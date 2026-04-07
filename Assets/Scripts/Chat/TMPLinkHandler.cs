@@ -1,0 +1,30 @@
+using UnityEngine;
+using UnityEngine.EventSystems;
+using TMPro;
+
+[RequireComponent(typeof(TextMeshProUGUI))]
+public class TMPLinkHandler : MonoBehaviour, IPointerClickHandler
+{
+    private TextMeshProUGUI textMeshPro;
+
+    void Awake()
+    {
+        textMeshPro = GetComponent<TextMeshProUGUI>();
+    }
+
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        // Protect against accidental clicks while scrolling!
+        if (ScrollClickBlocker.IsBlocking) return;
+
+        // Ask TMP if the exact pixel the user touched contains a <link> tag
+        int linkIndex = TMP_TextUtilities.FindIntersectingLink(textMeshPro, eventData.position, eventData.pressEventCamera);
+        
+        if (linkIndex != -1)
+        {
+            // Grab the URL from the tag and open the phone's web browser!
+            TMP_LinkInfo linkInfo = textMeshPro.textInfo.linkInfo[linkIndex];
+            Application.OpenURL(linkInfo.GetLinkID());
+        }
+    }
+}

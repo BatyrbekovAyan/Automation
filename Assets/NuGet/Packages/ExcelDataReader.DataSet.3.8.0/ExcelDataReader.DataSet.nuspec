@@ -1,0 +1,31 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+    <id>ExcelDataReader.DataSet</id>
+    <version>3.8.0</version>
+    <authors>ExcelDataReader developers</authors>
+    <license type="expression">MIT</license>
+    <licenseUrl>https://licenses.nuget.org/MIT</licenseUrl>
+    <icon>ExcelDataReader.png</icon>
+    <readme>README.md</readme>
+    <projectUrl>https://github.com/ExcelDataReader/ExcelDataReader</projectUrl>
+    <description>ExcelDataReader extension for reading Microsoft Excel files into System.Data.DataSet.</description>
+    <tags>excel xls xlsx dataset</tags>
+    <repository type="git" url="https://github.com/ExcelDataReader/ExcelDataReader.git" commit="4de9116c9b13ebe71cc5ec40374fe6b7e9d91730" />
+    <dependencies>
+      <group targetFramework=".NETFramework4.6.2">
+        <dependency id="ExcelDataReader" version="3.8.0" exclude="Build,Analyzers" />
+        <dependency id="System.ValueTuple" version="4.5.0" exclude="Build,Analyzers" />
+      </group>
+      <group targetFramework="net8.0">
+        <dependency id="ExcelDataReader" version="3.8.0" exclude="Build,Analyzers" />
+      </group>
+      <group targetFramework=".NETStandard2.0">
+        <dependency id="ExcelDataReader" version="3.8.0" exclude="Build,Analyzers" />
+      </group>
+      <group targetFramework=".NETStandard2.1">
+        <dependency id="ExcelDataReader" version="3.8.0" exclude="Build,Analyzers" />
+      </group>
+    </dependencies>
+  </metadata>
+</package>
