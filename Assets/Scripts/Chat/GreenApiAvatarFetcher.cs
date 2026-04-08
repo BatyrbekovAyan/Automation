@@ -14,10 +14,9 @@ public class AvatarResponse
 
 public class GreenApiAvatarFetcher : MonoBehaviour
 {
-    // Ensure this points to the European server (e.g., https://7103.api.greenapi.com)
-    private readonly string apiUrl = "https://7103.api.greenapi.com"; 
-    private readonly string idInstance = "7103531658";
-    private readonly string apiTokenInstance = "d389990e731d4d8792b60d92d35a7f068a1e0d3b89d7448d95";
+    private string apiUrl => Secrets.Data.greenApiAvatar.apiUrl;
+    private string idInstance => Secrets.Data.greenApiAvatar.idInstance;
+    private string apiTokenInstance => Secrets.Data.greenApiAvatar.apiTokenInstance;
 
     // We use Actions to pass the result back when the coroutine finishes
     public IEnumerator GetChatAvatar(string targetChatId, Action<Texture2D> onSuccess, Action<string> onError)

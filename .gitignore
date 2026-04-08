@@ -48,3 +48,6 @@ mono_crash.*
 
 # UTMP
 .utmp/
+
+# Secrets
+Assets/StreamingAssets/secrets.json

@@ -8,7 +8,7 @@ using Newtonsoft.Json.Linq;
 public class WappiUnitySync : MonoBehaviour
 {
     [Header("Wappi Configuration")]
-    public string apiToken = "d25b07316f6053d594eb0c57c7eb7cc3f02b9de4";
+    public string apiToken = "";
     public string profileId = "39c779ea-57ff";
     public string chatId = "77022889848@c.us";
 
@@ -20,6 +20,8 @@ public class WappiUnitySync : MonoBehaviour
     public async void FetchHistory()
     {
         Debug.Log("--- Starting Wappi Sync ---");
+        if (string.IsNullOrEmpty(apiToken))
+            apiToken = Secrets.Data.wappiAuthToken;
         await GetChatHistory();
     }
 

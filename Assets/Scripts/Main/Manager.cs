@@ -96,12 +96,12 @@ public class Manager : MonoBehaviour
     private string whatsappProfileId = "-1";
     private string telegramProfileId = "-1";
 
-    public static string wappiAuthToken = "d25b07316f6053d594eb0c57c7eb7cc3f02b9de4";
-    public static string n8nAPIKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMDYzN2Y2MC1iMjM5LTQxNDgtYWI4MC0wYzQzZGQ0YjEzMDUiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzYxNjQwMjI5fQ.98DTiUc1iIV09b07gELVdd7Hm8DbjgoCXNZyyzZBzR4";
-    
-    private readonly string apiUrl = "https://4100.api.green-api.com";
-    private readonly string idInstance = "4100532367";
-    private readonly string apiTokenInstance = "ae6b05d11f8e4f09a80b5737ef58fd7f862f250abbcb4c8182";
+    public static string wappiAuthToken => Secrets.Data.wappiAuthToken;
+    public static string n8nAPIKey => Secrets.Data.n8nAPIKey;
+
+    private string apiUrl => Secrets.Data.greenApi.apiUrl;
+    private string idInstance => Secrets.Data.greenApi.idInstance;
+    private string apiTokenInstance => Secrets.Data.greenApi.apiTokenInstance;
 
     public static GameObject BotSettingsParentStatic;
     public static Manager Instance;
