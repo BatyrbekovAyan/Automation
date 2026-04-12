@@ -43,6 +43,9 @@ public class TabData
 
     [Tooltip("Icon sprite shown when this tab is ACTIVE (filled / coloured variant).")]
     public Sprite activeIcon;
+    
+    [Tooltip("Color of the Label text when this tab is ACTIVE (filled / coloured variant).")]
+    public Color activeLabelColor;
 }
 
 /// <summary>
@@ -66,10 +69,10 @@ public class BottomTabManager : MonoBehaviour
     [Tooltip("Add one TabData entry per tab, ordered left to right.")]
     [SerializeField] private List<TabData> tabs = new();
 
-    [Header("Colour Scheme")]
-    [Tooltip("Colour applied to the icon and label of the ACTIVE tab.")]
-    [SerializeField] private Color activeColor = new Color(0.07f, 0.53f, 0.45f); // WhatsApp teal
-
+    // [Header("Colour Scheme")]
+    // [Tooltip("Colour applied to the icon and label of the ACTIVE tab.")]
+    // [SerializeField] private Color activeColor = new Color(0.07f, 0.53f, 0.45f); // WhatsApp teal
+    
     [Tooltip("Colour applied to the icon and label of all INACTIVE tabs.")]
     [SerializeField] private Color inactiveColor = new Color(0.55f, 0.55f, 0.55f); // Muted gray
 
@@ -184,7 +187,7 @@ public class BottomTabManager : MonoBehaviour
     /// <param name="isActive">Whether to apply the active state.</param>
     private void ApplyTabState(TabData tab, bool isActive)
     {
-        Color targetColor = isActive ? activeColor : inactiveColor;
+        Color targetColor = isActive ? tab.activeLabelColor : inactiveColor;
 
         // --- Icon ---
         if (tab.iconImage != null)

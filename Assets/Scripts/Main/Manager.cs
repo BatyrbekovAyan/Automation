@@ -12,14 +12,8 @@ public class Manager : MonoBehaviour
 {
     #region
     [SerializeField] private GameObject MainPage;
-    [SerializeField] private GameObject Chanel;
-    [SerializeField] private GameObject Name;
     [SerializeField] private GameObject WhatsappAuth;
     [SerializeField] private GameObject TelegramAuth;
-    [SerializeField] private GameObject Business;
-    [SerializeField] private GameObject Summary;
-    [SerializeField] private GameObject SummaryChannelWhatsapp;
-    [SerializeField] private GameObject SummaryChennelTelegram;
     [SerializeField] private GameObject Confirmation;
     [SerializeField] private GameObject BotsPage;
     [SerializeField] private GameObject BotsParent;
@@ -38,22 +32,10 @@ public class Manager : MonoBehaviour
     [SerializeField] private GameObject TelegramCodeSendingMessage;
     [SerializeField] public GameObject LoadingPanel;
 
-    [SerializeField] private Button CreateBotButton;
-    [SerializeField] private Button ChanelContinueButton;
-    [SerializeField] private Button ChanelBackButton;
-    [SerializeField] private Button NameContinueButton;
-    [SerializeField] private Button NameBackButton;
     [SerializeField] private Button WhatsappAuthContinueButton;
     [SerializeField] private Button WhatsappAuthBackButton;
     [SerializeField] private Button TelegramAuthContinueButton;
     [SerializeField] private Button TelegramAuthBackButton;
-    [SerializeField] private Button BusinessContinueButton;
-    [SerializeField] private Button BusinessBackButton;
-    [SerializeField] private Button LaunchButton;
-    [SerializeField] private Button SummaryBackButton;
-    [SerializeField] private Button CancelButton;
-    [SerializeField] private Button ConfirmationContinueButton;
-    [SerializeField] private Button MyBotsButton;
     [SerializeField] private Button OpenWhatsappQRPanelButton;
     [SerializeField] private Button OpenWhatsappCodePanelButton;
     [SerializeField] private Button CloseWhatsappQRPanelButton;
@@ -67,20 +49,37 @@ public class Manager : MonoBehaviour
     [SerializeField] private Button SendTelegramCodeButton;
     [SerializeField] private Button SaveButton;
 
-    [SerializeField] private TMP_InputField BotNameInput;
     [SerializeField] private TMP_InputField WhatsappNumberInput;
     [SerializeField] private TMP_InputField TelegramNumberInput;
     [SerializeField] private TMP_InputField TelegramCodeInput;
-    [SerializeField] private TextMeshProUGUI SummaryBusinessType;
-    [SerializeField] private TextMeshProUGUI SummaryBotName;
-    [SerializeField] private TextMeshProUGUI SummaryWhatsappNumber;
-    [SerializeField] private TextMeshProUGUI SummaryTelegramNumber;
 
-    [SerializeField] private Toggle WhatsappToggle;
-    [SerializeField] private Toggle TelegramToggle;
     [SerializeField] private RawImage WhatsappQRCodeImage;
     [SerializeField] private RawImage TelegramQRCodeImage;
     [SerializeField] private List<Button> BusinessTypesList = new();
+
+    [Header("Add Bot Form")]
+    [SerializeField] private GameObject AddBotFormPage;
+    [SerializeField] private TextMeshProUGUI platformValueText;
+    [SerializeField] private GameObject platformWhatsappGroup;
+    [SerializeField] private GameObject platformTelegramGroup;
+    [SerializeField] private GameObject platformPlusSeparator;
+    [SerializeField] private TextMeshProUGUI botNameValueText;
+    [SerializeField] private TextMeshProUGUI businessTypeValueText;
+    [SerializeField] private TextMeshProUGUI descriptionValueText;
+    [SerializeField] private Button createBotFormButton;
+    [SerializeField] private GameObject platformSelectorPanel;
+    [SerializeField] private GameObject botNameInputPanel;
+    [SerializeField] private GameObject businessSelectorPanel;
+    [SerializeField] private GameObject descriptionInputPanel;
+    [SerializeField] private TMP_InputField botNamePopupInput;
+    [SerializeField] private TMP_InputField descriptionPopupInput;
+    [SerializeField] private Button platformRowButton;
+    [SerializeField] private Button botNameRowButton;
+    [SerializeField] private Button businessTypeRowButton;
+    [SerializeField] private Button descriptionRowButton;
+    [SerializeField] private Button whatsappOptionButton;
+    [SerializeField] private Button telegramOptionButton;
+    [SerializeField] private Button bothOptionButton;
 
     private GameObject businessType;
     private int id;
@@ -95,6 +94,16 @@ public class Manager : MonoBehaviour
 
     private string whatsappProfileId = "-1";
     private string telegramProfileId = "-1";
+
+    private int selectedPlatform; // 0=none, 1=WhatsApp, 2=Telegram, 3=Both
+    private string formBotName = "";
+    private string formDescription = "";
+    private bool businessTypeSelected;
+    private bool whatsappAuthCompleted;
+    private bool telegramAuthCompleted;
+    private bool isCreatingBot;
+    private Coroutine _whatsappStatusCoroutine;
+    private Coroutine _telegramStatusCoroutine;
 
     public static string wappiAuthToken => Secrets.Data.wappiAuthToken;
     public static string n8nAPIKey => Secrets.Data.n8nAPIKey;
@@ -151,196 +160,126 @@ public class Manager : MonoBehaviour
         EditTelegramWorkflowSaved = false;
         EnableTelegramWorkflowSaved = false;
 
-
         Instance = this;
-        // greenApiAvatarFetcher = GreenApi.GetComponent<GreenApiAvatarFetcher>();
 
-        if (CreateBotButton != null)
+        // Add Bot Form — row buttons
+        if (platformRowButton != null) platformRowButton.onClick.AddListener(OpenPlatformSelector);
+        if (botNameRowButton != null) botNameRowButton.onClick.AddListener(OpenBotNameInput);
+        if (businessTypeRowButton != null) businessTypeRowButton.onClick.AddListener(OpenBusinessSelector);
+        if (descriptionRowButton != null) descriptionRowButton.onClick.AddListener(OpenDescriptionInput);
+
+        // Add Bot Form — platform selector
+        if (whatsappOptionButton != null) whatsappOptionButton.onClick.AddListener(() => SelectPlatform(1));
+        if (telegramOptionButton != null) telegramOptionButton.onClick.AddListener(() => SelectPlatform(2));
+        if (bothOptionButton != null) bothOptionButton.onClick.AddListener(() => SelectPlatform(3));
+
+        // Add Bot Form — create button
+        if (createBotFormButton != null)
         {
-            CreateBotButton.onClick.AddListener(CreateBot);
+            createBotFormButton.onClick.AddListener(() => StartCoroutine(CreateBotFromForm()));
+            createBotFormButton.interactable = false;
         }
 
-        if (ChanelContinueButton != null)
-        {
-            ChanelContinueButton.onClick.AddListener(ChanelContinue);
-        }
-
-        if (ChanelBackButton != null)
-        {
-            ChanelBackButton.onClick.AddListener(ChanelBack);
-        }
-
-        if (NameContinueButton != null)
-        {
-            NameContinueButton.onClick.AddListener(NameContinue);
-        }
-
-        if (NameBackButton != null)
-        {
-            NameBackButton.onClick.AddListener(NameBack);
-        }
-
-        if (BusinessContinueButton != null)
-        {
-            BusinessContinueButton.onClick.AddListener(BusinessContinue);
-        }
-
-        if (BusinessBackButton != null)
-        {
-            BusinessBackButton.onClick.AddListener(BusinessBack);
-        }
-
-        if (LaunchButton != null)
-        {
-            LaunchButton.onClick.AddListener(Launch);
-        }
-
-        if (SummaryBackButton != null)
-        {
-            SummaryBackButton.onClick.AddListener(SummaryBack);
-        }
-
-        if (CancelButton != null)
-        {
-            CancelButton.onClick.AddListener(CancelLaunch);
-        }
-
-        if (ConfirmationContinueButton != null)
-        {
-            ConfirmationContinueButton.onClick.AddListener(ConfirmationContinue);
-        }
-
-        if (MyBotsButton != null)
-        {
-            MyBotsButton.onClick.AddListener(OpenMyBots);
-        }
-
-
+        // Auth panels — WhatsApp
         if (WhatsappAuthContinueButton != null)
         {
-            WhatsappAuthContinueButton.onClick.AddListener(WhatsappAuthContinue);
+            WhatsappAuthContinueButton.onClick.AddListener(() =>
+            {
+                whatsappAuthCompleted = true;
+                WhatsappAuth.SetActive(false);
+            });
         }
+        if (WhatsappAuthBackButton != null) WhatsappAuthBackButton.onClick.AddListener(CancelBotCreation);
 
-        if (WhatsappAuthBackButton != null)
-        {
-            WhatsappAuthBackButton.onClick.AddListener(WhatsappAuthBack);
-        }
+        if (OpenWhatsappQRPanelButton != null) OpenWhatsappQRPanelButton.onClick.AddListener(() => StartCoroutine(OpenWhatsappQRPanel()));
+        if (OpenWhatsappCodePanelButton != null) OpenWhatsappCodePanelButton.onClick.AddListener(OpenWhatsappCodePanel);
+        if (CloseWhatsappQRPanelButton != null) CloseWhatsappQRPanelButton.onClick.AddListener(CloseWhatsappQRPanel);
+        if (CloseWhatsappCodePanelButton != null) CloseWhatsappCodePanelButton.onClick.AddListener(CloseWhatsappCodePanel);
+        if (GetWhatsappCodeButton != null) GetWhatsappCodeButton.onClick.AddListener(() => StartCoroutine(GetWhatsappCode()));
 
-        if (OpenWhatsappQRPanelButton != null)
-        {
-            OpenWhatsappQRPanelButton.onClick.AddListener(() => StartCoroutine(OpenWhatsappQRPanel()));
-        }
-
-        if (OpenWhatsappCodePanelButton != null)
-        {
-            OpenWhatsappCodePanelButton.onClick.AddListener(OpenWhatsappCodePanel);
-        }
-
-        if (CloseWhatsappQRPanelButton != null)
-        {
-            CloseWhatsappQRPanelButton.onClick.AddListener(CloseWhatsappQRPanel);
-        }
-
-        if (CloseWhatsappCodePanelButton != null)
-        {
-            CloseWhatsappCodePanelButton.onClick.AddListener(CloseWhatsappCodePanel);
-        }
-
-        if (GetWhatsappCodeButton != null)
-        {
-            GetWhatsappCodeButton.onClick.AddListener(() => StartCoroutine(GetWhatsappCode()));
-        }
-
-
+        // Auth panels — Telegram
         if (TelegramAuthContinueButton != null)
         {
-            TelegramAuthContinueButton.onClick.AddListener(TelegramAuthContinue);
+            TelegramAuthContinueButton.onClick.AddListener(() =>
+            {
+                telegramAuthCompleted = true;
+                TelegramAuth.SetActive(false);
+            });
         }
+        if (TelegramAuthBackButton != null) TelegramAuthBackButton.onClick.AddListener(CancelBotCreation);
 
-        if (TelegramAuthBackButton != null)
-        {
-            TelegramAuthBackButton.onClick.AddListener(TelegramAuthBack);
-        }
+        if (OpenTelegramQRPanelButton != null) OpenTelegramQRPanelButton.onClick.AddListener(() => StartCoroutine(OpenTelegramQRPanel()));
+        if (OpenTelegramCodePanelButton != null) OpenTelegramCodePanelButton.onClick.AddListener(OpenTelegramCodePanel);
+        if (CloseTelegramQRPanelButton != null) CloseTelegramQRPanelButton.onClick.AddListener(CloseTelegramQRPanel);
+        if (CloseTelegramCodePanelButton != null) CloseTelegramCodePanelButton.onClick.AddListener(CloseTelegramCodePanel);
+        if (GetTelegramCodeButton != null) GetTelegramCodeButton.onClick.AddListener(() => StartCoroutine(GetTelegramCode()));
+        if (SendTelegramCodeButton != null) SendTelegramCodeButton.onClick.AddListener(() => StartCoroutine(SendTelegramCode()));
 
-        if (OpenTelegramQRPanelButton != null)
-        {
-            OpenTelegramQRPanelButton.onClick.AddListener(() => StartCoroutine(OpenTelegramQRPanel()));
-        }
+        // Auth input fields
+        if (WhatsappNumberInput != null) WhatsappNumberInput.onValueChanged.AddListener(WhatsappNumberInputChanged);
+        if (TelegramNumberInput != null) TelegramNumberInput.onValueChanged.AddListener(TelegramNumberInputChanged);
+        if (TelegramCodeInput != null) TelegramCodeInput.onValueChanged.AddListener(TelegramCodeInputChanged);
 
-        if (OpenTelegramCodePanelButton != null)
-        {
-            OpenTelegramCodePanelButton.onClick.AddListener(OpenTelegramCodePanel);
-        }
-
-        if (CloseTelegramQRPanelButton != null)
-        {
-            CloseTelegramQRPanelButton.onClick.AddListener(CloseTelegramQRPanel);
-        }
-
-        if (CloseTelegramCodePanelButton != null)
-        {
-            CloseTelegramCodePanelButton.onClick.AddListener(CloseTelegramCodePanel);
-        }
-
-        if (GetTelegramCodeButton != null)
-        {
-            GetTelegramCodeButton.onClick.AddListener(() => StartCoroutine(GetTelegramCode()));
-        }
-
-        if (SendTelegramCodeButton != null)
-        {
-            SendTelegramCodeButton.onClick.AddListener(() => StartCoroutine(SendTelegramCode()));
-        }
-
-
-        if (BotNameInput != null)
-        {
-            BotNameInput.onValueChanged.AddListener(BotNameInputChanged);
-        }
-
-        if (WhatsappNumberInput != null)
-        {
-            WhatsappNumberInput.onValueChanged.AddListener(WhatsappNumberInputChanged);
-        }
-
-        if (TelegramNumberInput != null)
-        {
-            TelegramNumberInput.onValueChanged.AddListener(TelegramNumberInputChanged);
-        }
-
-        if (TelegramCodeInput != null)
-        {
-            TelegramCodeInput.onValueChanged.AddListener(TelegramCodeInputChanged);
-        }
-
-        if (WhatsappToggle != null)
-        {
-            WhatsappToggle.onValueChanged.AddListener(ChannelToggleChanged);
-        }
-
-        if (TelegramToggle != null)
-        {
-            TelegramToggle.onValueChanged.AddListener(ChannelToggleChanged);
-        }
-
+        // Business type buttons
         foreach (Button business in BusinessTypesList)
         {
             business.onClick.AddListener(() => ChooseBusiness(business));
         }
 
+        // Other
+        if (ChatsButton != null) ChatsButton.onClick.AddListener(OpenChatsPanel);
+        if (SettingsButton != null) SettingsButton.onClick.AddListener(() => StartCoroutine(GetWhatsappMesseges()));
 
+        // Initialize popups as hidden
+        if (platformSelectorPanel != null) platformSelectorPanel.SetActive(false);
+        if (botNameInputPanel != null) botNameInputPanel.SetActive(false);
+        if (businessSelectorPanel != null) businessSelectorPanel.SetActive(false);
+        if (descriptionInputPanel != null) descriptionInputPanel.SetActive(false);
 
-        if (ChatsButton != null)
+        // Wire overlay background tap + close button (✕) to dismiss popups
+        if (platformSelectorPanel != null)
         {
-            // QR.onClick.AddListener(() => StartCoroutine(SendToTelegram("salammm")));
-            // QR.onClick.AddListener(() => StartCoroutine(GetWhatsappMesseges()));
-            ChatsButton.onClick.AddListener(OpenChatsPanel);
+            Button overlayBtn = platformSelectorPanel.GetComponent<Button>();
+            if (overlayBtn != null) overlayBtn.onClick.AddListener(ClosePlatformSelector);
+            Button closeBtn = platformSelectorPanel.transform.Find("Content/CloseButton")?.GetComponent<Button>();
+            if (closeBtn != null) closeBtn.onClick.AddListener(ClosePlatformSelector);
+        }
+        if (botNameInputPanel != null)
+        {
+            Button overlayBtn = botNameInputPanel.GetComponent<Button>();
+            if (overlayBtn != null) overlayBtn.onClick.AddListener(CloseBotNameInput);
+            Button closeBtn = botNameInputPanel.transform.Find("Content/CloseButton")?.GetComponent<Button>();
+            if (closeBtn != null) closeBtn.onClick.AddListener(CloseBotNameInput);
+        }
+        if (businessSelectorPanel != null)
+        {
+            Button overlayBtn = businessSelectorPanel.GetComponent<Button>();
+            if (overlayBtn != null) overlayBtn.onClick.AddListener(CloseBusinessSelector);
+            Button closeBtn = businessSelectorPanel.transform.Find("Content/CloseButton")?.GetComponent<Button>();
+            if (closeBtn != null) closeBtn.onClick.AddListener(CloseBusinessSelector);
+        }
+        if (descriptionInputPanel != null)
+        {
+            Button overlayBtn = descriptionInputPanel.GetComponent<Button>();
+            if (overlayBtn != null) overlayBtn.onClick.AddListener(CloseDescriptionInput);
+            Button closeBtn = descriptionInputPanel.transform.Find("Content/CloseButton")?.GetComponent<Button>();
+            if (closeBtn != null) closeBtn.onClick.AddListener(CloseDescriptionInput);
         }
 
-        if (SettingsButton != null)
+        // Wire popup confirm/cancel buttons by name
+        if (botNameInputPanel != null)
         {
-            SettingsButton.onClick.AddListener(() => StartCoroutine(GetWhatsappMesseges()));
-            // SettingsButton.onClick.AddListener(LoadUserAvatar);
+            Button confirmName = botNameInputPanel.transform.Find("Content/ConfirmButton")?.GetComponent<Button>();
+            Button cancelName = botNameInputPanel.transform.Find("Content/CancelButton")?.GetComponent<Button>();
+            if (confirmName != null) confirmName.onClick.AddListener(ConfirmBotName);
+            if (cancelName != null) cancelName.onClick.AddListener(CloseBotNameInput);
+        }
+        if (descriptionInputPanel != null)
+        {
+            Button confirmDesc = descriptionInputPanel.transform.Find("Content/ConfirmButton")?.GetComponent<Button>();
+            Button cancelDesc = descriptionInputPanel.transform.Find("Content/CancelButton")?.GetComponent<Button>();
+            if (confirmDesc != null) confirmDesc.onClick.AddListener(ConfirmDescription);
+            if (cancelDesc != null) cancelDesc.onClick.AddListener(CloseDescriptionInput);
         }
     }
 
@@ -648,234 +587,214 @@ public class Manager : MonoBehaviour
         BotsPage.SetActive(true);
     }
 
-    public void CreateBot()
+    // ── Add Bot Form — Popup Controllers ──
+
+    public void OpenPlatformSelector()
     {
-        MainPage.SetActive(false);
-        Chanel.SetActive(true);
+        platformSelectorPanel.SetActive(true);
     }
 
-    public void ChanelBack()
+    public void ClosePlatformSelector()
     {
-        Chanel.SetActive(false);
-        MainPage.SetActive(true);
-
-        WhatsappToggle.isOn = true;
-        TelegramToggle.isOn = true;
+        platformSelectorPanel.SetActive(false);
     }
 
-    public void ChannelToggleChanged(bool isOn)
+    public void SelectPlatform(int mode)
     {
-        if (WhatsappToggle.isOn || TelegramToggle.isOn)
+        selectedPlatform = mode;
+
+        bool showWa = mode == 1 || mode == 3;
+        bool showTg = mode == 2 || mode == 3;
+
+        if (platformWhatsappGroup != null) platformWhatsappGroup.SetActive(showWa);
+        if (platformTelegramGroup != null) platformTelegramGroup.SetActive(showTg);
+        if (platformPlusSeparator != null) platformPlusSeparator.SetActive(mode == 3);
+
+        // Hide placeholder ValueText — each group carries its own colored label
+        if (platformValueText != null) platformValueText.gameObject.SetActive(false);
+
+        // Force immediate layout rebuild — nested CSF + HLG chains don't resolve on
+        // the same frame a previously-inactive child becomes active, so the first
+        // selection would show the icon/label overlapping until the next change.
+        RectTransform platformIconContainer = null;
+        if (platformWhatsappGroup != null)
+            platformIconContainer = platformWhatsappGroup.transform.parent as RectTransform;
+        else if (platformTelegramGroup != null)
+            platformIconContainer = platformTelegramGroup.transform.parent as RectTransform;
+        if (platformIconContainer != null)
         {
-            ChanelContinueButton.interactable = true;
+            LayoutRebuilder.ForceRebuildLayoutImmediate(platformIconContainer);
+            if (platformIconContainer.parent is RectTransform rowRt)
+                LayoutRebuilder.ForceRebuildLayoutImmediate(rowRt);
         }
-        else
-        {
-            ChanelContinueButton.interactable = false;
-        }
+
+        ClosePlatformSelector();
+        ValidateCreateForm();
     }
 
-    public void ChanelContinue()
+    public void OpenBotNameInput()
     {
-        Chanel.SetActive(false);
-        Name.SetActive(true);
-
-        BotNameInput.caretPosition = BotNameInput.text.Length;
-        BotNameInput.ActivateInputField();
-    }
-
-    public void NameBack()
-    {
-        Name.SetActive(false);
-        Chanel.SetActive(true);
-
-        BotNameInput.text = "";
-    }
-
-    public void BotNameInputChanged(string newText)
-    {
-        if (string.IsNullOrEmpty(newText))
+        botNameInputPanel.SetActive(true);
+        if (botNamePopupInput != null)
         {
-            NameContinueButton.interactable = false;
-        }
-        else
-        {
-            NameContinueButton.interactable = true;
-        }
-    }
-
-    public void NameContinue()
-    {
-        Name.SetActive(false);
-
-        if (WhatsappToggle.isOn)
-        {
-            WhatsappAuth.SetActive(true);
-
-            PlayerPrefs.SetString("WhatsappCooldownFinishTime", "-1");
-            WhatsappCodeTimer.SetActive(false);
-
-            StartCoroutine(CreateWhatsappProfile(BotNameInput.text, true));
-        }
-        else if (TelegramToggle.isOn)
-        {
-            TelegramAuth.SetActive(true);
-
-            PlayerPrefs.SetString("TelegramCooldownFinishTime", "-1");
-            TelegramCodeTimer.SetActive(false);
-
-            StartCoroutine(CreateTelegramProfile(BotNameInput.text, true));
+            botNamePopupInput.text = formBotName;
+            botNamePopupInput.ActivateInputField();
         }
     }
 
-    public void WhatsappAuthBack()
+    public void CloseBotNameInput()
     {
-        WhatsappAuth.SetActive(false);
-        Name.SetActive(true);
-
-        BotNameInput.caretPosition = BotNameInput.text.Length;
-        BotNameInput.ActivateInputField();
-
-        WhatsappNumberInput.text = "";
-        WhatsappAuthContinueButton.interactable = false;
-
-        StartCoroutine(DeleteWhatsappProfile(whatsappProfileId, true));
+        botNameInputPanel.SetActive(false);
     }
 
-    public void WhatsappAuthContinue()
+    public void ConfirmBotName()
     {
-        WhatsappAuth.SetActive(false);
-
-        if (TelegramToggle.isOn)
+        if (botNamePopupInput != null && !string.IsNullOrEmpty(botNamePopupInput.text))
         {
-            TelegramAuth.SetActive(true);
-
-            PlayerPrefs.SetString("TelegramCooldownFinishTime", "-1");
-            TelegramCodeTimer.SetActive(false);
-
-            StartCoroutine(CreateTelegramProfile(BotNameInput.text, true));
+            formBotName = botNamePopupInput.text.Trim();
+            botNameValueText.text = formBotName;
+            botNameValueText.color = new Color32(28, 28, 30, 255); // --text-primary
         }
-        else
-        {
-            Business.SetActive(true);
-        }
+
+        CloseBotNameInput();
+        ValidateCreateForm();
     }
 
-    public void TelegramAuthBack()
+    public void OpenBusinessSelector()
     {
-        TelegramAuth.SetActive(false);
-
-        if (WhatsappToggle.isOn)
-        {
-            WhatsappAuth.SetActive(true);
-        }
-        else
-        {
-            Name.SetActive(true);
-
-            BotNameInput.caretPosition = BotNameInput.text.Length;
-            BotNameInput.ActivateInputField();
-        }
-
-        TelegramNumberInput.text = "";
-        TelegramAuthContinueButton.interactable = false;
-
-        StartCoroutine(DeleteTelegramProfile(telegramProfileId, true));
+        businessSelectorPanel.SetActive(true);
     }
 
-    public void TelegramAuthContinue()
+    public void CloseBusinessSelector()
     {
-        TelegramAuth.SetActive(false);
-        Business.SetActive(true);
-    }
-
-    public void BusinessBack()
-    {
-        Business.SetActive(false);
-
-        if (TelegramToggle.isOn)
-        {
-            TelegramAuth.SetActive(true);
-        }
-        else if (WhatsappToggle.isOn)
-        {
-            WhatsappAuth.SetActive(true);
-        }
-
-        businessType = BusinessTypesList[0].gameObject;
-        BusinessContinueButton.interactable = false;
-
-        foreach (Button business in BusinessTypesList)
-        {
-            business.gameObject.GetComponent<Image>().color = businessButtonDefaultColor;
-        }
+        businessSelectorPanel.SetActive(false);
     }
 
     public void ChooseBusiness(Button chosenBusiness)
     {
         businessType = chosenBusiness.gameObject;
-        BusinessContinueButton.interactable = true;
+        businessTypeSelected = true;
 
         foreach (Button business in BusinessTypesList)
         {
             business.gameObject.GetComponent<Image>().color = businessButtonDefaultColor;
         }
-
         chosenBusiness.gameObject.GetComponent<Image>().color = Color.green;
+
+        if (businessTypeValueText != null)
+        {
+            businessTypeValueText.text = chosenBusiness.gameObject.name;
+            businessTypeValueText.color = new Color32(28, 28, 30, 255);
+        }
+
+        CloseBusinessSelector();
+        ValidateCreateForm();
     }
 
-    public void BusinessContinue()
+    public void OpenDescriptionInput()
     {
-        Business.SetActive(false);
-        Summary.SetActive(true);
-
-        Summarize();
-    }
-
-    public void Summarize()
-    {
-        SummaryChannelWhatsapp.SetActive(WhatsappToggle.isOn);
-        SummaryWhatsappNumber.transform.parent.gameObject.SetActive(WhatsappToggle.isOn);
-
-        SummaryChennelTelegram.SetActive(TelegramToggle.isOn);
-        SummaryTelegramNumber.transform.parent.gameObject.SetActive(TelegramToggle.isOn);
-
-        if (BotNameInput != null)
+        descriptionInputPanel.SetActive(true);
+        if (descriptionPopupInput != null)
         {
-            SummaryBotName.text = BotNameInput.text;
-        }
-
-        if (WhatsappToggle.isOn && WhatsappNumberInput != null)
-        {
-            SummaryWhatsappNumber.text = WhatsappNumberInput.text;
-        }
-
-        if (TelegramToggle.isOn && TelegramNumberInput != null)
-        {
-            SummaryTelegramNumber.text = TelegramNumberInput.text;
-        }
-
-        if (businessType != null)
-        {
-            SummaryBusinessType.text = businessType.name;
+            descriptionPopupInput.text = formDescription;
+            descriptionPopupInput.ActivateInputField();
         }
     }
 
-    public void SummaryBack()
+    public void CloseDescriptionInput()
     {
-        Summary.SetActive(false);
-        Business.SetActive(true);
+        descriptionInputPanel.SetActive(false);
     }
 
-    public void Launch()
+    public void ConfirmDescription()
     {
-        Summary.SetActive(false);
-        Confirmation.SetActive(true);
+        if (descriptionPopupInput != null)
+        {
+            formDescription = descriptionPopupInput.text.Trim();
+            if (!string.IsNullOrEmpty(formDescription))
+            {
+                descriptionValueText.text = formDescription;
+                descriptionValueText.color = new Color32(28, 28, 30, 255);
+            }
+            else
+            {
+                descriptionValueText.text = "Необязательно";
+                descriptionValueText.color = new Color32(199, 199, 204, 255); // --text-tertiary
+            }
+        }
 
+        CloseDescriptionInput();
+    }
+
+    // ── Form Validation ──
+
+    private void ValidateCreateForm()
+    {
+        bool isValid = selectedPlatform > 0
+                    && !string.IsNullOrEmpty(formBotName)
+                    && businessTypeSelected;
+
+        if (createBotFormButton != null)
+        {
+            createBotFormButton.interactable = isValid;
+        }
+    }
+
+    // ── Bot Creation Flow ──
+
+    private IEnumerator CreateBotFromForm()
+    {
+        isCreatingBot = true;
+        whatsappAuthCompleted = false;
+        telegramAuthCompleted = false;
+        whatsappProfileId = "-1";
+        telegramProfileId = "-1";
+        createBotFormButton.interactable = false;
+
+        bool useWhatsapp = selectedPlatform == 1 || selectedPlatform == 3;
+        bool useTelegram = selectedPlatform == 2 || selectedPlatform == 3;
+
+        // Step 1: Create WhatsApp profile and authenticate
+        if (useWhatsapp)
+        {
+            yield return StartCoroutine(CreateWhatsappProfile(formBotName, true));
+            if (!isCreatingBot) yield break;
+
+            WhatsappAuth.SetActive(true);
+            WhatsappAuthContinueButton.interactable = false;
+            PlayerPrefs.SetString("WhatsappCooldownFinishTime", "-1");
+            WhatsappCodeTimer.SetActive(false);
+
+            while (!whatsappAuthCompleted)
+            {
+                if (!isCreatingBot) yield break;
+                yield return new WaitForSeconds(0.5f);
+            }
+        }
+
+        // Step 2: Create Telegram profile and authenticate
+        if (useTelegram)
+        {
+            yield return StartCoroutine(CreateTelegramProfile(formBotName, true));
+            if (!isCreatingBot) yield break;
+
+            TelegramAuth.SetActive(true);
+            TelegramAuthContinueButton.interactable = false;
+            PlayerPrefs.SetString("TelegramCooldownFinishTime", "-1");
+            TelegramCodeTimer.SetActive(false);
+
+            while (!telegramAuthCompleted)
+            {
+                if (!isCreatingBot) yield break;
+                yield return new WaitForSeconds(0.5f);
+            }
+        }
+
+        // Step 3: Instantiate bot
         GameObject newBot = Instantiate(BotPrefab, BotPrefab.transform.position, BotPrefab.transform.rotation, BotsParent.transform);
         newBot.name = "Bot" + id.ToString();
 
-        newBot.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = BotNameInput.text;
+        newBot.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = formBotName;
         newBot.transform.GetChild(1).GetComponent<Toggle>().isOn = true;
         newBot.transform.GetChild(2).GetComponent<TextMeshProUGUI>().text = "Connecting..";
         newBot.GetComponent<Bot>().active = false;
@@ -884,20 +803,19 @@ public class Manager : MonoBehaviour
         newBot.GetComponent<Bot>().whatsappProfileId = whatsappProfileId;
         newBot.GetComponent<Bot>().telegramProfileId = telegramProfileId;
 
-        BotSettings newBotSettings = Instantiate(BotSettings, new Vector3(BotSettings.transform.position.x + Screen.width / 2, BotSettings.transform.position.y + Screen.height / 2, 0), BotSettings.transform.rotation, BotSettingsParent.transform).GetComponent<BotSettings>();
+        BotSettings newBotSettings = Instantiate(BotSettings, new Vector3(BotSettings.transform.position.x + Screen.width / 2, BotSettings.transform.position.y + Screen.height / 2, 0), BotSettings.transform.rotation, BotSettingsParentStatic.transform).GetComponent<BotSettings>();
 
-        newBotSettings.BotNameButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = BotNameInput.text;
-        newBotSettings.WhatsappToggle.isOn = WhatsappToggle.isOn;
-        newBotSettings.TelegramToggle.isOn = TelegramToggle.isOn;
+        newBotSettings.BotNameButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = formBotName;
+        newBotSettings.WhatsappToggle.isOn = useWhatsapp;
+        newBotSettings.TelegramToggle.isOn = useTelegram;
         newBotSettings.BusinessTypeDropdown.value = businessType.transform.GetSiblingIndex();
-        newBotSettings.WhatsappNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = WhatsappNumberInput.text;
-        newBotSettings.TelegramNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = TelegramNumberInput.text;
+        newBotSettings.WhatsappNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = useWhatsapp ? WhatsappNumberInput.text : "";
+        newBotSettings.TelegramNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = useTelegram ? TelegramNumberInput.text : "";
+        newBotSettings.WhatsappNumberButton.transform.parent.gameObject.SetActive(useWhatsapp && !string.IsNullOrEmpty(WhatsappNumberInput.text));
+        newBotSettings.TelegramNumberButton.transform.parent.gameObject.SetActive(useTelegram && !string.IsNullOrEmpty(TelegramNumberInput.text));
 
-        newBotSettings.WhatsappNumberButton.transform.parent.gameObject.SetActive(!newBotSettings.WhatsappNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(""));
-        newBotSettings.TelegramNumberButton.transform.parent.gameObject.SetActive(!newBotSettings.TelegramNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(""));
-
-
-        if (WhatsappToggle.isOn)
+        // Step 4: Create workflows
+        if (useWhatsapp)
         {
             StartCoroutine(CreateWhatsappWorkflowFromStart(newBot));
         }
@@ -907,7 +825,7 @@ public class Manager : MonoBehaviour
             PlayerPrefs.SetString(newBot.name + "WhatsappWorkflowId", "-1");
         }
 
-        if (TelegramToggle.isOn)
+        if (useTelegram)
         {
             StartCoroutine(CreateTelegramWorkflowFromStart(newBot));
         }
@@ -917,82 +835,91 @@ public class Manager : MonoBehaviour
             PlayerPrefs.SetString(newBot.name + "TelegramWorkflowId", "-1");
         }
 
-
-        PlayerPrefs.SetString(newBot.name + "Name", BotNameInput.text);
+        // Step 5: Save to PlayerPrefs
+        PlayerPrefs.SetString(newBot.name + "Name", formBotName);
         PlayerPrefs.SetInt(newBot.name + "isOn", 1);
         PlayerPrefs.SetString(newBot.name + "Status", "Connecting..");
         PlayerPrefs.SetInt(newBot.name + "Active", 0);
-
-        PlayerPrefs.SetInt(newBot.name + "isOnWhatsapp", WhatsappToggle.isOn ? 1 : 0);
-        PlayerPrefs.SetInt(newBot.name + "isOnTelegram", TelegramToggle.isOn ? 1 : 0);
+        PlayerPrefs.SetInt(newBot.name + "isOnWhatsapp", useWhatsapp ? 1 : 0);
+        PlayerPrefs.SetInt(newBot.name + "isOnTelegram", useTelegram ? 1 : 0);
         PlayerPrefs.SetInt(newBot.name + "BusinessType", businessType.transform.GetSiblingIndex());
-        PlayerPrefs.SetString(newBot.name + "WhatsappNumber", WhatsappNumberInput.text);
-        PlayerPrefs.SetString(newBot.name + "TelegramNumber", TelegramNumberInput.text);
-
+        PlayerPrefs.SetString(newBot.name + "WhatsappNumber", useWhatsapp ? WhatsappNumberInput.text : "");
+        PlayerPrefs.SetString(newBot.name + "TelegramNumber", useTelegram ? TelegramNumberInput.text : "");
 
         PlayerPrefs.SetInt("ids", ++id);
         PlayerPrefs.Save();
 
+        // Step 6: Reset form and navigate to bots tab
+        ResetAddBotForm();
+        isCreatingBot = false;
 
-        WhatsappToggle.isOn = true;
-        TelegramToggle.isOn = true;
-        BotNameInput.text = "";
-        WhatsappNumberInput.text = "";
-        TelegramNumberInput.text = "";
-        businessType = BusinessTypesList[0].gameObject;
-        WhatsappAuthContinueButton.interactable = false;
-        TelegramAuthContinueButton.interactable = false;
-        BusinessContinueButton.interactable = false;
-
-        foreach (Button business in BusinessTypesList)
+        BottomTabManager tabManager = FindObjectOfType<BottomTabManager>();
+        if (tabManager != null)
         {
-            business.gameObject.GetComponent<Image>().color = businessButtonDefaultColor;
+            tabManager.SwitchTab(3);
         }
-
-
-
-        //StartCoroutine(SendToTelegram("Запрос на новую автоматизацию!" + "\nTelegram: " + TelegramToggle.isOn + "\nWhatsApp: " + WhatsappToggle.isOn
-        //    + "\nBusiness: " + SummaryBusinessText.text + "\nBot Name: " + SummaryBotNameText.text + "\nNumber: " + SummaryNumberText.text));
     }
 
-    public void CancelLaunch()
+    private void CancelBotCreation()
     {
-        Summary.SetActive(false);
-        MainPage.SetActive(true);
+        isCreatingBot = false;
+        WhatsappAuth.SetActive(false);
+        TelegramAuth.SetActive(false);
 
-        if (WhatsappToggle.isOn)
+        if (!whatsappProfileId.Equals("-1"))
         {
             StartCoroutine(DeleteWhatsappProfile(whatsappProfileId, true));
         }
-
-        if (TelegramToggle.isOn)
+        if (!telegramProfileId.Equals("-1"))
         {
             StartCoroutine(DeleteTelegramProfile(telegramProfileId, true));
         }
 
-        WhatsappToggle.isOn = true;
-        TelegramToggle.isOn = true;
-        BotNameInput.text = "";
-        WhatsappNumberInput.text = "";
-        TelegramNumberInput.text = "";
+        ValidateCreateForm();
+    }
+
+    private void ResetAddBotForm()
+    {
+        selectedPlatform = 0;
+        formBotName = "";
+        formDescription = "";
+        businessTypeSelected = false;
         businessType = BusinessTypesList[0].gameObject;
-        WhatsappAuthContinueButton.interactable = false;
-        TelegramAuthContinueButton.interactable = false;
-        BusinessContinueButton.interactable = false;
+
+        if (platformValueText != null)
+        {
+            platformValueText.text = "Выберите";
+            platformValueText.color = new Color32(142, 142, 147, 255);
+            platformValueText.gameObject.SetActive(true);
+        }
+        if (platformWhatsappGroup != null) platformWhatsappGroup.SetActive(false);
+        if (platformTelegramGroup != null) platformTelegramGroup.SetActive(false);
+        if (platformPlusSeparator != null) platformPlusSeparator.SetActive(false);
+        if (botNameValueText != null)
+        {
+            botNameValueText.text = "Введите имя";
+            botNameValueText.color = new Color32(142, 142, 147, 255);
+        }
+        if (businessTypeValueText != null)
+        {
+            businessTypeValueText.text = "Выберите тип";
+            businessTypeValueText.color = new Color32(142, 142, 147, 255);
+        }
+        if (descriptionValueText != null)
+        {
+            descriptionValueText.text = "Необязательно";
+            descriptionValueText.color = new Color32(199, 199, 204, 255);
+        }
+
+        if (WhatsappNumberInput != null) WhatsappNumberInput.text = "";
+        if (TelegramNumberInput != null) TelegramNumberInput.text = "";
 
         foreach (Button business in BusinessTypesList)
         {
             business.gameObject.GetComponent<Image>().color = businessButtonDefaultColor;
         }
-    }
 
-    public void ConfirmationContinue()
-    {
-        Confirmation.SetActive(false);
-        BotsPage.SetActive(true);
-
-        Confirmation.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = "";
-        Confirmation.transform.GetChild(1).GetComponent<TextMeshProUGUI>().text = "";
+        if (createBotFormButton != null) createBotFormButton.interactable = false;
     }
 
 
@@ -1066,7 +993,8 @@ public class Manager : MonoBehaviour
                     WhatsappQRCodeImage.texture = texture;
                 }
 
-                StartCoroutine(GetWhatsappProfileStatus());
+                if (_whatsappStatusCoroutine != null) StopCoroutine(_whatsappStatusCoroutine);
+                _whatsappStatusCoroutine = StartCoroutine(GetWhatsappProfileStatus());
             }
         }
 
@@ -1102,7 +1030,8 @@ public class Manager : MonoBehaviour
                 // Optionally update UI to say "Already Connected" here
                 
                 // Proceed directly to status checking to finalize the UI state
-                StartCoroutine(GetWhatsappProfileStatus());
+                if (_whatsappStatusCoroutine != null) StopCoroutine(_whatsappStatusCoroutine);
+                _whatsappStatusCoroutine = StartCoroutine(GetWhatsappProfileStatus());
             }
             else if (response.Contains("\"type\":\"qrCode\"") && response.Contains("\"message\":\""))
             {
@@ -1122,7 +1051,8 @@ public class Manager : MonoBehaviour
                     {
                         WhatsappQRCodeImage.texture = texture;
                         // Start polling for status changes after successfully displaying the QR code
-                        StartCoroutine(GetWhatsappProfileStatus());
+                        if (_whatsappStatusCoroutine != null) StopCoroutine(_whatsappStatusCoroutine);
+                _whatsappStatusCoroutine = StartCoroutine(GetWhatsappProfileStatus());
                     }
                     else
                     {
@@ -1258,7 +1188,8 @@ public class Manager : MonoBehaviour
 
                 WhatsappCodePanel.transform.GetChild(5).GetChild(0).GetComponent<TextMeshProUGUI>().text = response.Substring(startIndex, 9);
 
-                StartCoroutine(GetWhatsappProfileStatus());
+                if (_whatsappStatusCoroutine != null) StopCoroutine(_whatsappStatusCoroutine);
+                _whatsappStatusCoroutine = StartCoroutine(GetWhatsappProfileStatus());
             }
         }
 
@@ -1317,7 +1248,8 @@ public class Manager : MonoBehaviour
 
                     WhatsappCodePanel.transform.GetChild(5).GetChild(0).GetComponent<TextMeshProUGUI>().text = authCode;
 
-                    StartCoroutine(GetWhatsappProfileStatus());
+                    if (_whatsappStatusCoroutine != null) StopCoroutine(_whatsappStatusCoroutine);
+                _whatsappStatusCoroutine = StartCoroutine(GetWhatsappProfileStatus());
                 }
             }
             else if (cleanResponse.Contains("\"status\":false"))
@@ -1330,7 +1262,8 @@ public class Manager : MonoBehaviour
                     WhatsappCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = "Already Authorized!";
                     
                     // Jump straight to the status checker to finalize the UI
-                    StartCoroutine(GetWhatsappProfileStatus());
+                    if (_whatsappStatusCoroutine != null) StopCoroutine(_whatsappStatusCoroutine);
+                _whatsappStatusCoroutine = StartCoroutine(GetWhatsappProfileStatus());
                 }
                 else
                 {
@@ -1389,6 +1322,11 @@ public class Manager : MonoBehaviour
                     {
                         authorized = true;
                         WhatsappAuthContinueButton.interactable = true;
+                        whatsappAuthCompleted = true;
+                        if (isCreatingBot)
+                        {
+                            WhatsappAuth.SetActive(false);
+                        }
 
                         CloseWhatsappQRPanel();
                         CloseWhatsappCodePanel();
@@ -1509,7 +1447,8 @@ public class Manager : MonoBehaviour
                     TelegramQRCodeImage.texture = texture;
                 }
 
-                StartCoroutine(GetTelegramProfileStatus());
+                if (_telegramStatusCoroutine != null) StopCoroutine(_telegramStatusCoroutine);
+                _telegramStatusCoroutine = StartCoroutine(GetTelegramProfileStatus());
             }
         }
 
@@ -1539,7 +1478,8 @@ public class Manager : MonoBehaviour
             if (response.Contains("\"type\":\"already_registered\""))
             {
                 Debug.Log("Telegram Instance already authorized.");
-                StartCoroutine(GetTelegramProfileStatus());
+                if (_telegramStatusCoroutine != null) StopCoroutine(_telegramStatusCoroutine);
+                _telegramStatusCoroutine = StartCoroutine(GetTelegramProfileStatus());
             }
             else if (response.Contains("\"type\":\"qrCode\"") && response.Contains("\"message\":\""))
             {
@@ -1560,7 +1500,8 @@ public class Manager : MonoBehaviour
                     if (texture.LoadImage(imageBytes))
                     {
                         TelegramQRCodeImage.texture = texture;
-                        StartCoroutine(GetTelegramProfileStatus());
+                        if (_telegramStatusCoroutine != null) StopCoroutine(_telegramStatusCoroutine);
+                _telegramStatusCoroutine = StartCoroutine(GetTelegramProfileStatus());
                     }
                 }
                 catch (FormatException e)
@@ -1739,7 +1680,8 @@ public class Manager : MonoBehaviour
                 if (response.Contains("\"status\":false"))
                 {
                     TelegramCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = "Already Authorized!";
-                    StartCoroutine(GetTelegramProfileStatus());
+                    if (_telegramStatusCoroutine != null) StopCoroutine(_telegramStatusCoroutine);
+                _telegramStatusCoroutine = StartCoroutine(GetTelegramProfileStatus());
                 }
             }
             else
@@ -1868,7 +1810,8 @@ public class Manager : MonoBehaviour
                 {
                     TelegramCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = "Authorization Complete";
 
-                    StartCoroutine(GetTelegramProfileStatus());
+                    if (_telegramStatusCoroutine != null) StopCoroutine(_telegramStatusCoroutine);
+                _telegramStatusCoroutine = StartCoroutine(GetTelegramProfileStatus());
 
                     yield return new WaitForSeconds(2f);
                     TelegramCodeSendingMessage.SetActive(false);
@@ -1927,7 +1870,8 @@ public class Manager : MonoBehaviour
             if (cleanResponse.Contains("\"status\":true"))
             {
                 TelegramCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = "Authorization Complete";
-                StartCoroutine(GetTelegramProfileStatus());
+                if (_telegramStatusCoroutine != null) StopCoroutine(_telegramStatusCoroutine);
+                _telegramStatusCoroutine = StartCoroutine(GetTelegramProfileStatus());
                 
                 yield return new WaitForSeconds(2f);
                 TelegramCodeSendingMessage.SetActive(false);
@@ -1985,6 +1929,11 @@ public class Manager : MonoBehaviour
                     {
                         authorized = true;
                         TelegramAuthContinueButton.interactable = true;
+                        telegramAuthCompleted = true;
+                        if (isCreatingBot)
+                        {
+                            TelegramAuth.SetActive(false);
+                        }
 
                         CloseTelegramQRPanel();
                         CloseTelegramCodePanel();
@@ -2278,21 +2227,27 @@ public class Manager : MonoBehaviour
         if (www.result == UnityWebRequest.Result.Success)
         // if (www.result != UnityWebRequest.Result.Success)
         {
-            Confirmation.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = "ERROR";
-            Confirmation.transform.GetChild(1).GetComponent<TextMeshProUGUI>().text = "Something went wrong.\n\n Please try later!";
-
-            if (www.result == UnityWebRequest.Result.ConnectionError)
+            if (Confirmation != null)
             {
                 Confirmation.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = "ERROR";
-                Confirmation.transform.GetChild(1).GetComponent<TextMeshProUGUI>().text = "Network error: Please check your internet connection and try again.";
+                Confirmation.transform.GetChild(1).GetComponent<TextMeshProUGUI>().text = "Something went wrong.\n\n Please try later!";
+
+                if (www.result == UnityWebRequest.Result.ConnectionError)
+                {
+                    Confirmation.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = "ERROR";
+                    Confirmation.transform.GetChild(1).GetComponent<TextMeshProUGUI>().text = "Network error: Please check your internet connection and try again.";
+                }
             }
 
             StartCoroutine(DeleteWhatsappProfile(whatsappProfileId, true));
         }
         else
         {
-            Confirmation.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = "Congartulations!";
-            Confirmation.transform.GetChild(1).GetComponent<TextMeshProUGUI>().text = "New bot is created! \n\nIt is already active. \n\nYou can check your bots status in My Bots tab.";
+            if (Confirmation != null)
+            {
+                Confirmation.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = "Congartulations!";
+                Confirmation.transform.GetChild(1).GetComponent<TextMeshProUGUI>().text = "New bot is created! \n\nIt is already active. \n\nYou can check your bots status in My Bots tab.";
+            }
 
             bot.GetComponent<Bot>().active = true;
             PlayerPrefs.SetInt(bot.name + "Active", 1);
@@ -2419,21 +2374,27 @@ public class Manager : MonoBehaviour
 
         if (www.result != UnityWebRequest.Result.Success)
         {
-            Confirmation.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = "ERROR";
-            Confirmation.transform.GetChild(1).GetComponent<TextMeshProUGUI>().text = "Something went wrong.\n\n Please try later!";
-
-            if (www.result == UnityWebRequest.Result.ConnectionError)
+            if (Confirmation != null)
             {
                 Confirmation.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = "ERROR";
-                Confirmation.transform.GetChild(1).GetComponent<TextMeshProUGUI>().text = "Network error: Please check your internet connection and try again.";
+                Confirmation.transform.GetChild(1).GetComponent<TextMeshProUGUI>().text = "Something went wrong.\n\n Please try later!";
+
+                if (www.result == UnityWebRequest.Result.ConnectionError)
+                {
+                    Confirmation.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = "ERROR";
+                    Confirmation.transform.GetChild(1).GetComponent<TextMeshProUGUI>().text = "Network error: Please check your internet connection and try again.";
+                }
             }
 
             StartCoroutine(DeleteTelegramProfile(telegramProfileId, true));
         }
         else
         {
-            Confirmation.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = "Congartulations!";
-            Confirmation.transform.GetChild(1).GetComponent<TextMeshProUGUI>().text = "New bot is created! \n\nIt is already active. \n\nYou can check your bots status in My Bots tab.";
+            if (Confirmation != null)
+            {
+                Confirmation.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = "Congartulations!";
+                Confirmation.transform.GetChild(1).GetComponent<TextMeshProUGUI>().text = "New bot is created! \n\nIt is already active. \n\nYou can check your bots status in My Bots tab.";
+            }
 
             bot.GetComponent<Bot>().active = true;
             PlayerPrefs.SetInt(bot.name + "Active", 1);

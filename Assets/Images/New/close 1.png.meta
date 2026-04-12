@@ -1,15 +1,15 @@
 fileFormatVersion: 2
-guid: f76a6821fc2fb434a9dc5019a2a473ac
+guid: 4724bff48e7864ad79db523b7f1bc02c
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 3716703726476149955
-    second: whatsapp-logo-4456 1_0
+      213: -85488583029258653
+    second: close 1_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
     mipMapMode: 0
-    enableMipMap: 1
+    enableMipMap: 0
     sRGBTexture: 1
     linearTexture: 0
     fadeOut: 0
@@ -126,13 +126,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: whatsapp-logo-4456 1_0
+      name: close 1_0
       rect:
         serializedVersion: 2
-        x: 0
-        y: 0
-        width: 2048
-        height: 2048
+        x: 15
+        y: 15
+        width: 310
+        height: 310
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -141,8 +141,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 3c44bf7e852649330800000000000000
-      internalID: 3716703726476149955
+      spriteID: 3668030369840def0800000000000000
+      internalID: -85488583029258653
       vertices: []
       indices: 
       edges: []
@@ -161,7 +161,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      whatsapp-logo-4456 1_0: 3716703726476149955
+      close 1_0: -85488583029258653
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

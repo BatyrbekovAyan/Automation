@@ -1,15 +1,18 @@
 fileFormatVersion: 2
-guid: 62aef043f7e1943b0a3ee3b276c1c3f7
+guid: 41cdae03e568e4567a4d12eb70b6118f
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -8489132506426836687
-    second: whatsapp-logo-4456_0
+      213: 3421356481841149665
+    second: Avatar2_0
+  - first:
+      213: 3098537634701348859
+    second: Avatar2_1
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
     mipMapMode: 0
-    enableMipMap: 1
+    enableMipMap: 0
     sRGBTexture: 1
     linearTexture: 0
     fadeOut: 0
@@ -46,7 +49,7 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 2
+  spriteMode: 1
   spriteExtrude: 1
   spriteMeshType: 1
   alignment: 0
@@ -126,13 +129,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: whatsapp-logo-4456_0
+      name: Avatar2_0
       rect:
         serializedVersion: 2
-        x: 0
-        y: 0
-        width: 2048
-        height: 2048
+        x: 97
+        y: 147
+        width: 206
+        height: 205
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -141,8 +144,30 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 139f43776fa803a80800000000000000
-      internalID: -8489132506426836687
+      spriteID: 1e63f16d7991b7f20800000000000000
+      internalID: 3421356481841149665
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Avatar2_1
+      rect:
+        serializedVersion: 2
+        x: 12
+        y: 0
+        width: 376
+        height: 118
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: bff8d8fdf87300b20800000000000000
+      internalID: 3098537634701348859
       vertices: []
       indices: 
       edges: []
@@ -151,7 +176,7 @@ TextureImporter:
     customData: 
     physicsShape: []
     bones: []
-    spriteID: 
+    spriteID: 5e97eb03825dee720800000000000000
     internalID: 0
     vertices: []
     indices: 
@@ -161,7 +186,8 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      whatsapp-logo-4456_0: -8489132506426836687
+      Avatar2_0: 3421356481841149665
+      Avatar2_1: 3098537634701348859
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
