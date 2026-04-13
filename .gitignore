@@ -51,3 +51,6 @@ mono_crash.*
 
 # Secrets
 Assets/StreamingAssets/secrets.json
+
+# Claude Code local config
+CLAUDE.local.md

@@ -822,6 +822,20 @@ public class BotSettings : MonoBehaviour
 
     //////////////////////////////////////////////////////////WHATSAPP AUTHORIZATION//////////////////////////////////////////////////////////
 
+    private static void SetStatusVisible(GameObject go, bool visible)
+    {
+        var cg = go.GetComponent<CanvasGroup>();
+        if (cg != null)
+        {
+            cg.alpha = visible ? 1f : 0f;
+            cg.blocksRaycasts = visible;
+        }
+        else
+        {
+            go.SetActive(visible);
+        }
+    }
+
     private void OpenWhatsappAuthorization(bool open)
     {
         OpenAuthorization(open);
@@ -978,7 +992,7 @@ public class BotSettings : MonoBehaviour
         GetWhatsappCodeButton.interactable = false;
 
         WhatsappCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = "Getting..";
-        WhatsappCodeSendingMessage.SetActive(true);
+        SetStatusVisible(WhatsappCodeSendingMessage, true);
 
 
         using UnityWebRequest www = UnityWebRequest.Get($"https://wappi.pro/api/sync/auth/code?profile_id={Manager.openBot.GetComponent<Bot>().whatsappProfileId}&phone={WhatsappNumberInput.text}");
@@ -1030,7 +1044,7 @@ public class BotSettings : MonoBehaviour
         }
         else
         {
-            WhatsappCodeSendingMessage.SetActive(false);
+            SetStatusVisible(WhatsappCodeSendingMessage, false);
             WhatsappCodeTimer.SetActive(true);
 
             WhatsappNumberInput.gameObject.SetActive(false);
@@ -1062,7 +1076,7 @@ public class BotSettings : MonoBehaviour
         WhatsappCodePanel.transform.GetChild(5).gameObject.SetActive(false);
         WhatsappCodePanel.transform.GetChild(6).gameObject.SetActive(false);
 
-        WhatsappCodeSendingMessage.SetActive(false);
+        SetStatusVisible(WhatsappCodeSendingMessage, false);
 
         WhatsappCodePanel.transform.GetChild(5).GetChild(0).GetComponent<TextMeshProUGUI>().text = "";
     }
@@ -1397,7 +1411,7 @@ public class BotSettings : MonoBehaviour
         GetTelegramCodeButton.interactable = false;
 
         TelegramCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = "Sending..";
-        TelegramCodeSendingMessage.SetActive(true);
+        SetStatusVisible(TelegramCodeSendingMessage, true);
 
 
         string jsonBody = "{\"phone\":\"" + TelegramNumberInput.text + "\"}";
@@ -1454,7 +1468,7 @@ public class BotSettings : MonoBehaviour
         }
         else
         {
-            TelegramCodeSendingMessage.SetActive(false);
+            SetStatusVisible(TelegramCodeSendingMessage, false);
             PlayerPrefs.SetString("TelegramCooldownFinishTime", DateTime.Now.AddSeconds(30).ToString());
 
             TelegramNumberInput.gameObject.SetActive(false);
@@ -1474,10 +1488,10 @@ public class BotSettings : MonoBehaviour
                 if (response.Substring(startIndex, 4).Equals("done"))
                 {
                     TelegramCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = "Sent";
-                    TelegramCodeSendingMessage.SetActive(true);
+                    SetStatusVisible(TelegramCodeSendingMessage, true);
 
                     yield return new WaitForSeconds(2f);
-                    TelegramCodeSendingMessage.SetActive(false);
+                    SetStatusVisible(TelegramCodeSendingMessage, false);
                 }
             }
         }
@@ -1503,7 +1517,7 @@ public class BotSettings : MonoBehaviour
         SendTelegramCodeButton.interactable = false;
 
         TelegramCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = "Authorizing..";
-        TelegramCodeSendingMessage.SetActive(true);
+        SetStatusVisible(TelegramCodeSendingMessage, true);
 
 
         string jsonBody = "{\"auth_code\":\"" + TelegramCodeInput.text + "\"}";
@@ -1573,14 +1587,14 @@ public class BotSettings : MonoBehaviour
                     StartCoroutine(GetTelegramProfileStatus());
 
                     yield return new WaitForSeconds(2f);
-                    TelegramCodeSendingMessage.SetActive(false);
+                    SetStatusVisible(TelegramCodeSendingMessage, false);
                 }
                 else
                 {
                     TelegramCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = "Authorization Failed";
 
                     yield return new WaitForSeconds(2f);
-                    TelegramCodeSendingMessage.SetActive(false);
+                    SetStatusVisible(TelegramCodeSendingMessage, false);
                 }
             }
             else
@@ -1588,7 +1602,7 @@ public class BotSettings : MonoBehaviour
                 TelegramCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = "Authorization Failed";
 
                 yield return new WaitForSeconds(2f);
-                TelegramCodeSendingMessage.SetActive(false);
+                SetStatusVisible(TelegramCodeSendingMessage, false);
             }
         }
 
@@ -1606,7 +1620,7 @@ public class BotSettings : MonoBehaviour
         SendTelegramCodeButton.gameObject.SetActive(false);
         TelegramCodePanel.transform.GetChild(7).gameObject.SetActive(false);
 
-        TelegramCodeSendingMessage.SetActive(false);
+        SetStatusVisible(TelegramCodeSendingMessage, false);
 
         TelegramCodeInput.text = "";
     }

@@ -7,6 +7,7 @@ using UnityEngine.UI;
 public class TelegramCodeTimer : MonoBehaviour
 {
     [SerializeField] private Button GetTelegramCodeButton;
+    [SerializeField] private Button GetAnotherTelegramCodeButton;
     [SerializeField] private TMP_InputField TelegramNumberInput;
 
     private int cooldown = 30;
@@ -38,14 +39,18 @@ public class TelegramCodeTimer : MonoBehaviour
             yield return new WaitForSecondsRealtime (1f);
         }
 
-        if (TelegramNumberInput.text.Length >= 11)
+        if (TelegramNumberInput.text.Length >= 10)
         {
             GetTelegramCodeButton.interactable = true;
+            if (GetAnotherTelegramCodeButton != null) GetAnotherTelegramCodeButton.interactable = true;
         }
 
         PlayerPrefs.SetString("TelegramCooldownFinishTime", "-1");
 
         gameObject.SetActive(false);
+
+        if (Manager.Instance != null)
+            Manager.Instance.RebuildTelegramAuthLayout();
 
         yield return null;
     }
