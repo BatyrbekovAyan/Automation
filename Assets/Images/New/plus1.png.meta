@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 7a1b6270928cb4e0895338f87a068239
+guid: 84cb5ef8f390447ca9cac55a202a1fa8
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -4641502836160023550
-    second: abededb4_0_3_0
+      213: -6698567728355539575
+    second: plus copy 4_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -126,13 +126,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: abededb4_0_3_0
+      name: plus copy 4_0
       rect:
         serializedVersion: 2
-        x: 224
-        y: 100
-        width: 575
-        height: 821
+        x: 0
+        y: 0
+        width: 512
+        height: 512
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -141,8 +141,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 204b6b223c1169fb0800000000000000
-      internalID: -4641502836160023550
+      spriteID: 985097f3428e903a0800000000000000
+      internalID: -6698567728355539575
       vertices: []
       indices: 
       edges: []
@@ -161,7 +161,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      abededb4_0_3_0: -4641502836160023550
+      plus copy 4_0: -6698567728355539575
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
