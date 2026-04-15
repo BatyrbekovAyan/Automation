@@ -7,7 +7,6 @@ using UnityEngine.UI;
 public class WhatsappCodeTimer : MonoBehaviour
 {
     [SerializeField] private Button GetWhatsappCodeButton;
-    [SerializeField] private Button GetAnotherWhatsappCodeButton;
     [SerializeField] private TMP_InputField WhatsappNumberInput;
 
     private int cooldown = 30;
@@ -42,7 +41,6 @@ public class WhatsappCodeTimer : MonoBehaviour
         if (WhatsappNumberInput.text.Length >= 10)
         {
             GetWhatsappCodeButton.interactable = true;
-            if (GetAnotherWhatsappCodeButton != null) GetAnotherWhatsappCodeButton.interactable = true;
         }
 
         PlayerPrefs.SetString("WhatsappCooldownFinishTime", "-1");

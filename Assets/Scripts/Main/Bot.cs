@@ -54,15 +54,11 @@ public class Bot : MonoBehaviour
             DeleteButton.onClick.AddListener(OpenDeletePopup);
         }
 
+        // Delete confirm popup: fire on real finger release via PopupUI.
         if (DeleteConfirmButton != null)
-        {
-            DeleteConfirmButton.onClick.AddListener(DeleteBot);
-        }
-
+            PopupUI.WireFingerUp(DeleteConfirmButton, DeleteBot);
         if (DeleteCancelButton != null)
-        {
-            DeleteCancelButton.onClick.AddListener(DeleteCancel);
-        }
+            PopupUI.WireFingerUp(DeleteCancelButton, DeleteCancel);
     }
 
 
@@ -163,15 +159,9 @@ public class Bot : MonoBehaviour
         Destroy(gameObject);
     }
 
-    private void OpenDeletePopup()
-    {
-        DeletePopup.SetActive(true);
-    }
+    private void OpenDeletePopup() => PopupUI.Show(DeletePopup);
 
-    private void DeleteCancel()
-    {
-        DeletePopup.SetActive(false);
-    }
+    private void DeleteCancel() => PopupUI.Hide(DeletePopup);
 
     private void EnableBot (bool enabled)
     {

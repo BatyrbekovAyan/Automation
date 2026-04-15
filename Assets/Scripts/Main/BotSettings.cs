@@ -32,8 +32,7 @@ public class BotSettings : MonoBehaviour
     [SerializeField] private GameObject ConfirmChangeTelegramNumberPopup;
     [SerializeField] private GameObject WhatsappCodeTimer;
     [SerializeField] private GameObject TelegramCodeTimer;
-    [SerializeField] private GameObject WhatsappCodeSendingMessage;
-    [SerializeField] private GameObject TelegramCodeSendingMessage;
+    // Status messages are shown inline in button text — no separate GOs needed
 
     [SerializeField] private Button GeneralTabButton;
     [SerializeField] private Button BusinessTabButton;
@@ -160,25 +159,17 @@ public class BotSettings : MonoBehaviour
             TelegramNumberButton.onClick.AddListener(OpenConfirmChangeTelegramNumberPopup);
         }
 
+        // Change-number confirm popups: fire on real finger release via PopupUI
+        // so the action commits only when the user lifts their finger, and so
+        // animated close runs via PopupUI.Hide inside each handler.
         if (ConfirmChangeWhatsappNumberButton != null)
-        {
-            ConfirmChangeWhatsappNumberButton.onClick.AddListener(ConfirmChangeWhatsappNumber);
-        }
-
+            PopupUI.WireFingerUp(ConfirmChangeWhatsappNumberButton, ConfirmChangeWhatsappNumber);
         if (CancelChangeWhatsappNumberButton != null)
-        {
-            CancelChangeWhatsappNumberButton.onClick.AddListener(CancelChangeWhatsappNumber);
-        }
-
+            PopupUI.WireFingerUp(CancelChangeWhatsappNumberButton, CancelChangeWhatsappNumber);
         if (ConfirmChangeTelegramNumberButton != null)
-        {
-            ConfirmChangeTelegramNumberButton.onClick.AddListener(ConfirmChangeTelegramNumber);
-        }
-
+            PopupUI.WireFingerUp(ConfirmChangeTelegramNumberButton, ConfirmChangeTelegramNumber);
         if (CancelChangeTelegramNumberButton != null)
-        {
-            CancelChangeTelegramNumberButton.onClick.AddListener(CancelChangeTelegramNumber);
-        }
+            PopupUI.WireFingerUp(CancelChangeTelegramNumberButton, CancelChangeTelegramNumber);
 
 
         if (BusinessInputButton != null)
@@ -432,41 +423,27 @@ public class BotSettings : MonoBehaviour
         }
     }
 
-    public void OpenConfirmChangeWhatsappNumberPopup()
-    {
-        ConfirmChangeWhatsappNumberPopup.SetActive(true);
-    }
+    public void OpenConfirmChangeWhatsappNumberPopup() => PopupUI.Show(ConfirmChangeWhatsappNumberPopup);
 
     public void ConfirmChangeWhatsappNumber()
     {
         StartCoroutine(UnauthorizeWhatsapp());
-
-        ConfirmChangeWhatsappNumberPopup.SetActive(false);
+        PopupUI.Hide(ConfirmChangeWhatsappNumberPopup);
         OpenWhatsappAuthorization(true);
     }
 
-    public void CancelChangeWhatsappNumber()
-    {
-        ConfirmChangeWhatsappNumberPopup.SetActive(false);
-    }
+    public void CancelChangeWhatsappNumber() => PopupUI.Hide(ConfirmChangeWhatsappNumberPopup);
 
-    public void OpenConfirmChangeTelegramNumberPopup()
-    {
-        ConfirmChangeTelegramNumberPopup.SetActive(true);
-    }
+    public void OpenConfirmChangeTelegramNumberPopup() => PopupUI.Show(ConfirmChangeTelegramNumberPopup);
 
     public void ConfirmChangeTelegramNumber()
     {
         StartCoroutine(UnauthorizeTelegram());
-
-        ConfirmChangeTelegramNumberPopup.SetActive(false);
+        PopupUI.Hide(ConfirmChangeTelegramNumberPopup);
         OpenTelegramAuthorization(true);
     }
 
-    public void CancelChangeTelegramNumber()
-    {
-        ConfirmChangeTelegramNumberPopup.SetActive(false);
-    }
+    public void CancelChangeTelegramNumber() => PopupUI.Hide(ConfirmChangeTelegramNumberPopup);
 
     public void OpenBusinessInput()
     {
@@ -822,18 +799,11 @@ public class BotSettings : MonoBehaviour
 
     //////////////////////////////////////////////////////////WHATSAPP AUTHORIZATION//////////////////////////////////////////////////////////
 
-    private static void SetStatusVisible(GameObject go, bool visible)
+    private static void SetButtonText(Button btn, string text)
     {
-        var cg = go.GetComponent<CanvasGroup>();
-        if (cg != null)
-        {
-            cg.alpha = visible ? 1f : 0f;
-            cg.blocksRaycasts = visible;
-        }
-        else
-        {
-            go.SetActive(visible);
-        }
+        if (btn == null) return;
+        var tmp = btn.GetComponentInChildren<TextMeshProUGUI>();
+        if (tmp != null) tmp.text = text;
     }
 
     private void OpenWhatsappAuthorization(bool open)
@@ -964,6 +934,7 @@ public class BotSettings : MonoBehaviour
     public void OpenWhatsappCodePanel()
     {
         WhatsappCodePanel.SetActive(true);
+        SetButtonText(GetWhatsappCodeButton, "Получить код");
 
         WhatsappNumberInput.caretPosition = WhatsappNumberInput.text.Length;
         WhatsappNumberInput.ActivateInputField();
@@ -991,8 +962,8 @@ public class BotSettings : MonoBehaviour
         Manager.Instance.LoadingPanel.SetActive(true);
         GetWhatsappCodeButton.interactable = false;
 
-        WhatsappCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = "Getting..";
-        SetStatusVisible(WhatsappCodeSendingMessage, true);
+        string originalBtnText = GetWhatsappCodeButton.GetComponentInChildren<TextMeshProUGUI>().text;
+        SetButtonText(GetWhatsappCodeButton, "Getting..");
 
 
         using UnityWebRequest www = UnityWebRequest.Get($"https://wappi.pro/api/sync/auth/code?profile_id={Manager.openBot.GetComponent<Bot>().whatsappProfileId}&phone={WhatsappNumberInput.text}");
@@ -1003,39 +974,25 @@ public class BotSettings : MonoBehaviour
 
         if (www.result != UnityWebRequest.Result.Success)
         {
+            string errorMsg = "Server Unavailable";
             if (www.result == UnityWebRequest.Result.ConnectionError)
             {
-                WhatsappCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = "Check internet connection.";
+                errorMsg = "Check internet connection";
             }
-            else if (www.result == UnityWebRequest.Result.ProtocolError)
+            else if (www.result == UnityWebRequest.Result.ProtocolError && www.downloadHandler != null)
             {
-                if (www.downloadHandler != null)
+                string response = www.downloadHandler.text;
+                if (response.Contains("\"detail\":") && response.Contains("\",\"uuid\":"))
                 {
-                    string response = www.downloadHandler.text;
-
-                    if (response.Contains("\"detail\":") && response.Contains("\",\"uuid\":"))
-                    {
-                        int startIndex = response.IndexOf("\"detail\":") + 10;
-                        int endIndex = response.IndexOf("\",\"uuid\":");
-                        int length = endIndex - startIndex;
-
-                        WhatsappCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = response.Substring(startIndex, length) + ".";
-                    }
-                    else
-                    {
-                        WhatsappCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = "Server Unavailable.\n\nTry Again Later";
-                    }
-                }
-                else
-                {
-                    WhatsappCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = "Server Unavailable.\n\nTry Again Later";
+                    int startIndex = response.IndexOf("\"detail\":") + 10;
+                    int endIndex = response.IndexOf("\",\"uuid\":");
+                    errorMsg = response.Substring(startIndex, endIndex - startIndex);
                 }
             }
-            else
-            {
-                WhatsappCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = "Server Unavailable.\n\nTry Again Later";
-            }
 
+            SetButtonText(GetWhatsappCodeButton, errorMsg);
+            yield return new WaitForSeconds(2f);
+            SetButtonText(GetWhatsappCodeButton, originalBtnText);
 
             if (WhatsappNumberInput.text.Length >= 11)
             {
@@ -1044,7 +1001,7 @@ public class BotSettings : MonoBehaviour
         }
         else
         {
-            SetStatusVisible(WhatsappCodeSendingMessage, false);
+            SetButtonText(GetWhatsappCodeButton, "Получить другой код");
             WhatsappCodeTimer.SetActive(true);
 
             WhatsappNumberInput.gameObject.SetActive(false);
@@ -1070,13 +1027,12 @@ public class BotSettings : MonoBehaviour
     public void CloseWhatsappCodePanel()
     {
         WhatsappCodePanel.SetActive(false);
+        SetButtonText(GetWhatsappCodeButton, "Получить код");
 
         WhatsappNumberInput.gameObject.SetActive(true);
         WhatsappCodePanel.transform.GetChild(4).gameObject.SetActive(true);
         WhatsappCodePanel.transform.GetChild(5).gameObject.SetActive(false);
         WhatsappCodePanel.transform.GetChild(6).gameObject.SetActive(false);
-
-        SetStatusVisible(WhatsappCodeSendingMessage, false);
 
         WhatsappCodePanel.transform.GetChild(5).GetChild(0).GetComponent<TextMeshProUGUI>().text = "";
     }
@@ -1378,6 +1334,7 @@ public class BotSettings : MonoBehaviour
     public void OpenTelegramCodePanel()
     {
         TelegramCodePanel.SetActive(true);
+        SetButtonText(GetTelegramCodeButton, "Получить код");
 
         TelegramNumberInput.caretPosition = TelegramNumberInput.text.Length;
         TelegramNumberInput.ActivateInputField();
@@ -1410,8 +1367,8 @@ public class BotSettings : MonoBehaviour
         Manager.Instance.LoadingPanel.SetActive(true);
         GetTelegramCodeButton.interactable = false;
 
-        TelegramCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = "Sending..";
-        SetStatusVisible(TelegramCodeSendingMessage, true);
+        string originalBtnText = GetTelegramCodeButton.GetComponentInChildren<TextMeshProUGUI>().text;
+        SetButtonText(GetTelegramCodeButton, "Sending..");
 
 
         string jsonBody = "{\"phone\":\"" + TelegramNumberInput.text + "\"}";
@@ -1427,39 +1384,25 @@ public class BotSettings : MonoBehaviour
 
         if (www.result != UnityWebRequest.Result.Success)
         {
+            string errorMsg = "Server Unavailable";
             if (www.result == UnityWebRequest.Result.ConnectionError)
             {
-                TelegramCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = "Check internet connection.";
+                errorMsg = "Check internet connection";
             }
-            else if (www.result == UnityWebRequest.Result.ProtocolError)
+            else if (www.result == UnityWebRequest.Result.ProtocolError && www.downloadHandler != null)
             {
-                if (www.downloadHandler != null)
+                string response = www.downloadHandler.text;
+                if (response.Contains("\"detail\":") && response.Contains("\",\"status\":"))
                 {
-                    string response = www.downloadHandler.text;
-
-                    if (response.Contains("\"detail\":") && response.Contains("\",\"status\":"))
-                    {
-                        int startIndex = response.IndexOf("\"detail\":") + 10;
-                        int endIndex = response.IndexOf("\",\"status\":");
-                        int length = endIndex - startIndex;
-
-                        TelegramCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = response.Substring(startIndex, length) + ".";
-                    }
-                    else
-                    {
-                        TelegramCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = "Server Unavailable.\n\nTry Again Later";
-                    }
-                }
-                else
-                {
-                    TelegramCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = "Server Unavailable.\n\nTry Again Later";
+                    int startIndex = response.IndexOf("\"detail\":") + 10;
+                    int endIndex = response.IndexOf("\",\"status\":");
+                    errorMsg = response.Substring(startIndex, endIndex - startIndex);
                 }
             }
-            else
-            {
-                TelegramCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = "Server Unavailable.\n\nTry Again Later";
-            }
 
+            SetButtonText(GetTelegramCodeButton, errorMsg);
+            yield return new WaitForSeconds(2f);
+            SetButtonText(GetTelegramCodeButton, originalBtnText);
 
             if (TelegramNumberInput.text.Length >= 11)
             {
@@ -1468,11 +1411,10 @@ public class BotSettings : MonoBehaviour
         }
         else
         {
-            SetStatusVisible(TelegramCodeSendingMessage, false);
+            SetButtonText(GetTelegramCodeButton, "Sent");
             PlayerPrefs.SetString("TelegramCooldownFinishTime", DateTime.Now.AddSeconds(30).ToString());
 
             TelegramNumberInput.gameObject.SetActive(false);
-            GetTelegramCodeButton.gameObject.SetActive(false);
             TelegramCodePanel.transform.GetChild(4).gameObject.SetActive(false);
             TelegramCodeInput.gameObject.SetActive(true);
             SendTelegramCodeButton.gameObject.SetActive(true);
@@ -1487,13 +1429,10 @@ public class BotSettings : MonoBehaviour
 
                 if (response.Substring(startIndex, 4).Equals("done"))
                 {
-                    TelegramCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = "Sent";
-                    SetStatusVisible(TelegramCodeSendingMessage, true);
-
                     yield return new WaitForSeconds(2f);
-                    SetStatusVisible(TelegramCodeSendingMessage, false);
                 }
             }
+            SetButtonText(GetTelegramCodeButton, "Получить другой код");
         }
 
         Manager.Instance.LoadingPanel.SetActive(false);
@@ -1516,8 +1455,7 @@ public class BotSettings : MonoBehaviour
         Manager.Instance.LoadingPanel.SetActive(true);
         SendTelegramCodeButton.interactable = false;
 
-        TelegramCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = "Authorizing..";
-        SetStatusVisible(TelegramCodeSendingMessage, true);
+        SetButtonText(SendTelegramCodeButton, "Authorizing..");
 
 
         string jsonBody = "{\"auth_code\":\"" + TelegramCodeInput.text + "\"}";
@@ -1533,39 +1471,25 @@ public class BotSettings : MonoBehaviour
 
         if (www.result != UnityWebRequest.Result.Success)
         {
+            string errorMsg = "Server Unavailable";
             if (www.result == UnityWebRequest.Result.ConnectionError)
             {
-                TelegramCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = "Check internet connection.";
+                errorMsg = "Check internet connection";
             }
-            else if (www.result == UnityWebRequest.Result.ProtocolError)
+            else if (www.result == UnityWebRequest.Result.ProtocolError && www.downloadHandler != null)
             {
-                if (www.downloadHandler != null)
+                string response = www.downloadHandler.text;
+                if (response.Contains("\"detail\":") && response.Contains("\",\"uuid\":"))
                 {
-                    string response = www.downloadHandler.text;
-
-                    if (response.Contains("\"detail\":") && response.Contains("\",\"uuid\":"))
-                    {
-                        int startIndex = response.IndexOf("\"detail\":") + 10;
-                        int endIndex = response.IndexOf("\",\"uuid\":");
-                        int length = endIndex - startIndex;
-
-                        TelegramCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = response.Substring(startIndex, length) + ".";
-                    }
-                    else
-                    {
-                        TelegramCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = "Server Unavailable.\n\nTry Again Later";
-                    }
-                }
-                else
-                {
-                    TelegramCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = "Server Unavailable.\n\nTry Again Later";
+                    int startIndex = response.IndexOf("\"detail\":") + 10;
+                    int endIndex = response.IndexOf("\",\"uuid\":");
+                    errorMsg = response.Substring(startIndex, endIndex - startIndex);
                 }
             }
-            else
-            {
-                TelegramCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = "Server Unavailable.\n\nTry Again Later";
-            }
 
+            SetButtonText(SendTelegramCodeButton, errorMsg);
+            yield return new WaitForSeconds(2f);
+            SetButtonText(SendTelegramCodeButton, "Подтвердить код");
 
             if (TelegramCodeInput.text.Length >= 5)
             {
@@ -1582,27 +1506,27 @@ public class BotSettings : MonoBehaviour
 
                 if (response.Substring(startIndex, 12).Equals("auth_success"))
                 {
-                    TelegramCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = "Authorization Complete";
+                    SetButtonText(SendTelegramCodeButton, "Authorization Complete");
 
                     StartCoroutine(GetTelegramProfileStatus());
 
                     yield return new WaitForSeconds(2f);
-                    SetStatusVisible(TelegramCodeSendingMessage, false);
+                    SetButtonText(SendTelegramCodeButton, "Подтвердить код");
                 }
                 else
                 {
-                    TelegramCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = "Authorization Failed";
+                    SetButtonText(SendTelegramCodeButton, "Authorization Failed");
 
                     yield return new WaitForSeconds(2f);
-                    SetStatusVisible(TelegramCodeSendingMessage, false);
+                    SetButtonText(SendTelegramCodeButton, "Подтвердить код");
                 }
             }
             else
             {
-                TelegramCodeSendingMessage.GetComponent<TextMeshProUGUI>().text = "Authorization Failed";
+                SetButtonText(SendTelegramCodeButton, "Authorization Failed");
 
                 yield return new WaitForSeconds(2f);
-                SetStatusVisible(TelegramCodeSendingMessage, false);
+                SetButtonText(SendTelegramCodeButton, "Подтвердить код");
             }
         }
 
@@ -1612,15 +1536,13 @@ public class BotSettings : MonoBehaviour
     public void CloseTelegramCodePanel()
     {
         TelegramCodePanel.SetActive(false);
+        SetButtonText(GetTelegramCodeButton, "Получить код");
 
         TelegramNumberInput.gameObject.SetActive(true);
-        GetTelegramCodeButton.gameObject.SetActive(true);
         TelegramCodePanel.transform.GetChild(4).gameObject.SetActive(true);
         TelegramCodeInput.gameObject.SetActive(false);
         SendTelegramCodeButton.gameObject.SetActive(false);
         TelegramCodePanel.transform.GetChild(7).gameObject.SetActive(false);
-
-        SetStatusVisible(TelegramCodeSendingMessage, false);
 
         TelegramCodeInput.text = "";
     }

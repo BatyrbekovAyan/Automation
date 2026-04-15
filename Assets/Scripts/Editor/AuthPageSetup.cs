@@ -8,8 +8,8 @@
 //  Design reference: mockup.html PAGE 9 — WhatsApp & Telegram auth.
 //
 //  CRITICAL: Manager.cs accesses panel children by index:
-//    WhatsApp CodePanel: GetChild(4)=PhoneInputGroup, GetChild(5)=CodeDisplay, GetChild(6)=CodeInstruction
-//    Telegram CodePanel: GetChild(4)=PhoneInputGroup, GetChild(6)=CodeInputLabel
+//    WhatsApp CodePanel: GetChild(3)=PhoneInputGroup, GetChild(4)=CodeDisplay, GetChild(5)=CodeInstruction
+//    Telegram CodePanel: GetChild(3)=PhoneInputGroup, GetChild(4)=CodeInputLabel
 //  QR StatusText is inside QRContainer (serialized field, no index dependency).
 //  Do NOT add/remove children before these indices without updating Manager.cs.
 //
@@ -62,9 +62,6 @@ public static class AuthPageSetup
 
     // Spacing
     private const float DividerH      = 2f;
-    private const float CloseBtnSize  = 64f;
-    private const float CloseBtnPad   = 20f;
-
     // VLG spacing used inside QR and Code panels — gives baseline gap
     // between children; extra gaps handled by LE height padding on text elements
     private const float PanelSpacing  = 22f;
@@ -145,6 +142,7 @@ public static class AuthPageSetup
         Stretch(root);
         root.gameObject.AddComponent<Image>().color = ColBg;
         root.gameObject.AddComponent<LayoutRebuildOnEnable>();
+        root.gameObject.AddComponent<KeyboardScrollFix>();
         root.gameObject.SetActive(false);
 
         // ══════════════════════════════════════════════════════════════════
@@ -231,8 +229,7 @@ public static class AuthPageSetup
         // Child index layout:
         //   [0] QRTitle
         //   [1] QRBody
-        //   [2] QRContainer  (→ QRCodeImage, StatusText overlay inside)
-        //   [3] CloseQRPanelButton (ignoreLayout)
+        //   [2] QRContainer  (→ QRCodeImage, StatusText, SuccessOverlay inside)
         //
         // StatusText lives INSIDE QRContainer so toggling it doesn't
         // change the QR panel's VLG height (no layout jump).
@@ -294,9 +291,6 @@ public static class AuthPageSetup
         qrStatusTxt.rectTransform.offsetMax = new Vector2(-40f, -40f);
         qrStatusTxt.gameObject.SetActive(false);
 
-        // [3] CloseQRPanelButton (ignoreLayout, absolute top-right X)
-        var closeQRBtn = BuildIgnoredCloseButton(qrPanel, fontBold, "CloseQRPanelButton");
-
         // ══════════════════════════════════════════════════════════════════
         // DIVIDER ("или")
         // ══════════════════════════════════════════════════════════════════
@@ -335,33 +329,27 @@ public static class AuthPageSetup
         // CODE PANEL
         //
         // WhatsApp child layout:
-        //   [0] CloseCodePanelButton (ignoreLayout)
-        //   [1] PhoneTitle
-        //   [2] PhoneBody
-        //   [3] Spacer (index filler — VLG spacing gives ~44px total)
-        //   [4] PhoneInputGroup        ← Manager.GetChild(4)
-        //   [5] CodeDisplayCard        ← Manager.GetChild(5) (hidden)
-        //   [6] CodeInstructionText    ← Manager.GetChild(6) (hidden)
-        //   [7] GetCodeButton
-        //   [8] GetAnotherCodeButton   (hidden)
-        //   [9] CodeTimer              (inactive)
-        //  [10] ChangeNumberButton     (hidden)
-        //  [11] CodeSendingMessage     (inactive)
+        //   [0] PhoneTitle
+        //   [1] PhoneBody
+        //   [2] Spacer (index filler — VLG spacing gives ~44px total)
+        //   [3] PhoneInputGroup        ← Manager.GetChild(3)
+        //   [4] CodeDisplayCard        ← Manager.GetChild(4) (hidden)
+        //   [5] CodeInstructionText    ← Manager.GetChild(5) (hidden)
+        //   [6] GetCodeButton          (text changes to "Получить другой код" after first use)
+        //   [7] CodeTimer              (inactive)
+        //   [8] ChangeNumberButton     (hidden)
         //
         // Telegram child layout:
-        //   [0] CloseCodePanelButton (ignoreLayout)
-        //   [1] PhoneTitle
-        //   [2] PhoneBody
-        //   [3] Spacer (index filler)
-        //   [4] PhoneInputGroup        ← Manager.GetChild(4)
-        //   [5] GetCodeButton
-        //   [6] CodeInputLabel         ← Manager.GetChild(6)
-        //   [7] TelegramCodeInput      (inactive)
-        //   [8] SendTelegramCodeButton (inactive)
-        //   [9] GetAnotherCodeButton   (hidden)
-        //  [10] CodeTimer              (inactive)
-        //  [11] ChangeNumberButton     (hidden)
-        //  [12] CodeSendingMessage     (inactive)
+        //   [0] PhoneTitle
+        //   [1] PhoneBody
+        //   [2] Spacer (index filler)
+        //   [3] PhoneInputGroup        ← Manager.GetChild(3)
+        //   [4] CodeInputLabel         ← Manager.GetChild(4) (hidden)
+        //   [5] TelegramCodeInput      (inactive)
+        //   [6] SendTelegramCodeButton (inactive)
+        //   [7] GetCodeButton          (text → "Получить другой код" after first use)
+        //   [8] CodeTimer              (inactive)
+        //   [9] ChangeNumberButton     (hidden)
         // ══════════════════════════════════════════════════════════════════
         var codePanel = MakeRect("CodePanel", content);
         var codeVlg = codePanel.gameObject.AddComponent<VerticalLayoutGroup>();
@@ -372,10 +360,7 @@ public static class AuthPageSetup
         var codeCsf = codePanel.gameObject.AddComponent<ContentSizeFitter>();
         codeCsf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-        // [0] CloseCodePanelButton (ignoreLayout, absolute top-right X)
-        var closeCodeBtn = BuildIgnoredCloseButton(codePanel, fontBold, "CloseCodePanelButton");
-
-        // [1] PhoneTitle
+        // [0] PhoneTitle
         var phoneTitle = MakeTMP("PhoneTitle", codePanel, fontBold, FH3, ColTextPrimary,
             "Войти по номеру");
         phoneTitle.alignment = TextAlignmentOptions.Center;
@@ -432,8 +417,8 @@ public static class AuthPageSetup
 
         Button getCodeBtn;
         GameObject codeTimerGo;
-        GameObject codeSendingGo;
-        Button getAnotherCodeBtn;
+        // codeSendingGo removed — status shown inline in button text
+        // codeSendingGo removed — status shown inline in button text
         Button changeNumberBtn;
         TMP_InputField telegramCodeField = null;
         Button sendTelegramBtn = null;
@@ -462,33 +447,21 @@ public static class AuthPageSetup
             LE(codeInstruction.rectTransform, ciH);
             codeInstruction.gameObject.SetActive(false);
 
-            // [7] GetCodeButton
+            // [6] GetCodeButton — text changes to "Получить другой код" after first use
             getCodeBtn = BuildActionButton("GetCodeButton", codePanel, fontBold, "Получить код",
                 platformColor);
 
-            // [8] GetAnotherCodeButton — hidden, shown when code is displayed
-            getAnotherCodeBtn = BuildActionButton("GetAnotherCodeButton", codePanel, fontBold,
-                "Получить другой код", platformColor);
-            getAnotherCodeBtn.gameObject.SetActive(false);
-
-            // [9] CodeTimer (inactive)
+            // [7] CodeTimer (inactive)
             codeTimerGo = BuildTimerGO("CodeTimer", codePanel, fontRegular, isWa);
 
-            // [10] ChangeNumberButton — hidden, shown when code is displayed
+            // [8] ChangeNumberButton — hidden, shown when code is displayed
             changeNumberBtn = BuildOutlineButton("ChangeNumberButton", codePanel, fontBold,
                 "Изменить номер", platformColor);
             changeNumberBtn.gameObject.SetActive(false);
-
-            // [11] CodeSendingMessage (inactive)
-            codeSendingGo = BuildStatusGO("CodeSendingMessage", codePanel, fontRegular, platformColor);
         }
         else
         {
-            // [5] GetCodeButton
-            getCodeBtn = BuildActionButton("GetCodeButton", codePanel, fontBold, "Получить код",
-                platformColor);
-
-            // [6] CodeInputLabel ← Manager.GetChild(6) — initially hidden, shown after phone code sent
+            // [4] CodeInputLabel ← Manager.GetChild(4) — initially hidden, shown after phone code sent
             var codeInputLabel = MakeTMP("CodeInputLabel", codePanel, fontBold, FH3, ColTextPrimary,
                 "Введите код");
             codeInputLabel.alignment = TextAlignmentOptions.Center;
@@ -497,62 +470,59 @@ public static class AuthPageSetup
             LE(codeInputLabel.rectTransform, cilH);
             codeInputLabel.gameObject.SetActive(false);
 
-            // [7] TelegramCodeInput (inactive)
+            // [5] TelegramCodeInput (inactive)
             telegramCodeField = BuildTMPInput("TelegramCodeInput", codePanel, fontRegular,
                 "Код подтверждения", InputH, false, true);
             telegramCodeField.gameObject.SetActive(false);
 
-            // [8] SendTelegramCodeButton (inactive)
+            // [6] SendTelegramCodeButton (inactive)
             sendTelegramBtn = BuildActionButton("SendTelegramCodeButton", codePanel, fontBold,
                 "Подтвердить код", ColTgBlue);
             sendTelegramBtn.gameObject.SetActive(false);
 
-            // [9] GetAnotherCodeButton — hidden, shown in code-entry mode
-            getAnotherCodeBtn = BuildActionButton("GetAnotherCodeButton", codePanel, fontBold,
-                "Получить другой код", platformColor);
-            getAnotherCodeBtn.gameObject.SetActive(false);
+            // [7] GetCodeButton — text changes to "Получить другой код" after first use
+            getCodeBtn = BuildActionButton("GetCodeButton", codePanel, fontBold, "Получить код",
+                platformColor);
 
-            // [10] CodeTimer (inactive)
+            // [8] CodeTimer (inactive)
             codeTimerGo = BuildTimerGO("CodeTimer", codePanel, fontRegular, isWa);
 
-            // [11] ChangeNumberButton — hidden, shown in code-entry mode
+            // [9] ChangeNumberButton — hidden, shown in code-entry mode
             changeNumberBtn = BuildOutlineButton("ChangeNumberButton", codePanel, fontBold,
                 "Изменить номер", platformColor);
             changeNumberBtn.gameObject.SetActive(false);
-
-            // [12] CodeSendingMessage (inactive)
-            codeSendingGo = BuildStatusGO("CodeSendingMessage", codePanel, fontRegular, platformColor);
         }
 
         // ══════════════════════════════════════════════════════════════════
-        // SUCCESS PANEL (full-page overlay, hidden by default)
+        // SUCCESS OVERLAY (inside QRContainer — replaces QR image in-place)
         // ══════════════════════════════════════════════════════════════════
-        var successPanel = MakeRect("SuccessPanel", root);
+        var successPanel = MakeRect("SuccessOverlay", qrContainer);
         Stretch(successPanel);
+        // White background to cover the QR image underneath
         var spImg = successPanel.gameObject.AddComponent<Image>();
-        spImg.color = ColBg;
+        spImg.color = ColWhite;
 
         // Center container for checkmark + text
         var spCenter = MakeRect("Center", successPanel);
         spCenter.anchorMin = new Vector2(0.5f, 0.5f);
         spCenter.anchorMax = new Vector2(0.5f, 0.5f);
         spCenter.pivot = new Vector2(0.5f, 0.5f);
-        spCenter.sizeDelta = new Vector2(400f, 350f);
+        spCenter.sizeDelta = new Vector2(400f, 300f);
         var spVlg = spCenter.gameObject.AddComponent<VerticalLayoutGroup>();
         spVlg.childAlignment = TextAnchor.MiddleCenter;
         spVlg.childControlWidth  = true;  spVlg.childForceExpandWidth  = true;
         spVlg.childControlHeight = false; spVlg.childForceExpandHeight = false;
-        spVlg.spacing = 40f;
+        spVlg.spacing = 30f;
 
         // Checkmark circle
         var checkCircle = MakeRect("CheckCircle", spCenter);
-        checkCircle.sizeDelta = new Vector2(160f, 160f);
+        checkCircle.sizeDelta = new Vector2(140f, 140f);
         var ccLE = checkCircle.gameObject.AddComponent<LayoutElement>();
-        ccLE.minWidth = 160f; ccLE.preferredWidth = 160f;
-        ccLE.minHeight = 160f; ccLE.preferredHeight = 160f;
+        ccLE.minWidth = 140f; ccLE.preferredWidth = 140f;
+        ccLE.minHeight = 140f; ccLE.preferredHeight = 140f;
         var ccImg = checkCircle.gameObject.AddComponent<Image>();
         ccImg.sprite = RoundSprite; ccImg.type = Image.Type.Sliced; ccImg.color = platformColor;
-        var checkTxt = MakeTMP("Checkmark", checkCircle, fontBold, 80f, ColWhite, "✓");
+        var checkTxt = MakeTMP("Checkmark", checkCircle, fontBold, 72f, ColWhite, "✓");
         Stretch(checkTxt.rectTransform);
         checkTxt.alignment = TextAlignmentOptions.Center;
 
@@ -578,11 +548,11 @@ public static class AuthPageSetup
         so.FindProperty($"{p}QRStatusText").objectReferenceValue              = qrStatusTxt.gameObject;
         so.FindProperty($"{p}NumberInput").objectReferenceValue                = phoneField;
         so.FindProperty($"{p}CodeTimer").objectReferenceValue                  = codeTimerGo;
-        so.FindProperty($"{p}CodeSendingMessage").objectReferenceValue         = codeSendingGo;
+        // Status is shown inline in button text — no separate CodeSendingMessage GO
         so.FindProperty($"{p}AuthSuccessPanel").objectReferenceValue           = successPanel.gameObject;
         so.FindProperty($"{p}AuthBackButton").objectReferenceValue             = backBtn;
         so.FindProperty($"Get{p}CodeButton").objectReferenceValue              = getCodeBtn;
-        so.FindProperty($"GetAnother{p}CodeButton").objectReferenceValue      = getAnotherCodeBtn;
+        // GetAnother button removed — single GetCodeButton changes text after first use
         so.FindProperty($"Change{p}NumberButton").objectReferenceValue        = changeNumberBtn;
 
         if (!isWa)
@@ -600,9 +570,7 @@ public static class AuthPageSetup
             var timerSO = new SerializedObject(timerComponent);
             string timerBtnProp = isWa ? "GetWhatsappCodeButton" : "GetTelegramCodeButton";
             string timerInputProp = isWa ? "WhatsappNumberInput" : "TelegramNumberInput";
-            string timerAnotherBtnProp = isWa ? "GetAnotherWhatsappCodeButton" : "GetAnotherTelegramCodeButton";
             timerSO.FindProperty(timerBtnProp).objectReferenceValue = getCodeBtn;
-            timerSO.FindProperty(timerAnotherBtnProp).objectReferenceValue = getAnotherCodeBtn;
             timerSO.FindProperty(timerInputProp).objectReferenceValue = phoneField;
             timerSO.ApplyModifiedProperties();
         }
@@ -648,9 +616,8 @@ public static class AuthPageSetup
         return btn;
     }
 
-    // Timer and status GOs need TextMeshProUGUI on the ROOT GameObject
-    // because WhatsappCodeTimer/TelegramCodeTimer call GetComponent<TMP>() on themselves,
-    // and Manager calls CodeSendingMessage.GetComponent<TMP>() on the GO directly.
+    // Timer GOs need TextMeshProUGUI on the ROOT GameObject
+    // because WhatsappCodeTimer/TelegramCodeTimer call GetComponent<TMP>() on themselves.
 
     private static GameObject BuildTimerGO(string name, RectTransform parent,
         TMP_FontAsset font, bool isWa)
@@ -672,24 +639,7 @@ public static class AuthPageSetup
         return go.gameObject;
     }
 
-    private static GameObject BuildStatusGO(string name, RectTransform parent,
-        TMP_FontAsset font, Color color)
-    {
-        var go = MakeRect(name, parent);
-        float h = FBody + 20f;
-        go.sizeDelta = new Vector2(0, h);
-        LE(go, h);
-        // TMP must be on this GO — Manager calls GetComponent<TMP>() on the GO directly
-        var tmp = go.gameObject.AddComponent<TextMeshProUGUI>();
-        tmp.font = font; tmp.fontSize = FBody; tmp.color = color; tmp.text = "";
-        tmp.alignment = TextAlignmentOptions.Center;
-        tmp.raycastTarget = false;
-        // Use CanvasGroup for visibility — keeps layout space reserved to prevent VLG jumping
-        var cg = go.gameObject.AddComponent<CanvasGroup>();
-        cg.alpha = 0f;
-        cg.blocksRaycasts = false;
-        return go.gameObject;
-    }
+    // BuildStatusGO removed — status is now shown inline in button text
 
     private static TMP_InputField BuildTMPInput(string name, RectTransform parent,
         TMP_FontAsset font, string placeholder, float height, bool multiline, bool integerOnly)
@@ -724,24 +674,6 @@ public static class AuthPageSetup
         return field;
     }
 
-    private static Button BuildIgnoredCloseButton(RectTransform parent, TMP_FontAsset font, string name)
-    {
-        var go = MakeRect(name, parent);
-        go.anchorMin = new Vector2(1f, 1f);
-        go.anchorMax = new Vector2(1f, 1f);
-        go.pivot = new Vector2(1f, 1f);
-        go.anchoredPosition = new Vector2(-CloseBtnPad, -CloseBtnPad);
-        go.sizeDelta = new Vector2(CloseBtnSize, CloseBtnSize);
-        MakeIgnored(go, true);
-        go.gameObject.AddComponent<Image>().color = Color.clear;
-        var btn = go.gameObject.AddComponent<Button>();
-        btn.transition = Selectable.Transition.None;
-        var txt = MakeTMP("Text", go, font, 56f, ColTextTert, "✕");
-        Stretch(txt.rectTransform);
-        txt.alignment = TextAlignmentOptions.Center;
-        return btn;
-    }
-
     // ══════════════════════════════════════════════════════════════════════
     //  Utility helpers (matching AddBotPageSetup pattern)
     // ══════════════════════════════════════════════════════════════════════
@@ -762,12 +694,6 @@ public static class AuthPageSetup
         spacer.sizeDelta = new Vector2(0, height);
         var le = spacer.gameObject.AddComponent<LayoutElement>();
         le.minHeight = height; le.preferredHeight = height;
-    }
-
-    private static void MakeIgnored(RectTransform rt, bool ignoreLayout)
-    {
-        var le = rt.gameObject.GetComponent<LayoutElement>() ?? rt.gameObject.AddComponent<LayoutElement>();
-        le.ignoreLayout = ignoreLayout;
     }
 
     private static RectTransform MakeRect(string name, Transform parent)

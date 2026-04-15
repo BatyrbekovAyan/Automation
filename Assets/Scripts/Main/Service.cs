@@ -45,15 +45,11 @@ public class Service : MonoBehaviour
             DeleteServiceButton.onClick.AddListener(OpenDeletePopup);
         }
 
+        // Delete confirm popup: fire on real finger release via PopupUI.
         if (DeleteConfirmButton != null)
-        {
-            DeleteConfirmButton.onClick.AddListener(DeleteService);
-        }
-
+            PopupUI.WireFingerUp(DeleteConfirmButton, DeleteService);
         if (DeleteCancelButton != null)
-        {
-            DeleteCancelButton.onClick.AddListener(DeleteCancel);
-        }
+            PopupUI.WireFingerUp(DeleteCancelButton, DeleteCancel);
 
         if (ServiceInput != null)
         {
@@ -146,13 +142,7 @@ public class Service : MonoBehaviour
         Destroy(gameObject);
     }
 
-    private void OpenDeletePopup()
-    {
-        DeletePopup.SetActive(true);
-    }
+    private void OpenDeletePopup() => PopupUI.Show(DeletePopup);
 
-    private void DeleteCancel()
-    {
-        DeletePopup.SetActive(false);
-    }
+    private void DeleteCancel() => PopupUI.Hide(DeletePopup);
 }

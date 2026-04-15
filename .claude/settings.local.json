@@ -20,7 +20,19 @@
       "Bash(git push:*)",
       "Bash(brew install:*)",
       "Bash(git lfs:*)",
-      "Bash(git clean:*)"
+      "Bash(git clean:*)",
+      "Bash(grep -l \"EventTrigger\\\\|PointerDown\" /Users/ayan/Projects/Automation/Assets/Prefabs/*.prefab)",
+      "Bash(awk '/m_Name: BotNameInputPanel/{flag=1} flag{print NR\": \"$0; if\\(/m_Name: DescriptionInputPanel/\\) exit}' /Users/ayan/Projects/Automation/Assets/Scenes/Main.unity)",
+      "Bash(awk '/^--- !u!114.*Button/,/^---/{print NR\": \"$0}' /Users/ayan/Projects/Automation/Assets/Scenes/Main.unity)",
+      "Bash(awk 'NR>=38200 && NR<=39100' /Users/ayan/Projects/Automation/Assets/Scenes/Main.unity)",
+      "Bash(awk 'NR>=33300 && NR<=34100' /Users/ayan/Projects/Automation/Assets/Scenes/Main.unity)",
+      "Bash(awk 'NR>=21872 && NR<=22100' /Users/ayan/Projects/Automation/Assets/Scenes/Main.unity)",
+      "Bash(awk '/m_Name: ConfirmChangeWhatsappNumberPopup|m_Name: ConfirmChangeTelegramNumberPopup/{found=1} found{print NR\": \"$0; n++; if\\(n>200\\) exit}' /Users/ayan/Projects/Automation/Assets/Scenes/Main.unity)",
+      "Bash(awk 'NR>=1660 && NR<=1810' /Users/ayan/Projects/Automation/Assets/Prefabs/Bot.prefab)",
+      "Bash(awk 'NR>=1660 && NR<=2000' /Users/ayan/Projects/Automation/Assets/Prefabs/Bot.prefab)",
+      "Bash(awk 'NR>=1666 && NR<=2200' /Users/ayan/Projects/Automation/Assets/Prefabs/Bot.prefab)",
+      "Skill(commit-commands:commit-push-pr)",
+      "Skill(commit-commands:commit-push-pr:*)"
     ]
   }
 }
