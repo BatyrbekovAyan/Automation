@@ -103,7 +103,7 @@ public static class BotsPageSetup
     private static readonly Color FgPillActive = Hex("#34C759");
 
     private const string BotPrefabPath = "Assets/Prefabs/Bot.prefab";
-    private const string BusinessIconsAssetPath = "Assets/Data/BusinessIcons.asset";
+    private const string BusinessTypesAssetPath = "Assets/Data/BusinessTypes.asset";
     private const string BusinessIconsSpritesDir = "Assets/Images/BusinessIcons";
 
     // ── Round sprite ──────────────────────────────────────────────────────
@@ -412,7 +412,7 @@ public static class BotsPageSetup
         so.FindProperty("handleActiveColor").colorValue     = handleActive;
         so.FindProperty("BotIconTile").objectReferenceValue   = iconRefs.tileBg;
         so.FindProperty("BotIconImage").objectReferenceValue  = iconRefs.iconImage;
-        so.FindProperty("businessIcons").objectReferenceValue = EnsureBusinessIconsAsset();
+        so.FindProperty("businessTypes").objectReferenceValue = EnsureBusinessTypesAsset();
         so.ApplyModifiedProperties();
 
         // Wire BotStatusPill observer component.
@@ -676,44 +676,55 @@ public static class BotsPageSetup
         };
     }
 
-    // ── BusinessIcons ScriptableObject bootstrap ─────────────────────────
-    // Index order MUST match Manager.BusinessTypesList:
+    // ── BusinessTypes ScriptableObject bootstrap ─────────────────────────
+    // Index order MUST match the legacy hand-wired BusinessTypesList so the
+    // first run after the rename creates an asset whose entries align with
+    // any pre-existing dev PlayerPrefs (best-effort; pre-launch).
     // 0 Car Service, 1 Cafe, 2 Beauty Salon, 3 Dentist,
     // 4 Real Estate, 5 Tour Agency, 6 Flowers.
-    private static readonly (string fileName, Color tile)[] BusinessIconDefaults =
+    private static readonly (string id, string displayName, string fileName, Color tile)[] BusinessTypeDefaults =
     {
-        ("CarService.png",  Hex("#8E8E93")),
-        ("Cafe.png",        Hex("#FF9500")),
-        ("BeautySalon.png", Hex("#FF375F")),
-        ("Dentist.png",     Hex("#30B0C7")),
-        ("RealEstate.png",  Hex("#5856D6")),
-        ("TourAgency.png",  Hex("#32ADE6")),
-        ("Flowers.png",     Hex("#FF2D55")),
+        ("car_service",  "Car Service",  "CarService.png",  Hex("#8E8E93")),
+        ("cafe",         "Cafe",         "Cafe.png",        Hex("#FF9500")),
+        ("beauty_salon", "Beauty Salon", "BeautySalon.png", Hex("#FF375F")),
+        ("dentist",      "Dentist",      "Dentist.png",     Hex("#30B0C7")),
+        ("real_estate",  "Real Estate",  "RealEstate.png",  Hex("#5856D6")),
+        ("tour_agency",  "Tour Agency",  "TourAgency.png",  Hex("#32ADE6")),
+        ("flowers",      "Flowers",      "Flowers.png",     Hex("#FF2D55")),
     };
 
-    private static BusinessIconsSO EnsureBusinessIconsAsset()
+    private static BusinessTypesSO EnsureBusinessTypesAsset()
     {
         // Make sure Assets/Data exists.
         if (!AssetDatabase.IsValidFolder("Assets/Data"))
             AssetDatabase.CreateFolder("Assets", "Data");
 
-        var so = AssetDatabase.LoadAssetAtPath<BusinessIconsSO>(BusinessIconsAssetPath);
+        var so = AssetDatabase.LoadAssetAtPath<BusinessTypesSO>(BusinessTypesAssetPath);
         if (so == null)
         {
-            so = ScriptableObject.CreateInstance<BusinessIconsSO>();
-            AssetDatabase.CreateAsset(so, BusinessIconsAssetPath);
+            so = ScriptableObject.CreateInstance<BusinessTypesSO>();
+            AssetDatabase.CreateAsset(so, BusinessTypesAssetPath);
         }
 
         var serialized = new SerializedObject(so);
         var entriesProp = serialized.FindProperty("entries");
-        entriesProp.arraySize = BusinessIconDefaults.Length;
 
-        for (int i = 0; i < BusinessIconDefaults.Length; i++)
+        // Grow (never shrink) to defaults length so user-added entries are kept.
+        if (entriesProp.arraySize < BusinessTypeDefaults.Length)
+            entriesProp.arraySize = BusinessTypeDefaults.Length;
+
+        for (int i = 0; i < BusinessTypeDefaults.Length; i++)
         {
-            var (fileName, tile) = BusinessIconDefaults[i];
+            var (id, displayName, fileName, tile) = BusinessTypeDefaults[i];
             var elem = entriesProp.GetArrayElementAtIndex(i);
-            var spriteProp = elem.FindPropertyRelative("sprite");
-            var colorProp  = elem.FindPropertyRelative("tileColor");
+            var idProp          = elem.FindPropertyRelative("id");
+            var displayNameProp = elem.FindPropertyRelative("displayName");
+            var spriteProp      = elem.FindPropertyRelative("sprite");
+            var colorProp       = elem.FindPropertyRelative("tileColor");
+
+            // Fill empty id / displayName only — never clobber user edits.
+            if (string.IsNullOrEmpty(idProp.stringValue))          idProp.stringValue          = id;
+            if (string.IsNullOrEmpty(displayNameProp.stringValue)) displayNameProp.stringValue = displayName;
 
             // Always overwrite tile color with the default (the SO is the
             // source of truth, and the design owns the color).
