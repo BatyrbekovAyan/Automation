@@ -53,7 +53,6 @@ public class Manager : MonoBehaviour
     [SerializeField] private RectTransform BusinessTypesParent;
     [SerializeField] private GameObject BusinessTypeButtonTemplate;
     [SerializeField] private BusinessTypesSO businessTypes;
-    [SerializeField] private List<Button> BusinessTypesList = new();
 
     [Header("Add Bot Form")]
     [SerializeField] private GameObject AddBotFormPage;
@@ -79,7 +78,6 @@ public class Manager : MonoBehaviour
     [SerializeField] private Button telegramOptionButton;
     [SerializeField] private Button bothOptionButton;
 
-    private GameObject businessType;
     private readonly System.Collections.Generic.List<Button> businessTypeButtons = new();
     private string selectedBusinessId = "";
     private int id;
@@ -139,8 +137,7 @@ public class Manager : MonoBehaviour
     {
         Application.targetFrameRate = 60;
 
-        businessType = BusinessTypesList[0].gameObject;
-        businessButtonDefaultColor = businessType.GetComponent<Image>().color;
+        PopulateBusinessTypes();
 
         id = PlayerPrefs.GetInt("ids", 0);
 
@@ -192,13 +189,6 @@ public class Manager : MonoBehaviour
         if (WhatsappNumberInput != null) WhatsappNumberInput.onValueChanged.AddListener(WhatsappNumberInputChanged);
         if (TelegramNumberInput != null) TelegramNumberInput.onValueChanged.AddListener(TelegramNumberInputChanged);
         if (TelegramCodeInput != null) TelegramCodeInput.onValueChanged.AddListener(TelegramCodeInputChanged);
-
-        // Business type buttons (dismiss the selector → finger-up)
-        foreach (Button business in BusinessTypesList)
-        {
-            var captured = business;
-            PopupUI.WireFingerUp(captured, () => ChooseBusiness(captured));
-        }
 
         // Initialize popups as hidden
         if (platformSelectorPanel != null) platformSelectorPanel.SetActive(false);
@@ -274,7 +264,11 @@ public class Manager : MonoBehaviour
                 recreatedBotSettings.BotNameButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(recreatedBot.name + "Name", "");
                 recreatedBotSettings.WhatsappToggle.isOn = PlayerPrefs.GetInt(recreatedBot.name + "isOnWhatsapp", 1) == 1;
                 recreatedBotSettings.TelegramToggle.isOn = PlayerPrefs.GetInt(recreatedBot.name + "isOnTelegram", 1) == 1;
-                recreatedBotSettings.BusinessTypeDropdown.value = PlayerPrefs.GetInt(recreatedBot.name + "BusinessType", 0);
+                PopulateBusinessDropdown(recreatedBotSettings.BusinessTypeDropdown);
+                {
+                    var savedId = PlayerPrefs.GetString(recreatedBot.name + "BusinessType", "");
+                    recreatedBotSettings.BusinessTypeDropdown.value = Mathf.Max(0, businessTypes.IndexOf(savedId));
+                }
                 recreatedBotSettings.WhatsappNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(recreatedBot.name + "WhatsappNumber", "");
                 recreatedBotSettings.TelegramNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(recreatedBot.name + "TelegramNumber", "");
 
@@ -332,7 +326,11 @@ public class Manager : MonoBehaviour
         if (openBotComp.BotDesc != null)
             openBotComp.BotDesc.text = openBotSettings.BusinessInputButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text;
 
-        PlayerPrefs.SetInt(openBot.name + "BusinessType", openBotSettings.BusinessTypeDropdown.value);
+        {
+            var dd = openBotSettings.BusinessTypeDropdown;
+            if (businessTypes.TryGetByIndex(dd.value, out var bt))
+                PlayerPrefs.SetString(openBot.name + "BusinessType", bt.id);
+        }
         openBot.GetComponent<Bot>()?.RefreshBusinessIcon();
         //PlayerPrefs.SetInt(openBot.name + "isOnWhatsapp", openBotSettings.WhatsappToggle.isOn ? 1 : 0);
         //PlayerPrefs.SetInt(openBot.name + "isOnTelegram", openBotSettings.TelegramToggle.isOn ? 1 : 0);
@@ -435,7 +433,10 @@ public class Manager : MonoBehaviour
         openBotSettings.BotNameButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(openBot.name + "Name", "");
         openBotSettings.WhatsappToggle.SetIsOnWithoutNotify(PlayerPrefs.GetInt(openBot.name + "isOnWhatsapp", 1) == 1);
         openBotSettings.TelegramToggle.SetIsOnWithoutNotify(PlayerPrefs.GetInt(openBot.name + "isOnTelegram", 1) == 1);
-        openBotSettings.BusinessTypeDropdown.value = PlayerPrefs.GetInt(openBot.name + "BusinessType", 0);
+        {
+            var savedId = PlayerPrefs.GetString(openBot.name + "BusinessType", "");
+            openBotSettings.BusinessTypeDropdown.value = Mathf.Max(0, businessTypes.IndexOf(savedId));
+        }
         openBotSettings.WhatsappNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(openBot.name + "WhatsappNumber", "");
         openBotSettings.TelegramNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(openBot.name + "TelegramNumber", "");
 
@@ -489,7 +490,9 @@ public class Manager : MonoBehaviour
         if (!openBotSettings.BotNameButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(PlayerPrefs.GetString(openBot.name + "Name", "")) ||
             openBotSettings.WhatsappToggle.isOn != (PlayerPrefs.GetInt(openBot.name + "isOnWhatsapp", 1) == 1) ||
             openBotSettings.TelegramToggle.isOn != (PlayerPrefs.GetInt(openBot.name + "isOnTelegram", 1) == 1) ||
-            openBotSettings.BusinessTypeDropdown.value != PlayerPrefs.GetInt(openBot.name + "BusinessType", 0) ||
+            (businessTypes.TryGetByIndex(openBotSettings.BusinessTypeDropdown.value, out var dirtyBt)
+                ? dirtyBt.id : "")
+                != PlayerPrefs.GetString(openBot.name + "BusinessType", "") ||
             !openBotSettings.WhatsappNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(PlayerPrefs.GetString(openBot.name + "WhatsappNumber", "")) ||
             !openBotSettings.TelegramNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(PlayerPrefs.GetString(openBot.name + "TelegramNumber", "")) ||
             !openBotSettings.BusinessInputButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(PlayerPrefs.GetString(openBot.name + "Business", "")) ||
@@ -701,27 +704,6 @@ public class Manager : MonoBehaviour
         ValidateCreateForm();
     }
 
-    public void ChooseBusiness(Button chosenBusiness)
-    {
-        businessType = chosenBusiness.gameObject;
-        businessTypeSelected = true;
-
-        foreach (Button business in BusinessTypesList)
-        {
-            business.gameObject.GetComponent<Image>().color = businessButtonDefaultColor;
-        }
-        chosenBusiness.gameObject.GetComponent<Image>().color = Color.green;
-
-        if (businessTypeValueText != null)
-        {
-            businessTypeValueText.text = chosenBusiness.gameObject.name;
-            businessTypeValueText.color = new Color32(28, 28, 30, 255);
-        }
-
-        CloseBusinessSelector();
-        ValidateCreateForm();
-    }
-
     public void OpenDescriptionInput()
     {
         PopupUI.Show(descriptionInputPanel, onCardSettled: () =>
@@ -841,7 +823,8 @@ public class Manager : MonoBehaviour
         newBotSettings.BotNameButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = formBotName;
         newBotSettings.WhatsappToggle.isOn = useWhatsapp;
         newBotSettings.TelegramToggle.isOn = useTelegram;
-        newBotSettings.BusinessTypeDropdown.value = businessType.transform.GetSiblingIndex();
+        PopulateBusinessDropdown(newBotSettings.BusinessTypeDropdown);
+        newBotSettings.BusinessTypeDropdown.value = Mathf.Max(0, businessTypes.IndexOf(selectedBusinessId));
         newBotSettings.BusinessInputButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = formDescription;
         newBotSettings.WhatsappNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = useWhatsapp ? WhatsappNumberInput.text : "";
         newBotSettings.TelegramNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = useTelegram ? TelegramNumberInput.text : "";
@@ -876,7 +859,7 @@ public class Manager : MonoBehaviour
         PlayerPrefs.SetInt(newBot.name + "Active", 0);
         PlayerPrefs.SetInt(newBot.name + "isOnWhatsapp", useWhatsapp ? 1 : 0);
         PlayerPrefs.SetInt(newBot.name + "isOnTelegram", useTelegram ? 1 : 0);
-        PlayerPrefs.SetInt(newBot.name + "BusinessType", businessType.transform.GetSiblingIndex());
+        PlayerPrefs.SetString(newBot.name + "BusinessType", selectedBusinessId);
         PlayerPrefs.SetString(newBot.name + "Business", formDescription);
         PlayerPrefs.SetString(newBot.name + "WhatsappNumber", useWhatsapp ? WhatsappNumberInput.text : "");
         PlayerPrefs.SetString(newBot.name + "TelegramNumber", useTelegram ? TelegramNumberInput.text : "");
@@ -917,7 +900,7 @@ public class Manager : MonoBehaviour
         formBotName = "";
         formDescription = "";
         businessTypeSelected = false;
-        businessType = BusinessTypesList[0].gameObject;
+        selectedBusinessId = businessTypes.Count > 0 ? businessTypes.All[0].id : "";
 
         if (platformValueText != null)
         {
@@ -947,9 +930,9 @@ public class Manager : MonoBehaviour
         if (WhatsappNumberInput != null) WhatsappNumberInput.text = "";
         if (TelegramNumberInput != null) TelegramNumberInput.text = "";
 
-        foreach (Button business in BusinessTypesList)
+        foreach (var btn in businessTypeButtons)
         {
-            business.gameObject.GetComponent<Image>().color = businessButtonDefaultColor;
+            btn.GetComponent<Image>().color = businessButtonDefaultColor;
         }
 
         if (createBotFormButton != null) createBotFormButton.interactable = false;
@@ -1981,7 +1964,7 @@ public class Manager : MonoBehaviour
         WWWForm form = new();
 
         form.AddField("Name", bot.GetComponent<Bot>().BotName != null ? bot.GetComponent<Bot>().BotName.text : "");
-        form.AddField("BusinessType", businessType.name);
+        form.AddField("BusinessType", businessTypes.TryGetById(selectedBusinessId, out var bt1) ? bt1.displayName : "");
         form.AddField("WhatsappProfileId", whatsappProfileId);
 
         form.AddField("Business", "");
@@ -2111,7 +2094,7 @@ public class Manager : MonoBehaviour
         WWWForm form = new();
 
         form.AddField("Name", bot.GetComponent<Bot>().BotName != null ? bot.GetComponent<Bot>().BotName.text : "");
-        form.AddField("BusinessType", businessType.name);
+        form.AddField("BusinessType", businessTypes.TryGetById(selectedBusinessId, out var bt2) ? bt2.displayName : "");
         form.AddField("TelegramProfileId", telegramProfileId);
 
         form.AddField("Business", "");
