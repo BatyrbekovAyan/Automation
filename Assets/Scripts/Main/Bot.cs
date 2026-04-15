@@ -6,6 +6,8 @@ using TMPro;
 
 public class Bot : MonoBehaviour
 {
+    [SerializeField] public TextMeshProUGUI BotName;
+    [SerializeField] public TextMeshProUGUI BotDesc;
     [SerializeField] public TextMeshProUGUI Status;
     [SerializeField] public Button EditButton;
     [SerializeField] private Button DeleteButton;
@@ -17,6 +19,11 @@ public class Bot : MonoBehaviour
 
     [SerializeField] private Color backgroundActiveColor;
     [SerializeField] private Color handleActiveColor;
+
+    [Header("Business Icon")]
+    [SerializeField] private Image BotIconTile;
+    [SerializeField] private Image BotIconImage;
+    [SerializeField] private BusinessIconsSO businessIcons;
 
 
     public bool active = false;
@@ -40,6 +47,7 @@ public class Bot : MonoBehaviour
     private void Awake ()
     {
         StartCoroutine(SetSwitches());
+        ApplyBusinessIcon();
 
 
         ActivationSwitch.onValueChanged.AddListener(EnableBot);
@@ -220,6 +228,23 @@ public class Bot : MonoBehaviour
             Status.text = "Not Active";
             Status.color = red;
         }
+    }
+
+    public void RefreshBusinessIcon() => ApplyBusinessIcon();
+
+    private void ApplyBusinessIcon()
+    {
+        if (businessIcons == null) return;
+
+        int index = PlayerPrefs.GetInt(transform.name + "BusinessType", 0);
+        if (!businessIcons.TryGet(index, out var entry))
+        {
+            Debug.LogWarning($"[Bot] No business icon entry for index {index} on '{transform.name}'");
+            return;
+        }
+
+        if (BotIconImage != null && entry.sprite != null) BotIconImage.sprite = entry.sprite;
+        if (BotIconTile != null) BotIconTile.color = entry.tileColor;
     }
 
     private void OnDestroy ()
