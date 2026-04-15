@@ -50,6 +50,9 @@ public class Manager : MonoBehaviour
     [SerializeField] private RawImage TelegramQRCodeImage;
     [SerializeField] private GameObject WhatsappQRStatusText;
     [SerializeField] private GameObject TelegramQRStatusText;
+    [SerializeField] private RectTransform BusinessTypesParent;
+    [SerializeField] private GameObject BusinessTypeButtonTemplate;
+    [SerializeField] private BusinessTypesSO businessTypes;
     [SerializeField] private List<Button> BusinessTypesList = new();
 
     [Header("Add Bot Form")]
@@ -77,6 +80,8 @@ public class Manager : MonoBehaviour
     [SerializeField] private Button bothOptionButton;
 
     private GameObject businessType;
+    private readonly System.Collections.Generic.List<Button> businessTypeButtons = new();
+    private string selectedBusinessId = "";
     private int id;
     private Color businessButtonDefaultColor;
 
@@ -616,6 +621,85 @@ public class Manager : MonoBehaviour
     public void OpenBusinessSelector() => PopupUI.Show(businessSelectorPanel);
 
     public void CloseBusinessSelector() => PopupUI.Hide(businessSelectorPanel);
+
+    private void PopulateBusinessTypes()
+    {
+        if (BusinessTypesParent == null || BusinessTypeButtonTemplate == null || businessTypes == null)
+        {
+            Debug.LogError("[Manager] PopulateBusinessTypes: missing serialized refs (BusinessTypesParent, BusinessTypeButtonTemplate, or businessTypes).");
+            return;
+        }
+
+        // Destroy any previously-instantiated buttons (everything except the template).
+        for (int i = BusinessTypesParent.childCount - 1; i >= 0; i--)
+        {
+            var child = BusinessTypesParent.GetChild(i).gameObject;
+            if (child == BusinessTypeButtonTemplate) continue;
+            DestroyImmediate(child);
+        }
+
+        BusinessTypeButtonTemplate.SetActive(false);
+        businessTypeButtons.Clear();
+
+        foreach (var entry in businessTypes.All)
+        {
+            var go = Instantiate(BusinessTypeButtonTemplate, BusinessTypesParent);
+            go.SetActive(true);
+            go.name = entry.id;
+
+            var label = go.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (label != null) label.text = entry.displayName;
+
+            var btn = go.GetComponent<Button>();
+            var capturedId = entry.id;
+            PopupUI.WireFingerUp(btn, () => ChooseBusiness(capturedId));
+            businessTypeButtons.Add(btn);
+        }
+
+        if (businessTypes.Count > 0)
+        {
+            selectedBusinessId = businessTypes.All[0].id;
+            if (businessTypeButtons.Count > 0)
+                businessButtonDefaultColor = businessTypeButtons[0].GetComponent<Image>().color;
+        }
+        else
+        {
+            selectedBusinessId = "";
+        }
+    }
+
+    private void PopulateBusinessDropdown(TMP_Dropdown dd)
+    {
+        if (dd == null || businessTypes == null) return;
+
+        dd.options.Clear();
+        foreach (var entry in businessTypes.All)
+            dd.options.Add(new TMP_Dropdown.OptionData(entry.displayName));
+        dd.RefreshShownValue();
+    }
+
+    public void ChooseBusiness(string id)
+    {
+        if (businessTypes == null || !businessTypes.TryGetById(id, out var entry)) return;
+        selectedBusinessId = id;
+        businessTypeSelected = true;
+
+        for (int i = 0; i < businessTypeButtons.Count; i++)
+        {
+            var btn = businessTypeButtons[i];
+            var img = btn.GetComponent<Image>();
+            img.color = (btn.gameObject.name == id) ? Color.green : businessButtonDefaultColor;
+        }
+
+        if (businessTypeValueText != null)
+        {
+            businessTypeValueText.text = entry.displayName;
+            businessTypeValueText.color = new Color32(28, 28, 30, 255);
+        }
+
+        CloseBusinessSelector();
+        ValidateCreateForm();
+    }
 
     public void ChooseBusiness(Button chosenBusiness)
     {
