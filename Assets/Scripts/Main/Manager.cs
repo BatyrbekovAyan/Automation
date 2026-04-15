@@ -258,6 +258,10 @@ public class Manager : MonoBehaviour
                 recreatedBot.GetComponent<Bot>().telegramProfileId = PlayerPrefs.GetString(recreatedBot.name + "TelegramProfileId", "-1");
                 recreatedBot.GetComponent<Bot>().whatsappWorkflowId = PlayerPrefs.GetString(recreatedBot.name + "WhatsappWorkflowId", "-1");
                 recreatedBot.GetComponent<Bot>().telegramWorkflowId = PlayerPrefs.GetString(recreatedBot.name + "TelegramWorkflowId", "-1");
+                // Apply the icon now — Bot.Awake fires before the rename above,
+                // so it sees the prefab name and no PlayerPrefs entry. Refresh
+                // explicitly now that the bot has its final name.
+                recreatedBotComp.RefreshBusinessIcon();
 
                 BotSettings recreatedBotSettings = Instantiate(BotSettings, new Vector3(BotSettings.transform.position.x + Screen.width / 2, BotSettings.transform.position.y + Screen.height / 2, 0), BotSettings.transform.rotation, BotSettingsParent.transform).GetComponent<BotSettings>();
 
@@ -860,6 +864,9 @@ public class Manager : MonoBehaviour
         PlayerPrefs.SetInt(newBot.name + "isOnWhatsapp", useWhatsapp ? 1 : 0);
         PlayerPrefs.SetInt(newBot.name + "isOnTelegram", useTelegram ? 1 : 0);
         PlayerPrefs.SetString(newBot.name + "BusinessType", selectedBusinessId);
+        // Bot.Awake() fires during Instantiate before the rename + PlayerPrefs
+        // write above, so the icon was never applied. Apply it explicitly now.
+        newBot.GetComponent<Bot>()?.RefreshBusinessIcon();
         PlayerPrefs.SetString(newBot.name + "Business", formDescription);
         PlayerPrefs.SetString(newBot.name + "WhatsappNumber", useWhatsapp ? WhatsappNumberInput.text : "");
         PlayerPrefs.SetString(newBot.name + "TelegramNumber", useTelegram ? TelegramNumberInput.text : "");

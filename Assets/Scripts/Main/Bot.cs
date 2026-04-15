@@ -237,6 +237,11 @@ public class Bot : MonoBehaviour
         if (businessTypes == null) return;
 
         var id = PlayerPrefs.GetString(transform.name + "BusinessType", "");
+        // Empty id is expected when Awake fires before the Manager has renamed
+        // the instantiated bot and written PlayerPrefs. Manager calls
+        // RefreshBusinessIcon() explicitly once both are done.
+        if (string.IsNullOrEmpty(id)) return;
+
         if (!businessTypes.TryGetById(id, out var entry))
         {
             Debug.LogWarning($"[Bot] No business type entry for id '{id}' on '{transform.name}'");
