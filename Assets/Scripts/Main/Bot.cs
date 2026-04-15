@@ -23,7 +23,7 @@ public class Bot : MonoBehaviour
     [Header("Business Icon")]
     [SerializeField] private Image BotIconTile;
     [SerializeField] private Image BotIconImage;
-    [SerializeField] private BusinessIconsSO businessIcons;
+    [SerializeField] private BusinessTypesSO businessTypes;
 
 
     public bool active = false;
@@ -234,12 +234,12 @@ public class Bot : MonoBehaviour
 
     private void ApplyBusinessIcon()
     {
-        if (businessIcons == null) return;
+        if (businessTypes == null) return;
 
-        int index = PlayerPrefs.GetInt(transform.name + "BusinessType", 0);
-        if (!businessIcons.TryGet(index, out var entry))
+        var id = PlayerPrefs.GetString(transform.name + "BusinessType", "");
+        if (!businessTypes.TryGetById(id, out var entry))
         {
-            Debug.LogWarning($"[Bot] No business icon entry for index {index} on '{transform.name}'");
+            Debug.LogWarning($"[Bot] No business type entry for id '{id}' on '{transform.name}'");
             return;
         }
 
