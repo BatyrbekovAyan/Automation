@@ -249,9 +249,15 @@ public class Manager : MonoBehaviour
 
                 recreatedBot.name = "Bot" + i.ToString();
 
-                recreatedBot.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(recreatedBot.name + "Name", "");
-                recreatedBot.transform.GetChild(1).GetComponent<Toggle>().isOn = PlayerPrefs.GetInt(recreatedBot.name + "isOn", 1) == 1;
-                recreatedBot.transform.GetChild(2).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(recreatedBot.name + "Status", "");
+                var recreatedBotComp = recreatedBot.GetComponent<Bot>();
+                if (recreatedBotComp.BotName != null)
+                    recreatedBotComp.BotName.text = PlayerPrefs.GetString(recreatedBot.name + "Name", "");
+                if (recreatedBotComp.BotDesc != null)
+                    recreatedBotComp.BotDesc.text = PlayerPrefs.GetString(recreatedBot.name + "Business", "");
+                if (recreatedBotComp.ActivationSwitch != null)
+                    recreatedBotComp.ActivationSwitch.isOn = PlayerPrefs.GetInt(recreatedBot.name + "isOn", 1) == 1;
+                if (recreatedBotComp.Status != null)
+                    recreatedBotComp.Status.text = PlayerPrefs.GetString(recreatedBot.name + "Status", "");
                 recreatedBot.GetComponent<Bot>().active = PlayerPrefs.GetInt(recreatedBot.name + "Active", 0) == 1;
                 recreatedBot.GetComponent<Bot>().whatsappProfileId = PlayerPrefs.GetString(recreatedBot.name + "WhatsappProfileId", "-1");
                 recreatedBot.GetComponent<Bot>().telegramProfileId = PlayerPrefs.GetString(recreatedBot.name + "TelegramProfileId", "-1");
@@ -313,10 +319,16 @@ public class Manager : MonoBehaviour
 
     public void SaveSettings()
     {
-        PlayerPrefs.SetString(openBot.name + "Name", openBotSettings.BotNameButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text);
-        openBot.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = openBotSettings.BotNameButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text;
+        var newName = openBotSettings.BotNameButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text;
+        PlayerPrefs.SetString(openBot.name + "Name", newName);
+        var openBotComp = openBot.GetComponent<Bot>();
+        if (openBotComp.BotName != null) openBotComp.BotName.text = newName;
+        // Refresh the card's description from the about-business text.
+        if (openBotComp.BotDesc != null)
+            openBotComp.BotDesc.text = openBotSettings.BusinessInputButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text;
 
         PlayerPrefs.SetInt(openBot.name + "BusinessType", openBotSettings.BusinessTypeDropdown.value);
+        openBot.GetComponent<Bot>()?.RefreshBusinessIcon();
         //PlayerPrefs.SetInt(openBot.name + "isOnWhatsapp", openBotSettings.WhatsappToggle.isOn ? 1 : 0);
         //PlayerPrefs.SetInt(openBot.name + "isOnTelegram", openBotSettings.TelegramToggle.isOn ? 1 : 0);
 
@@ -726,9 +738,14 @@ public class Manager : MonoBehaviour
         GameObject newBot = Instantiate(BotPrefab, BotPrefab.transform.position, BotPrefab.transform.rotation, BotsParent.transform);
         newBot.name = "Bot" + id.ToString();
 
-        newBot.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = formBotName;
-        newBot.transform.GetChild(1).GetComponent<Toggle>().isOn = true;
-        newBot.transform.GetChild(2).GetComponent<TextMeshProUGUI>().text = "Connecting..";
+        var newBotComp = newBot.GetComponent<Bot>();
+        if (newBotComp.BotName != null) newBotComp.BotName.text = formBotName;
+        // The Add Bot form captures an optional description in formDescription.
+        // Propagate it so the card renders it immediately (matches the LoadBots
+        // path which reads PlayerPrefs "Business").
+        if (newBotComp.BotDesc != null) newBotComp.BotDesc.text = formDescription;
+        if (newBotComp.ActivationSwitch != null) newBotComp.ActivationSwitch.isOn = true;
+        if (newBotComp.Status != null) newBotComp.Status.text = "Connecting..";
         newBot.GetComponent<Bot>().active = false;
         newBot.GetComponent<Bot>().EditButton.interactable = false;
         newBot.GetComponent<Bot>().ActivationSwitch.interactable = false;
@@ -741,6 +758,7 @@ public class Manager : MonoBehaviour
         newBotSettings.WhatsappToggle.isOn = useWhatsapp;
         newBotSettings.TelegramToggle.isOn = useTelegram;
         newBotSettings.BusinessTypeDropdown.value = businessType.transform.GetSiblingIndex();
+        newBotSettings.BusinessInputButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = formDescription;
         newBotSettings.WhatsappNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = useWhatsapp ? WhatsappNumberInput.text : "";
         newBotSettings.TelegramNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = useTelegram ? TelegramNumberInput.text : "";
         newBotSettings.WhatsappNumberButton.transform.parent.gameObject.SetActive(useWhatsapp && !string.IsNullOrEmpty(WhatsappNumberInput.text));
@@ -775,6 +793,7 @@ public class Manager : MonoBehaviour
         PlayerPrefs.SetInt(newBot.name + "isOnWhatsapp", useWhatsapp ? 1 : 0);
         PlayerPrefs.SetInt(newBot.name + "isOnTelegram", useTelegram ? 1 : 0);
         PlayerPrefs.SetInt(newBot.name + "BusinessType", businessType.transform.GetSiblingIndex());
+        PlayerPrefs.SetString(newBot.name + "Business", formDescription);
         PlayerPrefs.SetString(newBot.name + "WhatsappNumber", useWhatsapp ? WhatsappNumberInput.text : "");
         PlayerPrefs.SetString(newBot.name + "TelegramNumber", useTelegram ? TelegramNumberInput.text : "");
 
@@ -1877,7 +1896,7 @@ public class Manager : MonoBehaviour
 
         WWWForm form = new();
 
-        form.AddField("Name", bot.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text);
+        form.AddField("Name", bot.GetComponent<Bot>().BotName != null ? bot.GetComponent<Bot>().BotName.text : "");
         form.AddField("BusinessType", businessType.name);
         form.AddField("WhatsappProfileId", whatsappProfileId);
 
@@ -2007,7 +2026,7 @@ public class Manager : MonoBehaviour
 
         WWWForm form = new();
 
-        form.AddField("Name", bot.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text);
+        form.AddField("Name", bot.GetComponent<Bot>().BotName != null ? bot.GetComponent<Bot>().BotName.text : "");
         form.AddField("BusinessType", businessType.name);
         form.AddField("TelegramProfileId", telegramProfileId);
 
