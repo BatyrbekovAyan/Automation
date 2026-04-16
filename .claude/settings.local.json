@@ -32,7 +32,12 @@
       "Bash(awk 'NR>=1660 && NR<=2000' /Users/ayan/Projects/Automation/Assets/Prefabs/Bot.prefab)",
       "Bash(awk 'NR>=1666 && NR<=2200' /Users/ayan/Projects/Automation/Assets/Prefabs/Bot.prefab)",
       "Skill(commit-commands:commit-push-pr)",
-      "Skill(commit-commands:commit-push-pr:*)"
+      "Skill(commit-commands:commit-push-pr:*)",
+      "Skill(unity-ui-builder)",
+      "Skill(unity-ui-builder:*)",
+      "Bash(grep -B2 'fileID: 954544247$\\\\|fileID: 1682385$\\\\|fileID: 1897212066$\\\\|fileID: 1069528584$\\\\|fileID: 581298398$\\\\|fileID: 621291294$\\\\|fileID: 876266925$' /Users/ayan/Projects/Automation/Assets/Scenes/Main.unity)",
+      "Bash(grep -n \"&1246009917$\\\\|&1246009918$\\\\|&1246009919$\\\\|&1246009916$\" /Users/ayan/Projects/Automation/Assets/Scenes/Main.unity)",
+      "Bash(python3)"
     ]
   }
 }

@@ -26,6 +26,8 @@ public class Manager : MonoBehaviour
     [SerializeField] private GameObject WhatsappCodePanel;
     [SerializeField] private GameObject TelegramQRPanel;
     [SerializeField] private GameObject TelegramCodePanel;
+    [SerializeField] private TextMeshProUGUI TelegramPhoneTitle;
+    [SerializeField] private TextMeshProUGUI TelegramPhoneBody;
     [SerializeField] private GameObject WhatsappCodeTimer;
     [SerializeField] private GameObject TelegramCodeTimer;
     // Status messages are shown inline in button text — no separate GOs needed
@@ -102,6 +104,8 @@ public class Manager : MonoBehaviour
     private bool isCreatingBot;
     private Coroutine _whatsappStatusCoroutine;
     private Coroutine _telegramStatusCoroutine;
+    private string telegramPhoneTitleInitial;
+    private string telegramPhoneBodyInitial;
 
     public static string wappiAuthToken => Secrets.Data.wappiAuthToken;
     public static string n8nAPIKey => Secrets.Data.n8nAPIKey;
@@ -154,6 +158,9 @@ public class Manager : MonoBehaviour
         EnableTelegramWorkflowSaved = false;
 
         Instance = this;
+
+        if (TelegramPhoneTitle != null) telegramPhoneTitleInitial = TelegramPhoneTitle.text;
+        if (TelegramPhoneBody != null) telegramPhoneBodyInitial = TelegramPhoneBody.text;
 
         // Add Bot Form — row buttons
         if (platformRowButton != null) platformRowButton.onClick.AddListener(OpenPlatformSelector);
@@ -1090,10 +1097,10 @@ public class Manager : MonoBehaviour
         TelegramCodePanel.transform.GetChild(3).gameObject.SetActive(true);
         TelegramCodeInput.gameObject.SetActive(false);
         SendTelegramCodeButton.gameObject.SetActive(false);
-        TelegramCodePanel.transform.GetChild(4).gameObject.SetActive(false);
         if (ChangeTelegramNumberButton != null) ChangeTelegramNumberButton.gameObject.SetActive(false);
         TelegramCodeInput.text = "";
         SetButtonText(GetTelegramCodeButton, "Получить код");
+        SetTelegramCodeEntryTexts(false);
 
         // Restore timer/button state from persisted cooldown
         string tgCooldown = PlayerPrefs.GetString("TelegramCooldownFinishTime", "-1");
@@ -1126,7 +1133,7 @@ public class Manager : MonoBehaviour
         yield return new WaitForSeconds(3f);
         if (!WhatsappQRPanel.activeSelf) yield break;
 
-        string lastError = "Server Unavailable.\n\nTry Again Later";
+        string lastError = "Server Unavailable.\nTry Again Later";
 
         for (int attempt = 0; attempt < 5; attempt++)
         {
@@ -1195,7 +1202,7 @@ public class Manager : MonoBehaviour
         WhatsappQRCodeImage.texture = null;
 
         WhatsappQRStatusText.SetActive(false);
-        WhatsappQRStatusText.GetComponent<TextMeshProUGUI>().text = "Server Unavailable.\n\nTry Again Later";
+        WhatsappQRStatusText.GetComponent<TextMeshProUGUI>().text = "Server Unavailable.\nTry Again Later";
     }
 
     public void OpenWhatsappCodePanel()
@@ -1386,7 +1393,7 @@ public class Manager : MonoBehaviour
         yield return new WaitForSeconds(3f);
         if (!TelegramQRPanel.activeSelf) yield break;
 
-        string lastError = "Server Unavailable.\n\nTry Again Later";
+        string lastError = "Server Unavailable.\nTry Again Later";
 
         for (int attempt = 0; attempt < 5; attempt++)
         {
@@ -1456,7 +1463,15 @@ public class Manager : MonoBehaviour
         TelegramQRCodeImage.texture = null;
 
         TelegramQRStatusText.SetActive(false);
-        TelegramQRStatusText.GetComponent<TextMeshProUGUI>().text = "Server Unavailable.\n\nTry Again Later";
+        TelegramQRStatusText.GetComponent<TextMeshProUGUI>().text = "Server Unavailable.\nTry Again Later";
+    }
+
+    private void SetTelegramCodeEntryTexts(bool codeMode)
+    {
+        if (TelegramPhoneTitle != null)
+            TelegramPhoneTitle.text = codeMode ? "Введите код" : telegramPhoneTitleInitial;
+        if (TelegramPhoneBody != null)
+            TelegramPhoneBody.text = codeMode ? "Откройте Telegram и введите\nполученный код подтверждения" : telegramPhoneBodyInitial;
     }
 
     public void OpenTelegramCodePanel()
@@ -1541,8 +1556,8 @@ public class Manager : MonoBehaviour
 
             TelegramNumberInput.gameObject.SetActive(false);
             TelegramCodePanel.transform.GetChild(3).gameObject.SetActive(false);
-            TelegramCodePanel.transform.GetChild(4).gameObject.SetActive(true);
             TelegramCodeInput.gameObject.SetActive(true);
+            SetTelegramCodeEntryTexts(true);
             SendTelegramCodeButton.gameObject.SetActive(true);
             if (ChangeTelegramNumberButton != null) ChangeTelegramNumberButton.gameObject.SetActive(true);
 
@@ -1665,7 +1680,7 @@ public class Manager : MonoBehaviour
         TelegramCodePanel.transform.GetChild(3).gameObject.SetActive(true);
         TelegramCodeInput.gameObject.SetActive(false);
         SendTelegramCodeButton.gameObject.SetActive(false);
-        TelegramCodePanel.transform.GetChild(4).gameObject.SetActive(false);
+        SetTelegramCodeEntryTexts(false);
 
         if (ChangeTelegramNumberButton != null) ChangeTelegramNumberButton.gameObject.SetActive(false);
 
@@ -1681,7 +1696,7 @@ public class Manager : MonoBehaviour
         TelegramCodePanel.transform.GetChild(3).gameObject.SetActive(true);
         TelegramCodeInput.gameObject.SetActive(false);
         SendTelegramCodeButton.gameObject.SetActive(false);
-        TelegramCodePanel.transform.GetChild(4).gameObject.SetActive(false);
+        SetTelegramCodeEntryTexts(false);
 
         if (ChangeTelegramNumberButton != null) ChangeTelegramNumberButton.gameObject.SetActive(false);
 

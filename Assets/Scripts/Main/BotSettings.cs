@@ -27,6 +27,8 @@ public class BotSettings : MonoBehaviour
     [SerializeField] public GameObject TelegramAuthorization;
     [SerializeField] public GameObject TelegramQRPanel;
     [SerializeField] public GameObject TelegramCodePanel;
+    [SerializeField] private TextMeshProUGUI TelegramPhoneTitle;
+    [SerializeField] private TextMeshProUGUI TelegramPhoneBody;
     [SerializeField] public GameObject Saved;
     [SerializeField] private GameObject ConfirmChangeWhatsappNumberPopup;
     [SerializeField] private GameObject ConfirmChangeTelegramNumberPopup;
@@ -96,6 +98,8 @@ public class BotSettings : MonoBehaviour
     private string xls;
     private string xlsx;
     private string docx;
+    private string telegramPhoneTitleInitial;
+    private string telegramPhoneBodyInitial;
 
     public static BotSettings Instance;
     #endregion
@@ -103,6 +107,9 @@ public class BotSettings : MonoBehaviour
 
     void Start()
     {
+        if (TelegramPhoneTitle != null) telegramPhoneTitleInitial = TelegramPhoneTitle.text;
+        if (TelegramPhoneBody != null) telegramPhoneBodyInitial = TelegramPhoneBody.text;
+
         if (GeneralTabButton != null)
         {
             GeneralTabButton.onClick.AddListener(OpenGeneralTab);
@@ -1331,6 +1338,14 @@ public class BotSettings : MonoBehaviour
         TelegramQRPanel.transform.GetChild(3).GetComponent<TextMeshProUGUI>().text = "Server Unavailable.\n\nTry Again Later";
     }
 
+    private void SetTelegramCodeEntryTexts(bool codeMode)
+    {
+        if (TelegramPhoneTitle != null)
+            TelegramPhoneTitle.text = codeMode ? "Введите код" : telegramPhoneTitleInitial;
+        if (TelegramPhoneBody != null)
+            TelegramPhoneBody.text = codeMode ? "Откройте Telegram и введите\nполученный код подтверждения" : telegramPhoneBodyInitial;
+    }
+
     public void OpenTelegramCodePanel()
     {
         TelegramCodePanel.SetActive(true);
@@ -1415,10 +1430,10 @@ public class BotSettings : MonoBehaviour
             PlayerPrefs.SetString("TelegramCooldownFinishTime", DateTime.Now.AddSeconds(30).ToString());
 
             TelegramNumberInput.gameObject.SetActive(false);
-            TelegramCodePanel.transform.GetChild(4).gameObject.SetActive(false);
             TelegramCodeInput.gameObject.SetActive(true);
             SendTelegramCodeButton.gameObject.SetActive(true);
-            TelegramCodePanel.transform.GetChild(7).gameObject.SetActive(true);
+            TelegramCodePanel.transform.GetChild(6).gameObject.SetActive(true);
+            SetTelegramCodeEntryTexts(true);
 
 
             string response = www.downloadHandler.text;
@@ -1539,10 +1554,10 @@ public class BotSettings : MonoBehaviour
         SetButtonText(GetTelegramCodeButton, "Получить код");
 
         TelegramNumberInput.gameObject.SetActive(true);
-        TelegramCodePanel.transform.GetChild(4).gameObject.SetActive(true);
         TelegramCodeInput.gameObject.SetActive(false);
         SendTelegramCodeButton.gameObject.SetActive(false);
-        TelegramCodePanel.transform.GetChild(7).gameObject.SetActive(false);
+        TelegramCodePanel.transform.GetChild(6).gameObject.SetActive(false);
+        SetTelegramCodeEntryTexts(false);
 
         TelegramCodeInput.text = "";
     }
