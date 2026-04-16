@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Text;
 using System;
 using System.IO;
+using Automation.BotSettingsUI;
 
 public class Manager : MonoBehaviour
 {
@@ -272,7 +273,7 @@ public class Manager : MonoBehaviour
 
                 BotSettings recreatedBotSettings = Instantiate(BotSettings, new Vector3(BotSettings.transform.position.x + Screen.width / 2, BotSettings.transform.position.y + Screen.height / 2, 0), BotSettings.transform.rotation, BotSettingsParent.transform).GetComponent<BotSettings>();
 
-                recreatedBotSettings.BotNameButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(recreatedBot.name + "Name", "");
+                recreatedBotSettings.BotNameField.Value = PlayerPrefs.GetString(recreatedBot.name + "Name", "");
                 recreatedBotSettings.WhatsappToggle.isOn = PlayerPrefs.GetInt(recreatedBot.name + "isOnWhatsapp", 1) == 1;
                 recreatedBotSettings.TelegramToggle.isOn = PlayerPrefs.GetInt(recreatedBot.name + "isOnTelegram", 1) == 1;
                 PopulateBusinessDropdown(recreatedBotSettings.BusinessTypeDropdown);
@@ -280,23 +281,23 @@ public class Manager : MonoBehaviour
                     var savedId = PlayerPrefs.GetString(recreatedBot.name + "BusinessType", "");
                     recreatedBotSettings.BusinessTypeDropdown.value = Mathf.Max(0, businessTypes.IndexOf(savedId));
                 }
-                recreatedBotSettings.WhatsappNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(recreatedBot.name + "WhatsappNumber", "");
-                recreatedBotSettings.TelegramNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(recreatedBot.name + "TelegramNumber", "");
+                recreatedBotSettings.WhatsappNumberField.Value = PlayerPrefs.GetString(recreatedBot.name + "WhatsappNumber", "");
+                recreatedBotSettings.TelegramNumberField.Value = PlayerPrefs.GetString(recreatedBot.name + "TelegramNumber", "");
 
-                recreatedBotSettings.WhatsappNumberButton.transform.parent.gameObject.SetActive(!recreatedBotSettings.WhatsappNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(""));
-                recreatedBotSettings.TelegramNumberButton.transform.parent.gameObject.SetActive(!recreatedBotSettings.TelegramNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(""));
+                recreatedBotSettings.WhatsappNumberField.gameObject.SetActive(!recreatedBotSettings.WhatsappNumberField.Value.Equals(""));
+                recreatedBotSettings.TelegramNumberField.gameObject.SetActive(!recreatedBotSettings.TelegramNumberField.Value.Equals(""));
 
-                recreatedBotSettings.BusinessInputButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(recreatedBot.name + "Business", "");
-                recreatedBotSettings.PromptInputButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(recreatedBot.name + "Prompt", "");
+                recreatedBotSettings.BusinessField.Value = PlayerPrefs.GetString(recreatedBot.name + "Business", "");
+                recreatedBotSettings.PromptField.Value = PlayerPrefs.GetString(recreatedBot.name + "Prompt", "");
 
                 int ProductsNumber = PlayerPrefs.GetInt(recreatedBot.name + "ProductsNumber", 0);
                 for (int p = 0; p < ProductsNumber; p++)
                 {
-                    Product recreatedProduct = Instantiate(ProductPrefab, ProductPrefab.transform.position, ProductPrefab.transform.rotation, recreatedBotSettings.AddProductButton.transform.parent.parent).GetComponent<Product>();
+                    ProductCardView recreatedProduct = Instantiate(ProductPrefab, ProductPrefab.transform.position, ProductPrefab.transform.rotation, recreatedBotSettings.AddProductButton.transform.parent.parent).GetComponent<ProductCardView>();
 
-                    recreatedProduct.ProductButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(recreatedBot.name + "Product" + p, "");
-                    recreatedProduct.PriceButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(recreatedBot.name + "Product" + p + "Price", "");
-                    recreatedProduct.DescriptionButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(recreatedBot.name + "Product" + p + "Description", "");
+                    recreatedProduct.Name = PlayerPrefs.GetString(recreatedBot.name + "Product" + p, "");
+                    recreatedProduct.Price = PlayerPrefs.GetString(recreatedBot.name + "Product" + p + "Price", "");
+                    recreatedProduct.Description = PlayerPrefs.GetString(recreatedBot.name + "Product" + p + "Description", "");
                 }
 
                 recreatedBotSettings.AddProductButton.transform.parent.SetAsLastSibling();
@@ -305,11 +306,11 @@ public class Manager : MonoBehaviour
                 int ServicesNumber = PlayerPrefs.GetInt(recreatedBot.name + "ServicesNumber", 0);
                 for (int s = 0; s < ServicesNumber; s++)
                 {
-                    Service recreatedService = Instantiate(ServicePrefab, ServicePrefab.transform.position, ServicePrefab.transform.rotation, recreatedBotSettings.AddServiceButton.transform.parent.parent).GetComponent<Service>();
+                    ServiceCardView recreatedService = Instantiate(ServicePrefab, ServicePrefab.transform.position, ServicePrefab.transform.rotation, recreatedBotSettings.AddServiceButton.transform.parent.parent).GetComponent<ServiceCardView>();
 
-                    recreatedService.ServiceButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(recreatedBot.name + "Service" + s, "");
-                    recreatedService.PriceButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(recreatedBot.name + "Service" + s + "Price", "");
-                    recreatedService.DescriptionButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(recreatedBot.name + "Service" + s + "Description", "");
+                    recreatedService.Name = PlayerPrefs.GetString(recreatedBot.name + "Service" + s, "");
+                    recreatedService.Price = PlayerPrefs.GetString(recreatedBot.name + "Service" + s + "Price", "");
+                    recreatedService.Description = PlayerPrefs.GetString(recreatedBot.name + "Service" + s + "Description", "");
                 }
 
                 recreatedBotSettings.AddServiceButton.transform.parent.SetAsLastSibling();
@@ -329,13 +330,13 @@ public class Manager : MonoBehaviour
 
     public void SaveSettings()
     {
-        var newName = openBotSettings.BotNameButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text;
+        var newName = openBotSettings.BotNameField.Value;
         PlayerPrefs.SetString(openBot.name + "Name", newName);
         var openBotComp = openBot.GetComponent<Bot>();
         if (openBotComp.BotName != null) openBotComp.BotName.text = newName;
         // Refresh the card's description from the about-business text.
         if (openBotComp.BotDesc != null)
-            openBotComp.BotDesc.text = openBotSettings.BusinessInputButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text;
+            openBotComp.BotDesc.text = openBotSettings.BusinessField.Value;
 
         {
             var dd = openBotSettings.BusinessTypeDropdown;
@@ -346,17 +347,17 @@ public class Manager : MonoBehaviour
         //PlayerPrefs.SetInt(openBot.name + "isOnWhatsapp", openBotSettings.WhatsappToggle.isOn ? 1 : 0);
         //PlayerPrefs.SetInt(openBot.name + "isOnTelegram", openBotSettings.TelegramToggle.isOn ? 1 : 0);
 
-        PlayerPrefs.SetString(openBot.name + "WhatsappNumber", openBotSettings.WhatsappNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text);
-        PlayerPrefs.SetString(openBot.name + "TelegramNumber", openBotSettings.TelegramNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text);
+        PlayerPrefs.SetString(openBot.name + "WhatsappNumber", openBotSettings.WhatsappNumberField.Value);
+        PlayerPrefs.SetString(openBot.name + "TelegramNumber", openBotSettings.TelegramNumberField.Value);
 
-        openBotSettings.WhatsappNumberButton.transform.parent.gameObject.SetActive(!openBotSettings.WhatsappNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(""));
-        openBotSettings.TelegramNumberButton.transform.parent.gameObject.SetActive(!openBotSettings.TelegramNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(""));
+        openBotSettings.WhatsappNumberField.gameObject.SetActive(!openBotSettings.WhatsappNumberField.Value.Equals(""));
+        openBotSettings.TelegramNumberField.gameObject.SetActive(!openBotSettings.TelegramNumberField.Value.Equals(""));
 
 
-        PlayerPrefs.SetString(openBot.name + "Business", openBotSettings.BusinessInputButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text);
+        PlayerPrefs.SetString(openBot.name + "Business", openBotSettings.BusinessField.Value);
         openBotSettings.BusinessInput.text = "";
 
-        PlayerPrefs.SetString(openBot.name + "Prompt", openBotSettings.PromptInputButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text);
+        PlayerPrefs.SetString(openBot.name + "Prompt", openBotSettings.PromptField.Value);
         openBotSettings.PromptInput.text = "";
 
 
@@ -364,12 +365,12 @@ public class Manager : MonoBehaviour
         {
             Transform product = openBotSettings.ProductsParent.transform.GetChild(i);
 
-            product.GetComponent<Product>().ProductButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Trim();
-            if (!product.GetComponent<Product>().ProductButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(""))
+            product.GetComponent<ProductCardView>().Name.Trim();
+            if (!product.GetComponent<ProductCardView>().Name.Equals(""))
             {
-                PlayerPrefs.SetString(openBot.name + "Product" + i, product.GetComponent<Product>().ProductButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text);
-                PlayerPrefs.SetString(openBot.name + "Product" + i + "Price", product.GetComponent<Product>().PriceButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text);
-                PlayerPrefs.SetString(openBot.name + "Product" + i + "Description", product.GetComponent<Product>().DescriptionButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text);
+                PlayerPrefs.SetString(openBot.name + "Product" + i, product.GetComponent<ProductCardView>().Name);
+                PlayerPrefs.SetString(openBot.name + "Product" + i + "Price", product.GetComponent<ProductCardView>().Price);
+                PlayerPrefs.SetString(openBot.name + "Product" + i + "Description", product.GetComponent<ProductCardView>().Description);
             }
         }
 
@@ -402,12 +403,12 @@ public class Manager : MonoBehaviour
         {
             Transform service = openBotSettings.ServicesParent.transform.GetChild(i);
 
-            service.GetComponent<Service>().ServiceButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Trim();
-            if (!service.GetComponent<Service>().ServiceButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(""))
+            service.GetComponent<ServiceCardView>().Name.Trim();
+            if (!service.GetComponent<ServiceCardView>().Name.Equals(""))
             {
-                PlayerPrefs.SetString(openBot.name + "Service" + i, service.GetComponent<Service>().ServiceButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text);
-                PlayerPrefs.SetString(openBot.name + "Service" + i + "Price", service.GetComponent<Service>().PriceButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text);
-                PlayerPrefs.SetString(openBot.name + "Service" + i + "Description", service.GetComponent<Service>().DescriptionButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text);
+                PlayerPrefs.SetString(openBot.name + "Service" + i, service.GetComponent<ServiceCardView>().Name);
+                PlayerPrefs.SetString(openBot.name + "Service" + i + "Price", service.GetComponent<ServiceCardView>().Price);
+                PlayerPrefs.SetString(openBot.name + "Service" + i + "Description", service.GetComponent<ServiceCardView>().Description);
             }
         }
 
@@ -441,21 +442,21 @@ public class Manager : MonoBehaviour
 
     public void CloseSettings()
     {
-        openBotSettings.BotNameButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(openBot.name + "Name", "");
+        openBotSettings.BotNameField.Value = PlayerPrefs.GetString(openBot.name + "Name", "");
         openBotSettings.WhatsappToggle.SetIsOnWithoutNotify(PlayerPrefs.GetInt(openBot.name + "isOnWhatsapp", 1) == 1);
         openBotSettings.TelegramToggle.SetIsOnWithoutNotify(PlayerPrefs.GetInt(openBot.name + "isOnTelegram", 1) == 1);
         {
             var savedId = PlayerPrefs.GetString(openBot.name + "BusinessType", "");
             openBotSettings.BusinessTypeDropdown.value = Mathf.Max(0, businessTypes.IndexOf(savedId));
         }
-        openBotSettings.WhatsappNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(openBot.name + "WhatsappNumber", "");
-        openBotSettings.TelegramNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(openBot.name + "TelegramNumber", "");
+        openBotSettings.WhatsappNumberField.Value = PlayerPrefs.GetString(openBot.name + "WhatsappNumber", "");
+        openBotSettings.TelegramNumberField.Value = PlayerPrefs.GetString(openBot.name + "TelegramNumber", "");
 
-        openBotSettings.WhatsappNumberButton.transform.parent.gameObject.SetActive(!openBotSettings.WhatsappNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(""));
-        openBotSettings.TelegramNumberButton.transform.parent.gameObject.SetActive(!openBotSettings.TelegramNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(""));
+        openBotSettings.WhatsappNumberField.gameObject.SetActive(!openBotSettings.WhatsappNumberField.Value.Equals(""));
+        openBotSettings.TelegramNumberField.gameObject.SetActive(!openBotSettings.TelegramNumberField.Value.Equals(""));
 
-        openBotSettings.BusinessInputButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(openBot.name + "Business", "");
-        openBotSettings.PromptInputButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(openBot.name + "Prompt", "");
+        openBotSettings.BusinessField.Value = PlayerPrefs.GetString(openBot.name + "Business", "");
+        openBotSettings.PromptField.Value = PlayerPrefs.GetString(openBot.name + "Prompt", "");
 
 
         for (int p = 0; p < openBotSettings.ProductsParent.transform.childCount - 1; p++)
@@ -466,11 +467,11 @@ public class Manager : MonoBehaviour
         int ProductsNumber = PlayerPrefs.GetInt(openBot.name + "ProductsNumber", 0);
         for (int p = 0; p < ProductsNumber; p++)
         {
-            Product recreatedProduct = Instantiate(ProductPrefab, ProductPrefab.transform.position, ProductPrefab.transform.rotation, openBotSettings.AddProductButton.transform.parent.parent).GetComponent<Product>();
+            ProductCardView recreatedProduct = Instantiate(ProductPrefab, ProductPrefab.transform.position, ProductPrefab.transform.rotation, openBotSettings.AddProductButton.transform.parent.parent).GetComponent<ProductCardView>();
 
-            recreatedProduct.ProductButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(openBot.name + "Product" + p, "");
-            recreatedProduct.PriceButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(openBot.name + "Product" + p + "Price", "");
-            recreatedProduct.DescriptionButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(openBot.name + "Product" + p + "Description", "");
+            recreatedProduct.Name = PlayerPrefs.GetString(openBot.name + "Product" + p, "");
+            recreatedProduct.Price = PlayerPrefs.GetString(openBot.name + "Product" + p + "Price", "");
+            recreatedProduct.Description = PlayerPrefs.GetString(openBot.name + "Product" + p + "Description", "");
         }
 
         openBotSettings.AddProductButton.transform.parent.SetAsLastSibling();
@@ -484,11 +485,11 @@ public class Manager : MonoBehaviour
         int ServicesNumber = PlayerPrefs.GetInt(openBot.name + "ServicesNumber", 0);
         for (int s = 0; s < ServicesNumber; s++)
         {
-            Service recreatedService = Instantiate(ServicePrefab, ServicePrefab.transform.position, ServicePrefab.transform.rotation, openBotSettings.AddServiceButton.transform.parent.parent).GetComponent<Service>();
+            ServiceCardView recreatedService = Instantiate(ServicePrefab, ServicePrefab.transform.position, ServicePrefab.transform.rotation, openBotSettings.AddServiceButton.transform.parent.parent).GetComponent<ServiceCardView>();
 
-            recreatedService.ServiceButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(openBot.name + "Service" + s, "");
-            recreatedService.PriceButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(openBot.name + "Service" + s + "Price", "");
-            recreatedService.DescriptionButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = PlayerPrefs.GetString(openBot.name + "Service" + s + "Description", "");
+            recreatedService.Name = PlayerPrefs.GetString(openBot.name + "Service" + s, "");
+            recreatedService.Price = PlayerPrefs.GetString(openBot.name + "Service" + s + "Price", "");
+            recreatedService.Description = PlayerPrefs.GetString(openBot.name + "Service" + s + "Description", "");
         }
 
         openBotSettings.AddServiceButton.transform.parent.SetAsLastSibling();
@@ -498,16 +499,16 @@ public class Manager : MonoBehaviour
     {
         bool settingsChanged = false;
 
-        if (!openBotSettings.BotNameButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(PlayerPrefs.GetString(openBot.name + "Name", "")) ||
+        if (!openBotSettings.BotNameField.Value.Equals(PlayerPrefs.GetString(openBot.name + "Name", "")) ||
             openBotSettings.WhatsappToggle.isOn != (PlayerPrefs.GetInt(openBot.name + "isOnWhatsapp", 1) == 1) ||
             openBotSettings.TelegramToggle.isOn != (PlayerPrefs.GetInt(openBot.name + "isOnTelegram", 1) == 1) ||
             (businessTypes.TryGetByIndex(openBotSettings.BusinessTypeDropdown.value, out var dirtyBt)
                 ? dirtyBt.id : "")
                 != PlayerPrefs.GetString(openBot.name + "BusinessType", "") ||
-            !openBotSettings.WhatsappNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(PlayerPrefs.GetString(openBot.name + "WhatsappNumber", "")) ||
-            !openBotSettings.TelegramNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(PlayerPrefs.GetString(openBot.name + "TelegramNumber", "")) ||
-            !openBotSettings.BusinessInputButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(PlayerPrefs.GetString(openBot.name + "Business", "")) ||
-            !openBotSettings.PromptInputButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(PlayerPrefs.GetString(openBot.name + "Prompt", "")))
+            !openBotSettings.WhatsappNumberField.Value.Equals(PlayerPrefs.GetString(openBot.name + "WhatsappNumber", "")) ||
+            !openBotSettings.TelegramNumberField.Value.Equals(PlayerPrefs.GetString(openBot.name + "TelegramNumber", "")) ||
+            !openBotSettings.BusinessField.Value.Equals(PlayerPrefs.GetString(openBot.name + "Business", "")) ||
+            !openBotSettings.PromptField.Value.Equals(PlayerPrefs.GetString(openBot.name + "Prompt", "")))
         {
             settingsChanged = true;
         }
@@ -539,9 +540,9 @@ public class Manager : MonoBehaviour
         {
             for (int p = 0; p < openBotSettings.ProductsParent.transform.childCount - 1; p++)
             {
-                if (!openBotSettings.ProductsParent.transform.GetChild(p).GetChild(0).GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(PlayerPrefs.GetString(openBot.name + "Product" + p, "")) ||
-                    !openBotSettings.ProductsParent.transform.GetChild(p).GetChild(2).GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(PlayerPrefs.GetString(openBot.name + "Product" + p + "Price", "")) ||
-                    !openBotSettings.ProductsParent.transform.GetChild(p).GetChild(4).GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(PlayerPrefs.GetString(openBot.name + "Product" + p + "Description", "")))
+                if (!openBotSettings.ProductsParent.transform.GetChild(p).GetComponent<ProductCardView>().Name.Equals(PlayerPrefs.GetString(openBot.name + "Product" + p, "")) ||
+                    !openBotSettings.ProductsParent.transform.GetChild(p).GetComponent<ProductCardView>().Price.Equals(PlayerPrefs.GetString(openBot.name + "Product" + p + "Price", "")) ||
+                    !openBotSettings.ProductsParent.transform.GetChild(p).GetComponent<ProductCardView>().Description.Equals(PlayerPrefs.GetString(openBot.name + "Product" + p + "Description", "")))
                 {
                     SaveButton.interactable = true;
                 }
@@ -552,9 +553,9 @@ public class Manager : MonoBehaviour
         {
             for (int s = 0; s < openBotSettings.ServicesParent.transform.childCount - 1; s++)
             {
-                if (!openBotSettings.ServicesParent.transform.GetChild(s).GetChild(0).GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(PlayerPrefs.GetString(openBot.name + "Service" + s, "")) ||
-                    !openBotSettings.ServicesParent.transform.GetChild(s).GetChild(2).GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(PlayerPrefs.GetString(openBot.name + "Service" + s + "Price", "")) ||
-                    !openBotSettings.ServicesParent.transform.GetChild(s).GetChild(4).GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(PlayerPrefs.GetString(openBot.name + "Service" + s + "Description", "")))
+                if (!openBotSettings.ServicesParent.transform.GetChild(s).GetComponent<ServiceCardView>().Name.Equals(PlayerPrefs.GetString(openBot.name + "Service" + s, "")) ||
+                    !openBotSettings.ServicesParent.transform.GetChild(s).GetComponent<ServiceCardView>().Price.Equals(PlayerPrefs.GetString(openBot.name + "Service" + s + "Price", "")) ||
+                    !openBotSettings.ServicesParent.transform.GetChild(s).GetComponent<ServiceCardView>().Description.Equals(PlayerPrefs.GetString(openBot.name + "Service" + s + "Description", "")))
                 {
                     SaveButton.interactable = true;
                 }
@@ -831,16 +832,16 @@ public class Manager : MonoBehaviour
 
         BotSettings newBotSettings = Instantiate(BotSettings, new Vector3(BotSettings.transform.position.x + Screen.width / 2, BotSettings.transform.position.y + Screen.height / 2, 0), BotSettings.transform.rotation, BotSettingsParentStatic.transform).GetComponent<BotSettings>();
 
-        newBotSettings.BotNameButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = formBotName;
+        newBotSettings.BotNameField.Value = formBotName;
         newBotSettings.WhatsappToggle.isOn = useWhatsapp;
         newBotSettings.TelegramToggle.isOn = useTelegram;
         PopulateBusinessDropdown(newBotSettings.BusinessTypeDropdown);
         newBotSettings.BusinessTypeDropdown.value = Mathf.Max(0, businessTypes.IndexOf(selectedBusinessId));
-        newBotSettings.BusinessInputButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = formDescription;
-        newBotSettings.WhatsappNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = useWhatsapp ? WhatsappNumberInput.text : "";
-        newBotSettings.TelegramNumberButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = useTelegram ? TelegramNumberInput.text : "";
-        newBotSettings.WhatsappNumberButton.transform.parent.gameObject.SetActive(useWhatsapp && !string.IsNullOrEmpty(WhatsappNumberInput.text));
-        newBotSettings.TelegramNumberButton.transform.parent.gameObject.SetActive(useTelegram && !string.IsNullOrEmpty(TelegramNumberInput.text));
+        newBotSettings.BusinessField.Value = formDescription;
+        newBotSettings.WhatsappNumberField.Value = useWhatsapp ? WhatsappNumberInput.text : "";
+        newBotSettings.TelegramNumberField.Value = useTelegram ? TelegramNumberInput.text : "";
+        newBotSettings.WhatsappNumberField.gameObject.SetActive(useWhatsapp && !string.IsNullOrEmpty(WhatsappNumberInput.text));
+        newBotSettings.TelegramNumberField.gameObject.SetActive(useTelegram && !string.IsNullOrEmpty(TelegramNumberInput.text));
 
         // Step 4: Create workflows
         if (useWhatsapp)
@@ -2044,14 +2045,14 @@ public class Manager : MonoBehaviour
 
         for (int i = 0; i < openBotSettings.ProductsParent.transform.childCount - 1; i++)
         {
-            Product product = openBotSettings.ProductsParent.transform.GetChild(i).GetComponent<Product>();
+            ProductCardView product = openBotSettings.ProductsParent.transform.GetChild(i).GetComponent<ProductCardView>();
 
-            product.ProductButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Trim();
-            if (!product.ProductButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(""))
+            product.Name.Trim();
+            if (!product.Name.Equals(""))
             {
-                productsList += $"Product{i + 1}: {product.ProductButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text}" +
-                    $"\nProduct{i + 1} Price: {product.PriceButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text}" +
-                    $"\nProduct{i + 1} Description: {product.DescriptionButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text}"
+                productsList += $"Product{i + 1}: {product.Name}" +
+                    $"\nProduct{i + 1} Price: {product.Price}" +
+                    $"\nProduct{i + 1} Description: {product.Description}"
                     + (i == openBotSettings.ProductsParent.transform.childCount - 2 ? "" : $"\n\n");
             }
         }
@@ -2061,14 +2062,14 @@ public class Manager : MonoBehaviour
 
         for (int i = 0; i < openBotSettings.ServicesParent.transform.childCount - 1; i++)
         {
-            Service service = openBotSettings.ServicesParent.transform.GetChild(i).GetComponent<Service>();
+            ServiceCardView service = openBotSettings.ServicesParent.transform.GetChild(i).GetComponent<ServiceCardView>();
 
-            service.ServiceButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Trim();
-            if (!service.ServiceButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(""))
+            service.Name.Trim();
+            if (!service.Name.Equals(""))
             {
-                servicesList += $"Service{i + 1}: {service.ServiceButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text}" +
-                    $"\nService{i + 1} Price: {service.PriceButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text}" +
-                    $"\nService{i + 1} Description: {service.DescriptionButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text}"
+                servicesList += $"Service{i + 1}: {service.Name}" +
+                    $"\nService{i + 1} Price: {service.Price}" +
+                    $"\nService{i + 1} Description: {service.Description}"
                     + (i == openBotSettings.ServicesParent.transform.childCount - 2 ? "" : $"\n\n");
             }
         }
@@ -2076,12 +2077,12 @@ public class Manager : MonoBehaviour
 
         WWWForm form = new();
 
-        form.AddField("Name", openBotSettings.BotNameButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text);
+        form.AddField("Name", openBotSettings.BotNameField.Value);
         form.AddField("BusinessType", openBotSettings.BusinessTypeDropdown.options[openBotSettings.BusinessTypeDropdown.value].text);
         form.AddField("WhatsappProfileId", openBot.GetComponent<Bot>().whatsappProfileId);
 
-        form.AddField("Business", "About Business:\n" + openBotSettings.BusinessInputButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text);
-        form.AddField("Prompt", openBotSettings.PromptInputButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text);
+        form.AddField("Business", "About Business:\n" + openBotSettings.BusinessField.Value);
+        form.AddField("Prompt", openBotSettings.PromptField.Value);
         form.AddField("ProductsList", "Products:\n" + productsList);
         form.AddField("ServicesList", "Services:\n" + servicesList);
 
@@ -2174,14 +2175,14 @@ public class Manager : MonoBehaviour
 
         for (int i = 0; i < openBotSettings.ProductsParent.transform.childCount - 1; i++)
         {
-            Product product = openBotSettings.ProductsParent.transform.GetChild(i).GetComponent<Product>();
+            ProductCardView product = openBotSettings.ProductsParent.transform.GetChild(i).GetComponent<ProductCardView>();
 
-            product.ProductButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Trim();
-            if (!product.ProductButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(""))
+            product.Name.Trim();
+            if (!product.Name.Equals(""))
             {
-                productsList += $"Product{i + 1}: {product.ProductButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text}" +
-                    $"\nProduct{i + 1} Price: {product.PriceButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text}" +
-                    $"\nProduct{i + 1} Description: {product.DescriptionButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text}"
+                productsList += $"Product{i + 1}: {product.Name}" +
+                    $"\nProduct{i + 1} Price: {product.Price}" +
+                    $"\nProduct{i + 1} Description: {product.Description}"
                     + (i == openBotSettings.ProductsParent.transform.childCount - 2 ? "" : $"\n\n");
             }
         }
@@ -2191,14 +2192,14 @@ public class Manager : MonoBehaviour
 
         for (int i = 0; i < openBotSettings.ServicesParent.transform.childCount - 1; i++)
         {
-            Service service = openBotSettings.ServicesParent.transform.GetChild(i).GetComponent<Service>();
+            ServiceCardView service = openBotSettings.ServicesParent.transform.GetChild(i).GetComponent<ServiceCardView>();
 
-            service.ServiceButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Trim();
-            if (!service.ServiceButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(""))
+            service.Name.Trim();
+            if (!service.Name.Equals(""))
             {
-                servicesList += $"Service{i + 1}: {service.ServiceButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text}" +
-                    $"\nService{i + 1} Price: {service.PriceButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text}" +
-                    $"\nService{i + 1} Description: {service.DescriptionButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text}"
+                servicesList += $"Service{i + 1}: {service.Name}" +
+                    $"\nService{i + 1} Price: {service.Price}" +
+                    $"\nService{i + 1} Description: {service.Description}"
                     + (i == openBotSettings.ServicesParent.transform.childCount - 2 ? "" : $"\n\n");
             }
         }
@@ -2206,12 +2207,12 @@ public class Manager : MonoBehaviour
 
         WWWForm form = new();
 
-        form.AddField("Name", openBotSettings.BotNameButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text);
+        form.AddField("Name", openBotSettings.BotNameField.Value);
         form.AddField("BusinessType", openBotSettings.BusinessTypeDropdown.options[openBotSettings.BusinessTypeDropdown.value].text);
         form.AddField("TelegramProfileId", openBot.GetComponent<Bot>().telegramProfileId);
 
-        form.AddField("Business", "About Business:\n" + openBotSettings.BusinessInputButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text);
-        form.AddField("Prompt", openBotSettings.PromptInputButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text);
+        form.AddField("Business", "About Business:\n" + openBotSettings.BusinessField.Value);
+        form.AddField("Prompt", openBotSettings.PromptField.Value);
         form.AddField("ProductsList", "Products:\n" + productsList);
         form.AddField("ServicesList", "Services:\n" + servicesList);
 
@@ -2329,14 +2330,14 @@ public class Manager : MonoBehaviour
 
         for (int i = 0; i < openBotSettings.ProductsParent.transform.childCount - 1; i++)
         {
-            Product product = openBotSettings.ProductsParent.transform.GetChild(i).GetComponent<Product>();
+            ProductCardView product = openBotSettings.ProductsParent.transform.GetChild(i).GetComponent<ProductCardView>();
 
-            product.ProductButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Trim();
-            if (!product.ProductButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(""))
+            product.Name.Trim();
+            if (!product.Name.Equals(""))
             {
-                productsList += $"Product{i + 1}: {product.ProductButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text}" +
-                    $"\nProduct{i + 1} Price: {product.PriceButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text}" +
-                    $"\nProduct{i + 1} Description: {product.DescriptionButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text}"
+                productsList += $"Product{i + 1}: {product.Name}" +
+                    $"\nProduct{i + 1} Price: {product.Price}" +
+                    $"\nProduct{i + 1} Description: {product.Description}"
                     + (i == openBotSettings.ProductsParent.transform.childCount - 2 ? "" : $"\n\n");
             }
         }
@@ -2346,14 +2347,14 @@ public class Manager : MonoBehaviour
 
         for (int i = 0; i < openBotSettings.ServicesParent.transform.childCount - 1; i++)
         {
-            Service service = openBotSettings.ServicesParent.transform.GetChild(i).GetComponent<Service>();
+            ServiceCardView service = openBotSettings.ServicesParent.transform.GetChild(i).GetComponent<ServiceCardView>();
 
-            service.ServiceButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Trim();
-            if (!service.ServiceButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text.Equals(""))
+            service.Name.Trim();
+            if (!service.Name.Equals(""))
             {
-                servicesList += $"Service{i + 1}: {service.ServiceButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text}" +
-                    $"\nService{i + 1} Price: {service.PriceButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text}" +
-                    $"\nService{i + 1} Description: {service.DescriptionButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text}"
+                servicesList += $"Service{i + 1}: {service.Name}" +
+                    $"\nService{i + 1} Price: {service.Price}" +
+                    $"\nService{i + 1} Description: {service.Description}"
                     + (i == openBotSettings.ServicesParent.transform.childCount - 2 ? "" : $"\n\n");
             }
         }
@@ -2363,10 +2364,10 @@ public class Manager : MonoBehaviour
 
         form.AddField("WhatsappWorkflowId", whatsappWorkflowId);
         form.AddField("TelegramWorkflowId", telegramWorkflowId);
-        form.AddField("Name", openBotSettings.BotNameButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text);
+        form.AddField("Name", openBotSettings.BotNameField.Value);
         form.AddField("BusinessType", openBotSettings.BusinessTypeDropdown.options[openBotSettings.BusinessTypeDropdown.value].text);
-        form.AddField("Business", openBotSettings.BusinessInputButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text);
-        form.AddField("Prompt", openBotSettings.PromptInputButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text);
+        form.AddField("Business", openBotSettings.BusinessField.Value);
+        form.AddField("Prompt", openBotSettings.PromptField.Value);
         form.AddField("ProductsList", productsList);
         form.AddField("ServicesList", servicesList);
 
