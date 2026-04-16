@@ -1,11 +1,11 @@
 using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 
 namespace Automation.BotSettingsUI
 {
     public class SectionHeader : MonoBehaviour
     {
-        // Implemented in Task 2
+        [SerializeField] private TextMeshProUGUI labelText;
+        public string Text { get => labelText.text; set => labelText.text = value; }
     }
 }
