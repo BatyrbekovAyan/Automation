@@ -355,10 +355,8 @@ public class Manager : MonoBehaviour
 
 
         PlayerPrefs.SetString(openBot.name + "Business", openBotSettings.BusinessField.Value);
-        openBotSettings.BusinessInput.text = "";
 
         PlayerPrefs.SetString(openBot.name + "Prompt", openBotSettings.PromptField.Value);
-        openBotSettings.PromptInput.text = "";
 
 
         for (int i = 0; i < openBotSettings.ProductsParent.transform.childCount - 1; i++)

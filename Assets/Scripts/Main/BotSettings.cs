@@ -59,7 +59,7 @@ public partial class BotSettings : MonoBehaviour
     [SerializeField] public GameObject TelegramCodePanel;
     [SerializeField] private TextMeshProUGUI TelegramPhoneTitle;
     [SerializeField] private TextMeshProUGUI TelegramPhoneBody;
-    [SerializeField] public SavedToast Saved;
+    [SerializeField] public GameObject Saved;
     [SerializeField] private GameObject ConfirmChangeWhatsappNumberPopup;
     [SerializeField] private GameObject ConfirmChangeTelegramNumberPopup;
     [SerializeField] private GameObject WhatsappCodeTimer;
