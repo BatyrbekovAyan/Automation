@@ -26,6 +26,15 @@ public static class BotSettingsRebuilder
     private const string ServicePrefabPath = "Assets/Prefabs/Service.prefab";
     private const string BotSettingsPrefabPath = "Assets/Prefabs/BotSettings.prefab";
 
+    // UI scale: mockup values are authored at iPhone points (390-wide);
+    // the project's Canvas Scaler reference is wider (1080-ish). Multiply
+    // every size/font/padding by this to get readable sizing at runtime.
+    // Tweak this if the rebuild looks wrong.
+    private const float S = 2.5f;
+    private static float Sz(float v) => v * S;
+    private static int Szi(float v) => Mathf.RoundToInt(v * S);
+    private static Vector2 Sv(float x, float y) => new Vector2(x * S, y * S);
+
     // Design tokens (pulled from Design/mockup.html :root)
     private static readonly Color Bg         = Hex("#F0F2F5");
     private static readonly Color Card       = Hex("#FFFFFF");
@@ -94,7 +103,7 @@ public static class BotSettingsRebuilder
     {
         var root = new GameObject("CardRoot");
         var rt = root.AddComponent<RectTransform>();
-        rt.sizeDelta = new Vector2(0, 78);
+        rt.sizeDelta = Sv(0, 78);
         SetAnchors(rt, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1));
 
         var bg = root.AddComponent<Image>();
@@ -107,37 +116,37 @@ public static class BotSettingsRebuilder
         var thumbImg = thumb.AddComponent<Image>();
         thumbImg.color = Bg;
         SetAnchors(thumbRt, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(0, 0.5f));
-        thumbRt.sizeDelta = new Vector2(50, 50);
-        thumbRt.anchoredPosition = new Vector2(16, 0);
+        thumbRt.sizeDelta = Sv(50, 50);
+        thumbRt.anchoredPosition = Sv(16, 0);
 
         var emojiGo = NewChild(thumb, "Emoji", out RectTransform emojiRt);
-        var emojiTmp = AddStyledText(emojiGo, emoji, 24, FontWeight.Regular, Text);
+        var emojiTmp = AddStyledText(emojiGo, emoji, Sz(24), FontWeight.Regular, Text);
         emojiTmp.alignment = TextAlignmentOptions.Center;
         StretchFill(emojiRt);
 
         var info = NewChild(root, "Info", out RectTransform infoRt);
         SetAnchors(infoRt, new Vector2(0, 0), new Vector2(1, 1), new Vector2(0, 0.5f));
-        infoRt.offsetMin = new Vector2(78, 10);
-        infoRt.offsetMax = new Vector2(-44, -10);
+        infoRt.offsetMin = Sv(78, 10);
+        infoRt.offsetMax = Sv(-44, -10);
 
         var nameGo = NewChild(info, "Name", out RectTransform nameRt);
-        var nameTmp = AddStyledText(nameGo, "Название", 15, FontWeight.Bold, Text);
+        var nameTmp = AddStyledText(nameGo, "Название", Sz(15), FontWeight.Bold, Text);
         SetAnchors(nameRt, new Vector2(0, 0.66f), new Vector2(1, 1), new Vector2(0, 0.5f));
 
         var priceGo = NewChild(info, "Price", out RectTransform priceRt);
-        var priceTmp = AddStyledText(priceGo, "0 ₸", 13, FontWeight.Bold, Primary);
+        var priceTmp = AddStyledText(priceGo, "0 ₸", Sz(13), FontWeight.Bold, Primary);
         SetAnchors(priceRt, new Vector2(0, 0.33f), new Vector2(1, 0.66f), new Vector2(0, 0.5f));
 
         var descGo = NewChild(info, "Desc", out RectTransform descRt);
-        var descTmp = AddStyledText(descGo, "Описание", 12, FontWeight.Regular, TextMuted);
+        var descTmp = AddStyledText(descGo, "Описание", Sz(12), FontWeight.Regular, TextMuted);
         SetAnchors(descRt, new Vector2(0, 0), new Vector2(1, 0.33f), new Vector2(0, 0.5f));
 
         var chevronGo = NewChild(root, "Chevron", out RectTransform chevRt);
         var chevImg = chevronGo.AddComponent<Image>();
         chevImg.color = Chevron;
         SetAnchors(chevRt, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(1, 0.5f));
-        chevRt.sizeDelta = new Vector2(8, 12);
-        chevRt.anchoredPosition = new Vector2(-16, 0);
+        chevRt.sizeDelta = Sv(8, 12);
+        chevRt.anchoredPosition = Sv(-16, 0);
 
         var cardView = root.AddComponent<T>();
         var so = new SerializedObject(cardView);
@@ -313,15 +322,15 @@ public static class BotSettingsRebuilder
         var img = header.AddComponent<Image>();
         img.color = Card;
         SetAnchors(rt, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1));
-        rt.sizeDelta = new Vector2(0, 56);
+        rt.sizeDelta = Sv(0, 56);
         rt.anchoredPosition = Vector2.zero;
 
         var title = NewChild(header, "Title", out RectTransform titleRt);
-        var titleTmp = AddStyledText(title, "ShopBot", 20, FontWeight.Bold, Text);
+        var titleTmp = AddStyledText(title, "ShopBot", Sz(20), FontWeight.Bold, Text);
         titleTmp.alignment = TextAlignmentOptions.Center;
         SetAnchors(titleRt, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f));
-        titleRt.offsetMin = new Vector2(48, 0);
-        titleRt.offsetMax = new Vector2(-100, 0);
+        titleRt.offsetMin = Sv(48, 0);
+        titleRt.offsetMax = Sv(-100, 0);
         return header;
     }
 
@@ -331,12 +340,12 @@ public static class BotSettingsRebuilder
         var img = tabBar.AddComponent<Image>();
         img.color = Card;
         SetAnchors(rt, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1));
-        rt.sizeDelta = new Vector2(0, 44);
-        rt.anchoredPosition = new Vector2(0, -56);
+        rt.sizeDelta = Sv(0, 44);
+        rt.anchoredPosition = Sv(0, -56);
 
         var hlg = tabBar.AddComponent<HorizontalLayoutGroup>();
         hlg.childAlignment = TextAnchor.MiddleCenter;
-        hlg.spacing = 4;
+        hlg.spacing = Sz(4);
         hlg.childForceExpandWidth = true;
         hlg.childForceExpandHeight = true;
 
@@ -351,7 +360,7 @@ public static class BotSettingsRebuilder
             tabButtons[i] = tab.AddComponent<Button>();
 
             var label = NewChild(tab, "Label", out RectTransform labelRt);
-            var tmp = AddStyledText(label, labels[i], 13, FontWeight.Bold, i == 0 ? Primary : TextMuted);
+            var tmp = AddStyledText(label, labels[i], Sz(13), FontWeight.Bold, i == 0 ? Primary : TextMuted);
             tmp.alignment = TextAlignmentOptions.Center;
             StretchFill(labelRt);
         }
@@ -368,11 +377,11 @@ public static class BotSettingsRebuilder
             img.color = Bg;
             SetAnchors(rt, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f));
             rt.offsetMin = Vector2.zero;
-            rt.offsetMax = new Vector2(0, -100); // below header (56) + tabs (44)
+            rt.offsetMax = Sv(0, -100); // below header (56) + tabs (44)
 
             var vlg = tab.AddComponent<VerticalLayoutGroup>();
-            vlg.padding = new RectOffset(20, 20, 20, 20);
-            vlg.spacing = 12;
+            vlg.padding = new RectOffset(Szi(20), Szi(20), Szi(20), Szi(20));
+            vlg.spacing = Sz(12);
             vlg.childAlignment = TextAnchor.UpperCenter;
             vlg.childForceExpandWidth = true;
             vlg.childForceExpandHeight = false;
@@ -404,11 +413,11 @@ public static class BotSettingsRebuilder
         // Skeleton dropdown (replaced with preserved one if present).
         var ddGo = NewChild(tab, "BusinessTypeDropdown", out RectTransform ddRt);
         ddGo.AddComponent<Image>().color = Card;
-        ddRt.sizeDelta = new Vector2(0, 56);
+        ddRt.sizeDelta = Sv(0, 56);
         refs.businessTypeDropdown = ddGo.AddComponent<TMP_Dropdown>();
         var ddLabel = NewChild(ddGo, "Label", out RectTransform ddLabelRt);
-        AddStyledText(ddLabel, "Тип бизнеса", 16, FontWeight.Medium, Text);
-        StretchFill(ddLabelRt, new RectOffset(16, 16, 0, 0));
+        AddStyledText(ddLabel, "Тип бизнеса", Sz(16), FontWeight.Medium, Text);
+        StretchFill(ddLabelRt, new RectOffset(Szi(16), Szi(16), Szi(0), Szi(0)));
 
         AddSectionHeader(tab, "ПОДКЛЮЧЕНИЯ");
         refs.whatsappRow = CreateToggleRow(tab, "WhatsApp");
@@ -422,9 +431,9 @@ public static class BotSettingsRebuilder
         var deleteBtn = NewChild(tab, "DeleteBotButton", out RectTransform delRt);
         deleteBtn.AddComponent<Image>().color = Danger;
         deleteBtn.AddComponent<Button>();
-        delRt.sizeDelta = new Vector2(0, 56);
+        delRt.sizeDelta = Sv(0, 56);
         var delLabel = NewChild(deleteBtn, "Label", out RectTransform delLabelRt);
-        var delTmp = AddStyledText(delLabel, "Удалить бота", 17, FontWeight.Bold, Color.white);
+        var delTmp = AddStyledText(delLabel, "Удалить бота", Sz(17), FontWeight.Bold, Color.white);
         delTmp.alignment = TextAlignmentOptions.Center;
         StretchFill(delLabelRt);
 
@@ -440,7 +449,7 @@ public static class BotSettingsRebuilder
         Object.DestroyImmediate(field);
         var textArea = go.AddComponent<EditableTextArea>();
         RewireEditableField(textArea, go, scrim);
-        go.GetComponent<RectTransform>().sizeDelta = new Vector2(0, 240);
+        go.GetComponent<RectTransform>().sizeDelta = Sv(0, 240);
         return textArea;
     }
 
@@ -456,7 +465,7 @@ public static class BotSettingsRebuilder
 
         var listGo = NewChild(tab, isProducts ? "ProductsParent" : "ServicesParent", out RectTransform listRt);
         var listVlg = listGo.AddComponent<VerticalLayoutGroup>();
-        listVlg.spacing = 10;
+        listVlg.spacing = Sz(10);
         listVlg.childForceExpandHeight = false;
         listVlg.childControlHeight = false;
         listVlg.childForceExpandWidth = true;
@@ -467,10 +476,10 @@ public static class BotSettingsRebuilder
         var addGo = NewChild(tab, isProducts ? "AddProductButton" : "AddServiceButton", out RectTransform addRt);
         addGo.AddComponent<Image>().color = new Color(Border.r, Border.g, Border.b, 0.4f);
         var addBtn = addGo.AddComponent<Button>();
-        addRt.sizeDelta = new Vector2(0, 52);
+        addRt.sizeDelta = Sv(0, 52);
 
         var addLabel = NewChild(addGo, "Label", out RectTransform addLabelRt);
-        var addTmp = AddStyledText(addLabel, isProducts ? "+ Добавить товар" : "+ Добавить услугу", 15, FontWeight.Bold, Primary);
+        var addTmp = AddStyledText(addLabel, isProducts ? "+ Добавить товар" : "+ Добавить услугу", Sz(15), FontWeight.Bold, Primary);
         addTmp.alignment = TextAlignmentOptions.Center;
         StretchFill(addLabelRt);
 
@@ -493,16 +502,16 @@ public static class BotSettingsRebuilder
         rt.sizeDelta = new Vector2(0, multiline ? 100 : 64);
 
         var labelGo = NewChild(go, "Label", out RectTransform labelRt);
-        AddStyledText(labelGo, label, 12, FontWeight.Medium, TextMuted);
+        AddStyledText(labelGo, label, Sz(12), FontWeight.Medium, TextMuted);
         SetAnchors(labelRt, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1));
-        labelRt.sizeDelta = new Vector2(-32, 14);
-        labelRt.anchoredPosition = new Vector2(16, -10);
+        labelRt.sizeDelta = Sv(-32, 14);
+        labelRt.anchoredPosition = Sv(16, -10);
 
         var inputGo = NewChild(go, "Input", out RectTransform inputRt);
         inputRt.anchorMin = new Vector2(0, 0);
         inputRt.anchorMax = new Vector2(1, 1);
-        inputRt.offsetMin = new Vector2(16, 10);
-        inputRt.offsetMax = new Vector2(-16, -26);
+        inputRt.offsetMin = Sv(16, 10);
+        inputRt.offsetMax = Sv(-16, -26);
         var inputBg = inputGo.AddComponent<Image>();
         inputBg.color = new Color(0, 0, 0, 0);
         var input = inputGo.AddComponent<TMP_InputField>();
@@ -512,7 +521,7 @@ public static class BotSettingsRebuilder
         textArea.AddComponent<RectMask2D>();
 
         var textGo = NewChild(textArea, "Text", out RectTransform textRt);
-        var textTmp = AddStyledText(textGo, "", 16, FontWeight.Medium, Text);
+        var textTmp = AddStyledText(textGo, "", Sz(16), FontWeight.Medium, Text);
         StretchFill(textRt);
 
         input.textComponent = textTmp;
@@ -539,18 +548,18 @@ public static class BotSettingsRebuilder
     {
         var go = NewChild(parent, "ToggleRow_" + label, out RectTransform rt);
         go.AddComponent<Image>().color = Card;
-        rt.sizeDelta = new Vector2(0, 56);
+        rt.sizeDelta = Sv(0, 56);
 
         var labelGo = NewChild(go, "Label", out RectTransform labelRt);
-        var labelTmp = AddStyledText(labelGo, label, 16, FontWeight.Medium, Text);
+        var labelTmp = AddStyledText(labelGo, label, Sz(16), FontWeight.Medium, Text);
         SetAnchors(labelRt, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(0, 0.5f));
-        labelRt.sizeDelta = new Vector2(200, 24);
+        labelRt.sizeDelta = Sv(200, 24);
         labelRt.anchoredPosition = new Vector2(16 + 100, 0);
 
         var toggleGo = NewChild(go, "Toggle", out RectTransform toggleRt);
         SetAnchors(toggleRt, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(1, 0.5f));
-        toggleRt.sizeDelta = new Vector2(52, 32);
-        toggleRt.anchoredPosition = new Vector2(-42, 0);
+        toggleRt.sizeDelta = Sv(52, 32);
+        toggleRt.anchoredPosition = Sv(-42, 0);
         var toggle = toggleGo.AddComponent<Toggle>();
 
         var trackGo = NewChild(toggleGo, "Track", out RectTransform trackRt);
@@ -562,8 +571,8 @@ public static class BotSettingsRebuilder
         var thumbImg = thumbGo.AddComponent<Image>();
         thumbImg.color = Color.white;
         SetAnchors(thumbRt, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(0.5f, 0.5f));
-        thumbRt.sizeDelta = new Vector2(28, 28);
-        thumbRt.anchoredPosition = new Vector2(16, 0);
+        thumbRt.sizeDelta = Sv(28, 28);
+        thumbRt.anchoredPosition = Sv(16, 0);
 
         toggle.targetGraphic = trackImg;
 
@@ -620,24 +629,24 @@ public static class BotSettingsRebuilder
         var sheetGo = NewChild(sheetContainer, "SheetRoot", out RectTransform sheetRt);
         sheetGo.AddComponent<Image>().color = Card;
         SetAnchors(sheetRt, new Vector2(0, 0), new Vector2(1, 0), new Vector2(0.5f, 0));
-        sheetRt.sizeDelta = new Vector2(0, 420);
+        sheetRt.sizeDelta = Sv(0, 420);
         sheetRt.anchoredPosition = Vector2.zero;
 
         var titleGo = NewChild(sheetGo, "Title", out RectTransform titleRt);
-        var titleTmp = AddStyledText(titleGo, "Изменить", 18, FontWeight.Bold, Text);
+        var titleTmp = AddStyledText(titleGo, "Изменить", Sz(18), FontWeight.Bold, Text);
         titleTmp.alignment = TextAlignmentOptions.Center;
         SetAnchors(titleRt, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1));
-        titleRt.sizeDelta = new Vector2(-32, 40);
-        titleRt.anchoredPosition = new Vector2(0, -24);
+        titleRt.sizeDelta = Sv(-32, 40);
+        titleRt.anchoredPosition = Sv(0, -24);
 
         var sheetScrim = BuildFocusScrim(sheetGo, "SheetFocusScrim");
 
         var fieldsContainer = NewChild(sheetGo, "Fields", out RectTransform fieldsRt);
         SetAnchors(fieldsRt, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1));
-        fieldsRt.sizeDelta = new Vector2(-32, 240);
-        fieldsRt.anchoredPosition = new Vector2(0, -76);
+        fieldsRt.sizeDelta = Sv(-32, 240);
+        fieldsRt.anchoredPosition = Sv(0, -76);
         var fvlg = fieldsContainer.AddComponent<VerticalLayoutGroup>();
-        fvlg.spacing = 12;
+        fvlg.spacing = Sz(12);
         fvlg.childForceExpandHeight = false;
         fvlg.childControlHeight = false;
         fvlg.childForceExpandWidth = true;
@@ -651,10 +660,10 @@ public static class BotSettingsRebuilder
         doneGo.AddComponent<Image>().color = Primary;
         var doneBtn = doneGo.AddComponent<Button>();
         SetAnchors(doneRt, new Vector2(0, 0), new Vector2(0.5f, 0), new Vector2(0, 0));
-        doneRt.sizeDelta = new Vector2(-24, 52);
-        doneRt.anchoredPosition = new Vector2(16, 24);
+        doneRt.sizeDelta = Sv(-24, 52);
+        doneRt.anchoredPosition = Sv(16, 24);
         var doneLabel = NewChild(doneGo, "Label", out RectTransform doneLabelRt);
-        var doneTmp = AddStyledText(doneLabel, "Готово", 17, FontWeight.Bold, Color.white);
+        var doneTmp = AddStyledText(doneLabel, "Готово", Sz(17), FontWeight.Bold, Color.white);
         doneTmp.alignment = TextAlignmentOptions.Center;
         StretchFill(doneLabelRt);
 
@@ -662,10 +671,10 @@ public static class BotSettingsRebuilder
         deleteGo.AddComponent<Image>().color = Danger;
         var deleteBtn = deleteGo.AddComponent<Button>();
         SetAnchors(deleteRt, new Vector2(0.5f, 0), new Vector2(1, 0), new Vector2(1, 0));
-        deleteRt.sizeDelta = new Vector2(-24, 52);
-        deleteRt.anchoredPosition = new Vector2(-16, 24);
+        deleteRt.sizeDelta = Sv(-24, 52);
+        deleteRt.anchoredPosition = Sv(-16, 24);
         var deleteLabelGo = NewChild(deleteGo, "Label", out RectTransform deleteLabelRt);
-        var deleteTmp = AddStyledText(deleteLabelGo, "Удалить", 17, FontWeight.Bold, Color.white);
+        var deleteTmp = AddStyledText(deleteLabelGo, "Удалить", Sz(17), FontWeight.Bold, Color.white);
         deleteTmp.alignment = TextAlignmentOptions.Center;
         StretchFill(deleteLabelRt);
 
@@ -677,23 +686,23 @@ public static class BotSettingsRebuilder
         var popupCard = NewChild(popupGo, "Content", out RectTransform popupCardRt);
         popupCard.AddComponent<Image>().color = Card;
         SetAnchors(popupCardRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
-        popupCardRt.sizeDelta = new Vector2(280, 160);
+        popupCardRt.sizeDelta = Sv(280, 160);
 
         var popupTextGo = NewChild(popupCard, "Text", out RectTransform popupTextRt);
-        var popupTmp = AddStyledText(popupTextGo, "Удалить элемент?", 16, FontWeight.Medium, Text);
+        var popupTmp = AddStyledText(popupTextGo, "Удалить элемент?", Sz(16), FontWeight.Medium, Text);
         popupTmp.alignment = TextAlignmentOptions.Center;
         SetAnchors(popupTextRt, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1));
-        popupTextRt.sizeDelta = new Vector2(-24, 40);
-        popupTextRt.anchoredPosition = new Vector2(0, -40);
+        popupTextRt.sizeDelta = Sv(-24, 40);
+        popupTextRt.anchoredPosition = Sv(0, -40);
 
         var yesGo = NewChild(popupCard, "Yes", out RectTransform yesRt);
         yesGo.AddComponent<Image>().color = Danger;
         var yesBtn = yesGo.AddComponent<Button>();
         SetAnchors(yesRt, new Vector2(0, 0), new Vector2(0.5f, 0), new Vector2(0, 0));
-        yesRt.sizeDelta = new Vector2(-16, 44);
-        yesRt.anchoredPosition = new Vector2(12, 12);
+        yesRt.sizeDelta = Sv(-16, 44);
+        yesRt.anchoredPosition = Sv(12, 12);
         var yesLabelGo = NewChild(yesGo, "Label", out RectTransform yesLabelRt);
-        var yesTmp = AddStyledText(yesLabelGo, "Да", 15, FontWeight.Bold, Color.white);
+        var yesTmp = AddStyledText(yesLabelGo, "Да", Sz(15), FontWeight.Bold, Color.white);
         yesTmp.alignment = TextAlignmentOptions.Center;
         StretchFill(yesLabelRt);
 
@@ -701,10 +710,10 @@ public static class BotSettingsRebuilder
         noGo.AddComponent<Image>().color = Border;
         var noBtn = noGo.AddComponent<Button>();
         SetAnchors(noRt, new Vector2(0.5f, 0), new Vector2(1, 0), new Vector2(1, 0));
-        noRt.sizeDelta = new Vector2(-16, 44);
-        noRt.anchoredPosition = new Vector2(-12, 12);
+        noRt.sizeDelta = Sv(-16, 44);
+        noRt.anchoredPosition = Sv(-12, 12);
         var noLabelGo = NewChild(noGo, "Label", out RectTransform noLabelRt);
-        var noTmp = AddStyledText(noLabelGo, "Отмена", 15, FontWeight.Bold, Text);
+        var noTmp = AddStyledText(noLabelGo, "Отмена", Sz(15), FontWeight.Bold, Text);
         noTmp.alignment = TextAlignmentOptions.Center;
         StretchFill(noLabelRt);
 
@@ -729,9 +738,9 @@ public static class BotSettingsRebuilder
     private static void AddSectionHeader(GameObject parent, string text)
     {
         var go = NewChild(parent, "SectionHeader_" + text, out RectTransform rt);
-        var tmp = AddStyledText(go, text, 13, FontWeight.Bold, TextMuted);
+        var tmp = AddStyledText(go, text, Sz(13), FontWeight.Bold, TextMuted);
         tmp.characterSpacing = 0.5f;
-        rt.sizeDelta = new Vector2(0, 20);
+        rt.sizeDelta = Sv(0, 20);
         var sh = go.AddComponent<SectionHeader>();
         var so = new SerializedObject(sh);
         so.FindProperty("labelText").objectReferenceValue = tmp;
