@@ -181,24 +181,18 @@ public static class BotSettingsRebuilder
                 rootRt.offsetMax = Vector2.zero;
             }
 
-            // Allowlist preserve at direct-child level.
+            // Allowlist preserve at direct-child level. Only exact-name matches
+            // from PreserveTopLevelNames survive. We do NOT preserve containers
+            // based on "contains a dropdown" — that was grafting the whole old
+            // Pages container into the new General tab.
             var preserve = new HashSet<Transform>();
             var preserveSet = new HashSet<string>(PreserveTopLevelNames);
-            Transform preservedDropdown = null;
 
             for (int i = 0; i < root.transform.childCount; i++)
             {
                 var child = root.transform.GetChild(i);
                 if (preserveSet.Contains(child.name))
-                {
                     preserve.Add(child);
-                    continue;
-                }
-                if (child.GetComponentInChildren<TMP_Dropdown>(true) != null)
-                {
-                    preserve.Add(child);
-                    if (preservedDropdown == null) preservedDropdown = child;
-                }
             }
 
             int destroyedCount = 0;
@@ -241,22 +235,9 @@ public static class BotSettingsRebuilder
             var productSheet = BuildItemEditSheet(root, "ProductEditSheet");
             var serviceSheet = BuildItemEditSheet(root, "ServiceEditSheet");
 
-            // General tab content.
+            // General tab content. Dropdown is a skeleton; options are
+            // populated at runtime from BusinessTypesSO by Manager code.
             var generalFields = BuildGeneralTab(tabs["General"], mainScrim);
-
-            // Reparent preserved dropdown into General, replacing skeleton.
-            if (preservedDropdown != null)
-            {
-                var existingDropdown = preservedDropdown.GetComponentInChildren<TMP_Dropdown>(true);
-                if (existingDropdown != null)
-                {
-                    if (generalFields.businessTypeDropdown != null)
-                        Object.DestroyImmediate(generalFields.businessTypeDropdown.gameObject);
-                    preservedDropdown.SetParent(tabs["General"].transform, false);
-                    preservedDropdown.SetSiblingIndex(2);
-                    generalFields.businessTypeDropdown = existingDropdown;
-                }
-            }
 
             var businessField = BuildBusinessOrPromptTab(tabs["Business"], "ОПИСАНИЕ БИЗНЕСА", "Описание", mainScrim);
             var promptField   = BuildBusinessOrPromptTab(tabs["Prompt"],   "ПРОМПТ",              "Промпт",    mainScrim);
