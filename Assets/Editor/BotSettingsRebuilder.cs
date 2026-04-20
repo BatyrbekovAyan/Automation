@@ -674,29 +674,36 @@ public static class BotSettingsRebuilder
     private static ToggleRow CreateToggleRow(GameObject parent, string label)
     {
         var go = NewChild(parent, "ToggleRow_" + label, out RectTransform rt);
-        go.AddComponent<Image>().color = Card;
+        var cardImg = go.AddComponent<Image>();
+        cardImg.color = Card;
+        AddRoundedCorners(go, 10f);
+        AddShadow(go);
         rt.sizeDelta = Sv(0, 56);
 
         var labelGo = NewChild(go, "Label", out RectTransform labelRt);
         var labelTmp = AddStyledText(labelGo, label, Sz(16), FontWeight.Medium, Text);
-        SetAnchors(labelRt, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(0, 0.5f));
-        labelRt.sizeDelta = Sv(200, 24);
-        labelRt.anchoredPosition = new Vector2(16 + 100, 0);
+        SetAnchors(labelRt, new Vector2(0, 0.5f), new Vector2(1, 0.5f), new Vector2(0, 0.5f));
+        labelRt.sizeDelta = Sv(-92, 24);
+        labelRt.anchoredPosition = Sv(16, 0);
 
         var toggleGo = NewChild(go, "Toggle", out RectTransform toggleRt);
         SetAnchors(toggleRt, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(1, 0.5f));
         toggleRt.sizeDelta = Sv(52, 32);
-        toggleRt.anchoredPosition = Sv(-42, 0);
+        toggleRt.anchoredPosition = Sv(-16 - 26, 0);
         var toggle = toggleGo.AddComponent<Toggle>();
 
         var trackGo = NewChild(toggleGo, "Track", out RectTransform trackRt);
         StretchFill(trackRt);
         var trackImg = trackGo.AddComponent<Image>();
-        trackImg.color = ToggleOff;
+        trackImg.sprite = Sprites.ToggleBg;
+        trackImg.color = Color.white; // tint applied by ToggleRow at runtime
+        AddRoundedCorners(trackGo, 16f);
 
         var thumbGo = NewChild(toggleGo, "Thumb", out RectTransform thumbRt);
         var thumbImg = thumbGo.AddComponent<Image>();
+        thumbImg.sprite = Sprites.ToggleHandle;
         thumbImg.color = Color.white;
+        thumbImg.preserveAspect = true;
         SetAnchors(thumbRt, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(0.5f, 0.5f));
         thumbRt.sizeDelta = Sv(28, 28);
         thumbRt.anchoredPosition = Sv(16, 0);
