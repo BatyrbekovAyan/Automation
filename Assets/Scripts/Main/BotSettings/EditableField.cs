@@ -40,6 +40,8 @@ namespace Automation.BotSettingsUI
 
         public bool IsFocused => isFocused;
 
+        public TMP_InputField InputField => input;
+
         protected virtual void Awake()
         {
             if (input == null) return;

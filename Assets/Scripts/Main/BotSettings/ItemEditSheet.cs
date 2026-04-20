@@ -33,6 +33,9 @@ namespace Automation.BotSettingsUI
         private Canvas canvas;
         private float baselineY;
         private bool isShown;
+        private EditableField lastFocusedField;
+        private const float LiftDuration = 0.3f;
+        private const float LiftMargin = 24f;
 
         private ProductCardView boundProduct;
         private ServiceCardView boundService;
@@ -63,21 +66,53 @@ namespace Automation.BotSettingsUI
         private void Update()
         {
             if (!isShown || sheetRoot == null) return;
-            LiftSheetForKeyboard();
+            var focused = GetFocusedField();
+            if (focused != lastFocusedField)
+            {
+                lastFocusedField = focused;
+                AnimateLiftFor(focused);
+            }
         }
 
-        private void LiftSheetForKeyboard()
+        private EditableField GetFocusedField()
         {
-            if (!TouchScreenKeyboard.isSupported) return;
+            if (nameField != null && nameField.InputField != null && nameField.InputField.isFocused) return nameField;
+            if (priceField != null && priceField.InputField != null && priceField.InputField.isFocused) return priceField;
+            if (descField != null && descField.InputField != null && descField.InputField.isFocused) return descField;
+            return null;
+        }
 
-            float keyboardHeightPx = TouchScreenKeyboard.area.height;
-            float scaleFactor = (canvas != null && canvas.scaleFactor > 0f) ? canvas.scaleFactor : 1f;
-            float keyboardHeightCanvas = keyboardHeightPx / scaleFactor;
+        private void AnimateLiftFor(EditableField field)
+        {
+            float targetY = baselineY;
+            if (field != null)
+            {
+                float keyboardCanvas = GetKeyboardHeightCanvas();
+                if (keyboardCanvas > 0f)
+                {
+                    var fieldRect = field.GetComponent<RectTransform>();
+                    if (fieldRect != null)
+                    {
+                        var worldCorners = new Vector3[4];
+                        fieldRect.GetWorldCorners(worldCorners);
+                        var localBottom = sheetRoot.InverseTransformPoint(worldCorners[0]);
+                        float fieldBottomInSheet = localBottom.y; // sheet pivot is at bottom
+                        float lift = Mathf.Max(0f, keyboardCanvas - fieldBottomInSheet + LiftMargin);
+                        targetY = baselineY + lift;
+                    }
+                }
+            }
+            sheetRoot.DOKill();
+            sheetRoot.DOAnchorPosY(targetY, LiftDuration).SetEase(Ease.OutCubic);
+        }
 
-            var target = new Vector2(shownAnchored.x, baselineY + keyboardHeightCanvas);
-            var pos = sheetRoot.anchoredPosition;
-            if (Mathf.Abs(pos.y - target.y) > 0.5f)
-                sheetRoot.anchoredPosition = Vector2.Lerp(pos, target, 12f * Time.unscaledDeltaTime);
+        private float GetKeyboardHeightCanvas()
+        {
+            if (!TouchScreenKeyboard.isSupported) return 0f;
+            float heightPx = TouchScreenKeyboard.area.height;
+            if (heightPx <= 0f) return 0f;
+            float scale = (canvas != null && canvas.scaleFactor > 0f) ? canvas.scaleFactor : 1f;
+            return heightPx / scale;
         }
 
         public void Show(ProductCardView card)
@@ -108,6 +143,7 @@ namespace Automation.BotSettingsUI
             gameObject.SetActive(true);
             transform.SetAsLastSibling();
             isShown = true;
+            lastFocusedField = null;
             if (scrimBehind != null)
             {
                 scrimBehind.SetActive(true);

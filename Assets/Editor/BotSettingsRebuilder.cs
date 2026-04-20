@@ -510,7 +510,7 @@ public static class BotSettingsRebuilder
             contentRt.anchoredPosition = Vector2.zero;
 
             var vlg = content.AddComponent<VerticalLayoutGroup>();
-            vlg.padding = new RectOffset(Szi(20), Szi(20), Szi(20), Szi(20));
+            vlg.padding = new RectOffset(Szi(20), Szi(20), Szi(24), Szi(24));
             vlg.spacing = Sz(12);
             vlg.childAlignment = TextAnchor.UpperCenter;
             vlg.childForceExpandWidth = true;
