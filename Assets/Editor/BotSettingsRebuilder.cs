@@ -703,7 +703,7 @@ public static class BotSettingsRebuilder
         var so = new SerializedObject(field);
         so.FindProperty("labelText").objectReferenceValue = labelTmp;
         so.FindProperty("input").objectReferenceValue = input;
-        if (scrim != null) so.FindProperty("scrim").objectReferenceValue = scrim;
+        so.FindProperty("scrim").objectReferenceValue = scrim; // write explicitly so a null passed in overwrites any stale reference
         so.ApplyModifiedPropertiesWithoutUndo();
     }
 
