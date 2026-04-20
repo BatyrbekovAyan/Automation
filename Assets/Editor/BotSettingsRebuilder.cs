@@ -270,7 +270,7 @@ public static class BotSettingsRebuilder
             clearSo.ApplyModifiedPropertiesWithoutUndo();
 
             // Build fresh structure.
-            var header = BuildHeader(root);
+            var header = BuildHeader(root, out var backBtn, out var saveBtn);
             var tabBar = BuildTabBar(root, out var tabButtons);
             var tabs = BuildTabs(root);
             var mainScrim = BuildFocusScrim(root, "MainFocusScrim");
@@ -364,7 +364,7 @@ public static class BotSettingsRebuilder
     // Sub-builders
     // ============================================================
 
-    private static GameObject BuildHeader(GameObject root)
+    private static GameObject BuildHeader(GameObject root, out Button backBtn, out Button saveBtn)
     {
         var header = NewChild(root, "HeaderGroup", out RectTransform rt);
         var img = header.AddComponent<Image>();
@@ -373,12 +373,37 @@ public static class BotSettingsRebuilder
         rt.sizeDelta = Sv(0, 56);
         rt.anchoredPosition = Vector2.zero;
 
+        var backGo = NewChild(header, "BackButton", out RectTransform backRt);
+        var backImg = backGo.AddComponent<Image>();
+        backImg.sprite = Sprites.BackIcon;
+        backImg.color = Primary;
+        backImg.preserveAspect = true;
+        backBtn = backGo.AddComponent<Button>();
+        SetAnchors(backRt, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(0, 0.5f));
+        backRt.sizeDelta = Sv(24, 24);
+        backRt.anchoredPosition = Sv(16, 0);
+
         var title = NewChild(header, "Title", out RectTransform titleRt);
         var titleTmp = AddStyledText(title, "ShopBot", Sz(20), FontWeight.Bold, Text);
         titleTmp.alignment = TextAlignmentOptions.Center;
         SetAnchors(titleRt, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f));
-        titleRt.offsetMin = Sv(48, 0);
-        titleRt.offsetMax = Sv(-100, 0);
+        titleRt.offsetMin = Sv(60, 0);
+        titleRt.offsetMax = Sv(-110, 0);
+
+        var saveGo = NewChild(header, "SaveButton", out RectTransform saveRt);
+        var saveImg = saveGo.AddComponent<Image>();
+        saveImg.color = Primary;
+        AddRoundedCorners(saveGo, 10f);
+        saveBtn = saveGo.AddComponent<Button>();
+        SetAnchors(saveRt, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(1, 0.5f));
+        saveRt.sizeDelta = Sv(92, 36);
+        saveRt.anchoredPosition = Sv(-16 - 46, 0);
+
+        var saveLabelGo = NewChild(saveGo, "Label", out RectTransform saveLabelRt);
+        var saveTmp = AddStyledText(saveLabelGo, "Сохранить", Sz(14), FontWeight.Bold, Color.white);
+        saveTmp.alignment = TextAlignmentOptions.Center;
+        StretchFill(saveLabelRt);
+
         return header;
     }
 
