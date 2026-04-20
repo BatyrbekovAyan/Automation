@@ -26,8 +26,13 @@ namespace Automation.BotSettingsUI
         [SerializeField] private Button deleteConfirmNo;
         [SerializeField] private GameObject scrimBehind;  // dim behind sheet (separate from FocusScrim)
         [SerializeField] private CanvasGroup scrimBehindGroup;
+        [SerializeField] private Button scrimBehindButton;  // tap-outside to close
         [SerializeField] private float slideDuration = 0.25f;
         [SerializeField] private float scrimAlpha = 0.5f;
+
+        private Canvas canvas;
+        private float baselineY;
+        private bool isShown;
 
         private ProductCardView boundProduct;
         private ServiceCardView boundService;
@@ -43,12 +48,36 @@ namespace Automation.BotSettingsUI
             shownAnchored = sheetRoot.anchoredPosition;
             hiddenAnchored = new Vector2(shownAnchored.x, -sheetRoot.rect.height);
             sheetRoot.anchoredPosition = hiddenAnchored;
+            baselineY = shownAnchored.y;
+            canvas = GetComponentInParent<Canvas>();
             gameObject.SetActive(false);
 
             doneButton.onClick.AddListener(Commit);
             deleteButton.onClick.AddListener(() => PopupUI.Show(deleteConfirmPopup));
             PopupUI.WireFingerUp(deleteConfirmYes, ConfirmDelete);
             PopupUI.WireFingerUp(deleteConfirmNo, () => PopupUI.Hide(deleteConfirmPopup));
+            if (scrimBehindButton != null)
+                scrimBehindButton.onClick.AddListener(Hide);
+        }
+
+        private void Update()
+        {
+            if (!isShown || sheetRoot == null) return;
+            LiftSheetForKeyboard();
+        }
+
+        private void LiftSheetForKeyboard()
+        {
+            if (!TouchScreenKeyboard.isSupported) return;
+
+            float keyboardHeightPx = TouchScreenKeyboard.area.height;
+            float scaleFactor = (canvas != null && canvas.scaleFactor > 0f) ? canvas.scaleFactor : 1f;
+            float keyboardHeightCanvas = keyboardHeightPx / scaleFactor;
+
+            var target = new Vector2(shownAnchored.x, baselineY + keyboardHeightCanvas);
+            var pos = sheetRoot.anchoredPosition;
+            if (Mathf.Abs(pos.y - target.y) > 0.5f)
+                sheetRoot.anchoredPosition = Vector2.Lerp(pos, target, 12f * Time.unscaledDeltaTime);
         }
 
         public void Show(ProductCardView card)
@@ -78,6 +107,7 @@ namespace Automation.BotSettingsUI
         {
             gameObject.SetActive(true);
             transform.SetAsLastSibling();
+            isShown = true;
             if (scrimBehind != null)
             {
                 scrimBehind.SetActive(true);
@@ -90,6 +120,7 @@ namespace Automation.BotSettingsUI
 
         public void Hide()
         {
+            isShown = false;
             sheetRoot.DOKill();
             sheetRoot.DOAnchorPos(hiddenAnchored, slideDuration).SetEase(Ease.InCubic);
             if (scrimBehind != null)

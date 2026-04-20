@@ -282,14 +282,14 @@ public static class BotSettingsRebuilder
 
             // General tab content. Dropdown is a skeleton; options are
             // populated at runtime from BusinessTypesSO by Manager code.
-            var generalFields = BuildGeneralTab(tabs["General"], mainScrim);
+            var generalFields = BuildGeneralTab(tabs["General"].content, mainScrim);
 
             // Re-parent the preserved dropdown into position 3 (after Section "ИНФОРМАЦИЯ" + BotName + the skeleton dropdown line).
             // BuildGeneralTab's VLG order: SectionHeader, BotNameField, (dropdown slot), SectionHeader, WhatsappToggle, ...
-            AttachDropdownToGeneralTab(stashedDropdown, tabs["General"], siblingIndex: 3);
+            AttachDropdownToGeneralTab(stashedDropdown, tabs["General"].content, siblingIndex: 3);
 
             // Remove the skeleton dropdown that BuildGeneralTab creates (it would duplicate the preserved one).
-            var skeletonDropdownGo = FindDescendantInChildren(tabs["General"].transform, "BusinessTypeDropdown");
+            var skeletonDropdownGo = FindDescendantInChildren(tabs["General"].content.transform, "BusinessTypeDropdown");
             if (stashedDropdown != null && skeletonDropdownGo != null && skeletonDropdownGo != stashedDropdown.gameObject)
             {
                 Object.DestroyImmediate(skeletonDropdownGo);
@@ -299,18 +299,18 @@ public static class BotSettingsRebuilder
             if (stashedDropdown != null)
                 generalFields.businessTypeDropdown = stashedDropdown;
 
-            var businessField = BuildBusinessOrPromptTab(tabs["Business"], "ОПИСАНИЕ БИЗНЕСА", "Описание", mainScrim);
-            var promptField   = BuildBusinessOrPromptTab(tabs["Prompt"],   "ПРОМПТ",              "Промпт",    mainScrim);
-            var productTabRefs = BuildProductOrServiceTab(tabs["Product"], isProducts: true);
-            var serviceTabRefs = BuildProductOrServiceTab(tabs["Service"], isProducts: false);
+            var businessField = BuildBusinessOrPromptTab(tabs["Business"].content, "ОПИСАНИЕ БИЗНЕСА", "Описание", mainScrim);
+            var promptField   = BuildBusinessOrPromptTab(tabs["Prompt"].content,   "ПРОМПТ",              "Промпт",    mainScrim);
+            var productTabRefs = BuildProductOrServiceTab(tabs["Product"].content, isProducts: true);
+            var serviceTabRefs = BuildProductOrServiceTab(tabs["Service"].content, isProducts: false);
 
             // Wire BotSettings serialized fields.
             var so = new SerializedObject(botSettings);
-            so.FindProperty("General").objectReferenceValue  = tabs["General"];
-            so.FindProperty("Business").objectReferenceValue = tabs["Business"];
-            so.FindProperty("Product").objectReferenceValue  = tabs["Product"];
-            so.FindProperty("Service").objectReferenceValue  = tabs["Service"];
-            so.FindProperty("Prompt").objectReferenceValue   = tabs["Prompt"];
+            so.FindProperty("General").objectReferenceValue  = tabs["General"].tab;
+            so.FindProperty("Business").objectReferenceValue = tabs["Business"].tab;
+            so.FindProperty("Product").objectReferenceValue  = tabs["Product"].tab;
+            so.FindProperty("Service").objectReferenceValue  = tabs["Service"].tab;
+            so.FindProperty("Prompt").objectReferenceValue   = tabs["Prompt"].tab;
             so.FindProperty("GeneralTabButton").objectReferenceValue  = tabButtons[0];
             so.FindProperty("BusinessTabButton").objectReferenceValue = tabButtons[1];
             so.FindProperty("ProductTabButton").objectReferenceValue  = tabButtons[2];
@@ -475,9 +475,11 @@ public static class BotSettingsRebuilder
         return tabBar;
     }
 
-    private static Dictionary<string, GameObject> BuildTabs(GameObject root)
+    private struct TabRoots { public GameObject tab; public GameObject content; }
+
+    private static Dictionary<string, TabRoots> BuildTabs(GameObject root)
     {
-        var map = new Dictionary<string, GameObject>();
+        var map = new Dictionary<string, TabRoots>();
         foreach (var name in new[] { "General", "Business", "Product", "Service", "Prompt" })
         {
             var tab = NewChild(root, name, out RectTransform rt);
@@ -487,7 +489,27 @@ public static class BotSettingsRebuilder
             rt.offsetMin = Vector2.zero;
             rt.offsetMax = Sv(0, -100); // below header (56) + tabs (44)
 
-            var vlg = tab.AddComponent<VerticalLayoutGroup>();
+            // ScrollRect so long content is scrollable.
+            var scroll = tab.AddComponent<ScrollRect>();
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.movementType = ScrollRect.MovementType.Elastic;
+            scroll.inertia = true;
+            scroll.scrollSensitivity = Sz(20);
+
+            var viewport = NewChild(tab, "Viewport", out RectTransform vpRt);
+            StretchFill(vpRt);
+            var vpImg = viewport.AddComponent<Image>();
+            vpImg.color = new Color(1, 1, 1, 0.003f); // effectively invisible; Mask needs a Graphic
+            var vpMask = viewport.AddComponent<Mask>();
+            vpMask.showMaskGraphic = false;
+
+            var content = NewChild(viewport, "Content", out RectTransform contentRt);
+            SetAnchors(contentRt, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1));
+            contentRt.sizeDelta = Vector2.zero;
+            contentRt.anchoredPosition = Vector2.zero;
+
+            var vlg = content.AddComponent<VerticalLayoutGroup>();
             vlg.padding = new RectOffset(Szi(20), Szi(20), Szi(20), Szi(20));
             vlg.spacing = Sz(12);
             vlg.childAlignment = TextAnchor.UpperCenter;
@@ -496,8 +518,14 @@ public static class BotSettingsRebuilder
             vlg.childControlWidth = true;
             vlg.childControlHeight = false;
 
+            var fitter = content.AddComponent<ContentSizeFitter>();
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            scroll.viewport = vpRt;
+            scroll.content = contentRt;
+
             tab.SetActive(name == "General");
-            map[name] = tab;
+            map[name] = new TabRoots { tab = tab, content = content };
         }
         return map;
     }
@@ -795,6 +823,7 @@ public static class BotSettingsRebuilder
         scrimBehindGo.AddComponent<Image>().color = new Color(0, 0, 0, 1);
         var scrimBehindCg = scrimBehindGo.AddComponent<CanvasGroup>();
         scrimBehindCg.alpha = 0;
+        var scrimBehindBtn = scrimBehindGo.AddComponent<Button>(); // tap outside closes the sheet
 
         var sheetGo = NewChild(sheetContainer, "SheetRoot", out RectTransform sheetRt);
         sheetGo.AddComponent<Image>().color = Card;
@@ -902,6 +931,7 @@ public static class BotSettingsRebuilder
         so.FindProperty("deleteConfirmNo").objectReferenceValue = noBtn;
         so.FindProperty("scrimBehind").objectReferenceValue = scrimBehindGo;
         so.FindProperty("scrimBehindGroup").objectReferenceValue = scrimBehindCg;
+        so.FindProperty("scrimBehindButton").objectReferenceValue = scrimBehindBtn;
         so.ApplyModifiedPropertiesWithoutUndo();
 
         return sheet;
