@@ -127,10 +127,10 @@ public static class BotSettingsRebuilder
     // Product / Service prefabs
     // ============================================================
 
-    private static void BuildProductPrefab() => BuildCardPrefab<ProductCardView>(ProductPrefabPath, "📦");
-    private static void BuildServicePrefab() => BuildCardPrefab<ServiceCardView>(ServicePrefabPath, "🛠");
+    private static void BuildProductPrefab() => BuildCardPrefab<ProductCardView>(ProductPrefabPath);
+    private static void BuildServicePrefab() => BuildCardPrefab<ServiceCardView>(ServicePrefabPath);
 
-    private static void BuildCardPrefab<T>(string path, string emoji) where T : MonoBehaviour
+    private static void BuildCardPrefab<T>(string path) where T : MonoBehaviour
     {
         var root = new GameObject("CardRoot");
         var rt = root.AddComponent<RectTransform>();
@@ -140,20 +140,18 @@ public static class BotSettingsRebuilder
         var bg = root.AddComponent<Image>();
         bg.color = Card;
         bg.raycastTarget = true;
+        AddRoundedCorners(root, 10f);
+        AddShadow(root);
 
         var button = root.AddComponent<Button>();
 
         var thumb = NewChild(root, "Thumb", out RectTransform thumbRt);
         var thumbImg = thumb.AddComponent<Image>();
         thumbImg.color = Bg;
+        AddRoundedCorners(thumb, 10f);
         SetAnchors(thumbRt, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(0, 0.5f));
         thumbRt.sizeDelta = Sv(50, 50);
-        thumbRt.anchoredPosition = Sv(16, 0);
-
-        var emojiGo = NewChild(thumb, "Emoji", out RectTransform emojiRt);
-        var emojiTmp = AddStyledText(emojiGo, emoji, Sz(24), FontWeight.Regular, Text);
-        emojiTmp.alignment = TextAlignmentOptions.Center;
-        StretchFill(emojiRt);
+        thumbRt.anchoredPosition = Sv(16 + 25, 0);
 
         var info = NewChild(root, "Info", out RectTransform infoRt);
         SetAnchors(infoRt, new Vector2(0, 0), new Vector2(1, 1), new Vector2(0, 0.5f));
@@ -174,9 +172,11 @@ public static class BotSettingsRebuilder
 
         var chevronGo = NewChild(root, "Chevron", out RectTransform chevRt);
         var chevImg = chevronGo.AddComponent<Image>();
+        chevImg.sprite = Sprites.ChevronRight;
         chevImg.color = Chevron;
+        chevImg.preserveAspect = true;
         SetAnchors(chevRt, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(1, 0.5f));
-        chevRt.sizeDelta = Sv(8, 12);
+        chevRt.sizeDelta = Sv(12, 12);
         chevRt.anchoredPosition = Sv(-16, 0);
 
         var cardView = root.AddComponent<T>();
