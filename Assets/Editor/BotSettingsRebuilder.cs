@@ -913,6 +913,11 @@ public static class BotSettingsRebuilder
         var so = new SerializedObject(sh);
         so.FindProperty("labelText").objectReferenceValue = tmp;
         so.ApplyModifiedPropertiesWithoutUndo();
+
+        // Give section headers a 40-high slot so visual spacing above/below matches mockup.
+        var le = go.AddComponent<LayoutElement>();
+        le.preferredHeight = Sz(40);
+        le.minHeight = Sz(28);
     }
 
     // ============================================================
