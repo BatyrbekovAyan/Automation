@@ -287,8 +287,6 @@ public partial class BotSettings : MonoBehaviour
                              ProductPrefab.transform.position,
                              ProductPrefab.transform.rotation,
                              ProductsParent);
-        if (addProductButton != null)
-            addProductButton.transform.parent.SetAsLastSibling();
 
         var card = go.GetComponent<ProductCardView>();
         if (card != null) BindProductCard(card);
@@ -305,8 +303,6 @@ public partial class BotSettings : MonoBehaviour
                              ServicePrefab.transform.position,
                              ServicePrefab.transform.rotation,
                              ServicesParent);
-        if (addServiceButton != null)
-            addServiceButton.transform.parent.SetAsLastSibling();
 
         var card = go.GetComponent<ServiceCardView>();
         if (card != null) BindServiceCard(card);

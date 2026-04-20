@@ -809,8 +809,10 @@ public static class BotSettingsRebuilder
         titleRt.sizeDelta = Sv(-32, 40);
         titleRt.anchoredPosition = Sv(0, -24);
 
-        var sheetScrim = BuildFocusScrim(sheetGo, "SheetFocusScrim");
-
+        // Sheet is already modal (scrimBehind dims the page behind it).
+        // Sheet fields edit inline without their own raise-to-scrim effect,
+        // which prevents the "field disappears when tapped because scrim
+        // raisedLayer sits behind sibling content" issue.
         var fieldsContainer = NewChild(sheetGo, "Fields", out RectTransform fieldsRt);
         SetAnchors(fieldsRt, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1));
         fieldsRt.sizeDelta = Sv(-32, 240);
@@ -822,9 +824,9 @@ public static class BotSettingsRebuilder
         fvlg.childForceExpandWidth = true;
         fvlg.childControlWidth = true;
 
-        var nameField  = CreateEditableField(fieldsContainer, "Название", sheetScrim, multiline: false);
-        var priceField = CreateEditableField(fieldsContainer, "Цена",      sheetScrim, multiline: false);
-        var descField  = CreateEditableField(fieldsContainer, "Описание",  sheetScrim, multiline: false);
+        var nameField  = CreateEditableField(fieldsContainer, "Название", scrim: null, multiline: false);
+        var priceField = CreateEditableField(fieldsContainer, "Цена",      scrim: null, multiline: false);
+        var descField  = CreateEditableField(fieldsContainer, "Описание",  scrim: null, multiline: false);
 
         var doneGo = NewChild(sheetGo, "DoneButton", out RectTransform doneRt);
         doneGo.AddComponent<Image>().color = Primary;

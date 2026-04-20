@@ -293,27 +293,22 @@ public class Manager : MonoBehaviour
                 int ProductsNumber = PlayerPrefs.GetInt(recreatedBot.name + "ProductsNumber", 0);
                 for (int p = 0; p < ProductsNumber; p++)
                 {
-                    ProductCardView recreatedProduct = Instantiate(ProductPrefab, ProductPrefab.transform.position, ProductPrefab.transform.rotation, recreatedBotSettings.AddProductButton.transform.parent.parent).GetComponent<ProductCardView>();
+                    ProductCardView recreatedProduct = Instantiate(ProductPrefab, ProductPrefab.transform.position, ProductPrefab.transform.rotation, recreatedBotSettings.ProductsParent).GetComponent<ProductCardView>();
 
                     recreatedProduct.Name = PlayerPrefs.GetString(recreatedBot.name + "Product" + p, "");
                     recreatedProduct.Price = PlayerPrefs.GetString(recreatedBot.name + "Product" + p + "Price", "");
                     recreatedProduct.Description = PlayerPrefs.GetString(recreatedBot.name + "Product" + p + "Description", "");
                 }
 
-                recreatedBotSettings.AddProductButton.transform.parent.SetAsLastSibling();
-
-
                 int ServicesNumber = PlayerPrefs.GetInt(recreatedBot.name + "ServicesNumber", 0);
                 for (int s = 0; s < ServicesNumber; s++)
                 {
-                    ServiceCardView recreatedService = Instantiate(ServicePrefab, ServicePrefab.transform.position, ServicePrefab.transform.rotation, recreatedBotSettings.AddServiceButton.transform.parent.parent).GetComponent<ServiceCardView>();
+                    ServiceCardView recreatedService = Instantiate(ServicePrefab, ServicePrefab.transform.position, ServicePrefab.transform.rotation, recreatedBotSettings.ServicesParent).GetComponent<ServiceCardView>();
 
                     recreatedService.Name = PlayerPrefs.GetString(recreatedBot.name + "Service" + s, "");
                     recreatedService.Price = PlayerPrefs.GetString(recreatedBot.name + "Service" + s + "Price", "");
                     recreatedService.Description = PlayerPrefs.GetString(recreatedBot.name + "Service" + s + "Description", "");
                 }
-
-                recreatedBotSettings.AddServiceButton.transform.parent.SetAsLastSibling();
             }
         }
 
@@ -359,7 +354,7 @@ public class Manager : MonoBehaviour
         PlayerPrefs.SetString(openBot.name + "Prompt", openBotSettings.PromptField.Value);
 
 
-        for (int i = 0; i < openBotSettings.ProductsParent.transform.childCount - 1; i++)
+        for (int i = 0; i < openBotSettings.ProductsParent.transform.childCount; i++)
         {
             Transform product = openBotSettings.ProductsParent.transform.GetChild(i);
 
@@ -373,9 +368,9 @@ public class Manager : MonoBehaviour
         }
 
         //delete not used keyes
-        if (PlayerPrefs.GetInt(openBot.name + "ProductsNumber", 0) > openBotSettings.ProductsParent.transform.childCount - 1)
+        if (PlayerPrefs.GetInt(openBot.name + "ProductsNumber", 0) > openBotSettings.ProductsParent.transform.childCount)
         {
-            for (int p = openBotSettings.ProductsParent.transform.childCount - 1; p < PlayerPrefs.GetInt(openBot.name + "ProductsNumber", 0); p++)
+            for (int p = openBotSettings.ProductsParent.transform.childCount; p < PlayerPrefs.GetInt(openBot.name + "ProductsNumber", 0); p++)
             {
                 if (PlayerPrefs.HasKey(openBot.name + "Product" + p))
                 {
@@ -394,10 +389,10 @@ public class Manager : MonoBehaviour
             }
         }
 
-        PlayerPrefs.SetInt(openBot.name + "ProductsNumber", openBotSettings.ProductsParent.transform.childCount - 1);
+        PlayerPrefs.SetInt(openBot.name + "ProductsNumber", openBotSettings.ProductsParent.transform.childCount);
 
 
-        for (int i = 0; i < openBotSettings.ServicesParent.transform.childCount - 1; i++)
+        for (int i = 0; i < openBotSettings.ServicesParent.transform.childCount; i++)
         {
             Transform service = openBotSettings.ServicesParent.transform.GetChild(i);
 
@@ -411,9 +406,9 @@ public class Manager : MonoBehaviour
         }
 
         //delete not used keyes
-        if (PlayerPrefs.GetInt(openBot.name + "ServicesNumber", 0) > openBotSettings.ServicesParent.transform.childCount - 1)
+        if (PlayerPrefs.GetInt(openBot.name + "ServicesNumber", 0) > openBotSettings.ServicesParent.transform.childCount)
         {
-            for (int s = openBotSettings.ServicesParent.transform.childCount - 1; s < PlayerPrefs.GetInt(openBot.name + "ServicesNumber", 0); s++)
+            for (int s = openBotSettings.ServicesParent.transform.childCount; s < PlayerPrefs.GetInt(openBot.name + "ServicesNumber", 0); s++)
             {
                 if (PlayerPrefs.HasKey(openBot.name + "Service" + s))
                 {
@@ -432,7 +427,7 @@ public class Manager : MonoBehaviour
             }
         }
 
-        PlayerPrefs.SetInt(openBot.name + "ServicesNumber", openBotSettings.ServicesParent.transform.childCount - 1);
+        PlayerPrefs.SetInt(openBot.name + "ServicesNumber", openBotSettings.ServicesParent.transform.childCount);
 
 
         PlayerPrefs.Save(); // Ensure changes are written to disk
@@ -457,7 +452,7 @@ public class Manager : MonoBehaviour
         openBotSettings.PromptField.Value = PlayerPrefs.GetString(openBot.name + "Prompt", "");
 
 
-        for (int p = 0; p < openBotSettings.ProductsParent.transform.childCount - 1; p++)
+        for (int p = 0; p < openBotSettings.ProductsParent.transform.childCount; p++)
         {
             Destroy(openBotSettings.ProductsParent.transform.GetChild(p).gameObject);
         }
@@ -465,17 +460,14 @@ public class Manager : MonoBehaviour
         int ProductsNumber = PlayerPrefs.GetInt(openBot.name + "ProductsNumber", 0);
         for (int p = 0; p < ProductsNumber; p++)
         {
-            ProductCardView recreatedProduct = Instantiate(ProductPrefab, ProductPrefab.transform.position, ProductPrefab.transform.rotation, openBotSettings.AddProductButton.transform.parent.parent).GetComponent<ProductCardView>();
+            ProductCardView recreatedProduct = Instantiate(ProductPrefab, ProductPrefab.transform.position, ProductPrefab.transform.rotation, openBotSettings.ProductsParent).GetComponent<ProductCardView>();
 
             recreatedProduct.Name = PlayerPrefs.GetString(openBot.name + "Product" + p, "");
             recreatedProduct.Price = PlayerPrefs.GetString(openBot.name + "Product" + p + "Price", "");
             recreatedProduct.Description = PlayerPrefs.GetString(openBot.name + "Product" + p + "Description", "");
         }
 
-        openBotSettings.AddProductButton.transform.parent.SetAsLastSibling();
-
-
-        for (int s = 0; s < openBotSettings.ServicesParent.transform.childCount - 1; s++)
+        for (int s = 0; s < openBotSettings.ServicesParent.transform.childCount; s++)
         {
             Destroy(openBotSettings.ServicesParent.transform.GetChild(s).gameObject);
         }
@@ -483,14 +475,12 @@ public class Manager : MonoBehaviour
         int ServicesNumber = PlayerPrefs.GetInt(openBot.name + "ServicesNumber", 0);
         for (int s = 0; s < ServicesNumber; s++)
         {
-            ServiceCardView recreatedService = Instantiate(ServicePrefab, ServicePrefab.transform.position, ServicePrefab.transform.rotation, openBotSettings.AddServiceButton.transform.parent.parent).GetComponent<ServiceCardView>();
+            ServiceCardView recreatedService = Instantiate(ServicePrefab, ServicePrefab.transform.position, ServicePrefab.transform.rotation, openBotSettings.ServicesParent).GetComponent<ServiceCardView>();
 
             recreatedService.Name = PlayerPrefs.GetString(openBot.name + "Service" + s, "");
             recreatedService.Price = PlayerPrefs.GetString(openBot.name + "Service" + s + "Price", "");
             recreatedService.Description = PlayerPrefs.GetString(openBot.name + "Service" + s + "Description", "");
         }
-
-        openBotSettings.AddServiceButton.transform.parent.SetAsLastSibling();
     }
 
     public void EnableSave()
@@ -528,15 +518,15 @@ public class Manager : MonoBehaviour
     {
         yield return new WaitForEndOfFrame();
 
-        if (openBotSettings.ProductsParent.transform.childCount - 1 != PlayerPrefs.GetInt(openBot.name + "ProductsNumber", 0) ||
-            openBotSettings.ServicesParent.transform.childCount - 1 != PlayerPrefs.GetInt(openBot.name + "ServicesNumber", 0))
+        if (openBotSettings.ProductsParent.transform.childCount != PlayerPrefs.GetInt(openBot.name + "ProductsNumber", 0) ||
+            openBotSettings.ServicesParent.transform.childCount != PlayerPrefs.GetInt(openBot.name + "ServicesNumber", 0))
         {
             SaveButton.interactable = true;
         }
 
-        else if (openBotSettings.ProductsParent.transform.childCount - 1 == PlayerPrefs.GetInt(openBot.name + "ProductsNumber", 0))
+        else if (openBotSettings.ProductsParent.transform.childCount == PlayerPrefs.GetInt(openBot.name + "ProductsNumber", 0))
         {
-            for (int p = 0; p < openBotSettings.ProductsParent.transform.childCount - 1; p++)
+            for (int p = 0; p < openBotSettings.ProductsParent.transform.childCount; p++)
             {
                 if (!openBotSettings.ProductsParent.transform.GetChild(p).GetComponent<ProductCardView>().Name.Equals(PlayerPrefs.GetString(openBot.name + "Product" + p, "")) ||
                     !openBotSettings.ProductsParent.transform.GetChild(p).GetComponent<ProductCardView>().Price.Equals(PlayerPrefs.GetString(openBot.name + "Product" + p + "Price", "")) ||
@@ -547,9 +537,9 @@ public class Manager : MonoBehaviour
             }
         }
 
-        else if (openBotSettings.ServicesParent.transform.childCount - 1 == PlayerPrefs.GetInt(openBot.name + "ServicesNumber", 0))
+        else if (openBotSettings.ServicesParent.transform.childCount == PlayerPrefs.GetInt(openBot.name + "ServicesNumber", 0))
         {
-            for (int s = 0; s < openBotSettings.ServicesParent.transform.childCount - 1; s++)
+            for (int s = 0; s < openBotSettings.ServicesParent.transform.childCount; s++)
             {
                 if (!openBotSettings.ServicesParent.transform.GetChild(s).GetComponent<ServiceCardView>().Name.Equals(PlayerPrefs.GetString(openBot.name + "Service" + s, "")) ||
                     !openBotSettings.ServicesParent.transform.GetChild(s).GetComponent<ServiceCardView>().Price.Equals(PlayerPrefs.GetString(openBot.name + "Service" + s + "Price", "")) ||
@@ -2041,7 +2031,7 @@ public class Manager : MonoBehaviour
 
         string productsList = "";
 
-        for (int i = 0; i < openBotSettings.ProductsParent.transform.childCount - 1; i++)
+        for (int i = 0; i < openBotSettings.ProductsParent.transform.childCount; i++)
         {
             ProductCardView product = openBotSettings.ProductsParent.transform.GetChild(i).GetComponent<ProductCardView>();
 
@@ -2051,14 +2041,14 @@ public class Manager : MonoBehaviour
                 productsList += $"Product{i + 1}: {product.Name}" +
                     $"\nProduct{i + 1} Price: {product.Price}" +
                     $"\nProduct{i + 1} Description: {product.Description}"
-                    + (i == openBotSettings.ProductsParent.transform.childCount - 2 ? "" : $"\n\n");
+                    + (i == openBotSettings.ProductsParent.transform.childCount - 1 ? "" : $"\n\n");
             }
         }
 
 
         string servicesList = "";
 
-        for (int i = 0; i < openBotSettings.ServicesParent.transform.childCount - 1; i++)
+        for (int i = 0; i < openBotSettings.ServicesParent.transform.childCount; i++)
         {
             ServiceCardView service = openBotSettings.ServicesParent.transform.GetChild(i).GetComponent<ServiceCardView>();
 
@@ -2068,7 +2058,7 @@ public class Manager : MonoBehaviour
                 servicesList += $"Service{i + 1}: {service.Name}" +
                     $"\nService{i + 1} Price: {service.Price}" +
                     $"\nService{i + 1} Description: {service.Description}"
-                    + (i == openBotSettings.ServicesParent.transform.childCount - 2 ? "" : $"\n\n");
+                    + (i == openBotSettings.ServicesParent.transform.childCount - 1 ? "" : $"\n\n");
             }
         }
 
@@ -2171,7 +2161,7 @@ public class Manager : MonoBehaviour
 
         string productsList = "";
 
-        for (int i = 0; i < openBotSettings.ProductsParent.transform.childCount - 1; i++)
+        for (int i = 0; i < openBotSettings.ProductsParent.transform.childCount; i++)
         {
             ProductCardView product = openBotSettings.ProductsParent.transform.GetChild(i).GetComponent<ProductCardView>();
 
@@ -2181,14 +2171,14 @@ public class Manager : MonoBehaviour
                 productsList += $"Product{i + 1}: {product.Name}" +
                     $"\nProduct{i + 1} Price: {product.Price}" +
                     $"\nProduct{i + 1} Description: {product.Description}"
-                    + (i == openBotSettings.ProductsParent.transform.childCount - 2 ? "" : $"\n\n");
+                    + (i == openBotSettings.ProductsParent.transform.childCount - 1 ? "" : $"\n\n");
             }
         }
 
 
         string servicesList = "";
 
-        for (int i = 0; i < openBotSettings.ServicesParent.transform.childCount - 1; i++)
+        for (int i = 0; i < openBotSettings.ServicesParent.transform.childCount; i++)
         {
             ServiceCardView service = openBotSettings.ServicesParent.transform.GetChild(i).GetComponent<ServiceCardView>();
 
@@ -2198,7 +2188,7 @@ public class Manager : MonoBehaviour
                 servicesList += $"Service{i + 1}: {service.Name}" +
                     $"\nService{i + 1} Price: {service.Price}" +
                     $"\nService{i + 1} Description: {service.Description}"
-                    + (i == openBotSettings.ServicesParent.transform.childCount - 2 ? "" : $"\n\n");
+                    + (i == openBotSettings.ServicesParent.transform.childCount - 1 ? "" : $"\n\n");
             }
         }
 
@@ -2326,7 +2316,7 @@ public class Manager : MonoBehaviour
 
         string productsList = "";
 
-        for (int i = 0; i < openBotSettings.ProductsParent.transform.childCount - 1; i++)
+        for (int i = 0; i < openBotSettings.ProductsParent.transform.childCount; i++)
         {
             ProductCardView product = openBotSettings.ProductsParent.transform.GetChild(i).GetComponent<ProductCardView>();
 
@@ -2336,14 +2326,14 @@ public class Manager : MonoBehaviour
                 productsList += $"Product{i + 1}: {product.Name}" +
                     $"\nProduct{i + 1} Price: {product.Price}" +
                     $"\nProduct{i + 1} Description: {product.Description}"
-                    + (i == openBotSettings.ProductsParent.transform.childCount - 2 ? "" : $"\n\n");
+                    + (i == openBotSettings.ProductsParent.transform.childCount - 1 ? "" : $"\n\n");
             }
         }
 
 
         string servicesList = "";
 
-        for (int i = 0; i < openBotSettings.ServicesParent.transform.childCount - 1; i++)
+        for (int i = 0; i < openBotSettings.ServicesParent.transform.childCount; i++)
         {
             ServiceCardView service = openBotSettings.ServicesParent.transform.GetChild(i).GetComponent<ServiceCardView>();
 
@@ -2353,7 +2343,7 @@ public class Manager : MonoBehaviour
                 servicesList += $"Service{i + 1}: {service.Name}" +
                     $"\nService{i + 1} Price: {service.Price}" +
                     $"\nService{i + 1} Description: {service.Description}"
-                    + (i == openBotSettings.ServicesParent.transform.childCount - 2 ? "" : $"\n\n");
+                    + (i == openBotSettings.ServicesParent.transform.childCount - 1 ? "" : $"\n\n");
             }
         }
 
