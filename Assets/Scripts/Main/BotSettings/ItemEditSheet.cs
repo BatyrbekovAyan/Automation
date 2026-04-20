@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
@@ -34,8 +35,9 @@ namespace Automation.BotSettingsUI
         private float baselineY;
         private bool isShown;
         private EditableField lastFocusedField;
+        private Coroutine liftCoroutine;
         private const float LiftDuration = 0.3f;
-        private const float LiftMargin = 24f;
+        private const float KeyboardOpenWait = 0.35f;
 
         private ProductCardView boundProduct;
         private ServiceCardView boundService;
@@ -70,7 +72,8 @@ namespace Automation.BotSettingsUI
             if (focused != lastFocusedField)
             {
                 lastFocusedField = focused;
-                AnimateLiftFor(focused);
+                if (liftCoroutine != null) StopCoroutine(liftCoroutine);
+                liftCoroutine = StartCoroutine(LiftRoutine(focused));
             }
         }
 
@@ -82,38 +85,75 @@ namespace Automation.BotSettingsUI
             return null;
         }
 
-        private void AnimateLiftFor(EditableField field)
+        private IEnumerator LiftRoutine(EditableField field)
         {
+            if (field != null)
+            {
+                // Wait for the native keyboard to finish its slide-up animation
+                // before measuring its height.
+                yield return new WaitForSeconds(KeyboardOpenWait);
+            }
+
             float targetY = baselineY;
             if (field != null)
             {
                 float keyboardCanvas = GetKeyboardHeightCanvas();
                 if (keyboardCanvas > 0f)
-                {
-                    var fieldRect = field.GetComponent<RectTransform>();
-                    if (fieldRect != null)
-                    {
-                        var worldCorners = new Vector3[4];
-                        fieldRect.GetWorldCorners(worldCorners);
-                        var localBottom = sheetRoot.InverseTransformPoint(worldCorners[0]);
-                        float fieldBottomInSheet = localBottom.y; // sheet pivot is at bottom
-                        float lift = Mathf.Max(0f, keyboardCanvas - fieldBottomInSheet + LiftMargin);
-                        targetY = baselineY + lift;
-                    }
-                }
+                    targetY = baselineY + keyboardCanvas;
             }
+
             sheetRoot.DOKill();
             sheetRoot.DOAnchorPosY(targetY, LiftDuration).SetEase(Ease.OutCubic);
+            liftCoroutine = null;
         }
 
         private float GetKeyboardHeightCanvas()
         {
-            if (!TouchScreenKeyboard.isSupported) return 0f;
-            float heightPx = TouchScreenKeyboard.area.height;
+            float heightPx = EstimateKeyboardHeightPixels();
             if (heightPx <= 0f) return 0f;
             float scale = (canvas != null && canvas.scaleFactor > 0f) ? canvas.scaleFactor : 1f;
             return heightPx / scale;
         }
+
+        private static float EstimateKeyboardHeightPixels()
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            float measured = MeasureKeyboardHeightAndroid();
+            return measured > 0f ? measured : Screen.height * 0.4f;
+#elif UNITY_IOS && !UNITY_EDITOR
+            float area = TouchScreenKeyboard.area.height;
+            return area > 0f ? area : Screen.height * 0.4f;
+#else
+            return 0f;
+#endif
+        }
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+        private static float MeasureKeyboardHeightAndroid()
+        {
+            try
+            {
+                using var unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
+                using var activity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity");
+                using var window = activity.Call<AndroidJavaObject>("getWindow");
+                using var decorView = window.Call<AndroidJavaObject>("getDecorView");
+                using var rootView = decorView.Call<AndroidJavaObject>("getRootView");
+
+                using var visibleRect = new AndroidJavaObject("android.graphics.Rect");
+                decorView.Call("getWindowVisibleDisplayFrame", visibleRect);
+
+                int visibleBottom = visibleRect.Call<int>("bottom");
+                int rootHeight = rootView.Call<int>("getHeight");
+                int height = rootHeight - visibleBottom;
+
+                return height > 100 ? height : 0f;
+            }
+            catch
+            {
+                return 0f;
+            }
+        }
+#endif
 
         public void Show(ProductCardView card)
         {
@@ -157,6 +197,12 @@ namespace Automation.BotSettingsUI
         public void Hide()
         {
             isShown = false;
+            lastFocusedField = null;
+            if (liftCoroutine != null)
+            {
+                StopCoroutine(liftCoroutine);
+                liftCoroutine = null;
+            }
             sheetRoot.DOKill();
             sheetRoot.DOAnchorPos(hiddenAnchored, slideDuration).SetEase(Ease.InCubic);
             if (scrimBehind != null)
