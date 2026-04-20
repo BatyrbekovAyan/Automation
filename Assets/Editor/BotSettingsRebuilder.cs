@@ -19,6 +19,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using Automation.BotSettingsUI;
+using Nobi.UiRoundedCorners;
 
 internal static class Sprites
 {
@@ -849,5 +850,22 @@ public static class BotSettingsRebuilder
         if (prop.objectReferenceValue != null) return;
         var go = FindDescendant(root, propName);
         if (go != null) prop.objectReferenceValue = go;
+    }
+
+    private static ImageWithRoundedCorners AddRoundedCorners(GameObject go, float radius)
+    {
+        var r = go.GetComponent<ImageWithRoundedCorners>();
+        if (r == null) r = go.AddComponent<ImageWithRoundedCorners>();
+        r.radius = radius;
+        return r;
+    }
+
+    private static Shadow AddShadow(GameObject go)
+    {
+        var s = go.GetComponent<Shadow>();
+        if (s == null) s = go.AddComponent<Shadow>();
+        s.effectColor = new Color(0f, 0f, 0f, 0.08f);
+        s.effectDistance = new Vector2(0f, -1f);
+        return s;
     }
 }
