@@ -20,6 +20,35 @@ using UnityEngine.UI;
 using TMPro;
 using Automation.BotSettingsUI;
 
+internal static class Sprites
+{
+    public static Sprite BackIcon;
+    public static Sprite ChevronRight;
+    public static Sprite ArrowDown;
+    public static Sprite Plus;
+    public static Sprite ToggleBg;
+    public static Sprite ToggleHandle;
+    public static Sprite Bin;
+
+    public static void Load()
+    {
+        BackIcon     = Load("Assets/Images/Chat/chevron-left.png");
+        ChevronRight = Load("Assets/Images/Chat/chevron-right.png");
+        ArrowDown    = Load("Assets/Images/Icons/arrowDown.png");
+        Plus         = Load("Assets/Images/Chat/Plus.png");
+        ToggleBg     = Load("Assets/Images/Toggle/bg2.png");
+        ToggleHandle = Load("Assets/Images/Toggle/handle.png");
+        Bin          = Load("Assets/Images/Icons/Bin.png");
+    }
+
+    private static Sprite Load(string path)
+    {
+        var s = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(path);
+        if (s == null) Debug.LogWarning($"[BotSettingsRebuilder.Sprites] Missing: {path}");
+        return s;
+    }
+}
+
 public static class BotSettingsRebuilder
 {
     private const string ProductPrefabPath = "Assets/Prefabs/Product.prefab";
@@ -73,6 +102,7 @@ public static class BotSettingsRebuilder
         try
         {
             AssetDatabase.StartAssetEditing();
+            Sprites.Load();
             BuildProductPrefab();
             BuildServicePrefab();
             BuildBotSettingsPrefab();
