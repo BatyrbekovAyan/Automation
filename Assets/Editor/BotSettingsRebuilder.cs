@@ -74,7 +74,8 @@ public static class BotSettingsRebuilder
     private static readonly Color Primary    = Hex("#1B7CEB");
     private static readonly Color ToggleOff  = Hex("#E0E0E0");
     private static readonly Color Chevron    = Hex("#C7C7CC");
-    private static readonly Color Danger     = Hex("#E53935");
+    private static readonly Color Danger       = Hex("#E53935");
+    private static readonly Color PrimaryLight = Hex("#E8F2FD");
 
     // Strict allowlist of top-level names to preserve.
     // Everything else at root level gets destroyed.
@@ -597,14 +598,36 @@ public static class BotSettingsRebuilder
         fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
         var addGo = NewChild(tab, isProducts ? "AddProductButton" : "AddServiceButton", out RectTransform addRt);
-        addGo.AddComponent<Image>().color = new Color(Border.r, Border.g, Border.b, 0.4f);
+        var addImg = addGo.AddComponent<Image>();
+        addImg.color = PrimaryLight;
+        AddRoundedCorners(addGo, 10f);
         var addBtn = addGo.AddComponent<Button>();
         addRt.sizeDelta = Sv(0, 52);
 
-        var addLabel = NewChild(addGo, "Label", out RectTransform addLabelRt);
-        var addTmp = AddStyledText(addLabel, isProducts ? "+ Добавить товар" : "+ Добавить услугу", Sz(15), FontWeight.Bold, Primary);
-        addTmp.alignment = TextAlignmentOptions.Center;
-        StretchFill(addLabelRt);
+        var rowGo = NewChild(addGo, "Row", out RectTransform rowRt);
+        StretchFill(rowRt);
+        var hlg = rowGo.AddComponent<HorizontalLayoutGroup>();
+        hlg.childAlignment = TextAnchor.MiddleCenter;
+        hlg.spacing = Sz(8);
+        hlg.childForceExpandWidth = false;
+        hlg.childForceExpandHeight = true;
+
+        var plusGo = NewChild(rowGo, "PlusIcon", out RectTransform plusRt);
+        var plusImg = plusGo.AddComponent<Image>();
+        plusImg.sprite = Sprites.Plus;
+        plusImg.color = Primary;
+        plusImg.preserveAspect = true;
+        var plusLe = plusGo.AddComponent<LayoutElement>();
+        plusLe.preferredWidth = Sz(20);
+        plusLe.preferredHeight = Sz(20);
+
+        var addLabelGo = NewChild(rowGo, "Label", out RectTransform addLabelRt);
+        var addTmp = AddStyledText(addLabelGo, isProducts ? "Добавить товар" : "Добавить услугу",
+                                   Sz(15), FontWeight.Bold, Primary);
+        addTmp.alignment = TextAlignmentOptions.Left;
+        var labelLe = addLabelGo.AddComponent<LayoutElement>();
+        labelLe.preferredWidth = Sz(180);
+        labelLe.preferredHeight = Sz(20);
 
         var addItemBtn = addGo.AddComponent<AddItemButton>();
         var so = new SerializedObject(addItemBtn);
