@@ -533,14 +533,7 @@ public static class BotSettingsRebuilder
         refs.telegramNumberField = CreateEditableField(tab, "Номер Telegram", scrim, multiline: false);
         refs.telegramNumberField.gameObject.SetActive(false);
 
-        var deleteBtn = NewChild(tab, "DeleteBotButton", out RectTransform delRt);
-        deleteBtn.AddComponent<Image>().color = Danger;
-        deleteBtn.AddComponent<Button>();
-        delRt.sizeDelta = Sv(0, 56);
-        var delLabel = NewChild(deleteBtn, "Label", out RectTransform delLabelRt);
-        var delTmp = AddStyledText(delLabel, "Удалить бота", Sz(17), FontWeight.Bold, Color.white);
-        delTmp.alignment = TextAlignmentOptions.Center;
-        StretchFill(delLabelRt);
+        BuildDeleteBotButton(tab);
 
         return refs;
     }
@@ -556,6 +549,24 @@ public static class BotSettingsRebuilder
         RewireEditableField(textArea, go, scrim);
         go.GetComponent<RectTransform>().sizeDelta = Sv(0, 240);
         return textArea;
+    }
+
+    private static Button BuildDeleteBotButton(GameObject parent)
+    {
+        var go = NewChild(parent, "DeleteBotButton", out RectTransform rt);
+        var img = go.AddComponent<Image>();
+        img.color = Danger;
+        AddRoundedCorners(go, 14f);
+        AddShadow(go);
+        var btn = go.AddComponent<Button>();
+        rt.sizeDelta = Sv(0, 56);
+
+        var labelGo = NewChild(go, "Label", out RectTransform labelRt);
+        var tmp = AddStyledText(labelGo, "Удалить бота", Sz(17), FontWeight.Bold, Color.white);
+        tmp.alignment = TextAlignmentOptions.Center;
+        StretchFill(labelRt);
+
+        return btn;
     }
 
     private struct CardTabRefs
