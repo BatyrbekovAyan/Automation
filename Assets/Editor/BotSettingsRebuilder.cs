@@ -529,8 +529,11 @@ public static class BotSettingsRebuilder
     private static EditableField CreateEditableField(GameObject parent, string label, FocusScrim scrim, bool multiline)
     {
         var go = NewChild(parent, "Field_" + label, out RectTransform rt);
-        go.AddComponent<Image>().color = Card;
-        rt.sizeDelta = new Vector2(0, multiline ? 100 : 64);
+        var cardImg = go.AddComponent<Image>();
+        cardImg.color = Card;
+        AddRoundedCorners(go, 10f);
+        AddShadow(go);
+        rt.sizeDelta = Sv(0, multiline ? 240 : 64);
 
         var labelGo = NewChild(go, "Label", out RectTransform labelRt);
         AddStyledText(labelGo, label, Sz(12), FontWeight.Medium, TextMuted);
@@ -551,13 +554,25 @@ public static class BotSettingsRebuilder
         StretchFill(taRt);
         textArea.AddComponent<RectMask2D>();
 
+        var placeholderGo = NewChild(textArea, "Placeholder", out RectTransform phRt);
+        var placeholderTmp = AddStyledText(placeholderGo, label, Sz(16), FontWeight.Regular, TextMuted);
+        placeholderTmp.fontStyle = FontStyles.Italic;
+        StretchFill(phRt);
+
         var textGo = NewChild(textArea, "Text", out RectTransform textRt);
         var textTmp = AddStyledText(textGo, "", Sz(16), FontWeight.Medium, Text);
         StretchFill(textRt);
 
+        input.textViewport = taRt;
         input.textComponent = textTmp;
+        input.placeholder = placeholderTmp;
         input.targetGraphic = inputBg;
         input.lineType = multiline ? TMP_InputField.LineType.MultiLineNewline : TMP_InputField.LineType.SingleLine;
+        if (multiline)
+        {
+            textTmp.enableWordWrapping = true;
+            placeholderTmp.enableWordWrapping = true;
+        }
 
         var field = go.AddComponent<EditableField>();
         RewireEditableField(field, go, scrim);
