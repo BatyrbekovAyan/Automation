@@ -19,6 +19,8 @@ public partial class BotSettings : MonoBehaviour
     [SerializeField] private RectTransform headerGroup;
     [SerializeField] private RectTransform tabBarGroup;
     [SerializeField] private FocusScrim mainScrim;
+    [SerializeField] private Button saveButton;
+    [SerializeField] private Button backButton;
     #endregion
 
     [System.Serializable]
@@ -127,6 +129,15 @@ public partial class BotSettings : MonoBehaviour
         WireFields();
         WireProductsAndServices();
         WireAuthButtons();
+        WireHeaderButtons();
+    }
+
+    private void WireHeaderButtons()
+    {
+        if (saveButton != null)
+            saveButton.onClick.AddListener(() => Manager.Instance.SaveSettings());
+        if (backButton != null)
+            backButton.onClick.AddListener(() => Manager.Instance.CloseSettings());
     }
 
     public void OnEnable()

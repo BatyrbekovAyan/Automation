@@ -316,6 +316,8 @@ public static class BotSettingsRebuilder
             so.FindProperty("ProductTabButton").objectReferenceValue  = tabButtons[2];
             so.FindProperty("ServiceTabButton").objectReferenceValue  = tabButtons[3];
             so.FindProperty("PromptTabButton").objectReferenceValue   = tabButtons[4];
+            so.FindProperty("saveButton").objectReferenceValue = saveBtn;
+            so.FindProperty("backButton").objectReferenceValue = backBtn;
 
             // Serialize per-tab visual refs so BotSettings.SetActiveTab can toggle them at runtime.
             var tabVisualsProp = so.FindProperty("tabVisuals");

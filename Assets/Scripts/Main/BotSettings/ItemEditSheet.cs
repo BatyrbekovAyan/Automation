@@ -77,6 +77,7 @@ namespace Automation.BotSettingsUI
         private void SlideIn()
         {
             gameObject.SetActive(true);
+            transform.SetAsLastSibling();
             if (scrimBehind != null)
             {
                 scrimBehind.SetActive(true);
