@@ -271,7 +271,9 @@ public static class BotSettingsRebuilder
 
             // Build fresh structure.
             var header = BuildHeader(root, out var backBtn, out var saveBtn);
-            var tabBar = BuildTabBar(root, out var tabButtons);
+            var tabBar = BuildTabBar(root, out var tabVisuals);
+            var tabButtons = new[] { tabVisuals[0].button, tabVisuals[1].button, tabVisuals[2].button,
+                                     tabVisuals[3].button, tabVisuals[4].button };
             var tabs = BuildTabs(root);
             var mainScrim = BuildFocusScrim(root, "MainFocusScrim");
             var productSheet = BuildItemEditSheet(root, "ProductEditSheet");
@@ -313,6 +315,20 @@ public static class BotSettingsRebuilder
             so.FindProperty("ProductTabButton").objectReferenceValue  = tabButtons[2];
             so.FindProperty("ServiceTabButton").objectReferenceValue  = tabButtons[3];
             so.FindProperty("PromptTabButton").objectReferenceValue   = tabButtons[4];
+
+            // Serialize per-tab visual refs so BotSettings.SetActiveTab can toggle them at runtime.
+            var tabVisualsProp = so.FindProperty("tabVisuals");
+            if (tabVisualsProp != null)
+            {
+                tabVisualsProp.arraySize = tabVisuals.Length;
+                for (int i = 0; i < tabVisuals.Length; i++)
+                {
+                    var elem = tabVisualsProp.GetArrayElementAtIndex(i);
+                    elem.FindPropertyRelative("label").objectReferenceValue = tabVisuals[i].label;
+                    elem.FindPropertyRelative("underline").objectReferenceValue = tabVisuals[i].underline;
+                }
+            }
+
             so.FindProperty("headerGroup").objectReferenceValue = header.GetComponent<RectTransform>();
             so.FindProperty("tabBarGroup").objectReferenceValue = tabBar.GetComponent<RectTransform>();
             so.FindProperty("mainScrim").objectReferenceValue = mainScrim;
@@ -407,7 +423,7 @@ public static class BotSettingsRebuilder
         return header;
     }
 
-    private static GameObject BuildTabBar(GameObject root, out Button[] tabButtons)
+    private static GameObject BuildTabBar(GameObject root, out TabVisualRefs[] tabVisuals)
     {
         var tabBar = NewChild(root, "TabBarGroup", out RectTransform rt);
         var img = tabBar.AddComponent<Image>();
@@ -423,19 +439,35 @@ public static class BotSettingsRebuilder
         hlg.childForceExpandHeight = true;
 
         var labels = new[] { "Основное", "Бизнес", "Продукты", "Услуги", "Промпты" };
-        tabButtons = new Button[5];
+        tabVisuals = new TabVisualRefs[5];
         for (int i = 0; i < 5; i++)
         {
             var tab = NewChild(tabBar, "Tab_" + labels[i], out RectTransform _);
             var tabImg = tab.AddComponent<Image>();
             tabImg.color = new Color(0, 0, 0, 0);
             tabImg.raycastTarget = true;
-            tabButtons[i] = tab.AddComponent<Button>();
+            var btn = tab.AddComponent<Button>();
 
-            var label = NewChild(tab, "Label", out RectTransform labelRt);
-            var tmp = AddStyledText(label, labels[i], Sz(13), FontWeight.Bold, i == 0 ? Primary : TextMuted);
+            var labelGo = NewChild(tab, "Label", out RectTransform labelRt);
+            var tmp = AddStyledText(labelGo, labels[i], Sz(13), FontWeight.Bold,
+                                    i == 0 ? Primary : TextMuted);
             tmp.alignment = TextAlignmentOptions.Center;
             StretchFill(labelRt);
+
+            var underlineGo = NewChild(tab, "Underline", out RectTransform underlineRt);
+            var underlineImg = underlineGo.AddComponent<Image>();
+            underlineImg.color = Primary;
+            SetAnchors(underlineRt, new Vector2(0, 0), new Vector2(1, 0), new Vector2(0.5f, 0));
+            underlineRt.sizeDelta = Sv(0, 2);
+            underlineRt.anchoredPosition = Vector2.zero;
+            underlineGo.SetActive(i == 0);
+
+            tabVisuals[i] = new TabVisualRefs
+            {
+                button = btn,
+                label = tmp,
+                underline = underlineGo,
+            };
         }
         return tabBar;
     }
@@ -530,6 +562,13 @@ public static class BotSettingsRebuilder
     {
         public RectTransform parent;
         public AddItemButton addButton;
+    }
+
+    private struct TabVisualRefs
+    {
+        public Button button;
+        public TextMeshProUGUI label;
+        public GameObject underline;
     }
 
     private static CardTabRefs BuildProductOrServiceTab(GameObject tab, bool isProducts)

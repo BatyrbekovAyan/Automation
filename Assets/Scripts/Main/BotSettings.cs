@@ -21,6 +21,19 @@ public partial class BotSettings : MonoBehaviour
     [SerializeField] private FocusScrim mainScrim;
     #endregion
 
+    [System.Serializable]
+    public struct TabVisual
+    {
+        public TextMeshProUGUI label;
+        public GameObject underline;
+    }
+
+    #region Serialized — Tab visuals
+    [SerializeField] private TabVisual[] tabVisuals;
+    [SerializeField] private Color tabActiveColor = new Color(0.106f, 0.486f, 0.922f); // #1B7CEB
+    [SerializeField] private Color tabInactiveColor = new Color(0.557f, 0.557f, 0.576f); // #8E8E93
+    #endregion
+
     #region Serialized — General tab
     [SerializeField] public EditableField BotNameField;
     public TMP_Dropdown BusinessTypeDropdown;
@@ -141,6 +154,16 @@ public partial class BotSettings : MonoBehaviour
         Product.SetActive(product);
         Service.SetActive(service);
         Prompt.SetActive(prompt);
+
+        if (tabVisuals == null || tabVisuals.Length < 5) return;
+        var active = new[] { general, business, product, service, prompt };
+        for (int i = 0; i < tabVisuals.Length; i++)
+        {
+            if (tabVisuals[i].underline != null)
+                tabVisuals[i].underline.SetActive(active[i]);
+            if (tabVisuals[i].label != null)
+                tabVisuals[i].label.color = active[i] ? tabActiveColor : tabInactiveColor;
+        }
     }
 
     private void WireTabs()
