@@ -211,6 +211,8 @@ public static class BotSettingsRebuilder
             var botSettings = root.GetComponent<BotSettings>();
             if (botSettings == null) botSettings = root.AddComponent<BotSettings>();
 
+            var stashedDropdown = StashBusinessTypeDropdown(root.transform);
+
             // Ensure root RectTransform stretches to fill its parent (phone screen).
             var rootRt = root.transform as RectTransform;
             if (rootRt != null && rootRt.anchorMin == rootRt.anchorMax)
@@ -278,6 +280,21 @@ public static class BotSettingsRebuilder
             // General tab content. Dropdown is a skeleton; options are
             // populated at runtime from BusinessTypesSO by Manager code.
             var generalFields = BuildGeneralTab(tabs["General"], mainScrim);
+
+            // Re-parent the preserved dropdown into position 3 (after Section "ИНФОРМАЦИЯ" + BotName + the skeleton dropdown line).
+            // BuildGeneralTab's VLG order: SectionHeader, BotNameField, (dropdown slot), SectionHeader, WhatsappToggle, ...
+            AttachDropdownToGeneralTab(stashedDropdown, tabs["General"], siblingIndex: 3);
+
+            // Remove the skeleton dropdown that BuildGeneralTab creates (it would duplicate the preserved one).
+            var skeletonDropdownGo = FindDescendantInChildren(tabs["General"].transform, "BusinessTypeDropdown");
+            if (stashedDropdown != null && skeletonDropdownGo != null && skeletonDropdownGo != stashedDropdown.gameObject)
+            {
+                Object.DestroyImmediate(skeletonDropdownGo);
+            }
+
+            // Ensure the serialized reference on BotSettings points at whichever dropdown survived.
+            if (stashedDropdown != null)
+                generalFields.businessTypeDropdown = stashedDropdown;
 
             var businessField = BuildBusinessOrPromptTab(tabs["Business"], "ОПИСАНИЕ БИЗНЕСА", "Описание", mainScrim);
             var promptField   = BuildBusinessOrPromptTab(tabs["Prompt"],   "ПРОМПТ",              "Промпт",    mainScrim);
@@ -856,6 +873,55 @@ public static class BotSettingsRebuilder
             if (found != null) return found;
         }
         return null;
+    }
+
+    private static GameObject FindDescendantInChildren(Transform t, string name)
+    {
+        for (int i = 0; i < t.childCount; i++)
+        {
+            var c = t.GetChild(i);
+            if (c.name == name) return c.gameObject;
+            var nested = FindDescendantInChildren(c, name);
+            if (nested != null) return nested;
+        }
+        return null;
+    }
+
+    private static TMP_Dropdown StashBusinessTypeDropdown(Transform root)
+    {
+        var go = FindDescendant(root, "BusinessTypeDropdown");
+        if (go == null)
+        {
+            Debug.LogWarning("[BotSettingsRebuilder] No BusinessTypeDropdown found in prefab. " +
+                             "After rebuild, right-click the General tab in Unity and choose " +
+                             "UI > Dropdown - TextMeshPro, rename it 'BusinessTypeDropdown', " +
+                             "and drag it into BotSettings.BusinessTypeDropdown in the Inspector.");
+            return null;
+        }
+        var dropdown = go.GetComponent<TMP_Dropdown>();
+        if (dropdown == null || dropdown.template == null)
+        {
+            Debug.LogWarning("[BotSettingsRebuilder] Found BusinessTypeDropdown GameObject but it " +
+                             "has no valid TMP_Dropdown template. Destroying it. Manually add a " +
+                             "fresh Dropdown - TextMeshPro after the rebuild completes.");
+            Object.DestroyImmediate(go);
+            return null;
+        }
+        go.transform.SetParent(null, false); // detach so the top-level destroy loop skips it
+        return dropdown;
+    }
+
+    private static void AttachDropdownToGeneralTab(TMP_Dropdown dropdown, GameObject generalTab,
+                                                    int siblingIndex)
+    {
+        if (dropdown == null) return;
+        dropdown.transform.SetParent(generalTab.transform, false);
+        dropdown.transform.SetSiblingIndex(siblingIndex);
+        var rt = dropdown.GetComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0, 1);
+        rt.anchorMax = new Vector2(1, 1);
+        rt.pivot = new Vector2(0.5f, 1f);
+        rt.sizeDelta = Sv(0, 64);
     }
 
     private static void AssignByDescendantIfNull(SerializedObject so, Transform root, string propName)
