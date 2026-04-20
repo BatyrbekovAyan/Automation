@@ -27,17 +27,20 @@ namespace Automation.BotSettingsUI
         [SerializeField] private Button deleteConfirmNo;
         [SerializeField] private GameObject scrimBehind;  // dim behind sheet (separate from FocusScrim)
         [SerializeField] private CanvasGroup scrimBehindGroup;
-        [SerializeField] private Button scrimBehindButton;  // tap-outside to close
+        [SerializeField] private DelayedFingerUpAction scrimBehindFinger;  // tap-outside to close (full-press verified)
         [SerializeField] private float slideDuration = 0.25f;
         [SerializeField] private float scrimAlpha = 0.5f;
 
         private Canvas canvas;
         private float baselineY;
         private bool isShown;
+        private bool isLifted;
         private EditableField lastFocusedField;
         private Coroutine liftCoroutine;
+        private Coroutine lowerCoroutine;
         private const float LiftDuration = 0.3f;
         private const float KeyboardOpenWait = 0.35f;
+        private const float LowerGrace = 0.15f;
 
         private ProductCardView boundProduct;
         private ServiceCardView boundService;
@@ -61,19 +64,34 @@ namespace Automation.BotSettingsUI
             deleteButton.onClick.AddListener(() => PopupUI.Show(deleteConfirmPopup));
             PopupUI.WireFingerUp(deleteConfirmYes, ConfirmDelete);
             PopupUI.WireFingerUp(deleteConfirmNo, () => PopupUI.Hide(deleteConfirmPopup));
-            if (scrimBehindButton != null)
-                scrimBehindButton.onClick.AddListener(Hide);
+            if (scrimBehindFinger != null)
+                scrimBehindFinger.OnRealRelease += Hide;
         }
 
         private void Update()
         {
             if (!isShown || sheetRoot == null) return;
             var focused = GetFocusedField();
-            if (focused != lastFocusedField)
+            if (focused == lastFocusedField) return;
+            lastFocusedField = focused;
+
+            if (focused != null)
             {
-                lastFocusedField = focused;
-                if (liftCoroutine != null) StopCoroutine(liftCoroutine);
-                liftCoroutine = StartCoroutine(LiftRoutine(focused));
+                // New field gained focus. Cancel any pending lower so a
+                // rapid field-to-field tap doesn't cause a down-then-up blip.
+                if (lowerCoroutine != null) { StopCoroutine(lowerCoroutine); lowerCoroutine = null; }
+                if (!isLifted)
+                {
+                    if (liftCoroutine != null) StopCoroutine(liftCoroutine);
+                    liftCoroutine = StartCoroutine(LiftRoutine());
+                }
+            }
+            else
+            {
+                // Lost focus — wait briefly before lowering, in case another
+                // field is about to gain focus on the next frame.
+                if (lowerCoroutine != null) StopCoroutine(lowerCoroutine);
+                lowerCoroutine = StartCoroutine(LowerRoutine());
             }
         }
 
@@ -85,26 +103,28 @@ namespace Automation.BotSettingsUI
             return null;
         }
 
-        private IEnumerator LiftRoutine(EditableField field)
+        private IEnumerator LiftRoutine()
         {
-            if (field != null)
-            {
-                // Wait for the native keyboard to finish its slide-up animation
-                // before measuring its height.
-                yield return new WaitForSeconds(KeyboardOpenWait);
-            }
+            // Wait for the native keyboard to finish its slide-up animation
+            // before measuring its height.
+            yield return new WaitForSeconds(KeyboardOpenWait);
 
-            float targetY = baselineY;
-            if (field != null)
-            {
-                float keyboardCanvas = GetKeyboardHeightCanvas();
-                if (keyboardCanvas > 0f)
-                    targetY = baselineY + keyboardCanvas;
-            }
+            float keyboardCanvas = GetKeyboardHeightCanvas();
+            float targetY = keyboardCanvas > 0f ? baselineY + keyboardCanvas : baselineY;
 
             sheetRoot.DOKill();
             sheetRoot.DOAnchorPosY(targetY, LiftDuration).SetEase(Ease.OutCubic);
+            isLifted = true;
             liftCoroutine = null;
+        }
+
+        private IEnumerator LowerRoutine()
+        {
+            yield return new WaitForSeconds(LowerGrace);
+            sheetRoot.DOKill();
+            sheetRoot.DOAnchorPosY(baselineY, LiftDuration).SetEase(Ease.OutCubic);
+            isLifted = false;
+            lowerCoroutine = null;
         }
 
         private float GetKeyboardHeightCanvas()
@@ -197,11 +217,17 @@ namespace Automation.BotSettingsUI
         public void Hide()
         {
             isShown = false;
+            isLifted = false;
             lastFocusedField = null;
             if (liftCoroutine != null)
             {
                 StopCoroutine(liftCoroutine);
                 liftCoroutine = null;
+            }
+            if (lowerCoroutine != null)
+            {
+                StopCoroutine(lowerCoroutine);
+                lowerCoroutine = null;
             }
             sheetRoot.DOKill();
             sheetRoot.DOAnchorPos(hiddenAnchored, slideDuration).SetEase(Ease.InCubic);

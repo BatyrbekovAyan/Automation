@@ -823,7 +823,11 @@ public static class BotSettingsRebuilder
         scrimBehindGo.AddComponent<Image>().color = new Color(0, 0, 0, 1);
         var scrimBehindCg = scrimBehindGo.AddComponent<CanvasGroup>();
         scrimBehindCg.alpha = 0;
-        var scrimBehindBtn = scrimBehindGo.AddComponent<Button>(); // tap outside closes the sheet
+        // DelayedFingerUpAction: tap-outside closes the sheet only when both
+        // the finger-down and the finger-up are on this scrim element.
+        // Prevents false closures when a tap on the sheet lands on scrim at
+        // finger-up because the sheet animated away mid-gesture.
+        var scrimBehindFinger = scrimBehindGo.AddComponent<DelayedFingerUpAction>();
 
         var sheetGo = NewChild(sheetContainer, "SheetRoot", out RectTransform sheetRt);
         sheetGo.AddComponent<Image>().color = Card;
@@ -931,7 +935,7 @@ public static class BotSettingsRebuilder
         so.FindProperty("deleteConfirmNo").objectReferenceValue = noBtn;
         so.FindProperty("scrimBehind").objectReferenceValue = scrimBehindGo;
         so.FindProperty("scrimBehindGroup").objectReferenceValue = scrimBehindCg;
-        so.FindProperty("scrimBehindButton").objectReferenceValue = scrimBehindBtn;
+        so.FindProperty("scrimBehindFinger").objectReferenceValue = scrimBehindFinger;
         so.ApplyModifiedPropertiesWithoutUndo();
 
         return sheet;
