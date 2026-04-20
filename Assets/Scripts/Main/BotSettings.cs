@@ -137,7 +137,28 @@ public partial class BotSettings : MonoBehaviour
         if (saveButton != null)
             saveButton.onClick.AddListener(() => Manager.Instance.SaveSettings());
         if (backButton != null)
-            backButton.onClick.AddListener(() => Manager.Instance.CloseSettings());
+            backButton.onClick.AddListener(OnBackPressed);
+    }
+
+    private void OnBackPressed()
+    {
+        // Revert any unsaved edits from PlayerPrefs.
+        Manager.Instance.CloseSettings();
+
+        // Deactivate the BotSettings page and show the Bots list. Mirrors
+        // the forward flow in Bot.OpenSettings().
+        if (Manager.BotSettingsParentStatic != null)
+        {
+            var parentGo = Manager.BotSettingsParentStatic.transform.parent != null
+                ? Manager.BotSettingsParentStatic.transform.parent.gameObject
+                : Manager.BotSettingsParentStatic;
+            parentGo.SetActive(false);
+        }
+        if (BotsPage.Instance != null)
+            BotsPage.Instance.gameObject.SetActive(true);
+
+        Manager.openBot = null;
+        Manager.openBotSettings = null;
     }
 
     public void OnEnable()

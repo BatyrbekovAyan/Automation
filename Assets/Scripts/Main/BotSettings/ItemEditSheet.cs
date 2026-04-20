@@ -30,6 +30,9 @@ namespace Automation.BotSettingsUI
         [SerializeField] private DelayedFingerUpAction scrimBehindFinger;  // tap-outside to close (full-press verified)
         [SerializeField] private float slideDuration = 0.25f;
         [SerializeField] private float scrimAlpha = 0.5f;
+        [Tooltip("Canvas-unit reduction applied to the measured keyboard height. " +
+                 "Raise this (e.g. 80-160) if the lift appears to overshoot on device.")]
+        [SerializeField] private float liftReduction = 0f;
 
         private Canvas canvas;
         private float baselineY;
@@ -58,7 +61,10 @@ namespace Automation.BotSettingsUI
             sheetRoot.anchoredPosition = hiddenAnchored;
             baselineY = shownAnchored.y;
             canvas = GetComponentInParent<Canvas>();
-            gameObject.SetActive(false);
+            // NOTE: do not SetActive(false) here. The prefab ships with the
+            // sheet container already inactive, so Awake only runs the first
+            // time Show() activates it — deactivating again inside Awake
+            // would cancel that first SlideIn mid-animation.
 
             doneButton.onClick.AddListener(Commit);
             deleteButton.onClick.AddListener(() => PopupUI.Show(deleteConfirmPopup));
@@ -110,7 +116,8 @@ namespace Automation.BotSettingsUI
             yield return new WaitForSeconds(KeyboardOpenWait);
 
             float keyboardCanvas = GetKeyboardHeightCanvas();
-            float targetY = keyboardCanvas > 0f ? baselineY + keyboardCanvas : baselineY;
+            float effectiveLift = Mathf.Max(0f, keyboardCanvas - liftReduction);
+            float targetY = effectiveLift > 0f ? baselineY + effectiveLift : baselineY;
 
             sheetRoot.DOKill();
             sheetRoot.DOAnchorPosY(targetY, LiftDuration).SetEase(Ease.OutCubic);
