@@ -214,14 +214,18 @@ public static class BotSettingsRebuilder
 
             var stashedDropdown = StashBusinessTypeDropdown(root.transform);
 
-            // Ensure root RectTransform stretches to fill its parent (phone screen).
+            // Force root RectTransform to fill its parent flush, regardless of
+            // any prior offsets left on the prefab asset.
             var rootRt = root.transform as RectTransform;
-            if (rootRt != null && rootRt.anchorMin == rootRt.anchorMax)
+            if (rootRt != null)
             {
                 rootRt.anchorMin = Vector2.zero;
                 rootRt.anchorMax = Vector2.one;
+                rootRt.pivot = new Vector2(0.5f, 0.5f);
                 rootRt.offsetMin = Vector2.zero;
                 rootRt.offsetMax = Vector2.zero;
+                rootRt.anchoredPosition3D = Vector3.zero;
+                rootRt.localScale = Vector3.one;
             }
 
             // Allowlist preserve at direct-child level. Only exact-name matches
