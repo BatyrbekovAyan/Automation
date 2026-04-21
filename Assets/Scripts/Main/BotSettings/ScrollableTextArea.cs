@@ -52,9 +52,22 @@ namespace Automation.BotSettingsUI
         private void ResizeContent(string text)
         {
             var width = viewport.rect.width;
-            var preferred = inputField.textComponent.GetPreferredValues(text, width, 0f).y;
+            var preferred = inputField.textComponent.GetPreferredValues(MeasureText(text), width, 0f).y;
             var target = Mathf.Max(viewport.rect.height, preferred + bottomPadding);
             content.sizeDelta = new Vector2(content.sizeDelta.x, target);
+        }
+
+        // TMPro.GetPreferredValues drops a trailing empty line from its
+        // measurement. On a filled card, pressing Enter produces "...\n" —
+        // same measured height as before — so content stays too short and
+        // the ScrollRect elastic-snaps the caret back to the previous line.
+        // Appending a stub character forces that last empty line to count.
+        // Mirrors Chat/ExpandableInput.GetAccurateTextHeight.
+        private static string MeasureText(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return "A";
+            if (text.EndsWith("\n")) return text + "A";
+            return text;
         }
     }
 }
