@@ -114,6 +114,13 @@ namespace Automation.BotSettingsUI
 
         private float GetKeyboardHeightCanvas()
         {
+            // No focused field → no keyboard is actually up → no lift.
+            // Without this guard the fallback branches below can fire every
+            // frame (0.4 * Screen.height) and shove the sheet off-screen,
+            // preventing the user from ever tapping a field to open the
+            // keyboard in the first place.
+            if (lastFocusedField == null) return 0f;
+
             float heightPx = EstimateKeyboardHeightPixels();
             if (heightPx <= 0f) return 0f;
 
