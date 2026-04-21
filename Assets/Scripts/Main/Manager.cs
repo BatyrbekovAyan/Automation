@@ -271,7 +271,7 @@ public class Manager : MonoBehaviour
                 // explicitly now that the bot has its final name.
                 recreatedBotComp.RefreshBusinessIcon();
 
-                BotSettings recreatedBotSettings = Instantiate(BotSettings, new Vector3(BotSettings.transform.position.x + Screen.width / 2, BotSettings.transform.position.y + Screen.height / 2, 0), BotSettings.transform.rotation, BotSettingsParent.transform).GetComponent<BotSettings>();
+                BotSettings recreatedBotSettings = InstantiateBotSettingsFlush(BotSettingsParent.transform);
 
                 recreatedBotSettings.BotNameField.Value = PlayerPrefs.GetString(recreatedBot.name + "Name", "");
                 recreatedBotSettings.WhatsappToggle.isOn = PlayerPrefs.GetInt(recreatedBot.name + "isOnWhatsapp", 1) == 1;
@@ -321,6 +321,28 @@ public class Manager : MonoBehaviour
         {
             // StartCoroutine(DeleteTelegramProfile(PlayerPrefs.GetString("lastCreatedTelegramProfileId", "-1"), true));
         }
+    }
+
+    // Instantiate BotSettings under a parent and force its RectTransform to
+    // fill the parent flush. The old code passed a Vector3 world position
+    // offset by (Screen.width/2, Screen.height/2) which Unity converted into
+    // RectTransform offsets, producing the ~104px downward shift on every
+    // clone. Using worldPositionStays:false keeps the prefab's local values.
+    private BotSettings InstantiateBotSettingsFlush(Transform parent)
+    {
+        var go = Instantiate(BotSettings, parent, worldPositionStays: false);
+        var rt = go.transform as RectTransform;
+        if (rt != null)
+        {
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+            rt.anchoredPosition3D = Vector3.zero;
+            rt.localScale = Vector3.one;
+        }
+        return go.GetComponent<BotSettings>();
     }
 
     public void SaveSettings()
@@ -818,7 +840,7 @@ public class Manager : MonoBehaviour
         newBot.GetComponent<Bot>().whatsappProfileId = whatsappProfileId;
         newBot.GetComponent<Bot>().telegramProfileId = telegramProfileId;
 
-        BotSettings newBotSettings = Instantiate(BotSettings, new Vector3(BotSettings.transform.position.x + Screen.width / 2, BotSettings.transform.position.y + Screen.height / 2, 0), BotSettings.transform.rotation, BotSettingsParentStatic.transform).GetComponent<BotSettings>();
+        BotSettings newBotSettings = InstantiateBotSettingsFlush(BotSettingsParentStatic.transform);
 
         newBotSettings.BotNameField.Value = formBotName;
         newBotSettings.WhatsappToggle.isOn = useWhatsapp;
