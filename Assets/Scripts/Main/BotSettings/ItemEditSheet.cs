@@ -33,6 +33,11 @@ namespace Automation.BotSettingsUI
         [Tooltip("Canvas-unit reduction applied to the measured keyboard height. " +
                  "Raise this (e.g. 80-160) if the lift appears to overshoot on device.")]
         [SerializeField] private float liftReduction = 0f;
+        [Tooltip("Canvas-unit height of the iOS accessory bar above the keyboard. " +
+                 "Subtracted when the focused field has 'Hide Mobile Input' enabled, " +
+                 "because TouchScreenKeyboard.area still reports that invisible bar. " +
+                 "~44pt at reference 1x; tune if your canvas scale differs.")]
+        [SerializeField] private float hiddenMobileInputBarHeight = 44f;
 
         private Canvas canvas;
         private float baselineY;
@@ -147,7 +152,24 @@ namespace Automation.BotSettingsUI
             float adjustedPx = Mathf.Max(0f, heightPx - safeBottomPx);
 
             float scale = (canvas != null && canvas.scaleFactor > 0f) ? canvas.scaleFactor : 1f;
-            return adjustedPx / scale;
+            float heightCanvas = adjustedPx / scale;
+
+            // When the focused field hides its mobile input accessory bar,
+            // iOS still reports the bar's height as part of area.height —
+            // producing a gap the size of the (now invisible) bar above the
+            // keyboard. Subtract it in canvas space.
+            if (FocusedFieldHidesMobileInput())
+                heightCanvas = Mathf.Max(0f, heightCanvas - hiddenMobileInputBarHeight);
+
+            return heightCanvas;
+        }
+
+        private bool FocusedFieldHidesMobileInput()
+        {
+            var field = lastFocusedField != null ? lastFocusedField : GetFocusedField();
+            return field != null
+                && field.InputField != null
+                && field.InputField.shouldHideMobileInput;
         }
 
         private static float EstimateKeyboardHeightPixels()
