@@ -138,8 +138,16 @@ namespace Automation.BotSettingsUI
         {
             float heightPx = EstimateKeyboardHeightPixels();
             if (heightPx <= 0f) return 0f;
+
+            // Subtract the bottom safe-area inset (iPhone home bar / Android
+            // gesture inset). The canvas is inset to the safe area, so we
+            // only need to lift by the portion of the keyboard that covers
+            // new canvas space. Mirrors Chat/KeyboardAwarePanel.
+            float safeBottomPx = Screen.safeArea.y;
+            float adjustedPx = Mathf.Max(0f, heightPx - safeBottomPx);
+
             float scale = (canvas != null && canvas.scaleFactor > 0f) ? canvas.scaleFactor : 1f;
-            return heightPx / scale;
+            return adjustedPx / scale;
         }
 
         private static float EstimateKeyboardHeightPixels()
