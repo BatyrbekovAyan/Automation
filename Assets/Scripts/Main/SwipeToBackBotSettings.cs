@@ -11,7 +11,21 @@ public class SwipeToBackBotSettings : MonoBehaviour,
 
     [Header("UI References")]
     [SerializeField] private RectTransform botSettingsPanelToSlide;
-    [SerializeField] private RectTransform botsPagePanel;
+
+    // BotsPage lives in Main.unity and cannot be serialized on a prefab
+    // component (prefab assets cannot hold references to scene objects).
+    // Resolve it lazily via the BotsPage singleton instead.
+    private RectTransform botsPagePanelCached;
+    private RectTransform BotsPagePanel
+    {
+        get
+        {
+            if (botsPagePanelCached != null) return botsPagePanelCached;
+            if (BotsPage.Instance != null)
+                botsPagePanelCached = BotsPage.Instance.GetComponent<RectTransform>();
+            return botsPagePanelCached;
+        }
+    }
 
     [Header("Swipe Physics")]
     [Range(0.1f, 1f)] [SerializeField] private float parallaxStrength = 0.3f;
@@ -48,7 +62,7 @@ public class SwipeToBackBotSettings : MonoBehaviour,
         var screenWidth = GetScreenWidth();
 
         SetPanelX(botSettingsPanelToSlide, screenWidth);
-        SetPanelX(botsPagePanel, 0f);
+        SetPanelX(BotsPagePanel, 0f);
 
         if (snapCoroutine != null) StopCoroutine(snapCoroutine);
         snapCoroutine = StartCoroutine(SnapToPosition(0f, commitBack: false, onComplete: onComplete));
@@ -99,10 +113,11 @@ public class SwipeToBackBotSettings : MonoBehaviour,
     private void ApplyPositions(float panelX, float screenWidth, float maxOffset)
     {
         SetPanelX(botSettingsPanelToSlide, panelX);
-        if (botsPagePanel != null)
+        var bgPanel = BotsPagePanel;
+        if (bgPanel != null)
         {
             var progress = panelX / screenWidth;
-            SetPanelX(botsPagePanel, -maxOffset + (maxOffset * progress));
+            SetPanelX(bgPanel, -maxOffset + (maxOffset * progress));
         }
     }
 
@@ -133,7 +148,8 @@ public class SwipeToBackBotSettings : MonoBehaviour,
             isHorizontalDrag = true;
             if (snapCoroutine != null) { StopCoroutine(snapCoroutine); snapCoroutine = null; }
             if (dragScrollRect != null) dragScrollRect.vertical = false;
-            if (botsPagePanel != null) botsPagePanel.gameObject.SetActive(true);
+            var bgPanel = BotsPagePanel;
+            if (bgPanel != null) bgPanel.gameObject.SetActive(true);
         }
         else
         {
