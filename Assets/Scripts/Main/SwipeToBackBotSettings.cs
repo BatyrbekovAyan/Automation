@@ -4,10 +4,6 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-// Swipe-right-to-go-back + slide-in-from-right animation for the BotSettings
-// page. Mirrors Assets/Scripts/Chat/SwipeToBack.cs but is scoped to the
-// bot-settings flow (BotSettings wrapper + BotsPage parallax, no chat
-// ScrollRect or bottom-tab panel).
 public class SwipeToBackBotSettings : MonoBehaviour,
     IInitializePotentialDragHandler, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
@@ -30,7 +26,7 @@ public class SwipeToBackBotSettings : MonoBehaviour,
     private bool isHorizontalDrag;
     private float dragStartTime;
     private Vector2 dragStartPos;
-    private ScrollRect dragScrollRect; // ScrollRect captured at drag-begin for restore
+    private ScrollRect dragScrollRect;
 
     public bool IsAnimating => snapCoroutine != null;
 
@@ -42,6 +38,84 @@ public class SwipeToBackBotSettings : MonoBehaviour,
         if (EventSystem.current != null) EventSystem.current.pixelDragThreshold = 15;
     }
 
+    // Called by Bot.OpenSettings() after activating the BotSettings wrapper.
+    // BotsPage must still be active when this is invoked so the parallax is
+    // visible; the onComplete callback deactivates BotsPage once the slide
+    // finishes.
+    public void SlideInFromRight(Action onComplete = null)
+    {
+        if (botSettingsPanelToSlide == null) { onComplete?.Invoke(); return; }
+        var screenWidth = GetScreenWidth();
+
+        SetPanelX(botSettingsPanelToSlide, screenWidth);
+        SetPanelX(botsPagePanel, 0f);
+
+        if (snapCoroutine != null) StopCoroutine(snapCoroutine);
+        snapCoroutine = StartCoroutine(SnapToPosition(0f, commitBack: false, onComplete: onComplete));
+    }
+
+    // Called by BotSettings.OnBackPressed() after the revert step and after
+    // BotsPage has been re-activated. When the animation finishes, onComplete
+    // runs — BotSettings uses that to deactivate its wrapper.
+    public void SlideOutToBotsPage(Action onComplete = null)
+    {
+        if (botSettingsPanelToSlide == null) { onComplete?.Invoke(); return; }
+        var screenWidth = GetScreenWidth();
+
+        if (snapCoroutine != null) StopCoroutine(snapCoroutine);
+        snapCoroutine = StartCoroutine(SnapToPosition(screenWidth, commitBack: false, onComplete: onComplete));
+    }
+
+    // One coroutine powers both directions. commitBack=true means "call
+    // BotSettings.OnBackPressed() at the end" — used only by the gesture
+    // path (see Task 4). Programmatic callers pass commitBack=false.
+    private IEnumerator SnapToPosition(float targetX, bool commitBack, Action onComplete = null)
+    {
+        var screenWidth = GetScreenWidth();
+        var maxOffset = screenWidth * parallaxStrength;
+
+        while (Mathf.Abs(botSettingsPanelToSlide.anchoredPosition.x - targetX) > 2f)
+        {
+            var currentX = botSettingsPanelToSlide.anchoredPosition.x;
+            var newX = Mathf.Lerp(currentX, targetX, Time.deltaTime * snapSpeed);
+
+            var minStep = minSnapSpeed * Time.deltaTime;
+            if (Mathf.Abs(newX - currentX) < minStep)
+                newX = Mathf.MoveTowards(currentX, targetX, minStep);
+
+            ApplyPositions(newX, screenWidth, maxOffset);
+            yield return null;
+        }
+
+        ApplyPositions(targetX, screenWidth, maxOffset);
+        snapCoroutine = null;
+
+        if (commitBack && BotSettings.Instance != null)
+            BotSettings.Instance.OnSwipeCommitted();
+
+        onComplete?.Invoke();
+    }
+
+    private void ApplyPositions(float panelX, float screenWidth, float maxOffset)
+    {
+        SetPanelX(botSettingsPanelToSlide, panelX);
+        if (botsPagePanel != null)
+        {
+            var progress = panelX / screenWidth;
+            SetPanelX(botsPagePanel, -maxOffset + (maxOffset * progress));
+        }
+    }
+
+    private static void SetPanelX(RectTransform rt, float x)
+    {
+        if (rt == null) return;
+        rt.anchoredPosition = new Vector2(x, rt.anchoredPosition.y);
+    }
+
+    private float GetScreenWidth() =>
+        canvas != null ? canvas.GetComponent<RectTransform>().rect.width : Screen.width;
+
+    // Stubs — filled in Task 4.
     public void OnInitializePotentialDrag(PointerEventData eventData) { }
     public void OnBeginDrag(PointerEventData eventData) { }
     public void OnDrag(PointerEventData eventData) { }

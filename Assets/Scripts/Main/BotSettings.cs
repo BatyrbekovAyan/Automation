@@ -17,10 +17,12 @@ public partial class BotSettings : MonoBehaviour
     [SerializeField] private Button ServiceTabButton;
     [SerializeField] private Button PromptTabButton;
     [SerializeField] private RectTransform headerGroup;
+    [SerializeField] private TextMeshProUGUI headerTitle;
     [SerializeField] private RectTransform tabBarGroup;
     [SerializeField] private FocusScrim mainScrim;
     [SerializeField] private Button saveButton;
     [SerializeField] private Button backButton;
+    public Button SaveButton => saveButton;
     #endregion
 
     [System.Serializable]
@@ -63,6 +65,13 @@ public partial class BotSettings : MonoBehaviour
     [SerializeField] private ItemEditSheet serviceEditSheet;
     public AddItemButton AddProductButton => addProductButton;
     public AddItemButton AddServiceButton => addServiceButton;
+    #endregion
+
+    #region Serialized — Delete Bot
+    [SerializeField] private Button deleteBotButton;
+    [SerializeField] private GameObject deleteConfirmPopup;
+    [SerializeField] private Button deleteConfirmButton;
+    [SerializeField] private Button deleteCancelButton;
     #endregion
 
     #region Serialized — Auth (names preserved for Manager + auth partial)
@@ -120,6 +129,11 @@ public partial class BotSettings : MonoBehaviour
 
     public static BotSettings Instance;
 
+    void Awake()
+    {
+        ResolveHeaderTitle();
+    }
+
     void Start()
     {
         if (TelegramPhoneTitle != null) telegramPhoneTitleInitial = TelegramPhoneTitle.text;
@@ -130,23 +144,98 @@ public partial class BotSettings : MonoBehaviour
         WireProductsAndServices();
         WireAuthButtons();
         WireHeaderButtons();
+        WireDeleteBot();
+        SyncHeaderTitle();
+
+        // General-tab layout: each authenticated-number field must sit right
+        // under its platform toggle. The rebuilder groups both numbers after
+        // both toggles, so re-order at runtime once references are bound.
+        PlaceNumberFieldsUnderToggles();
+
+        // Editing a phone number must be gated by the "really change number?"
+        // confirmation. An invisible button over each number field intercepts
+        // taps before the TMP_InputField grabs focus.
+        WireNumberFieldAsChangeTrigger(WhatsappNumberField, OpenConfirmChangeWhatsappNumberPopup);
+        WireNumberFieldAsChangeTrigger(TelegramNumberField, OpenConfirmChangeTelegramNumberPopup);
+    }
+
+    private void PlaceNumberFieldsUnderToggles()
+    {
+        if (whatsappRow != null && WhatsappNumberField != null &&
+            whatsappRow.transform.parent == WhatsappNumberField.transform.parent)
+        {
+            WhatsappNumberField.transform.SetSiblingIndex(whatsappRow.transform.GetSiblingIndex() + 1);
+        }
+        if (telegramRow != null && TelegramNumberField != null &&
+            telegramRow.transform.parent == TelegramNumberField.transform.parent)
+        {
+            TelegramNumberField.transform.SetSiblingIndex(telegramRow.transform.GetSiblingIndex() + 1);
+        }
+    }
+
+    //////////////////////////////////////// CONFIRM-CHANGE POPUPS ////////////////////////////////////////
+    //
+    // ConfirmChangeWhatsappNumberPopup / ConfirmChangeTelegramNumberPopup are
+    // baked into the BotSettings prefab by the editor menu
+    // "Tools → BotSettings → Build Confirm-Change Popups"
+    // (Assets/Editor/BotSettingsConfirmChangePopupBuilder.cs).
+    //
+    // Run that once after pulling this change; the popups will appear in the
+    // prefab hierarchy and the serialized references on BotSettings will be
+    // populated. No runtime building.
+
+    //////////////////////////////////////// NUMBER-FIELD TAP-TO-CHANGE ////////////////////////////////////////
+
+    // After the editor menu "Tools → BotSettings → Build Confirm-Change Popups"
+    // runs, each number field is a NumberDisplayField card with a Button on
+    // its root. This method just wires the tap to the popup opener — no
+    // InputField fight, no hide-the-label hack.
+    private static void WireNumberFieldAsChangeTrigger(EditableField field, UnityEngine.Events.UnityAction onTap)
+    {
+        if (field == null) return;
+        var btn = field.GetComponent<Button>();
+        if (btn == null) return;
+        btn.onClick.RemoveAllListeners();
+        btn.onClick.AddListener(onTap);
     }
 
     private void WireHeaderButtons()
     {
         if (saveButton != null)
+        {
             saveButton.onClick.AddListener(() => Manager.Instance.SaveSettings());
+            saveButton.interactable = false;
+        }
         if (backButton != null)
             backButton.onClick.AddListener(OnBackPressed);
     }
 
     private void OnBackPressed()
     {
-        // Revert any unsaved edits from PlayerPrefs.
-        Manager.Instance.CloseSettings();
+        // If already animating (either slide-in or slide-out in progress), ignore
+        // duplicate taps. The gesture commit path calls OnSwipeCommitted() directly
+        // so it does not go through here.
+        if (SwipeToBackBotSettings.Instance != null && SwipeToBackBotSettings.Instance.IsAnimating)
+            return;
 
-        // Deactivate the BotSettings page and show the Bots list. Mirrors
-        // the forward flow in Bot.OpenSettings().
+        RevertUnsavedEdits();
+
+        // BotsPage must be visible during the slide-out so the parallax shows.
+        if (BotsPage.Instance != null)
+            BotsPage.Instance.gameObject.SetActive(true);
+
+        if (SwipeToBackBotSettings.Instance != null)
+            SwipeToBackBotSettings.Instance.SlideOutToBotsPage(SettleClosedInstant);
+        else
+            SettleClosedInstant(); // fallback when swipe component isn't wired
+    }
+
+    // Called by SwipeToBackBotSettings once the commit animation finishes (either
+    // gesture-driven or programmatic via OnBackPressed). Deactivates the wrapper
+    // and clears the open-bot references. Also used as the fallback when the
+    // swipe component is missing.
+    public void SettleClosedInstant()
+    {
         if (Manager.BotSettingsParentStatic != null)
         {
             var parentGo = Manager.BotSettingsParentStatic.transform.parent != null
@@ -161,13 +250,141 @@ public partial class BotSettings : MonoBehaviour
         Manager.openBotSettings = null;
     }
 
+    // Runs the existing revert-unsaved-edits behavior. Extracted so
+    // OnBackPressed and the gesture-commit path share one source of truth.
+    private void RevertUnsavedEdits()
+    {
+        // Revert any unsaved edits from PlayerPrefs. CloseSettings uses
+        // Toggle.SetIsOnWithoutNotify, which flips isOn but bypasses the
+        // ToggleRow's onValueChanged listener, so the iOS-style thumb/track
+        // stays stuck on the user's last choice. Resync the row visuals
+        // below to the now-reverted Toggle.isOn state.
+        Manager.Instance.CloseSettings();
+
+        if (whatsappRow != null && WhatsappToggle != null)
+            whatsappRow.SetIsOnQuiet(WhatsappToggle.isOn);
+        if (telegramRow != null && TelegramToggle != null)
+            telegramRow.SetIsOnQuiet(TelegramToggle.isOn);
+
+        if (saveButton != null) saveButton.interactable = false;
+    }
+
+    // Called by SwipeToBackBotSettings when the user swipes past the commit
+    // threshold (or flicks hard enough). Runs the same revert step that the tap
+    // path runs, then settles the page closed. Does NOT start another animation
+    // — the swipe component's snap coroutine is what animated us here.
+    public void OnSwipeCommitted()
+    {
+        RevertUnsavedEdits();
+        SettleClosedInstant();
+    }
+
+    //////////////////////////////////////// DELETE BOT ////////////////////////////////////////
+    //
+    // DeleteBotButton lives inside the BotSettings page and, when tapped,
+    // shows DeleteConfirmPopup. Confirm reuses Bot.DeleteBot() (the exact
+    // teardown path used by the bot-card delete on the Bots list) so both
+    // entry points stay consistent.
+
+    private void WireDeleteBot()
+    {
+        if (deleteBotButton != null)
+            deleteBotButton.onClick.AddListener(OpenDeleteBotPopup);
+        if (deleteConfirmButton != null)
+            PopupUI.WireFingerUp(deleteConfirmButton, ConfirmDeleteBot);
+        if (deleteCancelButton != null)
+            PopupUI.WireFingerUp(deleteCancelButton, CancelDeleteBot);
+    }
+
+    private void OpenDeleteBotPopup()
+    {
+        if (deleteConfirmPopup != null) PopupUI.Show(deleteConfirmPopup);
+    }
+
+    private void CancelDeleteBot()
+    {
+        if (deleteConfirmPopup != null) PopupUI.Hide(deleteConfirmPopup);
+    }
+
+    private void ConfirmDeleteBot()
+    {
+        // Bot.DeleteBot() destroys this whole BotSettings GameObject
+        // synchronously below, so starting the animated PopupUI.Hide tweens
+        // (backdrop DOFade + card DOScale) would leave DOTween chasing
+        // destroyed RectTransform/Image targets next frame. Snap the popup
+        // off instead — the user never sees it, the page is gone.
+        if (deleteConfirmPopup != null) deleteConfirmPopup.SetActive(false);
+
+        var openBot = Manager.openBot;
+        if (openBot == null) return;
+
+        // Return to the Bots list before destruction. Bot.DeleteBot()
+        // destroys both the Bot GameObject and this BotSettings instance,
+        // so any code must run before that point.
+        if (Manager.BotSettingsParentStatic != null)
+        {
+            var parentGo = Manager.BotSettingsParentStatic.transform.parent != null
+                ? Manager.BotSettingsParentStatic.transform.parent.gameObject
+                : Manager.BotSettingsParentStatic;
+            parentGo.SetActive(false);
+        }
+        if (BotsPage.Instance != null)
+            BotsPage.Instance.gameObject.SetActive(true);
+
+        var bot = openBot.GetComponent<Bot>();
+        Manager.openBot = null;
+        Manager.openBotSettings = null;
+
+        if (bot != null) bot.DeleteBot();
+    }
+
     public void OnEnable()
     {
         StartCoroutine(CheckWhatsappUnauthorizationOutsideApp());
         StartCoroutine(CheckTelegramUnauthorizationOutsideApp());
+        SyncHeaderTitle();
+    }
+
+    // Resolves the HeaderGroup > Title TMP text if it wasn't wired in the
+    // inspector. Falls back to searching under the serialized headerGroup so
+    // the prefab doesn't need to be re-wired after this change.
+    private void ResolveHeaderTitle()
+    {
+        if (headerTitle != null || headerGroup == null) return;
+        var titleTransform = headerGroup.Find("Title");
+        if (titleTransform != null)
+            headerTitle = titleTransform.GetComponent<TextMeshProUGUI>();
+    }
+
+    // Mirrors the bot's current name onto the header. Called on enable, after
+    // wiring, on name-field commit, and from Manager.CloseSettings when the
+    // field is reverted to the saved PlayerPref value.
+    public void SyncHeaderTitle()
+    {
+        if (headerTitle == null) ResolveHeaderTitle();
+        if (headerTitle == null || BotNameField == null) return;
+        headerTitle.text = BotNameField.Value;
     }
 
     public void OnDisable() => OpenGeneralTab();
+
+    // Returns the vertical ScrollRect under the currently-active tab root, if
+    // any. Used by SwipeToBackBotSettings to disable vertical scrolling during
+    // a horizontal swipe gesture. Returns null when no tab is active or the
+    // active tab has no ScrollRect child.
+    public ScrollRect CurrentTabScrollRect
+    {
+        get
+        {
+            GameObject tab = null;
+            if (General  != null && General.activeInHierarchy)  tab = General;
+            else if (Business != null && Business.activeInHierarchy) tab = Business;
+            else if (Product  != null && Product.activeInHierarchy)  tab = Product;
+            else if (Service  != null && Service.activeInHierarchy)  tab = Service;
+            else if (Prompt   != null && Prompt.activeInHierarchy)   tab = Prompt;
+            return tab != null ? tab.GetComponentInChildren<ScrollRect>(false) : null;
+        }
+    }
 
     //////////////////////////////////////// TABS ////////////////////////////////////////
 
@@ -212,7 +429,10 @@ public partial class BotSettings : MonoBehaviour
     private void WireFields()
     {
         if (BotNameField != null)
+        {
             BotNameField.OnCommitted.AddListener(_ => Manager.Instance.EnableSave());
+            BotNameField.OnCommitted.AddListener(_ => SyncHeaderTitle());
+        }
         if (WhatsappNumberField != null)
             WhatsappNumberField.OnCommitted.AddListener(_ => Manager.Instance.EnableSave());
         if (TelegramNumberField != null)
@@ -315,6 +535,8 @@ public partial class BotSettings : MonoBehaviour
         var anim = go.GetComponent<Animation>();
         if (anim != null) anim.Play();
 
+        RebuildTabLayout(ProductsParent);
+
         Manager.Instance.EnableSave();
     }
 
@@ -331,7 +553,25 @@ public partial class BotSettings : MonoBehaviour
         var anim = go.GetComponent<Animation>();
         if (anim != null) anim.Play();
 
+        RebuildTabLayout(ServicesParent);
+
         Manager.Instance.EnableSave();
+    }
+
+    // Re-run layout on the list RectTransform and walk up the ancestors so a
+    // parent VerticalLayoutGroup (childControlHeight=false) re-reads the new
+    // ContentSizeFitter-driven height and repositions sibling buttons instead
+    // of letting them overlap the last created card.
+    private static void RebuildTabLayout(RectTransform listRoot)
+    {
+        if (listRoot == null) return;
+        LayoutRebuilder.ForceRebuildLayoutImmediate(listRoot);
+        var parent = listRoot.parent as RectTransform;
+        while (parent != null)
+        {
+            LayoutRebuilder.ForceRebuildLayoutImmediate(parent);
+            parent = parent.parent as RectTransform;
+        }
     }
 
     private void DeleteProductCard(ProductCardView card)
