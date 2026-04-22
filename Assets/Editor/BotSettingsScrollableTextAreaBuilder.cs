@@ -15,7 +15,7 @@ using UnityEngine.UI;
 ///     Background
 ///     TMP_InputField                       ← ScrollRect.content
 ///       (TMP's own Text Area / Text / Placeholder left untouched)
-///     DragShield (transparent raycast-target Image, stretch-fills root)
+///       DragShield (transparent raycast-target Image, last child)
 ///
 /// The ScrollRect lives on the BusinessField root; its content is the
 /// TMP_InputField's OWN RectTransform. TMP_InputField grows with text
@@ -227,28 +227,33 @@ public static class BotSettingsScrollableTextAreaBuilder
             modified = true;
         }
 
-        // 9. Delete any stale DragShield that earlier builder versions
-        // placed under the TMP_InputField GameObject — it has moved to the
-        // field root so it captures taps on the whole card, not just the
-        // input field's own rect.
-        var staleShield = inputGo.transform.Find("DragShield");
-        if (staleShield != null)
+        // 9. Delete any stale DragShield left on the BusinessField root by a
+        // previous (incorrect) builder version. Placing the shield there
+        // put TMP_InputField outside its ancestor chain, so every tap
+        // triggered EventSystem.DeselectIfSelectionChanged and unfocused
+        // the input — firing onEndEdit → Blur → scrim.Hide on every tap.
+        var staleRootShield = field.transform.Find("DragShield");
+        if (staleRootShield != null)
         {
-            Object.DestroyImmediate(staleShield.gameObject);
+            Object.DestroyImmediate(staleRootShield.gameObject);
             modified = true;
         }
 
-        // 10. Insert DragShield as the last child of the field root.
-        // Transparent raycast-target Image that distinguishes tap (place
-        // caret) from drag (forward to ScrollRect) — same shield the chat
-        // outgoing-message input uses.
-        var shieldTransform = field.transform.Find("DragShield");
+        // 10. Insert DragShield as the last child of the TMP_InputField
+        // GameObject (matches the chat outgoing-input layout). Being inside
+        // TMP_InputField makes the field itself the nearest ISelectHandler
+        // ancestor during EventSystem's select-change check, so the field
+        // stays focused across taps and the scrim does not flicker.
+        // ScrollableTextArea keeps the TMP_InputField at least as tall as
+        // the viewport, so DragShield always covers the full visible card
+        // interior; RectMask2D on the field root clips any overscroll.
+        var shieldTransform = inputGo.transform.Find("DragShield");
         DragShield shield;
         if (shieldTransform == null)
         {
             var shieldGo = new GameObject(
                 "DragShield", typeof(RectTransform), typeof(Image));
-            shieldGo.transform.SetParent(field.transform, worldPositionStays: false);
+            shieldGo.transform.SetParent(inputGo.transform, worldPositionStays: false);
 
             var shieldRt = (RectTransform)shieldGo.transform;
             shieldRt.anchorMin = Vector2.zero;
@@ -273,8 +278,9 @@ public static class BotSettingsScrollableTextAreaBuilder
             }
         }
 
-        // Ensure DragShield is front-most sibling so raycasts hit it first.
-        var lastSibling = field.transform.childCount - 1;
+        // Ensure DragShield is front-most sibling of TMP_InputField so
+        // raycasts hit it before TMP's textComponent / placeholder.
+        var lastSibling = inputGo.transform.childCount - 1;
         if (shield.transform.GetSiblingIndex() != lastSibling)
         {
             shield.transform.SetAsLastSibling();
