@@ -1,3 +1,4 @@
+using System.Collections;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -21,6 +22,7 @@ namespace Automation.BotSettingsUI
         [SerializeField] private float bottomPadding = 8f;
 
         private RectTransform viewport;
+        private bool scrollSnapPending;
 
         private void Awake()
         {
@@ -45,16 +47,24 @@ namespace Automation.BotSettingsUI
         {
             var previous = content.sizeDelta.y;
             ResizeContent(text);
-            if (content.sizeDelta.y > previous)
+            if (content.sizeDelta.y > previous && !scrollSnapPending && isActiveAndEnabled)
             {
-                // Flush pending Canvas rebuilds so ScrollRect has the new
-                // content size before we pin the scroll to the bottom —
-                // otherwise verticalNormalizedPosition clamps against the
-                // stale bounds and the caret lands below the viewport.
-                // Same trick as Chat/ExpandableInput.cs.
-                Canvas.ForceUpdateCanvases();
-                scrollRect.verticalNormalizedPosition = 0f;
+                // Defer the snap to the next frame. TMP_InputField fires
+                // onValueChanged from inside its Rebuild pass; calling
+                // Canvas.ForceUpdateCanvases or touching the ScrollRect
+                // content here re-enters the rebuild and the caret graphic
+                // throws "already inside a graphic rebuild loop".
+                scrollSnapPending = true;
+                StartCoroutine(SnapToBottomNextFrame());
             }
+        }
+
+        private IEnumerator SnapToBottomNextFrame()
+        {
+            yield return null; // Let TMP finish this frame's rebuild cycle.
+            if (scrollRect != null)
+                scrollRect.verticalNormalizedPosition = 0f;
+            scrollSnapPending = false;
         }
 
         private void ResizeContent(string text)
