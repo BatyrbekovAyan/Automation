@@ -8,19 +8,25 @@ using UnityEngine.UI;
 /// <summary>
 /// Editor maintenance for BotSettings.prefab.
 ///
-/// For each of BusinessField and PromptField:
-///   1. Deletes the inner Label GameObject (redundant with SectionHeader).
-///   2. Wraps the TMP_InputField's textViewport + textComponent in a
-///      ScrollRect so the fixed-height card supports touch-drag scrolling.
-///   3. Attaches ScrollableTextArea with wired references for runtime
-///      content-size sync.
-///   4. Inserts a DragShield overlay (same script the chat outgoing input
-///      uses) as the last child of the TMP_InputField. The shield
-///      distinguishes tap (place caret) from drag (scroll) instead of
-///      letting TMP_InputField interpret every drag as text selection.
+/// For each of BusinessField and PromptField, the target layout mirrors
+/// the chat outgoing-message input wiring:
+///
+///   BusinessField (ScrollRect + RectMask2D + ScrollableTextArea)
+///     Background
+///     TMP_InputField                       ← ScrollRect.content
+///       (TMP's own Text Area / Text / Placeholder left untouched)
+///     DragShield (transparent raycast-target Image, stretch-fills root)
+///
+/// The ScrollRect lives on the BusinessField root; its content is the
+/// TMP_InputField's OWN RectTransform. TMP_InputField grows with text
+/// via ScrollableTextArea writing to its RectTransform.sizeDelta — TMP
+/// keeps managing its internal textViewport / textComponent / caret,
+/// which avoids caret-graphic rebuild re-entry during layout.
+/// DragShield on the root captures pointer events before the input field
+/// does so tap places caret and drag scrolls the ScrollRect.
 ///
 /// Each step is individually idempotent — safe to re-run on a prefab
-/// that has already been partially converted.
+/// already converted by earlier (incorrect) versions of this tool.
 /// </summary>
 public static class BotSettingsScrollableTextAreaBuilder
 {
@@ -91,9 +97,12 @@ public static class BotSettingsScrollableTextAreaBuilder
             return false;
         }
 
+        var fieldRt = (RectTransform)field.transform;
+        var inputGo = input.gameObject;
+        var inputRt = (RectTransform)inputGo.transform;
         var modified = false;
 
-        // 1. Delete the inner Label (idempotent: skipped if already cleared).
+        // 1. Delete the inner Label (idempotent).
         if (labelProp != null && labelProp.objectReferenceValue is TextMeshProUGUI label)
         {
             Object.DestroyImmediate(label.gameObject);
@@ -102,43 +111,8 @@ public static class BotSettingsScrollableTextAreaBuilder
             modified = true;
         }
 
-        // 2. Configure content RT (top-stretch, pivot top). Idempotent by
-        // equality check so re-runs don't mark the prefab dirty.
-        var contentRt = textComponent.rectTransform;
-        var targetMin = new Vector2(0f, 1f);
-        var targetMax = new Vector2(1f, 1f);
-        var targetPivot = new Vector2(0.5f, 1f);
-        if (contentRt.anchorMin != targetMin ||
-            contentRt.anchorMax != targetMax ||
-            contentRt.pivot != targetPivot)
-        {
-            contentRt.anchorMin = targetMin;
-            contentRt.anchorMax = targetMax;
-            contentRt.pivot = targetPivot;
-            modified = true;
-        }
-
-        // 3. Add ScrollRect on the TMP_InputField GameObject (idempotent).
-        var inputGo = input.gameObject;
-        var scroll = inputGo.GetComponent<ScrollRect>();
-        if (scroll == null)
-        {
-            scroll = inputGo.AddComponent<ScrollRect>();
-            scroll.horizontal = false;
-            scroll.vertical = true;
-            scroll.movementType = ScrollRect.MovementType.Elastic;
-            scroll.elasticity = 0.1f;
-            scroll.inertia = true;
-            scroll.decelerationRate = 0.135f;
-            scroll.scrollSensitivity = 1f;
-            scroll.viewport = viewport;
-            scroll.content = contentRt;
-            modified = true;
-        }
-
-        // 3b. Revert any prior ScrollableInputField swap to stock
-        // TMP_InputField. DragShield supersedes the subclass so the prefab
-        // should reference only the stock class going forward.
+        // 2. Revert any prior ScrollableInputField swap back to stock
+        // TMP_InputField. DragShield supersedes the subclass.
         if (input.GetType() != typeof(TMP_InputField))
         {
             var tmpScript = GetMonoScriptForType(typeof(TMP_InputField));
@@ -149,40 +123,132 @@ public static class BotSettingsScrollableTextAreaBuilder
                 inputSo.ApplyModifiedPropertiesWithoutUndo();
                 modified = true;
             }
-            else
-            {
-                Debug.LogWarning(
-                    "[BotSettings] Could not locate TMP_InputField MonoScript; " +
-                    "leaving input component class unchanged.");
-            }
         }
 
-        // 4. Attach ScrollableTextArea on the field root and wire refs
-        // (idempotent: skipped if already attached).
+        // 3. Remove any ScrollRect left over on the TMP_InputField GameObject
+        // from earlier (incorrect) builder versions — the ScrollRect now
+        // lives on the field root. Also strip the RectMask2D that the old
+        // variant could have attached here.
+        var staleScroll = inputGo.GetComponent<ScrollRect>();
+        if (staleScroll != null)
+        {
+            Object.DestroyImmediate(staleScroll);
+            modified = true;
+        }
+
+        // 4. Reset textComponent RT to TMP defaults. Earlier builder
+        // versions set it to top-stretch; TMP expects the text component
+        // to fill its textViewport (stretch-stretch, pivot center).
+        var textCompRt = textComponent.rectTransform;
+        var tmpMin = Vector2.zero;
+        var tmpMax = Vector2.one;
+        var tmpPivot = new Vector2(0.5f, 0.5f);
+        if (textCompRt.anchorMin != tmpMin ||
+            textCompRt.anchorMax != tmpMax ||
+            textCompRt.pivot != tmpPivot ||
+            textCompRt.sizeDelta != Vector2.zero ||
+            textCompRt.anchoredPosition != Vector2.zero)
+        {
+            textCompRt.anchorMin = tmpMin;
+            textCompRt.anchorMax = tmpMax;
+            textCompRt.pivot = tmpPivot;
+            textCompRt.sizeDelta = Vector2.zero;
+            textCompRt.anchoredPosition = Vector2.zero;
+            modified = true;
+        }
+
+        // 5. Configure TMP_InputField RT as scroll content: top-stretch,
+        // pivot top-center. Its sizeDelta.y is driven by ScrollableTextArea
+        // at runtime; leave whatever height is currently on the prefab.
+        var contentMin = new Vector2(0f, 1f);
+        var contentMax = new Vector2(1f, 1f);
+        var contentPivot = new Vector2(0.5f, 1f);
+        if (inputRt.anchorMin != contentMin ||
+            inputRt.anchorMax != contentMax ||
+            inputRt.pivot != contentPivot)
+        {
+            inputRt.anchorMin = contentMin;
+            inputRt.anchorMax = contentMax;
+            inputRt.pivot = contentPivot;
+            modified = true;
+        }
+
+        // 6. Add ScrollRect on the field root (idempotent). Viewport is the
+        // field root itself (clipped by RectMask2D below); content is the
+        // TMP_InputField's own RectTransform.
+        var scroll = field.gameObject.GetComponent<ScrollRect>();
+        if (scroll == null)
+        {
+            scroll = field.gameObject.AddComponent<ScrollRect>();
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.movementType = ScrollRect.MovementType.Elastic;
+            scroll.elasticity = 0.1f;
+            scroll.inertia = true;
+            scroll.decelerationRate = 0.135f;
+            scroll.scrollSensitivity = 1f;
+            modified = true;
+        }
+        if (scroll.viewport != fieldRt || scroll.content != inputRt)
+        {
+            scroll.viewport = fieldRt;
+            scroll.content = inputRt;
+            modified = true;
+        }
+
+        // 7. RectMask2D on the field root clips the input when it scrolls
+        // past the card bounds.
+        if (field.gameObject.GetComponent<RectMask2D>() == null)
+        {
+            field.gameObject.AddComponent<RectMask2D>();
+            modified = true;
+        }
+
+        // 8. Attach ScrollableTextArea and (re)wire refs to the correct
+        // content — the TMP_InputField's RectTransform, NOT textComponent's.
         var sta = field.GetComponent<ScrollableTextArea>();
         if (sta == null)
         {
             sta = field.gameObject.AddComponent<ScrollableTextArea>();
-            var staSo = new SerializedObject(sta);
-            staSo.FindProperty("scrollRect").objectReferenceValue = scroll;
-            staSo.FindProperty("inputField").objectReferenceValue = input;
-            staSo.FindProperty("content").objectReferenceValue = contentRt;
+            modified = true;
+        }
+        var staSo = new SerializedObject(sta);
+        var staScrollProp = staSo.FindProperty("scrollRect");
+        var staInputProp = staSo.FindProperty("inputField");
+        var staContentProp = staSo.FindProperty("content");
+        if (staScrollProp.objectReferenceValue != scroll ||
+            staInputProp.objectReferenceValue != input ||
+            staContentProp.objectReferenceValue != inputRt)
+        {
+            staScrollProp.objectReferenceValue = scroll;
+            staInputProp.objectReferenceValue = input;
+            staContentProp.objectReferenceValue = inputRt;
             staSo.ApplyModifiedPropertiesWithoutUndo();
             modified = true;
         }
 
-        // 5. Insert DragShield overlay as the last child of the TMP_InputField
-        // GameObject so it captures pointer events before the input field
-        // does. This is the same shield the chat outgoing-message input uses:
-        // tap places caret, drag scrolls the parent ScrollRect, long-press
-        // double-tap selects a word. Idempotent — reuses the existing shield.
-        var shieldTransform = inputGo.transform.Find("DragShield");
+        // 9. Delete any stale DragShield that earlier builder versions
+        // placed under the TMP_InputField GameObject — it has moved to the
+        // field root so it captures taps on the whole card, not just the
+        // input field's own rect.
+        var staleShield = inputGo.transform.Find("DragShield");
+        if (staleShield != null)
+        {
+            Object.DestroyImmediate(staleShield.gameObject);
+            modified = true;
+        }
+
+        // 10. Insert DragShield as the last child of the field root.
+        // Transparent raycast-target Image that distinguishes tap (place
+        // caret) from drag (forward to ScrollRect) — same shield the chat
+        // outgoing-message input uses.
+        var shieldTransform = field.transform.Find("DragShield");
         DragShield shield;
         if (shieldTransform == null)
         {
             var shieldGo = new GameObject(
                 "DragShield", typeof(RectTransform), typeof(Image));
-            shieldGo.transform.SetParent(inputGo.transform, worldPositionStays: false);
+            shieldGo.transform.SetParent(field.transform, worldPositionStays: false);
 
             var shieldRt = (RectTransform)shieldGo.transform;
             shieldRt.anchorMin = Vector2.zero;
@@ -208,8 +274,8 @@ public static class BotSettingsScrollableTextAreaBuilder
         }
 
         // Ensure DragShield is front-most sibling so raycasts hit it first.
-        var lastIndex = inputGo.transform.childCount - 1;
-        if (shield.transform.GetSiblingIndex() != lastIndex)
+        var lastSibling = field.transform.childCount - 1;
+        if (shield.transform.GetSiblingIndex() != lastSibling)
         {
             shield.transform.SetAsLastSibling();
             modified = true;
