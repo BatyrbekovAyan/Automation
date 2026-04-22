@@ -416,8 +416,10 @@ public partial class BotSettings
 
     private IEnumerator CheckWhatsappUnauthorizationOutsideApp()
     {
-        Manager.Instance.LoadingPanel.SetActive(true);
-
+        // Silent background probe fired from OnEnable. No LoadingPanel — it
+        // would overlay the slide-in animation. User-triggered logout
+        // (UnauthorizeWhatsapp) still shows LoadingPanel because that is a
+        // foreground action the user expects to see.
         yield return new WaitForEndOfFrame();
 
         using UnityWebRequest www = UnityWebRequest.Get($"https://wappi.pro/api/sync/get/status?profile_id={Manager.openBot.GetComponent<Bot>().whatsappProfileId}");
@@ -450,8 +452,6 @@ public partial class BotSettings
                 }
             }
         }
-
-        Manager.Instance.LoadingPanel.SetActive(false);
     }
 
     private IEnumerator UnauthorizeWhatsapp()
@@ -935,8 +935,10 @@ public partial class BotSettings
 
     private IEnumerator CheckTelegramUnauthorizationOutsideApp()
     {
-        Manager.Instance.LoadingPanel.SetActive(true);
-
+        // Silent background probe fired from OnEnable. No LoadingPanel — it
+        // would overlay the slide-in animation. User-triggered logout
+        // (UnauthorizeTelegram) still shows LoadingPanel because that is a
+        // foreground action the user expects to see.
         yield return new WaitForEndOfFrame();
 
         using UnityWebRequest www = UnityWebRequest.Get($"https://wappi.pro/tapi/sync/get/status?profile_id={Manager.openBot.GetComponent<Bot>().telegramProfileId}");
@@ -969,8 +971,6 @@ public partial class BotSettings
                 }
             }
         }
-
-        Manager.Instance.LoadingPanel.SetActive(false);
     }
 
     private IEnumerator UnauthorizeTelegram()
