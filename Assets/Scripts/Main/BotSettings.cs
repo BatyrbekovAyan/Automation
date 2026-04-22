@@ -340,29 +340,9 @@ public partial class BotSettings : MonoBehaviour
 
     public void OnEnable()
     {
-        // Defer the auth checks — they show the LoadingPanel, which would
-        // otherwise overlay the slide-in animation kicked off by
-        // Bot.OpenSettings(). Wait for any in-flight swipe animation to
-        // finish before triggering them.
-        StartCoroutine(RunPostOpenChecksWhenReady());
-        SyncHeaderTitle();
-    }
-
-    private System.Collections.IEnumerator RunPostOpenChecksWhenReady()
-    {
-        // OnEnable fires inside Bot.OpenSettings()'s foreach loop, BEFORE
-        // SlideInFromRight() is called further down in that method. Yield
-        // one frame so the animation has a chance to start — otherwise
-        // IsAnimating is still false on the first check and the gate
-        // exits immediately.
-        yield return null;
-
-        while (SwipeToBackBotSettings.Instance != null &&
-               SwipeToBackBotSettings.Instance.IsAnimating)
-            yield return null;
-
         StartCoroutine(CheckWhatsappUnauthorizationOutsideApp());
         StartCoroutine(CheckTelegramUnauthorizationOutsideApp());
+        SyncHeaderTitle();
     }
 
     // Resolves the HeaderGroup > Title TMP text if it wasn't wired in the
