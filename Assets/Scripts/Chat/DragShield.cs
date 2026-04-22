@@ -83,16 +83,23 @@ public class DragShield : MonoBehaviour, IPointerDownHandler, IPointerUpHandler,
             eventData.pressEventCamera
         );
 
-        // Send down + up with NO yield between them so TMP's long-press
-        // coroutine starts and is immediately cancelled in the same frame
-        ExecuteEvents.Execute(inputField.gameObject, eventData, ExecuteEvents.pointerEnterHandler);
-        ExecuteEvents.Execute(inputField.gameObject, eventData, ExecuteEvents.pointerDownHandler);
-        ExecuteEvents.Execute(inputField.gameObject, eventData, ExecuteEvents.pointerUpHandler);
-        ExecuteEvents.Execute(inputField.gameObject, eventData, ExecuteEvents.pointerClickHandler);
+        // Only run the activate sequence when the field isn't already focused.
+        // Forwarding pointer events to a focused TMP_InputField causes it to
+        // briefly deactivate + reactivate — firing onEndEdit then onSelect —
+        // which flickers FocusScrim (Blur hides, then HandleSelect re-Shows).
+        if (!inputField.isFocused)
+        {
+            // Send down + up with NO yield between them so TMP's long-press
+            // coroutine starts and is immediately cancelled in the same frame
+            ExecuteEvents.Execute(inputField.gameObject, eventData, ExecuteEvents.pointerEnterHandler);
+            ExecuteEvents.Execute(inputField.gameObject, eventData, ExecuteEvents.pointerDownHandler);
+            ExecuteEvents.Execute(inputField.gameObject, eventData, ExecuteEvents.pointerUpHandler);
+            ExecuteEvents.Execute(inputField.gameObject, eventData, ExecuteEvents.pointerClickHandler);
 
-        // Wait for TMP to finish its internal caret-move-to-end call
-        yield return null;
-        yield return null;
+            // Wait for TMP to finish its internal caret-move-to-end call
+            yield return null;
+            yield return null;
+        }
 
         // Now safely place the caret exactly where the finger was
         inputField.caretPosition = caretIndex;
