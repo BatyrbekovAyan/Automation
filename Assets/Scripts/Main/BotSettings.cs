@@ -350,8 +350,15 @@ public partial class BotSettings : MonoBehaviour
 
     private System.Collections.IEnumerator RunPostOpenChecksWhenReady()
     {
-        var swipe = SwipeToBackBotSettings.Instance;
-        while (swipe != null && swipe.IsAnimating)
+        // OnEnable fires inside Bot.OpenSettings()'s foreach loop, BEFORE
+        // SlideInFromRight() is called further down in that method. Yield
+        // one frame so the animation has a chance to start — otherwise
+        // IsAnimating is still false on the first check and the gate
+        // exits immediately.
+        yield return null;
+
+        while (SwipeToBackBotSettings.Instance != null &&
+               SwipeToBackBotSettings.Instance.IsAnimating)
             yield return null;
 
         StartCoroutine(CheckWhatsappUnauthorizationOutsideApp());
