@@ -115,9 +115,84 @@ public class SwipeToBackBotSettings : MonoBehaviour,
     private float GetScreenWidth() =>
         canvas != null ? canvas.GetComponent<RectTransform>().rect.width : Screen.width;
 
-    // Stubs — filled in Task 4.
-    public void OnInitializePotentialDrag(PointerEventData eventData) { }
-    public void OnBeginDrag(PointerEventData eventData) { }
-    public void OnDrag(PointerEventData eventData) { }
-    public void OnEndDrag(PointerEventData eventData) { }
+    public void OnInitializePotentialDrag(PointerEventData eventData)
+    {
+        dragDecided = false;
+        dragScrollRect = BotSettings.Instance != null ? BotSettings.Instance.CurrentTabScrollRect : null;
+        if (dragScrollRect != null) dragScrollRect.OnInitializePotentialDrag(eventData);
+    }
+
+    public void OnBeginDrag(PointerEventData eventData)
+    {
+        var trajectory = eventData.position - eventData.pressPosition;
+        var mostlyHorizontal = Mathf.Abs(trajectory.x) > Mathf.Abs(trajectory.y);
+        var swipingRight = trajectory.x > 0f;
+
+        if (mostlyHorizontal && swipingRight)
+        {
+            isHorizontalDrag = true;
+            if (snapCoroutine != null) { StopCoroutine(snapCoroutine); snapCoroutine = null; }
+            if (dragScrollRect != null) dragScrollRect.vertical = false;
+            if (botsPagePanel != null) botsPagePanel.gameObject.SetActive(true);
+        }
+        else
+        {
+            isHorizontalDrag = false;
+            if (dragScrollRect != null) dragScrollRect.OnBeginDrag(eventData);
+        }
+
+        dragDecided = true;
+        dragStartTime = Time.unscaledTime;
+        dragStartPos = eventData.position;
+    }
+
+    public void OnDrag(PointerEventData eventData)
+    {
+        if (!dragDecided) return;
+
+        if (isHorizontalDrag)
+        {
+            var scaleFactor = canvas != null ? canvas.scaleFactor : 1f;
+            var deltaX = eventData.delta.x / scaleFactor;
+            var newX = Mathf.Max(0f, botSettingsPanelToSlide.anchoredPosition.x + deltaX);
+
+            var screenWidth = GetScreenWidth();
+            var maxOffset = screenWidth * parallaxStrength;
+            ApplyPositions(newX, screenWidth, maxOffset);
+        }
+        else if (dragScrollRect != null)
+        {
+            dragScrollRect.OnDrag(eventData);
+        }
+    }
+
+    public void OnEndDrag(PointerEventData eventData)
+    {
+        if (!dragDecided) return;
+
+        if (isHorizontalDrag)
+        {
+            var screenWidth = GetScreenWidth();
+            var dragDuration = Mathf.Max(0.0001f, Time.unscaledTime - dragStartTime);
+            var dragDistanceX = eventData.position.x - dragStartPos.x;
+            var velocityX = dragDistanceX / dragDuration;
+
+            var fastFlick = velocityX > flickVelocityThreshold && dragDistanceX > 20f;
+            var pastThreshold = botSettingsPanelToSlide.anchoredPosition.x > (screenWidth * slowSwipeThreshold);
+
+            if (fastFlick || pastThreshold)
+                snapCoroutine = StartCoroutine(SnapToPosition(screenWidth, commitBack: true));
+            else
+                snapCoroutine = StartCoroutine(SnapToPosition(0f, commitBack: false));
+
+            if (dragScrollRect != null) dragScrollRect.vertical = true;
+        }
+        else if (dragScrollRect != null)
+        {
+            dragScrollRect.OnEndDrag(eventData);
+        }
+
+        dragDecided = false;
+        isHorizontalDrag = false;
+    }
 }
