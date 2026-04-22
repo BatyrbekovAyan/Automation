@@ -46,7 +46,15 @@ namespace Automation.BotSettingsUI
             var previous = content.sizeDelta.y;
             ResizeContent(text);
             if (content.sizeDelta.y > previous)
+            {
+                // Flush pending Canvas rebuilds so ScrollRect has the new
+                // content size before we pin the scroll to the bottom —
+                // otherwise verticalNormalizedPosition clamps against the
+                // stale bounds and the caret lands below the viewport.
+                // Same trick as Chat/ExpandableInput.cs.
+                Canvas.ForceUpdateCanvases();
                 scrollRect.verticalNormalizedPosition = 0f;
+            }
         }
 
         private void ResizeContent(string text)

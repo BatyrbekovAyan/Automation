@@ -12,10 +12,12 @@ using UnityEngine.UI;
 ///   1. Deletes the inner Label GameObject (redundant with SectionHeader).
 ///   2. Wraps the TMP_InputField's textViewport + textComponent in a
 ///      ScrollRect so the fixed-height card supports touch-drag scrolling.
-///   3. Swaps the TMP_InputField's script to ScrollableInputField so
-///      drag gestures forward to the ScrollRect instead of selecting text.
-///   4. Attaches ScrollableTextArea with wired references for runtime
+///   3. Attaches ScrollableTextArea with wired references for runtime
 ///      content-size sync.
+///   4. Inserts a DragShield overlay (same script the chat outgoing input
+///      uses) as the last child of the TMP_InputField. The shield
+///      distinguishes tap (place caret) from drag (scroll) instead of
+///      letting TMP_InputField interpret every drag as text selection.
 ///
 /// Each step is individually idempotent — safe to re-run on a prefab
 /// that has already been partially converted.
@@ -23,8 +25,6 @@ using UnityEngine.UI;
 public static class BotSettingsScrollableTextAreaBuilder
 {
     private const string PrefabPath = "Assets/Prefabs/BotSettings.prefab";
-    private const string ScrollableInputFieldScriptPath =
-        "Assets/Scripts/Main/BotSettings/ScrollableInputField.cs";
 
     [MenuItem("Tools/BotSettings/Build Scrollable Business+Prompt")]
     public static void Build()
@@ -136,28 +136,28 @@ public static class BotSettingsScrollableTextAreaBuilder
             modified = true;
         }
 
-        // 4. Swap TMP_InputField -> ScrollableInputField so drag gestures
-        // forward to the ScrollRect. Idempotent: skipped if already swapped.
-        if (!(input is ScrollableInputField))
+        // 3b. Revert any prior ScrollableInputField swap to stock
+        // TMP_InputField. DragShield supersedes the subclass so the prefab
+        // should reference only the stock class going forward.
+        if (input.GetType() != typeof(TMP_InputField))
         {
-            var scrollableScript =
-                AssetDatabase.LoadAssetAtPath<MonoScript>(ScrollableInputFieldScriptPath);
-            if (scrollableScript == null)
-            {
-                Debug.LogError(
-                    $"[BotSettings] ScrollableInputField script not found at {ScrollableInputFieldScriptPath}; " +
-                    "skipping InputField swap.");
-            }
-            else
+            var tmpScript = GetMonoScriptForType(typeof(TMP_InputField));
+            if (tmpScript != null)
             {
                 var inputSo = new SerializedObject(input);
-                inputSo.FindProperty("m_Script").objectReferenceValue = scrollableScript;
+                inputSo.FindProperty("m_Script").objectReferenceValue = tmpScript;
                 inputSo.ApplyModifiedPropertiesWithoutUndo();
                 modified = true;
             }
+            else
+            {
+                Debug.LogWarning(
+                    "[BotSettings] Could not locate TMP_InputField MonoScript; " +
+                    "leaving input component class unchanged.");
+            }
         }
 
-        // 5. Attach ScrollableTextArea on the field root and wire refs
+        // 4. Attach ScrollableTextArea on the field root and wire refs
         // (idempotent: skipped if already attached).
         var sta = field.GetComponent<ScrollableTextArea>();
         if (sta == null)
@@ -171,9 +171,76 @@ public static class BotSettingsScrollableTextAreaBuilder
             modified = true;
         }
 
+        // 5. Insert DragShield overlay as the last child of the TMP_InputField
+        // GameObject so it captures pointer events before the input field
+        // does. This is the same shield the chat outgoing-message input uses:
+        // tap places caret, drag scrolls the parent ScrollRect, long-press
+        // double-tap selects a word. Idempotent — reuses the existing shield.
+        var shieldTransform = inputGo.transform.Find("DragShield");
+        DragShield shield;
+        if (shieldTransform == null)
+        {
+            var shieldGo = new GameObject(
+                "DragShield", typeof(RectTransform), typeof(Image));
+            shieldGo.transform.SetParent(inputGo.transform, worldPositionStays: false);
+
+            var shieldRt = (RectTransform)shieldGo.transform;
+            shieldRt.anchorMin = Vector2.zero;
+            shieldRt.anchorMax = Vector2.one;
+            shieldRt.sizeDelta = Vector2.zero;
+            shieldRt.anchoredPosition = Vector2.zero;
+
+            var shieldImage = shieldGo.GetComponent<Image>();
+            shieldImage.color = new Color(0f, 0f, 0f, 0f);
+            shieldImage.raycastTarget = true;
+
+            shield = shieldGo.AddComponent<DragShield>();
+            modified = true;
+        }
+        else
+        {
+            shield = shieldTransform.GetComponent<DragShield>();
+            if (shield == null)
+            {
+                shield = shieldTransform.gameObject.AddComponent<DragShield>();
+                modified = true;
+            }
+        }
+
+        // Ensure DragShield is front-most sibling so raycasts hit it first.
+        var lastIndex = inputGo.transform.childCount - 1;
+        if (shield.transform.GetSiblingIndex() != lastIndex)
+        {
+            shield.transform.SetAsLastSibling();
+            modified = true;
+        }
+
+        // Wire DragShield refs (idempotent by equality check).
+        if (shield.parentScrollRect != scroll || shield.inputField != input)
+        {
+            var shieldSo = new SerializedObject(shield);
+            shieldSo.FindProperty("parentScrollRect").objectReferenceValue = scroll;
+            shieldSo.FindProperty("inputField").objectReferenceValue = input;
+            shieldSo.ApplyModifiedPropertiesWithoutUndo();
+            modified = true;
+        }
+
         if (modified)
             Debug.Log($"[BotSettings] Converted {fieldName}.");
         return modified;
+    }
+
+    // TMP_InputField lives in a compiled assembly, so its MonoScript isn't
+    // reachable via AssetDatabase.LoadAssetAtPath. Scan the runtime
+    // MonoScript registry to find it.
+    private static MonoScript GetMonoScriptForType(System.Type type)
+    {
+        foreach (var script in MonoImporter.GetAllRuntimeMonoScripts())
+        {
+            if (script != null && script.GetClass() == type)
+                return script;
+        }
+        return null;
     }
 }
 #endif
