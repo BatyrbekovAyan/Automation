@@ -72,7 +72,8 @@ public class Bot : MonoBehaviour
 
     private void OpenSettings()
     {
-        BotsPage.Instance.gameObject.SetActive(false);
+        // Keep BotsPage active during the slide-in so its parallax is visible.
+        // It is deactivated in the slide-in onComplete callback below.
         Manager.BotSettingsParentStatic.transform.parent.gameObject.SetActive(true);
 
         if (Manager.BotSettingsParentStatic.transform.childCount != 0)
@@ -91,9 +92,27 @@ public class Bot : MonoBehaviour
                 }
             }
         }
+
+        if (SwipeToBackBotSettings.Instance != null)
+        {
+            SwipeToBackBotSettings.Instance.SlideInFromRight(() =>
+            {
+                if (BotsPage.Instance != null)
+                    BotsPage.Instance.gameObject.SetActive(false);
+            });
+        }
+        else
+        {
+            Debug.LogWarning("[Bot.OpenSettings] SwipeToBackBotSettings.Instance is null — " +
+                             "falling back to instant open. Run Tools/Bot Settings/Wire Swipe Back.");
+            if (BotsPage.Instance != null) BotsPage.Instance.gameObject.SetActive(false);
+        }
     }
 
-    private void DeleteBot()
+    // Made public so BotSettings' in-page Delete flow can reuse the exact
+    // same teardown (PlayerPrefs cleanup + profile/workflow deletes + destroy
+    // both the Bot card and its paired BotSettings GameObject).
+    public void DeleteBot()
     {
         if (PlayerPrefs.HasKey(transform.name + "Name"))
         {
