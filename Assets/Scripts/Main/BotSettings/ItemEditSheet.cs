@@ -87,6 +87,15 @@ namespace Automation.BotSettingsUI
         // if Select fires first, Blur bails via this guard; if Blur fires
         // first, HandleFieldSelected clears dismissingKeyboard after.
         private int lastSelectedFrame = -1;
+        // The field most recently selected. Paired with lastSelectedFrame
+        // to detect TMP_InputField's iOS quirk where a synthetic OnSubmit
+        // fires on the newly focused field one frame after a field-switch
+        // (the keyboard's resignFirstResponder/becomeFirstResponder dance
+        // gets routed to whoever's currently selected via OnSubmit). Blur
+        // on the just-selected field within selectRecencyFramesForBlurSkip
+        // frames is treated as this artifact and skipped.
+        private EditableField lastSelectedField;
+        private const int selectRecencyFramesForBlurSkip = 2;
         // Which field most recently fired Blurred. Used by Update()'s
         // focus-regain fallback to distinguish a real field-switch (another
         // field is focused — clear bypass) from stale input.isFocused reports
@@ -328,6 +337,7 @@ namespace Automation.BotSettingsUI
             lastFocusedField = null;
             lastBlurredField = null;
             lastSelectedFrame = -1;
+            lastSelectedField = null;
             // Reset the debounce so a freshly-shown sheet doesn't inherit a
             // "held" keyboard height from a previous session.
             heldKeyboardHeight = 0f;
@@ -450,9 +460,26 @@ namespace Automation.BotSettingsUI
                       $"f={Time.frameCount} lastSelF={lastSelectedFrame} " +
                       $"dismissingKB={dismissingKeyboard} heldKB={heldKeyboardHeight}");
             if (mode != SheetMode.Shown) return;
+            // Same-frame guard: old field's blur during a field-switch.
             if (Time.frameCount == lastSelectedFrame)
             {
                 Debug.Log($"[KB] HandleFieldBlurred SKIPPED (same frame as Select — field-switch)");
+                return;
+            }
+            // iOS field-switch-OnSubmit artifact guard: when the user switches
+            // from input A to input B on iOS, TMP_InputField fires a synthetic
+            // OnSubmit on B one frame after B's Select. OnSubmit calls
+            // DeactivateInputField → onEndEdit → Blur, and the spurious Blur
+            // on the newly focused field trips the bypass, which starts a
+            // descent before EditableField.Update can synthesize a Select back.
+            // Suppress Blurs that hit the just-selected field within a few
+            // frames — physically impossible for a human to press Done that
+            // fast (needs 100+ ms / 6+ frames of reaction time).
+            int framesSinceSelect = Time.frameCount - lastSelectedFrame;
+            if (blurred == lastSelectedField && framesSinceSelect <= selectRecencyFramesForBlurSkip)
+            {
+                Debug.Log($"[KB] HandleFieldBlurred SKIPPED (iOS field-switch OnSubmit on just-selected field, " +
+                          $"framesSinceSelect={framesSinceSelect})");
                 return;
             }
             lastBlurredField = blurred;
@@ -466,14 +493,16 @@ namespace Automation.BotSettingsUI
         // Called when any of the three EditableFields fires its Selected event.
         // The user tapped a field — they want the keyboard back. Clear the
         // dismissal bypass so Update()'s polling can refill heldKeyboardHeight
-        // and lift the sheet. Also records the frame so HandleFieldBlurred can
-        // detect a same-frame field-switch and skip setting the flag.
+        // and lift the sheet. Also records the frame + field so
+        // HandleFieldBlurred can detect both same-frame field-switches and
+        // the iOS OnSubmit-on-newly-selected-field artifact.
         private void HandleFieldSelected(EditableField selected)
         {
             Debug.Log($"[KB] HandleFieldSelected({selected.name}) mode={mode} " +
                       $"f={Time.frameCount} dismissingKB={dismissingKeyboard}");
             if (mode != SheetMode.Shown) return;
             lastSelectedFrame = Time.frameCount;
+            lastSelectedField = selected;
             if (dismissingKeyboard)
             {
                 dismissingKeyboard = false;
