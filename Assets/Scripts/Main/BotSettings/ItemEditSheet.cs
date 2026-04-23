@@ -87,6 +87,11 @@ namespace Automation.BotSettingsUI
         // if Select fires first, Blur bails via this guard; if Blur fires
         // first, HandleFieldSelected clears dismissingKeyboard after.
         private int lastSelectedFrame = -1;
+        // Which field most recently fired Blurred. Used by Update()'s
+        // focus-regain fallback to distinguish a real field-switch (another
+        // field is focused — clear bypass) from stale input.isFocused reports
+        // on the same field after Blur (leave bypass alone).
+        private EditableField lastBlurredField;
 
         private ProductCardView boundProduct;
         private ServiceCardView boundService;
@@ -144,6 +149,23 @@ namespace Automation.BotSettingsUI
             // dip. Stickiness keeps the lift stable across field switches.
             var focused = GetFocusedField();
             if (focused != null) lastFocusedField = focused;
+
+            // Field-switch fallback: if a *different* field is currently
+            // focused while dismissingKeyboard is set, the user tapped another
+            // input and TMP_InputField on iOS failed to fire onSelect on the
+            // new field (known quirk). EventSystem moved the selection so
+            // input.isFocused reads true on B, but neither HandleFieldSelected
+            // nor the same-frame guard caught it. Clear the bypass before the
+            // descent tween gets issued, avoiding the yo-yo.
+            // Same-field focused (== lastBlurredField) is ignored here — it's
+            // either a stale-true read or a genuine re-tap, both handled by
+            // the synthesize-Select path in EditableField.Update.
+            if (dismissingKeyboard && focused != null && focused != lastBlurredField)
+            {
+                Debug.Log($"[KB] dismissingKeyboard CLEARED via Update focus-regain " +
+                          $"(focused={focused.name}, lastBlurred={(lastBlurredField != null ? lastBlurredField.name : "null")}) f={Time.frameCount}");
+                dismissingKeyboard = false;
+            }
 
             // Debounce the "keyboard is down" signal. During a field-to-field
             // focus switch, the OS briefly reports the keyboard as gone for
@@ -304,6 +326,8 @@ namespace Automation.BotSettingsUI
             transform.SetAsLastSibling();
             isShown = true;
             lastFocusedField = null;
+            lastBlurredField = null;
+            lastSelectedFrame = -1;
             // Reset the debounce so a freshly-shown sheet doesn't inherit a
             // "held" keyboard height from a previous session.
             heldKeyboardHeight = 0f;
@@ -431,6 +455,7 @@ namespace Automation.BotSettingsUI
                 Debug.Log($"[KB] HandleFieldBlurred SKIPPED (same frame as Select — field-switch)");
                 return;
             }
+            lastBlurredField = blurred;
             heldKeyboardHeight = 0f;
             lastPositiveKeyboardTime = float.NegativeInfinity;
             dismissingKeyboard = true;
