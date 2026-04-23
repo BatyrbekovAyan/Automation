@@ -67,6 +67,13 @@ namespace Automation.BotSettingsUI
         // Coroutine handle for the one-frame post-blur check. We hold it so a
         // rapid second blur cancels the first check (only the most recent matters).
         private Coroutine pendingDismissCheck;
+        // Set true by the dismissal coroutine after it confirms an explicit
+        // keyboard dismissal (Done key / outside-tap). While true, Update()
+        // ignores positive height readings — iOS reports the keyboard as still
+        // visible during its ~250 ms dismissal animation, which would yo-yo the
+        // sheet back up and undo the bypass. Cleared when the OS finally agrees
+        // the keyboard is down (rawKeyboard <= 0) or when a field re-focuses.
+        private bool dismissingKeyboard;
 
         private ProductCardView boundProduct;
         private ServiceCardView boundService;
@@ -123,13 +130,27 @@ namespace Automation.BotSettingsUI
             var focused = GetFocusedField();
             if (focused != null) lastFocusedField = focused;
 
+            // If a field re-focused mid-dismissal (user tapped another input
+            // while the keyboard was animating away), abandon the dismissal
+            // suppression and let normal polling lift the sheet again.
+            if (dismissingKeyboard && focused != null) dismissingKeyboard = false;
+
             // Debounce the "keyboard is down" signal. During a field-to-field
             // focus switch, the OS briefly reports the keyboard as gone for
             // 1–3 frames even though it stays visible to the user. Hold the
             // last positive height until the OS has reported zero for longer
             // than keyboardDownConfirmSeconds.
             float rawKeyboard = GetKeyboardHeightCanvas();
-            if (rawKeyboard > 0f)
+            if (dismissingKeyboard)
+            {
+                // The dismissal coroutine zeroed heldKeyboardHeight already.
+                // Do NOT re-fill from polling — iOS keeps reporting a non-zero
+                // height during the ~250 ms dismissal animation, which would
+                // yo-yo the sheet right back up. Hold zero until the OS finally
+                // confirms the keyboard is fully down.
+                if (rawKeyboard <= 0f) dismissingKeyboard = false;
+            }
+            else if (rawKeyboard > 0f)
             {
                 heldKeyboardHeight = rawKeyboard;
                 lastPositiveKeyboardTime = Time.unscaledTime;
@@ -263,6 +284,7 @@ namespace Automation.BotSettingsUI
             // "held" keyboard height from a previous session.
             heldKeyboardHeight = 0f;
             lastPositiveKeyboardTime = float.NegativeInfinity;
+            dismissingKeyboard = false;
             mode = SheetMode.Showing;
             // Clear the Update pipeline's memory of any prior tween target
             // so the first frame after slide-in issues a fresh tween if the
@@ -395,9 +417,14 @@ namespace Automation.BotSettingsUI
 
             // Explicit dismissal: bypass the 0.15 s height-debounce so Update()
             // retweens toward baselineY on the next tick using the existing
-            // keyboardFollowDuration / OutQuad path.
+            // keyboardFollowDuration / OutQuad path. Also raise the
+            // dismissingKeyboard flag so Update() ignores positive height
+            // readings during the OS dismissal animation — without this, iOS
+            // refills heldKeyboardHeight from its still-positive area.height
+            // and the sheet yo-yos back up.
             heldKeyboardHeight = 0f;
             lastPositiveKeyboardTime = float.NegativeInfinity;
+            dismissingKeyboard = true;
         }
     }
 }
