@@ -79,6 +79,14 @@ namespace Automation.BotSettingsUI
         // mid-animation. Re-focus (Selected event) clears it immediately
         // regardless of this floor, so re-tapping the same field still works.
         private const float suppressionFloorSeconds = 0.3f;
+        // Frame in which HandleFieldSelected last fired. Used to skip setting
+        // the bypass in HandleFieldBlurred if a Select happened in the same
+        // frame — that means a field-switch is in progress and the keyboard
+        // stays up, so we must NOT start a dismissal. Handles both event
+        // orderings (Blur-then-Select AND Select-then-Blur) symmetrically:
+        // if Select fires first, Blur bails via this guard; if Blur fires
+        // first, HandleFieldSelected clears dismissingKeyboard after.
+        private int lastSelectedFrame = -1;
 
         private ProductCardView boundProduct;
         private ServiceCardView boundService;
@@ -158,6 +166,8 @@ namespace Automation.BotSettingsUI
                     Time.unscaledTime - dismissalStartTime > suppressionFloorSeconds)
                 {
                     dismissingKeyboard = false;
+                    Debug.Log($"[KB] dismissingKeyboard CLEARED via floor+rawKB<=0 " +
+                              $"f={Time.frameCount} elapsed={Time.unscaledTime - dismissalStartTime:F3}");
                 }
             }
             else if (rawKeyboard > 0f)
@@ -178,6 +188,10 @@ namespace Automation.BotSettingsUI
             // OutQuad ease into a linear-looking motion.
             if (!Mathf.Approximately(activeTargetY, target))
             {
+                Debug.Log($"[KB] TWEEN issued target={target:F1} prev={activeTargetY:F1} " +
+                          $"focused={(focused != null ? focused.name : "null")} " +
+                          $"dismissingKB={dismissingKeyboard} rawKB={rawKeyboard:F1} " +
+                          $"heldKB={heldKeyboardHeight:F1} f={Time.frameCount}");
                 activeTargetY = target;
                 activePosTween?.Kill();
                 activePosTween = sheetRoot.DOAnchorPosY(target, keyboardFollowDuration)
@@ -404,28 +418,42 @@ namespace Automation.BotSettingsUI
         // Sets dismissingKeyboard immediately and zeros the height state so the
         // very next Update() tweens the sheet toward baselineY without waiting
         // for the OS height-debounce or for iOS's lying TouchScreenKeyboard.area
-        // to drop. Field-switches and same-field re-focuses are handled by the
-        // companion HandleFieldSelected — Selected fires synchronously on tap
-        // and clears the bypass before Update() can drop the sheet.
+        // to drop. Skips the bypass entirely if a Select happened in the same
+        // frame — that's a field-switch, keyboard stays up, sheet must stay.
         private void HandleFieldBlurred(EditableField blurred)
         {
+            Debug.Log($"[KB] HandleFieldBlurred({blurred.name}) mode={mode} " +
+                      $"f={Time.frameCount} lastSelF={lastSelectedFrame} " +
+                      $"dismissingKB={dismissingKeyboard} heldKB={heldKeyboardHeight}");
             if (mode != SheetMode.Shown) return;
+            if (Time.frameCount == lastSelectedFrame)
+            {
+                Debug.Log($"[KB] HandleFieldBlurred SKIPPED (same frame as Select — field-switch)");
+                return;
+            }
             heldKeyboardHeight = 0f;
             lastPositiveKeyboardTime = float.NegativeInfinity;
             dismissingKeyboard = true;
             dismissalStartTime = Time.unscaledTime;
+            Debug.Log($"[KB] dismissingKeyboard SET TRUE at t={Time.unscaledTime:F3}");
         }
 
         // Called when any of the three EditableFields fires its Selected event.
         // The user tapped a field — they want the keyboard back. Clear the
         // dismissal bypass so Update()'s polling can refill heldKeyboardHeight
-        // and lift the sheet. This is the *only* path that clears the bypass
-        // before suppressionFloorSeconds elapses, so iOS's mid-animation
-        // rawKeyboard flicker can no longer end the bypass early.
+        // and lift the sheet. Also records the frame so HandleFieldBlurred can
+        // detect a same-frame field-switch and skip setting the flag.
         private void HandleFieldSelected(EditableField selected)
         {
+            Debug.Log($"[KB] HandleFieldSelected({selected.name}) mode={mode} " +
+                      $"f={Time.frameCount} dismissingKB={dismissingKeyboard}");
             if (mode != SheetMode.Shown) return;
-            dismissingKeyboard = false;
+            lastSelectedFrame = Time.frameCount;
+            if (dismissingKeyboard)
+            {
+                dismissingKeyboard = false;
+                Debug.Log($"[KB] dismissingKeyboard CLEARED via Select");
+            }
         }
     }
 }

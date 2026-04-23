@@ -73,12 +73,17 @@ namespace Automation.BotSettingsUI
 
         private void HandleSelect(string _)
         {
-            if (isFocused) return;
+            if (isFocused)
+            {
+                Debug.Log($"[KB] {name}.HandleSelect SKIPPED (already isFocused=true) f={Time.frameCount}");
+                return;
+            }
             isFocused = true;
             focusValue = input.text;
             OnFocused();
             if (scrim != null)
                 scrim.Show(GetComponent<RectTransform>(), () => Blur(commit: true));
+            Debug.Log($"[KB] {name}.Selected firing f={Time.frameCount}");
             Selected?.Invoke(this);
         }
 
@@ -86,7 +91,11 @@ namespace Automation.BotSettingsUI
 
         public void Blur(bool commit)
         {
-            if (!isFocused) return;
+            if (!isFocused)
+            {
+                Debug.Log($"[KB] {name}.Blur SKIPPED (isFocused=false) f={Time.frameCount}");
+                return;
+            }
             isFocused = false;
 
             var current = input.text;
@@ -96,6 +105,7 @@ namespace Automation.BotSettingsUI
             input.DeactivateInputField();
             if (scrim != null && scrim.IsShowing) scrim.Hide();
             OnBlurred();
+            Debug.Log($"[KB] {name}.Blurred firing f={Time.frameCount} inputIsFocused={input.isFocused}");
             Blurred?.Invoke(this);
         }
 
