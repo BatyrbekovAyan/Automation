@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
@@ -64,15 +63,12 @@ namespace Automation.BotSettingsUI
         // otherwise every Update would churn the tween and progress resets.
         private float activeTargetY = float.NaN;
         private Tween activePosTween;
-        // Coroutine handle for the one-frame post-blur check. We hold it so a
-        // rapid second blur cancels the first check (only the most recent matters).
-        private Coroutine pendingDismissCheck;
-        // Set true by the dismissal coroutine after it confirms an explicit
-        // keyboard dismissal (Done key / outside-tap). While true, Update()
-        // ignores positive height readings — iOS reports the keyboard as still
-        // visible during its ~250 ms dismissal animation, which would yo-yo the
-        // sheet back up and undo the bypass. Cleared when the OS finally agrees
-        // the keyboard is down (rawKeyboard <= 0) or when a field re-focuses.
+        // Set true by HandleFieldBlurred when any field blurs. While true,
+        // Update() ignores positive keyboard-height readings — iOS keeps
+        // reporting the keyboard as visible during its ~250 ms dismissal
+        // animation, which would yo-yo the sheet back up and undo the bypass.
+        // Cleared when the OS finally agrees the keyboard is down
+        // (rawKeyboard <= 0) or when a field re-focuses (field-switch).
         private bool dismissingKeyboard;
 
         private ProductCardView boundProduct;
@@ -390,38 +386,17 @@ namespace Automation.BotSettingsUI
         }
 
         // Called when any of the three EditableFields fires its Blurred event.
-        // Schedules a one-frame check: if no field gains focus, the user
-        // dismissed the keyboard (Done key, outside-tap), so we drop the sheet
-        // immediately instead of waiting for the OS keyboard-height debounce.
+        // Sets dismissingKeyboard immediately and zeros the height state so the
+        // very next Update() tweens the sheet toward baselineY without waiting
+        // for the OS height-debounce or for iOS's lying TouchScreenKeyboard.area
+        // to drop. Field-switches are absorbed by Update()'s focus-regain clear:
+        // when the next field gains focus on the same frame, Update() sees
+        // dismissingKeyboard=true AND focused!=null, clears the flag, and
+        // refills heldKeyboardHeight from polling — keeping the sheet lifted
+        // with no visible dip.
         private void HandleFieldBlurred()
         {
             if (mode != SheetMode.Shown) return;
-            if (pendingDismissCheck != null) StopCoroutine(pendingDismissCheck);
-            pendingDismissCheck = StartCoroutine(CheckDismissalNextFrame());
-        }
-
-        private IEnumerator CheckDismissalNextFrame()
-        {
-            // Yield one frame so any same-frame field-switch select() handlers
-            // can mark the next field focused before we read focus state.
-            yield return null;
-            pendingDismissCheck = null;
-
-            // If we're no longer Shown (e.g., Hide() ran during the wait),
-            // skip — the sheet is already animating off.
-            if (mode != SheetMode.Shown) yield break;
-
-            // If another field grabbed focus, this was a field-switch, not a
-            // dismissal. Leave the existing height-debounce path in charge.
-            if (GetFocusedField() != null) yield break;
-
-            // Explicit dismissal: bypass the 0.15 s height-debounce so Update()
-            // retweens toward baselineY on the next tick using the existing
-            // keyboardFollowDuration / OutQuad path. Also raise the
-            // dismissingKeyboard flag so Update() ignores positive height
-            // readings during the OS dismissal animation — without this, iOS
-            // refills heldKeyboardHeight from its still-positive area.height
-            // and the sheet yo-yos back up.
             heldKeyboardHeight = 0f;
             lastPositiveKeyboardTime = float.NegativeInfinity;
             dismissingKeyboard = true;
