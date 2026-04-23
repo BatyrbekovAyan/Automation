@@ -30,17 +30,24 @@ namespace Automation.BotSettingsUI
         [SerializeField] private float slideDuration = 0.25f;
         [SerializeField] private float scrimAlpha = 0.5f;
         [Tooltip("Canvas-unit reduction applied to the measured keyboard height. " +
-                 "Raise this (e.g. 80-160) if the lift appears to overshoot on device.")]
-        [SerializeField] private float liftReduction = 0f;
-        [Tooltip("Canvas-unit height of the iOS accessory bar above the keyboard. " +
-                 "Subtracted when the focused field has 'Hide Mobile Input' enabled, " +
-                 "because TouchScreenKeyboard.area still reports that invisible bar. " +
-                 "~44pt at reference 1x; tune if your canvas scale differs.")]
-        [SerializeField] private float hiddenMobileInputBarHeight = 44f;
+                 "iOS still reports the (now invisible) accessory bar's height in " +
+                 "TouchScreenKeyboard.area.height when fields have 'Hide Mobile Input' " +
+                 "enabled, so subtract it here. ~44 at reference 1x; tune if your " +
+                 "canvas scale differs or the lift overshoots on device.")]
+        [SerializeField] private float liftReduction = 44f;
 
-        [Tooltip("SmoothDamp time (s) used to track the keyboard while the sheet is shown. " +
-                 "0.12 matches the Apple native keyboard spring — same value used by KeyboardAwarePanel.")]
-        [SerializeField] private float keyboardFollowSmoothTime = 0.12f;
+        [Tooltip("DOTween duration (s) for keyboard-follow moves. Each time the measured " +
+                 "keyboard height changes, the sheet retweens to the new target over this " +
+                 "duration with an OutQuad ease. Shorter = snappier but potentially jittery; " +
+                 "longer = smoother but laggier. 0.10–0.12 matches the native keyboard feel.")]
+        [SerializeField] private float keyboardFollowDuration = 0.1f;
+
+        [Tooltip("Seconds the OS must consistently report the keyboard as down before " +
+                 "we actually drop the sheet. Absorbs the 1-3 frame blip where " +
+                 "TouchScreenKeyboard.visible / the Android IME measurement briefly " +
+                 "reports 0 between DeactivateInputField on field A and ActivateInputField " +
+                 "on field B. Without this the sheet dips visibly on every field switch.")]
+        [SerializeField] private float keyboardDownConfirmSeconds = 0.15f;
 
         private enum SheetMode { Hidden, Showing, Shown, Hiding }
 
@@ -49,8 +56,13 @@ namespace Automation.BotSettingsUI
         private bool isShown;
         private EditableField lastFocusedField;
         private SheetMode mode = SheetMode.Hidden;
-        private float currentLiftedY;
-        private float liftVelocity;
+        private float heldKeyboardHeight;
+        private float lastPositiveKeyboardTime;
+        // Tracks the target the active sheet-position tween is aiming at, so
+        // we only kill-and-reissue a tween when the target actually shifts —
+        // otherwise every Update would churn the tween and progress resets.
+        private float activeTargetY = float.NaN;
+        private Tween activePosTween;
 
         private ProductCardView boundProduct;
         private ServiceCardView boundService;
@@ -83,25 +95,46 @@ namespace Automation.BotSettingsUI
 
         private void Update()
         {
-            if (!isShown || sheetRoot == null || mode != SheetMode.Shown) return;
+            if (sheetRoot == null || mode != SheetMode.Shown) return;
 
-            // Track which field is currently focused so the mobile-input-bar
-            // subtraction in GetKeyboardHeightCanvas has fresh context.
-            lastFocusedField = GetFocusedField();
+            // Sticky focus tracking: only overwrite when a field is actually
+            // focused. When the user taps from one input to another, a few
+            // frames report no focused field while the OS keyboard is still
+            // up; clearing lastFocusedField in that gap would cause a visible
+            // dip. Stickiness keeps the lift stable across field switches.
+            var focused = GetFocusedField();
+            if (focused != null) lastFocusedField = focused;
 
-            float targetKeyboard = GetKeyboardHeightCanvas();
-            float effectiveLift = Mathf.Max(0f, targetKeyboard - liftReduction);
-            float targetY = baselineY + effectiveLift;
+            // Debounce the "keyboard is down" signal. During a field-to-field
+            // focus switch, the OS briefly reports the keyboard as gone for
+            // 1–3 frames even though it stays visible to the user. Hold the
+            // last positive height until the OS has reported zero for longer
+            // than keyboardDownConfirmSeconds.
+            float rawKeyboard = GetKeyboardHeightCanvas();
+            if (rawKeyboard > 0f)
+            {
+                heldKeyboardHeight = rawKeyboard;
+                lastPositiveKeyboardTime = Time.unscaledTime;
+            }
+            else if (Time.unscaledTime - lastPositiveKeyboardTime > keyboardDownConfirmSeconds)
+            {
+                heldKeyboardHeight = 0f;
+            }
 
-            currentLiftedY = Mathf.SmoothDamp(
-                currentLiftedY, targetY,
-                ref liftVelocity,
-                keyboardFollowSmoothTime,
-                Mathf.Infinity,
-                Time.unscaledDeltaTime
-            );
+            float effectiveLift = Mathf.Max(0f, heldKeyboardHeight - liftReduction);
+            float target = baselineY + effectiveLift;
 
-            sheetRoot.anchoredPosition = new Vector2(sheetRoot.anchoredPosition.x, currentLiftedY);
+            // Only reissue the tween when the target has meaningfully shifted.
+            // This prevents per-frame kill/restart that would stutter the
+            // OutQuad ease into a linear-looking motion.
+            if (!Mathf.Approximately(activeTargetY, target))
+            {
+                activeTargetY = target;
+                activePosTween?.Kill();
+                activePosTween = sheetRoot.DOAnchorPosY(target, keyboardFollowDuration)
+                    .SetEase(Ease.OutQuad)
+                    .SetUpdate(UpdateType.Normal, isIndependentUpdate: true);
+            }
         }
 
         private EditableField GetFocusedField()
@@ -114,13 +147,11 @@ namespace Automation.BotSettingsUI
 
         private float GetKeyboardHeightCanvas()
         {
-            // No focused field → no keyboard is actually up → no lift.
-            // Without this guard the fallback branches below can fire every
-            // frame (0.4 * Screen.height) and shove the sheet off-screen,
-            // preventing the user from ever tapping a field to open the
-            // keyboard in the first place.
-            if (lastFocusedField == null) return 0f;
-
+            // EstimateKeyboardHeightPixels now returns 0 whenever the OS
+            // reports the keyboard is down, so no focus-based gate is
+            // needed here. The previous gate ("if lastFocusedField == null
+            // return 0") caused the sheet to drop during field-to-field
+            // focus switches where the keyboard actually stays up.
             float heightPx = EstimateKeyboardHeightPixels();
             if (heightPx <= 0f) return 0f;
 
@@ -132,32 +163,21 @@ namespace Automation.BotSettingsUI
             float adjustedPx = Mathf.Max(0f, heightPx - safeBottomPx);
 
             float scale = (canvas != null && canvas.scaleFactor > 0f) ? canvas.scaleFactor : 1f;
-            float heightCanvas = adjustedPx / scale;
-
-            // When the focused field hides its mobile input accessory bar,
-            // iOS still reports the bar's height as part of area.height —
-            // producing a gap the size of the (now invisible) bar above the
-            // keyboard. Subtract it in canvas space.
-            if (FocusedFieldHidesMobileInput())
-                heightCanvas = Mathf.Max(0f, heightCanvas - hiddenMobileInputBarHeight);
-
-            return heightCanvas;
-        }
-
-        private bool FocusedFieldHidesMobileInput()
-        {
-            var field = lastFocusedField != null ? lastFocusedField : GetFocusedField();
-            return field != null
-                && field.InputField != null
-                && field.InputField.shouldHideMobileInput;
+            return adjustedPx / scale;
         }
 
         private static float EstimateKeyboardHeightPixels()
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
-            float measured = MeasureKeyboardHeightAndroid();
-            return measured > 0f ? measured : Screen.height * 0.4f;
+            // JNI measurement returns 0 whenever the keyboard is down, so
+            // no fallback is needed. Firing the 0.4 * Screen.height fallback
+            // when the keyboard is genuinely down would push the sheet off
+            // screen whenever the user tapped outside or pressed "Done".
+            return MeasureKeyboardHeightAndroid();
 #elif UNITY_IOS && !UNITY_EDITOR
+            // Gate the fallback on TouchScreenKeyboard.visible so it only
+            // fires while the OS keyboard is actually on screen.
+            if (!TouchScreenKeyboard.visible) return 0f;
             float area = TouchScreenKeyboard.area.height;
             return area > 0f ? area : Screen.height * 0.4f;
 #else
@@ -221,22 +241,32 @@ namespace Automation.BotSettingsUI
             transform.SetAsLastSibling();
             isShown = true;
             lastFocusedField = null;
+            // Reset the debounce so a freshly-shown sheet doesn't inherit a
+            // "held" keyboard height from a previous session.
+            heldKeyboardHeight = 0f;
+            lastPositiveKeyboardTime = float.NegativeInfinity;
             mode = SheetMode.Showing;
+            // Clear the Update pipeline's memory of any prior tween target
+            // so the first frame after slide-in issues a fresh tween if the
+            // keyboard is already (or still) on screen.
+            activeTargetY = float.NaN;
 
             if (scrimBehind != null)
             {
                 scrimBehind.SetActive(true);
                 scrimBehindGroup.alpha = 0f;
+                scrimBehindGroup.DOKill();
                 scrimBehindGroup.DOFade(scrimAlpha, slideDuration).SetEase(Ease.OutQuad);
             }
-            sheetRoot.DOKill();
-            sheetRoot.DOAnchorPos(shownAnchored, slideDuration)
+
+            activePosTween?.Kill();
+            activePosTween = sheetRoot.DOAnchorPos(shownAnchored, slideDuration)
                 .SetEase(Ease.OutCubic)
                 .OnComplete(() =>
                 {
                     mode = SheetMode.Shown;
-                    currentLiftedY = baselineY;
-                    liftVelocity = 0f;
+                    activeTargetY = shownAnchored.y;
+                    activePosTween = null;
                 });
         }
 
@@ -245,32 +275,43 @@ namespace Automation.BotSettingsUI
             isShown = false;
             lastFocusedField = null;
             mode = SheetMode.Hiding;
-            liftVelocity = 0f;
+            activeTargetY = float.NaN;
 
-            sheetRoot.DOKill();
-            sheetRoot.DOAnchorPos(hiddenAnchored, slideDuration).SetEase(Ease.InCubic);
+            // Start the slide-off IMMEDIATELY on the same frame as the user's
+            // tap. The sheet and keyboard then begin descending together.
+            //
+            // Trying to drive this via Update + keyboard-height polling
+            // doesn't work: iOS's TouchScreenKeyboard.area.height stays at
+            // full value during the dismissal animation and only jumps to 0
+            // after the keyboard is already off-screen, which is exactly the
+            // "sheet starts sliding only after keyboard is gone" bug. On
+            // Android the height animates, but the down-confirm debounce
+            // window (needed to absorb field-switch blips in Shown mode) adds
+            // its own delay. Committing to the off-screen target here and
+            // letting DOTween drive it is the only reliable way to sync the
+            // start moment with the keyboard dismissal across platforms.
+            activePosTween?.Kill();
+            activePosTween = sheetRoot.DOAnchorPos(hiddenAnchored, slideDuration)
+                .SetEase(Ease.OutQuad)
+                .SetUpdate(UpdateType.Normal, isIndependentUpdate: true)
+                .OnComplete(() =>
+                {
+                    gameObject.SetActive(false);
+                    mode = SheetMode.Hidden;
+                    activePosTween = null;
+                });
+
+            // Scrim fade runs in parallel on its own timeline — purely
+            // cosmetic backdrop so it doesn't need to wait on the sheet.
             if (scrimBehind != null)
             {
+                scrimBehindGroup.DOKill();
                 scrimBehindGroup.DOFade(0f, slideDuration).SetEase(Ease.InQuad)
-                    .OnComplete(() =>
-                    {
-                        scrimBehind.SetActive(false);
-                        gameObject.SetActive(false);
-                        mode = SheetMode.Hidden;
-                    });
+                    .OnComplete(() => scrimBehind.SetActive(false));
             }
-            else
-            {
-                Invoke(nameof(FinishHide), slideDuration);
-            }
+
             boundProduct = null;
             boundService = null;
-        }
-
-        private void FinishHide()
-        {
-            gameObject.SetActive(false);
-            mode = SheetMode.Hidden;
         }
 
         private void Commit()
