@@ -42,16 +42,6 @@ namespace Automation.BotSettingsUI
                  "longer = smoother but laggier. 0.10–0.12 matches the native keyboard feel.")]
         [SerializeField] private float keyboardFollowDuration = 0.1f;
 
-        [Tooltip("Duration (s) used ONLY for the very first lift in an app session. " +
-                 "iOS cold-starts the keyboard input session on first show (~250-300 ms " +
-                 "for RTI bridge / autocorrect / etc.) but TouchScreenKeyboard.area.height " +
-                 "reports the final height instantly, so the normal keyboardFollowDuration " +
-                 "(~100 ms) makes the sheet leap up while the keyboard is still rising. " +
-                 "Use ~0.25 here so the first lift visually matches the keyboard's actual " +
-                 "rise speed. Subsequent lifts (cached keyboard, ~100-150 ms) and all " +
-                 "descents use keyboardFollowDuration.")]
-        [SerializeField] private float firstLiftDuration = 0.25f;
-
         [Tooltip("Seconds the OS must consistently report the keyboard as down before " +
                  "we actually drop the sheet. Absorbs the 1-3 frame blip where " +
                  "TouchScreenKeyboard.visible / the Android IME measurement briefly " +
@@ -73,13 +63,6 @@ namespace Automation.BotSettingsUI
         // otherwise every Update would churn the tween and progress resets.
         private float activeTargetY = float.NaN;
         private Tween activePosTween;
-        // Static (per app session) — true once iOS has shown the keyboard at
-        // least once. The first show in an app session is a cold start
-        // (~250-300 ms iOS animation); subsequent shows are cached (~100-150 ms).
-        // Update() picks firstLiftDuration vs keyboardFollowDuration based on
-        // this flag so the sheet's lift speed matches the keyboard's actual
-        // rise speed for both cases.
-        private static bool hasShownKeyboardSinceAppStart;
         // Set true by HandleFieldBlurred when any field blurs. While true,
         // Update() ignores positive keyboard-height readings — iOS keeps
         // reporting the keyboard as visible (and TouchScreenKeyboard.area
@@ -236,24 +219,13 @@ namespace Automation.BotSettingsUI
             // OutQuad ease into a linear-looking motion.
             if (!Mathf.Approximately(activeTargetY, target))
             {
-                // Cold-start lift: iOS first-show takes ~250-300 ms but
-                // TouchScreenKeyboard.area.height reports the final height
-                // instantly, so the normal short follow duration makes the
-                // sheet leap up while the keyboard is still rising. Use the
-                // longer firstLiftDuration just for that very first lift.
-                bool isLift = target > sheetRoot.anchoredPosition.y;
-                float duration = (isLift && !hasShownKeyboardSinceAppStart)
-                    ? firstLiftDuration
-                    : keyboardFollowDuration;
-                if (isLift) hasShownKeyboardSinceAppStart = true;
-
                 Debug.Log($"[KB] TWEEN issued target={target:F1} prev={activeTargetY:F1} " +
                           $"focused={(focused != null ? focused.name : "null")} " +
                           $"dismissingKB={dismissingKeyboard} rawKB={rawKeyboard:F1} " +
-                          $"heldKB={heldKeyboardHeight:F1} dur={duration:F2} f={Time.frameCount}");
+                          $"heldKB={heldKeyboardHeight:F1} f={Time.frameCount}");
                 activeTargetY = target;
                 activePosTween?.Kill();
-                activePosTween = sheetRoot.DOAnchorPosY(target, duration)
+                activePosTween = sheetRoot.DOAnchorPosY(target, keyboardFollowDuration)
                     .SetEase(Ease.OutQuad)
                     .SetUpdate(UpdateType.Normal, isIndependentUpdate: true);
             }
