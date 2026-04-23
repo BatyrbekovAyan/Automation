@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
@@ -63,6 +64,9 @@ namespace Automation.BotSettingsUI
         // otherwise every Update would churn the tween and progress resets.
         private float activeTargetY = float.NaN;
         private Tween activePosTween;
+        // Coroutine handle for the one-frame post-blur check. We hold it so a
+        // rapid second blur cancels the first check (only the most recent matters).
+        private Coroutine pendingDismissCheck;
 
         private ProductCardView boundProduct;
         private ServiceCardView boundService;
@@ -91,6 +95,20 @@ namespace Automation.BotSettingsUI
             PopupUI.WireFingerUp(deleteConfirmNo, () => PopupUI.Hide(deleteConfirmPopup));
             if (scrimBehindFinger != null)
                 scrimBehindFinger.OnRealRelease += Hide;
+
+            // Subscribe to field blur events so an explicit keyboard-Done dismissal
+            // can bypass the 0.15 s height-debounce and descend in sync with the
+            // keyboard. See HandleFieldBlurred for the focus-check logic.
+            if (nameField != null) nameField.Blurred += HandleFieldBlurred;
+            if (priceField != null) priceField.Blurred += HandleFieldBlurred;
+            if (descField != null) descField.Blurred += HandleFieldBlurred;
+        }
+
+        private void OnDestroy()
+        {
+            if (nameField != null) nameField.Blurred -= HandleFieldBlurred;
+            if (priceField != null) priceField.Blurred -= HandleFieldBlurred;
+            if (descField != null) descField.Blurred -= HandleFieldBlurred;
         }
 
         private void Update()
@@ -347,6 +365,39 @@ namespace Automation.BotSettingsUI
                 Hide();
                 OnServiceDeleted?.Invoke(card);
             }
+        }
+
+        // Called when any of the three EditableFields fires its Blurred event.
+        // Schedules a one-frame check: if no field gains focus, the user
+        // dismissed the keyboard (Done key, outside-tap), so we drop the sheet
+        // immediately instead of waiting for the OS keyboard-height debounce.
+        private void HandleFieldBlurred()
+        {
+            if (mode != SheetMode.Shown) return;
+            if (pendingDismissCheck != null) StopCoroutine(pendingDismissCheck);
+            pendingDismissCheck = StartCoroutine(CheckDismissalNextFrame());
+        }
+
+        private IEnumerator CheckDismissalNextFrame()
+        {
+            // Yield one frame so any same-frame field-switch select() handlers
+            // can mark the next field focused before we read focus state.
+            yield return null;
+            pendingDismissCheck = null;
+
+            // If we're no longer Shown (e.g., Hide() ran during the wait),
+            // skip — the sheet is already animating off.
+            if (mode != SheetMode.Shown) yield break;
+
+            // If another field grabbed focus, this was a field-switch, not a
+            // dismissal. Leave the existing height-debounce path in charge.
+            if (GetFocusedField() != null) yield break;
+
+            // Explicit dismissal: bypass the 0.15 s height-debounce so Update()
+            // retweens toward baselineY on the next tick using the existing
+            // keyboardFollowDuration / OutQuad path.
+            heldKeyboardHeight = 0f;
+            lastPositiveKeyboardTime = float.NegativeInfinity;
         }
     }
 }
