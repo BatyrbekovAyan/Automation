@@ -23,6 +23,11 @@ namespace Automation.BotSettingsUI
         [Serializable] public class StringEvent : UnityEvent<string> { }
         public StringEvent OnCommitted = new StringEvent();
 
+        // Fires after Blur() runs (keyboard Done, outside-tap, programmatic blur).
+        // ItemEditSheet listens to this to bypass its keyboard-height debounce when
+        // the user explicitly dismisses the keyboard, so the sheet descends in sync.
+        public event Action Blurred;
+
         protected string focusValue;
         protected bool isFocused;
 
@@ -80,6 +85,7 @@ namespace Automation.BotSettingsUI
             input.DeactivateInputField();
             if (scrim != null && scrim.IsShowing) scrim.Hide();
             OnBlurred();
+            Blurred?.Invoke();
         }
 
         /// <summary>Overridable hook for EditableTextArea to hide header etc.</summary>
