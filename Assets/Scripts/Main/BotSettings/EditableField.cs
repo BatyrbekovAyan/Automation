@@ -24,9 +24,12 @@ namespace Automation.BotSettingsUI
         public StringEvent OnCommitted = new StringEvent();
 
         // Fires after Blur() runs (keyboard Done, outside-tap, programmatic blur).
-        // ItemEditSheet listens to this to bypass its keyboard-height debounce when
-        // the user explicitly dismisses the keyboard, so the sheet descends in sync.
-        public event Action Blurred;
+        // The argument is the field that just blurred (this), so consumers can
+        // distinguish a same-field re-focus from a real field-switch when they
+        // observe focus state on a later frame. ItemEditSheet uses this to keep
+        // the keyboard-dismissal bypass set even if input.isFocused reads
+        // stale-true after DeactivateInputField on second-and-later focus cycles.
+        public event Action<EditableField> Blurred;
 
         protected string focusValue;
         protected bool isFocused;
@@ -85,7 +88,7 @@ namespace Automation.BotSettingsUI
             input.DeactivateInputField();
             if (scrim != null && scrim.IsShowing) scrim.Hide();
             OnBlurred();
-            Blurred?.Invoke();
+            Blurred?.Invoke(this);
         }
 
         /// <summary>Overridable hook for EditableTextArea to hide header etc.</summary>
