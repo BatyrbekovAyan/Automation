@@ -31,6 +31,13 @@ namespace Automation.BotSettingsUI
         // stale-true after DeactivateInputField on second-and-later focus cycles.
         public event Action<EditableField> Blurred;
 
+        // Fires after HandleSelect runs (user tapped the field, programmatic
+        // focus). ItemEditSheet listens for this to clear its keyboard-
+        // dismissal bypass when the user genuinely re-focuses a field — using
+        // a fresh event signal instead of polling input.isFocused, which on
+        // iOS reads stale-true for one frame after DeactivateInputField.
+        public event Action<EditableField> Selected;
+
         protected string focusValue;
         protected bool isFocused;
 
@@ -72,6 +79,7 @@ namespace Automation.BotSettingsUI
             OnFocused();
             if (scrim != null)
                 scrim.Show(GetComponent<RectTransform>(), () => Blur(commit: true));
+            Selected?.Invoke(this);
         }
 
         private void HandleEndEdit(string _) => Blur(commit: true);

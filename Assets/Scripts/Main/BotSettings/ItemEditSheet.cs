@@ -65,16 +65,20 @@ namespace Automation.BotSettingsUI
         private Tween activePosTween;
         // Set true by HandleFieldBlurred when any field blurs. While true,
         // Update() ignores positive keyboard-height readings — iOS keeps
-        // reporting the keyboard as visible during its ~250 ms dismissal
+        // reporting the keyboard as visible (and TouchScreenKeyboard.area
+        // sometimes flickers to non-zero) during its ~250 ms dismissal
         // animation, which would yo-yo the sheet back up and undo the bypass.
-        // Cleared when the OS finally agrees the keyboard is down
-        // (rawKeyboard <= 0) or when a *different* field gains focus.
+        // Cleared by HandleFieldSelected when any field re-focuses, or by the
+        // floor-protected rawKeyboard <= 0 check in Update once at least
+        // suppressionFloorSeconds has elapsed since the bypass started.
         private bool dismissingKeyboard;
-        // Which field most recently fired Blurred. Used by Update()'s
-        // focus-regain check to distinguish a real field-switch (different
-        // field gains focus → clear the bypass) from TMP_InputField's stale
-        // isFocused report on the same field after Done (keep the bypass).
-        private EditableField lastBlurredField;
+        private float dismissalStartTime;
+        // Minimum time the bypass stays active before rawKeyboard <= 0 is
+        // allowed to clear it. Covers the worst-case iOS dismissal animation
+        // (~250 ms) plus a margin so flicker readings can't end the bypass
+        // mid-animation. Re-focus (Selected event) clears it immediately
+        // regardless of this floor, so re-tapping the same field still works.
+        private const float suppressionFloorSeconds = 0.3f;
 
         private ProductCardView boundProduct;
         private ServiceCardView boundService;
@@ -104,19 +108,21 @@ namespace Automation.BotSettingsUI
             if (scrimBehindFinger != null)
                 scrimBehindFinger.OnRealRelease += Hide;
 
-            // Subscribe to field blur events so an explicit keyboard-Done dismissal
-            // can bypass the 0.15 s height-debounce and descend in sync with the
-            // keyboard. See HandleFieldBlurred for the focus-check logic.
-            if (nameField != null) nameField.Blurred += HandleFieldBlurred;
-            if (priceField != null) priceField.Blurred += HandleFieldBlurred;
-            if (descField != null) descField.Blurred += HandleFieldBlurred;
+            // Subscribe to field blur events to set the dismissal bypass when
+            // the user dismisses the keyboard, and to field selected events to
+            // clear the bypass when the user re-focuses any field. The pair
+            // gives us a clean state-machine driven entirely by user-action
+            // signals — no reliance on iOS's lying TouchScreenKeyboard polling.
+            if (nameField != null) { nameField.Blurred += HandleFieldBlurred; nameField.Selected += HandleFieldSelected; }
+            if (priceField != null) { priceField.Blurred += HandleFieldBlurred; priceField.Selected += HandleFieldSelected; }
+            if (descField != null) { descField.Blurred += HandleFieldBlurred; descField.Selected += HandleFieldSelected; }
         }
 
         private void OnDestroy()
         {
-            if (nameField != null) nameField.Blurred -= HandleFieldBlurred;
-            if (priceField != null) priceField.Blurred -= HandleFieldBlurred;
-            if (descField != null) descField.Blurred -= HandleFieldBlurred;
+            if (nameField != null) { nameField.Blurred -= HandleFieldBlurred; nameField.Selected -= HandleFieldSelected; }
+            if (priceField != null) { priceField.Blurred -= HandleFieldBlurred; priceField.Selected -= HandleFieldSelected; }
+            if (descField != null) { descField.Blurred -= HandleFieldBlurred; descField.Selected -= HandleFieldSelected; }
         }
 
         private void Update()
@@ -131,17 +137,6 @@ namespace Automation.BotSettingsUI
             var focused = GetFocusedField();
             if (focused != null) lastFocusedField = focused;
 
-            // Abandon the dismissal suppression only if a *different* field
-            // gained focus (real field-switch — user tapped another input mid-
-            // dismissal). When the focused field is the same one that just
-            // blurred, treat that as TMP_InputField's stale isFocused report
-            // (common on iOS for second-and-later focus cycles of the same
-            // field) and keep the bypass — otherwise polling refills
-            // heldKeyboardHeight from iOS's lying area.height and the sheet
-            // sits there until the dismissal animation finishes.
-            if (dismissingKeyboard && focused != null && focused != lastBlurredField)
-                dismissingKeyboard = false;
-
             // Debounce the "keyboard is down" signal. During a field-to-field
             // focus switch, the OS briefly reports the keyboard as gone for
             // 1–3 frames even though it stays visible to the user. Hold the
@@ -150,12 +145,20 @@ namespace Automation.BotSettingsUI
             float rawKeyboard = GetKeyboardHeightCanvas();
             if (dismissingKeyboard)
             {
-                // The dismissal coroutine zeroed heldKeyboardHeight already.
-                // Do NOT re-fill from polling — iOS keeps reporting a non-zero
-                // height during the ~250 ms dismissal animation, which would
-                // yo-yo the sheet right back up. Hold zero until the OS finally
-                // confirms the keyboard is fully down.
-                if (rawKeyboard <= 0f) dismissingKeyboard = false;
+                // HandleFieldBlurred zeroed heldKeyboardHeight already. Do NOT
+                // refill from polling — iOS keeps reporting a non-zero height
+                // (and on subsequent dismissals, briefly flickers between 0
+                // and non-zero) during the ~250 ms dismissal animation, which
+                // would yo-yo the sheet right back up. Hold zero until either
+                // (a) HandleFieldSelected fires (user re-focused a field —
+                // immediate clear) or (b) suppressionFloorSeconds has elapsed
+                // AND rawKeyboard reads zero. The floor protects against
+                // mid-animation flicker readings ending the bypass early.
+                if (rawKeyboard <= 0f &&
+                    Time.unscaledTime - dismissalStartTime > suppressionFloorSeconds)
+                {
+                    dismissingKeyboard = false;
+                }
             }
             else if (rawKeyboard > 0f)
             {
@@ -287,12 +290,12 @@ namespace Automation.BotSettingsUI
             transform.SetAsLastSibling();
             isShown = true;
             lastFocusedField = null;
-            lastBlurredField = null;
             // Reset the debounce so a freshly-shown sheet doesn't inherit a
             // "held" keyboard height from a previous session.
             heldKeyboardHeight = 0f;
             lastPositiveKeyboardTime = float.NegativeInfinity;
             dismissingKeyboard = false;
+            dismissalStartTime = float.NegativeInfinity;
             mode = SheetMode.Showing;
             // Clear the Update pipeline's memory of any prior tween target
             // so the first frame after slide-in issues a fresh tween if the
@@ -401,20 +404,28 @@ namespace Automation.BotSettingsUI
         // Sets dismissingKeyboard immediately and zeros the height state so the
         // very next Update() tweens the sheet toward baselineY without waiting
         // for the OS height-debounce or for iOS's lying TouchScreenKeyboard.area
-        // to drop. Field-switches are absorbed by Update()'s focus-regain clear:
-        // when a *different* field gains focus on the same frame, Update() sees
-        // focused != lastBlurredField, clears the flag, and refills
-        // heldKeyboardHeight from polling — keeping the sheet lifted with no
-        // visible dip. Same-field stale isFocused reports (TMP_InputField
-        // quirk on iOS for second-and-later focus cycles) do NOT clear the
-        // flag, so the bypass survives the dismissal animation.
+        // to drop. Field-switches and same-field re-focuses are handled by the
+        // companion HandleFieldSelected — Selected fires synchronously on tap
+        // and clears the bypass before Update() can drop the sheet.
         private void HandleFieldBlurred(EditableField blurred)
         {
             if (mode != SheetMode.Shown) return;
-            lastBlurredField = blurred;
             heldKeyboardHeight = 0f;
             lastPositiveKeyboardTime = float.NegativeInfinity;
             dismissingKeyboard = true;
+            dismissalStartTime = Time.unscaledTime;
+        }
+
+        // Called when any of the three EditableFields fires its Selected event.
+        // The user tapped a field — they want the keyboard back. Clear the
+        // dismissal bypass so Update()'s polling can refill heldKeyboardHeight
+        // and lift the sheet. This is the *only* path that clears the bypass
+        // before suppressionFloorSeconds elapses, so iOS's mid-animation
+        // rawKeyboard flicker can no longer end the bypass early.
+        private void HandleFieldSelected(EditableField selected)
+        {
+            if (mode != SheetMode.Shown) return;
+            dismissingKeyboard = false;
         }
     }
 }
