@@ -64,6 +64,27 @@ namespace Automation.BotSettingsUI
             input.onEndEdit.AddListener(HandleEndEdit);
         }
 
+        private void Update()
+        {
+            // TMP_InputField on iOS doesn't reliably fire onSelect when the
+            // SAME input is re-tapped after being deselected (EventSystem
+            // activates the field and brings the keyboard back up, but the
+            // onSelect UnityEvent never invokes). Result: our isFocused flag
+            // stays stale-false, Blur() later sees !isFocused and early-
+            // returns without firing Blurred — the sheet misses the dismissal
+            // signal and lags through the slow debounce path.
+            //
+            // Poll input.isFocused each frame. When it flips to true behind
+            // our back, synthesize the select we didn't get. (input.isFocused
+            // is an EventSystem.currentSelectedGameObject comparison — cheap.)
+            if (input == null) return;
+            if (input.isFocused && !isFocused)
+            {
+                Debug.Log($"[KB] {name}.Update SYNTHESIZED Select (input.isFocused true, isFocused false) f={Time.frameCount}");
+                HandleSelect(null);
+            }
+        }
+
         protected virtual void OnDestroy()
         {
             if (input == null) return;
