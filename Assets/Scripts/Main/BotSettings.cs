@@ -16,10 +16,7 @@ public partial class BotSettings : MonoBehaviour
     [SerializeField] private Button ProductTabButton;
     [SerializeField] private Button ServiceTabButton;
     [SerializeField] private Button PromptTabButton;
-    [SerializeField] private RectTransform headerGroup;
     [SerializeField] private TextMeshProUGUI headerTitle;
-    [SerializeField] private RectTransform tabBarGroup;
-    [SerializeField] private FocusScrim mainScrim;
     [SerializeField] private Button saveButton;
     [SerializeField] private Button backButton;
     public Button SaveButton => saveButton;
@@ -74,47 +71,22 @@ public partial class BotSettings : MonoBehaviour
     [SerializeField] private Button deleteCancelButton;
     #endregion
 
-    #region Serialized — Auth (names preserved for Manager + auth partial)
-    [SerializeField] public GameObject WhatsappAuthorization;
-    [SerializeField] public GameObject WhatsappQRPanel;
-    [SerializeField] public GameObject WhatsappCodePanel;
-    [SerializeField] public GameObject TelegramAuthorization;
-    [SerializeField] public GameObject TelegramQRPanel;
-    [SerializeField] public GameObject TelegramCodePanel;
-    [SerializeField] private TextMeshProUGUI TelegramPhoneTitle;
-    [SerializeField] private TextMeshProUGUI TelegramPhoneBody;
+    #region Serialized — Change-number popups, save indicator, upload
+    // Auth itself (QR / code panels, number inputs, timers, done/back buttons)
+    // is now owned by Manager's shared auth page — see
+    // ShowWhatsappAuthFromSettings / ShowTelegramAuthFromSettings in the
+    // BotSettings.Auth partial. Only the "really change number?" popups,
+    // the Save indicator, and the per-tab list-upload buttons live in the
+    // BotSettings prefab now.
     [SerializeField] public GameObject Saved;
     [SerializeField] private GameObject ConfirmChangeWhatsappNumberPopup;
     [SerializeField] private GameObject ConfirmChangeTelegramNumberPopup;
-    [SerializeField] private GameObject WhatsappCodeTimer;
-    [SerializeField] private GameObject TelegramCodeTimer;
-    [SerializeField] public Button WhatsappAuthorizationBackButton;
-    [SerializeField] private Button WhatsappAuthorizationDoneBotton;
-    [SerializeField] private Button OpenWhatsappQRPanelButton;
-    [SerializeField] private Button OpenWhatsappCodePanelButton;
-    [SerializeField] private Button CloseWhatsappQRPanelButton;
-    [SerializeField] private Button CloseWhatsappCodePanelButton;
-    [SerializeField] private Button GetWhatsappCodeButton;
-    [SerializeField] public Button TelegramAuthorizationBackButton;
-    [SerializeField] private Button TelegramAuthorizationDoneBotton;
-    [SerializeField] private Button OpenTelegramQRPanelButton;
-    [SerializeField] private Button OpenTelegramCodePanelButton;
-    [SerializeField] private Button CloseTelegramQRPanelButton;
-    [SerializeField] private Button CloseTelegramCodePanelButton;
-    [SerializeField] private Button GetTelegramCodeButton;
-    [SerializeField] private Button SendTelegramCodeButton;
     [SerializeField] private Button ConfirmChangeWhatsappNumberButton;
     [SerializeField] private Button CancelChangeWhatsappNumberButton;
     [SerializeField] private Button ConfirmChangeTelegramNumberButton;
     [SerializeField] private Button CancelChangeTelegramNumberButton;
-    [SerializeField] private Button UploadPriceListButton;
-    public TMP_InputField WhatsappNumberInput;
-    public TMP_InputField TelegramNumberInput;
-    public TMP_InputField TelegramCodeInput;
-    [SerializeField] private RawImage WhatsappQRCodeImage;
-    [SerializeField] private RawImage TelegramQRCodeImage;
-    private string telegramPhoneTitleInitial;
-    private string telegramPhoneBodyInitial;
+    [SerializeField] private Button UploadProductsPriceListButton;
+    [SerializeField] private Button UploadServicesPriceListButton;
     #endregion
 
     // Needed for PickMediaFile / UploadFile logic that references file extension fields
@@ -128,17 +100,10 @@ public partial class BotSettings : MonoBehaviour
     private string docx;
 
     public static BotSettings Instance;
-
-    void Awake()
-    {
-        ResolveHeaderTitle();
-    }
+    
 
     void Start()
     {
-        if (TelegramPhoneTitle != null) telegramPhoneTitleInitial = TelegramPhoneTitle.text;
-        if (TelegramPhoneBody != null) telegramPhoneBodyInitial = TelegramPhoneBody.text;
-
         WireTabs();
         WireFields();
         WireProductsAndServices();
@@ -203,7 +168,14 @@ public partial class BotSettings : MonoBehaviour
     {
         if (saveButton != null)
         {
-            saveButton.onClick.AddListener(() => Manager.Instance.SaveSettings());
+            saveButton.onClick.AddListener(() =>
+            {
+                var bot = Manager.openBot != null ? Manager.openBot.GetComponent<Bot>() : null;
+                if (bot != null)
+                    Manager.Instance.GetSaveSettings(bot.whatsappWorkflowId, bot.telegramWorkflowId);
+                else
+                    Manager.Instance.SaveSettings();
+            });
             saveButton.interactable = false;
         }
         if (backButton != null)
@@ -344,24 +316,14 @@ public partial class BotSettings : MonoBehaviour
         StartCoroutine(CheckTelegramUnauthorizationOutsideApp());
         SyncHeaderTitle();
     }
-
-    // Resolves the HeaderGroup > Title TMP text if it wasn't wired in the
-    // inspector. Falls back to searching under the serialized headerGroup so
-    // the prefab doesn't need to be re-wired after this change.
-    private void ResolveHeaderTitle()
-    {
-        if (headerTitle != null || headerGroup == null) return;
-        var titleTransform = headerGroup.Find("Title");
-        if (titleTransform != null)
-            headerTitle = titleTransform.GetComponent<TextMeshProUGUI>();
-    }
-
+    
     // Mirrors the bot's current name onto the header. Called on enable, after
-    // wiring, on name-field commit, and from Manager.CloseSettings when the
-    // field is reverted to the saved PlayerPref value.
+    // wiring, from Manager.SaveSettings after the new name is persisted, and
+    // from Manager.CloseSettings when the field is reverted to the saved
+    // PlayerPref value. Deliberately NOT wired to BotNameField.OnCommitted so
+    // the header reflects only the saved name, not the in-progress edit.
     public void SyncHeaderTitle()
     {
-        if (headerTitle == null) ResolveHeaderTitle();
         if (headerTitle == null || BotNameField == null) return;
         headerTitle.text = BotNameField.Value;
     }
@@ -431,7 +393,6 @@ public partial class BotSettings : MonoBehaviour
         if (BotNameField != null)
         {
             BotNameField.OnCommitted.AddListener(_ => Manager.Instance.EnableSave());
-            BotNameField.OnCommitted.AddListener(_ => SyncHeaderTitle());
         }
         if (WhatsappNumberField != null)
             WhatsappNumberField.OnCommitted.AddListener(_ => Manager.Instance.EnableSave());
@@ -439,17 +400,9 @@ public partial class BotSettings : MonoBehaviour
             TelegramNumberField.OnCommitted.AddListener(_ => Manager.Instance.EnableSave());
 
         if (BusinessField != null)
-        {
             BusinessField.OnCommitted.AddListener(_ => Manager.Instance.EnableSave());
-            BusinessField.OnFullScreenFocusRequested.AddListener(HideHeaderAndTabs);
-            BusinessField.OnFullScreenFocusReleased.AddListener(RestoreHeaderAndTabs);
-        }
         if (PromptField != null)
-        {
             PromptField.OnCommitted.AddListener(_ => Manager.Instance.EnableSave());
-            PromptField.OnFullScreenFocusRequested.AddListener(HideHeaderAndTabs);
-            PromptField.OnFullScreenFocusReleased.AddListener(RestoreHeaderAndTabs);
-        }
 
         if (BusinessTypeDropdown != null)
             BusinessTypeDropdown.onValueChanged.AddListener(_ => Manager.Instance.EnableSave());
@@ -458,18 +411,6 @@ public partial class BotSettings : MonoBehaviour
             WhatsappToggle.onValueChanged.AddListener(WhatsappChannelToggleChanged);
         if (TelegramToggle != null)
             TelegramToggle.onValueChanged.AddListener(TelegramChannelToggleChanged);
-    }
-
-    private void HideHeaderAndTabs()
-    {
-        if (headerGroup != null) headerGroup.gameObject.SetActive(false);
-        if (tabBarGroup != null) tabBarGroup.gameObject.SetActive(false);
-    }
-
-    private void RestoreHeaderAndTabs()
-    {
-        if (headerGroup != null) headerGroup.gameObject.SetActive(true);
-        if (tabBarGroup != null) tabBarGroup.gameObject.SetActive(true);
     }
 
     //////////////////////////////////////// PRODUCTS / SERVICES ////////////////////////////////////////
@@ -489,36 +430,23 @@ public partial class BotSettings : MonoBehaviour
             serviceEditSheet.OnAnyCommitted += () => Manager.Instance.EnableSave();
             serviceEditSheet.OnServiceDeleted += DeleteServiceCard;
         }
-
-        WireExistingProductCards();
-        WireExistingServiceCards();
     }
 
-    private void WireExistingProductCards()
+    // Callers that instantiate a ProductCardView into ProductsParent MUST
+    // call this right after Instantiate so the card's tap opens the edit
+    // sheet. BotSettings.Start no longer scans ProductsParent as a safety
+    // net, so binding is now the caller's responsibility — Manager.LoadBots,
+    // Manager.CloseSettings, and BotSettings.AddProduct all funnel through
+    // here to keep the invariant "every card in the list is bound".
+    public void RegisterProductCard(ProductCardView card)
     {
-        for (int i = 0; i < ProductsParent.childCount; i++)
-        {
-            var card = ProductsParent.GetChild(i).GetComponent<ProductCardView>();
-            if (card != null) BindProductCard(card);
-        }
-    }
-
-    private void WireExistingServiceCards()
-    {
-        for (int i = 0; i < ServicesParent.childCount; i++)
-        {
-            var card = ServicesParent.GetChild(i).GetComponent<ServiceCardView>();
-            if (card != null) BindServiceCard(card);
-        }
-    }
-
-    private void BindProductCard(ProductCardView card)
-    {
+        if (card == null) return;
         card.OnEditRequested += c => productEditSheet.Show(c);
     }
 
-    private void BindServiceCard(ServiceCardView card)
+    public void RegisterServiceCard(ServiceCardView card)
     {
+        if (card == null) return;
         card.OnEditRequested += c => serviceEditSheet.Show(c);
     }
 
@@ -530,14 +458,31 @@ public partial class BotSettings : MonoBehaviour
                              ProductsParent);
 
         var card = go.GetComponent<ProductCardView>();
-        if (card != null) BindProductCard(card);
+        RegisterProductCard(card);
+
+        // Blank the prefab's display defaults ("Название" / "0" / "Описание")
+        // so ItemEditSheet.Show binds empty strings into the input fields —
+        // the user shouldn't have to delete pre-typed text before entering theirs.
+        if (card != null)
+        {
+            card.Name = string.Empty;
+            card.Price = string.Empty;
+            card.Description = string.Empty;
+        }
 
         var anim = go.GetComponent<Animation>();
         if (anim != null) anim.Play();
 
         RebuildTabLayout(ProductsParent);
+        // Append + auto-scroll so the newly added card is visible at the
+        // bottom of the viewport once the user dismisses the edit sheet.
+        ScrollTabToBottom(Product);
 
         Manager.Instance.EnableSave();
+
+        // Open the edit sheet right away so the user can fill in the new
+        // item's fields without an extra tap.
+        if (card != null && productEditSheet != null) productEditSheet.Show(card, isNewlyAdded: true);
     }
 
     public void AddService()
@@ -548,14 +493,36 @@ public partial class BotSettings : MonoBehaviour
                              ServicesParent);
 
         var card = go.GetComponent<ServiceCardView>();
-        if (card != null) BindServiceCard(card);
+        RegisterServiceCard(card);
+
+        if (card != null)
+        {
+            card.Name = string.Empty;
+            card.Price = string.Empty;
+            card.Description = string.Empty;
+        }
 
         var anim = go.GetComponent<Animation>();
         if (anim != null) anim.Play();
 
         RebuildTabLayout(ServicesParent);
+        ScrollTabToBottom(Service);
 
         Manager.Instance.EnableSave();
+
+        if (card != null && serviceEditSheet != null) serviceEditSheet.Show(card, isNewlyAdded: true);
+    }
+
+    // Scrolls the given tab's ScrollRect to the bottom. Canvases are flushed
+    // first so the ScrollRect sees the freshly-grown content size and scrolls
+    // to the real new bottom rather than the pre-add one.
+    private static void ScrollTabToBottom(GameObject tab)
+    {
+        if (tab == null) return;
+        var scroll = tab.GetComponent<ScrollRect>();
+        if (scroll == null) return;
+        Canvas.ForceUpdateCanvases();
+        scroll.verticalNormalizedPosition = 0f;
     }
 
     // Re-run layout on the list RectTransform and walk up the ancestors so a
@@ -576,13 +543,23 @@ public partial class BotSettings : MonoBehaviour
 
     private void DeleteProductCard(ProductCardView card)
     {
-        Destroy(card.gameObject);
+        // SetActive(false) removes the child from VerticalLayoutGroup
+        // consideration immediately (VLG skips inactive children), so the
+        // rebuild below reflows as if the card were already gone. Without
+        // this, Destroy is deferred to end-of-frame and VLG keeps a blank
+        // slot for the doomed card, leaving a gap between the section
+        // header and ProductsParent until the next layout pass.
+        if (card != null) card.gameObject.SetActive(false);
+        Destroy(card != null ? card.gameObject : null);
+        RebuildTabLayout(ProductsParent);
         Manager.Instance.EnableSave();
     }
 
     private void DeleteServiceCard(ServiceCardView card)
     {
-        Destroy(card.gameObject);
+        if (card != null) card.gameObject.SetActive(false);
+        Destroy(card != null ? card.gameObject : null);
+        RebuildTabLayout(ServicesParent);
         Manager.Instance.EnableSave();
     }
 
@@ -590,45 +567,6 @@ public partial class BotSettings : MonoBehaviour
 
     private void WireAuthButtons()
     {
-        if (WhatsappAuthorizationBackButton != null)
-            WhatsappAuthorizationBackButton.onClick.AddListener(WhatsappAuthorizationBack);
-        if (WhatsappAuthorizationDoneBotton != null)
-            WhatsappAuthorizationDoneBotton.onClick.AddListener(WhatsappAuthorizationDone);
-        if (OpenWhatsappQRPanelButton != null)
-            OpenWhatsappQRPanelButton.onClick.AddListener(() => StartCoroutine(OpenWhatsappQRPanel()));
-        if (OpenWhatsappCodePanelButton != null)
-            OpenWhatsappCodePanelButton.onClick.AddListener(OpenWhatsappCodePanel);
-        if (CloseWhatsappQRPanelButton != null)
-            CloseWhatsappQRPanelButton.onClick.AddListener(CloseWhatsappQRPanel);
-        if (CloseWhatsappCodePanelButton != null)
-            CloseWhatsappCodePanelButton.onClick.AddListener(CloseWhatsappCodePanel);
-        if (GetWhatsappCodeButton != null)
-            GetWhatsappCodeButton.onClick.AddListener(() => StartCoroutine(GetWhatsappCode()));
-
-        if (TelegramAuthorizationBackButton != null)
-            TelegramAuthorizationBackButton.onClick.AddListener(TelegramAuthorizationBack);
-        if (TelegramAuthorizationDoneBotton != null)
-            TelegramAuthorizationDoneBotton.onClick.AddListener(TelegramAuthorizationDone);
-        if (OpenTelegramQRPanelButton != null)
-            OpenTelegramQRPanelButton.onClick.AddListener(() => StartCoroutine(OpenTelegramQRPanel()));
-        if (OpenTelegramCodePanelButton != null)
-            OpenTelegramCodePanelButton.onClick.AddListener(OpenTelegramCodePanel);
-        if (CloseTelegramQRPanelButton != null)
-            CloseTelegramQRPanelButton.onClick.AddListener(CloseTelegramQRPanel);
-        if (CloseTelegramCodePanelButton != null)
-            CloseTelegramCodePanelButton.onClick.AddListener(CloseTelegramCodePanel);
-        if (GetTelegramCodeButton != null)
-            GetTelegramCodeButton.onClick.AddListener(() => StartCoroutine(GetTelegramCode()));
-        if (SendTelegramCodeButton != null)
-            SendTelegramCodeButton.onClick.AddListener(() => StartCoroutine(SendTelegramCode()));
-
-        if (WhatsappNumberInput != null)
-            WhatsappNumberInput.onValueChanged.AddListener(WhatsappNumberInputChanged);
-        if (TelegramNumberInput != null)
-            TelegramNumberInput.onValueChanged.AddListener(TelegramNumberInputChanged);
-        if (TelegramCodeInput != null)
-            TelegramCodeInput.onValueChanged.AddListener(TelegramCodeInputChanged);
-
         if (ConfirmChangeWhatsappNumberButton != null)
             PopupUI.WireFingerUp(ConfirmChangeWhatsappNumberButton, ConfirmChangeWhatsappNumber);
         if (CancelChangeWhatsappNumberButton != null)
@@ -638,7 +576,9 @@ public partial class BotSettings : MonoBehaviour
         if (CancelChangeTelegramNumberButton != null)
             PopupUI.WireFingerUp(CancelChangeTelegramNumberButton, CancelChangeTelegramNumber);
 
-        if (UploadPriceListButton != null)
-            UploadPriceListButton.onClick.AddListener(UploadPriceList);
+        if (UploadProductsPriceListButton != null)
+            UploadProductsPriceListButton.onClick.AddListener(UploadPriceList);
+        if (UploadServicesPriceListButton != null)
+            UploadServicesPriceListButton.onClick.AddListener(UploadServiceList);
     }
 }

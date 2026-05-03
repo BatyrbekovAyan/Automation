@@ -259,7 +259,7 @@ public static class BotSettingsRebuilder
                 "General", "Business", "Product", "Service", "Prompt",
                 "GeneralTabButton", "BusinessTabButton", "ProductTabButton",
                 "ServiceTabButton", "PromptTabButton",
-                "headerGroup", "tabBarGroup", "mainScrim",
+                "mainScrim",
                 "BotNameField", "whatsappRow", "telegramRow",
                 "WhatsappNumberField", "TelegramNumberField",
                 "BusinessField", "PromptField",
@@ -275,8 +275,8 @@ public static class BotSettingsRebuilder
             clearSo.ApplyModifiedPropertiesWithoutUndo();
 
             // Build fresh structure.
-            var header = BuildHeader(root, out var backBtn, out var saveBtn);
-            var tabBar = BuildTabBar(root, out var tabVisuals);
+            BuildHeader(root, out var backBtn, out var saveBtn);
+            BuildTabBar(root, out var tabVisuals);
             var tabButtons = new[] { tabVisuals[0].button, tabVisuals[1].button, tabVisuals[2].button,
                                      tabVisuals[3].button, tabVisuals[4].button };
             var tabs = BuildTabs(root);
@@ -336,8 +336,6 @@ public static class BotSettingsRebuilder
                 }
             }
 
-            so.FindProperty("headerGroup").objectReferenceValue = header.GetComponent<RectTransform>();
-            so.FindProperty("tabBarGroup").objectReferenceValue = tabBar.GetComponent<RectTransform>();
             so.FindProperty("mainScrim").objectReferenceValue = mainScrim;
             so.FindProperty("BotNameField").objectReferenceValue          = generalFields.botName;
             so.FindProperty("BusinessTypeDropdown").objectReferenceValue  = generalFields.businessTypeDropdown;
@@ -484,6 +482,11 @@ public static class BotSettingsRebuilder
     private static Dictionary<string, TabRoots> BuildTabs(GameObject root)
     {
         var map = new Dictionary<string, TabRoots>();
+        // Business and Prompt host a single multi-line input that scrolls
+        // internally via TMP_InputField + RectMask2D, so the tab itself
+        // does not need a ScrollRect — the page stays static.
+        var nonScrollableTabs = new HashSet<string> { "Business", "Prompt" };
+
         foreach (var name in new[] { "General", "Business", "Product", "Service", "Prompt" })
         {
             var tab = NewChild(root, name, out RectTransform rt);
@@ -493,25 +496,43 @@ public static class BotSettingsRebuilder
             rt.offsetMin = Vector2.zero;
             rt.offsetMax = Sv(0, -100); // below header (56) + tabs (44)
 
-            // ScrollRect so long content is scrollable.
-            var scroll = tab.AddComponent<ScrollRect>();
-            scroll.horizontal = false;
-            scroll.vertical = true;
-            scroll.movementType = ScrollRect.MovementType.Elastic;
-            scroll.inertia = true;
-            scroll.scrollSensitivity = Sz(20);
+            GameObject content;
+            RectTransform contentRt;
 
-            var viewport = NewChild(tab, "Viewport", out RectTransform vpRt);
-            StretchFill(vpRt);
-            var vpImg = viewport.AddComponent<Image>();
-            vpImg.color = new Color(1, 1, 1, 0.003f); // effectively invisible; Mask needs a Graphic
-            var vpMask = viewport.AddComponent<Mask>();
-            vpMask.showMaskGraphic = false;
+            if (nonScrollableTabs.Contains(name))
+            {
+                // Content fills the tab directly — no ScrollRect, no viewport.
+                content = NewChild(tab, "Content", out contentRt);
+                StretchFill(contentRt);
+            }
+            else
+            {
+                // ScrollRect so long content is scrollable.
+                var scroll = tab.AddComponent<ScrollRect>();
+                scroll.horizontal = false;
+                scroll.vertical = true;
+                scroll.movementType = ScrollRect.MovementType.Elastic;
+                scroll.inertia = true;
+                scroll.scrollSensitivity = Sz(20);
 
-            var content = NewChild(viewport, "Content", out RectTransform contentRt);
-            SetAnchors(contentRt, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1));
-            contentRt.sizeDelta = Vector2.zero;
-            contentRt.anchoredPosition = Vector2.zero;
+                var viewport = NewChild(tab, "Viewport", out RectTransform vpRt);
+                StretchFill(vpRt);
+                var vpImg = viewport.AddComponent<Image>();
+                vpImg.color = new Color(1, 1, 1, 0.003f); // effectively invisible; Mask needs a Graphic
+                var vpMask = viewport.AddComponent<Mask>();
+                vpMask.showMaskGraphic = false;
+
+                content = NewChild(viewport, "Content", out contentRt);
+                SetAnchors(contentRt, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1));
+                contentRt.sizeDelta = Vector2.zero;
+                contentRt.anchoredPosition = Vector2.zero;
+
+                var fitter = content.AddComponent<ContentSizeFitter>();
+                fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+                scroll.viewport = vpRt;
+                scroll.content = contentRt;
+            }
 
             var vlg = content.AddComponent<VerticalLayoutGroup>();
             vlg.padding = new RectOffset(Szi(20), Szi(20), Szi(24), Szi(24));
@@ -521,12 +542,6 @@ public static class BotSettingsRebuilder
             vlg.childForceExpandHeight = false;
             vlg.childControlWidth = true;
             vlg.childControlHeight = false;
-
-            var fitter = content.AddComponent<ContentSizeFitter>();
-            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-            scroll.viewport = vpRt;
-            scroll.content = contentRt;
 
             tab.SetActive(name == "General");
             map[name] = new TabRoots { tab = tab, content = content };

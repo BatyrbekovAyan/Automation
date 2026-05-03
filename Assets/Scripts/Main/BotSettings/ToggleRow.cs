@@ -25,6 +25,19 @@ namespace Automation.BotSettingsUI
         public Toggle Toggle => toggle;
         public string Label { get => labelText.text; set => labelText.text = value; }
 
+        /// <summary>
+        /// Set the toggle state without firing onValueChanged, but still
+        /// update the visual (thumb position + track color) immediately.
+        /// Use this when code needs to force the toggle off/on without
+        /// triggering auth/EnableSave side effects, yet still wants the
+        /// control to reflect the new state on screen.
+        /// </summary>
+        public void SetIsOnQuiet(bool on)
+        {
+            if (toggle != null) toggle.SetIsOnWithoutNotify(on);
+            ApplyImmediate(on);
+        }
+
         private Vector2 thumbOffAnchored;
         private Vector2 thumbOnAnchored;
 

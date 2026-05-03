@@ -1,19 +1,12 @@
-using UnityEngine;
-using UnityEngine.Events;
-
 namespace Automation.BotSettingsUI
 {
     /// <summary>
     /// Multi-line variant of EditableField used for Business description
-    /// and Prompt fields. Raises OnFullScreenFocusRequested so BotSettings
-    /// can hide the header + tab bar (matching BotSettings.cs:743-747).
+    /// and Prompt fields. Kept as a distinct type so prefab references
+    /// (BusinessField, PromptField) and ScrollableTextArea's
+    /// [RequireComponent] can target the multi-line case specifically.
     /// </summary>
     public class EditableTextArea : EditableField
     {
-        public UnityEvent OnFullScreenFocusRequested = new UnityEvent();
-        public UnityEvent OnFullScreenFocusReleased = new UnityEvent();
-
-        protected override void OnFocused() => OnFullScreenFocusRequested.Invoke();
-        protected override void OnBlurred() => OnFullScreenFocusReleased.Invoke();
     }
 }

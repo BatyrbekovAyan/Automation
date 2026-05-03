@@ -80,7 +80,6 @@ namespace Automation.BotSettingsUI
             if (input == null) return;
             if (input.isFocused && !isFocused)
             {
-                Debug.Log($"[KB] {name}.Update SYNTHESIZED Select (input.isFocused true, isFocused false) f={Time.frameCount}");
                 HandleSelect(null);
             }
         }
@@ -94,17 +93,12 @@ namespace Automation.BotSettingsUI
 
         private void HandleSelect(string _)
         {
-            if (isFocused)
-            {
-                Debug.Log($"[KB] {name}.HandleSelect SKIPPED (already isFocused=true) f={Time.frameCount}");
-                return;
-            }
+            if (isFocused) return;
             isFocused = true;
             focusValue = input.text;
             OnFocused();
             if (scrim != null)
                 scrim.Show(GetComponent<RectTransform>(), () => Blur(commit: true));
-            Debug.Log($"[KB] {name}.Selected firing f={Time.frameCount}");
             Selected?.Invoke(this);
         }
 
@@ -112,11 +106,7 @@ namespace Automation.BotSettingsUI
 
         public void Blur(bool commit)
         {
-            if (!isFocused)
-            {
-                Debug.Log($"[KB] {name}.Blur SKIPPED (isFocused=false) f={Time.frameCount}");
-                return;
-            }
+            if (!isFocused) return;
             isFocused = false;
 
             var current = input.text;
@@ -126,11 +116,37 @@ namespace Automation.BotSettingsUI
             input.DeactivateInputField();
             if (scrim != null && scrim.IsShowing) scrim.Hide();
             OnBlurred();
-            Debug.Log($"[KB] {name}.Blurred firing f={Time.frameCount} inputIsFocused={input.isFocused}");
             Blurred?.Invoke(this);
         }
 
-        /// <summary>Overridable hook for EditableTextArea to hide header etc.</summary>
+        // Idempotent cleanup for container teardown / re-entry paths.
+        //
+        // The project's TMP_InputField prefab has `Reset On Deactivation`
+        // turned off (m_ResetOnDeActivation = 0 in the prefab YAML). With
+        // that flag off, DeactivateInputField sets m_SelectionStillActive
+        // = true and intentionally does NOT call ReleaseSelection() to
+        // clear it. OnFillVBO's guard is `if (!isFocused && !m_SelectionStillActive)
+        // return empty;` — so as long as m_SelectionStillActive stays true,
+        // every subsequent canvas rebuild RE-renders the caret quad at
+        // its last position. Result: ghost caret painted over the next
+        // card's text, no blink (the blink coroutine stops with focus),
+        // no input capture (m_AllowInput is false).
+        //
+        // Calling ReleaseSelection() here clears m_SelectionStillActive
+        // and schedules a rebuild via MarkGeometryAsDirty — the next
+        // canvas update then outputs an empty caret mesh. Order matters:
+        // it MUST run AFTER DeactivateInputField, which would otherwise
+        // re-set the flag to true and undo this.
+        public void ForceBlur()
+        {
+            if (input == null) return;
+
+            if (input.isFocused)
+                input.DeactivateInputField();
+
+            input.ReleaseSelection();
+        }
+
         protected virtual void OnFocused() { }
         protected virtual void OnBlurred() { }
     }

@@ -242,6 +242,10 @@ public class Manager : MonoBehaviour
 
     public IEnumerator LoadBots()
     {
+        // One-shot migration: compact pre-existing phantom-blank Product/Service
+        // slot keys before LoadBots reads them. Idempotent on clean data.
+        MigrateBotPersistence();
+
         yield return new WaitForEndOfFrame();
 
         for (int i = 0; i < id; i++)
@@ -274,6 +278,7 @@ public class Manager : MonoBehaviour
                 BotSettings recreatedBotSettings = InstantiateBotSettingsFlush(BotSettingsParent.transform);
 
                 recreatedBotSettings.BotNameField.Value = PlayerPrefs.GetString(recreatedBot.name + "Name", "");
+                recreatedBotSettings.SyncHeaderTitle();
                 recreatedBotSettings.WhatsappToggle.isOn = PlayerPrefs.GetInt(recreatedBot.name + "isOnWhatsapp", 1) == 1;
                 recreatedBotSettings.TelegramToggle.isOn = PlayerPrefs.GetInt(recreatedBot.name + "isOnTelegram", 1) == 1;
                 PopulateBusinessDropdown(recreatedBotSettings.BusinessTypeDropdown);
@@ -294,6 +299,7 @@ public class Manager : MonoBehaviour
                 for (int p = 0; p < ProductsNumber; p++)
                 {
                     ProductCardView recreatedProduct = Instantiate(ProductPrefab, ProductPrefab.transform.position, ProductPrefab.transform.rotation, recreatedBotSettings.ProductsParent).GetComponent<ProductCardView>();
+                    recreatedBotSettings.RegisterProductCard(recreatedProduct);
 
                     recreatedProduct.Name = PlayerPrefs.GetString(recreatedBot.name + "Product" + p, "");
                     recreatedProduct.Price = PlayerPrefs.GetString(recreatedBot.name + "Product" + p + "Price", "");
@@ -304,6 +310,7 @@ public class Manager : MonoBehaviour
                 for (int s = 0; s < ServicesNumber; s++)
                 {
                     ServiceCardView recreatedService = Instantiate(ServicePrefab, ServicePrefab.transform.position, ServicePrefab.transform.rotation, recreatedBotSettings.ServicesParent).GetComponent<ServiceCardView>();
+                    recreatedBotSettings.RegisterServiceCard(recreatedService);
 
                     recreatedService.Name = PlayerPrefs.GetString(recreatedBot.name + "Service" + s, "");
                     recreatedService.Price = PlayerPrefs.GetString(recreatedBot.name + "Service" + s + "Price", "");
@@ -345,10 +352,148 @@ public class Manager : MonoBehaviour
         return go.GetComponent<BotSettings>();
     }
 
+    // Counts only cards whose Name is non-empty. Mirrors the predicate at
+    // SaveSettings (`!card.Name.Equals("")`) that gates whether per-slot
+    // PlayerPrefs keys are written. Decoupling the saved count from
+    // ProductsParent.transform.childCount prevents the count drift that
+    // would otherwise let an in-list blank card poison save→reload (the
+    // skipped slot would hydrate as an empty card on next LoadBots).
+    private static int CountNonEmptyProductCards(Transform parent)
+    {
+        if (parent == null) return 0;
+        int count = 0;
+        for (int i = 0; i < parent.childCount; i++)
+        {
+            var card = parent.GetChild(i).GetComponent<ProductCardView>();
+            if (card != null && !string.IsNullOrEmpty(card.Name)) count++;
+        }
+        return count;
+    }
+
+    // Service-side mirror of CountNonEmptyProductCards. Two helpers
+    // (rather than a generic) because ProductCardView and ServiceCardView
+    // do not share a common base/interface exposing Name; introducing one
+    // would be a larger refactor unrelated to this fix.
+    private static int CountNonEmptyServiceCards(Transform parent)
+    {
+        if (parent == null) return 0;
+        int count = 0;
+        for (int i = 0; i < parent.childCount; i++)
+        {
+            var card = parent.GetChild(i).GetComponent<ServiceCardView>();
+            if (card != null && !string.IsNullOrEmpty(card.Name)) count++;
+        }
+        return count;
+    }
+
+    // Compacts a saved bot's product slot keys: walks PlayerPrefs entries
+    // 0..oldCount-1, collects non-empty slots (Name key non-empty per
+    // string.IsNullOrEmpty), writes them back at contiguous indices 0..N-1,
+    // deletes orphans at [N..oldCount-1], and rewrites the saved
+    // ProductsNumber to N. No-op if the data is already clean. Pure data
+    // operation — does not touch the live UI / scene.
+    private static void CompactSavedProducts(string botKey)
+    {
+        int oldCount = PlayerPrefs.GetInt(botKey + "ProductsNumber", 0);
+        if (oldCount <= 0) return;
+
+        var liveNames = new System.Collections.Generic.List<string>(oldCount);
+        var livePrices = new System.Collections.Generic.List<string>(oldCount);
+        var liveDescriptions = new System.Collections.Generic.List<string>(oldCount);
+
+        for (int p = 0; p < oldCount; p++)
+        {
+            var name = PlayerPrefs.GetString(botKey + "Product" + p, "");
+            if (string.IsNullOrEmpty(name)) continue;
+            liveNames.Add(name);
+            livePrices.Add(PlayerPrefs.GetString(botKey + "Product" + p + "Price", ""));
+            liveDescriptions.Add(PlayerPrefs.GetString(botKey + "Product" + p + "Description", ""));
+        }
+
+        if (liveNames.Count == oldCount) return; // already compact
+
+        for (int p = 0; p < liveNames.Count; p++)
+        {
+            PlayerPrefs.SetString(botKey + "Product" + p, liveNames[p]);
+            PlayerPrefs.SetString(botKey + "Product" + p + "Price", livePrices[p]);
+            PlayerPrefs.SetString(botKey + "Product" + p + "Description", liveDescriptions[p]);
+        }
+
+        for (int p = liveNames.Count; p < oldCount; p++)
+        {
+            PlayerPrefs.DeleteKey(botKey + "Product" + p);
+            PlayerPrefs.DeleteKey(botKey + "Product" + p + "Price");
+            PlayerPrefs.DeleteKey(botKey + "Product" + p + "Description");
+        }
+
+        PlayerPrefs.SetInt(botKey + "ProductsNumber", liveNames.Count);
+    }
+
+    // Service-side mirror of CompactSavedProducts. Two helpers (rather than
+    // a generic) because product and service slot keys differ in name
+    // ("Product" vs "Service") and live-list helper signatures differ; the
+    // duplication is mechanical and isolated.
+    private static void CompactSavedServices(string botKey)
+    {
+        int oldCount = PlayerPrefs.GetInt(botKey + "ServicesNumber", 0);
+        if (oldCount <= 0) return;
+
+        var liveNames = new System.Collections.Generic.List<string>(oldCount);
+        var livePrices = new System.Collections.Generic.List<string>(oldCount);
+        var liveDescriptions = new System.Collections.Generic.List<string>(oldCount);
+
+        for (int s = 0; s < oldCount; s++)
+        {
+            var name = PlayerPrefs.GetString(botKey + "Service" + s, "");
+            if (string.IsNullOrEmpty(name)) continue;
+            liveNames.Add(name);
+            livePrices.Add(PlayerPrefs.GetString(botKey + "Service" + s + "Price", ""));
+            liveDescriptions.Add(PlayerPrefs.GetString(botKey + "Service" + s + "Description", ""));
+        }
+
+        if (liveNames.Count == oldCount) return; // already compact
+
+        for (int s = 0; s < liveNames.Count; s++)
+        {
+            PlayerPrefs.SetString(botKey + "Service" + s, liveNames[s]);
+            PlayerPrefs.SetString(botKey + "Service" + s + "Price", livePrices[s]);
+            PlayerPrefs.SetString(botKey + "Service" + s + "Description", liveDescriptions[s]);
+        }
+
+        for (int s = liveNames.Count; s < oldCount; s++)
+        {
+            PlayerPrefs.DeleteKey(botKey + "Service" + s);
+            PlayerPrefs.DeleteKey(botKey + "Service" + s + "Price");
+            PlayerPrefs.DeleteKey(botKey + "Service" + s + "Description");
+        }
+
+        PlayerPrefs.SetInt(botKey + "ServicesNumber", liveNames.Count);
+    }
+
+    // One-shot migration that runs at the top of LoadBots(). Walks every
+    // saved bot (using the same enumeration LoadBots itself uses) and
+    // compacts each bot's products and services slot keys. Idempotent
+    // (compacting clean data is a no-op) and synchronous (PlayerPrefs is
+    // synchronous). Closes the gap left by Fix C: SaveSettings's saved-
+    // count is correct going forward, but pre-existing data with a mid-
+    // list phantom slot would still re-create a blank card on next
+    // LoadBots without compaction.
+    private void MigrateBotPersistence()
+    {
+        for (int i = 0; i < id; i++)
+        {
+            string botKey = "Bot" + i.ToString();
+            if (!PlayerPrefs.HasKey(botKey + "Name")) continue;
+            CompactSavedProducts(botKey);
+            CompactSavedServices(botKey);
+        }
+    }
+
     public void SaveSettings()
     {
         var newName = openBotSettings.BotNameField.Value;
         PlayerPrefs.SetString(openBot.name + "Name", newName);
+        openBotSettings.SyncHeaderTitle();
         var openBotComp = openBot.GetComponent<Bot>();
         if (openBotComp.BotName != null) openBotComp.BotName.text = newName;
         // Refresh the card's description from the about-business text.
@@ -379,13 +524,21 @@ public class Manager : MonoBehaviour
         for (int i = 0; i < openBotSettings.ProductsParent.transform.childCount; i++)
         {
             Transform product = openBotSettings.ProductsParent.transform.GetChild(i);
-
-            product.GetComponent<ProductCardView>().Name.Trim();
-            if (!product.GetComponent<ProductCardView>().Name.Equals(""))
+            var card = product.GetComponent<ProductCardView>();
+            // Trim once into a local. Use the trimmed value for BOTH the
+            // empty-check and the SetString write so leading/trailing
+            // whitespace doesn't survive into PlayerPrefs.
+            // Note: CountNonEmptyProductCards (the Fix C count helper) does
+            // NOT trim — its predicate is !IsNullOrEmpty(raw). The 1-off
+            // count drift in the whitespace-only case is unreachable in
+            // practice (ItemEditSheet.Commit's IsNullOrWhiteSpace fallback
+            // prevents whitespace-only Names from being committed).
+            var name = card.Name?.Trim() ?? string.Empty;
+            if (!string.IsNullOrEmpty(name))
             {
-                PlayerPrefs.SetString(openBot.name + "Product" + i, product.GetComponent<ProductCardView>().Name);
-                PlayerPrefs.SetString(openBot.name + "Product" + i + "Price", product.GetComponent<ProductCardView>().Price);
-                PlayerPrefs.SetString(openBot.name + "Product" + i + "Description", product.GetComponent<ProductCardView>().Description);
+                PlayerPrefs.SetString(openBot.name + "Product" + i, name);
+                PlayerPrefs.SetString(openBot.name + "Product" + i + "Price", card.Price);
+                PlayerPrefs.SetString(openBot.name + "Product" + i + "Description", card.Description);
             }
         }
 
@@ -411,19 +564,19 @@ public class Manager : MonoBehaviour
             }
         }
 
-        PlayerPrefs.SetInt(openBot.name + "ProductsNumber", openBotSettings.ProductsParent.transform.childCount);
+        PlayerPrefs.SetInt(openBot.name + "ProductsNumber", CountNonEmptyProductCards(openBotSettings.ProductsParent));
 
 
         for (int i = 0; i < openBotSettings.ServicesParent.transform.childCount; i++)
         {
             Transform service = openBotSettings.ServicesParent.transform.GetChild(i);
-
-            service.GetComponent<ServiceCardView>().Name.Trim();
-            if (!service.GetComponent<ServiceCardView>().Name.Equals(""))
+            var card = service.GetComponent<ServiceCardView>();
+            var name = card.Name?.Trim() ?? string.Empty;
+            if (!string.IsNullOrEmpty(name))
             {
-                PlayerPrefs.SetString(openBot.name + "Service" + i, service.GetComponent<ServiceCardView>().Name);
-                PlayerPrefs.SetString(openBot.name + "Service" + i + "Price", service.GetComponent<ServiceCardView>().Price);
-                PlayerPrefs.SetString(openBot.name + "Service" + i + "Description", service.GetComponent<ServiceCardView>().Description);
+                PlayerPrefs.SetString(openBot.name + "Service" + i, name);
+                PlayerPrefs.SetString(openBot.name + "Service" + i + "Price", card.Price);
+                PlayerPrefs.SetString(openBot.name + "Service" + i + "Description", card.Description);
             }
         }
 
@@ -449,15 +602,19 @@ public class Manager : MonoBehaviour
             }
         }
 
-        PlayerPrefs.SetInt(openBot.name + "ServicesNumber", openBotSettings.ServicesParent.transform.childCount);
+        PlayerPrefs.SetInt(openBot.name + "ServicesNumber", CountNonEmptyServiceCards(openBotSettings.ServicesParent));
 
 
         PlayerPrefs.Save(); // Ensure changes are written to disk
+
+        // Prefs now reflect current UI; re-run the dirty check to flip save off.
+        EnableSave();
     }
 
     public void CloseSettings()
     {
         openBotSettings.BotNameField.Value = PlayerPrefs.GetString(openBot.name + "Name", "");
+        openBotSettings.SyncHeaderTitle();
         openBotSettings.WhatsappToggle.SetIsOnWithoutNotify(PlayerPrefs.GetInt(openBot.name + "isOnWhatsapp", 1) == 1);
         openBotSettings.TelegramToggle.SetIsOnWithoutNotify(PlayerPrefs.GetInt(openBot.name + "isOnTelegram", 1) == 1);
         {
@@ -483,6 +640,7 @@ public class Manager : MonoBehaviour
         for (int p = 0; p < ProductsNumber; p++)
         {
             ProductCardView recreatedProduct = Instantiate(ProductPrefab, ProductPrefab.transform.position, ProductPrefab.transform.rotation, openBotSettings.ProductsParent).GetComponent<ProductCardView>();
+            openBotSettings.RegisterProductCard(recreatedProduct);
 
             recreatedProduct.Name = PlayerPrefs.GetString(openBot.name + "Product" + p, "");
             recreatedProduct.Price = PlayerPrefs.GetString(openBot.name + "Product" + p + "Price", "");
@@ -498,6 +656,7 @@ public class Manager : MonoBehaviour
         for (int s = 0; s < ServicesNumber; s++)
         {
             ServiceCardView recreatedService = Instantiate(ServicePrefab, ServicePrefab.transform.position, ServicePrefab.transform.rotation, openBotSettings.ServicesParent).GetComponent<ServiceCardView>();
+            openBotSettings.RegisterServiceCard(recreatedService);
 
             recreatedService.Name = PlayerPrefs.GetString(openBot.name + "Service" + s, "");
             recreatedService.Price = PlayerPrefs.GetString(openBot.name + "Service" + s + "Price", "");
@@ -524,16 +683,130 @@ public class Manager : MonoBehaviour
         }
 
 
-        if (settingsChanged)
-        {
-            SaveButton.interactable = true;
-        }
-        else
-        {
-            SaveButton.interactable = false;
-        }
+        SetBotSettingsSaveInteractable(settingsChanged);
 
         StartCoroutine(CheckProductsOrServicesChanged());
+    }
+
+    private void SetBotSettingsSaveInteractable(bool interactable)
+    {
+        if (openBotSettings != null && openBotSettings.SaveButton != null)
+            openBotSettings.SaveButton.interactable = interactable;
+        if (SaveButton != null)
+            SaveButton.interactable = interactable;
+    }
+
+    //////////////////////////////////////////////////////////
+    // BOT SETTINGS — SHARED AUTH PANELS
+    //
+    // The Add-Bot flow's WhatsappAuth / TelegramAuth panels are reused from
+    // Bot Settings so there is a single redesigned auth UI to maintain. These
+    // entry points point the panels at an existing bot's profile id, rewire
+    // the Back button to a settings-mode callback, and wait for the existing
+    // whatsappAuthCompleted / telegramAuthCompleted signal to fire onDone.
+    //////////////////////////////////////////////////////////
+
+    private bool _authFromSettings;
+    private System.Action _settingsAuthOnDone;
+    private System.Action _settingsAuthOnBack;
+    private Coroutine _settingsAuthWaiter;
+
+    public void OpenWhatsappAuthFromSettings(string profileId, System.Action onDone, System.Action onBack)
+    {
+        BeginSettingsAuth(onDone, onBack);
+        whatsappProfileId = profileId;
+        whatsappAuthCompleted = false;
+
+        if (WhatsappAuthBackButton != null)
+        {
+            WhatsappAuthBackButton.onClick.RemoveAllListeners();
+            WhatsappAuthBackButton.onClick.AddListener(OnSettingsAuthBackPressed);
+        }
+
+        ShowWhatsappAuth();
+
+        if (_settingsAuthWaiter != null) StopCoroutine(_settingsAuthWaiter);
+        _settingsAuthWaiter = StartCoroutine(WaitForSettingsAuthCompletion(whatsapp: true));
+    }
+
+    public void OpenTelegramAuthFromSettings(string profileId, System.Action onDone, System.Action onBack)
+    {
+        BeginSettingsAuth(onDone, onBack);
+        telegramProfileId = profileId;
+        telegramAuthCompleted = false;
+
+        if (TelegramAuthBackButton != null)
+        {
+            TelegramAuthBackButton.onClick.RemoveAllListeners();
+            TelegramAuthBackButton.onClick.AddListener(OnSettingsAuthBackPressed);
+        }
+
+        ShowTelegramAuth();
+
+        if (_settingsAuthWaiter != null) StopCoroutine(_settingsAuthWaiter);
+        _settingsAuthWaiter = StartCoroutine(WaitForSettingsAuthCompletion(whatsapp: false));
+    }
+
+    // Phone number the user typed during the shared auth flow. Settings-mode
+    // onDone callbacks read this to populate the bot's WhatsappNumberField.
+    public string LastAuthedWhatsappNumber => WhatsappNumberInput != null ? WhatsappNumberInput.text : "";
+    public string LastAuthedTelegramNumber => TelegramNumberInput != null ? TelegramNumberInput.text : "";
+    public string LastAuthedWhatsappProfileId => whatsappProfileId;
+    public string LastAuthedTelegramProfileId => telegramProfileId;
+
+    private void BeginSettingsAuth(System.Action onDone, System.Action onBack)
+    {
+        _authFromSettings = true;
+        _settingsAuthOnDone = onDone;
+        _settingsAuthOnBack = onBack;
+    }
+
+    private IEnumerator WaitForSettingsAuthCompletion(bool whatsapp)
+    {
+        while (_authFromSettings)
+        {
+            if (whatsapp && whatsappAuthCompleted) break;
+            if (!whatsapp && telegramAuthCompleted) break;
+            yield return null;
+        }
+
+        if (!_authFromSettings) yield break;
+
+        var done = _settingsAuthOnDone;
+        EndSettingsAuth();
+        done?.Invoke();
+    }
+
+    private void OnSettingsAuthBackPressed()
+    {
+        if (_whatsappStatusCoroutine != null) { StopCoroutine(_whatsappStatusCoroutine); _whatsappStatusCoroutine = null; }
+        if (_telegramStatusCoroutine != null) { StopCoroutine(_telegramStatusCoroutine); _telegramStatusCoroutine = null; }
+        if (WhatsappAuth != null) WhatsappAuth.SetActive(false);
+        if (TelegramAuth != null) TelegramAuth.SetActive(false);
+
+        var back = _settingsAuthOnBack;
+        EndSettingsAuth();
+        back?.Invoke();
+    }
+
+    private void EndSettingsAuth()
+    {
+        _authFromSettings = false;
+        _settingsAuthOnDone = null;
+        _settingsAuthOnBack = null;
+        if (_settingsAuthWaiter != null) { StopCoroutine(_settingsAuthWaiter); _settingsAuthWaiter = null; }
+
+        // Restore the default Add-Bot flow back-button wiring.
+        if (WhatsappAuthBackButton != null)
+        {
+            WhatsappAuthBackButton.onClick.RemoveAllListeners();
+            WhatsappAuthBackButton.onClick.AddListener(CancelBotCreation);
+        }
+        if (TelegramAuthBackButton != null)
+        {
+            TelegramAuthBackButton.onClick.RemoveAllListeners();
+            TelegramAuthBackButton.onClick.AddListener(CancelBotCreation);
+        }
     }
 
     public IEnumerator CheckProductsOrServicesChanged()
@@ -543,7 +816,7 @@ public class Manager : MonoBehaviour
         if (openBotSettings.ProductsParent.transform.childCount != PlayerPrefs.GetInt(openBot.name + "ProductsNumber", 0) ||
             openBotSettings.ServicesParent.transform.childCount != PlayerPrefs.GetInt(openBot.name + "ServicesNumber", 0))
         {
-            SaveButton.interactable = true;
+            SetBotSettingsSaveInteractable(true);
         }
 
         else if (openBotSettings.ProductsParent.transform.childCount == PlayerPrefs.GetInt(openBot.name + "ProductsNumber", 0))
@@ -554,7 +827,7 @@ public class Manager : MonoBehaviour
                     !openBotSettings.ProductsParent.transform.GetChild(p).GetComponent<ProductCardView>().Price.Equals(PlayerPrefs.GetString(openBot.name + "Product" + p + "Price", "")) ||
                     !openBotSettings.ProductsParent.transform.GetChild(p).GetComponent<ProductCardView>().Description.Equals(PlayerPrefs.GetString(openBot.name + "Product" + p + "Description", "")))
                 {
-                    SaveButton.interactable = true;
+                    SetBotSettingsSaveInteractable(true);
                 }
             }
         }
@@ -567,7 +840,7 @@ public class Manager : MonoBehaviour
                     !openBotSettings.ServicesParent.transform.GetChild(s).GetComponent<ServiceCardView>().Price.Equals(PlayerPrefs.GetString(openBot.name + "Service" + s + "Price", "")) ||
                     !openBotSettings.ServicesParent.transform.GetChild(s).GetComponent<ServiceCardView>().Description.Equals(PlayerPrefs.GetString(openBot.name + "Service" + s + "Description", "")))
                 {
-                    SaveButton.interactable = true;
+                    SetBotSettingsSaveInteractable(true);
                 }
             }
         }
@@ -843,6 +1116,7 @@ public class Manager : MonoBehaviour
         BotSettings newBotSettings = InstantiateBotSettingsFlush(BotSettingsParentStatic.transform);
 
         newBotSettings.BotNameField.Value = formBotName;
+        newBotSettings.SyncHeaderTitle();
         newBotSettings.WhatsappToggle.isOn = useWhatsapp;
         newBotSettings.TelegramToggle.isOn = useTelegram;
         PopulateBusinessDropdown(newBotSettings.BusinessTypeDropdown);
@@ -1045,7 +1319,7 @@ public class Manager : MonoBehaviour
             else
             {
                 // Final auth — switch to bots tab before hiding
-                var tabManager = FindObjectOfType<BottomTabManager>();
+                var tabManager = FindFirstObjectByType<BottomTabManager>();
                 if (tabManager != null)
                     tabManager.SwitchTab(3);
             }
@@ -2486,11 +2760,22 @@ public class Manager : MonoBehaviour
 
     private IEnumerator ShowSavedPanel()
     {
-        openBotSettings.Saved.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = "Saved";
+        // Capture the Saved GameObject reference up-front. The user can
+        // press back during the 2-second wait, which routes through
+        // SettleClosedInstant and nulls openBotSettings before this
+        // coroutine resumes. Without the capture the post-wait line
+        // NullRefs, the Saved child never gets SetActive(false), and
+        // re-entering that bot's settings shows it still active because
+        // SetActive(false) on the parent only hid it visually — its own
+        // activeSelf stayed true. The GameObject itself isn't destroyed
+        // (BotSettings clones persist under BotSettingsParent), so the
+        // captured reference stays valid and SetActive(false) still works.
+        var saved = openBotSettings.Saved;
+        saved.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = "Saved";
 
         yield return new WaitForSeconds(2f);
 
-        openBotSettings.Saved.SetActive(false);
+        if (saved != null) saved.SetActive(false);
     }
 
 
@@ -2518,6 +2803,8 @@ public class Manager : MonoBehaviour
             }
         }
     }
+
+    //////////////////////////////////////////////////////////SEND FILE//////////////////////////////////////////////////////////
 
     public void OnPickFileButtonPressed()
     {
@@ -2777,7 +3064,7 @@ public class Manager : MonoBehaviour
         }, "Select a video");
     }
 
-     private IEnumerator GetWhatsappMesseges()
+    private IEnumerator GetWhatsappMesseges()
      {
          LoadingPanel.SetActive(true);
          WWWForm form = new();

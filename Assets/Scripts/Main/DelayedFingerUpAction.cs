@@ -23,6 +23,15 @@ using UnityEngine.EventSystems;
 public class DelayedFingerUpAction : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
 {
     public event Action OnRealRelease;
+    /// <summary>
+    /// Fires synchronously inside OnPointerDown — before any guard logic.
+    /// Lets owners observe the moment the press lands so they can record
+    /// surrounding state (e.g. "was the keyboard already dismissing when
+    /// this press arrived?") to discriminate genuine presses from synthetic
+    /// PointerDowns that iOS dispatches when it cancels a touch session
+    /// during keyboard dismissal and re-targets to a different object.
+    /// </summary>
+    public event Action OnPress;
 
     [Tooltip("Frames to wait after PointerUp before firing. Must be >= 1 so a " +
              "spurious Down arriving the next frame can cancel the action.")]
@@ -36,6 +45,7 @@ public class DelayedFingerUpAction : MonoBehaviour, IPointerDownHandler, IPointe
     public void OnPointerDown(PointerEventData eventData)
     {
         fingerDown = true;
+        OnPress?.Invoke();
     }
 
     public void OnPointerUp(PointerEventData eventData)

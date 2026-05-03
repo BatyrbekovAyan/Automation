@@ -159,7 +159,7 @@ public class QuickReplyPanel : MonoBehaviour
         tmp.color = textColor;
         tmp.fontSize = fontSize;
         tmp.alignment = TextAlignmentOptions.Center;
-        tmp.enableWordWrapping = true;
+        tmp.textWrappingMode = TextWrappingModes.Normal;
         tmp.overflowMode = TextOverflowModes.Ellipsis;
         tmp.margin = new Vector4(10, 4, 4, 4);
         if (font != null) tmp.font = font;

@@ -5,7 +5,8 @@ using TMPro;
 using System.Collections;
 
 [RequireComponent(typeof(Image))]
-public class DragShield : MonoBehaviour, IPointerDownHandler, IPointerUpHandler,
+public class DragShield : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerMoveHandler,
+    IPointerClickHandler,
     IBeginDragHandler, IDragHandler, IEndDragHandler, IInitializePotentialDragHandler
 {
     public ScrollRect parentScrollRect;
@@ -21,6 +22,7 @@ public class DragShield : MonoBehaviour, IPointerDownHandler, IPointerUpHandler,
     private bool isPointerHeld = false; // Prevents hold re-fires from acting as taps
     private float pointerDownTime;
     private Vector2 pointerDownPosition;
+    private float maxMoveFromDown; // Farthest displacement seen during current gesture
     private float lastTapTime = -1f;
     private Vector2 lastTapPosition;
 
@@ -40,19 +42,50 @@ public class DragShield : MonoBehaviour, IPointerDownHandler, IPointerUpHandler,
         isPointerHeld = true;
         pointerDownTime = Time.unscaledTime;
         pointerDownPosition = eventData.position;
+        maxMoveFromDown = 0f;
     }
+
+    // Fires on every pointer move while the finger is pressed, even before
+    // Unity's drag threshold is crossed. This lets us disqualify the tap as
+    // soon as the finger has clearly moved — without waiting for OnBeginDrag
+    // (which requires crossing EventSystem.pixelDragThreshold) and without
+    // relying on final displacement (which misses loop-back scroll gestures
+    // that start and end near the same point).
+    public void OnPointerMove(PointerEventData eventData)
+    {
+        if (!isPointerHeld) return;
+        var dist = Vector2.Distance(eventData.position, pointerDownPosition);
+        if (dist > maxMoveFromDown) maxMoveFromDown = dist;
+    }
+
+    // Absorb the generic IPointerClickHandler dispatch so it does not fall
+    // through to TMP_InputField and activate the field behind our back.
+    // Unity's input modules walk up from the raycast target to find an
+    // IPointerClickHandler; if DragShield does not implement it, the walk
+    // finds TMP_InputField and fires OnPointerClick there directly —
+    // bypassing our drag-vs-tap logic entirely. eligibleForClick is also
+    // never cleared when pointerPress == pointerDrag (both DragShield),
+    // so even a 500px drag triggers activation on release-over-field.
+    // Actual tap activation is driven by OnPointerUp → HandleSingleTap,
+    // which respects the drag guards. This handler intentionally no-ops.
+    public void OnPointerClick(PointerEventData eventData) { }
 
     public void OnPointerUp(PointerEventData eventData)
     {
         isPointerHeld = false;
 
+        float tapMovement = Mathf.Max(
+            maxMoveFromDown,
+            Vector2.Distance(eventData.position, pointerDownPosition));
+
         if (isDragging) return;
         if (inputField == null) return;
 
-        float tapDuration = Time.unscaledTime - pointerDownTime;
-        float tapMovement = Vector2.Distance(eventData.position, pointerDownPosition);
-
-        if (tapDuration >= tapTimeThreshold || tapMovement >= tapMoveTolerance) return;
+        // Only movement disqualifies a tap — a long press with the finger
+        // still should activate the field. tapMovement uses max displacement
+        // observed during the gesture, not just the final down→up distance,
+        // so a scroll that returns to its start is still rejected.
+        if (tapMovement >= tapMoveTolerance) return;
 
         float timeSinceLastTap = Time.unscaledTime - lastTapTime;
         float distFromLastTap = Vector2.Distance(eventData.position, lastTapPosition);
@@ -225,15 +258,18 @@ IEnumerator HandleDoubleTap(PointerEventData eventData)
 
     public void OnDrag(PointerEventData eventData)
     {
+        var dist = Vector2.Distance(eventData.position, pointerDownPosition);
+        if (dist > maxMoveFromDown) maxMoveFromDown = dist;
         if (parentScrollRect != null) parentScrollRect.OnDrag(eventData);
     }
 
     public void OnEndDrag(PointerEventData eventData)
     {
         isPointerHeld = false;
-        isDragging = false;
+        // Intentionally do NOT reset isDragging here. Unity fires OnEndDrag
+        // before OnPointerUp, and OnPointerUp relies on isDragging to
+        // distinguish a scroll gesture from a tap. OnPointerDown resets
+        // the flag at the start of the next gesture.
         if (parentScrollRect != null) parentScrollRect.OnEndDrag(eventData);
     }
-
-    void ResetDrag() => isDragging = false;
 }

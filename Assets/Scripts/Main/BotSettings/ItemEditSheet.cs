@@ -42,6 +42,21 @@ namespace Automation.BotSettingsUI
                  "longer = smoother but laggier. 0.10–0.12 matches the native keyboard feel.")]
         [SerializeField] private float keyboardFollowDuration = 0.1f;
 
+        [Tooltip("Duration (s) used ONLY for the very first lift in an app session. iOS " +
+                 "cold-starts the keyboard input session on first show (~250-350 ms for " +
+                 "RTI bridge / autocorrect / etc.) but TouchScreenKeyboard.area.height " +
+                 "reports the final height instantly, so the normal keyboardFollowDuration " +
+                 "(~100 ms) makes the sheet leap up while the keyboard is still rising. " +
+                 "Tune up if the sheet still finishes ahead of the keyboard on first tap.")]
+        [SerializeField] private float firstLiftDuration = 0.35f;
+
+        [Tooltip("Delay (s) before the very first lift tween actually starts. iOS reports " +
+                 "the final keyboard height the same frame the show is requested, but the " +
+                 "visual rise begins a beat later (RTI bridge wakeup). A small delay here " +
+                 "lets the keyboard start rising first so the sheet trails it instead of " +
+                 "leading it. Tune up if the sheet still feels 'instant' on first tap.")]
+        [SerializeField] private float firstLiftStartDelay = 0.06f;
+
         [Tooltip("Seconds the OS must consistently report the keyboard as down before " +
                  "we actually drop the sheet. Absorbs the 1-3 frame blip where " +
                  "TouchScreenKeyboard.visible / the Android IME measurement briefly " +
@@ -63,6 +78,20 @@ namespace Automation.BotSettingsUI
         // otherwise every Update would churn the tween and progress resets.
         private float activeTargetY = float.NaN;
         private Tween activePosTween;
+        // Static (per app session) — flips true the first time we issue a real
+        // lift tween in this app session. Update() picks firstLiftDuration +
+        // firstLiftStartDelay vs keyboardFollowDuration based on this so the
+        // sheet's rise matches iOS's cold-start keyboard animation only on the
+        // very first tap. Subsequent shows use the cached keyboard infrastructure
+        // (~100-150 ms rise) which matches keyboardFollowDuration. Static survives
+        // sheet open/close cycles and field switches, resets on app relaunch —
+        // the same scope as iOS's own keyboard caching.
+        private static bool hasIssuedFirstLift;
+        // Pixels the sheet must rise above baseline for a tween to count as the
+        // "first real lift" that consumes hasIssuedFirstLift. Filters out tiny
+        // transient readings (e.g., 1-2 px from rounding) so the cold-start
+        // treatment isn't burned on noise before the real lift arrives.
+        private const float firstLiftMinHeight = 50f;
         // Set true by HandleFieldBlurred when any field blurs. While true,
         // Update() ignores positive keyboard-height readings — iOS keeps
         // reporting the keyboard as visible (and TouchScreenKeyboard.area
@@ -96,14 +125,41 @@ namespace Automation.BotSettingsUI
         // frames is treated as this artifact and skipped.
         private EditableField lastSelectedField;
         private const int selectRecencyFramesForBlurSkip = 2;
+        // Placeholder values written into the bound card by Commit() when
+        // the corresponding input field is empty/whitespace. Description has
+        // no placeholder — it intentionally stays empty when not filled.
+        private const string ProductNamePlaceholder = "New Product";
+        private const string ServiceNamePlaceholder = "New Service";
+        private const string PricePlaceholder = "0";
         // Which field most recently fired Blurred. Used by Update()'s
         // focus-regain fallback to distinguish a real field-switch (another
         // field is focused — clear bypass) from stale input.isFocused reports
         // on the same field after Blur (leave bypass alone).
         private EditableField lastBlurredField;
+        // Snapshot of dismissingKeyboard at the moment scrim's PointerDown
+        // fired. Used by MaybeHide to discriminate genuine outside-taps from
+        // iOS-synthetic PointerDowns that get re-targeted to the scrim when
+        // the touch session is cancelled mid-gesture during keyboard dismissal.
+        //
+        // Genuine scrim tap with keyboard up: scrim.OnPress fires BEFORE the
+        // EventSystem's deselection chain runs, so dismissingKeyboard is still
+        // false → kbDismissingAtScrimPress=false → close fires. ✓
+        // iOS reroute (user pressed sheet, synthetic Down lands on scrim):
+        // HandleFieldBlurred already ran from the original sheet press and set
+        // dismissingKeyboard=true → kbDismissingAtScrimPress=true → close
+        // suppressed. ✓
+        // Scrim tap with keyboard already down: dismissingKeyboard=false (no
+        // recent blur) → close fires normally. ✓
+        private bool kbDismissingAtScrimPress;
 
         private ProductCardView boundProduct;
         private ServiceCardView boundService;
+        // True when the currently-bound card was opened via AddProduct/AddService
+        // (i.e., it has never been committed). Cleared on Commit() and consumed by
+        // MaybeHide() to auto-discard the card if the user dismisses the sheet
+        // without pressing Done. Default-false Show overload preserves the
+        // existing tap-to-edit-existing-card behavior.
+        private bool isNewlyAdded;
         private Vector2 hiddenAnchored;
         private Vector2 shownAnchored;
 
@@ -128,7 +184,10 @@ namespace Automation.BotSettingsUI
             PopupUI.WireFingerUp(deleteConfirmYes, ConfirmDelete);
             PopupUI.WireFingerUp(deleteConfirmNo, () => PopupUI.Hide(deleteConfirmPopup));
             if (scrimBehindFinger != null)
-                scrimBehindFinger.OnRealRelease += Hide;
+            {
+                scrimBehindFinger.OnPress += HandleScrimPress;
+                scrimBehindFinger.OnRealRelease += MaybeHide;
+            }
 
             // Subscribe to field blur events to set the dismissal bypass when
             // the user dismisses the keyboard, and to field selected events to
@@ -145,6 +204,11 @@ namespace Automation.BotSettingsUI
             if (nameField != null) { nameField.Blurred -= HandleFieldBlurred; nameField.Selected -= HandleFieldSelected; }
             if (priceField != null) { priceField.Blurred -= HandleFieldBlurred; priceField.Selected -= HandleFieldSelected; }
             if (descField != null) { descField.Blurred -= HandleFieldBlurred; descField.Selected -= HandleFieldSelected; }
+            if (scrimBehindFinger != null)
+            {
+                scrimBehindFinger.OnPress -= HandleScrimPress;
+                scrimBehindFinger.OnRealRelease -= MaybeHide;
+            }
         }
 
         private void Update()
@@ -171,8 +235,6 @@ namespace Automation.BotSettingsUI
             // the synthesize-Select path in EditableField.Update.
             if (dismissingKeyboard && focused != null && focused != lastBlurredField)
             {
-                Debug.Log($"[KB] dismissingKeyboard CLEARED via Update focus-regain " +
-                          $"(focused={focused.name}, lastBlurred={(lastBlurredField != null ? lastBlurredField.name : "null")}) f={Time.frameCount}");
                 dismissingKeyboard = false;
             }
 
@@ -197,8 +259,6 @@ namespace Automation.BotSettingsUI
                     Time.unscaledTime - dismissalStartTime > suppressionFloorSeconds)
                 {
                     dismissingKeyboard = false;
-                    Debug.Log($"[KB] dismissingKeyboard CLEARED via floor+rawKB<=0 " +
-                              $"f={Time.frameCount} elapsed={Time.unscaledTime - dismissalStartTime:F3}");
                 }
             }
             else if (rawKeyboard > 0f)
@@ -219,15 +279,34 @@ namespace Automation.BotSettingsUI
             // OutQuad ease into a linear-looking motion.
             if (!Mathf.Approximately(activeTargetY, target))
             {
-                Debug.Log($"[KB] TWEEN issued target={target:F1} prev={activeTargetY:F1} " +
-                          $"focused={(focused != null ? focused.name : "null")} " +
-                          $"dismissingKB={dismissingKeyboard} rawKB={rawKeyboard:F1} " +
-                          $"heldKB={heldKeyboardHeight:F1} f={Time.frameCount}");
+                // Cold-start lift handling. iOS's first keyboard show in an app
+                // session takes ~250-350 ms (RTI bridge / autocorrect setup) but
+                // TouchScreenKeyboard.area.height reports the final value the
+                // same frame the show is requested. Without intervention the
+                // normal short tween finishes while the keyboard is still mid-
+                // rise, so the sheet appears to "jump up almost instantly".
+                // Two knobs combine to fix this for the very first lift only:
+                //   - firstLiftStartDelay defers the tween start so the keyboard
+                //     gets a head start and the sheet trails it instead of leads.
+                //   - firstLiftDuration stretches the tween to roughly match the
+                //     iOS cold-start keyboard rise duration.
+                // The min-height guard ensures the flag isn't burned on tiny
+                // transient readings before the real lift arrives.
+                bool isLift = target > sheetRoot.anchoredPosition.y;
+                bool useFirstLiftTreatment = isLift
+                                             && !hasIssuedFirstLift
+                                             && (target - baselineY) > firstLiftMinHeight;
+                float duration = useFirstLiftTreatment ? firstLiftDuration : keyboardFollowDuration;
+                float startDelay = useFirstLiftTreatment ? firstLiftStartDelay : 0f;
+                if (useFirstLiftTreatment) hasIssuedFirstLift = true;
+
                 activeTargetY = target;
                 activePosTween?.Kill();
-                activePosTween = sheetRoot.DOAnchorPosY(target, keyboardFollowDuration)
+                var tween = sheetRoot.DOAnchorPosY(target, duration)
                     .SetEase(Ease.OutQuad)
                     .SetUpdate(UpdateType.Normal, isIndependentUpdate: true);
+                if (startDelay > 0f) tween.SetDelay(startDelay);
+                activePosTween = tween;
             }
         }
 
@@ -306,18 +385,20 @@ namespace Automation.BotSettingsUI
         }
 #endif
 
-        public void Show(ProductCardView card)
+        public void Show(ProductCardView card, bool isNewlyAdded = false)
         {
             boundProduct = card;
             boundService = null;
+            this.isNewlyAdded = isNewlyAdded;
             BindFields(card.Name, card.Price, card.Description);
             SlideIn();
         }
 
-        public void Show(ServiceCardView card)
+        public void Show(ServiceCardView card, bool isNewlyAdded = false)
         {
             boundService = card;
             boundProduct = null;
+            this.isNewlyAdded = isNewlyAdded;
             BindFields(card.Name, card.Price, card.Description);
             SlideIn();
         }
@@ -376,6 +457,19 @@ namespace Automation.BotSettingsUI
             mode = SheetMode.Hiding;
             activeTargetY = float.NaN;
 
+            // Force-blur every field BEFORE the slide-out tween starts.
+            // The prefab has Reset On Deactivation off on these inputs, so
+            // TMP_InputField leaves m_SelectionStillActive=true after blur
+            // and OnFillVBO keeps re-rendering the caret quad on every
+            // canvas rebuild. The next sheet open would otherwise show a
+            // stuck caret over the new card's content with no blink and
+            // no input capture. ForceBlur calls ReleaseSelection() to
+            // clear the flag. Mode is already Hiding, so HandleFieldBlurred
+            // bails on the synthetic blurs (no keyboard-dismissal bypass).
+            if (nameField != null) nameField.ForceBlur();
+            if (priceField != null) priceField.ForceBlur();
+            if (descField != null) descField.ForceBlur();
+
             // Start the slide-off IMMEDIATELY on the same frame as the user's
             // tap. The sheet and keyboard then begin descending together.
             //
@@ -415,17 +509,22 @@ namespace Automation.BotSettingsUI
 
         private void Commit()
         {
+            isNewlyAdded = false;
+            var name = nameField.Value;
+            var price = priceField.Value;
+            var desc = descField.Value;
+
             if (boundProduct != null)
             {
-                boundProduct.Name = nameField.Value;
-                boundProduct.Price = priceField.Value;
-                boundProduct.Description = descField.Value;
+                boundProduct.Name = string.IsNullOrWhiteSpace(name) ? ProductNamePlaceholder : name;
+                boundProduct.Price = string.IsNullOrWhiteSpace(price) ? PricePlaceholder : price;
+                boundProduct.Description = desc;
             }
             else if (boundService != null)
             {
-                boundService.Name = nameField.Value;
-                boundService.Price = priceField.Value;
-                boundService.Description = descField.Value;
+                boundService.Name = string.IsNullOrWhiteSpace(name) ? ServiceNamePlaceholder : name;
+                boundService.Price = string.IsNullOrWhiteSpace(price) ? PricePlaceholder : price;
+                boundService.Description = desc;
             }
             OnAnyCommitted?.Invoke();
             Hide();
@@ -448,6 +547,45 @@ namespace Automation.BotSettingsUI
             }
         }
 
+        // Snapshots dismissingKeyboard at the moment the scrim's PointerDown
+        // fires (BEFORE the EventSystem's deselection chain runs for that
+        // press). For a genuine scrim tap, dismissingKeyboard is still false
+        // here because no field has blurred yet — the SetSelectedGameObject
+        // call that triggers the blur happens AFTER ExecuteHierarchy<IPointerDownHandler>.
+        // For an iOS-synthetic Down that lands on the scrim mid-gesture
+        // (because the user pressed inside the sheet, the keyboard started
+        // dismissing, iOS cancelled the touch session, and the synthetic
+        // Down was re-targeted to whatever was under the finger now), the
+        // original sheet press has already triggered HandleFieldBlurred
+        // and dismissingKeyboard is true.
+        private void HandleScrimPress()
+        {
+            kbDismissingAtScrimPress = dismissingKeyboard;
+        }
+
+        // Wraps the scrim's OnRealRelease subscription. DelayedFingerUpAction
+        // already filters Up→Down→Up cycles on the SAME object (its existing
+        // 2-frame guard), but it cannot detect the cross-object reroute
+        // described in HandleScrimPress. Use the snapshot taken at press
+        // time as the discriminator.
+        private void MaybeHide()
+        {
+            if (kbDismissingAtScrimPress) return;
+            if (isNewlyAdded)
+            {
+                // Capture before Hide(): Hide() nulls boundProduct/boundService
+                // as part of its existing teardown, so we must snapshot the
+                // references before invoking it.
+                var product = boundProduct;
+                var service = boundService;
+                Hide();
+                if (product != null) OnProductDeleted?.Invoke(product);
+                if (service != null) OnServiceDeleted?.Invoke(service);
+                return;
+            }
+            Hide();
+        }
+
         // Called when any of the three EditableFields fires its Blurred event.
         // Sets dismissingKeyboard immediately and zeros the height state so the
         // very next Update() tweens the sheet toward baselineY without waiting
@@ -456,16 +594,9 @@ namespace Automation.BotSettingsUI
         // frame — that's a field-switch, keyboard stays up, sheet must stay.
         private void HandleFieldBlurred(EditableField blurred)
         {
-            Debug.Log($"[KB] HandleFieldBlurred({blurred.name}) mode={mode} " +
-                      $"f={Time.frameCount} lastSelF={lastSelectedFrame} " +
-                      $"dismissingKB={dismissingKeyboard} heldKB={heldKeyboardHeight}");
             if (mode != SheetMode.Shown) return;
             // Same-frame guard: old field's blur during a field-switch.
-            if (Time.frameCount == lastSelectedFrame)
-            {
-                Debug.Log($"[KB] HandleFieldBlurred SKIPPED (same frame as Select — field-switch)");
-                return;
-            }
+            if (Time.frameCount == lastSelectedFrame) return;
             // iOS field-switch-OnSubmit artifact guard: when the user switches
             // from input A to input B on iOS, TMP_InputField fires a synthetic
             // OnSubmit on B one frame after B's Select. OnSubmit calls
@@ -476,18 +607,12 @@ namespace Automation.BotSettingsUI
             // frames — physically impossible for a human to press Done that
             // fast (needs 100+ ms / 6+ frames of reaction time).
             int framesSinceSelect = Time.frameCount - lastSelectedFrame;
-            if (blurred == lastSelectedField && framesSinceSelect <= selectRecencyFramesForBlurSkip)
-            {
-                Debug.Log($"[KB] HandleFieldBlurred SKIPPED (iOS field-switch OnSubmit on just-selected field, " +
-                          $"framesSinceSelect={framesSinceSelect})");
-                return;
-            }
+            if (blurred == lastSelectedField && framesSinceSelect <= selectRecencyFramesForBlurSkip) return;
             lastBlurredField = blurred;
             heldKeyboardHeight = 0f;
             lastPositiveKeyboardTime = float.NegativeInfinity;
             dismissingKeyboard = true;
             dismissalStartTime = Time.unscaledTime;
-            Debug.Log($"[KB] dismissingKeyboard SET TRUE at t={Time.unscaledTime:F3}");
         }
 
         // Called when any of the three EditableFields fires its Selected event.
@@ -498,16 +623,10 @@ namespace Automation.BotSettingsUI
         // the iOS OnSubmit-on-newly-selected-field artifact.
         private void HandleFieldSelected(EditableField selected)
         {
-            Debug.Log($"[KB] HandleFieldSelected({selected.name}) mode={mode} " +
-                      $"f={Time.frameCount} dismissingKB={dismissingKeyboard}");
             if (mode != SheetMode.Shown) return;
             lastSelectedFrame = Time.frameCount;
             lastSelectedField = selected;
-            if (dismissingKeyboard)
-            {
-                dismissingKeyboard = false;
-                Debug.Log($"[KB] dismissingKeyboard CLEARED via Select");
-            }
+            if (dismissingKeyboard) dismissingKeyboard = false;
         }
     }
 }

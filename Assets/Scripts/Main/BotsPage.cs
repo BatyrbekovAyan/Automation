@@ -3,82 +3,31 @@ using UnityEngine.UI;
 
 public class BotsPage : MonoBehaviour
 {
-    [SerializeField] private GameObject MainPage;
-    [SerializeField] private GameObject BotsParent;
-    [SerializeField] private GameObject Chanel;
-
-    [SerializeField] private Button MainPageButton;
-    [SerializeField] private Button AllBotsButton;
-    [SerializeField] private Button ActiveBotsButton;
+    [Tooltip("Plus button in the Bots page header (top-right).")]
     [SerializeField] private Button NewBotButton;
 
-    public static BotsPage Instance; 
+    [Tooltip("Plus button in the bottom navigation bar (Screen_New tab). " +
+             "Pressing the header + forwards to this button so the tab " +
+             "switch — including icon/label active state — is handled by " +
+             "the existing BottomTabManager wiring.")]
+    [SerializeField] private Button BottomNavNewButton;
 
-    public static bool onlyActiveBotsVisible = false;
+    public static BotsPage Instance;
 
     void Start()
     {
         Instance = this;
 
-        if (MainPageButton != null)
-        {
-            MainPageButton.onClick.AddListener(OpenMainPage);
-        }
-
-        if (AllBotsButton != null)
-        {
-            AllBotsButton.onClick.AddListener(OpenAllBots);
-        }
-
-        if (ActiveBotsButton != null)
-        {
-            ActiveBotsButton.onClick.AddListener(OpenActiveBots);
-        }
-
         if (NewBotButton != null)
-        {
-            NewBotButton.onClick.AddListener(CreateBot);
-        }
+            NewBotButton.onClick.AddListener(OnNewBotPressed);
     }
 
-    public void OpenMainPage()
+    private void OnNewBotPressed()
     {
-        gameObject.SetActive(false);
-        MainPage.SetActive(true);
-    }
-
-    public void OpenAllBots()
-    {
-        onlyActiveBotsVisible = false;
-
-        if (BotsParent.transform.childCount != 0)
-        {
-            foreach (Transform bot in BotsParent.transform)
-            {
-                bot.gameObject.SetActive(true);
-            }
-        }
-    }
-
-    public void OpenActiveBots()
-    {
-        onlyActiveBotsVisible = true;
-
-        if (BotsParent.transform.childCount != 0)
-        {
-            foreach (Transform bot in BotsParent.transform)
-            {
-                if (!bot.GetChild(1).GetComponent<Toggle>().isOn)
-                {
-                    bot.gameObject.SetActive(false);
-                }
-            }
-        }
-    }
-
-    public void CreateBot()
-    {
-        gameObject.SetActive(false);
-        Chanel.SetActive(true);
+        // Forward to the bottom-nav + button so behavior is identical to
+        // tapping it directly: BottomTabManager activates Screen_New and
+        // updates the active icon/label visuals for us.
+        if (BottomNavNewButton != null)
+            BottomNavNewButton.onClick.Invoke();
     }
 }

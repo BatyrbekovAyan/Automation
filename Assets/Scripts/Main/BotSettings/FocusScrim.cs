@@ -24,6 +24,7 @@ namespace Automation.BotSettingsUI
         private RectTransform raisedField;
         private Transform originalParent;
         private int originalSiblingIndex;
+        private RectTransform placeholder;
         private DelayedFingerUpAction fingerUp;
         private Action onOutsideTapCached;
 
@@ -42,6 +43,21 @@ namespace Automation.BotSettingsUI
             raisedField = field;
             originalParent = field.parent;
             originalSiblingIndex = field.GetSiblingIndex();
+
+            // Insert a spacer that preserves the field's layout slot so
+            // siblings under the parent's VerticalLayoutGroup don't reflow
+            // when we reparent the field onto the raised layer.
+            var placeholderGo = new GameObject(
+                "FocusScrimPlaceholder", typeof(RectTransform), typeof(LayoutElement));
+            placeholder = (RectTransform)placeholderGo.transform;
+            placeholder.SetParent(originalParent, worldPositionStays: false);
+            placeholder.SetSiblingIndex(originalSiblingIndex);
+            placeholder.localScale = Vector3.one;
+            placeholder.anchoredPosition = Vector2.zero;
+            placeholder.sizeDelta = new Vector2(0f, field.rect.height);
+            var le = placeholderGo.GetComponent<LayoutElement>();
+            le.preferredHeight = field.rect.height;
+            le.flexibleHeight = 0f;
 
             field.SetParent(raisedLayer, worldPositionStays: true);
             field.SetAsLastSibling();
@@ -76,6 +92,12 @@ namespace Automation.BotSettingsUI
             {
                 raisedField.SetParent(originalParent, worldPositionStays: true);
                 raisedField.SetSiblingIndex(originalSiblingIndex);
+            }
+
+            if (placeholder != null)
+            {
+                Destroy(placeholder.gameObject);
+                placeholder = null;
             }
 
             raisedField = null;

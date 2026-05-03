@@ -199,9 +199,7 @@ public class Bot : MonoBehaviour
         PlayerPrefs.SetInt(transform.name, enabled ? 1 : 0);
         Status.text = enabled ? active ? "Active" : "Connecting.." : "Not Active";
         Status.color = enabled ? active ? green : blue : red;
-
-        gameObject.SetActive(!BotsPage.onlyActiveBotsVisible);
-
+        
         Manager.Instance.GetEnableWhatsappWorkflow(whatsappWorkflowId, enabled);
         Manager.Instance.GetEnableTelegramWorkflow(telegramWorkflowId, enabled);
     }
