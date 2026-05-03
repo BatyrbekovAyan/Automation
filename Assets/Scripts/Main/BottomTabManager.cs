@@ -59,6 +59,7 @@ public class TabData
 ///   4. Set <see cref="defaultTabIndex"/> to the tab that should
 ///      be selected when the scene first loads.
 /// </summary>
+[DefaultExecutionOrder(100)]
 public class BottomTabManager : MonoBehaviour
 {
     // ------------------------------------------------------------------ //

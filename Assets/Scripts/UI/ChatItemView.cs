@@ -16,6 +16,7 @@ public class ChatItemView : MonoBehaviour
 
     private ChatViewModel vm;
     private string chatId;
+    private Coroutine avatarLoadCoroutine;
 
     // The memory bank! It remembers: [ChatID_RawMessage] -> [Perfectly Sliced String]
     private static System.Collections.Generic.Dictionary<string, string> textCache = new();
@@ -34,6 +35,12 @@ public void Bind(ChatViewModel model)
             timeText.text = vm.LastMessageTimeString;
 
 // --- THE ZERO-FRAME AVATAR FIX ---
+        if (vm.AvatarSprite == null && !string.IsNullOrEmpty(vm.AvatarUrl) && MediaCacheManager.Instance != null)
+        {
+            Sprite cached = MediaCacheManager.Instance.GetSpriteFromMemory(vm.AvatarUrl);
+            if (cached != null) vm.AvatarSprite = cached;
+        }
+
         if (vm.AvatarSprite != null)
         {
             avatarImage.sprite = vm.AvatarSprite;
@@ -50,13 +57,14 @@ public void Bind(ChatViewModel model)
                 string path = MediaCacheManager.Instance.GetFilePathFromUrl(vm.AvatarUrl);
                 byte[] bytes = System.IO.File.ReadAllBytes(path);
                 Texture2D tex = new Texture2D(2, 2);
-                
+
                 if (tex.LoadImage(bytes))
                 {
                     Sprite sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
                     vm.AvatarSprite = sprite;
+                    MediaCacheManager.Instance.StoreSpriteInMemory(vm.AvatarUrl, sprite);
                     avatarImage.sprite = sprite;
-                    
+
                     avatarImage.gameObject.SetActive(true);
                     defaultAvatar.gameObject.SetActive(false); // Make sure default hides!
                     loadedFromCache = true;
@@ -74,8 +82,8 @@ public void Bind(ChatViewModel model)
 
                 if (!string.IsNullOrEmpty(vm.AvatarUrl))
                 {
-                    StopAllCoroutines(); 
-                    StartCoroutine(LoadAvatar(vm));
+                    if (avatarLoadCoroutine != null) StopCoroutine(avatarLoadCoroutine);
+                    avatarLoadCoroutine = StartCoroutine(LoadAvatar(vm));
                 }
             }
         }
@@ -92,6 +100,7 @@ public void Bind(ChatViewModel model)
     {
         // Use standard Get instead of GetTexture so we have access to the raw bytes for saving!
         using UnityWebRequest req = UnityWebRequest.Get(vm.AvatarUrl);
+        req.timeout = 30;
         yield return req.SendWebRequest();
 
         if (req.result != UnityWebRequest.Result.Success) yield break;
@@ -107,6 +116,8 @@ public void Bind(ChatViewModel model)
         {
             Sprite sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
             vm.AvatarSprite = sprite;
+            if (MediaCacheManager.Instance != null)
+                MediaCacheManager.Instance.StoreSpriteInMemory(vm.AvatarUrl, sprite);
             if (avatarImage != null) avatarImage.sprite = sprite;
             avatarImage.gameObject.SetActive(true);
             defaultAvatar.gameObject.SetActive(false);
@@ -125,6 +136,9 @@ public void Bind(ChatViewModel model)
 
         // --- THE FIX: Format the preview text on updates too ---
         UpdatePreviewText(vm.LastMessage ?? "");
+
+        // Move this row to the top of the list — fires only when LastMessage actually changed
+        transform.SetAsFirstSibling();
     }
 
     private void UpdatePreviewText(string rawMessage)

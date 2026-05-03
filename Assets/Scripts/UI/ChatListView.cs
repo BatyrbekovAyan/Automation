@@ -39,21 +39,16 @@ public class ChatListView : MonoBehaviour
         item.Bind(vm);
         itemsByChatId[vm.ChatId] = item;
 
-        // Since Manager sends them in order, SetAsLastSibling 
+        // Since Manager sends them in order, SetAsLastSibling
         // puts them in the correct sequence. Empty chats will naturally pile at the bottom.
         item.transform.SetAsLastSibling();
         item.transform.localScale = Vector3.one;
 
-        vm.OnUpdated += (updatedVm) => HandleChatMovement(updatedVm, item);
+        // Row movement on update is handled inside ChatItemView.OnVmUpdated, which
+        // unsubscribes itself in OnDestroy. Don't re-subscribe here — that leaks closures.
     }
 
-    void HandleChatMovement(ChatViewModel vm, ChatItemView item)
-    {
-        // --- THE FIX: Unified Movement Logic ---
-        // Any time a chat receives a new message, it simply jumps to the top of the unified list!
-        item.transform.SetAsFirstSibling();
-    }    
-    
+
     void OnDestroy()
     {
         if (ChatManager.Instance != null)

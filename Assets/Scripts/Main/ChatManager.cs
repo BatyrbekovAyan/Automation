@@ -6,10 +6,11 @@ using UnityEngine.Networking;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
 
+[DefaultExecutionOrder(-100)]
 public class ChatManager : MonoBehaviour
 {
     // Settings
-    public static int MessagesPerPage = 50; 
+    public static int MessagesPerPage = 50;
 
     [Header("UI Panels")]
     public GameObject ChatListPanel;
@@ -111,6 +112,7 @@ public class ChatManager : MonoBehaviour
 
         using UnityWebRequest www = UnityWebRequest.Get(url);
         www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
+        www.timeout = 30;
         yield return www.SendWebRequest();
 
         if (www.result != UnityWebRequest.Result.Success) yield break;
@@ -119,7 +121,7 @@ public class ChatManager : MonoBehaviour
 
         if (newJson != cachedJson)
         {
-            System.IO.File.WriteAllText(cachePath, newJson);
+            System.IO.File.WriteAllTextAsync(cachePath, newJson);
             ParseChatsJson(newJson, false); // FALSE = Background sync, DO NOT CLEAR THE UI!
         }
     }
@@ -223,6 +225,7 @@ public class ChatManager : MonoBehaviour
 
         using UnityWebRequest www = UnityWebRequest.Get(url);
         www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
+        www.timeout = 30;
         yield return www.SendWebRequest();
 
         if (www.result != UnityWebRequest.Result.Success) yield break;
@@ -299,15 +302,18 @@ public class ChatManager : MonoBehaviour
 
         using UnityWebRequest www = UnityWebRequest.Get(url);
         www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
+        www.timeout = 30;
         yield return www.SendWebRequest();
 
+#if UNITY_EDITOR
         var text = www.downloadHandler.text;
         System.IO.File.WriteAllText(
             Application.persistentDataPath + "/response.txt",
             text
         );
         Debug.Log("Saved to: " + Application.persistentDataPath);
-        
+#endif
+
         if (www.result != UnityWebRequest.Result.Success)
         {
             Debug.LogError($"[ChatManager] Error loading messages: {www.error}");
