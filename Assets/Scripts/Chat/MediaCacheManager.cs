@@ -15,6 +15,9 @@ public class MediaCacheManager : MonoBehaviour
     private readonly Dictionary<string, LinkedListNode<KeyValuePair<string, Sprite>>> spriteMemoryCache = new();
     private readonly LinkedList<KeyValuePair<string, Sprite>> spriteAccessOrder = new();
 
+    // Memoize URL → cache-file path so MD5 + StringBuilder allocations happen at most once per URL.
+    private readonly Dictionary<string, string> urlPathCache = new();
+
     void Awake()
     {
         if (Instance == null)
@@ -126,20 +129,20 @@ public class MediaCacheManager : MonoBehaviour
     /// </summary>
     public string GetFilePathFromUrl(string url) // <--- CHANGED TO PUBLIC
     {
-        using (MD5 md5 = MD5.Create())
-        {
-            byte[] inputBytes = Encoding.UTF8.GetBytes(url);
-            byte[] hashBytes = md5.ComputeHash(inputBytes);
+        if (urlPathCache.TryGetValue(url, out var cachedPath)) return cachedPath;
 
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < hashBytes.Length; i++)
-            {
-                sb.Append(hashBytes[i].ToString("X2"));
-            }
-            
-            // Example: "https://example.com/image.jpg" becomes "9E107D9D372BB6826BD81D3542A419D6.jpg"
-            return Path.Combine(cacheDirectory, sb.ToString() + ".jpg");
-        }
+        using MD5 md5 = MD5.Create();
+        byte[] inputBytes = Encoding.UTF8.GetBytes(url);
+        byte[] hashBytes = md5.ComputeHash(inputBytes);
+
+        StringBuilder sb = new StringBuilder(hashBytes.Length * 2);
+        for (int i = 0; i < hashBytes.Length; i++)
+            sb.Append(hashBytes[i].ToString("X2"));
+
+        // Example: "https://example.com/image.jpg" becomes "9E107D9D372BB6826BD81D3542A419D6.jpg"
+        string path = Path.Combine(cacheDirectory, sb.ToString() + ".jpg");
+        urlPathCache[url] = path;
+        return path;
     }
     
     /// <summary>

@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Networking;
 using System.Collections;
+using System.Collections.Generic;
 
 public class ChatItemView : MonoBehaviour
 {
@@ -11,15 +12,17 @@ public class ChatItemView : MonoBehaviour
     public Image defaultAvatar;
     public Button button;
     public TextMeshProUGUI lastMessageText;
-    
-    public TextMeshProUGUI timeText; 
+
+    public TextMeshProUGUI timeText;
 
     private ChatViewModel vm;
     private string chatId;
     private Coroutine avatarLoadCoroutine;
 
-    // The memory bank! It remembers: [ChatID_RawMessage] -> [Perfectly Sliced String]
-    private static System.Collections.Generic.Dictionary<string, string> textCache = new();
+    // LRU cache: [ChatID_RawMessage] -> [Perfectly Sliced String]. Capped to bound memory on long sessions.
+    private const int MaxTextCacheCount = 500;
+    private static readonly Dictionary<string, LinkedListNode<KeyValuePair<string, string>>> textCache = new();
+    private static readonly LinkedList<KeyValuePair<string, string>> textCacheOrder = new();
     
 public void Bind(ChatViewModel model)
     {
@@ -76,7 +79,7 @@ public void Bind(ChatViewModel model)
             {
                 avatarImage.gameObject.SetActive(false);
                 defaultAvatar.gameObject.SetActive(true);
-                
+
                 // --- APPLY THE RANDOM COLOR FIX HERE ---
                 ApplyDefaultAvatarColor(chatId);
 
@@ -108,7 +111,7 @@ public void Bind(ChatViewModel model)
         byte[] bytes = req.downloadHandler.data;
 
         // Save it to the phone permanently!
-        if (MediaCacheManager.Instance != null) 
+        if (MediaCacheManager.Instance != null)
             MediaCacheManager.Instance.SaveImageToCache(vm.AvatarUrl, bytes);
 
         Texture2D tex = new Texture2D(2, 2);
@@ -152,35 +155,46 @@ public void Bind(ChatViewModel model)
         // --- THE PERFORMANCE FIX: Check the Cache! ---
         // Create a unique key for this exact message in this exact chat
         string cacheKey = chatId + "_" + rawMessage;
-        
+
         // If we already did the heavy math for this exact string, use the saved answer instantly!
-        if (textCache.TryGetValue(cacheKey, out string savedText))
+        if (textCache.TryGetValue(cacheKey, out var existingNode))
         {
-            lastMessageText.text = savedText;
+            textCacheOrder.Remove(existingNode);
+            textCacheOrder.AddFirst(existingNode);
+            lastMessageText.text = existingNode.Value.Value;
             return;
         }
 
         float exactWidth = lastMessageText.rectTransform.rect.width;
         float maxWidth = 0f;
 
-        if (exactWidth > 50f) 
+        if (exactWidth > 50f)
         {
-            maxWidth = exactWidth; 
+            maxWidth = exactWidth;
         }
-        else 
+        else
         {
             float containerWidth = 1080f;
             Canvas canvas = GetComponentInParent<Canvas>();
             if (canvas != null) containerWidth = canvas.GetComponent<RectTransform>().rect.width;
-            maxWidth = containerWidth - 280f; 
+            maxWidth = containerWidth - 280f;
         }
 
         // Do the heavy binary search math ONE TIME...
         string slicedText = SplitLongWord(rawMessage, lastMessageText, maxWidth);
-        
-        // ...and save the answer in the vault for the next time we scroll past it!
-        textCache[cacheKey] = slicedText;
-        
+
+        // ...and save the answer in the LRU vault for the next time we scroll past it!
+        var node = new LinkedListNode<KeyValuePair<string, string>>(
+            new KeyValuePair<string, string>(cacheKey, slicedText));
+        textCacheOrder.AddFirst(node);
+        textCache[cacheKey] = node;
+        while (textCache.Count > MaxTextCacheCount)
+        {
+            var tail = textCacheOrder.Last;
+            textCacheOrder.RemoveLast();
+            textCache.Remove(tail.Value.Key);
+        }
+
         lastMessageText.text = slicedText;
     }
     
