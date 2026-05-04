@@ -125,6 +125,17 @@ public class ChatManager : MonoBehaviour
     public void Start()
     {
         ShowChatList(true);
+        StartCoroutine(InitializeActiveBotNextFrame());
+    }
+
+    /// <summary>
+    /// Defer active-bot resolution by one frame so Manager.Start() (which runs after
+    /// ChatManager.Start() due to ChatManager's [DefaultExecutionOrder(-100)]) has a
+    /// chance to instantiate the bot GameObjects under BotsParent first.
+    /// </summary>
+    private IEnumerator InitializeActiveBotNextFrame()
+    {
+        yield return null;
         ResolveInitialActiveBot();
         BeginLoadForActiveBot();
     }
