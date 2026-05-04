@@ -14,8 +14,10 @@ public class ChatListView : MonoBehaviour
     {
         var manager = ChatManager.Instance;
         manager.OnChatAdded += AddChat;
-        manager.OnChatListCleared += ClearChatList; 
-        
+        manager.OnChatListCleared += ClearChatList;
+        manager.OnEmptyState += HandleEmptyState;
+        manager.OnActiveBotChanged += HandleActiveBotChanged;
+
         foreach (var chat in manager.Chats)
             AddChat(chat);
     }
@@ -34,6 +36,12 @@ public class ChatListView : MonoBehaviour
 
     void AddChat(ChatViewModel vm)
     {
+        // Real data came in — make sure our content panel is visible.
+        if (content != null && !content.gameObject.activeSelf)
+        {
+            content.gameObject.SetActive(true);
+        }
+
         // --- THE FIX: Everything goes into the normalContent now! ---
         var item = Instantiate(prefab, content);
         item.Bind(vm);
@@ -48,13 +56,31 @@ public class ChatListView : MonoBehaviour
         // unsubscribes itself in OnDestroy. Don't re-subscribe here — that leaks closures.
     }
 
+    private void HandleEmptyState(EmptyStateReason _)
+    {
+        // The EmptyStateView surface activates itself; we just hide the list area.
+        if (content != null)
+        {
+            content.gameObject.SetActive(false);
+        }
+    }
+
+    private void HandleActiveBotChanged(string _)
+    {
+        if (content != null)
+        {
+            content.gameObject.SetActive(true);
+        }
+    }
 
     void OnDestroy()
     {
         if (ChatManager.Instance != null)
         {
             ChatManager.Instance.OnChatAdded -= AddChat;
-            ChatManager.Instance.OnChatListCleared -= ClearChatList; 
+            ChatManager.Instance.OnChatListCleared -= ClearChatList;
+            ChatManager.Instance.OnEmptyState -= HandleEmptyState;
+            ChatManager.Instance.OnActiveBotChanged -= HandleActiveBotChanged;
         }
     }
 }
