@@ -46,9 +46,26 @@ public class MediaCacheManager : MonoBehaviour
         return mediaDir;
     }
 
+    /// <summary>
+    /// Drops cached entries that belonged to a previous active bot. Called by every
+    /// public method whose result is bot-scoped, so a bot switch cannot serve stale
+    /// data from any of urlPathCache / spriteMemoryCache / spriteAccessOrder.
+    /// </summary>
+    private void EnsureBotScoped()
+    {
+        string activeBotId = ChatManager.Instance != null ? ChatManager.Instance.CurrentBotId : "_default";
+        if (cachedUrlBotId == activeBotId) return;
+
+        cachedUrlBotId = activeBotId;
+        urlPathCache.Clear();
+        spriteMemoryCache.Clear();
+        spriteAccessOrder.Clear();
+    }
+
     public Sprite GetSpriteFromMemory(string url)
     {
         if (string.IsNullOrEmpty(url)) return null;
+        EnsureBotScoped();
         if (!spriteMemoryCache.TryGetValue(url, out var node)) return null;
 
         spriteAccessOrder.Remove(node);
@@ -59,6 +76,7 @@ public class MediaCacheManager : MonoBehaviour
     public void StoreSpriteInMemory(string url, Sprite sprite)
     {
         if (string.IsNullOrEmpty(url) || sprite == null) return;
+        EnsureBotScoped();
 
         if (spriteMemoryCache.TryGetValue(url, out var existing))
         {
@@ -117,13 +135,7 @@ public class MediaCacheManager : MonoBehaviour
     /// </summary>
     public string GetFilePathFromUrl(string url)
     {
-        string activeBotId = ChatManager.Instance != null ? ChatManager.Instance.CurrentBotId : "_default";
-
-        if (cachedUrlBotId != activeBotId)
-        {
-            urlPathCache.Clear();
-            cachedUrlBotId = activeBotId;
-        }
+        EnsureBotScoped();
 
         if (urlPathCache.TryGetValue(url, out var cachedPath)) return cachedPath;
 
