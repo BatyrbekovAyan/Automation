@@ -93,6 +93,60 @@ public class ChatManager : MonoBehaviour
     }
 
     /// <summary>
+    /// Deletes the cache subtree for a bot. If that bot was active, falls back
+    /// to the first remaining bot or fires NoBotsExist. Called by Bot.DeleteBot.
+    /// </summary>
+    public void PurgeCacheForBot(string botId)
+    {
+        if (string.IsNullOrEmpty(botId)) return;
+
+        try
+        {
+            string botCacheDir = Path.Combine(Application.persistentDataPath, "BotCache", botId);
+            if (Directory.Exists(botCacheDir))
+            {
+                Directory.Delete(botCacheDir, recursive: true);
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[ChatManager] PurgeCacheForBot({botId}) failed: {e.Message}");
+        }
+
+        if (botId != CurrentBotId) return;
+
+        // The active bot was deleted. Pick the next bot or empty out.
+        Transform root = Manager.Instance != null ? Manager.Instance.BotsRoot : null;
+        Transform next = null;
+        if (root != null)
+        {
+            for (int i = 0; i < root.childCount; i++)
+            {
+                Transform child = root.GetChild(i);
+                if (child.name != botId) { next = child; break; }
+            }
+        }
+
+        if (next != null)
+        {
+            // SetActiveBot's early-return guard (`botId == CurrentBotId`) does not
+            // fire here because next.name differs from the just-deleted bot we are
+            // still nominally "on". SetActiveBot persists, clears list, and refreshes.
+            SetActiveBot(next.name);
+        }
+        else
+        {
+            CurrentBotId = DefaultBotId;
+            PlayerPrefs.DeleteKey(LastSelectedBotPrefKey);
+            PlayerPrefs.Save();
+            Chats.Clear();
+            chatLookup.Clear();
+            OnChatListCleared?.Invoke();
+            OnEmptyState?.Invoke(EmptyStateReason.NoBotsExist);
+        }
+    }
+
+    /// <summary>
     /// Strips path separators and invalid filename characters from a bot id.
     /// Falls back to the default sentinel if the input is empty or fully invalid.
     /// Defense-in-depth: PlayerPrefs are user-editable on disk.
