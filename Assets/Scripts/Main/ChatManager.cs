@@ -38,7 +38,8 @@ public class ChatManager : MonoBehaviour
     private string profileId = "af80627e-6d9d"; // TEMP: still used until Task 7; removed there.
 
     // Active-bot state
-    public string CurrentBotId { get; private set; } = "_default";
+    private const string DefaultBotId = "_default";
+    public string CurrentBotId { get; private set; } = DefaultBotId;
 
     /// <summary>
     /// Per-bot cache root: {persistentDataPath}/BotCache/{CurrentBotId}/.
@@ -46,9 +47,26 @@ public class ChatManager : MonoBehaviour
     /// </summary>
     public string GetCacheRoot()
     {
-        string path = Path.Combine(Application.persistentDataPath, "BotCache", CurrentBotId);
+        string botId = SanitizeBotId(CurrentBotId);
+        string path = Path.Combine(Application.persistentDataPath, "BotCache", botId);
         if (!Directory.Exists(path)) Directory.CreateDirectory(path);
         return path;
+    }
+
+    /// <summary>
+    /// Strips path separators and invalid filename characters from a bot id.
+    /// Falls back to the default sentinel if the input is empty or fully invalid.
+    /// Defense-in-depth: PlayerPrefs are user-editable on disk.
+    /// </summary>
+    private static string SanitizeBotId(string botId)
+    {
+        if (string.IsNullOrEmpty(botId)) return DefaultBotId;
+
+        char[] invalid = Path.GetInvalidFileNameChars();
+        if (botId.IndexOfAny(invalid) < 0 && botId.IndexOf("..", StringComparison.Ordinal) < 0)
+            return botId;
+
+        return DefaultBotId;
     }
 
     public void Awake()
