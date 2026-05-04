@@ -35,7 +35,6 @@ public class ChatManager : MonoBehaviour
     // State
     public int currentPage = 1;
     private string currentChatId;
-    private string profileId = "af80627e-6d9d"; // TEMP: still used until Task 7; removed there.
 
     // Active-bot state
     private const string DefaultBotId = "_default";
@@ -91,6 +90,16 @@ public class ChatManager : MonoBehaviour
 
         StopAllCoroutines();
         BeginLoadForActiveBot();
+    }
+
+    /// <summary>
+    /// Returns the active bot's WhatsApp profile ID, or null if missing.
+    /// Coroutines guard on null and abort to avoid sending malformed requests.
+    /// </summary>
+    private string GetActiveProfileId()
+    {
+        Bot bot = Manager.Instance != null ? Manager.Instance.FindBotByName(CurrentBotId) : null;
+        return bot != null ? bot.whatsappProfileId : null;
     }
 
     /// <summary>
@@ -223,7 +232,13 @@ public class ChatManager : MonoBehaviour
 
     IEnumerator SyncAllChats(string cachePath, string cachedJson)
     {
-        string url = $"https://wappi.pro/api/sync/chats/filter?profile_id={profileId}";
+        string activeProfileId = GetActiveProfileId();
+        if (string.IsNullOrEmpty(activeProfileId))
+        {
+            OnEmptyState?.Invoke(EmptyStateReason.BotHasNoWhatsApp);
+            yield break;
+        }
+        string url = $"https://wappi.pro/api/sync/chats/filter?profile_id={activeProfileId}";
 
         using UnityWebRequest www = UnityWebRequest.Get(url);
         www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
@@ -334,9 +349,11 @@ public class ChatManager : MonoBehaviour
     
     IEnumerator SyncLatestMessages(string chatId, List<MessageViewModel> cachedList)
     {
+        string activeProfileId = GetActiveProfileId();
+        if (string.IsNullOrEmpty(activeProfileId)) yield break;
         string escapedId = UnityWebRequest.EscapeURL(chatId);
         // We strictly only check offset 0 (the absolute newest messages)
-        string url = $"https://wappi.pro/api/sync/messages/get?profile_id={profileId}&chat_id={escapedId}&limit={MessagesPerPage}&offset=0";
+        string url = $"https://wappi.pro/api/sync/messages/get?profile_id={activeProfileId}&chat_id={escapedId}&limit={MessagesPerPage}&offset=0";
 
         using UnityWebRequest www = UnityWebRequest.Get(url);
         www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
@@ -411,9 +428,15 @@ public class ChatManager : MonoBehaviour
     IEnumerator GetMessagesRoutine(string chatId, int page, Action<List<MessageViewModel>, bool> onComplete)
     {
         int offset = (page - 1) * MessagesPerPage;
-        
+
+        string activeProfileId = GetActiveProfileId();
+        if (string.IsNullOrEmpty(activeProfileId))
+        {
+            onComplete?.Invoke(new List<MessageViewModel>(), false);
+            yield break;
+        }
         string escapedId = UnityWebRequest.EscapeURL(chatId);
-        string url = $"https://wappi.pro/api/sync/messages/get?profile_id={profileId}&chat_id={escapedId}&limit={MessagesPerPage}&offset={offset}";
+        string url = $"https://wappi.pro/api/sync/messages/get?profile_id={activeProfileId}&chat_id={escapedId}&limit={MessagesPerPage}&offset={offset}";
 
         using UnityWebRequest www = UnityWebRequest.Get(url);
         www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
@@ -694,7 +717,13 @@ if (msg.messageType == MessageType.Video)
 
     IEnumerator DownloadMediaRoutine(string messageId, Action<string> onSuccess, Action onFailure)
     {
-        string url = $"https://wappi.pro/api/sync/message/media/download?profile_id={profileId}&message_id={messageId}";
+        string activeProfileId = GetActiveProfileId();
+        if (string.IsNullOrEmpty(activeProfileId))
+        {
+            onFailure?.Invoke();
+            yield break;
+        }
+        string url = $"https://wappi.pro/api/sync/message/media/download?profile_id={activeProfileId}&message_id={messageId}";
         using UnityWebRequest www = UnityWebRequest.Get(url);
         www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
         yield return www.SendWebRequest();
@@ -729,7 +758,9 @@ if (msg.messageType == MessageType.Video)
 
 IEnumerator SendTextMessageRoutine(string chatId, string text)
 {
-    string url = $"https://wappi.pro/api/sync/message/send?profile_id={profileId}";
+    string activeProfileId = GetActiveProfileId();
+    if (string.IsNullOrEmpty(activeProfileId)) yield break;
+    string url = $"https://wappi.pro/api/sync/message/send?profile_id={activeProfileId}";
     string recipient = chatId;
     if (recipient.EndsWith("@c.us")) recipient = recipient.Replace("@c.us", "");
 
