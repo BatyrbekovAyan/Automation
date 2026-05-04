@@ -28,6 +28,8 @@ public class ChatManager : MonoBehaviour
     public event Action<string> OnChatSelected;
     public event Action<List<MessageViewModel>, bool, bool> OnBatchMessagesLoaded;
     public event Action<List<MessageViewModel>> OnLiveMessagesReceived;
+    public event Action<string> OnActiveBotChanged;
+    public event Action<EmptyStateReason> OnEmptyState;
     
     // State
     public int currentPage = 1;
@@ -702,4 +704,10 @@ public class WappiSendTextResponse
     public string status;
     public string message_id;
     public long timestamp;
+}
+
+public enum EmptyStateReason
+{
+    NoBotsExist,
+    BotHasNoWhatsApp,
 }
