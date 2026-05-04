@@ -18,6 +18,22 @@ public class Manager : MonoBehaviour
     // [SerializeField] private GameObject Confirmation;
     [SerializeField] private GameObject BotsPage;
     [SerializeField] private GameObject BotsParent;
+
+    /// <summary>Read-only access to the bots root transform. Used by ChatManager to enumerate bots.</summary>
+    public Transform BotsRoot => BotsParent != null ? BotsParent.transform : null;
+
+    /// <summary>
+    /// Returns the Bot whose GameObject name matches botName, or null if not found.
+    /// Bot names are "Bot0", "Bot1", etc. — they are persistent identifiers used for
+    /// PlayerPrefs and per-bot cache directories.
+    /// </summary>
+    public Bot FindBotByName(string botName)
+    {
+        if (BotsParent == null || string.IsNullOrEmpty(botName)) return null;
+        Transform t = BotsParent.transform.Find(botName);
+        return t != null ? t.GetComponent<Bot>() : null;
+    }
+
     [SerializeField] private GameObject BotPrefab;
     [SerializeField] private GameObject BotSettings;
     [SerializeField] private GameObject BotSettingsParent;
