@@ -53,6 +53,8 @@ public static class BotSwitcherSheetBuilder
         var backdropButton = backdrop.GetComponent<Button>();
 
         // Sheet panel — bottom-anchored (pivot Y = 0, anchor Y = 0) per BotSwitcherSheet contract.
+        // Fixed sizeDelta keeps the sheet a comfortable size even with few bots; RowScroll inside
+        // takes flexibleHeight = 1 so it fills the remaining space below the header.
         GameObject panel = new GameObject("Panel", typeof(RectTransform), typeof(Image), typeof(VerticalLayoutGroup));
         panel.transform.SetParent(sheet.transform, false);
         RectTransform panelRT = panel.GetComponent<RectTransform>();
@@ -60,7 +62,7 @@ public static class BotSwitcherSheetBuilder
         panelRT.anchorMax = new Vector2(1f, 0f);
         panelRT.pivot = new Vector2(0.5f, 0f);
         panelRT.anchoredPosition = Vector2.zero;
-        panelRT.sizeDelta = new Vector2(0f, 720f); // initial; ContentSizeFitter will refine
+        panelRT.sizeDelta = new Vector2(0f, 720f); // fixed sheet height
         panel.GetComponent<Image>().color = Color.white;
 
         var panelLayout = panel.GetComponent<VerticalLayoutGroup>();
@@ -68,9 +70,6 @@ public static class BotSwitcherSheetBuilder
         panelLayout.spacing = 0;
         panelLayout.childForceExpandWidth = true;
         panelLayout.childForceExpandHeight = false;
-
-        var panelFitter = panel.AddComponent<ContentSizeFitter>();
-        panelFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
         // Sheet header label
         GameObject header = new GameObject("Header", typeof(RectTransform), typeof(TextMeshProUGUI));
@@ -85,14 +84,15 @@ public static class BotSwitcherSheetBuilder
         headerLE.minHeight = 56;
         headerLE.preferredHeight = 56;
 
-        // Row container (scrollable)
+        // Row container (scrollable). flexibleHeight = 1 makes it fill the remaining
+        // space inside the fixed-height Panel below the header.
         GameObject scroll = new GameObject("RowScroll", typeof(RectTransform), typeof(ScrollRect), typeof(Image));
         scroll.transform.SetParent(panel.transform, false);
         var scrollImage = scroll.GetComponent<Image>();
         scrollImage.color = new Color(0, 0, 0, 0); // transparent
         var scrollLE = scroll.AddComponent<LayoutElement>();
-        scrollLE.minHeight = 320;
-        scrollLE.preferredHeight = 480;
+        scrollLE.minHeight = 200;
+        scrollLE.flexibleHeight = 1;
 
         var scrollRect = scroll.GetComponent<ScrollRect>();
         scrollRect.horizontal = false;

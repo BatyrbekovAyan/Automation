@@ -91,8 +91,12 @@ public static class Screen_WhatsappHeaderRebuilder
         GameObject chev = new GameObject("Chevron", typeof(RectTransform), typeof(TextMeshProUGUI), typeof(LayoutElement));
         chev.transform.SetParent(root.transform, false);
         var chevText = chev.GetComponent<TextMeshProUGUI>();
-        chevText.text = "▼";
-        chevText.fontSize = 12;
+        // TODO: replace with a chevron sprite when art is available. The Unicode
+        // triangle U+25BC isn't in SFProText, so we fall back to a Latin "v" which
+        // every font supports.
+        chevText.text = "v";
+        chevText.fontSize = 14;
+        chevText.fontStyle = FontStyles.Bold;
         chevText.color = new Color(0.45f, 0.45f, 0.45f);
         var chevLE = chev.GetComponent<LayoutElement>();
         chevLE.preferredWidth = 16;
