@@ -69,6 +69,54 @@ public class ChatManager : MonoBehaviour
         return DefaultBotId;
     }
 
+    private const string LastSelectedBotPrefKey = "LastSelectedBotForChats";
+
+    /// <summary>
+    /// Switch the active bot. Persists the choice, fires OnActiveBotChanged,
+    /// clears the current chat list, and triggers a fresh load.
+    /// </summary>
+    public void SetActiveBot(string botId)
+    {
+        if (string.IsNullOrEmpty(botId)) return;
+        if (botId == CurrentBotId) return;
+
+        CurrentBotId = botId;
+        PlayerPrefs.SetString(LastSelectedBotPrefKey, botId);
+        PlayerPrefs.Save();
+
+        Chats.Clear();
+        chatLookup.Clear();
+        OnChatListCleared?.Invoke();
+        OnActiveBotChanged?.Invoke(botId);
+
+        StopAllCoroutines();
+        BeginLoadForActiveBot();
+    }
+
+    /// <summary>
+    /// Resolve the active bot's WhatsApp profile, then load cached chats and
+    /// kick off a network sync. Fires OnEmptyState if the bot has no WhatsApp.
+    /// </summary>
+    private void BeginLoadForActiveBot()
+    {
+        Bot bot = Manager.Instance != null ? Manager.Instance.FindBotByName(CurrentBotId) : null;
+        if (bot == null || string.IsNullOrEmpty(bot.whatsappProfileId))
+        {
+            OnEmptyState?.Invoke(EmptyStateReason.BotHasNoWhatsApp);
+            return;
+        }
+
+        string cachePath = Path.Combine(GetCacheRoot(), "chats.json");
+        string cachedJson = "";
+        if (File.Exists(cachePath))
+        {
+            cachedJson = File.ReadAllText(cachePath);
+            ParseChatsJson(cachedJson, true);
+        }
+
+        StartCoroutine(SyncAllChats(cachePath, cachedJson));
+    }
+
     public void Awake()
     {
         Instance = this;
@@ -77,17 +125,33 @@ public class ChatManager : MonoBehaviour
     public void Start()
     {
         ShowChatList(true);
-        
-        string cachePath = System.IO.Path.Combine(Application.persistentDataPath, "all_chats_cache.json");
-        string cachedJson = "";
-        
-        if (System.IO.File.Exists(cachePath))
+        ResolveInitialActiveBot();
+        BeginLoadForActiveBot();
+    }
+
+    /// <summary>
+    /// Pick the active bot at startup: persisted choice if it still exists,
+    /// otherwise the first bot, otherwise fire NoBotsExist.
+    /// </summary>
+    private void ResolveInitialActiveBot()
+    {
+        string saved = PlayerPrefs.GetString(LastSelectedBotPrefKey, "");
+        if (!string.IsNullOrEmpty(saved) && Manager.Instance != null && Manager.Instance.FindBotByName(saved) != null)
         {
-            cachedJson = System.IO.File.ReadAllText(cachePath);
-            ParseChatsJson(cachedJson, true); // TRUE = Initial load, safe to clear the screen!
+            CurrentBotId = saved;
+            return;
         }
 
-        StartCoroutine(SyncAllChats(cachePath, cachedJson));
+        Transform root = Manager.Instance != null ? Manager.Instance.BotsRoot : null;
+        if (root != null && root.childCount > 0)
+        {
+            CurrentBotId = root.GetChild(0).name;
+            PlayerPrefs.SetString(LastSelectedBotPrefKey, CurrentBotId);
+            PlayerPrefs.Save();
+            return;
+        }
+
+        OnEmptyState?.Invoke(EmptyStateReason.NoBotsExist);
     }
 
     public ChatViewModel GetChat(string chatId)
