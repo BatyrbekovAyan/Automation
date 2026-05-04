@@ -9,14 +9,14 @@ public class MediaCacheManager : MonoBehaviour
 {
     public static MediaCacheManager Instance;
 
-    private string cacheDirectory;
-
     private const int MaxMemorySpriteCount = 100;
     private readonly Dictionary<string, LinkedListNode<KeyValuePair<string, Sprite>>> spriteMemoryCache = new();
     private readonly LinkedList<KeyValuePair<string, Sprite>> spriteAccessOrder = new();
 
-    // Memoize URL → cache-file path so MD5 + StringBuilder allocations happen at most once per URL.
+    // Memoized URL → cache-file path. Keyed by (botId, url) so a bot switch does not
+    // serve another bot's file. Cleared on bot change.
     private readonly Dictionary<string, string> urlPathCache = new();
+    private string cachedUrlBotId;
 
     void Awake()
     {
@@ -24,15 +24,6 @@ public class MediaCacheManager : MonoBehaviour
         {
             Instance = this;
             DontDestroyOnLoad(gameObject);
-            
-            // Define the safe folder on the phone's hard drive
-            cacheDirectory = Path.Combine(Application.persistentDataPath, "MediaCache");
-
-            // If the folder doesn't exist yet, create it!
-            if (!Directory.Exists(cacheDirectory))
-            {
-                Directory.CreateDirectory(cacheDirectory);
-            }
         }
         else
         {
@@ -41,8 +32,20 @@ public class MediaCacheManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Returns a previously-decoded sprite from memory, or null. O(1), bypasses disk + decode.
+    /// Per-bot media directory: {ChatManager.GetCacheRoot()}/media/.
+    /// Created on first access.
     /// </summary>
+    private string GetMediaDirectory()
+    {
+        string root = ChatManager.Instance != null
+            ? ChatManager.Instance.GetCacheRoot()
+            : Path.Combine(Application.persistentDataPath, "BotCache", "_default");
+
+        string mediaDir = Path.Combine(root, "media");
+        if (!Directory.Exists(mediaDir)) Directory.CreateDirectory(mediaDir);
+        return mediaDir;
+    }
+
     public Sprite GetSpriteFromMemory(string url)
     {
         if (string.IsNullOrEmpty(url)) return null;
@@ -53,10 +56,6 @@ public class MediaCacheManager : MonoBehaviour
         return node.Value.Value;
     }
 
-    /// <summary>
-    /// Caches a decoded sprite in memory keyed by URL. LRU-evicted at MaxMemorySpriteCount.
-    /// Evicted entries are dropped from the dictionary only — VMs/Images keep their references intact.
-    /// </summary>
     public void StoreSpriteInMemory(string url, Sprite sprite)
     {
         if (string.IsNullOrEmpty(url) || sprite == null) return;
@@ -81,9 +80,6 @@ public class MediaCacheManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Checks if we already have this file downloaded and saved on the phone.
-    /// </summary>
     public bool IsImageCached(string url)
     {
         if (string.IsNullOrEmpty(url)) return false;
@@ -91,22 +87,14 @@ public class MediaCacheManager : MonoBehaviour
         return File.Exists(filePath);
     }
 
-    /// <summary>
-    /// Saves the raw downloaded bytes directly to the phone's hard drive.
-    /// </summary>
     public void SaveImageToCache(string url, byte[] imageData)
     {
         if (string.IsNullOrEmpty(url) || imageData == null || imageData.Length == 0) return;
 
         string filePath = GetFilePathFromUrl(url);
-        
-        // Write the bytes to the disk asynchronously so it doesn't freeze the app
         File.WriteAllBytesAsync(filePath, imageData);
     }
 
-    /// <summary>
-    /// Loads the image instantly from the phone's hard drive.
-    /// </summary>
     public Texture2D LoadImageFromCache(string url)
     {
         if (!IsImageCached(url)) return null;
@@ -114,7 +102,6 @@ public class MediaCacheManager : MonoBehaviour
         string filePath = GetFilePathFromUrl(url);
         byte[] fileData = File.ReadAllBytes(filePath);
 
-        // Create an empty texture and load the bytes into it
         Texture2D texture = new Texture2D(2, 2);
         if (texture.LoadImage(fileData))
         {
@@ -125,10 +112,19 @@ public class MediaCacheManager : MonoBehaviour
     }
 
     /// <summary>
-    /// URLs contain illegal characters. This converts the URL into a safe, unique 32-character MD5 hash.
+    /// URL → MD5-hashed file path under the active bot's media directory.
+    /// Memoization is invalidated when the active bot changes.
     /// </summary>
-    public string GetFilePathFromUrl(string url) // <--- CHANGED TO PUBLIC
+    public string GetFilePathFromUrl(string url)
     {
+        string activeBotId = ChatManager.Instance != null ? ChatManager.Instance.CurrentBotId : "_default";
+
+        if (cachedUrlBotId != activeBotId)
+        {
+            urlPathCache.Clear();
+            cachedUrlBotId = activeBotId;
+        }
+
         if (urlPathCache.TryGetValue(url, out var cachedPath)) return cachedPath;
 
         using MD5 md5 = MD5.Create();
@@ -139,24 +135,26 @@ public class MediaCacheManager : MonoBehaviour
         for (int i = 0; i < hashBytes.Length; i++)
             sb.Append(hashBytes[i].ToString("X2"));
 
-        // Example: "https://example.com/image.jpg" becomes "9E107D9D372BB6826BD81D3542A419D6.jpg"
-        string path = Path.Combine(cacheDirectory, sb.ToString() + ".jpg");
+        string path = Path.Combine(GetMediaDirectory(), sb.ToString() + ".jpg");
         urlPathCache[url] = path;
         return path;
     }
-    
+
     /// <summary>
-    /// Optional: Call this if you want to let the user clear their cache to save phone storage.
+    /// Clear the active bot's media cache. Used by ChatManager.PurgeCacheForBot
+    /// when needed; routine deletion of a non-active bot wipes the directory directly.
     /// </summary>
     public void ClearCache()
     {
-        if (Directory.Exists(cacheDirectory))
+        string mediaDir = GetMediaDirectory();
+        if (Directory.Exists(mediaDir))
         {
-            DirectoryInfo dir = new DirectoryInfo(cacheDirectory);
+            DirectoryInfo dir = new DirectoryInfo(mediaDir);
             foreach (FileInfo file in dir.GetFiles())
             {
                 file.Delete();
             }
         }
+        urlPathCache.Clear();
     }
 }
