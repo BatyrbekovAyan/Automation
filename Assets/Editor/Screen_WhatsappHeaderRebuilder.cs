@@ -16,10 +16,10 @@ public static class Screen_WhatsappHeaderRebuilder
     [MenuItem("Tools/Bot Switcher/Rebuild Whatsapp Header")]
     public static void Rebuild()
     {
-        GameObject screen = GameObject.Find(ScreenName);
+        GameObject screen = FindGameObjectByNameIncludeInactive(ScreenName);
         if (screen == null)
         {
-            Debug.LogError($"[Screen_WhatsappHeaderRebuilder] Could not find {ScreenName} in the active scene. Open the Main scene.");
+            Debug.LogError($"[Screen_WhatsappHeaderRebuilder] Could not find {ScreenName} in the active scene (active or inactive). Open the Main scene.");
             return;
         }
 
@@ -112,6 +112,26 @@ public static class Screen_WhatsappHeaderRebuilder
         EditorSceneManager.MarkSceneDirty(root.scene);
         Debug.Log("[Screen_WhatsappHeaderRebuilder] Whatsapp header rebuilt with bot-switcher title.");
         Selection.activeGameObject = root;
+    }
+
+    /// <summary>
+    /// Finds a GameObject by name in the loaded scenes, including inactive ones.
+    /// Returns the first match, or null. Used because GameObject.Find skips inactive
+    /// objects, but our screen panels are deactivated when not the current tab.
+    /// </summary>
+    private static GameObject FindGameObjectByNameIncludeInactive(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return null;
+
+        Transform[] all = Object.FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < all.Length; i++)
+        {
+            if (all[i] != null && all[i].name == name)
+            {
+                return all[i].gameObject;
+            }
+        }
+        return null;
     }
 }
 #endif
