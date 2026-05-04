@@ -93,13 +93,22 @@ public class ChatManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Returns the active bot's WhatsApp profile ID, or null if missing.
+    /// "-1" is the codebase's "not authed yet" sentinel for profile ids
+    /// (see Manager.cs default for whatsappProfileId / telegramProfileId).
+    /// Treat it the same as null/empty for our purposes.
+    /// </summary>
+    private static bool IsValidProfileId(string profileId)
+        => !string.IsNullOrEmpty(profileId) && profileId != "-1";
+
+    /// <summary>
+    /// Returns the active bot's WhatsApp profile ID, or null if missing/sentinel.
     /// Coroutines guard on null and abort to avoid sending malformed requests.
     /// </summary>
     private string GetActiveProfileId()
     {
         Bot bot = Manager.Instance != null ? Manager.Instance.FindBotByName(CurrentBotId) : null;
-        return bot != null ? bot.whatsappProfileId : null;
+        if (bot == null) return null;
+        return IsValidProfileId(bot.whatsappProfileId) ? bot.whatsappProfileId : null;
     }
 
     /// <summary>
@@ -109,7 +118,7 @@ public class ChatManager : MonoBehaviour
     private void BeginLoadForActiveBot()
     {
         Bot bot = Manager.Instance != null ? Manager.Instance.FindBotByName(CurrentBotId) : null;
-        if (bot == null || string.IsNullOrEmpty(bot.whatsappProfileId))
+        if (bot == null || !IsValidProfileId(bot.whatsappProfileId))
         {
             OnEmptyState?.Invoke(EmptyStateReason.BotHasNoWhatsApp);
             return;
