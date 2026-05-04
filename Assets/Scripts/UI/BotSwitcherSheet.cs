@@ -2,6 +2,13 @@ using UnityEngine;
 using UnityEngine.UI;
 using DG.Tweening;
 
+/// <summary>
+/// Bottom-sheet controller. Animates a panel up from the bottom of the screen
+/// and back down. The panel must be BOTTOM-ANCHORED (pivot Y = 0, anchorMin/Max
+/// Y = 0) so the offscreen position is one panel-height BELOW the shown position.
+/// Top- or center-anchored panels would slide up/sideways instead — Task 14's
+/// editor builder enforces this layout.
+/// </summary>
 public class BotSwitcherSheet : MonoBehaviour
 {
     [Header("Refs")]
@@ -15,6 +22,12 @@ public class BotSwitcherSheet : MonoBehaviour
     [SerializeField] private float openDurationSeconds = 0.3f;
     [SerializeField] private float closeDurationSeconds = 0.25f;
 
+    // Used only as a defensive backup when sheetPanel.rect.height is 0 at Awake time
+    // (e.g., the layout hasn't computed yet). Task 14's builder sets a real size so
+    // this fallback rarely fires. 1200 is comfortably larger than any phone height
+    // so the panel is guaranteed to start offscreen.
+    private const float FallbackPanelHeight = 1200f;
+
     private bool isAnimating;
     private float panelHiddenY;
     private float panelShownY;
@@ -25,7 +38,7 @@ public class BotSwitcherSheet : MonoBehaviour
         {
             panelShownY = sheetPanel.anchoredPosition.y;
             // Hide below the screen by the sheet's height.
-            panelHiddenY = panelShownY - (sheetPanel.rect.height > 0 ? sheetPanel.rect.height : 1200f);
+            panelHiddenY = panelShownY - (sheetPanel.rect.height > 0 ? sheetPanel.rect.height : FallbackPanelHeight);
             sheetPanel.anchoredPosition = new Vector2(sheetPanel.anchoredPosition.x, panelHiddenY);
         }
         if (backdropGroup != null)
@@ -39,6 +52,18 @@ public class BotSwitcherSheet : MonoBehaviour
             backdropButton.onClick.AddListener(Close);
         }
         gameObject.SetActive(false);
+    }
+
+    /// <summary>
+    /// Kills any in-flight tweens and resets the animating flag so we don't
+    /// lock the sheet if the GameObject is deactivated mid-animation
+    /// (parent SetActive, scene unload, etc.).
+    /// </summary>
+    private void OnDisable()
+    {
+        if (sheetPanel != null) sheetPanel.DOKill();
+        if (backdropGroup != null) backdropGroup.DOKill();
+        isAnimating = false;
     }
 
     public void Open()
