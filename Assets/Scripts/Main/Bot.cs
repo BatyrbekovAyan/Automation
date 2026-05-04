@@ -186,6 +186,11 @@ public class Bot : MonoBehaviour
             PlayerPrefs.DeleteKey(transform.name + "ServicesNumber");
         }
 
+        if (ChatManager.Instance != null)
+        {
+            ChatManager.Instance.PurgeCacheForBot(transform.name);
+        }
+
         Manager.Instance.DeleteProfilesAndWorkflows(whatsappProfileId, telegramProfileId, whatsappWorkflowId, telegramWorkflowId);
 
         Destroy(Manager.BotSettingsParentStatic.transform.GetChild(transform.GetSiblingIndex()).gameObject);
