@@ -85,6 +85,9 @@ public class ChatManager : MonoBehaviour
             Debug.LogWarning($"[ChatManager] Legacy cache migration encountered an error: {e.Message}. Continuing.");
         }
 
+        // Set the flag unconditionally — even on exception. A persistent IO failure
+        // (e.g., locked file, FS corruption) must not trigger a launch-loop warning
+        // the user can't resolve. Worst case: a few orphan legacy files remain on disk.
         PlayerPrefs.SetInt(MigrationDoneKey, 1);
         PlayerPrefs.Save();
     }
