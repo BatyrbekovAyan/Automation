@@ -136,21 +136,25 @@ public class ChatManager : MonoBehaviour
     private IEnumerator InitializeActiveBotNextFrame()
     {
         yield return null;
-        ResolveInitialActiveBot();
-        BeginLoadForActiveBot();
+        if (ResolveInitialActiveBot())
+        {
+            BeginLoadForActiveBot();
+        }
     }
 
     /// <summary>
     /// Pick the active bot at startup: persisted choice if it still exists,
-    /// otherwise the first bot, otherwise fire NoBotsExist.
+    /// otherwise the first bot. Returns false (after firing OnEmptyState(NoBotsExist))
+    /// when no bots exist — caller should skip BeginLoadForActiveBot in that case to
+    /// avoid a redundant BotHasNoWhatsApp event.
     /// </summary>
-    private void ResolveInitialActiveBot()
+    private bool ResolveInitialActiveBot()
     {
         string saved = PlayerPrefs.GetString(LastSelectedBotPrefKey, "");
         if (!string.IsNullOrEmpty(saved) && Manager.Instance != null && Manager.Instance.FindBotByName(saved) != null)
         {
             CurrentBotId = saved;
-            return;
+            return true;
         }
 
         Transform root = Manager.Instance != null ? Manager.Instance.BotsRoot : null;
@@ -159,10 +163,11 @@ public class ChatManager : MonoBehaviour
             CurrentBotId = root.GetChild(0).name;
             PlayerPrefs.SetString(LastSelectedBotPrefKey, CurrentBotId);
             PlayerPrefs.Save();
-            return;
+            return true;
         }
 
         OnEmptyState?.Invoke(EmptyStateReason.NoBotsExist);
+        return false;
     }
 
     public ChatViewModel GetChat(string chatId)
