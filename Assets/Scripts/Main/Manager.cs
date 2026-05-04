@@ -282,10 +282,10 @@ public class Manager : MonoBehaviour
                 if (recreatedBotComp.Status != null)
                     recreatedBotComp.Status.text = PlayerPrefs.GetString(recreatedBot.name + "Status", "");
                 recreatedBot.GetComponent<Bot>().active = PlayerPrefs.GetInt(recreatedBot.name + "Active", 0) == 1;
-                recreatedBot.GetComponent<Bot>().whatsappProfileId = PlayerPrefs.GetString(recreatedBot.name + "WhatsappProfileId", "-1");
-                recreatedBot.GetComponent<Bot>().telegramProfileId = PlayerPrefs.GetString(recreatedBot.name + "TelegramProfileId", "-1");
-                recreatedBot.GetComponent<Bot>().whatsappWorkflowId = PlayerPrefs.GetString(recreatedBot.name + "WhatsappWorkflowId", "-1");
-                recreatedBot.GetComponent<Bot>().telegramWorkflowId = PlayerPrefs.GetString(recreatedBot.name + "TelegramWorkflowId", "-1");
+                recreatedBot.GetComponent<Bot>().whatsappProfileId = PlayerPrefs.GetString(recreatedBot.name + "WhatsappProfileId", Bot.UnauthedProfileSentinel);
+                recreatedBot.GetComponent<Bot>().telegramProfileId = PlayerPrefs.GetString(recreatedBot.name + "TelegramProfileId", Bot.UnauthedProfileSentinel);
+                recreatedBot.GetComponent<Bot>().whatsappWorkflowId = PlayerPrefs.GetString(recreatedBot.name + "WhatsappWorkflowId", Bot.UnauthedProfileSentinel);
+                recreatedBot.GetComponent<Bot>().telegramWorkflowId = PlayerPrefs.GetString(recreatedBot.name + "TelegramWorkflowId", Bot.UnauthedProfileSentinel);
                 // Apply the icon now — Bot.Awake fires before the rename above,
                 // so it sees the prefab name and no PlayerPrefs entry. Refresh
                 // explicitly now that the bot has its final name.

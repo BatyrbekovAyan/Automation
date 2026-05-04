@@ -93,12 +93,11 @@ public class ChatManager : MonoBehaviour
     }
 
     /// <summary>
-    /// "-1" is the codebase's "not authed yet" sentinel for profile ids
-    /// (see Manager.cs default for whatsappProfileId / telegramProfileId).
-    /// Treat it the same as null/empty for our purposes.
+    /// Returns true when profileId is a usable bot profile id — not null/empty
+    /// and not the unauthed sentinel (Bot.UnauthedProfileSentinel).
     /// </summary>
     private static bool IsValidProfileId(string profileId)
-        => !string.IsNullOrEmpty(profileId) && profileId != "-1";
+        => !string.IsNullOrEmpty(profileId) && profileId != Bot.UnauthedProfileSentinel;
 
     /// <summary>
     /// Returns the active bot's WhatsApp profile ID, or null if missing/sentinel.
@@ -359,7 +358,11 @@ public class ChatManager : MonoBehaviour
     IEnumerator SyncLatestMessages(string chatId, List<MessageViewModel> cachedList)
     {
         string activeProfileId = GetActiveProfileId();
-        if (string.IsNullOrEmpty(activeProfileId)) yield break;
+        if (string.IsNullOrEmpty(activeProfileId))
+        {
+            Debug.LogWarning("[ChatManager] SyncLatestMessages aborted: no valid profile for active bot.");
+            yield break;
+        }
         string escapedId = UnityWebRequest.EscapeURL(chatId);
         // We strictly only check offset 0 (the absolute newest messages)
         string url = $"https://wappi.pro/api/sync/messages/get?profile_id={activeProfileId}&chat_id={escapedId}&limit={MessagesPerPage}&offset=0";
@@ -768,8 +771,12 @@ if (msg.messageType == MessageType.Video)
 IEnumerator SendTextMessageRoutine(string chatId, string text)
 {
     string activeProfileId = GetActiveProfileId();
-    if (string.IsNullOrEmpty(activeProfileId)) yield break;
-    string url = $"https://wappi.pro/api/sync/message/send?profile_id={activeProfileId}";
+    if (string.IsNullOrEmpty(activeProfileId))
+    {
+        Debug.LogWarning("[ChatManager] SendTextMessageRoutine aborted: no valid profile for active bot.");
+        yield break;
+    }
+
     string recipient = chatId;
     if (recipient.EndsWith("@c.us")) recipient = recipient.Replace("@c.us", "");
 
@@ -800,6 +807,7 @@ IEnumerator SendTextMessageRoutine(string chatId, string text)
     ChatHistoryCache.SaveHistory(GetCacheRoot(), chatId, cachedList);
 
     // --- BACKGROUND: Send to server silently ---
+    string url = $"https://wappi.pro/api/sync/message/send?profile_id={activeProfileId}";
     var requestData = new WappiSendTextRequest { body = text, recipient = recipient };
     string jsonPayload = JsonConvert.SerializeObject(requestData);
 

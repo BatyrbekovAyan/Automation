@@ -28,6 +28,12 @@ public class Bot : MonoBehaviour
 
     public bool active = false;
 
+    /// <summary>
+    /// Sentinel value used as the default for whatsappProfileId/telegramProfileId
+    /// when a bot has not yet completed auth. Treated as "no profile" by ChatManager.
+    /// </summary>
+    public const string UnauthedProfileSentinel = "-1";
+
     public string whatsappProfileId;
     public string telegramProfileId;
 
