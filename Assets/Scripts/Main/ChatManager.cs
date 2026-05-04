@@ -52,6 +52,43 @@ public class ChatManager : MonoBehaviour
         return path;
     }
 
+    private const string MigrationDoneKey = "BotCacheV1MigrationDone";
+
+    /// <summary>
+    /// One-time wipe of legacy flat cache files. Runs in Awake before any
+    /// cache reads. Sets a PlayerPrefs flag to ensure single execution.
+    /// </summary>
+    private void MigrateLegacyCacheOnce()
+    {
+        if (PlayerPrefs.GetInt(MigrationDoneKey, 0) == 1) return;
+
+        try
+        {
+            string root = Application.persistentDataPath;
+
+            string legacyChatsList = Path.Combine(root, "all_chats_cache.json");
+            if (File.Exists(legacyChatsList)) File.Delete(legacyChatsList);
+
+            foreach (string legacyMessageFile in Directory.GetFiles(root, "chat_*.json", SearchOption.TopDirectoryOnly))
+            {
+                File.Delete(legacyMessageFile);
+            }
+
+            string legacyMediaDir = Path.Combine(root, "MediaCache");
+            if (Directory.Exists(legacyMediaDir))
+            {
+                Directory.Delete(legacyMediaDir, recursive: true);
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[ChatManager] Legacy cache migration encountered an error: {e.Message}. Continuing.");
+        }
+
+        PlayerPrefs.SetInt(MigrationDoneKey, 1);
+        PlayerPrefs.Save();
+    }
+
     /// <summary>
     /// Strips path separators and invalid filename characters from a bot id.
     /// Falls back to the default sentinel if the input is empty or fully invalid.
@@ -137,6 +174,7 @@ public class ChatManager : MonoBehaviour
     public void Awake()
     {
         Instance = this;
+        MigrateLegacyCacheOnce();
     }
 
     public void Start()
