@@ -1,5 +1,6 @@
 #if UNITY_EDITOR
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -12,7 +13,7 @@ public static class BotSwitcherSheetBuilder
     [MenuItem("Tools/Bot Switcher/Build Sheet")]
     public static void Build()
     {
-        Canvas canvas = GameObject.FindObjectOfType<Canvas>();
+        Canvas canvas = Object.FindFirstObjectByType<Canvas>();
         if (canvas == null)
         {
             Debug.LogError("[BotSwitcherSheetBuilder] No Canvas found in scene. Open the Main scene first.");
@@ -127,7 +128,7 @@ public static class BotSwitcherSheetBuilder
         scrollRect.content = contentRT;
 
         // Row prefab
-        GameObject row = BuildRowPrefab();
+        GameObject row = BuildRowPrefab(canvas);
 
         // Wire controller serialized fields via SerializedObject
         var so = new SerializedObject(controller);
@@ -141,15 +142,15 @@ public static class BotSwitcherSheetBuilder
         sheet.SetActive(false);
         Debug.Log($"[BotSwitcherSheetBuilder] Built {SheetName} under {canvas.name}.");
         Selection.activeGameObject = sheet;
+        EditorSceneManager.MarkSceneDirty(sheet.scene);
     }
 
-    private static GameObject BuildRowPrefab()
+    private static GameObject BuildRowPrefab(Canvas canvas)
     {
         // The row lives as a hidden template under the canvas; BotSwitcherSheet
         // instantiates it at runtime. We attach it under a special holder so it
         // does not render in the live scene.
         const string HolderName = "BotSwitcherRowPrefabHolder";
-        Canvas canvas = GameObject.FindObjectOfType<Canvas>();
         Transform holder = canvas.transform.Find(HolderName);
         if (holder != null) Object.DestroyImmediate(holder.gameObject);
 
