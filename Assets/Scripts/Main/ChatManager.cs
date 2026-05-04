@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 using UnityEngine.Networking;
 using Newtonsoft.Json.Linq;
@@ -34,7 +35,21 @@ public class ChatManager : MonoBehaviour
     // State
     public int currentPage = 1;
     private string currentChatId;
-    private string profileId = "af80627e-6d9d"; 
+    private string profileId = "af80627e-6d9d"; // TEMP: still used until Task 7; removed there.
+
+    // Active-bot state
+    public string CurrentBotId { get; private set; } = "_default";
+
+    /// <summary>
+    /// Per-bot cache root: {persistentDataPath}/BotCache/{CurrentBotId}/.
+    /// Always exists after this call; safe for callers to write under.
+    /// </summary>
+    public string GetCacheRoot()
+    {
+        string path = Path.Combine(Application.persistentDataPath, "BotCache", CurrentBotId);
+        if (!Directory.Exists(path)) Directory.CreateDirectory(path);
+        return path;
+    }
 
     public void Awake()
     {
