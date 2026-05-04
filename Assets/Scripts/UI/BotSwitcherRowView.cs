@@ -47,7 +47,9 @@ public class BotSwitcherRowView : MonoBehaviour
             statusDot.color = waConnected ? statusConnectedColor : statusDisconnectedColor;
         }
 
-        if (avatarImage != null && avatarImage.sprite == null && avatarFallback != null)
+        // Reset to fallback unconditionally so a rebind doesn't keep the prior bot's avatar.
+        // A future avatar fetcher will overwrite this once a real sprite resolves.
+        if (avatarImage != null)
         {
             avatarImage.sprite = avatarFallback;
         }
