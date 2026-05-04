@@ -4,7 +4,6 @@ using UnityEngine;
 
 public static class ChatHistoryCache
 {
-    // Unity needs a "wrapper" class to save Lists to JSON
     [System.Serializable]
     private class MessageListWrapper
     {
@@ -12,38 +11,45 @@ public static class ChatHistoryCache
     }
 
     /// <summary>
-    /// Saves a list of messages to the phone's hard drive.
+    /// Saves a list of messages to {baseDir}/messages/{chatId}.json.
     /// </summary>
-    public static void SaveHistory(string chatId, List<MessageViewModel> messages)
+    public static void SaveHistory(string baseDir, string chatId, List<MessageViewModel> messages)
     {
-        // Creates a unique file for every chat, e.g., "chat_79001234567.json"
-        string path = Path.Combine(Application.persistentDataPath, $"chat_{chatId}.json");
-        
+        if (string.IsNullOrEmpty(baseDir) || string.IsNullOrEmpty(chatId)) return;
+
+        string messagesDir = Path.Combine(baseDir, "messages");
+        if (!Directory.Exists(messagesDir)) Directory.CreateDirectory(messagesDir);
+
+        string path = Path.Combine(messagesDir, $"{chatId}.json");
+
         MessageListWrapper wrapper = new MessageListWrapper { messages = messages };
         string json = JsonUtility.ToJson(wrapper);
-        
+
         File.WriteAllText(path, json);
     }
 
     /// <summary>
-    /// Loads the chat history instantly from the hard drive.
+    /// Loads chat history from {baseDir}/messages/{chatId}.json.
+    /// Returns an empty list if the file doesn't exist.
     /// </summary>
-    public static List<MessageViewModel> LoadHistory(string chatId)
+    public static List<MessageViewModel> LoadHistory(string baseDir, string chatId)
     {
-        string path = Path.Combine(Application.persistentDataPath, $"chat_{chatId}.json");
-        
+        if (string.IsNullOrEmpty(baseDir) || string.IsNullOrEmpty(chatId))
+            return new List<MessageViewModel>();
+
+        string path = Path.Combine(baseDir, "messages", $"{chatId}.json");
+
         if (File.Exists(path))
         {
             string json = File.ReadAllText(path);
             MessageListWrapper wrapper = JsonUtility.FromJson<MessageListWrapper>(json);
-            
+
             if (wrapper != null && wrapper.messages != null)
             {
                 return wrapper.messages;
             }
         }
-        
-        // Return an empty list if this is a brand new chat we've never opened before
-        return new List<MessageViewModel>(); 
+
+        return new List<MessageViewModel>();
     }
 }

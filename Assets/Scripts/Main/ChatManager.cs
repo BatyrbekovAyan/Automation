@@ -230,7 +230,7 @@ public class ChatManager : MonoBehaviour
         // Safety check: Make sure the user didn't swipe back out before the animation finished!
         if (currentChatId != chatId) return;
 
-        List<MessageViewModel> cachedMessages = ChatHistoryCache.LoadHistory(chatId);
+        List<MessageViewModel> cachedMessages = ChatHistoryCache.LoadHistory(GetCacheRoot(), chatId);
 
         if (cachedMessages != null && cachedMessages.Count > 0)
         {
@@ -246,7 +246,7 @@ public class ChatManager : MonoBehaviour
             // 3. NO CACHE: This is a brand new chat, do a normal fetch
             StartCoroutine(GetMessagesRoutine(chatId, 1, (newMessages, hasMore) => 
             {
-                if (newMessages.Count > 0) ChatHistoryCache.SaveHistory(chatId, newMessages);
+                if (newMessages.Count > 0) ChatHistoryCache.SaveHistory(GetCacheRoot(), chatId, newMessages);
                 OnBatchMessagesLoaded?.Invoke(newMessages, false, hasMore);
             }));
         }
@@ -308,7 +308,7 @@ public class ChatManager : MonoBehaviour
             foreach (var m in newMessages) seenMessageIds.Add(m.messageId);
 
             // Save the newly merged list permanently
-            ChatHistoryCache.SaveHistory(chatId, newMessages);
+            ChatHistoryCache.SaveHistory(GetCacheRoot(), chatId, newMessages);
 
             // Refresh the UI with the fully up-to-date list!
             OnBatchMessagesLoaded?.Invoke(newMessages, false, true);
@@ -675,9 +675,9 @@ IEnumerator SendTextMessageRoutine(string chatId, string text)
     var chatVm = GetChat(chatId);
     if (chatVm != null) chatVm.UpdateLastMessage(text, now);
 
-    List<MessageViewModel> cachedList = ChatHistoryCache.LoadHistory(chatId);
+    List<MessageViewModel> cachedList = ChatHistoryCache.LoadHistory(GetCacheRoot(), chatId);
     cachedList.Add(instantMessage);
-    ChatHistoryCache.SaveHistory(chatId, cachedList);
+    ChatHistoryCache.SaveHistory(GetCacheRoot(), chatId, cachedList);
 
     // --- BACKGROUND: Send to server silently ---
     var requestData = new WappiSendTextRequest { body = text, recipient = recipient };
@@ -707,13 +707,13 @@ IEnumerator SendTextMessageRoutine(string chatId, string text)
             seenMessageIds.Remove(tempId);
             seenMessageIds.Add(response.message_id);
 
-            var cache = ChatHistoryCache.LoadHistory(chatId);
+            var cache = ChatHistoryCache.LoadHistory(GetCacheRoot(), chatId);
             var msg = cache.Find(m => m.messageId == tempId);
             if (msg != null)
             {
                 msg.messageId = response.message_id;
                 if (response.timestamp > 0) msg.timestamp = response.timestamp;
-                ChatHistoryCache.SaveHistory(chatId, cache);
+                ChatHistoryCache.SaveHistory(GetCacheRoot(), chatId, cache);
             }
         }
     }
