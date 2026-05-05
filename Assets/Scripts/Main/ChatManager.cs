@@ -625,8 +625,12 @@ if (msg.messageType == MessageType.Video)
     {
         // Don't send empty blanks or if no chat is selected
         if (string.IsNullOrEmpty(currentChatId) || string.IsNullOrWhiteSpace(text)) return;
-        
-        StartCoroutine(SendTextMessageRoutine(currentChatId, text));
+
+        // Run on Manager.Instance so SetActiveBot's StopAllCoroutines on this
+        // object can't strand the optimistic message with a temp id when the
+        // user switches bots mid-send. Falls back to this if Manager isn't ready.
+        MonoBehaviour runner = Manager.Instance != null ? (MonoBehaviour)Manager.Instance : this;
+        runner.StartCoroutine(SendTextMessageRoutine(currentChatId, text));
     }
 
 IEnumerator SendTextMessageRoutine(string chatId, string text)
@@ -637,6 +641,11 @@ IEnumerator SendTextMessageRoutine(string chatId, string text)
         Debug.LogWarning("[ChatManager] SendTextMessageRoutine aborted: no valid profile for active bot.");
         yield break;
     }
+
+    // Snapshot the originating bot's cache root so the temp-id swap below always
+    // lands in the bot the message was sent on, even if the user switches bots
+    // while the request is in flight.
+    string sendCacheRoot = GetCacheRoot();
 
     string recipient = chatId;
     if (recipient.EndsWith("@c.us")) recipient = recipient.Replace("@c.us", "");
@@ -663,9 +672,9 @@ IEnumerator SendTextMessageRoutine(string chatId, string text)
     var chatVm = GetChat(chatId);
     if (chatVm != null) chatVm.UpdateLastMessage(text, now);
 
-    List<MessageViewModel> cachedList = ChatHistoryCache.LoadHistory(GetCacheRoot(), chatId);
+    List<MessageViewModel> cachedList = ChatHistoryCache.LoadHistory(sendCacheRoot, chatId);
     cachedList.Add(instantMessage);
-    ChatHistoryCache.SaveHistory(GetCacheRoot(), chatId, cachedList);
+    ChatHistoryCache.SaveHistory(sendCacheRoot, chatId, cachedList);
 
     // --- BACKGROUND: Send to server silently ---
     string url = $"https://wappi.pro/api/sync/message/send?profile_id={activeProfileId}";
@@ -696,13 +705,13 @@ IEnumerator SendTextMessageRoutine(string chatId, string text)
             seenMessageIds.Remove(tempId);
             seenMessageIds.Add(response.message_id);
 
-            var cache = ChatHistoryCache.LoadHistory(GetCacheRoot(), chatId);
+            var cache = ChatHistoryCache.LoadHistory(sendCacheRoot, chatId);
             var msg = cache.Find(m => m.messageId == tempId);
             if (msg != null)
             {
                 msg.messageId = response.message_id;
                 if (response.timestamp > 0) msg.timestamp = response.timestamp;
-                ChatHistoryCache.SaveHistory(GetCacheRoot(), chatId, cache);
+                ChatHistoryCache.SaveHistory(sendCacheRoot, chatId, cache);
             }
         }
     }
