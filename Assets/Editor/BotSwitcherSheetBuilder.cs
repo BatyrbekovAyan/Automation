@@ -10,6 +10,11 @@ public static class BotSwitcherSheetBuilder
     private const string SheetName = "Sheet_BotSwitcher";
     private const string RowName = "BotSwitcherRow";
 
+    /// <summary>
+    /// Constructs Sheet_BotSwitcher and the BotSwitcherRow prefab template under the Canvas.
+    /// RUN FIRST — Screen_WhatsappHeaderRebuilder's title binder finds this sheet at runtime.
+    /// If no sheet exists, the title button wires to nothing and silently fails on first play.
+    /// </summary>
     [MenuItem("Tools/Bot Switcher/Build Sheet")]
     public static void Build()
     {

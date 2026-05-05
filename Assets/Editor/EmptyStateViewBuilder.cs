@@ -11,6 +11,10 @@ public static class EmptyStateViewBuilder
     private const string ChatsPanelName = "ChatsPanel";
     private const string EmptyStateName = "EmptyState";
 
+    /// <summary>
+    /// Constructs Screen_Whatsapp/ChatsPanel/EmptyState with the EmptyStateView component.
+    /// Independent of the other Bot Switcher builders — no ordering dependency.
+    /// </summary>
     [MenuItem("Tools/Bot Switcher/Build EmptyState")]
     public static void Build()
     {

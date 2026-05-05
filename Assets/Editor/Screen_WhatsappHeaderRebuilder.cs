@@ -13,6 +13,11 @@ public static class Screen_WhatsappHeaderRebuilder
     private const string HeaderChildName = "TopBar";
     private const string TitleName = "BotSwitcherTitle";
 
+    /// <summary>
+    /// Rebuilds Screen_Whatsapp/ChatsPanel/TopBar/BotSwitcherTitle.
+    /// RUN AFTER 'Tools → Bot Switcher → Build Sheet' — the title's BotSwitcherTitleBinder
+    /// finds the sheet at runtime and wires the open-button click to it.
+    /// </summary>
     [MenuItem("Tools/Bot Switcher/Rebuild Whatsapp Header")]
     public static void Rebuild()
     {
