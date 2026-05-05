@@ -39,7 +39,6 @@ public partial class ChatManager : MonoBehaviour
     public void Awake()
     {
         Instance = this;
-        MigrateLegacyCacheOnce();
     }
 
     public void Start()
