@@ -21,56 +21,97 @@ Unity -batchmode -nographics -projectPath . -buildTarget Android -quit
 
 ## Architecture
 
-**Single scene**: `Assets/Scenes/Main.unity` — all UI is canvas-based, toggled via `GameObject.SetActive()`.
+**Single scene**: `Assets/Scenes/Main.unity` — all UI is canvas-based, toggled via `GameObject.SetActive()`. No scene transitions.
 
-**Scripts layout** (`Assets/Scripts/`):
-- `Main/` — Top-level orchestration. `Manager.cs` is a singleton (`Manager.Instance`) that drives bot creation flows and page navigation. `BotSettings.cs` handles the multi-tab bot config UI (General, Business, Products, Services, Prompts). `Bot.cs`, `Product.cs`, `Service.cs` manage individual entities.
-- `Chat/` — Chat system. Data models (`ChatDialog`, `NormalizedMessage`, `RawMessage`), API response types, message/chat list views, media handling (video, audio, photo, caching), and platform bridges (`AndroidBridge.cs`, `IOSBridge.cs`).
-- `UI/` — ViewModels for data binding (`ChatViewModel`, `MessageViewModel`).
+### Scripts layout (`Assets/Scripts/`)
+
+- `Main/` — Top-level orchestration and entity logic
+  - `Manager.cs` — God-object singleton (`Manager.Instance`). Drives the bot creation wizard (MainPage → Channel → Name → Whatsapp/Telegram Auth → Business → Summary → Confirmation), bot CRUD, and all n8n/Wappi/GreenAPI calls. Exposes `Manager.wappiAuthToken`, `Manager.n8nAPIKey`, `Manager.BotSettingsParentStatic`, `Manager.openBot`, `Manager.openBotSettings`.
+  - `ChatManager.cs` — Owns the chat UI system. Fetches chat list from Wappi, handles pagination, message normalization, send. Events: `OnChatAdded`, `OnChatListCleared`, `OnChatSelected`, `OnBatchMessagesLoaded`, `OnLiveMessagesReceived`.
+  - `BotsPage.cs` — Bots list page (all vs active filter). `BotsPage.Instance`, `BotsPage.onlyActiveBotsVisible`.
+  - `BotSettings.cs` + `BotSettings.Auth.cs` (partial class) — 5-tab bot config UI (General | Business | Products | Services | Prompts). Auth tab split out for WhatsApp/Telegram QR + code flows.
+  - `BotSettings/` (subfolder) — Reusable UI primitives for the config screen: `EditableField`, `EditableTextArea`, `ScrollableInputField`, `ScrollableTextArea`, `NumberDisplayField`, `SectionHeader`, `ToggleRow`, `AddItemButton`, `FocusScrim`, `ItemEditSheet`, `ProductCardView`, `ServiceCardView`.
+  - `Bot.cs` — MonoBehaviour on each bot prefab in `BotsParent`. Holds `whatsappProfileId`, `telegramProfileId`, `whatsappWorkflowId`, `telegramWorkflowId`, activation toggle. All bot data persisted in `PlayerPrefs` keyed by `transform.name` (e.g. `Bot0Name`, `Bot0isOnWhatsapp`, `Bot0Products0`).
+  - `ProfilePage.cs`, `BottomTabManager.cs`, `PopupUI.cs`, `BotStatusPill.cs` — Other pages and shared UI.
+  - `BusinessTypesSO.cs` — ScriptableObject dropdown data.
+  - `Secrets.cs` — Lazy-loaded `Secrets.Data` from `Assets/StreamingAssets/secrets.json` (gitignored).
+  - Input/layout helpers: `SnappyFlickScrollRect`, `EventAbsorber`, `DelayedFingerUpAction`, `SwipeToBackBotSettings`, `WhatsappCodeTimer`, `TelegramCodeTimer`, `AddUniformTypeIdentifiers`, `WappiUnitySync`.
+
+- `Chat/` — Chat system
+  - Data models: `RawMessage`, `NormalizedMessage`, `ChatDialog`, `ChatsResponse`, `MessagesResponseRaw`, `MessageType` enum (Chat, Image, Video, Audio, Voice, Sticker, Document, Unknown).
+  - Views/controls: `MessageHeaderView`, `DateSeparatorView`, `PhotoViewer`, `VideoController`, `AudioController`, `ExpandableInput`, `KeyboardAwarePanel`, `MessagesBottomPanel`, `QuickReplyPanel`, `QuickReplyButton`.
+  - Gesture/touch helpers: `SwipeToBack`, `SwipeToClose`, `DragShield`, `ClickPassthrough`, `ScrollClickBlocker`, `MirrorSize`, `NativeHairline`, `TMPLinkHandler`.
+  - Caching: `MediaCacheManager` (disk cache keyed by URL/`thumb://id`), `ChatHistoryCache` (per-chat, max 100 messages).
+  - Platform bridges: `AndroidBridge`, `IOSBridge`, `IOSAudioFix`.
+  - Utilities: `GreenApiAvatarFetcher`, `LinkScraper`, `UnicodeEmojiConverter`.
+
+- `UI/` — ViewModels and list/item views
+  - `ChatViewModel`, `MessageViewModel` — UI binding models.
+  - `ChatListView` / `MessageListView` — prefab spawners, driven by `ChatManager` events.
+  - `ChatItemView` / `MessageItemView` — per-item views.
+
 - `Converters/` — Document-to-text utilities (`TableToTextConverter`, `XmlToTextConverter`).
-- `Editor/` — Editor-only tooling (`EmojiMetricsFixer`).
+
+**Editor tooling** lives in `Assets/Editor/` — `[MenuItem]` UI builders for constructing BotSettings UI programmatically: `BotSettingsRebuilder`, `BotSettingsConfirmChangePopupBuilder`, `BotSettingsDeleteBotPopupBuilder`, `BotSettingsScrollableTextAreaBuilder`, `BotSettingsStickyAddButtonBuilder`, `BotSettingsSwipeWirer`, `FixIOSBuildSettings`, `ArchitectureExporter`. When adding new UI screens, follow this builder pattern (see `.claude/rules/editor-scripts.md`).
+
+### Chat data flow
+
+```
+wappi.pro API
+  └── ChatManager.SyncAllChats()         → ChatsResponse (JsonUtility) → ChatViewModel list
+  └── ChatManager.GetMessagesRoutine()   → MessagesResponseRaw (JsonConvert) → RawMessage[]
+        └── Normalize(RawMessage)        → NormalizedMessage
+              └── CreateViewModel()      → MessageViewModel
+                    └── OnBatchMessagesLoaded event → MessageListView renders prefabs
+```
+
+### Caching strategy
+
+- Chat list: `persistentDataPath/all_chats_cache.json`
+- Message history: `ChatHistoryCache` (per `chatId`, max 100 messages)
+- Media/thumbnails: `MediaCacheManager` saves to disk, keyed by URL
+- Background sync pattern: on chat open, load from cache instantly, then quietly diff against server response.
 
 **Key third-party plugins** (in `Assets/Plugins/`): DOTween (animation), NativeFilePicker, NativeGallery, unity.webp. Additional UPM packages: NativeShare, RoundedCorners.
 
 ## External APIs
 
-The app communicates with three external services via `UnityWebRequest`. Auth tokens are passed as headers.
+The app communicates with four external services via `UnityWebRequest` + coroutines (`IEnumerator` + `yield return SendWebRequest()`). Auth via headers or URL path.
 
 ### Wappi.pro (WhatsApp)
-- **Base**: `https://wappi.pro/api/sync/`
-- **Auth**: `Authorization` header with `wappiAuthToken`
-- **Endpoints used**:
-  - `chats/filter` — fetch filtered chat list
+- **Base**: `https://wappi.pro/api/sync/` (some endpoints under `https://wappi.pro/api/` directly, e.g. `profile/add`, `profile/delete`, `profile/logout`)
+- **Auth**: `Authorization` header with `Manager.wappiAuthToken`
+- **Endpoints**:
+  - `chats/filter` — filtered chat list
   - `messages/get` — paginated message history
   - `messages/all/get` — all messages (bulk)
   - `message/media/download` — download media by message ID
   - `message/send` — send a message
-  - `qr/get` — get QR code for WhatsApp login
+  - `qr/get` — QR code for WhatsApp login
   - `auth/code` — request phone auth code
-  - `get/status` — check connection status
-  - `contact/info` — get contact details
-  - `profile/add`, `profile/delete` — manage Wappi profiles
-  - `profile/logout` — disconnect session
+  - `get/status` — connection status
+  - `contact/info` — contact details
+  - `profile/add`, `profile/delete`, `profile/logout`
 
 ### Wappi.pro (Telegram)
-- **Base**: `https://wappi.pro/tapi/sync/`
+- **Base**: `https://wappi.pro/tapi/sync/` (profile management under `https://wappi.pro/tapi/`)
 - **Auth**: same `Authorization` header
-- **Endpoints**: mirrors WhatsApp (`auth/qr`, `auth/phone`, `auth/code`, `get/status`, `profile/add`, `profile/delete`, `profile/logout`)
+- **Endpoints**: `auth/qr`, `auth/phone` (POST), `auth/code` (POST), `get/status`, `profile/add`, `profile/delete`, `profile/logout`
 
 ### n8n (Workflow Automation)
 - **Base**: `https://bagkz.app.n8n.cloud/`
-- **Auth**: `X-N8N-API-KEY` header
+- **Auth**: `X-N8N-API-KEY` header with `Manager.n8nAPIKey`
 - **API endpoints** (`/api/v1/workflows/`):
-  - `{id}/activate`, `{id}/deactivate` — toggle workflow
-  - `DELETE {id}` — delete workflow
+  - `{id}/activate`, `{id}/deactivate`
+  - `DELETE {id}`
 - **Webhook endpoints**:
-  - `/webhook/CreateWhatsappWorkflow`, `/webhook/CreateTelegramWorkflow` — create bot workflows
-  - `/webhook/EditWhatsappWorkflow`, `/webhook/EditTelegramWorkflow` — update bot workflows
+  - `/webhook/CreateWhatsappWorkflow`, `/webhook/CreateTelegramWorkflow`
+  - `/webhook/EditWhatsappWorkflow`, `/webhook/EditTelegramWorkflow`
   - `/webhook-test/UploadFile` — file upload
 
-### Green API (Avatars)
-- **Base**: `https://7103.api.greenapi.com/` (also `https://4100.api.green-api.com/` in Manager.cs)
-- **Auth**: instance ID and token embedded in URL path (`/waInstance{id}/{method}/{token}`)
+### Green API (Avatars + secondary auth)
+- **Bases**: `https://7103.api.greenapi.com/` (avatars), `https://4100.api.green-api.com/` (auth flow in Manager.cs)
+- **Auth**: instance ID and token embedded in URL path (`/waInstance{id}/{method}/{token}`); keys under `greenApi` / `greenApiAvatar` in `secrets.json`
 - **Endpoints**: `getAvatar`, `qr`, `getAuthorizationCode`, `getStateInstance`, `startAuthorization`, `sendAuthorizationCode`
 
 ## Additional Instructions
@@ -82,13 +123,32 @@ The app communicates with three external services via `UnityWebRequest`. Auth to
 
 ## Conventions
 
-- Singleton pattern for managers (`Manager.Instance`)
+- Singleton pattern for managers (`Manager.Instance`, `ChatManager.Instance`, `BotsPage.Instance`)
 - MonoBehaviour with `[SerializeField]` for UI references
 - PascalCase for classes, methods, and properties
 - Prefab-based reusable components in `Assets/Prefabs/`
 - Platform-specific code isolated in bridge classes (`AndroidBridge`, `IOSBridge`)
 - TMPro for all text rendering
 - DOTween for UI animations
+- Bot entity persistence: `PlayerPrefs` keyed by `transform.name` (e.g. `Bot0Name`, `Bot0Products0`)
+- Event-driven UI: views subscribe to `ChatManager` events rather than polling
+- Partial classes for large components: see `BotSettings.cs` / `BotSettings.Auth.cs`
+
+## Skills and Rules
+
+This project has project-scoped Claude configuration under `.claude/`:
+
+- **Skills** (`.claude/skills/`) — read the SKILL.md before doing matching work:
+  - `unity-ui-builder/SKILL.md` — use when creating screens, pages, dialogs, or any canvas-based visual component
+  - `unity-api-integration/SKILL.md` — use when adding REST API endpoints, webhooks, or external service calls
+- **Path-scoped rules** (`.claude/rules/`) — automatically apply to matching files:
+  - `unity-general.md` → all `Assets/Scripts/**/*.cs`
+  - `networking.md` → `Assets/Scripts/Chat/**/*.cs`, `Assets/Scripts/Main/Manager.cs`
+  - `ui-scripts.md` → `Assets/Scripts/UI/**/*.cs`, `BotSettings.cs`, `Manager.cs`
+  - `editor-scripts.md` → `Assets/Editor/**/*.cs`
+- **Hooks** (`.claude/hooks/`) — run automatically on tool calls. `validate-cs.sh` runs after every `Edit`/`Write` and checks C# quality; `gsd-*` hooks enforce the GSD workflow.
+
+Before new feature work: use the `brainstorming` skill. Before UI work: use `frontend-design` + `unity-ui-builder`. Before network code: use `unity-api-integration`.
 
 ## Self-Maintenance
 

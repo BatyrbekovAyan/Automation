@@ -1,4 +1,3 @@
-using DG.Tweening;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -103,13 +102,24 @@ public class ProfilePage : MonoBehaviour
 
     private void WireButtons()
     {
-        if (editButton       != null) editButton.onClick.AddListener(OpenEditPopup);
-        if (editSaveButton   != null) editSaveButton.onClick.AddListener(SaveProfile);
-        if (editCancelButton != null) editCancelButton.onClick.AddListener(CloseEditPopup);
+        // Row buttons that OPEN popups stay on Button.onClick — they're not
+        // dismiss/confirm actions, just navigation triggers.
+        if (editButton   != null) editButton.onClick.AddListener(OpenEditPopup);
+        if (logoutButton != null) logoutButton.onClick.AddListener(OpenLogoutConfirm);
 
-        if (logoutButton        != null) logoutButton.onClick.AddListener(OpenLogoutConfirm);
-        if (logoutConfirmButton != null) logoutConfirmButton.onClick.AddListener(ConfirmLogout);
-        if (logoutCancelButton  != null) logoutCancelButton.onClick.AddListener(CloseLogoutConfirm);
+        // Popup dismiss/confirm actions: route via PopupUI so they fire on
+        // true finger release (filters spurious iOS PointerUp on keyboard
+        // dismiss) and never on finger-down.
+        if (editSaveButton      != null) PopupUI.WireFingerUp(editSaveButton,      SaveProfile);
+        if (editCancelButton    != null) PopupUI.WireFingerUp(editCancelButton,    CloseEditPopup);
+        if (logoutConfirmButton != null) PopupUI.WireFingerUp(logoutConfirmButton, ConfirmLogout);
+        if (logoutCancelButton  != null) PopupUI.WireFingerUp(logoutCancelButton,  CloseLogoutConfirm);
+
+        // Overlay backdrop tap → close. EventAbsorber on the card prevents
+        // taps on card background (between/around inputs/buttons) from
+        // bubbling up to the overlay's dismiss handler.
+        WireOverlayDismiss(editPopup,   CloseEditPopup);
+        WireOverlayDismiss(logoutPopup, CloseLogoutConfirm);
 
         // Settings stubs — replace with real navigation when screens exist
         if (accountButton       != null) accountButton.onClick.AddListener(OnAccount);
@@ -117,6 +127,34 @@ public class ProfilePage : MonoBehaviour
         if (privacyButton       != null) privacyButton.onClick.AddListener(OnPrivacy);
         if (supportButton       != null) supportButton.onClick.AddListener(OnSupport);
         if (aboutButton         != null) aboutButton.onClick.AddListener(OnAbout);
+    }
+
+    private static void WireOverlayDismiss(GameObject popup, System.Action onCancel)
+    {
+        if (popup == null) return;
+
+        // Backdrop tap → dismiss.
+        PopupUI.WireFingerUp(popup, onCancel);
+
+        var card = popup.transform.Find("Card");
+        if (card == null) return;
+
+        // Card-bg taps must NOT bubble to the overlay dismiss handler.
+        PopupUI.AbsorbEvents(card);
+
+        // ✕ close button (if present in the card) → dismiss on finger-up.
+        // Tries Card/CloseButton first, then any descendant named "CloseButton".
+        var closeBtn = card.Find("CloseButton")?.GetComponent<Button>();
+        if (closeBtn == null)
+        {
+            foreach (var t in card.GetComponentsInChildren<Transform>(includeInactive: true))
+            {
+                if (t.name != "CloseButton") continue;
+                closeBtn = t.GetComponent<Button>();
+                if (closeBtn != null) break;
+            }
+        }
+        if (closeBtn != null) PopupUI.WireFingerUp(closeBtn, onCancel);
     }
 
     // ── Edit popup ─────────────────────────────────────────────────────────
@@ -128,15 +166,16 @@ public class ProfilePage : MonoBehaviour
         editNameInput.text  = PlayerPrefs.GetString(KeyName,  DefaultName);
         editEmailInput.text = PlayerPrefs.GetString(KeyEmail, DefaultEmail);
 
-        editPopup.SetActive(true);
-        AnimatePopupIn(editPopup.transform);
+        // Activate name field after the open tween completes — calling
+        // ActivateInputField during the scale tween would let the keyboard
+        // slide-up steal main-thread time and cause stutter.
+        PopupUI.Show(editPopup, onCardSettled: () =>
+        {
+            if (editNameInput != null) editNameInput.ActivateInputField();
+        });
     }
 
-    private void CloseEditPopup()
-    {
-        if (editPopup == null) return;
-        AnimatePopupOut(editPopup.transform, () => editPopup.SetActive(false));
-    }
+    private void CloseEditPopup() => PopupUI.Hide(editPopup);
 
     private void SaveProfile()
     {
@@ -153,18 +192,9 @@ public class ProfilePage : MonoBehaviour
 
     // ── Logout popup ───────────────────────────────────────────────────────
 
-    private void OpenLogoutConfirm()
-    {
-        if (logoutPopup == null) return;
-        logoutPopup.SetActive(true);
-        AnimatePopupIn(logoutPopup.transform);
-    }
+    private void OpenLogoutConfirm() => PopupUI.Show(logoutPopup);
 
-    private void CloseLogoutConfirm()
-    {
-        if (logoutPopup == null) return;
-        AnimatePopupOut(logoutPopup.transform, () => logoutPopup.SetActive(false));
-    }
+    private void CloseLogoutConfirm() => PopupUI.Hide(logoutPopup);
 
     private void ConfirmLogout()
     {
@@ -199,24 +229,4 @@ public class ProfilePage : MonoBehaviour
     private void OnPrivacy()       => Debug.Log("[ProfilePage] Privacy tapped — stub");
     private void OnSupport()       => Debug.Log("[ProfilePage] Support tapped — stub");
     private void OnAbout()         => Debug.Log("[ProfilePage] About tapped — stub");
-
-    // ── DOTween helpers ────────────────────────────────────────────────────
-
-    private static void AnimatePopupIn(Transform t)
-    {
-        t.localScale = Vector3.one * 0.88f;
-        t.DOScale(Vector3.one, 0.22f).SetEase(Ease.OutBack);
-    }
-
-    private static void AnimatePopupOut(Transform t, TweenCallback onComplete)
-    {
-        t.DOScale(Vector3.one * 0.88f, 0.16f)
-         .SetEase(Ease.InBack)
-         .OnComplete(onComplete);
-    }
-
-    private void OnDestroy()
-    {
-        DOTween.Kill(transform);
-    }
 }

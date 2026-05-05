@@ -6,6 +6,8 @@ using TMPro;
 
 public class Bot : MonoBehaviour
 {
+    [SerializeField] public TextMeshProUGUI BotName;
+    [SerializeField] public TextMeshProUGUI BotDesc;
     [SerializeField] public TextMeshProUGUI Status;
     [SerializeField] public Button EditButton;
     [SerializeField] private Button DeleteButton;
@@ -18,8 +20,19 @@ public class Bot : MonoBehaviour
     [SerializeField] private Color backgroundActiveColor;
     [SerializeField] private Color handleActiveColor;
 
+    [Header("Business Icon")]
+    [SerializeField] private Image BotIconTile;
+    [SerializeField] private Image BotIconImage;
+    [SerializeField] private BusinessTypesSO businessTypes;
+
 
     public bool active = false;
+
+    /// <summary>
+    /// Sentinel value used as the default for whatsappProfileId/telegramProfileId
+    /// when a bot has not yet completed auth. Treated as "no profile" by ChatManager.
+    /// </summary>
+    public const string UnauthedProfileSentinel = "-1";
 
     public string whatsappProfileId;
     public string telegramProfileId;
@@ -40,6 +53,7 @@ public class Bot : MonoBehaviour
     private void Awake ()
     {
         StartCoroutine(SetSwitches());
+        ApplyBusinessIcon();
 
 
         ActivationSwitch.onValueChanged.AddListener(EnableBot);
@@ -54,21 +68,18 @@ public class Bot : MonoBehaviour
             DeleteButton.onClick.AddListener(OpenDeletePopup);
         }
 
+        // Delete confirm popup: fire on real finger release via PopupUI.
         if (DeleteConfirmButton != null)
-        {
-            DeleteConfirmButton.onClick.AddListener(DeleteBot);
-        }
-
+            PopupUI.WireFingerUp(DeleteConfirmButton, DeleteBot);
         if (DeleteCancelButton != null)
-        {
-            DeleteCancelButton.onClick.AddListener(DeleteCancel);
-        }
+            PopupUI.WireFingerUp(DeleteCancelButton, DeleteCancel);
     }
 
 
     private void OpenSettings()
     {
-        BotsPage.Instance.gameObject.SetActive(false);
+        // Keep BotsPage active during the slide-in so its parallax is visible.
+        // It is deactivated in the slide-in onComplete callback below.
         Manager.BotSettingsParentStatic.transform.parent.gameObject.SetActive(true);
 
         if (Manager.BotSettingsParentStatic.transform.childCount != 0)
@@ -87,9 +98,27 @@ public class Bot : MonoBehaviour
                 }
             }
         }
+
+        if (SwipeToBackBotSettings.Instance != null)
+        {
+            SwipeToBackBotSettings.Instance.SlideInFromRight(() =>
+            {
+                if (BotsPage.Instance != null)
+                    BotsPage.Instance.gameObject.SetActive(false);
+            });
+        }
+        else
+        {
+            Debug.LogWarning("[Bot.OpenSettings] SwipeToBackBotSettings.Instance is null — " +
+                             "falling back to instant open. Run Tools/Bot Settings/Wire Swipe Back.");
+            if (BotsPage.Instance != null) BotsPage.Instance.gameObject.SetActive(false);
+        }
     }
 
-    private void DeleteBot()
+    // Made public so BotSettings' in-page Delete flow can reuse the exact
+    // same teardown (PlayerPrefs cleanup + profile/workflow deletes + destroy
+    // both the Bot card and its paired BotSettings GameObject).
+    public void DeleteBot()
     {
         if (PlayerPrefs.HasKey(transform.name + "Name"))
         {
@@ -157,21 +186,20 @@ public class Bot : MonoBehaviour
             PlayerPrefs.DeleteKey(transform.name + "ServicesNumber");
         }
 
+        if (ChatManager.Instance != null)
+        {
+            ChatManager.Instance.PurgeCacheForBot(transform.name);
+        }
+
         Manager.Instance.DeleteProfilesAndWorkflows(whatsappProfileId, telegramProfileId, whatsappWorkflowId, telegramWorkflowId);
 
         Destroy(Manager.BotSettingsParentStatic.transform.GetChild(transform.GetSiblingIndex()).gameObject);
         Destroy(gameObject);
     }
 
-    private void OpenDeletePopup()
-    {
-        DeletePopup.SetActive(true);
-    }
+    private void OpenDeletePopup() => PopupUI.Show(DeletePopup);
 
-    private void DeleteCancel()
-    {
-        DeletePopup.SetActive(false);
-    }
+    private void DeleteCancel() => PopupUI.Hide(DeletePopup);
 
     private void EnableBot (bool enabled)
     {
@@ -182,9 +210,7 @@ public class Bot : MonoBehaviour
         PlayerPrefs.SetInt(transform.name, enabled ? 1 : 0);
         Status.text = enabled ? active ? "Active" : "Connecting.." : "Not Active";
         Status.color = enabled ? active ? green : blue : red;
-
-        gameObject.SetActive(!BotsPage.onlyActiveBotsVisible);
-
+        
         Manager.Instance.GetEnableWhatsappWorkflow(whatsappWorkflowId, enabled);
         Manager.Instance.GetEnableTelegramWorkflow(telegramWorkflowId, enabled);
     }
@@ -230,6 +256,28 @@ public class Bot : MonoBehaviour
             Status.text = "Not Active";
             Status.color = red;
         }
+    }
+
+    public void RefreshBusinessIcon() => ApplyBusinessIcon();
+
+    private void ApplyBusinessIcon()
+    {
+        if (businessTypes == null) return;
+
+        var id = PlayerPrefs.GetString(transform.name + "BusinessType", "");
+        // Empty id is expected when Awake fires before the Manager has renamed
+        // the instantiated bot and written PlayerPrefs. Manager calls
+        // RefreshBusinessIcon() explicitly once both are done.
+        if (string.IsNullOrEmpty(id)) return;
+
+        if (!businessTypes.TryGetById(id, out var entry))
+        {
+            Debug.LogWarning($"[Bot] No business type entry for id '{id}' on '{transform.name}'");
+            return;
+        }
+
+        if (BotIconImage != null && entry.sprite != null) BotIconImage.sprite = entry.sprite;
+        if (BotIconTile != null) BotIconTile.color = entry.tileColor;
     }
 
     private void OnDestroy ()

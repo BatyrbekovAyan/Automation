@@ -1,15 +1,17 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 using UnityEngine.Networking;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
 
+[DefaultExecutionOrder(-100)]
 public class ChatManager : MonoBehaviour
 {
     // Settings
-    public static int MessagesPerPage = 50; 
+    public static int MessagesPerPage = 50;
 
     [Header("UI Panels")]
     public GameObject ChatListPanel;
@@ -27,31 +29,281 @@ public class ChatManager : MonoBehaviour
     public event Action<string> OnChatSelected;
     public event Action<List<MessageViewModel>, bool, bool> OnBatchMessagesLoaded;
     public event Action<List<MessageViewModel>> OnLiveMessagesReceived;
+    public event Action<string> OnActiveBotChanged;
+    public event Action<EmptyStateReason> OnEmptyState;
     
     // State
     public int currentPage = 1;
     private string currentChatId;
-    private string profileId = "af80627e-6d9d"; 
+
+    // Active-bot state
+    private const string DefaultBotId = "_default";
+    public string CurrentBotId { get; private set; } = DefaultBotId;
+
+    /// <summary>
+    /// Per-bot cache root: {persistentDataPath}/BotCache/{CurrentBotId}/.
+    /// Always exists after this call; safe for callers to write under.
+    /// </summary>
+    public string GetCacheRoot()
+    {
+        string botId = SanitizeBotId(CurrentBotId);
+        string path = Path.Combine(Application.persistentDataPath, "BotCache", botId);
+        if (!Directory.Exists(path)) Directory.CreateDirectory(path);
+        return path;
+    }
+
+    private const string MigrationDoneKey = "BotCacheV1MigrationDone";
+
+    /// <summary>
+    /// One-time wipe of legacy flat cache files. Runs in Awake before any
+    /// cache reads. Sets a PlayerPrefs flag to ensure single execution.
+    /// </summary>
+    private void MigrateLegacyCacheOnce()
+    {
+        if (PlayerPrefs.GetInt(MigrationDoneKey, 0) == 1) return;
+
+        try
+        {
+            string root = Application.persistentDataPath;
+
+            string legacyChatsList = Path.Combine(root, "all_chats_cache.json");
+            if (File.Exists(legacyChatsList)) File.Delete(legacyChatsList);
+
+            foreach (string legacyMessageFile in Directory.GetFiles(root, "chat_*.json", SearchOption.TopDirectoryOnly))
+            {
+                File.Delete(legacyMessageFile);
+            }
+
+            string legacyMediaDir = Path.Combine(root, "MediaCache");
+            if (Directory.Exists(legacyMediaDir))
+            {
+                Directory.Delete(legacyMediaDir, recursive: true);
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[ChatManager] Legacy cache migration encountered an error: {e.Message}. Continuing.");
+        }
+
+        // Set the flag unconditionally — even on exception. A persistent IO failure
+        // (e.g., locked file, FS corruption) must not trigger a launch-loop warning
+        // the user can't resolve. Worst case: a few orphan legacy files remain on disk.
+        PlayerPrefs.SetInt(MigrationDoneKey, 1);
+        PlayerPrefs.Save();
+    }
+
+    /// <summary>
+    /// Deletes the cache subtree for a bot. If that bot was active, falls back
+    /// to the first remaining bot or fires NoBotsExist. Called by Bot.DeleteBot.
+    /// </summary>
+    public void PurgeCacheForBot(string botId)
+    {
+        if (string.IsNullOrEmpty(botId)) return;
+
+        try
+        {
+            string botCacheDir = Path.Combine(Application.persistentDataPath, "BotCache", botId);
+            if (Directory.Exists(botCacheDir))
+            {
+                Directory.Delete(botCacheDir, recursive: true);
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[ChatManager] PurgeCacheForBot({botId}) failed: {e.Message}");
+        }
+
+        if (botId != CurrentBotId) return;
+
+        // The active bot was deleted. Pick the next bot or empty out.
+        Transform root = Manager.Instance != null ? Manager.Instance.BotsRoot : null;
+        Transform next = null;
+        if (root != null)
+        {
+            for (int i = 0; i < root.childCount; i++)
+            {
+                Transform child = root.GetChild(i);
+                if (child.name != botId) { next = child; break; }
+            }
+        }
+
+        if (next != null)
+        {
+            // SetActiveBot's early-return guard (`botId == CurrentBotId`) does not
+            // fire here because next.name differs from the just-deleted bot we are
+            // still nominally "on". SetActiveBot persists, clears list, and refreshes.
+            SetActiveBot(next.name);
+        }
+        else
+        {
+            CurrentBotId = DefaultBotId;
+            PlayerPrefs.DeleteKey(LastSelectedBotPrefKey);
+            PlayerPrefs.Save();
+            Chats.Clear();
+            chatLookup.Clear();
+            OnChatListCleared?.Invoke();
+            OnEmptyState?.Invoke(EmptyStateReason.NoBotsExist);
+        }
+    }
+
+    /// <summary>
+    /// Strips path separators and invalid filename characters from a bot id.
+    /// Falls back to the default sentinel if the input is empty or fully invalid.
+    /// Defense-in-depth: PlayerPrefs are user-editable on disk.
+    /// </summary>
+    private static string SanitizeBotId(string botId)
+    {
+        if (string.IsNullOrEmpty(botId)) return DefaultBotId;
+
+        char[] invalid = Path.GetInvalidFileNameChars();
+        if (botId.IndexOfAny(invalid) < 0 && botId.IndexOf("..", StringComparison.Ordinal) < 0)
+            return botId;
+
+        return DefaultBotId;
+    }
+
+    private const string LastSelectedBotPrefKey = "LastSelectedBotForChats";
+
+    /// <summary>
+    /// Switch the active bot. Persists the choice, fires OnActiveBotChanged,
+    /// clears the current chat list, and triggers a fresh load.
+    /// </summary>
+    public void SetActiveBot(string botId)
+    {
+        if (string.IsNullOrEmpty(botId)) return;
+        if (botId == CurrentBotId) return;
+
+        CurrentBotId = botId;
+        PlayerPrefs.SetString(LastSelectedBotPrefKey, botId);
+        PlayerPrefs.Save();
+
+        Chats.Clear();
+        chatLookup.Clear();
+        OnChatListCleared?.Invoke();
+        OnActiveBotChanged?.Invoke(botId);
+
+        StopAllCoroutines();
+        BeginLoadForActiveBot();
+    }
+
+    /// <summary>
+    /// Returns true when profileId is a usable bot profile id — not null/empty
+    /// and not the unauthed sentinel (Bot.UnauthedProfileSentinel).
+    /// </summary>
+    private static bool IsValidProfileId(string profileId)
+        => !string.IsNullOrEmpty(profileId) && profileId != Bot.UnauthedProfileSentinel;
+
+    /// <summary>
+    /// Returns the active bot's WhatsApp profile ID, or null if missing/sentinel.
+    /// Coroutines guard on null and abort to avoid sending malformed requests.
+    /// </summary>
+    private string GetActiveProfileId()
+    {
+        Bot bot = Manager.Instance != null ? Manager.Instance.FindBotByName(CurrentBotId) : null;
+        if (bot == null) return null;
+        return IsValidProfileId(bot.whatsappProfileId) ? bot.whatsappProfileId : null;
+    }
+
+    /// <summary>
+    /// Returns the current empty-state reason without firing an event. Used by
+    /// late-attaching subscribers (e.g., a UI surface that activates after the
+    /// initial OnEmptyState fired) to catch up to current state.
+    /// Returns null when there is no empty state — i.e., a valid bot is active
+    /// with a real profile.
+    /// </summary>
+    public EmptyStateReason? ComputeCurrentEmptyState()
+    {
+        Transform root = Manager.Instance != null ? Manager.Instance.BotsRoot : null;
+        if (root == null || root.childCount == 0)
+        {
+            return EmptyStateReason.NoBotsExist;
+        }
+
+        Bot bot = Manager.Instance.FindBotByName(CurrentBotId);
+        if (bot == null || !IsValidProfileId(bot.whatsappProfileId))
+        {
+            return EmptyStateReason.BotHasNoWhatsApp;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Resolve the active bot's WhatsApp profile, then load cached chats and
+    /// kick off a network sync. Fires OnEmptyState if the bot has no WhatsApp.
+    /// </summary>
+    private void BeginLoadForActiveBot()
+    {
+        Bot bot = Manager.Instance != null ? Manager.Instance.FindBotByName(CurrentBotId) : null;
+        if (bot == null || !IsValidProfileId(bot.whatsappProfileId))
+        {
+            OnEmptyState?.Invoke(EmptyStateReason.BotHasNoWhatsApp);
+            return;
+        }
+
+        string cachePath = Path.Combine(GetCacheRoot(), "chats.json");
+        string cachedJson = "";
+        if (File.Exists(cachePath))
+        {
+            cachedJson = File.ReadAllText(cachePath);
+            ParseChatsJson(cachedJson, true);
+        }
+
+        StartCoroutine(SyncAllChats(cachePath, cachedJson));
+    }
 
     public void Awake()
     {
         Instance = this;
+        MigrateLegacyCacheOnce();
     }
 
     public void Start()
     {
         ShowChatList(true);
-        
-        string cachePath = System.IO.Path.Combine(Application.persistentDataPath, "all_chats_cache.json");
-        string cachedJson = "";
-        
-        if (System.IO.File.Exists(cachePath))
+        StartCoroutine(InitializeActiveBotNextFrame());
+    }
+
+    /// <summary>
+    /// Defer active-bot resolution by one frame so Manager.Start() (which runs after
+    /// ChatManager.Start() due to ChatManager's [DefaultExecutionOrder(-100)]) has a
+    /// chance to instantiate the bot GameObjects under BotsParent first.
+    /// </summary>
+    private IEnumerator InitializeActiveBotNextFrame()
+    {
+        yield return null;
+        if (ResolveInitialActiveBot())
         {
-            cachedJson = System.IO.File.ReadAllText(cachePath);
-            ParseChatsJson(cachedJson, true); // TRUE = Initial load, safe to clear the screen!
+            BeginLoadForActiveBot();
+        }
+    }
+
+    /// <summary>
+    /// Pick the active bot at startup: persisted choice if it still exists,
+    /// otherwise the first bot. Returns false (after firing OnEmptyState(NoBotsExist))
+    /// when no bots exist — caller should skip BeginLoadForActiveBot in that case to
+    /// avoid a redundant BotHasNoWhatsApp event.
+    /// </summary>
+    private bool ResolveInitialActiveBot()
+    {
+        string saved = PlayerPrefs.GetString(LastSelectedBotPrefKey, "");
+        if (!string.IsNullOrEmpty(saved) && Manager.Instance != null && Manager.Instance.FindBotByName(saved) != null)
+        {
+            CurrentBotId = saved;
+            return true;
         }
 
-        StartCoroutine(SyncAllChats(cachePath, cachedJson));
+        Transform root = Manager.Instance != null ? Manager.Instance.BotsRoot : null;
+        if (root != null && root.childCount > 0)
+        {
+            CurrentBotId = root.GetChild(0).name;
+            PlayerPrefs.SetString(LastSelectedBotPrefKey, CurrentBotId);
+            PlayerPrefs.Save();
+            return true;
+        }
+
+        OnEmptyState?.Invoke(EmptyStateReason.NoBotsExist);
+        return false;
     }
 
     public ChatViewModel GetChat(string chatId)
@@ -107,10 +359,17 @@ public class ChatManager : MonoBehaviour
 
     IEnumerator SyncAllChats(string cachePath, string cachedJson)
     {
-        string url = $"https://wappi.pro/api/sync/chats/filter?profile_id={profileId}";
+        string activeProfileId = GetActiveProfileId();
+        if (string.IsNullOrEmpty(activeProfileId))
+        {
+            OnEmptyState?.Invoke(EmptyStateReason.BotHasNoWhatsApp);
+            yield break;
+        }
+        string url = $"https://wappi.pro/api/sync/chats/filter?profile_id={activeProfileId}";
 
         using UnityWebRequest www = UnityWebRequest.Get(url);
         www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
+        www.timeout = 30;
         yield return www.SendWebRequest();
 
         if (www.result != UnityWebRequest.Result.Success) yield break;
@@ -119,7 +378,7 @@ public class ChatManager : MonoBehaviour
 
         if (newJson != cachedJson)
         {
-            System.IO.File.WriteAllText(cachePath, newJson);
+            System.IO.File.WriteAllTextAsync(cachePath, newJson);
             ParseChatsJson(newJson, false); // FALSE = Background sync, DO NOT CLEAR THE UI!
         }
     }
@@ -193,7 +452,7 @@ public class ChatManager : MonoBehaviour
         // Safety check: Make sure the user didn't swipe back out before the animation finished!
         if (currentChatId != chatId) return;
 
-        List<MessageViewModel> cachedMessages = ChatHistoryCache.LoadHistory(chatId);
+        List<MessageViewModel> cachedMessages = ChatHistoryCache.LoadHistory(GetCacheRoot(), chatId);
 
         if (cachedMessages != null && cachedMessages.Count > 0)
         {
@@ -209,7 +468,7 @@ public class ChatManager : MonoBehaviour
             // 3. NO CACHE: This is a brand new chat, do a normal fetch
             StartCoroutine(GetMessagesRoutine(chatId, 1, (newMessages, hasMore) => 
             {
-                if (newMessages.Count > 0) ChatHistoryCache.SaveHistory(chatId, newMessages);
+                if (newMessages.Count > 0) ChatHistoryCache.SaveHistory(GetCacheRoot(), chatId, newMessages);
                 OnBatchMessagesLoaded?.Invoke(newMessages, false, hasMore);
             }));
         }
@@ -217,12 +476,19 @@ public class ChatManager : MonoBehaviour
     
     IEnumerator SyncLatestMessages(string chatId, List<MessageViewModel> cachedList)
     {
+        string activeProfileId = GetActiveProfileId();
+        if (string.IsNullOrEmpty(activeProfileId))
+        {
+            Debug.LogWarning("[ChatManager] SyncLatestMessages aborted: no valid profile for active bot.");
+            yield break;
+        }
         string escapedId = UnityWebRequest.EscapeURL(chatId);
         // We strictly only check offset 0 (the absolute newest messages)
-        string url = $"https://wappi.pro/api/sync/messages/get?profile_id={profileId}&chat_id={escapedId}&limit={MessagesPerPage}&offset=0";
+        string url = $"https://wappi.pro/api/sync/messages/get?profile_id={activeProfileId}&chat_id={escapedId}&limit={MessagesPerPage}&offset=0";
 
         using UnityWebRequest www = UnityWebRequest.Get(url);
         www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
+        www.timeout = 30;
         yield return www.SendWebRequest();
 
         if (www.result != UnityWebRequest.Result.Success) yield break;
@@ -270,7 +536,7 @@ public class ChatManager : MonoBehaviour
             foreach (var m in newMessages) seenMessageIds.Add(m.messageId);
 
             // Save the newly merged list permanently
-            ChatHistoryCache.SaveHistory(chatId, newMessages);
+            ChatHistoryCache.SaveHistory(GetCacheRoot(), chatId, newMessages);
 
             // Refresh the UI with the fully up-to-date list!
             OnBatchMessagesLoaded?.Invoke(newMessages, false, true);
@@ -293,21 +559,30 @@ public class ChatManager : MonoBehaviour
     IEnumerator GetMessagesRoutine(string chatId, int page, Action<List<MessageViewModel>, bool> onComplete)
     {
         int offset = (page - 1) * MessagesPerPage;
-        
+
+        string activeProfileId = GetActiveProfileId();
+        if (string.IsNullOrEmpty(activeProfileId))
+        {
+            onComplete?.Invoke(new List<MessageViewModel>(), false);
+            yield break;
+        }
         string escapedId = UnityWebRequest.EscapeURL(chatId);
-        string url = $"https://wappi.pro/api/sync/messages/get?profile_id={profileId}&chat_id={escapedId}&limit={MessagesPerPage}&offset={offset}";
+        string url = $"https://wappi.pro/api/sync/messages/get?profile_id={activeProfileId}&chat_id={escapedId}&limit={MessagesPerPage}&offset={offset}";
 
         using UnityWebRequest www = UnityWebRequest.Get(url);
         www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
+        www.timeout = 30;
         yield return www.SendWebRequest();
 
+#if UNITY_EDITOR
         var text = www.downloadHandler.text;
         System.IO.File.WriteAllText(
             Application.persistentDataPath + "/response.txt",
             text
         );
         Debug.Log("Saved to: " + Application.persistentDataPath);
-        
+#endif
+
         if (www.result != UnityWebRequest.Result.Success)
         {
             Debug.LogError($"[ChatManager] Error loading messages: {www.error}");
@@ -573,7 +848,13 @@ if (msg.messageType == MessageType.Video)
 
     IEnumerator DownloadMediaRoutine(string messageId, Action<string> onSuccess, Action onFailure)
     {
-        string url = $"https://wappi.pro/api/sync/message/media/download?profile_id={profileId}&message_id={messageId}";
+        string activeProfileId = GetActiveProfileId();
+        if (string.IsNullOrEmpty(activeProfileId))
+        {
+            onFailure?.Invoke();
+            yield break;
+        }
+        string url = $"https://wappi.pro/api/sync/message/media/download?profile_id={activeProfileId}&message_id={messageId}";
         using UnityWebRequest www = UnityWebRequest.Get(url);
         www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
         yield return www.SendWebRequest();
@@ -608,7 +889,13 @@ if (msg.messageType == MessageType.Video)
 
 IEnumerator SendTextMessageRoutine(string chatId, string text)
 {
-    string url = $"https://wappi.pro/api/sync/message/send?profile_id={profileId}";
+    string activeProfileId = GetActiveProfileId();
+    if (string.IsNullOrEmpty(activeProfileId))
+    {
+        Debug.LogWarning("[ChatManager] SendTextMessageRoutine aborted: no valid profile for active bot.");
+        yield break;
+    }
+
     string recipient = chatId;
     if (recipient.EndsWith("@c.us")) recipient = recipient.Replace("@c.us", "");
 
@@ -634,11 +921,12 @@ IEnumerator SendTextMessageRoutine(string chatId, string text)
     var chatVm = GetChat(chatId);
     if (chatVm != null) chatVm.UpdateLastMessage(text, now);
 
-    List<MessageViewModel> cachedList = ChatHistoryCache.LoadHistory(chatId);
+    List<MessageViewModel> cachedList = ChatHistoryCache.LoadHistory(GetCacheRoot(), chatId);
     cachedList.Add(instantMessage);
-    ChatHistoryCache.SaveHistory(chatId, cachedList);
+    ChatHistoryCache.SaveHistory(GetCacheRoot(), chatId, cachedList);
 
     // --- BACKGROUND: Send to server silently ---
+    string url = $"https://wappi.pro/api/sync/message/send?profile_id={activeProfileId}";
     var requestData = new WappiSendTextRequest { body = text, recipient = recipient };
     string jsonPayload = JsonConvert.SerializeObject(requestData);
 
@@ -666,13 +954,13 @@ IEnumerator SendTextMessageRoutine(string chatId, string text)
             seenMessageIds.Remove(tempId);
             seenMessageIds.Add(response.message_id);
 
-            var cache = ChatHistoryCache.LoadHistory(chatId);
+            var cache = ChatHistoryCache.LoadHistory(GetCacheRoot(), chatId);
             var msg = cache.Find(m => m.messageId == tempId);
             if (msg != null)
             {
                 msg.messageId = response.message_id;
                 if (response.timestamp > 0) msg.timestamp = response.timestamp;
-                ChatHistoryCache.SaveHistory(chatId, cache);
+                ChatHistoryCache.SaveHistory(GetCacheRoot(), chatId, cache);
             }
         }
     }
@@ -696,4 +984,10 @@ public class WappiSendTextResponse
     public string status;
     public string message_id;
     public long timestamp;
+}
+
+public enum EmptyStateReason
+{
+    NoBotsExist,
+    BotHasNoWhatsApp,
 }
