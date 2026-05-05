@@ -1337,7 +1337,7 @@ public class Manager : MonoBehaviour
                 // Final auth — switch to bots tab before hiding
                 var tabManager = FindFirstObjectByType<BottomTabManager>();
                 if (tabManager != null)
-                    tabManager.SwitchTab(3);
+                    tabManager.SwitchTab(BottomTabManager.BotsTabIndex);
             }
         }
 

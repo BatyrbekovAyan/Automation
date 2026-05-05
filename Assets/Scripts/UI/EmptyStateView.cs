@@ -17,6 +17,7 @@ public class EmptyStateView : MonoBehaviour
     [SerializeField] private Sprite iconNoWhatsApp;
 
     private CanvasGroup canvasGroup;
+    private EmptyStateReason? _lastReason;
 
     private void Awake()
     {
@@ -72,10 +73,18 @@ public class EmptyStateView : MonoBehaviour
         canvasGroup.alpha = 0f;
         canvasGroup.interactable = false;
         canvasGroup.blocksRaycasts = false;
+        _lastReason = null;
     }
 
     private void HandleEmptyState(EmptyStateReason reason)
     {
+        // Guard against double-fire during the OnEnable catch-up race: the
+        // catch-up call and a real OnEmptyState event can both deliver the
+        // same reason in the same frame. Reprocessing is safe but wasteful
+        // (re-applies sprites, re-binds button listeners).
+        if (_lastReason == reason) return;
+        _lastReason = reason;
+
         ConfigureForReason(reason);
         Show();
     }
@@ -122,11 +131,6 @@ public class EmptyStateView : MonoBehaviour
         }
     }
 
-    // Index of the bots tab in BottomTabManager — matches BottomTabManager.defaultTabIndex.
-    // Bot settings live under Screen_Bots, so we must switch to it before the
-    // SettingsPage activation in Bot.OpenSettings has anything visible to render against.
-    private const int BotsTabIndex = 3;
-
     private void OpenCurrentBotAuth()
     {
         if (ChatManager.Instance == null) return;
@@ -138,7 +142,7 @@ public class EmptyStateView : MonoBehaviour
         BottomTabManager tabManager = FindFirstObjectByType<BottomTabManager>(FindObjectsInactive.Include);
         if (tabManager != null)
         {
-            tabManager.SwitchTab(BotsTabIndex);
+            tabManager.SwitchTab(BottomTabManager.BotsTabIndex);
         }
 
         // Bot.EditButton is wired to the existing OpenSettings flow (SettingsPage

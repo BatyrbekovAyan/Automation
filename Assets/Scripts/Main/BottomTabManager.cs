@@ -63,6 +63,17 @@ public class TabData
 public class BottomTabManager : MonoBehaviour
 {
     // ------------------------------------------------------------------ //
+    //  Public constants                                                    //
+    // ------------------------------------------------------------------ //
+
+    /// <summary>
+    /// Index of the Bots tab in the navigation bar.
+    /// Single source of truth for callers that need to switch to the bots
+    /// tab without hardcoding the index (e.g. EmptyStateView, Manager).
+    /// </summary>
+    public const int BotsTabIndex = 3;
+
+    // ------------------------------------------------------------------ //
     //  Inspector-exposed fields                                            //
     // ------------------------------------------------------------------ //
 
