@@ -205,6 +205,30 @@ public class ChatManager : MonoBehaviour
     }
 
     /// <summary>
+    /// Returns the current empty-state reason without firing an event. Used by
+    /// late-attaching subscribers (e.g., a UI surface that activates after the
+    /// initial OnEmptyState fired) to catch up to current state.
+    /// Returns null when there is no empty state — i.e., a valid bot is active
+    /// with a real profile.
+    /// </summary>
+    public EmptyStateReason? ComputeCurrentEmptyState()
+    {
+        Transform root = Manager.Instance != null ? Manager.Instance.BotsRoot : null;
+        if (root == null || root.childCount == 0)
+        {
+            return EmptyStateReason.NoBotsExist;
+        }
+
+        Bot bot = Manager.Instance.FindBotByName(CurrentBotId);
+        if (bot == null || !IsValidProfileId(bot.whatsappProfileId))
+        {
+            return EmptyStateReason.BotHasNoWhatsApp;
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Resolve the active bot's WhatsApp profile, then load cached chats and
     /// kick off a network sync. Fires OnEmptyState if the bot has no WhatsApp.
     /// </summary>

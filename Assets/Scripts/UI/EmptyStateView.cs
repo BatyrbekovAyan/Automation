@@ -31,6 +31,19 @@ public class EmptyStateView : MonoBehaviour
             ChatManager.Instance.OnEmptyState += HandleEmptyState;
             ChatManager.Instance.OnActiveBotChanged += HandleActiveBotChanged;
             ChatManager.Instance.OnChatAdded += HandleChatAdded;
+
+            // Catch up to the current state. The initial OnEmptyState event may have
+            // fired before this view's GameObject was activated (Screen_Whatsapp is
+            // inactive at scene load), in which case our subscription missed it.
+            EmptyStateReason? reason = ChatManager.Instance.ComputeCurrentEmptyState();
+            if (reason.HasValue)
+            {
+                HandleEmptyState(reason.Value);
+            }
+            else if (ChatManager.Instance.Chats != null && ChatManager.Instance.Chats.Count > 0)
+            {
+                Hide();
+            }
         }
     }
 
