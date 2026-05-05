@@ -122,15 +122,28 @@ public class EmptyStateView : MonoBehaviour
         }
     }
 
+    // Index of the bots tab in BottomTabManager — matches BottomTabManager.defaultTabIndex.
+    // Bot settings live under Screen_Bots, so we must switch to it before the
+    // SettingsPage activation in Bot.OpenSettings has anything visible to render against.
+    private const int BotsTabIndex = 3;
+
     private void OpenCurrentBotAuth()
     {
         if (ChatManager.Instance == null) return;
         Bot bot = Manager.Instance != null ? Manager.Instance.FindBotByName(ChatManager.Instance.CurrentBotId) : null;
         if (bot == null) return;
 
-        // Bot.EditButton is wired to the existing OpenSettings flow (parent activation
-        // + slide-in animation). Invoking it avoids exposing OpenSettings publicly or
-        // calling SendMessage by string name.
+        // Switch to Screen_Bots first. SwitchTab toggles SetActive on the screen panels
+        // synchronously, so by the next line Screen_Bots is the active screen container.
+        BottomTabManager tabManager = FindFirstObjectByType<BottomTabManager>(FindObjectsInactive.Include);
+        if (tabManager != null)
+        {
+            tabManager.SwitchTab(BotsTabIndex);
+        }
+
+        // Bot.EditButton is wired to the existing OpenSettings flow (SettingsPage
+        // activation + slide-in animation). Invoking it avoids exposing OpenSettings
+        // publicly or calling SendMessage by string name.
         if (bot.EditButton != null) bot.EditButton.onClick.Invoke();
     }
 }
