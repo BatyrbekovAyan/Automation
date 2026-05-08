@@ -25,6 +25,34 @@ public class Bot : MonoBehaviour
     [SerializeField] private Image BotIconImage;
     [SerializeField] private BusinessTypesSO businessTypes;
 
+    private static readonly Color NeutralTile = new Color(0.85f, 0.85f, 0.85f);
+
+    /// <summary>
+    /// Returns the bot's business icon sprite, or null when no business type
+    /// is set (mid-wizard) or the SO has no entry for the saved id. Cheap —
+    /// PlayerPrefs read + dictionary lookup; safe to call from OnEnable.
+    /// </summary>
+    public Sprite GetBusinessIconSprite()
+    {
+        if (businessTypes == null) return null;
+        var id = PlayerPrefs.GetString(transform.name + "BusinessType", "");
+        if (string.IsNullOrEmpty(id)) return null;
+        return businessTypes.TryGetById(id, out var entry) ? entry.sprite : null;
+    }
+
+    /// <summary>
+    /// Returns the bot's business icon tile color, or NeutralTile when no
+    /// business type is set or the SO has no matching entry. Callers can
+    /// always assign the result to an Image.color without null-checking.
+    /// </summary>
+    public Color GetBusinessIconTint()
+    {
+        if (businessTypes == null) return NeutralTile;
+        var id = PlayerPrefs.GetString(transform.name + "BusinessType", "");
+        if (string.IsNullOrEmpty(id)) return NeutralTile;
+        return businessTypes.TryGetById(id, out var entry) ? entry.tileColor : NeutralTile;
+    }
+
 
     public bool active = false;
 
