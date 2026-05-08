@@ -32,6 +32,10 @@ public class BotSwitcherSheet : MonoBehaviour
     private float panelHiddenY;
     private float panelShownY;
 
+    // The scene + editor builder start this GameObject inactive, so Awake first runs reentrantly
+    // from inside Open()'s SetActive(true). Calling SetActive(false) here would re-deactivate the
+    // sheet mid-Open() and cause the panel to invisibly tween into place — breaking the slide
+    // animation on the first two presses. Leave deactivation to Close() and the scene state.
     private void Awake()
     {
         if (sheetPanel != null)
@@ -51,7 +55,6 @@ public class BotSwitcherSheet : MonoBehaviour
             backdropButton.onClick.RemoveAllListeners();
             backdropButton.onClick.AddListener(Close);
         }
-        gameObject.SetActive(false);
     }
 
     /// <summary>
