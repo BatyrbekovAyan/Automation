@@ -7,6 +7,7 @@ public class BotSwitcherRowView : MonoBehaviour
 {
     [Header("UI references")]
     [SerializeField] private Image avatarImage;
+    [SerializeField] private Image avatarIcon;
     [SerializeField] private TextMeshProUGUI nameLabel;
     [SerializeField] private TextMeshProUGUI subLineLabel;
     [SerializeField] private Image statusDot;
@@ -17,7 +18,6 @@ public class BotSwitcherRowView : MonoBehaviour
     [Header("Style")]
     [SerializeField] private Color statusConnectedColor = new Color(0.13f, 0.78f, 0.42f);
     [SerializeField] private Color statusDisconnectedColor = new Color(0.6f, 0.6f, 0.6f);
-    [SerializeField] private Sprite avatarFallback;
 
     private string botId;
     private System.Action<string> onTap;
@@ -47,11 +47,13 @@ public class BotSwitcherRowView : MonoBehaviour
             statusDot.color = waConnected ? statusConnectedColor : statusDisconnectedColor;
         }
 
-        // Reset to fallback unconditionally so a rebind doesn't keep the prior bot's avatar.
-        // A future avatar fetcher will overwrite this once a real sprite resolves.
-        if (avatarImage != null)
+        if (avatarImage != null) avatarImage.color = bot.GetBusinessIconTint();
+
+        if (avatarIcon != null)
         {
-            avatarImage.sprite = avatarFallback;
+            Sprite sprite = bot.GetBusinessIconSprite();
+            avatarIcon.sprite = sprite;
+            avatarIcon.enabled = sprite != null;
         }
 
         if (selectedBackground != null) selectedBackground.gameObject.SetActive(isSelected);
