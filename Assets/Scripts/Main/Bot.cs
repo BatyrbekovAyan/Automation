@@ -25,7 +25,12 @@ public class Bot : MonoBehaviour
     [SerializeField] private Image BotIconImage;
     [SerializeField] private BusinessTypesSO businessTypes;
 
-    private static readonly Color NeutralTile = new Color(0.85f, 0.85f, 0.85f);
+    /// <summary>
+    /// Light gray fallback used by the BotsPage card and BotSwitcher avatar
+    /// surfaces when a bot has no business type set. Single source of truth
+    /// so designer tweaks land in one place.
+    /// </summary>
+    public static readonly Color NeutralTile = new Color(0.85f, 0.85f, 0.85f);
 
     /// <summary>
     /// Returns the bot's business icon sprite, or null when no business type

@@ -5,8 +5,6 @@ using TMPro;
 [RequireComponent(typeof(Button))]
 public class BotSwitcherTitleBinder : MonoBehaviour
 {
-    private static readonly Color NeutralTile = new Color(0.85f, 0.85f, 0.85f);
-
     [SerializeField] private TextMeshProUGUI nameLabel;
     [SerializeField] private Image avatarImage;
     [SerializeField] private Image avatarIcon;
@@ -65,7 +63,7 @@ public class BotSwitcherTitleBinder : MonoBehaviour
     private void ApplyAvatar(Bot bot)
     {
         if (avatarImage != null)
-            avatarImage.color = bot != null ? bot.GetBusinessIconTint() : NeutralTile;
+            avatarImage.color = bot != null ? bot.GetBusinessIconTint() : Bot.NeutralTile;
 
         if (avatarIcon != null)
         {
