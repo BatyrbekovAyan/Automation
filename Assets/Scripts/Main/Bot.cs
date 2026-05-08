@@ -10,12 +10,7 @@ public class Bot : MonoBehaviour
     [SerializeField] public TextMeshProUGUI BotDesc;
     [SerializeField] public TextMeshProUGUI Status;
     [SerializeField] public Button EditButton;
-    [SerializeField] private Button DeleteButton;
     [SerializeField] public Toggle ActivationSwitch;
-    [SerializeField] private GameObject DeletePopup;
-
-    [SerializeField] private Button DeleteConfirmButton;
-    [SerializeField] private Button DeleteCancelButton;
 
     [SerializeField] private Color backgroundActiveColor;
     [SerializeField] private Color handleActiveColor;
@@ -62,17 +57,6 @@ public class Bot : MonoBehaviour
         {
             EditButton.onClick.AddListener(OpenSettings);
         }
-
-        if (DeleteButton != null)
-        {
-            DeleteButton.onClick.AddListener(OpenDeletePopup);
-        }
-
-        // Delete confirm popup: fire on real finger release via PopupUI.
-        if (DeleteConfirmButton != null)
-            PopupUI.WireFingerUp(DeleteConfirmButton, DeleteBot);
-        if (DeleteCancelButton != null)
-            PopupUI.WireFingerUp(DeleteCancelButton, DeleteCancel);
     }
 
 
@@ -81,6 +65,8 @@ public class Bot : MonoBehaviour
         // Keep BotsPage active during the slide-in so its parallax is visible.
         // It is deactivated in the slide-in onComplete callback below.
         Manager.BotSettingsParentStatic.transform.parent.gameObject.SetActive(true);
+
+        SwipeToBackBotSettings activeSwipe = null;
 
         if (Manager.BotSettingsParentStatic.transform.childCount != 0)
         {
@@ -91,6 +77,16 @@ public class Bot : MonoBehaviour
                     botSettings.gameObject.SetActive(true);
                     Manager.openBot = gameObject;
                     Manager.openBotSettings = botSettings.gameObject.GetComponent<BotSettings>();
+
+                    // Each BotSettings prefab has its own SwipeBack child. Resolve
+                    // the right one explicitly instead of relying on the static
+                    // Instance — the cascade activation when the wrapper turns on
+                    // can fire OnEnable on multiple SwipeBacks and the last one
+                    // wins the singleton, even if it is about to be deactivated
+                    // below by the non-matching branch.
+                    activeSwipe = botSettings.GetComponentInChildren<SwipeToBackBotSettings>(includeInactive: true);
+                    if (activeSwipe != null && !activeSwipe.gameObject.activeSelf)
+                        activeSwipe.gameObject.SetActive(true);
                 }
                 else
                 {
@@ -99,9 +95,12 @@ public class Bot : MonoBehaviour
             }
         }
 
-        if (SwipeToBackBotSettings.Instance != null)
+        if (activeSwipe != null)
         {
-            SwipeToBackBotSettings.Instance.SlideInFromRight(() =>
+            // Authoritative singleton update — supersedes any OnEnable assignment
+            // that fired during the cascade above.
+            SwipeToBackBotSettings.Instance = activeSwipe;
+            activeSwipe.SlideInFromRight(() =>
             {
                 if (BotsPage.Instance != null)
                     BotsPage.Instance.gameObject.SetActive(false);
@@ -109,8 +108,9 @@ public class Bot : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("[Bot.OpenSettings] SwipeToBackBotSettings.Instance is null — " +
-                             "falling back to instant open. Run Tools/Bot Settings/Wire Swipe Back.");
+            Debug.LogWarning("[Bot.OpenSettings] No SwipeToBackBotSettings found on the " +
+                             "matching BotSettings — falling back to instant open. " +
+                             "Run Tools/Bot Settings/Wire Swipe Back.");
             if (BotsPage.Instance != null) BotsPage.Instance.gameObject.SetActive(false);
         }
     }
@@ -196,10 +196,6 @@ public class Bot : MonoBehaviour
         Destroy(Manager.BotSettingsParentStatic.transform.GetChild(transform.GetSiblingIndex()).gameObject);
         Destroy(gameObject);
     }
-
-    private void OpenDeletePopup() => PopupUI.Show(DeletePopup);
-
-    private void DeleteCancel() => PopupUI.Hide(DeletePopup);
 
     private void EnableBot (bool enabled)
     {

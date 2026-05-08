@@ -46,11 +46,16 @@ public class SwipeToBackBotSettings : MonoBehaviour,
 
     private void Awake()
     {
-        Instance = this;
         var localCanvas = GetComponentInParent<Canvas>();
         if (localCanvas != null) canvas = localCanvas.rootCanvas;
         if (EventSystem.current != null) EventSystem.current.pixelDragThreshold = 15;
     }
+
+    // Each BotSettings prefab has its own SwipeBack child, so multiple
+    // instances exist (one per bot). Claim the singleton on activation —
+    // Bot.OpenSettings activates exactly one BotSettings at a time, so
+    // OnEnable always runs on the SwipeBack the user is currently driving.
+    private void OnEnable() => Instance = this;
 
     // Called by Bot.OpenSettings() after activating the BotSettings wrapper.
     // BotsPage must still be active when this is invoked so the parallax is

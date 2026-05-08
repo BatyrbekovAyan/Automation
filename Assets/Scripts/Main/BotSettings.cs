@@ -99,8 +99,17 @@ public partial class BotSettings : MonoBehaviour
     private string xlsx;
     private string docx;
 
-    public static BotSettings Instance;
-    
+    // Each bot has its own BotSettings prefab instance, so a write-on-Awake
+    // singleton would race the same way SwipeToBackBotSettings.Instance did
+    // (last-instantiated wins, even when a different BotSettings is the one
+    // the user is actually driving). Forward to Manager.openBotSettings
+    // instead — that field has a single, deterministic lifecycle: set in
+    // Bot.OpenSettings, cleared in BotSettings.SettleClosedInstant /
+    // ConfirmDeleteBot. Read-only by design — assignments must go through
+    // Manager.openBotSettings to keep one source of truth.
+    public static BotSettings Instance => Manager.openBotSettings;
+
+
 
     void Start()
     {
