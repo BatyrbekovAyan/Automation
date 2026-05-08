@@ -70,10 +70,10 @@ Same nesting pattern already used by `Bot.BotIconTile` → `Bot.BotIconImage` on
 
 ### 3. Runtime binding
 
-**`Assets/Scripts/UI/BotSwitcherTitleBinder.cs`** — add two serialized refs and one apply call:
+**`Assets/Scripts/UI/BotSwitcherTitleBinder.cs`** — add two serialized refs and one apply call. Field names mirror `BotSwitcherRowView`'s convention: `avatarImage` is the tinted background circle (matches `ChatItemView`/`MessageHeaderView` naming); `avatarIcon` is the foreground business glyph.
 
 ```csharp
-[SerializeField] private Image avatarTile;
+[SerializeField] private Image avatarImage;
 [SerializeField] private Image avatarIcon;
 
 private void UpdateTitle(string botId)
@@ -89,8 +89,8 @@ private void UpdateTitle(string botId)
 
 private void ApplyAvatar(Bot bot)
 {
-    if (avatarTile != null)
-        avatarTile.color = bot != null ? bot.GetBusinessIconTint() : new Color(0.85f, 0.85f, 0.85f);
+    if (avatarImage != null)
+        avatarImage.color = bot != null ? bot.GetBusinessIconTint() : new Color(0.85f, 0.85f, 0.85f);
     if (avatarIcon != null)
     {
         Sprite sprite = bot != null ? bot.GetBusinessIconSprite() : null;
@@ -102,7 +102,7 @@ private void ApplyAvatar(Bot bot)
 
 `UpdateTitle` already runs on `OnEnable` and on every `OnActiveBotChanged` event, so the avatar refreshes automatically whenever the Whatsapp tab activates or the active bot changes.
 
-**`Assets/Scripts/UI/BotSwitcherRowView.cs`** — replace the current `avatarImage` + `avatarFallback` fields with `avatarTile` + `avatarIcon`. In `Bind`, call the same two getters from `Bot`. The "future avatar fetcher will overwrite this" comment is removed — the icon/tint pair is now the resolved avatar; no fetcher is involved.
+**`Assets/Scripts/UI/BotSwitcherRowView.cs`** — keep the existing `avatarImage` field (now semantically "the tile") so the existing `BotSwitcherSheetBuilder.cs:262` wiring (`FindProperty("avatarImage")`) still resolves. Add a new sibling `avatarIcon` field. Drop the unused `avatarFallback` field. In `Bind`, call `Bot.GetBusinessIconTint()` to set `avatarImage.color` and `Bot.GetBusinessIconSprite()` to set `avatarIcon.sprite` / `avatarIcon.enabled`. The "future avatar fetcher will overwrite this" comment is removed — the icon/tint pair is now the resolved avatar; no fetcher is involved.
 
 `Bind` is invoked fresh on every `BotSwitcherSheet.PopulateRows` call (which runs on every `Open()`), so business-type changes show up the next time the sheet opens.
 
@@ -122,12 +122,12 @@ If it does exist, it:
 - Removes any existing children of `Avatar`, then creates a single `IconSprite` child:
   - Anchored center, `sizeDelta = sizeDelta * 0.64f`, `anchoredPosition = Vector2.zero`.
   - `Image` with no sprite (set at runtime), `raycastTarget = false`.
-- Wires the new fields on the parent's `BotSwitcherTitleBinder` via `SerializedObject`: `avatarTile` → the Avatar's `Image`, `avatarIcon` → the `IconSprite`'s `Image`. Does not touch `nameLabel`.
+- Wires the new fields on the parent's `BotSwitcherTitleBinder` via `SerializedObject`: `avatarImage` → the Avatar's `Image`, `avatarIcon` → the `IconSprite`'s `Image`. Does not touch `nameLabel`.
 - `EditorUtility.SetDirty` + `EditorSceneManager.MarkSceneDirty` and selects the rebuilt Avatar.
 
-**`Tools/Bot Switcher/Rebuild Row Avatar`** — same surgical pattern, but operates on the row template's avatar slot. Resolves the slot by path: `Canvas/BotSwitcherRowPrefabHolder/BotSwitcherRow/Avatar`. Path-based rather than SerializedProperty-based because the `BotSwitcherRowView.avatarImage` field is being renamed in this same change — reading the old field would break the order of operations (pull C# → run menu item).
+**`Tools/Bot Switcher/Rebuild Row Avatar`** — same surgical pattern, but operates on the row template's avatar slot. Resolves the slot by path: `Canvas/BotSwitcherRowPrefabHolder/BotSwitcherRow/Avatar`. Path-based rather than SerializedProperty-based: the menu item is structural (it edits the GameObject hierarchy, then rewires the field afterward), so it shouldn't read the existing field state to find its target.
 
-Restructures only that GameObject's internals (Image config, ImageWithRoundedCorners, IconSprite child) and rewires `avatarTile` / `avatarIcon` on `BotSwitcherRowView`. Leaves `nameLabel`, `subLineLabel`, `statusDot`, `selectedBackground`, `selectedAccentBar`, `rowButton` untouched.
+Restructures only that GameObject's internals (Image config, ImageWithRoundedCorners, IconSprite child) and rewires `avatarImage` (now the tile) and `avatarIcon` on `BotSwitcherRowView`. Leaves `nameLabel`, `subLineLabel`, `statusDot`, `selectedBackground`, `selectedAccentBar`, `rowButton` untouched.
 
 Net effect for both menu items: the only things modified are the Avatar's internal hierarchy and the two new serialized fields on the binder/row. Every other tweak survives.
 
@@ -157,8 +157,8 @@ No new event subscriptions are required.
 | File | Change |
 | --- | --- |
 | `Assets/Scripts/Main/Bot.cs` | Add `GetBusinessIconSprite()`, `GetBusinessIconTint()`, `NeutralTile` constant. |
-| `Assets/Scripts/UI/BotSwitcherTitleBinder.cs` | Add `avatarTile`/`avatarIcon` serialized fields and `ApplyAvatar`; call from `UpdateTitle`. |
-| `Assets/Scripts/UI/BotSwitcherRowView.cs` | Replace `avatarImage` + `avatarFallback` with `avatarTile` + `avatarIcon`; call `Bot.GetBusinessIconSprite/Tint` from `Bind`; remove the "future avatar fetcher" comment. |
+| `Assets/Scripts/UI/BotSwitcherTitleBinder.cs` | Add `avatarImage`/`avatarIcon` serialized fields and `ApplyAvatar`; call from `UpdateTitle`. |
+| `Assets/Scripts/UI/BotSwitcherRowView.cs` | Keep `avatarImage` (now the tile, preserves existing builder wiring), add `avatarIcon`, drop `avatarFallback`. Call `Bot.GetBusinessIconSprite/Tint` from `Bind`; remove the "future avatar fetcher" comment. |
 | `Assets/Editor/BotSwitcherTitleAvatarRebuilder.cs` (new) | `Tools/Bot Switcher/Rebuild Title Avatar` menu item. Surgical — restructures only the Avatar. |
 | `Assets/Editor/BotSwitcherRowAvatarRebuilder.cs` (new) | `Tools/Bot Switcher/Rebuild Row Avatar` menu item. Surgical — restructures only the row's avatar slot. |
 
