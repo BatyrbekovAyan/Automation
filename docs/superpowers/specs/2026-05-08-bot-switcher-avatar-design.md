@@ -125,11 +125,11 @@ If it does exist, it:
 - Wires the new fields on the parent's `BotSwitcherTitleBinder` via `SerializedObject`: `avatarImage` → the Avatar's `Image`, `avatarIcon` → the `IconSprite`'s `Image`. Does not touch `nameLabel`.
 - `EditorUtility.SetDirty` + `EditorSceneManager.MarkSceneDirty` and selects the rebuilt Avatar.
 
-**`Tools/Bot Switcher/Rebuild Row Avatar`** — same surgical pattern, but operates on the row template's avatar slot. Resolves the slot by path: `Canvas/BotSwitcherRowPrefabHolder/BotSwitcherRow/Avatar`. Path-based rather than SerializedProperty-based: the menu item is structural (it edits the GameObject hierarchy, then rewires the field afterward), so it shouldn't read the existing field state to find its target.
+**`Tools/Bot Switcher/Rebuild Row Avatar`** — same surgical pattern, but operates on the **row prefab asset** (the row template was extracted from an in-scene holder into a standalone `.prefab` file). Discovers the prefab via `BotSwitcherSheet.rowPrefab` in the open scene, resolves its asset path via `AssetDatabase.GetAssetPath`, loads it editable via `PrefabUtility.LoadPrefabContents`, restructures the Avatar, wires `avatarImage` + `avatarIcon` on the prefab's `BotSwitcherRowView`, and saves with `PrefabUtility.SaveAsPrefabAsset`. Scene instances inherit the change automatically through the prefab system — no scene edit required.
 
-Restructures only that GameObject's internals (Image config, ImageWithRoundedCorners, IconSprite child) and rewires `avatarImage` (now the tile) and `avatarIcon` on `BotSwitcherRowView`. Leaves `nameLabel`, `subLineLabel`, `statusDot`, `selectedBackground`, `selectedAccentBar`, `rowButton` untouched.
+Restructures only the Avatar's internals (Image config, ImageWithRoundedCorners, IconSprite child) and rewires `avatarImage` (now the tile) and `avatarIcon` on `BotSwitcherRowView`. Leaves `nameLabel`, `subLineLabel`, `statusDot`, `selectedBackground`, `selectedAccentBar`, `rowButton` untouched.
 
-Net effect for both menu items: the only things modified are the Avatar's internal hierarchy and the two new serialized fields on the binder/row. Every other tweak survives.
+Net effect: the only things modified are the Avatar's internal hierarchy and the two new serialized fields. Every other row tweak survives. The title rebuilder modifies the scene; the row rebuilder modifies the prefab asset. Same end result — the user sees a tinted circle + business glyph in both surfaces — but they take different routes because the row template lives in a different place.
 
 ## Fallback behavior
 

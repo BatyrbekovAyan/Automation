@@ -513,7 +513,9 @@ avatarImage + avatarIcon. Does not touch BotName/Chevron siblings."
 **Files:**
 - Create: `Assets/Editor/BotSwitcherRowAvatarRebuilder.cs`
 
-Same surgical pattern, but operates on the row prefab template at `Canvas/BotSwitcherRowPrefabHolder/BotSwitcherRow/Avatar`. The holder GameObject is set inactive (so the template doesn't render in the live scene), but `Transform.Find` resolves inactive children fine.
+> **Pivot during execution:** The original plan assumed the row template lived as an inactive in-scene holder under `Canvas/BotSwitcherRowPrefabHolder/...`. Mid-implementation we discovered the user had extracted it into a standalone `Assets/Prefabs/BotSwitcherRow.prefab` asset. Task 5 was rewritten to operate on the prefab asset via `PrefabUtility.LoadPrefabContents` / `SaveAsPrefabAsset` instead of editing the scene. End behavior is identical from the user's perspective; the route differs because the row template now lives in a different place. The two earlier subagent reviews approved the original scene-based version; the rewrite was reviewed by the controller before commit.
+
+Same surgical pattern as Task 4 — only restructures the Avatar GameObject (Image, `ImageWithRoundedCorners`, single `IconSprite` child) and rewires `avatarImage` + `avatarIcon` on `BotSwitcherRowView`. Leaves `nameLabel`, `subLineLabel`, `statusDot`, `selectedBackground`, `selectedAccentBar`, `rowButton` untouched. Runs against whatever prefab `BotSwitcherSheet.rowPrefab` points at, so it follows wherever the user keeps the prefab in `Assets/`.
 
 - [ ] **Step 1: Create the file**
 
@@ -523,25 +525,24 @@ Write `Assets/Editor/BotSwitcherRowAvatarRebuilder.cs`:
 #if UNITY_EDITOR
 using Nobi.UiRoundedCorners;
 using UnityEditor;
-using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Surgical rebuilder for ONLY the Avatar GameObject inside the bot
-/// switcher row prefab template. Does not touch SelectedBackground,
-/// SelectedAccentBar, the Stack/Name/SubLine subtree, or rowButton —
-/// BotSwitcherSheetBuilder owns the row shell; this menu owns just the
-/// Avatar's visual config and child hierarchy.
+/// Surgical rebuilder for ONLY the Avatar GameObject inside the bot switcher
+/// row prefab asset. Resolves the prefab via BotSwitcherSheet.rowPrefab in
+/// the open scene, loads it via PrefabUtility, restructures the Avatar, and
+/// saves the prefab back to disk. Scene instances inherit the change
+/// automatically through the prefab system — no scene edit needed.
 ///
+/// Does not touch SelectedBackground, SelectedAccentBar, the Stack/Name/SubLine
+/// subtree, or rowButton — only the Avatar's visual config and child hierarchy.
 /// Preserves the existing Avatar's RectTransform and LayoutElement so
-/// post-build sizing tweaks survive. Re-run after resizing to refresh
-/// the rounded corner radius.
+/// post-build sizing tweaks survive. Re-run after resizing to refresh the
+/// rounded corner radius.
 /// </summary>
 public static class BotSwitcherRowAvatarRebuilder
 {
-    private const string HolderName = "BotSwitcherRowPrefabHolder";
-    private const string RowName = "BotSwitcherRow";
     private const string AvatarName = "Avatar";
     private const string IconChildName = "IconSprite";
     private const float IconChildScale = 0.64f;
@@ -549,84 +550,105 @@ public static class BotSwitcherRowAvatarRebuilder
     [MenuItem("Tools/Bot Switcher/Rebuild Row Avatar")]
     public static void Rebuild()
     {
-        Canvas canvas = Object.FindFirstObjectByType<Canvas>(FindObjectsInactive.Include);
-        if (canvas == null)
+        // 1. Locate a BotSwitcherSheet in any open scene to discover the row prefab reference.
+        BotSwitcherSheet sheet = Object.FindFirstObjectByType<BotSwitcherSheet>(FindObjectsInactive.Include);
+        if (sheet == null)
         {
-            Debug.LogError("[BotSwitcherRowAvatarRebuilder] No Canvas found in any open scene. Open the Main scene.");
+            Debug.LogError("[BotSwitcherRowAvatarRebuilder] No BotSwitcherSheet found in any open scene. Open the Main scene first.");
             return;
         }
 
-        Transform holder = canvas.transform.Find(HolderName);
-        Transform row = holder != null ? holder.Find(RowName) : null;
-        Transform avatar = row != null ? row.Find(AvatarName) : null;
-        if (avatar == null)
+        // 2. Read the rowPrefab serialized reference and resolve its asset path.
+        var sheetSO = new SerializedObject(sheet);
+        SerializedProperty rowPrefabProp = sheetSO.FindProperty("rowPrefab");
+        if (rowPrefabProp == null || rowPrefabProp.objectReferenceValue == null)
         {
-            Debug.LogError($"[BotSwitcherRowAvatarRebuilder] Path '{HolderName}/{RowName}/{AvatarName}' not found under Canvas. Run 'Tools/Bot Switcher/Build Sheet' first to create the row template.");
+            Debug.LogError("[BotSwitcherRowAvatarRebuilder] BotSwitcherSheet.rowPrefab is unwired. Wire it to a BotSwitcherRow prefab asset in the Inspector first.");
             return;
         }
 
-        BotSwitcherRowView rowView = row.GetComponent<BotSwitcherRowView>();
-        if (rowView == null)
+        string prefabPath = AssetDatabase.GetAssetPath(rowPrefabProp.objectReferenceValue);
+        if (string.IsNullOrEmpty(prefabPath))
         {
-            Debug.LogError($"[BotSwitcherRowAvatarRebuilder] '{RowName}' has no BotSwitcherRowView. Re-run 'Tools/Bot Switcher/Build Sheet' to attach it.");
+            Debug.LogError($"[BotSwitcherRowAvatarRebuilder] BotSwitcherSheet.rowPrefab references '{rowPrefabProp.objectReferenceValue.name}', which is not a saved prefab asset. Save the row template as a prefab in Assets/ and re-wire the field.");
             return;
         }
 
-        // 1. Tile Image — use existing if present, else add.
-        Image tileImage = avatar.GetComponent<Image>();
-        if (tileImage == null) tileImage = avatar.gameObject.AddComponent<Image>();
-        // Unity's Image renders nothing without a sprite. Built-in UISprite is
-        // a flat 9-sliced rounded rect; ImageWithRoundedCorners then masks it
-        // to a true circle at our chosen radius. The tile color is overwritten
-        // at runtime by the binder/row view per the active bot's business type.
-        if (tileImage.sprite == null)
-            tileImage.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
-        tileImage.type = Image.Type.Simple;
-        tileImage.color = new Color(0.85f, 0.85f, 0.85f);
-        tileImage.raycastTarget = true;
-
-        // 2. ImageWithRoundedCorners — radius from current size.
-        var roundedExisting = avatar.GetComponents<ImageWithRoundedCorners>();
-        for (int i = 1; i < roundedExisting.Length; i++) Object.DestroyImmediate(roundedExisting[i]);
-        ImageWithRoundedCorners rounded = avatar.GetComponent<ImageWithRoundedCorners>();
-        if (rounded == null) rounded = avatar.gameObject.AddComponent<ImageWithRoundedCorners>();
-        RectTransform avRT = avatar.GetComponent<RectTransform>();
-        rounded.radius = avRT.sizeDelta.x * 0.5f;
-        rounded.Validate();
-        rounded.Refresh();
-
-        // 3. Wipe children, create IconSprite at 64% size.
-        for (int i = avatar.childCount - 1; i >= 0; i--)
+        // 3. Load the prefab in an editable in-memory scene.
+        GameObject prefabRoot = PrefabUtility.LoadPrefabContents(prefabPath);
+        try
         {
-            Object.DestroyImmediate(avatar.GetChild(i).gameObject);
+            BotSwitcherRowView rowView = prefabRoot.GetComponent<BotSwitcherRowView>();
+            if (rowView == null)
+            {
+                Debug.LogError($"[BotSwitcherRowAvatarRebuilder] Prefab at '{prefabPath}' has no BotSwitcherRowView component on the root.");
+                return;
+            }
+
+            Transform avatar = prefabRoot.transform.Find(AvatarName);
+            if (avatar == null)
+            {
+                Debug.LogError($"[BotSwitcherRowAvatarRebuilder] Prefab at '{prefabPath}' has no child named '{AvatarName}'. Re-run 'Tools/Bot Switcher/Build Sheet' to regenerate the row template.");
+                return;
+            }
+
+            // 4. Tile Image — use existing if present, else add. UISprite is a flat
+            //    9-sliced rounded rect; ImageWithRoundedCorners then masks it to a
+            //    true circle. The tile color is overwritten at runtime per active bot.
+            Image tileImage = avatar.GetComponent<Image>();
+            if (tileImage == null) tileImage = avatar.gameObject.AddComponent<Image>();
+            if (tileImage.sprite == null)
+                tileImage.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+            tileImage.type = Image.Type.Simple;
+            tileImage.color = new Color(0.85f, 0.85f, 0.85f);
+            tileImage.raycastTarget = true;
+
+            // 5. ImageWithRoundedCorners — radius from current size.
+            var roundedExisting = avatar.GetComponents<ImageWithRoundedCorners>();
+            for (int i = 1; i < roundedExisting.Length; i++) Object.DestroyImmediate(roundedExisting[i]);
+            ImageWithRoundedCorners rounded = avatar.GetComponent<ImageWithRoundedCorners>();
+            if (rounded == null) rounded = avatar.gameObject.AddComponent<ImageWithRoundedCorners>();
+            RectTransform avRT = avatar.GetComponent<RectTransform>();
+            rounded.radius = avRT.sizeDelta.x * 0.5f;
+            rounded.Validate();
+            rounded.Refresh();
+
+            // 6. Wipe children, create IconSprite at 64% size.
+            for (int i = avatar.childCount - 1; i >= 0; i--)
+            {
+                Object.DestroyImmediate(avatar.GetChild(i).gameObject);
+            }
+
+            GameObject iconGO = new GameObject(IconChildName, typeof(RectTransform), typeof(Image));
+            iconGO.transform.SetParent(avatar, false);
+            RectTransform iconRT = iconGO.GetComponent<RectTransform>();
+            iconRT.anchorMin = new Vector2(0.5f, 0.5f);
+            iconRT.anchorMax = new Vector2(0.5f, 0.5f);
+            iconRT.pivot = new Vector2(0.5f, 0.5f);
+            iconRT.anchoredPosition = Vector2.zero;
+            iconRT.sizeDelta = avRT.sizeDelta * IconChildScale;
+            Image iconImage = iconGO.GetComponent<Image>();
+            iconImage.sprite = null;
+            iconImage.raycastTarget = false;
+            iconImage.preserveAspect = true;
+
+            // 7. Wire avatarImage + avatarIcon on BotSwitcherRowView. Leave
+            //    nameLabel/subLineLabel/statusDot/selectedBackground/etc. alone.
+            var so = new SerializedObject(rowView);
+            so.FindProperty("avatarImage").objectReferenceValue = tileImage;
+            so.FindProperty("avatarIcon").objectReferenceValue = iconImage;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            // 8. Save the prefab back. Scene instances pick up the change via the
+            //    prefab system — no scene edit, no MarkSceneDirty.
+            PrefabUtility.SaveAsPrefabAsset(prefabRoot, prefabPath);
+
+            Debug.Log($"[BotSwitcherRowAvatarRebuilder] Rebuilt {AvatarName} at radius {rounded.radius:F1}px (size {avRT.sizeDelta.x:F0}×{avRT.sizeDelta.y:F0}) in '{prefabPath}'. Re-run after resizing.");
         }
-
-        GameObject iconGO = new GameObject(IconChildName, typeof(RectTransform), typeof(Image));
-        iconGO.transform.SetParent(avatar, false);
-        RectTransform iconRT = iconGO.GetComponent<RectTransform>();
-        iconRT.anchorMin = new Vector2(0.5f, 0.5f);
-        iconRT.anchorMax = new Vector2(0.5f, 0.5f);
-        iconRT.pivot = new Vector2(0.5f, 0.5f);
-        iconRT.anchoredPosition = Vector2.zero;
-        iconRT.sizeDelta = avRT.sizeDelta * IconChildScale;
-        Image iconImage = iconGO.GetComponent<Image>();
-        iconImage.sprite = null;
-        iconImage.raycastTarget = false;
-        iconImage.preserveAspect = true;
-
-        // 4. Wire avatarImage + avatarIcon on BotSwitcherRowView. Leave
-        //    nameLabel/subLineLabel/statusDot/selectedBackground/etc. alone.
-        var so = new SerializedObject(rowView);
-        so.FindProperty("avatarImage").objectReferenceValue = tileImage;
-        so.FindProperty("avatarIcon").objectReferenceValue = iconImage;
-        so.ApplyModifiedPropertiesWithoutUndo();
-
-        EditorUtility.SetDirty(rowView);
-        EditorUtility.SetDirty(avatar);
-        EditorSceneManager.MarkSceneDirty(avatar.gameObject.scene);
-        Selection.activeGameObject = avatar.gameObject;
-
-        Debug.Log($"[BotSwitcherRowAvatarRebuilder] Rebuilt {AvatarName} at radius {rounded.radius:F1}px (size {avRT.sizeDelta.x:F0}×{avRT.sizeDelta.y:F0}). Re-run after resizing.");
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(prefabRoot);
+        }
     }
 }
 #endif
@@ -640,30 +662,33 @@ Switch to Unity. Wait for the recompile. Confirm the Console has no red errors.
 
 In the Unity Editor:
 
-1. Make sure the Main scene is open.
+1. Make sure the Main scene is open and the `BotSwitcherSheet` in the scene has its `rowPrefab` Inspector field wired to `Assets/Prefabs/BotSwitcherRow.prefab` (or wherever the row prefab asset lives).
 2. Click `Tools → Bot Switcher → Rebuild Row Avatar`.
-3. Look at the Console — you should see: `[BotSwitcherRowAvatarRebuilder] Rebuilt Avatar at radius X px ...`
-4. In the Hierarchy, navigate to `Canvas/BotSwitcherRowPrefabHolder/BotSwitcherRow/Avatar` (the holder is inactive — expand it anyway). It should now have:
-   - An `Image` component (sprite=None, color=light gray, raycastTarget=on)
-   - An `ImageWithRoundedCorners` component with `radius = half of width` (40 / 2 = 20 by default from `BotSwitcherSheetBuilder.cs:210`)
+3. Look at the Console — you should see: `[BotSwitcherRowAvatarRebuilder] Rebuilt Avatar at radius X px ... in 'Assets/Prefabs/BotSwitcherRow.prefab'`
+4. Open the prefab (double-click the asset). Inside, navigate to the `Avatar` child of the root. It should now have:
+   - An `Image` component (sprite=`UI/Skin/UISprite`, color=light gray, raycastTarget=on)
+   - An `ImageWithRoundedCorners` component with `radius = half of Avatar's width`
    - One child named `IconSprite` with an `Image` (sprite=None, raycastTarget=off, preserveAspect=on)
-5. Select `BotSwitcherRow` and confirm the `Bot Switcher Row View` Inspector shows the `Avatar Image` field pointing at `Avatar`'s Image and the new `Avatar Icon` field pointing at `IconSprite`'s Image.
+5. Still in prefab edit mode, select the root `BotSwitcherRow` and confirm the `Bot Switcher Row View` Inspector shows the `Avatar Image` field pointing at the Avatar's Image and the new `Avatar Icon` field pointing at `IconSprite`'s Image.
 6. `SelectedBackground`, `SelectedAccentBar`, `Name`, `SubLine/StatusDot`, `SubLine/SubText`, `rowButton` should be unchanged.
 
 If any of those fail, fix the menu item before committing.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Commit the prefab change**
+
+The menu item modifies the prefab asset, not the scene — so the diff is on `Assets/Prefabs/BotSwitcherRow.prefab` (and possibly `.meta` if Unity touched it). Commit:
 
 ```bash
-git add Assets/Editor/BotSwitcherRowAvatarRebuilder.cs
-git commit -m "feat(editor): BotSwitcherRowAvatarRebuilder menu item
+git add Assets/Prefabs/BotSwitcherRow.prefab
+git commit -m "scene(prefab): wire bot-switcher row avatar after rebuild
 
-Surgical rebuild of the Avatar GameObject inside the bot switcher row
-prefab template — same shape as the title avatar rebuilder. Wires
-BotSwitcherRowView.avatarImage (tile) + avatarIcon. Leaves the row's
-SelectedBackground, SelectedAccentBar, Name/SubLine subtree, and
-rowButton untouched."
+Ran Tools/Bot Switcher/Rebuild Row Avatar to drop the old avatar Image
+config and populate the new avatarImage (tile) + avatarIcon refs on
+BotSwitcherRowView, plus add the centered IconSprite child. Scene
+instances pick up the change automatically via the prefab system."
 ```
+
+(The C# file `BotSwitcherRowAvatarRebuilder.cs` itself was already committed when Task 5 was implemented.)
 
 ---
 
