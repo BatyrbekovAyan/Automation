@@ -18,6 +18,7 @@ public class ChatItemView : MonoBehaviour
     private ChatViewModel vm;
     private string chatId;
     private Coroutine avatarLoadCoroutine;
+    private bool pendingAvatarLoad;
 
     // LRU cache: [ChatID_RawMessage] -> [Perfectly Sliced String]. Capped to bound memory on long sessions.
     private const int MaxTextCacheCount = 500;
@@ -86,7 +87,13 @@ public void Bind(ChatViewModel model)
                 if (!string.IsNullOrEmpty(vm.AvatarUrl))
                 {
                     if (avatarLoadCoroutine != null) StopCoroutine(avatarLoadCoroutine);
-                    avatarLoadCoroutine = StartCoroutine(LoadAvatar(vm));
+                    // Bind can fire while the chat list panel is inactive (initial
+                    // cache load before the user has navigated to it). StartCoroutine
+                    // throws on inactive GameObjects, so defer to OnEnable.
+                    if (isActiveAndEnabled)
+                        avatarLoadCoroutine = StartCoroutine(LoadAvatar(vm));
+                    else
+                        pendingAvatarLoad = true;
                 }
             }
         }
@@ -288,6 +295,14 @@ public void Bind(ChatViewModel model)
 
         return result.ToString().TrimEnd();
     }
+    private void OnEnable()
+    {
+        if (!pendingAvatarLoad) return;
+        pendingAvatarLoad = false;
+        if (vm == null || vm.AvatarSprite != null || string.IsNullOrEmpty(vm.AvatarUrl)) return;
+        avatarLoadCoroutine = StartCoroutine(LoadAvatar(vm));
+    }
+
     void OnDestroy()
     {
         if (vm != null) vm.OnUpdated -= OnVmUpdated;
