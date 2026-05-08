@@ -5,11 +5,11 @@ using TMPro;
 [RequireComponent(typeof(Button))]
 public class BotSwitcherTitleBinder : MonoBehaviour
 {
+    private static readonly Color NeutralTile = new Color(0.85f, 0.85f, 0.85f);
+
     [SerializeField] private TextMeshProUGUI nameLabel;
     [SerializeField] private Image avatarImage;
     [SerializeField] private Image avatarIcon;
-
-    private static readonly Color NeutralTile = new Color(0.85f, 0.85f, 0.85f);
 
     private Button rowButton;
 
@@ -53,7 +53,8 @@ public class BotSwitcherTitleBinder : MonoBehaviour
     private void UpdateTitle(string botId)
     {
         Bot bot = !string.IsNullOrEmpty(botId) && Manager.Instance != null
-            ? Manager.Instance.FindBotByName(botId) : null;
+            ? Manager.Instance.FindBotByName(botId)
+            : null;
 
         if (nameLabel != null)
             nameLabel.text = bot != null ? PlayerPrefs.GetString(botId + "Name", botId) : "Bot";
