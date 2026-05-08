@@ -19,8 +19,6 @@ using UnityEngine.UI;
 public static class BotSwitcherTitleAvatarRebuilder
 {
     private const string ScreenName = "Screen_Whatsapp";
-    private const string ChatsPanelName = "ChatsPanel";
-    private const string HeaderChildName = "TopBar";
     private const string TitleName = "BotSwitcherTitle";
     private const string AvatarName = "Avatar";
     private const string IconChildName = "IconSprite";
@@ -36,13 +34,14 @@ public static class BotSwitcherTitleAvatarRebuilder
             return;
         }
 
-        Transform chatsPanel = screen.transform.Find(ChatsPanelName);
-        Transform header = chatsPanel != null ? chatsPanel.Find(HeaderChildName) : null;
-        Transform title = header != null ? header.Find(TitleName) : null;
+        // Search recursively under Screen_Whatsapp for BotSwitcherTitle. The header
+        // layout has gone through several iterations (TopBar/BotSwitcherTitle ->
+        // TopBar/LeftZone/BotSwitcherTitle, etc.), so we don't hard-code a path.
+        Transform title = FindDescendantByName(screen.transform, TitleName);
         Transform avatar = title != null ? title.Find(AvatarName) : null;
         if (avatar == null)
         {
-            Debug.LogError($"[BotSwitcherTitleAvatarRebuilder] Path '{ScreenName}/{ChatsPanelName}/{HeaderChildName}/{TitleName}/{AvatarName}' not found. Run 'Tools/Bot Switcher/Rebuild Whatsapp Header' first to create the title shell.");
+            Debug.LogError($"[BotSwitcherTitleAvatarRebuilder] No '{TitleName}/{AvatarName}' found anywhere under '{ScreenName}'. Run 'Tools/Bot Switcher/Rebuild Whatsapp Header' first to create the title shell, or check that the Avatar child still exists on BotSwitcherTitle.");
             return;
         }
 
@@ -119,6 +118,23 @@ public static class BotSwitcherTitleAvatarRebuilder
         for (int i = 0; i < all.Length; i++)
         {
             if (all[i] != null && all[i].name == name) return all[i].gameObject;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Depth-first search for a Transform with the given name anywhere under root,
+    /// inclusive of inactive descendants. Returns the first match or null. Used so
+    /// the rebuilder doesn't have to know the current TopBar layout.
+    /// </summary>
+    private static Transform FindDescendantByName(Transform root, string name)
+    {
+        if (root == null || string.IsNullOrEmpty(name)) return null;
+        Transform[] descendants = root.GetComponentsInChildren<Transform>(includeInactive: true);
+        for (int i = 0; i < descendants.Length; i++)
+        {
+            if (descendants[i] != null && descendants[i] != root && descendants[i].name == name)
+                return descendants[i];
         }
         return null;
     }
