@@ -19,8 +19,6 @@ public class BotSwitcherRowView : MonoBehaviour
     [SerializeField] private Color statusConnectedColor = new Color(0.13f, 0.78f, 0.42f);
     [SerializeField] private Color statusDisconnectedColor = new Color(0.6f, 0.6f, 0.6f);
 
-    private static readonly Color NeutralTile = new Color(0.85f, 0.85f, 0.85f);
-
     private string botId;
     private System.Action<string> onTap;
 
@@ -49,8 +47,7 @@ public class BotSwitcherRowView : MonoBehaviour
             statusDot.color = waConnected ? statusConnectedColor : statusDisconnectedColor;
         }
 
-        if (avatarImage != null)
-            avatarImage.color = bot.GetBusinessIconTint();
+        if (avatarImage != null) avatarImage.color = bot.GetBusinessIconTint();
 
         if (avatarIcon != null)
         {
