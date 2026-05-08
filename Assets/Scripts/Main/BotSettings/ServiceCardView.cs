@@ -36,7 +36,13 @@ namespace Automation.BotSettingsUI
         public string Description
         {
             get => descLabel != null ? descLabel.text : string.Empty;
-            set { if (descLabel != null) descLabel.text = value ?? string.Empty; }
+            set
+            {
+                if (descLabel == null) return;
+                var text = value ?? string.Empty;
+                descLabel.text = text;
+                descLabel.gameObject.SetActive(!string.IsNullOrWhiteSpace(text));
+            }
         }
 
         private void Awake()

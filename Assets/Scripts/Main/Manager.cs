@@ -2282,29 +2282,28 @@ public class Manager : MonoBehaviour
 
     private IEnumerator CreateWhatsappWorkflowFromStart(GameObject bot)
     {
-        LoadingPanel.SetActive(true);
-
-        WWWForm form = new();
-
-        form.AddField("Name", bot.GetComponent<Bot>().BotName != null ? bot.GetComponent<Bot>().BotName.text : "");
-        form.AddField("BusinessType", businessTypes.TryGetById(selectedBusinessId, out var bt1) ? bt1.displayName : "");
-        form.AddField("WhatsappProfileId", whatsappProfileId);
-
-        form.AddField("Business", "");
-        form.AddField("Prompt", "");
-        form.AddField("ProductsList", "");
-        form.AddField("ServicesList", "");
-
-        using UnityWebRequest www = UnityWebRequest.Post("https://bagkz.app.n8n.cloud/webhook/CreateWhatsappWorkflow", form);
-        yield return www.SendWebRequest();
-
-        if (www.result == UnityWebRequest.Result.Success)
+        // LoadingPanel.SetActive(true);
+        //
+        // WWWForm form = new();
+        //
+        // form.AddField("Name", bot.GetComponent<Bot>().BotName != null ? bot.GetComponent<Bot>().BotName.text : "");
+        // form.AddField("BusinessType", businessTypes.TryGetById(selectedBusinessId, out var bt1) ? bt1.displayName : "");
+        // form.AddField("WhatsappProfileId", whatsappProfileId);
+        //
+        // form.AddField("Business", "");
+        // form.AddField("Prompt", "");
+        // form.AddField("ProductsList", "");
+        // form.AddField("ServicesList", "");
+        //
+        // using UnityWebRequest www = UnityWebRequest.Post("https://bagkz.app.n8n.cloud/webhook/CreateWhatsappWorkflow", form);
+        // yield return www.SendWebRequest();
+        //
         // if (www.result != UnityWebRequest.Result.Success)
-        {
-            StartCoroutine(DeleteWhatsappProfile(whatsappProfileId, true));
-        }
-        else
-        {
+        // {
+        //     StartCoroutine(DeleteWhatsappProfile(whatsappProfileId, true));
+        // }
+        // else
+        // {
             bot.GetComponent<Bot>().active = true;
             PlayerPrefs.SetInt(bot.name + "Active", 1);
             bot.GetComponent<Bot>().Status.GetComponent<TextMeshProUGUI>().text = "Active";
@@ -2314,23 +2313,24 @@ public class Manager : MonoBehaviour
             bot.GetComponent<Bot>().ActivationSwitch.interactable = true;
 
 
-            string response = www.downloadHandler.text;
-
-            if (response.Contains("\"id\":"))
-            {
-                int startIndex = response.IndexOf("\"id\":") + 6;
-                int length = response.Length - 9;
-
-                bot.GetComponent<Bot>().whatsappWorkflowId = response.Substring(startIndex, length);
+            // string response = www.downloadHandler.text;
+            //
+            // if (response.Contains("\"id\":"))
+            // {
+            //     int startIndex = response.IndexOf("\"id\":") + 6;
+            //     int length = response.Length - 9;
+            //
+            //     bot.GetComponent<Bot>().whatsappWorkflowId = response.Substring(startIndex, length);
                 // PlayerPrefs.SetString(bot.name + "WhatsappWorkflowId", bot.GetComponent<Bot>().whatsappWorkflowId);
                 PlayerPrefs.SetString(bot.name + "WhatsappProfileId", bot.GetComponent<Bot>().whatsappProfileId);
                 PlayerPrefs.SetInt("lastCreatedWhatsappProfileIdSaved", 1);
-            }
-        }
+        //     }
+        // }
 
         whatsappProfileId = "-1";
 
         LoadingPanel.SetActive(false);
+        yield break; //to be deleted
     }
 
     private IEnumerator CreateWhatsappWorkflowFromEdit()
@@ -2412,29 +2412,29 @@ public class Manager : MonoBehaviour
 
     private IEnumerator CreateTelegramWorkflowFromStart(GameObject bot)
     {
-        LoadingPanel.SetActive(true);
-
-        WWWForm form = new();
-
-        form.AddField("Name", bot.GetComponent<Bot>().BotName != null ? bot.GetComponent<Bot>().BotName.text : "");
-        form.AddField("BusinessType", businessTypes.TryGetById(selectedBusinessId, out var bt2) ? bt2.displayName : "");
-        form.AddField("TelegramProfileId", telegramProfileId);
-
-        form.AddField("Business", "");
-        form.AddField("Prompt", "");
-        form.AddField("ProductsList", "");
-        form.AddField("ServicesList", "");
-
-        using UnityWebRequest www = UnityWebRequest.Post("https://bagkz.app.n8n.cloud/webhook/CreateTelegramWorkflow", form);
-        yield return www.SendWebRequest();
-
-        if (www.result == UnityWebRequest.Result.Success)
-        // if (www.result != UnityWebRequest.Result.Success)
-        {
-            StartCoroutine(DeleteTelegramProfile(telegramProfileId, true));
-        }
-        else
-        {
+        // LoadingPanel.SetActive(true);
+        //
+        // WWWForm form = new();
+        //
+        // form.AddField("Name", bot.GetComponent<Bot>().BotName != null ? bot.GetComponent<Bot>().BotName.text : "");
+        // form.AddField("BusinessType", businessTypes.TryGetById(selectedBusinessId, out var bt2) ? bt2.displayName : "");
+        // form.AddField("TelegramProfileId", telegramProfileId);
+        //
+        // form.AddField("Business", "");
+        // form.AddField("Prompt", "");
+        // form.AddField("ProductsList", "");
+        // form.AddField("ServicesList", "");
+        //
+        // using UnityWebRequest www = UnityWebRequest.Post("https://bagkz.app.n8n.cloud/webhook/CreateTelegramWorkflow", form);
+        // yield return www.SendWebRequest();
+        //
+        // if (www.result == UnityWebRequest.Result.Success)
+        // // if (www.result != UnityWebRequest.Result.Success)
+        // {
+        //     StartCoroutine(DeleteTelegramProfile(telegramProfileId, true));
+        // }
+        // else
+        // {
             bot.GetComponent<Bot>().active = true;
             PlayerPrefs.SetInt(bot.name + "Active", 1);
             bot.GetComponent<Bot>().Status.GetComponent<TextMeshProUGUI>().text = "Active";
@@ -2443,24 +2443,25 @@ public class Manager : MonoBehaviour
             bot.GetComponent<Bot>().EditButton.interactable = true;
             bot.GetComponent<Bot>().ActivationSwitch.interactable = true;
 
-
-            string response = www.downloadHandler.text;
-
-            if (response.Contains("\"id\":"))
-            {
-                int startIndex = response.IndexOf("\"id\":") + 6;
-                int length = response.Length - 9;
-
-                bot.GetComponent<Bot>().telegramWorkflowId = response.Substring(startIndex, length);
-                PlayerPrefs.SetString(bot.name + "TelegramWorkflowId", bot.GetComponent<Bot>().telegramWorkflowId);
+            //
+            // string response = www.downloadHandler.text;
+            //
+            // if (response.Contains("\"id\":"))
+            // {
+            //     int startIndex = response.IndexOf("\"id\":") + 6;
+            //     int length = response.Length - 9;
+            //
+            //     bot.GetComponent<Bot>().telegramWorkflowId = response.Substring(startIndex, length);
+            //     PlayerPrefs.SetString(bot.name + "TelegramWorkflowId", bot.GetComponent<Bot>().telegramWorkflowId);
                 PlayerPrefs.SetString(bot.name + "TelegramProfileId", bot.GetComponent<Bot>().telegramProfileId);
                 PlayerPrefs.SetInt("lastCreatedTelegramProfileIdSaved", 1);
-            }
-        }
+        //     }
+        // }
 
         telegramProfileId = "-1";
 
         LoadingPanel.SetActive(false);
+        yield break; //to be deleted
     }
 
     private IEnumerator CreateTelegramWorkflowFromEdit()
