@@ -246,6 +246,18 @@ public static class ChatTicksSpriteAssetBuilder
         AddGlyph(glyphTable, charTable, 1u, "tick_double", TextureSize);
         AddGlyph(glyphTable, charTable, 2u, "tick_double_blue", TextureSize * 2);
 
+        // Force TMP's UpgradeSpriteAsset path to run NOW, while both internal
+        // tables are still empty. UpdateLookupTables triggers UpgradeSpriteAsset
+        // when material != null && m_Version is empty (TMP_SpriteAsset.cs:116);
+        // the upgrade calls m_SpriteCharacterTable.Clear() and m_GlyphTable.Clear()
+        // (lines 525-526). If we populate the tables FIRST and then access
+        // spriteCharacterTable's getter (which lazily runs UpdateLookupTables on
+        // first access), the upgrade nukes everything we just added — glyph table
+        // shows as empty in the inspector and tick names resolve to missing glyphs.
+        // Triggering the upgrade early clears the (already empty) tables and sets
+        // m_Version = "1.1.0", so subsequent UpdateLookupTables calls are no-ops.
+        spriteAsset.UpdateLookupTables();
+
         // TMP_SpriteAsset.spriteGlyphTable / spriteCharacterTable are read-only
         // getters that expose the internal lists by reference. Mutate them in
         // place rather than re-assigning.
