@@ -166,21 +166,25 @@ public void Bind(ChatViewModel model)
 
     private void UpdatePreviewText(string rawMessage)
     {
-        if (string.IsNullOrEmpty(rawMessage))
+        // Phase 2: prepend [tick] [media-emoji] using ChatPreviewFormatter, then
+        // convert any Unicode emoji (in either the rawMessage or our injected
+        // media emoji prefix) to EmojiOne sprite tags. Tick sprite tags are ASCII
+        // and pass through the converter unchanged.
+        //
+        // Run the formatter FIRST so an empty rawMessage paired with a media type
+        // or delivery status still produces a visible tick/emoji prefix.
+        string formatted = ChatPreviewFormatter.Format(
+            rawMessage ?? "",
+            vm != null ? vm.LastMessageType : null,
+            vm != null ? vm.LastMessageDeliveryStatus : null,
+            vm != null && vm.IsLastMessageMine);
+
+        if (string.IsNullOrEmpty(formatted))
         {
             lastMessageText.text = "";
             return;
         }
 
-        // Phase 2: prepend [tick] [media-emoji] using ChatPreviewFormatter, then
-        // convert any Unicode emoji (in either the rawMessage or our injected
-        // media emoji prefix) to EmojiOne sprite tags. Tick sprite tags are ASCII
-        // and pass through the converter unchanged.
-        string formatted = ChatPreviewFormatter.Format(
-            rawMessage,
-            vm != null ? vm.LastMessageType : null,
-            vm != null ? vm.LastMessageDeliveryStatus : null,
-            vm != null && vm.IsLastMessageMine);
         string composed = UnicodeEmojiConverter.ConvertRealEmojisToSprites(formatted);
 
         // --- THE PERFORMANCE FIX: Check the Cache! ---
