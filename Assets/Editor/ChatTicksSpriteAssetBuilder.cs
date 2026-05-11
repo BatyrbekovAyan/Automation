@@ -236,8 +236,13 @@ public static class ChatTicksSpriteAssetBuilder
         AddGlyph(glyphTable, charTable, 1u, "tick_double", TextureSize);
         AddGlyph(glyphTable, charTable, 2u, "tick_double_blue", TextureSize * 2);
 
-        spriteAsset.spriteGlyphTable = glyphTable;
-        spriteAsset.spriteCharacterTable = charTable;
+        // TMP_SpriteAsset.spriteGlyphTable / spriteCharacterTable are read-only
+        // getters that expose the internal lists by reference. Mutate them in
+        // place rather than re-assigning.
+        spriteAsset.spriteGlyphTable.Clear();
+        spriteAsset.spriteGlyphTable.AddRange(glyphTable);
+        spriteAsset.spriteCharacterTable.Clear();
+        spriteAsset.spriteCharacterTable.AddRange(charTable);
         spriteAsset.UpdateLookupTables();
 
         EditorUtility.SetDirty(spriteAsset);
