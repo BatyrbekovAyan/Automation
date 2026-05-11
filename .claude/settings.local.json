@@ -150,7 +150,8 @@
       "Bash(grep -n -B1 -A22 \"m_Name: LoadingPanel$\" Assets/Scenes/Main.unity)",
       "Bash(grep -n -B22 \"m_Color: {r: 0, g: 0, b: 0, a: 0\\\\.\" Assets/Scenes/Main.unity)",
       "Bash(grep -n -B30 \"m_Color: {r: 0\\\\..*g: 0\\\\..*b: 0\\\\..*a: 0\\\\.\" Assets/Scenes/Main.unity)",
-      "Bash(xargs -I {} basename {} .cs)"
+      "Bash(xargs -I {} basename {} .cs)",
+      "Bash(cat > *)"
     ]
   }
 }
