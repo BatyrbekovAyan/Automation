@@ -199,11 +199,31 @@ public static class ChatTicksSpriteAssetBuilder
         spriteAsset.spriteSheet = atlasTexture;
 
         // Inherit material from the EmojiOne sprite asset (always present in this project).
+        // The material MUST be added as a sub-asset of the TMP_SpriteAsset so it survives
+        // domain reloads — matching TMP's own creation pattern at
+        // TMP_SpriteAssetMenu.cs:374-383 (AddDefaultMaterial). Without AddObjectToAsset
+        // the reference is orphaned on disk and resolves to "Missing (Material)" on
+        // the next Unity reload.
         var emojiOne = AssetDatabase.LoadAssetAtPath<TMP_SpriteAsset>(
             "Assets/TextMesh Pro/Resources/Sprite Assets/EmojiOne.asset");
         if (emojiOne != null && emojiOne.material != null)
         {
-            spriteAsset.material = new Material(emojiOne.material) { mainTexture = atlasTexture };
+            // Clean up any previous material we authored on a prior builder run so we don't
+            // accumulate orphan sub-assets across re-runs (the builder is idempotent).
+            var previousMaterial = spriteAsset.material;
+            var newMaterial = new Material(emojiOne.material)
+            {
+                mainTexture = atlasTexture,
+                name = "ChatTicks Material",
+            };
+            spriteAsset.material = newMaterial;
+            AssetDatabase.AddObjectToAsset(newMaterial, spriteAsset);
+            if (previousMaterial != null
+                && previousMaterial != newMaterial
+                && AssetDatabase.IsSubAsset(previousMaterial))
+            {
+                Object.DestroyImmediate(previousMaterial, true);
+            }
         }
         else
         {
