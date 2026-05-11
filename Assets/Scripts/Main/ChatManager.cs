@@ -84,13 +84,14 @@ public partial class ChatManager : MonoBehaviour
             {
                 // --- THE SMART MERGE ---
                 // The chat is already on the screen! Do not destroy the prefab!
-                // Just quietly update the text and time. The UI will catch the event and refresh seamlessly.
+                // Just quietly update the text, time, and unread count. The UI will catch the event and refresh seamlessly.
                 existingVm.UpdateLastMessage(lastMsg, unixTime);
+                existingVm.UpdateUnreadCount(chat.unread_count);
             }
             else
             {
                 // This is a brand new chat we haven't seen before, spawn it!
-                var chatVM = new ChatViewModel(chat.id, displayName, chat.thumbnail, lastMsg, unixTime);
+                var chatVM = new ChatViewModel(chat.id, displayName, chat.thumbnail, lastMsg, unixTime, unreadCount: chat.unread_count);
                 Chats.Add(chatVM);
                 chatLookup[chat.id] = chatVM;
                 OnChatAdded?.Invoke(chatVM);
@@ -114,7 +115,7 @@ public partial class ChatManager : MonoBehaviour
         yield return www.SendWebRequest();
 
         if (www.result != UnityWebRequest.Result.Success) yield break;
-        
+
         string newJson = www.downloadHandler.text;
 
         if (newJson != cachedJson)
@@ -152,7 +153,14 @@ public partial class ChatManager : MonoBehaviour
     public void SelectChat(string chatId)
     {
         if (ScrollClickBlocker.IsBlocking) return;
-        
+
+        // Optimistic local reset — match WhatsApp's instant feel.
+        // If the next sync returns a non-zero count, the badge re-appears.
+        if (chatLookup.TryGetValue(chatId, out var selectedVm))
+        {
+            selectedVm.UpdateUnreadCount(0);
+        }
+
         currentChatId = chatId;
         currentPage = 1;
         seenMessageIds.Clear();
