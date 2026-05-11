@@ -161,7 +161,14 @@ public partial class ChatManager : MonoBehaviour
         // If the next sync returns a non-zero count, the badge re-appears.
         if (chatLookup.TryGetValue(chatId, out var selectedVm))
         {
+            bool hadUnread = selectedVm.UnreadCount > 0;
             selectedVm.UpdateUnreadCount(0);
+
+            // Persist read state to Wappi so the badge does not re-appear on next sync.
+            if (hadUnread)
+            {
+                StartCoroutine(MarkChatAsRead(chatId));
+            }
         }
 
         currentChatId = chatId;
