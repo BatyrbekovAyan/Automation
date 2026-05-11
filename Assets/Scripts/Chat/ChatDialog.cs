@@ -10,4 +10,5 @@ public class ChatDialog
     public string last_message_data;
     public string last_timestamp;
     public bool isArchived;
+    public int unread_count;
 }
