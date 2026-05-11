@@ -30,7 +30,10 @@ public class ChatItemView : MonoBehaviour
 public void Bind(ChatViewModel model)
     {
         if (vm != null)
+        {
             vm.OnUpdated -= OnVmUpdated;
+            vm.OnLastMessageChanged -= OnLastMessageChanged;
+        }
 
         vm = model;
         chatId = vm.ChatId;
