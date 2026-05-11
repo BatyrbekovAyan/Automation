@@ -1,5 +1,4 @@
 #if UNITY_EDITOR
-using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
@@ -113,14 +112,9 @@ public static class ChatItemUnreadBadgeBuilder
         fitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
 
         var rounded = badge.GetComponent<ImageWithRoundedCorners>();
-        var radiusField = typeof(ImageWithRoundedCorners).GetField(
-            "radius", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-        if (radiusField != null)
-        {
-            radiusField.SetValue(rounded, 30f);
-            rounded.Validate();
-            rounded.Refresh();
-        }
+        rounded.radius = 30f;
+        rounded.Validate();
+        rounded.Refresh();
 
         return badge;
     }
