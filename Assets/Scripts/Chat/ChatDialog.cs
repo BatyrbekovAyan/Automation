@@ -12,4 +12,7 @@ public class ChatDialog
     public bool isArchived;
     public int unread_count;
     public string last_message_id;
+    public string last_message_type;
+    public string last_message_delivery_status;
+    public ChatSender last_message_sender;
 }
