@@ -88,13 +88,19 @@ public partial class ChatManager : MonoBehaviour
                 existingVm.UpdateLastMessage(lastMsg, unixTime);
                 existingVm.UpdateUnreadCount(chat.unread_count);
                 existingVm.UpdateLastMessageId(chat.last_message_id);
+                bool mergedIsMine = chat.last_message_sender != null && chat.last_message_sender.isMe;
+                existingVm.UpdateLastMessageMeta(chat.last_message_type, chat.last_message_delivery_status, mergedIsMine);
             }
             else
             {
                 // This is a brand new chat we haven't seen before, spawn it!
+                bool isMine = chat.last_message_sender != null && chat.last_message_sender.isMe;
                 var chatVM = new ChatViewModel(chat.id, displayName, chat.thumbnail, lastMsg, unixTime,
                                                unreadCount: chat.unread_count,
-                                               lastMessageId: chat.last_message_id);
+                                               lastMessageId: chat.last_message_id,
+                                               lastMessageType: chat.last_message_type,
+                                               lastMessageDeliveryStatus: chat.last_message_delivery_status,
+                                               isLastMessageMine: isMine);
                 Chats.Add(chatVM);
                 chatLookup[chat.id] = chatVM;
                 OnChatAdded?.Invoke(chatVM);
