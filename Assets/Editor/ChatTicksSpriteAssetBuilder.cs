@@ -196,6 +196,16 @@ public static class ChatTicksSpriteAssetBuilder
             AssetDatabase.CreateAsset(spriteAsset, SpriteAssetPath);
         }
 
+        // Prevent NPE in TMP_SpriteAsset.UpgradeSpriteAsset() — when the asset is
+        // freshly created and we later assign `material`, the next property getter
+        // on spriteCharacterTable triggers UpdateLookupTables → UpgradeSpriteAsset,
+        // which iterates over spriteInfoList. A newly-created sprite asset has
+        // spriteInfoList == null, so the loop NPEs. Initializing here to an empty
+        // list lets the upgrade run as a no-op, set m_Version = "1.1.0", and exit
+        // cleanly. After that, our Clear()+AddRange() calls work.
+        if (spriteAsset.spriteInfoList == null)
+            spriteAsset.spriteInfoList = new List<TMP_Sprite>();
+
         spriteAsset.spriteSheet = atlasTexture;
 
         // Inherit material from the EmojiOne sprite asset (always present in this project).
