@@ -60,7 +60,10 @@ public static class ChatItemUnreadBadgeBuilder
             var badge = BuildBadge(textBlock);
             var countText = BuildCountText(badge.transform);
 
-            WireChatItemViewRefs(prefabRoot, badge, countText);
+            if (!WireChatItemViewRefs(prefabRoot, badge, countText))
+            {
+                return;
+            }
 
             PrefabUtility.SaveAsPrefabAsset(prefabRoot, PrefabPath);
             Debug.Log($"[ChatItemUnreadBadge] Built badge under {PrefabPath} → TextBlock/{BadgeName}");
@@ -112,7 +115,12 @@ public static class ChatItemUnreadBadgeBuilder
         var rounded = badge.GetComponent<ImageWithRoundedCorners>();
         var radiusField = typeof(ImageWithRoundedCorners).GetField(
             "radius", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-        if (radiusField != null) radiusField.SetValue(rounded, 30f);
+        if (radiusField != null)
+        {
+            radiusField.SetValue(rounded, 30f);
+            rounded.Validate();
+            rounded.Refresh();
+        }
 
         return badge;
     }
@@ -142,13 +150,13 @@ public static class ChatItemUnreadBadgeBuilder
         return tmp;
     }
 
-    private static void WireChatItemViewRefs(GameObject prefabRoot, GameObject badge, TextMeshProUGUI countText)
+    private static bool WireChatItemViewRefs(GameObject prefabRoot, GameObject badge, TextMeshProUGUI countText)
     {
         var view = prefabRoot.GetComponent<ChatItemView>();
         if (view == null)
         {
             Debug.LogError($"[ChatItemUnreadBadge] No ChatItemView component on prefab root.");
-            return;
+            return false;
         }
 
         var so = new SerializedObject(view);
@@ -160,12 +168,13 @@ public static class ChatItemUnreadBadgeBuilder
             Debug.LogError(
                 "[ChatItemUnreadBadge] ChatItemView is missing 'unreadBadge' or 'unreadCountText' fields. " +
                 "Did Task 4 land?");
-            return;
+            return false;
         }
 
         badgeProp.objectReferenceValue = badge;
         countProp.objectReferenceValue = countText;
         so.ApplyModifiedPropertiesWithoutUndo();
+        return true;
     }
 
     private static Transform FindChildRecursive(Transform root, string name)
