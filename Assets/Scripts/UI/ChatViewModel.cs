@@ -16,6 +16,7 @@ public class ChatViewModel
     public string LastMessageTimeString { get; private set; }
     // public string OnlineStatus { get; set; }
     public event Action<ChatViewModel> OnUpdated;
+    public event Action<ChatViewModel> OnLastMessageChanged;
 
     public ChatViewModel(string chatId, string title, string avatarUrl,
                          string lastMessage, long lastTime, int unreadCount = 0)
@@ -41,6 +42,7 @@ public class ChatViewModel
 
         // This will now ONLY fire if a chat genuinely received a new message!
         NotifyUpdated();
+        OnLastMessageChanged?.Invoke(this);
     }
 
     public void UpdateUnreadCount(int count)

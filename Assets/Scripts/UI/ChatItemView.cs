@@ -105,6 +105,7 @@ public void Bind(ChatViewModel model)
         UpdatePreviewText(vm.LastMessage ?? "");
 
         vm.OnUpdated += OnVmUpdated;
+        vm.OnLastMessageChanged += OnLastMessageChanged;
 
         button.onClick.RemoveAllListeners();
         button.onClick.AddListener(OnClick);
@@ -151,10 +152,13 @@ public void Bind(ChatViewModel model)
         // --- THE FIX: Format the preview text on updates too ---
         UpdatePreviewText(vm.LastMessage ?? "");
 
-        // Move this row to the top of the list — fires only when LastMessage actually changed
-        transform.SetAsFirstSibling();
-
         ApplyUnreadBadge(vm.UnreadCount);
+    }
+
+    private void OnLastMessageChanged(ChatViewModel vmRef)
+    {
+        // Move this row to the top of the list — fires only when the last message actually changed
+        transform.SetAsFirstSibling();
     }
 
     private void UpdatePreviewText(string rawMessage)
@@ -311,7 +315,11 @@ public void Bind(ChatViewModel model)
 
     void OnDestroy()
     {
-        if (vm != null) vm.OnUpdated -= OnVmUpdated;
+        if (vm != null)
+        {
+            vm.OnUpdated -= OnVmUpdated;
+            vm.OnLastMessageChanged -= OnLastMessageChanged;
+        }
     }
     
     
