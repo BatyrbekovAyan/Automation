@@ -14,6 +14,8 @@ public class ChatItemView : MonoBehaviour
     public TextMeshProUGUI lastMessageText;
 
     public TextMeshProUGUI timeText;
+    public GameObject unreadBadge;
+    public TextMeshProUGUI unreadCountText;
 
     private ChatViewModel vm;
     private string chatId;
@@ -34,9 +36,11 @@ public void Bind(ChatViewModel model)
         chatId = vm.ChatId;
 
         titleText.text = vm.Title;
-        
+
         if (timeText != null)
             timeText.text = vm.LastMessageTimeString;
+
+        ApplyUnreadBadge(vm.UnreadCount);
 
 // --- THE ZERO-FRAME AVATAR FIX ---
         if (vm.AvatarSprite == null && !string.IsNullOrEmpty(vm.AvatarUrl) && MediaCacheManager.Instance != null)
@@ -149,6 +153,8 @@ public void Bind(ChatViewModel model)
 
         // Move this row to the top of the list — fires only when LastMessage actually changed
         transform.SetAsFirstSibling();
+
+        ApplyUnreadBadge(vm.UnreadCount);
     }
 
     private void UpdatePreviewText(string rawMessage)
@@ -354,6 +360,21 @@ public void Bind(ChatViewModel model)
             {
                 silhouette.color = fgColor;
             }
+        }
+    }
+
+    private void ApplyUnreadBadge(int count)
+    {
+        if (unreadBadge == null) return;
+        if (count <= 0)
+        {
+            unreadBadge.SetActive(false);
+            return;
+        }
+        unreadBadge.SetActive(true);
+        if (unreadCountText != null)
+        {
+            unreadCountText.text = count > 99 ? "99+" : count.ToString();
         }
     }
 }
