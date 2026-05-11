@@ -87,11 +87,14 @@ public partial class ChatManager : MonoBehaviour
                 // Just quietly update the text, time, and unread count. The UI will catch the event and refresh seamlessly.
                 existingVm.UpdateLastMessage(lastMsg, unixTime);
                 existingVm.UpdateUnreadCount(chat.unread_count);
+                existingVm.UpdateLastMessageId(chat.last_message_id);
             }
             else
             {
                 // This is a brand new chat we haven't seen before, spawn it!
-                var chatVM = new ChatViewModel(chat.id, displayName, chat.thumbnail, lastMsg, unixTime, unreadCount: chat.unread_count);
+                var chatVM = new ChatViewModel(chat.id, displayName, chat.thumbnail, lastMsg, unixTime,
+                                               unreadCount: chat.unread_count,
+                                               lastMessageId: chat.last_message_id);
                 Chats.Add(chatVM);
                 chatLookup[chat.id] = chatVM;
                 OnChatAdded?.Invoke(chatVM);
@@ -726,6 +729,55 @@ IEnumerator SendTextMessageRoutine(string chatId, string text)
     {
         Debug.LogError($"[Wappi] Response parse error: {e.Message}");
     }
+}
+
+/// <summary>
+/// Tells Wappi the user has read the given chat. Fire-and-forget — on failure,
+/// the next /chats/filter sync corrects any drift.
+/// </summary>
+private IEnumerator MarkChatAsRead(string chatId)
+{
+    if (string.IsNullOrEmpty(chatId)) yield break;
+
+    string activeProfileId = GetActiveProfileId();
+    if (string.IsNullOrEmpty(activeProfileId))
+    {
+        Debug.LogWarning($"[ChatManager.MarkChatAsRead] No active profile_id; skipping for chat {chatId}.");
+        yield break;
+    }
+
+    if (!chatLookup.TryGetValue(chatId, out var vm))
+    {
+        Debug.LogWarning($"[ChatManager.MarkChatAsRead] Chat {chatId} not in lookup; skipping.");
+        yield break;
+    }
+
+    if (string.IsNullOrEmpty(vm.LastMessageId))
+    {
+        Debug.LogWarning($"[ChatManager.MarkChatAsRead] Chat {chatId} has no LastMessageId; skipping.");
+        yield break;
+    }
+
+    string url = $"https://wappi.pro/api/sync/message/mark/read?profile_id={activeProfileId}&mark_all=true";
+    string jsonPayload = JsonConvert.SerializeObject(new { message_id = vm.LastMessageId });
+
+    using UnityWebRequest www = new UnityWebRequest(url, "POST");
+    byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(jsonPayload);
+    www.uploadHandler = new UploadHandlerRaw(bodyRaw);
+    www.downloadHandler = new DownloadHandlerBuffer();
+    www.SetRequestHeader("Content-Type", "application/json");
+    www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
+    www.timeout = 30;
+
+    yield return www.SendWebRequest();
+
+    if (www.result != UnityWebRequest.Result.Success)
+    {
+        Debug.LogError($"[ChatManager.MarkChatAsRead] {www.responseCode} {url}: {www.error}\n{www.downloadHandler.text}");
+        yield break;
+    }
+
+    // Success — server will return unread_count=0 on next sync.
 }
 }
 
