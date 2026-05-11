@@ -79,6 +79,10 @@ public static class ChatPreviewFormatter
             case "document": return "📄";
             case "location": return "📍";
             case "sticker":  return null; // EmojiOne lacks a clean sticker glyph.
+            case "vcard":
+            case "contact":  return "👤";
+            case "reaction": return "💬"; // last action was a reaction; speech bubble keeps it
+                                          // visually distinct from a content message.
             default:
                 if (LoggedUnknownTypes.Add(type))
                     Debug.LogWarning($"[ChatPreviewFormatter] Unknown message type: '{type}'");
