@@ -119,6 +119,13 @@ public partial class ChatManager : MonoBehaviour
 
         if (www.result != UnityWebRequest.Result.Success) yield break;
 
+        // var text = www.downloadHandler.text;
+        // System.IO.File.WriteAllText(
+        //     Application.persistentDataPath + "/response.txt",
+        //     text
+        // );
+        // Debug.Log("Saved to: " + Application.persistentDataPath);
+
         string newJson = www.downloadHandler.text;
 
         if (newJson != cachedJson)
