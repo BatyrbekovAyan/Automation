@@ -11,6 +11,7 @@ public class ChatViewModel
     public string LastMessage { get; private set; }
     public long LastMessageTime { get; private set; }
     public int UnreadCount { get; private set; }
+    public string LastMessageId { get; private set; }
 
     // Added for UI display
     public string LastMessageTimeString { get; private set; }
@@ -19,7 +20,8 @@ public class ChatViewModel
     public event Action<ChatViewModel> OnLastMessageChanged;
 
     public ChatViewModel(string chatId, string title, string avatarUrl,
-                         string lastMessage, long lastTime, int unreadCount = 0)
+                         string lastMessage, long lastTime, int unreadCount = 0,
+                         string lastMessageId = null)
     {
         ChatId = chatId;
         Title = title;
@@ -27,6 +29,7 @@ public class ChatViewModel
         LastMessage = lastMessage;
         LastMessageTime = lastTime;
         UnreadCount = unreadCount;
+        LastMessageId = lastMessageId;
         LastMessageTimeString = FormatTimestamp(lastTime);
 
         // OnlineStatus = "tap here for contact info";
@@ -51,6 +54,13 @@ public class ChatViewModel
         if (UnreadCount == count) return;
         UnreadCount = count;
         NotifyUpdated();
+    }
+
+    public void UpdateLastMessageId(string id)
+    {
+        if (LastMessageId == id) return;
+        LastMessageId = id;
+        // No NotifyUpdated — metadata for API calls, not visual state.
     }
 
     private string FormatTimestamp(long timestamp)
