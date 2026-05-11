@@ -126,7 +126,31 @@
       "Bash(grep -A 30 \"^--- !u!224 &1129158428$\" /Users/ayan/Projects/Automation/Assets/Scenes/Main.unity)",
       "Bash(grep -B 10 \"^--- !u!224 &1573994791$\" /Users/ayan/Projects/Automation/Assets/Scenes/Main.unity)",
       "Bash(grep -A 50 \"^--- !u!224 &128643810$\" /Users/ayan/Projects/Automation/Assets/Scenes/Main.unity)",
-      "Bash(grep -A 20 \"m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc\")"
+      "Bash(grep -A 20 \"m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc\")",
+      "Bash(diffstat)",
+      "Bash(xargs -I{} echo \"  {} diff lines\")",
+      "Bash(kill %1)",
+      "Bash(jobs)",
+      "Bash(/Users/ayan/Projects/Automation/.claude/hooks/validate-cs.sh /Users/ayan/Projects/Automation/Assets/Editor/BotSwitcherSheetBuilder.cs)",
+      "Bash(awk '/m_Name: Backdrop/{found=1; print NR\": \"$0; next} found && /m_Name:/{found=0} found{print NR\": \"$0}' /Users/ayan/Projects/Automation/Assets/Scenes/Main.unity)",
+      "Bash(awk '/m_Name: Sheet_BotSwitcher/{found=NR} found && NR>=found && NR<=found+30{print NR\": \"$0}' /Users/ayan/Projects/Automation/Assets/Scenes/Main.unity)",
+      "Bash(awk '/&1131169389/{found=NR} found && NR>=found && NR<=found+50 && /Children:|fileID:/{print NR\": \"$0}' /Users/ayan/Projects/Automation/Assets/Scenes/Main.unity)",
+      "Bash(grep -B 2 -A 4 \"m_Color: {r: 0, g: 0, b: 0, a: 0\\\\.\" /Users/ayan/Projects/Automation/Assets/Scenes/Main.unity)",
+      "Bash(awk ' *)",
+      "Bash(awk '/&263910445/{found=NR} found && NR>=found && NR<=found+10{print NR\": \"$0}' /Users/ayan/Projects/Automation/Assets/Scenes/Main.unity)",
+      "Bash(awk '/^--- !u!224 &2009018689$/{found=NR} found && NR>=found && NR<=found+30{print NR\": \"$0}' /Users/ayan/Projects/Automation/Assets/Scenes/Main.unity)",
+      "Bash(awk '/&1288273371\\\\b/{found=NR} found && NR>=found && NR<=found+30{print NR\": \"$0}' /Users/ayan/Projects/Automation/Assets/Scenes/Main.unity)",
+      "Bash(grep -B 50 \"m_Color: {r: 0, g: 0, b: 0, a: 0.5}\" /Users/ayan/Projects/Automation/Assets/Scenes/Main.unity)",
+      "Bash(grep -A 15 \"m_Script: {fileID: 11500000, guid: 5a69b8f63db5a4d54a6dfb13b72e90df\" /Users/ayan/Projects/Automation/Assets/Scenes/Main.unity)",
+      "Bash(grep -B 5 \"m_Color: {r: 0, g: 0, b: 0, a: 0\\\\.\" /Users/ayan/Projects/Automation/Assets/Prefabs/Bot.prefab)",
+      "Bash(awk '/^GameObject:/{in_go=1; start=NR; lines=\"\"} *)",
+      "Bash(awk '/private.*InstantiateBotSettingsFlush|InstantiateBotSettingsFlush\\\\\\(\\\\\\)/{found=NR} found && NR>=found && NR<=found+30{print NR\": \"$0}' /Users/ayan/Projects/Automation/Assets/Scripts/Main/Manager.cs)",
+      "Bash(grep -n -E \"\\(Backdrop|m_Alpha:|m_Color: \\\\{r: 0, g: 0, b: 0, a: 0\\\\.|FocusScrim\\)\")",
+      "Bash(grep -n -B6 -A4 \"m_Name: LoadingPanel$\" Assets/Scenes/Main.unity)",
+      "Bash(grep -n -B1 -A22 \"m_Name: LoadingPanel$\" Assets/Scenes/Main.unity)",
+      "Bash(grep -n -B22 \"m_Color: {r: 0, g: 0, b: 0, a: 0\\\\.\" Assets/Scenes/Main.unity)",
+      "Bash(grep -n -B30 \"m_Color: {r: 0\\\\..*g: 0\\\\..*b: 0\\\\..*a: 0\\\\.\" Assets/Scenes/Main.unity)",
+      "Bash(xargs -I {} basename {} .cs)"
     ]
   }
 }

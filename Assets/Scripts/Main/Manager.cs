@@ -276,7 +276,11 @@ public class Manager : MonoBehaviour
                 if (recreatedBotComp.BotName != null)
                     recreatedBotComp.BotName.text = PlayerPrefs.GetString(recreatedBot.name + "Name", "");
                 if (recreatedBotComp.BotDesc != null)
-                    recreatedBotComp.BotDesc.text = PlayerPrefs.GetString(recreatedBot.name + "Business", "");
+                {
+                    var business = PlayerPrefs.GetString(recreatedBot.name + "Business", "");
+                    recreatedBotComp.BotDesc.text = business;
+                    recreatedBotComp.BotDesc.gameObject.SetActive(!string.IsNullOrWhiteSpace(business));
+                }
                 if (recreatedBotComp.ActivationSwitch != null)
                     recreatedBotComp.ActivationSwitch.isOn = PlayerPrefs.GetInt(recreatedBot.name + "isOn", 1) == 1;
                 if (recreatedBotComp.Status != null)
@@ -514,7 +518,11 @@ public class Manager : MonoBehaviour
         if (openBotComp.BotName != null) openBotComp.BotName.text = newName;
         // Refresh the card's description from the about-business text.
         if (openBotComp.BotDesc != null)
-            openBotComp.BotDesc.text = openBotSettings.BusinessField.Value;
+        {
+            var business = openBotSettings.BusinessField.Value;
+            openBotComp.BotDesc.text = business;
+            openBotComp.BotDesc.gameObject.SetActive(!string.IsNullOrWhiteSpace(business));
+        }
 
         {
             var dd = openBotSettings.BusinessTypeDropdown;
@@ -2679,7 +2687,13 @@ public class Manager : MonoBehaviour
         EditTelegramWorkflowSaved = false;
 
 
-        if (openBot.GetComponent<Bot>().whatsappWorkflowId.Equals("-1"))
+        // Freshly-created bots reach here with empty whatsappWorkflowId/telegramWorkflowId
+        // because CreateWhatsappWorkflowFromStart / CreateTelegramWorkflowFromStart have
+        // their n8n create-workflow POST commented out and never assign an id. Treating
+        // "" the same as the "-1" sentinel skips the doomed Edit webhook (which would hang
+        // Saved()'s AND-gate forever and leave LoadingPanel stuck).
+        var whatsappWid = openBot.GetComponent<Bot>().whatsappWorkflowId;
+        if (string.IsNullOrEmpty(whatsappWid) || whatsappWid.Equals("-1"))
         {
             EnableWhatsappWorkflowSaved = true;
             EditWhatsappWorkflowSaved = true;
@@ -2688,7 +2702,7 @@ public class Manager : MonoBehaviour
         {
             if (PlayerPrefs.GetInt(openBot.name + "isOnWhatsapp", 0) != (openBotSettings.WhatsappToggle.isOn ? 1 : 0))
             {
-                StartCoroutine(EnableWhatsappWorkflow(openBot.GetComponent<Bot>().whatsappWorkflowId, openBotSettings.WhatsappToggle.isOn));
+                StartCoroutine(EnableWhatsappWorkflow(whatsappWid, openBotSettings.WhatsappToggle.isOn));
             }
             else
             {
@@ -2711,7 +2725,8 @@ public class Manager : MonoBehaviour
         }
 
 
-        if (openBot.GetComponent<Bot>().telegramWorkflowId.Equals("-1"))
+        var telegramWid = openBot.GetComponent<Bot>().telegramWorkflowId;
+        if (string.IsNullOrEmpty(telegramWid) || telegramWid.Equals("-1"))
         {
             EnableTelegramWorkflowSaved = true;
             EditTelegramWorkflowSaved = true;
@@ -2720,7 +2735,7 @@ public class Manager : MonoBehaviour
         {
             if (PlayerPrefs.GetInt(openBot.name + "isOnTelegram", 0) != (openBotSettings.TelegramToggle.isOn ? 1 : 0))
             {
-                StartCoroutine(EnableTelegramWorkflow(openBot.GetComponent<Bot>().telegramWorkflowId, openBotSettings.TelegramToggle.isOn));
+                StartCoroutine(EnableTelegramWorkflow(telegramWid, openBotSettings.TelegramToggle.isOn));
             }
             else
             {

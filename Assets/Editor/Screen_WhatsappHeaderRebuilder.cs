@@ -82,8 +82,12 @@ public static class Screen_WhatsappHeaderRebuilder
         avLE.preferredHeight = 24;
         avatar.GetComponent<Image>().color = new Color(0.85f, 0.85f, 0.85f);
 
-        // Name
-        GameObject nameGO = new GameObject("BotName", typeof(RectTransform), typeof(TextMeshProUGUI));
+        // Name. TMPMaxWidthLayoutElement reports a preferred width of MIN(text
+        // natural, maxWidth) to the HLG, so the BotName slot grows tight to
+        // short names (avatar/chevron sit close) and stops at maxWidth for
+        // long names — TMP then ellipsizes inside the capped slot. Stock
+        // LayoutElement.preferredWidth would freeze the slot at the cap.
+        GameObject nameGO = new GameObject("BotName", typeof(RectTransform), typeof(TextMeshProUGUI), typeof(TMPMaxWidthLayoutElement));
         nameGO.transform.SetParent(root.transform, false);
         var nameText = nameGO.GetComponent<TextMeshProUGUI>();
         nameText.text = "Bot";
@@ -91,6 +95,10 @@ public static class Screen_WhatsappHeaderRebuilder
         nameText.fontStyle = FontStyles.Bold;
         nameText.color = new Color(0.1f, 0.1f, 0.1f);
         nameText.alignment = TextAlignmentOptions.Center;
+        nameText.overflowMode = TextOverflowModes.Ellipsis;
+        nameText.enableWordWrapping = false;
+        var nameLE = nameGO.GetComponent<TMPMaxWidthLayoutElement>();
+        nameLE.MaxWidth = 160f;
 
         // Chevron (placeholder ▼ glyph; replace with sprite when art arrives)
         GameObject chev = new GameObject("Chevron", typeof(RectTransform), typeof(TextMeshProUGUI), typeof(LayoutElement));

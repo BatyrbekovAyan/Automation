@@ -188,13 +188,17 @@ public partial class ChatManager
     /// <summary>
     /// Defer active-bot resolution by one frame so Manager.Start() (which runs after
     /// ChatManager.Start() due to ChatManager's [DefaultExecutionOrder(-100)]) has a
-    /// chance to instantiate the bot GameObjects under BotsParent first.
+    /// chance to instantiate the bot GameObjects under BotsParent first. Fires
+    /// OnActiveBotChanged after resolving so UI subscribers whose OnEnable ran in
+    /// frame 0 — while CurrentBotId was still the "_default" sentinel — refresh to
+    /// the real bot. Matches SetActiveBot's announce-then-load ordering.
     /// </summary>
     private IEnumerator InitializeActiveBotNextFrame()
     {
         yield return null;
         if (ResolveInitialActiveBot())
         {
+            OnActiveBotChanged?.Invoke(CurrentBotId);
             BeginLoadForActiveBot();
         }
     }

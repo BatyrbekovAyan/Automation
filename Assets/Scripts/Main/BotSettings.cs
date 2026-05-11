@@ -310,7 +310,17 @@ public partial class BotSettings : MonoBehaviour
             parentGo.SetActive(false);
         }
         if (BotsPage.Instance != null)
+        {
+            // Slide-in pushed BotsPage left for the parallax depth effect.
+            // The normal back path animates it back to X=0 via
+            // SlideOutToBotsPage, but Delete skips that animation, so restore
+            // the centered position explicitly before reactivating — otherwise
+            // the list reappears shifted ~30% of screen width to the left.
+            var botsPageRt = BotsPage.Instance.GetComponent<RectTransform>();
+            if (botsPageRt != null)
+                botsPageRt.anchoredPosition = new Vector2(0f, botsPageRt.anchoredPosition.y);
             BotsPage.Instance.gameObject.SetActive(true);
+        }
 
         var bot = openBot.GetComponent<Bot>();
         Manager.openBot = null;

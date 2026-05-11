@@ -41,7 +41,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 227}
+  m_SizeDelta: {x: 0, y: 232}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &3898779194993395536
 MonoBehaviour:
@@ -57,9 +57,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.LayoutElement
   m_IgnoreLayout: 0
   m_MinWidth: -1
-  m_MinHeight: 227
+  m_MinHeight: 232
   m_PreferredWidth: -1
-  m_PreferredHeight: 227
+  m_PreferredHeight: 232
   m_FlexibleWidth: -1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
@@ -161,11 +161,7 @@ MonoBehaviour:
   BotDesc: {fileID: 8141626005627473746}
   Status: {fileID: 5676894983707078622}
   EditButton: {fileID: 7032202525717405737}
-  DeleteButton: {fileID: 0}
   ActivationSwitch: {fileID: 8477256342550100433}
-  DeletePopup: {fileID: 0}
-  DeleteConfirmButton: {fileID: 0}
-  DeleteCancelButton: {fileID: 0}
   backgroundActiveColor: {r: 0, g: 0.8, b: 0, a: 1}
   handleActiveColor: {r: 1, g: 1, b: 1, a: 1}
   BotIconTile: {fileID: 7687641788116652963}
@@ -468,10 +464,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.LayoutElement
   m_IgnoreLayout: 0
-  m_MinWidth: 139
-  m_MinHeight: 139
-  m_PreferredWidth: 139
-  m_PreferredHeight: 139
+  m_MinWidth: 140
+  m_MinHeight: 140
+  m_PreferredWidth: 140
+  m_PreferredHeight: 140
   m_FlexibleWidth: 0
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
@@ -525,7 +521,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: adb30198aa32dd140b5750692dd48104, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithRoundedCorners
-  radius: 40
+  radius: 70
   image: {fileID: 7687641788116652963}
 --- !u!1 &2133407027076269597
 GameObject:
@@ -1625,9 +1621,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.LayoutElement
   m_IgnoreLayout: 0
   m_MinWidth: 200
-  m_MinHeight: 139
+  m_MinHeight: 140
   m_PreferredWidth: -1
-  m_PreferredHeight: 139
+  m_PreferredHeight: 140
   m_FlexibleWidth: 1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1

@@ -1,19 +1,60 @@
 #if UNITY_EDITOR
+using Nobi.UiRoundedCorners;
+using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
 
 public static class BotSwitcherSheetBuilder
 {
     private const string SheetName = "Sheet_BotSwitcher";
     private const string RowName = "BotSwitcherRow";
+    private const string PrefabHolderName = "BotSwitcherRowPrefabHolder";
+
+    // Sheet shell
+    private const float SheetHeight = 640f;
+    private const float TopCornerRadius = 24f;
+
+    // Drag handle
+    private const float HandleAreaHeight = 24f;
+    private const float HandleWidth = 36f;
+    private const float HandleHeight = 4f;
+
+    // Header + divider
+    private const float HeaderHeight = 56f;
+    private const float HeaderFontSize = 18f;
+    private const float DividerHeight = 1f;
+
+    // Row
+    private const float RowHeight = 72f;
+    private const float AvatarSize = 48f;
+    private const float TrailingCheckSize = 20f;
+    private const float SelectedBgRadius = 12f;
+    private const float NameFontSize = 16f;
+    private const float SubFontSize = 13f;
+    private const float StatusDotSize = 8f;
+
+    // Palette — kept inline so the look-and-feel is auditable from one file.
+    private static readonly Color BackdropColor = new Color(0f, 0f, 0f, 1f);
+    private static readonly Color PanelColor = Color.white;
+    private static readonly Color HandleColor = new Color(0.82f, 0.82f, 0.84f);
+    private static readonly Color HeaderTextColor = new Color(0.10f, 0.10f, 0.12f);
+    private static readonly Color DividerColor = new Color(0f, 0f, 0f, 0.06f);
+
+    private static readonly Color RowNameColor = new Color(0.10f, 0.10f, 0.12f);
+    private static readonly Color RowSubColor = new Color(0.45f, 0.45f, 0.48f);
+    private static readonly Color SelectedTint = new Color(0.13f, 0.78f, 0.42f, 0.10f);
+    private static readonly Color AccentGreen = new Color(0.13f, 0.78f, 0.42f);
+    private static readonly Color StatusDisconnected = new Color(0.6f, 0.6f, 0.62f);
+    private static readonly Color AvatarPlaceholder = new Color(0.85f, 0.85f, 0.85f);
 
     /// <summary>
-    /// Constructs Sheet_BotSwitcher and the BotSwitcherRow prefab template under the Canvas.
-    /// RUN FIRST — Screen_WhatsappHeaderRebuilder's title binder finds this sheet at runtime.
-    /// If no sheet exists, the title button wires to nothing and silently fails on first play.
+    /// Constructs Sheet_BotSwitcher and the BotSwitcherRow prefab template under
+    /// the Canvas. RUN FIRST — Screen_WhatsappHeaderRebuilder's title binder finds
+    /// this sheet at runtime. After this, also re-run "Tools/Bot Switcher/Rebuild
+    /// Row Avatar" so the Avatar picks up its 48px circular styling against the
+    /// new row size.
     /// </summary>
     [MenuItem("Tools/Bot Switcher/Build Sheet")]
     public static void Build()
@@ -25,153 +66,251 @@ public static class BotSwitcherSheetBuilder
             return;
         }
 
-        // Remove existing instance
         Transform existing = canvas.transform.Find(SheetName);
-        if (existing != null)
-        {
-            Object.DestroyImmediate(existing.gameObject);
-        }
+        if (existing != null) Object.DestroyImmediate(existing.gameObject);
 
-        // Root sheet object
-        GameObject sheet = new GameObject(SheetName, typeof(RectTransform));
-        sheet.transform.SetParent(canvas.transform, false);
-        RectTransform sheetRT = sheet.GetComponent<RectTransform>();
-        sheetRT.anchorMin = Vector2.zero;
-        sheetRT.anchorMax = Vector2.one;
-        sheetRT.offsetMin = Vector2.zero;
-        sheetRT.offsetMax = Vector2.zero;
+        GameObject sheet = BuildSheetRoot(canvas);
+        GameObject backdrop = BuildBackdrop(sheet);
+        GameObject panel = BuildPanel(sheet);
+        BuildDragHandle(panel);
+        BuildHeader(panel);
+        BuildDivider(panel);
+        RectTransform contentRT = BuildRowScroll(panel);
 
-        BotSwitcherSheet controller = sheet.AddComponent<BotSwitcherSheet>();
-
-        // Backdrop
-        GameObject backdrop = new GameObject("Backdrop", typeof(RectTransform), typeof(Image), typeof(CanvasGroup), typeof(Button));
-        backdrop.transform.SetParent(sheet.transform, false);
-        RectTransform bdRT = backdrop.GetComponent<RectTransform>();
-        bdRT.anchorMin = Vector2.zero;
-        bdRT.anchorMax = Vector2.one;
-        bdRT.offsetMin = Vector2.zero;
-        bdRT.offsetMax = Vector2.zero;
-        backdrop.GetComponent<Image>().color = new Color(0f, 0f, 0f, 1f); // alpha controlled by CanvasGroup
-        var backdropCanvasGroup = backdrop.GetComponent<CanvasGroup>();
-        backdropCanvasGroup.alpha = 0f;
-        backdropCanvasGroup.blocksRaycasts = false;
-        var backdropButton = backdrop.GetComponent<Button>();
-
-        // Sheet panel — bottom-anchored (pivot Y = 0, anchor Y = 0) per BotSwitcherSheet contract.
-        // Fixed sizeDelta keeps the sheet a comfortable size even with few bots; RowScroll inside
-        // takes flexibleHeight = 1 so it fills the remaining space below the header.
-        GameObject panel = new GameObject("Panel", typeof(RectTransform), typeof(Image), typeof(VerticalLayoutGroup));
-        panel.transform.SetParent(sheet.transform, false);
-        RectTransform panelRT = panel.GetComponent<RectTransform>();
-        panelRT.anchorMin = new Vector2(0f, 0f);
-        panelRT.anchorMax = new Vector2(1f, 0f);
-        panelRT.pivot = new Vector2(0.5f, 0f);
-        panelRT.anchoredPosition = Vector2.zero;
-        panelRT.sizeDelta = new Vector2(0f, 720f); // fixed sheet height
-        panel.GetComponent<Image>().color = Color.white;
-
-        var panelLayout = panel.GetComponent<VerticalLayoutGroup>();
-        panelLayout.padding = new RectOffset(0, 0, 16, 16);
-        panelLayout.spacing = 0;
-        panelLayout.childForceExpandWidth = true;
-        panelLayout.childForceExpandHeight = false;
-
-        // Sheet header label
-        GameObject header = new GameObject("Header", typeof(RectTransform), typeof(TextMeshProUGUI));
-        header.transform.SetParent(panel.transform, false);
-        var headerText = header.GetComponent<TextMeshProUGUI>();
-        headerText.text = "Select bot";
-        headerText.fontSize = 16;
-        headerText.fontStyle = FontStyles.Bold;
-        headerText.color = new Color(0.1f, 0.1f, 0.1f);
-        headerText.alignment = TextAlignmentOptions.Center;
-        var headerLE = header.AddComponent<LayoutElement>();
-        headerLE.minHeight = 56;
-        headerLE.preferredHeight = 56;
-
-        // Row container (scrollable). flexibleHeight = 1 makes it fill the remaining
-        // space inside the fixed-height Panel below the header.
-        GameObject scroll = new GameObject("RowScroll", typeof(RectTransform), typeof(ScrollRect), typeof(Image));
-        scroll.transform.SetParent(panel.transform, false);
-        var scrollImage = scroll.GetComponent<Image>();
-        scrollImage.color = new Color(0, 0, 0, 0); // transparent
-        var scrollLE = scroll.AddComponent<LayoutElement>();
-        scrollLE.minHeight = 200;
-        scrollLE.flexibleHeight = 1;
-
-        var scrollRect = scroll.GetComponent<ScrollRect>();
-        scrollRect.horizontal = false;
-        scrollRect.vertical = true;
-
-        GameObject viewport = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(Mask));
-        viewport.transform.SetParent(scroll.transform, false);
-        var viewportRT = viewport.GetComponent<RectTransform>();
-        viewportRT.anchorMin = Vector2.zero;
-        viewportRT.anchorMax = Vector2.one;
-        viewportRT.offsetMin = Vector2.zero;
-        viewportRT.offsetMax = Vector2.zero;
-        viewport.GetComponent<Image>().color = new Color(1, 1, 1, 0.01f);
-        viewport.GetComponent<Mask>().showMaskGraphic = false;
-
-        GameObject content = new GameObject("Content", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
-        content.transform.SetParent(viewport.transform, false);
-        var contentRT = content.GetComponent<RectTransform>();
-        contentRT.anchorMin = new Vector2(0, 1);
-        contentRT.anchorMax = new Vector2(1, 1);
-        contentRT.pivot = new Vector2(0.5f, 1);
-        contentRT.offsetMin = Vector2.zero;
-        contentRT.offsetMax = Vector2.zero;
-        var contentLayout = content.GetComponent<VerticalLayoutGroup>();
-        contentLayout.spacing = 4;
-        contentLayout.padding = new RectOffset(4, 4, 4, 4);
-        contentLayout.childForceExpandWidth = true;
-        contentLayout.childForceExpandHeight = false;
-        var contentFitter = content.GetComponent<ContentSizeFitter>();
-        contentFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-        scrollRect.viewport = viewportRT;
-        scrollRect.content = contentRT;
-
-        // Row prefab
         GameObject row = BuildRowPrefab(canvas);
 
-        // Wire controller serialized fields via SerializedObject
+        var controller = sheet.GetComponent<BotSwitcherSheet>();
         var so = new SerializedObject(controller);
-        so.FindProperty("backdropGroup").objectReferenceValue = backdropCanvasGroup;
-        so.FindProperty("backdropButton").objectReferenceValue = backdropButton;
-        so.FindProperty("sheetPanel").objectReferenceValue = panelRT;
+        so.FindProperty("backdropGroup").objectReferenceValue = backdrop.GetComponent<CanvasGroup>();
+        so.FindProperty("backdropButton").objectReferenceValue = backdrop.GetComponent<Button>();
+        so.FindProperty("sheetPanel").objectReferenceValue = panel.GetComponent<RectTransform>();
         so.FindProperty("rowContainer").objectReferenceValue = contentRT;
         so.FindProperty("rowPrefab").objectReferenceValue = row.GetComponent<BotSwitcherRowView>();
         so.ApplyModifiedPropertiesWithoutUndo();
 
         sheet.SetActive(false);
-        Debug.Log($"[BotSwitcherSheetBuilder] Built {SheetName} under {canvas.name}.");
+        Debug.Log(
+            $"[BotSwitcherSheetBuilder] Built {SheetName} under {canvas.name}. " +
+            $"Next: drag {RowName} from the hidden {PrefabHolderName} into Assets/Prefabs/ to overwrite BotSwitcherRow.prefab, " +
+            $"re-wire BotSwitcherSheet.rowPrefab to the saved asset, " +
+            $"then run 'Tools/Bot Switcher/Rebuild Row Avatar' so the Avatar picks up the new {AvatarSize}px circular styling.");
         Selection.activeGameObject = sheet;
         EditorSceneManager.MarkSceneDirty(sheet.scene);
     }
 
+    private static GameObject BuildSheetRoot(Canvas canvas)
+    {
+        GameObject sheet = new GameObject(SheetName, typeof(RectTransform));
+        sheet.transform.SetParent(canvas.transform, false);
+        StretchFill(sheet.GetComponent<RectTransform>());
+        sheet.AddComponent<BotSwitcherSheet>();
+        return sheet;
+    }
+
+    private static GameObject BuildBackdrop(GameObject sheet)
+    {
+        GameObject backdrop = new GameObject("Backdrop",
+            typeof(RectTransform), typeof(Image), typeof(CanvasGroup), typeof(Button));
+        backdrop.transform.SetParent(sheet.transform, false);
+        StretchFill(backdrop.GetComponent<RectTransform>());
+
+        backdrop.GetComponent<Image>().color = BackdropColor; // alpha controlled by CanvasGroup
+        var group = backdrop.GetComponent<CanvasGroup>();
+        group.alpha = 0f;
+        group.blocksRaycasts = false;
+        return backdrop;
+    }
+
+    /// <summary>
+    /// Bottom-anchored sheet panel (pivot Y = 0, anchor Y = 0) per the
+    /// BotSwitcherSheet contract — the controller slides this up by its own
+    /// height. Rounded only on the top corners so the bottom can sit flush
+    /// against the safe-area edge without a visible gap.
+    /// </summary>
+    private static GameObject BuildPanel(GameObject sheet)
+    {
+        GameObject panel = new GameObject("Panel",
+            typeof(RectTransform), typeof(Image), typeof(VerticalLayoutGroup));
+        panel.transform.SetParent(sheet.transform, false);
+
+        var rt = panel.GetComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0f, 0f);
+        rt.anchorMax = new Vector2(1f, 0f);
+        rt.pivot = new Vector2(0.5f, 0f);
+        rt.anchoredPosition = Vector2.zero;
+        rt.sizeDelta = new Vector2(0f, SheetHeight);
+
+        var image = panel.GetComponent<Image>();
+        image.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+        image.type = Image.Type.Simple;
+        image.color = PanelColor;
+        image.raycastTarget = true;
+
+        // Top-only rounded corners. Vector4 mapping: x=TL, y=TR, z=BR, w=BL.
+        var rounded = panel.AddComponent<ImageWithIndependentRoundedCorners>();
+        rounded.r = new Vector4(TopCornerRadius, TopCornerRadius, 0f, 0f);
+        rounded.Validate();
+        rounded.Refresh();
+
+        var layout = panel.GetComponent<VerticalLayoutGroup>();
+        layout.padding = new RectOffset(0, 0, 0, 16);
+        layout.spacing = 0;
+        layout.childAlignment = TextAnchor.UpperCenter;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = false;
+        layout.childControlWidth = true;
+        layout.childControlHeight = true;
+        return panel;
+    }
+
+    private static void BuildDragHandle(GameObject panel)
+    {
+        GameObject area = new GameObject("DragHandleArea",
+            typeof(RectTransform), typeof(LayoutElement));
+        area.transform.SetParent(panel.transform, false);
+        var le = area.GetComponent<LayoutElement>();
+        le.minHeight = HandleAreaHeight;
+        le.preferredHeight = HandleAreaHeight;
+
+        GameObject pill = new GameObject("Pill", typeof(RectTransform), typeof(Image));
+        pill.transform.SetParent(area.transform, false);
+        var pillRT = pill.GetComponent<RectTransform>();
+        pillRT.anchorMin = new Vector2(0.5f, 0.5f);
+        pillRT.anchorMax = new Vector2(0.5f, 0.5f);
+        pillRT.pivot = new Vector2(0.5f, 0.5f);
+        pillRT.sizeDelta = new Vector2(HandleWidth, HandleHeight);
+        pillRT.anchoredPosition = Vector2.zero;
+
+        var pillImage = pill.GetComponent<Image>();
+        pillImage.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+        pillImage.type = Image.Type.Simple;
+        pillImage.color = HandleColor;
+        pillImage.raycastTarget = false;
+
+        var pillRounded = pill.AddComponent<ImageWithRoundedCorners>();
+        pillRounded.radius = HandleHeight * 0.5f;
+        pillRounded.Validate();
+        pillRounded.Refresh();
+    }
+
+    private static void BuildHeader(GameObject panel)
+    {
+        GameObject header = new GameObject("Header",
+            typeof(RectTransform), typeof(TextMeshProUGUI), typeof(LayoutElement));
+        header.transform.SetParent(panel.transform, false);
+
+        var text = header.GetComponent<TextMeshProUGUI>();
+        text.text = "Select bot";
+        text.fontSize = HeaderFontSize;
+        text.fontStyle = FontStyles.Bold;
+        text.color = HeaderTextColor;
+        text.alignment = TextAlignmentOptions.Center;
+        text.raycastTarget = false;
+
+        var le = header.GetComponent<LayoutElement>();
+        le.minHeight = HeaderHeight;
+        le.preferredHeight = HeaderHeight;
+    }
+
+    private static void BuildDivider(GameObject panel)
+    {
+        GameObject divider = new GameObject("Divider",
+            typeof(RectTransform), typeof(Image), typeof(LayoutElement));
+        divider.transform.SetParent(panel.transform, false);
+
+        var image = divider.GetComponent<Image>();
+        image.color = DividerColor;
+        image.raycastTarget = false;
+
+        var le = divider.GetComponent<LayoutElement>();
+        le.minHeight = DividerHeight;
+        le.preferredHeight = DividerHeight;
+    }
+
+    /// <summary>
+    /// Scrollable row container. flexibleHeight = 1 makes it absorb the
+    /// remaining vertical space inside the panel below the header/divider.
+    /// </summary>
+    private static RectTransform BuildRowScroll(GameObject panel)
+    {
+        GameObject scroll = new GameObject("RowScroll",
+            typeof(RectTransform), typeof(ScrollRect), typeof(Image), typeof(LayoutElement));
+        scroll.transform.SetParent(panel.transform, false);
+
+        scroll.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0f);
+        var le = scroll.GetComponent<LayoutElement>();
+        le.minHeight = 200f;
+        le.flexibleHeight = 1f;
+
+        var scrollRect = scroll.GetComponent<ScrollRect>();
+        scrollRect.horizontal = false;
+        scrollRect.vertical = true;
+        scrollRect.movementType = ScrollRect.MovementType.Elastic;
+        scrollRect.inertia = true;
+        scrollRect.decelerationRate = 0.135f;
+
+        GameObject viewport = new GameObject("Viewport",
+            typeof(RectTransform), typeof(Image), typeof(Mask));
+        viewport.transform.SetParent(scroll.transform, false);
+        StretchFill(viewport.GetComponent<RectTransform>());
+        viewport.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0.01f);
+        viewport.GetComponent<Mask>().showMaskGraphic = false;
+
+        GameObject content = new GameObject("Content",
+            typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
+        content.transform.SetParent(viewport.transform, false);
+
+        var contentRT = content.GetComponent<RectTransform>();
+        contentRT.anchorMin = new Vector2(0f, 1f);
+        contentRT.anchorMax = new Vector2(1f, 1f);
+        contentRT.pivot = new Vector2(0.5f, 1f);
+        contentRT.offsetMin = Vector2.zero;
+        contentRT.offsetMax = Vector2.zero;
+
+        var contentLayout = content.GetComponent<VerticalLayoutGroup>();
+        contentLayout.spacing = 4;
+        contentLayout.padding = new RectOffset(8, 8, 8, 8);
+        contentLayout.childForceExpandWidth = true;
+        contentLayout.childForceExpandHeight = false;
+        contentLayout.childControlWidth = true;
+        contentLayout.childControlHeight = true;
+
+        var fitter = content.GetComponent<ContentSizeFitter>();
+        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        scrollRect.viewport = viewport.GetComponent<RectTransform>();
+        scrollRect.content = contentRT;
+        return contentRT;
+    }
+
+    /// <summary>
+    /// Hidden template under the Canvas; BotSwitcherSheet instantiates it at
+    /// runtime. SelectedBackground = soft green pill behind the row when
+    /// selected. The runtime view's "selectedAccentBar" SerializedField is
+    /// repurposed to drive the trailing checkmark: BotSwitcherRowView only
+    /// SetActives the GameObject on selection — any Image works there.
+    /// </summary>
     private static GameObject BuildRowPrefab(Canvas canvas)
     {
-        // The row lives as a hidden template under the canvas; BotSwitcherSheet
-        // instantiates it at runtime. We attach it under a special holder so it
-        // does not render in the live scene.
-        const string HolderName = "BotSwitcherRowPrefabHolder";
-        Transform holder = canvas.transform.Find(HolderName);
-        if (holder != null) Object.DestroyImmediate(holder.gameObject);
+        Transform existingHolder = canvas.transform.Find(PrefabHolderName);
+        if (existingHolder != null) Object.DestroyImmediate(existingHolder.gameObject);
 
-        GameObject holderGO = new GameObject(HolderName, typeof(RectTransform));
-        holderGO.SetActive(false);
-        holderGO.transform.SetParent(canvas.transform, false);
+        GameObject holder = new GameObject(PrefabHolderName, typeof(RectTransform));
+        holder.transform.SetParent(canvas.transform, false);
+        holder.SetActive(false);
 
-        GameObject row = new GameObject(RowName, typeof(RectTransform), typeof(Image), typeof(Button), typeof(HorizontalLayoutGroup));
-        row.transform.SetParent(holderGO.transform, false);
-        RectTransform rowRT = row.GetComponent<RectTransform>();
-        rowRT.sizeDelta = new Vector2(0, 64);
-        var rowImage = row.GetComponent<Image>();
-        rowImage.color = new Color(1, 1, 1, 0); // transparent base; clicks still hit
-        var rowButton = row.GetComponent<Button>();
+        GameObject row = new GameObject(RowName,
+            typeof(RectTransform), typeof(Image), typeof(Button), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+        row.transform.SetParent(holder.transform, false);
+
+        row.GetComponent<RectTransform>().sizeDelta = new Vector2(0f, RowHeight);
+        row.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0f); // transparent base — clicks still hit
+        var rowLE = row.GetComponent<LayoutElement>();
+        rowLE.minHeight = RowHeight;
+        rowLE.preferredHeight = RowHeight;
+
         var rowLayout = row.GetComponent<HorizontalLayoutGroup>();
-        rowLayout.padding = new RectOffset(16, 16, 8, 8);
+        rowLayout.padding = new RectOffset(16, 16, 12, 12);
         rowLayout.spacing = 12;
         rowLayout.childAlignment = TextAnchor.MiddleLeft;
         rowLayout.childForceExpandWidth = false;
@@ -179,96 +318,193 @@ public static class BotSwitcherSheetBuilder
         rowLayout.childControlWidth = true;
         rowLayout.childControlHeight = true;
 
-        // Selected background (full-row)
-        GameObject selBg = new GameObject("SelectedBackground", typeof(RectTransform), typeof(Image));
-        selBg.transform.SetParent(row.transform, false);
-        var selBgRT = selBg.GetComponent<RectTransform>();
-        selBgRT.anchorMin = Vector2.zero;
-        selBgRT.anchorMax = Vector2.one;
-        selBgRT.offsetMin = new Vector2(4, 0);
-        selBgRT.offsetMax = new Vector2(-4, 0);
-        var selBgImage = selBg.GetComponent<Image>();
-        selBgImage.color = new Color(0.13f, 0.78f, 0.42f, 0.10f); // ~10% accent tint
-        selBg.transform.SetAsFirstSibling();
-        selBg.SetActive(false);
+        Image selectedBg = BuildSelectedBackground(row);
+        Image avatarImage = BuildAvatar(row);
+        (TextMeshProUGUI nameText, TextMeshProUGUI subText, Image statusDot) = BuildTextStack(row);
+        Image trailingCheck = BuildTrailingCheck(row);
 
-        // Selected accent bar (left edge)
-        GameObject accentBar = new GameObject("SelectedAccentBar", typeof(RectTransform), typeof(Image));
-        accentBar.transform.SetParent(row.transform, false);
-        var barRT = accentBar.GetComponent<RectTransform>();
-        barRT.anchorMin = new Vector2(0, 0);
-        barRT.anchorMax = new Vector2(0, 1);
-        barRT.pivot = new Vector2(0, 0.5f);
-        barRT.sizeDelta = new Vector2(2, 0);
-        barRT.anchoredPosition = new Vector2(4, 0);
-        accentBar.GetComponent<Image>().color = new Color(0.13f, 0.78f, 0.42f);
-        accentBar.SetActive(false);
+        var rowView = row.AddComponent<BotSwitcherRowView>();
+        var so = new SerializedObject(rowView);
+        so.FindProperty("avatarImage").objectReferenceValue = avatarImage;
+        so.FindProperty("nameLabel").objectReferenceValue = nameText;
+        so.FindProperty("subLineLabel").objectReferenceValue = subText;
+        so.FindProperty("statusDot").objectReferenceValue = statusDot;
+        so.FindProperty("selectedBackground").objectReferenceValue = selectedBg;
+        so.FindProperty("selectedAccentBar").objectReferenceValue = trailingCheck;
+        so.FindProperty("rowButton").objectReferenceValue = row.GetComponent<Button>();
+        so.ApplyModifiedPropertiesWithoutUndo();
 
-        // Avatar
-        GameObject avatar = new GameObject("Avatar", typeof(RectTransform), typeof(Image), typeof(LayoutElement));
+        return row;
+    }
+
+    /// <summary>
+    /// Full-row tinted pill that sits BEHIND avatar/stack/check when the row
+    /// is selected. Anchored full-stretch with insets — but the row's
+    /// HorizontalLayoutGroup would otherwise treat it as a flow child and
+    /// shove everything else to its right. LayoutElement.ignoreLayout opts
+    /// it out so the anchor-based positioning wins.
+    /// </summary>
+    private static Image BuildSelectedBackground(GameObject row)
+    {
+        GameObject bg = new GameObject("SelectedBackground",
+            typeof(RectTransform), typeof(Image), typeof(LayoutElement));
+        bg.transform.SetParent(row.transform, false);
+
+        bg.GetComponent<LayoutElement>().ignoreLayout = true;
+
+        var rt = bg.GetComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.offsetMin = new Vector2(8f, 4f);
+        rt.offsetMax = new Vector2(-8f, -4f);
+
+        var image = bg.GetComponent<Image>();
+        image.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+        image.type = Image.Type.Simple;
+        image.color = SelectedTint;
+        image.raycastTarget = false;
+
+        var rounded = bg.AddComponent<ImageWithRoundedCorners>();
+        rounded.radius = SelectedBgRadius;
+        rounded.Validate();
+        rounded.Refresh();
+
+        bg.transform.SetAsFirstSibling();
+        bg.SetActive(false);
+        return image;
+    }
+
+    private static Image BuildAvatar(GameObject row)
+    {
+        GameObject avatar = new GameObject("Avatar",
+            typeof(RectTransform), typeof(Image), typeof(LayoutElement));
         avatar.transform.SetParent(row.transform, false);
-        avatar.GetComponent<RectTransform>().sizeDelta = new Vector2(40, 40);
-        var avLE = avatar.GetComponent<LayoutElement>();
-        avLE.preferredWidth = 40;
-        avLE.preferredHeight = 40;
-        var avImage = avatar.GetComponent<Image>();
-        avImage.color = new Color(0.85f, 0.85f, 0.85f);
 
-        // Stack: name + sub-line
-        GameObject stack = new GameObject("Stack", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(LayoutElement));
+        avatar.GetComponent<RectTransform>().sizeDelta = new Vector2(AvatarSize, AvatarSize);
+        var le = avatar.GetComponent<LayoutElement>();
+        le.preferredWidth = AvatarSize;
+        le.preferredHeight = AvatarSize;
+        le.minWidth = AvatarSize;
+        le.minHeight = AvatarSize;
+
+        // Final circular masking + IconSprite child are applied by
+        // BotSwitcherRowAvatarRebuilder against the saved prefab asset.
+        var image = avatar.GetComponent<Image>();
+        image.color = AvatarPlaceholder;
+        return image;
+    }
+
+    private static (TextMeshProUGUI nameText, TextMeshProUGUI subText, Image statusDot) BuildTextStack(GameObject row)
+    {
+        GameObject stack = new GameObject("Stack",
+            typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(LayoutElement));
         stack.transform.SetParent(row.transform, false);
+
         var stackLayout = stack.GetComponent<VerticalLayoutGroup>();
         stackLayout.spacing = 2;
         stackLayout.childAlignment = TextAnchor.MiddleLeft;
         stackLayout.childForceExpandWidth = true;
         stackLayout.childForceExpandHeight = false;
-        var stackLE = stack.GetComponent<LayoutElement>();
-        stackLE.flexibleWidth = 1;
+        stackLayout.childControlWidth = true;
+        stackLayout.childControlHeight = true;
 
-        GameObject nameGO = new GameObject("Name", typeof(RectTransform), typeof(TextMeshProUGUI));
+        var stackLE = stack.GetComponent<LayoutElement>();
+        stackLE.flexibleWidth = 1f;
+
+        GameObject nameGO = new GameObject("Name",
+            typeof(RectTransform), typeof(TextMeshProUGUI));
         nameGO.transform.SetParent(stack.transform, false);
         var nameText = nameGO.GetComponent<TextMeshProUGUI>();
         nameText.text = "Bot";
-        nameText.fontSize = 16;
-        nameText.color = new Color(0.1f, 0.1f, 0.1f);
+        nameText.fontSize = NameFontSize;
+        nameText.fontStyle = FontStyles.Normal;
+        nameText.color = RowNameColor;
+        nameText.raycastTarget = false;
+        nameText.overflowMode = TextOverflowModes.Ellipsis;
+        nameText.enableWordWrapping = false;
 
-        GameObject subGO = new GameObject("SubLine", typeof(RectTransform), typeof(HorizontalLayoutGroup));
-        subGO.transform.SetParent(stack.transform, false);
-        var subLayout = subGO.GetComponent<HorizontalLayoutGroup>();
+        GameObject subRow = new GameObject("SubLine",
+            typeof(RectTransform), typeof(HorizontalLayoutGroup));
+        subRow.transform.SetParent(stack.transform, false);
+        var subLayout = subRow.GetComponent<HorizontalLayoutGroup>();
         subLayout.spacing = 6;
         subLayout.childAlignment = TextAnchor.MiddleLeft;
         subLayout.childForceExpandWidth = false;
         subLayout.childForceExpandHeight = false;
+        subLayout.childControlWidth = true;
+        subLayout.childControlHeight = true;
 
-        GameObject statusDotGO = new GameObject("StatusDot", typeof(RectTransform), typeof(Image), typeof(LayoutElement));
-        statusDotGO.transform.SetParent(subGO.transform, false);
-        statusDotGO.GetComponent<RectTransform>().sizeDelta = new Vector2(8, 8);
-        var dotLE = statusDotGO.GetComponent<LayoutElement>();
-        dotLE.preferredWidth = 8;
-        dotLE.preferredHeight = 8;
-        var dotImage = statusDotGO.GetComponent<Image>();
-        dotImage.color = new Color(0.6f, 0.6f, 0.6f);
+        GameObject dotGO = new GameObject("StatusDot",
+            typeof(RectTransform), typeof(Image), typeof(LayoutElement));
+        dotGO.transform.SetParent(subRow.transform, false);
+        dotGO.GetComponent<RectTransform>().sizeDelta = new Vector2(StatusDotSize, StatusDotSize);
+        var dotLE = dotGO.GetComponent<LayoutElement>();
+        dotLE.preferredWidth = StatusDotSize;
+        dotLE.preferredHeight = StatusDotSize;
+        dotLE.minWidth = StatusDotSize;
+        dotLE.minHeight = StatusDotSize;
 
-        GameObject subTextGO = new GameObject("SubText", typeof(RectTransform), typeof(TextMeshProUGUI));
-        subTextGO.transform.SetParent(subGO.transform, false);
+        var dotImage = dotGO.GetComponent<Image>();
+        dotImage.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+        dotImage.type = Image.Type.Simple;
+        dotImage.color = StatusDisconnected;
+        dotImage.raycastTarget = false;
+
+        var dotRounded = dotGO.AddComponent<ImageWithRoundedCorners>();
+        dotRounded.radius = StatusDotSize * 0.5f;
+        dotRounded.Validate();
+        dotRounded.Refresh();
+
+        GameObject subTextGO = new GameObject("SubText",
+            typeof(RectTransform), typeof(TextMeshProUGUI), typeof(LayoutElement));
+        subTextGO.transform.SetParent(subRow.transform, false);
         var subText = subTextGO.GetComponent<TextMeshProUGUI>();
         subText.text = "WhatsApp not connected";
-        subText.fontSize = 12;
-        subText.color = new Color(0.45f, 0.45f, 0.45f);
+        subText.fontSize = SubFontSize;
+        subText.color = RowSubColor;
+        subText.raycastTarget = false;
+        subText.overflowMode = TextOverflowModes.Ellipsis;
+        subText.enableWordWrapping = false;
+        var subLE = subTextGO.GetComponent<LayoutElement>();
+        subLE.flexibleWidth = 1f;
 
-        // Wire BotSwitcherRowView serialized fields
-        var rowView = row.AddComponent<BotSwitcherRowView>();
-        var so = new SerializedObject(rowView);
-        so.FindProperty("avatarImage").objectReferenceValue = avImage;
-        so.FindProperty("nameLabel").objectReferenceValue = nameText;
-        so.FindProperty("subLineLabel").objectReferenceValue = subText;
-        so.FindProperty("statusDot").objectReferenceValue = dotImage;
-        so.FindProperty("selectedBackground").objectReferenceValue = selBgImage;
-        so.FindProperty("selectedAccentBar").objectReferenceValue = accentBar.GetComponent<Image>();
-        so.FindProperty("rowButton").objectReferenceValue = rowButton;
-        so.ApplyModifiedPropertiesWithoutUndo();
+        return (nameText, subText, dotImage);
+    }
 
-        return row;
+    /// <summary>
+    /// Wired into BotSwitcherRowView.selectedAccentBar — the row view toggles
+    /// this GameObject active when the row represents the active bot. Uses
+    /// Unity's built-in checkmark sprite tinted with the accent green.
+    /// </summary>
+    private static Image BuildTrailingCheck(GameObject row)
+    {
+        GameObject check = new GameObject("TrailingCheck",
+            typeof(RectTransform), typeof(Image), typeof(LayoutElement));
+        check.transform.SetParent(row.transform, false);
+
+        check.GetComponent<RectTransform>().sizeDelta = new Vector2(TrailingCheckSize, TrailingCheckSize);
+        var le = check.GetComponent<LayoutElement>();
+        le.preferredWidth = TrailingCheckSize;
+        le.preferredHeight = TrailingCheckSize;
+        le.minWidth = TrailingCheckSize;
+        le.minHeight = TrailingCheckSize;
+
+        var image = check.GetComponent<Image>();
+        image.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Checkmark.psd");
+        image.color = AccentGreen;
+        image.preserveAspect = true;
+        image.raycastTarget = false;
+
+        check.SetActive(false);
+        return image;
+    }
+
+    private static void StretchFill(RectTransform rt)
+    {
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
     }
 }
 #endif
