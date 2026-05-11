@@ -172,9 +172,20 @@ public void Bind(ChatViewModel model)
             return;
         }
 
+        // Phase 2: prepend [tick] [media-emoji] using ChatPreviewFormatter, then
+        // convert any Unicode emoji (in either the rawMessage or our injected
+        // media emoji prefix) to EmojiOne sprite tags. Tick sprite tags are ASCII
+        // and pass through the converter unchanged.
+        string formatted = ChatPreviewFormatter.Format(
+            rawMessage,
+            vm != null ? vm.LastMessageType : null,
+            vm != null ? vm.LastMessageDeliveryStatus : null,
+            vm != null && vm.IsLastMessageMine);
+        string composed = UnicodeEmojiConverter.ConvertRealEmojisToSprites(formatted);
+
         // --- THE PERFORMANCE FIX: Check the Cache! ---
-        // Create a unique key for this exact message in this exact chat
-        string cacheKey = chatId + "_" + rawMessage;
+        // Create a unique key for this exact composed string in this exact chat
+        string cacheKey = $"{chatId}_{composed}";
 
         // If we already did the heavy math for this exact string, use the saved answer instantly!
         if (textCache.TryGetValue(cacheKey, out var existingNode))
@@ -201,7 +212,7 @@ public void Bind(ChatViewModel model)
         }
 
         // Do the heavy binary search math ONE TIME...
-        string slicedText = SplitLongWord(rawMessage, lastMessageText, maxWidth);
+        string slicedText = SplitLongWord(composed, lastMessageText, maxWidth);
 
         // ...and save the answer in the LRU vault for the next time we scroll past it!
         var node = new LinkedListNode<KeyValuePair<string, string>>(
