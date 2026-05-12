@@ -1,6 +1,7 @@
 using System;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 public class ChatSearchBar : MonoBehaviour
@@ -39,6 +40,20 @@ public class ChatSearchBar : MonoBehaviour
     public void Clear()
     {
         if (input != null) input.text = "";
+    }
+
+    // Release input focus when the chats panel is hidden (e.g. user taps a chat
+    // and the SwipeToBack panel-swap deactivates this GameObject). Without
+    // this, TMP_InputField stays the EventSystem's selected object and
+    // re-spawns its caret child the next time the panel reactivates.
+    private void OnDisable()
+    {
+        if (input != null && input.isFocused)
+            input.DeactivateInputField();
+
+        var es = EventSystem.current;
+        if (es != null && input != null && es.currentSelectedGameObject == input.gameObject)
+            es.SetSelectedGameObject(null);
     }
 
     private void OnDestroy()
