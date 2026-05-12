@@ -24,13 +24,12 @@ public class ChatListView : MonoBehaviour
 
     void ClearChatList()
     {
-        // 1. Wipe the unified chat list
-        foreach (Transform child in content) 
+        // Destroy only the items this view tracks — leaves any non-item
+        // siblings (e.g. ChatsSearchBar header) intact across bot switches.
+        foreach (var item in itemsByChatId.Values)
         {
-            Destroy(child.gameObject);
+            if (item != null) Destroy(item.gameObject);
         }
-        
-        // 2. Clear the dictionary so we don't hold "ghost" references in memory!
         itemsByChatId.Clear();
     }
 
