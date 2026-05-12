@@ -34,9 +34,9 @@ public static class ChatPreviewFormatter
         var text = rawText ?? string.Empty;
 
         // When Wappi sends the body as the bare type keyword (e.g. "image" for
-        // an image with no caption), capitalize it so the row reads "📷 Image"
-        // rather than "📷 image". When the body is empty, fall back to the
-        // mapped English label. Real captions / chat text pass through.
+        // an image with no caption) or leaves it empty, substitute the
+        // WhatsApp-style English label so the row reads "📷 Photo" rather
+        // than "📷 image". Real captions and chat text are preserved as-is.
         //
         // UnicodeEmojiConverter prepends a zero-width space (U+200B) to its
         // output in ChatManager.ParseChatsJson, so the body looks like
@@ -45,13 +45,11 @@ public static class ChatPreviewFormatter
         if (label != null)
         {
             var stripped = text.Trim('​', ' ', '\t', '\n', '\r');
-            if (stripped.Length == 0)
+            if (stripped.Length == 0
+                || string.Equals(stripped, type, System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(stripped, label, System.StringComparison.OrdinalIgnoreCase))
             {
                 text = label;
-            }
-            else if (string.Equals(stripped, type, System.StringComparison.OrdinalIgnoreCase))
-            {
-                text = char.ToUpperInvariant(stripped[0]) + stripped.Substring(1).ToLowerInvariant();
             }
         }
 
