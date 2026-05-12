@@ -18,6 +18,7 @@ public class ChatItemView : MonoBehaviour
     public TextMeshProUGUI unreadCountText;
 
     private ChatViewModel vm;
+    public ChatViewModel Vm => vm;
     private string chatId;
     private Coroutine avatarLoadCoroutine;
     private bool pendingAvatarLoad;
