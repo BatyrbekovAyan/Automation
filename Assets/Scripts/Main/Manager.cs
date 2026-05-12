@@ -3096,7 +3096,7 @@ public class Manager : MonoBehaviour
         }, "Select a video");
     }
 
-    private IEnumerator GetWhatsappMesseges()
+    public IEnumerator GetWhatsappMesseges()
      {
          LoadingPanel.SetActive(true);
          WWWForm form = new();
@@ -3107,7 +3107,8 @@ public class Manager : MonoBehaviour
          // using UnityWebRequest www = UnityWebRequest.Get($"https://wappi.pro/api/sync/messages/get?profile_id=ecd897e3-d1c8&chat_id=77026998844@c.us");
          
          // using UnityWebRequest www = UnityWebRequest.Get($"https://wappi.pro/api/sync/message/media/download?profile_id=cf87cc87-94ff&message_id=3ABD17EC4D6379CAB94F");
-         using UnityWebRequest www = UnityWebRequest.Get($"https://wappi.pro/api/sync/contact/info?profile_id=af80627e-6d9d&user_id=77472714618@c.us");
+         // using UnityWebRequest www = UnityWebRequest.Get($"https://wappi.pro/api/sync/contact/info?profile_id=af80627e-6d9d&user_id=77472714618@c.us");
+         using UnityWebRequest www = UnityWebRequest.Get($"https://wappi.pro/api/sync/messages/id/get?profile_id=cc905590-24d2&message_id=3AB0D7FD0B7D4523ED07");
 
 
          www.SetRequestHeader("Authorization", wappiAuthToken);
