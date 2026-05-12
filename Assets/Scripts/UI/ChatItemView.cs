@@ -392,7 +392,7 @@ public void Bind(ChatViewModel model)
     // WhatsApp-style time-color toggle. When the row carries unread messages
     // the timestamp on the right shifts to WhatsApp green; on read it returns
     // to the muted gray defined on the prefab.
-    private static readonly Color UnreadTimeColor = new Color32(0x25, 0xD3, 0x66, 0xFF);
+    private static readonly Color UnreadTimeColor = new Color32(0x26, 0xB2, 0x5A, 0xFF);
     private static readonly Color ReadTimeColor = new Color32(0x66, 0x66, 0x66, 0xFF);
 
     private void ApplyUnreadBadge(int count)
