@@ -30,8 +30,20 @@ public static class ChatPreviewFormatter
     public static string Format(string rawText, string type, string deliveryStatus, bool isMine)
     {
         var tick = isMine ? GetTickSprite(deliveryStatus) : null;
-        var emoji = GetMediaEmoji(type);
+        var (emoji, label) = GetMediaInfo(type);
         var text = rawText ?? string.Empty;
+
+        // When Wappi sends the body as the bare type keyword (e.g. "audio" for an
+        // audio message with no caption) or leaves it empty, substitute the
+        // proper-cased label so the row reads "🎵 Audio" rather than "🎵 audio".
+        // Real captions and chat text are preserved as-is.
+        if (label != null &&
+            (text.Length == 0
+             || string.Equals(text, type, System.StringComparison.OrdinalIgnoreCase)
+             || string.Equals(text, label, System.StringComparison.OrdinalIgnoreCase)))
+        {
+            text = label;
+        }
 
         if (tick == null && emoji == null) return text;
 
@@ -63,30 +75,36 @@ public static class ChatPreviewFormatter
         }
     }
 
-    private static string GetMediaEmoji(string type)
+    /// <summary>
+    /// Returns the (emoji, label) for a Wappi message type. The label is the
+    /// proper-cased name shown when Wappi's body is empty or duplicates the
+    /// type keyword. Reaction returns (null, null) because Wappi pre-formats
+    /// the full reaction sentence in `last_message_data` (e.g.
+    /// "Отреагировал(-а) ☺ на '...'") — adding a prefix would clutter it.
+    /// </summary>
+    private static (string emoji, string label) GetMediaInfo(string type)
     {
-        if (string.IsNullOrEmpty(type)) return null;
+        if (string.IsNullOrEmpty(type)) return (null, null);
         switch (type.ToLowerInvariant())
         {
             case "chat":
-            case "text":     return null;
+            case "text":     return (null, null);
             case "image":
-            case "photo":    return "📷";
-            case "video":    return "📹";
+            case "photo":    return ("📷", "Photo");
+            case "video":    return ("📹", "Video");
             case "voice":
-            case "ptt":      return "🎤";
-            case "audio":    return "🎵";
-            case "document": return "📄";
-            case "location": return "📍";
-            case "sticker":  return null; // EmojiOne lacks a clean sticker glyph.
+            case "ptt":      return ("🎤", "Voice");
+            case "audio":    return ("🎵", "Audio");
+            case "document": return ("📄", "Document");
+            case "location": return ("📍", "Location");
+            case "sticker":  return (null, "Sticker"); // EmojiOne lacks a clean sticker glyph.
             case "vcard":
-            case "contact":  return "👤";
-            case "reaction": return "💬"; // last action was a reaction; speech bubble keeps it
-                                          // visually distinct from a content message.
+            case "contact":  return ("👤", "Contact");
+            case "reaction": return (null, null); // Wappi pre-formats the full sentence.
             default:
                 if (LoggedUnknownTypes.Add(type))
                     Debug.LogWarning($"[ChatPreviewFormatter] Unknown message type: '{type}'");
-                return null;
+                return (null, null);
         }
     }
 }
