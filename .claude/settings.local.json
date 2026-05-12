@@ -151,7 +151,10 @@
       "Bash(grep -n -B22 \"m_Color: {r: 0, g: 0, b: 0, a: 0\\\\.\" Assets/Scenes/Main.unity)",
       "Bash(grep -n -B30 \"m_Color: {r: 0\\\\..*g: 0\\\\..*b: 0\\\\..*a: 0\\\\.\" Assets/Scenes/Main.unity)",
       "Bash(xargs -I {} basename {} .cs)",
-      "Bash(cat > *)"
+      "Bash(cat > *)",
+      "Bash(csc -noconfig Assets/Scripts/UI/ChatViewModel.cs)",
+      "Bash(find /Users/ayan/Library/Caches/Unity -name \"TMP_SpriteCharacter*.cs\" 2>&1 | head -3)",
+      "Bash(find ~/Library/Unity -name \"TMP_SpriteCharacter*\" 2>&1 | head -3)"
     ]
   }
 }
