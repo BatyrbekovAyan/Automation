@@ -20,6 +20,7 @@ public class ChatItemView : MonoBehaviour
     private ChatViewModel vm;
     public ChatViewModel Vm => vm;
     private string chatId;
+    private ChatListView parentList;
     private Coroutine avatarLoadCoroutine;
     private bool pendingAvatarLoad;
 
@@ -30,6 +31,9 @@ public class ChatItemView : MonoBehaviour
     
 public void Bind(ChatViewModel model)
     {
+        if (parentList == null)
+            parentList = GetComponentInParent<ChatListView>();
+
         if (vm != null)
         {
             vm.OnUpdated -= OnVmUpdated;
@@ -161,8 +165,12 @@ public void Bind(ChatViewModel model)
 
     private void OnLastMessageChanged(ChatViewModel vmRef)
     {
-        // Move this row to the top of the list — fires only when the last message actually changed
-        transform.SetAsFirstSibling();
+        // Move this row to the top — header-aware via ChatListView so a
+        // ChatsSearchBar at sibling index 0 isn't pushed out of the way.
+        if (parentList != null)
+            parentList.RaiseToTop(this);
+        else
+            transform.SetAsFirstSibling();
     }
 
     private void UpdatePreviewText(string rawMessage)

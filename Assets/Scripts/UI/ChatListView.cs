@@ -73,6 +73,24 @@ public class ChatListView : MonoBehaviour
         }
     }
 
+    // Header-aware bubble-to-top. When a ChatsSearchBar header sits at
+    // sibling index 0, chat rows must land at index 1 so the search row
+    // stays pinned to the top of the scroll content.
+    public void RaiseToTop(ChatItemView item)
+    {
+        if (item == null || content == null) return;
+
+        int firstChatIndex = 0;
+        if (content.childCount > 0)
+        {
+            var first = content.GetChild(0);
+            if (first != null && first.GetComponent<ChatSearchBar>() != null)
+                firstChatIndex = 1;
+        }
+
+        item.transform.SetSiblingIndex(firstChatIndex);
+    }
+
     void OnDestroy()
     {
         if (ChatManager.Instance != null)
