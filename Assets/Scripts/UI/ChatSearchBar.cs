@@ -42,12 +42,12 @@ public class ChatSearchBar : MonoBehaviour
         if (input != null) input.text = "";
     }
 
-    // Force-release input focus and tear down TMP's caret children. TMP names
-    // the caret GameObject differently across versions ("TMP Input Caret",
-    // "Caret", "{InputName} Input Caret") and parents it under either the
-    // input field or its text viewport — so we walk every descendant and
-    // disable anything matching "caret" by substring. Also clears
-    // EventSystem selection so reactivation can't re-focus into us.
+    // Force-release input focus. TMP_InputField.DeactivateInputField stops
+    // the caret blink coroutine but leaves the caret graphic at whatever
+    // alpha the last blink frame drew — if visible, it stays visible as a
+    // static line. Set the caret graphic's render alpha to 0 directly.
+    // When the user re-focuses, TMP restarts the blink coroutine which
+    // overwrites the alpha, so the caret reappears normally.
     public void ReleaseFocus()
     {
         if (input == null) return;
@@ -59,17 +59,18 @@ public class ChatSearchBar : MonoBehaviour
         if (es != null && es.currentSelectedGameObject == input.gameObject)
             es.SetSelectedGameObject(null);
 
-        var descendants = input.GetComponentsInChildren<Transform>(includeInactive: true);
-        for (int i = 0; i < descendants.Length; i++)
+        var graphics = input.GetComponentsInChildren<Graphic>(includeInactive: true);
+        for (int i = 0; i < graphics.Length; i++)
         {
-            var t = descendants[i];
-            if (t == input.transform) continue;
-            if (t.name.IndexOf("caret", StringComparison.OrdinalIgnoreCase) >= 0)
-                t.gameObject.SetActive(false);
+            var g = graphics[i];
+            if (g.name.IndexOf("caret", StringComparison.OrdinalIgnoreCase) >= 0
+                && g.canvasRenderer != null)
+            {
+                g.canvasRenderer.SetAlpha(0f);
+            }
         }
     }
 
-    private void OnEnable() => ReleaseFocus();
     private void OnDisable() => ReleaseFocus();
 
     private void OnDestroy()
