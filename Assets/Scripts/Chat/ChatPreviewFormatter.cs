@@ -33,16 +33,26 @@ public static class ChatPreviewFormatter
         var (emoji, label) = GetMediaInfo(type);
         var text = rawText ?? string.Empty;
 
-        // When Wappi sends the body as the bare type keyword (e.g. "audio" for an
-        // audio message with no caption) or leaves it empty, substitute the
-        // proper-cased label so the row reads "🎵 Audio" rather than "🎵 audio".
-        // Real captions and chat text are preserved as-is.
-        if (label != null &&
-            (text.Length == 0
-             || string.Equals(text, type, System.StringComparison.OrdinalIgnoreCase)
-             || string.Equals(text, label, System.StringComparison.OrdinalIgnoreCase)))
+        // When Wappi sends the body as the bare type keyword (e.g. "image" for
+        // an image with no caption), capitalize it so the row reads "📷 Image"
+        // rather than "📷 image". When the body is empty, fall back to the
+        // mapped English label. Real captions / chat text pass through.
+        //
+        // UnicodeEmojiConverter prepends a zero-width space (U+200B) to its
+        // output in ChatManager.ParseChatsJson, so the body looks like
+        // "​image" rather than "image". Strip ZWS and surrounding
+        // whitespace before comparing.
+        if (label != null)
         {
-            text = label;
+            var stripped = text.Trim('​', ' ', '\t', '\n', '\r');
+            if (stripped.Length == 0)
+            {
+                text = label;
+            }
+            else if (string.Equals(stripped, type, System.StringComparison.OrdinalIgnoreCase))
+            {
+                text = char.ToUpperInvariant(stripped[0]) + stripped.Substring(1).ToLowerInvariant();
+            }
         }
 
         if (tick == null && emoji == null) return text;
