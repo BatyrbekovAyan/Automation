@@ -42,19 +42,27 @@ public class ChatSearchBar : MonoBehaviour
         if (input != null) input.text = "";
     }
 
-    // Release input focus when the chats panel is hidden (e.g. user taps a chat
-    // and the SwipeToBack panel-swap deactivates this GameObject). Without
-    // this, TMP_InputField stays the EventSystem's selected object and
-    // re-spawns its caret child the next time the panel reactivates.
-    private void OnDisable()
+    // Force-release input focus and tear down TMP's caret child. Called both
+    // on OnDisable (panel hide) and externally by ChatListView when the user
+    // taps a chat — the panel deactivation path alone isn't always enough,
+    // since TMP_InputField parents a separate "TMP Input Caret" GameObject
+    // that can render independently of the input's focused state.
+    public void ReleaseFocus()
     {
-        if (input != null && input.isFocused)
+        if (input == null) return;
+
+        if (input.isFocused)
             input.DeactivateInputField();
 
         var es = EventSystem.current;
-        if (es != null && input != null && es.currentSelectedGameObject == input.gameObject)
+        if (es != null && es.currentSelectedGameObject == input.gameObject)
             es.SetSelectedGameObject(null);
+
+        var caret = input.transform.Find("TMP Input Caret");
+        if (caret != null) caret.gameObject.SetActive(false);
     }
+
+    private void OnDisable() => ReleaseFocus();
 
     private void OnDestroy()
     {

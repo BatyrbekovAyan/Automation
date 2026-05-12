@@ -22,6 +22,7 @@ public class ChatListView : MonoBehaviour
         manager.OnChatListCleared += ClearChatList;
         manager.OnEmptyState += HandleEmptyState;
         manager.OnActiveBotChanged += HandleActiveBotChanged;
+        manager.OnChatSelected += HandleChatSelected;
 
         searchBar = GetComponentInChildren<ChatSearchBar>(true);
         if (searchBar != null)
@@ -83,6 +84,13 @@ public class ChatListView : MonoBehaviour
         {
             content.gameObject.SetActive(true);
         }
+    }
+
+    private void HandleChatSelected(string _)
+    {
+        // User opened a chat — drop search focus so TMP's caret can't linger
+        // on top of the placeholder when they swipe back to the list.
+        if (searchBar != null) searchBar.ReleaseFocus();
     }
 
     private void ApplyFilter(string query)
@@ -151,6 +159,7 @@ public class ChatListView : MonoBehaviour
             ChatManager.Instance.OnChatListCleared -= ClearChatList;
             ChatManager.Instance.OnEmptyState -= HandleEmptyState;
             ChatManager.Instance.OnActiveBotChanged -= HandleActiveBotChanged;
+            ChatManager.Instance.OnChatSelected -= HandleChatSelected;
         }
 
         if (searchBar != null)
