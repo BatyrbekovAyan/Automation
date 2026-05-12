@@ -42,11 +42,12 @@ public class ChatSearchBar : MonoBehaviour
         if (input != null) input.text = "";
     }
 
-    // Force-release input focus and tear down TMP's caret child. Called both
-    // on OnDisable (panel hide) and externally by ChatListView when the user
-    // taps a chat — the panel deactivation path alone isn't always enough,
-    // since TMP_InputField parents a separate "TMP Input Caret" GameObject
-    // that can render independently of the input's focused state.
+    // Force-release input focus and tear down TMP's caret children. TMP names
+    // the caret GameObject differently across versions ("TMP Input Caret",
+    // "Caret", "{InputName} Input Caret") and parents it under either the
+    // input field or its text viewport — so we walk every descendant and
+    // disable anything matching "caret" by substring. Also clears
+    // EventSystem selection so reactivation can't re-focus into us.
     public void ReleaseFocus()
     {
         if (input == null) return;
@@ -58,10 +59,17 @@ public class ChatSearchBar : MonoBehaviour
         if (es != null && es.currentSelectedGameObject == input.gameObject)
             es.SetSelectedGameObject(null);
 
-        var caret = input.transform.Find("TMP Input Caret");
-        if (caret != null) caret.gameObject.SetActive(false);
+        var descendants = input.GetComponentsInChildren<Transform>(includeInactive: true);
+        for (int i = 0; i < descendants.Length; i++)
+        {
+            var t = descendants[i];
+            if (t == input.transform) continue;
+            if (t.name.IndexOf("caret", StringComparison.OrdinalIgnoreCase) >= 0)
+                t.gameObject.SetActive(false);
+        }
     }
 
+    private void OnEnable() => ReleaseFocus();
     private void OnDisable() => ReleaseFocus();
 
     private void OnDestroy()
