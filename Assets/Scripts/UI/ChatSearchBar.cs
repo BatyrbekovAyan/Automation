@@ -16,7 +16,10 @@ public class ChatSearchBar : MonoBehaviour
     private void Awake()
     {
         if (input != null)
+        {
             input.onValueChanged.AddListener(HandleChanged);
+            input.onSelect.AddListener(RestoreCaretAlpha);
+        }
 
         if (clearButton != null)
             clearButton.onClick.AddListener(Clear);
@@ -44,10 +47,13 @@ public class ChatSearchBar : MonoBehaviour
 
     // Force-release input focus. TMP_InputField.DeactivateInputField stops
     // the caret blink coroutine but leaves the caret graphic at whatever
-    // alpha the last blink frame drew — if visible, it stays visible as a
-    // static line. Set the caret graphic's render alpha to 0 directly.
-    // When the user re-focuses, TMP restarts the blink coroutine which
-    // overwrites the alpha, so the caret reappears normally.
+    // alpha the last blink frame drew — if visible, it stays as a static
+    // line. Setting the caret graphic's CanvasRenderer alpha to 0 hides it
+    // without disabling the GameObject. The companion RestoreCaretAlpha
+    // listener (wired to input.onSelect) puts alpha back to 1 on every
+    // re-focus, because TMP only updates the caret geometry on refocus —
+    // never the CanvasRenderer alpha — so without the restore the caret
+    // would render at alpha 0 forever after the first release.
     public void ReleaseFocus()
     {
         if (input == null) return;
@@ -59,14 +65,22 @@ public class ChatSearchBar : MonoBehaviour
         if (es != null && es.currentSelectedGameObject == input.gameObject)
             es.SetSelectedGameObject(null);
 
+        SetCaretAlpha(0f);
+    }
+
+    private void RestoreCaretAlpha(string _) => SetCaretAlpha(1f);
+
+    private void SetCaretAlpha(float alpha)
+    {
+        if (input == null) return;
         var graphics = input.GetComponentsInChildren<Graphic>(includeInactive: true);
         for (int i = 0; i < graphics.Length; i++)
         {
-            var g = graphics[i];
-            if (g.name.IndexOf("caret", StringComparison.OrdinalIgnoreCase) >= 0
-                && g.canvasRenderer != null)
+            var graphic = graphics[i];
+            if (graphic.name.IndexOf("caret", StringComparison.OrdinalIgnoreCase) >= 0
+                && graphic.canvasRenderer != null)
             {
-                g.canvasRenderer.SetAlpha(0f);
+                graphic.canvasRenderer.SetAlpha(alpha);
             }
         }
     }
@@ -75,7 +89,11 @@ public class ChatSearchBar : MonoBehaviour
 
     private void OnDestroy()
     {
-        if (input != null) input.onValueChanged.RemoveListener(HandleChanged);
+        if (input != null)
+        {
+            input.onValueChanged.RemoveListener(HandleChanged);
+            input.onSelect.RemoveListener(RestoreCaretAlpha);
+        }
         if (clearButton != null) clearButton.onClick.RemoveListener(Clear);
     }
 }
