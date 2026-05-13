@@ -185,10 +185,10 @@ IEnumerator AppendLiveMessagesRoutine(List<MessageViewModel> messages)
 
         if (lastItem != null)
         {
-            string lastDate = GetDateString(lastItem.currentVm.timestamp);
+            string lastDate = GetDateString(lastItem.BoundVm.timestamp);
             string newDate  = GetDateString(vm.timestamp);
             if (lastDate != newDate) needDateSeparator = true;
-            else if (lastItem.currentVm.isIncoming != vm.isIncoming) needSpacer = true;
+            else if (lastItem.BoundVm.isIncoming != vm.isIncoming) needSpacer = true;
         }
         else needDateSeparator = true;
 
@@ -211,9 +211,9 @@ IEnumerator AppendLiveMessagesRoutine(List<MessageViewModel> messages)
 
         bool isGroup = vm.chatId != null && vm.chatId.EndsWith("@g.us");
 
-        if (lastItem != null && lastItem.currentVm.isIncoming == vm.isIncoming && !needDateSeparator)
+        if (lastItem != null && lastItem.BoundVm.isIncoming == vm.isIncoming && !needDateSeparator)
         {
-            lastItem.Bind(lastItem.currentVm, false, true, (lastItem.currentVm.isIncoming && isGroup));
+            lastItem.Bind(lastItem.BoundVm, false, true, (lastItem.BoundVm.isIncoming && isGroup));
             lastItem.FinalizeCustomVisuals();
         }
 
@@ -337,7 +337,7 @@ IEnumerator UpdateListRoutine(List<MessageViewModel> sortedMessages, bool isLoad
 
             if (existingOldestView != null)
             {
-                string oldDate = GetDateString(existingOldestView.currentVm.timestamp);
+                string oldDate = GetDateString(existingOldestView.BoundVm.timestamp);
                 string newBatchYoungestDate = GetDateString(sortedMessages.Last().timestamp);
 
                 if (oldDate == newBatchYoungestDate)
@@ -356,7 +356,7 @@ IEnumerator UpdateListRoutine(List<MessageViewModel> sortedMessages, bool isLoad
             }
 
             var newestInOldBatch = sortedMessages.Last();
-            var oldestInCurrentBatch = existingOldestView.currentVm;
+            var oldestInCurrentBatch = existingOldestView.BoundVm;
 
             if (newestInOldBatch.isIncoming != oldestInCurrentBatch.isIncoming && 
                 GetDateString(newestInOldBatch.timestamp) == GetDateString(oldestInCurrentBatch.timestamp))
@@ -395,7 +395,7 @@ IEnumerator UpdateListRoutine(List<MessageViewModel> sortedMessages, bool isLoad
             }
             else if (isLoadMore && existingOldestView != null)
             {
-                if (existingOldestView.currentVm.isIncoming == vm.isIncoming && GetDateString(existingOldestView.currentVm.timestamp) == currentDate)
+                if (existingOldestView.BoundVm.isIncoming == vm.isIncoming && GetDateString(existingOldestView.BoundVm.timestamp) == currentDate)
                     showTail = false;
             }
 

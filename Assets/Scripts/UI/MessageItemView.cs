@@ -67,7 +67,14 @@ public class MessageItemView : MonoBehaviour
     private const float MinAspectRatio = 0.5f; 
     private const float MaxAspectRatio = 2.0f; 
     
-    public MessageViewModel currentVm; 
+    [SerializeField] private MessageViewModel currentVm;
+
+    /// <summary>
+    /// Read-only access to the message this bubble is currently bound to.
+    /// Used by MessageListView for tail-merging, date-separator placement,
+    /// and pagination boundary checks. Never null after the first Bind().
+    /// </summary>
+    public MessageViewModel BoundVm => currentVm;
     private float defaultFontSize = -1f;
     private bool hideBubble = false;
     private bool isJumboEmoji = false;
