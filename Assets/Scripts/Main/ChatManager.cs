@@ -307,22 +307,60 @@ public partial class ChatManager : MonoBehaviour
             {
                 foreach (var raw in response.messages)
                 {
-                    // BRAND NEW message we missed: existing path.
-                    // KNOWN LIMITATION: if a previous-session send POST reached
-                    // Wappi but the client never received the response, the
-                    // outbox still holds the tempId AND the server has the
-                    // same message under a real id. LoadMessagesForChat's
-                    // promotion pass renders the tempId VM as Failed; then
-                    // this loop creates a SECOND VM for the real id with
-                    // Sent. The user sees the same message twice. Fix would
-                    // belong in the promotion pass — see Task 9 follow-up.
+                    // BRAND NEW message we missed: existing path with
+                    // ghost-send recovery dedup. If a previous-session POST
+                    // reached Wappi but the client never got the response,
+                    // the outbox holds the tempId AND the server has the
+                    // same message under its own real id. We detect that
+                    // here by matching text + timestamp and clean up the
+                    // stale Failed VM and outbox entry before adding the
+                    // server's authoritative copy. The on-screen Failed
+                    // bubble won't disappear until the chat is closed +
+                    // reopened (UpdateListRoutine doesn't dedup against
+                    // already-rendered children), but the cache and the
+                    // next chat-open render are correct.
                     if (seenMessageIds.Add(raw.id))
                     {
                         NormalizedMessage norm = Normalize(raw);
-                        if (norm.messageType != MessageType.Unknown)
+                        if (norm.messageType == MessageType.Unknown) continue;
+
+                        if (norm.fromMe && norm.messageType == MessageType.Chat && !string.IsNullOrEmpty(norm.text))
                         {
-                            newMessages.Add(CreateViewModel(norm));
+                            var unresolved = Outbox.GetFor(chatId);
+                            int bestMatchIndex = -1;
+                            long bestMatchDelta = long.MaxValue;
+                            for (int i = 0; i < unresolved.Count; i++)
+                            {
+                                if (unresolved[i].text != norm.text) continue;
+                                long delta = Math.Abs(unresolved[i].timestamp - norm.time);
+                                if (delta > 120) continue;
+                                if (delta < bestMatchDelta)
+                                {
+                                    bestMatchDelta = delta;
+                                    bestMatchIndex = i;
+                                }
+                            }
+
+                            if (bestMatchIndex >= 0)
+                            {
+                                string ghostTempId = unresolved[bestMatchIndex].tempId;
+
+                                // Drop the now-superseded Failed VM from the cache list.
+                                for (int j = cachedList.Count - 1; j >= 0; j--)
+                                {
+                                    if (cachedList[j].messageId == ghostTempId)
+                                    {
+                                        cachedList.RemoveAt(j);
+                                        break;
+                                    }
+                                }
+
+                                Outbox.RemoveAt(GetCacheRoot(), chatId, ghostTempId);
+                                seenMessageIds.Remove(ghostTempId);
+                            }
                         }
+
+                        newMessages.Add(CreateViewModel(norm));
                         continue;
                     }
 
