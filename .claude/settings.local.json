@@ -154,7 +154,20 @@
       "Bash(cat > *)",
       "Bash(csc -noconfig Assets/Scripts/UI/ChatViewModel.cs)",
       "Bash(find /Users/ayan/Library/Caches/Unity -name \"TMP_SpriteCharacter*.cs\" 2>&1 | head -3)",
-      "Bash(find ~/Library/Unity -name \"TMP_SpriteCharacter*\" 2>&1 | head -3)"
+      "Bash(find ~/Library/Unity -name \"TMP_SpriteCharacter*\" 2>&1 | head -3)",
+      "Bash(awk -F: '{print NR, $0}')",
+      "Bash(awk 'NR>=1 && $0 ~ /ChatsPanel|TopBar|Screen_Whatsapp|ChatsList|Content/')",
+      "Bash(awk '/m_Name: ChatsPanel/{print NR\": \"$0} /m_Name: Screen_Whatsapp/{print NR\": \"$0}' /Users/ayan/Projects/Automation/Assets/Scenes/Main.unity)",
+      "Bash(awk 'NR>=41510 && NR<=41700' /Users/ayan/Projects/Automation/Assets/Scenes/Main.unity)",
+      "Bash(awk -F: '$2 ~ /Whatsapp|Message|Chat|Bottom|Input|Mic|Send|Reply|Header|Avatar|Background|Wallpaper|Quick|Typing|Status|Online|Attach|Emoji|Camera|TopBar|Search/')",
+      "Bash(awk 'NR>=41500 && NR<=44500' /Users/ayan/Projects/Automation/Assets/Scenes/Main.unity)",
+      "Bash(awk 'NR>=26370 && NR<=26380' /Users/ayan/Projects/Automation/Assets/Scenes/Main.unity)",
+      "Bash(awk 'NR>=44400 && NR<=47600' /Users/ayan/Projects/Automation/Assets/Scenes/Main.unity)",
+      "Bash(/Users/ayan/Projects/Automation/.claude/hooks/validate-cs.sh /Users/ayan/Projects/Automation/Assets/Editor/ChatsSearchBarBuilder.cs)",
+      "Bash(/Users/ayan/Projects/Automation/.claude/hooks/validate-cs.sh)",
+      "Bash(awk 'NR>=563 && NR<=890' /Users/ayan/Projects/Automation/docs/superpowers/plans/2026-05-12-whatsapp-chat-search-bar.md > /tmp/spec.cs && diff -u /tmp/spec.cs /Users/ayan/Projects/Automation/Assets/Editor/ChatsSearchBarBuilder.cs)",
+      "Bash(awk 'NR>=906 && NR<=915' /Users/ayan/Projects/Automation/docs/superpowers/plans/2026-05-12-whatsapp-chat-search-bar.md)",
+      "Bash(grep -n \"m_Name: Avatar$\" /Users/ayan/Projects/Automation/Assets/Scenes/Main.unity)"
     ]
   }
 }
