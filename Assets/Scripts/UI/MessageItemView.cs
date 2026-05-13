@@ -2713,10 +2713,14 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
 
         if (enableRetry)
         {
+            // raycastTarget must be true on EVERY enable, not just the first
+            // lazy-create — the else branch sets it to false on Pending/Sent,
+            // and the bubble can cycle Failed → Pending → Failed during a retry.
+            timeText.raycastTarget = true;
+
             // Lazily create the Button on first failure for this bubble.
             if (retryButton == null)
             {
-                timeText.raycastTarget = true;
                 retryButton = timeText.GetComponent<Button>() ?? timeText.gameObject.AddComponent<Button>();
             }
             retryButton.transition = Selectable.Transition.None;
