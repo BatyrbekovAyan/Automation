@@ -3,7 +3,8 @@
     "rootNamespace": "Automation.Tests.EditMode",
     "references": [
         "UnityEngine.TestRunner",
-        "UnityEditor.TestRunner"
+        "UnityEditor.TestRunner",
+        "Assembly-CSharp"
     ],
     "includePlatforms": [
         "Editor"
