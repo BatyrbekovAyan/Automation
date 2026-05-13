@@ -29,6 +29,16 @@ public partial class ChatManager : MonoBehaviour
     public event Action<string> OnChatSelected;
     public event Action<List<MessageViewModel>, bool, bool> OnBatchMessagesLoaded;
     public event Action<List<MessageViewModel>> OnLiveMessagesReceived;
+
+    /// <summary>
+    /// Fires when an outgoing message's delivery status changes.
+    /// oldMessageId matches the bubble's current MessageViewModel.messageId.
+    /// newMessageId is the post-change id — for the optimistic-send → server-ack
+    /// transition it's the real Wappi id; for in-place status updates it's the
+    /// same as oldMessageId.
+    /// </summary>
+    public event Action<string, string, DeliveryStatus> OnMessageStatusChanged;
+
     public event Action<string> OnActiveBotChanged;
     public event Action<EmptyStateReason> OnEmptyState;
     

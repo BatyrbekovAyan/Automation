@@ -103,6 +103,9 @@ public class MessageItemView : MonoBehaviour
             AudioController.Instance.OnAudioStopped += HandleAudioStopped;
             AudioController.Instance.OnAudioProgress += HandleAudioProgress;
         }
+
+        if (ChatManager.Instance != null)
+            ChatManager.Instance.OnMessageStatusChanged += HandleStatusChanged;
     }
 
     void OnDisable()
@@ -113,6 +116,9 @@ public class MessageItemView : MonoBehaviour
             AudioController.Instance.OnAudioStopped -= HandleAudioStopped;
             AudioController.Instance.OnAudioProgress -= HandleAudioProgress;
         }
+
+        if (ChatManager.Instance != null)
+            ChatManager.Instance.OnMessageStatusChanged -= HandleStatusChanged;
     }
     
     public void Bind(MessageViewModel vm, bool showTail = true, bool skipLayoutRebuild = false, bool showSenderName = false)    
@@ -265,13 +271,7 @@ public class MessageItemView : MonoBehaviour
         messageText.text = processedText;
         messageText.gameObject.SetActive(!string.IsNullOrEmpty(processedText));
 
-        if (timeText != null)
-        {
-            DateTime localTime = DateTimeOffset.FromUnixTimeSeconds(vm.timestamp).LocalDateTime;
-            string formattedTime = localTime.ToString("HH:mm");
-            string tickTag = vm.isIncoming ? null : DeliveryTickFormatter.GetSprite(vm.deliveryStatus);
-            timeText.text = tickTag != null ? $"{formattedTime} {tickTag}" : formattedTime;
-        }
+        RefreshTimeAndTick();
         
         playOverlay.SetActive(false);
         audioPanel.SetActive(false);
@@ -2655,8 +2655,8 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
         string[] sizes = { "B", "KB", "MB", "GB" };
         double len = bytes;
         int order = 0;
-        
-        while (len >= 1024 && order < sizes.Length - 1) 
+
+        while (len >= 1024 && order < sizes.Length - 1)
         {
             order++;
             len = len / 1024;
@@ -2670,5 +2670,39 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
         {
             return string.Format("{0:0.#} {1}", len, sizes[order]);
         }
+    }
+
+    // --- Task 5: delivery-status re-render cluster ---
+
+    private void RefreshTimeAndTick()
+    {
+        if (timeText == null || currentVm == null) return;
+        DateTime localTime = DateTimeOffset.FromUnixTimeSeconds(currentVm.timestamp).LocalDateTime;
+        string formattedTime = localTime.ToString("HH:mm");
+        string tickTag = currentVm.isIncoming ? null : DeliveryTickFormatter.GetSprite(currentVm.deliveryStatus);
+        timeText.text = tickTag != null ? $"{formattedTime} {tickTag}" : formattedTime;
+    }
+
+    public void SetDeliveryStatus(DeliveryStatus newStatus)
+    {
+        if (currentVm == null || currentVm.isIncoming) return;
+        currentVm.deliveryStatus = newStatus;
+        RefreshTimeAndTick();
+        UpdateRetryButton(newStatus == DeliveryStatus.Failed);
+    }
+
+    private void HandleStatusChanged(string oldMessageId, string newMessageId, DeliveryStatus status)
+    {
+        if (currentVm == null || currentVm.isIncoming) return;
+        if (currentVm.messageId != oldMessageId) return;
+        if (newMessageId != oldMessageId) currentVm.messageId = newMessageId;
+        SetDeliveryStatus(status);
+    }
+
+    // Stub — full implementation in Task 8 (tap-to-retry).
+    private void UpdateRetryButton(bool enableRetry)
+    {
+        // TODO Task 8: lazily AddComponent<Button> on timeText, wire onClick to
+        // ChatManager.Instance.RetryOutboxMessage(currentVm.messageId).
     }
 }
