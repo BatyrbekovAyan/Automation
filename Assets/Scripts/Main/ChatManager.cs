@@ -426,7 +426,8 @@ public partial class ChatManager : MonoBehaviour
             isIncoming = !msg.fromMe,
             timestamp = msg.time,
             fileSize = msg.fileSize,
-            pageCount = msg.pageCount
+            pageCount = msg.pageCount,
+            deliveryStatus = msg.deliveryStatus
         };
     }
 
@@ -441,6 +442,11 @@ public partial class ChatManager : MonoBehaviour
             fromMe = raw.fromMe,
             time = raw.time
         };
+
+        // Outgoing messages carry a Wappi delivery_status string. Incoming
+        // messages never render a tick — leave at DeliveryStatus.None.
+        if (raw.fromMe)
+            msg.deliveryStatus = DeliveryTickFormatter.ParseWappiString(raw.deliveryStatusRaw);
 
         // --- 1. SEPARATE TEXT FROM CAPTIONS ---
         if (msg.messageType == MessageType.Chat)

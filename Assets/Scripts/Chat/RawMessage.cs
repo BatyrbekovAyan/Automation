@@ -12,7 +12,10 @@ public class RawMessage
     public bool fromMe;
     public long time;
     public string caption;
-    
+
+    [JsonProperty("delivery_status")]
+    public string deliveryStatusRaw;
+
     public JToken body;   // Contains the encrypted URL (bad)
     public JToken s3Info; // Contains the hosted URL (good)
     

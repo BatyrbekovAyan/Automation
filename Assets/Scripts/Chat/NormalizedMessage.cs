@@ -21,4 +21,6 @@ public class NormalizedMessage
     public long expireTime;
     public long fileSize;
     public int pageCount;
+
+    public DeliveryStatus deliveryStatus;
 }

@@ -25,4 +25,6 @@ public class MessageViewModel
     public long expireTime;
     public long fileSize;
     public int pageCount;
+
+    public DeliveryStatus deliveryStatus;
 }
