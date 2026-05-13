@@ -297,9 +297,10 @@ public partial class ChatManager : MonoBehaviour
         if (www.result != UnityWebRequest.Result.Success) yield break;
 
         List<MessageViewModel> newMessages = new List<MessageViewModel>();
-        bool hasChanges = false;
+        bool hasNewMessages = false;
+        bool hasStatusUpdates = false;
 
-        try 
+        try
         {
             MessagesResponseRaw response = JsonConvert.DeserializeObject<MessagesResponseRaw>(www.downloadHandler.text);
 
@@ -307,14 +308,34 @@ public partial class ChatManager : MonoBehaviour
             {
                 foreach (var raw in response.messages)
                 {
-                    // If the ID isn't in our seenMessageIds, it's a BRAND NEW message we missed!
+                    // BRAND NEW message we missed: existing path.
                     if (seenMessageIds.Add(raw.id))
                     {
                         NormalizedMessage norm = Normalize(raw);
                         if (norm.messageType != MessageType.Unknown)
                         {
                             newMessages.Add(CreateViewModel(norm));
-                            hasChanges = true;
+                            hasNewMessages = true;
+                        }
+                        continue;
+                    }
+
+                    // Already-cached outgoing message: server may have a fresher
+                    // delivery_status than the cached VM. Update in place so the
+                    // bubble re-renders and the cache stops drifting.
+                    if (!raw.fromMe || string.IsNullOrEmpty(raw.deliveryStatusRaw)) continue;
+
+                    DeliveryStatus serverStatus = DeliveryTickFormatter.ParseWappiString(raw.deliveryStatusRaw);
+                    if (serverStatus == DeliveryStatus.None) continue;
+
+                    for (int i = 0; i < cachedList.Count; i++)
+                    {
+                        if (cachedList[i].messageId == raw.id && cachedList[i].deliveryStatus != serverStatus)
+                        {
+                            cachedList[i].deliveryStatus = serverStatus;
+                            hasStatusUpdates = true;
+                            OnMessageStatusChanged?.Invoke(raw.id, raw.id, serverStatus);
+                            break;
                         }
                     }
                 }
@@ -326,7 +347,7 @@ public partial class ChatManager : MonoBehaviour
         }
 
         // If we found new messages while the app was closed, merge them!
-        if (hasChanges && newMessages.Count > 0)
+        if (hasNewMessages && newMessages.Count > 0)
         {
             // Add the old cached messages to the bottom of the brand new ones
             newMessages.AddRange(cachedList);
@@ -343,6 +364,13 @@ public partial class ChatManager : MonoBehaviour
 
             // Refresh the UI with the fully up-to-date list!
             OnBatchMessagesLoaded?.Invoke(newMessages, false, true);
+        }
+        else if (hasStatusUpdates)
+        {
+            // Status-only updates: save the mutated cachedList to disk. No
+            // OnBatchMessagesLoaded fire needed — OnMessageStatusChanged
+            // already refreshed any visible bubbles in place.
+            ChatHistoryCache.SaveHistory(GetCacheRoot(), chatId, cachedList);
         }
     }
 
