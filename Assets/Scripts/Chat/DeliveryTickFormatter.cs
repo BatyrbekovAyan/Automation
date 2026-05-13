@@ -15,7 +15,7 @@ public static class DeliveryTickFormatter
     private const string TagBlue    = "<sprite name=\"tick_double_blue\">";
     private const string TagFailed  = "<sprite name=\"tick_failed\">";
 
-    private static readonly HashSet<string> LoggedUnknown = new();
+    private static readonly HashSet<string> loggedUnknown = new();
 
     public static string GetSprite(DeliveryStatus status) => status switch
     {
@@ -29,14 +29,14 @@ public static class DeliveryTickFormatter
 
     public static DeliveryStatus ParseWappiString(string raw)
     {
-        if (string.IsNullOrEmpty(raw)) return DeliveryStatus.None;
-        switch (raw.ToLowerInvariant())
+        if (string.IsNullOrWhiteSpace(raw)) return DeliveryStatus.None;
+        switch (raw.Trim().ToLowerInvariant())
         {
             case "sent":      return DeliveryStatus.Sent;
             case "delivered": return DeliveryStatus.Delivered;
             case "read":      return DeliveryStatus.Read;
             default:
-                if (LoggedUnknown.Add(raw))
+                if (loggedUnknown.Add(raw))
                     Debug.LogWarning($"[DeliveryTickFormatter] Unknown Wappi delivery_status: '{raw}'");
                 return DeliveryStatus.None;
         }

@@ -43,6 +43,7 @@ public class DeliveryTickFormatterTests
     [TestCase("Sent",      DeliveryStatus.Sent)]
     [TestCase("delivered", DeliveryStatus.Delivered)]
     [TestCase("read",      DeliveryStatus.Read)]
+    [TestCase("  Sent  ", DeliveryStatus.Sent)]
     public void ParseWappiString_KnownValue_ReturnsMatchingEnum(string raw, DeliveryStatus expected)
     {
         Assert.AreEqual(expected, DeliveryTickFormatter.ParseWappiString(raw));
@@ -51,6 +52,7 @@ public class DeliveryTickFormatterTests
     [TestCase("")]
     [TestCase(null)]
     [TestCase("unknown_status_value")]
+    [TestCase("   ")]
     public void ParseWappiString_UnknownOrEmpty_ReturnsNone(string raw)
     {
         Assert.AreEqual(DeliveryStatus.None, DeliveryTickFormatter.ParseWappiString(raw));
