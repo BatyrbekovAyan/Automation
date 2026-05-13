@@ -170,4 +170,32 @@ public class OutboxStoreTests
         Assert.AreEqual(1, entries.Count);
     }
 
+    [Test]
+    public void RemoveAt_TargetsSpecificCacheRoot_NotJustCurrentBot()
+    {
+        // Simulate the bot-switch-mid-retry scenario: store A's outbox file
+        // exists, but the in-memory _byChatId would point at store B if we
+        // built a store with a different getCacheRoot. RemoveAt should still
+        // clear store A's file by path.
+        var storeForBotA = MakeStore();
+        storeForBotA.Add(MakeEntry(tempId: "tempA1"));
+
+        // Build a "different bot" store that does not know about store A's entry.
+        var differentRoot = Path.Combine(Path.GetTempPath(), "OutboxStoreTests_otherBot_" + System.Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(differentRoot);
+        var storeForBotB = new OutboxStore(() => differentRoot);
+
+        // Calling RemoveAt on storeForBotB but pointing at storeForBotA's
+        // cacheRoot should clear storeForBotA's file.
+        storeForBotB.RemoveAt(_tempRoot, "+15551@c.us", "tempA1");
+
+        // Verify the entry is gone from disk by loading via a fresh store on the
+        // original root.
+        var storeAReread = MakeStore();
+        Assert.AreEqual(0, storeAReread.GetFor("+15551@c.us").Count);
+
+        // Cleanup the second temp dir.
+        if (Directory.Exists(differentRoot)) Directory.Delete(differentRoot, recursive: true);
+    }
+
 }

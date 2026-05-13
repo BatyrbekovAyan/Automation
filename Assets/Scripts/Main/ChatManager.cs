@@ -857,7 +857,7 @@ private IEnumerator PostTextMessageRoutine(
         }
         ChatHistoryCache.SaveHistory(sendCacheRoot, chatId, cachedList);
 
-        Outbox.Remove(tempId);
+        Outbox.RemoveAt(sendCacheRoot, chatId, tempId);
         OnMessageStatusChanged?.Invoke(tempId, response.message_id, DeliveryStatus.Sent);
     }
     else

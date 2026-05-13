@@ -100,6 +100,69 @@ public class OutboxStore
                          "If the chat wasn't loaded yet, the entry on disk will be orphaned.");
     }
 
+    /// <summary>
+    /// Removes a tempId entry directly from a specific bot's outbox file on disk,
+    /// bypassing the in-memory cache. Used by PostTextMessageRoutine's success
+    /// path so a send that started on bot A and completed after a switch to bot B
+    /// still clears bot A's outbox file (the cacheRoot snapshot taken at send time
+    /// points to bot A's folder, not the currently-active bot's).
+    /// </summary>
+    public void RemoveAt(string cacheRoot, string chatId, string tempId)
+    {
+        if (string.IsNullOrEmpty(cacheRoot) || string.IsNullOrEmpty(chatId) || string.IsNullOrEmpty(tempId))
+            return;
+
+        string path = Path.Combine(cacheRoot, $"outbox_{SanitizeChatId(chatId)}.json");
+        if (!File.Exists(path)) return;
+
+        try
+        {
+            string json = File.ReadAllText(path);
+            var parsed = JsonUtility.FromJson<OutboxFile>(json);
+            if (parsed?.entries == null) return;
+
+            bool removed = false;
+            for (int i = parsed.entries.Count - 1; i >= 0; i--)
+            {
+                if (parsed.entries[i].tempId == tempId)
+                {
+                    parsed.entries.RemoveAt(i);
+                    removed = true;
+                    break;
+                }
+            }
+
+            if (!removed) return;
+
+            // Atomic write through the same .tmp + File.Replace pattern as Persist.
+            string tmp = path + ".tmp";
+            string newJson = JsonUtility.ToJson(new OutboxFile { entries = parsed.entries }, prettyPrint: false);
+            File.WriteAllText(tmp, newJson);
+
+            if (File.Exists(path)) File.Replace(tmp, path, destinationBackupFileName: null);
+            else File.Move(tmp, path);
+
+            // If this cacheRoot happens to match the currently-active bot AND we have
+            // the chat loaded in memory, also evict the stale entry so subsequent
+            // GetFor returns the right list without a disk re-read.
+            if (_byChatId.TryGetValue(chatId, out var inMemory))
+            {
+                for (int i = inMemory.Count - 1; i >= 0; i--)
+                {
+                    if (inMemory[i].tempId == tempId)
+                    {
+                        inMemory.RemoveAt(i);
+                        break;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[OutboxStore] RemoveAt failed at {path}: {ex.Message}");
+        }
+    }
+
     public void Update(OutboxEntry entry)
     {
         if (entry == null || string.IsNullOrEmpty(entry.chatId) || string.IsNullOrEmpty(entry.tempId))
