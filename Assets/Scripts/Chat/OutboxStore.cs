@@ -77,8 +77,8 @@ public class OutboxStore
     /// <summary>
     /// Removes the entry with the given tempId. Same loaded-chat contract as
     /// Find — only operates on chats already loaded into the in-memory cache.
-    /// In the production flow, the success path of PostTextMessageRoutine
-    /// runs after Add(), so the chat is always loaded when Remove is called.
+    /// In the production flow, the success path of an outgoing send runs
+    /// after Add(), so the chat is always loaded when Remove is called.
     /// </summary>
     public void Remove(string tempId)
     {
