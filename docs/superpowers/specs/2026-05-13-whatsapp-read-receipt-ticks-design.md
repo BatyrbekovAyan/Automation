@@ -60,9 +60,9 @@ No new prefab fields, no new `Sprite` references to wire — all five glyphs ren
 The existing pipeline is unchanged in shape; one new field threads through every layer:
 
 ```
-Wappi messages/get JSON
-  └── RawMessage.deliveryStatusRaw  (string, exact field name TBD §7)
-        └── ChatManager.Normalize()
+Wappi messages/get JSON  ({ "delivery_status": "sent" | "delivered" | "read" })
+  └── RawMessage.deliveryStatusRaw  (string)
+        └── ChatManager.Normalize() → DeliveryTickFormatter.ParseWappiString
               └── NormalizedMessage.deliveryStatus  (DeliveryStatus enum)
                     └── ChatManager.CreateViewModel()
                           └── MessageViewModel.deliveryStatus
@@ -78,7 +78,7 @@ A new event `ChatManager.OnMessageStatusChanged(string oldMessageId, string newM
 | `Assets/Scripts/Chat/DeliveryStatus.cs` | **NEW.** `public enum DeliveryStatus { None, Pending, Sent, Delivered, Read, Failed }` |
 | `Assets/Scripts/Chat/DeliveryTickFormatter.cs` | **NEW.** Static `GetSprite(DeliveryStatus) → string` returning the matching `<sprite name="..."> ` tag, or `null` for `None`. Mirrors [`ChatPreviewFormatter.GetTickSprite`](../../../Assets/Scripts/Chat/ChatPreviewFormatter.cs#L65). |
 | `Assets/Scripts/Chat/OutboxStore.cs` | **NEW.** Plain C# class. Per-chat persistence under `{persistentDataPath}/outbox_{chatId}.json`. `OutboxEntry` inner type: `tempId, chatId, text, timestamp, attemptCount, profileId`. Atomic writes via `.tmp` + `File.Replace`. |
-| `Assets/Scripts/Chat/RawMessage.cs` | Add `[JsonProperty("...")] public string deliveryStatusRaw;` — field name finalized after §7 probe. |
+| `Assets/Scripts/Chat/RawMessage.cs` | Add `[JsonProperty("delivery_status")] public string deliveryStatusRaw;` |
 | `Assets/Scripts/Chat/NormalizedMessage.cs` | Add `public DeliveryStatus deliveryStatus;` |
 | `Assets/Scripts/UI/MessageViewModel.cs` | Add `public DeliveryStatus deliveryStatus;` |
 | `Assets/Scripts/Main/ChatManager.cs` | (a) Parse `deliveryStatus` inside `Normalize()`; (b) declare new event `OnMessageStatusChanged`; (c) extend `OnChatSelected` to splice outbox entries into the rendered list; (d) hook outbox into `SendTextMessage`. |
@@ -129,19 +129,10 @@ public static class DeliveryTickFormatter
                 return DeliveryStatus.None;
         }
     }
-
-    public static DeliveryStatus ParseWappiAck(int ack) => ack switch
-    {
-        0 => DeliveryStatus.Pending,
-        1 => DeliveryStatus.Sent,
-        2 => DeliveryStatus.Delivered,
-        3 => DeliveryStatus.Read,
-        _ => DeliveryStatus.None,
-    };
 }
 ```
 
-The string vs. ack-int parse path is chosen in `ChatManager.Normalize()` once the §7 probe nails down the actual field shape.
+`ChatManager.Normalize()` calls `ParseWappiString(raw.deliveryStatusRaw)` for outgoing messages (`raw.fromMe == true`) and skips the call for incoming messages (which stay at `DeliveryStatus.None`).
 
 ### 5.2 `OutboxStore`
 
@@ -301,31 +292,26 @@ A subtle case: if the user is *currently in* a chat when a send fails and then b
 | Missing sprite in `ChatTicks.asset` | TMP renders the `?` fallback glyph and logs once. The asset is shipped in the repo, so this only fires if it's deleted. |
 | Outbox file is corrupted JSON | `OutboxStore` catches the parse exception, logs once per chat, and treats the chat's outbox as empty. The user loses persistence on that chat only; the rest of the app stays healthy. |
 
-## 7. Open question — Wappi field name
+## 7. Wappi API contract — resolved
 
-The exact JSON field for per-message delivery status on `messages/get` is not yet known. The chat-list endpoint uses `last_message_delivery_status` (string-typed: `sent` / `delivered` / `read`), so `delivery_status` is the most likely candidate, but Wappi sometimes wraps WhatsApp's internal numeric ack (0/1/2/3) instead.
+Confirmed by user (no probe needed):
 
-**Resolution plan** — part of the implementation plan, not blocking the design:
-
-1. Temporarily add `Debug.Log(request.downloadHandler.text);` inside [`GetMessagesRoutine`](../../../Assets/Scripts/Main/ChatManager.cs).
-2. Call against a chat with outgoing messages in mixed states (sent / delivered / read).
-3. Inspect the JSON for `delivery_status`, `ack`, or `status`. Pick the path that matches.
-4. Wire the parser:
-   - String-typed → `DeliveryTickFormatter.ParseWappiString`.
-   - Numeric-typed → `DeliveryTickFormatter.ParseWappiAck`.
-5. Remove the debug log before commit.
-
-If the field doesn't exist at all on `messages/get`, fallback plan: render only outbox-driven statuses (`Pending` / `Failed` / `Sent`-on-send-success); leave `Delivered` / `Read` for a follow-up phase that polls Wappi's chat list or hooks a webhook.
+- **Endpoint:** `messages/get` (and by extension `messages/all/get`).
+- **Field:** `delivery_status` on each message object.
+- **Type:** String. Same domain as the chat-list field `last_message_delivery_status`.
+- **Known values:** `"sent"`, `"delivered"`, `"read"`.
+- **Other values / missing field:** Treated as `DeliveryStatus.None` — no tick rendered. The one-shot warning via `DeliveryTickFormatter.LoggedUnknown` flags any new value Wappi adds without flooding the console.
+- **Incoming messages:** May or may not carry the field; we don't parse it because incoming messages are never assigned a tick regardless. The `fromMe` gate inside `ChatManager.Normalize()` skips the parse for `fromMe == false`.
 
 ## 8. Testing
 
 ### 8.1 EditMode unit tests (Unity Test Framework, plain NUnit)
 
 - **`DeliveryTickFormatterTests`**
-  - Each enum value → expected sprite-tag string.
-  - `None` and unknown values → `null`.
-  - `ParseWappiString` round-trip for the three known strings.
-  - `ParseWappiAck` covers 0–3 and an out-of-range value.
+  - `GetSprite` for each enum value → expected sprite-tag string.
+  - `GetSprite(None)` → `null`.
+  - `ParseWappiString` round-trip for the three known strings (`"sent"` / `"delivered"` / `"read"`), case-insensitive.
+  - `ParseWappiString` returns `None` for an unknown value and for `null` / empty input; logs only once for repeated unknowns.
 
 - **`OutboxStoreTests`**
   - `Add` then `GetFor` returns one entry.
