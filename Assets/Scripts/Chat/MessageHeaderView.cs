@@ -37,7 +37,7 @@ public class MessageHeaderView : MonoBehaviour
     {
         currentChatId = chatId;
         ChatViewModel vm = ChatManager.Instance.GetChat(chatId);
-        
+
         if (vm == null) return;
 
         // 1. Set the Text
@@ -47,9 +47,7 @@ public class MessageHeaderView : MonoBehaviour
         // 2. Handle the Avatar
         if (vm.AvatarSprite != null)
         {
-            avatarImage.sprite = vm.AvatarSprite;
-            avatarImage.gameObject.SetActive(true);
-            defaultAvatarBg.gameObject.SetActive(false);
+            ApplyAvatarSprite(vm.AvatarSprite);
         }
         else
         {
@@ -60,16 +58,13 @@ public class MessageHeaderView : MonoBehaviour
             {
                 string path = MediaCacheManager.Instance.GetFilePathFromUrl(vm.AvatarUrl);
                 byte[] bytes = System.IO.File.ReadAllBytes(path);
-                Texture2D tex = new Texture2D(2, 2);
-                
+                var tex = new Texture2D(2, 2);
+
                 if (tex.LoadImage(bytes))
                 {
-                    Sprite sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+                    var sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
                     vm.AvatarSprite = sprite;
-                    avatarImage.sprite = sprite;
-                    
-                    avatarImage.gameObject.SetActive(true);
-                    defaultAvatarBg.gameObject.SetActive(false);
+                    ApplyAvatarSprite(sprite);
                     loadedFromCache = true;
                 }
             }
@@ -79,17 +74,33 @@ public class MessageHeaderView : MonoBehaviour
             {
                 avatarImage.gameObject.SetActive(false);
                 defaultAvatarBg.gameObject.SetActive(true);
-                
+
                 ApplyDefaultAvatarColor(chatId);
 
                 // Fetch from network if it has a URL but wasn't cached
                 if (!string.IsNullOrEmpty(vm.AvatarUrl))
                 {
-                    StopAllCoroutines(); 
+                    StopAllCoroutines();
                     StartCoroutine(LoadAvatar(vm));
                 }
             }
         }
+    }
+
+    // Assigns the avatar sprite and forces a clean Image + ImageWithRoundedCorners
+    // refresh. Without the off/on toggle, the first sprite assigned after panel
+    // activation can render squeezed: Image.preserveAspect produces a non-square
+    // mesh for non-square source textures, but the rounded-corner shader keeps
+    // drawing its SDF in the RectTransform's 96x96 logical space, so the visible
+    // shape comes out as an ellipse. The toggle re-fires OnEnable on both the
+    // Image (clean mesh rebuild while active) and ImageWithRoundedCorners
+    // (re-reads outerUV from the new sprite and re-pushes the shader props).
+    private void ApplyAvatarSprite(Sprite sprite)
+    {
+        avatarImage.sprite = sprite;
+        avatarImage.gameObject.SetActive(false);
+        avatarImage.gameObject.SetActive(true);
+        defaultAvatarBg.gameObject.SetActive(false);
     }
 
     IEnumerator LoadAvatar(ChatViewModel vm)
@@ -104,18 +115,16 @@ public class MessageHeaderView : MonoBehaviour
         if (MediaCacheManager.Instance != null) 
             MediaCacheManager.Instance.SaveImageToCache(vm.AvatarUrl, bytes);
 
-        Texture2D tex = new Texture2D(2, 2);
+        var tex = new Texture2D(2, 2);
         if (tex.LoadImage(bytes))
         {
-            Sprite sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+            var sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
             vm.AvatarSprite = sprite;
-            
+
             // Safety check: ensure the user hasn't quickly swiped to a different chat while this was downloading!
             if (currentChatId == vm.ChatId)
             {
-                avatarImage.sprite = sprite;
-                avatarImage.gameObject.SetActive(true);
-                defaultAvatarBg.gameObject.SetActive(false);
+                ApplyAvatarSprite(sprite);
             }
         }
     }
