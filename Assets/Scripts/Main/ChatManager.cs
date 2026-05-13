@@ -707,7 +707,8 @@ IEnumerator SendTextMessageRoutine(string chatId, string text)
         type = MessageType.Chat,
         text = text,
         isIncoming = false,
-        timestamp = now
+        timestamp = now,
+        deliveryStatus = DeliveryStatus.Pending
     };
 
     OnLiveMessagesReceived?.Invoke(new List<MessageViewModel> { instantMessage });
@@ -718,6 +719,16 @@ IEnumerator SendTextMessageRoutine(string chatId, string text)
     List<MessageViewModel> cachedList = ChatHistoryCache.LoadHistory(sendCacheRoot, chatId);
     cachedList.Add(instantMessage);
     ChatHistoryCache.SaveHistory(sendCacheRoot, chatId, cachedList);
+
+    Outbox.Add(new OutboxStore.OutboxEntry
+    {
+        tempId       = tempId,
+        chatId       = chatId,
+        text         = text,
+        timestamp    = now,
+        attemptCount = 1,
+        profileId    = activeProfileId
+    });
 
     // --- BACKGROUND: Send to server silently ---
     yield return PostTextMessageRoutine(chatId, text, tempId, activeProfileId, sendCacheRoot);
@@ -791,6 +802,7 @@ private IEnumerator PostTextMessageRoutine(
         }
         ChatHistoryCache.SaveHistory(sendCacheRoot, chatId, cachedList);
 
+        Outbox.Remove(tempId);
         OnMessageStatusChanged?.Invoke(tempId, response.message_id, DeliveryStatus.Sent);
     }
     else
