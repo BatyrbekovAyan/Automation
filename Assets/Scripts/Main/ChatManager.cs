@@ -374,11 +374,13 @@ public partial class ChatManager : MonoBehaviour
 
                     // Already-cached outgoing message: server may have a fresher
                     // delivery_status than the cached VM. Update in place so the
-                    // bubble re-renders and the cache stops drifting.
-                    if (!raw.fromMe || string.IsNullOrEmpty(raw.deliveryStatusRaw)) continue;
+                    // bubble re-renders and the cache stops drifting. Apply the
+                    // same Sent-fallback as Normalize so cached None entries
+                    // from self-chat sends get migrated on the next sync.
+                    if (!raw.fromMe) continue;
 
-                    DeliveryStatus serverStatus = DeliveryTickFormatter.ParseWappiString(raw.deliveryStatusRaw);
-                    if (serverStatus == DeliveryStatus.None) continue;
+                    DeliveryStatus parsedRaw = DeliveryTickFormatter.ParseWappiString(raw.deliveryStatusRaw);
+                    DeliveryStatus serverStatus = (parsedRaw == DeliveryStatus.None) ? DeliveryStatus.Sent : parsedRaw;
 
                     for (int i = 0; i < cachedList.Count; i++)
                     {
@@ -556,8 +558,15 @@ public partial class ChatManager : MonoBehaviour
 
         // Outgoing messages carry a Wappi delivery_status string. Incoming
         // messages never render a tick — leave at DeliveryStatus.None.
+        // Wappi sometimes omits the field entirely (self-chat sends, very
+        // fresh messages awaiting delivery ack, etc.). Fall back to Sent
+        // for fromMe + empty/unknown — the message is in messages/get so
+        // Wappi has at least received it.
         if (raw.fromMe)
-            msg.deliveryStatus = DeliveryTickFormatter.ParseWappiString(raw.deliveryStatusRaw);
+        {
+            DeliveryStatus parsed = DeliveryTickFormatter.ParseWappiString(raw.deliveryStatusRaw);
+            msg.deliveryStatus = (parsed == DeliveryStatus.None) ? DeliveryStatus.Sent : parsed;
+        }
 
         // --- 1. SEPARATE TEXT FROM CAPTIONS ---
         if (msg.messageType == MessageType.Chat)
