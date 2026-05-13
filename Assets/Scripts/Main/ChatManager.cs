@@ -238,6 +238,25 @@ public partial class ChatManager : MonoBehaviour
 
         if (cachedMessages != null && cachedMessages.Count > 0)
         {
+            // Promote stale-Pending cached messages to Failed for any tempId still
+            // sitting in the outbox. An unresolved entry means the in-flight POST
+            // from a previous session never completed — without this pass the user
+            // would see a phantom clock that never resolves. Loading the outbox
+            // here also populates OutboxStore's in-memory cache so tap-to-retry
+            // can Find() the entry when the user taps the red !.
+            var unresolved = Outbox.GetFor(chatId);
+            if (unresolved.Count > 0)
+            {
+                var unresolvedIds = new HashSet<string>();
+                foreach (var entry in unresolved) unresolvedIds.Add(entry.tempId);
+
+                foreach (var msg in cachedMessages)
+                {
+                    if (!msg.isIncoming && unresolvedIds.Contains(msg.messageId))
+                        msg.deliveryStatus = DeliveryStatus.Failed;
+                }
+            }
+
             // 1. INSTANT LOAD: Register the cached IDs and draw the UI immediately!
             foreach (var msg in cachedMessages) seenMessageIds.Add(msg.messageId);
             OnBatchMessagesLoaded?.Invoke(cachedMessages, false, true);
