@@ -21,11 +21,23 @@ public static class ChatHistoryCache
         if (!Directory.Exists(messagesDir)) Directory.CreateDirectory(messagesDir);
 
         string path = Path.Combine(messagesDir, $"{chatId}.json");
+        string tmp = path + ".tmp";
 
         MessageListWrapper wrapper = new MessageListWrapper { messages = messages };
         string json = JsonUtility.ToJson(wrapper);
 
-        File.WriteAllText(path, json);
+        try
+        {
+            File.WriteAllText(tmp, json);
+
+            if (File.Exists(path)) File.Replace(tmp, path, destinationBackupFileName: null);
+            else File.Move(tmp, path);
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError($"[ChatHistoryCache] Failed to persist history for {chatId}: {ex.Message}");
+            if (File.Exists(tmp)) File.Delete(tmp);
+        }
     }
 
     /// <summary>
@@ -39,7 +51,9 @@ public static class ChatHistoryCache
 
         string path = Path.Combine(baseDir, "messages", $"{chatId}.json");
 
-        if (File.Exists(path))
+        if (!File.Exists(path)) return new List<MessageViewModel>();
+
+        try
         {
             string json = File.ReadAllText(path);
             MessageListWrapper wrapper = JsonUtility.FromJson<MessageListWrapper>(json);
@@ -48,6 +62,10 @@ public static class ChatHistoryCache
             {
                 return wrapper.messages;
             }
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogWarning($"[ChatHistoryCache] Corrupted history at {path}: {ex.Message}. Treating as empty.");
         }
 
         return new List<MessageViewModel>();

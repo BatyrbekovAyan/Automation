@@ -95,6 +95,9 @@ public class OutboxStore
                 }
             }
         }
+
+        Debug.LogWarning($"[OutboxStore] Remove called with tempId '{tempId}' but no matching entry found in any loaded chat. " +
+                         "If the chat wasn't loaded yet, the entry on disk will be orphaned.");
     }
 
     public void Update(OutboxEntry entry)

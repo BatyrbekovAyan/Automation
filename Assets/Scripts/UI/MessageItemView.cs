@@ -2691,7 +2691,7 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
         timeText.text = tickTag != null ? $"{formattedTime} {tickTag}" : formattedTime;
     }
 
-    public void SetDeliveryStatus(DeliveryStatus newStatus)
+    private void SetDeliveryStatus(DeliveryStatus newStatus)
     {
         if (currentVm == null || currentVm.isIncoming) return;
         currentVm.deliveryStatus = newStatus;
