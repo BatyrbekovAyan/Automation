@@ -17,6 +17,11 @@ using UnityEngine;
 /// </summary>
 public class OutboxStore
 {
+    /// <summary>
+    /// Mutable DTO. Always pass a modified entry back through OutboxStore.Update()
+    /// to ensure disk persistence — mutating fields directly on a reference from
+    /// GetFor() or Find() will update the in-memory cache but NOT the on-disk file.
+    /// </summary>
     [Serializable]
     public class OutboxEntry
     {
@@ -42,11 +47,16 @@ public class OutboxStore
         _getCacheRoot = getCacheRoot ?? throw new ArgumentNullException(nameof(getCacheRoot));
     }
 
-    public IReadOnlyList<OutboxEntry> GetFor(string chatId)
-    {
-        return LoadOrCache(chatId);
-    }
+    public IReadOnlyList<OutboxEntry> GetFor(string chatId) => LoadOrCache(chatId);
 
+    /// <summary>
+    /// Searches all currently-loaded chats for the given tempId. Only finds
+    /// entries whose chat has been loaded via GetFor(), Add(), or Update() in
+    /// the current session — entries persisted on disk but never loaded will
+    /// return null. In the production flow, OnChatSelected calls GetFor(chatId)
+    /// during the chat-open splice, which preloads the relevant chat before
+    /// any tap-to-retry path calls Find.
+    /// </summary>
     public OutboxEntry Find(string tempId)
     {
         foreach (var list in _byChatId.Values)
@@ -64,6 +74,12 @@ public class OutboxStore
         Persist(entry.chatId, list);
     }
 
+    /// <summary>
+    /// Removes the entry with the given tempId. Same loaded-chat contract as
+    /// Find — only operates on chats already loaded into the in-memory cache.
+    /// In the production flow, the success path of PostTextMessageRoutine
+    /// runs after Add(), so the chat is always loaded when Remove is called.
+    /// </summary>
     public void Remove(string tempId)
     {
         foreach (var kvp in _byChatId)
@@ -146,7 +162,7 @@ public class OutboxStore
 
     private string FilePath(string chatId)
     {
-        string root = _getCacheRoot?.Invoke();
+        string root = _getCacheRoot();
         if (string.IsNullOrEmpty(root))
             throw new InvalidOperationException("OutboxStore: getCacheRoot returned null or empty.");
         return Path.Combine(root, $"outbox_{SanitizeChatId(chatId)}.json");
@@ -155,9 +171,15 @@ public class OutboxStore
     private static string SanitizeChatId(string chatId)
     {
         var invalid = Path.GetInvalidFileNameChars();
-        var sb = new StringBuilder(chatId.Length);
+        var sb = new StringBuilder(chatId.Length + 9);
         foreach (var c in chatId)
             sb.Append(Array.IndexOf(invalid, c) >= 0 ? '_' : c);
+        // Hash suffix prevents filename collisions when two chat IDs differ
+        // only by invalid-filename chars (e.g. "foo/bar" and "foo_bar" both
+        // sanitize to "foo_bar"). Mono and IL2CPP both produce stable
+        // string.GetHashCode() across processes; this is safe on Android + iOS.
+        sb.Append('_');
+        sb.Append(Math.Abs(chatId.GetHashCode()).ToString("x8"));
         return sb.ToString();
     }
 }

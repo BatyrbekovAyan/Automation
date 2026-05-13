@@ -79,6 +79,19 @@ public class OutboxStoreTests
     }
 
     [Test]
+    public void Remove_PersistsToDisk()
+    {
+        var store = MakeStore();
+        var entry = MakeEntry();
+        store.Add(entry);
+        store.Remove("t1");
+
+        // A second store on the same root must also see zero entries.
+        var store2 = MakeStore();
+        Assert.AreEqual(0, store2.GetFor(entry.chatId).Count);
+    }
+
+    [Test]
     public void Find_ReturnsMatchingEntry()
     {
         var store = MakeStore();
@@ -114,14 +127,35 @@ public class OutboxStoreTests
     }
 
     [Test]
+    public void Update_NonExistentTempId_DoesNotThrowOrCorruptList()
+    {
+        var store = MakeStore();
+        store.Add(MakeEntry(tempId: "t1"));
+
+        // Update an entry that doesn't exist — must not throw, must not corrupt the list.
+        Assert.DoesNotThrow(() => store.Update(MakeEntry(tempId: "missing")));
+
+        var entries = store.GetFor("+15551@c.us");
+        Assert.AreEqual(1, entries.Count);
+        Assert.AreEqual("t1", entries[0].tempId);
+    }
+
+    [Test]
     public void CorruptedJsonFile_GetForReturnsEmpty()
     {
+        // Use Add to create the on-disk file (avoids coupling to the internal sanitization scheme),
+        // then overwrite it with garbage.
         var chatId = "+15551@c.us";
-        var path = Path.Combine(_tempRoot, "outbox_" + SanitizeForTest(chatId) + ".json");
-        File.WriteAllText(path, "{ this is not valid json ");
+        var seedStore = MakeStore();
+        seedStore.Add(MakeEntry(chatId: chatId));
 
-        var store = MakeStore();
-        Assert.AreEqual(0, store.GetFor(chatId).Count);
+        var files = Directory.GetFiles(_tempRoot, "outbox_*.json");
+        Assert.AreEqual(1, files.Length);
+        File.WriteAllText(files[0], "{ this is not valid json ");
+
+        // A fresh store reading the corrupted file should degrade to empty.
+        var freshStore = MakeStore();
+        Assert.AreEqual(0, freshStore.GetFor(chatId).Count);
     }
 
     [Test]
@@ -136,13 +170,4 @@ public class OutboxStoreTests
         Assert.AreEqual(1, entries.Count);
     }
 
-    // Mirrors the SanitizeChatId used inside the SUT — keep in sync.
-    private static string SanitizeForTest(string chatId)
-    {
-        var invalid = Path.GetInvalidFileNameChars();
-        var sb = new System.Text.StringBuilder(chatId.Length);
-        foreach (var c in chatId)
-            sb.Append(System.Array.IndexOf(invalid, c) >= 0 ? '_' : c);
-        return sb.ToString();
-    }
 }
