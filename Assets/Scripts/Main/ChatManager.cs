@@ -693,9 +693,6 @@ IEnumerator SendTextMessageRoutine(string chatId, string text)
     // while the request is in flight.
     string sendCacheRoot = GetCacheRoot();
 
-    string recipient = chatId;
-    if (recipient.EndsWith("@c.us")) recipient = recipient.Replace("@c.us", "");
-
     // --- INSTANT UI: Fire before ANY network call ---
     string tempId = "sending_" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
     long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
@@ -723,7 +720,26 @@ IEnumerator SendTextMessageRoutine(string chatId, string text)
     ChatHistoryCache.SaveHistory(sendCacheRoot, chatId, cachedList);
 
     // --- BACKGROUND: Send to server silently ---
-    string url = $"https://wappi.pro/api/sync/message/send?profile_id={activeProfileId}";
+    yield return PostTextMessageRoutine(chatId, text, tempId, activeProfileId, sendCacheRoot);
+}
+
+/// <summary>
+/// Network half of an outgoing text send. Shared between the initial
+/// optimistic send (SendTextMessageRoutine) and tap-to-retry
+/// (RetryOutboxMessage). Fires OnMessageStatusChanged on both success
+/// and failure paths; does NOT touch the outbox itself — callers own
+/// outbox lifecycle.
+/// </summary>
+private IEnumerator PostTextMessageRoutine(
+    string chatId,
+    string text,
+    string tempId,
+    string profileId,
+    string sendCacheRoot)
+{
+    string recipient = chatId.EndsWith("@c.us") ? chatId.Replace("@c.us", "") : chatId;
+    string url = $"https://wappi.pro/api/sync/message/send?profile_id={profileId}";
+
     var requestData = new WappiSendTextRequest { body = text, recipient = recipient };
     string jsonPayload = JsonConvert.SerializeObject(requestData);
 
@@ -733,37 +749,54 @@ IEnumerator SendTextMessageRoutine(string chatId, string text)
     www.downloadHandler = new DownloadHandlerBuffer();
     www.SetRequestHeader("Content-Type", "application/json");
     www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
+    www.timeout = 30;
 
     yield return www.SendWebRequest();
 
     if (www.result != UnityWebRequest.Result.Success)
     {
-        Debug.LogError($"[Wappi] Failed to send: {www.error}\n{www.downloadHandler.text}");
+        Debug.LogError($"[Wappi] message/send failed: {www.error}\n{www.downloadHandler?.text}");
+        OnMessageStatusChanged?.Invoke(tempId, tempId, DeliveryStatus.Failed);
         yield break;
     }
 
+    WappiSendTextResponse response = null;
     try
     {
-        var response = JsonConvert.DeserializeObject<WappiSendTextResponse>(www.downloadHandler.text);
-        if (response != null && response.status == "done" && !string.IsNullOrEmpty(response.message_id))
-        {
-            // Silently swap temp ID for the real server ID
-            seenMessageIds.Remove(tempId);
-            seenMessageIds.Add(response.message_id);
+        response = JsonConvert.DeserializeObject<WappiSendTextResponse>(www.downloadHandler.text);
+    }
+    catch (Exception ex)
+    {
+        Debug.LogError($"[Wappi] message/send response parse failed: {ex.Message}\n{www.downloadHandler.text}");
+        OnMessageStatusChanged?.Invoke(tempId, tempId, DeliveryStatus.Failed);
+        yield break;
+    }
 
-            var cache = ChatHistoryCache.LoadHistory(sendCacheRoot, chatId);
-            var msg = cache.Find(m => m.messageId == tempId);
-            if (msg != null)
+    if (response != null && response.status == "done" && !string.IsNullOrEmpty(response.message_id))
+    {
+        seenMessageIds.Remove(tempId);
+        seenMessageIds.Add(response.message_id);
+
+        // Update cached optimistic message so a chat reopen picks up the
+        // real id and Sent status instead of a stranded tempId / Pending.
+        List<MessageViewModel> cachedList = ChatHistoryCache.LoadHistory(sendCacheRoot, chatId);
+        for (int i = 0; i < cachedList.Count; i++)
+        {
+            if (cachedList[i].messageId == tempId)
             {
-                msg.messageId = response.message_id;
-                if (response.timestamp > 0) msg.timestamp = response.timestamp;
-                ChatHistoryCache.SaveHistory(sendCacheRoot, chatId, cache);
+                cachedList[i].messageId = response.message_id;
+                cachedList[i].deliveryStatus = DeliveryStatus.Sent;
+                break;
             }
         }
+        ChatHistoryCache.SaveHistory(sendCacheRoot, chatId, cachedList);
+
+        OnMessageStatusChanged?.Invoke(tempId, response.message_id, DeliveryStatus.Sent);
     }
-    catch (Exception e)
+    else
     {
-        Debug.LogError($"[Wappi] Response parse error: {e.Message}");
+        Debug.LogWarning($"[Wappi] message/send returned non-done status: {www.downloadHandler.text}");
+        OnMessageStatusChanged?.Invoke(tempId, tempId, DeliveryStatus.Failed);
     }
 }
 
