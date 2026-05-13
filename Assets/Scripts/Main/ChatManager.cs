@@ -324,39 +324,47 @@ public partial class ChatManager : MonoBehaviour
                         NormalizedMessage norm = Normalize(raw);
                         if (norm.messageType == MessageType.Unknown) continue;
 
-                        if (norm.fromMe && norm.messageType == MessageType.Chat && !string.IsNullOrEmpty(norm.text))
+                        if (norm.fromMe && norm.messageType == MessageType.Chat)
                         {
-                            var unresolved = Outbox.GetFor(chatId);
-                            int bestMatchIndex = -1;
-                            long bestMatchDelta = long.MaxValue;
-                            for (int i = 0; i < unresolved.Count; i++)
+                            // Compare against the RAW server body, not norm.text. Normalize()
+                            // rewrites Unicode emoji into TMP <sprite name="..."> tags via
+                            // UnicodeEmojiConverter — the outbox entry's text is the raw user
+                            // input and only matches the raw body, not the converted form.
+                            string rawBody = raw.body?.ToString();
+                            if (!string.IsNullOrEmpty(rawBody))
                             {
-                                if (unresolved[i].text != norm.text) continue;
-                                long delta = Math.Abs(unresolved[i].timestamp - norm.time);
-                                if (delta > 120) continue;
-                                if (delta < bestMatchDelta)
+                                var unresolved = Outbox.GetFor(chatId);
+                                int bestMatchIndex = -1;
+                                long bestMatchDelta = long.MaxValue;
+                                for (int i = 0; i < unresolved.Count; i++)
                                 {
-                                    bestMatchDelta = delta;
-                                    bestMatchIndex = i;
-                                }
-                            }
-
-                            if (bestMatchIndex >= 0)
-                            {
-                                string ghostTempId = unresolved[bestMatchIndex].tempId;
-
-                                // Drop the now-superseded Failed VM from the cache list.
-                                for (int j = cachedList.Count - 1; j >= 0; j--)
-                                {
-                                    if (cachedList[j].messageId == ghostTempId)
+                                    if (unresolved[i].text != rawBody) continue;
+                                    long delta = Math.Abs(unresolved[i].timestamp - norm.time);
+                                    if (delta > 120) continue;
+                                    if (delta < bestMatchDelta)
                                     {
-                                        cachedList.RemoveAt(j);
-                                        break;
+                                        bestMatchDelta = delta;
+                                        bestMatchIndex = i;
                                     }
                                 }
 
-                                Outbox.RemoveAt(GetCacheRoot(), chatId, ghostTempId);
-                                seenMessageIds.Remove(ghostTempId);
+                                if (bestMatchIndex >= 0)
+                                {
+                                    string ghostTempId = unresolved[bestMatchIndex].tempId;
+
+                                    // Drop the now-superseded Failed VM from the cache list.
+                                    for (int j = cachedList.Count - 1; j >= 0; j--)
+                                    {
+                                        if (cachedList[j].messageId == ghostTempId)
+                                        {
+                                            cachedList.RemoveAt(j);
+                                            break;
+                                        }
+                                    }
+
+                                    Outbox.RemoveAt(GetCacheRoot(), chatId, ghostTempId);
+                                    seenMessageIds.Remove(ghostTempId);
+                                }
                             }
                         }
 
