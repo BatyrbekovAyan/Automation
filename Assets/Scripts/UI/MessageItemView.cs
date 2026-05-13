@@ -268,7 +268,9 @@ public class MessageItemView : MonoBehaviour
         if (timeText != null)
         {
             DateTime localTime = DateTimeOffset.FromUnixTimeSeconds(vm.timestamp).LocalDateTime;
-            timeText.text = localTime.ToString("HH:mm");
+            string formattedTime = localTime.ToString("HH:mm");
+            string tickTag = vm.isIncoming ? null : DeliveryTickFormatter.GetSprite(vm.deliveryStatus);
+            timeText.text = tickTag != null ? $"{formattedTime} {tickTag}" : formattedTime;
         }
         
         playOverlay.SetActive(false);
