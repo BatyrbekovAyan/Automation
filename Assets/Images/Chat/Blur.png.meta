@@ -1,15 +1,15 @@
 fileFormatVersion: 2
-guid: ab84d7e7744b944d8bb5c0808028ad75
+guid: 80953fd6e6d4b4538bc29c49df782d1a
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -5153523313097400493
-    second: pngegg (1)_0
+      213: 5890271583650849315
+    second: Blur_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
     mipMapMode: 0
-    enableMipMap: 1
+    enableMipMap: 0
     sRGBTexture: 1
     linearTexture: 0
     fadeOut: 0
@@ -126,13 +126,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: pngegg (1)_0
+      name: Blur_0
       rect:
         serializedVersion: 2
-        x: 47
-        y: 61
-        width: 407
-        height: 377
+        x: 0
+        y: 0
+        width: 800
+        height: 1199
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -141,8 +141,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 35f922de9d10b78b0800000000000000
-      internalID: -5153523313097400493
+      spriteID: 322261e1cc27eb150800000000000000
+      internalID: 5890271583650849315
       vertices: []
       indices: 
       edges: []
@@ -161,7 +161,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      pngegg (1)_0: -5153523313097400493
+      Blur_0: 5890271583650849315
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
