@@ -297,7 +297,6 @@ public partial class ChatManager : MonoBehaviour
         if (www.result != UnityWebRequest.Result.Success) yield break;
 
         List<MessageViewModel> newMessages = new List<MessageViewModel>();
-        bool hasNewMessages = false;
         bool hasStatusUpdates = false;
 
         try
@@ -309,13 +308,20 @@ public partial class ChatManager : MonoBehaviour
                 foreach (var raw in response.messages)
                 {
                     // BRAND NEW message we missed: existing path.
+                    // KNOWN LIMITATION: if a previous-session send POST reached
+                    // Wappi but the client never received the response, the
+                    // outbox still holds the tempId AND the server has the
+                    // same message under a real id. LoadMessagesForChat's
+                    // promotion pass renders the tempId VM as Failed; then
+                    // this loop creates a SECOND VM for the real id with
+                    // Sent. The user sees the same message twice. Fix would
+                    // belong in the promotion pass — see Task 9 follow-up.
                     if (seenMessageIds.Add(raw.id))
                     {
                         NormalizedMessage norm = Normalize(raw);
                         if (norm.messageType != MessageType.Unknown)
                         {
                             newMessages.Add(CreateViewModel(norm));
-                            hasNewMessages = true;
                         }
                         continue;
                     }
@@ -347,7 +353,7 @@ public partial class ChatManager : MonoBehaviour
         }
 
         // If we found new messages while the app was closed, merge them!
-        if (hasNewMessages && newMessages.Count > 0)
+        if (newMessages.Count > 0)
         {
             // Add the old cached messages to the bottom of the brand new ones
             newMessages.AddRange(cachedList);
