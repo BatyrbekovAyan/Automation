@@ -3,15 +3,14 @@
     "rootNamespace": "Automation.Tests.EditMode",
     "references": [
         "UnityEngine.TestRunner",
-        "UnityEditor.TestRunner",
-        "Assembly-CSharp"
+        "UnityEditor.TestRunner"
     ],
     "includePlatforms": [
         "Editor"
     ],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
-    "overrideReferences": true,
+    "overrideReferences": false,
     "precompiledReferences": [
         "nunit.framework.dll"
     ],
