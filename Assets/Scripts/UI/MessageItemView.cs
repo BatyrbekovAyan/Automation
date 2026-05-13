@@ -2709,7 +2709,12 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
     private void HandleStatusChanged(string oldMessageId, string newMessageId, DeliveryStatus status)
     {
         if (currentVm == null || currentVm.isIncoming) return;
-        if (currentVm.messageId != oldMessageId) return;
+        // Match against EITHER the pre-swap id or the post-swap id. The optimistic
+        // send path fires before any external mutation (currentVm.messageId is
+        // still oldMessageId at fire time), but the ghost-send recovery path in
+        // SyncLatestMessages writes the new id to the shared VM reference before
+        // firing — so we must accept either form to be robust to call-site order.
+        if (currentVm.messageId != oldMessageId && currentVm.messageId != newMessageId) return;
         if (newMessageId != oldMessageId) currentVm.messageId = newMessageId;
         SetDeliveryStatus(status);
     }
