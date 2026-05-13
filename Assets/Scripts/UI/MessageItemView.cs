@@ -122,7 +122,10 @@ public class MessageItemView : MonoBehaviour
             ChatManager.Instance.OnMessageStatusChanged -= HandleStatusChanged;
 
         if (retryButton != null)
+        {
             retryButton.onClick.RemoveAllListeners();
+            retryButton.interactable = false;
+        }
     }
     
     public void Bind(MessageViewModel vm, bool showTail = true, bool skipLayoutRebuild = false, bool showSenderName = false)    
@@ -276,7 +279,8 @@ public class MessageItemView : MonoBehaviour
         messageText.gameObject.SetActive(!string.IsNullOrEmpty(processedText));
 
         RefreshTimeAndTick();
-        
+        UpdateRetryButton(!currentVm.isIncoming && currentVm.deliveryStatus == DeliveryStatus.Failed);
+
         playOverlay.SetActive(false);
         audioPanel.SetActive(false);
         if (documentPanel) documentPanel.SetActive(false);
@@ -2713,10 +2717,9 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
             if (retryButton == null)
             {
                 timeText.raycastTarget = true;
-                retryButton = timeText.GetComponent<Button>();
-                if (retryButton == null) retryButton = timeText.gameObject.AddComponent<Button>();
-                retryButton.transition = Selectable.Transition.None;
+                retryButton = timeText.GetComponent<Button>() ?? timeText.gameObject.AddComponent<Button>();
             }
+            retryButton.transition = Selectable.Transition.None;
 
             retryButton.onClick.RemoveAllListeners();
             string capturedMessageId = currentVm.messageId;
@@ -2731,6 +2734,9 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
         {
             retryButton.onClick.RemoveAllListeners();
             retryButton.interactable = false;
+            // Symmetric restore — pairs with timeText.raycastTarget = true in the
+            // lazy-create branch. Keeps the time area non-blocking when not Failed.
+            if (timeText != null) timeText.raycastTarget = false;
         }
     }
 }
