@@ -236,15 +236,17 @@ public partial class ChatManager : MonoBehaviour
 
         List<MessageViewModel> cachedMessages = ChatHistoryCache.LoadHistory(GetCacheRoot(), chatId);
 
+        // Always load the outbox for this chat — populates OutboxStore's in-memory
+        // _byChatId map so tap-to-retry's Find() can resolve the tempId, even if
+        // the message cache was purged but the outbox file survived.
+        var unresolved = Outbox.GetFor(chatId);
+
         if (cachedMessages != null && cachedMessages.Count > 0)
         {
             // Promote stale-Pending cached messages to Failed for any tempId still
-            // sitting in the outbox. An unresolved entry means the in-flight POST
-            // from a previous session never completed — without this pass the user
-            // would see a phantom clock that never resolves. Loading the outbox
-            // here also populates OutboxStore's in-memory cache so tap-to-retry
-            // can Find() the entry when the user taps the red !.
-            var unresolved = Outbox.GetFor(chatId);
+            // in the outbox. An unresolved entry means the in-flight POST from a
+            // previous session never completed — without this pass the user would
+            // see a phantom clock that never resolves.
             if (unresolved.Count > 0)
             {
                 var unresolvedIds = new HashSet<string>();
