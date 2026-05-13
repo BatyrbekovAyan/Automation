@@ -307,22 +307,20 @@ public partial class ChatManager : MonoBehaviour
             {
                 foreach (var raw in response.messages)
                 {
-                    // BRAND NEW message we missed: existing path with
-                    // ghost-send recovery dedup. If a previous-session POST
-                    // reached Wappi but the client never got the response,
-                    // the outbox holds the tempId AND the server has the
-                    // same message under its own real id. We detect that
-                    // here by matching text + timestamp and clean up the
-                    // stale Failed VM and outbox entry before adding the
-                    // server's authoritative copy. The on-screen Failed
-                    // bubble won't disappear until the chat is closed +
-                    // reopened (UpdateListRoutine doesn't dedup against
-                    // already-rendered children), but the cache and the
-                    // next chat-open render are correct.
+                    // BRAND NEW message we missed: ghost-send recovery dedup.
+                    // If a previous-session POST reached Wappi but the client
+                    // never got the response, the outbox holds the tempId AND
+                    // the server has the same message under its real id. We
+                    // detect that here by matching text + timestamp, then mutate
+                    // the cached VM in place (swap id, status, timestamp) and
+                    // fire OnMessageStatusChanged so the rendered bubble updates
+                    // its tick immediately — no close+reopen required.
                     if (seenMessageIds.Add(raw.id))
                     {
                         NormalizedMessage norm = Normalize(raw);
                         if (norm.messageType == MessageType.Unknown) continue;
+
+                        bool isGhostRecovery = false;
 
                         if (norm.fromMe && norm.messageType == MessageType.Chat)
                         {
@@ -352,21 +350,43 @@ public partial class ChatManager : MonoBehaviour
                                 {
                                     string ghostTempId = unresolved[bestMatchIndex].tempId;
 
-                                    // Drop the now-superseded Failed VM from the cache list.
-                                    for (int j = cachedList.Count - 1; j >= 0; j--)
+                                    // Mutate the cached VM in place: swap to the real id,
+                                    // adopt the server's status + timestamp. The rendered
+                                    // bubble subscribes to OnMessageStatusChanged and will
+                                    // match its currentVm.messageId against ghostTempId
+                                    // before this loop's event fire, swap to raw.id, and
+                                    // re-render the tick.
+                                    for (int j = 0; j < cachedList.Count; j++)
                                     {
                                         if (cachedList[j].messageId == ghostTempId)
                                         {
-                                            cachedList.RemoveAt(j);
+                                            cachedList[j].messageId = raw.id;
+                                            cachedList[j].deliveryStatus = norm.deliveryStatus;
+                                            cachedList[j].timestamp = norm.time;
+                                            isGhostRecovery = true;
                                             break;
                                         }
                                     }
 
                                     Outbox.RemoveAt(GetCacheRoot(), chatId, ghostTempId);
                                     seenMessageIds.Remove(ghostTempId);
+
+                                    if (isGhostRecovery)
+                                    {
+                                        // Fire the id swap + status change to the rendered
+                                        // bubble. HandleStatusChanged swaps messageId →
+                                        // raw.id and calls SetDeliveryStatus(norm.deliveryStatus),
+                                        // which re-renders the tick. No duplicate bubble.
+                                        OnMessageStatusChanged?.Invoke(ghostTempId, raw.id, norm.deliveryStatus);
+                                        hasStatusUpdates = true;
+                                    }
                                 }
                             }
                         }
+
+                        // If we already absorbed this server message into a recovered
+                        // cached VM, don't also append a duplicate to newMessages.
+                        if (isGhostRecovery) continue;
 
                         newMessages.Add(CreateViewModel(norm));
                         continue;
