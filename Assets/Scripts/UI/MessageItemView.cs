@@ -76,7 +76,8 @@ public class MessageItemView : MonoBehaviour
     private AudioSource audioSource;
     private RectTransform rectTransform;
     private TextMeshProUGUI downloadButtonText;
-    private Sprite fullScreenSprite; 
+    private Sprite fullScreenSprite;
+    private Button retryButton;
 
 #if UNITY_IOS
     [System.Runtime.InteropServices.DllImport("__Internal")]
@@ -119,6 +120,9 @@ public class MessageItemView : MonoBehaviour
 
         if (ChatManager.Instance != null)
             ChatManager.Instance.OnMessageStatusChanged -= HandleStatusChanged;
+
+        if (retryButton != null)
+            retryButton.onClick.RemoveAllListeners();
     }
     
     public void Bind(MessageViewModel vm, bool showTail = true, bool skipLayoutRebuild = false, bool showSenderName = false)    
@@ -2699,10 +2703,34 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
         SetDeliveryStatus(status);
     }
 
-    // Stub — full implementation in Task 8 (tap-to-retry).
     private void UpdateRetryButton(bool enableRetry)
     {
-        // TODO Task 8: lazily AddComponent<Button> on timeText, wire onClick to
-        // ChatManager.Instance.RetryOutboxMessage(currentVm.messageId).
+        if (timeText == null) return;
+
+        if (enableRetry)
+        {
+            // Lazily create the Button on first failure for this bubble.
+            if (retryButton == null)
+            {
+                timeText.raycastTarget = true;
+                retryButton = timeText.GetComponent<Button>();
+                if (retryButton == null) retryButton = timeText.gameObject.AddComponent<Button>();
+                retryButton.transition = Selectable.Transition.None;
+            }
+
+            retryButton.onClick.RemoveAllListeners();
+            string capturedMessageId = currentVm.messageId;
+            retryButton.onClick.AddListener(() =>
+            {
+                if (ScrollClickBlocker.IsBlocking) return;
+                if (ChatManager.Instance != null) ChatManager.Instance.RetryOutboxMessage(capturedMessageId);
+            });
+            retryButton.interactable = true;
+        }
+        else if (retryButton != null)
+        {
+            retryButton.onClick.RemoveAllListeners();
+            retryButton.interactable = false;
+        }
     }
 }
