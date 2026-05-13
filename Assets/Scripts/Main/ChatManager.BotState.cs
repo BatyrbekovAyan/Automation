@@ -107,6 +107,9 @@ public partial class ChatManager
         if (botId == CurrentBotId) return;
 
         CurrentBotId = botId;
+        // Drop the per-bot outbox cache so the next access against the new bot
+        // re-loads from disk instead of returning stale entries from the previous bot.
+        _outbox = null;
         PlayerPrefs.SetString(LastSelectedBotPrefKey, botId);
         PlayerPrefs.Save();
 
