@@ -2751,6 +2751,18 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
         }
     }
 
+    // Sizes timeText's RectTransform to match its rendered content. Required
+    // because the rect's pivot/anchor are bottom-right and LayoutElement.ignoreLayout
+    // is true; with a zero sizeDelta, TMP overflow would draw the text out from
+    // a single point and overlap surrounding bubble content.
+    private void SyncFloatingTimeSize()
+    {
+        if (timeText == null) return;
+        if (string.IsNullOrEmpty(timeText.text)) return;
+        Vector2 size = timeText.GetPreferredValues(timeText.text, Mathf.Infinity, Mathf.Infinity);
+        timeText.rectTransform.sizeDelta = size;
+    }
+
     // Returns the pixel width that needs to be reserved at the end of a
     // wrappable text so timeText fits inline. Includes an 8px visual gap
     // between the trailing word and the time.
@@ -2803,6 +2815,7 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
         string formattedTime = localTime.ToString("HH:mm");
         string tickTag = currentVm.isIncoming ? null : DeliveryTickFormatter.GetSprite(currentVm.deliveryStatus);
         timeText.text = tickTag != null ? $"{formattedTime} {tickTag}" : formattedTime;
+        SyncFloatingTimeSize();
     }
 
     private void SetDeliveryStatus(DeliveryStatus newStatus)
