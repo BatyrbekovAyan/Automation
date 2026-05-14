@@ -80,8 +80,7 @@ public class MessageItemView : MonoBehaviour
     private bool isJumboEmoji = false;
     private bool currentShowTail;
     private bool floatingTimeConfigured = false;
-    private Vector2 lastFloatingTimePosition = Vector2.zero;
-    
+
     private AudioSource audioSource;
     private RectTransform rectTransform;
     private TextMeshProUGUI downloadButtonText;
@@ -2713,6 +2712,10 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
 
         if (timeBackground != null)
         {
+            var bgLe = timeBackground.GetComponent<LayoutElement>();
+            if (bgLe == null) bgLe = timeBackground.AddComponent<LayoutElement>();
+            bgLe.ignoreLayout = true;
+
             var bgRt = timeBackground.transform as RectTransform;
             if (bgRt != null)
             {
@@ -2726,15 +2729,16 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
     }
 
     // Sets timeText.rectTransform.anchoredPosition relative to the
-    // bottom-right corner of Bubble. rightInset and bottomInset are
-    // positive values; a rightInset of 12 means 12px in from the right edge.
+    // bottom-right corner of Bubble. rightInset is typically positive
+    // (12 = 12px inset from the right edge); negative values push the
+    // time outside the bubble edge. bottomInset is positive = up from
+    // the bottom anchor.
     private void PositionFloatingTime(float rightInset, float bottomInset)
     {
         if (timeText == null) return;
         var rt = timeText.rectTransform;
         var pos = new Vector2(-rightInset, bottomInset);
         rt.anchoredPosition = pos;
-        lastFloatingTimePosition = pos;
 
         if (timeBackground != null)
         {
