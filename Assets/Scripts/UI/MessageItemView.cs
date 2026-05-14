@@ -2765,7 +2765,7 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
     private static string StripTrailingReservation(string input)
     {
         if (string.IsNullOrEmpty(input)) return input;
-        if (input.Length == 0 || input[input.Length - 1] != '>') return input;
+        if (input[input.Length - 1] != '>') return input;
         int openIdx = input.LastIndexOf("<space=", System.StringComparison.Ordinal);
         if (openIdx < 0) return input;
         int closeIdx = input.IndexOf('>', openIdx);
