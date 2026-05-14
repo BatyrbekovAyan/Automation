@@ -323,7 +323,7 @@ RectTransform:
   m_AnchorMin: {x: 1, y: 0}
   m_AnchorMax: {x: 1, y: 0}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 98, y: 46}
+  m_SizeDelta: {x: 140, y: 47}
   m_Pivot: {x: 1, y: 0}
 --- !u!222 &7441034081806738636
 CanvasRenderer:
@@ -376,7 +376,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithIndependentRoundedCorners
   r: {x: 12, y: 12, z: 23, w: 12}
-  rect2props: {x: -2.7499962, y: 2.7499962, z: 38.537323, w: 42.42641}
+  rect2props: {x: -2.7499924, y: 2.7499924, z: 53.74012, w: 57.629208}
   image: {fileID: 7930018431650757537}
 --- !u!1 &1232923811252141548
 GameObject:
@@ -1321,6 +1321,7 @@ MonoBehaviour:
     expireTime: 0
     fileSize: 0
     pageCount: 0
+    deliveryStatus: 0
 --- !u!1 &2748691260983683912
 GameObject:
   m_ObjectHideFlags: 0
