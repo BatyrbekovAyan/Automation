@@ -668,7 +668,7 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             else
             {
                 layout.padding = new RectOffset(6, 6, hasSenderName ? 14 : 6, 6);
-                if (timeText != null) PositionFloatingTime(layout.padding.right + 12f, layout.padding.bottom - 2f);
+                if (timeText != null) PositionFloatingTime(layout.padding.right + 12f, layout.padding.bottom + 6f);
             }
 
             if (senderNameText != null && hasSenderName)
