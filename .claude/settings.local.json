@@ -175,7 +175,12 @@
       "Bash(awk 'NR>=45 && NR<=48' /Users/ayan/Projects/Automation/Assets/Scripts/Chat/OutboxStore.cs)",
       "Bash(awk '/private void Persist/,/^    \\\\}/' /Users/ayan/Projects/Automation/Assets/Scripts/Chat/OutboxStore.cs)",
       "Bash(grep -v \"^commit\\\\|^Author\\\\|^Date\\\\|^Merge\\\\|^$\\\\|refactor\\\\|Splits\\\\|private\\\\|coroutine\\\\|Behavior\\\\|failure\\\\|Success\\\\|Co-Auth\")",
-      "Bash(python3 -c \"import json, sys; data = json.load\\(sys.stdin\\); msgs = data['messages']; outgoing = [m for m in msgs if not m.get\\('isIncoming', True\\)][:5]; print\\(json.dumps\\([{'text': m.get\\('text', ''\\), 'deliveryStatus': m.get\\('deliveryStatus', 'MISSING'\\), 'timestamp': m.get\\('timestamp', 0\\)} for m in outgoing], indent=2, ensure_ascii=False\\)\\)\")"
+      "Bash(python3 -c \"import json, sys; data = json.load\\(sys.stdin\\); msgs = data['messages']; outgoing = [m for m in msgs if not m.get\\('isIncoming', True\\)][:5]; print\\(json.dumps\\([{'text': m.get\\('text', ''\\), 'deliveryStatus': m.get\\('deliveryStatus', 'MISSING'\\), 'timestamp': m.get\\('timestamp', 0\\)} for m in outgoing], indent=2, ensure_ascii=False\\)\\)\")",
+      "Bash(awk 'NR>=2693 && NR<=2750' /Users/ayan/Projects/Automation/Assets/Scripts/UI/MessageItemView.cs)",
+      "Bash(ls -lat ~/.claude/projects/ | head -20)",
+      "Bash(find ~/.claude/projects -name \"*.jsonl\" -type f 2>/dev/null | xargs ls -t 2>/dev/null | head -50 > /tmp/recent_jsonl.txt && wc -l /tmp/recent_jsonl.txt)",
+      "Bash(xargs -I {} cat {})",
+      "Bash(grep -c '\"type\":\"sticker\"' \"/Users/ayan/Library/Application Support/SynergySoft/Automation/response.txt\")"
     ]
   }
 }
