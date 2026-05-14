@@ -516,7 +516,7 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                 
                 if (timeText != null)
                 {
-                    PositionFloatingTime(6f, 2f);
+                    PositionFloatingTime(layout.padding.right + 6f, layout.padding.bottom - 2f);
                 }
             }
             else
@@ -526,7 +526,7 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                 
                 layout.padding = new RectOffset(12, 12, 12, 12);
 
-                if (timeText != null) PositionFloatingTime(6f, 2f);
+                if (timeText != null) PositionFloatingTime(layout.padding.right + 6f, layout.padding.bottom - 2f);
             }
         }
         else if (type == MessageType.Chat)
@@ -555,7 +555,7 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                 
                 if (timeText != null)
                 {
-                    PositionFloatingTime(6f, 2f);
+                    PositionFloatingTime(layout.padding.right + 6f, layout.padding.bottom - 2f);
                 }
             }
             else if (isJumboEmoji)
@@ -566,7 +566,7 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                     
                     if (timeText != null)
                     {
-                        PositionFloatingTime(18f, -4f);
+                        PositionFloatingTime(layout.padding.right + 18f, layout.padding.bottom + 4f);
                     }
 
                     timeText.color = Color.white;
@@ -577,7 +577,7 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                     
                     if (timeText != null)
                     {
-                        PositionFloatingTime(10f, -4f);
+                        PositionFloatingTime(layout.padding.right + 10f, layout.padding.bottom + 4f);
                     }
                 }
             }
@@ -588,7 +588,7 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                 if (timeText != null)
                 {
                     timeText.overflowMode = TextOverflowModes.Overflow;
-                    PositionFloatingTime(-4f, 8f);
+                    PositionFloatingTime(layout.padding.right - 4f, layout.padding.bottom - 8f);
                 }
             }
         }
@@ -607,7 +607,7 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
 
                 if (timeText != null)
                 {
-                    PositionFloatingTime(6f, 2f);
+                    PositionFloatingTime(layout.padding.right + 6f, layout.padding.bottom - 2f);
                 }
 
                 if (senderNameText != null && hasSenderName)
@@ -622,7 +622,7 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
 
                 if (timeText != null)
                 {
-                    PositionFloatingTime(6f, 2f);
+                    PositionFloatingTime(layout.padding.right + 6f, layout.padding.bottom - 2f);
                 }
 
                 if (senderNameText != null && hasSenderName)
@@ -663,13 +663,13 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             {
                 // Add 14px of top padding if there is a name
                 layout.padding = new RectOffset(8, 8, hasSenderName ? 14 : 8, 12);
-                if (timeText != null) PositionFloatingTime(6f, 2f);
+                if (timeText != null) PositionFloatingTime(layout.padding.right + 6f, layout.padding.bottom - 2f);
             }
             else
             {
                 // If it has a caption, use standard bottom padding (12) instead of the oversized image padding (15)
                 layout.padding = new RectOffset(6, 6, hasSenderName ? 14 : 6, hasCaption ? 12 : 15);
-                if (timeText != null) PositionFloatingTime(12f, 2f);
+                if (timeText != null) PositionFloatingTime(layout.padding.right + 12f, layout.padding.bottom - 2f);
             }
 
             if (senderNameText != null && hasSenderName)
@@ -684,7 +684,7 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
 
             if (timeText != null)
             {
-                PositionFloatingTime(12f, 2f);
+                PositionFloatingTime(layout.padding.right + 12f, layout.padding.bottom - 2f);
             }
         }
         
