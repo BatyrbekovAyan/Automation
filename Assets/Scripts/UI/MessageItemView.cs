@@ -78,7 +78,9 @@ public class MessageItemView : MonoBehaviour
     private float defaultFontSize = -1f;
     private bool hideBubble = false;
     private bool isJumboEmoji = false;
-    private bool currentShowTail; 
+    private bool currentShowTail;
+    private bool floatingTimeConfigured = false;
+    private Vector2 lastFloatingTimePosition = Vector2.zero;
     
     private AudioSource audioSource;
     private RectTransform rectTransform;
@@ -101,6 +103,8 @@ public class MessageItemView : MonoBehaviour
         {
             downloadButtonText = downloadButton.GetComponentInChildren<TextMeshProUGUI>(true);
         }
+
+        ConfigureFloatingTime();
     }
 
     void OnEnable()
@@ -513,7 +517,7 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                 
                 if (timeText != null)
                 {
-                    timeText.margin = new Vector4(0, 0, 6, -2);
+                    PositionFloatingTime(6f, 2f);
                 }
             }
             else
@@ -521,9 +525,9 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                 // --- THE SPACING FIX: 12px if there is a caption, 8px if there isn't! ---
                 layout.spacing = hasCaption ? 12 : 8; 
                 
-                layout.padding = new RectOffset(12, 12, 12, 12); 
-                
-                if (timeText != null) timeText.margin = new Vector4(0, 0, 6, -2);
+                layout.padding = new RectOffset(12, 12, 12, 12);
+
+                if (timeText != null) PositionFloatingTime(6f, 2f);
             }
         }
         else if (type == MessageType.Chat)
@@ -552,7 +556,7 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                 
                 if (timeText != null)
                 {
-                    timeText.margin = new Vector4(0, 0, 6, -2);
+                    PositionFloatingTime(6f, 2f);
                 }
             }
             else if (isJumboEmoji)
@@ -563,9 +567,9 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                     
                     if (timeText != null)
                     {
-                        timeText.margin = new Vector4(0, 0, 18, 4);
+                        PositionFloatingTime(18f, -4f);
                     }
-                    
+
                     timeText.color = Color.white;
                 }
                 else 
@@ -574,18 +578,18 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                     
                     if (timeText != null)
                     {
-                        timeText.margin = new Vector4(0, 0, 10, 4);
+                        PositionFloatingTime(10f, -4f);
                     }
                 }
             }
-            else 
+            else
             {
                 layout.padding = new RectOffset(24, 24, 14, 18);
                 
                 if (timeText != null)
                 {
                     timeText.overflowMode = TextOverflowModes.Overflow;
-                    timeText.margin = new Vector4(0, 0, -4, -8); 
+                    PositionFloatingTime(-4f, 8f);
                 }
             }
         }
@@ -599,14 +603,14 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
 
             if (useCardLayout)
             {
-                layout.spacing = 8; 
+                layout.spacing = 8;
                 layout.padding = new RectOffset(8, 8, 8, 12);
-                
+
                 if (timeText != null)
                 {
-                    timeText.margin = new Vector4(0, 0, 6, -2);
+                    PositionFloatingTime(6f, 2f);
                 }
-                
+
                 if (senderNameText != null && hasSenderName)
                 {
                     senderNameText.margin = new Vector4(16, 0, 0, 0);
@@ -614,14 +618,14 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             }
             else
             {
-                layout.spacing = -34; 
+                layout.spacing = -34;
                 layout.padding = new RectOffset(16, 14, 12, 12);
-                
+
                 if (timeText != null)
                 {
-                    timeText.margin = new Vector4(0, 0, 6, -2);
+                    PositionFloatingTime(6f, 2f);
                 }
-                
+
                 if (senderNameText != null && hasSenderName)
                 {
                     senderNameText.margin = new Vector4(8, 0, 0, 34);
@@ -659,14 +663,14 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             if (useCardLayout)
             {
                 // Add 14px of top padding if there is a name
-                layout.padding = new RectOffset(8, 8, hasSenderName ? 14 : 8, 12); 
-                if (timeText != null) timeText.margin = new Vector4(0, 0, 6, -2); 
+                layout.padding = new RectOffset(8, 8, hasSenderName ? 14 : 8, 12);
+                if (timeText != null) PositionFloatingTime(6f, 2f);
             }
             else
             {
                 // If it has a caption, use standard bottom padding (12) instead of the oversized image padding (15)
-                layout.padding = new RectOffset(6, 6, hasSenderName ? 14 : 6, hasCaption ? 12 : 15); 
-                if (timeText != null) timeText.margin = new Vector4(0, 0, 12, -2);
+                layout.padding = new RectOffset(6, 6, hasSenderName ? 14 : 6, hasCaption ? 12 : 15);
+                if (timeText != null) PositionFloatingTime(12f, 2f);
             }
 
             if (senderNameText != null && hasSenderName)
@@ -676,12 +680,12 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
         }        
         else
         {
-            layout.spacing = 5; 
-            layout.padding = new RectOffset(6, 6, 6, 16); 
-            
+            layout.spacing = 5;
+            layout.padding = new RectOffset(6, 6, 6, 16);
+
             if (timeText != null)
             {
-                timeText.margin = new Vector4(0, 0, 12, -2);
+                PositionFloatingTime(12f, 2f);
             }
         }
         
@@ -2688,6 +2692,56 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
     }
 
     // --- Task 5: delivery-status re-render cluster ---
+
+    // Reconfigures timeText to be absolutely positioned at bottom-right of Bubble
+    // so it no longer reserves vertical space in the bubble's VerticalLayoutGroup.
+    // Runs once per bubble instance; position offsets are applied later by
+    // PositionFloatingTime() inside ApplyDynamicLayout.
+    private void ConfigureFloatingTime()
+    {
+        if (timeText == null) return;
+        if (floatingTimeConfigured) return;
+
+        var le = timeText.GetComponent<LayoutElement>();
+        if (le == null) le = timeText.gameObject.AddComponent<LayoutElement>();
+        le.ignoreLayout = true;
+
+        var rt = timeText.rectTransform;
+        rt.anchorMin = new Vector2(1f, 0f);
+        rt.anchorMax = new Vector2(1f, 0f);
+        rt.pivot = new Vector2(1f, 0f);
+
+        if (timeBackground != null)
+        {
+            var bgRt = timeBackground.transform as RectTransform;
+            if (bgRt != null)
+            {
+                bgRt.anchorMin = new Vector2(1f, 0f);
+                bgRt.anchorMax = new Vector2(1f, 0f);
+                bgRt.pivot = new Vector2(1f, 0f);
+            }
+        }
+
+        floatingTimeConfigured = true;
+    }
+
+    // Sets timeText.rectTransform.anchoredPosition relative to the
+    // bottom-right corner of Bubble. rightInset and bottomInset are
+    // positive values; a rightInset of 12 means 12px in from the right edge.
+    private void PositionFloatingTime(float rightInset, float bottomInset)
+    {
+        if (timeText == null) return;
+        var rt = timeText.rectTransform;
+        var pos = new Vector2(-rightInset, bottomInset);
+        rt.anchoredPosition = pos;
+        lastFloatingTimePosition = pos;
+
+        if (timeBackground != null)
+        {
+            var bgRt = timeBackground.transform as RectTransform;
+            if (bgRt != null) bgRt.anchoredPosition = pos;
+        }
+    }
 
     private void RefreshTimeAndTick()
     {
