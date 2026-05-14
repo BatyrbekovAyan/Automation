@@ -2747,6 +2747,51 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
         }
     }
 
+    // Returns the pixel width that needs to be reserved at the end of a
+    // wrappable text so timeText fits inline. Includes an 8px visual gap
+    // between the trailing word and the time.
+    private float MeasureTimeWidth()
+    {
+        if (timeText == null) return 0f;
+        if (string.IsNullOrEmpty(timeText.text)) return 0f;
+        float w = timeText.GetPreferredValues(timeText.text, Mathf.Infinity, Mathf.Infinity).x;
+        return w + 8f;
+    }
+
+    // Removes a single trailing TMP <space=...> tag if present. Used to
+    // scrub the previous reservation before appending a fresh one, so the
+    // text doesn't accumulate stacked space tags across re-binds and
+    // status-change re-renders.
+    private static string StripTrailingReservation(string input)
+    {
+        if (string.IsNullOrEmpty(input)) return input;
+        if (input.Length == 0 || input[input.Length - 1] != '>') return input;
+        int openIdx = input.LastIndexOf("<space=", System.StringComparison.Ordinal);
+        if (openIdx < 0) return input;
+        int closeIdx = input.IndexOf('>', openIdx);
+        if (closeIdx != input.Length - 1) return input;
+        return input.Substring(0, openIdx);
+    }
+
+    // Appends a TMP <space={width}px> tag to the end of target.text so the
+    // last line reserves horizontal room for the inline timestamp. TMP's
+    // wrap logic treats the space as a regular glyph, so a full last line
+    // pushes the space to a new line (and timeText, anchored at bottom-right,
+    // follows visually).
+    private void ApplyInlineTimeReservation(TextMeshProUGUI target)
+    {
+        if (target == null) return;
+        if (!target.gameObject.activeSelf) return;
+        if (string.IsNullOrEmpty(target.text)) return;
+        if (isJumboEmoji) return;
+
+        float w = MeasureTimeWidth();
+        if (w <= 0f) return;
+
+        string baseText = StripTrailingReservation(target.text);
+        target.text = $"{baseText}<space={w:0.##}px>";
+    }
+
     private void RefreshTimeAndTick()
     {
         if (timeText == null || currentVm == null) return;
