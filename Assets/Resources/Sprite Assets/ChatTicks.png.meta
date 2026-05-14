@@ -17,6 +17,12 @@ TextureImporter:
   - first:
       213: 7477049491928991792
     second: ChatTicks_4
+  - first:
+      213: 5153289918511531435
+    second: ChatTicks_5
+  - first:
+      213: 2579449417053903693
+    second: ChatTicks_6
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -229,8 +235,8 @@ TextureImporter:
       name: ChatTicks_4
       rect:
         serializedVersion: 2
-        x: 0
-        y: 127
+        x: 1028
+        y: 641
         width: 362
         height: 260
       alignment: 0
@@ -243,6 +249,50 @@ TextureImporter:
       bones: []
       spriteID: 0384176d5e0d3c760800000000000000
       internalID: 7477049491928991792
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ChatTicks_5
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 0
+        width: 514
+        height: 514
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ba54b79a0e9248740800000000000000
+      internalID: 5153289918511531435
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ChatTicks_6
+      rect:
+        serializedVersion: 2
+        x: 514
+        y: 0
+        width: 514
+        height: 514
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d4b169b049b0cc320800000000000000
+      internalID: 2579449417053903693
       vertices: []
       indices: 
       edges: []
@@ -266,6 +316,8 @@ TextureImporter:
       ChatTicks_2: 5301533730997508508
       ChatTicks_3: 6195923368721153620
       ChatTicks_4: 7477049491928991792
+      ChatTicks_5: 5153289918511531435
+      ChatTicks_6: 2579449417053903693
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
