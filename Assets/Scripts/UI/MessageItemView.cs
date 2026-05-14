@@ -526,7 +526,9 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                 
                 layout.padding = new RectOffset(12, 12, 12, 54);
 
-                if (timeText != null) PositionFloatingTime(layout.padding.right + 6f, layout.padding.bottom - 2f);
+                // Time stays at the original 10px bottom inset (matched the pre-54 padding);
+                // the wider bottom padding is for the document card visual, not the time placement.
+                if (timeText != null) PositionFloatingTime(layout.padding.right + 6f, 10f);
             }
         }
         else if (type == MessageType.Chat)
