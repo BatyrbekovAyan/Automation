@@ -2781,11 +2781,8 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
     private static string StripTrailingReservation(string input)
     {
         if (string.IsNullOrEmpty(input)) return input;
-        if (input[input.Length - 1] != '>') return input;
         int openIdx = input.LastIndexOf("<space=", System.StringComparison.Ordinal);
         if (openIdx < 0) return input;
-        int closeIdx = input.IndexOf('>', openIdx);
-        if (closeIdx != input.Length - 1) return input;
         return input.Substring(0, openIdx);
     }
 
@@ -2805,7 +2802,7 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
         if (w <= 0f) return;
 
         string baseText = StripTrailingReservation(target.text);
-        target.text = $"{baseText}<space={w:0.##}px>";
+        target.text = $"{baseText}<space={w:0.##}px><alpha=#00>.";
     }
 
     private void RefreshTimeAndTick()
