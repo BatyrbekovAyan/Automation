@@ -296,6 +296,15 @@ public partial class ChatManager : MonoBehaviour
 
         if (www.result != UnityWebRequest.Result.Success) yield break;
 
+#if UNITY_EDITOR
+        var text = www.downloadHandler.text;
+        System.IO.File.WriteAllText(
+            Application.persistentDataPath + "/response.txt",
+            text
+        );
+        Debug.Log("Saved to: " + Application.persistentDataPath);
+#endif
+        
         List<MessageViewModel> newMessages = new List<MessageViewModel>();
         bool hasStatusUpdates = false;
 
