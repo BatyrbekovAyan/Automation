@@ -725,6 +725,10 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             if (timeLayout == null) timeLayout = timeText.gameObject.AddComponent<LayoutElement>();
         }
 
+        // Reserve trailing space in the wrappable text so the floating timeText
+        // sits inline. Skipped automatically for jumbo emoji / empty / inactive text.
+        ApplyInlineTimeReservation(messageText);
+
         if (isJumboEmoji)
         {
             messageText.textWrappingMode = TextWrappingModes.NoWrap;
