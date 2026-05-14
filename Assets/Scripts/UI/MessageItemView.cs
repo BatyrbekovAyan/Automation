@@ -669,8 +669,12 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             }
             else
             {
-                layout.padding = new RectOffset(6, 6, hasSenderName ? 14 : 6, 6);
-                if (timeText != null) PositionFloatingTime(layout.padding.right + 12f, layout.padding.bottom + 6f);
+                // Stickers get the wider 54px bottom padding (matches the document card visual);
+                // images and videos keep the tight 6px so the media fills the bubble.
+                int bottomPad = (type == MessageType.Sticker) ? 54 : 6;
+                layout.padding = new RectOffset(6, 6, hasSenderName ? 14 : 6, bottomPad);
+                // Time inset is fixed at 12 — independent of bottomPad so stickers don't push it up.
+                if (timeText != null) PositionFloatingTime(layout.padding.right + 12f, 12f);
             }
 
             if (senderNameText != null && hasSenderName)
