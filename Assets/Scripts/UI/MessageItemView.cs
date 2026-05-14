@@ -524,7 +524,7 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                 // --- THE SPACING FIX: 12px if there is a caption, 8px if there isn't! ---
                 layout.spacing = hasCaption ? 12 : 8; 
                 
-                layout.padding = new RectOffset(12, 12, 12, 12);
+                layout.padding = new RectOffset(12, 12, 12, 54);
 
                 if (timeText != null) PositionFloatingTime(layout.padding.right + 6f, layout.padding.bottom - 2f);
             }
