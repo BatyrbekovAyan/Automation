@@ -2811,6 +2811,11 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
         currentVm.deliveryStatus = newStatus;
         RefreshTimeAndTick();
         UpdateRetryButton(newStatus == DeliveryStatus.Failed);
+
+        // Tick width may have changed — recompute the reserved space and
+        // ask the layout to redraw so the bubble width re-snaps if needed.
+        ApplyInlineTimeReservation(messageText);
+        if (rectTransform != null) LayoutRebuilder.MarkLayoutForRebuild(rectTransform);
     }
 
     private void HandleStatusChanged(string oldMessageId, string newMessageId, DeliveryStatus status)
