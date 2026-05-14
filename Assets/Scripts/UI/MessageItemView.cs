@@ -667,8 +667,7 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             }
             else
             {
-                // If it has a caption, use standard bottom padding (12) instead of the oversized image padding (15)
-                layout.padding = new RectOffset(6, 6, hasSenderName ? 14 : 6, hasCaption ? 12 : 15);
+                layout.padding = new RectOffset(6, 6, hasSenderName ? 14 : 6, 6);
                 if (timeText != null) PositionFloatingTime(layout.padding.right + 12f, layout.padding.bottom - 2f);
             }
 
@@ -2714,21 +2713,6 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
         rt.anchorMax = new Vector2(1f, 0f);
         rt.pivot = new Vector2(1f, 0f);
 
-        if (timeBackground != null)
-        {
-            var bgLe = timeBackground.GetComponent<LayoutElement>();
-            if (bgLe == null) bgLe = timeBackground.AddComponent<LayoutElement>();
-            bgLe.ignoreLayout = true;
-
-            var bgRt = timeBackground.transform as RectTransform;
-            if (bgRt != null)
-            {
-                bgRt.anchorMin = new Vector2(1f, 0f);
-                bgRt.anchorMax = new Vector2(1f, 0f);
-                bgRt.pivot = new Vector2(1f, 0f);
-            }
-        }
-
         floatingTimeConfigured = true;
     }
 
@@ -2744,11 +2728,6 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
         var pos = new Vector2(-rightInset, bottomInset);
         rt.anchoredPosition = pos;
 
-        if (timeBackground != null)
-        {
-            var bgRt = timeBackground.transform as RectTransform;
-            if (bgRt != null) bgRt.anchoredPosition = pos;
-        }
     }
 
     // Sizes timeText's RectTransform to match its rendered content. Required
