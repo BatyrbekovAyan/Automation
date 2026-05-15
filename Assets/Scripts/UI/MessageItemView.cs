@@ -547,23 +547,28 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             {
                 bool hasSenderName = senderNameText != null && senderNameText.gameObject.activeSelf;
                 
-                bool hasCaption = messageText != null && messageText.gameObject.activeSelf && !string.IsNullOrEmpty(messageText.text);
-                
-                layout.spacing = hasCaption ? 12 : 8; 
-                
-                // Match the 12px bottom padding from the Media blocks
-                layout.padding = new RectOffset(6, 6, hasSenderName ? 14 : 6, hasCaption ? 12 : 15); 
-                
+                string rawCaption = currentVm?.text ?? "";
+                rawCaption = System.Text.RegularExpressions.Regex.Replace(rawCaption, @"https?://\S+", "");
+                rawCaption = System.Text.RegularExpressions.Regex.Replace(rawCaption, @"[​-‏ - ﻿]", "");
+                rawCaption = rawCaption.Trim();
+                bool vmHasCaption = !string.IsNullOrWhiteSpace(rawCaption);
+                bool messageTextActive = messageText != null && messageText.gameObject.activeSelf;
+                bool hasCaption = messageTextActive && vmHasCaption;
+
+                layout.spacing = hasCaption ? 12 : 8;
+
+                layout.padding = new RectOffset(6, 6, hasSenderName ? 14 : 6, hasCaption ? 12 : 0);
+
                 if (hasSenderName)
                 {
-                    // If layout spacing increased to 12px, we offset the sender name's bottom 
+                    // If layout spacing increased to 12px, we offset the sender name's bottom
                     // margin by -4px so the name doesn't float too far away from the card!
                     senderNameText.margin = new Vector4(18, 0, 0, hasCaption ? -4 : 0);
                 }
-                
+
                 if (timeText != null)
                 {
-                    PositionFloatingTime(layout.padding.right + 6f, layout.padding.bottom - 2f);
+                    PositionFloatingTime(layout.padding.right + 6f, 10f);
                 }
             }
             else if (isJumboEmoji)
@@ -591,8 +596,8 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             }
             else
             {
-                layout.padding = new RectOffset(24, 24, 14, 18);
-                
+                layout.padding = new RectOffset(12, 12, 14, 18);
+
                 if (timeText != null)
                 {
                     timeText.overflowMode = TextOverflowModes.Overflow;
