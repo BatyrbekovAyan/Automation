@@ -39,12 +39,40 @@ public partial class ChatManager : MonoBehaviour
     /// </summary>
     public event Action<string, string, DeliveryStatus> OnMessageStatusChanged;
 
+    /// <summary>
+    /// Fires when a cached message's media URL is refreshed from a later
+    /// server fetch. Subscribers receive the same MessageViewModel reference
+    /// that lives in cachedList — mediaUrl / videoUrl / thumbnailUrl /
+    /// expireTime have already been mutated when the event fires, so a
+    /// listener can simply re-bind to pick up the new URL.
+    /// </summary>
+    public event Action<MessageViewModel> OnMessageMediaRefreshed;
+
     public event Action<string> OnActiveBotChanged;
     public event Action<EmptyStateReason> OnEmptyState;
     
     // State
     public int currentPage = 1;
     private string currentChatId;
+
+    /// <summary>
+    /// The MessageViewModel list currently powering the open chat's bubbles.
+    /// The references in this list are the same ones held by each rendered
+    /// MessageItemView.currentVm, so mutating an entry's mediaUrl in place
+    /// is observable in the UI. Set by LoadMessagesForChat and re-synced by
+    /// SyncLatestMessages when new messages merge in. SyncLatestMessages and
+    /// GetMessagesRoutine both read it to refresh stale URLs.
+    /// </summary>
+    private List<MessageViewModel> _activeChatCache;
+
+    /// <summary>
+    /// Cached messages that haven't been rendered yet. We only show the newest
+    /// MessagesPerPage on chat open; the rest sit here and get drained by
+    /// LoadNextPage one batch at a time. Each cache-drain pairs with a parallel
+    /// server fetch (ValidateCachePageAgainstServer) so the bubbles render
+    /// with freshly-validated URLs instead of whatever the cache file held.
+    /// </summary>
+    private List<MessageViewModel> _cachedQueue;
 
     public void Awake()
     {
@@ -234,6 +262,11 @@ public partial class ChatManager : MonoBehaviour
         // Safety check: Make sure the user didn't swipe back out before the animation finished!
         if (currentChatId != chatId) return;
 
+        // Reset per-chat pagination state so a previous chat's queue can't
+        // leak into this one if LoadNextPage races a chat switch.
+        _activeChatCache = null;
+        _cachedQueue = null;
+
         List<MessageViewModel> cachedMessages = ChatHistoryCache.LoadHistory(GetCacheRoot(), chatId);
 
         // Always load the outbox for this chat — populates OutboxStore's in-memory
@@ -259,9 +292,37 @@ public partial class ChatManager : MonoBehaviour
                 }
             }
 
-            // 1. INSTANT LOAD: Register the cached IDs and draw the UI immediately!
+            // Sort newest-first so the "first MessagesPerPage" really are the
+            // latest. The cache file's order is roughly newest-first after
+            // SyncLatestMessages merges, but not guaranteed — explicit sort
+            // protects the pagination contract.
+            cachedMessages.Sort((a, b) => b.timestamp.CompareTo(a.timestamp));
+
+            // Register every cached id so SyncLatestMessages and any later
+            // server fetches route already-known messages into the refresh
+            // branch instead of creating duplicate bubbles.
             foreach (var msg in cachedMessages) seenMessageIds.Add(msg.messageId);
-            OnBatchMessagesLoaded?.Invoke(cachedMessages, false, true);
+            _activeChatCache = cachedMessages;
+
+            // Show only the newest MessagesPerPage on first paint; the rest
+            // wait in _cachedQueue until LoadNextPage drains a batch. This
+            // keeps older stale-URL bubbles from rendering before their
+            // ValidateCachePageAgainstServer pass has a chance to patch them.
+            List<MessageViewModel> initialBatch;
+            if (cachedMessages.Count > MessagesPerPage)
+            {
+                initialBatch = cachedMessages.GetRange(0, MessagesPerPage);
+                _cachedQueue = cachedMessages.GetRange(MessagesPerPage, cachedMessages.Count - MessagesPerPage);
+            }
+            else
+            {
+                initialBatch = cachedMessages;
+                _cachedQueue = new List<MessageViewModel>();
+            }
+
+            // hasMore stays true while the cache queue still has entries or
+            // the server might have older messages (we don't know yet).
+            OnBatchMessagesLoaded?.Invoke(initialBatch, false, true);
 
             // 2. BACKGROUND SYNC: Quietly check for missed messages
             StartCoroutine(SyncLatestMessages(chatId, cachedMessages));
@@ -269,9 +330,11 @@ public partial class ChatManager : MonoBehaviour
         else
         {
             // 3. NO CACHE: This is a brand new chat, do a normal fetch
-            StartCoroutine(GetMessagesRoutine(chatId, 1, (newMessages, hasMore) => 
+            StartCoroutine(GetMessagesRoutine(chatId, 1, (newMessages, hasMore) =>
             {
                 if (newMessages.Count > 0) ChatHistoryCache.SaveHistory(GetCacheRoot(), chatId, newMessages);
+                _activeChatCache = newMessages;
+                _cachedQueue = new List<MessageViewModel>();
                 OnBatchMessagesLoaded?.Invoke(newMessages, false, hasMore);
             }));
         }
@@ -401,11 +464,22 @@ public partial class ChatManager : MonoBehaviour
                         continue;
                     }
 
-                    // Already-cached outgoing message: server may have a fresher
-                    // delivery_status than the cached VM. Update in place so the
-                    // bubble re-renders and the cache stops drifting. Apply the
-                    // same Sent-fallback as Normalize so cached None entries
-                    // from self-chat sends get migrated on the next sync.
+                    // Already-cached message: refresh stale media URLs and
+                    // delivery_status. Wappi can return s3Info: null on first
+                    // arrival and populate it later, or — seen in production —
+                    // hand out an s3 URL whose file path points at another
+                    // message's bytes. Without this pass the cached entry
+                    // stays wrong forever and the on-disk media cache (keyed
+                    // by URL MD5) serves the wrong file on every reload.
+                    if (RefreshCachedMessageMedia(Normalize(raw), cachedList))
+                    {
+                        hasStatusUpdates = true;
+                    }
+
+                    // Server may also have a fresher delivery_status for an
+                    // outgoing message. Apply the same Sent-fallback as
+                    // Normalize so cached None entries from self-chat sends
+                    // get migrated on the next sync.
                     if (!raw.fromMe) continue;
 
                     DeliveryStatus parsedRaw = DeliveryTickFormatter.ParseWappiString(raw.deliveryStatusRaw);
@@ -445,6 +519,9 @@ public partial class ChatManager : MonoBehaviour
             // Save the newly merged list permanently
             ChatHistoryCache.SaveHistory(GetCacheRoot(), chatId, newMessages);
 
+            // Track the merged list for future paginated refreshes.
+            _activeChatCache = newMessages;
+
             // Refresh the UI with the fully up-to-date list!
             OnBatchMessagesLoaded?.Invoke(newMessages, false, true);
         }
@@ -463,10 +540,84 @@ public partial class ChatManager : MonoBehaviour
 
         currentPage++;
 
-        StartCoroutine(GetMessagesRoutine(currentChatId, currentPage, (messages, hasMore) => 
+        // Drain the cache queue first — those bubbles render instantly and
+        // we kick off a parallel server fetch to validate (and overwrite
+        // via OnMessageMediaRefreshed) any stale URLs in the batch. Only
+        // after the queue is empty do we go to the server for genuinely
+        // older history.
+        if (_cachedQueue != null && _cachedQueue.Count > 0)
+        {
+            int take = Math.Min(MessagesPerPage, _cachedQueue.Count);
+            var batch = _cachedQueue.GetRange(0, take);
+            _cachedQueue.RemoveRange(0, take);
+
+            // hasMore stays armed while either the queue still has entries
+            // or the server might have older messages we haven't touched.
+            bool moreToCome = _cachedQueue.Count > 0 || true;
+            OnBatchMessagesLoaded?.Invoke(batch, true, moreToCome);
+
+            // Parallel URL validation against the matching server page.
+            StartCoroutine(ValidateCachePageAgainstServer(currentChatId, currentPage));
+            return;
+        }
+
+        StartCoroutine(GetMessagesRoutine(currentChatId, currentPage, (messages, hasMore) =>
         {
             OnBatchMessagesLoaded?.Invoke(messages, true, hasMore);
         }));
+    }
+
+    /// <summary>
+    /// Background URL-validation pass for a cache-served page. Fetches the
+    /// matching server page and feeds every returned message through
+    /// RefreshCachedMessageMedia, which patches any cached entry whose URL
+    /// path has shifted on the server. Saves the cache file if anything
+    /// changed. Unlike GetMessagesRoutine this never fires
+    /// OnBatchMessagesLoaded — the bubbles for these messages have already
+    /// been rendered from cache, and the only thing we want from the server
+    /// is fresh URLs, not extra entries.
+    /// </summary>
+    private IEnumerator ValidateCachePageAgainstServer(string chatId, int page)
+    {
+        int offset = (page - 1) * MessagesPerPage;
+        string activeProfileId = GetActiveProfileId();
+        if (string.IsNullOrEmpty(activeProfileId)) yield break;
+
+        string escapedId = UnityWebRequest.EscapeURL(chatId);
+        string url = $"https://wappi.pro/api/sync/messages/get?profile_id={activeProfileId}&chat_id={escapedId}&limit={MessagesPerPage}&offset={offset}";
+
+        using UnityWebRequest www = UnityWebRequest.Get(url);
+        www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
+        www.timeout = 30;
+        yield return www.SendWebRequest();
+
+        if (www.result != UnityWebRequest.Result.Success) yield break;
+
+        bool cacheDirty = false;
+        try
+        {
+            MessagesResponseRaw response = JsonConvert.DeserializeObject<MessagesResponseRaw>(www.downloadHandler.text);
+            if (response?.messages != null)
+            {
+                foreach (var raw in response.messages)
+                {
+                    if (string.IsNullOrEmpty(raw.id)) continue;
+                    if (RefreshCachedMessageMedia(Normalize(raw), _activeChatCache))
+                    {
+                        cacheDirty = true;
+                    }
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"ValidateCachePage JSON Parse Error: {e.Message}");
+        }
+
+        if (cacheDirty && _activeChatCache != null)
+        {
+            ChatHistoryCache.SaveHistory(GetCacheRoot(), chatId, _activeChatCache);
+        }
     }
 
 // Notice the Action signature now includes a bool!
@@ -506,8 +657,9 @@ public partial class ChatManager : MonoBehaviour
         
         List<MessageViewModel> loadedMessages = new List<MessageViewModel>();
         int rawServerCount = 0; // --- THE FIX: Track the raw count before filtering! ---
-        
-        try 
+        bool cacheDirty = false;
+
+        try
         {
             MessagesResponseRaw response = JsonConvert.DeserializeObject<MessagesResponseRaw>(www.downloadHandler.text);
 
@@ -517,11 +669,26 @@ public partial class ChatManager : MonoBehaviour
                 {
                     rawServerCount++; // Count every single message the server gave us
 
-                    if (string.IsNullOrEmpty(raw.id) || !seenMessageIds.Add(raw.id)) continue;
+                    if (string.IsNullOrEmpty(raw.id)) continue;
+
+                    if (!seenMessageIds.Add(raw.id))
+                    {
+                        // Already in cache: trust the server's fresh URLs over
+                        // whatever the cache still holds. Mainly catches the
+                        // case where an older message in _activeChatCache has
+                        // a stale or wrong s3 URL from a prior sync — once the
+                        // user paginates past it, we patch the cache so the
+                        // next render uses the right file.
+                        if (RefreshCachedMessageMedia(Normalize(raw), _activeChatCache))
+                        {
+                            cacheDirty = true;
+                        }
+                        continue;
+                    }
 
                     NormalizedMessage norm = Normalize(raw);
                     if (norm.messageType == MessageType.Unknown) continue;
-                    
+
                     MessageViewModel vm = CreateViewModel(norm);
                     loadedMessages.Add(vm);
                 }
@@ -530,6 +697,11 @@ public partial class ChatManager : MonoBehaviour
         catch (Exception e)
         {
             Debug.LogError($"JSON Parse Error: {e.Message}");
+        }
+
+        if (cacheDirty && _activeChatCache != null)
+        {
+            ChatHistoryCache.SaveHistory(GetCacheRoot(), chatId, _activeChatCache);
         }
 
         bool hasMore = rawServerCount >= MessagesPerPage;
@@ -766,6 +938,84 @@ if (msg.messageType == MessageType.Video)
             "document" => MessageType.Document,
             _ => MessageType.Unknown
         };
+    }
+
+    static bool IsMediaMessageType(MessageType type) =>
+        type == MessageType.Image
+        || type == MessageType.Video
+        || type == MessageType.Audio
+        || type == MessageType.Voice
+        || type == MessageType.Sticker
+        || type == MessageType.Document;
+
+    /// <summary>
+    /// If `refreshed` matches an entry in `cachedList`, copy any
+    /// newly-available media URLs onto the cached entry in place. Used by
+    /// both SyncLatestMessages (latest-50 window) and GetMessagesRoutine
+    /// (paginated older pages) — anywhere we re-encounter an already-cached
+    /// message, we trust the server's fresh URL over whatever the cache
+    /// holds. Returns true if any field changed (caller should mark its
+    /// cache dirty). Fires OnMessageMediaRefreshed so rendered bubbles
+    /// re-bind under the new URL.
+    /// </summary>
+    private bool RefreshCachedMessageMedia(NormalizedMessage refreshed, List<MessageViewModel> cachedList)
+    {
+        if (refreshed == null || cachedList == null) return false;
+        if (refreshed.messageType == MessageType.Unknown) return false;
+        if (!IsMediaMessageType(refreshed.messageType)) return false;
+
+        for (int i = 0; i < cachedList.Count; i++)
+        {
+            if (cachedList[i].messageId != refreshed.id) continue;
+
+            var cached = cachedList[i];
+            bool mediaRefreshed = false;
+
+            if (!string.IsNullOrEmpty(refreshed.mediaUrl) && UrlPathDiffers(refreshed.mediaUrl, cached.mediaUrl))
+            {
+                cached.mediaUrl = refreshed.mediaUrl;
+                cached.expireTime = refreshed.expireTime;
+                mediaRefreshed = true;
+            }
+            if (!string.IsNullOrEmpty(refreshed.videoUrl) && UrlPathDiffers(refreshed.videoUrl, cached.videoUrl))
+            {
+                cached.videoUrl = refreshed.videoUrl;
+                cached.expireTime = refreshed.expireTime;
+                mediaRefreshed = true;
+            }
+            if (!string.IsNullOrEmpty(refreshed.thumbnailUrl) && string.IsNullOrEmpty(cached.thumbnailUrl))
+            {
+                cached.thumbnailUrl = refreshed.thumbnailUrl;
+                mediaRefreshed = true;
+            }
+
+            if (mediaRefreshed) OnMessageMediaRefreshed?.Invoke(cached);
+            return mediaRefreshed;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Compare two URLs by file path only (ignoring query string). S3
+    /// signed URLs get a fresh X-Amz-Signature on every fetch even when
+    /// the underlying file is unchanged — those refreshes are harmless to
+    /// skip in cache, the rendering layer falls back to Wappi's
+    /// /media/download endpoint when the local expireTime is past. We only
+    /// care when the FILE behind the URL changes (different uuid path).
+    /// Treats empty/non-empty as differing so a server URL can fill a hole.
+    /// </summary>
+    static bool UrlPathDiffers(string a, string b)
+    {
+        bool aEmpty = string.IsNullOrEmpty(a);
+        bool bEmpty = string.IsNullOrEmpty(b);
+        if (aEmpty && bEmpty) return false;
+        if (aEmpty != bEmpty) return true;
+
+        int ai = a.IndexOf('?');
+        int bi = b.IndexOf('?');
+        string aPath = ai >= 0 ? a.Substring(0, ai) : a;
+        string bPath = bi >= 0 ? b.Substring(0, bi) : b;
+        return !string.Equals(aPath, bPath, StringComparison.Ordinal);
     }
 
     public void DownloadMediaForMessage(string messageId, Action<string> onSuccess, Action onFailure)

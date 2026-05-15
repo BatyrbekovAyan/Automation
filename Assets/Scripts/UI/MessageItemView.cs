@@ -116,7 +116,10 @@ public class MessageItemView : MonoBehaviour
         }
 
         if (ChatManager.Instance != null)
+        {
             ChatManager.Instance.OnMessageStatusChanged += HandleStatusChanged;
+            ChatManager.Instance.OnMessageMediaRefreshed += HandleMediaRefreshed;
+        }
     }
 
     void OnDisable()
@@ -129,7 +132,10 @@ public class MessageItemView : MonoBehaviour
         }
 
         if (ChatManager.Instance != null)
+        {
             ChatManager.Instance.OnMessageStatusChanged -= HandleStatusChanged;
+            ChatManager.Instance.OnMessageMediaRefreshed -= HandleMediaRefreshed;
+        }
 
         if (retryButton != null)
         {
@@ -2824,6 +2830,21 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
         if (currentVm.messageId != oldMessageId && currentVm.messageId != newMessageId) return;
         if (newMessageId != oldMessageId) currentVm.messageId = newMessageId;
         SetDeliveryStatus(status);
+    }
+
+    private void HandleMediaRefreshed(MessageViewModel refreshed)
+    {
+        if (currentVm == null || refreshed == null) return;
+        if (currentVm.messageId != refreshed.messageId) return;
+
+        // ChatManager mutates the cached VM in place, so currentVm already
+        // holds the new URL by the time this fires. Re-binding restarts the
+        // media fetch under the fresh URL — the old MD5-keyed on-disk entry
+        // is orphaned (the new URL hashes differently) and the fresh bytes
+        // overwrite the stale render.
+        bool showSenderName = senderNameText != null && senderNameText.gameObject.activeSelf;
+        Bind(currentVm, currentShowTail, true, showSenderName);
+        FinalizeCustomVisuals();
     }
 
     private void UpdateRetryButton(bool enableRetry)
