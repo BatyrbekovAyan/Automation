@@ -47,6 +47,7 @@ public class MessageItemView : MonoBehaviour
     [Header("Link Preview UI")]
     public GameObject linkPreviewCard;
     public TextMeshProUGUI linkPreviewTitle;
+    public TextMeshProUGUI linkPreviewDescription;
     public TextMeshProUGUI linkPreviewDomain;
     public Image linkPreviewImage;
     private string activeScrapedUrl = ""; // To remember what to open!
@@ -477,7 +478,11 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
         if (messageText != null && messageText.gameObject.activeSelf)
         {
             messageText.transform.SetSiblingIndex(currentIndex++);
-            messageText.margin = new Vector4(8, 0, 8, 0); 
+            // Align the caption's visible left edge with plain text's (~16px from the bubble
+            // border) regardless of which media branch set the bubble's left padding.
+            var bubbleLayout = bubbleBackground != null ? bubbleBackground.GetComponent<HorizontalOrVerticalLayoutGroup>() : null;
+            float marginX = bubbleLayout != null ? Mathf.Max(24f - bubbleLayout.padding.left, 0f) : 8f;
+            messageText.margin = new Vector4(marginX, 0, marginX, 0);
         }
         
         if (!skipLayoutRebuild)
@@ -517,12 +522,12 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
 
             if (useCardLayout)
             {
-                layout.spacing = 8; 
-                layout.padding = new RectOffset(8, 8, 8, 12);
-                
+                layout.spacing = 8;
+                layout.padding = new RectOffset(6, 6, 6, 6);
+
                 if (timeText != null)
                 {
-                    PositionFloatingTime(layout.padding.right + 6f, layout.padding.bottom - 2f);
+                    PositionFloatingTime(20f, 16f);
                 }
             }
             else
@@ -530,11 +535,9 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                 // --- THE SPACING FIX: 12px if there is a caption, 8px if there isn't! ---
                 layout.spacing = hasCaption ? 12 : 8; 
                 
-                layout.padding = new RectOffset(12, 12, 12, 54);
+                layout.padding = new RectOffset(6, 6, 6, 12);
 
-                // Time stays at the original 10px bottom inset (matched the pre-54 padding);
-                // the wider bottom padding is for the document card visual, not the time placement.
-                if (timeText != null) PositionFloatingTime(layout.padding.right + 6f, 10f);
+                if (timeText != null) PositionFloatingTime(20f, 10f);
             }
         }
         else if (type == MessageType.Chat)
@@ -559,6 +562,11 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
 
                 layout.padding = new RectOffset(6, 6, hasSenderName ? 14 : 6, hasCaption ? 12 : 0);
 
+                if (hasCaption)
+                {
+                    messageText.margin = new Vector4(18, 0, 18, 0);
+                }
+
                 if (hasSenderName)
                 {
                     // If layout spacing increased to 12px, we offset the sender name's bottom
@@ -568,40 +576,42 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
 
                 if (timeText != null)
                 {
-                    PositionFloatingTime(layout.padding.right + 6f, 10f);
+                    PositionFloatingTime(20f, 10f);
                 }
             }
             else if (isJumboEmoji)
             {
-                if (hideBubble) 
+                if (hideBubble)
                 {
-                    layout.padding = new RectOffset(-24, -24, 12, 16);
-                    
+                    layout.padding = new RectOffset(-24, -24, 12, 10);
+                    layout.spacing = 16;
+
                     if (timeText != null)
                     {
-                        PositionFloatingTime(layout.padding.right + 18f, layout.padding.bottom + 4f);
+                        PositionFloatingTime(-6f, layout.padding.bottom + 4f);
                     }
 
                     timeText.color = Color.white;
                 }
-                else 
+                else
                 {
-                    layout.padding = new RectOffset(8, 8, 12, 16);
-                    
+                    layout.padding = new RectOffset(8, 8, 12, 10);
+                    layout.spacing = 16;
+
                     if (timeText != null)
                     {
-                        PositionFloatingTime(layout.padding.right + 10f, layout.padding.bottom + 4f);
+                        PositionFloatingTime(20f, layout.padding.bottom + 4f);
                     }
                 }
             }
             else
             {
-                layout.padding = new RectOffset(12, 12, 14, 18);
+                layout.padding = new RectOffset(16, 16, 14, 18);
 
                 if (timeText != null)
                 {
                     timeText.overflowMode = TextOverflowModes.Overflow;
-                    PositionFloatingTime(layout.padding.right - 4f, layout.padding.bottom - 8f);
+                    PositionFloatingTime(20f, layout.padding.bottom - 8f);
                 }
             }
         }
@@ -616,11 +626,11 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             if (useCardLayout)
             {
                 layout.spacing = 8;
-                layout.padding = new RectOffset(8, 8, 8, 12);
+                layout.padding = new RectOffset(6, 6, 6, 6);
 
                 if (timeText != null)
                 {
-                    PositionFloatingTime(layout.padding.right + 6f, layout.padding.bottom - 2f);
+                    PositionFloatingTime(20f, 16f);
                 }
 
                 if (senderNameText != null && hasSenderName)
@@ -635,7 +645,7 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
 
                 if (timeText != null)
                 {
-                    PositionFloatingTime(layout.padding.right + 6f, layout.padding.bottom - 2f);
+                    PositionFloatingTime(20f, layout.padding.bottom - 2f);
                 }
 
                 if (senderNameText != null && hasSenderName)
@@ -674,18 +684,20 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             
             if (useCardLayout)
             {
-                // Add 14px of top padding if there is a name
-                layout.padding = new RectOffset(8, 8, hasSenderName ? 14 : 8, 12);
-                if (timeText != null) PositionFloatingTime(layout.padding.right + 6f, layout.padding.bottom - 2f);
+                layout.padding = new RectOffset(6, 6, 6, 6);
+                if (timeText != null) PositionFloatingTime(20f, 16f);
             }
             else
             {
                 // Stickers get the wider 54px bottom padding (matches the document card visual);
-                // images and videos keep the tight 6px so the media fills the bubble.
-                int bottomPad = (type == MessageType.Sticker) ? 54 : 6;
+                // images and videos keep the tight 6px so the media fills the bubble, but
+                // get 12px when there's a caption so the text doesn't crowd the bubble edge.
+                int bottomPad = (type == MessageType.Sticker) ? 54 : (hasCaption ? 12 : 6);
                 layout.padding = new RectOffset(6, 6, hasSenderName ? 14 : 6, bottomPad);
-                // Time inset is fixed at 12 — independent of bottomPad so stickers don't push it up.
-                if (timeText != null) PositionFloatingTime(layout.padding.right + 12f, 12f);
+                // Image/video without a caption float the time over the media at 16; with
+                // a caption (or for stickers) the time drops to 10 to sit alongside the text.
+                float timeBottomInset = (type == MessageType.Sticker || hasCaption) ? 10f : 16f;
+                if (timeText != null) PositionFloatingTime(20f, timeBottomInset);
             }
 
             if (senderNameText != null && hasSenderName)
@@ -700,7 +712,7 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
 
             if (timeText != null)
             {
-                PositionFloatingTime(layout.padding.right + 12f, layout.padding.bottom - 2f);
+                PositionFloatingTime(20f, 10f);
             }
         }
         
@@ -712,7 +724,9 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
 
             if (isDownloadActive || isExpiredActive)
             {
-                timeText.color = Color.white;
+                // The download/expired card uses a white background — white time would vanish.
+                timeText.color = new Color(0.4f, 0.4f, 0.4f, 1f);
+                if (timeBackground != null) timeBackground.SetActive(false);
             }
             else if ((type == MessageType.Image || type == MessageType.Video) && !hasCaption)
             {
@@ -826,7 +840,11 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                 }
                 
                 float maxTextWidth = Mathf.Max(nameWidth, infoWidth);
-                if (timeLayout != null) timeLayout.ignoreLayout = false;
+                // No-caption documents keep the Time inside the VLG flow (renders as its
+                // own row below the document card). With a caption, float the Time so it
+                // can sit inline on the caption's last line via PositionFloatingTime.
+                bool hasCaption = messageText != null && messageText.gameObject.activeSelf && !string.IsNullOrEmpty(messageText.text);
+                if (timeLayout != null) timeLayout.ignoreLayout = hasCaption;
 
                 float finalWidth = maxTextWidth + 132f; 
                 float minDocWidth = 240f;
@@ -942,7 +960,20 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                 float actualHeight = linkPreviewTitle.GetPreferredValues(linkPreviewTitle.text, targetWidth, Mathf.Infinity).y;
                 
                 titleLe.preferredHeight = Mathf.Min(actualHeight, singleLineHeight * 3f) + 16f;
-                titleLe.minWidth = 0; titleLe.preferredWidth = 0; 
+                titleLe.minWidth = 0; titleLe.preferredWidth = 0;
+            }
+
+            // Description Math
+            bool descActive = linkPreviewDescription != null && linkPreviewDescription.gameObject.activeSelf;
+            if (descActive)
+            {
+                var descLe = linkPreviewDescription.GetComponent<LayoutElement>();
+                if (descLe == null) descLe = linkPreviewDescription.gameObject.AddComponent<LayoutElement>();
+
+                float singleLineHeight = linkPreviewDescription.GetPreferredValues("A", targetWidth, Mathf.Infinity).y;
+
+                descLe.preferredHeight = singleLineHeight * 2f + 16f;
+                descLe.minWidth = 0; descLe.preferredWidth = 0;
             }
 
             // Domain Math
@@ -950,9 +981,15 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             {
                 var domainLe = linkPreviewDomain.GetComponent<LayoutElement>();
                 if (domainLe == null) domainLe = linkPreviewDomain.gameObject.AddComponent<LayoutElement>();
-                
-                domainLe.preferredHeight = linkPreviewDomain.GetPreferredValues("A", targetWidth, Mathf.Infinity).y + 16; 
-                domainLe.minWidth = 0; domainLe.preferredWidth = 0; 
+
+                domainLe.preferredHeight = linkPreviewDomain.GetPreferredValues("A", targetWidth, Mathf.Infinity).y + 16;
+                domainLe.minWidth = 0; domainLe.preferredWidth = 0;
+
+                // Prefab default of -16 collapses the 16px VLG spacing — desired between
+                // title and domain, but with a description in between it eats the gap.
+                Vector4 domainMargin = linkPreviewDomain.margin;
+                domainMargin.y = descActive ? 0f : -16f;
+                linkPreviewDomain.margin = domainMargin;
             }
             
             // Text Math (If the user typed a message with the link, don't let their text stretch the card out!)
@@ -2359,17 +2396,21 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
         yield return null;
 
         string scrapedTitle = null;
+        string scrapedDesc = null;
         string scrapedImage = null;
         bool scrapeDone = false;
 
         LinkScraper.Instance.FetchPreview(url, (title, desc, imageUrl) => {
-            scrapedTitle = title; scrapedImage = imageUrl; scrapeDone = true;
+            scrapedTitle = title; scrapedDesc = desc; scrapedImage = imageUrl; scrapeDone = true;
         });
 
         while (!scrapeDone) yield return null;
 
-        // If we didn't even get a title, abort completely and just leave the text link.
-        if (string.IsNullOrEmpty(scrapedTitle)) yield break;
+        bool hasTitle = !string.IsNullOrWhiteSpace(scrapedTitle);
+        bool hasDesc = !string.IsNullOrWhiteSpace(scrapedDesc);
+
+        // No useful preview content — leave the inline text link as-is.
+        if (!hasTitle && !hasDesc) yield break;
 
         Texture2D downloadedTex = null;
         
@@ -2405,14 +2446,36 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
 
         if (this == null || !gameObject.activeInHierarchy) yield break;
 
-        // 1. We have at least a title! Populate the basic card text.
-        linkPreviewTitle.overflowMode = TextOverflowModes.Ellipsis;
-        linkPreviewTitle.maxVisibleLines = 3;
-        linkPreviewTitle.text = scrapedTitle;
+        if (hasTitle)
+        {
+            linkPreviewTitle.overflowMode = TextOverflowModes.Ellipsis;
+            linkPreviewTitle.maxVisibleLines = 3;
+            linkPreviewTitle.text = scrapedTitle;
+            linkPreviewTitle.gameObject.SetActive(true);
+        }
+        else
+        {
+            linkPreviewTitle.gameObject.SetActive(false);
+        }
 
         linkPreviewDomain.overflowMode = TextOverflowModes.Ellipsis;
         linkPreviewDomain.maxVisibleLines = 1;
         linkPreviewDomain.text = new Uri(url).Host.Replace("www.", "");
+
+        if (linkPreviewDescription != null)
+        {
+            if (hasDesc)
+            {
+                linkPreviewDescription.overflowMode = TextOverflowModes.Ellipsis;
+                linkPreviewDescription.maxVisibleLines = 2;
+                linkPreviewDescription.text = scrapedDesc;
+                linkPreviewDescription.gameObject.SetActive(true);
+            }
+            else
+            {
+                linkPreviewDescription.gameObject.SetActive(false);
+            }
+        }
 
         // 2. Apply your Display Rules based on the Image!
         if (downloadedTex != null)
