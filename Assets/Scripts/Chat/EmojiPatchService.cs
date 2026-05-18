@@ -41,7 +41,7 @@ public class EmojiPatchService : MonoBehaviour
     // inter-sprite em-gap of ~37 units — matching what atlas sprites produce.
     //
     // Tune up to widen gaps further, down to tighten.
-    private const float EmojiPaddingFraction = 0.15f;
+    private const float EmojiPaddingFraction = 0.25f;
 
     private string _cacheDir;
     private Shader _tmpSpriteShader;
@@ -164,11 +164,15 @@ public class EmojiPatchService : MonoBehaviour
         asset.faceInfo = face;
 
         // Atlas-identical metric size (160) for visual size parity with existing
-        // atlas-rendered sprites. bearingY = 147.2 ≈ 92% of 160 (atlas uses 148).
+        // atlas-rendered sprites. bearingY lowered to 136 (vs atlas's 148) because
+        // Twemoji centers emoji content vertically in the texture while Apple's
+        // atlas renders emojis aligned lower within each tile — using the same
+        // bearingY makes ours appear ~10 units higher than atlas neighbors. The
+        // -12 unit offset compensates for that texture-content positioning gap.
         // bearingX=0 and advance=width — visual inter-sprite padding comes from the
         // texture margin (EmojiPaddingFraction), not the metric.
         const float EmojiMetricSize     = 160f;
-        const float EmojiMetricBearingY = 147.2f;
+        const float EmojiMetricBearingY = 136f;
         var glyph = new TMP_SpriteGlyph
         {
             index     = 0,
