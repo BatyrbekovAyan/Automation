@@ -129,15 +129,22 @@ public class EmojiPatchService : MonoBehaviour
         asset.name = spriteName;
         asset.spriteSheet = tex;
 
+        // CRITICAL: explicitly mirror the existing atlas's FaceInfo (texture-0.asset).
+        // TMP_Text renders a sprite with `fontSize / spriteFace.pointSize * spriteFace.scale`
+        // if pointSize > 0, otherwise it falls into a fallback path that uses the FONT's
+        // ascentLine relative to the sprite's glyph height — producing a ~2-3x oversized
+        // sprite. Copying from defaultSpriteAsset.faceInfo via property assignment was not
+        // reliably propagating these values, so we set them explicitly.
         var defaultAsset = TMP_Settings.defaultSpriteAsset;
-        if (defaultAsset != null)
-            asset.faceInfo = defaultAsset.faceInfo;
+        var face = defaultAsset != null ? defaultAsset.faceInfo : default;
+        face.pointSize = 100;       // matches all texture-N.asset face info
+        face.scale     = 0.86f;
+        face.baseline  = -38f;
+        asset.faceInfo = face;
 
-        // Use the same logical metric dimensions as the existing emoji atlases (texture-0 through
-        // texture-30). Those assets use width=160, height=160, bearingY=148, advance=160 — these
-        // are em-space units, not pixel counts. The glyphRect maps to actual texture pixels.
-        // Using pixel dimensions here (72x72) made sprites render tiny; matching the atlas
-        // metrics ensures the CDN sprite renders at the same visual size as atlas emojis.
+        // Logical metric dimensions match the existing emoji atlases (texture-0..30):
+        // width=160, height=160, bearingY=148, advance=160 — em-space units, not pixels.
+        // The glyphRect maps to actual texture pixels.
         const float EmojiMetricSize    = 160f;
         const float EmojiMetricBearingY = 148f;
         var glyph = new TMP_SpriteGlyph
