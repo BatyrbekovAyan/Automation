@@ -22,13 +22,14 @@ public class EmojiPatchService : MonoBehaviour
     private const string CdnBase = "https://cdn.jsdelivr.net/gh/jdecked/twemoji@latest/assets/72x72/";
     private static readonly string[] SkinTones = { "1f3fb", "1f3fc", "1f3fd", "1f3fe", "1f3ff" };
 
-    private string CacheDir => Path.Combine(Application.persistentDataPath, "emoji_patch");
-
     private readonly Queue<string>   _fetchQueue    = new Queue<string>();
     private readonly HashSet<string> _queuedNames   = new HashSet<string>();
     private int  _activeDownloads;
     private bool _isProcessingQueue;
     private const int MaxConcurrentDownloads = 3;
+
+    private string _cacheDir;
+    private Shader _tmpSpriteShader;
 
     // -------------------------------------------------------------------------
     // Lifecycle
@@ -38,6 +39,11 @@ public class EmojiPatchService : MonoBehaviour
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
+
+        _cacheDir = Path.Combine(Application.persistentDataPath, "emoji_patch");
+        _tmpSpriteShader = Shader.Find("TextMeshPro/Sprite");
+        if (_tmpSpriteShader == null)
+            Debug.LogError("[EmojiPatchService] TextMeshPro/Sprite shader not found — emoji sprites will not render. Ensure it is in Always Included Shaders.");
 
         BuildRegistry();
         LoadDiskCache();
@@ -56,14 +62,16 @@ public class EmojiPatchService : MonoBehaviour
     {
         var assets = Resources.LoadAll<TMP_SpriteAsset>("Sprite Assets");
         EmojiSpriteRegistry.Build(assets);
+        if (assets.Length == 0)
+            Debug.LogWarning("[EmojiPatchService] No sprite assets found under Resources/Sprite Assets — emoji registry will be empty.");
         Debug.Log($"[EmojiPatchService] Registry built with {assets.Length} sprite assets.");
     }
 
     private void LoadDiskCache()
     {
-        if (!Directory.Exists(CacheDir)) return;
+        if (!Directory.Exists(_cacheDir)) return;
 
-        var files = Directory.GetFiles(CacheDir, "*.png");
+        var files = Directory.GetFiles(_cacheDir, "*.png");
         int loaded = 0;
 
         foreach (var path in files)
@@ -111,7 +119,7 @@ public class EmojiPatchService : MonoBehaviour
         if (defaultAsset != null)
             asset.faceInfo = defaultAsset.faceInfo;
 
-        var mat = new Material(Shader.Find("TextMeshPro/Sprite")) { mainTexture = tex };
+        var mat = new Material(_tmpSpriteShader != null ? _tmpSpriteShader : Shader.Find("TextMeshPro/Sprite")) { mainTexture = tex };
         asset.material = mat;
 
         float h = tex.height;
@@ -188,19 +196,23 @@ public class EmojiPatchService : MonoBehaviour
     {
         _isProcessingQueue = true;
 
-        while (_fetchQueue.Count > 0)
+        while (_fetchQueue.Count > 0 || _activeDownloads > 0)
         {
             while (_activeDownloads >= MaxConcurrentDownloads)
                 yield return null;
 
-            var spriteName = _fetchQueue.Dequeue();
-            _queuedNames.Remove(spriteName);
-            _activeDownloads++;
-            StartCoroutine(FetchEmojiRoutine(spriteName));
+            if (_fetchQueue.Count > 0)
+            {
+                var spriteName = _fetchQueue.Dequeue();
+                _queuedNames.Remove(spriteName);
+                _activeDownloads++;
+                StartCoroutine(FetchEmojiRoutine(spriteName));
+            }
+            else
+            {
+                yield return null; // downloads still in-flight, nothing to dequeue yet
+            }
         }
-
-        while (_activeDownloads > 0)
-            yield return null;
 
         _isProcessingQueue = false;
     }
@@ -214,11 +226,12 @@ public class EmojiPatchService : MonoBehaviour
             request.timeout = 30;
             yield return request.SendWebRequest();
 
+            _activeDownloads--; // decrement here once regardless of outcome
+
             if (request.result != UnityEngine.Networking.UnityWebRequest.Result.Success)
             {
                 Debug.LogWarning($"[EmojiPatchService] Fetch failed for {spriteName} ({request.responseCode}): {request.error}");
                 EmojiSpriteRegistry.MarkFailed(spriteName);
-                _activeDownloads--;
                 yield break;
             }
 
@@ -226,9 +239,9 @@ public class EmojiPatchService : MonoBehaviour
 
             try
             {
-                if (!Directory.Exists(CacheDir))
-                    Directory.CreateDirectory(CacheDir);
-                File.WriteAllBytes(Path.Combine(CacheDir, $"{spriteName}.png"), bytes);
+                if (!Directory.Exists(_cacheDir))
+                    Directory.CreateDirectory(_cacheDir);
+                File.WriteAllBytes(Path.Combine(_cacheDir, $"{spriteName}.png"), bytes);
             }
             catch (Exception ex)
             {
@@ -241,7 +254,6 @@ public class EmojiPatchService : MonoBehaviour
                 Debug.LogWarning($"[EmojiPatchService] Corrupt PNG from CDN for {spriteName}");
                 Destroy(tex);
                 EmojiSpriteRegistry.MarkFailed(spriteName);
-                _activeDownloads--;
                 yield break;
             }
 
@@ -252,7 +264,6 @@ public class EmojiPatchService : MonoBehaviour
             Debug.Log($"[EmojiPatchService] Registered new emoji sprite: {spriteName}");
             OnEmojiReady?.Invoke(spriteName);
         }
-
-        _activeDownloads--;
+        // No decrement here — already done inside using block
     }
 }
