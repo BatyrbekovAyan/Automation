@@ -32,6 +32,19 @@ public class EmojiPatchService : MonoBehaviour
     private Shader _tmpSpriteShader;
 
     // -------------------------------------------------------------------------
+    // Bootstrap — auto-creates the singleton before the scene loads if it is
+    // not already placed as a component in the scene hierarchy.
+    // -------------------------------------------------------------------------
+
+    [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.BeforeSceneLoad)]
+    private static void Bootstrap()
+    {
+        if (Instance != null) return;
+        var go = new GameObject("[EmojiPatchService]");
+        go.AddComponent<EmojiPatchService>();
+    }
+
+    // -------------------------------------------------------------------------
     // Lifecycle
     // -------------------------------------------------------------------------
 
