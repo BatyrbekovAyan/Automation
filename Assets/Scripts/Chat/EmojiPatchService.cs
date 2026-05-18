@@ -29,6 +29,11 @@ public class EmojiPatchService : MonoBehaviour
     private bool _isProcessingQueue;
     private const int MaxConcurrentDownloads = 3;
 
+    // Fraction of the source texture size to add as transparent padding on each side.
+    // Atlas tiles are 180px with ~160px emoji content, so padding ≈ 10/180 ≈ 0.056.
+    // Increase to widen the gap between consecutive sprites; decrease to tighten.
+    private const float EmojiPaddingFraction = 0.056f;
+
     private string _cacheDir;
     private Shader _tmpSpriteShader;
 
@@ -125,42 +130,37 @@ public class EmojiPatchService : MonoBehaviour
 
     private TMP_SpriteAsset BuildSpriteAsset(string spriteName, Texture2D tex)
     {
+        // The existing atlas PNGs are 180px tiles with the emoji content occupying
+        // the central ~160px (10px transparent margin on each side). Twemoji's 72px
+        // PNGs are edge-to-edge with no margin, so consecutive sprites visually
+        // touch. We bake the equivalent margin into a padded copy of the texture so
+        // our metrics can mirror the atlas exactly (width=advance=160, bearingX=0)
+        // and inter-sprite spacing matches what the atlas does naturally.
+        var paddedTex = CreatePaddedTexture(tex, EmojiPaddingFraction);
+
         var asset = ScriptableObject.CreateInstance<TMP_SpriteAsset>();
         asset.name = spriteName;
-        asset.spriteSheet = tex;
+        asset.spriteSheet = paddedTex;
 
-        // CRITICAL: explicitly mirror the existing atlas's FaceInfo (texture-0.asset).
-        // TMP_Text renders a sprite with `fontSize / spriteFace.pointSize * spriteFace.scale`
-        // if pointSize > 0, otherwise it falls into a fallback path that uses the FONT's
-        // ascentLine relative to the sprite's glyph height — producing a ~2-3x oversized
-        // sprite. Copying from defaultSpriteAsset.faceInfo via property assignment was not
-        // reliably propagating these values, so we set them explicitly.
+        // Mirror the existing atlas's FaceInfo (texture-0.asset) exactly. TMP_Text
+        // renders sprites with `fontSize / spriteFace.pointSize * spriteFace.scale`
+        // when pointSize > 0; otherwise it falls back to a path that scales by
+        // fontFace.ascentLine / glyph.metrics.height, producing a 2-3x oversized
+        // sprite. Setting pointSize/scale/baseline explicitly forces the correct path.
         var defaultAsset = TMP_Settings.defaultSpriteAsset;
         var face = defaultAsset != null ? defaultAsset.faceInfo : default;
-        face.pointSize = 100;       // matches all texture-N.asset face info
+        face.pointSize = 100;
         face.scale     = 0.86f;
         face.baseline  = -38f;
         asset.faceInfo = face;
 
-        // Metric tuning — three independent knobs:
-        //  - EmojiMetricSize:    rendered width/height of the emoji (visual size)
-        //  - EmojiMetricBearingY: ascent above baseline (vertical alignment)
-        //  - EmojiMetricAdvance:  horizontal cursor advance (controls inter-sprite spacing)
-        //
-        // Why Advance > Size: Twemoji PNGs fill the entire 72px texture edge-to-edge
-        // with NO transparent padding. The existing atlas PNGs include built-in padding
-        // (180px texture, ~140px emoji content), giving consecutive sprites natural gaps.
-        // To compensate, we set Advance > Size so each sprite reserves padding on its right.
-        // The half-bearingX (Advance-Size)/2 centers the emoji within its advance box.
-        const float EmojiMetricSize     = 128f;
-        const float EmojiMetricBearingY = 118f; // ~92% of size — baseline alignment
-        const float EmojiMetricAdvance  = 156f; // ~22% wider than size — adds gap between sprites
-        const float EmojiMetricBearingX = (EmojiMetricAdvance - EmojiMetricSize) * 0.5f; // center
+        // Atlas-parity metrics: width=advance=160, bearingX=0, bearingY=148.
+        // Visual padding is baked into the texture, not encoded in the metric.
         var glyph = new TMP_SpriteGlyph
         {
             index     = 0,
-            metrics   = new GlyphMetrics(EmojiMetricSize, EmojiMetricSize, EmojiMetricBearingX, EmojiMetricBearingY, EmojiMetricAdvance),
-            glyphRect = new GlyphRect(0, 0, tex.width, tex.height),
+            metrics   = new GlyphMetrics(160f, 160f, 0f, 148f, 160f),
+            glyphRect = new GlyphRect(0, 0, paddedTex.width, paddedTex.height),
             scale     = 1f,
             atlasIndex = 0
         };
@@ -180,10 +180,38 @@ public class EmojiPatchService : MonoBehaviour
         // Building the lookup tables first (while material is still null) bypasses that path.
         asset.UpdateLookupTables();
 
-        var mat = new Material(_tmpSpriteShader != null ? _tmpSpriteShader : Shader.Find("TextMeshPro/Sprite")) { mainTexture = tex };
+        var mat = new Material(_tmpSpriteShader != null ? _tmpSpriteShader : Shader.Find("TextMeshPro/Sprite")) { mainTexture = paddedTex };
         asset.material = mat;
 
         return asset;
+    }
+
+    /// <summary>
+    /// Returns a new Texture2D with transparent padding around the source.
+    /// Used to give Twemoji's edge-to-edge PNGs the same kind of internal margin
+    /// the atlas tiles have, so consecutive sprites render with natural visual gaps.
+    /// </summary>
+    private static Texture2D CreatePaddedTexture(Texture2D src, float paddingFraction)
+    {
+        int pad     = Mathf.Max(1, Mathf.RoundToInt(src.width * paddingFraction));
+        int newSize = src.width + pad * 2;
+
+        var padded = new Texture2D(newSize, newSize, TextureFormat.RGBA32, false);
+        padded.name = src.name;
+
+        // Fill transparent
+        var transparent = new Color32[newSize * newSize];
+        padded.SetPixels32(transparent);
+
+        // Copy source pixels into the center
+        var srcPixels = src.GetPixels32();
+        padded.SetPixels32(pad, pad, src.width, src.height, srcPixels);
+        padded.Apply(updateMipmaps: false, makeNoLongerReadable: true);
+
+        // Source texture is no longer needed
+        Destroy(src);
+
+        return padded;
     }
 
     private void RegisterFallback(TMP_SpriteAsset asset)
