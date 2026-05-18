@@ -224,7 +224,10 @@
       "Bash(awk 'NR>=875 && NR<=1020' /Users/ayan/Projects/Automation/Assets/Prefabs/MessageTextIncoming.prefab)",
       "Bash(awk 'NR>=200 && NR<=460' /Users/ayan/Projects/Automation/Assets/Prefabs/MessageTextIncoming.prefab)",
       "Bash(awk 'NR>=1245 && NR<=1410' /Users/ayan/Projects/Automation/Assets/Prefabs/MessageTextIncoming.prefab)",
-      "Bash(awk 'NR>=3155 && NR<=3380' /Users/ayan/Projects/Automation/Assets/Prefabs/MessageTextIncoming.prefab)"
+      "Bash(awk 'NR>=3155 && NR<=3380' /Users/ayan/Projects/Automation/Assets/Prefabs/MessageTextIncoming.prefab)",
+      "Bash(awk '/^--- !u!114 &4132774896767344042$/,/^--- !u!/{print NR\": \"$0; if\\(/^--- !u!/ && NR > 2900\\) exit}' /Users/ayan/Projects/Automation/Assets/Prefabs/MessageTextIncoming.prefab)",
+      "Bash(bash .claude/hooks/validate-cs.sh Assets/Scripts/UI/MessageItemView.cs)",
+      "Bash(awk '/^--- !u!1 .*4783006639147938202/,/^--- !u!1 /{print NR\": \"$0}' /Users/ayan/Projects/Automation/Assets/Prefabs/MessageTextIncoming.prefab)"
     ]
   }
 }
