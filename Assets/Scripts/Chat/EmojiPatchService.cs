@@ -31,17 +31,17 @@ public class EmojiPatchService : MonoBehaviour
 
     // Fraction of the source texture size to add as transparent padding on each side.
     //
-    // Calculated to give patched sprites the same em-space gap as atlas sprites:
-    //   Atlas em-space gap = 2 * (10/180) * 160 ≈ 17.78 units
-    //   For our gap at metric 140 to match:
-    //     2 * pad/(72 + 2*pad) * 140 = 17.78  →  pad ≈ 5.24px  →  fraction ≈ 0.073
+    // Calibrated empirically: atlas PNGs have substantial internal padding (~20% of
+    // their 180px tile), producing a visible inter-sprite gap of ~30% of the emoji
+    // width. Earlier math assumed only 5.6% atlas padding (the metric/glyphRect
+    // ratio), which underestimated by ~3x.
     //
-    // If you change EmojiMetricSize below, also recompute this fraction to keep spacing
-    // uniform. Formula:
-    //   target_gap_em = 17.78
-    //   x = target_gap_em / (2 * EmojiMetricSize)   // pad/(72+2pad) ratio needed
-    //   padding_fraction = x / (1 - 2 * x)          // pad as fraction of 72
-    private const float EmojiPaddingFraction = 0.073f;
+    // 0.15 means we add ~11px of transparent border to each side of the 72px source,
+    // producing a 94px padded texture that, when rendered at metric 140, gives an
+    // inter-sprite em-gap of ~37 units — matching what atlas sprites produce.
+    //
+    // Tune up to widen gaps further, down to tighten.
+    private const float EmojiPaddingFraction = 0.15f;
 
     private string _cacheDir;
     private Shader _tmpSpriteShader;
