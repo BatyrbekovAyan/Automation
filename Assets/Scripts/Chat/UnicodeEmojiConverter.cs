@@ -86,9 +86,10 @@ public static class UnicodeEmojiConverter
                 // Convert list of hex codes to string: "1f44b-1f3fb" or "1f1f0-1f1ff"
                 string hexName = GetHexName(emojiSequence);
 
-                if (EmojiSpriteRegistry.IsKnown(hexName))
+                if (EmojiSpriteRegistry.IsKnown(hexName) || EmojiSpriteRegistry.IsPending(hexName))
                 {
-                    // Sprite exists \u2014 emit TMP rich-text tag with spacing
+                    // Sprite exists or fetch is in flight \u2014 emit TMP rich-text tag with spacing.
+                    // TMP will find the sprite once it is registered from the background download.
                     bool needsGap = sb.Length > 0
                         && !char.IsWhiteSpace(sb[sb.Length - 1])
                         && sb[sb.Length - 1] != '>'
@@ -102,9 +103,10 @@ public static class UnicodeEmojiConverter
                 else
                 {
                     // Sprite missing \u2014 leave raw Unicode so font fallback renders it,
-                    // and queue a background CDN fetch.
+                    // clear any stale failed state to allow retry, and queue a CDN fetch.
                     hasMissingEmojis = true;
                     sb.Append(input, i, currentIdx - i);
+                    EmojiSpriteRegistry.ClearFailed(hexName);
                     if (EmojiPatchService.Instance != null)
                         EmojiPatchService.Instance.RequestEmoji(hexName);
                 }
