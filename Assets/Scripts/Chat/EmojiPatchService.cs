@@ -142,11 +142,13 @@ public class EmojiPatchService : MonoBehaviour
         face.baseline  = -38f;
         asset.faceInfo = face;
 
-        // Logical metric dimensions match the existing emoji atlases (texture-0..30):
-        // width=160, height=160, bearingY=148, advance=160 — em-space units, not pixels.
-        // The glyphRect maps to actual texture pixels.
-        const float EmojiMetricSize    = 160f;
-        const float EmojiMetricBearingY = 148f;
+        // Metric size tuned to match the visual size of system-font-rendered emojis.
+        // The existing atlas uses 160 (em-space), but other emojis in the chat that have
+        // no sprite match render through the OS font's glyphs at a smaller effective size.
+        // Using metric 100 makes new Twemoji sprites visually match those system emojis.
+        // If you want strict atlas-parity (matches existing atlas-rendered sprites), use 160.
+        const float EmojiMetricSize    = 100f;
+        const float EmojiMetricBearingY = 92f;  // ~92% of size, matches atlas ratio (148/160)
         var glyph = new TMP_SpriteGlyph
         {
             index     = 0,
