@@ -30,11 +30,16 @@ public class EmojiPatchService : MonoBehaviour
     private const int MaxConcurrentDownloads = 3;
 
     // Fraction of the source texture size to add as transparent padding on each side.
-    // Atlas tiles are 180px with ~160px emoji content (≈5.6% padding per side). Twemoji
-    // textures pack more emoji into the same pixels, so a slightly larger padding (10%)
-    // produces visual inter-sprite gaps closer to what atlas sprites have in this UI.
-    // Increase to widen the gap between consecutive sprites; decrease to tighten.
-    private const float EmojiPaddingFraction = 0.10f;
+    //
+    // Calculated to give patched sprites the same em-space gap as atlas sprites:
+    //   Atlas em-space gap = 2 * (10/180) * 160 ≈ 17.78 units
+    //   For our gap at metric 132 to match:
+    //     2 * pad/(72 + 2*pad) * 132 = 17.78  →  pad ≈ 5.6px  →  fraction ≈ 0.078
+    //
+    // If you change EmojiMetricSize below, also recompute this fraction to keep spacing
+    // uniform. Formula: padding_fraction = (atlas_gap_em / (2 * EmojiMetricSize)) /
+    //                                       (1 - 2 * atlas_gap_em / (2 * EmojiMetricSize))
+    private const float EmojiPaddingFraction = 0.078f;
 
     private string _cacheDir;
     private Shader _tmpSpriteShader;
