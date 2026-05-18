@@ -133,9 +133,6 @@ public class EmojiPatchService : MonoBehaviour
         if (defaultAsset != null)
             asset.faceInfo = defaultAsset.faceInfo;
 
-        var mat = new Material(_tmpSpriteShader != null ? _tmpSpriteShader : Shader.Find("TextMeshPro/Sprite")) { mainTexture = tex };
-        asset.material = mat;
-
         float h = tex.height;
         float w = tex.width;
         var glyph = new TMP_SpriteGlyph
@@ -155,7 +152,15 @@ public class EmojiPatchService : MonoBehaviour
 
         asset.spriteGlyphTable.Add(glyph);
         asset.spriteCharacterTable.Add(character);
+
+        // UpdateLookupTables BEFORE assigning material: TMP checks
+        // `material != null && version == ""` and if true calls UpgradeSpriteAsset(),
+        // which clears our tables and crashes on the null legacy spriteInfoList.
+        // Building the lookup tables first (while material is still null) bypasses that path.
         asset.UpdateLookupTables();
+
+        var mat = new Material(_tmpSpriteShader != null ? _tmpSpriteShader : Shader.Find("TextMeshPro/Sprite")) { mainTexture = tex };
+        asset.material = mat;
 
         return asset;
     }
