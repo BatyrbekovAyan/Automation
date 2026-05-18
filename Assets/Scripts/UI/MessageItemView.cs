@@ -57,7 +57,13 @@ public class MessageItemView : MonoBehaviour
     [Tooltip("How much of the screen should the text bubble take up before wrapping? (0.7 = 70%)")]
     public float maxBubbleWidthPercentage = 0.7f; 
     public Color incomingColor = Color.white;
-    public Color outgoingColor = new Color(0.8f, 1f, 0.8f); 
+    public Color outgoingColor = new Color(0.8f, 1f, 0.8f);
+    private static readonly Color downloadButtonFillColor = new Color32(0xF1, 0xF1, 0xF1, 0xFF);
+
+    // Light-gray on incoming (white bubble), white on outgoing (green bubble) so the
+    // placeholder reads as a card layered on top of the bubble in both directions.
+    private Color DownloadFillColor =>
+        (currentVm != null && !currentVm.isIncoming) ? Color.white : downloadButtonFillColor;
 
     [Header("Layout Settings")]
     public float downloadButtonHeight = 284f; 
@@ -172,11 +178,11 @@ public class MessageItemView : MonoBehaviour
             {
                 btnImg.enabled = true;
                 if (downloadArrowIcon != null) btnImg.sprite = downloadArrowIcon;
-                btnImg.color = Color.white;
+                btnImg.color = DownloadFillColor;
             }
         }
-        
-        if (defaultFontSize < 0) defaultFontSize = messageText.fontSize; 
+
+        if (defaultFontSize < 0) defaultFontSize = messageText.fontSize;
         messageText.fontSize = defaultFontSize; 
         
         messageText.alignment = TextAlignmentOptions.TopLeft; 
@@ -450,8 +456,13 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
         
 // --- THE TRIGGER FIX ---
         // We must tell the script to run the calculator for Media Captions too!
-        if (!string.IsNullOrEmpty(vm.text) && 
-            (vm.type == MessageType.Chat || vm.type == MessageType.Document || vm.type == MessageType.Image || vm.type == MessageType.Video))
+        // Documents also need it without a caption: the document card otherwise
+        // has no explicit preferredWidth and the bubble's ContentSizeFitter lets
+        // it grow past the maxBubbleWidthPercentage clamp for long filenames.
+        bool hasCaption = !string.IsNullOrEmpty(vm.text);
+        bool isDocument = vm.type == MessageType.Document;
+        bool isCaptionableMedia = vm.type == MessageType.Chat || vm.type == MessageType.Image || vm.type == MessageType.Video;
+        if (isDocument || (hasCaption && isCaptionableMedia))
         {
             AdjustTextBubbleSize();
         }
@@ -463,13 +474,18 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             senderNameText.transform.SetSiblingIndex(currentIndex++);
 
         // 2. The Media File (Grabbing the correct parent container!)
+        // Include the download/expired placeholders so the caption lands below them
+        // when a media message hasn't finished downloading yet.
         Transform activeMedia = null;
-        if (messageImage != null && messageImage.gameObject.activeSelf) 
+        if (messageImage != null && messageImage.gameObject.activeSelf)
         {
             // We must move the MediaContainer, not the Image itself!
             activeMedia = messageImage.transform.parent.name == "MediaContainer" ? messageImage.transform.parent : messageImage.transform;
         }
         else if (documentPanel != null && documentPanel.gameObject.activeSelf) activeMedia = documentPanel.transform;
+        else if (audioPanel != null && audioPanel.activeSelf) activeMedia = audioPanel.transform;
+        else if (downloadButton != null && downloadButton.gameObject.activeSelf) activeMedia = downloadButton.transform;
+        else if (expiredPlaceholder != null && expiredPlaceholder.activeSelf) activeMedia = expiredPlaceholder.transform;
         else if (linkPreviewCard != null && linkPreviewCard.activeSelf) activeMedia = linkPreviewCard.transform;
 
         if (activeMedia != null) activeMedia.SetSiblingIndex(currentIndex++);
@@ -533,11 +549,14 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             else
             {
                 // --- THE SPACING FIX: 12px if there is a caption, 8px if there isn't! ---
-                layout.spacing = hasCaption ? 12 : 8; 
-                
+                layout.spacing = hasCaption ? 12 : 8;
+
                 layout.padding = new RectOffset(6, 6, 6, 12);
 
-                if (timeText != null) PositionFloatingTime(20f, 10f);
+                // Without a caption, match the 16px bottom inset used by image/video so
+                // the time sits at the same offset from the bubble border. With a caption
+                // the time rides the caption's last line, so the 10px inset is fine.
+                if (timeText != null) PositionFloatingTime(20f, hasCaption ? 10f : 16f);
             }
         }
         else if (type == MessageType.Chat)
@@ -811,47 +830,50 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
         if (currentVm != null && currentVm.type == MessageType.Document)
         {
             bool isDownloaded = documentPanel != null && documentPanel.activeInHierarchy;
-            
+            bool isDownloadActive = downloadButton != null && downloadButton.gameObject.activeSelf;
+            float mediaWidth = 0f;
+            bool hasCaption = messageText != null && messageText.gameObject.activeSelf && !string.IsNullOrEmpty(messageText.text);
+
             if (isDownloaded && documentNameText != null)
             {
                 LayoutElement docLayout = documentPanel.GetComponent<LayoutElement>();
                 if (!docLayout) docLayout = documentPanel.gameObject.AddComponent<LayoutElement>();
 
                 documentNameText.textWrappingMode = TextWrappingModes.Normal;
-                documentNameText.overflowMode = TextOverflowModes.Ellipsis; 
+                documentNameText.overflowMode = TextOverflowModes.Ellipsis;
                 documentNameText.maxVisibleLines = 2;
-                
+
                 float maxTextWidthAllowed = maxAllowedTextWidth - 90f;
 
-                string rawName = string.IsNullOrEmpty(currentVm.fileName) ? "Document.file" : currentVm.fileName;                
+                string rawName = string.IsNullOrEmpty(currentVm.fileName) ? "Document.file" : currentVm.fileName;
                 string decodedName = UnicodeEmojiConverter.ConvertRealEmojisToSprites(System.Uri.UnescapeDataString(rawName));
 
                 documentNameText.text = SplitLongWord(decodedName, documentNameText, maxTextWidthAllowed);
 
                 float unbrokenNameWidth = documentNameText.GetPreferredValues(documentNameText.text, Mathf.Infinity, Mathf.Infinity).x;
-                
+
                 float nameWidth = Mathf.Min(unbrokenNameWidth, maxTextWidthAllowed);
-                
+
                 float infoWidth = 0f;
                 if (documentInfoText != null)
                 {
                     documentInfoText.textWrappingMode = TextWrappingModes.NoWrap;
                     infoWidth = documentInfoText.GetPreferredValues(documentInfoText.text, Mathf.Infinity, Mathf.Infinity).x;
                 }
-                
-                float maxTextWidth = Mathf.Max(nameWidth, infoWidth);
-                // No-caption documents keep the Time inside the VLG flow (renders as its
-                // own row below the document card). With a caption, float the Time so it
-                // can sit inline on the caption's last line via PositionFloatingTime.
-                bool hasCaption = messageText != null && messageText.gameObject.activeSelf && !string.IsNullOrEmpty(messageText.text);
-                if (timeLayout != null) timeLayout.ignoreLayout = hasCaption;
 
-                float finalWidth = maxTextWidth + 132f; 
+                float maxTextWidth = Mathf.Max(nameWidth, infoWidth);
+                // Always float the Time on documents so it gets the standard 20px right
+                // inset from PositionFloatingTime (with a caption it sits inline on the
+                // caption's last line; without one it floats at the card's bottom-right).
+                if (timeLayout != null) timeLayout.ignoreLayout = true;
+
+                float finalWidth = maxTextWidth + 132f;
                 float minDocWidth = 240f;
-                
+
                 if (finalWidth < minDocWidth) finalWidth = minDocWidth;
-                
+
                 docLayout.preferredWidth = finalWidth;
+                mediaWidth = finalWidth;
 
                 LayoutElement nameLe = documentNameText.GetComponent<LayoutElement>();
                 if (!nameLe) nameLe = documentNameText.gameObject.AddComponent<LayoutElement>();
@@ -859,11 +881,33 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                 float textWidthInsidePanel = finalWidth - 90f;
                 float actualHeight = documentNameText.GetPreferredValues(documentNameText.text, textWidthInsidePanel, Mathf.Infinity).y;
                 float singleLineHeight = documentNameText.GetPreferredValues("A", textWidthInsidePanel, Mathf.Infinity).y;
-                
+
                 nameLe.preferredHeight = Mathf.Min(actualHeight, singleLineHeight * 2f);
             }
-            
-            return; 
+            else if (isDownloadActive)
+            {
+                // Standard media-download placeholder width comes from the button's prefab
+                // LayoutElement (444 in both incoming/outgoing prefabs).
+                var btnLe = downloadButton.GetComponent<LayoutElement>();
+                mediaWidth = (btnLe != null && btnLe.preferredWidth > 0f) ? btnLe.preferredWidth : 444f;
+            }
+
+            // Clamp caption width to the active media element. Without this, a long
+            // caption stretches the bubble — and since the bubble VLG has
+            // childForceExpandWidth=true, that stretches the download button or
+            // document card right along with it.
+            if (hasCaption && mediaWidth > 0f)
+            {
+                messageText.textWrappingMode = TextWrappingModes.Normal;
+                textLayout.ignoreLayout = false;
+                textLayout.minWidth = 0;
+                textLayout.flexibleWidth = 0;
+
+                Vector2 wrappedSize = messageText.GetPreferredValues(messageText.text, mediaWidth - 16f, Mathf.Infinity);
+                textLayout.preferredWidth = Mathf.Min(wrappedSize.x + 21f, mediaWidth);
+            }
+
+            return;
         }
         
         messageText.textWrappingMode = TextWrappingModes.Normal;
@@ -1663,8 +1707,15 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
 
         if (isManual)
         {
-            if (expiredPlaceholder) expiredPlaceholder.SetActive(true);
-            if (downloadButton) downloadButton.gameObject.SetActive(false); 
+            if (expiredPlaceholder)
+            {
+                expiredPlaceholder.SetActive(true);
+                // Match the download button fill so the expired placeholder reads as
+                // the same kind of card-on-bubble that preceded it.
+                if (expiredPlaceholder.TryGetComponent<Image>(out var expiredImg))
+                    expiredImg.color = DownloadFillColor;
+            }
+            if (downloadButton) downloadButton.gameObject.SetActive(false);
         }
         else
         {
@@ -1698,12 +1749,12 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
             {
                 btnImg.enabled = true;
                 if (downloadArrowIcon != null) btnImg.sprite = downloadArrowIcon;
-                btnImg.color = Color.white;
+                btnImg.color = DownloadFillColor;
             }
             if (downloadButtonText) downloadButtonText.gameObject.SetActive(true);
         }
-        
-        if (bubbleBackground != null && bubbleBackground.TryGetComponent<LayoutElement>(out var pLayout)) 
+
+        if (bubbleBackground != null && bubbleBackground.TryGetComponent<LayoutElement>(out var pLayout))
         {
             pLayout.preferredHeight = -1; 
         }
@@ -1963,7 +2014,7 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
             {
                 btnImg.enabled = true;
                 if (downloadArrowIcon != null) btnImg.sprite = downloadArrowIcon;
-                btnImg.color = Color.white;
+                btnImg.color = DownloadFillColor;
             }
             if (downloadButtonText) downloadButtonText.gameObject.SetActive(true);
         }
@@ -2000,7 +2051,7 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
             {
                 btnImg.enabled = true;
                 if (downloadArrowIcon != null) btnImg.sprite = downloadArrowIcon;
-                btnImg.color = Color.white;
+                btnImg.color = DownloadFillColor;
             }
             if (downloadButtonText) downloadButtonText.gameObject.SetActive(true);
         }
@@ -2323,20 +2374,18 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
 
         bool isDownloadActive = downloadButton != null && downloadButton.gameObject.activeSelf;
         bool isExpiredActive = expiredPlaceholder != null && expiredPlaceholder.activeSelf;
-        
-        bool isLoadingNoThumb = loadingSpinner != null && loadingSpinner.activeSelf && string.IsNullOrEmpty(currentVm.thumbnailUrl);
-        
-        bool needsDarkBubble = isDownloadActive || isExpiredActive || (isLoadingNoThumb && !currentVm.isSticker);
+        bool isPlaceholderActive = isDownloadActive || isExpiredActive;
 
-        bool isTransparent = (currentVm.isSticker && !needsDarkBubble) || hideBubble;
+        // Bubble keeps its incoming/outgoing colour in every state — both the
+        // download button and the expired placeholder sit on top as cards instead
+        // of swapping the bubble to a dark fill. Stickers normally go transparent
+        // (the sticker IS the content), but while the placeholder card is showing
+        // the bubble has to be visible so the card has a colour to contrast with.
+        bool isTransparent = (currentVm.isSticker && !isPlaceholderActive) || hideBubble;
 
         if (isTransparent)
         {
             bubbleBackground.color = Color.clear;
-        }
-        else if (needsDarkBubble)
-        {
-            bubbleBackground.color = new Color(0.84f, 0.84f, 0.84f, 1f); 
         }
         else
         {
@@ -2726,7 +2775,7 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
             var rounded = documentPanel.GetComponent<ImageWithRoundedCorners>();
             if (!rounded) rounded = documentPanel.gameObject.AddComponent<ImageWithRoundedCorners>();
             rounded.enabled = true;
-            rounded.radius = 16;
+            rounded.radius = 23;
             rounded.Validate();
             rounded.Refresh();
         }
