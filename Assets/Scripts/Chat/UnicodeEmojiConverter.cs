@@ -4,8 +4,23 @@ using UnityEngine;
 
 public static class UnicodeEmojiConverter
 {
+    /// <summary>
+    /// Backward-compatible overload — callers that do not need the missing-emoji flag.
+    /// </summary>
     public static string ConvertRealEmojisToSprites(string input)
     {
+        return ConvertRealEmojisToSprites(input, out _);
+    }
+
+    /// <summary>
+    /// Converts real Unicode emoji in <paramref name="input"/> to TMP sprite tags for any
+    /// emoji that is registered in <see cref="EmojiSpriteRegistry"/>. Unknown emoji are left
+    /// as raw Unicode so font-fallback can render them, and <paramref name="hasMissingEmojis"/>
+    /// is set to <c>true</c> so the caller can schedule a background CDN fetch.
+    /// </summary>
+    public static string ConvertRealEmojisToSprites(string input, out bool hasMissingEmojis)
+    {
+        hasMissingEmojis = false;
         if (string.IsNullOrEmpty(input)) return input;
 
         StringBuilder sb = new StringBuilder();
@@ -71,15 +86,30 @@ public static class UnicodeEmojiConverter
                 // Convert list of hex codes to string: "1f44b-1f3fb" or "1f1f0-1f1ff"
                 string hexName = GetHexName(emojiSequence);
 
-                bool needsGap = sb.Length > 0 && !char.IsWhiteSpace(sb[sb.Length - 1]) && sb[sb.Length - 1] != '>' && sb[sb.Length - 1] != '\u200B';
+                if (EmojiSpriteRegistry.IsKnown(hexName))
+                {
+                    // Sprite exists \u2014 emit TMP rich-text tag with spacing
+                    bool needsGap = sb.Length > 0
+                        && !char.IsWhiteSpace(sb[sb.Length - 1])
+                        && sb[sb.Length - 1] != '>'
+                        && sb[sb.Length - 1] != '\u200B';
 
-                sb.Append('\u200B'); 
-                if (needsGap) sb.Append("<space=0.12em>"); 
-                
-                sb.Append($"<sprite name=\"{hexName}\">");
-                sb.Append('\u200B');
+                    sb.Append('\u200B');
+                    if (needsGap) sb.Append("<space=0.12em>");
+                    sb.Append($"<sprite name=\"{hexName}\">");
+                    sb.Append('\u200B');
+                }
+                else
+                {
+                    // Sprite missing \u2014 leave raw Unicode so font fallback renders it,
+                    // and queue a background CDN fetch.
+                    hasMissingEmojis = true;
+                    sb.Append(input, i, currentIdx - i);
+                    if (EmojiPatchService.Instance != null)
+                        EmojiPatchService.Instance.RequestEmoji(hexName);
+                }
 
-                i = currentIdx; 
+                i = currentIdx;
             }
             else
             {
