@@ -30,9 +30,11 @@ public class EmojiPatchService : MonoBehaviour
     private const int MaxConcurrentDownloads = 3;
 
     // Fraction of the source texture size to add as transparent padding on each side.
-    // Atlas tiles are 180px with ~160px emoji content, so padding ≈ 10/180 ≈ 0.056.
+    // Atlas tiles are 180px with ~160px emoji content (≈5.6% padding per side). Twemoji
+    // textures pack more emoji into the same pixels, so a slightly larger padding (10%)
+    // produces visual inter-sprite gaps closer to what atlas sprites have in this UI.
     // Increase to widen the gap between consecutive sprites; decrease to tighten.
-    private const float EmojiPaddingFraction = 0.056f;
+    private const float EmojiPaddingFraction = 0.10f;
 
     private string _cacheDir;
     private Shader _tmpSpriteShader;
@@ -154,13 +156,13 @@ public class EmojiPatchService : MonoBehaviour
         face.baseline  = -38f;
         asset.faceInfo = face;
 
-        // Atlas-style metrics scaled down to 128 (tuned visual size that matches the
-        // chat UI's other emoji rendering). Atlas uses 160; we use 128 with proportional
-        // bearingY (118 ≈ 92% of 128, same ratio as atlas's 148/160). bearingX=0 and
+        // Atlas-style metrics scaled down to 132 (tuned visual size that matches the
+        // chat UI's other emoji rendering). Atlas uses 160; we use 132 with proportional
+        // bearingY (122 ≈ 92% of 132, same ratio as atlas's 148/160). bearingX=0 and
         // advance=width — visual inter-sprite padding comes from the texture margin,
         // not the metric.
-        const float EmojiMetricSize     = 128f;
-        const float EmojiMetricBearingY = 118f;
+        const float EmojiMetricSize     = 132f;
+        const float EmojiMetricBearingY = 122f;
         var glyph = new TMP_SpriteGlyph
         {
             index     = 0,
