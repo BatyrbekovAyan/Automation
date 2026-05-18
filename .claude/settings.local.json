@@ -214,7 +214,17 @@
       "Bash(awk '/m_EditorClassIdentifier:.*ContentSizeFitter/,/^---/' /Users/ayan/Projects/Automation/Assets/Prefabs/MessageTextOutgoing.prefab)",
       "Bash(awk '/m_Script: \\\\{fileID: 11500000, guid: 306cc8c2b49d7114eaa3623786fc2126/,/^---/' /Users/ayan/Projects/Automation/Assets/Prefabs/MessageTextOutgoing.prefab)",
       "Bash(awk '/^--- !u!224 &3081330112543501561$/,/^---/' /Users/ayan/Projects/Automation/Assets/Prefabs/MessageTextOutgoing.prefab)",
-      "Bash(awk '/^--- !u!224 &8432781846609743631$/,/^---/' /Users/ayan/Projects/Automation/Assets/Prefabs/MessageTextOutgoing.prefab)"
+      "Bash(awk '/^--- !u!224 &8432781846609743631$/,/^---/' /Users/ayan/Projects/Automation/Assets/Prefabs/MessageTextOutgoing.prefab)",
+      "WebFetch(domain:www.anthropic.com)",
+      "WebFetch(domain:docs.claude.com)",
+      "WebFetch(domain:claude.com)",
+      "Bash(awk 'NR<=740 && /^    \\(void|private|public|protected|IEnumerator\\)/{name=$0; line=NR} END{print line\": \"name}' Assets/Scripts/UI/MessageItemView.cs)",
+      "Bash(awk 'NR==552' Assets/Scripts/UI/MessageItemView.cs)",
+      "Bash(awk '/m_Name: LinkPreview/{print NR\": \"$0; flag=1; count=0} flag && /m_Name:/{count++; if \\(count > 1\\) flag=0} flag{print NR\": \"$0}' /Users/ayan/Projects/Automation/Assets/Prefabs/MessageTextIncoming.prefab)",
+      "Bash(awk 'NR>=875 && NR<=1020' /Users/ayan/Projects/Automation/Assets/Prefabs/MessageTextIncoming.prefab)",
+      "Bash(awk 'NR>=200 && NR<=460' /Users/ayan/Projects/Automation/Assets/Prefabs/MessageTextIncoming.prefab)",
+      "Bash(awk 'NR>=1245 && NR<=1410' /Users/ayan/Projects/Automation/Assets/Prefabs/MessageTextIncoming.prefab)",
+      "Bash(awk 'NR>=3155 && NR<=3380' /Users/ayan/Projects/Automation/Assets/Prefabs/MessageTextIncoming.prefab)"
     ]
   }
 }
