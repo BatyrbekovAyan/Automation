@@ -141,7 +141,7 @@ public static class UnicodeEmojiConverter
         for (int j = 0; j < sequence.Count; j++)
         {
             if (j > 0) hexBuilder.Append("-");
-            hexBuilder.Append(sequence[j].ToString("x")); 
+            hexBuilder.Append(sequence[j].ToString("x4")); // min 4 digits — matches Twemoji CDN convention (e.g. "00a9" not "a9")
         }
         return hexBuilder.ToString();
     }
