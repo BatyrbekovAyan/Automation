@@ -133,12 +133,17 @@ public class EmojiPatchService : MonoBehaviour
         if (defaultAsset != null)
             asset.faceInfo = defaultAsset.faceInfo;
 
-        float h = tex.height;
-        float w = tex.width;
+        // Use the same logical metric dimensions as the existing emoji atlases (texture-0 through
+        // texture-30). Those assets use width=160, height=160, bearingY=148, advance=160 — these
+        // are em-space units, not pixel counts. The glyphRect maps to actual texture pixels.
+        // Using pixel dimensions here (72x72) made sprites render tiny; matching the atlas
+        // metrics ensures the CDN sprite renders at the same visual size as atlas emojis.
+        const float EmojiMetricSize    = 160f;
+        const float EmojiMetricBearingY = 148f;
         var glyph = new TMP_SpriteGlyph
         {
             index     = 0,
-            metrics   = new GlyphMetrics(w, h, 0f, h * 0.78f, w),
+            metrics   = new GlyphMetrics(EmojiMetricSize, EmojiMetricSize, 0f, EmojiMetricBearingY, EmojiMetricSize),
             glyphRect = new GlyphRect(0, 0, tex.width, tex.height),
             scale     = 1f,
             atlasIndex = 0
