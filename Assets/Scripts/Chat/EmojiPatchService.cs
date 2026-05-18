@@ -142,17 +142,24 @@ public class EmojiPatchService : MonoBehaviour
         face.baseline  = -38f;
         asset.faceInfo = face;
 
-        // Metric size tuned to match the visual size of system-font-rendered emojis.
-        // The existing atlas uses 160 (em-space), but other emojis in the chat that have
-        // no sprite match render through the OS font's glyphs at a smaller effective size.
-        // Using metric 100 makes new Twemoji sprites visually match those system emojis.
-        // If you want strict atlas-parity (matches existing atlas-rendered sprites), use 160.
-        const float EmojiMetricSize    = 100f;
-        const float EmojiMetricBearingY = 92f;  // ~92% of size, matches atlas ratio (148/160)
+        // Metric tuning — three independent knobs:
+        //  - EmojiMetricSize:    rendered width/height of the emoji (visual size)
+        //  - EmojiMetricBearingY: ascent above baseline (vertical alignment)
+        //  - EmojiMetricAdvance:  horizontal cursor advance (controls inter-sprite spacing)
+        //
+        // Why Advance > Size: Twemoji PNGs fill the entire 72px texture edge-to-edge
+        // with NO transparent padding. The existing atlas PNGs include built-in padding
+        // (180px texture, ~140px emoji content), giving consecutive sprites natural gaps.
+        // To compensate, we set Advance > Size so each sprite reserves padding on its right.
+        // The half-bearingX (Advance-Size)/2 centers the emoji within its advance box.
+        const float EmojiMetricSize     = 128f;
+        const float EmojiMetricBearingY = 118f; // ~92% of size — baseline alignment
+        const float EmojiMetricAdvance  = 156f; // ~22% wider than size — adds gap between sprites
+        const float EmojiMetricBearingX = (EmojiMetricAdvance - EmojiMetricSize) * 0.5f; // center
         var glyph = new TMP_SpriteGlyph
         {
             index     = 0,
-            metrics   = new GlyphMetrics(EmojiMetricSize, EmojiMetricSize, 0f, EmojiMetricBearingY, EmojiMetricSize),
+            metrics   = new GlyphMetrics(EmojiMetricSize, EmojiMetricSize, EmojiMetricBearingX, EmojiMetricBearingY, EmojiMetricAdvance),
             glyphRect = new GlyphRect(0, 0, tex.width, tex.height),
             scale     = 1f,
             atlasIndex = 0
