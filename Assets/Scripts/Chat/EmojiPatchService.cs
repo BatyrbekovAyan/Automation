@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using TMPro;
 using UnityEngine;
+using UnityEngine.TextCore;
 
 /// <summary>
 /// Singleton MonoBehaviour that owns the missing-emoji download pipeline.
@@ -152,8 +153,8 @@ public class EmojiPatchService : MonoBehaviour
             scale = 1f
         };
 
-        asset.spriteGlyphTable     = new List<TMP_SpriteGlyph>    { glyph };
-        asset.spriteCharacterTable = new List<TMP_SpriteCharacter> { character };
+        asset.spriteGlyphTable.Add(glyph);
+        asset.spriteCharacterTable.Add(character);
         asset.UpdateLookupTables();
 
         return asset;
