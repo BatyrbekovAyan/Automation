@@ -163,13 +163,12 @@ public class EmojiPatchService : MonoBehaviour
         face.baseline  = -38f;
         asset.faceInfo = face;
 
-        // Atlas-style metrics scaled down to 140 (tuned visual size that matches the
-        // chat UI's other emoji rendering). Atlas uses 160; we use 140 with proportional
-        // bearingY (128.8 = 92% of 140, same ratio as atlas's 148/160). bearingX=0 and
-        // advance=width — visual inter-sprite padding comes from the texture margin,
-        // not the metric.
-        const float EmojiMetricSize     = 140f;
-        const float EmojiMetricBearingY = 128.8f;
+        // Atlas-identical metric size (160) for visual size parity with existing
+        // atlas-rendered sprites. bearingY = 147.2 ≈ 92% of 160 (atlas uses 148).
+        // bearingX=0 and advance=width — visual inter-sprite padding comes from the
+        // texture margin (EmojiPaddingFraction), not the metric.
+        const float EmojiMetricSize     = 160f;
+        const float EmojiMetricBearingY = 147.2f;
         var glyph = new TMP_SpriteGlyph
         {
             index     = 0,
