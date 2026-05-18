@@ -88,6 +88,7 @@ public class MessageItemView : MonoBehaviour
     private bool currentShowTail;
     private bool floatingTimeConfigured = false;
 
+    private string _mainMessageOriginalText;
     private AudioSource audioSource;
     private RectTransform rectTransform;
     private TextMeshProUGUI downloadButtonText;
@@ -149,8 +150,31 @@ public class MessageItemView : MonoBehaviour
             retryButton.onClick.RemoveAllListeners();
             retryButton.interactable = false;
         }
+
+        EmojiPatchService.OnEmojiReady -= HandleEmojiReady;
     }
-    
+
+    private void SubscribeToEmojiReady()
+    {
+        // Avoid duplicate subscription
+        EmojiPatchService.OnEmojiReady -= HandleEmojiReady;
+        EmojiPatchService.OnEmojiReady += HandleEmojiReady;
+    }
+
+    private void HandleEmojiReady(string spriteName)
+    {
+        if (messageText == null || string.IsNullOrEmpty(_mainMessageOriginalText)) return;
+
+        var reconverted = UnicodeEmojiConverter.ConvertRealEmojisToSprites(
+            _mainMessageOriginalText, out bool stillMissing);
+
+        if (reconverted != messageText.text)
+            messageText.text = reconverted;
+
+        if (!stillMissing)
+            EmojiPatchService.OnEmojiReady -= HandleEmojiReady;
+    }
+
     public void Bind(MessageViewModel vm, bool showTail = true, bool skipLayoutRebuild = false, bool showSenderName = false)    
     {
         currentVm = vm;
@@ -234,7 +258,10 @@ public class MessageItemView : MonoBehaviour
             textToProcess = FormatTextWithWrappableLinks(safeText);
         }
 
-        string processedText = UnicodeEmojiConverter.ConvertRealEmojisToSprites(textToProcess) ?? "";
+        _mainMessageOriginalText = textToProcess;
+        string processedText = UnicodeEmojiConverter.ConvertRealEmojisToSprites(textToProcess, out bool hasMissingMain);
+        processedText ??= "";
+        if (hasMissingMain) SubscribeToEmojiReady();
         
         if (linkPreviewCard != null) linkPreviewCard.SetActive(false);
 
@@ -2552,8 +2579,10 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
                 else
                 {
                     // If the user typed a message with the link, keep their message visible!
-                    messageText.text = UnicodeEmojiConverter.ConvertRealEmojisToSprites(textWithoutUrl);
-                    messageText.gameObject.SetActive(true); 
+                    _mainMessageOriginalText = textWithoutUrl;
+                    messageText.text = UnicodeEmojiConverter.ConvertRealEmojisToSprites(textWithoutUrl, out bool hasMissingUrl);
+                    if (hasMissingUrl) SubscribeToEmojiReady();
+                    messageText.gameObject.SetActive(true);
                 }
             }
         }
@@ -2565,7 +2594,9 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
             if (messageText != null)
             {
                 string originalText = FormatTextWithWrappableLinks(vm.text ?? "");
-                messageText.text = UnicodeEmojiConverter.ConvertRealEmojisToSprites(originalText);
+                _mainMessageOriginalText = originalText;
+                messageText.text = UnicodeEmojiConverter.ConvertRealEmojisToSprites(originalText, out bool hasMissingLink);
+                if (hasMissingLink) SubscribeToEmojiReady();
                 messageText.gameObject.SetActive(true);
             }
         }
