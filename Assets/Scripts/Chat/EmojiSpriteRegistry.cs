@@ -1,5 +1,12 @@
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using TMPro;
+
+// Allow the editor test assembly to call internal test helpers (Reset, BuildFromNames).
+// Without .asmdef files Unity compiles runtime scripts into Assembly-CSharp and
+// editor/test scripts into Assembly-CSharp-Editor — different assemblies, so
+// internal visibility does not cross the boundary without this attribute.
+[assembly: InternalsVisibleTo("Assembly-CSharp-Editor")]
 
 /// <summary>
 /// Tracks which TMP sprite names are known (in atlas), pending (fetch in flight),
