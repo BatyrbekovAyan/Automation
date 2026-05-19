@@ -227,7 +227,16 @@
       "Bash(awk 'NR>=3155 && NR<=3380' /Users/ayan/Projects/Automation/Assets/Prefabs/MessageTextIncoming.prefab)",
       "Bash(awk '/^--- !u!114 &4132774896767344042$/,/^--- !u!/{print NR\": \"$0; if\\(/^--- !u!/ && NR > 2900\\) exit}' /Users/ayan/Projects/Automation/Assets/Prefabs/MessageTextIncoming.prefab)",
       "Bash(bash .claude/hooks/validate-cs.sh Assets/Scripts/UI/MessageItemView.cs)",
-      "Bash(awk '/^--- !u!1 .*4783006639147938202/,/^--- !u!1 /{print NR\": \"$0}' /Users/ayan/Projects/Automation/Assets/Prefabs/MessageTextIncoming.prefab)"
+      "Bash(awk '/^--- !u!1 .*4783006639147938202/,/^--- !u!1 /{print NR\": \"$0}' /Users/ayan/Projects/Automation/Assets/Prefabs/MessageTextIncoming.prefab)",
+      "Bash(curl -s \"https://api.github.com/repos/jdecked/twemoji/releases/latest\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/jdecked/twemoji/master/README.md\")",
+      "Bash(curl -s \"https://www.unicode.org/Public/emoji/16.0/emoji-test.txt\")",
+      "Bash(awk -F';' '{ print $1 }')",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' -I __TRACKED_VAR__/__TRACKED_VAR__.png)",
+      "Bash(cd /Users/ayan/.claude/projects/-Users-ayan-Projects-Automation && ls -la | head -30 && echo \"---\" && ls -la /Users/ayan/.claude/ 2>/dev/null | head -30 && echo \"---\" && stat -f \"%Sm %z %N\" 4329cbcd-f477-4b79-a281-7344981d803c.jsonl df365367-8e54-40df-bd60-862902f7331b.jsonl 2>/dev/null)",
+      "Bash(python3 -c \"import uuid; print\\(uuid.uuid4\\(\\).hex\\); print\\(uuid.uuid4\\(\\).hex\\)\")",
+      "Bash(python3 -c \"print\\(hex\\(0xFFFE\\)\\)\")",
+      "Bash(kill %1 2>/dev/null; grep -rln \"public struct FaceInfo\\\\b\" /Applications/Unity/Hub/Editor/ 2>/dev/null | head -3)"
     ]
   }
 }
