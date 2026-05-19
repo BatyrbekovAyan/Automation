@@ -31,17 +31,18 @@ public class EmojiPatchService : MonoBehaviour
 
     // Fraction of the source texture size to add as transparent padding on each side.
     //
-    // Calibrated empirically: atlas PNGs have substantial internal padding (~20% of
-    // their 180px tile), producing a visible inter-sprite gap of ~30% of the emoji
-    // width. Earlier math assumed only 5.6% atlas padding (the metric/glyphRect
-    // ratio), which underestimated by ~3x.
+    // Atlas structural reference (verified by inspecting texture-0.png):
+    //   - Each atlas tile is 180×180 pixels
+    //   - Emoji content occupies the central ~144px (≈80% of tile)
+    //   - Transparent margin per side: ~18px (≈10% of tile)
     //
-    // 0.15 means we add ~11px of transparent border to each side of the 72px source,
-    // producing a 94px padded texture that, when rendered at metric 140, gives an
-    // inter-sprite em-gap of ~37 units — matching what atlas sprites produce.
+    // To structurally mirror atlas: we want 72px Twemoji source to be ~80% of the
+    // padded texture, i.e. pad such that 72 / (72 + 2·pad) = 0.80 → pad = 9px →
+    // fraction = 9/72 = 0.125. This gives our sprites the same emoji-to-margin
+    // ratio that atlas tiles have, so inter-sprite gaps match structurally.
     //
-    // Tune up to widen gaps further, down to tighten.
-    private const float EmojiPaddingFraction = 0.25f;
+    // Tune up to widen gaps; tune down to tighten.
+    private const float EmojiPaddingFraction = 0.125f;
 
     private string _cacheDir;
     private Shader _tmpSpriteShader;
@@ -171,13 +172,13 @@ public class EmojiPatchService : MonoBehaviour
         // -12 unit offset compensates for that texture-content positioning gap.
         // bearingX=0 and advance=width — visual inter-sprite padding comes from the
         // texture margin (EmojiPaddingFraction), not the metric.
-        const float EmojiMetricSize     = 160f;
-        const float EmojiMetricBearingY = 136f;
+        const float EmojiMetricSize     = 164f;
+        const float EmojiMetricBearingY = 140f;
         var glyph = new TMP_SpriteGlyph
         {
             index     = 0,
             metrics   = new GlyphMetrics(EmojiMetricSize, EmojiMetricSize, 0f, EmojiMetricBearingY, EmojiMetricSize),
-            glyphRect = new GlyphRect(0, 0, paddedTex.width, paddedTex.height),
+            glyphRect = new GlyphRect(4, 0, paddedTex.width, paddedTex.height),
             scale     = 1f,
             atlasIndex = 0
         };
