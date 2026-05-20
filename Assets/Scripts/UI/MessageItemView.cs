@@ -764,7 +764,18 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             bool isDownloadActive = downloadButton != null && downloadButton.gameObject.activeSelf;
             bool isExpiredActive = expiredPlaceholder != null && expiredPlaceholder.activeSelf;
             bool useCardLayout = isDownloadActive || isExpiredActive;
-    
+
+            // Only size the audio panel when it's the active visual (not the download/expired card).
+            if (!useCardLayout && audioPanel != null && audioPanel.activeSelf)
+            {
+                var audioLe = audioPanel.GetComponent<LayoutElement>();
+                if (audioLe == null) audioLe = audioPanel.AddComponent<LayoutElement>();
+
+                Vector2 size = ResolveContentSize(type, 1f);
+                audioLe.preferredWidth  = size.x;
+                audioLe.preferredHeight = size.y;
+            }
+
             bool hasSenderName = senderNameText != null && senderNameText.gameObject.activeSelf;
 
             if (useCardLayout)
