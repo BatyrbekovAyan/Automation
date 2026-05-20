@@ -1691,15 +1691,22 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
     
     IEnumerator ForceRebuildRoutine()
     {
-        yield return null; 
-        
+        yield return null;
+
+        // Self rebuild stays immediate — MirrorSize and RefreshCorners below
+        // read this bubble's rect on the same frame.
         LayoutRebuilder.ForceRebuildLayoutImmediate(rectTransform);
-        
-        if (transform.parent != null)
-            LayoutRebuilder.ForceRebuildLayoutImmediate(transform.parent as RectTransform);
-            
-        if (transform.parent != null && transform.parent.parent != null)
-            LayoutRebuilder.ForceRebuildLayoutImmediate(transform.parent.parent as RectTransform);
+
+        // Parent (content) and grandparent (viewport) are marked dirty instead
+        // of force-rebuilt. ForceRebuildLayoutImmediate on these was the main
+        // amplifier of chat-open freeze: every async media decode triggered
+        // two full content-tree rebuilds (50+ bubbles). MarkLayoutForRebuild
+        // coalesces concurrent dirties into a single deferred pass.
+        if (transform.parent is RectTransform parentRt)
+            LayoutRebuilder.MarkLayoutForRebuild(parentRt);
+
+        if (transform.parent != null && transform.parent.parent is RectTransform grandparentRt)
+            LayoutRebuilder.MarkLayoutForRebuild(grandparentRt);
 
         if (bubbleBackground != null)
         {

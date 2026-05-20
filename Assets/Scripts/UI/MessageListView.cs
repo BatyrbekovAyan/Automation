@@ -82,15 +82,23 @@ public class MessageListView : MonoBehaviour
     void OnChatSelected(string chatId)
     {
         activeChatId = chatId;
-        
+
         hasMoreMessages = true;
-        isLoadingData = true; 
-        loadedPagesCount = 1; 
-        
+        isLoadingData = true;
+        loadedPagesCount = 1;
+
         if (scrollRect != null) scrollRect.movementType = defaultMovementType;
-        
+
         if (loadingMessagesSpinner) loadingMessagesSpinner.SetActive(false);
-        Clear(); 
+
+        // Kill any in-flight UpdateListRoutine or AppendLiveMessagesRoutine
+        // from a previous chat open. Without this, those coroutines keep
+        // running and Instantiate bubbles into the (about-to-be-cleared)
+        // content right after Clear() runs — producing duplicate bubbles or
+        // bubbles from the previous chat leaking into the new view.
+        StopAllCoroutines();
+
+        Clear();
     }
     
     void OnScroll(Vector2 scrollPos)
@@ -466,25 +474,16 @@ IEnumerator UpdateListRoutine(List<MessageViewModel> sortedMessages, bool isLoad
 
             countSinceYield++;
 
-            // G. STAGGERED YIELD & OUTLINE FIX
+            // Yield occasionally so the slide-in animation stays smooth while
+            // bubbles spawn. Items remain hidden (alpha=0) throughout the loop —
+            // they're revealed in one batch by the final cleanup pass below,
+            // after a single full layout rebuild settles every TMP/CSF/VLG
+            // chain. This matches WhatsApp's feel: chat appears fully formed
+            // on open instead of bubbles popping in and resizing one batch at
+            // a time as the natural layout pass catches up.
             if (!isLoadMore && countSinceYield % 15 == 0)
             {
-                Canvas.ForceUpdateCanvases();
-                LayoutRebuilder.ForceRebuildLayoutImmediate(content.GetComponent<RectTransform>());
-                
-                if (scrollRect) scrollRect.verticalNormalizedPosition = 0f; 
-                
-                // 1. Wait for Unity to actually draw the layouts
-                yield return null; 
-                
-                // 2. Fix the outlines!
-                foreach (var msg in batchItems) if (msg != null) msg.FinalizeCustomVisuals();
-                
-                // 3. POP THEM ON SCREEN NOW THAT THEY ARE PERFECT!
-                foreach (var cg in batchCanvasGroups) if (cg != null) cg.alpha = 1f;
-
-                batchItems.Clear();
-                batchCanvasGroups.Clear();
+                yield return null;
             }
         }
         

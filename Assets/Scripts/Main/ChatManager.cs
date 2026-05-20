@@ -74,6 +74,15 @@ public partial class ChatManager : MonoBehaviour
     /// </summary>
     private List<MessageViewModel> _cachedQueue;
 
+    /// <summary>
+    /// The in-flight SyncLatestMessages coroutine for the current chat. We
+    /// cancel this when a new chat opens (or the same chat re-opens) so a
+    /// stale sync's OnLiveMessagesReceived fire can't leak into a different
+    /// view, and so two concurrent syncs of the same chat don't both append
+    /// the same brand-new messages.
+    /// </summary>
+    private Coroutine _activeSync;
+
     public void Awake()
     {
         Instance = this;
@@ -241,11 +250,16 @@ public partial class ChatManager : MonoBehaviour
         // Now that the UI is awake, it will hear this command and instantly delete the old prefabs!
         OnChatSelected?.Invoke(chatId);
 
-        // --- 3. ANIMATE AND LOAD ---
+        // --- 3. ANIMATE FIRST, THEN LOAD ---
+        // Loading in parallel with the slide makes the slide animation jank
+        // because spawn work competes with the animation tick on the main
+        // thread. Wait for the slide to finish, then load. The alpha=0
+        // /end-reveal pattern in UpdateListRoutine still prevents bubbles from
+        // popping in and resizing — they appear sized correctly all at once
+        // once the loop completes its single final layout rebuild.
         if (SwipeToBack.Instance != null)
         {
-            // Trigger the smooth slide, and spawn the messages when it finishes
-            SwipeToBack.Instance.SlideInToMessages(() => 
+            SwipeToBack.Instance.SlideInToMessages(() =>
             {
                 LoadMessagesForChat(chatId);
             });
@@ -324,8 +338,12 @@ public partial class ChatManager : MonoBehaviour
             // the server might have older messages (we don't know yet).
             OnBatchMessagesLoaded?.Invoke(initialBatch, false, true);
 
-            // 2. BACKGROUND SYNC: Quietly check for missed messages
-            StartCoroutine(SyncLatestMessages(chatId, cachedMessages));
+            // 2. BACKGROUND SYNC: Quietly check for missed messages. Cancel any
+            // prior in-flight sync first — a rapid retap or chat switch would
+            // otherwise leave the previous sync alive, and its delayed event
+            // fire would append the same brand-new messages a second time.
+            if (_activeSync != null) StopCoroutine(_activeSync);
+            _activeSync = StartCoroutine(SyncLatestMessages(chatId, cachedMessages));
         }
         else
         {
@@ -358,6 +376,14 @@ public partial class ChatManager : MonoBehaviour
         yield return www.SendWebRequest();
 
         if (www.result != UnityWebRequest.Result.Success) yield break;
+
+        // If the user has navigated to a different chat while the sync was in
+        // flight, abort entirely. Firing OnLiveMessagesReceived or
+        // OnMessageStatusChanged now would leak this chat's data into whatever
+        // view is currently shown, and mutating shared state (seenMessageIds,
+        // _activeChatCache) would corrupt the now-active chat's session. The
+        // next open of this chat will run sync again with fresh state.
+        if (currentChatId != chatId) yield break;
 
 #if UNITY_EDITOR
         var text = www.downloadHandler.text;
@@ -506,6 +532,15 @@ public partial class ChatManager : MonoBehaviour
         // If we found new messages while the app was closed, merge them!
         if (newMessages.Count > 0)
         {
+            // Snapshot the brand-new server messages before merging — these are
+            // the ids the rendered list hasn't seen yet. The merged list below
+            // goes to the cache file and pagination tracker, but the UI must
+            // only be told about the brand-new ones. Firing OnBatchMessagesLoaded
+            // with the full merged list re-spawns the already-rendered cached
+            // bubbles on top of themselves (HandleBatchMessages does not Clear
+            // outside OnChatSelected), producing visible duplicates.
+            var brandNew = new List<MessageViewModel>(newMessages);
+
             // Add the old cached messages to the bottom of the brand new ones
             newMessages.AddRange(cachedList);
 
@@ -522,8 +557,10 @@ public partial class ChatManager : MonoBehaviour
             // Track the merged list for future paginated refreshes.
             _activeChatCache = newMessages;
 
-            // Refresh the UI with the fully up-to-date list!
-            OnBatchMessagesLoaded?.Invoke(newMessages, false, true);
+            // Append only the brand-new messages — AppendLiveMessagesRoutine
+            // slides them in at the bottom without re-spawning the cached
+            // bubbles already on screen.
+            OnLiveMessagesReceived?.Invoke(brandNew);
         }
         else if (hasStatusUpdates)
         {
