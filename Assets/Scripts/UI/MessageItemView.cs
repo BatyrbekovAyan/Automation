@@ -89,10 +89,14 @@ public class MessageItemView : MonoBehaviour
     private const float AspectPortraitThreshold  = 0.9f; // < → portrait
 
     // === Voice / Audio ===
+    // Height 120 matches the prefab's natural audioPanel SizeDelta and WhatsApp's
+    // ~40-48pt voice-note row (~111-133 on the 1080 canvas). Both voice and audio
+    // file share the same play+slider+duration layout — no filename row — so the
+    // height is identical for both.
     private const float VoiceWidth            = 720f;   // 0.67 × canvas
-    private const float VoiceHeight           = 150f;
+    private const float VoiceHeight           = 120f;
     private const float AudioFileWidth        = 760f;   // 0.70 × canvas
-    private const float AudioFileHeight       = 190f;
+    private const float AudioFileHeight       = 120f;
 
     // === Sticker (no bubble bg) ===
     private const float StickerWidth          = 432f;   // 0.40 × canvas
@@ -1280,20 +1284,28 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
 
         if (messageImage.TryGetComponent<AspectRatioFitter>(out var imgFitter)) imgFitter.enabled = false;
 
-        if (messageImage.TryGetComponent<ImageWithRoundedCorners>(out var oldR)) Destroy(oldR);
+        // Reuse the existing ImageWithRoundedCorners (added in the editor on the
+        // ImageOrVideo prefab, or added by a prior Bind on a recycled bubble).
+        // The previous Destroy(oldR) + GetComponent + AddComponent pattern
+        // raced Unity's end-of-frame destruction: GetComponent returned the
+        // still-attached-but-destroyed component, AddComponent then either
+        // no-op'd or added a duplicate that got swept with the destroyed one,
+        // leaving the GameObject with no ImageWithRoundedCorners next frame.
+        // RefreshCorners then had nothing to refresh and the image rendered
+        // sharp corners. Reusing the component avoids the race entirely — we
+        // only mutate radius/enabled, which is what the component is for.
+        if (!messageImage.TryGetComponent<ImageWithRoundedCorners>(out var rounded))
+            rounded = messageImage.gameObject.AddComponent<ImageWithRoundedCorners>();
 
-        var rounded = messageImage.GetComponent<ImageWithRoundedCorners>();
-        if (!rounded) rounded = messageImage.gameObject.AddComponent<ImageWithRoundedCorners>();
-        
         if (isSticker)
         {
             rounded.enabled = false;
-            messageImage.material = null; 
+            messageImage.material = null;
         }
         else
         {
             rounded.enabled = true;
-            rounded.radius = 23f; 
+            rounded.radius = 23f;
         }
     }
 
