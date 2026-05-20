@@ -932,7 +932,9 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                 if (messageText.gameObject.activeSelf && !string.IsNullOrEmpty(messageText.text))
                 {
                     // Force the caption to wrap tightly under the Image!
-                    float maxCaptionWidth = fixedWidth + 12f; 
+                    float realRatio = currentVm.aspectRatio > 0 ? currentVm.aspectRatio : 1.0f;
+                    float captionMediaWidth = ResolveMediaSize(realRatio).x;
+                    float maxCaptionWidth = captionMediaWidth - CaptionInset;
                     textLayout.preferredWidth = Mathf.Min(textLayout.preferredWidth, maxCaptionWidth);
                 }
             }
@@ -1064,19 +1066,22 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             
             bool isMediaCaption = (currentVm.type == MessageType.Image || currentVm.type == MessageType.Video) && !currentVm.isSticker;
             
+            float captionMediaWidth = 0f;
             if (isMediaCaption)
             {
+                float realRatio = currentVm.aspectRatio > 0 ? currentVm.aspectRatio : 1.0f;
+                captionMediaWidth = ResolveMediaSize(realRatio).x;
                 // Force the measuring tape to be no wider than the image container!
-                availableWidthForText = Mathf.Min(availableWidthForText, fixedWidth - 16f);
+                availableWidthForText = Mathf.Min(availableWidthForText, captionMediaWidth - CaptionInset);
             }
 
             Vector2 wrappedSize = messageText.GetPreferredValues(messageText.text, availableWidthForText, Mathf.Infinity);
-            textLayout.preferredWidth = Mathf.Min(wrappedSize.x + 21f, maxAllowedTextWidth); 
+            textLayout.preferredWidth = Mathf.Min(wrappedSize.x + 21f, maxAllowedTextWidth);
 
             if (isMediaCaption)
             {
                 // Clamp the text block so its preferred width physically cannot exceed the image
-                textLayout.preferredWidth = Mathf.Min(textLayout.preferredWidth, fixedWidth);
+                textLayout.preferredWidth = Mathf.Min(textLayout.preferredWidth, captionMediaWidth);
             }
             
             textLayout.minWidth = 0; 
