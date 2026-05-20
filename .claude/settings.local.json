@@ -236,7 +236,12 @@
       "Bash(cd /Users/ayan/.claude/projects/-Users-ayan-Projects-Automation && ls -la | head -30 && echo \"---\" && ls -la /Users/ayan/.claude/ 2>/dev/null | head -30 && echo \"---\" && stat -f \"%Sm %z %N\" 4329cbcd-f477-4b79-a281-7344981d803c.jsonl df365367-8e54-40df-bd60-862902f7331b.jsonl 2>/dev/null)",
       "Bash(python3 -c \"import uuid; print\\(uuid.uuid4\\(\\).hex\\); print\\(uuid.uuid4\\(\\).hex\\)\")",
       "Bash(python3 -c \"print\\(hex\\(0xFFFE\\)\\)\")",
-      "Bash(kill %1 2>/dev/null; grep -rln \"public struct FaceInfo\\\\b\" /Applications/Unity/Hub/Editor/ 2>/dev/null | head -3)"
+      "Bash(kill %1 2>/dev/null; grep -rln \"public struct FaceInfo\\\\b\" /Applications/Unity/Hub/Editor/ 2>/dev/null | head -3)",
+      "Bash(grep -n \"maxBubbleWidth\\\\|preferredWidth\\\\|preferredHeight\\\\|sizeDelta\\\\|ContentSizeFitter\\\\|LayoutElement\\\\|max.*[0-9]\\\\{3,4\\\\}\" /Users/ayan/Projects/Automation/Assets/Scripts/UI/MessageItemView.cs)",
+      "Bash(grep -n \"hardcode\\\\|=.*[0-9]\\\\{3,4\\\\}\\\\|constant\" /Users/ayan/Projects/Automation/Assets/Scripts/UI/MessageItemView.cs)",
+      "Bash(grep -n \"sizeDelta\\\\|width\\\\|height\\\\|[0-9]\\\\{3,4\\\\}f\" /Users/ayan/Projects/Automation/Assets/Scripts/Chat/PhotoViewer.cs)",
+      "Bash(grep -n \"sizeDelta\\\\|width\\\\|height\\\\|[0-9]\\\\{3,4\\\\}f\" /Users/ayan/Projects/Automation/Assets/Scripts/Chat/VideoController.cs)",
+      "Bash(grep -n \"sizeDelta\\\\|width\\\\|height\\\\|[0-9]\\\\{3,4\\\\}f\" /Users/ayan/Projects/Automation/Assets/Scripts/Chat/AudioController.cs)"
     ]
   }
 }
