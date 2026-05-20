@@ -1003,10 +1003,7 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                 // caption's last line; without one it floats at the card's bottom-right).
                 if (timeLayout != null) timeLayout.ignoreLayout = true;
 
-                float finalWidth = maxTextWidth + 132f;
-                float minDocWidth = 240f;
-
-                if (finalWidth < minDocWidth) finalWidth = minDocWidth;
+                float finalWidth = Mathf.Clamp(maxTextWidth + 132f, DocumentMinWidth, DocumentWidth);
 
                 docLayout.preferredWidth = finalWidth;
                 mediaWidth = finalWidth;
