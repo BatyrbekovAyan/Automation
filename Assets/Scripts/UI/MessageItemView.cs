@@ -1238,8 +1238,12 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
         var contLayout = containerTr.GetComponent<LayoutElement>();
         if (!contLayout) contLayout = containerTr.gameObject.AddComponent<LayoutElement>();
         contLayout.ignoreLayout = false;
-        contLayout.preferredWidth = fixedWidth;
-        contLayout.preferredHeight = fixedWidth / bubbleRatio;
+
+        Vector2 mediaSize = isSticker
+            ? new Vector2(StickerWidth, StickerHeight)
+            : ResolveMediaSize(bubbleRatio);
+        contLayout.preferredWidth  = mediaSize.x;
+        contLayout.preferredHeight = mediaSize.y;
 
         if (containerTr.TryGetComponent<RectMask2D>(out var rMask)) Destroy(rMask);
         if (containerTr.TryGetComponent<Mask>(out var mask)) Destroy(mask);
