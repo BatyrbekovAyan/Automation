@@ -1102,24 +1102,26 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             var previewLe = linkPreviewCard.GetComponent<LayoutElement>();
             if (previewLe == null) previewLe = linkPreviewCard.gameObject.AddComponent<LayoutElement>();
 
-            float targetWidth = containerWidth * 0.55f; // Safe default
+            float bubbleCeiling = MaxBubbleWidth - paddingX;
+            float targetWidth = bubbleCeiling * LinkPreviewRatio; // Safe default — 65% of the bubble
 
-            // --- THE NEW FIX: IMAGE-DRIVEN WIDTH ---
+            // --- IMAGE-DRIVEN WIDTH ---
             // We ignore the text length completely. The Image Aspect Ratio controls the card size!
             if (linkPreviewImage != null && linkPreviewImage.gameObject.activeSelf && linkPreviewImage.sprite != null)
             {
                 float aspect = (float)linkPreviewImage.sprite.texture.width / linkPreviewImage.sprite.texture.height;
-                
-                // Base the width on a "Square" image taking up 60% of the screen.
-                // Landscape images will scale up (and hit the max limit). Portrait images will scale down.
-                float calculatedWidth = (containerWidth * 0.6f) * aspect;
-                
-                float minCardWidth = containerWidth * 0.45f; // Don't let portrait cards get too skinny
-                targetWidth = Mathf.Clamp(calculatedWidth, minCardWidth, maxAllowedTextWidth);
+
+                // Base the width on a "Square" image taking ~75% of the bubble. Landscape
+                // images scale up and clamp at the bubble ceiling; portraits scale down to
+                // the floor so they don't get spindly.
+                float calculatedWidth = (bubbleCeiling * 0.75f) * aspect;
+
+                float minCardWidth = bubbleCeiling * 0.55f; // Don't let portrait cards get too skinny
+                targetWidth = Mathf.Clamp(calculatedWidth, minCardWidth, bubbleCeiling);
 
                 var imgLe = linkPreviewImage.GetComponent<LayoutElement>();
                 if (imgLe == null) imgLe = linkPreviewImage.gameObject.AddComponent<LayoutElement>();
-                
+
                 imgLe.preferredHeight = targetWidth / aspect;
                 imgLe.minWidth = 0; imgLe.preferredWidth = 0; // Prevent stretching
             }
@@ -1128,14 +1130,14 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                 // If there is NO image, then we fall back to measuring the text (but we clamp it strictly!)
                 float titleWidth = 0f;
                 if (linkPreviewTitle != null && linkPreviewTitle.gameObject.activeSelf)
-                    titleWidth = linkPreviewTitle.GetPreferredValues(linkPreviewTitle.text, Mathf.Infinity, Mathf.Infinity).x + 32f; 
+                    titleWidth = linkPreviewTitle.GetPreferredValues(linkPreviewTitle.text, Mathf.Infinity, Mathf.Infinity).x + 32f;
 
                 float domainWidth = 0f;
                 if (linkPreviewDomain != null && linkPreviewDomain.gameObject.activeSelf)
                     domainWidth = linkPreviewDomain.GetPreferredValues(linkPreviewDomain.text, Mathf.Infinity, Mathf.Infinity).x + 32f;
 
                 float maxTextWidth = Mathf.Max(titleWidth, domainWidth);
-                targetWidth = Mathf.Clamp(maxTextWidth, containerWidth * 0.45f, maxAllowedTextWidth);
+                targetWidth = Mathf.Clamp(maxTextWidth, bubbleCeiling * 0.55f, bubbleCeiling);
             }
 
             previewLe.preferredWidth = targetWidth;
