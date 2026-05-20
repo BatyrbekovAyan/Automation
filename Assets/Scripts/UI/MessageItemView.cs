@@ -53,9 +53,6 @@ public class MessageItemView : MonoBehaviour
     private string activeScrapedUrl = ""; // To remember what to open!
     
     [Header("Settings")]
-    public float fixedWidth = 464f;
-    [Tooltip("How much of the screen should the text bubble take up before wrapping? (0.7 = 70%)")]
-    public float maxBubbleWidthPercentage = 0.7f; 
     public Color incomingColor = Color.white;
     public Color outgoingColor = new Color(0.8f, 1f, 0.8f);
     private static readonly Color downloadButtonFillColor = new Color32(0xF1, 0xF1, 0xF1, 0xFF);
@@ -583,7 +580,7 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
         // We must tell the script to run the calculator for Media Captions too!
         // Documents also need it without a caption: the document card otherwise
         // has no explicit preferredWidth and the bubble's ContentSizeFitter lets
-        // it grow past the maxBubbleWidthPercentage clamp for long filenames.
+        // it grow past the resolved max-bubble-width clamp for long filenames.
         bool hasCaption = !string.IsNullOrEmpty(vm.text);
         bool isDocument = vm.type == MessageType.Document;
         bool isCaptionableMedia = vm.type == MessageType.Chat || vm.type == MessageType.Image || vm.type == MessageType.Video;
