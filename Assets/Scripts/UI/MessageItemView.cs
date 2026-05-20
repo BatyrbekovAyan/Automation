@@ -686,7 +686,15 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
         }
         else if (type == MessageType.Chat)
         {
-            layout.spacing = 4; 
+            // Reserve room for the inline timestamp + tick on very short messages.
+            if (bubbleBackground != null)
+            {
+                var bubbleLe = bubbleBackground.GetComponent<LayoutElement>();
+                if (bubbleLe == null) bubbleLe = bubbleBackground.gameObject.AddComponent<LayoutElement>();
+                bubbleLe.minWidth = MinBubbleWidth;
+            }
+
+            layout.spacing = 4;
             
             bool hasLinkCard = linkPreviewCard != null && linkPreviewCard.activeSelf;
             
@@ -961,7 +969,7 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             paddingX = 24f; 
         }
 
-        float maxAllowedTextWidth = (containerWidth * maxBubbleWidthPercentage) - paddingX;
+        float maxAllowedTextWidth = MaxBubbleWidth - paddingX;
 
         if (currentVm != null && currentVm.type == MessageType.Document)
         {
