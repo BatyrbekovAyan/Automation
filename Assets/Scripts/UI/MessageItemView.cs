@@ -142,6 +142,7 @@ public class MessageItemView : MonoBehaviour
 
     private Vector2 ResolveMediaSize(float aspect)
     {
+        if (!float.IsFinite(aspect) || aspect <= 0f) aspect = 1f;
         aspect = Mathf.Clamp(aspect, MinAspectRatio, MaxAspectRatio);
 
         float width, height;
