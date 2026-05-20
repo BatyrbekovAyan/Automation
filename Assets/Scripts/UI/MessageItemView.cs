@@ -1346,7 +1346,7 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
 
         if (bubbleParent.TryGetComponent<VerticalLayoutGroup>(out var bubbleLayout))
         {
-            bubbleLayout.padding = new RectOffset(8, 8, 8, 12);
+            bubbleLayout.padding = new RectOffset(BubblePadLeft, BubblePadRight, BubblePadTop, BubblePadBottom);
             bubbleLayout.childForceExpandWidth = true; 
         }
 
