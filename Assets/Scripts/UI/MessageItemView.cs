@@ -71,9 +71,106 @@ public class MessageItemView : MonoBehaviour
     public Slider audioSlider;
     public bool isDragging;
     
-    private const float MinAspectRatio = 0.5f; 
-    private const float MaxAspectRatio = 2.0f; 
-    
+    // === Bubble container ===
+    private const float MaxBubbleWidth        = 810f;   // 0.75 × 1080 canvas — text + caption ceiling
+    private const float MinBubbleWidth        =  90f;   // Set on text-bubble LayoutElement.minWidth so very short messages (e.g. "ok") still fit an inline timestamp
+
+    // === Bubble reset padding (LRTB) — used by ResetBubbleLayoutToDefault and synced into both prefabs ===
+    private const int   BubblePadLeft         = 8;
+    private const int   BubblePadRight        = 8;
+    private const int   BubblePadTop          = 8;
+    private const int   BubblePadBottom       = 12;
+
+    // === Image / Video ===
+    private const float ImageLandscapeWidth   = 810f;   // 0.75 × canvas
+    private const float ImagePortraitWidth    = 648f;   // 0.60 × canvas
+    private const float ImageSquareWidth      = 700f;   // 0.65 × canvas
+    private const float ImageMaxHeight        = 1080f;  // tall-portrait clamp
+    private const float MinAspectRatio        = 0.56f;  // 9:16
+    private const float MaxAspectRatio        = 1.78f;  // 16:9
+    private const float AspectLandscapeThreshold = 1.1f; // > → landscape
+    private const float AspectPortraitThreshold  = 0.9f; // < → portrait
+
+    // === Voice / Audio ===
+    private const float VoiceWidth            = 720f;   // 0.67 × canvas
+    private const float VoiceHeight           = 150f;
+    private const float AudioFileWidth        = 760f;   // 0.70 × canvas
+    private const float AudioFileHeight       = 190f;
+
+    // === Sticker (no bubble bg) ===
+    private const float StickerWidth          = 432f;   // 0.40 × canvas
+    private const float StickerHeight         = 432f;
+
+    // === Document ===
+    private const float DocumentWidth         = 760f;   // 0.70 × canvas
+    private const float DocumentMinWidth      = 480f;
+    private const float DocumentHeight        = 200f;
+
+    // === Caption + link preview ===
+    private const float CaptionInset          = 32f;    // captionWidth = mediaWidth - inset
+    private const float LinkPreviewRatio      = 0.65f;  // × bubbleWidth
+
+    /// <summary>
+    /// Resolves the bubble content size for any message type.
+    /// For text/caption-only bubbles, returns (MaxBubbleWidth, 0) — height is text-driven.
+    /// For media, returns final width and height after aspect/clamp logic.
+    /// </summary>
+    private Vector2 ResolveContentSize(MessageType type, float aspect)
+    {
+        switch (type)
+        {
+            case MessageType.Image:
+            case MessageType.Video:
+                return ResolveMediaSize(aspect);
+
+            case MessageType.Sticker:
+                return new Vector2(StickerWidth, StickerHeight);
+
+            case MessageType.Voice:
+                return new Vector2(VoiceWidth, VoiceHeight);
+
+            case MessageType.Audio:
+                return new Vector2(AudioFileWidth, AudioFileHeight);
+
+            case MessageType.Document:
+                return new Vector2(DocumentWidth, DocumentHeight);
+
+            default: // Chat, Unknown
+                return new Vector2(MaxBubbleWidth, 0f);
+        }
+    }
+
+    private Vector2 ResolveMediaSize(float aspect)
+    {
+        aspect = Mathf.Clamp(aspect, MinAspectRatio, MaxAspectRatio);
+
+        float width, height;
+
+        if (aspect >= AspectLandscapeThreshold)
+        {
+            width  = ImageLandscapeWidth;
+            height = width / aspect;
+        }
+        else if (aspect <= AspectPortraitThreshold)
+        {
+            width  = ImagePortraitWidth;
+            height = width / aspect;
+
+            if (height > ImageMaxHeight)
+            {
+                height = ImageMaxHeight;
+                width  = height * aspect;
+            }
+        }
+        else
+        {
+            width  = ImageSquareWidth;
+            height = width / aspect;
+        }
+
+        return new Vector2(width, height);
+    }
+
     [SerializeField] private MessageViewModel currentVm;
 
     /// <summary>
