@@ -412,19 +412,21 @@ public partial class ChatManager : MonoBehaviour
 
         ChatOpenLog("Sync network return");
 
-        // Park sync processing while any slide animation is running. The
-        // JsonConvert.DeserializeObject + foreach + CreateViewModel pass
-        // below costs ~100-300ms on phone hardware — landing it mid-slide
-        // would stall the animation by ~5-10 frames. Capped at 500ms so a
-        // stuck slide can't block sync indefinitely.
+        // Park sync processing while the chat-open phase has not yet reached Populate
+        // (covers Prep, Slide, plus any future intermediate phases). The
+        // JsonConvert.DeserializeObject + foreach + CreateViewModel pass below costs
+        // ~100-300ms on phone hardware — landing it during Prep or mid-slide would stall
+        // the animation by ~5-10 frames. Capped at 500ms so a stuck phase transition
+        // can't block sync indefinitely.
         float syncWaitStart = Time.realtimeSinceStartup;
-        while (SwipeToBack.IsSliding && Time.realtimeSinceStartup - syncWaitStart < 0.5f)
+        while (_phase != ChatOpenPhase.Populate && _phase != ChatOpenPhase.Idle
+               && Time.realtimeSinceStartup - syncWaitStart < 0.5f)
         {
             yield return null;
         }
 
-        // Re-check chat-id after the wait — user may have switched chats
-        // during the slide we were waiting for.
+        // Re-check chat-id after the wait — user may have switched chats during the
+        // phase we were waiting on.
         if (currentChatId != chatId) yield break;
 
 #if UNITY_EDITOR
@@ -599,11 +601,19 @@ public partial class ChatManager : MonoBehaviour
             // Track the merged list for future paginated refreshes.
             _activeChatCache = newMessages;
 
-            // Append only the brand-new messages — AppendLiveMessagesRoutine
-            // slides them in at the bottom without re-spawning the cached
-            // bubbles already on screen.
-            ChatOpenLog($"OnLiveMessagesReceived fire ({brandNew.Count} new)");
-            OnLiveMessagesReceived?.Invoke(brandNew);
+            // Brand-new messages: queue if we're not yet in Populate (Prep or Slide
+            // would spawn into an empty/closing list). Otherwise fire immediately.
+            if (_phase == ChatOpenPhase.Populate || _phase == ChatOpenPhase.Idle)
+            {
+                ChatOpenLog($"OnLiveMessagesReceived fire ({brandNew.Count} new)");
+                OnLiveMessagesReceived?.Invoke(brandNew);
+            }
+            else
+            {
+                ChatOpenLog($"OnLiveMessagesReceived queued ({brandNew.Count} new, phase={_phase})");
+                if (_pendingLiveSyncMessages == null) _pendingLiveSyncMessages = new List<MessageViewModel>();
+                _pendingLiveSyncMessages.AddRange(brandNew);
+            }
         }
         else if (hasStatusUpdates)
         {
