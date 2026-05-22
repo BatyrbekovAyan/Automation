@@ -61,12 +61,14 @@ public class MessageListView : MonoBehaviour
             ChatManager.Instance.OnBatchMessagesLoaded += HandleBatchMessages;
             ChatManager.Instance.OnLiveMessagesReceived += HandleLiveMessages;
         }
-        
+
+        SwipeToBack.OnSlideOutComplete += HandleSlideOutComplete;
+
         if (scrollRect != null)
         {
             scrollRect.onValueChanged.AddListener(OnScroll);
         }
-        
+
         if (loadingMessagesSpinner)
         {
             loadingMessagesSpinner.SetActive(false);
@@ -81,11 +83,29 @@ public class MessageListView : MonoBehaviour
             ChatManager.Instance.OnBatchMessagesLoaded -= HandleBatchMessages;
             ChatManager.Instance.OnLiveMessagesReceived -= HandleLiveMessages;
         }
-        
+
+        SwipeToBack.OnSlideOutComplete -= HandleSlideOutComplete;
+
         if (scrollRect != null)
         {
             scrollRect.onValueChanged.RemoveListener(OnScroll);
         }
+    }
+
+    /// <summary>
+    /// Fires from SwipeToBack after a slide-out snap finishes (BEFORE the panel
+    /// is deactivated). Destroys all spawned bubbles immediately — each
+    /// MessageItemView.OnDestroy frees its owned textures and sprites, so the
+    /// memory of the chat the user just left is recovered now rather than
+    /// waiting for the next chat open to clear it.
+    /// </summary>
+    void HandleSlideOutComplete()
+    {
+        StopAllCoroutines();
+        Clear();
+        activeChatId = null;
+        isInitialLoadInProgress = false;
+        pendingLiveMessages.Clear();
     }
 
     void OnChatSelected(string chatId)

@@ -296,9 +296,12 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
 
         if (triggerBack)
         {
+            // Fire OnSlideOutComplete BEFORE SetActive(false). MessageListView lives
+            // under chatPanelToSlide, so deactivating it would trigger OnDisable and
+            // unsubscribe the handler before the event fires.
+            OnSlideOutComplete?.Invoke();
             chatPanelToSlide.gameObject.SetActive(false);
             onSwipeComplete?.Invoke();
-            OnSlideOutComplete?.Invoke();
         }
         else
         {
