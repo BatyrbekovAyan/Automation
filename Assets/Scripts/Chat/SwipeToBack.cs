@@ -41,6 +41,14 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
     /// </summary>
     public static bool IsSliding { get; private set; }
 
+    /// <summary>
+    /// Fires the frame after a slide-out finishes and the chat panel is deactivated.
+    /// Subscribers (currently MessageListView) free per-chat state — destroying
+    /// bubbles here recovers their owned textures immediately instead of waiting
+    /// for the next chat-open to clear them.
+    /// </summary>
+    public static event System.Action OnSlideOutComplete;
+
     void Awake()
     {
         Instance = this;
@@ -149,9 +157,29 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
 
         if (isMostlyHorizontal && isSwipingRight)
         {
+            // Lock out swipe-back during the slide-in animation. Mid-tween cancellation
+            // looks janky and would add state to SnapToPosition. The slide is brief
+            // (~300 ms) so the lockout window is short. Slide-OUT itself is fine to
+            // interact with (the user IS the one driving slide-out via drag); we only
+            // block when phase is Slide AND the panel is moving in (anchoredPosition.x
+            // approaching 0 from screenWidth).
+            float screenWidth = canvas.GetComponent<RectTransform>().rect.width;
+            bool isSlidingIn = ChatManager.Instance != null
+                && ChatManager.Instance.Phase == ChatManager.ChatOpenPhase.Slide
+                && chatPanelToSlide.anchoredPosition.x < screenWidth - 1f;
+            if (isSlidingIn)
+            {
+                isHorizontalDrag = false;
+                dragDecided = true;
+                dragStartTime = Time.unscaledTime;
+                dragStartPos = eventData.position;
+                return;
+            }
+
             isHorizontalDrag = true;
+            IsSliding = true;
             if (snapCoroutine != null) StopCoroutine(snapCoroutine);
-            
+
             if (chatScrollRect != null) chatScrollRect.vertical = false;
             if (chatListPanel) chatListPanel.gameObject.SetActive(true); // Ensure background is visible
         }
@@ -296,6 +324,7 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
         {
             chatPanelToSlide.gameObject.SetActive(false);
             onSwipeComplete?.Invoke();
+            OnSlideOutComplete?.Invoke();
         }
         else
         {
