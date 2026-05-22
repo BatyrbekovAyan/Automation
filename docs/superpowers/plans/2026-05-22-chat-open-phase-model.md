@@ -14,14 +14,87 @@
 
 ---
 
-## Task 1: Remove dormant `spriteMemoryCache` from `MediaCacheManager`
+## Task 1: Drop sprite-cache callers in `ChatItemView`, then remove cache from `MediaCacheManager`
 
-The in-memory sprite cache has zero callers. Carrying it as dead code is a liability — if a future change reintroduces it without coordinating with the new ownership model in `MessageItemView`, an `Image` consuming a cached sprite would crash once `OnDestroy` destroys its underlying texture. Remove it now.
+The original premise that the cache had "zero callers" was wrong — `ChatItemView` uses it for the chat-list avatar fast-path. Removing the cache directly would break compilation. The revised sequence: first drop the callers (and trust `vm.AvatarSprite` as the single source of truth for both `ChatItemView` and `MessageHeaderView`, which already coordinates via the shared VM), then delete the cache. Avatar textures still leak when the chat list rebuilds — that's an existing bug, separate from the bubble-image leak this plan is solving. Documented as known follow-up.
 
 **Files:**
+- Modify: `Assets/Scripts/UI/ChatItemView.cs`
 - Modify: `Assets/Scripts/Chat/MediaCacheManager.cs`
 
-- [ ] **Step 1: Open `Assets/Scripts/Chat/MediaCacheManager.cs`. Delete the three field declarations.**
+- [ ] **Step 1: Drop the cache fast-path block in `ChatItemView.Bind`.**
+
+Find (around lines 53–58):
+
+```csharp
+// --- THE ZERO-FRAME AVATAR FIX ---
+        if (vm.AvatarSprite == null && !string.IsNullOrEmpty(vm.AvatarUrl) && MediaCacheManager.Instance != null)
+        {
+            Sprite cached = MediaCacheManager.Instance.GetSpriteFromMemory(vm.AvatarUrl);
+            if (cached != null) vm.AvatarSprite = cached;
+        }
+
+        if (vm.AvatarSprite != null)
+```
+
+Replace with:
+
+```csharp
+        if (vm.AvatarSprite != null)
+```
+
+(The whole `if (vm.AvatarSprite == null ...) { Sprite cached = ... }` block goes away. `vm.AvatarSprite` directly drives the branch below, which already handles the null case via disk cache + LoadAvatar.)
+
+- [ ] **Step 2: Drop the `StoreSpriteInMemory` call after disk-cache load.**
+
+Find (around line 81):
+
+```csharp
+                if (tex.LoadImage(bytes))
+                {
+                    Sprite sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+                    vm.AvatarSprite = sprite;
+                    MediaCacheManager.Instance.StoreSpriteInMemory(vm.AvatarUrl, sprite);
+                    avatarImage.sprite = sprite;
+```
+
+Replace with:
+
+```csharp
+                if (tex.LoadImage(bytes))
+                {
+                    Sprite sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+                    vm.AvatarSprite = sprite;
+                    avatarImage.sprite = sprite;
+```
+
+- [ ] **Step 3: Drop the `StoreSpriteInMemory` call in `LoadAvatar`.**
+
+Find (around line 143):
+
+```csharp
+        Texture2D tex = new Texture2D(2, 2);
+        if (tex.LoadImage(bytes))
+        {
+            Sprite sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+            vm.AvatarSprite = sprite;
+            if (MediaCacheManager.Instance != null)
+                MediaCacheManager.Instance.StoreSpriteInMemory(vm.AvatarUrl, sprite);
+            if (avatarImage != null) avatarImage.sprite = sprite;
+```
+
+Replace with:
+
+```csharp
+        Texture2D tex = new Texture2D(2, 2);
+        if (tex.LoadImage(bytes))
+        {
+            Sprite sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+            vm.AvatarSprite = sprite;
+            if (avatarImage != null) avatarImage.sprite = sprite;
+```
+
+- [ ] **Step 4: Open `Assets/Scripts/Chat/MediaCacheManager.cs`. Delete the three field declarations.**
 
 Find lines 12–14:
 
@@ -33,11 +106,11 @@ Find lines 12–14:
 
 Delete all three lines.
 
-- [ ] **Step 2: Delete both unused methods.**
+- [ ] **Step 5: Delete both unused methods.**
 
 Find `GetSpriteFromMemory` (around line 65) and `StoreSpriteInMemory` (around line 76). Delete both methods entirely.
 
-- [ ] **Step 3: Trim the matching cache-clear lines from `EnsureBotScoped`.**
+- [ ] **Step 6: Trim the matching cache-clear lines from `EnsureBotScoped`.**
 
 In `EnsureBotScoped` (around line 54), find:
 
@@ -51,7 +124,7 @@ In `EnsureBotScoped` (around line 54), find:
 
 Remove the two `spriteMemoryCache.Clear()` and `spriteAccessOrder.Clear()` lines. Keep `urlPathCache.Clear()`.
 
-- [ ] **Step 4: Verify no callers remain.**
+- [ ] **Step 7: Verify no callers remain.**
 
 Run:
 
@@ -61,18 +134,25 @@ grep -rn "spriteMemoryCache\|spriteAccessOrder\|GetSpriteFromMemory\|StoreSprite
 
 Expected: zero matches.
 
-- [ ] **Step 5: Compile via Unity (or trust the editor auto-recompile). Then commit.**
+- [ ] **Step 8: Commit.**
 
 ```bash
-git add Assets/Scripts/Chat/MediaCacheManager.cs
+git add Assets/Scripts/UI/ChatItemView.cs Assets/Scripts/Chat/MediaCacheManager.cs
 git commit -m "$(cat <<'EOF'
-chore(media): remove dormant in-memory sprite cache
+chore(media): drop in-memory sprite cache, trust vm.AvatarSprite alone
 
-Zero callers in the codebase. Carrying it as dead code is a liability
-once MessageItemView starts destroying its own textures — a cached
-Sprite whose backing Texture2D got destroyed would render garbage on
-iOS. File-cache path (IsImageCached / SaveImageToCache / LoadImageFromCache)
-unchanged.
+The cache duplicated vm.AvatarSprite as a secondary cache. With it gone,
+ChatItemView and MessageHeaderView coordinate avatars purely through the
+shared ChatViewModel.AvatarSprite field. Disk cache still provides the
+fast-path on first row paint; vm.AvatarSprite survives row re-binds.
+
+Original premise that the cache had zero callers was wrong — three live
+ChatItemView call sites depended on it. Those are removed here in the
+same commit so the deletion is safe.
+
+Avatar Texture2D and Sprite still leak when the chat list rebuilds —
+~20 MB worst case versus the hundreds of MB the bubble fix recovers.
+Tracked as a follow-up; not in scope for this branch.
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
