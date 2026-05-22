@@ -602,6 +602,23 @@ IEnumerator UpdateListRoutine(List<MessageViewModel> sortedMessages, bool isLoad
         Canvas.ForceUpdateCanvases();
         LayoutRebuilder.ForceRebuildLayoutImmediate(content.GetComponent<RectTransform>());
 
+        // Anchor adjustment must happen SYNCHRONOUSLY right after the layout rebuild,
+        // before any yield. The rebuild has pushed the previously-oldest bubble (anchorItem)
+        // down to make room for the new bubbles spawned above it. If we yield first,
+        // for those frames the content is rendered in its displaced position — the user
+        // sees existing bubbles jump down, then 2 frames later the adjustment snaps them
+        // back. That's the load-more flicker. Doing the adjustment in the same frame as
+        // the rebuild means the first rendered frame already has correct content position.
+        if (isLoadMore && anchorItem != null)
+        {
+            float newAnchorY = anchorItem.position.y;
+            float diff = newAnchorY - oldAnchorY;
+
+            Vector2 finalPos = content.GetComponent<RectTransform>().anchoredPosition;
+            finalPos.y -= diff;
+            content.GetComponent<RectTransform>().anchoredPosition = finalPos;
+        }
+
         yield return null;
         yield return null;
 
@@ -612,16 +629,7 @@ IEnumerator UpdateListRoutine(List<MessageViewModel> sortedMessages, bool isLoad
         batchItems.Clear();
         batchCanvasGroups.Clear();
 
-        if (isLoadMore && anchorItem != null)
-        {
-            float newAnchorY = anchorItem.position.y;
-            float diff = newAnchorY - oldAnchorY; 
-            
-            Vector2 finalPos = content.GetComponent<RectTransform>().anchoredPosition;
-            finalPos.y -= diff; 
-            content.GetComponent<RectTransform>().anchoredPosition = finalPos;
-        }
-        else
+        if (!isLoadMore)
         {
             if (scrollRect) scrollRect.verticalNormalizedPosition = 0f;
         }
