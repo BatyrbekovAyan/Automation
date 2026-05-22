@@ -2742,7 +2742,7 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
         if (!hasTitle && !hasDesc) yield break;
 
         Texture2D downloadedTex = null;
-        
+
         // Try to load the image IF one was provided
         if (!string.IsNullOrEmpty(scrapedImage))
         {
@@ -2754,12 +2754,12 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
             {
                 using UnityWebRequest www = UnityWebRequest.Get(scrapedImage);
                 yield return www.SendWebRequest();
-                
+
                 if (www.result == UnityWebRequest.Result.Success)
                 {
                     byte[] imageBytes = www.downloadHandler.data;
                     downloadedTex = new Texture2D(2, 2);
-                    
+
                     if (downloadedTex.LoadImage(imageBytes))
                     {
                         // 3. SAVE FOR LATER: Write the bytes to the hard drive so we never have to download it again!
@@ -2767,10 +2767,13 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
                     }
                     else
                     {
+                        Destroy(downloadedTex);
                         downloadedTex = null;
                     }
                 }
             }
+
+            if (downloadedTex != null) TrackOwned(downloadedTex);
         }
 
         if (this == null || !gameObject.activeInHierarchy) yield break;
@@ -2810,7 +2813,7 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
         if (downloadedTex != null)
         {
             // IMAGE FOUND: Show the image, hide the text link!
-            linkPreviewImage.sprite = Sprite.Create(downloadedTex, new Rect(0, 0, downloadedTex.width, downloadedTex.height), new Vector2(0.5f, 0.5f));
+            linkPreviewImage.sprite = TrackOwned(Sprite.Create(downloadedTex, new Rect(0, 0, downloadedTex.width, downloadedTex.height), new Vector2(0.5f, 0.5f)));
             linkPreviewImage.color = Color.white;
             linkPreviewImage.gameObject.SetActive(true);
 
