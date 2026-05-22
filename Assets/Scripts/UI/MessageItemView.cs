@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -187,6 +188,14 @@ public class MessageItemView : MonoBehaviour
     private bool currentShowTail;
     private bool floatingTimeConfigured = false;
 
+    /// <summary>
+    /// Dynamically-created Texture2D and Sprite objects this bubble owns. Populated by TrackOwned
+    /// as media loads; freed by DisposeOwned (called at the start of each ApplyTextureAspectFill
+    /// and from OnDestroy). Project-asset sprites (stickerPlaceholder, playIcon, etc.) are NOT
+    /// added here — they are not ours to destroy.
+    /// </summary>
+    private readonly List<UnityEngine.Object> _ownedDisposables = new List<UnityEngine.Object>();
+
     private string _mainMessageOriginalText;
     private AudioSource audioSource;
     private RectTransform rectTransform;
@@ -198,7 +207,33 @@ public class MessageItemView : MonoBehaviour
     [System.Runtime.InteropServices.DllImport("__Internal")]
     private static extern void _ShowQuickLook(string path);
 #endif
-    
+
+    /// <summary>
+    /// Records a dynamically-created Texture2D or Sprite as owned by this bubble. Returns the
+    /// same reference for easy chaining: `var spr = TrackOwned(Sprite.Create(...));`.
+    /// Pass nulls freely — they are ignored.
+    /// </summary>
+    private T TrackOwned<T>(T obj) where T : UnityEngine.Object
+    {
+        if (obj != null) _ownedDisposables.Add(obj);
+        return obj;
+    }
+
+    /// <summary>
+    /// Destroys every tracked Texture2D and Sprite. Safe to call repeatedly; safe to call
+    /// after OnDestroy. Unity defers Destroy until end of frame, so any Image still
+    /// referencing one of these in the current frame finishes rendering before the
+    /// destruction lands — provided the caller has reassigned Image.sprite first.
+    /// </summary>
+    private void DisposeOwned()
+    {
+        for (int i = 0; i < _ownedDisposables.Count; i++)
+        {
+            if (_ownedDisposables[i] != null) Destroy(_ownedDisposables[i]);
+        }
+        _ownedDisposables.Clear();
+    }
+
     void Awake()
     {
         rectTransform = GetComponent<RectTransform>();
@@ -251,6 +286,11 @@ public class MessageItemView : MonoBehaviour
         }
 
         EmojiPatchService.OnEmojiReady -= HandleEmojiReady;
+    }
+
+    void OnDestroy()
+    {
+        DisposeOwned();
     }
 
     private void SubscribeToEmojiReady()
