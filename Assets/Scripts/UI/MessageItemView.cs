@@ -1574,11 +1574,13 @@ private static IEnumerator AcquireDecodeSlot()
 {
     while (true)
     {
-        // Pause decodes entirely during slide animations — a 30ms texture
-        // decode lands roughly in the middle of every other slide frame and
-        // drops the animation to ~25fps. Resumes the instant the slide
-        // releases the gate.
-        if (SwipeToBack.IsSliding)
+        // Pause decodes entirely during slide animations and during the Prep phase.
+        // During Prep the panel isn't visible — decoding now is wasted work that may
+        // be cancelled if the user re-taps. During Slide a 30ms texture decode lands
+        // mid-tween frame and drops the animation framerate.
+        bool inSlide = SwipeToBack.IsSliding;
+        bool inPrep = ChatManager.Instance != null && ChatManager.Instance.Phase == ChatManager.ChatOpenPhase.Prep;
+        if (inSlide || inPrep)
         {
             yield return null;
             continue;
