@@ -77,6 +77,10 @@ public void Bind(ChatViewModel model)
                     defaultAvatar.gameObject.SetActive(false); // Make sure default hides!
                     loadedFromCache = true;
                 }
+                else
+                {
+                    Destroy(tex);
+                }
             }
 
             // 2. ONLY fallback to the default avatar and network download if missing
@@ -134,6 +138,10 @@ public void Bind(ChatViewModel model)
             if (avatarImage != null) avatarImage.sprite = sprite;
             avatarImage.gameObject.SetActive(true);
             defaultAvatar.gameObject.SetActive(false);
+        }
+        else
+        {
+            Destroy(tex);
         }
     }
 

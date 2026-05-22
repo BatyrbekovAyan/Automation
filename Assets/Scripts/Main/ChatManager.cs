@@ -782,6 +782,12 @@ public partial class ChatManager : MonoBehaviour
             OnLiveMessagesReceived?.Invoke(_pendingLiveSyncMessages);
             _pendingLiveSyncMessages = null;
         }
+
+        // Transition to Idle (settled state). Downstream consumers (SyncLatestMessages,
+        // AcquireDecodeSlot) treat Idle and Populate identically, so this is a doc-accuracy
+        // fix not a behavior change: the enum's doc says "Idle is the steady state (chat
+        // list visible, or chat fully open and settled)" and we've now actually settled.
+        _phase = ChatOpenPhase.Idle;
     }
 
     public void LoadNextPage()

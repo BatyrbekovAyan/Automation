@@ -84,6 +84,7 @@ public class MediaCacheManager : MonoBehaviour
             return texture;
         }
 
+        Destroy(texture);
         return null;
     }
 
