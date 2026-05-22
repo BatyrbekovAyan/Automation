@@ -357,13 +357,28 @@ public partial class ChatManager : MonoBehaviour
         _activeChatCache = null;
         _cachedQueue = null;
 
+        // Activate the panel BEFORE firing OnChatSelected. MessageListView subscribes
+        // to OnChatSelected in OnEnable, so the panel must be active for the event
+        // delivery to reach it. The panel is left at x = screenWidth (off-screen)
+        // by the previous slide-out, so re-activating it here is invisible to the
+        // user — SlideInToMessages will re-activate (idempotent) and snap to
+        // off-screen before starting the slide tween.
+        if (SwipeToBack.Instance != null && SwipeToBack.Instance.chatPanelToSlide != null)
+        {
+            SwipeToBack.Instance.chatPanelToSlide.gameObject.SetActive(true);
+        }
+        else
+        {
+            MessageListPanel.SetActive(true);
+        }
+
         // Fire OnChatSelected so MessageListView clears its bubbles synchronously. Each
         // destroyed bubble's OnDestroy releases its owned Texture2D + Sprite refs — this
         // is the leak fix's enforcement point.
         OnChatSelected?.Invoke(chatId);
 
-        // Enter Prep. The panel is NOT activated here — SlideInToMessages (inside
-        // OpenChatRoutine, after the 300 ms wait) is the sole activation point.
+        // Enter Prep. SlideInToMessages (inside OpenChatRoutine, after the 300 ms wait)
+        // will re-activate the panel and atomically begin the slide animation.
         _phase = ChatOpenPhase.Prep;
         _activeOpen = StartCoroutine(OpenChatRoutine(chatId, tapTime));
     }
