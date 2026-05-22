@@ -50,13 +50,6 @@ public void Bind(ChatViewModel model)
 
         ApplyUnreadBadge(vm.UnreadCount);
 
-// --- THE ZERO-FRAME AVATAR FIX ---
-        if (vm.AvatarSprite == null && !string.IsNullOrEmpty(vm.AvatarUrl) && MediaCacheManager.Instance != null)
-        {
-            Sprite cached = MediaCacheManager.Instance.GetSpriteFromMemory(vm.AvatarUrl);
-            if (cached != null) vm.AvatarSprite = cached;
-        }
-
         if (vm.AvatarSprite != null)
         {
             avatarImage.sprite = vm.AvatarSprite;
@@ -78,7 +71,6 @@ public void Bind(ChatViewModel model)
                 {
                     Sprite sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
                     vm.AvatarSprite = sprite;
-                    MediaCacheManager.Instance.StoreSpriteInMemory(vm.AvatarUrl, sprite);
                     avatarImage.sprite = sprite;
 
                     avatarImage.gameObject.SetActive(true);
@@ -139,8 +131,6 @@ public void Bind(ChatViewModel model)
         {
             Sprite sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
             vm.AvatarSprite = sprite;
-            if (MediaCacheManager.Instance != null)
-                MediaCacheManager.Instance.StoreSpriteInMemory(vm.AvatarUrl, sprite);
             if (avatarImage != null) avatarImage.sprite = sprite;
             avatarImage.gameObject.SetActive(true);
             defaultAvatar.gameObject.SetActive(false);

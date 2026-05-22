@@ -9,10 +9,6 @@ public class MediaCacheManager : MonoBehaviour
 {
     public static MediaCacheManager Instance;
 
-    private const int MaxMemorySpriteCount = 100;
-    private readonly Dictionary<string, LinkedListNode<KeyValuePair<string, Sprite>>> spriteMemoryCache = new();
-    private readonly LinkedList<KeyValuePair<string, Sprite>> spriteAccessOrder = new();
-
     // Memoized URL → cache-file path. Keyed by (botId, url) so a bot switch does not
     // serve another bot's file. Cleared on bot change.
     private readonly Dictionary<string, string> urlPathCache = new();
@@ -49,7 +45,7 @@ public class MediaCacheManager : MonoBehaviour
     /// <summary>
     /// Drops cached entries that belonged to a previous active bot. Called by every
     /// public method whose result is bot-scoped, so a bot switch cannot serve stale
-    /// data from any of urlPathCache / spriteMemoryCache / spriteAccessOrder.
+    /// data from urlPathCache.
     /// </summary>
     private void EnsureBotScoped()
     {
@@ -58,44 +54,6 @@ public class MediaCacheManager : MonoBehaviour
 
         cachedUrlBotId = activeBotId;
         urlPathCache.Clear();
-        spriteMemoryCache.Clear();
-        spriteAccessOrder.Clear();
-    }
-
-    public Sprite GetSpriteFromMemory(string url)
-    {
-        if (string.IsNullOrEmpty(url)) return null;
-        EnsureBotScoped();
-        if (!spriteMemoryCache.TryGetValue(url, out var node)) return null;
-
-        spriteAccessOrder.Remove(node);
-        spriteAccessOrder.AddFirst(node);
-        return node.Value.Value;
-    }
-
-    public void StoreSpriteInMemory(string url, Sprite sprite)
-    {
-        if (string.IsNullOrEmpty(url) || sprite == null) return;
-        EnsureBotScoped();
-
-        if (spriteMemoryCache.TryGetValue(url, out var existing))
-        {
-            spriteAccessOrder.Remove(existing);
-            spriteAccessOrder.AddFirst(existing);
-            return;
-        }
-
-        var node = new LinkedListNode<KeyValuePair<string, Sprite>>(
-            new KeyValuePair<string, Sprite>(url, sprite));
-        spriteAccessOrder.AddFirst(node);
-        spriteMemoryCache[url] = node;
-
-        while (spriteMemoryCache.Count > MaxMemorySpriteCount)
-        {
-            var tail = spriteAccessOrder.Last;
-            spriteAccessOrder.RemoveLast();
-            spriteMemoryCache.Remove(tail.Value.Key);
-        }
     }
 
     public bool IsImageCached(string url)
