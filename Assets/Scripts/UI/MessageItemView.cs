@@ -1638,6 +1638,7 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
             }
             else
             {
+                Destroy(tex);
                 // THE FIX: If the cached file is corrupt, trigger the fallback!
                 HandleFinalFailure(isManual, false);
             }
@@ -1711,13 +1712,14 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
             byte[] imageBytes = www.downloadHandler.data;
             Texture2D tex = new Texture2D(2, 2);
             
-            if (tex.LoadImage(imageBytes)) 
+            if (tex.LoadImage(imageBytes))
             {
                 MediaCacheManager.Instance.SaveImageToCache(url, imageBytes);
                 ApplyTextureAspectFill(tex, false, bubbleRatio);
             }
             else
             {
+                Destroy(tex);
                 // --- THE FIX: The bytes downloaded, but they are corrupt/not an image! ---
                 // Show the download button so the user can try again!
                 HandleFinalFailure(isManual, false);
@@ -2069,10 +2071,11 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
                 byte[] bytes = System.IO.File.ReadAllBytes(filePath);
 
                 if (isSticker) TryDecodeSticker(bytes, bubbleRatio);
-                else 
+                else
                 {
                     Texture2D tex = new Texture2D(2, 2);
                     if (tex.LoadImage(bytes)) ApplyTextureAspectFill(tex, false, bubbleRatio);
+                    else Destroy(tex);
                 }
             }
             else
@@ -2289,6 +2292,7 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
         {
             Texture2D tex = new Texture2D(2, 2);
             if (tex.LoadImage(bytes)) ApplyTextureAspectFill(tex, vm.isSticker, targetRatio);
+            else Destroy(tex);
         }
     }
 
@@ -2344,6 +2348,7 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
             {
                 Texture2D tex = new Texture2D(2, 2);
                 if (tex.LoadImage(bytes)) ApplyTextureAspectFill(tex, false, targetRatio);
+                else Destroy(tex);
             }
         }
     }
@@ -2359,36 +2364,43 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
 
             byte[] bytes = Convert.FromBase64String(base64);
             Texture2D tex = new Texture2D(2, 2);
-            if (tex.LoadImage(bytes)) 
+            if (tex.LoadImage(bytes))
             {
                 ApplyTextureAspectFill(tex, isSticker, targetRatio);
             }
-        } catch (Exception e) { 
+            else
+            {
+                Destroy(tex);
+            }
+        } catch (Exception e) {
             Debug.LogError("Base64 Decode Error: " + e.Message); 
         }
     }
 
     void TryDecodeSticker(byte[] rawBytes, float targetRatio)
     {
-        try 
+        try
         {
             byte[] staticBytes = GetFirstFrameOfWebP(rawBytes);
             Texture2D tex = Texture2DExt.CreateTexture2DFromWebP(staticBytes, true, false, out Error error);
-            
-            if (error == Error.Success && tex != null) 
+
+            if (error == Error.Success && tex != null)
             {
                 ApplyTextureAspectFill(tex, true, targetRatio);
             }
             else
             {
+                if (tex != null) Destroy(tex);
                 Texture2D fallbackTex = new Texture2D(2, 2);
                 if (fallbackTex.LoadImage(rawBytes)) ApplyTextureAspectFill(fallbackTex, true, targetRatio);
+                else Destroy(fallbackTex);
             }
-        } 
+        }
         catch (Exception)
         {
             Texture2D fallbackTex = new Texture2D(2, 2);
             if (fallbackTex.LoadImage(rawBytes)) ApplyTextureAspectFill(fallbackTex, true, targetRatio);
+            else Destroy(fallbackTex);
         }
     }
 
