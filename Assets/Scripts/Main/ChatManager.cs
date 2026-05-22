@@ -48,6 +48,22 @@ public partial class ChatManager : MonoBehaviour
     }
 
     /// <summary>
+    /// Three-phase chat-open state machine. Prep runs cache load and queues sync results
+    /// without touching UI. Slide is the slide-in animation with all heavy main-thread
+    /// work gated. Populate fires OnBatchMessagesLoaded and drains queued sync results.
+    /// Idle is the steady state (chat list visible, or chat fully open and settled).
+    /// Slide-out is also represented by Idle — IsSliding handles its own gating.
+    /// </summary>
+    public enum ChatOpenPhase { Idle, Prep, Slide, Populate }
+
+    /// <summary>
+    /// Public read-only access to the chat-open phase. Subscribers (MessageListView,
+    /// MessageItemView.AcquireDecodeSlot, SyncLatestMessages) gate their heavy work on this.
+    /// </summary>
+    public ChatOpenPhase Phase => _phase;
+    private ChatOpenPhase _phase = ChatOpenPhase.Idle;
+
+    /// <summary>
     /// Returns how many messages from the start of a newest-first list fit
     /// the first-paint point budget. Always includes at least one message
     /// even if it alone exceeds the budget (e.g. opening on a chat whose
@@ -152,6 +168,25 @@ public partial class ChatManager : MonoBehaviour
     /// the same brand-new messages.
     /// </summary>
     private Coroutine _activeSync;
+
+    /// <summary>
+    /// The in-flight OpenChatRoutine. Held so SelectChat can cancel a Prep-phase open
+    /// when the user taps another chat before the 300 ms timer elapses.
+    /// </summary>
+    private Coroutine _activeOpen;
+
+    /// <summary>
+    /// First-screen batch staged during Prep, fired via OnBatchMessagesLoaded at the
+    /// start of Populate. Null until Prep populates it; reset on SelectChat.
+    /// </summary>
+    private List<MessageViewModel> _pendingFirstBatch;
+
+    /// <summary>
+    /// Brand-new messages from SyncLatestMessages that arrived before Populate began.
+    /// Fired via OnLiveMessagesReceived during Populate, after OnBatchMessagesLoaded.
+    /// Null when no queued result is waiting.
+    /// </summary>
+    private List<MessageViewModel> _pendingLiveSyncMessages;
 
     public void Awake()
     {
