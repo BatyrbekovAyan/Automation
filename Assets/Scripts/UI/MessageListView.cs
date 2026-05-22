@@ -31,16 +31,25 @@ public class MessageListView : MonoBehaviour
     // Infinite Scroll State Variables
     private bool isLoadingData = false;
     private bool hasMoreMessages = true;
-    private int loadedPagesCount = 1; 
-    
+    private int loadedPagesCount = 1;
+
     private ScrollRect.MovementType defaultMovementType;
 
-    
+    // Live-message deferral: when SyncLatestMessages returns mid-load with
+    // brand-new messages, OnLiveMessagesReceived would otherwise fire
+    // AppendLiveMessagesRoutine in parallel with the in-progress
+    // UpdateListRoutine. Both touch content, and AppendLiveMessagesRoutine's
+    // synchronous ForceRebuildLayoutImmediate(content) caused batch 2 settle
+    // to roughly double in profiling runs. We queue brand-new messages here
+    // and drain them after the initial cache UpdateListRoutine completes.
+    private bool isInitialLoadInProgress;
+    private readonly List<MessageViewModel> pendingLiveMessages = new List<MessageViewModel>();
+
     void Awake()
     {
         if (scrollRect != null)
         {
-            defaultMovementType = scrollRect.movementType; 
+            defaultMovementType = scrollRect.movementType;
         }
     }
 
@@ -86,6 +95,12 @@ public class MessageListView : MonoBehaviour
         hasMoreMessages = true;
         isLoadingData = true;
         loadedPagesCount = 1;
+
+        // Reset live-message deferral state for the new chat. Any pending
+        // entries from a prior chat (in case StopAllCoroutines killed the
+        // drain mid-flight) belong to that chat and must be discarded.
+        isInitialLoadInProgress = true;
+        pendingLiveMessages.Clear();
 
         if (scrollRect != null) scrollRect.movementType = defaultMovementType;
 
@@ -167,6 +182,17 @@ public class MessageListView : MonoBehaviour
     void HandleLiveMessages(List<MessageViewModel> newMessages)
     {
         if (newMessages == null || newMessages.Count == 0) return;
+
+        // If the initial cache UpdateListRoutine is still spawning bubbles,
+        // queue these and drain after it completes. Running both routines
+        // in parallel made batch 2 settle ~280ms instead of ~120ms because
+        // AppendLiveMessagesRoutine's synchronous ForceRebuildLayoutImmediate
+        // raced UpdateListRoutine's per-batch rebuild.
+        if (isInitialLoadInProgress)
+        {
+            pendingLiveMessages.AddRange(newMessages);
+            return;
+        }
 
         var sortedMessages = newMessages.OrderBy(x => x.timestamp).ToList();
 
@@ -321,14 +347,14 @@ IEnumerator SlideUpRevealRoutine(float startNorm)
 
 IEnumerator UpdateListRoutine(List<MessageViewModel> sortedMessages, bool isLoadMore)
     {
+        if (!isLoadMore) ChatManager.ChatOpenLog($"UpdateListRoutine start ({sortedMessages.Count} msgs)");
+
         if (scrollRect && !isLoadMore) scrollRect.velocity = Vector2.zero;
 
-        // 1. INSTANT UI FEEDBACK (No Freeze)
-        if (!isLoadMore)
-        {
-            yield return null;
-            yield return null; 
-        }
+        // 2-frame yield removed: the slide-in callback already finished before
+        // this coroutine ran, so there's nothing left to wait for. Profiling
+        // showed this gate cost ~40ms on every chat-open with no benefit.
+        if (!isLoadMore) ChatManager.ChatOpenLog("Spawn loop start (no yield gate)");
 
         Transform anchorItem = null;
         float oldAnchorY = 0;
@@ -474,28 +500,73 @@ IEnumerator UpdateListRoutine(List<MessageViewModel> sortedMessages, bool isLoad
 
             countSinceYield++;
 
-            // Yield occasionally so the slide-in animation stays smooth while
-            // bubbles spawn. Items remain hidden (alpha=0) throughout the loop —
-            // they're revealed in one batch by the final cleanup pass below,
-            // after a single full layout rebuild settles every TMP/CSF/VLG
-            // chain. This matches WhatsApp's feel: chat appears fully formed
-            // on open instead of bubbles popping in and resizing one batch at
-            // a time as the natural layout pass catches up.
+            // Yield after every spawned item so each frame's spawn cost
+            // (~10ms with the decode-budget fix) fits alongside the slide-in
+            // animation tick (~5ms). This is what makes parallel-load viable
+            // now where it previously lagged the slide — we used to do 15
+            // synchronous spawns per frame which blew the 16ms frame budget
+            // immediately. Items still reveal in batches of 15 to maintain
+            // the "chat populates as slide ends" feel.
+            //
+            // Every 15 items, settle the layout and reveal that batch. The
+            // ForceRebuildLayoutImmediate + two yields below let TMP mesh
+            // updates and nested CSF chains finish before alpha=1 — one yield
+            // is not enough for TMP rich-text-with-sprites (items would pop
+            // and resize as the natural layout pass catches up). Scroll
+            // snap-to-bottom is intentionally only done in the final block
+            // below, so progressive reveal doesn't fight a user's drag.
             if (!isLoadMore && countSinceYield % 15 == 0)
             {
+                ChatManager.ChatOpenLog($"Batch settle start (item #{countSinceYield})");
+
+                // No explicit ForceRebuildLayoutImmediate here. The per-item
+                // yield above ran Unity's natural layout pass between every
+                // spawn — by the time we reach the 15th item, each bubble's
+                // CSF/VLG chain has had 1-15 frames to settle, so positions
+                // and sizes are already correct. The synchronous rebuild
+                // used to cost ~30-50ms and was what made the slide-in
+                // animation feel laggy. We yield a couple extra frames just
+                // to give TMP rich-text-with-sprites a chance to finalize
+                // its mesh update before alpha=1.
+                yield return null;
+                yield return null;
+
+                foreach (var msg in batchItems) if (msg != null) msg.FinalizeCustomVisuals();
+                foreach (var cg in batchCanvasGroups) if (cg != null) cg.alpha = 1f;
+                ChatManager.ChatOpenLog($"Batch reveal done (item #{countSinceYield})");
+
+                batchItems.Clear();
+                batchCanvasGroups.Clear();
+            }
+            else if (!isLoadMore)
+            {
+                // Per-item yield: lets the slide-in animation render its tick
+                // each frame while the spawn loop spreads its ~10ms work
+                // across frames. Total spawn for 15 items = ~15 frames =
+                // ~250ms, which lines up with the slide's ~290ms duration so
+                // the first batch reveals around the same time the slide
+                // settles. Skipped on isLoadMore because pagination spawn
+                // happens after first paint is done — no need to spread cost.
                 yield return null;
             }
         }
-        
+
         // --- 4. Final Cleanup for Remaining Items ---
+        // Handles the trailing (count % 15) items that didn't form a full
+        // batch, or the entire list when isLoadMore is true (load-more skips
+        // the inner-loop batched reveal). Same two-yield settle pattern as
+        // the inner batches to keep TMP sprites stable on reveal.
+        if (!isLoadMore) ChatManager.ChatOpenLog($"Final settle start ({batchItems.Count} trailing)");
         Canvas.ForceUpdateCanvases();
         LayoutRebuilder.ForceRebuildLayoutImmediate(content.GetComponent<RectTransform>());
+
+        yield return null;
         yield return null;
 
-        // Fix outlines and reveal any leftovers
         foreach (var msg in batchItems) if (msg != null) msg.FinalizeCustomVisuals();
         foreach (var cg in batchCanvasGroups) if (cg != null) cg.alpha = 1f;
-        
+        if (!isLoadMore) ChatManager.ChatOpenLog("Final reveal done (all visible)");
+
         batchItems.Clear();
         batchCanvasGroups.Clear();
 
@@ -513,9 +584,28 @@ IEnumerator UpdateListRoutine(List<MessageViewModel> sortedMessages, bool isLoad
             if (scrollRect) scrollRect.verticalNormalizedPosition = 0f;
         }
 
-        isLoadingData = false; 
+        isLoadingData = false;
         if (scrollRect != null) scrollRect.movementType = defaultMovementType;
-    }    
+
+        // Initial cache load is done — release the live-message gate and
+        // drain anything SyncLatestMessages queued while we were spawning.
+        // Safe to do here because the chat-open flow is sequential: slide
+        // runs first (before LoadMessagesForChat), so by the time we reach
+        // this point, the slide is already over and AppendLiveMessagesRoutine
+        // won't compete with the slide animation.
+        if (!isLoadMore)
+        {
+            isInitialLoadInProgress = false;
+
+            if (pendingLiveMessages.Count > 0)
+            {
+                var drained = pendingLiveMessages.OrderBy(x => x.timestamp).ToList();
+                pendingLiveMessages.Clear();
+                ChatManager.ChatOpenLog($"Drain pending live ({drained.Count} new)");
+                StartCoroutine(AppendLiveMessagesRoutine(drained));
+            }
+        }
+    }
     void Clear()
     {
         foreach (Transform child in content)

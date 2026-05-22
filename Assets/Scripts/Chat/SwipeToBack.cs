@@ -26,11 +26,20 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
 
     private Canvas canvas;
     private bool isHorizontalDrag = false;
-    private bool dragDecided = false; 
+    private bool dragDecided = false;
     private Coroutine snapCoroutine;
 
     private float dragStartTime;
     private Vector2 dragStartPos;
+
+    /// <summary>
+    /// True whenever a slide animation is running (in, out, or swipe-back
+    /// snap). Read by MessageItemView.AcquireDecodeSlot and
+    /// ChatManager.SyncLatestMessages to pause their heavy main-thread work
+    /// during slides — image decode (~30ms each) and JSON parse (~100-300ms)
+    /// would otherwise drop frames and make the slide look laggy.
+    /// </summary>
+    public static bool IsSliding { get; private set; }
 
     void Awake()
     {
@@ -40,7 +49,33 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
         {
             canvas = localCanvas.rootCanvas;
         }
-        if (EventSystem.current != null) EventSystem.current.pixelDragThreshold = 15; 
+        if (EventSystem.current != null) EventSystem.current.pixelDragThreshold = 15;
+    }
+
+    /// <summary>
+    /// Activates the chat panel off-screen so its child coroutines (mainly
+    /// UpdateListRoutine and SmartMediaRoutine) can run pre-spawn work
+    /// before the slide-in animation begins. The panel is also hidden via
+    /// CanvasGroup alpha=0 as a belt-and-suspenders against any first-frame
+    /// position lag on initial activation.
+    /// </summary>
+    public void PrepareForPrespawn()
+    {
+        var cg = chatPanelToSlide.GetComponent<CanvasGroup>();
+        if (cg == null) cg = chatPanelToSlide.gameObject.AddComponent<CanvasGroup>();
+        cg.alpha = 0f;
+        cg.blocksRaycasts = false;
+
+        if (canvas != null)
+        {
+            float screenWidth = canvas.GetComponent<RectTransform>().rect.width;
+            chatPanelToSlide.anchoredPosition = new Vector2(screenWidth, chatPanelToSlide.anchoredPosition.y);
+        }
+
+        if (snapCoroutine != null) StopCoroutine(snapCoroutine);
+
+        chatPanelToSlide.gameObject.SetActive(true);
+        if (chatListPanel) chatListPanel.gameObject.SetActive(true);
     }
 
     // --- NEW: Call this from ChatManager.SelectChat() to animate IN ---
@@ -50,13 +85,29 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
         if (chatListPanel) chatListPanel.gameObject.SetActive(true);
 
         float screenWidth = canvas.GetComponent<RectTransform>().rect.width;
-        
+
+        // Snap to off-screen BEFORE restoring alpha so there's no single-
+        // frame window where the panel is visible (alpha=1) at the wrong
+        // pre-window position. If a parent LayoutGroup or OnEnable handler
+        // moved the panel during pre-window, this resets it before the user
+        // can see anything.
         chatPanelToSlide.anchoredPosition = new Vector2(screenWidth, chatPanelToSlide.anchoredPosition.y);
 
+        // Now restore visibility. SnapToPosition (below) does a second
+        // re-assert of the off-screen position before its while loop, so by
+        // the time alpha=1 takes effect and SnapToPosition runs its first
+        // frame, the panel is guaranteed to be off-screen.
+        var cg = chatPanelToSlide.GetComponent<CanvasGroup>();
+        if (cg != null)
+        {
+            cg.alpha = 1f;
+            cg.blocksRaycasts = true;
+        }
+
         if (snapCoroutine != null) StopCoroutine(snapCoroutine);
-        
+
         // Pass the callback to the Coroutine!
-        snapCoroutine = StartCoroutine(SnapToPosition(0f, false, onComplete)); 
+        snapCoroutine = StartCoroutine(SnapToPosition(0f, false, onComplete));
     }
 
     public void SlideOutToChatList(bool instant = false)
@@ -183,15 +234,32 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
 
     private IEnumerator SnapToPosition(float targetX, bool triggerBack, System.Action onComplete = null)
     {
+        // Mark the slide active for the duration of the animation. Heavy
+        // main-thread work elsewhere (image decode in MessageItemView, JSON
+        // parse in SyncLatestMessages) polls IsSliding and pauses while it's
+        // true so the animation can hit its frame budget.
+        IsSliding = true;
+
         float screenWidth = canvas.GetComponent<RectTransform>().rect.width;
         float maxOffset = screenWidth * parallaxStrength;
+
+        // For slide-IN (target = 0), guarantee the panel STARTS off-screen.
+        // PrepareForPrespawn and SlideInToMessages both set this, but a parent
+        // LayoutGroup or OnEnable handler can override anchoredPosition during
+        // the pre-window. Without this re-assert, the while loop below can
+        // start with the panel already near target=0, exit in 2-3 frames, and
+        // make the slide look like a snap instead of an animation.
+        if (Mathf.Approximately(targetX, 0f))
+        {
+            chatPanelToSlide.anchoredPosition = new Vector2(screenWidth, chatPanelToSlide.anchoredPosition.y);
+        }
 
         while (Mathf.Abs(chatPanelToSlide.anchoredPosition.x - targetX) > 2f)
         {
             float currentX = chatPanelToSlide.anchoredPosition.x;
             float newX = Mathf.Lerp(currentX, targetX, Time.deltaTime * snapSpeed);
-            
-            float minSpeed = 1500f * Time.deltaTime; 
+
+            float minSpeed = 1500f * Time.deltaTime;
             if (Mathf.Abs(newX - currentX) < minSpeed)
             {
                 newX = Mathf.MoveTowards(currentX, targetX, minSpeed);
@@ -235,6 +303,10 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
         }
 
         // --- 3. FIRE the callback now that the animation is 100% finished! ---
-        onComplete?.Invoke(); 
+        onComplete?.Invoke();
+
+        // Slide done — release the gate so paused decodes / sync processing
+        // can resume on the main thread.
+        IsSliding = false;
     }
 }

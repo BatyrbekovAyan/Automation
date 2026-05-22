@@ -1296,8 +1296,6 @@ MonoBehaviour:
   linkPreviewDescription: {fileID: 1305253543003840461}
   linkPreviewDomain: {fileID: 7038443151430542772}
   linkPreviewImage: {fileID: 8368284833052523045}
-  fixedWidth: 464
-  maxBubbleWidthPercentage: 0.7
   incomingColor: {r: 1, g: 1, b: 1, a: 1}
   outgoingColor: {r: 0.84705883, g: 0.99215686, b: 0.83137256, a: 1}
   downloadButtonHeight: 284
@@ -1370,7 +1368,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 0, y: -0}
+  m_AnchoredPosition: {x: 8, y: -12.5}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &7809113822818746917
@@ -1494,6 +1492,7 @@ GameObject:
   - component: {fileID: 8217548244319241046}
   - component: {fileID: 973965905834982513}
   - component: {fileID: 3570222824421757622}
+  - component: {fileID: 6223670112820879555}
   m_Layer: 5
   m_Name: ImageOrVideo
   m_TagString: Untagged
@@ -1638,6 +1637,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.AspectRatioFitter
   m_AspectMode: 1
   m_AspectRatio: 1
+--- !u!114 &6223670112820879555
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2849307411586119166}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: adb30198aa32dd140b5750692dd48104, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithRoundedCorners
+  radius: 23
+  image: {fileID: 351758997260560168}
 --- !u!1 &2916859232407805349
 GameObject:
   m_ObjectHideFlags: 0

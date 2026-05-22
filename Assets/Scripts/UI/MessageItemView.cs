@@ -1518,6 +1518,47 @@ void StartDownload(MessageViewModel vm, int attemptNumber, bool isManual)
     
 // --- THE NEW SMART MEDIA FLOW (Images & Videos Only) ---
 
+// Per-frame decode budget. The cache-intercept path below does a synchronous
+// File.ReadAllBytes + Texture2D.LoadImage + sprite create, which costs
+// ~30-40ms per item on phone hardware. With 15 cached media items in the
+// initial chat-open spawn loop, all those decodes used to stack on a single
+// frame — that's the ~700ms spawn cost we saw profiled. AcquireDecodeSlot
+// caps decodes to one per frame globally so the spawn loop returns fast and
+// images fade in over the slide-in/first-batch reveal window instead of
+// blocking it.
+private static int _decodeFrame;
+private static int _decodesThisFrame;
+private const int MaxDecodesPerFrame = 1;
+
+private static IEnumerator AcquireDecodeSlot()
+{
+    while (true)
+    {
+        // Pause decodes entirely during slide animations — a 30ms texture
+        // decode lands roughly in the middle of every other slide frame and
+        // drops the animation to ~25fps. Resumes the instant the slide
+        // releases the gate.
+        if (SwipeToBack.IsSliding)
+        {
+            yield return null;
+            continue;
+        }
+
+        int currentFrame = Time.frameCount;
+        if (currentFrame != _decodeFrame)
+        {
+            _decodeFrame = currentFrame;
+            _decodesThisFrame = 0;
+        }
+        if (_decodesThisFrame < MaxDecodesPerFrame)
+        {
+            _decodesThisFrame++;
+            yield break;
+        }
+        yield return null;
+    }
+}
+
 IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isManual)
     {
         // --- 1. THE VIDEO FAST-TRACK ---
@@ -1535,23 +1576,33 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
         // INSTANT CACHE INTERCEPT
         if (!string.IsNullOrEmpty(targetUrl) && MediaCacheManager.Instance.IsImageCached(targetUrl))
         {
-            ShowSmartThumbnail(vm, bubbleRatio, false); 
-            
+            // Render the placeholder + thumbnail immediately so the bubble has
+            // its final size for layout. The HD decode below is gated by a
+            // per-frame budget so it can't block the spawn loop.
+            ShowSmartThumbnail(vm, bubbleRatio, false);
+
+            yield return AcquireDecodeSlot();
+
+            // The item may have been destroyed (chat switched) while we were
+            // waiting for a decode slot. Unity's overloaded null operator
+            // returns true for destroyed components.
+            if (this == null) yield break;
+
             string filePath = MediaCacheManager.Instance.GetFilePathFromUrl(targetUrl);
             byte[] bytes = System.IO.File.ReadAllBytes(filePath);
             Texture2D tex = new Texture2D(2, 2);
-            
-            if (tex.LoadImage(bytes)) 
+
+            if (tex.LoadImage(bytes))
             {
                 ApplyTextureAspectFill(tex, false, bubbleRatio);
             }
-            else 
+            else
             {
                 // THE FIX: If the cached file is corrupt, trigger the fallback!
-                HandleFinalFailure(isManual, false); 
+                HandleFinalFailure(isManual, false);
             }
-            
-            yield break; 
+
+            yield break;
         }
 
         // NOT CACHED: PROCEED WITH NETWORK LOGIC

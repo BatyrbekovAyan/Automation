@@ -13,6 +13,76 @@ public partial class ChatManager : MonoBehaviour
     // Settings
     public static int MessagesPerPage = 50;
 
+    /// <summary>
+    /// Visual cost budget for the initial paint. Different message types
+    /// consume different amounts of vertical space, so we size the first
+    /// batch by visual cost rather than fixed message count. This stops
+    /// media-heavy chats from over-spawning items off-screen during the
+    /// slide-in animation — only the messages that actually fit the viewport
+    /// are spawned on first paint; the rest stay in _cachedQueue and load
+    /// when the user scrolls up.
+    ///
+    /// 15 points roughly fills a 1080×2400 mobile viewport:
+    ///   - 15 text bubbles (1pt each), OR
+    ///   - 3 image/video + 3 text bubbles (12+3 = 15), OR
+    ///   - 1 image + 1 sticker + 1 audio + 7 text (4+2+1.5+7 = 14.5)
+    /// </summary>
+    private const float FirstScreenPointBudget = 15f;
+
+    private static float GetMessageTypeWeight(MessageType type)
+    {
+        switch (type)
+        {
+            case MessageType.Image:
+            case MessageType.Video:
+                return 4f;
+            case MessageType.Sticker:
+                return 2f;
+            case MessageType.Audio:
+            case MessageType.Voice:
+            case MessageType.Document:
+                return 1.5f;
+            default: // Chat (text) and Unknown
+                return 1f;
+        }
+    }
+
+    /// <summary>
+    /// Returns how many messages from the start of a newest-first list fit
+    /// the first-paint point budget. Always includes at least one message
+    /// even if it alone exceeds the budget (e.g. opening on a chat whose
+    /// single newest message is a long video).
+    /// </summary>
+    private static int FirstScreenMessageCount(List<MessageViewModel> sortedNewestFirst)
+    {
+        if (sortedNewestFirst == null || sortedNewestFirst.Count == 0) return 0;
+
+        float points = 0;
+        int count = 0;
+        foreach (var vm in sortedNewestFirst)
+        {
+            float weight = GetMessageTypeWeight(vm.type);
+            // After the first message, stop as soon as adding the next would
+            // push past the budget. The first message is always included.
+            if (count > 0 && points + weight > FirstScreenPointBudget) break;
+            points += weight;
+            count++;
+        }
+        return Math.Max(1, count);
+    }
+
+    /// <summary>
+    /// Diagnostic stopwatch for chat-open profiling. Reset by SelectChat at the
+    /// moment the user taps a chat; ChatOpenLog prints "+N ms tag" against
+    /// this. Remove once chat-open perf work is complete.
+    /// </summary>
+    private static float _chatOpenStartTime;
+    public static void ChatOpenLog(string tag)
+    {
+        float ms = (Time.realtimeSinceStartup - _chatOpenStartTime) * 1000f;
+        Debug.Log($"[ChatOpen] +{ms,5:F0}ms  {tag}");
+    }
+
     [Header("UI Panels")]
     public GameObject ChatListPanel;
     public GameObject MessageListPanel;
@@ -217,6 +287,9 @@ public partial class ChatManager : MonoBehaviour
     {
         if (ScrollClickBlocker.IsBlocking) return;
 
+        _chatOpenStartTime = Time.realtimeSinceStartup;
+        ChatOpenLog("SelectChat (tap registered)");
+
         // Optimistic local reset — match WhatsApp's instant feel.
         // If the next sync returns a non-zero count, the badge re-appears.
         if (chatLookup.TryGetValue(chatId, out var selectedVm))
@@ -235,8 +308,9 @@ public partial class ChatManager : MonoBehaviour
         currentPage = 1;
         seenMessageIds.Clear();
 
-        // --- 1. WAKE UP THE PANEL FIRST ---
-        // We must force the panel to wake up so its scripts run OnEnable() and listen for events!
+        // --- 1. WAKE UP THE PANEL ---
+        // Activate the chat panel so its scripts run OnEnable and subscribe
+        // to ChatManager events before OnChatSelected fires.
         if (SwipeToBack.Instance != null && SwipeToBack.Instance.chatPanelToSlide != null)
         {
             SwipeToBack.Instance.chatPanelToSlide.gameObject.SetActive(true);
@@ -247,20 +321,20 @@ public partial class ChatManager : MonoBehaviour
         }
 
         // --- 2. CLEAR THE OLD CHAT ---
-        // Now that the UI is awake, it will hear this command and instantly delete the old prefabs!
         OnChatSelected?.Invoke(chatId);
 
-        // --- 3. ANIMATE FIRST, THEN LOAD ---
-        // Loading in parallel with the slide makes the slide animation jank
-        // because spawn work competes with the animation tick on the main
-        // thread. Wait for the slide to finish, then load. The alpha=0
-        // /end-reveal pattern in UpdateListRoutine still prevents bubbles from
-        // popping in and resizing — they appear sized correctly all at once
-        // once the loop completes its single final layout rebuild.
+        // --- 3. SLIDE FIRST, THEN LOAD ---
+        // Sequential. Slide animates with nothing else running on the main
+        // thread (IsSliding flag in SnapToPosition pauses decode + sync work),
+        // then LoadMessagesForChat fires from the slide-in callback. Trying
+        // to pre-spawn during a 250ms pre-window caused a one-frame panel
+        // flash on first open and editor frame instability skewed the slide
+        // duration. Sequential is the reliable shape.
         if (SwipeToBack.Instance != null)
         {
             SwipeToBack.Instance.SlideInToMessages(() =>
             {
+                ChatOpenLog("Slide-in complete");
                 LoadMessagesForChat(chatId);
             });
         }
@@ -275,6 +349,8 @@ public partial class ChatManager : MonoBehaviour
     {
         // Safety check: Make sure the user didn't swipe back out before the animation finished!
         if (currentChatId != chatId) return;
+
+        ChatOpenLog("LoadMessagesForChat entry");
 
         // Reset per-chat pagination state so a previous chat's queue can't
         // leak into this one if LoadNextPage races a chat switch.
@@ -318,15 +394,19 @@ public partial class ChatManager : MonoBehaviour
             foreach (var msg in cachedMessages) seenMessageIds.Add(msg.messageId);
             _activeChatCache = cachedMessages;
 
-            // Show only the newest MessagesPerPage on first paint; the rest
-            // wait in _cachedQueue until LoadNextPage drains a batch. This
-            // keeps older stale-URL bubbles from rendering before their
-            // ValidateCachePageAgainstServer pass has a chance to patch them.
+            // Size the first paint by visual cost, not message count. For a
+            // media-heavy chat where 15 messages would over-spawn way past
+            // the visible viewport (each image takes ~4× the height of a
+            // text bubble), FirstScreenMessageCount returns just the
+            // newest 4-6 messages — exactly what fits on screen during
+            // slide-in. The rest stay in _cachedQueue and pop in via
+            // LoadNextPage when the user scrolls up.
+            int initialCount = FirstScreenMessageCount(cachedMessages);
             List<MessageViewModel> initialBatch;
-            if (cachedMessages.Count > MessagesPerPage)
+            if (cachedMessages.Count > initialCount)
             {
-                initialBatch = cachedMessages.GetRange(0, MessagesPerPage);
-                _cachedQueue = cachedMessages.GetRange(MessagesPerPage, cachedMessages.Count - MessagesPerPage);
+                initialBatch = cachedMessages.GetRange(0, initialCount);
+                _cachedQueue = cachedMessages.GetRange(initialCount, cachedMessages.Count - initialCount);
             }
             else
             {
@@ -336,6 +416,7 @@ public partial class ChatManager : MonoBehaviour
 
             // hasMore stays true while the cache queue still has entries or
             // the server might have older messages (we don't know yet).
+            ChatOpenLog($"OnBatchMessagesLoaded fire (cache, {initialBatch.Count} msgs)");
             OnBatchMessagesLoaded?.Invoke(initialBatch, false, true);
 
             // 2. BACKGROUND SYNC: Quietly check for missed messages. Cancel any
@@ -352,8 +433,30 @@ public partial class ChatManager : MonoBehaviour
             {
                 if (newMessages.Count > 0) ChatHistoryCache.SaveHistory(GetCacheRoot(), chatId, newMessages);
                 _activeChatCache = newMessages;
-                _cachedQueue = new List<MessageViewModel>();
-                OnBatchMessagesLoaded?.Invoke(newMessages, false, hasMore);
+
+                // Server response may not be strictly newest-first depending on
+                // the endpoint — sort explicitly so the first-screen split
+                // operates on the right ordering.
+                newMessages.Sort((a, b) => b.timestamp.CompareTo(a.timestamp));
+
+                // Apply the same first-screen point budget here so first-time
+                // chat opens (no cache yet) get the same fast-paint behavior
+                // as re-opens. Leftover messages go to _cachedQueue and load
+                // when the user scrolls up.
+                int initialCount = FirstScreenMessageCount(newMessages);
+                List<MessageViewModel> firstBatch;
+                if (newMessages.Count > initialCount)
+                {
+                    firstBatch = newMessages.GetRange(0, initialCount);
+                    _cachedQueue = newMessages.GetRange(initialCount, newMessages.Count - initialCount);
+                }
+                else
+                {
+                    firstBatch = newMessages;
+                    _cachedQueue = new List<MessageViewModel>();
+                }
+
+                OnBatchMessagesLoaded?.Invoke(firstBatch, false, hasMore);
             }));
         }
     }
@@ -383,6 +486,23 @@ public partial class ChatManager : MonoBehaviour
         // view is currently shown, and mutating shared state (seenMessageIds,
         // _activeChatCache) would corrupt the now-active chat's session. The
         // next open of this chat will run sync again with fresh state.
+        if (currentChatId != chatId) yield break;
+
+        ChatOpenLog("Sync network return");
+
+        // Park sync processing while any slide animation is running. The
+        // JsonConvert.DeserializeObject + foreach + CreateViewModel pass
+        // below costs ~100-300ms on phone hardware — landing it mid-slide
+        // would stall the animation by ~5-10 frames. Capped at 500ms so a
+        // stuck slide can't block sync indefinitely.
+        float syncWaitStart = Time.realtimeSinceStartup;
+        while (SwipeToBack.IsSliding && Time.realtimeSinceStartup - syncWaitStart < 0.5f)
+        {
+            yield return null;
+        }
+
+        // Re-check chat-id after the wait — user may have switched chats
+        // during the slide we were waiting for.
         if (currentChatId != chatId) yield break;
 
 #if UNITY_EDITOR
@@ -560,6 +680,7 @@ public partial class ChatManager : MonoBehaviour
             // Append only the brand-new messages — AppendLiveMessagesRoutine
             // slides them in at the bottom without re-spawning the cached
             // bubbles already on screen.
+            ChatOpenLog($"OnLiveMessagesReceived fire ({brandNew.Count} new)");
             OnLiveMessagesReceived?.Invoke(brandNew);
         }
         else if (hasStatusUpdates)
