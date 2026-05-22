@@ -17,9 +17,20 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
     [Header("Swipe Physics Settings")]
     [Range(0.1f, 1f)]
     public float parallaxStrength = 0.3f; // <--- NEW: How far the background moves (30%)
+
+    [Tooltip("Slide-IN duration in seconds (chat-list → chat panel). Ease-out cubic (decelerate into rest).")]
+    [Range(0.15f, 0.6f)]
+    public float slideInDuration = 0.290f;
+
+    [Tooltip("Slide-OUT duration in seconds (chat panel → chat list). Ease-in-out cubic (accelerate then decelerate, WhatsApp-like).")]
+    [Range(0.15f, 0.6f)]
+    public float slideOutDuration = 0.320f;
+
+    [Tooltip("DEPRECATED: legacy exponential-lerp speed. Unused now that animation is fixed-duration. Kept for serialization compatibility; remove on next prefab cleanup.")]
     public float snapSpeed = 10f;
+
     public float slowSwipeThreshold = 0.4f;
-    public float flickVelocityThreshold = 1000f; 
+    public float flickVelocityThreshold = 1000f;
 
     [Header("Action")]
     public UnityEvent onSwipeComplete;
@@ -48,6 +59,31 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
     /// for the next chat-open to clear them.
     /// </summary>
     public static event System.Action OnSlideOutComplete;
+
+    /// <summary>
+    /// Ease-out cubic: starts at full speed, decelerates into the target. Used by
+    /// slide-in (the panel settles into its on-screen rest position) and by the
+    /// drag-cancel snap-back-to-zero (same "settle to rest" motion).
+    /// </summary>
+    private static float EaseOutCubic(float t)
+    {
+        t = Mathf.Clamp01(t);
+        float inv = 1f - t;
+        return 1f - inv * inv * inv;
+    }
+
+    /// <summary>
+    /// Ease-in-out cubic: accelerates from rest in the first half, decelerates into
+    /// the target in the second half. Used by slide-out — feels weightier and more
+    /// natural than ease-out alone, matching WhatsApp/iOS swipe-back behavior.
+    /// </summary>
+    private static float EaseInOutCubic(float t)
+    {
+        t = Mathf.Clamp01(t);
+        if (t < 0.5f) return 4f * t * t * t;
+        float inv = -2f * t + 2f;
+        return 1f - inv * inv * inv / 2f;
+    }
 
     void Awake()
     {
@@ -285,26 +321,35 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
         float maxOffset = screenWidth * parallaxStrength;
 
         // For slide-IN (target = 0), guarantee the panel STARTS off-screen.
-        // SlideInToMessages sets this, but a parent LayoutGroup or OnEnable
-        // handler can override anchoredPosition between activation and the
-        // first SnapToPosition frame. Without this re-assert, the while loop
-        // below can start with the panel already near target=0, exit in 2-3
-        // frames, and make the slide look like a snap instead of an animation.
+        // SlideInToMessages sets this, but a parent LayoutGroup or OnEnable handler
+        // can override anchoredPosition between activation and the first SnapToPosition
+        // frame. Without this re-assert, the animation below can start from a stale
+        // position and look like a snap instead of a slide.
         if (Mathf.Approximately(targetX, 0f))
         {
             chatPanelToSlide.anchoredPosition = new Vector2(screenWidth, chatPanelToSlide.anchoredPosition.y);
         }
 
-        while (Mathf.Abs(chatPanelToSlide.anchoredPosition.x - targetX) > 2f)
-        {
-            float currentX = chatPanelToSlide.anchoredPosition.x;
-            float newX = Mathf.Lerp(currentX, targetX, Time.deltaTime * snapSpeed);
+        // Fixed-duration animation. Frame-rate independent: the same physical duration
+        // regardless of whether the device runs at 60 fps or 30 fps. triggerBack=true
+        // is the slide-OUT (panel exiting to screenWidth) — use ease-in-out cubic for
+        // a weightier WhatsApp-like feel. Everything else (slide-IN from OpenChatRoutine,
+        // drag-cancel snap-back-to-zero from OnEndDrag) settles into rest — use
+        // ease-out cubic so the panel decelerates into its final position.
+        float startX = chatPanelToSlide.anchoredPosition.x;
+        float startTime = Time.realtimeSinceStartup;
+        float duration = triggerBack ? slideOutDuration : slideInDuration;
+        bool useEaseInOut = triggerBack;
 
-            float minSpeed = 1500f * Time.deltaTime;
-            if (Mathf.Abs(newX - currentX) < minSpeed)
-            {
-                newX = Mathf.MoveTowards(currentX, targetX, minSpeed);
-            }
+        ChatManager.ChatOpenLog($"Slide-{(triggerBack ? "OUT" : "IN")} start (duration={duration*1000f:F0}ms, from x={startX:F0} to x={targetX:F0})");
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed = Time.realtimeSinceStartup - startTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            float eased = useEaseInOut ? EaseInOutCubic(t) : EaseOutCubic(t);
+            float newX = Mathf.Lerp(startX, targetX, eased);
 
             chatPanelToSlide.anchoredPosition = new Vector2(newX, chatPanelToSlide.anchoredPosition.y);
 
@@ -322,6 +367,7 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
             yield return null;
         }
 
+        // Final snap to exact target (eliminates any sub-pixel residual from the curve).
         chatPanelToSlide.anchoredPosition = new Vector2(targetX, chatPanelToSlide.anchoredPosition.y);
         float finalProgress = targetX / screenWidth;
         if (chatListPanel != null)
@@ -332,6 +378,9 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
         {
             bottomTabPanel.anchoredPosition = new Vector2(-maxOffset + (maxOffset * finalProgress), bottomTabPanel.anchoredPosition.y);
         }
+
+        float actualMs = (Time.realtimeSinceStartup - startTime) * 1000f;
+        ChatManager.ChatOpenLog($"Slide-{(triggerBack ? "OUT" : "IN")} done (actual={actualMs:F0}ms)");
 
         if (triggerBack)
         {
