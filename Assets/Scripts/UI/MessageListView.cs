@@ -203,11 +203,18 @@ public class MessageListView : MonoBehaviour
     {
         if (newMessages == null || newMessages.Count == 0) return;
 
-        // If the initial cache UpdateListRoutine is still spawning bubbles,
-        // queue these and drain after it completes. Running both routines
-        // in parallel made batch 2 settle ~280ms instead of ~120ms because
-        // AppendLiveMessagesRoutine's synchronous ForceRebuildLayoutImmediate
-        // raced UpdateListRoutine's per-batch rebuild.
+        // If the initial cache UpdateListRoutine is still spawning bubbles, queue these
+        // and drain after it completes. Running both routines in parallel made batch 2
+        // settle ~280ms instead of ~120ms because AppendLiveMessagesRoutine's synchronous
+        // ForceRebuildLayoutImmediate raced UpdateListRoutine's per-batch rebuild.
+        //
+        // The Phase check in ChatManager.SyncLatestMessages already filters out Prep/Slide
+        // arrivals (they get queued in _pendingLiveSyncMessages and drained by
+        // PopulateBubbles AFTER OnBatchMessagesLoaded). isInitialLoadInProgress here
+        // covers the in-process window from "OnBatchMessagesLoaded fired" to
+        // "UpdateListRoutine actually finished spawning everything" — which the phase
+        // model alone does NOT cover because phase becomes Populate at the start of
+        // OnBatchMessagesLoaded, not the end of UpdateListRoutine.
         if (isInitialLoadInProgress)
         {
             pendingLiveMessages.AddRange(newMessages);
@@ -215,8 +222,6 @@ public class MessageListView : MonoBehaviour
         }
 
         var sortedMessages = newMessages.OrderBy(x => x.timestamp).ToList();
-
-        // Use the new appending routine instead of the batch loading routine!
         StartCoroutine(AppendLiveMessagesRoutine(sortedMessages));
     }
 
@@ -607,12 +612,13 @@ IEnumerator UpdateListRoutine(List<MessageViewModel> sortedMessages, bool isLoad
         isLoadingData = false;
         if (scrollRect != null) scrollRect.movementType = defaultMovementType;
 
-        // Initial cache load is done — release the live-message gate and
-        // drain anything SyncLatestMessages queued while we were spawning.
-        // Safe to do here because the chat-open flow is sequential: slide
-        // runs first (before LoadMessagesForChat), so by the time we reach
-        // this point, the slide is already over and AppendLiveMessagesRoutine
-        // won't compete with the slide animation.
+        // Initial cache load is done — release the live-message gate and drain
+        // anything SyncLatestMessages queued while we were spawning. Safe to do
+        // here because the chat-open flow is sequential: Prep + Slide both run
+        // before OnBatchMessagesLoaded fires (PopulateBubbles fires it during
+        // the slide-in completion callback), so by the time we reach this point,
+        // the slide is already over and AppendLiveMessagesRoutine won't compete
+        // with the slide animation.
         if (!isLoadMore)
         {
             isInitialLoadInProgress = false;
