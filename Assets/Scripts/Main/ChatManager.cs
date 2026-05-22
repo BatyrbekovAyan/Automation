@@ -145,7 +145,7 @@ public partial class ChatManager : MonoBehaviour
     /// The MessageViewModel list currently powering the open chat's bubbles.
     /// The references in this list are the same ones held by each rendered
     /// MessageItemView.currentVm, so mutating an entry's mediaUrl in place
-    /// is observable in the UI. Set by LoadMessagesForChat and re-synced by
+    /// is observable in the UI. Set by OpenChatRoutine and re-synced by
     /// SyncLatestMessages when new messages merge in. SyncLatestMessages and
     /// GetMessagesRoutine both read it to refresh stale URLs.
     /// </summary>
@@ -322,17 +322,29 @@ public partial class ChatManager : MonoBehaviour
     {
         if (ScrollClickBlocker.IsBlocking) return;
 
-        _chatOpenStartTime = Time.realtimeSinceStartup;
+        // Lock out re-taps while the slide-in animation is running. If we allowed a new
+        // SelectChat during Slide, the new OpenChatRoutine would later trigger another
+        // SlideInToMessages which snaps the panel off-screen — a visible jump while the
+        // first slide is still finishing. Slide is brief (~300 ms); the lockout is short.
+        if (_phase == ChatOpenPhase.Slide) return;
+
+        float tapTime = Time.realtimeSinceStartup;
+        _chatOpenStartTime = tapTime;
         ChatOpenLog("SelectChat (tap registered)");
 
-        // Optimistic local reset — match WhatsApp's instant feel.
-        // If the next sync returns a non-zero count, the badge re-appears.
+        // Cancel any in-flight open. If the user re-tapped during Prep we restart from
+        // scratch with the new chat. (Slide-phase re-taps are blocked above.)
+        if (_activeOpen != null) StopCoroutine(_activeOpen);
+        _pendingFirstBatch = null;
+        _pendingLiveSyncMessages = null;
+
+        // Optimistic local reset — match WhatsApp's instant feel. If the next sync returns
+        // a non-zero count, the badge re-appears.
         if (chatLookup.TryGetValue(chatId, out var selectedVm))
         {
             bool hadUnread = selectedVm.UnreadCount > 0;
             selectedVm.UpdateUnreadCount(0);
 
-            // Persist read state to Wappi so the badge does not re-appear on next sync.
             if (hadUnread)
             {
                 StartCoroutine(MarkChatAsRead(chatId));
@@ -342,160 +354,20 @@ public partial class ChatManager : MonoBehaviour
         currentChatId = chatId;
         currentPage = 1;
         seenMessageIds.Clear();
-
-        // --- 1. WAKE UP THE PANEL ---
-        // Activate the chat panel so its scripts run OnEnable and subscribe
-        // to ChatManager events before OnChatSelected fires.
-        if (SwipeToBack.Instance != null && SwipeToBack.Instance.chatPanelToSlide != null)
-        {
-            SwipeToBack.Instance.chatPanelToSlide.gameObject.SetActive(true);
-        }
-        else
-        {
-            MessageListPanel.SetActive(true);
-        }
-
-        // --- 2. CLEAR THE OLD CHAT ---
-        OnChatSelected?.Invoke(chatId);
-
-        // --- 3. SLIDE FIRST, THEN LOAD ---
-        // Sequential. Slide animates with nothing else running on the main
-        // thread (IsSliding flag in SnapToPosition pauses decode + sync work),
-        // then LoadMessagesForChat fires from the slide-in callback. Trying
-        // to pre-spawn during a 250ms pre-window caused a one-frame panel
-        // flash on first open and editor frame instability skewed the slide
-        // duration. Sequential is the reliable shape.
-        if (SwipeToBack.Instance != null)
-        {
-            SwipeToBack.Instance.SlideInToMessages(() =>
-            {
-                ChatOpenLog("Slide-in complete");
-                LoadMessagesForChat(chatId);
-            });
-        }
-        else
-        {
-            LoadMessagesForChat(chatId);
-        }
-    }
-
-    // --- NEW: The heavy lifting is now safely isolated here! ---
-    private void LoadMessagesForChat(string chatId)
-    {
-        // Safety check: Make sure the user didn't swipe back out before the animation finished!
-        if (currentChatId != chatId) return;
-
-        ChatOpenLog("LoadMessagesForChat entry");
-
-        // Reset per-chat pagination state so a previous chat's queue can't
-        // leak into this one if LoadNextPage races a chat switch.
         _activeChatCache = null;
         _cachedQueue = null;
 
-        List<MessageViewModel> cachedMessages = ChatHistoryCache.LoadHistory(GetCacheRoot(), chatId);
+        // Fire OnChatSelected so MessageListView clears its bubbles synchronously. Each
+        // destroyed bubble's OnDestroy releases its owned Texture2D + Sprite refs — this
+        // is the leak fix's enforcement point.
+        OnChatSelected?.Invoke(chatId);
 
-        // Always load the outbox for this chat — populates OutboxStore's in-memory
-        // _byChatId map so tap-to-retry's Find() can resolve the tempId, even if
-        // the message cache was purged but the outbox file survived.
-        var unresolved = Outbox.GetFor(chatId);
-
-        if (cachedMessages != null && cachedMessages.Count > 0)
-        {
-            // Promote stale-Pending cached messages to Failed for any tempId still
-            // in the outbox. An unresolved entry means the in-flight POST from a
-            // previous session never completed — without this pass the user would
-            // see a phantom clock that never resolves.
-            if (unresolved.Count > 0)
-            {
-                var unresolvedIds = new HashSet<string>();
-                foreach (var entry in unresolved) unresolvedIds.Add(entry.tempId);
-
-                foreach (var msg in cachedMessages)
-                {
-                    if (!msg.isIncoming && unresolvedIds.Contains(msg.messageId))
-                        msg.deliveryStatus = DeliveryStatus.Failed;
-                }
-            }
-
-            // Sort newest-first so the "first MessagesPerPage" really are the
-            // latest. The cache file's order is roughly newest-first after
-            // SyncLatestMessages merges, but not guaranteed — explicit sort
-            // protects the pagination contract.
-            cachedMessages.Sort((a, b) => b.timestamp.CompareTo(a.timestamp));
-
-            // Register every cached id so SyncLatestMessages and any later
-            // server fetches route already-known messages into the refresh
-            // branch instead of creating duplicate bubbles.
-            foreach (var msg in cachedMessages) seenMessageIds.Add(msg.messageId);
-            _activeChatCache = cachedMessages;
-
-            // Size the first paint by visual cost, not message count. For a
-            // media-heavy chat where 15 messages would over-spawn way past
-            // the visible viewport (each image takes ~4× the height of a
-            // text bubble), FirstScreenMessageCount returns just the
-            // newest 4-6 messages — exactly what fits on screen during
-            // slide-in. The rest stay in _cachedQueue and pop in via
-            // LoadNextPage when the user scrolls up.
-            int initialCount = FirstScreenMessageCount(cachedMessages);
-            List<MessageViewModel> initialBatch;
-            if (cachedMessages.Count > initialCount)
-            {
-                initialBatch = cachedMessages.GetRange(0, initialCount);
-                _cachedQueue = cachedMessages.GetRange(initialCount, cachedMessages.Count - initialCount);
-            }
-            else
-            {
-                initialBatch = cachedMessages;
-                _cachedQueue = new List<MessageViewModel>();
-            }
-
-            // hasMore stays true while the cache queue still has entries or
-            // the server might have older messages (we don't know yet).
-            ChatOpenLog($"OnBatchMessagesLoaded fire (cache, {initialBatch.Count} msgs)");
-            OnBatchMessagesLoaded?.Invoke(initialBatch, false, true);
-
-            // 2. BACKGROUND SYNC: Quietly check for missed messages. Cancel any
-            // prior in-flight sync first — a rapid retap or chat switch would
-            // otherwise leave the previous sync alive, and its delayed event
-            // fire would append the same brand-new messages a second time.
-            if (_activeSync != null) StopCoroutine(_activeSync);
-            _activeSync = StartCoroutine(SyncLatestMessages(chatId, cachedMessages));
-        }
-        else
-        {
-            // 3. NO CACHE: This is a brand new chat, do a normal fetch
-            StartCoroutine(GetMessagesRoutine(chatId, 1, (newMessages, hasMore) =>
-            {
-                if (newMessages.Count > 0) ChatHistoryCache.SaveHistory(GetCacheRoot(), chatId, newMessages);
-                _activeChatCache = newMessages;
-
-                // Server response may not be strictly newest-first depending on
-                // the endpoint — sort explicitly so the first-screen split
-                // operates on the right ordering.
-                newMessages.Sort((a, b) => b.timestamp.CompareTo(a.timestamp));
-
-                // Apply the same first-screen point budget here so first-time
-                // chat opens (no cache yet) get the same fast-paint behavior
-                // as re-opens. Leftover messages go to _cachedQueue and load
-                // when the user scrolls up.
-                int initialCount = FirstScreenMessageCount(newMessages);
-                List<MessageViewModel> firstBatch;
-                if (newMessages.Count > initialCount)
-                {
-                    firstBatch = newMessages.GetRange(0, initialCount);
-                    _cachedQueue = newMessages.GetRange(initialCount, newMessages.Count - initialCount);
-                }
-                else
-                {
-                    firstBatch = newMessages;
-                    _cachedQueue = new List<MessageViewModel>();
-                }
-
-                OnBatchMessagesLoaded?.Invoke(firstBatch, false, hasMore);
-            }));
-        }
+        // Enter Prep. The panel is NOT activated here — SlideInToMessages (inside
+        // OpenChatRoutine, after the 300 ms wait) is the sole activation point.
+        _phase = ChatOpenPhase.Prep;
+        _activeOpen = StartCoroutine(OpenChatRoutine(chatId, tapTime));
     }
-    
+
     IEnumerator SyncLatestMessages(string chatId, List<MessageViewModel> cachedList)
     {
         string activeProfileId = GetActiveProfileId();
