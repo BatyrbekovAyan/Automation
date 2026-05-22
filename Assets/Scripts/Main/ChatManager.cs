@@ -191,6 +191,19 @@ public partial class ChatManager : MonoBehaviour
     public void Awake()
     {
         Instance = this;
+
+        // Activate MessageListPanel here so SwipeToBack (which lives on/under it) has
+        // its Awake invoked and registers SwipeToBack.Instance BEFORE any chat-open
+        // can run. Without this, the very first SelectChat finds SwipeToBack.Instance
+        // null and OpenChatRoutine's else branch skips the slide entirely — bubbles
+        // appear instantly with no animation. ChatManager.Start's ShowChatList(true)
+        // below will slide-out-then-deactivate properly now that SwipeToBack.Instance
+        // is wired up. All of this completes before Unity's first frame render, so
+        // the user never sees the panel in its activated-pre-slide state.
+        if (MessageListPanel != null && !MessageListPanel.activeSelf)
+        {
+            MessageListPanel.SetActive(true);
+        }
     }
 
     public void Start()
