@@ -60,32 +60,6 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
         if (EventSystem.current != null) EventSystem.current.pixelDragThreshold = 15;
     }
 
-    /// <summary>
-    /// Activates the chat panel off-screen so its child coroutines (mainly
-    /// UpdateListRoutine and SmartMediaRoutine) can run pre-spawn work
-    /// before the slide-in animation begins. The panel is also hidden via
-    /// CanvasGroup alpha=0 as a belt-and-suspenders against any first-frame
-    /// position lag on initial activation.
-    /// </summary>
-    public void PrepareForPrespawn()
-    {
-        var cg = chatPanelToSlide.GetComponent<CanvasGroup>();
-        if (cg == null) cg = chatPanelToSlide.gameObject.AddComponent<CanvasGroup>();
-        cg.alpha = 0f;
-        cg.blocksRaycasts = false;
-
-        if (canvas != null)
-        {
-            float screenWidth = canvas.GetComponent<RectTransform>().rect.width;
-            chatPanelToSlide.anchoredPosition = new Vector2(screenWidth, chatPanelToSlide.anchoredPosition.y);
-        }
-
-        if (snapCoroutine != null) StopCoroutine(snapCoroutine);
-
-        chatPanelToSlide.gameObject.SetActive(true);
-        if (chatListPanel) chatListPanel.gameObject.SetActive(true);
-    }
-
     // --- NEW: Call this from ChatManager.SelectChat() to animate IN ---
     public void SlideInToMessages(System.Action onComplete = null)
     {
@@ -272,11 +246,11 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
         float maxOffset = screenWidth * parallaxStrength;
 
         // For slide-IN (target = 0), guarantee the panel STARTS off-screen.
-        // PrepareForPrespawn and SlideInToMessages both set this, but a parent
-        // LayoutGroup or OnEnable handler can override anchoredPosition during
-        // the pre-window. Without this re-assert, the while loop below can
-        // start with the panel already near target=0, exit in 2-3 frames, and
-        // make the slide look like a snap instead of an animation.
+        // SlideInToMessages sets this, but a parent LayoutGroup or OnEnable
+        // handler can override anchoredPosition between activation and the
+        // first SnapToPosition frame. Without this re-assert, the while loop
+        // below can start with the panel already near target=0, exit in 2-3
+        // frames, and make the slide look like a snap instead of an animation.
         if (Mathf.Approximately(targetX, 0f))
         {
             chatPanelToSlide.anchoredPosition = new Vector2(screenWidth, chatPanelToSlide.anchoredPosition.y);
