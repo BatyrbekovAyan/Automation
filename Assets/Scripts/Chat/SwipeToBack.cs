@@ -83,45 +83,6 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
             canvas = localCanvas.rootCanvas;
         }
         if (EventSystem.current != null) EventSystem.current.pixelDragThreshold = 15;
-
-        // Isolate the chat panel and chat list panel into their own sub-canvases. Without
-        // these, every per-frame anchoredPosition update during slide-in/out dirties the
-        // ENTIRE root canvas and forces Unity to re-batch all UI elements — visible as
-        // dropped frames on heavy-media chats. With a sub-Canvas, moving the panel only
-        // re-batches that panel's own children, and the root canvas geometry stays cached.
-        EnsureSubCanvas(chatPanelToSlide, sortingOrder: 2);
-        EnsureSubCanvas(chatListPanel,    sortingOrder: 1);
-    }
-
-    /// <summary>
-    /// Add a Canvas + GraphicRaycaster to the given panel if not already present. The
-    /// sub-canvas isolates this panel's batching from the root, so animating its
-    /// RectTransform doesn't trigger a root-canvas rebuild. GraphicRaycaster restores
-    /// child click/drag detection (otherwise children stop receiving pointer events).
-    /// Cheap one-shot setup at Awake; no per-frame cost.
-    /// </summary>
-    private static void EnsureSubCanvas(RectTransform panel, int sortingOrder)
-    {
-        if (panel == null) return;
-
-        var existingCanvas = panel.GetComponent<Canvas>();
-        if (existingCanvas == null)
-        {
-            var c = panel.gameObject.AddComponent<Canvas>();
-            c.overrideSorting = true;
-            c.sortingOrder = sortingOrder;
-            // Inherit additional shader channels from the root so TextMeshPro features
-            // (underline, gradient, etc.) keep working. TMP uses TexCoord1 for some shaders.
-            c.additionalShaderChannels =
-                UnityEngine.AdditionalCanvasShaderChannels.TexCoord1 |
-                UnityEngine.AdditionalCanvasShaderChannels.Normal |
-                UnityEngine.AdditionalCanvasShaderChannels.Tangent;
-        }
-
-        if (panel.GetComponent<GraphicRaycaster>() == null)
-        {
-            panel.gameObject.AddComponent<GraphicRaycaster>();
-        }
     }
 
     // --- NEW: Call this from ChatManager.SelectChat() to animate IN ---
