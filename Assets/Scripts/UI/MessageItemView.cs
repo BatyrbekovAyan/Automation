@@ -2474,15 +2474,21 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
 
     void ApplyTextureAspectFill(Texture2D tex, bool isSticker, float targetRatio)
     {
+        // Free any visuals from a previous load cycle on this bubble. The Image still references
+        // the old sprite for one more frame; we reassign messageImage.sprite below before yielding,
+        // so Unity's end-of-frame Destroy never catches a sprite that's about to be rendered.
+        DisposeOwned();
+        TrackOwned(tex);
+
         messageImage.color = Color.white;
-        
         tex.wrapMode = TextureWrapMode.Clamp;
 
         if (isSticker)
         {
+            Sprite spr = TrackOwned(Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect));
             messageImage.type = Image.Type.Simple;
-            messageImage.sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect);
-            fullScreenSprite = messageImage.sprite;
+            messageImage.sprite = spr;
+            fullScreenSprite = spr;
             messageImage.preserveAspect = true;
         }
         else
@@ -2493,7 +2499,7 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
             int x = 0;
             int y = 0;
 
-            if (Mathf.Abs(imageRatio - targetRatio) > 0.01f) 
+            if (Mathf.Abs(imageRatio - targetRatio) > 0.01f)
             {
                 if (imageRatio > targetRatio)
                 {
@@ -2507,24 +2513,27 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
                 }
 
                 Color[] pixels = tex.GetPixels(x, y, cropW, cropH);
-                Texture2D croppedTex = new Texture2D(cropW, cropH, tex.format, false);
+                Texture2D croppedTex = TrackOwned(new Texture2D(cropW, cropH, tex.format, false));
                 croppedTex.wrapMode = TextureWrapMode.Clamp;
                 croppedTex.SetPixels(pixels);
                 croppedTex.Apply();
 
+                Sprite bubbleSpr = TrackOwned(Sprite.Create(croppedTex, new Rect(0, 0, cropW, cropH), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect));
+                Sprite fullSpr   = TrackOwned(Sprite.Create(tex,        new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect));
+
                 messageImage.type = Image.Type.Simple;
-                messageImage.sprite = Sprite.Create(croppedTex, new Rect(0, 0, cropW, cropH), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect);
-                
-                fullScreenSprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect);
+                messageImage.sprite = bubbleSpr;
+                fullScreenSprite = fullSpr;
             }
             else
             {
+                Sprite spr = TrackOwned(Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect));
                 messageImage.type = Image.Type.Simple;
-                messageImage.sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect);
-                fullScreenSprite = messageImage.sprite;
+                messageImage.sprite = spr;
+                fullScreenSprite = spr;
             }
 
-            messageImage.preserveAspect = false; 
+            messageImage.preserveAspect = false;
         }
 
         StartCoroutine(ForceRebuildRoutine());
