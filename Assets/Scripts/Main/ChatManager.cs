@@ -357,24 +357,11 @@ public partial class ChatManager : MonoBehaviour
         _activeChatCache = null;
         _cachedQueue = null;
 
-        // Activate the panel BEFORE firing OnChatSelected. MessageListView subscribes
-        // to OnChatSelected in OnEnable, so the panel must be active for the event
-        // delivery to reach it. The panel is left at x = screenWidth (off-screen)
-        // by the previous slide-out, so re-activating it here is invisible to the
-        // user — SlideInToMessages will re-activate (idempotent) and snap to
-        // off-screen before starting the slide tween.
-        if (SwipeToBack.Instance != null && SwipeToBack.Instance.chatPanelToSlide != null)
-        {
-            SwipeToBack.Instance.chatPanelToSlide.gameObject.SetActive(true);
-        }
-        else
-        {
-            MessageListPanel.SetActive(true);
-        }
-
         // Fire OnChatSelected so MessageListView clears its bubbles synchronously. Each
         // destroyed bubble's OnDestroy releases its owned Texture2D + Sprite refs — this
-        // is the leak fix's enforcement point.
+        // is the leak fix's enforcement point. MessageListView subscribes to this in
+        // Awake (not OnEnable) so the event delivery works even though the panel
+        // is currently inactive — SlideInToMessages is the sole activation point.
         OnChatSelected?.Invoke(chatId);
 
         // Enter Prep. SlideInToMessages (inside OpenChatRoutine, after the 300 ms wait)
@@ -419,7 +406,8 @@ public partial class ChatManager : MonoBehaviour
         // the animation by ~5-10 frames. Capped at 500ms so a stuck phase transition
         // can't block sync indefinitely.
         float syncWaitStart = Time.realtimeSinceStartup;
-        while (_phase != ChatOpenPhase.Populate && _phase != ChatOpenPhase.Idle
+        while ((SwipeToBack.IsSliding
+                || (_phase != ChatOpenPhase.Populate && _phase != ChatOpenPhase.Idle))
                && Time.realtimeSinceStartup - syncWaitStart < 0.5f)
         {
             yield return null;
@@ -601,16 +589,21 @@ public partial class ChatManager : MonoBehaviour
             // Track the merged list for future paginated refreshes.
             _activeChatCache = newMessages;
 
-            // Brand-new messages: queue if we're not yet in Populate (Prep or Slide
-            // would spawn into an empty/closing list). Otherwise fire immediately.
-            if (_phase == ChatOpenPhase.Populate || _phase == ChatOpenPhase.Idle)
+            // Brand-new messages: queue if we're not in a settled state (Prep or Slide
+            // would spawn into an empty/closing list; IsSliding covers both slide-in
+            // and slide-out drag/snap). Otherwise fire immediately. Queued messages
+            // are either drained by PopulateBubbles on next open of the same chat, or
+            // dropped if the user navigates to a different chat (the cache has them).
+            bool isSettled = (_phase == ChatOpenPhase.Populate || _phase == ChatOpenPhase.Idle)
+                             && !SwipeToBack.IsSliding;
+            if (isSettled)
             {
                 ChatOpenLog($"OnLiveMessagesReceived fire ({brandNew.Count} new)");
                 OnLiveMessagesReceived?.Invoke(brandNew);
             }
             else
             {
-                ChatOpenLog($"OnLiveMessagesReceived queued ({brandNew.Count} new, phase={_phase})");
+                ChatOpenLog($"OnLiveMessagesReceived queued ({brandNew.Count} new, phase={_phase}, sliding={SwipeToBack.IsSliding})");
                 if (_pendingLiveSyncMessages == null) _pendingLiveSyncMessages = new List<MessageViewModel>();
                 _pendingLiveSyncMessages.AddRange(brandNew);
             }

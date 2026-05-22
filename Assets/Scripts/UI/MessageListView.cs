@@ -51,13 +51,31 @@ public class MessageListView : MonoBehaviour
         {
             defaultMovementType = scrollRect.movementType;
         }
+
+        // OnChatSelected subscription lives in Awake (not OnEnable) so the event
+        // delivery works even when the chat panel is inactive — which is the case
+        // on cold-open and between chats (slide-out deactivates the panel).
+        // Other handlers (HandleBatchMessages, HandleLiveMessages) stay in
+        // OnEnable because they call StartCoroutine and would throw on an inactive
+        // GameObject.
+        if (ChatManager.Instance != null)
+        {
+            ChatManager.Instance.OnChatSelected += OnChatSelected;
+        }
+    }
+
+    void OnDestroy()
+    {
+        if (ChatManager.Instance != null)
+        {
+            ChatManager.Instance.OnChatSelected -= OnChatSelected;
+        }
     }
 
     void OnEnable()
     {
         if (ChatManager.Instance != null)
         {
-            ChatManager.Instance.OnChatSelected += OnChatSelected;
             ChatManager.Instance.OnBatchMessagesLoaded += HandleBatchMessages;
             ChatManager.Instance.OnLiveMessagesReceived += HandleLiveMessages;
         }
@@ -79,7 +97,6 @@ public class MessageListView : MonoBehaviour
     {
         if (ChatManager.Instance != null)
         {
-            ChatManager.Instance.OnChatSelected -= OnChatSelected;
             ChatManager.Instance.OnBatchMessagesLoaded -= HandleBatchMessages;
             ChatManager.Instance.OnLiveMessagesReceived -= HandleLiveMessages;
         }
