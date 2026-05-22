@@ -727,6 +727,166 @@ public partial class ChatManager : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Phase A (Prep) of chat-open. Runs cache load + sort + first-screen split synchronously
+    /// inside the coroutine, kicks off sync (whose results buffer into _pendingLiveSyncMessages),
+    /// then waits until 300 ms has elapsed from tap time before triggering the slide-in animation.
+    /// On slide-in completion the callback transitions to Phase C (Populate).
+    /// </summary>
+    private IEnumerator OpenChatRoutine(string chatId, float tapTime)
+    {
+        const float PrepDurationSeconds = 0.300f;
+
+        ChatOpenLog("OpenChatRoutine entry (Prep)");
+
+        // On device only — releasing orphaned natives can take 30-80 ms but Prep has the
+        // budget. Editor skips this; the cost shows up as iteration friction in play mode.
+        if (!Application.isEditor)
+        {
+            Resources.UnloadUnusedAssets();
+        }
+
+        List<MessageViewModel> cachedMessages = ChatHistoryCache.LoadHistory(GetCacheRoot(), chatId);
+
+        // Always load the outbox — populates OutboxStore's in-memory _byChatId map so
+        // tap-to-retry's Find() can resolve the tempId, even if the message cache was
+        // purged but the outbox file survived.
+        var unresolved = Outbox.GetFor(chatId);
+
+        if (cachedMessages != null && cachedMessages.Count > 0)
+        {
+            // Promote stale-Pending cached messages to Failed for any tempId still in
+            // the outbox. An unresolved entry means the in-flight POST from a previous
+            // session never completed — without this pass the user would see a phantom
+            // clock that never resolves.
+            if (unresolved.Count > 0)
+            {
+                var unresolvedIds = new HashSet<string>();
+                foreach (var entry in unresolved) unresolvedIds.Add(entry.tempId);
+
+                foreach (var msg in cachedMessages)
+                {
+                    if (!msg.isIncoming && unresolvedIds.Contains(msg.messageId))
+                        msg.deliveryStatus = DeliveryStatus.Failed;
+                }
+            }
+
+            cachedMessages.Sort((a, b) => b.timestamp.CompareTo(a.timestamp));
+            foreach (var msg in cachedMessages) seenMessageIds.Add(msg.messageId);
+            _activeChatCache = cachedMessages;
+
+            int initialCount = FirstScreenMessageCount(cachedMessages);
+            if (cachedMessages.Count > initialCount)
+            {
+                _pendingFirstBatch = cachedMessages.GetRange(0, initialCount);
+                _cachedQueue = cachedMessages.GetRange(initialCount, cachedMessages.Count - initialCount);
+            }
+            else
+            {
+                _pendingFirstBatch = cachedMessages;
+                _cachedQueue = new List<MessageViewModel>();
+            }
+
+            // Kick off sync. Its callback fires OnLiveMessagesReceived only after Populate
+            // begins (gated by Phase != Populate inside SyncLatestMessages).
+            if (_activeSync != null) StopCoroutine(_activeSync);
+            _activeSync = StartCoroutine(SyncLatestMessages(chatId, cachedMessages));
+        }
+        else
+        {
+            // No cache: kick the network fetch. Its callback writes _pendingFirstBatch
+            // and _cachedQueue if the response arrives before slide-in completes; otherwise
+            // the slide reveals an empty content and the bubbles land in Populate.
+            StartCoroutine(GetMessagesRoutine(chatId, 1, (newMessages, hasMore) =>
+            {
+                if (chatId != currentChatId) return; // stale fetch — user switched chats
+
+                if (newMessages.Count > 0)
+                    ChatHistoryCache.SaveHistory(GetCacheRoot(), chatId, newMessages);
+
+                _activeChatCache = newMessages;
+
+                newMessages.Sort((a, b) => b.timestamp.CompareTo(a.timestamp));
+
+                int initialCount = FirstScreenMessageCount(newMessages);
+                if (newMessages.Count > initialCount)
+                {
+                    _pendingFirstBatch = newMessages.GetRange(0, initialCount);
+                    _cachedQueue = newMessages.GetRange(initialCount, newMessages.Count - initialCount);
+                }
+                else
+                {
+                    _pendingFirstBatch = newMessages;
+                    _cachedQueue = new List<MessageViewModel>();
+                }
+
+                // If we're already in Populate by the time the fetch returns, fire immediately.
+                if (_phase == ChatOpenPhase.Populate)
+                {
+                    OnBatchMessagesLoaded?.Invoke(_pendingFirstBatch, false, hasMore);
+                    _pendingFirstBatch = null;
+                }
+            }));
+        }
+
+        // Wait until 300 ms has elapsed since the tap. If Prep finished early, this is
+        // intentional lead-in so the slide doesn't start before the user's eye has had
+        // time to register the row tap.
+        while (Time.realtimeSinceStartup - tapTime < PrepDurationSeconds)
+        {
+            yield return null;
+        }
+
+        ChatOpenLog("Prep complete, starting slide");
+        _phase = ChatOpenPhase.Slide;
+
+        if (SwipeToBack.Instance != null)
+        {
+            SwipeToBack.Instance.SlideInToMessages(() =>
+            {
+                ChatOpenLog("Slide-in complete, entering Populate");
+                PopulateBubbles(chatId);
+            });
+        }
+        else
+        {
+            // No SwipeToBack instance (shouldn't happen in production but safe fallback):
+            // skip the animation and go straight to Populate.
+            MessageListPanel.SetActive(true);
+            PopulateBubbles(chatId);
+        }
+    }
+
+    /// <summary>
+    /// Phase C (Populate). Fires OnBatchMessagesLoaded with the staged first batch,
+    /// then drains any sync results that landed during Prep or Slide.
+    /// </summary>
+    private void PopulateBubbles(string chatId)
+    {
+        if (currentChatId != chatId)
+        {
+            // User switched chats during the slide. SelectChat already reset state for
+            // the new chat — bail out cleanly.
+            return;
+        }
+
+        _phase = ChatOpenPhase.Populate;
+
+        if (_pendingFirstBatch != null)
+        {
+            ChatOpenLog($"Fire OnBatchMessagesLoaded ({_pendingFirstBatch.Count} msgs)");
+            OnBatchMessagesLoaded?.Invoke(_pendingFirstBatch, false, true);
+            _pendingFirstBatch = null;
+        }
+
+        if (_pendingLiveSyncMessages != null && _pendingLiveSyncMessages.Count > 0)
+        {
+            ChatOpenLog($"Drain pending sync ({_pendingLiveSyncMessages.Count} new)");
+            OnLiveMessagesReceived?.Invoke(_pendingLiveSyncMessages);
+            _pendingLiveSyncMessages = null;
+        }
+    }
+
     public void LoadNextPage()
     {
         if (string.IsNullOrEmpty(currentChatId)) return;
