@@ -22,7 +22,7 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
     [Range(0.15f, 0.6f)]
     public float slideInDuration = 0.290f;
 
-    [Tooltip("Slide-OUT duration in seconds (chat panel → chat list). Ease-in-out cubic (accelerate then decelerate, WhatsApp-like).")]
+    [Tooltip("Slide-OUT duration in seconds (chat panel → chat list). Ease-out cubic (peak velocity at t=0 so the animation picks up the finger's release momentum).")]
     [Range(0.15f, 0.6f)]
     public float slideOutDuration = 0.320f;
 
@@ -61,28 +61,17 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
     public static event System.Action OnSlideOutComplete;
 
     /// <summary>
-    /// Ease-out cubic: starts at full speed, decelerates into the target. Used by
-    /// slide-in (the panel settles into its on-screen rest position) and by the
-    /// drag-cancel snap-back-to-zero (same "settle to rest" motion).
+    /// Ease-out cubic: starts at full speed, decelerates into the target. Used by all
+    /// slide directions — slide-in (settles into the on-screen rest position),
+    /// drag-cancel snap-back-to-zero (same "settle to rest" motion), and drag-commit
+    /// slide-out (peak velocity at t=0 picks up the finger's release momentum so
+    /// there's no perceived pause before the animation takes over).
     /// </summary>
     private static float EaseOutCubic(float t)
     {
         t = Mathf.Clamp01(t);
         float inv = 1f - t;
         return 1f - inv * inv * inv;
-    }
-
-    /// <summary>
-    /// Ease-in-out cubic: accelerates from rest in the first half, decelerates into
-    /// the target in the second half. Used by slide-out — feels weightier and more
-    /// natural than ease-out alone, matching WhatsApp/iOS swipe-back behavior.
-    /// </summary>
-    private static float EaseInOutCubic(float t)
-    {
-        t = Mathf.Clamp01(t);
-        if (t < 0.5f) return 4f * t * t * t;
-        float inv = -2f * t + 2f;
-        return 1f - inv * inv * inv / 2f;
     }
 
     void Awake()
@@ -150,10 +139,9 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
         // can see anything.
         chatPanelToSlide.anchoredPosition = new Vector2(screenWidth, chatPanelToSlide.anchoredPosition.y);
 
-        // Now restore visibility. SnapToPosition (below) does a second
-        // re-assert of the off-screen position before its while loop, so by
-        // the time alpha=1 takes effect and SnapToPosition runs its first
-        // frame, the panel is guaranteed to be off-screen.
+        // Now restore visibility. The pre-snap above guarantees the panel is at
+        // screenWidth before alpha=1 takes effect, so SnapToPosition's first frame
+        // animates from off-screen rather than from a stale layout position.
         var cg = chatPanelToSlide.GetComponent<CanvasGroup>();
         if (cg != null)
         {
@@ -320,27 +308,23 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
         float screenWidth = canvas.GetComponent<RectTransform>().rect.width;
         float maxOffset = screenWidth * parallaxStrength;
 
-        // For slide-IN (target = 0), guarantee the panel STARTS off-screen.
-        // SlideInToMessages sets this, but a parent LayoutGroup or OnEnable handler
-        // can override anchoredPosition between activation and the first SnapToPosition
-        // frame. Without this re-assert, the animation below can start from a stale
-        // position and look like a snap instead of a slide.
-        if (Mathf.Approximately(targetX, 0f))
-        {
-            chatPanelToSlide.anchoredPosition = new Vector2(screenWidth, chatPanelToSlide.anchoredPosition.y);
-        }
+        // Note: SlideInToMessages handles its own pre-snap to screenWidth before calling
+        // SnapToPosition, so no internal re-snap is needed for slide-in. Drag flows
+        // (OnEndDrag) intentionally preserve the panel's current position so the animation
+        // continues from wherever the finger released — a generic pre-snap here would
+        // make drag-cancel jump to the screen edge and slide back instead of smoothly
+        // returning from the finger's position.
 
         // Fixed-duration animation. Frame-rate independent: the same physical duration
-        // regardless of whether the device runs at 60 fps or 30 fps. triggerBack=true
-        // is the slide-OUT (panel exiting to screenWidth) — use ease-in-out cubic for
-        // a weightier WhatsApp-like feel. Everything else (slide-IN from OpenChatRoutine,
-        // drag-cancel snap-back-to-zero from OnEndDrag) settles into rest — use
-        // ease-out cubic so the panel decelerates into its final position.
+        // regardless of whether the device runs at 60 fps or 30 fps.
         float startX = chatPanelToSlide.anchoredPosition.x;
         float startTime = Time.realtimeSinceStartup;
         float duration = triggerBack ? slideOutDuration : slideInDuration;
-        bool useEaseInOut = triggerBack;
 
+        // Both directions use ease-out cubic. Ease-out has peak velocity at t=0, so a
+        // drag-completed slide-out continues smoothly from the finger's release momentum
+        // rather than starting from rest (which felt like a "pause" before the animation
+        // took over). Slide-in and drag-cancel decelerate into rest as before.
         ChatManager.ChatOpenLog($"Slide-{(triggerBack ? "OUT" : "IN")} start (duration={duration*1000f:F0}ms, from x={startX:F0} to x={targetX:F0})");
 
         float elapsed = 0f;
@@ -348,7 +332,7 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
         {
             elapsed = Time.realtimeSinceStartup - startTime;
             float t = Mathf.Clamp01(elapsed / duration);
-            float eased = useEaseInOut ? EaseInOutCubic(t) : EaseOutCubic(t);
+            float eased = EaseOutCubic(t);
             float newX = Mathf.Lerp(startX, targetX, eased);
 
             chatPanelToSlide.anchoredPosition = new Vector2(newX, chatPanelToSlide.anchoredPosition.y);
