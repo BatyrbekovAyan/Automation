@@ -389,14 +389,11 @@ IEnumerator SlideUpRevealRoutine(float startNorm)
 
 IEnumerator UpdateListRoutine(List<MessageViewModel> sortedMessages, bool isLoadMore)
     {
-        if (!isLoadMore) ChatManager.ChatOpenLog($"UpdateListRoutine start ({sortedMessages.Count} msgs)");
-
         if (scrollRect && !isLoadMore) scrollRect.velocity = Vector2.zero;
 
         // 2-frame yield removed: the slide-in callback already finished before
         // this coroutine ran, so there's nothing left to wait for. Profiling
         // showed this gate cost ~40ms on every chat-open with no benefit.
-        if (!isLoadMore) ChatManager.ChatOpenLog("Spawn loop start (no yield gate)");
 
         Transform anchorItem = null;
         float oldAnchorY = 0;
@@ -559,8 +556,6 @@ IEnumerator UpdateListRoutine(List<MessageViewModel> sortedMessages, bool isLoad
             // below, so progressive reveal doesn't fight a user's drag.
             if (!isLoadMore && countSinceYield % 15 == 0)
             {
-                ChatManager.ChatOpenLog($"Batch settle start (item #{countSinceYield})");
-
                 // No explicit ForceRebuildLayoutImmediate here. The per-item
                 // yield above ran Unity's natural layout pass between every
                 // spawn — by the time we reach the 15th item, each bubble's
@@ -575,7 +570,6 @@ IEnumerator UpdateListRoutine(List<MessageViewModel> sortedMessages, bool isLoad
 
                 foreach (var msg in batchItems) if (msg != null) msg.FinalizeCustomVisuals();
                 foreach (var cg in batchCanvasGroups) if (cg != null) cg.alpha = 1f;
-                ChatManager.ChatOpenLog($"Batch reveal done (item #{countSinceYield})");
 
                 batchItems.Clear();
                 batchCanvasGroups.Clear();
@@ -598,7 +592,6 @@ IEnumerator UpdateListRoutine(List<MessageViewModel> sortedMessages, bool isLoad
         // batch, or the entire list when isLoadMore is true (load-more skips
         // the inner-loop batched reveal). Same two-yield settle pattern as
         // the inner batches to keep TMP sprites stable on reveal.
-        if (!isLoadMore) ChatManager.ChatOpenLog($"Final settle start ({batchItems.Count} trailing)");
         Canvas.ForceUpdateCanvases();
         LayoutRebuilder.ForceRebuildLayoutImmediate(content.GetComponent<RectTransform>());
 
@@ -624,7 +617,6 @@ IEnumerator UpdateListRoutine(List<MessageViewModel> sortedMessages, bool isLoad
 
         foreach (var msg in batchItems) if (msg != null) msg.FinalizeCustomVisuals();
         foreach (var cg in batchCanvasGroups) if (cg != null) cg.alpha = 1f;
-        if (!isLoadMore) ChatManager.ChatOpenLog("Final reveal done (all visible)");
 
         batchItems.Clear();
         batchCanvasGroups.Clear();
@@ -652,7 +644,6 @@ IEnumerator UpdateListRoutine(List<MessageViewModel> sortedMessages, bool isLoad
             {
                 var drained = pendingLiveMessages.OrderBy(x => x.timestamp).ToList();
                 pendingLiveMessages.Clear();
-                ChatManager.ChatOpenLog($"Drain pending live ({drained.Count} new)");
                 StartCoroutine(AppendLiveMessagesRoutine(drained));
             }
         }

@@ -87,18 +87,6 @@ public partial class ChatManager : MonoBehaviour
         return Math.Max(1, count);
     }
 
-    /// <summary>
-    /// Diagnostic stopwatch for chat-open profiling. Reset by SelectChat at the
-    /// moment the user taps a chat; ChatOpenLog prints "+N ms tag" against
-    /// this. Remove once chat-open perf work is complete.
-    /// </summary>
-    private static float _chatOpenStartTime;
-    public static void ChatOpenLog(string tag)
-    {
-        float ms = (Time.realtimeSinceStartup - _chatOpenStartTime) * 1000f;
-        Debug.Log($"[ChatOpen] +{ms,5:F0}ms  {tag}");
-    }
-
     [Header("UI Panels")]
     public GameObject ChatListPanel;
     public GameObject MessageListPanel;
@@ -342,8 +330,6 @@ public partial class ChatManager : MonoBehaviour
         if (_phase == ChatOpenPhase.Slide) return;
 
         float tapTime = Time.realtimeSinceStartup;
-        _chatOpenStartTime = tapTime;
-        ChatOpenLog("SelectChat (tap registered)");
 
         // Cancel any in-flight open. If the user re-tapped during Prep we restart from
         // scratch with the new chat. (Slide-phase re-taps are blocked above.)
@@ -409,8 +395,6 @@ public partial class ChatManager : MonoBehaviour
         // _activeChatCache) would corrupt the now-active chat's session. The
         // next open of this chat will run sync again with fresh state.
         if (currentChatId != chatId) yield break;
-
-        ChatOpenLog("Sync network return");
 
         // Park sync processing while the chat-open phase has not yet reached Populate
         // (covers Prep, Slide, plus any future intermediate phases). The
@@ -611,12 +595,10 @@ public partial class ChatManager : MonoBehaviour
                              && !SwipeToBack.IsSliding;
             if (isSettled)
             {
-                ChatOpenLog($"OnLiveMessagesReceived fire ({brandNew.Count} new)");
                 OnLiveMessagesReceived?.Invoke(brandNew);
             }
             else
             {
-                ChatOpenLog($"OnLiveMessagesReceived queued ({brandNew.Count} new, phase={_phase}, sliding={SwipeToBack.IsSliding})");
                 if (_pendingLiveSyncMessages == null) _pendingLiveSyncMessages = new List<MessageViewModel>();
                 _pendingLiveSyncMessages.AddRange(brandNew);
             }
@@ -639,8 +621,6 @@ public partial class ChatManager : MonoBehaviour
     private IEnumerator OpenChatRoutine(string chatId, float tapTime)
     {
         const float PrepDurationSeconds = 0.300f;
-
-        ChatOpenLog("OpenChatRoutine entry (Prep)");
 
         // On device only — releasing orphaned natives can take 30-80 ms but Prep has the
         // budget. Editor skips this; the cost shows up as iteration friction in play mode.
@@ -740,14 +720,12 @@ public partial class ChatManager : MonoBehaviour
             yield return null;
         }
 
-        ChatOpenLog("Prep complete, starting slide");
         _phase = ChatOpenPhase.Slide;
 
         if (SwipeToBack.Instance != null)
         {
             SwipeToBack.Instance.SlideInToMessages(() =>
             {
-                ChatOpenLog("Slide-in complete, entering Populate");
                 PopulateBubbles(chatId);
             });
         }
@@ -777,14 +755,12 @@ public partial class ChatManager : MonoBehaviour
 
         if (_pendingFirstBatch != null)
         {
-            ChatOpenLog($"Fire OnBatchMessagesLoaded ({_pendingFirstBatch.Count} msgs)");
             OnBatchMessagesLoaded?.Invoke(_pendingFirstBatch, false, true);
             _pendingFirstBatch = null;
         }
 
         if (_pendingLiveSyncMessages != null && _pendingLiveSyncMessages.Count > 0)
         {
-            ChatOpenLog($"Drain pending sync ({_pendingLiveSyncMessages.Count} new)");
             OnLiveMessagesReceived?.Invoke(_pendingLiveSyncMessages);
             _pendingLiveSyncMessages = null;
         }

@@ -286,7 +286,6 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
         // drag-completed slide-out continues smoothly from the finger's release momentum
         // rather than starting from rest (which felt like a "pause" before the animation
         // took over). Slide-in and drag-cancel decelerate into rest as before.
-        ChatManager.ChatOpenLog($"Slide-{(triggerBack ? "OUT" : "IN")} start (duration={duration*1000f:F0}ms, from x={startX:F0} to x={targetX:F0})");
 
         float elapsed = 0f;
         while (elapsed < duration)
@@ -323,9 +322,6 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
         {
             bottomTabPanel.anchoredPosition = new Vector2(-maxOffset + (maxOffset * finalProgress), bottomTabPanel.anchoredPosition.y);
         }
-
-        float actualMs = (Time.realtimeSinceStartup - startTime) * 1000f;
-        ChatManager.ChatOpenLog($"Slide-{(triggerBack ? "OUT" : "IN")} done (actual={actualMs:F0}ms)");
 
         if (triggerBack)
         {
