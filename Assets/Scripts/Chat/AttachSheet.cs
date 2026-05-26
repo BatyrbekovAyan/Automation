@@ -92,33 +92,35 @@ public class AttachSheet : MonoBehaviour
 
         float areaCanvas = keyboardPanel.EffectiveAreaCanvasPx;
 
-        // Cache the OS keyboard's canvas-space height while sheet is closed —
-        // we'll use this as the sheet height when the user opens cold (no kb up).
-        if (!_isOpen && TouchScreenKeyboard.visible && areaCanvas > 0f)
+        // Cache OS keyboard's canvas-space height when the OS keyboard is up.
+        // (Caching while sheet is open is also fine — EffectiveAreaCanvasPx reflects
+        // whatever the keyboard area is, which is our inset value during sheet-open.
+        // This means the cache stays usable across sessions.)
+        if (TouchScreenKeyboard.visible && areaCanvas > 0f)
         {
             _lastKeyboardHeightCanvasPx = areaCanvas;
         }
 
-        bool shouldShow = _isOpen && areaCanvas > 0.5f;
-
-        if (shouldShow)
+        // While the sheet is open, continuously match its geometry to the keyboard area.
+        // SetActive is NOT toggled here — Open()/Close() own that.
+        if (_isOpen)
         {
-            // Resize and reposition to match the keyboard area exactly.
-            _rt.sizeDelta = new Vector2(_rt.sizeDelta.x, areaCanvas);
+            _rt.sizeDelta = new Vector2(_rt.sizeDelta.x, Mathf.Max(areaCanvas, 0f));
             _rt.anchoredPosition = new Vector2(0f, 0f);
-            if (!gameObject.activeSelf) gameObject.SetActive(true);
-        }
-        else
-        {
-            if (gameObject.activeSelf) gameObject.SetActive(false);
 
-            // If the sheet was open but the area collapsed (e.g. input lost focus),
-            // reset our state so the icon and flags match reality.
-            if (_isOpen && areaCanvas <= 0.5f)
+            // If the area unexpectedly collapsed (e.g. input field lost focus through
+            // a path that didn't trigger OnInputFieldDeselected), close cleanly.
+            if (areaCanvas <= 0.5f)
             {
+                // Inline cleanup — calling Close() would start a tween from 0 to 0
+                // which is pointless. Just reset state and deactivate.
                 _isOpen = false;
                 if (messagesBottomPanel != null) messagesBottomPanel.ShowPlusIcon();
+                SetOsKeyboardHidden(false);
                 if (inputField != null) inputField.shouldHideSoftKeyboard = false;
+                if (keyboardPanel != null) keyboardPanel.ExtraBottomInsetPx = 0f;
+                _insetTween?.Kill();
+                gameObject.SetActive(false);
             }
         }
     }
@@ -133,6 +135,10 @@ public class AttachSheet : MonoBehaviour
     {
         if (_isOpen) return;
         _isOpen = true;
+
+        // Activate the GameObject FIRST so subsequent StartCoroutine calls work.
+        // Update() can no longer reliably handle this — it doesn't run on inactive GOs.
+        if (!gameObject.activeSelf) gameObject.SetActive(true);
 
         if (messagesBottomPanel != null) messagesBottomPanel.ShowKeyboardIcon();
 
@@ -164,12 +170,21 @@ public class AttachSheet : MonoBehaviour
                 float targetCanvas = _lastKeyboardHeightCanvasPx > 0f
                     ? _lastKeyboardHeightCanvasPx
                     : sheetHeightCanvasPx;
+                float targetScreenPx = CanvasPxToScreenPx(targetCanvas);
+
+                // Seed the inset to a small non-zero value immediately so Update()'s
+                // area > 0.5 check passes on the first frame after Open() — otherwise the
+                // auto-close cleanup fires before the tween ticks. The tween then ramps
+                // from this seed to the full target.
+                float seedScreenPx = Mathf.Max(targetScreenPx * 0.02f, 2f);
+                keyboardPanel.ExtraBottomInsetPx = seedScreenPx;
+
                 _insetTween = DOTween.To(
                     () => keyboardPanel.ExtraBottomInsetPx,
                     v  => keyboardPanel.ExtraBottomInsetPx = v,
-                    CanvasPxToScreenPx(targetCanvas),
+                    targetScreenPx,
                     openDuration)
-                    .From(0f)
+                    .From(seedScreenPx)
                     .SetEase(Ease.OutCubic);
             }
         }
@@ -236,7 +251,8 @@ public class AttachSheet : MonoBehaviour
                 0f,
                 closeDuration)
                 .From(startInset)
-                .SetEase(Ease.OutCubic);
+                .SetEase(Ease.OutCubic)
+                .OnComplete(() => gameObject.SetActive(false));
         }
     }
 
