@@ -110,7 +110,14 @@ public class MessageItemView : MonoBehaviour
 
     // === Caption + link preview ===
     private const float CaptionInset          = 32f;    // captionWidth = mediaWidth - inset
-    private const float LinkPreviewRatio      = 0.65f;  // × bubbleWidth
+    // Card width as a fraction of the bubble interior. Used both as the
+    // image-driven card width and as the no-image text fallback.
+    private const float LinkPreviewRatio      = 0.75f;  // × bubbleWidth
+    // Link preview cards crop tighter than media — WhatsApp never shows
+    // 9:16 posters at source aspect. We clamp to a moderate range and let
+    // the fixed card width drive the height via the clamped aspect.
+    private const float LinkPreviewMinAspect  = 5f / 7f;  // 5:7 — portrait floor
+    private const float LinkPreviewMaxAspect  = 7f / 5f;  // 7:5 — landscape ceiling
 
     /// <summary>
     /// Resolves the bubble content size for any message type.
@@ -580,10 +587,30 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             messageImage.gameObject.SetActive(false);
             audioPanel.SetActive(false);
             playOverlay.SetActive(false);
-            // messageText.gameObject.SetActive(false);
 
             string rawName = string.IsNullOrEmpty(vm.fileName) ? "Document.file" : vm.fileName;
             string decodedName = System.Uri.UnescapeDataString(rawName);
+
+            // Defense-in-depth: if a caption ever slips through that matches the filename
+            // (Wappi has been seen echoing fileName into the caption field on some payloads),
+            // hide the messageText so the filename doesn't appear as a text line under the
+            // document card / download button. ChatManager already drops the exact-match
+            // caption upstream; this guard catches stale-cache replays from ChatHistoryCache
+            // (.json files persisted before the upstream fix) and variants like the ZWS prefix
+            // that UnicodeEmojiConverter prepends to every converted string.
+            if (messageText != null && messageText.gameObject.activeSelf && !string.IsNullOrEmpty(messageText.text))
+            {
+                char[] trimChars = { '​', ' ', '\t', '\n', '\r' };
+                string textPlain = System.Text.RegularExpressions.Regex.Replace(messageText.text, @"<[^>]+>", "").Trim(trimChars);
+                string decodedPlain = decodedName?.Trim(trimChars) ?? string.Empty;
+                string rawPlain = rawName?.Trim(trimChars) ?? string.Empty;
+                if (string.Equals(textPlain, decodedPlain, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(textPlain, rawPlain, StringComparison.OrdinalIgnoreCase))
+                {
+                    messageText.text = string.Empty;
+                    messageText.gameObject.SetActive(false);
+                }
+            }
 
             bool isMissing = string.IsNullOrEmpty(vm.mediaUrl);
             isLinkExpired = vm.expireTime > 0 && vm.expireTime < DateTimeOffset.UtcNow.ToUnixTimeSeconds();
@@ -592,14 +619,14 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             if (needsDownload)
             {
                 if (documentPanel) documentPanel.SetActive(false);
-                
+
                 if (downloadButton != null)
                 {
                     Image btnImg = downloadButton.GetComponent<Image>();
                     if (btnImg != null && downloadArrowIcon != null) btnImg.sprite = downloadArrowIcon;
                 }
 
-                downloadButton.gameObject.SetActive(false); 
+                downloadButton.gameObject.SetActive(false);
                 SetDownloadButtonText(vm.type);
                 SetLayoutToButton();
 
@@ -633,30 +660,53 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             AdjustTextBubbleSize();
         }
         
-// --- THE HIERARCHY FIX: Force Caption BELOW Media ---
+        ReorderBubbleSiblings();
+
+        if (!skipLayoutRebuild)
+        {
+            StartCoroutine(ForceRebuildRoutine());
+        }
+    }
+
+    // Forces a stable sibling order inside the bubble: senderName → media → caption.
+    // Called by Bind() during initial setup and by HandleFinalFailure() when the
+    // expired placeholder takes over mid-life. Download/Expired placeholders take
+    // precedence over the underlying media object because they visually replace it
+    // — without this, an Expired stamp activated after Bind would stay at its
+    // prefab sibling index, ending up below the caption.
+    private void ReorderBubbleSiblings()
+    {
         int currentIndex = 0;
 
         if (senderNameText != null && senderNameText.gameObject.activeSelf)
             senderNameText.transform.SetSiblingIndex(currentIndex++);
 
-        // 2. The Media File (Grabbing the correct parent container!)
-        // Include the download/expired placeholders so the caption lands below them
-        // when a media message hasn't finished downloading yet.
-        Transform activeMedia = null;
-        if (messageImage != null && messageImage.gameObject.activeSelf)
+        // Re-parent every active media-region object in priority order. Inactive
+        // objects keep their prefab index (they don't render anyway).
+        Transform messageImageTransform = null;
+        if (messageImage != null)
         {
-            // We must move the MediaContainer, not the Image itself!
-            activeMedia = messageImage.transform.parent.name == "MediaContainer" ? messageImage.transform.parent : messageImage.transform;
+            messageImageTransform = messageImage.transform.parent != null && messageImage.transform.parent.name == "MediaContainer"
+                ? messageImage.transform.parent
+                : messageImage.transform;
         }
-        else if (documentPanel != null && documentPanel.gameObject.activeSelf) activeMedia = documentPanel.transform;
-        else if (audioPanel != null && audioPanel.activeSelf) activeMedia = audioPanel.transform;
-        else if (downloadButton != null && downloadButton.gameObject.activeSelf) activeMedia = downloadButton.transform;
-        else if (expiredPlaceholder != null && expiredPlaceholder.activeSelf) activeMedia = expiredPlaceholder.transform;
-        else if (linkPreviewCard != null && linkPreviewCard.activeSelf) activeMedia = linkPreviewCard.transform;
 
-        if (activeMedia != null) activeMedia.SetSiblingIndex(currentIndex++);
+        Transform[] orderedMedia =
+        {
+            downloadButton != null ? downloadButton.transform : null,
+            expiredPlaceholder != null ? expiredPlaceholder.transform : null,
+            messageImageTransform,
+            documentPanel != null ? documentPanel.transform : null,
+            audioPanel != null ? audioPanel.transform : null,
+            linkPreviewCard != null ? linkPreviewCard.transform : null,
+        };
 
-        // 3. Text or Caption ALWAYS at the very bottom
+        foreach (Transform t in orderedMedia)
+        {
+            if (t != null && t.gameObject.activeSelf)
+                t.SetSiblingIndex(currentIndex++);
+        }
+
         if (messageText != null && messageText.gameObject.activeSelf)
         {
             messageText.transform.SetSiblingIndex(currentIndex++);
@@ -666,11 +716,6 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             float marginX = bubbleLayout != null ? Mathf.Max(24f - bubbleLayout.padding.left, 0f) : 8f;
             messageText.margin = new Vector4(marginX, 0, marginX, 0);
         }
-        
-        if (!skipLayoutRebuild)
-        {
-            StartCoroutine(ForceRebuildRoutine());
-        }    
     }
 
     void ApplyDynamicLayout(MessageType type)
@@ -709,7 +754,7 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
 
                 if (timeText != null)
                 {
-                    PositionFloatingTime(20f, 16f);
+                    PositionFloatingTime(20f, 10f);
                 }
             }
             else
@@ -717,12 +762,16 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                 // --- THE SPACING FIX: 12px if there is a caption, 8px if there isn't! ---
                 layout.spacing = hasCaption ? 12 : 8;
 
-                layout.padding = new RectOffset(6, 6, 6, 12);
+                // No-caption bottom padding is intentionally tall (64) so the floating time
+                // sits in the padding zone BELOW the document card instead of overlapping
+                // inside it. With a caption, the caption text itself follows the card and
+                // the time rides its last line, so 12 is enough breathing room.
+                layout.padding = new RectOffset(6, 6, 6, hasCaption ? 12 : 64);
 
-                // Without a caption, match the 16px bottom inset used by image/video so
-                // the time sits at the same offset from the bubble border. With a caption
-                // the time rides the caption's last line, so the 10px inset is fine.
-                if (timeText != null) PositionFloatingTime(20f, hasCaption ? 10f : 16f);
+                // Document bubbles use a 10px inset regardless of caption state — both
+                // cases (caption riding last line, time floating below the card) read
+                // better tucked closer to the bubble edge than the 16px used by media.
+                if (timeText != null) PositionFloatingTime(20f, 10f);
             }
         }
         else if (type == MessageType.Chat)
@@ -753,9 +802,22 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
 
                 layout.spacing = hasCaption ? 12 : 8;
 
-                layout.padding = new RectOffset(6, 6, hasSenderName ? 14 : 6, hasCaption ? 12 : 0);
+                // Bottom padding for a link-card bubble:
+                //   • any visible text below the card (caption OR URL fallback) → 18
+                //     (set as a fallback here AND enforced by the unified caption
+                //     rule at the end of the method, so both paths agree)
+                //   • nothing below (URL absorbed into card, no caption, or only a
+                //     leftover ZWSP/spacer) → 54, so the floating time pill gets
+                //     its own breathing zone, matching the document/sticker convention.
+                bool textVisible = MessageTextHasVisibleContent();
+                layout.padding = new RectOffset(6, 6, hasSenderName ? 14 : 6, textVisible ? 18 : 54);
 
-                if (hasCaption)
+                // Apply the 18px horizontal margin whenever any text is showing
+                // below the card — covers both real captions and URL-fallback text.
+                // (The per-bubble ReorderBubbleSiblings margin pass runs only from
+                // Bind/HandleFinalFailure, not from the async scrape path, so we
+                // have to set it here too for URL-fallback to land correctly.)
+                if (textVisible)
                 {
                     messageText.margin = new Vector4(18, 0, 18, 0);
                 }
@@ -941,9 +1003,33 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             else
             {
                 // WITH CAPTION (or normal text): Time is gray and sits neatly underneath!
-                timeText.color = new Color(0.4f, 0.4f, 0.4f, 1f); 
+                timeText.color = new Color(0.4f, 0.4f, 0.4f, 1f);
                 if (timeBackground != null) timeBackground.SetActive(false);
             }
+        }
+
+        // Unified caption rule: any media bubble with an active caption gets 18px
+        // bottom padding so the caption text breathes from the bubble edge. Each
+        // per-type branch above sets its own bottom padding for the no-caption case
+        // (6 for tight image fit, 54 for sticker, 64 for floating-time document
+        // card, etc.); this override only kicks in when a caption is actually
+        // present. Excludes plain-text Chat bubbles (no media → messageText is the
+        // bubble body, not a caption) and jumbo-emoji bubbles (same reason).
+        bool hasMediaRegion = (downloadButton != null && downloadButton.gameObject.activeSelf)
+            || (expiredPlaceholder != null && expiredPlaceholder.activeSelf)
+            || (messageImage != null && messageImage.gameObject.activeSelf)
+            || (documentPanel != null && documentPanel.gameObject.activeSelf)
+            || (audioPanel != null && audioPanel.activeSelf)
+            || (linkPreviewCard != null && linkPreviewCard.activeSelf);
+        // Use MessageTextHasVisibleContent (not just activeSelf + IsNullOrEmpty)
+        // so a Text object holding only a ZWSP/spacer combo doesn't masquerade
+        // as a real caption. Caption AND URL-fallback both qualify here — both
+        // render glyphs the bubble needs breathing room around.
+        bool captionActive = hasMediaRegion && MessageTextHasVisibleContent();
+        if (captionActive)
+        {
+            var p = layout.padding;
+            layout.padding = new RectOffset(p.left, p.right, p.top, 18);
         }
     }
 
@@ -1144,21 +1230,19 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             if (previewLe == null) previewLe = linkPreviewCard.gameObject.AddComponent<LayoutElement>();
 
             float bubbleCeiling = MaxBubbleWidth - paddingX;
-            float targetWidth = bubbleCeiling * LinkPreviewRatio; // Safe default — 65% of the bubble
+            float targetWidth = bubbleCeiling * LinkPreviewRatio; // Safe default — 75% of the bubble
 
             // --- IMAGE-DRIVEN WIDTH ---
             // We ignore the text length completely. The Image Aspect Ratio controls the card size!
             if (linkPreviewImage != null && linkPreviewImage.gameObject.activeSelf && linkPreviewImage.sprite != null)
             {
-                float aspect = (float)linkPreviewImage.sprite.texture.width / linkPreviewImage.sprite.texture.height;
-
-                // Base the width on a "Square" image taking ~75% of the bubble. Landscape
-                // images scale up and clamp at the bubble ceiling; portraits scale down to
-                // the floor so they don't get spindly.
-                float calculatedWidth = (bubbleCeiling * 0.75f) * aspect;
-
-                float minCardWidth = bubbleCeiling * 0.55f; // Don't let portrait cards get too skinny
-                targetWidth = Mathf.Clamp(calculatedWidth, minCardWidth, bubbleCeiling);
+                // WhatsApp behavior: card has a fixed fraction of bubble width;
+                // the (already-cropped) sprite aspect drives the image height.
+                // The crop in ProcessLinkPreviewSilently keeps aspect within
+                // [LinkPreviewMinAspect, LinkPreviewMaxAspect] so the resulting
+                // card never becomes spindly or excessively tall.
+                float aspect = linkPreviewImage.sprite.rect.width / linkPreviewImage.sprite.rect.height;
+                targetWidth = bubbleCeiling * LinkPreviewRatio;
 
                 var imgLe = linkPreviewImage.GetComponent<LayoutElement>();
                 if (imgLe == null) imgLe = linkPreviewImage.gameObject.AddComponent<LayoutElement>();
@@ -1168,17 +1252,10 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             }
             else
             {
-                // If there is NO image, then we fall back to measuring the text (but we clamp it strictly!)
-                float titleWidth = 0f;
-                if (linkPreviewTitle != null && linkPreviewTitle.gameObject.activeSelf)
-                    titleWidth = linkPreviewTitle.GetPreferredValues(linkPreviewTitle.text, Mathf.Infinity, Mathf.Infinity).x + 32f;
-
-                float domainWidth = 0f;
-                if (linkPreviewDomain != null && linkPreviewDomain.gameObject.activeSelf)
-                    domainWidth = linkPreviewDomain.GetPreferredValues(linkPreviewDomain.text, Mathf.Infinity, Mathf.Infinity).x + 32f;
-
-                float maxTextWidth = Mathf.Max(titleWidth, domainWidth);
-                targetWidth = Mathf.Clamp(maxTextWidth, bubbleCeiling * 0.55f, bubbleCeiling);
+                // No image: use the same card width as the image case so the bubble
+                // stays wide enough for the URL text below to lay out cleanly instead
+                // of wrapping into a tall, narrow stack of fragments.
+                targetWidth = bubbleCeiling * LinkPreviewRatio;
             }
 
             previewLe.preferredWidth = targetWidth;
@@ -1920,22 +1997,13 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
     
     IEnumerator ForceRebuildRoutine()
     {
-        yield return null;
-
-        // Self rebuild stays immediate — MirrorSize and RefreshCorners below
-        // read this bubble's rect on the same frame.
+        // SYNC PHASE — must run before the next render so corners don't flash wrong on first
+        // load. The ImageWithRoundedCorners shader reads rect dimensions inside Refresh(); if
+        // we yield first, the rect for a fresh bubble may still be 0×0 (before VLG/CSF
+        // resolved), and the shader bakes 0-width-with-radius — a circular splat that gets
+        // stretched to a giant rounded blob once the rect later settles. Doing the self-rebuild
+        // and corner refresh up front guarantees the rect is finalized before the first frame.
         LayoutRebuilder.ForceRebuildLayoutImmediate(rectTransform);
-
-        // Parent (content) and grandparent (viewport) are marked dirty instead
-        // of force-rebuilt. ForceRebuildLayoutImmediate on these was the main
-        // amplifier of chat-open freeze: every async media decode triggered
-        // two full content-tree rebuilds (50+ bubbles). MarkLayoutForRebuild
-        // coalesces concurrent dirties into a single deferred pass.
-        if (transform.parent is RectTransform parentRt)
-            LayoutRebuilder.MarkLayoutForRebuild(parentRt);
-
-        if (transform.parent != null && transform.parent.parent is RectTransform grandparentRt)
-            LayoutRebuilder.MarkLayoutForRebuild(grandparentRt);
 
         if (bubbleBackground != null)
         {
@@ -1943,6 +2011,24 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
             if (mirror != null) mirror.UpdateSize();
         }
 
+        RefreshCorners(messageImage != null ? messageImage.gameObject : null);
+        RefreshCorners(bubbleBackground != null ? bubbleBackground.gameObject : null);
+        RefreshCorners(outline);
+
+        yield return null;
+
+        // DEFERRED PHASE — parent (content) and grandparent (viewport) marks happen one frame
+        // late on purpose. ForceRebuildLayoutImmediate on these was the main amplifier of the
+        // prior chat-open freeze (50+ bubbles × 2 tree rebuilds per async media decode);
+        // MarkLayoutForRebuild coalesces concurrent dirties into a single deferred pass.
+        if (transform.parent is RectTransform parentRt)
+            LayoutRebuilder.MarkLayoutForRebuild(parentRt);
+
+        if (transform.parent != null && transform.parent.parent is RectTransform grandparentRt)
+            LayoutRebuilder.MarkLayoutForRebuild(grandparentRt);
+
+        // Re-refresh after the parent rebuild settles — parents can shift our rect on
+        // mass insert (e.g. initial chat open spawning many bubbles in one frame).
         RefreshCorners(messageImage != null ? messageImage.gameObject : null);
         RefreshCorners(bubbleBackground != null ? bubbleBackground.gameObject : null);
         RefreshCorners(outline);
@@ -2024,10 +2110,13 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
 
         UpdateBubbleVisuals();
         if (currentVm != null) ApplyDynamicLayout(currentVm.type);
-        
+        // The Expired card just took the media's place; re-stamp the sibling order
+        // so the caption sits below it instead of clinging to its old prefab index.
+        ReorderBubbleSiblings();
+
         StartCoroutine(ForceRebuildRoutine());
     }
-    
+
     IEnumerator WaitAndRetry(MessageViewModel vm, int nextAttempt)
     {
         yield return new WaitForSeconds(2.0f);
@@ -2814,8 +2903,30 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
         // 2. Apply your Display Rules based on the Image!
         if (downloadedTex != null)
         {
+            // Center-crop the texture into the link-preview aspect range so
+            // tall posters (9:16 Instagram reels, etc.) render at ~3:4 — not
+            // their source 9:16, which produces slim, oddly proportioned cards.
+            float texAspect = (float)downloadedTex.width / downloadedTex.height;
+            Rect spriteRect;
+            if (texAspect > LinkPreviewMaxAspect)
+            {
+                int croppedWidth = Mathf.RoundToInt(downloadedTex.height * LinkPreviewMaxAspect);
+                int xOffset = (downloadedTex.width - croppedWidth) / 2;
+                spriteRect = new Rect(xOffset, 0, croppedWidth, downloadedTex.height);
+            }
+            else if (texAspect < LinkPreviewMinAspect)
+            {
+                int croppedHeight = Mathf.RoundToInt(downloadedTex.width / LinkPreviewMinAspect);
+                int yOffset = (downloadedTex.height - croppedHeight) / 2;
+                spriteRect = new Rect(0, yOffset, downloadedTex.width, croppedHeight);
+            }
+            else
+            {
+                spriteRect = new Rect(0, 0, downloadedTex.width, downloadedTex.height);
+            }
+
             // IMAGE FOUND: Show the image, hide the text link!
-            linkPreviewImage.sprite = TrackOwned(Sprite.Create(downloadedTex, new Rect(0, 0, downloadedTex.width, downloadedTex.height), new Vector2(0.5f, 0.5f)));
+            linkPreviewImage.sprite = TrackOwned(Sprite.Create(downloadedTex, spriteRect, new Vector2(0.5f, 0.5f)));
             linkPreviewImage.color = Color.white;
             linkPreviewImage.gameObject.SetActive(true);
 
@@ -2928,7 +3039,8 @@ private Color GetSenderColor(string name)
                 .Replace("_", "_\u200B");
                                       
             // The raw URL stays in the <link> tag for clicking, but the displayUrl wraps beautifully!
-            return $"<link=\"{rawUrl}\"><color=#2b88d9><u>{displayUrl}</u></color></link>";
+            // Color: WhatsApp's classic dark teal — reads as "green" against the light bubble bg.
+            return $"<link=\"{rawUrl}\"><color=#075E54><u>{displayUrl}</u></color></link>";
         });
     }
     
@@ -3171,16 +3283,53 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
         return w + 8f;
     }
 
-    // Removes a single trailing TMP <space=...> tag if present. Used to
+    // Returns true if the string has no rendered glyphs — whitespace and
+    // zero-width joiners count as empty. ZWSP/ZWJ/ZWNJ/BOM are NOT classified
+    // as whitespace by char.IsWhiteSpace, so we have to enumerate them
+    // explicitly. Used by ApplyInlineTimeReservation and the unified caption
+    // rule so URL-stripped captions consisting only of a leftover ZWSP (which
+    // UnicodeEmojiConverter prepends to every output) don't masquerade as a
+    // real caption and keep messageText alive with a spacer-only payload.
+    private static bool IsEffectivelyEmpty(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return true;
+        foreach (char c in text)
+        {
+            if (char.IsWhiteSpace(c)) continue;
+            if (c == '​' || c == '‌' || c == '‍' || c == '﻿') continue;
+            return false;
+        }
+        return true;
+    }
+
+    // True when messageText carries a glyph that will actually render — used by
+    // padding decisions so a Text object that holds only a ZWSP / spacer combo
+    // is treated the same as an inactive one.
+    private bool MessageTextHasVisibleContent()
+    {
+        if (messageText == null) return false;
+        if (!messageText.gameObject.activeSelf) return false;
+        return !IsEffectivelyEmpty(StripTrailingReservation(messageText.text ?? ""));
+    }
+
+    // Matches ONLY the exact time-reservation suffix appended by
+    // ApplyInlineTimeReservation. Anchored to end-of-string so the
+    // <space=0.12em> tag that UnicodeEmojiConverter inserts before sprite
+    // tags (when an emoji follows non-whitespace text) is never mistaken
+    // for a stale reservation and stripped along with the sprite.
+    private static readonly System.Text.RegularExpressions.Regex TimeReservationSuffix =
+        new System.Text.RegularExpressions.Regex(@"<space=[^>]+><alpha=#00>\.$",
+            System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    // Removes the trailing time-reservation TMP tag if present. Used to
     // scrub the previous reservation before appending a fresh one, so the
     // text doesn't accumulate stacked space tags across re-binds and
     // status-change re-renders.
     private static string StripTrailingReservation(string input)
     {
         if (string.IsNullOrEmpty(input)) return input;
-        int openIdx = input.LastIndexOf("<space=", System.StringComparison.Ordinal);
-        if (openIdx < 0) return input;
-        return input.Substring(0, openIdx);
+        var match = TimeReservationSuffix.Match(input);
+        return match.Success ? input.Substring(0, match.Index) : input;
     }
 
     // Appends a TMP <space={width}px> tag to the end of target.text so the
@@ -3192,13 +3341,37 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
     {
         if (target == null) return;
         if (!target.gameObject.activeSelf) return;
-        if (string.IsNullOrEmpty(target.text)) return;
         if (isJumboEmoji) return;
+
+        string baseText = StripTrailingReservation(target.text ?? "");
+
+        // If stripping the previous reservation leaves nothing real behind —
+        // empty, whitespace, or only zero-width chars (the ZWSP that
+        // UnicodeEmojiConverter prepends to every output is the common culprit)
+        // — the Text object is just carrying a leftover spacer. Hide it outright
+        // and hand the floating time pill its own 54px of breathing room below
+        // the media, matching the no-caption document/sticker convention.
+        if (IsEffectivelyEmpty(baseText))
+        {
+            target.text = string.Empty;
+            target.gameObject.SetActive(false);
+
+            if (target.TryGetComponent<LayoutElement>(out var textLe))
+            {
+                textLe.preferredWidth = 0;
+            }
+
+            if (bubbleBackground != null && bubbleBackground.TryGetComponent<VerticalLayoutGroup>(out var bubbleLayout))
+            {
+                var p = bubbleLayout.padding;
+                bubbleLayout.padding = new RectOffset(p.left, p.right, p.top, 54);
+            }
+            return;
+        }
 
         float w = MeasureTimeWidth();
         if (w <= 0f) return;
 
-        string baseText = StripTrailingReservation(target.text);
         target.text = $"{baseText}<space={w:0.##}px><alpha=#00>.";
     }
 

@@ -1137,8 +1137,8 @@ if (msg.messageType == MessageType.Video)
             {
                 // THE FIX: Save to fileName! Leave msg.text alone so the caption survives!
                 string fName = bodyObj["fileName"]?.ToString() ?? bodyObj["title"]?.ToString();
-                msg.fileName = fName; 
-                
+                msg.fileName = fName;
+
                 msg.mimeType = bodyObj["mimetype"]?.ToString();
 
                 // --- ADDED: Extract the file length and page count right here! ---
@@ -1146,10 +1146,25 @@ if (msg.messageType == MessageType.Video)
                 {
                     long.TryParse(bodyObj["fileLength"].ToString(), out msg.fileSize);
                 }
-                 
+
                 if (bodyObj["pageCount"] != null)
                 {
                     int.TryParse(bodyObj["pageCount"].ToString(), out msg.pageCount);
+                }
+
+                // Wappi sometimes echoes fileName into the caption field. Treat caption == fileName
+                // as "no caption" so it doesn't render as a chat-text line under the document card.
+                // ConvertRealEmojisToSprites prepends ​ (zero-width space) — plain Trim()
+                // doesn't strip it, so compare with ZWS-aware trim chars.
+                if (!string.IsNullOrEmpty(msg.text) && !string.IsNullOrEmpty(fName))
+                {
+                    char[] trimChars = { '​', ' ', '\t', '\n', '\r' };
+                    string normalizedText = msg.text.Trim(trimChars);
+                    string normalizedName = fName.Trim(trimChars);
+                    if (string.Equals(normalizedText, normalizedName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        msg.text = null;
+                    }
                 }
             }
 

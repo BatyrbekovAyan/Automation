@@ -19,7 +19,15 @@ public class LinkScraper : MonoBehaviour
         public string title;
         public string desc;
         public string image;
+        public long scrapedAtUnix; // Unix seconds — used to re-try no-image entries after TTL
     }
+
+    // Re-scrape no-image entries after this many seconds. Sites (especially
+    // Instagram) sometimes block the first request then succeed later. Successful
+    // scrapes never expire. Legacy entries written before this field existed have
+    // scrapedAtUnix == 0, so they'll be considered stale and refresh automatically.
+    private const long NoImageRetryAfterSeconds = 24 * 60 * 60; // 1 day
+    private const int RequestTimeoutSeconds = 30;
 
     // Unity's JsonUtility cannot save Dictionaries directly, so we wrap it in a List
     [Serializable]
@@ -79,8 +87,9 @@ public class LinkScraper : MonoBehaviour
     // ==========================================
     public void FetchPreview(string url, Action<string, string, string> onComplete)
     {
-        // Check RAM first (Instant load)
-        if (memoryCache.TryGetValue(url, out var cachedData))
+        // Check RAM first (Instant load) — but bypass cached failures past their TTL
+        // so previously-blocked URLs (Instagram reels, etc.) get another chance.
+        if (memoryCache.TryGetValue(url, out var cachedData) && !IsStaleFailure(cachedData))
         {
             onComplete?.Invoke(cachedData.title, cachedData.desc, cachedData.image);
             return;
@@ -96,14 +105,22 @@ public class LinkScraper : MonoBehaviour
         }
     }
 
+    private bool IsStaleFailure(PreviewData data)
+    {
+        if (!string.IsNullOrEmpty(data.image)) return false; // Successful scrape — never stale
+        long nowUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        return (nowUnix - data.scrapedAtUnix) > NoImageRetryAfterSeconds;
+    }
+
     // ==========================================
     // TIKTOK O-EMBED ROUTINE
     // ==========================================
     private IEnumerator ScrapeTikTokRoutine(string url, Action<string, string, string> onComplete)
     {
         string oembedUrl = $"https://www.tiktok.com/oembed?url={url}";
-        
+
         using UnityWebRequest www = UnityWebRequest.Get(oembedUrl);
+        www.timeout = RequestTimeoutSeconds;
         yield return www.SendWebRequest();
 
         if (www.result != UnityWebRequest.Result.Success)
@@ -116,8 +133,14 @@ public class LinkScraper : MonoBehaviour
         string title = ExtractJsonValue(json, "title");
         string image = ExtractJsonValue(json, "thumbnail_url");
 
-        // --- NEW: Save to RAM and Hard Drive ---
-        PreviewData newData = new PreviewData { url = url, title = title, desc = "TikTok - Make Your Day", image = image };
+        PreviewData newData = new PreviewData
+        {
+            url = url,
+            title = title,
+            desc = "TikTok - Make Your Day",
+            image = image,
+            scrapedAtUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+        };
         memoryCache[url] = newData;
         SaveCacheToDisk();
 
@@ -139,11 +162,13 @@ public class LinkScraper : MonoBehaviour
         using UnityWebRequest www = UnityWebRequest.Get(cleanUrl);
         www.SetRequestHeader("User-Agent", "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)");
         www.SetRequestHeader("Accept-Language", "en-US,en;q=0.9");
-        
+        www.timeout = RequestTimeoutSeconds;
+
         yield return www.SendWebRequest();
 
         if (www.result != UnityWebRequest.Result.Success)
         {
+            Debug.LogWarning($"[LinkScraper] [{www.responseCode}] {cleanUrl}: {www.error}");
             onComplete?.Invoke(null, null, null);
             yield break;
         }
@@ -152,12 +177,12 @@ public class LinkScraper : MonoBehaviour
 
         string title = ExtractMetaContent(html, "og:title") ?? ExtractMetaContent(html, "twitter:title");
         string desc = ExtractMetaContent(html, "og:description") ?? ExtractMetaContent(html, "twitter:description");
-        string image = ExtractMetaContent(html, "og:image") ?? ExtractMetaContent(html, "twitter:image");
+        string image = ExtractImageWithFallbacks(html);
 
         if (!string.IsNullOrEmpty(image))
         {
             image = System.Net.WebUtility.HtmlDecode(image);
-            image = image.Replace("\\u0026", "&"); 
+            image = image.Replace("\\u0026", "&");
         }
 
         if (!string.IsNullOrEmpty(image) && !image.StartsWith("http"))
@@ -175,12 +200,32 @@ public class LinkScraper : MonoBehaviour
         if (!string.IsNullOrEmpty(desc)) desc = System.Net.WebUtility.HtmlDecode(desc);
         if (string.IsNullOrWhiteSpace(title)) title = null;
 
-        // --- NEW: Save to RAM and Hard Drive ---
-        PreviewData newData = new PreviewData { url = url, title = title, desc = desc, image = image };
+        PreviewData newData = new PreviewData
+        {
+            url = url,
+            title = title,
+            desc = desc,
+            image = image,
+            scrapedAtUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+        };
         memoryCache[url] = newData;
         SaveCacheToDisk();
 
         onComplete?.Invoke(title, desc, image);
+    }
+
+    // Tries each known image-meta location in order of reliability. Instagram reels
+    // frequently omit og:image but expose og:video:thumbnail_url; older blogs use
+    // the legacy <link rel="image_src"> tag; some sites use twitter:image:src.
+    private string ExtractImageWithFallbacks(string html)
+    {
+        return ExtractMetaContent(html, "og:image")
+            ?? ExtractMetaContent(html, "og:image:secure_url")
+            ?? ExtractMetaContent(html, "og:image:url")
+            ?? ExtractMetaContent(html, "og:video:thumbnail_url")
+            ?? ExtractMetaContent(html, "twitter:image")
+            ?? ExtractMetaContent(html, "twitter:image:src")
+            ?? ExtractLinkRelHref(html, "image_src");
     }
 
     // ==========================================
@@ -202,5 +247,17 @@ public class LinkScraper : MonoBehaviour
         Match match = Regex.Match(json, $@"""{key}""\s*:\s*""([^""]+)""");
         if (match.Success) return Regex.Unescape(match.Groups[1].Value);
         return null;
+    }
+
+    // Matches <link rel="rel" href="..."> in either attribute order.
+    private string ExtractLinkRelHref(string html, string rel)
+    {
+        string pattern = $@"<link[^>]+rel=[""']{rel}[""'][^>]+href=[""']([^""']+)[""']";
+        Match match = Regex.Match(html, pattern, RegexOptions.IgnoreCase);
+        if (match.Success) return match.Groups[1].Value;
+
+        string reversePattern = $@"<link[^>]+href=[""']([^""']+)[""'][^>]+rel=[""']{rel}[""']";
+        Match reverseMatch = Regex.Match(html, reversePattern, RegexOptions.IgnoreCase);
+        return reverseMatch.Success ? reverseMatch.Groups[1].Value : null;
     }
 }

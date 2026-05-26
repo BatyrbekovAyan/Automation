@@ -244,7 +244,12 @@
       "Bash(grep -n \"sizeDelta\\\\|width\\\\|height\\\\|[0-9]\\\\{3,4\\\\}f\" /Users/ayan/Projects/Automation/Assets/Scripts/Chat/AudioController.cs)",
       "Bash(awk '/^--- !u!1 &7010310980219111381/{found=1} found && /^--- !u!/{count++; if\\(count>1\\) exit} found{print NR\": \"$0}' /Users/ayan/Projects/Automation/Assets/Prefabs/MessageTextIncoming.prefab)",
       "Bash(awk '/^--- !u!224 &1282463731089587715/{found=1} found && /^--- !u!/{count++; if\\(count>1\\) exit} found{print NR\": \"$0}' /Users/ayan/Projects/Automation/Assets/Prefabs/MessageTextIncoming.prefab)",
-      "Bash(grep -n \"## Task 10\\\\|Step 1: Replace the body of \\\\`SelectChat\" /Users/ayan/Projects/Automation/docs/superpowers/plans/2026-05-22-chat-open-phase-model.md)"
+      "Bash(grep -n \"## Task 10\\\\|Step 1: Replace the body of \\\\`SelectChat\" /Users/ayan/Projects/Automation/docs/superpowers/plans/2026-05-22-chat-open-phase-model.md)",
+      "Bash(awk '/^    void ApplyTextureAspectFill/,/^    void OnVisualClicked/' /Users/ayan/Projects/Automation/Assets/Scripts/UI/MessageItemView.cs)",
+      "Bash(awk 'NR>=2475 && NR<=2540' /Users/ayan/Projects/Automation/Assets/Scripts/UI/MessageItemView.cs)",
+      "Bash(grep -v \"^[+-]\\\\s*$\")",
+      "Bash(find /Users/ayan/Projects/Automation -path \"*/Library*\" -prune -o -name \"ImageWithRoundedCorners.cs\" -print 2>/dev/null; find ~/Library/Unity -name \"ImageWithRoundedCorners*\" 2>/dev/null | head -3)",
+      "Bash(xxd)"
     ]
   }
 }
