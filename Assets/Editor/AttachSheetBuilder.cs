@@ -36,18 +36,27 @@ public static class AttachSheetBuilder
             return;
         }
 
-        Transform parent = bottomPanel.transform.parent; // sheet is sibling of the input bar
-        if (parent == null)
+        // Parent the sheet to the root Canvas so it lands at the device's actual bottom,
+        // not at whatever intermediate container's bottom (which may be lifted by layout
+        // rules in the chat screen). Anchored to canvas bottom = sheet's bottom edge sits
+        // at the device bottom, where the OS keyboard renders.
+        var canvas = bottomPanel.GetComponentInParent<Canvas>();
+        if (canvas == null)
         {
-            Debug.LogError("[AttachSheetBuilder] MessagesBottomPanel has no parent — unexpected hierarchy.");
+            Debug.LogError("[AttachSheetBuilder] No Canvas found in MessagesBottomPanel's parent chain.");
             return;
         }
+        // Walk up to the root Canvas (in case the bottom panel is under a nested sub-Canvas).
+        var rootCanvas = canvas.rootCanvas;
+        Transform parent = rootCanvas.transform;
 
-        // Idempotent: nuke any existing sheet
-        for (int i = parent.childCount - 1; i >= 0; i--)
+        // Idempotent: nuke ANY existing AttachSheet anywhere under the root Canvas,
+        // not just under the new parent — handles the case where the previous build
+        // placed the sheet under a different parent (e.g. MovingArea before this change).
+        var existingSheets = rootCanvas.GetComponentsInChildren<AttachSheet>(includeInactive: true);
+        foreach (var existing in existingSheets)
         {
-            var child = parent.GetChild(i);
-            if (child.name == SheetName) Object.DestroyImmediate(child.gameObject);
+            Object.DestroyImmediate(existing.gameObject);
         }
 
         var sheetGo = new GameObject(SheetName, typeof(RectTransform), typeof(Image), typeof(AttachSheet));
