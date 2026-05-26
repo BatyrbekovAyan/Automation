@@ -29,11 +29,8 @@ public class AttachSheet : MonoBehaviour
     private RectTransform _rt;
     private Canvas        _canvas;
     private bool          _isOpen;
-    private bool          _openedOverKeyboard;
-    private bool          _isAnimating;
     private bool          _suppressDeselectListener;
     private Tween         _insetTween;
-    private Tween         _sheetTween;
     private float         _lastKeyboardHeightCanvasPx;
 
     void Awake()
@@ -63,7 +60,6 @@ public class AttachSheet : MonoBehaviour
         if (inputField     != null) inputField.onDeselect.RemoveListener(OnInputFieldDeselected);
 
         _insetTween?.Kill();
-        _sheetTween?.Kill();
 
         // Safety: if the sheet is disabled mid-animation (e.g. screen change), make
         // sure the input bar isn't stuck at a non-zero inset.
@@ -73,98 +69,92 @@ public class AttachSheet : MonoBehaviour
 
     void Update()
     {
-        // Cache the OS keyboard's canvas-space height while the sheet is closed.
-        // We use this on the next Open() so the sheet's height matches the keyboard
-        // that was last visible — making the AttachSheet feel like the same panel
-        // the keyboard occupies, not a different-sized panel that slides in.
-        if (!_isOpen && keyboardPanel != null && TouchScreenKeyboard.visible)
+        if (keyboardPanel == null) return;
+
+        float areaCanvas = keyboardPanel.EffectiveAreaCanvasPx;
+
+        // Cache the OS keyboard's canvas-space height while sheet is closed —
+        // we'll use this as the sheet height when the user opens cold (no kb up).
+        if (!_isOpen && TouchScreenKeyboard.visible && areaCanvas > 0f)
         {
-            float h = keyboardPanel.EffectiveAreaCanvasPx;
-            if (h > 0f) _lastKeyboardHeightCanvasPx = h;
+            _lastKeyboardHeightCanvasPx = areaCanvas;
+        }
+
+        bool shouldShow = _isOpen && areaCanvas > 0.5f;
+
+        if (shouldShow)
+        {
+            // Resize and reposition to match the keyboard area exactly.
+            _rt.sizeDelta = new Vector2(_rt.sizeDelta.x, areaCanvas);
+            _rt.anchoredPosition = new Vector2(0f, 0f);
+            if (!gameObject.activeSelf) gameObject.SetActive(true);
+        }
+        else
+        {
+            if (gameObject.activeSelf) gameObject.SetActive(false);
+
+            // If the sheet was open but the area collapsed (e.g. input lost focus),
+            // reset our state so the icon and flags match reality.
+            if (_isOpen && areaCanvas <= 0.5f)
+            {
+                _isOpen = false;
+                if (messagesBottomPanel != null) messagesBottomPanel.ShowPlusIcon();
+                if (inputField != null) inputField.shouldHideSoftKeyboard = false;
+            }
         }
     }
 
     public void Toggle()
     {
-        if (_isAnimating) return;
         if (_isOpen) Close();
         else         Open();
     }
 
     public void Open()
     {
-        if (_isOpen || _isAnimating) return;
+        if (_isOpen) return;
         _isOpen = true;
-        _openedOverKeyboard = TouchScreenKeyboard.visible;
-
-        // Pick a sheet height that matches the keyboard:
-        //   Case A: read the current keyboard's height directly
-        //   Case B (cold): use the last-cached keyboard height, or fall back to the
-        //     inspector value if we've never seen the keyboard this session
-        float effectiveHeightCanvas;
-        if (_openedOverKeyboard && keyboardPanel != null && keyboardPanel.EffectiveAreaCanvasPx > 0f)
-            effectiveHeightCanvas = keyboardPanel.EffectiveAreaCanvasPx;
-        else if (_lastKeyboardHeightCanvasPx > 0f)
-            effectiveHeightCanvas = _lastKeyboardHeightCanvasPx;
-        else
-            effectiveHeightCanvas = sheetHeightCanvasPx;
-
-        // Resize the sheet so its height matches the keyboard panel — this is the
-        // key change that makes the sheet feel like it occupies the same panel.
-        _rt.sizeDelta = new Vector2(_rt.sizeDelta.x, effectiveHeightCanvas);
-
-        float sheetHeightScreenPx = CanvasPxToScreenPx(effectiveHeightCanvas);
 
         if (messagesBottomPanel != null) messagesBottomPanel.ShowKeyboardIcon();
-        if (!gameObject.activeSelf) gameObject.SetActive(true);
 
-        _insetTween?.Kill();
-        _sheetTween?.Kill();
+        bool wasKeyboardVisible = TouchScreenKeyboard.visible;
+        float currentAreaCanvas = keyboardPanel != null ? keyboardPanel.EffectiveAreaCanvasPx : 0f;
 
-        if (_openedOverKeyboard)
+        // Drive the keyboard area:
+        //   Case A — OS keyboard is currently up: snap the inset to the current
+        //     area height so it stays maintained as we dismiss the OS keyboard.
+        //   Case B — OS keyboard is down: tween the inset up to mirror the rise.
+        if (keyboardPanel != null)
         {
-            // CASE A — instant content swap. Sheet snaps to the keyboard's exact
-            // position. ExtraBottomInsetPx is set immediately so the input bar
-            // doesn't drop when the OS keyboard slides away. No tween — the OS
-            // keyboard's own slide-down animation visually "covers" the swap.
-            _rt.anchoredPosition = new Vector2(0f, 0f);
-            if (keyboardPanel != null) keyboardPanel.ExtraBottomInsetPx = sheetHeightScreenPx;
-        }
-        else
-        {
-            // CASE B — cold start. No keyboard panel exists yet, so slide up like
-            // a keyboard would. The input bar rises in parallel via tweened inset.
-            _isAnimating = true;
-            _rt.anchoredPosition = new Vector2(0f, -effectiveHeightCanvas);
+            _insetTween?.Kill();
 
-            if (keyboardPanel != null)
+            if (wasKeyboardVisible && currentAreaCanvas > 0f)
             {
+                keyboardPanel.ExtraBottomInsetPx = CanvasPxToScreenPx(currentAreaCanvas);
+            }
+            else
+            {
+                float targetCanvas = _lastKeyboardHeightCanvasPx > 0f
+                    ? _lastKeyboardHeightCanvasPx
+                    : sheetHeightCanvasPx;
                 _insetTween = DOTween.To(
                     () => keyboardPanel.ExtraBottomInsetPx,
                     v  => keyboardPanel.ExtraBottomInsetPx = v,
-                    sheetHeightScreenPx,
+                    CanvasPxToScreenPx(targetCanvas),
                     openDuration)
                     .From(0f)
                     .SetEase(Ease.OutCubic);
             }
-
-            _sheetTween = _rt.DOAnchorPosY(0f, openDuration)
-                .SetEase(Ease.OutCubic)
-                .OnComplete(() => { _isAnimating = false; });
         }
 
-        // Dismiss OS keyboard if it was up, then suppress + reselect so the caret
-        // stays blinking without a new keyboard appearing. shouldHideSoftKeyboard
-        // is set FIRST so that ActivateInputField below doesn't create a keyboard.
+        // Dismiss the OS keyboard if up, and keep the input field visually
+        // selected so the caret blinks. shouldHideSoftKeyboard prevents the
+        // re-activation from raising a new keyboard.
         if (inputField != null)
         {
-            if (_openedOverKeyboard)
-            {
-                _suppressDeselectListener = true;
-                inputField.DeactivateInputField();
-            }
-            inputField.shouldHideSoftKeyboard = true;
             _suppressDeselectListener = true;
+            inputField.shouldHideSoftKeyboard = true;
+            inputField.DeactivateInputField();
             inputField.ActivateInputField();
             EventSystem.current.SetSelectedGameObject(inputField.gameObject);
             StartCoroutine(ClearSuppressNextFrame());
@@ -190,36 +180,23 @@ public class AttachSheet : MonoBehaviour
         if (!_isOpen) return;
         _isOpen = false;
 
-        _insetTween?.Kill();
-        _sheetTween?.Kill();
+        if (messagesBottomPanel != null) messagesBottomPanel.ShowPlusIcon();
 
-        if (_openedOverKeyboard)
+        // Restore normal keyboard behavior and bring the OS keyboard back up.
+        if (inputField != null)
         {
-            // CASE A close — instant content swap back. Sheet hides immediately,
-            // OS keyboard is restored. The OS keyboard's slide-up animation visually
-            // covers the swap. ExtraBottomInsetPx is cleared so the OS keyboard's
-            // own area drives KeyboardAwarePanel from here.
-            if (inputField != null) inputField.shouldHideSoftKeyboard = false;
-            if (keyboardPanel != null) keyboardPanel.ExtraBottomInsetPx = 0f;
-
-            if (inputField != null)
-            {
-                _suppressDeselectListener = true;
-                inputField.ActivateInputField();
-                StartCoroutine(ClearSuppressNextFrame());
-            }
-
-            if (messagesBottomPanel != null) messagesBottomPanel.ShowPlusIcon();
-            gameObject.SetActive(false);
-            return;
+            inputField.shouldHideSoftKeyboard = false;
+            _suppressDeselectListener = true;
+            inputField.ActivateInputField();
+            StartCoroutine(ClearSuppressNextFrame());
         }
 
-        // CASE B close — cold path. Slide the sheet down and tween the inset back
-        // to 0 so the input bar lowers smoothly.
-        _isAnimating = true;
-
+        // Tween the inset down — KeyboardAwarePanel uses Max(rawKbHeight, inset),
+        // so as the OS keyboard rises (its own ~0.25s animation) the inset fades
+        // out without the input bar visibly dipping.
         if (keyboardPanel != null)
         {
+            _insetTween?.Kill();
             float startInset = keyboardPanel.ExtraBottomInsetPx;
             _insetTween = DOTween.To(
                 () => keyboardPanel.ExtraBottomInsetPx,
@@ -229,32 +206,23 @@ public class AttachSheet : MonoBehaviour
                 .From(startInset)
                 .SetEase(Ease.OutCubic);
         }
-
-        _sheetTween = _rt.DOAnchorPosY(-_rt.sizeDelta.y, closeDuration)
-            .SetEase(Ease.OutCubic)
-            .OnComplete(() =>
-            {
-                _isAnimating = false;
-
-                if (inputField != null)
-                {
-                    inputField.shouldHideSoftKeyboard = false;
-                    _suppressDeselectListener = true;
-                    inputField.DeactivateInputField();
-                    StartCoroutine(ClearSuppressNextFrame());
-                }
-
-                if (messagesBottomPanel != null) messagesBottomPanel.ShowPlusIcon();
-                gameObject.SetActive(false);
-            });
     }
 
     private void OnInputFieldDeselected(string _)
     {
-        // Open() in Case A deactivates the input field intentionally, which fires onDeselect.
-        // The suppression flag prevents that synthetic deselect from recursively closing the sheet.
         if (_suppressDeselectListener) return;
-        if (_isOpen) Close();
+
+        // The input field lost focus while the sheet was open (likely user tapped
+        // outside the input area). Clean up: drop the inset, reset the suppress
+        // flag, and let Update() hide the sheet on the next tick.
+        if (_isOpen)
+        {
+            _isOpen = false;
+            if (messagesBottomPanel != null) messagesBottomPanel.ShowPlusIcon();
+            if (inputField != null) inputField.shouldHideSoftKeyboard = false;
+            if (keyboardPanel != null) keyboardPanel.ExtraBottomInsetPx = 0f;
+            _insetTween?.Kill();
+        }
     }
 
     // Used by Open() in Case A to swallow the immediate onDeselect that follows DeactivateInputField.
@@ -320,18 +288,15 @@ public class AttachSheet : MonoBehaviour
 
     private void InvokeAfterClose(System.Action action)
     {
-        // Case A close calls gameObject.SetActive(false) before this runs.
-        // Case B's tween OnComplete also deactivates the sheet, which would kill
-        // a coroutine hosted on `this` mid-wait. Host on messagesBottomPanel
-        // (always active while the chat screen is visible) so the action survives.
+        // Host on messagesBottomPanel (always active while chat is visible) so the
+        // coroutine survives Update() deactivating this sheet on the same frame.
         MonoBehaviour host = messagesBottomPanel != null ? (MonoBehaviour)messagesBottomPanel : this;
         host.StartCoroutine(InvokeAfterCloseRoutine(action));
     }
 
     private System.Collections.IEnumerator InvokeAfterCloseRoutine(System.Action action)
     {
-        // Wait until any close tween is done (or just one frame for Case A).
-        while (_isAnimating) yield return null;
+        // Wait one frame for Update() to deactivate the sheet before invoking.
         yield return null;
         action?.Invoke();
     }
