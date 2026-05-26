@@ -65,8 +65,9 @@ public class KeyboardAwarePanel : MonoBehaviour
         float editorTarget = _editorKbVisible ? EditorKbTargetHeight : 0f;
         _editorSimulated = Mathf.MoveTowards(_editorSimulated, editorTarget,
                                              EditorKbSpeed * Time.unscaledDeltaTime);
-        EffectiveAreaCanvasPx = ConvertToCanvasSpace(_editorSimulated);
-        ApplyAndroid(_editorSimulated);
+        float editorEffective = Mathf.Max(_editorSimulated, ExtraBottomInsetPx);
+        EffectiveAreaCanvasPx = ConvertToCanvasSpace(editorEffective);
+        ApplyAndroid(editorEffective);
 
 #elif UNITY_ANDROID
         float liveAndroid = GetAndroidLiveHeight();
