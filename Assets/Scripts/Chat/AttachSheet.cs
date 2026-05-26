@@ -9,8 +9,8 @@ using UnityEngine.UI;
 public class AttachSheet : MonoBehaviour
 {
     [Header("Layout")]
-    [Tooltip("Sheet height in canvas pixels — used as fallback when no keyboard height has been observed yet.")]
-    [SerializeField] private float sheetHeightCanvasPx = 290f;
+    [Tooltip("Sheet height in canvas pixels — sized to feel like a real keyboard area at the 1080×2400 reference resolution.")]
+    [SerializeField] private float sheetHeightCanvasPx = 700f;
 
     [Header("References")]
     [SerializeField] private TMP_InputField inputField;

@@ -9,15 +9,16 @@ public static class AttachSheetBuilder
 {
     private const string SheetName = "AttachSheet";
 
-    // Layout — canvas-space px at the project's 1080×2400 reference resolution
-    private const float SheetHeight   = 290f;
-    private const float TilePrefWidth = 88f;
-    private const float TileHeight    = 120f;
-    private const float IconSize      = 56f;
-    private const float IconSpacing   = 8f;
-    private const float LabelFontSize = 11f;
-    private const int   PaddingX      = 24;
-    private const int   PaddingY      = 16;
+    // Layout — canvas-space px at the project's 1080×2400 reference resolution.
+    // SheetHeight sized to feel like a real keyboard area (~30% of canvas height).
+    private const float SheetHeight   = 700f;
+    private const float TilePrefWidth = 160f;
+    private const float TileHeight    = 200f;
+    private const float IconSize      = 96f;
+    private const float IconSpacing   = 16f;
+    private const float LabelFontSize = 28f;
+    private const int   PaddingX      = 48;
+    private const int   PaddingY      = 40;
 
     private static readonly Color BackgroundColor = Color.white;
     private static readonly Color LabelColor      = new Color(0.33f, 0.33f, 0.33f);
@@ -133,7 +134,7 @@ public static class AttachSheetBuilder
         var le = go.GetComponent<LayoutElement>();
         le.preferredWidth  = TilePrefWidth;
         le.preferredHeight = TileHeight;
-        le.flexibleWidth   = 0;
+        le.flexibleWidth   = 1;          // distribute remaining row width evenly across 3 tiles
 
         // Icon circle
         var iconGo = new GameObject("Icon", typeof(RectTransform), typeof(Image));
@@ -149,7 +150,7 @@ public static class AttachSheetBuilder
         var labelGo = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
         labelGo.transform.SetParent(go.transform, false);
         var labelRt = (RectTransform)labelGo.transform;
-        labelRt.sizeDelta = new Vector2(TilePrefWidth, 16);
+        labelRt.sizeDelta = new Vector2(TilePrefWidth, 40);
         var tmp = labelGo.GetComponent<TextMeshProUGUI>();
         tmp.text         = label;
         tmp.fontSize     = LabelFontSize;
