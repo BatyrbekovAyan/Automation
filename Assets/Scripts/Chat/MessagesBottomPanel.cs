@@ -11,6 +11,10 @@ public class MessagesBottomPanel : MonoBehaviour
     public Button sendButton;
     public Button micButton;
     public Button attachButton;
+    [SerializeField] private Image attachButtonIcon;
+    [SerializeField] private Sprite plusIconSprite;
+    [SerializeField] private Sprite keyboardIconSprite;
+    [SerializeField] private AttachSheet attachSheet;
 
     [Header("Quick Replies")]
     public QuickReplyPanel quickReplyPanel;
@@ -90,6 +94,21 @@ public class MessagesBottomPanel : MonoBehaviour
 
     private void OnAttachClicked()
     {
-        Debug.Log("Attachment button clicked!");
+        if (attachSheet != null)
+            attachSheet.Toggle();
+        else
+            Debug.LogWarning("[MessagesBottomPanel] attachSheet ref is null — open Tools menu and run Build Attach Sheet");
+    }
+
+    public void ShowKeyboardIcon()
+    {
+        if (attachButtonIcon != null && keyboardIconSprite != null)
+            attachButtonIcon.sprite = keyboardIconSprite;
+    }
+
+    public void ShowPlusIcon()
+    {
+        if (attachButtonIcon != null && plusIconSprite != null)
+            attachButtonIcon.sprite = plusIconSprite;
     }
 }
