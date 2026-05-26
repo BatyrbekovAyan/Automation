@@ -2,6 +2,7 @@ using System;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 [RequireComponent(typeof(RectTransform))]
@@ -124,6 +125,17 @@ public class AttachSheet : MonoBehaviour
         _sheetTween = _rt.DOAnchorPosY(0f, openDuration)
             .SetEase(Ease.OutCubic)
             .OnComplete(() => { _isAnimating = false; });
+
+        // Keep the input field visually selected so the caret blinks, but suppress
+        // the OS keyboard so it doesn't reappear over our sheet. Matches WhatsApp.
+        if (inputField != null)
+        {
+            inputField.shouldHideSoftKeyboard = true;
+            _suppressDeselectListener = true;
+            inputField.ActivateInputField();
+            EventSystem.current.SetSelectedGameObject(inputField.gameObject);
+            StartCoroutine(ClearSuppressNextFrame());
+        }
     }
 
     private float CanvasPxToScreenPx(float canvasPx)
@@ -170,14 +182,21 @@ public class AttachSheet : MonoBehaviour
             {
                 _isAnimating = false;
 
-                // If the sheet was opened from a keyboard-up state, restore the
-                // OS keyboard now — matches WhatsApp's "keyboard icon brings the
-                // keyboard back" behavior. Otherwise leave the input field as-is
-                // so the user can tap it when they want to type.
+                // Reset the keyboard-suppression flag so future activations behave normally.
+                if (inputField != null) inputField.shouldHideSoftKeyboard = false;
+
                 if (_openedOverKeyboard && inputField != null)
                 {
+                    // Came from keyboard-up: bring the OS keyboard back so the user can type.
                     _suppressDeselectListener = true;
                     inputField.ActivateInputField();
+                    StartCoroutine(ClearSuppressNextFrame());
+                }
+                else if (inputField != null)
+                {
+                    // Came from cold (no keyboard): deselect cleanly so caret stops.
+                    _suppressDeselectListener = true;
+                    inputField.DeactivateInputField();
                     StartCoroutine(ClearSuppressNextFrame());
                 }
 
