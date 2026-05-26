@@ -110,6 +110,7 @@ public class AttachSheet : MonoBehaviour
         {
             // Case B: keyboard is down. Tween the inset up so the area rises smoothly
             // and the sheet follows.
+            if (keyboardPanel == null) return;
             _isAnimating = true;
             _insetTween?.Kill();
             float start = keyboardPanel != null ? keyboardPanel.ExtraBottomInsetPx : 0f;
@@ -135,10 +136,15 @@ public class AttachSheet : MonoBehaviour
     private float CanvasPxToScreenPx(float canvasPx)
     {
         if (_canvas == null) return canvasPx;
-        if (_canvas.renderMode == RenderMode.ScreenSpaceOverlay) return canvasPx * _canvas.scaleFactor;
+        // KeyboardAwarePanel.ConvertToCanvasSpace subtracts Screen.safeArea.y from the raw
+        // screen-px keyboard height before dividing by scale. We're going the other way —
+        // add it back so the sheet's screen-space inset accounts for the home-bar gap.
+        float safeBottom = Screen.safeArea.y;
+        if (_canvas.renderMode == RenderMode.ScreenSpaceOverlay)
+            return canvasPx * _canvas.scaleFactor + safeBottom;
         float screenH = Screen.height;
         float canvasH = ((RectTransform)_canvas.transform).rect.height;
-        return canvasH > 0f ? canvasPx * (screenH / canvasH) : canvasPx;
+        return canvasH > 0f ? canvasPx * (screenH / canvasH) + safeBottom : canvasPx;
     }
 
     public void Close()
@@ -168,6 +174,12 @@ public class AttachSheet : MonoBehaviour
         }
 
         // Case B close: tween the inset down, sheet slides with the area.
+        if (keyboardPanel == null)
+        {
+            if (messagesBottomPanel != null) messagesBottomPanel.ShowPlusIcon();
+            gameObject.SetActive(false);
+            return;
+        }
         _isAnimating = true;
         _insetTween?.Kill();
         float start = keyboardPanel != null ? keyboardPanel.ExtraBottomInsetPx : 0f;
@@ -264,9 +276,12 @@ public class AttachSheet : MonoBehaviour
 
     private void InvokeAfterClose(System.Action action)
     {
-        // Case A close is synchronous; Case B has a tween. Wait one extra frame
-        // either way so the close has settled before the OS picker animates in.
-        StartCoroutine(InvokeAfterCloseRoutine(action));
+        // Case A close calls gameObject.SetActive(false) before this runs.
+        // Case B's tween OnComplete also deactivates the sheet, which would kill
+        // a coroutine hosted on `this` mid-wait. Host on messagesBottomPanel
+        // (always active while the chat screen is visible) so the action survives.
+        MonoBehaviour host = messagesBottomPanel != null ? (MonoBehaviour)messagesBottomPanel : this;
+        host.StartCoroutine(InvokeAfterCloseRoutine(action));
     }
 
     private System.Collections.IEnumerator InvokeAfterCloseRoutine(System.Action action)
