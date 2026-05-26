@@ -208,7 +208,72 @@ public class AttachSheet : MonoBehaviour
         _suppressDeselectListener = false;
     }
 
-    private void OnCameraTapped()   { /* Filled in Task 9. */ }
-    private void OnGalleryTapped()  { /* Filled in Task 9. */ }
-    private void OnDocumentTapped() { /* Filled in Task 9. */ }
+    private void OnCameraTapped()
+    {
+        if (NativeGallery.IsMediaPickerBusy()) return;
+        Close();
+        InvokeAfterClose(() =>
+            NativeGallery.TakePicture(path =>
+            {
+                if (string.IsNullOrEmpty(path)) return;
+                EmitPick(AttachmentKind.Photo, path);
+            }, maxSize: 2048));
+    }
+
+    private void OnGalleryTapped()
+    {
+        if (NativeGallery.IsMediaPickerBusy()) return;
+        Close();
+        InvokeAfterClose(() =>
+            NativeGallery.GetMixedMediaFromGallery(path =>
+                {
+                    if (string.IsNullOrEmpty(path)) return;
+                    EmitPick(AttachmentTypeUtil.GalleryKindFromPath(path), path);
+                },
+                NativeGallery.MediaType.Image | NativeGallery.MediaType.Video,
+                "Select a photo or video"));
+    }
+
+    private void OnDocumentTapped()
+    {
+        Close();
+        InvokeAfterClose(() =>
+            NativeFilePicker.PickFile(path =>
+            {
+                if (string.IsNullOrEmpty(path)) return;
+                EmitPick(AttachmentKind.Document, path);
+            }));
+    }
+
+    private void EmitPick(AttachmentKind kind, string path)
+    {
+        long size = 0;
+        try { if (System.IO.File.Exists(path)) size = new System.IO.FileInfo(path).Length; }
+        catch { size = 0; }
+
+        var pick = new AttachmentPick
+        {
+            Kind          = kind,
+            Path          = path,
+            FileName      = System.IO.Path.GetFileName(path),
+            MimeType      = AttachmentTypeUtil.MimeFromExtension(path),
+            FileSizeBytes = size
+        };
+        OnPicked?.Invoke(pick);
+    }
+
+    private void InvokeAfterClose(System.Action action)
+    {
+        // Case A close is synchronous; Case B has a tween. Wait one extra frame
+        // either way so the close has settled before the OS picker animates in.
+        StartCoroutine(InvokeAfterCloseRoutine(action));
+    }
+
+    private System.Collections.IEnumerator InvokeAfterCloseRoutine(System.Action action)
+    {
+        // Wait until any close tween is done (or just one frame for Case A).
+        while (_isAnimating) yield return null;
+        yield return null;
+        action?.Invoke();
+    }
 }
