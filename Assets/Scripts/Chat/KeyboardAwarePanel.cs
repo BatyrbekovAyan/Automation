@@ -29,6 +29,13 @@ public class KeyboardAwarePanel : MonoBehaviour
     private float _currentY;
     private float _velocityY;
 
+    // ── attach-sheet hook ──────────────────────────────────────────
+    /// <summary>Set by AttachSheet to keep the keyboard area "up" without an OS keyboard. Screen pixels.</summary>
+    public float ExtraBottomInsetPx { get; set; }
+
+    /// <summary>Last computed effective keyboard area in canvas-space pixels. Updated every frame.</summary>
+    public float EffectiveAreaCanvasPx { get; private set; }
+
     // Editor simulation
 #if UNITY_EDITOR
     private bool  _editorKbVisible;
@@ -58,13 +65,18 @@ public class KeyboardAwarePanel : MonoBehaviour
         float editorTarget = _editorKbVisible ? EditorKbTargetHeight : 0f;
         _editorSimulated = Mathf.MoveTowards(_editorSimulated, editorTarget,
                                              EditorKbSpeed * Time.unscaledDeltaTime);
+        EffectiveAreaCanvasPx = ConvertToCanvasSpace(_editorSimulated);
         ApplyAndroid(_editorSimulated);
 
 #elif UNITY_ANDROID
-        ApplyAndroid(GetAndroidLiveHeight());
+        float liveAndroid = GetAndroidLiveHeight();
+        EffectiveAreaCanvasPx = ConvertToCanvasSpace(liveAndroid);
+        ApplyAndroid(liveAndroid);
 
 #elif UNITY_IOS
-        ApplyIOS(GetIOSTargetHeight());
+        float targetIos = GetIOSTargetHeight();
+        EffectiveAreaCanvasPx = ConvertToCanvasSpace(targetIos);
+        ApplyIOS(targetIos);
 
 #endif
     }
@@ -100,21 +112,21 @@ public class KeyboardAwarePanel : MonoBehaviour
     float GetAndroidLiveHeight()
     {
 #if UNITY_ANDROID
-        if (!TouchScreenKeyboard.visible) return 0f;
-        return Screen.height - TouchScreenKeyboard.area.y;
+        float raw = TouchScreenKeyboard.visible ? (Screen.height - TouchScreenKeyboard.area.y) : 0f;
 #else
-        return 0f;
+        float raw = 0f;
 #endif
+        return Mathf.Max(raw, ExtraBottomInsetPx);
     }
 
     float GetIOSTargetHeight()
     {
 #if UNITY_IOS
-        if (!TouchScreenKeyboard.visible) return 0f;
-        return TouchScreenKeyboard.area.height;
+        float raw = TouchScreenKeyboard.visible ? TouchScreenKeyboard.area.height : 0f;
 #else
-        return 0f;
+        float raw = 0f;
 #endif
+        return Mathf.Max(raw, ExtraBottomInsetPx);
     }
 
     // ── canvas conversion ──────────────────────────────────────────
