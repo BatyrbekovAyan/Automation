@@ -147,10 +147,20 @@ public class AttachSheet : MonoBehaviour
         {
             _insetTween?.Kill();
 
-            if (!wasKeyboardVisible)
+            if (wasKeyboardVisible)
             {
-                // Cold start (no keyboard): raise the area via inset so the sheet
-                // has a place to appear. Mirrors a keyboard rising.
+                // Case A: keyboard is currently up. Snap ExtraBottomInsetPx to its
+                // current height so the area stays propped open even if iOS dismisses
+                // the keyboard despite our efforts to keep it (button-tap deselect race,
+                // edge cases, etc.). KeyboardAwarePanel uses Max(rawKb, inset) so this
+                // never lowers the area — only ensures it doesn't collapse.
+                float currentAreaCanvas = keyboardPanel.EffectiveAreaCanvasPx;
+                if (currentAreaCanvas > 0f)
+                    keyboardPanel.ExtraBottomInsetPx = CanvasPxToScreenPx(currentAreaCanvas);
+            }
+            else
+            {
+                // Case B (cold): raise the area via inset so the sheet has a place to appear.
                 float targetCanvas = _lastKeyboardHeightCanvasPx > 0f
                     ? _lastKeyboardHeightCanvasPx
                     : sheetHeightCanvasPx;
@@ -162,9 +172,6 @@ public class AttachSheet : MonoBehaviour
                     .From(0f)
                     .SetEase(Ease.OutCubic);
             }
-            // If kb was visible, no inset tween needed — KeyboardAwarePanel
-            // already sees the OS keyboard's area via TouchScreenKeyboard.area,
-            // and our native plugin hid only the rendering, not the logical state.
         }
 
         // Ensure the input field is selected so the caret blinks.

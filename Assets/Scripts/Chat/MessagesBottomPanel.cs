@@ -29,6 +29,14 @@ public class MessagesBottomPanel : MonoBehaviour
         inputField.onValueChanged.AddListener(UpdateButtonState);
         attachButton.onClick.AddListener(OnAttachClicked);
 
+        // Prevent the attach button from stealing EventSystem selection on tap.
+        // Without this, tapping + would deselect the focused input field, which
+        // on iOS triggers the OS keyboard's resignFirstResponder slide-down
+        // animation — exactly what we're trying to avoid.
+        var attachNav = attachButton.navigation;
+        attachNav.mode = UnityEngine.UI.Navigation.Mode.None;
+        attachButton.navigation = attachNav;
+
         // Remove standard onClick
         sendButton.onClick.RemoveAllListeners();
         

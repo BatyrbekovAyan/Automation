@@ -96,7 +96,11 @@ public static class AttachSheetBuilder
         var attachSheet = sheetGo.GetComponent<AttachSheet>();
         var so = new SerializedObject(attachSheet);
         SetObjectRef(so, "inputField",          bottomPanel.inputField);
-        SetObjectRef(so, "keyboardPanel",       bottomPanel.GetComponent<KeyboardAwarePanel>());
+        // Try the obvious location first (component on the bottom panel), then fall back to
+        // any KeyboardAwarePanel in the open scene — it may be attached elsewhere in the hierarchy.
+        var kbPanel = bottomPanel.GetComponent<KeyboardAwarePanel>();
+        if (kbPanel == null) kbPanel = Object.FindFirstObjectByType<KeyboardAwarePanel>(FindObjectsInactive.Include);
+        SetObjectRef(so, "keyboardPanel", kbPanel);
         SetObjectRef(so, "messagesBottomPanel", bottomPanel);
         SetObjectRef(so, "cameraButton",        cameraTile.button);
         SetObjectRef(so, "galleryButton",       galleryTile.button);
@@ -174,8 +178,16 @@ public static class AttachSheetBuilder
     private static void SetObjectRef(SerializedObject so, string propertyName, Object value)
     {
         var p = so.FindProperty(propertyName);
-        if (p != null) p.objectReferenceValue = value;
-        else Debug.LogWarning($"[AttachSheetBuilder] Property {propertyName} not found on {so.targetObject}");
+        if (p == null)
+        {
+            Debug.LogWarning($"[AttachSheetBuilder] Property {propertyName} not found on {so.targetObject}");
+            return;
+        }
+        p.objectReferenceValue = value;
+        if (value == null)
+        {
+            Debug.LogWarning($"[AttachSheetBuilder] {so.targetObject.GetType().Name}.{propertyName} was set to null — wiring incomplete, please assign manually in the inspector.");
+        }
     }
 
     private static Image FindButtonIconImage(Button button)
