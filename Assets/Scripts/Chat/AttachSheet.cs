@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.InteropServices;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
@@ -25,6 +26,22 @@ public class AttachSheet : MonoBehaviour
     [SerializeField] private float closeDuration = 0.25f;
 
     public event Action<AttachmentPick> OnPicked;
+
+    // Native iOS hook — hides/shows the OS keyboard window directly, no animation.
+    // Implemented in Assets/Plugins/iOS/AttachSheetKeyboardHider.mm
+#if UNITY_IOS && !UNITY_EDITOR
+    [DllImport("__Internal")]
+    private static extern void ASKeyboardHider_SetHidden(bool hidden);
+#endif
+
+    private static void SetOsKeyboardHidden(bool hidden)
+    {
+#if UNITY_IOS && !UNITY_EDITOR
+        ASKeyboardHider_SetHidden(hidden);
+#endif
+        // Editor / non-iOS builds: no-op. AttachSheet falls back to existing
+        // shouldHideSoftKeyboard + DeactivateInputField behavior in editor.
+    }
 
     private RectTransform _rt;
     private Canvas        _canvas;
@@ -62,9 +79,11 @@ public class AttachSheet : MonoBehaviour
         _insetTween?.Kill();
 
         // Safety: if the sheet is disabled mid-animation (e.g. screen change), make
-        // sure the input bar isn't stuck at a non-zero inset.
+        // sure the input bar isn't stuck at a non-zero inset and the keyboard
+        // window isn't left hidden.
         if (keyboardPanel != null) keyboardPanel.ExtraBottomInsetPx = 0f;
         if (inputField != null) inputField.shouldHideSoftKeyboard = false;
+        SetOsKeyboardHidden(false);
     }
 
     void Update()
@@ -118,22 +137,20 @@ public class AttachSheet : MonoBehaviour
         if (messagesBottomPanel != null) messagesBottomPanel.ShowKeyboardIcon();
 
         bool wasKeyboardVisible = TouchScreenKeyboard.visible;
-        float currentAreaCanvas = keyboardPanel != null ? keyboardPanel.EffectiveAreaCanvasPx : 0f;
 
-        // Drive the keyboard area:
-        //   Case A — OS keyboard is currently up: snap the inset to the current
-        //     area height so it stays maintained as we dismiss the OS keyboard.
-        //   Case B — OS keyboard is down: tween the inset up to mirror the rise.
+        // Hide the OS keyboard window NOW (no animation, no dismissal).
+        // The input field stays focused; the keyboard is "still up" logically
+        // but its rendering is hidden. Sheet appears in its place.
+        SetOsKeyboardHidden(true);
+
         if (keyboardPanel != null)
         {
             _insetTween?.Kill();
 
-            if (wasKeyboardVisible && currentAreaCanvas > 0f)
+            if (!wasKeyboardVisible)
             {
-                keyboardPanel.ExtraBottomInsetPx = CanvasPxToScreenPx(currentAreaCanvas);
-            }
-            else
-            {
+                // Cold start (no keyboard): raise the area via inset so the sheet
+                // has a place to appear. Mirrors a keyboard rising.
                 float targetCanvas = _lastKeyboardHeightCanvasPx > 0f
                     ? _lastKeyboardHeightCanvasPx
                     : sheetHeightCanvasPx;
@@ -145,19 +162,23 @@ public class AttachSheet : MonoBehaviour
                     .From(0f)
                     .SetEase(Ease.OutCubic);
             }
+            // If kb was visible, no inset tween needed — KeyboardAwarePanel
+            // already sees the OS keyboard's area via TouchScreenKeyboard.area,
+            // and our native plugin hid only the rendering, not the logical state.
         }
 
-        // Dismiss the OS keyboard if up, and keep the input field visually
-        // selected so the caret blinks. shouldHideSoftKeyboard prevents the
-        // re-activation from raising a new keyboard.
+        // Ensure the input field is selected so the caret blinks.
         if (inputField != null)
         {
-            _suppressDeselectListener = true;
-            inputField.shouldHideSoftKeyboard = true;
-            inputField.DeactivateInputField();
-            inputField.ActivateInputField();
-            EventSystem.current.SetSelectedGameObject(inputField.gameObject);
-            StartCoroutine(ClearSuppressNextFrame());
+            inputField.shouldHideSoftKeyboard = true; // belt-and-suspenders for cold start
+            if (!wasKeyboardVisible)
+            {
+                _suppressDeselectListener = true;
+                inputField.ActivateInputField();
+                EventSystem.current.SetSelectedGameObject(inputField.gameObject);
+                StartCoroutine(ClearSuppressNextFrame());
+            }
+            // If kb was visible, field is already selected — leave it alone.
         }
     }
 
@@ -182,18 +203,22 @@ public class AttachSheet : MonoBehaviour
 
         if (messagesBottomPanel != null) messagesBottomPanel.ShowPlusIcon();
 
-        // Restore normal keyboard behavior and bring the OS keyboard back up.
+        // Unhide the keyboard window. If it was hidden during Open (Case A),
+        // it instantly reappears at its existing position — keyboard is back.
+        SetOsKeyboardHidden(false);
+
         if (inputField != null)
         {
             inputField.shouldHideSoftKeyboard = false;
+            // Re-activate so a fresh keyboard is created if one wasn't already up
+            // (Case B cold-close path). For Case A this is a no-op refresh.
             _suppressDeselectListener = true;
             inputField.ActivateInputField();
             StartCoroutine(ClearSuppressNextFrame());
         }
 
-        // Tween the inset down — KeyboardAwarePanel uses Max(rawKbHeight, inset),
-        // so as the OS keyboard rises (its own ~0.25s animation) the inset fades
-        // out without the input bar visibly dipping.
+        // Tween inset down for Case B; for Case A inset was never raised, so this
+        // is a no-op (0 → 0).
         if (keyboardPanel != null)
         {
             _insetTween?.Kill();
@@ -212,13 +237,12 @@ public class AttachSheet : MonoBehaviour
     {
         if (_suppressDeselectListener) return;
 
-        // The input field lost focus while the sheet was open (likely user tapped
-        // outside the input area). Clean up: drop the inset, reset the suppress
-        // flag, and let Update() hide the sheet on the next tick.
         if (_isOpen)
         {
             _isOpen = false;
             if (messagesBottomPanel != null) messagesBottomPanel.ShowPlusIcon();
+            // Safety: ensure the keyboard window isn't left hidden.
+            SetOsKeyboardHidden(false);
             if (inputField != null) inputField.shouldHideSoftKeyboard = false;
             if (keyboardPanel != null) keyboardPanel.ExtraBottomInsetPx = 0f;
             _insetTween?.Kill();
