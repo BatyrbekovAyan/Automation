@@ -143,10 +143,54 @@ public class AttachSheet : MonoBehaviour
 
     public void Close()
     {
-        if (!_isOpen || _isAnimating) return;
+        if (!_isOpen) return;
         _isOpen = false;
-        Debug.Log("[AttachSheet] Close (stub)");
-        // Body filled in Task 8.
+
+        if (_openedOverKeyboard)
+        {
+            // Case A close: bring the OS keyboard back, drop the extra inset (no visual
+            // impact because OS keyboard now provides the area height). ActivateInputField
+            // may fire onSelect → no recursion risk, but suppress just in case the platform
+            // also fires onDeselect on the previously selected target.
+            if (keyboardPanel != null) keyboardPanel.ExtraBottomInsetPx = 0f;
+            if (inputField != null)
+            {
+                _suppressDeselectListener = true;
+                inputField.ActivateInputField();
+                StartCoroutine(ClearSuppressNextFrame());
+            }
+
+            // Case A is instant — no slide tween. Spec §9.2 says "swap after the close
+            // transition completes"; for instant Case A that's immediately.
+            if (messagesBottomPanel != null) messagesBottomPanel.ShowPlusIcon();
+            gameObject.SetActive(false);
+            return;
+        }
+
+        // Case B close: tween the inset down, sheet slides with the area.
+        _isAnimating = true;
+        _insetTween?.Kill();
+        float start = keyboardPanel != null ? keyboardPanel.ExtraBottomInsetPx : 0f;
+        _insetTween = DOTween.To(
+            () => keyboardPanel.ExtraBottomInsetPx,
+            v  => keyboardPanel.ExtraBottomInsetPx = v,
+            0f,
+            closeDuration)
+            .From(start)
+            .SetEase(Ease.OutCubic)
+            .OnComplete(() =>
+            {
+                _isAnimating = false;
+                if (inputField != null)
+                {
+                    _suppressDeselectListener = true;
+                    inputField.DeactivateInputField();
+                    StartCoroutine(ClearSuppressNextFrame());
+                }
+                // Spec §9.2: swap AFTER the close tween completes.
+                if (messagesBottomPanel != null) messagesBottomPanel.ShowPlusIcon();
+                gameObject.SetActive(false);
+            });
     }
 
     private void OnInputFieldDeselected(string _)
