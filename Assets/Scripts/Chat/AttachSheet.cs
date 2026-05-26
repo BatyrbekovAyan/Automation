@@ -82,8 +82,63 @@ public class AttachSheet : MonoBehaviour
     {
         if (_isOpen || _isAnimating) return;
         _isOpen = true;
-        Debug.Log("[AttachSheet] Open (stub)");
-        // Body filled in Task 7.
+        _openedOverKeyboard = TouchScreenKeyboard.visible;
+
+        // Spec §9.2: icon swap happens BEFORE the open transition starts.
+        if (messagesBottomPanel != null) messagesBottomPanel.ShowKeyboardIcon();
+        if (!gameObject.activeSelf) gameObject.SetActive(true);
+
+        float sheetHeightScreenPx = CanvasPxToScreenPx(sheetHeightCanvasPx);
+
+        if (_openedOverKeyboard)
+        {
+            // Case A: keyboard is visible. Park the inset immediately so the area
+            // stays "up" while we dismiss the OS keyboard. Sheet's Update tracks
+            // the area to y=0 within one frame — visually a panel swap.
+            if (keyboardPanel != null) keyboardPanel.ExtraBottomInsetPx = sheetHeightScreenPx;
+
+            if (inputField != null)
+            {
+                // DeactivateInputField will fire onDeselect synchronously — suppress so it
+                // doesn't recursively trigger Close().
+                _suppressDeselectListener = true;
+                inputField.DeactivateInputField();
+                StartCoroutine(ClearSuppressNextFrame());
+            }
+        }
+        else
+        {
+            // Case B: keyboard is down. Tween the inset up so the area rises smoothly
+            // and the sheet follows.
+            _isAnimating = true;
+            _insetTween?.Kill();
+            float start = keyboardPanel != null ? keyboardPanel.ExtraBottomInsetPx : 0f;
+            _insetTween = DOTween.To(
+                () => keyboardPanel.ExtraBottomInsetPx,
+                v  => keyboardPanel.ExtraBottomInsetPx = v,
+                sheetHeightScreenPx,
+                openDuration)
+                .From(start)
+                .SetEase(Ease.OutCubic)
+                .OnComplete(() => { _isAnimating = false; });
+
+            if (inputField != null)
+            {
+                // Visual selection without raising the OS keyboard (see spec §9.1).
+                _suppressDeselectListener = true;
+                EventSystem.current.SetSelectedGameObject(inputField.gameObject);
+                StartCoroutine(ClearSuppressNextFrame());
+            }
+        }
+    }
+
+    private float CanvasPxToScreenPx(float canvasPx)
+    {
+        if (_canvas == null) return canvasPx;
+        if (_canvas.renderMode == RenderMode.ScreenSpaceOverlay) return canvasPx * _canvas.scaleFactor;
+        float screenH = Screen.height;
+        float canvasH = ((RectTransform)_canvas.transform).rect.height;
+        return canvasH > 0f ? canvasPx * (screenH / canvasH) : canvasPx;
     }
 
     public void Close()
