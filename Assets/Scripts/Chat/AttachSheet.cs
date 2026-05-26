@@ -222,10 +222,10 @@ public class AttachSheet : MonoBehaviour
 
     private void OnCameraTapped()
     {
-        if (NativeGallery.IsMediaPickerBusy()) return;
+        if (NativeCamera.IsCameraBusy()) return;
         Close();
         InvokeAfterClose(() =>
-            NativeGallery.TakePicture(path =>
+            NativeCamera.TakePicture(path =>
             {
                 if (string.IsNullOrEmpty(path)) return;
                 EmitPick(AttachmentKind.Photo, path);
