@@ -40,7 +40,8 @@ public class DeferredDismissInputField : TMP_InputField
         if (dismissPending)
         {
             dismissPending = false;
-            base.OnDeselect(new BaseEventData(EventSystem.current));
+            if (EventSystem.current != null)
+                base.OnDeselect(new BaseEventData(EventSystem.current));
         }
         base.OnDisable();
     }
