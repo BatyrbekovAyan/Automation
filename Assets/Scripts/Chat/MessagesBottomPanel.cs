@@ -26,6 +26,15 @@ public class MessagesBottomPanel : MonoBehaviour
         inputField.onValueChanged.AddListener(UpdateButtonState);
         attachButton.onClick.AddListener(OnAttachClicked);
 
+        // Prevent buttons from stealing EventSystem selection on PointerDown.
+        // Pairs with DeferredDismissInputField: without Navigation.Mode.None,
+        // tapping a button would deselect the focused input field on Down,
+        // which then defers; with Mode.None the input field never receives
+        // OnDeselect in the first place and the EventSystem state stays clean.
+        SetNavigationNone(attachButton);
+        SetNavigationNone(micButton);
+        SetNavigationNone(sendButton);
+
         // Send button uses raw PointerDown for responsiveness.
         sendButton.onClick.RemoveAllListeners();
         EventTrigger trigger = sendButton.gameObject.GetComponent<EventTrigger>();
@@ -35,6 +44,14 @@ public class MessagesBottomPanel : MonoBehaviour
         entry.eventID = EventTriggerType.PointerDown;
         entry.callback.AddListener((data) => { OnSendClicked(); });
         trigger.triggers.Add(entry);
+    }
+
+    private static void SetNavigationNone(Button button)
+    {
+        if (button == null) return;
+        var nav = button.navigation;
+        nav.mode = Navigation.Mode.None;
+        button.navigation = nav;
     }
 
     void OnDisable()
