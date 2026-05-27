@@ -249,7 +249,17 @@
       "Bash(awk 'NR>=2475 && NR<=2540' /Users/ayan/Projects/Automation/Assets/Scripts/UI/MessageItemView.cs)",
       "Bash(grep -v \"^[+-]\\\\s*$\")",
       "Bash(find /Users/ayan/Projects/Automation -path \"*/Library*\" -prune -o -name \"ImageWithRoundedCorners.cs\" -print 2>/dev/null; find ~/Library/Unity -name \"ImageWithRoundedCorners*\" 2>/dev/null | head -3)",
-      "Bash(xxd)"
+      "Bash(xxd)",
+      "Bash(grep -E \"\\\\.cs$\")",
+      "Bash(/Users/ayan/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7/skills/brainstorming/scripts/start-server.sh --project-dir /Users/ayan/Projects/Automation)",
+      "Bash(awk '/m_Name: EventSystem/{found=1} found && /m_Script:/{print; count++; if\\(count>=5\\) exit}' Assets/Scenes/Main.unity)",
+      "Bash(bash .claude/hooks/validate-cs.sh)",
+      "Bash(awk -v 'id=&__TRACKED_VAR__' '$0 ~ id {found=1; count=0} found && count<10 {print; count++} found && count>=10 {exit}' Assets/Scenes/Main.unity)",
+      "Bash(awk '/&1108097616$/{found=1; count=0} found && count<15 {print; count++}' Assets/Scenes/Main.unity)",
+      "Bash(awk '/&1108097614$/{found=1; count=0} found && count<10 {print; count++}' Assets/Scenes/Main.unity)",
+      "Bash(awk -v 'target=&__TRACKED_VAR__' '$0 ~ \"^--- !u!.* \"target\"$\"{found=1; count=0} found && count<10 {print; count++} found && count>=10{exit}' Assets/Scenes/Main.unity)",
+      "Bash(xargs -I{} grep -E \"^guid:\" {})",
+      "Bash(xargs -I{} git add {})"
     ]
   }
 }
