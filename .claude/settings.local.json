@@ -259,7 +259,13 @@
       "Bash(awk '/&1108097614$/{found=1; count=0} found && count<10 {print; count++}' Assets/Scenes/Main.unity)",
       "Bash(awk -v 'target=&__TRACKED_VAR__' '$0 ~ \"^--- !u!.* \"target\"$\"{found=1; count=0} found && count<10 {print; count++} found && count>=10{exit}' Assets/Scenes/Main.unity)",
       "Bash(xargs -I{} grep -E \"^guid:\" {})",
-      "Bash(xargs -I{} git add {})"
+      "Bash(xargs -I{} git add {})",
+      "Bash(mdfind -name \"Unity.app\")",
+      "Bash(ls /Applications/Unity/Hub/Editor/ 2>/dev/null | head -5)",
+      "Bash(grep \"error CS\" /tmp/unity-compile.log || echo \"no compile errors\")",
+      "Bash(xargs -I{} sh -c 'echo \"=== {} ===\"; cat \"{}\"')",
+      "Bash(which msbuild *)",
+      "Bash(msbuild Assembly-CSharp.csproj -t:Build -p:Configuration=Debug -v:m -nologo)"
     ]
   }
 }
