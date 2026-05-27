@@ -155,11 +155,19 @@ public static class InputFieldMigrator
 
     private static void SwapScript(TMP_InputField component, MonoScript newScript)
     {
+        // Capture the GameObject before the swap. Unity invalidates the
+        // MonoBehaviour reference after m_Script is changed (the typed
+        // instance is destroyed and replaced with the new script type), so
+        // EditorUtility.SetDirty(component) would throw ArgumentNullException.
+        // The GameObject reference remains valid through the swap.
+        var owner = component.gameObject;
+
         var so = new SerializedObject(component);
         var scriptProp = so.FindProperty("m_Script");
         scriptProp.objectReferenceValue = newScript;
         so.ApplyModifiedProperties();
-        EditorUtility.SetDirty(component);
+
+        EditorUtility.SetDirty(owner);
     }
 }
 #endif
