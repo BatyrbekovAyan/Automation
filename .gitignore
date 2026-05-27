@@ -54,3 +54,6 @@ Assets/StreamingAssets/secrets.json
 
 # Claude Code local config
 CLAUDE.local.md
+
+# Superpowers / Brainstorming workspace artifacts
+.superpowers/
