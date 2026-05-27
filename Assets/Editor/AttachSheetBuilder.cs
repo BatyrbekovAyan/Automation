@@ -7,10 +7,10 @@ using UnityEngine.UI;
 
 public static class AttachSheetBuilder
 {
-    private const string SheetName = "AttachSheet";
+    private const string SheetName    = "AttachSheet";
+    private const string BackdropName = "AttachSheetBackdrop";
 
     // Layout — canvas-space px at the project's 1080×2400 reference resolution.
-    // SheetHeight sized to feel like a real keyboard area (~30% of canvas height).
     private const float SheetHeight   = 700f;
     private const float TilePrefWidth = 160f;
     private const float TileHeight    = 200f;
@@ -36,42 +36,64 @@ public static class AttachSheetBuilder
             return;
         }
 
-        // Parent the sheet to the root Canvas so it lands at the device's actual bottom,
-        // not at whatever intermediate container's bottom (which may be lifted by layout
-        // rules in the chat screen). Anchored to canvas bottom = sheet's bottom edge sits
-        // at the device bottom, where the OS keyboard renders.
         var canvas = bottomPanel.GetComponentInParent<Canvas>();
         if (canvas == null)
         {
             Debug.LogError("[AttachSheetBuilder] No Canvas found in MessagesBottomPanel's parent chain.");
             return;
         }
-        // Walk up to the root Canvas (in case the bottom panel is under a nested sub-Canvas).
         var rootCanvas = canvas.rootCanvas;
         Transform parent = rootCanvas.transform;
 
-        // Idempotent: nuke ANY existing AttachSheet anywhere under the root Canvas,
-        // not just under the new parent — handles the case where the previous build
-        // placed the sheet under a different parent (e.g. MovingArea before this change).
-        var existingSheets = rootCanvas.GetComponentsInChildren<AttachSheet>(includeInactive: true);
-        foreach (var existing in existingSheets)
-        {
+        // Idempotent: remove any pre-existing sheets + backdrops anywhere under the root Canvas.
+        foreach (var existing in rootCanvas.GetComponentsInChildren<AttachSheet>(includeInactive: true))
             Object.DestroyImmediate(existing.gameObject);
+        for (int i = parent.childCount - 1; i >= 0; i--)
+        {
+            var child = parent.GetChild(i);
+            if (child != null && child.gameObject.name == BackdropName)
+                Object.DestroyImmediate(child.gameObject);
         }
 
+        // ── Backdrop ──────────────────────────────────────────────
+        // Full-screen invisible click catcher. Anchored full-screen, with the bottom
+        // edge raised by SheetHeight so the sheet area is NOT covered (taps on the
+        // sheet itself go to sheet content / tiles, not the backdrop).
+        var backdropGo = new GameObject(BackdropName, typeof(RectTransform), typeof(Image), typeof(Button));
+        backdropGo.transform.SetParent(parent, false);
+        backdropGo.SetActive(false); // hidden until sheet opens
+
+        var backdropRt = (RectTransform)backdropGo.transform;
+        backdropRt.anchorMin = new Vector2(0f, 0f);
+        backdropRt.anchorMax = new Vector2(1f, 1f);
+        backdropRt.offsetMin = new Vector2(0f, SheetHeight); // bottom edge above where sheet sits
+        backdropRt.offsetMax = new Vector2(0f, 0f);
+
+        var backdropImg = backdropGo.GetComponent<Image>();
+        backdropImg.color         = new Color(0f, 0f, 0f, 0f); // transparent
+        backdropImg.raycastTarget = true;
+
+        var backdropBtn = backdropGo.GetComponent<Button>();
+        var backdropNav = backdropBtn.navigation;
+        backdropNav.mode = Navigation.Mode.None;
+        backdropBtn.navigation = backdropNav;
+        backdropBtn.transition = Selectable.Transition.None;
+
+        // ── Sheet ─────────────────────────────────────────────────
         var sheetGo = new GameObject(SheetName, typeof(RectTransform), typeof(Image), typeof(AttachSheet));
         sheetGo.transform.SetParent(parent, false);
+        sheetGo.SetActive(false); // hidden until opened
 
         var rt = (RectTransform)sheetGo.transform;
         rt.anchorMin = new Vector2(0f, 0f);
         rt.anchorMax = new Vector2(1f, 0f);
         rt.pivot     = new Vector2(0.5f, 0f);
-        rt.sizeDelta = new Vector2(0f, SheetHeight);          // height in canvas px; width stretched by anchors
-        rt.anchoredPosition = new Vector2(0f, -SheetHeight);  // start off-screen; AttachSheet.Update will track
+        rt.sizeDelta        = new Vector2(0f, SheetHeight);
+        rt.anchoredPosition = new Vector2(0f, -SheetHeight);
 
         var bg = sheetGo.GetComponent<Image>();
-        bg.color = BackgroundColor;
-        bg.raycastTarget = true; // catches stray taps so they don't bubble through
+        bg.color         = BackgroundColor;
+        bg.raycastTarget = true; // catches taps on the sheet so they don't dismiss
 
         var row = new GameObject("Row", typeof(RectTransform), typeof(HorizontalLayoutGroup));
         row.transform.SetParent(sheetGo.transform, false);
@@ -82,7 +104,7 @@ public static class AttachSheetBuilder
         rowRt.offsetMax = new Vector2(-PaddingX, -PaddingY);
         var hl = row.GetComponent<HorizontalLayoutGroup>();
         hl.childAlignment         = TextAnchor.MiddleCenter;
-        hl.childControlWidth      = true;   // distribute remaining row width across 3 tiles
+        hl.childControlWidth      = true;
         hl.childControlHeight     = false;
         hl.childForceExpandWidth  = true;
         hl.childForceExpandHeight = false;
@@ -92,32 +114,24 @@ public static class AttachSheetBuilder
         var galleryTile  = BuildTile(row.transform, "GalleryOpt",  "Gallery",  GalleryTint);
         var documentTile = BuildTile(row.transform, "DocumentOpt", "Document", DocumentTint);
 
-        // Wire via SerializedObject for undo safety
+        // ── Wire AttachSheet ──────────────────────────────────────
         var attachSheet = sheetGo.GetComponent<AttachSheet>();
         var so = new SerializedObject(attachSheet);
-        SetObjectRef(so, "inputField",          bottomPanel.inputField);
-        // Try the obvious location first (component on the bottom panel), then fall back to
-        // any KeyboardAwarePanel in the open scene — it may be attached elsewhere in the hierarchy.
-        var kbPanel = bottomPanel.GetComponent<KeyboardAwarePanel>();
-        if (kbPanel == null) kbPanel = Object.FindFirstObjectByType<KeyboardAwarePanel>(FindObjectsInactive.Include);
-        SetObjectRef(so, "keyboardPanel", kbPanel);
-        SetObjectRef(so, "messagesBottomPanel", bottomPanel);
-        SetObjectRef(so, "cameraButton",        cameraTile.button);
-        SetObjectRef(so, "galleryButton",       galleryTile.button);
-        SetObjectRef(so, "documentButton",      documentTile.button);
+        SetObjectRef(so, "inputField",     bottomPanel.inputField);
+        SetObjectRef(so, "backdrop",       backdropGo);
+        SetObjectRef(so, "backdropButton", backdropBtn);
+        SetObjectRef(so, "cameraButton",   cameraTile.button);
+        SetObjectRef(so, "galleryButton",  galleryTile.button);
+        SetObjectRef(so, "documentButton", documentTile.button);
         so.ApplyModifiedPropertiesWithoutUndo();
 
-        // Wire MessagesBottomPanel.attachSheet + attachButtonIcon
+        // Wire MessagesBottomPanel.attachSheet
         var soPanel = new SerializedObject(bottomPanel);
         SetObjectRef(soPanel, "attachSheet", attachSheet);
-        var attachIcon = FindButtonIconImage(bottomPanel.attachButton);
-        if (attachIcon != null) SetObjectRef(soPanel, "attachButtonIcon", attachIcon);
-        else Debug.LogWarning("[AttachSheetBuilder] Could not find Image child inside attachButton — please assign attachButtonIcon manually.");
         soPanel.ApplyModifiedPropertiesWithoutUndo();
 
         EditorSceneManager.MarkSceneDirty(bottomPanel.gameObject.scene);
-        Debug.Log("[AttachSheetBuilder] Built AttachSheet. Now assign sprites in the inspector: " +
-                  "MessagesBottomPanel.plusIconSprite/keyboardIconSprite, and each tile's Icon.sprite.");
+        Debug.Log("[AttachSheetBuilder] Built AttachSheet + backdrop. Assign tile icon sprites in the inspector.");
     }
 
     private struct Tile { public GameObject root; public Button button; public Image icon; }
@@ -132,44 +146,41 @@ public static class AttachSheetBuilder
         rt.sizeDelta = new Vector2(TilePrefWidth, TileHeight);
 
         var bg = go.GetComponent<Image>();
-        bg.color = new Color(0, 0, 0, 0);   // transparent tile bg; only icon shows color
-        bg.raycastTarget = true;            // tap target
+        bg.color         = new Color(0, 0, 0, 0);
+        bg.raycastTarget = true;
 
         var vl = go.GetComponent<VerticalLayoutGroup>();
-        vl.childAlignment       = TextAnchor.UpperCenter;
-        vl.childControlWidth    = false;
-        vl.childControlHeight   = false;
+        vl.childAlignment         = TextAnchor.UpperCenter;
+        vl.childControlWidth      = false;
+        vl.childControlHeight     = false;
         vl.childForceExpandWidth  = false;
         vl.childForceExpandHeight = false;
-        vl.spacing = IconSpacing;
-        vl.padding = new RectOffset(0, 0, 0, 0);
+        vl.spacing                = IconSpacing;
+        vl.padding                = new RectOffset(0, 0, 0, 0);
 
         var le = go.GetComponent<LayoutElement>();
         le.preferredWidth  = TilePrefWidth;
         le.preferredHeight = TileHeight;
-        le.flexibleWidth   = 1;          // distribute remaining row width evenly across 3 tiles
+        le.flexibleWidth   = 1;
 
-        // Icon circle
         var iconGo = new GameObject("Icon", typeof(RectTransform), typeof(Image));
         iconGo.transform.SetParent(go.transform, false);
         var iconRt = (RectTransform)iconGo.transform;
         iconRt.sizeDelta = new Vector2(IconSize, IconSize);
         var iconImg = iconGo.GetComponent<Image>();
-        iconImg.color = tint;
-        // Sprite slot stays empty — user drops the white glyph PNG in via inspector after authoring.
+        iconImg.color         = tint;
         iconImg.raycastTarget = false;
 
-        // Label
         var labelGo = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
         labelGo.transform.SetParent(go.transform, false);
         var labelRt = (RectTransform)labelGo.transform;
         labelRt.sizeDelta = new Vector2(TilePrefWidth, 40);
         var tmp = labelGo.GetComponent<TextMeshProUGUI>();
-        tmp.text         = label;
-        tmp.fontSize     = LabelFontSize;
-        tmp.color        = LabelColor;
-        tmp.alignment    = TextAlignmentOptions.Center;
-        tmp.fontStyle    = FontStyles.Normal;
+        tmp.text          = label;
+        tmp.fontSize      = LabelFontSize;
+        tmp.color         = LabelColor;
+        tmp.alignment     = TextAlignmentOptions.Center;
+        tmp.fontStyle     = FontStyles.Normal;
         tmp.raycastTarget = false;
 
         return new Tile { root = go, button = go.GetComponent<Button>(), icon = iconImg };
@@ -185,21 +196,7 @@ public static class AttachSheetBuilder
         }
         p.objectReferenceValue = value;
         if (value == null)
-        {
             Debug.LogWarning($"[AttachSheetBuilder] {so.targetObject.GetType().Name}.{propertyName} was set to null — wiring incomplete, please assign manually in the inspector.");
-        }
-    }
-
-    private static Image FindButtonIconImage(Button button)
-    {
-        if (button == null) return null;
-        // Prefer a child named "Icon" or the first Image that's not the button's own background.
-        foreach (var img in button.GetComponentsInChildren<Image>(true))
-        {
-            if (img.gameObject == button.gameObject) continue; // skip button's own bg
-            return img;
-        }
-        return null;
     }
 }
 #endif

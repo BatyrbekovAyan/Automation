@@ -29,10 +29,6 @@ public class KeyboardAwarePanel : MonoBehaviour
     private float _currentY;
     private float _velocityY;
 
-    // ── attach-sheet hook ──────────────────────────────────────────
-    /// <summary>Set by AttachSheet to keep the keyboard area "up" without an OS keyboard. Screen pixels.</summary>
-    public float ExtraBottomInsetPx { get; set; }
-
     /// <summary>Last computed effective keyboard area in canvas-space pixels. Updated every frame.</summary>
     public float EffectiveAreaCanvasPx { get; private set; }
 
@@ -65,9 +61,8 @@ public class KeyboardAwarePanel : MonoBehaviour
         float editorTarget = _editorKbVisible ? EditorKbTargetHeight : 0f;
         _editorSimulated = Mathf.MoveTowards(_editorSimulated, editorTarget,
                                              EditorKbSpeed * Time.unscaledDeltaTime);
-        float editorEffective = Mathf.Max(_editorSimulated, ExtraBottomInsetPx);
-        EffectiveAreaCanvasPx = ConvertToCanvasSpace(editorEffective);
-        ApplyAndroid(editorEffective);
+        EffectiveAreaCanvasPx = ConvertToCanvasSpace(_editorSimulated);
+        ApplyAndroid(_editorSimulated);
 
 #elif UNITY_ANDROID
         float liveAndroid = GetAndroidLiveHeight();
@@ -113,21 +108,19 @@ public class KeyboardAwarePanel : MonoBehaviour
     float GetAndroidLiveHeight()
     {
 #if UNITY_ANDROID
-        float raw = TouchScreenKeyboard.visible ? (Screen.height - TouchScreenKeyboard.area.y) : 0f;
+        return TouchScreenKeyboard.visible ? (Screen.height - TouchScreenKeyboard.area.y) : 0f;
 #else
-        float raw = 0f;
+        return 0f;
 #endif
-        return Mathf.Max(raw, ExtraBottomInsetPx);
     }
 
     float GetIOSTargetHeight()
     {
 #if UNITY_IOS
-        float raw = TouchScreenKeyboard.visible ? TouchScreenKeyboard.area.height : 0f;
+        return TouchScreenKeyboard.visible ? TouchScreenKeyboard.area.height : 0f;
 #else
-        float raw = 0f;
+        return 0f;
 #endif
-        return Mathf.Max(raw, ExtraBottomInsetPx);
     }
 
     // ── canvas conversion ──────────────────────────────────────────
