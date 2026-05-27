@@ -17,7 +17,17 @@ public class MessageHeaderView : MonoBehaviour
 
     private string currentChatId;
 
-    void OnEnable()
+    // Avatar download deferred from HandleChatSelected because the GameObject
+    // was inactive at the time (SelectChat fires OnChatSelected during Prep,
+    // before OpenChatRoutine activates the panel). Flushed in OnEnable.
+    private ChatViewModel pendingAvatarVm;
+
+    // OnChatSelected subscription lives in Awake (not OnEnable) so the event
+    // delivery works even when the messages panel is inactive — which is the
+    // case between chats (slide-out deactivates the panel) and during the Prep
+    // phase before SlideInToMessages re-activates it. Matches MessageListView's
+    // pattern for the same reason.
+    void Awake()
     {
         if (ChatManager.Instance != null)
         {
@@ -25,7 +35,7 @@ public class MessageHeaderView : MonoBehaviour
         }
     }
 
-    void OnDisable()
+    void OnDestroy()
     {
         if (ChatManager.Instance != null)
         {
@@ -33,9 +43,21 @@ public class MessageHeaderView : MonoBehaviour
         }
     }
 
+    void OnEnable()
+    {
+        if (pendingAvatarVm != null)
+        {
+            var vm = pendingAvatarVm;
+            pendingAvatarVm = null;
+            StartCoroutine(LoadAvatar(vm));
+        }
+    }
+
     void HandleChatSelected(string chatId)
     {
         currentChatId = chatId;
+        pendingAvatarVm = null; // discard any deferred fetch from a previous chat
+
         ChatViewModel vm = ChatManager.Instance.GetChat(chatId);
 
         if (vm == null) return;
@@ -77,11 +99,20 @@ public class MessageHeaderView : MonoBehaviour
 
                 ApplyDefaultAvatarColor(chatId);
 
-                // Fetch from network if it has a URL but wasn't cached
+                // Fetch from network if it has a URL but wasn't cached. StartCoroutine
+                // throws on an inactive GameObject — defer to OnEnable when this fires
+                // during Prep (before OpenChatRoutine activates the panel).
                 if (!string.IsNullOrEmpty(vm.AvatarUrl))
                 {
-                    StopAllCoroutines();
-                    StartCoroutine(LoadAvatar(vm));
+                    if (isActiveAndEnabled)
+                    {
+                        StopAllCoroutines();
+                        StartCoroutine(LoadAvatar(vm));
+                    }
+                    else
+                    {
+                        pendingAvatarVm = vm;
+                    }
                 }
             }
         }
