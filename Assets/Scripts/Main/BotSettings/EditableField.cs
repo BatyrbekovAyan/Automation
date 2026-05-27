@@ -2,6 +2,7 @@ using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace Automation.BotSettingsUI
@@ -66,21 +67,58 @@ namespace Automation.BotSettingsUI
 
         private void Update()
         {
-            // TMP_InputField on iOS doesn't reliably fire onSelect when the
-            // SAME input is re-tapped after being deselected (EventSystem
-            // activates the field and brings the keyboard back up, but the
-            // onSelect UnityEvent never invokes). Result: our isFocused flag
-            // stays stale-false, Blur() later sees !isFocused and early-
-            // returns without firing Blurred — the sheet misses the dismissal
-            // signal and lags through the slow debounce path.
-            //
-            // Poll input.isFocused each frame. When it flips to true behind
-            // our back, synthesize the select we didn't get. (input.isFocused
-            // is an EventSystem.currentSelectedGameObject comparison — cheap.)
             if (input == null) return;
-            if (input.isFocused && !isFocused)
+
+            var es = EventSystem.current;
+            var sel = es != null ? es.currentSelectedGameObject : null;
+            bool esSelectsUs = sel == input.gameObject;
+
+            // Synthesize-Select: TMP_InputField on iOS doesn't reliably fire
+            // onSelect when the SAME input is re-tapped after being deselected
+            // (EventSystem activates the field and brings the keyboard back
+            // up, but the onSelect UnityEvent never invokes). Without this,
+            // our isFocused stays stale-false, Blur() later sees !isFocused
+            // and early-returns without firing Blurred — the sheet misses the
+            // dismissal signal and lags through the slow debounce path.
+            //
+            // The esSelectsUs guard prevents flip-flopping with the reconcile
+            // branch below: after a smooth-switch, m_AllowInput (which backs
+            // input.isFocused) stays true on the deselected field because
+            // DeferredDismissInputField skipped base.OnDeselect → no
+            // DeactivateInputField call. Without the guard, the reconcile
+            // branch would clear isFocused and this branch would re-set it
+            // every other frame.
+            if (input.isFocused && !isFocused && esSelectsUs)
             {
                 HandleSelect(null);
+            }
+            // Smooth-switch reconciliation: EventSystem has moved focus to
+            // another TMP_InputField while we still believe we're focused.
+            // DeferredDismissInputField intentionally skipped base.OnDeselect
+            // on us so the OS keyboard stays up for the new field — but that
+            // also skipped DeactivateInputField, so onEndEdit → HandleEndEdit
+            // → Blur never fired and our isFocused is stale-true.
+            //
+            // Reconcile wrapper state with deactivateInput:false. Calling
+            // input.DeactivateInputField() here would set m_Keyboard.active =
+            // false and dismiss the OS keyboard — the exact behavior
+            // DeferredDismissInputField exists to prevent.
+            //
+            // Gated to "sel is another TMP_InputField" because the outside-
+            // tap case (sel is null or a non-input Selectable) is already
+            // handled by DeferredDismissInputField.Update → base.OnDeselect
+            // → DeactivateInputField → onEndEdit → HandleEndEdit → Blur on
+            // pointer release. Timing note: EventSystem has
+            // DefaultExecutionOrder = -1000, so B.OnSelect runs (and
+            // ItemEditSheet.HandleFieldSelected sets lastSelectedFrame)
+            // before any default-order Update, which lets the same-frame
+            // guard in HandleFieldBlurred swallow the spurious Blurred we
+            // emit here without setting dismissingKeyboard.
+            else if (isFocused && !esSelectsUs
+                     && sel != null
+                     && sel.GetComponent<TMP_InputField>() != null)
+            {
+                Blur(commit: true, deactivateInput: false);
             }
         }
 
@@ -104,7 +142,15 @@ namespace Automation.BotSettingsUI
 
         private void HandleEndEdit(string _) => Blur(commit: true);
 
-        public void Blur(bool commit)
+        public void Blur(bool commit) => Blur(commit, deactivateInput: true);
+
+        // deactivateInput:false is for the smooth-switch reconcile path in
+        // Update() — the wrapper bookkeeping needs to run but calling
+        // input.DeactivateInputField() would dismiss the OS keyboard that
+        // the newly focused field is now driving. All other callers go
+        // through the public single-arg overload above and keep the original
+        // behavior of deactivating the input as part of Blur.
+        private void Blur(bool commit, bool deactivateInput)
         {
             if (!isFocused) return;
             isFocused = false;
@@ -113,7 +159,7 @@ namespace Automation.BotSettingsUI
             if (commit && current != focusValue)
                 OnCommitted.Invoke(current);
 
-            input.DeactivateInputField();
+            if (deactivateInput) input.DeactivateInputField();
             if (scrim != null && scrim.IsShowing) scrim.Hide();
             OnBlurred();
             Blurred?.Invoke(this);
