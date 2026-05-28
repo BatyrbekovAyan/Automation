@@ -48,6 +48,10 @@ public class AttachmentPreviewScreen : MonoBehaviour
     private Tween          _fadeTween;
     private AspectRatioFitter _imagePreviewFitter;
     private AspectRatioFitter _videoPreviewFitter;
+    private TextMeshProUGUI _sizeErrorLabel;
+    private Tween           _sizeErrorTween;
+
+    private const long MaxVideoUploadBytes = 16L * 1024 * 1024;   // WhatsApp-like; tunable
 
     void Awake()
     {
@@ -83,6 +87,7 @@ public class AttachmentPreviewScreen : MonoBehaviour
         if (backButton  != null) backButton.onClick.RemoveListener(OnBackTapped);
 
         _fadeTween?.Kill();
+        _sizeErrorTween?.Kill();
         ReleasePreviewTexture();
         _currentPick = null;
     }
@@ -259,6 +264,17 @@ public class AttachmentPreviewScreen : MonoBehaviour
     private void OnSendTapped()
     {
         if (_currentPick == null) return;
+
+        // Reject over-cap video BEFORE staging. pick.FileSizeBytes is already
+        // populated by the picker (used for the document size label), so no extra I/O.
+        if (_currentPick.Kind == AttachmentKind.GalleryVideo &&
+            _currentPick.FileSizeBytes > MaxVideoUploadBytes)
+        {
+            ShowSizeError($"Video is too large to send (max {MaxVideoUploadBytes / (1024 * 1024)} MB).");
+            if (sendButton != null) sendButton.interactable = true;   // let the user go Back and re-pick
+            return;                                                   // do NOT stage, do NOT close
+        }
+
         if (sendButton != null) sendButton.interactable = false;
 
         string caption = captionField != null ? (captionField.text ?? "").Trim() : "";
@@ -321,5 +337,51 @@ public class AttachmentPreviewScreen : MonoBehaviour
         }
         if (imagePreview != null) imagePreview.texture = null;
         if (videoPreview != null) videoPreview.texture = null;
+    }
+
+    /// <summary>
+    /// Shows a transient error line on the preview (e.g. "video too large").
+    /// The label is created lazily in code so this needs no builder change and
+    /// no serialized reference. Auto-fades after a few seconds.
+    /// </summary>
+    private void ShowSizeError(string message)
+    {
+        Debug.LogWarning($"[AttachmentPreviewScreen] {message}");
+        EnsureSizeErrorLabel();
+        if (_sizeErrorLabel == null) return;
+
+        _sizeErrorLabel.text = message;
+        _sizeErrorLabel.gameObject.SetActive(true);
+        _sizeErrorLabel.alpha = 1f;
+
+        _sizeErrorTween?.Kill();
+        _sizeErrorTween = DOTween.Sequence()
+            .AppendInterval(2.5f)
+            .Append(DOTween.To(() => _sizeErrorLabel.alpha, v => _sizeErrorLabel.alpha = v, 0f, 0.3f))
+            .OnComplete(() => { if (_sizeErrorLabel != null) _sizeErrorLabel.gameObject.SetActive(false); });
+    }
+
+    private void EnsureSizeErrorLabel()
+    {
+        if (_sizeErrorLabel != null) return;
+        if (bottomBarRect == null) return;   // built hierarchy missing; skip gracefully
+
+        var go = new GameObject("SizeErrorLabel", typeof(RectTransform));
+        var rt = go.GetComponent<RectTransform>();
+        rt.SetParent(bottomBarRect, worldPositionStays: false);
+        // Stretch horizontally, sit just above the bottom bar, in the thumb zone.
+        rt.anchorMin = new Vector2(0f, 1f);
+        rt.anchorMax = new Vector2(1f, 1f);
+        rt.pivot     = new Vector2(0.5f, 0f);
+        rt.offsetMin = new Vector2(16f, 8f);
+        rt.offsetMax = new Vector2(-16f, 44f);
+
+        _sizeErrorLabel = go.AddComponent<TextMeshProUGUI>();
+        _sizeErrorLabel.fontSize          = 14f;
+        _sizeErrorLabel.color             = new Color(1f, 0.42f, 0.42f, 1f);  // soft red
+        _sizeErrorLabel.alignment         = TextAlignmentOptions.Center;
+        _sizeErrorLabel.raycastTarget     = false;
+        _sizeErrorLabel.textWrappingMode  = TextWrappingModes.Normal;
+        go.SetActive(false);
     }
 }
