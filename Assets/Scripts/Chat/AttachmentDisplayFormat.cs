@@ -10,8 +10,8 @@ public static class AttachmentDisplayFormat
     {
         if (bytes < KB) return "<1 KB";
         if (bytes < MB) return $"{bytes / KB} KB";
-        if (bytes < GB) return ((double)bytes / MB).ToString("0.0", CultureInfo.InvariantCulture) + " MB";
-        return ((double)bytes / GB).ToString("0.0", CultureInfo.InvariantCulture) + " GB";
+        if (bytes < GB) return string.Format(CultureInfo.InvariantCulture, "{0:0.0} MB", (double)bytes / MB);
+        return string.Format(CultureInfo.InvariantCulture, "{0:0.0} GB", (double)bytes / GB);
     }
 
     public static string ShortMime(string mime)

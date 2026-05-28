@@ -4,7 +4,6 @@ public class AttachmentDisplayFormatTests
 {
     // ── HumanReadableBytes ────────────────────────────────────────
 
-    [TestCase(0L,           "<1 KB")]
     [TestCase(512L,         "<1 KB")]
     [TestCase(1023L,        "<1 KB")]
     [TestCase(1024L,        "1 KB")]
@@ -20,6 +19,7 @@ public class AttachmentDisplayFormatTests
         Assert.AreEqual(expected, AttachmentDisplayFormat.HumanReadableBytes(bytes));
     }
 
+    [TestCase(0L,           "<1 KB")]
     [TestCase(-1L,          "<1 KB")]
     [TestCase(long.MinValue, "<1 KB")]
     public void HumanReadableBytes_NegativeOrZero_ReturnsLessThanOneKb(long bytes, string expected)
@@ -32,6 +32,7 @@ public class AttachmentDisplayFormatTests
     [TestCase(null,                                                                                  "")]
     [TestCase("",                                                                                    "")]
     [TestCase("no-slash",                                                                            "")]
+    [TestCase("application/",                                                                        "")]
     [TestCase("application/pdf",                                                                     "PDF")]
     [TestCase("image/jpeg",                                                                          "JPEG")]
     [TestCase("image/png",                                                                           "PNG")]
