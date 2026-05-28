@@ -43,12 +43,15 @@ public partial class ChatManager
     private IEnumerator RetryRoutine(string tempId, OutboxStore.OutboxEntry entry)
     {
         // Snapshot the cache root BEFORE any yield, mirroring SendTextMessageRoutine
-        // (line 694) so a same-frame bot switch can't redirect the retry's
-        // cache write to the wrong bot's folder.
+        // so a same-frame bot switch can't redirect the retry's cache write to the
+        // wrong bot's folder.
         string retryCacheRoot = GetCacheRoot();
         try
         {
-            yield return PostTextMessageRoutine(entry.chatId, entry.text, tempId, entry.profileId, retryCacheRoot);
+            if (entry.kind == (int)OutboxKind.Media)
+                yield return PostMediaMessageRoutine(entry, retryCacheRoot);
+            else
+                yield return PostTextMessageRoutine(entry.chatId, entry.text, tempId, entry.profileId, retryCacheRoot);
         }
         finally
         {
