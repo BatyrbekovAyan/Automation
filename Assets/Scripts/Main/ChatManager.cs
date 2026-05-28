@@ -1501,6 +1501,12 @@ public void StageLocalMedia(AttachmentPick pick, string caption, Texture2D prelo
             }
             else
             {
+                // Fallback: only reached if AttachmentPreviewScreen.LoadTextureFromFile
+                // returned null (decode failed). SeedImageCache will try the same path
+                // again and likely fail the same way — known performance cliff on the
+                // already-failing path. Part c's outbox-retry caller may legitimately
+                // call StageLocalMedia without a preloaded texture; revisit the
+                // double-decode shape then.
                 var img = SeedImageCache(pick.Path, tempId);
                 vm.mediaUrl    = img.syntheticUrl;
                 vm.aspectRatio = img.aspect;
@@ -1522,6 +1528,13 @@ public void StageLocalMedia(AttachmentPick pick, string caption, Texture2D prelo
             // The staged:// URL is a placeholder — document bubbles don't decode it, only
             // check it's non-empty. Tap-to-open won't work in part b (no real upload yet)
             // but the bubble visually renders with the file icon + name + size.
+            //
+            // The document path at MessageItemView.cs:616 also checks
+            //   isLinkExpired = vm.expireTime > 0 && vm.expireTime < now
+            // which evaluates to false because vm.expireTime stays at 0 here. If a
+            // future change defaults vm.expireTime to "now" for staged messages
+            // (e.g. for UI timestamp display), the needsDownload guard would flip
+            // true and re-break this. Keep expireTime at 0 for staged documents.
             vm.mediaUrl = $"staged://document/{tempId}";
             break;
     }
@@ -1571,6 +1584,11 @@ private string SeedImageCacheFromTexture(Texture2D tex, string tempId)
 {
     string syntheticUrl = $"staged://image/{tempId}";
     if (tex == null) return syntheticUrl;
+    if (MediaCacheManager.Instance == null)
+    {
+        Debug.LogWarning("[ChatManager] SeedImageCacheFromTexture: MediaCacheManager.Instance is null");
+        return syntheticUrl;
+    }
     try
     {
         // Re-encode as JPEG so MediaCacheManager's downstream Texture2D.LoadImage
