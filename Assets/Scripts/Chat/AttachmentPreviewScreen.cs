@@ -226,9 +226,13 @@ public class AttachmentPreviewScreen : MonoBehaviour
 
     private static Texture2D LoadTextureFromFile(string path)
     {
-        if (string.IsNullOrEmpty(path) || !System.IO.File.Exists(path)) return null;
         try
         {
+            // Guard inside the try so a TOCTOU race (file deleted between this
+            // check and NativeGallery's own File.Exists at line 733) is caught by
+            // the FileNotFoundException handler below instead of escaping uncaught.
+            if (string.IsNullOrEmpty(path) || !System.IO.File.Exists(path)) return null;
+
             // NativeGallery.LoadImageAtPath handles HEIC → JPG conversion on iOS
             // natively. Unity's Texture2D.LoadImage cannot decode HEIC, so iPhone
             // camera shots would silently render as the default 2×2 white texture.
