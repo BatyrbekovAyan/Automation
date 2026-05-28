@@ -1518,7 +1518,11 @@ public void StageLocalMedia(AttachmentPick pick, string caption, Texture2D prelo
 
         case AttachmentKind.Document:
             vm.type = MessageType.Document;
-            // No mediaUrl/videoUrl — document bubble uses fileName + fileSize + mimeType.
+            // Non-empty mediaUrl bypasses MessageItemView's isMissing guard at line 615.
+            // The staged:// URL is a placeholder — document bubbles don't decode it, only
+            // check it's non-empty. Tap-to-open won't work in part b (no real upload yet)
+            // but the bubble visually renders with the file icon + name + size.
+            vm.mediaUrl = $"staged://document/{tempId}";
             break;
     }
 
