@@ -315,6 +315,9 @@ public static class AttachmentPreviewScreenBuilder
         SetObjectRef(so, "imagePanel",        imagePanel);
         SetObjectRef(so, "videoPanel",        videoPanel);
         SetObjectRef(so, "documentPanel",     documentPanel);
+        SetObjectRef(so, "topBarRect",        (RectTransform)topBar.transform);
+        SetObjectRef(so, "bottomBarRect",     (RectTransform)bottomBar.transform);
+        SetObjectRef(so, "contentAreaRect",   (RectTransform)contentGo.transform);
         SetObjectRef(so, "imagePreview",      imagePreview);
         SetObjectRef(so, "videoPreview",      videoPreview);
         SetObjectRef(so, "videoPlayOverlay",  playOverlayGo);

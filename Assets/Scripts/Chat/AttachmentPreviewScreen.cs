@@ -21,6 +21,9 @@ public class AttachmentPreviewScreen : MonoBehaviour
     [SerializeField] private GameObject  imagePanel;
     [SerializeField] private GameObject  videoPanel;
     [SerializeField] private GameObject  documentPanel;
+    [SerializeField] private RectTransform topBarRect;
+    [SerializeField] private RectTransform bottomBarRect;
+    [SerializeField] private RectTransform contentAreaRect;
     [SerializeField] private RawImage    imagePreview;
     [SerializeField] private RawImage    videoPreview;
     [SerializeField] private GameObject  videoPlayOverlay;
@@ -58,6 +61,8 @@ public class AttachmentPreviewScreen : MonoBehaviour
 
         if (imagePreview != null) _imagePreviewFitter = imagePreview.GetComponent<AspectRatioFitter>();
         if (videoPreview != null) _videoPreviewFitter = videoPreview.GetComponent<AspectRatioFitter>();
+
+        ApplySafeArea();
     }
 
     // This component must live on a permanently-active GameObject (the script
@@ -189,6 +194,34 @@ public class AttachmentPreviewScreen : MonoBehaviour
             return;
         }
         fitter.aspectRatio = (float)tex.width / tex.height;
+    }
+
+    private void ApplySafeArea()
+    {
+        var canvas = GetComponentInParent<Canvas>();
+        if (canvas == null) return;
+
+        float scale = canvas.scaleFactor > 0f ? canvas.scaleFactor : 1f;
+        float topSafePx    = Mathf.Max(0f, (Screen.height - Screen.safeArea.yMax) / scale);
+        float bottomSafePx = Mathf.Max(0f, Screen.safeArea.y / scale);
+
+        if (topBarRect != null)
+        {
+            var pos = topBarRect.anchoredPosition;
+            topBarRect.anchoredPosition = new Vector2(pos.x, -topSafePx);
+        }
+        if (bottomBarRect != null)
+        {
+            var pos = bottomBarRect.anchoredPosition;
+            bottomBarRect.anchoredPosition = new Vector2(pos.x, bottomSafePx);
+        }
+        if (contentAreaRect != null)
+        {
+            var maxOff = contentAreaRect.offsetMax;
+            var minOff = contentAreaRect.offsetMin;
+            contentAreaRect.offsetMax = new Vector2(maxOff.x, maxOff.y - topSafePx);
+            contentAreaRect.offsetMin = new Vector2(minOff.x, minOff.y + bottomSafePx);
+        }
     }
 
     private static Texture2D LoadTextureFromFile(string path)
