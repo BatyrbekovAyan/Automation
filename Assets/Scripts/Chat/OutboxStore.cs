@@ -4,6 +4,9 @@ using System.IO;
 using System.Text;
 using UnityEngine;
 
+/// <summary>Discriminator for OutboxEntry. Append-only; persisted as int ordinal.</summary>
+public enum OutboxKind { Text = 0, Media = 1 }
+
 /// <summary>
 /// Per-bot, per-chat persisted queue of unresolved outgoing sends.
 /// Entries are added when SendTextMessage fires its optimistic UI update,
@@ -25,12 +28,25 @@ public class OutboxStore
     [Serializable]
     public class OutboxEntry
     {
+        // --- existing (unchanged) ---
         public string tempId;
         public string chatId;
-        public string text;
-        public long timestamp;
-        public int attemptCount;
+        public string text;          // caption for media entries
+        public long   timestamp;
+        public int    attemptCount;
         public string profileId;
+
+        // --- appended for part c (append-only; JsonUtility fills missing as default) ---
+        public int    kind;            // OutboxKind ordinal; 0 = Text (back-compat default)
+        public int    attachmentKind;  // AttachmentKind ordinal (Photo=0..Document=3)
+        public string mediaPath;       // upload byte source: staged-JPEG path (image) | pick.Path (video/doc)
+        public string mimeType;
+        public string fileName;
+        public string mediaUrl;        // staged://image/{tempId} or staged://document/{tempId}
+        public string thumbnailUrl;    // thumb://staged/{tempId} (video)
+        public string videoUrl;        // file://{pick.Path} (video, in-session playback)
+        public float  aspectRatio;
+        public int    duration;
     }
 
     [Serializable]
