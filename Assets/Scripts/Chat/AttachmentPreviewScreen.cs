@@ -43,6 +43,8 @@ public class AttachmentPreviewScreen : MonoBehaviour
     private AttachmentPick _currentPick;
     private Texture2D      _currentPreviewTexture;
     private Tween          _fadeTween;
+    private AspectRatioFitter _imagePreviewFitter;
+    private AspectRatioFitter _videoPreviewFitter;
 
     void Awake()
     {
@@ -53,6 +55,9 @@ public class AttachmentPreviewScreen : MonoBehaviour
             rootCanvasGroup.interactable   = false;
             rootCanvasGroup.blocksRaycasts = false;
         }
+
+        if (imagePreview != null) _imagePreviewFitter = imagePreview.GetComponent<AspectRatioFitter>();
+        if (videoPreview != null) _videoPreviewFitter = videoPreview.GetComponent<AspectRatioFitter>();
     }
 
     // This component must live on a permanently-active GameObject (the script
@@ -116,6 +121,7 @@ public class AttachmentPreviewScreen : MonoBehaviour
 
         _currentPreviewTexture = LoadTextureFromFile(pick.Path);
         imagePreview.texture = _currentPreviewTexture;
+        ApplyAspectRatio(_imagePreviewFitter, _currentPreviewTexture);
     }
 
     private void PopulateVideoPanel(AttachmentPick pick)
@@ -131,6 +137,7 @@ public class AttachmentPreviewScreen : MonoBehaviour
 
         _currentPreviewTexture = thumb;
         videoPreview.texture = thumb;
+        ApplyAspectRatio(_videoPreviewFitter, thumb);
 
         int durationSec = 0;
         try
@@ -171,6 +178,17 @@ public class AttachmentPreviewScreen : MonoBehaviour
                 return entry.sprite != null ? entry.sprite : documentFallbackIcon;
         }
         return documentFallbackIcon;
+    }
+
+    private static void ApplyAspectRatio(AspectRatioFitter fitter, Texture2D tex)
+    {
+        if (fitter == null) return;
+        if (tex == null || tex.width <= 0 || tex.height <= 0)
+        {
+            fitter.aspectRatio = 1f;
+            return;
+        }
+        fitter.aspectRatio = (float)tex.width / tex.height;
     }
 
     private static Texture2D LoadTextureFromFile(string path)
