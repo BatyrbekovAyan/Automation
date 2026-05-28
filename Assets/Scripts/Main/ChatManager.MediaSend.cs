@@ -1,28 +1,43 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using Newtonsoft.Json;
 using UnityEngine;
+using UnityEngine.Networking;
 
 /// <summary>
 /// Media-attachment send concerns split out of ChatManager — keeps the
 /// god-object trimmer and groups related behavior. Mirrors ChatManager.Outbox.cs
 /// and ChatManager.BotState.cs. Houses optimistic staging, the per-kind cache
-/// seed helpers, and (Task 5) the Wappi upload + reconcile coroutine.
+/// seed helpers, and the Wappi upload + reconcile coroutine.
 /// </summary>
 public partial class ChatManager
 {
     /// <summary>
-    /// Part "b" optimistic-staging for media attachments. Builds a
+    /// Optimistic media-attachment send (text-path parity). Builds a
     /// MessageViewModel from the AttachmentPick + caption, pre-seeds the
     /// image/video thumbnail into MediaCacheManager under a synthetic
-    /// "staged://" URL so existing bubble views render unchanged, then
-    /// fires OnLiveMessagesReceived. Does NOT persist (no ChatHistoryCache,
-    /// no Outbox) and does NOT upload to Wappi — part "c" replaces this body
-    /// with the real upload + persist path.
+    /// "staged://" URL so existing bubble views render unchanged, persists to
+    /// ChatHistoryCache, enqueues a media Outbox entry (tap-to-retry + survives
+    /// reopen), fires OnLiveMessagesReceived for the optimistic bubble, then
+    /// dispatches PostMediaMessageRoutine to upload to Wappi and reconcile the
+    /// temp id → real message_id. Mirrors SendTextMessageRoutine.
     /// </summary>
     public void StageLocalMedia(AttachmentPick pick, string caption, Texture2D preloadedImage = null)
     {
         if (string.IsNullOrEmpty(currentChatId)) return;
         if (pick == null || string.IsNullOrEmpty(pick.Path)) return;
+
+        // Snapshot the originating bot's cache root + profile BEFORE any work so the
+        // upload/reconcile lands in the bot the media was sent on, even across a
+        // mid-send bot switch (mirrors SendTextMessageRoutine).
+        string sendCacheRoot   = GetCacheRoot();
+        string activeProfileId = GetActiveProfileId();
+        if (string.IsNullOrEmpty(activeProfileId))
+        {
+            Debug.LogWarning("[ChatManager] StageLocalMedia aborted: no valid profile for active bot.");
+            return;
+        }
 
         string tempId = "staging_" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
@@ -95,7 +110,149 @@ public partial class ChatManager
                 break;
         }
 
+        // ---- persist (parity with SendTextMessageRoutine) ----
+        List<MessageViewModel> cachedList = ChatHistoryCache.LoadHistory(sendCacheRoot, currentChatId);
+        cachedList.Add(vm);
+        ChatHistoryCache.SaveHistory(sendCacheRoot, currentChatId, cachedList);
+
+        var chatVm = GetChat(currentChatId);
+        if (chatVm != null) chatVm.UpdateLastMessage(LastMessagePreview(pick, caption), now);
+
+        // ---- enqueue media outbox entry (tap-to-retry + survives reopen) ----
+        // Image byte source is the staged JPEG already on disk in persistentDataPath;
+        // video/document point at the original picked path (light retry durability).
+        // A null MediaCacheManager means the image was never seeded to disk
+        // (SeedImageCacheFromTexture no-ops on a null Instance), so fall back to the
+        // original picked file rather than NRE dereferencing Instance here.
+        string mediaPath = (vm.type == MessageType.Image && MediaCacheManager.Instance != null)
+            ? MediaCacheManager.Instance.GetFilePathFromUrl(vm.mediaUrl)
+            : pick.Path;
+
+        var entry = new OutboxStore.OutboxEntry
+        {
+            tempId         = tempId,
+            chatId         = currentChatId,
+            text           = caption ?? "",
+            timestamp      = now,
+            attemptCount   = 1,
+            profileId      = activeProfileId,
+            kind           = (int)OutboxKind.Media,
+            attachmentKind = (int)pick.Kind,
+            mediaPath      = mediaPath,
+            mimeType       = pick.MimeType,
+            fileName       = pick.FileName,
+            mediaUrl       = vm.mediaUrl,
+            thumbnailUrl   = vm.thumbnailUrl,
+            videoUrl       = vm.videoUrl,
+            aspectRatio    = vm.aspectRatio,
+            duration       = vm.duration
+        };
+        Outbox.Add(entry);
+
+        // ---- optimistic UI (unchanged from part b) ----
         OnLiveMessagesReceived?.Invoke(new List<MessageViewModel> { vm });
+
+        // ---- network half on Manager.Instance (bot-switch safe), like SendTextMessage ----
+        // entry is the same reference Outbox.Add just stored — no Find round-trip needed.
+        MonoBehaviour runner = Manager.Instance != null ? (MonoBehaviour)Manager.Instance : this;
+        runner.StartCoroutine(PostMediaMessageRoutine(entry, sendCacheRoot));
+    }
+
+    /// <summary>
+    /// Chat-list preview text for a staged attachment: a non-empty caption wins,
+    /// else a kind label. New helper — the text path passes its text straight into
+    /// UpdateLastMessage, so there was no existing formatter to reuse.
+    /// </summary>
+    private static string LastMessagePreview(AttachmentPick pick, string caption)
+    {
+        if (!string.IsNullOrEmpty(caption)) return caption;
+        switch (pick.Kind)
+        {
+            case AttachmentKind.GalleryVideo: return "🎞 Video";
+            case AttachmentKind.Document:     return "📄 " + (string.IsNullOrEmpty(pick.FileName) ? "Document" : pick.FileName);
+            default:                          return "📷 Photo";
+        }
+    }
+
+    /// <summary>
+    /// Network half of an outgoing media send. Shared by the initial optimistic
+    /// send (StageLocalMedia) and tap-to-retry (RetryRoutine). Encodes the file
+    /// off-thread, POSTs to the kind-specific Wappi endpoint, and reconciles the
+    /// temp id → real message_id exactly like PostTextMessageRoutine. Fires
+    /// OnMessageStatusChanged on both success and failure; does NOT own outbox
+    /// lifecycle beyond the success RemoveAt (callers own the rest).
+    /// </summary>
+    private IEnumerator PostMediaMessageRoutine(OutboxStore.OutboxEntry entry, string sendCacheRoot)
+    {
+        if (entry == null) yield break;
+
+        var kind = (AttachmentKind)entry.attachmentKind;
+        string url = WappiMediaRequestFactory.EndpointFor(kind, entry.profileId);
+        if (string.IsNullOrEmpty(url))
+        {
+            Debug.LogError($"[Wappi] no media endpoint for kind {kind}");
+            OnMessageStatusChanged?.Invoke(entry.tempId, entry.tempId, DeliveryStatus.Failed);
+            yield break;
+        }
+
+        // --- off-thread read + base64 (no frame hitch / no OOM stall on the main thread) ---
+        var encodeTask = Base64Encoder.EncodeFileAsync(entry.mediaPath);
+        yield return new WaitUntil(() => encodeTask.IsCompleted);
+        if (encodeTask.IsFaulted || string.IsNullOrEmpty(encodeTask.Result))
+        {
+            Debug.LogError($"[Wappi] media encode failed for {entry.mediaPath}: {encodeTask.Exception?.Message}");
+            OnMessageStatusChanged?.Invoke(entry.tempId, entry.tempId, DeliveryStatus.Failed);
+            yield break;
+        }
+
+        string body = WappiMediaRequestFactory.BuildBody(kind, entry.chatId, entry.text, entry.fileName, encodeTask.Result);
+
+        using UnityWebRequest www = new UnityWebRequest(url, "POST");
+        www.uploadHandler   = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(body));
+        www.downloadHandler = new DownloadHandlerBuffer();
+        www.SetRequestHeader("Content-Type", "application/json");
+        www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
+        www.timeout = 30;
+
+        yield return www.SendWebRequest();
+
+        if (www.result != UnityWebRequest.Result.Success)
+        {
+            Debug.LogError($"[Wappi] {url} failed: {www.error}\n{www.downloadHandler?.text}");
+            OnMessageStatusChanged?.Invoke(entry.tempId, entry.tempId, DeliveryStatus.Failed);
+            yield break;
+        }
+
+        WappiSendTextResponse resp = null;
+        try { resp = JsonConvert.DeserializeObject<WappiSendTextResponse>(www.downloadHandler.text); }
+        catch (Exception ex) { Debug.LogError($"[Wappi] media response parse failed: {ex.Message}\n{www.downloadHandler.text}"); }
+
+        if (resp != null && resp.status == "done" && !string.IsNullOrEmpty(resp.message_id))
+        {
+            // --- identical reconcile to PostTextMessageRoutine ---
+            seenMessageIds.Remove(entry.tempId);
+            seenMessageIds.Add(resp.message_id);
+
+            List<MessageViewModel> cached = ChatHistoryCache.LoadHistory(sendCacheRoot, entry.chatId);
+            for (int i = 0; i < cached.Count; i++)
+            {
+                if (cached[i].messageId == entry.tempId)
+                {
+                    cached[i].messageId      = resp.message_id;
+                    cached[i].deliveryStatus = DeliveryStatus.Sent;
+                    break;
+                }
+            }
+            ChatHistoryCache.SaveHistory(sendCacheRoot, entry.chatId, cached);
+
+            Outbox.RemoveAt(sendCacheRoot, entry.chatId, entry.tempId);
+            OnMessageStatusChanged?.Invoke(entry.tempId, resp.message_id, DeliveryStatus.Sent);
+        }
+        else
+        {
+            Debug.LogWarning($"[Wappi] media send returned non-done status: {www.downloadHandler.text}");
+            OnMessageStatusChanged?.Invoke(entry.tempId, entry.tempId, DeliveryStatus.Failed);
+        }
     }
 
     private (string syntheticUrl, float aspect) SeedImageCache(string localPath, string tempId)
