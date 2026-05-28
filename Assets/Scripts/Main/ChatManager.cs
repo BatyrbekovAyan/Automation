@@ -1521,12 +1521,24 @@ private (string syntheticUrl, float aspect) SeedImageCache(string localPath, str
     Texture2D tex = null;
     try
     {
-        byte[] bytes = System.IO.File.ReadAllBytes(localPath);
-        string targetPath = MediaCacheManager.Instance.GetFilePathFromUrl(syntheticUrl);
-        System.IO.File.WriteAllBytes(targetPath, bytes);
+        // NativeGallery.LoadImageAtPath decodes HEIC → RGBA natively on iOS.
+        // markTextureNonReadable: false so we can EncodeToJPG below.
+        tex = NativeGallery.LoadImageAtPath(localPath,
+                                            markTextureNonReadable: false,
+                                            generateMipmaps: false);
+        if (tex == null)
+        {
+            Debug.LogWarning($"[ChatManager] SeedImageCache: LoadImageAtPath returned null for {localPath}");
+            return (syntheticUrl, 1.0f);
+        }
 
-        tex = new Texture2D(2, 2);
-        if (!tex.LoadImage(bytes)) return (syntheticUrl, 1.0f);
+        // Re-encode as JPEG so MediaCacheManager's downstream Texture2D.LoadImage
+        // (which is JPG/PNG only) reads it back successfully — even if the source
+        // file was HEIC.
+        byte[] jpgBytes = tex.EncodeToJPG(90);
+        string targetPath = MediaCacheManager.Instance.GetFilePathFromUrl(syntheticUrl);
+        System.IO.File.WriteAllBytes(targetPath, jpgBytes);
+
         float aspect = tex.height > 0 ? (float)tex.width / tex.height : 1.0f;
         return (syntheticUrl, aspect);
     }

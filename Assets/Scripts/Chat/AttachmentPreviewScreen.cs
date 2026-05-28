@@ -175,17 +175,13 @@ public class AttachmentPreviewScreen : MonoBehaviour
 
     private static Texture2D LoadTextureFromFile(string path)
     {
+        if (string.IsNullOrEmpty(path) || !System.IO.File.Exists(path)) return null;
         try
         {
-            if (string.IsNullOrEmpty(path) || !System.IO.File.Exists(path)) return null;
-            byte[] bytes = System.IO.File.ReadAllBytes(path);
-            var tex = new Texture2D(2, 2);
-            if (!tex.LoadImage(bytes))
-            {
-                UnityEngine.Object.Destroy(tex);
-                return null;
-            }
-            return tex;
+            // NativeGallery.LoadImageAtPath handles HEIC → JPG conversion on iOS
+            // natively. Unity's Texture2D.LoadImage cannot decode HEIC, so iPhone
+            // camera shots would silently render as the default 2×2 white texture.
+            return NativeGallery.LoadImageAtPath(path);
         }
         catch (Exception ex)
         {
