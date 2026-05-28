@@ -21,6 +21,9 @@ public static class AttachmentPreviewScreenBuilder
     private const float DocIconSize        = 56f;
     private const float PlayOverlaySize    = 80f;
     private const float PlayIconSize       = 56f;
+    private const float DurationBadgeWidth  = 96f;
+    private const float DurationBadgeHeight = 36f;
+    private const float DurationBadgeOffset = 16f;
 
     private static readonly Color RootBg         = new Color(0.055f, 0.078f, 0.086f); // #0E1416
     private static readonly Color BarBg          = new Color(0.118f, 0.145f, 0.157f); // #1E2528
@@ -61,6 +64,15 @@ public static class AttachmentPreviewScreenBuilder
         // ── ScriptHolder (always-on) + Root (toggled) ────────────────
         var screenGo = new GameObject(ScreenName, typeof(RectTransform), typeof(AttachmentPreviewScreen));
         screenGo.transform.SetParent(parent, false);
+
+        // Place preview screen BELOW AttachSheet in sibling order (renders behind)
+        // so AttachSheet stays on top during the brief overlap if both are ever alive
+        // on the same frame. Idempotent: if AttachSheet's index shifts on rebuild, we
+        // recompute against the live ref.
+        var attachSheetInScene = Object.FindFirstObjectByType<AttachSheet>(FindObjectsInactive.Include);
+        if (attachSheetInScene != null && attachSheetInScene.transform.parent == screenGo.transform.parent)
+            screenGo.transform.SetSiblingIndex(attachSheetInScene.transform.GetSiblingIndex());
+
         var screenRt = (RectTransform)screenGo.transform;
         Stretch(screenRt);
 
@@ -222,8 +234,8 @@ public static class AttachmentPreviewScreenBuilder
         dbRt.anchorMin = new Vector2(1f, 0f);
         dbRt.anchorMax = new Vector2(1f, 0f);
         dbRt.pivot     = new Vector2(1f, 0f);
-        dbRt.sizeDelta = new Vector2(96f, 36f);
-        dbRt.anchoredPosition = new Vector2(-16f, 16f);
+        dbRt.sizeDelta = new Vector2(DurationBadgeWidth, DurationBadgeHeight);
+        dbRt.anchoredPosition = new Vector2(-DurationBadgeOffset, DurationBadgeOffset);
         var dbBg = durationBadge.GetComponent<Image>();
         dbBg.color = PlayOverlayBg;
         dbBg.raycastTarget = false;
