@@ -1491,18 +1491,19 @@ public void StageLocalMedia(AttachmentPick pick, string caption)
     {
         case AttachmentKind.Photo:
         case AttachmentKind.GalleryImage:
-            vm.type        = MessageType.Image;
-            vm.mediaUrl    = SeedImageCache(pick.Path, tempId);
-            vm.aspectRatio = ReadImageAspect(pick.Path);
+            vm.type = MessageType.Image;
+            var img = SeedImageCache(pick.Path, tempId);
+            vm.mediaUrl    = img.syntheticUrl;
+            vm.aspectRatio = img.aspect;
             break;
 
         case AttachmentKind.GalleryVideo:
-            vm.type        = MessageType.Video;
-            vm.mediaUrl    = SeedVideoThumbCache(pick.Path, tempId);
-            vm.videoUrl    = "file://" + pick.Path;
+            vm.type         = MessageType.Video;
+            vm.thumbnailUrl = SeedVideoThumbCache(pick.Path, tempId);
+            vm.videoUrl     = "file://" + pick.Path;
             var meta = ReadVideoMetadata(pick.Path);
-            vm.aspectRatio = meta.aspect;
-            vm.duration    = meta.durationSec;
+            vm.aspectRatio  = meta.aspect;
+            vm.duration     = meta.durationSec;
             break;
 
         case AttachmentKind.Document:
@@ -1514,31 +1515,43 @@ public void StageLocalMedia(AttachmentPick pick, string caption)
     OnLiveMessagesReceived?.Invoke(new System.Collections.Generic.List<MessageViewModel> { vm });
 }
 
-private string SeedImageCache(string localPath, string tempId)
+private (string syntheticUrl, float aspect) SeedImageCache(string localPath, string tempId)
 {
     string syntheticUrl = $"staged://image/{tempId}";
+    Texture2D tex = null;
     try
     {
         byte[] bytes = System.IO.File.ReadAllBytes(localPath);
-        MediaCacheManager.Instance.SaveImageToCache(syntheticUrl, bytes);
+        string targetPath = MediaCacheManager.Instance.GetFilePathFromUrl(syntheticUrl);
+        System.IO.File.WriteAllBytes(targetPath, bytes);
+
+        tex = new Texture2D(2, 2);
+        if (!tex.LoadImage(bytes)) return (syntheticUrl, 1.0f);
+        float aspect = tex.height > 0 ? (float)tex.width / tex.height : 1.0f;
+        return (syntheticUrl, aspect);
     }
     catch (System.Exception ex)
     {
         Debug.LogWarning($"[ChatManager] SeedImageCache failed for {localPath}: {ex.Message}");
+        return (syntheticUrl, 1.0f);
     }
-    return syntheticUrl;
+    finally
+    {
+        if (tex != null) UnityEngine.Object.Destroy(tex);
+    }
 }
 
 private string SeedVideoThumbCache(string localPath, string tempId)
 {
-    string syntheticUrl = $"staged://thumb/{tempId}";
+    string syntheticUrl = $"thumb://staged/{tempId}";
     Texture2D thumb = null;
     try
     {
         thumb = NativeGallery.GetVideoThumbnail(localPath);
         if (thumb == null) return syntheticUrl;
         byte[] png = thumb.EncodeToPNG();
-        MediaCacheManager.Instance.SaveImageToCache(syntheticUrl, png);
+        string targetPath = MediaCacheManager.Instance.GetFilePathFromUrl(syntheticUrl);
+        System.IO.File.WriteAllBytes(targetPath, png);
     }
     catch (System.Exception ex)
     {
@@ -1549,23 +1562,6 @@ private string SeedVideoThumbCache(string localPath, string tempId)
         if (thumb != null) UnityEngine.Object.Destroy(thumb);
     }
     return syntheticUrl;
-}
-
-private float ReadImageAspect(string path)
-{
-    Texture2D tex = null;
-    try
-    {
-        byte[] bytes = System.IO.File.ReadAllBytes(path);
-        tex = new Texture2D(2, 2);
-        if (!tex.LoadImage(bytes)) return 1.0f;
-        return tex.height > 0 ? (float)tex.width / tex.height : 1.0f;
-    }
-    catch { return 1.0f; }
-    finally
-    {
-        if (tex != null) UnityEngine.Object.Destroy(tex);
-    }
 }
 
 private (float aspect, int durationSec) ReadVideoMetadata(string path)
