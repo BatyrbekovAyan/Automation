@@ -236,7 +236,18 @@ public class AttachmentPreviewScreen : MonoBehaviour
             // NativeGallery.LoadImageAtPath handles HEIC → JPG conversion on iOS
             // natively. Unity's Texture2D.LoadImage cannot decode HEIC, so iPhone
             // camera shots would silently render as the default 2×2 white texture.
-            return NativeGallery.LoadImageAtPath(path);
+            //
+            // maxSize: 1024 keeps the iOS hardware decode fast (full-resolution
+            // HEIC decode is 1-3 seconds main-thread). 1024px is plenty for both
+            // the preview area and the chat bubble.
+            //
+            // markTextureNonReadable: false — we hand this texture to
+            // ChatManager.StageLocalMedia which calls EncodeToJPG on it to
+            // populate the bubble's cache. EncodeToJPG requires readable.
+            return NativeGallery.LoadImageAtPath(path,
+                                                 maxSize: 1024,
+                                                 markTextureNonReadable: false,
+                                                 generateMipmaps: false);
         }
         catch (Exception ex)
         {
@@ -252,9 +263,10 @@ public class AttachmentPreviewScreen : MonoBehaviour
 
         string caption = captionField != null ? (captionField.text ?? "").Trim() : "";
         var pick = _currentPick;
+        var preloadedImage = _currentPreviewTexture;   // may be null for video / document
 
         if (ChatManager.Instance != null)
-            ChatManager.Instance.StageLocalMedia(pick, caption);
+            ChatManager.Instance.StageLocalMedia(pick, caption, preloadedImage);
         else
             Debug.LogWarning("[AttachmentPreviewScreen] ChatManager.Instance is null; cannot stage.");
 

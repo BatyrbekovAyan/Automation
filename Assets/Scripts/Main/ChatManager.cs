@@ -1463,7 +1463,7 @@ private IEnumerator PostTextMessageRoutine(
 /// no Outbox) and does NOT upload to Wappi — part "c" replaces this body
 /// with the real upload + persist path.
 /// </summary>
-public void StageLocalMedia(AttachmentPick pick, string caption)
+public void StageLocalMedia(AttachmentPick pick, string caption, Texture2D preloadedImage = null)
 {
     if (string.IsNullOrEmpty(currentChatId)) return;
     if (pick == null || string.IsNullOrEmpty(pick.Path)) return;
@@ -1492,9 +1492,19 @@ public void StageLocalMedia(AttachmentPick pick, string caption)
         case AttachmentKind.Photo:
         case AttachmentKind.GalleryImage:
             vm.type = MessageType.Image;
-            var img = SeedImageCache(pick.Path, tempId);
-            vm.mediaUrl    = img.syntheticUrl;
-            vm.aspectRatio = img.aspect;
+            if (preloadedImage != null)
+            {
+                vm.mediaUrl    = SeedImageCacheFromTexture(preloadedImage, tempId);
+                vm.aspectRatio = preloadedImage.height > 0
+                               ? (float)preloadedImage.width / preloadedImage.height
+                               : 1f;
+            }
+            else
+            {
+                var img = SeedImageCache(pick.Path, tempId);
+                vm.mediaUrl    = img.syntheticUrl;
+                vm.aspectRatio = img.aspect;
+            }
             break;
 
         case AttachmentKind.GalleryVideo:
@@ -1551,6 +1561,27 @@ private (string syntheticUrl, float aspect) SeedImageCache(string localPath, str
     {
         if (tex != null) UnityEngine.Object.Destroy(tex);
     }
+}
+
+private string SeedImageCacheFromTexture(Texture2D tex, string tempId)
+{
+    string syntheticUrl = $"staged://image/{tempId}";
+    if (tex == null) return syntheticUrl;
+    try
+    {
+        // Re-encode as JPEG so MediaCacheManager's downstream Texture2D.LoadImage
+        // (JPG/PNG only) reads it back successfully. Same scheme as SeedImageCache,
+        // but skips the file-path decode entirely because the caller already has
+        // a decoded Texture2D in hand.
+        byte[] jpgBytes = tex.EncodeToJPG(90);
+        string targetPath = MediaCacheManager.Instance.GetFilePathFromUrl(syntheticUrl);
+        System.IO.File.WriteAllBytes(targetPath, jpgBytes);
+    }
+    catch (System.Exception ex)
+    {
+        Debug.LogWarning($"[ChatManager] SeedImageCacheFromTexture failed: {ex.Message}");
+    }
+    return syntheticUrl;
 }
 
 private string SeedVideoThumbCache(string localPath, string tempId)
