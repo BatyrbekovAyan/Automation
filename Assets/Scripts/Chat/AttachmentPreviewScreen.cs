@@ -55,6 +55,10 @@ public class AttachmentPreviewScreen : MonoBehaviour
         }
     }
 
+    // This component must live on a permanently-active GameObject (the script
+    // holder) as built by AttachmentPreviewScreenBuilder. If the holder is ever
+    // SetActive(false) then re-enabled, onClick listeners will be added a second
+    // time, causing double-fire. The builder enforces this; do not change it.
     void OnEnable()
     {
         if (attachSheet != null) attachSheet.OnPicked += Show;
@@ -99,6 +103,7 @@ public class AttachmentPreviewScreen : MonoBehaviour
 
         if (captionField != null) captionField.text = "";
         if (sendButton   != null) sendButton.interactable = true;
+        if (backButton   != null) backButton.interactable = true;
 
         if (root != null) root.SetActive(true);
         FadeTo(1f, blocksRaycasts: true);
@@ -117,6 +122,8 @@ public class AttachmentPreviewScreen : MonoBehaviour
     {
         if (videoPanel == null || videoPreview == null) return;
         videoPanel.SetActive(true);
+
+        if (videoDurationLabel != null) videoDurationLabel.text = "";
 
         Texture2D thumb = null;
         try { thumb = NativeGallery.GetVideoThumbnail(pick.Path); }
@@ -206,6 +213,7 @@ public class AttachmentPreviewScreen : MonoBehaviour
 
     private void OnBackTapped()
     {
+        if (backButton != null) backButton.interactable = false;
         if (captionField != null && captionField.isFocused) captionField.DeactivateInputField();
         Close();
     }
