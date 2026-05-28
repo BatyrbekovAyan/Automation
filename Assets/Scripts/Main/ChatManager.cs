@@ -1455,6 +1455,132 @@ private IEnumerator PostTextMessageRoutine(
 }
 
 /// <summary>
+/// Part "b" optimistic-staging for media attachments. Builds a
+/// MessageViewModel from the AttachmentPick + caption, pre-seeds the
+/// image/video thumbnail into MediaCacheManager under a synthetic
+/// "staged://" URL so existing bubble views render unchanged, then
+/// fires OnLiveMessagesReceived. Does NOT persist (no ChatHistoryCache,
+/// no Outbox) and does NOT upload to Wappi — part "c" replaces this body
+/// with the real upload + persist path.
+/// </summary>
+public void StageLocalMedia(AttachmentPick pick, string caption)
+{
+    if (string.IsNullOrEmpty(currentChatId)) return;
+    if (pick == null || string.IsNullOrEmpty(pick.Path)) return;
+
+    string tempId = "staging_" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+    long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
+    seenMessageIds.Add(tempId);
+
+    var vm = new MessageViewModel
+    {
+        messageId      = tempId,
+        chatId         = currentChatId,
+        senderName     = "Me",
+        isIncoming     = false,
+        timestamp      = now,
+        text           = caption ?? "",
+        mimeType       = pick.MimeType,
+        fileName       = pick.FileName,
+        fileSize       = pick.FileSizeBytes,
+        deliveryStatus = DeliveryStatus.Pending,
+    };
+
+    switch (pick.Kind)
+    {
+        case AttachmentKind.Photo:
+        case AttachmentKind.GalleryImage:
+            vm.type        = MessageType.Image;
+            vm.mediaUrl    = SeedImageCache(pick.Path, tempId);
+            vm.aspectRatio = ReadImageAspect(pick.Path);
+            break;
+
+        case AttachmentKind.GalleryVideo:
+            vm.type        = MessageType.Video;
+            vm.mediaUrl    = SeedVideoThumbCache(pick.Path, tempId);
+            vm.videoUrl    = "file://" + pick.Path;
+            var meta = ReadVideoMetadata(pick.Path);
+            vm.aspectRatio = meta.aspect;
+            vm.duration    = meta.durationSec;
+            break;
+
+        case AttachmentKind.Document:
+            vm.type = MessageType.Document;
+            // No mediaUrl/videoUrl — document bubble uses fileName + fileSize + mimeType.
+            break;
+    }
+
+    OnLiveMessagesReceived?.Invoke(new System.Collections.Generic.List<MessageViewModel> { vm });
+}
+
+private string SeedImageCache(string localPath, string tempId)
+{
+    string syntheticUrl = $"staged://image/{tempId}";
+    try
+    {
+        byte[] bytes = System.IO.File.ReadAllBytes(localPath);
+        MediaCacheManager.Instance.SaveImageToCache(syntheticUrl, bytes);
+    }
+    catch (System.Exception ex)
+    {
+        Debug.LogWarning($"[ChatManager] SeedImageCache failed for {localPath}: {ex.Message}");
+    }
+    return syntheticUrl;
+}
+
+private string SeedVideoThumbCache(string localPath, string tempId)
+{
+    string syntheticUrl = $"staged://thumb/{tempId}";
+    Texture2D thumb = null;
+    try
+    {
+        thumb = NativeGallery.GetVideoThumbnail(localPath);
+        if (thumb == null) return syntheticUrl;
+        byte[] png = thumb.EncodeToPNG();
+        MediaCacheManager.Instance.SaveImageToCache(syntheticUrl, png);
+    }
+    catch (System.Exception ex)
+    {
+        Debug.LogWarning($"[ChatManager] SeedVideoThumbCache failed for {localPath}: {ex.Message}");
+    }
+    finally
+    {
+        if (thumb != null) UnityEngine.Object.Destroy(thumb);
+    }
+    return syntheticUrl;
+}
+
+private float ReadImageAspect(string path)
+{
+    Texture2D tex = null;
+    try
+    {
+        byte[] bytes = System.IO.File.ReadAllBytes(path);
+        tex = new Texture2D(2, 2);
+        if (!tex.LoadImage(bytes)) return 1.0f;
+        return tex.height > 0 ? (float)tex.width / tex.height : 1.0f;
+    }
+    catch { return 1.0f; }
+    finally
+    {
+        if (tex != null) UnityEngine.Object.Destroy(tex);
+    }
+}
+
+private (float aspect, int durationSec) ReadVideoMetadata(string path)
+{
+    try
+    {
+        var props = NativeGallery.GetVideoProperties(path);
+        float aspect = props.height > 0 ? (float)props.width / props.height : 1.0f;
+        int durationSec = (int)(props.duration / 1000);
+        return (aspect, durationSec);
+    }
+    catch { return (1.0f, 0); }
+}
+
+/// <summary>
 /// Tells Wappi the user has read the given chat. Fire-and-forget — on failure,
 /// the next /chats/filter sync corrects any drift.
 /// </summary>
