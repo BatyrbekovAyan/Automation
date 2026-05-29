@@ -449,65 +449,40 @@ public partial class ChatManager : MonoBehaviour
 
                         bool isGhostRecovery = false;
 
-                        if (norm.fromMe && norm.messageType == MessageType.Chat)
+                        if (norm.fromMe)
                         {
-                            // Compare against the RAW server body, not norm.text. Normalize()
-                            // rewrites Unicode emoji into TMP <sprite name="..."> tags via
-                            // UnicodeEmojiConverter — the outbox entry's text is the raw user
-                            // input and only matches the raw body, not the converted form.
-                            string rawBody = raw.body?.ToString();
-                            if (!string.IsNullOrEmpty(rawBody))
+                            // Cross-session ghost-recovery: a previous-session send reached
+                            // Wappi but the client never saw the ack, so the outbox still holds
+                            // the tempId while the server now echoes the same message under its
+                            // real id. Match the unresolved outbox entry, then reconcile the
+                            // cached bubble in place. Text keys on the raw body; media keys on
+                            // attachment kind + timestamp (captions are frequently empty and
+                            // can't disambiguate a photo from a video sent seconds apart).
+                            string ghostTempId = null;
+                            var unresolved = Outbox.GetFor(chatId);
+
+                            if (norm.messageType == MessageType.Chat)
                             {
-                                var unresolved = Outbox.GetFor(chatId);
-                                int bestMatchIndex = -1;
-                                long bestMatchDelta = long.MaxValue;
-                                for (int i = 0; i < unresolved.Count; i++)
-                                {
-                                    if (unresolved[i].text != rawBody) continue;
-                                    long delta = Math.Abs(unresolved[i].timestamp - norm.time);
-                                    if (delta > 120) continue;
-                                    if (delta < bestMatchDelta)
-                                    {
-                                        bestMatchDelta = delta;
-                                        bestMatchIndex = i;
-                                    }
-                                }
+                                // Compare against the RAW server body, not norm.text. Normalize()
+                                // rewrites Unicode emoji into TMP <sprite name="..."> tags via
+                                // UnicodeEmojiConverter — the outbox entry's text is the raw user
+                                // input and only matches the raw body, not the converted form.
+                                string rawBody = raw.body?.ToString();
+                                if (!string.IsNullOrEmpty(rawBody))
+                                    ghostTempId = BestGhostMatch(unresolved, norm.time, e => e.text == rawBody);
+                            }
+                            else if (norm.messageType == MessageType.Image ||
+                                     norm.messageType == MessageType.Video ||
+                                     norm.messageType == MessageType.Document)
+                            {
+                                ghostTempId = BestGhostMatch(unresolved, norm.time,
+                                                             e => MediaGhostMatch.IsKindMatch(e, norm.messageType));
+                            }
 
-                                if (bestMatchIndex >= 0)
-                                {
-                                    string ghostTempId = unresolved[bestMatchIndex].tempId;
-
-                                    // Mutate the cached VM in place: swap to the real id,
-                                    // adopt the server's status + timestamp. The rendered
-                                    // bubble subscribes to OnMessageStatusChanged and will
-                                    // match its currentVm.messageId against ghostTempId
-                                    // before this loop's event fire, swap to raw.id, and
-                                    // re-render the tick.
-                                    for (int j = 0; j < cachedList.Count; j++)
-                                    {
-                                        if (cachedList[j].messageId == ghostTempId)
-                                        {
-                                            cachedList[j].messageId = raw.id;
-                                            cachedList[j].deliveryStatus = norm.deliveryStatus;
-                                            cachedList[j].timestamp = norm.time;
-                                            isGhostRecovery = true;
-                                            break;
-                                        }
-                                    }
-
-                                    Outbox.RemoveAt(GetCacheRoot(), chatId, ghostTempId);
-                                    seenMessageIds.Remove(ghostTempId);
-
-                                    if (isGhostRecovery)
-                                    {
-                                        // Fire the id swap + status change to the rendered
-                                        // bubble. HandleStatusChanged swaps messageId →
-                                        // raw.id and calls SetDeliveryStatus(norm.deliveryStatus),
-                                        // which re-renders the tick. No duplicate bubble.
-                                        OnMessageStatusChanged?.Invoke(ghostTempId, raw.id, norm.deliveryStatus);
-                                        hasStatusUpdates = true;
-                                    }
-                                }
+                            if (!string.IsNullOrEmpty(ghostTempId))
+                            {
+                                isGhostRecovery = ReconcileGhostSend(ghostTempId, raw, norm, cachedList, chatId);
+                                if (isGhostRecovery) hasStatusUpdates = true;
                             }
                         }
 
@@ -610,6 +585,64 @@ public partial class ChatManager : MonoBehaviour
             // already refreshed any visible bubbles in place.
             ChatHistoryCache.SaveHistory(GetCacheRoot(), chatId, cachedList);
         }
+    }
+
+    /// <summary>
+    /// Shared swap/remove/fire tail for cross-session ghost-recovery (text + media).
+    /// Swaps the cached optimistic bubble's tempId → the server's real id, adopts the
+    /// server delivery status + timestamp, removes the resolved outbox entry, clears the
+    /// tempId from seenMessageIds, and fires OnMessageStatusChanged so the rendered bubble
+    /// re-renders its tick in place. Returns true iff a cached bubble was found and mutated
+    /// (caller then skips appending a duplicate to newMessages). RemoveAt + the seenMessageIds
+    /// clear run even when no cached bubble is found, so a stale outbox entry for an
+    /// already-evicted bubble (>100-msg cap) is still cleaned up.
+    /// </summary>
+    private bool ReconcileGhostSend(string ghostTempId, RawMessage raw, NormalizedMessage norm,
+                                    List<MessageViewModel> cachedList, string chatId)
+    {
+        bool found = false;
+        for (int j = 0; j < cachedList.Count; j++)
+        {
+            if (cachedList[j].messageId == ghostTempId)
+            {
+                cachedList[j].messageId      = raw.id;
+                cachedList[j].deliveryStatus = norm.deliveryStatus;
+                cachedList[j].timestamp      = norm.time;
+                found = true;
+                break;
+            }
+        }
+
+        Outbox.RemoveAt(GetCacheRoot(), chatId, ghostTempId);
+        seenMessageIds.Remove(ghostTempId);
+
+        if (found) OnMessageStatusChanged?.Invoke(ghostTempId, raw.id, norm.deliveryStatus);
+        return found;
+    }
+
+    /// <summary>
+    /// Finds the unresolved outbox entry that best matches a server message: the smallest
+    /// |entry.timestamp - serverTime| within ±120s among entries the predicate accepts.
+    /// Returns the winning tempId, or null if none match. Shared by the text matcher
+    /// (predicate = raw-body equality) and the media matcher (predicate = MediaGhostMatch.IsKindMatch).
+    /// </summary>
+    private static string BestGhostMatch(IReadOnlyList<OutboxStore.OutboxEntry> unresolved,
+                                         long serverTime, Func<OutboxStore.OutboxEntry, bool> predicate)
+    {
+        int bestIndex = -1;
+        long bestDelta = long.MaxValue;
+        for (int i = 0; i < unresolved.Count; i++)
+        {
+            if (!predicate(unresolved[i])) continue;
+            long delta = Math.Abs(unresolved[i].timestamp - serverTime);
+            if (delta > 120) continue;
+            if (delta < bestDelta)
+            {
+                bestDelta = delta;
+                bestIndex = i;
+            }
+        }
+        return bestIndex >= 0 ? unresolved[bestIndex].tempId : null;
     }
 
     /// <summary>
