@@ -51,7 +51,10 @@ public class AttachmentPreviewScreen : MonoBehaviour
     private TextMeshProUGUI _sizeErrorLabel;
     private Tween           _sizeErrorTween;
 
-    private const long MaxVideoUploadBytes = 16L * 1024 * 1024;   // WhatsApp-like; tunable
+    // Pathological-pick ceiling only: reject absurdly large videos before we bother
+    // converting. The real ~16 MB Wappi cap is enforced post-conversion in
+    // ChatManager.PostMediaMessageRoutine, since conversion shrinks the file.
+    private const long MaxVideoPickBytes = 512L * 1024 * 1024;
 
     void Awake()
     {
@@ -265,12 +268,12 @@ public class AttachmentPreviewScreen : MonoBehaviour
     {
         if (_currentPick == null) return;
 
-        // Reject over-cap video BEFORE staging. pick.FileSizeBytes is already
-        // populated by the picker (used for the document size label), so no extra I/O.
+        // Reject only absurdly large videos here; normal large clips are shrunk by
+        // on-device conversion before upload (see PostMediaMessageRoutine).
         if (_currentPick.Kind == AttachmentKind.GalleryVideo &&
-            _currentPick.FileSizeBytes > MaxVideoUploadBytes)
+            _currentPick.FileSizeBytes > MaxVideoPickBytes)
         {
-            ShowSizeError($"Video is too large to send (max {MaxVideoUploadBytes / (1024 * 1024)} MB).");
+            ShowSizeError("This video is too large to process.");
             if (sendButton != null) sendButton.interactable = true;   // let the user go Back and re-pick
             return;                                                   // do NOT stage, do NOT close
         }
