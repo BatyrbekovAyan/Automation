@@ -16,6 +16,7 @@ public static class VideoConverter
     [DllImport("__Internal")] private static extern int    _StartVideoConvert(string inPath, string outPath, long maxBytes);
     [DllImport("__Internal")] private static extern int    _PollVideoConvert(int jobId);   // 0 run, 1 done, 2 fail, 3 use-original
     [DllImport("__Internal")] private static extern IntPtr _VideoConvertError(int jobId);
+    [DllImport("__Internal")] private static extern void   _FreeVideoConvertJob(int jobId);
 #endif
 
     /// <summary>
@@ -38,12 +39,15 @@ public static class VideoConverter
         if (status == 2)
         {
             string message = Marshal.PtrToStringAnsi(_VideoConvertError(jobId)) ?? "video conversion failed";
+            _FreeVideoConvertJob(jobId);
             onError?.Invoke(message);
             yield break;
         }
 
         // status 1 = converted to outputPath; status 3 = already deliverable, use original.
-        onResult?.Invoke(status == 3 ? inputPath : outputPath);
+        string resolved = status == 3 ? inputPath : outputPath;
+        _FreeVideoConvertJob(jobId);
+        onResult?.Invoke(resolved);
 #else
         // Editor + Android: no native converter — pass the original through unchanged.
         onResult?.Invoke(inputPath);

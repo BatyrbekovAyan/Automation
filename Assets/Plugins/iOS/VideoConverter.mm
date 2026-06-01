@@ -124,3 +124,17 @@ extern "C" const char *_VideoConvertError(int jobId) {
         return job->error ? job->error : "";   // Unity copies via PtrToStringAnsi; do not free here
     }
 }
+
+// Called by VideoConverter.cs once it has consumed the terminal status (and copied
+// any error string) so jobs don't accumulate in gJobs across a long session.
+extern "C" void _FreeVideoConvertJob(int jobId) {
+    EnsureInit();
+    @synchronized (gLock) {
+        NSValue *v = gJobs[@(jobId)];
+        if (!v) return;
+        ConvertJob *job = (ConvertJob *)v.pointerValue;
+        if (job->error) free(job->error);
+        free(job);
+        [gJobs removeObjectForKey:@(jobId)];
+    }
+}
