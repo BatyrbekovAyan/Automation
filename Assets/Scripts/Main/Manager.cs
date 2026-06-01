@@ -3083,19 +3083,6 @@ public class Manager : MonoBehaviour
         });
     }
 
-    private void PickVideo()
-    {
-        NativeGallery.GetVideoFromGallery((path) =>
-        {
-            Debug.Log("Video path: " + path);
-            if (path != null)
-            {
-                // Play the selected video
-                Handheld.PlayFullScreenMovie("file://" + path);
-            }
-        }, "Select a video");
-    }
-
     public IEnumerator GetWhatsappMesseges()
      {
          LoadingPanel.SetActive(true);
