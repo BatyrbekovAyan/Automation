@@ -15,7 +15,7 @@ public partial class ChatManager
 {
     // Wappi's video endpoint only delivers MP4/H.264 under ~16 MB; a converted
     // file still above this can't be sent (see design spec / project memory).
-    private const long WappiVideoCapBytes = 128L * 1024 * 1024;
+    private const long WappiVideoCapBytes = 11L * 1024 * 1024;
 
     /// <summary>
     /// Optimistic media-attachment send (text-path parity). Builds a

@@ -18,12 +18,16 @@ static NSMutableDictionary<NSNumber *, NSValue *> *gJobs = nil;
 static NSObject *gLock = nil;
 static int gNextJob = 1;
 
-// Encoder budget (WhatsApp-style).
-static const int  kMaxLongSide      = 1280;
-static const int  kMaxShortSide     = 720;
-static const int  kVideoBitrate     = 2000000;   // ~2 Mbps
-static const int  kAudioBitrate     = 128000;    // 128 kbps
-static const long kUseAsIsMaxBitrate = 2500000;  // already small enough -> skip re-encode
+// Encoder budget (WhatsApp-style: size-targeted so the upload body stays under
+// Wappi's ~16 MB limit regardless of clip length).
+static const int  kMaxLongSide        = 1280;
+static const int  kMaxShortSide       = 720;
+static const long kTargetFileBytes    = 9L * 1024 * 1024;  // aim each transcode at ~9 MB (body ~12 MB)
+static const int  kMinVideoBitrate    = 200000;   // floor for encode validity; clips too long to fit at this rate exceed the cap and fail cleanly
+static const int  kMaxVideoBitrate    = 6000000;  // ceiling so short clips don't bloat
+static const int  kDefaultVideoBitrate = 2000000; // fallback when duration is unknown
+static const int  kAudioBitrate       = 128000;   // 128 kbps
+static const long kUseAsIsMaxBitrate  = 2500000;  // already small enough -> skip re-encode
 
 static void EnsureInit() {
     static dispatch_once_t once;
@@ -80,6 +84,16 @@ static void TranscodeReaderWriter(AVURLAsset *asset, NSString *outPath, int jobI
     int outW = EvenClamp(natural.width * scale);
     int outH = EvenClamp(natural.height * scale);
 
+    // Size-targeted bitrate: derive from duration to keep the file near kTargetFileBytes
+    // (short clips get more, long clips less). Clamped for encode validity / no bloat.
+    CMTime dur = asset.duration;
+    double durSec = (dur.timescale > 0) ? (double)dur.value / dur.timescale : 0;
+    long videoBitrate = (durSec > 0)
+        ? (long)((double)kTargetFileBytes * 8.0 / durSec) - kAudioBitrate
+        : kDefaultVideoBitrate;
+    if (videoBitrate < kMinVideoBitrate) videoBitrate = kMinVideoBitrate;
+    if (videoBitrate > kMaxVideoBitrate) videoBitrate = kMaxVideoBitrate;
+
     AVAssetReaderTrackOutput *vOut = [AVAssetReaderTrackOutput
         assetReaderTrackOutputWithTrack:vtrack
         outputSettings:@{
@@ -98,7 +112,7 @@ static void TranscodeReaderWriter(AVURLAsset *asset, NSString *outPath, int jobI
             AVVideoWidthKey: @(outW),
             AVVideoHeightKey: @(outH),
             AVVideoCompressionPropertiesKey: @{
-                AVVideoAverageBitRateKey: @(kVideoBitrate),
+                AVVideoAverageBitRateKey: @(videoBitrate),
                 AVVideoMaxKeyFrameIntervalKey: @(60),
                 AVVideoProfileLevelKey: AVVideoProfileLevelH264MainAutoLevel
             }
@@ -136,9 +150,6 @@ static void TranscodeReaderWriter(AVURLAsset *asset, NSString *outPath, int jobI
     if (![reader startReading]) { SetJob(jobId, 2, (reader.error.localizedDescription ?: @"startReading failed").UTF8String); return; }
     if (![writer startWriting]) { SetJob(jobId, 2, (writer.error.localizedDescription ?: @"startWriting failed").UTF8String); return; }
     [writer startSessionAtSourceTime:kCMTimeZero];
-
-    CMTime dur = asset.duration;
-    double durSec = (dur.timescale > 0) ? (double)dur.value / dur.timescale : 0;
 
     dispatch_group_t group = dispatch_group_create();
 
