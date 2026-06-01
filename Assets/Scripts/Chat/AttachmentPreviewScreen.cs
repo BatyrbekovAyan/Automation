@@ -54,7 +54,7 @@ public class AttachmentPreviewScreen : MonoBehaviour
     // Pathological-pick ceiling only: reject absurdly large videos before we bother
     // converting. The real ~16 MB Wappi cap is enforced post-conversion in
     // ChatManager.PostMediaMessageRoutine, since conversion shrinks the file.
-    private const long MaxVideoPickBytes = 512L * 1024 * 1024;
+    private const long MaxVideoPickBytes = 1024L * 1024 * 1024;
 
     void Awake()
     {

@@ -15,7 +15,7 @@ public partial class ChatManager
 {
     // Wappi's video endpoint only delivers MP4/H.264 under ~16 MB; a converted
     // file still above this can't be sent (see design spec / project memory).
-    private const long WappiVideoCapBytes = 16L * 1024 * 1024;
+    private const long WappiVideoCapBytes = 128L * 1024 * 1024;
 
     /// <summary>
     /// Optimistic media-attachment send (text-path parity). Builds a
@@ -260,7 +260,7 @@ public partial class ChatManager
         www.downloadHandler = new DownloadHandlerBuffer();
         www.SetRequestHeader("Content-Type", "application/json");
         www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
-        www.timeout = 120;   // media uploads carry multi-MB base64 bodies; 30s (text default) is too short
+        www.timeout = 300;   // media uploads carry multi-MB base64 bodies; 30s (text default) is too short
 
         yield return www.SendWebRequest();
 

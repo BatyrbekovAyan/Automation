@@ -17,6 +17,7 @@ public static class VideoConverter
     [DllImport("__Internal")] private static extern int    _PollVideoConvert(int jobId);   // 0 run, 1 done, 2 fail, 3 use-original
     [DllImport("__Internal")] private static extern IntPtr _VideoConvertError(int jobId);
     [DllImport("__Internal")] private static extern void   _FreeVideoConvertJob(int jobId);
+    [DllImport("__Internal")] private static extern float  _PollVideoConvertProgress(int jobId);
 #endif
 
     /// <summary>
