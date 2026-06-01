@@ -13,6 +13,10 @@ using UnityEngine.Networking;
 /// </summary>
 public partial class ChatManager
 {
+    // Wappi's video endpoint only delivers MP4/H.264 under ~16 MB; a converted
+    // file still above this can't be sent (see design spec / project memory).
+    private const long WappiVideoCapBytes = 16L * 1024 * 1024;
+
     /// <summary>
     /// Optimistic media-attachment send (text-path parity). Builds a
     /// MessageViewModel from the AttachmentPick + caption, pre-seeds the
@@ -195,8 +199,52 @@ public partial class ChatManager
             yield break;
         }
 
+        // --- video: ensure MP4/H.264 before upload (Wappi/WhatsApp reject .mov/HEVC) ---
+        string uploadPath = entry.mediaPath;
+        string convertedTemp = null;   // the temp .mp4 written this attempt, if any (deleted on success)
+        if (kind == AttachmentKind.GalleryVideo)
+        {
+            string convertedPath = System.IO.Path.Combine(Application.temporaryCachePath, $"send_{entry.tempId}.mp4");
+            bool   convertOk     = false;
+            string convertResult = null;
+            string convertErr    = null;
+            yield return VideoConverter.Convert(entry.mediaPath, convertedPath, WappiVideoCapBytes,
+                r => { convertOk = true; convertResult = r; },
+                e => { convertErr = e; });
+
+            if (!convertOk || string.IsNullOrEmpty(convertResult))
+            {
+                Debug.LogError($"[Wappi] video convert failed for {entry.mediaPath}: {convertErr}");
+                OnMessageStatusChanged?.Invoke(entry.tempId, entry.tempId, DeliveryStatus.Failed);
+                yield break;
+            }
+
+            uploadPath = convertResult;
+            // We re-convert from the original pick on every attempt (the native "use-as-is"
+            // fast-path makes an already-deliverable file nearly free), so we never persist
+            // the temp path: it lives in Library/Caches and can be purged between sessions,
+            // and entry.mediaPath must keep pointing at the original for retries. convertedTemp
+            // is non-null only when a NEW file was written (not the pass-through original).
+            convertedTemp = uploadPath != entry.mediaPath ? uploadPath : null;
+
+            if (!System.IO.File.Exists(uploadPath))
+            {
+                Debug.LogError($"[Wappi] converted file missing at {uploadPath}");
+                OnMessageStatusChanged?.Invoke(entry.tempId, entry.tempId, DeliveryStatus.Failed);
+                yield break;
+            }
+
+            long convertedBytes = new System.IO.FileInfo(uploadPath).Length;
+            if (convertedBytes > WappiVideoCapBytes)
+            {
+                Debug.LogWarning($"[Wappi] video still {convertedBytes} bytes after conversion (cap {WappiVideoCapBytes}); failing send");
+                OnMessageStatusChanged?.Invoke(entry.tempId, entry.tempId, DeliveryStatus.Failed);
+                yield break;
+            }
+        }
+
         // --- off-thread read + base64 (no frame hitch / no OOM stall on the main thread) ---
-        var encodeTask = Base64Encoder.EncodeFileAsync(entry.mediaPath);
+        var encodeTask = Base64Encoder.EncodeFileAsync(uploadPath);
         yield return new WaitUntil(() => encodeTask.IsCompleted);
         if (encodeTask.IsFaulted || string.IsNullOrEmpty(encodeTask.Result))
         {
@@ -212,7 +260,7 @@ public partial class ChatManager
         www.downloadHandler = new DownloadHandlerBuffer();
         www.SetRequestHeader("Content-Type", "application/json");
         www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
-        www.timeout = 30;
+        www.timeout = 120;   // media uploads carry multi-MB base64 bodies; 30s (text default) is too short
 
         yield return www.SendWebRequest();
 
@@ -246,6 +294,10 @@ public partial class ChatManager
             ChatHistoryCache.SaveHistory(sendCacheRoot, entry.chatId, cached);
 
             Outbox.RemoveAt(sendCacheRoot, entry.chatId, entry.tempId);
+            if (convertedTemp != null)
+            {
+                try { System.IO.File.Delete(convertedTemp); } catch { /* best-effort cleanup */ }
+            }
             OnMessageStatusChanged?.Invoke(entry.tempId, resp.message_id, DeliveryStatus.Sent);
         }
         else
