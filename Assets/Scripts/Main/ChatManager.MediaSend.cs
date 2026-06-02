@@ -38,6 +38,20 @@ public partial class ChatManager
     };
 
     /// <summary>
+    /// Tracks a running media send so CancelMediaSend can reach into it.
+    /// request is non-null only during the upload phase (so Abort() can kill the
+    /// in-flight POST); cancelled is set by CancelMediaSend and checked at every
+    /// phase boundary so we stop without firing a Failed tick.
+    /// </summary>
+    private sealed class MediaSendContext
+    {
+        public UnityWebRequest request;
+        public bool cancelled;
+    }
+
+    private readonly Dictionary<string, MediaSendContext> _inFlight = new();
+
+    /// <summary>
     /// Optimistic media-attachment send (text-path parity). Builds a
     /// MessageViewModel from the AttachmentPick + caption, pre-seeds the
     /// image/video thumbnail into MediaCacheManager under a synthetic
@@ -234,121 +248,193 @@ public partial class ChatManager
     {
         if (entry == null) yield break;
 
-        var kind = (AttachmentKind)entry.attachmentKind;
-        string url = WappiMediaRequestFactory.EndpointFor(kind, entry.profileId);
-        if (string.IsNullOrEmpty(url))
+        var ctx = new MediaSendContext();
+        _inFlight[entry.tempId] = ctx;
+        try
         {
-            Debug.LogError($"[Wappi] no media endpoint for kind {kind}");
-            OnMessageStatusChanged?.Invoke(entry.tempId, entry.tempId, DeliveryStatus.Failed);
-            yield break;
-        }
-
-        // --- video: ensure MP4/H.264 before upload (Wappi/WhatsApp reject .mov/HEVC) ---
-        string uploadPath = entry.mediaPath;
-        string convertedTemp = null;   // the temp .mp4 written this attempt, if any (deleted on success)
-        if (kind == AttachmentKind.GalleryVideo)
-        {
-            string convertedPath = System.IO.Path.Combine(Application.temporaryCachePath, $"send_{entry.tempId}.mp4");
-            bool   convertOk     = false;
-            string convertResult = null;
-            string convertErr    = null;
-            yield return VideoConverter.Convert(entry.mediaPath, convertedPath, WappiVideoCapBytes,
-                r => { convertOk = true; convertResult = r; },
-                e => { convertErr = e; });
-
-            if (!convertOk || string.IsNullOrEmpty(convertResult))
+            var kind = (AttachmentKind)entry.attachmentKind;
+            string url = WappiMediaRequestFactory.EndpointFor(kind, entry.profileId);
+            if (string.IsNullOrEmpty(url))
             {
-                Debug.LogError($"[Wappi] video convert failed for {entry.mediaPath}: {convertErr}");
+                Debug.LogError($"[Wappi] no media endpoint for kind {kind}");
                 OnMessageStatusChanged?.Invoke(entry.tempId, entry.tempId, DeliveryStatus.Failed);
                 yield break;
             }
 
-            uploadPath = convertResult;
-            // We re-convert from the original pick on every attempt (the native "use-as-is"
-            // fast-path makes an already-deliverable file nearly free), so we never persist
-            // the temp path: it lives in Library/Caches and can be purged between sessions,
-            // and entry.mediaPath must keep pointing at the original for retries. convertedTemp
-            // is non-null only when a NEW file was written (not the pass-through original).
-            convertedTemp = uploadPath != entry.mediaPath ? uploadPath : null;
-
-            if (!System.IO.File.Exists(uploadPath))
+            // --- video: ensure MP4/H.264 before upload (Wappi/WhatsApp reject .mov/HEVC) ---
+            string uploadPath = entry.mediaPath;
+            string convertedTemp = null;   // the temp .mp4 written this attempt, if any (deleted on success)
+            if (kind == AttachmentKind.GalleryVideo)
             {
-                Debug.LogError($"[Wappi] converted file missing at {uploadPath}");
-                OnMessageStatusChanged?.Invoke(entry.tempId, entry.tempId, DeliveryStatus.Failed);
-                yield break;
-            }
+                string convertedPath = System.IO.Path.Combine(Application.temporaryCachePath, $"send_{entry.tempId}.mp4");
+                bool   convertOk     = false;
+                string convertResult = null;
+                string convertErr    = null;
+                yield return VideoConverter.Convert(entry.mediaPath, convertedPath, WappiVideoCapBytes,
+                    r => { convertOk = true; convertResult = r; },
+                    e => { convertErr = e; },
+                    p => OnMediaSendProgress?.Invoke(entry.tempId, SendProgress(SendPhase.Convert, p)));
 
-            long convertedBytes = new System.IO.FileInfo(uploadPath).Length;
-            if (convertedBytes > WappiVideoCapBytes)
-            {
-                Debug.LogWarning($"[Wappi] video still {convertedBytes} bytes after conversion (cap {WappiVideoCapBytes}); failing send");
-                OnMessageStatusChanged?.Invoke(entry.tempId, entry.tempId, DeliveryStatus.Failed);
-                yield break;
-            }
-        }
+                // Cancelled mid-convert: the native job can't be hard-killed, so we drop
+                // its result here and let CancelMediaSend handle bubble/temp cleanup.
+                if (ctx.cancelled) yield break;
 
-        // --- off-thread read + base64 (no frame hitch / no OOM stall on the main thread) ---
-        var encodeTask = Base64Encoder.EncodeFileAsync(uploadPath);
-        yield return new WaitUntil(() => encodeTask.IsCompleted);
-        if (encodeTask.IsFaulted || string.IsNullOrEmpty(encodeTask.Result))
-        {
-            Debug.LogError($"[Wappi] media encode failed for {entry.mediaPath}: {encodeTask.Exception?.Message}");
-            OnMessageStatusChanged?.Invoke(entry.tempId, entry.tempId, DeliveryStatus.Failed);
-            yield break;
-        }
-
-        string body = WappiMediaRequestFactory.BuildBody(kind, entry.chatId, entry.text, entry.fileName, encodeTask.Result);
-
-        using UnityWebRequest www = new UnityWebRequest(url, "POST");
-        www.uploadHandler   = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(body));
-        www.downloadHandler = new DownloadHandlerBuffer();
-        www.SetRequestHeader("Content-Type", "application/json");
-        www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
-        www.timeout = 300;   // media uploads carry multi-MB base64 bodies; 30s (text default) is too short
-
-        yield return www.SendWebRequest();
-
-        if (www.result != UnityWebRequest.Result.Success)
-        {
-            Debug.LogError($"[Wappi] {url} failed: {www.error}\n{www.downloadHandler?.text}");
-            OnMessageStatusChanged?.Invoke(entry.tempId, entry.tempId, DeliveryStatus.Failed);
-            yield break;
-        }
-
-        WappiSendTextResponse resp = null;
-        try { resp = JsonConvert.DeserializeObject<WappiSendTextResponse>(www.downloadHandler.text); }
-        catch (Exception ex) { Debug.LogError($"[Wappi] media response parse failed: {ex.Message}\n{www.downloadHandler.text}"); }
-
-        if (resp != null && resp.status == "done" && !string.IsNullOrEmpty(resp.message_id))
-        {
-            // --- identical reconcile to PostTextMessageRoutine ---
-            seenMessageIds.Remove(entry.tempId);
-            seenMessageIds.Add(resp.message_id);
-
-            List<MessageViewModel> cached = ChatHistoryCache.LoadHistory(sendCacheRoot, entry.chatId);
-            for (int i = 0; i < cached.Count; i++)
-            {
-                if (cached[i].messageId == entry.tempId)
+                if (!convertOk || string.IsNullOrEmpty(convertResult))
                 {
-                    cached[i].messageId      = resp.message_id;
-                    cached[i].deliveryStatus = DeliveryStatus.Sent;
-                    break;
+                    Debug.LogError($"[Wappi] video convert failed for {entry.mediaPath}: {convertErr}");
+                    OnMessageStatusChanged?.Invoke(entry.tempId, entry.tempId, DeliveryStatus.Failed);
+                    yield break;
+                }
+
+                uploadPath = convertResult;
+                // We re-convert from the original pick on every attempt (the native "use-as-is"
+                // fast-path makes an already-deliverable file nearly free), so we never persist
+                // the temp path: it lives in Library/Caches and can be purged between sessions,
+                // and entry.mediaPath must keep pointing at the original for retries. convertedTemp
+                // is non-null only when a NEW file was written (not the pass-through original).
+                convertedTemp = uploadPath != entry.mediaPath ? uploadPath : null;
+
+                if (!System.IO.File.Exists(uploadPath))
+                {
+                    Debug.LogError($"[Wappi] converted file missing at {uploadPath}");
+                    OnMessageStatusChanged?.Invoke(entry.tempId, entry.tempId, DeliveryStatus.Failed);
+                    yield break;
+                }
+
+                long convertedBytes = new System.IO.FileInfo(uploadPath).Length;
+                if (convertedBytes > WappiVideoCapBytes)
+                {
+                    Debug.LogWarning($"[Wappi] video still {convertedBytes} bytes after conversion (cap {WappiVideoCapBytes}); failing send");
+                    OnMessageStatusChanged?.Invoke(entry.tempId, entry.tempId, DeliveryStatus.Failed);
+                    yield break;
                 }
             }
-            ChatHistoryCache.SaveHistory(sendCacheRoot, entry.chatId, cached);
 
-            Outbox.RemoveAt(sendCacheRoot, entry.chatId, entry.tempId);
-            if (convertedTemp != null)
+            // --- off-thread read + base64 (no frame hitch / no OOM stall on the main thread) ---
+            var encodeTask = Base64Encoder.EncodeFileAsync(uploadPath);
+            yield return new WaitUntil(() => encodeTask.IsCompleted);
+            if (ctx.cancelled) yield break;   // discard the encode result on cancel
+            if (encodeTask.IsFaulted || string.IsNullOrEmpty(encodeTask.Result))
             {
-                try { System.IO.File.Delete(convertedTemp); } catch { /* best-effort cleanup */ }
+                Debug.LogError($"[Wappi] media encode failed for {entry.mediaPath}: {encodeTask.Exception?.Message}");
+                OnMessageStatusChanged?.Invoke(entry.tempId, entry.tempId, DeliveryStatus.Failed);
+                yield break;
             }
-            OnMessageStatusChanged?.Invoke(entry.tempId, resp.message_id, DeliveryStatus.Sent);
+            // Encode is opaque (one Task), so the ring snaps to the encode ceiling.
+            OnMediaSendProgress?.Invoke(entry.tempId, SendProgress(SendPhase.Encode, 1f));
+
+            string body = WappiMediaRequestFactory.BuildBody(kind, entry.chatId, entry.text, entry.fileName, encodeTask.Result);
+
+            using UnityWebRequest www = new UnityWebRequest(url, "POST");
+            www.uploadHandler   = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(body));
+            www.downloadHandler = new DownloadHandlerBuffer();
+            www.SetRequestHeader("Content-Type", "application/json");
+            www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
+            www.timeout = 300;   // media uploads carry multi-MB base64 bodies; 30s (text default) is too short
+
+            // Non-blocking upload poll so we can surface byte-level progress and let
+            // CancelMediaSend Abort() the request mid-flight.
+            ctx.request = www;
+            var op = www.SendWebRequest();
+            while (!op.isDone)
+            {
+                OnMediaSendProgress?.Invoke(entry.tempId, SendProgress(SendPhase.Upload, www.uploadProgress));
+                yield return null;
+            }
+            ctx.request = null;
+
+            // A cancel during upload Abort()s www (result becomes ConnectionError); the
+            // cancelled flag distinguishes "user cancelled" from a real network failure so
+            // we don't flash a Failed tick on a bubble that's about to be removed.
+            if (ctx.cancelled) yield break;
+
+            if (www.result != UnityWebRequest.Result.Success)
+            {
+                Debug.LogError($"[Wappi] {url} failed: {www.error}\n{www.downloadHandler?.text}");
+                OnMessageStatusChanged?.Invoke(entry.tempId, entry.tempId, DeliveryStatus.Failed);
+                yield break;
+            }
+
+            WappiSendTextResponse resp = null;
+            try { resp = JsonConvert.DeserializeObject<WappiSendTextResponse>(www.downloadHandler.text); }
+            catch (Exception ex) { Debug.LogError($"[Wappi] media response parse failed: {ex.Message}\n{www.downloadHandler.text}"); }
+
+            if (resp != null && resp.status == "done" && !string.IsNullOrEmpty(resp.message_id))
+            {
+                // --- identical reconcile to PostTextMessageRoutine ---
+                seenMessageIds.Remove(entry.tempId);
+                seenMessageIds.Add(resp.message_id);
+
+                List<MessageViewModel> cached = ChatHistoryCache.LoadHistory(sendCacheRoot, entry.chatId);
+                for (int i = 0; i < cached.Count; i++)
+                {
+                    if (cached[i].messageId == entry.tempId)
+                    {
+                        cached[i].messageId      = resp.message_id;
+                        cached[i].deliveryStatus = DeliveryStatus.Sent;
+                        break;
+                    }
+                }
+                ChatHistoryCache.SaveHistory(sendCacheRoot, entry.chatId, cached);
+
+                Outbox.RemoveAt(sendCacheRoot, entry.chatId, entry.tempId);
+                if (convertedTemp != null)
+                {
+                    try { System.IO.File.Delete(convertedTemp); } catch { /* best-effort cleanup */ }
+                }
+                OnMessageStatusChanged?.Invoke(entry.tempId, resp.message_id, DeliveryStatus.Sent);
+            }
+            else
+            {
+                Debug.LogWarning($"[Wappi] media send returned non-done status: {www.downloadHandler.text}");
+                OnMessageStatusChanged?.Invoke(entry.tempId, entry.tempId, DeliveryStatus.Failed);
+            }
         }
-        else
+        finally
         {
-            Debug.LogWarning($"[Wappi] media send returned non-done status: {www.downloadHandler.text}");
-            OnMessageStatusChanged?.Invoke(entry.tempId, entry.tempId, DeliveryStatus.Failed);
+            // Unregister on every exit path (success, failure, cancel, exception).
+            _inFlight.Remove(entry.tempId);
         }
+    }
+
+    /// <summary>
+    /// Aborts an in-flight media send and removes its optimistic bubble + outbox
+    /// entry entirely (WhatsApp-style cancel — no "cancelled" placeholder). Safe to
+    /// call with an unknown/finished tempId (no-op). Called from the bubble's X button.
+    /// </summary>
+    public void CancelMediaSend(string tempId)
+    {
+        if (string.IsNullOrEmpty(tempId)) return;
+        if (!_inFlight.TryGetValue(tempId, out var ctx)) return;   // already finished / never tracked
+
+        ctx.cancelled = true;
+        // Abort the upload immediately if we're mid-POST; the loop's cancelled check
+        // then suppresses the Failed fire. Convert/encode can't be hard-killed — the
+        // cancelled flag discards their result at the next phase boundary.
+        ctx.request?.Abort();
+
+        string cacheRoot = GetCacheRoot();
+        var outboxEntry = Outbox.Find(tempId);
+        string chatId = outboxEntry != null ? outboxEntry.chatId : currentChatId;
+
+        // Remove from cache, outbox, and the seen-set so the message is gone everywhere.
+        List<MessageViewModel> cached = ChatHistoryCache.LoadHistory(cacheRoot, chatId);
+        cached.RemoveAll(m => m.messageId == tempId);
+        ChatHistoryCache.SaveHistory(cacheRoot, chatId, cached);
+        Outbox.RemoveAt(cacheRoot, chatId, tempId);
+        seenMessageIds.Remove(tempId);
+
+        // Best-effort delete the staged source + any converted temp.
+        TryDeleteTemp(System.IO.Path.Combine(Application.temporaryCachePath, $"staged_video_{tempId}.mov"));
+        TryDeleteTemp(System.IO.Path.Combine(Application.temporaryCachePath, $"send_{tempId}.mp4"));
+
+        OnMessageRemoved?.Invoke(tempId);
+    }
+
+    private static void TryDeleteTemp(string path)
+    {
+        try { if (System.IO.File.Exists(path)) System.IO.File.Delete(path); }
+        catch (Exception ex) { Debug.LogWarning($"[ChatManager] temp delete failed for {path}: {ex.Message}"); }
     }
 
     private (string syntheticUrl, float aspect) SeedImageCache(string localPath, string tempId)
