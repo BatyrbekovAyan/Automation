@@ -992,7 +992,7 @@ public partial class ChatManager : MonoBehaviour
 
     MessageViewModel CreateViewModel(NormalizedMessage msg)
     {
-        return new MessageViewModel
+        var vm = new MessageViewModel
         {
             messageId = msg.id,
             chatId = msg.chatId,
@@ -1014,6 +1014,12 @@ public partial class ChatManager : MonoBehaviour
             pageCount = msg.pageCount,
             deliveryStatus = msg.deliveryStatus
         };
+
+        // Proactively extract a native thumbnail for videos (replaces the server
+        // JPEGThumbnail when ready). No-op off-iOS / already-cached / urlless.
+        if (vm.type == MessageType.Video) EnqueueIncomingVideoThumb(vm);
+
+        return vm;
     }
 
     NormalizedMessage Normalize(RawMessage raw)

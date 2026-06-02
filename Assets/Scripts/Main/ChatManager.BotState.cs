@@ -118,7 +118,8 @@ public partial class ChatManager
         OnChatListCleared?.Invoke();
         OnActiveBotChanged?.Invoke(botId);
 
-        StopAllCoroutines();
+        StopAllCoroutines();      // also cancels in-flight thumbnail extraction coroutines
+        ClearVideoThumbQueue();   // reset queue bookkeeping the cancelled coroutines never freed
         BeginLoadForActiveBot();
     }
 
