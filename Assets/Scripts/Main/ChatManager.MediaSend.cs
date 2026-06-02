@@ -18,6 +18,26 @@ public partial class ChatManager
     private const long WappiVideoCapBytes = 11L * 1024 * 1024;
 
     /// <summary>
+    /// Send-pipeline phase. Convert (iOS transcode) and Upload are the slow,
+    /// measurable phases; Encode is a fast opaque base64 Task that snaps.
+    /// Public so the EditMode test assembly (Assembly-CSharp-Editor) can see it.
+    /// </summary>
+    public enum SendPhase { Convert, Encode, Upload }
+
+    /// <summary>
+    /// Maps (phase, intra-phase 0..1) onto the whole-pipeline 0..1 fill the ring
+    /// shows: Convert 0→0.30, Encode 0.30→0.40, Upload 0.40→1.00. Pure + public
+    /// for unit testing; touches no Unity state.
+    /// </summary>
+    public static float SendProgress(SendPhase phase, float sub) => phase switch
+    {
+        SendPhase.Convert => 0.00f + 0.30f * Mathf.Clamp01(sub),
+        SendPhase.Encode  => 0.30f + 0.10f * Mathf.Clamp01(sub),
+        SendPhase.Upload  => 0.40f + 0.60f * Mathf.Clamp01(sub),
+        _ => 0f,
+    };
+
+    /// <summary>
     /// Optimistic media-attachment send (text-path parity). Builds a
     /// MessageViewModel from the AttachmentPick + caption, pre-seeds the
     /// image/video thumbnail into MediaCacheManager under a synthetic
