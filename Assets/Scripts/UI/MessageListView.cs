@@ -98,6 +98,7 @@ public class MessageListView : MonoBehaviour
         {
             ChatManager.Instance.OnBatchMessagesLoaded += HandleBatchMessages;
             ChatManager.Instance.OnLiveMessagesReceived += HandleLiveMessages;
+            ChatManager.Instance.OnMessageRemoved += HandleMessageRemoved;
         }
 
         SwipeToBack.OnSlideOutComplete += HandleSlideOutComplete;
@@ -124,6 +125,7 @@ public class MessageListView : MonoBehaviour
         {
             ChatManager.Instance.OnBatchMessagesLoaded -= HandleBatchMessages;
             ChatManager.Instance.OnLiveMessagesReceived -= HandleLiveMessages;
+            ChatManager.Instance.OnMessageRemoved -= HandleMessageRemoved;
         }
 
         SwipeToBack.OnSlideOutComplete -= HandleSlideOutComplete;
@@ -363,6 +365,29 @@ public class MessageListView : MonoBehaviour
 
         var sortedMessages = newMessages.OrderBy(x => x.timestamp).ToList();
         StartCoroutine(AppendLiveMessagesRoutine(sortedMessages));
+    }
+
+    // Destroys the bubble for a cancelled in-flight send. There may be a single
+    // match (the optimistic bubble), but we scan defensively. Mirrors the
+    // clear-list destroy + ForceRebuild pattern used elsewhere in this view.
+    void HandleMessageRemoved(string tempId)
+    {
+        if (string.IsNullOrEmpty(tempId) || content == null) return;
+
+        bool removed = false;
+        for (int i = content.childCount - 1; i >= 0; i--)
+        {
+            var child = content.GetChild(i);
+            var view = child.GetComponent<MessageItemView>();
+            if (view != null && view.BoundVm != null && view.BoundVm.messageId == tempId)
+            {
+                Destroy(child.gameObject);
+                removed = true;
+            }
+        }
+
+        if (removed)
+            LayoutRebuilder.ForceRebuildLayoutImmediate(content.GetComponent<RectTransform>());
     }
 
 // --- UPDATED: Beautiful Smooth Scroll & Fade Animation ---
