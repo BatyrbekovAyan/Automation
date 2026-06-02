@@ -110,12 +110,15 @@ public partial class ChatManager
                     Debug.LogWarning($"[ChatManager] staged-video move failed: {ex.Message}; using picked path");
                     stagedVideoPath = pick.Path;
                 }
-                vm.thumbnailUrl = SeedVideoThumbCache(stagedVideoPath, tempId);
-                vm.videoUrl     = "file://" + stagedVideoPath;
+                var (thumbUrl, thumbAspect) = SeedVideoThumbCache(stagedVideoPath, tempId);
                 var meta = ReadVideoMetadata(stagedVideoPath);
-                vm.aspectRatio   = meta.aspect;
+                vm.thumbnailUrl  = thumbUrl;
+                vm.videoUrl      = "file://" + stagedVideoPath;
+                // Upright thumbnail dims are the ground truth; corrected metadata is the
+                // fallback (e.g. Editor, or thumbnail decode failure). Both are display-oriented.
+                vm.aspectRatio   = thumbAspect > 0f ? thumbAspect : meta.aspect;
                 vm.duration      = meta.durationSec;
-                vm.videoRotation = meta.rotation;
+                vm.videoRotation = meta.rotation; // unchanged; consumed by VideoController only
                 break;
 
             case AttachmentKind.Document:
@@ -392,14 +395,25 @@ public partial class ChatManager
         return syntheticUrl;
     }
 
-    private string SeedVideoThumbCache(string localPath, string tempId)
+    private (string syntheticUrl, float aspect) SeedVideoThumbCache(string localPath, string tempId)
     {
         string syntheticUrl = $"thumb://staged/{tempId}";
+        float aspect = 0f; // 0 = unknown (Editor / decode failure) -> caller falls back to metadata
         Texture2D thumb = null;
         try
         {
-            thumb = NativeGallery.GetVideoThumbnail(localPath);
-            if (thumb == null) return syntheticUrl;
+            // markTextureNonReadable: false keeps the thumbnail's pixels CPU-readable so
+            // EncodeToPNG below works. NativeGallery's default (true) discards the CPU copy
+            // on GPU upload, so EncodeToPNG throws "Texture is not readable" and the thumb
+            // never caches — same reason SeedImageCache passes the flag on its decode.
+            thumb = NativeGallery.GetVideoThumbnail(localPath, markTextureNonReadable: false);
+            if (thumb == null) return (syntheticUrl, 0f);
+
+            // The thumbnail is decoded upright (display orientation), so its own pixel
+            // dimensions are the ground truth for the bubble's aspect — independent of the
+            // raw-frame rotation metadata that GetVideoProperties reports.
+            if (thumb.height > 0) aspect = (float)thumb.width / thumb.height;
+
             byte[] png = thumb.EncodeToPNG();
             string targetPath = MediaCacheManager.Instance.GetFilePathFromUrl(syntheticUrl);
             System.IO.File.WriteAllBytes(targetPath, png);
@@ -412,7 +426,7 @@ public partial class ChatManager
         {
             if (thumb != null) UnityEngine.Object.Destroy(thumb);
         }
-        return syntheticUrl;
+        return (syntheticUrl, aspect);
     }
 
     private (float aspect, int durationSec, float rotation) ReadVideoMetadata(string path)
@@ -420,7 +434,11 @@ public partial class ChatManager
         try
         {
             var props = NativeGallery.GetVideoProperties(path);
-            float aspect = props.height > 0 ? (float)props.width / props.height : 1.0f;
+            float rawAspect = props.height > 0 ? (float)props.width / props.height : 1.0f;
+            // Fallback aspect when no thumbnail decoded: correct the raw-frame aspect for a
+            // quarter-turn so a portrait clip stored as a landscape frame still gets a
+            // portrait bubble. Thumbnail dims (preferred source) need no correction.
+            float aspect = MediaBubbleSize.OrientedAspect(rawAspect, props.rotation);
             int durationSec = (int)(props.duration / 1000);
             return (aspect, durationSec, props.rotation);
         }
