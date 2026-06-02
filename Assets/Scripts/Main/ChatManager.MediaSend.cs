@@ -62,6 +62,12 @@ public partial class ChatManager
             deliveryStatus = DeliveryStatus.Pending,
         };
 
+        // The picker reuses one temp path (pickedMedia1.mov) and overwrites it on every
+        // pick, so a video clip is moved to a unique per-tempId path below — otherwise
+        // every staged video would point at (and play) the last-picked file. Set in the
+        // GalleryVideo case; used for both playback (videoUrl) and the upload source.
+        string stagedVideoPath = null;
+
         switch (pick.Kind)
         {
             case AttachmentKind.Photo:
@@ -89,12 +95,27 @@ public partial class ChatManager
                 break;
 
             case AttachmentKind.GalleryVideo:
-                vm.type         = MessageType.Video;
-                vm.thumbnailUrl = SeedVideoThumbCache(pick.Path, tempId);
-                vm.videoUrl     = "file://" + pick.Path;
-                var meta = ReadVideoMetadata(pick.Path);
-                vm.aspectRatio  = meta.aspect;
-                vm.duration     = meta.durationSec;
+                vm.type = MessageType.Video;
+                // Move the clip off the shared pickedMedia1.mov to a unique per-tempId path
+                // (same Caches volume → instant rename) so each video bubble plays its own
+                // file. Fall back to the picked path if the move fails.
+                stagedVideoPath = System.IO.Path.Combine(Application.temporaryCachePath, $"staged_video_{tempId}.mov");
+                try
+                {
+                    if (System.IO.File.Exists(stagedVideoPath)) System.IO.File.Delete(stagedVideoPath);
+                    System.IO.File.Move(pick.Path, stagedVideoPath);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[ChatManager] staged-video move failed: {ex.Message}; using picked path");
+                    stagedVideoPath = pick.Path;
+                }
+                vm.thumbnailUrl = SeedVideoThumbCache(stagedVideoPath, tempId);
+                vm.videoUrl     = "file://" + stagedVideoPath;
+                var meta = ReadVideoMetadata(stagedVideoPath);
+                vm.aspectRatio   = meta.aspect;
+                vm.duration      = meta.durationSec;
+                vm.videoRotation = meta.rotation;
                 break;
 
             case AttachmentKind.Document:
@@ -130,7 +151,7 @@ public partial class ChatManager
         // original picked file rather than NRE dereferencing Instance here.
         string mediaPath = (vm.type == MessageType.Image && MediaCacheManager.Instance != null)
             ? MediaCacheManager.Instance.GetFilePathFromUrl(vm.mediaUrl)
-            : pick.Path;
+            : (stagedVideoPath ?? pick.Path);
 
         var entry = new OutboxStore.OutboxEntry
         {
@@ -394,15 +415,15 @@ public partial class ChatManager
         return syntheticUrl;
     }
 
-    private (float aspect, int durationSec) ReadVideoMetadata(string path)
+    private (float aspect, int durationSec, float rotation) ReadVideoMetadata(string path)
     {
         try
         {
             var props = NativeGallery.GetVideoProperties(path);
             float aspect = props.height > 0 ? (float)props.width / props.height : 1.0f;
             int durationSec = (int)(props.duration / 1000);
-            return (aspect, durationSec);
+            return (aspect, durationSec, props.rotation);
         }
-        catch { return (1.0f, 0); }
+        catch { return (1.0f, 0, 0f); }
     }
 }

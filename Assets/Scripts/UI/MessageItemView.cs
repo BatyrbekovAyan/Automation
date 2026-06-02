@@ -2659,11 +2659,11 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
                     if (isCachedLocally)
                     {
                         string localPath = MediaCacheManager.Instance.GetFilePathFromUrl(vm.videoUrl);
-                        VideoController.Instance.PlayVideo(localPath, vm.aspectRatio);
+                        VideoController.Instance.PlayVideo(localPath, vm.aspectRatio, vm.videoRotation);
                     }
                     else
                     {
-                        VideoController.Instance.PlayVideo(vm.videoUrl, vm.aspectRatio);
+                        VideoController.Instance.PlayVideo(vm.videoUrl, vm.aspectRatio, vm.videoRotation);
                     }
                 }
             }
@@ -2730,7 +2730,7 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
 
             if (VideoController.Instance != null)
             {
-                VideoController.Instance.PlayVideo(fetchedUrl, vm.aspectRatio);
+                VideoController.Instance.PlayVideo(fetchedUrl, vm.aspectRatio, vm.videoRotation);
             }
         }
         else

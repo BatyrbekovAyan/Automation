@@ -17,8 +17,9 @@ public class MessageViewModel
     public long timestamp;
     public string fileName;
 
-    public float aspectRatio; 
+    public float aspectRatio;
     public int duration;
+    public float videoRotation; // degrees (0/90/180/270) from NativeGallery; 0 = unknown -> viewer heuristic
     public bool isSticker;
     public string senderName;
     

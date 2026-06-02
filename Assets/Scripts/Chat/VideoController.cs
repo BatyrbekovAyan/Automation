@@ -13,7 +13,8 @@ public class VideoController : MonoBehaviour
     // Assign the Panel (Black Background) here so we know the screen size
     public RectTransform containerRect; 
 
-    private float apiAspectRatio = 0f; 
+    private float apiAspectRatio = 0f;
+    private float videoRotation = 0f;
 
 #if UNITY_IOS && !UNITY_EDITOR
     [DllImport("__Internal")]
@@ -44,18 +45,19 @@ public class VideoController : MonoBehaviour
         gameObject.SetActive(false); 
     }
 
-    public void PlayVideo(string url, float aspectRatio)
+    public void PlayVideo(string url, float aspectRatio, float videoRotation = 0f)
     {
         gameObject.SetActive(true);
-        
+
         // --- FIX: PREVENT WHITE FLASH ---
         // 1. Clear the old texture immediately
-        rawImage.texture = null; 
-        
+        rawImage.texture = null;
+
         // 2. Turn the screen BLACK while loading
-        rawImage.color = Color.black; 
+        rawImage.color = Color.black;
 
         this.apiAspectRatio = aspectRatio;
+        this.videoRotation = videoRotation;
 
         // Reset Transform
         rawImage.rectTransform.localRotation = Quaternion.identity;
@@ -80,32 +82,34 @@ public class VideoController : MonoBehaviour
 
         // --- ASPECT RATIO LOGIC ---
         float textureRatio = (float)vp.texture.width / vp.texture.height;
-        bool shouldRotate = false;
+        bool shouldRotate;
+        float rotZ;
 
-        if (apiAspectRatio > 0)
+        if (videoRotation != 0f)
         {
-            bool isTextureLandscape = textureRatio > 1.2f; 
-            bool isApiNotLandscape = apiAspectRatio < 1.1f; 
-
-            if (isTextureLandscape && isApiNotLandscape)
-            {
-                shouldRotate = true;
-            }
+            // Known rotation (staged clip): apply it exactly. Unity's VideoPlayer decodes the
+            // raw (unrotated) frame, so rotate the RawImage by -rotation to display upright.
+            rotZ = -videoRotation;
+            shouldRotate = (videoRotation == 90f || videoRotation == 270f);
+        }
+        else
+        {
+            // Unknown rotation (e.g. server video): fall back to the aspect-ratio heuristic.
+            bool isTextureLandscape = textureRatio > 1.2f;
+            bool isApiNotLandscape = apiAspectRatio > 0f && apiAspectRatio < 1.1f;
+            shouldRotate = isTextureLandscape && isApiNotLandscape;
+            rotZ = shouldRotate ? -90f : 0f;
         }
 
         // Remove old fitter
         var fitter = rawImage.GetComponent<AspectRatioFitter>();
         if (fitter) Destroy(fitter);
 
-        // Apply Size
+        // Apply Size + rotation
         rawImage.rectTransform.sizeDelta = new Vector2(vp.texture.width, vp.texture.height);
+        rawImage.rectTransform.localRotation = Quaternion.Euler(0, 0, rotZ);
 
-        if (shouldRotate)
-            rawImage.rectTransform.localRotation = Quaternion.Euler(0, 0, -90f);
-        else
-            rawImage.rectTransform.localRotation = Quaternion.identity;
-
-        // Calculate Scale
+        // Calculate Scale (swap visual dims for 90/270)
         float visualWidth = shouldRotate ? vp.texture.height : vp.texture.width;
         float visualHeight = shouldRotate ? vp.texture.width : vp.texture.height;
 
