@@ -5,6 +5,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.UI;
+using DG.Tweening;
 using Nobi.UiRoundedCorners; 
 using WebP; 
 
@@ -20,7 +21,14 @@ public class MessageItemView : MonoBehaviour
     public GameObject timeBackground; 
 
     [Header("Media Controls")]
-    public GameObject playOverlay; 
+    public GameObject playOverlay;
+    [SerializeField] private Image uploadRing;          // radial fill ring (procedural annulus sprite)
+    [SerializeField] private Button cancelButton;       // X center; aborts the in-flight send
+    [SerializeField] private Image cancelIcon;          // X glyph child of cancelButton (procedural sprite)
+    [SerializeField] private GameObject playIconObject; // the "Play" child; hidden while uploading
+    private static Sprite _ringSprite;
+    private static Sprite _cancelSprite;
+    private Tween _ringTween;
     public GameObject audioPanel;
     public TextMeshProUGUI audioDurationText;
     public Button audioPlayButton;
@@ -235,6 +243,18 @@ public class MessageItemView : MonoBehaviour
         {
             ChatManager.Instance.OnMessageStatusChanged += HandleStatusChanged;
             ChatManager.Instance.OnMessageMediaRefreshed += HandleMediaRefreshed;
+            ChatManager.Instance.OnMediaSendProgress += HandleSendProgress;
+        }
+
+        if (cancelButton != null)
+        {
+            cancelButton.onClick.RemoveAllListeners();
+            cancelButton.onClick.AddListener(() =>
+            {
+                if (ScrollClickBlocker.IsBlocking) return;
+                if (currentVm != null && ChatManager.Instance != null)
+                    ChatManager.Instance.CancelMediaSend(currentVm.messageId);
+            });
         }
     }
 
@@ -251,6 +271,7 @@ public class MessageItemView : MonoBehaviour
         {
             ChatManager.Instance.OnMessageStatusChanged -= HandleStatusChanged;
             ChatManager.Instance.OnMessageMediaRefreshed -= HandleMediaRefreshed;
+            ChatManager.Instance.OnMediaSendProgress -= HandleSendProgress;
         }
 
         if (retryButton != null)
@@ -259,12 +280,124 @@ public class MessageItemView : MonoBehaviour
             retryButton.interactable = false;
         }
 
+        if (cancelButton != null) cancelButton.onClick.RemoveAllListeners();
+        _ringTween?.Kill();
+        _ringTween = null;
+
         EmojiPatchService.OnEmojiReady -= HandleEmojiReady;
     }
 
     void OnDestroy()
     {
         DisposeOwned();
+    }
+
+    private void HandleSendProgress(string tempId, float progress)
+    {
+        if (currentVm == null || currentVm.isIncoming) return;
+        if (currentVm.messageId != tempId) return;
+        if (currentVm.type != MessageType.Video) return;
+        ShowUploadRing(progress);
+    }
+
+    // Shows the ring + X over the video thumbnail and animates the fill to `progress`.
+    // No-ops on the incoming prefab (uploadRing is null there).
+    private void ShowUploadRing(float progress)
+    {
+        if (uploadRing == null) return;
+
+        if (uploadRing.sprite == null)
+        {
+            uploadRing.sprite        = BuildRingSprite();
+            uploadRing.type          = Image.Type.Filled;
+            uploadRing.fillMethod    = Image.FillMethod.Radial360;
+            uploadRing.fillOrigin    = (int)Image.Origin360.Top;
+            uploadRing.fillClockwise = true;
+        }
+        if (cancelIcon != null && cancelIcon.sprite == null) cancelIcon.sprite = BuildCancelSprite();
+
+        if (playOverlay != null) playOverlay.SetActive(true);
+        if (playIconObject != null) playIconObject.SetActive(false);
+        uploadRing.gameObject.SetActive(true);
+        if (cancelButton != null) cancelButton.gameObject.SetActive(true);
+
+        float target = Mathf.Clamp01(progress);
+        _ringTween?.Kill();
+        // DOFillAmount smooths byte-level jumps; ~0.15s per the design spec.
+        _ringTween = uploadRing.DOFillAmount(target, 0.15f).SetEase(Ease.OutQuad);
+    }
+
+    // Restores the play icon and removes the ring + X. No-ops on the incoming prefab.
+    private void HideUploadRing()
+    {
+        _ringTween?.Kill();
+        _ringTween = null;
+        if (uploadRing != null)
+        {
+            uploadRing.fillAmount = 0f;
+            uploadRing.gameObject.SetActive(false);
+        }
+        if (cancelButton != null) cancelButton.gameObject.SetActive(false);
+        if (playIconObject != null) playIconObject.SetActive(true);
+    }
+
+    // White annulus (ring) so a radial-filled Image reads as a ring, not a pie wedge.
+    // The ring sits on the play overlay's existing dark backdrop (no new scrim added).
+    // stroke/size are visual-tune values — confirm on device in Task 8 (spec target
+    // ≈6px on the 1080-ref canvas; 7px at 128px tex over a 150px Image ≈ 8px, tune down
+    // if it reads heavy). Cached once per process.
+    private static Sprite BuildRingSprite()
+    {
+        if (_ringSprite != null) return _ringSprite;
+        const int   size   = 128;
+        const float outer  = 63f;   // 1px margin inside the texture
+        const float stroke = 7f;    // tunable; see comment above
+        float inner = outer - stroke;
+        var center  = new Vector2(size * 0.5f, size * 0.5f);
+        var pixels  = new Color[size * size];
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float d = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), center);
+                // 1px feather on both rims: 0 outside `outer`, 0 inside `inner`, 1 in the band.
+                float alpha = Mathf.Min(Mathf.Clamp01(outer - d), Mathf.Clamp01(d - inner));
+                pixels[y * size + x] = new Color(1f, 1f, 1f, alpha);
+            }
+        }
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+        tex.SetPixels(pixels);
+        tex.Apply();
+        _ringSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
+        _ringSprite.name = "ProcRing";
+        return _ringSprite;
+    }
+
+    // White "X" glyph centered in a 128px texture. Cached once per process.
+    private static Sprite BuildCancelSprite()
+    {
+        if (_cancelSprite != null) return _cancelSprite;
+        const int   size = 128;
+        const float half = 3f;                  // half stroke width (px)
+        float lo = size * 0.30f, hi = size * 0.70f;
+        var pixels = new Color[size * size];
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                bool inBox = x >= lo && x <= hi && y >= lo && y <= hi;
+                // Perpendicular distance to each diagonal: |x-y|/√2 and |x+y-size|/√2.
+                float d = Mathf.Min(Mathf.Abs(x - y), Mathf.Abs(x + y - size)) * 0.70710677f;
+                float alpha = inBox ? Mathf.Clamp01(half - d + 0.5f) : 0f;
+                pixels[y * size + x] = new Color(1f, 1f, 1f, alpha);
+            }
+        }
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+        tex.SetPixels(pixels);
+        tex.Apply();
+        _cancelSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
+        _cancelSprite.name = "ProcCancelX";
+        return _cancelSprite;
     }
 
     private void SubscribeToEmojiReady()
@@ -1824,7 +1957,16 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
         }
 
         // --- THE FIX: This is no longer skipped! ---
-        if (vm.type == MessageType.Video) playOverlay.SetActive(true);
+        if (vm.type == MessageType.Video)
+        {
+            playOverlay.SetActive(true);
+            // A just-staged / reopened outgoing video still uploading shows the ring + X
+            // at zero fill so it reads as in-progress; a delivered one shows the play icon.
+            if (!vm.isIncoming && vm.deliveryStatus == DeliveryStatus.Pending)
+                ShowUploadRing(0f);
+            else
+                HideUploadRing();
+        }
 
         if (loadingSpinner)
         {
@@ -3358,6 +3500,11 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
     {
         if (currentVm == null || currentVm.isIncoming) return;
         currentVm.deliveryStatus = newStatus;
+
+        // Terminal states end the upload: drop the ring + X, restore the play icon.
+        if (newStatus == DeliveryStatus.Sent || newStatus == DeliveryStatus.Failed)
+            HideUploadRing();
+
         RefreshTimeAndTick();
         UpdateRetryButton(newStatus == DeliveryStatus.Failed);
 
