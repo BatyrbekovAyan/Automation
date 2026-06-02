@@ -1281,6 +1281,12 @@ if (msg.messageType == MessageType.Video)
                 mediaRefreshed = true;
             }
 
+            // Cached videos bypass CreateViewModel (first screen + scrolled history are
+            // served straight from ChatHistoryCache), so enqueue native thumbnail
+            // extraction here too. Covers incoming and outgoing; dedup via the vthumb
+            // cache + queue makes the repeated calls during sync cheap.
+            if (cached.type == MessageType.Video) EnqueueIncomingVideoThumb(cached);
+
             if (mediaRefreshed) OnMessageMediaRefreshed?.Invoke(cached);
             return mediaRefreshed;
         }
