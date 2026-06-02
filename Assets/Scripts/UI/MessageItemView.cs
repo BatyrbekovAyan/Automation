@@ -1831,10 +1831,12 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
 
         if (!string.IsNullOrEmpty(vm.thumbnailUrl))
         {
-            if (vm.thumbnailUrl.StartsWith("thumb://"))
+            if (vm.thumbnailUrl.StartsWith("thumb://") || vm.thumbnailUrl.StartsWith("vthumb://"))
             {
+                // thumb:// = server JPEGThumbnail (or staged); vthumb:// = our native frame.
+                // Both are MediaCacheManager keys, so the same cache load handles either.
                 Texture2D cachedTex = MediaCacheManager.Instance.LoadImageFromCache(vm.thumbnailUrl);
-                if (cachedTex != null) 
+                if (cachedTex != null)
                 {
                     ApplyTextureAspectFill(cachedTex, false, bubbleRatio);
                     imageLoaded = true;
