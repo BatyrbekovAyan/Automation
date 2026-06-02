@@ -122,6 +122,22 @@ public partial class ChatManager : MonoBehaviour
     /// </summary>
     public event Action<MessageViewModel> OnMessageMediaRefreshed;
 
+    /// <summary>
+    /// Fires repeatedly during an outgoing media send with whole-pipeline
+    /// progress in 0..1 (see SendProgress). tempId matches the optimistic
+    /// bubble's MessageViewModel.messageId until the server ack swaps it.
+    /// Video bubbles render this as a radial ring; other kinds ignore it.
+    /// </summary>
+    public event Action<string, float> OnMediaSendProgress;
+
+    /// <summary>
+    /// Fires when a single message must be removed from the open transcript
+    /// (currently only a cancelled in-flight media send). Carries the bubble's
+    /// current messageId (the send tempId). Fills the gap left by there being
+    /// no per-message removal — OnLiveMessagesReceived only ever adds.
+    /// </summary>
+    public event Action<string> OnMessageRemoved;
+
     public event Action<string> OnActiveBotChanged;
     public event Action<EmptyStateReason> OnEmptyState;
     
