@@ -26,13 +26,15 @@ public static class VideoConverter
     /// invokes onError with a message. Never throws.
     /// </summary>
     public static IEnumerator Convert(string inputPath, string outputPath, long maxBytes,
-                                      Action<string> onResult, Action<string> onError)
+                                      Action<string> onResult, Action<string> onError,
+                                      Action<float> onProgress = null)
     {
 #if UNITY_IOS && !UNITY_EDITOR
         int jobId = _StartVideoConvert(inputPath, outputPath, maxBytes);
         int status = _PollVideoConvert(jobId);
         while (status == 0)
         {
+            onProgress?.Invoke(_PollVideoConvertProgress(jobId));
             yield return null;
             status = _PollVideoConvert(jobId);
         }
@@ -46,11 +48,14 @@ public static class VideoConverter
         }
 
         // status 1 = converted to outputPath; status 3 = already deliverable, use original.
+        onProgress?.Invoke(1f);
         string resolved = status == 3 ? inputPath : outputPath;
         _FreeVideoConvertJob(jobId);
         onResult?.Invoke(resolved);
 #else
-        // Editor + Android: no native converter — pass the original through unchanged.
+        // Editor + Android: no native converter — convert is instant, so snap the
+        // ring to the convert ceiling, then pass the original through unchanged.
+        onProgress?.Invoke(1f);
         onResult?.Invoke(inputPath);
         yield break;
 #endif
