@@ -5,6 +5,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq; 
 using UnityEngine.InputSystem;
+using DG.Tweening;
 
 public class MessageListView : MonoBehaviour
 {
@@ -19,7 +20,11 @@ public class MessageListView : MonoBehaviour
     public MessageItemView textOutgoing;
     
     // --- NEW: The prefab for the date separator ---
-    public DateSeparatorView dateSeparatorPrefab; 
+    public DateSeparatorView dateSeparatorPrefab;
+
+    [Header("Unread Markers")]
+    [SerializeField] private UnreadSeparatorView unreadSeparatorPrefab;
+    [SerializeField] private ScrollToBottomFab scrollToBottomFab;
 
     [Header("Settings")]
     [Tooltip("Percentage of a single page's height to use as the load trigger threshold (e.g., 0.85 for 85%).")]
@@ -44,6 +49,21 @@ public class MessageListView : MonoBehaviour
     // and drain them after the initial cache UpdateListRoutine completes.
     private bool isInitialLoadInProgress;
     private readonly List<MessageViewModel> pendingLiveMessages = new List<MessageViewModel>();
+
+    // --- Unread markers state (per chat visit) ---
+    // Incoming bubbles below the open-snapshot separator + any live incoming arrivals,
+    // tracked by RectTransform so pagination prepends (which shift sibling indices) don't
+    // break the badge. The separator instance is a content child destroyed by Clear().
+    private readonly List<RectTransform> _unreadBubbles = new List<RectTransform>();
+    private RectTransform _unreadSeparatorInstance;
+    private float _lastFabRefreshTime;
+    private Tween _scrollToBottomTween;
+
+    // Reusable scratch buffers for the throttled below-fold recompute — avoids
+    // per-tick GC while scrolling (ComputeBelowFoldCount runs ~20 Hz).
+    private readonly Vector3[] _viewportCorners = new Vector3[4];
+    private readonly Vector3[] _bubbleCorners = new Vector3[4];
+    private readonly List<float> _bubbleTopsBuffer = new List<float>();
 
     void Awake()
     {
@@ -87,6 +107,11 @@ public class MessageListView : MonoBehaviour
             scrollRect.onValueChanged.AddListener(OnScroll);
         }
 
+        if (scrollToBottomFab != null)
+        {
+            scrollToBottomFab.OnClicked += HandleScrollToBottomClicked;
+        }
+
         if (loadingMessagesSpinner)
         {
             loadingMessagesSpinner.SetActive(false);
@@ -107,6 +132,15 @@ public class MessageListView : MonoBehaviour
         {
             scrollRect.onValueChanged.RemoveListener(OnScroll);
         }
+
+        if (scrollToBottomFab != null)
+        {
+            scrollToBottomFab.OnClicked -= HandleScrollToBottomClicked;
+        }
+
+        // Kill any in-flight auto-scroll so it can't run against a deactivated ScrollRect.
+        _scrollToBottomTween?.Kill();
+        _scrollToBottomTween = null;
     }
 
     /// <summary>
@@ -120,6 +154,7 @@ public class MessageListView : MonoBehaviour
     {
         StopAllCoroutines();
         Clear();
+        ResetUnreadState();
         activeChatId = null;
         isInitialLoadInProgress = false;
         pendingLiveMessages.Clear();
@@ -151,10 +186,33 @@ public class MessageListView : MonoBehaviour
         StopAllCoroutines();
 
         Clear();
+        ResetUnreadState();
     }
-    
+
+    void ResetUnreadState()
+    {
+        _unreadBubbles.Clear();
+        _unreadSeparatorInstance = null; // its GameObject is a content child destroyed by Clear()
+        _scrollToBottomTween?.Kill();
+        _scrollToBottomTween = null;
+
+        if (scrollToBottomFab != null)
+        {
+            scrollToBottomFab.SetCount(0);
+            scrollToBottomFab.Hide();
+        }
+    }
+
     void OnScroll(Vector2 scrollPos)
     {
+        // If the user grabs the list mid auto-scroll, cancel the tween so we don't fight them.
+        if (_scrollToBottomTween != null && _scrollToBottomTween.IsActive()
+            && Pointer.current != null && Pointer.current.press.isPressed)
+        {
+            _scrollToBottomTween.Kill();
+            _scrollToBottomTween = null;
+        }
+
         if (!isLoadingData && hasMoreMessages)
         {
             float scrollableHeight = Mathf.Max(0, scrollRect.content.rect.height - scrollRect.viewport.rect.height);
@@ -165,21 +223,86 @@ public class MessageListView : MonoBehaviour
 
             if (pixelsFromTop <= dynamicThreshold)
             {
-                isLoadingData = true; 
-                
-                if (scrollRect != null) 
+                isLoadingData = true;
+
+                if (scrollRect != null)
                 {
                     scrollRect.movementType = ScrollRect.MovementType.Clamped;
                 }
-                
-                if (loadingMessagesSpinner) 
+
+                if (loadingMessagesSpinner)
                 {
                     loadingMessagesSpinner.SetActive(true);
                 }
-                
+
                 ChatManager.Instance.LoadNextPage();
             }
         }
+
+        RefreshFab();
+    }
+
+    void RefreshFab()
+    {
+        if (scrollToBottomFab == null || scrollRect == null) return;
+
+        var contentRt = (RectTransform)content;
+        bool scrollable = contentRt.rect.height > scrollRect.viewport.rect.height + 1f;
+        bool scrolledUp = scrollRect.verticalNormalizedPosition > 0.05f;
+
+        if (scrollable && scrolledUp) scrollToBottomFab.Show();
+        else scrollToBottomFab.Hide();
+
+        // Throttle the heavier below-fold recompute (~20 Hz). Show/Hide above is cheap
+        // (no-op when already in the target state) so it stays responsive every event.
+        if (Time.unscaledTime - _lastFabRefreshTime < 0.05f) return;
+        _lastFabRefreshTime = Time.unscaledTime;
+
+        scrollToBottomFab.SetCount(ComputeBelowFoldCount());
+    }
+
+    int ComputeBelowFoldCount()
+    {
+        if (scrollRect == null || _unreadBubbles.Count == 0) return 0;
+
+        scrollRect.viewport.GetWorldCorners(_viewportCorners); // 0=BL, 1=TL, 2=TR, 3=BR
+        float viewportBottomWorldY = _viewportCorners[0].y;
+
+        _bubbleTopsBuffer.Clear();
+        for (int i = 0; i < _unreadBubbles.Count; i++)
+        {
+            var rt = _unreadBubbles[i];
+            if (rt == null) continue;
+            rt.GetWorldCorners(_bubbleCorners);
+            _bubbleTopsBuffer.Add(_bubbleCorners[1].y); // top-left world Y
+        }
+
+        return ScrollFabMath.CountBelowFold(_bubbleTopsBuffer, viewportBottomWorldY);
+    }
+
+    void HandleScrollToBottomClicked()
+    {
+        if (scrollRect == null) return;
+
+        _scrollToBottomTween?.Kill();
+        scrollRect.velocity = Vector2.zero;
+
+        _scrollToBottomTween = DOTween.To(
+                () => scrollRect.verticalNormalizedPosition,
+                v => scrollRect.verticalNormalizedPosition = v,
+                0f, 0.3f)
+            .SetEase(Ease.OutCubic)
+            .OnComplete(() =>
+            {
+                scrollRect.verticalNormalizedPosition = 0f;
+                scrollRect.velocity = Vector2.zero;
+                _scrollToBottomTween = null;
+                if (scrollToBottomFab != null)
+                {
+                    scrollToBottomFab.SetCount(0);
+                    scrollToBottomFab.Hide();
+                }
+            });
     }
 
 // Note the new signature!
@@ -342,6 +465,17 @@ IEnumerator AppendLiveMessagesRoutine(List<MessageViewModel> messages)
         yield return StartCoroutine(SlideUpRevealRoutine(startNorm));
     else if (scrollRect && wasAtBottom)
         scrollRect.verticalNormalizedPosition = 0f;
+
+    // Track live incoming arrivals for the badge. When at bottom they slide into view and
+    // sit above the fold (not counted); when scrolled up they're below the fold (counted).
+    foreach (var item in newlyAddedItems)
+    {
+        if (item != null && item.BoundVm != null && item.BoundVm.isIncoming)
+            _unreadBubbles.Add((RectTransform)item.transform);
+    }
+
+    Canvas.ForceUpdateCanvases();
+    RefreshFab();
 }
 
 IEnumerator SlideUpRevealRoutine(float startNorm)
@@ -623,7 +757,7 @@ IEnumerator UpdateListRoutine(List<MessageViewModel> sortedMessages, bool isLoad
 
         if (!isLoadMore)
         {
-            if (scrollRect) scrollRect.verticalNormalizedPosition = 0f;
+            PlaceUnreadSeparatorAndLand();
         }
 
         isLoadingData = false;
@@ -648,6 +782,97 @@ IEnumerator UpdateListRoutine(List<MessageViewModel> sortedMessages, bool isLoad
             }
         }
     }
+
+    // Called at the end of the initial build (!isLoadMore). Reads ChatManager.UnreadOnOpen,
+    // inserts the separator above the oldest unread incoming message, tracks the unread
+    // bubbles for the badge, and either lands at the separator (N > 0) or jumps to the
+    // newest message (N == 0).
+    void PlaceUnreadSeparatorAndLand()
+    {
+        int n = ChatManager.Instance != null ? ChatManager.Instance.UnreadOnOpen : 0;
+
+        _unreadBubbles.Clear();
+
+        if (n <= 0 || unreadSeparatorPrefab == null)
+        {
+            if (scrollRect) scrollRect.verticalNormalizedPosition = 0f;
+            RefreshFab();
+            return;
+        }
+
+        // Content is ordered oldest→newest by sibling index (backwards spawn + SetAsFirstSibling),
+        // so walk children high→low to build a newest-first view, skipping spacers/date separators.
+        var bubblesNewestFirst = new List<RectTransform>();
+        var isIncomingNewestFirst = new List<bool>();
+        for (int i = content.childCount - 1; i >= 0; i--)
+        {
+            var bubble = content.GetChild(i).GetComponent<MessageItemView>();
+            if (bubble == null || bubble.BoundVm == null) continue;
+            bubblesNewestFirst.Add((RectTransform)bubble.transform);
+            isIncomingNewestFirst.Add(bubble.BoundVm.isIncoming);
+        }
+
+        int belowCount = UnreadSeparatorPlacement.IndexForUnreadCount(isIncomingNewestFirst, n);
+
+        // Track ONLY the unread incoming bubbles below the separator (own messages aren't unread).
+        for (int i = 0; i < belowCount && i < bubblesNewestFirst.Count; i++)
+        {
+            if (isIncomingNewestFirst[i]) _unreadBubbles.Add(bubblesNewestFirst[i]);
+        }
+
+        var sep = Instantiate(unreadSeparatorPrefab, content);
+        sep.SetCount(n);
+        _unreadSeparatorInstance = (RectTransform)sep.transform;
+
+        bool placeAtTop = bubblesNewestFirst.Count == 0
+                          || belowCount <= 0
+                          || belowCount >= bubblesNewestFirst.Count;
+        if (placeAtTop)
+        {
+            sep.transform.SetAsFirstSibling();
+        }
+        else
+        {
+            // Insert immediately above the oldest unread bubble (= just below the newest read one).
+            var oldestUnread = bubblesNewestFirst[belowCount - 1];
+            sep.transform.SetSiblingIndex(oldestUnread.GetSiblingIndex());
+        }
+
+        Canvas.ForceUpdateCanvases();
+        LayoutRebuilder.ForceRebuildLayoutImmediate(content.GetComponent<RectTransform>());
+
+        ScrollSeparatorToTop();
+
+        Canvas.ForceUpdateCanvases();
+        RefreshFab();
+    }
+
+    // Scrolls so the separator's top edge sits at the viewport's top edge. Pivot- and
+    // canvas-scale-agnostic: convert the separator's top world corner into content-local
+    // space, measure its distance from the content's top edge, normalize against scrollable
+    // height. verticalNormalizedPosition: 1 = top, 0 = bottom.
+    void ScrollSeparatorToTop()
+    {
+        if (scrollRect == null || _unreadSeparatorInstance == null) return;
+
+        Canvas.ForceUpdateCanvases();
+
+        var contentRt = (RectTransform)content;
+        float scrollableH = contentRt.rect.height - scrollRect.viewport.rect.height;
+        if (scrollableH <= 1f)
+        {
+            scrollRect.verticalNormalizedPosition = 0f; // too short to scroll; stay at bottom
+            return;
+        }
+
+        Vector3[] corners = new Vector3[4];
+        _unreadSeparatorInstance.GetWorldCorners(corners); // 1 = top-left
+        Vector3 sepTopLocal = contentRt.InverseTransformPoint(corners[1]);
+
+        float distanceFromTop = Mathf.Clamp(contentRt.rect.yMax - sepTopLocal.y, 0f, scrollableH);
+        scrollRect.verticalNormalizedPosition = Mathf.Clamp01(1f - distanceFromTop / scrollableH);
+    }
+
     void Clear()
     {
         foreach (Transform child in content)
