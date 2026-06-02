@@ -80,14 +80,11 @@ public class MessageItemView : MonoBehaviour
     private const int   BubblePadBottom       = 12;
 
     // === Image / Video ===
-    private const float ImageLandscapeWidth   = 810f;   // 0.75 × canvas
-    private const float ImagePortraitWidth    = 648f;   // 0.60 × canvas
-    private const float ImageSquareWidth      = 700f;   // 0.65 × canvas
-    private const float ImageMaxHeight        = 1080f;  // tall-portrait clamp
-    private const float MinAspectRatio        = 0.56f;  // 9:16
-    private const float MaxAspectRatio        = 1.78f;  // 16:9
-    private const float AspectLandscapeThreshold = 1.1f; // > → landscape
-    private const float AspectPortraitThreshold  = 0.9f; // < → portrait
+    // Bubble dimensions + aspect clamp live in MediaBubbleSize (pure, unit-tested).
+    // These aliases keep the clamp used for the crop target (passed to
+    // ApplyTextureAspectFill) identical to the sizing clamp — one source of truth.
+    private const float MinAspectRatio = MediaBubbleSize.MinAspect;  // 9:16
+    private const float MaxAspectRatio = MediaBubbleSize.MaxAspect;  // 16:9
 
     // === Voice / Audio ===
     // Height 120 matches the prefab's natural audioPanel SizeDelta and WhatsApp's
@@ -149,37 +146,7 @@ public class MessageItemView : MonoBehaviour
         }
     }
 
-    private Vector2 ResolveMediaSize(float aspect)
-    {
-        if (!float.IsFinite(aspect) || aspect <= 0f) aspect = 1f;
-        aspect = Mathf.Clamp(aspect, MinAspectRatio, MaxAspectRatio);
-
-        float width, height;
-
-        if (aspect >= AspectLandscapeThreshold)
-        {
-            width  = ImageLandscapeWidth;
-            height = width / aspect;
-        }
-        else if (aspect <= AspectPortraitThreshold)
-        {
-            width  = ImagePortraitWidth;
-            height = width / aspect;
-
-            if (height > ImageMaxHeight)
-            {
-                height = ImageMaxHeight;
-                width  = height * aspect;
-            }
-        }
-        else
-        {
-            width  = ImageSquareWidth;
-            height = width / aspect;
-        }
-
-        return new Vector2(width, height);
-    }
+    private Vector2 ResolveMediaSize(float aspect) => MediaBubbleSize.Resolve(aspect);
 
     [SerializeField] private MessageViewModel currentVm;
 
