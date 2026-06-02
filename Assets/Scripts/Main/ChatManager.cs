@@ -319,6 +319,14 @@ public partial class ChatManager : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Server-reported unread count captured at the instant a chat is opened, BEFORE the
+    /// optimistic local zeroing in SelectChat. MessageListView reads this when it builds
+    /// bubbles to place the "N unread" separator and seed the scroll-to-bottom badge.
+    /// 0 when the chat was already read (or unknown).
+    /// </summary>
+    public int UnreadOnOpen { get; private set; }
+
     public void SelectChat(string chatId)
     {
         if (ScrollClickBlocker.IsBlocking) return;
@@ -341,6 +349,7 @@ public partial class ChatManager : MonoBehaviour
         // a non-zero count, the badge re-appears.
         if (chatLookup.TryGetValue(chatId, out var selectedVm))
         {
+            UnreadOnOpen = selectedVm.UnreadCount;
             bool hadUnread = selectedVm.UnreadCount > 0;
             selectedVm.UpdateUnreadCount(0);
 
@@ -348,6 +357,10 @@ public partial class ChatManager : MonoBehaviour
             {
                 StartCoroutine(MarkChatAsRead(chatId));
             }
+        }
+        else
+        {
+            UnreadOnOpen = 0;
         }
 
         currentChatId = chatId;
