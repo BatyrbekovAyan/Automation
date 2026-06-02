@@ -25,10 +25,10 @@ public class MessageItemView : MonoBehaviour
     [SerializeField] private Image uploadRing;          // radial fill ring (procedural annulus sprite)
     [SerializeField] private Button cancelButton;       // X center; aborts the in-flight send
     [SerializeField] private Image cancelIcon;          // X glyph child of cancelButton (procedural sprite)
-    [SerializeField] private GameObject playIconObject; // the "Play" child; hidden while uploading
     private static Sprite _ringSprite;
     private static Sprite _cancelSprite;
     private Tween _ringTween;
+    private Image _playOverlayImage;                    // playOverlay's own Image = the play triangle
     public GameObject audioPanel;
     public TextMeshProUGUI audioDurationText;
     public Button audioPlayButton;
@@ -317,7 +317,7 @@ public class MessageItemView : MonoBehaviour
         if (cancelIcon != null && cancelIcon.sprite == null) cancelIcon.sprite = BuildCancelSprite();
 
         if (playOverlay != null) playOverlay.SetActive(true);
-        if (playIconObject != null) playIconObject.SetActive(false);
+        SetPlayIconVisible(false);
         uploadRing.gameObject.SetActive(true);
         if (cancelButton != null) cancelButton.gameObject.SetActive(true);
 
@@ -338,7 +338,17 @@ public class MessageItemView : MonoBehaviour
             uploadRing.gameObject.SetActive(false);
         }
         if (cancelButton != null) cancelButton.gameObject.SetActive(false);
-        if (playIconObject != null) playIconObject.SetActive(true);
+        SetPlayIconVisible(true);
+    }
+
+    // PlayOverlay's own Image IS the play triangle (there is no separate icon child),
+    // so toggle its enabled state to hide/show the glyph while keeping the overlay
+    // GameObject active so the ring + X children stay visible.
+    private void SetPlayIconVisible(bool visible)
+    {
+        if (playOverlay == null) return;
+        if (_playOverlayImage == null) _playOverlayImage = playOverlay.GetComponent<Image>();
+        if (_playOverlayImage != null) _playOverlayImage.enabled = visible;
     }
 
     // White annulus (ring) so a radial-filled Image reads as a ring, not a pie wedge.
