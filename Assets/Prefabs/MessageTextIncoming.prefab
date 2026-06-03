@@ -320,8 +320,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 0.5}
   m_AnchorMax: {x: 1, y: 0.5}
-  m_AnchoredPosition: {x: -40, y: 0}
-  m_SizeDelta: {x: 64, y: 40}
+  m_AnchoredPosition: {x: -20, y: 0}
+  m_SizeDelta: {x: 100, y: 60}
   m_Pivot: {x: 1, y: 0.5}
 --- !u!222 &599566344899809568
 CanvasRenderer:
@@ -417,7 +417,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: adb30198aa32dd140b5750692dd48104, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithRoundedCorners
-  radius: 20
+  radius: 30
   image: {fileID: 2962410540972463885}
 --- !u!1 &3007431221091889096
 GameObject:
@@ -1024,9 +1024,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AudioWaveform
   barsContainer: {fileID: 2418770599455029435}
   barSprite: {fileID: 0}
-  barCount: 32
-  barSpacing: 2
-  playedColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  barCount: 45
+  barSpacing: 4
+  playedColor: {r: 0.20754719, g: 0.20754719, b: 0.20754719, a: 1}
   unplayedColor: {r: 0.5, g: 0.5, b: 0.5, a: 0.5019608}
 --- !u!1 &3722320480690458316
 GameObject:
@@ -1231,7 +1231,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: d0160f076b4464d3c8411cf5152e58e5, type: 3}
+  m_Sprite: {fileID: 21300000, guid: a0b42ab629819433685de848d51a7590, type: 3}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
@@ -2087,7 +2087,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0.5}
   m_AnchorMax: {x: 0, y: 0.5}
-  m_AnchoredPosition: {x: 132, y: -40}
+  m_AnchoredPosition: {x: 132, y: -60}
   m_SizeDelta: {x: 120, y: 40}
   m_Pivot: {x: 0, y: 0.5}
 --- !u!222 &3325241951818575504
@@ -2488,7 +2488,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: e115a5108b6a84fdc97ec06ed9062cf0, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 2efd7a03d32474226a0f28247c5a7d8f, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -3192,8 +3192,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 258, y: -68}
-  m_SizeDelta: {x: 500, y: 120}
+  m_AnchoredPosition: {x: 258, y: -88}
+  m_SizeDelta: {x: 500, y: 160}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &6123620372214355730
 MonoBehaviour:
@@ -3211,7 +3211,7 @@ MonoBehaviour:
   m_MinWidth: -1
   m_MinHeight: -1
   m_PreferredWidth: 500
-  m_PreferredHeight: 120
+  m_PreferredHeight: 160
   m_FlexibleWidth: 0
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
@@ -3620,8 +3620,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 22
-  m_fontSizeBase: 22
+  m_fontSize: 26
+  m_fontSizeBase: 26
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
