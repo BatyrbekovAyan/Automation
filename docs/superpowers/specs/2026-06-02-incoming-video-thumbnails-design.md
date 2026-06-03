@@ -21,7 +21,7 @@ Proactively extract a native, correctly-rotated frame from every incoming video'
 | Trigger | Proactive on receipt (history batch + live), throttled | Guaranteed-instant preview; user accepts bandwidth cost |
 | Server thumb | Always extract our own and replace | User does not want to depend on Wappi quality/presence |
 | Mechanism | Custom native (iOS `AVAssetImageGenerator`) | Fetches only moov + keyframe — most bandwidth-efficient; native frame quality + rotation |
-| Platform | iOS native now; Android + Editor fall back to server thumb | Mirrors `VideoConverter`'s iOS-first / Android-deferred decision; same C# seam for a later Android extractor |
+| Platform | iOS (`AVAssetImageGenerator`) + Android (`MediaMetadataRetriever`) native; Editor falls back to server thumb | Native frames on both platforms behind one `VideoThumbnailExtractor.Extract` seam (Android added as an addendum — see end) |
 | Placeholder | Server `JPEGThumbnail` shown transiently, then overwritten by native frame | Strictly better UX, free (already decoded) |
 
 ## Architecture
@@ -139,7 +139,7 @@ Incoming video (history batch OR live)
 
 ## Out of scope / future
 
-- Android native `MediaMetadataRetriever` extractor — drop-in behind `VideoThumbnailExtractor.Extract`.
+- Android: download-then-extract fallback for the occasional codec `MediaMetadataRetriever` can't stream (v1 falls back to the server thumb).
 - v2 expired-URL refresh-then-retry.
 - Viewport-exact extraction priority (v1 extracts in parse order).
 
@@ -150,9 +150,38 @@ Incoming video (history batch OR live)
 - `Assets/Scripts/Chat/VideoThumbnailExtractor.cs`
 - `Assets/Scripts/Chat/VideoThumbQueue.cs`
 - `Assets/Scripts/Main/ChatManager.VideoThumbs.cs`
+- `Assets/Plugins/Android/VideoThumbnailExtractor.java` (addendum)
 - `Assets/Tests/Editor/Chat/VideoThumbQueueTests.cs`
 
 **Edit:**
 - `Assets/Scripts/Main/ChatManager.cs` — enqueue from `CreateViewModel`.
 - `Assets/Scripts/Main/ChatManager.BotState.cs` — `ClearVideoThumbQueue()` in `SetActiveBot`.
 - `Assets/Scripts/UI/MessageItemView.cs` — broaden scheme check to `vthumb://` (reuses existing `OnMessageMediaRefreshed` → `HandleMediaRefreshed`).
+
+## Android native extraction (addendum — iOS parity)
+
+Closes the deferred Android item so Android gets its own native frames instead of relying on Wappi's `JPEGThumbnail`. **Additive:** one new Java file + a `#elif` branch in the existing bridge. Orchestration (`ChatManager.VideoThumbs`), the `vthumb://` cache, and rendering are already platform-agnostic — Android just starts succeeding instead of hitting `onError`.
+
+### New — `Assets/Plugins/Android/VideoThumbnailExtractor.java` (`com.unity.video`)
+
+Job/poll API mirroring the iOS C externs so the bridge coroutine stays symmetric:
+- `int startThumbExtract(String url, String outPath, double timeSec)` — returns a jobId and spawns a **background thread** (network `setDataSource` on the UI thread would ANR). On that thread: `MediaMetadataRetriever.setDataSource(url)` → `getFrameAtTime(timeSec*1e6, OPTION_CLOSEST_SYNC)` → scale the `Bitmap` to ≤640px long edge via `Bitmap.createScaledBitmap` (`getScaledFrameAtTime` needs API 27 > our minSdk 25) → `compress(JPEG, 90)` to `outPath` → set status. Jobs in a `ConcurrentHashMap<Integer, Job>`; `retriever.release()` in a `finally`.
+- `int pollThumbExtract(int jobId)` — 0 running, 1 done, 2 fail.
+- `String thumbExtractError(int jobId)`.
+- `void freeThumbExtractJob(int jobId)`.
+
+### Edit — `Assets/Scripts/Chat/VideoThumbnailExtractor.cs`
+
+Add a `#elif UNITY_ANDROID && !UNITY_EDITOR` branch that caches a static `AndroidJavaClass("com.unity.video.VideoThumbnailExtractor")` and drives it with the **same `yield return null` poll loop** as iOS (`CallStatic<int>("startThumbExtract", …)` → poll `pollThumbExtract` → `onResult(outputPath)` / `onError(thumbExtractError(jobId))` → `freeThumbExtractJob`). The Editor `#else` (`onError`) is unchanged.
+
+### Decisions
+
+- **Poll bridge, not `UnitySendMessage`** — keeps `Extract` identical across platforms; no receiver GameObject.
+- **Failure = best-effort + server-thumb fallback** — any `setDataSource`/decode failure → `pollThumbExtract` returns 2 → bridge `onError` → keep the server thumb (identical to iOS failure semantics). `MediaMetadataRetriever` over network is less robust than AVFoundation for odd codecs; standard MP4/H.264 (what Wappi delivers) is generally fine.
+- **minSdk 25** → `getFrameAtTime` + manual scale (not `getScaledFrameAtTime`).
+- **INTERNET permission** — already present (app networks throughout; Unity auto-adds it). No manifest change.
+
+### Testing
+
+- No new EditMode tests (shared `VideoThumbQueue` already covered; the Java path is device-only).
+- Android device: an incoming/outgoing video **without** a server thumb now shows a native frame; no ANR/jank while a video-heavy chat extracts two-at-a-time; failures fall back to the server thumb; rotation looks correct.
