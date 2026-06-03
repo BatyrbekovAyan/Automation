@@ -5,6 +5,7 @@ static AVPlayer *player = nil;
 static id timeObserver = nil;
 static id endObserver = nil; // --- ADDED: To track when the audio finishes ---
 static NSString *currentUrl = nil;
+static float desiredSpeed = 1.0f;
 
 // --- ADDED: A safe helper to clean up the player and plug memory leaks ---
 void _cleanupPlayer() {
@@ -39,6 +40,7 @@ void playUrl(const char* url)
 
     player = [[AVPlayer alloc] initWithURL:audioUrl];
     [player play];
+    player.rate = desiredSpeed;
 
     // --- Progress updates ---
     CMTime interval = CMTimeMake(1, 2); // 0.5 sec
@@ -86,7 +88,7 @@ void pausePlayer()
 
 void resumePlayer()
 {
-    if (player) [player play];
+    if (player) { [player play]; player.rate = desiredSpeed; }
 }
 
 void stopPlayer()
@@ -101,6 +103,12 @@ void seekPlayer(float seconds)
 
     CMTime time = CMTimeMakeWithSeconds(seconds, 600);
     [player seekToTime:time];
+}
+
+void setSpeed(float speed)
+{
+    desiredSpeed = speed;
+    if (player && player.rate != 0.0f) player.rate = speed; // only while playing
 }
 
 }

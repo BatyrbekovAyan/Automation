@@ -14,6 +14,7 @@ import android.os.PowerManager;
 
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.MediaItem;
+import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.audio.AudioAttributes;
 import com.google.android.exoplayer2.C;
@@ -25,6 +26,7 @@ public class AudioPlayer {
     private static Handler handler = new Handler(Looper.getMainLooper());
     private static Runnable progressTask;
     private static String currentUrl;
+    private static volatile float desiredSpeed = 1.0f;
 
     // --- PROXIMITY SENSOR VARIABLES ---
     private static PowerManager.WakeLock proximityWakeLock;
@@ -70,6 +72,7 @@ public class AudioPlayer {
             player.setMediaItem(item);
 
             player.prepare();
+            player.setPlaybackParameters(new PlaybackParameters(desiredSpeed));
             player.play();
 
             startProgressUpdates();
@@ -134,6 +137,18 @@ public class AudioPlayer {
             activity.runOnUiThread(() -> {
                 if (player != null) {
                     player.seekTo((long)(seconds * 1000));
+                }
+            });
+        }
+    }
+
+    public static void setSpeed(final float speed) {
+        desiredSpeed = speed;
+        final Activity activity = UnityPlayer.currentActivity;
+        if (activity != null) {
+            activity.runOnUiThread(() -> {
+                if (player != null) {
+                    player.setPlaybackParameters(new PlaybackParameters(speed));
                 }
             });
         }
