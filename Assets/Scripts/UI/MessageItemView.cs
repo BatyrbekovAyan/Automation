@@ -98,7 +98,7 @@ public class MessageItemView : MonoBehaviour
     // === Voice / Audio ===
     // Height 120 matches the prefab's natural audioPanel SizeDelta and WhatsApp's
     // ~40-48pt voice-note row (~111-133 on the 1080 canvas). Both voice and audio
-    // file share the same play+slider+duration layout — no filename row — so the
+    // file share the same play+waveform+duration layout — no filename row — so the
     // height is identical for both.
     private const float VoiceWidth            = 720f;   // 0.67 × canvas
     private const float VoiceHeight           = 120f;
@@ -3236,7 +3236,8 @@ private Color GetSenderColor(string name)
 
     static string FormatSpeed(float speed)
     {
-        string num = (speed == Mathf.Floor(speed)) ? speed.ToString("0") : speed.ToString("0.0");
+        var ci = System.Globalization.CultureInfo.InvariantCulture;
+        string num = (speed == Mathf.Floor(speed)) ? speed.ToString("0", ci) : speed.ToString("0.0", ci);
         return num + "×";
     }
     
@@ -3247,7 +3248,7 @@ private Color GetSenderColor(string name)
         {
             if (audioButtonIcon) audioButtonIcon.sprite = playIcon;
             if (audioWaveform != null) audioWaveform.SetProgress(0f);
-            if (audioDurationText != null && currentVm != null)
+            if (audioDurationText != null)
             {
                 TimeSpan total = TimeSpan.FromSeconds(currentVm.duration);
                 audioDurationText.text = string.Format("{0:D1}:{1:D2}", total.Minutes, total.Seconds);
