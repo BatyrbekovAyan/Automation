@@ -83,7 +83,16 @@ public partial class ChatManager
         if (ok && System.IO.File.Exists(finalPath))
         {
             vm.thumbnailUrl = vthumbUrl;
-            UpdateCachedThumbnailUrl(cacheRoot, vm.chatId, messageId, vthumbUrl);
+
+            // The extracted frame is upright (display orientation), so its pixel
+            // dimensions are the ground-truth bubble aspect — overriding whatever
+            // Normalize guessed from server dims (often missing -> square, or
+            // rotation-raw -> landscape). Same thumbnail-as-source-of-truth
+            // principle the outgoing send path uses (SeedVideoThumbCache).
+            float thumbAspect = ReadImageFileAspect(finalPath);
+            if (thumbAspect > 0f) vm.aspectRatio = thumbAspect;
+
+            UpdateCachedThumbnailUrl(cacheRoot, vm.chatId, messageId, vthumbUrl, vm.aspectRatio);
             OnMessageMediaRefreshed?.Invoke(vm);
         }
 
@@ -92,7 +101,7 @@ public partial class ChatManager
         PumpVideoThumbQueue();
     }
 
-    private void UpdateCachedThumbnailUrl(string cacheRoot, string chatId, string messageId, string thumbnailUrl)
+    private void UpdateCachedThumbnailUrl(string cacheRoot, string chatId, string messageId, string thumbnailUrl, float aspectRatio)
     {
         if (string.IsNullOrEmpty(chatId)) return;
         List<MessageViewModel> cached = ChatHistoryCache.LoadHistory(cacheRoot, chatId);
@@ -101,9 +110,40 @@ public partial class ChatManager
             if (cached[i].messageId == messageId)
             {
                 cached[i].thumbnailUrl = thumbnailUrl;
+                // Persist the upright-thumbnail aspect so the correct bubble shape
+                // survives app restarts without re-extracting (CreateViewModel copies
+                // it back into the VM on the next cache load).
+                if (aspectRatio > 0f) cached[i].aspectRatio = aspectRatio;
                 ChatHistoryCache.SaveHistory(cacheRoot, chatId, cached);
                 return;
             }
+        }
+    }
+
+    /// <summary>
+    /// Decodes the image at <paramref name="path"/> and returns its display aspect
+    /// (width / height), or 0 if it can't be read. The extracted video frame is
+    /// already upright, so no rotation correction is applied. The temporary decode
+    /// texture is destroyed immediately. Never throws.
+    /// </summary>
+    private static float ReadImageFileAspect(string path)
+    {
+        Texture2D tex = null;
+        try
+        {
+            byte[] bytes = System.IO.File.ReadAllBytes(path);
+            tex = new Texture2D(2, 2);
+            if (!tex.LoadImage(bytes) || tex.height <= 0) return 0f;
+            return (float)tex.width / tex.height;
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogWarning($"[ChatManager] ReadImageFileAspect failed for {path}: {ex.Message}");
+            return 0f;
+        }
+        finally
+        {
+            if (tex != null) UnityEngine.Object.Destroy(tex);
         }
     }
 
