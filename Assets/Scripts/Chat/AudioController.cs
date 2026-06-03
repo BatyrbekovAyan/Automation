@@ -1,6 +1,5 @@
 using UnityEngine;
 using System;
-using UnityEngine.UI;
 using System.Runtime.InteropServices; // Required for iOS DllImport
 using System.Globalization;
 
@@ -11,11 +10,12 @@ public class AudioController : MonoBehaviour
     public event Action<string> OnAudioStarted; 
     public event Action<string> OnAudioStopped; 
     public event Action<string, float, float> OnAudioProgress;
-
-    public Slider progressSlider;
+    public event Action<string> OnAudioFinished;
 
     private string currentUrl;
     private bool isPaused = false;
+    private string pendingSeekUrl;
+    private float pendingSeekSeconds;
 
     public static float CurrentSpeed { get; private set; } = 1f;
     public event Action<float> OnSpeedChanged;
@@ -73,6 +73,13 @@ public class AudioController : MonoBehaviour
 #elif UNITY_IOS && !UNITY_EDITOR
         IOSBridge.PlayUrl(url);
 #endif
+
+        // Apply a seek the user made on the waveform before pressing play.
+        if (pendingSeekUrl == url)
+        {
+            Seek(pendingSeekSeconds);
+            pendingSeekUrl = null;
+        }
     }
 
     public void Pause()
@@ -133,8 +140,18 @@ public class AudioController : MonoBehaviour
 
     public void SeekTo(string url, float seconds)
     {
-        if (currentUrl != url) PlayAudio(url);
-        Seek(seconds);
+        // Repositions only — never starts playback. If this note is the loaded
+        // track (playing or paused), seek it in place; otherwise remember the
+        // position and apply it when the user presses play.
+        if (currentUrl == url)
+        {
+            Seek(seconds);
+        }
+        else
+        {
+            pendingSeekUrl = url;
+            pendingSeekSeconds = seconds;
+        }
     }
 
     public void CycleSpeed() => SetSpeed(AudioBubbleMath.NextSpeed(CurrentSpeed));
@@ -171,8 +188,9 @@ public class AudioController : MonoBehaviour
         // Make sure the audio that finished is actually the one we are tracking
         if (currentUrl == url)
         {
-            // 1. Force the UI slider to snap perfectly back to 0 seconds
-            OnAudioProgress?.Invoke(url, 0f, 1f); 
+            // 1. Fill the waveform to the end (fully played) instead of snapping to empty.
+            //    The view handles the visual via OnAudioFinished.
+            OnAudioFinished?.Invoke(url);
             
             // 2. Trigger the standard Stop routine (flips the button sprite and turns off proximity)
             Stop();

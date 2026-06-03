@@ -96,14 +96,14 @@ public class MessageItemView : MonoBehaviour
     private const float MaxAspectRatio = MediaBubbleSize.MaxAspect;  // 16:9
 
     // === Voice / Audio ===
-    // Height 120 matches the prefab's natural audioPanel SizeDelta and WhatsApp's
+    // Height 160 (user preference — taller than WhatsApp's ~120 voice row). WhatsApp's
     // ~40-48pt voice-note row (~111-133 on the 1080 canvas). Both voice and audio
     // file share the same play+waveform+duration layout — no filename row — so the
     // height is identical for both.
     private const float VoiceWidth            = 720f;   // 0.67 × canvas
-    private const float VoiceHeight           = 120f;
+    private const float VoiceHeight           = 160f;
     private const float AudioFileWidth        = 760f;   // 0.70 × canvas
-    private const float AudioFileHeight       = 120f;
+    private const float AudioFileHeight       = 160f;
 
     // === Sticker (no bubble bg) ===
     private const float StickerWidth          = 432f;   // 0.40 × canvas
@@ -239,6 +239,7 @@ public class MessageItemView : MonoBehaviour
             AudioController.Instance.OnAudioStopped += HandleAudioStopped;
             AudioController.Instance.OnAudioProgress += HandleAudioProgress;
             AudioController.Instance.OnSpeedChanged += HandleSpeedChanged;
+            AudioController.Instance.OnAudioFinished += HandleAudioFinished;
         }
 
         if (ChatManager.Instance != null)
@@ -268,6 +269,7 @@ public class MessageItemView : MonoBehaviour
             AudioController.Instance.OnAudioStopped -= HandleAudioStopped;
             AudioController.Instance.OnAudioProgress -= HandleAudioProgress;
             AudioController.Instance.OnSpeedChanged -= HandleSpeedChanged;
+            AudioController.Instance.OnAudioFinished -= HandleAudioFinished;
         }
 
         if (ChatManager.Instance != null)
@@ -3244,15 +3246,28 @@ private Color GetSenderColor(string name)
     void HandleAudioStarted(string playingUrl) { if (currentVm != null && currentVm.mediaUrl == playingUrl && audioButtonIcon) audioButtonIcon.sprite = stopIcon; else if(audioButtonIcon) audioButtonIcon.sprite = playIcon; }
     void HandleAudioStopped(string stoppedUrl)
     {
+        // Does NOT reset the waveform: a paused note keeps its position, and a
+        // finished note is filled to the end by HandleAudioFinished.
         if (currentVm != null && currentVm.mediaUrl == stoppedUrl)
         {
             if (audioButtonIcon) audioButtonIcon.sprite = playIcon;
-            if (audioWaveform != null) audioWaveform.SetProgress(0f);
             if (audioDurationText != null)
             {
                 TimeSpan total = TimeSpan.FromSeconds(currentVm.duration);
                 audioDurationText.text = string.Format("{0:D1}:{1:D2}", total.Minutes, total.Seconds);
             }
+        }
+    }
+
+    void HandleAudioFinished(string finishedUrl)
+    {
+        if (currentVm == null || currentVm.mediaUrl != finishedUrl) return;
+        if (audioButtonIcon) audioButtonIcon.sprite = playIcon;
+        if (audioWaveform != null) audioWaveform.SetProgress(1f);   // all bars filled — fully played
+        if (audioDurationText != null)
+        {
+            TimeSpan total = TimeSpan.FromSeconds(currentVm.duration);
+            audioDurationText.text = string.Format("{0:D1}:{1:D2}", total.Minutes, total.Seconds);
         }
     }
     void HandleAudioProgress(string url, float pos, float dur)

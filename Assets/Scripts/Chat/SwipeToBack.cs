@@ -325,6 +325,10 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
 
         if (triggerBack)
         {
+            // Leaving the chat via the swipe-back gesture — stop any playing voice note.
+            // This path does NOT route through ChatManager.ShowChatList (the other stop point).
+            if (AudioController.Instance != null) AudioController.Instance.Stop();
+
             // Fire OnSlideOutComplete BEFORE SetActive(false). MessageListView lives
             // under chatPanelToSlide, so deactivating it would trigger OnDisable and
             // unsubscribe the handler before the event fires.
