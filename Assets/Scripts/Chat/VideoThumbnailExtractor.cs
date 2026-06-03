@@ -5,10 +5,10 @@ using UnityEngine;
 
 /// <summary>
 /// Extracts a single thumbnail frame from a (remote) video URL into outputPath.
-/// On iOS this drives the native AVAssetImageGenerator job (VideoThumbnailExtractor.mm)
-/// and polls it from a coroutine. In the Editor and on Android there is no native
-/// extractor, so it reports onError and the caller keeps the server JPEGThumbnail.
-/// Mirrors VideoConverter. Never throws.
+/// On iOS this drives the native AVAssetImageGenerator job (VideoThumbnailExtractor.mm);
+/// on Android the native MediaMetadataRetriever job (VideoThumbnailExtractor.java) — both
+/// polled from a coroutine. In the Editor there is no native extractor, so it reports
+/// onError and the caller keeps the server JPEGThumbnail. Mirrors VideoConverter. Never throws.
 /// </summary>
 public static class VideoThumbnailExtractor
 {
@@ -17,6 +17,9 @@ public static class VideoThumbnailExtractor
     [DllImport("__Internal")] private static extern int    _PollThumbExtract(int jobId);   // 0 run, 1 done, 2 fail
     [DllImport("__Internal")] private static extern IntPtr _ThumbExtractError(int jobId);
     [DllImport("__Internal")] private static extern void   _FreeThumbExtractJob(int jobId);
+#elif UNITY_ANDROID && !UNITY_EDITOR
+    // Cached for the app lifetime (mirrors AndroidBridge.cs). Drives the Java job/poll API.
+    private static readonly AndroidJavaClass _android = new AndroidJavaClass("com.unity.video.VideoThumbnailExtractor");
 #endif
 
     /// <summary>
@@ -50,8 +53,27 @@ public static class VideoThumbnailExtractor
 
         _FreeThumbExtractJob(jobId);
         onResult?.Invoke(outputPath);
+#elif UNITY_ANDROID && !UNITY_EDITOR
+        int jobId = _android.CallStatic<int>("startThumbExtract", url, outputPath, timeSec);
+        int status = _android.CallStatic<int>("pollThumbExtract", jobId);
+        while (status == 0)
+        {
+            yield return null;
+            status = _android.CallStatic<int>("pollThumbExtract", jobId);
+        }
+
+        if (status == 2)
+        {
+            string message = _android.CallStatic<string>("thumbExtractError", jobId) ?? "thumbnail extraction failed";
+            _android.CallStatic("freeThumbExtractJob", jobId);
+            onError?.Invoke(message);
+            yield break;
+        }
+
+        _android.CallStatic("freeThumbExtractJob", jobId);
+        onResult?.Invoke(outputPath);
 #else
-        // Editor + Android: no native extractor — caller keeps the server thumbnail.
+        // Editor: no native extractor — caller keeps the server thumbnail.
         onError?.Invoke("no native thumbnail extractor on this platform");
         yield break;
 #endif

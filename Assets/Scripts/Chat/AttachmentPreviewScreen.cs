@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
 using TMPro;
@@ -56,6 +57,10 @@ public class AttachmentPreviewScreen : MonoBehaviour
     // ChatManager.PostMediaMessageRoutine, since conversion shrinks the file.
     private const long MaxVideoPickBytes = 1024L * 1024 * 1024;
 
+    // Dark placeholder shown in the preview area while the thumbnail/image decodes,
+    // so the just-opened screen has no white flash before the media appears.
+    private static readonly Color LoadingPlaceholderColor = new Color(0.12f, 0.12f, 0.12f, 1f);
+
     void Awake()
     {
         if (root != null) root.SetActive(false);
@@ -105,6 +110,47 @@ public class AttachmentPreviewScreen : MonoBehaviour
         if (videoPanel    != null) videoPanel.SetActive(false);
         if (documentPanel != null) documentPanel.SetActive(false);
 
+        if (captionField != null) captionField.text = "";
+        if (sendButton   != null) sendButton.interactable = true;
+        if (backButton   != null) backButton.interactable = true;
+
+        // Bring the correct panel up EMPTY and present the screen immediately, so the
+        // chat behind it never flashes between the picker dismissing and the preview
+        // appearing. The expensive native decode (video thumbnail / HEIC image — up to
+        // a few seconds main-thread) is deferred one frame so it runs with the screen
+        // already on top instead of blocking its activation.
+        switch (pick.Kind)
+        {
+            case AttachmentKind.Photo:
+            case AttachmentKind.GalleryImage:
+                if (imagePanel != null) imagePanel.SetActive(true);
+                ShowPreviewPlaceholder(imagePreview, _imagePreviewFitter);
+                break;
+            case AttachmentKind.GalleryVideo:
+                if (videoPanel != null) videoPanel.SetActive(true);
+                ShowPreviewPlaceholder(videoPreview, _videoPreviewFitter);
+                if (videoPlayOverlay   != null) videoPlayOverlay.SetActive(false);
+                if (videoDurationBadge != null) videoDurationBadge.SetActive(false);
+                break;
+            case AttachmentKind.Document:
+                if (documentPanel != null) documentPanel.SetActive(true);
+                break;
+        }
+
+        if (root != null) root.SetActive(true);
+        FadeTo(1f, blocksRaycasts: true);
+
+        StartCoroutine(PopulateDeferred(pick));
+    }
+
+    // Lets the just-activated screen render one frame before we block the main thread
+    // on native decode, so the preview is already covering the chat. Bails if the user
+    // backed out or picked something else during the wait.
+    private IEnumerator PopulateDeferred(AttachmentPick pick)
+    {
+        yield return null;
+        if (_currentPick != pick) yield break;
+
         switch (pick.Kind)
         {
             case AttachmentKind.Photo:
@@ -118,13 +164,14 @@ public class AttachmentPreviewScreen : MonoBehaviour
                 PopulateDocumentPanel(pick);
                 break;
         }
+    }
 
-        if (captionField != null) captionField.text = "";
-        if (sendButton   != null) sendButton.interactable = true;
-        if (backButton   != null) backButton.interactable = true;
-
-        if (root != null) root.SetActive(true);
-        FadeTo(1f, blocksRaycasts: true);
+    private static void ShowPreviewPlaceholder(RawImage preview, AspectRatioFitter fitter)
+    {
+        if (preview == null) return;
+        preview.texture = null;
+        preview.color   = LoadingPlaceholderColor;
+        ApplyAspectRatio(fitter, null);
     }
 
     private void PopulateImagePanel(AttachmentPick pick)
@@ -134,6 +181,7 @@ public class AttachmentPreviewScreen : MonoBehaviour
 
         _currentPreviewTexture = LoadTextureFromFile(pick.Path);
         imagePreview.texture = _currentPreviewTexture;
+        if (_currentPreviewTexture != null) imagePreview.color = Color.white;
         ApplyAspectRatio(_imagePreviewFitter, _currentPreviewTexture);
     }
 
@@ -150,6 +198,7 @@ public class AttachmentPreviewScreen : MonoBehaviour
 
         _currentPreviewTexture = thumb;
         videoPreview.texture = thumb;
+        if (thumb != null) videoPreview.color = Color.white;
         ApplyAspectRatio(_videoPreviewFitter, thumb);
 
         int durationSec = 0;

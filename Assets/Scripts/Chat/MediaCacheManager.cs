@@ -68,7 +68,7 @@ public class MediaCacheManager : MonoBehaviour
         if (string.IsNullOrEmpty(url) || imageData == null || imageData.Length == 0) return;
 
         string filePath = GetFilePathFromUrl(url);
-        File.WriteAllBytesAsync(filePath, imageData);
+        File.WriteAllBytes(filePath, imageData);
     }
 
     public Texture2D LoadImageFromCache(string url)
