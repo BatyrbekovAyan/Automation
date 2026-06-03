@@ -17,6 +17,9 @@ public class AudioController : MonoBehaviour
     private string currentUrl;
     private bool isPaused = false;
 
+    public static float CurrentSpeed { get; private set; } = 1f;
+    public event Action<float> OnSpeedChanged;
+
     // --- NATIVE IOS LINK ---
 #if UNITY_IOS && !UNITY_EDITOR
     [DllImport("__Internal")]
@@ -117,7 +120,36 @@ public class AudioController : MonoBehaviour
         IOSBridge.Stop();
 #endif
     }
-    
+
+    public void Seek(float seconds)
+    {
+        if (string.IsNullOrEmpty(currentUrl)) return;
+#if UNITY_ANDROID && !UNITY_EDITOR
+        AndroidBridge.Seek(seconds);
+#elif UNITY_IOS && !UNITY_EDITOR
+        IOSBridge.Seek(seconds);
+#endif
+    }
+
+    public void SeekTo(string url, float seconds)
+    {
+        if (currentUrl != url) PlayAudio(url);
+        Seek(seconds);
+    }
+
+    public void CycleSpeed() => SetSpeed(AudioBubbleMath.NextSpeed(CurrentSpeed));
+
+    public void SetSpeed(float speed)
+    {
+        CurrentSpeed = speed;
+        OnSpeedChanged?.Invoke(speed);
+#if UNITY_ANDROID && !UNITY_EDITOR
+        AndroidBridge.SetSpeed(speed);
+#elif UNITY_IOS && !UNITY_EDITOR
+        IOSBridge.SetSpeed(speed);
+#endif
+    }
+
     public void OnNativeProgress(string data)
     {
         var parts = data.Split('|');

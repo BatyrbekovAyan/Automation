@@ -48,11 +48,23 @@ public static class IOSBridge
     [DllImport("__Internal")]
     private static extern void seekPlayer(float seconds);
 #endif
-    
+
     public static void Seek(float seconds)
     {
 #if UNITY_IOS && !UNITY_EDITOR
     seekPlayer(seconds);
+#endif
+    }
+
+#if UNITY_IOS && !UNITY_EDITOR
+    [DllImport("__Internal")]
+    private static extern void setSpeed(float speed);
+#endif
+
+    public static void SetSpeed(float speed)
+    {
+#if UNITY_IOS && !UNITY_EDITOR
+    setSpeed(speed);
 #endif
     }
 

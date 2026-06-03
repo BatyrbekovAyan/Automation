@@ -42,6 +42,13 @@ public static class AndroidBridge
 #endif
     }
 
+    public static void SetSpeed(float speed)
+    {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        player.CallStatic("setSpeed", speed);
+#endif
+    }
+
     // ⭐ THE NEW PROXIMITY SENSOR BRIDGE
     public static void ToggleProximity(bool enable)
     {
