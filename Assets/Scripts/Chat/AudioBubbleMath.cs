@@ -26,15 +26,16 @@ public static class AudioBubbleMath
         return heights;
     }
 
-    /// Number of leading "played" bars at the given progress fraction (0..1).
-    public static int PlayedBarCount(float fraction, int barCount)
+    /// Continuous filled-bar position (0..barCount) for the progress fraction (0..1).
+    public static float FilledBars(float fraction, int barCount)
     {
-        if (barCount <= 0) return 0;
+        if (barCount <= 0) return 0f;
         float clamped = fraction < 0f ? 0f : (fraction > 1f ? 1f : fraction);
-        int played = (int)Math.Round(clamped * barCount, MidpointRounding.AwayFromZero);
-        if (played < 0) played = 0;
-        if (played > barCount) played = barCount;
-        return played;
+        // n+1 segment mapping: the visible bars finish filling just before playback
+        // ends, so the finish event never has to pop the last bar in. floor = fully
+        // filled bars; fractional part = the leading bar's partial fill.
+        float exact = clamped * (barCount + 1);
+        return exact > barCount ? barCount : exact;
     }
 
     /// Next speed in the cycle (wraps 2x -> 1x). Tolerant of float drift.

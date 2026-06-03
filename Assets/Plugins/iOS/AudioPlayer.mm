@@ -43,7 +43,7 @@ void playUrl(const char* url)
     player.rate = desiredSpeed;
 
     // --- Progress updates ---
-    CMTime interval = CMTimeMake(1, 2); // 0.5 sec
+    CMTime interval = CMTimeMake(1, 10); // 0.1 sec — match Android cadence for a smooth waveform fill
 
     timeObserver =
     [player addPeriodicTimeObserverForInterval:interval

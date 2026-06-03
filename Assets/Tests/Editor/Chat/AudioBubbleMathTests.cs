@@ -41,33 +41,54 @@ public class AudioBubbleMathTests
     }
 
     [Test]
-    public void PlayedBarCount_Zero_None()
+    public void FilledBars_Zero_None()
     {
-        Assert.AreEqual(0, AudioBubbleMath.PlayedBarCount(0f, 32));
+        Assert.AreEqual(0f, AudioBubbleMath.FilledBars(0f, 32));
     }
 
     [Test]
-    public void PlayedBarCount_Full_All()
+    public void FilledBars_Full_CapsAtBarCount()
     {
-        Assert.AreEqual(32, AudioBubbleMath.PlayedBarCount(1f, 32));
+        Assert.AreEqual(32f, AudioBubbleMath.FilledBars(1f, 32));
     }
 
     [Test]
-    public void PlayedBarCount_Half()
+    public void FilledBars_CompletesBeforeEnd()
     {
-        Assert.AreEqual(16, AudioBubbleMath.PlayedBarCount(0.5f, 32));
+        // n+1 mapping: all 32 bars are full well before the audio ends (here at 98%),
+        // so the finish event never has to pop the last bar in.
+        Assert.AreEqual(32f, AudioBubbleMath.FilledBars(0.98f, 32));
     }
 
     [Test]
-    public void PlayedBarCount_ClampsAboveOne()
+    public void FilledBars_Midpoint_IsContinuous()
     {
-        Assert.AreEqual(32, AudioBubbleMath.PlayedBarCount(1.4f, 32));
+        // 0.5 * (32 + 1) = 16.5 → 16 full bars + leading bar half filled.
+        Assert.AreEqual(16.5f, AudioBubbleMath.FilledBars(0.5f, 32), 0.001f);
     }
 
     [Test]
-    public void PlayedBarCount_ClampsBelowZero()
+    public void FilledBars_LeadingBarFillsGradually()
     {
-        Assert.AreEqual(0, AudioBubbleMath.PlayedBarCount(-0.3f, 32));
+        // Across the last bar's range the value climbs continuously (the bar tints in)
+        // rather than jumping from empty to full.
+        float a = AudioBubbleMath.FilledBars(0.94f, 32);
+        float b = AudioBubbleMath.FilledBars(0.96f, 32);
+        Assert.GreaterOrEqual(a, 31f);
+        Assert.Greater(b, a);
+        Assert.Less(b, 32f);
+    }
+
+    [Test]
+    public void FilledBars_ClampsAboveOne()
+    {
+        Assert.AreEqual(32f, AudioBubbleMath.FilledBars(1.4f, 32));
+    }
+
+    [Test]
+    public void FilledBars_ClampsBelowZero()
+    {
+        Assert.AreEqual(0f, AudioBubbleMath.FilledBars(-0.3f, 32));
     }
 
     [Test]

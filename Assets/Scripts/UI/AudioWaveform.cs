@@ -100,9 +100,18 @@ public class AudioWaveform : MonoBehaviour,
     private void ApplyColors()
     {
         int n = Mathf.Min(_heights.Length, _bars.Count);
-        int played = AudioBubbleMath.PlayedBarCount(_progress, n);
+        float filled = AudioBubbleMath.FilledBars(_progress, n);
+        int full = (int)filled;        // fully filled bars
+        float lead = filled - full;    // partial fill of the leading bar (smooth edge)
         for (int i = 0; i < n; i++)
-            _bars[i].color = i < played ? playedColor : unplayedColor;
+        {
+            if (i < full)
+                _bars[i].color = playedColor;
+            else if (i == full && lead > 0f)
+                _bars[i].color = Color.Lerp(unplayedColor, playedColor, lead);
+            else
+                _bars[i].color = unplayedColor;
+        }
     }
 
     // --- Pointer / drag -------------------------------------------------------
