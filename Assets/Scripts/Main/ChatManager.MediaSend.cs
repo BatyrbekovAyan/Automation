@@ -26,14 +26,17 @@ public partial class ChatManager
 
     /// <summary>
     /// Maps (phase, intra-phase 0..1) onto the whole-pipeline 0..1 fill the ring
-    /// shows: Convert 0→0.30, Encode 0.30→0.40, Upload 0.40→1.00. Pure + public
-    /// for unit testing; touches no Unity state.
+    /// shows: Convert 0→0.30, Encode 0.30→0.40, Upload(bytes sent) 0.40→0.90. The
+    /// final 0.90→1.00 is the server-ack window (Wappi receiving + forwarding the
+    /// clip) which has no progress signal, so the ring holds at 0.90 there and the
+    /// view animates the last slice when the Sent event lands. Pure + public for
+    /// unit testing; touches no Unity state.
     /// </summary>
     public static float SendProgress(SendPhase phase, float sub) => phase switch
     {
         SendPhase.Convert => 0.00f + 0.30f * Mathf.Clamp01(sub),
         SendPhase.Encode  => 0.30f + 0.10f * Mathf.Clamp01(sub),
-        SendPhase.Upload  => 0.40f + 0.60f * Mathf.Clamp01(sub),
+        SendPhase.Upload  => 0.40f + 0.50f * Mathf.Clamp01(sub),   // caps at 0.90; ack finishes it
         _ => 0f,
     };
 

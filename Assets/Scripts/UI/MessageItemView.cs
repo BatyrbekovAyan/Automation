@@ -74,8 +74,9 @@ public class MessageItemView : MonoBehaviour
     [Header("Layout Settings")]
     public float downloadButtonHeight = 284f; 
     
-    public Slider audioSlider;
-    public bool isDragging;
+    [SerializeField] private AudioWaveform audioWaveform;
+    [SerializeField] private Button speedPillButton;
+    [SerializeField] private TextMeshProUGUI speedPillLabel;
     
     // === Bubble container ===
     private const float MaxBubbleWidth        = 810f;   // 0.75 × 1080 canvas — text + caption ceiling
@@ -237,6 +238,7 @@ public class MessageItemView : MonoBehaviour
             AudioController.Instance.OnAudioStarted += HandleAudioStarted;
             AudioController.Instance.OnAudioStopped += HandleAudioStopped;
             AudioController.Instance.OnAudioProgress += HandleAudioProgress;
+            AudioController.Instance.OnSpeedChanged += HandleSpeedChanged;
         }
 
         if (ChatManager.Instance != null)
@@ -265,6 +267,7 @@ public class MessageItemView : MonoBehaviour
             AudioController.Instance.OnAudioStarted -= HandleAudioStarted;
             AudioController.Instance.OnAudioStopped -= HandleAudioStopped;
             AudioController.Instance.OnAudioProgress -= HandleAudioProgress;
+            AudioController.Instance.OnSpeedChanged -= HandleSpeedChanged;
         }
 
         if (ChatManager.Instance != null)
@@ -339,6 +342,20 @@ public class MessageItemView : MonoBehaviour
         }
         if (cancelButton != null) cancelButton.gameObject.SetActive(false);
         SetPlayIconVisible(true);
+    }
+
+    // On server ack (Sent), animate the reserved last slice (0.90→1.00) so the ring
+    // finishes before it's swapped for the play icon. Falls back to a plain hide when
+    // the ring isn't actually showing (non-video bubble, or already hidden).
+    private void CompleteAndHideUploadRing()
+    {
+        if (uploadRing == null || !uploadRing.gameObject.activeSelf)
+        {
+            HideUploadRing();
+            return;
+        }
+        _ringTween?.Kill();
+        _ringTween = uploadRing.DOFillAmount(1f, 0.18f).SetEase(Ease.OutQuad).OnComplete(HideUploadRing);
     }
 
     // PlayOverlay's own Image IS the play triangle (there is no separate icon child),
@@ -3168,16 +3185,15 @@ private Color GetSenderColor(string name)
     void HandleAudioMedia(MessageViewModel vm)
     {
         audioPanel.SetActive(true);
-        // messageText.gameObject.SetActive(false); 
-        
+
         if (timeText != null) timeText.margin = new Vector4(0, 0, 0, 0);
-        
-        if (audioSlider != null)
+
+        if (audioWaveform != null)
         {
-            audioSlider.gameObject.SetActive(true);
-            audioSlider.minValue = 0f;
-            audioSlider.maxValue = vm.duration > 0 ? vm.duration : 1f;
-            audioSlider.value = 0f;
+            audioWaveform.gameObject.SetActive(true);
+            audioWaveform.SetSeed(vm.messageId);
+            audioWaveform.SetProgress(0f);
+            audioWaveform.OnSeek = fraction => SeekAudio(vm, fraction);
         }
 
         TimeSpan t = TimeSpan.FromSeconds(vm.duration);
@@ -3186,31 +3202,70 @@ private Color GetSenderColor(string name)
         if (audioPlayButton)
         {
             audioPlayButton.onClick.RemoveAllListeners();
-            audioPlayButton.onClick.AddListener(() => 
+            audioPlayButton.onClick.AddListener(() =>
             {
                 if (ScrollClickBlocker.IsBlocking) return;
                 AudioController.Instance.ToggleAudio(vm.mediaUrl);
             });
         }
+
+        if (speedPillButton != null)
+        {
+            speedPillButton.onClick.RemoveAllListeners();
+            speedPillButton.onClick.AddListener(() =>
+            {
+                if (ScrollClickBlocker.IsBlocking) return;
+                AudioController.Instance.CycleSpeed();
+            });
+        }
+        if (speedPillLabel != null)
+            speedPillLabel.text = FormatSpeed(AudioController.CurrentSpeed);
+    }
+
+    void SeekAudio(MessageViewModel vm, float fraction)
+    {
+        if (AudioController.Instance == null) return;
+        float seconds = AudioBubbleMath.SecondsFromFraction(fraction, vm.duration);
+        AudioController.Instance.SeekTo(vm.mediaUrl, seconds);
+    }
+
+    void HandleSpeedChanged(float speed)
+    {
+        if (speedPillLabel != null) speedPillLabel.text = FormatSpeed(speed);
+    }
+
+    static string FormatSpeed(float speed)
+    {
+        string num = (speed == Mathf.Floor(speed)) ? speed.ToString("0") : speed.ToString("0.0");
+        return num + "×";
     }
     
     void HandleAudioStarted(string playingUrl) { if (currentVm != null && currentVm.mediaUrl == playingUrl && audioButtonIcon) audioButtonIcon.sprite = stopIcon; else if(audioButtonIcon) audioButtonIcon.sprite = playIcon; }
-    void HandleAudioStopped(string stoppedUrl) 
-    { 
-        if (currentVm != null && currentVm.mediaUrl == stoppedUrl) 
+    void HandleAudioStopped(string stoppedUrl)
+    {
+        if (currentVm != null && currentVm.mediaUrl == stoppedUrl)
         {
             if (audioButtonIcon) audioButtonIcon.sprite = playIcon;
-            if (audioSlider != null) audioSlider.value = 0f; 
-        } 
-    }    
-    void HandleAudioProgress(string url, float pos, float dur) 
-    { 
-        if (currentVm == null || currentVm.mediaUrl != url || isDragging) return; 
-        
-        if (audioSlider != null)
+            if (audioWaveform != null) audioWaveform.SetProgress(0f);
+            if (audioDurationText != null && currentVm != null)
+            {
+                TimeSpan total = TimeSpan.FromSeconds(currentVm.duration);
+                audioDurationText.text = string.Format("{0:D1}:{1:D2}", total.Minutes, total.Seconds);
+            }
+        }
+    }
+    void HandleAudioProgress(string url, float pos, float dur)
+    {
+        if (currentVm == null || currentVm.mediaUrl != url) return;
+        if (audioWaveform != null && audioWaveform.IsDragging) return;
+
+        if (audioWaveform != null)
+            audioWaveform.SetProgress(dur > 0f ? pos / dur : 0f);
+
+        if (audioDurationText != null)
         {
-            audioSlider.maxValue = dur > 0 ? dur : 1f; 
-            audioSlider.value = pos; 
+            TimeSpan elapsed = TimeSpan.FromSeconds(pos);
+            audioDurationText.text = string.Format("{0:D1}:{1:D2}", elapsed.Minutes, elapsed.Seconds);
         }
     }
     
@@ -3511,8 +3566,12 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
         if (currentVm == null || currentVm.isIncoming) return;
         currentVm.deliveryStatus = newStatus;
 
-        // Terminal states end the upload: drop the ring + X, restore the play icon.
-        if (newStatus == DeliveryStatus.Sent || newStatus == DeliveryStatus.Failed)
+        // Terminal states end the upload. On Sent, fill the reserved last slice
+        // (0.90→1.00) so the ring visibly completes before swapping to the play icon;
+        // on Failed, drop it immediately (the tap-to-retry path is unchanged).
+        if (newStatus == DeliveryStatus.Sent)
+            CompleteAndHideUploadRing();
+        else if (newStatus == DeliveryStatus.Failed)
             HideUploadRing();
 
         RefreshTimeAndTick();
