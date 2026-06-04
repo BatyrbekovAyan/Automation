@@ -1023,10 +1023,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AudioWaveform
   barsContainer: {fileID: 2418770599455029435}
-  barSprite: {fileID: 0}
+  barSprite: {fileID: 21300000, guid: 5733649a8d8d94c2dac21ca9b47ae287, type: 3}
   barCount: 45
   barSpacing: 4
-  barCornerRadius: 3.5
+  barPixelsPerUnit: 10
+  minBarHeightFraction: 0.2
   playedColor: {r: 0.20754719, g: 0.20754719, b: 0.20754719, a: 1}
   unplayedColor: {r: 0.5, g: 0.5, b: 0.5, a: 0.5019608}
 --- !u!1 &3722320480690458316

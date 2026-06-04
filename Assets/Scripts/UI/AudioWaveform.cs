@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
-using Nobi.UiRoundedCorners;
 
 /// <summary>
 /// Decorative voice/audio waveform. Generates bars at runtime from
@@ -20,7 +19,8 @@ public class AudioWaveform : MonoBehaviour,
     [SerializeField] private Sprite barSprite;             // optional rounded sprite; null = sharp bars
     [SerializeField] private int barCount = 32;
     [SerializeField] private float barSpacing = 2f;
-    [SerializeField] private float barCornerRadius = 4f;   // 0 = sharp; rounds each bar's ends via ImageWithRoundedCorners (keep <= half the smallest bar dimension to avoid SDF artifacts)
+    [SerializeField] private float barPixelsPerUnit = 7f;        // Sliced barSprite only: higher shrinks the 9-slice caps so the sprite's round ends fit a thin bar (tune in Inspector)
+    [SerializeField] private float minBarHeightFraction = 0.2f;  // floor on bar height so quiet bars stay tall enough that their rounded caps don't crush together
     [SerializeField] private Color playedColor   = new Color32(0x12, 0x8C, 0x7E, 0xFF);
     [SerializeField] private Color unplayedColor = new Color32(0xC6, 0xCD, 0xCB, 0xFF);
 
@@ -74,15 +74,11 @@ public class AudioWaveform : MonoBehaviour,
             go.transform.SetParent(barsContainer, false);
             var img = go.GetComponent<Image>();
             img.raycastTarget = false;
-            if (barSprite != null) { img.sprite = barSprite; img.type = Image.Type.Sliced; }
-            // Rounded bar ends via the project's RoundedCorners shader (no sprite needed).
-            // Each bar gets its own material instance keyed to its size, so these do NOT
-            // batch — fine for a handful of audio bubbles; watch draw calls if many are
-            // on-screen. Set barCornerRadius = 0 to fall back to plain rectangles.
-            if (barCornerRadius > 0f)
+            if (barSprite != null)
             {
-                var rounded = go.AddComponent<ImageWithRoundedCorners>();
-                rounded.radius = barCornerRadius;
+                img.sprite = barSprite;
+                img.type = Image.Type.Sliced;                    // 9-slice: caps (sprite T/B borders) stay fixed, straight middle stretches
+                img.pixelsPerUnitMultiplier = barPixelsPerUnit;  // shrink the caps so they fit a thin bar
             }
             _bars.Add(img);
         }
@@ -98,7 +94,7 @@ public class AudioWaveform : MonoBehaviour,
         {
             float x0 = i / (float)total;
             float x1 = (i + 1) / (float)total;
-            float hFrac = Mathf.Clamp01(_heights[i]);
+            float hFrac = Mathf.Clamp(_heights[i], minBarHeightFraction, 1f);
 
             var rt = _bars[i].rectTransform;
             rt.anchorMin = new Vector2(x0, 0.5f - hFrac * 0.5f);
