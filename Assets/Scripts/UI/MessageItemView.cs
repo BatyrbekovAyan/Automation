@@ -990,7 +990,7 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             }
             else
             {
-                layout.padding = new RectOffset(16, 16, 14, 18);
+                layout.padding = new RectOffset(16, 16, 16, 20);
 
                 if (timeText != null)
                 {
