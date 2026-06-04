@@ -391,12 +391,15 @@ public class MessageListView : MonoBehaviour
     }
 
 // --- UPDATED: Beautiful Smooth Scroll & Fade Animation ---
-IEnumerator AppendLiveMessagesRoutine(List<MessageViewModel> messages)
+IEnumerator AppendLiveMessagesRoutine(List<MessageViewModel> messages, bool suppressLanding = false)
 {
     List<MessageItemView> newlyAddedItems = new List<MessageItemView>();
     List<CanvasGroup> newlyAddedCanvasGroups = new List<CanvasGroup>();
 
-    bool wasAtBottom = scrollRect != null && scrollRect.verticalNormalizedPosition <= 0.05f;
+    // suppressLanding (initial-load drain): leave the scroll position untouched so
+    // PlaceUnreadSeparatorAndLand owns the final landing. Forcing wasAtBottom false
+    // disables every scroll/slide branch below; the bubbles still spawn and fade in.
+    bool wasAtBottom = !suppressLanding && scrollRect != null && scrollRect.verticalNormalizedPosition <= 0.05f;
 
     foreach (var vm in messages)
     {
@@ -500,7 +503,9 @@ IEnumerator AppendLiveMessagesRoutine(List<MessageViewModel> messages)
     }
 
     Canvas.ForceUpdateCanvases();
-    RefreshFab();
+    // On the initial-load drain, PlaceUnreadSeparatorAndLand runs next and refreshes the
+    // FAB after it positions the separator — refreshing here would read a half-placed list.
+    if (!suppressLanding) RefreshFab();
 }
 
 IEnumerator SlideUpRevealRoutine(float startNorm)
@@ -782,30 +787,36 @@ IEnumerator UpdateListRoutine(List<MessageViewModel> sortedMessages, bool isLoad
 
         if (!isLoadMore)
         {
-            PlaceUnreadSeparatorAndLand();
-        }
-
-        isLoadingData = false;
-        if (scrollRect != null) scrollRect.movementType = defaultMovementType;
-
-        // Initial cache load is done — release the live-message gate and drain
-        // anything SyncLatestMessages queued while we were spawning. Safe to do
-        // here because the chat-open flow is sequential: Prep + Slide both run
-        // before OnBatchMessagesLoaded fires (PopulateBubbles fires it during
-        // the slide-in completion callback), so by the time we reach this point,
-        // the slide is already over and AppendLiveMessagesRoutine won't compete
-        // with the slide animation.
-        if (!isLoadMore)
-        {
+            // Release the live-message gate and fold in the first server sync's brand-new
+            // messages BEFORE placing the unread separator. SyncLatestMessages runs in
+            // parallel with this cache build and buffers its newer messages into
+            // pendingLiveMessages while the gate is up. The old order placed the separator
+            // on the cache alone and drained afterward, so those synced messages appended
+            // BELOW the just-placed line — inflating the messages-below-the-line count past
+            // the separator's printed count (the "says 3 unread but shows 6 below" bug).
+            // Folding them in first lets PlaceUnreadSeparatorAndLand position the line
+            // against the complete initial set (cache + first sync), so its count matches
+            // the messages beneath it.
+            //
+            // Safe to spawn here: the chat-open flow is sequential, so the slide-in is over
+            // by now and AppendLiveMessagesRoutine won't compete with the animation. Landing
+            // is suppressed because PlaceUnreadSeparatorAndLand owns the final scroll.
+            // isLoadingData stays true through placement so ScrollSeparatorToTop's scroll
+            // can't trip OnScroll pagination.
             isInitialLoadInProgress = false;
 
             if (pendingLiveMessages.Count > 0)
             {
                 var drained = pendingLiveMessages.OrderBy(x => x.timestamp).ToList();
                 pendingLiveMessages.Clear();
-                StartCoroutine(AppendLiveMessagesRoutine(drained));
+                yield return StartCoroutine(AppendLiveMessagesRoutine(drained, suppressLanding: true));
             }
+
+            PlaceUnreadSeparatorAndLand();
         }
+
+        isLoadingData = false;
+        if (scrollRect != null) scrollRect.movementType = defaultMovementType;
     }
 
     // Called at the end of the initial build (!isLoadMore). Reads ChatManager.UnreadOnOpen,
