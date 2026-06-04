@@ -1,17 +1,17 @@
 using UnityEngine;
 
 /// <summary>
-/// Pure sizing math for image/video message bubbles. WhatsApp-style: fit the media's
-/// (clamped) aspect ratio into one MaxWidth × MaxHeight bounding box, preserving
-/// proportion. Aspect = width / height (>1 landscape, <1 portrait). Media wider than
-/// MaxAspect or taller than MinAspect is sized to the clamp edge; the caller
-/// (ApplyTextureAspectFill) center-crops it to that same clamped ratio.
+/// Pure sizing math for image/video message bubbles. WhatsApp-style: landscape media
+/// fills a wider max width, portrait media a narrower one (so tall content isn't
+/// overwhelming); height follows from the clamped aspect. Aspect = width / height
+/// (>1 landscape, <1 portrait). Media wider than MaxAspect or taller than MinAspect is
+/// sized to the clamp edge; the caller (ApplyTextureAspectFill) center-crops the extreme.
 /// </summary>
 public static class MediaBubbleSize
 {
-    public const float MaxWidth  = 810f;   // box width  (~0.75 × 1080 ref canvas)
-    public const float MaxHeight = 1080f;  // box height (portrait cap)
-    public const float MinAspect = 0.56f;  // 9:16 — taller is center-cropped
+    public const float MaxWidthLandscape = 810f;  // aspect > 1 — fills more width (WhatsApp shows landscape wide)
+    public const float MaxWidthPortrait  = 700f;  // aspect <= 1 — narrower so tall portraits aren't overwhelming
+    public const float MinAspect = 0.70f;  // ~7:10 — taller is center-cropped (WhatsApp trims tall clips)
     public const float MaxAspect = 1.78f;  // 16:9 — wider is center-cropped
 
     public static Vector2 Resolve(float aspect)
@@ -19,16 +19,11 @@ public static class MediaBubbleSize
         if (!float.IsFinite(aspect) || aspect <= 0f) aspect = 1f;
         aspect = Mathf.Clamp(aspect, MinAspect, MaxAspect);
 
-        float width  = MaxWidth;
-        float height = width / aspect;
-
-        if (height > MaxHeight)         // portrait taller than the box → height-bound
-        {
-            height = MaxHeight;
-            width  = height * aspect;   // narrower, taller bubble
-        }
-
-        return new Vector2(width, height);
+        // Landscape fills the wider max width; portrait (and square) the narrower one.
+        // Height follows from the clamped aspect, so the clamp also bounds how tall a
+        // portrait bubble gets (MaxWidthPortrait / MinAspect = 1000).
+        float width = aspect > 1f ? MaxWidthLandscape : MaxWidthPortrait;
+        return new Vector2(width, width / aspect);
     }
 
     /// <summary>
