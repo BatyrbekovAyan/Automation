@@ -106,8 +106,8 @@ public class MessageItemView : MonoBehaviour
     private const float AudioFileHeight       = 160f;
 
     // === Sticker (no bubble bg) ===
-    private const float StickerWidth          = 432f;   // 0.40 × canvas
-    private const float StickerHeight         = 432f;
+    private const float StickerWidth          = 396f;   // 0.37 × canvas — matches WhatsApp sticker size
+    private const float StickerHeight         = 396f;
 
     // === Document ===
     private const float DocumentWidth         = 760f;   // 0.70 × canvas
