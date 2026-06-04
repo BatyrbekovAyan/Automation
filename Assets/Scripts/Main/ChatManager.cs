@@ -22,29 +22,52 @@ public partial class ChatManager : MonoBehaviour
     /// are spawned on first paint; the rest stay in _cachedQueue and load
     /// when the user scrolls up.
     ///
-    /// 15 points roughly fills a 1080×2400 mobile viewport:
-    ///   - 15 text bubbles (1pt each), OR
-    ///   - 3 image/video + 3 text bubbles (12+3 = 15), OR
-    ///   - 1 image + 1 sticker + 1 audio + 7 text (4+2+1.5+7 = 14.5)
+    /// Media weight tracks displayed height: portrait media is tallest (10pt),
+    /// square middle (9pt), landscape shortest (7pt). 20 points roughly fills
+    /// a 1080×2400 mobile viewport:
+    ///   - 20 text bubbles (1pt each), OR
+    ///   - 2 portrait images/videos (10+10), OR
+    ///   - 1 landscape image + 1 square image + 4 text (7+9+4 = 20)
     /// </summary>
-    private const float FirstScreenPointBudget = 15f;
+    private const float FirstScreenPointBudget = 20f;
 
-    private static float GetMessageTypeWeight(MessageType type)
+    // Media weight depends on orientation: portrait fills the most vertical
+    // space, square less, landscape least.
+    private const float PortraitMediaWeight  = 10f;
+    private const float SquareMediaWeight    = 9f;
+    private const float LandscapeMediaWeight = 7f;
+
+    // "Square" = longer side within this ratio of the shorter (≈ within 15% of
+    // 1:1). Anything more elongated counts as portrait or landscape. Media with
+    // missing dimensions normalizes to aspect 1.0 upstream, so it lands here.
+    private const float SquareAspectTolerance = 1.15f;
+
+    private static float GetMessageTypeWeight(MessageViewModel vm)
     {
-        switch (type)
+        switch (vm.type)
         {
             case MessageType.Image:
             case MessageType.Video:
-                return 4f;
+                return MediaWeight(vm);
             case MessageType.Sticker:
-                return 2f;
+                return 4.5f;
             case MessageType.Audio:
             case MessageType.Voice:
             case MessageType.Document:
-                return 1.5f;
+                return 2f;
             default: // Chat (text) and Unknown
                 return 1f;
         }
+    }
+
+    private static float MediaWeight(MessageViewModel vm)
+    {
+        // OrientedAspect corrects rotated phone videos (stored as a landscape
+        // frame plus a 90/270 rotation flag) so they're weighed as portrait.
+        float aspect = MediaBubbleSize.OrientedAspect(vm.aspectRatio, vm.videoRotation);
+        float longSideRatio = aspect >= 1f ? aspect : 1f / aspect;
+        if (longSideRatio <= SquareAspectTolerance) return SquareMediaWeight;
+        return aspect > 1f ? LandscapeMediaWeight : PortraitMediaWeight;
     }
 
     /// <summary>
@@ -77,7 +100,7 @@ public partial class ChatManager : MonoBehaviour
         int count = 0;
         foreach (var vm in sortedNewestFirst)
         {
-            float weight = GetMessageTypeWeight(vm.type);
+            float weight = GetMessageTypeWeight(vm);
             // After the first message, stop as soon as adding the next would
             // push past the budget. The first message is always included.
             if (count > 0 && points + weight > FirstScreenPointBudget) break;
