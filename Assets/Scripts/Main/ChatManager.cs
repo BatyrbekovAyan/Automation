@@ -14,63 +14,6 @@ public partial class ChatManager : MonoBehaviour
     public static int MessagesPerPage = 50;
 
     /// <summary>
-    /// Visual cost budget for the initial paint. Different message types
-    /// consume different amounts of vertical space, so we size the first
-    /// batch by visual cost rather than fixed message count. This stops
-    /// media-heavy chats from over-spawning items off-screen during the
-    /// slide-in animation — only the messages that actually fit the viewport
-    /// are spawned on first paint; the rest stay in _cachedQueue and load
-    /// when the user scrolls up.
-    ///
-    /// Media weight tracks displayed height: portrait media is tallest (10pt),
-    /// square middle (9pt), landscape shortest (7pt). 20 points roughly fills
-    /// a 1080×2400 mobile viewport:
-    ///   - 20 text bubbles (1pt each), OR
-    ///   - 2 portrait images/videos (10+10), OR
-    ///   - 1 landscape image + 1 square image + 4 text (7+9+4 = 20)
-    /// </summary>
-    private const float FirstScreenPointBudget = 20f;
-
-    // Media weight depends on orientation: portrait fills the most vertical
-    // space, square less, landscape least.
-    private const float PortraitMediaWeight  = 10f;
-    private const float SquareMediaWeight    = 9f;
-    private const float LandscapeMediaWeight = 7f;
-
-    // "Square" = longer side within this ratio of the shorter (≈ within 15% of
-    // 1:1). Anything more elongated counts as portrait or landscape. Media with
-    // missing dimensions normalizes to aspect 1.0 upstream, so it lands here.
-    private const float SquareAspectTolerance = 1.15f;
-
-    private static float GetMessageTypeWeight(MessageViewModel vm)
-    {
-        switch (vm.type)
-        {
-            case MessageType.Image:
-            case MessageType.Video:
-                return MediaWeight(vm);
-            case MessageType.Sticker:
-                return 4.5f;
-            case MessageType.Audio:
-            case MessageType.Voice:
-            case MessageType.Document:
-                return 2f;
-            default: // Chat (text) and Unknown
-                return 1f;
-        }
-    }
-
-    private static float MediaWeight(MessageViewModel vm)
-    {
-        // OrientedAspect corrects rotated phone videos (stored as a landscape
-        // frame plus a 90/270 rotation flag) so they're weighed as portrait.
-        float aspect = MediaBubbleSize.OrientedAspect(vm.aspectRatio, vm.videoRotation);
-        float longSideRatio = aspect >= 1f ? aspect : 1f / aspect;
-        if (longSideRatio <= SquareAspectTolerance) return SquareMediaWeight;
-        return aspect > 1f ? LandscapeMediaWeight : PortraitMediaWeight;
-    }
-
-    /// <summary>
     /// Three-phase chat-open state machine. Prep runs cache load and queues sync results
     /// without touching UI. Slide is the slide-in animation with all heavy main-thread
     /// work gated. Populate fires OnBatchMessagesLoaded and drains queued sync results.
@@ -85,30 +28,6 @@ public partial class ChatManager : MonoBehaviour
     /// </summary>
     public ChatOpenPhase Phase => _phase;
     private ChatOpenPhase _phase = ChatOpenPhase.Idle;
-
-    /// <summary>
-    /// Returns how many messages from the start of a newest-first list fit
-    /// the first-paint point budget. Always includes at least one message
-    /// even if it alone exceeds the budget (e.g. opening on a chat whose
-    /// single newest message is a long video).
-    /// </summary>
-    private static int FirstScreenMessageCount(List<MessageViewModel> sortedNewestFirst)
-    {
-        if (sortedNewestFirst == null || sortedNewestFirst.Count == 0) return 0;
-
-        float points = 0;
-        int count = 0;
-        foreach (var vm in sortedNewestFirst)
-        {
-            float weight = GetMessageTypeWeight(vm);
-            // After the first message, stop as soon as adding the next would
-            // push past the budget. The first message is always included.
-            if (count > 0 && points + weight > FirstScreenPointBudget) break;
-            points += weight;
-            count++;
-        }
-        return Math.Max(1, count);
-    }
 
     [Header("UI Panels")]
     public GameObject ChatListPanel;
@@ -743,7 +662,7 @@ public partial class ChatManager : MonoBehaviour
             foreach (var msg in cachedMessages) seenMessageIds.Add(msg.messageId);
             _activeChatCache = cachedMessages;
 
-            int initialCount = FirstScreenMessageCount(cachedMessages);
+            int initialCount = FirstScreenBudget.MessageCount(cachedMessages);
             if (cachedMessages.Count > initialCount)
             {
                 _pendingFirstBatch = cachedMessages.GetRange(0, initialCount);
@@ -776,7 +695,7 @@ public partial class ChatManager : MonoBehaviour
 
                 newMessages.Sort((a, b) => b.timestamp.CompareTo(a.timestamp));
 
-                int initialCount = FirstScreenMessageCount(newMessages);
+                int initialCount = FirstScreenBudget.MessageCount(newMessages);
                 if (newMessages.Count > initialCount)
                 {
                     _pendingFirstBatch = newMessages.GetRange(0, initialCount);
