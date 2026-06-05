@@ -609,7 +609,7 @@ public class MessageItemView : MonoBehaviour
         playOverlay.SetActive(false);
         audioPanel.SetActive(false);
         if (documentPanel) documentPanel.SetActive(false);
-        if (loadingSpinner) loadingSpinner.SetActive(false);
+        HideLoadingSpinner();
         if (expiredPlaceholder) expiredPlaceholder.SetActive(false);
 
         long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
@@ -1629,7 +1629,44 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
         }
     }
 
-void StartDownload(MessageViewModel vm, int attemptNumber, bool isManual)
+    // === Loading spinner (shared) =========================================
+    // `loadingSpinner` is a per-bubble overlay: its root Image is a card
+    // background and a child object is the rotating spinner. Bare mode hides
+    // the card (clears the root Image) so only the spinner shows — used over
+    // media/stickers. Card mode leaves the root Image alone — used on the
+    // download button. Centralised here so every load path shows/hides the
+    // spinner the same way.
+    void ShowLoadingSpinner(Transform parent, bool bareSpinner)
+    {
+        if (loadingSpinner == null) return;
+
+        loadingSpinner.SetActive(true);
+        loadingSpinner.transform.SetParent(parent, false);
+        loadingSpinner.transform.SetAsLastSibling();
+
+        if (loadingSpinner.TryGetComponent<RectTransform>(out var rt))
+        {
+            rt.anchorMin = new Vector2(0.5f, 0.5f);
+            rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = Vector2.zero;
+        }
+
+        if (!loadingSpinner.TryGetComponent<LayoutElement>(out var le))
+            le = loadingSpinner.AddComponent<LayoutElement>();
+        le.ignoreLayout = true;
+
+        if (bareSpinner && loadingSpinner.TryGetComponent<Image>(out var img))
+            img.color = Color.clear;
+    }
+
+    void HideLoadingSpinner(Transform reparentTo = null)
+    {
+        if (loadingSpinner == null) return;
+        if (reparentTo != null) loadingSpinner.transform.SetParent(reparentTo, false);
+        loadingSpinner.SetActive(false);
+    }
+
+    void StartDownload(MessageViewModel vm, int attemptNumber, bool isManual)
     {
         bool isAudio = (vm.type == MessageType.Audio || vm.type == MessageType.Voice);
         bool isDoc = (vm.type == MessageType.Document); 
@@ -1642,21 +1679,7 @@ void StartDownload(MessageViewModel vm, int attemptNumber, bool isManual)
         
         if (downloadButtonText) downloadButtonText.gameObject.SetActive(false); 
 
-        if (loadingSpinner) 
-        {
-            loadingSpinner.SetActive(true);
-            loadingSpinner.transform.SetParent(downloadButton.transform, false);
-            var rt = loadingSpinner.GetComponent<RectTransform>();
-            if (rt != null) 
-            {
-                rt.anchorMin = new Vector2(0.5f, 0.5f);
-                rt.anchorMax = new Vector2(0.5f, 0.5f);
-                rt.anchoredPosition = Vector2.zero;
-            }
-            var le = loadingSpinner.GetComponent<LayoutElement>();
-            if (!le) le = loadingSpinner.gameObject.AddComponent<LayoutElement>();
-            le.ignoreLayout = true;
-        }
+        ShowLoadingSpinner(downloadButton.transform, bareSpinner: false);
 
         ChatManager.Instance.DownloadMediaForMessage(vm.messageId, 
             (source) => 
@@ -1666,11 +1689,7 @@ void StartDownload(MessageViewModel vm, int attemptNumber, bool isManual)
                 if (btnImg != null) btnImg.enabled = true;
                 if (downloadButtonText) downloadButtonText.gameObject.SetActive(true);
                 
-                if (loadingSpinner)
-                {
-                    loadingSpinner.transform.SetParent(downloadButton.transform.parent, false);
-                    loadingSpinner.SetActive(false);
-                }
+                HideLoadingSpinner(downloadButton.transform.parent);
 
                 if (downloadButton) downloadButton.gameObject.SetActive(false);
 
@@ -1750,11 +1769,7 @@ void StartDownload(MessageViewModel vm, int attemptNumber, bool isManual)
                     if (btnImg != null) btnImg.enabled = true;
                     if (downloadButtonText) downloadButtonText.gameObject.SetActive(true);
                     
-                    if (loadingSpinner)
-                    {
-                        loadingSpinner.transform.SetParent(downloadButton.transform.parent, false);
-                        loadingSpinner.SetActive(false);
-                    }
+                    HideLoadingSpinner(downloadButton.transform.parent);
                     
                     HandleFinalFailure(isManual, isAudio); 
                 }
@@ -1898,14 +1913,14 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
         if (url.StartsWith("base64://"))
         {
             LoadBase64Image(url.Substring(9), false, bubbleRatio);
-            if (loadingSpinner) loadingSpinner.SetActive(false);
+            HideLoadingSpinner();
             yield break;
         }
 
         Texture2D cachedTex = MediaCacheManager.Instance.LoadImageFromCache(url);
         if (cachedTex != null)
         {
-            if (loadingSpinner) loadingSpinner.SetActive(false);
+            HideLoadingSpinner();
             ApplyTextureAspectFill(cachedTex, false, bubbleRatio);
             yield break; 
         }
@@ -1915,7 +1930,7 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
 
         if (www.result == UnityWebRequest.Result.Success)
         {
-            if (loadingSpinner) loadingSpinner.SetActive(false);
+            HideLoadingSpinner();
 
             byte[] imageBytes = www.downloadHandler.data;
             Texture2D tex = new Texture2D(2, 2);
@@ -1942,7 +1957,7 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
             }
             else
             {
-                if (loadingSpinner) loadingSpinner.SetActive(false);
+                HideLoadingSpinner();
                 HandleFinalFailure(isManual, false);
             }
         }
@@ -1997,27 +2012,8 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
                 HideUploadRing();
         }
 
-        if (loadingSpinner)
-        {
-            loadingSpinner.SetActive(showSpinner); 
-            
-            loadingSpinner.transform.SetParent(messageImage.transform, false);
-            loadingSpinner.transform.SetAsLastSibling();
-            
-            var rt = loadingSpinner.GetComponent<RectTransform>();
-            if (rt)
-            {
-                rt.anchorMin = new Vector2(0.5f, 0.5f);
-                rt.anchorMax = new Vector2(0.5f, 0.5f);
-                rt.anchoredPosition = Vector2.zero;
-            }
-
-            var le = loadingSpinner.GetComponent<LayoutElement>();
-            if (!le) le = loadingSpinner.gameObject.AddComponent<LayoutElement>();
-            le.ignoreLayout = true;
-            
-            if (loadingSpinner.TryGetComponent<Image>(out var img)) img.color = Color.clear;
-        }
+        if (showSpinner) ShowLoadingSpinner(messageImage.transform, bareSpinner: true);
+        else HideLoadingSpinner();
 
         UpdateBubbleVisuals();
         ApplyDynamicLayout(vm.type);
@@ -2035,24 +2031,7 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
 
         SetLayoutToButton();
 
-        if (loadingSpinner)
-        {
-            loadingSpinner.SetActive(true);
-            loadingSpinner.transform.SetParent(downloadButton.transform, false);
-            loadingSpinner.transform.SetAsLastSibling();
-            
-            var rt = loadingSpinner.GetComponent<RectTransform>();
-            if (rt)
-            {
-                rt.anchorMin = new Vector2(0.5f, 0.5f);
-                rt.anchorMax = new Vector2(0.5f, 0.5f);
-                rt.anchoredPosition = Vector2.zero;
-            }
-
-            var le = loadingSpinner.GetComponent<LayoutElement>();
-            if (!le) le = loadingSpinner.gameObject.AddComponent<LayoutElement>();
-            le.ignoreLayout = true;
-        }
+        ShowLoadingSpinner(downloadButton.transform, bareSpinner: false);
 
         UpdateBubbleVisuals();
         ApplyDynamicLayout(vm.type);
@@ -2192,7 +2171,7 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
 
     void HandleFinalFailure(bool isManual, bool isAudio = false)
     {
-        if (loadingSpinner) loadingSpinner.SetActive(false);
+        HideLoadingSpinner();
 
         if (isManual)
         {
@@ -2464,7 +2443,7 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
         if (url.StartsWith("base64://"))
         {
             LoadBase64Image(url.Substring(9), vm.isSticker, bubbleRatio);
-            if (loadingSpinner) loadingSpinner.SetActive(false);
+            HideLoadingSpinner();
             yield break;
         }
 
@@ -2474,7 +2453,7 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
         if (www.result == UnityWebRequest.Result.Success)
         {
             ProcessHDBytes(www.downloadHandler.data, vm, bubbleRatio);
-            if (loadingSpinner) loadingSpinner.SetActive(false);
+            HideLoadingSpinner();
         }
         else
         {
@@ -2485,10 +2464,7 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
 
     void ProcessHDBytes(byte[] bytes, MessageViewModel vm, float targetRatio)
     {
-        if (loadingSpinner) 
-        {
-            loadingSpinner.SetActive(false); 
-        }
+        HideLoadingSpinner();
 
         Transform currentParent = messageImage.transform.parent;
         Transform bubbleParent = (currentParent.name == "MediaContainer") ? currentParent.parent : currentParent;
@@ -2529,10 +2505,7 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
 
     void ShowVisualDownloadButton(MessageViewModel vm)
     {
-        if (loadingSpinner) 
-        {
-            loadingSpinner.SetActive(false);
-        }
+        HideLoadingSpinner();
 
         messageImage.gameObject.SetActive(false);
 
@@ -2564,8 +2537,14 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
     
     IEnumerator LoadWebPOrImage(string url, bool isSticker, float targetRatio)
     {
+        // Sticker downloads have no thumbnail to fill the 396x396 area while bytes arrive,
+        // so it would sit empty until decode - show the spinner over it for the duration.
+        if (isSticker) ShowLoadingSpinner(messageImage.transform, bareSpinner: true);
+
         using UnityWebRequest www = UnityWebRequest.Get(url);
         yield return www.SendWebRequest();
+
+        if (isSticker) HideLoadingSpinner();
 
         if (www.result == UnityWebRequest.Result.Success)
         {
@@ -2827,24 +2806,7 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
         // 1. Hide the Play Icon and show the Spinner perfectly centered OVER the thumbnail
         if (playOverlay != null) playOverlay.SetActive(false);
         
-        if (loadingSpinner != null)
-        {
-            loadingSpinner.SetActive(true);
-            loadingSpinner.transform.SetParent(messageImage.transform, false);
-            loadingSpinner.transform.SetAsLastSibling();
-
-            var rt = loadingSpinner.GetComponent<RectTransform>();
-            if (rt)
-            {
-                rt.anchorMin = new Vector2(0.5f, 0.5f);
-                rt.anchorMax = new Vector2(0.5f, 0.5f);
-                rt.anchoredPosition = Vector2.zero;
-            }
-
-            var le = loadingSpinner.GetComponent<LayoutElement>();
-            if (!le) le = loadingSpinner.gameObject.AddComponent<LayoutElement>();
-            le.ignoreLayout = true;
-        }
+        ShowLoadingSpinner(messageImage.transform, bareSpinner: false);
 
         bool apiSuccess = false;
         string fetchedUrl = "";
@@ -2859,7 +2821,7 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
         while (!apiDone) yield return null;
 
         // 3. Restore the UI back to normal
-        if (loadingSpinner != null) loadingSpinner.SetActive(false);
+        HideLoadingSpinner();
         if (playOverlay != null) playOverlay.SetActive(true);
 
         // 4. If we got the new URL, update the memory and immediately launch the video!
