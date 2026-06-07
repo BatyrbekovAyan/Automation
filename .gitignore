@@ -57,3 +57,6 @@ CLAUDE.local.md
 
 # Superpowers / Brainstorming workspace artifacts
 .superpowers/
+
+# Headless test runner output (Tools/run-tests-headless.sh)
+Tools/test-output/

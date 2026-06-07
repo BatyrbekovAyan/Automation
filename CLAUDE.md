@@ -19,6 +19,13 @@ Command-line build example:
 Unity -batchmode -nographics -projectPath . -buildTarget Android -quit
 ```
 
+### Running EditMode tests
+
+EditMode tests live in `Assets/Tests/Editor/Chat/` (no asmdef — they compile into the predefined `Assembly-CSharp-Editor`). Two ways to run them:
+
+- **Editor closed (headless, hands-off)** — `Tools/run-tests-headless.sh`. Launches Unity in batch mode (`-runTests -batchmode -nographics -testPlatform EditMode`, never `-quit`), parses the NUnit3 result, and writes outputs to `Tools/test-output/` (gitignored — must NOT be under `Temp/`, which Unity wipes on launch). Refuses if the Editor has the project open (the project lock is single-instance). Pass a `-testFilter` regex as `$1` to scope the run.
+- **Editor open** — `Assets/Editor/ClaudeTestBridge.cs`: drop `Temp/claude/run-tests.trigger`, read `Temp/claude/test-summary.json`. Runs the suite inside the already-open Editor (which must be focused).
+
 ## Architecture
 
 **Single scene**: `Assets/Scenes/Main.unity` — all UI is canvas-based, toggled via `GameObject.SetActive()`. No scene transitions.
