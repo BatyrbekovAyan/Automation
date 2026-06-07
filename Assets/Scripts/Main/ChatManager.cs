@@ -707,8 +707,15 @@ public partial class ChatManager : MonoBehaviour
                     _cachedQueue = new List<MessageViewModel>();
                 }
 
-                // If we're already in Populate by the time the fetch returns, fire immediately.
-                if (_phase == ChatOpenPhase.Populate)
+                // Fire immediately if the open has already settled — and this MUST accept Idle
+                // as well as Populate. PopulateBubbles advances _phase Populate->Idle
+                // synchronously within a single call (no yield between lines 758 and 776), so by
+                // the time this async network callback resumes the phase is Idle, never Populate.
+                // Checking only ==Populate made this branch dead code: a slow fetch on an
+                // uncached chat staged _pendingFirstBatch but never fired it, leaving the chat
+                // blank until the next open rendered it from the cache saved above. Mirrors the
+                // isSettled gate in SyncLatestMessages.
+                if (_phase == ChatOpenPhase.Populate || _phase == ChatOpenPhase.Idle)
                 {
                     OnBatchMessagesLoaded?.Invoke(_pendingFirstBatch, false, hasMore);
                     _pendingFirstBatch = null;

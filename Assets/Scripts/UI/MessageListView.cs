@@ -319,9 +319,26 @@ public class MessageListView : MonoBehaviour
             }
             
             isLoadingData = false;
-            
-            if (scrollRect != null) scrollRect.movementType = defaultMovementType; 
-            if(loadingMessagesSpinner) loadingMessagesSpinner.SetActive(false); 
+
+            // Defense-in-depth: an empty INITIAL batch must still release the live-message
+            // gate. OnChatSelected set isInitialLoadInProgress = true, and the only other
+            // reset lives inside UpdateListRoutine — which we never start here. Without this,
+            // every subsequent HandleLiveMessages would park into pendingLiveMessages forever,
+            // leaving the chat stuck empty until it is closed and reopened. Drain anything
+            // already queued so late-arriving messages still render this visit.
+            if (!isLoadMore && isInitialLoadInProgress)
+            {
+                isInitialLoadInProgress = false;
+                if (pendingLiveMessages.Count > 0)
+                {
+                    var drained = pendingLiveMessages.OrderBy(x => x.timestamp).ToList();
+                    pendingLiveMessages.Clear();
+                    StartCoroutine(AppendLiveMessagesRoutine(drained));
+                }
+            }
+
+            if (scrollRect != null) scrollRect.movementType = defaultMovementType;
+            if(loadingMessagesSpinner) loadingMessagesSpinner.SetActive(false);
             return;
         }
 
