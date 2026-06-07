@@ -305,7 +305,29 @@
       "Bash(awk '/^--- !u!224 &1815923767$/{f=1} f{print NR\": \"$0} f&&/m_Pivot:/{exit}' Assets/Scenes/Main.unity)",
       "Read(//Applications/Unity/Hub/Editor/**)",
       "Read(//Applications/Unity Hub.app/**)",
-      "Bash(python3 /tmp/spinner_refactor.py)"
+      "Bash(python3 /tmp/spinner_refactor.py)",
+      "Bash(grep -n \"m_Script: {fileID: 11500000, guid:\" Assets/Scenes/Main.unity)",
+      "Bash(awk '/&1815923766/,/m_IsActive/' Assets/Scenes/Main.unity)",
+      "Bash(xmllint --version)",
+      "Bash(grep -vE '^\\(Library|Temp|obj|Logs|UserSettings\\)$')",
+      "WebFetch(domain:docs.nunit.org)",
+      "Bash([ -f \"$LOG\" ])",
+      "Read(//Users/ayan/Library/Logs/Unity/**)",
+      "WebFetch(domain:issuetracker.unity3d.com)",
+      "WebFetch(domain:discussions.unity.com)",
+      "WebFetch(domain:support.unity.com)",
+      "Bash(exit 1)",
+      "Bash(xmllint --xpath 'string\\(/test-run/@total\\)' tr.xml)",
+      "Bash(xmllint --xpath 'string\\(/test-run/@result\\)' tr.xml)",
+      "Bash(xmllint --xpath '/test-run/@failed' tr.xml)",
+      "Bash(xmllint --xpath 'boolean\\(/test-run[@result=\"Passed\" and @failed=\"0\" and @inconclusive=\"0\"]\\)' tr.xml)",
+      "Bash(xmllint --xpath '//test-case[@result=\"Failed\"]/@fullname' tr.xml)",
+      "Bash(sed -n 's/^fullname=\"\\\\\\(.*\\\\\\)\"$/\\\\1/p')",
+      "Bash(:)",
+      "Bash(xmllint --xpath '//test-case[@result=\"Failed\"]' tr.xml)",
+      "Bash(chmod +x Tools/run-tests-headless.sh)",
+      "Bash(bash -n Tools/run-tests-headless.sh)",
+      "Bash(./Tools/run-tests-headless.sh)"
     ]
   }
 }
