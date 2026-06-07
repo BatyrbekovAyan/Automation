@@ -302,7 +302,10 @@
       "Bash(awk '/^--- !u!114 &385429974$/{f=1} f{print NR\": \"$0} f&&/m_Vertical:/{exit}' Assets/Scenes/Main.unity)",
       "Bash(awk '/^--- !u!224 /{blk=NR; buf=\"\"} {buf=buf\"\\\\n\"NR\": \"$0} /m_GameObject: \\\\{fileID: 1815923766\\\\}/{print buf} /^--- !u!224 /{if\\(prev\\)prev=\"\"}' Assets/Scenes/Main.unity)",
       "Bash(awk '/^--- !u!224 &1005138142$/{f=1} f{print NR\": \"$0} f&&/m_Pivot:/{exit}' Assets/Scenes/Main.unity)",
-      "Bash(awk '/^--- !u!224 &1815923767$/{f=1} f{print NR\": \"$0} f&&/m_Pivot:/{exit}' Assets/Scenes/Main.unity)"
+      "Bash(awk '/^--- !u!224 &1815923767$/{f=1} f{print NR\": \"$0} f&&/m_Pivot:/{exit}' Assets/Scenes/Main.unity)",
+      "Read(//Applications/Unity/Hub/Editor/**)",
+      "Read(//Applications/Unity Hub.app/**)",
+      "Bash(python3 /tmp/spinner_refactor.py)"
     ]
   }
 }
