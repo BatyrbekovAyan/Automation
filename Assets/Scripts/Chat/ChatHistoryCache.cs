@@ -17,6 +17,17 @@ public static class ChatHistoryCache
     {
         if (string.IsNullOrEmpty(baseDir) || string.IsNullOrEmpty(chatId)) return;
 
+        // Media floor: aged Wappi payloads come back with empty thumbnail/url for outgoing
+        // videos, and naively persisting one wipes a previously-good preview. Carry the
+        // existing on-disk media forward into any incoming entry whose fields are empty,
+        // so empty never overwrites good for the same message id. Strictly additive — a
+        // genuinely fresh (non-empty) url on the incoming side still wins. Single choke
+        // point: every SaveHistory caller is covered here.
+        if (messages != null)
+        {
+            MessageMediaMerge.ApplyMediaFloor(messages, LoadHistory(baseDir, chatId));
+        }
+
         string messagesDir = Path.Combine(baseDir, "messages");
         if (!Directory.Exists(messagesDir)) Directory.CreateDirectory(messagesDir);
 

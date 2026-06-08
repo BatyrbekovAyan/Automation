@@ -23,6 +23,18 @@ public static class VideoThumbnailExtractor
 #endif
 
     /// <summary>
+    /// True only on platforms with a real native extractor (device iOS / Android). In
+    /// the Editor and anywhere else Extract reports onError immediately, so callers can
+    /// gate retry/re-fetch work on this to avoid pointless network round-trips.
+    /// </summary>
+    public static bool IsSupported =>
+#if (UNITY_IOS || UNITY_ANDROID) && !UNITY_EDITOR
+        true;
+#else
+        false;
+#endif
+
+    /// <summary>
     /// Yields until extraction finishes. Invokes onResult(outputPath) on success, or
     /// onError(message) on failure or on a platform without a native extractor.
     /// </summary>

@@ -1973,31 +1973,50 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
 
         bool imageLoaded = false;
 
-        if (!string.IsNullOrEmpty(vm.thumbnailUrl))
+        // Resolve which cache key to load: honor a populated thumbnailUrl, else reconstruct the
+        // message-id-stable keys (vthumb://{id} / thumb://{id}) and use whichever file is still on
+        // disk. Keeps the bubble painting even when an aged Wappi payload blanked the VM's pointer
+        // while the staged/extracted file survives.
+        Func<string, bool> isThumbCached = MediaCacheManager.Instance != null
+            ? MediaCacheManager.Instance.IsImageCached
+            : (Func<string, bool>)null;
+        string thumbKey = ThumbnailKeyResolver.Resolve(vm.thumbnailUrl, vm.messageId, isThumbCached);
+
+        if (!string.IsNullOrEmpty(thumbKey))
         {
-            if (vm.thumbnailUrl.StartsWith("thumb://") || vm.thumbnailUrl.StartsWith("vthumb://"))
+            if (thumbKey.StartsWith("thumb://") || thumbKey.StartsWith("vthumb://"))
             {
                 // thumb:// = server JPEGThumbnail (or staged); vthumb:// = our native frame.
                 // Both are MediaCacheManager keys, so the same cache load handles either.
-                Texture2D cachedTex = MediaCacheManager.Instance.LoadImageFromCache(vm.thumbnailUrl);
+                Texture2D cachedTex = MediaCacheManager.Instance.LoadImageFromCache(thumbKey);
                 if (cachedTex != null)
                 {
                     ApplyTextureAspectFill(cachedTex, false, bubbleRatio);
                     imageLoaded = true;
+                    // Self-heal: if we recovered via a reconstructed key, adopt it so later binds
+                    // see a populated pointer (in-memory only; persistence stays in ChatManager).
+                    if (vm.thumbnailUrl != thumbKey) vm.thumbnailUrl = thumbKey;
                 }
             }
-            else if (vm.thumbnailUrl.StartsWith("base64://"))
+            else if (thumbKey.StartsWith("base64://"))
             {
-                LoadBase64Image(vm.thumbnailUrl.Substring(9), false, bubbleRatio);
+                LoadBase64Image(thumbKey.Substring(9), false, bubbleRatio);
                 imageLoaded = true;
             }
         }
-        
+
         // If we didn't find a thumbnail in the cache or Base64, show the dark blank card
         if (!imageLoaded)
         {
             messageImage.sprite = null;
             messageImage.color = new Color(0.15f, 0.15f, 0.15f, 1f);
+
+            // Recovery: an aged outgoing video loses its server thumbnail + url and its staged
+            // file is gone. Rebuild the preview by re-fetching the media and extracting a frame
+            // (native-extractor platforms only). Deduped via the thumb queue; on success it
+            // fires OnMessageMediaRefreshed, which re-binds this bubble and paints the frame.
+            if (vm.type == MessageType.Video && ChatManager.Instance != null)
+                ChatManager.Instance.EnqueueIncomingVideoThumb(vm);
         }
 
         // --- THE FIX: This is no longer skipped! ---

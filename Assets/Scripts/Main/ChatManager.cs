@@ -1066,19 +1066,12 @@ if (msg.messageType == MessageType.Video)
             // 1. ALWAYS grab the thumbnail first!
             if (raw.body is JObject bodyObj && bodyObj["JPEGThumbnail"] != null)
             {
-                // --- THE CACHE FIX: Remove Base64 from the JSON! ---
-                try 
-                {
-                    string b64 = bodyObj["JPEGThumbnail"].ToString();
-                    byte[] bytes = Convert.FromBase64String(b64);
-                    string thumbUrl = "thumb://" + msg.id; // Tiny fake URL
-                    
-                    if (MediaCacheManager.Instance != null) 
-                        MediaCacheManager.Instance.SaveImageToCache(thumbUrl, bytes);
-                        
-                    msg.thumbnailUrl = thumbUrl; 
-                }
-                catch { msg.thumbnailUrl = ""; }
+                // Wappi's video JPEGThumbnail arrives in the same inconsistent base64
+                // shapes as the image one (data-URI prefix, whitespace, URL-safe, no
+                // padding). StageServerThumbnail sanitizes + verifies the cache write so
+                // a payload we can't decode leaves thumbnailUrl empty (loading/black
+                // placeholder) instead of pointing at a file that never got written.
+                msg.thumbnailUrl = StageServerThumbnail(msg.id, bodyObj["JPEGThumbnail"].ToString());
             }
 
             // 2. THEN grab the S3 URL
@@ -1099,34 +1092,11 @@ if (msg.messageType == MessageType.Video)
             // 1. ALWAYS grab the thumbnail first!
             if (raw.body is JObject bodyObj)
             {
-                if (bodyObj["JPEGThumbnail"] != null) 
+                if (bodyObj["JPEGThumbnail"] != null)
                 {
-                    // --- THE CACHE FIX: Remove Base64 from the JSON! ---
-                    try 
-                    {
-                        string b64 = bodyObj["JPEGThumbnail"].ToString();
-                        
-                        // 1. Strip off HTML data prefixes if they exist
-                        if (b64.Contains(",")) b64 = b64.Substring(b64.IndexOf(",") + 1);
-                        
-                        // 2. Clean out hidden spaces or line breaks that APIs sometimes leave behind
-                        b64 = b64.Replace(" ", "").Replace("\n", "").Replace("\r", "");
-                        
-                        byte[] bytes = Convert.FromBase64String(b64);
-                        string thumbUrl = "thumb://" + msg.id; 
-                        
-                        if (MediaCacheManager.Instance != null) 
-                            MediaCacheManager.Instance.SaveImageToCache(thumbUrl, bytes);
-                            
-                        msg.thumbnailUrl = thumbUrl; 
-                    }
-                    catch (Exception e) 
-                    { 
-                        Debug.LogWarning("Failed to decode thumbnail: " + e.Message);
-                        msg.thumbnailUrl = ""; 
-                    }
+                    msg.thumbnailUrl = StageServerThumbnail(msg.id, bodyObj["JPEGThumbnail"].ToString());
                 }
-                
+
                 if (bodyObj["url"] != null) msg.mediaUrl = bodyObj["url"].ToString();
             }
 
@@ -1194,7 +1164,28 @@ if (msg.messageType == MessageType.Video)
 
         return msg;
     }
-    
+
+    /// <summary>
+    /// Decodes a server <c>JPEGThumbnail</c> base64 payload, stages it in the media
+    /// cache under <c>thumb://{id}</c>, and returns that key — or "" when the payload
+    /// is missing, undecodable, or failed to persist. Returning "" (rather than a key
+    /// that points at a non-existent / unwritten file) lets the bubble fall back to its
+    /// loading/black state and, for videos, to the native HD frame instead of rendering
+    /// a permanent black card. Shared by the image and video branches of Normalize.
+    /// </summary>
+    private static string StageServerThumbnail(string id, string rawBase64)
+    {
+        if (string.IsNullOrEmpty(id)) return "";
+        if (!JpegThumbnailDecoder.TryDecodeBase64(rawBase64, out byte[] bytes)) return "";
+        if (MediaCacheManager.Instance == null) return "";
+
+        string thumbUrl = "thumb://" + id;
+        MediaCacheManager.Instance.SaveImageToCache(thumbUrl, bytes);
+        // SaveImageToCache silently no-ops on empty data; only claim the thumbnail
+        // once the file is actually on disk so ShowSmartThumbnail can load it.
+        return MediaCacheManager.Instance.IsImageCached(thumbUrl) ? thumbUrl : "";
+    }
+
     MessageType ParseMessageType(string type)
     {
         return type switch

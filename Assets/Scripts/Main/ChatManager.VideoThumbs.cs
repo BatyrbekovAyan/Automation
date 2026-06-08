@@ -22,14 +22,18 @@ public partial class ChatManager
     private readonly Dictionary<string, MessageViewModel> _pendingThumbVms = new();
 
     /// <summary>
-    /// Queues an incoming video for native thumbnail extraction. No-op for non-video,
-    /// urlless, or already-extracted messages. Durable de-dup is the on-disk vthumb file.
-    /// Called from CreateViewModel for every server-sourced message.
+    /// Queues a video for native thumbnail extraction / recovery. No-op for non-video or
+    /// already-extracted messages. Crucially, this now ALSO handles aged outgoing videos that
+    /// arrive with an EMPTY videoUrl: Wappi drops s3Info+JPEGThumbnail once a sent video is
+    /// delivered, so the only way to rebuild a preview is to re-fetch a fresh link at
+    /// extraction time (RunVideoThumbExtraction). That re-fetch needs a native extractor, so a
+    /// url-less video is only queued where one exists. Durable de-dup is the on-disk vthumb
+    /// file; in-session de-dup is the queue. Called from CreateViewModel, RefreshCachedMessageMedia,
+    /// and the render path (MessageItemView) when a video bubble has no usable thumbnail.
     /// </summary>
     public void EnqueueIncomingVideoThumb(MessageViewModel vm)
     {
-        if (vm == null || vm.type != MessageType.Video) return;
-        if (string.IsNullOrEmpty(vm.videoUrl) || string.IsNullOrEmpty(vm.messageId)) return;
+        if (vm == null || vm.type != MessageType.Video || string.IsNullOrEmpty(vm.messageId)) return;
         if (MediaCacheManager.Instance == null) return;
 
         string vthumbUrl = "vthumb://" + vm.messageId;
@@ -44,6 +48,11 @@ public partial class ChatManager
             }
             return;
         }
+
+        // With no url we can only recover by re-fetching one at extraction time, which needs a
+        // native extractor. No url AND no extractor (e.g. Editor) => nothing we can do.
+        bool haveUrl = !string.IsNullOrEmpty(vm.videoUrl);
+        if (!haveUrl && !VideoThumbnailExtractor.IsSupported) return;
 
         _videoThumbQueue ??= new VideoThumbQueue(VideoThumbMaxConcurrent);
         if (_videoThumbQueue.TryEnqueue(vm.messageId))
@@ -74,11 +83,32 @@ public partial class ChatManager
         // Compute (and ensure the media dir exists) before the native atomic write.
         string finalPath = MediaCacheManager.Instance.GetFilePathFromUrl(vthumbUrl);
 
+        // Aged outgoing videos arrive with no usable videoUrl (Wappi drops s3Info once a sent
+        // video is delivered). Re-fetch a fresh signed link up front — the same /media/download
+        // the play path uses — so the native extractor has something to read.
+        if (string.IsNullOrEmpty(vm.videoUrl) || !vm.videoUrl.StartsWith("http"))
+            yield return RefetchVideoUrl(messageId, vm);
+
         bool ok = false;
-        yield return VideoThumbnailExtractor.Extract(
-            vm.videoUrl, finalPath, VideoThumbTimeSec,
-            _   => ok = true,
-            err => Debug.LogWarning($"[ChatManager] video thumb extract failed for {messageId}: {err}"));
+        if (!string.IsNullOrEmpty(vm.videoUrl) && vm.videoUrl.StartsWith("http"))
+        {
+            yield return VideoThumbnailExtractor.Extract(
+                vm.videoUrl, finalPath, VideoThumbTimeSec,
+                _   => ok = true,
+                err => Debug.LogWarning($"[ChatManager] video thumb extract failed for {messageId}: {err}"));
+
+            // A signed link that was already on the VM may be expired (403s). Re-fetch once
+            // more and retry — only where a native extractor exists.
+            if (!ok && VideoThumbnailExtractor.IsSupported)
+            {
+                yield return RefetchVideoUrl(messageId, vm);
+                if (!string.IsNullOrEmpty(vm.videoUrl) && vm.videoUrl.StartsWith("http"))
+                    yield return VideoThumbnailExtractor.Extract(
+                        vm.videoUrl, finalPath, VideoThumbTimeSec,
+                        _   => ok = true,
+                        err => Debug.LogWarning($"[ChatManager] video thumb retry failed for {messageId}: {err}"));
+            }
+        }
 
         if (ok && System.IO.File.Exists(finalPath))
         {
@@ -99,6 +129,28 @@ public partial class ChatManager
         _pendingThumbVms.Remove(messageId);
         _videoThumbQueue.Complete(messageId);
         PumpVideoThumbQueue();
+    }
+
+    /// <summary>
+    /// Re-fetches a fresh, decryptable media link for a message via Wappi's /media/download
+    /// (the same endpoint the play path uses) and, on success with a real http link, writes it
+    /// onto the VM with a 24h expiry. base64:// payloads are skipped — the native extractor
+    /// reads from a URL/path, not an inline pseudo-scheme. Yields until the fetch settles.
+    /// </summary>
+    private IEnumerator RefetchVideoUrl(string messageId, MessageViewModel vm)
+    {
+        string freshUrl = null;
+        bool fetchDone = false;
+        DownloadMediaForMessage(messageId,
+            url => { freshUrl = url; fetchDone = true; },
+            ()  => { fetchDone = true; });
+        while (!fetchDone) yield return null;
+
+        if (!string.IsNullOrEmpty(freshUrl) && freshUrl.StartsWith("http"))
+        {
+            vm.videoUrl = freshUrl;
+            vm.expireTime = System.DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 86400;
+        }
     }
 
     private void UpdateCachedThumbnailUrl(string cacheRoot, string chatId, string messageId, string thumbnailUrl, float aspectRatio)
