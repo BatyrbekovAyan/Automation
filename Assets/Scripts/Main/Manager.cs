@@ -126,6 +126,7 @@ public class Manager : MonoBehaviour
 
     public static string wappiAuthToken => Secrets.Data.wappiAuthToken;
     public static string n8nAPIKey => Secrets.Data.n8nAPIKey;
+    public static string telegramBotToken => Secrets.Data.telegramBotToken;
 
     private string apiUrl => Secrets.Data.greenApi.apiUrl;
     private string idInstance => Secrets.Data.greenApi.idInstance;
@@ -2817,7 +2818,7 @@ public class Manager : MonoBehaviour
     {
         if (message != "")
         {
-            string url = "https://api.telegram.org/bot8435792686:AAHSSN6RblmlO-4Do2UDPJlLRNwR6zCgnpI/sendMessage";
+            string url = $"https://api.telegram.org/bot{telegramBotToken}/sendMessage";
             WWWForm form = new();
             form.AddField("chat_id", "1038376805");
             form.AddField("text", message);

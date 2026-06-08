@@ -14,6 +14,7 @@ public class SecretsData
 {
     public string wappiAuthToken;
     public string n8nAPIKey;
+    public string telegramBotToken;
     public GreenApiSecrets greenApi;
     public GreenApiSecrets greenApiAvatar;
 }
