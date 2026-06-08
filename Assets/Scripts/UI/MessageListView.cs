@@ -830,6 +830,24 @@ IEnumerator UpdateListRoutine(List<MessageViewModel> sortedMessages, bool isLoad
             }
 
             PlaceUnreadSeparatorAndLand();
+
+            // First-screen corner re-bake. The first batch bakes its rounded
+            // corners early (the per-15 FinalizeCustomVisuals above), BEFORE the
+            // final content rebuild and PlaceUnreadSeparatorAndLand settle its
+            // rects — so those bubbles can be left showing corners baked against a
+            // still-transient size. Below-the-fold bubbles dodge this because they
+            // re-render (and re-bake) when they un-cull on scroll into view, and
+            // paginated batches force their own rebuild; only the first screen is
+            // left stale. Sweep every spawned bubble once the open has settled so
+            // their corners are re-baked against the final rect — the same refresh
+            // a manual scroll would have triggered.
+            yield return null;
+            Canvas.ForceUpdateCanvases();
+            for (int i = 0; i < content.childCount; i++)
+            {
+                var settledItem = content.GetChild(i).GetComponent<MessageItemView>();
+                if (settledItem != null) settledItem.FinalizeCustomVisuals();
+            }
         }
 
         isLoadingData = false;

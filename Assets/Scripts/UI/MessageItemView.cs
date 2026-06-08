@@ -1997,7 +1997,7 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
         if (!imageLoaded)
         {
             messageImage.sprite = null;
-            messageImage.color = new Color(0.15f, 0.15f, 0.15f, 1f); 
+            messageImage.color = new Color(0.15f, 0.15f, 0.15f, 1f);
         }
 
         // --- THE FIX: This is no longer skipped! ---
@@ -2017,6 +2017,13 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
 
         UpdateBubbleVisuals();
         ApplyDynamicLayout(vm.type);
+        // Re-assert sibling order (senderName -> media -> caption) now that the real media is
+        // active and re-parented. Bind() already ordered once, but on a cold open with an
+        // expired link the image activates HERE — asynchronously, after Bind() ran — so without
+        // this the caption keeps the index it got while the media was still the (now-hidden)
+        // download card, rendering ABOVE the image with the wrong bubble padding. Idempotent on
+        // the cached/sync path where the media was already active at Bind time.
+        ReorderBubbleSiblings();
         StartCoroutine(ForceRebuildRoutine());
     }
     void ShowSmartLoadingCard(MessageViewModel vm)
@@ -2153,20 +2160,56 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
         RefreshCorners(outline);
     }
 
+    // Shader id for the rounded-corners size vector (width, height, radius*2, 0). Used by both
+    // the bake-staleness check below and the diagnostic probe.
+    private static readonly int CornerBakeProp = Shader.PropertyToID("_WidthHeightRadius");
+
     private void RefreshCorners(GameObject targetObject)
     {
         if (targetObject == null) return;
-        
+
         var rounded = targetObject.GetComponent<ImageWithRoundedCorners>();
-        if (rounded != null && rounded.enabled)
-        {
-            float currentRadius = rounded.radius;
-            rounded.radius = 0;
-            rounded.radius = currentRadius;
-            
-            rounded.Validate();
-            rounded.Refresh();
-        }
+        if (rounded == null || !rounded.enabled) return;
+
+        float currentRadius = rounded.radius;
+        rounded.radius = 0;
+        rounded.radius = currentRadius;
+
+        rounded.Validate();   // assigns the base rounded material to the graphic
+        rounded.Refresh();    // writes the correct _WidthHeightRadius into the BASE material
+
+        // These graphics are maskable and render under the chat Viewport's stencil Mask, so the
+        // CanvasRenderer draws a CACHED StencilMaterial COPY (new Material(baseMat)), not the
+        // base material Refresh() just wrote. Validate()/Refresh() never dirty the graphic
+        // (Validate's same-instance `image.material = material` hits Graphic.material's early-out),
+        // so on a cold open the copy keeps the transient size it snapshotted on first render and
+        // the corners render against the wrong rect — first-screen-only and intermittent. Rebuild
+        // the copy from the corrected base whenever its baked size is stale.
+        InvalidateStaleMaskMaterial(targetObject);
+    }
+
+    // The CanvasRenderer of a masked graphic draws a cached StencilMaterial copy, not
+    // graphic.material. When the copy's baked corner size no longer matches the real rect (it was
+    // snapshotted before layout settled), force it to be rebuilt from the now-correct base.
+    // RecalculateMasking() removes the cached mask material before dirtying, so StencilMaterial.Add
+    // re-copies — a bare SetMaterialDirty() would hit the dedup cache and hand back the same stale
+    // copy. No-ops when the copy is already correct, so it never churns materials on a stable bake.
+    private void InvalidateStaleMaskMaterial(GameObject targetObject)
+    {
+        if (!targetObject.TryGetComponent<MaskableGraphic>(out var maskable)) return;
+
+        var cr = maskable.canvasRenderer;
+        if (cr == null || cr.materialCount == 0) return;   // not drawn yet — first render snapshots fresh
+
+        Material rendered = cr.GetMaterial(0);
+        if (rendered == null || ReferenceEquals(rendered, maskable.material)) return;   // no stencil copy in play
+
+        Vector4 renderedSize = rendered.GetVector(CornerBakeProp);
+        Vector2 actualSize = ((RectTransform)targetObject.transform).rect.size;
+        bool stale = Mathf.Abs(actualSize.x - renderedSize.x) > 1f
+                  || Mathf.Abs(actualSize.y - renderedSize.y) > 1f;
+
+        if (stale) maskable.RecalculateMasking();
     }
 
     void HandleFinalFailure(bool isManual, bool isAudio = false)
@@ -2898,7 +2941,6 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
             bubbleOutlineRounded.Validate();
             bubbleRounded.Refresh();
             bubbleOutlineRounded.Refresh();
-            
         }
 
         if (bubbleTail != null)
