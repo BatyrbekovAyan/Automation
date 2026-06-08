@@ -146,8 +146,10 @@ The app communicates with four external services via `UnityWebRequest` + corouti
 This project has project-scoped Claude configuration under `.claude/`:
 
 - **Skills** (`.claude/skills/`) — read the SKILL.md before doing matching work:
-  - `unity-ui-builder/SKILL.md` — use when creating screens, pages, dialogs, or any canvas-based visual component
+  - `unity-ui-builder/SKILL.md` — use when creating screens, pages, dialogs, or any canvas-based visual component (project-calibrated: 1080×1920 reference units, measured type/spacing scale, rendering gotchas)
   - `unity-api-integration/SKILL.md` — use when adding REST API endpoints, webhooks, or external service calls
+  - `bot-persistence/SKILL.md` — use when reading/writing bot entity data in PlayerPrefs (creation, editing, deletion, activation, products/services lists, any per-bot field)
+  - `chat-data-flow/SKILL.md` — use when changing a message field, message type, media handling, delivery status, or anything in the RawMessage → NormalizedMessage → MessageViewModel pipeline / ChatManager events
 - **Path-scoped rules** (`.claude/rules/`) — automatically apply to matching files:
   - `unity-general.md` → all `Assets/Scripts/**/*.cs`
   - `networking.md` → `Assets/Scripts/Chat/**/*.cs`, `Assets/Scripts/Main/Manager.cs`

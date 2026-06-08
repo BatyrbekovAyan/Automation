@@ -1,69 +1,101 @@
 ---
 name: unity-ui-builder
-description: Build professional mobile UI for Unity canvas-based interfaces. Use when creating screens, pages, dialogs, or any visual interface component.
+description: Build professional, project-calibrated mobile UI for this Unity app's 1080x1920 canvas. Use whenever creating or polishing any screen, page, dialog, sheet, card, list row, header, or visual component — even small tweaks to spacing, font size, padding, icons, or colors. Sizes here are in canvas reference units, NOT CSS pixels; this skill carries the measured type/spacing scale and the project's rendering gotchas so UI looks right on the first pass instead of needing hand-polishing.
 allowed-tools: Bash(find *) Read(*) Edit(*) Write(*) Glob(*) Grep(*)
 ---
 
-# Unity UI Builder — Professional Mobile Design
+# Unity UI Builder — Professional Mobile Design (Project-Calibrated)
 
-You are a senior mobile UI/UX designer AND Unity developer. Every screen you build must look like it belongs in a polished app store release.
+You are a senior mobile UI/UX designer AND Unity developer. Every screen you build must look like it belongs in a polished app-store release **on the first pass**.
 
-## Before Writing Any Code
+The reason UI here gets re-polished by hand is almost always one of three things: sizes written in mockup pixels (which render ~⅓ too small), a known rendering quirk that wasn't accounted for, or an edit made at the wrong place (a value that gets overridden at runtime). This skill exists to eliminate all three. Take it seriously — the numbers below are *measured from this project's scene*, not generic design-system defaults.
 
-1. **Read existing UI** — Check `Assets/Prefabs/` and existing screens in `Assets/Scripts/Main/` to match the visual language
-2. **Identify the design pattern** — Is this a list view? Form? Detail page? Modal? Tab bar?
-3. **Plan the hierarchy** — Sketch the GameObject tree mentally before creating it
+## The one rule that matters most: sizes are in reference units
 
-## Design System
+The main canvas (`Assets/Scenes/Main.unity`) uses `CanvasScaler = Scale With Screen Size`, reference resolution **1080×1920**, `Match = Width (0)`. So the canvas is always 1080 units wide, and **every size you set — font size, sizeDelta, padding, spacing — is in those reference units, not pixels.**
 
-### Spacing (4px grid)
-| Token | Value | Use |
-|-------|-------|-----|
-| xs | 4px | Icon padding, tight groups |
-| sm | 8px | Between related elements |
-| md | 16px | Section padding, card padding |
-| lg | 24px | Between sections |
-| xl | 32px | Page margins |
-| xxl | 48px | Hero spacing |
+Roughly **1 dp ≈ 3 reference units** (xxhdpi baseline). A "16px" value from a CSS/Figma mockup renders far too small on device. Convert before you write anything:
 
-### Typography (TMPro only)
-| Level | Size | Weight | Use |
-|-------|------|--------|-----|
-| H1 | 28sp | Bold | Page titles |
-| H2 | 22sp | SemiBold | Section headers |
-| H3 | 18sp | SemiBold | Card titles, subtitles |
-| Body | 16sp | Regular | Main content |
-| Body2 | 14sp | Regular | Secondary text |
-| Caption | 12sp | Regular | Timestamps, labels |
-| Overline | 10sp | Bold+Uppercase | Category labels |
+- **Spacing / sizing:** multiply dp by 3 (a 44dp touch target ≈ **132 units**, a 16dp gap ≈ **48 units**).
+- **Type:** don't multiply — use the measured scale below. It's the source of truth.
 
-### Animation (DOTween)
+### Calibrated quick reference
+
+These are the values actually used across `Main.unity`. Match them and your UI will sit correctly next to existing screens.
+
+**Type scale (TMP font sizes, in reference units):**
+
+| Role | Size | Notes |
+|------|------|-------|
+| Display / hero number | 60–72 | Big stat or splash figure |
+| H1 — page title | 50–55 | Top-of-screen titles |
+| H2 — section header | 47–48 | Group headers |
+| H3 — card title / prominent label | 42–44 | |
+| **Body — default** | **40–42** | The workhorse. When unsure, use 42. |
+| Body2 — secondary | 36–39 | Subtitles, helper text |
+| Caption — meta | 28–32 | Timestamps, small labels |
+| Micro / overline | 24–26 | Tiny labels, badges |
+
+**Spacing (4dp grid × 3 = reference units):**
+
+| Token | dp | Units | Use |
+|-------|----|----|-----|
+| xs | 4 | 12 | Tight icon padding |
+| sm | 8 | 24 | Between related elements |
+| md | 16 | 48 | Card/section padding |
+| lg | 24 | 72 | Between sections |
+| xl | 32 | 96 | Page margins |
+| xxl | 48 | 144 | Hero spacing |
+
+For the full rationale, the measured size distribution, and per-component specs, read **`references/design-system.md`**.
+
+## Before writing any code
+
+1. **Read the closest existing screen** — check `Assets/Prefabs/` and `Assets/Scripts/Main/` to match the visual language. Reuse, don't reinvent.
+2. **Copy the editor-builder pattern** — UI here is constructed by `[MenuItem]` builder scripts in `Assets/Editor/` (there are ~20+, e.g. `BotSettingsRebuilder`, `ChatsSearchBarBuilder`, `AttachSheetBuilder`, `EmptyStateViewBuilder`). Several already handle rounded corners and sprite icons correctly — find the closest one and follow it. See `.claude/rules/editor-scripts.md`.
+3. **Identify the pattern** — list view? form? detail page? modal/sheet? tab bar? — and plan the GameObject hierarchy before creating it.
+4. **Check for runtime override points** — some visual values get re-stamped in code at bind time. Editing the prefab does nothing for those. See the gotchas below.
+
+## Project rendering gotchas
+
+These are quirks that have bitten this project before. Account for them up front — full catalog and how-to in `references/design-system.md`.
+
+- **Rounded corners** need a script component (e.g. the project's rounded-corner/`RoundedCorners` setup), not just an `Image`. Apply it explicitly on backgrounds, cards, and buttons.
+- **TMP-drawn icons don't render.** Chevrons, arrows, and glyphs typed as TextMeshPro characters silently fail to show. Use an `Image` + sprite for every icon.
+- **Set TMP alignment explicitly.** Default alignment is often wrong (avatar initials, button labels, centered numbers) — set it, don't assume.
+- **Some metrics live in code, not the prefab.** Chat bubble padding is re-stamped per `MessageType` in `MessageItemView` at bind time — editing the prefab or the `BubblePad*` constants has *zero* effect. Tune the per-type `RectOffset` in `MessageItemView` instead.
+- **Don't "fix" intentional sizes.** `Screen_Whatsapp/ChatsPanel/TopBar` `sizeDelta.y = 250` looks tall in the raw scene but is correct on device. Don't shrink header bars just because the pixel number looks large.
+
+## Animation (DOTween, not Animator)
+
 | Action | Tween | Duration | Ease |
 |--------|-------|----------|------|
 | Page enter | DOAnchorPos from right | 0.3s | OutCubic |
 | Page exit | DOAnchorPos to left | 0.25s | InCubic |
 | Fade in | DOFade 0→1 | 0.2s | Linear |
-| Modal open | DOScale 0.9→1 + DOFade | 0.25s | OutBack |
+| Modal/sheet open | DOScale 0.9→1 + DOFade | 0.25s | OutBack |
 | Button press | DOPunchScale 0.95 | 0.15s | OutQuad |
 | List cascade | DOAnchorPosY + stagger 0.05s | 0.3s | OutCubic |
 | Swipe dismiss | DOAnchorPosX + DOFade | 0.2s | InCubic |
 
-### Touch Targets
-- Minimum 44x44 dp (88x88 px at 2x scale)
-- Primary action buttons: full-width or prominent placement in thumb zone
-- Destructive actions: require confirmation, never in easy-tap zones
+## Touch targets (in reference units)
 
-## Implementation Checklist
+- Minimum **~120–132 units** (≈ 40–44 dp). Below that is hard to tap.
+- Primary actions in the thumb zone (bottom third), full-width or prominent.
+- Destructive actions require confirmation and never sit in an easy-tap zone.
 
-- [ ] All text uses TextMeshProUGUI
-- [ ] All animations use DOTween (not Animator)
-- [ ] Layout uses anchors + LayoutGroups (no hardcoded positions)
-- [ ] Safe area handled for notched devices
-- [ ] Touch targets meet minimum size
-- [ ] Visual style matches existing app screens
-- [ ] Primary actions in thumb zone (bottom 1/3)
-- [ ] Responsive to different screen sizes (test 1080x1920, 1080x2400, 1170x2532)
-- [ ] CanvasGroup used for fade/interactability control
-- [ ] ScrollRect for any content that could exceed screen height
-- [ ] [SerializeField] private for all UI references
-- [ ] Page transitions feel smooth and intentional
+## Self-check before you hand off
+
+The skill can't see the rendered screen — you can. Getting the numbers right the *first* time is what removes the manual-polish loop, so verify before declaring done:
+
+- [ ] Every font size matches the calibrated type scale (body ≈ 42, not 16)
+- [ ] Every spacing/size value is in reference units (dp × 3), no raw mockup px
+- [ ] No TMP-text icons — all icons are `Image` + sprite
+- [ ] Rounded corners applied via the corner script on backgrounds/cards/buttons
+- [ ] TMP alignment set explicitly everywhere it matters
+- [ ] Runtime-overridden metrics (e.g. bubble padding) edited at the code tune-point, not the prefab
+- [ ] All text is `TextMeshProUGUI`; all anim is DOTween; refs are `[SerializeField] private`
+- [ ] Layout uses anchors + LayoutGroups (no hardcoded world positions); `ScrollRect` for content that can overflow; safe area handled
+- [ ] **Rendered in Game view at 1080×2400 and compared against the closest existing screen**
+
+If you can't verify the last item yourself, say so explicitly and tell the user exactly what to eyeball — don't claim it's done.
