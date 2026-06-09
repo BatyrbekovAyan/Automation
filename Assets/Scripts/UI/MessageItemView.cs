@@ -2150,15 +2150,14 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
 
             // Recovery: an aged/server video loses its server thumbnail + url and its staged
             // file is gone. Rebuild the preview by re-fetching the media and extracting a frame
-            // (native-extractor platforms only). Deduped via the thumb queue; on success it
-            // fires OnMessageMediaRefreshed, which re-binds this bubble and paints the frame.
-            // Mark `recovering` so the shared spinner stays up (the showSpinner branch below
-            // would otherwise hide it).
+            // (native-extractor platforms only). Deduped via the thumb queue; when it settles it
+            // fires OnMessageMediaRefreshed, which re-binds this bubble. EnqueueIncomingVideoThumb
+            // returns true ONLY while a recovery is genuinely in flight — for a playable-but-
+            // unextractable (or already-parked) video it returns false, so `recovering` stays
+            // false and we fall through to a dark card + play button below instead of spinning
+            // forever waiting on a re-bind that will never come.
             if (vm.type == MessageType.Video && ChatManager.Instance != null)
-            {
-                ChatManager.Instance.EnqueueIncomingVideoThumb(vm);
-                recovering = true;
-            }
+                recovering = ChatManager.Instance.EnqueueIncomingVideoThumb(vm);
         }
 
         if (vm.type == MessageType.Video)

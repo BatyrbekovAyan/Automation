@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Video;
@@ -9,9 +10,20 @@ public class VideoController : MonoBehaviour
 
     public VideoPlayer videoPlayer;
     public RawImage rawImage;
-    
+
     // Assign the Panel (Black Background) here so we know the screen size
-    public RectTransform containerRect; 
+    public RectTransform containerRect;
+
+    // Optional: a spinner shown while the clip is preparing and hidden the moment it is ready or
+    // fails. Leave unassigned to keep the legacy plain-black-while-loading behaviour.
+    [SerializeField] private GameObject preparingSpinner;
+
+    // A Prepare() that never completes (expired/403 link, undecodable HEVC/.mov, stalled remote
+    // read) would otherwise leave the screen black forever — errorReceived does not fire for every
+    // stall. This watchdog bails out and closes the player so the user is returned to the chat
+    // instead of staring at black. Tuned generously so a slow-but-valid clip still gets to play.
+    private const float PrepareTimeoutSec = 25f;
+    private Coroutine prepareTimeoutCo;
 
     private float apiAspectRatio = 0f;
     private float videoRotation = 0f;
@@ -39,14 +51,27 @@ public class VideoController : MonoBehaviour
         if (!containerRect) containerRect = GetComponent<RectTransform>();
 
         videoPlayer.playOnAwake = false;
-        videoPlayer.renderMode = VideoRenderMode.APIOnly; 
+        videoPlayer.renderMode = VideoRenderMode.APIOnly;
         videoPlayer.prepareCompleted += OnPrepareCompleted;
+        videoPlayer.errorReceived += OnVideoError;
 
-        gameObject.SetActive(false); 
+        if (preparingSpinner) preparingSpinner.SetActive(false);
+
+        gameObject.SetActive(false);
     }
 
     public void PlayVideo(string url, float aspectRatio, float videoRotation = 0f)
     {
+        // VideoPlayer can only decode a real http(s) URL or a local file path. An empty or
+        // base64:// source (the /media/download fallback payload) would silently fail Prepare and
+        // leave the screen black — reject it up front instead of opening a dead black player.
+        if (string.IsNullOrEmpty(url) || url.StartsWith("base64://"))
+        {
+            Debug.LogWarning($"[VideoController] refusing unplayable source: {(string.IsNullOrEmpty(url) ? "<empty>" : "base64")}");
+            FailPlayback();
+            return;
+        }
+
         gameObject.SetActive(true);
 
         // --- FIX: PREVENT WHITE FLASH ---
@@ -55,6 +80,7 @@ public class VideoController : MonoBehaviour
 
         // 2. Turn the screen BLACK while loading
         rawImage.color = Color.black;
+        if (preparingSpinner) preparingSpinner.SetActive(true);
 
         this.apiAspectRatio = aspectRatio;
         this.videoRotation = videoRotation;
@@ -67,11 +93,17 @@ public class VideoController : MonoBehaviour
         rawImage.rectTransform.pivot = new Vector2(0.5f, 0.5f);
 
         videoPlayer.url = url;
-        videoPlayer.Prepare(); 
+        videoPlayer.Prepare();
+
+        if (prepareTimeoutCo != null) StopCoroutine(prepareTimeoutCo);
+        prepareTimeoutCo = StartCoroutine(PrepareTimeoutRoutine());
     }
 
     void OnPrepareCompleted(VideoPlayer vp)
     {
+        if (prepareTimeoutCo != null) { StopCoroutine(prepareTimeoutCo); prepareTimeoutCo = null; }
+        if (preparingSpinner) preparingSpinner.SetActive(false);
+
         // --- FIX: SHOW VIDEO ---
         // 3. Video is ready! Assign texture.
         rawImage.texture = vp.texture;
@@ -129,8 +161,48 @@ public class VideoController : MonoBehaviour
         vp.Play();
     }
 
+    // VideoPlayer surfaces decode/network failures here. Without this handler a failed Prepare
+    // left OnPrepareCompleted unreached and the screen black forever — the core of the
+    // "tap a stuck video → black fullscreen" symptom.
+    void OnVideoError(VideoPlayer vp, string message)
+    {
+        Debug.LogWarning($"[VideoController] playback error: {message}");
+        // Only tear down if the clip never started. An error during Prepare is the black-screen
+        // failure we must escape; an error after a successful prepare (a rare mid-stream hiccup)
+        // shouldn't yank a video the user is already watching.
+        if (!vp.isPrepared) FailPlayback();
+    }
+
+    // Watchdog for a Prepare() that neither completes nor errors (some stalled remote reads do
+    // exactly that). Closes the player so the user returns to the chat rather than to black.
+    IEnumerator PrepareTimeoutRoutine()
+    {
+        float elapsed = 0f;
+        while (elapsed < PrepareTimeoutSec)
+        {
+            if (videoPlayer.isPrepared) { prepareTimeoutCo = null; yield break; }
+            elapsed += Time.unscaledDeltaTime;
+            yield return null;
+        }
+        prepareTimeoutCo = null;
+        Debug.LogWarning($"[VideoController] Prepare timed out after {PrepareTimeoutSec:0}s — closing.");
+        FailPlayback();
+    }
+
+    // Tear down a failed playback attempt and return to the chat. Closing beats an indefinite
+    // black screen; the originating bubble now shows a dark card + play button so the user can
+    // retry the tap.
+    void FailPlayback()
+    {
+        if (prepareTimeoutCo != null) { StopCoroutine(prepareTimeoutCo); prepareTimeoutCo = null; }
+        if (preparingSpinner) preparingSpinner.SetActive(false);
+        CloseVideo();
+    }
+
     public void CloseVideo()
     {
+        if (prepareTimeoutCo != null) { StopCoroutine(prepareTimeoutCo); prepareTimeoutCo = null; }
+        if (preparingSpinner) preparingSpinner.SetActive(false);
         videoPlayer.Stop();
         gameObject.SetActive(false);
         rawImage.texture = null;
