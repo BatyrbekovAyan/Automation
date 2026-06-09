@@ -1064,10 +1064,6 @@ public partial class ChatManager : MonoBehaviour
 if (msg.messageType == MessageType.Video)
         {
             // 1. ALWAYS grab the thumbnail first!
-            // [VTHUMB-DBG] Prove we check for the blurry server thumbnail. hasJPEGThumbnail=False
-            // everywhere => Wappi strips the embedded thumbnail from these videos, so there is no
-            // blurry preview to show (only the native HD recovery).
-            Debug.Log($"[VTHUMB-DBG] normalize-video id={msg.id} hasJPEGThumbnail={(raw.body is JObject jb && jb["JPEGThumbnail"] != null)}");
             if (raw.body is JObject bodyObj && bodyObj["JPEGThumbnail"] != null)
             {
                 // Wappi's video JPEGThumbnail arrives in the same inconsistent base64
@@ -1180,25 +1176,14 @@ if (msg.messageType == MessageType.Video)
     private static string StageServerThumbnail(string id, string rawBase64)
     {
         if (string.IsNullOrEmpty(id)) return "";
-
-        // [VTHUMB-DBG] Confirm whether the server even GAVE us a blurry JPEGThumbnail and whether
-        // we staged it. hasPayload=False everywhere => Wappi drops the embedded thumbnail for
-        // these videos, so there is no blurry preview to show (only the native HD recovery).
-        bool hasPayload = !string.IsNullOrEmpty(rawBase64);
-        if (!JpegThumbnailDecoder.TryDecodeBase64(rawBase64, out byte[] bytes))
-        {
-            Debug.Log($"[VTHUMB-DBG] blurry id={id} hasPayload={hasPayload} decoded=False");
-            return "";
-        }
+        if (!JpegThumbnailDecoder.TryDecodeBase64(rawBase64, out byte[] bytes)) return "";
         if (MediaCacheManager.Instance == null) return "";
 
         string thumbUrl = "thumb://" + id;
         MediaCacheManager.Instance.SaveImageToCache(thumbUrl, bytes);
         // SaveImageToCache silently no-ops on empty data; only claim the thumbnail
         // once the file is actually on disk so ShowSmartThumbnail can load it.
-        bool staged = MediaCacheManager.Instance.IsImageCached(thumbUrl);
-        Debug.Log($"[VTHUMB-DBG] blurry id={id} hasPayload={hasPayload} decoded=True staged={staged} bytes={bytes.Length}");
-        return staged ? thumbUrl : "";
+        return MediaCacheManager.Instance.IsImageCached(thumbUrl) ? thumbUrl : "";
     }
 
     MessageType ParseMessageType(string type)
@@ -1321,38 +1306,21 @@ if (msg.messageType == MessageType.Video)
 
         if (www.result != UnityWebRequest.Result.Success)
         {
-            // [VTHUMB-DBG] confirm WHY /media/download fails for Class-B videos: HTTP code +
-            // error + a body snippet. Expect 400/404 'media expired' for permanently-gone media.
-            string failBody = (www.downloadHandler != null && !string.IsNullOrEmpty(www.downloadHandler.text))
-                ? (www.downloadHandler.text.Length > 200 ? www.downloadHandler.text.Substring(0, 200) : www.downloadHandler.text)
-                : "";
-            Debug.Log($"[VTHUMB-DBG] mediadl HTTP-FAIL id={messageId} code={www.responseCode} result={www.result} err='{www.error}' body='{failBody}'");
             onFailure?.Invoke();
             yield break;
         }
 
         try
         {
-            string rawText = www.downloadHandler.text;
-            JObject json = JObject.Parse(rawText);
+            JObject json = JObject.Parse(www.downloadHandler.text);
             string fileLink = json["file_link"]?.ToString();
             string fileB64 = json["file_b64"]?.ToString();
 
             if (!string.IsNullOrEmpty(fileLink)) onSuccess?.Invoke(fileLink);
             else if (!string.IsNullOrEmpty(fileB64)) onSuccess?.Invoke("base64://" + fileB64);
-            else
-            {
-                // [VTHUMB-DBG] 2xx but no link/b64 — body tells us what Wappi reports here.
-                string emptyBody = !string.IsNullOrEmpty(rawText) ? (rawText.Length > 200 ? rawText.Substring(0, 200) : rawText) : "";
-                Debug.Log($"[VTHUMB-DBG] mediadl OK-EMPTY id={messageId} code={www.responseCode} body='{emptyBody}'");
-                onFailure?.Invoke();
-            }
+            else onFailure?.Invoke();
         }
-        catch (Exception ex)
-        {
-            Debug.Log($"[VTHUMB-DBG] mediadl PARSE-ERR id={messageId} code={www.responseCode} ex='{ex.Message}'");
-            onFailure?.Invoke();
-        }
+        catch { onFailure?.Invoke(); }
     }
     
     public void SendTextMessage(string text)

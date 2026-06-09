@@ -2141,12 +2141,6 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
             }
         }
 
-        // [VTHUMB-DBG] render-time diagnostic — incoming-path verification. Remove once confirmed.
-        if (vm.type == MessageType.Video)
-            Debug.Log($"[VTHUMB-DBG] render id={vm.messageId} incoming={vm.isIncoming} " +
-                      $"thumb='{(string.IsNullOrEmpty(vm.thumbnailUrl) ? "EMPTY" : vm.thumbnailUrl)}' loaded={imageLoaded} " +
-                      $"videoUrl={(string.IsNullOrEmpty(vm.videoUrl) ? "EMPTY" : (vm.videoUrl.StartsWith("http") ? "http" : vm.videoUrl))}");
-
         // If we didn't find a thumbnail in the cache or Base64, show the dark placeholder card
         bool recovering = false;
         if (!imageLoaded)

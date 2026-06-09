@@ -90,16 +90,11 @@ public partial class ChatManager
         // With no url we can only recover by re-fetching one at extraction time, which needs a
         // native extractor. No url AND no extractor (e.g. Editor) => nothing we can do.
         bool haveUrl = !string.IsNullOrEmpty(vm.videoUrl);
-        if (!haveUrl && !VideoThumbnailExtractor.IsSupported)
-        {
-            Debug.Log($"[VTHUMB-DBG] enqueue SKIP-no-extractor id={vm.messageId} incoming={vm.isIncoming}");
-            return;
-        }
+        if (!haveUrl && !VideoThumbnailExtractor.IsSupported) return;
 
         _videoThumbQueue ??= new VideoThumbQueue(VideoThumbMaxConcurrent);
         if (_videoThumbQueue.TryEnqueue(vm.messageId))
         {
-            Debug.Log($"[VTHUMB-DBG] enqueue QUEUED id={vm.messageId} incoming={vm.isIncoming} haveUrl={haveUrl}");
             _pendingThumbVms[vm.messageId] = vm;
             PumpVideoThumbQueue();
         }
@@ -165,8 +160,6 @@ public partial class ChatManager
             OnMessageMediaRefreshed?.Invoke(vm);   // re-bind → download panel
         }
 
-        Debug.Log($"[VTHUMB-DBG] extraction DONE id={messageId} incoming={vm.isIncoming} ok={ok} gotUrl={gotUsableUrl} unavailable={_unavailableMediaIds.Contains(messageId)}");
-
         if (ok && System.IO.File.Exists(finalPath))
         {
             vm.thumbnailUrl = vthumbUrl;
@@ -202,15 +195,6 @@ public partial class ChatManager
             url => { freshUrl = url; fetchDone = true; },
             ()  => { fetchDone = true; });
         while (!fetchDone) yield return null;
-
-        // [VTHUMB-DBG] KEY incoming-path diagnostic: what did /media/download hand back?
-        // Hypothesis: incoming videos return a base64:// payload the native extractor can't
-        // read, leaving them stuck black. This line confirms or refutes that.
-        string scheme = string.IsNullOrEmpty(freshUrl) ? "EMPTY/FAIL"
-            : freshUrl.StartsWith("http") ? "http/len" + freshUrl.Length
-            : freshUrl.StartsWith("base64://") ? "base64/len" + freshUrl.Length
-            : "other(" + freshUrl.Substring(0, System.Math.Min(24, freshUrl.Length)) + ")";
-        Debug.Log($"[VTHUMB-DBG] refetch id={messageId} incoming={vm.isIncoming} result={scheme}");
 
         if (!string.IsNullOrEmpty(freshUrl) && freshUrl.StartsWith("http"))
         {
