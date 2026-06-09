@@ -23,7 +23,18 @@ public class VideoController : MonoBehaviour
     // stall. This watchdog bails out and closes the player so the user is returned to the chat
     // instead of staring at black. Tuned generously so a slow-but-valid clip still gets to play.
     private const float PrepareTimeoutSec = 25f;
+    // Grace window for a transient errorReceived during Prepare to self-recover. errorReceived can
+    // fire for non-fatal hiccups (HTTP redirects / range-request retries) on clips that still go on
+    // to play, so we do NOT tear down the instant an error arrives — only if the clip still hasn't
+    // prepared this long after erroring. A genuinely dead clip still closes ~this fast, so the
+    // black-screen escape is preserved without killing a video that was about to play.
+    private const float ErrorGraceSec = 6f;
     private Coroutine prepareTimeoutCo;
+    // Monotonic id stamped on each PlayVideo. The shared single VideoController.Instance keeps one
+    // persistent videoPlayer + errorReceived subscription, so a late error/poll from a PREVIOUS
+    // clip can arrive against a freshly-opened one; comparing against this id ignores stale ones.
+    private int playAttemptId;
+    private int erroredAttemptId = -1;
 
     private float apiAspectRatio = 0f;
     private float videoRotation = 0f;
@@ -92,11 +103,13 @@ public class VideoController : MonoBehaviour
         rawImage.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
         rawImage.rectTransform.pivot = new Vector2(0.5f, 0.5f);
 
+        int attempt = ++playAttemptId;
+
         videoPlayer.url = url;
         videoPlayer.Prepare();
 
         if (prepareTimeoutCo != null) StopCoroutine(prepareTimeoutCo);
-        prepareTimeoutCo = StartCoroutine(PrepareTimeoutRoutine());
+        prepareTimeoutCo = StartCoroutine(PrepareTimeoutRoutine(attempt));
     }
 
     void OnPrepareCompleted(VideoPlayer vp)
@@ -167,20 +180,40 @@ public class VideoController : MonoBehaviour
     void OnVideoError(VideoPlayer vp, string message)
     {
         Debug.LogWarning($"[VideoController] playback error: {message}");
-        // Only tear down if the clip never started. An error during Prepare is the black-screen
-        // failure we must escape; an error after a successful prepare (a rare mid-stream hiccup)
-        // shouldn't yank a video the user is already watching.
-        if (!vp.isPrepared) FailPlayback();
+        // Do NOT tear down here. errorReceived fires for transient/non-fatal conditions during
+        // Prepare (HTTP redirects, range-request retries) on clips that still go on to play, and on
+        // this shared player a late error from a PREVIOUS clip can land against a freshly-opened
+        // one. So: ignore it once we're prepared (a mid-stream blip must not yank a playing video),
+        // otherwise just mark THIS attempt as having errored and let the prepare watchdog decide —
+        // it closes only if the clip still hasn't prepared after ErrorGraceSec, which keeps the
+        // black-screen escape without closing a video that was about to play.
+        if (vp.isPrepared) return;
+        erroredAttemptId = playAttemptId;
     }
 
     // Watchdog for a Prepare() that neither completes nor errors (some stalled remote reads do
     // exactly that). Closes the player so the user returns to the chat rather than to black.
-    IEnumerator PrepareTimeoutRoutine()
+    IEnumerator PrepareTimeoutRoutine(int attempt)
     {
         float elapsed = 0f;
         while (elapsed < PrepareTimeoutSec)
         {
+            // A newer PlayVideo superseded this attempt — it owns the watchdog now; stop.
+            if (attempt != playAttemptId) yield break;
+
             if (videoPlayer.isPrepared) { prepareTimeoutCo = null; yield break; }
+
+            // Errored during Prepare and still hasn't recovered within the grace window → treat as
+            // a genuine failure and escape the black screen now (well before the full timeout),
+            // instead of either closing instantly on a transient blip or sitting black for 25s.
+            if (erroredAttemptId == attempt && elapsed >= ErrorGraceSec)
+            {
+                prepareTimeoutCo = null;
+                Debug.LogWarning("[VideoController] Prepare failed (error, no recovery within grace) — closing.");
+                FailPlayback();
+                yield break;
+            }
+
             elapsed += Time.unscaledDeltaTime;
             yield return null;
         }
