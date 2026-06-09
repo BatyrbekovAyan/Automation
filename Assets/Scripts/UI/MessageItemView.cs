@@ -2501,12 +2501,24 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
                 string filePath = MediaCacheManager.Instance.GetFilePathFromUrl(source);
                 byte[] bytes = System.IO.File.ReadAllBytes(filePath);
 
-                if (isSticker) TryDecodeSticker(bytes, bubbleRatio);
+                // A thumb:// source is this message's own staged JPEG preview (keyed by its
+                // unique message id) — a trusted non-WebP, so decode it directly even for a
+                // sticker. Any other source for a sticker must be a real WebP, so route it
+                // through the validated decoder that refuses foreign photos.
+                bool stickerNeedsWebP = isSticker && !source.StartsWith("thumb://");
+                if (stickerNeedsWebP)
+                {
+                    TryDecodeSticker(bytes, bubbleRatio);
+                }
                 else
                 {
                     Texture2D tex = new Texture2D(2, 2);
-                    if (tex.LoadImage(bytes)) ApplyTextureAspectFill(tex, false, bubbleRatio);
-                    else Destroy(tex);
+                    if (tex.LoadImage(bytes)) ApplyTextureAspectFill(tex, isSticker, bubbleRatio);
+                    else
+                    {
+                        Destroy(tex);
+                        if (isSticker) ShowStickerLoadFailed();
+                    }
                 }
             }
             else
@@ -2782,6 +2794,12 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
                 else Destroy(tex);
             }
         }
+        else if (isSticker)
+        {
+            // Network/HTTP failure fetching the sticker bytes — the spinner was just hidden
+            // above, so without this the 396x396 area would sit permanently blank.
+            ShowStickerLoadFailed();
+        }
     }
 
     void LoadBase64Image(string base64, bool isSticker, float targetRatio)
@@ -2794,22 +2812,45 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
             }
 
             byte[] bytes = Convert.FromBase64String(base64);
+
+            // A base64:// sticker payload is the sticker's own media (the /media/download
+            // file_b64 fallback) and must be a real WebP — validate it through the sticker
+            // decoder instead of LoadImage, which can't read WebP (blank slot) and would
+            // paint any foreign JPEG as a sticker.
+            if (isSticker)
+            {
+                TryDecodeSticker(bytes, targetRatio);
+                return;
+            }
+
             Texture2D tex = new Texture2D(2, 2);
             if (tex.LoadImage(bytes))
             {
-                ApplyTextureAspectFill(tex, isSticker, targetRatio);
+                ApplyTextureAspectFill(tex, false, targetRatio);
             }
             else
             {
                 Destroy(tex);
             }
         } catch (Exception e) {
-            Debug.LogError("Base64 Decode Error: " + e.Message); 
+            Debug.LogError("Base64 Decode Error: " + e.Message);
         }
     }
 
     void TryDecodeSticker(byte[] rawBytes, float targetRatio)
     {
+        // A real WhatsApp sticker is always a WebP container. If these bytes aren't WebP,
+        // they don't belong to this sticker — they're a mis-sourced photo from the media
+        // pipeline (e.g. a /media/download response whose bytes are a JPEG). The old code
+        // fell back to Texture2D.LoadImage(rawBytes), which happily decoded that photo and
+        // the sticker branch painted it transparent + 1:1 — the "random image shown as a
+        // sticker" bug. Never force-paint non-WebP bytes with sticker styling.
+        if (!WebPSignature.IsWebP(rawBytes))
+        {
+            ShowStickerLoadFailed();
+            return;
+        }
+
         try
         {
             byte[] staticBytes = GetFirstFrameOfWebP(rawBytes);
@@ -2821,17 +2862,38 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
             }
             else
             {
+                // Genuine WebP the decoder couldn't handle (e.g. a malformed animated
+                // frame). Show the placeholder rather than a blank slot — and never
+                // LoadImage-fallback, which would only ever "succeed" on a foreign image.
                 if (tex != null) Destroy(tex);
-                Texture2D fallbackTex = new Texture2D(2, 2);
-                if (fallbackTex.LoadImage(rawBytes)) ApplyTextureAspectFill(fallbackTex, true, targetRatio);
-                else Destroy(fallbackTex);
+                ShowStickerLoadFailed();
             }
         }
         catch (Exception)
         {
-            Texture2D fallbackTex = new Texture2D(2, 2);
-            if (fallbackTex.LoadImage(rawBytes)) ApplyTextureAspectFill(fallbackTex, true, targetRatio);
-            else Destroy(fallbackTex);
+            ShowStickerLoadFailed();
+        }
+    }
+
+    // Terminal state when sticker bytes can't be rendered as a sticker (not a WebP, the
+    // WebP decoder rejected them, or the fetch failed). Falls back to the sticker
+    // placeholder instead of painting whatever bytes we were handed — a mis-sourced photo
+    // must never surface as a sticker, and a decode/fetch failure must not leave a blank slot.
+    void ShowStickerLoadFailed()
+    {
+        DisposeOwned();
+
+        if (stickerPlaceholder != null)
+        {
+            messageImage.sprite = stickerPlaceholder;
+            fullScreenSprite = stickerPlaceholder;
+            messageImage.color = Color.white;
+            messageImage.preserveAspect = true;
+        }
+        else
+        {
+            messageImage.sprite = null;
+            fullScreenSprite = null;
         }
     }
 
