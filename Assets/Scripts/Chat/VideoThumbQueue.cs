@@ -51,6 +51,30 @@ public class VideoThumbQueue
         inFlight.Remove(messageId);
     }
 
+    /// <summary>
+    /// Drops a single id from ALL tracking (known / pending / in-flight) so it can be
+    /// re-enqueued. Used by manual tap-to-retry: Complete() keeps an id 'known' for the
+    /// session, which would make a later TryEnqueue silently no-op — Forget() clears that so
+    /// the retry actually runs. Returns true if the id was present.
+    /// </summary>
+    public bool Forget(string messageId)
+    {
+        if (string.IsNullOrEmpty(messageId)) return false;
+        bool wasKnown = known.Remove(messageId);
+        inFlight.Remove(messageId);
+        if (pending.Contains(messageId))
+        {
+            var kept = new Queue<string>(pending.Count);
+            while (pending.Count > 0)
+            {
+                string id = pending.Dequeue();
+                if (id != messageId) kept.Enqueue(id);
+            }
+            while (kept.Count > 0) pending.Enqueue(kept.Dequeue());
+        }
+        return wasKnown;
+    }
+
     /// <summary>Drops all state (bot switch / chat close). The durable de-dup is the cache file.</summary>
     public void Clear()
     {

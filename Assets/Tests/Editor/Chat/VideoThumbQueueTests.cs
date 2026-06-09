@@ -62,4 +62,41 @@ public class VideoThumbQueueTests
         Assert.AreEqual(0, q.PendingCount);
         Assert.IsTrue(q.TryEnqueue("a"));      // enqueueable again after Clear
     }
+
+    [Test]
+    public void Forget_AllowsReEnqueueOfCompletedId()
+    {
+        // The tap-to-retry case: an id was dispatched + completed (stays 'known'), so a plain
+        // TryEnqueue no-ops — Forget() must clear it so the manual retry actually runs.
+        var q = new VideoThumbQueue(2);
+        q.TryEnqueue("a");
+        q.Dispatch();
+        q.Complete("a");
+        Assert.IsFalse(q.TryEnqueue("a"));     // still 'known' → would no-op (the spinner-hang bug)
+        Assert.IsTrue(q.Forget("a"));          // forget it...
+        Assert.IsTrue(q.TryEnqueue("a"));      // ...now it re-enqueues
+        Assert.AreEqual(1, q.PendingCount);
+    }
+
+    [Test]
+    public void Forget_RemovesFromPending()
+    {
+        var q = new VideoThumbQueue(1);
+        q.TryEnqueue("a"); q.TryEnqueue("b"); q.TryEnqueue("c");
+        q.Dispatch();                          // a in-flight; b, c pending
+        Assert.IsTrue(q.Forget("b"));          // drop b from the pending queue
+        var next = q.Dispatch();               // slot still taken by a → nothing
+        q.Complete("a");
+        next = q.Dispatch();                   // c should come, not b
+        Assert.AreEqual(1, next.Count);
+        Assert.AreEqual("c", next[0]);
+    }
+
+    [Test]
+    public void Forget_UnknownId_ReturnsFalse()
+    {
+        var q = new VideoThumbQueue(2);
+        Assert.IsFalse(q.Forget("nope"));
+        Assert.IsFalse(q.Forget(null));
+    }
 }

@@ -628,7 +628,18 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             messageImage.gameObject.SetActive(false);
             downloadButton.gameObject.SetActive(false);
 
-            StartCoroutine(SmartMediaRoutine(vm, bubbleRatio, false));
+            // A video whose media Wappi can no longer fetch (gone from WhatsApp) can't show a
+            // thumbnail OR play — render the download panel (tap-to-retry) instead of attempting
+            // (and failing) recovery again on every bind.
+            if (vm.type == MessageType.Video && ChatManager.Instance != null
+                && ChatManager.Instance.IsMediaUnavailable(vm.messageId))
+            {
+                ShowUnavailableMediaPanel(vm);
+            }
+            else
+            {
+                StartCoroutine(SmartMediaRoutine(vm, bubbleRatio, false));
+            }
 
             var btn = messageImage.GetComponent<Button>();
             if (!btn) btn = messageImage.gameObject.AddComponent<Button>();
@@ -1162,6 +1173,21 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
         }
     }
 
+    // Re-runs the caption-width clamp for an image/video bubble after its active media region
+    // swaps asynchronously (download/expired card ↔ real media). AdjustTextBubbleSize clamps a
+    // media caption to whichever region is active right now — the fixed-width card or the
+    // full-resolution media — so callers must re-run it whenever that swaps post-Bind; otherwise
+    // the caption keeps a width measured against the wrong region and (via childForceExpandWidth)
+    // stretches the card. No-op without a caption. Run AFTER ApplyDynamicLayout so the bubble
+    // padding it reads is current.
+    private void ReclampMediaCaption()
+    {
+        if (currentVm == null) return;
+        bool hasCaption = !string.IsNullOrEmpty(currentVm.text);
+        bool isCaptionableMedia = currentVm.type == MessageType.Image || currentVm.type == MessageType.Video;
+        if (hasCaption && isCaptionableMedia) AdjustTextBubbleSize();
+    }
+
     void AdjustTextBubbleSize()
     {
         LayoutElement textLayout = messageText.GetComponent<LayoutElement>();
@@ -1349,9 +1375,25 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             float captionMediaWidth = 0f;
             if (isMediaCaption)
             {
-                float realRatio = currentVm.aspectRatio > 0 ? currentVm.aspectRatio : 1.0f;
-                captionMediaWidth = ResolveMediaSize(realRatio).x;
-                // Force the measuring tape to be no wider than the image container!
+                // When the media can't be shown, the bubble renders the fixed-width download /
+                // expired card instead of the full-resolution media. Clamp the caption to that
+                // card's width — NOT the hypothetical media width — otherwise a long caption
+                // widens the bubble and the VLG's childForceExpandWidth drags the card out with
+                // it, leaving a wide, short, stretched placeholder. (Mirrors the Document branch
+                // above, which reads the same prefab LayoutElement width of 444.)
+                bool isCardActive = (downloadButton != null && downloadButton.gameObject.activeSelf)
+                    || (expiredPlaceholder != null && expiredPlaceholder.activeSelf);
+                if (isCardActive)
+                {
+                    var btnLe = downloadButton != null ? downloadButton.GetComponent<LayoutElement>() : null;
+                    captionMediaWidth = (btnLe != null && btnLe.preferredWidth > 0f) ? btnLe.preferredWidth : 444f;
+                }
+                else
+                {
+                    float realRatio = currentVm.aspectRatio > 0 ? currentVm.aspectRatio : 1.0f;
+                    captionMediaWidth = ResolveMediaSize(realRatio).x;
+                }
+                // Force the measuring tape to be no wider than the active media container!
                 availableWidthForText = Mathf.Min(availableWidthForText, captionMediaWidth - CaptionInset);
             }
 
@@ -1640,7 +1682,26 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
     void OnDownloadClicked(MessageViewModel vm)
     {
         if (ScrollClickBlocker.IsBlocking) return;
-        
+
+        // Tap-to-retry on a gone-media video: clear the unavailable mark, show a spinner on the
+        // panel, and re-attempt recovery once. Completion fires OnMessageMediaRefreshed, which
+        // re-binds to either the recovered thumbnail or back to this panel.
+        if (vm.type == MessageType.Video && ChatManager.Instance != null
+            && ChatManager.Instance.IsMediaUnavailable(vm.messageId))
+        {
+            if (downloadButton != null)
+            {
+                // Hide the download arrow + label so only the spinner card shows while retrying
+                // (mirrors StartDownload) — the button must not peek out from behind the spinner.
+                var btnImg = downloadButton.GetComponent<Image>();
+                if (btnImg != null) btnImg.enabled = false;
+                if (downloadButtonText != null) downloadButtonText.gameObject.SetActive(false);
+                ShowLoadingSpinner(downloadButton.transform, bareSpinner: false);
+            }
+            ChatManager.Instance.RetryUnavailableMedia(vm);
+            return;
+        }
+
         if (vm.type == MessageType.Image || vm.type == MessageType.Video)
         {
             float realRatio = vm.aspectRatio > 0 ? vm.aspectRatio : 1.0f;
@@ -1651,6 +1712,49 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
         {
             StartDownload(vm, 0, true);
         }
+    }
+
+    // Renders the download-panel card for a video whose media Wappi can no longer fetch
+    // (expired/deleted on WhatsApp). Reuses the same downloadButton placeholder the other media
+    // types use; its onClick is wired in Bind to OnDownloadClicked, which retries once on tap.
+    void ShowUnavailableMediaPanel(MessageViewModel vm)
+    {
+        messageImage.gameObject.SetActive(false);
+        Transform mediaParent = messageImage.transform.parent;
+        if (mediaParent != null && mediaParent.name == "MediaContainer")
+            mediaParent.gameObject.SetActive(false);
+
+        if (playOverlay != null) playOverlay.SetActive(false);
+        HideLoadingSpinner();
+
+        // First time: offer the download/retry card. After a manual retry has also failed,
+        // graduate to the terminal "expired/unavailable" placeholder (no more retrying).
+        bool exhausted = ChatManager.Instance != null
+            && ChatManager.Instance.HasRetriedUnavailable(vm.messageId);
+
+        if (exhausted && expiredPlaceholder != null)
+        {
+            if (downloadButton != null) downloadButton.gameObject.SetActive(false);
+            expiredPlaceholder.SetActive(true);
+            if (expiredPlaceholder.TryGetComponent<Image>(out var expiredImg))
+                expiredImg.color = DownloadFillColor;
+        }
+        else if (downloadButton != null)
+        {
+            if (expiredPlaceholder != null) expiredPlaceholder.SetActive(false);
+            downloadButton.gameObject.SetActive(true);
+            var btnImg = downloadButton.GetComponent<Image>();
+            if (btnImg != null)
+            {
+                btnImg.enabled = true;
+                if (downloadArrowIcon != null) btnImg.sprite = downloadArrowIcon;
+                btnImg.color = DownloadFillColor;
+            }
+            if (downloadButtonText != null) downloadButtonText.gameObject.SetActive(true);
+            SetDownloadButtonText(vm.type);
+        }
+
+        SetLayoutToButton();
     }
 
     // === Loading spinner (shared) =========================================
@@ -2037,37 +2141,61 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
             }
         }
 
-        // If we didn't find a thumbnail in the cache or Base64, show the dark blank card
+        // [VTHUMB-DBG] render-time diagnostic — incoming-path verification. Remove once confirmed.
+        if (vm.type == MessageType.Video)
+            Debug.Log($"[VTHUMB-DBG] render id={vm.messageId} incoming={vm.isIncoming} " +
+                      $"thumb='{(string.IsNullOrEmpty(vm.thumbnailUrl) ? "EMPTY" : vm.thumbnailUrl)}' loaded={imageLoaded} " +
+                      $"videoUrl={(string.IsNullOrEmpty(vm.videoUrl) ? "EMPTY" : (vm.videoUrl.StartsWith("http") ? "http" : vm.videoUrl))}");
+
+        // If we didn't find a thumbnail in the cache or Base64, show the dark placeholder card
+        bool recovering = false;
         if (!imageLoaded)
         {
             messageImage.sprite = null;
             messageImage.color = new Color(0.15f, 0.15f, 0.15f, 1f);
 
-            // Recovery: an aged outgoing video loses its server thumbnail + url and its staged
+            // Recovery: an aged/server video loses its server thumbnail + url and its staged
             // file is gone. Rebuild the preview by re-fetching the media and extracting a frame
             // (native-extractor platforms only). Deduped via the thumb queue; on success it
             // fires OnMessageMediaRefreshed, which re-binds this bubble and paints the frame.
+            // Mark `recovering` so the shared spinner stays up (the showSpinner branch below
+            // would otherwise hide it).
             if (vm.type == MessageType.Video && ChatManager.Instance != null)
+            {
                 ChatManager.Instance.EnqueueIncomingVideoThumb(vm);
+                recovering = true;
+            }
         }
 
-        // --- THE FIX: This is no longer skipped! ---
         if (vm.type == MessageType.Video)
         {
-            playOverlay.SetActive(true);
+            // While recovering, the loading spinner owns the bubble — hide the play overlay so a
+            // play triangle doesn't sit on top of the spinner (it reappears on the recovered
+            // thumbnail when this bubble re-binds).
+            playOverlay.SetActive(!recovering);
+
             // A just-staged / reopened outgoing video still uploading shows the ring + X
             // at zero fill so it reads as in-progress; a delivered one shows the play icon.
-            if (!vm.isIncoming && vm.deliveryStatus == DeliveryStatus.Pending)
-                ShowUploadRing(0f);
-            else
-                HideUploadRing();
+            if (!recovering)
+            {
+                if (!vm.isIncoming && vm.deliveryStatus == DeliveryStatus.Pending)
+                    ShowUploadRing(0f);
+                else
+                    HideUploadRing();
+            }
         }
 
-        if (showSpinner) ShowLoadingSpinner(messageImage.transform, bareSpinner: true);
+        // Keep the spinner up while recovery is in flight (no thumbnail yet) so a video with no
+        // blurry server thumbnail shows "loading" instead of a stark black card until the frame
+        // is decoded. Re-bind on recovery completion swaps it for the thumbnail or the panel.
+        if (showSpinner || recovering) ShowLoadingSpinner(messageImage.transform, bareSpinner: true);
         else HideLoadingSpinner();
 
         UpdateBubbleVisuals();
         ApplyDynamicLayout(vm.type);
+        // If a download/loading card preceded this (expired-link path), the caption was clamped to
+        // the narrow card width; now that the real media is active, re-clamp it to the media width.
+        ReclampMediaCaption();
         // Re-assert sibling order (senderName -> media -> caption) now that the real media is
         // active and re-parented. Bind() already ordered once, but on a cold open with an
         // expired link the image activates HERE — asynchronously, after Bind() ran — so without
@@ -2093,9 +2221,11 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
 
         UpdateBubbleVisuals();
         ApplyDynamicLayout(vm.type);
+        // Caption rides the fixed-width download card here too — clamp it to the card width.
+        ReclampMediaCaption();
         StartCoroutine(ForceRebuildRoutine());
     }
-    
+
     IEnumerator DownloadAndOpenDocumentLocal(MessageViewModel vm, string decodedName, bool openImmediately)
     {
         Transform originalSpinnerParent = null;
@@ -2323,6 +2453,10 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
 
         UpdateBubbleVisuals();
         if (currentVm != null) ApplyDynamicLayout(currentVm.type);
+        // The card just replaced the media. Bind sized any caption to the full media width while
+        // the card was still inactive; re-clamp it to the (now-active) card width so the caption
+        // can't stretch the card.
+        ReclampMediaCaption();
         // The Expired card just took the media's place; re-stamp the sibling order
         // so the caption sits below it instead of clinging to its old prefab index.
         ReorderBubbleSiblings();

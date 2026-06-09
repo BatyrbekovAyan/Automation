@@ -14,12 +14,46 @@ using UnityEngine;
 /// </summary>
 public partial class ChatManager
 {
-    private const int    VideoThumbMaxConcurrent = 2;
+    private const int    VideoThumbMaxConcurrent = 4;   // drain a backlog of url-less videos faster
     private const double VideoThumbTimeSec       = 1.0;   // grab ~1s in (clamped to duration native-side)
 
     private VideoThumbQueue _videoThumbQueue;
     // Live VM instance per queued id, so completion can mutate it + fire OnMessageMediaRefreshed.
     private readonly Dictionary<string, MessageViewModel> _pendingThumbVms = new();
+
+    // Messages whose media Wappi can no longer fetch (/media/download → 400 "download media
+    // error" = expired/deleted on WhatsApp). Recovery is impossible: neither a thumbnail nor
+    // playback can be produced. We render the download panel (tap-to-retry) for these and stop
+    // auto-re-attempting on every sync/scroll. In-session only — cleared on bot switch, so each
+    // video makes at most one recovery attempt per launch before being parked.
+    private readonly HashSet<string> _unavailableMediaIds = new();
+    // Ids the user has already manually retried (and which failed again). These graduate from
+    // the tap-to-retry download panel to the terminal "expired/unavailable" placeholder.
+    private readonly HashSet<string> _retriedUnavailableIds = new();
+
+    /// <summary>True when this message's media is confirmed unfetchable (gone from WhatsApp).</summary>
+    public bool IsMediaUnavailable(string messageId) =>
+        !string.IsNullOrEmpty(messageId) && _unavailableMediaIds.Contains(messageId);
+
+    /// <summary>True once the user has manually retried this unavailable media (→ show expired card).</summary>
+    public bool HasRetriedUnavailable(string messageId) =>
+        !string.IsNullOrEmpty(messageId) && _retriedUnavailableIds.Contains(messageId);
+
+    /// <summary>
+    /// Manual tap-to-retry: clears the unavailable mark and re-queues one recovery attempt.
+    /// Called by the download-panel tap on an unavailable video bubble. A second failure
+    /// promotes the bubble to the terminal expired placeholder (HasRetriedUnavailable).
+    /// </summary>
+    public void RetryUnavailableMedia(MessageViewModel vm)
+    {
+        if (vm == null || string.IsNullOrEmpty(vm.messageId)) return;
+        _unavailableMediaIds.Remove(vm.messageId);
+        _retriedUnavailableIds.Add(vm.messageId);
+        // The queue still holds this id as 'known' from the first auto-attempt; without
+        // forgetting it, TryEnqueue would no-op and the retry would never run (spinner hangs).
+        _videoThumbQueue?.Forget(vm.messageId);
+        EnqueueIncomingVideoThumb(vm);
+    }
 
     /// <summary>
     /// Queues a video for native thumbnail extraction / recovery. No-op for non-video or
@@ -35,6 +69,10 @@ public partial class ChatManager
     {
         if (vm == null || vm.type != MessageType.Video || string.IsNullOrEmpty(vm.messageId)) return;
         if (MediaCacheManager.Instance == null) return;
+
+        // Already confirmed unfetchable this session — don't hammer /media/download again.
+        // The bubble shows the download panel; only a manual tap (RetryUnavailableMedia) retries.
+        if (_unavailableMediaIds.Contains(vm.messageId)) return;
 
         string vthumbUrl = "vthumb://" + vm.messageId;
 
@@ -52,11 +90,16 @@ public partial class ChatManager
         // With no url we can only recover by re-fetching one at extraction time, which needs a
         // native extractor. No url AND no extractor (e.g. Editor) => nothing we can do.
         bool haveUrl = !string.IsNullOrEmpty(vm.videoUrl);
-        if (!haveUrl && !VideoThumbnailExtractor.IsSupported) return;
+        if (!haveUrl && !VideoThumbnailExtractor.IsSupported)
+        {
+            Debug.Log($"[VTHUMB-DBG] enqueue SKIP-no-extractor id={vm.messageId} incoming={vm.isIncoming}");
+            return;
+        }
 
         _videoThumbQueue ??= new VideoThumbQueue(VideoThumbMaxConcurrent);
         if (_videoThumbQueue.TryEnqueue(vm.messageId))
         {
+            Debug.Log($"[VTHUMB-DBG] enqueue QUEUED id={vm.messageId} incoming={vm.isIncoming} haveUrl={haveUrl}");
             _pendingThumbVms[vm.messageId] = vm;
             PumpVideoThumbQueue();
         }
@@ -110,6 +153,20 @@ public partial class ChatManager
             }
         }
 
+        // If we still have no usable link after re-fetching, /media/download couldn't retrieve
+        // the media (400 "download media error" = expired/deleted on WhatsApp). Mark it
+        // unavailable so the bubble switches to the download panel and we stop auto-retrying.
+        // Only conclude this where a native extractor exists (on Editor a url-less video is
+        // simply un-extractable, not necessarily gone).
+        bool gotUsableUrl = !string.IsNullOrEmpty(vm.videoUrl) && vm.videoUrl.StartsWith("http");
+        if (!ok && !gotUsableUrl && VideoThumbnailExtractor.IsSupported)
+        {
+            _unavailableMediaIds.Add(messageId);
+            OnMessageMediaRefreshed?.Invoke(vm);   // re-bind → download panel
+        }
+
+        Debug.Log($"[VTHUMB-DBG] extraction DONE id={messageId} incoming={vm.isIncoming} ok={ok} gotUrl={gotUsableUrl} unavailable={_unavailableMediaIds.Contains(messageId)}");
+
         if (ok && System.IO.File.Exists(finalPath))
         {
             vm.thumbnailUrl = vthumbUrl;
@@ -145,6 +202,15 @@ public partial class ChatManager
             url => { freshUrl = url; fetchDone = true; },
             ()  => { fetchDone = true; });
         while (!fetchDone) yield return null;
+
+        // [VTHUMB-DBG] KEY incoming-path diagnostic: what did /media/download hand back?
+        // Hypothesis: incoming videos return a base64:// payload the native extractor can't
+        // read, leaving them stuck black. This line confirms or refutes that.
+        string scheme = string.IsNullOrEmpty(freshUrl) ? "EMPTY/FAIL"
+            : freshUrl.StartsWith("http") ? "http/len" + freshUrl.Length
+            : freshUrl.StartsWith("base64://") ? "base64/len" + freshUrl.Length
+            : "other(" + freshUrl.Substring(0, System.Math.Min(24, freshUrl.Length)) + ")";
+        Debug.Log($"[VTHUMB-DBG] refetch id={messageId} incoming={vm.isIncoming} result={scheme}");
 
         if (!string.IsNullOrEmpty(freshUrl) && freshUrl.StartsWith("http"))
         {
@@ -205,5 +271,7 @@ public partial class ChatManager
     {
         _videoThumbQueue?.Clear();
         _pendingThumbVms.Clear();
+        _unavailableMediaIds.Clear();
+        _retriedUnavailableIds.Clear();
     }
 }
