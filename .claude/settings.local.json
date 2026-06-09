@@ -191,7 +191,8 @@
       "Bash(sed -n '3326,3346p' Assets/Prefabs/MessageTextOutgoing.prefab)",
       "Bash(awk '/m_Name: Document$/{found=1} found' Assets/Prefabs/MessageTextOutgoing.prefab)",
       "Bash(sed -n '2235,2262p' Assets/Prefabs/MessageTextOutgoing.prefab)",
-      "Bash(cd /Users/ayan/Projects/Automation *)"
+      "Bash(cd /Users/ayan/Projects/Automation *)",
+      "Bash(grep -vE '^\\\\+\\\\s*$')"
     ],
     "defaultMode": "acceptEdits"
   }
