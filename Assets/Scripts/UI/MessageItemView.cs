@@ -110,7 +110,7 @@ public class MessageItemView : MonoBehaviour
     private const float StickerHeight         = 396f;
 
     // === Document ===
-    private const float DocumentWidth         = 760f;   // 0.70 × canvas
+    private const float DocumentWidth         = 810f;   // 0.75 × 1080 canvas — matches the app-wide ceiling (text + landscape video)
     private const float DocumentMinWidth      = 480f;
     private const float DocumentHeight        = 200f;
 
@@ -1231,7 +1231,15 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
 
         if (currentVm != null && currentVm.type == MessageType.Document)
         {
-            bool isDownloaded = documentPanel != null && documentPanel.activeInHierarchy;
+            // activeSelf, NOT activeInHierarchy: on first chat-open, bubbles are Bind()'d
+            // (→ AdjustTextBubbleSize) while the chat panel's ancestor chain is still inactive
+            // (the Prep-phase populate). activeInHierarchy was then false, so this entire
+            // width-clamp block was skipped — the Document panel never got a preferredWidth and
+            // DocName kept the full unbroken filename from SetupDocumentView, letting the bubble's
+            // ContentSizeFitter grow the card off-screen for long filenames. The text-bubble path
+            // below measures the same way with no such gate and sizes correctly while inactive,
+            // so activeSelf is both correct and consistent with the rest of this class (e.g. L1161).
+            bool isDownloaded = documentPanel != null && documentPanel.activeSelf;
             bool isDownloadActive = downloadButton != null && downloadButton.gameObject.activeSelf;
             float mediaWidth = 0f;
             bool hasCaption = messageText != null && messageText.gameObject.activeSelf && !string.IsNullOrEmpty(messageText.text);
@@ -1245,16 +1253,25 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                 documentNameText.overflowMode = TextOverflowModes.Ellipsis;
                 documentNameText.maxVisibleLines = 2;
 
-                float maxTextWidthAllowed = maxAllowedTextWidth - 90f;
+                // Real horizontal chrome of the document card, measured from the prefab:
+                // Document HLG padding (left 32 + right 28) + DocIcon (64) + HLG spacing (24).
+                // TextContainer adds no horizontal padding. Sizing the card as content + this EXACT
+                // chrome — and measuring/wrapping the name against the SAME cell width the card hands
+                // back — makes the card hug its text. The old code measured the name unwrapped and
+                // used mismatched chrome (+132 / -90), so any long name pegged the card to its 760
+                // max and left dead space to the right of a name that wrapped to two short lines.
+                const float DocCardChrome = 148f;
+                float maxNameCell = DocumentWidth - DocCardChrome;      // 612 — widest the text column can ever be
+                float minNameCell = DocumentMinWidth - DocCardChrome;   // floor so the card never collapses below its min
 
                 string rawName = string.IsNullOrEmpty(currentVm.fileName) ? "Document.file" : currentVm.fileName;
                 string decodedName = UnicodeEmojiConverter.ConvertRealEmojisToSprites(System.Uri.UnescapeDataString(rawName));
 
-                documentNameText.text = SplitLongWord(decodedName, documentNameText, maxTextWidthAllowed);
-
-                float unbrokenNameWidth = documentNameText.GetPreferredValues(documentNameText.text, Mathf.Infinity, Mathf.Infinity).x;
-
-                float nameWidth = Mathf.Min(unbrokenNameWidth, maxTextWidthAllowed);
+                // Break unbreakable runs to the real cell width, then measure the name WRAPPED to that
+                // same width: a finite width makes TMP word-wrap, so .x is the longest *rendered* line,
+                // not the full single-line width.
+                documentNameText.text = SplitLongWord(decodedName, documentNameText, maxNameCell);
+                float nameWidth = documentNameText.GetPreferredValues(documentNameText.text, maxNameCell, Mathf.Infinity).x;
 
                 float infoWidth = 0f;
                 if (documentInfoText != null)
@@ -1263,13 +1280,15 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                     infoWidth = documentInfoText.GetPreferredValues(documentInfoText.text, Mathf.Infinity, Mathf.Infinity).x;
                 }
 
-                float maxTextWidth = Mathf.Max(nameWidth, infoWidth);
+                // Width the text column actually needs, bounded to the [min, max] cell.
+                float textCellWidth = Mathf.Clamp(Mathf.Max(nameWidth, infoWidth), minNameCell, maxNameCell);
+
                 // Always float the Time on documents so it gets the standard 20px right
                 // inset from PositionFloatingTime (with a caption it sits inline on the
                 // caption's last line; without one it floats at the card's bottom-right).
                 if (timeLayout != null) timeLayout.ignoreLayout = true;
 
-                float finalWidth = Mathf.Clamp(maxTextWidth + 132f, DocumentMinWidth, DocumentWidth);
+                float finalWidth = textCellWidth + DocCardChrome;   // hugs content; resolves to [480, 760] by construction
 
                 docLayout.preferredWidth = finalWidth;
                 mediaWidth = finalWidth;
@@ -1277,10 +1296,15 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                 LayoutElement nameLe = documentNameText.GetComponent<LayoutElement>();
                 if (!nameLe) nameLe = documentNameText.gameObject.AddComponent<LayoutElement>();
 
-                float textWidthInsidePanel = finalWidth - 90f;
-                float actualHeight = documentNameText.GetPreferredValues(documentNameText.text, textWidthInsidePanel, Mathf.Infinity).y;
-                float singleLineHeight = documentNameText.GetPreferredValues("A", textWidthInsidePanel, Mathf.Infinity).y;
+                float actualHeight = documentNameText.GetPreferredValues(documentNameText.text, textCellWidth, Mathf.Infinity).y;
+                float singleLineHeight = documentNameText.GetPreferredValues("A", textCellWidth, Mathf.Infinity).y;
 
+                // Pin the name to the exact cell width so wrap/ellipsis engage at the same width the
+                // card was sized for (DocName has no LayoutElement in the prefab). flexibleWidth=0
+                // stops it stretching past the cell.
+                nameLe.minWidth = 0f;
+                nameLe.flexibleWidth = 0f;
+                nameLe.preferredWidth = textCellWidth;
                 nameLe.preferredHeight = Mathf.Min(actualHeight, singleLineHeight * 2f);
             }
             else if (isDownloadActive)
@@ -1727,6 +1751,14 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                         ResetBubbleLayoutToDefault();
                         SetupDocumentView(vm, decodedName);
                         ApplyDynamicLayout(vm.type);
+                        // Apply the document width clamp + filename wrap/ellipsis. SetupDocumentView
+                        // alone sets DocName to the full unbroken filename and adds no preferredWidth
+                        // to the Document panel, so the bubble's ContentSizeFitter grows the card off
+                        // the screen for long names. This auto-download-complete path was the only
+                        // one rendering the card without it (Bind L800 and DownloadAndOpenDocumentLocal
+                        // L2244 both call it) — which is why history documents with expired media URLs
+                        // overflowed regardless of the AdjustTextBubbleSize fix.
+                        AdjustTextBubbleSize();
                         StartCoroutine(ForceRebuildRoutine());
                     }
                 }
