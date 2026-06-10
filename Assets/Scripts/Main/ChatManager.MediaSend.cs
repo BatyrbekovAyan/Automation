@@ -92,6 +92,7 @@ public partial class ChatManager
             senderName     = "Me",
             isIncoming     = false,
             timestamp      = now,
+            sequence       = _nextLocalSendSequence++,
             text           = caption ?? "",
             mimeType       = pick.MimeType,
             fileName       = pick.FileName,

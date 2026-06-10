@@ -15,6 +15,9 @@ public class MessageViewModel
     public string mimeType;
     public bool isIncoming;
     public long timestamp;
+    // Within-second order tiebreak — see MessageOrder. Persisted with the
+    // cache so same-second messages keep their server order across reopens.
+    public int sequence;
     public string fileName;
 
     public float aspectRatio;

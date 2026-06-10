@@ -331,7 +331,7 @@ public class MessageListView : MonoBehaviour
                 isInitialLoadInProgress = false;
                 if (pendingLiveMessages.Count > 0)
                 {
-                    var drained = pendingLiveMessages.OrderBy(x => x.timestamp).ToList();
+                    var drained = pendingLiveMessages.OrderBy(x => x, MessageOrder.AscendingComparer).ToList();
                     pendingLiveMessages.Clear();
                     StartCoroutine(AppendLiveMessagesRoutine(drained));
                 }
@@ -352,7 +352,7 @@ public class MessageListView : MonoBehaviour
         
         if(loadingMessagesSpinner) loadingMessagesSpinner.SetActive(false); 
 
-        var sortedMessages = messages.OrderBy(x => x.timestamp).ToList();
+        var sortedMessages = messages.OrderBy(x => x, MessageOrder.AscendingComparer).ToList();
 
         StartCoroutine(UpdateListRoutine(sortedMessages, isLoadMore));
     }
@@ -380,7 +380,7 @@ public class MessageListView : MonoBehaviour
             return;
         }
 
-        var sortedMessages = newMessages.OrderBy(x => x.timestamp).ToList();
+        var sortedMessages = newMessages.OrderBy(x => x, MessageOrder.AscendingComparer).ToList();
         StartCoroutine(AppendLiveMessagesRoutine(sortedMessages));
     }
 
@@ -408,6 +408,26 @@ public class MessageListView : MonoBehaviour
     }
 
 // --- UPDATED: Beautiful Smooth Scroll & Fade Animation ---
+// Maps a live arrival to the sibling index it must occupy when it sorts
+// before the newest rendered bubble; -1 for the normal append case. Walks
+// the content children so separators/spacers are skipped but still counted
+// in the returned sibling index.
+private int FindOutOfOrderSiblingIndex(MessageViewModel vm)
+{
+    var bubbleVms = new List<MessageViewModel>();
+    var bubbleTransforms = new List<Transform>();
+    for (int i = 0; i < content.childCount; i++)
+    {
+        var view = content.GetChild(i).GetComponent<MessageItemView>();
+        if (view == null || view.BoundVm == null) continue;
+        bubbleVms.Add(view.BoundVm);
+        bubbleTransforms.Add(view.transform);
+    }
+
+    int insertAt = MessageOrder.InsertIndex(bubbleVms, vm);
+    return insertAt >= 0 ? bubbleTransforms[insertAt].GetSiblingIndex() : -1;
+}
+
 IEnumerator AppendLiveMessagesRoutine(List<MessageViewModel> messages, bool suppressLanding = false)
 {
     List<MessageItemView> newlyAddedItems = new List<MessageItemView>();
@@ -420,6 +440,32 @@ IEnumerator AppendLiveMessagesRoutine(List<MessageViewModel> messages, bool supp
 
     foreach (var vm in messages)
     {
+        bool isGroup = vm.chatId != null && vm.chatId.EndsWith("@g.us");
+
+        // Out-of-order arrival (sorts before the newest rendered bubble, e.g.
+        // a late Wappi delivery): insert at its canonical position so the live
+        // view matches what a reopen would render. It joins an existing date
+        // section, so no separator/spacer bookkeeping — the common newest-case
+        // stays on the append path below. Pending = the user's own optimistic
+        // send, which always appends (its device-clock timestamp may lag the
+        // server; sync adopts the real keys later).
+        int insertSiblingIndex = (vm.deliveryStatus == DeliveryStatus.Pending)
+            ? -1
+            : FindOutOfOrderSiblingIndex(vm);
+        if (insertSiblingIndex >= 0)
+        {
+            var inserted = Instantiate(ResolvePrefab(vm), content);
+            inserted.Bind(vm, true, true, (vm.isIncoming && isGroup));
+            inserted.transform.SetSiblingIndex(insertSiblingIndex);
+
+            CanvasGroup insertedCg = inserted.GetComponent<CanvasGroup>();
+            if (insertedCg == null) insertedCg = inserted.gameObject.AddComponent<CanvasGroup>();
+            insertedCg.alpha = 0f;
+            newlyAddedCanvasGroups.Add(insertedCg);
+            newlyAddedItems.Add(inserted);
+            continue;
+        }
+
         bool needDateSeparator = false;
         bool needSpacer = false;
 
@@ -452,8 +498,6 @@ IEnumerator AppendLiveMessagesRoutine(List<MessageViewModel> messages, bool supp
             sep.SetDate(GetDateString(vm.timestamp));
             sep.transform.SetAsLastSibling();
         }
-
-        bool isGroup = vm.chatId != null && vm.chatId.EndsWith("@g.us");
 
         if (lastItem != null && lastItem.BoundVm.isIncoming == vm.isIncoming && !needDateSeparator)
         {
@@ -824,7 +868,7 @@ IEnumerator UpdateListRoutine(List<MessageViewModel> sortedMessages, bool isLoad
 
             if (pendingLiveMessages.Count > 0)
             {
-                var drained = pendingLiveMessages.OrderBy(x => x.timestamp).ToList();
+                var drained = pendingLiveMessages.OrderBy(x => x, MessageOrder.AscendingComparer).ToList();
                 pendingLiveMessages.Clear();
                 yield return StartCoroutine(AppendLiveMessagesRoutine(drained, suppressLanding: true));
             }

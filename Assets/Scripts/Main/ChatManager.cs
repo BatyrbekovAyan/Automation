@@ -106,6 +106,14 @@ public partial class ChatManager : MonoBehaviour
     private string currentChatId;
 
     /// <summary>
+    /// Order tiebreak for optimistic local sends (see MessageOrder). Starts
+    /// high so an unacked send sorts after any server message in the same
+    /// second; increments preserve send order across rapid sends. The first
+    /// sync echo replaces it with the server's within-second sequence.
+    /// </summary>
+    private int _nextLocalSendSequence = 1000;
+
+    /// <summary>
     /// The MessageViewModel list currently powering the open chat's bubbles.
     /// The references in this list are the same ones held by each rendered
     /// MessageItemView.currentVm, so mutating an entry's mediaUrl in place
@@ -422,8 +430,14 @@ public partial class ChatManager : MonoBehaviour
 
             if (response?.messages != null)
             {
+                long[] responseTimes = MessageOrder.ResponseTimes(response.messages);
+                int responseIndex = -1;
+
                 foreach (var raw in response.messages)
                 {
+                    responseIndex++;
+                    int serverSequence = MessageOrder.WithinSecondSequence(responseTimes, responseIndex);
+
                     // BRAND NEW message we missed: ghost-send recovery dedup.
                     // If a previous-session POST reached Wappi but the client
                     // never got the response, the outbox holds the tempId AND
@@ -471,7 +485,7 @@ public partial class ChatManager : MonoBehaviour
 
                             if (!string.IsNullOrEmpty(ghostTempId))
                             {
-                                isGhostRecovery = ReconcileGhostSend(ghostTempId, raw, norm, cachedList, chatId);
+                                isGhostRecovery = ReconcileGhostSend(ghostTempId, raw, norm, serverSequence, cachedList, chatId);
                                 if (isGhostRecovery) hasStatusUpdates = true;
                             }
                         }
@@ -480,7 +494,9 @@ public partial class ChatManager : MonoBehaviour
                         // cached VM, don't also append a duplicate to newMessages.
                         if (isGhostRecovery) continue;
 
-                        newMessages.Add(CreateViewModel(norm));
+                        var newVm = CreateViewModel(norm);
+                        newVm.sequence = serverSequence;
+                        newMessages.Add(newVm);
                         continue;
                     }
 
@@ -494,6 +510,26 @@ public partial class ChatManager : MonoBehaviour
                     if (RefreshCachedMessageMedia(Normalize(raw), cachedList))
                     {
                         hasStatusUpdates = true;
+                    }
+
+                    // Adopt the server's canonical order keys. Optimistic sends
+                    // carry a device-clock timestamp + a high local sequence
+                    // until the ack, and the ack path doesn't update them — so
+                    // the first sync that echoes the message replaces both with
+                    // server values, keeping reopen order identical to WhatsApp
+                    // even when the device clock is skewed. Doesn't reposition
+                    // the rendered bubble; the corrected keys apply on next open.
+                    for (int i = 0; i < cachedList.Count; i++)
+                    {
+                        var cached = cachedList[i];
+                        if (cached.messageId != raw.id) continue;
+                        if (cached.timestamp != raw.time || cached.sequence != serverSequence)
+                        {
+                            cached.timestamp = raw.time;
+                            cached.sequence  = serverSequence;
+                            hasStatusUpdates = true;
+                        }
+                        break;
                     }
 
                     // Server may also have a fresher delivery_status for an
@@ -588,7 +624,7 @@ public partial class ChatManager : MonoBehaviour
     /// already-evicted bubble (>100-msg cap) is still cleaned up.
     /// </summary>
     private bool ReconcileGhostSend(string ghostTempId, RawMessage raw, NormalizedMessage norm,
-                                    List<MessageViewModel> cachedList, string chatId)
+                                    int serverSequence, List<MessageViewModel> cachedList, string chatId)
     {
         bool found = false;
         for (int j = 0; j < cachedList.Count; j++)
@@ -598,6 +634,7 @@ public partial class ChatManager : MonoBehaviour
                 cachedList[j].messageId      = raw.id;
                 cachedList[j].deliveryStatus = norm.deliveryStatus;
                 cachedList[j].timestamp      = norm.time;
+                cachedList[j].sequence       = serverSequence;
                 found = true;
                 break;
             }
@@ -677,7 +714,7 @@ public partial class ChatManager : MonoBehaviour
                 }
             }
 
-            cachedMessages.Sort((a, b) => b.timestamp.CompareTo(a.timestamp));
+            cachedMessages.Sort(MessageOrder.Descending);
             foreach (var msg in cachedMessages) seenMessageIds.Add(msg.messageId);
             _activeChatCache = cachedMessages;
 
@@ -716,7 +753,7 @@ public partial class ChatManager : MonoBehaviour
 
                 _activeChatCache = newMessages;
 
-                newMessages.Sort((a, b) => b.timestamp.CompareTo(a.timestamp));
+                newMessages.Sort(MessageOrder.Descending);
 
                 int initialCount = FirstScreenBudget.MessageCount(newMessages);
                 if (newMessages.Count > initialCount)
@@ -950,6 +987,8 @@ public partial class ChatManager : MonoBehaviour
 
             if (response?.messages != null)
             {
+                long[] responseTimes = MessageOrder.ResponseTimes(response.messages);
+
                 foreach (var raw in response.messages)
                 {
                     rawServerCount++; // Count every single message the server gave us
@@ -975,6 +1014,7 @@ public partial class ChatManager : MonoBehaviour
                     if (norm.messageType == MessageType.Unknown) continue;
 
                     MessageViewModel vm = CreateViewModel(norm);
+                    vm.sequence = MessageOrder.WithinSecondSequence(responseTimes, rawServerCount - 1);
                     loadedMessages.Add(vm);
                 }
             }
@@ -1404,6 +1444,7 @@ IEnumerator SendTextMessageRoutine(string chatId, string text)
         text = text,
         isIncoming = false,
         timestamp = now,
+        sequence = _nextLocalSendSequence++,
         deliveryStatus = DeliveryStatus.Pending
     };
 
