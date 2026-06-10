@@ -1767,9 +1767,10 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
     // `loadingSpinner` is a per-bubble overlay: its root Image is a card
     // background and a child object is the rotating spinner. Bare mode hides
     // the card (clears the root Image) so only the spinner shows — used over
-    // media/stickers. Card mode leaves the root Image alone — used on the
-    // download button. Centralised here so every load path shows/hides the
-    // spinner the same way.
+    // media/stickers, where the white card would read as a box floating on
+    // the content. Card mode shows the white card — used ONLY over the
+    // download button, which it exists to cover. Centralised here so every
+    // load path shows/hides the spinner the same way.
     void ShowLoadingSpinner(Transform parent, bool bareSpinner)
     {
         if (loadingSpinner == null) return;
@@ -1789,8 +1790,11 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             le = loadingSpinner.AddComponent<LayoutElement>();
         le.ignoreLayout = true;
 
-        if (bareSpinner && loadingSpinner.TryGetComponent<Image>(out var img))
-            img.color = Color.clear;
+        // Set the card explicitly BOTH ways: a bubble's spinner is reused across loads, so card
+        // mode must restore the white the last bare-mode show cleared (and vice versa) — otherwise
+        // the card a later download needs to cover its button never comes back.
+        if (loadingSpinner.TryGetComponent<Image>(out var img))
+            img.color = bareSpinner ? Color.clear : Color.white;
     }
 
     void HideLoadingSpinner(Transform reparentTo = null)
@@ -3203,10 +3207,12 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
     }
     IEnumerator RefreshAndPlayVideo(MessageViewModel vm)
     {
-        // 1. Hide the Play Icon and show the Spinner perfectly centered OVER the thumbnail
+        // 1. Hide the Play Icon and show the Spinner perfectly centered OVER the thumbnail.
+        // Bare mode: this spinner sits on the video thumbnail, not the download button, so the
+        // white card would read as a floating box on the media — show only the ring.
         if (playOverlay != null) playOverlay.SetActive(false);
-        
-        ShowLoadingSpinner(messageImage.transform, bareSpinner: false);
+
+        ShowLoadingSpinner(messageImage.transform, bareSpinner: true);
 
         bool apiSuccess = false;
         string fetchedUrl = "";
