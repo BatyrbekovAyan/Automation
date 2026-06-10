@@ -89,6 +89,37 @@ public class MediaCacheManager : MonoBehaviour
     }
 
     /// <summary>
+    /// Copies the cached bytes stored under <paramref name="fromUrl"/>'s key to
+    /// <paramref name="toUrl"/>'s key. The cache is keyed by MD5 of the FULL URL, so
+    /// when the server re-addresses an unchanged file (recovery file_link → hosted s3
+    /// URL) the bytes are already on disk but the new key misses. The caller must
+    /// establish that both URLs name the same stored file (MediaUrlIdentity.SameFile)
+    /// — this method only moves bytes between keys, it does not judge identity.
+    /// Returns true when the destination key ends up backed by a file.
+    /// </summary>
+    public bool TryAliasCachedImage(string fromUrl, string toUrl)
+    {
+        if (string.IsNullOrEmpty(fromUrl) || string.IsNullOrEmpty(toUrl)) return false;
+        if (!IsImageCached(fromUrl)) return false;
+
+        string fromPath = GetFilePathFromUrl(fromUrl);
+        string toPath = GetFilePathFromUrl(toUrl);
+        if (string.Equals(fromPath, toPath, System.StringComparison.Ordinal)) return true;
+        if (File.Exists(toPath)) return true;
+
+        try
+        {
+            File.Copy(fromPath, toPath);
+            return true;
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogWarning($"[MediaCacheManager] Cache alias failed ({fromUrl} -> {toUrl}): {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
     /// URL → MD5-hashed file path under the active bot's media directory.
     /// Memoization is invalidated when the active bot changes.
     /// </summary>

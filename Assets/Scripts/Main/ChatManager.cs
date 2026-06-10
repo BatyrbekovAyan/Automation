@@ -1314,6 +1314,16 @@ if (msg.messageType == MessageType.Video)
 
             if (!string.IsNullOrEmpty(refreshed.mediaUrl) && UrlPathDiffers(refreshed.mediaUrl, cached.mediaUrl))
             {
+                // Same file, new address (sticker recovery pinned the /media/download
+                // file_link; this sync hands the hosted s3 URL for the same uuid): carry
+                // the cached bytes to the new URL's MD5 key BEFORE the swap, so the
+                // re-bind fired below hits disk instead of re-downloading bytes we hold.
+                if (MediaCacheManager.Instance != null
+                    && MediaUrlIdentity.SameFile(cached.mediaUrl, refreshed.mediaUrl))
+                {
+                    MediaCacheManager.Instance.TryAliasCachedImage(cached.mediaUrl, refreshed.mediaUrl);
+                }
+
                 cached.mediaUrl = refreshed.mediaUrl;
                 cached.expireTime = refreshed.expireTime;
                 mediaRefreshed = true;

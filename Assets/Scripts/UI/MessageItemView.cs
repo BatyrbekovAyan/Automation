@@ -3041,6 +3041,11 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
                     MediaCacheManager.Instance.SaveImageToCache(link, bytes);
                     vm.mediaUrl = link;
                     vm.expireTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 86400;
+                    // The pin above mutates the in-memory VM only — the history file was
+                    // saved before recovery ran. Persist it, or the next open loads an
+                    // empty mediaUrl and re-downloads a sticker already in the cache.
+                    MediaPinPersistence.PersistMediaUrl(ChatManager.Instance.GetCacheRoot(),
+                        vm.chatId, vm.messageId, link, vm.expireTime);
                 }
                 TryDecodeSticker(bytes, realRatio);
                 break;
