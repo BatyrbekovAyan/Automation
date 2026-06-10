@@ -17,6 +17,7 @@ typedef NS_ENUM(NSInteger, ThumbJobStatus) {
 @property (nonatomic) ThumbJobStatus status;
 @property (nonatomic, strong) NSString *error;
 @property (nonatomic, strong) AVAssetImageGenerator *generator; // retained until generation completes
+@property (nonatomic, strong) AVURLAsset *asset;                // retained so a freed job can cancelLoading
 @end
 @implementation ThumbJob
 @end
@@ -53,6 +54,7 @@ extern "C" int _StartThumbExtract(const char *cUrl, const char *cOutPath, double
         gen.requestedTimeToleranceBefore = kCMTimeZero;
         gen.requestedTimeToleranceAfter  = CMTimeMakeWithSeconds(1.0, 600); // snap to a nearby keyframe
         job.generator = gen;
+        job.asset = asset;
 
         [asset loadValuesAsynchronouslyForKeys:@[@"duration"] completionHandler:^{
             NSError *durErr = nil;
@@ -101,5 +103,14 @@ extern "C" const char *_ThumbExtractError(int jobId) {
 }
 
 extern "C" void _FreeThumbExtractJob(int jobId) {
+    ThumbJob *job = ThumbJobs()[@(jobId)];
+    if (job != nil && job.status == ThumbJobRunning) {
+        // C# only frees a still-running job on timeout. Without cancellation the abandoned
+        // generator keeps reading the remote asset and eventually writes a frame while a
+        // later attempt (or another video's job) is doing native work — cancel both phases
+        // so a freed job goes quiet instead of racing live extractions.
+        [job.asset cancelLoading];
+        [job.generator cancelAllCGImageGeneration];
+    }
     [ThumbJobs() removeObjectForKey:@(jobId)];
 }

@@ -14,8 +14,20 @@ using UnityEngine;
 /// </summary>
 public partial class ChatManager
 {
-    private const int    VideoThumbMaxConcurrent = 4;   // drain a backlog of url-less videos faster
+    // STRICTLY 1: concurrent extraction is what cross-contaminated thumbnails on first chat
+    // entry (a video permanently showing another video's decoded frame). Every per-message
+    // pairing in this file is id-keyed and provably correct in isolation — the crossing
+    // happened below us, where several native decoder jobs + Wappi /media/download re-fetches
+    // ran simultaneously. Because the on-disk vthumb file is the durable de-dup, one wrong
+    // frame written during that burst was never re-extracted. Serial extraction removes the
+    // burst entirely; the scratch-file commit (VideoThumbFiles) defuses timed-out zombie jobs
+    // that would otherwise still overlap the next job's write.
+    private const int    VideoThumbMaxConcurrent = 1;
     private const double VideoThumbTimeSec       = 1.0;   // grab ~1s in (clamped to duration native-side)
+
+    // Unique suffix per extraction attempt — every native job writes to its own .part scratch
+    // file, so an abandoned (timed-out) job can never write into a path a later attempt uses.
+    private static int _extractAttemptSeq;
 
     private VideoThumbQueue _videoThumbQueue;
     // Live VM instance per queued id, so completion can mutate it + fire OnMessageMediaRefreshed.
@@ -155,11 +167,16 @@ public partial class ChatManager
         if (string.IsNullOrEmpty(vm.videoUrl) || !vm.videoUrl.StartsWith("http"))
             yield return RefetchVideoUrl(messageId, vm);
 
+        // Each attempt extracts into its own scratch .part file; only a confirmed success is
+        // promoted into the renderable vthumb path (Commit below). A native job that outlives
+        // its 30s C# timeout keeps running and eventually writes its frame — into an orphaned
+        // scratch file nobody renders, instead of the final cache key.
         bool ok = false;
+        string tempPath = VideoThumbFiles.TempPathFor(finalPath, ++_extractAttemptSeq);
         if (!string.IsNullOrEmpty(vm.videoUrl) && vm.videoUrl.StartsWith("http"))
         {
             yield return VideoThumbnailExtractor.Extract(
-                vm.videoUrl, finalPath, VideoThumbTimeSec,
+                vm.videoUrl, tempPath, VideoThumbTimeSec,
                 _   => ok = true,
                 err => Debug.LogWarning($"[ChatManager] video thumb extract failed for {messageId}: {err}"));
 
@@ -167,12 +184,18 @@ public partial class ChatManager
             // more and retry — only where a native extractor exists.
             if (!ok && VideoThumbnailExtractor.IsSupported)
             {
+                VideoThumbFiles.Discard(tempPath);
                 yield return RefetchVideoUrl(messageId, vm);
                 if (!string.IsNullOrEmpty(vm.videoUrl) && vm.videoUrl.StartsWith("http"))
+                {
+                    // Fresh scratch path: the timed-out first job may still write its old
+                    // file later — the retry must never share a target with it.
+                    tempPath = VideoThumbFiles.TempPathFor(finalPath, ++_extractAttemptSeq);
                     yield return VideoThumbnailExtractor.Extract(
-                        vm.videoUrl, finalPath, VideoThumbTimeSec,
+                        vm.videoUrl, tempPath, VideoThumbTimeSec,
                         _   => ok = true,
                         err => Debug.LogWarning($"[ChatManager] video thumb retry failed for {messageId}: {err}"));
+                }
             }
         }
 
@@ -181,7 +204,9 @@ public partial class ChatManager
         // that returns here without firing OnMessageMediaRefreshed orphans the spinner forever.
         bool gotUsableUrl = !string.IsNullOrEmpty(vm.videoUrl) && vm.videoUrl.StartsWith("http");
 
-        if (ok && System.IO.File.Exists(finalPath))
+        if (!ok) VideoThumbFiles.Discard(tempPath);
+
+        if (ok && VideoThumbFiles.Commit(tempPath, finalPath))
         {
             // Success: native frame extracted. The frame is upright (display orientation), so its
             // pixel dimensions are the ground-truth bubble aspect — overriding whatever Normalize
