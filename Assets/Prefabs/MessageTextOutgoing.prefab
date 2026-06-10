@@ -1500,6 +1500,7 @@ MonoBehaviour:
     mimeType: 
     isIncoming: 0
     timestamp: 0
+    sequence: 0
     fileName: 
     aspectRatio: 0
     duration: 0
