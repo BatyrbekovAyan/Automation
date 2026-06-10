@@ -6,11 +6,19 @@
 //   IN   run-tests.trigger   Drop this file to request a run.
 //                              - empty            -> run all EditMode tests
 //                              - one regex/line   -> matched against each test's full name
-//   OUT  test-summary.json    { status: running|completed, counts, failures[] }
+//   OUT  test-summary.json    { status: running|completed|error, counts, failures[] }
 //   OUT  test-results.xml     Full NUnit result XML (best-effort)
 //
 // The Editor polls for the trigger ~2x/second while it has focus. If Unity is unfocused
 // it may defer the poll until you click its window — that is expected.
+//
+// Compile safety: scripts edited while the Editor was unfocused are not compiled yet when
+// the trigger is noticed, and TestRunnerApi.Execute would run the STALE assemblies (and
+// report green for code it never saw). So the bridge refreshes the AssetDatabase first and
+// leaves the trigger file armed until compilation (and any domain reload) finishes — the
+// trigger is only consumed, and the run only started, against freshly compiled assemblies.
+// test-summary.json carries editorAssemblyWrittenUtc (Assembly-CSharp-Editor.dll mtime at
+// run start) so a stale run is detectable after the fact; `total` is the executed count.
 
 using System;
 using System.Collections.Generic;
@@ -37,6 +45,11 @@ namespace ClaudeTools
 
         static double _nextPoll;
         static bool _running;
+        // True once we've issued the pre-run AssetDatabase.Refresh for the armed trigger.
+        // Deliberately NOT persisted: a compile's domain reload resets it, so after the
+        // reload we refresh once more (a cheap no-op) before consuming the trigger.
+        static bool _refreshIssued;
+        static string _assemblyStampForRun;
         static TestRunnerApi _api;
         static Callbacks _callbacks;
 
@@ -53,16 +66,49 @@ namespace ClaudeTools
 
             try
             {
-                if (!File.Exists(TriggerFile)) return;
-
-                string content = SafeRead(TriggerFile);
-                File.Delete(TriggerFile); // consume immediately so we never double-fire
+                if (!File.Exists(TriggerFile))
+                {
+                    _refreshIssued = false;
+                    return;
+                }
 
                 if (_running)
                 {
+                    File.Delete(TriggerFile); // consume so it can't fire after this run ends
                     Debug.LogWarning("[ClaudeTestBridge] Trigger ignored — a run is already in progress.");
                     return;
                 }
+
+                // Leave the trigger armed while Unity compiles or imports: the file survives
+                // the domain reload, and consuming it now would execute stale assemblies.
+                if (EditorApplication.isCompiling || EditorApplication.isUpdating) return;
+
+                if (!_refreshIssued)
+                {
+                    _refreshIssued = true;
+                    AssetDatabase.Refresh();
+                    return; // give a queued compile one tick to flip isCompiling / reload the domain
+                }
+
+                // Compilation is done. If it failed, Unity kept the OLD assemblies — running
+                // now would silently test stale code, so report an error result instead.
+                if (EditorUtility.scriptCompilationFailed)
+                {
+                    _refreshIssued = false;
+                    File.Delete(TriggerFile);
+                    WriteSummary(new Summary
+                    {
+                        status = "error",
+                        overall = "CompilationFailed",
+                        editorAssemblyWrittenUtc = EditorAssemblyTimestampUtc()
+                    });
+                    Debug.LogError("[ClaudeTestBridge] Scripts failed to compile — run aborted (stale assemblies would have been tested). Fix errors and re-trigger.");
+                    return;
+                }
+
+                _refreshIssued = false;
+                string content = SafeRead(TriggerFile);
+                File.Delete(TriggerFile); // consume only now, against fresh assemblies
 
                 StartRun(content);
             }
@@ -76,12 +122,19 @@ namespace ClaudeTools
         {
             Directory.CreateDirectory(Dir);
             _running = true;
+            _assemblyStampForRun = EditorAssemblyTimestampUtc();
 
             var filter = new Filter { testMode = TestMode.EditMode };
             var groups = ParseGroups(triggerContent);
             if (groups.Length > 0) filter.groupNames = groups;
 
-            WriteSummary(new Summary { status = "running", overall = "Running", startedAt = EditorApplication.timeSinceStartup });
+            WriteSummary(new Summary
+            {
+                status = "running",
+                overall = "Running",
+                startedAt = EditorApplication.timeSinceStartup,
+                editorAssemblyWrittenUtc = _assemblyStampForRun
+            });
 
             Debug.Log("[ClaudeTestBridge] Starting EditMode test run " +
                       (groups.Length > 0 ? "(filter: " + string.Join(", ", groups) + ")" : "(all tests)"));
@@ -124,6 +177,9 @@ namespace ClaudeTools
                     total = result.PassCount + result.FailCount + result.SkipCount + result.InconclusiveCount,
                     durationSeconds = result.Duration,
                     finishedAt = EditorApplication.timeSinceStartup,
+                    editorAssemblyWrittenUtc = string.IsNullOrEmpty(_assemblyStampForRun)
+                        ? EditorAssemblyTimestampUtc()
+                        : _assemblyStampForRun,
                     failures = failures.ToArray()
                 };
 
@@ -189,6 +245,18 @@ namespace ClaudeTools
             try { return File.ReadAllText(path); } catch { return ""; }
         }
 
+        // The EditMode tests compile into Assembly-CSharp-Editor (no asmdef), so its dll
+        // mtime identifies exactly which build of the test code a run executed.
+        static string EditorAssemblyTimestampUtc()
+        {
+            try
+            {
+                var dll = Path.Combine(Root, "Library", "ScriptAssemblies", "Assembly-CSharp-Editor.dll");
+                return File.Exists(dll) ? File.GetLastWriteTimeUtc(dll).ToString("o") : "";
+            }
+            catch { return ""; }
+        }
+
         class Callbacks : ICallbacks
         {
             public void RunStarted(ITestAdaptor testsToRun) { }
@@ -211,6 +279,7 @@ namespace ClaudeTools
             public double durationSeconds;
             public double startedAt;
             public double finishedAt;
+            public string editorAssemblyWrittenUtc;
             public Failure[] failures = new Failure[0];
         }
 
