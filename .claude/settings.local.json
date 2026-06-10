@@ -240,7 +240,18 @@
       "mcp__mcp-unity__delete_gameobject",
       "mcp__mcp-unity__save_scene",
       "Skill(commit-commands:commit)",
-      "Skill(commit-commands:commit:*)"
+      "Skill(commit-commands:commit:*)",
+      "Bash(grep -vE '^\\\\s*$')",
+      "Bash(grep -vE '\\\\{x: 0, y: 0')",
+      "Bash(grep -vE '\\\\{x: 0, y: 0\\\\}')",
+      "Bash(grep -cE 'm_AnchorMax: \\\\{x: 0, y: 1\\\\}')",
+      "Bash(grep -vcE '\\\\{x: 0, y: 0\\\\}')",
+      "Bash(grep -cE 'm_AnchorMax: \\\\{x: 0, y: 1\\\\}' Assets/_Recovery/0.unity)",
+      "Bash(grep -cE 'm_AnchorMax: \\\\{x: 0, y: 0\\\\}' Assets/_Recovery/0.unity)",
+      "Bash(python3 /tmp/unity_rect_detail.py)",
+      "Bash(cat)",
+      "Bash(python3 /tmp/unity_mb.py)",
+      "Bash(python3 /tmp/unity_color.py)"
     ],
     "defaultMode": "acceptEdits"
   }
