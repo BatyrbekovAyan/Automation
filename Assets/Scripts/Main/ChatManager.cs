@@ -1365,9 +1365,45 @@ if (msg.messageType == MessageType.Video)
         return !string.Equals(aPath, bPath, StringComparison.Ordinal);
     }
 
+    // Wappi's /message/media/download cross-serves files between requests that are in
+    // flight together: a logged repro showed the first-open recovery burst receiving
+    // each other's links — image bubbles handed .mp4/.csv files, and image-for-image
+    // rotations that rendered another message's photo — while requests with no concurrent
+    // siblings returned the right file. Strictly one in-flight request removes the
+    // concurrency the server mis-pairs under (same cure as the serial video-thumb queue).
+    private readonly Queue<(string messageId, Action<string> onSuccess, Action onFailure)> _mediaDownloadQueue = new();
+    private bool _mediaDownloadDraining;
+
     public void DownloadMediaForMessage(string messageId, Action<string> onSuccess, Action onFailure)
     {
-        StartCoroutine(DownloadMediaRoutine(messageId, onSuccess, onFailure));
+        _mediaDownloadQueue.Enqueue((messageId, onSuccess, onFailure));
+        if (!_mediaDownloadDraining) StartCoroutine(DrainMediaDownloadQueue());
+    }
+
+    /// <summary>
+    /// Single worker draining the media-download queue one request at a time. SetActiveBot's
+    /// StopAllCoroutines kills the worker mid-drain without resetting the flag, so
+    /// ClearMediaDownloadQueue must run right after it (mirrors ClearVideoThumbQueue).
+    /// </summary>
+    IEnumerator DrainMediaDownloadQueue()
+    {
+        _mediaDownloadDraining = true;
+        while (_mediaDownloadQueue.Count > 0)
+        {
+            var (messageId, onSuccess, onFailure) = _mediaDownloadQueue.Dequeue();
+            yield return DownloadMediaRoutine(messageId, onSuccess, onFailure);
+        }
+        _mediaDownloadDraining = false;
+    }
+
+    /// <summary>
+    /// Drops queued requests (their callbacks target the previous bot's bubbles) and lets
+    /// the next enqueue restart the worker. Call only after StopAllCoroutines on bot switch.
+    /// </summary>
+    private void ClearMediaDownloadQueue()
+    {
+        _mediaDownloadQueue.Clear();
+        _mediaDownloadDraining = false;
     }
 
     IEnumerator DownloadMediaRoutine(string messageId, Action<string> onSuccess, Action onFailure)
