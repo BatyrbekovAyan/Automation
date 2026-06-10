@@ -1975,6 +1975,18 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
         // We just show the thumbnail and the Play button. The MP4 downloads when they click Play.
         if (vm.type == MessageType.Video)
         {
+            // With no frame on disk, don't pre-grow to a black media box that may have to
+            // shrink back: while a recovery is in flight, hold the fixed-size card with a
+            // spinner — its settle always fires OnMessageMediaRefreshed, re-binding to the
+            // recovered frame (grow) or the download panel (still card-sized). A parked
+            // playable-but-frameless video falls through to the dark card + play as before.
+            if (!HasRenderableThumbnail(vm)
+                && ChatManager.Instance != null && ChatManager.Instance.EnqueueIncomingVideoThumb(vm))
+            {
+                ShowSmartLoadingCard(vm);
+                yield break;
+            }
+
             ShowSmartThumbnail(vm, bubbleRatio, false);
             yield break;
         }
@@ -2023,7 +2035,12 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
 
         if (hasValidUrl)
         {
-            ShowSmartThumbnail(vm, bubbleRatio, true); 
+            // Pre-grow to media size only when a real preview can fill the box. With no
+            // thumbnail, hold the fixed-size card + spinner and let the verified download
+            // do the growing (EnsureMediaSurfaceActive) — never a black box that has to
+            // shrink back to the card when the media turns out to be gone.
+            if (HasRenderableThumbnail(vm)) ShowSmartThumbnail(vm, bubbleRatio, true);
+            else ShowSmartLoadingCard(vm);
             yield return StartCoroutine(DownloadSmartHDBytes(targetUrl, vm, bubbleRatio, isManual, 0));
         }
         else
@@ -2047,7 +2064,10 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
                 vm.expireTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 86400;
                 vm.mediaUrl = fetchedUrl;
 
-                ShowSmartThumbnail(vm, bubbleRatio, true);
+                // Same rule as above: the loading card is already up — keep its size until the
+                // bytes are verified. Only a renderable thumbnail justifies growing right now
+                // (the API "success" is just a URL; it can still 404 or return junk).
+                if (HasRenderableThumbnail(vm)) ShowSmartThumbnail(vm, bubbleRatio, true);
                 yield return StartCoroutine(DownloadSmartHDBytes(fetchedUrl, vm, bubbleRatio, isManual, 0));
             }
             else HandleFinalFailure(isManual, false);
@@ -2058,6 +2078,7 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
     {
         if (url.StartsWith("base64://"))
         {
+            EnsureMediaSurfaceActive(vm, bubbleRatio);
             LoadBase64Image(url.Substring(9), false, bubbleRatio);
             HideLoadingSpinner();
             yield break;
@@ -2067,8 +2088,9 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
         if (cachedTex != null)
         {
             HideLoadingSpinner();
+            EnsureMediaSurfaceActive(vm, bubbleRatio);
             ApplyTextureAspectFill(cachedTex, false, bubbleRatio);
-            yield break; 
+            yield break;
         }
 
         using UnityWebRequest www = UnityWebRequest.Get(url);
@@ -2084,6 +2106,9 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
             if (tex.LoadImage(imageBytes))
             {
                 MediaCacheManager.Instance.SaveImageToCache(url, imageBytes);
+                // Decode succeeded — only NOW swap the held card for the media surface,
+                // so a dead link never grows the bubble just to shrink it back.
+                EnsureMediaSurfaceActive(vm, bubbleRatio);
                 ApplyTextureAspectFill(tex, false, bubbleRatio);
             }
             else
@@ -2211,11 +2236,19 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
     void ShowSmartLoadingCard(MessageViewModel vm)
     {
         messageImage.gameObject.SetActive(false);
-        
+        if (playOverlay != null) playOverlay.SetActive(false);
+        if (expiredPlaceholder != null) expiredPlaceholder.SetActive(false);
+
         if (downloadButton)
         {
-            downloadButtonText.text = vm.type.ToString();
+            SetDownloadButtonText(vm.type);
             downloadButton.gameObject.SetActive(true);
+
+            // Hide the arrow + label so only the spinner card shows (mirrors StartDownload) —
+            // HandleFinalFailure or the next card shower restores them.
+            var btnImg = downloadButton.GetComponent<Image>();
+            if (btnImg != null) btnImg.enabled = false;
+            if (downloadButtonText != null) downloadButtonText.gameObject.SetActive(false);
         }
 
         SetLayoutToButton();
@@ -2227,6 +2260,32 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
         // Caption rides the fixed-width download card here too — clamp it to the card width.
         ReclampMediaCaption();
         StartCoroutine(ForceRebuildRoutine());
+    }
+
+    // True when ShowSmartThumbnail would actually paint a preview (cached thumb://-vthumb://
+    // frame or inline base64) rather than fall back to the dark placeholder card. Drives the
+    // "grow only when there's something real to show" rule in the download/loading flows.
+    bool HasRenderableThumbnail(MessageViewModel vm)
+    {
+        Func<string, bool> isThumbCached = MediaCacheManager.Instance != null
+            ? MediaCacheManager.Instance.IsImageCached
+            : (Func<string, bool>)null;
+        string thumbKey = ThumbnailKeyResolver.Resolve(vm.thumbnailUrl, vm.messageId, isThumbCached);
+
+        if (string.IsNullOrEmpty(thumbKey)) return false;
+        if (thumbKey.StartsWith("base64://")) return true;
+        return (thumbKey.StartsWith("thumb://") || thumbKey.StartsWith("vthumb://"))
+            && isThumbCached != null && isThumbCached(thumbKey);
+    }
+
+    // Card → media swap for the post-download success path: while bytes were in flight the
+    // bubble held the fixed-size download card (no thumbnail to pre-grow with). Activate the
+    // media surface only now that the content is verified — the texture lands in the same
+    // frame, so the bubble never grows to a black box it might have to shrink back from.
+    void EnsureMediaSurfaceActive(MessageViewModel vm, float bubbleRatio)
+    {
+        if (messageImage != null && messageImage.gameObject.activeSelf) return;
+        ShowSmartThumbnail(vm, bubbleRatio, false);
     }
 
     IEnumerator DownloadAndOpenDocumentLocal(MessageViewModel vm, string decodedName, bool openImmediately)
