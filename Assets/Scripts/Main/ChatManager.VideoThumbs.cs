@@ -30,6 +30,12 @@ public partial class ChatManager
     // Ids the user has already manually retried (and which failed again). These graduate from
     // the tap-to-retry download panel to the terminal "expired/unavailable" placeholder.
     private readonly HashSet<string> _retriedUnavailableIds = new();
+    // Videos whose media link is still valid (playable) but whose preview FRAME could not be
+    // extracted — the decoder choked on the codec (HEVC/.mov) or extraction timed out. These are
+    // NOT gone; they play fine, they just have no thumbnail. The bubble shows a dark card + play
+    // button instead of an endless recovery spinner, and we stop re-attempting extraction for
+    // them. In-session only — cleared on bot switch.
+    private readonly HashSet<string> _thumbUnextractableIds = new();
 
     /// <summary>True when this message's media is confirmed unfetchable (gone from WhatsApp).</summary>
     public bool IsMediaUnavailable(string messageId) =>
@@ -38,6 +44,11 @@ public partial class ChatManager
     /// <summary>True once the user has manually retried this unavailable media (→ show expired card).</summary>
     public bool HasRetriedUnavailable(string messageId) =>
         !string.IsNullOrEmpty(messageId) && _retriedUnavailableIds.Contains(messageId);
+
+    /// <summary>True when this video's preview frame couldn't be extracted but the media is still
+    /// playable — the bubble shows a dark card + play button rather than a recovery spinner.</summary>
+    public bool HasUnextractableThumbnail(string messageId) =>
+        !string.IsNullOrEmpty(messageId) && _thumbUnextractableIds.Contains(messageId);
 
     /// <summary>
     /// Manual tap-to-retry: clears the unavailable mark and re-queues one recovery attempt.
@@ -65,14 +76,26 @@ public partial class ChatManager
     /// file; in-session de-dup is the queue. Called from CreateViewModel, RefreshCachedMessageMedia,
     /// and the render path (MessageItemView) when a video bubble has no usable thumbnail.
     /// </summary>
-    public void EnqueueIncomingVideoThumb(MessageViewModel vm)
+    /// <returns>
+    /// True when a recovery is now in flight for this message (RunVideoThumbExtraction will fire
+    /// OnMessageMediaRefreshed when it settles) — the caller should show the recovery spinner.
+    /// False when nothing was queued (non-video, no thumbnail possible, or already parked as
+    /// playable-but-unextractable / unavailable / already-cached) — the caller should render a
+    /// static card instead of an endless spinner. Returning the right answer here is what stops
+    /// the recovery spinner being orphaned on a re-bind.
+    /// </returns>
+    public bool EnqueueIncomingVideoThumb(MessageViewModel vm)
     {
-        if (vm == null || vm.type != MessageType.Video || string.IsNullOrEmpty(vm.messageId)) return;
-        if (MediaCacheManager.Instance == null) return;
+        if (vm == null || vm.type != MessageType.Video || string.IsNullOrEmpty(vm.messageId)) return false;
+        if (MediaCacheManager.Instance == null) return false;
 
         // Already confirmed unfetchable this session — don't hammer /media/download again.
         // The bubble shows the download panel; only a manual tap (RetryUnavailableMedia) retries.
-        if (_unavailableMediaIds.Contains(vm.messageId)) return;
+        if (_unavailableMediaIds.Contains(vm.messageId)) return false;
+
+        // Frame extraction already failed for this still-playable video — don't re-attempt; the
+        // bubble shows a dark card + play button (HasUnextractableThumbnail) rather than spinning.
+        if (_thumbUnextractableIds.Contains(vm.messageId)) return false;
 
         string vthumbUrl = "vthumb://" + vm.messageId;
 
@@ -84,13 +107,13 @@ public partial class ChatManager
                 vm.thumbnailUrl = vthumbUrl;
                 OnMessageMediaRefreshed?.Invoke(vm);
             }
-            return;
+            return false;   // frame already on disk — caller paints it, no spinner
         }
 
         // With no url we can only recover by re-fetching one at extraction time, which needs a
         // native extractor. No url AND no extractor (e.g. Editor) => nothing we can do.
         bool haveUrl = !string.IsNullOrEmpty(vm.videoUrl);
-        if (!haveUrl && !VideoThumbnailExtractor.IsSupported) return;
+        if (!haveUrl && !VideoThumbnailExtractor.IsSupported) return false;
 
         _videoThumbQueue ??= new VideoThumbQueue(VideoThumbMaxConcurrent);
         if (_videoThumbQueue.TryEnqueue(vm.messageId))
@@ -98,6 +121,11 @@ public partial class ChatManager
             _pendingThumbVms[vm.messageId] = vm;
             PumpVideoThumbQueue();
         }
+        // Newly enqueued OR already in-flight from a prior bind: a recovery is pending and will
+        // fire OnMessageMediaRefreshed when it settles. (Every COMPLETED outcome — success,
+        // unextractable, unavailable — is caught by the early-returns above, so reaching here
+        // always means in-flight.)
+        return true;
     }
 
     private void PumpVideoThumbQueue()
@@ -148,36 +176,48 @@ public partial class ChatManager
             }
         }
 
-        // If we still have no usable link after re-fetching, /media/download couldn't retrieve
-        // the media (400 "download media error" = expired/deleted on WhatsApp). Mark it
-        // unavailable so the bubble switches to the download panel and we stop auto-retrying.
-        // Only conclude this where a native extractor exists (on Editor a url-less video is
-        // simply un-extractable, not necessarily gone).
+        // Classify the terminal outcome. Whatever it is, we MUST re-bind the bubble below: the
+        // recovery spinner ShowSmartThumbnail raised is cleared ONLY by a re-bind, so any path
+        // that returns here without firing OnMessageMediaRefreshed orphans the spinner forever.
         bool gotUsableUrl = !string.IsNullOrEmpty(vm.videoUrl) && vm.videoUrl.StartsWith("http");
-        if (!ok && !gotUsableUrl && VideoThumbnailExtractor.IsSupported)
-        {
-            _unavailableMediaIds.Add(messageId);
-            OnMessageMediaRefreshed?.Invoke(vm);   // re-bind → download panel
-        }
 
         if (ok && System.IO.File.Exists(finalPath))
         {
+            // Success: native frame extracted. The frame is upright (display orientation), so its
+            // pixel dimensions are the ground-truth bubble aspect — overriding whatever Normalize
+            // guessed from server dims (often missing -> square, or rotation-raw -> landscape).
+            // Same thumbnail-as-source-of-truth principle the outgoing send path uses.
             vm.thumbnailUrl = vthumbUrl;
-
-            // The extracted frame is upright (display orientation), so its pixel
-            // dimensions are the ground-truth bubble aspect — overriding whatever
-            // Normalize guessed from server dims (often missing -> square, or
-            // rotation-raw -> landscape). Same thumbnail-as-source-of-truth
-            // principle the outgoing send path uses (SeedVideoThumbCache).
             float thumbAspect = ReadImageFileAspect(finalPath);
             if (thumbAspect > 0f) vm.aspectRatio = thumbAspect;
-
             UpdateCachedThumbnailUrl(cacheRoot, vm.chatId, messageId, vthumbUrl, vm.aspectRatio);
-            OnMessageMediaRefreshed?.Invoke(vm);
+        }
+        else if (gotUsableUrl)
+        {
+            // Extraction failed but the media link is still valid: the video is playable, it just
+            // has no preview frame (decoder choked on the codec, or extraction timed out). Park it
+            // so the bubble re-binds to a dark card + play button instead of an endless spinner,
+            // and we stop re-attempting extraction for it this session.
+            _thumbUnextractableIds.Add(messageId);
+        }
+        else if (VideoThumbnailExtractor.IsSupported)
+        {
+            // No usable link after re-fetching AND extraction failed: /media/download couldn't
+            // retrieve the media (400 "download media error" = expired/deleted on WhatsApp). Mark
+            // it unavailable so the bubble switches to the download panel and we stop auto-retrying.
+            // Only conclude this where a native extractor exists (on Editor a url-less video is
+            // simply un-extractable, not necessarily gone).
+            _unavailableMediaIds.Add(messageId);
         }
 
         _pendingThumbVms.Remove(messageId);
         _videoThumbQueue.Complete(messageId);
+
+        // Always re-bind — this single unconditional invoke guarantees the recovery spinner
+        // resolves on EVERY outcome (success → thumbnail; playable-but-no-frame → play card;
+        // gone → download panel; Editor/no-op → dark card), closing the orphaned-spinner bug.
+        OnMessageMediaRefreshed?.Invoke(vm);
+
         PumpVideoThumbQueue();
     }
 
@@ -257,5 +297,6 @@ public partial class ChatManager
         _pendingThumbVms.Clear();
         _unavailableMediaIds.Clear();
         _retriedUnavailableIds.Clear();
+        _thumbUnextractableIds.Clear();
     }
 }

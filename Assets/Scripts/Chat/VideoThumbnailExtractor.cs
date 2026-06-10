@@ -34,9 +34,15 @@ public static class VideoThumbnailExtractor
         false;
 #endif
 
+    // Hard cap on the native poll loop. AVAssetImageGenerator / MediaMetadataRetriever read the
+    // remote video over the network to grab a frame; if that read stalls the native job can sit in
+    // the "running" state indefinitely, and an uncapped poll loop would hang the recovery coroutine
+    // forever — orphaning the bubble's loading spinner and wedging the limited extraction queue.
+    private const float ExtractTimeoutSec = 30f;
+
     /// <summary>
     /// Yields until extraction finishes. Invokes onResult(outputPath) on success, or
-    /// onError(message) on failure or on a platform without a native extractor.
+    /// onError(message) on failure, timeout, or on a platform without a native extractor.
     /// </summary>
     public static IEnumerator Extract(string url, string outputPath, double timeSec,
                                       Action<string> onResult, Action<string> onError)
@@ -48,9 +54,16 @@ public static class VideoThumbnailExtractor
         }
 #if UNITY_IOS && !UNITY_EDITOR
         int jobId = _StartThumbExtract(url, outputPath, timeSec);
+        float deadline = Time.realtimeSinceStartup + ExtractTimeoutSec;
         int status = _PollThumbExtract(jobId);
         while (status == 0)
         {
+            if (Time.realtimeSinceStartup >= deadline)
+            {
+                _FreeThumbExtractJob(jobId);
+                onError?.Invoke("thumbnail extraction timed out");
+                yield break;
+            }
             yield return null;
             status = _PollThumbExtract(jobId);
         }
@@ -67,9 +80,16 @@ public static class VideoThumbnailExtractor
         onResult?.Invoke(outputPath);
 #elif UNITY_ANDROID && !UNITY_EDITOR
         int jobId = _android.CallStatic<int>("startThumbExtract", url, outputPath, timeSec);
+        float deadline = Time.realtimeSinceStartup + ExtractTimeoutSec;
         int status = _android.CallStatic<int>("pollThumbExtract", jobId);
         while (status == 0)
         {
+            if (Time.realtimeSinceStartup >= deadline)
+            {
+                _android.CallStatic("freeThumbExtractJob", jobId);
+                onError?.Invoke("thumbnail extraction timed out");
+                yield break;
+            }
             yield return null;
             status = _android.CallStatic<int>("pollThumbExtract", jobId);
         }

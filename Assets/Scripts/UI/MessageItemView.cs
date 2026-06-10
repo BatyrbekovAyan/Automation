@@ -664,7 +664,7 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                 float bubbleRatio = realRatio;
 
                 SetupMaskedLayout(bubbleRatio, realRatio, true);
-                        
+
                 DisplayMedia(urlToCheck, true, false, bubbleRatio);
 
                 var btn = messageImage.GetComponent<Button>();
@@ -674,30 +674,30 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             }
             else
             {
-                if (!string.IsNullOrEmpty(vm.thumbnailUrl))
-                {
-                    messageImage.gameObject.SetActive(true);
-                    
-                    float realRatio = vm.aspectRatio > 0 ? vm.aspectRatio : 1.0f;
-                    float bubbleRatio = realRatio;
-                    
-                    SetupMaskedLayout(bubbleRatio, realRatio, true);
-                    DisplayMedia(vm.thumbnailUrl, true, false, bubbleRatio);
-                    
-                    var btnLe = downloadButton.GetComponent<LayoutElement>();
-                    if (!btnLe) btnLe = downloadButton.gameObject.AddComponent<LayoutElement>();
-                    btnLe.ignoreLayout = true;
-                }
-                else
-                {
-                    messageImage.gameObject.SetActive(false);
-                    SetLayoutToButton(); 
-                }
+                // No hosted URL yet — Wappi hasn't finished hosting this sticker, and stickers
+                // carry no thumbnail or inline body. Keep the slot active on the placeholder and
+                // fetch via /media/download with validation + bounded retry. That endpoint is
+                // unreliable for unhosted stickers (returns junk as often as the real WebP), so
+                // LoadStickerViaDownload never caches or pins what it returns unless it is a WebP.
+                messageImage.gameObject.SetActive(true);
 
-                downloadButton.gameObject.SetActive(false); 
-                SetDownloadButtonText(vm.type); 
-                
-                StartDownload(vm, 0, false); 
+                float realRatio = vm.aspectRatio > 0 ? vm.aspectRatio : 1.0f;
+                SetupMaskedLayout(realRatio, realRatio, true);
+
+                if (!string.IsNullOrEmpty(vm.thumbnailUrl))
+                    DisplayMedia(vm.thumbnailUrl, true, false, realRatio);
+
+                downloadButton.gameObject.SetActive(false);
+                // Pre-stage the label so a retry-exhausted give-up (HandleFinalFailure shows the
+                // download button) reads "Sticker" like every other media type's button.
+                SetDownloadButtonText(vm.type);
+
+                var btn = messageImage.GetComponent<Button>();
+                if (!btn) btn = messageImage.gameObject.AddComponent<Button>();
+                btn.onClick.RemoveAllListeners();
+                btn.onClick.AddListener(() => OnVisualClicked(vm));
+
+                StartCoroutine(LoadStickerViaDownload(vm, 0, false));
             }
         }
         else if (vm.type == MessageType.Audio || vm.type == MessageType.Voice)
@@ -1708,6 +1708,12 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             float bubbleRatio = Mathf.Clamp(realRatio, MinAspectRatio, MaxAspectRatio);
             StartCoroutine(SmartMediaRoutine(vm, bubbleRatio, true));
         }
+        else if (vm.type == MessageType.Sticker)
+        {
+            // Tap-to-retry on a given-up sticker: re-run the validated download in manual mode, so a
+            // second exhaustion shows the expired card (mirrors the other-media download flow).
+            StartCoroutine(LoadStickerViaDownload(vm, 0, true));
+        }
         else
         {
             StartDownload(vm, 0, true);
@@ -1892,11 +1898,11 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                     btn.onClick.AddListener(() => OnVisualClicked(vm));
                 }
             },
-            () => 
+            () =>
             {
                 if (this == null || !gameObject.activeInHierarchy) return;
-                
-                if (!isManual && attemptNumber < 1) 
+
+                if (!isManual && attemptNumber < 1)
                 {
                     StartCoroutine(WaitAndRetry(vm, attemptNumber + 1));
                 }
@@ -2098,8 +2104,8 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
             }
         }
     }
-    
-void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner = true) 
+
+    void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner = true)
     {
         downloadButton.gameObject.SetActive(false);
         messageImage.gameObject.SetActive(true);
@@ -2150,15 +2156,14 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
 
             // Recovery: an aged/server video loses its server thumbnail + url and its staged
             // file is gone. Rebuild the preview by re-fetching the media and extracting a frame
-            // (native-extractor platforms only). Deduped via the thumb queue; on success it
-            // fires OnMessageMediaRefreshed, which re-binds this bubble and paints the frame.
-            // Mark `recovering` so the shared spinner stays up (the showSpinner branch below
-            // would otherwise hide it).
+            // (native-extractor platforms only). Deduped via the thumb queue; when it settles it
+            // fires OnMessageMediaRefreshed, which re-binds this bubble. EnqueueIncomingVideoThumb
+            // returns true ONLY while a recovery is genuinely in flight — for a playable-but-
+            // unextractable (or already-parked) video it returns false, so `recovering` stays
+            // false and we fall through to a dark card + play button below instead of spinning
+            // forever waiting on a re-bind that will never come.
             if (vm.type == MessageType.Video && ChatManager.Instance != null)
-            {
-                ChatManager.Instance.EnqueueIncomingVideoThumb(vm);
-                recovering = true;
-            }
+                recovering = ChatManager.Instance.EnqueueIncomingVideoThumb(vm);
         }
 
         if (vm.type == MessageType.Video)
@@ -2502,12 +2507,24 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
                 string filePath = MediaCacheManager.Instance.GetFilePathFromUrl(source);
                 byte[] bytes = System.IO.File.ReadAllBytes(filePath);
 
-                if (isSticker) TryDecodeSticker(bytes, bubbleRatio);
+                // A thumb:// source is this message's own staged JPEG preview (keyed by its
+                // unique message id) — a trusted non-WebP, so decode it directly even for a
+                // sticker. Any other source for a sticker must be a real WebP, so route it
+                // through the validated decoder that refuses foreign photos.
+                bool stickerNeedsWebP = isSticker && !source.StartsWith("thumb://");
+                if (stickerNeedsWebP)
+                {
+                    TryDecodeSticker(bytes, bubbleRatio);
+                }
                 else
                 {
                     Texture2D tex = new Texture2D(2, 2);
-                    if (tex.LoadImage(bytes)) ApplyTextureAspectFill(tex, false, bubbleRatio);
-                    else Destroy(tex);
+                    if (tex.LoadImage(bytes)) ApplyTextureAspectFill(tex, isSticker, bubbleRatio);
+                    else
+                    {
+                        Destroy(tex);
+                        if (isSticker) ShowStickerLoadFailed();
+                    }
                 }
             }
             else
@@ -2771,17 +2788,28 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
         if (www.result == UnityWebRequest.Result.Success)
         {
             byte[] bytes = www.downloadHandler.data;
-            
-            // --- NEW: Save ALL media (including stickers) to hard drive! ---
-            MediaCacheManager.Instance.SaveImageToCache(url, bytes);
 
-            if (isSticker) TryDecodeSticker(bytes, targetRatio);
+            if (isSticker)
+            {
+                // Never cache non-WebP bytes under a sticker key. A stale HD sticker URL can
+                // occasionally serve an error/placeholder; caching it would poison every later
+                // open. TryDecodeSticker renders the WebP or falls back to the placeholder.
+                if (WebPSignature.IsWebP(bytes)) MediaCacheManager.Instance.SaveImageToCache(url, bytes);
+                TryDecodeSticker(bytes, targetRatio);
+            }
             else
             {
+                MediaCacheManager.Instance.SaveImageToCache(url, bytes);
                 Texture2D tex = new Texture2D(2, 2);
                 if (tex.LoadImage(bytes)) ApplyTextureAspectFill(tex, false, targetRatio);
                 else Destroy(tex);
             }
+        }
+        else if (isSticker)
+        {
+            // Network/HTTP failure fetching the sticker bytes — show the placeholder instead of
+            // leaving the slot blank (the spinner was just hidden above).
+            ShowStickerLoadFailed();
         }
     }
 
@@ -2795,22 +2823,45 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
             }
 
             byte[] bytes = Convert.FromBase64String(base64);
+
+            // A base64:// sticker payload is the sticker's own media (the /media/download
+            // file_b64 fallback) and must be a real WebP — validate it through the sticker
+            // decoder instead of LoadImage, which can't read WebP (blank slot) and would
+            // paint any foreign JPEG as a sticker.
+            if (isSticker)
+            {
+                TryDecodeSticker(bytes, targetRatio);
+                return;
+            }
+
             Texture2D tex = new Texture2D(2, 2);
             if (tex.LoadImage(bytes))
             {
-                ApplyTextureAspectFill(tex, isSticker, targetRatio);
+                ApplyTextureAspectFill(tex, false, targetRatio);
             }
             else
             {
                 Destroy(tex);
             }
         } catch (Exception e) {
-            Debug.LogError("Base64 Decode Error: " + e.Message); 
+            Debug.LogError("Base64 Decode Error: " + e.Message);
         }
     }
 
     void TryDecodeSticker(byte[] rawBytes, float targetRatio)
     {
+        // A real WhatsApp sticker is always a WebP container. If these bytes aren't WebP,
+        // they don't belong to this sticker — they're a mis-sourced photo from the media
+        // pipeline (e.g. a /media/download response whose bytes are a JPEG). The old code
+        // fell back to Texture2D.LoadImage(rawBytes), which happily decoded that photo and
+        // the sticker branch painted it transparent + 1:1 — the "random image shown as a
+        // sticker" bug. Never force-paint non-WebP bytes with sticker styling.
+        if (!WebPSignature.IsWebP(rawBytes))
+        {
+            ShowStickerLoadFailed();
+            return;
+        }
+
         try
         {
             byte[] staticBytes = GetFirstFrameOfWebP(rawBytes);
@@ -2822,18 +2873,145 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
             }
             else
             {
+                // Genuine WebP the decoder couldn't handle (e.g. a malformed animated
+                // frame). Show the placeholder rather than a blank slot — and never
+                // LoadImage-fallback, which would only ever "succeed" on a foreign image.
                 if (tex != null) Destroy(tex);
-                Texture2D fallbackTex = new Texture2D(2, 2);
-                if (fallbackTex.LoadImage(rawBytes)) ApplyTextureAspectFill(fallbackTex, true, targetRatio);
-                else Destroy(fallbackTex);
+                ShowStickerLoadFailed();
             }
         }
         catch (Exception)
         {
-            Texture2D fallbackTex = new Texture2D(2, 2);
-            if (fallbackTex.LoadImage(rawBytes)) ApplyTextureAspectFill(fallbackTex, true, targetRatio);
-            else Destroy(fallbackTex);
+            ShowStickerLoadFailed();
         }
+    }
+
+    // Terminal state when sticker bytes can't be rendered as a sticker (not a WebP, the
+    // WebP decoder rejected them, or the fetch failed). Falls back to the sticker
+    // placeholder instead of painting whatever bytes we were handed — a mis-sourced photo
+    // must never surface as a sticker, and a decode/fetch failure must not leave a blank slot.
+    void ShowStickerLoadFailed()
+    {
+        DisposeOwned();
+
+        if (stickerPlaceholder != null)
+        {
+            messageImage.sprite = stickerPlaceholder;
+            fullScreenSprite = stickerPlaceholder;
+            messageImage.color = Color.white;
+            messageImage.preserveAspect = true;
+        }
+        else
+        {
+            messageImage.sprite = null;
+            fullScreenSprite = null;
+        }
+    }
+
+    // How many /media/download attempts before falling back to the placeholder. The endpoint is
+    // unreliable for not-yet-hosted stickers (returns junk as often as the real WebP), so a few
+    // re-requests materially improve the odds of getting the real sticker on first open.
+    private const int StickerMaxDownloadAttempts = 3;
+    private const float StickerRetryDelaySeconds = 1.5f;
+
+    // Validated, bounded-retry loader for a sticker with no hosted URL yet. Fetches via
+    // /media/download and ONLY caches + pins the bytes when they are an actual WebP — never the
+    // junk (CSV/error files) the endpoint sometimes returns. On junk/failure it retries a few
+    // times, then shows the placeholder and leaves vm.mediaUrl empty so a later sync/reopen
+    // re-attempts cleanly instead of serving a poisoned cache entry.
+    IEnumerator LoadStickerViaDownload(MessageViewModel vm, int attempt, bool isManual)
+    {
+        if (ChatManager.Instance == null) { HandleFinalFailure(isManual); yield break; }
+
+        // Restore the image slot — covers both the initial bind and a manual download-button retry
+        // (HandleFinalFailure hides the image and shows the button/expired card between attempts).
+        if (expiredPlaceholder) expiredPlaceholder.SetActive(false);
+        if (downloadButton) downloadButton.gameObject.SetActive(false);
+        messageImage.gameObject.SetActive(true);
+
+        float realRatio = vm.aspectRatio > 0 ? vm.aspectRatio : 1.0f;
+        SetupMaskedLayout(realRatio, realRatio, true);
+
+        if (stickerPlaceholder != null)
+        {
+            messageImage.sprite = stickerPlaceholder;
+            fullScreenSprite = stickerPlaceholder;
+            messageImage.color = Color.white;
+            messageImage.preserveAspect = true;
+        }
+        ShowLoadingSpinner(messageImage.transform, bareSpinner: true);
+
+        // DownloadMediaForMessage is callback-based; bridge it into this coroutine.
+        bool done = false;
+        string link = null;
+        ChatManager.Instance.DownloadMediaForMessage(vm.messageId,
+            src => { link = src; done = true; },
+            ()  => { link = null; done = true; });
+        while (!done) yield return null;
+        if (StickerBindStale(vm)) yield break;
+
+        byte[] bytes = null;
+        if (!string.IsNullOrEmpty(link))
+        {
+            if (link.StartsWith("base64://"))
+            {
+                bytes = TryStickerBytesFromBase64(link.Substring(9));
+            }
+            else
+            {
+                using UnityWebRequest www = UnityWebRequest.Get(link);
+                yield return www.SendWebRequest();
+                if (StickerBindStale(vm)) yield break;
+                if (www.result == UnityWebRequest.Result.Success) bytes = www.downloadHandler.data;
+            }
+        }
+
+        if (StickerBindStale(vm)) yield break;
+
+        switch (StickerLoadPolicy.Decide(bytes, attempt, StickerMaxDownloadAttempts))
+        {
+            case StickerLoadAction.Render:
+                HideLoadingSpinner();
+                // Cache + pin ONLY validated WebP so a reopen is instant and no junk ever persists.
+                if (!string.IsNullOrEmpty(link) && !link.StartsWith("base64://"))
+                {
+                    MediaCacheManager.Instance.SaveImageToCache(link, bytes);
+                    vm.mediaUrl = link;
+                    vm.expireTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 86400;
+                }
+                TryDecodeSticker(bytes, realRatio);
+                break;
+
+            case StickerLoadAction.Retry:
+                // Keep the spinner up across the short backoff, then re-request a fresh link.
+                yield return new WaitForSeconds(StickerRetryDelaySeconds);
+                if (StickerBindStale(vm)) yield break;
+                StartCoroutine(LoadStickerViaDownload(vm, attempt + 1, isManual));
+                break;
+
+            case StickerLoadAction.GiveUp:
+                // Mirror the other-media failure flow: an auto give-up shows the download button
+                // (tap to retry); a manual give-up (user already tapped) shows the expired card.
+                HideLoadingSpinner();
+                HandleFinalFailure(isManual);
+                break;
+        }
+    }
+
+    // True once this bubble has been destroyed or re-bound to a different message — any in-flight
+    // sticker fetch must abandon so it can't paint into a slot that now belongs to another message.
+    bool StickerBindStale(MessageViewModel vm) =>
+        this == null || currentVm == null || vm == null || currentVm.messageId != vm.messageId;
+
+    byte[] TryStickerBytesFromBase64(string base64)
+    {
+        try
+        {
+            int mod4 = base64.Length % 4;
+            if (mod4 > 0) base64 += new string('=', 4 - mod4);
+            return Convert.FromBase64String(base64);
+        }
+        catch { return null; }
     }
 
     private byte[] GetFirstFrameOfWebP(byte[] data)

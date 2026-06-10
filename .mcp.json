@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "mcp-unity": {
+      "command": "node",
+      "args": [
+        "/Users/ayan/Projects/Automation/Library/PackageCache/com.gamelovers.mcp-unity@4c24251eb7c0/Server~/build/index.js"
+      ]
+    }
+  }
+}
