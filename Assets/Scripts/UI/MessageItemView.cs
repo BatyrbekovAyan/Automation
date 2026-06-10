@@ -688,6 +688,9 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                     DisplayMedia(vm.thumbnailUrl, true, false, realRatio);
 
                 downloadButton.gameObject.SetActive(false);
+                // Pre-stage the label so a retry-exhausted give-up (HandleFinalFailure shows the
+                // download button) reads "Sticker" like every other media type's button.
+                SetDownloadButtonText(vm.type);
 
                 var btn = messageImage.GetComponent<Button>();
                 if (!btn) btn = messageImage.gameObject.AddComponent<Button>();
