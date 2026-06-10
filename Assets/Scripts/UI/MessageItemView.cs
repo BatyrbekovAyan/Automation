@@ -2105,19 +2105,7 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
         }
     }
 
-    // [WPDBG] TEMPORARY — returns the bucket filename of a media url (the part after the last '/'
-    // and before the query string), e.g. "f7818ad7-…​.mp4". Lets the diagnostic correlate which
-    // source URL a thumbnail was extracted from. Remove with the [WPDBG] logs.
-    static string WpUrlTail(string u)
-    {
-        if (string.IsNullOrEmpty(u)) return "<empty>";
-        int q = u.IndexOf('?');
-        string p = q >= 0 ? u.Substring(0, q) : u;
-        int s = p.LastIndexOf('/');
-        return s >= 0 ? p.Substring(s + 1) : p;
-    }
-
-void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner = true)
+    void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner = true)
     {
         downloadButton.gameObject.SetActive(false);
         messageImage.gameObject.SetActive(true);
@@ -2145,24 +2133,6 @@ void ShowSmartThumbnail(MessageViewModel vm, float bubbleRatio, bool showSpinner
                 Texture2D cachedTex = MediaCacheManager.Instance.LoadImageFromCache(thumbKey);
                 if (cachedTex != null)
                 {
-                    // [WPDBG] Symptom-1 (wrong video preview) diagnostic — TEMPORARY, remove after repro.
-                    // This is the only spot a video bubble paints a frame off the id-stable cache key,
-                    // so a stale (prior-session) or id-collided file surfaces here. Log file write-time
-                    // + dims so a repro distinguishes stale-file reuse from a genuine duplicate-id
-                    // collision (two different mids -> same key, or a fileWrittenUtc older than this open).
-                    if (vm.type == MessageType.Video)
-                    {
-                        string wpPath = MediaCacheManager.Instance.GetFilePathFromUrl(thumbKey);
-                        string wpWritten = System.IO.File.Exists(wpPath)
-                            ? System.IO.File.GetLastWriteTimeUtc(wpPath).ToString("HH:mm:ss.fff")
-                            : "MISSING";
-                        // src = the bucket filename of vm.videoUrl (the URL the frame was extracted
-                        // from). If two DIFFERENT mids show the SAME src, the frame source is
-                        // cross-assigned — the real wrong-preview cause (cache/key layer is proven OK).
-                        string wpSrc = WpUrlTail(vm.videoUrl);
-                        Debug.Log($"[WPDBG] video-thumb paint mid={vm.messageId} chat={vm.chatId} key={thumbKey} reconstructed={(vm.thumbnailUrl != thumbKey)} fileWrittenUtc={wpWritten} tex={cachedTex.width}x{cachedTex.height} vmAspect={vm.aspectRatio:0.00} src={wpSrc}");
-                    }
-
                     ApplyTextureAspectFill(cachedTex, false, bubbleRatio);
                     imageLoaded = true;
                     // Self-heal: if we recovered via a reconstructed key, adopt it so later binds
