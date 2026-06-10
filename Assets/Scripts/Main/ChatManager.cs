@@ -84,7 +84,25 @@ public partial class ChatManager : MonoBehaviour
     public event Action<EmptyStateReason> OnEmptyState;
     
     // State
-    public int currentPage = 1;
+    /// <summary>
+    /// Last server history page actually fetched for the open chat (1-based,
+    /// 0 = none yet). Cache-queue drains must NOT advance this — drained
+    /// bubbles come from the local store, not a server fetch. Consuming page
+    /// numbers on drains is what used to skip a whole server page (50
+    /// messages) once the queue ran out. See ServerPageMath.
+    /// </summary>
+    private int _lastFetchedServerPage;
+
+    /// <summary>
+    /// Messages handed to the UI from the local store: the first-screen batch
+    /// plus every cache-queue drain. Equals the 0-based server offset of the
+    /// first message the UI hasn't seen, which lets LoadNextPage resume server
+    /// history on the right page once the queue empties. Live arrivals don't
+    /// count — they only push history offsets deeper, and ServerPageMath
+    /// rounds down so that direction is overlap (deduped), never a gap.
+    /// </summary>
+    private int _servedFromStore;
+
     private string currentChatId;
 
     /// <summary>
@@ -322,7 +340,8 @@ public partial class ChatManager : MonoBehaviour
         }
 
         currentChatId = chatId;
-        currentPage = 1;
+        _lastFetchedServerPage = 0;
+        _servedFromStore = 0;
         seenMessageIds.Clear();
         _activeChatCache = null;
         _cachedQueue = null;
@@ -673,6 +692,7 @@ public partial class ChatManager : MonoBehaviour
                 _pendingFirstBatch = cachedMessages;
                 _cachedQueue = new List<MessageViewModel>();
             }
+            _servedFromStore = _pendingFirstBatch.Count;
 
             // Kick off sync. Its callback fires OnLiveMessagesReceived only after Populate
             // begins (gated by Phase != Populate inside SyncLatestMessages).
@@ -684,6 +704,9 @@ public partial class ChatManager : MonoBehaviour
             // No cache: kick the network fetch. Its callback writes _pendingFirstBatch
             // and _cachedQueue if the response arrives before slide-in completes; otherwise
             // the slide reveals an empty content and the bubbles land in Populate.
+            // This IS server page 1 — record it so LoadNextPage resumes at page 2
+            // after the queued tail of this page is drained.
+            _lastFetchedServerPage = 1;
             StartCoroutine(GetMessagesRoutine(chatId, 1, (newMessages, hasMore) =>
             {
                 if (chatId != currentChatId) return; // stale fetch — user switched chats
@@ -706,6 +729,7 @@ public partial class ChatManager : MonoBehaviour
                     _pendingFirstBatch = newMessages;
                     _cachedQueue = new List<MessageViewModel>();
                 }
+                _servedFromStore = _pendingFirstBatch.Count;
 
                 // Fire immediately if the open has already settled — and this MUST accept Idle
                 // as well as Populate. PopulateBubbles advances _phase Populate->Idle
@@ -787,30 +811,42 @@ public partial class ChatManager : MonoBehaviour
     {
         if (string.IsNullOrEmpty(currentChatId)) return;
 
-        currentPage++;
-
         // Drain the cache queue first — those bubbles render instantly and
         // we kick off a parallel server fetch to validate (and overwrite
         // via OnMessageMediaRefreshed) any stale URLs in the batch. Only
         // after the queue is empty do we go to the server for genuinely
-        // older history.
+        // older history. Draining must NOT advance _lastFetchedServerPage:
+        // these messages came from the local store, and consuming a page
+        // number per drain used to make the first real fetch start a full
+        // server page too deep — silently dropping 50 messages of history.
         if (_cachedQueue != null && _cachedQueue.Count > 0)
         {
             int take = Math.Min(MessagesPerPage, _cachedQueue.Count);
             var batch = _cachedQueue.GetRange(0, take);
             _cachedQueue.RemoveRange(0, take);
 
-            // hasMore stays armed while either the queue still has entries
-            // or the server might have older messages we haven't touched.
-            bool moreToCome = _cachedQueue.Count > 0 || true;
-            OnBatchMessagesLoaded?.Invoke(batch, true, moreToCome);
+            int servedBefore = _servedFromStore;
+            _servedFromStore += take;
 
-            // Parallel URL validation against the matching server page.
-            StartCoroutine(ValidateCachePageAgainstServer(currentChatId, currentPage));
+            // hasMore stays armed: the queue may still have entries, and even
+            // when empty the server may hold older history — the next
+            // LoadNextPage resolves that with a real fetch.
+            OnBatchMessagesLoaded?.Invoke(batch, true, true);
+
+            // Parallel URL validation against the server page(s) that actually
+            // cover the drained offset range [servedBefore, servedBefore+take).
+            int firstPage = ServerPageMath.PageContaining(servedBefore, MessagesPerPage);
+            int lastPage = ServerPageMath.PageContaining(servedBefore + take - 1, MessagesPerPage);
+            for (int page = firstPage; page <= lastPage; page++)
+            {
+                StartCoroutine(ValidateCachePageAgainstServer(currentChatId, page));
+            }
             return;
         }
 
-        StartCoroutine(GetMessagesRoutine(currentChatId, currentPage, (messages, hasMore) =>
+        int nextPage = ServerPageMath.NextServerPage(_servedFromStore, _lastFetchedServerPage, MessagesPerPage);
+        _lastFetchedServerPage = nextPage;
+        StartCoroutine(GetMessagesRoutine(currentChatId, nextPage, (messages, hasMore) =>
         {
             OnBatchMessagesLoaded?.Invoke(messages, true, hasMore);
         }));
@@ -960,8 +996,12 @@ public partial class ChatManager : MonoBehaviour
         // we must silently fetch the next page so the UI doesn't freeze!
         if (loadedMessages.Count == 0 && hasMore)
         {
-            currentPage++;
-            StartCoroutine(GetMessagesRoutine(chatId, currentPage, onComplete));
+            int nextPage = page + 1;
+            // Only move the shared cursor when this chain still belongs to the
+            // open chat — a stale chain (user switched mid-fetch) must not
+            // corrupt the new chat's pagination state.
+            if (chatId == currentChatId) _lastFetchedServerPage = nextPage;
+            StartCoroutine(GetMessagesRoutine(chatId, nextPage, onComplete));
             yield break;
         }
 
