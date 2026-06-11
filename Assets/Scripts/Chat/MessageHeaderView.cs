@@ -37,10 +37,27 @@ public class MessageHeaderView : MonoBehaviour
 
     void OnDestroy()
     {
+        EmojiPatchService.OnEmojiReady -= HandleEmojiReady;
         if (ChatManager.Instance != null)
         {
             ChatManager.Instance.OnChatSelected -= HandleChatSelected;
         }
+    }
+
+    private void ApplyTitle(ChatViewModel vm)
+    {
+        nameText.text = UnicodeEmojiConverter.ConvertRealEmojisToSprites(
+            vm.Title ?? "", MissingEmojiMode.Hide, out bool titleMissing);
+
+        EmojiPatchService.OnEmojiReady -= HandleEmojiReady;
+        if (titleMissing) EmojiPatchService.OnEmojiReady += HandleEmojiReady;
+    }
+
+    private void HandleEmojiReady(string spriteName)
+    {
+        if (string.IsNullOrEmpty(currentChatId) || ChatManager.Instance == null) return;
+        ChatViewModel vm = ChatManager.Instance.GetChat(currentChatId);
+        if (vm != null) ApplyTitle(vm);
     }
 
     void OnEnable()
@@ -62,8 +79,9 @@ public class MessageHeaderView : MonoBehaviour
 
         if (vm == null) return;
 
-        // 1. Set the Text
-        nameText.text = vm.Title;
+        // 1. Set the Text — Hide mode so a not-yet-downloaded emoji sprite never
+        // shows as tofu/tag text; re-rendered via OnEmojiReady once it lands.
+        ApplyTitle(vm);
         // statusText.text = vm.OnlineStatus;
 
         // 2. Handle the Avatar

@@ -43,7 +43,7 @@ public void Bind(ChatViewModel model)
         vm = model;
         chatId = vm.ChatId;
 
-        titleText.text = vm.Title;
+        ApplyTitle();
 
         if (timeText != null)
             timeText.text = vm.LastMessageTimeString;
@@ -171,6 +171,31 @@ public void Bind(ChatViewModel model)
             transform.SetAsFirstSibling();
     }
 
+    // Title/preview emoji are converted in Hide mode so a sprite that has not
+    // downloaded yet never shows as tofu or literal tag text. While anything is
+    // missing we listen for OnEmojiReady and re-render when the sprite lands.
+    private void ApplyTitle()
+    {
+        titleText.text = UnicodeEmojiConverter.ConvertRealEmojisToSprites(
+            vm.Title ?? "", MissingEmojiMode.Hide, out bool titleMissing);
+        if (titleMissing) SubscribeToEmojiReady();
+    }
+
+    private void SubscribeToEmojiReady()
+    {
+        EmojiPatchService.OnEmojiReady -= HandleEmojiReady;
+        EmojiPatchService.OnEmojiReady += HandleEmojiReady;
+    }
+
+    private void HandleEmojiReady(string spriteName)
+    {
+        if (vm == null) return;
+        // Unsubscribe first — ApplyTitle/UpdatePreviewText re-subscribe if anything is still missing.
+        EmojiPatchService.OnEmojiReady -= HandleEmojiReady;
+        ApplyTitle();
+        UpdatePreviewText(vm.LastMessage ?? "");
+    }
+
     private void UpdatePreviewText(string rawMessage)
     {
         // Phase 2: prepend [tick] [media-emoji] using ChatPreviewFormatter, then
@@ -192,7 +217,9 @@ public void Bind(ChatViewModel model)
             return;
         }
 
-        string composed = UnicodeEmojiConverter.ConvertRealEmojisToSprites(formatted);
+        string composed = UnicodeEmojiConverter.ConvertRealEmojisToSprites(
+            formatted, MissingEmojiMode.Hide, out bool previewMissing);
+        if (previewMissing) SubscribeToEmojiReady();
 
         // --- THE PERFORMANCE FIX: Check the Cache! ---
         // Create a unique key for this exact composed string in this exact chat
@@ -340,6 +367,7 @@ public void Bind(ChatViewModel model)
 
     void OnDestroy()
     {
+        EmojiPatchService.OnEmojiReady -= HandleEmojiReady;
         if (vm != null)
         {
             vm.OnUpdated -= OnVmUpdated;

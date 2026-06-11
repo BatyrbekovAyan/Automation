@@ -63,16 +63,71 @@ public class UnicodeEmojiConverterPatchTests
     }
 
     [Test]
-    public void Convert_PendingEmoji_EmitsSpriteTag_NoMissingFlag()
+    public void Convert_PendingEmoji_KeepsRaw_SetsMissingFlag()
     {
-        // A pending emoji (fetch in flight) should emit the sprite tag so TMP can
-        // find it once the background download registers the sprite asset.
+        // A pending emoji (fetch in flight) must NOT emit a sprite tag — TMP renders
+        // a tag with no matching sprite as literal "<sprite name=...>" text. The raw
+        // Unicode is kept and the missing flag tells the caller to re-convert when
+        // OnEmojiReady fires.
         EmojiSpriteRegistry.MarkPending("1faea");
 
         var result = UnicodeEmojiConverter.ConvertRealEmojisToSprites("🫪", out bool hasMissing);
 
-        StringAssert.Contains("<sprite name=\"1faea\">", result);
+        StringAssert.DoesNotContain("<sprite", result);
+        StringAssert.Contains("🫪", result);
+        Assert.IsTrue(hasMissing);
+    }
+
+    [Test]
+    public void ConvertHide_KnownEmoji_StillEmitsSpriteTag()
+    {
+        EmojiSpriteRegistry.BuildFromNames(new[] { "1f600" });
+
+        var result = UnicodeEmojiConverter.ConvertRealEmojisToSprites(
+            "😀", MissingEmojiMode.Hide, out bool hasMissing);
+
+        StringAssert.Contains("<sprite name=\"1f600\">", result);
         Assert.IsFalse(hasMissing);
+    }
+
+    [Test]
+    public void ConvertHide_UnknownEmoji_OmittedEntirely_SetsMissingFlag()
+    {
+        // Display surfaces use Hide mode: an emoji with no sprite is dropped from
+        // the output entirely — no raw Unicode tofu, no literal tag text.
+        var result = UnicodeEmojiConverter.ConvertRealEmojisToSprites(
+            "привет 🫪", MissingEmojiMode.Hide, out bool hasMissing);
+
+        StringAssert.DoesNotContain("<sprite", result);
+        StringAssert.DoesNotContain("🫪", result);
+        StringAssert.Contains("привет", result);
+        Assert.IsTrue(hasMissing);
+    }
+
+    [Test]
+    public void ConvertHide_PendingEmoji_OmittedEntirely_SetsMissingFlag()
+    {
+        EmojiSpriteRegistry.MarkPending("1faea");
+
+        var result = UnicodeEmojiConverter.ConvertRealEmojisToSprites(
+            "🫪", MissingEmojiMode.Hide, out bool hasMissing);
+
+        StringAssert.DoesNotContain("<sprite", result);
+        StringAssert.DoesNotContain("🫪", result);
+        Assert.IsTrue(hasMissing);
+    }
+
+    [Test]
+    public void ConvertHide_MixedString_TagForKnown_NothingForUnknown()
+    {
+        EmojiSpriteRegistry.BuildFromNames(new[] { "1f600" });
+
+        var result = UnicodeEmojiConverter.ConvertRealEmojisToSprites(
+            "😀🫪", MissingEmojiMode.Hide, out bool hasMissing);
+
+        StringAssert.Contains("<sprite name=\"1f600\">", result);
+        StringAssert.DoesNotContain("🫪", result);
+        Assert.IsTrue(hasMissing);
     }
 
     [Test]

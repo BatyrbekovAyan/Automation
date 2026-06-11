@@ -441,7 +441,7 @@ public class MessageItemView : MonoBehaviour
         if (messageText == null || string.IsNullOrEmpty(_mainMessageOriginalText)) return;
 
         var reconverted = UnicodeEmojiConverter.ConvertRealEmojisToSprites(
-            _mainMessageOriginalText, out bool stillMissing);
+            _mainMessageOriginalText, MissingEmojiMode.Hide, out bool stillMissing);
 
         if (reconverted != messageText.text)
             messageText.text = reconverted;
@@ -461,7 +461,7 @@ public class MessageItemView : MonoBehaviour
             senderNameText.gameObject.SetActive(showSenderName);
             if (showSenderName)
             {
-                senderNameText.text = UnicodeEmojiConverter.ConvertRealEmojisToSprites(vm.senderName);
+                senderNameText.text = UnicodeEmojiConverter.ConvertRealEmojisToSprites(vm.senderName, MissingEmojiMode.Hide);
                 senderNameText.color = GetSenderColor(vm.senderName);
             }
         }
@@ -534,7 +534,7 @@ public class MessageItemView : MonoBehaviour
         }
 
         _mainMessageOriginalText = textToProcess;
-        string processedText = UnicodeEmojiConverter.ConvertRealEmojisToSprites(textToProcess, out bool hasMissingMain);
+        string processedText = UnicodeEmojiConverter.ConvertRealEmojisToSprites(textToProcess, MissingEmojiMode.Hide, out bool hasMissingMain);
         processedText ??= "";
         if (hasMissingMain) SubscribeToEmojiReady();
         
@@ -1291,7 +1291,7 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                 float minNameCell = DocumentMinWidth - DocCardChrome;   // floor so the card never collapses below its min
 
                 string rawName = string.IsNullOrEmpty(currentVm.fileName) ? "Document.file" : currentVm.fileName;
-                string decodedName = UnicodeEmojiConverter.ConvertRealEmojisToSprites(System.Uri.UnescapeDataString(rawName));
+                string decodedName = UnicodeEmojiConverter.ConvertRealEmojisToSprites(System.Uri.UnescapeDataString(rawName), MissingEmojiMode.Hide);
 
                 // Break unbreakable runs to the real cell width, then measure the name WRAPPED to that
                 // same width: a finite width makes TMP word-wrap, so .x is the longest *rendered* line,
@@ -2331,7 +2331,7 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
                         loadingSpinner.SetActive(false);
                     }
                     if (btnImg != null) btnImg.color = originalBtnColor;
-                    if (downloadButtonText) downloadButtonText.text = UnicodeEmojiConverter.ConvertRealEmojisToSprites(decodedName);
+                    if (downloadButtonText) downloadButtonText.text = UnicodeEmojiConverter.ConvertRealEmojisToSprites(decodedName, MissingEmojiMode.Hide);
                     yield break;
                 }
             }
@@ -3556,7 +3556,7 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
                 {
                     // If the user typed a message with the link, keep their message visible!
                     _mainMessageOriginalText = textWithoutUrl;
-                    messageText.text = UnicodeEmojiConverter.ConvertRealEmojisToSprites(textWithoutUrl, out bool hasMissingUrl);
+                    messageText.text = UnicodeEmojiConverter.ConvertRealEmojisToSprites(textWithoutUrl, MissingEmojiMode.Hide, out bool hasMissingUrl);
                     if (hasMissingUrl) SubscribeToEmojiReady();
                     messageText.gameObject.SetActive(true);
                 }
@@ -3571,7 +3571,7 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
             {
                 string originalText = FormatTextWithWrappableLinks(vm.text ?? "");
                 _mainMessageOriginalText = originalText;
-                messageText.text = UnicodeEmojiConverter.ConvertRealEmojisToSprites(originalText, out bool hasMissingLink);
+                messageText.text = UnicodeEmojiConverter.ConvertRealEmojisToSprites(originalText, MissingEmojiMode.Hide, out bool hasMissingLink);
                 if (hasMissingLink) SubscribeToEmojiReady();
                 messageText.gameObject.SetActive(true);
             }
@@ -3813,7 +3813,7 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
         if (downloadButton) downloadButton.gameObject.SetActive(false);
         // if (messageText) messageText.gameObject.SetActive(false);
 
-        if (documentNameText) documentNameText.text = UnicodeEmojiConverter.ConvertRealEmojisToSprites(decodedName);
+        if (documentNameText) documentNameText.text = UnicodeEmojiConverter.ConvertRealEmojisToSprites(decodedName, MissingEmojiMode.Hide);
         
         string ext = System.IO.Path.GetExtension(decodedName).Replace(".", "").ToUpper();
         if (string.IsNullOrEmpty(ext)) ext = "FILE";

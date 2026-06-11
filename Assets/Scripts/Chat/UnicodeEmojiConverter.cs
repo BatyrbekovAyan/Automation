@@ -2,6 +2,26 @@ using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 
+/// <summary>
+/// Controls what <see cref="UnicodeEmojiConverter.ConvertRealEmojisToSprites(string, MissingEmojiMode, out bool)"/>
+/// emits for an emoji that has no registered sprite yet (never fetched, fetch in flight, or fetch failed).
+/// </summary>
+public enum MissingEmojiMode
+{
+    /// <summary>
+    /// Keep the raw Unicode codepoints in the output. Use for data-layer strings
+    /// (NormalizedMessage text, ChatHistoryCache, view-models) so the emoji survives
+    /// for re-conversion once the background download registers the sprite.
+    /// </summary>
+    KeepRaw,
+
+    /// <summary>
+    /// Omit the emoji entirely. Use for display-layer strings so bubbles and labels
+    /// never show tofu boxes or literal sprite-tag text while a sprite is unavailable.
+    /// </summary>
+    Hide
+}
+
 public static class UnicodeEmojiConverter
 {
     /// <summary>
@@ -9,16 +29,34 @@ public static class UnicodeEmojiConverter
     /// </summary>
     public static string ConvertRealEmojisToSprites(string input)
     {
-        return ConvertRealEmojisToSprites(input, out _);
+        return ConvertRealEmojisToSprites(input, MissingEmojiMode.KeepRaw, out _);
+    }
+
+    /// <summary>
+    /// Backward-compatible overload — data-layer behaviour (missing emoji stay as raw Unicode).
+    /// </summary>
+    public static string ConvertRealEmojisToSprites(string input, out bool hasMissingEmojis)
+    {
+        return ConvertRealEmojisToSprites(input, MissingEmojiMode.KeepRaw, out hasMissingEmojis);
+    }
+
+    /// <summary>
+    /// Overload for display call sites that do not need the missing-emoji flag.
+    /// </summary>
+    public static string ConvertRealEmojisToSprites(string input, MissingEmojiMode mode)
+    {
+        return ConvertRealEmojisToSprites(input, mode, out _);
     }
 
     /// <summary>
     /// Converts real Unicode emoji in <paramref name="input"/> to TMP sprite tags for any
-    /// emoji that is registered in <see cref="EmojiSpriteRegistry"/>. Unknown emoji are left
-    /// as raw Unicode so font-fallback can render them, and <paramref name="hasMissingEmojis"/>
-    /// is set to <c>true</c> so the caller can schedule a background CDN fetch.
+    /// emoji that is registered in <see cref="EmojiSpriteRegistry"/>. Emoji without a
+    /// registered sprite are kept as raw Unicode or omitted per <paramref name="mode"/> —
+    /// never emitted as a sprite tag, because TMP renders a tag it cannot resolve as
+    /// literal text. <paramref name="hasMissingEmojis"/> is set to <c>true</c> so the
+    /// caller can re-convert when <see cref="EmojiPatchService.OnEmojiReady"/> fires.
     /// </summary>
-    public static string ConvertRealEmojisToSprites(string input, out bool hasMissingEmojis)
+    public static string ConvertRealEmojisToSprites(string input, MissingEmojiMode mode, out bool hasMissingEmojis)
     {
         hasMissingEmojis = false;
         if (string.IsNullOrEmpty(input)) return input;
@@ -86,10 +124,9 @@ public static class UnicodeEmojiConverter
                 // Convert list of hex codes to string: "1f44b-1f3fb" or "1f1f0-1f1ff"
                 string hexName = GetHexName(emojiSequence);
 
-                if (EmojiSpriteRegistry.IsKnown(hexName) || EmojiSpriteRegistry.IsPending(hexName))
+                if (EmojiSpriteRegistry.IsKnown(hexName))
                 {
-                    // Sprite exists or fetch is in flight \u2014 emit TMP rich-text tag with spacing.
-                    // TMP will find the sprite once it is registered from the background download.
+                    // Sprite is registered \u2014 emit TMP rich-text tag with spacing.
                     bool needsGap = sb.Length > 0
                         && !char.IsWhiteSpace(sb[sb.Length - 1])
                         && sb[sb.Length - 1] != '>'
@@ -102,10 +139,13 @@ public static class UnicodeEmojiConverter
                 }
                 else
                 {
-                    // Sprite missing \u2014 leave raw Unicode so font fallback renders it,
-                    // clear any stale failed state to allow retry, and queue a CDN fetch.
+                    // No sprite yet (never fetched, fetch pending, or last fetch failed).
+                    // Never emit the tag here: TMP renders an unresolvable <sprite> tag
+                    // as literal text. KeepRaw preserves the emoji for re-conversion
+                    // after download; Hide drops it so the UI shows nothing instead.
                     hasMissingEmojis = true;
-                    sb.Append(input, i, currentIdx - i);
+                    if (mode == MissingEmojiMode.KeepRaw)
+                        sb.Append(input, i, currentIdx - i);
                     EmojiSpriteRegistry.ClearFailed(hexName);
                     if (EmojiPatchService.Instance != null)
                         EmojiPatchService.Instance.RequestEmoji(hexName);

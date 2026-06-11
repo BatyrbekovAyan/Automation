@@ -305,51 +305,133 @@ public class EmojiPatchService : MonoBehaviour
 
     private IEnumerator FetchEmojiRoutine(string spriteName)
     {
-        string url = $"{CdnBase}{spriteName}.png";
+        // Twemoji's filename may differ from the codepoint sequence the sender used
+        // (FE0F placement varies per emoji family) — walk the candidate names until
+        // one resolves. The sprite is always registered under the *requested* name
+        // so already-emitted tags and the disk cache stay consistent.
+        List<string> candidates = BuildCandidateNames(spriteName);
+        byte[] bytes = null;
 
-        using (var request = UnityEngine.Networking.UnityWebRequest.Get(url))
+        foreach (string candidate in candidates)
         {
-            request.timeout = 30;
-            yield return request.SendWebRequest();
+            string url = $"{CdnBase}{candidate}.png";
 
-            _activeDownloads--; // decrement here once regardless of outcome
-
-            if (request.result != UnityEngine.Networking.UnityWebRequest.Result.Success)
+            using (var request = UnityEngine.Networking.UnityWebRequest.Get(url))
             {
-                Debug.LogWarning($"[EmojiPatchService] Fetch failed for {spriteName} ({request.responseCode}): {request.error}");
-                EmojiSpriteRegistry.MarkFailed(spriteName);
-                yield break;
+                request.timeout = 30;
+                yield return request.SendWebRequest();
+
+                if (request.result == UnityEngine.Networking.UnityWebRequest.Result.Success)
+                {
+                    bytes = request.downloadHandler.data;
+                    break;
+                }
+
+                Debug.LogWarning($"[EmojiPatchService] Fetch failed for {spriteName} via {candidate} ({request.responseCode}): {request.error}");
+
+                // Only a 404 means "wrong filename guess" — try the next variant.
+                // Network/server errors would fail for every candidate; stop now.
+                if (request.responseCode != 404) break;
             }
-
-            byte[] bytes = request.downloadHandler.data;
-
-            try
-            {
-                if (!Directory.Exists(_cacheDir))
-                    Directory.CreateDirectory(_cacheDir);
-                File.WriteAllBytes(Path.Combine(_cacheDir, $"{spriteName}.png"), bytes);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"[EmojiPatchService] Disk write failed for {spriteName}: {ex.Message}");
-            }
-
-            var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
-            if (!tex.LoadImage(bytes))
-            {
-                Debug.LogWarning($"[EmojiPatchService] Corrupt PNG from CDN for {spriteName}");
-                Destroy(tex);
-                EmojiSpriteRegistry.MarkFailed(spriteName);
-                yield break;
-            }
-
-            var asset = BuildSpriteAsset(spriteName, tex);
-            RegisterFallback(asset);
-            EmojiSpriteRegistry.Register(spriteName);
-
-            Debug.Log($"[EmojiPatchService] Registered new emoji sprite: {spriteName}");
-            OnEmojiReady?.Invoke(spriteName);
         }
-        // No decrement here — already done inside using block
+
+        _activeDownloads--; // decrement once regardless of outcome
+
+        if (bytes == null)
+        {
+            EmojiSpriteRegistry.MarkFailed(spriteName);
+            yield break;
+        }
+
+        try
+        {
+            if (!Directory.Exists(_cacheDir))
+                Directory.CreateDirectory(_cacheDir);
+            File.WriteAllBytes(Path.Combine(_cacheDir, $"{spriteName}.png"), bytes);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[EmojiPatchService] Disk write failed for {spriteName}: {ex.Message}");
+        }
+
+        var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+        if (!tex.LoadImage(bytes))
+        {
+            Debug.LogWarning($"[EmojiPatchService] Corrupt PNG from CDN for {spriteName}");
+            Destroy(tex);
+            EmojiSpriteRegistry.MarkFailed(spriteName);
+            yield break;
+        }
+
+        var asset = BuildSpriteAsset(spriteName, tex);
+        RegisterFallback(asset);
+        EmojiSpriteRegistry.Register(spriteName);
+
+        Debug.Log($"[EmojiPatchService] Registered new emoji sprite: {spriteName}");
+        OnEmojiReady?.Invoke(spriteName);
     }
+
+    // -------------------------------------------------------------------------
+    // CDN filename candidates
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Twemoji CDN filenames are inconsistent about U+FE0F (variation selector-16):
+    /// single-codepoint emoji drop it (263a.png, not 263a-fe0f.png), most ZWJ
+    /// sequences require it at RGI positions (2764-fe0f-200d-1f525.png,
+    /// 1f636-200d-1f32b-fe0f.png, 1f3f3-fe0f-200d-26a7-fe0f.png) — yet some use
+    /// the minimal form (1f441-200d-1f5e8.png). Senders are equally inconsistent
+    /// about including FE0F, so instead of one rename rule we try a short ordered
+    /// list of plausible filenames. The first entry is always the name as requested.
+    /// </summary>
+    internal static List<string> BuildCandidateNames(string spriteName)
+    {
+        var candidates = new List<string> { spriteName };
+
+        void Add(string name)
+        {
+            if (!string.IsNullOrEmpty(name) && !candidates.Contains(name)) candidates.Add(name);
+        }
+
+        var parts = new List<string>(spriteName.Split('-'));
+        parts.RemoveAll(p => p == "fe0f");
+        string stripped = string.Join("-", parts);
+        Add(stripped);
+
+        if (!stripped.Contains("200d")) return candidates;
+
+        // ZWJ sequence: re-insert fe0f at the positions RGI sequences use.
+        // Segments are the chunks between ZWJs; a segment may carry a skin tone
+        // ("1f9d1-1f3fb") and fe0f never follows a skin-tone-modified codepoint.
+        string[] segments = stripped.Split(new[] { "-200d-" }, StringSplitOptions.None);
+
+        Add(JoinSegmentsWithFe0f(segments, (seg, idx) => IsBmpCodepoint(seg)));       // 2764-fe0f-200d-1f525
+        if (IsBareCodepoint(segments[segments.Length - 1]))                           // fe0f never follows a skin tone
+            Add(stripped + "-fe0f");                                                  // 1f636-200d-1f32b-fe0f
+        Add(JoinSegmentsWithFe0f(segments, (seg, idx) => idx == 0 && IsBareCodepoint(seg))); // 1f3f3-fe0f-200d-1f308
+        Add(JoinSegmentsWithFe0f(segments, (seg, idx) => IsBareCodepoint(seg)));      // 1f3f3-fe0f-200d-26a7-fe0f
+
+        return candidates;
+    }
+
+    private static string JoinSegmentsWithFe0f(string[] segments, Func<string, int, bool> wantsFe0f)
+    {
+        var sb = new System.Text.StringBuilder();
+        for (int i = 0; i < segments.Length; i++)
+        {
+            if (i > 0) sb.Append("-200d-");
+            sb.Append(segments[i]);
+            if (wantsFe0f(segments[i], i)) sb.Append("-fe0f");
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>A single codepoint with no skin-tone modifier attached.</summary>
+    private static bool IsBareCodepoint(string segment) => !segment.Contains('-');
+
+    /// <summary>
+    /// A bare BMP codepoint (4 hex digits, e.g. "2764", "26d3") — the classic
+    /// text-presentation symbols that RGI ZWJ sequences qualify with FE0F.
+    /// </summary>
+    private static bool IsBmpCodepoint(string segment) => IsBareCodepoint(segment) && segment.Length == 4;
 }
