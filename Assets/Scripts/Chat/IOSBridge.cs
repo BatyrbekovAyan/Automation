@@ -68,4 +68,20 @@ public static class IOSBridge
 #endif
     }
 
+#if UNITY_IOS && !UNITY_EDITOR
+    [DllImport("__Internal")]
+    private static extern void _SetDarkKeyboard(bool enable);
+#endif
+
+    // Overrides the window interface style so the system keyboard renders dark
+    // (WhatsApp attachment-preview parity). Callers must pair enable=true with
+    // enable=false on every exit path, or all keyboards in the app stay dark.
+    // No-op on Android/Editor: Android offers no API to theme the IME.
+    public static void SetDarkKeyboard(bool enable)
+    {
+#if UNITY_IOS && !UNITY_EDITOR
+        _SetDarkKeyboard(enable);
+#endif
+    }
+
 }

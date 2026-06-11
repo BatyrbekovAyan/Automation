@@ -96,6 +96,9 @@ public class AttachmentPreviewScreen : MonoBehaviour
         ResetButtonScale(backButton);
         ReleasePreviewTexture();
         _currentPick = null;
+        // Killing _fadeTween above skips Close()'s OnComplete, so the dark
+        // keyboard would leak into the chat input without this reset.
+        IOSBridge.SetDarkKeyboard(false);
     }
 
     private static void ResetButtonScale(Button button)
@@ -143,6 +146,9 @@ public class AttachmentPreviewScreen : MonoBehaviour
         }
 
         if (root != null) root.SetActive(true);
+        // WhatsApp parity: the caption keyboard renders dark over the media
+        // preview. iOS-only; no-op on Android/Editor.
+        IOSBridge.SetDarkKeyboard(true);
         FadeTo(1f, blocksRaycasts: true);
 
         StartCoroutine(PopulateDeferred(pick));
@@ -338,6 +344,9 @@ public class AttachmentPreviewScreen : MonoBehaviour
     {
         FadeTo(0f, blocksRaycasts: false, onComplete: () =>
         {
+            // Restore after the fade so the keyboard finishes its dismiss
+            // animation dark instead of flashing light mid-slide.
+            IOSBridge.SetDarkKeyboard(false);
             if (root != null) root.SetActive(false);
             ReleasePreviewTexture();
             _currentPick = null;
