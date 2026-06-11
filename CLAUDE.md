@@ -150,6 +150,7 @@ This project has project-scoped Claude configuration under `.claude/`:
   - `unity-api-integration/SKILL.md` — use when adding REST API endpoints, webhooks, or external service calls
   - `bot-persistence/SKILL.md` — use when reading/writing bot entity data in PlayerPrefs (creation, editing, deletion, activation, products/services lists, any per-bot field)
   - `chat-data-flow/SKILL.md` — use when changing a message field, message type, media handling, delivery status, or anything in the RawMessage → NormalizedMessage → MessageViewModel pipeline / ChatManager events
+  - `mobile-app-ui-design/SKILL.md` — third-party (ceorkm) mobile design judgment: thumb zones, 60/30/10 color, peak-end emotional design, industry conventions. Use for design *direction* alongside `unity-ui-builder`; its sizes are dp and its implementation notes are web-only — see the Unity Adaptation section at its end
 - **Path-scoped rules** (`.claude/rules/`) — automatically apply to matching files:
   - `unity-general.md` → all `Assets/Scripts/**/*.cs`
   - `networking.md` → `Assets/Scripts/Chat/**/*.cs`, `Assets/Scripts/Main/Manager.cs`
@@ -157,7 +158,7 @@ This project has project-scoped Claude configuration under `.claude/`:
   - `editor-scripts.md` → `Assets/Editor/**/*.cs`
 - **Hooks** (`.claude/hooks/`) — run automatically on tool calls. `validate-cs.sh` runs after every `Edit`/`Write` and checks C# quality; `gsd-*` hooks enforce the GSD workflow.
 
-Before new feature work: use the `brainstorming` skill. Before UI work: use `frontend-design` + `unity-ui-builder`. Before network code: use `unity-api-integration`.
+Before new feature work: use the `brainstorming` skill. Before UI work: use `frontend-design` + `mobile-app-ui-design` (design direction) + `unity-ui-builder` (implementation). Before network code: use `unity-api-integration`.
 
 ## Self-Maintenance
 
