@@ -282,7 +282,10 @@
       "Bash(Tools/run-tests-headless.sh)",
       "Bash(git commit *)",
       "Bash(grep -cv \"TryAlias\\\\|MediaUrlIdentity\\\\|MediaPinPersistence\\\\|alias\\\\|Alias\\\\|//\\\\|^+$\\\\|string fromPath\\\\|string toPath\\\\|File.Copy\\\\|File.Exists\\(toPath\\)\\\\|IsImageCached\\(fromUrl\\)\\\\|string.IsNullOrEmpty\\(fromUrl\\)\\\\|return true\\\\|return false\\\\|catch\\\\|Debug.LogWarning\\\\|try\\\\|^+        {\\\\|^+        }\\\\|^+    {\\\\|^+    }\\\\|^+    public bool\\\\|vm.chatId\")",
-      "Bash(grep -v \"TryAlias\\\\|MediaUrlIdentity\\\\|MediaPinPersistence\\\\|alias\\\\|Alias\\\\|//\\\\|^+$\\\\|string fromPath\\\\|string toPath\\\\|File.Copy\\\\|File.Exists\\(toPath\\)\\\\|IsImageCached\\(fromUrl\\)\\\\|string.IsNullOrEmpty\\(fromUrl\\)\\\\|return true\\\\|return false\\\\|catch\\\\|Debug.LogWarning\\\\|try\\\\|^+        {\\\\|^+        }\\\\|^+    {\\\\|^+    }\\\\|^+    public bool\\\\|vm.chatId\")"
+      "Bash(grep -v \"TryAlias\\\\|MediaUrlIdentity\\\\|MediaPinPersistence\\\\|alias\\\\|Alias\\\\|//\\\\|^+$\\\\|string fromPath\\\\|string toPath\\\\|File.Copy\\\\|File.Exists\\(toPath\\)\\\\|IsImageCached\\(fromUrl\\)\\\\|string.IsNullOrEmpty\\(fromUrl\\)\\\\|return true\\\\|return false\\\\|catch\\\\|Debug.LogWarning\\\\|try\\\\|^+        {\\\\|^+        }\\\\|^+    {\\\\|^+    }\\\\|^+    public bool\\\\|vm.chatId\")",
+      "Bash(awk 'NR>=2580 && NR<=2640' Assets/Prefabs/MessageTextIncoming.prefab)",
+      "Bash(awk '/&763551205735561166$/{flag=1} flag{print NR\": \"$0; c++; if\\(c>15\\) exit}')",
+      "Bash(awk 'NR>=2580 && NR<=2629')"
     ],
     "defaultMode": "acceptEdits"
   }
