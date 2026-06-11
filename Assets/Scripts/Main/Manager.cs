@@ -8,6 +8,7 @@ using System.Text;
 using System;
 using System.IO;
 using Automation.BotSettingsUI;
+using DG.Tweening;
 
 public class Manager : MonoBehaviour
 {
@@ -101,6 +102,11 @@ public class Manager : MonoBehaviour
     private string selectedBusinessId = "";
     private int id;
     private Color businessButtonDefaultColor;
+
+    // Platform brand colors — must match the PlatformRow label colors in Main.unity
+    private static readonly Color CreateButtonDefaultColor = new Color32(0x00, 0x7A, 0xFF, 0xFF); // iOS blue
+    private static readonly Color WhatsappBrandColor = new Color32(0x25, 0xD3, 0x66, 0xFF);
+    private static readonly Color TelegramBrandColor = new Color32(0x2A, 0xAB, 0xEE, 0xFF);
 
     private bool CreateWhatsappWorkflowFromEditSuccess;
     private bool EditWhatsappWorkflowSaved;
@@ -910,7 +916,27 @@ public class Manager : MonoBehaviour
         }
 
         ClosePlatformSelector();
+        UpdateCreateButtonColor(mode);
         ValidateCreateForm();
+    }
+
+    // Tint the create button to the chosen platform's brand color.
+    // Button uses ColorTint transition, so the disabled state still greys
+    // this base color out via the tint multiplier.
+    private void UpdateCreateButtonColor(int mode, bool instant = false)
+    {
+        if (createBotFormButton == null || createBotFormButton.image == null) return;
+
+        Color target = mode switch
+        {
+            1 => WhatsappBrandColor,
+            2 => TelegramBrandColor,
+            _ => CreateButtonDefaultColor, // 0=none and 3=Both keep the default accent
+        };
+
+        createBotFormButton.image.DOKill();
+        if (instant) createBotFormButton.image.color = target;
+        else createBotFormButton.image.DOColor(target, 0.2f);
     }
 
     public void OpenBotNameInput()
@@ -1260,6 +1286,7 @@ public class Manager : MonoBehaviour
         }
 
         if (createBotFormButton != null) createBotFormButton.interactable = false;
+        UpdateCreateButtonColor(0, instant: true);
     }
 
 
