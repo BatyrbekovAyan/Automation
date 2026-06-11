@@ -22,9 +22,7 @@ public class AttachmentPreviewScreen : MonoBehaviour
     [SerializeField] private GameObject  imagePanel;
     [SerializeField] private GameObject  videoPanel;
     [SerializeField] private GameObject  documentPanel;
-    [SerializeField] private RectTransform topBarRect;
     [SerializeField] private RectTransform bottomBarRect;
-    [SerializeField] private RectTransform contentAreaRect;
     [SerializeField] private RawImage    imagePreview;
     [SerializeField] private RawImage    videoPreview;
     [SerializeField] private GameObject  videoPlayOverlay;
@@ -73,8 +71,6 @@ public class AttachmentPreviewScreen : MonoBehaviour
 
         if (imagePreview != null) _imagePreviewFitter = imagePreview.GetComponent<AspectRatioFitter>();
         if (videoPreview != null) _videoPreviewFitter = videoPreview.GetComponent<AspectRatioFitter>();
-
-        ApplySafeArea();
     }
 
     // This component must live on a permanently-active GameObject (the script
@@ -96,8 +92,17 @@ public class AttachmentPreviewScreen : MonoBehaviour
 
         _fadeTween?.Kill();
         _sizeErrorTween?.Kill();
+        ResetButtonScale(sendButton);
+        ResetButtonScale(backButton);
         ReleasePreviewTexture();
         _currentPick = null;
+    }
+
+    private static void ResetButtonScale(Button button)
+    {
+        if (button == null) return;
+        button.transform.DOKill();
+        button.transform.localScale = Vector3.one;
     }
 
     public void Show(AttachmentPick pick)
@@ -253,33 +258,11 @@ public class AttachmentPreviewScreen : MonoBehaviour
         fitter.aspectRatio = (float)tex.width / tex.height;
     }
 
-    private void ApplySafeArea()
-    {
-        var canvas = GetComponentInParent<Canvas>();
-        if (canvas == null) return;
-
-        float scale = canvas.scaleFactor > 0f ? canvas.scaleFactor : 1f;
-        float topSafePx    = Mathf.Max(0f, (Screen.height - Screen.safeArea.yMax) / scale);
-        float bottomSafePx = Mathf.Max(0f, Screen.safeArea.y / scale);
-
-        if (topBarRect != null)
-        {
-            var pos = topBarRect.anchoredPosition;
-            topBarRect.anchoredPosition = new Vector2(pos.x, -topSafePx);
-        }
-        if (bottomBarRect != null)
-        {
-            var pos = bottomBarRect.anchoredPosition;
-            bottomBarRect.anchoredPosition = new Vector2(pos.x, bottomSafePx);
-        }
-        if (contentAreaRect != null)
-        {
-            var maxOff = contentAreaRect.offsetMax;
-            var minOff = contentAreaRect.offsetMin;
-            contentAreaRect.offsetMax = new Vector2(maxOff.x, maxOff.y - topSafePx);
-            contentAreaRect.offsetMin = new Vector2(minOff.x, minOff.y + bottomSafePx);
-        }
-    }
+    // Safe zones are baked statically into the built layout (TopBar 284 / BottomBar 204,
+    // same pattern as the messages screen) — see AttachmentPreviewScreenBuilder. A previous
+    // runtime ApplySafeArea() was removed: it ran before canvas scale / Screen.safeArea were
+    // reliable, and KeyboardAwarePanel re-stamps the bottom bar's Y from a _baseY captured
+    // at first activation, which silently erased any later runtime offset.
 
     private static Texture2D LoadTextureFromFile(string path)
     {
@@ -316,6 +299,7 @@ public class AttachmentPreviewScreen : MonoBehaviour
     private void OnSendTapped()
     {
         if (_currentPick == null) return;
+        PunchButton(sendButton);
 
         // Reject only absurdly large videos here; normal large clips are shrunk by
         // on-device conversion before upload (see PostMediaMessageRoutine).
@@ -344,6 +328,7 @@ public class AttachmentPreviewScreen : MonoBehaviour
 
     private void OnBackTapped()
     {
+        PunchButton(backButton);
         if (backButton != null) backButton.interactable = false;
         if (captionField != null && captionField.isFocused) captionField.DeactivateInputField();
         Close();
@@ -378,6 +363,17 @@ public class AttachmentPreviewScreen : MonoBehaviour
                 fadeDuration)
             .SetEase(Ease.OutQuad)
             .OnComplete(() => onComplete?.Invoke());
+    }
+
+    // Quick tactile press feedback on the action buttons (project anim spec: DOPunchScale).
+    // Negative magnitude = a subtle press-in. Resets scale first so rapid taps don't stack.
+    private static void PunchButton(Button button)
+    {
+        if (button == null) return;
+        var t = button.transform;
+        t.DOKill();
+        t.localScale = Vector3.one;
+        t.DOPunchScale(Vector3.one * -0.06f, 0.15f, 1, 0.5f);
     }
 
     private void ReleasePreviewTexture()
@@ -425,11 +421,11 @@ public class AttachmentPreviewScreen : MonoBehaviour
         rt.anchorMin = new Vector2(0f, 1f);
         rt.anchorMax = new Vector2(1f, 1f);
         rt.pivot     = new Vector2(0.5f, 0f);
-        rt.offsetMin = new Vector2(16f, 8f);
-        rt.offsetMax = new Vector2(-16f, 44f);
+        rt.offsetMin = new Vector2(24f, 12f);
+        rt.offsetMax = new Vector2(-24f, 64f);
 
         _sizeErrorLabel = go.AddComponent<TextMeshProUGUI>();
-        _sizeErrorLabel.fontSize          = 14f;
+        _sizeErrorLabel.fontSize          = 30f;
         _sizeErrorLabel.color             = new Color(1f, 0.42f, 0.42f, 1f);  // soft red
         _sizeErrorLabel.alignment         = TextAlignmentOptions.Center;
         _sizeErrorLabel.raycastTarget     = false;

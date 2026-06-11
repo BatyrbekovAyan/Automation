@@ -11,10 +11,21 @@ public static class AttachmentPreviewScreenBuilder
     private const string RootName      = "Root";
 
     // Layout — canvas-space px at the project's 1080×2400 reference resolution.
-    private const float TopBarHeight       = 88f;
-    private const float BottomBarMinHeight = 88f;
-    private const float CaptionFieldHeight = 64f;
+    //
+    // Safe zones are STATIC in this app (same pattern as the messages screen the
+    // preview overlays): bars sit flush against the physical screen edges with the
+    // notch / home-indicator inset baked into their height, and content lives in
+    // the safe portion. Measured from the live scene: messages TopBar = 284 tall
+    // (content row in the bottom 126), MessagesBottomPanel = 204 tall.
+    // KeyboardAwarePanel depends on this — it subtracts safeArea.y from the
+    // keyboard rise assuming the bar's resting height already contains the gap.
+    private const float TopBarHeight       = 284f;  // top ~158 = status/notch zone
+    private const float TopContentHeight   = 100f;  // back/title row, mirrors messages LeftZone
+    private const float TopContentOffsetY  = 26f;   // row bottom edge above bar bottom (row spans 26..126)
+    private const float BottomBarMinHeight = 204f;  // bottom 92 = home-indicator zone (see HLG padding)
+    private const float CaptionFieldHeight = 80f;   // taller so Body2 text breathes; pill ends at radius = h/2
     private const float SendButtonSize     = 88f;
+    private const float SendIconSize       = 44f;   // white glyph centered inside the green circle
     private const float BackButtonSize     = 88f;
     private const float DocCardWidth       = 360f;
     private const float DocCardHeight      = 220f;
@@ -24,6 +35,21 @@ public static class AttachmentPreviewScreenBuilder
     private const float DurationBadgeWidth  = 96f;
     private const float DurationBadgeHeight = 36f;
     private const float DurationBadgeOffset = 16f;
+
+    // Type scale — project-calibrated reference units (see unity-ui-builder skill).
+    // These replace the old mockup-px sizes that rendered ~⅓ too small on device.
+    private const float TitleFontSize    = 50f;  // H1 — page title
+    private const float CaptionFontSize  = 38f;  // Body2 — caption input + placeholder
+    private const float DocNameFontSize  = 42f;  // H3 — card title
+    private const float DocSizeFontSize  = 30f;  // Caption — meta
+    private const float DurationFontSize = 26f;  // Micro — badge
+
+    // Corner radii (reference units). Half-the-height radii give true circles / pill ends.
+    private const float SendRadius     = 44f;   // SendButtonSize / 2 → circle
+    private const float PlayRadius     = 40f;   // PlayOverlaySize / 2 → circle
+    private const float DurationRadius = 18f;   // DurationBadgeHeight / 2 → pill
+    private const float CaptionRadius  = 40f;   // CaptionFieldHeight / 2 → pill
+    private const float DocCardRadius  = 32f;   // rounded-rect card
 
     private static readonly Color RootBg         = new Color(0.055f, 0.078f, 0.086f); // #0E1416
     private static readonly Color BarBg          = new Color(0.118f, 0.145f, 0.157f); // #1E2528
@@ -98,7 +124,17 @@ public static class AttachmentPreviewScreenBuilder
         topBarRt.sizeDelta = new Vector2(0f, TopBarHeight);
         topBarRt.anchoredPosition = Vector2.zero;
 
-        var backBtnGo = NewChild(topBar.transform, "BackButton",
+        // Content row pinned to the bar's safe bottom portion — the area above it
+        // (the notch/status zone) stays empty, matching the messages screen.
+        var topContent = NewChild(topBar.transform, "Content", typeof(RectTransform));
+        var topContentRt = (RectTransform)topContent.transform;
+        topContentRt.anchorMin = new Vector2(0f, 0f);
+        topContentRt.anchorMax = new Vector2(1f, 0f);
+        topContentRt.pivot     = new Vector2(0.5f, 0f);
+        topContentRt.sizeDelta = new Vector2(0f, TopContentHeight);
+        topContentRt.anchoredPosition = new Vector2(0f, TopContentOffsetY);
+
+        var backBtnGo = NewChild(topContent.transform, "BackButton",
                                   typeof(RectTransform), typeof(Image), typeof(Button));
         var backRt = (RectTransform)backBtnGo.transform;
         backRt.anchorMin = new Vector2(0f, 0.5f);
@@ -112,13 +148,13 @@ public static class AttachmentPreviewScreenBuilder
         var backBtn = backBtnGo.GetComponent<Button>();
         var backNav = backBtn.navigation; backNav.mode = Navigation.Mode.None; backBtn.navigation = backNav;
 
-        var titleGo = NewChild(topBar.transform, "Title",
+        var titleGo = NewChild(topContent.transform, "Title",
                                 typeof(RectTransform), typeof(TextMeshProUGUI));
         var titleRt = (RectTransform)titleGo.transform;
         Stretch(titleRt);
         var titleTmp = titleGo.GetComponent<TextMeshProUGUI>();
         titleTmp.text          = "Preview";
-        titleTmp.fontSize      = 32f;
+        titleTmp.fontSize      = TitleFontSize;
         titleTmp.color         = White;
         titleTmp.alignment     = TextAlignmentOptions.Center;
         titleTmp.raycastTarget = false;
@@ -137,7 +173,9 @@ public static class AttachmentPreviewScreenBuilder
         bottomBg.color = BarBg;
         bottomBg.raycastTarget = true;
         var hl = bottomBar.GetComponent<HorizontalLayoutGroup>();
-        hl.padding = new RectOffset(32, 32, 24, 24);
+        // Bottom 92 = home-indicator zone: 24 (top) + 88 (send FAB row) + 92 = 204.
+        // The bar background extends under the home bar; content stays above it.
+        hl.padding = new RectOffset(32, 32, 24, 92);
         hl.spacing = 24;
         hl.childAlignment = TextAnchor.MiddleCenter;
         hl.childControlWidth      = true;
@@ -151,6 +189,7 @@ public static class AttachmentPreviewScreenBuilder
         var captionImg = captionGo.GetComponent<Image>();
         captionImg.color = CaptionFieldBg;
         captionImg.raycastTarget = true;
+        AddRoundedCorners(captionGo, CaptionRadius);
         var captionLe = captionGo.GetComponent<LayoutElement>();
         captionLe.flexibleWidth   = 1;
         captionLe.minHeight       = CaptionFieldHeight;
@@ -162,17 +201,31 @@ public static class AttachmentPreviewScreenBuilder
         captionField.textComponent = textComp;
         captionField.placeholder   = placeholderComp;
 
-        // Send button
+        // Send button — green circular FAB (rounded bg) + centered white icon child.
+        // The bg is a pure green circle (no sprite); assign the paper-plane/arrow
+        // sprite to the "Icon" child in the inspector, NOT to the button background.
         var sendBtnGo = NewChild(bottomBar.transform, "SendButton",
                                   typeof(RectTransform), typeof(Image), typeof(Button), typeof(LayoutElement));
         var sendImg = sendBtnGo.GetComponent<Image>();
         sendImg.color = SendGreen;
         sendImg.raycastTarget = true;
+        AddRoundedCorners(sendBtnGo, SendRadius);
         var sendLe = sendBtnGo.GetComponent<LayoutElement>();
         sendLe.minWidth = sendLe.preferredWidth = SendButtonSize;
         sendLe.minHeight = sendLe.preferredHeight = SendButtonSize;
         var sendBtn = sendBtnGo.GetComponent<Button>();
         var sendNav = sendBtn.navigation; sendNav.mode = Navigation.Mode.None; sendBtn.navigation = sendNav;
+
+        var sendIconGo = NewChild(sendBtnGo.transform, "Icon",
+                                   typeof(RectTransform), typeof(Image));
+        var sendIconRt = (RectTransform)sendIconGo.transform;
+        sendIconRt.anchorMin = sendIconRt.anchorMax = new Vector2(0.5f, 0.5f);
+        sendIconRt.pivot     = new Vector2(0.5f, 0.5f);
+        sendIconRt.sizeDelta = new Vector2(SendIconSize, SendIconSize);
+        sendIconRt.anchoredPosition = Vector2.zero;
+        var sendIconImg = sendIconGo.GetComponent<Image>();
+        sendIconImg.color         = White;
+        sendIconImg.raycastTarget = false;
 
         // ── ContentArea (sits between TopBar and BottomBar) ──────────
         var contentGo = NewChild(rootGo.transform, "ContentArea", typeof(RectTransform));
@@ -216,6 +269,7 @@ public static class AttachmentPreviewScreenBuilder
         var playBg = playOverlayGo.GetComponent<Image>();
         playBg.color = PlayOverlayBg;
         playBg.raycastTarget = false;
+        AddRoundedCorners(playOverlayGo, PlayRadius);
 
         var playIconGo = NewChild(playOverlayGo.transform, "PlayIcon",
                                    typeof(RectTransform), typeof(Image));
@@ -239,13 +293,14 @@ public static class AttachmentPreviewScreenBuilder
         var dbBg = durationBadge.GetComponent<Image>();
         dbBg.color = PlayOverlayBg;
         dbBg.raycastTarget = false;
+        AddRoundedCorners(durationBadge, DurationRadius);
 
         var durationLabelGo = NewChild(durationBadge.transform, "Label",
                                         typeof(RectTransform), typeof(TextMeshProUGUI));
         Stretch((RectTransform)durationLabelGo.transform);
         var durationLabel = durationLabelGo.GetComponent<TextMeshProUGUI>();
         durationLabel.text = "0:00";
-        durationLabel.fontSize = 24f;
+        durationLabel.fontSize = DurationFontSize;
         durationLabel.color = White;
         durationLabel.alignment = TextAlignmentOptions.Center;
         durationLabel.raycastTarget = false;
@@ -265,6 +320,7 @@ public static class AttachmentPreviewScreenBuilder
         var docCardBg = docCardGo.GetComponent<Image>();
         docCardBg.color = BarBg;
         docCardBg.raycastTarget = false;
+        AddRoundedCorners(docCardGo, DocCardRadius);
         var docVl = docCardGo.GetComponent<VerticalLayoutGroup>();
         docVl.padding = new RectOffset(24, 24, 24, 24);
         docVl.spacing = 12;
@@ -287,7 +343,7 @@ public static class AttachmentPreviewScreenBuilder
                                   typeof(RectTransform), typeof(TextMeshProUGUI));
         var docName = docNameGo.GetComponent<TextMeshProUGUI>();
         docName.text = "filename.pdf";
-        docName.fontSize = 32f;
+        docName.fontSize = DocNameFontSize;
         docName.fontStyle = FontStyles.Bold;
         docName.color = White;
         docName.alignment = TextAlignmentOptions.Center;
@@ -299,7 +355,7 @@ public static class AttachmentPreviewScreenBuilder
                                   typeof(RectTransform), typeof(TextMeshProUGUI));
         var docSize = docSizeGo.GetComponent<TextMeshProUGUI>();
         docSize.text = "0 B";
-        docSize.fontSize = 24f;
+        docSize.fontSize = DocSizeFontSize;
         docSize.color = SubtleText;
         docSize.alignment = TextAlignmentOptions.Center;
         docSize.raycastTarget = false;
@@ -315,9 +371,7 @@ public static class AttachmentPreviewScreenBuilder
         SetObjectRef(so, "imagePanel",        imagePanel);
         SetObjectRef(so, "videoPanel",        videoPanel);
         SetObjectRef(so, "documentPanel",     documentPanel);
-        SetObjectRef(so, "topBarRect",        (RectTransform)topBar.transform);
         SetObjectRef(so, "bottomBarRect",     (RectTransform)bottomBar.transform);
-        SetObjectRef(so, "contentAreaRect",   (RectTransform)contentGo.transform);
         SetObjectRef(so, "imagePreview",      imagePreview);
         SetObjectRef(so, "videoPreview",      videoPreview);
         SetObjectRef(so, "videoPlayOverlay",  playOverlayGo);
@@ -344,7 +398,9 @@ public static class AttachmentPreviewScreenBuilder
         so.ApplyModifiedPropertiesWithoutUndo();
 
         EditorSceneManager.MarkSceneDirty(screenGo.scene);
-        Debug.Log("[AttachmentPreviewScreenBuilder] Built AttachmentPreviewScreen. Assign sprite refs (back/send/play/doc icons) in the inspector.");
+        Debug.Log("[AttachmentPreviewScreenBuilder] Built AttachmentPreviewScreen. Assign sprite refs in the inspector: "
+                + "back arrow → BackButton (Image), send glyph → SendButton/Icon (the new white child, NOT the green bg), "
+                + "play glyph → PlayOverlay/PlayIcon, doc MIME icons → the AttachmentPreviewScreen 'Mime Icons' list.");
     }
 
     // ── helpers ───────────────────────────────────────────────────
@@ -354,6 +410,29 @@ public static class AttachmentPreviewScreenBuilder
         var go = new GameObject(name, components);
         go.transform.SetParent(parent, false);
         return go;
+    }
+
+    /// <summary>
+    /// Adds the project's RoundedCorners component (Nobi.UiRoundedCorners.ImageWithRoundedCorners)
+    /// to an Image-bearing GameObject. A radius of half the smaller dimension yields a true
+    /// circle / pill. Resolved by type name to avoid a hard compile dependency in this editor
+    /// script — mirrors ChatsSearchBarBuilder.
+    /// </summary>
+    private static void AddRoundedCorners(GameObject go, float radius)
+    {
+        var roundedType = System.Type.GetType("Nobi.UiRoundedCorners.ImageWithRoundedCorners, Assembly-CSharp")
+                         ?? System.Type.GetType("Nobi.UiRoundedCorners.ImageWithRoundedCorners");
+        if (roundedType == null)
+        {
+            Debug.LogWarning(
+                "[AttachmentPreviewScreenBuilder] ImageWithRoundedCorners type not found — "
+                + $"'{go.name}' will render as a hard rectangle. Add the rounded-corner component manually if needed.");
+            return;
+        }
+
+        var rounded = go.GetComponent(roundedType) ?? go.AddComponent(roundedType);
+        var radiusField = roundedType.GetField("radius");
+        if (radiusField != null) radiusField.SetValue(rounded, radius);
     }
 
     private static void Stretch(RectTransform rt)
@@ -391,7 +470,7 @@ public static class AttachmentPreviewScreenBuilder
         Stretch((RectTransform)placeholderGo.transform);
         var ph = placeholderGo.GetComponent<TextMeshProUGUI>();
         ph.text          = "Add a caption…";
-        ph.fontSize      = 28f;
+        ph.fontSize      = CaptionFontSize;
         ph.color         = PlaceholderText;
         ph.fontStyle     = FontStyles.Italic;
         ph.alignment     = TextAlignmentOptions.Left;
@@ -402,7 +481,7 @@ public static class AttachmentPreviewScreenBuilder
         Stretch((RectTransform)textGo.transform);
         var tx = textGo.GetComponent<TextMeshProUGUI>();
         tx.text          = "";
-        tx.fontSize      = 28f;
+        tx.fontSize      = CaptionFontSize;
         tx.color         = White;
         tx.alignment     = TextAlignmentOptions.Left;
         tx.raycastTarget = false;
