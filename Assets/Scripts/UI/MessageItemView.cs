@@ -2986,23 +2986,42 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
     {
         if (ChatManager.Instance == null) { HandleFinalFailure(isManual); yield break; }
 
-        // Restore the image slot — covers both the initial bind and a manual download-button retry
-        // (HandleFinalFailure hides the image and shows the button/expired card between attempts).
         if (expiredPlaceholder) expiredPlaceholder.SetActive(false);
-        if (downloadButton) downloadButton.gameObject.SetActive(false);
-        messageImage.gameObject.SetActive(true);
 
         float realRatio = vm.aspectRatio > 0 ? vm.aspectRatio : 1.0f;
-        SetupMaskedLayout(realRatio, realRatio, true);
 
-        if (stickerPlaceholder != null)
+        if (isManual)
         {
-            messageImage.sprite = stickerPlaceholder;
-            fullScreenSprite = stickerPlaceholder;
-            messageImage.color = Color.white;
-            messageImage.preserveAspect = true;
+            // Manual retry from the download card: do NOT resize the bubble to sticker size yet —
+            // a failed retry would snap it back to the card. Keep the button-card layout, hide the
+            // arrow + label, and spin on the white card (mirrors StartDownload). The bubble only
+            // takes sticker size in the Render case below, once the bytes are validated WebP.
+            if (downloadButton)
+            {
+                downloadButton.gameObject.SetActive(true);
+                var btnImg = downloadButton.GetComponent<Image>();
+                if (btnImg != null) btnImg.enabled = false;
+                if (downloadButtonText) downloadButtonText.gameObject.SetActive(false);
+                ShowLoadingSpinner(downloadButton.transform, bareSpinner: false);
+            }
         }
-        ShowLoadingSpinner(messageImage.transform, bareSpinner: true);
+        else
+        {
+            // Initial bind: the slot is already sticker-sized with no card to hold onto — keep it
+            // on the placeholder and spin bare over it.
+            if (downloadButton) downloadButton.gameObject.SetActive(false);
+            messageImage.gameObject.SetActive(true);
+            SetupMaskedLayout(realRatio, realRatio, true);
+
+            if (stickerPlaceholder != null)
+            {
+                messageImage.sprite = stickerPlaceholder;
+                fullScreenSprite = stickerPlaceholder;
+                messageImage.color = Color.white;
+                messageImage.preserveAspect = true;
+            }
+            ShowLoadingSpinner(messageImage.transform, bareSpinner: true);
+        }
 
         // DownloadMediaForMessage is callback-based; bridge it into this coroutine.
         bool done = false;
@@ -3034,7 +3053,24 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
         switch (StickerLoadPolicy.Decide(bytes, attempt, StickerMaxDownloadAttempts))
         {
             case StickerLoadAction.Render:
-                HideLoadingSpinner();
+                HideLoadingSpinner(isManual && downloadButton != null ? downloadButton.transform.parent : null);
+                if (isManual)
+                {
+                    // The card carried the wait; with validated WebP in hand the bubble can finally
+                    // take sticker size. Restore the button's visuals for its next reuse, drop the
+                    // card, and stand the image slot up (transparent bubble + sticker layout).
+                    if (downloadButton)
+                    {
+                        var btnImg = downloadButton.GetComponent<Image>();
+                        if (btnImg != null) btnImg.enabled = true;
+                        if (downloadButtonText) downloadButtonText.gameObject.SetActive(true);
+                        downloadButton.gameObject.SetActive(false);
+                    }
+                    messageImage.gameObject.SetActive(true);
+                    SetupMaskedLayout(realRatio, realRatio, true);
+                    UpdateBubbleVisuals();
+                    ApplyDynamicLayout(vm.type);
+                }
                 // Cache + pin ONLY validated WebP so a reopen is instant and no junk ever persists.
                 if (!string.IsNullOrEmpty(link) && !link.StartsWith("base64://"))
                 {
