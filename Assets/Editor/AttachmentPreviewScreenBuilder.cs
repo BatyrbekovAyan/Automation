@@ -23,6 +23,7 @@ public static class AttachmentPreviewScreenBuilder
     private const float TopContentHeight   = 100f;  // back/title row, mirrors messages LeftZone
     private const float TopContentOffsetY  = 26f;   // row bottom edge above bar bottom (row spans 26..126)
     private const float BottomBarMinHeight = 204f;  // bottom 92 = home-indicator zone (see HLG padding)
+    private const float BottomBarMaxHeight = 412f;  // caption growth ceiling — matches messages ExpandableInput
     private const float CaptionFieldHeight = 80f;   // taller so Body2 text breathes; pill ends at radius = h/2
     private const float SendButtonSize     = 88f;
     private const float SendIconSize       = 44f;   // white glyph centered inside the green circle
@@ -183,23 +184,48 @@ public static class AttachmentPreviewScreenBuilder
         hl.childForceExpandWidth  = false;
         hl.childForceExpandHeight = false;
 
-        // Caption field
-        var captionGo = NewChild(bottomBar.transform, "CaptionField",
-                                  typeof(RectTransform), typeof(Image), typeof(LayoutElement));
+        // Caption scroll host — pill visual + mask + scroller. The input field
+        // is its CONTENT and grows unbounded; the host clamps the visible
+        // window and overflow drag-scrolls inside it. Mirrors the messages
+        // input's "Input" scroll host structure exactly.
+        var captionScrollGo = NewChild(bottomBar.transform, "CaptionScroll",
+                                        typeof(RectTransform), typeof(Image), typeof(ScrollRect),
+                                        typeof(RectMask2D), typeof(LayoutElement));
+        var captionScrollImg = captionScrollGo.GetComponent<Image>();
+        captionScrollImg.color = CaptionFieldBg;
+        captionScrollImg.raycastTarget = true;
+        AddRoundedCorners(captionScrollGo, CaptionRadius);
+        var captionScrollLe = captionScrollGo.GetComponent<LayoutElement>();
+        captionScrollLe.flexibleWidth   = 1;
+        captionScrollLe.minHeight       = CaptionFieldHeight;
+        captionScrollLe.preferredHeight = CaptionFieldHeight;
+
+        // Caption field (scroll content) — transparent raycast image like the
+        // messages InputField; the pill visual stays on the static host so its
+        // rounded ends never scroll out of the masked window.
+        var captionGo = NewChild(captionScrollGo.transform, "CaptionField",
+                                  typeof(RectTransform), typeof(Image));
+        var captionRt = (RectTransform)captionGo.transform;
+        captionRt.anchorMin = new Vector2(0f, 1f);
+        captionRt.anchorMax = new Vector2(1f, 1f);
+        captionRt.pivot     = new Vector2(0.5f, 1f);
+        captionRt.sizeDelta = new Vector2(0f, CaptionFieldHeight);
+        captionRt.anchoredPosition = Vector2.zero;
         var captionImg = captionGo.GetComponent<Image>();
-        captionImg.color = CaptionFieldBg;
+        captionImg.color = new Color(1f, 1f, 1f, 0f);
         captionImg.raycastTarget = true;
-        AddRoundedCorners(captionGo, CaptionRadius);
-        var captionLe = captionGo.GetComponent<LayoutElement>();
-        captionLe.flexibleWidth   = 1;
-        captionLe.minHeight       = CaptionFieldHeight;
-        captionLe.preferredHeight = CaptionFieldHeight;
 
         var captionField = captionGo.AddComponent<DeferredDismissInputField>();
         captionField.lineType = TMP_InputField.LineType.MultiLineNewline;
+        captionField.transition = Selectable.Transition.None;
+        captionField.targetGraphic = captionImg;
         captionField.textViewport = MakeTextArea(captionGo.transform, out var textComp, out var placeholderComp);
         captionField.textComponent = textComp;
         captionField.placeholder   = placeholderComp;
+
+        var captionScroll = captionScrollGo.GetComponent<ScrollRect>();
+        ConfigureCaptionScroll(captionScroll, (RectTransform)captionScrollGo.transform, captionRt);
+        EnsureCaptionDragShield(captionGo, captionField, captionScroll);
 
         // Send button — green circular FAB (rounded bg) + centered white icon child.
         // The bg is a pure green circle (no sprite); assign the paper-plane/arrow
@@ -235,6 +261,12 @@ public static class AttachmentPreviewScreenBuilder
         contentRt.pivot     = new Vector2(0.5f, 0.5f);
         contentRt.offsetMin = new Vector2(0f, BottomBarMinHeight);
         contentRt.offsetMax = new Vector2(0f, -TopBarHeight);
+
+        // Caption grows with multi-line text — same component as the messages
+        // screen. The input (scroll content) grows unbounded via sizeDelta;
+        // the host's LayoutElement tracks it, clamped at BottomBarMaxHeight.
+        WireExpandableInput(bottomBar, bottomRt, captionGo, captionField,
+                            captionScrollLe, captionScroll);
 
         // ── ImagePanel ───────────────────────────────────────────────
         var imagePanel = NewChild(contentGo.transform, "ImagePanel", typeof(RectTransform));
@@ -403,7 +435,175 @@ public static class AttachmentPreviewScreenBuilder
                 + "play glyph → PlayOverlay/PlayIcon, doc MIME icons → the AttachmentPreviewScreen 'Mime Icons' list.");
     }
 
+    /// <summary>
+    /// Surgical wirer for an already-built (and hand-configured) preview screen —
+    /// upgrades it in place to full messages-input parity without rebuilding:
+    /// inserts the CaptionScroll host (pill + mask + ScrollRect) above CaptionField
+    /// if missing, moves the pill visual onto it, and (re)wires ExpandableInput +
+    /// DragShield. Replaces the earlier separate Expandable/DragShield wirers.
+    /// Idempotent — safe to run repeatedly.
+    /// </summary>
+    [MenuItem("Tools/Attach Sheet/Wire Caption Input")]
+    public static void WireCaptionInput()
+    {
+        var screen = Object.FindFirstObjectByType<AttachmentPreviewScreen>(FindObjectsInactive.Include);
+        var root      = screen != null ? screen.transform.Find(RootName) : null;
+        var bottomBar = root != null ? root.Find("BottomBar") : null;
+        if (bottomBar == null)
+        {
+            Debug.LogError("[AttachmentPreviewScreenBuilder] Expected Root/BottomBar hierarchy not found — cannot wire.");
+            return;
+        }
+
+        // Pre-migration the field sits directly under the HLG; post-migration
+        // it is the content of the CaptionScroll host.
+        var host      = bottomBar.Find("CaptionScroll");
+        var captionTr = host != null ? host.Find("CaptionField") : bottomBar.Find("CaptionField");
+        var captionField = captionTr != null ? captionTr.GetComponent<TMP_InputField>() : null;
+        if (captionField == null)
+        {
+            Debug.LogError("[AttachmentPreviewScreenBuilder] CaptionField with TMP_InputField not found — cannot wire.");
+            return;
+        }
+        var captionGo = captionTr.gameObject;
+
+        if (host == null)
+            host = MigrateCaptionUnderScrollHost(bottomBar, captionGo, captionField);
+
+        // Always re-ensure the pill corners — covers re-runs after a failed
+        // type resolve (AddRoundedCorners is get-or-add, so this is idempotent).
+        AddRoundedCorners(host.gameObject, CaptionRadius);
+
+        var captionScroll = host.GetComponent<ScrollRect>();
+        ConfigureCaptionScroll(captionScroll, (RectTransform)host, (RectTransform)captionTr);
+        EnsureCaptionDragShield(captionGo, captionField, captionScroll);
+        WireExpandableInput(bottomBar.gameObject, (RectTransform)bottomBar, captionGo, captionField,
+                            host.GetComponent<LayoutElement>(), captionScroll);
+
+        EditorSceneManager.MarkSceneDirty(screen.gameObject.scene);
+        Debug.Log("[AttachmentPreviewScreenBuilder] Caption input wired to messages parity "
+                + "(scroll host + ExpandableInput + DragShield). Save the scene to persist.");
+    }
+
     // ── helpers ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// In-place migration of a pre-scroll-host caption: creates the host at the
+    /// field's sibling slot, moves the pill visual (color, rounded corners,
+    /// HLG LayoutElement role) onto it, and turns the field into transparent
+    /// scroll content — the exact structure of the messages input.
+    /// </summary>
+    private static Transform MigrateCaptionUnderScrollHost(Transform bottomBar, GameObject captionGo,
+                                                           TMP_InputField captionField)
+    {
+        var captionImg = captionGo.GetComponent<Image>();
+
+        var hostGo = NewChild(bottomBar, "CaptionScroll",
+                              typeof(RectTransform), typeof(Image), typeof(ScrollRect),
+                              typeof(RectMask2D), typeof(LayoutElement));
+        hostGo.transform.SetSiblingIndex(captionGo.transform.GetSiblingIndex());
+
+        var hostImg = hostGo.GetComponent<Image>();
+        hostImg.color = captionImg != null ? captionImg.color : CaptionFieldBg;
+        hostImg.raycastTarget = true;
+        AddRoundedCorners(hostGo, CaptionRadius);
+
+        var hostLe = hostGo.GetComponent<LayoutElement>();
+        hostLe.flexibleWidth   = 1;
+        hostLe.minHeight       = CaptionFieldHeight;
+        hostLe.preferredHeight = CaptionFieldHeight;
+
+        var captionRt = (RectTransform)captionGo.transform;
+        captionRt.SetParent(hostGo.transform, false);
+        captionRt.anchorMin = new Vector2(0f, 1f);
+        captionRt.anchorMax = new Vector2(1f, 1f);
+        captionRt.pivot     = new Vector2(0.5f, 1f);
+        captionRt.sizeDelta = new Vector2(0f, CaptionFieldHeight);
+        captionRt.anchoredPosition = Vector2.zero;
+
+        // The content keeps only a transparent raycast image (messages parity);
+        // the pill visual now lives on the static host so its rounded ends never
+        // scroll out of the masked window. The HLG no longer controls the field,
+        // so its LayoutElement goes too.
+        var rounded = captionGo.GetComponent("ImageWithRoundedCorners");
+        if (rounded != null) Object.DestroyImmediate(rounded);
+        var le = captionGo.GetComponent<LayoutElement>();
+        if (le != null) Object.DestroyImmediate(le);
+        if (captionImg != null)
+        {
+            captionImg.color    = new Color(1f, 1f, 1f, 0f);
+            captionImg.material = null;
+        }
+        captionField.transition    = Selectable.Transition.None;
+        captionField.targetGraphic = captionImg;
+
+        return hostGo.transform;
+    }
+
+    /// <summary>Vertical elastic scroller, viewport = the host itself — mirrors the messages "Input" host.</summary>
+    private static void ConfigureCaptionScroll(ScrollRect scroll, RectTransform hostRt, RectTransform contentRt)
+    {
+        scroll.content           = contentRt;
+        scroll.viewport          = hostRt;
+        scroll.horizontal        = false;
+        scroll.vertical          = true;
+        scroll.movementType      = ScrollRect.MovementType.Elastic;
+        scroll.inertia           = true;
+        scroll.decelerationRate  = 0.135f;
+        scroll.scrollSensitivity = 1f;
+    }
+
+    /// <summary>
+    /// Transparent full-stretch raycast overlay that owns all pointer events on
+    /// the caption — mirrors the messages input's DragShield child. Drags are
+    /// forwarded to the caption scroll host so overflowing text drag-scrolls.
+    /// Must be the LAST child so it raycasts above the Text Area.
+    /// </summary>
+    private static void EnsureCaptionDragShield(GameObject captionGo, TMP_InputField captionField,
+                                                ScrollRect captionScroll)
+    {
+        var existing = captionGo.transform.Find("DragShield");
+        var shieldGo = existing != null
+            ? existing.gameObject
+            : NewChild(captionGo.transform, "DragShield", typeof(RectTransform), typeof(Image), typeof(DragShield));
+
+        var shieldRt = (RectTransform)shieldGo.transform;
+        Stretch(shieldRt);
+        shieldGo.transform.SetAsLastSibling();
+
+        var shieldImg = shieldGo.GetComponent<Image>();
+        if (shieldImg == null) shieldImg = shieldGo.AddComponent<Image>();
+        shieldImg.color = new Color(1f, 1f, 1f, 0f);   // invisible, raycast-only
+        shieldImg.raycastTarget = true;
+
+        var shield = shieldGo.GetComponent<DragShield>();
+        if (shield == null) shield = shieldGo.AddComponent<DragShield>();
+        var so = new SerializedObject(shield);
+        so.FindProperty("inputField").objectReferenceValue = captionField;
+        so.FindProperty("parentScrollRect").objectReferenceValue = captionScroll;   // drags scroll the caption overflow
+        so.ApplyModifiedPropertiesWithoutUndo();
+    }
+
+    private static void WireExpandableInput(GameObject bottomBar, RectTransform bottomRt, GameObject captionGo,
+                                            TMP_InputField captionField, LayoutElement hostLe,
+                                            ScrollRect captionScroll)
+    {
+        var expand = bottomBar.GetComponent<ExpandableInput>();
+        if (expand == null) expand = bottomBar.AddComponent<ExpandableInput>();
+
+        var so = new SerializedObject(expand);
+        so.FindProperty("bottomPanelRect").objectReferenceValue    = bottomRt;
+        so.FindProperty("inputFieldRect").objectReferenceValue     = (RectTransform)captionGo.transform;
+        so.FindProperty("inputField").objectReferenceValue         = captionField;
+        so.FindProperty("inputLayoutElement").objectReferenceValue = hostLe;        // host tracks content, clamped at max
+        // messageListRect stays null: the media preview keeps its size and the
+        // bar grows over it (WhatsApp-style) — consistent with the keyboard,
+        // which already slides the bar over the content area.
+        so.FindProperty("messageListRect").objectReferenceValue    = null;
+        so.FindProperty("scrollRect").objectReferenceValue         = captionScroll; // over-max growth scrolls caret into view
+        so.FindProperty("maxHeight").floatValue                    = BottomBarMaxHeight;
+        so.ApplyModifiedPropertiesWithoutUndo();
+    }
 
     private static GameObject NewChild(Transform parent, string name, params System.Type[] components)
     {
@@ -420,8 +620,15 @@ public static class AttachmentPreviewScreenBuilder
     /// </summary>
     private static void AddRoundedCorners(GameObject go, float radius)
     {
-        var roundedType = System.Type.GetType("Nobi.UiRoundedCorners.ImageWithRoundedCorners, Assembly-CSharp")
-                         ?? System.Type.GetType("Nobi.UiRoundedCorners.ImageWithRoundedCorners");
+        // The component ships in the RoundedCorners UPM package's own assembly,
+        // so a bare Type.GetType (which only searches Assembly-CSharp/mscorlib)
+        // misses it — scan all loaded assemblies instead.
+        System.Type roundedType = null;
+        foreach (var asm in System.AppDomain.CurrentDomain.GetAssemblies())
+        {
+            roundedType = asm.GetType("Nobi.UiRoundedCorners.ImageWithRoundedCorners");
+            if (roundedType != null) break;
+        }
         if (roundedType == null)
         {
             Debug.LogWarning(

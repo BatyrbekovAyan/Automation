@@ -15,6 +15,13 @@ public class ExpandableInput : MonoBehaviour
     [Header("Layout")]
     public RectTransform messageListRect;
 
+    // When the input is the content of a scroll host that sits under a layout
+    // group (attachment preview caption), assign the HOST's LayoutElement here:
+    // it tracks the growing input but stops at maxHeight, so the overflow
+    // drag-scrolls inside the host via scrollRect — the same structure the
+    // messages input uses. Leave null for anchor-driven hosts (messages).
+    public LayoutElement inputLayoutElement;
+
     [Header("Sizing")]
     public float maxHeight = 412;
 
@@ -49,7 +56,13 @@ public class ExpandableInput : MonoBehaviour
 
         if (Mathf.Abs(currentAppliedHeight - targetHeight) > updateThreshold)
         {
+            // The input rect always grows with its text — when hosted in a
+            // ScrollRect it is the scroll content. In layout-driven mode the
+            // host's LayoutElement tracks it but stops at the panel max; past
+            // that the overflow drag-scrolls inside the host.
             inputFieldRect.sizeDelta = new Vector2(inputFieldRect.sizeDelta.x, targetHeight);
+            if (inputLayoutElement != null)
+                inputLayoutElement.preferredHeight = Mathf.Min(targetHeight, maxHeight - heightPadding);
 
             float targetPanelHeight = targetHeight + heightPadding;
             float clampedHeight = Mathf.Clamp(targetPanelHeight, minHeight, maxHeight);
@@ -58,7 +71,7 @@ public class ExpandableInput : MonoBehaviour
             // --- KEEP SCROLL LIST ABOVE THE PANEL ---
             ApplyScrollRectOffset(clampedHeight);
 
-            if (targetHeight > currentAppliedHeight && targetPanelHeight > maxHeight)
+            if (scrollRect != null && targetHeight > currentAppliedHeight && targetPanelHeight > maxHeight)
             {
                 Canvas.ForceUpdateCanvases();
                 scrollRect.verticalNormalizedPosition = 0f;
