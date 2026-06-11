@@ -285,7 +285,27 @@
       "Bash(grep -v \"TryAlias\\\\|MediaUrlIdentity\\\\|MediaPinPersistence\\\\|alias\\\\|Alias\\\\|//\\\\|^+$\\\\|string fromPath\\\\|string toPath\\\\|File.Copy\\\\|File.Exists\\(toPath\\)\\\\|IsImageCached\\(fromUrl\\)\\\\|string.IsNullOrEmpty\\(fromUrl\\)\\\\|return true\\\\|return false\\\\|catch\\\\|Debug.LogWarning\\\\|try\\\\|^+        {\\\\|^+        }\\\\|^+    {\\\\|^+    }\\\\|^+    public bool\\\\|vm.chatId\")",
       "Bash(awk 'NR>=2580 && NR<=2640' Assets/Prefabs/MessageTextIncoming.prefab)",
       "Bash(awk '/&763551205735561166$/{flag=1} flag{print NR\": \"$0; c++; if\\(c>15\\) exit}')",
-      "Bash(awk 'NR>=2580 && NR<=2629')"
+      "Bash(awk 'NR>=2580 && NR<=2629')",
+      "Bash(grep -E \"m_Children|fileID: [0-9]+}$\")",
+      "Bash(sed -n '1,16p')",
+      "Bash(awk '/^--- !u!114 &398485036/{f=1} f && /m_GameObject:|m_LineType|m_ScrollSensitivity|m_VerticalScrollbar|m_TextViewport|m_TextComponent/{print} f && /^--- !u!/ && !/398485036/{exit}' Assets/Scenes/Main.unity)",
+      "Bash(awk '/^--- !u!114 &683210552/{f=1} f{print} f && /^--- !u!/ && !/683210552/{exit}' Assets/Scenes/Main.unity)",
+      "Bash(awk '/^--- !u!114 &683210552/{f=1} f && /m_GameObject:/{print $3; exit}' Assets/Scenes/Main.unity)",
+      "Bash(awk '/^--- !u!114 &398485036\\\\r?$/{f=1} f && /m_TargetGraphic|m_Transition|m_Interactable/{print} f && /m_TextViewport/{exit}' Assets/Scenes/Main.unity)",
+      "Bash(awk '/^--- !u!1 &398485034\\\\r?$/{f=1} f && /component:/{print} f && /m_Name/{print; exit}' Assets/Scenes/Main.unity)",
+      "Bash(awk '/^--- !u!114 &398485037\\\\r?$/{f=1} f && /m_Color|m_RaycastTarget/{print} f && /m_Sprite/{exit}' Assets/Scenes/Main.unity)",
+      "Bash(awk '/Assembly-CSharp::ExpandableInput/{n++} n==2 && /messageListRect|maxHeight/{print} n==2 && /maxHeight/{exit}' Assets/Scenes/Main.unity)",
+      "Bash(awk '/m_Name: .*[Ss]pinner/{print NR\": \"$0}' /Users/ayan/Projects/Automation/Assets/Prefabs/MessageTextIncoming.prefab)",
+      "Bash(awk 'NR>=14060 && NR<=14180' /Users/ayan/Projects/Automation/Assets/Scenes/Main.unity)",
+      "Bash(awk 'NR>=11179 && NR<=11210' /Users/ayan/Projects/Automation/Assets/Scenes/Main.unity)",
+      "Bash(awk 'NR>=33136 && NR<=33167' /Users/ayan/Projects/Automation/Assets/Scenes/Main.unity)",
+      "Bash(break)",
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__plugin_context7_context7__query-docs",
+      "Bash(kill 6405 7439)",
+      "Bash(grep -iE \"nuget|^Packages$\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/Unity-Technologies/UnityCsReference/master/Editor/Mono/AssemblyValidation.cs\" -o /tmp/AssemblyValidation.cs)",
+      "Bash(awk '{print $1}')"
     ],
     "defaultMode": "acceptEdits"
   }
