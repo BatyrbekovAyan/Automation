@@ -53,6 +53,28 @@ public static class AttachSheetBuilder
     private static readonly Color DocumentTint = new Color(0.29f, 0.56f, 0.89f); // #4A90E2
     private static readonly Color PressedTint  = new Color(0.85f, 0.85f, 0.85f, 1f);
 
+    // Headless entry point (Editor closed):
+    //   Unity -batchmode -nographics -projectPath . \
+    //         -executeMethod AttachSheetBuilder.BuildHeadless -quit
+    // Throws (→ nonzero Unity exit) if the build leaves the scene unwired.
+    public static void BuildHeadless()
+    {
+        var scene = EditorSceneManager.OpenScene("Assets/Scenes/Main.unity");
+        Build();
+
+        var sheet = Object.FindFirstObjectByType<AttachSheet>(FindObjectsInactive.Include);
+        if (sheet == null)
+            throw new System.InvalidOperationException("Headless build produced no AttachSheet.");
+
+        var preview = Object.FindFirstObjectByType<AttachmentPreviewScreen>(FindObjectsInactive.Include);
+        if (preview != null &&
+            new SerializedObject(preview).FindProperty("attachSheet").objectReferenceValue == null)
+            throw new System.InvalidOperationException("AttachmentPreviewScreen.attachSheet still null after build.");
+
+        EditorSceneManager.SaveScene(scene);
+        Debug.Log("[AttachSheetBuilder] Headless build + save complete.");
+    }
+
     [MenuItem("Tools/Attach Sheet/Build")]
     public static void Build()
     {
@@ -179,6 +201,21 @@ public static class AttachSheetBuilder
         var soPanel = new SerializedObject(bottomPanel);
         SetObjectRef(soPanel, "attachSheet", attachSheet);
         soPanel.ApplyModifiedPropertiesWithoutUndo();
+
+        // Re-point AttachmentPreviewScreen at the recreated sheet — it opens off
+        // OnPicked through this serialized ref, which dies with the old instance.
+        var previewScreen = Object.FindFirstObjectByType<AttachmentPreviewScreen>(FindObjectsInactive.Include);
+        if (previewScreen != null)
+        {
+            var soPreview = new SerializedObject(previewScreen);
+            SetObjectRef(soPreview, "attachSheet", attachSheet);
+            soPreview.ApplyModifiedPropertiesWithoutUndo();
+        }
+        else
+        {
+            Debug.LogWarning("[AttachSheetBuilder] AttachmentPreviewScreen not found — " +
+                             "its OnPicked subscription is not wired; previews won't open.");
+        }
 
         EditorSceneManager.MarkSceneDirty(bottomPanel.gameObject.scene);
         Debug.Log("[AttachSheetBuilder] Built circle-grid AttachSheet + dim backdrop under " +
