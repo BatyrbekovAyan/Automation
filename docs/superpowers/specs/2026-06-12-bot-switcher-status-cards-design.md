@@ -103,7 +103,9 @@ Chip colors, the disconnected gray, and the ring/badge accent (`#1B7CEB`) live a
 Same menu item (`Tools/Bot Switcher/Build Sheet`), rebuilt output:
 
 - All constants authored in reference units per the table above (no scale helper needed — write final values).
-- Builds the sheet shell: root + backdrop (unchanged pattern) + gray panel + grabber + title + ScrollRect list.
+- Builds the sheet shell: root + backdrop + gray panel + grabber + title + ScrollRect list.
+- **Parenting (shipped 2026-06-12):** the sheet root lives inside the WhatsApp `ChatsPanel` (the screen it serves, same as AttachSheet inside MessagesPanel), not at canvas root. The builder resolves the panel by finding `BotSwitcherTitleBinder` and walking up to the transform named `ChatsPanel` — immune to container nesting between canvas and screen. The destroy sweep removes prior sheets anywhere under the canvas.
+- **No UISprite (shipped 2026-06-12):** every surface (panel, grabber, ring, card, avatar tile, chip, badge) is a plain `Image` with `sprite = null`, rounded purely by the RoundedCorners shader. Stretching `UI/Skin/UISprite.psd` bakes a soft blurry border into every edge — the house builders (AttachSheet, BotSettings) never use it. Only the check glyph keeps a sprite (`UI/Skin/Checkmark.psd`).
 - Builds the row template **and saves it directly to `Assets/Prefabs/BotSwitcherRow.prefab`** via `PrefabUtility.SaveAsPrefabAsset`, then wires `BotSwitcherSheet.rowPrefab` to the saved asset and deletes the in-scene holder. This removes the old manual steps (drag-to-prefab, re-wire, run avatar rebuilder) — one menu item produces the working sheet.
 - Avatar internals (tile + `IconSprite` child at 64%) are built inline by this builder, keeping the same `avatarImage`/`avatarIcon` contract the runtime expects.
 - Loads the two brand sprites via `AssetDatabase.LoadAssetAtPath<Sprite>`; logs an error and aborts if either is missing or not imported as a Sprite.
