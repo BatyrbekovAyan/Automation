@@ -571,6 +571,19 @@ namespace Automation.BotSettingsUI
         private void MaybeHide()
         {
             if (kbDismissingAtScrimPress) return;
+            Dismiss();
+        }
+
+        /// <summary>
+        /// Abandon-the-sheet dismissal — scrim tap and grabber drag both land
+        /// here. Unlike a bare Hide(), a newly added card that was never
+        /// committed is discarded, otherwise a phantom blank card would be
+        /// left behind. The scrim's iOS reroute guard doesn't apply to drags
+        /// (they begin on the sheet's own DragZone, not the scrim), so
+        /// SheetDragDismiss wires onDismiss directly to this.
+        /// </summary>
+        public void Dismiss()
+        {
             if (isNewlyAdded)
             {
                 // Capture before Hide(): Hide() nulls boundProduct/boundService

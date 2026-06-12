@@ -87,12 +87,15 @@ public class AttachSheet : MonoBehaviour
         _rt.anchoredPosition = new Vector2(0f, -sheetHeightCanvasPx);
 
         _slideTween?.Kill();
+        // SetTarget links the lambda tween to the RectTransform so
+        // SheetDragDismiss's DOTween.IsTweening guard can see it.
         _slideTween = DOTween.To(
                 () => _rt.anchoredPosition.y,
                 v  => _rt.anchoredPosition = new Vector2(0f, v),
                 0f,
                 openDuration)
-            .SetEase(Ease.OutCubic);
+            .SetEase(Ease.OutCubic)
+            .SetTarget(_rt);
     }
 
     public void Close()
@@ -111,6 +114,7 @@ public class AttachSheet : MonoBehaviour
                 closeDuration)
             .From(startY)
             .SetEase(Ease.OutCubic)
+            .SetTarget(_rt)
             .OnComplete(() =>
             {
                 gameObject.SetActive(false);

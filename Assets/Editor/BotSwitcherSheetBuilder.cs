@@ -143,7 +143,8 @@ public static class BotSwitcherSheetBuilder
         sheet.SetActive(false);
         Selection.activeGameObject = sheet;
         EditorSceneManager.MarkSceneDirty(sheet.scene);
-        Debug.Log($"[BotSwitcherSheetBuilder] Built {SheetName} and saved {RowPrefabPath}. No further manual steps.");
+        Debug.Log($"[BotSwitcherSheetBuilder] Built {SheetName} and saved {RowPrefabPath}. " +
+            "Re-run 'Tools/Sheets/Wire Drag Dismiss' — the rebuild drops the DragZone.");
     }
 
     private static GameObject BuildSheetRoot(Transform parent)
