@@ -28,6 +28,9 @@ public class BotSwitcherSheet : MonoBehaviour
     // so the panel is guaranteed to start offscreen.
     private const float FallbackPanelHeight = 1200f;
 
+    private const float CascadeFadeSeconds = 0.2f;
+    private const float CascadeStaggerSeconds = 0.05f;
+
     private bool isAnimating;
     private float panelHiddenY;
     private float panelShownY;
@@ -135,6 +138,7 @@ public class BotSwitcherSheet : MonoBehaviour
 
         string activeBotId = ChatManager.Instance != null ? ChatManager.Instance.CurrentBotId : "";
 
+        int spawned = 0;
         for (int i = 0; i < botsRoot.childCount; i++)
         {
             Bot bot = botsRoot.GetChild(i).GetComponent<Bot>();
@@ -143,6 +147,18 @@ public class BotSwitcherSheet : MonoBehaviour
             var row = Instantiate(rowPrefab, rowContainer);
             row.transform.localScale = Vector3.one;
             row.Bind(bot, isSelected: bot.transform.name == activeBotId, tapHandler: HandleRowTap);
+
+            CanvasGroup rowGroup = row.CanvasGroup;
+            if (rowGroup != null)
+            {
+                // SetLink kills the tween if PopulateRows destroys the row
+                // mid-fade on a quick close/reopen.
+                rowGroup.alpha = 0f;
+                rowGroup.DOFade(1f, CascadeFadeSeconds)
+                    .SetDelay(spawned * CascadeStaggerSeconds)
+                    .SetLink(row.gameObject);
+            }
+            spawned++;
         }
     }
 
