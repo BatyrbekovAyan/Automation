@@ -16,6 +16,7 @@ public class AttachSheet : MonoBehaviour
     [SerializeField] private TMP_InputField inputField;
     [SerializeField] private GameObject backdrop;
     [SerializeField] private Button backdropButton;
+    [SerializeField] private CanvasGroup backdropGroup;
     [SerializeField] private Button cameraButton;
     [SerializeField] private Button galleryButton;
     [SerializeField] private Button documentButton;
@@ -29,6 +30,7 @@ public class AttachSheet : MonoBehaviour
     private RectTransform _rt;
     private bool          _isOpen;
     private Tween         _slideTween;
+    private Tween         _fadeTween;
 
     void Awake()
     {
@@ -55,6 +57,7 @@ public class AttachSheet : MonoBehaviour
         if (backdropButton != null) backdropButton.onClick.RemoveListener(Close);
 
         _slideTween?.Kill();
+        _fadeTween?.Kill();
         if (backdrop != null) backdrop.SetActive(false);
     }
 
@@ -76,6 +79,7 @@ public class AttachSheet : MonoBehaviour
 
         gameObject.SetActive(true);
         if (backdrop != null) backdrop.SetActive(true);
+        FadeBackdrop(1f, openDuration);
 
         // Sheet slides up from below the canvas. Width is held by the
         // pre-existing anchors (built by AttachSheetBuilder).
@@ -96,6 +100,8 @@ public class AttachSheet : MonoBehaviour
         if (!_isOpen) return;
         _isOpen = false;
 
+        FadeBackdrop(0f, closeDuration);
+
         _slideTween?.Kill();
         float startY = _rt.anchoredPosition.y;
         _slideTween = DOTween.To(
@@ -110,6 +116,13 @@ public class AttachSheet : MonoBehaviour
                 gameObject.SetActive(false);
                 if (backdrop != null) backdrop.SetActive(false);
             });
+    }
+
+    private void FadeBackdrop(float targetAlpha, float duration)
+    {
+        if (backdropGroup == null) return;
+        _fadeTween?.Kill();
+        _fadeTween = backdropGroup.DOFade(targetAlpha, duration).SetEase(Ease.Linear);
     }
 
     // ── Tile actions ────────────────────────────────────────────────
