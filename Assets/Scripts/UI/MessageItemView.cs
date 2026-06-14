@@ -47,6 +47,9 @@ public class MessageItemView : MonoBehaviour
     
     public TextMeshProUGUI timeText;
 
+    [Header("Reactions")]
+    [SerializeField] private ReactionPillView reactionPill;
+
     [Header("Document UI")]
     public GameObject documentPanel;
     public Image documentIcon;
@@ -246,6 +249,7 @@ public class MessageItemView : MonoBehaviour
         {
             ChatManager.Instance.OnMessageStatusChanged += HandleStatusChanged;
             ChatManager.Instance.OnMessageMediaRefreshed += HandleMediaRefreshed;
+            ChatManager.Instance.OnMessageReactionsChanged += HandleReactionsChanged;
             ChatManager.Instance.OnMediaSendProgress += HandleSendProgress;
         }
 
@@ -276,6 +280,7 @@ public class MessageItemView : MonoBehaviour
         {
             ChatManager.Instance.OnMessageStatusChanged -= HandleStatusChanged;
             ChatManager.Instance.OnMessageMediaRefreshed -= HandleMediaRefreshed;
+            ChatManager.Instance.OnMessageReactionsChanged -= HandleReactionsChanged;
             ChatManager.Instance.OnMediaSendProgress -= HandleSendProgress;
         }
 
@@ -453,8 +458,10 @@ public class MessageItemView : MonoBehaviour
     public void Bind(MessageViewModel vm, bool showTail = true, bool skipLayoutRebuild = false, bool showSenderName = false)    
     {
         currentVm = vm;
-        currentShowTail = showTail; 
-        
+        currentShowTail = showTail;
+
+        RenderReactions();
+
 // --- SENDER NAME LOGIC ---
         if (senderNameText != null)
         {
@@ -4110,6 +4117,22 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
         bool showSenderName = senderNameText != null && senderNameText.gameObject.activeSelf;
         Bind(currentVm, currentShowTail, true, showSenderName);
         FinalizeCustomVisuals();
+    }
+
+    private void HandleReactionsChanged(MessageViewModel changed)
+    {
+        if (currentVm == null || changed == null) return;
+        if (currentVm.messageId != changed.messageId) return;
+
+        // ChatManager mutates the cached VM in place, so currentVm.reactions is
+        // already current. Re-render the pill only — no full re-bind needed.
+        RenderReactions();
+    }
+
+    private void RenderReactions()
+    {
+        if (reactionPill == null) return;
+        reactionPill.Render(currentVm != null ? currentVm.reactions : null);
     }
 
     private void UpdateRetryButton(bool enableRetry)
