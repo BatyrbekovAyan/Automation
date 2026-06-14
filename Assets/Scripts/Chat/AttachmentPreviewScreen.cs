@@ -1,6 +1,5 @@
 using System;
 using System.Collections;
-using System.Collections.Generic;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
@@ -8,13 +7,6 @@ using UnityEngine.UI;
 
 public class AttachmentPreviewScreen : MonoBehaviour
 {
-    [Serializable]
-    public struct MimeIconEntry
-    {
-        public string mimePrefix;
-        public Sprite sprite;
-    }
-
     [Header("References — wired by AttachmentPreviewScreenBuilder")]
     [SerializeField] private AttachSheet attachSheet;
     [SerializeField] private GameObject  root;
@@ -30,14 +22,11 @@ public class AttachmentPreviewScreen : MonoBehaviour
     [SerializeField] private TextMeshProUGUI videoDurationLabel;
     [SerializeField] private TextMeshProUGUI documentFileName;
     [SerializeField] private TextMeshProUGUI documentFileSize;
-    [SerializeField] private Image       documentIcon;
+    [SerializeField] private Image       documentChipBackground;
+    [SerializeField] private TextMeshProUGUI documentChipLabel;
     [SerializeField] private DeferredDismissInputField captionField;
     [SerializeField] private Button      sendButton;
     [SerializeField] private Button      backButton;
-
-    [Header("MIME → icon mapping (first prefix match wins)")]
-    [SerializeField] private List<MimeIconEntry> mimeIcons = new List<MimeIconEntry>();
-    [SerializeField] private Sprite documentFallbackIcon;
 
     [Header("Tween")]
     [SerializeField] private float fadeDuration = 0.18f;
@@ -231,26 +220,44 @@ public class AttachmentPreviewScreen : MonoBehaviour
         if (documentPanel == null) return;
         documentPanel.SetActive(true);
 
-        if (documentFileName != null) documentFileName.text = pick.FileName ?? "";
+        string typeLabel = TypeLabelFor(pick);
+        if (documentChipLabel      != null) documentChipLabel.text       = typeLabel;
+        if (documentChipBackground != null) documentChipBackground.color = ChipColorFor(typeLabel);
+        if (documentFileName       != null) documentFileName.text        = pick.FileName ?? "";
 
         string sizeText = AttachmentDisplayFormat.HumanReadableBytes(pick.FileSizeBytes);
-        string mimeText = AttachmentDisplayFormat.ShortMime(pick.MimeType);
         if (documentFileSize != null)
-            documentFileSize.text = string.IsNullOrEmpty(mimeText) ? sizeText : $"{sizeText} · {mimeText}";
-
-        if (documentIcon != null) documentIcon.sprite = SpriteForMime(pick.MimeType);
+            documentFileSize.text = $"{typeLabel} · {sizeText}";
     }
 
-    private Sprite SpriteForMime(string mime)
+    // The chip can comfortably fit ~4 characters at its font size; anything
+    // longer (odd extensions, raw MIME suffixes) falls back to a generic label.
+    private const int MaxChipLabelLength = 4;
+
+    private static string TypeLabelFor(AttachmentPick pick)
     {
-        if (string.IsNullOrEmpty(mime)) return documentFallbackIcon;
-        foreach (var entry in mimeIcons)
+        string ext = System.IO.Path.GetExtension(pick.FileName ?? "");
+        string label = string.IsNullOrEmpty(ext)
+            ? AttachmentDisplayFormat.ShortMime(pick.MimeType)
+            : ext.TrimStart('.').ToUpperInvariant();
+        return string.IsNullOrEmpty(label) || label.Length > MaxChipLabelLength ? "FILE" : label;
+    }
+
+    private static Color ChipColorFor(string typeLabel)
+    {
+        switch (typeLabel)
         {
-            if (string.IsNullOrEmpty(entry.mimePrefix)) continue;
-            if (mime.StartsWith(entry.mimePrefix, StringComparison.OrdinalIgnoreCase))
-                return entry.sprite != null ? entry.sprite : documentFallbackIcon;
+            case "PDF":
+                return new Color(0.898f, 0.282f, 0.302f);                // #E5484D
+            case "DOC": case "DOCX": case "RTF": case "ODT":
+                return new Color(0.290f, 0.549f, 0.859f);                // #4A8CDB
+            case "XLS": case "XLSX": case "CSV": case "ODS":
+                return new Color(0.180f, 0.620f, 0.357f);                // #2E9E5B
+            case "PPT": case "PPTX":
+                return new Color(0.910f, 0.522f, 0.235f);                // #E8853C
+            default:
+                return new Color(0.373f, 0.420f, 0.451f);                // #5F6B73
         }
-        return documentFallbackIcon;
     }
 
     private static void ApplyAspectRatio(AspectRatioFitter fitter, Texture2D tex)

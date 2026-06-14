@@ -28,21 +28,32 @@ public static class AttachmentPreviewScreenBuilder
     private const float SendButtonSize     = 88f;
     private const float SendIconSize       = 44f;   // white glyph centered inside the green circle
     private const float BackButtonSize     = 88f;
-    private const float DocCardWidth       = 360f;
-    private const float DocCardHeight      = 220f;
-    private const float DocIconSize        = 56f;
     private const float PlayOverlaySize    = 80f;
     private const float PlayIconSize       = 56f;
     private const float DurationBadgeWidth  = 96f;
     private const float DurationBadgeHeight = 36f;
     private const float DurationBadgeOffset = 16f;
 
+    // Document "paper page" hero — a white A4-proportioned page with an
+    // extension chip and abstract text lines, filename + meta below it.
+    private const float PageWidth       = 560f;
+    private const float PageHeight      = 792f;  // PageWidth × √2 → A4 ratio
+    private const float PagePadding     = 48f;
+    private const float PageLineSpacing = 32f;
+    private const float BarHeight       = 20f;   // abstract "text line" bars
+    private const float DocNameGap      = 64f;   // page bottom → filename
+    private const float DocMetaGap      = 12f;   // filename → meta line
+    private const float DocNameHeight   = 56f;
+    private const float DocMetaHeight   = 40f;
+    private const float DocTextWidth    = 920f;  // filename/meta label width
+
     // Type scale — project-calibrated reference units (see unity-ui-builder skill).
     // These replace the old mockup-px sizes that rendered ~⅓ too small on device.
     private const float TitleFontSize    = 50f;  // H1 — page title
     private const float CaptionFontSize  = 38f;  // Body2 — caption input + placeholder
-    private const float DocNameFontSize  = 42f;  // H3 — card title
-    private const float DocSizeFontSize  = 30f;  // Caption — meta
+    private const float DocNameFontSize  = 44f;  // H3 — filename under the page
+    private const float DocSizeFontSize  = 32f;  // Caption — "PDF · 2.4 MB" meta
+    private const float ChipFontSize     = 30f;  // Caption — extension chip label
     private const float DurationFontSize = 26f;  // Micro — badge
 
     // Corner radii (reference units). Half-the-height radii give true circles / pill ends.
@@ -50,7 +61,9 @@ public static class AttachmentPreviewScreenBuilder
     private const float PlayRadius     = 40f;   // PlayOverlaySize / 2 → circle
     private const float DurationRadius = 18f;   // DurationBadgeHeight / 2 → pill
     private const float CaptionRadius  = 40f;   // CaptionFieldHeight / 2 → pill
-    private const float DocCardRadius  = 32f;   // rounded-rect card
+    private const float PageRadius     = 28f;   // paper page corners
+    private const float ChipRadius     = 12f;   // extension chip
+    private const float BarRadius      = 10f;   // BarHeight / 2 → pill text lines
 
     private static readonly Color RootBg         = new Color(0.055f, 0.078f, 0.086f); // #0E1416
     private static readonly Color BarBg          = new Color(0.118f, 0.145f, 0.157f); // #1E2528
@@ -60,6 +73,9 @@ public static class AttachmentPreviewScreenBuilder
     private static readonly Color SubtleText     = new Color(0.604f, 0.631f, 0.651f); // #9AA1A6
     private static readonly Color PlaceholderText = new Color(0.435f, 0.455f, 0.475f); // #6F7479
     private static readonly Color PlayOverlayBg  = new Color(0f, 0f, 0f, 0.50f);
+    private static readonly Color PaperBg        = new Color(0.925f, 0.937f, 0.945f); // #ECEFF1
+    private static readonly Color PaperLine      = new Color(0.773f, 0.804f, 0.824f); // #C5CDD2
+    private static readonly Color ChipPdfRed     = new Color(0.898f, 0.282f, 0.302f); // #E5484D — editor default; runtime recolors per type
 
     [MenuItem("Tools/Attach Sheet/Build Preview Screen")]
     public static void Build()
@@ -178,7 +194,12 @@ public static class AttachmentPreviewScreenBuilder
         // The bar background extends under the home bar; content stays above it.
         hl.padding = new RectOffset(32, 32, 24, 92);
         hl.spacing = 24;
-        hl.childAlignment = TextAnchor.MiddleCenter;
+        // LowerCenter (not MiddleCenter): the bar grows UPWARD as the caption wraps
+        // (pivot is at the bar's bottom). Bottom-aligning the row pins the fixed-size
+        // SendButton to the bottom padding zone so it stays put while the caption
+        // pill expands above it — WhatsApp behavior. MiddleCenter re-centered the
+        // button every line, displacing it upward.
+        hl.childAlignment = TextAnchor.LowerCenter;
         hl.childControlWidth      = true;
         hl.childControlHeight     = true;
         hl.childForceExpandWidth  = false;
@@ -338,60 +359,8 @@ public static class AttachmentPreviewScreenBuilder
         durationLabel.raycastTarget = false;
         videoPanel.SetActive(false);
 
-        // ── DocumentPanel ────────────────────────────────────────────
-        var documentPanel = NewChild(contentGo.transform, "DocumentPanel", typeof(RectTransform));
-        var docRt = (RectTransform)documentPanel.transform;
-        docRt.anchorMin = new Vector2(0.5f, 0.5f);
-        docRt.anchorMax = new Vector2(0.5f, 0.5f);
-        docRt.pivot     = new Vector2(0.5f, 0.5f);
-        docRt.sizeDelta = new Vector2(DocCardWidth, DocCardHeight);
-        var docCardGo = NewChild(documentPanel.transform, "Card",
-                                  typeof(RectTransform), typeof(Image), typeof(VerticalLayoutGroup));
-        var docCardRt = (RectTransform)docCardGo.transform;
-        Stretch(docCardRt);
-        var docCardBg = docCardGo.GetComponent<Image>();
-        docCardBg.color = BarBg;
-        docCardBg.raycastTarget = false;
-        AddRoundedCorners(docCardGo, DocCardRadius);
-        var docVl = docCardGo.GetComponent<VerticalLayoutGroup>();
-        docVl.padding = new RectOffset(24, 24, 24, 24);
-        docVl.spacing = 12;
-        docVl.childAlignment = TextAnchor.MiddleCenter;
-        docVl.childControlWidth      = true;
-        docVl.childControlHeight     = false;
-        docVl.childForceExpandWidth  = true;
-        docVl.childForceExpandHeight = false;
-
-        var docIconGo = NewChild(docCardGo.transform, "Icon",
-                                  typeof(RectTransform), typeof(Image), typeof(LayoutElement));
-        var docIconLe = docIconGo.GetComponent<LayoutElement>();
-        docIconLe.minWidth = docIconLe.preferredWidth = DocIconSize;
-        docIconLe.minHeight = docIconLe.preferredHeight = DocIconSize;
-        var docIconImg = docIconGo.GetComponent<Image>();
-        docIconImg.color = White;
-        docIconImg.raycastTarget = false;
-
-        var docNameGo = NewChild(docCardGo.transform, "FileName",
-                                  typeof(RectTransform), typeof(TextMeshProUGUI));
-        var docName = docNameGo.GetComponent<TextMeshProUGUI>();
-        docName.text = "filename.pdf";
-        docName.fontSize = DocNameFontSize;
-        docName.fontStyle = FontStyles.Bold;
-        docName.color = White;
-        docName.alignment = TextAlignmentOptions.Center;
-        docName.enableWordWrapping = false;
-        docName.overflowMode = TextOverflowModes.Ellipsis;
-        docName.raycastTarget = false;
-
-        var docSizeGo = NewChild(docCardGo.transform, "FileSize",
-                                  typeof(RectTransform), typeof(TextMeshProUGUI));
-        var docSize = docSizeGo.GetComponent<TextMeshProUGUI>();
-        docSize.text = "0 B";
-        docSize.fontSize = DocSizeFontSize;
-        docSize.color = SubtleText;
-        docSize.alignment = TextAlignmentOptions.Center;
-        docSize.raycastTarget = false;
-        documentPanel.SetActive(false);
+        // ── DocumentPanel (paper page hero) ──────────────────────────
+        var docRefs = BuildDocumentPanel(contentGo.transform);
 
         // ── Wire serialized refs ─────────────────────────────────────
         var screen = screenGo.GetComponent<AttachmentPreviewScreen>();
@@ -402,37 +371,27 @@ public static class AttachmentPreviewScreenBuilder
         SetObjectRef(so, "rootCanvasGroup",   rootCg);
         SetObjectRef(so, "imagePanel",        imagePanel);
         SetObjectRef(so, "videoPanel",        videoPanel);
-        SetObjectRef(so, "documentPanel",     documentPanel);
+        SetObjectRef(so, "documentPanel",     docRefs.panel);
         SetObjectRef(so, "bottomBarRect",     (RectTransform)bottomBar.transform);
         SetObjectRef(so, "imagePreview",      imagePreview);
         SetObjectRef(so, "videoPreview",      videoPreview);
         SetObjectRef(so, "videoPlayOverlay",  playOverlayGo);
         SetObjectRef(so, "videoDurationBadge", durationBadge);
         SetObjectRef(so, "videoDurationLabel", durationLabel);
-        SetObjectRef(so, "documentFileName",  docName);
-        SetObjectRef(so, "documentFileSize",  docSize);
-        SetObjectRef(so, "documentIcon",      docIconImg);
+        SetObjectRef(so, "documentFileName",  docRefs.fileName);
+        SetObjectRef(so, "documentFileSize",  docRefs.meta);
+        SetObjectRef(so, "documentChipBackground", docRefs.chipBackground);
+        SetObjectRef(so, "documentChipLabel", docRefs.chipLabel);
         SetObjectRef(so, "captionField",      captionField);
         SetObjectRef(so, "sendButton",        sendBtn);
         SetObjectRef(so, "backButton",        backBtn);
-
-        // Seed the MIME-icon list with empty slots — user drops sprites in inspector.
-        var mimeIconsProp = so.FindProperty("mimeIcons");
-        mimeIconsProp.arraySize = 0;
-        AddMimeIconEntry(mimeIconsProp, "application/pdf");
-        AddMimeIconEntry(mimeIconsProp, "application/vnd.openxmlformats-officedocument");
-        AddMimeIconEntry(mimeIconsProp, "application/msword");
-        AddMimeIconEntry(mimeIconsProp, "application/vnd.ms-excel");
-        AddMimeIconEntry(mimeIconsProp, "image/");
-        AddMimeIconEntry(mimeIconsProp, "video/");
-        AddMimeIconEntry(mimeIconsProp, "text/");
 
         so.ApplyModifiedPropertiesWithoutUndo();
 
         EditorSceneManager.MarkSceneDirty(screenGo.scene);
         Debug.Log("[AttachmentPreviewScreenBuilder] Built AttachmentPreviewScreen. Assign sprite refs in the inspector: "
                 + "back arrow → BackButton (Image), send glyph → SendButton/Icon (the new white child, NOT the green bg), "
-                + "play glyph → PlayOverlay/PlayIcon, doc MIME icons → the AttachmentPreviewScreen 'Mime Icons' list.");
+                + "play glyph → PlayOverlay/PlayIcon. The document panel needs no sprites — chip color/label are set at runtime.");
     }
 
     /// <summary>
@@ -485,7 +444,174 @@ public static class AttachmentPreviewScreenBuilder
                 + "(scroll host + ExpandableInput + DragShield). Save the scene to persist.");
     }
 
+    /// <summary>
+    /// Surgical redesign of ONLY the document panel on an already-built screen —
+    /// replaces the old small card with the paper-page hero and rewires the four
+    /// document refs. Leaves the rest of the screen (and its hand-assigned
+    /// back/send/play sprites) untouched. Idempotent.
+    /// </summary>
+    [MenuItem("Tools/Attach Sheet/Rebuild Document Panel")]
+    public static void RebuildDocumentPanel()
+    {
+        var screen = Object.FindFirstObjectByType<AttachmentPreviewScreen>(FindObjectsInactive.Include);
+        var contentArea = screen != null ? screen.transform.Find($"{RootName}/ContentArea") : null;
+        if (contentArea == null)
+        {
+            Debug.LogError("[AttachmentPreviewScreenBuilder] Root/ContentArea not found — build the full screen first via Tools > Attach Sheet > Build Preview Screen.");
+            return;
+        }
+
+        var oldPanel = contentArea.Find("DocumentPanel");
+        if (oldPanel != null) Object.DestroyImmediate(oldPanel.gameObject);
+
+        var docRefs = BuildDocumentPanel(contentArea);
+
+        var so = new SerializedObject(screen);
+        SetObjectRef(so, "documentPanel",          docRefs.panel);
+        SetObjectRef(so, "documentFileName",       docRefs.fileName);
+        SetObjectRef(so, "documentFileSize",       docRefs.meta);
+        SetObjectRef(so, "documentChipBackground", docRefs.chipBackground);
+        SetObjectRef(so, "documentChipLabel",      docRefs.chipLabel);
+        so.ApplyModifiedPropertiesWithoutUndo();
+
+        EditorSceneManager.MarkSceneDirty(screen.gameObject.scene);
+        Debug.Log("[AttachmentPreviewScreenBuilder] Document panel rebuilt as paper-page hero and refs rewired. Save the scene to persist.");
+    }
+
     // ── helpers ───────────────────────────────────────────────────
+
+    private struct DocumentPanelRefs
+    {
+        public GameObject panel;
+        public TextMeshProUGUI fileName;
+        public TextMeshProUGUI meta;
+        public Image chipBackground;
+        public TextMeshProUGUI chipLabel;
+    }
+
+    /// <summary>
+    /// Document preview as a "paper page" hero: a white A4-proportioned page
+    /// holding a colored extension chip and abstract text-line bars, with the
+    /// filename and "TYPE · size" meta centered below. The whole stack is
+    /// vertically centered in the content area. No sprites required — the chip
+    /// label is TMP text and AttachmentPreviewScreen recolors it per file type.
+    /// </summary>
+    private static DocumentPanelRefs BuildDocumentPanel(Transform contentParent)
+    {
+        var refs = new DocumentPanelRefs();
+
+        var panel = NewChild(contentParent, "DocumentPanel", typeof(RectTransform));
+        Stretch((RectTransform)panel.transform);
+        refs.panel = panel;
+
+        float stackHeight = PageHeight + DocNameGap + DocNameHeight + DocMetaGap + DocMetaHeight;
+        float stackTop    = stackHeight * 0.5f;
+
+        // Page — white rounded rect, VLG lays out chip + text-line bars top-down.
+        var pageGo = NewChild(panel.transform, "Page",
+                              typeof(RectTransform), typeof(Image), typeof(VerticalLayoutGroup));
+        var pageRt = (RectTransform)pageGo.transform;
+        pageRt.anchorMin = pageRt.anchorMax = new Vector2(0.5f, 0.5f);
+        pageRt.pivot     = new Vector2(0.5f, 0.5f);
+        pageRt.sizeDelta = new Vector2(PageWidth, PageHeight);
+        pageRt.anchoredPosition = new Vector2(0f, stackTop - PageHeight * 0.5f);
+        var pageImg = pageGo.GetComponent<Image>();
+        pageImg.color = PaperBg;
+        pageImg.raycastTarget = false;
+        AddRoundedCorners(pageGo, PageRadius);
+        var pageVl = pageGo.GetComponent<VerticalLayoutGroup>();
+        pageVl.padding = new RectOffset((int)PagePadding, (int)PagePadding, (int)PagePadding, (int)PagePadding);
+        pageVl.spacing = PageLineSpacing;
+        pageVl.childAlignment = TextAnchor.UpperLeft;
+        pageVl.childControlWidth      = false;
+        pageVl.childControlHeight     = false;
+        pageVl.childForceExpandWidth  = false;
+        pageVl.childForceExpandHeight = false;
+
+        // Extension chip — colored tag that hugs its label via ContentSizeFitter.
+        var chipGo = NewChild(pageGo.transform, "TypeChip",
+                              typeof(RectTransform), typeof(Image),
+                              typeof(HorizontalLayoutGroup), typeof(ContentSizeFitter));
+        var chipImg = chipGo.GetComponent<Image>();
+        chipImg.color = ChipPdfRed;
+        chipImg.raycastTarget = false;
+        AddRoundedCorners(chipGo, ChipRadius);
+        var chipHl = chipGo.GetComponent<HorizontalLayoutGroup>();
+        chipHl.padding = new RectOffset(20, 20, 6, 6);
+        chipHl.childAlignment = TextAnchor.MiddleCenter;
+        chipHl.childControlWidth      = true;
+        chipHl.childControlHeight     = true;
+        chipHl.childForceExpandWidth  = false;
+        chipHl.childForceExpandHeight = false;
+        var chipFit = chipGo.GetComponent<ContentSizeFitter>();
+        chipFit.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+        chipFit.verticalFit   = ContentSizeFitter.FitMode.PreferredSize;
+
+        var chipLabelGo = NewChild(chipGo.transform, "Label",
+                                   typeof(RectTransform), typeof(TextMeshProUGUI));
+        var chipLabel = chipLabelGo.GetComponent<TextMeshProUGUI>();
+        chipLabel.text          = "PDF";
+        chipLabel.fontSize      = ChipFontSize;
+        chipLabel.fontStyle     = FontStyles.Bold;
+        chipLabel.color         = White;
+        chipLabel.alignment     = TextAlignmentOptions.Center;
+        chipLabel.raycastTarget = false;
+        refs.chipBackground = chipImg;
+        refs.chipLabel      = chipLabel;
+
+        // Abstract "text line" bars — varying widths read as a document at a glance.
+        float innerWidth = PageWidth - PagePadding * 2f;
+        float[] lineWidthFractions = { 1f, 1f, 0.82f, 1f, 0.64f, 0.90f, 1f, 0.52f };
+        for (int i = 0; i < lineWidthFractions.Length; i++)
+        {
+            var barGo = NewChild(pageGo.transform, $"Line{i}", typeof(RectTransform), typeof(Image));
+            var barRt = (RectTransform)barGo.transform;
+            barRt.sizeDelta = new Vector2(innerWidth * lineWidthFractions[i], BarHeight);
+            var barImg = barGo.GetComponent<Image>();
+            barImg.color = PaperLine;
+            barImg.raycastTarget = false;
+            AddRoundedCorners(barGo, BarRadius);
+        }
+
+        // Filename + meta, centered under the page.
+        var docNameGo = NewChild(panel.transform, "FileName",
+                                 typeof(RectTransform), typeof(TextMeshProUGUI));
+        var docNameRt = (RectTransform)docNameGo.transform;
+        docNameRt.anchorMin = docNameRt.anchorMax = new Vector2(0.5f, 0.5f);
+        docNameRt.pivot     = new Vector2(0.5f, 0.5f);
+        docNameRt.sizeDelta = new Vector2(DocTextWidth, DocNameHeight);
+        docNameRt.anchoredPosition = new Vector2(
+            0f, stackTop - PageHeight - DocNameGap - DocNameHeight * 0.5f);
+        var docName = docNameGo.GetComponent<TextMeshProUGUI>();
+        docName.text               = "filename.pdf";
+        docName.fontSize           = DocNameFontSize;
+        docName.fontStyle          = FontStyles.Bold;
+        docName.color              = White;
+        docName.alignment          = TextAlignmentOptions.Center;
+        docName.textWrappingMode   = TextWrappingModes.NoWrap;
+        docName.overflowMode       = TextOverflowModes.Ellipsis;
+        docName.raycastTarget      = false;
+        refs.fileName = docName;
+
+        var docMetaGo = NewChild(panel.transform, "Meta",
+                                 typeof(RectTransform), typeof(TextMeshProUGUI));
+        var docMetaRt = (RectTransform)docMetaGo.transform;
+        docMetaRt.anchorMin = docMetaRt.anchorMax = new Vector2(0.5f, 0.5f);
+        docMetaRt.pivot     = new Vector2(0.5f, 0.5f);
+        docMetaRt.sizeDelta = new Vector2(DocTextWidth, DocMetaHeight);
+        docMetaRt.anchoredPosition = new Vector2(
+            0f, stackTop - PageHeight - DocNameGap - DocNameHeight - DocMetaGap - DocMetaHeight * 0.5f);
+        var docMeta = docMetaGo.GetComponent<TextMeshProUGUI>();
+        docMeta.text          = "PDF · 0 KB";
+        docMeta.fontSize      = DocSizeFontSize;
+        docMeta.color         = SubtleText;
+        docMeta.alignment     = TextAlignmentOptions.Center;
+        docMeta.raycastTarget = false;
+        refs.meta = docMeta;
+
+        panel.SetActive(false);
+        return refs;
+    }
 
     /// <summary>
     /// In-place migration of a pre-scroll-host caption: creates the host at the
@@ -695,16 +821,6 @@ public static class AttachmentPreviewScreenBuilder
         text = tx;
 
         return areaRt;
-    }
-
-    private static void AddMimeIconEntry(SerializedProperty arrayProp, string prefix)
-    {
-        arrayProp.arraySize++;
-        var element = arrayProp.GetArrayElementAtIndex(arrayProp.arraySize - 1);
-        var prefixProp = element.FindPropertyRelative("mimePrefix");
-        var spriteProp = element.FindPropertyRelative("sprite");
-        prefixProp.stringValue = prefix;
-        spriteProp.objectReferenceValue = null;
     }
 
     private static void SetObjectRef(SerializedObject so, string propertyName, Object value)
