@@ -12,6 +12,8 @@ public class RawMessage
     public bool fromMe;
     public long time;
     public string caption;
+    public string stanzaId;   // For reactions: id of the target message being reacted to.
+    public string from;       // Reactor jid (group aggregation keys on this, not senderName).
 
     [JsonProperty("delivery_status")]
     public string deliveryStatusRaw;

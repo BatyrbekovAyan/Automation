@@ -7,5 +7,6 @@ public enum MessageType
     Voice,
     Sticker,
     Document,
-    Unknown
+    Unknown,
+    Reaction
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 [Serializable]
 public class MessageViewModel
@@ -31,4 +32,8 @@ public class MessageViewModel
     public int pageCount;
 
     public DeliveryStatus deliveryStatus;
+
+    // Reactions targeting this message, keyed per-reactor by ReactionStore.
+    // Null or empty == no reactions. JsonUtility serializes List<MessageReaction>.
+    public List<MessageReaction> reactions;
 }
