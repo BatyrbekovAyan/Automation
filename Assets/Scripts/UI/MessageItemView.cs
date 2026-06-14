@@ -484,9 +484,13 @@ public class MessageItemView : MonoBehaviour
         if (defaultFontSize < 0) defaultFontSize = messageText.fontSize;
         messageText.fontSize = defaultFontSize; 
         
-        messageText.alignment = TextAlignmentOptions.TopLeft; 
-        messageText.margin = Vector4.zero; 
-        
+        messageText.alignment = TextAlignmentOptions.TopLeft;
+        messageText.margin = Vector4.zero;
+        // Clear the sender name's margin each bind so a recycled item never carries a
+        // stale vertical offset into a branch that doesn't set one. ApplyDynamicLayout
+        // re-stamps the left/right inset (and any per-branch vertical) right after.
+        if (senderNameText != null) senderNameText.margin = Vector4.zero;
+
         hideBubble = false;
         isJumboEmoji = false; 
         
@@ -1170,6 +1174,20 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
         {
             var p = layout.padding;
             layout.padding = new RectOffset(p.left, p.right, p.top, 18);
+        }
+
+        // Sender name horizontal inset — single source of truth for every bubble type.
+        // The body text margin (set in ReorderBubbleSiblings) is computed as
+        // (24 - padding.left) so the message's visible left edge always lands 24u from
+        // the bubble border regardless of the per-type padding set above. Mirror that
+        // exact formula here so the group sender name lines up with the message text in
+        // plain-text, media, audio, document and link-card bubbles alike. The per-branch
+        // sender margins above only carry their vertical offsets; this pass owns left/right.
+        if (senderNameText != null && senderNameText.gameObject.activeSelf)
+        {
+            float senderMarginX = Mathf.Max(24f - layout.padding.left, 0f);
+            Vector4 sm = senderNameText.margin;
+            senderNameText.margin = new Vector4(senderMarginX, sm.y, senderMarginX, sm.w);
         }
     }
 
