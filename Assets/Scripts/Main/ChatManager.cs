@@ -36,6 +36,7 @@ public partial class ChatManager : MonoBehaviour
     public List<ChatViewModel> Chats = new();
     private Dictionary<string, ChatViewModel> chatLookup = new();
     private HashSet<string> seenMessageIds = new HashSet<string>();
+    private readonly ReactionStore _reactions = new ReactionStore();
 
     public static ChatManager Instance;
     
@@ -63,6 +64,13 @@ public partial class ChatManager : MonoBehaviour
     /// listener can simply re-bind to pick up the new URL.
     /// </summary>
     public event Action<MessageViewModel> OnMessageMediaRefreshed;
+
+    /// <summary>
+    /// Fires when a reaction is added/changed/removed on an already-loaded message.
+    /// Carries the same MessageViewModel reference held in the active cache — its
+    /// .reactions list is already mutated, so a listener re-renders its pill in place.
+    /// </summary>
+    public event Action<MessageViewModel> OnMessageReactionsChanged;
 
     /// <summary>
     /// Fires repeatedly during an outgoing media send with whole-pipeline
@@ -351,6 +359,7 @@ public partial class ChatManager : MonoBehaviour
         _lastFetchedServerPage = 0;
         _servedFromStore = 0;
         seenMessageIds.Clear();
+        _reactions.Clear();
         _activeChatCache = null;
         _cachedQueue = null;
 
@@ -449,6 +458,13 @@ public partial class ChatManager : MonoBehaviour
                     if (seenMessageIds.Add(raw.id))
                     {
                         NormalizedMessage norm = Normalize(raw);
+
+                        if (norm.messageType == MessageType.Reaction)
+                        {
+                            if (HandleReactionEvent(raw, cachedList)) hasStatusUpdates = true;
+                            continue;
+                        }
+
                         if (norm.messageType == MessageType.Unknown) continue;
 
                         bool isGhostRecovery = false;
@@ -495,6 +511,7 @@ public partial class ChatManager : MonoBehaviour
                         if (isGhostRecovery) continue;
 
                         var newVm = CreateViewModel(norm);
+                        _reactions.DrainInto(newVm);
                         newVm.sequence = serverSequence;
                         newMessages.Add(newVm);
                         continue;
@@ -915,6 +932,11 @@ public partial class ChatManager : MonoBehaviour
 
         if (www.result != UnityWebRequest.Result.Success) yield break;
 
+        // User switched chats while this validation request was in flight — _activeChatCache
+        // now belongs to a different chat (or is null). Bail so a stale page can't feed reaction
+        // events into the new chat's store or persist under the wrong chatId.
+        if (currentChatId != chatId) yield break;
+
         bool cacheDirty = false;
         try
         {
@@ -924,7 +946,15 @@ public partial class ChatManager : MonoBehaviour
                 foreach (var raw in response.messages)
                 {
                     if (string.IsNullOrEmpty(raw.id)) continue;
-                    if (RefreshCachedMessageMedia(Normalize(raw), _activeChatCache))
+
+                    NormalizedMessage norm = Normalize(raw);
+                    if (norm.messageType == MessageType.Reaction)
+                    {
+                        if (HandleReactionEvent(raw, _activeChatCache)) cacheDirty = true;
+                        continue;
+                    }
+
+                    if (RefreshCachedMessageMedia(norm, _activeChatCache))
                     {
                         cacheDirty = true;
                     }
@@ -1011,9 +1041,17 @@ public partial class ChatManager : MonoBehaviour
                     }
 
                     NormalizedMessage norm = Normalize(raw);
+
+                    if (norm.messageType == MessageType.Reaction)
+                    {
+                        if (HandleReactionEvent(raw, _activeChatCache ?? loadedMessages)) cacheDirty = true;
+                        continue;
+                    }
+
                     if (norm.messageType == MessageType.Unknown) continue;
 
                     MessageViewModel vm = CreateViewModel(norm);
+                    _reactions.DrainInto(vm);
                     vm.sequence = MessageOrder.WithinSecondSequence(responseTimes, rawServerCount - 1);
                     loadedMessages.Add(vm);
                 }
@@ -1266,6 +1304,24 @@ if (msg.messageType == MessageType.Video)
         return MediaCacheManager.Instance.IsImageCached(thumbUrl) ? thumbUrl : "";
     }
 
+    /// <summary>
+    /// Applies a reaction event to the open chat's messages. Returns true if the
+    /// cache changed (caller marks dirty / saves). Fires OnMessageReactionsChanged
+    /// for the in-place bubble update. Reactions targeting a not-yet-loaded message
+    /// are buffered by ReactionStore and applied when that message arrives.
+    /// </summary>
+    private bool HandleReactionEvent(RawMessage raw, IReadOnlyList<MessageViewModel> messages)
+    {
+        ReactionEvent ev = ReactionParser.FromRaw(raw);
+        if (ev == null) return false;
+
+        MessageViewModel target = _reactions.Apply(ev, messages);
+        if (target == null) return false;   // buffered, or idempotent no-op
+
+        OnMessageReactionsChanged?.Invoke(target);
+        return true;
+    }
+
     MessageType ParseMessageType(string type)
     {
         return type switch
@@ -1277,6 +1333,7 @@ if (msg.messageType == MessageType.Video)
             "ptt" => MessageType.Voice,
             "sticker" => MessageType.Sticker,
             "document" => MessageType.Document,
+            "reaction" => MessageType.Reaction,
             _ => MessageType.Unknown
         };
     }
