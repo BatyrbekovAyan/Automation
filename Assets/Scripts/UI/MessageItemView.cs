@@ -53,6 +53,11 @@ public class MessageItemView : MonoBehaviour
     // the floating pill, which hangs past the bubble's bottom edge, can't overlap the next
     // message. Zero when there are no reactions.
     private HorizontalLayoutGroup _rootLayout;
+    // The bubble tail anchors to the root's bottom edge, which the clearance padding moves
+    // down — so we lift the tail back to the bubble corner by the same amount.
+    private RectTransform _tailRt;
+    private float _tailBaseY;
+    private bool _tailBaseCaptured;
     // Matches the pill's hang below the bubble (pill height ~58, anchored +8, pivot top →
     // ~50 below) so the row ends flush with the pill bottom and the gap to the next
     // message is the normal inter-message spacing.
@@ -4159,7 +4164,21 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
         if (_rootLayout == null) return;
 
         int target = hasReactions ? ReactionClearanceHeight : 0;
-        if (_rootLayout.padding.bottom != target) _rootLayout.padding.bottom = target;
+        if (_rootLayout.padding.bottom == target) return;
+        _rootLayout.padding.bottom = target;
+
+        // The tail is anchored to the root's bottom edge, which the padding above pushes
+        // down by `target`. Lift the tail by the same amount so it stays glued to the
+        // bubble's corner instead of detaching below the reserved space. Base Y is captured
+        // on the first state change, while the tail is still at its prefab position.
+        if (bubbleTail != null)
+        {
+            if (_tailRt == null) _tailRt = (RectTransform)bubbleTail.transform;
+            if (!_tailBaseCaptured) { _tailBaseY = _tailRt.anchoredPosition.y; _tailBaseCaptured = true; }
+            var pos = _tailRt.anchoredPosition;
+            pos.y = _tailBaseY + target;
+            _tailRt.anchoredPosition = pos;
+        }
     }
 
     private void UpdateRetryButton(bool enableRetry)
