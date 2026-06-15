@@ -99,9 +99,9 @@ public class EmptyStateView : MonoBehaviour
         {
             case EmptyStateReason.NoBotsExist:
                 // if (iconImage != null) iconImage.sprite = iconNoBots;
-                if (titleLabel != null) titleLabel.text = "No bots yet";
-                if (bodyLabel != null) bodyLabel.text = "Create your first bot to start managing chats.";
-                if (primaryButtonLabel != null) primaryButtonLabel.text = "Create your first bot";
+                if (titleLabel != null) titleLabel.text = "Create your first bot";
+                if (bodyLabel != null) bodyLabel.text = "An AI assistant that answers your customers on WhatsApp, day and night.";
+                if (primaryButtonLabel != null) primaryButtonLabel.text = "Create a bot";
                 if (primaryButton != null)
                 {
                     primaryButton.onClick.RemoveAllListeners();

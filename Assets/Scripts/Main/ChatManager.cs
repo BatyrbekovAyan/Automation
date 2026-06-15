@@ -90,7 +90,16 @@ public partial class ChatManager : MonoBehaviour
 
     public event Action<string> OnActiveBotChanged;
     public event Action<EmptyStateReason> OnEmptyState;
-    
+
+    /// <summary>Fixed post-creation WhatsApp sync window. Single source of truth.</summary>
+    public const int WhatsAppSyncWindowSeconds = 300;
+
+    /// <summary>Fires with the sync-window end (Unix ms) when the active bot is syncing.</summary>
+    public event Action<long> OnWhatsAppSyncing;
+
+    /// <summary>Fires when the active bot's sync window has elapsed and chats are about to load.</summary>
+    public event Action OnWhatsAppSyncReady;
+
     // State
     /// <summary>
     /// Last server history page actually fetched for the open chat (1-based,

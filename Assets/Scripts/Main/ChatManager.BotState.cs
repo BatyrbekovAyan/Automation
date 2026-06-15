@@ -106,6 +106,8 @@ public partial class ChatManager
         if (string.IsNullOrEmpty(botId)) return;
         if (botId == CurrentBotId) return;
 
+        if (_syncWaitRoutine != null) { StopCoroutine(_syncWaitRoutine); _syncWaitRoutine = null; }
+
         CurrentBotId = botId;
         // Drop the per-bot outbox cache so the next access against the new bot
         // re-loads from disk instead of returning stale entries from the previous bot.
@@ -142,6 +144,24 @@ public partial class ChatManager
         return IsValidProfileId(bot.whatsappProfileId) ? bot.whatsappProfileId : null;
     }
 
+    /// <summary>PlayerPrefs key suffix holding a bot's sync-window end (Unix ms).</summary>
+    private const string SyncUntilKeySuffix = "WhatsappSyncUntil";
+
+    private static long NowUnixMs() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+    /// <summary>
+    /// True when the given bot is still inside its fixed post-creation sync window.
+    /// Missing/unparseable key (e.g. bots created before this feature) ⇒ not syncing.
+    /// </summary>
+    public bool IsWhatsAppSyncing(string botId, out long syncUntilUnixMs)
+    {
+        syncUntilUnixMs = 0L;
+        if (string.IsNullOrEmpty(botId)) return false;
+        string raw = PlayerPrefs.GetString(botId + SyncUntilKeySuffix, "0");
+        if (!long.TryParse(raw, out syncUntilUnixMs)) { syncUntilUnixMs = 0L; return false; }
+        return WhatsAppSyncGate.IsSyncing(syncUntilUnixMs, NowUnixMs());
+    }
+
     /// <summary>
     /// Returns the current empty-state reason without firing an event. Used by
     /// late-attaching subscribers (e.g., a UI surface that activates after the
@@ -152,24 +172,26 @@ public partial class ChatManager
     public EmptyStateReason? ComputeCurrentEmptyState()
     {
         Transform root = Manager.Instance != null ? Manager.Instance.BotsRoot : null;
-        if (root == null || root.childCount == 0)
-        {
-            return EmptyStateReason.NoBotsExist;
-        }
+        int botCount = root != null ? root.childCount : 0;
 
-        Bot bot = Manager.Instance.FindBotByName(CurrentBotId);
-        if (bot == null || !IsValidProfileId(bot.whatsappProfileId))
-        {
-            return EmptyStateReason.BotHasNoWhatsApp;
-        }
+        Bot bot = Manager.Instance != null ? Manager.Instance.FindBotByName(CurrentBotId) : null;
+        bool hasWhatsApp = bot != null && IsValidProfileId(bot.whatsappProfileId);
+        bool syncing = hasWhatsApp && IsWhatsAppSyncing(CurrentBotId, out _);
 
-        return null;
+        return WhatsAppTabStateResolver.Resolve(botCount, hasWhatsApp, syncing) switch
+        {
+            WhatsAppTabState.NoBots => EmptyStateReason.NoBotsExist,
+            WhatsAppTabState.NoWhatsApp => EmptyStateReason.BotHasNoWhatsApp,
+            _ => (EmptyStateReason?)null, // Syncing / Ready are not empty-card states
+        };
     }
 
     /// <summary>
     /// Resolve the active bot's WhatsApp profile, then load cached chats and
     /// kick off a network sync. Fires OnEmptyState if the bot has no WhatsApp.
     /// </summary>
+    private Coroutine _syncWaitRoutine;
+
     private void BeginLoadForActiveBot()
     {
         Bot bot = Manager.Instance != null ? Manager.Instance.FindBotByName(CurrentBotId) : null;
@@ -179,6 +201,19 @@ public partial class ChatManager
             return;
         }
 
+        if (IsWhatsAppSyncing(CurrentBotId, out long syncUntilUnixMs))
+        {
+            OnWhatsAppSyncing?.Invoke(syncUntilUnixMs);
+            if (_syncWaitRoutine != null) StopCoroutine(_syncWaitRoutine);
+            _syncWaitRoutine = StartCoroutine(WaitForWhatsAppSyncRoutine(syncUntilUnixMs));
+            return;
+        }
+
+        LoadChatsForActiveBot();
+    }
+
+    private void LoadChatsForActiveBot()
+    {
         string cachePath = Path.Combine(GetCacheRoot(), "chats.json");
         string cachedJson = "";
         if (File.Exists(cachePath))
@@ -188,6 +223,16 @@ public partial class ChatManager
         }
 
         StartCoroutine(SyncAllChats(cachePath, cachedJson));
+    }
+
+    private IEnumerator WaitForWhatsAppSyncRoutine(long syncUntilUnixMs)
+    {
+        while (WhatsAppSyncGate.IsSyncing(syncUntilUnixMs, NowUnixMs()))
+            yield return new WaitForSecondsRealtime(1f);
+
+        OnWhatsAppSyncReady?.Invoke();
+        _syncWaitRoutine = null;
+        LoadChatsForActiveBot();
     }
 
     /// <summary>

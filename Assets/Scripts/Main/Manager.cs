@@ -1217,6 +1217,18 @@ public class Manager : MonoBehaviour
         PlayerPrefs.SetInt("ids", ++id);
         PlayerPrefs.Save();
 
+        // Start the fixed post-creation sync window for the WhatsApp tab. Anchored
+        // here (after auth completed earlier in the wizard) so it lines up with when
+        // Wappi actually begins importing chats for the new profile.
+        if (useWhatsapp)
+        {
+            long syncUntil = System.DateTimeOffset.UtcNow
+                .AddSeconds(ChatManager.WhatsAppSyncWindowSeconds)
+                .ToUnixTimeMilliseconds();
+            PlayerPrefs.SetString(newBot.name + "WhatsappSyncUntil", syncUntil.ToString());
+            PlayerPrefs.Save();
+        }
+
         // Step 6: Reset form
         ResetAddBotForm();
         isCreatingBot = false;

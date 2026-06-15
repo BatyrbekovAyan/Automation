@@ -6,49 +6,51 @@ using UnityEngine.UI;
 using TMPro;
 
 /// <summary>
-/// Builds Screen_Whatsapp/ChatsPanel/EmptyState (the "no bots yet" screen) in the
-/// "welcoming hero" layout: a soft mint disc with an icon slot, a bold headline,
-/// a supportive line, and a full-width green CTA pinned in the thumb zone.
-/// Sizes are in 1080x1920 canvas reference units (dp x 3).
+/// Builds Screen_Whatsapp/ChatsPanel/SyncingState (the post-creation "Setting things
+/// up" screen) in the "progress + reassurance" layout: a spinner, headline, body, a
+/// time-based progress bar, a live countdown, and a reassuring footnote pinned low.
+/// Sibling of EmptyState; covers the chat-list area while the WhatsApp top bar and the
+/// bottom tabs stay usable. Sizes are in 1080x1920 canvas reference units (dp x 3).
 /// </summary>
-public static class EmptyStateViewBuilder
+public static class SyncingStateBuilder
 {
     private const string ScreenName = "Screen_Whatsapp";
     private const string ChatsPanelName = "ChatsPanel";
-    private const string EmptyStateName = "EmptyState";
+    private const string SyncingStateName = "SyncingState";
 
     private static readonly Color Brand = HexColor("#008069");
-    private static readonly Color BrandTint = HexColor("#DFF3EA");
+    private static readonly Color Track = HexColor("#ECECEC");
     private static readonly Color TitleColor = HexColor("#111111");
     private static readonly Color BodyColor = HexColor("#6A6A6A");
+    private static readonly Color FootnoteColor = HexColor("#9A9A9A");
 
-    [MenuItem("Tools/Bot Switcher/Build EmptyState")]
+    [MenuItem("Tools/Bot Switcher/Build SyncingState")]
     public static void Build()
     {
         GameObject screen = FindGameObjectByNameIncludeInactive(ScreenName);
         if (screen == null)
         {
-            Debug.LogError($"[EmptyStateViewBuilder] Could not find {ScreenName} (active or inactive). Open the Main scene.");
+            Debug.LogError($"[SyncingStateBuilder] Could not find {ScreenName} (active or inactive). Open the Main scene.");
             return;
         }
 
         Transform chatsPanel = screen.transform.Find(ChatsPanelName);
         if (chatsPanel == null)
         {
-            Debug.LogError($"[EmptyStateViewBuilder] {ScreenName} has no child named '{ChatsPanelName}'.");
+            Debug.LogError($"[SyncingStateBuilder] {ScreenName} has no child named '{ChatsPanelName}'.");
             return;
         }
 
-        Transform existing = chatsPanel.Find(EmptyStateName);
+        Transform existing = chatsPanel.Find(SyncingStateName);
         if (existing != null) Object.DestroyImmediate(existing.gameObject);
 
-        // Root — full-stretch overlay over the chat list, last sibling so it covers it.
-        GameObject root = new GameObject(EmptyStateName, typeof(RectTransform), typeof(CanvasGroup));
+        // Root — full-stretch overlay, last sibling so it covers the chat list.
+        GameObject root = new GameObject(SyncingStateName, typeof(RectTransform), typeof(CanvasGroup));
         root.transform.SetParent(chatsPanel, false);
         root.transform.SetAsLastSibling();
         StretchFull(root.GetComponent<RectTransform>());
 
-        // Hero block — icon + title + body, centered slightly above middle.
+        // Hero block — spinner + title + body + progress + countdown, centered.
         GameObject hero = new GameObject("Hero",
             typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
         hero.transform.SetParent(root.transform, false);
@@ -57,7 +59,7 @@ public static class EmptyStateViewBuilder
         heroRT.anchorMax = new Vector2(1f, 0.5f);
         heroRT.pivot = new Vector2(0.5f, 0.5f);
         heroRT.sizeDelta = Vector2.zero;
-        heroRT.anchoredPosition = new Vector2(0f, 150f);
+        heroRT.anchoredPosition = new Vector2(0f, 120f);
         var vlg = hero.GetComponent<VerticalLayoutGroup>();
         vlg.childAlignment = TextAnchor.MiddleCenter;
         vlg.spacing = 48f;
@@ -70,58 +72,70 @@ public static class EmptyStateViewBuilder
         fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
         fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
 
-        // Mint disc (decorative surface — rounded corners, no sprite).
-        GameObject circle = new GameObject("IconCircle", typeof(RectTransform), typeof(Image), typeof(LayoutElement));
-        circle.transform.SetParent(hero.transform, false);
-        circle.GetComponent<RectTransform>().sizeDelta = new Vector2(252f, 252f);
-        circle.GetComponent<Image>().color = BrandTint;
-        SetPreferred(circle, 252f, 252f);
-        AddRoundedCorners(circle, 126f); // half of 252 -> full circle
-
-        // Inner icon — the sprite slot the designer fills (left as a tinted placeholder).
-        GameObject icon = new GameObject("Icon", typeof(RectTransform), typeof(Image));
-        icon.transform.SetParent(circle.transform, false);
-        var iconRT = icon.GetComponent<RectTransform>();
-        iconRT.anchorMin = iconRT.anchorMax = iconRT.pivot = new Vector2(0.5f, 0.5f);
-        iconRT.anchoredPosition = Vector2.zero;
-        iconRT.sizeDelta = new Vector2(120f, 120f);
-        var iconImage = icon.GetComponent<Image>();
-        iconImage.color = Brand;          // placeholder tint; assign a bot sprite here
-        iconImage.preserveAspect = true;
+        // Spinner — sprite slot the designer fills with a ring; plain Image so the
+        // rotation is visible even as a placeholder (no rounded-corner material to
+        // fight an assigned sprite later).
+        GameObject spinnerGO = new GameObject("Spinner", typeof(RectTransform), typeof(Image), typeof(LayoutElement));
+        spinnerGO.transform.SetParent(hero.transform, false);
+        spinnerGO.GetComponent<RectTransform>().sizeDelta = new Vector2(180f, 180f);
+        var spinnerImg = spinnerGO.GetComponent<Image>();
+        spinnerImg.color = Brand;            // placeholder tint; assign a ring sprite here
+        spinnerImg.preserveAspect = true;
+        SetPreferred(spinnerGO, 180f, 180f);
+        var spinnerRT = spinnerGO.GetComponent<RectTransform>();
 
         // Title (H1) + Body.
-        var titleText = CreateText(hero.transform, "Title", "Create your first bot", 52f, FontStyles.Bold, TitleColor, 820f, 70f);
+        var titleText = CreateText(hero.transform, "Title", "Setting things up", 52f, FontStyles.Bold, TitleColor, 820f, 70f);
         var bodyText = CreateText(hero.transform, "Body",
-            "An AI assistant that answers your customers on WhatsApp, day and night.",
-            40f, FontStyles.Normal, BodyColor, 820f, 150f);
+            "We're importing your chats and messages from WhatsApp.",
+            40f, FontStyles.Normal, BodyColor, 820f, 110f);
         bodyText.enableWordWrapping = true;
 
-        // Primary CTA — full width minus side margins, pinned in the thumb zone.
-        GameObject btn = new GameObject("PrimaryButton", typeof(RectTransform), typeof(Image), typeof(Button));
-        btn.transform.SetParent(root.transform, false);
-        var btnRT = btn.GetComponent<RectTransform>();
-        btnRT.anchorMin = new Vector2(0f, 0f);
-        btnRT.anchorMax = new Vector2(1f, 0f);
-        btnRT.pivot = new Vector2(0.5f, 0f);
-        btnRT.sizeDelta = new Vector2(-192f, 132f);   // 96 margin each side, 132 tall
-        btnRT.anchoredPosition = new Vector2(0f, 210f);
-        btn.GetComponent<Image>().color = Brand;
-        AddRoundedCorners(btn, 66f);                   // half of 132 -> pill
+        // Progress track + filled bar.
+        GameObject track = new GameObject("ProgressTrack", typeof(RectTransform), typeof(Image), typeof(LayoutElement));
+        track.transform.SetParent(hero.transform, false);
+        track.GetComponent<RectTransform>().sizeDelta = new Vector2(760f, 18f);
+        track.GetComponent<Image>().color = Track;
+        SetPreferred(track, 760f, 18f);
+        AddRoundedCorners(track, 9f);
 
-        var btnLabel = CreateText(btn.transform, "Label", "Create a bot", 42f, FontStyles.Bold, Color.white);
-        StretchFull(btnLabel.rectTransform);
+        GameObject fill = new GameObject("ProgressFill", typeof(RectTransform), typeof(Image));
+        fill.transform.SetParent(track.transform, false);
+        StretchFull(fill.GetComponent<RectTransform>());
+        var fillImage = fill.GetComponent<Image>();
+        fillImage.color = Brand;
+        fillImage.type = Image.Type.Filled;
+        fillImage.fillMethod = Image.FillMethod.Horizontal;
+        fillImage.fillOrigin = (int)Image.OriginHorizontal.Left;
+        fillImage.fillAmount = 0f;
 
-        // EmptyStateView + serialized wiring.
-        var view = root.AddComponent<EmptyStateView>();
+        // Countdown.
+        var countdownText = CreateText(hero.transform, "Countdown", "About 5 min left", 36f, FontStyles.Bold, Brand, 760f, 48f);
+
+        // Footnote — reassurance pinned in the lower zone.
+        var footnoteText = CreateText(root.transform, "Footnote",
+            "You can keep using the app. Chats appear here when ready.",
+            30f, FontStyles.Normal, FootnoteColor);
+        footnoteText.enableWordWrapping = true;
+        var footRT = footnoteText.rectTransform;
+        footRT.anchorMin = new Vector2(0f, 0f);
+        footRT.anchorMax = new Vector2(1f, 0f);
+        footRT.pivot = new Vector2(0.5f, 0f);
+        footRT.sizeDelta = new Vector2(-192f, 80f);
+        footRT.anchoredPosition = new Vector2(0f, 140f);
+
+        // SyncingView + serialized wiring.
+        var view = root.AddComponent<SyncingView>();
         var so = new SerializedObject(view);
-        so.FindProperty("iconImage").objectReferenceValue = iconImage;
+        so.FindProperty("spinner").objectReferenceValue = spinnerRT;
         so.FindProperty("titleLabel").objectReferenceValue = titleText;
         so.FindProperty("bodyLabel").objectReferenceValue = bodyText;
-        so.FindProperty("primaryButton").objectReferenceValue = btn.GetComponent<Button>();
-        so.FindProperty("primaryButtonLabel").objectReferenceValue = btnLabel;
+        so.FindProperty("progressFill").objectReferenceValue = fillImage;
+        so.FindProperty("countdownLabel").objectReferenceValue = countdownText;
+        so.FindProperty("footnoteLabel").objectReferenceValue = footnoteText;
         so.ApplyModifiedPropertiesWithoutUndo();
 
-        root.GetComponent<CanvasGroup>().alpha = 0f; // starts hidden; EmptyStateView.Awake also hides
+        root.GetComponent<CanvasGroup>().alpha = 0f; // starts hidden; SyncingView.Awake also hides
 
         // Force a layout pass so the rounded-corner shaders see final rects, then refresh them.
         LayoutRebuilder.ForceRebuildLayoutImmediate(heroRT);
@@ -129,7 +143,7 @@ public static class EmptyStateViewBuilder
         RefreshAllRounded(root);
 
         EditorSceneManager.MarkSceneDirty(root.scene);
-        Debug.Log($"[EmptyStateViewBuilder] Rebuilt {EmptyStateName} (welcoming hero) under {ScreenName}/{ChatsPanelName}.");
+        Debug.Log($"[SyncingStateBuilder] Built {SyncingStateName} (progress + reassurance) under {ScreenName}/{ChatsPanelName}.");
         Selection.activeGameObject = root;
     }
 
@@ -173,7 +187,7 @@ public static class EmptyStateViewBuilder
         var roundedType = ResolveRoundedType();
         if (roundedType == null)
         {
-            Debug.LogWarning("[EmptyStateViewBuilder] ImageWithRoundedCorners not found — corners render square.");
+            Debug.LogWarning("[SyncingStateBuilder] ImageWithRoundedCorners not found — corners render square.");
             return;
         }
         var rounded = go.AddComponent(roundedType);
