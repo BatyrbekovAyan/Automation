@@ -8,8 +8,8 @@ Modes:
 """
 import random, sys, math
 
-BG = "#F7F1EC"
-INK = "#E9E2D9"
+BG = "#F5F2EA"
+INK = "#E5DAC6"   # warm tan — #E8E1D9 read grayish at this low contrast
 W, H = 1596, 2688
 
 # ---------------------------------------------------------------- helpers
@@ -534,6 +534,278 @@ def _():
     return ['<text x="50" y="62" text-anchor="middle" font-family="Chalkboard SE, Comic Sans MS" '
             f'font-size="40" font-weight="bold" fill="none" stroke="{INK}">GG</text>']
 
+@motif("cat", 1.0)
+def _():
+    return [
+        C(50, 52, 25),
+        P("M31 33 L27 14 L45 27"), P("M69 33 L73 14 L55 27"),
+        dot(41, 49, 3), dot(59, 49, 3),
+        P("M47 56 L53 56 L50 60 Z"),
+        L(20, 55, 38, 55), L(20, 61, 38, 58), L(62, 55, 80, 55), L(62, 58, 80, 61),
+        P("M50 60 Q44 66 39 62"), P("M50 60 Q56 66 61 62"),
+    ]
+
+@motif("ghost", 1.05)
+def _():
+    return [
+        P("M26 86 V46 A24 24 0 0 1 74 46 V86 L66 79 L58 86 L50 79 L42 86 L34 79 Z"),
+        E(41, 48, 4.5, 6.5), E(59, 48, 4.5, 6.5),   # big round eyes
+        E(50, 65, 4.5, 6),                            # open "boo" mouth
+    ]
+
+@motif("mushroom", 1.0)
+def _():
+    return [
+        P("M22 50 A28 21 0 0 1 78 50 Z"), L(24, 50, 76, 50),
+        P("M41 50 V74 A9 7 0 0 0 59 74 V50"),
+        dot(38, 39, 4), dot(57, 35, 5), dot(64, 45, 3),
+    ]
+
+@motif("cactus", 1.0)
+def _():
+    return [
+        P("M44 82 V40 A6 6 0 0 1 56 40 V82"),
+        P("M44 60 H35 A5 5 0 0 0 30 65 V55"),
+        P("M56 54 H65 A5 5 0 0 1 70 59 V48"),
+        P("M36 82 H64 L60 94 H40 Z"), L(34, 82, 66, 82),
+    ]
+
+@motif("rocket", 1.05)
+def _():
+    return [
+        P("M50 15 C40 25 38 50 41 64 H59 C62 50 60 25 50 15 Z"),
+        C(50, 39, 7),
+        P("M41 56 L30 72 L42 66"), P("M59 56 L70 72 L58 66"),
+        P("M45 64 Q50 80 55 64"),
+    ]
+
+@motif("camera", 1.05)
+def _():
+    return [
+        R(23, 39, 54, 35, 6),
+        P("M39 39 L43 30 H57 L61 39"),
+        C(50, 57, 12), C(50, 57, 5),
+        dot(67, 47, 3),
+    ]
+
+@motif("cassette", 1.0)
+def _():
+    return [
+        R(22, 34, 56, 33, 5),
+        R(31, 39, 38, 10, 2),
+        C(38, 57, 6), C(62, 57, 6), dot(38, 57, 2), dot(62, 57, 2),
+        L(44, 57, 56, 57),
+    ]
+
+@motif("planet", 1.1)
+def _():
+    return [
+        C(50, 50, 19),
+        E(50, 50, 33, 11, -22),
+        dot(44, 45, 3), dot(57, 53, 2.5),
+    ]
+
+@motif("snowman", 1.0)
+def _():
+    return [
+        C(50, 67, 17), C(50, 39, 12),
+        dot(46, 37, 2), dot(54, 37, 2),
+        P("M50 41 L59 43 L50 45"),
+        dot(50, 61, 2.5), dot(50, 70, 2.5),
+        L(33, 58, 18, 49), L(67, 58, 82, 49),
+    ]
+
+@motif("star_eyes", 0.85)
+def _():
+    return [
+        C(50, 50, 18),
+        star_path(43, 46, 4.5, 1.9), star_path(57, 46, 4.5, 1.9),
+        P("M39 55 Q50 65 61 55"),
+    ]
+
+@motif("bird", 0.95)
+def _():
+    return [
+        C(50, 54, 22),
+        P("M41 33 Q45 24 50 31"),
+        P("M28 50 L14 54 L28 58 Z"),
+        dot(40, 47, 2.8),
+        P("M50 56 Q63 50 70 61 Q60 65 50 61"),
+        P("M72 54 L88 50 L85 63"),
+        L(44, 76, 44, 85), L(56, 76, 56, 85),
+    ]
+
+@motif("whale", 1.1)
+def _():
+    return [
+        P("M16 54 Q20 38 46 38 Q74 38 80 54 Q80 62 68 62 L30 62 Q16 62 16 54 Z"),
+        P("M80 50 L94 42 L90 55 L96 62 L80 58"),
+        dot(34, 49, 2.6),
+        P("M40 33 Q40 24 35 18"), P("M46 33 Q48 24 53 19"),
+        P("M28 60 Q44 66 62 60"),
+    ]
+
+@motif("ladybug", 0.9)
+def _():
+    return [
+        E(50, 57, 22, 25),
+        C(50, 32, 9),
+        L(50, 41, 50, 82),
+        dot(40, 55, 4), dot(60, 55, 4), dot(43, 69, 3.5), dot(57, 69, 3.5),
+        L(46, 26, 42, 17), dot(42, 16, 2), L(54, 26, 58, 17), dot(58, 16, 2),
+    ]
+
+@motif("gem", 0.95)
+def _():
+    return [
+        P("M36 26 H64 L78 40 H22 Z"),
+        P("M22 40 L50 82 L78 40"),
+        L(36, 26, 44, 40), L(64, 26, 56, 40),
+        L(44, 40, 50, 82), L(56, 40, 50, 82),
+        L(44, 40, 56, 40),
+    ]
+
+@motif("alien", 0.95)
+def _():
+    return [
+        P("M50 18 C30 18 24 38 28 56 C31 70 40 80 50 80 C60 80 69 70 72 56 C76 38 70 18 50 18 Z"),
+        E(40, 50, 6.5, 10, 20), E(60, 50, 6.5, 10, -20),
+        P("M44 68 Q50 72 56 68"),
+        L(43, 21, 39, 9), dot(39, 8, 2.6), L(57, 21, 61, 9), dot(61, 8, 2.6),
+    ]
+
+@motif("dog", 0.95)
+def _():
+    return [
+        C(50, 54, 21),                                   # round head
+        P("M33 37 Q21 36 23 52 Q25 61 35 57"),           # left floppy ear
+        P("M67 37 Q79 36 77 52 Q75 61 65 57"),           # right floppy ear
+        dot(43, 51, 3), dot(57, 51, 3),                  # eyes
+        dot(50, 60, 3.6),                                # nose
+        P("M50 63 Q45 67 41 64"), P("M50 63 Q55 67 59 64"),  # smile
+    ]
+
+@motif("rabbit", 0.95)
+def _():
+    return [
+        C(50, 58, 19),
+        E(42, 28, 6.5, 17, -8), E(58, 28, 6.5, 17, 8),
+        dot(43, 56, 2.8), dot(57, 56, 2.8),
+        P("M47 63 H53 L50 66 Z"),
+        L(30, 62, 42, 63), L(58, 63, 70, 62),
+    ]
+
+@motif("penguin", 0.95)
+def _():
+    return [
+        P("M50 18 C35 18 31 40 33 60 C35 80 42 88 50 88 C58 88 65 80 67 60 C69 40 65 18 50 18 Z"),
+        P("M50 32 C43 32 41 50 43 64 C45 77 50 80 50 80 C50 80 55 77 57 64 C59 50 57 32 50 32 Z"),
+        dot(44, 37, 2.4), dot(56, 37, 2.4),
+        P("M46 43 L54 43 L50 49 Z"),
+        L(40, 88, 36, 93), L(40, 88, 45, 93), L(60, 88, 64, 93), L(60, 88, 55, 93),
+    ]
+
+@motif("frog", 0.95)
+def _():
+    return [
+        P("M28 62 A22 18 0 0 1 72 62 Q72 74 60 74 H40 Q28 74 28 62 Z"),
+        C(37, 48, 9), C(63, 48, 9), dot(37, 48, 2.6), dot(63, 48, 2.6),
+        P("M41 64 Q50 70 59 64"),
+        P("M30 72 L24 80 L33 80"), P("M70 72 L76 80 L67 80"),
+    ]
+
+@motif("tree", 1.0)
+def _():
+    return [
+        C(50, 38, 24),
+        R(45, 60, 10, 26, 2),
+        P("M40 40 Q50 48 60 40"),
+    ]
+
+@motif("leaf", 0.9)
+def _():
+    return [
+        P("M28 72 Q28 30 72 28 Q70 70 28 72 Z"),
+        P("M34 66 Q52 48 66 34"),
+        P("M44 60 L50 50"), P("M40 54 Q48 54 50 50"),
+    ]
+
+@motif("cupcake", 0.95)
+def _():
+    return [
+        P("M30 50 Q30 32 50 32 Q70 32 70 50 Z"),
+        P("M33 50 H67 L61 80 H39 Z"),
+        L(43, 50, 39, 80), L(50, 50, 50, 80), L(57, 50, 61, 80),
+        C(50, 27, 4),
+    ]
+
+@motif("lightbulb", 0.9)
+def _():
+    return [
+        C(50, 42, 20),
+        P("M44 44 L48 52 L52 44 L56 52"),
+        R(42, 60, 16, 7), L(44, 67, 56, 67), L(45, 71, 55, 71),
+    ]
+
+@motif("scissors", 0.9)
+def _():
+    return [
+        C(33, 66, 8), C(67, 66, 8),
+        P("M39 62 L70 30"), P("M61 62 L30 30"),
+        dot(50, 48, 2.2),
+    ]
+
+@motif("candle", 0.9)
+def _():
+    return [
+        R(42, 42, 16, 44, 2),
+        P("M42 42 Q50 46 58 42"),
+        L(50, 42, 50, 36),
+        P("M50 22 Q43 31 50 38 Q57 31 50 22 Z"),
+    ]
+
+@motif("trophy", 0.95)
+def _():
+    return [
+        P("M37 28 H63 V40 A13 13 0 0 1 37 40 Z"),
+        P("M37 31 Q27 33 31 44"), P("M63 31 Q73 33 69 44"),
+        L(50, 53, 50, 64), P("M40 74 H60 L57 64 H43 Z"), L(35, 74, 65, 74),
+    ]
+
+@motif("shoe", 0.9)
+def _():
+    return [
+        P("M18 66 L22 50 Q29 46 35 52 L52 58 Q67 60 80 60 Q84 60 84 67 L84 70 L18 70 Z"),
+        L(18, 70, 84, 70),
+        L(33, 54, 39, 50), L(37, 57, 43, 53),
+    ]
+
+@motif("snowflake", 0.9)
+def _():
+    out = []
+    for a in (0, 60, 120):
+        import math as _m
+        dx, dy = _m.cos(_m.radians(a)), _m.sin(_m.radians(a))
+        out.append(L(round(50-34*dx,1), round(50-34*dy,1), round(50+34*dx,1), round(50+34*dy,1)))
+    out += [P("M50 20 L45 27"), P("M50 20 L55 27"), P("M50 80 L45 73"), P("M50 80 L55 73")]
+    return out
+
+@motif("apple", 0.95)
+def _():
+    return [
+        P("M50 38 C39 30 27 38 29 53 C31 68 42 77 50 73 C58 77 69 68 71 53 C73 38 61 30 50 38 Z"),
+        L(50, 38, 52, 27),
+        P("M52 31 Q61 27 60 35 Q53 37 52 31 Z"),
+    ]
+
+@motif("grapes", 0.95)
+def _():
+    return [
+        C(43, 50, 7), C(57, 50, 7), C(50, 60, 7), C(36, 60, 7), C(64, 60, 7), C(50, 72, 7),
+        L(50, 36, 50, 44),
+        P("M50 36 Q60 30 64 34 Q58 42 50 36 Z"),
+    ]
+
 # ---------------------------------------------------------------- fillers
 def F_sparkle(): return [sparkle4(50, 50, 42)]
 def F_star():    return [star_path(50, 50, 40, 17)]
@@ -571,67 +843,82 @@ def build(svg_w, svg_h, seed=42):
     out = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{svg_w}" height="{svg_h}" viewBox="0 0 {svg_w} {svg_h}">',
            f'<rect width="{svg_w}" height="{svg_h}" fill="{BG}"/>',
            f'<g fill="none" stroke="{INK}" stroke-linecap="round" stroke-linejoin="round">']
-    cols, rows = 9, 15
-    cw, ch = svg_w / cols, svg_h / rows
-    names = list(MOTIFS.keys())
-    # deal motifs so duplicates are spread out
+    # Exclude motifs whose drawings read poorly (ugly faces).
+    EXCLUDE = {"penguin", "frog", "bird"}
+    names = [n for n in MOTIFS.keys() if n not in EXCLUDE]
+    # Deal motifs from a shuffled deck so duplicates are spread out and every
+    # motif gets used roughly evenly across the wallpaper.
     deck = []
-    while len(deck) < cols * rows:
-        batch = names[:]
-        rng.shuffle(batch)
-        deck.extend(batch)
-    placed = []  # (x, y, radius)
+
+    def draw_name():
+        nonlocal deck
+        if not deck:
+            deck = names[:]
+            rng.shuffle(deck)
+        return deck.pop()
+
+    # DENSE but NON-OVERLAPPING packing. Place motifs largest-first with
+    # collision avoidance; smaller motifs then pack into the gaps between the
+    # big ones, so the field is tightly filled yet nothing crosses. Varied sizes
+    # + rotation keep it organic and hand-drawn. Original motifs only — no brand
+    # art, no dot/sparkle filler tier.
+    # Bounding-BOX collision (boxes tile tightly -> dense; no box overlap ->
+    # strokes don't cross). he = half-extent of a motif's square box. EFAC<0.5
+    # because the line art sits inside its box with padding, so boxes may abut
+    # closely without the drawings touching.
+    EFAC, GAP = 0.36, 1.0
+    CELL, HEMAX = 180.0, 200.0
     grid = {}
-    for r in range(rows):
-        for c in range(cols):
-            name = deck[r * cols + c]
-            # avoid same motif directly left or above
-            if grid.get((r, c-1)) == name or grid.get((r-1, c)) == name:
-                for alt in deck[cols*rows:] + names:
-                    if alt != grid.get((r, c-1)) and alt != grid.get((r-1, c)):
-                        name = alt; break
-            grid[(r, c)] = name
+    placed = []                    # (cx, cy, he, name)
+    tier = {"L": 0, "M": 0, "S": 0, "F": 0, "T": 0}
+
+    def fits(cx, cy, he):
+        span = int((he + GAP + HEMAX) // CELL) + 1
+        gx, gy = int(cx // CELL), int(cy // CELL)
+        for ix in range(gx - span, gx + span + 1):
+            for iy in range(gy - span, gy + span + 1):
+                for (px, py, phe, _n) in grid.get((ix, iy), ()):
+                    lim = he + phe + GAP
+                    if abs(cx - px) < lim and abs(cy - py) < lim:
+                        return False
+        return True
+
+    def add(cx, cy, he, name):
+        grid.setdefault((int(cx // CELL), int(cy // CELL)), []).append((cx, cy, he, name))
+        placed.append((cx, cy, he, name))
+
+    def place_tier(lo, hi, key, stop_miss, cap=None):
+        miss = 0
+        while miss < stop_miss:
+            if cap is not None and tier[key] >= cap:
+                break
+            name = draw_name()
             elems, szmul = MOTIFS[name]
-            size = (rng.uniform(230, 295) if rng.random() < 0.25 and grid.get((r, c-1), (0,))[-1] != 'A' and grid.get((r-1, c), (0,))[-1] != 'A' else rng.uniform(130, 185)) * szmul
-            cx = (c + 0.5) * cw + rng.uniform(-9, 9)
-            cy = (r + 0.5) * ch + rng.uniform(-8, 8)
-            rot = rng.uniform(-18, 18)
-            out.append(instance(elems, cx, cy, size, rot, stroke_final=4.0, text=name.startswith("txt_")))
-            placed.append((cx, cy, size * 0.38))
-    # minor tier: mid-size simple shapes squeezed between majors
-    MINI = [F_star, F_heart, F_sparkle, F_flower, F_note, F_moon, F_spiral, F_circle]
-    tries, count = 0, 0
-    fplaced = []
-    while count < 240 and tries < 110000:
-        tries += 1
-        fx = rng.uniform(14, svg_w - 14); fy = rng.uniform(14, svg_h - 14)
-        fsize = rng.uniform(50, 95)
-        ok = all((fx-x)**2 + (fy-y)**2 > (rad + fsize*0.5 + 1)**2 for x, y, rad in placed)
-        if not ok:
-            continue
-        fn = rng.choice(MINI)
-        out.append(instance(fn(), fx, fy, fsize, rng.uniform(-25, 25), stroke_final=3.4))
-        placed.append((fx, fy, fsize * 0.5))
-        count += 1
-    nmini = count
-    # fillers
-    tries, count = 0, 0
-    while count < 1200 and tries < 280000:
-        tries += 1
-        fx = rng.uniform(10, svg_w - 10); fy = rng.uniform(10, svg_h - 10)
-        fsize = rng.uniform(14, 48)
-        ok = all((fx-x)**2 + (fy-y)**2 > (rad + fsize*0.5 + 1)**2 for x, y, rad in placed)
-        if ok:
-            ok = all((fx-x)**2 + (fy-y)**2 > (fs*0.5 + fsize*0.5 + 7)**2 for x, y, fs in fplaced)
-        if not ok:
-            continue
-        fn = rng.choice(FILLERS)
-        rot = rng.uniform(-25, 25)
-        out.append(instance(fn(), fx, fy, fsize, rot, stroke_final=3.2))
-        fplaced.append((fx, fy, fsize))
-        count += 1
+            size = rng.uniform(lo, hi) * szmul
+            he = size * EFAC
+            cx = rng.uniform(he * 0.5, svg_w - he * 0.5)
+            cy = rng.uniform(he * 0.5, svg_h - he * 0.5)
+            if fits(cx, cy, he):
+                # Thicker strokes so the ink reaches its true #E8E1D9 core (thin
+                # strokes are all anti-aliasing and render washed-out). Scaled by
+                # size for even visual weight; large motifs match the approved ~5.4.
+                f = max(0.0, min(1.0, (size - 30) / (290 - 30)))
+                stroke = 3.0 + f * (5.4 - 3.0)
+                out.append(instance(elems, cx, cy, size, rng.uniform(-20, 20),
+                                    stroke_final=stroke, text=name.startswith("txt_")))
+                add(cx, cy, he, name)
+                tier[key] += 1
+                miss = 0
+            else:
+                miss += 1
+
+    place_tier(230, 290, "L", 300, cap=13)    # a few big accents only
+    place_tier(138, 182, "M", 1200, cap=200)  # medium, capped to leave room
+    place_tier(88, 130, "S", 4500)            # small saturates the gaps
+    place_tier(54, 84, "F", 6500)             # tiny real motifs pack tighter
+    place_tier(28, 52, "T", 9000)             # micro motifs fill remaining slivers
     out.append('</g></svg>')
-    return "".join(out), (nmini, count)
+    return "".join(out), (len(placed), tier)
 
 def build_sheet():
     names = list(MOTIFS.keys())
