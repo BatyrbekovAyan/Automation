@@ -47,6 +47,12 @@ public class EmojiPatchService : MonoBehaviour
     private string _cacheDir;
     private Shader _tmpSpriteShader;
 
+    // Runtime sprite assets this service appended to the default sprite asset's fallback
+    // list. Tracked so OnDestroy can remove them on play-mode exit — otherwise the editor
+    // keeps the dangling references in the shared asset and they surface as
+    // "Missing (TMP_Sprite Asset)" / "Type mismatch" rows once the runtime objects die.
+    private readonly List<TMP_SpriteAsset> _runtimeFallbacks = new List<TMP_SpriteAsset>();
+
     // -------------------------------------------------------------------------
     // Bootstrap — auto-creates the singleton before the scene loads if it is
     // not already placed as a component in the scene hierarchy.
@@ -80,6 +86,14 @@ public class EmojiPatchService : MonoBehaviour
 
     private void OnDestroy()
     {
+        // Remove the fallbacks we registered so the editor never persists dangling
+        // references into the shared default sprite asset when play mode exits.
+        var defaultAsset = TMP_Settings.defaultSpriteAsset;
+        if (defaultAsset?.fallbackSpriteAssets != null)
+            foreach (var asset in _runtimeFallbacks)
+                defaultAsset.fallbackSpriteAssets.Remove(asset);
+        _runtimeFallbacks.Clear();
+
         if (Instance == this) Instance = null;
     }
 
@@ -151,6 +165,9 @@ public class EmojiPatchService : MonoBehaviour
         var asset = ScriptableObject.CreateInstance<TMP_SpriteAsset>();
         asset.name = spriteName;
         asset.spriteSheet = paddedTex;
+        // Runtime-only asset: never serialize it into the project (keeps it out of the
+        // shared default sprite asset and avoids stray sub-assets in the editor).
+        asset.hideFlags = HideFlags.DontSave;
 
         // Mirror the existing atlas's FaceInfo (texture-0.asset) exactly. TMP_Text
         // renders sprites with `fontSize / spriteFace.pointSize * spriteFace.scale`
@@ -170,15 +187,19 @@ public class EmojiPatchService : MonoBehaviour
         // atlas renders emojis aligned lower within each tile — using the same
         // bearingY makes ours appear ~10 units higher than atlas neighbors. The
         // -12 unit offset compensates for that texture-content positioning gap.
-        // bearingX=0 and advance=width — visual inter-sprite padding comes from the
-        // texture margin (EmojiPaddingFraction), not the metric.
+        // advance=width — visual inter-sprite padding comes from the texture margin
+        // (EmojiPaddingFraction), not the metric. bearingX is a small rightward nudge so
+        // downloaded emoji line up horizontally with the atlas sheets (which use bearingX=12
+        // in their 160-unit space); the symmetric texture padding already near-centers these,
+        // so only a hair is needed. Tune by eye — ~4 units ≈ 1px on-screen.
         const float EmojiMetricSize     = 164f;
         const float EmojiMetricBearingY = 140f;
+        const float EmojiMetricBearingX = 4f;
         var glyph = new TMP_SpriteGlyph
         {
             index     = 0,
-            metrics   = new GlyphMetrics(EmojiMetricSize, EmojiMetricSize, 0f, EmojiMetricBearingY, EmojiMetricSize),
-            glyphRect = new GlyphRect(4, 0, paddedTex.width, paddedTex.height),
+            metrics   = new GlyphMetrics(EmojiMetricSize, EmojiMetricSize, EmojiMetricBearingX, EmojiMetricBearingY, EmojiMetricSize),
+            glyphRect = new GlyphRect(0, 0, paddedTex.width, paddedTex.height),
             scale     = 1f,
             atlasIndex = 0
         };
@@ -198,7 +219,11 @@ public class EmojiPatchService : MonoBehaviour
         // Building the lookup tables first (while material is still null) bypasses that path.
         asset.UpdateLookupTables();
 
-        var mat = new Material(_tmpSpriteShader != null ? _tmpSpriteShader : Shader.Find("TextMeshPro/Sprite")) { mainTexture = paddedTex };
+        var mat = new Material(_tmpSpriteShader != null ? _tmpSpriteShader : Shader.Find("TextMeshPro/Sprite"))
+        {
+            mainTexture = paddedTex,
+            hideFlags   = HideFlags.DontSave
+        };
         asset.material = mat;
 
         return asset;
@@ -216,6 +241,7 @@ public class EmojiPatchService : MonoBehaviour
 
         var padded = new Texture2D(newSize, newSize, TextureFormat.RGBA32, false);
         padded.name = src.name;
+        padded.hideFlags = HideFlags.DontSave;
 
         // Fill transparent
         var transparent = new Color32[newSize * newSize];
@@ -244,7 +270,10 @@ public class EmojiPatchService : MonoBehaviour
         defaultAsset.fallbackSpriteAssets ??= new List<TMP_SpriteAsset>();
 
         if (!defaultAsset.fallbackSpriteAssets.Contains(asset))
+        {
             defaultAsset.fallbackSpriteAssets.Add(asset);
+            _runtimeFallbacks.Add(asset);
+        }
     }
 
     // -------------------------------------------------------------------------
