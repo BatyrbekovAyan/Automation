@@ -141,4 +141,69 @@ public class UnicodeEmojiConverterPatchTests
 
         Assert.IsFalse(EmojiSpriteRegistry.IsFailed("1faea"));
     }
+
+    // ---- Keycap emoji (#️⃣ *️⃣ 0️⃣–9️⃣) -----------------------------------------
+    // These are an ASCII base (# * or 0-9) + optional FE0F + U+20E3 (combining
+    // enclosing keycap). The base is a normal text char, so detection must be
+    // contextual: only a base actually followed by U+20E3 is an emoji.
+
+    [Test]
+    public void Convert_HashKeycap_EmitsSpriteTag_NoMissingFlag()
+    {
+        // '#' = U+0023, FE0F, U+20E3 → Twemoji name "0023-fe0f-20e3"
+        EmojiSpriteRegistry.BuildFromNames(new[] { "0023-fe0f-20e3" });
+
+        var result = UnicodeEmojiConverter.ConvertRealEmojisToSprites("#️⃣", out bool hasMissing);
+
+        StringAssert.Contains("<sprite name=\"0023-fe0f-20e3\">", result);
+        Assert.IsFalse(hasMissing);
+    }
+
+    [Test]
+    public void Convert_StarKeycap_EmitsSpriteTag()
+    {
+        EmojiSpriteRegistry.BuildFromNames(new[] { "002a-fe0f-20e3" });
+
+        var result = UnicodeEmojiConverter.ConvertRealEmojisToSprites("*️⃣", out _);
+
+        StringAssert.Contains("<sprite name=\"002a-fe0f-20e3\">", result);
+    }
+
+    [Test]
+    public void Convert_DigitKeycap_EmitsSpriteTag()
+    {
+        EmojiSpriteRegistry.BuildFromNames(new[] { "0031-fe0f-20e3" });
+
+        var result = UnicodeEmojiConverter.ConvertRealEmojisToSprites("1️⃣", out _);
+
+        StringAssert.Contains("<sprite name=\"0031-fe0f-20e3\">", result);
+    }
+
+    [Test]
+    public void Convert_KeycapWithoutVariationSelector_EmitsCanonicalSpriteTag()
+    {
+        // Sender omitted FE0F (minimally-qualified): "#" + U+20E3. The converter
+        // must still resolve the fully-qualified registered name.
+        EmojiSpriteRegistry.BuildFromNames(new[] { "0023-fe0f-20e3" });
+
+        var result = UnicodeEmojiConverter.ConvertRealEmojisToSprites("#⃣", out _);
+
+        StringAssert.Contains("<sprite name=\"0023-fe0f-20e3\">", result);
+    }
+
+    [Test]
+    public void Convert_BareHashStarDigits_NotTreatedAsKeycap()
+    {
+        // Regression guard: a bare '#', '*' or digit in ordinary text must NEVER be
+        // converted to a sprite — the keycap detection is contextual on U+20E3.
+        EmojiSpriteRegistry.BuildFromNames(new[] { "0023-fe0f-20e3", "0031-fe0f-20e3", "002a-fe0f-20e3" });
+
+        var result = UnicodeEmojiConverter.ConvertRealEmojisToSprites("call #5 or *9 at 30", out bool hasMissing);
+
+        StringAssert.DoesNotContain("<sprite", result);
+        StringAssert.Contains("#5", result);
+        StringAssert.Contains("*9", result);
+        StringAssert.Contains("30", result);
+        Assert.IsFalse(hasMissing);
+    }
 }

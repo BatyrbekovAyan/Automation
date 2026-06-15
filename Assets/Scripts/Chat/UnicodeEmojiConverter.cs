@@ -70,8 +70,14 @@ public static class UnicodeEmojiConverter
         {
             int codepoint = char.ConvertToUtf32(input, i);
             int length = char.IsHighSurrogate(input[i]) ? 2 : 1;
-            
-            if (IsEmoji(codepoint))
+
+            // Keycap emoji (#️⃣ *️⃣ 0️⃣–9️⃣) are an ASCII base (# * or 0-9) followed by an
+            // optional FE0F and a combining enclosing keycap (U+20E3). The base is a normal
+            // text character, so it only counts as an emoji when U+20E3 actually follows —
+            // checked contextually so a bare '#' or digit in text is never converted.
+            bool isKeycap = IsKeycapBase(codepoint) && KeycapFollows(input, i + length);
+
+            if (IsEmoji(codepoint) || isKeycap)
             {
                 // Start the sequence
                 List<int> emojiSequence = new List<int> { codepoint };
@@ -83,8 +89,8 @@ public static class UnicodeEmojiConverter
                     int nextCp = char.ConvertToUtf32(input, currentIdx);
                     int nextLen = char.IsHighSurrogate(input[currentIdx]) ? 2 : 1;
 
-                    // 1. Fitzpatrick Skin Tones & Variation Selectors
-                    if ((nextCp >= 0x1F3FB && nextCp <= 0x1F3FF) || nextCp == 0xFE0F)
+                    // 1. Fitzpatrick Skin Tones, Variation Selector (FE0F) & keycap (20E3)
+                    if ((nextCp >= 0x1F3FB && nextCp <= 0x1F3FF) || nextCp == 0xFE0F || nextCp == 0x20E3)
                     {
                         emojiSequence.Add(nextCp);
                         currentIdx += nextLen;
@@ -120,6 +126,12 @@ public static class UnicodeEmojiConverter
                         break;
                     }
                 }
+
+                // Keycaps resolve by their fully-qualified Twemoji name ("0023-fe0f-20e3").
+                // If the sender omitted the FE0F variation selector, insert it so the name
+                // matches the registered sprite.
+                if (emojiSequence[emojiSequence.Count - 1] == 0x20E3 && !emojiSequence.Contains(0xFE0F))
+                    emojiSequence.Insert(emojiSequence.Count - 1, 0xFE0F);
 
                 // Convert list of hex codes to string: "1f44b-1f3fb" or "1f1f0-1f1ff"
                 string hexName = GetHexName(emojiSequence);
@@ -172,7 +184,21 @@ public static class UnicodeEmojiConverter
                (codepoint >= 0x2B00 && codepoint <= 0x2BFF) ||   
                (codepoint >= 0x25A0 && codepoint <= 0x25FF) ||   
                (codepoint == 0x203C || codepoint == 0x2049) ||   
-               (codepoint == 0x00A9 || codepoint == 0x00AE || codepoint == 0x2122); 
+               (codepoint == 0x00A9 || codepoint == 0x00AE || codepoint == 0x2122);
+    }
+
+    /// <summary>The ASCII base of a keycap emoji: '#', '*' or a digit 0-9.</summary>
+    private static bool IsKeycapBase(int codepoint) =>
+        codepoint == 0x23 || codepoint == 0x2A || (codepoint >= 0x30 && codepoint <= 0x39);
+
+    /// <summary>
+    /// True when the characters at <paramref name="idx"/> complete a keycap emoji:
+    /// an optional FE0F variation selector followed by U+20E3 (combining enclosing keycap).
+    /// </summary>
+    private static bool KeycapFollows(string s, int idx)
+    {
+        if (idx < s.Length && s[idx] == 0xFE0F) idx++;   // variation selector-16
+        return idx < s.Length && s[idx] == 0x20E3;        // combining enclosing keycap
     }
 
     private static string GetHexName(List<int> sequence)
