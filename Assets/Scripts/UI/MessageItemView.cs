@@ -49,6 +49,14 @@ public class MessageItemView : MonoBehaviour
 
     [Header("Reactions")]
     [SerializeField] private ReactionPillView reactionPill;
+    // Reserves row space below the bubble (via the root layout group's bottom padding) so
+    // the floating pill, which hangs past the bubble's bottom edge, can't overlap the next
+    // message. Zero when there are no reactions.
+    private HorizontalLayoutGroup _rootLayout;
+    // Matches the pill's hang below the bubble (pill height ~58, anchored +8, pivot top →
+    // ~50 below) so the row ends flush with the pill bottom and the gap to the next
+    // message is the normal inter-message spacing.
+    private const int ReactionClearanceHeight = 50;
 
     [Header("Document UI")]
     public GameObject documentPanel;
@@ -4125,14 +4133,33 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
         if (currentVm.messageId != changed.messageId) return;
 
         // ChatManager mutates the cached VM in place, so currentVm.reactions is
-        // already current. Re-render the pill only — no full re-bind needed.
+        // already current. Re-render the pill + clearance, then rebuild the row so the
+        // reserved space takes effect (this is a live update, not a full re-bind).
         RenderReactions();
+        StartCoroutine(ForceRebuildRoutine());
     }
 
     private void RenderReactions()
     {
-        if (reactionPill == null) return;
-        reactionPill.Render(currentVm != null ? currentVm.reactions : null);
+        var reactions = currentVm != null ? currentVm.reactions : null;
+        bool hasReactions = reactions != null && reactions.Count > 0;
+
+        if (reactionPill != null) reactionPill.Render(reactions);
+        ApplyReactionClearance(hasReactions);
+    }
+
+    // Reserves vertical space below the bubble for the floating reaction pill so it
+    // doesn't collide with the next message. The root is a HorizontalLayoutGroup +
+    // ContentSizeFitter with the bubble top-aligned, so growing the root's bottom padding
+    // grows the row below the bubble without moving or resizing the bubble itself. The
+    // following ForceRebuildRoutine (Bind / live update) applies it.
+    private void ApplyReactionClearance(bool hasReactions)
+    {
+        if (_rootLayout == null) _rootLayout = GetComponent<HorizontalLayoutGroup>();
+        if (_rootLayout == null) return;
+
+        int target = hasReactions ? ReactionClearanceHeight : 0;
+        if (_rootLayout.padding.bottom != target) _rootLayout.padding.bottom = target;
     }
 
     private void UpdateRetryButton(bool enableRetry)
