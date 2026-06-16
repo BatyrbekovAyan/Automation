@@ -1095,6 +1095,17 @@ public partial class ChatManager : MonoBehaviour
         onComplete?.Invoke(loadedMessages, hasMore);
     }
 
+    /// Linear scan of the loaded chat for a message by id. Null-safe during cold load
+    /// (when _activeChatCache is not yet assigned). Used by ReplyParser to resolve quotes.
+    private MessageViewModel FindActiveById(string id)
+    {
+        if (string.IsNullOrEmpty(id) || _activeChatCache == null) return null;
+        for (int i = 0; i < _activeChatCache.Count; i++)
+            if (_activeChatCache[i] != null && _activeChatCache[i].messageId == id)
+                return _activeChatCache[i];
+        return null;
+    }
+
     MessageViewModel CreateViewModel(NormalizedMessage msg)
     {
         var vm = new MessageViewModel
@@ -1117,7 +1128,12 @@ public partial class ChatManager : MonoBehaviour
             timestamp = msg.time,
             fileSize = msg.fileSize,
             pageCount = msg.pageCount,
-            deliveryStatus = msg.deliveryStatus
+            deliveryStatus = msg.deliveryStatus,
+            quotedMessageId    = msg.quotedMessageId,
+            quotedSenderName   = msg.quotedSenderName,
+            quotedText         = msg.quotedText,
+            quotedType         = msg.quotedType,
+            quotedThumbnailUrl = msg.quotedThumbnailUrl
         };
 
         // Proactively extract a native thumbnail for videos (replaces the server
@@ -1286,6 +1302,19 @@ if (msg.messageType == MessageType.Video)
             {
                 msg.mediaUrl = s3["url"].ToString();
                 if (s3["expire"] != null) long.TryParse(s3["expire"].ToString(), out msg.expireTime);
+            }
+        }
+
+        if (raw.type != "reaction")
+        {
+            QuotedPreview quote = ReplyParser.Resolve(raw, FindActiveById, ParseMessageType);
+            if (!quote.IsEmpty)
+            {
+                msg.quotedMessageId    = quote.messageId;
+                msg.quotedSenderName   = quote.senderName;
+                msg.quotedText         = quote.text;
+                msg.quotedType         = quote.type;
+                msg.quotedThumbnailUrl = quote.thumbnailUrl;
             }
         }
 
@@ -1716,6 +1745,9 @@ public class WappiSendTextRequest
 {
     public string body;
     public string recipient;
+
+    [JsonProperty("quoted_message_id", NullValueHandling = NullValueHandling.Ignore)]
+    public string quotedMessageId;   // Only serialized when this send is a reply.
 }
 
 [Serializable]
