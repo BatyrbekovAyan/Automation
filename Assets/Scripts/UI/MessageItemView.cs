@@ -77,6 +77,17 @@ public class MessageItemView : MonoBehaviour
     public Image linkPreviewImage;
     private string activeScrapedUrl = ""; // To remember what to open!
     
+    [Header("Reply Quote")]
+    [SerializeField] private GameObject quotedCard;
+    [SerializeField] private Image quotedAccentBar;
+    [SerializeField] private TextMeshProUGUI quotedSenderText;
+    [SerializeField] private TextMeshProUGUI quotedSnippetText;
+    [SerializeField] private Image quotedThumbnail;
+
+    // Quoted-thumbnail texture+sprite are owned here, NOT in _ownedDisposables — DisposeOwned()
+    // runs at the head of every ApplyTextureAspectFill and would otherwise destroy them.
+    private readonly System.Collections.Generic.List<UnityEngine.Object> _quotedDisposables = new System.Collections.Generic.List<UnityEngine.Object>();
+
     [Header("Settings")]
     public Color incomingColor = Color.white;
     public Color outgoingColor = new Color(0.8f, 1f, 0.8f);
@@ -221,6 +232,66 @@ public class MessageItemView : MonoBehaviour
         return obj;
     }
 
+    private void DisposeQuoted()
+    {
+        for (int i = 0; i < _quotedDisposables.Count; i++)
+            if (_quotedDisposables[i] != null) Destroy(_quotedDisposables[i]);
+        _quotedDisposables.Clear();
+    }
+
+    private void RenderQuotedCard(MessageViewModel vm)
+    {
+        DisposeQuoted();
+        if (quotedCard == null) return;
+
+        if (vm == null || string.IsNullOrEmpty(vm.quotedMessageId))
+        {
+            quotedCard.SetActive(false);
+            return;
+        }
+
+        quotedCard.SetActive(true);
+
+        bool quotedIsOwn = vm.quotedSenderName == "You";
+        Color accent = quotedIsOwn ? new Color32(0x1F, 0xA8, 0x55, 0xFF) : GetSenderColor(vm.quotedSenderName);
+        if (quotedAccentBar != null) quotedAccentBar.color = accent;
+
+        if (quotedSenderText != null)
+        {
+            quotedSenderText.text = UnicodeEmojiConverter.ConvertRealEmojisToSprites(vm.quotedSenderName, MissingEmojiMode.Hide);
+            quotedSenderText.color = accent;
+        }
+
+        if (quotedSnippetText != null)
+            quotedSnippetText.text = ReplyParser.CleanSnippet(
+                UnicodeEmojiConverter.ConvertRealEmojisToSprites(vm.quotedText, MissingEmojiMode.Hide));
+
+        bool isMediaQuote = vm.quotedType == MessageType.Image || vm.quotedType == MessageType.Video;
+        if (quotedThumbnail != null)
+        {
+            bool shown = false;
+            if (isMediaQuote)
+            {
+                string key = ThumbnailKeyResolver.Resolve(vm.quotedThumbnailUrl, vm.quotedMessageId, MediaCacheManager.Instance.IsImageCached);
+                if (!string.IsNullOrEmpty(key))
+                {
+                    Texture2D tex = MediaCacheManager.Instance.LoadImageFromCache(key);
+                    if (tex != null)
+                    {
+                        _quotedDisposables.Add(tex);
+                        var spr = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
+                        _quotedDisposables.Add(spr);
+                        quotedThumbnail.sprite = spr;
+                        shown = true;
+                    }
+                }
+            }
+            quotedThumbnail.gameObject.SetActive(shown);
+        }
+        // NOTE: tap-to-scroll is intentionally NOT wired here — it is added in Task 17 together
+        // with MessageListView.ScrollToMessage. Do not add a Button onClick that calls it.
+    }
+
     /// <summary>
     /// Destroys every tracked Texture2D and Sprite. Safe to call repeatedly; safe to call
     /// after OnDestroy. Unity defers Destroy until end of frame, so any Image still
@@ -316,6 +387,7 @@ public class MessageItemView : MonoBehaviour
     void OnDestroy()
     {
         DisposeOwned();
+        DisposeQuoted();
     }
 
     private void HandleSendProgress(string tempId, float progress)
@@ -488,7 +560,9 @@ public class MessageItemView : MonoBehaviour
                 senderNameText.color = GetSenderColor(vm.senderName);
             }
         }
-        
+
+        RenderQuotedCard(vm);
+
         if (downloadButton != null)
         {
             downloadButton.onClick.RemoveAllListeners();
@@ -605,8 +679,8 @@ public class MessageItemView : MonoBehaviour
             {
                 messageText.fontSize = defaultFontSize * 3f; 
                 
-                // --- THE FIX: Don't hide the bubble if we are displaying a name! ---
-                hideBubble = !showSenderName; 
+                // --- THE FIX: Don't hide the bubble if we are displaying a name or a reply card! ---
+                hideBubble = !showSenderName && !(quotedCard != null && quotedCard.activeSelf);
                 
                 isJumboEmoji = true; 
                 messageText.margin = new Vector4(24, 0, 0, 8); 
@@ -848,6 +922,9 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
         if (senderNameText != null && senderNameText.gameObject.activeSelf)
             senderNameText.transform.SetSiblingIndex(currentIndex++);
 
+        if (quotedCard != null && quotedCard.activeSelf)
+            quotedCard.transform.SetSiblingIndex(currentIndex++);
+
         // Re-parent every active media-region object in priority order. Inactive
         // objects keep their prefab index (they don't render anyway).
         Transform messageImageTransform = null;
@@ -1017,7 +1094,11 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                 }
                 else
                 {
-                    layout.padding = new RectOffset(8, 8, 12, 10);
+                    // A jumbo-emoji reply drops to 6px side padding so its quoted card spans wide,
+                    // matching the normal-text reply branch below.
+                    bool hasQuote = quotedCard != null && quotedCard.activeSelf;
+                    int sidePad = hasQuote ? 6 : 8;
+                    layout.padding = new RectOffset(sidePad, sidePad, hasQuote ? 6 : 12, 10);
                     layout.spacing = 16;
 
                     if (timeText != null)
@@ -1028,7 +1109,13 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             }
             else
             {
-                layout.padding = new RectOffset(16, 16, 16, 20);
+                // A reply bubble drops to 6px side padding (like documents/media) so the
+                // quoted card spans wide; the reply text below auto-compensates back to a
+                // 24px visible inset via ReorderBubbleSiblings' (24 - padding.left) margin,
+                // exactly how a document caption stays aligned over a 6px-padded card.
+                bool hasQuote = quotedCard != null && quotedCard.activeSelf;
+                int sidePad = hasQuote ? 6 : 16;
+                layout.padding = new RectOffset(sidePad, sidePad, hasQuote ? 6 : 16, 20);
 
                 if (timeText != null)
                 {
@@ -1074,6 +1161,7 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             else
             {
                 layout.spacing = -34;
+                if (quotedCard != null && quotedCard.activeSelf && layout.spacing < 0f) layout.spacing = 0f;
                 layout.padding = new RectOffset(16, 14, 12, 12);
 
                 if (timeText != null)
@@ -1110,7 +1198,8 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             {
                 if (useCardLayout) layout.spacing = 8;
                 else if (hasCaption) layout.spacing = 12; // Push the caption safely below the image!
-                else layout.spacing = -42;            
+                else layout.spacing = -42;
+                if (quotedCard != null && quotedCard.activeSelf && layout.spacing < 0f) layout.spacing = 0f;
             }
             
             bool hasSenderName = senderNameText != null && senderNameText.gameObject.activeSelf;
@@ -1439,7 +1528,12 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             }
 
             Vector2 wrappedSize = messageText.GetPreferredValues(messageText.text, availableWidthForText, Mathf.Infinity);
-            textLayout.preferredWidth = Mathf.Min(wrappedSize.x + 21f, maxAllowedTextWidth);
+            // Margin-aware width allowance: the bubble is sized to this preferredWidth, but
+            // ReorderBubbleSiblings then insets the text by (24 - padding.left) per side. With
+            // symmetric padding that inset totals (48 - paddingX), so reserve it here (+5px fudge),
+            // else a reduced-padding reply bubble eats the glyph width and the inline time
+            // reservation wraps to extra lines. Reproduces the old +21f exactly at paddingX=32.
+            textLayout.preferredWidth = Mathf.Min(wrappedSize.x + Mathf.Max(48f - paddingX, 0f) + 5f, maxAllowedTextWidth);
 
             if (isMediaCaption)
             {
