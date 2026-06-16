@@ -36,4 +36,11 @@ public class MessageViewModel
     // Reactions targeting this message, keyed per-reactor by ReactionStore.
     // Null or empty == no reactions. JsonUtility serializes List<MessageReaction>.
     public List<MessageReaction> reactions;
+
+    // Reply quote — flat primitives only (JsonUtility-persisted via ChatHistoryCache).
+    public string      quotedMessageId;
+    public string      quotedSenderName;
+    public string      quotedText;
+    public MessageType quotedType;
+    public string      quotedThumbnailUrl;
 }

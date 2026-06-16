@@ -22,5 +22,12 @@ public class NormalizedMessage
     public long fileSize;
     public int pageCount;
 
+    // Reply quote (resolved in ChatManager.Normalize via ReplyParser).
+    public string      quotedMessageId;
+    public string      quotedSenderName;
+    public string      quotedText;
+    public MessageType quotedType;
+    public string      quotedThumbnailUrl;
+
     public DeliveryStatus deliveryStatus;
 }
