@@ -15,6 +15,12 @@ public class RawMessage
     public string stanzaId;   // For reactions: id of the target message being reacted to.
     public string from;       // Reactor jid (group aggregation keys on this, not senderName).
 
+    [JsonProperty("isReply")]
+    public bool isReply;        // True when this message replies to another.
+
+    [JsonProperty("reply_message")]
+    public JToken replyMessage; // Snapshot of the quoted message (id/type/body/caption/...).
+
     [JsonProperty("delivery_status")]
     public string deliveryStatusRaw;
 
