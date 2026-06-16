@@ -364,6 +364,9 @@ public partial class ChatManager : MonoBehaviour
             UnreadOnOpen = 0;
         }
 
+        // A pending reply must not leak into the newly-opened chat.
+        CancelReply();
+
         currentChatId = chatId;
         _lastFetchedServerPage = 0;
         _servedFromStore = 0;
@@ -1574,6 +1577,12 @@ IEnumerator SendTextMessageRoutine(string chatId, string text)
     string tempId = "sending_" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
     long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
+    // Snapshot the reply target before any yield; clear it so the NEXT message
+    // isn't a reply. D1: BeginReply only accepts Sent messages, so this id is real.
+    MessageViewModel replyTarget = _replyTarget;
+    string quotedId = replyTarget != null ? replyTarget.messageId : null;
+    if (_replyTarget != null) CancelReply();
+
     seenMessageIds.Add(tempId);
 
     var instantMessage = new MessageViewModel
@@ -1586,7 +1595,12 @@ IEnumerator SendTextMessageRoutine(string chatId, string text)
         isIncoming = false,
         timestamp = now,
         sequence = _nextLocalSendSequence++,
-        deliveryStatus = DeliveryStatus.Pending
+        deliveryStatus = DeliveryStatus.Pending,
+        quotedMessageId    = replyTarget != null ? replyTarget.messageId : null,
+        quotedSenderName   = replyTarget != null ? ReplyParser.SenderLabel(replyTarget.isIncoming, replyTarget.senderName) : null,
+        quotedText         = replyTarget != null ? ReplyParser.SnippetFor(replyTarget.type, replyTarget.text) : null,
+        quotedType         = replyTarget != null ? replyTarget.type : MessageType.Unknown,
+        quotedThumbnailUrl = replyTarget != null ? (string.IsNullOrEmpty(replyTarget.thumbnailUrl) ? replyTarget.mediaUrl : replyTarget.thumbnailUrl) : null,
     };
 
     OnLiveMessagesReceived?.Invoke(new List<MessageViewModel> { instantMessage });
@@ -1600,16 +1614,17 @@ IEnumerator SendTextMessageRoutine(string chatId, string text)
 
     Outbox.Add(new OutboxStore.OutboxEntry
     {
-        tempId       = tempId,
-        chatId       = chatId,
-        text         = text,
-        timestamp    = now,
-        attemptCount = 1,
-        profileId    = activeProfileId
+        tempId          = tempId,
+        chatId          = chatId,
+        text            = text,
+        timestamp       = now,
+        attemptCount    = 1,
+        profileId       = activeProfileId,
+        quotedMessageId = quotedId,
     });
 
     // --- BACKGROUND: Send to server silently ---
-    yield return PostTextMessageRoutine(chatId, text, tempId, activeProfileId, sendCacheRoot);
+    yield return PostTextMessageRoutine(chatId, text, tempId, activeProfileId, sendCacheRoot, quotedId);
 }
 
 /// <summary>
@@ -1624,12 +1639,13 @@ private IEnumerator PostTextMessageRoutine(
     string text,
     string tempId,
     string profileId,
-    string sendCacheRoot)
+    string sendCacheRoot,
+    string quotedMessageId = null)
 {
     string recipient = chatId.EndsWith("@c.us") ? chatId.Replace("@c.us", "") : chatId;
     string url = $"https://wappi.pro/api/sync/message/send?profile_id={profileId}";
 
-    var requestData = new WappiSendTextRequest { body = text, recipient = recipient };
+    var requestData = new WappiSendTextRequest { body = text, recipient = recipient, quotedMessageId = quotedMessageId };
     string jsonPayload = JsonConvert.SerializeObject(requestData);
 
     using UnityWebRequest www = new UnityWebRequest(url, "POST");

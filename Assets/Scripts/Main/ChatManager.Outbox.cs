@@ -12,6 +12,35 @@ public partial class ChatManager
     private OutboxStore _outbox;
     private readonly HashSet<string> _retriesInFlight = new();
 
+    // ── Reply compose state ────────────────────────────────────────────────
+    private MessageViewModel _replyTarget;
+
+    /// <summary>Fires whenever the active reply target changes. Null payload == reply cancelled.</summary>
+    public event System.Action<MessageViewModel> OnReplyTargetChanged;
+
+    /// <summary>The message the next sent text will quote, or null. Read by SendTextMessageRoutine.</summary>
+    public MessageViewModel ReplyTarget => _replyTarget;
+
+    /// <summary>
+    /// Begin replying to a message. Ignored for not-yet-Sent messages (decision D1):
+    /// their id is still a temp id and cannot be quoted on the wire.
+    /// </summary>
+    public void BeginReply(MessageViewModel target)
+    {
+        if (target == null) return;
+        if (target.deliveryStatus == DeliveryStatus.Pending || target.deliveryStatus == DeliveryStatus.Failed) return;
+        _replyTarget = target;
+        OnReplyTargetChanged?.Invoke(target);
+    }
+
+    public void CancelReply()
+    {
+        if (_replyTarget == null) return;
+        _replyTarget = null;
+        OnReplyTargetChanged?.Invoke(null);
+    }
+    // ── End reply compose state ────────────────────────────────────────────
+
     private OutboxStore Outbox => _outbox ??= new OutboxStore(GetCacheRoot);
 
     /// <summary>
@@ -51,7 +80,7 @@ public partial class ChatManager
             if (entry.kind == (int)OutboxKind.Media)
                 yield return PostMediaMessageRoutine(entry, retryCacheRoot);
             else
-                yield return PostTextMessageRoutine(entry.chatId, entry.text, tempId, entry.profileId, retryCacheRoot);
+                yield return PostTextMessageRoutine(entry.chatId, entry.text, tempId, entry.profileId, retryCacheRoot, entry.quotedMessageId);
         }
         finally
         {
