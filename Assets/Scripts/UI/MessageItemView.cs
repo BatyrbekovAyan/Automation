@@ -1200,15 +1200,15 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
         }
 
         // Sender name horizontal inset — single source of truth for every bubble type.
-        // The body text margin (set in ReorderBubbleSiblings) is computed as
-        // (24 - padding.left) so the message's visible left edge always lands 24u from
-        // the bubble border regardless of the per-type padding set above. Mirror that
-        // exact formula here so the group sender name lines up with the message text in
-        // plain-text, media, audio, document and link-card bubbles alike. The per-branch
+        // Mirrors the body text's (24 - padding.left) inset (set in ReorderBubbleSiblings)
+        // but pulls in 1.5u tighter, so the name's left edge lands 22.5u from the bubble
+        // border. The constant is the single knob: it resolves to 6.5 in plain-text/audio
+        // bubbles (padding.left 16) and 16.5 in media/document/link-card bubbles
+        // (padding.left 6), keeping the name consistent across every type. Per-branch
         // sender margins above only carry their vertical offsets; this pass owns left/right.
         if (senderNameText != null && senderNameText.gameObject.activeSelf)
         {
-            float senderMarginX = Mathf.Max(24f - layout.padding.left, 0f);
+            float senderMarginX = Mathf.Max(22.5f - layout.padding.left, 0f);
             Vector4 sm = senderNameText.margin;
             senderNameText.margin = new Vector4(senderMarginX, sm.y, senderMarginX, sm.w);
         }
