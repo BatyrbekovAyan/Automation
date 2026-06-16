@@ -135,6 +135,12 @@ public static class ReactionBarBuilder
 
         contentGo.SetActive(false);   // hidden until a long-press shows it
 
+        // The left-edge SwipeBack strip sits in front of the messages and forwards taps via
+        // ClickPassthrough — but its loop stops at the first button, shadowing a bubble's
+        // long-press handler. Opt that one passthrough into delivering press events to all
+        // stacked targets so long-press works over the swipe strip too.
+        ConfigureSwipeBackPassthrough();
+
         EditorSceneManager.MarkSceneDirty(chatPanel.gameObject.scene);
         Debug.Log($"[ReactionBar] Built reaction-bar overlay under '{chatPanel.name}'. " +
                   "Verify the 6 quick-emoji sprites (1f44d 2764-fe0f 1f602 1f62e 1f622 1f64f) are in the static atlas. " +
@@ -206,6 +212,29 @@ public static class ReactionBarBuilder
             Debug.Log($"[ReactionBar] Attached MessageBubbleLongPress to '{bubbleGo.name}' in {prefabPath}");
         }
         finally { PrefabUtility.UnloadPrefabContents(root); }
+    }
+
+    private static void ConfigureSwipeBackPassthrough()
+    {
+        var swipe = Object.FindFirstObjectByType<SwipeToBack>(FindObjectsInactive.Include);
+        var passthrough = swipe != null ? swipe.GetComponent<ClickPassthrough>() : null;
+        if (passthrough == null)
+        {
+            Debug.LogWarning("[ReactionBar] No ClickPassthrough on the SwipeBack panel — long-press over the " +
+                             "left swipe strip won't fire until 'deliverPressToAllBehind' is enabled there.");
+            return;
+        }
+
+        var so = new SerializedObject(passthrough);
+        var p = so.FindProperty("deliverPressToAllBehind");
+        if (p == null)
+        {
+            Debug.LogWarning("[ReactionBar] ClickPassthrough has no 'deliverPressToAllBehind' field — recompile, then re-run.");
+            return;
+        }
+        p.boolValue = true;
+        so.ApplyModifiedPropertiesWithoutUndo();
+        Debug.Log("[ReactionBar] Enabled ClickPassthrough.deliverPressToAllBehind on the SwipeBack strip.");
     }
 
     private static RectTransform ResolveChatPanel()
