@@ -47,6 +47,9 @@ public class OutboxStore
         public string videoUrl;        // file://{pick.Path} (video, in-session playback)
         public float  aspectRatio;
         public int    duration;
+
+        // --- appended for reply feature (append-only; JsonUtility fills missing as null) ---
+        public string quotedMessageId;   // non-null => this outbox message is a reply
     }
 
     [Serializable]
