@@ -94,6 +94,7 @@ The app communicates with four external services via `UnityWebRequest` + corouti
   - `messages/all/get` — all messages (bulk)
   - `message/media/download` — download media by message ID
   - `message/send` — send a message
+  - `message/reaction` — send/remove an emoji reaction (body `{ body, message_id }`; empty `body` removes; targets by `message_id`, no recipient)
   - `qr/get` — QR code for WhatsApp login
   - `auth/code` — request phone auth code
   - `get/status` — connection status
