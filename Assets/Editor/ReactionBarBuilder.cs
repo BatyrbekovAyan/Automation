@@ -51,8 +51,6 @@ public static class ReactionBarBuilder
     private const float PickerSheetHeight  = 1180f;
     private const float PickerTopRadius    = 60f;
     private const float PickerHeaderHeight = 132f;
-    private const float PickerCell         = 144f;
-    private const int   PickerColumns      = 6;
 
     [MenuItem("Tools/Chat/Build Reaction Bar Overlay")]
     public static void BuildOverlay()
@@ -335,24 +333,26 @@ public static class ReactionBarBuilder
         vpImg.color = new Color(1f, 1f, 1f, 0.004f);   // near-invisible but a raycast target so empty space drag-scrolls
         vpImg.raycastTarget = true;
 
-        var gridGo = new GameObject("GridContent", typeof(RectTransform), typeof(GridLayoutGroup), typeof(ContentSizeFitter));
-        gridGo.transform.SetParent(viewportGo.transform, false);
-        var gridRt = (RectTransform)gridGo.transform;
-        gridRt.anchorMin = new Vector2(0f, 1f);
-        gridRt.anchorMax = new Vector2(1f, 1f);
-        gridRt.pivot = new Vector2(0.5f, 1f);
-        gridRt.anchoredPosition = Vector2.zero;
-        gridRt.sizeDelta = new Vector2(0f, 0f);
-        var grid = gridGo.GetComponent<GridLayoutGroup>();
-        grid.cellSize = new Vector2(PickerCell, PickerCell);
-        grid.spacing = new Vector2(12f, 12f);
-        grid.padding = new RectOffset(48, 48, 12, 48);
-        grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-        grid.constraintCount = PickerColumns;
-        grid.childAlignment = TextAnchor.UpperCenter;
-        var gridFitter = gridGo.GetComponent<ContentSizeFitter>();
-        gridFitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
-        gridFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        // Vertical list — EmojiPickerController adds one (header + grid) section per category at runtime.
+        var listGo = new GameObject("ListContent", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
+        listGo.transform.SetParent(viewportGo.transform, false);
+        var listRt = (RectTransform)listGo.transform;
+        listRt.anchorMin = new Vector2(0f, 1f);
+        listRt.anchorMax = new Vector2(1f, 1f);
+        listRt.pivot = new Vector2(0.5f, 1f);
+        listRt.anchoredPosition = Vector2.zero;
+        listRt.sizeDelta = Vector2.zero;
+        var vlg = listGo.GetComponent<VerticalLayoutGroup>();
+        vlg.padding = new RectOffset(24, 24, 12, 48);
+        vlg.spacing = 8f;
+        vlg.childAlignment = TextAnchor.UpperCenter;
+        vlg.childControlWidth = true;
+        vlg.childControlHeight = true;
+        vlg.childForceExpandWidth = true;
+        vlg.childForceExpandHeight = false;
+        var listFitter = listGo.GetComponent<ContentSizeFitter>();
+        listFitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+        listFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
         var scroll = scrollGo.GetComponent<ScrollRect>();
         scroll.horizontal = false;
@@ -360,7 +360,7 @@ public static class ReactionBarBuilder
         scroll.movementType = ScrollRect.MovementType.Clamped;
         scroll.scrollSensitivity = 30f;
         scroll.viewport = (RectTransform)viewportGo.transform;
-        scroll.content = gridRt;
+        scroll.content = listRt;
 
         // Wire EmojiPickerController
         var controller = rootGo.GetComponent<EmojiPickerController>();
@@ -368,14 +368,14 @@ public static class ReactionBarBuilder
         SetRef(so, "content", contentGo);
         SetRef(so, "scrimButton", scrimButton);
         SetRef(so, "sheet", sheetRt);
-        SetRef(so, "gridContent", gridRt);
+        SetRef(so, "listContent", listRt);
         so.ApplyModifiedPropertiesWithoutUndo();
 
         contentGo.SetActive(false);
 
         EditorSceneManager.MarkSceneDirty(chatPanel.gameObject.scene);
-        Debug.Log($"[ReactionBar] Built emoji picker sheet under '{chatPanel.name}' ({ReactionEmojiCatalog.All.Length} emoji, " +
-                  $"{PickerColumns} cols). Save the scene to persist.");
+        Debug.Log($"[ReactionBar] Built emoji picker sheet under '{chatPanel.name}' " +
+                  $"({ReactionEmojiCatalog.All.Length} emoji across {ReactionEmojiCatalog.Categories.Length} categories). Save the scene to persist.");
     }
 
     [MenuItem("Tools/Chat/Attach Long-Press To Both Bubbles")]

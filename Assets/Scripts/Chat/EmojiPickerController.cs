@@ -5,9 +5,9 @@ using UnityEngine.UI;
 using DG.Tweening;
 
 /// <summary>
-/// Bottom-sheet grid of the full reaction emoji catalog, opened from the reaction
-/// bar's "+". Builds one cell per ReactionEmojiCatalog entry on first show; tapping
-/// a cell sends that reaction via ChatManager and closes. Missing sprites are
+/// Bottom-sheet emoji picker opened from the reaction bar's "+". On first show it builds
+/// one section (header + grid) per ReactionEmojiCatalog category into a vertical list;
+/// tapping a cell sends that reaction via ChatManager and closes. Missing sprites are
 /// auto-requested by UnicodeEmojiConverter and filled in on EmojiPatchService.OnEmojiReady.
 /// Lives on the messages screen panel; its root stays active while the Content child toggles.
 /// </summary>
@@ -19,11 +19,22 @@ public class EmojiPickerController : MonoBehaviour
     [SerializeField] private GameObject content;        // scrim + sheet; toggled on show/hide
     [SerializeField] private Button scrimButton;        // tap-out dismiss
     [SerializeField] private RectTransform sheet;       // bottom sheet (slide-up anim)
-    [SerializeField] private RectTransform gridContent; // GridLayoutGroup parent for the cells
-    [SerializeField] private float cellFontSize = 72f;
+    [SerializeField] private RectTransform listContent; // VerticalLayoutGroup container the sections are added to
+
+    [Header("Grid")]
+    [SerializeField] private float cellSize = 130f;
+    [SerializeField] private float cellSpacing = 12f;
+    [SerializeField] private int columns = 7;
+    [SerializeField] private float cellFontSize = 64f;
+
+    [Header("Section header")]
+    [SerializeField] private float headerHeight = 64f;
+    [SerializeField] private float headerFontSize = 32f;
+    [SerializeField] private Color headerColor = new Color(0.45f, 0.45f, 0.48f);
 
     private MessageViewModel _target;
     private readonly List<TextMeshProUGUI> _cellLabels = new List<TextMeshProUGUI>();
+    private readonly List<string> _cellEmojis = new List<string>();
     private bool _built;
 
     private void Awake()
@@ -53,7 +64,7 @@ public class EmojiPickerController : MonoBehaviour
         if (target == null) return;
         _target = target;
 
-        BuildGridIfNeeded();
+        BuildSectionsIfNeeded();
         RenderCells();
         if (content != null) content.SetActive(true);
 
@@ -71,50 +82,85 @@ public class EmojiPickerController : MonoBehaviour
         if (content != null) content.SetActive(false);
     }
 
-    private void BuildGridIfNeeded()
+    private void BuildSectionsIfNeeded()
     {
-        if (_built || gridContent == null) return;
+        if (_built || listContent == null) return;
 
-        string[] emojis = ReactionEmojiCatalog.All;
-        for (int i = 0; i < emojis.Length; i++)
+        foreach (var category in ReactionEmojiCatalog.Categories)
         {
-            string emoji = emojis[i];   // capture per cell for the closure
-
-            var cell = new GameObject("Cell", typeof(RectTransform), typeof(Image), typeof(Button));
-            cell.transform.SetParent(gridContent, false);
-
-            var bg = cell.GetComponent<Image>();
-            bg.color = new Color(0f, 0f, 0f, 0f);   // invisible, the whole cell is tappable
-            bg.raycastTarget = true;
-
-            var labelGo = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
-            labelGo.transform.SetParent(cell.transform, false);
-            var lrt = (RectTransform)labelGo.transform;
-            lrt.anchorMin = Vector2.zero; lrt.anchorMax = Vector2.one;
-            lrt.offsetMin = Vector2.zero; lrt.offsetMax = Vector2.zero;
-
-            var tmp = labelGo.GetComponent<TextMeshProUGUI>();
-            tmp.fontSize = cellFontSize;
-            tmp.alignment = TextAlignmentOptions.Center;
-            tmp.enableWordWrapping = false;
-            tmp.overflowMode = TextOverflowModes.Overflow;
-            tmp.raycastTarget = false;
-            _cellLabels.Add(tmp);
-
-            var btn = cell.GetComponent<Button>();
-            btn.transition = Selectable.Transition.None;
-            var nav = btn.navigation; nav.mode = Navigation.Mode.None; btn.navigation = nav;
-            btn.onClick.AddListener(() => OnEmojiTapped(emoji));
+            BuildHeader(category.Name);
+            BuildGrid(category.Emojis);
         }
         _built = true;
     }
 
+    private void BuildHeader(string text)
+    {
+        var go = new GameObject("Header", typeof(RectTransform), typeof(TextMeshProUGUI), typeof(LayoutElement));
+        go.transform.SetParent(listContent, false);
+        go.GetComponent<LayoutElement>().preferredHeight = headerHeight;
+
+        var tmp = go.GetComponent<TextMeshProUGUI>();
+        tmp.text = text;
+        tmp.fontSize = headerFontSize;
+        tmp.color = headerColor;
+        tmp.alignment = TextAlignmentOptions.MidlineLeft;
+        tmp.raycastTarget = false;
+    }
+
+    private void BuildGrid(string[] emojis)
+    {
+        var gridGo = new GameObject("Grid", typeof(RectTransform), typeof(GridLayoutGroup));
+        gridGo.transform.SetParent(listContent, false);
+
+        var grid = gridGo.GetComponent<GridLayoutGroup>();
+        grid.cellSize = new Vector2(cellSize, cellSize);
+        grid.spacing = new Vector2(cellSpacing, cellSpacing);
+        grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        grid.constraintCount = Mathf.Max(1, columns);
+        grid.childAlignment = TextAnchor.UpperCenter;
+
+        foreach (var emoji in emojis)
+            BuildCell(gridGo.transform, emoji);
+    }
+
+    private void BuildCell(Transform parent, string emoji)
+    {
+        string captured = emoji;   // per-cell capture for the click closure
+
+        var cell = new GameObject("Cell", typeof(RectTransform), typeof(Image), typeof(Button));
+        cell.transform.SetParent(parent, false);
+
+        var bg = cell.GetComponent<Image>();
+        bg.color = new Color(0f, 0f, 0f, 0f);   // invisible, the whole cell is tappable
+        bg.raycastTarget = true;
+
+        var labelGo = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
+        labelGo.transform.SetParent(cell.transform, false);
+        var lrt = (RectTransform)labelGo.transform;
+        lrt.anchorMin = Vector2.zero; lrt.anchorMax = Vector2.one;
+        lrt.offsetMin = Vector2.zero; lrt.offsetMax = Vector2.zero;
+
+        var tmp = labelGo.GetComponent<TextMeshProUGUI>();
+        tmp.fontSize = cellFontSize;
+        tmp.alignment = TextAlignmentOptions.Center;
+        tmp.enableWordWrapping = false;
+        tmp.overflowMode = TextOverflowModes.Overflow;
+        tmp.raycastTarget = false;
+        _cellLabels.Add(tmp);
+        _cellEmojis.Add(captured);
+
+        var btn = cell.GetComponent<Button>();
+        btn.transition = Selectable.Transition.None;
+        var nav = btn.navigation; nav.mode = Navigation.Mode.None; btn.navigation = nav;
+        btn.onClick.AddListener(() => OnEmojiTapped(captured));
+    }
+
     private void RenderCells()
     {
-        string[] emojis = ReactionEmojiCatalog.All;
-        for (int i = 0; i < _cellLabels.Count && i < emojis.Length; i++)
+        for (int i = 0; i < _cellLabels.Count && i < _cellEmojis.Count; i++)
             if (_cellLabels[i] != null)
-                _cellLabels[i].text = UnicodeEmojiConverter.ConvertRealEmojisToSprites(emojis[i], MissingEmojiMode.Hide);
+                _cellLabels[i].text = UnicodeEmojiConverter.ConvertRealEmojisToSprites(_cellEmojis[i], MissingEmojiMode.Hide);
     }
 
     private void OnEmojiTapped(string emoji)
