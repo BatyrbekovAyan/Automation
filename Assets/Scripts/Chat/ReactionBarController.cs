@@ -93,8 +93,9 @@ public class ReactionBarController : MonoBehaviour
 
     private void OnPlusTapped()
     {
-        // Plan B: EmojiPickerController.Instance?.Show(_target);
+        var target = _target;   // Hide() nulls _target — capture before closing the bar
         Hide();
+        if (target != null) EmojiPickerController.Instance?.Show(target);
     }
 
     private void RenderEmojiLabels()

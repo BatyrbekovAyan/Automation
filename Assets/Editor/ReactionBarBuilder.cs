@@ -47,6 +47,13 @@ public static class ReactionBarBuilder
     private static readonly Color BarColor   = Color.white;
     private static readonly Color ScrimColor = new Color(0f, 0f, 0f, ScrimAlpha);
 
+    // Emoji picker bottom sheet
+    private const float PickerSheetHeight  = 1180f;
+    private const float PickerTopRadius    = 60f;
+    private const float PickerHeaderHeight = 132f;
+    private const float PickerCell         = 144f;
+    private const int   PickerColumns      = 6;
+
     [MenuItem("Tools/Chat/Build Reaction Bar Overlay")]
     public static void BuildOverlay()
     {
@@ -120,6 +127,7 @@ public static class ReactionBarBuilder
         var buttons = new Button[6];
         for (int i = 0; i < 6; i++)
             buttons[i] = BuildEmojiButton(barGo.transform, i);
+        var plus = BuildPlusButton(barGo.transform);   // 7th item — opens the full picker (Plan B)
 
         // ── Wire the controller ──
         var controller = rootGo.GetComponent<ReactionBarController>();
@@ -127,6 +135,7 @@ public static class ReactionBarBuilder
         SetRef(so, "content", contentGo);
         SetRef(so, "scrimButton", scrimButton);
         SetRef(so, "bar", barRt);
+        SetRef(so, "plusButton", plus);
         var arr = so.FindProperty("emojiButtons");
         arr.arraySize = 6;
         for (int i = 0; i < 6; i++)
@@ -183,6 +192,190 @@ public static class ReactionBarBuilder
         tmp.raycastTarget = false;
 
         return button;
+    }
+
+    // The "+" that opens the full picker. A light-gray circle with a "+" drawn from two
+    // Image bars — TMP-text glyph icons don't render in this project, so never use a TMP "+".
+    private static Button BuildPlusButton(Transform parent)
+    {
+        var go = new GameObject("Plus", typeof(RectTransform), typeof(Image),
+                                typeof(Button), typeof(LayoutElement), typeof(ImageWithRoundedCorners));
+        go.transform.SetParent(parent, false);
+
+        var le = go.GetComponent<LayoutElement>();
+        le.preferredWidth = ButtonSize;
+        le.preferredHeight = ButtonSize;
+
+        var bg = go.GetComponent<Image>();
+        bg.color = new Color32(0xEC, 0xEC, 0xEE, 0xFF);   // light gray so it reads against the white bar
+        bg.raycastTarget = true;
+
+        var rounded = go.GetComponent<ImageWithRoundedCorners>();
+        rounded.radius = ButtonRadius;
+        rounded.Validate();
+        rounded.Refresh();
+
+        var button = go.GetComponent<Button>();
+        button.transition = Selectable.Transition.None;
+        button.targetGraphic = bg;
+        var nav = button.navigation; nav.mode = Navigation.Mode.None; button.navigation = nav;
+
+        var glyph = new Color32(0x6E, 0x6E, 0x73, 0xFF);
+        MakePlusBar(go.transform, new Vector2(44f, 8f), glyph);   // horizontal
+        MakePlusBar(go.transform, new Vector2(8f, 44f), glyph);   // vertical
+        return button;
+    }
+
+    private static void MakePlusBar(Transform parent, Vector2 size, Color color)
+    {
+        var bar = new GameObject("Bar", typeof(RectTransform), typeof(Image));
+        bar.transform.SetParent(parent, false);
+        var rt = (RectTransform)bar.transform;
+        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = Vector2.zero;
+        rt.sizeDelta = size;
+        var img = bar.GetComponent<Image>();
+        img.color = color;
+        img.raycastTarget = false;
+    }
+
+    [MenuItem("Tools/Chat/Build Emoji Picker")]
+    public static void BuildEmojiPicker()
+    {
+        RectTransform chatPanel = ResolveChatPanel();
+        if (chatPanel == null)
+        {
+            Debug.LogError("[ReactionBar] Could not resolve the chat panel for the emoji picker.");
+            return;
+        }
+
+        foreach (var prior in chatPanel.GetComponentsInChildren<EmojiPickerController>(includeInactive: true))
+            Object.DestroyImmediate(prior.gameObject);
+
+        var rootGo = new GameObject("EmojiPickerOverlay", typeof(RectTransform), typeof(EmojiPickerController));
+        rootGo.transform.SetParent(chatPanel, false);
+        rootGo.transform.SetAsLastSibling();
+        Stretch((RectTransform)rootGo.transform);
+
+        var contentGo = new GameObject("Content", typeof(RectTransform));
+        contentGo.transform.SetParent(rootGo.transform, false);
+        Stretch((RectTransform)contentGo.transform);
+
+        // Scrim
+        var scrimGo = new GameObject("Scrim", typeof(RectTransform), typeof(Image), typeof(Button));
+        scrimGo.transform.SetParent(contentGo.transform, false);
+        Stretch((RectTransform)scrimGo.transform);
+        var scrimImg = scrimGo.GetComponent<Image>();
+        scrimImg.color = ScrimColor;
+        scrimImg.raycastTarget = true;
+        var scrimButton = scrimGo.GetComponent<Button>();
+        scrimButton.transition = Selectable.Transition.None;
+        var sNav = scrimButton.navigation; sNav.mode = Navigation.Mode.None; scrimButton.navigation = sNav;
+
+        // Sheet — bottom-anchored, top corners rounded
+        var sheetGo = new GameObject("Sheet", typeof(RectTransform), typeof(Image), typeof(ImageWithIndependentRoundedCorners));
+        sheetGo.transform.SetParent(contentGo.transform, false);
+        var sheetRt = (RectTransform)sheetGo.transform;
+        sheetRt.anchorMin = new Vector2(0f, 0f);
+        sheetRt.anchorMax = new Vector2(1f, 0f);
+        sheetRt.pivot = new Vector2(0.5f, 0f);
+        sheetRt.sizeDelta = new Vector2(0f, PickerSheetHeight);
+        sheetRt.anchoredPosition = Vector2.zero;
+        var sheetImg = sheetGo.GetComponent<Image>();
+        sheetImg.color = Color.white;
+        sheetImg.raycastTarget = true;   // taps on the sheet don't fall through to the scrim
+        var sheetRounded = sheetGo.GetComponent<ImageWithIndependentRoundedCorners>();
+        sheetRounded.r = new Vector4(PickerTopRadius, PickerTopRadius, 0f, 0f);
+        sheetRounded.Validate();
+        sheetRounded.Refresh();
+
+        // Grabber pill
+        var grab = new GameObject("Grabber", typeof(RectTransform), typeof(Image), typeof(ImageWithRoundedCorners));
+        grab.transform.SetParent(sheetGo.transform, false);
+        var grabRt = (RectTransform)grab.transform;
+        grabRt.anchorMin = grabRt.anchorMax = new Vector2(0.5f, 1f);
+        grabRt.pivot = new Vector2(0.5f, 1f);
+        grabRt.sizeDelta = new Vector2(108f, 12f);
+        grabRt.anchoredPosition = new Vector2(0f, -28f);
+        grab.GetComponent<Image>().color = new Color32(0xC8, 0xC8, 0xCC, 0xFF);
+        grab.GetComponent<Image>().raycastTarget = false;
+        var grabRound = grab.GetComponent<ImageWithRoundedCorners>();
+        grabRound.radius = 6f; grabRound.Validate(); grabRound.Refresh();
+
+        // Title
+        var titleGo = new GameObject("Title", typeof(RectTransform), typeof(TextMeshProUGUI));
+        titleGo.transform.SetParent(sheetGo.transform, false);
+        var titleRt = (RectTransform)titleGo.transform;
+        titleRt.anchorMin = new Vector2(0f, 1f);
+        titleRt.anchorMax = new Vector2(1f, 1f);
+        titleRt.pivot = new Vector2(0.5f, 1f);
+        titleRt.sizeDelta = new Vector2(0f, 56f);
+        titleRt.anchoredPosition = new Vector2(0f, -56f);
+        var title = titleGo.GetComponent<TextMeshProUGUI>();
+        title.text = "React";
+        title.fontSize = 44f;
+        title.alignment = TextAlignmentOptions.Center;
+        title.color = new Color32(0x11, 0x1B, 0x21, 0xFF);
+        title.raycastTarget = false;
+
+        // ScrollRect → Viewport (mask) → GridContent
+        var scrollGo = new GameObject("Scroll", typeof(RectTransform), typeof(ScrollRect));
+        scrollGo.transform.SetParent(sheetGo.transform, false);
+        var scrollRt = (RectTransform)scrollGo.transform;
+        scrollRt.anchorMin = new Vector2(0f, 0f);
+        scrollRt.anchorMax = new Vector2(1f, 1f);
+        scrollRt.offsetMin = new Vector2(0f, 24f);
+        scrollRt.offsetMax = new Vector2(0f, -PickerHeaderHeight);
+
+        var viewportGo = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(RectMask2D));
+        viewportGo.transform.SetParent(scrollGo.transform, false);
+        Stretch((RectTransform)viewportGo.transform);
+        var vpImg = viewportGo.GetComponent<Image>();
+        vpImg.color = new Color(1f, 1f, 1f, 0.004f);   // near-invisible but a raycast target so empty space drag-scrolls
+        vpImg.raycastTarget = true;
+
+        var gridGo = new GameObject("GridContent", typeof(RectTransform), typeof(GridLayoutGroup), typeof(ContentSizeFitter));
+        gridGo.transform.SetParent(viewportGo.transform, false);
+        var gridRt = (RectTransform)gridGo.transform;
+        gridRt.anchorMin = new Vector2(0f, 1f);
+        gridRt.anchorMax = new Vector2(1f, 1f);
+        gridRt.pivot = new Vector2(0.5f, 1f);
+        gridRt.anchoredPosition = Vector2.zero;
+        gridRt.sizeDelta = new Vector2(0f, 0f);
+        var grid = gridGo.GetComponent<GridLayoutGroup>();
+        grid.cellSize = new Vector2(PickerCell, PickerCell);
+        grid.spacing = new Vector2(12f, 12f);
+        grid.padding = new RectOffset(48, 48, 12, 48);
+        grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        grid.constraintCount = PickerColumns;
+        grid.childAlignment = TextAnchor.UpperCenter;
+        var gridFitter = gridGo.GetComponent<ContentSizeFitter>();
+        gridFitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+        gridFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        var scroll = scrollGo.GetComponent<ScrollRect>();
+        scroll.horizontal = false;
+        scroll.vertical = true;
+        scroll.movementType = ScrollRect.MovementType.Clamped;
+        scroll.scrollSensitivity = 30f;
+        scroll.viewport = (RectTransform)viewportGo.transform;
+        scroll.content = gridRt;
+
+        // Wire EmojiPickerController
+        var controller = rootGo.GetComponent<EmojiPickerController>();
+        var so = new SerializedObject(controller);
+        SetRef(so, "content", contentGo);
+        SetRef(so, "scrimButton", scrimButton);
+        SetRef(so, "sheet", sheetRt);
+        SetRef(so, "gridContent", gridRt);
+        so.ApplyModifiedPropertiesWithoutUndo();
+
+        contentGo.SetActive(false);
+
+        EditorSceneManager.MarkSceneDirty(chatPanel.gameObject.scene);
+        Debug.Log($"[ReactionBar] Built emoji picker sheet under '{chatPanel.name}' ({ReactionEmojiCatalog.All.Length} emoji, " +
+                  $"{PickerColumns} cols). Save the scene to persist.");
     }
 
     [MenuItem("Tools/Chat/Attach Long-Press To Both Bubbles")]
