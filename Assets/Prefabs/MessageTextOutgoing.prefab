@@ -1650,6 +1650,11 @@ MonoBehaviour:
     pageCount: 0
     deliveryStatus: 0
     reactions: []
+    quotedMessageId: 
+    quotedSenderName: 
+    quotedText: 
+    quotedType: 0
+    quotedThumbnailUrl: 
 --- !u!1 &2748691260983683912
 GameObject:
   m_ObjectHideFlags: 0
@@ -1665,6 +1670,7 @@ GameObject:
   - component: {fileID: 6766194234542197007}
   - component: {fileID: 7521844350222315793}
   - component: {fileID: 2592324639511053011}
+  - component: {fileID: 3356880877141673262}
   m_Layer: 5
   m_Name: Bubble
   m_TagString: Untagged
@@ -1698,7 +1704,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 8, y: -12.5}
+  m_AnchoredPosition: {x: 0, y: -0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &7809113822818746917
@@ -1723,7 +1729,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 0.84705883, g: 0.99215686, b: 0.83137256, a: 1}
-  m_RaycastTarget: 0
+  m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
@@ -1808,6 +1814,20 @@ MonoBehaviour:
   outlineRect: {fileID: 7734653619915556645}
   extraSize: 2
   outgoing: 1
+--- !u!114 &3356880877141673262
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2748691260983683912}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8e68cb8300d334278bf8c58189f70bf7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MessageBubbleLongPress
+  holdSeconds: 0.45
+  moveCancelPixels: 16
 --- !u!1 &2849307411586119166
 GameObject:
   m_ObjectHideFlags: 0

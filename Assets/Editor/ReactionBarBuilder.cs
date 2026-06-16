@@ -34,13 +34,13 @@ public static class ReactionBarBuilder
     private const string OverlayName = "ReactionBarOverlay";
 
     // Bar
-    private const int   BarPadding   = 24;   // 8dp
-    private const int   BarSpacing   = 16;   // ~5dp between emoji
-    private const float BarRadius    = 80f;  // ~half of the 168-unit bar height -> pill
+    private const int   BarPadding   = 20;   // ~7dp
+    private const int   BarSpacing   = 12;   // ~4dp between emoji
+    private const float BarRadius    = 66f;  // ~half of the 140-unit bar height -> pill
     // Emoji button
-    private const float ButtonSize   = 120f; // 40dp touch target
-    private const float ButtonRadius = 60f;  // half size -> circle
-    private const float EmojiFont    = 72f;
+    private const float ButtonSize   = 100f; // ~33dp — compact reaction bar
+    private const float ButtonRadius = 50f;  // half size -> circle
+    private const float EmojiFont    = 60f;
     // Scrim
     private const float ScrimAlpha   = 0.28f;
 
