@@ -181,6 +181,9 @@ public class MessageItemView : MonoBehaviour
     /// and pagination boundary checks. Never null after the first Bind().
     /// </summary>
     public MessageViewModel BoundVm => currentVm;
+
+    /// <summary>The visible bubble surface's RectTransform — anchor for the long-press reaction bar.</summary>
+    public RectTransform BubbleRect => bubbleBackground != null ? (RectTransform)bubbleBackground.transform : null;
     private float defaultFontSize = -1f;
     private bool hideBubble = false;
     private bool isJumboEmoji = false;
