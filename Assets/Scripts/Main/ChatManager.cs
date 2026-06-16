@@ -536,7 +536,12 @@ public partial class ChatManager : MonoBehaviour
                     // message's bytes. Without this pass the cached entry
                     // stays wrong forever and the on-disk media cache (keyed
                     // by URL MD5) serves the wrong file on every reload.
-                    if (RefreshCachedMessageMedia(Normalize(raw), cachedList))
+                    NormalizedMessage reconcileNorm = Normalize(raw);
+                    if (RefreshCachedMessageMedia(reconcileNorm, cachedList))
+                    {
+                        hasStatusUpdates = true;
+                    }
+                    if (RefreshCachedMessageQuote(reconcileNorm, cachedList))
                     {
                         hasStatusUpdates = true;
                     }
@@ -970,6 +975,10 @@ public partial class ChatManager : MonoBehaviour
                     {
                         cacheDirty = true;
                     }
+                    if (RefreshCachedMessageQuote(norm, _activeChatCache))
+                    {
+                        cacheDirty = true;
+                    }
                 }
             }
         }
@@ -1045,7 +1054,12 @@ public partial class ChatManager : MonoBehaviour
                         // a stale or wrong s3 URL from a prior sync — once the
                         // user paginates past it, we patch the cache so the
                         // next render uses the right file.
-                        if (RefreshCachedMessageMedia(Normalize(raw), _activeChatCache))
+                        NormalizedMessage reconcileNorm = Normalize(raw);
+                        if (RefreshCachedMessageMedia(reconcileNorm, _activeChatCache))
+                        {
+                            cacheDirty = true;
+                        }
+                        if (RefreshCachedMessageQuote(reconcileNorm, _activeChatCache))
                         {
                             cacheDirty = true;
                         }
@@ -1386,6 +1400,41 @@ if (msg.messageType == MessageType.Video)
         || type == MessageType.Voice
         || type == MessageType.Sticker
         || type == MessageType.Document;
+
+    /// <summary>
+    /// Mirrors RefreshCachedMessageMedia but for the reply quote. Cached histories that
+    /// predate the reply feature (or whose quote first resolved to a placeholder) carry no
+    /// quoted* fields; this copies the freshly-Normalized quote onto the existing cached VM
+    /// in place and fires OnMessageMediaRefreshed so the bound bubble re-renders its card.
+    /// Runs for ALL message types (unlike the media refresh, which early-returns on non-media).
+    /// </summary>
+    private bool RefreshCachedMessageQuote(NormalizedMessage refreshed, List<MessageViewModel> cachedList)
+    {
+        if (refreshed == null || cachedList == null) return false;
+        if (string.IsNullOrEmpty(refreshed.quotedMessageId)) return false; // not a reply
+
+        for (int i = 0; i < cachedList.Count; i++)
+        {
+            if (cachedList[i].messageId != refreshed.id) continue;
+
+            var cached = cachedList[i];
+            bool unchanged = cached.quotedMessageId == refreshed.quotedMessageId
+                          && cached.quotedText == refreshed.quotedText
+                          && cached.quotedSenderName == refreshed.quotedSenderName
+                          && cached.quotedType == refreshed.quotedType
+                          && cached.quotedThumbnailUrl == refreshed.quotedThumbnailUrl;
+            if (unchanged) return false;
+
+            cached.quotedMessageId    = refreshed.quotedMessageId;
+            cached.quotedSenderName   = refreshed.quotedSenderName;
+            cached.quotedText         = refreshed.quotedText;
+            cached.quotedType         = refreshed.quotedType;
+            cached.quotedThumbnailUrl = refreshed.quotedThumbnailUrl;
+            OnMessageMediaRefreshed?.Invoke(cached);
+            return true;
+        }
+        return false;
+    }
 
     /// <summary>
     /// If `refreshed` matches an entry in `cachedList`, copy any

@@ -56,7 +56,8 @@ public static class ReplyParser
         string caption = snap["caption"]?.ToString();
         string body    = snap["body"]?.ToString();
         bool fromMe    = snap["fromMe"]?.ToObject<bool>() ?? false;
-        string sender  = snap["senderName"]?.ToString();
+        // Wappi's reply_message carries the quoted sender in contact_name (no senderName/fromMe).
+        string sender  = snap["contact_name"]?.ToString() ?? snap["senderName"]?.ToString();
         return new QuotedPreview
         {
             messageId    = id,
