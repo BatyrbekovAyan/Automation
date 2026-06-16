@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 89521bd748f104e3990595f495eb967a
+guid: 599d39a51f23340efa1e2ee1544a208f
 TextureImporter:
   internalIDToNameTable:
   - first:
@@ -147,10 +147,10 @@ TextureImporter:
       name: ChatTicks_0
       rect:
         serializedVersion: 2
-        x: 0
-        y: 641
-        width: 362
-        height: 260
+        x: 1
+        y: 1282
+        width: 723
+        height: 520
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -169,10 +169,10 @@ TextureImporter:
       name: ChatTicks_1
       rect:
         serializedVersion: 2
-        x: 229
-        y: 641
-        width: 285
-        height: 259
+        x: 458
+        y: 1282
+        width: 569
+        height: 518
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -191,10 +191,10 @@ TextureImporter:
       name: ChatTicks_2
       rect:
         serializedVersion: 2
-        x: 514
-        y: 641
-        width: 362
-        height: 260
+        x: 1029
+        y: 1282
+        width: 723
+        height: 520
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -213,10 +213,10 @@ TextureImporter:
       name: ChatTicks_3
       rect:
         serializedVersion: 2
-        x: 743
-        y: 641
-        width: 285
-        height: 259
+        x: 1486
+        y: 1282
+        width: 569
+        height: 518
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -235,10 +235,10 @@ TextureImporter:
       name: ChatTicks_4
       rect:
         serializedVersion: 2
-        x: 1028
-        y: 641
-        width: 362
-        height: 260
+        x: 2057
+        y: 1282
+        width: 722
+        height: 520
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -257,10 +257,10 @@ TextureImporter:
       name: ChatTicks_5
       rect:
         serializedVersion: 2
-        x: 0
-        y: 0
-        width: 514
-        height: 514
+        x: 84
+        y: 84
+        width: 860
+        height: 860
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -279,10 +279,10 @@ TextureImporter:
       name: ChatTicks_6
       rect:
         serializedVersion: 2
-        x: 514
-        y: 0
-        width: 514
-        height: 514
+        x: 1029
+        y: 1
+        width: 1026
+        height: 1026
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}

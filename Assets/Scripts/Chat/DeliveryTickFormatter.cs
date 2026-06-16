@@ -13,7 +13,20 @@ public static class DeliveryTickFormatter
     private const string TagSent    = "<sprite name=\"tick_sent\">";
     private const string TagDouble  = "<sprite name=\"tick_double\">";
     private const string TagBlue    = "<sprite name=\"tick_double_blue\">";
-    private const string TagFailed  = "<sprite name=\"tick_failed\">";
+    // Failed shows a ⚠️ warning emoji in front of the tick_failed glyph (now a refresh
+    // icon in ChatTicks) so users see something is wrong; the whole timeText stays tappable
+    // to retry (see MessageItemView.UpdateRetryButton). The emoji's sprite name must be the
+    // fully-qualified Twemoji name "26a0-fe0f" (⚠️ is U+26A0 U+FE0F) — the bare "26a0" matches
+    // no glyph in the emoji atlas and TMP would render the literal tag as text. The glyph
+    // lives in texture-29, a serialized fallback of the default sprite asset, so it resolves
+    // by name in the time label exactly like the ChatTicks tick glyphs do.
+    //
+    // The emoji is wrapped in <size=80%> so it sits a touch smaller than full line-height,
+    // closer to the monochrome refresh/tick glyph beside it, without looking shrunken. Its
+    // measured advance only weakly affects MessageItemView's inline-time reservation (the
+    // <space=…px> appended to the bubble text), so this value is a visual choice, not a
+    // layout lever. </size> closes before the refresh glyph so only the emoji is scaled.
+    private const string TagFailed  = "<size=80%><sprite name=\"26a0-fe0f\"></size><sprite name=\"tick_failed\">";
 
     private static readonly HashSet<string> loggedUnknown = new();
 

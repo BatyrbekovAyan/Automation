@@ -33,9 +33,10 @@ public class DeliveryTickFormatterTests
     }
 
     [Test]
-    public void GetSprite_Failed_ReturnsFailedTag()
+    public void GetSprite_Failed_ReturnsWarningEmojiThenFailedTag()
     {
-        Assert.AreEqual("<sprite name=\"tick_failed\">", DeliveryTickFormatter.GetSprite(DeliveryStatus.Failed));
+        // ⚠️ warning emoji (fully-qualified "26a0-fe0f"), scaled down, in front of the tick_failed (refresh) glyph.
+        Assert.AreEqual("<size=80%><sprite name=\"26a0-fe0f\"></size><sprite name=\"tick_failed\">", DeliveryTickFormatter.GetSprite(DeliveryStatus.Failed));
     }
 
     [TestCase("sent",      DeliveryStatus.Sent)]

@@ -4085,6 +4085,7 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
     private void SetDeliveryStatus(DeliveryStatus newStatus)
     {
         if (currentVm == null || currentVm.isIncoming) return;
+        DeliveryStatus oldStatus = currentVm.deliveryStatus;
         currentVm.deliveryStatus = newStatus;
 
         // Terminal states end the upload. On Sent, fill the reserved last slice
@@ -4098,10 +4099,27 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
         RefreshTimeAndTick();
         UpdateRetryButton(newStatus == DeliveryStatus.Failed);
 
-        // Tick width may have changed — recompute the reserved space and
-        // ask the layout to redraw so the bubble width re-snaps if needed.
-        ApplyInlineTimeReservation(messageText);
-        if (rectTransform != null) LayoutRebuilder.MarkLayoutForRebuild(rectTransform);
+        bool failedToggled = newStatus == DeliveryStatus.Failed || oldStatus == DeliveryStatus.Failed;
+        if (failedToggled)
+        {
+            // Entering/leaving Failed swaps a single tick for the wider ⚠️ + refresh pair. Re-run
+            // the FULL text sizing — not just ApplyInlineTimeReservation — because the reservation
+            // alone leaves messageText's LayoutElement.preferredWidth at its old (narrower) value,
+            // so the now-wider content wraps onto a second line and the bubble grows tall. This is
+            // exactly what AdjustTextBubbleSize (the method Bind uses) recomputes; without it the
+            // bubble only corrects itself when the chat is re-entered. Then force the same
+            // immediate rebuild Bind / reaction-changes use so it re-snaps now, not next re-bind.
+            AdjustTextBubbleSize();
+            if (isActiveAndEnabled) StartCoroutine(ForceRebuildRoutine());
+            else if (rectTransform != null) LayoutRebuilder.MarkLayoutForRebuild(rectTransform);
+        }
+        else
+        {
+            // Ordinary tick changes (sent→delivered→read) barely move the width, so just refresh
+            // the reservation and let the deferred, coalesced rebuild handle a burst of acks.
+            ApplyInlineTimeReservation(messageText);
+            if (rectTransform != null) LayoutRebuilder.MarkLayoutForRebuild(rectTransform);
+        }
     }
 
     private void HandleStatusChanged(string oldMessageId, string newMessageId, DeliveryStatus status)
