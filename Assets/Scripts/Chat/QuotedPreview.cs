@@ -11,5 +11,5 @@ public struct QuotedPreview
     public string      thumbnailUrl; // Null for text / when no cached thumb is available.
 
     public bool IsEmpty => string.IsNullOrEmpty(messageId);
-    public static QuotedPreview None => new QuotedPreview();
+    public static readonly QuotedPreview None = new QuotedPreview();
 }

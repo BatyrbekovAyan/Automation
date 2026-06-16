@@ -60,6 +60,7 @@ public class ReplyParserTests
         Assert.AreEqual("Q2", preview.messageId);
         Assert.AreEqual(MessageType.Image, preview.type);
         Assert.AreEqual("Beach", preview.text);
+        Assert.AreEqual(string.Empty, preview.senderName);
     }
 
     [Test]
@@ -94,4 +95,26 @@ public class ReplyParserTests
     [Test]
     public void CleanSnippet_TrimsLeadingZeroWidthSpace()
         => Assert.AreEqual("hi", ReplyParser.CleanSnippet("​  hi"));
+
+    [Test]
+    public void Snapshot_FromMe_SenderLabelIsYou()
+    {
+        var snap = new JObject { ["id"] = "Q6", ["type"] = "chat", ["body"] = "hi", ["fromMe"] = true };
+        var raw = new RawMessage { type = "chat", isReply = true, replyMessage = snap };
+        Assert.AreEqual("You", ReplyParser.Resolve(raw, _ => null, StubParse).senderName);
+    }
+
+    [Test]
+    public void CacheHit_PrefersThumbnailUrlOverMediaUrl()
+    {
+        var vm = new MessageViewModel { messageId = "QT", type = MessageType.Image, thumbnailUrl = "thumb://QT", mediaUrl = "https://cdn/img.jpg", isIncoming = true };
+        Assert.AreEqual("thumb://QT", ReplyParser.Resolve(Reply("QT"), id => vm, StubParse).thumbnailUrl);
+    }
+
+    [Test]
+    public void CacheHit_FallsBackToMediaUrlWhenNoThumbnail()
+    {
+        var vm = new MessageViewModel { messageId = "QU", type = MessageType.Image, thumbnailUrl = null, mediaUrl = "https://cdn/img.jpg", isIncoming = true };
+        Assert.AreEqual("https://cdn/img.jpg", ReplyParser.Resolve(Reply("QU"), id => vm, StubParse).thumbnailUrl);
+    }
 }
