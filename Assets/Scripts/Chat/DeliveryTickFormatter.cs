@@ -21,12 +21,12 @@ public static class DeliveryTickFormatter
     // lives in texture-29, a serialized fallback of the default sprite asset, so it resolves
     // by name in the time label exactly like the ChatTicks tick glyphs do.
     //
-    // The emoji is wrapped in <size=80%> so it sits a touch smaller than full line-height,
-    // closer to the monochrome refresh/tick glyph beside it, without looking shrunken. Its
-    // measured advance only weakly affects MessageItemView's inline-time reservation (the
-    // <space=…px> appended to the bubble text), so this value is a visual choice, not a
-    // layout lever. </size> closes before the refresh glyph so only the emoji is scaled.
-    private const string TagFailed  = "<size=80%><sprite name=\"26a0-fe0f\"></size><sprite name=\"tick_failed\">";
+    // The emoji is wrapped in <size=90%> (just under full line-height); tune this percentage to
+    // balance the warning against the monochrome refresh/tick glyph beside it. Its measured advance
+    // only weakly affects MessageItemView's inline-time reservation (the <space=…px> appended
+    // to the bubble text), so this value is a visual choice, not a layout lever. </size> closes
+    // before the refresh glyph so only the emoji is scaled.
+    private const string TagFailed  = "<size=90%><sprite name=\"26a0-fe0f\"></size><sprite name=\"tick_failed\">";
 
     private static readonly HashSet<string> loggedUnknown = new();
 
