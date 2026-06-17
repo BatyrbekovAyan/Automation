@@ -240,17 +240,21 @@ public partial class ChatManager : MonoBehaviour
                 // The chat is already on the screen! Do not destroy the prefab!
                 // Just quietly update the text, time, and unread count. The UI will catch the event and refresh seamlessly.
 
-                // Phase 1: the bulk endpoint can't supply the reacted-to text, so clear
-                // any text a live reaction set — otherwise a newer emoji-only reaction
-                // would inherit the older quote. (Phase 2 fills this from a fetch.)
-                if (chat.last_message_type == "reaction")
-                    existingVm.UpdateReactionContext(null, null);
+                // Capture before the id is overwritten: did the reaction identity change?
+                bool reactionIdChanged = existingVm.LastMessageId != chat.last_message_id;
 
                 existingVm.UpdateLastMessage(lastMsg, unixTime);
                 existingVm.UpdateUnreadCount(chat.unread_count);
                 existingVm.UpdateLastMessageId(chat.last_message_id);
                 bool mergedIsMine = chat.last_message_sender != null && chat.last_message_sender.isMe;
                 existingVm.UpdateLastMessageMeta(chat.last_message_type, chat.last_message_delivery_status, mergedIsMine);
+
+                // A new/changed reaction (different id) can't reuse the previous reaction's
+                // cached target text. Clear LAST — after the id is updated — so the row's
+                // re-resolve reads the new reaction id and refetches; an unchanged reaction
+                // keeps its resolved text (no churn, instant re-fill from cache).
+                if (chat.last_message_type == "reaction" && reactionIdChanged)
+                    existingVm.UpdateReactionContext(null, null);
             }
             else
             {

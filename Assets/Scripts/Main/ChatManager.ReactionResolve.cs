@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using Newtonsoft.Json;
@@ -23,7 +24,8 @@ public partial class ChatManager
         string reactionId = chatVm.LastMessageId;
         if (string.IsNullOrEmpty(reactionId)) return;
 
-        if (ReactionTargetCache.TryGet(GetCacheRoot(), reactionId, out string cachedText, out string cachedType))
+        long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        if (ReactionTargetCache.TryGet(GetCacheRoot(), reactionId, now, out string cachedText, out string cachedType))
         {
             chatVm.UpdateReactionContext(cachedText, cachedType);
             return;
@@ -92,7 +94,7 @@ public partial class ChatManager
             // unresolved so it retries on a later on-screen bind.
             if (definitive)
             {
-                ReactionTargetCache.Put(cacheRoot, reactionId, res.text, res.type);
+                ReactionTargetCache.Put(cacheRoot, reactionId, res.text, res.type, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
                 if (GetActiveProfileId() == profileId)
                 {
                     ChatViewModel current = GetChat(chatId);
