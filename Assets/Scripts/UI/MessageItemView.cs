@@ -88,6 +88,9 @@ public class MessageItemView : MonoBehaviour
     // runs at the head of every ApplyTextureAspectFill and would otherwise destroy them.
     private readonly System.Collections.Generic.List<UnityEngine.Object> _quotedDisposables = new System.Collections.Generic.List<UnityEngine.Object>();
 
+    // Transient full-bubble flash overlay for scroll-to-original (created lazily on first flash).
+    private Image _highlightOverlay;
+
     [Header("Settings")]
     public Color incomingColor = Color.white;
     public Color outgoingColor = new Color(0.8f, 1f, 0.8f);
@@ -288,8 +291,40 @@ public class MessageItemView : MonoBehaviour
             }
             quotedThumbnail.gameObject.SetActive(shown);
         }
-        // NOTE: tap-to-scroll is intentionally NOT wired here — it is added in Task 17 together
-        // with MessageListView.ScrollToMessage. Do not add a Button onClick that calls it.
+
+        // Tap-to-scroll: a clean tap jumps to the original. QuotedCardTap is IPointerClickHandler
+        // only (not a Button), so pointer-down still reaches the bubble's long-press / swipe.
+        if (quotedCard.GetComponent<QuotedCardTap>() == null) quotedCard.AddComponent<QuotedCardTap>();
+        var cardImg = quotedCard.GetComponent<Image>();
+        if (cardImg != null) cardImg.raycastTarget = true;
+    }
+
+    /// <summary>
+    /// Briefly flashes the bubble to draw attention after a scroll-to-original jump. Uses a
+    /// dedicated overlay rather than tinting bubbleBackground (which UpdateBubbleVisuals owns and
+    /// clears for transparent sticker/jumbo bubbles), so it works uniformly on every bubble type.
+    /// </summary>
+    public void FlashHighlight()
+    {
+        if (bubbleBackground == null) return;
+
+        if (_highlightOverlay == null)
+        {
+            var go = new GameObject("HighlightOverlay", typeof(RectTransform), typeof(Image), typeof(LayoutElement));
+            go.transform.SetParent(bubbleBackground.transform, false);
+            var rt = (RectTransform)go.transform;
+            rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+            rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
+            go.GetComponent<LayoutElement>().ignoreLayout = true; // overlay, not a VLG content row
+            _highlightOverlay = go.GetComponent<Image>();
+            _highlightOverlay.raycastTarget = false;
+            _highlightOverlay.color = new Color(0.10f, 0.45f, 0.95f, 0f); // subtle blue, alpha 0
+        }
+
+        _highlightOverlay.transform.SetAsLastSibling();
+        _highlightOverlay.DOKill();
+        Color c = _highlightOverlay.color; c.a = 0f; _highlightOverlay.color = c;
+        _highlightOverlay.DOFade(0.18f, 0.22f).SetLoops(2, LoopType.Yoyo);
     }
 
     /// <summary>

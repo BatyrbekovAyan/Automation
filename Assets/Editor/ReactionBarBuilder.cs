@@ -42,7 +42,7 @@ public static class ReactionBarBuilder
     private const float ButtonRadius = 50f;  // half size -> circle
     private const float EmojiFont    = 60f;
     // Scrim
-    private const float ScrimAlpha   = 0.28f;
+    private const float ScrimAlpha   = 0.72f;
 
     private static readonly Color BarColor   = Color.white;
     private static readonly Color ScrimColor = new Color(0f, 0f, 0f, ScrimAlpha);
@@ -261,7 +261,7 @@ public static class ReactionBarBuilder
         cardRt.anchorMin = cardRt.anchorMax = new Vector2(0.5f, 0.5f);
         cardRt.pivot = new Vector2(0.5f, 0.5f);
         // Fixed width; height driven by VLG + ContentSizeFitter.
-        cardRt.sizeDelta = new Vector2(360f, 0f);
+        cardRt.sizeDelta = new Vector2(600f, 0f);
 
         var cardImg = cardGo.GetComponent<Image>();
         cardImg.color = Color.white;
@@ -289,21 +289,21 @@ public static class ReactionBarBuilder
         TMP_FontAsset messageFont = FindMessageFont();
 
         // Build the three rows.
-        var replyBtn   = BuildMenuRow(cardGo.transform, "RowReply",   "Reply",   false, messageFont);
+        var replyBtn   = BuildMenuRow(cardGo.transform, "RowReply",   "Reply",   "reply",   messageFont);
         BuildDivider(cardGo.transform);
-        var copyBtn    = BuildMenuRow(cardGo.transform, "RowCopy",    "Copy",    false, messageFont);
+        var copyBtn    = BuildMenuRow(cardGo.transform, "RowCopy",    "Copy",    "copy",    messageFont);
         BuildDivider(cardGo.transform);
-        var forwardBtn = BuildMenuRow(cardGo.transform, "RowForward", "Forward", false, messageFont);
+        var forwardBtn = BuildMenuRow(cardGo.transform, "RowForward", "Forward", "forward", messageFont);
 
         return (cardRt, replyBtn, copyBtn, forwardBtn);
     }
 
     // One tap row: HLG with optional reply-arrow icon + TMP label. Height ~88 ref units.
     private static Button BuildMenuRow(Transform parent, string name, string label,
-                                       bool showArrowIcon, TMP_FontAsset font)
+                                       string iconKind, TMP_FontAsset font)
     {
-        const float RowHeight   = 88f;
-        const float LeadingPad  = 24f;   // left padding before icon / text
+        const float RowHeight   = 120f;
+        const float LeadingPad  = 36f;   // left padding before icon / text
         const float IconSize    = 40f;   // small icon square
         const float IconSpacing = 16f;   // gap between icon and label
 
@@ -311,12 +311,14 @@ public static class ReactionBarBuilder
                                    typeof(Button), typeof(LayoutElement));
         rowGo.transform.SetParent(parent, false);
 
+        // Transparent row background (raycast target only) so the card's rounded corners show
+        // through instead of being hidden behind opaque per-row backgrounds.
         var rowImg = rowGo.GetComponent<Image>();
-        rowImg.color = Color.white;
+        rowImg.color = new Color(1f, 1f, 1f, 0f);
         rowImg.raycastTarget = true;
 
         var rowBtn = rowGo.GetComponent<Button>();
-        rowBtn.transition = Selectable.Transition.ColorTint;
+        rowBtn.transition = Selectable.Transition.None;
         rowBtn.targetGraphic = rowImg;
         var rowNav = rowBtn.navigation; rowNav.mode = Navigation.Mode.None; rowBtn.navigation = rowNav;
 
@@ -340,9 +342,9 @@ public static class ReactionBarBuilder
         hlg.childForceExpandWidth = false;
         hlg.childForceExpandHeight = true;
 
-        if (showArrowIcon)
+        // Leading icon, drawn from Image shapes (TMP glyphs aren't reliable for these symbols).
+        if (!string.IsNullOrEmpty(iconKind))
         {
-            // Icon container — a fixed-size transparent pivot that holds the arrow bars.
             var iconGo = new GameObject("Icon", typeof(RectTransform), typeof(LayoutElement));
             iconGo.transform.SetParent(hlgGo.transform, false);
             var iconLe = iconGo.GetComponent<LayoutElement>();
@@ -350,10 +352,23 @@ public static class ReactionBarBuilder
             iconLe.preferredHeight = IconSize;
 
             var glyph = new Color32(0x6E, 0x6E, 0x73, 0xFF);
-            // Scaled-down arrow bars to fit the smaller icon container.
-            MakeArrowBar(iconGo.transform, new Vector2(22f, 5f),   0f,  new Vector2(4f, 0f),   glyph);
-            MakeArrowBar(iconGo.transform, new Vector2(13f, 5f),  45f,  new Vector2(-8f, 4f),  glyph);
-            MakeArrowBar(iconGo.transform, new Vector2(13f, 5f), -45f,  new Vector2(-8f, -4f), glyph);
+            switch (iconKind)
+            {
+                case "reply":   // arrow pointing left
+                    MakeArrowBar(iconGo.transform, new Vector2(22f, 5f),   0f, new Vector2(4f, 0f),   glyph);
+                    MakeArrowBar(iconGo.transform, new Vector2(13f, 5f),  45f, new Vector2(-8f, 4f),  glyph);
+                    MakeArrowBar(iconGo.transform, new Vector2(13f, 5f), -45f, new Vector2(-8f, -4f), glyph);
+                    break;
+                case "forward": // arrow pointing right (mirror of reply)
+                    MakeArrowBar(iconGo.transform, new Vector2(22f, 5f),   0f, new Vector2(-4f, 0f),  glyph);
+                    MakeArrowBar(iconGo.transform, new Vector2(13f, 5f), -45f, new Vector2(8f, 4f),   glyph);
+                    MakeArrowBar(iconGo.transform, new Vector2(13f, 5f),  45f, new Vector2(8f, -4f),  glyph);
+                    break;
+                case "copy":    // two overlapping outlined squares
+                    MakeSquareOutline(iconGo.transform, 26f, 16f, new Vector2(6f, 6f),   glyph, Color.white);
+                    MakeSquareOutline(iconGo.transform, 26f, 16f, new Vector2(-4f, -4f), glyph, Color.white);
+                    break;
+            }
         }
 
         // TMP label.
@@ -365,7 +380,7 @@ public static class ReactionBarBuilder
 
         var tmp = labelGo.GetComponent<TextMeshProUGUI>();
         tmp.text = label;
-        tmp.fontSize = 36f;
+        tmp.fontSize = 46f;
         tmp.color = new Color32(0x11, 0x1B, 0x21, 0xFF);
         tmp.alignment = TextAlignmentOptions.Left;
         tmp.enableWordWrapping = false;
@@ -452,6 +467,14 @@ public static class ReactionBarBuilder
         var img = bar.GetComponent<Image>();
         img.color = color;
         img.raycastTarget = false;
+    }
+
+    // An outlined square = a filled glyph square with a smaller hole-colored square punched in its
+    // centre. Used for the copy icon (two overlapping outlines). Drawn via MakeArrowBar (angle 0).
+    private static void MakeSquareOutline(Transform parent, float outer, float inner, Vector2 offset, Color glyph, Color hole)
+    {
+        MakeArrowBar(parent, new Vector2(outer, outer), 0f, offset, glyph);
+        MakeArrowBar(parent, new Vector2(inner, inner), 0f, offset, hole);
     }
 
     [MenuItem("Tools/Chat/Build Emoji Picker")]

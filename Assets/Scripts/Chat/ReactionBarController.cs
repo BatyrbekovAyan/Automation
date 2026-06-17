@@ -17,6 +17,9 @@ public class ReactionBarController : MonoBehaviour
     // WhatsApp quick-reaction set (raw unicode; converted to TMP sprites at render).
     private static readonly string[] QuickEmojis = { "👍", "❤️", "😂", "😮", "😢", "🙏" };
 
+    // Horizontal inset the floating bar/menu keep from the screen edges — matches the bubbles'.
+    private const float EdgePadding = 40f;
+
     [Header("Overlay")]
     [SerializeField] private GameObject content;     // scrim + bar; toggled on show/hide
     [SerializeField] private Button scrimButton;     // full-panel dismiss
@@ -38,6 +41,7 @@ public class ReactionBarController : MonoBehaviour
 
     private MessageViewModel _target;
     private readonly TextMeshProUGUI[] _labels = new TextMeshProUGUI[6];
+    private Canvas _liftedCanvas;   // the pressed row's sort-override, raising it above the scrim
 
     private void Awake()
     {
@@ -78,6 +82,8 @@ public class ReactionBarController : MonoBehaviour
         if (source == null || source.BoundVm == null || source.BubbleRect == null) return;
         _target = source.BoundVm;
 
+        LiftRow(source);   // raise the pressed message above the dark scrim so it stays bright
+
         if (content != null) content.SetActive(true);
         RenderEmojiLabels();
         RefreshHighlight();
@@ -104,7 +110,32 @@ public class ReactionBarController : MonoBehaviour
     public void Hide()
     {
         _target = null;
+        UnliftRow();
         if (content != null) content.SetActive(false);
+    }
+
+    // Raises the long-pressed row's whole hierarchy above the dimming scrim (overrideSorting) so it
+    // reads as highlighted; UnliftRow drops it back into the normal scroll-content order.
+    private void LiftRow(MessageItemView source)
+    {
+        UnliftRow();
+        if (source == null) return;
+        var canvas = source.GetComponent<Canvas>();
+        if (canvas == null) canvas = source.gameObject.AddComponent<Canvas>();
+        canvas.overrideSorting = true;
+        canvas.sortingOrder = 5;   // above the scrim (the overlay renders at order 0)
+        _liftedCanvas = canvas;
+    }
+
+    private void UnliftRow()
+    {
+        if (_liftedCanvas == null) return;
+        // Destroy the Canvas (don't just disable overrideSorting): a leftover nested Canvas keeps
+        // the row's graphics in its own registry, which the root GraphicRaycaster won't raycast —
+        // leaving the row dead to taps/swipes/long-press. Destroying it re-registers the graphics
+        // to the parent canvas. Deferred destroy lands within the frame, long before any re-press.
+        Destroy(_liftedCanvas);
+        _liftedCanvas = null;
     }
 
     private void OnEmojiTapped(string emoji)
@@ -169,7 +200,7 @@ public class ReactionBarController : MonoBehaviour
         float y = topLocal.y + gap + bar.rect.height * 0.5f;
 
         float halfBarW = bar.rect.width * 0.5f;
-        float maxX = parentRt.rect.width * 0.5f - halfBarW - 12f;
+        float maxX = parentRt.rect.width * 0.5f - halfBarW - EdgePadding;
         float x = Mathf.Clamp(topLocal.x, -maxX, maxX);
 
         float topLimit = parentRt.rect.height * 0.5f - bar.rect.height * 0.5f - 12f;
@@ -198,7 +229,7 @@ public class ReactionBarController : MonoBehaviour
         float y = botLocal.y - gap - actionMenu.rect.height * 0.5f;
 
         float halfMenuW = actionMenu.rect.width * 0.5f;
-        float maxX = parentRt.rect.width * 0.5f - halfMenuW - 12f;
+        float maxX = parentRt.rect.width * 0.5f - halfMenuW - EdgePadding;
         float x = Mathf.Clamp(botLocal.x, -maxX, maxX);
 
         // Clamp so the menu never goes below the bottom of the overlay.

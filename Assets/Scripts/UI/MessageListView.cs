@@ -58,6 +58,7 @@ public class MessageListView : MonoBehaviour
     private RectTransform _unreadSeparatorInstance;
     private float _lastFabRefreshTime;
     private Tween _scrollToBottomTween;
+    private Tween _scrollToMessageTween;
 
     // Reusable scratch buffers for the throttled below-fold recompute — avoids
     // per-tick GC while scrolling (ComputeBelowFoldCount runs ~20 Hz).
@@ -143,6 +144,7 @@ public class MessageListView : MonoBehaviour
         // Kill any in-flight auto-scroll so it can't run against a deactivated ScrollRect.
         _scrollToBottomTween?.Kill();
         _scrollToBottomTween = null;
+        if (_scrollToMessageTween != null) { _scrollToMessageTween.Kill(); _scrollToMessageTween = null; isLoadingData = false; }
     }
 
     /// <summary>
@@ -197,6 +199,7 @@ public class MessageListView : MonoBehaviour
         _unreadSeparatorInstance = null; // its GameObject is a content child destroyed by Clear()
         _scrollToBottomTween?.Kill();
         _scrollToBottomTween = null;
+        if (_scrollToMessageTween != null) { _scrollToMessageTween.Kill(); _scrollToMessageTween = null; isLoadingData = false; }
 
         if (scrollToBottomFab != null)
         {
@@ -304,6 +307,61 @@ public class MessageListView : MonoBehaviour
                     scrollToBottomFab.SetCount(0);
                     scrollToBottomFab.Hide();
                 }
+            });
+    }
+
+    /// <summary>
+    /// Scrolls the list to center the message with <paramref name="messageId"/> and flashes it.
+    /// Used by the quoted reply card's tap. No-op when that message isn't currently instantiated
+    /// (its page hasn't been loaded) — the quote still renders, the jump just does nothing.
+    /// </summary>
+    public void ScrollToMessage(string messageId)
+    {
+        if (scrollRect == null || string.IsNullOrEmpty(messageId)) return;
+
+        var contentRt = (RectTransform)content;
+        MessageItemView target = null;
+        for (int i = 0; i < contentRt.childCount; i++)
+        {
+            var view = contentRt.GetChild(i).GetComponent<MessageItemView>();
+            if (view != null && view.BoundVm != null && view.BoundVm.messageId == messageId)
+            {
+                target = view;
+                break;
+            }
+        }
+        if (target == null) return; // not loaded — graceful no-op
+
+        Canvas.ForceUpdateCanvases();
+        float scrollableH = contentRt.rect.height - scrollRect.viewport.rect.height;
+        if (scrollableH <= 1f)
+        {
+            target.FlashHighlight(); // too short to scroll; just flash it
+            return;
+        }
+
+        Vector3[] corners = new Vector3[4];
+        ((RectTransform)target.transform).GetWorldCorners(corners); // 1 = top-left
+        Vector3 topLocal = contentRt.InverseTransformPoint(corners[1]);
+        // Use the UNCLAMPED distance (>=0 only) — CenteredNormalizedPosition clamps the final
+        // offset. Pre-clamping to scrollableH would push a bottom-region message too low instead
+        // of centering it as far as the list allows.
+        float distanceFromTop = Mathf.Max(0f, contentRt.rect.yMax - topLocal.y);
+        float targetNp = ScrollTargetMath.CenteredNormalizedPosition(distanceFromTop, scrollRect.viewport.rect.height, scrollableH);
+
+        _scrollToMessageTween?.Kill();
+        scrollRect.velocity = Vector2.zero;
+        isLoadingData = true; // suppress pagination during the programmatic scroll
+        _scrollToMessageTween = DOTween.To(
+                () => scrollRect.verticalNormalizedPosition,
+                v => scrollRect.verticalNormalizedPosition = v,
+                targetNp, 0.3f)
+            .SetEase(Ease.OutCubic)
+            .OnComplete(() =>
+            {
+                isLoadingData = false;
+                _scrollToMessageTween = null;
+                target.FlashHighlight();
             });
     }
 
