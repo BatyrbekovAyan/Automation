@@ -3430,6 +3430,7 @@ GameObject:
   - component: {fileID: 8956913878708331259}
   - component: {fileID: 7228396342142677920}
   - component: {fileID: 6174394677600711788}
+  - component: {fileID: 9001943784829539351}
   m_Layer: 5
   m_Name: Bubble
   m_TagString: Untagged
@@ -3589,6 +3590,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MessageBubbleLongPress
   holdSeconds: 0.45
   moveCancelPixels: 16
+--- !u!114 &9001943784829539351
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5480445928266618135}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 71c26ec7013ba47679b71b4985524984, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SwipeToReply
 --- !u!1 &5821044698115121554
 GameObject:
   m_ObjectHideFlags: 0
@@ -4819,7 +4832,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: adb30198aa32dd140b5750692dd48104, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithRoundedCorners
-  radius: 16
+  radius: 27
   image: {fileID: 1561347249483763271}
 --- !u!114 &959210974231157716
 MonoBehaviour:
