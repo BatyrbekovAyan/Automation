@@ -93,8 +93,9 @@ The app communicates with four external services via `UnityWebRequest` + corouti
   - `messages/get` — paginated message history
   - `messages/all/get` — all messages (bulk)
   - `message/media/download` — download media by message ID
-  - `message/send` — send a message
+  - `message/send` — send a message; add `quoted_message_id` (omit when null) to send a **reply** quoting another message
   - `message/reaction` — send/remove an emoji reaction (body `{ body, message_id }`; empty `body` removes; targets by `message_id`, no recipient)
+  - **Incoming replies**: a reply message carries `isReply: true` + a `reply_message` snapshot of the quoted original — keys `id` / `type` / `body` / `caption` / `contact_name` (the quoted sender; NOT `senderName`) / `file_name`; no `fromMe`. Resolved by `ReplyParser` (cache-by-id → snapshot → placeholder) into flat `quoted*` fields carried through the 4-layer message pipeline; rendered as a quoted card by `MessageItemView`. Reply triggers: swipe-right (`SwipeToReply`) + the long-press action menu (`ReactionBarController`).
   - `qr/get` — QR code for WhatsApp login
   - `auth/code` — request phone auth code
   - `get/status` — connection status
