@@ -27,8 +27,13 @@ public static class ChatPreviewFormatter
     private static readonly HashSet<string> LoggedUnknownTypes = new();
     private static readonly HashSet<string> LoggedUnknownStatuses = new();
 
-    public static string Format(string rawText, string type, string deliveryStatus, bool isMine)
+    public static string Format(string rawText, string type, string deliveryStatus, bool isMine,
+                                string reactionTargetText = null, string reactionTargetType = null)
     {
+        if (!string.IsNullOrEmpty(type)
+            && type.Equals("reaction", System.StringComparison.OrdinalIgnoreCase))
+            return FormatReaction(rawText, isMine, reactionTargetText, reactionTargetType);
+
         var tick = isMine ? GetTickSprite(deliveryStatus) : null;
         var (emoji, label) = GetMediaInfo(type);
         var text = rawText ?? string.Empty;
@@ -60,6 +65,71 @@ public static class ChatPreviewFormatter
         if (emoji != null) { sb.Append(emoji); sb.Append(' '); }
         sb.Append(text);
         return sb.ToString();
+    }
+
+    // Max characters of the reacted-to message text shown inside the quote.
+    private const int ReactionSnippetMax = 24;
+
+    /// <summary>
+    /// WhatsApp-style reaction preview: "You reacted ❤️ to “msg”" / "Reacted ❤️".
+    /// The emoji arrives already (possibly) sprite-converted with a leading U+200B;
+    /// an empty/whitespace emoji means the reaction was removed.
+    /// </summary>
+    private static string FormatReaction(string emojiRaw, bool isMine,
+                                         string targetText, string targetType)
+    {
+        string emoji = (emojiRaw ?? string.Empty).Trim('​', ' ', '\t', '\n', '\r');
+        if (emoji.Length == 0) return "Reaction removed";
+
+        var sb = new System.Text.StringBuilder(64);
+        sb.Append(isMine ? "You reacted " : "Reacted ");
+        sb.Append(emoji);
+
+        string clause = ReactionTargetClause(targetText, targetType);
+        if (clause != null) sb.Append(clause);
+        return sb.ToString();
+    }
+
+    // " to 📷 Photo" for a media target (unquoted label), " to “snippet”" for text,
+    // or null when the target is unknown (Phase 1 bulk-fetched reactions).
+    private static string ReactionTargetClause(string targetText, string targetType)
+    {
+        var (emoji, label) = GetMediaInfo(targetType);
+        if (label != null)
+            return emoji != null ? $" to {emoji} {label}" : $" to {label}";
+
+        string snippet = Snippet(targetText);
+        if (string.IsNullOrEmpty(snippet)) return null;
+        return $" to “{snippet}”"; // “ ”
+    }
+
+    private static string Snippet(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return null;
+        string t = text.Trim('​', ' ', '\t', '\n', '\r');
+        if (t.Length == 0) return null;
+        if (t.Length <= ReactionSnippetMax) return t;
+        int cut = ReactionSnippetMax;
+        if (char.IsHighSurrogate(t[cut - 1])) cut--; // never split a surrogate pair
+        return t.Substring(0, cut).TrimEnd() + "…";
+    }
+
+    /// <summary>
+    /// Maps a target message's MessageType to the Wappi type keyword GetMediaInfo
+    /// understands. Used by the live reaction paths, which hold a MessageViewModel.
+    /// </summary>
+    public static string TargetTypeKey(MessageType type)
+    {
+        switch (type)
+        {
+            case MessageType.Image:    return "image";
+            case MessageType.Video:    return "video";
+            case MessageType.Voice:    return "voice";
+            case MessageType.Audio:    return "audio";
+            case MessageType.Sticker:  return "sticker";
+            case MessageType.Document: return "document";
+            default:                   return "chat"; // Chat / Unknown → text
+        }
     }
 
     private static string GetTickSprite(string status)

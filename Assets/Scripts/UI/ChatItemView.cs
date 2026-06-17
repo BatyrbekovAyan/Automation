@@ -209,7 +209,9 @@ public void Bind(ChatViewModel model)
             rawMessage ?? "",
             vm != null ? vm.LastMessageType : null,
             vm != null ? vm.LastMessageDeliveryStatus : null,
-            vm != null && vm.IsLastMessageMine);
+            vm != null && vm.IsLastMessageMine,
+            vm != null ? vm.ReactionTargetText : null,
+            vm != null ? vm.ReactionTargetType : null);
 
         if (string.IsNullOrEmpty(formatted))
         {

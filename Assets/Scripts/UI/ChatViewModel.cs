@@ -16,6 +16,11 @@ public class ChatViewModel
     public string LastMessageDeliveryStatus { get; private set; }
     public bool IsLastMessageMine { get; private set; }
 
+    // Reacted-to message context for a reaction last-message. Null = unknown
+    // (formatter omits the "to …" clause). Phase 2 backfills these from a fetch.
+    public string ReactionTargetText { get; private set; }
+    public string ReactionTargetType { get; private set; }
+
     // Added for UI display
     public string LastMessageTimeString { get; private set; }
     // public string OnlineStatus { get; set; }
@@ -84,6 +89,33 @@ public class ChatViewModel
         LastMessageType = type;
         LastMessageDeliveryStatus = deliveryStatus;
         IsLastMessageMine = isMine;
+        NotifyUpdated();
+    }
+
+    /// <summary>
+    /// Sets a reaction as the last message and refreshes the row in place — fires
+    /// OnUpdated only, never OnLastMessageChanged, so the chat list does NOT reorder.
+    /// Used by the live send/receive reaction paths, which hold the target message.
+    /// </summary>
+    public void SetReactionPreview(string emoji, bool fromMe, string targetText, string targetType)
+    {
+        LastMessage = emoji ?? "";
+        LastMessageType = "reaction";
+        IsLastMessageMine = fromMe;
+        ReactionTargetText = targetText;
+        ReactionTargetType = targetType;
+        NotifyUpdated();
+    }
+
+    /// <summary>
+    /// Sets the reaction target context alone (used by the bulk fetch to clear stale
+    /// live-set text so a newer emoji-only reaction can't inherit an older quote).
+    /// </summary>
+    public void UpdateReactionContext(string targetText, string targetType)
+    {
+        if (ReactionTargetText == targetText && ReactionTargetType == targetType) return;
+        ReactionTargetText = targetText;
+        ReactionTargetType = targetType;
         NotifyUpdated();
     }
 

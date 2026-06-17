@@ -239,6 +239,13 @@ public partial class ChatManager : MonoBehaviour
                 // --- THE SMART MERGE ---
                 // The chat is already on the screen! Do not destroy the prefab!
                 // Just quietly update the text, time, and unread count. The UI will catch the event and refresh seamlessly.
+
+                // Phase 1: the bulk endpoint can't supply the reacted-to text, so clear
+                // any text a live reaction set — otherwise a newer emoji-only reaction
+                // would inherit the older quote. (Phase 2 fills this from a fetch.)
+                if (chat.last_message_type == "reaction")
+                    existingVm.UpdateReactionContext(null, null);
+
                 existingVm.UpdateLastMessage(lastMsg, unixTime);
                 existingVm.UpdateUnreadCount(chat.unread_count);
                 existingVm.UpdateLastMessageId(chat.last_message_id);
@@ -279,12 +286,12 @@ public partial class ChatManager : MonoBehaviour
 
         if (www.result != UnityWebRequest.Result.Success) yield break;
 
-        // var text = www.downloadHandler.text;
-        // System.IO.File.WriteAllText(
-        //     Application.persistentDataPath + "/response.txt",
-        //     text
-        // );
-        // Debug.Log("Saved to: " + Application.persistentDataPath);
+        var text = www.downloadHandler.text;
+        System.IO.File.WriteAllText(
+            Application.persistentDataPath + "/response.txt",
+            text
+        );
+        Debug.Log("Saved to: " + Application.persistentDataPath);
 
         string newJson = www.downloadHandler.text;
 
@@ -473,7 +480,7 @@ public partial class ChatManager : MonoBehaviour
 
                         if (norm.messageType == MessageType.Reaction)
                         {
-                            if (HandleReactionEvent(raw, cachedList)) hasStatusUpdates = true;
+                            if (HandleReactionEvent(raw, cachedList, chatId)) hasStatusUpdates = true;
                             continue;
                         }
 
@@ -1365,7 +1372,8 @@ if (msg.messageType == MessageType.Video)
     /// for the in-place bubble update. Reactions targeting a not-yet-loaded message
     /// are buffered by ReactionStore and applied when that message arrives.
     /// </summary>
-    private bool HandleReactionEvent(RawMessage raw, IReadOnlyList<MessageViewModel> messages)
+    private bool HandleReactionEvent(RawMessage raw, IReadOnlyList<MessageViewModel> messages,
+                                     string liveChatId = null)
     {
         ReactionEvent ev = ReactionParser.FromRaw(raw);
         if (ev == null) return false;
@@ -1374,7 +1382,28 @@ if (msg.messageType == MessageType.Video)
         if (target == null) return false;   // buffered, or idempotent no-op
 
         OnMessageReactionsChanged?.Invoke(target);
+
+        // Only genuinely live reactions (passed a chat id) update the chat-list row;
+        // historical reactions replayed during chat open must not.
+        if (liveChatId != null)
+            UpdateChatListPreviewForReaction(liveChatId, ev, target);
+
         return true;
+    }
+
+    /// <summary>
+    /// Reflects a live reaction in the chat-list row in place (no reorder), with the
+    /// reacted-to text resolved from the target message. Skipped if the reaction is
+    /// older than the row's current last-message (i.e. not the newest activity).
+    /// </summary>
+    private void UpdateChatListPreviewForReaction(string chatId, ReactionEvent ev, MessageViewModel target)
+    {
+        ChatViewModel chatVm = GetChat(chatId);
+        if (chatVm == null) return;
+        if (ev.time < chatVm.LastMessageTime) return;
+
+        chatVm.SetReactionPreview(
+            ev.emoji, ev.fromMe, target.text, ChatPreviewFormatter.TargetTypeKey(target.type));
     }
 
     MessageType ParseMessageType(string type)

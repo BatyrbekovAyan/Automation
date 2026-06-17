@@ -48,6 +48,13 @@ public partial class ChatManager
             PersistReaction(sendCacheRoot, target);
         }
 
+        // Reflect the reaction in the chat-list row in place (no reorder). We hold the
+        // target message, so we can show the full "You reacted ❤️ to “msg”".
+        var sendChatVm = GetChat(target.chatId);
+        if (sendChatVm != null)
+            sendChatVm.SetReactionPreview(
+                ev.emoji, true, target.text, ChatPreviewFormatter.TargetTypeKey(target.type));
+
         MonoBehaviour runner = Manager.Instance != null ? (MonoBehaviour)Manager.Instance : this;
         runner.StartCoroutine(PostReactionRoutine(target, ev.emoji, priorEmoji, profileId, sendCacheRoot, now));
     }
