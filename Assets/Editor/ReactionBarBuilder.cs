@@ -125,7 +125,10 @@ public static class ReactionBarBuilder
         var buttons = new Button[6];
         for (int i = 0; i < 6; i++)
             buttons[i] = BuildEmojiButton(barGo.transform, i);
-        var plus = BuildPlusButton(barGo.transform);   // 7th item — opens the full picker (Plan B)
+        var plus = BuildPlusButton(barGo.transform);    // 7th item — opens the full picker
+
+        // ── Action menu (Reply / Copy / Forward card below the bar) ──
+        var (menuRt, replyBtn, copyBtn, forwardBtn) = BuildActionMenu(contentGo.transform);
 
         // ── Wire the controller ──
         var controller = rootGo.GetComponent<ReactionBarController>();
@@ -134,6 +137,10 @@ public static class ReactionBarBuilder
         SetRef(so, "scrimButton", scrimButton);
         SetRef(so, "bar", barRt);
         SetRef(so, "plusButton", plus);
+        SetRef(so, "actionMenu", menuRt);
+        SetRef(so, "replyAction", replyBtn);
+        SetRef(so, "copyAction", copyBtn);
+        SetRef(so, "forwardAction", forwardBtn);
         var arr = so.FindProperty("emojiButtons");
         arr.arraySize = 6;
         for (int i = 0; i < 6; i++)
@@ -233,6 +240,215 @@ public static class ReactionBarBuilder
         rt.pivot = new Vector2(0.5f, 0.5f);
         rt.anchoredPosition = Vector2.zero;
         rt.sizeDelta = size;
+        var img = bar.GetComponent<Image>();
+        img.color = color;
+        img.raycastTarget = false;
+    }
+
+    // The action menu card — a white rounded card with three tap rows (Reply/Copy/Forward)
+    // positioned by the controller just below the emoji bar. Lives under Content so it
+    // hides/shows with the overlay. Returns: (card RectTransform, reply, copy, forward buttons).
+    private static (RectTransform menu, Button reply, Button copy, Button forward)
+        BuildActionMenu(Transform contentParent)
+    {
+        // ── Card (white, rounded, VLG hugs rows) ──
+        var cardGo = new GameObject("ActionMenu", typeof(RectTransform), typeof(Image),
+                                    typeof(VerticalLayoutGroup), typeof(ContentSizeFitter),
+                                    typeof(ImageWithRoundedCorners));
+        cardGo.transform.SetParent(contentParent, false);
+
+        var cardRt = (RectTransform)cardGo.transform;
+        cardRt.anchorMin = cardRt.anchorMax = new Vector2(0.5f, 0.5f);
+        cardRt.pivot = new Vector2(0.5f, 0.5f);
+        // Fixed width; height driven by VLG + ContentSizeFitter.
+        cardRt.sizeDelta = new Vector2(360f, 0f);
+
+        var cardImg = cardGo.GetComponent<Image>();
+        cardImg.color = Color.white;
+        cardImg.raycastTarget = true;   // taps on the card don't fall through to scrim
+
+        var vlg = cardGo.GetComponent<VerticalLayoutGroup>();
+        vlg.padding = new RectOffset(0, 0, 0, 0);
+        vlg.spacing = 0f;
+        vlg.childAlignment = TextAnchor.UpperLeft;
+        vlg.childControlWidth = true;
+        vlg.childControlHeight = true;
+        vlg.childForceExpandWidth = true;
+        vlg.childForceExpandHeight = false;
+
+        var fitter = cardGo.GetComponent<ContentSizeFitter>();
+        fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+        fitter.verticalFit   = ContentSizeFitter.FitMode.PreferredSize;
+
+        var cardRounded = cardGo.GetComponent<ImageWithRoundedCorners>();
+        cardRounded.radius = 16f;
+        cardRounded.Validate();
+        cardRounded.Refresh();
+
+        // Read message font from an existing TMP in the scene for correct GUID wiring.
+        TMP_FontAsset messageFont = FindMessageFont();
+
+        // Build the three rows.
+        var replyBtn   = BuildMenuRow(cardGo.transform, "RowReply",   "Reply",   false, messageFont);
+        BuildDivider(cardGo.transform);
+        var copyBtn    = BuildMenuRow(cardGo.transform, "RowCopy",    "Copy",    false, messageFont);
+        BuildDivider(cardGo.transform);
+        var forwardBtn = BuildMenuRow(cardGo.transform, "RowForward", "Forward", false, messageFont);
+
+        return (cardRt, replyBtn, copyBtn, forwardBtn);
+    }
+
+    // One tap row: HLG with optional reply-arrow icon + TMP label. Height ~88 ref units.
+    private static Button BuildMenuRow(Transform parent, string name, string label,
+                                       bool showArrowIcon, TMP_FontAsset font)
+    {
+        const float RowHeight   = 88f;
+        const float LeadingPad  = 24f;   // left padding before icon / text
+        const float IconSize    = 40f;   // small icon square
+        const float IconSpacing = 16f;   // gap between icon and label
+
+        var rowGo = new GameObject(name, typeof(RectTransform), typeof(Image),
+                                   typeof(Button), typeof(LayoutElement));
+        rowGo.transform.SetParent(parent, false);
+
+        var rowImg = rowGo.GetComponent<Image>();
+        rowImg.color = Color.white;
+        rowImg.raycastTarget = true;
+
+        var rowBtn = rowGo.GetComponent<Button>();
+        rowBtn.transition = Selectable.Transition.ColorTint;
+        rowBtn.targetGraphic = rowImg;
+        var rowNav = rowBtn.navigation; rowNav.mode = Navigation.Mode.None; rowBtn.navigation = rowNav;
+
+        var rowLe = rowGo.GetComponent<LayoutElement>();
+        rowLe.preferredHeight = RowHeight;
+        rowLe.flexibleWidth = 1f;
+
+        // Inner HLG so icon + label sit side by side with left-aligned padding.
+        var hlgGo = new GameObject("Inner", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+        hlgGo.transform.SetParent(rowGo.transform, false);
+        var hlgRt = (RectTransform)hlgGo.transform;
+        hlgRt.anchorMin = Vector2.zero;
+        hlgRt.anchorMax = Vector2.one;
+        hlgRt.offsetMin = hlgRt.offsetMax = Vector2.zero;
+        var hlg = hlgGo.GetComponent<HorizontalLayoutGroup>();
+        hlg.padding = new RectOffset((int)LeadingPad, (int)LeadingPad, 0, 0);
+        hlg.spacing = IconSpacing;
+        hlg.childAlignment = TextAnchor.MiddleLeft;
+        hlg.childControlWidth = false;
+        hlg.childControlHeight = true;
+        hlg.childForceExpandWidth = false;
+        hlg.childForceExpandHeight = true;
+
+        if (showArrowIcon)
+        {
+            // Icon container — a fixed-size transparent pivot that holds the arrow bars.
+            var iconGo = new GameObject("Icon", typeof(RectTransform), typeof(LayoutElement));
+            iconGo.transform.SetParent(hlgGo.transform, false);
+            var iconLe = iconGo.GetComponent<LayoutElement>();
+            iconLe.preferredWidth  = IconSize;
+            iconLe.preferredHeight = IconSize;
+
+            var glyph = new Color32(0x6E, 0x6E, 0x73, 0xFF);
+            // Scaled-down arrow bars to fit the smaller icon container.
+            MakeArrowBar(iconGo.transform, new Vector2(22f, 5f),   0f,  new Vector2(4f, 0f),   glyph);
+            MakeArrowBar(iconGo.transform, new Vector2(13f, 5f),  45f,  new Vector2(-8f, 4f),  glyph);
+            MakeArrowBar(iconGo.transform, new Vector2(13f, 5f), -45f,  new Vector2(-8f, -4f), glyph);
+        }
+
+        // TMP label.
+        var labelGo = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI),
+                                     typeof(LayoutElement));
+        labelGo.transform.SetParent(hlgGo.transform, false);
+        var labelLe = labelGo.GetComponent<LayoutElement>();
+        labelLe.flexibleWidth = 1f;
+
+        var tmp = labelGo.GetComponent<TextMeshProUGUI>();
+        tmp.text = label;
+        tmp.fontSize = 36f;
+        tmp.color = new Color32(0x11, 0x1B, 0x21, 0xFF);
+        tmp.alignment = TextAlignmentOptions.Left;
+        tmp.enableWordWrapping = false;
+        tmp.overflowMode = TextOverflowModes.Ellipsis;
+        tmp.raycastTarget = false;
+        if (font != null) tmp.font = font;
+
+        return rowBtn;
+    }
+
+    // Thin 1px divider between rows.
+    private static void BuildDivider(Transform parent)
+    {
+        var divGo = new GameObject("Divider", typeof(RectTransform), typeof(Image), typeof(LayoutElement));
+        divGo.transform.SetParent(parent, false);
+        var divImg = divGo.GetComponent<Image>();
+        divImg.color = new Color32(0xE9, 0xED, 0xEF, 0xFF);
+        divImg.raycastTarget = false;
+        var divLe = divGo.GetComponent<LayoutElement>();
+        divLe.preferredHeight = 1f;
+        divLe.flexibleWidth = 1f;
+    }
+
+    // Scan the scene for any TMP in the message list to reuse its font asset.
+    private static TMP_FontAsset FindMessageFont()
+    {
+        var tmp = Object.FindFirstObjectByType<TextMeshProUGUI>(FindObjectsInactive.Include);
+        return tmp != null ? tmp.font : null;
+    }
+
+    // The reply-arrow button. Same circle background as the "+" button.
+    // Arrow icon drawn from three Image bars (no TMP glyph):
+    //   • a horizontal shaft pointing left
+    //   • an upper-left arrowhead arm (rotated +45°)
+    //   • a lower-left arrowhead arm (rotated -45°)
+    private static Button BuildReplyButton(Transform parent)
+    {
+        var go = new GameObject("Reply", typeof(RectTransform), typeof(Image),
+                                typeof(Button), typeof(LayoutElement), typeof(ImageWithRoundedCorners));
+        go.transform.SetParent(parent, false);
+
+        var le = go.GetComponent<LayoutElement>();
+        le.preferredWidth  = ButtonSize;
+        le.preferredHeight = ButtonSize;
+
+        var bg = go.GetComponent<Image>();
+        bg.color = new Color32(0xEC, 0xEC, 0xEE, 0xFF);   // matches the "+" button background
+        bg.raycastTarget = true;
+
+        var rounded = go.GetComponent<ImageWithRoundedCorners>();
+        rounded.radius = ButtonRadius;
+        rounded.Validate();
+        rounded.Refresh();
+
+        var button = go.GetComponent<Button>();
+        button.transition = Selectable.Transition.None;
+        button.targetGraphic = bg;
+        var nav = button.navigation; nav.mode = Navigation.Mode.None; button.navigation = nav;
+
+        // Draw a left-pointing reply arrow using Image bars — same technique as BuildPlusButton.
+        // The arrow consists of: horizontal shaft + two arrowhead arms at ±45°.
+        var glyph = new Color32(0x6E, 0x6E, 0x73, 0xFF);   // matches "+" glyph color
+
+        // Horizontal shaft: offset slightly right of center so the arrowhead tip lands near center.
+        MakeArrowBar(go.transform, new Vector2(36f, 7f), 0f,   new Vector2(6f, 0f),  glyph);  // shaft
+        MakeArrowBar(go.transform, new Vector2(20f, 7f), 45f,  new Vector2(-14f, 8f), glyph); // upper arm
+        MakeArrowBar(go.transform, new Vector2(20f, 7f), -45f, new Vector2(-14f, -8f), glyph); // lower arm
+
+        return button;
+    }
+
+    // Like MakePlusBar but supports rotation and positional offset.
+    private static void MakeArrowBar(Transform parent, Vector2 size, float angleDeg,
+                                     Vector2 offset, Color color)
+    {
+        var bar = new GameObject("Bar", typeof(RectTransform), typeof(Image));
+        bar.transform.SetParent(parent, false);
+        var rt = (RectTransform)bar.transform;
+        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = offset;
+        rt.sizeDelta = size;
+        rt.localRotation = Quaternion.Euler(0f, 0f, angleDeg);
         var img = bar.GetComponent<Image>();
         img.color = color;
         img.raycastTarget = false;
@@ -396,15 +612,42 @@ public static class ReactionBarBuilder
             if (item.bubbleBackground == null)
             { Debug.LogError($"[ReactionBar] MessageItemView.bubbleBackground unassigned on {prefabPath}"); return; }
 
+            // Primary: bubble background Image.
             var bubbleGo = item.bubbleBackground.gameObject;
-            item.bubbleBackground.raycastTarget = true;          // gesture must receive pointer events
-            if (bubbleGo.GetComponent<MessageBubbleLongPress>() == null)
-                bubbleGo.AddComponent<MessageBubbleLongPress>();
+            item.bubbleBackground.raycastTarget = true;
+            EnsureLongPress(bubbleGo, "bubble background");
+
+            // Media-region targets: messageImage covers Image/Video/Sticker taps.
+            // downloadButton, audioPanel, documentPanel cover their respective media surfaces.
+            // Each MessageBubbleLongPress.Awake() calls GetComponentInParent<MessageItemView>()
+            // so view resolution is automatic — no extra wiring needed.
+            if (item.messageImage != null)
+                EnsureLongPress(item.messageImage.gameObject, "messageImage");
+
+            if (item.downloadButton != null)
+                EnsureLongPress(item.downloadButton.gameObject, "downloadButton");
+
+            if (item.audioPanel != null)
+                EnsureLongPress(item.audioPanel, "audioPanel");
+
+            if (item.documentPanel != null)
+                EnsureLongPress(item.documentPanel, "documentPanel");
 
             PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
-            Debug.Log($"[ReactionBar] Attached MessageBubbleLongPress to '{bubbleGo.name}' in {prefabPath}");
+            Debug.Log($"[ReactionBar] Attached MessageBubbleLongPress to bubble + media surfaces in {prefabPath}");
         }
         finally { PrefabUtility.UnloadPrefabContents(root); }
+    }
+
+    /// <summary>Adds MessageBubbleLongPress to <paramref name="go"/> if not already present.</summary>
+    private static void EnsureLongPress(GameObject go, string label)
+    {
+        if (go == null) return;
+        if (go.GetComponent<MessageBubbleLongPress>() == null)
+        {
+            go.AddComponent<MessageBubbleLongPress>();
+            Debug.Log($"[ReactionBar]   + MessageBubbleLongPress on '{go.name}' ({label})");
+        }
     }
 
     private static void ConfigureSwipeBackPassthrough()

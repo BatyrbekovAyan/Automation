@@ -2,6 +2,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using DG.Tweening;
+using Nobi.UiRoundedCorners;
 
 /// <summary>
 /// Single shared overlay showing the quick-reaction bar above a long-pressed bubble.
@@ -25,6 +26,12 @@ public class ReactionBarController : MonoBehaviour
     [SerializeField] private Button[] emojiButtons;  // length 6, each with a TMP label child
     [SerializeField] private Button plusButton;
 
+    [Header("Action menu (Reply / Copy / Forward)")]
+    [SerializeField] private RectTransform actionMenu;   // vertical card below the bar
+    [SerializeField] private Button replyAction;
+    [SerializeField] private Button copyAction;
+    [SerializeField] private Button forwardAction;
+
     [Header("Selected highlight")]
     [SerializeField] private Color selectedTint = new Color(0.85f, 0.92f, 1f, 1f);
     [SerializeField] private Color normalTint = Color.white;
@@ -42,6 +49,9 @@ public class ReactionBarController : MonoBehaviour
             emojiButtons[i].onClick.AddListener(() => OnEmojiTapped(QuickEmojis[idx]));
         }
         if (plusButton != null) plusButton.onClick.AddListener(OnPlusTapped);
+        if (replyAction != null) replyAction.onClick.AddListener(OnReplyTapped);
+        if (copyAction != null) copyAction.onClick.AddListener(OnCopyTapped);
+        if (forwardAction != null) forwardAction.onClick.AddListener(OnForwardTapped);
         if (scrimButton != null) scrimButton.onClick.AddListener(Hide);
         if (content != null) content.SetActive(false);
     }
@@ -75,6 +85,18 @@ public class ReactionBarController : MonoBehaviour
         LayoutRebuilder.ForceRebuildLayoutImmediate(bar);   // bar size valid before positioning
         PositionBarOver(source.BubbleRect);
 
+        if (actionMenu != null)
+        {
+            LayoutRebuilder.ForceRebuildLayoutImmediate(actionMenu);
+
+            // Fix 3: refresh rounded corners now that ContentSizeFitter has given the card a real size.
+            var menuRounded = actionMenu.GetComponent<ImageWithRoundedCorners>();
+            if (menuRounded != null) { menuRounded.Validate(); menuRounded.Refresh(); }
+
+            // Fix 2: position below the pressed bubble (WhatsApp-style), not below the bar.
+            PositionMenuUnderBubble(source.BubbleRect);
+        }
+
         bar.localScale = Vector3.one * 0.85f;
         bar.DOScale(1f, 0.18f).SetEase(Ease.OutBack);
     }
@@ -96,6 +118,27 @@ public class ReactionBarController : MonoBehaviour
         var target = _target;   // Hide() nulls _target — capture before closing the bar
         Hide();
         if (target != null) EmojiPickerController.Instance?.Show(target);
+    }
+
+    private void OnReplyTapped()
+    {
+        var target = _target;   // Hide() nulls _target — capture before closing the bar
+        Hide();
+        if (target != null) ChatManager.Instance?.BeginReply(target);
+    }
+
+    private void OnCopyTapped()
+    {
+        var target = _target;
+        Hide();
+        if (target != null && !string.IsNullOrEmpty(target.text))
+            GUIUtility.systemCopyBuffer = target.text;
+    }
+
+    private void OnForwardTapped()
+    {
+        Hide();
+        Debug.Log("[ReactionBar] Forward — coming soon");
     }
 
     private void RenderEmojiLabels()
@@ -137,6 +180,32 @@ public class ReactionBarController : MonoBehaviour
         }
 
         bar.anchoredPosition = new Vector2(x, y);
+    }
+
+    /// <summary>
+    /// Places the action menu just below the pressed bubble, horizontally centered on it
+    /// and clamped to stay on-screen — mirrors PositionBarOver's approach.
+    /// corners[0]=BL, corners[3]=BR → bottom-center = (corners[0]+corners[3])*0.5
+    /// </summary>
+    private void PositionMenuUnderBubble(RectTransform bubble)
+    {
+        RectTransform parentRt = (RectTransform)actionMenu.parent;
+        Vector3[] corners = new Vector3[4];
+        bubble.GetWorldCorners(corners);   // 0=BL 1=TL 2=TR 3=BR
+
+        Vector2 botLocal = (Vector2)parentRt.InverseTransformPoint((corners[0] + corners[3]) * 0.5f);
+        const float gap = 16f;
+        float y = botLocal.y - gap - actionMenu.rect.height * 0.5f;
+
+        float halfMenuW = actionMenu.rect.width * 0.5f;
+        float maxX = parentRt.rect.width * 0.5f - halfMenuW - 12f;
+        float x = Mathf.Clamp(botLocal.x, -maxX, maxX);
+
+        // Clamp so the menu never goes below the bottom of the overlay.
+        float botLimit = -parentRt.rect.height * 0.5f + actionMenu.rect.height * 0.5f + 12f;
+        y = Mathf.Max(y, botLimit);
+
+        actionMenu.anchoredPosition = new Vector2(x, y);
     }
 
     private void HandleChatSelected(string chatId) => Hide();

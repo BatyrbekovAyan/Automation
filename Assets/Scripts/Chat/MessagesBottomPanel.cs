@@ -16,6 +16,12 @@ public class MessagesBottomPanel : MonoBehaviour
     [Header("Quick Replies")]
     public QuickReplyPanel quickReplyPanel;
 
+    [Header("Reply Preview")]
+    [SerializeField] private GameObject replyPreviewBar;
+    [SerializeField] private TextMeshProUGUI replyPreviewSender;
+    [SerializeField] private TextMeshProUGUI replyPreviewSnippet;
+    [SerializeField] private Button replyPreviewCancel;
+
     public static event Action<string> OnMessageSendRequested;
 
     void OnEnable()
@@ -44,6 +50,15 @@ public class MessagesBottomPanel : MonoBehaviour
         entry.eventID = EventTriggerType.PointerDown;
         entry.callback.AddListener((data) => { OnSendClicked(); });
         trigger.triggers.Add(entry);
+
+        if (ChatManager.Instance != null)
+            ChatManager.Instance.OnReplyTargetChanged += HandleReplyTargetChanged;
+        if (replyPreviewCancel != null)
+        {
+            replyPreviewCancel.onClick.RemoveAllListeners();
+            replyPreviewCancel.onClick.AddListener(() => ChatManager.Instance?.CancelReply());
+        }
+        if (replyPreviewBar != null) replyPreviewBar.SetActive(false);
     }
 
     private static void SetNavigationNone(Button button)
@@ -61,6 +76,9 @@ public class MessagesBottomPanel : MonoBehaviour
 
         EventTrigger trigger = sendButton.gameObject.GetComponent<EventTrigger>();
         if (trigger != null) trigger.triggers.Clear();
+
+        if (ChatManager.Instance != null)
+            ChatManager.Instance.OnReplyTargetChanged -= HandleReplyTargetChanged;
     }
 
     private void UpdateButtonState(string currentText)
@@ -102,5 +120,22 @@ public class MessagesBottomPanel : MonoBehaviour
             attachSheet.Toggle();
         else
             Debug.LogWarning("[MessagesBottomPanel] attachSheet ref is null — open Tools menu and run Build Attach Sheet");
+    }
+
+    private void HandleReplyTargetChanged(MessageViewModel target)
+    {
+        if (replyPreviewBar == null) return;
+        if (target == null) { replyPreviewBar.SetActive(false); return; }
+
+        replyPreviewBar.SetActive(true);
+        if (replyPreviewSender != null)
+            replyPreviewSender.text = UnicodeEmojiConverter.ConvertRealEmojisToSprites(
+                ReplyParser.SenderLabel(target.isIncoming, target.senderName), MissingEmojiMode.Hide);
+        if (replyPreviewSnippet != null)
+            replyPreviewSnippet.text = ReplyParser.CleanSnippet(
+                UnicodeEmojiConverter.ConvertRealEmojisToSprites(
+                    ReplyParser.SnippetFor(target.type, target.text), MissingEmojiMode.Hide));
+
+        if (inputField != null) inputField.ActivateInputField();   // open keyboard on reply
     }
 }

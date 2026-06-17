@@ -248,7 +248,7 @@ public static class MessageQuotedCardBuilder
     /// </summary>
     private static TextMeshProUGUI BuildSenderTmp(Transform parent, TMP_FontAsset font)
     {
-        var go = new GameObject(SenderTmpName, typeof(RectTransform), typeof(TextMeshProUGUI));
+        var go = new GameObject(SenderTmpName, typeof(RectTransform), typeof(TextMeshProUGUI), typeof(LayoutElement));
         go.transform.SetParent(parent, false);
 
         var tmp = go.GetComponent<TextMeshProUGUI>();
@@ -257,11 +257,15 @@ public static class MessageQuotedCardBuilder
         tmp.fontSize = SenderFontSize;
         tmp.fontStyle = FontStyles.Bold;
         tmp.color = DefaultAccent;   // overwritten at runtime to match the accent bar
-        tmp.alignment = TextAlignmentOptions.TopLeft;
+        tmp.alignment = TextAlignmentOptions.MidlineLeft;
         tmp.enableWordWrapping = false;
         tmp.overflowMode = TextOverflowModes.Ellipsis;
         tmp.maxVisibleLines = 1;
         tmp.raycastTarget = false;
+
+        // Pin a one-line row height so a sprite-only (emoji) value can't collapse the VLG row to ~0.
+        var le = go.GetComponent<LayoutElement>();
+        le.minHeight = le.preferredHeight = SenderFontSize * 1.32f;
 
         return tmp;
     }
@@ -272,7 +276,7 @@ public static class MessageQuotedCardBuilder
     /// </summary>
     private static TextMeshProUGUI BuildSnippetTmp(Transform parent, TMP_FontAsset font)
     {
-        var go = new GameObject(SnippetTmpName, typeof(RectTransform), typeof(TextMeshProUGUI));
+        var go = new GameObject(SnippetTmpName, typeof(RectTransform), typeof(TextMeshProUGUI), typeof(LayoutElement));
         go.transform.SetParent(parent, false);
 
         var tmp = go.GetComponent<TextMeshProUGUI>();
@@ -281,11 +285,15 @@ public static class MessageQuotedCardBuilder
         tmp.fontSize = SnippetFontSize;
         tmp.fontStyle = FontStyles.Normal;
         tmp.color = SnippetColor;
-        tmp.alignment = TextAlignmentOptions.TopLeft;
+        tmp.alignment = TextAlignmentOptions.MidlineLeft;
         tmp.enableWordWrapping = false;
         tmp.overflowMode = TextOverflowModes.Ellipsis;
         tmp.maxVisibleLines = 1;
         tmp.raycastTarget = false;
+
+        // Pin a one-line row height so a sprite-only (emoji) snippet can't collapse the VLG row to ~0.
+        var le = go.GetComponent<LayoutElement>();
+        le.minHeight = le.preferredHeight = SnippetFontSize * 1.32f;
 
         return tmp;
     }
