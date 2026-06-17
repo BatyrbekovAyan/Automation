@@ -30,9 +30,12 @@ public static class ChatPreviewFormatter
     public static string Format(string rawText, string type, string deliveryStatus, bool isMine,
                                 string reactionTargetText = null, string reactionTargetType = null)
     {
-        if (!string.IsNullOrEmpty(type)
-            && type.Equals("reaction", System.StringComparison.OrdinalIgnoreCase))
-            return FormatReaction(rawText, isMine, reactionTargetText, reactionTargetType);
+        bool isReaction = !string.IsNullOrEmpty(type)
+            && type.Equals("reaction", System.StringComparison.OrdinalIgnoreCase);
+        bool isReactionRemoved = !string.IsNullOrEmpty(type)
+            && type.Equals("reaction_remove", System.StringComparison.OrdinalIgnoreCase);
+        if (isReaction || isReactionRemoved)
+            return FormatReaction(rawText, isMine, reactionTargetText, reactionTargetType, isReactionRemoved);
 
         var tick = isMine ? GetTickSprite(deliveryStatus) : null;
         var (emoji, label) = GetMediaInfo(type);
@@ -76,10 +79,12 @@ public static class ChatPreviewFormatter
     /// an empty/whitespace emoji means the reaction was removed.
     /// </summary>
     private static string FormatReaction(string emojiRaw, bool isMine,
-                                         string targetText, string targetType)
+                                         string targetText, string targetType, bool isRemoval)
     {
         string emoji = (emojiRaw ?? string.Empty).Trim('​', ' ', '\t', '\n', '\r');
-        if (emoji.Length == 0) return "Reaction removed";
+        // Wappi reports a removed reaction as type "reaction_remove" with the literal
+        // "reaction_remove" as the body; treat that (and an empty emoji) as removed.
+        if (isRemoval || emoji.Length == 0) return "Reaction removed";
 
         var sb = new System.Text.StringBuilder(64);
         sb.Append(isMine ? "You reacted " : "Reacted ");

@@ -61,6 +61,22 @@ public class ChatPreviewFormatterReactionTests
     }
 
     [Test]
+    public void ReactionRemoveType_Mine_RendersReactionRemoved()
+    {
+        // Wappi reports a removed reaction as type "reaction_remove" with the literal
+        // "reaction_remove" as the body — must not leak that raw string into the row.
+        string s = ChatPreviewFormatter.Format("reaction_remove", "reaction_remove", "read", true, null, null);
+        Assert.AreEqual("Reaction removed", s);
+    }
+
+    [Test]
+    public void ReactionRemoveType_Incoming_RendersReactionRemoved()
+    {
+        string s = ChatPreviewFormatter.Format("reaction_remove", "reaction_remove", null, false, null, null);
+        Assert.AreEqual("Reaction removed", s);
+    }
+
+    [Test]
     public void NonReactionType_Unaffected()
     {
         string s = ChatPreviewFormatter.Format("Hello", "chat", null, false);
