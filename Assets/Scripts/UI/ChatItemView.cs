@@ -107,6 +107,7 @@ public void Bind(ChatViewModel model)
         }
 
         UpdatePreviewText(vm.LastMessage ?? "");
+        MaybeResolveReactionTarget();
 
         vm.OnUpdated += OnVmUpdated;
         vm.OnLastMessageChanged += OnLastMessageChanged;
@@ -157,8 +158,22 @@ public void Bind(ChatViewModel model)
 
         // --- THE FIX: Format the preview text on updates too ---
         UpdatePreviewText(vm.LastMessage ?? "");
+        MaybeResolveReactionTarget();
 
         ApplyUnreadBadge(vm.UnreadCount);
+    }
+
+    // Phase 2: when an on-screen reaction row has no resolved target text yet, ask the
+    // manager to backfill it. The manager caches/dedupes/queues, so this is a cheap ping.
+    // Reference-null (not IsNullOrEmpty): a resolved media row keeps "" + a type and must
+    // not re-ping, while a cleared/unresolved row (null) should.
+    private void MaybeResolveReactionTarget()
+    {
+        if (vm == null) return;
+        if (vm.LastMessageType != "reaction") return;
+        if (vm.ReactionTargetText != null) return;
+        if (string.IsNullOrEmpty(vm.LastMessageId)) return;
+        if (ChatManager.Instance != null) ChatManager.Instance.ResolveReactionTarget(vm);
     }
 
     private void OnLastMessageChanged(ChatViewModel vmRef)
