@@ -1115,6 +1115,13 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             }
             else if (isJumboEmoji)
             {
+                // Unlike every other type, the jumbo time is NOT a floating element — AdjustTextBubbleSize
+                // re-enables its layout (ignoreLayout=false) so it rides its own VLG row beneath the emoji
+                // (there's no horizontal room for it inline beside a jumbo glyph). The bubble VLG then
+                // force-expands that row full-width and the Time's TMP right-alignment parks the tick at the
+                // row's right (content) edge, so without a right margin it skips the 20px inset the floating
+                // time uses on every other bubble. We add that margin per sub-case so the tick lands in the
+                // same column as all other message ticks.
                 if (hideBubble)
                 {
                     layout.padding = new RectOffset(-24, -24, 12, 10);
@@ -1123,6 +1130,11 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                     if (timeText != null)
                     {
                         PositionFloatingTime(-6f, layout.padding.bottom + 4f);
+                        // No visible bubble: the content row hugs the lone emoji, so the tick's reference is
+                        // the emoji's own right edge (= the content edge the row right-aligns to). A flat 20px
+                        // inset tucks it 20px inside that edge, matching the bubble-tick column. ("20 -
+                        // padding.right" overshoots here because the -24 side padding inflates it to 44.)
+                        timeText.margin = new Vector4(0, 0, 20f, 0);
                     }
 
                     timeText.color = Color.white;
@@ -1139,6 +1151,10 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
                     if (timeText != null)
                     {
                         PositionFloatingTime(20f, layout.padding.bottom + 4f);
+                        // Visible bubble: the row right-aligns to the content edge (padding.right inset from
+                        // the bubble edge), so (20 - padding.right) lands the tick at the standard 20px inset
+                        // from the bubble's right edge — matching every other bubble type.
+                        timeText.margin = new Vector4(0, 0, 20f - layout.padding.right, 0);
                     }
                 }
             }
