@@ -7,34 +7,48 @@ using UnityEngine.Networking;
 
 public partial class ChatManager
 {
-    // Phase 2: lazily backfill the reacted-to text for chat-list reaction rows.
+    // Lazily backfill chat-list row details for on-screen rows that are missing them:
+    // a reaction's target text, and/or a group row's sender name (empty pushname for LID
+    // participants). One serial messages/get per row resolves both; results are cached.
     private readonly Queue<string> _reactionResolveQueue = new Queue<string>();   // chatIds pending
-    private readonly HashSet<string> _reactionResolveInFlight = new HashSet<string>(); // reactionIds
+    private readonly HashSet<string> _reactionResolveInFlight = new HashSet<string>(); // last-message ids
     private bool _reactionResolveDraining;
 
     /// <summary>
-    /// Entry point called by ChatItemView when a reaction row missing its target text comes
-    /// on screen. Cache hit → fills instantly; miss → enqueues one serial messages/get fetch.
+    /// Entry point called by ChatItemView when an on-screen row is missing detail. Cache hit →
+    /// fills instantly; miss → enqueues one serial messages/get fetch for that chat.
     /// </summary>
-    public void ResolveReactionTarget(ChatViewModel chatVm)
+    public void ResolveRowDetails(ChatViewModel chatVm)
     {
         if (chatVm == null) return;
-        if (chatVm.LastMessageType != "reaction") return;
-        if (chatVm.ReactionTargetText != null) return;          // already resolved (incl. "")
-        string reactionId = chatVm.LastMessageId;
-        if (string.IsNullOrEmpty(reactionId)) return;
+        string id = chatVm.LastMessageId;
+        if (string.IsNullOrEmpty(id) || !RowNeedsResolve(chatVm)) return;
 
         long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        if (ReactionTargetCache.TryGet(GetCacheRoot(), reactionId, now, out string cachedText, out string cachedType))
+        if (ReactionTargetCache.TryGet(GetCacheRoot(), id, now, out string cText, out string cType, out string cName))
         {
-            chatVm.UpdateReactionContext(cachedText, cachedType);
+            ApplyRowDetails(chatVm, cText, cType, cName);
             return;
         }
 
-        if (_reactionResolveInFlight.Contains(reactionId)) return;
-        _reactionResolveInFlight.Add(reactionId);
+        if (_reactionResolveInFlight.Contains(id)) return;
+        _reactionResolveInFlight.Add(id);
         _reactionResolveQueue.Enqueue(chatVm.ChatId);
         if (!_reactionResolveDraining) StartCoroutine(DrainReactionResolveQueue());
+    }
+
+    // A row needs a fetch when it's a reaction whose target text is unresolved, or an incoming
+    // group row whose sender name is still unknown (own rows render "You", 1:1 rows no prefix).
+    private static bool RowNeedsResolve(ChatViewModel vm)
+    {
+        bool needsTarget = vm.LastMessageType == "reaction" && vm.ReactionTargetText == null;
+        bool needsName = vm.IsGroup && !vm.IsLastMessageMine && string.IsNullOrEmpty(vm.LastMessageSenderName);
+        return needsTarget || needsName;
+    }
+
+    private static void ApplyRowDetails(ChatViewModel vm, string text, string type, string senderName)
+    {
+        vm.ApplyResolvedRowDetails(text, type, senderName);
     }
 
     private IEnumerator DrainReactionResolveQueue()
@@ -50,18 +64,17 @@ public partial class ChatManager
 
             string chatId = _reactionResolveQueue.Dequeue();
             ChatViewModel chatVm = GetChat(chatId);
-            if (chatVm == null || chatVm.LastMessageType != "reaction"
-                || chatVm.ReactionTargetText != null || string.IsNullOrEmpty(chatVm.LastMessageId))
+            if (chatVm == null || string.IsNullOrEmpty(chatVm.LastMessageId) || !RowNeedsResolve(chatVm))
                 continue;
 
-            string reactionId = chatVm.LastMessageId;
-            if (string.IsNullOrEmpty(profileId)) { _reactionResolveInFlight.Remove(reactionId); continue; }
+            string id = chatVm.LastMessageId;
+            if (string.IsNullOrEmpty(profileId)) { _reactionResolveInFlight.Remove(id); continue; }
 
             string escapedId = UnityWebRequest.EscapeURL(chatId);
             string url = $"https://wappi.pro/api/sync/messages/get?profile_id={profileId}&chat_id={escapedId}&limit={MessagesPerPage}&offset=0";
 
             bool definitive = false;
-            ReactionTargetResolver.Result res = new ReactionTargetResolver.Result { text = "", type = "" };
+            ReactionTargetResolver.Result res = new ReactionTargetResolver.Result { text = "", type = "", senderName = "" };
 
             using (UnityWebRequest www = UnityWebRequest.Get(url))
             {
@@ -74,33 +87,32 @@ public partial class ChatManager
                     try
                     {
                         var resp = JsonConvert.DeserializeObject<MessagesResponseRaw>(www.downloadHandler.text);
-                        if (resp?.messages != null) res = ReactionTargetResolver.Resolve(resp.messages, reactionId);
+                        if (resp?.messages != null) res = ReactionTargetResolver.Resolve(resp.messages, id);
                         definitive = true;
                     }
                     catch (System.Exception ex)
                     {
-                        Debug.LogWarning($"[ChatManager] reaction-target parse failed: {ex.Message}");
+                        Debug.LogWarning($"[ChatManager] row-detail parse failed: {ex.Message}");
                     }
                 }
                 else
                 {
-                    Debug.LogWarning($"[Wappi] reaction-target messages/get failed [{www.responseCode}] {url}: {www.error}");
+                    Debug.LogWarning($"[Wappi] row-detail messages/get failed [{www.responseCode}] {url}: {www.error}");
                 }
             }
 
-            _reactionResolveInFlight.Remove(reactionId);
+            _reactionResolveInFlight.Remove(id);
 
             // Only cache/apply on a definitive answer; a network failure leaves the row
             // unresolved so it retries on a later on-screen bind.
             if (definitive)
             {
-                ReactionTargetCache.Put(cacheRoot, reactionId, res.text, res.type, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                ReactionTargetCache.Put(cacheRoot, id, res.text, res.type, res.senderName, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
                 if (GetActiveProfileId() == profileId)
                 {
                     ChatViewModel current = GetChat(chatId);
-                    if (current != null && current.LastMessageType == "reaction"
-                        && current.LastMessageId == reactionId)
-                        current.UpdateReactionContext(res.text, res.type);
+                    if (current != null && current.LastMessageId == id)
+                        ApplyRowDetails(current, res.text, res.type, res.senderName);
                 }
             }
         }

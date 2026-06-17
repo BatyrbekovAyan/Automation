@@ -16,6 +16,14 @@ public class ChatViewModel
     public string LastMessageDeliveryStatus { get; private set; }
     public bool IsLastMessageMine { get; private set; }
 
+    // Display name of the last message's sender (Wappi last_message_sender.pushname).
+    // Used to prefix group chat-list rows ("Aliya: …"); "You" is substituted for own.
+    public string LastMessageSenderName { get; private set; }
+
+    // Group chats use the WhatsApp "@g.us" jid suffix — same rule MessageListView uses
+    // to decide per-bubble sender headers. Only group rows get a sender prefix.
+    public bool IsGroup => !string.IsNullOrEmpty(ChatId) && ChatId.EndsWith("@g.us");
+
     // Reacted-to message context for a reaction last-message. Null = unknown
     // (formatter omits the "to …" clause). Phase 2 backfills these from a fetch.
     public string ReactionTargetText { get; private set; }
@@ -32,7 +40,8 @@ public class ChatViewModel
                          string lastMessageId = null,
                          string lastMessageType = null,
                          string lastMessageDeliveryStatus = null,
-                         bool isLastMessageMine = false)
+                         bool isLastMessageMine = false,
+                         string lastMessageSenderName = null)
     {
         ChatId = chatId;
         Title = title;
@@ -44,6 +53,7 @@ public class ChatViewModel
         LastMessageType = lastMessageType;
         LastMessageDeliveryStatus = lastMessageDeliveryStatus;
         IsLastMessageMine = isLastMessageMine;
+        LastMessageSenderName = lastMessageSenderName;
         LastMessageTimeString = FormatTimestamp(lastTime);
 
         // OnlineStatus = "tap here for contact info";
@@ -93,17 +103,58 @@ public class ChatViewModel
     }
 
     /// <summary>
+    /// Authoritative last-message sender name from the chat-list payload
+    /// (last_message_sender.pushname). Set only when the last message itself changes; may be
+    /// empty for WhatsApp LID group participants, in which case the resolver backfills it.
+    /// </summary>
+    public void SetLastMessageSenderName(string name)
+    {
+        name ??= "";
+        if (LastMessageSenderName == name) return;
+        LastMessageSenderName = name;
+        NotifyUpdated();
+    }
+
+    /// <summary>
+    /// Applies resolver-backfilled row details in one shot (a single NotifyUpdated) so the
+    /// two-field update can't re-enter the resolver mid-apply. Target text/type apply only to
+    /// reaction rows; the sender name only when non-empty so it never wipes a known name.
+    /// </summary>
+    public void ApplyResolvedRowDetails(string targetText, string targetType, string senderName)
+    {
+        bool changed = false;
+        if (LastMessageType == "reaction" && (ReactionTargetText != targetText || ReactionTargetType != targetType))
+        {
+            ReactionTargetText = targetText;
+            ReactionTargetType = targetType;
+            changed = true;
+        }
+        if (!string.IsNullOrEmpty(senderName) && LastMessageSenderName != senderName)
+        {
+            LastMessageSenderName = senderName;
+            changed = true;
+        }
+        if (changed) NotifyUpdated();
+    }
+
+    /// <summary>
     /// Sets a reaction as the last message and refreshes the row in place — fires
     /// OnUpdated only, never OnLastMessageChanged, so the chat list does NOT reorder.
     /// Used by the live send/receive reaction paths, which hold the target message.
     /// </summary>
-    public void SetReactionPreview(string emoji, bool fromMe, string targetText, string targetType)
+    public void SetReactionPreview(string emoji, bool fromMe, string targetText, string targetType,
+                                   string senderName = null, string lastMessageId = null)
     {
         LastMessage = emoji ?? "";
         LastMessageType = "reaction";
         IsLastMessageMine = fromMe;
+        LastMessageSenderName = senderName;
         ReactionTargetText = targetText;
         ReactionTargetType = targetType;
+        // Advance the id to the reaction's own id (incoming live path) so a later bulk merge
+        // sees the same id (lastIdChanged=false) and preserves the resolved name/target
+        // instead of clobbering them back to the empty LID pushname.
+        if (!string.IsNullOrEmpty(lastMessageId)) LastMessageId = lastMessageId;
         NotifyUpdated();
     }
 

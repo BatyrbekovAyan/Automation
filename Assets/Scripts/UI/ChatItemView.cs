@@ -107,7 +107,7 @@ public void Bind(ChatViewModel model)
         }
 
         UpdatePreviewText(vm.LastMessage ?? "");
-        MaybeResolveReactionTarget();
+        MaybeResolveRowDetails();
 
         vm.OnUpdated += OnVmUpdated;
         vm.OnLastMessageChanged += OnLastMessageChanged;
@@ -158,22 +158,22 @@ public void Bind(ChatViewModel model)
 
         // --- THE FIX: Format the preview text on updates too ---
         UpdatePreviewText(vm.LastMessage ?? "");
-        MaybeResolveReactionTarget();
+        MaybeResolveRowDetails();
 
         ApplyUnreadBadge(vm.UnreadCount);
     }
 
-    // Phase 2: when an on-screen reaction row has no resolved target text yet, ask the
+    // Phase 2 / group-author: when an on-screen row is missing detail — a reaction's target
+    // text, or a group row's sender name (empty pushname for LID participants) — ask the
     // manager to backfill it. The manager caches/dedupes/queues, so this is a cheap ping.
-    // Reference-null (not IsNullOrEmpty): a resolved media row keeps "" + a type and must
-    // not re-ping, while a cleared/unresolved row (null) should.
-    private void MaybeResolveReactionTarget()
+    // ReactionTargetText is checked by reference-null (a resolved "" media row must not re-ping).
+    private void MaybeResolveRowDetails()
     {
-        if (vm == null) return;
-        if (vm.LastMessageType != "reaction") return;
-        if (vm.ReactionTargetText != null) return;
-        if (string.IsNullOrEmpty(vm.LastMessageId)) return;
-        if (ChatManager.Instance != null) ChatManager.Instance.ResolveReactionTarget(vm);
+        if (vm == null || string.IsNullOrEmpty(vm.LastMessageId)) return;
+        bool needsTarget = vm.LastMessageType == "reaction" && vm.ReactionTargetText == null;
+        bool needsName = vm.IsGroup && !vm.IsLastMessageMine && string.IsNullOrEmpty(vm.LastMessageSenderName);
+        if (!needsTarget && !needsName) return;
+        if (ChatManager.Instance != null) ChatManager.Instance.ResolveRowDetails(vm);
     }
 
     private void OnLastMessageChanged(ChatViewModel vmRef)
@@ -226,7 +226,9 @@ public void Bind(ChatViewModel model)
             vm != null ? vm.LastMessageDeliveryStatus : null,
             vm != null && vm.IsLastMessageMine,
             vm != null ? vm.ReactionTargetText : null,
-            vm != null ? vm.ReactionTargetType : null);
+            vm != null ? vm.ReactionTargetType : null,
+            vm != null ? vm.LastMessageSenderName : null,
+            vm != null && vm.IsGroup);
 
         if (string.IsNullOrEmpty(formatted))
         {

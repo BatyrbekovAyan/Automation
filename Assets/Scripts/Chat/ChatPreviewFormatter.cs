@@ -28,14 +28,16 @@ public static class ChatPreviewFormatter
     private static readonly HashSet<string> LoggedUnknownStatuses = new();
 
     public static string Format(string rawText, string type, string deliveryStatus, bool isMine,
-                                string reactionTargetText = null, string reactionTargetType = null)
+                                string reactionTargetText = null, string reactionTargetType = null,
+                                string senderName = null, bool isGroup = false)
     {
         bool isReaction = !string.IsNullOrEmpty(type)
             && type.Equals("reaction", System.StringComparison.OrdinalIgnoreCase);
         bool isReactionRemoved = !string.IsNullOrEmpty(type)
             && type.Equals("reaction_remove", System.StringComparison.OrdinalIgnoreCase);
         if (isReaction || isReactionRemoved)
-            return FormatReaction(rawText, isMine, reactionTargetText, reactionTargetType, isReactionRemoved);
+            return FormatReaction(rawText, isMine, reactionTargetText, reactionTargetType,
+                                  isReactionRemoved, senderName, isGroup);
 
         var tick = isMine ? GetTickSprite(deliveryStatus) : null;
         var (emoji, label) = GetMediaInfo(type);
@@ -61,10 +63,22 @@ public static class ChatPreviewFormatter
             }
         }
 
-        if (tick == null && emoji == null) return text;
+        // In group rows, prefix the sender ("You" for own, else the pushname) so the row
+        // reads "Aliya: 📷 Photo" / "✓✓ You: Hello". 1:1 rows get no prefix. Skip the prefix
+        // when there's nothing to show (empty body, no media, no tick) so we never emit a
+        // dangling "Name: " — that case returns "" exactly like the 1:1 path.
+        string senderPrefix = null;
+        if (isGroup && !(tick == null && emoji == null && string.IsNullOrEmpty(text)))
+        {
+            string who = isMine ? "You" : senderName;
+            if (!string.IsNullOrEmpty(who)) senderPrefix = who + ": ";
+        }
 
-        var sb = new System.Text.StringBuilder(text.Length + 48);
+        if (tick == null && emoji == null && senderPrefix == null) return text;
+
+        var sb = new System.Text.StringBuilder(text.Length + 64);
         if (tick != null) { sb.Append(tick); sb.Append(' '); }
+        if (senderPrefix != null) sb.Append(senderPrefix);
         if (emoji != null) { sb.Append(emoji); sb.Append(' '); }
         sb.Append(text);
         return sb.ToString();
@@ -79,7 +93,8 @@ public static class ChatPreviewFormatter
     /// an empty/whitespace emoji means the reaction was removed.
     /// </summary>
     private static string FormatReaction(string emojiRaw, bool isMine,
-                                         string targetText, string targetType, bool isRemoval)
+                                         string targetText, string targetType, bool isRemoval,
+                                         string senderName, bool isGroup)
     {
         string emoji = (emojiRaw ?? string.Empty).Trim('​', ' ', '\t', '\n', '\r');
         // Wappi reports a removed reaction as type "reaction_remove" with the literal
@@ -87,7 +102,10 @@ public static class ChatPreviewFormatter
         if (isRemoval || emoji.Length == 0) return "Reaction removed";
 
         var sb = new System.Text.StringBuilder(64);
-        sb.Append(isMine ? "You reacted " : "Reacted ");
+        // In groups, attribute the reactor by name ("Aliya reacted ❤️"); 1:1 stays "Reacted".
+        if (isMine) sb.Append("You reacted ");
+        else if (isGroup && !string.IsNullOrEmpty(senderName)) { sb.Append(senderName); sb.Append(" reacted "); }
+        else sb.Append("Reacted ");
         sb.Append(emoji);
 
         string clause = ReactionTargetClause(targetText, targetType);

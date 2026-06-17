@@ -240,8 +240,8 @@ public partial class ChatManager : MonoBehaviour
                 // The chat is already on the screen! Do not destroy the prefab!
                 // Just quietly update the text, time, and unread count. The UI will catch the event and refresh seamlessly.
 
-                // Capture before the id is overwritten: did the reaction identity change?
-                bool reactionIdChanged = existingVm.LastMessageId != chat.last_message_id;
+                // Capture before the id is overwritten: did the last message change?
+                bool lastIdChanged = existingVm.LastMessageId != chat.last_message_id;
 
                 existingVm.UpdateLastMessage(lastMsg, unixTime);
                 existingVm.UpdateUnreadCount(chat.unread_count);
@@ -249,12 +249,17 @@ public partial class ChatManager : MonoBehaviour
                 bool mergedIsMine = chat.last_message_sender != null && chat.last_message_sender.isMe;
                 existingVm.UpdateLastMessageMeta(chat.last_message_type, chat.last_message_delivery_status, mergedIsMine);
 
-                // A new/changed reaction (different id) can't reuse the previous reaction's
-                // cached target text. Clear LAST — after the id is updated — so the row's
-                // re-resolve reads the new reaction id and refetches; an unchanged reaction
-                // keeps its resolved text (no churn, instant re-fill from cache).
-                if (chat.last_message_type == "reaction" && reactionIdChanged)
-                    existingVm.UpdateReactionContext(null, null);
+                // A genuinely new last message resets per-message resolved state. Only then:
+                // adopt the new sender pushname (the resolver backfills it if empty for a LID
+                // group participant), and clear a reaction's cached target text so the row
+                // re-resolves against the new reaction id. An unchanged last message keeps its
+                // resolved sender name / target text (no churn, instant re-fill from cache).
+                if (lastIdChanged)
+                {
+                    existingVm.SetLastMessageSenderName(chat.last_message_sender?.pushname);
+                    if (chat.last_message_type == "reaction")
+                        existingVm.UpdateReactionContext(null, null);
+                }
             }
             else
             {
@@ -265,7 +270,8 @@ public partial class ChatManager : MonoBehaviour
                                                lastMessageId: chat.last_message_id,
                                                lastMessageType: chat.last_message_type,
                                                lastMessageDeliveryStatus: chat.last_message_delivery_status,
-                                               isLastMessageMine: isMine);
+                                               isLastMessageMine: isMine,
+                                               lastMessageSenderName: chat.last_message_sender?.pushname);
                 Chats.Add(chatVM);
                 chatLookup[chat.id] = chatVM;
                 OnChatAdded?.Invoke(chatVM);
@@ -1390,7 +1396,7 @@ if (msg.messageType == MessageType.Video)
         // Only genuinely live reactions (passed a chat id) update the chat-list row;
         // historical reactions replayed during chat open must not.
         if (liveChatId != null)
-            UpdateChatListPreviewForReaction(liveChatId, ev, target);
+            UpdateChatListPreviewForReaction(liveChatId, raw.id, ev, target);
 
         return true;
     }
@@ -1400,14 +1406,15 @@ if (msg.messageType == MessageType.Video)
     /// reacted-to text resolved from the target message. Skipped if the reaction is
     /// older than the row's current last-message (i.e. not the newest activity).
     /// </summary>
-    private void UpdateChatListPreviewForReaction(string chatId, ReactionEvent ev, MessageViewModel target)
+    private void UpdateChatListPreviewForReaction(string chatId, string reactionMessageId, ReactionEvent ev, MessageViewModel target)
     {
         ChatViewModel chatVm = GetChat(chatId);
         if (chatVm == null) return;
         if (ev.time < chatVm.LastMessageTime) return;
 
         chatVm.SetReactionPreview(
-            ev.emoji, ev.fromMe, target.text, ChatPreviewFormatter.TargetTypeKey(target.type));
+            ev.emoji, ev.fromMe, target.text, ChatPreviewFormatter.TargetTypeKey(target.type),
+            ev.senderName, reactionMessageId);
     }
 
     MessageType ParseMessageType(string type)
