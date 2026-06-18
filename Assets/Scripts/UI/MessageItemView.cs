@@ -3814,28 +3814,19 @@ private Color GetSenderColor(string name)
         return groupColors[hash % groupColors.Length];
     }
 
-// --- THE FIX: Inject Zero-Width Spaces so long URLs wrap perfectly! ---
-    private string FormatTextWithWrappableLinks(string text)
-    {
-        if (string.IsNullOrEmpty(text)) return text;
-        
-        return System.Text.RegularExpressions.Regex.Replace(text, @"(https?://[^\s]+)", match => 
-        {
-            string rawUrl = match.Groups[1].Value;
-            
-            // Insert \u200B after common URL symbols so TextMeshPro knows it can break the line there
-            string displayUrl = rawUrl.Replace("/", "/\u200B")
-                .Replace("?", "?\u200B")
-                .Replace("=", "=\u200B")
-                .Replace("&", "&\u200B")
-                .Replace("-", "-\u200B")
-                .Replace("_", "_\u200B");
-                                      
-            // The raw URL stays in the <link> tag for clicking, but the displayUrl wraps beautifully!
-            // Color: WhatsApp's classic dark teal — reads as "green" against the light bubble bg.
-            return $"<link=\"{rawUrl}\"><color=#075E54><u>{displayUrl}</u></color></link>";
-        });
-    }
+    // id -> full URL for the <link> tags currently shown in messageText. Refilled on every
+    // FormatTextWithWrappableLinks call so it always matches the displayed text. Tapped ids
+    // are resolved back to the real URL via TryResolveLink (see TMPLinkHandler).
+    private readonly Dictionary<string, string> _linkUrlsById = new Dictionary<string, string>();
+
+    // Wrap URLs in TMP <link> tags. We use short numeric ids (not the raw URL) so the tag
+    // never overflows TMP's 128-char rich-text buffer and leaks as literal "<link=...>" text.
+    private string FormatTextWithWrappableLinks(string text) =>
+        WrappableLinkFormatter.Format(text, _linkUrlsById);
+
+    // Resolve a tapped TMP link id back to its full URL (used by TMPLinkHandler).
+    public bool TryResolveLink(string linkId, out string url) =>
+        _linkUrlsById.TryGetValue(linkId, out url);
     
     void HandleAudioMedia(MessageViewModel vm)
     {

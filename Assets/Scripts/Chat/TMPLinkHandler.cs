@@ -22,9 +22,18 @@ public class TMPLinkHandler : MonoBehaviour, IPointerClickHandler
         
         if (linkIndex != -1)
         {
-            // Grab the URL from the tag and open the phone's web browser!
             TMP_LinkInfo linkInfo = textMeshPro.textInfo.linkInfo[linkIndex];
-            Application.OpenURL(linkInfo.GetLinkID());
+            string linkId = linkInfo.GetLinkID();
+
+            // The tag carries a short numeric id (so it never overflows TMP's 128-char tag
+            // buffer); resolve it back to the full URL via the owning bubble. Fall back to the
+            // id itself for any tag that still embeds a raw URL.
+            string url = linkId;
+            var owner = GetComponentInParent<MessageItemView>();
+            if (owner != null && owner.TryResolveLink(linkId, out string resolved))
+                url = resolved;
+
+            if (!string.IsNullOrEmpty(url)) Application.OpenURL(url);
         }
     }
 }
