@@ -297,10 +297,18 @@ public class AttachmentPreviewScreen : MonoBehaviour
             // markTextureNonReadable: false — we hand this texture to
             // ChatManager.StageLocalMedia which calls EncodeToJPG on it to
             // populate the bubble's cache. EncodeToJPG requires readable.
-            return NativeGallery.LoadImageAtPath(path,
-                                                 maxSize: 1024,
-                                                 markTextureNonReadable: false,
-                                                 generateMipmaps: false);
+            const int maxSize = 1024;
+            Texture2D tex = NativeGallery.LoadImageAtPath(path,
+                                                          maxSize: maxSize,
+                                                          markTextureNonReadable: false,
+                                                          generateMipmaps: false);
+
+            // The native maxSize downscaler bakes a 1px dark line onto the shorter dimension's
+            // trailing edge (fractional-pixel render). iOS is patched at the source, but the
+            // Android scaler is a prebuilt .aar we can't touch — repair it here on the decoded
+            // (readable) texture so the bubble + uploaded JPEG are clean on every platform.
+            if (tex != null) ResizeEdgeRepair.Repair(tex, maxSize);
+            return tex;
         }
         catch (Exception ex)
         {

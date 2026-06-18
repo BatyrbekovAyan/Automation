@@ -1117,7 +1117,13 @@ static BOOL pickingMultipleFiles = NO;
 	BOOL hasAlpha = alpha == kCGImageAlphaFirst || alpha == kCGImageAlphaLast || alpha == kCGImageAlphaPremultipliedFirst || alpha == kCGImageAlphaPremultipliedLast;
 	
 	CGFloat scaleRatio = scaleX < scaleY ? scaleX : scaleY;
-	CGRect imageRect = CGRectMake( 0, 0, width * scaleRatio, height * scaleRatio );
+	// LOCAL PATCH (re-apply after any NativeGallery update): round the scaled dimensions to
+	// whole pixels. A fractional target size (e.g. a 1170x2532 screenshot scaling to
+	// 473.175 x 1024) leaves the trailing column/row only partially covered by drawInRect;
+	// on an opaque (non-alpha) context the uncovered sliver bakes in as a 1px dark line on
+	// the fractional edge (portrait -> right edge, landscape -> bottom). Rounding makes the
+	// renderer's bitmap match the drawn rect exactly, so no partial edge survives.
+	CGRect imageRect = CGRectMake( 0, 0, round( width * scaleRatio ), round( height * scaleRatio ) );
 	UIGraphicsImageRendererFormat *format = [image imageRendererFormat];
 	format.opaque = !hasAlpha;
 	format.scale = image.scale;
