@@ -769,6 +769,15 @@ public partial class ChatManager : MonoBehaviour
             foreach (var msg in cachedMessages) seenMessageIds.Add(msg.messageId);
             _activeChatCache = cachedMessages;
 
+            // Back-fill any reply whose persisted quote is still an id-only placeholder (saved by a
+            // build that predated quote resolution, or a reply older than the live-sync window) from
+            // its target now that the full history is in memory. Idempotent — no-op once resolved.
+            ReplyParser.BackfillFromCache(cachedMessages);
+
+            // Start recovering any still-unavailable quotes by id now, before bubbles render, so the
+            // real text is ready (cache hit) by first paint instead of one chat-reopen later.
+            PrefetchUnavailableQuotes(cachedMessages);
+
             int initialCount = FirstScreenBudget.MessageCount(cachedMessages);
             if (cachedMessages.Count > initialCount)
             {
@@ -799,10 +808,20 @@ public partial class ChatManager : MonoBehaviour
             {
                 if (chatId != currentChatId) return; // stale fetch — user switched chats
 
+                // Quotes resolved to id-only placeholders during the per-message Normalize pass —
+                // the cache they needed didn't exist yet, and ~all replies carry no embedded
+                // reply_message snapshot. Now that the whole page is loaded, back-fill each reply's
+                // preview from its target BEFORE saving, so the persisted cache carries resolved
+                // quotes and the very first render shows them (not just a re-entry).
+                ReplyParser.BackfillFromCache(newMessages);
+
                 if (newMessages.Count > 0)
                     ChatHistoryCache.SaveHistory(GetCacheRoot(), chatId, newMessages);
 
                 _activeChatCache = newMessages;
+
+                // Front-load by-id recovery for echoed/unresolvable quotes before the first render.
+                PrefetchUnavailableQuotes(newMessages);
 
                 newMessages.Sort(MessageOrder.Descending);
 
@@ -1458,6 +1477,14 @@ if (msg.messageType == MessageType.Video)
             if (cachedList[i].messageId != refreshed.id) continue;
 
             var cached = cachedList[i];
+
+            // Never downgrade a quote that already has preview text (recovered by the by-id
+            // resolver, or resolved from cache) back to an empty/echo-blanked one a fresh Normalize
+            // produced — a re-Normalized echo snapshot reports empty quoted text, which would
+            // otherwise clobber the recovered original on the next sync.
+            if (string.IsNullOrEmpty(refreshed.quotedText) && !string.IsNullOrEmpty(cached.quotedText))
+                return false;
+
             bool unchanged = cached.quotedMessageId == refreshed.quotedMessageId
                           && cached.quotedText == refreshed.quotedText
                           && cached.quotedSenderName == refreshed.quotedSenderName

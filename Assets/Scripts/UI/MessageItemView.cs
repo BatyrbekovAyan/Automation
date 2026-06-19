@@ -255,19 +255,42 @@ public class MessageItemView : MonoBehaviour
 
         quotedCard.SetActive(true);
 
+        // If we know the quote's id but have no preview text (the reply carried no snapshot and its
+        // target isn't loaded, or ReplyParser dropped a snapshot that echoed this message's own
+        // body), recover the original by id. A cache hit fills vm.quotedText synchronously here; a
+        // miss kicks a one-shot messages/id/get fetch that re-binds this bubble when it lands.
+        if (string.IsNullOrEmpty(vm.quotedText) && !string.IsNullOrEmpty(vm.quotedMessageId))
+            ChatManager.Instance?.ResolveQuotedMessage(vm);
+
+        // Still no quoted text → the original couldn't be previewed (not loaded yet, or genuinely
+        // unrecoverable). Keep the card so it reads as a reply, but show a neutral placeholder
+        // instead of a blank line. (A real reply-to-identical-text resolved from cache keeps its
+        // text — it isn't blanked, so it never lands here.)
+        bool quoteUnavailable = string.IsNullOrEmpty(vm.quotedText);
+
         bool quotedIsOwn = vm.quotedSenderName == "You";
         Color accent = quotedIsOwn ? new Color32(0x1F, 0xA8, 0x55, 0xFF) : GetSenderColor(vm.quotedSenderName);
         if (quotedAccentBar != null) quotedAccentBar.color = accent;
 
         if (quotedSenderText != null)
         {
-            quotedSenderText.text = UnicodeEmojiConverter.ConvertRealEmojisToSprites(vm.quotedSenderName, MissingEmojiMode.Hide);
-            quotedSenderText.color = accent;
+            // Hide the sender row when there's no name (e.g. an echoed/unavailable quote), so the
+            // card doesn't carry a blank line above the snippet.
+            string senderLabel = UnicodeEmojiConverter.ConvertRealEmojisToSprites(vm.quotedSenderName, MissingEmojiMode.Hide);
+            bool showSender = !string.IsNullOrEmpty(senderLabel);
+            quotedSenderText.gameObject.SetActive(showSender);
+            if (showSender)
+            {
+                quotedSenderText.text  = senderLabel;
+                quotedSenderText.color = accent;
+            }
         }
 
         if (quotedSnippetText != null)
-            quotedSnippetText.text = ReplyParser.CleanSnippet(
-                UnicodeEmojiConverter.ConvertRealEmojisToSprites(vm.quotedText, MissingEmojiMode.Hide));
+            quotedSnippetText.text = quoteUnavailable
+                ? QuotedUnavailableLabel
+                : ReplyParser.CleanSnippet(
+                    UnicodeEmojiConverter.ConvertRealEmojisToSprites(vm.quotedText, MissingEmojiMode.Hide));
 
         bool isMediaQuote = vm.quotedType == MessageType.Image || vm.quotedType == MessageType.Video;
         if (quotedThumbnail != null)
@@ -297,6 +320,58 @@ public class MessageItemView : MonoBehaviour
         if (quotedCard.GetComponent<QuotedCardTap>() == null) quotedCard.AddComponent<QuotedCardTap>();
         var cardImg = quotedCard.GetComponent<Image>();
         if (cardImg != null) cardImg.raycastTarget = true;
+
+        ClampQuotedCardText();
+    }
+
+    // The prefab sets the Snippet/Sender TMP to NoWrap + Ellipsis but no width cap. With the
+    // bubble's ContentSizeFitter (PreferredSize) and the childControlWidth chain
+    // (Bubble → QuotedCard HLG → TextColumn VLG), a long single-line snippet — which is what a
+    // reply resolves to once its full cached original is substituted via FromCached — drives the
+    // whole bubble past MaxBubbleWidth (observed ~4717px). These constants are the card's fixed
+    // horizontal chrome, measured from both message prefabs.
+    // Shown in the quoted card when the original message can't be previewed (e.g. Wappi echoed the
+    // reply's own body into the snapshot and the real target isn't loaded). Keeps the reply
+    // affordance without duplicating the bubble text.
+    private const string QuotedUnavailableLabel = "Message";
+
+    private const float QuotedBubblePadX  = 16f;   // Bubble VLG padding (8 left + 8 right)
+    private const float QuotedCardChrome  = 44f;   // QuotedCard HLG padding (24) + Accent (8) + spacing (12)
+    private const float QuotedThumbChrome = 108f;  // Thumbnail (96) + its spacing (12), only when shown
+
+    /// <summary>
+    /// Caps the quoted snippet/sender to a single ellipsized line within the bubble's max width —
+    /// mirrors how AdjustTextBubbleSize clamps the body text via min(textWidth, maxAllowed). Setting
+    /// preferredWidth (not a fixed width) keeps short quotes narrow, while TextColumn's
+    /// childForceExpandWidth still lets the card visually fill a body-driven width ("spans wide").
+    /// Runs on every Bind / media-refresh re-bind through RenderQuotedCard, so it covers first
+    /// entry, re-entry, and the mid-session OnMessageMediaRefreshed upgrade.
+    /// </summary>
+    private void ClampQuotedCardText()
+    {
+        if (quotedCard == null || !quotedCard.activeSelf) return;
+
+        bool hasThumb = quotedThumbnail != null && quotedThumbnail.gameObject.activeSelf;
+        float cap = MaxBubbleWidth - QuotedBubblePadX - QuotedCardChrome - (hasThumb ? QuotedThumbChrome : 0f);
+
+        ClampQuotedText(quotedSnippetText, cap);
+        ClampQuotedText(quotedSenderText, cap);
+    }
+
+    private static void ClampQuotedText(TextMeshProUGUI tmp, float cap)
+    {
+        if (tmp == null || !tmp.gameObject.activeSelf) return;
+
+        tmp.textWrappingMode = TextWrappingModes.NoWrap;
+        tmp.overflowMode     = TextOverflowModes.Ellipsis;
+
+        float single = tmp.GetPreferredValues(tmp.text, Mathf.Infinity, Mathf.Infinity).x;
+
+        var le = tmp.GetComponent<LayoutElement>();
+        if (le == null) le = tmp.gameObject.AddComponent<LayoutElement>();
+        le.minWidth       = 0f;
+        le.flexibleWidth  = 0f;
+        le.preferredWidth = Mathf.Min(single, cap);
     }
 
     /// <summary>

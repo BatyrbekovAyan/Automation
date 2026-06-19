@@ -90,12 +90,13 @@ The app communicates with four external services via `UnityWebRequest` + corouti
 - **Auth**: `Authorization` header with `Manager.wappiAuthToken`
 - **Endpoints**:
   - `chats/filter` — filtered chat list
-  - `messages/get` — paginated message history
+  - `messages/get` — paginated message history (requires `chat_id`)
   - `messages/all/get` — all messages (bulk)
+  - `messages/id/get` — fetch a SINGLE message by id (`profile_id` + `message_id`, no `chat_id`); returns `{ status:"done", message:{ id/type/body/caption/senderName/contact_name/fromMe/… } }`. Used to recover a quoted reply's real text when `reply_message` is missing/echoed (see Incoming replies)
   - `message/media/download` — download media by message ID
   - `message/send` — send a message; add `quoted_message_id` (omit when null) to send a **reply** quoting another message
   - `message/reaction` — send/remove an emoji reaction (body `{ body, message_id }`; empty `body` removes; targets by `message_id`, no recipient)
-  - **Incoming replies**: a reply message carries `isReply: true` + a `reply_message` snapshot of the quoted original — keys `id` / `type` / `body` / `caption` / `contact_name` (the quoted sender; NOT `senderName`) / `file_name`; no `fromMe`. Resolved by `ReplyParser` (cache-by-id → snapshot → placeholder) into flat `quoted*` fields carried through the 4-layer message pipeline; rendered as a quoted card by `MessageItemView`. Reply triggers: swipe-right (`SwipeToReply`) + the long-press action menu (`ReactionBarController`).
+  - **Incoming replies**: a reply message carries `isReply: true` + (often, but not always) a `reply_message` snapshot of the quoted original — keys `id` / `type` / `body` / `caption` / `contact_name` (the quoted sender; NOT `senderName`) / `file_name`; no `fromMe`. Resolved by `ReplyParser` (cache-by-id → snapshot → placeholder) into flat `quoted*` fields carried through the 4-layer message pipeline; rendered as a quoted card by `MessageItemView`. The `reply_message` id is always correct, but its `body` is sometimes absent or **echoes the replying message's own text** — `ReplyParser.FromSnapshot` detects that (snapshot body == own raw body) and blanks it, then the card is recovered by fetching the original via `messages/id/get` (`QuotedMessageCache` + `ChatManager.QuoteResolve.cs`, mirroring the reaction-target resolver). Reply triggers: swipe-right (`SwipeToReply`) + the long-press action menu (`ReactionBarController`).
   - `qr/get` — QR code for WhatsApp login
   - `auth/code` — request phone auth code
   - `get/status` — connection status
