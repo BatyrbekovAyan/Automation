@@ -17,6 +17,12 @@ public static class ChatHistoryCache
     {
         if (string.IsNullOrEmpty(baseDir) || string.IsNullOrEmpty(chatId)) return;
 
+        // Never persist another chat's messages under this chat's file. A prior Wappi
+        // messages/get response crossing (see CrossChatResponseGuard) could have spliced
+        // foreign entries into the in-memory list now being saved — drop them at this choke
+        // point so the poison can't reach (or survive on) disk.
+        StripForeignMessages(messages, chatId);
+
         // Media floor: aged Wappi payloads come back with empty thumbnail/url for outgoing
         // videos, and naively persisting one wipes a previously-good preview. Carry the
         // existing on-disk media forward into any incoming entry whose fields are empty,
@@ -71,6 +77,11 @@ public static class ChatHistoryCache
 
             if (wrapper != null && wrapper.messages != null)
             {
+                // Strip any foreign-chat entries left in this file by a prior Wappi
+                // messages/get response crossing — the chat renders cache-first, so without
+                // this the old poison keeps showing up on every open even after the network
+                // guard stops new crossings. Self-heals: the next SaveHistory rewrites it clean.
+                StripForeignMessages(wrapper.messages, chatId);
                 return wrapper.messages;
             }
         }
@@ -80,5 +91,25 @@ public static class ChatHistoryCache
         }
 
         return new List<MessageViewModel>();
+    }
+
+    /// <summary>
+    /// Removes every message whose own <see cref="MessageViewModel.chatId"/> names a DIFFERENT
+    /// chat than this cache file's id — poison written by Wappi's concurrent messages/get response
+    /// crossing. Conservative: an empty/absent chatId is kept (legacy entries from before chatId
+    /// was reliably populated must not be dropped). Mutates the list in place; returns the count
+    /// removed.
+    /// </summary>
+    private static int StripForeignMessages(List<MessageViewModel> messages, string chatId)
+    {
+        if (messages == null || string.IsNullOrEmpty(chatId)) return 0;
+
+        int removed = messages.RemoveAll(m =>
+            m != null && !string.IsNullOrEmpty(m.chatId) && m.chatId != chatId);
+
+        if (removed > 0)
+            Debug.LogWarning($"[ChatHistoryCache] Stripped {removed} foreign-chat message(s) from {chatId} cache.");
+
+        return removed;
     }
 }

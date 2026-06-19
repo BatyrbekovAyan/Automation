@@ -99,6 +99,10 @@ public partial class ChatManager
             string text = "", senderName = "";
             MessageType type = MessageType.Unknown;
 
+            // Defer to in-flight chat-open/sync/pagination fetches so this background backfill
+            // never races them on Wappi's crossing-prone sync API (see WaitForChatFetchesToDrain).
+            yield return WaitForChatFetchesToDrain();
+
             using (UnityWebRequest www = UnityWebRequest.Get(url))
             {
                 www.SetRequestHeader("Authorization", Manager.wappiAuthToken);

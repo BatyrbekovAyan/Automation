@@ -121,6 +121,7 @@ public partial class ChatManager
         OnActiveBotChanged?.Invoke(botId);
 
         StopAllCoroutines();        // also cancels in-flight thumbnail extraction coroutines
+        _chatFetchesInFlight = 0;   // counter never decremented for the killed-mid-flight fetches
         ClearVideoThumbQueue();     // reset queue bookkeeping the cancelled coroutines never freed
         ClearMediaDownloadQueue();  // same for the serial media-download worker
         BeginLoadForActiveBot();

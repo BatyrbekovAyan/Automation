@@ -14,6 +14,13 @@ public partial class ChatManager : MonoBehaviour
     public static int MessagesPerPage = 50;
 
     /// <summary>
+    /// How many times a chat-open page fetch retries when Wappi crosses it with another chat's
+    /// response. The backfill drains wait out chat fetches, so a single in-flight straggler is the
+    /// only thing that can cross — a couple of retries clears it; beyond that we settle to empty.
+    /// </summary>
+    private const int MaxCrossChatRetries = 3;
+
+    /// <summary>
     /// Three-phase chat-open state machine. Prep runs cache load and queues sync results
     /// without touching UI. Slide is the slide-in animation with all heavy main-thread
     /// work gated. Populate fires OnBatchMessagesLoaded and drains queued sync results.
@@ -119,6 +126,15 @@ public partial class ChatManager : MonoBehaviour
     /// rounds down so that direction is overlap (deduped), never a gap.
     /// </summary>
     private int _servedFromStore;
+
+    /// <summary>
+    /// Number of chat-scoped messages/get requests (open + sync + pagination + cache
+    /// validation) currently awaiting a server response. Background row/quote backfill
+    /// drains wait on this so they never run a messages/get concurrently with a chat-open
+    /// fetch: Wappi crosses concurrent same-endpoint responses, which would feed another
+    /// chat's messages into the open chat. Reset to 0 wherever those fetches are force-stopped.
+    /// </summary>
+    private int _chatFetchesInFlight;
 
     private string currentChatId;
 
@@ -387,6 +403,7 @@ public partial class ChatManager : MonoBehaviour
         currentChatId = chatId;
         _lastFetchedServerPage = 0;
         _servedFromStore = 0;
+        _chatFetchesInFlight = 0;   // a sync stopped mid-flight above never ran its decrement
         seenMessageIds.Clear();
         _reactions.Clear();
         _activeChatCache = null;
@@ -420,7 +437,9 @@ public partial class ChatManager : MonoBehaviour
         using UnityWebRequest www = UnityWebRequest.Get(url);
         www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
         www.timeout = 30;
+        _chatFetchesInFlight++;
         yield return www.SendWebRequest();
+        _chatFetchesInFlight = Mathf.Max(0, _chatFetchesInFlight - 1);
 
         if (www.result != UnityWebRequest.Result.Success) yield break;
 
@@ -466,7 +485,14 @@ public partial class ChatManager : MonoBehaviour
         {
             MessagesResponseRaw response = JsonConvert.DeserializeObject<MessagesResponseRaw>(www.downloadHandler.text);
 
-            if (response?.messages != null)
+            if (CrossChatResponseGuard.IsForDifferentChat(response?.messages, chatId))
+            {
+                // Wappi handed us another chat's window (concurrent-request crossing). Drop it —
+                // the cache + page fetch already rendered this chat's real messages, and the next
+                // open re-syncs. Merging would splice a foreign chat's messages into this one.
+                Debug.LogWarning($"[ChatManager] SyncLatestMessages: discarded crossed messages/get response for {chatId}.");
+            }
+            else if (response?.messages != null)
             {
                 long[] responseTimes = MessageOrder.ResponseTimes(response.messages);
                 int responseIndex = -1;
@@ -981,7 +1007,9 @@ public partial class ChatManager : MonoBehaviour
         using UnityWebRequest www = UnityWebRequest.Get(url);
         www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
         www.timeout = 30;
+        _chatFetchesInFlight++;
         yield return www.SendWebRequest();
+        _chatFetchesInFlight = Mathf.Max(0, _chatFetchesInFlight - 1);
 
         if (www.result != UnityWebRequest.Result.Success) yield break;
 
@@ -994,7 +1022,13 @@ public partial class ChatManager : MonoBehaviour
         try
         {
             MessagesResponseRaw response = JsonConvert.DeserializeObject<MessagesResponseRaw>(www.downloadHandler.text);
-            if (response?.messages != null)
+            if (CrossChatResponseGuard.IsForDifferentChat(response?.messages, chatId))
+            {
+                // Crossed response for another chat — patching _activeChatCache from it would
+                // overwrite this chat's media/quote fields with a foreign chat's. Skip the pass.
+                Debug.LogWarning($"[ChatManager] ValidateCachePageAgainstServer: discarded crossed messages/get response for {chatId}.");
+            }
+            else if (response?.messages != null)
             {
                 foreach (var raw in response.messages)
                 {
@@ -1030,7 +1064,7 @@ public partial class ChatManager : MonoBehaviour
     }
 
 // Notice the Action signature now includes a bool!
-    IEnumerator GetMessagesRoutine(string chatId, int page, Action<List<MessageViewModel>, bool> onComplete)
+    IEnumerator GetMessagesRoutine(string chatId, int page, Action<List<MessageViewModel>, bool> onComplete, int crossRetry = 0)
     {
         int offset = (page - 1) * MessagesPerPage;
 
@@ -1046,7 +1080,9 @@ public partial class ChatManager : MonoBehaviour
         using UnityWebRequest www = UnityWebRequest.Get(url);
         www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
         www.timeout = 30;
+        _chatFetchesInFlight++;
         yield return www.SendWebRequest();
+        _chatFetchesInFlight = Mathf.Max(0, _chatFetchesInFlight - 1);
 
 #if UNITY_EDITOR
         var text = www.downloadHandler.text;
@@ -1067,12 +1103,19 @@ public partial class ChatManager : MonoBehaviour
         List<MessageViewModel> loadedMessages = new List<MessageViewModel>();
         int rawServerCount = 0; // --- THE FIX: Track the raw count before filtering! ---
         bool cacheDirty = false;
+        bool crossed = false;
 
         try
         {
             MessagesResponseRaw response = JsonConvert.DeserializeObject<MessagesResponseRaw>(www.downloadHandler.text);
 
-            if (response?.messages != null)
+            if (CrossChatResponseGuard.IsForDifferentChat(response?.messages, chatId))
+            {
+                // Wappi handed this request another chat's window (concurrent-request crossing).
+                // Handled after the try so we can yield a retry — see below.
+                crossed = true;
+            }
+            else if (response?.messages != null)
             {
                 long[] responseTimes = MessageOrder.ResponseTimes(response.messages);
 
@@ -1124,6 +1167,23 @@ public partial class ChatManager : MonoBehaviour
             Debug.LogError($"JSON Parse Error: {e.Message}");
         }
 
+        // Crossed response: don't render a foreign chat's messages. The backfill drains now wait
+        // out chat fetches, but a request already in flight when the chat opened can still cross —
+        // retry the same page after a short beat (the in-flight straggler clears), then give up to
+        // an empty page so the view settles rather than showing wrong data.
+        if (crossed)
+        {
+            Debug.LogWarning($"[ChatManager] GetMessagesRoutine: crossed messages/get response for {chatId} page {page} (attempt {crossRetry + 1}).");
+            if (crossRetry < MaxCrossChatRetries && chatId == currentChatId)
+            {
+                yield return new WaitForSecondsRealtime(0.25f);
+                StartCoroutine(GetMessagesRoutine(chatId, page, onComplete, crossRetry + 1));
+                yield break;
+            }
+            onComplete?.Invoke(new List<MessageViewModel>(), false);
+            yield break;
+        }
+
         if (cacheDirty && _activeChatCache != null)
         {
             ChatHistoryCache.SaveHistory(GetCacheRoot(), chatId, _activeChatCache);
@@ -1146,6 +1206,20 @@ public partial class ChatManager : MonoBehaviour
         }
 
         onComplete?.Invoke(loadedMessages, hasMore);
+    }
+
+    /// <summary>
+    /// Yields until no chat-scoped messages/get is in flight (open/sync/pagination/validation),
+    /// so background row/quote backfill never runs a messages/get concurrently with a chat-open
+    /// fetch — Wappi crosses concurrent same-endpoint responses. Bounded so a force-stopped fetch
+    /// that leaked the counter can't deadlock the backfill; the response guard catches any residual
+    /// cross. Background backfill is non-urgent, so deferring to active chat fetches is free.
+    /// </summary>
+    private IEnumerator WaitForChatFetchesToDrain()
+    {
+        float start = Time.realtimeSinceStartup;
+        while (_chatFetchesInFlight > 0 && Time.realtimeSinceStartup - start < 3f)
+            yield return null;
     }
 
     /// Linear scan of the loaded chat for a message by id. Null-safe during cold load

@@ -76,6 +76,11 @@ public partial class ChatManager
             bool definitive = false;
             ReactionTargetResolver.Result res = new ReactionTargetResolver.Result { text = "", type = "", senderName = "" };
 
+            // Never run this background messages/get while a chat-open/sync/pagination fetch is in
+            // flight — Wappi crosses concurrent same-endpoint responses, which is what splices
+            // another chat's messages into the open chat. Defer until the chat fetches drain.
+            yield return WaitForChatFetchesToDrain();
+
             using (UnityWebRequest www = UnityWebRequest.Get(url))
             {
                 www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
