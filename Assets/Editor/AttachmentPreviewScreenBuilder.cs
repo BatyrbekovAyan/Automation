@@ -24,7 +24,10 @@ public static class AttachmentPreviewScreenBuilder
     private const float TopContentOffsetY  = 26f;   // row bottom edge above bar bottom (row spans 26..126)
     private const float BottomBarMinHeight = 204f;  // bottom 92 = home-indicator zone (see HLG padding)
     private const float BottomBarMaxHeight = 412f;  // caption growth ceiling — matches messages ExpandableInput
-    private const float CaptionFieldHeight = 80f;   // taller so Body2 text breathes; pill ends at radius = h/2
+    private const int   BottomBarBottomPad   = 92;  // home-indicator zone baked into the bar's bottom padding
+    private const int   BottomBarSendReserve = 144; // HLG right padding: margin 32 + SendButtonSize 88 + gap 24 — reserves the pinned send column
+    private const float SendButtonMargin     = 32f; // send-button gap from the bar's right edge
+    private const float CaptionFieldHeight = 80f;   // single-line pill height (intentionally < SendButtonSize); pill ends at radius = h/2
     private const float SendButtonSize     = 88f;
     private const float SendIconSize       = 44f;   // white glyph centered inside the green circle
     private const float BackButtonSize     = 88f;
@@ -192,13 +195,15 @@ public static class AttachmentPreviewScreenBuilder
         var hl = bottomBar.GetComponent<HorizontalLayoutGroup>();
         // Bottom 92 = home-indicator zone: 24 (top) + 88 (send FAB row) + 92 = 204.
         // The bar background extends under the home bar; content stays above it.
-        hl.padding = new RectOffset(32, 32, 24, 92);
+        // Right padding reserves the send-button column (margin 32 + FAB 88 + gap 24 = 144):
+        // the SendButton is pulled OUT of this layout (ignoreLayout) and pinned separately
+        // (see below), so the caption pill must stop short of it instead of flowing under it.
+        hl.padding = new RectOffset(32, BottomBarSendReserve, 24, BottomBarBottomPad);
         hl.spacing = 24;
-        // LowerCenter (not MiddleCenter): the bar grows UPWARD as the caption wraps
-        // (pivot is at the bar's bottom). Bottom-aligning the row pins the fixed-size
-        // SendButton to the bottom padding zone so it stays put while the caption
-        // pill expands above it — WhatsApp behavior. MiddleCenter re-centered the
-        // button every line, displacing it upward.
+        // LowerCenter bottom-aligns the caption pill to the bottom padding zone; the pill
+        // grows UPWARD as text wraps (bar pivot is at the bottom). The send button is NOT a
+        // layout child — see the SendButton block for how it is pinned at the single-line
+        // pill's center so it keeps a fixed size and never displaces.
         hl.childAlignment = TextAnchor.LowerCenter;
         hl.childControlWidth      = true;
         hl.childControlHeight     = true;
@@ -257,7 +262,23 @@ public static class AttachmentPreviewScreenBuilder
         sendImg.color = SendGreen;
         sendImg.raycastTarget = true;
         AddRoundedCorners(sendBtnGo, SendRadius);
+
+        // Pinned, NOT a layout child: anchored to the bar's bottom-right with its center at
+        // the SINGLE-LINE caption pill's center (bottomPad + pillHeight/2). The bar grows
+        // upward as the caption wraps, so a bottom-anchored button keeps its fixed 88×88 size
+        // and never displaces — while still center-aligning with the one-line pill. This is
+        // why the HLG reserves BottomBarSendReserve on the right (the pill stops short of it).
+        var sendBtnRt = (RectTransform)sendBtnGo.transform;
+        sendBtnRt.anchorMin = new Vector2(1f, 0f);
+        sendBtnRt.anchorMax = new Vector2(1f, 0f);
+        sendBtnRt.pivot     = new Vector2(0.5f, 0.5f);
+        sendBtnRt.sizeDelta = new Vector2(SendButtonSize, SendButtonSize);
+        sendBtnRt.anchoredPosition = new Vector2(
+            -(SendButtonMargin + SendButtonSize * 0.5f),
+            BottomBarBottomPad + CaptionFieldHeight * 0.5f);
+
         var sendLe = sendBtnGo.GetComponent<LayoutElement>();
+        sendLe.ignoreLayout = true;   // pinned by anchors above, excluded from the HLG flow
         sendLe.minWidth = sendLe.preferredWidth = SendButtonSize;
         sendLe.minHeight = sendLe.preferredHeight = SendButtonSize;
         var sendBtn = sendBtnGo.GetComponent<Button>();
