@@ -806,6 +806,68 @@ def _():
         P("M50 36 Q60 30 64 34 Q58 42 50 36 Z"),
     ]
 
+# --- character / figure motifs (the richer, more interesting doodles) ---
+@motif("astronaut", 1.05)
+def _():
+    return [
+        C(50, 30, 15),                              # helmet
+        P("M42 30 A9 9 0 0 1 58 30"),               # visor curve
+        R(40, 44, 20, 26, 6),                       # suit body
+        P("M40 50 L29 61"), P("M60 50 L71 61"),     # arms
+        P("M45 70 L43 84"), P("M55 70 L57 84"),     # legs
+        dot(46, 53, 2.3), dot(54, 53, 2.3),         # chest controls
+    ]
+
+@motif("bicycle", 1.15)
+def _():
+    return [
+        C(29, 60, 15), C(71, 60, 15),               # wheels
+        C(29, 60, 2.2), C(71, 60, 2.2),             # hubs
+        P("M29 60 L45 40 L60 60"),                  # frame triangle
+        P("M45 40 L52 60"),                         # down tube
+        P("M45 40 L41 34"), R(35, 31, 10, 4, 1.5),  # seat post + saddle
+        P("M60 60 L64 36 L74 36"),                  # handlebar
+    ]
+
+@motif("person_headphones", 0.95)
+def _():
+    return [
+        C(50, 45, 18),                              # head
+        P("M30 45 A20 20 0 0 1 70 45"),             # headphone band
+        R(26, 43, 8, 15, 4), R(66, 43, 8, 15, 4),   # ear cups
+        dot(44, 43, 2.5), dot(56, 43, 2.5),         # eyes
+        P("M44 53 Q50 57 56 53"),                   # smile
+    ]
+
+@motif("person_laptop", 1.0)
+def _():
+    return [
+        C(50, 26, 8),                               # head (above the screen)
+        P("M43 40 Q43 33 50 33 Q57 33 57 40"),      # shoulders peeking up
+        R(34, 40, 32, 18, 2),                       # laptop screen (person on a call)
+        P("M28 70 H72 L66 58 H34 Z"),               # keyboard base
+    ]
+
+@motif("guitar", 1.0)
+def _():
+    return [
+        C(40, 66, 16),                              # lower body
+        C(53, 55, 10),                              # upper bout
+        C(40, 66, 5),                               # sound hole
+        P("M60 48 L82 24"),                         # neck
+        R(79, 17, 9, 11, 2),                        # headstock
+        L(62, 50, 85, 27),                          # string
+    ]
+
+@motif("envelope_letter", 1.0)
+def _():
+    return [
+        R(24, 47, 52, 31, 3),                       # envelope
+        P("M24 47 L50 64 L76 47"),                  # flap
+        R(39, 33, 28, 17, 2),                       # letter peeking out
+        L(45, 39, 61, 39), L(45, 44, 61, 44),       # letter lines
+    ]
+
 # ---------------------------------------------------------------- fillers
 def F_sparkle(): return [sparkle4(50, 50, 42)]
 def F_star():    return [star_path(50, 50, 40, 17)]
@@ -866,7 +928,7 @@ def build(svg_w, svg_h, seed=42):
     # strokes don't cross). he = half-extent of a motif's square box. EFAC<0.5
     # because the line art sits inside its box with padding, so boxes may abut
     # closely without the drawings touching.
-    EFAC, GAP = 0.36, 1.0
+    EFAC, GAP = 0.32, 0.5    # tighter -> denser; thin strokes keep slight touches clean
     CELL, HEMAX = 180.0, 200.0
     grid = {}
     placed = []                    # (cx, cy, he, name)
@@ -899,11 +961,10 @@ def build(svg_w, svg_h, seed=42):
             cx = rng.uniform(he * 0.5, svg_w - he * 0.5)
             cy = rng.uniform(he * 0.5, svg_h - he * 0.5)
             if fits(cx, cy, he):
-                # Thicker strokes so the ink reaches its true #E8E1D9 core (thin
-                # strokes are all anti-aliasing and render washed-out). Scaled by
-                # size for even visual weight; large motifs match the approved ~5.4.
+                # Thinner strokes (WhatsApp-like, delicate). The warm #E5DAC6 ink
+                # holds enough contrast to stay visible even thin. Scaled by size.
                 f = max(0.0, min(1.0, (size - 30) / (290 - 30)))
-                stroke = 3.0 + f * (5.4 - 3.0)
+                stroke = 2.6 + f * (4.1 - 2.6)
                 out.append(instance(elems, cx, cy, size, rng.uniform(-20, 20),
                                     stroke_final=stroke, text=name.startswith("txt_")))
                 add(cx, cy, he, name)
@@ -912,11 +973,11 @@ def build(svg_w, svg_h, seed=42):
             else:
                 miss += 1
 
-    place_tier(230, 290, "L", 300, cap=13)    # a few big accents only
-    place_tier(138, 182, "M", 1200, cap=200)  # medium, capped to leave room
-    place_tier(88, 130, "S", 4500)            # small saturates the gaps
-    place_tier(54, 84, "F", 6500)             # tiny real motifs pack tighter
-    place_tier(28, 52, "T", 9000)             # micro motifs fill remaining slivers
+    place_tier(225, 285, "L", 300, cap=13)    # a few big accents only
+    place_tier(135, 178, "M", 1400, cap=230)  # medium, capped to leave room
+    place_tier(85, 126, "S", 6000)            # small saturates the gaps
+    place_tier(52, 82, "F", 8500)             # tiny real motifs pack tighter
+    place_tier(26, 50, "T", 12000)            # micro motifs fill remaining slivers
     out.append('</g></svg>')
     return "".join(out), (len(placed), tier)
 
