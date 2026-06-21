@@ -50,7 +50,7 @@ public class ExpandableInput : MonoBehaviour
 
     void OnTextChanged(string newText)
     {
-        float rawTextHeight = GetAccurateTextHeight(newText);
+        float rawTextHeight = GetRenderedTextHeight(newText);
         float textGrowth = Mathf.Max(0f, rawTextHeight - singleLineTextHeight);
         float targetHeight = baseInputFieldHeight + textGrowth;
 
@@ -123,6 +123,30 @@ public class ExpandableInput : MonoBehaviour
 
         float width = inputFieldRect.rect.width;
         return inputField.textComponent.GetPreferredValues(textToMeasure, width, 0f).y;
+    }
+
+    // Measures the composer content height from TMP's ACTUAL line layout: the span from the
+    // first line's top (ascender) to the last line's bottom (descender). This equals the real
+    // per-line advance summed over the rows, so it matches exactly what TMP renders.
+    //
+    // NOTE: an earlier version summed per-row glyph-QUAD heights. That was a workaround for
+    // when the emoji sprite FaceInfo had ascent/descent = 0 (lines collapsed to ~0). Now the
+    // FaceInfo carries real line metrics, so the glyph-quad sum OVER-measures — a glyph quad is
+    // a few px TALLER than its line advance (the emoji slightly overflows its line box) — and
+    // that error accumulates per row, leaving growing empty padding + top-clipping once the
+    // field exceeds maxHeight and scrolls. The line-layout span has no such accumulation.
+    private float GetRenderedTextHeight(string newText)
+    {
+        if (string.IsNullOrEmpty(newText)) return singleLineTextHeight;
+
+        TMP_Text textComponent = inputField.textComponent;
+        textComponent.ForceMeshUpdate();
+        TMP_TextInfo info = textComponent.textInfo;
+        if (info == null || info.lineCount < 1) return singleLineTextHeight;
+
+        float top = info.lineInfo[0].ascender;
+        float bottom = info.lineInfo[info.lineCount - 1].descender;
+        return Mathf.Max(top - bottom, singleLineTextHeight);
     }
 
     void OnDestroy()
