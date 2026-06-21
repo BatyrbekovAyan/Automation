@@ -26,6 +26,12 @@ public class MessageListView : MonoBehaviour
     [SerializeField] private UnreadSeparatorView unreadSeparatorPrefab;
     [SerializeField] private ScrollToBottomFab scrollToBottomFab;
 
+    [Header("Scroll-to-bottom FAB")]
+    [Tooltip("Show the FAB once the list is scrolled this many content-pixels up from the newest message.")]
+    [SerializeField] private float fabShowGapPx = 160f;
+    [Tooltip("Hide the FAB once back within this many content-pixels of the bottom. Must be <= fabShowGapPx; the gap between the two is a hysteresis dead-band that absorbs async image relayout.")]
+    [SerializeField] private float fabHideGapPx = 48f;
+
     [Header("Settings")]
     [Tooltip("Percentage of a single page's height to use as the load trigger threshold (e.g., 0.85 for 85%).")]
     [Range(0f, 1f)]
@@ -252,10 +258,25 @@ public class MessageListView : MonoBehaviour
         if (scrollToBottomFab == null || scrollRect == null) return;
 
         var contentRt = (RectTransform)content;
-        bool scrollable = contentRt.rect.height > scrollRect.viewport.rect.height + 1f;
-        bool scrolledUp = scrollRect.verticalNormalizedPosition > 0.05f;
+        float viewportHeight = scrollRect.viewport.rect.height;
+        bool scrollable = contentRt.rect.height > viewportHeight + 1f;
 
-        if (scrollable && scrolledUp) scrollToBottomFab.Show();
+        // Gate visibility on the ABSOLUTE pixel gap the list is scrolled up from the newest
+        // message — NOT verticalNormalizedPosition. vNP is a ratio over (contentHeight -
+        // viewportHeight); when a newest-area image bubble finishes downloading and grows
+        // (download card 284 -> full media height, MediaItemView.SmartMediaRoutine), that
+        // denominator jumps and the SAME physical scroll position crossed the old 0.05 threshold
+        // downward — hiding the FAB mid-scroll, then showing it again as the user kept scrolling.
+        // vNP * scrollableHeight cancels the denominator: it equals the world gap between the
+        // content's bottom edge and the viewport bottom, which a bottom-pinned list keeps stable
+        // across that relayout. ScrollFabMath.ShouldShow adds a hysteresis dead-band on top.
+        float scrollableHeight = Mathf.Max(0f, contentRt.rect.height - viewportHeight);
+        float pixelsScrolledUp = scrollRect.verticalNormalizedPosition * scrollableHeight;
+
+        bool show = scrollable && ScrollFabMath.ShouldShow(
+            scrollToBottomFab.IsShown, pixelsScrolledUp, fabShowGapPx, fabHideGapPx);
+
+        if (show) scrollToBottomFab.Show();
         else scrollToBottomFab.Hide();
 
         // Throttle the heavier below-fold recompute (~20 Hz). Show/Hide above is cheap
