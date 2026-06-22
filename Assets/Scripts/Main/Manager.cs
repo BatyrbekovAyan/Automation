@@ -115,6 +115,19 @@ public class Manager : MonoBehaviour
     private bool EditTelegramWorkflowSaved;
     private bool EnableTelegramWorkflowSaved;
 
+    // True when any sub-request of the in-flight save failed. Read by Saved()
+    // to pick the pill's final text. Reset to false at every "Saving.." show so
+    // it is scoped to the current save and can't leak in from a prior failure
+    // (e.g. a failed bot-card activation toggle, which shares the Enable*
+    // coroutines but never shows the pill).
+    private bool _saveHadError;
+
+    // Pill states (Russian, matching the rest of the app's UI language).
+    // SavingText is the in-progress text shown at each save entry point.
+    private const string SavingText = "Сохранение..";
+    private const string SavedText = "Сохранено";
+    private const string SaveFailedText = "Не удалось сохранить";
+
     private string whatsappProfileId = "-1";
     private string telegramProfileId = "-1";
 
@@ -2392,7 +2405,8 @@ public class Manager : MonoBehaviour
     {
         LoadingPanel.SetActive(true);
 
-        openBotSettings.Saved.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = "Saving..";
+        _saveHadError = false;
+        openBotSettings.Saved.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = SavingText;
         openBotSettings.Saved.SetActive(true);
 
 
@@ -2444,6 +2458,7 @@ public class Manager : MonoBehaviour
         using UnityWebRequest www = UnityWebRequest.Post("https://bagkz.app.n8n.cloud/webhook/CreateWhatsappWorkflow", form);
         yield return www.SendWebRequest();
 
+        bool resolved = false;
         if (www.result == UnityWebRequest.Result.Success)
         {
             string response = www.downloadHandler.text;
@@ -2458,8 +2473,18 @@ public class Manager : MonoBehaviour
                 PlayerPrefs.SetInt("lastCreatedWhatsappProfileIdSaved", 1);
 
                 CreateWhatsappWorkflowFromEditSuccess = true;
+                resolved = true;
                 Saved();
             }
+        }
+
+        // Failure or a 200 without an "id" left the "Saving.." pill stranded
+        // forever (no else branch). Always settle it — show the error briefly,
+        // then hide — so the pill can never hang.
+        if (!resolved)
+        {
+            Debug.LogError($"[{www.responseCode}] CreateWhatsappWorkflow failed or returned no id: {www.error}");
+            FailSavePanel();
         }
 
         LoadingPanel.SetActive(false);
@@ -2523,7 +2548,8 @@ public class Manager : MonoBehaviour
     {
         LoadingPanel.SetActive(true);
 
-        openBotSettings.Saved.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = "Saving..";
+        _saveHadError = false;
+        openBotSettings.Saved.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = SavingText;
         openBotSettings.Saved.SetActive(true);
 
 
@@ -2575,6 +2601,7 @@ public class Manager : MonoBehaviour
         using UnityWebRequest www = UnityWebRequest.Post("https://bagkz.app.n8n.cloud/webhook/CreateTelegramWorkflow", form);
         yield return www.SendWebRequest();
 
+        bool resolved = false;
         if (www.result == UnityWebRequest.Result.Success)
         {
             string response = www.downloadHandler.text;
@@ -2589,8 +2616,17 @@ public class Manager : MonoBehaviour
                 PlayerPrefs.SetInt("lastCreatedTelegramProfileIdSaved", 1);
 
                 CreateTelegramWorkflowFromEditSuccess = true;
+                resolved = true;
                 Saved();
             }
+        }
+
+        // Mirror of CreateWhatsappWorkflowFromEdit: never leave the pill stuck
+        // on "Saving.." when the webhook fails or returns no id.
+        if (!resolved)
+        {
+            Debug.LogError($"[{www.responseCode}] CreateTelegramWorkflow failed or returned no id: {www.error}");
+            FailSavePanel();
         }
 
         LoadingPanel.SetActive(false);
@@ -2608,11 +2644,20 @@ public class Manager : MonoBehaviour
 
         yield return www.SendWebRequest();
 
-        if (www.result == UnityWebRequest.Result.Success)
+        // Mark this sub-step done whether the request succeeded or not, so the
+        // save pill's four-flag gate in Saved() can never hang on a failed
+        // activate/deactivate. Record the failure so the pill ends on the error
+        // state. (The bot-card activation toggle shares this coroutine but never
+        // shows the pill, and the next "Saving.." show resets _saveHadError, so
+        // a failure there can't leak into a later save's pill text.)
+        if (www.result != UnityWebRequest.Result.Success)
         {
-            EnableWhatsappWorkflowSaved = true;
-            Saved();
+            Debug.LogError($"[{www.responseCode}] EnableWhatsappWorkflow failed: {www.error}");
+            _saveHadError = true;
         }
+
+        EnableWhatsappWorkflowSaved = true;
+        Saved();
 
         LoadingPanel.SetActive(false);
     }
@@ -2629,11 +2674,15 @@ public class Manager : MonoBehaviour
 
         yield return www.SendWebRequest();
 
-        if (www.result == UnityWebRequest.Result.Success)
+        // See EnableWhatsappWorkflow: always settle the gate, record failures.
+        if (www.result != UnityWebRequest.Result.Success)
         {
-            EnableTelegramWorkflowSaved = true;
-            Saved();
+            Debug.LogError($"[{www.responseCode}] EnableTelegramWorkflow failed: {www.error}");
+            _saveHadError = true;
         }
+
+        EnableTelegramWorkflowSaved = true;
+        Saved();
 
         LoadingPanel.SetActive(false);
     }
@@ -2678,7 +2727,8 @@ public class Manager : MonoBehaviour
     {
         LoadingPanel.SetActive(true);
 
-        openBotSettings.Saved.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = "Saving..";
+        _saveHadError = false;
+        openBotSettings.Saved.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = SavingText;
         openBotSettings.Saved.SetActive(true);
 
 
@@ -2765,10 +2815,14 @@ public class Manager : MonoBehaviour
 
             yield return editWhatsappRequest.SendWebRequest();
 
-            if (editWhatsappRequest.result == UnityWebRequest.Result.Success)
+            // Mark done either way: a failed Edit must not leave EditWhatsappWorkflowSaved
+            // false forever, which would hang Saved()'s four-flag gate and strand the pill.
+            if (editWhatsappRequest.result != UnityWebRequest.Result.Success)
             {
-                EditWhatsappWorkflowSaved = true;
+                Debug.LogError($"[{editWhatsappRequest.responseCode}] EditWhatsappWorkflow failed: {editWhatsappRequest.error}");
+                _saveHadError = true;
             }
+            EditWhatsappWorkflowSaved = true;
         }
 
 
@@ -2798,10 +2852,13 @@ public class Manager : MonoBehaviour
 
             yield return editTelegramRequest.SendWebRequest();
 
-            if (editTelegramRequest.result == UnityWebRequest.Result.Success)
+            // See EditWhatsappWorkflow above: mark done either way so the gate can settle.
+            if (editTelegramRequest.result != UnityWebRequest.Result.Success)
             {
-                EditTelegramWorkflowSaved = true;
+                Debug.LogError($"[{editTelegramRequest.responseCode}] EditTelegramWorkflow failed: {editTelegramRequest.error}");
+                _saveHadError = true;
             }
+            EditTelegramWorkflowSaved = true;
         }
 
 
@@ -2810,34 +2867,40 @@ public class Manager : MonoBehaviour
 
     private void Saved()
     {
-        if (EditWhatsappWorkflowSaved && EnableWhatsappWorkflowSaved && EditTelegramWorkflowSaved && EnableTelegramWorkflowSaved ||
-            CreateWhatsappWorkflowFromEditSuccess || CreateTelegramWorkflowFromEditSuccess)
+        // The four *Saved flags now mean "this sub-step finished" (success OR
+        // failure), so the gate settles the pill once everything is done rather
+        // than hanging when a request fails. _saveHadError decides the text.
+        bool workflowsDone = EditWhatsappWorkflowSaved && EnableWhatsappWorkflowSaved &&
+                             EditTelegramWorkflowSaved && EnableTelegramWorkflowSaved;
+        bool createDone = CreateWhatsappWorkflowFromEditSuccess || CreateTelegramWorkflowFromEditSuccess;
+
+        if (workflowsDone || createDone)
         {
             LoadingPanel.SetActive(false);
 
-            StartCoroutine(ShowSavedPanel());
+            StartCoroutine(ShowSavedPanel(_saveHadError ? SaveFailedText : SavedText));
 
-            if (CreateWhatsappWorkflowFromEditSuccess)
-            {
-                CreateWhatsappWorkflowFromEditSuccess = false;
-            }
+            CreateWhatsappWorkflowFromEditSuccess = false;
+            CreateTelegramWorkflowFromEditSuccess = false;
 
-            if (CreateTelegramWorkflowFromEditSuccess)
-            {
-                CreateTelegramWorkflowFromEditSuccess = false;
-            }
-
-            if (EditWhatsappWorkflowSaved && EnableWhatsappWorkflowSaved && EditTelegramWorkflowSaved && EnableTelegramWorkflowSaved)
+            if (workflowsDone)
             {
                 EditWhatsappWorkflowSaved = false;
                 EnableWhatsappWorkflowSaved = false;
                 EditTelegramWorkflowSaved = false;
                 EnableTelegramWorkflowSaved = false;
             }
+
+            _saveHadError = false;
         }
     }
 
-    private IEnumerator ShowSavedPanel()
+    // Settle the pill into its failure state and hide it. Used by the
+    // Create*WorkflowFromEdit paths, whose success is tracked outside the
+    // four-flag gate, so a failure there can't route through Saved().
+    private void FailSavePanel() => StartCoroutine(ShowSavedPanel(SaveFailedText));
+
+    private IEnumerator ShowSavedPanel(string finalText)
     {
         // Capture the Saved GameObject reference up-front. The user can
         // press back during the 2-second wait, which routes through
@@ -2849,8 +2912,10 @@ public class Manager : MonoBehaviour
         // activeSelf stayed true. The GameObject itself isn't destroyed
         // (BotSettings clones persist under BotSettingsParent), so the
         // captured reference stays valid and SetActive(false) still works.
+        if (openBotSettings == null) yield break;
         var saved = openBotSettings.Saved;
-        saved.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = "Saved";
+        if (saved == null) yield break;
+        saved.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = finalText;
 
         yield return new WaitForSeconds(2f);
 

@@ -331,6 +331,12 @@ public partial class BotSettings : MonoBehaviour
 
     public void OnEnable()
     {
+        // Defense-in-depth: never carry a stranded "Saving.." pill into a fresh
+        // open. The pill is normally hidden by its own settle coroutine, but if
+        // an edge ever left its activeSelf true on this persistent clone it
+        // would otherwise reappear stuck the next time settings open.
+        if (Saved != null) Saved.SetActive(false);
+
         StartCoroutine(CheckWhatsappUnauthorizationOutsideApp());
         StartCoroutine(CheckTelegramUnauthorizationOutsideApp());
         SyncHeaderTitle();
