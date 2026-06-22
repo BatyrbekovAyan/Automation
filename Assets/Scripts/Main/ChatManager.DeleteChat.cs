@@ -1,21 +1,23 @@
 using System;
 using System.Collections;
-using System.IO;
+using System.Collections.Generic;
 using Newtonsoft.Json;
 using UnityEngine;
 using UnityEngine.Networking;
 
 public partial class ChatManager
 {
-    /// <summary>Fired after a chat is removed from the in-memory list (optimistic or confirmed).</summary>
+    /// <summary>Fired after a chat is removed from the in-memory list (optimistic delete, server sync, or rollback re-add via OnChatAdded).</summary>
     public event Action<string> OnChatRemoved;
 
-    // Suppresses re-add of chats deleted this session until the server confirms (see ParseChatsJson).
-    private readonly DeletedChatGuard _deletedChats = new DeletedChatGuard();
+    // Per-bot soft-delete watermarks: chatId -> the chat's last-message unix timestamp at deletion.
+    // Loaded in LoadChatsForActiveBot, consulted in ParseChatsJson (DeletedChatRule), persisted via
+    // DeletedChatStore. A deleted chat stays hidden until a newer message arrives (then it revives).
+    private Dictionary<string, long> _deletedWatermarks = new Dictionary<string, long>();
 
     /// <summary>
-    /// Optimistically removes the chat + its caches, then deletes it on the Wappi server.
-    /// Rolls back (re-adds the row) if the server call fails.
+    /// Optimistically removes the chat + its message cache, records a deletion watermark, then
+    /// soft-deletes it on the Wappi server. Rolls back (re-adds the row, drops the watermark) on failure.
     /// </summary>
     public void DeleteChat(string chatId)
     {
@@ -24,9 +26,12 @@ public partial class ChatManager
 
         int index = Chats.IndexOf(vm);
 
-        _deletedChats.MarkDeleted(chatId);
+        // Watermark at the current last message: the chat hides until something newer arrives.
+        _deletedWatermarks[chatId] = vm.LastMessageTime;
+        DeletedChatStore.Save(GetCacheRoot(), _deletedWatermarks);
+
         RemoveChatLocally(chatId);
-        EvictChatCaches(chatId);
+        ChatHistoryCache.DeleteHistory(GetCacheRoot(), chatId);
 
         StartCoroutine(DeleteChatRoutine(chatId, vm, index));
     }
@@ -39,24 +44,6 @@ public partial class ChatManager
             chatLookup.Remove(chatId);
         }
         OnChatRemoved?.Invoke(chatId);
-    }
-
-    private void EvictChatCaches(string chatId)
-    {
-        string root = GetCacheRoot();
-        ChatHistoryCache.DeleteHistory(root, chatId);
-
-        string cachePath = Path.Combine(root, "chats.json");
-        if (!File.Exists(cachePath)) return;
-        try
-        {
-            string updated = ChatListCacheEditor.RemoveChat(File.ReadAllText(cachePath), chatId);
-            File.WriteAllText(cachePath, updated);
-        }
-        catch (Exception ex)
-        {
-            Debug.LogWarning($"[ChatManager] chats.json rewrite failed for {chatId}: {ex.Message}");
-        }
     }
 
     private IEnumerator DeleteChatRoutine(string chatId, ChatViewModel vm, int index)
@@ -104,13 +91,13 @@ public partial class ChatManager
             yield break;
         }
 
-        // Success: keep the guard until a later /chats/filter no longer lists chatId
-        // (cleared by ParseChatsJson's reconcile).
+        // Success: the watermark keeps the chat hidden until newer activity revives it. Nothing else to do.
     }
 
     private void RollbackDelete(string chatId, ChatViewModel vm, int index)
     {
-        _deletedChats.Clear(chatId);
+        _deletedWatermarks.Remove(chatId);
+        DeletedChatStore.Save(GetCacheRoot(), _deletedWatermarks);
         if (vm == null) return;
         if (chatLookup.ContainsKey(chatId)) return; // already restored / never gone
 
@@ -121,13 +108,7 @@ public partial class ChatManager
 }
 
 [Serializable]
-public class WappiDeleteChatRequest
-{
-    public string recipient;
-}
+public class WappiDeleteChatRequest { public string recipient; }
 
 [Serializable]
-public class WappiDeleteChatResponse
-{
-    public string status;
-}
+public class WappiDeleteChatResponse { public string status; }
