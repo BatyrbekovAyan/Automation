@@ -1229,6 +1229,13 @@ public class Manager : MonoBehaviour
             PlayerPrefs.Save();
         }
 
+        // Make the just-created bot the active one so the chat UI resolves to it
+        // (syncing screen or chat list) the moment the user opens the WhatsApp tab.
+        if (ChatManager.Instance != null)
+        {
+            ChatManager.Instance.SetActiveBot(newBot.name);
+        }
+
         // Step 6: Reset form
         ResetAddBotForm();
         isCreatingBot = false;

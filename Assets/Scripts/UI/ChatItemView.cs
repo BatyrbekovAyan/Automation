@@ -181,9 +181,21 @@ public void Bind(ChatViewModel model)
         // Move this row to the top — header-aware via ChatListView so a
         // ChatsSearchBar at sibling index 0 isn't pushed out of the way.
         if (parentList != null)
+        {
             parentList.RaiseToTop(this);
-        else
-            transform.SetAsFirstSibling();
+            return;
+        }
+
+        // Fallback before our list ref resolves: still respect a ChatsSearchBar
+        // pinned at sibling 0 so we don't shove it into the middle of the list.
+        Transform parent = transform.parent;
+        int target = 0;
+        if (parent != null && parent.childCount > 0 &&
+            parent.GetChild(0).GetComponent<ChatSearchBar>() != null)
+        {
+            target = 1;
+        }
+        transform.SetSiblingIndex(target);
     }
 
     // Title/preview emoji are converted in Hide mode so a sprite that has not

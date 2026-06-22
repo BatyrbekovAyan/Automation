@@ -18,7 +18,8 @@ public static class SyncingStateBuilder
     private const string ChatsPanelName = "ChatsPanel";
     private const string SyncingStateName = "SyncingState";
 
-    private static readonly Color Brand = HexColor("#008069");
+    private static readonly Color Brand = HexColor("#25D366");         // WhatsApp light green (fills)
+    private static readonly Color BrandReadable = HexColor("#1FA855"); // deeper green for text on white
     private static readonly Color Track = HexColor("#ECECEC");
     private static readonly Color TitleColor = HexColor("#111111");
     private static readonly Color BodyColor = HexColor("#6A6A6A");
@@ -47,8 +48,16 @@ public static class SyncingStateBuilder
         // Root — full-stretch overlay, last sibling so it covers the chat list.
         GameObject root = new GameObject(SyncingStateName, typeof(RectTransform), typeof(CanvasGroup));
         root.transform.SetParent(chatsPanel, false);
-        root.transform.SetAsLastSibling();
+        // Sit above the chat list but BELOW the header (TopBar) and the bot-switcher
+        // sheet, so those stay visible and tappable — you can switch bots while syncing.
+        PlaceAboveListBelowHeader(root.transform, chatsPanel);
         StretchFull(root.GetComponent<RectTransform>());
+
+        // Opaque background so the syncing screen actually covers the chat list behind
+        // it (the CanvasGroup still fades the whole thing in/out via alpha).
+        var rootBg = root.AddComponent<Image>();
+        rootBg.color = Color.white;
+        rootBg.raycastTarget = true;
 
         // Hero block — spinner + title + body + progress + countdown, centered.
         GameObject hero = new GameObject("Hero",
@@ -110,7 +119,7 @@ public static class SyncingStateBuilder
         fillImage.fillAmount = 0f;
 
         // Countdown.
-        var countdownText = CreateText(hero.transform, "Countdown", "About 5 min left", 36f, FontStyles.Bold, Brand, 760f, 48f);
+        var countdownText = CreateText(hero.transform, "Countdown", "About 5 min left", 36f, FontStyles.Bold, BrandReadable, 760f, 48f);
 
         // Footnote — reassurance pinned in the lower zone.
         var footnoteText = CreateText(root.transform, "Footnote",
@@ -180,6 +189,18 @@ public static class SyncingStateBuilder
         rt.anchorMax = Vector2.one;
         rt.offsetMin = Vector2.zero;
         rt.offsetMax = Vector2.zero;
+    }
+
+    // Keep this overlay below the header + bot-switcher sheet (so those stay on top
+    // and interactive) while still covering the chat list behind it.
+    private static void PlaceAboveListBelowHeader(Transform child, Transform chatsPanel)
+    {
+        int insertAt = chatsPanel.childCount;
+        Transform topBar = chatsPanel.Find("TopBar");
+        Transform sheet = chatsPanel.Find("Sheet_BotSwitcher");
+        if (topBar != null) insertAt = Mathf.Min(insertAt, topBar.GetSiblingIndex());
+        if (sheet != null) insertAt = Mathf.Min(insertAt, sheet.GetSiblingIndex());
+        child.SetSiblingIndex(insertAt);
     }
 
     private static void AddRoundedCorners(GameObject go, float radius)

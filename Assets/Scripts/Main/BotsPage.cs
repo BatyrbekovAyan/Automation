@@ -19,14 +19,17 @@ public class BotsPage : MonoBehaviour
         Instance = this;
 
         if (NewBotButton != null)
-            NewBotButton.onClick.AddListener(OnNewBotPressed);
+            NewBotButton.onClick.AddListener(StartNewBot);
     }
 
-    private void OnNewBotPressed()
+    /// <summary>
+    /// Opens the add-bot wizard. Forwards to the bottom-nav + button so behavior is
+    /// identical to tapping it directly: BottomTabManager activates Screen_New and
+    /// updates the active icon/label visuals for us. Public so the empty-state CTA
+    /// can launch the same flow.
+    /// </summary>
+    public void StartNewBot()
     {
-        // Forward to the bottom-nav + button so behavior is identical to
-        // tapping it directly: BottomTabManager activates Screen_New and
-        // updates the active icon/label visuals for us.
         if (BottomNavNewButton != null)
             BottomNavNewButton.onClick.Invoke();
     }

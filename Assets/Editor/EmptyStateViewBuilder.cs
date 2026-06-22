@@ -17,7 +17,7 @@ public static class EmptyStateViewBuilder
     private const string ChatsPanelName = "ChatsPanel";
     private const string EmptyStateName = "EmptyState";
 
-    private static readonly Color Brand = HexColor("#008069");
+    private static readonly Color Brand = HexColor("#25D366"); // WhatsApp light green
     private static readonly Color BrandTint = HexColor("#DFF3EA");
     private static readonly Color TitleColor = HexColor("#111111");
     private static readonly Color BodyColor = HexColor("#6A6A6A");
@@ -45,8 +45,16 @@ public static class EmptyStateViewBuilder
         // Root — full-stretch overlay over the chat list, last sibling so it covers it.
         GameObject root = new GameObject(EmptyStateName, typeof(RectTransform), typeof(CanvasGroup));
         root.transform.SetParent(chatsPanel, false);
-        root.transform.SetAsLastSibling();
+        // Sit above the chat list but BELOW the header (TopBar) and the bot-switcher
+        // sheet, so those stay visible and tappable (you can still switch bots here).
+        PlaceAboveListBelowHeader(root.transform, chatsPanel);
         StretchFull(root.GetComponent<RectTransform>());
+
+        // Opaque background so the screen actually covers the chat list behind it
+        // (the CanvasGroup still fades the whole thing in/out via alpha).
+        var rootBg = root.AddComponent<Image>();
+        rootBg.color = Color.white;
+        rootBg.raycastTarget = true;
 
         // Hero block — icon + title + body, centered slightly above middle.
         GameObject hero = new GameObject("Hero",
@@ -166,6 +174,18 @@ public static class EmptyStateViewBuilder
         rt.anchorMax = Vector2.one;
         rt.offsetMin = Vector2.zero;
         rt.offsetMax = Vector2.zero;
+    }
+
+    // Keep this overlay below the header + bot-switcher sheet (so those stay on top
+    // and interactive) while still covering the chat list behind it.
+    private static void PlaceAboveListBelowHeader(Transform child, Transform chatsPanel)
+    {
+        int insertAt = chatsPanel.childCount;
+        Transform topBar = chatsPanel.Find("TopBar");
+        Transform sheet = chatsPanel.Find("Sheet_BotSwitcher");
+        if (topBar != null) insertAt = Mathf.Min(insertAt, topBar.GetSiblingIndex());
+        if (sheet != null) insertAt = Mathf.Min(insertAt, sheet.GetSiblingIndex());
+        child.SetSiblingIndex(insertAt);
     }
 
     private static void AddRoundedCorners(GameObject go, float radius)

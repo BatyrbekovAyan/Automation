@@ -38,6 +38,7 @@ public class SyncingView : MonoBehaviour
         if (ChatManager.Instance == null) return;
         ChatManager.Instance.OnWhatsAppSyncing += HandleSyncing;
         ChatManager.Instance.OnWhatsAppSyncReady += HandleReady;
+        ChatManager.Instance.OnActiveBotChanged += HandleActiveBotChanged;
 
         // Catch up: tab re-opened or app relaunched mid-window — resume without an event.
         if (ChatManager.Instance.IsWhatsAppSyncing(ChatManager.Instance.CurrentBotId, out long untilMs))
@@ -50,6 +51,7 @@ public class SyncingView : MonoBehaviour
         {
             ChatManager.Instance.OnWhatsAppSyncing -= HandleSyncing;
             ChatManager.Instance.OnWhatsAppSyncReady -= HandleReady;
+            ChatManager.Instance.OnActiveBotChanged -= HandleActiveBotChanged;
         }
         StopTicking();
     }
@@ -64,6 +66,10 @@ public class SyncingView : MonoBehaviour
     }
 
     private void HandleReady() => Hide();
+
+    // A bot switch hides any stale syncing screen. If the newly active bot is also
+    // syncing, BeginLoadForActiveBot fires OnWhatsAppSyncing right after and we re-show.
+    private void HandleActiveBotChanged(string _) => Hide();
 
     private IEnumerator TickRoutine()
     {

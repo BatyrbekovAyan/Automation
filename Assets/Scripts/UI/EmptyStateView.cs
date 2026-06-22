@@ -57,6 +57,11 @@ public class EmptyStateView : MonoBehaviour
             ChatManager.Instance.OnChatAdded -= HandleChatAdded;
         }
         if (primaryButton != null) primaryButton.onClick.RemoveAllListeners();
+        // Reset so the next OnEnable re-runs ConfigureForReason and RE-WIRES the button.
+        // Without this, the _lastReason guard skips re-config on re-entry (same reason),
+        // leaving the just-cleared button with no click listener — so it works once then
+        // goes dead on the second visit.
+        _lastReason = null;
     }
 
     private void Show()
@@ -125,10 +130,16 @@ public class EmptyStateView : MonoBehaviour
 
     private void OpenCreateBotFlow()
     {
-        if (BotsPage.Instance != null)
-        {
-            BotsPage.Instance.gameObject.SetActive(true);
-        }
+        // Reuse the exact add-bot entry the header "+" uses (BotsPage forwards to the
+        // bottom-nav New button). Find it include-inactive so it works even if the
+        // Bots tab was never opened this session (BotsPage.Instance may be unset).
+        BotsPage botsPage = FindFirstObjectByType<BotsPage>(FindObjectsInactive.Include);
+        if (botsPage != null) botsPage.StartNewBot();
+
+        // We launched from the WhatsApp page — preselect WhatsApp as the platform so the
+        // user lands on the form with it already chosen. StartNewBot switched to the form
+        // synchronously, so the page is active and SelectPlatform's UI updates apply.
+        if (Manager.Instance != null) Manager.Instance.SelectPlatform(1);
     }
 
     private void OpenCurrentBotAuth()
