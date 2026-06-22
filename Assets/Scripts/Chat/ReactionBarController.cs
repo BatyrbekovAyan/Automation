@@ -19,6 +19,10 @@ public class ReactionBarController : MonoBehaviour
 
     // Horizontal inset the floating bar/menu keep from the screen edges — matches the bubbles'.
     private const float EdgePadding = 40f;
+    // Vertical gap between the pressed bubble and each floating panel (bar above, menu below).
+    private const float PanelGap = 16f;
+    // Inset the panels keep from the top/bottom of the overlay before they're considered off-screen.
+    private const float VerticalLimitInset = 12f;
 
     [Header("Overlay")]
     [SerializeField] private GameObject content;     // scrim + bar; toggled on show/hide
@@ -41,7 +45,14 @@ public class ReactionBarController : MonoBehaviour
 
     private MessageViewModel _target;
     private readonly TextMeshProUGUI[] _labels = new TextMeshProUGUI[6];
-    private Canvas _liftedCanvas;   // the pressed row's sort-override, raising it above the scrim
+    private Canvas _liftedCanvas;        // the pressed row's sort-override, raising it above the scrim
+    private RectTransform _liftedRowRt;  // the pressed row, floated up when the menu would overflow
+    private Vector2 _liftedRowOrigPos;   // its layout-driven position, restored on Hide
+    private Vector2 _liftedRowTargetPos; // the floated-up position, re-pinned each frame while shown
+    private bool _rowFloated;            // true while the row is held above its layout slot
+
+    // Incoming bubbles sit on the left, outgoing on the right; the floating panels align to match.
+    private bool IsTargetIncoming => _target != null && _target.isIncoming;
 
     private void Awake()
     {
@@ -77,6 +88,15 @@ public class ReactionBarController : MonoBehaviour
 
     private void OnDestroy() { if (Instance == this) Instance = null; }
 
+    // Hold the floated-up row against the scroll content's VerticalLayoutGroup, which would
+    // otherwise re-stamp it back into its slot on any relayout (e.g. a live message arriving)
+    // while the overlay is open — same per-frame pin KeyboardAwarePanel uses.
+    private void LateUpdate()
+    {
+        if (_rowFloated && _liftedRowRt != null)
+            _liftedRowRt.anchoredPosition = _liftedRowTargetPos;
+    }
+
     public void Show(MessageItemView source)
     {
         if (source == null || source.BoundVm == null || source.BubbleRect == null) return;
@@ -88,20 +108,25 @@ public class ReactionBarController : MonoBehaviour
         RenderEmojiLabels();
         RefreshHighlight();
 
-        LayoutRebuilder.ForceRebuildLayoutImmediate(bar);   // bar size valid before positioning
-        PositionBarOver(source.BubbleRect);
-
+        // Rebuild both panels first so their real sizes are known before any positioning — the
+        // float-up below needs the menu's height to know whether the menu would overflow.
+        LayoutRebuilder.ForceRebuildLayoutImmediate(bar);
         if (actionMenu != null)
         {
             LayoutRebuilder.ForceRebuildLayoutImmediate(actionMenu);
 
-            // Fix 3: refresh rounded corners now that ContentSizeFitter has given the card a real size.
+            // Refresh rounded corners now that ContentSizeFitter has given the card a real size.
             var menuRounded = actionMenu.GetComponent<ImageWithRoundedCorners>();
             if (menuRounded != null) { menuRounded.Validate(); menuRounded.Refresh(); }
-
-            // Fix 2: position below the pressed bubble (WhatsApp-style), not below the bar.
-            PositionMenuUnderBubble(source.BubbleRect);
         }
+
+        // When the bubble sits too low for the menu to fit below it, float the whole pressed row
+        // up (works even for the last message, where there's nothing below to scroll into view)
+        // so the menu lands below with proper spacing instead of overlapping the bubble.
+        ApplyLiftIfNeeded(source.BubbleRect);
+
+        PositionBarOver(source.BubbleRect);
+        if (actionMenu != null) PositionMenuUnderBubble(source.BubbleRect);
 
         bar.localScale = Vector3.one * 0.85f;
         bar.DOScale(1f, 0.18f).SetEase(Ease.OutBack);
@@ -125,10 +150,20 @@ public class ReactionBarController : MonoBehaviour
         canvas.overrideSorting = true;
         canvas.sortingOrder = 5;   // above the scrim (the overlay renders at order 0)
         _liftedCanvas = canvas;
+
+        // Remember the row's layout-driven position so any float-up can be undone on Hide.
+        _liftedRowRt = (RectTransform)source.transform;
+        _liftedRowOrigPos = _liftedRowRt.anchoredPosition;
     }
 
     private void UnliftRow()
     {
+        _rowFloated = false;
+        if (_liftedRowRt != null)
+        {
+            _liftedRowRt.anchoredPosition = _liftedRowOrigPos;   // drop the row back into the list
+            _liftedRowRt = null;
+        }
         if (_liftedCanvas == null) return;
         // Destroy the Canvas (don't just disable overrideSorting): a leftover nested Canvas keeps
         // the row's graphics in its own registry, which the root GraphicRaycaster won't raycast —
@@ -136,6 +171,36 @@ public class ReactionBarController : MonoBehaviour
         // to the parent canvas. Deferred destroy lands within the frame, long before any re-press.
         Destroy(_liftedCanvas);
         _liftedCanvas = null;
+    }
+
+    /// <summary>
+    /// Floats the pressed row up by just enough for the action menu to fit below the bubble when
+    /// the bubble sits too low. The lift moves the row inside the (layout-driven) scroll content;
+    /// LateUpdate re-pins it against any relayout while the overlay is open, and UnliftRow restores
+    /// the original position on dismiss. The list content shares the canvas at scale 1 with the
+    /// overlay, so a parent-local Y delta moves the row by the same amount.
+    /// </summary>
+    private void ApplyLiftIfNeeded(RectTransform bubble)
+    {
+        if (_liftedRowRt == null || actionMenu == null || bubble == null) return;
+
+        RectTransform parentRt = (RectTransform)actionMenu.parent;
+        Vector3[] corners = new Vector3[4];
+        bubble.GetWorldCorners(corners);   // 0=BL 1=TL 2=TR 3=BR
+
+        float topY = parentRt.InverseTransformPoint((corners[1] + corners[2]) * 0.5f).y;
+        float botY = parentRt.InverseTransformPoint((corners[0] + corners[3]) * 0.5f).y;
+
+        float topLimit = parentRt.rect.height * 0.5f - bar.rect.height * 0.5f - VerticalLimitInset;
+        float botLimit = -parentRt.rect.height * 0.5f + actionMenu.rect.height * 0.5f + VerticalLimitInset;
+
+        float lift = ReactionBarLayout.LiftToFitMenu(
+            topY, botY, bar.rect.height, actionMenu.rect.height, PanelGap, topLimit, botLimit);
+        if (lift <= 0.5f) return;
+
+        _liftedRowTargetPos = new Vector2(_liftedRowOrigPos.x, _liftedRowOrigPos.y + lift);
+        _liftedRowRt.anchoredPosition = _liftedRowTargetPos;
+        _rowFloated = true;
     }
 
     private void OnEmojiTapped(string emoji)
@@ -189,34 +254,36 @@ public class ReactionBarController : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Places the quick-emoji bar just above the pressed bubble, edge-aligned to the message's
+    /// side (left for incoming, right for outgoing) and clamped on-screen. Drops below the bubble
+    /// only when there's no room above.
+    /// </summary>
     private void PositionBarOver(RectTransform bubble)
     {
         RectTransform parentRt = (RectTransform)bar.parent;
         Vector3[] corners = new Vector3[4];
         bubble.GetWorldCorners(corners);                       // 0=BL 1=TL 2=TR 3=BR
 
-        Vector2 topLocal = (Vector2)parentRt.InverseTransformPoint((corners[1] + corners[2]) * 0.5f);
-        float gap = 16f;
-        float y = topLocal.y + gap + bar.rect.height * 0.5f;
+        float topY = parentRt.InverseTransformPoint((corners[1] + corners[2]) * 0.5f).y;
+        float y = topY + PanelGap + bar.rect.height * 0.5f;
 
-        float halfBarW = bar.rect.width * 0.5f;
-        float maxX = parentRt.rect.width * 0.5f - halfBarW - EdgePadding;
-        float x = Mathf.Clamp(topLocal.x, -maxX, maxX);
-
-        float topLimit = parentRt.rect.height * 0.5f - bar.rect.height * 0.5f - 12f;
+        float topLimit = parentRt.rect.height * 0.5f - bar.rect.height * 0.5f - VerticalLimitInset;
         if (y > topLimit)   // not enough room above — drop below the bubble
         {
-            Vector2 botLocal = (Vector2)parentRt.InverseTransformPoint((corners[0] + corners[3]) * 0.5f);
-            y = botLocal.y - gap - bar.rect.height * 0.5f;
+            float botY = parentRt.InverseTransformPoint((corners[0] + corners[3]) * 0.5f).y;
+            y = botY - PanelGap - bar.rect.height * 0.5f;
         }
 
+        float x = SideAlignedX(parentRt, corners, bar.rect.width);
         bar.anchoredPosition = new Vector2(x, y);
     }
 
     /// <summary>
-    /// Places the action menu just below the pressed bubble, horizontally centered on it
-    /// and clamped to stay on-screen — mirrors PositionBarOver's approach.
-    /// corners[0]=BL, corners[3]=BR → bottom-center = (corners[0]+corners[3])*0.5
+    /// Places the action menu just below the pressed bubble, edge-aligned to the message's side
+    /// (so the narrow card lines up with the bubble instead of floating off-center). The bubble
+    /// has already been floated up by ApplyLiftIfNeeded when needed, so the bottom clamp here is
+    /// only a last-resort safety. corners[0]=BL, corners[3]=BR → bottom-center = (BL+BR)*0.5.
     /// </summary>
     private void PositionMenuUnderBubble(RectTransform bubble)
     {
@@ -224,19 +291,24 @@ public class ReactionBarController : MonoBehaviour
         Vector3[] corners = new Vector3[4];
         bubble.GetWorldCorners(corners);   // 0=BL 1=TL 2=TR 3=BR
 
-        Vector2 botLocal = (Vector2)parentRt.InverseTransformPoint((corners[0] + corners[3]) * 0.5f);
-        const float gap = 16f;
-        float y = botLocal.y - gap - actionMenu.rect.height * 0.5f;
+        float botY = parentRt.InverseTransformPoint((corners[0] + corners[3]) * 0.5f).y;
+        float y = botY - PanelGap - actionMenu.rect.height * 0.5f;
 
-        float halfMenuW = actionMenu.rect.width * 0.5f;
-        float maxX = parentRt.rect.width * 0.5f - halfMenuW - EdgePadding;
-        float x = Mathf.Clamp(botLocal.x, -maxX, maxX);
-
-        // Clamp so the menu never goes below the bottom of the overlay.
-        float botLimit = -parentRt.rect.height * 0.5f + actionMenu.rect.height * 0.5f + 12f;
+        float botLimit = -parentRt.rect.height * 0.5f + actionMenu.rect.height * 0.5f + VerticalLimitInset;
         y = Mathf.Max(y, botLimit);
 
+        float x = SideAlignedX(parentRt, corners, actionMenu.rect.width);
         actionMenu.anchoredPosition = new Vector2(x, y);
+    }
+
+    // Side-aligned anchored-x for a floating panel: its near edge meets the bubble's near edge
+    // (left for incoming, right for outgoing), clamped on-screen. corners[0]=BL, corners[3]=BR.
+    private float SideAlignedX(RectTransform parentRt, Vector3[] corners, float panelWidth)
+    {
+        float bubbleLeftX = parentRt.InverseTransformPoint(corners[0]).x;
+        float bubbleRightX = parentRt.InverseTransformPoint(corners[3]).x;
+        return ReactionBarLayout.SideAlignedCenterX(
+            bubbleLeftX, bubbleRightX, panelWidth, parentRt.rect.width, EdgePadding, IsTargetIncoming);
     }
 
     private void HandleChatSelected(string chatId) => Hide();
