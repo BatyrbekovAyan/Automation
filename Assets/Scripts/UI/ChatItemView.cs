@@ -17,6 +17,10 @@ public class ChatItemView : MonoBehaviour
     public GameObject unreadBadge;
     public TextMeshProUGUI unreadCountText;
 
+    [Header("Swipe-to-delete")]
+    public Button deleteButton;        // the red button revealed behind the row
+    public SwipeToDelete swipeToDelete; // on the SwipeContent child
+
     private ChatViewModel vm;
     public ChatViewModel Vm => vm;
     private string chatId;
@@ -114,6 +118,14 @@ public void Bind(ChatViewModel model)
 
         button.onClick.RemoveAllListeners();
         button.onClick.AddListener(OnClick);
+
+        if (swipeToDelete != null) swipeToDelete.ResetClosed();
+
+        if (deleteButton != null)
+        {
+            deleteButton.onClick.RemoveAllListeners();
+            deleteButton.onClick.AddListener(OnDeleteClicked);
+        }
     }
 
     IEnumerator LoadAvatar(ChatViewModel vm)
@@ -409,7 +421,18 @@ public void Bind(ChatViewModel model)
     
     void OnClick()
     {
+        // An open row's tap closes the reveal instead of opening the chat (WhatsApp behavior).
+        if (swipeToDelete != null && swipeToDelete.IsOpen)
+        {
+            swipeToDelete.Close();
+            return;
+        }
         ChatManager.Instance.SelectChat(chatId);
+    }
+
+    void OnDeleteClicked()
+    {
+        if (parentList != null) parentList.RequestDelete(vm);
     }
     
     // --- THE WHATSAPP DEFAULT COLORS ---
