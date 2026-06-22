@@ -421,12 +421,18 @@ public void Bind(ChatViewModel model)
     
     void OnClick()
     {
-        // An open row's tap closes the reveal instead of opening the chat (WhatsApp behavior).
-        if (swipeToDelete != null && swipeToDelete.IsOpen)
+        // A scroll/swipe that ended on this row is NOT a tap — ignore it (checked first so a
+        // swipe that just opened this row isn't immediately dismissed by the "any open" rule).
+        if (swipeToDelete != null && swipeToDelete.ConsumeDragFlag()) return;
+        // A real tap while a row's delete is open just dismisses it — it does NOT open a chat
+        // (WhatsApp behavior: the first tap is "put it away").
+        if (SwipeToDelete.AnyOpen)
         {
-            swipeToDelete.Close();
+            SwipeToDelete.CloseAnyOpen();
             return;
         }
+        if (ScrollClickBlocker.IsBlocking) return;
+
         ChatManager.Instance.SelectChat(chatId);
     }
 

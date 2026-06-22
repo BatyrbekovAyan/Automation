@@ -96,6 +96,8 @@ public class ChatListView : MonoBehaviour
         // User opened a chat — drop search focus so TMP's caret can't linger
         // on top of the placeholder when they swipe back to the list.
         if (searchBar != null) searchBar.ReleaseFocus();
+        // ...and put away any open swipe-to-delete reveal.
+        SwipeToDelete.CloseAnyOpen();
     }
 
     private void ApplyFilter(string query)
