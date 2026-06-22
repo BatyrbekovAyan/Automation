@@ -19,7 +19,9 @@ public class ChatDeleteConfirm : MonoBehaviour
     {
         if (cancelButton != null) cancelButton.onClick.AddListener(Cancel);
         if (deleteButton != null) deleteButton.onClick.AddListener(Confirm);
-        if (panel != null) panel.SetActive(false);
+        // NOTE: do NOT SetActive(false) here. This component lives on the panel, which starts
+        // inactive (saved that way in the scene), so Awake runs only when PopupUI.Show first
+        // activates it — deactivating here would immediately re-hide that first show.
     }
 
     public void Ask(string chatId, string chatTitle)
