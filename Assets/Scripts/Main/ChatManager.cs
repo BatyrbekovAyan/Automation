@@ -234,6 +234,13 @@ public partial class ChatManager : MonoBehaviour
         ChatsResponse response = JsonUtility.FromJson<ChatsResponse>(json);
         if (response?.dialogs == null) return;
 
+        // Resurrection guard: drop guarded ids the server no longer lists (delete confirmed),
+        // then below we skip re-adding ids still being suppressed this session.
+        var serverIds = new System.Collections.Generic.HashSet<string>();
+        foreach (var d in response.dialogs)
+            if (d != null && d.id != null) serverIds.Add(d.id);
+        _deletedChats.ReconcileWithServer(serverIds);
+
         // ONLY clear the UI and memory if this is the very first instant load
         if (isInitialLoad)
         {
@@ -244,6 +251,8 @@ public partial class ChatManager : MonoBehaviour
 
         foreach (var chat in response.dialogs)
         {
+            if (_deletedChats.ShouldSuppress(chat.id)) continue;
+
             long unixTime = 0;
             if (DateTimeOffset.TryParse(chat.last_timestamp, out var dto)) unixTime = dto.ToUnixTimeSeconds();
 
