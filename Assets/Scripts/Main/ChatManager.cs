@@ -217,6 +217,21 @@ public partial class ChatManager : MonoBehaviour
         StartCoroutine(InitializeActiveBotNextFrame());
     }
 
+    void OnEnable()
+    {
+        // Returning from an open chat — back button OR swipe-back — fires
+        // OnSlideOutComplete (both routes go through SnapToPosition with triggerBack).
+        // Quietly re-sync the chat list so previews/unread reflect anything that changed
+        // while the chat was open. The startup ShowChatList(true) uses the instant path,
+        // which never raises this event, so there's no launch-time double sync.
+        SwipeToBack.OnSlideOutComplete += RefreshActiveBotChats;
+    }
+
+    void OnDisable()
+    {
+        SwipeToBack.OnSlideOutComplete -= RefreshActiveBotChats;
+    }
+
     public ChatViewModel GetChat(string chatId)
     {
         if (chatLookup.TryGetValue(chatId, out var chat))
