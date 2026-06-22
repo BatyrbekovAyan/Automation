@@ -73,6 +73,12 @@ public class BottomTabManager : MonoBehaviour
     /// </summary>
     public const int BotsTabIndex = 3;
 
+    /// <summary>
+    /// Index of the WhatsApp (Chats) tab in the navigation bar. Navigating to it
+    /// quietly re-syncs the chat list. Matches the scene tab order (0 = Whatsapp).
+    /// </summary>
+    public const int WhatsAppTabIndex = 0;
+
     // ------------------------------------------------------------------ //
     //  Inspector-exposed fields                                            //
     // ------------------------------------------------------------------ //
@@ -143,6 +149,7 @@ public class BottomTabManager : MonoBehaviour
         // Skip if this tab is already active (avoids redundant UI work)
         if (index == _activeTabIndex) return;
 
+        bool isInitialSelection = _activeTabIndex == -1;
         _activeTabIndex = index;
 
         for (int i = 0; i < tabs.Count; i++)
@@ -150,6 +157,12 @@ public class BottomTabManager : MonoBehaviour
             bool isActive = (i == index);
             ApplyTabState(tabs[i], isActive);
         }
+
+        // Quietly re-sync the chat list whenever the user navigates to the WhatsApp
+        // tab so it stays fresh between bot switches. Skip the initial startup
+        // selection — ChatManager runs its own first load on launch.
+        if (TabRefreshGate.ShouldRefreshChats(index, isInitialSelection, WhatsAppTabIndex))
+            ChatManager.Instance?.RefreshActiveBotChats();
     }
 
     /// <summary>
