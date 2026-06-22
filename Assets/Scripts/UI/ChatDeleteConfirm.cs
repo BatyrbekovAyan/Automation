@@ -28,8 +28,8 @@ public class ChatDeleteConfirm : MonoBehaviour
         _pendingChatId = chatId;
         if (bodyText != null)
             bodyText.text = string.IsNullOrEmpty(chatTitle)
-                ? "This chat will be permanently deleted."
-                : $"\"{chatTitle}\" will be permanently deleted.";
+                ? "Чат будет удалён безвозвратно."
+                : $"Чат «{chatTitle}» будет удалён безвозвратно.";
         PopupUI.Show(panel);
     }
 
