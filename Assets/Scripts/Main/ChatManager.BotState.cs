@@ -124,6 +124,7 @@ public partial class ChatManager
 
         StopAllCoroutines();        // also cancels in-flight thumbnail extraction coroutines
         _chatFetchesInFlight = 0;   // counter never decremented for the killed-mid-flight fetches
+        _chatListSyncing = false;   // a SyncAllChats killed mid-flight never runs its finally
         ClearVideoThumbQueue();     // reset queue bookkeeping the cancelled coroutines never freed
         ClearMediaDownloadQueue();  // same for the serial media-download worker
         BeginLoadForActiveBot();
@@ -225,6 +226,25 @@ public partial class ChatManager
             ParseChatsJson(cachedJson, true);
         }
 
+        StartCoroutine(SyncAllChats(cachePath, cachedJson));
+    }
+
+    /// <summary>
+    /// Quietly re-sync the active bot's chat list against the server without
+    /// clearing the visible list. Called when the user navigates to the WhatsApp
+    /// tab so the list stays fresh between bot switches. No-ops when there is no
+    /// WhatsApp profile, the post-creation sync window is still open, or a
+    /// chat-list sync is already in flight.
+    /// </summary>
+    public void RefreshActiveBotChats()
+    {
+        Bot bot = Manager.Instance != null ? Manager.Instance.FindBotByName(CurrentBotId) : null;
+        if (bot == null || !IsValidProfileId(bot.whatsappProfileId)) return; // empty card already shown
+        if (IsWhatsAppSyncing(CurrentBotId, out _)) return;                  // syncing UI owns this case
+        if (_chatListSyncing) return;                                        // collapse duplicate syncs
+
+        string cachePath = Path.Combine(GetCacheRoot(), "chats.json");
+        string cachedJson = File.Exists(cachePath) ? File.ReadAllText(cachePath) : "";
         StartCoroutine(SyncAllChats(cachePath, cachedJson));
     }
 

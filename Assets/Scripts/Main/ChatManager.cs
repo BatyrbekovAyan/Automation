@@ -329,36 +329,52 @@ public partial class ChatManager : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// True while a chats/filter sync is in flight. Guards RefreshActiveBotChats
+    /// against launching overlapping syncs on rapid WhatsApp-tab re-entry. Reset
+    /// in SetActiveBot because StopAllCoroutines abandons the coroutine without
+    /// running its finally.
+    /// </summary>
+    private bool _chatListSyncing;
+
     IEnumerator SyncAllChats(string cachePath, string cachedJson)
     {
-        string activeProfileId = GetActiveProfileId();
-        if (string.IsNullOrEmpty(activeProfileId))
+        _chatListSyncing = true;
+        try
         {
-            OnEmptyState?.Invoke(EmptyStateReason.BotHasNoWhatsApp);
-            yield break;
+            string activeProfileId = GetActiveProfileId();
+            if (string.IsNullOrEmpty(activeProfileId))
+            {
+                OnEmptyState?.Invoke(EmptyStateReason.BotHasNoWhatsApp);
+                yield break;
+            }
+            string url = $"https://wappi.pro/api/sync/chats/filter?profile_id={activeProfileId}";
+
+            using UnityWebRequest www = UnityWebRequest.Get(url);
+            www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
+            www.timeout = 30;
+            yield return www.SendWebRequest();
+
+            if (www.result != UnityWebRequest.Result.Success) yield break;
+
+            var text = www.downloadHandler.text;
+            System.IO.File.WriteAllText(
+                Application.persistentDataPath + "/response.txt",
+                text
+            );
+            Debug.Log("Saved to: " + Application.persistentDataPath);
+
+            string newJson = www.downloadHandler.text;
+
+            if (newJson != cachedJson)
+            {
+                System.IO.File.WriteAllTextAsync(cachePath, newJson);
+                ParseChatsJson(newJson, false); // FALSE = Background sync, DO NOT CLEAR THE UI!
+            }
         }
-        string url = $"https://wappi.pro/api/sync/chats/filter?profile_id={activeProfileId}";
-
-        using UnityWebRequest www = UnityWebRequest.Get(url);
-        www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
-        www.timeout = 30;
-        yield return www.SendWebRequest();
-
-        if (www.result != UnityWebRequest.Result.Success) yield break;
-
-        var text = www.downloadHandler.text;
-        System.IO.File.WriteAllText(
-            Application.persistentDataPath + "/response.txt",
-            text
-        );
-        Debug.Log("Saved to: " + Application.persistentDataPath);
-
-        string newJson = www.downloadHandler.text;
-
-        if (newJson != cachedJson)
+        finally
         {
-            System.IO.File.WriteAllTextAsync(cachePath, newJson);
-            ParseChatsJson(newJson, false); // FALSE = Background sync, DO NOT CLEAR THE UI!
+            _chatListSyncing = false;
         }
     }
     
