@@ -94,6 +94,23 @@ public static class ChatHistoryCache
     }
 
     /// <summary>
+    /// Deletes {baseDir}/messages/{chatId}.json if present. Null/empty-safe; never throws.
+    /// </summary>
+    public static void DeleteHistory(string baseDir, string chatId)
+    {
+        if (string.IsNullOrEmpty(baseDir) || string.IsNullOrEmpty(chatId)) return;
+        string path = Path.Combine(baseDir, "messages", $"{chatId}.json");
+        try
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogWarning($"[ChatHistoryCache] DeleteHistory failed for {chatId}: {ex.Message}");
+        }
+    }
+
+    /// <summary>
     /// Removes every message whose own <see cref="MessageViewModel.chatId"/> names a DIFFERENT
     /// chat than this cache file's id — poison written by Wappi's concurrent messages/get response
     /// crossing. Conservative: an empty/absent chatId is kept (legacy entries from before chatId
