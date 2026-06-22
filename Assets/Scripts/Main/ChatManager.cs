@@ -302,6 +302,31 @@ public partial class ChatManager : MonoBehaviour
                 OnChatAdded?.Invoke(chatVM);
             }
         }
+
+        // Drop chats deleted on the server: present in memory but absent from this full list.
+        // chats/filter returns the complete set, so a missing chat was removed in WhatsApp itself.
+        // Skipped on the initial cache load (the list was just rebuilt above) and when the response
+        // came back empty while we still hold chats (treat as a suspicious/transient response rather
+        // than mass-clearing the whole list).
+        if (!isInitialLoad && (serverIds.Count > 0 || chatLookup.Count == 0))
+        {
+            List<string> stale = null;
+            foreach (var kvp in chatLookup)
+                if (!serverIds.Contains(kvp.Key))
+                    (stale ??= new List<string>()).Add(kvp.Key);
+
+            if (stale != null)
+            {
+                string cacheRoot = GetCacheRoot();
+                foreach (var goneId in stale)
+                {
+                    if (chatLookup.TryGetValue(goneId, out var goneVm)) Chats.Remove(goneVm);
+                    chatLookup.Remove(goneId);
+                    ChatHistoryCache.DeleteHistory(cacheRoot, goneId);
+                    OnChatRemoved?.Invoke(goneId);
+                }
+            }
+        }
     }
 
     IEnumerator SyncAllChats(string cachePath, string cachedJson)
@@ -758,6 +783,13 @@ public partial class ChatManager : MonoBehaviour
         return bestIndex >= 0 ? unresolved[bestIndex].tempId : null;
     }
 
+    // Probe FirstScreenBudget uses to weigh undownloaded media at its download-card
+    // height instead of its full bubble — see FirstScreenBudget.Weight / MediaRendersFullSize.
+    private static Func<string, bool> ImageCacheProbe()
+        => MediaCacheManager.Instance != null
+            ? MediaCacheManager.Instance.IsImageCached
+            : (Func<string, bool>)null;
+
     /// <summary>
     /// Phase A (Prep) of chat-open. Runs cache load + sort + first-screen split synchronously
     /// inside the coroutine, kicks off sync (whose results buffer into _pendingLiveSyncMessages),
@@ -813,7 +845,7 @@ public partial class ChatManager : MonoBehaviour
             // real text is ready (cache hit) by first paint instead of one chat-reopen later.
             PrefetchUnavailableQuotes(cachedMessages);
 
-            int initialCount = FirstScreenBudget.MessageCount(cachedMessages);
+            int initialCount = FirstScreenBudget.MessageCount(cachedMessages, ImageCacheProbe());
             if (cachedMessages.Count > initialCount)
             {
                 _pendingFirstBatch = cachedMessages.GetRange(0, initialCount);
@@ -860,7 +892,7 @@ public partial class ChatManager : MonoBehaviour
 
                 newMessages.Sort(MessageOrder.Descending);
 
-                int initialCount = FirstScreenBudget.MessageCount(newMessages);
+                int initialCount = FirstScreenBudget.MessageCount(newMessages, ImageCacheProbe());
                 if (newMessages.Count > initialCount)
                 {
                     _pendingFirstBatch = newMessages.GetRange(0, initialCount);
