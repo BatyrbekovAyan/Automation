@@ -74,6 +74,7 @@ public partial class ChatManager
             PlayerPrefs.Save();
             Chats.Clear();
             chatLookup.Clear();
+            _deletedChats.ClearAll();
             OnChatListCleared?.Invoke();
             OnEmptyState?.Invoke(EmptyStateReason.NoBotsExist);
         }
@@ -117,6 +118,7 @@ public partial class ChatManager
 
         Chats.Clear();
         chatLookup.Clear();
+        _deletedChats.ClearAll(); // per-bot: a delete guard left set would suppress the same chatId on the next bot
         OnChatListCleared?.Invoke();
         OnActiveBotChanged?.Invoke(botId);
 

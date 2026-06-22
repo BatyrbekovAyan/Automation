@@ -43,4 +43,14 @@ public class DeletedChatGuardTests
         Assert.IsFalse(g.ShouldSuppress(""));
         g.ReconcileWithServer(null);
     }
+
+    [Test] public void ClearAllForgetsEverything()
+    {
+        var g = new DeletedChatGuard();
+        g.MarkDeleted("a@c.us");
+        g.MarkDeleted("b@c.us");
+        g.ClearAll();
+        Assert.IsFalse(g.ShouldSuppress("a@c.us"));
+        Assert.IsFalse(g.ShouldSuppress("b@c.us"));
+    }
 }

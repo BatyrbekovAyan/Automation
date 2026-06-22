@@ -26,6 +26,13 @@ public class DeletedChatGuard
     }
 
     /// <summary>
+    /// Forget every guarded id. Called on bot switch: the guard is per-session AND
+    /// per-active-bot — two bots can share a chatId, so a guard left set across a
+    /// switch would wrongly suppress the same chat on the next bot.
+    /// </summary>
+    public void ClearAll() => _deleted.Clear();
+
+    /// <summary>
     /// Drop any guarded id the server no longer lists — the delete is confirmed,
     /// so suppression is no longer needed.
     /// </summary>
