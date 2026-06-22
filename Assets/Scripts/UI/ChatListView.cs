@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using System.Globalization;
 using UnityEngine;
+using UnityEngine.UI;
+using DG.Tweening;
 
 public class ChatListView : MonoBehaviour
 {
@@ -8,6 +10,8 @@ public class ChatListView : MonoBehaviour
     public Transform content;
     
     public ChatItemView prefab;
+
+    [SerializeField] private ChatDeleteConfirm deleteConfirm;
 
     private Dictionary<string, ChatItemView> itemsByChatId = new();
 
@@ -23,6 +27,7 @@ public class ChatListView : MonoBehaviour
         manager.OnEmptyState += HandleEmptyState;
         manager.OnActiveBotChanged += HandleActiveBotChanged;
         manager.OnChatSelected += HandleChatSelected;
+        manager.OnChatRemoved += RemoveChat;
 
         searchBar = GetComponentInChildren<ChatSearchBar>(true);
         if (searchBar != null)
@@ -151,6 +156,38 @@ public class ChatListView : MonoBehaviour
         ApplyMatchToItem(item, item.Vm);
     }
 
+    // Collapse the row out, then destroy it. The scroll content uses a layout group
+    // (rows reorder by sibling index), so animating LayoutElement.preferredHeight reflows.
+    private void RemoveChat(string chatId)
+    {
+        if (!itemsByChatId.TryGetValue(chatId, out var item))
+            return;
+        itemsByChatId.Remove(chatId);
+        if (item == null) return;
+
+        var rt = (RectTransform)item.transform;
+        var le = item.GetComponent<LayoutElement>();
+        if (le == null) le = item.gameObject.AddComponent<LayoutElement>();
+        le.preferredHeight = rt.rect.height;
+
+        var cg = item.GetComponent<CanvasGroup>();
+        if (cg == null) cg = item.gameObject.AddComponent<CanvasGroup>();
+
+        var go = item.gameObject;
+        DOTween.To(() => le.preferredHeight, v => le.preferredHeight = v, 0f, 0.2f)
+            .SetEase(Ease.InCubic)
+            .OnComplete(() => { if (go != null) Destroy(go); });
+        cg.DOFade(0f, 0.2f);
+    }
+
+    // Called by a row's Delete button (via ChatItemView) — raises the confirm dialog.
+    public void RequestDelete(ChatViewModel vm)
+    {
+        if (vm == null) return;
+        if (deleteConfirm != null) deleteConfirm.Ask(vm.ChatId, vm.Title);
+        else ChatManager.Instance?.DeleteChat(vm.ChatId); // fallback: no dialog wired
+    }
+
     void OnDestroy()
     {
         if (ChatManager.Instance != null)
@@ -160,6 +197,7 @@ public class ChatListView : MonoBehaviour
             ChatManager.Instance.OnEmptyState -= HandleEmptyState;
             ChatManager.Instance.OnActiveBotChanged -= HandleActiveBotChanged;
             ChatManager.Instance.OnChatSelected -= HandleChatSelected;
+            ChatManager.Instance.OnChatRemoved -= RemoveChat;
         }
 
         if (searchBar != null)
