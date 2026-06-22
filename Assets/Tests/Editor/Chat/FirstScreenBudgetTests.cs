@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 
@@ -100,5 +101,77 @@ public class FirstScreenBudgetTests
     {
         Assert.AreEqual(0, FirstScreenBudget.MessageCount(new List<MessageViewModel>()));
         Assert.AreEqual(0, FirstScreenBudget.MessageCount(null));
+    }
+
+    // --- Cache-aware media weight (download card vs full bubble) -------------
+
+    private static readonly Func<string, bool> NoneCached = _ => false;
+    private static readonly Func<string, bool> AllCached  = _ => true;
+
+    private static MessageViewModel UndownloadedPortrait(int i = 0) => new MessageViewModel
+    {
+        type = MessageType.Image, aspectRatio = 0.5625f, mediaUrl = $"http://p/{i}.jpg", messageId = $"m{i}"
+    };
+
+    [Test]
+    public void Weight_UndownloadedPortrait_CostsCardWeight()
+    {
+        // Nothing cached and no thumbnail -> paints the fixed download card, so it
+        // costs the card weight (3), not a full portrait (9).
+        Assert.AreEqual(3f, FirstScreenBudget.Weight(UndownloadedPortrait(), NoneCached), 0.001f);
+    }
+
+    [Test]
+    public void Weight_CachedPortrait_KeepsFullWeight()
+    {
+        // HD bytes already on disk -> instant full-size render -> full portrait weight.
+        Assert.AreEqual(9f, FirstScreenBudget.Weight(UndownloadedPortrait(), AllCached), 0.001f);
+    }
+
+    [Test]
+    public void Weight_PortraitWithBase64Thumbnail_KeepsFullWeight()
+    {
+        // A renderable (inline base64) thumbnail pre-grows the bubble to media size
+        // even before the HD download, so it is weighed full despite no cached bytes.
+        var vm = new MessageViewModel
+        {
+            type = MessageType.Image,
+            aspectRatio = 0.5625f,
+            mediaUrl = "http://p/x.jpg",
+            messageId = "m",
+            thumbnailUrl = "base64://AAAA"
+        };
+        Assert.AreEqual(9f, FirstScreenBudget.Weight(vm, NoneCached), 0.001f);
+    }
+
+    [Test]
+    public void Weight_NullProbe_KeepsLegacyFullWeight()
+    {
+        // No probe supplied -> legacy behaviour, media always weighed at full height.
+        Assert.AreEqual(9f, FirstScreenBudget.Weight(UndownloadedPortrait(), null), 0.001f);
+        Assert.AreEqual(9f, FirstScreenBudget.Weight(UndownloadedPortrait()), 0.001f);
+    }
+
+    [Test]
+    public void MessageCount_UndownloadedPortraits_FillScreenWithMore()
+    {
+        // The reported bug: a few undownloaded portraits only paint ~284px cards each,
+        // leaving the viewport half empty. At card weight (3) the budget keeps pulling
+        // messages until the screen is actually covered: 6 cards = 18pts (uncovered),
+        // the 7th crosses 20 and is included -> 7 shown (vs. 3 under the old weights).
+        var list = new List<MessageViewModel>();
+        for (int i = 0; i < 10; i++) list.Add(UndownloadedPortrait(i));
+        Assert.AreEqual(7, FirstScreenBudget.MessageCount(list, NoneCached));
+    }
+
+    [Test]
+    public void MessageCount_CachedPortraits_UnchangedFromLegacy()
+    {
+        // When the same portraits are already cached they paint full-size, so the
+        // legacy count stands: three cover the screen (27pts), the rest queue.
+        var list = new List<MessageViewModel>();
+        for (int i = 0; i < 10; i++) list.Add(UndownloadedPortrait(i));
+        Assert.AreEqual(3, FirstScreenBudget.MessageCount(list, AllCached));
+        Assert.AreEqual(3, FirstScreenBudget.MessageCount(list)); // null probe = legacy
     }
 }
