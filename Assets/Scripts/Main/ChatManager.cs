@@ -254,8 +254,6 @@ public partial class ChatManager : MonoBehaviour
         foreach (var d in response.dialogs)
             if (d != null && d.id != null) serverIds.Add(d.id);
 
-        bool watermarksDirty = false;
-
         // ONLY clear the UI and memory if this is the very first instant load
         if (isInitialLoad)
         {
@@ -266,23 +264,22 @@ public partial class ChatManager : MonoBehaviour
 
         foreach (var chat in response.dialogs)
         {
-            long unixTime = 0;
-            if (DateTimeOffset.TryParse(chat.last_timestamp, out var dto)) unixTime = dto.ToUnixTimeSeconds();
-
-            // Soft-delete watermark: hide a deleted chat until newer activity revives it, and adopt
-            // an externally-isDeleted chat we have no record for. See DeletedChatRule.
-            bool hasWatermark = _deletedWatermarks.TryGetValue(chat.id, out long watermark);
-            if (DeletedChatRule.ShouldHide(hasWatermark, watermark, unixTime, chat.isDeleted, out long adopt))
+            // Honor Wappi's delete flag: a successful chat/delete sets isDeleted, so the chat stays
+            // hidden across syncs, bot-switches, and restarts. (Deletes made directly in the WhatsApp
+            // app do NOT set isDeleted and aren't visible to us — that case is unsupported.)
+            if (chat.isDeleted)
             {
-                if (adopt >= 0) { _deletedWatermarks[chat.id] = adopt; watermarksDirty = true; }
-                if (chatLookup.TryGetValue(chat.id, out var hiddenVm))
+                if (chatLookup.TryGetValue(chat.id, out var deletedVm))
                 {
-                    Chats.Remove(hiddenVm);
+                    Chats.Remove(deletedVm);
                     chatLookup.Remove(chat.id);
                     OnChatRemoved?.Invoke(chat.id);
                 }
                 continue;
             }
+
+            long unixTime = 0;
+            if (DateTimeOffset.TryParse(chat.last_timestamp, out var dto)) unixTime = dto.ToUnixTimeSeconds();
 
             string displayName = string.IsNullOrEmpty(chat.name) ? chat.id[..^5] : UnicodeEmojiConverter.ConvertRealEmojisToSprites(chat.name);
             string lastMsg = string.IsNullOrEmpty(chat.last_message_data) ? "" : UnicodeEmojiConverter.ConvertRealEmojisToSprites(chat.last_message_data);
@@ -355,8 +352,6 @@ public partial class ChatManager : MonoBehaviour
                 }
             }
         }
-
-        if (watermarksDirty) DeletedChatStore.Save(GetCacheRoot(), _deletedWatermarks);
     }
 
     /// <summary>

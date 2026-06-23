@@ -1,6 +1,5 @@
 using System;
 using System.Collections;
-using System.Collections.Generic;
 using Newtonsoft.Json;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -10,14 +9,11 @@ public partial class ChatManager
     /// <summary>Fired after a chat is removed from the in-memory list (optimistic delete, server sync, or rollback re-add via OnChatAdded).</summary>
     public event Action<string> OnChatRemoved;
 
-    // Per-bot soft-delete watermarks: chatId -> the chat's last-message unix timestamp at deletion.
-    // Loaded in LoadChatsForActiveBot, consulted in ParseChatsJson (DeletedChatRule), persisted via
-    // DeletedChatStore. A deleted chat stays hidden until a newer message arrives (then it revives).
-    private Dictionary<string, long> _deletedWatermarks = new Dictionary<string, long>();
-
     /// <summary>
-    /// Optimistically removes the chat + its message cache, records a deletion watermark, then
-    /// soft-deletes it on the Wappi server. Rolls back (re-adds the row, drops the watermark) on failure.
+    /// Optimistically removes the chat + its message cache, then deletes it on the Wappi server.
+    /// A successful chat/delete removes the chat in WhatsApp and reports it back as isDeleted, which
+    /// ParseChatsJson honors so it stays gone across syncs and bot-switches. Rolls back (re-adds the
+    /// row) if the server call fails.
     /// </summary>
     public void DeleteChat(string chatId)
     {
@@ -25,10 +21,6 @@ public partial class ChatManager
         if (!chatLookup.TryGetValue(chatId, out var vm)) return;
 
         int index = Chats.IndexOf(vm);
-
-        // Watermark at the current last message: the chat hides until something newer arrives.
-        _deletedWatermarks[chatId] = vm.LastMessageTime;
-        DeletedChatStore.Save(GetCacheRoot(), _deletedWatermarks);
 
         RemoveChatLocally(chatId);
         ChatHistoryCache.DeleteHistory(GetCacheRoot(), chatId);
@@ -91,13 +83,11 @@ public partial class ChatManager
             yield break;
         }
 
-        // Success: the watermark keeps the chat hidden until newer activity revives it. Nothing else to do.
+        // Success: the chat is deleted on the server (comes back isDeleted=true); ParseChatsJson keeps it hidden.
     }
 
     private void RollbackDelete(string chatId, ChatViewModel vm, int index)
     {
-        _deletedWatermarks.Remove(chatId);
-        DeletedChatStore.Save(GetCacheRoot(), _deletedWatermarks);
         if (vm == null) return;
         if (chatLookup.ContainsKey(chatId)) return; // already restored / never gone
 

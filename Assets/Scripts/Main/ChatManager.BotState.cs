@@ -216,7 +216,6 @@ public partial class ChatManager
 
     private void LoadChatsForActiveBot()
     {
-        _deletedWatermarks = DeletedChatStore.Load(GetCacheRoot());
         string cachePath = Path.Combine(GetCacheRoot(), "chats.json");
         string cachedJson = "";
         if (File.Exists(cachePath))
