@@ -60,6 +60,10 @@ public partial class ChatManager
         www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
         www.timeout = 30;
 
+        // TEMP diagnostic: log the exact outgoing request so we can compare it byte-for-byte
+        // against Wappi's docs / a Postman call when chat/delete returns "deleteChat error".
+        Debug.Log($"[Wappi] chat/delete → POST {url}  chatId='{chatId}'  body={body}");
+
         yield return www.SendWebRequest();
 
         if (www.result != UnityWebRequest.Result.Success)
