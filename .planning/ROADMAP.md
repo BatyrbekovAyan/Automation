@@ -27,7 +27,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Tapping a card loads its text into the composer to edit and never auto-sends; an incoming customer message auto-populates fresh suggestions without overwriting an in-progress composer draft; the owner can manually refresh.
   4. Picking a card regenerates a fresh, steered set of 4 (the re-cluster loop), and the owner can keep refining or edit and send via the existing Send button.
   5. Rapid picks and chat switches never render stale or crossed suggestions — out-of-order/superseded responses are discarded via a correlation/sequence guard (reusing the CrossChatResponseGuard / WaitForChatFetchesToDrain pattern), exercised by the adversarial mock; nothing above the seam references n8n, UnityWebRequest, or Wappi.
-**Plans**: TBD
+**Plans**: 4 plans
+  - [ ] 01-01-PLAN.md — Provider seam + value objects + MockSuggestionsProvider + sequence guard (+ EditMode tests)
+  - [ ] 01-02-PLAN.md — ChatManager CurrentChatId/drain accessors + SemiAutoStore persistence (+ EditMode tests)
+  - [ ] 01-03-PLAN.md — Panel/card/chip/badge/skeleton + top-bar toggle views + [MenuItem] builder
+  - [ ] 01-04-PLAN.md — SuggestionsController wiring (guard, toggle, hand-off, auto-populate, refresh) + wirer
 **UI hint**: yes
 
 ### Phase 2: n8n Live Wiring
@@ -48,5 +52,5 @@ Phases execute in numeric order: 1 → 2
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Polished Suggestions Panel on Mock Data | 0/TBD | Not started | - |
+| 1. Polished Suggestions Panel on Mock Data | 0/4 | Planned | - |
 | 2. n8n Live Wiring | 0/TBD | Not started | - |
