@@ -104,6 +104,7 @@ Mock content is **Russian** (CIS small-business market, D-14). UI chrome copy be
 | Error state heading | «Не удалось загрузить» | "Couldn't load" |
 | Error state body + recovery | «Проверьте соединение и попробуйте снова» + inline **«Обновить»** retry control | "Check your connection and try again" + "Refresh" retry |
 | Manual-refresh control | icon-only refresh `Image` (circular-arrow sprite) in the panel header row; accessible label «Обновить» | "Refresh" (INT-03) |
+| Semi-auto toggle (accessible label) | icon-only top-bar toggle (no visible text label); accessible label «Полуавтоматический режим» | "Semi-auto mode" — wire into the `Selectable` accessible name so the icon-only toggle has a verbatim label parallel to «Обновить» (SEMI-01) |
 | Loading | NO text — 4 shimmer skeleton cards only (D-12); panel never collapses to empty | — |
 | Destructive confirmation | **none** — this phase has no destructive action. Flipping the semi-auto toggle off simply hides the panel (D-11, non-destructive, no draft is lost because the composer is independent). No confirmation dialog | — |
 
