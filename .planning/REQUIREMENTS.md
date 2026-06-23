@@ -72,21 +72,37 @@ Explicitly excluded for this milestone.
 
 ## Traceability
 
-Populated during roadmap creation.
+Mapped during roadmap creation (2026-06-23). Build order is load-bearing: Phase 1 = polished UI on mock data (includes the seam, guards, toggle, and ChatManager accessors so it ships standalone); Phase 2 = n8n live wiring behind the same seam with no Phase-1 UI edits.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SEMI-01..03 | TBD | Pending |
-| PANEL-01..06 | TBD | Pending |
-| INT-01..04 | TBD | Pending |
-| DATA-01..04 | TBD | Pending |
-| N8N-01..04 | TBD | Pending |
+| SEMI-01 | Phase 1 | Pending |
+| SEMI-02 | Phase 1 | Pending |
+| SEMI-03 | Phase 1 | Pending |
+| PANEL-01 | Phase 1 | Pending |
+| PANEL-02 | Phase 1 | Pending |
+| PANEL-03 | Phase 1 | Pending |
+| PANEL-04 | Phase 1 | Pending |
+| PANEL-05 | Phase 1 | Pending |
+| PANEL-06 | Phase 1 | Pending |
+| INT-01 | Phase 1 | Pending |
+| INT-02 | Phase 1 | Pending |
+| INT-03 | Phase 1 | Pending |
+| INT-04 | Phase 1 | Pending |
+| DATA-01 | Phase 1 | Pending |
+| DATA-02 | Phase 1 | Pending |
+| DATA-03 | Phase 1 | Pending |
+| DATA-04 | Phase 1 | Pending |
+| N8N-01 | Phase 2 | Pending |
+| N8N-02 | Phase 2 | Pending |
+| N8N-03 | Phase 2 | Pending |
+| N8N-04 | Phase 2 | Pending |
 
 **Coverage:**
 - v1 requirements: 21 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 21 ⚠️
+- Mapped to phases: 21 (Phase 1: 17, Phase 2: 4)
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-06-23*
-*Last updated: 2026-06-23 after initialization*
+*Last updated: 2026-06-23 after roadmap creation*
