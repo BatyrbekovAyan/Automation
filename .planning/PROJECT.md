@@ -28,7 +28,7 @@ The owner stays in control along a spectrum from fully autonomous to hands-on: t
 <!-- This milestone: the Reply Suggestions Panel (semi-auto mode). Hypotheses until shipped. -->
 
 - [ ] Per-chat **semi-auto toggle** that enables the suggestions panel for a specific chat
-- [ ] Reply Suggestions Panel UI — bottom sheet above the composer, **4 cards**, each showing reply text + intent label + confidence
+- [ ] Reply Suggestions Panel UI — bottom sheet above the composer, **4 cards** ordered best-first, each showing reply text + intent label; the top card carries a "Recommended" badge (no numeric confidence)
 - [ ] Suggestions **auto-populate on each incoming customer message**, plus a manual refresh
 - [ ] Tapping a card **loads its text into the composer to edit** (never auto-sends)
 - [ ] **Re-cluster loop**: picking regenerates a fresh set of 4 suggestions re-ranked toward the chosen reply; owner keeps refining or edits the composer draft and sends
@@ -65,7 +65,7 @@ The owner stays in control along a spectrum from fully autonomous to hands-on: t
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| 4 suggestion cards: text + intent label + confidence | Owner scans fast and can trust the ranking | — Pending |
+| 4 cards: text + intent label; ranked best-first + "Recommended" badge (no numeric %) | Research-backed (arXiv 2402.07632): numeric LLM confidence is miscalibrated, skews high, and erodes trust (core value); no shipped agent-assist product shows per-reply % | — Pending |
 | Tapping a card loads into composer to edit, never auto-sends | Maximizes owner control and trust (core value) | — Pending |
 | Picking regenerates a full fresh set of 4, re-clustered toward the pick | Delivers the spectrum-of-control refine loop | — Pending |
 | Per-chat semi-auto toggle (not global) | Keeps the automation↔semi-auto spectrum per conversation | — Pending |
