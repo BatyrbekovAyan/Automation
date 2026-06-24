@@ -31,9 +31,12 @@ Requirements for this milestone. Build order: **Phase 1** = polished UI on mock 
 
 ### Data & Provider Seam
 
-- [ ] **DATA-01**: An `ISuggestionsProvider` seam abstracts suggestion sourcing so UI is built independent of the backend
-- [ ] **DATA-02**: A `MockSuggestionsProvider` supplies realistic stub data (simulated latency, steered re-cluster, correlation echo) for the entire Phase-1 UI build
-- [ ] **DATA-03**: Suggestion fetches reject stale/out-of-order responses (monotonic sequence/correlation guard) and survive rapid re-cluster picks and chat switches — reusing the existing CrossChatResponseGuard / WaitForChatFetchesToDrain pattern; no concurrent Wappi-style crossing
+- [x] **DATA-01
+**: An `ISuggestionsProvider` seam abstracts suggestion sourcing so UI is built independent of the backend
+- [x] **DATA-02
+**: A `MockSuggestionsProvider` supplies realistic stub data (simulated latency, steered re-cluster, correlation echo) for the entire Phase-1 UI build
+- [x] **DATA-03
+**: Suggestion fetches reject stale/out-of-order responses (monotonic sequence/correlation guard) and survive rapid re-cluster picks and chat switches — reusing the existing CrossChatResponseGuard / WaitForChatFetchesToDrain pattern; no concurrent Wappi-style crossing
 - [ ] **DATA-04**: `ChatManager` exposes a public current-chat accessor (and drain hook) needed to scope suggestions to the open chat
 
 ### n8n Live Wiring
