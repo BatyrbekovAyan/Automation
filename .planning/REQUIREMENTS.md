@@ -10,7 +10,8 @@ Requirements for this milestone. Build order: **Phase 1** = polished UI on mock 
 ### Semi-Auto Toggle
 
 - [ ] **SEMI-01**: Owner can flip a specific chat into semi-auto mode via a per-chat toggle
-- [ ] **SEMI-02**: Semi-auto state persists per chat across app restarts and bot switches (follows existing PlayerPrefs/chat conventions)
+- [x] **SEMI-02
+**: Semi-auto state persists per chat across app restarts and bot switches (follows existing PlayerPrefs/chat conventions)
 - [ ] **SEMI-03**: The suggestions panel appears only in chats flipped to semi-auto; other chats stay autonomous/manual
 
 ### Panel UI
@@ -37,7 +38,8 @@ Requirements for this milestone. Build order: **Phase 1** = polished UI on mock 
 **: A `MockSuggestionsProvider` supplies realistic stub data (simulated latency, steered re-cluster, correlation echo) for the entire Phase-1 UI build
 - [x] **DATA-03
 **: Suggestion fetches reject stale/out-of-order responses (monotonic sequence/correlation guard) and survive rapid re-cluster picks and chat switches — reusing the existing CrossChatResponseGuard / WaitForChatFetchesToDrain pattern; no concurrent Wappi-style crossing
-- [ ] **DATA-04**: `ChatManager` exposes a public current-chat accessor (and drain hook) needed to scope suggestions to the open chat
+- [x] **DATA-04
+**: `ChatManager` exposes a public current-chat accessor (and drain hook) needed to scope suggestions to the open chat
 
 ### n8n Live Wiring
 
