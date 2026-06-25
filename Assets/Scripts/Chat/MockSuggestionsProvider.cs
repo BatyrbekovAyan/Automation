@@ -42,8 +42,14 @@ public class MockSuggestionsProvider : ISuggestionsProvider
 
     public void Request(SuggestionRequest request, Action<SuggestionResult> callback)
     {
-        // No runner (headless/tests) => answer synchronously rather than NRE on StartCoroutine.
-        if (_runner == null) { callback?.Invoke(BuildResult(request)); return; }
+        // No runner (tests), OR the runner's GameObject is inactive — OnChatSelected fires ~300ms
+        // before SlideInToMessages activates the chat panel, so StartCoroutine would THROW
+        // ("game object is inactive"). Answer synchronously instead of crashing/losing the request.
+        if (_runner == null || !_runner.isActiveAndEnabled)
+        {
+            callback?.Invoke(BuildResult(request));
+            return;
+        }
         _runner.StartCoroutine(RespondAfterLatency(request, callback));
     }
 
