@@ -20,6 +20,13 @@ public class SuggestionCard : MonoBehaviour
 
     public event Action<string> OnTapped;
 
+    void OnDisable()
+    {
+        // The card is Destroy()'d on every re-cluster (panel Clear); kill the tap-punch tween
+        // so it doesn't tick on a destroyed RectTransform (the DOTWEEN "target destroyed" errors).
+        transform.DOKill();
+    }
+
     public void Setup(SuggestionItem item, bool isTop)
     {
         if (item == null) return;

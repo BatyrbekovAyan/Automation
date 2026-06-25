@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using DG.Tweening;
 using UnityEngine;
 
 /// <summary>
@@ -17,11 +18,13 @@ public class SuggestionsController : MonoBehaviour
     [SerializeField] private SuggestionsPanel _panel;
     [SerializeField] private SemiAutoToggle _toggle;
     [SerializeField] private MessagesBottomPanel _bottomPanel;
+    [SerializeField] private ExpandableInput _expandableInput;   // composer growth → panel rides its top + list makes room
     [SerializeField] private float _mockLatencySeconds = 1.0f;
 
     private ISuggestionsProvider _provider;
     private long _requestSeq;          // monotonic; newest wins (A6)
     private bool _semiAutoOn;
+    private Tweener _offsetTween;      // animates the message-list floor in sync with the panel slide
 
     void Awake()
     {
@@ -57,12 +60,15 @@ public class SuggestionsController : MonoBehaviour
     void OnEnable()
     {
         if (ChatManager.Instance != null) ChatManager.Instance.OnLiveMessagesReceived += HandleLive;   // active-only
+        if (_expandableInput != null) _expandableInput.OnPanelHeightChanged += HandleComposerHeight;
     }
 
     void OnDisable()
     {
         _requestSeq++;                                         // supersede in-flight requests on deactivate (Render guards on this)
+        _offsetTween?.Kill();
         if (ChatManager.Instance != null) ChatManager.Instance.OnLiveMessagesReceived -= HandleLive;
+        if (_expandableInput != null) _expandableInput.OnPanelHeightChanged -= HandleComposerHeight;
     }
 
     // --- State restore on chat-open / bot-switch (SEMI-02/SEMI-03) ---
@@ -78,7 +84,7 @@ public class SuggestionsController : MonoBehaviour
         _semiAutoOn = false;
         _requestSeq++;                                        // supersede any in-flight request
         if (_toggle != null) _toggle.SetLit(false);
-        if (_panel != null) _panel.Hide();
+        HidePanel();
     }
 
     private void RestoreForActiveChat()
@@ -88,10 +94,10 @@ public class SuggestionsController : MonoBehaviour
         if (_toggle != null) _toggle.SetLit(_semiAutoOn);     // default OFF → other chats stay manual (SEMI-03)
         if (_semiAutoOn)
         {
-            if (_panel != null) _panel.Show();
+            ShowPanel();
             IssueRequest(null, null);
         }
-        else if (_panel != null) _panel.Hide();
+        else HidePanel();
     }
 
     // --- Toggle on/off (SEMI-01 / D-08/09/10/11) ---
@@ -104,13 +110,13 @@ public class SuggestionsController : MonoBehaviour
         if (_toggle != null) _toggle.SetLit(desiredOn);
         if (desiredOn)
         {
-            if (_panel != null) _panel.Show();
+            ShowPanel();
             IssueRequest(null, null);                          // first set on turn-on
         }
         else
         {
             _requestSeq++;                                     // supersede any in-flight request — no late render
-            if (_panel != null) _panel.Hide();                // D-11: off = hide; composer untouched
+            HidePanel();                                       // D-11: off = hide; composer untouched
         }
     }
 
@@ -169,6 +175,40 @@ public class SuggestionsController : MonoBehaviour
         for (int i = msgs.Count - 1; i >= 0; i--)
             if (msgs[i] != null && msgs[i].isIncoming) return msgs[i].text;
         return null;
+    }
+
+    // --- Panel show/hide coordinated with the composer top + message-list floor (FIX 1 & 2) ---
+
+    private void ShowPanel()
+    {
+        if (_panel == null) return;
+        if (_expandableInput != null)
+            _panel.SetComposerHeight(_expandableInput.CurrentPanelHeight);   // panel bottom rides the composer top
+        AnimateListOffset(_panel.Footprint, 0.25f, Ease.OutCubic);          // messages slide up with the panel (no jump)
+        _panel.Show();
+    }
+
+    private void HidePanel()
+    {
+        AnimateListOffset(0f, 0.20f, Ease.InCubic);                         // messages slide back down with the panel
+        if (_panel != null) _panel.Hide();
+    }
+
+    // Animate the message-list floor (ExpandableInput's extra bottom offset) so the messages
+    // follow the panel smoothly, the way the stack follows the keyboard — not an instant jump.
+    private void AnimateListOffset(float target, float duration, Ease ease)
+    {
+        if (_expandableInput == null) return;
+        _offsetTween?.Kill();
+        _offsetTween = DOVirtual.Float(_expandableInput.ExtraBottomOffset, target, duration,
+            v => _expandableInput.SetExtraBottomOffset(v)).SetEase(ease);
+    }
+
+    // Composer grew/shrank (multi-line) → keep the panel riding its top edge. The message-list
+    // floor auto-updates inside ExpandableInput (it re-adds _extraBottomOffset on each height change).
+    private void HandleComposerHeight(float composerHeight)
+    {
+        if (_panel != null) _panel.SetComposerHeight(composerHeight);
     }
 
     // --- Manual refresh (INT-03) ---

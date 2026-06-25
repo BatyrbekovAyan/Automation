@@ -33,6 +33,22 @@ public class ExpandableInput : MonoBehaviour
     private float updateThreshold;
     private bool needsFlush = false;
 
+    // --- Suggestions-panel integration (additive; 0 / no subscriber = composer behaviour unchanged) ---
+    private float _extraBottomOffset;                        // extra clearance ABOVE the composer (e.g. the suggestions panel height)
+    public event System.Action<float> OnPanelHeightChanged;  // emits the clamped composer height whenever it changes
+    public float CurrentPanelHeight => bottomPanelRect != null ? bottomPanelRect.rect.height : 0f;
+    public float ExtraBottomOffset => _extraBottomOffset;    // current extra clearance (for animating show/hide)
+
+    /// <summary>
+    /// Add (or clear with 0) extra bottom clearance above the composer so the message-list floor
+    /// rises past a panel that sits on the composer's top edge. Re-pushes the offset immediately.
+    /// </summary>
+    public void SetExtraBottomOffset(float extra)
+    {
+        _extraBottomOffset = extra;
+        if (bottomPanelRect != null) ApplyScrollRectOffset(bottomPanelRect.rect.height);
+    }
+
     void Start()
     {
         baseInputFieldHeight = inputFieldRect.rect.height;
@@ -79,6 +95,7 @@ public class ExpandableInput : MonoBehaviour
 
             currentAppliedHeight = targetHeight;
             needsFlush = true;
+            OnPanelHeightChanged?.Invoke(clampedHeight);   // notify panels that ride the composer's top edge
         }
     }
 
@@ -89,7 +106,7 @@ public class ExpandableInput : MonoBehaviour
 
         messageListRect.offsetMin = new Vector2(
             messageListRect.offsetMin.x,
-            panelHeight
+            panelHeight + _extraBottomOffset
         );
     }
 

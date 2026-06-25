@@ -25,6 +25,15 @@ public static class SuggestionsControllerWirer
             return;
         }
 
+        // The composer's ExpandableInput lives on the same GameObject as MessagesBottomPanel —
+        // the controller drives it so the messages make room + the panel rides the composer top.
+        var expandable = bottomPanel.GetComponent<ExpandableInput>();
+        if (expandable == null)
+        {
+            Debug.LogError("SuggestionsControllerWirer: MessagesBottomPanel has no ExpandableInput component.");
+            return;
+        }
+
         // Host the controller on the composer it drives (active while a chat is open, so OnEnable/
         // OnDisable track the live-message subscription correctly). Reuse an existing one.
         var controller = Object.FindFirstObjectByType<SuggestionsController>(FindObjectsInactive.Include);
@@ -35,6 +44,7 @@ public static class SuggestionsControllerWirer
         so.FindProperty("_panel").objectReferenceValue = panel;
         so.FindProperty("_toggle").objectReferenceValue = toggle;
         so.FindProperty("_bottomPanel").objectReferenceValue = bottomPanel;
+        so.FindProperty("_expandableInput").objectReferenceValue = expandable;
         so.ApplyModifiedPropertiesWithoutUndo();
 
         EditorUtility.SetDirty(controller);

@@ -32,11 +32,13 @@ public static class SuggestionsPanelBuilder
 
     // --- Reference-unit sizes (1080×1920, dp×3) -----------------------------
     private const float Sm = 24f, Md = 48f, Lg = 72f;     // spacing tokens
-    private const float CardMinHeight = 132f;
+    private const float CellHeight = 190f;         // 2×2 grid cell height
+    private const float CellWidth = 480f, GridGap = 24f;   // 2 columns across the ~984u content width
+    private const float ReplyMinHeight = 50f;      // min scroll height; the scroll flexes to fill the card
     private const float CardRadius = 24f, PanelTopRadius = 36f;
-    private const float ReplySize = 42f, ChipSize = 28f, BadgeSize = 26f, StateSize = 39f;
+    private const float ReplySize = 38f, ChipSize = 26f, BadgeSize = 24f, StateSize = 39f;   // smaller for narrow grid cards
     private const float ToggleHit = 132f, RefreshHit = 120f;
-    private const float PanelHeight = 880f;
+    private const float PanelHeight = 620f;        // 2×2 grid: 2 rows (190) + gap + refresh row (~half the old 1100)
 
     [MenuItem("Tools/UI/Build Suggestions Panel")]
     public static void Build()
@@ -100,17 +102,19 @@ public static class SuggestionsPanelBuilder
         // Refresh control — top-right corner of the sheet, fully inset so it never clips.
         Button refreshButton = BuildRefreshControl(panelGo.transform);
 
-        // Cards container — single VERTICAL column of 4 (D-04), below the refresh row.
+        // Cards container — 2×2 grid (revises D-04's vertical stack per owner; cards scroll internally
+        // so they no longer need full width). Best-first reads top-left → Z-order.
         GameObject cards = Rect("CardsContainer", panelGo.transform);
         var crt = (RectTransform)cards.transform;
         crt.anchorMin = new Vector2(0, 0); crt.anchorMax = new Vector2(1, 1); crt.pivot = new Vector2(0.5f, 1);
         crt.offsetMin = new Vector2(Md, Md);                       // left/bottom inset
         crt.offsetMax = new Vector2(-Md, -(RefreshHit + Md));      // right/top inset (clears refresh row)
-        var vlg = cards.AddComponent<VerticalLayoutGroup>();
-        vlg.spacing = Sm;
-        vlg.childAlignment = TextAnchor.UpperCenter;
-        vlg.childForceExpandWidth = true; vlg.childForceExpandHeight = false;
-        vlg.childControlWidth = true; vlg.childControlHeight = true;
+        var grid = cards.AddComponent<GridLayoutGroup>();
+        grid.cellSize = new Vector2(CellWidth, CellHeight);
+        grid.spacing = new Vector2(GridGap, GridGap);
+        grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        grid.constraintCount = 2;
+        grid.childAlignment = TextAnchor.UpperCenter;
 
         // 4 skeleton placeholders (D-12) + the card template (cardPrefab).
         var skeletons = new List<GameObject>();
@@ -160,28 +164,23 @@ public static class SuggestionsPanelBuilder
     {
         GameObject card = ImageGo("SuggestionCard", parent, CardSurface);
         AddRounded(card, CardRadius);
-        var le = card.AddComponent<LayoutElement>();
-        le.minHeight = CardMinHeight; le.flexibleWidth = 1f;
+        // The grid sizes the card to the cell — no LayoutElement needed.
         var vlg = card.AddComponent<VerticalLayoutGroup>();
-        vlg.padding = new RectOffset((int)Md, (int)Md, (int)Md, (int)Md);
-        vlg.spacing = Sm;
+        vlg.padding = new RectOffset(20, 20, 14, 14);   // tight for the narrow grid card
+        vlg.spacing = 8;
         vlg.childAlignment = TextAnchor.UpperLeft;
-        vlg.childForceExpandWidth = true; vlg.childForceExpandHeight = false;
+        vlg.childForceExpandWidth = false; vlg.childForceExpandHeight = false;   // chip/badge hug; reply fills
         vlg.childControlWidth = true; vlg.childControlHeight = true;
 
-        // Reply text — 2-line ellipsis, explicit clamp (Pitfall 6: never rely on NoWrap).
-        TextMeshProUGUI reply = Text("ReplyText", card.transform, "—", ReplySize, BodyText,
-            FontStyles.Normal, TextAlignmentOptions.TopLeft);
-        reply.textWrappingMode = TextWrappingModes.Normal;
-        reply.overflowMode = TextOverflowModes.Ellipsis;
-        reply.maxVisibleLines = 2;
-        reply.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
+        // Order: recommended badge (top, top card only — PANEL-03/D-07) → reply scroll (fills) → chip (bottom).
+        GameObject badge = BuildBadge(card.transform);
+
+        // Reply text in a fixed-height in-card scroller — a long reply scrolls (no truncation) so
+        // the card/panel never stretches and the FULL text is readable before tapping (revises PANEL-06).
+        TextMeshProUGUI reply = BuildReplyScroll(card.transform);
 
         // Intent chip — ONE muted tone for all intents (D-06), bottom-left.
         TextMeshProUGUI chipLabel = BuildChip(card.transform);
-
-        // Recommended badge — top-right overlay, top card only (PANEL-03/D-07).
-        GameObject badge = BuildBadge(card.transform);
 
         var button = card.AddComponent<Button>();
         button.transition = Selectable.Transition.None;
@@ -198,13 +197,47 @@ public static class SuggestionsPanelBuilder
         return comp;
     }
 
+    // Fixed-height vertical scroller holding the FULL reply text. Returns the inner TMP (the
+    // SuggestionCard.replyText ref). Tap on the card still selects (Button bubbling); drag scrolls.
+    private static TextMeshProUGUI BuildReplyScroll(Transform cardParent)
+    {
+        GameObject scrollGo = Rect("ReplyScroll", cardParent);
+        var scrollLe = scrollGo.AddComponent<LayoutElement>();
+        scrollLe.minHeight = ReplyMinHeight; scrollLe.flexibleHeight = 1f; scrollLe.flexibleWidth = 1f;   // fills the card
+        var scroll = scrollGo.AddComponent<ScrollRect>();
+        scroll.horizontal = false; scroll.vertical = true;
+        scroll.movementType = ScrollRect.MovementType.Clamped;
+        scroll.scrollSensitivity = 30f;
+
+        // Viewport masks the content; transparent raycast target so a drag scrolls.
+        GameObject viewport = ImageGo("Viewport", scrollGo.transform, new Color(0, 0, 0, 0));
+        Stretch((RectTransform)viewport.transform);
+        viewport.GetComponent<Image>().raycastTarget = true;
+        viewport.AddComponent<RectMask2D>();
+
+        // Content = the reply TMP itself, top-anchored, sized to the full text by a ContentSizeFitter.
+        TextMeshProUGUI reply = Text("ReplyText", viewport.transform, "—", ReplySize, BodyText,
+            FontStyles.Normal, TextAlignmentOptions.TopLeft);
+        reply.textWrappingMode = TextWrappingModes.Normal;
+        reply.overflowMode = TextOverflowModes.Overflow;     // no ellipsis/cap — the scroll reveals overflow
+        var rrt = (RectTransform)reply.transform;
+        rrt.anchorMin = new Vector2(0, 1); rrt.anchorMax = new Vector2(1, 1); rrt.pivot = new Vector2(0.5f, 1);
+        rrt.sizeDelta = new Vector2(0f, 0f);             // full viewport width (TMP defaults to 200 → it overflowed); height driven below
+        rrt.anchoredPosition = Vector2.zero;
+        reply.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        scroll.viewport = (RectTransform)viewport.transform;
+        scroll.content = rrt;
+        return reply;
+    }
+
     private static TextMeshProUGUI BuildChip(Transform parent)
     {
         GameObject chip = ImageGo("IntentChip", parent, ChipFill);
-        var le = chip.AddComponent<LayoutElement>(); le.minHeight = 52f; le.preferredHeight = 52f;
-        AddRounded(chip, 26f);                          // radius ≈ half height => pill
+        var le = chip.AddComponent<LayoutElement>(); le.minHeight = 44f; le.preferredHeight = 44f;
+        AddRounded(chip, 22f);                          // radius ≈ half height => pill
         var hlg = chip.AddComponent<HorizontalLayoutGroup>();
-        hlg.padding = new RectOffset(24, 24, 6, 6);
+        hlg.padding = new RectOffset(18, 18, 4, 4);
         hlg.childAlignment = TextAnchor.MiddleCenter;
         hlg.childControlWidth = true; hlg.childControlHeight = true;
         hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
@@ -215,16 +248,19 @@ public static class SuggestionsPanelBuilder
 
     private static GameObject BuildBadge(Transform parent)
     {
+        // Flow pill at the card top-left (hugs its text) — toggled on by SuggestionCard.Setup for
+        // the top card only. In the narrow grid card a top-right overlay would cover the reply text,
+        // so it lives in the layout flow above the reply instead.
         GameObject badge = ImageGo("RecommendedBadge", parent, AccentGreen);
-        var rt = (RectTransform)badge.transform;
-        rt.anchorMin = new Vector2(1, 1); rt.anchorMax = new Vector2(1, 1); rt.pivot = new Vector2(1, 1);
-        rt.anchoredPosition = new Vector2(-Sm, -Sm);
-        rt.sizeDelta = new Vector2(220, 56);
-        badge.AddComponent<LayoutElement>().ignoreLayout = true;   // overlay, not in card flow
-        AddRounded(badge, 28f);
-        TextMeshProUGUI t = Text("Label", badge.transform, "Рекомендуем", BadgeSize, White,
-            FontStyles.Bold, TextAlignmentOptions.Center);
-        Stretch((RectTransform)t.transform);
+        var le = badge.AddComponent<LayoutElement>(); le.minHeight = 36f; le.preferredHeight = 36f;
+        AddRounded(badge, 18f);                          // pill
+        var hlg = badge.AddComponent<HorizontalLayoutGroup>();
+        hlg.padding = new RectOffset(16, 16, 4, 4);
+        hlg.childAlignment = TextAnchor.MiddleCenter;
+        hlg.childControlWidth = true; hlg.childControlHeight = true;
+        hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
+        badge.AddComponent<ContentSizeFitter>().horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+        Text("Label", badge.transform, "Рекомендуем", BadgeSize, White, FontStyles.Bold, TextAlignmentOptions.Center);
         return badge;
     }
 
@@ -233,7 +269,7 @@ public static class SuggestionsPanelBuilder
         GameObject sk = ImageGo("Skeleton" + index, parent, SkeletonBase);
         AddRounded(sk, CardRadius);
         var le = sk.AddComponent<LayoutElement>();
-        le.minHeight = CardMinHeight; le.flexibleWidth = 1f;
+        le.minHeight = CellHeight; le.flexibleWidth = 1f;   // grid overrides size; harmless
         sk.AddComponent<CanvasGroup>();                 // shimmer target (panel pulses it)
         // Highlight bar inside the placeholder for the sweep cue.
         GameObject hi = ImageGo("Highlight", sk.transform, Hex("#F5F5F5"));

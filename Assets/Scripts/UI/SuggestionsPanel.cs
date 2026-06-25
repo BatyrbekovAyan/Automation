@@ -27,9 +27,13 @@ public class SuggestionsPanel : MonoBehaviour
     public event Action OnRefreshRequested;
 
     private readonly List<SuggestionCard> _cards = new();
-    private float _restY, _hiddenY;
-    private bool _metricsReady;
-    private Tween _slideTween;
+    private float _restY;            // panel bottom sits on the composer's top edge (set by the controller)
+    private bool _visible, _sliding;
+    private Tweener _slideTween;     // Tweener (not Tween) so ChangeEndValue is available for live retargeting
+
+    /// <summary>Full sheet height — the clearance the message list must leave above the composer.</summary>
+    public float Footprint => rt != null ? rt.rect.height : 0f;
+    private float HiddenY => _restY - Footprint;
 
     void Awake()
     {
@@ -37,22 +41,28 @@ public class SuggestionsPanel : MonoBehaviour
         if (errorRetryButton != null) errorRetryButton.onClick.AddListener(() => OnRefreshRequested?.Invoke());
     }
 
-    void OnEnable() => CaptureMetrics();
-
     void OnDisable()
     {
         _slideTween?.Kill();
         _slideTween = null;
+        _sliding = false;
         if (canvasGroup != null) canvasGroup.DOKill();
         StopShimmer();
     }
 
-    private void CaptureMetrics()
+    /// <summary>
+    /// Controller-fed: the panel's bottom edge must sit at the composer's TOP edge, i.e. at
+    /// `composerHeight` units above the MovingArea bottom. Repositions live when shown, retargets
+    /// the slide if mid-animation, or stores it for the next Show when hidden.
+    /// </summary>
+    public void SetComposerHeight(float composerHeight)
     {
-        if (_metricsReady || rt == null) return;
-        _restY = rt.anchoredPosition.y;
-        _hiddenY = _restY - rt.rect.height;
-        _metricsReady = true;
+        _restY = composerHeight;
+        if (rt == null) return;
+        if (_visible && !_sliding)
+            rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, _restY);
+        else if (_sliding && _slideTween != null && _slideTween.IsActive())
+            _slideTween.ChangeEndValue(new Vector2(rt.anchoredPosition.x, _visible ? _restY : HiddenY), true);
     }
 
     // --- 5-state machine ----------------------------------------------------
@@ -127,24 +137,29 @@ public class SuggestionsPanel : MonoBehaviour
     public void Show()
     {
         gameObject.SetActive(true);
-        CaptureMetrics();
+        _visible = true;
         _slideTween?.Kill();
-        if (canvasGroup != null) canvasGroup.DOKill();        // kill any in-flight fade too (rapid toggle)
-        if (rt != null) rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, _hiddenY);
-        if (canvasGroup != null) { canvasGroup.alpha = 0f; canvasGroup.DOFade(1f, 0.25f); }
-        if (rt != null) _slideTween = rt.DOAnchorPosY(_restY, 0.25f).SetEase(Ease.OutCubic);
+        if (canvasGroup != null) canvasGroup.alpha = 1f;     // no fade — pure slide up from behind the composer
+        if (rt != null)
+        {
+            rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, HiddenY);   // start behind composer, slide up to rest-Y
+            _sliding = true;
+            _slideTween = rt.DOAnchorPosY(_restY, 0.25f).SetEase(Ease.OutCubic).OnComplete(() => _sliding = false);
+        }
     }
 
     public void Hide()
     {
         if (!gameObject.activeSelf) return;
+        _visible = false;
         _slideTween?.Kill();
-        if (canvasGroup != null) { canvasGroup.DOKill(); canvasGroup.DOFade(0f, 0.20f); }
         if (rt != null)
-            _slideTween = rt.DOAnchorPosY(_hiddenY, 0.20f).SetEase(Ease.InCubic)
-                            .OnComplete(() => gameObject.SetActive(false));
-        else
-            gameObject.SetActive(false);
+        {
+            _sliding = true;
+            _slideTween = rt.DOAnchorPosY(HiddenY, 0.20f).SetEase(Ease.InCubic)   // slide back down behind the composer
+                            .OnComplete(() => { _sliding = false; gameObject.SetActive(false); });
+        }
+        else gameObject.SetActive(false);
     }
 
     // --- Skeleton shimmer (neutral, no spinner) -----------------------------
