@@ -43,6 +43,7 @@ public class SuggestionsPanel : MonoBehaviour
     {
         _slideTween?.Kill();
         _slideTween = null;
+        if (canvasGroup != null) canvasGroup.DOKill();
         StopShimmer();
     }
 
@@ -128,6 +129,7 @@ public class SuggestionsPanel : MonoBehaviour
         gameObject.SetActive(true);
         CaptureMetrics();
         _slideTween?.Kill();
+        if (canvasGroup != null) canvasGroup.DOKill();        // kill any in-flight fade too (rapid toggle)
         if (rt != null) rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, _hiddenY);
         if (canvasGroup != null) { canvasGroup.alpha = 0f; canvasGroup.DOFade(1f, 0.25f); }
         if (rt != null) _slideTween = rt.DOAnchorPosY(_restY, 0.25f).SetEase(Ease.OutCubic);
@@ -137,7 +139,7 @@ public class SuggestionsPanel : MonoBehaviour
     {
         if (!gameObject.activeSelf) return;
         _slideTween?.Kill();
-        if (canvasGroup != null) canvasGroup.DOFade(0f, 0.20f);
+        if (canvasGroup != null) { canvasGroup.DOKill(); canvasGroup.DOFade(0f, 0.20f); }
         if (rt != null)
             _slideTween = rt.DOAnchorPosY(_hiddenY, 0.20f).SetEase(Ease.InCubic)
                             .OnComplete(() => gameObject.SetActive(false));

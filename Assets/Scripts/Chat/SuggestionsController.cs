@@ -119,8 +119,9 @@ public class SuggestionsController : MonoBehaviour
     private void IssueRequest(string steerTowardText, string lastIncomingText)
     {
         if (ChatManager.Instance == null || _provider == null) return;
-        long seq = ++_requestSeq;                              // newest wins
+        long seq = ++_requestSeq;                              // newest wins (also supersedes any in-flight)
         string chatId = ChatManager.Instance.CurrentChatId;
+        if (string.IsNullOrEmpty(chatId)) return;             // no open chat → nothing to scope a request to (WR-02)
         if (_panel != null) _panel.ShowSkeleton();            // D-12: skeleton EVERY load
         var req = new SuggestionRequest
         {
