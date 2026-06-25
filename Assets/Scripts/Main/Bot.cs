@@ -171,6 +171,7 @@ public class Bot : MonoBehaviour
             PlayerPrefs.DeleteKey(transform.name + "TelegramWorkflowId");
             PlayerPrefs.DeleteKey(transform.name + "TelegramProfileId");
             PlayerPrefs.DeleteKey(transform.name + "WhatsappSyncUntil");
+            PlayerPrefs.DeleteKey(transform.name + "ReplyMode");
 
             if (PlayerPrefs.GetInt(transform.name + "ProductsNumber", 0) > 0)
             {
