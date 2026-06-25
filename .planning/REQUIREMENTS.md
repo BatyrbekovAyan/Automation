@@ -9,19 +9,26 @@ Requirements for this milestone. Build order: **Phase 1** = polished UI on mock 
 
 ### Semi-Auto Toggle
 
-- [ ] **SEMI-01**: Owner can flip a specific chat into semi-auto mode via a per-chat toggle
+- [x] **SEMI-01
+**: Owner can flip a specific chat into semi-auto mode via a per-chat toggle
 - [x] **SEMI-02
 **: Semi-auto state persists per chat across app restarts and bot switches (follows existing PlayerPrefs/chat conventions)
 - [ ] **SEMI-03**: The suggestions panel appears only in chats flipped to semi-auto; other chats stay autonomous/manual
 
 ### Panel UI
 
-- [ ] **PANEL-01**: Suggestions render as a bottom sheet above the composer, in the WhatsApp chat screen (extending the existing QuickReplyPanel / MessagesBottomPanel area)
-- [ ] **PANEL-02**: Panel shows 4 suggestion cards, each displaying reply text + an intent label (e.g. Price / Availability / Greeting)
-- [ ] **PANEL-03**: Cards are ordered best-first; the top card carries a "Recommended" badge (no numeric confidence shown)
-- [ ] **PANEL-04**: Panel handles loading, empty, and error states gracefully (no blank/jank)
-- [ ] **PANEL-05**: Panel can be dismissed/collapsed so the owner can fall back to free typing
-- [ ] **PANEL-06**: Long reply text truncates cleanly within a card without breaking layout
+- [x] **PANEL-01
+**: Suggestions render as a bottom sheet above the composer, in the WhatsApp chat screen (extending the existing QuickReplyPanel / MessagesBottomPanel area)
+- [x] **PANEL-02
+**: Panel shows 4 suggestion cards, each displaying reply text + an intent label (e.g. Price / Availability / Greeting)
+- [x] **PANEL-03
+**: Cards are ordered best-first; the top card carries a "Recommended" badge (no numeric confidence shown)
+- [x] **PANEL-04
+**: Panel handles loading, empty, and error states gracefully (no blank/jank)
+- [x] **PANEL-05
+**: Panel can be dismissed/collapsed so the owner can fall back to free typing
+- [x] **PANEL-06
+**: Long reply text truncates cleanly within a card without breaking layout
 
 ### Interaction
 
