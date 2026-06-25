@@ -13,7 +13,8 @@ Requirements for this milestone. Build order: **Phase 1** = polished UI on mock 
 **: Owner can flip a specific chat into semi-auto mode via a per-chat toggle
 - [x] **SEMI-02
 **: Semi-auto state persists per chat across app restarts and bot switches (follows existing PlayerPrefs/chat conventions)
-- [ ] **SEMI-03**: The suggestions panel appears only in chats flipped to semi-auto; other chats stay autonomous/manual
+- [x] **SEMI-03
+**: The suggestions panel appears only in chats flipped to semi-auto; other chats stay autonomous/manual
 
 ### Panel UI
 
@@ -32,10 +33,14 @@ Requirements for this milestone. Build order: **Phase 1** = polished UI on mock 
 
 ### Interaction
 
-- [ ] **INT-01**: Tapping a card loads its text into the composer to edit — it never auto-sends
-- [ ] **INT-02**: Suggestions auto-populate when a new incoming customer message arrives, but never overwrite an in-progress composer edit
-- [ ] **INT-03**: Owner can manually refresh to request a fresh set of suggestions
-- [ ] **INT-04**: Picking a card regenerates a fresh set of 4 suggestions re-clustered/re-ranked toward that pick (the steering loop); owner can keep refining or edit + send
+- [x] **INT-01
+**: Tapping a card loads its text into the composer to edit — it never auto-sends
+- [x] **INT-02
+**: Suggestions auto-populate when a new incoming customer message arrives, but never overwrite an in-progress composer edit
+- [x] **INT-03
+**: Owner can manually refresh to request a fresh set of suggestions
+- [x] **INT-04
+**: Picking a card regenerates a fresh set of 4 suggestions re-clustered/re-ranked toward that pick (the steering loop); owner can keep refining or edit + send
 
 ### Data & Provider Seam
 
