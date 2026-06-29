@@ -2369,7 +2369,7 @@ public class Manager : MonoBehaviour
         // form.AddField("ProductsList", "");
         // form.AddField("ServicesList", "");
         //
-        // using UnityWebRequest www = UnityWebRequest.Post("https://bagkz.app.n8n.cloud/webhook/CreateWhatsappWorkflow", form);
+        // using UnityWebRequest www = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateWhatsappWorkflow", form);
         // yield return www.SendWebRequest();
         //
         // if (www.result != UnityWebRequest.Result.Success)
@@ -2461,7 +2461,7 @@ public class Manager : MonoBehaviour
         form.AddField("ProductsList", "Products:\n" + productsList);
         form.AddField("ServicesList", "Services:\n" + servicesList);
 
-        using UnityWebRequest www = UnityWebRequest.Post("https://bagkz.app.n8n.cloud/webhook/CreateWhatsappWorkflow", form);
+        using UnityWebRequest www = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateWhatsappWorkflow", form);
         yield return www.SendWebRequest();
 
         bool resolved = false;
@@ -2511,7 +2511,7 @@ public class Manager : MonoBehaviour
         // form.AddField("ProductsList", "");
         // form.AddField("ServicesList", "");
         //
-        // using UnityWebRequest www = UnityWebRequest.Post("https://bagkz.app.n8n.cloud/webhook/CreateTelegramWorkflow", form);
+        // using UnityWebRequest www = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateTelegramWorkflow", form);
         // yield return www.SendWebRequest();
         //
         // if (www.result == UnityWebRequest.Result.Success)
@@ -2604,7 +2604,7 @@ public class Manager : MonoBehaviour
         form.AddField("ProductsList", "Products:\n" + productsList);
         form.AddField("ServicesList", "Services:\n" + servicesList);
 
-        using UnityWebRequest www = UnityWebRequest.Post("https://bagkz.app.n8n.cloud/webhook/CreateTelegramWorkflow", form);
+        using UnityWebRequest www = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateTelegramWorkflow", form);
         yield return www.SendWebRequest();
 
         bool resolved = false;
@@ -2644,7 +2644,7 @@ public class Manager : MonoBehaviour
 
         WWWForm form = new();
 
-        using UnityWebRequest www = UnityWebRequest.Post($"https://bagkz.app.n8n.cloud/api/v1/workflows/{id}/" + (enabled ? "activate" : "deactivate"), form);
+        using UnityWebRequest www = UnityWebRequest.Post($"{n8nBaseUrl}/api/v1/workflows/{id}/" + (enabled ? "activate" : "deactivate"), form);
 
         www.SetRequestHeader("X-N8N-API-KEY", n8nAPIKey);
 
@@ -2674,7 +2674,7 @@ public class Manager : MonoBehaviour
 
         WWWForm form = new();
 
-        using UnityWebRequest www = UnityWebRequest.Post($"https://bagkz.app.n8n.cloud/api/v1/workflows/{id}/" + (enabled ? "activate" : "deactivate"), form);
+        using UnityWebRequest www = UnityWebRequest.Post($"{n8nBaseUrl}/api/v1/workflows/{id}/" + (enabled ? "activate" : "deactivate"), form);
 
         www.SetRequestHeader("X-N8N-API-KEY", n8nAPIKey);
 
@@ -2695,7 +2695,7 @@ public class Manager : MonoBehaviour
 
     private IEnumerator DeleteWhatsappWorkflow(string whatsappWorkflowId, bool deletingBot)
     {
-        using UnityWebRequest whatsappRequest = UnityWebRequest.Delete($"https://bagkz.app.n8n.cloud/api/v1/workflows/{whatsappWorkflowId}");
+        using UnityWebRequest whatsappRequest = UnityWebRequest.Delete($"{n8nBaseUrl}/api/v1/workflows/{whatsappWorkflowId}");
 
         whatsappRequest.SetRequestHeader("X-N8N-API-KEY", n8nAPIKey);
 
@@ -2713,7 +2713,7 @@ public class Manager : MonoBehaviour
 
     private IEnumerator DeleteTelegramWorkflow(string telegramWorkflowId, bool deletingBot)
     {
-        using UnityWebRequest telegramRequest = UnityWebRequest.Delete($"https://bagkz.app.n8n.cloud/api/v1/workflows/{telegramWorkflowId}");
+        using UnityWebRequest telegramRequest = UnityWebRequest.Delete($"{n8nBaseUrl}/api/v1/workflows/{telegramWorkflowId}");
 
         telegramRequest.SetRequestHeader("X-N8N-API-KEY", n8nAPIKey);
 
@@ -2815,7 +2815,7 @@ public class Manager : MonoBehaviour
             PlayerPrefs.SetInt(openBot.name + "isOnWhatsapp", openBotSettings.WhatsappToggle.isOn ? 1 : 0);
 
 
-            using UnityWebRequest editWhatsappRequest = UnityWebRequest.Post("https://bagkz.app.n8n.cloud/webhook/EditWhatsappWorkflow", form);
+            using UnityWebRequest editWhatsappRequest = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/EditWhatsappWorkflow", form);
 
             editWhatsappRequest.SetRequestHeader("X-N8N-API-KEY", n8nAPIKey);
 
@@ -2852,7 +2852,7 @@ public class Manager : MonoBehaviour
             PlayerPrefs.SetInt(openBot.name + "isOnTelegram", openBotSettings.TelegramToggle.isOn ? 1 : 0);
 
 
-            using UnityWebRequest editTelegramRequest = UnityWebRequest.Post("https://bagkz.app.n8n.cloud/webhook/EditTelegramWorkflow", form);
+            using UnityWebRequest editTelegramRequest = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/EditTelegramWorkflow", form);
 
             editTelegramRequest.SetRequestHeader("X-N8N-API-KEY", n8nAPIKey);
 
@@ -3069,7 +3069,7 @@ public class Manager : MonoBehaviour
         //string originalName = "MyImportantDocument.pdf";
         //string path = Path.Combine(filePath, originalName);
 
-        string uploadUrl = "https://bagkz.app.n8n.cloud/webhook-test/UploadFile";
+        string uploadUrl = $"{n8nBaseUrl}/webhook/UploadFile";
 
         byte[] fileData = File.ReadAllBytes(filePath);
         string fileName = Path.GetFileName(filePath);

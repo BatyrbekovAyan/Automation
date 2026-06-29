@@ -507,7 +507,7 @@ public partial class BotSettings
         }
 
 
-        using UnityWebRequest www = UnityWebRequest.Post("https://bagkz.app.n8n.cloud/webhook-test/UploadFile", form);
+        using UnityWebRequest www = UnityWebRequest.Post($"{Manager.n8nBaseUrl}/webhook/UploadFile", form);
 
         yield return www.SendWebRequest();
 
