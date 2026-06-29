@@ -51,13 +51,28 @@ The app reads `n8nBaseUrl` via `Manager.n8nBaseUrl` (empty → Cloud default).
 
 ## Importing the dev-config workflows
 
-After creating local credentials (`n8nAPIKey`, `WappiAuthToken`, …), run:
-```bash
-python3 Tools/n8n/apply-dev-config.py        # derives Tools/n8n/workflows-local/
-n8n import:workflow --separate --input=Tools/n8n/workflows-local/
-```
-Then in the n8n UI activate the handler workflows (`CreateWhatsappWorkflow`,
-`CreateTelegramWorkflow`, `Edit Whatsapp Workflow`, `Edit Telegram Workflow`,
-`Upload File`); leave the two clone sources (`WhatsApp Bot`, `Telegram Bot`) inactive.
+After creating local credentials (`n8n account`, `n8nAPIKey`, `WappiAuthToken`, …):
 
-> Stop n8n before any `n8n import:workflow` (the CLI writes the SQLite DB directly).
+```bash
+# 1) derive — N8N_PUBLIC_URL = your tunnel host so the Wappi callback host points at the
+#    tunnel (NOT Cloud); internal /api/v1 calls are rewritten to localhost automatically.
+N8N_PUBLIC_URL=https://<tunnel-host> python3 Tools/n8n/apply-dev-config.py
+
+# 2) stop n8n (the CLI writes the SQLite DB directly), then import (upserts by id)
+n8n import:workflow --separate --input=Tools/n8n/workflows-local/
+
+# 3) activate ONLY the 5 handlers (publish). Leave the 2 clone sources inactive —
+#    they share webhook path 0091024b-7b46 and would collide if activated.
+for id in XuvOp7TxOImOAmlj Uz6HBBUpAiUqVysB 3qax5J9u2qsT9Vao TwWPW3gIyjZS3foR KoTuIlk4LMrlvnWI; do
+  n8n publish:workflow --id="$id"
+done
+
+# 4) restart
+WEBHOOK_URL=https://<tunnel-host> n8n start
+```
+
+Verify: `sqlite3 ~/.n8n/database.sqlite "SELECT active,name FROM workflow_entity ORDER BY active DESC;"`
+→ 5 handlers `active=1`, `WhatsApp Bot` / `Telegram Bot` `active=0`.
+
+> Note (zsh): `for id in $VAR` does NOT word-split in zsh — use a literal list as above.
+> Note: `update:workflow --active` is deprecated → use `publish:workflow`.

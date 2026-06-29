@@ -18,6 +18,11 @@ DB = os.path.expanduser("~/.n8n/database.sqlite")
 
 CLOUD_API = "https://bagkz.app.n8n.cloud/api/v1"
 LOCAL_API = "http://localhost:5678/api/v1"
+# Public callback host registered WITH Wappi for incoming messages — must be the
+# internet-reachable tunnel URL (Wappi cannot reach localhost). Passed via env so
+# the dynamic quick-tunnel URL is not baked into the committed canonical workflows.
+CLOUD_WEBHOOK = "https://bagkz.app.n8n.cloud/webhook/"
+PUBLIC = os.environ.get("N8N_PUBLIC_URL", "").rstrip("/")
 
 
 def local_credentials():
@@ -50,10 +55,15 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     cred_by_name = local_credentials()
     missing = set()
+    webhook_unrewritten = []
     files = sorted(f for f in os.listdir(SRC) if f.endswith(".json"))
     for f in files:
         text = open(os.path.join(SRC, f)).read()
         text = text.replace(CLOUD_API, LOCAL_API)
+        if PUBLIC:
+            text = text.replace(CLOUD_WEBHOOK, PUBLIC + "/webhook/")
+        elif CLOUD_WEBHOOK in text:
+            webhook_unrewritten.append(f)
         text = text.replace("/activate ", "/activate")  # trailing-space bug
         wf = json.loads(text)
         for node in wf.get("nodes", []):
@@ -62,8 +72,13 @@ def main():
         print(f"  wrote {f}")
     print(f"\n{len(files)} workflows -> {OUT}")
     print(f"local credentials found: {sorted(cred_by_name)}")
+    print(f"public webhook host (N8N_PUBLIC_URL): {PUBLIC or '(unset)'}")
     if missing:
         print(f"\n⚠️  credentials referenced but NOT found locally (create them, re-run): {sorted(missing)}")
+    if webhook_unrewritten:
+        print(f"\n⚠️  N8N_PUBLIC_URL not set — Wappi callback host left as Cloud in: {webhook_unrewritten}")
+        print("    Set N8N_PUBLIC_URL=<tunnel-https-url> and re-run, or local-dev bots will")
+        print("    register incoming webhooks against PRODUCTION Cloud n8n.")
 
 
 if __name__ == "__main__":
