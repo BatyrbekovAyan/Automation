@@ -202,6 +202,17 @@ public class Manager : MonoBehaviour
     #endregion
 
 
+    public void Awake()
+    {
+        // Warm the secrets cache before anything makes an API call. On Android the
+        // StreamingAssets file lives inside the APK and can only be read asynchronously
+        // (UnityWebRequest), so we kick the load off here — the earliest lifecycle hook —
+        // and let it populate the cache before any user-driven request or the next-frame
+        // chat sync fires. iOS/Editor/desktop read the file directly in the same frame.
+        // See Secrets.cs.
+        StartCoroutine(Secrets.Preload());
+    }
+
     public void Start()
     {
         Application.targetFrameRate = 60;
