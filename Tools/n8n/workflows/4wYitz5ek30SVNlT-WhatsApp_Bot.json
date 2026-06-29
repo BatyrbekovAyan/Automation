@@ -1,0 +1,1076 @@
+{
+  "name": "WhatsApp Bot",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "0091024b-7b46",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -3776,
+        -96
+      ],
+      "id": "fd0eff33-adce-4fb6-8d7f-774f51bba520",
+      "name": "Webhook",
+      "webhookId": "0eeb25df-f40b-4fb8-8003-2a80648ddb17"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wappi.pro/api/sync/message/send",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "profile_id",
+              "value": "={{ $('Webhook').item.json.body.messages[0].profile_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "body",
+              "value": "={{ $json.text }}"
+            },
+            {
+              "name": "=recipient",
+              "value": "={{ $('Webhook').item.json.body.messages[0].from }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        208,
+        288
+      ],
+      "id": "fb823641-ff80-4105-909d-e703a129bfb8",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "EuhhqAaV56DpoqAN",
+          "name": "WappiAuthToken"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "binaryPropertyName": "=data",
+        "options": {}
+      },
+      "id": "ae85e601-ac83-4b93-81f3-b37efe2aec68",
+      "name": "Transcribe Audio",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "position": [
+        -2816,
+        -144
+      ],
+      "typeVersion": 1.8,
+      "credentials": {
+        "openAiApi": {
+          "id": "XVjhR1xlWrIgJjKz",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c53cd9f9-77c1-4331-98ff-bfc9bdf95a3c",
+              "name": "text",
+              "type": "string",
+              "value": "={{ $('Webhook').item.json.body.messages[0].body }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9611c2d6-966f-4989-9bec-b337bcebfcec",
+      "name": "Text",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -2816,
+        -368
+      ],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "219577d5-b028-48fc-90be-980f4171ab68",
+              "name": "text",
+              "type": "string",
+              "value": "={{ $json.text }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8488b3d8-f8d6-4289-b9a4-d074f9ffd371",
+      "name": "Audio",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -2624,
+        -144
+      ],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.text }}",
+        "options": {
+          "systemMessage": "=You are an intelligent assistant. Your purpose is to analyze various types of input and provide helpful, accurate responses.\n\nCAPABILITIES:\n- Process and respond to text messages\n\nINPUT HANDLING:\nAnalyze the content, understand the intent, and provide a relevant response.\n\n\nRESPONSE GUIDELINES:\n- Be concise but thorough\n- No speculation\n- Maintain a professional and helpful tone\n- When uncertain, acknowledge limitations\n- Format responses for easy reading on mobile devices\n- Do not offer further assistance, ask follow-up questions, or end with phrases like 'Is there anything else?' or 'How else can I help you?' Answer the question and then stop. \n- End your response immediately after the final fact\n- Keep answers shot\n- Never think up or invent any information and facts, if you do not know the answer, just say that you dont know\n\nLIMITATIONS:\n- Mention if you're unable to process certain file formats\n\nSECURITY & PRIVACY:\n- Do not share personal information across different user interactions\n- Inform users about data privacy limitations when relevant\n\nAnalyze all inputs, Chat Memory and relevent documents from Supabase Vector Store tool carefully before responding. Your goal is to provide value through accurate information and helpful assistance.\n\n\n# RULES\nUse the **Chat Memory** to store  all input and output messages.\n\n# Tools\n##Supabase Vector Store##\nUse Supabase Vector Store tool to get relevant information and prices for products and services"
+        }
+      },
+      "id": "ea25c962-4546-41e1-9183-db71b5caf2bd",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        -2272,
+        -144
+      ],
+      "typeVersion": 1.8
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "08fd0c80-307e-4f45-b1de-35192ee4ec5e",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.body.messages[0].type }}",
+                    "rightValue": "chat"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Text"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "b7b64446-f1ea-4622-990c-22f3999a8269",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.body.messages[0].type }}",
+                    "rightValue": "ptt"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Audio"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "202af928-a324-411a-bf15-68a349e7bf9e",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.body.messages[0].type }}",
+                    "rightValue": "image"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Image"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "c63299e9-6069-4bc6-afb9-7beebf6e3d69",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.body.messages[0].type }}",
+                    "rightValue": "document"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Document"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "14f99636-1964-4d74-8ee2-754a572fa047",
+      "name": "Input type",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        -3280,
+        -160
+      ],
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wappi.pro/api/sync/message/mark/read",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "profile_id",
+              "value": "={{ $('Webhook').item.json.body.messages[0].profile_id }}"
+            },
+            {
+              "name": "mark_all",
+              "value": "true"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "message_id",
+              "value": "={{ $('Webhook').item.json.body.messages[0].id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1712,
+        -144
+      ],
+      "id": "64c6557b-7080-4125-8024-c5791f867c69",
+      "name": "Mark Read",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "EuhhqAaV56DpoqAN",
+          "name": "WappiAuthToken"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wappi.pro/api/sync/chat/typing/start",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "profile_id",
+              "value": "={{ $('Webhook').item.json.body.messages[0].profile_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "recipient",
+              "value": "={{ $('Webhook').item.json.body.messages[0].from }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -944,
+        -160
+      ],
+      "id": "f01b6d39-a071-482b-843d-89bfe99b5a66",
+      "name": "Typing",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "EuhhqAaV56DpoqAN",
+          "name": "WappiAuthToken"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": "={{ $json.wordCount / 2 + 2 }}"
+      },
+      "id": "d01ce82a-8075-480e-ab10-7c720c0dd5d5",
+      "name": "Reading Pause",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        -1088,
+        -320
+      ],
+      "webhookId": "99b49c83-d956-46d2-b8d3-d65622121ad9",
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "amount": "={{ $json.wordCount / 2 + 2}} "
+      },
+      "id": "b0a2da36-ace0-49b5-8f79-22ef6c1710c5",
+      "name": "Typing Pause",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        -560,
+        -160
+      ],
+      "webhookId": "99b49c83-d956-46d2-b8d3-d65622121ad9",
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {},
+      "id": "8895379d-0337-4049-a994-cabc3b429d2b",
+      "name": "Pause Before Reading",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        -1920,
+        -144
+      ],
+      "webhookId": "99b49c83-d956-46d2-b8d3-d65622121ad9",
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c53cd9f9-77c1-4331-98ff-bfc9bdf95a3c",
+              "name": "text",
+              "type": "string",
+              "value": "=Please send text messages"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a96b157a-2cf3-4272-8172-00d45bec8c32",
+      "name": "Ask to Send Text",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -2816,
+        288
+      ],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "08fd0c80-307e-4f45-b1de-35192ee4ec5e",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $('Webhook').item.json.body.messages[0].type }}",
+                    "rightValue": "chat"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Text"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "b7b64446-f1ea-4622-990c-22f3999a8269",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $('Webhook').item.json.body.messages[0].type }}",
+                    "rightValue": "ptt"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Audio"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "202af928-a324-411a-bf15-68a349e7bf9e",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $('Webhook').item.json.body.messages[0].type }}",
+                    "rightValue": "image"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Image"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "c63299e9-6069-4bc6-afb9-7beebf6e3d69",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $('Webhook').item.json.body.messages[0].type }}",
+                    "rightValue": "document"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Document"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0b742ea5-57d3-4660-95ab-728c5a5b35ac",
+      "name": "Input type2",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        -1488,
+        -176
+      ],
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "jsCode": "function countWords(str) { \n  const matches = str.match(/\\p{L}[\\p{L}\\p{N}_']*/gu);\n  return matches ? matches.length : 0; \n} \nreturn [{ \n    json: { wordCount: countWords($('AI Agent').first().json.output) } \n  }];"
+      },
+      "id": "59cd8e85-a77a-4897-9a98-bae9ed60f301",
+      "name": "Count Output Words",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -752,
+        -160
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "jsCode": "function countWords(str) { \n  const matches = str.match(/\\p{L}[\\p{L}\\p{N}_']*/gu);\n  return matches ? matches.length : 0; \n} \nreturn [{ \n    json: { wordCount: countWords($('Webhook').first().json.body.messages[0].body) } \n  }];"
+      },
+      "id": "5301f6e8-8aad-484d-a670-664dd58b6e7c",
+      "name": "Count Input Words",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -1280,
+        -320
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.body.messages[0].file_link }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "afaeebb6-9fd1-4c7d-abf7-274103a63012",
+      "name": "Download Audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -3024,
+        -144
+      ],
+      "typeVersion": 4.2,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "EuhhqAaV56DpoqAN",
+          "name": "WappiAuthToken"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": "={{ $('Webhook').item.json.body.messages[0].media_info.duration + 2 }}"
+      },
+      "id": "8c44f40d-20a0-4a8f-9fb4-87960b5188dc",
+      "name": "Listening Pause",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        -1184,
+        -160
+      ],
+      "webhookId": "99b49c83-d956-46d2-b8d3-d65622121ad9",
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Webhook').item.json.body.messages[0].from + $('Webhook').item.json.body.messages[0].to || $('Webhook').item.json.body.messages[0].to + $('Webhook').item.json.body.messages[0].from}}",
+        "contextWindowLength": 50
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        -2240,
+        32
+      ],
+      "id": "6e75d2df-62af-4941-a833-20c9be5dea09",
+      "name": "Chat Memory",
+      "credentials": {
+        "postgres": {
+          "id": "1H5xlpFSESU4w6JH",
+          "name": "Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "aa86d0bf-7a03-4435-b592-5970f6c53ff1",
+              "leftValue": "={{ $json.body.messages[0].from }}",
+              "rightValue": "={{ $json.body.messages[0].chatId }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -3536,
+        -96
+      ],
+      "id": "e39c6baa-36ba-4a08-956f-e798a2992223",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {
+          "frequencyPenalty": 0.2,
+          "maxTokens": 200,
+          "responseFormat": "text",
+          "temperature": 0.2,
+          "maxRetries": 2
+        }
+      },
+      "id": "079f0580-3d7b-4877-89d7-786d2778a349",
+      "name": "OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        -2368,
+        32
+      ],
+      "typeVersion": 1.2,
+      "credentials": {
+        "openAiApi": {
+          "id": "XVjhR1xlWrIgJjKz",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Use this tool to retrieve data from the Supabase Vector Store where the important documents are stored.",
+        "tableName": {
+          "__rl": true,
+          "value": "documents",
+          "mode": "list",
+          "cachedResultName": "documents"
+        },
+        "topK": 20,
+        "useReranker": true,
+        "options": {
+          "queryName": "match_documents"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        -2096,
+        32
+      ],
+      "id": "27d2c21f-f412-4bce-84c4-104b3ce3f367",
+      "name": "Supabase Vector Store",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ifCYb9DhUxoCq3pu",
+          "name": "Supabase"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c53cd9f9-77c1-4331-98ff-bfc9bdf95a3c",
+              "name": "text",
+              "type": "string",
+              "value": "={{ $('AI Agent').item.json.output }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0876451d-2948-4772-919c-1065836347b8",
+      "name": "Retrieve Answer",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -256,
+        -160
+      ],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.rerankerCohere",
+      "typeVersion": 1,
+      "position": [
+        -1936,
+        176
+      ],
+      "id": "dd719583-4d4d-414b-9bdf-b622fca65b47",
+      "name": "Reranker Cohere",
+      "credentials": {
+        "cohereApi": {
+          "id": "LT4M1G33fto2SYNB",
+          "name": "CohereApi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -2096,
+        176
+      ],
+      "id": "67901179-fe62-4c41-bcda-6e0a985710a3",
+      "name": "OpenAI Embedding",
+      "credentials": {
+        "openAiApi": {
+          "id": "XVjhR1xlWrIgJjKz",
+          "name": "OpenAi account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribe Audio": {
+      "main": [
+        [
+          {
+            "node": "Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Text": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Audio": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Pause Before Reading",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Input type": {
+      "main": [
+        [
+          {
+            "node": "Text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Download Audio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ask to Send Text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ask to Send Text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ask to Send Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Read": {
+      "main": [
+        [
+          {
+            "node": "Input type2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Typing": {
+      "main": [
+        [
+          {
+            "node": "Count Output Words",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reading Pause": {
+      "main": [
+        [
+          {
+            "node": "Typing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Typing Pause": {
+      "main": [
+        [
+          {
+            "node": "Retrieve Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pause Before Reading": {
+      "main": [
+        [
+          {
+            "node": "Mark Read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask to Send Text": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Count Output Words": {
+      "main": [
+        [
+          {
+            "node": "Typing Pause",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Input type2": {
+      "main": [
+        [
+          {
+            "node": "Count Input Words",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Listening Pause",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Count Input Words": {
+      "main": [
+        [
+          {
+            "node": "Reading Pause",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Audio": {
+      "main": [
+        [
+          {
+            "node": "Transcribe Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Listening Pause": {
+      "main": [
+        [
+          {
+            "node": "Typing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Input type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Vector Store": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve Answer": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reranker Cohere": {
+      "ai_reranker": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "ai_reranker",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Embedding": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": {},
+  "triggerCount": 1,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "4wYitz5ek30SVNlT",
+  "active": false
+}

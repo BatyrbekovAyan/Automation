@@ -1,0 +1,1196 @@
+{
+  "name": "Upload File",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "UploadFile",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1344,
+        464
+      ],
+      "id": "06994814-aad3-42a4-9b95-82fab7e46ee6",
+      "name": "Webhook",
+      "webhookId": "b45566e0-633a-4fa7-9e2f-10e975657efc"
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "tableName": {
+          "__rl": true,
+          "value": "documents",
+          "mode": "list",
+          "cachedResultName": "documents"
+        },
+        "options": {
+          "queryName": "match_documents"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        4480,
+        432
+      ],
+      "id": "98f45385-26be-45d7-9bd6-a89ff96ecde6",
+      "name": "Supabase Vector Store",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ifCYb9DhUxoCq3pu",
+          "name": "Supabase"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        4480,
+        624
+      ],
+      "id": "74520661-56e1-40fb-9c5d-aaf5d69eb08b",
+      "name": "Embeddings OpenAI",
+      "credentials": {
+        "openAiApi": {
+          "id": "XVjhR1xlWrIgJjKz",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Function to remove all null bytes from a string\nfunction removeNullBytes(str) {\n  return str.replace(/\\0/g, ''); \n}\n\nconst outputItems = [];\n\nfor (const item of $input.all()) {\n  // *** Corrected line: Define the exact field name as a string literal ***\n  const fieldName = 'text'; \n\n  if (item.json[fieldName] && typeof item.json[fieldName] === 'string') {\n    // Sanitize the data in place\n    item.json[fieldName] = removeNullBytes(item.json[fieldName]);\n  }\n  \n  outputItems.push(item);\n}\n\nreturn outputItems;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2960,
+        432
+      ],
+      "id": "ccc0c501-6e2d-4613-b990-6d6df3fd9147",
+      "name": "Clean Text"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.name }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        4864,
+        432
+      ],
+      "id": "a5ca6b1c-ac66-4f5d-bd50-5f7abff22a79",
+      "name": "Return File Id"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "533a84d0-6760-4575-82c8-b4fcd20cbf38",
+              "name": "fileId",
+              "value": "={{ $binary.data.fileName + '_' + Date.now()}}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -944,
+        464
+      ],
+      "id": "acce9464-7bdc-4a38-a688-7543598a2e9e",
+      "name": "Set File Id"
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "binaryPropertyName": "whatsappWorkflowId",
+        "destinationKey": "whatsappWorkflowId",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -528,
+        464
+      ],
+      "id": "cab3e3b8-7979-4007-9dff-e4b554a3f2c9",
+      "name": "Extract Whatsapp Workflow Id"
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $json.content }}",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "={{\n(() => {\n  const whatsappWorkflowId = $('Extract Whatsapp Workflow Id').item.json.whatsappWorkflowId;\n  let metadataValues;\n\n  if (whatsappWorkflowId !== \"-1\") {\n    metadataValues = $('Add Whatsapp Filter').item.json.nodes[21].parameters.options.metadata.metadataValues;\n  } else {\n    metadataValues = $('Add Telegram Filter').item.json.nodes[21].parameters.options.metadata.metadataValues;\n  }\n\n  // Returns the name of the last item in the array\n  return metadataValues.at(-1)?.name;\n})()\n}}",
+                "value": "={{ $('Set File Id').item.json.fileId }}"
+              },
+              {
+                "name": "contentType",
+                "value": "={{ $('Extract Content Type').item.json.contentType }}"
+              },
+              {
+                "name": "chunkIndex",
+                "value": "={{ $json.metadata.chunkIndex }}"
+              },
+              {
+                "name": "chunkCount",
+                "value": "={{ $json.metadata.chunkCount }}"
+              },
+              {
+                "name": "source",
+                "value": "={{ $json.metadata.source }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        4656,
+        624
+      ],
+      "id": "51091986-604a-4942-b4aa-1710f0cb75c9",
+      "name": "Data Loader"
+    },
+    {
+      "parameters": {
+        "jsCode": "function decodeMimeQP(encodedString) {\n    // Декодирование из формата =?UTF-8?Q?...?=\n    if (encodedString.startsWith('=?utf-8?Q?') && encodedString.endsWith('?=')) {\n        let content = encodedString.substring(10, encodedString.length - 2);\n        // Замена '_', используемого вместо пробела\n        content = content.replace(/_/g, ' ');\n        // Декодирование шестнадцатеричных последовательностей (=D0=A3)\n        return decodeURIComponent(content.replace(/=([0-9A-F]{2})/g, '%$1'));\n    }\n    return encodedString; // Возвращаем исходную строку, если формат не QP\n}\n\n// Access the first item from the input using $input.first()\nconst firstItem = $input.first();\n\n// Check if binary data exists within the first item\nif (firstItem && firstItem.binary && firstItem.binary.data && firstItem.binary.data.fileName) {\n    const originalFileName = firstItem.binary.data.fileName;\n    const decodedFileName = decodeMimeQP(originalFileName);\n    \n    // Обновляем объект бинарных данных новым именем файла\n    firstItem.binary.data.fileName = decodedFileName;\n}\n\n// Return the modified input items\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1136,
+        464
+      ],
+      "id": "3a4c7fed-5dcb-4370-af88-ace854c57527",
+      "name": "Get File Name"
+    },
+    {
+      "parameters": {
+        "url": "=https://bagkz.app.n8n.cloud/api/v1/workflows/{{ $('Extract Whatsapp Workflow Id').item.json.whatsappWorkflowId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        544,
+        592
+      ],
+      "id": "c3ef9a6a-1530-4630-871d-65ac2593f7c2",
+      "name": "Get Whatsapp Workflow",
+      "credentials": {
+        "n8nApi": {
+          "id": "X1k4igOAG65Fb3oz",
+          "name": "n8n account"
+        },
+        "httpBearerAuth": {
+          "id": "nfU8CbYjPssGjEZA",
+          "name": "Bearer Auth account"
+        },
+        "httpHeaderAuth": {
+          "id": "RV7m661NMLPXEcvm",
+          "name": "n8nAPIKey"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://bagkz.app.n8n.cloud/api/v1/workflows/{{ $('Get Whatsapp Workflow').item.json.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1040,
+        592
+      ],
+      "id": "0f749cb5-d44c-44c5-a26a-7fff8b934f51",
+      "name": "Update Whatsapp Workflow",
+      "credentials": {
+        "n8nApi": {
+          "id": "X1k4igOAG65Fb3oz",
+          "name": "n8n account"
+        },
+        "httpBearerAuth": {
+          "id": "nfU8CbYjPssGjEZA",
+          "name": "Bearer Auth account"
+        },
+        "httpHeaderAuth": {
+          "id": "RV7m661NMLPXEcvm",
+          "name": "n8nAPIKey"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a1e10cd8-8a71-4c78-b1ed-9835cf19c087",
+              "leftValue": "={{ $('Extract Whatsapp Workflow Id').item.json.whatsappWorkflowId }}",
+              "rightValue": "-1",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        272,
+        768
+      ],
+      "id": "216d581f-7ea9-4ca9-9582-fe2e19be0251",
+      "name": "If Whatsapp Id Exists"
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "binaryPropertyName": "telegramWorkflowId",
+        "destinationKey": "telegramWorkflowId",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -320,
+        464
+      ],
+      "id": "7c318c83-660b-4cdf-b55a-2595a06efa18",
+      "name": "Extract Telegram Workflow Id"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a1e10cd8-8a71-4c78-b1ed-9835cf19c087",
+              "leftValue": "={{ $('Extract Telegram Workflow Id').item.json.telegramWorkflowId }}",
+              "rightValue": "-1",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1440,
+        784
+      ],
+      "id": "e5825379-9e5e-4294-89c0-4792f0f6c0a0",
+      "name": "If Telegram Id Exists"
+    },
+    {
+      "parameters": {
+        "url": "=https://bagkz.app.n8n.cloud/api/v1/workflows/{{ $('Extract Telegram Workflow Id').item.json.telegramWorkflowId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1680,
+        592
+      ],
+      "id": "8e8756fd-bdc8-4008-9279-02a65d42a90f",
+      "name": "Get Telegram Workflow",
+      "credentials": {
+        "n8nApi": {
+          "id": "X1k4igOAG65Fb3oz",
+          "name": "n8n account"
+        },
+        "httpBearerAuth": {
+          "id": "nfU8CbYjPssGjEZA",
+          "name": "Bearer Auth account"
+        },
+        "httpHeaderAuth": {
+          "id": "RV7m661NMLPXEcvm",
+          "name": "n8nAPIKey"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://bagkz.app.n8n.cloud/api/v1/workflows/{{ $('Get Telegram Workflow').item.json.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2176,
+        592
+      ],
+      "id": "1f33e5b7-ea14-483c-97c4-2addc2a8c9a0",
+      "name": "Update Telegram Workflow",
+      "credentials": {
+        "n8nApi": {
+          "id": "X1k4igOAG65Fb3oz",
+          "name": "n8n account"
+        },
+        "httpBearerAuth": {
+          "id": "nfU8CbYjPssGjEZA",
+          "name": "Bearer Auth account"
+        },
+        "httpHeaderAuth": {
+          "id": "RV7m661NMLPXEcvm",
+          "name": "n8nAPIKey"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1f432e83-78ce-4105-9907-0ad76fd40bcb",
+              "name": "nodes[21].parameters.options.metadata",
+              "value": "={{\n(() => {\n  const old = $json.nodes?.[21]?.parameters?.options?.metadata?.metadataValues ?? [];\n\n  const baseKey = \"fileName\";\n\n  // Find existing keys that match baseKey or baseKey<number>\n  const existingIndexes = old\n    .map(item => item.name)\n    .filter(name => name === baseKey || name.startsWith(baseKey))\n    .map(name => {\n      const match = name.match(new RegExp(`^${baseKey}(\\\\d+)?$`));\n      return match && match[1] ? Number(match[1]) : 0;\n    });\n\n  // Next index\n  const nextIndex = existingIndexes.length\n    ? Math.max(...existingIndexes) + 1\n    : 0;\n\n  const newKey = nextIndex === 0 ? baseKey : `${baseKey}${nextIndex}`;\n\n  return {\n    metadataValues: [\n      ...old,\n      {\n        name: newKey,\n        value: $('Set File Id').item.json.fileId\n      }\n    ]\n  };\n})()\n}}",
+              "type": "object"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "include": "selected",
+        "includeFields": "name, nodes, connections, settings",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        784,
+        592
+      ],
+      "id": "b0cedfe0-3e9f-4630-abca-2b0665347810",
+      "name": "Add Whatsapp Filter",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1f432e83-78ce-4105-9907-0ad76fd40bcb",
+              "name": "nodes[21].parameters.options.metadata",
+              "value": "={{\n(() => {\n  const old = $json.nodes?.[21]?.parameters?.options?.metadata?.metadataValues ?? [];\n\n  const baseKey = \"fileName\";\n\n  // Find existing keys that match baseKey or baseKey<number>\n  const existingIndexes = old\n    .map(item => item.name)\n    .filter(name => name === baseKey || name.startsWith(baseKey))\n    .map(name => {\n      const match = name.match(new RegExp(`^${baseKey}(\\\\d+)?$`));\n      return match && match[1] ? Number(match[1]) : 0;\n    });\n\n  // Next index\n  const nextIndex = existingIndexes.length\n    ? Math.max(...existingIndexes) + 1\n    : 0;\n\n  const newKey = nextIndex === 0 ? baseKey : `${baseKey}${nextIndex}`;\n\n  return {\n    metadataValues: [\n      ...old,\n      {\n        name: newKey,\n        value: $('Set File Id').item.json.fileId\n      }\n    ]\n  };\n})()\n}}",
+              "type": "object"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "include": "selected",
+        "includeFields": "name, nodes, connections, settings",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1920,
+        592
+      ],
+      "id": "59e6aca8-8a12-4dc5-a13f-0ebbb49cc1dc",
+      "name": "Add Telegram Filter",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Set File Id').item.binary.data.fileExtension }}",
+                    "rightValue": "txt",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "d993be74-bbbe-4fcc-bd65-5ed665a2b1a7"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "txt"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "400a711f-9f13-4e5e-a155-a0dc746fbec9",
+                    "leftValue": "={{ $('Set File Id').item.binary.data.fileExtension }}",
+                    "rightValue": "pdf",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "pdf"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        480,
+        80
+      ],
+      "id": "fe131edd-f9c5-48ee-a9d5-520d6ec5e8e8",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "=data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        816,
+        192
+      ],
+      "id": "87eb8bef-94dd-4122-b3f9-f723a9bc79a2",
+      "name": "Extract from PDF"
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "binaryPropertyName": "=data",
+        "destinationKey": "text",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        816,
+        -16
+      ],
+      "id": "5b98f88b-bae0-4fff-ae3f-c3818bae4039",
+      "name": "Extract from TXT"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2736,
+        432
+      ],
+      "id": "3e634b35-2b57-4916-b009-eca7108f451e",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "binaryPropertyName": "contentType",
+        "destinationKey": "contentType",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -736,
+        464
+      ],
+      "id": "b4bad0ec-d923-451b-b85b-dee507bb99cd",
+      "name": "Extract Content Type"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "324a3f4d-dbee-4d87-8951-b55e7a81039f",
+              "name": "content",
+              "value": "={{ $json.text }}",
+              "type": "string"
+            },
+            {
+              "id": "b61684e8-3143-45ec-a279-8b8557035d55",
+              "name": "metadata",
+              "value": "={{ \n  {\n    source: \"blob\",\n    contentType: $('Extract Content Type').item.json.contentType || \"unknown\",\n    fileName: $('Set File Id').item.json.fileId || \"unknown\"\n  } \n}}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3232,
+        432
+      ],
+      "id": "fb5ce8a7-d150-47a4-a8bb-f980f8006d9f",
+      "name": "Source Text"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "324a3f4d-dbee-4d87-8951-b55e7a81039f",
+              "name": "system_prompt",
+              "value": "You clean extracted document text before embedding.\n\nRules:\n- Output plain text only\n- Remove noise, headers, footers, page numbers\n- Preserve factual content\n- Preserve lists and tables as text\n- Do not explain anything\n- Do not add new information",
+              "type": "string"
+            },
+            {
+              "id": "1cb99bc6-ab82-4dd6-b000-f98f8a98c633",
+              "name": "user_prompt",
+              "value": "=Document metadata:\n- contentType: {{$json.metadata.contentType}}\n- fileName: {{$json.metadata.fileName}}\n\nRaw document text:\n{{$json.content}}",
+              "type": "string"
+            },
+            {
+              "id": "7a9520d5-0e85-4673-b549-f29e4561751f",
+              "name": "metadata",
+              "value": "={{$json.metadata}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2960,
+        816
+      ],
+      "id": "ef78d3cd-f2f5-47fe-b662-91189fbf4f85",
+      "name": "Prepare AI Prompt",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "={{$json.system_prompt}}"
+            },
+            {
+              "content": "={{$json.user_prompt}}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        3136,
+        816
+      ],
+      "id": "f15ff9c1-5fb7-47c2-a612-a90b7e81cda8",
+      "name": "AI Cleaner",
+      "credentials": {
+        "openAiApi": {
+          "id": "XVjhR1xlWrIgJjKz",
+          "name": "OpenAi account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3c476957-b20b-41ed-97ea-65d55583d3cf",
+              "name": "cleanText",
+              "value": "={{$json.output[0].content[0].text}}",
+              "type": "string"
+            },
+            {
+              "id": "9d0cde00-b7ec-4a92-a592-77443fd94dab",
+              "name": "metadata",
+              "value": "={{$node[\"Prepare AI Prompt\"].json.metadata}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3456,
+        816
+      ],
+      "id": "f652d13f-882f-4a68-8ce5-7734a5de5fe0",
+      "name": "Extract Clean Text",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = $json.content || '';\nconst baseMetadata = $json.metadata || {};\n\nconst chunks = text\n  .split(/\\n(?=product\\[\\d+\\]:)/) // 👈 ключевая строка\n  .map(t => t.trim())\n  .filter(Boolean);\n\nreturn chunks.map((chunk, index) => ({\n  json: {\n    content: chunk,\n    metadata: {\n      ...baseMetadata,\n      chunkIndex: index + 1,\n      chunkCount: chunks.length\n    }\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4176,
+        432
+      ],
+      "id": "74a30d1f-ec26-477e-aba8-a855bc39a7bb",
+      "name": "Split into Chunks"
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "tableName": {
+          "__rl": true,
+          "value": "documents",
+          "mode": "list",
+          "cachedResultName": "documents"
+        },
+        "options": {
+          "queryName": "match_documents"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        3776,
+        832
+      ],
+      "id": "5caec62c-894e-43c2-be92-6c0a286bdc90",
+      "name": "Supabase Vector Store1",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ifCYb9DhUxoCq3pu",
+          "name": "Supabase"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        3776,
+        1024
+      ],
+      "id": "6659a0d0-90bc-42cd-a45c-fc20335d40e3",
+      "name": "Embeddings OpenAI1",
+      "credentials": {
+        "openAiApi": {
+          "id": "XVjhR1xlWrIgJjKz",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $('Split into Chunks').item.json.content }}",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "={{\n(() => {\n  const whatsappWorkflowId = $('Extract Whatsapp Workflow Id').item.json.whatsappWorkflowId;\n  let metadataValues;\n\n  if (whatsappWorkflowId !== \"-1\") {\n    metadataValues = $('Add Whatsapp Filter').item.json.nodes[21].parameters.options.metadata.metadataValues;\n  } else {\n    metadataValues = $('Add Telegram Filter').item.json.nodes[21].parameters.options.metadata.metadataValues;\n  }\n\n  // Returns the name of the last item in the array\n  return metadataValues.at(-1)?.name;\n})()\n}}",
+                "value": "={{ $('Set File Id').item.json.fileId }}"
+              },
+              {
+                "name": "contentType",
+                "value": "={{ $('Extract Content Type').item.json.contentType }}"
+              },
+              {
+                "name": "chunkIndex",
+                "value": "={{ $json.metadata.chunkIndex }}"
+              },
+              {
+                "name": "chunkCount",
+                "value": "={{ $json.metadata.chunkCount }}"
+              },
+              {
+                "name": "source",
+                "value": "={{ $json.metadata.source }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        3952,
+        1024
+      ],
+      "id": "22bef09d-e540-4d80-b0ee-ef9935100e5a",
+      "name": "Data Loader1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawText = $json.text;\n\nif (!rawText || typeof rawText !== 'string') {\n  return [\n    {\n      json: {\n        text: ''\n      }\n    }\n  ];\n}\n\n// 1. нормализация переносов\nconst normalized = rawText\n  .replace(/\\r\\n/g, '\\n')\n  .replace(/\\n{2,}/g, '\\n')\n  .trim();\n\n// 2. разбивка по строкам\nconst rows = normalized\n  .split('\\n')\n  .map(r => r.trim())\n  .filter(r => r.length > 0);\n\n// 3. добавляем префиксы product[n]\nconst withPrefix = rows.map((row, index) => {\n  return `product[${index + 1}]: ${row}`;\n});\n\n// 4. собираем в одну строку (как Extract from TXT)\nconst finalText = withPrefix.join('\\n');\n\n// 5. ВОЗВРАЩАЕМ 1 ITEM\nreturn [\n  {\n    json: {\n      text: finalText\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1024,
+        192
+      ],
+      "id": "2e52afe2-e079-4dd5-bd41-3a3414854d35",
+      "name": "Normalize PDF"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get File Name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Vector Store": {
+      "main": [
+        [
+          {
+            "node": "Return File Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean Text": {
+      "main": [
+        [
+          {
+            "node": "Source Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set File Id": {
+      "main": [
+        [
+          {
+            "node": "Extract Content Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Whatsapp Workflow Id": {
+      "main": [
+        [
+          {
+            "node": "Extract Telegram Workflow Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get File Name": {
+      "main": [
+        [
+          {
+            "node": "Set File Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Whatsapp Workflow": {
+      "main": [
+        [
+          {
+            "node": "Add Whatsapp Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Whatsapp Workflow": {
+      "main": [
+        [
+          {
+            "node": "If Telegram Id Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Whatsapp Id Exists": {
+      "main": [
+        [
+          {
+            "node": "Get Whatsapp Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If Telegram Id Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Telegram Workflow Id": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "If Whatsapp Id Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Telegram Id Exists": {
+      "main": [
+        [
+          {
+            "node": "Get Telegram Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Get Telegram Workflow": {
+      "main": [
+        [
+          {
+            "node": "Add Telegram Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Telegram Workflow": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Add Whatsapp Filter": {
+      "main": [
+        [
+          {
+            "node": "Update Whatsapp Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Telegram Filter": {
+      "main": [
+        [
+          {
+            "node": "Update Telegram Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from PDF": {
+      "main": [
+        [
+          {
+            "node": "Normalize PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from TXT": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Extract from TXT",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract from PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Clean Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Content Type": {
+      "main": [
+        [
+          {
+            "node": "Extract Whatsapp Workflow Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Source Text": {
+      "main": [
+        [
+          {
+            "node": "Split into Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare AI Prompt": {
+      "main": [
+        [
+          {
+            "node": "AI Cleaner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Cleaner": {
+      "main": [
+        [
+          {
+            "node": "Extract Clean Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Clean Text": {
+      "main": [
+        []
+      ]
+    },
+    "Split into Chunks": {
+      "main": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Supabase Vector Store1",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data Loader1": {
+      "ai_document": [
+        [
+          {
+            "node": "Supabase Vector Store1",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Vector Store1": {
+      "main": [
+        []
+      ]
+    },
+    "Normalize PDF": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": {},
+  "triggerCount": 1,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "KoTuIlk4LMrlvnWI",
+  "active": false
+}

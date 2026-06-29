@@ -1,0 +1,373 @@
+{
+  "name": "CreateWhatsappWorkflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "CreateWhatsappWorkflow",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -160,
+        -16
+      ],
+      "id": "bb161ce7-fa41-4c4b-8448-e3c4df9af8d6",
+      "name": "Unity Webhook",
+      "webhookId": "29c14c57-4d43-4185-907d-9ac94902222d"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wappi.pro/api/webhook/url/set",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "profile_id",
+              "value": "={{ $('Unity Webhook').item.json.body.WhatsappProfileId }}"
+            },
+            {
+              "name": "url",
+              "value": "=https://bagkz.app.n8n.cloud/webhook/{{ $('Unity Webhook').item.json.body.WhatsappProfileId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1232,
+        -16
+      ],
+      "id": "d9b6beb7-c293-444f-887d-51e109fcbdaf",
+      "name": "Set Wappi Webhook",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "EuhhqAaV56DpoqAN",
+          "name": "WappiAuthToken"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wappi.pro/api/webhook/types/set",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "profile_id",
+              "value": "={{ $('Unity Webhook').item.json.body.WhatsappProfileId }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "[\n  \"incoming_message\"\n]",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1408,
+        -16
+      ],
+      "id": "f3ecd9a8-8c9b-40d9-b10e-69138800eef3",
+      "name": "Set Wappi Webhook Types",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "EuhhqAaV56DpoqAN",
+          "name": "WappiAuthToken"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://bagkz.app.n8n.cloud/api/v1/workflows/{{ $json.id }}/activate ",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        -16
+      ],
+      "id": "a3f0d5dc-e86f-434b-82af-fff63cd85831",
+      "name": "Activate Created Workflow",
+      "credentials": {
+        "n8nApi": {
+          "id": "X1k4igOAG65Fb3oz",
+          "name": "n8n account"
+        },
+        "httpBearerAuth": {
+          "id": "nfU8CbYjPssGjEZA",
+          "name": "Bearer Auth account"
+        },
+        "httpHeaderAuth": {
+          "id": "RV7m661NMLPXEcvm",
+          "name": "n8nAPIKey"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d730dd9e-5fef-4dce-be83-cd5cfdda2ed6",
+              "name": "id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        784,
+        -16
+      ],
+      "id": "43fc8007-8196-45d4-ad13-33169215fe57",
+      "name": "Get Created Workflow Id"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d730dd9e-5fef-4dce-be83-cd5cfdda2ed6",
+              "name": "id",
+              "value": "={{ $('Get Created Workflow Id').item.json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1664,
+        -16
+      ],
+      "id": "0bfba713-ae60-435e-87ce-d2980384fd54",
+      "name": "Send New Workflows Id"
+    },
+    {
+      "parameters": {
+        "url": "https://bagkz.app.n8n.cloud/api/v1/workflows/4wYitz5ek30SVNlT",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        96,
+        -16
+      ],
+      "id": "6fe729ba-1051-467c-98b4-1690e97dc0c4",
+      "name": "Get Sample Workflow",
+      "credentials": {
+        "n8nApi": {
+          "id": "X1k4igOAG65Fb3oz",
+          "name": "n8n account"
+        },
+        "httpBearerAuth": {
+          "id": "nfU8CbYjPssGjEZA",
+          "name": "Bearer Auth account"
+        },
+        "httpHeaderAuth": {
+          "id": "RV7m661NMLPXEcvm",
+          "name": "n8nAPIKey"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://bagkz.app.n8n.cloud/api/v1/workflows",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        496,
+        -16
+      ],
+      "id": "2b800017-076e-44ef-b794-5be56021c70f",
+      "name": "Create Workflow",
+      "credentials": {
+        "n8nApi": {
+          "id": "X1k4igOAG65Fb3oz",
+          "name": "n8n account"
+        },
+        "httpBearerAuth": {
+          "id": "nfU8CbYjPssGjEZA",
+          "name": "Bearer Auth account"
+        },
+        "httpHeaderAuth": {
+          "id": "RV7m661NMLPXEcvm",
+          "name": "n8nAPIKey"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "36c6ecbb-0daf-4db9-af70-55ee1782ec83",
+              "name": "name",
+              "value": "={{ $('Unity Webhook').item.json.body.Name }}",
+              "type": "string"
+            },
+            {
+              "id": "a112d99d-4c9d-4012-be25-f051f92981fa",
+              "name": "nodes[0].parameters.path",
+              "value": "={{ $('Unity Webhook').item.json.body.WhatsappProfileId }}",
+              "type": "string"
+            },
+            {
+              "id": "c59e9d59-7610-4be8-ab2e-61ad5916e896",
+              "name": "nodes[5].parameters.options.systemMessage",
+              "value": "=Business Type: {{ $('Unity Webhook').item.json.body.BusinessType }}\n\n{{ $json.nodes[5].parameters.options.systemMessage.slice(1) }}\n\nAdditional Instructions: {{ $('Unity Webhook').item.json.body.Prompt }}  \n\nAbout Business: {{ $('Unity Webhook').item.json.body.Business }}\n\nProducts:\n{{ $('Unity Webhook').item.json.body.ProductsList }}\n\nServices:\n{{ $('Unity Webhook').item.json.body.ServicesList }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "include": "selected",
+        "includeFields": "name, nodes, connections, settings",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        304,
+        -16
+      ],
+      "id": "11f7a4b1-ca88-426b-b25a-aa0bd36903d1",
+      "name": "Set Fields"
+    }
+  ],
+  "connections": {
+    "Unity Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get Sample Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Wappi Webhook": {
+      "main": [
+        [
+          {
+            "node": "Set Wappi Webhook Types",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Activate Created Workflow": {
+      "main": [
+        [
+          {
+            "node": "Set Wappi Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Created Workflow Id": {
+      "main": [
+        [
+          {
+            "node": "Activate Created Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Wappi Webhook Types": {
+      "main": [
+        [
+          {
+            "node": "Send New Workflows Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Sample Workflow": {
+      "main": [
+        [
+          {
+            "node": "Set Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Workflow": {
+      "main": [
+        [
+          {
+            "node": "Get Created Workflow Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Fields": {
+      "main": [
+        [
+          {
+            "node": "Create Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": {},
+  "triggerCount": 1,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "XuvOp7TxOImOAmlj",
+  "active": false
+}

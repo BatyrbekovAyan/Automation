@@ -1,0 +1,204 @@
+{
+  "name": "Edit Telegram Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "EditTelegramWorkflow",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -640,
+        112
+      ],
+      "id": "bcf82ae8-d168-4747-a70a-ff0bcf4e7eea",
+      "name": "Unity Webhook",
+      "webhookId": "908396ca-8496-45dd-963b-c703f5dc0915"
+    },
+    {
+      "parameters": {
+        "url": "=https://bagkz.app.n8n.cloud/api/v1/workflows/{{ $json.body.TelegramWorkflowId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -464,
+        112
+      ],
+      "id": "b37c847c-6048-4b87-96ea-97f4ed1b5ba6",
+      "name": "Get Workflow",
+      "credentials": {
+        "n8nApi": {
+          "id": "X1k4igOAG65Fb3oz",
+          "name": "n8n account"
+        },
+        "httpBearerAuth": {
+          "id": "nfU8CbYjPssGjEZA",
+          "name": "Bearer Auth account"
+        },
+        "httpHeaderAuth": {
+          "id": "RV7m661NMLPXEcvm",
+          "name": "n8nAPIKey"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://bagkz.app.n8n.cloud/api/v1/workflows/{{ $('Get Workflow').item.json.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        224,
+        112
+      ],
+      "id": "fa99c90b-ff93-46c9-b6fb-eeb27530d276",
+      "name": "Update Workflow",
+      "credentials": {
+        "n8nApi": {
+          "id": "X1k4igOAG65Fb3oz",
+          "name": "n8n account"
+        },
+        "httpBearerAuth": {
+          "id": "nfU8CbYjPssGjEZA",
+          "name": "Bearer Auth account"
+        },
+        "httpHeaderAuth": {
+          "id": "RV7m661NMLPXEcvm",
+          "name": "n8nAPIKey"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "533a84d0-6760-4575-82c8-b4fcd20cbf38",
+              "name": "name",
+              "value": "={{ $('Unity Webhook').item.json.body.Name }}",
+              "type": "string"
+            },
+            {
+              "id": "f594051b-800e-4eb3-b1e4-525aa342364d",
+              "name": "nodes[5].parameters.options.systemMessage",
+              "value": "={{ $json.nodes[5].parameters.options.systemMessage.slice(0, $json.nodes[5].parameters.options.systemMessage.indexOf(\"\\n\" + \"Additional Instructions: \")); }}\nAdditional Instructions: {{ $('Unity Webhook').item.json.body.Prompt }}\n\nAbout Business: {{ $('Unity Webhook').item.json.body.Business }}\n\nProducts:\n{{ $('Unity Webhook').item.json.body.ProductsList }}\n\nServices:\n{{ $('Unity Webhook').item.json.body.ServicesList }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "include": "selected",
+        "includeFields": "name, nodes, connections, settings",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -16,
+        112
+      ],
+      "id": "cc0d8df4-3e79-4603-9652-a6b15ffba5fd",
+      "name": "Set Fields"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f594051b-800e-4eb3-b1e4-525aa342364d",
+              "name": "nodes[5].parameters.options.systemMessage",
+              "value": "=Business Type: {{ $('Unity Webhook').item.json.body.BusinessType }}\n{{$json.nodes[5].parameters.options.systemMessage.slice($json.nodes[5].parameters.options.systemMessage.indexOf('\\n') + 1) }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "include": "selected",
+        "includeFields": "name, nodes, connections, settings",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -256,
+        112
+      ],
+      "id": "ee40b5aa-d4ce-485d-9d56-c0186c52d3ee",
+      "name": "Set Bussiness Type"
+    }
+  ],
+  "connections": {
+    "Unity Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Workflow": {
+      "main": [
+        [
+          {
+            "node": "Set Bussiness Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Workflow": {
+      "main": [
+        []
+      ]
+    },
+    "Set Fields": {
+      "main": [
+        [
+          {
+            "node": "Update Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Bussiness Type": {
+      "main": [
+        [
+          {
+            "node": "Set Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": {},
+  "triggerCount": 1,
+  "meta": null,
+  "id": "TwWPW3gIyjZS3foR",
+  "active": false
+}

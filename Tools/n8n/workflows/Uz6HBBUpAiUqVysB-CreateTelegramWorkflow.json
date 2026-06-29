@@ -1,0 +1,371 @@
+{
+  "name": "CreateTelegramWorkflow",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://bagkz.app.n8n.cloud/api/v1/workflows/4VN3gsFaC2HUYmcc",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -272,
+        672
+      ],
+      "id": "8074b2ad-4336-445e-926b-04e947636cc5",
+      "name": "Get Sample Workflow",
+      "credentials": {
+        "n8nApi": {
+          "id": "X1k4igOAG65Fb3oz",
+          "name": "n8n account"
+        },
+        "httpBearerAuth": {
+          "id": "nfU8CbYjPssGjEZA",
+          "name": "Bearer Auth account"
+        },
+        "httpHeaderAuth": {
+          "id": "RV7m661NMLPXEcvm",
+          "name": "n8nAPIKey"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://bagkz.app.n8n.cloud/api/v1/workflows",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        128,
+        672
+      ],
+      "id": "8d6a78cb-776b-4e79-8e00-4fc6720a4ffa",
+      "name": "Create Workflow",
+      "credentials": {
+        "n8nApi": {
+          "id": "X1k4igOAG65Fb3oz",
+          "name": "n8n account"
+        },
+        "httpBearerAuth": {
+          "id": "nfU8CbYjPssGjEZA",
+          "name": "Bearer Auth account"
+        },
+        "httpHeaderAuth": {
+          "id": "RV7m661NMLPXEcvm",
+          "name": "n8nAPIKey"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "36c6ecbb-0daf-4db9-af70-55ee1782ec83",
+              "name": "name",
+              "value": "={{ $('Unity Webhook').item.json.body.Name }}",
+              "type": "string"
+            },
+            {
+              "id": "a112d99d-4c9d-4012-be25-f051f92981fa",
+              "name": "nodes[0].parameters.path",
+              "value": "={{ $('Unity Webhook').item.json.body.WhatsappProfileId }}",
+              "type": "string"
+            },
+            {
+              "id": "c59e9d59-7610-4be8-ab2e-61ad5916e896",
+              "name": "nodes[5].parameters.options.systemMessage",
+              "value": "=Business Type: {{ $('Unity Webhook').item.json.body.BusinessType }}\n\n{{ $json.nodes[5].parameters.options.systemMessage.slice(1) }}\n\nAdditional Instructions: {{ $('Unity Webhook').item.json.body.Prompt }}  \n\nAbout Business: {{ $('Unity Webhook').item.json.body.Business }}\n\nProducts:\n{{ $('Unity Webhook').item.json.body.ProductsList }}\n\nServices:\n{{ $('Unity Webhook').item.json.body.ServicesList }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "include": "selected",
+        "includeFields": "name, nodes, connections, settings",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -64,
+        672
+      ],
+      "id": "c3249084-a534-4c8b-bc04-2345c75ba1f0",
+      "name": "Set Fields"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "CreateTelegramWorkflow",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -528,
+        672
+      ],
+      "id": "8f1ef0d5-16f1-44ab-b9fb-df2e978b78e2",
+      "name": "Unity Webhook",
+      "webhookId": "29c14c57-4d43-4185-907d-9ac94902222d"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d730dd9e-5fef-4dce-be83-cd5cfdda2ed6",
+              "name": "id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        416,
+        672
+      ],
+      "id": "e47d3754-dbc6-435e-ac9b-67a9c16031b5",
+      "name": "Get Created Workflow Id"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://bagkz.app.n8n.cloud/api/v1/workflows/{{ $json.id }}/activate",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        592,
+        672
+      ],
+      "id": "04555395-1ac0-4851-91cf-e2a32b4d656a",
+      "name": "Activate Created Workflow",
+      "credentials": {
+        "n8nApi": {
+          "id": "X1k4igOAG65Fb3oz",
+          "name": "n8n account"
+        },
+        "httpBearerAuth": {
+          "id": "nfU8CbYjPssGjEZA",
+          "name": "Bearer Auth account"
+        },
+        "httpHeaderAuth": {
+          "id": "RV7m661NMLPXEcvm",
+          "name": "n8nAPIKey"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wappi.pro/tapi/webhook/url/set",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "profile_id",
+              "value": "={{ $('Unity Webhook').item.json.body.TelegramProfileId }}"
+            },
+            {
+              "name": "url",
+              "value": "=https://bagkz.app.n8n.cloud/webhook/{{ $('Unity Webhook').item.json.body.TelegramProfileId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        864,
+        672
+      ],
+      "id": "863b3680-68f6-4069-8cdb-9789f0588a7a",
+      "name": "Set Wappi Webhook",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "EuhhqAaV56DpoqAN",
+          "name": "WappiAuthToken"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://wappi.pro/tapi/webhook/types/set",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "profile_id",
+              "value": "={{ $('Unity Webhook').item.json.body.TelegramProfileId }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "[\n  \"incoming_message\"\n]",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1040,
+        672
+      ],
+      "id": "14a13077-9d38-4eaf-8593-4f4dd7158909",
+      "name": "Set Wappi Webhook Types",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "EuhhqAaV56DpoqAN",
+          "name": "WappiAuthToken"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d730dd9e-5fef-4dce-be83-cd5cfdda2ed6",
+              "name": "id",
+              "value": "={{ $('Get Created Workflow Id').item.json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1296,
+        672
+      ],
+      "id": "5b372561-59de-415a-9aba-3b4b61f7281a",
+      "name": "Send New Workflows Id"
+    }
+  ],
+  "connections": {
+    "Get Sample Workflow": {
+      "main": [
+        [
+          {
+            "node": "Set Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Workflow": {
+      "main": [
+        [
+          {
+            "node": "Get Created Workflow Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Fields": {
+      "main": [
+        [
+          {
+            "node": "Create Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unity Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get Sample Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Created Workflow Id": {
+      "main": [
+        [
+          {
+            "node": "Activate Created Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Activate Created Workflow": {
+      "main": [
+        [
+          {
+            "node": "Set Wappi Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Wappi Webhook": {
+      "main": [
+        [
+          {
+            "node": "Set Wappi Webhook Types",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Wappi Webhook Types": {
+      "main": [
+        [
+          {
+            "node": "Send New Workflows Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": {},
+  "triggerCount": 1,
+  "meta": null,
+  "id": "Uz6HBBUpAiUqVysB",
+  "active": false
+}

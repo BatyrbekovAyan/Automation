@@ -60,3 +60,6 @@ CLAUDE.local.md
 
 # Headless test runner output (Tools/run-tests-headless.sh)
 Tools/test-output/
+
+# n8n reference templates (downloaded community/marketplace workflows, not part of the app)
+Tools/n8n/reference/
