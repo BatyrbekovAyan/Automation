@@ -167,12 +167,13 @@ public class SuggestionsPanel : MonoBehaviour
     private void StartShimmer()
     {
         if (skeletonCards == null) return;
+        // Each skeleton self-animates its "thinking" dots (ThinkingDotsSkeleton) once active —
+        // just ensure the card is at full opacity (no whole-card pulse on top of the dot bounce).
         foreach (GameObject sk in skeletonCards)
         {
             if (sk == null) continue;
-            CanvasGroup cg = sk.GetComponent<CanvasGroup>() ?? sk.AddComponent<CanvasGroup>();
-            cg.alpha = 0.45f;
-            cg.DOFade(1f, 1.0f).SetEase(Ease.InOutSine).SetLoops(-1, LoopType.Yoyo);
+            CanvasGroup cg = sk.GetComponent<CanvasGroup>();
+            if (cg != null) { cg.DOKill(); cg.alpha = 1f; }
         }
     }
 

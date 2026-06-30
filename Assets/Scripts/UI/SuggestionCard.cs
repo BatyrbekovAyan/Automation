@@ -6,17 +6,20 @@ using DG.Tweening;
 
 /// <summary>
 /// One reply-suggestion card (PANEL-02/03/06). The WHOLE card is a single tap target
-/// (D-01 — no dual-action arrow). Shows reply text (≤2 lines, ellipsis — clamped by the
-/// builder), a single-accent intent chip, and a «Рекомендуем» badge on the top card only.
-/// Pure view: it raises <see cref="OnTapped"/> with the reply text; Plan 04's controller
-/// does the composer hand-off + re-cluster. Binds only Plan-01 seam types — no networking.
+/// (D-01 — no dual-action arrow). Shows the full reply text and a muted intent caption.
+/// The top (recommended) card is tinted green instead of carrying a separate badge, so the
+/// reply text gets the whole card (D-07 revised per owner). Pure view: it raises
+/// <see cref="OnTapped"/> with the reply text; Plan 04's controller does the composer
+/// hand-off + re-cluster. Binds only Plan-01 seam types — no networking.
 /// </summary>
 public class SuggestionCard : MonoBehaviour
 {
     [SerializeField] private Button cardButton;            // whole card is the tap target
-    [SerializeField] private TextMeshProUGUI replyText;    // 42u, #111B21, Ellipsis, 2-line cap (builder)
-    [SerializeField] private TextMeshProUGUI intentLabel;  // 28u semibold, inside the chip
-    [SerializeField] private GameObject recommendedBadge;  // top card only (PANEL-03/D-07)
+    [SerializeField] private TextMeshProUGUI replyText;    // full reply, fills the card (builder)
+    [SerializeField] private TextMeshProUGUI intentLabel;  // muted one-word intent caption
+    [SerializeField] private Image cardBackground;         // recolored on the top (recommended) card
+    [SerializeField] private Color normalColor = Color.white;                                // #FFFFFF (builder-driven)
+    [SerializeField] private Color recommendedColor = new Color(0.788f, 0.937f, 0.851f, 1f); // #C9EFD9 mint (builder-driven)
 
     public event Action<string> OnTapped;
 
@@ -32,7 +35,7 @@ public class SuggestionCard : MonoBehaviour
         if (item == null) return;
         replyText.text = item.text;
         intentLabel.text = item.intentLabel;
-        if (recommendedBadge != null) recommendedBadge.SetActive(isTop);   // index 0 ONLY
+        if (cardBackground != null) cardBackground.color = isTop ? recommendedColor : normalColor;  // mint tint = recommended
         cardButton.onClick.RemoveAllListeners();
         cardButton.onClick.AddListener(() =>
         {
