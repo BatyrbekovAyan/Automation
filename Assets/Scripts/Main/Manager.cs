@@ -2674,9 +2674,11 @@ public class Manager : MonoBehaviour
     {
         LoadingPanel.SetActive(true);
 
-        WWWForm form = new();
-
-        using UnityWebRequest www = UnityWebRequest.Post($"{n8nBaseUrl}/api/v1/workflows/{id}/" + (enabled ? "activate" : "deactivate"), form);
+        // n8n's REST API rejects an empty multipart/form-data body with 415; send a
+        // bodyless POST (like the Delete calls) so /activate /deactivate are accepted.
+        using UnityWebRequest www = new UnityWebRequest($"{n8nBaseUrl}/api/v1/workflows/{id}/" + (enabled ? "activate" : "deactivate"), "POST");
+        www.downloadHandler = new DownloadHandlerBuffer();
+        www.timeout = 30;
 
         www.SetRequestHeader("X-N8N-API-KEY", n8nAPIKey);
 
@@ -2704,9 +2706,11 @@ public class Manager : MonoBehaviour
     {
         LoadingPanel.SetActive(true);
 
-        WWWForm form = new();
-
-        using UnityWebRequest www = UnityWebRequest.Post($"{n8nBaseUrl}/api/v1/workflows/{id}/" + (enabled ? "activate" : "deactivate"), form);
+        // n8n's REST API rejects an empty multipart/form-data body with 415; send a
+        // bodyless POST (like the Delete calls) so /activate /deactivate are accepted.
+        using UnityWebRequest www = new UnityWebRequest($"{n8nBaseUrl}/api/v1/workflows/{id}/" + (enabled ? "activate" : "deactivate"), "POST");
+        www.downloadHandler = new DownloadHandlerBuffer();
+        www.timeout = 30;
 
         www.SetRequestHeader("X-N8N-API-KEY", n8nAPIKey);
 
