@@ -35,4 +35,39 @@ public class N8nBaseUrlTests
         Assert.AreEqual("https://abc.trycloudflare.com",
             Manager.ResolveN8nBaseUrl("https://abc.trycloudflare.com/"));
     }
+
+    // --- override precedence (2-arg) ---
+    [Test]
+    public void Override_WinsOverConfigured()
+    {
+        Assert.AreEqual("https://override.example",
+            Manager.ResolveN8nBaseUrl("https://override.example", "https://configured.example"));
+    }
+
+    [Test]
+    public void BlankOverride_FallsBackToConfigured()
+    {
+        Assert.AreEqual("https://configured.example",
+            Manager.ResolveN8nBaseUrl("", "https://configured.example"));
+    }
+
+    [Test]
+    public void WhitespaceOverride_FallsBackToConfigured()
+    {
+        Assert.AreEqual("https://configured.example",
+            Manager.ResolveN8nBaseUrl("   ", "https://configured.example"));
+    }
+
+    [Test]
+    public void BothBlank_FallsBackToCloud()
+    {
+        Assert.AreEqual(CloudDefault, Manager.ResolveN8nBaseUrl("", ""));
+    }
+
+    [Test]
+    public void Override_TrailingSlashAndWhitespaceTrimmed()
+    {
+        Assert.AreEqual("https://override.example",
+            Manager.ResolveN8nBaseUrl("  https://override.example/  ", "x"));
+    }
 }

@@ -147,12 +147,19 @@ public class Manager : MonoBehaviour
     public static string wappiAuthToken => Secrets.Data.wappiAuthToken;
     public static string n8nAPIKey => Secrets.Data.n8nAPIKey;
     public static string telegramBotToken => Secrets.Data.telegramBotToken;
-    public static string n8nBaseUrl => ResolveN8nBaseUrl(Secrets.Data.n8nBaseUrl);
+    public const string DevN8nBaseUrlKey = "DevN8nBaseUrl";
 
-    public static string ResolveN8nBaseUrl(string configured) =>
-        string.IsNullOrWhiteSpace(configured)
-            ? "https://bagkz.app.n8n.cloud"
-            : configured.TrimEnd('/');
+    public static string n8nBaseUrl =>
+        ResolveN8nBaseUrl(PlayerPrefs.GetString(DevN8nBaseUrlKey, ""), Secrets.Data.n8nBaseUrl);
+
+    public static string ResolveN8nBaseUrl(string configured) => ResolveN8nBaseUrl(null, configured);
+
+    public static string ResolveN8nBaseUrl(string overrideUrl, string configured)
+    {
+        if (!string.IsNullOrWhiteSpace(overrideUrl)) return overrideUrl.Trim().TrimEnd('/');
+        if (!string.IsNullOrWhiteSpace(configured)) return configured.Trim().TrimEnd('/');
+        return "https://bagkz.app.n8n.cloud";
+    }
 
     // Robustly extract the workflow "id" from an n8n create response. Tolerates the
     // full workflow object, a trimmed {"id":"..."}, whitespace, and malformed bodies
