@@ -44,6 +44,14 @@ public class ProfilePage : MonoBehaviour
     [SerializeField] private TMP_InputField  editNameInput;
     [SerializeField] private TMP_InputField  editEmailInput;
     [SerializeField] private TMP_InputField  editN8nUrlInput;   // dev-only n8n URL override
+    [SerializeField] private RectTransform   editPopupCard;     // grown by one row when the dev field shows
+    [SerializeField] private RectTransform   editButtonRow;     // nudged down when the dev field shows
+
+    // Scene defaults of the edit-popup card/buttons, captured once so the dev-only
+    // layout shift can be applied relative to them (prod layout stays untouched).
+    private float _baseEditCardHeight;
+    private float _baseEditButtonY;
+    private bool  _editLayoutCaptured;
     [SerializeField] private Button          editSaveButton;
     [SerializeField] private Button          editCancelButton;
 
@@ -169,8 +177,31 @@ public class ProfilePage : MonoBehaviour
 
         if (editN8nUrlInput != null)
         {
-            editN8nUrlInput.gameObject.SetActive(Debug.isDebugBuild);
+            if (!_editLayoutCaptured)
+            {
+                if (editPopupCard != null) _baseEditCardHeight = editPopupCard.sizeDelta.y;
+                if (editButtonRow != null) _baseEditButtonY    = editButtonRow.anchoredPosition.y;
+                _editLayoutCaptured = true;
+            }
+
+            bool dev = Debug.isDebugBuild;
+            const float rowHeight = 150f;
+
+            editN8nUrlInput.gameObject.SetActive(dev);
             editN8nUrlInput.text = PlayerPrefs.GetString(Manager.DevN8nBaseUrlKey, "");
+
+            if (editPopupCard != null)
+            {
+                var size = editPopupCard.sizeDelta;
+                size.y = _baseEditCardHeight + (dev ? rowHeight : 0f);
+                editPopupCard.sizeDelta = size;
+            }
+            if (editButtonRow != null)
+            {
+                var pos = editButtonRow.anchoredPosition;
+                pos.y = _baseEditButtonY - (dev ? rowHeight : 0f);
+                editButtonRow.anchoredPosition = pos;
+            }
         }
 
         // Activate name field after the open tween completes — calling
