@@ -44,7 +44,6 @@ public class ProfilePage : MonoBehaviour
     [SerializeField] private TMP_InputField  editNameInput;
     [SerializeField] private TMP_InputField  editEmailInput;
     [SerializeField] private TMP_InputField  editN8nUrlInput;   // dev-only n8n URL override
-    [SerializeField] private TMP_InputField  editN8nApiKeyInput; // dev-only n8n API key override
     [SerializeField] private RectTransform   editPopupCard;     // grown by one row when the dev field shows
     [SerializeField] private RectTransform   editButtonRow;     // nudged down when the dev field shows
 
@@ -176,7 +175,7 @@ public class ProfilePage : MonoBehaviour
         editNameInput.text  = PlayerPrefs.GetString(KeyName,  DefaultName);
         editEmailInput.text = PlayerPrefs.GetString(KeyEmail, DefaultEmail);
 
-        if (editN8nUrlInput != null || editN8nApiKeyInput != null)
+        if (editN8nUrlInput != null)
         {
             if (!_editLayoutCaptured)
             {
@@ -193,12 +192,6 @@ public class ProfilePage : MonoBehaviour
             {
                 editN8nUrlInput.gameObject.SetActive(dev);
                 editN8nUrlInput.text = PlayerPrefs.GetString(Manager.DevN8nBaseUrlKey, "");
-                if (dev) devRows++;
-            }
-            if (editN8nApiKeyInput != null)
-            {
-                editN8nApiKeyInput.gameObject.SetActive(dev);
-                editN8nApiKeyInput.text = PlayerPrefs.GetString(Manager.DevN8nApiKeyKey, "");
                 if (dev) devRows++;
             }
 
@@ -236,7 +229,6 @@ public class ProfilePage : MonoBehaviour
         if (!string.IsNullOrEmpty(newName))  PlayerPrefs.SetString(KeyName,  newName);
         if (!string.IsNullOrEmpty(newEmail)) PlayerPrefs.SetString(KeyEmail, newEmail);
         if (editN8nUrlInput != null) PlayerPrefs.SetString(Manager.DevN8nBaseUrlKey, editN8nUrlInput.text.Trim());
-        if (editN8nApiKeyInput != null) PlayerPrefs.SetString(Manager.DevN8nApiKeyKey, editN8nApiKeyInput.text.Trim());
         PlayerPrefs.Save();
 
         RefreshProfileCard();

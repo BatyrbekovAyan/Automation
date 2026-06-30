@@ -145,12 +145,7 @@ public class Manager : MonoBehaviour
     private string telegramPhoneBodyInitial;
 
     public static string wappiAuthToken => Secrets.Data.wappiAuthToken;
-    public const string DevN8nApiKeyKey = "DevN8nApiKey";
-    public static string n8nAPIKey =>
-        ResolveN8nApiKey(PlayerPrefs.GetString(DevN8nApiKeyKey, ""), Secrets.Data.n8nAPIKey);
-
-    public static string ResolveN8nApiKey(string overrideKey, string configured) =>
-        !string.IsNullOrWhiteSpace(overrideKey) ? overrideKey.Trim() : (configured ?? "");
+    public static string n8nAPIKey => Secrets.Data.n8nAPIKey;
     public static string telegramBotToken => Secrets.Data.telegramBotToken;
     public const string DevN8nBaseUrlKey = "DevN8nBaseUrl";
 

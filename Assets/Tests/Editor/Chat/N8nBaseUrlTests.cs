@@ -71,28 +71,4 @@ public class N8nBaseUrlTests
             Manager.ResolveN8nBaseUrl("  https://override.example/  ", "x"));
     }
 
-    // --- API key override ---
-    [Test]
-    public void ApiKey_OverrideWinsOverConfigured()
-    {
-        Assert.AreEqual("localkey", Manager.ResolveN8nApiKey("localkey", "cloudkey"));
-    }
-
-    [Test]
-    public void ApiKey_BlankOverride_FallsBackToConfigured()
-    {
-        Assert.AreEqual("cloudkey", Manager.ResolveN8nApiKey("", "cloudkey"));
-    }
-
-    [Test]
-    public void ApiKey_BothBlank_ReturnsEmpty()
-    {
-        Assert.AreEqual("", Manager.ResolveN8nApiKey("", ""));
-    }
-
-    [Test]
-    public void ApiKey_Override_Trimmed()
-    {
-        Assert.AreEqual("localkey", Manager.ResolveN8nApiKey("  localkey  ", "cloudkey"));
-    }
 }
