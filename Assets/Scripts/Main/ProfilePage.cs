@@ -43,6 +43,7 @@ public class ProfilePage : MonoBehaviour
     [SerializeField] private GameObject      editPopup;
     [SerializeField] private TMP_InputField  editNameInput;
     [SerializeField] private TMP_InputField  editEmailInput;
+    [SerializeField] private TMP_InputField  editN8nUrlInput;   // dev-only n8n URL override
     [SerializeField] private Button          editSaveButton;
     [SerializeField] private Button          editCancelButton;
 
@@ -166,6 +167,12 @@ public class ProfilePage : MonoBehaviour
         editNameInput.text  = PlayerPrefs.GetString(KeyName,  DefaultName);
         editEmailInput.text = PlayerPrefs.GetString(KeyEmail, DefaultEmail);
 
+        if (editN8nUrlInput != null)
+        {
+            editN8nUrlInput.gameObject.SetActive(Debug.isDebugBuild);
+            editN8nUrlInput.text = PlayerPrefs.GetString(Manager.DevN8nBaseUrlKey, "");
+        }
+
         // Activate name field after the open tween completes — calling
         // ActivateInputField during the scale tween would let the keyboard
         // slide-up steal main-thread time and cause stutter.
@@ -184,6 +191,7 @@ public class ProfilePage : MonoBehaviour
 
         if (!string.IsNullOrEmpty(newName))  PlayerPrefs.SetString(KeyName,  newName);
         if (!string.IsNullOrEmpty(newEmail)) PlayerPrefs.SetString(KeyEmail, newEmail);
+        if (editN8nUrlInput != null) PlayerPrefs.SetString(Manager.DevN8nBaseUrlKey, editN8nUrlInput.text.Trim());
         PlayerPrefs.Save();
 
         RefreshProfileCard();
