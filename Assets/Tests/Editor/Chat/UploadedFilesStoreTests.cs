@@ -106,6 +106,49 @@ public class UploadedFilesStoreTests
     }
 
     [Test]
+    public void FindByName_ReturnsOnlyExactMatches()
+    {
+        UploadedFilesStore.Add(BotA, Product, Entry("a", "price.pdf"));
+        UploadedFilesStore.Add(BotA, Product, Entry("b", "other.pdf"));
+
+        var matches = UploadedFilesStore.FindByName(BotA, Product, "price.pdf");
+
+        Assert.AreEqual(1, matches.Count);
+        Assert.AreEqual("a", matches[0].Id);
+    }
+
+    [Test]
+    public void FindByName_ReturnsAllEntriesSharingTheName()
+    {
+        UploadedFilesStore.Add(BotA, Product, Entry("a", "price.pdf"));
+        UploadedFilesStore.Add(BotA, Product, Entry("b", "price.pdf"));
+        UploadedFilesStore.Add(BotA, Product, Entry("c", "other.pdf"));
+
+        var ids = UploadedFilesStore.FindByName(BotA, Product, "price.pdf").ConvertAll(e => e.Id);
+
+        CollectionAssert.AreEqual(new[] { "a", "b" }, ids);
+    }
+
+    [Test]
+    public void FindByName_ReturnsEmpty_ForNoMatchOrEmptyName()
+    {
+        UploadedFilesStore.Add(BotA, Product, Entry("a", "price.pdf"));
+
+        Assert.AreEqual(0, UploadedFilesStore.FindByName(BotA, Product, "nope.pdf").Count);
+        Assert.AreEqual(0, UploadedFilesStore.FindByName(BotA, Product, "").Count);
+        Assert.AreEqual(0, UploadedFilesStore.FindByName(BotA, Product, null).Count);
+    }
+
+    [Test]
+    public void FindByName_IsScopedToBotAndType()
+    {
+        UploadedFilesStore.Add(BotA, Product, Entry("a", "price.pdf"));
+
+        Assert.AreEqual(0, UploadedFilesStore.FindByName(BotA, Service, "price.pdf").Count);
+        Assert.AreEqual(0, UploadedFilesStore.FindByName(BotB, Product, "price.pdf").Count);
+    }
+
+    [Test]
     public void Stores_AreIsolated_ByType()
     {
         UploadedFilesStore.Add(BotA, Product, Entry("p", "p.pdf"));

@@ -126,31 +126,19 @@ public partial class BotSettings
         StartCoroutine(DeleteUploadedFileRoutine(pendingDeleteEntry, pendingDeleteContentType, pendingDeleteRow));
     }
 
-    // POST {n8nBaseUrl}/webhook/DeleteFile { fileId } — the n8n workflow removes
-    // every RAG chunk tagged with this fileId, so the bot genuinely forgets the
-    // file. Local record + row are dropped only after the server confirms.
+    // The X-button delete flow: server first, then local record + row are
+    // dropped only after the server confirms.
     private IEnumerator DeleteUploadedFileRoutine(UploadedFileEntry entry, string contentType, GameObject row)
     {
         Bot openBot = Manager.openBot != null ? Manager.openBot.GetComponent<Bot>() : null;
         if (openBot == null) yield break;
 
         deleteFileInFlight = true;
-        string url = $"{Manager.n8nBaseUrl}/webhook/DeleteFile";
-        string body = JsonConvert.SerializeObject(new { fileId = entry.Id });
-
-        using var request = new UnityWebRequest(url, "POST");
-        request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(body));
-        request.downloadHandler = new DownloadHandlerBuffer();
-        request.SetRequestHeader("Content-Type", "application/json");
-        request.timeout = 30;
-        yield return request.SendWebRequest();
+        bool deleted = false;
+        yield return DeleteFileChunksRequest(entry.Id, success => deleted = success);
         deleteFileInFlight = false;
 
-        if (request.result != UnityWebRequest.Result.Success)
-        {
-            Debug.LogError($"[DeleteFile] [{request.responseCode}] {url}: {request.error}\n{request.downloadHandler?.text}");
-            yield break; // keep the row — the bot still knows this file
-        }
+        if (!deleted) yield break; // keep the row — the bot still knows this file
 
         // deletedChunks == 0 means the chunks were already gone server-side;
         // still drop the local record so the list reflects reality.
@@ -162,6 +150,46 @@ public partial class BotSettings
             Destroy(row);
         }
         RefreshUploadedFiles();
+    }
+
+    // Replace-on-reupload: a fresh upload with the same file name superseded this
+    // entry, so its stale RAG chunks (old prices!) must not keep answering. No
+    // popup/row here, and no deleteFileInFlight gate — it targets a different
+    // fileId than any X-button delete. Keeps the record on failure so a later
+    // manual X can retry the cleanup.
+    public IEnumerator DeleteReplacedFileRoutine(string botName, string contentType, string staleFileId)
+    {
+        bool deleted = false;
+        yield return DeleteFileChunksRequest(staleFileId, success => deleted = success);
+        if (!deleted) yield break;
+
+        UploadedFilesStore.Remove(botName, contentType, staleFileId);
+        RefreshUploadedFiles();
+    }
+
+    // POST {n8nBaseUrl}/webhook/DeleteFile { fileId } — the n8n workflow removes
+    // every RAG chunk tagged with this fileId, so the bot genuinely forgets the
+    // file. Shared by the X-button delete and the replace-on-reupload path.
+    private IEnumerator DeleteFileChunksRequest(string fileId, System.Action<bool> callback)
+    {
+        string url = $"{Manager.n8nBaseUrl}/webhook/DeleteFile";
+        string body = JsonConvert.SerializeObject(new { fileId });
+
+        using var request = new UnityWebRequest(url, "POST");
+        request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(body));
+        request.downloadHandler = new DownloadHandlerBuffer();
+        request.SetRequestHeader("Content-Type", "application/json");
+        request.timeout = 30;
+        yield return request.SendWebRequest();
+
+        if (request.result != UnityWebRequest.Result.Success)
+        {
+            Debug.LogError($"[DeleteFile] [{request.responseCode}] {url}: {request.error}\n{request.downloadHandler?.text}");
+            callback?.Invoke(false);
+            yield break;
+        }
+
+        callback?.Invoke(true);
     }
 
     private static string ExtensionBadge(string fileName)

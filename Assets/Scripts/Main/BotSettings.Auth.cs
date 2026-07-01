@@ -529,6 +529,16 @@ public partial class BotSettings
         }
         else
         {
+            // Re-uploading a same-named file REPLACES it: delete the superseded
+            // upload's RAG chunks (by old fileId), or stale and current prices would
+            // coexist in the vector store and retrieval could quote either. The new
+            // chunks are already inserted under a fresh fileId, so this is safe.
+            foreach (UploadedFileEntry stale in UploadedFilesStore.FindByName(openBot.name, contentType, fileName))
+            {
+                if (stale.Id == fileId) continue; // never target the fresh upload
+                StartCoroutine(DeleteReplacedFileRoutine(openBot.name, contentType, stale.Id));
+            }
+
             // Remember the upload on-device so the file survives closing/reopening the bot,
             // and so the per-file delete (X) can target this fileId in the RAG store.
             UploadedFilesStore.Add(openBot.name, contentType, new UploadedFileEntry

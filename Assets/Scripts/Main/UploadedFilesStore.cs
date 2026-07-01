@@ -40,6 +40,21 @@ public static class UploadedFilesStore
         return list;
     }
 
+    // Entries of this type whose Name matches exactly. Used by replace-on-reupload:
+    // uploading a file with a name that is already in the list supersedes the old
+    // upload(s), whose RAG chunks are then deleted by their fileId.
+    public static List<UploadedFileEntry> FindByName(string botName, string contentType, string name)
+    {
+        var matches = new List<UploadedFileEntry>();
+        if (string.IsNullOrEmpty(name))
+            return matches;
+
+        foreach (var entry in Load(botName, contentType))
+            if (entry.Name == name)
+                matches.Add(entry);
+        return matches;
+    }
+
     public static void Add(string botName, string contentType, UploadedFileEntry entry)
     {
         if (string.IsNullOrEmpty(botName) || string.IsNullOrEmpty(contentType) || string.IsNullOrEmpty(entry.Id))
