@@ -83,7 +83,13 @@ def fix_bot(wf):
 
 
 def fix_upload(wf):
-    return wf  # implemented in Tasks 3 & 4
+    # Part A: delete verified-dead orphans + the disabled AI-cleaner chain.
+    delete_nodes(wf, {
+        "Supabase Vector Store1", "Embeddings OpenAI1", "Data Loader1",  # orphan trio
+        "Prepare AI Prompt", "AI Cleaner", "Extract Clean Text",          # disabled chain
+    })
+    # Part B added in Task 4.
+    return wf
 
 
 def main():

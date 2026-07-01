@@ -609,110 +609,6 @@
     },
     {
       "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "324a3f4d-dbee-4d87-8951-b55e7a81039f",
-              "name": "system_prompt",
-              "value": "You clean extracted document text before embedding.\n\nRules:\n- Output plain text only\n- Remove noise, headers, footers, page numbers\n- Preserve factual content\n- Preserve lists and tables as text\n- Do not explain anything\n- Do not add new information",
-              "type": "string"
-            },
-            {
-              "id": "1cb99bc6-ab82-4dd6-b000-f98f8a98c633",
-              "name": "user_prompt",
-              "value": "=Document metadata:\n- contentType: {{$json.metadata.contentType}}\n- fileName: {{$json.metadata.fileName}}\n\nRaw document text:\n{{$json.content}}",
-              "type": "string"
-            },
-            {
-              "id": "7a9520d5-0e85-4673-b549-f29e4561751f",
-              "name": "metadata",
-              "value": "={{$json.metadata}}",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        2960,
-        816
-      ],
-      "id": "ef78d3cd-f2f5-47fe-b662-91189fbf4f85",
-      "name": "Prepare AI Prompt",
-      "disabled": true
-    },
-    {
-      "parameters": {
-        "modelId": {
-          "__rl": true,
-          "value": "gpt-4o-mini",
-          "mode": "list",
-          "cachedResultName": "GPT-4O-MINI"
-        },
-        "responses": {
-          "values": [
-            {
-              "role": "system",
-              "content": "={{$json.system_prompt}}"
-            },
-            {
-              "content": "={{$json.user_prompt}}"
-            }
-          ]
-        },
-        "builtInTools": {},
-        "options": {}
-      },
-      "type": "@n8n/n8n-nodes-langchain.openAi",
-      "typeVersion": 2.1,
-      "position": [
-        3136,
-        816
-      ],
-      "id": "f15ff9c1-5fb7-47c2-a612-a90b7e81cda8",
-      "name": "AI Cleaner",
-      "credentials": {
-        "openAiApi": {
-          "id": "XVjhR1xlWrIgJjKz",
-          "name": "OpenAi account"
-        }
-      },
-      "disabled": true
-    },
-    {
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "3c476957-b20b-41ed-97ea-65d55583d3cf",
-              "name": "cleanText",
-              "value": "={{$json.output[0].content[0].text}}",
-              "type": "string"
-            },
-            {
-              "id": "9d0cde00-b7ec-4a92-a592-77443fd94dab",
-              "name": "metadata",
-              "value": "={{$node[\"Prepare AI Prompt\"].json.metadata}}",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        3456,
-        816
-      ],
-      "id": "f652d13f-882f-4a68-8ce5-7734a5de5fe0",
-      "name": "Extract Clean Text",
-      "disabled": true
-    },
-    {
-      "parameters": {
         "jsCode": "const text = $json.content || '';\nconst baseMetadata = $json.metadata || {};\n\nconst chunks = text\n  .split(/\\n(?=product\\[\\d+\\]:)/) // 👈 ключевая строка\n  .map(t => t.trim())\n  .filter(Boolean);\n\nreturn chunks.map((chunk, index) => ({\n  json: {\n    content: chunk,\n    metadata: {\n      ...baseMetadata,\n      chunkIndex: index + 1,\n      chunkCount: chunks.length\n    }\n  }\n}));"
       },
       "type": "n8n-nodes-base.code",
@@ -723,93 +619,6 @@
       ],
       "id": "74a30d1f-ec26-477e-aba8-a855bc39a7bb",
       "name": "Split into Chunks"
-    },
-    {
-      "parameters": {
-        "mode": "insert",
-        "tableName": {
-          "__rl": true,
-          "value": "documents",
-          "mode": "list",
-          "cachedResultName": "documents"
-        },
-        "options": {
-          "queryName": "match_documents"
-        }
-      },
-      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
-      "typeVersion": 1.3,
-      "position": [
-        3776,
-        832
-      ],
-      "id": "5caec62c-894e-43c2-be92-6c0a286bdc90",
-      "name": "Supabase Vector Store1",
-      "credentials": {
-        "supabaseApi": {
-          "id": "ifCYb9DhUxoCq3pu",
-          "name": "Supabase"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "options": {}
-      },
-      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
-      "typeVersion": 1.2,
-      "position": [
-        3776,
-        1024
-      ],
-      "id": "6659a0d0-90bc-42cd-a45c-fc20335d40e3",
-      "name": "Embeddings OpenAI1",
-      "credentials": {
-        "openAiApi": {
-          "id": "XVjhR1xlWrIgJjKz",
-          "name": "OpenAi account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsonMode": "expressionData",
-        "jsonData": "={{ $('Split into Chunks').item.json.content }}",
-        "options": {
-          "metadata": {
-            "metadataValues": [
-              {
-                "name": "={{\n(() => {\n  const whatsappWorkflowId = $('Extract Whatsapp Workflow Id').item.json.whatsappWorkflowId;\n  let metadataValues;\n\n  if (whatsappWorkflowId !== \"-1\") {\n    metadataValues = $('Add Whatsapp Filter').item.json.nodes[21].parameters.options.metadata.metadataValues;\n  } else {\n    metadataValues = $('Add Telegram Filter').item.json.nodes[21].parameters.options.metadata.metadataValues;\n  }\n\n  // Returns the name of the last item in the array\n  return metadataValues.at(-1)?.name;\n})()\n}}",
-                "value": "={{ $('Set File Id').item.json.fileId }}"
-              },
-              {
-                "name": "contentType",
-                "value": "={{ $('Extract Content Type').item.json.contentType }}"
-              },
-              {
-                "name": "chunkIndex",
-                "value": "={{ $json.metadata.chunkIndex }}"
-              },
-              {
-                "name": "chunkCount",
-                "value": "={{ $json.metadata.chunkCount }}"
-              },
-              {
-                "name": "source",
-                "value": "={{ $json.metadata.source }}"
-              }
-            ]
-          }
-        }
-      },
-      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
-      "typeVersion": 1.1,
-      "position": [
-        3952,
-        1024
-      ],
-      "id": "22bef09d-e540-4d80-b0ee-ef9935100e5a",
-      "name": "Data Loader1"
     },
     {
       "parameters": {
@@ -1105,33 +914,6 @@
         ]
       ]
     },
-    "Prepare AI Prompt": {
-      "main": [
-        [
-          {
-            "node": "AI Cleaner",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "AI Cleaner": {
-      "main": [
-        [
-          {
-            "node": "Extract Clean Text",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Extract Clean Text": {
-      "main": [
-        []
-      ]
-    },
     "Split into Chunks": {
       "main": [
         [
@@ -1141,33 +923,6 @@
             "index": 0
           }
         ]
-      ]
-    },
-    "Embeddings OpenAI1": {
-      "ai_embedding": [
-        [
-          {
-            "node": "Supabase Vector Store1",
-            "type": "ai_embedding",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Data Loader1": {
-      "ai_document": [
-        [
-          {
-            "node": "Supabase Vector Store1",
-            "type": "ai_document",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Supabase Vector Store1": {
-      "main": [
-        []
       ]
     },
     "Normalize PDF": {
