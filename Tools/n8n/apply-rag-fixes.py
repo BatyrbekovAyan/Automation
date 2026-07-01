@@ -118,6 +118,27 @@ def fix_upload(wf):
 
     # Pin the INSERT-side embedding model to match the bot retrieve side exactly.
     find(nodes, name="Embeddings OpenAI")["parameters"]["model"] = EMBED_MODEL
+
+    # Part C: per-bot document scoping. The tutorial tagged each file with a UNIQUE key
+    # (fileName / fileName1 / ...), so a bot's 2nd+ file was invisible to retrieval. Replace
+    # that with STABLE per-bot keys = the bot's own workflow ids. Each chunk carries both the
+    # WhatsApp and Telegram workflow ids; each clone's Supabase retrieval filters by its own
+    # platform id -> every file a bot uploads is retrievable, and other bots stay isolated.
+    nodes = wf["nodes"]
+    find(nodes, name="Add Whatsapp Filter")["parameters"]["assignments"]["assignments"][0]["value"] = (
+        "={{ { metadataValues: [ { name: \"botWaId\", value: "
+        "$('Extract Whatsapp Workflow Id').item.json.whatsappWorkflowId } ] } }}"
+    )
+    find(nodes, name="Add Telegram Filter")["parameters"]["assignments"]["assignments"][0]["value"] = (
+        "={{ { metadataValues: [ { name: \"botTgId\", value: "
+        "$('Extract Telegram Workflow Id').item.json.telegramWorkflowId } ] } }}"
+    )
+    find(nodes, name="Data Loader")["parameters"]["options"]["metadata"]["metadataValues"] = [
+        {"name": "botWaId", "value": "={{ $('Extract Whatsapp Workflow Id').item.json.whatsappWorkflowId }}"},
+        {"name": "botTgId", "value": "={{ $('Extract Telegram Workflow Id').item.json.telegramWorkflowId }}"},
+        {"name": "contentType", "value": "={{ $('Extract Content Type').item.json.contentType }}"},
+        {"name": "source", "value": "blob"},
+    ]
     return wf
 
 

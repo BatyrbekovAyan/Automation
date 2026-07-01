@@ -142,24 +142,20 @@
           "metadata": {
             "metadataValues": [
               {
-                "name": "={{\n(() => {\n  const whatsappWorkflowId = $('Extract Whatsapp Workflow Id').item.json.whatsappWorkflowId;\n  let metadataValues;\n\n  if (whatsappWorkflowId !== \"-1\") {\n    metadataValues = $('Add Whatsapp Filter').item.json.nodes[21].parameters.options.metadata.metadataValues;\n  } else {\n    metadataValues = $('Add Telegram Filter').item.json.nodes[21].parameters.options.metadata.metadataValues;\n  }\n\n  // Returns the name of the last item in the array\n  return metadataValues.at(-1)?.name;\n})()\n}}",
-                "value": "={{ $('Set File Id').item.json.fileId }}"
+                "name": "botWaId",
+                "value": "={{ $('Extract Whatsapp Workflow Id').item.json.whatsappWorkflowId }}"
+              },
+              {
+                "name": "botTgId",
+                "value": "={{ $('Extract Telegram Workflow Id').item.json.telegramWorkflowId }}"
               },
               {
                 "name": "contentType",
                 "value": "={{ $('Extract Content Type').item.json.contentType }}"
               },
               {
-                "name": "chunkIndex",
-                "value": "={{ $json.metadata.chunkIndex }}"
-              },
-              {
-                "name": "chunkCount",
-                "value": "={{ $json.metadata.chunkCount }}"
-              },
-              {
                 "name": "source",
-                "value": "={{ $json.metadata.source }}"
+                "value": "blob"
               }
             ]
           }
@@ -405,7 +401,7 @@
             {
               "id": "1f432e83-78ce-4105-9907-0ad76fd40bcb",
               "name": "nodes[21].parameters.options.metadata",
-              "value": "={{\n(() => {\n  const old = $json.nodes?.[21]?.parameters?.options?.metadata?.metadataValues ?? [];\n\n  const baseKey = \"fileName\";\n\n  // Find existing keys that match baseKey or baseKey<number>\n  const existingIndexes = old\n    .map(item => item.name)\n    .filter(name => name === baseKey || name.startsWith(baseKey))\n    .map(name => {\n      const match = name.match(new RegExp(`^${baseKey}(\\\\d+)?$`));\n      return match && match[1] ? Number(match[1]) : 0;\n    });\n\n  // Next index\n  const nextIndex = existingIndexes.length\n    ? Math.max(...existingIndexes) + 1\n    : 0;\n\n  const newKey = nextIndex === 0 ? baseKey : `${baseKey}${nextIndex}`;\n\n  return {\n    metadataValues: [\n      ...old,\n      {\n        name: newKey,\n        value: $('Set File Id').item.json.fileId\n      }\n    ]\n  };\n})()\n}}",
+              "value": "={{ { metadataValues: [ { name: \"botWaId\", value: $('Extract Whatsapp Workflow Id').item.json.whatsappWorkflowId } ] } }}",
               "type": "object"
             }
           ]
@@ -432,7 +428,7 @@
             {
               "id": "1f432e83-78ce-4105-9907-0ad76fd40bcb",
               "name": "nodes[21].parameters.options.metadata",
-              "value": "={{\n(() => {\n  const old = $json.nodes?.[21]?.parameters?.options?.metadata?.metadataValues ?? [];\n\n  const baseKey = \"fileName\";\n\n  // Find existing keys that match baseKey or baseKey<number>\n  const existingIndexes = old\n    .map(item => item.name)\n    .filter(name => name === baseKey || name.startsWith(baseKey))\n    .map(name => {\n      const match = name.match(new RegExp(`^${baseKey}(\\\\d+)?$`));\n      return match && match[1] ? Number(match[1]) : 0;\n    });\n\n  // Next index\n  const nextIndex = existingIndexes.length\n    ? Math.max(...existingIndexes) + 1\n    : 0;\n\n  const newKey = nextIndex === 0 ? baseKey : `${baseKey}${nextIndex}`;\n\n  return {\n    metadataValues: [\n      ...old,\n      {\n        name: newKey,\n        value: $('Set File Id').item.json.fileId\n      }\n    ]\n  };\n})()\n}}",
+              "value": "={{ { metadataValues: [ { name: \"botTgId\", value: $('Extract Telegram Workflow Id').item.json.telegramWorkflowId } ] } }}",
               "type": "object"
             }
           ]

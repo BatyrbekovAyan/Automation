@@ -64,8 +64,22 @@ def check_upload_chunker():
     assert "3-small" in json.dumps(ins["parameters"].get("model", "")), "insert embed model not pinned"
 
 
+def check_upload_scoping():
+    wf = load(UPLOAD); ns = wf["nodes"]
+    dl = find(ns, name="Data Loader")
+    keys = [m["name"] for m in dl["parameters"]["options"]["metadata"]["metadataValues"]]
+    assert "botWaId" in keys and "botTgId" in keys, f"Data Loader not tagging per-bot keys: {keys}"
+    assert not any(str(k).startswith("fileName") for k in keys), f"stale fileName key still tagged: {keys}"
+    aw = find(ns, name="Add Whatsapp Filter")["parameters"]["assignments"]["assignments"][0]["value"]
+    at = find(ns, name="Add Telegram Filter")["parameters"]["assignments"]["assignments"][0]["value"]
+    assert "botWaId" in aw and "fileName" not in aw, "Add Whatsapp Filter not using stable botWaId"
+    assert "botTgId" in at and "fileName" not in at, "Add Telegram Filter not using stable botTgId"
+
+
 if __name__ == "__main__":
     which = sys.argv[1] if len(sys.argv) > 1 else "all"
+    if which in ("scoping", "all"):
+        check_upload_scoping()
     if which in ("bot", "all"):
         for f in BOTS:
             check_bot(f)
