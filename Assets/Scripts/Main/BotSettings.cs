@@ -119,6 +119,7 @@ public partial class BotSettings : MonoBehaviour
         WireAuthButtons();
         WireHeaderButtons();
         WireDeleteBot();
+        WireUploadedFiles();
         SyncHeaderTitle();
 
         // General-tab layout: each authenticated-number field must sit right
@@ -340,6 +341,7 @@ public partial class BotSettings : MonoBehaviour
         StartCoroutine(CheckWhatsappUnauthorizationOutsideApp());
         StartCoroutine(CheckTelegramUnauthorizationOutsideApp());
         SyncHeaderTitle();
+        RefreshUploadedFiles();
     }
     
     // Mirrors the bot's current name onto the header. Called on enable, after

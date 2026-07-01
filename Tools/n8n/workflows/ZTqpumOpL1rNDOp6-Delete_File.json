@@ -1,0 +1,94 @@
+{
+  "name": "Delete File",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "DeleteFile",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "9b2a2172-d355-473f-8528-f1396860d6f5",
+      "name": "Webhook",
+      "webhookId": "feb8d7b2-f793-497c-bec3-f000774b30f5"
+    },
+    {
+      "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "WITH deleted AS (\n  DELETE FROM documents\n  WHERE metadata->>'fileId' = $1 AND $1 <> ''\n  RETURNING id\n)\nSELECT count(*)::int AS \"deletedChunks\" FROM deleted;",
+        "options": {
+          "queryReplacement": "={{ $json.body.fileId }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        224,
+        0
+      ],
+      "id": "e65797bc-3c77-4f20-b05f-e0b8fcc4d280",
+      "name": "Delete File Chunks",
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"fileId\": $('Webhook').first().json.body.fileId, \"deletedChunks\": $json.deletedChunks } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        448,
+        0
+      ],
+      "id": "ac32fe64-5015-42c3-bdfb-f78fe6d97f59",
+      "name": "Respond"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Delete File Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete File Chunks": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": {},
+  "triggerCount": 1,
+  "meta": {},
+  "id": "ZTqpumOpL1rNDOp6",
+  "active": true
+}

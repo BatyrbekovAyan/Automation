@@ -473,16 +473,15 @@ public partial class BotSettings
         form.AddField("telegramWorkflowId", openBot.telegramWorkflowId);
         form.AddField("contentType", contentType);
 
+        // Mint a stable per-file id up front and send it with the upload. The n8n
+        // UploadFile workflow stamps this onto every RAG chunk (metadata.fileId), so
+        // the per-file delete (X) can later remove exactly this file's chunks.
+        string fileId = System.Guid.NewGuid().ToString();
+        form.AddField("fileId", fileId);
+
         byte[] fileData = File.ReadAllBytes(filePath);
         string fileName = Path.GetFileName(filePath);
         string fileExtension = Path.GetExtension(filePath);
-
-        // The button label is nested (Button > Row > Label); resolve the TMP anywhere in the
-        // subtree rather than assuming it is the direct first child. child[0] is "Row", which
-        // has no TextMeshProUGUI — dereferencing it was the upload NullReferenceException.
-        TextMeshProUGUI buttonLabel = targetButton.GetComponentInChildren<TextMeshProUGUI>(true);
-        if (buttonLabel != null)
-            buttonLabel.text = fileName;
 
         if (fileExtension.Equals(".pdf"))
         {
@@ -530,10 +529,20 @@ public partial class BotSettings
         }
         else
         {
-            // n8n's Upload File "Return File Id" responds with an empty body ($json.name is
-            // never set), so show the uploaded file name as the confirmation instead of blank.
-            if (buttonLabel != null)
-                buttonLabel.text = fileName;
+            // Remember the upload on-device so the file survives closing/reopening the bot,
+            // and so the per-file delete (X) can target this fileId in the RAG store.
+            UploadedFilesStore.Add(openBot.name, contentType, new UploadedFileEntry
+            {
+                Id = fileId,
+                Name = fileName,
+                Size = fileData.Length,
+                DateUnixMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+            });
+
+            // The "Прайс-листы" row list is the upload confirmation now (it shows
+            // every stored file with name/size/date), so the button label stays
+            // a constant call-to-action instead of echoing the last file name.
+            RefreshUploadedFiles();
         }
     }
 }

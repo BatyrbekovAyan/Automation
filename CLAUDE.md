@@ -118,7 +118,8 @@ The app communicates with four external services via `UnityWebRequest` + corouti
 - **Webhook endpoints**:
   - `/webhook/CreateWhatsappWorkflow`, `/webhook/CreateTelegramWorkflow`
   - `/webhook/EditWhatsappWorkflow`, `/webhook/EditTelegramWorkflow`
-  - `/webhook-test/UploadFile` — file upload
+  - `/webhook/UploadFile` — price-list upload. The app mints a GUID `fileId` per file (form field) and persists `{fileId, name, size, date}` per bot in PlayerPrefs (`UploadedFilesStore`); the workflow stamps `fileId` onto every RAG chunk's metadata in Supabase `documents`
+  - `/webhook/DeleteFile` — body `{ fileId }`; deletes that file's RAG chunks (`metadata->>'fileId'`), returns `{ success, deletedChunks }`. Backs the per-file ✕ in the BotSettings "Прайс-листы" list (`BotSettings.Files.cs`); files uploaded before fileId stamping can't be individually deleted
 
 ### Green API (Avatars + secondary auth)
 - **Bases**: `https://7103.api.greenapi.com/` (avatars), `https://4100.api.green-api.com/` (auth flow in Manager.cs)

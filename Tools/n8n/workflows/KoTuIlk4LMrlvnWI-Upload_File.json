@@ -156,6 +156,10 @@
               {
                 "name": "source",
                 "value": "blob"
+              },
+              {
+                "name": "fileId",
+                "value": "={{ $('Extract File Id').item.json.fileId }}"
               }
             ]
           }
@@ -578,6 +582,22 @@
     },
     {
       "parameters": {
+        "operation": "text",
+        "binaryPropertyName": "fileId",
+        "destinationKey": "fileId",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -840,
+        300
+      ],
+      "id": "ce9f3517-1634-4953-a34e-b1d28277b3c4",
+      "name": "Extract File Id"
+    },
+    {
+      "parameters": {
         "assignments": {
           "assignments": [
             {
@@ -667,6 +687,17 @@
       ]
     },
     "Set File Id": {
+      "main": [
+        [
+          {
+            "node": "Extract File Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract File Id": {
       "main": [
         [
           {

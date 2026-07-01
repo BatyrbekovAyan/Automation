@@ -219,6 +219,9 @@ public class Bot : MonoBehaviour
             }
 
             PlayerPrefs.DeleteKey(transform.name + "ServicesNumber");
+
+            UploadedFilesStore.Clear(transform.name, "product");
+            UploadedFilesStore.Clear(transform.name, "service");
         }
 
         if (ChatManager.Instance != null)
