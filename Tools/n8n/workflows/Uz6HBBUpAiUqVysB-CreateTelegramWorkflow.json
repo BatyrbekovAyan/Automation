@@ -78,7 +78,7 @@
             {
               "id": "a112d99d-4c9d-4012-be25-f051f92981fa",
               "name": "nodes[0].parameters.path",
-              "value": "={{ $('Unity Webhook').item.json.body.WhatsappProfileId }}",
+              "value": "={{ $('Unity Webhook').item.json.body.TelegramProfileId }}",
               "type": "string"
             },
             {
