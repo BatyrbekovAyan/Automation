@@ -48,7 +48,8 @@
     },
     {
       "parameters": {
-        "options": {}
+        "options": {},
+        "model": "text-embedding-3-small"
       },
       "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
       "typeVersion": 1.2,
@@ -162,7 +163,8 @@
               }
             ]
           }
-        }
+        },
+        "textSplittingMode": "custom"
       },
       "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
       "typeVersion": 1.1,
@@ -609,29 +611,18 @@
     },
     {
       "parameters": {
-        "jsCode": "const text = $json.content || '';\nconst baseMetadata = $json.metadata || {};\n\nconst chunks = text\n  .split(/\\n(?=product\\[\\d+\\]:)/) // 👈 ключевая строка\n  .map(t => t.trim())\n  .filter(Boolean);\n\nreturn chunks.map((chunk, index) => ({\n  json: {\n    content: chunk,\n    metadata: {\n      ...baseMetadata,\n      chunkIndex: index + 1,\n      chunkCount: chunks.length\n    }\n  }\n}));"
+        "chunkSize": 1000,
+        "chunkOverlap": 150,
+        "options": {}
       },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
       "position": [
-        4176,
-        432
+        4656,
+        844
       ],
-      "id": "74a30d1f-ec26-477e-aba8-a855bc39a7bb",
-      "name": "Split into Chunks"
-    },
-    {
-      "parameters": {
-        "jsCode": "const rawText = $json.text;\n\nif (!rawText || typeof rawText !== 'string') {\n  return [\n    {\n      json: {\n        text: ''\n      }\n    }\n  ];\n}\n\n// 1. нормализация переносов\nconst normalized = rawText\n  .replace(/\\r\\n/g, '\\n')\n  .replace(/\\n{2,}/g, '\\n')\n  .trim();\n\n// 2. разбивка по строкам\nconst rows = normalized\n  .split('\\n')\n  .map(r => r.trim())\n  .filter(r => r.length > 0);\n\n// 3. добавляем префиксы product[n]\nconst withPrefix = rows.map((row, index) => {\n  return `product[${index + 1}]: ${row}`;\n});\n\n// 4. собираем в одну строку (как Extract from TXT)\nconst finalText = withPrefix.join('\\n');\n\n// 5. ВОЗВРАЩАЕМ 1 ITEM\nreturn [\n  {\n    json: {\n      text: finalText\n    }\n  }\n];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1024,
-        192
-      ],
-      "id": "2e52afe2-e079-4dd5-bd41-3a3414854d35",
-      "name": "Normalize PDF"
+      "id": "5413ab58-bd45-5f9e-93ad-5be398726489",
+      "name": "Recursive Character Text Splitter"
     }
   ],
   "connections": {
@@ -845,7 +836,7 @@
       "main": [
         [
           {
-            "node": "Normalize PDF",
+            "node": "Merge",
             "type": "main",
             "index": 0
           }
@@ -907,17 +898,6 @@
       "main": [
         [
           {
-            "node": "Split into Chunks",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Split into Chunks": {
-      "main": [
-        [
-          {
             "node": "Supabase Vector Store",
             "type": "main",
             "index": 0
@@ -925,12 +905,12 @@
         ]
       ]
     },
-    "Normalize PDF": {
-      "main": [
+    "Recursive Character Text Splitter": {
+      "ai_textSplitter": [
         [
           {
-            "node": "Merge",
-            "type": "main",
+            "node": "Data Loader",
+            "type": "ai_textSplitter",
             "index": 0
           }
         ]

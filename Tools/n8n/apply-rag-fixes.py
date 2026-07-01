@@ -88,7 +88,36 @@ def fix_upload(wf):
         "Supabase Vector Store1", "Embeddings OpenAI1", "Data Loader1",  # orphan trio
         "Prepare AI Prompt", "AI Cleaner", "Extract Clean Text",          # disabled chain
     })
-    # Part B added in Task 4.
+    # Part B: replace the product-marker chunker with a native recursive splitter.
+    # Remove the marker hack first (PDF becomes prose, no product[n]: prefixing).
+    delete_nodes(wf, {"Normalize PDF", "Split into Chunks"})
+    nodes = wf["nodes"]; conns = wf["connections"]
+
+    # Rewire the two edges the deletions broke:
+    #   Extract from PDF -> Merge(0)     (was: -> Normalize PDF -> Merge)
+    #   Source Text      -> Supabase(0)  (was: -> Split into Chunks -> Supabase)
+    conns["Extract from PDF"] = {"main": [[{"node": "Merge", "type": "main", "index": 0}]]}
+    conns["Source Text"] = {"main": [[{"node": "Supabase Vector Store", "type": "main", "index": 0}]]}
+
+    # Add the recursive splitter node (idempotent) near the Data Loader.
+    if find(nodes, type_suffix="textSplitterRecursiveCharacterTextSplitter") is None:
+        x, y = find(nodes, name="Data Loader")["position"]
+        nodes.append({
+            "parameters": {"chunkSize": 1000, "chunkOverlap": 150, "options": {}},
+            "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+            "typeVersion": 1,
+            "position": [x, y + 220],
+            "id": str(uuid.uuid5(uuid.NAMESPACE_DNS, wf.get("id", "") + "-splitter")),
+            "name": "Recursive Character Text Splitter",
+        })
+    # Wire splitter -> Data Loader (ai_textSplitter) and enable custom splitting.
+    conns.setdefault("Recursive Character Text Splitter", {})["ai_textSplitter"] = [
+        [{"node": "Data Loader", "type": "ai_textSplitter", "index": 0}]
+    ]
+    find(nodes, name="Data Loader")["parameters"]["textSplittingMode"] = "custom"
+
+    # Pin the INSERT-side embedding model to match the bot retrieve side exactly.
+    find(nodes, name="Embeddings OpenAI")["parameters"]["model"] = EMBED_MODEL
     return wf
 
 
