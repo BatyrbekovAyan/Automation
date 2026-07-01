@@ -308,5 +308,14 @@
       "Bash(awk '{print $1}')"
     ],
     "defaultMode": "acceptEdits"
-  }
+  },
+  "enabledMcpjsonServers": [
+    "mcp-unity"
+  ],
+  "statusLine": {
+    "type": "command",
+    "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/gsd-statusline.js",
+    "padding": 0
+  },
+  "enableAllProjectMcpServers": true
 }
