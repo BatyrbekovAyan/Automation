@@ -79,6 +79,16 @@ def fix_bot(wf):
         "={{ $('Webhook').item.json.body.messages[0].profile_id + ':' + "
         "$('Webhook').item.json.body.messages[0].from }}"
     )
+
+    # 5. Fail-closed per-bot retrieval scoping, baked into the template. Every clone
+    #    filters the shared `documents` table by its OWN workflow id from birth
+    #    ($workflow.id == the id Upload File stamps as botWaId/botTgId). Previously the
+    #    filter only appeared after the first upload PUT-patched the clone by array
+    #    index (nodes[21]) — so a never-uploaded bot retrieved the whole table unscoped.
+    key = "botWaId" if "WhatsApp" in wf.get("name", "") else "botTgId"
+    sup["parameters"].setdefault("options", {})["metadata"] = {
+        "metadataValues": [{"name": key, "value": "={{ $workflow.id }}"}]
+    }
     return wf
 
 
@@ -138,6 +148,9 @@ def fix_upload(wf):
         {"name": "botTgId", "value": "={{ $('Extract Telegram Workflow Id').item.json.telegramWorkflowId }}"},
         {"name": "contentType", "value": "={{ $('Extract Content Type').item.json.contentType }}"},
         {"name": "source", "value": "blob"},
+        # fileId: per-upload GUID minted by the app (uploaded-files list + per-file
+        # delete). Keep it in this rewrite or rerunning the script would strip it.
+        {"name": "fileId", "value": "={{ $('Extract File Id').item.json.fileId }}"},
     ]
     return wf
 

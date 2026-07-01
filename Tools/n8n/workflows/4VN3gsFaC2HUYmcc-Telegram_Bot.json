@@ -683,7 +683,15 @@
         "topK": 10,
         "useReranker": false,
         "options": {
-          "queryName": "match_documents"
+          "queryName": "match_documents",
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "botTgId",
+                "value": "={{ $workflow.id }}"
+              }
+            ]
+          }
         }
       },
       "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",

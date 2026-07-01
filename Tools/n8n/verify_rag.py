@@ -27,6 +27,12 @@ def find(ns, name=None, ts=None):
     return None
 
 
+RETRIEVE_FILTER_KEY = {
+    "4wYitz5ek30SVNlT-WhatsApp_Bot.json": "botWaId",
+    "4VN3gsFaC2HUYmcc-Telegram_Bot.json": "botTgId",
+}
+
+
 def check_bot(f):
     wf = load(f); ns = wf["nodes"]
     assert find(ns, ts="rerankerCohere") is None, f"{f}: Cohere reranker still present"
@@ -35,6 +41,9 @@ def check_bot(f):
     assert sup["parameters"]["useReranker"] is False, f"{f}: useReranker not False"
     assert sup["parameters"]["topK"] == 10, f"{f}: topK not 10"
     assert "product" in sup["parameters"]["toolDescription"].lower(), f"{f}: toolDescription not sharpened"
+    mv = sup["parameters"].get("options", {}).get("metadata", {}).get("metadataValues", [])
+    assert len(mv) == 1 and mv[0]["name"] == RETRIEVE_FILTER_KEY[f], f"{f}: retrieve filter key wrong: {mv}"
+    assert "$workflow.id" in mv[0]["value"], f"{f}: retrieve filter not self-scoped to $workflow.id"
     emb = find(ns, name="OpenAI Embedding")
     assert "3-small" in json.dumps(emb["parameters"].get("model", "")), f"{f}: retrieve embed model not pinned"
     mem = find(ns, name="Chat Memory")
@@ -69,6 +78,7 @@ def check_upload_scoping():
     dl = find(ns, name="Data Loader")
     keys = [m["name"] for m in dl["parameters"]["options"]["metadata"]["metadataValues"]]
     assert "botWaId" in keys and "botTgId" in keys, f"Data Loader not tagging per-bot keys: {keys}"
+    assert "fileId" in keys, f"Data Loader not stamping fileId (breaks per-file delete): {keys}"
     assert not any(str(k).startswith("fileName") for k in keys), f"stale fileName key still tagged: {keys}"
     aw = find(ns, name="Add Whatsapp Filter")["parameters"]["assignments"]["assignments"][0]["value"]
     at = find(ns, name="Add Telegram Filter")["parameters"]["assignments"]["assignments"][0]["value"]
