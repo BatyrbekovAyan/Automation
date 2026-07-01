@@ -482,7 +482,7 @@ public partial class BotSettings
         // has no TextMeshProUGUI — dereferencing it was the upload NullReferenceException.
         TextMeshProUGUI buttonLabel = targetButton.GetComponentInChildren<TextMeshProUGUI>(true);
         if (buttonLabel != null)
-            buttonLabel.text = fileExtension;
+            buttonLabel.text = fileName;
 
         if (fileExtension.Equals(".pdf"))
         {
@@ -530,8 +530,10 @@ public partial class BotSettings
         }
         else
         {
+            // n8n's Upload File "Return File Id" responds with an empty body ($json.name is
+            // never set), so show the uploaded file name as the confirmation instead of blank.
             if (buttonLabel != null)
-                buttonLabel.text = www.downloadHandler.text;
+                buttonLabel.text = fileName;
         }
     }
 }
