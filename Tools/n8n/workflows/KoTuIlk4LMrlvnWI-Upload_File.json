@@ -81,8 +81,8 @@
     },
     {
       "parameters": {
-        "respondWith": "text",
-        "responseBody": "={{ $json.name }}",
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"fileId\": $('Extract File Id').item.json.fileId } }}",
         "options": {}
       },
       "type": "n8n-nodes-base.respondToWebhook",
@@ -93,6 +93,23 @@
       ],
       "id": "a5ca6b1c-ac66-4f5d-bd50-5f7abff22a79",
       "name": "Return File Id"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"error\": \"unsupported file type: \" + $('Set File Id').item.binary.data.fileExtension } }}",
+        "options": {
+          "responseCode": 415
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        816,
+        384
+      ],
+      "id": "7d1f2c3a-9b4e-4f6d-8a2c-5e0f1b3d7c9e",
+      "name": "Respond Unsupported Type"
     },
     {
       "parameters": {
@@ -507,7 +524,10 @@
             }
           ]
         },
-        "options": {}
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "unsupported"
+        }
       },
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.3,
@@ -893,6 +913,13 @@
         [
           {
             "node": "Extract from PDF",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Unsupported Type",
             "type": "main",
             "index": 0
           }

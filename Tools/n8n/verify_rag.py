@@ -86,10 +86,29 @@ def check_upload_scoping():
     assert "botTgId" in at and "fileName" not in at, "Add Telegram Filter not using stable botTgId"
 
 
+def check_upload_response():
+    wf = load(UPLOAD); ns = wf["nodes"]; conns = wf["connections"]
+    # Unsupported types must not vanish silently: Switch needs a fallback output
+    # wired to an explicit 415 response.
+    sw = find(ns, name="Switch")
+    assert sw["parameters"]["options"].get("fallbackOutput") == "extra", "Switch has no fallback output"
+    branches = conns["Switch"]["main"]
+    assert len(branches) == 3 and branches[2][0]["node"] == "Respond Unsupported Type", \
+        f"Switch fallback not wired to Respond Unsupported Type: {branches}"
+    ru = find(ns, name="Respond Unsupported Type")
+    assert ru["parameters"]["options"].get("responseCode") == 415, "unsupported-type response not 415"
+    # Success response must be real JSON carrying the fileId (was: empty $json.name text).
+    ok = find(ns, name="Return File Id")
+    assert ok["parameters"]["respondWith"] == "json", "success response not JSON"
+    assert "fileId" in ok["parameters"]["responseBody"], "success response missing fileId"
+
+
 if __name__ == "__main__":
     which = sys.argv[1] if len(sys.argv) > 1 else "all"
     if which in ("scoping", "all"):
         check_upload_scoping()
+    if which in ("response", "all"):
+        check_upload_response()
     if which in ("bot", "all"):
         for f in BOTS:
             check_bot(f)
