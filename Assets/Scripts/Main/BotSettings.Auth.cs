@@ -460,16 +460,29 @@ public partial class BotSettings
 
     private IEnumerator UploadFile(string filePath, string contentType, Button targetButton)
     {
+        Bot openBot = Manager.openBot != null ? Manager.openBot.GetComponent<Bot>() : null;
+        if (openBot == null)
+        {
+            Debug.LogError("[UploadFile] No open bot (Manager.openBot or its Bot component is null) — aborting upload.");
+            yield break;
+        }
+
         WWWForm form = new();
 
-        form.AddField("whatsappWorkflowId", Manager.openBot.GetComponent<Bot>().whatsappWorkflowId);
-        form.AddField("telegramWorkflowId", Manager.openBot.GetComponent<Bot>().telegramWorkflowId);
+        form.AddField("whatsappWorkflowId", openBot.whatsappWorkflowId);
+        form.AddField("telegramWorkflowId", openBot.telegramWorkflowId);
         form.AddField("contentType", contentType);
 
         byte[] fileData = File.ReadAllBytes(filePath);
         string fileName = Path.GetFileName(filePath);
         string fileExtension = Path.GetExtension(filePath);
-        targetButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = fileExtension;
+
+        // The button label is nested (Button > Row > Label); resolve the TMP anywhere in the
+        // subtree rather than assuming it is the direct first child. child[0] is "Row", which
+        // has no TextMeshProUGUI — dereferencing it was the upload NullReferenceException.
+        TextMeshProUGUI buttonLabel = targetButton.GetComponentInChildren<TextMeshProUGUI>(true);
+        if (buttonLabel != null)
+            buttonLabel.text = fileExtension;
 
         if (fileExtension.Equals(".pdf"))
         {
@@ -513,11 +526,12 @@ public partial class BotSettings
 
         if (www.result != UnityWebRequest.Result.Success)
         {
-
+            Debug.LogError($"[UploadFile] Upload failed ({www.responseCode} {www.result}): {www.error}\n{www.downloadHandler?.text}");
         }
         else
         {
-            targetButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = www.downloadHandler.text;
+            if (buttonLabel != null)
+                buttonLabel.text = www.downloadHandler.text;
         }
     }
 }
