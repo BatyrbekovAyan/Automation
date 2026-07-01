@@ -589,7 +589,7 @@
     {
       "parameters": {
         "sessionIdType": "customKey",
-        "sessionKey": "={{ $('Webhook').item.json.body.messages[0].from + $('Webhook').item.json.body.messages[0].to || $('Webhook').item.json.body.messages[0].to + $('Webhook').item.json.body.messages[0].from}}",
+        "sessionKey": "={{ $('Webhook').item.json.body.messages[0].profile_id + ':' + $('Webhook').item.json.body.messages[0].from }}",
         "contextWindowLength": 50
       },
       "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
@@ -673,15 +673,15 @@
     {
       "parameters": {
         "mode": "retrieve-as-tool",
-        "toolDescription": "Use this tool to retrieve data from the Supabase Vector Store where the important documents are stored.",
+        "toolDescription": "Retrieve product details, prices, services, and any uploaded catalog or document content for this business. Use whenever the customer asks about products, pricing, availability, or specifics that may be in uploaded documents.",
         "tableName": {
           "__rl": true,
           "value": "documents",
           "mode": "list",
           "cachedResultName": "documents"
         },
-        "topK": 20,
-        "useReranker": true,
+        "topK": 10,
+        "useReranker": false,
         "options": {
           "queryName": "match_documents"
         }
@@ -725,25 +725,9 @@
       "typeVersion": 3.4
     },
     {
-      "parameters": {},
-      "type": "@n8n/n8n-nodes-langchain.rerankerCohere",
-      "typeVersion": 1,
-      "position": [
-        -1936,
-        176
-      ],
-      "id": "dd719583-4d4d-414b-9bdf-b622fca65b47",
-      "name": "Reranker Cohere",
-      "credentials": {
-        "cohereApi": {
-          "id": "LT4M1G33fto2SYNB",
-          "name": "CohereApi account"
-        }
-      }
-    },
-    {
       "parameters": {
-        "options": {}
+        "options": {},
+        "model": "text-embedding-3-small"
       },
       "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
       "typeVersion": 1.2,
@@ -1034,17 +1018,6 @@
           {
             "node": "HTTP Request",
             "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Reranker Cohere": {
-      "ai_reranker": [
-        [
-          {
-            "node": "Supabase Vector Store",
-            "type": "ai_reranker",
             "index": 0
           }
         ]

@@ -57,7 +57,29 @@ def delete_nodes(wf, doomed):
 
 
 def fix_bot(wf):
-    return wf  # implemented in Task 2
+    # 1. Delete the unconfigured Cohere reranker + its ai_reranker connection.
+    delete_nodes(wf, {"Reranker Cohere"})
+    nodes = wf["nodes"]
+
+    # 2. Supabase retrieval tool: reranker off, smaller topK, sharper tool description.
+    sup = find(nodes, name="Supabase Vector Store")
+    sup["parameters"]["useReranker"] = False
+    sup["parameters"]["topK"] = 10
+    sup["parameters"]["toolDescription"] = (
+        "Retrieve product details, prices, services, and any uploaded catalog or "
+        "document content for this business. Use whenever the customer asks about "
+        "products, pricing, availability, or specifics that may be in uploaded documents."
+    )
+
+    # 3. Pin the retrieve-side embedding model (MUST match the Upload File insert side).
+    find(nodes, name="OpenAI Embedding")["parameters"]["model"] = EMBED_MODEL
+
+    # 4. Namespaced, correct sessionKey (kills the dead `||` and the cross-bot leak).
+    find(nodes, name="Chat Memory")["parameters"]["sessionKey"] = (
+        "={{ $('Webhook').item.json.body.messages[0].profile_id + ':' + "
+        "$('Webhook').item.json.body.messages[0].from }}"
+    )
+    return wf
 
 
 def fix_upload(wf):
