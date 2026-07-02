@@ -467,6 +467,22 @@ public partial class BotSettings
             yield break;
         }
 
+        string fileName = Path.GetFileName(filePath);
+        string fileExtension = Path.GetExtension(filePath);
+
+        // Optimistic feedback: the row appears in «Прайс-листы» immediately, in
+        // an uploading state — the n8n webhook takes a few seconds (extraction +
+        // embedding) and a silent gap reads as "did my tap even register?".
+        GameObject pendingRow = AddPendingFileRow(contentType, fileName);
+        System.Action retryUpload = () => StartCoroutine(UploadFile(filePath, contentType, targetButton));
+
+        byte[] fileData = ReadFileOrNull(filePath);
+        if (fileData == null)
+        {
+            MarkPendingRowFailed(pendingRow, contentType, retryUpload);
+            yield break;
+        }
+
         WWWForm form = new();
 
         form.AddField("whatsappWorkflowId", openBot.whatsappWorkflowId);
@@ -478,10 +494,6 @@ public partial class BotSettings
         // the per-file delete (X) can later remove exactly this file's chunks.
         string fileId = System.Guid.NewGuid().ToString();
         form.AddField("fileId", fileId);
-
-        byte[] fileData = File.ReadAllBytes(filePath);
-        string fileName = Path.GetFileName(filePath);
-        string fileExtension = Path.GetExtension(filePath);
 
         if (fileExtension.Equals(".pdf"))
         {
@@ -526,6 +538,7 @@ public partial class BotSettings
         if (www.result != UnityWebRequest.Result.Success)
         {
             Debug.LogError($"[UploadFile] Upload failed ({www.responseCode} {www.result}): {www.error}\n{www.downloadHandler?.text}");
+            MarkPendingRowFailed(pendingRow, contentType, retryUpload);
         }
         else
         {
@@ -549,10 +562,23 @@ public partial class BotSettings
                 DateUnixMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
             });
 
-            // The "Прайс-листы" row list is the upload confirmation now (it shows
-            // every stored file with name/size/date), so the button label stays
-            // a constant call-to-action instead of echoing the last file name.
-            RefreshUploadedFiles();
+            // The pending row settles into the real stored row (with a small
+            // pop) — the list is the upload confirmation, the button label
+            // stays a constant call-to-action.
+            CompletePendingFileRow(pendingRow, contentType);
+        }
+    }
+
+    private static byte[] ReadFileOrNull(string filePath)
+    {
+        try
+        {
+            return File.ReadAllBytes(filePath);
+        }
+        catch (System.Exception exception)
+        {
+            Debug.LogError($"[UploadFile] Could not read '{filePath}': {exception.Message}");
+            return null;
         }
     }
 }

@@ -105,7 +105,7 @@ public static class BotSettingsUploadedFilesBuilder
         sectionVlg.childForceExpandHeight = false;
         var fitter = section.AddComponent<ContentSizeFitter>();
         fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-        section.transform.SetAsLastSibling(); // after ProductsParent/ServicesParent
+        section.transform.SetAsFirstSibling(); // above the catalog section header + list
 
         AddSectionHeader(section, "ПРАЙС-ЛИСТЫ");
 
@@ -170,6 +170,13 @@ public static class BotSettingsUploadedFilesBuilder
         var rowLe = row.AddComponent<LayoutElement>();
         rowLe.preferredHeight = Sz(60);
         rowLe.minHeight = Sz(60);
+
+        // Tap-to-retry surface for the failed-upload state. Disabled in the
+        // normal/pending states so it never swallows the RemoveButton's taps.
+        var rowButton = row.AddComponent<Button>();
+        rowButton.transition = Selectable.Transition.None;
+        rowButton.targetGraphic = bg;
+        rowButton.interactable = false;
 
         BuildBadge(row.transform);
         BuildTexts(row.transform);
@@ -238,6 +245,43 @@ public static class BotSettingsUploadedFilesBuilder
         // rotated Image bars instead.
         BuildXBar(go.transform, "X1", 45f);
         BuildXBar(go.transform, "X2", -45f);
+
+        // Uploading state: three pulsing dots in the same trailing slot as the
+        // X (slot stays constant → no layout shift between states). Inactive by
+        // default; BotSettings.Files.cs toggles it for pending rows.
+        BuildDots(go.transform);
+    }
+
+    private static void BuildDots(Transform removeButton)
+    {
+        var dots = NewChild(removeButton, "Dots", out var dotsRt);
+        Stretch(dotsRt);
+
+        var graphics = new Graphic[3];
+        for (int i = 0; i < 3; i++)
+        {
+            var dot = NewChild(dots.transform, $"Dot{i}", out var rt);
+            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(Sz(3.5f), Sz(3.5f));
+            rt.anchoredPosition = new Vector2((i - 1) * Sz(6), 0f);
+            var img = dot.AddComponent<Image>();
+            img.color = Primary;
+            img.raycastTarget = false;
+            AddRoundedCorners(dot, Sz(1.75f));
+            graphics[i] = img;
+        }
+
+        // Reuse the app's existing "thinking" loading language — the same
+        // self-animating dots as the reply-suggestions skeleton.
+        var skeleton = dots.AddComponent<ThinkingDotsSkeleton>();
+        var so = new SerializedObject(skeleton);
+        var dotsProp = so.FindProperty("dots");
+        dotsProp.arraySize = graphics.Length;
+        for (int i = 0; i < graphics.Length; i++)
+            dotsProp.GetArrayElementAtIndex(i).objectReferenceValue = graphics[i];
+        so.ApplyModifiedPropertiesWithoutUndo();
+
+        dots.SetActive(false);
     }
 
     private static void BuildXBar(Transform parent, string name, float angle)

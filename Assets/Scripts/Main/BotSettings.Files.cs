@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
+using DG.Tweening;
 using Newtonsoft.Json;
 using TMPro;
 using UnityEngine;
@@ -29,6 +30,8 @@ public partial class BotSettings
 
     private readonly List<GameObject> spawnedProductFileRows = new();
     private readonly List<GameObject> spawnedServiceFileRows = new();
+    private readonly List<GameObject> pendingProductFileRows = new();
+    private readonly List<GameObject> pendingServiceFileRows = new();
     private UploadedFileEntry pendingDeleteEntry;
     private string pendingDeleteContentType;
     private GameObject pendingDeleteRow;
@@ -36,6 +39,11 @@ public partial class BotSettings
 
     private static readonly string[] RuMonthsShort =
         { "янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек" };
+
+    // Matches BotSettingsRebuilder's palette (Primary / Danger / light danger fill).
+    private static readonly Color UploadingAccent = new Color32(0x1B, 0x7C, 0xEB, 0xFF);
+    private static readonly Color FailedAccent = new Color32(0xE5, 0x39, 0x35, 0xFF);
+    private static readonly Color FailedBadgeBg = new Color32(0xFD, 0xEC, 0xEC, 0xFF);
 
     private void WireUploadedFiles()
     {
@@ -51,26 +59,30 @@ public partial class BotSettings
     {
         Bot openBot = Manager.openBot != null ? Manager.openBot.GetComponent<Bot>() : null;
         RefreshFilesTab(openBot, "product", uploadedProductFilesSection, uploadedProductFilesParent,
-                        uploadedProductFileRowTemplate, spawnedProductFileRows);
+                        uploadedProductFileRowTemplate, spawnedProductFileRows, pendingProductFileRows);
         RefreshFilesTab(openBot, "service", uploadedServiceFilesSection, uploadedServiceFilesParent,
-                        uploadedServiceFileRowTemplate, spawnedServiceFileRows);
+                        uploadedServiceFileRowTemplate, spawnedServiceFileRows, pendingServiceFileRows);
     }
 
     private void RefreshFilesTab(Bot openBot, string contentType, GameObject section,
-                                 RectTransform rowsParent, GameObject template, List<GameObject> spawned)
+                                 RectTransform rowsParent, GameObject template,
+                                 List<GameObject> spawned, List<GameObject> pending)
     {
         if (section == null || rowsParent == null || template == null) return;
 
         foreach (var row in spawned)
             if (row != null) Destroy(row);
         spawned.Clear();
+        pending.RemoveAll(row => row == null);
 
         var files = openBot != null
             ? UploadedFilesStore.Load(openBot.name, contentType)
             : new List<UploadedFileEntry>();
 
-        section.SetActive(files.Count > 0);
-        if (files.Count == 0) return;
+        // Pending (uploading/failed) rows are not in the store but keep the
+        // section alive so in-flight feedback stays visible.
+        section.SetActive(files.Count + pending.Count > 0);
+        if (files.Count + pending.Count == 0) return;
 
         foreach (var entry in files)
         {
@@ -79,6 +91,10 @@ public partial class BotSettings
             BindFileRow(row, entry, contentType);
             spawned.Add(row);
         }
+
+        // Stored rows first, in-flight uploads last (newest activity at the bottom).
+        foreach (var row in pending)
+            row.transform.SetAsLastSibling();
 
         RebuildTabLayout(rowsParent);
     }
@@ -165,6 +181,135 @@ public partial class BotSettings
 
         UploadedFilesStore.Remove(botName, contentType, staleFileId);
         RefreshUploadedFiles();
+    }
+
+    ////////////////////////// UPLOAD-IN-PROGRESS ROWS //////////////////////////
+
+    // Optimistic feedback: the row appears the moment a file is picked, with
+    // pulsing dots instead of the ✕ and «Загрузка…» instead of size · date.
+    // Not in UploadedFilesStore — tracked in the pending lists so
+    // RefreshUploadedFiles keeps it (and the section) alive during the upload.
+    public GameObject AddPendingFileRow(string contentType, string fileName)
+    {
+        bool isProduct = contentType == "product";
+        var section = isProduct ? uploadedProductFilesSection : uploadedServiceFilesSection;
+        var parent = isProduct ? uploadedProductFilesParent : uploadedServiceFilesParent;
+        var template = isProduct ? uploadedProductFileRowTemplate : uploadedServiceFileRowTemplate;
+        var pending = isProduct ? pendingProductFileRows : pendingServiceFileRows;
+        if (section == null || parent == null || template == null) return null;
+
+        var row = Instantiate(template, parent);
+        row.SetActive(true);
+
+        var nameLabel = row.transform.Find("Texts/Name")?.GetComponent<TextMeshProUGUI>();
+        var metaLabel = row.transform.Find("Texts/Meta")?.GetComponent<TextMeshProUGUI>();
+        var badgeLabel = row.transform.Find("Badge/Label")?.GetComponent<TextMeshProUGUI>();
+
+        if (badgeLabel != null) badgeLabel.text = ExtensionBadge(fileName);
+        if (nameLabel != null)
+        {
+            nameLabel.text = fileName;
+            var dimmed = nameLabel.color; dimmed.a = 0.75f; nameLabel.color = dimmed;
+        }
+        if (metaLabel != null)
+        {
+            metaLabel.text = "Загрузка…";
+            metaLabel.color = UploadingAccent;
+        }
+        SetRowTrailing(row, showDots: true, removeInteractable: false);
+
+        pending.Add(row);
+        section.SetActive(true);
+        RebuildTabLayout(parent);
+        return row;
+    }
+
+    // Upload confirmed: the pending row is replaced by the real stored row
+    // (caller has already added the store entry), with a small settle pop.
+    public void CompletePendingFileRow(GameObject row, string contentType)
+    {
+        DropPendingRow(row, contentType);
+        var spawned = contentType == "product" ? spawnedProductFileRows : spawnedServiceFileRows;
+        if (spawned.Count > 0 && spawned[^1] != null)
+            spawned[^1].transform.DOPunchScale(Vector3.one * 0.05f, 0.25f);
+    }
+
+    // Upload failed: the row flips to a red retry state instead of vanishing —
+    // tapping the row re-runs the upload, the ✕ dismisses the failed attempt.
+    public void MarkPendingRowFailed(GameObject row, string contentType, System.Action retry)
+    {
+        if (row == null) return;
+
+        var nameLabel = row.transform.Find("Texts/Name")?.GetComponent<TextMeshProUGUI>();
+        var metaLabel = row.transform.Find("Texts/Meta")?.GetComponent<TextMeshProUGUI>();
+        var badge = row.transform.Find("Badge")?.GetComponent<Image>();
+        var badgeLabel = row.transform.Find("Badge/Label")?.GetComponent<TextMeshProUGUI>();
+
+        if (nameLabel != null)
+        {
+            var full = nameLabel.color; full.a = 1f; nameLabel.color = full;
+        }
+        if (metaLabel != null)
+        {
+            metaLabel.text = "Не загрузилось · нажмите, чтобы повторить";
+            metaLabel.color = FailedAccent;
+        }
+        if (badge != null) badge.color = FailedBadgeBg;
+        if (badgeLabel != null) badgeLabel.color = FailedAccent;
+
+        SetRowTrailing(row, showDots: false, removeInteractable: true, barColor: FailedAccent);
+
+        var removeButton = row.transform.Find("RemoveButton")?.GetComponent<Button>();
+        if (removeButton != null)
+            PopupUI.WireFingerUp(removeButton, () => DropPendingRow(row, contentType));
+
+        var rowButton = row.GetComponent<Button>();
+        if (rowButton != null)
+        {
+            rowButton.interactable = true;
+            PopupUI.WireFingerUp(rowButton, () =>
+            {
+                DropPendingRow(row, contentType);
+                retry?.Invoke();
+            });
+        }
+    }
+
+    private void DropPendingRow(GameObject row, string contentType)
+    {
+        var pending = contentType == "product" ? pendingProductFileRows : pendingServiceFileRows;
+        pending.Remove(row);
+        if (row != null)
+        {
+            row.SetActive(false); // VLG skips inactive children — reflow now
+            Destroy(row);
+        }
+        RefreshUploadedFiles();
+    }
+
+    // The trailing 48-unit slot holds both the ✕ bars and the pulsing dots, so
+    // switching states never shifts the row layout.
+    private static void SetRowTrailing(GameObject row, bool showDots, bool removeInteractable,
+                                       Color? barColor = null)
+    {
+        var removeButton = row.transform.Find("RemoveButton");
+        if (removeButton == null) return;
+
+        var x1 = removeButton.Find("X1");
+        var x2 = removeButton.Find("X2");
+        var dots = removeButton.Find("Dots");
+
+        if (x1 != null) x1.gameObject.SetActive(!showDots);
+        if (x2 != null) x2.gameObject.SetActive(!showDots);
+        if (dots != null) dots.gameObject.SetActive(showDots);
+
+        if (barColor.HasValue)
+        {
+            if (x1 != null && x1.TryGetComponent(out Image bar1)) bar1.color = barColor.Value;
+            if (x2 != null && x2.TryGetComponent(out Image bar2)) bar2.color = barColor.Value;
+        }
+
+        if (removeButton.TryGetComponent(out Button button)) button.interactable = removeInteractable;
     }
 
     // POST {n8nBaseUrl}/webhook/DeleteFile { fileId } — the n8n workflow removes

@@ -111,6 +111,14 @@ public class Bot : MonoBehaviour
                     Manager.openBot = gameObject;
                     Manager.openBotSettings = botSettings.gameObject.GetComponent<BotSettings>();
 
+                    // SetActive above fired BotSettings.OnEnable BEFORE the two
+                    // assignments, so its RefreshUploadedFiles saw a null/stale
+                    // openBot and hid the "Прайс-листы" section. Re-run now that
+                    // the pairing is authoritative (same pattern as
+                    // RefreshBusinessIcon: Manager writes, then explicit refresh).
+                    if (Manager.openBotSettings != null)
+                        Manager.openBotSettings.RefreshUploadedFiles();
+
                     // Each BotSettings prefab has its own SwipeBack child. Resolve
                     // the right one explicitly instead of relying on the static
                     // Instance — the cascade activation when the wrapper turns on
