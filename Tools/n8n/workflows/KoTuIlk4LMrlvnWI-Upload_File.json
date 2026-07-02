@@ -235,7 +235,7 @@
                 },
                 "conditions": [
                   {
-                    "leftValue": "={{ $('Set File Id').item.binary.data.fileExtension }}",
+                    "leftValue": "={{ $('Set File Id').item.binary.data.fileExtension.toLowerCase() }}",
                     "rightValue": "txt",
                     "operator": {
                       "type": "string",
@@ -260,7 +260,7 @@
                 "conditions": [
                   {
                     "id": "400a711f-9f13-4e5e-a155-a0dc746fbec9",
-                    "leftValue": "={{ $('Set File Id').item.binary.data.fileExtension }}",
+                    "leftValue": "={{ $('Set File Id').item.binary.data.fileExtension.toLowerCase() }}",
                     "rightValue": "pdf",
                     "operator": {
                       "type": "string",
@@ -411,6 +411,42 @@
       ],
       "id": "5413ab58-bd45-5f9e-93ad-5be398726489",
       "name": "Recursive Character Text Splitter"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://mnwsdbqvehrkeqwnwpqb.supabase.co/storage/v1/object/price-lists/{{ $('Extract File Id').item.json.fileId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-upsert",
+              "value": "true"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        816,
+        -224
+      ],
+      "id": "2dc5405c-7f57-5765-9c37-ea972bbea551",
+      "name": "Store Original File",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ifCYb9DhUxoCq3pu",
+          "name": "Supabase"
+        }
+      },
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -558,11 +594,21 @@
             "node": "Extract from TXT",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "Store Original File",
+            "type": "main",
+            "index": 0
           }
         ],
         [
           {
             "node": "Extract from PDF",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Store Original File",
             "type": "main",
             "index": 0
           }

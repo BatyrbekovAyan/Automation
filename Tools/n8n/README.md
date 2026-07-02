@@ -8,8 +8,14 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
 - `workflows/` — **committed source of truth**: the 8 workflows the app actually depends on.
   Each JSON has its original n8n `id` injected at the top level so it round-trips on import.
 - `supabase/` — the RAG store's DB contract: `schema.sql` (documents table +
-  `match_documents` as deployed — note its multi-key filter uses OR semantics) and the
-  applied hardening migrations (RLS default-deny, anon revoke, HNSW + metadata indexes).
+  `match_documents` as deployed — note its multi-key filter uses OR semantics), the
+  applied hardening migrations (RLS default-deny, anon revoke, HNSW + metadata indexes),
+  and the `price-lists` originals bucket (`2026-07-02-price-list-originals-bucket.sql` —
+  must be applied once per Supabase project before the Store Original File node works).
+- `apply-*.py` — idempotent migrations over `workflows/` (edit by node name, re-runnable);
+  `verify_rag.py` asserts every applied invariant; `test-upload-e2e.sh` exercises the
+  Upload/Delete webhooks end-to-end against a live instance (curl mimicking Unity's
+  WWWForm binary-part quirk).
 - `reference/` — **gitignored**: downloaded community/marketplace templates + n8n onboarding
   samples, kept only to mine for ideas. Not part of the app, never imported.
 
@@ -21,8 +27,8 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
 | `Uz6HBBUpAiUqVysB` | CreateTelegramWorkflow | App webhook `/webhook/CreateTelegramWorkflow` — clones the Telegram template per bot |
 | `3qax5J9u2qsT9Vao` | Edit Whatsapp Workflow | App webhook `/webhook/EditWhatsappWorkflow` — edits a bot's system prompt |
 | `TwWPW3gIyjZS3foR` | Edit Telegram Workflow | App webhook `/webhook/EditTelegramWorkflow` — edits a bot's system prompt |
-| `KoTuIlk4LMrlvnWI` | Upload File | App webhook `UploadFile` — ingests files into the Supabase vector store; stamps `botWaId`/`botTgId`/`fileId` on every chunk; unsupported types get an explicit 415 |
-| `ZTqpumOpL1rNDOp6` | Delete File | App webhook `DeleteFile` — body `{ fileId }`; deletes that file's chunks from `documents`, returns `{ success, deletedChunks }` |
+| `KoTuIlk4LMrlvnWI` | Upload File | App webhook `UploadFile` — ingests files into the Supabase vector store; stamps `botWaId`/`botTgId`/`fileId` on every chunk; extension routing is case-insensitive; archives the uploaded bytes to Storage `price-lists/{fileId}` (dead-end branch, `onError: continue` — never fails the upload); unsupported types get an explicit 415 |
+| `ZTqpumOpL1rNDOp6` | Delete File | App webhook `DeleteFile` — body `{ fileId }`; deletes that file's chunks from `documents` AND its stored original `price-lists/{fileId}` (404 tolerated for pre-bucket files), returns `{ success, deletedChunks }` |
 | `4wYitz5ek30SVNlT` | WhatsApp Bot | **Clone source** for every WhatsApp bot (referenced by literal id in CreateWhatsappWorkflow); retrieval self-scoped by `botWaId = {{ $workflow.id }}` |
 | `4VN3gsFaC2HUYmcc` | Telegram Bot | **Clone source** for every Telegram bot (referenced by literal id in CreateTelegramWorkflow); retrieval self-scoped by `botTgId = {{ $workflow.id }}` |
 

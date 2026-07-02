@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Assertion harness for the RAG restore + fixes migration (apply-rag-fixes.py).
+"""Assertion harness for the RAG restore + fixes migration (apply-rag-fixes.py)
+and the upload/delete hardening migration (apply-upload-hardening.py).
 
-Usage: python3 Tools/n8n/verify_rag.py [bot|purge|chunker|all]
+Usage: python3 Tools/n8n/verify_rag.py [bot|purge|chunker|hardening|all]
 """
 import json, os, sys
 
@@ -121,6 +122,61 @@ def check_upload_response():
     assert "fileId" in ok["parameters"]["responseBody"], "success response missing fileId"
 
 
+DELETE = "ZTqpumOpL1rNDOp6-Delete_File.json"
+
+
+def check_upload_hardening():
+    wf = load(UPLOAD); ns = wf["nodes"]; conns = wf["connections"]
+    # 1. Extension routing must be case-insensitive: the app forwards the
+    #    ORIGINAL filename, so "MENU.PDF" must not fall into the 415 fallback.
+    for rule in find(ns, name="Switch")["parameters"]["rules"]["values"]:
+        for cond in rule["conditions"]["conditions"]:
+            assert ".toLowerCase()" in cond["leftValue"], \
+                f"Switch rule '{rule.get('outputKey')}' extension match is case-sensitive"
+    # 2. Original file archived to Supabase Storage keyed by fileId.
+    store = find(ns, name="Store Original File")
+    assert store is not None, "Store Original File node missing"
+    assert store["parameters"]["url"].startswith("=https://") \
+        and "/storage/v1/object/price-lists/" in store["parameters"]["url"], \
+        f"Store Original File url wrong: {store['parameters']['url']}"
+    assert "$('Extract File Id').item.json.fileId" in store["parameters"]["url"], \
+        "storage object key must be the app-minted fileId"
+    assert store["parameters"]["contentType"] == "binaryData" \
+        and store["parameters"]["inputDataFieldName"] == "data", "store node must send the binary as-is"
+    assert store["parameters"]["nodeCredentialType"] == "supabaseApi", "store node must auth via supabaseApi"
+    # A storage hiccup must never fail the upload: dead-end + continue-on-error.
+    assert store.get("onError") == "continueRegularOutput", "store node must not fail the upload"
+    assert "Store Original File" not in conns, "store node must be a dead-end (no outgoing edges)"
+    branches = conns["Switch"]["main"]
+    for i, key in ((0, "txt"), (1, "pdf")):
+        assert any(l["node"] == "Store Original File" for l in branches[i]), \
+            f"Switch {key} branch does not archive the original"
+    assert not any(l["node"] == "Store Original File" for l in branches[2]), \
+        "unsupported branch must NOT archive (nothing was ingested)"
+
+
+def check_delete_hardening():
+    wf = load_named(DELETE); ns = wf["nodes"]; conns = wf["connections"]
+    node = find(ns, name="Delete Stored Original")
+    assert node is not None, "Delete Stored Original node missing"
+    assert node["parameters"]["method"] == "DELETE", "must DELETE the storage object"
+    assert "/storage/v1/object/price-lists/" in node["parameters"]["url"] \
+        and "$json.body.fileId" in node["parameters"]["url"], \
+        f"Delete Stored Original url wrong: {node['parameters']['url']}"
+    # Pre-bucket uploads have no stored object (404) — chunks must still delete.
+    assert node.get("onError") == "continueRegularOutput", "storage 404 must not fail chunk deletion"
+    hook = conns["Webhook"]["main"][0]
+    targets = {l["node"] for l in hook}
+    assert {"Delete File Chunks", "Delete Stored Original"} <= targets, \
+        f"Webhook must fan out to chunks + storage delete: {targets}"
+    assert conns["Delete File Chunks"]["main"][0][0]["node"] == "Respond", "chunk→respond chain broken"
+
+
+def load_named(fname):
+    with open(os.path.join(WF, fname), encoding="utf-8") as fh:
+        return json.load(fh)
+
+
 if __name__ == "__main__":
     which = sys.argv[1] if len(sys.argv) > 1 else "all"
     if which in ("scoping", "all"):
@@ -136,4 +192,7 @@ if __name__ == "__main__":
         check_upload_purge()
     if which in ("chunker", "all"):
         check_upload_chunker()
+    if which in ("hardening", "all"):
+        check_upload_hardening()
+        check_delete_hardening()
     print("VERIFY OK:", which)

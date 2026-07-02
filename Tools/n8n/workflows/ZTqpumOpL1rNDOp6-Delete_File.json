@@ -56,6 +56,30 @@
       ],
       "id": "ac32fe64-5015-42c3-bdfb-f78fe6d97f59",
       "name": "Respond"
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://mnwsdbqvehrkeqwnwpqb.supabase.co/storage/v1/object/price-lists/{{ $json.body.fileId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        -192
+      ],
+      "id": "eeb85006-d0ab-5d50-8dca-3116a5abf662",
+      "name": "Delete Stored Original",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ifCYb9DhUxoCq3pu",
+          "name": "Supabase"
+        }
+      },
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -64,6 +88,11 @@
         [
           {
             "node": "Delete File Chunks",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Delete Stored Original",
             "type": "main",
             "index": 0
           }
