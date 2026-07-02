@@ -61,6 +61,17 @@ public partial class BotSettings
             PopupUI.WireFingerUp(replaceFileConfirmButton, () => ResolveReplaceDecision(replace: true));
         if (replaceFileCancelButton != null)
             PopupUI.WireFingerUp(replaceFileCancelButton, () => ResolveReplaceDecision(replace: false));
+
+        // The source sheet raises these when the user picks a source. Subscribe
+        // at runtime (mirrors the ItemEditSheet event wiring above) so the
+        // pending upload context set in ShowUploadSourceSheet is consumed by the
+        // right handler. Guarded because the sheet may not be baked into an
+        // older prefab yet — the upload buttons then fall back to the picker.
+        if (uploadSourceSheet != null)
+        {
+            uploadSourceSheet.OnFilePressed += OnUploadSourceFilePressed;
+            uploadSourceSheet.OnGalleryPressed += OnUploadSourceGalleryPressed;
+        }
     }
 
     // Uploading a file whose name is already in the list REPLACES the old
@@ -273,9 +284,13 @@ public partial class BotSettings
             spawned[^1].transform.DOPunchScale(Vector3.one * 0.05f, 0.25f);
     }
 
-    // Upload failed: the row flips to a red retry state instead of vanishing —
-    // tapping the row re-runs the upload, the ✕ dismisses the failed attempt.
-    public void MarkPendingRowFailed(GameObject row, string contentType, System.Action retry)
+    // Upload failed: the row flips to a red state instead of vanishing. A
+    // network failure (retry != null) shows the tap-to-retry hint and re-runs
+    // the upload on tap; a deterministic failure (retry == null) shows the
+    // specific reason instead — retrying a wrong format or an empty file can
+    // only fail again, so the row isn't tappable and the ✕ is the only exit.
+    public void MarkPendingRowFailed(GameObject row, string contentType, System.Action retry,
+                                     string reason = null)
     {
         if (row == null) return;
 
@@ -290,8 +305,9 @@ public partial class BotSettings
         }
         if (metaLabel != null)
         {
-            metaLabel.text = "Не загрузилось · нажмите, чтобы повторить";
+            metaLabel.text = reason ?? UploadFailureText.TapToRetry;
             metaLabel.color = FailedAccent;
+            metaLabel.textWrappingMode = TextWrappingModes.Normal;
         }
         if (badge != null) badge.color = FailedBadgeBg;
         if (badgeLabel != null) badgeLabel.color = FailedAccent;
@@ -305,12 +321,23 @@ public partial class BotSettings
         var rowButton = row.GetComponent<Button>();
         if (rowButton != null)
         {
-            rowButton.interactable = true;
-            PopupUI.WireFingerUp(rowButton, () =>
-            {
-                DropPendingRow(row, contentType);
-                retry?.Invoke();
-            });
+            rowButton.interactable = retry != null;
+            if (retry != null)
+                PopupUI.WireFingerUp(rowButton, () =>
+                {
+                    DropPendingRow(row, contentType);
+                    retry.Invoke();
+                });
+        }
+
+        // A specific reason can wrap to a second line — release the baked
+        // fixed row height so the card grows to fit instead of the meta text
+        // clipping past its bottom edge (minHeight keeps it from shrinking).
+        if (reason != null)
+        {
+            if (row.TryGetComponent(out LayoutElement rowLayout))
+                rowLayout.preferredHeight = -1f;
+            RebuildTabLayout(row.transform.parent as RectTransform);
         }
     }
 

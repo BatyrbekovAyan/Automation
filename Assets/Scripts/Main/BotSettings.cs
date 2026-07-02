@@ -87,6 +87,10 @@ public partial class BotSettings : MonoBehaviour
     [SerializeField] private Button CancelChangeTelegramNumberButton;
     [SerializeField] private Button UploadProductsPriceListButton;
     [SerializeField] private Button UploadServicesPriceListButton;
+    // Source sheet («Файл» / «Фото из галереи») shown before the picker.
+    // Built into the prefab by "Tools → BotSettings → Build Upload Source Sheet"
+    // (Assets/Editor/BotSettingsUploadSourceSheetBuilder.cs).
+    [SerializeField] private UploadSourceSheet uploadSourceSheet;
     #endregion
 
     // Needed for PickMediaFile / UploadFile logic that references file extension fields
@@ -101,6 +105,18 @@ public partial class BotSettings : MonoBehaviour
     private string xlsm;
     private string docx;
     private string html;
+    // Image types added to the picker's «Файл» branch and used by the gallery
+    // branch (jpg also covers .jpeg, resolved by extension in UploadFile).
+    private string jpg;
+    private string png;
+    private string webp;
+    private string heic;
+
+    // Source-sheet context: which list («product»/«service») and which button
+    // the pending upload targets. Set when the sheet opens, consumed by the
+    // two source handlers so they can resume the existing UploadFile flow.
+    private string pendingUploadContentType;
+    private Button pendingUploadButton;
 
     // Each bot has its own BotSettings prefab instance, so a write-on-Awake
     // singleton would race the same way SwipeToBackBotSettings.Instance did

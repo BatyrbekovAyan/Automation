@@ -409,16 +409,67 @@ public partial class BotSettings
 
 
 
+    // Tapping «Загрузить прайс-лист» no longer opens the picker directly — it
+    // opens the source sheet («Файл» / «Фото из галереи») so photos of price
+    // boards reach the iPhone Photos library, not just the document picker.
     private void UploadPriceList()
     {
-        InitializeFilePickerTypes();
-        PickMediaFile("product", UploadProductsPriceListButton);
+        ShowUploadSourceSheet("product", UploadProductsPriceListButton);
     }
 
     private void UploadServiceList()
     {
+        ShowUploadSourceSheet("service", UploadServicesPriceListButton);
+    }
+
+    private void ShowUploadSourceSheet(string contentType, Button targetButton)
+    {
+        pendingUploadContentType = contentType;
+        pendingUploadButton = targetButton;
+
+        // No sheet baked into this prefab yet — degrade gracefully to the old
+        // direct-picker behaviour so uploads still work.
+        if (uploadSourceSheet == null)
+        {
+            InitializeFilePickerTypes();
+            PickMediaFile(contentType, targetButton);
+            return;
+        }
+
+        uploadSourceSheet.Show();
+    }
+
+    // Wired to the sheet's «Файл» button (via UploadSourceSheet.OnFilePressed).
+    // Runs the existing document picker, now including image types.
+    public void OnUploadSourceFilePressed()
+    {
+        if (uploadSourceSheet != null) uploadSourceSheet.Hide();
         InitializeFilePickerTypes();
-        PickMediaFile("service", UploadServicesPriceListButton);
+        PickMediaFile(pendingUploadContentType, pendingUploadButton);
+    }
+
+    // Wired to the sheet's «Фото из галереи» button (via
+    // UploadSourceSheet.OnGalleryPressed). Multi-selects photos and reuses the
+    // same UploadFile coroutine — the image branch there decodes/downscales and
+    // the workflow's vision branch extracts the prices.
+    public void OnUploadSourceGalleryPressed()
+    {
+        if (uploadSourceSheet != null) uploadSourceSheet.Hide();
+
+        // Snapshot the pending context: the callback runs asynchronously and a
+        // later tap could overwrite the fields before it fires.
+        string contentType = pendingUploadContentType;
+        Button targetButton = pendingUploadButton;
+
+        NativeGallery.GetImagesFromGallery(paths =>
+        {
+            if (paths == null) return; // cancelled
+            foreach (string path in paths)
+            {
+                if (string.IsNullOrEmpty(path)) continue;
+                StartCoroutine(UploadFile(path, contentType, targetButton));
+            }
+        }, "Выберите фото прайс-листа");
     }
 
     private void InitializeFilePickerTypes()
@@ -434,16 +485,20 @@ public partial class BotSettings
         xlsm = NativeFilePicker.ConvertExtensionToFileType("xlsm");
         docx = "org.openxmlformats.wordprocessingml.document";
         html = NativeFilePicker.ConvertExtensionToFileType("html"); // text/html / public.html also cover .htm
+        jpg = NativeFilePicker.ConvertExtensionToFileType("jpg"); // also covers .jpeg
+        png = NativeFilePicker.ConvertExtensionToFileType("png");
+        webp = NativeFilePicker.ConvertExtensionToFileType("webp");
+        heic = NativeFilePicker.ConvertExtensionToFileType("heic");
     }
 
     private void PickMediaFile(string contentType, Button targetButton)
     {
 #if UNITY_ANDROID
 				// Use MIMEs on Android
-            string[] fileTypes = new string[] { pdf, txt, rtf, xml, csv, tsv, xls, xlsx, xlsm, docx, html };
+            string[] fileTypes = new string[] { pdf, txt, rtf, xml, csv, tsv, xls, xlsx, xlsm, docx, html, jpg, png, webp, heic };
 #else
         // Use UTIs on iOS
-        string[] fileTypes = new string[] { pdf, txt, rtf, xml, csv, tsv, xls, xlsx, xlsm, docx, html };
+        string[] fileTypes = new string[] { pdf, txt, rtf, xml, csv, tsv, xls, xlsx, xlsm, docx, html, jpg, png, webp, heic };
 #endif
         // Older Androids have no MIME registered for tsv/xlsm — drop nulls so
         // the picker intent doesn't choke on them.
