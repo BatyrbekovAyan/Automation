@@ -521,7 +521,8 @@ public partial class BotSettings
         string payloadName = null;
         string payloadMime = null;
         string convertedText = null;
-        string failReason = null;
+        string failReason = null;   // dev-facing, goes to the error log
+        string failReasonRu = null; // user-facing, shown in the row (deterministic failures)
 
         try
         {
@@ -566,6 +567,23 @@ public partial class BotSettings
                 convertedText = DocxToTextConverter.Convert(fileData);
                 payloadName = fileName + ".txt";
             }
+            else if (fileExtension.Equals(".jpg") || fileExtension.Equals(".jpeg") || fileExtension.Equals(".png")
+                || fileExtension.Equals(".webp") || fileExtension.Equals(".heic"))
+            {
+                // Photos of menus/price boards: decode (HEIC included on device),
+                // downscale, re-encode JPEG; the workflow's vision branch extracts text.
+                payloadBytes = ImageUploadPreprocessor.ToJpegPayload(filePath);
+                if (payloadBytes == null)
+                {
+                    failReason = "image decode/downscale/re-encode failed (undecodable, missing, or degenerate)";
+                    failReasonRu = UploadFailureText.PhotoUndecodable;
+                }
+                else
+                {
+                    payloadName = fileExtension.Equals(".jpg") ? fileName : fileName + ".jpg";
+                    payloadMime = "image/jpeg";
+                }
+            }
             else
             {
                 // Android pickers can ignore the MIME filter — without this
@@ -573,12 +591,16 @@ public partial class BotSettings
                 failReason = fileExtension.Equals(".doc")
                     ? "'.doc' (Word 97-2003) is not supported — ask the user to re-save as .docx or PDF"
                     : $"unsupported file type '{fileExtension}'";
+                failReasonRu = UploadFailureText.UnsupportedFormat(fileExtension);
             }
 
             if (failReason == null && payloadBytes == null)
             {
                 if (string.IsNullOrWhiteSpace(convertedText))
+                {
                     failReason = "converted to empty text (nothing to ingest)";
+                    failReasonRu = UploadFailureText.EmptyFile;
+                }
                 else
                 {
                     payloadBytes = Encoding.UTF8.GetBytes(convertedText);
@@ -589,12 +611,15 @@ public partial class BotSettings
         catch (System.Exception exception)
         {
             failReason = $"conversion failed: {exception.Message}";
+            failReasonRu = UploadFailureText.Unreadable;
         }
 
         if (failReason != null)
         {
+            // Deterministic: the same file will fail the same way, so the row
+            // shows WHY (in Russian) and offers no retry — only the ✕.
             Debug.LogError($"[UploadFile] '{fileName}': {failReason} — upload aborted.");
-            MarkPendingRowFailed(pendingRow, contentType, retryUpload);
+            MarkPendingRowFailed(pendingRow, contentType, retry: null, failReasonRu);
             yield break;
         }
 
@@ -606,6 +631,17 @@ public partial class BotSettings
 
         if (www.result != UnityWebRequest.Result.Success)
         {
+            // Deterministic server verdicts (e.g. a photo with no visible prices)
+            // retrying the same file cannot fix — surface the specific reason and
+            // suppress retry, same as the client-side deterministic failures above.
+            string deterministicReason = UploadFailureText.ReasonForHttpResponse(www.responseCode, www.downloadHandler?.text);
+            if (deterministicReason != null)
+            {
+                Debug.LogError($"[UploadFile] '{fileName}': {deterministicReason} ({www.responseCode})");
+                MarkPendingRowFailed(pendingRow, contentType, retry: null, deterministicReason);
+                yield break;
+            }
+
             Debug.LogError($"[UploadFile] Upload failed ({www.responseCode} {www.result}): {www.error}\n{www.downloadHandler?.text}");
             MarkPendingRowFailed(pendingRow, contentType, retryUpload);
         }
