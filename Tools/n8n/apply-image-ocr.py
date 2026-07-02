@@ -81,6 +81,16 @@ def add_switch_rule(wf):
     return True
 
 
+
+# openAi node v2.3 with simplify:true emits $json as an array of message
+# objects: [{ id, type:"message", content:[{type:"output_text", text:"..."}],
+# role:"assistant" }]. n8n binds $json to the current item's JSON (the
+# array element), so the extracted text lives at $json.content[0].text —
+# NOT the scalar $json.content. Confirmed against live execution 131
+# (.superpowers/sdd/task-4-report.md).
+TEXT_EXPR = "={{ $json.content[0].text }}"
+
+
 def add_nodes(wf):
     nodes = wf["nodes"]
     openai_cred = find(nodes, "Embeddings OpenAI")["credentials"]["openAiApi"]
@@ -94,16 +104,17 @@ def add_nodes(wf):
             "name": "Extract Price Text From Image",
             "credentials": {"openAiApi": dict(openai_cred)},
         })
-    if find(nodes, "Has Price Data") is None:
+    gate = find(nodes, "Has Price Data")
+    if gate is None:
         nodes.append({
             "parameters": {
                 "conditions": {
                     "options": {"caseSensitive": True, "leftValue": "", "typeValidation": "loose", "version": 2},
                     "conditions": [
-                        {"id": node_id(wf, "cond-marker"), "leftValue": "={{ $json.content }}",
+                        {"id": node_id(wf, "cond-marker"), "leftValue": TEXT_EXPR,
                          "rightValue": "NO_PRICE_DATA",
                          "operator": {"type": "string", "operation": "notContains"}},
-                        {"id": node_id(wf, "cond-notempty"), "leftValue": "={{ $json.content }}",
+                        {"id": node_id(wf, "cond-notempty"), "leftValue": TEXT_EXPR,
                          "operator": {"type": "string", "operation": "notEmpty",
                                        "singleValue": True}},
                     ],
@@ -117,12 +128,18 @@ def add_nodes(wf):
             "id": node_id(wf, "gate"),
             "name": "Has Price Data",
         })
-    if find(nodes, "Image Text") is None:
+    else:
+        # Self-correcting: update any stale $json.content leftValue to the
+        # verified $json.content[0].text shape, in place (preserve ids/order).
+        for cond in gate["parameters"]["conditions"]["conditions"]:
+            cond["leftValue"] = TEXT_EXPR
+    text_node = find(nodes, "Image Text")
+    if text_node is None:
         nodes.append({
             "parameters": {
                 "assignments": {"assignments": [
                     {"id": node_id(wf, "assign-text"), "name": "text",
-                     "value": "={{ $json.content }}", "type": "string"},
+                     "value": TEXT_EXPR, "type": "string"},
                 ]},
                 "options": {},
             },
@@ -132,6 +149,10 @@ def add_nodes(wf):
             "id": node_id(wf, "imagetext"),
             "name": "Image Text",
         })
+    else:
+        for a in text_node["parameters"]["assignments"]["assignments"]:
+            if a["name"] == "text":
+                a["value"] = TEXT_EXPR
     if find(nodes, "Respond No Price Data") is None:
         nodes.append({
             "parameters": {
