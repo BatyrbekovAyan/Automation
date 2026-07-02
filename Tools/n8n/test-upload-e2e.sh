@@ -66,6 +66,21 @@ check "delete 1" 200 "$code" '"deletedChunks":1'
 code="$(delete_file "$FILE_ID_2")"
 check "delete 2" 200 "$code" '"deletedChunks":1'
 
+FIXTURES="$(cd "$(dirname "$0")/fixtures" && pwd)"
+FILE_ID_IMG="e2e-${STAMP}-img"
+
+echo "== 5. text-bearing photo → 200 + ingested =="
+code="$(upload "$FILE_ID_IMG" "$FIXTURES/price-fixture.jpg" "menu.jpg" "image/jpeg")"
+check "image upload" 200 "$code" '"success":true'
+
+echo "== 6. blank photo → 422 no_price_data =="
+code="$(upload "e2e-${STAMP}-blank" "$FIXTURES/blank.jpg" "blank.jpg" "image/jpeg")"
+check "blank photo" 422 "$code" '"error":"no_price_data"'
+
+echo "== 7. image chunks + stored original delete =="
+code="$(delete_file "$FILE_ID_IMG")"
+check "delete image" 200 "$code" '"deletedChunks"'
+
 echo
 if [[ "$FAILS" -eq 0 ]]; then
   echo "E2E OK — also confirm in n8n executions that 'Store Original File' returned"
