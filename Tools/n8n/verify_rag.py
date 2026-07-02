@@ -206,7 +206,7 @@ def check_image_ocr():
     gate = find(ns, name="Has Price Data")
     assert gate is not None, "Has Price Data gate missing"
     for cond in gate["parameters"]["conditions"]["conditions"]:
-        assert cond["leftValue"] == "={{ $json.content[0].text }}", \
+        assert cond["leftValue"] == "={{ $json[0].content[0].text }}", \
             f"Has Price Data leftValue must read the real vision output shape: {cond['leftValue']}"
     assert conns["Has Price Data"]["main"][0][0]["node"] == "Image Text", "gate true branch wrong"
     assert conns["Has Price Data"]["main"][1][0]["node"] == "Respond No Price Data", "gate false branch wrong"
@@ -215,7 +215,7 @@ def check_image_ocr():
 
     text_node = find(ns, name="Image Text")
     text_assign = next(a for a in text_node["parameters"]["assignments"]["assignments"] if a["name"] == "text")
-    assert text_assign["value"] == "={{ $json.content[0].text }}", \
+    assert text_assign["value"] == "={{ $json[0].content[0].text }}", \
         f"Image Text value must read the real vision output shape: {text_assign['value']}"
 
     r422 = find(ns, name="Respond No Price Data")

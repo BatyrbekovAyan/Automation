@@ -82,13 +82,15 @@ def add_switch_rule(wf):
 
 
 
-# openAi node v2.3 with simplify:true emits $json as an array of message
-# objects: [{ id, type:"message", content:[{type:"output_text", text:"..."}],
-# role:"assistant" }]. n8n binds $json to the current item's JSON (the
-# array element), so the extracted text lives at $json.content[0].text —
-# NOT the scalar $json.content. Confirmed against live execution 131
-# (.superpowers/sdd/task-4-report.md).
-TEXT_EXPR = "={{ $json.content[0].text }}"
+# openAi node v2.3 with simplify:true emits ONE item whose .json value is
+# itself an array of message objects:
+#   $json === [{ id, type:"message", content:[{type:"output_text", text:"..."}],
+#                role:"assistant" }]
+# (verified directly against live execution 139 runData — the item's `json`
+# field is an array, n8n does NOT unwrap it onto $json). So the extracted
+# text lives at $json[0].content[0].text, NOT $json.content or
+# $json.content[0].text (both undefined since $json itself is an array).
+TEXT_EXPR = "={{ $json[0].content[0].text }}"
 
 
 def add_nodes(wf):

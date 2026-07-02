@@ -545,7 +545,7 @@
           "conditions": [
             {
               "id": "6eb37434-bd2c-5124-83e3-c3c0ea306d83",
-              "leftValue": "={{ $json.content[0].text }}",
+              "leftValue": "={{ $json[0].content[0].text }}",
               "rightValue": "NO_PRICE_DATA",
               "operator": {
                 "type": "string",
@@ -554,7 +554,7 @@
             },
             {
               "id": "44ed85b1-bddf-55ce-abd3-0a20f01fe9b6",
-              "leftValue": "={{ $json.content[0].text }}",
+              "leftValue": "={{ $json[0].content[0].text }}",
               "operator": {
                 "type": "string",
                 "operation": "notEmpty",
@@ -582,7 +582,7 @@
             {
               "id": "4c666193-d708-5f10-b3c1-5650f1e243ce",
               "name": "text",
-              "value": "={{ $json.content[0].text }}",
+              "value": "={{ $json[0].content[0].text }}",
               "type": "string"
             }
           ]
