@@ -28,6 +28,7 @@ public static class BotSettingsUploadedFilesBuilder
     private const string PrefabPath = "Assets/Prefabs/BotSettings.prefab";
     private const string SectionName = "UploadedFilesSection";
     private const string PopupGoName = "DeleteFileConfirmPopup";
+    private const string ReplacePopupGoName = "ReplaceFileConfirmPopup";
 
     private const float Scale = 2.5f; // matches BotSettingsRebuilder design units
 
@@ -67,6 +68,7 @@ public static class BotSettingsUploadedFilesBuilder
                 parentProp: "uploadedServiceFilesParent",
                 templateProp: "uploadedServiceFileRowTemplate");
             BuildConfirmPopup(prefabRoot, so);
+            BuildReplacePopup(prefabRoot, so);
 
             so.ApplyModifiedPropertiesWithoutUndo();
             PrefabUtility.SaveAsPrefabAsset(prefabRoot, PrefabPath);
@@ -303,13 +305,45 @@ public static class BotSettingsUploadedFilesBuilder
 
     private static void BuildConfirmPopup(GameObject prefabRoot, SerializedObject so)
     {
+        var (popup, confirm, cancel, bodyTmp) = BuildPopupCard(prefabRoot, PopupGoName,
+            title: "Удалить прайс-лист?",
+            body: "Бот перестанет использовать этот файл в ответах. Это действие необратимо.",
+            confirmLabel: "Удалить",
+            confirmBg: new Color(0.92f, 0.27f, 0.27f)); // destructive red
+
+        so.FindProperty("deleteFileConfirmPopup").objectReferenceValue = popup;
+        so.FindProperty("deleteFileConfirmButton").objectReferenceValue = confirm;
+        so.FindProperty("deleteFileCancelButton").objectReferenceValue = cancel;
+        so.FindProperty("deleteFileConfirmBody").objectReferenceValue = bodyTmp;
+    }
+
+    // Same-named upload → ask before replacing the existing file's knowledge.
+    // Confirm is Primary (not red): replacing is the expected action here.
+    private static void BuildReplacePopup(GameObject prefabRoot, SerializedObject so)
+    {
+        var (popup, confirm, cancel, bodyTmp) = BuildPopupCard(prefabRoot, ReplacePopupGoName,
+            title: "Файл уже загружен",
+            body: "Файл с таким именем уже есть в списке. Заменить его?",
+            confirmLabel: "Заменить",
+            confirmBg: Primary);
+
+        so.FindProperty("replaceFileConfirmPopup").objectReferenceValue = popup;
+        so.FindProperty("replaceFileConfirmButton").objectReferenceValue = confirm;
+        so.FindProperty("replaceFileCancelButton").objectReferenceValue = cancel;
+        so.FindProperty("replaceFileConfirmBody").objectReferenceValue = bodyTmp;
+    }
+
+    private static (GameObject popup, Button confirm, Button cancel, TextMeshProUGUI body)
+        BuildPopupCard(GameObject prefabRoot, string goName, string title, string body,
+                       string confirmLabel, Color confirmBg)
+    {
         for (int i = prefabRoot.transform.childCount - 1; i >= 0; i--)
         {
             var child = prefabRoot.transform.GetChild(i);
-            if (child.name == PopupGoName) Object.DestroyImmediate(child.gameObject);
+            if (child.name == goName) Object.DestroyImmediate(child.gameObject);
         }
 
-        var popup = NewChild(prefabRoot.transform, PopupGoName, out var prt);
+        var popup = NewChild(prefabRoot.transform, goName, out var prt);
         Stretch(prt);
         prt.SetAsLastSibling();
         var backdrop = popup.AddComponent<Image>();
@@ -325,28 +359,26 @@ public static class BotSettingsUploadedFilesBuilder
         AddRoundedCorners(card, 48f);
         card.AddComponent<EventAbsorber>();
 
-        var title = NewChild(card.transform, "Title", out var trt);
+        var titleGo = NewChild(card.transform, "Title", out var trt);
         SetTopStretch(trt, y: -72f, height: 84f);
-        AddText(title, "Удалить прайс-лист?", 54f, FontStyles.Bold, Text, TextAlignmentOptions.Center);
+        AddText(titleGo, title, 54f, FontStyles.Bold, Text, TextAlignmentOptions.Center);
 
-        var body = NewChild(card.transform, "Body", out var brt);
+        var bodyGo = NewChild(card.transform, "Body", out var brt);
         SetTopStretch(brt, y: -204f, height: 220f);
-        var bodyTmp = AddText(body,
-            "Бот перестанет использовать этот файл в ответах. Это действие необратимо.",
+        var bodyTmp = AddText(bodyGo, body,
             42f, FontStyles.Normal, new Color(0.39f, 0.39f, 0.4f), TextAlignmentOptions.Center);
 
-        var cancel = BuildPopupButton(card.transform, "CancelButton", "Отмена", destructive: false, anchorX: 0.28f);
-        var confirm = BuildPopupButton(card.transform, "ConfirmButton", "Удалить", destructive: true, anchorX: 0.72f);
+        var cancel = BuildPopupButton(card.transform, "CancelButton", "Отмена",
+            bg: new Color(0.94f, 0.94f, 0.95f), labelColor: Text, anchorX: 0.28f);
+        var confirm = BuildPopupButton(card.transform, "ConfirmButton", confirmLabel,
+            bg: confirmBg, labelColor: Color.white, anchorX: 0.72f);
 
         popup.SetActive(false);
-
-        so.FindProperty("deleteFileConfirmPopup").objectReferenceValue = popup;
-        so.FindProperty("deleteFileConfirmButton").objectReferenceValue = confirm;
-        so.FindProperty("deleteFileCancelButton").objectReferenceValue = cancel;
-        so.FindProperty("deleteFileConfirmBody").objectReferenceValue = bodyTmp;
+        return (popup, confirm, cancel, bodyTmp);
     }
 
-    private static Button BuildPopupButton(Transform card, string goName, string label, bool destructive, float anchorX)
+    private static Button BuildPopupButton(Transform card, string goName, string label,
+                                           Color bg, Color labelColor, float anchorX)
     {
         var go = NewChild(card, goName, out var rt);
         rt.anchorMin = new Vector2(anchorX, 0f);
@@ -356,13 +388,12 @@ public static class BotSettingsUploadedFilesBuilder
         rt.sizeDelta = new Vector2(384f, 144f);
 
         var img = go.AddComponent<Image>();
-        img.color = destructive ? new Color(0.92f, 0.27f, 0.27f) : new Color(0.94f, 0.94f, 0.95f);
+        img.color = bg;
         AddRoundedCorners(go, 36f);
 
         var labelGo = NewChild(go.transform, "Label", out var lrt);
         Stretch(lrt);
-        AddText(labelGo, label, 45f, FontStyles.Bold,
-            destructive ? Color.white : Text, TextAlignmentOptions.Center);
+        AddText(labelGo, label, 45f, FontStyles.Bold, labelColor, TextAlignmentOptions.Center);
 
         var button = go.AddComponent<Button>();
         button.transition = Selectable.Transition.None;

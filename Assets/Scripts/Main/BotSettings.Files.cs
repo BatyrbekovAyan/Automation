@@ -26,6 +26,10 @@ public partial class BotSettings
     [SerializeField] private Button deleteFileConfirmButton;
     [SerializeField] private Button deleteFileCancelButton;
     [SerializeField] private TextMeshProUGUI deleteFileConfirmBody;
+    [SerializeField] private GameObject replaceFileConfirmPopup;
+    [SerializeField] private Button replaceFileConfirmButton;
+    [SerializeField] private Button replaceFileCancelButton;
+    [SerializeField] private TextMeshProUGUI replaceFileConfirmBody;
     #endregion
 
     private readonly List<GameObject> spawnedProductFileRows = new();
@@ -36,6 +40,8 @@ public partial class BotSettings
     private string pendingDeleteContentType;
     private GameObject pendingDeleteRow;
     private bool deleteFileInFlight;
+    private bool replacePopupBusy;
+    private bool? replaceDecision;
 
     private static readonly string[] RuMonthsShort =
         { "янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек" };
@@ -51,6 +57,39 @@ public partial class BotSettings
             PopupUI.WireFingerUp(deleteFileConfirmButton, ConfirmDeleteUploadedFile);
         if (deleteFileCancelButton != null)
             PopupUI.WireFingerUp(deleteFileCancelButton, CancelDeleteUploadedFile);
+        if (replaceFileConfirmButton != null)
+            PopupUI.WireFingerUp(replaceFileConfirmButton, () => ResolveReplaceDecision(replace: true));
+        if (replaceFileCancelButton != null)
+            PopupUI.WireFingerUp(replaceFileCancelButton, () => ResolveReplaceDecision(replace: false));
+    }
+
+    // Uploading a file whose name is already in the list REPLACES the old
+    // version's knowledge — ask first. One popup serves all uploads: concurrent
+    // same-named picks queue on replacePopupBusy and are asked one at a time.
+    public IEnumerator RequestReplaceFileDecision(string fileName, System.Action<bool> onDecided)
+    {
+        while (replacePopupBusy) yield return null;
+        replacePopupBusy = true;
+        replaceDecision = null;
+
+        if (replaceFileConfirmBody != null)
+            replaceFileConfirmBody.text = $"«{fileName}» уже есть в списке. Заменить? Бот будет отвечать по новой версии.";
+
+        if (replaceFileConfirmPopup != null)
+            PopupUI.Show(replaceFileConfirmPopup);
+        else
+            replaceDecision = true; // popup not baked yet — keep the old replace behavior
+
+        while (!replaceDecision.HasValue) yield return null;
+
+        replacePopupBusy = false;
+        onDecided?.Invoke(replaceDecision.Value);
+    }
+
+    private void ResolveReplaceDecision(bool replace)
+    {
+        if (replaceFileConfirmPopup != null) PopupUI.Hide(replaceFileConfirmPopup);
+        replaceDecision = replace;
     }
 
     // Rebuilds both tabs' file rows from the store. Cheap (a handful of rows),

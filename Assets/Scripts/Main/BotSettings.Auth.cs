@@ -470,6 +470,15 @@ public partial class BotSettings
         string fileName = Path.GetFileName(filePath);
         string fileExtension = Path.GetExtension(filePath);
 
+        // A same-named upload replaces the existing file's knowledge — ask
+        // before uploading anything. Cancel = no upload, the old file stays.
+        if (UploadedFilesStore.FindByName(openBot.name, contentType, fileName).Count > 0)
+        {
+            bool replaceConfirmed = false;
+            yield return RequestReplaceFileDecision(fileName, decision => replaceConfirmed = decision);
+            if (!replaceConfirmed) yield break;
+        }
+
         // Optimistic feedback: the row appears in «Прайс-листы» immediately, in
         // an uploading state — the n8n webhook takes a few seconds (extraction +
         // embedding) and a silent gap reads as "did my tap even register?".
