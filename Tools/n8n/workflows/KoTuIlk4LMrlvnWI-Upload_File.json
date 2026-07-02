@@ -273,6 +273,57 @@
               },
               "renameOutput": true,
               "outputKey": "pdf"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "a3a4dc87-3ac8-5682-86c8-b1f4f9291870",
+                    "leftValue": "={{ $('Set File Id').item.binary.data.fileExtension.toLowerCase() }}",
+                    "rightValue": "jpg",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  },
+                  {
+                    "id": "d4b332ff-3dbb-5fb0-8916-51d36636f47d",
+                    "leftValue": "={{ $('Set File Id').item.binary.data.fileExtension.toLowerCase() }}",
+                    "rightValue": "jpeg",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  },
+                  {
+                    "id": "5d0f6abb-a20d-57e0-b212-c7a101cba2db",
+                    "leftValue": "={{ $('Set File Id').item.binary.data.fileExtension.toLowerCase() }}",
+                    "rightValue": "png",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  },
+                  {
+                    "id": "822f8e0a-a1b0-59bf-8cd6-9206e17fd389",
+                    "leftValue": "={{ $('Set File Id').item.binary.data.fileExtension.toLowerCase() }}",
+                    "rightValue": "webp",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "or"
+              },
+              "renameOutput": true,
+              "outputKey": "image"
             }
           ]
         },
@@ -447,6 +498,122 @@
         }
       },
       "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "text": "=Ты извлекаешь прайс-лист из фотографии (меню, ценник, прайс-борд, витрина).\nВыпиши КАЖДУЮ позицию с ценой, по одной на строку, ровно в формате:\n{{ $('Extract Content Type').item.json.contentType }}[N]: Название: <название>; Цена: <число и валюта как на фото>;\nгде N — порядковый номер, начиная с 1. Заголовки разделов (например «Напитки») выписывай отдельной строкой без номера. Ничего не придумывай: только то, что читается на фото. Если на фото нет ни одной читаемой цены, выведи ровно: NO_PRICE_DATA",
+        "inputType": "base64",
+        "binaryPropertyName": "data",
+        "simplify": true,
+        "options": {
+          "detail": "high",
+          "maxTokens": 4000
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        1100,
+        -224
+      ],
+      "id": "8c66c9a6-a658-5c54-8a45-bec1deb7911d",
+      "name": "Extract Price Text From Image",
+      "credentials": {
+        "openAiApi": {
+          "id": "XVjhR1xlWrIgJjKz",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "6eb37434-bd2c-5124-83e3-c3c0ea306d83",
+              "leftValue": "={{ $json.content }}",
+              "rightValue": "NO_PRICE_DATA",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            },
+            {
+              "id": "44ed85b1-bddf-55ce-abd3-0a20f01fe9b6",
+              "leftValue": "={{ $json.content }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1400,
+        -224
+      ],
+      "id": "f59d52b9-62eb-53bf-baba-c6d277a69758",
+      "name": "Has Price Data"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4c666193-d708-5f10-b3c1-5650f1e243ce",
+              "name": "text",
+              "value": "={{ $json.content }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1700,
+        -288
+      ],
+      "id": "c10e2a26-4748-5738-b873-ceeb5b4bf4b9",
+      "name": "Image Text"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"error\": \"no_price_data\" } }}",
+        "options": {
+          "responseCode": 422
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1700,
+        -128
+      ],
+      "id": "72f696de-1b70-51e8-a281-42224308a69d",
+      "name": "Respond No Price Data"
     }
   ],
   "connections": {
@@ -615,6 +782,18 @@
         ],
         [
           {
+            "node": "Extract Price Text From Image",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Store Original File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Respond Unsupported Type",
             "type": "main",
             "index": 0
@@ -661,6 +840,46 @@
           {
             "node": "Data Loader",
             "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Price Text From Image": {
+      "main": [
+        [
+          {
+            "node": "Has Price Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Price Data": {
+      "main": [
+        [
+          {
+            "node": "Image Text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond No Price Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Image Text": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
             "index": 0
           }
         ]

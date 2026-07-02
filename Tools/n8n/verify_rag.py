@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Assertion harness for the RAG restore + fixes migration (apply-rag-fixes.py)
-and the upload/delete hardening migration (apply-upload-hardening.py).
+"""Assertion harness for the RAG restore + fixes migration (apply-rag-fixes.py),
+the upload/delete hardening migration (apply-upload-hardening.py), and the
+image OCR branch migration (apply-image-ocr.py).
 
-Usage: python3 Tools/n8n/verify_rag.py [bot|purge|chunker|hardening|all]
+Usage: python3 Tools/n8n/verify_rag.py [bot|purge|chunker|hardening|image|all]
 """
 import json, os, sys
 
@@ -112,7 +113,7 @@ def check_upload_response():
     sw = find(ns, name="Switch")
     assert sw["parameters"]["options"].get("fallbackOutput") == "extra", "Switch has no fallback output"
     branches = conns["Switch"]["main"]
-    assert len(branches) == 3 and branches[2][0]["node"] == "Respond Unsupported Type", \
+    assert branches[-1][0]["node"] == "Respond Unsupported Type", \
         f"Switch fallback not wired to Respond Unsupported Type: {branches}"
     ru = find(ns, name="Respond Unsupported Type")
     assert ru["parameters"]["options"].get("responseCode") == 415, "unsupported-type response not 415"
@@ -151,7 +152,7 @@ def check_upload_hardening():
     for i, key in ((0, "txt"), (1, "pdf")):
         assert any(l["node"] == "Store Original File" for l in branches[i]), \
             f"Switch {key} branch does not archive the original"
-    assert not any(l["node"] == "Store Original File" for l in branches[2]), \
+    assert not any(l["node"] == "Store Original File" for l in branches[-1]), \
         "unsupported branch must NOT archive (nothing was ingested)"
 
 
@@ -177,6 +178,43 @@ def load_named(fname):
         return json.load(fh)
 
 
+def check_image_ocr():
+    wf = load(UPLOAD); ns = wf["nodes"]; conns = wf["connections"]
+    sw = find(ns, name="Switch")
+    rules = sw["parameters"]["rules"]["values"]
+    image = [r for r in rules if r.get("outputKey") == "image"]
+    assert len(image) == 1, "Switch has no image rule"
+    exts = {c["rightValue"] for c in image[0]["conditions"]["conditions"]}
+    assert exts == {"jpg", "jpeg", "png", "webp"}, f"image rule exts wrong: {exts}"
+    assert image[0]["conditions"]["combinator"] == "or", "image rule must OR its extensions"
+    for c in image[0]["conditions"]["conditions"]:
+        assert ".toLowerCase()" in c["leftValue"], "image rule must be case-insensitive"
+
+    vision = find(ns, name="Extract Price Text From Image")
+    assert vision is not None, "vision node missing"
+    assert "gpt-4o-mini" in json.dumps(vision["parameters"].get("modelId", "")), "vision model not pinned"
+    assert "NO_PRICE_DATA" in vision["parameters"]["text"], "prompt missing the no-data marker"
+    assert "contentType" in vision["parameters"]["text"], "prompt missing entity token"
+
+    branches = conns["Switch"]["main"]
+    assert len(branches) == 4, f"Switch must have 4 outputs, got {len(branches)}"
+    img_targets = {l["node"] for l in branches[2]}
+    assert img_targets == {"Extract Price Text From Image", "Store Original File"}, \
+        f"image branch targets wrong: {img_targets}"
+    assert branches[3][0]["node"] == "Respond Unsupported Type", "fallback lost its 415 wiring"
+
+    gate = find(ns, name="Has Price Data")
+    assert gate is not None, "Has Price Data gate missing"
+    assert conns["Has Price Data"]["main"][0][0]["node"] == "Image Text", "gate true branch wrong"
+    assert conns["Has Price Data"]["main"][1][0]["node"] == "Respond No Price Data", "gate false branch wrong"
+    assert conns["Image Text"]["main"][0][0]["node"] == "Merge", "Image Text must feed Merge(0)"
+    assert conns["Image Text"]["main"][0][0]["index"] == 0, "Image Text must feed Merge INPUT 0"
+
+    r422 = find(ns, name="Respond No Price Data")
+    assert r422["parameters"]["options"].get("responseCode") == 422, "no-data response not 422"
+    assert "no_price_data" in r422["parameters"]["responseBody"], "no-data response missing error code"
+
+
 if __name__ == "__main__":
     which = sys.argv[1] if len(sys.argv) > 1 else "all"
     if which in ("scoping", "all"):
@@ -195,4 +233,6 @@ if __name__ == "__main__":
     if which in ("hardening", "all"):
         check_upload_hardening()
         check_delete_hardening()
+    if which in ("image", "all"):
+        check_image_ocr()
     print("VERIFY OK:", which)
