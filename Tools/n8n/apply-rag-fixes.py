@@ -135,14 +135,6 @@ def fix_upload(wf):
     # WhatsApp and Telegram workflow ids; each clone's Supabase retrieval filters by its own
     # platform id -> every file a bot uploads is retrievable, and other bots stay isolated.
     nodes = wf["nodes"]
-    find(nodes, name="Add Whatsapp Filter")["parameters"]["assignments"]["assignments"][0]["value"] = (
-        "={{ { metadataValues: [ { name: \"botWaId\", value: "
-        "$('Extract Whatsapp Workflow Id').item.json.whatsappWorkflowId } ] } }}"
-    )
-    find(nodes, name="Add Telegram Filter")["parameters"]["assignments"]["assignments"][0]["value"] = (
-        "={{ { metadataValues: [ { name: \"botTgId\", value: "
-        "$('Extract Telegram Workflow Id').item.json.telegramWorkflowId } ] } }}"
-    )
     find(nodes, name="Data Loader")["parameters"]["options"]["metadata"]["metadataValues"] = [
         {"name": "botWaId", "value": "={{ $('Extract Whatsapp Workflow Id').item.json.whatsappWorkflowId }}"},
         {"name": "botTgId", "value": "={{ $('Extract Telegram Workflow Id').item.json.telegramWorkflowId }}"},
@@ -152,6 +144,24 @@ def fix_upload(wf):
         # delete). Keep it in this rewrite or rerunning the script would strip it.
         {"name": "fileId", "value": "={{ $('Extract File Id').item.json.fileId }}"},
     ]
+
+    # Part D: delete the upload-time PUT chain that used to inject the retrieval
+    # filter into the bot clone by array index (nodes[21]). It became redundant when
+    # the templates got the baked $workflow.id filter — and live dev data (clones
+    # 36/40/41, 2026-07-02) proved it actively HARMFUL: the n8n API workflow-update
+    # it performs does not preserve activation, so every file upload silently
+    # DEACTIVATED the bot (webhook dead until manually re-toggled).
+    delete_nodes(wf, {
+        "If Whatsapp Id Exists", "Get Whatsapp Workflow", "Add Whatsapp Filter", "Update Whatsapp Workflow",
+        "If Telegram Id Exists", "Get Telegram Workflow", "Add Telegram Filter", "Update Telegram Workflow",
+    })
+    # The chain's tail fed Merge input 1 (the sync/context item). Rewire that edge
+    # straight from the id-extraction path so combineByPosition still gets both inputs.
+    conns = wf["connections"]
+    ext_tg = conns.setdefault("Extract Telegram Workflow Id", {}).setdefault("main", [[]])
+    links = ext_tg[0]
+    if not any(l.get("node") == "Merge" for l in links):
+        links.append({"node": "Merge", "type": "main", "index": 1})
     return wf
 
 

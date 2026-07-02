@@ -73,6 +73,12 @@ def check_upload_chunker():
     assert "3-small" in json.dumps(ins["parameters"].get("model", "")), "insert embed model not pinned"
 
 
+PUT_CHAIN = {
+    "If Whatsapp Id Exists", "Get Whatsapp Workflow", "Add Whatsapp Filter", "Update Whatsapp Workflow",
+    "If Telegram Id Exists", "Get Telegram Workflow", "Add Telegram Filter", "Update Telegram Workflow",
+}
+
+
 def check_upload_scoping():
     wf = load(UPLOAD); ns = wf["nodes"]
     dl = find(ns, name="Data Loader")
@@ -80,10 +86,22 @@ def check_upload_scoping():
     assert "botWaId" in keys and "botTgId" in keys, f"Data Loader not tagging per-bot keys: {keys}"
     assert "fileId" in keys, f"Data Loader not stamping fileId (breaks per-file delete): {keys}"
     assert not any(str(k).startswith("fileName") for k in keys), f"stale fileName key still tagged: {keys}"
-    aw = find(ns, name="Add Whatsapp Filter")["parameters"]["assignments"]["assignments"][0]["value"]
-    at = find(ns, name="Add Telegram Filter")["parameters"]["assignments"]["assignments"][0]["value"]
-    assert "botWaId" in aw and "fileName" not in aw, "Add Whatsapp Filter not using stable botWaId"
-    assert "botTgId" in at and "fileName" not in at, "Add Telegram Filter not using stable botTgId"
+
+
+def check_upload_no_put_chain():
+    # The upload-time clone-PATCH chain must stay gone: it addressed the bot
+    # workflow by array index AND its API update dropped the clone's active
+    # flag — every upload silently deactivated the bot. Scoping now lives in
+    # the templates' baked $workflow.id filter (check_bot).
+    wf = load(UPLOAD); names = {n["name"] for n in wf["nodes"]}
+    leftover = PUT_CHAIN & names
+    assert not leftover, f"{UPLOAD}: PUT chain nodes still present: {leftover}"
+    for d in PUT_CHAIN:
+        assert d not in wf["connections"], f"{UPLOAD}: connection for {d} not pruned"
+    ext_tg = wf["connections"]["Extract Telegram Workflow Id"]["main"][0]
+    targets = {(l["node"], l.get("index", 0)) for l in ext_tg}
+    assert ("Switch", 0) in targets and ("Merge", 1) in targets, \
+        f"Extract Telegram Workflow Id must feed Switch and Merge(1): {targets}"
 
 
 def check_upload_response():
@@ -107,6 +125,8 @@ if __name__ == "__main__":
     which = sys.argv[1] if len(sys.argv) > 1 else "all"
     if which in ("scoping", "all"):
         check_upload_scoping()
+    if which in ("putchain", "all"):
+        check_upload_no_put_chain()
     if which in ("response", "all"):
         check_upload_response()
     if which in ("bot", "all"):
