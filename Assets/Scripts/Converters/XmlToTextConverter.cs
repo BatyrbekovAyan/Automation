@@ -1,3 +1,4 @@
+using System.IO;
 using System.Text;
 using System.Xml;
 using System.Text.RegularExpressions;
@@ -6,11 +7,35 @@ using System.Linq;
 
 public static class XmlToTextConverter
 {
+    static XmlToTextConverter()
+    {
+        // XmlDocument.Load needs the codepage provider to honor declarations
+        // like <?xml encoding="windows-1251"?> (typical for 1C/CommerceML).
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+    }
+
+    /// <summary>
+    /// Preferred entry point: decodes per the XML prolog's declared encoding
+    /// (1C/CommerceML price exports are commonly windows-1251 — forcing UTF-8
+    /// on those produced mojibake or a parse failure).
+    /// </summary>
+    public static string ConvertXmlToText(byte[] xmlBytes)
+    {
+        var doc = new XmlDocument();
+        using var stream = new MemoryStream(xmlBytes);
+        doc.Load(stream);
+        return ConvertDocument(doc);
+    }
+
     public static string ConvertXmlToText(string xmlContent)
     {
         var doc = new XmlDocument();
         doc.LoadXml(xmlContent);
+        return ConvertDocument(doc);
+    }
 
+    private static string ConvertDocument(XmlDocument doc)
+    {
         var sb = new StringBuilder();
 
         foreach (XmlNode child in doc.DocumentElement.ChildNodes)
@@ -53,9 +78,22 @@ public static class XmlToTextConverter
 
         var currentPath = new List<string>(path) { nodeLabel };
 
-        // Leaf node with text
+        // Attribute-carried data must not be invisible to retrieval — Kaspi
+        // price XML puts sku/model on <offer ...> attributes, for example.
+        if (node.Attributes != null)
+        {
+            foreach (XmlAttribute attribute in node.Attributes)
+            {
+                string attributeValue = attribute.Value?.Trim();
+                if (!string.IsNullOrEmpty(attributeValue))
+                    sb.Append($"{HumanizePath(currentPath)} {Humanize(attribute.Name)}: {attributeValue};\n");
+            }
+        }
+
+        // Leaf node with text (CDATA included — descriptions are often CDATA-wrapped)
         if (node.ChildNodes.Count == 1 &&
-            node.FirstChild.NodeType == XmlNodeType.Text)
+            (node.FirstChild.NodeType == XmlNodeType.Text ||
+             node.FirstChild.NodeType == XmlNodeType.CDATA))
         {
             string label = HumanizePath(currentPath);
             string value = node.InnerText.Trim();

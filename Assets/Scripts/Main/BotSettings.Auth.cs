@@ -428,20 +428,26 @@ public partial class BotSettings
         rtf = NativeFilePicker.ConvertExtensionToFileType("rtf");
         xml = NativeFilePicker.ConvertExtensionToFileType("xml");
         csv = NativeFilePicker.ConvertExtensionToFileType("csv");
+        tsv = NativeFilePicker.ConvertExtensionToFileType("tsv");
         xls = NativeFilePicker.ConvertExtensionToFileType("xls");
         xlsx = NativeFilePicker.ConvertExtensionToFileType("xlsx");
+        xlsm = NativeFilePicker.ConvertExtensionToFileType("xlsm");
         docx = "org.openxmlformats.wordprocessingml.document";
+        html = NativeFilePicker.ConvertExtensionToFileType("html"); // text/html / public.html also cover .htm
     }
 
     private void PickMediaFile(string contentType, Button targetButton)
     {
 #if UNITY_ANDROID
 				// Use MIMEs on Android
-            string[] fileTypes = new string[] { pdf, txt, rtf, xml, csv, xls, xlsx, docx };
+            string[] fileTypes = new string[] { pdf, txt, rtf, xml, csv, tsv, xls, xlsx, xlsm, docx, html };
 #else
         // Use UTIs on iOS
-        string[] fileTypes = new string[] { pdf, txt, rtf, xml, csv, xls, xlsx, docx };
+        string[] fileTypes = new string[] { pdf, txt, rtf, xml, csv, tsv, xls, xlsx, xlsm, docx, html };
 #endif
+        // Older Androids have no MIME registered for tsv/xlsm — drop nulls so
+        // the picker intent doesn't choke on them.
+        fileTypes = System.Array.FindAll(fileTypes, type => !string.IsNullOrEmpty(type));
         // Pick image(s) and/or video(s)
         NativeFilePicker.PickMultipleFiles((paths) =>
         {
@@ -468,7 +474,10 @@ public partial class BotSettings
         }
 
         string fileName = Path.GetFileName(filePath);
-        string fileExtension = Path.GetExtension(filePath);
+        // Lowercased: mobile pickers filter by MIME/UTI, not by name, so a
+        // "MENU.PDF" is perfectly pickable — and an ordinal Equals(".pdf")
+        // would match no branch and post the form with no file attached.
+        string fileExtension = Path.GetExtension(filePath).ToLowerInvariant();
 
         // A same-named upload replaces the existing file's knowledge — ask
         // before uploading anything. Cancel = no upload, the old file stays.
@@ -504,41 +513,92 @@ public partial class BotSettings
         string fileId = System.Guid.NewGuid().ToString();
         form.AddField("fileId", fileId);
 
-        if (fileExtension.Equals(".pdf"))
-        {
-            form.AddBinaryData("data", fileData, fileName, "application/pdf");
-        }
-        else if (fileExtension.Equals(".txt"))
-        {
-            form.AddBinaryData("data", fileData, fileName, "text/plain");
-        }
-        else if (fileExtension.Equals(".rtf"))
-        {
-            form.AddBinaryData("data", fileData, fileName, "application/rtf");
-        }
-        else if (fileExtension.Equals(".xml"))
-        {
-            string xmlString = Encoding.UTF8.GetString(fileData);
-            string xmlText = XmlToTextConverter.ConvertXmlToText(xmlString);
-            byte[] textBytes = Encoding.UTF8.GetBytes(xmlText);
-            string txtFileName = Path.ChangeExtension(fileName, ".txt");
+        // Every non-PDF format converts to plain text ON-DEVICE (the workflow
+        // only ingests text/plain + PDF). Converted text is validated below:
+        // an empty conversion or a converter throw fails the row honestly
+        // instead of uploading zero knowledge or hanging the coroutine.
+        byte[] payloadBytes = null;
+        string payloadName = null;
+        string payloadMime = null;
+        string convertedText = null;
+        string failReason = null;
 
-            form.AddBinaryData("data", textBytes, txtFileName, "text/plain");
-        }
-        else if (fileExtension.Equals(".csv") || fileExtension.Equals(".xls") || fileExtension.Equals(".xlsx"))
+        try
         {
-            string text = TableToTextConverter.Convert(fileData, fileName, contentType);
+            if (fileExtension.Equals(".pdf"))
+            {
+                payloadBytes = fileData;
+                payloadName = fileName;
+                payloadMime = "application/pdf";
+            }
+            else if (fileExtension.Equals(".txt"))
+            {
+                // Old-Notepad/1C TXT is often windows-1251 or UTF-16 — the
+                // workflow assumes UTF-8, so those used to ingest as mojibake.
+                convertedText = TextEncodingSniffer.Decode(fileData);
+                payloadName = fileName;
+            }
+            else if (fileExtension.Equals(".rtf"))
+            {
+                convertedText = RtfToTextConverter.Convert(fileData);
+                payloadName = fileName + ".txt";
+            }
+            else if (fileExtension.Equals(".xml"))
+            {
+                // Byte overload honors the prolog's declared encoding
+                // (1C/CommerceML exports are commonly windows-1251).
+                convertedText = XmlToTextConverter.ConvertXmlToText(fileData);
+                payloadName = Path.ChangeExtension(fileName, ".txt");
+            }
+            else if (fileExtension.Equals(".csv") || fileExtension.Equals(".tsv")
+                || fileExtension.Equals(".xls") || fileExtension.Equals(".xlsx") || fileExtension.Equals(".xlsm"))
+            {
+                convertedText = TableToTextConverter.Convert(fileData, fileName, contentType);
+                payloadName = fileName + ".txt";
+            }
+            else if (fileExtension.Equals(".html") || fileExtension.Equals(".htm"))
+            {
+                convertedText = HtmlTableToTextConverter.Convert(fileData, contentType);
+                payloadName = fileName + ".txt";
+            }
+            else if (fileExtension.Equals(".docx"))
+            {
+                convertedText = DocxToTextConverter.Convert(fileData);
+                payloadName = fileName + ".txt";
+            }
+            else
+            {
+                // Android pickers can ignore the MIME filter — without this
+                // guard the form would post with no file part at all.
+                failReason = fileExtension.Equals(".doc")
+                    ? "'.doc' (Word 97-2003) is not supported — ask the user to re-save as .docx or PDF"
+                    : $"unsupported file type '{fileExtension}'";
+            }
 
-            form.AddBinaryData("data", Encoding.UTF8.GetBytes(text), fileName + ".txt", "text/plain");
+            if (failReason == null && payloadBytes == null)
+            {
+                if (string.IsNullOrWhiteSpace(convertedText))
+                    failReason = "converted to empty text (nothing to ingest)";
+                else
+                {
+                    payloadBytes = Encoding.UTF8.GetBytes(convertedText);
+                    payloadMime = "text/plain";
+                }
+            }
         }
-
-        else if (fileExtension.Equals(".docx"))
+        catch (System.Exception exception)
         {
-            string text = DocxToTextConverter.Convert(fileData);
-
-            form.AddBinaryData("data", Encoding.UTF8.GetBytes(text), fileName + ".txt", "text/plain");
+            failReason = $"conversion failed: {exception.Message}";
         }
 
+        if (failReason != null)
+        {
+            Debug.LogError($"[UploadFile] '{fileName}': {failReason} — upload aborted.");
+            MarkPendingRowFailed(pendingRow, contentType, retryUpload);
+            yield break;
+        }
+
+        form.AddBinaryData("data", payloadBytes, payloadName, payloadMime);
 
         using UnityWebRequest www = UnityWebRequest.Post($"{Manager.n8nBaseUrl}/webhook/UploadFile", form);
 

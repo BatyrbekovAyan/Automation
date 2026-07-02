@@ -95,9 +95,12 @@ public partial class BotSettings : MonoBehaviour
     private string rtf;
     private string xml;
     private string csv;
+    private string tsv;
     private string xls;
     private string xlsx;
+    private string xlsm;
     private string docx;
+    private string html;
 
     // Each bot has its own BotSettings prefab instance, so a write-on-Awake
     // singleton would race the same way SwipeToBackBotSettings.Instance did
