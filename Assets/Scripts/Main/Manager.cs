@@ -2239,6 +2239,38 @@ public class Manager : MonoBehaviour
         StartCoroutine(DeleteTelegramWorkflow(telegramWorkflowId, true));
     }
 
+    // Server-side sweep of a deleted bot's price-list knowledge: the n8n
+    // DeleteBotFiles webhook removes every RAG chunk tagged with the bot's
+    // workflow ids (including legacy chunks with no fileId) plus each file's
+    // stored original in the price-lists bucket. Runs on Manager because the
+    // calling Bot destroys itself — a coroutine on the Bot would die with it.
+    public void DeleteBotFilesOnServer(string whatsappWorkflowId, string telegramWorkflowId)
+    {
+        bool noWhatsapp = string.IsNullOrEmpty(whatsappWorkflowId) || whatsappWorkflowId == Bot.UnauthedProfileSentinel;
+        bool noTelegram = string.IsNullOrEmpty(telegramWorkflowId) || telegramWorkflowId == Bot.UnauthedProfileSentinel;
+        if (noWhatsapp && noTelegram) return; // never-authed bot — nothing is tagged server-side
+
+        StartCoroutine(DeleteBotFilesRoutine(
+            string.IsNullOrEmpty(whatsappWorkflowId) ? Bot.UnauthedProfileSentinel : whatsappWorkflowId,
+            string.IsNullOrEmpty(telegramWorkflowId) ? Bot.UnauthedProfileSentinel : telegramWorkflowId));
+    }
+
+    private IEnumerator DeleteBotFilesRoutine(string botWaId, string botTgId)
+    {
+        string url = $"{n8nBaseUrl}/webhook/DeleteBotFiles";
+        string body = JsonConvert.SerializeObject(new { botWaId, botTgId });
+
+        using var request = new UnityWebRequest(url, "POST");
+        request.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(body));
+        request.downloadHandler = new DownloadHandlerBuffer();
+        request.SetRequestHeader("Content-Type", "application/json");
+        request.timeout = 30;
+        yield return request.SendWebRequest();
+
+        if (request.result != UnityWebRequest.Result.Success)
+            Debug.LogError($"[DeleteBotFiles] [{request.responseCode}] {url}: {request.error}\n{request.downloadHandler?.text}");
+    }
+
 
     //////////////////////////////////////////////////////////SEND PROFILE REQUESTS//////////////////////////////////////////////////////////
 

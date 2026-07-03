@@ -1,0 +1,153 @@
+{
+  "name": "Delete Bot Files",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "DeleteBotFiles",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "cef30115-aee7-408c-8a49-62f50d957b9c",
+      "name": "Webhook",
+      "webhookId": "f09c92ae-4bb9-4b45-bbe2-99da2bb241c6"
+    },
+    {
+      "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "WITH matched AS (\n  SELECT id, metadata->>'fileId' AS file_id\n  FROM documents\n  WHERE (metadata->>'botWaId' = $1 AND $1 NOT IN ('-1', ''))\n     OR (metadata->>'botTgId' = $2 AND $2 NOT IN ('-1', ''))\n),\ndeleted AS (\n  DELETE FROM documents WHERE id IN (SELECT id FROM matched) RETURNING id\n)\nSELECT\n  (SELECT count(*)::int FROM deleted) AS \"deletedChunks\",\n  COALESCE((SELECT array_agg(DISTINCT file_id) FROM matched WHERE file_id IS NOT NULL AND file_id <> ''), '{}'::text[]) AS \"fileIds\";",
+        "options": {
+          "queryReplacement": "={{ $json.body.botWaId }},{{ $json.body.botTgId }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        224,
+        0
+      ],
+      "id": "fb183c84-64a1-4bba-b8bb-a95992009841",
+      "name": "Delete Bot Chunks",
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"deletedChunks\": $json.deletedChunks, \"deletedFiles\": ($json.fileIds || []).length } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        448,
+        0
+      ],
+      "id": "72fb853d-e1e5-4783-a55c-e8435ef8c602",
+      "name": "Respond"
+    },
+    {
+      "parameters": {
+        "jsCode": "return ($('Delete Bot Chunks').first().json.fileIds || []).filter(Boolean).map(fileId => ({ json: { fileId } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "b370bace-f73e-4329-a140-7de8791ab0ab",
+      "name": "Split File Ids"
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://mnwsdbqvehrkeqwnwpqb.supabase.co/storage/v1/object/price-lists/{{ $json.fileId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        896,
+        0
+      ],
+      "id": "6bdf0c55-ce4c-4517-a3f4-1f686ae64b80",
+      "name": "Delete Stored Original",
+      "credentials": {
+        "supabaseApi": {
+          "id": "vrywn6AxQMlvbbzC",
+          "name": "Supabase"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Delete Bot Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Bot Chunks": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond": {
+      "main": [
+        [
+          {
+            "node": "Split File Ids",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split File Ids": {
+      "main": [
+        [
+          {
+            "node": "Delete Stored Original",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": {},
+  "triggerCount": 1,
+  "meta": {},
+  "id": "lmjYsdNcQA2IE5rl",
+  "active": true
+}
