@@ -7,8 +7,11 @@ Three placement engines, all using the WhatsApp-measured tier pyramid
   B gapfill   — largest-first; each element placed in the deepest pocket of free
                 space (distance transform), jittered among the top-decile pockets.
   C hybrid    — heroes on a jittered 4x4 lattice, everything else via gapfill.
+  D lattice+bn — heroes on the jittered lattice (C's judged strength: anchor
+                dispersion), all other tiers via blue-noise (A's judged strength:
+                continuous carpet texture). Panel-informed synthesis.
 
-Usage: python3 pack_organic.py <A|B|C> [seed] [out.png]
+Usage: python3 pack_organic.py <A|B|C|D> [seed] [out.png]
 """
 import glob, random, sys
 import numpy as np
@@ -48,6 +51,9 @@ canvas = Image.new("RGBA", (W, Hc), CREAM + (255,))
 GH, GW = Hc // S + 2, W // S + 2
 occ = np.zeros((GH, GW), bool); byidx = {}; cache = {}
 placed_pts = []          # (cx, cy, r) for bluenoise scoring
+BIG = 150; BIGSEP = 230  # judge-panel fix: no two >=150px items closer than 230px centers
+                         # (270 starved the large tier to 29/54 — feasible pitch is ~266)
+big_pts = []
 
 def scaled_fp(idx, size, use_bold):
     key = (idx, round(size / 5), use_bold)
@@ -64,8 +70,10 @@ def try_place(idx, cx, cy, size, rot, mindup, use_bold):
     ox = int(cx / S - fw / 2); oy = int(cy / S - fh / 2)
     if ox < 0 or oy < 0 or ox + fw > GW or oy + fh > GH: return False
     if not all((cx - px) ** 2 + (cy - py) ** 2 >= mindup * mindup for px, py in byidx.get(idx, ())): return False
+    if size >= BIG and any((cx - px) ** 2 + (cy - py) ** 2 < BIGSEP * BIGSEP for px, py in big_pts): return False
     if np.logical_and(occ[oy:oy + fh, ox:ox + fw], fp).any(): return False
     occ[oy:oy + fh, ox:ox + fw] |= fp
+    if size >= BIG: big_pts.append((cx, cy))
     sp = bold[idx][0] if use_bold else sprites[idx]
     w, h = sp.size; sc = size / max(w, h)
     sp2 = sp.resize((max(1, int(w * sc)), max(1, int(h * sc))), Image.LANCZOS).rotate(rot, expand=True, resample=Image.BICUBIC)
@@ -82,6 +90,7 @@ def pick(pool=None):
 
 MARG = 20
 def bluenoise_pos(r, k=24):
+    # score = worst normalized clearance over placed items; higher is emptier space
     best = None; best_s = -1
     for _ in range(k):
         cx = rng.uniform(MARG, W - MARG); cy = rng.uniform(MARG, Hc - MARG)
@@ -103,13 +112,13 @@ def gapfill_pos(r):
     j = sel[rng.randrange(len(sel))]
     return xs[j] * S + rng.uniform(-S, S), ys[j] * S + rng.uniform(-S, S)
 
-def run_tier(count, lo, hi, pool=None, mindup=MINDUP, use_bold=False, mode="B", tries=40):
+def run_tier(count, lo, hi, pool=None, mindup=MINDUP, use_bold=False, mode="B", tries=40, k=24):
     cnt = 0; fails = 0
     while cnt < count and fails < tries * 3:
         size = rng.uniform(lo, hi); r = size / 2
         ok = False
         for _ in range(tries):
-            pos = bluenoise_pos(r) if mode == "A" else gapfill_pos(r)
+            pos = bluenoise_pos(r, k) if mode == "A" else gapfill_pos(r)
             if pos is None: break
             if try_place(pick(pool), pos[0], pos[1], size, rng.uniform(-ROT, ROT), mindup, use_bold):
                 ok = True; break
@@ -129,15 +138,16 @@ def hero_lattice(count, lo, hi):
                 cnt += 1; break
     return cnt
 
-mode = "A" if VARIANT == "A" else "B"
-if VARIANT == "C":
+mode = "A" if VARIANT in ("A", "D") else "B"
+if VARIANT in ("C", "D"):
     n1 = hero_lattice(16, 240, 330)
 else:
     n1 = run_tier(16, 240, 330, mode=mode)
-n2 = run_tier(54, 150, 230, mode=mode)
+n2 = run_tier(54, 150, 230, mode=mode, tries=150, k=64)   # deep search: BIGSEP makes valid spots rare
+n2 += run_tier(54 - n2, 120, 149, mode=mode)              # deficit -> near-large (under BIGSEP), keeps pyramid mass
 n3 = run_tier(82, 90, 145, mode=mode)
 n4 = run_tier(200, 46, 88, mode=mode)
-n5 = run_tier(440, 23, 44, pool=micro_idx, mindup=190.0, use_bold=True, mode=mode)
+n5 = run_tier(440, 23, 44, pool=micro_idx, mindup=190.0, use_bold=True, mode=mode, k=40)
 print(f"variant {VARIANT} seed {SEED} placed: {n1} {n2} {n3} {n4} {n5} = {n1+n2+n3+n4+n5}")
 canvas.convert("RGB").save(OUT)
 lum = np.array(canvas.convert("L"))
