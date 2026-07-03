@@ -91,8 +91,14 @@ re-upload a better photo).
   pending-row spinner; no timeout changes.
 - **Multi-photo menus**: each photo = own row + fileId, independently deletable.
   No grouping (YAGNI).
-- **Replace-by-name**: gallery names (`IMG_1234.jpg`) are unique enough; existing
-  confirm flow unchanged.
+- **Replace-by-name**: the original assumption ("gallery names like `IMG_1234.jpg`
+  are unique enough") proved WRONG on iOS — NativeGallery returns temp copies named
+  `pickedMediaN.jpg`, reused every pick session, so later photos cross-matched
+  earlier ones and the replace flow deleted their knowledge. Fixed post-review:
+  gallery picks get synthesized unique display names («Фото 03.07.2026 14:22 (2).jpg»,
+  `GalleryPhotoNamer`, uniqueness guaranteed against the bot's stored names), passed
+  to `UploadFile` as a display-name override. Photos therefore never trigger
+  replace-by-name; file-picker uploads keep real names and the confirm flow unchanged.
 - **Old app versions**: cannot pick images, so the new branch is unreachable for
   them — no compatibility window.
 - **Privacy**: photos go to OpenAI — the same trust boundary as all existing bot

@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -464,10 +465,28 @@ public partial class BotSettings
         NativeGallery.GetImagesFromGallery(paths =>
         {
             if (paths == null) return; // cancelled
+
+            // Synthesize display names: the temp copies iOS hands back are all
+            // named pickedMediaN.jpg (reused across pick sessions), which reads
+            // as duplicates in the list and cross-fires the replace-by-name
+            // flow — a later photo would silently replace an earlier one's
+            // knowledge (see GalleryPhotoNamer).
+            Bot openBot = Manager.openBot != null ? Manager.openBot.GetComponent<Bot>() : null;
+            var takenNames = new HashSet<string>();
+            if (openBot != null)
+            {
+                foreach (UploadedFileEntry entry in UploadedFilesStore.Load(openBot.name, contentType))
+                    takenNames.Add(entry.Name);
+            }
+
+            int index = 0;
             foreach (string path in paths)
             {
                 if (string.IsNullOrEmpty(path)) continue;
-                StartCoroutine(UploadFile(path, contentType, targetButton));
+                string displayName = GalleryPhotoNamer.DisplayName(System.DateTime.Now, index, paths.Length, takenNames);
+                takenNames.Add(displayName);
+                index++;
+                StartCoroutine(UploadFile(path, contentType, targetButton, displayName));
             }
         }, "Выберите фото прайс-листа");
     }
@@ -520,7 +539,7 @@ public partial class BotSettings
         }, fileTypes);
     }
 
-    private IEnumerator UploadFile(string filePath, string contentType, Button targetButton)
+    private IEnumerator UploadFile(string filePath, string contentType, Button targetButton, string displayNameOverride = null)
     {
         Bot openBot = Manager.openBot != null ? Manager.openBot.GetComponent<Bot>() : null;
         if (openBot == null)
@@ -529,7 +548,10 @@ public partial class BotSettings
             yield break;
         }
 
-        string fileName = Path.GetFileName(filePath);
+        // Gallery picks pass a synthesized display name: iOS temp copies are
+        // all named pickedMediaN.jpg (reused every session), which both looks
+        // broken in the list and cross-matches the replace-by-name flow.
+        string fileName = displayNameOverride ?? Path.GetFileName(filePath);
         // Lowercased: mobile pickers filter by MIME/UTI, not by name, so a
         // "MENU.PDF" is perfectly pickable — and an ordinal Equals(".pdf")
         // would match no branch and post the form with no file attached.
@@ -548,7 +570,7 @@ public partial class BotSettings
         // an uploading state — the n8n webhook takes a few seconds (extraction +
         // embedding) and a silent gap reads as "did my tap even register?".
         GameObject pendingRow = AddPendingFileRow(contentType, fileName);
-        System.Action retryUpload = () => StartCoroutine(UploadFile(filePath, contentType, targetButton));
+        System.Action retryUpload = () => StartCoroutine(UploadFile(filePath, contentType, targetButton, displayNameOverride));
 
         byte[] fileData = ReadFileOrNull(filePath);
         if (fileData == null)
@@ -636,7 +658,12 @@ public partial class BotSettings
                 }
                 else
                 {
-                    payloadName = fileExtension.Equals(".jpg") ? fileName : fileName + ".jpg";
+                    // Route on the NAME's final extension (synthesized gallery
+                    // names already end in .jpg regardless of the temp file's
+                    // real extension) — the workflow's Switch reads the name.
+                    payloadName = fileName.EndsWith(".jpg", System.StringComparison.OrdinalIgnoreCase)
+                        ? fileName
+                        : fileName + ".jpg";
                     payloadMime = "image/jpeg";
                 }
             }
