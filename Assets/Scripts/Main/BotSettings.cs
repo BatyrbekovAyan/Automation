@@ -104,6 +104,10 @@ public partial class BotSettings : MonoBehaviour
     private string xlsx;
     private string xlsm;
     private string docx;
+    // .doc is NOT ingestible — it's pickable on purpose so UploadFile can fail
+    // the row with the "re-save as .docx or PDF" reason instead of the OS
+    // picker graying the file out with no explanation.
+    private string doc;
     private string html;
     // Image types added to the picker's «Файл» branch and used by the gallery
     // branch (jpg also covers .jpeg, resolved by extension in UploadFile).

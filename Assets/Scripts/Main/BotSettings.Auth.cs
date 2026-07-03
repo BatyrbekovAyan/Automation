@@ -484,6 +484,7 @@ public partial class BotSettings
         xlsx = NativeFilePicker.ConvertExtensionToFileType("xlsx");
         xlsm = NativeFilePicker.ConvertExtensionToFileType("xlsm");
         docx = "org.openxmlformats.wordprocessingml.document";
+        doc = NativeFilePicker.ConvertExtensionToFileType("doc"); // application/msword / com.microsoft.word.doc
         html = NativeFilePicker.ConvertExtensionToFileType("html"); // text/html / public.html also cover .htm
         jpg = NativeFilePicker.ConvertExtensionToFileType("jpg"); // also covers .jpeg
         png = NativeFilePicker.ConvertExtensionToFileType("png");
@@ -495,10 +496,10 @@ public partial class BotSettings
     {
 #if UNITY_ANDROID
 				// Use MIMEs on Android
-            string[] fileTypes = new string[] { pdf, txt, rtf, xml, csv, tsv, xls, xlsx, xlsm, docx, html, jpg, png, webp, heic };
+            string[] fileTypes = new string[] { pdf, txt, rtf, xml, csv, tsv, xls, xlsx, xlsm, docx, doc, html, jpg, png, webp, heic };
 #else
         // Use UTIs on iOS
-        string[] fileTypes = new string[] { pdf, txt, rtf, xml, csv, tsv, xls, xlsx, xlsm, docx, html, jpg, png, webp, heic };
+        string[] fileTypes = new string[] { pdf, txt, rtf, xml, csv, tsv, xls, xlsx, xlsm, docx, doc, html, jpg, png, webp, heic };
 #endif
         // Older Androids have no MIME registered for tsv/xlsm — drop nulls so
         // the picker intent doesn't choke on them.
