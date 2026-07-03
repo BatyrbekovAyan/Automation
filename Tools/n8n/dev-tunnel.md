@@ -38,7 +38,25 @@ cloudflared tunnel --url http://localhost:5678
 # Terminal B — restart n8n with that URL so webhooks register publicly
 WEBHOOK_URL=https://<random>.trycloudflare.com n8n start
 ```
-Each restart you must update `secrets.json` → `n8nBaseUrl` with the new URL.
+**Each restart the hostname rotates — run the rotation script, don't do it by hand:**
+
+```bash
+python3 Tools/n8n/rotate-tunnel.py            # or --dry-run first
+```
+
+It auto-detects the new hostname from cloudflared's metrics endpoint
+(`127.0.0.1:20241/quicktunnel`) and updates all four stale spots:
+1. `secrets.json` → `n8nBaseUrl`
+2. the live local Create handlers' "Set Wappi Webhook" callback URL (REST PUT)
+3. every existing bot's Wappi webhook registration (`webhook/url/set` per profile,
+   WhatsApp `/api/` + Telegram `/tapi/`, incl. inactive bots so reactivation keeps working)
+4. checks the running n8n's `WEBHOOK_URL` env and tells you to restart if stale
+   (that part it cannot do for you: `WEBHOOK_URL=<new-url> n8n start`)
+
+Then it verifies: tunnel `/healthz`, Wappi `url/get` per profile, and a GET probe of
+every webhook through the tunnel (expects the 404 "not registered for GET" hint).
+Idempotent — re-run any time; exit 0 = all green. Skipping a step by hand is what
+caused the 2026-07-03 "bots stopped replying" outage.
 
 ## Wire the app
 

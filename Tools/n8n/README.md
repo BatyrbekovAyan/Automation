@@ -19,6 +19,11 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
   `verify_rag.py` asserts every applied invariant; `test-upload-e2e.sh` exercises the
   Upload/Delete webhooks end-to-end against a live instance (curl mimicking Unity's
   WWWForm binary-part quirk).
+- `rotate-tunnel.py` — run after every cloudflared quick-tunnel restart: auto-detects the
+  new trycloudflare host and re-points secrets.json, the live local Create handlers'
+  Wappi callback, and every bot's Wappi webhook registration, then verifies (see
+  `dev-tunnel.md`). A missed manual step here caused the 2026-07-03 "bots stopped
+  replying" outage.
 - `reference/` — **gitignored**: downloaded community/marketplace templates + n8n onboarding
   samples, kept only to mine for ideas. Not part of the app, never imported.
 
