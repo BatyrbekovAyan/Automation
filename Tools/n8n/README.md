@@ -10,8 +10,11 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
 - `supabase/` — the RAG store's DB contract: `schema.sql` (documents table +
   `match_documents` as deployed — note its multi-key filter uses OR semantics), the
   applied hardening migrations (RLS default-deny, anon revoke, HNSW + metadata indexes),
-  and the `price-lists` originals bucket (`2026-07-02-price-list-originals-bucket.sql` —
-  must be applied once per Supabase project before the Store Original File node works).
+  the `price-lists` originals bucket (`2026-07-02-price-list-originals-bucket.sql` —
+  must be applied once per Supabase project before the Store Original File node works),
+  and `audit-price-lists-bucket.sql` — cross-checks bucket objects against
+  `documents.metadata->>'fileId'`. Invariant: zero `orphaned-unexpected`; image
+  orphans are `orphaned-by-rejection` (422-rejected photos, kept for re-OCR by design).
 - `apply-*.py` — idempotent migrations over `workflows/` (edit by node name, re-runnable);
   `verify_rag.py` asserts every applied invariant; `test-upload-e2e.sh` exercises the
   Upload/Delete webhooks end-to-end against a live instance (curl mimicking Unity's

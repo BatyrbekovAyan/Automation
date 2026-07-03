@@ -97,6 +97,14 @@ re-upload a better photo).
   them — no compatibility window.
 - **Privacy**: photos go to OpenAI — the same trust boundary as all existing bot
   content (chats and extracted documents already flow through OpenAI).
+- **Bucket audit**: a 422-rejected photo keeps its archived original (deliberate —
+  that's the re-OCR candidate), but the app discards the `fileId`, so the object is
+  unreferenced by `documents` chunks. The 2026-07-02 rollout invariant "bucket audit:
+  0 orphans" is therefore redefined as **0 *unexplained* orphans**:
+  `Tools/n8n/supabase/audit-price-lists-bucket.sql` cross-checks `storage.objects`
+  against `documents.metadata->>'fileId'` and reports image-mimetype orphans
+  separately as `orphaned-by-rejection` (expected). The 422 path intentionally does
+  NOT delete its stored object.
 
 ## Testing
 
