@@ -99,15 +99,20 @@ public static class BotSettingsUploadSourceSheetBuilder
         scrimCg.alpha = 0f;
         var scrimFinger = scrimGo.AddComponent<DelayedFingerUpAction>();
 
-        // Sheet card: bottom-anchored, slides up from below.
+        // Sheet card: bottom-anchored, slides up from below. Height = content
+        // (636) + 96 bottom safe-inset (~32dp, keeps «Отмена» clear of the
+        // home indicator; safe areas are baked static in this project, never
+        // Screen.safeArea) + 48 tucked BELOW the screen edge (rest y = -48)
+        // so the uniform rounded corners only show at the top. The controller
+        // captures this rest position as its shown-target in Awake.
         var sheetGo = NewChild(container.transform, "SheetRoot", out RectTransform sheetRt);
         sheetGo.AddComponent<Image>().color = Card;
         sheetRt.anchorMin = new Vector2(0f, 0f);
         sheetRt.anchorMax = new Vector2(1f, 0f);
         sheetRt.pivot = new Vector2(0.5f, 0f);
-        sheetRt.sizeDelta = new Vector2(0f, 640f);
-        sheetRt.anchoredPosition = Vector2.zero;
-        AddRoundedCorners(sheetGo, 48f); // top corners; bottom sits off-screen
+        sheetRt.sizeDelta = new Vector2(0f, 784f);
+        sheetRt.anchoredPosition = new Vector2(0f, -48f);
+        AddRoundedCorners(sheetGo, 48f);
 
         // Title.
         var titleGo = NewChild(sheetGo.transform, "Title", out RectTransform titleRt);
