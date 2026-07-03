@@ -141,6 +141,11 @@ public class Manager : MonoBehaviour
     private bool isCreatingBot;
     private Coroutine _whatsappStatusCoroutine;
     private Coroutine _telegramStatusCoroutine;
+    private Coroutine _whatsappQrCoroutine;
+    // True once a pairing code was issued for the current WhatsApp profile.
+    // WhatsApp refuses a repeat code for the same profile for ~2 minutes, so
+    // the next code request silently swaps in a fresh profile instead.
+    private bool _whatsappCodeIssued;
     private string telegramPhoneTitleInitial;
     private string telegramPhoneBodyInitial;
 
@@ -1493,9 +1498,12 @@ public class Manager : MonoBehaviour
 
         if (WhatsappAuthSuccessPanel != null) WhatsappAuthSuccessPanel.SetActive(false);
 
+        _whatsappCodeIssued = false;
+
         // Activate root LAST — everything appears in its final state
         WhatsappAuth.SetActive(true);
-        StartCoroutine(OpenWhatsappQRPanel());
+        if (_whatsappQrCoroutine != null) StopCoroutine(_whatsappQrCoroutine);
+        _whatsappQrCoroutine = StartCoroutine(OpenWhatsappQRPanel());
     }
 
     private void ShowTelegramAuth()
@@ -1653,6 +1661,36 @@ public class Manager : MonoBehaviour
         string originalWaBtnText = GetWhatsappCodeButton.GetComponentInChildren<TextMeshProUGUI>().text;
         SetButtonText(GetWhatsappCodeButton, "Getting..");
 
+        // A profile that already issued a code is inside WhatsApp's ~2min
+        // repeat-code cooldown. Instead of making the user wait it out, swap
+        // in a fresh profile behind the loader and request the code on it.
+        if (_whatsappCodeIssued || whatsappProfileId.Equals("-1"))
+        {
+            if (_whatsappStatusCoroutine != null) { StopCoroutine(_whatsappStatusCoroutine); _whatsappStatusCoroutine = null; }
+
+            bool alreadyAuthorized = false;
+            if (!whatsappProfileId.Equals("-1"))
+                yield return StartCoroutine(CheckWhatsappAuthorized(ok => alreadyAuthorized = ok));
+
+            if (alreadyAuthorized)
+            {
+                // The previous code actually worked — keep the profile and let
+                // the status poll flip the success UI momentarily.
+                _whatsappStatusCoroutine = StartCoroutine(GetWhatsappProfileStatus());
+                SetButtonText(GetWhatsappCodeButton, originalWaBtnText);
+                LoadingPanel.SetActive(false);
+                yield break;
+            }
+
+            yield return StartCoroutine(RecreateWhatsappProfileForNewCode());
+
+            if (whatsappProfileId.Equals("-1"))
+            {
+                yield return StartCoroutine(FlashWhatsappCodeError("Server Unavailable", originalWaBtnText));
+                yield break;
+            }
+        }
+
         using UnityWebRequest www = UnityWebRequest.Get($"https://wappi.pro/api/sync/auth/code?profile_id={whatsappProfileId}&phone=7{WhatsappNumberInput.text}");
 
         www.SetRequestHeader("Authorization", wappiAuthToken);
@@ -1677,17 +1715,12 @@ public class Manager : MonoBehaviour
                 }
             }
 
-            SetButtonText(GetWhatsappCodeButton, errorMsg);
-            yield return new WaitForSeconds(2f);
-            SetButtonText(GetWhatsappCodeButton, originalWaBtnText);
-
-            if (WhatsappNumberInput.text.Length >= 10)
-                GetWhatsappCodeButton.interactable = true;
-
-            LoadingPanel.SetActive(false);
+            yield return StartCoroutine(FlashWhatsappCodeError(errorMsg, originalWaBtnText));
         }
         else
         {
+            _whatsappCodeIssued = true;
+
             SetButtonText(GetWhatsappCodeButton, originalWaBtnText);
             WhatsappCodeTimer.SetActive(true);
 
@@ -1716,6 +1749,96 @@ public class Manager : MonoBehaviour
             if (waScrollRect != null) waScrollRect.normalizedPosition = Vector2.zero;
             LoadingPanel.SetActive(false);
         }
+    }
+
+    private IEnumerator FlashWhatsappCodeError(string errorMsg, string originalText)
+    {
+        SetButtonText(GetWhatsappCodeButton, errorMsg);
+        yield return new WaitForSeconds(2f);
+        SetButtonText(GetWhatsappCodeButton, originalText);
+
+        if (WhatsappNumberInput.text.Length >= 10)
+            GetWhatsappCodeButton.interactable = true;
+
+        LoadingPanel.SetActive(false);
+    }
+
+    private IEnumerator CheckWhatsappAuthorized(System.Action<bool> callback)
+    {
+        using UnityWebRequest www = UnityWebRequest.Get($"https://wappi.pro/api/sync/get/status?profile_id={whatsappProfileId}");
+
+        www.SetRequestHeader("Authorization", wappiAuthToken);
+        www.timeout = 30;
+
+        yield return www.SendWebRequest();
+
+        bool authorized = false;
+
+        if (www.result == UnityWebRequest.Result.Success)
+        {
+            string response = www.downloadHandler.text;
+            int startIndex = response.IndexOf("\"authorized\":");
+            int endIndex = response.IndexOf(",\"authorized_at\":");
+
+            if (startIndex >= 0 && endIndex > startIndex)
+            {
+                startIndex += 13;
+                authorized = response.Substring(startIndex, endIndex - startIndex).Equals("true");
+            }
+        }
+
+        callback?.Invoke(authorized);
+    }
+
+    // Deletes the current (cooldown-poisoned) Wappi profile and provisions a
+    // replacement under the same name, so a fresh pairing code can be issued
+    // immediately. Leaves whatsappProfileId at "-1" if provisioning failed.
+    private IEnumerator RecreateWhatsappProfileForNewCode()
+    {
+        if (!whatsappProfileId.Equals("-1"))
+        {
+            yield return StartCoroutine(DeleteWhatsappProfile(whatsappProfileId, true));
+            LoadingPanel.SetActive(true);
+
+            // Delete failed — keep the old profile; the code request will
+            // surface Wappi's cooldown error exactly as before.
+            if (!whatsappProfileId.Equals("-1")) yield break;
+        }
+
+        string profileName = _authFromSettings && openBot != null
+            ? PlayerPrefs.GetString(openBot.name + "Name", "")
+            : formBotName;
+        if (string.IsNullOrEmpty(profileName)) profileName = "Bot";
+
+        for (int attempt = 0; attempt < 3 && whatsappProfileId.Equals("-1"); attempt++)
+        {
+            if (attempt > 0) yield return new WaitForSeconds(2f);
+            yield return StartCoroutine(CreateWhatsappProfile(profileName, true));
+            LoadingPanel.SetActive(true);
+        }
+
+        if (_authFromSettings && openBot != null)
+        {
+            // The done-handler and workflow creation read the BOT's id, and an
+            // abandoned auth must not leave PlayerPrefs pointing at the deleted
+            // old profile — mirror the swap (or the failure) immediately.
+            openBot.GetComponent<Bot>().whatsappProfileId = whatsappProfileId;
+            PlayerPrefs.SetString(openBot.name + "WhatsappProfileId", whatsappProfileId);
+            if (!whatsappProfileId.Equals("-1"))
+                PlayerPrefs.SetInt("lastCreatedWhatsappProfileIdSaved", 1);
+            PlayerPrefs.Save();
+        }
+
+        if (whatsappProfileId.Equals("-1")) yield break;
+
+        _whatsappCodeIssued = false;
+
+        // Re-point the QR section at the replacement profile; its built-in 3s
+        // delay doubles as the provisioning wait mirrored below.
+        if (_whatsappQrCoroutine != null) StopCoroutine(_whatsappQrCoroutine);
+        _whatsappQrCoroutine = StartCoroutine(OpenWhatsappQRPanel());
+
+        yield return new WaitForSeconds(3f);
     }
 
     public void CloseWhatsappCodePanel()
