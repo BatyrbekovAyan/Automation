@@ -12,6 +12,10 @@ public class Bot : MonoBehaviour
     [SerializeField] public Button EditButton;
     [SerializeField] public Toggle ActivationSwitch;
 
+    [Tooltip("Footer caption under the divider: «Бот работает» / «Бот на паузе». " +
+             "Wired by BotCardFooterBuilder.")]
+    [SerializeField] private TextMeshProUGUI SwitchFooterLabel;
+
     [SerializeField] private Color backgroundActiveColor;
     [SerializeField] private Color handleActiveColor;
 
@@ -254,6 +258,8 @@ public class Bot : MonoBehaviour
         switchBackgroundImage.DOColor (enabled ? backgroundActiveColor : backgroundDefaultColor, .6f);
         switchHandleImage.DOColor (enabled ? handleActiveColor : handleDefaultColor, .4f);
 
+        ApplySwitchFooterLabel(enabled);
+
         PlayerPrefs.SetInt(transform.name, enabled ? 1 : 0);
         Status.text = enabled ? active ? "Active" : "Connecting.." : "Not Active";
         Status.color = enabled ? active ? green : blue : red;
@@ -262,13 +268,24 @@ public class Bot : MonoBehaviour
         Manager.Instance.GetEnableTelegramWorkflow(telegramWorkflowId, enabled);
     }
 
+    private void ApplySwitchFooterLabel(bool isOn)
+    {
+        if (SwitchFooterLabel == null) return;
+
+        SwitchFooterLabel.text = BotSwitchFooter.TextFor(isOn);
+        SwitchFooterLabel.color = BotSwitchFooter.ColorFor(isOn);
+    }
+
     private IEnumerator SetSwitches()
     {
         yield return new WaitForEndOfFrame();
 
         switchHandle = ActivationSwitch.transform.GetChild(0).GetChild(0).GetComponent<RectTransform>();
 
-        switchHandle.localPosition = new Vector2(-30 * ActivationSwitch.transform.GetChild(0).GetComponent<RectTransform>().rect.width / 160, switchHandle.localPosition.y);
+        var track = ActivationSwitch.transform.GetChild(0).GetComponent<RectTransform>();
+        switchHandle.localPosition = new Vector2(
+            -BotSwitchFooter.RestOffset(track.rect.width, switchHandle.rect.width),
+            switchHandle.localPosition.y);
 
         switchHandlePosition = switchHandle.anchoredPosition;
 
@@ -286,6 +303,8 @@ public class Bot : MonoBehaviour
             switchBackgroundImage.DOColor(backgroundActiveColor, .6f);
             switchHandleImage.DOColor(handleActiveColor, .4f);
 
+            ApplySwitchFooterLabel(true);
+
             if (active)
             {
                 Status.text = "Active";
@@ -302,6 +321,8 @@ public class Bot : MonoBehaviour
             ActivationSwitch.isOn = false;
             Status.text = "Not Active";
             Status.color = red;
+
+            ApplySwitchFooterLabel(false);
         }
     }
 
