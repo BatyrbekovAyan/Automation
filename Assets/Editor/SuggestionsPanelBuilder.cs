@@ -44,6 +44,8 @@ public static class SuggestionsPanelBuilder
     private const float CardRadius = 24f, PanelTopRadius = 36f;
     private const float ReplySize = 38f, ChipSize = 26f, StateSize = 39f;   // smaller for narrow grid cards
     private const float RefreshHit = 120f;
+    private const float RefreshIconSize = 90f;                                   // owner-tuned FAB icon size (was 56)
+    private const string RefreshIconGuid = "aabd39746767444e984449139c957125";   // "relaod 1.png" — owner-assigned refresh sprite
     // Compact per-chat reply-mode switch (open-chat header) — a smaller sibling of the chats-list switch.
     private const float SwitchW = 220f, SwitchH = 60f, SwitchThumbW = 100f, SwitchThumbH = 48f;
     private const float SwitchSlideX = 54f, SwitchFont = 24f;   // ±54 → thumb end-caps concentric with the track (uniform 6u gap)
@@ -104,8 +106,16 @@ public static class SuggestionsPanelBuilder
         AddRoundedTop(panelGo, PanelTopRadius);
         var canvasGroup = panelGo.AddComponent<CanvasGroup>();
 
-        // Render above the messages: place just after quickReplyPanel in its parent.
-        if (quickReplySibling != null)
+        // Render the sheet ABOVE the messages AND the invisible left-edge SwipeBack strip. SwipeBack's
+        // SwipeToBack forwards vertical drags to the message list, so if the panel sat below it a vertical
+        // drag on the LEFT card (which overlaps the ~150u strip) would scroll the messages instead of the
+        // card. Placing the panel just after SwipeBack lets the card's own ReplyScroll win the raycast; it
+        // stays below the scroll-FAB and the attach-sheet, and it's SetActive(false) when hidden so it
+        // never blocks SwipeBack while closed. Fall back to just-after-quickReply if the strip is absent.
+        Transform swipeStrip = parent.Find("SwipeBack");
+        if (swipeStrip != null)
+            panelGo.transform.SetSiblingIndex(swipeStrip.GetSiblingIndex() + 1);
+        else if (quickReplySibling != null)
             panelGo.transform.SetSiblingIndex(quickReplySibling.GetSiblingIndex() + 1);
 
         // Refresh control — a circular FAB floating just ABOVE the sheet's top-right (child of the panel
@@ -165,9 +175,13 @@ public static class SuggestionsPanelBuilder
         rt.sizeDelta = new Vector2(RefreshHit, RefreshHit);
         rt.anchoredPosition = new Vector2(-Sm, Sm);      // inset from the right; lifted above the panel top
         AddRounded(go, RefreshHit / 2f);                 // full circle
-        // Icon = Image + sprite (null sprite => assign the circular-arrow sprite at the checkpoint).
+        // Icon = the owner-assigned circular-arrow refresh sprite (guid-loaded so rebuilds keep it), white
+        // tint on the accent FAB, 90×90 + preserveAspect — restored owner tuning (a rebuild had reset it to a
+        // 56×56 null-sprite placeholder).
         Image icon = ImageGo("Icon", go.transform, Color.white).GetComponent<Image>();
-        var irt = (RectTransform)icon.transform; irt.sizeDelta = new Vector2(56, 56); Center(irt);
+        icon.sprite = LoadSpriteByGuid(RefreshIconGuid);
+        icon.preserveAspect = true;
+        var irt = (RectTransform)icon.transform; irt.sizeDelta = new Vector2(RefreshIconSize, RefreshIconSize); Center(irt);
         Rect("A11y:" + RefreshA11y, go.transform);       // accessible label node
         return go.AddComponent<Button>();
     }
@@ -446,6 +460,12 @@ public static class SuggestionsPanelBuilder
         rounded.radius = radius;
         rounded.Validate();
         rounded.Refresh();
+    }
+
+    private static Sprite LoadSpriteByGuid(string guid)
+    {
+        string path = AssetDatabase.GUIDToAssetPath(guid);
+        return string.IsNullOrEmpty(path) ? null : AssetDatabase.LoadAssetAtPath<Sprite>(path);
     }
 
     private static void AddRoundedTop(GameObject go, float radius)
