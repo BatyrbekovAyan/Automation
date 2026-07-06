@@ -283,9 +283,12 @@ public class Bot : MonoBehaviour
         switchHandle = ActivationSwitch.transform.GetChild(0).GetChild(0).GetComponent<RectTransform>();
 
         var track = ActivationSwitch.transform.GetChild(0).GetComponent<RectTransform>();
-        switchHandle.localPosition = new Vector2(
+        // anchoredPosition, NOT localPosition: the handle anchors to the track's
+        // CENTER while the track's pivot is its LEFT edge, so a local-space write
+        // lands (trackWidth/2) off-target and the ON tween mirrors the error.
+        switchHandle.anchoredPosition = new Vector2(
             -BotSwitchFooter.RestOffset(track.rect.width, switchHandle.rect.width),
-            switchHandle.localPosition.y);
+            switchHandle.anchoredPosition.y);
 
         switchHandlePosition = switchHandle.anchoredPosition;
 
