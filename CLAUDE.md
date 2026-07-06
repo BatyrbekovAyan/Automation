@@ -113,7 +113,7 @@ The app communicates with four external services via `UnityWebRequest` + corouti
 - **Base**: `https://bagkz.app.n8n.cloud/`
 - **Auth**: `X-N8N-API-KEY` header with `Manager.n8nAPIKey`
 - **API endpoints** (`/api/v1/workflows/`):
-  - `{id}/activate`, `{id}/deactivate`
+  - `{id}/activate`, `{id}/deactivate` — POST with an explicit `Content-Type: application/json` header (empty body is fine). Unity's libcurl transport stamps `application/x-www-form-urlencoded` onto a POST with no upload handler and n8n's REST API 415s any non-JSON content type, so "bodyless" alone is not enough. The Enable coroutines also skip the `""`/`"-1"` sentinel ids (channel never authed → no workflow → guaranteed 404)
   - `DELETE {id}`
 - **Webhook endpoints**:
   - `/webhook/CreateWhatsappWorkflow`, `/webhook/CreateTelegramWorkflow`

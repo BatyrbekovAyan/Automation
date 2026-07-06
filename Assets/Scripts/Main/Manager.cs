@@ -2827,15 +2827,30 @@ public class Manager : MonoBehaviour
 
     private IEnumerator EnableWhatsappWorkflow(string id, bool enabled)
     {
+        // "" (workflow never created) and "-1" (channel never authed) mean there is
+        // nothing to (de)activate on n8n — the same sentinels SaveBotSettings skips.
+        // The bot-card toggle fires this for both channels unconditionally, so a
+        // single-channel bot would otherwise log a guaranteed 404 (/workflows/-1/…).
+        if (string.IsNullOrEmpty(id) || id.Equals("-1"))
+        {
+            EnableWhatsappWorkflowSaved = true;
+            Saved();
+            yield break;
+        }
+
         LoadingPanel.SetActive(true);
 
-        // n8n's REST API rejects an empty multipart/form-data body with 415; send a
-        // bodyless POST (like the Delete calls) so /activate /deactivate are accepted.
+        // n8n's REST API only accepts application/json here and 415s anything else.
+        // A body-less POST is NOT enough: Unity's libcurl transport stamps
+        // Content-Type: application/x-www-form-urlencoded onto a POST with no upload
+        // handler, so the JSON content type must be pinned explicitly. An empty body
+        // with application/json is accepted (verified against n8n 2.27.4).
         using UnityWebRequest www = new UnityWebRequest($"{n8nBaseUrl}/api/v1/workflows/{id}/" + (enabled ? "activate" : "deactivate"), "POST");
         www.downloadHandler = new DownloadHandlerBuffer();
         www.timeout = 30;
 
         www.SetRequestHeader("X-N8N-API-KEY", n8nAPIKey);
+        www.SetRequestHeader("Content-Type", "application/json");
 
         yield return www.SendWebRequest();
 
@@ -2847,7 +2862,7 @@ public class Manager : MonoBehaviour
         // a failure there can't leak into a later save's pill text.)
         if (www.result != UnityWebRequest.Result.Success)
         {
-            Debug.LogError($"[{www.responseCode}] EnableWhatsappWorkflow failed: {www.error}");
+            Debug.LogError($"[{www.responseCode}] EnableWhatsappWorkflow {www.url}: {www.error} {www.downloadHandler.text}");
             _saveHadError = true;
         }
 
@@ -2859,22 +2874,31 @@ public class Manager : MonoBehaviour
 
     private IEnumerator EnableTelegramWorkflow(string id, bool enabled)
     {
+        // See EnableWhatsappWorkflow: sentinel ids ("" / "-1") have no n8n workflow.
+        if (string.IsNullOrEmpty(id) || id.Equals("-1"))
+        {
+            EnableTelegramWorkflowSaved = true;
+            Saved();
+            yield break;
+        }
+
         LoadingPanel.SetActive(true);
 
-        // n8n's REST API rejects an empty multipart/form-data body with 415; send a
-        // bodyless POST (like the Delete calls) so /activate /deactivate are accepted.
+        // See EnableWhatsappWorkflow: Content-Type must be pinned to application/json
+        // or Unity's transport substitutes x-www-form-urlencoded and n8n replies 415.
         using UnityWebRequest www = new UnityWebRequest($"{n8nBaseUrl}/api/v1/workflows/{id}/" + (enabled ? "activate" : "deactivate"), "POST");
         www.downloadHandler = new DownloadHandlerBuffer();
         www.timeout = 30;
 
         www.SetRequestHeader("X-N8N-API-KEY", n8nAPIKey);
+        www.SetRequestHeader("Content-Type", "application/json");
 
         yield return www.SendWebRequest();
 
         // See EnableWhatsappWorkflow: always settle the gate, record failures.
         if (www.result != UnityWebRequest.Result.Success)
         {
-            Debug.LogError($"[{www.responseCode}] EnableTelegramWorkflow failed: {www.error}");
+            Debug.LogError($"[{www.responseCode}] EnableTelegramWorkflow {www.url}: {www.error} {www.downloadHandler.text}");
             _saveHadError = true;
         }
 
