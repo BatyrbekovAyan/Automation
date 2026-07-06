@@ -2557,6 +2557,7 @@ public class Manager : MonoBehaviour
         
         form.AddField("Name", bot.GetComponent<Bot>().BotName != null ? bot.GetComponent<Bot>().BotName.text : "");
         form.AddField("BusinessType", businessTypes.TryGetById(selectedBusinessId, out var bt1) ? bt1.displayName : "");
+        form.AddField("BusinessTypeId", selectedBusinessId ?? "");
         form.AddField("WhatsappProfileId", whatsappProfileId);
         
         form.AddField("Business", "");
@@ -2647,6 +2648,7 @@ public class Manager : MonoBehaviour
 
         form.AddField("Name", openBotSettings.BotNameField.Value);
         form.AddField("BusinessType", openBotSettings.BusinessTypeDropdown.options[openBotSettings.BusinessTypeDropdown.value].text);
+        form.AddField("BusinessTypeId", businessTypes.TryGetByIndex(openBotSettings.BusinessTypeDropdown.value, out var btEntry) ? btEntry.id : "");
         form.AddField("WhatsappProfileId", openBot.GetComponent<Bot>().whatsappProfileId);
 
         form.AddField("Business", "About Business:\n" + openBotSettings.BusinessField.Value);
@@ -2695,6 +2697,7 @@ public class Manager : MonoBehaviour
         
         form.AddField("Name", bot.GetComponent<Bot>().BotName != null ? bot.GetComponent<Bot>().BotName.text : "");
         form.AddField("BusinessType", businessTypes.TryGetById(selectedBusinessId, out var bt2) ? bt2.displayName : "");
+        form.AddField("BusinessTypeId", selectedBusinessId ?? "");
         form.AddField("TelegramProfileId", telegramProfileId);
         
         form.AddField("Business", "");
@@ -2786,6 +2789,7 @@ public class Manager : MonoBehaviour
 
         form.AddField("Name", openBotSettings.BotNameField.Value);
         form.AddField("BusinessType", openBotSettings.BusinessTypeDropdown.options[openBotSettings.BusinessTypeDropdown.value].text);
+        form.AddField("BusinessTypeId", businessTypes.TryGetByIndex(openBotSettings.BusinessTypeDropdown.value, out var btEntry) ? btEntry.id : "");
         form.AddField("TelegramProfileId", openBot.GetComponent<Bot>().telegramProfileId);
 
         form.AddField("Business", "About Business:\n" + openBotSettings.BusinessField.Value);
@@ -2993,6 +2997,7 @@ public class Manager : MonoBehaviour
         form.AddField("TelegramWorkflowId", telegramWorkflowId);
         form.AddField("Name", openBotSettings.BotNameField.Value);
         form.AddField("BusinessType", openBotSettings.BusinessTypeDropdown.options[openBotSettings.BusinessTypeDropdown.value].text);
+        form.AddField("BusinessTypeId", businessTypes.TryGetByIndex(openBotSettings.BusinessTypeDropdown.value, out var btEntry) ? btEntry.id : "");
         form.AddField("Business", openBotSettings.BusinessField.Value);
         form.AddField("Prompt", openBotSettings.PromptField.Value);
         form.AddField("ProductsList", productsList);
