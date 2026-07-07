@@ -16,7 +16,7 @@ public partial class ProfileSubPages
     [SerializeField] private CanvasGroup supportSheetBackdrop;
     [SerializeField] private Button supportBackdropButton;
     [SerializeField] private RectTransform supportSheetPanel;
-    [SerializeField] private KeyboardAwarePanel supportSheetKeyboard;
+    [SerializeField] private FocusedFieldKeyboardLift supportSheetKeyboard;
     [SerializeField] private TMP_InputField supportMessageInput;
     [SerializeField] private TMP_InputField supportContactInput;
     [SerializeField] private Button supportSendButton;
@@ -90,7 +90,7 @@ public partial class ProfileSubPages
         supportSheetRoot.SetActive(true);
         LayoutRebuilder.ForceRebuildLayoutImmediate(supportSheetPanel);
 
-        // Keyboard tracking stays OFF during the slide — KeyboardAwarePanel
+        // Keyboard tracking stays OFF during the slide — the lift component
         // re-stamps anchoredPosition.y every frame and would kill the tween.
         // Hand over once the sheet has settled at its resting position.
         if (supportSheetKeyboard != null) supportSheetKeyboard.enabled = false;
@@ -107,9 +107,7 @@ public partial class ProfileSubPages
             .SetEase(Ease.OutCubic)
             .OnComplete(() =>
             {
-                if (supportSheetKeyboard == null) return;
-                supportSheetKeyboard.ResetToBase();
-                supportSheetKeyboard.enabled = true;
+                if (supportSheetKeyboard != null) supportSheetKeyboard.enabled = true;
             });
 
         RefreshSendInteractable();

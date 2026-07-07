@@ -447,11 +447,6 @@ public static class ProfileSubPagesBuilder
         rounded.r = new Vector4(60f, 60f, 0f, 0f);
         _roundedToRefresh.Add(rounded);
 
-        // Lifts the whole sheet above the keyboard while typing. Disabled by
-        // default — ProfileSubPages.Support enables it only after the open
-        // slide settles (it re-stamps anchoredPosition.y every frame).
-        var keyboardAware = sheet.AddComponent<KeyboardAwarePanel>();
-        keyboardAware.enabled = false;
 
         var vlg = sheet.AddComponent<VerticalLayoutGroup>();
         vlg.padding = new RectOffset((int)Gutter, (int)Gutter, 20, 84);
@@ -477,6 +472,21 @@ public static class ProfileSubPagesBuilder
         var messageInput = MakeInputField(sheet, "MessageInput", "Опишите проблему или вопрос…", 280f, multiline: true);
         var contactInput = MakeInputField(sheet, "ContactInput", "Телефон или @telegram для ответа", 120f, multiline: false);
 
+        // Field-relative keyboard lift: raises the sheet just enough that the
+        // FOCUSED input clears the keyboard (KeyboardAwarePanel would glue the
+        // sheet's bottom to the keyboard and overshoot by the sheet's height).
+        // Disabled by default — ProfileSubPages.Support enables it only after
+        // the open slide settles.
+        var keyboardLift = sheet.AddComponent<FocusedFieldKeyboardLift>();
+        keyboardLift.enabled = false;
+        var liftSo = new SerializedObject(keyboardLift);
+        liftSo.FindProperty("panel").objectReferenceValue = sheetRt;
+        var fieldsProp = liftSo.FindProperty("fields");
+        fieldsProp.arraySize = 2;
+        fieldsProp.GetArrayElementAtIndex(0).objectReferenceValue = messageInput;
+        fieldsProp.GetArrayElementAtIndex(1).objectReferenceValue = contactInput;
+        liftSo.ApplyModifiedPropertiesWithoutUndo();
+
         var caption = AddText(NewChild(sheet, "Caption", out _),
             "К сообщению добавятся версия приложения и модель устройства — так мы быстрее разберёмся.",
             30f, _regular, Muted);
@@ -501,7 +511,7 @@ public static class ProfileSubPagesBuilder
         so.FindProperty("supportSheetBackdrop").objectReferenceValue = backdropGroup;
         so.FindProperty("supportBackdropButton").objectReferenceValue = backdropButton;
         so.FindProperty("supportSheetPanel").objectReferenceValue = sheetRt;
-        so.FindProperty("supportSheetKeyboard").objectReferenceValue = keyboardAware;
+        so.FindProperty("supportSheetKeyboard").objectReferenceValue = keyboardLift;
         so.FindProperty("supportMessageInput").objectReferenceValue = messageInput;
         so.FindProperty("supportContactInput").objectReferenceValue = contactInput;
         so.FindProperty("supportSendButton").objectReferenceValue = sendButton;
@@ -930,6 +940,10 @@ public static class ProfileSubPagesBuilder
         input.textComponent = textTmp;
         input.placeholder = placeholderTmp;
         input.lineType = multiline ? TMP_InputField.LineType.MultiLineNewline : TMP_InputField.LineType.SingleLine;
+        // No native input bar over the keyboard — the in-sheet field stays
+        // visible via FocusedFieldKeyboardLift (baked in: a manual checkbox
+        // would be wiped on every rebuild).
+        input.shouldHideMobileInput = true;
         return input;
     }
 

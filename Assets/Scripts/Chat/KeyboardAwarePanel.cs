@@ -32,19 +32,6 @@ public class KeyboardAwarePanel : MonoBehaviour
     /// <summary>Last computed effective keyboard area in canvas-space pixels. Updated every frame.</summary>
     public float EffectiveAreaCanvasPx { get; private set; }
 
-    /// <summary>
-    /// Re-syncs the internal spring state to the resting position. For panels
-    /// that toggle this component around their own open/close animations
-    /// (e.g. the support sheet): call right before re-enabling so the iOS
-    /// SmoothDamp doesn't animate from a stale lifted position. No-op for
-    /// always-enabled users like the chat composer.
-    /// </summary>
-    public void ResetToBase()
-    {
-        _currentY = _baseY;
-        _velocityY = 0f;
-    }
-
     // Editor simulation
 #if UNITY_EDITOR
     private bool  _editorKbVisible;
