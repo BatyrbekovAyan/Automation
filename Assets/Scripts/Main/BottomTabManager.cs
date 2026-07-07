@@ -146,6 +146,12 @@ public class BottomTabManager : MonoBehaviour
             return;
         }
 
+        // The Add-Bot form is a slide-in overlay (not a tab panel), so the tab loop
+        // below won't hide it. Any tab navigation dismisses it. Placed before the
+        // already-active guard so a re-tap on the current tab closes it too.
+        if (AddBotPanel.Instance != null && AddBotPanel.Instance.IsOpen)
+            AddBotPanel.Instance.CloseImmediate();
+
         // Skip if this tab is already active (avoids redundant UI work)
         if (index == _activeTabIndex) return;
 
