@@ -1352,6 +1352,17 @@ public class Manager : MonoBehaviour
         isCreatingBot = false;
     }
 
+    /// <summary>
+    /// Public close for the Add-Bot overlay (back chevron / swipe). Cancels an
+    /// in-flight wizard (deletes any half-created Wappi profiles) exactly like the
+    /// auth back buttons, then slides the panel away.
+    /// </summary>
+    public void CloseAddBotForm()
+    {
+        if (isCreatingBot) CancelBotCreation();
+        AddBotPanel.Instance?.Close();
+    }
+
     private void CancelBotCreation()
     {
         isCreatingBot = false;
@@ -1500,7 +1511,8 @@ public class Manager : MonoBehaviour
             }
             else
             {
-                // Final auth — switch to bots tab before hiding
+                // Final auth — close the Add-Bot overlay and land on the Bots tab.
+                AddBotPanel.Instance?.CloseImmediate();
                 var tabManager = FindFirstObjectByType<BottomTabManager>();
                 if (tabManager != null)
                     tabManager.SwitchTab(BottomTabManager.BotsTabIndex);
