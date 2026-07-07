@@ -20,7 +20,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const ids = (($json.body || {}).profileIds || [])\n  .filter(x => typeof x === 'string' && x && x !== '-1');\n// Comma-joined for Postgres string_to_array (profile ids are digits — no commas).\n// n8n passes ZERO SQL params for an empty queryReplacement (\"there is no parameter $1\"),\n// so substitute a non-matching sentinel when the list is empty — keeps $1 populated and\n// matches no profile, yielding the correct empty response shape.\nconst csv = ids.join(',');\nreturn [{ json: { profileIdsCsv: csv || '__no_profiles__', profileCount: ids.length } }];"
+        "jsCode": "const ids = (($json.body || {}).profileIds || [])\n  .filter(x => typeof x === 'string' && x && x !== '-1');\n// Base64-encoded JSON array: n8n's queryReplacement splits plain values on\n// commas (a multi-id CSV would reach SQL as $1 = first id only); base64 has\n// no commas so the whole list survives as ONE parameter. Base64 of [] is\n// \"W10=\", never empty, so no empty-list sentinel is needed.\nreturn [{ json: { b64Ids: Buffer.from(JSON.stringify(ids)).toString('base64'), profileCount: ids.length } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -35,9 +35,9 @@
       "parameters": {
         "resource": "database",
         "operation": "executeQuery",
-        "query": "WITH ids AS (\n  SELECT unnest(string_to_array($1, ',')) AS profile_id\n),\nsessions AS (\n  SELECT h.session_id,\n         split_part(h.session_id, ':', 1) AS profile_id,\n         substr(h.session_id, position(':' in h.session_id) + 1) AS chat_id,\n         max(h.id) AS max_id,\n         max(h.created_at) AS last_message_at\n  FROM public.n8n_chat_histories h\n  JOIN ids ON ids.profile_id = split_part(h.session_id, ':', 1)\n  GROUP BY h.session_id\n),\nchanged AS (\n  SELECT s.session_id, s.profile_id, s.chat_id, s.max_id, s.last_message_at,\n         o.last_history_id AS prev_watermark,\n         t.transcript\n  FROM sessions s\n  LEFT JOIN public.conversation_outcomes o ON o.session_id = s.session_id\n  CROSS JOIN LATERAL (\n    SELECT string_agg(\n             (CASE WHEN m.message->>'type' = 'ai' THEN 'Бот: ' ELSE 'Клиент: ' END)\n             || coalesce(m.message->'data'->>'content', ''),\n             E'\\n' ORDER BY m.id) AS transcript\n    FROM (\n      SELECT id, message FROM public.n8n_chat_histories\n      WHERE session_id = s.session_id\n      ORDER BY id DESC LIMIT 30\n    ) m\n  ) t\n  WHERE s.chat_id NOT LIKE '%@g.us'\n    AND s.max_id > COALESCE(o.last_history_id, 0)\n  ORDER BY COALESCE(o.last_history_id, 0) ASC\n  LIMIT 21\n)\nSELECT\n  COALESCE(json_agg(json_build_object(\n    'session_id', c.session_id, 'profile_id', c.profile_id, 'chat_id', c.chat_id,\n    'max_id', c.max_id,\n    'last_message_at_ms', (extract(epoch from c.last_message_at)*1000)::bigint,\n    'transcript', c.transcript\n  )), '[]'::json) AS sessions,\n  count(*) AS total\nFROM changed c;",
+        "query": "WITH ids AS (\n  SELECT jsonb_array_elements_text(convert_from(decode($1, 'base64'), 'UTF8')::jsonb) AS profile_id\n),\nsessions AS (\n  SELECT h.session_id,\n         split_part(h.session_id, ':', 1) AS profile_id,\n         substr(h.session_id, position(':' in h.session_id) + 1) AS chat_id,\n         max(h.id) AS max_id,\n         max(h.created_at) AS last_message_at\n  FROM public.n8n_chat_histories h\n  JOIN ids ON ids.profile_id = split_part(h.session_id, ':', 1)\n  GROUP BY h.session_id\n),\nchanged AS (\n  SELECT s.session_id, s.profile_id, s.chat_id, s.max_id, s.last_message_at,\n         o.last_history_id AS prev_watermark,\n         t.transcript\n  FROM sessions s\n  LEFT JOIN public.conversation_outcomes o ON o.session_id = s.session_id\n  CROSS JOIN LATERAL (\n    SELECT string_agg(\n             (CASE WHEN m.message->>'type' = 'ai' THEN 'Бот: ' ELSE 'Клиент: ' END)\n             || coalesce(m.message->'data'->>'content', ''),\n             E'\\n' ORDER BY m.id) AS transcript\n    FROM (\n      SELECT id, message FROM public.n8n_chat_histories\n      WHERE session_id = s.session_id\n      ORDER BY id DESC LIMIT 30\n    ) m\n  ) t\n  WHERE s.chat_id NOT LIKE '%@g.us'\n    AND s.max_id > COALESCE(o.last_history_id, 0)\n  ORDER BY COALESCE(o.last_history_id, 0) ASC\n  LIMIT 21\n)\nSELECT\n  COALESCE(json_agg(json_build_object(\n    'session_id', c.session_id, 'profile_id', c.profile_id, 'chat_id', c.chat_id,\n    'max_id', c.max_id,\n    'last_message_at_ms', (extract(epoch from c.last_message_at)*1000)::bigint,\n    'transcript', c.transcript\n  )), '[]'::json) AS sessions,\n  count(*) AS total\nFROM changed c;",
         "options": {
-          "queryReplacement": "={{ $json.profileIdsCsv }}"
+          "queryReplacement": "={{ $json.b64Ids }}"
         }
       },
       "type": "n8n-nodes-base.postgres",
@@ -185,9 +185,9 @@
       "parameters": {
         "resource": "database",
         "operation": "executeQuery",
-        "query": "UPDATE public.conversation_outcomes c\nSET outcome = 'client_silent', outcome_at = now(), updated_at = now()\nWHERE split_part(c.session_id, ':', 1) = ANY(string_to_array($1, ','))\n  AND c.outcome = 'in_dialog'\n  AND c.last_message_at < now() - interval '12 hours'\n  AND (SELECT h.message->>'type' FROM public.n8n_chat_histories h\n       WHERE h.session_id = c.session_id ORDER BY h.id DESC LIMIT 1) = 'ai';",
+        "query": "UPDATE public.conversation_outcomes c\nSET outcome = 'client_silent', outcome_at = now(), updated_at = now()\nWHERE split_part(c.session_id, ':', 1) IN (SELECT jsonb_array_elements_text(convert_from(decode($1, 'base64'), 'UTF8')::jsonb))\n  AND c.outcome = 'in_dialog'\n  AND c.last_message_at < now() - interval '12 hours'\n  AND (SELECT h.message->>'type' FROM public.n8n_chat_histories h\n       WHERE h.session_id = c.session_id ORDER BY h.id DESC LIMIT 1) = 'ai';",
         "options": {
-          "queryReplacement": "={{ $('Prep').first().json.profileIdsCsv }}"
+          "queryReplacement": "={{ $('Prep').first().json.b64Ids }}"
         }
       },
       "type": "n8n-nodes-base.postgres",
@@ -210,9 +210,9 @@
       "parameters": {
         "resource": "database",
         "operation": "executeQuery",
-        "query": "SELECT c.profile_id AS \"profileId\",\n       c.chat_id    AS \"chatId\",\n       c.outcome,\n       c.summary,\n       (extract(epoch from c.outcome_at)*1000)::bigint      AS \"outcomeAt\",\n       (extract(epoch from c.last_message_at)*1000)::bigint AS \"lastMessageAt\"\nFROM public.conversation_outcomes c\nWHERE split_part(c.session_id, ':', 1) = ANY(string_to_array($1, ','))\nORDER BY c.last_message_at DESC;",
+        "query": "SELECT c.profile_id AS \"profileId\",\n       c.chat_id    AS \"chatId\",\n       c.outcome,\n       c.summary,\n       (extract(epoch from c.outcome_at)*1000)::bigint      AS \"outcomeAt\",\n       (extract(epoch from c.last_message_at)*1000)::bigint AS \"lastMessageAt\"\nFROM public.conversation_outcomes c\nWHERE split_part(c.session_id, ':', 1) IN (SELECT jsonb_array_elements_text(convert_from(decode($1, 'base64'), 'UTF8')::jsonb))\nORDER BY c.last_message_at DESC;",
         "options": {
-          "queryReplacement": "={{ $('Prep').first().json.profileIdsCsv }}"
+          "queryReplacement": "={{ $('Prep').first().json.b64Ids }}"
         }
       },
       "type": "n8n-nodes-base.postgres",
@@ -405,9 +405,9 @@
     "executionOrder": "v1"
   },
   "staticData": null,
-  "pinData": {},
+  "pinData": null,
   "triggerCount": 1,
-  "meta": {},
+  "meta": null,
   "id": "2htWSV5IHO8E2CgB",
   "active": true
 }
