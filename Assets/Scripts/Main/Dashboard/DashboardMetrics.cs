@@ -41,9 +41,12 @@ public static class DashboardMetrics
         => rows.Count(r => r.Status == OutcomeStatus.OrderCollected
                         && r.outcomeAt >= w.CurStart && r.outcomeAt <= w.CurEnd);
 
+    // Previous window is half-open at the top [PrevStart, PrevEnd): for Week/Month
+    // PrevEnd == CurStart exactly, so an order on that seam must belong to the
+    // CURRENT window only, never both. Otherwise the delta double-counts it.
     public static int CountOrdersPrev(IEnumerable<DashboardOutcome> rows, Window w)
         => rows.Count(r => r.Status == OutcomeStatus.OrderCollected
-                        && r.outcomeAt >= w.PrevStart && r.outcomeAt <= w.PrevEnd);
+                        && r.outcomeAt >= w.PrevStart && r.outcomeAt < w.PrevEnd);
 
     /// <summary>Counts current outcome of conversations active in the window,
     /// indexed by DashboardStatusInfo.Ordered.</summary>

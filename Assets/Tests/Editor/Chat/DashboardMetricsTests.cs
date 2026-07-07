@@ -54,4 +54,47 @@ public class DashboardMetricsTests
         Assert.AreEqual(2, new List<DashboardOutcome>(DashboardMetrics.FilterByProfile(rows, null)).Count);
         Assert.AreEqual(1, new List<DashboardOutcome>(DashboardMetrics.FilterByProfile(rows, "a")).Count);
     }
+
+    [Test] public void CountsOrdersInPreviousWindow()
+    {
+        long now = 100_000_000_000L;
+        var w = DashboardMetrics.ComputeWindow(DashboardPeriod.Week, now, 0);
+        var rows = new List<DashboardOutcome>
+        {
+            O("p", "order_collected", now - 10 * Day, now),  // inside previous window
+            O("p", "order_collected", now - 3 * Day, now),   // inside current, not previous
+        };
+        Assert.AreEqual(1, DashboardMetrics.CountOrdersPrev(rows, w));
+        Assert.AreEqual(1, DashboardMetrics.CountOrders(rows, w));
+    }
+
+    [Test] public void WeekSeamOrderCountedInCurrentOnly()
+    {
+        long now = 100_000_000_000L;
+        var w = DashboardMetrics.ComputeWindow(DashboardPeriod.Week, now, 0);
+        Assert.AreEqual(w.CurStart, w.PrevEnd, "precondition: week seam values coincide");
+        var rows = new List<DashboardOutcome>
+        {
+            O("p", "order_collected", w.CurStart, w.CurStart),
+        };
+        Assert.AreEqual(1, DashboardMetrics.CountOrders(rows, w));      // current
+        Assert.AreEqual(0, DashboardMetrics.CountOrdersPrev(rows, w));  // NOT also previous
+    }
+
+    [Test] public void RecentReturnsOrdersNewestFirstLimited()
+    {
+        var w = new Window { CurStart = 0, CurEnd = 1000, PrevStart = -1000, PrevEnd = 0 };
+        var rows = new List<DashboardOutcome>
+        {
+            O("p", "order_collected", 10, 100),
+            O("p", "order_collected", 10, 300),
+            O("p", "order_collected", 10, 200),
+            O("p", "in_dialog",       10, 400),   // not an order — excluded
+            O("p", "order_collected", 10, 5000),  // lastMessageAt outside window — excluded
+        };
+        var recent = DashboardMetrics.Recent(rows, w, 2);
+        Assert.AreEqual(2, recent.Count);
+        Assert.AreEqual(300, recent[0].lastMessageAt);  // newest first
+        Assert.AreEqual(200, recent[1].lastMessageAt);
+    }
 }
