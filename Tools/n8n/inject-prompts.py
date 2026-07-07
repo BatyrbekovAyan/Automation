@@ -104,9 +104,22 @@ def ensure_vertical_node(wf: dict, kind: str, jscode: str) -> None:
             "name": NODE_NAME,
         }
         wf["nodes"].append(node)
-        # rewire: prev -> Vertical Prompt -> next
-        wf["connections"][prev_name] = {"main": [[{"node": NODE_NAME, "type": "main", "index": 0}]]}
-        wf["connections"][NODE_NAME] = {"main": [[{"node": next_name, "type": "main", "index": 0}]]}
+        # rewire: prev -> Vertical Prompt -> next, touching only the existing
+        # prev -> next main[0] link; other links, outputs and error connections
+        # on the anchor node are preserved.
+        main = wf["connections"].setdefault(prev_name, {}).setdefault("main", [])
+        if not main:
+            main.append([])
+        link = next((l for l in main[0] if l.get("node") == next_name), None)
+        if link is None:
+            raise SystemExit(f"ERROR: expected connection {prev_name} -> {next_name} "
+                             f"not found; refusing to rewire")
+        next_input_index = link.get("index", 0)
+        link["node"] = NODE_NAME
+        link["index"] = 0
+        wf["connections"][NODE_NAME] = {
+            "main": [[{"node": next_name, "type": "main", "index": next_input_index}]]
+        }
     else:
         node["parameters"]["jsCode"] = jscode
 

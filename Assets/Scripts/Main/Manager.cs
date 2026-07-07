@@ -128,6 +128,7 @@ public class Manager : MonoBehaviour
     private const string SavingText = "Сохранение..";
     private const string SavedText = "Сохранено";
     private const string SaveFailedText = "Не удалось сохранить";
+    private const string UnknownBusinessTypeOption = "Тип не выбран";
 
     private string whatsappProfileId = "-1";
     private string telegramProfileId = "-1";
@@ -374,10 +375,8 @@ public class Manager : MonoBehaviour
                 recreatedBotSettings.WhatsappToggle.isOn = PlayerPrefs.GetInt(recreatedBot.name + "isOnWhatsapp", 1) == 1;
                 recreatedBotSettings.TelegramToggle.isOn = PlayerPrefs.GetInt(recreatedBot.name + "isOnTelegram", 1) == 1;
                 PopulateBusinessDropdown(recreatedBotSettings.BusinessTypeDropdown);
-                {
-                    var savedId = PlayerPrefs.GetString(recreatedBot.name + "BusinessType", "");
-                    recreatedBotSettings.BusinessTypeDropdown.value = Mathf.Max(0, businessTypes.IndexOf(savedId));
-                }
+                ApplyBusinessTypeToDropdown(recreatedBotSettings.BusinessTypeDropdown,
+                    PlayerPrefs.GetString(recreatedBot.name + "BusinessType", ""));
                 recreatedBotSettings.WhatsappNumberField.Value = PlayerPrefs.GetString(recreatedBot.name + "WhatsappNumber", "");
                 recreatedBotSettings.TelegramNumberField.Value = PlayerPrefs.GetString(recreatedBot.name + "TelegramNumber", "");
 
@@ -713,10 +712,8 @@ public class Manager : MonoBehaviour
         openBotSettings.SyncHeaderTitle();
         openBotSettings.WhatsappToggle.SetIsOnWithoutNotify(PlayerPrefs.GetInt(openBot.name + "isOnWhatsapp", 1) == 1);
         openBotSettings.TelegramToggle.SetIsOnWithoutNotify(PlayerPrefs.GetInt(openBot.name + "isOnTelegram", 1) == 1);
-        {
-            var savedId = PlayerPrefs.GetString(openBot.name + "BusinessType", "");
-            openBotSettings.BusinessTypeDropdown.value = Mathf.Max(0, businessTypes.IndexOf(savedId));
-        }
+        ApplyBusinessTypeToDropdown(openBotSettings.BusinessTypeDropdown,
+            PlayerPrefs.GetString(openBot.name + "BusinessType", ""));
         openBotSettings.WhatsappNumberField.Value = PlayerPrefs.GetString(openBot.name + "WhatsappNumber", "");
         openBotSettings.TelegramNumberField.Value = PlayerPrefs.GetString(openBot.name + "TelegramNumber", "");
 
@@ -767,9 +764,10 @@ public class Manager : MonoBehaviour
         if (!openBotSettings.BotNameField.Value.Equals(PlayerPrefs.GetString(openBot.name + "Name", "")) ||
             openBotSettings.WhatsappToggle.isOn != (PlayerPrefs.GetInt(openBot.name + "isOnWhatsapp", 1) == 1) ||
             openBotSettings.TelegramToggle.isOn != (PlayerPrefs.GetInt(openBot.name + "isOnTelegram", 1) == 1) ||
+            // Placeholder selected (legacy/unknown saved id) counts as unchanged:
+            // saving would keep the stored id anyway.
             (businessTypes.TryGetByIndex(openBotSettings.BusinessTypeDropdown.value, out var dirtyBt)
-                ? dirtyBt.id : "")
-                != PlayerPrefs.GetString(openBot.name + "BusinessType", "") ||
+                && dirtyBt.id != PlayerPrefs.GetString(openBot.name + "BusinessType", "")) ||
             !openBotSettings.WhatsappNumberField.Value.Equals(PlayerPrefs.GetString(openBot.name + "WhatsappNumber", "")) ||
             !openBotSettings.TelegramNumberField.Value.Equals(PlayerPrefs.GetString(openBot.name + "TelegramNumber", "")) ||
             !openBotSettings.BusinessField.Value.Equals(PlayerPrefs.GetString(openBot.name + "Business", "")) ||
@@ -1106,6 +1104,40 @@ public class Manager : MonoBehaviour
         dd.RefreshShownValue();
     }
 
+    // Selects the saved business type in the settings dropdown. A saved id that is
+    // missing or no longer offered (legacy vertical like "dentist") must NOT fall back
+    // to entry 0 — that would silently migrate the bot to auto_parts on its next save
+    // and overwrite its workflow prompt head. Instead a placeholder option is shown
+    // past the real entries, where TryGetByIndex fails: saving keeps the stored id and
+    // the webhooks get BusinessTypeId="" (workflows then preserve the existing head).
+    private void ApplyBusinessTypeToDropdown(TMP_Dropdown dd, string savedId)
+    {
+        if (dd == null || businessTypes == null) return;
+
+        while (dd.options.Count > businessTypes.Count)
+            dd.options.RemoveAt(dd.options.Count - 1);
+
+        int index = businessTypes.IndexOf(savedId);
+        if (index < 0)
+        {
+            dd.options.Add(new TMP_Dropdown.OptionData(UnknownBusinessTypeOption));
+            index = dd.options.Count - 1;
+        }
+        dd.value = index;
+        dd.RefreshShownValue();
+    }
+
+    // BusinessType/BusinessTypeId form fields for the settings-driven webhook payloads.
+    // With the dropdown on the unknown-type placeholder, the id goes empty so the n8n
+    // workflows keep the bot's existing prompt head, and the display name falls back to
+    // the stored legacy id so the "Business Type:" header line stays meaningful.
+    private void AddBusinessTypeFields(WWWForm form)
+    {
+        bool known = businessTypes.TryGetByIndex(openBotSettings.BusinessTypeDropdown.value, out var entry);
+        form.AddField("BusinessType", known ? entry.displayName : PlayerPrefs.GetString(openBot.name + "BusinessType", ""));
+        form.AddField("BusinessTypeId", known ? entry.id : "");
+    }
+
     public void ChooseBusiness(string id)
     {
         if (businessTypes == null || !businessTypes.TryGetById(id, out var entry)) return;
@@ -1250,7 +1282,7 @@ public class Manager : MonoBehaviour
         newBotSettings.WhatsappToggle.isOn = useWhatsapp;
         newBotSettings.TelegramToggle.isOn = useTelegram;
         PopulateBusinessDropdown(newBotSettings.BusinessTypeDropdown);
-        newBotSettings.BusinessTypeDropdown.value = Mathf.Max(0, businessTypes.IndexOf(selectedBusinessId));
+        ApplyBusinessTypeToDropdown(newBotSettings.BusinessTypeDropdown, selectedBusinessId);
         newBotSettings.BusinessField.Value = formDescription;
         newBotSettings.WhatsappNumberField.Value = useWhatsapp ? WhatsappNumberInput.text : "";
         newBotSettings.TelegramNumberField.Value = useTelegram ? TelegramNumberInput.text : "";
@@ -2662,8 +2694,7 @@ public class Manager : MonoBehaviour
         WWWForm form = new();
 
         form.AddField("Name", openBotSettings.BotNameField.Value);
-        form.AddField("BusinessType", openBotSettings.BusinessTypeDropdown.options[openBotSettings.BusinessTypeDropdown.value].text);
-        form.AddField("BusinessTypeId", businessTypes.TryGetByIndex(openBotSettings.BusinessTypeDropdown.value, out var btEntry) ? btEntry.id : "");
+        AddBusinessTypeFields(form);
         form.AddField("WhatsappProfileId", openBot.GetComponent<Bot>().whatsappProfileId);
 
         form.AddField("Business", "About Business:\n" + openBotSettings.BusinessField.Value);
@@ -2803,8 +2834,7 @@ public class Manager : MonoBehaviour
         WWWForm form = new();
 
         form.AddField("Name", openBotSettings.BotNameField.Value);
-        form.AddField("BusinessType", openBotSettings.BusinessTypeDropdown.options[openBotSettings.BusinessTypeDropdown.value].text);
-        form.AddField("BusinessTypeId", businessTypes.TryGetByIndex(openBotSettings.BusinessTypeDropdown.value, out var btEntry) ? btEntry.id : "");
+        AddBusinessTypeFields(form);
         form.AddField("TelegramProfileId", openBot.GetComponent<Bot>().telegramProfileId);
 
         form.AddField("Business", "About Business:\n" + openBotSettings.BusinessField.Value);
@@ -3011,8 +3041,7 @@ public class Manager : MonoBehaviour
         form.AddField("WhatsappWorkflowId", whatsappWorkflowId);
         form.AddField("TelegramWorkflowId", telegramWorkflowId);
         form.AddField("Name", openBotSettings.BotNameField.Value);
-        form.AddField("BusinessType", openBotSettings.BusinessTypeDropdown.options[openBotSettings.BusinessTypeDropdown.value].text);
-        form.AddField("BusinessTypeId", businessTypes.TryGetByIndex(openBotSettings.BusinessTypeDropdown.value, out var btEntry) ? btEntry.id : "");
+        AddBusinessTypeFields(form);
         form.AddField("Business", openBotSettings.BusinessField.Value);
         form.AddField("Prompt", openBotSettings.PromptField.Value);
         form.AddField("ProductsList", productsList);
