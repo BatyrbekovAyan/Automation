@@ -1,0 +1,413 @@
+{
+  "name": "Dashboard Outcomes",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "DashboardOutcomes",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "212b5d2f-f012-42d4-af1d-a9e7431d8abd",
+      "name": "Webhook",
+      "webhookId": "4b74b4fc-d211-4211-ac0d-70458b38b776"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ids = (($json.body || {}).profileIds || [])\n  .filter(x => typeof x === 'string' && x && x !== '-1');\n// Comma-joined for Postgres string_to_array (profile ids are digits — no commas).\n// n8n passes ZERO SQL params for an empty queryReplacement (\"there is no parameter $1\"),\n// so substitute a non-matching sentinel when the list is empty — keeps $1 populated and\n// matches no profile, yielding the correct empty response shape.\nconst csv = ids.join(',');\nreturn [{ json: { profileIdsCsv: csv || '__no_profiles__', profileCount: ids.length } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "id": "b6308959-f082-4ccf-b43f-7337bc34adae",
+      "name": "Prep"
+    },
+    {
+      "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "WITH ids AS (\n  SELECT unnest(string_to_array($1, ',')) AS profile_id\n),\nsessions AS (\n  SELECT h.session_id,\n         split_part(h.session_id, ':', 1) AS profile_id,\n         substr(h.session_id, position(':' in h.session_id) + 1) AS chat_id,\n         max(h.id) AS max_id,\n         max(h.created_at) AS last_message_at\n  FROM public.n8n_chat_histories h\n  JOIN ids ON ids.profile_id = split_part(h.session_id, ':', 1)\n  GROUP BY h.session_id\n),\nchanged AS (\n  SELECT s.session_id, s.profile_id, s.chat_id, s.max_id, s.last_message_at,\n         o.last_history_id AS prev_watermark,\n         t.transcript\n  FROM sessions s\n  LEFT JOIN public.conversation_outcomes o ON o.session_id = s.session_id\n  CROSS JOIN LATERAL (\n    SELECT string_agg(\n             (CASE WHEN m.message->>'type' = 'ai' THEN 'Бот: ' ELSE 'Клиент: ' END)\n             || coalesce(m.message->'data'->>'content', ''),\n             E'\\n' ORDER BY m.id) AS transcript\n    FROM (\n      SELECT id, message FROM public.n8n_chat_histories\n      WHERE session_id = s.session_id\n      ORDER BY id DESC LIMIT 30\n    ) m\n  ) t\n  WHERE s.chat_id NOT LIKE '%@g.us'\n    AND s.max_id > COALESCE(o.last_history_id, 0)\n  ORDER BY COALESCE(o.last_history_id, 0) ASC\n  LIMIT 21\n)\nSELECT\n  COALESCE(json_agg(json_build_object(\n    'session_id', c.session_id, 'profile_id', c.profile_id, 'chat_id', c.chat_id,\n    'max_id', c.max_id,\n    'last_message_at_ms', (extract(epoch from c.last_message_at)*1000)::bigint,\n    'transcript', c.transcript\n  )), '[]'::json) AS sessions,\n  count(*) AS total\nFROM changed c;",
+        "options": {
+          "queryReplacement": "={{ $json.profileIdsCsv }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        440,
+        0
+      ],
+      "id": "7a2cd300-c227-4928-b0b1-8c6e91c1aa34",
+      "name": "Find Changed Sessions",
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "379deb97-e4ee-438a-828e-4ef092a045c0",
+              "leftValue": "={{ $json.total }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        0
+      ],
+      "id": "9749ffbe-334f-4873-ad1f-c44bc75ea373",
+      "name": "Has Sessions?"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "sessions",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        880,
+        -140
+      ],
+      "id": "09579351-6b65-4f2e-a0ab-40a50059c0a1",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4o-mini\",\n  \"temperature\": 0,\n  \"max_tokens\": 200,\n  \"messages\": [\n    { \"role\": \"system\", \"content\": \"Ты классифицируешь диалог между ботом магазина и клиентом. На вход — переписка\\n(«Клиент:» и «Бот:» построчно). Верни СТРОГО JSON: {\\\"outcome\\\": \\\"<id>\\\", \\\"summary\\\": \\\"<строка>\\\"}.\\n\\noutcome — ровно один из:\\n- order_collected — бот собрал заявку/заказ: есть товар/услуга И контакт (имя или\\n  телефон), либо бот сказал «передаю владельцу/флористу/мастеру — подтвердит заказ».\\n  Это успех воронки.\\n- owner_needed — нужен человек: клиент просит возврат/жалуется, спрашивает то, чего\\n  бот не знает, просит оплату/скидку/нестандартное, или бот прямо передал вопрос\\n  владельцу БЕЗ оформленной заявки.\\n- in_dialog — активный диалог в процессе: бот отвечает, заявка ещё не собрана, клиент\\n  ещё пишет. Значение по умолчанию, если ничего конкретнее не подходит.\\n- question_closed — клиент получил ответ на вопрос (часы, адрес, цена, наличие) и не\\n  проявил намерения купить/заказать; разговор естественно закрыт.\\n- client_silent — НЕ выбирай сам: этот статус ставит отдельное правило по времени, не ты.\\n\\nsummary — одна короткая строка (до 120 символов, без переносов), по-русски,\\nпо сути диалога: что клиент хочет / что собрано. Пример: «101 роза, доставка завтра\\nк 10:00, тел. собран». Без Markdown, без кавычек внутри.\\n\\nОтвечай только JSON, без пояснений.\\n\" },\n    { \"role\": \"user\", \"content\": {{ JSON.stringify($json.transcript) }} }\n  ],\n  \"response_format\": {\n    \"type\": \"json_schema\",\n    \"json_schema\": {\n      \"name\": \"conversation_outcome\",\n      \"strict\": true,\n      \"schema\": {\n        \"type\": \"object\",\n        \"additionalProperties\": false,\n        \"required\": [\"outcome\", \"summary\"],\n        \"properties\": {\n          \"outcome\": { \"type\": \"string\", \"enum\": [\"order_collected\",\"owner_needed\",\"in_dialog\",\"question_closed\"] },\n          \"summary\": { \"type\": \"string\" }\n        }\n      }\n    }\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        -140
+      ],
+      "id": "ab110878-e660-42f6-ac80-43dfd68d316e",
+      "name": "Classify",
+      "credentials": {
+        "openAiApi": {
+          "id": "WNHwKWlO2E9OClkA",
+          "name": "OpenAi account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const src = $('Split Out').item.json;\nlet outcome = 'in_dialog', summary = '';\ntry {\n  const content = $json.choices?.[0]?.message?.content;\n  if (content) {\n    const parsed = JSON.parse(content);\n    const allowed = ['order_collected','owner_needed','in_dialog','question_closed'];\n    if (allowed.includes(parsed.outcome)) outcome = parsed.outcome;\n    if (typeof parsed.summary === 'string') summary = parsed.summary.slice(0, 120);\n  }\n} catch (e) { /* keep in_dialog */ }\nreturn { json: {\n  session_id: src.session_id, profile_id: src.profile_id, chat_id: src.chat_id,\n  outcome, summary,\n  last_history_id: src.max_id, last_message_at_ms: src.last_message_at_ms\n} };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        -140
+      ],
+      "id": "32f0f0ef-a82f-42cf-974c-d3121652308d",
+      "name": "Parse"
+    },
+    {
+      "parameters": {
+        "jsCode": "const all = $input.all().map(i => i.json);\nconst rows = all.slice(0, 20);\nconst total = $('Find Changed Sessions').first().json.total;\nreturn [{ json: {\n  b64: Buffer.from(JSON.stringify(rows)).toString('base64'),\n  classified: rows.length,\n  truncated: total > 20\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        -140
+      ],
+      "id": "857782c6-3c8e-4f88-aa63-74c77cc1f12f",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "INSERT INTO public.conversation_outcomes AS c\n  (session_id, profile_id, chat_id, outcome, summary,\n   last_history_id, last_message_at, outcome_at, updated_at)\nSELECT r.session_id, r.profile_id, r.chat_id, r.outcome, r.summary,\n       r.last_history_id, to_timestamp(r.last_message_at_ms / 1000.0), now(), now()\nFROM jsonb_to_recordset(convert_from(decode($1, 'base64'), 'UTF8')::jsonb)\n  AS r(session_id text, profile_id text, chat_id text, outcome text, summary text,\n       last_history_id bigint, last_message_at_ms bigint)\nON CONFLICT (session_id) DO UPDATE SET\n  outcome         = EXCLUDED.outcome,\n  summary         = EXCLUDED.summary,\n  last_history_id = EXCLUDED.last_history_id,\n  last_message_at = EXCLUDED.last_message_at,\n  outcome_at      = CASE WHEN c.outcome <> EXCLUDED.outcome\n                         THEN now() ELSE c.outcome_at END,\n  updated_at      = now();",
+        "options": {
+          "queryReplacement": "={{ $json.b64 }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1760,
+        -140
+      ],
+      "id": "2b360cbc-b59f-4720-adea-369c874341a3",
+      "name": "Upsert Outcomes",
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "UPDATE public.conversation_outcomes c\nSET outcome = 'client_silent', outcome_at = now(), updated_at = now()\nWHERE split_part(c.session_id, ':', 1) = ANY(string_to_array($1, ','))\n  AND c.outcome = 'in_dialog'\n  AND c.last_message_at < now() - interval '12 hours'\n  AND (SELECT h.message->>'type' FROM public.n8n_chat_histories h\n       WHERE h.session_id = c.session_id ORDER BY h.id DESC LIMIT 1) = 'ai';",
+        "options": {
+          "queryReplacement": "={{ $('Prep').first().json.profileIdsCsv }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1980,
+        0
+      ],
+      "id": "21a0698d-e8d5-4585-b983-eeea9a893980",
+      "name": "Apply Silence Rule",
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "SELECT c.profile_id AS \"profileId\",\n       c.chat_id    AS \"chatId\",\n       c.outcome,\n       c.summary,\n       (extract(epoch from c.outcome_at)*1000)::bigint      AS \"outcomeAt\",\n       (extract(epoch from c.last_message_at)*1000)::bigint AS \"lastMessageAt\"\nFROM public.conversation_outcomes c\nWHERE split_part(c.session_id, ':', 1) = ANY(string_to_array($1, ','))\nORDER BY c.last_message_at DESC;",
+        "options": {
+          "queryReplacement": "={{ $('Prep').first().json.profileIdsCsv }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2200,
+        0
+      ],
+      "id": "9e32efb5-60ff-4ad5-b12d-ae6a8be952f4",
+      "name": "Fetch Outcomes",
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "let classified = 0, truncated = false;\ntry {\n  const agg = $('Aggregate').first();\n  if (agg && agg.json) {\n    classified = agg.json.classified ?? 0;\n    truncated = agg.json.truncated ?? false;\n  }\n} catch (e) { /* Aggregate did not run (empty branch) */ }\nconst outcomes = $('Fetch Outcomes').all()\n  .map(i => i.json)\n  .filter(o => o && o.profileId !== undefined);\nreturn [{ json: { success: true, classified, truncated, outcomes } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        0
+      ],
+      "id": "23095ac1-eacf-42e7-bd44-5edaf9ea4a4e",
+      "name": "Build Response"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2640,
+        0
+      ],
+      "id": "a371cd3f-6270-4cd9-83f6-09e6775b85ed",
+      "name": "Respond"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Prep",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep": {
+      "main": [
+        [
+          {
+            "node": "Find Changed Sessions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Changed Sessions": {
+      "main": [
+        [
+          {
+            "node": "Has Sessions?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Sessions?": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Apply Silence Rule",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Classify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify": {
+      "main": [
+        [
+          {
+            "node": "Parse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Upsert Outcomes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Outcomes": {
+      "main": [
+        [
+          {
+            "node": "Apply Silence Rule",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Silence Rule": {
+      "main": [
+        [
+          {
+            "node": "Fetch Outcomes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Outcomes": {
+      "main": [
+        [
+          {
+            "node": "Build Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Response": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": {},
+  "triggerCount": 1,
+  "meta": {},
+  "id": "2htWSV5IHO8E2CgB",
+  "active": true
+}
