@@ -141,6 +141,29 @@ git commit -m "feat(dashboard): conversation-outcome classifier prompt"
 
 ### Task A3: `DashboardOutcomes` n8n workflow
 
+> **AMENDED (2026-07-08):** The task text below is a design sketch, not the shipped
+> implementation — kept for historical record, not to be re-applied. Four deltas:
+> (a) the CSV / `string_to_array($1,',')` id-passing design shown in Steps 3, 10, 11 below is
+> **SUPERSEDED** — n8n's `queryReplacement` comma-splits a multi-value replacement, so a
+> multi-id CSV never reached SQL as more than its first id. The shipped design base64-encodes
+> the id array in `Prep` (`b64Ids`, no commas → survives as one parameter) and the three
+> id-consuming queries (`Find Changed Sessions`, `Apply Silence Rule`, `Fetch Outcomes`) decode
+> via `jsonb_array_elements_text(convert_from(decode($1,'base64'),'UTF8')::jsonb)` instead of
+> `unnest(string_to_array($1,','))` / `= ANY(string_to_array($1,','))`. See the canonical export
+> `Tools/n8n/workflows/2htWSV5IHO8E2CgB-Dashboard_Outcomes.json` for the actual queries.
+> (b) `Parse`/`Aggregate` ship with failure-marking semantics, not the sketch's silent
+> `in_dialog` fallback: `Parse` sets `failed:true` when OpenAI errors or returns unparsable
+> content, and `Aggregate` drops failed rows from the upsert entirely — the watermark stays
+> untouched and any previously stored outcome/summary survives, so the row is retried
+> naturally on the next call. Per spec §4.3 (`docs/superpowers/specs/2026-07-07-dashboard-svodka-design.md`).
+> (c) Timestamps and counts are **numeric** on the wire — `Find Changed Sessions` and
+> `Fetch Outcomes` both set `options.largeNumbersOutput: "numbers"`, so `outcomeAt`/
+> `lastMessageAt`/`total` are unquoted JSON numbers, not strings.
+> (d) The contract's `{"success": false, "error": ...}` failure line (declared at the top of
+> Part A) is dead code in practice: server-side errors surface as a bare HTTP 500 with no such
+> body, and the app's fetch path treats any non-200 or unparseable response as quiet-fail
+> (keep the last cached outcomes), never branching on `success: false`.
+
 **Files:**
 - Create: `Tools/n8n/workflows/<devId>-Dashboard_Outcomes.json` (canonical export; `<devId>` = the id n8n mints, matching the filename-prefix convention of the other workflows)
 

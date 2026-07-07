@@ -56,6 +56,16 @@ check_sub()    { local f="${3:-$TMP/resp.json}" b; b="$(cat "$f")"; [[ "$b" == *
 check_absent() { local f="${3:-$TMP/resp.json}" b; b="$(cat "$f")"; [[ "$b" != *"$2"* ]] && pass "$1" || fail "$1 — unexpected '$2' in: $b"; }
 check_eq()     { [[ "$3" == "$2" ]] && pass "$1" || fail "$1 — expected '$2', got '$3'"; }
 check_http()   { check_eq "$1 (HTTP $3)" "$2" "$3"; }
+# Asserts a field is wire-encoded as an UNQUOTED JSON number ("field":123), not a
+# quoted string ("field":"123") — guards the largeNumbersOutput:numbers fix.
+check_numeric_field() { # $1=label $2=field-name
+  local b; b="$(cat "$TMP/resp.json")"
+  if [[ "$b" =~ \"$2\":[0-9] && "$b" != *"\"$2\":\""* ]]; then
+    pass "$1"
+  else
+    fail "$1 — expected unquoted numeric \"$2\":<digits> in: $b"
+  fi
+}
 
 # ── n8n REST + webhook plumbing ─────────────────────────────────────────────────
 runsql() { # $1 = SQL string. Body written to $TMP/sqlr.json; echoes http code.
@@ -73,6 +83,14 @@ import json,sys
 for o in json.load(open(sys.argv[1])).get("outcomes",[]):
     if o.get("chatId")==sys.argv[2]:
         print(o.get("outcome","")); break
+' "$TMP/resp.json" "$1"
+}
+field() { # $1 = top-level field name -> prints its value from $TMP/resp.json as a bare
+          # token (bools lowercase "true"/"false", numbers unquoted) for exact check_eq compares
+  python3 -c '
+import json,sys
+v = json.load(open(sys.argv[1])).get(sys.argv[2])
+print(json.dumps(v) if isinstance(v, bool) else v)
 ' "$TMP/resp.json" "$1"
 }
 wipe_profile() { # $1 = profile prefix — remove its histories + stored outcome
@@ -197,6 +215,8 @@ check_sub  "order success flag"      '"success":true'
 check_sub  "order outcome"           '"outcome":"order_collected"'
 check_sub  "order chatId echoed"     "$ORDER_CHAT"
 check_sub  "order classified>=1"     '"classified":1'
+check_numeric_field "order outcomeAt is numeric (largeNumbersOutput)"     "outcomeAt"
+check_numeric_field "order lastMessageAt is numeric (largeNumbersOutput)" "lastMessageAt"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Scenario 2 — idempotency / watermark (re-call same profile, no new rows)
@@ -306,6 +326,41 @@ fi
 if [[ "$silence_pass" -eq 0 && -n "$silence_skip_outcome" ]]; then
   echo "SKIP  silence: LLM classified '$silence_skip_outcome' (terminal) both attempts — rule only applies to in_dialog, not a failure"
 fi
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Scenario 7 — truncation / drain (22 changed sessions > the 20-per-call cap)
+#   Find Changed Sessions' inner CTE is capped at LIMIT 21 (20 + 1 sentinel to
+#   detect truncation), and Aggregate slices to 20 before upserting. So with 22
+#   brand-new one-message sessions: call-1 sees 21 (total=21, capped by the same
+#   LIMIT), classifies all 21 but upserts/commits only 20 -> classified:20,
+#   truncated:true (21>20); the 21st was classified but its watermark never
+#   advanced, so call-2 picks up that leftover 21st PLUS the 22nd session that
+#   call-1 never touched at all -> classified:2, truncated:false. Seeds are
+#   trivially classifiable one-liners — ~22 real gpt-4o-mini calls, negligible cost.
+# ══════════════════════════════════════════════════════════════════════════════
+echo "== 7. truncation / drain (22 sessions) =="
+P_DRAIN="${RUN}_drain"
+wipe_profile "$P_DRAIN"
+DRAIN_SQL="INSERT INTO public.n8n_chat_histories(session_id,message,created_at) VALUES"
+sep=""
+for i in $(seq 1 22); do
+  chat_id="$(printf '7706%08d@c.us' "$i")"
+  DRAIN_SQL+="$sep
+('$P_DRAIN:$chat_id', jsonb_build_object('type','human','data',jsonb_build_object('content','Сколько стоит доставка?')), now())"
+  sep=","
+done
+DRAIN_SQL+=";"
+seed "$DRAIN_SQL"
+
+code="$(call_dash "[\"$P_DRAIN\"]")"
+check_http "drain call-1 webhook"        200 "$code"
+check_eq   "drain call-1 classified=20"  "20"   "$(field classified)"
+check_eq   "drain call-1 truncated=true" "true" "$(field truncated)"
+
+code="$(call_dash "[\"$P_DRAIN\"]")"
+check_http "drain call-2 webhook"          200    "$code"
+check_eq   "drain call-2 classified=2"     "2"    "$(field classified)"
+check_eq   "drain call-2 truncated=false"  "false" "$(field truncated)"
 
 echo
 echo "----"
