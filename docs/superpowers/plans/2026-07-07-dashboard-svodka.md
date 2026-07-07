@@ -1141,9 +1141,12 @@ public static class DashboardMetrics
         => rows.Count(r => r.Status == OutcomeStatus.OrderCollected
                         && r.outcomeAt >= w.CurStart && r.outcomeAt <= w.CurEnd);
 
+    // Previous window is half-open at the top [PrevStart, PrevEnd): for Week/Month
+    // PrevEnd == CurStart exactly, so a seam-exact order belongs to CURRENT only —
+    // inclusive-inclusive would double-count it in the delta. (Fixed post-C3-review.)
     public static int CountOrdersPrev(IEnumerable<DashboardOutcome> rows, Window w)
         => rows.Count(r => r.Status == OutcomeStatus.OrderCollected
-                        && r.outcomeAt >= w.PrevStart && r.outcomeAt <= w.PrevEnd);
+                        && r.outcomeAt >= w.PrevStart && r.outcomeAt < w.PrevEnd);
 
     /// <summary>Counts current outcome of conversations active in the window,
     /// indexed by DashboardStatusInfo.Ordered.</summary>
@@ -1303,11 +1306,13 @@ public static class DashboardStore
 
     public static void Save(List<DashboardOutcome> outcomes, long nowMs)
     {
-        LastFetchMs = nowMs;
         try
         {
             var p = new Payload { lastFetchMs = nowMs, outcomes = outcomes ?? new List<DashboardOutcome>() };
             File.WriteAllText(Path, JsonConvert.SerializeObject(p));
+            // Advance only after a successful persist (fixed post-C5-review): a failed
+            // write leaves LastFetchMs where Load() set it, so the next visit refetches.
+            LastFetchMs = nowMs;
         }
         catch (IOException e) { Debug.LogWarning($"[DashboardStore] save failed: {e.Message}"); }
     }

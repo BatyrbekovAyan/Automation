@@ -18,11 +18,14 @@ public static class DashboardStore
 
     public static void Save(List<DashboardOutcome> outcomes, long nowMs)
     {
-        LastFetchMs = nowMs;
         try
         {
             var p = new Payload { lastFetchMs = nowMs, outcomes = outcomes ?? new List<DashboardOutcome>() };
             File.WriteAllText(Path, JsonConvert.SerializeObject(p));
+            // Advance only after a successful persist so in-memory and disk agree —
+            // a failed write leaves LastFetchMs where Load() set it, so the next
+            // visit refetches and re-persists instead of trusting an unwritten cache.
+            LastFetchMs = nowMs;
         }
         catch (IOException e) { Debug.LogWarning($"[DashboardStore] save failed: {e.Message}"); }
     }
