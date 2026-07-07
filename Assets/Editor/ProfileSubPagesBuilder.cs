@@ -447,6 +447,12 @@ public static class ProfileSubPagesBuilder
         rounded.r = new Vector4(60f, 60f, 0f, 0f);
         _roundedToRefresh.Add(rounded);
 
+        // Lifts the whole sheet above the keyboard while typing. Disabled by
+        // default — ProfileSubPages.Support enables it only after the open
+        // slide settles (it re-stamps anchoredPosition.y every frame).
+        var keyboardAware = sheet.AddComponent<KeyboardAwarePanel>();
+        keyboardAware.enabled = false;
+
         var vlg = sheet.AddComponent<VerticalLayoutGroup>();
         vlg.padding = new RectOffset((int)Gutter, (int)Gutter, 20, 84);
         vlg.spacing = 24f;
@@ -495,6 +501,7 @@ public static class ProfileSubPagesBuilder
         so.FindProperty("supportSheetBackdrop").objectReferenceValue = backdropGroup;
         so.FindProperty("supportBackdropButton").objectReferenceValue = backdropButton;
         so.FindProperty("supportSheetPanel").objectReferenceValue = sheetRt;
+        so.FindProperty("supportSheetKeyboard").objectReferenceValue = keyboardAware;
         so.FindProperty("supportMessageInput").objectReferenceValue = messageInput;
         so.FindProperty("supportContactInput").objectReferenceValue = contactInput;
         so.FindProperty("supportSendButton").objectReferenceValue = sendButton;

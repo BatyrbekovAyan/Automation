@@ -16,6 +16,7 @@ public partial class ProfileSubPages
     [SerializeField] private CanvasGroup supportSheetBackdrop;
     [SerializeField] private Button supportBackdropButton;
     [SerializeField] private RectTransform supportSheetPanel;
+    [SerializeField] private KeyboardAwarePanel supportSheetKeyboard;
     [SerializeField] private TMP_InputField supportMessageInput;
     [SerializeField] private TMP_InputField supportContactInput;
     [SerializeField] private Button supportSendButton;
@@ -89,6 +90,11 @@ public partial class ProfileSubPages
         supportSheetRoot.SetActive(true);
         LayoutRebuilder.ForceRebuildLayoutImmediate(supportSheetPanel);
 
+        // Keyboard tracking stays OFF during the slide — KeyboardAwarePanel
+        // re-stamps anchoredPosition.y every frame and would kill the tween.
+        // Hand over once the sheet has settled at its resting position.
+        if (supportSheetKeyboard != null) supportSheetKeyboard.enabled = false;
+
         if (supportSheetBackdrop != null)
         {
             supportSheetBackdrop.alpha = 0f;
@@ -97,7 +103,14 @@ public partial class ProfileSubPages
 
         float height = supportSheetPanel.rect.height;
         supportSheetPanel.anchoredPosition = new Vector2(0f, -height);
-        supportSheetPanel.DOAnchorPosY(0f, 0.25f).SetEase(Ease.OutCubic);
+        supportSheetPanel.DOAnchorPosY(0f, 0.25f)
+            .SetEase(Ease.OutCubic)
+            .OnComplete(() =>
+            {
+                if (supportSheetKeyboard == null) return;
+                supportSheetKeyboard.ResetToBase();
+                supportSheetKeyboard.enabled = true;
+            });
 
         RefreshSendInteractable();
     }
@@ -105,6 +118,9 @@ public partial class ProfileSubPages
     private void CloseSupportSheet()
     {
         if (supportSheetRoot == null || supportSheetPanel == null) return;
+
+        // Reclaim the panel from keyboard tracking before animating out.
+        if (supportSheetKeyboard != null) supportSheetKeyboard.enabled = false;
 
         supportSheetBackdrop?.DOFade(0f, 0.2f);
         supportSheetPanel.DOAnchorPosY(-supportSheetPanel.rect.height, 0.2f)
