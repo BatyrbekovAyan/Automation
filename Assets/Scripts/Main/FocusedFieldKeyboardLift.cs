@@ -6,12 +6,13 @@ using UnityEngine.InputSystem;
 #endif
 
 /// <summary>
-/// Keyboard lift for TALL sheets: raises the panel only far enough that the
-/// currently focused input field sits just above the keyboard (plus a small
-/// clearance). Unlike KeyboardAwarePanel — which glues the panel's BOTTOM to
-/// the keyboard top and shoves a tall sheet's fields way past it — the lift
-/// here is relative to the focused field, so each field stops right where
-/// the user is typing.
+/// Keyboard lift for TALL sheets. Unlike KeyboardAwarePanel — which glues the
+/// panel's BOTTOM to the keyboard top and shoves a tall sheet's fields way
+/// past it — this raises the panel by a single amount derived from the
+/// REFERENCE field (the lowest input): its bottom is placed half-a-field +
+/// clearance above the keyboard top. That same lift is used whenever any of
+/// the tracked fields is focused, so every field settles at the same height
+/// and the lowest one is comfortably clear.
 ///
 /// The host must disable this component while it animates the panel (it
 /// writes anchoredPosition.y every frame) and enable it once the panel has
@@ -21,8 +22,11 @@ using UnityEngine.InputSystem;
 public class FocusedFieldKeyboardLift : MonoBehaviour
 {
     [SerializeField] private RectTransform panel;
+    [Tooltip("Any of these being focused triggers the lift.")]
     [SerializeField] private TMP_InputField[] fields;
-    [Tooltip("Gap kept between the focused field's bottom and the keyboard top, in canvas units.")]
+    [Tooltip("Lowest field — the lift is sized so this one clears the keyboard; all fields share its height.")]
+    [SerializeField] private TMP_InputField referenceField;
+    [Tooltip("Extra gap above the half-field margin, in canvas units.")]
     [SerializeField] private float clearance = 24f;
     [SerializeField] private float smoothTime = 0.12f;
 
@@ -72,15 +76,24 @@ public class FocusedFieldKeyboardLift : MonoBehaviour
 
     private float ComputeLift(float keyboardCanvas)
     {
-        if (keyboardCanvas <= 0f || fields == null) return 0f;
+        if (keyboardCanvas <= 0f || referenceField == null) return 0f;
+        if (!AnyFieldFocused()) return 0f;
 
+        // Place the reference (lowest) field's bottom half-a-field + clearance
+        // above the keyboard top. Same lift for every field, so they all
+        // settle at the same height and the lowest one is fully visible.
+        var refRt = (RectTransform)referenceField.transform;
+        float refBottomAtRest = FieldBottomFromCanvasBottomAtRest(refRt);
+        float margin = refRt.rect.height * 0.5f + clearance;
+        return Mathf.Max(0f, keyboardCanvas + margin - refBottomAtRest);
+    }
+
+    private bool AnyFieldFocused()
+    {
+        if (fields == null) return false;
         foreach (var field in fields)
-        {
-            if (field == null || !field.isFocused) continue;
-            float fieldBottomAtRest = FieldBottomFromCanvasBottomAtRest((RectTransform)field.transform);
-            return Mathf.Max(0f, keyboardCanvas + clearance - fieldBottomAtRest);
-        }
-        return 0f;
+            if (field != null && field.isFocused) return true;
+        return false;
     }
 
     // The focused field's bottom edge measured from the canvas bottom with the

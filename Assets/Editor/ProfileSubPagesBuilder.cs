@@ -485,6 +485,8 @@ public static class ProfileSubPagesBuilder
         fieldsProp.arraySize = 2;
         fieldsProp.GetArrayElementAtIndex(0).objectReferenceValue = messageInput;
         fieldsProp.GetArrayElementAtIndex(1).objectReferenceValue = contactInput;
+        // Contact is the lowest field — size the shared lift to clear it.
+        liftSo.FindProperty("referenceField").objectReferenceValue = contactInput;
         liftSo.ApplyModifiedPropertiesWithoutUndo();
 
         var caption = AddText(NewChild(sheet, "Caption", out _),
