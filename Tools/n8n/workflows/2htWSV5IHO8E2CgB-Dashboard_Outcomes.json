@@ -37,7 +37,8 @@
         "operation": "executeQuery",
         "query": "WITH ids AS (\n  SELECT jsonb_array_elements_text(convert_from(decode($1, 'base64'), 'UTF8')::jsonb) AS profile_id\n),\nsessions AS (\n  SELECT h.session_id,\n         split_part(h.session_id, ':', 1) AS profile_id,\n         substr(h.session_id, position(':' in h.session_id) + 1) AS chat_id,\n         max(h.id) AS max_id,\n         max(h.created_at) AS last_message_at\n  FROM public.n8n_chat_histories h\n  JOIN ids ON ids.profile_id = split_part(h.session_id, ':', 1)\n  GROUP BY h.session_id\n),\nchanged AS (\n  SELECT s.session_id, s.profile_id, s.chat_id, s.max_id, s.last_message_at,\n         o.last_history_id AS prev_watermark,\n         t.transcript\n  FROM sessions s\n  LEFT JOIN public.conversation_outcomes o ON o.session_id = s.session_id\n  CROSS JOIN LATERAL (\n    SELECT string_agg(\n             (CASE WHEN m.message->>'type' = 'ai' THEN 'Бот: ' ELSE 'Клиент: ' END)\n             || coalesce(m.message->'data'->>'content', ''),\n             E'\\n' ORDER BY m.id) AS transcript\n    FROM (\n      SELECT id, message FROM public.n8n_chat_histories\n      WHERE session_id = s.session_id\n      ORDER BY id DESC LIMIT 30\n    ) m\n  ) t\n  WHERE s.chat_id NOT LIKE '%@g.us'\n    AND s.max_id > COALESCE(o.last_history_id, 0)\n  ORDER BY COALESCE(o.last_history_id, 0) ASC\n  LIMIT 21\n)\nSELECT\n  COALESCE(json_agg(json_build_object(\n    'session_id', c.session_id, 'profile_id', c.profile_id, 'chat_id', c.chat_id,\n    'max_id', c.max_id,\n    'last_message_at_ms', (extract(epoch from c.last_message_at)*1000)::bigint,\n    'transcript', c.transcript\n  )), '[]'::json) AS sessions,\n  count(*) AS total\nFROM changed c;",
         "options": {
-          "queryReplacement": "={{ $json.b64Ids }}"
+          "queryReplacement": "={{ $json.b64Ids }}",
+          "largeNumbersOutput": "numbers"
         }
       },
       "type": "n8n-nodes-base.postgres",
@@ -132,7 +133,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const src = $('Split Out').item.json;\nlet outcome = 'in_dialog', summary = '';\ntry {\n  const content = $json.choices?.[0]?.message?.content;\n  if (content) {\n    const parsed = JSON.parse(content);\n    const allowed = ['order_collected','owner_needed','in_dialog','question_closed'];\n    if (allowed.includes(parsed.outcome)) outcome = parsed.outcome;\n    if (typeof parsed.summary === 'string') summary = parsed.summary.slice(0, 120);\n  }\n} catch (e) { /* keep in_dialog */ }\nreturn { json: {\n  session_id: src.session_id, profile_id: src.profile_id, chat_id: src.chat_id,\n  outcome, summary,\n  last_history_id: src.max_id, last_message_at_ms: src.last_message_at_ms\n} };"
+        "jsCode": "const src = $('Split Out').item.json;\nlet outcome = null, summary = '';\ntry {\n  const content = $json.choices?.[0]?.message?.content;\n  if (content) {\n    const parsed = JSON.parse(content);\n    const allowed = ['order_collected','owner_needed','in_dialog','question_closed'];\n    if (allowed.includes(parsed.outcome)) outcome = parsed.outcome;\n    if (typeof parsed.summary === 'string') summary = parsed.summary.slice(0, 120);\n  }\n} catch (e) { /* outcome stays null */ }\n// outcome === null means OpenAI errored or returned garbage. Mark the row failed\n// so Aggregate drops it from the upsert: the watermark must NOT advance and any\n// previously stored outcome/summary must survive (spec 4.3 — keep previous\n// outcome); the untouched watermark makes the next call retry naturally.\nreturn { json: {\n  failed: outcome === null,\n  session_id: src.session_id, profile_id: src.profile_id, chat_id: src.chat_id,\n  outcome: outcome || 'in_dialog', summary,\n  last_history_id: src.max_id, last_message_at_ms: src.last_message_at_ms\n} };"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -145,7 +146,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const all = $input.all().map(i => i.json);\nconst rows = all.slice(0, 20);\nconst total = $('Find Changed Sessions').first().json.total;\nreturn [{ json: {\n  b64: Buffer.from(JSON.stringify(rows)).toString('base64'),\n  classified: rows.length,\n  truncated: total > 20\n} }];"
+        "jsCode": "const all = $input.all().map(i => i.json);\n// Drop classification failures entirely — no upsert row, watermark untouched,\n// retried on the next call. truncated stays keyed to the raw total so a real\n// backlog still triggers the client's drain loop (failures deliberately do NOT\n// set truncated: an OpenAI outage should degrade quietly, not hammer retries).\nconst ok = all.filter(r => !r.failed);\nconst rows = ok.slice(0, 20);\nconst total = Number($('Find Changed Sessions').first().json.total);\nreturn [{ json: {\n  b64: Buffer.from(JSON.stringify(rows)).toString('base64'),\n  classified: rows.length,\n  truncated: total > 20\n} }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -212,7 +213,8 @@
         "operation": "executeQuery",
         "query": "SELECT c.profile_id AS \"profileId\",\n       c.chat_id    AS \"chatId\",\n       c.outcome,\n       c.summary,\n       (extract(epoch from c.outcome_at)*1000)::bigint      AS \"outcomeAt\",\n       (extract(epoch from c.last_message_at)*1000)::bigint AS \"lastMessageAt\"\nFROM public.conversation_outcomes c\nWHERE split_part(c.session_id, ':', 1) IN (SELECT jsonb_array_elements_text(convert_from(decode($1, 'base64'), 'UTF8')::jsonb))\nORDER BY c.last_message_at DESC;",
         "options": {
-          "queryReplacement": "={{ $('Prep').first().json.b64Ids }}"
+          "queryReplacement": "={{ $('Prep').first().json.b64Ids }}",
+          "largeNumbersOutput": "numbers"
         }
       },
       "type": "n8n-nodes-base.postgres",
@@ -405,9 +407,9 @@
     "executionOrder": "v1"
   },
   "staticData": null,
-  "pinData": null,
+  "pinData": {},
   "triggerCount": 1,
-  "meta": null,
+  "meta": {},
   "id": "2htWSV5IHO8E2CgB",
   "active": true
 }
