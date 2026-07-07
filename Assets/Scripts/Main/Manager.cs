@@ -1272,6 +1272,10 @@ public class Manager : MonoBehaviour
         GameObject newBot = Instantiate(BotPrefab, BotPrefab.transform.position, BotPrefab.transform.rotation, BotsParent.transform);
         newBot.name = "Bot" + id.ToString();
 
+        // The wizard forced the Bots tab, so Screen_Bots never re-enables and its
+        // OnEnable empty-state refresh won't re-fire — hide it now that a card exists.
+        global::BotsPage.Instance?.RefreshEmptyState();
+
         var newBotComp = newBot.GetComponent<Bot>();
         if (newBotComp.BotName != null) newBotComp.BotName.text = formBotName;
         // The Add Bot form captures an optional description in formDescription.

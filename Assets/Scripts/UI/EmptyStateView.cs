@@ -130,9 +130,10 @@ public class EmptyStateView : MonoBehaviour
 
     private void OpenCreateBotFlow()
     {
-        // Reuse the exact add-bot entry the header "+" uses (BotsPage forwards to the
-        // bottom-nav New button). Find it include-inactive so it works even if the
-        // Bots tab was never opened this session (BotsPage.Instance may be unset).
+        // Reuse the exact add-bot entry the header "+" uses: StartNewBot ensures the
+        // Bots tab is active, then opens the Add-Bot overlay directly. Find it
+        // include-inactive so it works even if the Bots tab was never opened this
+        // session (BotsPage.Instance is set only after Screen_Bots first activates).
         BotsPage botsPage = FindFirstObjectByType<BotsPage>(FindObjectsInactive.Include);
         if (botsPage != null) botsPage.StartNewBot();
 

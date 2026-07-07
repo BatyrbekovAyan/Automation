@@ -139,10 +139,6 @@ public static class NavRestructureBuilder
         var newTab = tabsProp.GetArrayElementAtIndex(2);
         var botsTab = tabsProp.GetArrayElementAtIndex(3);
 
-        var screenNew = newTab.FindPropertyRelative("screenPanel").objectReferenceValue as GameObject;
-        if (screenNew == null)
-            throw new System.InvalidOperationException("tabs[2].screenPanel (Screen_New) is unassigned.");
-
         var screenBots = botsTab.FindPropertyRelative("screenPanel").objectReferenceValue as GameObject;
         if (screenBots == null)
             throw new System.InvalidOperationException("tabs[3].screenPanel (Screen_Bots) is unassigned.");
@@ -151,6 +147,14 @@ public static class NavRestructureBuilder
         Transform container = screenBots.transform.parent;
         if (container == null)
             throw new System.InvalidOperationException("Screen_Bots has no parent container.");
+
+        // Resolve Screen_New BY NAME, never via tabs[2].screenPanel: after the first
+        // build that slot holds Screen_Dashboard, which the teardown below destroys —
+        // a slot-based capture would hand BuildOverlayChrome a dead object on re-runs.
+        Transform screenNewT = container.Find("Screen_New");
+        if (screenNewT == null)
+            throw new System.InvalidOperationException("Screen_New not found under the screen container.");
+        var screenNew = screenNewT.gameObject;
 
         // (a) Screen_Dashboard placeholder.
         var dashboard = BuildDashboard(container);
@@ -166,6 +170,13 @@ public static class NavRestructureBuilder
 
         // Runtime singleton wiring targets → stamp the three Manager fields.
         StampManagerFields(backButton, swipeBack, emptyStateCta);
+
+        // Deterministic ScreenContainer child order: all tab screens first, then
+        // the Add-Bot overlay (Screen_New), then the auth pages LAST. The auth
+        // pages must always draw ABOVE the overlay form — Manager.ShowWhatsappAuth
+        // activates WhatsappAuth, and if it sat behind the opaque form the wizard
+        // would dead-end. Replaces AddBotPanel's old runtime SetAsLastSibling.
+        ReorderScreens(container);
 
         // Radius bake needs sized rects.
         Canvas.ForceUpdateCanvases();
@@ -390,6 +401,42 @@ public static class NavRestructureBuilder
         else
         {
             Debug.LogWarning("[NavRestructureBuilder] tabs[2].labelText is null — tab label text not updated.");
+        }
+    }
+
+    // ── ScreenContainer child ordering ─────────────────────────────────────
+
+    // Draw-order is child order under ScreenContainer. Put every tab screen
+    // first (relative order preserved, Screen_Dashboard right after
+    // Screen_Profile), then Screen_New (the Add-Bot overlay), then the auth
+    // pages LAST so they always render above the opaque overlay form.
+    // Idempotent: iterate the ordered name list and SetAsLastSibling each found
+    // child. Unlisted/unexpected siblings stay at the front, and the listed
+    // names end up in exactly the desired relative order. Names not present are
+    // skipped with a warning.
+    private static void ReorderScreens(Transform container)
+    {
+        string[] order =
+        {
+            "Screen_Whatsapp",
+            "Screen_Telegram",
+            "Screen_Bots",
+            "Screen_Profile",
+            "Screen_Dashboard",
+            "Screen_New",
+            "WhatsappAuth",
+            "TelegramAuth",
+        };
+
+        foreach (string name in order)
+        {
+            Transform child = container.Find(name);
+            if (child == null)
+            {
+                Debug.LogWarning($"[NavRestructureBuilder] ReorderScreens: '{name}' not found under ScreenContainer — skipped.");
+                continue;
+            }
+            child.SetAsLastSibling();
         }
     }
 

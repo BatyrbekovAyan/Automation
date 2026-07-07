@@ -45,7 +45,9 @@ public class AddBotPanel : MonoBehaviour
         EnsureInit();
         if (IsOpen) return;                      // idempotent — see EmptyStateView + zero-bot auto-open
         gameObject.SetActive(true);
-        transform.SetAsLastSibling();            // draw above the Bots page
+        // Static sibling order (set by NavRestructureBuilder.ReorderScreens) keeps
+        // this overlay above every tab screen and below the auth pages — do not
+        // reorder at runtime, or the auth pages get buried behind the form.
         _activeSlide?.Kill();
         _rt.anchoredPosition = new Vector2(CanvasWidth(), _rt.anchoredPosition.y);
         _activeSlide = _rt.DOAnchorPosX(0f, SlideInDuration).SetEase(Ease.OutCubic);

@@ -29,6 +29,11 @@ public class BotsPage : MonoBehaviour
         if (isActiveAndEnabled) Invoke(nameof(RefreshEmptyState), 0f);
     }
 
+    void OnDisable()
+    {
+        CancelInvoke(nameof(RefreshEmptyState));
+    }
+
     public void RefreshEmptyState()
     {
         bool hasBots = botsParent != null && botsParent.childCount > 0;
@@ -44,7 +49,8 @@ public class BotsPage : MonoBehaviour
     public void StartNewBot()
     {
         var tabs = FindFirstObjectByType<BottomTabManager>();
-        if (tabs != null) tabs.SwitchTab(BottomTabManager.BotsTabIndex);
+        if (tabs != null && tabs.ActiveTabIndex != BottomTabManager.BotsTabIndex)
+            tabs.SwitchTab(BottomTabManager.BotsTabIndex);
         AddBotPanel.Instance?.Open();
     }
 }
