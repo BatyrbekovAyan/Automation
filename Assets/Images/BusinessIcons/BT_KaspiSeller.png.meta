@@ -1,10 +1,7 @@
 fileFormatVersion: 2
-guid: dc55d5606f8fe45c89489346f3c367d2
+guid: 9de80a8e2b1a41a997a830124bcbbb1b
 TextureImporter:
-  internalIDToNameTable:
-  - first:
-      213: -2449844058664256442
-    second: Deer_0
+  internalIDToNameTable: []
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -124,29 +121,7 @@ TextureImporter:
     forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
-    sprites:
-    - serializedVersion: 2
-      name: Deer_0
-      rect:
-        serializedVersion: 2
-        x: 3
-        y: 0
-        width: 383
-        height: 491
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 64c3738fec7600ed0800000000000000
-      internalID: -2449844058664256442
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
+    sprites: []
     outline: []
     customData: 
     physicsShape: []
@@ -160,8 +135,7 @@ TextureImporter:
     secondaryTextures: []
     spriteCustomMetadata:
       entries: []
-    nameFileIdTable:
-      Deer_0: -2449844058664256442
+    nameFileIdTable: {}
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

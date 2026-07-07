@@ -1,10 +1,7 @@
 fileFormatVersion: 2
-guid: f0908e7d3a02d4a64a9e3762c748143b
+guid: a96a80b9e357423799c5adbe81ed2d42
 TextureImporter:
-  internalIDToNameTable:
-  - first:
-      213: 8647823593821616703
-    second: Bat_0
+  internalIDToNameTable: []
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -124,29 +121,7 @@ TextureImporter:
     forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
-    sprites:
-    - serializedVersion: 2
-      name: Bat_0
-      rect:
-        serializedVersion: 2
-        x: 11
-        y: 11
-        width: 377
-        height: 389
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: f3abafd8dbd330870800000000000000
-      internalID: 8647823593821616703
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
+    sprites: []
     outline: []
     customData: 
     physicsShape: []
@@ -160,8 +135,7 @@ TextureImporter:
     secondaryTextures: []
     spriteCustomMetadata:
       entries: []
-    nameFileIdTable:
-      Bat_0: 8647823593821616703
+    nameFileIdTable: {}
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

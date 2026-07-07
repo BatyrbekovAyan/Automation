@@ -40,6 +40,7 @@ EditMode tests live in `Assets/Tests/Editor/Chat/` (no asmdef — they compile i
   - `BotSettings/` (subfolder) — Reusable UI primitives for the config screen: `EditableField`, `EditableTextArea`, `ScrollableInputField`, `ScrollableTextArea`, `NumberDisplayField`, `SectionHeader`, `ToggleRow`, `AddItemButton`, `FocusScrim`, `ItemEditSheet`, `ProductCardView`, `ServiceCardView`.
   - `Bot.cs` — MonoBehaviour on each bot prefab in `BotsParent`. Holds `whatsappProfileId`, `telegramProfileId`, `whatsappWorkflowId`, `telegramWorkflowId`, activation toggle. All bot data persisted in `PlayerPrefs` keyed by `transform.name` (e.g. `Bot0Name`, `Bot0isOnWhatsapp`, `Bot0Products0`).
   - `ProfilePage.cs`, `BottomTabManager.cs`, `PopupUI.cs`, `BotStatusPill.cs` — Other pages and shared UI.
+  - `ProfileSubPages.cs` (+ `.Account/.Notifications/.Privacy/.Support/.About` partials) — Profile tab sub-pages (Аккаунт | Уведомления | Конфиденциальность | Поддержка | О приложении | Лицензии): slide-in panels inside `Screen_Profile`, built by `ProfileSubPagesBuilder` (`Tools/Profile Sub-Pages/Build`). Account hosts the full local wipe «Удалить все данные» (iterates `Bot.DeleteBot()` backwards, then `PlayerPrefs.DeleteAll()` + `LocalDataWipe` — replaced the old misleading main-screen «Выйти»). Notification toggles (`NotifPrefs`) drive `NotificationFx` on ChatManager's GameObject (cue gated by `IncomingNotifyPolicy` inside `ParseChatsJson`) and the unread-badge gate in `ChatItemView.ApplyUnreadBadge`. Privacy actions live in `ChatManager.PrivacyClear.cs` (`ComputeMediaCacheSize` / `ClearAllMediaCaches` / `ClearAllLocalHistory`; never route an active-bot privacy clear through `PurgeCacheForBot` — that's bot-deletion semantics). Support = static FAQ (`FaqItemView`) + bottom sheet → `Manager.SendToTelegram(msg, callback)` (bot token + `supportChatId` from secrets.json; text via `SupportMessageComposer`). Panels dismiss via back chevron or the generic `SwipeToBackPanel` left strip.
   - `BusinessTypesSO.cs` — ScriptableObject dropdown data.
   - `Secrets.cs` — Lazy-loaded `Secrets.Data` from `Assets/StreamingAssets/secrets.json` (gitignored).
   - Input/layout helpers: `SnappyFlickScrollRect`, `EventAbsorber`, `DelayedFingerUpAction`, `SwipeToBackBotSettings`, `WhatsappCodeTimer`, `TelegramCodeTimer`, `AddUniformTypeIdentifiers`, `WappiUnitySync`.
@@ -59,7 +60,7 @@ EditMode tests live in `Assets/Tests/Editor/Chat/` (no asmdef — they compile i
 
 - `Converters/` — Document-to-text utilities (`TableToTextConverter` for csv/tsv/xls/xlsx/xlsm incl. "fake .xls" HTML/SpreadsheetML exports, `XmlToTextConverter`, `RtfToTextConverter`, `HtmlTableToTextConverter`, `TextEncodingSniffer` for cp1251/UTF-16 detection; `DocxToTextConverter` lives in `Assets/DocumentParsers/`; `ImageUploadPreprocessor` handles native image decode, downscaling, and JPEG re-encoding). These run CLIENT-side before price-list upload — the n8n Upload File workflow only ever ingests text/plain, PDF, and JPEG (client-side sources: jpg/jpeg/png/webp/heic; workflow routes JPEG to vision extraction).
 
-**Editor tooling** lives in `Assets/Editor/` — `[MenuItem]` UI builders for constructing BotSettings UI programmatically: `BotSettingsRebuilder`, `BotSettingsConfirmChangePopupBuilder`, `BotSettingsDeleteBotPopupBuilder`, `BotSettingsScrollableTextAreaBuilder`, `BotSettingsStickyAddButtonBuilder`, `BotSettingsSwipeWirer`, `FixIOSBuildSettings`, `ArchitectureExporter`. When adding new UI screens, follow this builder pattern (see `.claude/rules/editor-scripts.md`).
+**Editor tooling** lives in `Assets/Editor/` — `[MenuItem]` UI builders for constructing BotSettings UI programmatically: `BotSettingsRebuilder`, `BotSettingsConfirmChangePopupBuilder`, `BotSettingsDeleteBotPopupBuilder`, `BotSettingsScrollableTextAreaBuilder`, `BotSettingsStickyAddButtonBuilder`, `BotSettingsSwipeWirer`, `BusinessTileIconBuilder` (wizard business-tile icon squircle in the template; glyphs rendered by `Tools/render_business_icons.js`, sprite + tileColor stamped per-entry at runtime by `Manager.PopulateBusinessTypes` via child names `IconBg`/`Icon`), `FixIOSBuildSettings`, `ArchitectureExporter`. When adding new UI screens, follow this builder pattern (see `.claude/rules/editor-scripts.md`).
 
 ### Chat data flow
 
@@ -74,7 +75,7 @@ wappi.pro API
 
 ### Caching strategy
 
-- Chat list: `persistentDataPath/all_chats_cache.json`
+- Chat list: `persistentDataPath/BotCache/{botId}/chats.json` (per-bot; the root-level `all_chats_cache.json` is legacy with no code references)
 - Message history: `ChatHistoryCache` (per `chatId`, max 100 messages)
 - Media/thumbnails: `MediaCacheManager` saves to disk, keyed by URL
 - Background sync pattern: on chat open, load from cache instantly, then quietly diff against server response.

@@ -152,6 +152,7 @@ public class Manager : MonoBehaviour
     public static string wappiAuthToken => Secrets.Data.wappiAuthToken;
     public static string n8nAPIKey => Secrets.Data.n8nAPIKey;
     public static string telegramBotToken => Secrets.Data.telegramBotToken;
+    public static string supportChatId => Secrets.Data.supportChatId;
     public const string DevN8nBaseUrlKey = "DevN8nBaseUrl";
 
     public static string n8nBaseUrl =>
@@ -1062,6 +1063,20 @@ public class Manager : MonoBehaviour
 
             var label = go.GetComponentInChildren<TextMeshProUGUI>(true);
             if (label != null) label.text = entry.displayName;
+
+            // Icon squircle built into the template by BusinessTileIconBuilder.
+            var iconBg = go.transform.Find("IconBg");
+            if (iconBg != null)
+            {
+                var badgeImage = iconBg.GetComponent<Image>();
+                if (badgeImage != null) badgeImage.color = entry.tileColor;
+
+                var iconTransform = iconBg.Find("Icon");
+                var iconImage = iconTransform != null ? iconTransform.GetComponent<Image>() : null;
+                if (iconImage != null) iconImage.sprite = entry.sprite;
+
+                iconBg.gameObject.SetActive(entry.sprite != null);
+            }
 
             var btn = go.GetComponent<Button>();
             var capturedId = entry.id;
@@ -3151,27 +3166,34 @@ public class Manager : MonoBehaviour
 
     //////////////////////////////////////////////////////////SEND TO TELEGRAM REQUESTS//////////////////////////////////////////////////////////
 
-    private IEnumerator SendToTelegram(string message)
+    // Delivers a support-form message to the owner's Telegram chat (both ids
+    // live in secrets.json). Public so ProfileSubPages.Support can start it;
+    // callback reports success so the sheet can close or keep the draft.
+    public IEnumerator SendToTelegram(string message, System.Action<bool> callback = null)
     {
-        if (message != "")
+        if (string.IsNullOrEmpty(message) || string.IsNullOrEmpty(telegramBotToken) || string.IsNullOrEmpty(supportChatId))
         {
-            string url = $"https://api.telegram.org/bot{telegramBotToken}/sendMessage";
-            WWWForm form = new();
-            form.AddField("chat_id", "1038376805");
-            form.AddField("text", message);
-
-            using UnityWebRequest www = UnityWebRequest.Post(url, form);
-            yield return www.SendWebRequest();
-
-            if (www.result != UnityWebRequest.Result.Success)
-            {
-                Debug.LogError("Ошибка отправки: " + www.error);
-            }
-            else
-            {
-                Debug.Log("Сообщение отправлено!");
-            }
+            if (string.IsNullOrEmpty(telegramBotToken))
+                Debug.LogError("[SendToTelegram] telegramBotToken missing from secrets.json");
+            if (string.IsNullOrEmpty(supportChatId))
+                Debug.LogError("[SendToTelegram] supportChatId missing from secrets.json");
+            callback?.Invoke(false);
+            yield break;
         }
+
+        string url = $"https://api.telegram.org/bot{telegramBotToken}/sendMessage";
+        WWWForm form = new();
+        form.AddField("chat_id", supportChatId);
+        form.AddField("text", message);
+
+        using UnityWebRequest www = UnityWebRequest.Post(url, form);
+        www.timeout = 30;
+        yield return www.SendWebRequest();
+
+        bool ok = www.result == UnityWebRequest.Result.Success;
+        if (!ok)
+            Debug.LogError($"[SendToTelegram] [{www.responseCode}] {www.error}"); // never log the URL — it embeds the bot token
+        callback?.Invoke(ok);
     }
 
     //////////////////////////////////////////////////////////SEND FILE//////////////////////////////////////////////////////////

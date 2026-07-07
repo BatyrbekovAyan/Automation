@@ -1,10 +1,7 @@
 fileFormatVersion: 2
-guid: 1b2b148d16add49d592f79984f8df7f9
+guid: d5a4471c59e549d0a5dabb79b637f7c7
 TextureImporter:
-  internalIDToNameTable:
-  - first:
-      213: -5533897470465847662
-    second: BoarBaby_0
+  internalIDToNameTable: []
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -124,29 +121,7 @@ TextureImporter:
     forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
-    sprites:
-    - serializedVersion: 2
-      name: BoarBaby_0
-      rect:
-        serializedVersion: 2
-        x: 1
-        y: 1
-        width: 398
-        height: 367
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 29e43790295a333b0800000000000000
-      internalID: -5533897470465847662
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
+    sprites: []
     outline: []
     customData: 
     physicsShape: []
@@ -160,8 +135,7 @@ TextureImporter:
     secondaryTextures: []
     spriteCustomMetadata:
       entries: []
-    nameFileIdTable:
-      BoarBaby_0: -5533897470465847662
+    nameFileIdTable: {}
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
