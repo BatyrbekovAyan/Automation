@@ -171,6 +171,7 @@ public class DashboardPage : MonoBehaviour
             heroSubtitle.text = $"{active} {Plural(active, "диалог", "диалога", "диалогов")}";
         }
         RenderFunnel(counts);
+        RenderLegend(counts);
         RenderStatusRows(counts);
         RenderRecent(DashboardMetrics.Recent(rows, w, 5));
 
@@ -181,7 +182,6 @@ public class DashboardPage : MonoBehaviour
     private void RenderFunnel(int[] counts)
     {
         if (funnelBar == null) return;
-        int total = Mathf.Max(1, counts.Sum());
         for (int i = 0; i < funnelBar.childCount && i < counts.Length; i++)
         {
             var seg = funnelBar.GetChild(i) as RectTransform;
@@ -209,6 +209,24 @@ public class DashboardPage : MonoBehaviour
             var btn = row.GetComponent<Button>();
             if (btn) { btn.onClick.RemoveAllListeners();
                        var s = status; btn.onClick.AddListener(() => OpenStatusList(s)); }
+        }
+    }
+
+    // The hero-card funnel legend: per-status count + colored dot (mockup shows counts
+    // here, distinct from the tappable status rows). Row children: Dot/Label/Count.
+    private void RenderLegend(int[] counts)
+    {
+        if (legendRoot == null) return;
+        for (int i = 0; i < legendRoot.childCount && i < counts.Length; i++)
+        {
+            var row = legendRoot.GetChild(i);
+            var status = DashboardStatusInfo.Ordered[i];
+            var label = row.Find("Label")?.GetComponent<TextMeshProUGUI>();
+            var count = row.Find("Count")?.GetComponent<TextMeshProUGUI>();
+            var dot = row.Find("Dot")?.GetComponent<Image>();
+            if (label) label.text = DashboardStatusInfo.Label(status);
+            if (count) count.text = counts[i].ToString();
+            if (dot) dot.color = DashboardStatusInfo.FgColor(status);
         }
     }
 
@@ -360,14 +378,26 @@ public class DashboardPage : MonoBehaviour
         if (tabs != null) tabs.SwitchTab(BottomTabManager.WhatsAppTabIndex);
 
         // Deferred one frame so the WhatsApp tab's own sync/list settles; if the chat
-        // isn't present we just land on that bot's list (no error popup).
-        StartCoroutine(OpenChatDeferred(r.chatId));
+        // isn't present we just land on that bot's list (no error popup). Hosted on
+        // ChatManager (always active): SwitchTab above just deactivated Screen_Dashboard,
+        // and Unity refuses to start a coroutine on an inactive GameObject.
+        ChatManager.Instance.StartCoroutine(OpenChatDeferred(r.chatId));
     }
 
     private IEnumerator OpenChatDeferred(string chatId)
     {
         yield return null;
         ChatManager.Instance.SelectChat(chatId);
+    }
+
+    private void OnDisable()
+    {
+        // Screen_Dashboard toggles via SetActive, which stops our coroutines mid-flight
+        // and skips their post-yield cleanup. Reset the fetch guard so leaving during a
+        // load can't wedge _fetching=true and freeze every later refresh. (The deep-link
+        // coroutine deliberately lives on ChatManager, so it survives this.)
+        StopAllCoroutines();
+        _fetching = false;
     }
 
     // Deterministic avatar (mirror ChatItemView) + display-name fallback.

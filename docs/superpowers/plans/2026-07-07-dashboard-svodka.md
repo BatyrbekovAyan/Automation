@@ -1751,14 +1751,25 @@ public class DashboardPage : MonoBehaviour
         if (tabs != null) tabs.SwitchTab(BottomTabManager.WhatsAppTabIndex);
 
         // Deferred one frame so the WhatsApp tab's own sync/list settles; if the chat
-        // isn't present we just land on that bot's list (no error popup).
-        StartCoroutine(OpenChatDeferred(r.chatId));
+        // isn't present we just land on that bot's list (no error popup). Host on
+        // ChatManager (always active) — SwitchTab just deactivated Screen_Dashboard and
+        // Unity won't start a coroutine on an inactive GameObject. (Fixed post-C6-review.)
+        ChatManager.Instance.StartCoroutine(OpenChatDeferred(r.chatId));
     }
 
     private IEnumerator OpenChatDeferred(string chatId)
     {
         yield return null;
         ChatManager.Instance.SelectChat(chatId);
+    }
+
+    // Screen_Dashboard toggles via SetActive → coroutines on it stop mid-flight and
+    // skip post-yield cleanup; reset the fetch guard so leaving during a load can't
+    // wedge _fetching=true forever. (Fixed post-C6-review.)
+    private void OnDisable()
+    {
+        StopAllCoroutines();
+        _fetching = false;
     }
 
     // Deterministic avatar (mirror ChatItemView) + display-name fallback.
@@ -1827,7 +1838,7 @@ git commit -m "feat(dashboard): DashboardPage controller — fetch, render, filt
   2. Find `Screen_Dashboard` (created in B5); `DestroyAllByName(screenDashboard, "DashContent")` and `"DashListPanel"` (idempotent).
   3. `AddComponent<DashboardPage>()` if absent; open one `SerializedObject so`.
   4. Build the scroll column (copy `BuildPanelShell`'s ScrollRect/Viewport/Content block, but no header/back — the header already exists on `Screen_Dashboard` from B5) into a `DashContent` root.
-  5. Build, in order, into Content (all sizes in reference units per the type/spacing scale): **period segmented control** (3 buttons in a 12px-inset `#E4E6EB` track + a white highlight pill; height ~96); **chips row** (horizontal, hidden by controller when ≤1 bot; include one inactive template chip `chipPrefabHost`); **hero card** (white, radius 40, pad 44: caption «Заявки собраны» 30pt semibold uppercase muted; `heroCount` 72pt Bold ink + `heroDelta` pill; `heroSubtitle` 36pt muted; a `funnelBar` HorizontalLayoutGroup 12px tall with 5 `Image` segments (each with a `LayoutElement`, rounded ends) + a `legendRoot` grid of 5 rows); **status rows card** (5 rows, each a `Button` named by index with children `Dot`(Image 20×20 circle)/`Label`(42 medium)/`Count`(42 semibold tabular)/`Chev`(Image)); **section caption** «Последние заявки»; **recentRoot** (VLG) + an inactive `rowTemplate` conversation row (children: `Avatar`(140 circle)+`Avatar/Initial`, `Name` 44, `BotTag` 30 muted, `Summary` 36 muted, `Pill`(rounded)+`Pill/Label` 30); **loadingState** + **emptyState** (hero + «Бот пока не вёл диалогов»).
+  5. Build, in order, into Content (all sizes in reference units per the type/spacing scale): **period segmented control** (3 buttons in a 12px-inset `#E4E6EB` track + a white highlight pill; height ~96); **chips row** (horizontal, hidden by controller when ≤1 bot; include one inactive template chip `chipPrefabHost`); **hero card** (white, radius 40, pad 44: caption «Заявки собраны» 30pt semibold uppercase muted; `heroCount` 72pt Bold ink + `heroDelta` pill; `heroSubtitle` 36pt muted; a `funnelBar` HorizontalLayoutGroup 12px tall with 5 `Image` segments (each with a `LayoutElement`, rounded ends) + a `legendRoot` grid of 5 rows, each row (in `Ordered` order) carrying children `Dot`(Image)/`Label`(TMP)/`Count`(TMP) — the controller's `RenderLegend` fills label/count/dot-color by index, so the child names must match exactly); **status rows card** (5 rows, each a `Button` named by index with children `Dot`(Image 20×20 circle)/`Label`(42 medium)/`Count`(42 semibold tabular)/`Chev`(Image)); **section caption** «Последние заявки»; **recentRoot** (VLG) + an inactive `rowTemplate` conversation row (children: `Avatar`(140 circle)+`Avatar/Initial`, `Name` 44, `BotTag` 30 muted, `Summary` 36 muted, `Pill`(rounded)+`Pill/Label` 30); **loadingState** + **emptyState** (hero + «Бот пока не вёл диалогов»).
   6. Build the **drill-down `DashListPanel`** as a sibling of Content inside `Screen_Dashboard` using the full `BuildPanelShell` (header + back + swipe + scroll) — capture its `backButton`→`listBackButton`, title→`listTitle`, content→`listRoot`, panel→`listPanel`. Start inactive.
   7. `StampController(so, ...)`: stamp every `DashboardPage` `[SerializeField]` (todayButton/weekButton/monthButton, periodHighlight, chipsRow, chipPrefabHost, heroCount/heroDelta/heroSubtitle, funnelBar, legendRoot, statusRowsRoot, recentRoot, rowTemplate, loadingState, emptyState, listPanel, listBackButton, listTitle, listRoot) via `so.FindProperty(name).objectReferenceValue = ...`. One `so.ApplyModifiedPropertiesWithoutUndo()`.
   8. `Canvas.ForceUpdateCanvases()` then `RefreshRounded` over every collected rounded component (LAST).
