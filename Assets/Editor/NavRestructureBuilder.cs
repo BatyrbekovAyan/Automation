@@ -55,6 +55,8 @@ public static class NavRestructureBuilder
 
     private const string ChevronDir = "Assets/Images/Chat";
     private const string HeroPath = "Assets/Images/Chat/bot_hero.png";
+    private const string DashboardInactiveIconPath = "Assets/Images/Nav/dashboard_inactive.png";
+    private const string DashboardActiveIconPath = "Assets/Images/Nav/dashboard_active.png";
 
     private static Sprite _chevronLeft, _hero;
     private static readonly List<Component> _roundedToRefresh = new List<Component>();
@@ -79,6 +81,40 @@ public static class NavRestructureBuilder
         BuildInternal();
         EditorSceneManager.SaveScene(scene);
         Debug.Log("[NavRestructureBuilder] Headless build + save complete: dashboard, overlay chrome, empty state, tab rewired.");
+    }
+
+    // Task B6: stamps the rendered line-chart glyphs into tabs[2]
+    // (inactiveIcon/activeIcon) now that the "Сводка" slot is rewired to
+    // Screen_Dashboard. Does not touch Build()/BuildInternal().
+    [MenuItem("Tools/Nav Restructure/Assign Dashboard Icons")]
+    public static void AssignDashboardIcons()
+    {
+        AssetDatabase.Refresh();
+        EnsureIconImportSettings(new[] { DashboardInactiveIconPath, DashboardActiveIconPath });
+
+        var inactiveIcon = AssetDatabase.LoadAssetAtPath<Sprite>(DashboardInactiveIconPath);
+        var activeIcon = AssetDatabase.LoadAssetAtPath<Sprite>(DashboardActiveIconPath);
+        if (inactiveIcon == null)
+            throw new System.InvalidOperationException($"Failed to load sprite at {DashboardInactiveIconPath}.");
+        if (activeIcon == null)
+            throw new System.InvalidOperationException($"Failed to load sprite at {DashboardActiveIconPath}.");
+
+        var tabManager = Object.FindFirstObjectByType<BottomTabManager>(FindObjectsInactive.Include);
+        if (tabManager == null)
+            throw new System.InvalidOperationException("BottomTabManager not found — is Main.unity open?");
+
+        var tabsSo = new SerializedObject(tabManager);
+        var tabsProp = tabsSo.FindProperty("tabs");
+        if (tabsProp == null || tabsProp.arraySize < 3)
+            throw new System.InvalidOperationException("BottomTabManager.tabs list is missing or too short.");
+
+        var dashboardTab = tabsProp.GetArrayElementAtIndex(2);
+        dashboardTab.FindPropertyRelative("inactiveIcon").objectReferenceValue = inactiveIcon;
+        dashboardTab.FindPropertyRelative("activeIcon").objectReferenceValue = activeIcon;
+        tabsSo.ApplyModifiedPropertiesWithoutUndo();
+        EditorUtility.SetDirty(tabManager);
+
+        Debug.Log("[NavRestructureBuilder] Assign Dashboard Icons complete: tabs[2] inactiveIcon/activeIcon stamped. SAVE THE SCENE (Cmd+S).");
     }
 
     // ── Main build ──────────────────────────────────────────────────────────
@@ -378,9 +414,12 @@ public static class NavRestructureBuilder
 
     // ── Asset loading / import settings ─────────────────────────────────────
 
-    private static void EnsureIconImportSettings()
+    private static void EnsureIconImportSettings() =>
+        EnsureIconImportSettings(new[] { $"{ChevronDir}/chevron-left.png", HeroPath });
+
+    private static void EnsureIconImportSettings(IEnumerable<string> paths)
     {
-        foreach (string path in new[] { $"{ChevronDir}/chevron-left.png", HeroPath })
+        foreach (string path in paths)
         {
             if (!File.Exists(path)) continue;
             var importer = AssetImporter.GetAtPath(path) as TextureImporter;
@@ -388,11 +427,17 @@ public static class NavRestructureBuilder
 
             bool dirty = importer.textureType != TextureImporterType.Sprite
                          || importer.spriteImportMode != SpriteImportMode.Single
+                         || importer.mipmapEnabled
+                         || importer.filterMode != FilterMode.Bilinear
+                         || importer.wrapMode != TextureWrapMode.Clamp
                          || !importer.alphaIsTransparency;
             if (!dirty) continue;
 
             importer.textureType = TextureImporterType.Sprite;
             importer.spriteImportMode = SpriteImportMode.Single;
+            importer.mipmapEnabled = false;
+            importer.filterMode = FilterMode.Bilinear;
+            importer.wrapMode = TextureWrapMode.Clamp;
             importer.alphaIsTransparency = true;
             importer.SaveAndReimport();
         }

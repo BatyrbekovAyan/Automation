@@ -103001,8 +103001,8 @@ MonoBehaviour:
     iconImage: {fileID: 1452831354}
     labelText: {fileID: 824116193}
     screenPanel: {fileID: 1575464078}
-    inactiveIcon: {fileID: 21300000, guid: 84cb5ef8f390447ca9cac55a202a1fa8, type: 3}
-    activeIcon: {fileID: 21300000, guid: 344c1b141d7aa459fa98c29ad4b858dd, type: 3}
+    inactiveIcon: {fileID: 21300000, guid: 2b436d68b458b426385e3bb822f07a6b, type: 3}
+    activeIcon: {fileID: 21300000, guid: fdeb6c82328c84d3f8f4c20fe601a9eb, type: 3}
     activeLabelColor: {r: 0.105882354, g: 0.4862745, b: 0.92156863, a: 1}
   - tabName: Bots
     tabRoot: {fileID: 1002117773}
