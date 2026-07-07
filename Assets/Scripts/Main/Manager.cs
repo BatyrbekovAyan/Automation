@@ -1381,6 +1381,13 @@ public class Manager : MonoBehaviour
     private void CancelBotCreation()
     {
         isCreatingBot = false;
+
+        // Stop auth polling before deleting the profiles — the status loops only
+        // exit on authorized:true, so they'd poll the deleted profiles forever.
+        if (_whatsappQrCoroutine != null) { StopCoroutine(_whatsappQrCoroutine); _whatsappQrCoroutine = null; }
+        if (_whatsappStatusCoroutine != null) { StopCoroutine(_whatsappStatusCoroutine); _whatsappStatusCoroutine = null; }
+        if (_telegramStatusCoroutine != null) { StopCoroutine(_telegramStatusCoroutine); _telegramStatusCoroutine = null; }
+
         WhatsappAuth.SetActive(false);
         TelegramAuth.SetActive(false);
 
@@ -1956,6 +1963,9 @@ public class Manager : MonoBehaviour
 
         while (!authorized)
         {
+            // Auth screen is gone (wizard cancelled / settings back) — nothing to advance
+            if (!WhatsappAuth.activeInHierarchy) yield break;
+
             using UnityWebRequest www = UnityWebRequest.Get($"https://wappi.pro/api/sync/get/status?profile_id={whatsappProfileId}");
 
             www.SetRequestHeader("Authorization", wappiAuthToken);
@@ -2326,6 +2336,9 @@ public class Manager : MonoBehaviour
 
         while (!authorized)
         {
+            // Auth screen is gone (wizard cancelled / settings back) — nothing to advance
+            if (!TelegramAuth.activeInHierarchy) yield break;
+
             using UnityWebRequest www = UnityWebRequest.Get($"https://wappi.pro/tapi/sync/get/status?profile_id={telegramProfileId}");
 
             www.SetRequestHeader("Authorization", wappiAuthToken);
