@@ -18,6 +18,8 @@ public class SecretsData
     public string n8nAPIKey;
     public string n8nBaseUrl;
     public string telegramBotToken;
+    // Telegram chat that receives in-app support-form messages (Profile → Поддержка).
+    public string supportChatId;
     public GreenApiSecrets greenApi;
     public GreenApiSecrets greenApiAvatar;
 }

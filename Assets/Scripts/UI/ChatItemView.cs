@@ -492,6 +492,10 @@ public void Bind(ChatViewModel model)
 
     private void ApplyUnreadBadge(int count)
     {
+        // Profile → Уведомления → «Счётчик непрочитанных»: treating the count
+        // as zero also reverts the green time tint, covering both call sites.
+        if (!NotifPrefs.UnreadBadgeEnabled) count = 0;
+
         bool hasUnread = count > 0;
 
         if (timeText != null)

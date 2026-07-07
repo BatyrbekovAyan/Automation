@@ -69,6 +69,23 @@ public static class QuotedMessageCache
         }
     }
 
+    /// <summary>
+    /// Drops the in-memory map AND the on-disk file for a cache root (privacy
+    /// clear). Both must go together: a surviving _mem entry would keep serving
+    /// stale previews and the next Put would re-persist the whole old map.
+    /// </summary>
+    public static void Clear(string baseDir)
+    {
+        if (string.IsNullOrEmpty(baseDir)) return;
+        _mem.Remove(baseDir);
+        try
+        {
+            string path = PathFor(baseDir);
+            if (File.Exists(path)) File.Delete(path);
+        }
+        catch (Exception ex) { Debug.LogWarning($"[QuotedMessageCache] clear failed: {ex.Message}"); }
+    }
+
     private static Dictionary<string, Entry> LoadMap(string baseDir)
     {
         if (_mem.TryGetValue(baseDir, out var cached)) return cached;

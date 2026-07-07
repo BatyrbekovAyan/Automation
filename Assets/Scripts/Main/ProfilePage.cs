@@ -12,12 +12,12 @@ public class ProfilePage : MonoBehaviour
     // ── Singleton ──────────────────────────────────────────────────────────
     public static ProfilePage Instance;
 
-    // ── PlayerPrefs keys ───────────────────────────────────────────────────
-    private const string KeyName  = "ProfileName";
-    private const string KeyEmail = "ProfileEmail";
+    // ── PlayerPrefs keys (public: ProfileSubPages.Account reads the same data) ──
+    public const string KeyName  = "ProfileName";
+    public const string KeyEmail = "ProfileEmail";
 
-    private const string DefaultName  = "Иван Петров";
-    private const string DefaultEmail = "ivan.petrov@email.com";
+    public const string DefaultName  = "Иван Петров";
+    public const string DefaultEmail = "ivan.petrov@email.com";
 
     // ── Profile card ───────────────────────────────────────────────────────
     [Header("Profile Card")]
@@ -33,10 +33,6 @@ public class ProfilePage : MonoBehaviour
     [SerializeField] private Button privacyButton;
     [SerializeField] private Button supportButton;
     [SerializeField] private Button aboutButton;
-
-    // ── Logout ─────────────────────────────────────────────────────────────
-    [Header("Logout")]
-    [SerializeField] private Button logoutButton;
 
     // ── Edit popup ─────────────────────────────────────────────────────────
     [Header("Edit Popup")]
@@ -54,12 +50,6 @@ public class ProfilePage : MonoBehaviour
     private bool  _editLayoutCaptured;
     [SerializeField] private Button          editSaveButton;
     [SerializeField] private Button          editCancelButton;
-
-    // ── Logout confirm popup ───────────────────────────────────────────────
-    [Header("Logout Confirm Popup")]
-    [SerializeField] private GameObject logoutPopup;
-    [SerializeField] private Button     logoutConfirmButton;
-    [SerializeField] private Button     logoutCancelButton;
 
     // ── Navigation ─────────────────────────────────────────────────────────
     [Header("Navigation")]
@@ -113,24 +103,20 @@ public class ProfilePage : MonoBehaviour
     {
         // Row buttons that OPEN popups stay on Button.onClick — they're not
         // dismiss/confirm actions, just navigation triggers.
-        if (editButton   != null) editButton.onClick.AddListener(OpenEditPopup);
-        if (logoutButton != null) logoutButton.onClick.AddListener(OpenLogoutConfirm);
+        if (editButton != null) editButton.onClick.AddListener(OpenEditPopup);
 
         // Popup dismiss/confirm actions: route via PopupUI so they fire on
         // true finger release (filters spurious iOS PointerUp on keyboard
         // dismiss) and never on finger-down.
-        if (editSaveButton      != null) PopupUI.WireFingerUp(editSaveButton,      SaveProfile);
-        if (editCancelButton    != null) PopupUI.WireFingerUp(editCancelButton,    CloseEditPopup);
-        if (logoutConfirmButton != null) PopupUI.WireFingerUp(logoutConfirmButton, ConfirmLogout);
-        if (logoutCancelButton  != null) PopupUI.WireFingerUp(logoutCancelButton,  CloseLogoutConfirm);
+        if (editSaveButton   != null) PopupUI.WireFingerUp(editSaveButton,   SaveProfile);
+        if (editCancelButton != null) PopupUI.WireFingerUp(editCancelButton, CloseEditPopup);
 
         // Overlay backdrop tap → close. EventAbsorber on the card prevents
         // taps on card background (between/around inputs/buttons) from
         // bubbling up to the overlay's dismiss handler.
-        WireOverlayDismiss(editPopup,   CloseEditPopup);
-        WireOverlayDismiss(logoutPopup, CloseLogoutConfirm);
+        WireOverlayDismiss(editPopup, CloseEditPopup);
 
-        // Settings stubs — replace with real navigation when screens exist
+        // Settings rows → ProfileSubPages panels (built by ProfileSubPagesBuilder)
         if (accountButton       != null) accountButton.onClick.AddListener(OnAccount);
         if (notificationsButton != null) notificationsButton.onClick.AddListener(OnNotifications);
         if (privacyButton       != null) privacyButton.onClick.AddListener(OnPrivacy);
@@ -221,6 +207,19 @@ public class ProfilePage : MonoBehaviour
 
     private void CloseEditPopup() => PopupUI.Hide(editPopup);
 
+    /// <summary>Opens the edit popup from ProfileSubPages.Account's pencil button.</summary>
+    public void OpenEditPopupPublic() => OpenEditPopup();
+
+    /// <summary>
+    /// Used by the «Удалить все данные» wipe (ProfileSubPages.Account) —
+    /// keeps BottomTabManager wiring in one place.
+    /// </summary>
+    public void NavigateToWhatsAppTab()
+    {
+        if (bottomTabManager != null)
+            bottomTabManager.SwitchTab(BottomTabManager.WhatsAppTabIndex);
+    }
+
     private void SaveProfile()
     {
         string newName  = editNameInput.text.Trim();
@@ -232,46 +231,17 @@ public class ProfilePage : MonoBehaviour
         PlayerPrefs.Save();
 
         RefreshProfileCard();
+        ProfileSubPages.Instance?.RefreshAccountCard(); // Account page shows the same data
         CloseEditPopup();
     }
 
-    // ── Logout popup ───────────────────────────────────────────────────────
+    // ── Settings rows → sub-pages ──────────────────────────────────────────
+    // The destructive wipe (ex-«Выйти») now lives on the Account page as
+    // «Удалить все данные», implemented in ProfileSubPages.Account.
 
-    private void OpenLogoutConfirm() => PopupUI.Show(logoutPopup);
-
-    private void CloseLogoutConfirm() => PopupUI.Hide(logoutPopup);
-
-    private void ConfirmLogout()
-    {
-        // Clear all bot PlayerPrefs entries
-        int botCount = PlayerPrefs.GetInt("ids", 0);
-        for (int i = 0; i < botCount; i++)
-        {
-            string prefix = "Bot" + i;
-            string[] suffixes =
-            {
-                "Name", "isOn", "Status", "Active", "isOnWhatsapp", "isOnTelegram",
-                "BusinessType", "WhatsappNumber", "TelegramNumber", "Business", "Prompt",
-                "WhatsappWorkflowId", "WhatsappProfileId", "TelegramWorkflowId", "TelegramProfileId",
-                "ProductsNumber", "ServicesNumber"
-            };
-            foreach (string s in suffixes) PlayerPrefs.DeleteKey(prefix + s);
-        }
-        PlayerPrefs.DeleteKey("ids");
-        PlayerPrefs.Save();
-
-        CloseLogoutConfirm();
-
-        // Navigate to the first tab (WhatsApp)
-        if (bottomTabManager != null)
-            bottomTabManager.SwitchTab(0);
-    }
-
-    // ── Settings stubs ─────────────────────────────────────────────────────
-
-    private void OnAccount()       => Debug.Log("[ProfilePage] Account tapped — stub");
-    private void OnNotifications() => Debug.Log("[ProfilePage] Notifications tapped — stub");
-    private void OnPrivacy()       => Debug.Log("[ProfilePage] Privacy tapped — stub");
-    private void OnSupport()       => Debug.Log("[ProfilePage] Support tapped — stub");
-    private void OnAbout()         => Debug.Log("[ProfilePage] About tapped — stub");
+    private void OnAccount()       => ProfileSubPages.Instance?.Open(ProfileSubPages.Page.Account);
+    private void OnNotifications() => ProfileSubPages.Instance?.Open(ProfileSubPages.Page.Notifications);
+    private void OnPrivacy()       => ProfileSubPages.Instance?.Open(ProfileSubPages.Page.Privacy);
+    private void OnSupport()       => ProfileSubPages.Instance?.Open(ProfileSubPages.Page.Support);
+    private void OnAbout()         => ProfileSubPages.Instance?.Open(ProfileSubPages.Page.About);
 }

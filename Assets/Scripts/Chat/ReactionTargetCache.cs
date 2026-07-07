@@ -56,6 +56,23 @@ public static class ReactionTargetCache
         Save(baseDir, map);
     }
 
+    /// <summary>
+    /// Drops the in-memory map AND the on-disk file for a cache root (privacy
+    /// clear). Both must go together: a surviving _mem entry would keep serving
+    /// stale targets and the next Put would re-persist the whole old map.
+    /// </summary>
+    public static void Clear(string baseDir)
+    {
+        if (string.IsNullOrEmpty(baseDir)) return;
+        _mem.Remove(baseDir);
+        try
+        {
+            string path = PathFor(baseDir);
+            if (File.Exists(path)) File.Delete(path);
+        }
+        catch (Exception ex) { Debug.LogWarning($"[ReactionTargetCache] clear failed: {ex.Message}"); }
+    }
+
     private static void EvictToCapacity(Dictionary<string, Entry> map)
     {
         while (map.Count > Capacity)

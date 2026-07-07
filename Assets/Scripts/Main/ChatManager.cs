@@ -259,8 +259,12 @@ public partial class ChatManager : MonoBehaviour
         {
             Chats.Clear();
             chatLookup.Clear();
-            OnChatListCleared?.Invoke(); 
+            OnChatListCleared?.Invoke();
         }
+
+        // One cue per sync pass, no matter how many chats got new messages.
+        bool notifyIncoming = false;
+        bool chatPanelVisible = MessageListPanel != null && MessageListPanel.activeSelf;
 
         foreach (var chat in response.dialogs)
         {
@@ -310,6 +314,10 @@ public partial class ChatManager : MonoBehaviour
                     if (chat.last_message_type == "reaction")
                         existingVm.UpdateReactionContext(null, null);
                 }
+
+                notifyIncoming |= IncomingNotifyPolicy.ShouldNotify(
+                    isInitialLoad, lastIdChanged, mergedIsMine, chat.unread_count,
+                    chat.id, currentChatId, chatPanelVisible);
             }
             else
             {
@@ -325,8 +333,15 @@ public partial class ChatManager : MonoBehaviour
                 Chats.Add(chatVM);
                 chatLookup[chat.id] = chatVM;
                 OnChatAdded?.Invoke(chatVM);
+
+                notifyIncoming |= IncomingNotifyPolicy.ShouldNotify(
+                    isInitialLoad, lastIdChanged: true, lastMessageIsMine: isMine,
+                    unreadCount: chat.unread_count, chatId: chat.id,
+                    openChatId: currentChatId, chatPanelVisible: chatPanelVisible);
             }
         }
+
+        if (notifyIncoming) NotificationFx.OnIncomingDetected();
 
         // Drop chats deleted on the server: present in memory but absent from this full list.
         // chats/filter returns the complete set, so a missing chat was removed in WhatsApp itself.
