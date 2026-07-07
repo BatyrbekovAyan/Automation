@@ -77,6 +77,12 @@ public class Manager : MonoBehaviour
 
     [Header("Add Bot Form")]
     [SerializeField] private GameObject AddBotFormPage;
+    [Tooltip("Back chevron in the Add-Bot overlay header (wired by NavRestructureBuilder).")]
+    [SerializeField] private Button addBotBackButton;
+    [Tooltip("Left-edge swipe strip on the Add-Bot overlay (wired by NavRestructureBuilder).")]
+    [SerializeField] private SwipeToBackPanel addBotSwipeBack;
+    [Tooltip("Bots-page empty-state CTA (wired by NavRestructureBuilder).")]
+    [SerializeField] private Button botsEmptyStateCta;
     [SerializeField] private TextMeshProUGUI platformValueText;
     [SerializeField] private GameObject platformWhatsappGroup;
     [SerializeField] private GameObject platformTelegramGroup;
@@ -269,6 +275,11 @@ public class Manager : MonoBehaviour
             createBotFormButton.onClick.AddListener(() => StartCoroutine(CreateBotFromForm()));
             createBotFormButton.interactable = false;
         }
+
+        // Add-Bot overlay chrome + Bots empty-state CTA (objects created by NavRestructureBuilder)
+        if (addBotBackButton != null) addBotBackButton.onClick.AddListener(CloseAddBotForm);
+        if (addBotSwipeBack != null) addBotSwipeBack.OnCommitted = CloseAddBotForm;
+        if (botsEmptyStateCta != null) botsEmptyStateCta.onClick.AddListener(() => global::BotsPage.Instance?.StartNewBot());
 
         // Auth panels — WhatsApp
         if (WhatsappAuthBackButton != null) WhatsappAuthBackButton.onClick.AddListener(CancelBotCreation);
