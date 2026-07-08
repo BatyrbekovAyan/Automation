@@ -26,6 +26,12 @@ public class FaqItemView : MonoBehaviour
     public Button QuestionButton => questionButton;
     public bool IsOpen { get; private set; }
 
+    // Laid-out width of the answer label. 0/near-0 until the panel has had a
+    // real layout pass — callers measuring the expanded height must wait for
+    // this to settle, else preferredHeight is computed at width ~0 (every word
+    // wraps to its own line) and blows up to thousands of px.
+    public float AnswerWidth => answerText != null ? answerText.rectTransform.rect.width : 0f;
+
     public void SetContent(string question, string answer)
     {
         if (questionText != null) questionText.text = question;
@@ -42,6 +48,8 @@ public class FaqItemView : MonoBehaviour
         {
             // The answer wraps to its container width, which is settled only
             // after a layout pass — force one before reading preferredHeight.
+            // (Callers doing an instant expand on first open must first wait for
+            // a real width; see ProfileSubPages.Support.ExpandFirstFaqWhenLaidOut.)
             LayoutRebuilder.ForceRebuildLayoutImmediate(answerText.rectTransform);
             target = answerText.preferredHeight + AnswerBottomPadding;
         }

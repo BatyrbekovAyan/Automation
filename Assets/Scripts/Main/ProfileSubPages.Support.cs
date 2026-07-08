@@ -1,3 +1,4 @@
+using System.Collections;
 using TMPro;
 using DG.Tweening;
 using UnityEngine;
@@ -37,6 +38,7 @@ public partial class ProfileSubPages
     };
 
     private bool _sendingSupport;
+    private Coroutine _faqExpandRoutine;
 
     private void WireSupport()
     {
@@ -77,8 +79,46 @@ public partial class ProfileSubPages
     private void ResetFaq()
     {
         if (faqItems == null) return;
+
+        // Collapse every row instantly (no width needed — collapse targets 0),
+        // then expand the first row only once its answer label actually has a
+        // laid-out width. On the very first open Open() calls this the same frame
+        // it activates the panel, so no layout/ScrollRect pass has run yet: a
+        // synchronous ForceRebuildLayoutImmediate does NOT resolve the deep
+        // answer-label width, and measuring preferredHeight now wraps the text at
+        // width ~0 into thousands of lines (6000+ px). Deferring the expand until
+        // the width settles fixes it — the same reason a later manual open fits.
         for (int i = 0; i < faqItems.Length; i++)
-            faqItems[i]?.SetExpanded(i == 0, instant: true);
+            faqItems[i]?.SetExpanded(false, instant: true);
+
+        if (_faqExpandRoutine != null) StopCoroutine(_faqExpandRoutine);
+        _faqExpandRoutine = StartCoroutine(ExpandFirstFaqWhenLaidOut());
+    }
+
+    private IEnumerator ExpandFirstFaqWhenLaidOut()
+    {
+        var first = faqItems.Length > 0 ? faqItems[0] : null;
+        var supportPanel = PanelFor(Page.Support);
+
+        // On first open the ScrollRect/layout chain hasn't run, so the answer
+        // label reports a bogus ~2px width; measuring preferredHeight there wraps
+        // the text into thousands of lines (6000+ px). Force a panel rebuild each
+        // frame and wait until the width is real (the laid-out card width is
+        // several hundred px; the unsettled state is ~2), then expand. Verified:
+        // the width settles after a single frame. Cap the wait so we never hang.
+        const float RealAnswerWidth = 100f;
+        int guard = 0;
+        while (first != null && first.AnswerWidth < RealAnswerWidth && guard < 60)
+        {
+            if (supportPanel != null)
+                LayoutRebuilder.ForceRebuildLayoutImmediate(supportPanel);
+            if (first.AnswerWidth >= RealAnswerWidth) break;
+            yield return null;
+            guard++;
+        }
+
+        first?.SetExpanded(true, instant: true);
+        _faqExpandRoutine = null;
     }
 
     // ── Bottom sheet ────────────────────────────────────────────────────────
