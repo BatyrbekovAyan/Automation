@@ -4668,6 +4668,7 @@ GameObject:
   - component: {fileID: 5113342428778853028}
   - component: {fileID: 3746473626186340259}
   - component: {fileID: 2799876263478566925}
+  - component: {fileID: 1304148670500931564}
   m_Layer: 0
   m_Name: Divider
   m_TagString: Untagged
@@ -4732,6 +4733,20 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!114 &1304148670500931564
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1502432760265938153}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 02934f87079704a12a3dabac697d8711, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PixelSnapLine
+  axis: 0
+  designThicknessUnits: 1
 --- !u!1 &1503187672809061486
 GameObject:
   m_ObjectHideFlags: 0
@@ -30260,6 +30275,7 @@ GameObject:
   - component: {fileID: 4886836334516551001}
   - component: {fileID: 385289245288277987}
   - component: {fileID: 3895570284029547877}
+  - component: {fileID: 8251051897149521380}
   m_Layer: 0
   m_Name: Divider
   m_TagString: Untagged
@@ -30324,6 +30340,20 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!114 &8251051897149521380
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8712752547195940512}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 02934f87079704a12a3dabac697d8711, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PixelSnapLine
+  axis: 0
+  designThicknessUnits: 1
 --- !u!1 &8797912497533981410
 GameObject:
   m_ObjectHideFlags: 0

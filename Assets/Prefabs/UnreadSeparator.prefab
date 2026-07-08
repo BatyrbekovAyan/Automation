@@ -82,6 +82,7 @@ GameObject:
   - component: {fileID: 1710181986113223957}
   - component: {fileID: 7240008195611629276}
   - component: {fileID: 8638053664100235190}
+  - component: {fileID: 3156852167621542779}
   m_Layer: 0
   m_Name: BottomLine
   m_TagString: Untagged
@@ -146,6 +147,20 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!114 &3156852167621542779
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5451330513821429014}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 02934f87079704a12a3dabac697d8711, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PixelSnapLine
+  axis: 0
+  designThicknessUnits: 1
 --- !u!1 &5790199503079909455
 GameObject:
   m_ObjectHideFlags: 0

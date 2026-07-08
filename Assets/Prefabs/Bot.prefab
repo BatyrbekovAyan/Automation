@@ -845,6 +845,7 @@ GameObject:
   - component: {fileID: 8043493862917158882}
   - component: {fileID: 5296194842189290401}
   - component: {fileID: 7738574221928317928}
+  - component: {fileID: 3404011885649522940}
   m_Layer: 5
   m_Name: Divider
   m_TagString: Untagged
@@ -909,6 +910,20 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!114 &3404011885649522940
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2447570566907358966}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 02934f87079704a12a3dabac697d8711, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PixelSnapLine
+  axis: 0
+  designThicknessUnits: 2
 --- !u!1 &3128666919321547283
 GameObject:
   m_ObjectHideFlags: 0
