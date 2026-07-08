@@ -1630,6 +1630,10 @@ public class Manager : MonoBehaviour
 
     private IEnumerator OpenWhatsappQRPanel()
     {
+        // Clear any stale QR before showing the loading label. On a resend the
+        // deleted profile's QR is still on screen; without this the "Загрузка..."
+        // text renders on top of the old QR instead of a clean box.
+        WhatsappQRCodeImage.texture = null;
         WhatsappQRStatusText.GetComponent<TextMeshProUGUI>().text = "Загрузка...";
         WhatsappQRStatusText.SetActive(true);
 
