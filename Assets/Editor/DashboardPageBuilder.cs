@@ -354,7 +354,7 @@ public static class DashboardPageBuilder
 
         var deltaPill = NewChild(numberRow, "DeltaPill", out _);
         var deltaBg = deltaPill.AddComponent<Image>();
-        deltaBg.color = Hex("#E8F8EE");
+        deltaBg.color = Hex("#F2F2F7");   // neutral — SetDelta signals the sign via text color (green +, orange −), so the pill must not be green
         deltaBg.raycastTarget = false;
         AddRounded(deltaPill, 24f);
         var dHlg = deltaPill.AddComponent<HorizontalLayoutGroup>();

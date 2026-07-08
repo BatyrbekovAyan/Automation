@@ -71,8 +71,9 @@ public class DashboardPage : MonoBehaviour
         long now = NowMs();
         if (DashboardRefreshGate.ShouldFetch(DashboardStore.LastFetchMs, now))
             StartCoroutine(FetchRoutine(0));
-        else if (_all.Count == 0)
-            SetLoading(true);                     // first-ever open, no cache
+        // If we just fetched (<60s) and cache is empty, the empty state is correct —
+        // don't show a loading overlay with no coroutine to clear it. FetchRoutine owns
+        // the first-open loading state.
     }
 
     // ---- data ----------------------------------------------------------------
@@ -113,6 +114,12 @@ public class DashboardPage : MonoBehaviour
     {
         if (_fetching && attempt == 0) yield break;
         _fetching = true;
+
+        // First-ever open with no cache: show the loading state, not a flash of the empty
+        // state, while the request is in flight. Render() suppresses empty when _fetching
+        // is true, and this runs synchronously before the first yield — so the empty state
+        // OnEnable painted a moment earlier never reaches the screen.
+        if (_all.Count == 0) { SetLoading(true); Render(); }
 
         var profiles = AuthedProfiles();
         if (profiles.Count == 0) { _fetching = false; SetLoading(false); Render(); yield break; }
@@ -287,7 +294,8 @@ public class DashboardPage : MonoBehaviour
         var go = Instantiate(chipPrefabHost, chipsRow);
         go.SetActive(true);
         var lbl = go.GetComponentInChildren<TextMeshProUGUI>();
-        if (lbl) lbl.text = text;
+        // White label on the selected (blue) chip; muted ink on the unselected (white) chip.
+        if (lbl) { lbl.text = text; lbl.color = on ? Color.white : DashboardStatusInfo.FgColor(OutcomeStatus.QuestionClosed); }
         var img = go.GetComponent<Image>();
         if (img) img.color = on ? DashboardStatusInfo.FgColor(OutcomeStatus.InDialog) : Color.white;
         var btn = go.GetComponent<Button>();
@@ -398,6 +406,8 @@ public class DashboardPage : MonoBehaviour
         // coroutine deliberately lives on ChatManager, so it survives this.)
         StopAllCoroutines();
         _fetching = false;
+        // Close any open drill-down so it doesn't reappear stale when the tab returns.
+        if (listPanel != null) listPanel.gameObject.SetActive(false);
     }
 
     // Deterministic avatar (mirror ChatItemView) + display-name fallback.
