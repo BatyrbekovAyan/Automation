@@ -547,12 +547,13 @@ public static class DashboardPageBuilder
         summary.textWrappingMode = TextWrappingModes.NoWrap;
         summary.overflowMode = TextOverflowModes.Ellipsis;
 
-        // Time — top-right, muted; the controller fills it (local-time-wins). Sits above
-        // the vertically-centered pill in the reserved right column, no overlap.
+        // Time — top-right, muted; the controller fills it (local-time-wins). Pinned to
+        // the top band (row-y ≈ [134,174]) so it clears the vertically-centered pill
+        // below it (pill spans ≈ [65,125] in the same right column) — no overlap.
         var timeGo = NewChild(row, "Time", out var timeRt);
         SetAnchors(timeRt, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f));
-        timeRt.sizeDelta = new Vector2(240f, 44f);
-        timeRt.anchoredPosition = new Vector2(-28f, -50f);
+        timeRt.sizeDelta = new Vector2(240f, 40f);
+        timeRt.anchoredPosition = new Vector2(-28f, -16f);
         var timeTmp = AddText(timeGo, "", 30f, _regular, Muted);
         timeTmp.alignment = TextAlignmentOptions.TopRight;
 
