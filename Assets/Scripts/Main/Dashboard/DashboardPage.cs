@@ -357,7 +357,7 @@ public class DashboardPage : MonoBehaviour
         var pillLabel = go.transform.Find("Pill/Label")?.GetComponent<TextMeshProUGUI>();
         var botTag = go.transform.Find("BotTag")?.GetComponent<TextMeshProUGUI>();
         var avatar = go.transform.Find("Avatar")?.GetComponent<Image>();
-        var avatarInitial = go.transform.Find("Avatar/Initial")?.GetComponent<TextMeshProUGUI>();
+        var avatarDefault = go.transform.Find("Avatar/DefaultImage")?.GetComponent<Image>();
         var time = go.transform.Find("Time")?.GetComponent<TextMeshProUGUI>();
 
         if (time)
@@ -386,13 +386,13 @@ public class DashboardPage : MonoBehaviour
         {
             avatar.sprite = avatarSprite;
             avatar.color = Color.white;
-            if (avatarInitial) avatarInitial.gameObject.SetActive(false);
+            if (avatarDefault) avatarDefault.gameObject.SetActive(false);
         }
         else
         {
             if (avatar) avatar.sprite = null;
-            if (avatarInitial) avatarInitial.gameObject.SetActive(true);
-            ApplyAvatar(avatar, avatarInitial, r.chatId, display);
+            if (avatarDefault) avatarDefault.gameObject.SetActive(true);
+            ApplyAvatar(avatar, avatarDefault, r.chatId);
         }
 
         var btn = go.GetComponent<Button>();
@@ -440,15 +440,14 @@ public class DashboardPage : MonoBehaviour
         new[]{"#CFE9E4","#00A884"}, new[]{"#D6E4FB","#1FA2FF"}, new[]{"#EADCF1","#A348D4"},
         new[]{"#FCE1D0","#F8942F"}, new[]{"#FCE2EC","#E14781"} };
 
-    private void ApplyAvatar(Image bg, TextMeshProUGUI initial, string chatId, string display)
+    // Default avatar: colored circle (pair[0]) + tinted silhouette (pair[1]) — the same
+    // deterministic bg/silhouette pairs the chat list uses.
+    private void ApplyAvatar(Image bg, Image silhouette, string chatId)
     {
         int hash = 0; foreach (char c in chatId ?? "") hash += c;
         var pair = AvatarColors[Mathf.Abs(hash) % AvatarColors.Length];
         if (bg && ColorUtility.TryParseHtmlString(pair[0], out var b)) bg.color = b;
-        if (initial) {
-            initial.text = string.IsNullOrEmpty(display) ? "?" : display.Substring(0, 1).ToUpper();
-            if (ColorUtility.TryParseHtmlString(pair[1], out var f)) initial.color = f;
-        }
+        if (silhouette && ColorUtility.TryParseHtmlString(pair[1], out var f)) silhouette.color = f;
     }
 
     private string ChatDisplayName(string chatId)

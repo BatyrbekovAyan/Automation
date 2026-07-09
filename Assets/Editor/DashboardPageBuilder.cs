@@ -70,8 +70,9 @@ public static class DashboardPageBuilder
     private const string ChevronLeftPath = "Assets/Images/Chat/chevron-left.png";
     private const string ChevronRightPath = "Assets/Images/Chat/chevron-right.png";
     private const string HeroPath = "Assets/Images/Chat/bot_hero.png";
+    private const string AvatarSilhouettePath = "Assets/Images/Chat/Avatar.png";  // chat-list default avatar
 
-    private static Sprite _chevronLeft, _chevronRight, _hero;
+    private static Sprite _chevronLeft, _chevronRight, _hero, _avatarSilhouette;
     private static readonly List<Component> _roundedToRefresh = new List<Component>();
 
     private struct PanelParts
@@ -529,10 +530,13 @@ public static class DashboardPageBuilder
         avatarImg.color = Hex("#D6E4FB");
         avatarImg.raycastTarget = false;
         AddRounded(avatar, 70f);
-        var initialGo = NewChild(avatar, "Initial", out var initialRt);
-        StretchFill(initialRt);
-        var initial = AddText(initialGo, "?", 56f, _bold, Hex("#1FA2FF"));
-        initial.alignment = TextAlignmentOptions.Center;
+        // Default-avatar silhouette (same sprite as the chat list) centered inside the
+        // circle; the controller tints it + toggles it when no real photo is loaded.
+        var defGo = NewChild(avatar, "DefaultImage", out var defRt);
+        SetAnchors(defRt, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0.5f, 0.5f));
+        defRt.offsetMin = new Vector2(44f, 44f);
+        defRt.offsetMax = new Vector2(-44f, -44f);
+        AddIconImage(defGo, _avatarSilhouette, Hex("#1FA2FF"));
 
         const float textLeft = 196f;    // 28 + 140 + 28
         const float textRight = 300f;   // reserve the pill column
@@ -839,6 +843,7 @@ public static class DashboardPageBuilder
         _chevronLeft = LoadSprite(ChevronLeftPath);
         _chevronRight = LoadSprite(ChevronRightPath);
         _hero = LoadSprite(HeroPath);
+        _avatarSilhouette = LoadSprite(AvatarSilhouettePath);
     }
 
     private static TMP_FontAsset LoadFont(string guid)
