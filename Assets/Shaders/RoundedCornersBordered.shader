@@ -98,9 +98,6 @@ Shader "UI/RoundedCorners/RoundedCornersBordered" {
                 uvS.y = (uvS.y - _OuterUV.y) / (_OuterUV.w - _OuterUV.y);
 
                 fixed4 fill = (tex2D(_MainTex, i.uv) + _TextureSampleAdd) * i.color;
-                #ifdef UNITY_UI_CLIP_RECT
-                fill.a *= UnityGet2DClipping(i.worldPosition.xy, _ClipRect);
-                #endif
 
                 float2 size = _WidthHeightRadius.xy;
                 float radius = _WidthHeightRadius.z;
@@ -113,6 +110,12 @@ Shader "UI/RoundedCorners/RoundedCornersBordered" {
                 fixed4 col;
                 col.rgb = lerp(_BorderColor.rgb, fill.rgb, interior);
                 col.a   = min(lerp(_BorderColor.a, fill.a, interior), fillAlpha);
+
+                // Apply the RectMask2D clip to the FINAL alpha (border band included), not just the
+                // fill — otherwise the border color bleeds past the mask edge on scroll.
+                #ifdef UNITY_UI_CLIP_RECT
+                col.a *= UnityGet2DClipping(i.worldPosition.xy, _ClipRect);
+                #endif
 
                 #ifdef UNITY_UI_ALPHACLIP
                 clip(col.a - 0.001);
