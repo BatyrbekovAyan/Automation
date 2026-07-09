@@ -6,19 +6,22 @@ using UnityEngine.UI;
 using System.Text;
 
 /// <summary>
-/// Idempotent tool: adds <see cref="PixelSnapLine"/> to thin single-axis line/divider/
-/// border objects across the open scene and the known prefabs.
+/// Idempotent tool: wires thin line/divider/border objects across the open scene and the
+/// known prefabs to a whole-pixel snap component. Two routes:
+///  • Route 1 → <see cref="PixelSnapLine"/> when thickness lives in the RectTransform's fixed
+///    (non-stretched, non-layout-controlled) axis with a small sizeDelta.
+///  • Route 2 → <see cref="PixelSnapLayoutThickness"/> when thickness is a
+///    <c>LayoutElement.preferredHeight</c> driven by a parent VLG (childControlHeight).
 ///
-/// Classification reads the SERIALIZED anchors + sizeDelta, never the live
-/// <c>RectTransform.rect</c> — most line objects in this single-scene app live inside
-/// inactive (SetActive-false) panels, so their live rect is unresolved (default 100x100
-/// or anchor-driven zero). Anchors + sizeDelta are valid regardless of active state.
+/// Classification reads SERIALIZED anchors + sizeDelta + the parent LayoutGroup, never the live
+/// <c>RectTransform.rect</c> — most line objects in this single-scene app live inside inactive
+/// (SetActive-false) panels, so their live rect is unresolved (default 100x100 or anchor-driven
+/// zero). Serialized values are valid regardless of active state.
 ///
-/// A "line" is an object whose FIXED axis (the one not driven by stretched anchors) has a
-/// small sizeDelta (1..MaxThicknessUnits) while the other axis is long (stretched, or a
-/// clearly larger sizeDelta). The small fixed axis is the thickness; the object snaps that
-/// axis to a whole pixel. Anything else (both axes long = a frame/container, both axes thin,
-/// or non-line names) is FLAGGED, never modified — a human resolves flags from the log.
+/// Anything that isn't a thin single-axis line (both axes long = frame/container, both thin,
+/// invisible spacers, or non-line names) is FLAGGED, never modified — a human resolves flags
+/// from the log. Design thickness is stamped ONLY when a component is newly added (re-reading
+/// the [ExecuteAlways]-snapped live geometry on a re-run would drift the pristine value).
 ///
 /// Run "Tools/Pixel Snap/Report (dry run)" first to review decisions without mutating,
 /// then "Tools/Pixel Snap/Wire All" to apply.
@@ -96,28 +99,37 @@ public static class PixelSnapWirer
         bool stretchX = (aMax.x - aMin.x) > StretchEps;
         bool stretchY = (aMax.y - aMin.y) > StretchEps;
 
-        // A parent layout group can drive an axis the RectTransform leaves at 0 (e.g. a
-        // full-width divider whose own width is 0 but the VLG expands it).
+        // A parent layout group can make an axis "long" (childControl OR forceExpand → it can be
+        // the long axis in Route 1).
         var pLayout = t.parent != null ? t.parent.GetComponent<HorizontalOrVerticalLayoutGroup>() : null;
         bool parentExpandsWidth  = pLayout != null && (pLayout.childControlWidth  || pLayout.childForceExpandWidth);
         bool parentExpandsHeight = pLayout != null && (pLayout.childControlHeight || pLayout.childForceExpandHeight);
+
+        // A "layout-driven" thin line is one the parent VLG actually SIZES on its thin axis: it
+        // controls child height, the object opts into layout (not ignoreLayout), and carries a
+        // small preferredHeight. Only these belong to Route 2 — PixelSnapLine's SetSize would be
+        // overwritten by the layout. An anchored line under a childControlHeight parent that opts
+        // out (ignoreLayout) or has no preferredHeight is NOT layout-driven and stays Route 1.
+        var le = t.GetComponent<LayoutElement>();
+        bool hasGraphic = t.GetComponent<Graphic>() != null;
+        bool parentControlsHeight = pLayout != null && pLayout.childControlHeight;
+        bool ignoresLayout = le != null && le.ignoreLayout;
+        bool layoutDrivenHeight = parentControlsHeight && !ignoresLayout
+            && le != null && le.preferredHeight > 0f && le.preferredHeight <= MaxThicknessUnits;
 
         string geo = $"aMin={V(aMin)} aMax={V(aMax)} sizeDelta={V(sd)}";
 
         // Route 1 — thickness from the RectTransform's fixed axis (PixelSnapLine). The "long"
         // axis may be stretched by anchors, larger by sizeDelta, or expanded by a parent layout.
-        bool horiz = !stretchY && sd.y > 0f && sd.y <= MaxThicknessUnits && (stretchX || parentExpandsWidth  || sd.x > sd.y);
+        // Exclude only genuine layout-driven-height lines (they belong to Route 2).
+        bool horiz = !stretchY && !layoutDrivenHeight && sd.y > 0f && sd.y <= MaxThicknessUnits && (stretchX || parentExpandsWidth  || sd.x > sd.y);
         bool vert  = !stretchX && sd.x > 0f && sd.x <= MaxThicknessUnits && (stretchY || parentExpandsHeight || sd.y > sd.x);
         if (horiz && !vert) { WireLine(t, where, PixelSnapLine.SnapAxis.Height, sd.y, apply, log, ref wired, geo); return; }
         if (vert && !horiz) { WireLine(t, where, PixelSnapLine.SnapAxis.Width,  sd.x, apply, log, ref wired, geo); return; }
 
-        // Route 2 — thickness from LayoutElement.preferredHeight, driven by a parent VLG that
-        // controls child height (PixelSnapLayoutThickness). Require a Graphic so invisible
-        // spacers (LayoutElements with no rendered line) are not wired.
-        var le = t.GetComponent<LayoutElement>();
-        bool parentControlsHeight = pLayout != null && pLayout.childControlHeight;
-        bool hasGraphic = t.GetComponent<Graphic>() != null;
-        if (hasGraphic && parentControlsHeight && le != null && le.preferredHeight > 0f && le.preferredHeight <= MaxThicknessUnits)
+        // Route 2 — thickness from LayoutElement.preferredHeight (PixelSnapLayoutThickness).
+        // Require a Graphic so invisible spacers (LayoutElements with no rendered line) are skipped.
+        if (hasGraphic && layoutDrivenHeight)
         {
             WireLayout(t, where, le.preferredHeight, apply, log, ref wired, geo);
             return;
