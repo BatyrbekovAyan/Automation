@@ -192,15 +192,15 @@ echo
 # ══════════════════════════════════════════════════════════════════════════════
 echo "== 1. order_collected =="
 ORDER_SEED="INSERT INTO public.n8n_chat_histories(session_id,message,created_at) VALUES
-('$P_ORDER:$ORDER_CHAT', jsonb_build_object('type','human','data',jsonb_build_object('content','Хочу букет 101 роза на завтра')), now()),
-('$P_ORDER:$ORDER_CHAT', jsonb_build_object('type','ai','data',jsonb_build_object('content','Записал: 101 роза, доставка завтра. Имя и телефон получателя?')), now()),
-('$P_ORDER:$ORDER_CHAT', jsonb_build_object('type','human','data',jsonb_build_object('content','Айгерим, 77010000001')), now()),
-('$P_ORDER:$ORDER_CHAT', jsonb_build_object('type','ai','data',jsonb_build_object('content','Передаю флористу — он подтвердит заказ и пришлёт фото букета')), now());"
+('$P_ORDER:$ORDER_CHAT', jsonb_build_object('type','human','content','Хочу букет 101 роза на завтра'), now()),
+('$P_ORDER:$ORDER_CHAT', jsonb_build_object('type','ai','content','Записал: 101 роза, доставка завтра. Имя и телефон получателя?'), now()),
+('$P_ORDER:$ORDER_CHAT', jsonb_build_object('type','human','content','Айгерим, 77010000001'), now()),
+('$P_ORDER:$ORDER_CHAT', jsonb_build_object('type','ai','content','Передаю флористу — он подтвердит заказ и пришлёт фото букета'), now());"
 ORDER_SEED_CLEAN="INSERT INTO public.n8n_chat_histories(session_id,message,created_at) VALUES
-('$P_ORDER:$ORDER_CHAT', jsonb_build_object('type','human','data',jsonb_build_object('content','Здравствуйте! Закажу 51 розу с доставкой завтра к 12:00')), now()),
-('$P_ORDER:$ORDER_CHAT', jsonb_build_object('type','ai','data',jsonb_build_object('content','Отлично! Как вас зовут и на какой номер оформить заказ?')), now()),
-('$P_ORDER:$ORDER_CHAT', jsonb_build_object('type','human','data',jsonb_build_object('content','Данияр, 77010000001')), now()),
-('$P_ORDER:$ORDER_CHAT', jsonb_build_object('type','ai','data',jsonb_build_object('content','Заказ оформлен: 51 роза, завтра к 12:00. Передаю флористу на подтверждение.')), now());"
+('$P_ORDER:$ORDER_CHAT', jsonb_build_object('type','human','content','Здравствуйте! Закажу 51 розу с доставкой завтра к 12:00'), now()),
+('$P_ORDER:$ORDER_CHAT', jsonb_build_object('type','ai','content','Отлично! Как вас зовут и на какой номер оформить заказ?'), now()),
+('$P_ORDER:$ORDER_CHAT', jsonb_build_object('type','human','content','Данияр, 77010000001'), now()),
+('$P_ORDER:$ORDER_CHAT', jsonb_build_object('type','ai','content','Заказ оформлен: 51 роза, завтра к 12:00. Передаю флористу на подтверждение.'), now());"
 
 wipe_profile "$P_ORDER"; seed "$ORDER_SEED"
 code="$(call_dash "[\"$P_ORDER\"]")"
@@ -234,8 +234,8 @@ check_sub  "idempotent chatId kept"  "$ORDER_CHAT"
 echo "== 3. group skip =="
 wipe_profile "$P_GROUP"
 seed "INSERT INTO public.n8n_chat_histories(session_id,message,created_at) VALUES
-('$P_GROUP:$GROUP_CHAT', jsonb_build_object('type','human','data',jsonb_build_object('content','всем привет, кто заказывал розы?')), now()),
-('$P_GROUP:$GROUP_CHAT', jsonb_build_object('type','ai','data',jsonb_build_object('content','это групповой чат')), now());"
+('$P_GROUP:$GROUP_CHAT', jsonb_build_object('type','human','content','всем привет, кто заказывал розы?'), now()),
+('$P_GROUP:$GROUP_CHAT', jsonb_build_object('type','ai','content','это групповой чат'), now());"
 code="$(call_dash "[\"$P_GROUP\"]")"
 check_http "group webhook"       200 "$code"
 check_sub    "group classified:0"    '"classified":0'
@@ -247,12 +247,12 @@ check_absent "group chat absent"     "@g.us"
 # ══════════════════════════════════════════════════════════════════════════════
 echo "== 4. owner_needed =="
 OWNER_SEED="INSERT INTO public.n8n_chat_histories(session_id,message,created_at) VALUES
-('$P_OWNER:$OWNER_CHAT', jsonb_build_object('type','human','data',jsonb_build_object('content','Хочу вернуть деньги за вчерашний заказ — розы завяли за один день')), now()),
-('$P_OWNER:$OWNER_CHAT', jsonb_build_object('type','ai','data',jsonb_build_object('content','Понимаю ваше недовольство. Возврат средств я оформить не могу — передаю вопрос владельцу, он свяжется с вами.')), now()),
-('$P_OWNER:$OWNER_CHAT', jsonb_build_object('type','human','data',jsonb_build_object('content','Хорошо, жду ответа владельца.')), now());"
+('$P_OWNER:$OWNER_CHAT', jsonb_build_object('type','human','content','Хочу вернуть деньги за вчерашний заказ — розы завяли за один день'), now()),
+('$P_OWNER:$OWNER_CHAT', jsonb_build_object('type','ai','content','Понимаю ваше недовольство. Возврат средств я оформить не могу — передаю вопрос владельцу, он свяжется с вами.'), now()),
+('$P_OWNER:$OWNER_CHAT', jsonb_build_object('type','human','content','Хорошо, жду ответа владельца.'), now());"
 OWNER_SEED_CLEAN="INSERT INTO public.n8n_chat_histories(session_id,message,created_at) VALUES
-('$P_OWNER:$OWNER_CHAT', jsonb_build_object('type','human','data',jsonb_build_object('content','Это ужасно, розы завяли за день! Требую вернуть деньги немедленно!')), now()),
-('$P_OWNER:$OWNER_CHAT', jsonb_build_object('type','ai','data',jsonb_build_object('content','Приношу извинения. Возврат я оформить не могу — передаю вашу жалобу владельцу магазина.')), now());"
+('$P_OWNER:$OWNER_CHAT', jsonb_build_object('type','human','content','Это ужасно, розы завяли за день! Требую вернуть деньги немедленно!'), now()),
+('$P_OWNER:$OWNER_CHAT', jsonb_build_object('type','ai','content','Приношу извинения. Возврат я оформить не могу — передаю вашу жалобу владельцу магазина.'), now());"
 
 wipe_profile "$P_OWNER"; seed "$OWNER_SEED"
 code="$(call_dash "[\"$P_OWNER\"]")"; got="$(outcome_for "$OWNER_CHAT")"
@@ -271,11 +271,11 @@ check_sub  "owner chatId echoed"     "$OWNER_CHAT"
 echo "== 5. multi-profile (comma-split regression) =="
 wipe_profile "$P_MP1"; wipe_profile "$P_MP2"
 seed "INSERT INTO public.n8n_chat_histories(session_id,message,created_at) VALUES
-('$P_MP1:$MP1_CHAT', jsonb_build_object('type','human','data',jsonb_build_object('content','Сколько стоит букет из 25 роз?')), now()),
-('$P_MP1:$MP1_CHAT', jsonb_build_object('type','ai','data',jsonb_build_object('content','Букет из 25 роз стоит 15000 тг. Оформить заказ?')), now());"
+('$P_MP1:$MP1_CHAT', jsonb_build_object('type','human','content','Сколько стоит букет из 25 роз?'), now()),
+('$P_MP1:$MP1_CHAT', jsonb_build_object('type','ai','content','Букет из 25 роз стоит 15000 тг. Оформить заказ?'), now());"
 seed "INSERT INTO public.n8n_chat_histories(session_id,message,created_at) VALUES
-('$P_MP2:$MP2_CHAT', jsonb_build_object('type','human','data',jsonb_build_object('content','Есть доставка в Астане?')), now()),
-('$P_MP2:$MP2_CHAT', jsonb_build_object('type','ai','data',jsonb_build_object('content','Да, доставка по Астане 2000 тг. Куда и на когда доставить?')), now());"
+('$P_MP2:$MP2_CHAT', jsonb_build_object('type','human','content','Есть доставка в Астане?'), now()),
+('$P_MP2:$MP2_CHAT', jsonb_build_object('type','ai','content','Да, доставка по Астане 2000 тг. Куда и на когда доставить?'), now());"
 code="$(call_dash "[\"$P_MP1\",\"$P_MP2\"]")"
 check_http "multi webhook"       200 "$code"
 check_sub  "multi chat #1 present"   "$MP1_CHAT"
@@ -291,11 +291,11 @@ check_sub  "multi classified:2"      '"classified":2'
 # ══════════════════════════════════════════════════════════════════════════════
 echo "== 6. silence rule =="
 SILENT_SEED="INSERT INTO public.n8n_chat_histories(session_id,message,created_at) VALUES
-('$P_SILENT:$SILENT_CHAT', jsonb_build_object('type','human','data',jsonb_build_object('content','Здравствуйте! Хочу заказать букет на день рождения')), now() - interval '13 hours'),
-('$P_SILENT:$SILENT_CHAT', jsonb_build_object('type','ai','data',jsonb_build_object('content','Здравствуйте! С радостью поможем. Какой размер букета вам подойдёт — небольшой, средний или большой?')), now() - interval '13 hours');"
+('$P_SILENT:$SILENT_CHAT', jsonb_build_object('type','human','content','Здравствуйте! Хочу заказать букет на день рождения'), now() - interval '13 hours'),
+('$P_SILENT:$SILENT_CHAT', jsonb_build_object('type','ai','content','Здравствуйте! С радостью поможем. Какой размер букета вам подойдёт — небольшой, средний или большой?'), now() - interval '13 hours');"
 SILENT_SEED_CLEAN="INSERT INTO public.n8n_chat_histories(session_id,message,created_at) VALUES
-('$P_SILENT:$SILENT_CHAT', jsonb_build_object('type','human','data',jsonb_build_object('content','Привет, интересует букет')), now() - interval '13 hours'),
-('$P_SILENT:$SILENT_CHAT', jsonb_build_object('type','ai','data',jsonb_build_object('content','Здравствуйте! Подскажите, на какую сумму рассчитываете?')), now() - interval '13 hours');"
+('$P_SILENT:$SILENT_CHAT', jsonb_build_object('type','human','content','Привет, интересует букет'), now() - interval '13 hours'),
+('$P_SILENT:$SILENT_CHAT', jsonb_build_object('type','ai','content','Здравствуйте! Подскажите, на какую сумму рассчитываете?'), now() - interval '13 hours');"
 
 # Runs INLINE in the current shell (never in $() ) so its check_* calls mutate FAILS.
 # Sets globals: silence_pass (1 once satisfied) and silence_skip_outcome (terminal id).
@@ -346,7 +346,7 @@ sep=""
 for i in $(seq 1 22); do
   chat_id="$(printf '7706%08d@c.us' "$i")"
   DRAIN_SQL+="$sep
-('$P_DRAIN:$chat_id', jsonb_build_object('type','human','data',jsonb_build_object('content','Сколько стоит доставка?')), now())"
+('$P_DRAIN:$chat_id', jsonb_build_object('type','human','content','Сколько стоит доставка?'), now())"
   sep=","
 done
 DRAIN_SQL+=";"
