@@ -379,7 +379,21 @@ public class DashboardPage : MonoBehaviour
         if (botTag) { botTag.gameObject.SetActive(showBotTag);
             if (showBotTag && map.TryGetValue(r.profileId, out var bn))
                 botTag.text = PlayerPrefs.GetString(bn + "Name", bn); }
-        ApplyAvatar(avatar, avatarInitial, r.chatId, display);
+        // Real WhatsApp avatar when the chat list has it loaded/cached; else the
+        // colored-initial default.
+        if (avatar != null && ChatManager.Instance != null &&
+            ChatManager.Instance.TryGetChatAvatar(r.chatId, out var avatarSprite) && avatarSprite != null)
+        {
+            avatar.sprite = avatarSprite;
+            avatar.color = Color.white;
+            if (avatarInitial) avatarInitial.gameObject.SetActive(false);
+        }
+        else
+        {
+            if (avatar) avatar.sprite = null;
+            if (avatarInitial) avatarInitial.gameObject.SetActive(true);
+            ApplyAvatar(avatar, avatarInitial, r.chatId, display);
+        }
 
         var btn = go.GetComponent<Button>();
         if (btn) { btn.onClick.RemoveAllListeners(); btn.onClick.AddListener(() => OpenChat(r)); }

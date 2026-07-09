@@ -23,4 +23,32 @@ public partial class ChatManager
         { lastActivitySec = vm.LastMessageTime; return true; }
         return false;
     }
+
+    // Real chat avatar for the dashboard row, reusing what the chat list already loaded:
+    // an in-memory sprite if present, else the on-disk avatar cache (same synchronous
+    // path as ChatItemView). No network fetch here — the dashboard falls back to the
+    // colored-initial default when nothing is cached.
+    public bool TryGetChatAvatar(string chatId, out Sprite sprite)
+    {
+        sprite = null;
+        if (chatLookup == null || !chatLookup.TryGetValue(chatId, out var vm) || vm == null) return false;
+        if (vm.AvatarSprite != null) { sprite = vm.AvatarSprite; return true; }
+        if (string.IsNullOrEmpty(vm.AvatarUrl) || MediaCacheManager.Instance == null
+            || !MediaCacheManager.Instance.IsImageCached(vm.AvatarUrl)) return false;
+        try
+        {
+            string path = MediaCacheManager.Instance.GetFilePathFromUrl(vm.AvatarUrl);
+            byte[] bytes = System.IO.File.ReadAllBytes(path);
+            var tex = new Texture2D(2, 2);
+            if (tex.LoadImage(bytes))
+            {
+                sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+                vm.AvatarSprite = sprite;   // cache back so this and the chat list reuse it
+                return true;
+            }
+            Object.Destroy(tex);
+        }
+        catch (System.Exception e) { Debug.LogWarning($"[Dashboard] avatar cache load failed: {e.Message}"); }
+        return false;
+    }
 }
