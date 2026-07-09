@@ -2,6 +2,7 @@
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.UI;
 using System.Text;
 
 /// <summary>
@@ -95,38 +96,74 @@ public static class PixelSnapWirer
         bool stretchX = (aMax.x - aMin.x) > StretchEps;
         bool stretchY = (aMax.y - aMin.y) > StretchEps;
 
-        // Fixed-axis thickness comes from sizeDelta; the other axis counts as "long" if it is
-        // stretched or its own sizeDelta is clearly larger than the thin one.
-        bool horiz = !stretchY && sd.y > 0f && sd.y <= MaxThicknessUnits && (stretchX || sd.x > sd.y);
-        bool vert  = !stretchX && sd.x > 0f && sd.x <= MaxThicknessUnits && (stretchY || sd.y > sd.x);
+        // A parent layout group can drive an axis the RectTransform leaves at 0 (e.g. a
+        // full-width divider whose own width is 0 but the VLG expands it).
+        var pLayout = t.parent != null ? t.parent.GetComponent<HorizontalOrVerticalLayoutGroup>() : null;
+        bool parentExpandsWidth  = pLayout != null && (pLayout.childControlWidth  || pLayout.childForceExpandWidth);
+        bool parentExpandsHeight = pLayout != null && (pLayout.childControlHeight || pLayout.childForceExpandHeight);
 
         string geo = $"aMin={V(aMin)} aMax={V(aMax)} sizeDelta={V(sd)}";
 
-        PixelSnapLine.SnapAxis axis;
-        float thickness;
-        if (horiz && !vert) { axis = PixelSnapLine.SnapAxis.Height; thickness = sd.y; }
-        else if (vert && !horiz) { axis = PixelSnapLine.SnapAxis.Width; thickness = sd.x; }
-        else
+        // Route 1 — thickness from the RectTransform's fixed axis (PixelSnapLine). The "long"
+        // axis may be stretched by anchors, larger by sizeDelta, or expanded by a parent layout.
+        bool horiz = !stretchY && sd.y > 0f && sd.y <= MaxThicknessUnits && (stretchX || parentExpandsWidth  || sd.x > sd.y);
+        bool vert  = !stretchX && sd.x > 0f && sd.x <= MaxThicknessUnits && (stretchY || parentExpandsHeight || sd.y > sd.x);
+        if (horiz && !vert) { WireLine(t, where, PixelSnapLine.SnapAxis.Height, sd.y, apply, log, ref wired, geo); return; }
+        if (vert && !horiz) { WireLine(t, where, PixelSnapLine.SnapAxis.Width,  sd.x, apply, log, ref wired, geo); return; }
+
+        // Route 2 — thickness from LayoutElement.preferredHeight, driven by a parent VLG that
+        // controls child height (PixelSnapLayoutThickness). Require a Graphic so invisible
+        // spacers (LayoutElements with no rendered line) are not wired.
+        var le = t.GetComponent<LayoutElement>();
+        bool parentControlsHeight = pLayout != null && pLayout.childControlHeight;
+        bool hasGraphic = t.GetComponent<Graphic>() != null;
+        if (hasGraphic && parentControlsHeight && le != null && le.preferredHeight > 0f && le.preferredHeight <= MaxThicknessUnits)
         {
-            log.AppendLine($"FLAG [{where}] {n} — not a thin single-axis line ({geo})");
-            flagged++;
+            WireLayout(t, where, le.preferredHeight, apply, log, ref wired, geo);
             return;
         }
 
+        log.AppendLine($"FLAG [{where}] {n} — not a snap-able thin line ({geo})");
+        flagged++;
+    }
+
+    private static void WireLine(Transform t, string where, PixelSnapLine.SnapAxis axis, float thickness,
+        bool apply, StringBuilder log, ref int wired, string geo)
+    {
+        // Stamp designThickness ONLY when adding the component. `thickness` is read from live
+        // geometry, and once a PixelSnapLine exists its [ExecuteAlways] snap has already mutated
+        // that geometry to the Editor's scale factor — re-stamping would drift the design value.
+        bool exists = t.GetComponent<PixelSnapLine>() != null;
         if (apply)
         {
-            // Retire the legacy NativeHairline on any wired object (only ChatItem's Divider
-            // has one). GetComponent(string) avoids a compile-time reference, so this tool
-            // still builds after NativeHairline.cs is deleted.
+            // Retire the legacy NativeHairline on any wired object (only ChatItem's Divider has
+            // one). GetComponent(string) avoids a compile-time reference, so this tool still
+            // builds after NativeHairline.cs is deleted.
             var legacy = t.GetComponent("NativeHairline");
             if (legacy != null) Object.DestroyImmediate(legacy, true);
 
-            var line = t.GetComponent<PixelSnapLine>();
-            if (line == null) line = t.gameObject.AddComponent<PixelSnapLine>();
-            line.EditorConfigure(axis, thickness);
+            if (!exists)
+            {
+                var line = t.gameObject.AddComponent<PixelSnapLine>();
+                line.EditorConfigure(axis, thickness);
+                EditorUtility.SetDirty(t.gameObject);
+            }
+        }
+        log.AppendLine($"WIRE-LINE({(exists ? "kept" : "add")}) [{where}] {t.name} — axis={axis} liveH={thickness:0.##} ({geo})");
+        wired++;
+    }
+
+    private static void WireLayout(Transform t, string where, float thickness,
+        bool apply, StringBuilder log, ref int wired, string geo)
+    {
+        bool exists = t.GetComponent<PixelSnapLayoutThickness>() != null;
+        if (apply && !exists)
+        {
+            var snap = t.gameObject.AddComponent<PixelSnapLayoutThickness>();
+            snap.EditorConfigure(thickness);
             EditorUtility.SetDirty(t.gameObject);
         }
-        log.AppendLine($"WIRE [{where}] {n} — axis={axis} thickness={thickness:0.##} ({geo})");
+        log.AppendLine($"WIRE-LAYOUT({(exists ? "kept" : "add")}) [{where}] {t.name} — prefH={thickness:0.##} ({geo})");
         wired++;
     }
 
