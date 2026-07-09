@@ -16,9 +16,8 @@ public class MessageItemView : MonoBehaviour
     public TextMeshProUGUI senderNameText;
     public Image messageImage;
     public Image bubbleBackground; 
-    public GameObject bubbleTail; 
-    public GameObject outline; 
-    public GameObject timeBackground; 
+    public GameObject bubbleTail;
+    public GameObject timeBackground;
 
     [Header("Media Controls")]
     public GameObject playOverlay;
@@ -1768,15 +1767,8 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
     
     public void FinalizeCustomVisuals()
     {
-        if (bubbleBackground != null)
-        {
-            var mirror = bubbleBackground.GetComponent<MirrorSize>();
-            if (mirror != null) mirror.UpdateSize();
-        }
-
         RefreshCorners(messageImage != null ? messageImage.gameObject : null);
         RefreshCorners(bubbleBackground != null ? bubbleBackground.gameObject : null);
-        RefreshCorners(outline);
     }
     
     void SetDownloadButtonText(MessageType type)
@@ -2635,15 +2627,8 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
         // and corner refresh up front guarantees the rect is finalized before the first frame.
         LayoutRebuilder.ForceRebuildLayoutImmediate(rectTransform);
 
-        if (bubbleBackground != null)
-        {
-            var mirror = bubbleBackground.GetComponent<MirrorSize>();
-            if (mirror != null) mirror.UpdateSize();
-        }
-
         RefreshCorners(messageImage != null ? messageImage.gameObject : null);
         RefreshCorners(bubbleBackground != null ? bubbleBackground.gameObject : null);
-        RefreshCorners(outline);
 
         yield return null;
 
@@ -2661,7 +2646,6 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
         // mass insert (e.g. initial chat open spawning many bubbles in one frame).
         RefreshCorners(messageImage != null ? messageImage.gameObject : null);
         RefreshCorners(bubbleBackground != null ? bubbleBackground.gameObject : null);
-        RefreshCorners(outline);
     }
 
     // Shader id for the rounded-corners size vector (width, height, radius*2, 0). Used by both
@@ -2672,15 +2656,24 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
     {
         if (targetObject == null) return;
 
-        var rounded = targetObject.GetComponent<ImageWithRoundedCorners>();
-        if (rounded == null || !rounded.enabled) return;
-
-        float currentRadius = rounded.radius;
-        rounded.radius = 0;
-        rounded.radius = currentRadius;
-
-        rounded.Validate();   // assigns the base rounded material to the graphic
-        rounded.Refresh();    // writes the correct _WidthHeightRadius into the BASE material
+        if (targetObject.TryGetComponent<ImageWithRoundedCorners>(out var rounded) && rounded.enabled)
+        {
+            float r = rounded.radius;
+            rounded.radius = 0; rounded.radius = r;   // force the shader size rebake (see note below)
+            rounded.Validate();
+            rounded.Refresh();
+        }
+        else if (targetObject.TryGetComponent<ImageWithRoundedCornersBordered>(out var bordered) && bordered.enabled)
+        {
+            float r = bordered.radius;
+            bordered.radius = 0; bordered.radius = r;
+            bordered.Validate();
+            bordered.Refresh();
+        }
+        else
+        {
+            return;
+        }
 
         // These graphics are maskable and render under the chat Viewport's stencil Mask, so the
         // CanvasRenderer draws a CACHED StencilMaterial COPY (new Material(baseMat)), not the
@@ -3623,49 +3616,28 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
         // the bubble has to be visible so the card has a colour to contrast with.
         bool isTransparent = (currentVm.isSticker && !isPlaceholderActive) || hideBubble;
 
+        bubbleBackground.color = isTransparent
+            ? Color.clear
+            : (currentVm.isIncoming ? incomingColor : outgoingColor);
+
+        if (!bubbleBackground.TryGetComponent<ImageWithRoundedCornersBordered>(out var bubbleBordered))
+            bubbleBordered = bubbleBackground.gameObject.AddComponent<ImageWithRoundedCornersBordered>();
+
         if (isTransparent)
         {
-            bubbleBackground.color = Color.clear;
+            bubbleBordered.enabled = false;
+            bubbleBackground.material = null;   // no rounded/stencil material while transparent
         }
         else
         {
-            bubbleBackground.color = currentVm.isIncoming ? incomingColor : outgoingColor;
+            bubbleBordered.enabled = true;
+            bubbleBordered.radius = 28f;
+            bubbleBordered.borderColor = new Color(0.851f, 0.831f, 0.792f, 1f);
+            bubbleBordered.designBorderUnits = 1f;
+            bubbleBordered.Validate();
+            bubbleBordered.Refresh();
         }
-        
-        if (isTransparent)
-        {
-            outline.SetActive(false);
-        }
-        else
-        {
-            // outline.SetActive(true);
-        }
-
-        var bubbleRounded = bubbleBackground.GetComponent<ImageWithRoundedCorners>();
-        var bubbleOutlineRounded = outline.GetComponent<Image>().GetComponent<ImageWithRoundedCorners>();
-        if (isTransparent)
-        {
-            if (bubbleRounded) bubbleRounded.enabled = false;
-            bubbleBackground.material = null; 
-            if (bubbleOutlineRounded) bubbleOutlineRounded.enabled = false;
-            outline.GetComponent<Image>().material = null; 
-        }
-        else
-        {
-            if (!bubbleRounded) bubbleRounded = bubbleBackground.gameObject.AddComponent<ImageWithRoundedCorners>();
-            if (!bubbleOutlineRounded) bubbleOutlineRounded = outline.AddComponent<ImageWithRoundedCorners>();
-
-            bubbleRounded.enabled = true;
-            bubbleOutlineRounded.enabled = true;
-
-            bubbleRounded.radius = 28f;
-            bubbleOutlineRounded.radius = 29; 
-
-            bubbleRounded.Validate();
-            bubbleOutlineRounded.Validate();
-            bubbleRounded.Refresh();
-            bubbleOutlineRounded.Refresh();
-        }
+        bubbleBordered.SetBorderVisible(!isTransparent);
 
         if (bubbleTail != null)
         {
