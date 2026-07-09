@@ -267,8 +267,8 @@ public static class DashboardPageBuilder
         AddRounded(hl, segHeight / 2f);
 
         today = MakeSegButton(track, "TodayButton", "Сегодня", TrackInset + 0f * segWidth, segWidth, segHeight);
-        week = MakeSegButton(track, "WeekButton", "Неделя", TrackInset + 1f * segWidth, segWidth, segHeight);
-        month = MakeSegButton(track, "MonthButton", "Месяц", TrackInset + 2f * segWidth, segWidth, segHeight);
+        week = MakeSegButton(track, "WeekButton", "7 дней", TrackInset + 1f * segWidth, segWidth, segHeight);
+        month = MakeSegButton(track, "MonthButton", "30 дней", TrackInset + 2f * segWidth, segWidth, segHeight);
     }
 
     private static Button MakeSegButton(GameObject track, string name, string label, float x, float width, float height)
