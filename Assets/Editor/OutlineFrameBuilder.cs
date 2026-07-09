@@ -11,7 +11,7 @@ using Nobi.UiRoundedCorners;
 ///   - "Tools/UI/Create OutlineFrame Prefab" — generates Assets/Prefabs/OutlineFrame.prefab,
 ///     a layout-driven wrapper for adding consistent outlines to any UI element whose
 ///     parent can be sized to its content. (Not used for the existing message bubbles —
-///     those keep MirrorSize because their root must remain full scroll-width.)
+///     those draw their border via the SDF-bordered rounded-corners shader.)
 ///
 /// Idempotent — rerunning rebuilds cleanly.
 /// </summary>

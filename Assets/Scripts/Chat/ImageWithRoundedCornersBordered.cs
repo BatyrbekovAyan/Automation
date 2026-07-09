@@ -34,7 +34,13 @@ public class ImageWithRoundedCornersBordered : MonoBehaviour
     private void OnDestroy()
     {
         if (image != null) image.material = null;
-        DestroyImmediate(material);
+        if (material != null)
+        {
+            // Destroy() at runtime, DestroyImmediate() in the editor — the per-instance material
+            // is a runtime object, not a disk asset.
+            if (Application.isPlaying) Destroy(material);
+            else DestroyImmediate(material);
+        }
         image = null;
         material = null;
     }
