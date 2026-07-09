@@ -547,6 +547,15 @@ public static class DashboardPageBuilder
         summary.textWrappingMode = TextWrappingModes.NoWrap;
         summary.overflowMode = TextOverflowModes.Ellipsis;
 
+        // Time — top-right, muted; the controller fills it (local-time-wins). Sits above
+        // the vertically-centered pill in the reserved right column, no overlap.
+        var timeGo = NewChild(row, "Time", out var timeRt);
+        SetAnchors(timeRt, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f));
+        timeRt.sizeDelta = new Vector2(240f, 44f);
+        timeRt.anchoredPosition = new Vector2(-28f, -50f);
+        var timeTmp = AddText(timeGo, "", 30f, _regular, Muted);
+        timeTmp.alignment = TextAlignmentOptions.TopRight;
+
         // Pill (status) — anchored right; hugs its label via ContentSizeFitter.
         var pill = NewChild(row, "Pill", out var pillRt);
         SetAnchors(pillRt, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f));

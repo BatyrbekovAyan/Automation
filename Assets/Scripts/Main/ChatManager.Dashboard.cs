@@ -12,4 +12,15 @@ public partial class ChatManager
         { title = vm.Title; return true; }
         return false;
     }
+
+    // Local last-activity time (unix SECONDS) for the dashboard's "local time wins":
+    // reflects the newest message in the chat — including owner-typed manual replies
+    // the bot transcript (server outcome) never sees.
+    public bool TryGetChatLastActivitySec(string chatId, out long lastActivitySec)
+    {
+        lastActivitySec = 0;
+        if (chatLookup != null && chatLookup.TryGetValue(chatId, out var vm) && vm != null)
+        { lastActivitySec = vm.LastMessageTime; return true; }
+        return false;
+    }
 }

@@ -358,6 +358,17 @@ public class DashboardPage : MonoBehaviour
         var botTag = go.transform.Find("BotTag")?.GetComponent<TextMeshProUGUI>();
         var avatar = go.transform.Find("Avatar")?.GetComponent<Image>();
         var avatarInitial = go.transform.Find("Avatar/Initial")?.GetComponent<TextMeshProUGUI>();
+        var time = go.transform.Find("Time")?.GetComponent<TextMeshProUGUI>();
+
+        if (time)
+        {
+            // "Local time wins": prefer the local chat's last-activity (sees the owner's
+            // manual replies) over the server's bot-only lastMessageAt when it's newer.
+            long localSec = ChatManager.Instance != null &&
+                            ChatManager.Instance.TryGetChatLastActivitySec(r.chatId, out var ls) ? ls : 0;
+            long displaySec = DashboardTimeFormat.PickDisplaySec(r.lastMessageAt, localSec);
+            time.text = DashboardTimeFormat.Relative(displaySec, NowMs() / 1000L);
+        }
 
         string display = ChatDisplayName(r.chatId);
         if (name) name.text = display;
