@@ -5,7 +5,7 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
 
 ## Layout
 
-- `workflows/` — **committed source of truth**: the 11 workflows the app actually depends on.
+- `workflows/` — **committed source of truth**: the 12 workflows the app actually depends on.
   Each JSON has its original n8n `id` injected at the top level so it round-trips on import.
 - `supabase/` — the RAG store's DB contract: `schema.sql` (documents table +
   `match_documents` as deployed — note its multi-key filter uses OR semantics), the
@@ -15,6 +15,11 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
   and `audit-price-lists-bucket.sql` — cross-checks bucket objects against
   `documents.metadata->>'fileId'`. Invariant: zero `orphaned-unexpected`; image
   orphans are `orphaned-by-rejection` (422-rejected photos, kept for re-OCR by design).
+- `build-suggest-replies.py` — builds/deploys the shared **Suggest Replies** workflow (semi-auto
+  Phase 2). `--stage full` deploys the whole graph (Webhook → Prep → If skipRag → conditional RAG
+  load → Assemble → LLM json_schema → Validate → retry-once → Build Response → Respond) to the
+  target n8n and activates it; `--export <id> <out>` re-emits the canonical JSON. Credential ids
+  resolve by name from the instance's SQLite DB (portable to prod replication).
 - `apply-*.py` — idempotent migrations over `workflows/` (edit by node name, re-runnable);
   `verify_rag.py` asserts every applied invariant; `test-upload-e2e.sh` exercises the
   Upload/Delete webhooks end-to-end against a live instance (curl mimicking Unity's
@@ -27,7 +32,7 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
 - `reference/` — **gitignored**: downloaded community/marketplace templates + n8n onboarding
   samples, kept only to mine for ideas. Not part of the app, never imported.
 
-## The 11 canonical workflows
+## The 12 canonical workflows
 
 | id | name | role |
 |----|------|------|
@@ -42,6 +47,7 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
 | `lmjYsdNcQA2IE5rl` | Delete Bot Files | App webhook `DeleteBotFiles` — body `{ botWaId, botTgId }`; sweeps ALL of a deleted bot's RAG chunks + stored originals (guards the `"-1"` unauthed sentinel) |
 | `2htWSV5IHO8E2CgB` | Dashboard Outcomes | App webhook `DashboardOutcomes` — body `{ profileIds }`; classifies conversation outcomes from `n8n_chat_histories` into `conversation_outcomes`, returns them for the «Сводка» dashboard |
 | `2islisFH7jjLoPQM` | Delete Orphan Profiles | **Scheduled, hourly** (no webhook) — server-side TTL sweep deleting Wappi profiles that stay unauthorized ≥ 24h; see below |
+| `9PTyYcelRQI7bGDb` | Suggest Replies | App webhook `SuggestReplies` — body = frozen v1 request (`{ v, requestSeq, chatId, botWaId, businessTypeId, catalog, steerTowardText, messages… }`); optional tenant-scoped RAG pre-retrieval (single `botWaId` filter, topK 5, skipped on `""`/`"-1"`) → one gpt-4o-mini call (strict json_schema, closed 6-label enum) → Code validation (exactly 4 distinct enum-labeled moves, ≤300 clamp, markdown-strip, one retry then `generation_failed`) → returns `{ v:1, requestSeq, suggestions:[{text,label}×4] }` for the semi-auto «Вместе» reply panel. Built by `build-suggest-replies.py` (dev id here; prod bagkz replication pending) |
 
 > ⚠️ `4wYitz5ek30SVNlT` and `4VN3gsFaC2HUYmcc` are referenced by **literal id** inside the
 > two Create handlers. Never change their ids, or bot creation 404s on the clone step.
