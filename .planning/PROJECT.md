@@ -23,18 +23,19 @@ The owner stays in control along a spectrum from fully autonomous to hands-on: t
 - ✓ Per-bot n8n workflow automation (create / edit / activate WhatsApp & Telegram workflows) — existing
 - ✓ Autonomous automation mode (bot answers customers via n8n) — existing
 
+- ✓ Per-chat **semi-auto toggle** + Reply Suggestions Panel (4 ranked cards, intent labels, Recommended badge, no numeric confidence) — Validated in Phase 1
+- ✓ Auto-populate on incoming, manual refresh, tap-to-composer (never auto-sends), re-cluster steering loop — Validated in Phase 1
+- ✓ Phase-1 UI proven on mock data behind the `ISuggestionsProvider` seam — Validated in Phase 1
+- ✓ n8n emits live suggestions (shared `Suggest Replies` webhook workflow: RAG + gpt-4o-mini, closed 6-move enum, injection-hardened) with steer-toward re-clustering — Validated in Phase 2
+- ✓ **Live wiring**: `N8nSuggestionsProvider` behind the seam, zero Phase-1 UI edits; panel consumes real suggestions end-to-end — Validated in Phase 2
+
 ### Active
 
-<!-- This milestone: the Reply Suggestions Panel (semi-auto mode). Hypotheses until shipped. -->
+<!-- Milestone requirements all shipped. Remaining follow-through before prod: -->
 
-- [ ] Per-chat **semi-auto toggle** that enables the suggestions panel for a specific chat
-- [ ] Reply Suggestions Panel UI — bottom sheet above the composer, **4 cards** ordered best-first, each showing reply text + intent label; the top card carries a "Recommended" badge (no numeric confidence)
-- [ ] Suggestions **auto-populate on each incoming customer message**, plus a manual refresh
-- [ ] Tapping a card **loads its text into the composer to edit** (never auto-sends)
-- [ ] **Re-cluster loop**: picking regenerates a fresh set of 4 suggestions re-ranked toward the chosen reply; owner keeps refining or edits the composer draft and sends
-- [ ] Phase-1 UI runs against **mock/stub suggestion data** (no n8n dependency) so visuals + interaction can be polished independently
-- [ ] Existing **n8n automations modified** to emit suggestions (text / intent label / confidence) and support re-clustering toward a pick
-- [ ] **Live wiring**: panel consumes real suggestions from n8n end-to-end
+- [ ] Detailed device UAT (5 scenarios, owner smoke pass done — tracked in `phases/02-n8n-live-wiring/02-HUMAN-UAT.md`)
+- [ ] Prod bagkz replication of the Suggest Replies workflow + RAG grounding-with-data verification (dev `documents` unseeded)
+- [ ] Code-review warnings WR-01..04 (`phases/02-n8n-live-wiring/02-REVIEW.md`) — advisory fixes
 
 ### Out of Scope
 
@@ -90,4 +91,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-23 after initialization*
+*Last updated: 2026-07-10 after Phase 2 completion (milestone requirements shipped; device UAT detail + prod replication pending)*
