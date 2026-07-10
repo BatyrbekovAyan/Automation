@@ -13,7 +13,7 @@ This milestone adds the semi-auto reply path to the existing WhatsApp chat clien
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 1: Polished Suggestions Panel on Mock Data** - Per-chat semi-auto toggle, 4-card panel, pick/refresh/re-cluster loop, and the provider seam + concurrency guards, all built and shippable against a mock provider with no n8n dependency.
-- [ ] **Phase 2: n8n Live Wiring** - Modify the n8n automation to emit and re-cluster suggestions, then consume it live via `N8nSuggestionsProvider` behind the seam with zero Phase-1 UI changes.
+- [x] **Phase 2: n8n Live Wiring** - Modify the n8n automation to emit and re-cluster suggestions, then consume it live via `N8nSuggestionsProvider` behind the seam with zero Phase-1 UI changes. (completed 2026-07-10)
 
 ## Phase Details
 
@@ -57,4 +57,4 @@ Phases execute in numeric order: 1 → 2
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Polished Suggestions Panel on Mock Data | 0/4 | Planned | - |
-| 2. n8n Live Wiring | 4/4 | In Progress | - |
+| 2. n8n Live Wiring | 4/4 | Complete    | 2026-07-10 |
