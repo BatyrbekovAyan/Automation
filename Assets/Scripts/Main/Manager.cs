@@ -421,15 +421,97 @@ public class Manager : MonoBehaviour
             }
         }
 
-        if (PlayerPrefs.GetInt("lastCreatedWhatsappProfileIdSaved", 1) == 0 && !PlayerPrefs.GetString("lastCreatedWhatsappProfileId", "-1").Equals("-1"))
+        // Sweep profiles orphaned by an app death mid-wizard/mid-re-auth that
+        // the quit-time settle (OnApplicationQuit) couldn't reach — on mobile
+        // most kills run no code at all, so this launch-time pass stays the
+        // safety net.
+        if (PendingProfileLedger.TryGetPendingWhatsapp(out string orphanedWhatsappProfileId))
         {
-            StartCoroutine(DeleteWhatsappProfile(PlayerPrefs.GetString("lastCreatedWhatsappProfileId", "-1"), true));
+            StartCoroutine(DeleteWhatsappProfile(orphanedWhatsappProfileId, true));
         }
 
-        if (PlayerPrefs.GetInt("lastCreatedTelegramProfileIdSaved", 1) == 0 && !PlayerPrefs.GetString("lastCreatedTelegramProfileId", "-1").Equals("-1"))
+        if (PendingProfileLedger.TryGetPendingTelegram(out string orphanedTelegramProfileId))
         {
-            StartCoroutine(DeleteTelegramProfile(PlayerPrefs.GetString("lastCreatedTelegramProfileId", "-1"), true));
+            StartCoroutine(DeleteTelegramProfile(orphanedTelegramProfileId, true));
         }
+    }
+
+    // ── App lifecycle: orphaned-profile cleanup ──
+    // A profile in the pending ledger is an orphan the moment the app dies.
+    // Backgrounding must NOT settle it — the pairing-code flow sends the user
+    // out of the app to type the code into WhatsApp/Telegram on this same
+    // phone — so deletion only runs on a real quit. OnApplicationQuit fires on
+    // Editor play-stop, desktop quit and Android clean finishes; iOS never
+    // raises it (and swipe-kills run no code anywhere) — those paths rely on
+    // the Start() sweep instead.
+
+    private void OnApplicationPause(bool pauseStatus)
+    {
+        // Flush PlayerPrefs (ledger included) — after backgrounding the OS may
+        // kill the process without any further callback.
+        if (pauseStatus) PlayerPrefs.Save();
+    }
+
+    private void OnApplicationQuit()
+    {
+        SettlePendingProfilesBeforeQuit();
+    }
+
+    // Coroutines are dead on the quit path, so this blocks the main thread
+    // (hard 2s cap) while the native transport pushes the delete requests out.
+    // Confirmed deletions clear the ledger so the next-launch sweep won't
+    // re-fire; anything unconfirmed stays pending for that sweep.
+    private void SettlePendingProfilesBeforeQuit()
+    {
+        bool hasWhatsappOrphan = PendingProfileLedger.TryGetPendingWhatsapp(out string pendingWhatsappId);
+        bool hasTelegramOrphan = PendingProfileLedger.TryGetPendingTelegram(out string pendingTelegramId);
+        if (!hasWhatsappOrphan && !hasTelegramOrphan) return;
+
+        UnityWebRequest whatsappDelete = null;
+        UnityWebRequest telegramDelete = null;
+
+        if (hasWhatsappOrphan)
+        {
+            whatsappDelete = UnityWebRequest.Post($"https://wappi.pro/api/profile/delete?profile_id={pendingWhatsappId}", new WWWForm());
+            whatsappDelete.SetRequestHeader("Authorization", wappiAuthToken);
+            whatsappDelete.SendWebRequest();
+        }
+        if (hasTelegramOrphan)
+        {
+            telegramDelete = UnityWebRequest.Post($"https://wappi.pro/tapi/profile/delete?profile_id={pendingTelegramId}", new WWWForm());
+            telegramDelete.SetRequestHeader("Authorization", wappiAuthToken);
+            telegramDelete.SendWebRequest();
+        }
+
+        var quitBudget = System.Diagnostics.Stopwatch.StartNew();
+        while (quitBudget.ElapsedMilliseconds < 2000 &&
+               ((whatsappDelete != null && !whatsappDelete.isDone) ||
+                (telegramDelete != null && !telegramDelete.isDone)))
+        {
+            System.Threading.Thread.Sleep(25);
+        }
+
+        SettleQuitDelete(whatsappDelete, pendingWhatsappId, PendingProfileLedger.ClearWhatsappIfMatches);
+        SettleQuitDelete(telegramDelete, pendingTelegramId, PendingProfileLedger.ClearTelegramIfMatches);
+    }
+
+    private static void SettleQuitDelete(UnityWebRequest request, string profileId, System.Action<string> clearLedger)
+    {
+        if (request == null) return;
+
+        if (request.isDone && request.result == UnityWebRequest.Result.Success)
+        {
+            clearLedger(profileId);
+            Debug.Log($"[QuitCleanup] Deleted orphaned profile {profileId}");
+        }
+        else
+        {
+            Debug.LogWarning($"[QuitCleanup] Orphaned profile {profileId} not confirmed deleted ({request.result}) — next-launch sweep will retry");
+        }
+
+        // Dispose aborts anything still in flight — acceptable, the process is
+        // exiting anyway and the ledger keeps the entry for the sweep.
+        request.Dispose();
     }
 
     // Instantiate BotSettings under a parent and force its RectTransform to
@@ -1910,7 +1992,7 @@ public class Manager : MonoBehaviour
             openBot.GetComponent<Bot>().whatsappProfileId = whatsappProfileId;
             PlayerPrefs.SetString(openBot.name + "WhatsappProfileId", whatsappProfileId);
             if (!whatsappProfileId.Equals("-1"))
-                PlayerPrefs.SetInt("lastCreatedWhatsappProfileIdSaved", 1);
+                PendingProfileLedger.MarkWhatsappClaimed();
             PlayerPrefs.Save();
         }
 
@@ -2514,17 +2596,18 @@ public class Manager : MonoBehaviour
                 int endIndex = response.IndexOf("\",\"status\":");
                 int lenght = endIndex - startIndex;
 
+                string createdWhatsappProfileId = response.Substring(startIndex, lenght);
+
                 if (localId)
                 {
-                    whatsappProfileId = response.Substring(startIndex, lenght);
+                    whatsappProfileId = createdWhatsappProfileId;
                 }
                 else
                 {
-                    openBot.GetComponent<Bot>().whatsappProfileId = response.Substring(startIndex, lenght);
+                    openBot.GetComponent<Bot>().whatsappProfileId = createdWhatsappProfileId;
                 }
 
-                PlayerPrefs.SetString("lastCreatedWhatsappProfileId", response.Substring(startIndex, lenght));
-                PlayerPrefs.SetInt("lastCreatedWhatsappProfileIdSaved", 0);
+                PendingProfileLedger.MarkWhatsappPending(createdWhatsappProfileId);
             }
         }
 
@@ -2555,8 +2638,7 @@ public class Manager : MonoBehaviour
                 PlayerPrefs.SetString(openBot.name + "WhatsappProfileId", "-1");
             }
 
-            PlayerPrefs.SetString("lastCreatedWhatsappProfileId", "-1");
-            PlayerPrefs.SetInt("lastCreatedWhatsappProfileIdSaved", 1);
+            PendingProfileLedger.ClearWhatsappIfMatches(whatsappProfileId);
         }
 
         LoadingPanel.SetActive(false);
@@ -2589,17 +2671,18 @@ public class Manager : MonoBehaviour
                 int endIndex = response.IndexOf("\",\"status\":");
                 int lenght = endIndex - startIndex;
 
+                string createdTelegramProfileId = response.Substring(startIndex, lenght);
+
                 if (localId)
                 {
-                    telegramProfileId = response.Substring(startIndex, lenght);
+                    telegramProfileId = createdTelegramProfileId;
                 }
                 else
                 {
-                    openBot.GetComponent<Bot>().telegramProfileId = response.Substring(startIndex, lenght);
+                    openBot.GetComponent<Bot>().telegramProfileId = createdTelegramProfileId;
                 }
 
-                PlayerPrefs.SetString("lastCreatedTelegramProfileId", response.Substring(startIndex, lenght));
-                PlayerPrefs.SetInt("lastCreatedTelegramProfileIdSaved", 0);
+                PendingProfileLedger.MarkTelegramPending(createdTelegramProfileId);
             }
         }
 
@@ -2630,8 +2713,7 @@ public class Manager : MonoBehaviour
                 PlayerPrefs.SetString(openBot.name + "TelegramProfileId", "-1");
             }
 
-            PlayerPrefs.SetString("lastCreatedTelegramProfileId", "-1");
-            PlayerPrefs.SetInt("lastCreatedTelegramProfileIdSaved", 1);
+            PendingProfileLedger.ClearTelegramIfMatches(telegramProfileId);
         }
 
         LoadingPanel.SetActive(false);
@@ -2682,7 +2764,7 @@ public class Manager : MonoBehaviour
                 bot.GetComponent<Bot>().whatsappWorkflowId = ExtractWorkflowId(response);
                 PlayerPrefs.SetString(bot.name + "WhatsappWorkflowId", bot.GetComponent<Bot>().whatsappWorkflowId);
                 PlayerPrefs.SetString(bot.name + "WhatsappProfileId", bot.GetComponent<Bot>().whatsappProfileId);
-                PlayerPrefs.SetInt("lastCreatedWhatsappProfileIdSaved", 1);
+                PendingProfileLedger.MarkWhatsappClaimed();
             }
         }
 
@@ -2759,7 +2841,7 @@ public class Manager : MonoBehaviour
 
                 openBot.GetComponent<Bot>().whatsappWorkflowId = ExtractWorkflowId(response);
                 PlayerPrefs.SetString(openBot.name + "WhatsappWorkflowId", openBot.GetComponent<Bot>().whatsappWorkflowId);
-                PlayerPrefs.SetInt("lastCreatedWhatsappProfileIdSaved", 1);
+                PendingProfileLedger.MarkWhatsappClaimed();
 
                 CreateWhatsappWorkflowFromEditSuccess = true;
                 resolved = true;
@@ -2798,8 +2880,10 @@ public class Manager : MonoBehaviour
         using UnityWebRequest www = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateTelegramWorkflow", form);
         yield return www.SendWebRequest();
         
-        if (www.result == UnityWebRequest.Result.Success)
-        // if (www.result != UnityWebRequest.Result.Success)
+        // NOTE: this check was left inverted (debug flip, correct line commented
+        // beside it) — on success it deleted the just-authorized profile and on
+        // failure marked the bot active. Restored to mirror the WhatsApp twin.
+        if (www.result != UnityWebRequest.Result.Success)
         {
             StartCoroutine(DeleteTelegramProfile(telegramProfileId, true));
         }
@@ -2822,7 +2906,7 @@ public class Manager : MonoBehaviour
                 bot.GetComponent<Bot>().telegramWorkflowId = ExtractWorkflowId(response);
                 PlayerPrefs.SetString(bot.name + "TelegramWorkflowId", bot.GetComponent<Bot>().telegramWorkflowId);
                 PlayerPrefs.SetString(bot.name + "TelegramProfileId", bot.GetComponent<Bot>().telegramProfileId);
-                PlayerPrefs.SetInt("lastCreatedTelegramProfileIdSaved", 1);
+                PendingProfileLedger.MarkTelegramClaimed();
             }
         }
 
@@ -2899,7 +2983,7 @@ public class Manager : MonoBehaviour
 
                 openBot.GetComponent<Bot>().telegramWorkflowId = ExtractWorkflowId(response);
                 PlayerPrefs.SetString(openBot.name + "TelegramWorkflowId", openBot.GetComponent<Bot>().telegramWorkflowId);
-                PlayerPrefs.SetInt("lastCreatedTelegramProfileIdSaved", 1);
+                PendingProfileLedger.MarkTelegramClaimed();
 
                 CreateTelegramWorkflowFromEditSuccess = true;
                 resolved = true;
