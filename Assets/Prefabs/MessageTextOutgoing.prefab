@@ -2538,7 +2538,7 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3238851604677693585}
-  m_LocalRotation: {x: -0, y: -0, z: -0.076457866, w: 0.9970728}
+  m_LocalRotation: {x: 0, y: 0, z: -0.041352507, w: 0.9991446}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: -1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -2547,8 +2547,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: -2.32}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 988.8771, y: 15.254707}
-  m_SizeDelta: {x: 42.940002, y: 32.48}
+  m_AnchoredPosition: {x: 987.6999, y: 16}
+  m_SizeDelta: {x: 48.940002, y: 38.48}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &1670956388207421332
 CanvasRenderer:
@@ -2570,7 +2570,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 2100000, guid: 8c8effc2cf5574b2b9489df2a1448bb2, type: 2}
   m_Color: {r: 0.8509804, g: 0.83137256, b: 0.7921569, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
@@ -5296,18 +5296,18 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8822902744302617524}
-  m_LocalRotation: {x: -0, y: -0, z: -0.096627414, w: 0.9953207}
+  m_LocalRotation: {x: 0, y: 0, z: -0.051464483, w: 0.99867487}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: -1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 8432781846609743631}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: -11.09}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 1006.19995, y: -3.1000767}
-  m_SizeDelta: {x: 41.5, y: 28}
-  m_Pivot: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 988.1399, y: 16.4}
+  m_SizeDelta: {x: 44.2, y: 32.48}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &8009978582003052774
 CanvasRenderer:
   m_ObjectHideFlags: 0
