@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-02-PLAN.md (N8nSuggestionsProvider live behind the seam)
-last_updated: "2026-07-10T15:21:50.765Z"
+stopped_at: Completed 02-03-PLAN.md (adversarial e2e hardening — 6/6 cases green, zero fixes)
+last_updated: "2026-07-10T15:38:18.282Z"
 last_activity: 2026-07-10
 progress:
   total_phases: 2
   completed_phases: 1
   total_plans: 8
-  completed_plans: 6
-  percent: 75
+  completed_plans: 7
+  percent: 88
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-06-23)
 ## Current Position
 
 Phase: 2 (n8n Live Wiring) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-07-10
 
-Progress: [████████░░] 75%
+Progress: [█████████░] 88%
 
 ## Performance Metrics
 
@@ -54,6 +54,7 @@ Progress: [████████░░] 75%
 *Updated after each plan completion*
 | Phase 2 P01 | 11min | 2 tasks | 3 files |
 | Phase 02 P02 | 13min | 3 tasks | 6 files |
+| Phase 02 P03 | 9min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -71,6 +72,9 @@ Recent decisions affecting current work:
 - [02-01]: Committed export carries dev credential ids resolved by NAME (Dashboard precedent); prod bagkz replication remaps by name via build-suggest-replies.py. Supabase cred present+functional on dev; RAG grounding-with-data deferred to prod/seed.
 - [02-02]: N8nSuggestionsProvider live behind the ISuggestionsProvider seam via the single SuggestionsController.Awake swap (N8N-02); network coroutine hosted on the always-active ChatManager.Instance, gated by WaitForChatFetchesDrain (never bumps the chat-fetch in-flight counter), requestSeq stamped from the REQUEST.
 - [02-02]: Pure static BuildPayloadJson (frozen v1 payload — roles, oldest→newest, ≤12, media placeholders, ≤500/≤1500 clamps, steer+seq passthrough) + MapResponse (Ok 1-4 / Error on fail|malformed|error|empty). 26 EditMode tests green (787/787 full); zero other Phase-1 edits — seam holds.
+- [02-03]: Adversarial e2e matrix (11 curl cases) green on dev with ZERO prompt/validation fixes — the Plan-01 Suggest Replies workflow already satisfies the frozen v1 contract under injection/grounding/missing-data/steer/trivial/sentinel/malformed load; canonical JSON re-export byte-identical (hardened final as-is).
+- [02-03]: Injection resistance (N8N-04) proven across 3 distinct strings (required + format-hijack + prompt-extraction) — no system-prompt leak, no format change, no sub-4 output; grounding invents zero prices (missing fact -> «Уточнить»/«Отложить»); generation_failed safe envelope reachable for malformed input.
+- [02-03]: RAG-skip fence proven STRUCTURALLY via n8n execution runData node lists (sentinel/'-1' skip Retrieve RAG; real botWaId executes it), not inferred from response shape. RAG grounding-with-data stays DEFERRED to prod bagkz replication (dev documents unseeded); catalog grounding fully validated on dev.
 
 ### Pending Todos
 
@@ -95,8 +99,8 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-10T15:21:35.255Z
-Stopped at: Completed 02-02-PLAN.md (N8nSuggestionsProvider live behind the seam)
+Last session: 2026-07-10T15:37:59.744Z
+Stopped at: Completed 02-03-PLAN.md (adversarial e2e hardening — 6/6 cases green, zero fixes)
 Resume file: None
 
 **Planned Phase:** 2 (n8n Live Wiring) — 4 plans — 2026-07-10T14:26:05.936Z
