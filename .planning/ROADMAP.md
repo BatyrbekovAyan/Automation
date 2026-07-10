@@ -45,7 +45,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. Malformed or out-of-contract LLM output (bad JSON, wrong card count, out-of-set labels, or prompt-injection content from the customer message) is validated against a schema and handled gracefully (empty/retry), never surfaced raw.
 **Plans**: 4 plans (3 waves)
   - [x] 02-01-PLAN.md — [Wave 1] Build + deploy the `Suggest Replies` n8n workflow (Webhook → conditional RAG → gpt-4o-mini json_schema → validate/retry → Respond) on dev
-  - [ ] 02-02-PLAN.md — [Wave 1] Unity `N8nSuggestionsProvider` + wire DTOs + `ChatManager.TryGetRecentMessages` + single seam swap + EditMode tests
+  - [x] 02-02-PLAN.md — [Wave 1] Unity `N8nSuggestionsProvider` + wire DTOs + `ChatManager.TryGetRecentMessages` + single seam swap + EditMode tests
   - [ ] 02-03-PLAN.md — [Wave 2] Adversarial e2e hardening matrix (injection / grounding / steer / trivial / sentinel) + canonical workflow commit
   - [ ] 02-04-PLAN.md — [Wave 3] Live end-to-end verification + human device UAT (milestone gate)
 
@@ -57,4 +57,4 @@ Phases execute in numeric order: 1 → 2
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Polished Suggestions Panel on Mock Data | 0/4 | Planned | - |
-| 2. n8n Live Wiring | 0/4 | Planned | - |
+| 2. n8n Live Wiring | 2/4 | In Progress | - |

@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-01-PLAN.md (Suggest Replies workflow live on dev)
-last_updated: "2026-07-10T15:01:52.341Z"
-last_activity: 2026-07-10 — completed 02-01-PLAN.md
+stopped_at: Completed 02-02-PLAN.md (N8nSuggestionsProvider live behind the seam)
+last_updated: "2026-07-10T15:21:50.765Z"
+last_activity: 2026-07-10
 progress:
   total_phases: 2
   completed_phases: 1
   total_plans: 8
-  completed_plans: 5
-  percent: 63
+  completed_plans: 6
+  percent: 75
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-06-23)
 ## Current Position
 
 Phase: 2 (n8n Live Wiring) — EXECUTING
-Plan: 2 of 4
-Status: Executing Phase 2 — 02-01 complete (Suggest Replies workflow live on dev)
-Last activity: 2026-07-10 — completed 02-01-PLAN.md
+Plan: 3 of 4
+Status: Ready to execute
+Last activity: 2026-07-10
 
-Progress: [██████░░░░] 63%
+Progress: [████████░░] 75%
 
 ## Performance Metrics
 
@@ -53,6 +53,7 @@ Progress: [██████░░░░] 63%
 
 *Updated after each plan completion*
 | Phase 2 P01 | 11min | 2 tasks | 3 files |
+| Phase 02 P02 | 13min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -68,6 +69,8 @@ Recent decisions affecting current work:
 - [02-01]: Suggest Replies n8n workflow deployed on dev (id 9PTyYcelRQI7bGDb, /webhook/SuggestReplies) — one gpt-4o-mini strict json_schema call, closed 6-label enum, Code-node count/distinct/clamp validation + one retry then generation_failed; requestSeq echoed.
 - [02-01]: RAG via vectorStoreSupabase LOAD mode grounded from installed node source (n8n MCP unavailable → REST/curl); single botWaId filter, topK 5, text-embedding-3-small; alwaysOutputData + skipRag-gated Assemble so an empty documents table never kills the branch.
 - [02-01]: Committed export carries dev credential ids resolved by NAME (Dashboard precedent); prod bagkz replication remaps by name via build-suggest-replies.py. Supabase cred present+functional on dev; RAG grounding-with-data deferred to prod/seed.
+- [02-02]: N8nSuggestionsProvider live behind the ISuggestionsProvider seam via the single SuggestionsController.Awake swap (N8N-02); network coroutine hosted on the always-active ChatManager.Instance, gated by WaitForChatFetchesDrain (never bumps the chat-fetch in-flight counter), requestSeq stamped from the REQUEST.
+- [02-02]: Pure static BuildPayloadJson (frozen v1 payload — roles, oldest→newest, ≤12, media placeholders, ≤500/≤1500 clamps, steer+seq passthrough) + MapResponse (Ok 1-4 / Error on fail|malformed|error|empty). 26 EditMode tests green (787/787 full); zero other Phase-1 edits — seam holds.
 
 ### Pending Todos
 
@@ -92,8 +95,8 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-10T14:58:12Z
-Stopped at: Completed 02-01-PLAN.md (Suggest Replies workflow live on dev)
+Last session: 2026-07-10T15:21:35.255Z
+Stopped at: Completed 02-02-PLAN.md (N8nSuggestionsProvider live behind the seam)
 Resume file: None
 
 **Planned Phase:** 2 (n8n Live Wiring) — 4 plans — 2026-07-10T14:26:05.936Z

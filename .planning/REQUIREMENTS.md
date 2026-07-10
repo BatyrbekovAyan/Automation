@@ -57,7 +57,8 @@ Requirements for this milestone. Build order: **Phase 1** = polished UI on mock 
 
 - [x] **N8N-01
 **: Existing n8n automation is extended with a synchronous Webhook + Respond-to-Webhook flow that returns suggestions for a chat as a versioned `{ text, label }[]` payload (ranked best-first) plus correlation id
-- [ ] **N8N-02**: A `N8nSuggestionsProvider` consumes the live flow end-to-end with zero changes to Phase-1 UI (the seam holds)
+- [x] **N8N-02
+**: A `N8nSuggestionsProvider` consumes the live flow end-to-end with zero changes to Phase-1 UI (the seam holds)
 - [x] **N8N-03
 **: The live flow supports re-clustering by accepting a "steer toward" field carrying the picked reply
 - [x] **N8N-04
@@ -114,7 +115,7 @@ Mapped during roadmap creation (2026-06-23). Build order is load-bearing: Phase 
 | DATA-03 | Phase 1 | Pending |
 | DATA-04 | Phase 1 | Pending |
 | N8N-01 | Phase 2 | Complete (02-01) |
-| N8N-02 | Phase 2 | Pending |
+| N8N-02 | Phase 2 | Complete (02-02) |
 | N8N-03 | Phase 2 | Complete (02-01) |
 | N8N-04 | Phase 2 | Complete (02-01) |
 
