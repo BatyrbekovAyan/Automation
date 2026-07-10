@@ -28,7 +28,7 @@ public class SuggestionsController : MonoBehaviour
 
     void Awake()
     {
-        _provider = new MockSuggestionsProvider(this, _mockLatencySeconds);   // 'this' = coroutine runner; ONLY mock reference
+        _provider = new N8nSuggestionsProvider();   // Phase-2 live provider (N8N-02 single-line swap); coroutine runs on ChatManager.Instance
         if (ChatManager.Instance != null)
         {
             ChatManager.Instance.OnChatSelected += HandleChatSelected;        // fires while this may be INACTIVE (Pitfall 3)
