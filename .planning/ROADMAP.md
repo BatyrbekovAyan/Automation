@@ -47,7 +47,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   - [x] 02-01-PLAN.md — [Wave 1] Build + deploy the `Suggest Replies` n8n workflow (Webhook → conditional RAG → gpt-4o-mini json_schema → validate/retry → Respond) on dev
   - [x] 02-02-PLAN.md — [Wave 1] Unity `N8nSuggestionsProvider` + wire DTOs + `ChatManager.TryGetRecentMessages` + single seam swap + EditMode tests
   - [x] 02-03-PLAN.md — [Wave 2] Adversarial e2e hardening matrix (injection / grounding / steer / trivial / sentinel) + canonical workflow commit
-  - [ ] 02-04-PLAN.md — [Wave 3] Live end-to-end verification + human device UAT (milestone gate)
+  - [x] 02-04-PLAN.md — [Wave 3] Live end-to-end verification + human device UAT (milestone gate)
 
 ## Progress
 
@@ -57,4 +57,4 @@ Phases execute in numeric order: 1 → 2
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Polished Suggestions Panel on Mock Data | 0/4 | Planned | - |
-| 2. n8n Live Wiring | 3/4 | In Progress | - |
+| 2. n8n Live Wiring | 4/4 | In Progress | - |
