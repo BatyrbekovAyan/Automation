@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Phase 1 UI-SPEC approved
-last_updated: "2026-06-25T07:27:42.194Z"
-last_activity: 2026-06-25
+status: executing
+stopped_at: Completed 02-01-PLAN.md (Suggest Replies workflow live on dev)
+last_updated: "2026-07-10T15:01:52.341Z"
+last_activity: 2026-07-10 — completed 02-01-PLAN.md
 progress:
   total_phases: 2
   completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
-  percent: 100
+  total_plans: 8
+  completed_plans: 5
+  percent: 63
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-23)
 
 **Core value:** The owner stays in control along the automation↔semi-auto spectrum — the bot can answer autonomously, or propose replies the owner picks and refines, without losing trust or the ability to take over.
-**Current focus:** Phase 01 — polished-suggestions-panel-on-mock-data
+**Current focus:** Phase 2 (n8n Live Wiring) — Plan 02-01 complete, 02-02 next
 
 ## Current Position
 
-Phase: 01 (polished-suggestions-panel-on-mock-data) — EXECUTING
-Plan: 4 of 4
-Status: Phase complete — ready for verification
-Last activity: 2026-06-25
+Phase: 2 (n8n Live Wiring) — EXECUTING
+Plan: 2 of 4
+Status: Executing Phase 2 — 02-01 complete (Suggest Replies workflow live on dev)
+Last activity: 2026-07-10 — completed 02-01-PLAN.md
 
-Progress: [██████████] 100%
+Progress: [██████░░░░] 63%
 
 ## Performance Metrics
 
@@ -52,6 +52,7 @@ Progress: [██████████] 100%
 - Trend: -
 
 *Updated after each plan completion*
+| Phase 2 P01 | 11min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -64,6 +65,9 @@ Recent decisions affecting current work:
 - [Roadmap]: Foundation (seam, correlation/stale guards, per-chat toggle + persistence, public `ChatManager.CurrentChatId` + `WaitForChatFetchesToDrain` accessors) lives inside Phase 1 so the UI phase is self-contained and shippable on mock data.
 - [Project]: Confidence shown as ranking + "Recommended" badge on top card only — no numeric percentage (research arXiv 2402.07632; trust core value). Lock before building card UI.
 - [Project]: Tapping a card loads into the composer to edit, never auto-sends; picking regenerates a full steered set of 4 (re-cluster loop).
+- [02-01]: Suggest Replies n8n workflow deployed on dev (id 9PTyYcelRQI7bGDb, /webhook/SuggestReplies) — one gpt-4o-mini strict json_schema call, closed 6-label enum, Code-node count/distinct/clamp validation + one retry then generation_failed; requestSeq echoed.
+- [02-01]: RAG via vectorStoreSupabase LOAD mode grounded from installed node source (n8n MCP unavailable → REST/curl); single botWaId filter, topK 5, text-embedding-3-small; alwaysOutputData + skipRag-gated Assemble so an empty documents table never kills the branch.
+- [02-01]: Committed export carries dev credential ids resolved by NAME (Dashboard precedent); prod bagkz replication remaps by name via build-suggest-replies.py. Supabase cred present+functional on dev; RAG grounding-with-data deferred to prod/seed.
 
 ### Pending Todos
 
@@ -88,8 +92,8 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: --stopped-at
-Stopped at: Phase 1 UI-SPEC approved
-Resume file: --resume-file
+Last session: 2026-07-10T14:58:12Z
+Stopped at: Completed 02-01-PLAN.md (Suggest Replies workflow live on dev)
+Resume file: None
 
-**Planned Phase:** 1 (polished-suggestions-panel-on-mock-data) — 4 plans — 2026-06-23T17:19:59.404Z
+**Planned Phase:** 2 (n8n Live Wiring) — 4 plans — 2026-07-10T14:26:05.936Z

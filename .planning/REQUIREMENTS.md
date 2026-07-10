@@ -55,10 +55,13 @@ Requirements for this milestone. Build order: **Phase 1** = polished UI on mock 
 
 ### n8n Live Wiring
 
-- [ ] **N8N-01**: Existing n8n automation is extended with a synchronous Webhook + Respond-to-Webhook flow that returns suggestions for a chat as a versioned `{ text, label }[]` payload (ranked best-first) plus correlation id
+- [x] **N8N-01
+**: Existing n8n automation is extended with a synchronous Webhook + Respond-to-Webhook flow that returns suggestions for a chat as a versioned `{ text, label }[]` payload (ranked best-first) plus correlation id
 - [ ] **N8N-02**: A `N8nSuggestionsProvider` consumes the live flow end-to-end with zero changes to Phase-1 UI (the seam holds)
-- [ ] **N8N-03**: The live flow supports re-clustering by accepting a "steer toward" field carrying the picked reply
-- [ ] **N8N-04**: Suggestion generation validates structured output against a schema and is hardened against prompt injection from customer-message content (labels constrained to a known set; malformed output handled, not surfaced raw)
+- [x] **N8N-03
+**: The live flow supports re-clustering by accepting a "steer toward" field carrying the picked reply
+- [x] **N8N-04
+**: Suggestion generation validates structured output against a schema and is hardened against prompt injection from customer-message content (labels constrained to a known set; malformed output handled, not surfaced raw)
 
 ## v2 Requirements
 
@@ -110,10 +113,10 @@ Mapped during roadmap creation (2026-06-23). Build order is load-bearing: Phase 
 | DATA-02 | Phase 1 | Pending |
 | DATA-03 | Phase 1 | Pending |
 | DATA-04 | Phase 1 | Pending |
-| N8N-01 | Phase 2 | Pending |
+| N8N-01 | Phase 2 | Complete (02-01) |
 | N8N-02 | Phase 2 | Pending |
-| N8N-03 | Phase 2 | Pending |
-| N8N-04 | Phase 2 | Pending |
+| N8N-03 | Phase 2 | Complete (02-01) |
+| N8N-04 | Phase 2 | Complete (02-01) |
 
 **Coverage:**
 - v1 requirements: 21 total
