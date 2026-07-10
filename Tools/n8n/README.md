@@ -5,7 +5,7 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
 
 ## Layout
 
-- `workflows/` — **committed source of truth**: the 8 workflows the app actually depends on.
+- `workflows/` — **committed source of truth**: the 11 workflows the app actually depends on.
   Each JSON has its original n8n `id` injected at the top level so it round-trips on import.
 - `supabase/` — the RAG store's DB contract: `schema.sql` (documents table +
   `match_documents` as deployed — note its multi-key filter uses OR semantics), the
@@ -27,7 +27,7 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
 - `reference/` — **gitignored**: downloaded community/marketplace templates + n8n onboarding
   samples, kept only to mine for ideas. Not part of the app, never imported.
 
-## The 8 canonical workflows
+## The 11 canonical workflows
 
 | id | name | role |
 |----|------|------|
@@ -39,11 +39,41 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
 | `ZTqpumOpL1rNDOp6` | Delete File | App webhook `DeleteFile` — body `{ fileId }`; deletes that file's chunks from `documents` AND its stored original `price-lists/{fileId}` (404 tolerated for pre-bucket files), returns `{ success, deletedChunks }` |
 | `4wYitz5ek30SVNlT` | WhatsApp Bot | **Clone source** for every WhatsApp bot (referenced by literal id in CreateWhatsappWorkflow); retrieval self-scoped by `botWaId = {{ $workflow.id }}` |
 | `4VN3gsFaC2HUYmcc` | Telegram Bot | **Clone source** for every Telegram bot (referenced by literal id in CreateTelegramWorkflow); retrieval self-scoped by `botTgId = {{ $workflow.id }}` |
+| `lmjYsdNcQA2IE5rl` | Delete Bot Files | App webhook `DeleteBotFiles` — body `{ botWaId, botTgId }`; sweeps ALL of a deleted bot's RAG chunks + stored originals (guards the `"-1"` unauthed sentinel) |
+| `2htWSV5IHO8E2CgB` | Dashboard Outcomes | App webhook `DashboardOutcomes` — body `{ profileIds }`; classifies conversation outcomes from `n8n_chat_histories` into `conversation_outcomes`, returns them for the «Сводка» dashboard |
+| `2islisFH7jjLoPQM` | Delete Orphan Profiles | **Scheduled, hourly** (no webhook) — server-side TTL sweep deleting Wappi profiles that stay unauthorized ≥ 24h; see below |
 
 > ⚠️ `4wYitz5ek30SVNlT` and `4VN3gsFaC2HUYmcc` are referenced by **literal id** inside the
 > two Create handlers. Never change their ids, or bot creation 404s on the clone step.
 > Keep both **inactive** — they share webhook path `0091024b-7b46` and only the per-bot
 > clones (with rewritten paths) ever go active.
+
+### Delete Orphan Profiles (scheduled sweep) — policy & gotchas
+
+Covers the orphan-profile leaks the client can never settle (swipe-kill / iOS quit mid-wizard,
+`profile/add` response lost in flight): hourly, lists ALL profiles (`GET /api/profile/all/get` +
+`GET /tapi/profile/all/get`), tracks unauthorized ones in a **first-seen ledger in workflow
+staticData** (Wappi exposes no creation timestamp — TTL runs from first observation, so a fresh
+import grants every existing orphan the full 24h grace), then re-checks `get/status` per candidate
+and POSTs `profile/delete`. Never deletes: authorized profiles, `deleted_at`-set entries, ambiguous
+`authorized` flags, or profiles with `authorized_at`/`logouted_at` inside the TTL window.
+`Sweep Config` node: `ttlHours` (24; values ≤ 0 coerce back to 24) / `dryRun` (reports
+`wouldDelete` without deleting). Verified e2e on dev 2026-07-10: seeded the ledger 25h in the past
+for two throwaway profiles → both deleted (WA + TG paths), the two live authorized profiles untouched.
+
+- **`get/status` has NO `status:"done"` field** (unlike add/delete/list/all-get). Response validity =
+  boolean `authorized` + `profile_id` echo match (the id match also guards Wappi's known
+  concurrent-response crossing). Don't "fix" the verify predicate to check `status`.
+- `profile/all/get` returns `profiles: null` (not `[]`) when the namespace is empty — handled.
+- `is_subscribe` is `false` even on working authorized profiles and `last_activity` is often `0` —
+  neither is usable in deletion policy.
+- staticData persists only across **production** (scheduled) runs; manual runs read but never write it.
+  The e2e trick: PUT seeded `staticData` via REST, then run manually with the real 24h TTL.
+- The n8n MCP builder strips/rejects generic-auth (`httpHeaderAuth`) credentials on HTTP Request
+  nodes — attach `WappiAuthToken` via the public REST API (`PUT /api/v1/workflows/{id}`) instead.
+- **Prod pass**: recreate the WappiAuthToken credential and repoint the 4 HTTP nodes' credential id
+  (dev id `ZowntFGvApDJ7UzQ`), import with fresh (empty) staticData, activate. Nothing else to wire —
+  no webhook, no Supabase.
 
 ## Import / export (local DEV server, `~/.n8n`)
 

@@ -1,0 +1,427 @@
+{
+  "name": "Delete Orphan Profiles",
+  "nodes": [
+    {
+      "id": "a71f1cee-192f-4229-834a-281779479642",
+      "name": "Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -680,
+        200
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "9111ca6a-1499-4b91-a941-89fa24e34df0",
+      "name": "Sweep Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -460,
+        200
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cfg-ttl-hours",
+              "name": "ttlHours",
+              "value": 24,
+              "type": "number"
+            },
+            {
+              "id": "cfg-dry-run",
+              "name": "dryRun",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ac33d239-e3fd-4ae4-9965-7462a0147b59",
+      "name": "List WA Profiles",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -240,
+        200
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://wappi.pro/api/profile/all/get",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ZowntFGvApDJ7UzQ",
+          "name": "WappiAuthToken"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "8b11c8f7-3ef0-4dbe-9ed6-32062deef3e2",
+      "name": "List TG Profiles",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -20,
+        200
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://wappi.pro/tapi/profile/all/get",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ZowntFGvApDJ7UzQ",
+          "name": "WappiAuthToken"
+        }
+      },
+      "executeOnce": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "9d2d39cb-e39d-4731-a760-3a32dda5c2ed",
+      "name": "Plan Sweep",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        200,
+        200
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const cfg = $('Sweep Config').first().json;\nconst ttlHours = Number(cfg.ttlHours) > 0 ? Number(cfg.ttlHours) : 24;\nconst dryRun = cfg.dryRun === true;\nconst ttlMs = ttlHours * 3600000;\nconst now = Date.now();\n\nconst sources = [\n  { platform: 'whatsapp', base: 'https://wappi.pro/api', payload: $('List WA Profiles').first().json },\n  { platform: 'telegram', base: 'https://wappi.pro/tapi', payload: $('List TG Profiles').first().json }\n];\n\n// first-seen ledger: { '<platform>:<profile_id>': epochMs } — persists across\n// production runs; the TTL clock starts when the sweep FIRST observes a profile\n// unauthorized (Wappi exposes no creation timestamp).\nconst staticData = $getWorkflowStaticData('global');\nif (typeof staticData.firstSeen !== 'object' || staticData.firstSeen === null) { staticData.firstSeen = {}; }\nconst firstSeen = staticData.firstSeen;\n\nfunction parseTs(v) {\n  if (!v || typeof v !== 'string') { return null; }\n  const t = Date.parse(v);\n  if (isNaN(t) || t <= 0) { return null; }\n  return t;\n}\n\nconst stats = { ranAt: new Date(now).toISOString(), mode: dryRun ? 'DRY RUN' : 'live', dryRun: dryRun, ttlHours: ttlHours, platforms: {}, candidateCount: 0, wouldDelete: [], skipped: [], ledgerSize: 0 };\nconst candidates = [];\nconst liveKeys = new Set();\n\nfor (const src of sources) {\n  if (!src.payload || src.payload.status !== 'done') {\n    throw new Error('Wappi profile list for ' + src.platform + ' did not return status done — aborting sweep, nothing deleted. Payload: ' + JSON.stringify(src.payload || null).slice(0, 300));\n  }\n  const profiles = Array.isArray(src.payload.profiles) ? src.payload.profiles : [];\n  const ps = { total: profiles.length, authorized: 0, unauthorized: 0, newlyTracked: 0, underTtl: 0, alreadyDeleted: 0, candidates: 0 };\n\n  for (const p of profiles) {\n    const id = String(p.profile_id || '').trim();\n    if (!id) { stats.skipped.push({ platform: src.platform, name: p.name || '', reason: 'empty profile_id' }); continue; }\n    const key = src.platform + ':' + id;\n    liveKeys.add(key);\n\n    if (p.deleted_at) { ps.alreadyDeleted += 1; delete firstSeen[key]; continue; }\n    if (p.authorized === true) { ps.authorized += 1; delete firstSeen[key]; continue; }\n    if (p.authorized !== false) { stats.skipped.push({ platform: src.platform, profileId: id, reason: 'authorized flag missing or ambiguous — never delete on ambiguity' }); continue; }\n\n    ps.unauthorized += 1;\n    if (!(key in firstSeen)) { firstSeen[key] = now; ps.newlyTracked += 1; }\n\n    const ageMs = now - firstSeen[key];\n    const authTs = parseTs(p.authorized_at);\n    const logoutTs = parseTs(p.logouted_at);\n    const recentlyActive = (authTs !== null && now - authTs < ttlMs) || (logoutTs !== null && now - logoutTs < ttlMs);\n\n    if (ageMs < ttlMs || recentlyActive) { ps.underTtl += 1; continue; }\n\n    ps.candidates += 1;\n    candidates.push({\n      platform: src.platform,\n      profileId: id,\n      profileName: p.name || '',\n      firstSeenAt: new Date(firstSeen[key]).toISOString(),\n      trackedHours: Math.round(ageMs / 360000) / 10,\n      statusUrl: src.base + '/sync/get/status?profile_id=' + encodeURIComponent(id),\n      deleteUrl: src.base + '/profile/delete?profile_id=' + encodeURIComponent(id)\n    });\n  }\n  stats.platforms[src.platform] = ps;\n}\n\n// GC ledger entries for profiles that no longer exist in the account\nfor (const key of Object.keys(firstSeen)) {\n  if (!liveKeys.has(key)) { delete firstSeen[key]; }\n}\nstats.ledgerSize = Object.keys(firstSeen).length;\nstats.candidateCount = candidates.length;\n\nif (dryRun) {\n  stats.wouldDelete = candidates;\n  return [{ json: Object.assign({}, stats, { candidates: [] }) }];\n}\nreturn [{ json: Object.assign({}, stats, { candidates: candidates }) }];"
+      }
+    },
+    {
+      "id": "e38e2732-8c40-4dbd-b3f9-1236aec39ab6",
+      "name": "Split Candidates",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        420,
+        200
+      ],
+      "parameters": {
+        "fieldToSplitOut": "candidates"
+      }
+    },
+    {
+      "id": "cd222a84-8a35-4c10-b34f-dbc25265d012",
+      "name": "Re-check Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        640,
+        200
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.statusUrl }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 30000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 500
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ZowntFGvApDJ7UzQ",
+          "name": "WappiAuthToken"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "63d177b4-74c6-4382-a63c-4c84952600e3",
+      "name": "Confirm Orphan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        860,
+        200
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const cand = $('Split Candidates').item.json;\nconst resp = $json;\n// Wappi get/status has NO status:\"done\" field (unlike add/delete/list) — a valid\n// response is identified by a real boolean `authorized` echoing our profile_id\n// (the id match also guards against Wappi's known concurrent-response crossing).\nconst verifyOk = typeof resp.authorized === 'boolean' && resp.profile_id === cand.profileId;\nreturn { json: Object.assign({}, cand, {\n  verifyOk: verifyOk,\n  verifyAuthorized: verifyOk ? resp.authorized : null,\n  confirmedOrphan: verifyOk && resp.authorized === false\n}) };"
+      }
+    },
+    {
+      "id": "c655b957-0b59-47d4-aa35-154c7551dd56",
+      "name": "Still Unauthorized?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        1080,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.confirmedOrphan }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "4cb08b14-5ce8-4947-957c-8465b0418d9d",
+      "name": "Delete Profile",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1300,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.deleteUrl }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 30000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 500
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ZowntFGvApDJ7UzQ",
+          "name": "WappiAuthToken"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "53cabb08-0cba-4df3-bde9-2d66274f8891",
+      "name": "Stamp Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1520,
+        200
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const cand = $('Confirm Orphan').item.json;\nconst resp = $json;\nreturn { json: {\n  platform: cand.platform,\n  profileId: cand.profileId,\n  profileName: cand.profileName,\n  firstSeenAt: cand.firstSeenAt,\n  trackedHours: cand.trackedHours,\n  deleted: resp.status === 'done',\n  deleteResponse: resp\n} };"
+      }
+    },
+    {
+      "id": "740b091e-c7b3-486f-9064-25c77bc7d156",
+      "name": "Sweep Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1740,
+        200
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const stats = $('Plan Sweep').first().json;\nconst results = $input.all().map(function (i) { return i.json; });\nconst deleted = results.filter(function (r) { return r.deleted; });\nconst failed = results.filter(function (r) { return !r.deleted; });\nreturn [{ json: {\n  ranAt: stats.ranAt,\n  mode: stats.mode,\n  ttlHours: stats.ttlHours,\n  platforms: stats.platforms,\n  deletedCount: deleted.length,\n  deleted: deleted,\n  failedCount: failed.length,\n  failed: failed\n} }];"
+      }
+    },
+    {
+      "id": "6602d1fa-4695-4123-ad2e-c5c6cd8b20f8",
+      "name": "Sticky Note 9ebd3c78",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -730,
+        150
+      ],
+      "parameters": {
+        "content": "## Delete Orphan Profiles — server-side TTL sweep\n\nHourly: lists ALL Wappi profiles (WhatsApp api/ + Telegram tapi/), tracks unauthorized ones in a first-seen ledger (workflow staticData — Wappi exposes no creation timestamp), and deletes profiles that stay unauthorized for the full TTL, re-checking get/status right before each delete.\n\nNEVER deletes: authorized profiles, deleted_at-set profiles, ambiguous authorized flags, profiles tracked < TTL, or profiles with authorized_at/logouted_at inside the TTL window.\n\nCovers the leaks the client cannot: swipe-kill / iOS quit mid-wizard, and profile/add responses that never reached the app. Client twin: PendingProfileLedger (quit-time settle + next-launch sweep).\n\nSweep Config: ttlHours (24) / dryRun — dryRun reports wouldDelete without deleting.",
+        "color": 4,
+        "width": 1180,
+        "height": 200
+      }
+    }
+  ],
+  "connections": {
+    "Every Hour": {
+      "main": [
+        [
+          {
+            "node": "Sweep Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sweep Config": {
+      "main": [
+        [
+          {
+            "node": "List WA Profiles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List WA Profiles": {
+      "main": [
+        [
+          {
+            "node": "List TG Profiles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List TG Profiles": {
+      "main": [
+        [
+          {
+            "node": "Plan Sweep",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan Sweep": {
+      "main": [
+        [
+          {
+            "node": "Split Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Candidates": {
+      "main": [
+        [
+          {
+            "node": "Re-check Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Re-check Status": {
+      "main": [
+        [
+          {
+            "node": "Confirm Orphan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirm Orphan": {
+      "main": [
+        [
+          {
+            "node": "Still Unauthorized?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Still Unauthorized?": {
+      "main": [
+        [
+          {
+            "node": "Delete Profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Profile": {
+      "main": [
+        [
+          {
+            "node": "Stamp Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stamp Result": {
+      "main": [
+        [
+          {
+            "node": "Sweep Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "staticData": null,
+  "pinData": {},
+  "triggerCount": 1,
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  },
+  "id": "2islisFH7jjLoPQM",
+  "active": true
+}
