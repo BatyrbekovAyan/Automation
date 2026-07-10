@@ -17,6 +17,9 @@ public class MessageItemView : MonoBehaviour
     public Image messageImage;
     public Image bubbleBackground; 
     public GameObject bubbleTail;
+    // Tail fill, rendered AFTER the bubble so it knocks out the SDF border segment at the
+    // bubble/tail junction (bubbleTail = the border-colored TailOutline, which stays behind).
+    [SerializeField] private GameObject bubbleTailFill;
     public GameObject timeBackground;
 
     [Header("Media Controls")]
@@ -57,6 +60,9 @@ public class MessageItemView : MonoBehaviour
     private RectTransform _tailRt;
     private float _tailBaseY;
     private bool _tailBaseCaptured;
+    private RectTransform _tailFillRt;
+    private float _tailFillBaseY;
+    private bool _tailFillBaseCaptured;
     // Matches the pill's hang below the bubble (pill height ~58, anchored +8, pivot top →
     // ~50 below) so the row ends flush with the pill bottom and the gap to the next
     // message is the normal inter-message spacing.
@@ -3641,8 +3647,13 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
 
         if (bubbleTail != null)
         {
-            bubbleTail.SetActive(currentShowTail && !isTransparent);
-            bubbleTail.transform.GetChild(0).GetComponent<Image>().color = bubbleBackground.color;
+            bool showTail = currentShowTail && !isTransparent;
+            bubbleTail.SetActive(showTail);
+            if (bubbleTailFill != null)
+            {
+                bubbleTailFill.SetActive(showTail);
+                bubbleTailFill.GetComponent<Image>().color = bubbleBackground.color;
+            }
         }
     }
     
@@ -4382,6 +4393,17 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
             var pos = _tailRt.anchoredPosition;
             pos.y = _tailBaseY + target;
             _tailRt.anchoredPosition = pos;
+        }
+
+        // The fill is a sibling of the bubble (rendered after it — see bubbleTailFill),
+        // so it must be lifted in lockstep with the outline above.
+        if (bubbleTailFill != null)
+        {
+            if (_tailFillRt == null) _tailFillRt = (RectTransform)bubbleTailFill.transform;
+            if (!_tailFillBaseCaptured) { _tailFillBaseY = _tailFillRt.anchoredPosition.y; _tailFillBaseCaptured = true; }
+            var fillPos = _tailFillRt.anchoredPosition;
+            fillPos.y = _tailFillBaseY + target;
+            _tailFillRt.anchoredPosition = fillPos;
         }
     }
 
