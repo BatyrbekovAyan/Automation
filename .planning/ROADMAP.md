@@ -1,60 +1,25 @@
-# Roadmap: Reply Suggestions Panel (semi-auto mode)
+# Roadmap: Automation — WhatsApp/Telegram AI Bot Manager
 
-## Overview
+## Milestones
 
-This milestone adds the semi-auto reply path to the existing WhatsApp chat client: a per-chat Reply Suggestions Panel that proposes 4 ranked candidate replies the owner picks, refines in the composer, and sends — never auto-sending. The journey is deliberately sequenced around one load-bearing seam (`ISuggestionsProvider`): Phase 1 builds and polishes the entire panel, toggle, interaction loop, and concurrency guards against a `MockSuggestionsProvider` so the feature is demoable end-to-end with zero backend; Phase 2 modifies the n8n automations and drops in a `N8nSuggestionsProvider` behind the same seam, wiring live suggestions with no edits to the Phase-1 UI. If Phase 2 ever requires a Phase-1 UI change, the seam was breached — treat it as a defect.
+- ✅ **v1.0 Reply Suggestions** — Phases 1-2 (shipped 2026-07-11)
+- 📋 **Next milestone** — not yet defined (run `/gsd-new-milestone`)
 
 ## Phases
 
-**Phase Numbering:**
-- Integer phases (1, 2): Planned milestone work
-- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
+<details>
+<summary>✅ v1.0 Reply Suggestions (Phases 1-2) — SHIPPED 2026-07-11</summary>
 
-Decimal phases appear between their surrounding integers in numeric order.
+- [x] Phase 1: Polished Suggestions Panel on Mock Data (4/4 plans) — completed 2026-06-25
+- [x] Phase 2: n8n Live Wiring (4/4 plans) — completed 2026-07-10
 
-- [ ] **Phase 1: Polished Suggestions Panel on Mock Data** - Per-chat semi-auto toggle, 4-card panel, pick/refresh/re-cluster loop, and the provider seam + concurrency guards, all built and shippable against a mock provider with no n8n dependency.
-- [x] **Phase 2: n8n Live Wiring** - Modify the n8n automation to emit and re-cluster suggestions, then consume it live via `N8nSuggestionsProvider` behind the seam with zero Phase-1 UI changes. (completed 2026-07-10)
+Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
-## Phase Details
-
-### Phase 1: Polished Suggestions Panel on Mock Data
-**Goal**: A fully functional, visually polished Reply Suggestions Panel — per-chat semi-auto toggle, 4 ranked cards, pick-to-composer hand-off, manual refresh, and the re-cluster steering loop — running end-to-end against a `MockSuggestionsProvider` behind the `ISuggestionsProvider` seam. Demoable and shippable with no backend. The seam, the stale-response/correlation guards, the per-chat toggle + persistence, and the public `ChatManager` accessors all live here so the UI phase is self-contained.
-**Depends on**: Nothing (first phase) — builds on existing chat UI (QuickReplyPanel / MessagesBottomPanel), ChatManager events, and the UnityWebRequest+coroutine conventions.
-**Requirements**: SEMI-01, SEMI-02, SEMI-03, PANEL-01, PANEL-02, PANEL-03, PANEL-04, PANEL-05, PANEL-06, INT-01, INT-02, INT-03, INT-04, DATA-01, DATA-02, DATA-03, DATA-04
-**Success Criteria** (what must be TRUE):
-  1. Owner flips a chat into semi-auto via a per-chat toggle and sees the panel appear; the state survives an app restart and bot switch, and other chats stay autonomous/manual (no panel).
-  2. The panel shows 4 suggestion cards ordered best-first, each with reply text + an intent label and a "Recommended" badge on the top card only (no numeric confidence); long text truncates cleanly and loading/empty/error states render without jank.
-  3. Tapping a card loads its text into the composer to edit and never auto-sends; an incoming customer message auto-populates fresh suggestions without overwriting an in-progress composer draft; the owner can manually refresh.
-  4. Picking a card regenerates a fresh, steered set of 4 (the re-cluster loop), and the owner can keep refining or edit and send via the existing Send button.
-  5. Rapid picks and chat switches never render stale or crossed suggestions — out-of-order/superseded responses are discarded via a correlation/sequence guard (reusing the CrossChatResponseGuard / WaitForChatFetchesToDrain pattern), exercised by the adversarial mock; nothing above the seam references n8n, UnityWebRequest, or Wappi.
-**Plans**: 4 plans
-  - [ ] 01-01-PLAN.md — Provider seam + value objects + MockSuggestionsProvider + sequence guard (+ EditMode tests)
-  - [ ] 01-02-PLAN.md — ChatManager CurrentChatId/drain accessors + SemiAutoStore persistence (+ EditMode tests)
-  - [ ] 01-03-PLAN.md — Panel/card/chip/badge/skeleton + top-bar toggle views + [MenuItem] builder
-  - [ ] 01-04-PLAN.md — SuggestionsController wiring (guard, toggle, hand-off, auto-populate, refresh) + wirer
-**UI hint**: yes
-
-### Phase 2: n8n Live Wiring
-**Goal**: Modify the existing n8n automation to emit suggestions (and support re-clustering toward a pick) via a new synchronous Webhook + Respond-to-Webhook flow, then consume it live through a `N8nSuggestionsProvider` swapped in behind the seam — with zero changes to any Phase-1 UI code. The live path is a serial, guarded PULL mirroring QuoteResolve, hardened against malformed/injected output.
-**Depends on**: Phase 1 (the seam, controller, panel, guards, and data contract must exist and be proven on mock data first).
-**Requirements**: N8N-01, N8N-02, N8N-03, N8N-04
-**Success Criteria** (what must be TRUE):
-  1. With the seam flipped to live, the owner sees real suggestions generated by n8n/LLM for the open chat end-to-end, with no Phase-1 UI code touched (any required UI edit is a seam-breach defect).
-  2. Picking a card produces a fresh live set re-clustered toward the pick via a "steer toward" field carried to the n8n flow.
-  3. The n8n flow returns a versioned `{ text, label }[]` payload ranked best-first plus a correlation id, and the live provider gates behind WaitForChatFetchesDrain, supersedes via correlation, and aborts on bot switch — never crossing or rendering a stale set.
-  4. Malformed or out-of-contract LLM output (bad JSON, wrong card count, out-of-set labels, or prompt-injection content from the customer message) is validated against a schema and handled gracefully (empty/retry), never surfaced raw.
-**Plans**: 4 plans (3 waves)
-  - [x] 02-01-PLAN.md — [Wave 1] Build + deploy the `Suggest Replies` n8n workflow (Webhook → conditional RAG → gpt-4o-mini json_schema → validate/retry → Respond) on dev
-  - [x] 02-02-PLAN.md — [Wave 1] Unity `N8nSuggestionsProvider` + wire DTOs + `ChatManager.TryGetRecentMessages` + single seam swap + EditMode tests
-  - [x] 02-03-PLAN.md — [Wave 2] Adversarial e2e hardening matrix (injection / grounding / steer / trivial / sentinel) + canonical workflow commit
-  - [x] 02-04-PLAN.md — [Wave 3] Live end-to-end verification + human device UAT (milestone gate)
+</details>
 
 ## Progress
 
-**Execution Order:**
-Phases execute in numeric order: 1 → 2
-
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 1. Polished Suggestions Panel on Mock Data | 0/4 | Planned | - |
-| 2. n8n Live Wiring | 4/4 | Complete    | 2026-07-10 |
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. Polished Suggestions Panel on Mock Data | v1.0 | 4/4 | Complete | 2026-06-25 |
+| 2. n8n Live Wiring | v1.0 | 4/4 | Complete | 2026-07-10 |

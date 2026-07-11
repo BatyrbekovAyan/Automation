@@ -2,33 +2,33 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: milestone_complete
-stopped_at: Completed 02-04-PLAN.md (device gate closed as owner smoke pass; detailed 5-scenario UAT deferred — 02-HUMAN-UAT.md)
-last_updated: "2026-07-10T18:06:10.449Z"
-last_activity: 2026-07-10
+status: completed
+stopped_at: Completed 02-04-PLAN.md (device gate closed as owner smoke pass; detailed UAT deferred to 02-HUMAN-UAT.md)
+last_updated: "2026-07-11T14:20:18.290Z"
+last_activity: 2026-07-11
 progress:
   total_phases: 2
-  completed_phases: 3
+  completed_phases: 2
   total_plans: 8
   completed_plans: 8
-  percent: 150
+  percent: 100
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-23)
+See: .planning/PROJECT.md (updated 2026-07-11)
 
 **Core value:** The owner stays in control along the automation↔semi-auto spectrum — the bot can answer autonomously, or propose replies the owner picks and refines, without losing trust or the ability to take over.
-**Current focus:** Phase 2 (n8n Live Wiring) — all 4 plans executed; device gate = owner smoke pass; ready for phase verification
+**Current focus:** v1.0 Reply Suggestions SHIPPED 2026-07-11 — planning next milestone (/gsd-new-milestone). Deferred: device-UAT details, prod bagkz replication, server-side «Вместе» suppression.
 
 ## Current Position
 
 Phase: 2
 Plan: Not started
 Status: Milestone complete
-Last activity: 2026-07-10
+Last activity: 2026-07-11
 
 Progress: [██████████] 100%
 
@@ -94,6 +94,9 @@ Items acknowledged and carried forward:
 |----------|------|--------|-------------|
 | Feedback | FB-01 thumbs-up/down to improve ranking | Deferred to v2 | Init |
 | Insight | FB-02 per-chat/per-bot suggestion analytics | Deferred to v2 | Init |
+| uat_gap | Phase 01: 01-HUMAN-UAT.md — 4 pending device scenarios | partial | v1.0 close 2026-07-11 |
+| uat_gap | Phase 02: 02-HUMAN-UAT.md — 4 pending device scenarios | partial | v1.0 close 2026-07-11 |
+| verification_gap | Phase 01: 01-VERIFICATION.md awaits device confirmation | human_needed | v1.0 close 2026-07-11 |
 | Polish | POL-01 streaming/animated suggestion reveal | Deferred to v2 | Init |
 | Polish | POL-02 Telegram chat support for the panel | Deferred to v2 | Init |
 
