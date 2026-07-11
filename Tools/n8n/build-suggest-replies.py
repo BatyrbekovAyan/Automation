@@ -56,20 +56,39 @@ def api_key():
 
 
 def resolve_cred(cred_type):
-    """Return (id, name) for a credential type, preferring the live DB by name."""
+    """Return (id, name) for a credential, matched by exact NAME from the live DB.
+
+    The wanted name is pinned in FALLBACK_CREDS. If the DB is readable but holds no
+    credential of this type with that exact name, fail LOUDLY listing the candidates —
+    on an instance with several credentials of one type (e.g. prod: `OpenAi account`
+    plus an older `OpenAi (old)`, or two Supabase projects), silently binding whichever
+    sorts first would point the workflow at the wrong account/project with no error.
+    Only a missing or unreadable DB falls back to the pinned ids.
+    """
     want_id, want_name = FALLBACK_CREDS[cred_type]
     if os.path.exists(DEV_DB):
         try:
             con = sqlite3.connect(DEV_DB)
             row = con.execute(
-                "SELECT id, name FROM credentials_entity WHERE type=? ORDER BY name LIMIT 1",
-                (cred_type,),
+                "SELECT id, name FROM credentials_entity WHERE type=? AND name=? LIMIT 1",
+                (cred_type, want_name),
             ).fetchone()
+            candidates = None
+            if not row:
+                candidates = con.execute(
+                    "SELECT id, name FROM credentials_entity WHERE type=?", (cred_type,)
+                ).fetchall()
             con.close()
-            if row:
-                return row[0], row[1]
         except Exception:
-            pass
+            return want_id, want_name  # DB unreadable -> pinned fallback (best effort)
+        if row:
+            return row[0], row[1]
+        listing = ", ".join(f"{cid} ({cname!r})" for cid, cname in candidates) or "(none of this type)"
+        raise SystemExit(
+            f"credential type {cred_type!r} named {want_name!r} not found in {DEV_DB}; "
+            f"candidates: {listing}. Rename the credential on the instance (or update "
+            f"FALLBACK_CREDS) — refusing to guess."
+        )
     return want_id, want_name
 
 

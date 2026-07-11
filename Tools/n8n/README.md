@@ -20,7 +20,8 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
   straight to Build Response's `generation_failed`, zero LLM spend] → If skipRag → conditional RAG
   load → Assemble → LLM json_schema → Validate → retry-once → Build Response → Respond) to the
   target n8n and activates it; `--export <id> <out>` re-emits the canonical JSON. Credential ids
-  resolve by name from the instance's SQLite DB (portable to prod replication).
+  resolve by exact name from the instance's SQLite DB (portable to prod replication; a
+  present-but-misnamed credential fails loudly listing the candidates instead of guessing).
 - `apply-*.py` — idempotent migrations over `workflows/` (edit by node name, re-runnable);
   `verify_rag.py` asserts every applied invariant; `test-upload-e2e.sh` exercises the
   Upload/Delete webhooks end-to-end against a live instance (curl mimicking Unity's
