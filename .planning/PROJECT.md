@@ -35,7 +35,7 @@ The owner stays in control along a spectrum from fully autonomous to hands-on: t
 
 - [ ] Detailed device UAT (5 scenarios, owner smoke pass done — tracked in `phases/02-n8n-live-wiring/02-HUMAN-UAT.md`)
 - [ ] Prod bagkz replication of the Suggest Replies workflow + RAG grounding-with-data verification (dev `documents` unseeded)
-- [ ] Code-review warnings WR-01..04 (`phases/02-n8n-live-wiring/02-REVIEW.md`) — advisory fixes
+- ✓ Code-review warnings WR-01..04 — fixed 2026-07-11 (`phases/02-n8n-live-wiring/02-REVIEW-FIX.md`, all_fixed, 27/27 tests)
 
 ### Out of Scope
 
