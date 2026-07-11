@@ -213,7 +213,9 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
     /// <summary>
     /// Maps the server JSON to a <see cref="SuggestionResult"/>: malformed/null/error-field/
     /// null-suggestions/0-valid => <see cref="SuggestionStatus.Error"/>; 1–4 valid {text,label}
-    /// => <see cref="SuggestionStatus.Ok"/> ({text,label} -&gt; {text,intentLabel}, order preserved).
+    /// => <see cref="SuggestionStatus.Ok"/> ({text,label} -&gt; {text,intentLabel}, order preserved);
+    /// &gt;4 valid => the FIRST 4 (the wire contract's upper bound, enforced client-side so a
+    /// misbehaving server can never overflow the fixed-footprint panel).
     /// <paramref name="requestSeq"/> is stamped from the REQUEST, not the server echo.
     /// </summary>
     public static SuggestionResult MapResponse(string json, long requestSeq)
@@ -226,6 +228,7 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
 
         var items = r.suggestions
             .Where(s => s != null && !string.IsNullOrEmpty(s.text) && !string.IsNullOrEmpty(s.label))
+            .Take(4)   // enforce the wire contract's upper bound client-side (trust boundary)
             .Select(s => new SuggestionItem { text = s.text, intentLabel = s.label })   // {text,label} -> {text,intentLabel}
             .ToList();
 

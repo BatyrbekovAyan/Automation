@@ -45,6 +45,25 @@ public class SuggestRepliesMapTests
     }
 
     [Test]
+    public void FiveItems_CappedAtFour_Ok()
+    {
+        // >4 valid items must clamp to the wire contract's upper bound (first 4, order kept) —
+        // the mapper is the trust boundary; the panel renders one card per item with no cap.
+        string json = "{\"v\":1,\"requestSeq\":1,\"suggestions\":[" +
+            "{\"text\":\"a\",\"label\":\"Ответ\"}," +
+            "{\"text\":\"b\",\"label\":\"Уточнить\"}," +
+            "{\"text\":\"c\",\"label\":\"Вариант\"}," +
+            "{\"text\":\"d\",\"label\":\"К заказу\"}," +
+            "{\"text\":\"e\",\"label\":\"Отложить\"}]}";
+        var r = N8nSuggestionsProvider.MapResponse(json, 9);
+        Assert.AreEqual(SuggestionStatus.Ok, r.status);
+        Assert.AreEqual(4, r.items.Count);
+        Assert.AreEqual("a", r.items[0].text);        // first four kept, order preserved
+        Assert.AreEqual("d", r.items[3].text);        // the 5th ("e") is dropped
+        Assert.AreEqual(9L, r.requestSeq);
+    }
+
+    [Test]
     public void ErrorField_MapsToError() =>
         Assert.AreEqual(SuggestionStatus.Error,
             N8nSuggestionsProvider.MapResponse(
