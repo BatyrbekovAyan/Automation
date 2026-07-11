@@ -57,10 +57,13 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
         yield return ChatManager.Instance.WaitForChatFetchesDrain();
 
         // Re-resolve AFTER the drain (up to ~3 s) so we assemble against the freshest history and
-        // bail if the chat/bot changed underneath us.
+        // bail if the chat/bot changed underneath us. The fetch is scoped to the REQUEST's chatId
+        // (never the currently-open chat) so a chat switch during the drain trips the accessor's
+        // chat-mismatch guard -> Empty, instead of pairing the new chat's messages with the old
+        // request's chatId/steer/lastIncoming in a mixed-context (and paid) LLM call.
         var cm = ChatManager.Instance;
         Bot bot = (cm != null && Manager.Instance != null) ? Manager.Instance.FindBotByName(cm.CurrentBotId) : null;
-        if (cm == null || bot == null || !cm.TryGetRecentMessages(cm.CurrentChatId, MaxMessages, out var msgs))
+        if (cm == null || bot == null || !cm.TryGetRecentMessages(req.chatId, MaxMessages, out var msgs))
         {
             cb?.Invoke(Empty(req));
             yield break;
