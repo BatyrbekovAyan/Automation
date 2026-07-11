@@ -42,6 +42,40 @@
           },
           "conditions": [
             {
+              "id": "1a2b3c4d-0003-4000-8000-000000000003",
+              "leftValue": "={{ $json.invalid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        0
+      ],
+      "id": "c1000000-0000-4000-8000-000000000308",
+      "name": "If invalid?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
               "id": "1a2b3c4d-0001-4000-8000-000000000001",
               "leftValue": "={{ $json.skipRag }}",
               "rightValue": "",
@@ -59,7 +93,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        440,
+        660,
         0
       ],
       "id": "c1000000-0000-4000-8000-000000000103",
@@ -297,6 +331,24 @@
     },
     "Prep": {
       "main": [
+        [
+          {
+            "node": "If invalid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If invalid?": {
+      "main": [
+        [
+          {
+            "node": "Build Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
         [
           {
             "node": "If skipRag?",

@@ -2,11 +2,12 @@
 """Build + deploy the shared "Suggest Replies" n8n workflow (semi-auto Phase 2).
 
 The 12th canonical workflow: a shared, always-active webhook (POST /webhook/SuggestReplies)
-that takes the frozen v1 request contract, optionally runs tenant-scoped RAG pre-retrieval
-(Supabase Vector Store, single-key botWaId filter, topK 5), calls one LLM (gpt-4o-mini,
-strict structured JSON), validates the output (exactly 4 distinct enum-labeled moves,
-hard-clamped, markdown-stripped, one retry then a safe error payload), and responds in-band
-echoing requestSeq.
+that takes the frozen v1 request contract, short-circuits known-invalid requests straight to
+the `generation_failed` payload (unauthenticated webhook — garbage must never cost an LLM
+call), optionally runs tenant-scoped RAG pre-retrieval (Supabase Vector Store, single-key
+botWaId filter, topK 5), calls one LLM (gpt-4o-mini, strict structured JSON), validates the
+output (exactly 4 distinct enum-labeled moves, hard-clamped, markdown-stripped, one retry
+then a safe error payload), and responds in-band echoing requestSeq.
 
 Mirrors the Dashboard Outcomes skeleton (Webhook -> Code -> httpRequest json_schema ->
 Code parse -> Respond). RAG uses the vectorStoreSupabase node in `load` (Get Many) mode
@@ -226,7 +227,8 @@ else if (!allValid) violation = 'метка вне списка или пуст�
 else if (!distinct) violation = 'метки повторяются — нужны 4 РАЗНЫЕ метки';
 return { json: { ok, items, violation, requestSeq: a.requestSeq, invalid: a.invalid } };"""
 
-# Build Response: always echo requestSeq verbatim. invalid input (from Prep) or a still-failing
+# Build Response: always echo requestSeq verbatim. invalid input (Prep's json routed straight
+# here by "If invalid?" — j.ok is undefined there, so !j.ok also holds) or a still-failing
 # retry -> the safe error payload; never raw model text.
 BUILD_RESPONSE_JS = r"""const j = $json;
 const requestSeq = (j.requestSeq === undefined || j.requestSeq === null) ? 0 : j.requestSeq;
@@ -407,12 +409,24 @@ def build_full():
         extra={"webhookId": "b3f7a1c0-1111-4aaa-9bbb-000000000001"},
     )
     prep = n("c1000000-0000-4000-8000-000000000102", "Prep", "n8n-nodes-base.code", 2, [220, 0], {"jsCode": PREP_JS})
+    # Short-circuit known-invalid requests (v mismatch / missing chatId / empty messages)
+    # straight to Build Response — its existing `j.invalid || !j.ok` check emits the
+    # generation_failed payload with the echoed requestSeq. Garbage on this unauthenticated
+    # webhook must never cost an LLM call (WR-03).
+    if_invalid = n(
+        "c1000000-0000-4000-8000-000000000308",
+        "If invalid?",
+        "n8n-nodes-base.if",
+        2.2,
+        [440, 0],
+        bool_if_condition("={{ $json.invalid }}", "1a2b3c4d-0003-4000-8000-000000000003"),
+    )
     if_skip = n(
         "c1000000-0000-4000-8000-000000000103",
         "If skipRag?",
         "n8n-nodes-base.if",
         2.2,
-        [440, 0],
+        [660, 0],
         bool_if_condition("={{ $json.skipRag }}", "1a2b3c4d-0001-4000-8000-000000000001"),
     )
     retrieve, embed = rag_nodes()
@@ -452,10 +466,14 @@ def build_full():
         [2500, 0],
         {"respondWith": "json", "responseBody": "={{ $json }}", "options": {}},
     )
-    nodes = [webhook, prep, if_skip, retrieve, embed, assemble, llm, validate, if_ok, llm_retry, validate2, build_resp, respond]
+    nodes = [webhook, prep, if_invalid, if_skip, retrieve, embed, assemble, llm, validate, if_ok, llm_retry, validate2, build_resp, respond]
     connections = {
         "Webhook": {"main": [[{"node": "Prep", "type": "main", "index": 0}]]},
-        "Prep": {"main": [[{"node": "If skipRag?", "type": "main", "index": 0}]]},
+        "Prep": {"main": [[{"node": "If invalid?", "type": "main", "index": 0}]]},
+        "If invalid?": {"main": [
+            [{"node": "Build Response", "type": "main", "index": 0}],  # TRUE  -> generation_failed, zero LLM spend
+            [{"node": "If skipRag?", "type": "main", "index": 0}],     # FALSE -> normal pipeline
+        ]},
         "If skipRag?": {"main": [
             [{"node": "Assemble", "type": "main", "index": 0}],       # TRUE  -> skip RAG
             [{"node": "Retrieve RAG", "type": "main", "index": 0}],   # FALSE -> RAG
