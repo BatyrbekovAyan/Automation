@@ -155,6 +155,10 @@ public class Manager : MonoBehaviour
     private bool _whatsappCodeIssued;
     private string telegramPhoneTitleInitial;
     private string telegramPhoneBodyInitial;
+    // True while the Telegram code-entry panel is repurposed as a cloud-password (2FA)
+    // prompt: TelegramCodeInputChanged relaxes its gate and the submit button posts
+    // auth/2fa instead of auth/code. Reset whenever the panel is closed / number changed.
+    private bool _telegram2faMode;
 
     public static string wappiAuthToken => Secrets.Data.wappiAuthToken;
     public static string n8nAPIKey => Secrets.Data.n8nAPIKey;
@@ -1684,6 +1688,7 @@ public class Manager : MonoBehaviour
         TelegramCodeInput.gameObject.SetActive(false);
         SendTelegramCodeButton.gameObject.SetActive(false);
         if (ChangeTelegramNumberButton != null) ChangeTelegramNumberButton.gameObject.SetActive(false);
+        _telegram2faMode = false;
         TelegramCodeInput.text = "";
         SetButtonText(GetTelegramCodeButton, "Получить код");
         SetTelegramCodeEntryTexts(false);
@@ -2293,6 +2298,14 @@ public class Manager : MonoBehaviour
     
     public void TelegramCodeInputChanged(string newText)
     {
+        // In cloud-password mode the field is a Telegram password, not a numeric code —
+        // any non-empty value enables submit (the min-5-digit gate is code-mode only).
+        if (_telegram2faMode)
+        {
+            SendTelegramCodeButton.interactable = !string.IsNullOrEmpty(newText);
+            return;
+        }
+
         if (string.IsNullOrEmpty(newText) || newText.Length < 5)
         {
             SendTelegramCodeButton.interactable = false;
@@ -2305,9 +2318,17 @@ public class Manager : MonoBehaviour
 
     private IEnumerator SendTelegramCode()
     {
+        // Once the panel is in cloud-password mode this same submit button posts the
+        // Telegram cloud password to auth/2fa instead of the pairing code to auth/code.
+        if (_telegram2faMode)
+        {
+            yield return StartCoroutine(SubmitTelegram2fa());
+            yield break;
+        }
+
         LoadingPanel.SetActive(true);
         SendTelegramCodeButton.interactable = false;
-        SetButtonText(SendTelegramCodeButton, "Authorizing..");
+        SetButtonText(SendTelegramCodeButton, "Авторизация...");
 
         string jsonBody = "{\"auth_code\":\"" + TelegramCodeInput.text + "\"}";
 
@@ -2347,38 +2368,138 @@ public class Manager : MonoBehaviour
         }
         else
         {
-            string response = www.downloadHandler.text;
+            string detail = TelegramAuthResponseParser.ExtractDetail(www.downloadHandler.text);
 
-            if (response.Contains("\"detail\":\""))
+            if (TelegramAuthResponseParser.IsAuthSuccess(detail))
             {
-                int startIndex = response.IndexOf("\"detail\":\"") + 10;
+                SetButtonText(SendTelegramCodeButton, "Авторизация завершена");
 
-                if (response.Substring(startIndex, 12).Equals("auth_success"))
-                {
-                    SetButtonText(SendTelegramCodeButton, "Authorization Complete");
+                if (_telegramStatusCoroutine != null) StopCoroutine(_telegramStatusCoroutine);
+                _telegramStatusCoroutine = StartCoroutine(GetTelegramProfileStatus());
 
-                    if (_telegramStatusCoroutine != null) StopCoroutine(_telegramStatusCoroutine);
-                    _telegramStatusCoroutine = StartCoroutine(GetTelegramProfileStatus());
-
-                    yield return new WaitForSeconds(2f);
-                }
-                else
-                {
-                    SetButtonText(SendTelegramCodeButton, "Authorization Failed");
-                    yield return new WaitForSeconds(2f);
-                }
+                yield return new WaitForSeconds(2f);
+                SetButtonText(SendTelegramCodeButton, "Подтвердить код");
+            }
+            else if (TelegramAuthResponseParser.IsTwoFactor(detail))
+            {
+                // Account has a cloud password: switch the panel into password mode
+                // instead of failing. The next submit posts auth/2fa.
+                EnterTelegram2faMode();
+                LoadingPanel.SetActive(false);
+                yield break;
             }
             else
             {
-                SetButtonText(SendTelegramCodeButton, "Authorization Failed");
+                // Any other / malformed detail -> re-prompt (fail-closed).
+                SetButtonText(SendTelegramCodeButton, "Неверный код");
                 yield return new WaitForSeconds(2f);
+                SetButtonText(SendTelegramCodeButton, "Подтвердить код");
+                if (TelegramCodeInput.text.Length >= 5)
+                    SendTelegramCodeButton.interactable = true;
             }
-
-            SetButtonText(SendTelegramCodeButton, "Подтвердить код");
         }
 
         LoadingPanel.SetActive(false);
     }
+    // Cloud-password (2FA) copy on the shared title/body labels of the code panel.
+    private void SetTelegram2faTexts()
+    {
+        if (TelegramPhoneTitle != null)
+            TelegramPhoneTitle.text = "Облачный пароль";
+        if (TelegramPhoneBody != null)
+            TelegramPhoneBody.text = "Введите пароль от Telegram";
+    }
+
+    // Repurpose the already-visible code-entry input as the Telegram cloud-password field.
+    // No new scene objects — reuses TelegramCodeInput + SendTelegramCodeButton.
+    private void EnterTelegram2faMode()
+    {
+        _telegram2faMode = true;
+        SetTelegram2faTexts();
+
+        TelegramCodeInput.gameObject.SetActive(true);
+        TelegramCodeInput.text = "";
+        SendTelegramCodeButton.gameObject.SetActive(true);
+        // Enabled once a non-empty password is typed (relaxed gate, see TelegramCodeInputChanged).
+        SendTelegramCodeButton.interactable = false;
+        SetButtonText(SendTelegramCodeButton, "Подтвердить пароль");
+
+        ForceRebuildLayout(TelegramAuth);
+        TelegramCodeInput.ActivateInputField();
+    }
+
+    // Clear the 2FA repurposing so the panel returns to numeric-code behavior next time.
+    private void ResetTelegram2faMode()
+    {
+        _telegram2faMode = false;
+        if (TelegramCodeInput != null) TelegramCodeInput.text = "";
+    }
+
+    // POST the Telegram cloud password to tapi/sync/auth/2fa. SECURITY: the password is
+    // sent ONLY here over HTTPS, is never logged and never persisted, and the input field
+    // is cleared immediately after the request completes (success or failure).
+    private IEnumerator SubmitTelegram2fa()
+    {
+        LoadingPanel.SetActive(true);
+        SendTelegramCodeButton.interactable = false;
+        SetButtonText(SendTelegramCodeButton, "Авторизация...");
+
+        string jsonBody = "{\"pwd_code\":\"" + TelegramCodeInput.text + "\"}";
+
+        using UnityWebRequest www = new($"https://wappi.pro/tapi/sync/auth/2fa?profile_id={telegramProfileId}", "POST");
+        byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonBody);
+        www.uploadHandler = new UploadHandlerRaw(bodyRaw);
+        www.downloadHandler = new DownloadHandlerBuffer();
+        www.SetRequestHeader("Content-Type", "application/json");
+        www.SetRequestHeader("Authorization", wappiAuthToken);
+        www.timeout = 30;
+
+        yield return www.SendWebRequest();
+
+        // SECURITY: never log the password / jsonBody. Clear the field on every path.
+        TelegramCodeInput.text = "";
+
+        if (www.result != UnityWebRequest.Result.Success)
+        {
+            string errorMsg = "Сервер недоступен";
+            if (www.result == UnityWebRequest.Result.ConnectionError)
+            {
+                errorMsg = "Проверьте подключение";
+            }
+            else if (www.result == UnityWebRequest.Result.ProtocolError && www.downloadHandler != null)
+            {
+                string errDetail = TelegramAuthResponseParser.ExtractDetail(www.downloadHandler.text);
+                if (!string.IsNullOrEmpty(errDetail)) errorMsg = errDetail;
+            }
+
+            SetButtonText(SendTelegramCodeButton, errorMsg);
+            yield return new WaitForSeconds(2f);
+            SetButtonText(SendTelegramCodeButton, "Подтвердить пароль");
+            LoadingPanel.SetActive(false);
+            yield break;
+        }
+
+        string detail = TelegramAuthResponseParser.ExtractDetail(www.downloadHandler.text);
+        if (TelegramAuthResponseParser.IsAuthSuccess(detail))
+        {
+            SetButtonText(SendTelegramCodeButton, "Авторизация завершена");
+
+            if (_telegramStatusCoroutine != null) StopCoroutine(_telegramStatusCoroutine);
+            _telegramStatusCoroutine = StartCoroutine(GetTelegramProfileStatus());
+
+            yield return new WaitForSeconds(2f);
+        }
+        else
+        {
+            // Wrong password / any non-success -> re-prompt (fail-closed).
+            SetButtonText(SendTelegramCodeButton, "Неверный пароль");
+            yield return new WaitForSeconds(2f);
+            SetButtonText(SendTelegramCodeButton, "Подтвердить пароль");
+        }
+
+        LoadingPanel.SetActive(false);
+    }
+
     public void CloseTelegramCodePanel()
     {
         TelegramCodePanel.SetActive(false);
@@ -2392,7 +2513,7 @@ public class Manager : MonoBehaviour
 
         if (ChangeTelegramNumberButton != null) ChangeTelegramNumberButton.gameObject.SetActive(false);
 
-        TelegramCodeInput.text = "";
+        ResetTelegram2faMode();
         ForceRebuildLayout(TelegramAuth);
     }
 
@@ -2408,7 +2529,7 @@ public class Manager : MonoBehaviour
 
         if (ChangeTelegramNumberButton != null) ChangeTelegramNumberButton.gameObject.SetActive(false);
 
-        TelegramCodeInput.text = "";
+        ResetTelegram2faMode();
 
         if (TelegramNumberInput.text.Length >= 10 && !TelegramCodeTimer.activeSelf)
             GetTelegramCodeButton.interactable = true;
