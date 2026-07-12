@@ -168,6 +168,31 @@
     },
     {
       "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE documents\nSET metadata = jsonb_set(metadata, '{botWaId}', to_jsonb($1::text))\nWHERE metadata->>'botTgId' = $2 AND metadata->>'botWaId' = '-1';",
+        "options": {
+          "queryReplacement": "={{ $('Get Created Workflow Id').item.json.id }},={{ $('Unity Webhook').first().json.body.TelegramWorkflowId }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1536,
+        160
+      ],
+      "id": "a5b6c7d8-0401-4e5f-9a01-000000000402",
+      "name": "Restamp RAG Chunks",
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
         "url": "https://bagkz.app.n8n.cloud/api/v1/workflows/4wYitz5ek30SVNlT",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
@@ -328,6 +353,17 @@
       ]
     },
     "Set Wappi Webhook Types": {
+      "main": [
+        [
+          {
+            "node": "Restamp RAG Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restamp RAG Chunks": {
       "main": [
         [
           {
