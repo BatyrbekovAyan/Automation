@@ -29,7 +29,8 @@
 - [x] **CHAT-08
 **: Owner can send/remove emoji reactions in Telegram chats (recipient-required tapi body)
 - [ ] **CHAT-09**: Opening an unread Telegram chat marks it read on tapi (no `mark_all` query)
-- [ ] **CHAT-10**: Swipe-to-delete is hidden on the Telegram channel (no tapi endpoint); WhatsApp behavior unchanged
+- [x] **CHAT-10
+**: Swipe-to-delete is hidden on the Telegram channel (no tapi endpoint); WhatsApp behavior unchanged
 - [x] **CHAT-11
 **: WhatsApp and Telegram caches for one bot are isolated (`BotCache/{botId}/` vs `BotCache/{botId}/telegram/`); cached chats open offline per channel; purge/privacy clears cover both
 
