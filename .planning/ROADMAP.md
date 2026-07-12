@@ -97,7 +97,10 @@ Plans:
   2. An unconnected channel's chip renders visibly muted; tapping it shows that channel's empty state with a connect CTA (no more permanent "not connected" dead end for single-channel bots).
   3. The last-used channel persists per bot across restarts, and a bot with only one connected channel auto-selects it.
   4. The Telegram bottom-nav tab and the `Screen_Telegram` placeholder are removed, and tab 0 reads «Чаты».
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 06-01-PLAN.md — Runtime: ChannelSwitcherModel (pure) + ChannelSwitcherView binder + tab-index-shift audit (BotsTabIndex 3→2) + EditMode tests (SWITCH-01/02/03, SWITCH-04 audit half)
+- [ ] 06-02-PLAN.md — ChannelSwitcherBuilder (pill into CenterZone) + nav restructure (remove Telegram tab, «Чаты», delete Screen_Telegram) + run-editor-builder.sh headless run + immediate scene commit + 06-HUMAN-UAT.md (SWITCH-01/04)
 **UI hint**: yes
 
 ### Phase 7: «Вместе» Suggestions + Dashboard on Telegram
@@ -135,6 +138,6 @@ Phases execute in numeric order: 3 → 4 → 5 → 6 → 7 → 8. Phases 3 and 4
 | 3. tapi Live-Shape Capture | v1.1 | 1/1 | Complete    | 2026-07-12 |
 | 4. n8n Telegram Template Parity (dev) | v1.1 | 2/2 | Complete    | 2026-07-12 |
 | 5. Channel-Aware ChatManager Core | v1.1 | 4/6 | In Progress | - |
-| 6. Channel Switcher UI | v1.1 | 0/TBD | Not started | - |
+| 6. Channel Switcher UI | v1.1 | 0/2 | Planned | - |
 | 7. «Вместе» Suggestions + Dashboard on Telegram | v1.1 | 0/TBD | Not started | - |
 | 8. Device UAT + Milestone Closeout | v1.1 | 0/TBD | Not started | - |
