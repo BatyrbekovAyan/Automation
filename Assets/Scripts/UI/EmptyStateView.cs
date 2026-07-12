@@ -125,6 +125,20 @@ public class EmptyStateView : MonoBehaviour
                     primaryButton.onClick.AddListener(OpenCurrentBotAuth);
                 }
                 break;
+
+            case EmptyStateReason.BotHasNoTelegram:
+                // if (iconImage != null) iconImage.sprite = iconNoWhatsApp;
+                if (titleLabel != null) titleLabel.text = "Telegram not connected";
+                if (bodyLabel != null) bodyLabel.text = "Connect Telegram to this bot to see its chats.";
+                if (primaryButtonLabel != null) primaryButtonLabel.text = "Connect Telegram";
+                if (primaryButton != null)
+                {
+                    // Same CTA as WhatsApp — OpenCurrentBotAuth opens BotSettings; no
+                    // channel-specific routing is needed this phase (Phase 6 owns that).
+                    primaryButton.onClick.RemoveAllListeners();
+                    primaryButton.onClick.AddListener(OpenCurrentBotAuth);
+                }
+                break;
         }
     }
 
