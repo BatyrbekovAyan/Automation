@@ -1903,10 +1903,11 @@ IEnumerator SendTextMessageRoutine(string chatId, string text)
         attemptCount    = 1,
         profileId       = activeProfileId,
         quotedMessageId = quotedId,
+        channel         = (int)ActiveChannel,   // snapshot channel alongside profileId for cross-session retry
     });
 
     // --- BACKGROUND: Send to server silently ---
-    yield return PostTextMessageRoutine(chatId, text, tempId, activeProfileId, sendCacheRoot, quotedId);
+    yield return PostTextMessageRoutine(chatId, text, tempId, activeProfileId, sendCacheRoot, quotedId, ActiveChannel);
 }
 
 /// <summary>
@@ -1922,13 +1923,30 @@ private IEnumerator PostTextMessageRoutine(
     string tempId,
     string profileId,
     string sendCacheRoot,
-    string quotedMessageId = null)
+    string quotedMessageId = null,
+    ChatChannel channel = ChatChannel.WhatsApp)
 {
-    string recipient = chatId.EndsWith("@c.us") ? chatId.Replace("@c.us", "") : chatId;
-    string url = $"https://wappi.pro/api/sync/message/send?profile_id={profileId}";
+    // Telegram replies use the dedicated message/reply endpoint (body {body, message_id},
+    // no recipient); WhatsApp — and Telegram non-replies — go to message/send. The URL
+    // base (api/tapi) is picked from the channel via WappiEndpoints so a Telegram
+    // profile_id never posts to the WhatsApp base.
+    bool telegramReply = channel == ChatChannel.Telegram && !string.IsNullOrEmpty(quotedMessageId);
 
-    var requestData = new WappiSendTextRequest { body = text, recipient = recipient, quotedMessageId = quotedMessageId };
-    string jsonPayload = JsonConvert.SerializeObject(requestData);
+    string url;
+    string jsonPayload;
+    if (telegramReply)
+    {
+        url = WappiEndpoints.Sync(channel, $"message/reply?profile_id={profileId}");
+        jsonPayload = JsonConvert.SerializeObject(
+            new WappiSendReplyRequest { body = text, message_id = quotedMessageId });
+    }
+    else
+    {
+        string recipient = ChatIdFormat.Recipient(chatId);
+        url = WappiEndpoints.Sync(channel, $"message/send?profile_id={profileId}");
+        var requestData = new WappiSendTextRequest { body = text, recipient = recipient, quotedMessageId = quotedMessageId };
+        jsonPayload = JsonConvert.SerializeObject(requestData);
+    }
 
     using UnityWebRequest www = new UnityWebRequest(url, "POST");
     byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(jsonPayload);
@@ -2015,7 +2033,13 @@ private IEnumerator MarkChatAsRead(string chatId)
         yield break;
     }
 
-    string url = $"https://wappi.pro/api/sync/message/mark/read?profile_id={activeProfileId}&mark_all=true";
+    // tapi mark/read documents no mark_all query param (its bulk-read lever is
+    // mark_all on messages/get instead); WhatsApp keeps mark_all=true. Body {message_id}
+    // is identical on both channels.
+    string markReadPath = ActiveChannel == ChatChannel.Telegram
+        ? $"message/mark/read?profile_id={activeProfileId}"
+        : $"message/mark/read?profile_id={activeProfileId}&mark_all=true";
+    string url = WappiEndpoints.Sync(ActiveChannel, markReadPath);
     string jsonPayload = JsonConvert.SerializeObject(new { message_id = vm.LastMessageId });
 
     using UnityWebRequest www = new UnityWebRequest(url, "POST");
@@ -2046,6 +2070,19 @@ public class WappiSendTextRequest
 
     [JsonProperty("quoted_message_id", NullValueHandling = NullValueHandling.Ignore)]
     public string quotedMessageId;   // Only serialized when this send is a reply.
+}
+
+/// <summary>
+/// Telegram reply body for the dedicated tapi endpoint
+/// (POST tapi/sync/message/reply). The message_id implies the chat, so there is
+/// NO recipient; and replies do NOT use WhatsApp's quoted_message_id mechanism.
+/// Serializes to exactly {"body":...,"message_id":...}.
+/// </summary>
+[Serializable]
+public class WappiSendReplyRequest
+{
+    public string body;
+    public string message_id;   // the quoted original's Wappi stanza id
 }
 
 [Serializable]
