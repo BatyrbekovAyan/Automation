@@ -100,9 +100,11 @@ HELP
 # --- Parse args ------------------------------------------------------------
 while [ $# -gt 0 ]; do
   case "$1" in
-    --profile)   PROFILE_ID="${2:-}"; shift 2 ;;
+    --profile)   [ $# -ge 2 ] || { print_banner; echo "ERROR: --profile requires a value." >&2; exit 2; }
+                 PROFILE_ID="$2"; shift 2 ;;
     --profile=*) PROFILE_ID="${1#*=}"; shift ;;
-    --chats)     CHATS_N="${2:-}"; shift 2 ;;
+    --chats)     [ $# -ge 2 ] || { print_banner; echo "ERROR: --chats requires a value." >&2; exit 2; }
+                 CHATS_N="$2"; shift 2 ;;
     --chats=*)   CHATS_N="${1#*=}"; shift ;;
     --dry-run)   DRY_RUN=1; shift ;;
     -h|--help)   print_banner; print_help; exit 0 ;;
