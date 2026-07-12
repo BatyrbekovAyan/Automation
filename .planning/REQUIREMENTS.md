@@ -76,13 +76,42 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (filled by roadmap) | | |
+| VER-01 | Phase 3 | Pending |
+| VER-02 | Phase 3 | Pending |
+| CHAT-01 | Phase 5 | Pending |
+| CHAT-02 | Phase 5 | Pending |
+| CHAT-03 | Phase 5 | Pending |
+| CHAT-04 | Phase 5 | Pending |
+| CHAT-05 | Phase 5 | Pending |
+| CHAT-06 | Phase 5 | Pending |
+| CHAT-07 | Phase 5 | Pending |
+| CHAT-08 | Phase 5 | Pending |
+| CHAT-09 | Phase 5 | Pending |
+| CHAT-10 | Phase 5 | Pending |
+| CHAT-11 | Phase 5 | Pending |
+| TGAUTH-01 | Phase 5 | Pending |
+| SWITCH-01 | Phase 6 | Pending |
+| SWITCH-02 | Phase 6 | Pending |
+| SWITCH-03 | Phase 6 | Pending |
+| SWITCH-04 | Phase 6 | Pending |
+| TPL-01 | Phase 4 | Pending |
+| TPL-02 | Phase 4 | Pending |
+| TPL-03 | Phase 4 | Pending |
+| TPL-04 | Phase 4 | Pending |
+| TPL-05 | Phase 4 | Pending |
+| TPL-06 | Phase 4 | Pending |
+| SUGG-01 | Phase 7 | Pending |
+| SUGG-02 | Phase 7 | Pending |
+| DASH-01 | Phase 7 | Pending |
+| DASH-02 | Phase 7 | Pending |
+| DASH-03 | Phase 7 | Pending |
 
 **Coverage:**
-- v1.1 requirements: 24 total
-- Mapped to phases: 0
-- Unmapped: 24 ⚠️ (pre-roadmap)
+- v1.1 requirements: 29 total (enumerated REQ-IDs; the earlier "24 total" header was a miscount — CHAT has 11 items + SUGG/DASH add 5)
+- Mapped to phases: 29 ✓
+- Unmapped: 0 ✓
+- No orphans, no duplicates. Phase 8 (Device UAT + Closeout) owns no v1.1 REQ by design — it closes carried v1.0 deferred UAT + the prod-replication checklist.
 
 ---
 *Requirements defined: 2026-07-12*
-*Last updated: 2026-07-12 (initial definition)*
+*Last updated: 2026-07-12 (roadmap traceability — 29/29 mapped to Phases 3-8)*
