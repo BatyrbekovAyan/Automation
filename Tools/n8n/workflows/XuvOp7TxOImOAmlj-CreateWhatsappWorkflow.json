@@ -150,7 +150,7 @@
             {
               "id": "d730dd9e-5fef-4dce-be83-cd5cfdda2ed6",
               "name": "id",
-              "value": "={{ $('Get Created Workflow Id').item.json.id }}",
+              "value": "={{ $('Get Created Workflow Id').first().json.id }}",
               "type": "string"
             }
           ]
