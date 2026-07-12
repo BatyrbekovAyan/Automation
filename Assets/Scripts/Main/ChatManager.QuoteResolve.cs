@@ -69,6 +69,27 @@ public partial class ChatManager
         if (!_quoteResolveDraining) StartCoroutine(DrainQuoteResolveQueue());
     }
 
+    /// <summary>
+    /// Reset the quote/reaction resolver bookkeeping after StopAllCoroutines killed the
+    /// drain workers mid-flight (bot/channel switch). The drains only clear their state at
+    /// the end of the coroutine body, so a kill leaves <c>_quoteResolveDraining</c> /
+    /// <c>_reactionResolveDraining</c> stuck true and the in-flight sets populated —
+    /// permanently stalling all future quote/row resolution (WR-01). Must be called by
+    /// every switcher right after its StopAllCoroutines-adjacent queue resets. The reaction
+    /// fields live in ChatManager.ReactionResolve.cs (same partial class).
+    /// </summary>
+    private void ClearResolveQueues()
+    {
+        _quoteResolveQueue.Clear();
+        _quoteResolveInFlight.Clear();
+        _quoteWaiters.Clear();
+        _quoteResolveDraining = false;
+
+        _reactionResolveQueue.Clear();
+        _reactionResolveInFlight.Clear();
+        _reactionResolveDraining = false;
+    }
+
     private void AddQuoteWaiter(string qid, MessageViewModel vm)
     {
         if (!_quoteWaiters.TryGetValue(qid, out var list))
