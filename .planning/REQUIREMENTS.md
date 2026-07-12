@@ -56,7 +56,8 @@
 
 ### Telegram Auth (TGAUTH)
 
-- [ ] **TGAUTH-01**: 2FA-protected Telegram accounts can authorize — `detail:"2fa"` handled in both code and QR flows with a cloud-password step (`tapi/sync/auth/2fa`)
+- [x] **TGAUTH-01
+**: 2FA-protected Telegram accounts can authorize — `detail:"2fa"` handled in both code and QR flows with a cloud-password step (`tapi/sync/auth/2fa`)
 
 ### «Вместе» Suggestions (SUGG)
 

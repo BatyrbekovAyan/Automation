@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
-status: planning
-stopped_at: Completed 05-01-PLAN.md
-last_updated: "2026-07-12T15:41:34.845Z"
+status: executing
+stopped_at: Completed 05-05-PLAN.md
+last_updated: "2026-07-12T16:18:34.212Z"
 last_activity: 2026-07-12
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 9
-  completed_plans: 4
-  percent: 44
+  completed_plans: 5
+  percent: 56
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 ## Current Position
 
 Phase: 5 of 8 (channel aware chatmanager core)
-Plan: 1 of 6 complete (05-01 seam primitives) — next: 05-02
-Status: In progress
+Plan: 2 of 6 complete (05-01 seam primitives) — next: 05-02
+Status: Ready to execute
 Last activity: 2026-07-12
 
-Progress: [████░░░░░░] 44%
+Progress: [██████░░░░] 56%
 
 ## Performance Metrics
 
@@ -58,6 +58,7 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [Phase 4]: RAG re-stamp added to both Create orchestrators (parameterized UPDATE, cred vvRrFiEXzLVqKjOx) preserving the { id } response; Suggest_Replies given additive channel-branched RAG (botWaId | botTgId), verifier verify-telegram-parity.py green
 - [Phase 4]: Unity create-workflow forms now send the opposite channel's workflow id (sentinel-guarded '-1') — enables the 04-01 RAG re-stamp on late channel auth (TPL-05 client half)
 - [Phase 4]: 04-HUMAN-UAT.md is the TPL-06 owner gate (dev n8n + tunnel + import-by-literal-id + Postgres cred pre-flight + text/voice/memory/pre-auth re-stamp e2e); closes the phase
+- [Phase 5]: Telegram 2FA fix (TGAUTH-01) — pure TelegramAuthResponseParser classifier + detail:2fa cloud-password branch in both code and QR flows posting tapi/sync/auth/2fa {pwd_code}; password never logged/persisted, cleared after submit; no new scene objects; 839/839 EditMode green
 
 ### Pending Todos
 
@@ -91,11 +92,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 04 P01 | 15min | 3 tasks | 5 files |
 | Phase 04 P02 | ~10min | 2 tasks | 2 files |
 | Phase 05 P01 | 35min | 3 tasks | 12 files |
+| Phase 05 P05 | 26min | 3 tasks | 4 files |
 
 ## Session Continuity
 
-Last session: 2026-07-12T15:41:34.789Z
-Stopped at: Completed 05-01-PLAN.md
+Last session: 2026-07-12T16:17:55.380Z
+Stopped at: Completed 05-05-PLAN.md
 Resume file: None
 
 **Planned Phase:** 5 (Channel-Aware ChatManager Core) — 6 plans — 2026-07-12T15:01:08.712Z

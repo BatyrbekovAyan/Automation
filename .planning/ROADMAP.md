@@ -83,7 +83,7 @@ Plans:
 - [ ] 05-02-PLAN.md — ChatManager identity seam: ActiveChannel + persistence, SetActiveChannel reset choreography, OnActiveChannelChanged, channel-aware GetActiveProfileId/GetCacheRoot/empty-state/sync-gate, channel resolution, EmptyStateView Telegram copy (wave 2)
 - [ ] 05-03-PLAN.md — URL builder wiring (8 literals) + tapi parser divergences: ChatDialog last_time/type, "text"→Chat, DisplayFallback, groupness, delivery-tick mapping, Telegram delete guard (wave 3)
 - [ ] 05-04-PLAN.md — Send-path branches: tapi message/reply, reaction recipient, mark-read no-mark_all body, channel-aware media EndpointFor, outbox channel snapshot + retry rebuild (wave 4)
-- [ ] 05-05-PLAN.md — Telegram 2FA auth fix (TGAUTH-01): pure TelegramAuthResponseParser + detail:"2fa" cloud-password branch in code + QR flows, tapi/sync/auth/2fa (wave 1, independent — Manager.cs only)
+- [x] 05-05-PLAN.md — Telegram 2FA auth fix (TGAUTH-01): pure TelegramAuthResponseParser + detail:"2fa" cloud-password branch in code + QR flows, tapi/sync/auth/2fa (wave 1, independent — Manager.cs only)
 - [ ] 05-06-PLAN.md — CAPTURE-GATED (autonomous:false, depends on all): media Normalize port, sticker/GIF type strings, reactions-receive go/no-go, name/thumbnail fallbacks, isDeleted, reply echo-bug — first task = human-action checkpoint on SHAPES.md verdicts (wave 5)
 **Flags**: CAPTURE-GATED — 05-06 blocks on the Phase-3 owner capture run (SHAPES.md verdicts); if still PENDING CAPTURE it closes as human_needed. Plans 05-01..05-05 proceed independently of capture.
 **UI hint**: yes
@@ -134,7 +134,7 @@ Phases execute in numeric order: 3 → 4 → 5 → 6 → 7 → 8. Phases 3 and 4
 | 2. n8n Live Wiring | v1.0 | 4/4 | Complete | 2026-07-10 |
 | 3. tapi Live-Shape Capture | v1.1 | 1/1 | Complete    | 2026-07-12 |
 | 4. n8n Telegram Template Parity (dev) | v1.1 | 2/2 | Complete    | 2026-07-12 |
-| 5. Channel-Aware ChatManager Core | v1.1 | 1/6 | In Progress | - |
+| 5. Channel-Aware ChatManager Core | v1.1 | 2/6 | In Progress | - |
 | 6. Channel Switcher UI | v1.1 | 0/TBD | Not started | - |
 | 7. «Вместе» Suggestions + Dashboard on Telegram | v1.1 | 0/TBD | Not started | - |
 | 8. Device UAT + Milestone Closeout | v1.1 | 0/TBD | Not started | - |

@@ -113,7 +113,7 @@ The app communicates with four external services via `UnityWebRequest` + corouti
 ### Wappi.pro (Telegram)
 - **Base**: `https://wappi.pro/tapi/sync/` (profile management under `https://wappi.pro/tapi/`)
 - **Auth**: same `Authorization` header
-- **Endpoints**: `auth/qr`, `auth/phone` (POST), `auth/code` (POST), `get/status`, `profile/add`, `profile/delete`, `profile/logout`
+- **Endpoints**: `auth/qr`, `auth/phone` (POST), `auth/code` (POST), `auth/2fa` (POST — body `{pwd_code}`; cloud-password step when `auth/code` or `auth/qr` returns `detail:"2fa"`; success = `detail` startswith `auth_success`; `Manager.SubmitTelegram2fa`, classified via `TelegramAuthResponseParser`), `get/status`, `profile/add`, `profile/delete`, `profile/logout`
 
 ### n8n (Workflow Automation)
 - **Base**: `https://bagkz.app.n8n.cloud/`
