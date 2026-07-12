@@ -29,7 +29,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 ### 🚧 v1.1 Telegram Parity (In Progress)
 
-- [ ] **Phase 3: tapi Live-Shape Capture** - User-assisted read-only capture script + sanitized samples + recorded verdicts on the 13 open shape questions (incl. reactions-receive go/no-go); gates the media/Normalize parser work.
+- [x] **Phase 3: tapi Live-Shape Capture** - User-assisted read-only capture script + sanitized samples + recorded verdicts on the 13 open shape questions (incl. reactions-receive go/no-go); gates the media/Normalize parser work. (completed 2026-07-12)
 - [ ] **Phase 4: n8n Telegram Template Parity (dev)** - Telegram_Bot template onto tapi bases (outbound URLs, `type:"text"`, sessionKey, voice duration) + RAG re-stamp on late channel auth; proven e2e against a real dev Telegram profile via tunnel.
 - [ ] **Phase 5: Channel-Aware ChatManager Core** - The channel seam (`ChatChannel`, `SetActiveChannel`, `WappiEndpoints` builder, per-channel caches), all tapi parser/send divergences, and the Telegram 2FA auth fix — WhatsApp behavior unchanged, full suite green.
 - [ ] **Phase 6: Channel Switcher UI** - In-screen TopBar segmented WhatsApp|Telegram control with muted/connect affordances, per-bot channel persistence, and removal of the Telegram bottom tab.
@@ -121,7 +121,7 @@ Phases execute in numeric order: 3 → 4 → 5 → 6 → 7 → 8. Phases 3 and 4
 |-------|-----------|----------------|--------|-----------|
 | 1. Polished Suggestions Panel on Mock Data | v1.0 | 4/4 | Complete | 2026-06-25 |
 | 2. n8n Live Wiring | v1.0 | 4/4 | Complete | 2026-07-10 |
-| 3. tapi Live-Shape Capture | v1.1 | 1/1 | Code-complete (owner UAT gate open) | 2026-07-12 |
+| 3. tapi Live-Shape Capture | v1.1 | 1/1 | Complete    | 2026-07-12 |
 | 4. n8n Telegram Template Parity (dev) | v1.1 | 0/TBD | Not started | - |
 | 5. Channel-Aware ChatManager Core | v1.1 | 0/TBD | Not started | - |
 | 6. Channel Switcher UI | v1.1 | 0/TBD | Not started | - |

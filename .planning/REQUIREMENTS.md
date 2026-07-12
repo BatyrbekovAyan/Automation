@@ -78,8 +78,8 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| VER-01 | Phase 3 | Pending |
-| VER-02 | Phase 3 | Pending |
+| VER-01 | Phase 3 | Complete |
+| VER-02 | Phase 3 | Complete |
 | CHAT-01 | Phase 5 | Pending |
 | CHAT-02 | Phase 5 | Pending |
 | CHAT-03 | Phase 5 | Pending |
