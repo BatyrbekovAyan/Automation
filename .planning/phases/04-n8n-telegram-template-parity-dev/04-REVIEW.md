@@ -15,7 +15,12 @@ findings:
   warning: 2
   info: 3
   total: 7
-status: issues_found
+status: fixed
+fixed_at: 2026-07-12T14:11:54Z
+fixes:
+  fixed: [CR-01, CR-02, WR-01, WR-02]
+  wontfix: [IN-01, IN-02, IN-03]
+  commits: [f3ffa8d, 2781ce4, f4fee44, 584bd58]
 ---
 
 # Phase 4: Code Review Report
@@ -42,6 +47,8 @@ Reviewed the four canonical n8n workflow JSONs, the parity verifier script, and 
 
 ### CR-01: Stray `=` in Restamp `queryReplacement` corrupts `$2` — re-stamp is a permanent silent no-op
 
+**Status:** FIXED — commit `f3ffa8d`. Removed the stray `=` after the comma in both orchestrators; now matches the proven Delete_Bot_Files shape `"={{ a }},{{ b }}"` (values are alphanumeric n8n workflow ids, so the queryReplacement comma-split is safe). UAT step remains: confirm a `botTgId='-1'` chunk flips after a Telegram create.
+
 **File:** `Tools/n8n/workflows/Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json:276` and `Tools/n8n/workflows/XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json:174`
 
 **Issue:** Both Restamp nodes use:
@@ -61,6 +68,8 @@ In n8n, only the *leading* `=` of the parameter value marks expression mode; the
 (and the `TelegramWorkflowId` twin in CreateWhatsappWorkflow). Then verify during the 04-HUMAN-UAT e2e that a `botTgId='-1'` chunk actually flips after a Telegram create.
 
 ### CR-02: Restamp SQL has no `-1`-sentinel guard — cross-bot chunk claim when the opposite channel is unauthed
+
+**Status:** FIXED — commit `2781ce4`. Both Restamp queries now open with `WHERE $2 <> '-1' AND $2 <> ''` (empty-string guard added for safety, mirroring Delete Bot Files' `NOT IN ('-1','')`), so a single-channel create matches zero rows instead of claiming shared unauthed chunks.
 
 **File:** `Tools/n8n/workflows/Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json:274` and `Tools/n8n/workflows/XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json:172`
 
@@ -90,6 +99,8 @@ WHERE $2 <> '-1'
 
 ### WR-01: `$('Get Created Workflow Id').item` in `Send New Workflows Id` now sits downstream of the Postgres node — paired-item lineage at risk
 
+**Status:** FIXED — commit `f4fee44`. `Send New Workflows Id` now uses `$('Get Created Workflow Id').first().json.id` in both orchestrators. Restamp's own `.item` reference is unchanged (fed by HTTP nodes, pairing intact, per this review). UAT step remains: exercise the Restamp error path once and confirm the webhook still returns `{ id }`.
+
 **File:** `Tools/n8n/workflows/Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json:255` and `Tools/n8n/workflows/XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json:153`
 
 **Issue:** `Send New Workflows Id` (the terminal node whose `{ id }` is the webhook's `lastNode` response) resolves `$('Get Created Workflow Id').item` — `.item` requires an unbroken paired-item chain from the current input item back to that node. Pre-phase, the chain ran only through HTTP Request nodes, which preserve pairing. Now the Restamp Postgres node sits in between, and its `alwaysOutputData` empty item and `onError: continueRegularOutput` error item (plus the plain `{success:true}` output of a non-RETURNING UPDATE, depending on n8n version) are exactly the outputs known to drop paired-item metadata. If `.item` fails to resolve, the expression errors, the webhook response loses `id`, and Unity's `response.Contains("\"id\":")` check fails — in the FromStart flows this **deletes the just-authorized Wappi profile** (Manager.cs:2748/2894). Restamp's own `$('Get Created Workflow Id').item` (line 276/174) is fed by HTTP nodes and is fine.
@@ -103,6 +114,8 @@ WHERE $2 <> '-1'
 At minimum, exercise the Restamp *error* path (e.g. wrong credential) once during 04-HUMAN-UAT and confirm the webhook still returns `{ id }`.
 
 ### WR-02: verify-telegram-parity.py has false-green paths — it passes today despite CR-01
+
+**Status:** FIXED — commit `584bd58`. Added: exact-match assert on both Restamp `queryReplacement` strings (catches the stray `=` and swapped/wrong opposite-channel fields — verified it fails with the CR-01 bug reintroduced), `$2 <> '-1'` / `$2 <> ''` sentinel asserts on the SQL, and Suggest_Replies wiring asserts (Embeddings `ai_embedding` feeds both Retrieve nodes; both Retrieve nodes feed Assemble). The minor Switch `leftValue` gap noted in item 3 was left as-is (out of the agreed fix scope). Verifier exits 0 on shipped files.
 
 **File:** `Tools/n8n/verify-telegram-parity.py:118-126` (Restamp checks), `Tools/n8n/verify-telegram-parity.py:143-179` (Suggest checks)
 
@@ -132,6 +145,8 @@ assert conns["Retrieve RAG TG"]["main"][0][0]["node"] == "Assemble", f"{f}: Retr
 
 ### IN-01: Telegram voice branch matches type `"ptt"` — confirm tapi's actual type string at UAT
 
+**Status:** WONTFIX (deferred to 04-HUMAN-UAT) — no code change is possible offline: the correct `type` string can only be observed in a live tapi webhook payload from a real Telegram voice note. Guessing a second rightValue now would be unverifiable. Verify during the device pass and adjust then if needed.
+
 **File:** `Tools/n8n/workflows/4VN3gsFaC2HUYmcc-Telegram_Bot.json:203` (Input type) and `:472` (Input type2)
 
 **Issue:** The audio rule was carried over from WhatsApp verbatim (`type == "ptt"`). If Wappi tapi reports Telegram voice notes under a different type (e.g. `"voice"`), voice messages fall to the Switch fallback and get the "Please send text messages" reply — graceful, but the transcription path would be dead.
@@ -140,6 +155,8 @@ assert conns["Retrieve RAG TG"]["main"][0][0]["node"] == "Assemble", f"{f}: Retr
 
 ### IN-02: Re-stamp only covers `-1` chunks — re-auth of an already-stamped channel still orphans RAG chunks
 
+**Status:** WONTFIX (out of phase scope, per the finding itself: "No action required for this phase") — pre-existing limitation shared with WhatsApp re-auth, not introduced here. Follow-up candidate: server-side re-stamp/reindex using the `price-lists` originals, which needs the old workflow id passed alongside — a design change, not a low-risk fix.
+
 **File:** `Tools/n8n/workflows/Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json:274`
 
 **Issue:** Chunks stamped with a real workflow id (e.g. `botTgId = T1`) are never re-stamped when that channel is logged out and re-authed (new workflow `T2`): the WHERE only matches `botTgId = '-1'`, so those chunks stay pointed at the deleted `T1` and the channel's RAG goes empty until re-upload. This is the same pre-existing limitation WhatsApp re-auth has (not introduced by this phase) — recorded here because the phase now owns the restamp mechanism and the Supabase `price-lists` originals would allow a server-side re-stamp/reindex later.
@@ -147,6 +164,8 @@ assert conns["Retrieve RAG TG"]["main"][0][0]["node"] == "Assemble", f"{f}: Retr
 **Fix:** No action required for this phase; consider a follow-up that re-stamps `botTgId = <old id>` chunks on re-auth (would need the old id passed alongside), or document re-upload as the recovery path.
 
 ### IN-03: First in-repo use of `?.`/`??` inside an n8n expression parameter
+
+**Status:** WONTFIX (deferred to 04-HUMAN-UAT) — the expression is syntactically valid and the finding expects no code change; the only open question is the dev n8n instance's expression-engine version, which can only be confirmed by opening the node on that instance. Check the Listening Pause expression preview once during UAT.
 
 **File:** `Tools/n8n/workflows/4VN3gsFaC2HUYmcc-Telegram_Bot.json:591` (Listening Pause)
 
