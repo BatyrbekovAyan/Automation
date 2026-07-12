@@ -9,9 +9,7 @@ public static class WappiRecipient
     /// </summary>
     /// <param name="chatId">The WhatsApp chat id (e.g. "79995579399@c.us" or "120363012345@g.us").</param>
     /// <returns>Bare phone number for @c.us chats; full id otherwise; null/empty passed through.</returns>
-    public static string FromChatId(string chatId)
-    {
-        if (string.IsNullOrEmpty(chatId)) return chatId;
-        return chatId.EndsWith("@c.us") ? chatId.Replace("@c.us", "") : chatId;
-    }
+    /// <remarks>Delegates to <see cref="ChatIdFormat.Recipient"/> — the single home for
+    /// @c.us stripping. This wrapper is kept so existing call sites/tests don't churn.</remarks>
+    public static string FromChatId(string chatId) => ChatIdFormat.Recipient(chatId);
 }

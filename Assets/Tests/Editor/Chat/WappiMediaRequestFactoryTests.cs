@@ -6,6 +6,11 @@ public class WappiMediaRequestFactoryTests
     private const string Vid = "https://wappi.pro/api/sync/message/video/send?profile_id=PID";
     private const string Doc = "https://wappi.pro/api/sync/message/document/send?profile_id=PID";
 
+    // Telegram tapi base — the 3-arg channel-aware overload.
+    private const string TgImg = "https://wappi.pro/tapi/sync/message/img/send?profile_id=PID";
+    private const string TgVid = "https://wappi.pro/tapi/sync/message/video/send?profile_id=PID";
+    private const string TgDoc = "https://wappi.pro/tapi/sync/message/document/send?profile_id=PID";
+
     [Test]
     public void EndpointFor_Image_UsesImgSend()
     {
@@ -20,6 +25,34 @@ public class WappiMediaRequestFactoryTests
     [Test]
     public void EndpointFor_Document_UsesDocumentSend() =>
         Assert.AreEqual(Doc, WappiMediaRequestFactory.EndpointFor(AttachmentKind.Document, "PID"));
+
+    // --- back-compat overload == 3-arg WhatsApp (byte-identical WhatsApp URLs) ---
+    [Test]
+    public void EndpointFor_TwoArg_EqualsThreeArgWhatsApp()
+    {
+        Assert.AreEqual(
+            WappiMediaRequestFactory.EndpointFor(AttachmentKind.Photo, "PID"),
+            WappiMediaRequestFactory.EndpointFor(AttachmentKind.Photo, "PID", ChatChannel.WhatsApp));
+        Assert.AreEqual(
+            WappiMediaRequestFactory.EndpointFor(AttachmentKind.GalleryVideo, "PID"),
+            WappiMediaRequestFactory.EndpointFor(AttachmentKind.GalleryVideo, "PID", ChatChannel.WhatsApp));
+    }
+
+    // --- 3-arg Telegram overload routes to the tapi base ---
+    [Test]
+    public void EndpointFor_Telegram_Image_UsesTapiImgSend()
+    {
+        Assert.AreEqual(TgImg, WappiMediaRequestFactory.EndpointFor(AttachmentKind.Photo, "PID", ChatChannel.Telegram));
+        Assert.AreEqual(TgImg, WappiMediaRequestFactory.EndpointFor(AttachmentKind.GalleryImage, "PID", ChatChannel.Telegram));
+    }
+
+    [Test]
+    public void EndpointFor_Telegram_Video_UsesTapiVideoSend() =>
+        Assert.AreEqual(TgVid, WappiMediaRequestFactory.EndpointFor(AttachmentKind.GalleryVideo, "PID", ChatChannel.Telegram));
+
+    [Test]
+    public void EndpointFor_Telegram_Document_UsesTapiDocumentSend() =>
+        Assert.AreEqual(TgDoc, WappiMediaRequestFactory.EndpointFor(AttachmentKind.Document, "PID", ChatChannel.Telegram));
 
     [Test]
     public void NormalizeRecipient_StripsCUs() =>

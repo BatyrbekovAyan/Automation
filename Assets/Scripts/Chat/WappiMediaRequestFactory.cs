@@ -9,18 +9,30 @@ using Newtonsoft.Json;
 /// </summary>
 public static class WappiMediaRequestFactory
 {
-    private const string Base = "https://wappi.pro/api/sync/message/";
+    /// <summary>
+    /// WhatsApp back-compat overload — resolves the media-send URL on the
+    /// WhatsApp base so existing WhatsApp call sites and tests stay byte-identical.
+    /// </summary>
+    public static string EndpointFor(AttachmentKind kind, string profileId) =>
+        EndpointFor(kind, profileId, ChatChannel.WhatsApp);
 
-    public static string EndpointFor(AttachmentKind kind, string profileId) => kind switch
+    /// <summary>
+    /// Channel-aware media-send endpoint. Routes through <see cref="WappiEndpoints.Sync"/>
+    /// so Telegram lands on the tapi base while WhatsApp keeps its api base.
+    /// </summary>
+    public static string EndpointFor(AttachmentKind kind, string profileId, ChatChannel channel)
     {
-        AttachmentKind.Photo or AttachmentKind.GalleryImage => $"{Base}img/send?profile_id={profileId}",
-        AttachmentKind.GalleryVideo                         => $"{Base}video/send?profile_id={profileId}",
-        AttachmentKind.Document                             => $"{Base}document/send?profile_id={profileId}",
-        _                                                   => null
-    };
+        string path = kind switch
+        {
+            AttachmentKind.Photo or AttachmentKind.GalleryImage => "message/img/send",
+            AttachmentKind.GalleryVideo                         => "message/video/send",
+            AttachmentKind.Document                             => "message/document/send",
+            _                                                   => null
+        };
+        return path == null ? null : WappiEndpoints.Sync(channel, $"{path}?profile_id={profileId}");
+    }
 
-    public static string NormalizeRecipient(string chatId) =>
-        chatId != null && chatId.EndsWith("@c.us") ? chatId.Replace("@c.us", "") : chatId;
+    public static string NormalizeRecipient(string chatId) => ChatIdFormat.Recipient(chatId);
 
     public static string BuildBody(AttachmentKind kind, string chatId, string caption,
                                    string fileName, string b64)
