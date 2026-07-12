@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
-status: ready_to_plan
-stopped_at: Completed 03-01-PLAN.md (Phase 3 code-complete; owner capture-run gate open)
-last_updated: "2026-07-12T12:20:44.399Z"
+status: planning
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-07-12T13:39:22.953Z"
 last_activity: 2026-07-12
 progress:
   total_phases: 6
-  completed_phases: 2
-  total_plans: 1
-  completed_plans: 1
-  percent: 33
+  completed_phases: 1
+  total_plans: 3
+  completed_plans: 2
+  percent: 67
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-12)
 
 **Core value:** The owner stays in control along the automation↔semi-auto spectrum — the bot can answer autonomously, or propose replies the owner picks and refines, without losing trust or the ability to take over.
-**Current focus:** Phase 3 (tapi Live-Shape Capture) — executing
+**Current focus:** Phase 4 (n8n Telegram Template Parity, dev) — 04-01 complete; 04-02 next (Unity form fields + owner deploy/e2e gate)
 
 ## Current Position
 
 Phase: 4 of 8 (n8n telegram template parity (dev))
-Plan: Not started
-Status: Ready to plan
+Plan: 2 of 2 (04-01 complete; 04-02 next)
+Status: In progress
 Last activity: 2026-07-12
 
-Progress: [██████████] 100%
+Progress: [███████░░░] 67%
 
 ## Performance Metrics
 
@@ -54,6 +54,8 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [D6]: Live shape capture is a USER-ASSISTED gate (`secrets.json` deny-ruled) — `Tools/tapi/capture-shapes.sh`; 13 open items in tapi-shapes.md §11 → Phase 3.
 - [D7]: Telegram_Bot template fixes + RAG re-stamp in BOTH Create orchestrators; WhatsApp template untouched → Phase 4.
 - Phase 3 shape-capture tooling shipped: read-only Tools/tapi/capture-shapes.sh + pre-filled 13-question SHAPES.md; Q9-Q13 verdicts DEFERRED (not observable read-only). Owner-run capture is the phase-closing human gate (03-HUMAN-UAT.md), blocking Phase 5 CHAT-03/CHAT-07 media/Normalize.
+- [Phase 4]: Telegram_Bot template moved onto tapi (send/mark-read/typing + text routing + length_seconds voice fallback + chatId sessionKey); node order preserved
+- [Phase 4]: RAG re-stamp added to both Create orchestrators (parameterized UPDATE, cred vvRrFiEXzLVqKjOx) preserving the { id } response; Suggest_Replies given additive channel-branched RAG (botWaId | botTgId), verifier verify-telegram-parity.py green
 
 ### Pending Todos
 
@@ -84,11 +86,12 @@ Items acknowledged and carried forward:
 
 Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG-01/02, Phase 7).
 | Phase 03 P01 | 10 min | 2 tasks | 5 files |
+| Phase 04 P01 | 15min | 3 tasks | 5 files |
 
 ## Session Continuity
 
-Last session: 2026-07-12T12:20:44.374Z
-Stopped at: Completed 03-01-PLAN.md (Phase 3 code-complete; owner capture-run gate open)
+Last session: 2026-07-12T13:39:00.326Z
+Stopped at: Completed 04-01-PLAN.md
 Resume file: None
 
-**Planned Phase:** 3 (tapi Live-Shape Capture) — 1 plans — 2026-07-12T12:04:06.437Z
+**Planned Phase:** 4 (n8n Telegram Template Parity (dev)) — 2 plans — 2026-07-12T13:23:46.594Z
