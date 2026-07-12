@@ -80,7 +80,9 @@ public partial class ChatManager
             if (entry.kind == (int)OutboxKind.Media)
                 yield return PostMediaMessageRoutine(entry, retryCacheRoot);
             else
-                yield return PostTextMessageRoutine(entry.chatId, entry.text, tempId, entry.profileId, retryCacheRoot, entry.quotedMessageId);
+                // Rebuild the send URL from the entry's snapshotted channel (legacy
+                // entries default to WhatsApp) so a cross-session retry hits the right base.
+                yield return PostTextMessageRoutine(entry.chatId, entry.text, tempId, entry.profileId, retryCacheRoot, entry.quotedMessageId, (ChatChannel)entry.channel);
         }
         finally
         {
