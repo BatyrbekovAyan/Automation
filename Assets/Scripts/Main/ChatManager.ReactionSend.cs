@@ -63,8 +63,16 @@ public partial class ChatManager
         MessageViewModel target, string sentEmoji, string priorEmoji,
         string profileId, string sendCacheRoot, long appliedTime)
     {
-        string url = $"https://wappi.pro/api/sync/message/reaction?profile_id={profileId}";
-        var requestData = new WappiSendReactionRequest { body = sentEmoji, message_id = target.messageId };
+        string url = WappiEndpoints.Sync(ActiveChannel, $"message/reaction?profile_id={profileId}");
+        var requestData = new WappiSendReactionRequest
+        {
+            body       = sentEmoji,
+            message_id = target.messageId,
+            // tapi requires the recipient; WhatsApp omits it (kept byte-identical).
+            recipient  = ActiveChannel == ChatChannel.Telegram
+                       ? ChatIdFormat.Recipient(target.chatId)
+                       : null,
+        };
         string jsonPayload = JsonConvert.SerializeObject(requestData);
 
         using UnityWebRequest www = new UnityWebRequest(url, "POST");
@@ -150,6 +158,12 @@ public class WappiSendReactionRequest
 {
     public string body;        // the emoji; "" removes the reaction
     public string message_id;  // target message's Wappi stanza id
+
+    // tapi requires a recipient; WhatsApp does not. Serialized only when set
+    // (mirrors WappiSendTextRequest.quotedMessageId) so the WhatsApp body stays
+    // byte-identical.
+    [JsonProperty("recipient", NullValueHandling = NullValueHandling.Ignore)]
+    public string recipient;
 }
 
 [Serializable]

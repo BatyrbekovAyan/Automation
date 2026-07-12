@@ -202,6 +202,7 @@ public partial class ChatManager
             timestamp      = now,
             attemptCount   = 1,
             profileId      = activeProfileId,
+            channel        = (int)ActiveChannel,   // snapshot channel alongside profileId for cross-session retry
             kind           = (int)OutboxKind.Media,
             attachmentKind = (int)pick.Kind,
             mediaPath      = mediaPath,
@@ -257,7 +258,9 @@ public partial class ChatManager
         try
         {
             var kind = (AttachmentKind)entry.attachmentKind;
-            string url = WappiMediaRequestFactory.EndpointFor(kind, entry.profileId);
+            // Channel-aware endpoint: entry.channel (snapshotted at send time) picks
+            // api/tapi. Legacy entries with channel==0 resolve to WhatsApp — byte-identical.
+            string url = WappiMediaRequestFactory.EndpointFor(kind, entry.profileId, (ChatChannel)entry.channel);
             if (string.IsNullOrEmpty(url))
             {
                 Debug.LogError($"[Wappi] no media endpoint for kind {kind}");
