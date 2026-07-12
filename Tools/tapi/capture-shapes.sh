@@ -178,14 +178,28 @@ if [ -z "${TOKEN}" ]; then
   echo "ERROR: no auth token found in secrets.json (key is missing or empty)." >&2
   exit 2
 fi
+# The token is sent via a curl --config read from a process substitution (see
+# auth_curl below), so it never appears on curl's argv — argv is readable by
+# any local process via 'ps' while curl runs. Reject charsets that could break
+# the config-file quoting ('"' or '\') before that config is ever built.
+if [[ ! "${TOKEN}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+  echo "ERROR: token in secrets.json has unexpected characters." >&2
+  exit 2
+fi
+
+# --- auth_curl <curl args...> : adds the Authorization header WITHOUT putting
+#     the token on curl's argv. printf is a bash builtin (no extra process) and
+#     the config travels over a /dev/fd/N pipe: never on disk, never in 'ps'.
+auth_curl() {
+  curl --config <(printf 'header = "Authorization: %s"\n' "${TOKEN}") "$@"
+}
 
 mkdir -p "${SAMPLES_DIR}"
 
 # --- fetch <label> <url> <outfile> : write response BODY only, degrade on non-2xx
 fetch() {
   local label="$1" url="$2" outfile="$3" http_code
-  http_code="$(curl -s -o "${outfile}.raw" -w '%{http_code}' \
-    -H "Authorization: ${TOKEN}" "${url}")"
+  http_code="$(auth_curl -s -o "${outfile}.raw" -w '%{http_code}' "${url}")"
   http_code="${http_code:-000}"
   if [ "${http_code}" -ge 200 ] && [ "${http_code}" -lt 300 ]; then
     if jq . "${outfile}.raw" > "${outfile}" 2>/dev/null; then
@@ -211,7 +225,7 @@ list_json() {
 
 # --- Profile selection ------------------------------------------------------
 if [ -z "${PROFILE_ID}" ]; then
-  PROFILES_JSON="$(curl -s -H "Authorization: ${TOKEN}" "${BASE}/tapi/profile/all/get")"
+  PROFILES_JSON="$(auth_curl -s "${BASE}/tapi/profile/all/get")"
   PROFILE_ID="$(printf '%s' "${PROFILES_JSON}" | jq -r '
     [ ( if type=="array" then .[]
         elif has("profiles") then .profiles[]
