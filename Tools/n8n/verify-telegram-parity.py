@@ -100,7 +100,7 @@ def check_telegram_bot():
     print(f"OK  {f}")
 
 
-def check_restamp_orchestrator(f, jsonb_key):
+def check_restamp_orchestrator(f, jsonb_key, opposite_field):
     wf = load(f)
     ns = wf["nodes"]
     conns = wf["connections"]
@@ -120,6 +120,21 @@ def check_restamp_orchestrator(f, jsonb_key):
     assert f"jsonb_set(metadata, '{jsonb_key}'" in q, f"{f}: jsonb_set target is not {jsonb_key}: {q}"
     assert "$1" in q and "$2" in q, f"{f}: SQL not parameterized with $1/$2: {q}"
     assert "{{" not in q, f"{f}: SQL string contains a '{{{{' interpolation (injection risk): {q}"
+
+    # (ii-b) -1/'' sentinel guard: a '-1' or '' opposite-channel id must match zero rows,
+    # otherwise a single-channel create claims shared fully-unauthed chunks from OTHER bots.
+    assert "$2 <> '-1'" in q, f"{f}: Restamp SQL missing the -1 sentinel guard: {q}"
+    assert "$2 <> ''" in q, f"{f}: Restamp SQL missing the empty-string sentinel guard: {q}"
+
+    # (ii-c) queryReplacement binding: exactly two comma-separated segments where only the
+    # LEADING '=' marks expression mode. A stray '=' after the comma is literal text and
+    # corrupts $2 to '=<id>' (permanent 0-row no-op). Exact match also catches swapped or
+    # wrong opposite-channel field names.
+    qr = r["parameters"]["options"]["queryReplacement"]
+    expected_qr = ("={{ $('Get Created Workflow Id').item.json.id }},"
+                   "{{ $('Unity Webhook').first().json.body." + opposite_field + " }}")
+    assert qr == expected_qr, \
+        f"{f}: queryReplacement format wrong (stray '=' after comma or wrong bindings): {qr}"
 
     # robustness: a 0-row UPDATE or DB error must not break the response chain.
     assert r.get("alwaysOutputData") is True, f"{f}: Restamp alwaysOutputData not true"
@@ -157,6 +172,17 @@ def check_suggest_replies():
     assert tg_keys == ["botTgId"], f"{f}: Retrieve RAG TG filter not single botTgId: {tg_keys}"
     assert wa_keys == ["botWaId"], f"{f}: Retrieve RAG filter not single botWaId: {wa_keys}"
 
+    # (ii-b) the new vector store MUST have its embeddings input (a vector-store node
+    # without ai_embedding hard-fails at runtime; the n8n UI round-trip can drop it).
+    emb_targets = {c["node"] for c in conns["Embeddings"]["ai_embedding"][0]}
+    assert {"Retrieve RAG", "Retrieve RAG TG"} <= emb_targets, \
+        f"{f}: Embeddings ai_embedding targets missing a Retrieve node: {emb_targets}"
+
+    # (ii-c) both retrieve nodes feed Assemble (a dropped main connection dead-ends the path).
+    for retr in ("Retrieve RAG TG", "Retrieve RAG"):
+        nxt = conns[retr]["main"][0][0]["node"]
+        assert nxt == "Assemble", f"{f}: {retr} -> {nxt}, expected Assemble"
+
     # (iii) channel branch on the RAG path.
     ictg = node(ns, "If channel TG?")
     assert ictg["type"] == "n8n-nodes-base.if", f"{f}: If channel TG? is not an If node"
@@ -182,8 +208,8 @@ def check_suggest_replies():
 def main():
     try:
         check_telegram_bot()
-        check_restamp_orchestrator(CREATE_TG, "{botTgId}")
-        check_restamp_orchestrator(CREATE_WA, "{botWaId}")
+        check_restamp_orchestrator(CREATE_TG, "{botTgId}", "WhatsappWorkflowId")
+        check_restamp_orchestrator(CREATE_WA, "{botWaId}", "TelegramWorkflowId")
         check_suggest_replies()
     except AssertionError as e:
         print(f"PARITY FAIL: {e}")
