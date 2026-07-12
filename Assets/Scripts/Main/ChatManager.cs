@@ -286,7 +286,7 @@ public partial class ChatManager : MonoBehaviour
             // when the primary is empty/unparseable. Both are RFC3339 strings. Neither parses => 0.
             long unixTime = ChatDialogTime.Resolve(chat.last_timestamp, chat.last_time);
 
-            // DisplayFallback never slices a numeric/short/empty Telegram id (retires chat.id[..^5]).
+            // DisplayFallback never slices a numeric/short/empty Telegram id (retires the crash-prone tail slice).
             string displayName = string.IsNullOrEmpty(chat.name)
                 ? ChatIdFormat.DisplayFallback(chat.id)
                 : UnicodeEmojiConverter.ConvertRealEmojisToSprites(chat.name);
