@@ -45,6 +45,12 @@ public class DeliveryTickFormatterTests
     [TestCase("delivered", DeliveryStatus.Delivered)]
     [TestCase("read",      DeliveryStatus.Read)]
     [TestCase("  Sent  ", DeliveryStatus.Sent)]
+    // Telegram (tapi) delivery states: pending → clock, undelivered/error → failed tick.
+    [TestCase("pending",     DeliveryStatus.Pending)]
+    [TestCase("PENDING",     DeliveryStatus.Pending)]
+    [TestCase("undelivered", DeliveryStatus.Failed)]
+    [TestCase("error",       DeliveryStatus.Failed)]
+    [TestCase(" Error ",     DeliveryStatus.Failed)]
     public void ParseWappiString_KnownValue_ReturnsMatchingEnum(string raw, DeliveryStatus expected)
     {
         Assert.AreEqual(expected, DeliveryTickFormatter.ParseWappiString(raw));
