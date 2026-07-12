@@ -2440,6 +2440,10 @@ public class Manager : MonoBehaviour
     // No new scene objects — reuses TelegramCodeInput + SendTelegramCodeButton.
     private void EnterTelegram2faMode()
     {
+        // Already in password mode: a late QR-poll "2fa" response must not re-enter and
+        // wipe a half-typed cloud password (IN-05). Texts/input are already set up.
+        if (_telegram2faMode) return;
+
         _telegram2faMode = true;
         SetTelegram2faTexts();
 
