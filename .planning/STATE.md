@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
-status: verifying
+status: ready_to_plan
 stopped_at: Completed 04-02-PLAN.md
 last_updated: "2026-07-12T13:48:26.057Z"
 last_activity: 2026-07-12
 progress:
   total_phases: 6
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 3
   completed_plans: 3
-  percent: 100
+  percent: 50
 ---
 
 # Project State
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 
 ## Current Position
 
-Phase: 4 of 8 (n8n telegram template parity (dev))
-Plan: 2 of 2 (04-01 complete; 04-02 complete — TPL-06 owner gate open)
-Status: Phase complete — ready for verification
+Phase: 5 of 8 (channel aware chatmanager core)
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-07-12
 
 Progress: [██████████] 100%
