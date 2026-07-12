@@ -120,9 +120,9 @@ if [[ ! "${PROFILE_ID}" =~ ^[A-Za-z0-9_-]*$ ]]; then
   echo "ERROR: --profile must contain only letters, digits, '_' or '-'." >&2
   exit 2
 fi
-if [[ ! "${CHATS_N}" =~ ^[0-9]+$ ]]; then
+if [[ ! "${CHATS_N}" =~ ^[1-9][0-9]*$ ]]; then
   print_banner
-  echo "ERROR: --chats must be a positive integer." >&2
+  echo "ERROR: --chats must be a positive integer (1 or more)." >&2
   exit 2
 fi
 
