@@ -2124,6 +2124,14 @@ public class Manager : MonoBehaviour
                 {
                     string response = www.downloadHandler.text;
 
+                    // A cloud password diverts the QR flow to detail:"2fa". Handle it BEFORE
+                    // the base64 branch (which would otherwise decode "2fa" into a broken texture).
+                    if (TelegramAuthResponseParser.IsTwoFactor(TelegramAuthResponseParser.ExtractDetail(response)))
+                    {
+                        ShowTelegram2faFromQr();
+                        yield break;
+                    }
+
                     if (response.Contains("\"detail\":\"") && response.Contains("\",\"uuid\":"))
                     {
                         int startIndex = response.IndexOf("\"detail\":\"") + 10;
@@ -2177,6 +2185,24 @@ public class Manager : MonoBehaviour
 
         TelegramQRStatusText.SetActive(false);
         TelegramQRStatusText.GetComponent<TextMeshProUGUI>().text = "Server Unavailable.\nTry Again Later";
+    }
+
+    // The auth/qr response was detail:"2fa" (a cloud password is set), so the QR path
+    // cannot complete. Hide the QR and reveal the code panel straight in cloud-password
+    // mode — reuses the Task-2 helpers; no new scene objects.
+    private void ShowTelegram2faFromQr()
+    {
+        TelegramQRCodeImage.texture = null;
+        TelegramQRStatusText.SetActive(false);
+        TelegramQRPanel.SetActive(false);
+
+        TelegramCodePanel.SetActive(true);
+        TelegramNumberInput.gameObject.SetActive(false);
+        TelegramCodePanel.transform.GetChild(3).gameObject.SetActive(false);
+        GetTelegramCodeButton.gameObject.SetActive(false);
+        if (ChangeTelegramNumberButton != null) ChangeTelegramNumberButton.gameObject.SetActive(false);
+
+        EnterTelegram2faMode();
     }
 
     private void SetTelegramCodeEntryTexts(bool codeMode)
