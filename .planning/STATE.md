@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
-status: roadmap_complete
-stopped_at: Roadmap created — 6 phases (3-8), 29/29 requirements mapped; ready to plan Phase 3
-last_updated: "2026-07-12T00:00:00.000Z"
+status: verifying
+stopped_at: Completed 03-01-PLAN.md (Phase 3 code-complete; owner capture-run gate open)
+last_updated: "2026-07-12T12:20:44.399Z"
 last_activity: 2026-07-12
 progress:
   total_phases: 6
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 1
+  total_plans: 1
+  completed_plans: 1
+  percent: 100
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-12)
 
 **Core value:** The owner stays in control along the automation↔semi-auto spectrum — the bot can answer autonomously, or propose replies the owner picks and refines, without losing trust or the ability to take over.
-**Current focus:** v1.1 Telegram Parity — bring the Telegram channel (Wappi tapi) to full parity with WhatsApp. Design: `docs/superpowers/specs/2026-07-12-telegram-parity-design.md`; research: `.planning/research/telegram-parity/`; roadmap: `.planning/ROADMAP.md` (Phases 3-8).
+**Current focus:** Phase 3 (tapi Live-Shape Capture) — executing
 
 ## Current Position
 
-Phase: 3 of 8 (tapi Live-Shape Capture) — first v1.1 phase
-Plan: — (not yet planned)
-Status: Ready to plan
-Last activity: 2026-07-12 — Roadmap created (6 phases 3-8, 29/29 requirements mapped)
+Phase: 3 of 8 (tapi Live-Shape Capture) — EXECUTING
+Plan: 1 of 1
+Status: Phase complete — ready for verification
+Last activity: 2026-07-12
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -53,6 +53,7 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [D5]: Confirmed tapi divergences (type:"text", numeric ids, last_time/last_timestamp swap, no isGroup, reply endpoint, reaction recipient, no chat/delete, native avatars, 2FA branch) → Phases 3 (verify) + 5 (implement).
 - [D6]: Live shape capture is a USER-ASSISTED gate (`secrets.json` deny-ruled) — `Tools/tapi/capture-shapes.sh`; 13 open items in tapi-shapes.md §11 → Phase 3.
 - [D7]: Telegram_Bot template fixes + RAG re-stamp in BOTH Create orchestrators; WhatsApp template untouched → Phase 4.
+- Phase 3 shape-capture tooling shipped: read-only Tools/tapi/capture-shapes.sh + pre-filled 13-question SHAPES.md; Q9-Q13 verdicts DEFERRED (not observable read-only). Owner-run capture is the phase-closing human gate (03-HUMAN-UAT.md), blocking Phase 5 CHAT-03/CHAT-07 media/Normalize.
 
 ### Pending Todos
 
@@ -82,9 +83,12 @@ Items acknowledged and carried forward:
 | Milestone | Server-side «Вместе» suppression | pending (v2 SUPPRESS-01) | v1.0 close |
 
 Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG-01/02, Phase 7).
+| Phase 03 P01 | 10 min | 2 tasks | 5 files |
 
 ## Session Continuity
 
-Last session: 2026-07-12
-Stopped at: Roadmap created (Phases 3-8, 29/29 mapped) — ready to plan Phase 3
+Last session: 2026-07-12T12:20:44.374Z
+Stopped at: Completed 03-01-PLAN.md (Phase 3 code-complete; owner capture-run gate open)
 Resume file: None
+
+**Planned Phase:** 3 (tapi Live-Shape Capture) — 1 plans — 2026-07-12T12:04:06.437Z

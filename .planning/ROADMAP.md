@@ -48,7 +48,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
   3. The reactions-receive go/no-go decision is recorded (viable tapi transport vs deferred to v2), so Phase 5 knows whether to build receive-side reactions at all.
 **Plans**: 1 plan
 Plans:
-- [ ] 03-01-PLAN.md — Read-only tapi shape-capture script + 13-question SHAPES.md verdict checklist, gitignore, README, human-gate note
+- [x] 03-01-PLAN.md — Read-only tapi shape-capture script + 13-question SHAPES.md verdict checklist, gitignore, README, human-gate note (SUMMARY 2026-07-12; owner capture run tracked in 03-HUMAN-UAT.md)
 **Flags**: USER-ASSISTED GATE — blocks the Normalize/media parts of Phase 5 (CHAT-03; media recovery in CHAT-07). URL/seam/parser-non-media work in Phase 5 can proceed in parallel with this capture.
 
 ### Phase 4: n8n Telegram Template Parity (dev)
@@ -121,7 +121,7 @@ Phases execute in numeric order: 3 → 4 → 5 → 6 → 7 → 8. Phases 3 and 4
 |-------|-----------|----------------|--------|-----------|
 | 1. Polished Suggestions Panel on Mock Data | v1.0 | 4/4 | Complete | 2026-06-25 |
 | 2. n8n Live Wiring | v1.0 | 4/4 | Complete | 2026-07-10 |
-| 3. tapi Live-Shape Capture | v1.1 | 0/1 | Planned | - |
+| 3. tapi Live-Shape Capture | v1.1 | 1/1 | Code-complete (owner UAT gate open) | 2026-07-12 |
 | 4. n8n Telegram Template Parity (dev) | v1.1 | 0/TBD | Not started | - |
 | 5. Channel-Aware ChatManager Core | v1.1 | 0/TBD | Not started | - |
 | 6. Channel Switcher UI | v1.1 | 0/TBD | Not started | - |

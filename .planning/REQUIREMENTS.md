@@ -8,8 +8,10 @@
 
 ### Shape Verification (user-assisted gate)
 
-- [ ] **VER-01**: Owner can run `Tools/tapi/capture-shapes.sh` (read-only; token stays local) against an authorized dev Telegram profile and produce sanitized samples in `Tools/tapi/samples/`
-- [ ] **VER-02**: The 13 open tapi shape questions (`.planning/research/telegram-parity/tapi-shapes.md` §11) each get a recorded verdict (SHAPES.md), including the reactions-receive go/no-go decision
+- [x] **VER-01
+**: Owner can run `Tools/tapi/capture-shapes.sh` (read-only; token stays local) against an authorized dev Telegram profile and produce sanitized samples in `Tools/tapi/samples/`
+- [x] **VER-02
+**: The 13 open tapi shape questions (`.planning/research/telegram-parity/tapi-shapes.md` §11) each get a recorded verdict (SHAPES.md), including the reactions-receive go/no-go decision
 
 ### Telegram Chat Client (CHAT)
 
