@@ -169,7 +169,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE documents\nSET metadata = jsonb_set(metadata, '{botWaId}', to_jsonb($1::text))\nWHERE metadata->>'botTgId' = $2 AND metadata->>'botWaId' = '-1';",
+        "query": "UPDATE documents\nSET metadata = jsonb_set(metadata, '{botWaId}', to_jsonb($1::text))\nWHERE $2 <> '-1' AND $2 <> ''\n  AND metadata->>'botTgId' = $2\n  AND metadata->>'botWaId' = '-1';",
         "options": {
           "queryReplacement": "={{ $('Get Created Workflow Id').item.json.id }},{{ $('Unity Webhook').first().json.body.TelegramWorkflowId }}"
         }
