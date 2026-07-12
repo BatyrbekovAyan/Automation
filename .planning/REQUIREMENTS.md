@@ -46,7 +46,8 @@
 **: Telegram session memory keys on `profile_id + ':' + chatId` (stable vs username-y `from`)
 - [x] **TPL-05
 **: Files uploaded before a channel's auth become RAG-retrievable once that channel's workflow is created (re-stamp of `"-1"` sentinel metadata in BOTH Create orchestrators)
-- [ ] **TPL-06**: Dev e2e proof with a real Telegram profile via tunnel (clone active only during the test window)
+- [x] **TPL-06
+**: Dev e2e proof with a real Telegram profile via tunnel (clone active only during the test window)
 
 ### Telegram Auth (TGAUTH)
 

@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
-status: planning
-stopped_at: Completed 04-01-PLAN.md
-last_updated: "2026-07-12T13:39:22.953Z"
+status: verifying
+stopped_at: Completed 04-02-PLAN.md
+last_updated: "2026-07-12T13:48:26.057Z"
 last_activity: 2026-07-12
 progress:
   total_phases: 6
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 3
-  completed_plans: 2
-  percent: 67
+  completed_plans: 3
+  percent: 100
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-12)
 
 **Core value:** The owner stays in control along the automation↔semi-auto spectrum — the bot can answer autonomously, or propose replies the owner picks and refines, without losing trust or the ability to take over.
-**Current focus:** Phase 4 (n8n Telegram Template Parity, dev) — 04-01 complete; 04-02 next (Unity form fields + owner deploy/e2e gate)
+**Current focus:** Phase 4 (n8n Telegram Template Parity, dev) — both plans code-complete (04-01 server workflows + 04-02 Unity form fields); TPL-06 owner deploy/e2e gate (04-HUMAN-UAT.md) open, then verify/transition
 
 ## Current Position
 
 Phase: 4 of 8 (n8n telegram template parity (dev))
-Plan: 2 of 2 (04-01 complete; 04-02 next)
-Status: In progress
+Plan: 2 of 2 (04-01 complete; 04-02 complete — TPL-06 owner gate open)
+Status: Phase complete — ready for verification
 Last activity: 2026-07-12
 
-Progress: [███████░░░] 67%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -56,6 +56,8 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - Phase 3 shape-capture tooling shipped: read-only Tools/tapi/capture-shapes.sh + pre-filled 13-question SHAPES.md; Q9-Q13 verdicts DEFERRED (not observable read-only). Owner-run capture is the phase-closing human gate (03-HUMAN-UAT.md), blocking Phase 5 CHAT-03/CHAT-07 media/Normalize.
 - [Phase 4]: Telegram_Bot template moved onto tapi (send/mark-read/typing + text routing + length_seconds voice fallback + chatId sessionKey); node order preserved
 - [Phase 4]: RAG re-stamp added to both Create orchestrators (parameterized UPDATE, cred vvRrFiEXzLVqKjOx) preserving the { id } response; Suggest_Replies given additive channel-branched RAG (botWaId | botTgId), verifier verify-telegram-parity.py green
+- [Phase 4]: Unity create-workflow forms now send the opposite channel's workflow id (sentinel-guarded '-1') — enables the 04-01 RAG re-stamp on late channel auth (TPL-05 client half)
+- [Phase 4]: 04-HUMAN-UAT.md is the TPL-06 owner gate (dev n8n + tunnel + import-by-literal-id + Postgres cred pre-flight + text/voice/memory/pre-auth re-stamp e2e); closes the phase
 
 ### Pending Todos
 
@@ -87,11 +89,12 @@ Items acknowledged and carried forward:
 Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG-01/02, Phase 7).
 | Phase 03 P01 | 10 min | 2 tasks | 5 files |
 | Phase 04 P01 | 15min | 3 tasks | 5 files |
+| Phase 04 P02 | ~10min | 2 tasks | 2 files |
 
 ## Session Continuity
 
-Last session: 2026-07-12T13:39:00.326Z
-Stopped at: Completed 04-01-PLAN.md
+Last session: 2026-07-12T13:48:26.027Z
+Stopped at: Completed 04-02-PLAN.md
 Resume file: None
 
 **Planned Phase:** 4 (n8n Telegram Template Parity (dev)) — 2 plans — 2026-07-12T13:23:46.594Z

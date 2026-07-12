@@ -64,7 +64,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 04-01-PLAN.md — Fix Telegram_Bot.json onto tapi (TPL-01..04) + RAG re-stamp in both Create orchestrators (TPL-05 server) + Suggest_Replies channel branch (D3) + structural verifier
-- [ ] 04-02-PLAN.md — Manager.cs opposite-channel workflow-id form fields (TPL-05 client) + 04-HUMAN-UAT.md owner deploy/e2e gate (TPL-06)
+- [x] 04-02-PLAN.md — Manager.cs opposite-channel workflow-id form fields (TPL-05 client) + 04-HUMAN-UAT.md owner deploy/e2e gate (TPL-06)
 **Flags**: USER-ASSISTED e2e (dev n8n + tunnel + real TG profile). Prod bagkz stays dormant. Any existing dev Telegram workflow clones carry wrong `api/sync` URLs and must be recreated after the template fix.
 
 ### Phase 5: Channel-Aware ChatManager Core
@@ -125,7 +125,7 @@ Phases execute in numeric order: 3 → 4 → 5 → 6 → 7 → 8. Phases 3 and 4
 | 1. Polished Suggestions Panel on Mock Data | v1.0 | 4/4 | Complete | 2026-06-25 |
 | 2. n8n Live Wiring | v1.0 | 4/4 | Complete | 2026-07-10 |
 | 3. tapi Live-Shape Capture | v1.1 | 1/1 | Complete    | 2026-07-12 |
-| 4. n8n Telegram Template Parity (dev) | v1.1 | 1/2 | In progress | - |
+| 4. n8n Telegram Template Parity (dev) | v1.1 | 2/2 | Verifying (TPL-06 owner gate open) | - |
 | 5. Channel-Aware ChatManager Core | v1.1 | 0/TBD | Not started | - |
 | 6. Channel Switcher UI | v1.1 | 0/TBD | Not started | - |
 | 7. «Вместе» Suggestions + Dashboard on Telegram | v1.1 | 0/TBD | Not started | - |
