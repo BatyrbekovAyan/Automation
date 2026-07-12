@@ -20,7 +20,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://wappi.pro/api/sync/message/send",
+        "url": "https://wappi.pro/tapi/sync/message/send",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendQuery": true,
@@ -168,9 +168,18 @@
                     },
                     "leftValue": "={{ $json.body.messages[0].type }}",
                     "rightValue": "chat"
+                  },
+                  {
+                    "id": "1a2b3c4d-0001-4a5b-8c9d-000000000001",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.body.messages[0].type }}",
+                    "rightValue": "text"
                   }
                 ],
-                "combinator": "and"
+                "combinator": "or"
               },
               "renameOutput": true,
               "outputKey": "Text"
@@ -265,7 +274,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://wappi.pro/api/sync/message/mark/read",
+        "url": "https://wappi.pro/tapi/sync/message/mark/read",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendQuery": true,
@@ -274,10 +283,6 @@
             {
               "name": "profile_id",
               "value": "={{ $('Webhook').item.json.body.messages[0].profile_id }}"
-            },
-            {
-              "name": "mark_all",
-              "value": "true"
             }
           ]
         },
@@ -310,7 +315,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://wappi.pro/api/sync/chat/typing/start",
+        "url": "https://wappi.pro/tapi/sync/chats/typing/start",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendQuery": true,
@@ -432,9 +437,18 @@
                     },
                     "leftValue": "={{ $('Webhook').item.json.body.messages[0].type }}",
                     "rightValue": "chat"
+                  },
+                  {
+                    "id": "1a2b3c4d-0002-4a5b-8c9d-000000000002",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $('Webhook').item.json.body.messages[0].type }}",
+                    "rightValue": "text"
                   }
                 ],
-                "combinator": "and"
+                "combinator": "or"
               },
               "renameOutput": true,
               "outputKey": "Text"
@@ -574,7 +588,7 @@
     },
     {
       "parameters": {
-        "amount": "={{ $('Webhook').item.json.body.messages[0].media_info.duration + 2 }}"
+        "amount": "={{ ($('Webhook').item.json.body.messages[0].media_info?.duration ?? $('Webhook').item.json.body.messages[0].length_seconds ?? 0) + 2 }}"
       },
       "id": "565d5ef8-9c95-437d-b193-3b50bb7659c3",
       "name": "Listening Pause",
@@ -589,7 +603,7 @@
     {
       "parameters": {
         "sessionIdType": "customKey",
-        "sessionKey": "={{ $('Webhook').item.json.body.messages[0].profile_id + ':' + $('Webhook').item.json.body.messages[0].from }}",
+        "sessionKey": "={{ $('Webhook').item.json.body.messages[0].profile_id + ':' + $('Webhook').item.json.body.messages[0].chatId }}",
         "contextWindowLength": 50
       },
       "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
