@@ -47,9 +47,11 @@ Tools/tapi/capture-shapes.sh --chats 8        # sample more chats (default 5)
 Tools/tapi/capture-shapes.sh --help
 ```
 
-If no authorized Telegram profile is found it exits with a clear message telling
-you to authorize one in-app first (exit code 3). Missing `jq` gives an install
-hint (exit code 2).
+Exit codes: `0` success; `2` guard failure (missing `jq`/`curl`/secrets, bad
+argument); `3` no authorized Telegram profile found — authorize one in-app
+first; `4` wappi.pro unreachable during profile auto-detection (a network
+problem, not an auth problem); `5` wappi.pro rejected the profile listing with
+a non-2xx status (usually a wrong or expired token in `secrets.json`).
 
 ## What it produces
 

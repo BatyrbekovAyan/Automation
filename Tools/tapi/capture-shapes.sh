@@ -42,8 +42,10 @@
 #
 # EXIT CODES
 #   0  success (or --dry-run / --help)
-#   2  guard failure (missing jq/curl, missing secrets, bad argument)
+#   2  guard failure (missing jq/curl, missing secrets, bad argument or token)
 #   3  no authorized Telegram profile found (authorize one in-app first)
+#   4  network failure — wappi.pro unreachable during profile auto-detection
+#   5  wappi.pro rejected the profile listing (non-2xx; check the token)
 #
 # Conventions mirror Tools/run-tests-headless.sh.
 
@@ -234,7 +236,22 @@ safe_id() { [[ "$1" =~ ^[A-Za-z0-9@._-]+$ ]]; }
 
 # --- Profile selection ------------------------------------------------------
 if [ -z "${PROFILE_ID}" ]; then
-  PROFILES_JSON="$(auth_curl -s "${BASE}/tapi/profile/all/get")"
+  # Capture the HTTP status alongside the body so network failure / rejected
+  # token / genuinely-no-authorized-profile each get their own diagnosis and
+  # exit code instead of collapsing into the misleading "authorize in-app" 3.
+  RESP="$(auth_curl -s -w '\n%{http_code}' "${BASE}/tapi/profile/all/get")"
+  HTTP="${RESP##*$'\n'}"
+  PROFILES_JSON="${RESP%$'\n'*}"
+  [[ "${HTTP}" =~ ^[0-9]{3}$ ]] || HTTP="000"
+  if [ "${HTTP}" = "000" ]; then
+    echo "ERROR: could not reach ${BASE} (no HTTP response) — check your network connection, then re-run." >&2
+    exit 4
+  fi
+  if [ "${HTTP}" -lt 200 ] || [ "${HTTP}" -ge 300 ]; then
+    echo "ERROR: profile listing returned HTTP ${HTTP} — wappi.pro rejected the request." >&2
+    echo "  A 401/403 usually means the token in secrets.json is wrong or expired." >&2
+    exit 5
+  fi
   PROFILE_ID="$(printf '%s' "${PROFILES_JSON}" | jq -r '
     [ ( if type=="array" then .[]
         elif has("profiles") then .profiles[]
