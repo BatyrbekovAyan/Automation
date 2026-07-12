@@ -273,7 +273,7 @@
         "operation": "executeQuery",
         "query": "UPDATE documents\nSET metadata = jsonb_set(metadata, '{botTgId}', to_jsonb($1::text))\nWHERE metadata->>'botWaId' = $2 AND metadata->>'botTgId' = '-1';",
         "options": {
-          "queryReplacement": "={{ $('Get Created Workflow Id').item.json.id }},={{ $('Unity Webhook').first().json.body.WhatsappWorkflowId }}"
+          "queryReplacement": "={{ $('Get Created Workflow Id').item.json.id }},{{ $('Unity Webhook').first().json.body.WhatsappWorkflowId }}"
         }
       },
       "type": "n8n-nodes-base.postgres",
