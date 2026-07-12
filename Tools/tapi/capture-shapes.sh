@@ -225,6 +225,13 @@ list_json() {
   printf '%s' "$out" | jq -R -s 'split("\n") | map(select(length > 0))'
 }
 
+# --- safe_id <id> : server-supplied chat/message ids get the same validation
+#     as user args before they are interpolated into URLs (an id containing
+#     '&', '?' or '#' could inject query parameters into an otherwise
+#     read-only GET) or filenames (an id containing '/' could escape
+#     SAMPLES_DIR). Anything with an unexpected shape is skipped with a WARN.
+safe_id() { [[ "$1" =~ ^[A-Za-z0-9@._-]+$ ]]; }
+
 # --- Profile selection ------------------------------------------------------
 if [ -z "${PROFILE_ID}" ]; then
   PROFILES_JSON="$(auth_curl -s "${BASE}/tapi/profile/all/get")"
@@ -272,7 +279,18 @@ get_chat_ids() {
     if [ -n "${ids}" ]; then printf '%s\n' "${ids}"; return 0; fi
   done
 }
-CHAT_IDS="$(get_chat_ids | grep -v '^$' | head -n "${CHATS_N}")"
+# Filter at the source so EVERY downstream use of CHAT_IDS (URL interpolation
+# and messages_<id>.json read/write paths) only ever sees safe_id-clean ids.
+FETCHED_CHAT_IDS="$(get_chat_ids | grep -v '^$' | head -n "${CHATS_N}")"
+CHAT_IDS=""
+for CID in ${FETCHED_CHAT_IDS}; do
+  if safe_id "${CID}"; then
+    CHAT_IDS="${CHAT_IDS}${CID}
+"
+  else
+    echo "WARN: skipping chat with unexpected id shape." >&2
+  fi
+done
 
 if [ -z "${CHAT_IDS}" ]; then
   echo "WARN: no chat ids found in any list endpoint — messages/contact steps skipped." >&2
@@ -311,6 +329,10 @@ REPLY_MID="$(for CID in ${CHAT_IDS}; do
     "${SAMPLES_DIR}/messages_${CID}.json" 2>/dev/null
 done | grep -v '^$' | head -n 1)"
 
+if [ -n "${REPLY_MID}" ] && ! safe_id "${REPLY_MID}"; then
+  echo "WARN: reply message id has unexpected shape — reply-snapshot sample skipped." >&2
+  REPLY_MID=""
+fi
 if [ -n "${REPLY_MID}" ]; then
   fetch "messages/id/get[reply ${REPLY_MID}]" \
     "${BASE}/tapi/sync/messages/id/get?profile_id=${PROFILE_ID}&message_id=${REPLY_MID}" \
@@ -329,6 +351,7 @@ FULL_DONE=0
 REACT_DONE=0
 N=0
 for MID in ${CAND_IDS}; do
+  safe_id "${MID}" || { echo "WARN: skipping message with unexpected id shape." >&2; continue; }
   N=$((N + 1)); [ "${N}" -gt 6 ] && break
   OUT="${SAMPLES_DIR}/message_id_${MID}.json"
   fetch "messages/id/get[${MID}]" \
