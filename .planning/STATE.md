@@ -1,80 +1,56 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: completed
-stopped_at: Completed 02-04-PLAN.md (device gate closed as owner smoke pass; detailed UAT deferred to 02-HUMAN-UAT.md)
-last_updated: "2026-07-11T14:20:18.290Z"
-last_activity: 2026-07-11
+milestone: v1.1
+milestone_name: Telegram Parity
+status: defining_requirements
+stopped_at: Milestone v1.1 started — defining requirements
+last_updated: "2026-07-12T00:00:00.000Z"
+last_activity: 2026-07-12
 progress:
-  total_phases: 2
-  completed_phases: 2
-  total_plans: 8
-  completed_plans: 8
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-07-11)
+See: .planning/PROJECT.md (updated 2026-07-12)
 
 **Core value:** The owner stays in control along the automation↔semi-auto spectrum — the bot can answer autonomously, or propose replies the owner picks and refines, without losing trust or the ability to take over.
-**Current focus:** v1.0 Reply Suggestions SHIPPED 2026-07-11 — planning next milestone (/gsd-new-milestone). Deferred: device-UAT details, prod bagkz replication, server-side «Вместе» suppression.
+**Current focus:** v1.1 Telegram Parity — bring the Telegram channel (Wappi tapi) to full parity with WhatsApp. Design: `docs/superpowers/specs/2026-07-12-telegram-parity-design.md`; research: `.planning/research/telegram-parity/`.
 
 ## Current Position
 
-Phase: 2
-Plan: Not started
-Status: Milestone complete
-Last activity: 2026-07-11
-
-Progress: [██████████] 100%
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-07-12 — Milestone v1.1 started
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 4
-- Average duration: -
-- Total execution time: 0 hours
-
-**By Phase:**
-
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| 2 | 4 | - | - |
-
-**Recent Trend:**
-
-- Last 5 plans: -
-- Trend: -
-
-*Updated after each plan completion*
-| Phase 2 P01 | 11min | 2 tasks | 3 files |
-| Phase 02 P02 | 13min | 3 tasks | 6 files |
-| Phase 02 P03 | 9min | 2 tasks | 1 files |
+- Total plans completed (v1.0): 8
+- Average duration: ~11min/plan (v1.0 phase 2 sample)
 
 ## Accumulated Context
 
 ### Decisions
 
 Decisions are logged in PROJECT.md Key Decisions table.
-Recent decisions affecting current work:
+Recent decisions affecting current work (v1.1 design, spec §2):
 
-- [Roadmap]: Two coarse phases driven by the fixed build order (mock-first UI, then n8n live), not requirement categories — the `ISuggestionsProvider` seam is what makes Phase 1 backend-independent.
-- [Roadmap]: Foundation (seam, correlation/stale guards, per-chat toggle + persistence, public `ChatManager.CurrentChatId` + `WaitForChatFetchesToDrain` accessors) lives inside Phase 1 so the UI phase is self-contained and shippable on mock data.
-- [Project]: Confidence shown as ranking + "Recommended" badge on top card only — no numeric percentage (research arXiv 2402.07632; trust core value). Lock before building card UI.
-- [Project]: Tapping a card loads into the composer to edit, never auto-sends; picking regenerates a full steered set of 4 (re-cluster loop).
-- [02-01]: Suggest Replies n8n workflow deployed on dev (id 9PTyYcelRQI7bGDb, /webhook/SuggestReplies) — one gpt-4o-mini strict json_schema call, closed 6-label enum, Code-node count/distinct/clamp validation + one retry then generation_failed; requestSeq echoed.
-- [02-01]: RAG via vectorStoreSupabase LOAD mode grounded from installed node source (n8n MCP unavailable → REST/curl); single botWaId filter, topK 5, text-embedding-3-small; alwaysOutputData + skipRag-gated Assemble so an empty documents table never kills the branch.
-- [02-01]: Committed export carries dev credential ids resolved by NAME (Dashboard precedent); prod bagkz replication remaps by name via build-suggest-replies.py. Supabase cred present+functional on dev; RAG grounding-with-data deferred to prod/seed.
-- [02-02]: N8nSuggestionsProvider live behind the ISuggestionsProvider seam via the single SuggestionsController.Awake swap (N8N-02); network coroutine hosted on the always-active ChatManager.Instance, gated by WaitForChatFetchesDrain (never bumps the chat-fetch in-flight counter), requestSeq stamped from the REQUEST.
-- [02-02]: Pure static BuildPayloadJson (frozen v1 payload — roles, oldest→newest, ≤12, media placeholders, ≤500/≤1500 clamps, steer+seq passthrough) + MapResponse (Ok 1-4 / Error on fail|malformed|error|empty). 26 EditMode tests green (787/787 full); zero other Phase-1 edits — seam holds.
-- [02-03]: Adversarial e2e matrix (11 curl cases) green on dev with ZERO prompt/validation fixes — the Plan-01 Suggest Replies workflow already satisfies the frozen v1 contract under injection/grounding/missing-data/steer/trivial/sentinel/malformed load; canonical JSON re-export byte-identical (hardened final as-is).
-- [02-03]: Injection resistance (N8N-04) proven across 3 distinct strings (required + format-hijack + prompt-extraction) — no system-prompt leak, no format change, no sub-4 output; grounding invents zero prices (missing fact -> «Уточнить»/«Отложить»); generation_failed safe envelope reachable for malformed input.
-- [02-03]: RAG-skip fence proven STRUCTURALLY via n8n execution runData node lists (sentinel/'-1' skip Retrieve RAG; real botWaId executes it), not inferred from response shape. RAG grounding-with-data stays DEFERRED to prod bagkz replication (dev documents unseeded); catalog grounding fully validated on dev.
+- [D1]: In-screen channel switcher (TopBar CenterZone segmented pill); Telegram bottom tab + Screen_Telegram placeholder removed; per-bot channel persistence `{botId}ActiveChatChannel`.
+- [D2]: Dashboard Telegram inclusion sequenced last (server needs zero changes; chips + deep-link need the channel concept).
+- [D3]: Suggestions = additive v1.1 contract (`channel` + `botTgId` fields, `botWaId` kept) + channel-branched RAG filter (single-key invariant preserved); per-bot «Вместе» default stays bot-scoped.
+- [D4]: `ChatChannel` enum + `ActiveChannel` on ChatManager; `WappiEndpoints.Sync(channel, path)` builder replaces 11 URL literals; Telegram cache under `BotCache/{botId}/telegram/` (no WhatsApp migration); `OutboxEntry` gains channel; no Telegram post-auth sync window initially.
+- [D5]: Confirmed tapi divergences from official docs — type:"text", numeric chat ids, last_time/last_timestamp swap, no isGroup (dialog type=="chat"), reply via dedicated endpoint, reaction needs recipient, no chat/delete (feature-gate), native avatars, 2FA auth branch required.
+- [D6]: Live shape capture is a USER-ASSISTED gate (secrets.json deny-ruled for Claude) — `Tools/tapi/capture-shapes.sh` run by owner; 13 open items in `.planning/research/telegram-parity/tapi-shapes.md` §11.
+- [D7]: Telegram_Bot template fixes (tapi bases, text type, length_seconds fallback, sessionKey→chatId) + RAG re-stamp nodes in BOTH Create orchestrators; WhatsApp template untouched.
 
 ### Pending Todos
 
@@ -82,9 +58,10 @@ None yet.
 
 ### Blockers/Concerns
 
-- [Phase 2 flag]: Measure real n8n cloud round-trip latency with the chosen model before designing timeout/debounce/skeleton; verify exact fast Russian-capable model IDs in the live console; test for the n8n AI Agent `output`-key double-nesting bug and unwrap defensively. Confirm Respond-to-Webhook timeout ceiling vs LLM latency (a too-low ceiling forces an ack+polling redesign).
-- [Constraint]: Respect the confirmed Wappi concurrent-response crossing bugs — suggestion fetches must be serial/guarded; the auto-trigger consumes `OnLiveMessagesReceived` and adds NO new Wappi `messages/get` caller.
-- [Note, not a blocker]: `{botId}_semiAuto_{chatId}` PlayerPrefs keys are unbounded per chat and not reliably enumerable; orphaned toggle keys on bot delete are acceptable this milestone (document, don't over-engineer).
+- [Gate]: tapi media message shapes (messages/get) are undocumented — Normalize/media work blocked until the owner runs the capture script against an authorized dev Telegram profile.
+- [Constraint]: Assume Wappi response-crossing bugs apply to tapi — keep serial media queue + `_chatFetchesInFlight` gate; reset on channel switch like bot switch.
+- [Constraint]: Bot workflow clones stay INACTIVE except during active testing (real contacts!); dev n8n (localhost:5678) + tunnel must be running for template e2e; prod bagkz stays dormant.
+- [Risk]: Any existing dev Telegram workflow clones carry wrong api/sync URLs — recreate after template fix.
 
 ## Deferred Items
 
@@ -92,18 +69,19 @@ Items acknowledged and carried forward:
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| Feedback | FB-01 thumbs-up/down to improve ranking | Deferred to v2 | Init |
-| Insight | FB-02 per-chat/per-bot suggestion analytics | Deferred to v2 | Init |
+| Feedback | FB-01 thumbs-up/down to improve ranking | Deferred to v2 | v1.0 Init |
+| Insight | FB-02 per-chat/per-bot suggestion analytics | Deferred to v2 | v1.0 Init |
 | uat_gap | Phase 01: 01-HUMAN-UAT.md — 4 pending device scenarios | partial | v1.0 close 2026-07-11 |
 | uat_gap | Phase 02: 02-HUMAN-UAT.md — 4 pending device scenarios | partial | v1.0 close 2026-07-11 |
 | verification_gap | Phase 01: 01-VERIFICATION.md awaits device confirmation | human_needed | v1.0 close 2026-07-11 |
-| Polish | POL-01 streaming/animated suggestion reveal | Deferred to v2 | Init |
-| Polish | POL-02 Telegram chat support for the panel | Deferred to v2 | Init |
+| Polish | POL-01 streaming/animated suggestion reveal | Deferred to v2 | v1.0 Init |
+| Milestone | Prod bagkz replication (Suggest Replies + all Telegram fixes, one bulk copy) | pending | v1.1 start 2026-07-12 |
+| Milestone | Server-side «Вместе» suppression | pending | v1.0 close |
+
+Note: POL-02 "Telegram chat support for the panel" graduates from deferred to v1.1 scope (SUGG requirements).
 
 ## Session Continuity
 
-Last session: 2026-07-10T18:03:48Z
-Stopped at: Completed 02-04-PLAN.md (device gate closed as owner smoke pass; detailed UAT deferred to 02-HUMAN-UAT.md)
+Last session: 2026-07-12
+Stopped at: Milestone v1.1 started — defining requirements
 Resume file: None
-
-**Planned Phase:** 2 (n8n Live Wiring) — 4 plans — 2026-07-10T14:26:05.936Z

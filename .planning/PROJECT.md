@@ -10,6 +10,22 @@ v1.0 shipped the **semi-auto reply path**: a per-chat «Вместе» mode wher
 
 The owner stays in control along a spectrum from fully autonomous to hands-on: the bot can answer on its own, **or** propose replies the owner picks and refines — without ever losing trust or the ability to take over a conversation.
 
+## Current Milestone: v1.1 Telegram Parity
+
+**Goal:** A Telegram-authed bot works end-to-end exactly like a WhatsApp one — chat client, n8n auto-replies, «Вместе» suggestions, dashboard — on the Wappi tapi API.
+
+**Target features:**
+- Channel-aware chat pipeline (ChatManager seam: profile resolution, api/sync↔tapi/sync bases, per-channel caches, empty states, tapi parser divergences)
+- In-screen WhatsApp|Telegram channel switcher on the chats screen (Telegram bottom tab removed)
+- n8n Telegram_Bot template fixed to tapi (outbound URLs, type:"text", sessionKey, voice duration) + RAG re-stamp on late channel auth
+- «Вместе» suggestions channel-aware (client payload v1.1 + channel-branched RAG filter)
+- Telegram 2FA auth fix (detail:"2fa" → auth/2fa step)
+- Dashboard «Сводка» includes Telegram profiles (bot-level chips, channel-aware deep-link)
+
+**Design spec:** `docs/superpowers/specs/2026-07-12-telegram-parity-design.md` (decisions D1–D7 + owner veto points §9)
+**Research:** `.planning/research/telegram-parity/` (7 deep-read reports + Wappi tapi docs extract)
+**Strategy (locked):** Telegram ships on Wappi tapi; official business-bots path PARKED (client-side Premium paywall — memory `telegram-channel-strategy`)
+
 ## Requirements
 
 ### Validated
@@ -31,20 +47,31 @@ The owner stays in control along a spectrum from fully autonomous to hands-on: t
 
 ### Active
 
-<!-- v1.0 follow-through + next-milestone candidates (formalize via /gsd-new-milestone): -->
+<!-- v1.1 Telegram Parity (see REQUIREMENTS.md for REQ-IDs): -->
 
-- [ ] Detailed device UAT (deferred at v1.0 close — 3 items in STATE.md Deferred Items / `phases/*/0X-HUMAN-UAT.md`)
-- [ ] Prod bagkz replication of the Suggest Replies workflow (creds by NAME via `build-suggest-replies.py`) + RAG grounding-with-data verification (dev `documents` unseeded)
-- [ ] Server-side «Вместе» suppression — an ACTIVE bot still auto-replies regardless of the client-side toggle (per-chat mode flag + bot-template check; deliberately deferred from v1.0)
+- [ ] Telegram chat client at parity: list, messages, media, send, quoted replies, reactions-send on tapi
+- [ ] In-screen per-bot channel switcher (WhatsApp|Telegram) on the chats screen
+- [ ] Telegram bots actually converse: Telegram_Bot template outbound nodes on tapi bases
+- [ ] «Вместе» suggestions work in Telegram chats
+- [ ] Telegram 2FA accounts can authorize
+- [ ] Dashboard «Сводка» counts and lists Telegram conversations
+- [ ] tapi live-shape verification (user-assisted capture; gates parser/media work)
+
+<!-- Carried from v1.0 (not this milestone's scope, still pending): -->
+
+- [ ] Detailed device UAT (v1.0 deferred items — folded into v1.1 closeout phase)
+- [ ] Prod bagkz replication (Suggest Replies + Telegram fixes; one bulk copy when dev is done — prod stays dormant)
+- [ ] Server-side «Вместе» suppression — an ACTIVE bot still auto-replies regardless of the client-side toggle (per-chat mode flag + bot-template check; deliberately deferred)
 
 ### Out of Scope
 
 <!-- Explicit boundaries with reasoning. -->
 
-- Telegram chat UI for suggestions — the WhatsApp chat client is the only live chat surface this milestone; defer Telegram
-- Changing autonomous automation-mode behavior — this milestone only **adds** the semi-auto path alongside it
+- Official Telegram business-bots path — PARKED: client-side Premium paywall kills try-before-buy (revisit triggers in memory `telegram-channel-strategy`)
+- Server-side «Вместе» suppression — separate deferred item, its own future phase
+- Reactions-RECEIVE on Telegram if live capture shows no viable transport (tapi documents no `type:"reaction"` message; decision recorded in the capture phase)
+- WhatsApp template sessionKey change — session-continuity risk for shipped bots outweighs symmetry with the Telegram fix
 - Migrating bot persistence off PlayerPrefs / breaking up the `Manager.cs` god-object — real concerns (see `.planning/codebase/CONCERNS.md`) but a separate effort
-- Unrelated chat features (e.g. reactions-over-webhook) — not part of this milestone
 
 ## Context
 
@@ -80,7 +107,11 @@ The owner stays in control along a spectrum from fully autonomous to hands-on: t
 | Shared always-active `Suggest Replies` workflow (DashboardOutcomes pattern), NOT a per-bot template change | On-demand pull, hot reply path untouched, no per-bot clone-propagation problem | ✓ Good (v1.0) |
 | App sends conversation context (last ≤12 messages) instead of reading `n8n_chat_histories` | App history is fresh even for paused bots; Telegram-ready later; workflow stays stateless | ✓ Good (v1.0) |
 | Provider coroutines on `ChatManager.Instance`, not the controller | Controller GameObject is inactive ~300ms at `OnChatSelected`; a network call can't answer synchronously like the mock | ✓ Good (v1.0) |
-| Server-side «Вместе» suppression deferred; unauthenticated webhook accepted (R-02-01) | Scope control for v1.0; suppression needs a per-chat mode flag + bot-template change — its own phase | — Pending (next milestone candidate) |
+| Server-side «Вместе» suppression deferred; unauthenticated webhook accepted (R-02-01) | Scope control for v1.0; suppression needs a per-chat mode flag + bot-template change — its own phase | — Pending (future milestone candidate) |
+| Telegram ships on Wappi tapi; official business-bots path PARKED | Client-side Premium paywall (₸13,490/yr, no trial) kills try-before-buy onboarding; tapi = same architecture as WhatsApp | — Pending (v1.1) |
+| In-screen channel switcher on the chats screen; Telegram bottom tab removed | ChatManager is a hard singleton with event-driven views; separate screen duplicates 2 subtrees + 7 overlays and collides with 3 singletons; SetActiveBot reset choreography is a proven near-clone for channel switch | — Pending (v1.1, owner veto point) |
+| Telegram cache under `BotCache/{botId}/telegram/`, WhatsApp keeps legacy root | Channel-scopes all per-bot caches with zero migration; purge/privacy paths already recurse | — Pending (v1.1) |
+| Telegram_Bot template sessionKey → `profile_id + ':' + chatId` (WhatsApp template untouched) | tapi `from` can be a username (memory fragmentation); WhatsApp change would reset shipped bots' session memory | — Pending (v1.1) |
 
 ## Evolution
 
@@ -100,4 +131,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-11 after v1.0 milestone*
+*Last updated: 2026-07-12 after starting milestone v1.1 Telegram Parity*
