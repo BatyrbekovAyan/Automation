@@ -1,0 +1,3393 @@
+
+Документация по WhatsApp API отправке сообщений в сервисе Wappi.pro
+Сервисы
+Агрегатор мессенджеров
+ИИ-ассистент
+Чат-боты
+Виджет на сайт
+Рассылка сообщений
+Интеграции
+Битрикс24
+amoCRM
+МойСклад
+RetailCRM
+1C-Битрикс
+WordPress
+Opencart
+API
+WhatsApp API
+Telegram API
+MAX API
+Цены
+Новости и обновления
+Партнерам-интеграторам
+Партнерам-разработчикам
+Контакты
+СервисыСервисы для продаж
+Агрегатор мессенджеровСообщения из разных мессенджеров в одном окне
+ИИ-ассистентЧат-бот с ИИ для автоматизации общения
+Чат-ботыС автоответчиком и интерактивным меню
+Виджет на сайт Виджет мессенджеров со сквозной аналитикой для вашего сайта
+Рассылка сообщенийМодуль массовой рассылки с поддержкой каскадной рассылки и СМС
+ИнтеграцииГотовые интеграции
+Битрикс24Готовые интеграции с Битрикс24
+AmoCRMГотовые интеграции с AmoCRM
+Другие системыИнтеграции с другими CRM, CMS системами и сервисами
+Битрикс24 + WhatsApp
+Битрикс24 + Telegram
+Битрикс24 + MAX
+Битрикс24 + Avito
+Битрикс24 + ВКонтакте
+Битрикс24 + HH.ru
+AmoCRM + WhatsApp
+AmoCRM + Telegram
+AmoCRM + MAX
+AmoCRM + Avito
+AmoCRM + ВКонтакте
+AmoCRM + HH.ru
+МойСклад
+RetailCRM
+1С-Битрикс
+Opencart
+Wordpress
+Make.com
+APIAPI для разработки
+WhatsApp APIПрием и отправка сообщений через HTTP-запросы, работа с чатами, контактами, группами
+Telegram APIПрием и отправка сообщений через HTTP-запросы, работа с чатами, контактами, каналами
+ MAX APIПрием и отправка сообщений через HTTP-запросы, работа с чатами, контактами, каналами
+Цены
+ПартнерамПартнерам
+ИнтеграторамЗарабатывайте до 40% с оплат профилей клиентов
+РазработчикамПодключите мессенджеры в свой сервис с помощью API
+ВойтиПопробовать бесплатно
+Документация Whatsapp API
+Прием и отправка сообщений через HTTP-запросы для работы с Whatsapp - работа с чатами, контактами, группами.
+Попробовать бесплатно5 дней пробный период
+Описание
+Методы
+Уведомления
+Вопросы
+Цены
+Описание WhatsApp API для сервиса Wappi
+Методы отправки сообщений
+Вы можете отправить сообщение в Whatsapp синхронной или асинхронной командой. Асинхронные методы выполняют запросы с постановкой в очередь, в ответе придет сообщение о постановке в очередь и id задачи. Синхронные методы отправления сообщений выполняются сразу и позволяют получить в ответе результат запроса.
+Особенности API
+Токен авторизации передается в заголовке Authorization HTTP запроса. Profile_id передается query параметром в каждом запросе.
+Безопасность
+API WhatsApp работает на основе протокола WhatsApp WEB и исключает бан. Несмотря на это, стоит быть осторожным с анти-спам системой WhatsApp, подробнее об этом в Вопросах.
+Тестирование API
+Чтобы протестировать API необходимо авторизоваться. Для этого на данной странице нажмите Authorize, в появившемся окне в поле Value вставьте ваш токен api. Токен можно найти в дашборде на странице вашего профиля. 
+Личный кабинет >
+Коллекция Postman
+Для удобства тестирования нашего API можете воспользоваться коллекцией Postman. Там же можно найти примеры реализованных методов на разных языках программирования.
+В коллекцию >
+Методы
+Все методы WhatsApp APIПолный справочник - 93 методаСвернутьРазвернутьРабота с профилем10 методовPOSTСоздать профиль/api/profile/addURL: https://wappi.pro/api/profile/add?name=новый&webhook_url=https://wappi.pro
+Описание метода
+Создание нового профиля. Вы указываете имя профиля, а профиль id создается автоматически.
+Query Params
+ПараметрЗначениеОписание
+nameновыйОбязательный параметр. Имя нового профиля.
+webhook_urlhttps://wappi.proНеобязательный параметр. Установка URL ссылки на вебхук.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+Тело запроса не передается.
+Responses
+Создать профиль200{
+ "profile_id": "b361be2d-88ca",
+ "status": "done",
+ "time": "2024-02-21T19:33:57+03:00",
+ "timestamp": 1708533237
+}
+POSTУдалить профиль/api/profile/deleteURL: https://wappi.pro/api/profile/delete?profile_id={{profile_id}}
+Описание метода
+Удаление существующего профиля. Авторизация при этом удаляется.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Удалить профиль200{
+ "detail": "Profile b361be2d-88ca deleted",
+ "status": "done",
+ "time": "2024-02-21T19:35:05+03:00",
+ "timestamp": 1708533305
+}
+GETПолучить QR/api/sync/qr/getURL: https://wappi.pro/api/sync/qr/get?profile_id={{profile_id}}
+Описание метода
+Запрос позволяет получить QR код в формате base64 с неавторизованного профиля.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Получить QR200{
+ "status": "done",
+ "timestamp": 1703583442,
+ "time": "2023-12-26T12:37:22+03:00",
+ "qrCode": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEAAQMAAABmvDolAAAABlBMVEX///8AAABVwtN+AAAEsElEQVR42uyZMY7zOhKEi2DAzLyAIV7DgQBeyaEyMmPoKwlQ4GtQ8AXamQJCtWjZ8/bHph4z2PcznPkCgd1dXUXj7/l3HUOy3PzaIimmjkiyD4ArQnLuBFTYIlgf3BzNupBZQrXZSYXtBaxccuKAMRacBlzgn3tYCmXl8ntAuTE8mtu84Rx5g3mQW2cggzjHDdSzXTFY5oSOQIXNSdY2xizPau8UMW10G/4o1reBV08O5/EyyXNd7uV2Gs7jNP1P034A6HGZOyyLN9XeM3bD5jb5Y/y+DJi1xQ2ej4UFnrxviTtiyVKHOPcCltnd/IBIYgcuTgybZcZafw9YigBh4esU4VotyyE0fQCEeZySfyvMbudEX0NDYg2vfvg+YKpKLAyXbfIn7dAbQrXMMpilEwDTAB097Qq/zpdEMY/ZEQgNvwJo8TN8aHZz/llxQZLBtmnijrEXsLbRZc/HfEmC0C4pG1ZMyYe9FwDTYqGviHOS3Sz3LZn9bDMkrO2XgAEjvK7KexYZIjewIpbCwbx6sgNgtBZS7XyZxK8NTgSIZRPDpRegxYcfznYDD/ciqroZNPtr/HsAcSkiNSyHh2lOZbfaQuA9eh8Dpo5jymCNc/J+1zE8hQqXUc3rnr4PIFBNE7ncs5wCtwmn8FgOq4Z+QHPid9j74aNcvgKIOhdsvwTALsxkG10hDOckT1a7JT+EXoBZ2abE8CCLR9At+1ybAuZHgjoAsy23l8p5ORr+qftkkn3oBlSM01XY4jZRzLLhynq22wRVxl8BDuOQCcR75vOwSWpi4MjaDTDL7Oh3jJdJ7SI3nPQ21E69Rq8DoBJ082yIRfy6bBNMtcsGWd+2+WPAkPoNOJy+r3aekqrONIl6pj4A1Ktmbx6c00FPaR+sWjWu73DwdcCwjSl7lbQkZtcVr8udBYP5LWCPSwZ2q7chYXZbUtcCCEIvQL9yuqJa3klTEfPVU+UGtR9wFOO9u09hmafrKWhF/M/ofR8wnI/FegyB5zKn20kLt+kX43eAfYzZ03C5EzLYOd2eNSyliFlfo9cDwOhumg7uRdQYOdkDF24qN70Atkjx+jcVgRG4ynB0wvBPfPgcwOQ1gLDwhNEVYQ1twn9fML4OYBgjb1LP9q6WdHTk87gOrHvsBKjqIOHYJKJ5s2gt2gThW4q/D6iR2pLGUq2Z2pZ0GmBLlnX/eYb5GLCzE6yPoy3q6HIy9Ryp4jv2AsJsN4iGr8z9GD3WM9wmRyLvA8A2l7U1Xfb7gMj8rHp38hMGPwbM8WojO6IO9NoujoYPTURh7QUAcXaEXv92+Afdr6owP2+kPQBD/Y8mgcmbHZd0O5kaC/0/Xu7rgKbrCWLUNuPJ+XIEBp3D+vPzxOdAs9nLqjfg1RXnJKbBZbKOnYDjnfbm93O8U2txrJW3K26dgOO9OmOwvGfhutxzelarmXf940H7M6DClht1eUzHN2Q8V6ozN3vsBaxc8lXIdoE/2g9+rbaQrLYjUG5i6nhRM96OyXvMrpDr0hMghtdiPYbE1EDSm/oTzD8FKmy+4sh673QgCBpB38/VPYDjVxiENiIJMF5SflI3uRZm7gP8Pf8/5z8BAAD//9IFR4Vf2pFiAAAAAElFTkSuQmCC",
+ "uuid": "71ad40e9-b023"
+}
+GETПолучить код авторизации/api/sync/auth/codeURL: https://wappi.pro/api/sync/auth/code?profile_id={{profile_id}}&phone=79115554445
+Описание метода
+Метод для авторизации в Whatsapp по номеру телефона. Позволяет получить код для авторизации с неавторизованного профиля. Код действителен 160 секунд.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+phone79115554445Обязательный параметр. Номер телефона, на который зарегистрирован Whatsapp.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Получить код авторизации200{
+ "status": "done",
+ "timestamp": 1703241927,
+ "time": "2023-12-22T13:45:27+03:00",
+ "code": "M1VT-LFC1",
+ "phone": "79602041980",
+ "uuid": "71ad40e9-b023"
+}
+GETПолучить статус и настройки профиля/api/sync/get/statusURL: https://wappi.pro/api/sync/get/status?profile_id={{profile_id}}
+Описание метода
+Получение настроек профиля.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Получить статус и настройки профиля200{
+ "app_status": "open",
+ "authorized": true,
+ "authorized_at": "2023-11-11T03:35:30.833435+03:00",
+ "checked_at": "2022-12-01T01:32:18.558776+03:00",
+ "last_activity": 1681196085.96676,
+ "logouted_at": null,
+ "message_count": 1438,
+ "name": "Профиль 1",
+ "payment_expired_at": "2023-12-13T00:00:00Z",
+ "payment_notification": true,
+ "phone": "79602041980",
+ "profile_id": "71ad40e9-b023",
+ "proxy": "",
+ "uuid": "71ad40e9-b023",
+ "webhook_types": [
+ "authorization_status",
+ "incoming_message",
+ "delivery_status",
+ "outgoing_message_phone",
+ "outgoing_message_api",
+ "application_status"
+ ],
+ "webhook_url": "https://webhook.site/1579ec54-2bff-4248-9600-3fce8adf5586",
+ "worked_days": 398
+}
+GETПолучить все профили/api/profile/all/getURL: https://wappi.pro/api/profile/all/get?profile_id={{profile_id}}
+Описание метода
+Получение сведений о всех профилях в аккаунте.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Получить все профили200{
+ "profiles": [
+ {
+ "proxy": "",
+ "profile_id": "a0fb3c20-3236",
+ "name": "тест",
+ "webhook_url": null,
+ "authorized": true,
+ "uuid": "a0fb3c20-3236",
+ "checked_at": "2023-06-02T18:22:20.257981+03:00",
+ "authorized_at": "2023-06-15T00:23:15.771808+03:00",
+ "phone": "79153955086",
+ "worked_days": 13,
+ "webhook_types": [
+ "incoming_message",
+ "delivery_status",
+ "authorization_status"
+ ],
+ "payment_notification": true
+ },
+ {
+ "proxy": "",
+ "profile_id": "79d1e3b7-8fc9",
+ "name": "Тест проф макс",
+ "webhook_url": null,
+ "authorized": true,
+ "uuid": "79d1e3b7-8fc9",
+ "checked_at": "2023-05-13T23:02:05.150663+03:00",
+ "authorized_at": "2023-06-15T00:17:59.616845+03:00",
+ "phone": "79602041981",
+ "worked_days": 33,
+ "webhook_types": [
+ "incoming_message",
+ "delivery_status",
+ "authorization_status"
+ ],
+ "last_activity": 1683997324.5348,
+ "message_count": 6,
+ "payment_notification": true
+ },
+ {
+ "proxy": "",
+ "profile_id": "b01d59e1-0b06",
+ "name": "Го - Авторизован БОРГ",
+ "webhook_url": "https://webhook.site/d7b581f5-f234-46c0-ae52-0fdd3b93e45c",
+ "authorized": true,
+ "uuid": "b01d59e1-0b06",
+ "checked_at": "2022-12-01T10:44:41.521576+03:00",
+ "authorized_at": "2023-06-15T00:28:03.580378+03:00",
+ "phone": "79217304495",
+ "worked_days": 251,
+ "webhook_types": [
+ "incoming_message",
+ "delivery_status",
+ "authorization_status"
+ ],
+ "last_activity": 1678872299.27528,
+ "message_count": 140,
+ "payment_notification": true
+ },
+ {
+ "proxy": "",
+ "profile_id": "71ad40e9-b023",
+ "name": "Профиль 1",
+ "webhook_url": "https://webhook.site/0434f4ba-77b8-4819-a660-5fd3cac71e2b",
+ "authorized": true,
+ "uuid": "71ad40e9-b023",
+ "checked_at": "2022-12-01T01:32:18.558776+03:00",
+ "authorized_at": "2023-06-15T00:23:07.982899+03:00",
+ "phone": "79602041981",
+ "worked_days": 251,
+ "webhook_types": [
+ "delivery_status",
+ "incoming_message",
+ "authorization_status"
+ ],
+ "last_activity": 1681196085.96676,
+ "message_count": 699,
+ "payment_notification": true
+ }
+ ],
+ "status": "done"
+}
+GETПерезагрузить профиль/api/profile/restartURL: https://wappi.pro/api/profile/restart?profile_id={{profile_id}}
+Описание метода
+Перезагрузка приложения (профиля).
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Перезагрузить профиль200{
+ "detail": "Your profile has been restarted",
+ "status": "done"
+}
+GETВыйти из whatsapp/api/profile/logoutURL: https://wappi.pro/api/profile/logout?profile_id={{profile_id}}
+Описание метода
+Разавторизация в Whatsapp.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Выйти из whatsapp200{
+ "status": "done",
+ "timestamp": 1679494602,
+ "time": "2023-03-22T17:16:42.605103898+03:00",
+ "detail": "ok! You are logouted"
+}
+POSTОплатить профиль с баланса/payments/balance/add_daysURL: https://wappi.pro/payments/balance/add_days
+Описание метода
+Метод позволяет оплатить один или несколько профилей за счёт средств на балансе Wappi с применением выбранного тарифа.
+Request Body
+ ПараметрТип данныхОбяз.Описание
+ profile_uuid
+string
+Да
+ID профиля, для которого выполняется оплата Можно получить в личном кабинете на странице конкретного профиля.
+tariff_id
+integer
+Да
+ID выбранного тарифа 
+Доступные тарифы: 
+1 - Базовый 1 месяц; 
+2 - Базовый 3 месяца; 
+3 - Базовый 6 месяцев; 
+4 - Базовый 12 месяцев; 
+5001 - Полный 1 месяц; 
+5002 - Полный 3 месяца; 
+5003 - Полный 6 месяцев; 
+5004 - Полный 12 месяцев.
+profile_ids
+array\[string\]
+Нет
+Массив ID дополнительных профилей для оплаты 
+Если указаны, оплата применяется ко всем профилям из profile_uuid и profile_ids.
+code
+string
+Нет
+Промо-код на скидку
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "profile_uuid": "uuid",
+ "tariff_id": 1,
+ "profile_ids": [
+ "uuid",
+ "uuid2"
+ ],
+ "code": "promo_code"
+}
+GETПолучить историю авторизаций профиля/panel/profile/auth/historyURL: https://wappi.pro/panel/profile/auth/history?profile_id={{profile_id}}
+Описание метода
+Получение истории авторизаций в профиле.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Работа с сообщениями / Синхронные методы24 методаPOSTОтправить текстовое сообщение/api/sync/message/sendURL: https://wappi.pro/api/sync/message/send?profile_id={{profile_id}}
+Описание метода
+Отправка текстового сообщения.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "body": "Тестовое сообщение",
+ "recipient": "79115576362"
+}
+Responses
+Отправка сообщения200{
+ "status": "done",
+ "timestamp": 1679823696,
+ "time": "2023-03-26T12:41:36+03:00",
+ "message_id": "3EB0128AE55B5D222DD0",
+ "task_id": "57411bfb-8f19-4d19-b6c1-2457b5164fd2"
+}
+POSTОтправить медиа по ссылке/api/sync/message/file/url/sendURL: https://wappi.pro/api/sync/message/file/url/send?profile_id={{profile_id}}
+Описание метода
+Отправка сообщения с изображением, видео или документом. К изображению, видео и документу можно добавить подпись. К документу можно добавить имя файла.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "url": "https://site.ru/file.pdf",
+ "caption": "текст",
+ "file_name": "name.pdf",
+ "recipient": "79002041981"
+}
+Responses
+Отправить медиа по ссылке200{
+ "status": "done",
+ "timestamp": 1679823941,
+ "time": "2023-03-26T12:45:41+03:00",
+ "message_id": "3EB00C8785732C081070",
+ "task_id": "bcfeb0e0-d1de-495c-9a32-947dc45e7af0"
+}
+POSTОтправить картинку (base64)/api/sync/message/img/sendURL: https://wappi.pro/api/sync/message/img/send?profile_id={{profile_id}}
+Описание метода
+Отправка сообщения с изображением. К изображению можно добавить подпись.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "recipient": "79995579399",
+ "caption": "Это картинка",
+ "b64_file": "/9j/4AAQSkZJRgABAQAAAQABAAD/9k="
+}
+Responses
+Отправить картинку (base64)200{
+ "status": "done",
+ "timestamp": 1679823745,
+ "time": "2023-03-26T12:42:25+03:00",
+ "message_id": "3EB086550A587F3D4A22",
+ "task_id": "8d7e6a20-20e2-4582-a79b-2a4267ab4ae4"
+}
+POSTОтправить документ (base64)/api/sync/message/document/sendURL: https://wappi.pro/api/sync/message/document/send?profile_id={{profile_id}}
+Описание метода
+Отправка сообщения с документом. Можно указать имя файла и подпись к файлу.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "recipient": "79002041981",
+ "caption": "Это документ",
+ "file_name": "name.pdf",
+ "b64_file": "JVBERi0xLjMKJcRgo="
+}
+Responses
+Отправить документ (base64)200{
+ "status": "done",
+ "timestamp": 1679823761,
+ "time": "2023-03-26T12:42:41+03:00",
+ "message_id": "3EB067FA9702977836BC",
+ "task_id": "911279fc-1b2c-4741-8deb-e0699c42b8f3"
+}
+POSTОтправить аудио (base64)/api/sync/message/audio/sendURL: https://wappi.pro/api/sync/message/audio/send?profile_id={{profile_id}}
+Описание метода
+Отправка сообщения с аудио.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "recipient": "79995579399",
+ "b64_file": "SUQzAwAAAAAHdlRDT04AAAAGAAAAT3RoZXAgICAgDA=="
+}
+Responses
+Отправить аудио (base64)200{
+ "status": "done",
+ "timestamp": 1679823803,
+ "time": "2023-03-26T12:43:23+03:00",
+ "message_id": "3EB003A402E46E3CCEC5",
+ "task_id": "e46c9f04-295d-44c7-b4ff-10589c2a7d95"
+}
+POSTОтправить видео (base64)/api/sync/message/video/sendURL: https://wappi.pro/api/sync/message/video/send?profile_id={{profile_id}}
+Описание метода
+Отправка сообщения с видео. К видео можно добавить подпись.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "recipient": "79995579399",
+ "caption": "Это видео",
+ "b64_file": "AAAAIGZ0eXBtcDQyLS0vA=="
+}
+Responses
+Отправить видео (base64)200{
+ "status": "done",
+ "timestamp": 1679823781,
+ "time": "2023-03-26T12:43:01+03:00",
+ "message_id": "3EB0E46840322D46DCE8",
+ "task_id": "4742f408-4478-4546-a27d-272a175459bb"
+}
+POSTОтправить локацию/api/sync/message/location/sendURL: https://wappi.pro/api/sync/message/location/send?profile_id={{profile_id}}
+Описание метода
+Отправка геолокации.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "recipient": "79995579399",
+ "latitude": 55.750446,
+ "longitude": 37.617494,
+ "address": "улица Торцева, 23А, Северодвинск, Архангельская область, 164520"
+}
+Responses
+Отправить локацию200{
+ "status": "done",
+ "timestamp": 1679824147,
+ "time": "2023-03-26T12:49:07+03:00",
+ "message_id": "3EB0F6F9E38658592755",
+ "task_id": "7d66315f-fe52-4328-b644-b444effd4cf0"
+}
+POSTОтправить контакт/api/sync/contact/sendURL: https://wappi.pro/api/sync/contact/send?profile_id={{profile_id}}
+Описание метода
+Отправка контакта.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "phone": "79002041988",
+ "recipient": "79995579399",
+ "name": "Имя контакта"
+}
+Responses
+Отправить контакт200{
+ "status": "done",
+ "timestamp": 1679824174,
+ "time": "2023-03-26T12:49:34+03:00",
+ "message_id": "3EB0B1C9D596672A2BA2",
+ "task_id": "69456602-d786-4e81-bab9-276b11eb5874"
+}
+POSTОтправить файл (устаревший)/api/sync/message/file/sendURL: https://wappi.pro/api/sync/message/file/send?profile_id={{profile_id}}&recipient=79995579399
+Описание метода
+Метод устарел. Для отправки различных файлов используйте соответсвующие для каждого типа файлов методы.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+recipient79995579399Обязательный параметр. Получатель сообщения. 
+Для ввода доступны форматы:
+ID контакта. Пример: 13475634251@c.us;
+Номер телефона. Пример: 79002224477. Номер должен начинаться с кода страны. Для России и Казахстана это всегда 7, затем 10 цифр. Сообщения на номера телефона с 8 не будут доставлены.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+JVBERi0xLMwNDkyCiUlRU9GCg==
+Responses
+Отправить файл (устаревший)200{
+ "status": "done",
+ "timestamp": 1679824190,
+ "time": "2023-03-26T12:49:50+03:00",
+ "message_id": "3EB0F4D080603C3C0C0A",
+ "task_id": "bb2fc603-8e0f-4941-a9aa-ba8e96a47077"
+}
+POSTОтправить кнопки/api/sync/message/buttons/sendURL: https://wappi.pro/api/sync/message/buttons/send?profile_id={{profile_id}}
+Описание метода
+МЕТОД ВРЕМЕННО НЕ РАБОТАЕТ. Отправка сообщения с кнопками.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "recipient": "79995579399",
+ "title": "Заголовок сообщения",
+ "body": "Текст сообщения",
+ "buttons": [
+ {
+ "body": "button text 1",
+ "id": "1"
+ },
+ {
+ "body": "button text 2",
+ "id": "2"
+ },
+ {
+ "body": "button text 3",
+ "id": "3"
+ }
+ ]
+}
+Responses
+Отправить кнопки200{
+ "status": "done",
+ "timestamp": 1680637818,
+ "time": "2023-04-04T22:50:18+03:00",
+ "message_id": "3EB0B9409285F9EA1B78",
+ "task_id": "91532ded-0e14-4b11-9399-84aea97a5756"
+}
+POSTОтправить списки/api/sync/message/list/sendURL: https://wappi.pro/api/sync/message/list/send?profile_id={{profile_id}}
+Описание метода
+МЕТОД ВРЕМЕННО НЕ РАБОТАЕТ. Отправка сообщения со списком.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "recipient": "79995579399",
+ "title": "Заголовок сообщения",
+ "body": "Текст сообщений",
+ "btn_text": "НАЖМИ на меня 😀",
+ "list": {
+ "title": "Заголовок меню",
+ "rows": [
+ {
+ "title": "Выбор 1",
+ "id": "id1"
+ },
+ {
+ "title": "Выбор 2",
+ "id": "id2"
+ },
+ {
+ "title": "Выбор 3",
+ "id": "id3",
+ "description": "Можно добавлять описание для секции"
+ },
+ {
+ "title": "Выбор 4 😁",
+ "description": "Можно 😁 добавлять эмоджики"
+ },
+ {
+ "title": "Выбор 5",
+ "description": "Оппппапапапа пана",
+ "id": "test-4"
+ },
+ {
+ "title": "Выбор 6",
+ "description": "Оп2а пана",
+ "id": "test-6"
+ },
+ {
+ "title": "Выбор 7",
+ "description": "Оп2а пана",
+ "id": "test-7"
+ },
+ {
+ "title": "Выбор 8",
+ "description": "Оп2а пана",
+ "id": "test-8"
+ }
+ ]
+ }
+}
+POSTОтправить реакцию на сообщение/api/sync/message/reactionURL: https://wappi.pro/api/sync/message/reaction?profile_id={{profile_id}}
+Описание метода
+Отправка реакции на сообщение.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "body": "👍",
+ "message_id": "3EB06C32E4E7B2690CBE"
+}
+Responses
+Отправить реакцию на сообщение200{
+ "status": "done",
+ "timestamp": 1683969388,
+ "time": "2023-05-13T12:16:28+03:00",
+ "message_id": "3EB0A7E2F4F0B8AFE013",
+ "uuid": "71ad40e9-b023"
+}
+POSTОтметить сообщение прочитанным/api/sync/message/mark/readURL: https://wappi.pro/api/sync/message/mark/read?profile_id={{profile_id}}&mark_all=true
+Описание метода
+Метод позволяет отметить сообщение прочитанным.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+mark_alltrueНеобязательный параметр. Значения true или false. Если true, то помечает все непрочитанные сообщения в чате прочитанными. Если не указывать, то по умолчанию стоит значение false.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "message_id": "3EB04E6C3BF173879610C0"
+}
+Responses
+Отметить сообщение прочитанным200{
+ "status": "done",
+ "timestamp": 1683969533,
+ "time": "2023-05-13T12:18:53+03:00",
+ "uuid": "71ad40e9-b023"
+}
+POSTПереслать сообщение/api/sync/message/forwardURL: https://wappi.pro/api/sync/message/forward?profile_id={{profile_id}}
+Описание метода
+Пересылка сообщения. Для Whatsapp пересылка сообщения является новым сообщением, поэтому в ответе вы получите message_id уже нового сообщения.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "message_id": "3EB07AD49FD5A5FD394D",
+ "recipient": "79995579399"
+}
+Responses
+Переслать сообщение200{
+ "status": "done",
+ "timestamp": 1679824509,
+ "time": "2023-03-26T12:55:09+03:00",
+ "message_id": "3EB016CDE8BCDD953EDA",
+ "task_id": "d2a4ec76-43d0-4458-a044-a83a7ba195f8"
+}
+POSTОтветить на сообщение/api/sync/message/replyURL: https://wappi.pro/api/sync/message/reply?profile_id={{profile_id}}
+Описание метода
+Ответить на сообщение. Чтобы отправить файл необходимо в body добавить поле url файла. Если не добавлять поле url, то будет отправлен просто текст.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "body": "тестовый ответ на сообщение",
+ "message_id": "3EB0F4D080603C3C0C0A",
+ "url": "https://freetestdata.com/wp-content/uploads/2022/02/Free_Test_Data_117KB_JPG.jpg"
+}
+Responses
+Ответить на сообщение200{
+ "status": "done",
+ "timestamp": 1679824453,
+ "time": "2023-03-26T12:54:13+03:00",
+ "message_id": "3EB0F2ECAAC3AF1D6219",
+ "task_id": "a71af6ad-0c6c-41bf-abc1-4e8a47eb665d"
+}
+POSTУдалить сообщение/api/sync/message/deleteURL: https://wappi.pro/api/sync/message/delete?profile_id={{profile_id}}
+Описание метода
+Удаление сообщения.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "message_id": "3EB07AD49FD5A5FD394D"
+}
+Responses
+Удалить сообщение200{
+ "status": "done",
+ "timestamp": 1679824863,
+ "time": "2023-03-26T13:01:03+03:00"
+}
+POSTИзменить сообщение/api/sync/message/editURL: https://wappi.pro/api/sync/message/edit?profile_id={{profile_id}}
+Описание метода
+Изменить текст сообщения можно только в течение 15 минут после отправки.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "message_id": "3A4CC6082FA81F126B42",
+ "body": "Измененный текст сообщения"
+}
+Responses
+Изменить сообщение200{
+ "status": "done",
+ "timestamp": 1708952135,
+ "time": "2024-02-26T15:55:35+03:00",
+ "message_id": "3EB0A15AF73CAC0C53A4B0",
+ "task_id": "d48cd34f-00e0-4c6d-9fba-fa4731343ad0",
+ "uuid": "58c2577a-6f22"
+}
+POSTСоздать опрос/api/sync/poll/createURL: https://wappi.pro/api/sync/poll/create?profile_id={{profile_id}}
+Описание метода
+Метод позволяет создать опрос.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "recipient": "79539059141",
+ "body": "Тестовый опрос",
+ "poll_options": [
+ "да",
+ "нет",
+ "не знаю",
+ "где я?"
+ ],
+ "poll_select_count": 1
+}
+Responses
+Создать опрос200{
+ "status": "done",
+ "timestamp": 1684745723,
+ "time": "2023-05-22T11:55:23+03:00",
+ "message_id": "3EB0447BB789341149D8",
+ "task_id": "32b6ebbe-f756-4b10-bb2a-329697431e1c",
+ "uuid": "71ad40e9-b023"
+}
+POSTПоиск сообщений/api/sync/messages/searchURL: https://wappi.pro/api/sync/messages/search?profile_id={{profile_id}}
+Описание метода
+Метод позволяет искать сообщение в конкретном чате, либо по всем чатам, если не указывать реципиента.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "body": "ми 9",
+ "recipient": "79602041980"
+}
+Responses
+Поиск сообщений200{
+ "status": "success",
+ "timestamp": 1762855113,
+ "time": "2025-11-11T12:58:33+03:00",
+ "messages": null,
+ "total_count": 1,
+ "uuid": "1955e928-b7b6",
+ "results": [
+ {
+ "chat": {
+ "id": "79602041980@s.whatsapp.net",
+ "type": "",
+ "isGroup": false,
+ "image": "",
+ "thumbnail": "https://fs.wappi.pro/fs/downloadFile/1955e928-b7b6/avatars/tumb_79602041980.jpg",
+ "avatar_updated_at": 1745482823,
+ "last_message_delivery_status": "",
+ "last_message_id": "",
+ "last_timestamp": 0,
+ "last_message_type": "",
+ "last_message_sender": {
+ "id": "",
+ "number": "",
+ "pushname": "",
+ "isMe": false
+ },
+ "last_message_data": "",
+ "name": "Я",
+ "unread_count": 0,
+ "isDeleted": false,
+ "isArchived": false,
+ "item_name": "",
+ "item_link": "",
+ "is_wappi_pinned": false,
+ "phone": "79602041980"
+ },
+ "message": {
+ "id": "3A5F6E23B6EA6D04FD9D",
+ "type": "chat",
+ "from": "79959643980@s.whatsapp.net",
+ "to": "79602041980@s.whatsapp.net",
+ "fromMe": true,
+ "senderName": "Сергей",
+ "contact_name": "",
+ "username": "",
+ "phone": "",
+ "time": 1759584850,
+ "body": "Ми 9",
+ "stanzaId": "",
+ "chatId": "79602041980@s.whatsapp.net",
+ "isForwarded": false,
+ "isReply": false,
+ "caption": "",
+ "file_name": "",
+ "isRead": true,
+ "delivery_status": "read",
+ "s3Info": {},
+ "poll_votes": null,
+ "mimetype": "",
+ "from_where": "phone",
+ "isEdited": false,
+ "isGif": false,
+ "isFromAPI": false,
+ "isDeleted": false,
+ "location": null,
+ "isPinned": false,
+ "reactions": null,
+ "wappi_bot_id": "",
+ "task_id": "",
+ "template_id": "",
+ "crm_entities": {
+ "crm_type": "",
+ "crm_id": "",
+ "message_id": "",
+ "chat_id": "",
+ "manager_id": ""
+ },
+ "is_blacklist": false,
+ "billable": false,
+ "attaches": null
+ }
+ }
+ ]
+}
+GETПолучить сообщения из чата/api/sync/messages/getURL: https://wappi.pro/api/sync/messages/get?profile_id={{profile_id}}&chat_id=79115576369&limit=1&date=2019-11-02T23:16:58&offset=0&mark_all=true&order=desc&reverse=false
+Описание метода
+Получение сообщений из конкретного чата.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+chat_id79115576369Обязательный параметр. ID чата из списка сообщений.
+Примеры:
+13475634251@c.us - id чата
+79115556677 - номер телефона чата
+134756342511567456345@g.us - id чата группы
+limit1Необязательный параметр. Количество сообщений для получения. Если не указывать, то по умолчанию установлено значение 50.
+date2019-11-02T23:16:58Необязательный параметр. Дата, с которой вывести список сообщений. Формат YYYY-mm-ddTHH:MM:ss (например 2023-12-31T12:00:00).
+offset0Необязательный параметр. От какого по счету элемента вывести список сообщений, где 0 это самое новое сообщение. Если не указывать, то по умолчанию установлено значение 0.
+mark_alltrueНеобязательный параметр. Значения true или false. Если true, то помечает все непрочитанные сообщения в чате прочитанными. Если не указывать, то по умолчанию стоит значение false. Работает только для личных чатов, для групп не работает.
+orderdescНеобязательный параметр. Значения desc или asc. Если desc - сортирует от нового к старым, если asc - от старого к новым. Если не указывать, то по умолчанию стоит desc
+reversefalseНеобязательный параметр. Переворачивает массив сообщений. Если не указывать, то по умолчанию стоит false
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Получить сообщения из чата200{
+ "status": "done",
+ "timestamp": 1720788635,
+ "time": "2024-07-12T15:50:35+03:00",
+ "messages": [
+ {
+ "id": "3EB0B62774646FC3959E87",
+ "type": "chat",
+ "from": "79602041980@c.us",
+ "to": "79115576367@c.us",
+ "fromMe": true,
+ "senderName": "Ми",
+ "time": 1720780615,
+ "body": "Test message from wappi.pro",
+ "stanzaId": "",
+ "chatId": "79115576367@c.us",
+ "isForwarded": false,
+ "isReply": false,
+ "caption": "",
+ "isRead": false,
+ "delivery_status": "delivered",
+ "s3Info": {},
+ "poll_votes": null,
+ "poll_options": null,
+ "poll_select_count": 0,
+ "isEdited": false,
+ "isFromAPI": false,
+ "isDeleted": false,
+ "isPinned": false
+ }
+ ],
+ "total_count": 1406,
+ "uuid": "6d154f68-71ec"
+}
+GETПолучить сообщение по ID/api/sync/messages/id/getURL: https://wappi.pro/api/sync/messages/id/get?profile_id={{profile_id}}&message_id=3A461A52041A6B133A22
+Описание метода
+Получение конкретного сообщения.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}—
+message_id3A461A52041A6B133A22—
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Получить сообщение по ID200{
+ "status": "done",
+ "timestamp": 1720788682,
+ "time": "2024-07-12T15:51:22+03:00",
+ "message": {
+ "id": "3EB0B62774646FC3959E87",
+ "type": "chat",
+ "from": "79602041980@c.us",
+ "to": "79115576367@c.us",
+ "fromMe": true,
+ "senderName": "Ми",
+ "time": 1720780615,
+ "body": "Test message from wappi.pro",
+ "stanzaId": "",
+ "chatId": "79115576367@c.us",
+ "isForwarded": false,
+ "isReply": false,
+ "caption": "",
+ "isRead": false,
+ "delivery_status": "delivered",
+ "s3Info": {},
+ "poll_votes": null,
+ "poll_options": null,
+ "poll_select_count": 0,
+ "isEdited": false,
+ "isFromAPI": false,
+ "isDeleted": false,
+ "isPinned": false
+ },
+ "uuid": "6d154f68-71ec"
+}
+GETСкачать медиа из сообщения/api/sync/message/media/downloadURL: https://wappi.pro/api/sync/message/media/download?profile_id={{profile_id}}&message_id=3EB0E42DEDE639E3570A9F
+Описание метода
+Метод позволяет скачать файл из конкретного сообщения. Whatsapp хранит файлы только за последние 20 дней.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+message_id3EB0E42DEDE639E3570A9FОбязательный параметр. ID сообщения, из которого необходимо скачать файл.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Скачать медиа из сообщения200{
+ "status": "done",
+ "timestamp": 1708956800,
+ "time": "2024-02-26T17:13:20+03:00",
+ "task_id": "cd11eccb-ca3c-4aed-bb88-5b6005e6dcb9",
+ "uuid": "58c2577a-6f22",
+ "file_b64": "/9j/4AAQSkZz+NQ5JDP/9k=",
+ "media_type": "image",
+ "mime_type": "image/jpeg"
+}
+GETПолучить все сообщения профиля/api/sync/messages/all/getURL: https://wappi.pro/api/sync/messages/all/get?profile_id={{profile_id}}&limit=100&offset=0&date=2023-05-02T23:16:58&order=desc
+Описание метода
+Получение всех сообщений в профиле.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+limit100Необязательный параметр. Количество сообщений для получения. Если не указывать, то по умолчанию установлено значение 400.
+offset0Необязательный параметр. От какого по счету элемента вывести список сообщений, где 0 это самое новое сообщение. Если не указывать, то по умолчанию установлено значение 0.
+date2023-05-02T23:16:58Необязательный параметр. Дата, с которой вывести список сообщений. Формат YYYY-mm-ddTHH:MM:ss (например 2023-12-31T12:00:00).
+orderdescНеобязательный параметр. Значения desc или asc. Если desc - сортирует от нового к старым, если asc - от старого к новым. Если не указывать, то по умолчанию стоит desc
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Получить все сообщения профиля200{
+ "status": "done",
+ "timestamp": 1720788711,
+ "time": "2024-07-12T15:51:51+03:00",
+ "messages": [
+ {
+ "id": "3EB0B62774646FC3959E87",
+ "type": "chat",
+ "from": "79602041980@c.us",
+ "to": "79115576367@c.us",
+ "fromMe": true,
+ "senderName": "Ми",
+ "time": 1720780615,
+ "body": "Test message from wappi.pro",
+ "stanzaId": "",
+ "chatId": "79115576367@c.us",
+ "isForwarded": false,
+ "isReply": false,
+ "caption": "",
+ "isRead": false,
+ "delivery_status": "delivered",
+ "s3Info": {},
+ "poll_votes": null,
+ "poll_options": null,
+ "poll_select_count": 0,
+ "isEdited": false,
+ "isFromAPI": false,
+ "isDeleted": false,
+ "isPinned": false
+ }
+ ],
+ "total_count": 3805,
+ "uuid": "6d154f68-71ec"
+}
+GETПолучить список отправленных сообщений (API)/api/sync/messages/historyURL: https://wappi.pro/api/sync/messages/history?profile_id={{profile_id}}&limit=3
+Описание метода
+Получение списка всех отправленных по API сообщений. Сообщений, отправленных с телефона или web whatsapp, в этом списке не будет.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+limit3Необязательный параметр. Количество сообщений для получения. Если не указывать, то по умолчанию установлено значение 200.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Получить список отправленных сообщений (API)200{
+ "status": "done",
+ "detail": [
+ {
+ "delivered": "success",
+ "recipient": "79115576367@c.us",
+ "message": "тест",
+ "caption": "",
+ "created_at": "2023-12-04T17:47:23.008Z",
+ "task_name": "sendMessage",
+ "id": "3EB0C8A79F15F30021B86B",
+ "task_id": "ad90cfc1-3d07-489f-ae3f-60a49e523178"
+ }
+ ],
+ "all_messages_count": 1276
+}
+Работа с сообщениями / Асинхронные методы12 методовPOSTОтправка текстового сообщения асинхронно/api/async/message/sendURL: https://wappi.pro/api/async/message/send?profile_id={{profile_id}}&timeout_from=1&timeout_to=3
+Описание метода
+Отправка сообщения асинхронно с постановкой его в очередь. Можно указать время задержки между отправлениями сообщений. Берется случайное число, выбранное между параметрами timeout_from и timeout_to. Если не указывать таймаут, то стандартное значение от 1 до 3 секунд.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+timeout_from1Необязательный параметр. Минимальное время задержки, указывается в секундах
+timeout_to3Необязательный параметр. Максимальное время задержки, указывается в секундах
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "body": "тестовое сообщение асинхронно",
+ "recipient": "79995579399"
+}
+Responses
+Отправка сообщения асинхронно200{
+ "status": "done",
+ "timestamp": 1679824587,
+ "time": "2023-03-26T12:56:27+03:00",
+ "detail": "Message sent to queue",
+ "task_id": "a391a1f9-d183-4e5b-9820-f390332c53cd"
+}
+POSTОтправить медиа по ссылке асинхронно/api/async/message/file/url/sendURL: https://wappi.pro/api/async/message/file/url/send?profile_id={{profile_id}}&timeout_from=1&timeout_to=3
+Описание метода
+Отправка сообщения с изображением, видео или документом асинхронно с постановкой его в очередь. Можно указать время задержки между отправлениями сообщений. Берется случайное число, выбранное между параметрами timeout_from и timeout_to. Если не указывать таймаут, то стандартное значение от 1 до 3 секунд.
+К изображению, видео и документу можно добавить подпись. К документу можно добавить имя файла.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+timeout_from1Необязательный параметр. Минимальное время задержки, указывается в секундах
+timeout_to3Необязательный параметр. Максимальное время задержки, указывается в секундах
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "url": "https://site.ru/file.pdf",
+ "caption": "Это подпись",
+ "file_name": "name.pdf",
+ "recipient": "79002041981"
+}
+Responses
+Отправить медиа по ссылке асинхронно200{
+ "status": "done",
+ "timestamp": 1679824764,
+ "time": "2023-03-26T12:59:24+03:00",
+ "detail": "Message sent to queue",
+ "task_id": "9636b89c-7aaa-4298-8442-535391676077"
+}
+POSTОтправить картинку (base64) асинхронно/api/async/message/img/sendURL: https://wappi.pro/api/async/message/img/send?profile_id={{profile_id}}&timeout_from=1&timeout_to=3
+Описание метода
+Отправка сообщения с изображением асинхронно с постановкой его в очередь. Можно указать время задержки между отправлениями сообщений. Берется случайное число, выбранное между параметрами timeout_from и timeout_to. Если не указывать таймаут, то стандартное значение от 1 до 3 секунд.
+К изображению можно добавить подпись.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+timeout_from1Необязательный параметр. Минимальное время задержки, указывается в секундах
+timeout_to3Необязательный параметр. Максимальное время задержки, указывается в секундах
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "recipient": "79995579399",
+ "caption": "Это картинка",
+ "b64_file": "/9j/4AAQSkZJRgA/z+NQ5JDP/9k="
+}
+Responses
+Отправить картинку (base64) асинхронно200{
+ "status": "done",
+ "timestamp": 1679824609,
+ "time": "2023-03-26T12:56:49+03:00",
+ "detail": "Message sent to queue",
+ "task_id": "a1b09067-6730-4f88-8b69-fbd30473cf1d"
+}
+POSTОтправить документ (base64) асинхронно/api/async/message/document/sendURL: https://wappi.pro/api/async/message/document/send?profile_id={{profile_id}}&timeout_from=1&timeout_to=3
+Описание метода
+Отправка сообщения с документом асинхронно с постановкой его в очередь. Можно указать время задержки между отправлениями сообщений. Берется случайное число, выбранное между параметрами timeout_from и timeout_to. Если не указывать таймаут, то стандартное значение от 1 до 3 секунд.
+Можно указать имя файла и подпись к файлу.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+timeout_from1Необязательный параметр. Минимальное время задержки, указывается в секундах
+timeout_to3Необязательный параметр. Максимальное время задержки, указывается в секундах
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "recipient": "79995579399",
+ "caption": "Это документ",
+ "file_name": "name.pdf",
+ "b64_file": "JVBERi0xLjMKJcTl8uXrp/Og0MTGCVPRgo="
+}
+Responses
+Отправить документ (base64) асинхронно200{
+ "status": "done",
+ "timestamp": 1679824622,
+ "time": "2023-03-26T12:57:02+03:00",
+ "detail": "Message sent to queue",
+ "task_id": "ad1f052b-1bb0-4181-a6b2-f5aae475123e"
+}
+POSTОтправить видео (base64) асинхронно/api/async/message/video/sendURL: https://wappi.pro/api/async/message/video/send?profile_id={{profile_id}}&timeout_from=1&timeout_to=3
+Описание метода
+Отправка сообщения с видео асинхронно с постановкой его в очередь. Можно указать время задержки между отправлениями сообщений. Берется случайное число, выбранное между параметрами timeout_from и timeout_to. Если не указывать таймаут, то стандартное значение от 1 до 3 секунд.
+К видео можно добавить подпись.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+timeout_from1Необязательный параметр. Минимальное время задержки, указывается в секундах
+timeout_to3Необязательный параметр. Максимальное время задержки, указывается в секундах
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "recipient": "79995579399",
+ "caption": "Это видео",
+ "b64_file": "AAAAIGZ0eXS0vA=="
+}
+Responses
+Отправить видео (base64) асинхронно200{
+ "status": "done",
+ "timestamp": 1679824641,
+ "time": "2023-03-26T12:57:21+03:00",
+ "detail": "Message sent to queue",
+ "task_id": "2638cf7b-5250-41fd-9323-97ac8f31b35f"
+}
+POSTОтправить аудио (base64) асинхронно/api/async/message/audio/sendURL: https://wappi.pro/api/async/message/audio/send?profile_id={{profile_id}}&timeout_from=1&timeout_to=3
+Описание метода
+Отправка сообщения с аудио асинхронно с постановкой его в очередь. Можно указать время задержки между отправлениями сообщений. Берется случайное число, выбранное между параметрами timeout_from и timeout_to. Если не указывать таймаут, то стандартное значение от 1 до 3 секунд.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+timeout_from1Необязательный параметр. Минимальное время задержки, указывается в секундах
+timeout_to3Необязательный параметр. Максимальное время задержки, указывается в секундах
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "recipient": "79995579399",
+ "b64_file": "SUQzAwAAAAAHdlRDT04AAAICAgICAgDA=="
+}
+Responses
+Отправить аудио (base64) асинхронно200{
+ "status": "done",
+ "timestamp": 1679824744,
+ "time": "2023-03-26T12:59:04+03:00",
+ "detail": "Message sent to queue",
+ "task_id": "28568a6b-40b1-43c5-998e-760ac7d9c866"
+}
+POSTОтправить локацию асинхронно/api/async/message/location/sendURL: https://wappi.pro/api/async/message/location/send?profile_id={{profile_id}}&timeout_from=1&timeout_to=3
+Описание метода
+Отправка сообщения с геолокацией асинхронно с постановкой его в очередь. Можно указать время задержки между отправлениями сообщений. Берется случайное число, выбранное между параметрами timeout_from и timeout_to. Если не указывать таймаут, то стандартное значение от 1 до 3 секунд.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+timeout_from1Необязательный параметр. Минимальное время задержки, указывается в секундах
+timeout_to3Необязательный параметр. Максимальное время задержки, указывается в секундах
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "recipient": "79995579399",
+ "latitude": 55.750446,
+ "longitude": 37.617494,
+ "address": "улица Торцева, 23А, Северодвинск, Архангельская область, 164520"
+}
+Responses
+Отправить локацию асинхронно200{
+ "status": "done",
+ "timestamp": 1679824702,
+ "time": "2023-03-26T12:58:22+03:00",
+ "detail": "Message sent to queue",
+ "task_id": "f878d839-36b5-4d33-9239-ef55b7045bdd"
+}
+POSTОтправить контакт асинхронно/api/async/contact/sendURL: https://wappi.pro/api/async/contact/send?profile_id={{profile_id}}&timeout_from=1&timeout_to=3
+Описание метода
+Отправка сообщения с контактом асинхронно с постановкой его в очередь. Можно указать время задержки между отправлениями сообщений. Берется случайное число, выбранное между параметрами timeout_from и timeout_to. Если не указывать таймаут, то стандартное значение от 1 до 3 секунд.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+timeout_from1Необязательный параметр. Минимальное время задержки, указывается в секундах
+timeout_to3Необязательный параметр. Максимальное время задержки, указывается в секундах
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "phone": "79662041988",
+ "recipient": "79995579399",
+ "name": "Имя контакта"
+}
+Responses
+Отправить контакт асинхронно200{
+ "status": "done",
+ "timestamp": 1679824712,
+ "time": "2023-03-26T12:58:32+03:00",
+ "detail": "Message sent to queue",
+ "task_id": "e93f75b1-40d9-4e86-bc0a-14dc46c93a0d"
+}
+POSTОтправить файл (устаревший) асинхронно/api/async/message/file/sendURL: https://wappi.pro/api/async/message/file/send?profile_id={{profile_id}}&recipient=79115576366&timeout_from=1&timeout_to=3
+Описание метода
+Метод устарел. Для отправки различных файлов используйте соответсвующие для каждого типа файлов методы.
+Отправка сообщения с файлом асинхронно с постановкой его в очередь. Можно указать время задержки между отправлениями сообщений. Берется случайное число, выбранное между параметрами timeout_from и timeout_to. Если не указывать таймаут, то стандартное значение от 1 до 3 секунд.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+recipient79115576366Обязательный параметр. Получатель сообщения. 
+Для ввода доступны форматы:
+ID контакта. Пример: 13475634251@c.us;
+Номер телефона. Пример: 79002224477. Номер должен начинаться с кода страны. Для России и Казахстана это всегда 7, затем 10 цифр. Сообщения на номера телефона с 8 не будут доставлены.
+timeout_from1Необязательный параметр. Минимальное время задержки, указывается в секундах
+timeout_to3Необязательный параметр. Максимальное время задержки, указывается в секундах
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+JVBERi0xLjQK+PgpzdGFydHhyZWYKMTMwNDkyCiUlRU9GCg==
+Responses
+Отправить файл (устаревший) асинхронно200{
+ "status": "done",
+ "timestamp": 1679824796,
+ "time": "2023-03-26T12:59:56+03:00",
+ "detail": "Message sent to queue",
+ "task_id": "d9472a65-a499-4a12-8918-32b490be0a69"
+}
+POSTПереслать сообщение асинхронно/api/async/message/forwardURL: https://wappi.pro/api/async/message/forward?profile_id={{profile_id}}&timeout_from=1&timeout_to=3
+Описание метода
+Переслать текстовое сообщение асинхронно с постановкой его в очередь. Можно указать время задержки между отправлениями сообщений. Берется случайное число, выбранное между параметрами timeout_from и timeout_to. Если не указывать таймаут, то стандартное значение от 1 до 3 секунд.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+timeout_from1Необязательный параметр. Минимальное время задержки, указывается в секундах
+timeout_to3Необязательный параметр. Максимальное время задержки, указывается в секундах
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "message_id": "3EB0C1CD127D5C606A76",
+ "recipient": "79995579399"
+}
+Responses
+Переслать сообщение асинхронно200{
+ "status": "done",
+ "timestamp": 1679824780,
+ "time": "2023-03-26T12:59:40+03:00",
+ "detail": "Message sent to queue",
+ "task_id": "f9dbb41d-f6b1-446b-bc2d-d1615c92546e"
+}
+POSTОтветить на сообщение асинхронно/api/async/message/replyURL: https://wappi.pro/api/async/message/reply?profile_id={{profile_id}}&timeout_from=1&timeout_to=3
+Описание метода
+Ответить на сообщение. Чтобы отправить файл необходимо в body добавить поле url файла. Если не добавлять поле url, то будет отправлен просто текст.
+Сообщение отправляется асинхронно с постановкой его в очередь. Можно указать время задержки. Берется случайное число, выбранное между параметрами timeout_from и timeout_to. Если не указывать таймаут, то стандартное значение от 1 до 3 секунд.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+timeout_from1Необязательный параметр. Минимальное время задержки, указывается в секундах
+timeout_to3Необязательный параметр. Максимальное время задержки, указывается в секундах
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "body": "тестовый ответ на сообщение",
+ "message_id": "3EB0C1CD127D5C606A76",
+ "url": "https://freetestdata.com/wp-content/uploads/2022/02/Free_Test_Data_117KB_JPG.jpg"
+}
+Responses
+Ответить на сообщение асинхронно200{
+ "status": "done",
+ "timestamp": 1679824799,
+ "time": "2023-03-26T12:59:59+03:00",
+ "detail": "Message sent to queue",
+ "task_id": "db159525-460e-423d-9e56-db06625a408b"
+}
+POSTСоздать опрос/api/async/poll/createURL: https://wappi.pro/api/async/poll/create?profile_id={{profile_id}}&timeout_from=1&timeout_to=3
+Описание метода
+Метод позволяет создать опрос.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+timeout_from1Необязательный параметр. Минимальное время задержки, указывается в секундах
+timeout_to3Необязательный параметр. Максимальное время задержки, указывается в секундах
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "recipient": "79115576361",
+ "body": "Тестовый опрос",
+ "poll_options": [
+ "да",
+ "нет",
+ "не знаю",
+ "где я?"
+ ],
+ "poll_select_count": 1
+}
+Responses
+Создать опрос200{
+ "status": "done",
+ "timestamp": 1684745723,
+ "time": "2023-05-22T11:55:23+03:00",
+ "message_id": "3EB0447BB789341149D8",
+ "task_id": "32b6ebbe-f756-4b10-bb2a-329697431e1c",
+ "uuid": "71ad40e9-b023"
+}
+Работа с чатами8 методовPOSTПолучить список чатов/api/sync/chats/getURL: https://wappi.pro/api/sync/chats/get?profile_id={{profile_id}}&limit=10&show_all=false&offset=0
+Описание метода
+Получение списка всех чатов в подключенном аккаунте Whatsapp.
+В _body_ можно передать массив "filter", в элементах которого можно использовать регулярные выражения. Вы можете оставить _body_ пустым, если не хотите использовать фильтр.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}—
+limit10—
+show_allfalse—
+offset0—
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "filter": {
+ "ids": [
+ "79995579399",
+ "79005579300"
+ ]
+ }
+}
+Responses
+Получить список чатов200{
+ "status": "done",
+ "timestamp": 1679494397,
+ "time": "2023-03-22T17:13:17.957011925+03:00",
+ "dialogs": [
+ {
+ "id": "79115576367@c.us",
+ "contact": {
+ "Found": true,
+ "FirstName": "Макс Моряк ⚓",
+ "FullName": "Макс Моряк ⚓",
+ "PushName": "Flood",
+ "BusinessName": ""
+ },
+ "chat": {
+ "VerifiedName": null,
+ "Status": "‎В кино",
+ "PictureID": "",
+ "Devices": [
+ "79115576367.0:0@c.us"
+ ]
+ },
+ "isGroup": false,
+ "image": null,
+ "last_message_id": "3EB06EAF3BB576BEE829",
+ "last_timestamp": "2023-03-22T14:02:32Z",
+ "last_time": 1679493752,
+ "name": "Макс Моряк ⚓"
+ },
+ {
+ "id": "79388110488@c.us",
+ "contact": {
+ "Found": true,
+ "FirstName": "",
+ "FullName": "",
+ "PushName": "Карина",
+ "BusinessName": ""
+ },
+ "chat": {
+ "VerifiedName": null,
+ "Status": "",
+ "PictureID": "1678534156",
+ "Devices": [
+ "79388110488.0:0@c.us",
+ "79388110488.0:5@c.us"
+ ]
+ },
+ "isGroup": false,
+ "image": "https://ppc.us/v/t61.24694-24/328761777_229426809472688_6485034525411932945_n.jpg?ccb=11-4&oh=01_AdQlbkMzbbpYkA7coYjGigpDzE-bwWB1kosxXGpeyaryTA&oe=6427E061",
+ "last_message_id": "BAE5DF204DCCFFB1",
+ "last_timestamp": "2023-03-22T11:07:03Z",
+ "last_time": 1679483223,
+ "name": "Карина"
+ }
+ ],
+ "total_count": 144
+}
+GETПолучить список чатов с фильтром/api/sync/chats/filterURL: https://wappi.pro/api/sync/chats/filter?profile_id={{profile_id}}&client_name=79827328
+Описание метода
+Получение списка чатов в подключенном аккаунте Whatsapp с применением фильтра. В параметре _client_name_ можно указать часть номера или слова для фильтрации по номеру телефона, имени чата и последнему сообщению.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+client_name79827328Необязательный параметр. Можно указать часть номера или слова для фильтрации по номеру телефона, имени чата и последнему сообщению чата.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+Тело запроса не передается.
+Responses
+Получить список чатов с фильтром200{
+ "status": "done",
+ "timestamp": 1738844296,
+ "time": "2025-02-06T15:18:16+03:00",
+ "detail": "Chats fetched",
+ "dialogs": [
+ {
+ "id": "79827328888@s.whatsapp.net",
+ "contact": {
+ "Found": true,
+ "FirstName": "",
+ "FullName": "",
+ "PushName": "Сергей",
+ "BusinessName": ""
+ },
+ "chat": {
+ "VerifiedName": null,
+ "Status": "Изготовление печатей и штампов любой сложности",
+ "PictureID": "1533707824",
+ "Devices": [
+ "79827328888@s.whatsapp.net",
+ "79827328888:49@s.whatsapp.net",
+ "79827328888:50@s.whatsapp.net"
+ ]
+ },
+ "group": null,
+ "isGroup": false,
+ "image": "",
+ "thumbnail": "https://fs.wappi.pro/fs/downloadFile/d4296db6-6e55/avatars/tumb_79827328888.jpg",
+ "avatar_updated_at": 1738595568,
+ "last_message_id": "BAE58DFBA17F45CC",
+ "last_timestamp": "2023-01-19T04:19:48Z",
+ "last_time": 1674101988,
+ "last_message_type": "chat",
+ "last_message_sender": {
+ "id": "79827328888@c.us",
+ "number": "79827328888",
+ "pushname": "",
+ "isMe": false
+ },
+ "last_message_data": "Трек-номер 80088680262488",
+ "name": "Сергей",
+ "unread_count": 0,
+ "isDeleted": false,
+ "isArchived": false
+ }
+ ],
+ "total_count": 1
+}
+GETПолучить список чатов по дням/api/sync/chats/days/getURL: https://wappi.pro/api/sync/chats/days/get?profile_id={{profile_id}}&offset=1&limit=2&order=desc&is_archived=false&is_deleted=false
+Описание метода
+Получение списка всех чатов в подключенном аккаунте Whatsapp по дням, в зависимости от даты последнего сообщения в чате.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+offset1Необязательный параметр. Отступ от текущего момента в днях. Если не указывать, то по умолчанию установлено значение 0.
+limit2Необязательный параметр. Количество дней в выборке. Если не указывать, то по умолчанию установлено значение 20.
+orderdescНеобязательный параметр. Если desc - сортирует от нового к старым, если asc - от старого к новым. Если не указывать, то по умолчанию стоит desc
+is_archivedfalseНеобязательный параметр. Фильтр по архивным чатам. Возможные значения true и false. По умолчанию false.
+is_deletedfalseНеобязательный параметр. Фильтр по удаленным чатам. Возможные значения true и false. По умолчанию false.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+Тело запроса не передается.
+Responses
+Получить список чатов по дням Copy200{
+ "status": "done",
+ "timestamp": 1738849191,
+ "time": "2025-02-06T16:39:51+03:00",
+ "detail": "Chats fetched",
+ "dialogs": [
+ {
+ "id": "79959643980@s.whatsapp.net",
+ "contact": {
+ "Found": false,
+ "FirstName": "",
+ "FullName": "",
+ "PushName": "",
+ "BusinessName": ""
+ },
+ "chat": {
+ "VerifiedName": null,
+ "Status": "Привет! Я использую WhatsApp.",
+ "PictureID": "",
+ "Devices": [
+ "79959643980@s.whatsapp.net",
+ "79959643980:5@s.whatsapp.net",
+ "79959643980:12@s.whatsapp.net",
+ "79959643980:13@s.whatsapp.net",
+ "79959643980:14@s.whatsapp.net"
+ ]
+ },
+ "group": null,
+ "isGroup": false,
+ "image": "",
+ "thumbnail": "",
+ "avatar_updated_at": 1738595576,
+ "last_message_id": "3EB0F880E04BF51F1AA77A",
+ "last_timestamp": "2025-02-04T10:24:55Z",
+ "last_time": 1738664695,
+ "last_message_type": "chat",
+ "last_message_sender": {
+ "id": "79959643980@c.us",
+ "number": "79959643980",
+ "pushname": "Сергей",
+ "isMe": false
+ },
+ "last_message_data": "Ваш заказ подтвержден! \n\nДоставка 2 бутылок воды по 19 литров будет осуществлена по адресу ул. Просто 12. Общая стоимость составляет 900 рублей. \n\nЕсли у Вас есть дополнительные вопросы или пожелания, пожалуйста, дайте знать!",
+ "name": "‪+79959643980‬",
+ "unread_count": 0,
+ "isDeleted": false,
+ "isArchived": false
+ }
+ ],
+ "total_count": 1
+}
+POSTАрхивировать чат/api/sync/chat/archiveURL: https://wappi.pro/api/sync/chat/archive?profile_id={{profile_id}}
+Описание метода
+Метод позволяет отправить чат в архив.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "recipient": "79995579399"
+}
+Responses
+Архивировать чат200{
+ "status": "done",
+ "timestamp": 1703541906,
+ "time": "2023-12-26T01:05:06+03:00",
+ "uuid": "71ad40e9-b023"
+}
+POSTРазархивировать чат/api/sync/chat/unarchiveURL: https://wappi.pro/api/sync/chat/unarchive?profile_id={{profile_id}}
+Описание метода
+Метод позволяет вернуть чат из архива.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "recipient": "79995579399"
+}
+Responses
+Разархивировать чат200{
+ "status": "done",
+ "timestamp": 1703541947,
+ "time": "2023-12-26T01:05:47+03:00",
+ "uuid": "71ad40e9-b023"
+}
+POSTУдалить чат/api/sync/chat/deleteURL: https://wappi.pro/api/sync/chat/delete?profile_id={{profile_id}}
+Описание метода
+Метод позволяет безвозвратно удалить чат.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "recipient": "79995579399"
+}
+Responses
+Удалить чат200{
+ "status": "done",
+ "timestamp": 1703541995,
+ "time": "2023-12-26T01:06:35+03:00",
+ "uuid": "71ad40e9-b023"
+}
+POSTУстановить статус "печатает"/api/sync/chat/typing/startURL: https://wappi.pro/api/sync/chat/typing/start?profile_id={{profile_id}}
+Описание метода
+Метод позволяет установить статус "печатает". Если не останавливать, то длится 20 секунд, затем снимается самим Whatsapp.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "recipient": "791155763666"
+}
+Responses
+Установить статус "печатает"200{
+ "status": "done",
+ "timestamp": 1737557476,
+ "time": "2025-01-22T17:51:16+03:00",
+ "uuid": "d4296db6-6e55"
+}
+POSTСнять статус "печатает"/api/sync/chat/typing/stopURL: https://wappi.pro/api/sync/chat/typing/stop?profile_id={{profile_id}}
+Описание метода
+Метод позволяет снять статус "печатает".
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "recipient": "79115576333"
+}
+Responses
+Снять статус "печатает"200{
+ "status": "done",
+ "timestamp": 1737557507,
+ "time": "2025-01-22T17:51:47+03:00",
+ "uuid": "d4296db6-6e55"
+}
+Работа с контактами4 методаGETПолучить контакты/api/sync/contacts/getURL: https://wappi.pro/api/sync/contacts/get?profile_id={{profile_id}}
+Описание метода
+Получение всех контактов авторизованного номера Whatsapp.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+GETПолучить контакт/api/sync/contact/getURL: https://wappi.pro/api/sync/contact/get?profile_id={{profile_id}}&recipient=79995579399
+Описание метода
+Получение данных конкретного контакта, в том числе аватара и его превью.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+recipient79995579399Обязательный параметр. Получатель сообщения.
+Для ввода доступны форматы:
+ID контакта. Пример: 13475634251@c.us;
+Номер телефона. Пример: 79002224477. Номер должен начинаться с кода страны. Для России и Казахстана это всегда 7, затем 10 цифр. Сообщения на номера телефона с 8 не будут доставлены.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Получить контакт200{
+ "status": "done",
+ "timestamp": 1679494106,
+ "time": "2023-03-22T17:08:26.770020807+03:00",
+ "contact": {
+ "id": "79115576367@c.us",
+ "number": "79115576367",
+ "is_business": false,
+ "name": "Макс Моряк ⚓",
+ "pushname": "Flood",
+ "short_name": "",
+ "business_name": ""
+ }
+}
+GETПроверить зарегистрирован ли номер/api/sync/contact/checkURL: https://wappi.pro/api/sync/contact/check?profile_id={{profile_id}}&phone=79995579399
+Описание метода
+Проверка зарегистрирован ли номер в Whatsapp.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+phone79995579399Обязательный параметр. Получатель сообщения.
+Для ввода доступны форматы:
+ID контакта. Пример: 13475634251@c.us;
+Номер телефона. Пример: 79002224477. Номер должен начинаться с кода страны. Для России и Казахстана это всегда 7, затем 10 цифр. Сообщения на номера телефона с 8 не будут доставлены.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Проверить зарегистрирован ли номер200{
+ "status": "done",
+ "timestamp": 1679494135,
+ "time": "2023-03-22T17:08:55.875262708+03:00",
+ "on_whatsapp": false,
+ "phone": "79115576366"
+}
+GETПолучить информацию о номере или группе/api/sync/contact/infoURL: https://wappi.pro/api/sync/contact/info?profile_id={{profile_id}}&user_id=79995579399
+Описание метода
+Получение информации, включая аватар и его превью, о любом номере или группе в Whatsapp (не обязательно из контактов).
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+user_id79995579399Обязательный параметр. Получатель сообщения. 
+Для ввода доступны форматы:
+ID контакта. Пример: 13475634251@c.us;
+Номер телефона. Пример: 79002224477. Номер должен начинаться с кода страны. Для России и Казахстана это всегда 7, затем 10 цифр. Сообщения на номера телефона с 8 не будут доставлены.
+ID группы. Пример: 120363026575789262@g.us
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Получить информацию о номере или группе200{
+ "status": "done",
+ "timestamp": 1679494153,
+ "time": "2023-03-22T17:09:13.63238617+03:00",
+ "profile": {
+ "is_on_whatsapp": true,
+ "id": "79115576367@c.us",
+ "user": {
+ "79115576367@c.us": {
+ "VerifiedName": null,
+ "Status": "‎В кино",
+ "PictureID": "",
+ "Devices": [
+ "79115576367.0:0@c.us",
+ "79115576367.0:40@c.us"
+ ]
+ }
+ },
+ "contact": {
+ "Found": true,
+ "FirstName": "Макс Моряк ⚓",
+ "FullName": "Макс Моряк ⚓",
+ "PushName": "Flood",
+ "BusinessName": ""
+ }
+ }
+}
+Работа с группами9 методовGETСсылка для приглашения в группу/api/sync/group/invitelink/getURL: https://wappi.pro/api/sync/group/invitelink/get?profile_id={{profile_id}}&group_id=120363046984195036@g.us
+Описание метода
+Получить ссылку для приглашения в группу.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+group_id120363046984195036@g.usОбязательный параметр. Указывается id группы, из которой надо выйти.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+POSTСоздать группу/api/sync/group/createURL: https://wappi.pro/api/sync/group/create?profile_id={{profile_id}}
+Описание метода
+Создание группы и приглашение в нее собеседников.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "name": "Тестовая группа",
+ "participants": [
+ "79995579399"
+ ]
+}
+Responses
+Создать группу200{
+ "status": "done",
+ "timestamp": 1679494750,
+ "time": "2023-03-22T17:19:10.062786587+03:00",
+ "result": {
+ "JID": "120363100934413750@g.us",
+ "OwnerJID": "79602041980@c.us",
+ "Name": "Тестовая группа",
+ "NameSetAt": "2023-03-22T17:13:43+03:00",
+ "NameSetBy": "79602041980@c.us",
+ "Topic": "",
+ "TopicID": "",
+ "TopicSetAt": "0001-01-01T00:00:00Z",
+ "TopicSetBy": "",
+ "TopicDeleted": false,
+ "IsLocked": false,
+ "IsAnnounce": false,
+ "AnnounceVersionID": "",
+ "IsEphemeral": false,
+ "DisappearingTimer": 0,
+ "IsParent": false,
+ "DefaultMembershipApprovalMode": "",
+ "LinkedParentJID": "",
+ "IsDefaultSubGroup": false,
+ "GroupCreated": "2023-03-22T17:13:43+03:00",
+ "ParticipantVersionID": "",
+ "Participants": [
+ {
+ "JID": "79602041980@c.us",
+ "IsAdmin": true,
+ "IsSuperAdmin": true,
+ "Error": 0,
+ "AddRequest": null
+ },
+ {
+ "JID": "79115576367@c.us",
+ "IsAdmin": false,
+ "IsSuperAdmin": false,
+ "Error": 0,
+ "AddRequest": null
+ }
+ ],
+ "MemberAddMode": "admin_add"
+ }
+}
+POSTПокинуть группу/api/sync/group/leaveURL: https://wappi.pro/api/sync/group/leave?profile_id={{profile_id}}&group_id=120363046984195036@g.us
+Описание метода
+Выход из группы.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+group_id120363046984195036@g.usОбязательный параметр. Указывается id группы, из которой надо выйти.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Покинуть группу200{
+ "status": "done",
+ "timestamp": 1679494965,
+ "time": "2023-03-22T17:22:45.645746666+03:00"
+}
+POSTДобавить участника в группу/api/sync/group/participant/addURL: https://wappi.pro/api/sync/group/participant/add?profile_id={{profile_id}}
+Описание метода
+Добавление участников в группу.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "group_id": "120363029426478403@g.us",
+ "participants": [
+ "79995579399",
+ "79995579300"
+ ]
+}
+Responses
+Добавить участника в группу200{
+ "status": "done",
+ "timestamp": 1679494785,
+ "time": "2023-03-22T17:19:45.339386764+03:00"
+}
+POSTУдалить участника из группы/api/sync/group/participant/removeURL: https://wappi.pro/api/sync/group/participant/remove?profile_id={{profile_id}}
+Описание метода
+Удаление участника из группы.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "group_id": "120363026575789262@g.us",
+ "participant": "79995579399"
+}
+Responses
+Удалить участника из группы200{
+ "status": "done",
+ "timestamp": 1679494832,
+ "time": "2023-03-22T17:20:32.874188867+03:00"
+}
+POSTДобавить контакту права администратора/api/sync/group/admin/promoteURL: https://wappi.pro/api/sync/group/admin/promote?profile_id={{profile_id}}
+Описание метода
+Добавление прав администратора участнику группы.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "group_id": "120363048413202750@g.us",
+ "participant": "79995579399"
+}
+Responses
+Добавить контакту права администратора200{
+ "status": "done",
+ "timestamp": 1679494861,
+ "time": "2023-03-22T17:21:01.911557255+03:00"
+}
+POSTУбрать у контакта права администратора/api/sync/group/admin/demoteURL: https://wappi.pro/api/sync/group/admin/demote?profile_id={{profile_id}}
+Описание метода
+Удаление прав администратора у участника группы.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "group_id": "120363026575789262@g.us",
+ "participant": "79995579399"
+}
+Responses
+Убрать у контакта права администратора200{
+ "status": "done",
+ "timestamp": 1679494874,
+ "time": "2023-03-22T17:21:14.373035003+03:00"
+}
+POSTУстановить описание группы/api/sync/group/description/setURL: https://wappi.pro/api/sync/group/description/set?profile_id={{profile_id}}
+Описание метода
+Установка описания группы.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "group_id": "120363100934413750@g.us",
+ "description": "Тестовое описание группы"
+}
+Responses
+Установить описание группы200{
+ "status": "done",
+ "timestamp": 1679494905,
+ "time": "2023-03-22T17:21:45.629076974+03:00"
+}
+POSTУстановить имя группы/api/sync/group/name/setURL: https://wappi.pro/api/sync/group/name/set?profile_id={{profile_id}}
+Описание метода
+Установка имени группы.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "group_id": "120363115950987905@g.us",
+ "name": "Тестовое имя группы"
+}
+Responses
+Установить описание группы200{
+ "status": "done",
+ "timestamp": 1679494905,
+ "time": "2023-03-22T17:21:45.629076974+03:00"
+}
+Работа с аккаунтом3 методаPOSTУстановить сведения (ранее Статус)/api/sync/status/setURL: https://wappi.pro/api/sync/status/set?profile_id={{profile_id}}
+Описание метода
+Метод позволяет установить текст в Сведения, ранее это называлось Статус.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "body": "Статус"
+}
+Responses
+Установить сведения (ранее Статус)200{
+ "status": "done",
+ "timestamp": 1706123957,
+ "time": "2024-01-24T22:19:17+03:00",
+ "task_id": "a52284d3-bbac-46ca-a4bc-b3b94e14daf0",
+ "uuid": "71ad40e9-b023"
+}
+POSTУдалить сведения (ранее Статус)/api/sync/status/deleteURL: https://wappi.pro/api/sync/status/delete?profile_id={{profile_id}}
+Описание метода
+Метод позволяет удалить текст из Сведений, ранее это называлось Статус.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+Тело запроса не передается.
+Responses
+Удалить сведения (ранее Статус)200{
+ "status": "done",
+ "timestamp": 1706123982,
+ "time": "2024-01-24T22:19:42+03:00",
+ "task_id": "9dbf7ec0-e9be-4e65-b376-92e2c17ef077",
+ "uuid": "71ad40e9-b023"
+}
+POSTДобавить статус (Сторис)/api/async/story/sendURL: https://wappi.pro/api/async/story/send?profile_id=d04aee46-73ab
+Описание метода
+Метод позволяет добавить статус (сторис). Может состоять из текста, фото, видео, фото с текстом, видео с текстом.
+Query Params
+ПараметрЗначениеОписание
+profile_idd04aee46-73abОбязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization17d0e8c99e86d50fe616d3977a2eb37b3966548e—
+Тело запроса raw
+{
+ "body": "justskinproducts",
+ "url": "https://www.justskinproducts.co.za/wp-content/uploads/2025/08/Update3.jpeg"
+}
+Responses
+Добавить статус (Сторис)200{
+ "status": "done",
+ "timestamp": 1706124033,
+ "time": "2024-01-24T22:20:33+03:00",
+ "detail": "Story sent to queue",
+ "task_id": "1a574fcb-4c6d-45c8-8769-1639d20a6b9e"
+}
+Работа с webhook (уведомлениями)4 методаGETПолучить ссылку на webhook/api/webhook/url/getURL: https://wappi.pro/api/webhook/url/get?profile_id={{profile_id}}
+Описание метода
+Получение ссылки на webhook, которая установлена для данного профиля.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Получить ссылку на webhook200{
+ "detail": "WebHook установлен на адрес https://webhook.site/e0c2ccb6-1823-420f-a891-5a8d783dff18",
+ "status": "done",
+ "url": "https://webhook.site/e0c2ccb6-1823-420f-a891-5a8d783dff18",
+ "installed": true
+}
+POSTУстановить ссылку на webhook/api/webhook/url/setURL: https://wappi.pro/api/webhook/url/set?profile_id={{profile_id}}&url=https://webhook.site/4c0822de-d95b-49e4-a44f-7832b15f7505&auth=StrongPassword
+Описание метода
+Установка ссылки на webhook.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+urlhttps://webhook.site/4c0822de-d95b-49e4-a44f-7832b15f7505Обязательный параметр. URL ссылки на вебхук.
+authStrongPasswordНеобязательный параметр. Можно установить секретную фразу в заголовке Webhook
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Установить ссылку на webhook200{
+ "status": "done",
+ "timestamp": 1679494324,
+ "time": "2023-03-22T17:12:04.477099797+03:00"
+}
+POSTУдалить ссылку на webhook/api/webhook/url/deleteURL: https://wappi.pro/api/webhook/url/delete?profile_id={{profile_id}}
+Описание метода
+Удаление ссылки на webhook.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Удалить ссылку на webhook200{
+ "status": "done",
+ "timestamp": 1679494339,
+ "time": "2023-03-22T17:12:19.942128061+03:00"
+}
+POSTНастройка типов webhook уведомлений/api/webhook/types/setURL: https://wappi.pro/api/webhook/types/set?profile_id={{profile_id}}
+Описание метода
+В json body описывается массив из типов webhook'ов, которые необходимы для получения. Неуказанные в массиве типы webhook'ов не будут отправляться.
+Типы webhook'ов:
+authorization_status - webhook на статусы авторизации профиля (online, offline). incoming_message - webhook на все входящие сообщения. delivery_status - webhook на статусы доставки отправленных сообщений (pending, delivered, read). outgoing_message_api - webhook на исходящие сообщения по API. outgoing_message_phone - webhook на исходящие сообщения с телефона. application_status - webhook на статусы авторизации приложения (online, offline). incoming_call - webhook на входящие звонки.
+По умолчанию для каждого нового профиля устанавливаются такие настройки: authorization_status, incoming_message, delivery_status
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+[
+ "authorization_status",
+ "incoming_message",
+ "delivery_status",
+ "outgoing_message_phone",
+ "outgoing_message_api",
+ "application_status",
+ "incoming_call"
+]
+Responses
+Настройка типов webhook уведомлений200{
+ "status": "done",
+ "timestamp": 1679494333,
+ "time": "2023-03-22T17:12:13.418892226+03:00"
+}
+Работа с proxy3 методаGETПолучить proxy/api/proxy/getURL: https://wappi.pro/api/proxy/get?profile_id={{profile_id}}
+Описание метода
+Получение proxy, который установлен для данного профиля. Если свой прокси не установлен, то используется прокси сервиса.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Получить proxy200{
+ "proxy": null,
+ "status": "done"
+}
+POSTУстановить proxy/api/proxy/setURL: https://wappi.pro/api/proxy/set?profile_id={{profile_id}}&proxy=azeQTk:cWJfaW@192.109.91.126:8000
+Описание метода
+Установка своего proxy. Можно установить только рабочий прокси.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+proxyazeQTk:cWJfaW@192.109.91.126:8000Обязательный параметр. Подходят только https/http прокси в формате `login:password@ip:port` или `ip:port`. Установить можно только рабочий прокси
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+POSTУдалить proxy/api/proxy/deleteURL: https://wappi.pro/api/proxy/delete?profile_id={{profile_id}}
+Описание метода
+Удаление своего proxy. После удаления будет использоваться встроенный прокси сервиса.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Удалить proxy200{
+ "detail": "Self proxy deleted",
+ "status": "done"
+}
+Работа с очередью4 методаGETПолучить очередь сообщений у профиля/api/profile/queue/getURL: https://wappi.pro/api/profile/queue/get?profile_id={{profile_id}}
+Описание метода
+Получение очереди сообщений у профиля.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Получить очередь сообщений у профиля200{
+ "status": "done",
+ "tasks": [
+ {
+ "task_id": "e543da5e-6f3f-4e42-b084-852f6410db18",
+ "timeout_from": 20,
+ "timeout_to": 40,
+ "command_start": "2023-03-26T13:05:02.771217149+03:00",
+ "command": "sendMessage",
+ "recipient": "79115576367@c.us",
+ "uuid": "71ad40e9-b023",
+ "body": "тестовое сообщение асинхронно",
+ "response": null,
+ "is_first": true
+ }
+ ]
+}
+GETОчистить очередь сообщений у профиля/api/profile/queue/purgeURL: https://wappi.pro/api/profile/queue/purge?profile_id={{profile_id}}
+Описание метода
+Очистка очереди сообщений у профиля.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Очистить очередь сообщений у профиля200{
+ "status": "done"
+}
+GETПолучить данные по задаче/api/task/getURL: https://wappi.pro/api/task/get?profile_id={{profile_id}}&task_id=d8c45d9d-a3d3-4dc7-9969-e044457a6aa5
+Описание метода
+Получение данных по конкретной задаче.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+task_idd8c45d9d-a3d3-4dc7-9969-e044457a6aa5Обязательный параметр. Task_id можно получить в ответах в методах по отправке сообщений.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Получить данные по задаче200{
+ "status": "done",
+ "task": {
+ "task_id": "d8c45d9d-a3d3-4dc7-9969-e044457a6aa5",
+ "command_start": "2023-03-26T10:04:44.631Z",
+ "command": "sendMessage",
+ "recipient": "79115576367@c.us",
+ "uuid": "71ad40e9-b023",
+ "body": "тестовое сообщение асинхронно",
+ "response": {
+ "status": "done",
+ "timestamp": 1679825084,
+ "time": "2023-03-26T13:04:44+03:00",
+ "detail": "",
+ "task_id": "d8c45d9d-a3d3-4dc7-9969-e044457a6aa5",
+ "command_end": "2023-03-26T10:10:22.204Z",
+ "uuid": "71ad40e9-b023",
+ "message_id": "3EB02A3FE984CEC19A20"
+ },
+ "is_first": true
+ }
+}
+GETПолучить данные по всем задачам/api/tasks/getURL: https://wappi.pro/api/tasks/get?profile_id={{profile_id}}
+Описание метода
+Получение данных по всем задачам.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Получить данные по всем задачам200{
+ "status": "done",
+ "tasks": [
+ {
+ "task_id": "e543da5e-6f3f-4e42-b084-852f6410db18",
+ "command_start": "2023-03-26T10:05:02.771Z",
+ "command": "sendMessage",
+ "recipient": "79115576367@c.us",
+ "uuid": "71ad40e9-b023",
+ "body": "тестовое сообщение асинхронно",
+ "response": null,
+ "is_first": true
+ },
+ {
+ "task_id": "d8c45d9d-a3d3-4dc7-9969-e044457a6aa5",
+ "command_start": "2023-03-26T10:04:44.631Z",
+ "command": "sendMessage",
+ "recipient": "79115576367@c.us",
+ "uuid": "71ad40e9-b023",
+ "body": "тестовое сообщение асинхронно",
+ "response": {
+ "status": "done",
+ "timestamp": 1679825084,
+ "time": "2023-03-26T13:04:44+03:00",
+ "detail": "",
+ "task_id": "d8c45d9d-a3d3-4dc7-9969-e044457a6aa5",
+ "command_end": "2023-03-26T10:10:22.204Z",
+ "uuid": "71ad40e9-b023",
+ "message_id": "3EB02A3FE984CEC19A20"
+ },
+ "is_first": true
+ }
+ ]
+}
+Массовая рассылка6 методовPOSTЗапустить рассылку Start/broadcast/initURL: https://wappi.pro/broadcast/init?profile_id={{profile_id}}
+Описание метода
+Запуск новой рассылки.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса formdata
+mass_text: Текст сообщения
+mass_phones: 79995579399
+79995579399
+79995579399
+mass_image: file
+mass_timeout_from: 5
+mass_timeout_to: 8
+base64: /9j/4AAQSkZJRgABAQAAAQABA==
+file_name: картинка
+send_after: 2025-05-28T15:17+03:00
+schedule: {
+ "isActive": true,
+ "week": [
+ {
+ "title": "Понедельник",
+ "enable": true,
+ "daynumber": 0,
+ "worktime": [
+ {
+ "start": "10:00",
+ "end": "21:00"
+ }
+ ]
+ },
+ {
+ "title": "Вторник",
+ "enable": true,
+ "daynumber": 1,
+ "worktime": [
+ {
+ "start": "10:00",
+ "end": "21:00"
+ }
+ ]
+ },
+ {
+ "title": "Среда",
+ "enable": true,
+ "daynumber": 2,
+ "worktime": [
+ {
+ "start": "10:00",
+ "end": "21:00"
+ }
+ ]
+ },
+ {
+ "title": "Четверг",
+ "enable": true,
+ "daynumber": 3,
+ "worktime": [
+ {
+ "start": "10:00",
+ "end": "21:00"
+ }
+ ]
+ },
+ {
+ "title": "Пятница",
+ "enable": true,
+ "daynumber": 4,
+ "worktime": [
+ {
+ "start": "10:00",
+ "end": "21:00"
+ }
+ ]
+ },
+ {
+ "title": "Суббота",
+ "enable": true,
+ "daynumber": 5,
+ "worktime": [
+ {
+ "start": "11:00",
+ "end": "23:00"
+ }
+ ]
+ },
+ {
+ "title": "Воскресенье",
+ "enable": true,
+ "daynumber": 6,
+ "worktime": [
+ {
+ "start": "11:00",
+ "end": "23:00"
+ }
+ ]
+ }
+ ]
+}
+current_time: 2025-05-28T15:17+03:00
+Responses
+Запустить рассылку Start200{
+ "status": "done",
+ "timestamp": 1701713396,
+ "time": "2023-12-04T21:09:56+03:00",
+ "detail": "Рассылка запущена",
+ "posting": {
+ "active": 3,
+ "messages_count": 3,
+ "profile_id": 2189,
+ "profile_uuid": "71ad40e9-b023",
+ "user_id": 21,
+ "platform": "wz",
+ "mass_posting_id": "6852c324-6385-4f",
+ "profile_name": "Профиль 1",
+ "created_at": "04.12.2023 21:09:56",
+ "have_consumer": true
+ }
+}
+GETПриостановить рассылку Pause/broadcast/pauseURL: https://wappi.pro/broadcast/pause?profile_id={{profile_id}}&mass_posting_id=68c2ddf4-d78c-46
+Описание метода
+Поставить на паузу рассылку.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+mass_posting_id68c2ddf4-d78c-46id рассылки
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Приостановить рассылку Pause200{
+ "detail": "Mass posting paused",
+ "status": "done"
+}
+GETВозобновить рассылку Resume/broadcast/startURL: https://wappi.pro/broadcast/start?profile_id={{profile_id}}&mass_posting_id=68c2ddf4-d78c-46
+Описание метода
+Возобновить рассылку (после паузы).
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+mass_posting_id68c2ddf4-d78c-46id рассылки
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Возобновить рассылку Resume200{
+ "detail": "Mass posting started",
+ "status": "done"
+}
+GETЗакрыть рассылку Cancel/broadcast/cancelURL: https://wappi.pro/broadcast/cancel?profile_id={{profile_id}}&mass_posting_id=68c2ddf4-d78c-46
+Описание метода
+Закрыть рассылку.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+mass_posting_id68c2ddf4-d78c-46id рассылки
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Закрыть рассылку Cancel200{
+ "detail": "Mass posting canceled",
+ "status": "done"
+}
+GETСписок всех рассылок/broadcast/historyURL: https://wappi.pro/broadcast/history?profile_id={{profile_id}}&offset=0&limit=3
+Описание метода
+История всех рассылок.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+offset0Необязательный параметр. От какого по счету элемента вывести список сообщений, где 0 это самое новое сообщение. Если не указывать, то по умолчанию установлено значение 0.
+limit3Необязательный параметр. Количество сообщений для получения. Если не указывать, то по умолчанию установлено значение 200.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Список всех рассылок200{
+ "all_history_count": 37,
+ "consumers": null,
+ "mass_posting_history": [
+ {
+ "profile_uuid": "71ad40e9-b023",
+ "profile_name": "Профиль 1",
+ "mass_posting_id": "68c2ddf4-d78c-46",
+ "done": 2,
+ "all": 3,
+ "date": "2023-05-27T10:46:15.677Z"
+ },
+ {
+ "profile_uuid": "71ad40e9-b023",
+ "profile_name": "Профиль 1",
+ "mass_posting_id": "397f4261-483e-43",
+ "done": 3,
+ "all": 3,
+ "date": "2023-05-27T10:44:08.243Z"
+ },
+ {
+ "profile_uuid": "71ad40e9-b023",
+ "profile_name": "Профиль 1",
+ "mass_posting_id": "a5c1b3dc-47c1-40",
+ "done": 1,
+ "all": 1,
+ "date": "2023-05-26T12:02:36.735Z"
+ }
+ ],
+ "status": "done"
+}
+GETРезультат рассылки/broadcast/messagesURL: https://wappi.pro/broadcast/messages?profile_id={{profile_id}}&mass_posting_id=68c2ddf4-d78c-46&offset=0&limit=100
+Описание метода
+Получение результатов рассылки по id рассылки.
+Query Params
+ПараметрЗначениеОписание
+profile_id{{profile_id}}Обязательный параметр. Можно получить в личном кабинете на странице конкретного профиля.
+mass_posting_id68c2ddf4-d78c-46id рассылки
+offset0Необязательный параметр. От какого по счету элемента вывести список сообщений, где 0 это самое новое сообщение. Если не указывать, то по умолчанию установлено значение 0.
+limit100Необязательный параметр. Количество сообщений для получения. Если не указывать, то по умолчанию установлено значение 400.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Responses
+Результат рассылки200{
+ "status": "done",
+ "detail": [
+ {
+ "delivered": "success",
+ "recipient": "79115576367@c.us",
+ "message": "Текст сообщения",
+ "caption": "",
+ "created_at": "2023-05-27T10:48:56.539Z",
+ "task_name": "sendMessage",
+ "id": "3EB0417AF02F0CD9C9A6",
+ "profile": {
+ "name": "Профиль 1",
+ "uuid": "71ad40e9-b023"
+ },
+ "task_id": "086d7d42-8368-45e5-ba4b-7fa286be6421"
+ }
+ ],
+ "all_messages_count": 2
+}
+Каскады6 методовPOSTSendCascade/csender/cascade/sendURL: https://wappi.pro/csender/cascade/send
+Описание метода
+Отправить сообщение каскадом.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "recipient": "79602041911",
+ "body": "Test",
+ "caption": "",
+ "cascade_id": "94b1f524059b29e514ef",
+ "file_name": "",
+ "url": ""
+}
+POSTCreateCascade/csender/cascade/createURL: https://wappi.pro/csender/cascade/create
+Описание метода
+Создать новый каскад.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "name": "Cascade4",
+ "description": "",
+ "order": [
+ {
+ "id": 1,
+ "profile_uuid": "87529b21-2ace",
+ "platform": "tg"
+ },
+ {
+ "id": 2,
+ "profile_uuid": "d64e106a-65d6",
+ "platform": "wz"
+ },
+ {
+ "id": 3,
+ "profile_uuid": "d64e106a-65d6",
+ "platform": "wz"
+ }
+ ]
+}
+POSTUpdateCascade/csender/cascade/updateURL: https://wappi.pro/csender/cascade/update
+Описание метода
+Редактировать существующий каскад.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+{
+ "cascade_id": "9fb693b7e61544284612",
+ "name": "NewCascade",
+ "description": "",
+ "order": [
+ {
+ "id": 1,
+ "profile_uuid": "87529b21-2ace",
+ "platform": "tg"
+ },
+ {
+ "id": 2,
+ "profile_uuid": "d64e106a-65d6",
+ "platform": "wz"
+ },
+ {
+ "id": 3,
+ "profile_uuid": "d64e106a-65d6",
+ "platform": "wz"
+ }
+ ]
+}
+POSTDeleteCascade/csender/cascade/deleteURL: https://wappi.pro/csender/cascade/delete?cascade_id=
+Описание метода
+Удалить существующий каскад.
+Query Params
+ПараметрЗначениеОписание
+cascade_id——
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+Тело запроса не передается.
+GETGetCascade/csender/cascade/getURL: https://wappi.pro/csender/cascade/get?cascade_id=
+Описание метода
+Получить данные каскада.
+Query Params
+ПараметрЗначениеОписание
+cascade_id——
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+Тело запроса не передается.
+GETGetAllCascades/csender/cascades/getURL: https://wappi.pro/csender/cascades/get
+Описание метода
+Получить все каскады в аккаунте.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+Тело запроса не передается.
+Тестирование методов
+Как протестировать методы WhatsApp API
+01Получите токенОткройте личный кабинет и скопируйте API-токен из профиля WhatsApp.
+02Передайте profile_idДобавляйте profile_id в query и Authorization в headers каждого запроса.
+03Проверьте методВыберите endpoint слева, скопируйте CURL или откройте Postman collection.
+04Подключите webhookНастройте уведомления, чтобы получать статусы и входящие сообщения.
+Список методов
+Работа с профилем10POSTСоздать профиль/api/profile/addPOSTУдалить профиль/api/profile/deleteGETПолучить QR/api/sync/qr/getGETПолучить код авторизации/api/sync/auth/codeGETПолучить статус и настройки профиля/api/sync/get/statusGETПолучить все профили/api/profile/all/getGETПерезагрузить профиль/api/profile/restartGETВыйти из whatsapp/api/profile/logoutPOSTОплатить профиль с баланса/payments/balance/add_daysGETПолучить историю авторизаций профиля/panel/profile/auth/history
+Работа с сообщениями36Синхронные методы24POSTОтправить текстовое сообщение/api/sync/message/sendPOSTОтправить медиа по ссылке/api/sync/message/file/url/sendPOSTОтправить картинку (base64)/api/sync/message/img/sendPOSTОтправить документ (base64)/api/sync/message/document/sendPOSTОтправить аудио (base64)/api/sync/message/audio/sendPOSTОтправить видео (base64)/api/sync/message/video/sendPOSTОтправить локацию/api/sync/message/location/sendPOSTОтправить контакт/api/sync/contact/sendPOSTОтправить файл (устаревший)/api/sync/message/file/sendPOSTОтправить кнопки/api/sync/message/buttons/sendPOSTОтправить списки/api/sync/message/list/sendPOSTОтправить реакцию на сообщение/api/sync/message/reactionPOSTОтметить сообщение прочитанным/api/sync/message/mark/readPOSTПереслать сообщение/api/sync/message/forwardPOSTОтветить на сообщение/api/sync/message/replyPOSTУдалить сообщение/api/sync/message/deletePOSTИзменить сообщение/api/sync/message/editPOSTСоздать опрос/api/sync/poll/createPOSTПоиск сообщений/api/sync/messages/searchGETПолучить сообщения из чата/api/sync/messages/getGETПолучить сообщение по ID/api/sync/messages/id/getGETСкачать медиа из сообщения/api/sync/message/media/downloadGETПолучить все сообщения профиля/api/sync/messages/all/getGETПолучить список отправленных сообщений (API)/api/sync/messages/history
+Асинхронные методы12POSTОтправка текстового сообщения асинхронно/api/async/message/sendPOSTОтправить медиа по ссылке асинхронно/api/async/message/file/url/sendPOSTОтправить картинку (base64) асинхронно/api/async/message/img/sendPOSTОтправить документ (base64) асинхронно/api/async/message/document/sendPOSTОтправить видео (base64) асинхронно/api/async/message/video/sendPOSTОтправить аудио (base64) асинхронно/api/async/message/audio/sendPOSTОтправить локацию асинхронно/api/async/message/location/sendPOSTОтправить контакт асинхронно/api/async/contact/sendPOSTОтправить файл (устаревший) асинхронно/api/async/message/file/sendPOSTПереслать сообщение асинхронно/api/async/message/forwardPOSTОтветить на сообщение асинхронно/api/async/message/replyPOSTСоздать опрос/api/async/poll/create
+Работа с чатами8POSTПолучить список чатов/api/sync/chats/getGETПолучить список чатов с фильтром/api/sync/chats/filterGETПолучить список чатов по дням/api/sync/chats/days/getPOSTАрхивировать чат/api/sync/chat/archivePOSTРазархивировать чат/api/sync/chat/unarchivePOSTУдалить чат/api/sync/chat/deletePOSTУстановить статус "печатает"/api/sync/chat/typing/startPOSTСнять статус "печатает"/api/sync/chat/typing/stop
+Работа с контактами4GETПолучить контакты/api/sync/contacts/getGETПолучить контакт/api/sync/contact/getGETПроверить зарегистрирован ли номер/api/sync/contact/checkGETПолучить информацию о номере или группе/api/sync/contact/info
+Работа с группами9GETСсылка для приглашения в группу/api/sync/group/invitelink/getPOSTСоздать группу/api/sync/group/createPOSTПокинуть группу/api/sync/group/leavePOSTДобавить участника в группу/api/sync/group/participant/addPOSTУдалить участника из группы/api/sync/group/participant/removePOSTДобавить контакту права администратора/api/sync/group/admin/promotePOSTУбрать у контакта права администратора/api/sync/group/admin/demotePOSTУстановить описание группы/api/sync/group/description/setPOSTУстановить имя группы/api/sync/group/name/set
+Работа с аккаунтом3POSTУстановить сведения (ранее Статус)/api/sync/status/setPOSTУдалить сведения (ранее Статус)/api/sync/status/deletePOSTДобавить статус (Сторис)/api/async/story/send
+Работа с webhook (уведомлениями)4GETПолучить ссылку на webhook/api/webhook/url/getPOSTУстановить ссылку на webhook/api/webhook/url/setPOSTУдалить ссылку на webhook/api/webhook/url/deletePOSTНастройка типов webhook уведомлений/api/webhook/types/set
+Работа с proxy3GETПолучить proxy/api/proxy/getPOSTУстановить proxy/api/proxy/setPOSTУдалить proxy/api/proxy/delete
+Работа с очередью4GETПолучить очередь сообщений у профиля/api/profile/queue/getGETОчистить очередь сообщений у профиля/api/profile/queue/purgeGETПолучить данные по задаче/api/task/getGETПолучить данные по всем задачам/api/tasks/get
+Массовая рассылка6POSTЗапустить рассылку Start/broadcast/initGETПриостановить рассылку Pause/broadcast/pauseGETВозобновить рассылку Resume/broadcast/startGETЗакрыть рассылку Cancel/broadcast/cancelGETСписок всех рассылок/broadcast/historyGETРезультат рассылки/broadcast/messages
+Каскады6POSTSendCascade/csender/cascade/sendPOSTCreateCascade/csender/cascade/createPOSTUpdateCascade/csender/cascade/updatePOSTDeleteCascade/csender/cascade/deleteGETGetCascade/csender/cascade/getGETGetAllCascades/csender/cascades/get
+Создать профиль
+Работа с профилем
+POST
+Подробная информацияURL, описание, параметры, headers, тело запроса, responses и CURLСвернутьРазвернутьPOSThttps://wappi.pro/api/profile/add?name=новый&webhook_url=https://wappi.pro
+Скопировать
+Описание метода
+Создание нового профиля. Вы указываете имя профиля, а профиль id создается автоматически.
+Query Params
+ПараметрЗначениеОписание
+nameновыйОбязательный параметр. Имя нового профиля.
+webhook_urlhttps://wappi.proНеобязательный параметр. Установка URL ссылки на вебхук.
+Headers
+КлючЗначениеОписание
+Authorization{{Token}}—
+Тело запроса raw
+Тело запроса не передается.
+Responses
+Создать профиль200{
+ "profile_id": "b361be2d-88ca",
+ "status": "done",
+ "time": "2024-02-21T19:33:57+03:00",
+ "timestamp": 1708533237
+}
+Пример CURL запроса
+Скопировать
+curl --request POST 'https://wappi.pro/api/profile/add?name=новый&webhook_url=https://wappi.pro' \
+ --header 'Authorization: {{Token}}'
+Тест запроса
+API tokenprofile_id
+POSThttps://wappi.pro/api/profile/add?name=%D0%BD%D0%BE%D0%B2%D1%8B%D0%B9&webhook_url=https%3A%2F%2Fwappi.pro
+Query Params Добавить параметр 
+ Удалить 
+ Удалить 
+Тело запросаОтправить запросВведите token, чтобы отправить тестовый запрос на https://wappi.pro.
+ Типы уведомлений Webhook 
+01Укажите адресWebhook - это URL для событий. Указать его можно в личном кабинете или через API.
+02Выберите событияВ личном кабинете или через API выберите типы: входящие, доставки, статусы профиля.
+03Примите запросВаш сервер должен принять POST-запрос с JSON и быстро вернуть успешный HTTP-ответ.
+04Проверьте тестомДля проверки вставьте временный URL из webhook.site или похожего сервиса.
+Webhook на статус отправленного сообщения 
+Есть несколько статусов отправленных сообщений - pending, delivered, read, undelivered, temporary ban, error.
+{
+ "messages": {
+ "id": "3EB0B9085608CCF26A7607",
+ "profile_id": "1955e928-b7b6",
+ "wh_type": "delivery_status",
+ "timestamp": "2025-10-23T15:45:14+03:00",
+ "time": 1761223514,
+ "from": "79959640099@c.us",
+ "to": "79602041988@c.us",
+ "chat_id": "79602041988@c.us",
+ "status": "pending",
+ "task_id": "47208660-3c55-4ad7-bb1d-ff4427f7a262"
+ }
+}
+Свернуть
+Webhook на статус профиля
+Есть несколько статусов профиля - online, offline
+{
+ "messages": [
+ {
+ "wh_type": "authorization_status",
+ "profile_id": "71ad40e9-b023",
+ "status": "offline",
+ "reason": "logout from api",
+ "phone": "79502041990",
+ "timestamp": "2023-11-13T17:00:02.57417156+03:00",
+ "time": 1699884002
+ }
+ ]
+}
+Свернуть
+Webhook на статус приложения
+{
+ "messages": [
+ {
+ "wh_type": "application_status",
+ "profile_id": "fae370e3-0a1a",
+ "status": "online",
+ "phone": "966507585521",
+ "timestamp": "2024-03-02T15:52:27.996591556+03:00",
+ "time": 1709383947
+ }
+ ]
+}
+Свернуть
+Webhook на входящее сообщение
+{
+ "messages": [
+ {
+ "wh_type": "incoming_message",
+ "profile_id": "6qw54f68-71eq",
+ "id": "3A945DD9CDD3016BE11B",
+ "body": "Ответ на сообщение",
+ "type": "chat",
+ "from": "79115576366@c.us",
+ "to": "79602041988@c.us",
+ "senderName": "Flood",
+ "chatId": "79115576366@c.us",
+ "timestamp": "2024-10-21T11:27:57+03:00",
+ "time": 1729499277,
+ "caption": null,
+ "from_where": "phone",
+ "contact_name": "Максим",
+ "is_forwarded": false,
+ "isReply": true,
+ "is_edited": false,
+ "stanza_id": "3A9DA038CF9A2CD87E66",
+ "is_me": false,
+ "chat_type": "dialog",
+ "thumbnail": "https://s3.wappi.pro/wapi-uploads30/6d154f68-71ec/tumb_79115576367.jpg?X-Amz-",
+ "picture": "https://s3.wappi.pro/wapi-uploads30/6d154f68-71ec/pic_79115576367.jpg?X-Amz",
+ "wappi_bot_id": "",
+ "is_deleted": false,
+ "is_bot": false,
+ "reply_message": {
+ "id": "3A9DA038CF9A2CD87E66",
+ "body": "https://wapi-uploads24.storage.yandexcloud.net/bitrix24/6d154f68-71ec/79bf",
+ "type": "image",
+ "chatId": "",
+ "timestamp": "2024-10-21T11:21:33+03:00",
+ "time": 0,
+ "caption": "Картинка",
+ "file_name": "79bf5bb7-ab23-455c-bf5e-42daca555529.jpg",
+ "contact_name": ""
+ }
+ }
+ ]
+}
+Свернуть
+Webhook на входящее изображение
+Обратите внимание, все изображения отдаются в формате base64.
+{
+ "messages": [
+ {
+ "wh_type": "incoming_message",
+ "profile_id": "71ad40e9-b023",
+ "id": "3EB0CC6709A45F7311FD",
+ "body": "/9j/4AAQSkZNQ5JDP/9k=",
+ "type": "image",
+ "from": "79991940200@c.us",
+ "to": "79662041999@c.us",
+ "senderName": "Александр Жукин",
+ "chatId": "79991940200@c.us",
+ "timestamp": "2023-12-05T12:56:45+03:00",
+ "time": 1701770205,
+ "caption": "Это картинка",
+ "from_where": "phone",
+ "mimetype": "image/jpeg",
+ "contact_name": "Саня Жукин",
+ "is_forwarded": false,
+ "isReply": false,
+ "is_edited": false,
+ "stanza_id": "",
+ "chat_type": "dialog"
+ }
+ ]
+}
+Свернуть
+Webhook на входящее видео
+Обратите внимание, что все видео отдаются в формате base64.
+{
+ "messages": [
+ {
+ "wh_type": "incoming_message",
+ "profile_id": "71ad40e9-b023",
+ "id": "3EB09F87B9CE13FA0667",
+ "body": "AAAAIGZ0eXBtcDQyAAS0vA==",
+ "type": "video",
+ "from": "79991940200@c.us",
+ "to": "79662041999@c.us",
+ "senderName": "Александр Жукин",
+ "chatId": "79991940200@c.us",
+ "timestamp": "2023-12-05T13:01:31+03:00",
+ "time": 1701770491,
+ "caption": "Это видео",
+ "from_where": "phone",
+ "mimetype": "video/mp4",
+ "contact_name": "Саня Жукин",
+ "is_forwarded": false,
+ "isReply": false,
+ "is_edited": false,
+ "stanza_id": "",
+ "chat_type": "dialog"
+ }
+ ]
+}
+Свернуть
+Webhook на входящий документ или файл
+Обратите внимание, что все файлы и документы отдаются в формате base64.
+{
+ "messages": [
+ {
+ "wh_type": "incoming_message",
+ "profile_id": "71ad40e9-b023",
+ "id": "3EB08F8DF5768B401716",
+ "body": "JVBERi0xLjMJUVPRgo=",
+ "type": "document",
+ "from": "79991940200@c.us",
+ "to": "79662041999@c.us",
+ "senderName": "Александр Жукин",
+ "chatId": "79991940200@c.us",
+ "timestamp": "2023-12-05T13:02:19+03:00",
+ "time": 1701770539,
+ "caption": "Это документ",
+ "title": "Это документ",
+ "from_where": "phone",
+ "file_name": "1.pdf",
+ "mimetype": "application/pdf",
+ "contact_name": "Саня Жукин",
+ "is_forwarded": false,
+ "isReply": false,
+ "is_edited": false,
+ "stanza_id": "",
+ "chat_type": "dialog"
+ }
+ ]
+}
+Свернуть
+Webhook на входящее аудио
+Обратите внимание, что все файлы аудио отдаются в формате base64.
+{
+ "messages": [
+ {
+ "wh_type": "incoming_message",
+ "profile_id": "71ad40e9-b023",
+ "id": "3EB0C341916D5111CC9A",
+ "body": "SUQzAwAAAAAHdAgDA==",
+ "type": "ptt",
+ "from": "79991940200@c.us",
+ "to": "79662041999@c.us",
+ "senderName": "Александр Жукин",
+ "chatId": "79991940200@c.us",
+ "timestamp": "2023-12-05T13:03:11+03:00",
+ "time": 1701770591,
+ "from_where": "phone",
+ "mimetype": "audio/mpeg",
+ "contact_name": "Саня Жукин",
+ "is_forwarded": false,
+ "isReply": false,
+ "is_edited": false,
+ "stanza_id": "",
+ "chat_type": "dialog"
+ }
+ ]
+}
+Свернуть
+Webhook на входящую геолокацию
+{
+ "messages": [
+ {
+ "wh_type": "incoming_message",
+ "profile_id": "71ad40e9-b023",
+ "id": "3EB0A6A4730776B10FA3",
+ "type": "location",
+ "from": "79991940200@c.us",
+ "to": "79662041999@c.us",
+ "senderName": "Александр Жукин",
+ "chatId": "79991940200@c.us",
+ "timestamp": "2023-12-05T13:04:03+03:00",
+ "time": 1701770643,
+ "from_where": "phone",
+ "location": {
+ "latitude": 55.750446,
+ "longitude": 37.617494,
+ "description": "улица Торцева, 23А, Северодвинск, Архангельская область, 164520"
+ },
+ "contact_name": "Саня Жукин",
+ "is_forwarded": false,
+ "isReply": false,
+ "is_edited": false,
+ "stanza_id": "",
+ "chat_type": "dialog"
+ }
+ ]
+}
+Свернуть
+Webhook на входящий контакт
+{
+ "messages": [
+ {
+ "wh_type": "incoming_message",
+ "profile_id": "71ad40e9-b023",
+ "id": "3EB0FB7CD60F1986B594",
+ "body": "BEGIN:VCARD\nVERSION:3.0\nN:;Имя контакта;;;\nFN:Имя
+ контакта\nTEL;type=CELL;type=VOICE;waid=79662041999:+79662041999\nEND:VCARD",
+ "type": "vcard",
+ "from": "79991940200@c.us",
+ "to": "79662041999@c.us",
+ "senderName": "Александр Жукин",
+ "chatId": "79991940200@c.us",
+ "timestamp": "2023-12-05T13:04:34+03:00",
+ "time": 1701770674,
+ "from_where": "phone",
+ "contact": {
+ "display_name": "Имя контакта",
+ "phone": "+79662041999"
+ },
+ "contact_name": "Саня Жукин",
+ "is_forwarded": false,
+ "isReply": false,
+ "is_edited": false,
+ "stanza_id": "",
+ "chat_type": "dialog"
+ }
+ ]
+}
+Свернуть
+Webhook на входящее голосовое сообщение
+{
+ "messages": [
+ {
+ "wh_type": "incoming_message",
+ "profile_id": "71ad40e9-b023",
+ "id": "3AD57A50F73CFC3B6DED",
+ "body": "T2dnUwACAAAAAAAJvNyUA=",
+ "type": "ptt",
+ "from": "79005576333@c.us",
+ "to": "79662041999@c.us",
+ "senderName": "Flood",
+ "chatId": "79005576333@c.us",
+ "timestamp": "2023-12-05T13:07:01+03:00",
+ "time": 1701770821,
+ "from_where": "phone",
+ "mimetype": "audio/ogg; codecs=opus",
+ "contact_name": "Максим",
+ "is_forwarded": false,
+ "isReply": false,
+ "is_edited": false,
+ "stanza_id": "",
+ "chat_type": "dialog"
+ }
+ ]
+}
+Свернуть
+Webhook на входящий звонок
+Поле "type": "incoming_call" - входящий звонок; "missed_call" - пропущенный звонок; "call_terminate" - завершение звонка; "call_accept" - звонок принят.
+{
+ "messages": {
+ "wh_type": "incoming_call",
+ "type": "incoming_call",
+ "contact": {
+ "Found": true,
+ "FirstName": "Саня Жукин",
+ "FullName": "Саня Жукин",
+ "PushName": "Александр Жукин",
+ "BusinessName": ""
+ },
+ "profile_id": "81ad40e9-b023",
+ "number": "71008888888",
+ "timestamp": "2023-07-17T17:40:34+03:00",
+ "time": 1689604834,
+ }
+}
+Свернуть
+Webhook на входящую реакцию
+{
+ "messages": [
+ {
+ "wh_type": "incoming_message",
+ "profile_id": "71ad40e9-b023",
+ "id": "3A786E94948BFBED8A27",
+ "body": "👍",
+ "type": "reaction",
+ "from": "79005576333@c.us",
+ "to": "79662041999@c.us",
+ "senderName": "Flood",
+ "chatId": "79005576333@c.us",
+ "timestamp": "2023-12-05T13:08:08+03:00",
+ "time": 1701770888,
+ "from_where": "phone",
+ "contact_name": "Максим",
+ "is_forwarded": false,
+ "isReply": false,
+ "is_edited": false,
+ "stanza_id": "3EB053D6EAE268F0FB4D42",
+ "chat_type": "dialog"
+ }
+ ]
+}
+Свернуть
+Webhook на входящее сообщение с кнопками
+{
+ "messages": [
+ {
+ "wh_type": "incoming_message",
+ "profile_id": "11a3e331-c546",
+ "id": "3EB0402A83A59D74852E",
+ "body": "contentText:\"Текст сообщения 1\" footerText:\"\" buttons:{buttonId:\"1\" buttonText:{displayText:\"button text 1\"} type:RESPONSE} buttons:{buttonId:\"2\" buttonText:{displayText:\"button text 2\"} type:RESPONSE} buttons:{buttonId:\"3\" buttonText:{displayText:\"button text 3\"} type:RESPONSE} headerType:TEXT text:\"Сообщение с кнопками\"",
+ "type": "buttons",
+ "from": "79995551122@c.us",
+ "to": "79224448855@c.us",
+ "senderName": "Дмитрий",
+ "chatId": "79995551122@c.us",
+ "timestamp": "2022-12-09T16:30:44+03:00",
+ "time": 1670592644,
+ "from_where": "api"
+ }
+ ]
+}
+Свернуть
+Webhook на входящее сообщение со списком
+{
+ "messages": [
+ {
+ "wh_type": "incoming_message",
+ "profile_id": "11a3e331-c546",
+ "id": "3EB002BA170199D9F8B2",
+ "body": "title:\"Заголовок сообщения со списком\" description:\"Это сообщение со списком\" buttonText:\"НАЖМИ на меня\" listType:SINGLE_SELECT sections:{title:\"Заголовок меню\" rows:{title:\"Выбор 1\" description:\"\" rowId:\"id1\"} rows:{title:\"Выбор 2\" description:\"\" rowId:\"id2\"} rows:{title:\"Выбор 3\" description:\"Можно добавлять описание для секции\" rowId:\"id3\"} rows:{title:\"Выбор 4\" description:\"Можно добавлять эмоджики\" rowId:\"aIfkv6\"} rows:{title:\"Выбор 5\" description:\"Текст\" rowId:\"test-4\"} rows:{title:\"Выбор 6\" description:\"Еще текст\" rowId:\"test-6\"} rows:{title:\"Выбор 7\" description:\"Больше текста\" rowId:\"test-7\"} rows:{title:\"Выбор 8\" description:\"Еще больше текста\" rowId:\"test-8\"}} contextInfo:{disappearingMode:{initiator:CHANGED_IN_CHAT}}",
+ "type": "list",
+ "from": "79995551122@c.us",
+ "to": "79224448855@c.us",
+ "senderName": "Дмитрий",
+ "chatId": "79995551122@c.us",
+ "timestamp": "2022-12-09T17:00:05+03:00",
+ "time": 1670594405,
+ "from_where": "api"
+ }
+ ]
+}
+Свернуть
+Webhook на входящий опрос
+{
+ "messages": [
+ {
+ "wh_type": "incoming_message",
+ "profile_id": "71ad40e9-b023",
+ "id": "3AD7644514D8B64B5E4F",
+ "body": "Вопрос",
+ "type": "poll",
+ "from": "79005576333@c.us",
+ "to": "79662041999@c.us",
+ "senderName": "Flood",
+ "chatId": "79005576333@c.us",
+ "timestamp": "2023-12-05T13:09:34+03:00",
+ "time": 1701770974,
+ "from_where": "phone",
+ "contact_name": "Максим",
+ "is_forwarded": false,
+ "isReply": false,
+ "is_edited": false,
+ "stanza_id": "",
+ "chat_type": "dialog",
+ "poll_options": [
+ "Ответ 1",
+ "Ответ 2"
+ ]
+ }
+ ]
+}
+Свернуть
+Webhook на нажатие кнопки
+{
+ "messages": [
+ {
+ "wh_type": "incoming_message",
+ "profile_id": "11a3e331-c546",
+ "id": "3A3CB510072A59DB53D2",
+ "body": "button text 1",
+ "type": "buttons_response",
+ "from": "79995551122@c.us",
+ "to": "79224448855@c.us",
+ "senderName": "Дмитрий",
+ "chatId": "79995551122@c.us",
+ "timestamp": "2022-12-09T16:43:22+03:00",
+ "time": 1670593402,
+ "from_where": "phone",
+ "button_response": true,
+ "selectedButtonId": "1"
+ }
+ ]
+}
+Свернуть
+Webhook на нажатие списка
+{
+ "messages": [
+ {
+ "wh_type": "incoming_message",
+ "profile_id": "11a3e331-c546",
+ "id": "3ADC84A9812D3B3E35F3",
+ "body": "id2",
+ "type": "list_response",
+ "from": "79995551122@c.us",
+ "to": "79224448855@c.us",
+ "senderName": "Ми",
+ "chatId": "79224448855@c.us",
+ "timestamp": "2022-12-09T17:04:20+03:00",
+ "time": 1670594660,
+ "from_where": "phone",
+ "list_response": true,
+ "selected_list_id": "id2"
+ }
+ ]
+}
+Свернуть
+Webhook на голосование в опросе
+{
+ "messages": [
+ {
+ "wh_type": "incoming_message",
+ "profile_id": "501d59e1-0b06",
+ "id": "3A8B4D1C2EF20C6F895C",
+ "type": "poll_vote",
+ "from": "79602041920@c.us",
+ "to": "79217304433@c.us",
+ "senderName": "Ми",
+ "chatId": "79602041920@c.us",
+ "timestamp": "2023-05-22T12:53:34+03:00",
+ "time": 1684749214,
+ "from_where": "phone",
+ "is_forwarded": false,
+ "isReply": false,
+ "is_edited": false,
+ "stanza_id": "3EB0F7485D1C02A618F3",
+ "poll_options": [
+ "да",
+ "нет",
+ "не знаю",
+ "где я?"
+ ],
+ "selected_poll_variant": [
+ "да"
+ ]
+ }
+ ]
+}
+Свернуть
+Webhook на исходящее сообщение API
+{
+ "messages": [
+ {
+ "wh_type": "outgoing_message_api",
+ "profile_id": "71ad40e9-b023",
+ "id": "3EB0220348D7366EE7067B",
+ "body": "тест",
+ "type": "chat",
+ "from": "79662041999@c.us",
+ "to": "79005576333@c.us",
+ "senderName": "Сергей",
+ "chatId": "79005576333@c.us",
+ "timestamp": "2023-12-05T13:10:21+03:00",
+ "time": 1701771021,
+ "from_where": "api",
+ "contact_name": "Максим",
+ "is_forwarded": false,
+ "isReply": false,
+ "is_edited": false,
+ "stanza_id": "",
+ "task_id": "faede625-0f03-46e9-8f56-dae5a89887df",
+ "chat_type": "dialog"
+ }
+ ]
+}
+Свернуть
+Webhook на исходящее сообщение с телефона
+{
+ "messages": [
+ {
+ "wh_type": "outgoing_message_phone",
+ "profile_id": "71ad40e9-b023",
+ "id": "3ABB9BBF9ACB92858E87",
+ "body": "Тест",
+ "type": "chat",
+ "from": "79662041999@c.us",
+ "to": "79005576333@c.us",
+ "senderName": "Сергей",
+ "chatId": "79005576333@c.us",
+ "timestamp": "2023-12-05T13:11:24+03:00",
+ "time": 1701771084,
+ "from_where": "phone",
+ "contact_name": "Максим",
+ "is_forwarded": false,
+ "isReply": false,
+ "is_edited": false,
+ "stanza_id": "",
+ "chat_type": "dialog"
+ }
+ ]
+}
+Свернуть
+ Частые вопросы 
+Можно ли получить бан за использование сервиса? 
+Получить бан за использование нашего сервиса нельзя, это абсолютно безопасно - все выглядит как Whatsapp Web. Но мы не несем ответственности за неправомерное использование WhatsApp или нарушение его правил. Согласно политике WhatsApp, можно получить бан за подозрительную автоматизацию работы с мессенджером, а также за использование массовой рассылки и рассылку спама. 
+Можно ли производить массовые рассылки? 
+Технически вы можете использовать Wappi для массовой рассылки, у нас нет ограничений на количество отправленных сообщений. Но мы не рекомендуем делать рассылку нежелательных сообщений или спама, иначе есть риск быть заблокированным алгоритмами антиспам системы WhatsApp 
+Не нашли ответ на свой вопрос?
+Наша поддержка всегда готова помочь
+Telegram
+Тарифы Whatsapp API
+Бесплатный пробный период 5 дней
+1 месяц 
+3 месяца-5%
+6 месяцев-10%
+12 месяцев-20%
+WhatsappБазовый
+700 ₽
+650 ₽700 ₽
+630 ₽700 ₽
+550 ₽700 ₽
+за 1 профиль в месяц
+Профиль это один подключенный аккаунт мессенджера. В рамках одного профиля можно менять номера.
+Безлимит на сообщения
+API:Whatsapp API
+Сервисы:Агрегатор мессенджеров
+Чат-боты
+Рассылка сообщений
+ИИ-ассистент
+Виджет на сайт 
+Без готовых интеграций
+Скидки при оплате 10+ профилей
+Начать бесплатно
+WhatsappПолный
+1690 ₽
+1600 ₽1690 ₽
+1500 ₽1690 ₽
+1350 ₽1690 ₽
+за 1 профиль в месяц
+Профиль это один подключенный аккаунт мессенджера. В рамках одного профиля можно менять номера.
+Безлимит на сообщения
+API:Whatsapp API
+Сервисы:Агрегатор мессенджеров
+Чат-боты
+Рассылка сообщений
+ИИ-ассистент
+Виджет на сайт 
+Готовые интеграции:Битрикс24
+amoCRM
+МойСклад
+RetailCRM
+Скидки при оплате 10+ профилей
+Начать бесплатно
+Что еще предлагаем?
+Становитесь техническим партнером и внедряйте мессенджеры в свою CRM или сервис с эксклюзивными условиями:
+Скидки от объема
+Подневная тарификация
+Постоплата
+Индивидуальные условия
+Подробнее здесь
+Стать партнером
+Сервисы
+Агрегатор мессенджеров
+Чат-боты
+Рассылка сообщений
+ИИ-ассистент
+Виджет на сайт
+API
+WhatsApp API
+Telegram API
+MAX API
+Интеграции
+Битрикс24 + WhatsApp
+Битрикс24 + Telegram
+Битрикс24 + Max
+Битрикс24 + Avito
+amoCRM + WhatsApp
+amoCRM + Telegram
+amoCRM + Max
+amoCRM + Avito
+МойСклад
+RetailCRM
+1C-Битрикс
+WordPress
+Opencart
+Make.com
+Информация
+Тарифы
+Партнерам интеграторам
+Партнерам разработчикам 
+Новости и обновления
+Контакты
+Техническая поддержка
+Свяжитесь с нами удобным способом. Служба техподдержки ответит в ближайшее время
+ support@wappi.pro Telegram
+Мы в соцсетях
+ИП Раджюнас Ольга Владимировна 
+ИНН 290217852532
+Лицензионное соглашениеПартнерское соглашениеПолитика обработки персональных данных
+© Wappi.pro, 2026
+Перейти к содержимому
+ 
