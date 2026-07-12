@@ -10,13 +10,23 @@ public partial class ChatManager
     public event Action<string> OnChatRemoved;
 
     /// <summary>
+    /// Whether the active channel exposes a chat/delete endpoint. Only WhatsApp does —
+    /// wappi tapi has NO Telegram chat/delete, so DeleteChat is a hard no-op on Telegram
+    /// (the swipe-action UI gate lands in Phase 6; this guard prevents any code path from
+    /// attempting a destructive call where no endpoint exists — CHAT-10 / T-0503-04).
+    /// </summary>
+    public bool ActiveChannelSupportsChatDelete => ActiveChannel == ChatChannel.WhatsApp;
+
+    /// <summary>
     /// Optimistically removes the chat + its message cache, then deletes it on the Wappi server.
     /// A successful chat/delete removes the chat in WhatsApp and reports it back as isDeleted, which
     /// ParseChatsJson honors so it stays gone across syncs and bot-switches. Rolls back (re-adds the
-    /// row) if the server call fails.
+    /// row) if the server call fails. On Telegram this is a no-op (no tapi chat/delete endpoint):
+    /// no optimistic removal, no cache eviction, no server coroutine.
     /// </summary>
     public void DeleteChat(string chatId)
     {
+        if (!ActiveChannelSupportsChatDelete) return;
         if (string.IsNullOrEmpty(chatId)) return;
         if (!chatLookup.TryGetValue(chatId, out var vm)) return;
 
@@ -49,7 +59,7 @@ public partial class ChatManager
         }
 
         string recipient = WappiRecipient.FromChatId(chatId);
-        string url = $"https://wappi.pro/api/sync/chat/delete?profile_id={profileId}";
+        string url = WappiEndpoints.Sync(ActiveChannel, $"chat/delete?profile_id={profileId}");
         string body = JsonConvert.SerializeObject(new WappiDeleteChatRequest { recipient = recipient });
 
         using UnityWebRequest www = new UnityWebRequest(url, "POST");

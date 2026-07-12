@@ -93,7 +93,7 @@ public partial class ChatManager
             string qid = _quoteResolveQueue.Dequeue();
             if (string.IsNullOrEmpty(profileId)) { _quoteResolveInFlight.Remove(qid); continue; }
 
-            string url = $"https://wappi.pro/api/sync/messages/id/get?profile_id={profileId}&message_id={UnityWebRequest.EscapeURL(qid)}";
+            string url = WappiEndpoints.Sync(ActiveChannel, $"messages/id/get?profile_id={profileId}&message_id={UnityWebRequest.EscapeURL(qid)}");
 
             bool definitive = false;
             string text = "", senderName = "";

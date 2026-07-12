@@ -388,7 +388,7 @@ public partial class ChatManager : MonoBehaviour
                 OnEmptyState?.Invoke(NoConnectionEmptyState());
                 yield break;
             }
-            string url = $"https://wappi.pro/api/sync/chats/filter?profile_id={activeProfileId}";
+            string url = WappiEndpoints.Sync(ActiveChannel, $"chats/filter?profile_id={activeProfileId}");
 
             using UnityWebRequest www = UnityWebRequest.Get(url);
             www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
@@ -522,7 +522,7 @@ public partial class ChatManager : MonoBehaviour
         }
         string escapedId = UnityWebRequest.EscapeURL(chatId);
         // We strictly only check offset 0 (the absolute newest messages)
-        string url = $"https://wappi.pro/api/sync/messages/get?profile_id={activeProfileId}&chat_id={escapedId}&limit={MessagesPerPage}&offset=0";
+        string url = WappiEndpoints.Sync(ActiveChannel, $"messages/get?profile_id={activeProfileId}&chat_id={escapedId}&limit={MessagesPerPage}&offset=0");
 
         using UnityWebRequest www = UnityWebRequest.Get(url);
         www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
@@ -1099,7 +1099,7 @@ public partial class ChatManager : MonoBehaviour
         if (string.IsNullOrEmpty(activeProfileId)) yield break;
 
         string escapedId = UnityWebRequest.EscapeURL(chatId);
-        string url = $"https://wappi.pro/api/sync/messages/get?profile_id={activeProfileId}&chat_id={escapedId}&limit={MessagesPerPage}&offset={offset}";
+        string url = WappiEndpoints.Sync(ActiveChannel, $"messages/get?profile_id={activeProfileId}&chat_id={escapedId}&limit={MessagesPerPage}&offset={offset}");
 
         using UnityWebRequest www = UnityWebRequest.Get(url);
         www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
@@ -1172,7 +1172,7 @@ public partial class ChatManager : MonoBehaviour
             yield break;
         }
         string escapedId = UnityWebRequest.EscapeURL(chatId);
-        string url = $"https://wappi.pro/api/sync/messages/get?profile_id={activeProfileId}&chat_id={escapedId}&limit={MessagesPerPage}&offset={offset}";
+        string url = WappiEndpoints.Sync(ActiveChannel, $"messages/get?profile_id={activeProfileId}&chat_id={escapedId}&limit={MessagesPerPage}&offset={offset}");
 
         using UnityWebRequest www = UnityWebRequest.Get(url);
         www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
@@ -1809,7 +1809,7 @@ if (msg.messageType == MessageType.Video)
             onFailure?.Invoke();
             yield break;
         }
-        string url = $"https://wappi.pro/api/sync/message/media/download?profile_id={activeProfileId}&message_id={messageId}";
+        string url = WappiEndpoints.Sync(ActiveChannel, $"message/media/download?profile_id={activeProfileId}&message_id={messageId}");
         using UnityWebRequest www = UnityWebRequest.Get(url);
         www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
         www.timeout = 30;   // never let recovery / tap-to-retry hang the spinner indefinitely

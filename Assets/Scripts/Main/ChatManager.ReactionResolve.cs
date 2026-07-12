@@ -71,7 +71,7 @@ public partial class ChatManager
             if (string.IsNullOrEmpty(profileId)) { _reactionResolveInFlight.Remove(id); continue; }
 
             string escapedId = UnityWebRequest.EscapeURL(chatId);
-            string url = $"https://wappi.pro/api/sync/messages/get?profile_id={profileId}&chat_id={escapedId}&limit={MessagesPerPage}&offset=0";
+            string url = WappiEndpoints.Sync(ActiveChannel, $"messages/get?profile_id={profileId}&chat_id={escapedId}&limit={MessagesPerPage}&offset=0");
 
             bool definitive = false;
             ReactionTargetResolver.Result res = new ReactionTargetResolver.Result { text = "", type = "", senderName = "" };
