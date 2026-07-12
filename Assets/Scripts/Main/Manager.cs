@@ -2732,7 +2732,9 @@ public class Manager : MonoBehaviour
         form.AddField("BusinessType", businessTypes.TryGetById(selectedBusinessId, out var bt1) ? bt1.displayName : "");
         form.AddField("BusinessTypeId", selectedBusinessId ?? "");
         form.AddField("WhatsappProfileId", whatsappProfileId);
-        
+        string tgId = bot.GetComponent<Bot>().telegramWorkflowId;
+        form.AddField("TelegramWorkflowId", string.IsNullOrEmpty(tgId) ? Bot.UnauthedProfileSentinel : tgId);
+
         form.AddField("Business", "");
         form.AddField("Prompt", "");
         form.AddField("ProductsList", "");
@@ -2822,6 +2824,8 @@ public class Manager : MonoBehaviour
         form.AddField("Name", openBotSettings.BotNameField.Value);
         AddBusinessTypeFields(form);
         form.AddField("WhatsappProfileId", openBot.GetComponent<Bot>().whatsappProfileId);
+        string tgId = openBot.GetComponent<Bot>().telegramWorkflowId;
+        form.AddField("TelegramWorkflowId", string.IsNullOrEmpty(tgId) ? Bot.UnauthedProfileSentinel : tgId);
 
         form.AddField("Business", "About Business:\n" + openBotSettings.BusinessField.Value);
         form.AddField("Prompt", openBotSettings.PromptField.Value);
@@ -2871,7 +2875,9 @@ public class Manager : MonoBehaviour
         form.AddField("BusinessType", businessTypes.TryGetById(selectedBusinessId, out var bt2) ? bt2.displayName : "");
         form.AddField("BusinessTypeId", selectedBusinessId ?? "");
         form.AddField("TelegramProfileId", telegramProfileId);
-        
+        string waId = bot.GetComponent<Bot>().whatsappWorkflowId;
+        form.AddField("WhatsappWorkflowId", string.IsNullOrEmpty(waId) ? Bot.UnauthedProfileSentinel : waId);
+
         form.AddField("Business", "");
         form.AddField("Prompt", "");
         form.AddField("ProductsList", "");
@@ -2964,6 +2970,8 @@ public class Manager : MonoBehaviour
         form.AddField("Name", openBotSettings.BotNameField.Value);
         AddBusinessTypeFields(form);
         form.AddField("TelegramProfileId", openBot.GetComponent<Bot>().telegramProfileId);
+        string waId = openBot.GetComponent<Bot>().whatsappWorkflowId;
+        form.AddField("WhatsappWorkflowId", string.IsNullOrEmpty(waId) ? Bot.UnauthedProfileSentinel : waId);
 
         form.AddField("Business", "About Business:\n" + openBotSettings.BusinessField.Value);
         form.AddField("Prompt", openBotSettings.PromptField.Value);
