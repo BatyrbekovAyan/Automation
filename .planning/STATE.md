@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
-status: ready_to_plan
-stopped_at: Completed 04-02-PLAN.md
-last_updated: "2026-07-12T13:48:26.057Z"
+status: planning
+stopped_at: Completed 05-01-PLAN.md
+last_updated: "2026-07-12T15:41:34.845Z"
 last_activity: 2026-07-12
 progress:
   total_phases: 6
-  completed_phases: 3
-  total_plans: 3
-  completed_plans: 3
-  percent: 50
+  completed_phases: 2
+  total_plans: 9
+  completed_plans: 4
+  percent: 44
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-12)
 
 **Core value:** The owner stays in control along the automation↔semi-auto spectrum — the bot can answer autonomously, or propose replies the owner picks and refines, without losing trust or the ability to take over.
-**Current focus:** Phase 4 (n8n Telegram Template Parity, dev) — both plans code-complete (04-01 server workflows + 04-02 Unity form fields); TPL-06 owner deploy/e2e gate (04-HUMAN-UAT.md) open, then verify/transition
+**Current focus:** Phase 5 (Channel-Aware ChatManager Core) — 05-01 seam primitives complete (ChatChannel/WappiEndpoints/ChatIdFormat/channel-neutral resolver/OutboxEntry.channel; 827/827 EditMode green, zero WhatsApp runtime change); next 05-02 ChatManager identity seam
 
 ## Current Position
 
 Phase: 5 of 8 (channel aware chatmanager core)
-Plan: Not started
-Status: Ready to plan
+Plan: 1 of 6 complete (05-01 seam primitives) — next: 05-02
+Status: In progress
 Last activity: 2026-07-12
 
-Progress: [██████████] 100%
+Progress: [████░░░░░░] 44%
 
 ## Performance Metrics
 
@@ -90,11 +90,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 03 P01 | 10 min | 2 tasks | 5 files |
 | Phase 04 P01 | 15min | 3 tasks | 5 files |
 | Phase 04 P02 | ~10min | 2 tasks | 2 files |
+| Phase 05 P01 | 35min | 3 tasks | 12 files |
 
 ## Session Continuity
 
-Last session: 2026-07-12T13:48:26.027Z
-Stopped at: Completed 04-02-PLAN.md
+Last session: 2026-07-12T15:41:34.789Z
+Stopped at: Completed 05-01-PLAN.md
 Resume file: None
 
-**Planned Phase:** 4 (n8n Telegram Template Parity (dev)) — 2 plans — 2026-07-12T13:23:46.594Z
+**Planned Phase:** 5 (Channel-Aware ChatManager Core) — 6 plans — 2026-07-12T15:01:08.712Z
