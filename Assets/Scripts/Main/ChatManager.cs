@@ -282,11 +282,20 @@ public partial class ChatManager : MonoBehaviour
                 continue;
             }
 
+            // Prefer last_timestamp (WhatsApp + Telegram); fall back to Telegram's last_time
+            // when the primary is empty/unparseable. Both are RFC3339 strings. Neither parses => 0.
             long unixTime = 0;
             if (DateTimeOffset.TryParse(chat.last_timestamp, out var dto)) unixTime = dto.ToUnixTimeSeconds();
+            else if (DateTimeOffset.TryParse(chat.last_time, out var dtoAlt)) unixTime = dtoAlt.ToUnixTimeSeconds();
 
-            string displayName = string.IsNullOrEmpty(chat.name) ? chat.id[..^5] : UnicodeEmojiConverter.ConvertRealEmojisToSprites(chat.name);
+            // DisplayFallback never slices a numeric/short/empty Telegram id (retires chat.id[..^5]).
+            string displayName = string.IsNullOrEmpty(chat.name)
+                ? ChatIdFormat.DisplayFallback(chat.id)
+                : UnicodeEmojiConverter.ConvertRealEmojisToSprites(chat.name);
             string lastMsg = string.IsNullOrEmpty(chat.last_message_data) ? "" : UnicodeEmojiConverter.ConvertRealEmojisToSprites(chat.last_message_data);
+
+            // Groupness: WhatsApp @g.us/isGroup flag; Telegram dialog type == "chat".
+            bool isGroup = ChatIdFormat.IsGroup(chat.id, chat.type, chat.isGroup);
 
             if (chatLookup.TryGetValue(chat.id, out var existingVm))
             {
@@ -329,7 +338,8 @@ public partial class ChatManager : MonoBehaviour
                                                lastMessageType: chat.last_message_type,
                                                lastMessageDeliveryStatus: chat.last_message_delivery_status,
                                                isLastMessageMine: isMine,
-                                               lastMessageSenderName: chat.last_message_sender?.pushname);
+                                               lastMessageSenderName: chat.last_message_sender?.pushname,
+                                               isGroup: isGroup);
                 Chats.Add(chatVM);
                 chatLookup[chat.id] = chatVM;
                 OnChatAdded?.Invoke(chatVM);
@@ -1612,6 +1622,8 @@ if (msg.messageType == MessageType.Video)
         return type switch
         {
             "chat" => MessageType.Chat,
+            // Telegram (tapi) text messages arrive as "text"; WhatsApp never sends "text".
+            "text" => MessageType.Chat,
             "image" => MessageType.Image,
             "video" => MessageType.Video,
             "audio" => MessageType.Audio,

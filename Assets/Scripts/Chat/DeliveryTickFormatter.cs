@@ -48,6 +48,10 @@ public static class DeliveryTickFormatter
             case "sent":      return DeliveryStatus.Sent;
             case "delivered": return DeliveryStatus.Delivered;
             case "read":      return DeliveryStatus.Read;
+            // Telegram (tapi) delivery states: pending → clock; undelivered/error → failed tick.
+            case "pending":     return DeliveryStatus.Pending;
+            case "undelivered": return DeliveryStatus.Failed;
+            case "error":       return DeliveryStatus.Failed;
             default:
                 if (loggedUnknown.Add(raw))
                     Debug.LogWarning($"[DeliveryTickFormatter] Unknown Wappi delivery_status: '{raw}'");

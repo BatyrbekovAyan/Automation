@@ -519,7 +519,7 @@ IEnumerator AppendLiveMessagesRoutine(List<MessageViewModel> messages, bool supp
 
     foreach (var vm in messages)
     {
-        bool isGroup = vm.chatId != null && vm.chatId.EndsWith("@g.us");
+        bool isGroup = ChatIdFormat.IsGroup(vm.chatId);
 
         // Out-of-order arrival (sorts before the newest rendered bubble, e.g.
         // a late Wappi delivery): insert at its canonical position so the live
@@ -786,7 +786,7 @@ IEnumerator UpdateListRoutine(List<MessageViewModel> sortedMessages, bool isLoad
                 needDateSeparator = true; 
             }
 
-            bool isGroup = vm.chatId != null && vm.chatId.EndsWith("@g.us");
+            bool isGroup = ChatIdFormat.IsGroup(vm.chatId);
             bool showSenderName = false;
             
             if (isGroup && vm.isIncoming && !string.IsNullOrEmpty(vm.senderName))

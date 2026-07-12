@@ -20,9 +20,11 @@ public class ChatViewModel
     // Used to prefix group chat-list rows ("Aliya: …"); "You" is substituted for own.
     public string LastMessageSenderName { get; private set; }
 
-    // Group chats use the WhatsApp "@g.us" jid suffix — same rule MessageListView uses
-    // to decide per-bubble sender headers. Only group rows get a sender prefix.
-    public bool IsGroup => !string.IsNullOrEmpty(ChatId) && ChatId.EndsWith("@g.us");
+    // Group chats: WhatsApp uses the "@g.us" jid suffix; Telegram groups are numeric-id
+    // dialogs flagged by their dialog type at construction. Set once so a Telegram group
+    // (no suffix) can still be a group. Callers that omit the flag keep the @g.us behavior.
+    // Only group rows get a sender prefix (same rule MessageListView uses for bubble headers).
+    public bool IsGroup { get; }
 
     // Reacted-to message context for a reaction last-message. Null = unknown
     // (formatter omits the "to …" clause). Phase 2 backfills these from a fetch.
@@ -41,7 +43,8 @@ public class ChatViewModel
                          string lastMessageType = null,
                          string lastMessageDeliveryStatus = null,
                          bool isLastMessageMine = false,
-                         string lastMessageSenderName = null)
+                         string lastMessageSenderName = null,
+                         bool isGroup = false)
     {
         ChatId = chatId;
         Title = title;
@@ -54,6 +57,9 @@ public class ChatViewModel
         LastMessageDeliveryStatus = lastMessageDeliveryStatus;
         IsLastMessageMine = isLastMessageMine;
         LastMessageSenderName = lastMessageSenderName;
+        // Preserve the @g.us behavior when a caller doesn't pass the flag (existing tests),
+        // and let ParseChatsJson pass true for Telegram groups (numeric id, no suffix).
+        IsGroup = isGroup || ChatIdFormat.IsGroup(chatId);
         LastMessageTimeString = FormatTimestamp(lastTime);
 
         // OnlineStatus = "tap here for contact info";
