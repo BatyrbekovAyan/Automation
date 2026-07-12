@@ -2470,7 +2470,9 @@ public class Manager : MonoBehaviour
         SendTelegramCodeButton.interactable = false;
         SetButtonText(SendTelegramCodeButton, "Авторизация...");
 
-        string jsonBody = "{\"pwd_code\":\"" + TelegramCodeInput.text + "\"}";
+        // JsonConvert escapes quotes/backslashes — a cloud password is free-form text,
+        // so manual concatenation would produce malformed JSON and hard-fail auth (WR-02).
+        string jsonBody = JsonConvert.SerializeObject(new { pwd_code = TelegramCodeInput.text });
 
         using UnityWebRequest www = new($"https://wappi.pro/tapi/sync/auth/2fa?profile_id={telegramProfileId}", "POST");
         byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonBody);
