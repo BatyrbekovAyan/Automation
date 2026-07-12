@@ -69,3 +69,6 @@ Tools/n8n/workflows-local/
 
 # npm-installed deps for Tools/*.js icon/asset renderers (e.g. @resvg/resvg-js)
 Tools/node_modules/
+
+# tapi live-shape samples (raw payloads may contain phone numbers / names — never commit)
+Tools/tapi/samples/
