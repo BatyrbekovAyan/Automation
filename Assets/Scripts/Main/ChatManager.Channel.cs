@@ -52,8 +52,13 @@ public partial class ChatManager
         if (channel == ActiveChannel) return;
 
         // If a chat is open, return to the list first so the message view doesn't
-        // strand on a channel that no longer owns the open conversation.
+        // strand on a channel that no longer owns the open conversation. Then drop the
+        // open-chat identity/cache: nothing SelectChat-owned may survive the switch, or
+        // public accessors (CurrentChatId, TryGetRecentMessages) would serve the other
+        // channel's chat until the next SelectChat (IN-01). ShowChatList never reads them.
         if (!string.IsNullOrEmpty(currentChatId)) ShowChatList();
+        currentChatId = null;
+        _activeChatCache = null;
 
         if (_syncWaitRoutine != null) { StopCoroutine(_syncWaitRoutine); _syncWaitRoutine = null; }
 
