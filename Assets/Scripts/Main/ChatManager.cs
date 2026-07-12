@@ -284,9 +284,7 @@ public partial class ChatManager : MonoBehaviour
 
             // Prefer last_timestamp (WhatsApp + Telegram); fall back to Telegram's last_time
             // when the primary is empty/unparseable. Both are RFC3339 strings. Neither parses => 0.
-            long unixTime = 0;
-            if (DateTimeOffset.TryParse(chat.last_timestamp, out var dto)) unixTime = dto.ToUnixTimeSeconds();
-            else if (DateTimeOffset.TryParse(chat.last_time, out var dtoAlt)) unixTime = dtoAlt.ToUnixTimeSeconds();
+            long unixTime = ChatDialogTime.Resolve(chat.last_timestamp, chat.last_time);
 
             // DisplayFallback never slices a numeric/short/empty Telegram id (retires chat.id[..^5]).
             string displayName = string.IsNullOrEmpty(chat.name)
@@ -1617,23 +1615,8 @@ if (msg.messageType == MessageType.Video)
             ev.senderName, reactionMessageId);
     }
 
-    MessageType ParseMessageType(string type)
-    {
-        return type switch
-        {
-            "chat" => MessageType.Chat,
-            // Telegram (tapi) text messages arrive as "text"; WhatsApp never sends "text".
-            "text" => MessageType.Chat,
-            "image" => MessageType.Image,
-            "video" => MessageType.Video,
-            "audio" => MessageType.Audio,
-            "ptt" => MessageType.Voice,
-            "sticker" => MessageType.Sticker,
-            "document" => MessageType.Document,
-            "reaction" => MessageType.Reaction,
-            _ => MessageType.Unknown
-        };
-    }
+    // Delegates to the pure MessageTypeParser seam (unit-tested; "text" => Chat for Telegram).
+    MessageType ParseMessageType(string type) => MessageTypeParser.From(type);
 
     static bool IsMediaMessageType(MessageType type) =>
         type == MessageType.Image
