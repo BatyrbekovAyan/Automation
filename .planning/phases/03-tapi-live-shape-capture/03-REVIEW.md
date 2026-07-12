@@ -13,7 +13,9 @@ findings:
   warning: 3
   info: 2
   total: 6
-status: issues_found
+  fixed: 6
+fixed_at: 2026-07-12T12:41:00Z
+status: fixed
 ---
 
 # Phase 3: Code Review Report
@@ -21,7 +23,7 @@ status: issues_found
 **Reviewed:** 2026-07-12T12:28:00Z
 **Depth:** standard
 **Files Reviewed:** 4
-**Status:** issues_found
+**Status:** fixed — all 6 findings fixed 2026-07-12 (commits 8b0c545, 3e2619b, 1c88345, 992a87e, 6fa4e9c, 4b106f7)
 
 ## Summary
 
@@ -44,6 +46,7 @@ Reviewed the owner-run tapi live-shape capture tooling: `capture-shapes.sh` (rea
 
 ### CR-01: Wappi token passed on curl argv — visible in `ps`, contradicts the documented guarantee
 
+**Status:** fixed in `8b0c545` — `auth_curl()` sends the header via `curl --config <(printf ...)` (process substitution, `/dev/fd/N`); token charset validated before the config is built; both call sites converted.
 **File:** `Tools/tapi/capture-shapes.sh:187-188` (also `:214`)
 **Issue:** Both curl call sites pass the secret as a command-line argument:
 
@@ -80,6 +83,7 @@ No doc change needed — the fix makes the existing claims true.
 
 ### WR-01: `--profile` / `--chats` as the last argument hangs the script in a silent infinite loop
 
+**Status:** fixed in `3e2619b` — both flags now require a value (`[ $# -ge 2 ]`) and exit 2 with banner + clear error; verified no hang on `/bin/bash` 3.2.57.
 **File:** `Tools/tapi/capture-shapes.sh:103,105`
 **Issue:** `shift 2` when only 1 positional parameter remains fails *without shifting* in bash, so the `while [ $# -gt 0 ]` loop never terminates. Reproduced on macOS `/bin/bash` 3.2.57: `Tools/tapi/capture-shapes.sh --profile` spins forever — and since arg parsing happens before `print_banner` (L125), it hangs with **zero output**, which is exactly the failure mode that erodes owner trust in an owner-run tool. (`set -e` is not in effect, so the failed `shift` is silently ignored.)
 **Fix:**
@@ -93,6 +97,7 @@ No doc change needed — the fix makes the existing claims true.
 
 ### WR-02: Server-supplied chat/message ids interpolated unvalidated into URLs and output filenames
 
+**Status:** fixed in `1c88345` — `safe_id()` (`^[A-Za-z0-9@._-]+$`) added; `CHAT_IDS` filtered at the source (covers every downstream URL/filename use incl. `FIRST_CID`), plus guards on `REPLY_MID` and the `MID` candidates loop; unsafe ids skipped with WARN.
 **File:** `Tools/tapi/capture-shapes.sh:267-271,299-301,317-320,331-335`
 **Issue:** `CID`, `MID`, `REPLY_MID`, and `FIRST_CID` come from jq over API response bodies and are interpolated raw into:
 - **URLs** — e.g. L270 `...&chat_id=${CID}&limit=100...`. An id containing `&` would inject query parameters; notably, a hostile/corrupt id like `123&mark_all=true` reaching `messages/get` would breach the script's hardest invariant (mutating the owner's read state) through an otherwise read-only call. Ids with `#`, `?`, or spaces silently break the request instead.
@@ -113,6 +118,7 @@ done
 
 ### WR-03: Profile auto-detection conflates network failure / rejected token with "no authorized profile" (misleading exit 3)
 
+**Status:** fixed in `992a87e` — profile listing now captures the HTTP status (`-w '\n%{http_code}'`): HTTP 000/no response → exit 4 (network), non-2xx → exit 5 (wappi rejected, token hint), exit 3 reserved for a genuine 2xx-but-no-authorized-profile. Exit codes documented in the script header and README.
 **File:** `Tools/tapi/capture-shapes.sh:213-231`
 **Issue:** The profile-listing curl (L214) is the only network call with no HTTP-status handling. If the network is down (`PROFILES_JSON` empty), the token is rejected (401/error object — `has("profiles")` on an error body yields false, or jq errors and is swallowed by `2>/dev/null`), or wappi returns any non-2xx, `PROFILE_ID` ends up empty and the script exits 3 telling the owner to *authorize a Telegram profile in-app* — the wrong remediation for all of those causes. Exit code 3 is documented as specifically "no authorized Telegram profile found", so the misdiagnosis leaks into the documented contract.
 **Fix:** Capture the HTTP code like `fetch()` does and fail with a distinct exit-2 diagnosis first:
@@ -132,12 +138,14 @@ fi
 
 ### IN-01: `fetch()` `mv` errors noisily when curl creates no output file on hard connection failure
 
+**Status:** fixed in `6fa4e9c` — `mv` guarded with `[ -f "${outfile}.raw" ]`; HTTP 000 now warns "got no HTTP response (network unreachable?)" instead of a bare code.
 **File:** `Tools/tapi/capture-shapes.sh:197`
 **Issue:** Verified locally: on DNS/connect failure, curl 8.x with `-o` does **not** create the output file (and `-w` prints `000`). The else branch's `mv -f "${outfile}.raw" "${outfile}"` then emits a raw `mv: ... No such file or directory` to stderr alongside the intended `WARN ... HTTP 000` line. Harmless (no leak, script continues), just confusing output on the exact failure path where the owner needs clarity.
 **Fix:** `[ -f "${outfile}.raw" ] && mv -f "${outfile}.raw" "${outfile}"` and extend the WARN with a hint when the code is `000` (e.g. "network unreachable?").
 
 ### IN-02: `--chats 0` accepted despite the error message promising "positive integer"
 
+**Status:** fixed in `4b106f7` — regex tightened to `^[1-9][0-9]*$`; both `--chats 0` and `--chats=0` now exit 2 upfront.
 **File:** `Tools/tapi/capture-shapes.sh:119-122`
 **Issue:** The regex `^[0-9]+$` admits `0`, which yields `head -n 0` → zero chats sampled → a confusing "no chat ids found" WARN instead of an upfront rejection; the validation error text already says "positive integer".
 **Fix:** `if [[ ! "${CHATS_N}" =~ ^[1-9][0-9]*$ ]]; then ...`
