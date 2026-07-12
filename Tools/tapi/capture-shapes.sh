@@ -212,8 +212,15 @@ fetch() {
       mv -f "${outfile}.raw" "${outfile}"   # non-JSON body: keep raw for inspection
     fi
   else
-    mv -f "${outfile}.raw" "${outfile}"      # DEGRADE: keep the real error body for parser work
-    echo "WARN: ${label} returned HTTP ${http_code}" >&2
+    # DEGRADE: keep the real error body for parser work. On a hard connect
+    # failure curl writes no output file at all — guard the mv so the WARN
+    # below is the only thing the owner sees on that path.
+    [ -f "${outfile}.raw" ] && mv -f "${outfile}.raw" "${outfile}"
+    if [ "${http_code}" = "000" ]; then
+      echo "WARN: ${label} got no HTTP response (network unreachable?)" >&2
+    else
+      echo "WARN: ${label} returned HTTP ${http_code}" >&2
+    fi
   fi
 }
 
