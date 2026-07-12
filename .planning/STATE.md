@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
 status: executing
-stopped_at: Completed 05-03-PLAN.md
-last_updated: "2026-07-12T18:32:32.395Z"
+stopped_at: Completed 05-04-PLAN.md
+last_updated: "2026-07-12T18:49:51.533Z"
 last_activity: 2026-07-12
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 9
-  completed_plans: 7
-  percent: 78
+  completed_plans: 8
+  percent: 89
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 ## Current Position
 
 Phase: 5 of 8 (channel aware chatmanager core)
-Plan: 4 of 6 complete (05-01 seam primitives, 05-02 identity seam, 05-03 read-pipeline + parser divergences, 05-05 2FA fix) — next: 05-04
+Plan: 5 of 6 complete (05-01 seam primitives, 05-02 identity seam, 05-03 read-pipeline + parser divergences, 05-05 2FA fix) — next: 05-04
 Status: Ready to execute
 Last activity: 2026-07-12
 
-Progress: [████████░░] 78%
+Progress: [█████████░] 89%
 
 ## Performance Metrics
 
@@ -61,6 +61,7 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [Phase 5]: Telegram 2FA fix (TGAUTH-01) — pure TelegramAuthResponseParser classifier + detail:2fa cloud-password branch in both code and QR flows posting tapi/sync/auth/2fa {pwd_code}; password never logged/persisted, cleared after submit; no new scene objects; 839/839 EditMode green
 - [Phase 5]: 05-02 ChatManager identity seam — ActiveChannel persisted per bot ({botId}ActiveChatChannel), SetActiveChannel reuses SetActiveBot reset choreography + OnActiveChannelChanged; channel-aware GetActiveProfileId/GetCacheRoot (BotCache/{botId}/telegram/ isolation, CHAT-11)/empty-state/sync-gate; ResolveChannelForBot auto-selects connected channel on switch/startup; BotHasNoTelegram empty state; WhatsApp byte-identical, 854/854 EditMode green
 - [Phase 5]: 05-03 read pipeline + tapi parser divergences — 8 non-send chat URLs via WappiEndpoints.Sync(ActiveChannel); ActiveChannelSupportsChatDelete no-ops DeleteChat on Telegram; ParseMessageType 'text'=>Chat + last_timestamp->last_time fallback + DisplayFallback retires chat.id[..^5] + ChatIdFormat.IsGroup groupness; ChatViewModel.IsGroup at construction; pending/undelivered/error ticks; pure MessageTypeParser/ChatDialogTime seams; WhatsApp byte-identical, 878/878 EditMode green
+- [Phase 5]: 05-04 send-path channel branches — Telegram quoted reply => tapi message/reply {body, message_id} (no recipient); reaction body gains required recipient (NullValueHandling.Ignore, WA byte-identical); mark-read drops mark_all on Telegram; media EndpointFor 3-arg via (ChatChannel)entry.channel; text+media outbox snapshot channel, text retry rebuilds URL from entry.channel; last api/sync literals in ChatManager.cs retired; WhatsApp byte-identical, 888/888 EditMode green
 
 ### Pending Todos
 
@@ -97,11 +98,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 05 P05 | 26min | 3 tasks | 4 files |
 | Phase 05 P02 | 19min | 3 tasks | 6 files |
 | Phase 05 P03 | 27min | 3 tasks | 13 files |
+| Phase 05 P04 | 9min | 3 tasks | 7 files |
 
 ## Session Continuity
 
-Last session: 2026-07-12T18:32:18.128Z
-Stopped at: Completed 05-03-PLAN.md
+Last session: 2026-07-12T18:49:51.516Z
+Stopped at: Completed 05-04-PLAN.md
 Resume file: None
 
 **Planned Phase:** 5 (Channel-Aware ChatManager Core) — 6 plans — 2026-07-12T15:01:08.712Z

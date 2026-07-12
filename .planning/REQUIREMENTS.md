@@ -24,11 +24,13 @@
 **: Owner can send text to a Telegram chat (tapi `message/send`), with outbox retry rebuilding the correct channel URL
 - [x] **CHAT-05
 **: Owner can send media (image/video/document) to a Telegram chat (channel-aware `WappiMediaRequestFactory`)
-- [ ] **CHAT-06**: Owner can send a quoted reply in a Telegram chat (dedicated tapi `message/reply` endpoint)
+- [x] **CHAT-06
+**: Owner can send a quoted reply in a Telegram chat (dedicated tapi `message/reply` endpoint)
 - [ ] **CHAT-07**: Incoming Telegram replies render quoted cards (snapshot + `messages/id/get` recovery)
 - [x] **CHAT-08
 **: Owner can send/remove emoji reactions in Telegram chats (recipient-required tapi body)
-- [ ] **CHAT-09**: Opening an unread Telegram chat marks it read on tapi (no `mark_all` query)
+- [x] **CHAT-09
+**: Opening an unread Telegram chat marks it read on tapi (no `mark_all` query)
 - [x] **CHAT-10
 **: Swipe-to-delete is hidden on the Telegram channel (no tapi endpoint); WhatsApp behavior unchanged
 - [x] **CHAT-11
@@ -99,10 +101,10 @@
 | CHAT-03 | Phase 5 | Pending |
 | CHAT-04 | Phase 5 | Complete |
 | CHAT-05 | Phase 5 | Complete |
-| CHAT-06 | Phase 5 | Pending |
+| CHAT-06 | Phase 5 | Complete |
 | CHAT-07 | Phase 5 | Pending |
 | CHAT-08 | Phase 5 | Complete |
-| CHAT-09 | Phase 5 | Pending |
+| CHAT-09 | Phase 5 | Complete |
 | CHAT-10 | Phase 5 | Pending |
 | CHAT-11 | Phase 5 | Complete |
 | TGAUTH-01 | Phase 5 | Pending |
