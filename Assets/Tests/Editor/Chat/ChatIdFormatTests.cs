@@ -71,4 +71,16 @@ public class ChatIdFormatTests
 
     [Test] public void IsGroup_Full_WaIsGroupFlag_True() =>
         Assert.IsTrue(ChatIdFormat.IsGroup("x", null, true)); // WA isGroup flag
+
+    // WR-03 regression: the "chat" type rule is trusted ONLY for suffix-less (Telegram
+    // numeric) ids. A WA id that carries any @ suffix must resolve by suffix/flag alone,
+    // even if Wappi ever starts populating type:"chat" on the api side.
+    [Test] public void IsGroup_Full_WaOneToOneSuffix_ChatType_StaysNonGroup() =>
+        Assert.IsFalse(ChatIdFormat.IsGroup("79995579399@c.us", "chat", false)); // WA 1:1 stays 1:1
+
+    [Test] public void IsGroup_Full_WaGroupSuffix_ChatType_StaysGroup() =>
+        Assert.IsTrue(ChatIdFormat.IsGroup("120363012345@g.us", "chat", false)); // @g.us wins by suffix
+
+    [Test] public void IsGroup_Full_NullId_ChatType_True() =>
+        Assert.IsTrue(ChatIdFormat.IsGroup(null, "chat", false)); // suffix-less (TG-shaped) → trust type
 }

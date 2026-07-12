@@ -49,8 +49,12 @@ public static class ChatIdFormat
     /// <summary>
     /// Full groupness check (used by the chat list, which has the dialog).
     /// WhatsApp: <c>@g.us</c> suffix OR the dialog's isGroup flag.
-    /// Telegram: <c>dialogType == "chat"</c>. Routes through the suffix check first.
+    /// Telegram: <c>dialogType == "chat"</c> — trusted ONLY for suffix-less (Telegram
+    /// numeric) ids, so a hypothetical WA-side <c>type:"chat"</c> field can never flip
+    /// suffixed WhatsApp ids to group rendering (WR-03).
     /// </summary>
     public static bool IsGroup(string chatId, string dialogType, bool dialogIsGroup) =>
-        IsGroup(chatId) || dialogIsGroup || dialogType == "chat";
+        IsGroup(chatId) || dialogIsGroup ||
+        // "chat" == Telegram group; only trust it for suffix-less (Telegram numeric) ids
+        (dialogType == "chat" && (chatId == null || chatId.IndexOf('@') < 0));
 }
