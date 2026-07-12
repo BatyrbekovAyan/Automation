@@ -14,13 +14,18 @@ public partial class ChatManager
     public string CurrentBotId { get; private set; } = DefaultBotId;
 
     /// <summary>
-    /// Per-bot cache root: {persistentDataPath}/BotCache/{CurrentBotId}/.
-    /// Always exists after this call; safe for callers to write under.
+    /// Per-bot, per-channel cache root. WhatsApp keeps the legacy
+    /// {persistentDataPath}/BotCache/{CurrentBotId}/ (byte-identical, no migration);
+    /// Telegram nests one hardcoded sub-dir deeper so a dual-channel bot never collides
+    /// chats.json. Always exists after this call; safe for callers to write under.
     /// </summary>
     public string GetCacheRoot()
     {
         string botId = SanitizeBotId(CurrentBotId);
-        string path = Path.Combine(Application.persistentDataPath, "BotCache", botId);
+        string subDir = ChannelCachePath.SubDir(ActiveChannel);
+        string path = string.IsNullOrEmpty(subDir)
+            ? Path.Combine(Application.persistentDataPath, "BotCache", botId)
+            : Path.Combine(Application.persistentDataPath, "BotCache", botId, subDir);
         if (!Directory.Exists(path)) Directory.CreateDirectory(path);
         return path;
     }
@@ -125,6 +130,10 @@ public partial class ChatManager
         _chatListSyncing = false;   // a SyncAllChats killed mid-flight never runs its finally
         ClearVideoThumbQueue();     // reset queue bookkeeping the cancelled coroutines never freed
         ClearMediaDownloadQueue();  // same for the serial media-download worker
+
+        // Restore the bot's persisted channel (auto-selecting the connected one if the
+        // persisted channel is unconnected) BEFORE loading so the loaded channel matches.
+        ActiveChannel = ResolveChannelForBot(botId);
         BeginLoadForActiveBot();
     }
 
@@ -136,15 +145,28 @@ public partial class ChatManager
         => !string.IsNullOrEmpty(profileId) && profileId != Bot.UnauthedProfileSentinel;
 
     /// <summary>
-    /// Returns the active bot's WhatsApp profile ID, or null if missing/sentinel.
-    /// Coroutines guard on null and abort to avoid sending malformed requests.
+    /// Returns the active bot's profile ID for the ACTIVE channel (WhatsApp or Telegram),
+    /// or null if missing/sentinel. Coroutines guard on null and abort to avoid sending
+    /// malformed requests. Channel-aware but zero call-site churn — every consumer that
+    /// used the WhatsApp id now follows ActiveChannel automatically.
     /// </summary>
     private string GetActiveProfileId()
     {
         Bot bot = Manager.Instance != null ? Manager.Instance.FindBotByName(CurrentBotId) : null;
         if (bot == null) return null;
-        return IsValidProfileId(bot.whatsappProfileId) ? bot.whatsappProfileId : null;
+        string profileId = ProfileIdForChannel(bot, ActiveChannel);
+        return IsValidProfileId(profileId) ? profileId : null;
     }
+
+    /// <summary>
+    /// The empty-state reason for "active channel has no connected profile" — WhatsApp or
+    /// Telegram copy depending on ActiveChannel so a Telegram-only bot no longer dead-ends
+    /// on the WhatsApp empty state.
+    /// </summary>
+    private EmptyStateReason NoConnectionEmptyState() =>
+        ActiveChannel == ChatChannel.Telegram
+            ? EmptyStateReason.BotHasNoTelegram
+            : EmptyStateReason.BotHasNoWhatsApp;
 
     /// <summary>PlayerPrefs key suffix holding a bot's sync-window end (Unix ms).</summary>
     private const string SyncUntilKeySuffix = "WhatsappSyncUntil";
@@ -176,14 +198,15 @@ public partial class ChatManager
         Transform root = Manager.Instance != null ? Manager.Instance.BotsRoot : null;
         int botCount = root != null ? root.childCount : 0;
 
-        Bot bot = Manager.Instance != null ? Manager.Instance.FindBotByName(CurrentBotId) : null;
-        bool hasWhatsApp = bot != null && IsValidProfileId(bot.whatsappProfileId);
-        bool syncing = hasWhatsApp && IsWhatsAppSyncing(CurrentBotId, out _);
+        // Channel-aware: hasChannel reflects the ACTIVE channel's profile; the sync
+        // window applies only to WhatsApp (no Telegram window is written at auth).
+        bool hasChannel = IsValidProfileId(GetActiveProfileId());
+        bool syncing = ActiveChannel == ChatChannel.WhatsApp && hasChannel && IsWhatsAppSyncing(CurrentBotId, out _);
 
-        return WhatsAppTabStateResolver.Resolve(botCount, hasWhatsApp, syncing) switch
+        return ChannelTabStateResolver.Resolve(botCount, hasChannel, syncing) switch
         {
-            WhatsAppTabState.NoBots => EmptyStateReason.NoBotsExist,
-            WhatsAppTabState.NoWhatsApp => EmptyStateReason.BotHasNoWhatsApp,
+            ChannelTabState.NoBots => EmptyStateReason.NoBotsExist,
+            ChannelTabState.NoConnection => NoConnectionEmptyState(),
             _ => (EmptyStateReason?)null, // Syncing / Ready are not empty-card states
         };
     }
@@ -197,13 +220,15 @@ public partial class ChatManager
     private void BeginLoadForActiveBot()
     {
         Bot bot = Manager.Instance != null ? Manager.Instance.FindBotByName(CurrentBotId) : null;
-        if (bot == null || !IsValidProfileId(bot.whatsappProfileId))
+        if (bot == null || !IsValidProfileId(ProfileIdForChannel(bot, ActiveChannel)))
         {
-            OnEmptyState?.Invoke(EmptyStateReason.BotHasNoWhatsApp);
+            OnEmptyState?.Invoke(NoConnectionEmptyState());
             return;
         }
 
-        if (IsWhatsAppSyncing(CurrentBotId, out long syncUntilUnixMs))
+        // Post-creation sync window is a WhatsApp-only concept — no Telegram window is
+        // written at auth, so Telegram skips the sync-gate and loads immediately.
+        if (ActiveChannel == ChatChannel.WhatsApp && IsWhatsAppSyncing(CurrentBotId, out long syncUntilUnixMs))
         {
             OnWhatsAppSyncing?.Invoke(syncUntilUnixMs);
             if (_syncWaitRoutine != null) StopCoroutine(_syncWaitRoutine);
@@ -237,8 +262,8 @@ public partial class ChatManager
     public void RefreshActiveBotChats()
     {
         Bot bot = Manager.Instance != null ? Manager.Instance.FindBotByName(CurrentBotId) : null;
-        if (bot == null || !IsValidProfileId(bot.whatsappProfileId)) return; // empty card already shown
-        if (IsWhatsAppSyncing(CurrentBotId, out _)) return;                  // syncing UI owns this case
+        if (bot == null || !IsValidProfileId(ProfileIdForChannel(bot, ActiveChannel))) return; // empty card already shown
+        if (ActiveChannel == ChatChannel.WhatsApp && IsWhatsAppSyncing(CurrentBotId, out _)) return; // syncing UI owns this (WhatsApp-only window)
         if (_chatListSyncing) return;                                        // collapse duplicate syncs
 
         string cachePath = Path.Combine(GetCacheRoot(), "chats.json");
@@ -269,6 +294,10 @@ public partial class ChatManager
         yield return null;
         if (ResolveInitialActiveBot())
         {
+            // Restore the persisted channel (auto-correcting to the connected one) BEFORE
+            // announcing/loading, so subscribers reading ActiveChannel in OnActiveBotChanged
+            // and the initial load both see the resolved channel.
+            ActiveChannel = ResolveChannelForBot(CurrentBotId);
             OnActiveBotChanged?.Invoke(CurrentBotId);
             BeginLoadForActiveBot();
         }

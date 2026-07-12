@@ -385,7 +385,7 @@ public partial class ChatManager : MonoBehaviour
             string activeProfileId = GetActiveProfileId();
             if (string.IsNullOrEmpty(activeProfileId))
             {
-                OnEmptyState?.Invoke(EmptyStateReason.BotHasNoWhatsApp);
+                OnEmptyState?.Invoke(NoConnectionEmptyState());
                 yield break;
             }
             string url = $"https://wappi.pro/api/sync/chats/filter?profile_id={activeProfileId}";
@@ -2065,4 +2065,5 @@ public enum EmptyStateReason
 {
     NoBotsExist,
     BotHasNoWhatsApp,
+    BotHasNoTelegram,
 }
