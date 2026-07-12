@@ -80,7 +80,7 @@ Plans:
 **Plans**: 6 plans
 Plans:
 - [x] 05-01-PLAN.md — Foundations: ChatChannel enum, WappiEndpoints URL builder, ChatIdFormat (recipient/display-fallback/isGroup), channel-parameterized tab-state resolver, OutboxEntry.channel + full EditMode coverage (wave 1)
-- [ ] 05-02-PLAN.md — ChatManager identity seam: ActiveChannel + persistence, SetActiveChannel reset choreography, OnActiveChannelChanged, channel-aware GetActiveProfileId/GetCacheRoot/empty-state/sync-gate, channel resolution, EmptyStateView Telegram copy (wave 2)
+- [x] 05-02-PLAN.md — ChatManager identity seam: ActiveChannel + persistence, SetActiveChannel reset choreography, OnActiveChannelChanged, channel-aware GetActiveProfileId/GetCacheRoot/empty-state/sync-gate, channel resolution, EmptyStateView Telegram copy (wave 2)
 - [ ] 05-03-PLAN.md — URL builder wiring (8 literals) + tapi parser divergences: ChatDialog last_time/type, "text"→Chat, DisplayFallback, groupness, delivery-tick mapping, Telegram delete guard (wave 3)
 - [ ] 05-04-PLAN.md — Send-path branches: tapi message/reply, reaction recipient, mark-read no-mark_all body, channel-aware media EndpointFor, outbox channel snapshot + retry rebuild (wave 4)
 - [x] 05-05-PLAN.md — Telegram 2FA auth fix (TGAUTH-01): pure TelegramAuthResponseParser + detail:"2fa" cloud-password branch in code + QR flows, tapi/sync/auth/2fa (wave 1, independent — Manager.cs only)
