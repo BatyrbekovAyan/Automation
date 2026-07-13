@@ -1,6 +1,7 @@
 // ============================================================
 //  BottomTabManager.cs
-//  Manages a WhatsApp-style bottom navigation bar with 5 tabs.
+//  Manages a WhatsApp-style bottom navigation bar (tab list
+//  configured in the Inspector; 4 tabs post-06-02 restructure).
 //
 //  Dependencies : Unity UI, TextMeshPro
 //  Unity Version: 6.x  |  C# 9+
@@ -97,7 +98,9 @@ public class BottomTabManager : MonoBehaviour
 
     [Header("Startup")]
     [Tooltip("Zero-based index of the tab selected when the scene loads.")]
-    [SerializeField] private int defaultTabIndex = 3; // 'Chats' matches WhatsApp default
+    // The committed scene serializes 0 (overrides this initializer); the constant
+    // only matters for a fresh component add, which must boot on Chats, not Profile.
+    [SerializeField] private int defaultTabIndex = WhatsAppTabIndex; // Chats (index 0) is the launch tab
 
     // ------------------------------------------------------------------ //
     //  Private state                                                       //
