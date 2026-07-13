@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Newtonsoft.Json.Linq;
 using NUnit.Framework;
 
@@ -179,5 +180,119 @@ public class SuggestRepliesPayloadTests
     {
         var j = Build(Req(lastIncoming: "есть в наличии?"), One());
         Assert.AreEqual("есть в наличии?", (string)j["lastIncomingText"]);
+    }
+
+    // --- v1.1 channel-selection matrix (SUGG-01) -----------------------------
+
+    [Test]
+    public void TelegramChat_SelectsTelegramProfileAndChannel()
+    {
+        var j = Build(Req(), One(), profileId: "wap",
+            channel: ChatChannel.Telegram, telegramProfileId: "tgp");
+        Assert.AreEqual("tgp", (string)j["profileId"]);       // channel-resolved to the TG profile
+        Assert.AreEqual("telegram", (string)j["channel"]);
+    }
+
+    [Test]
+    public void WhatsAppChat_SelectsWhatsAppProfileAndChannel()
+    {
+        var j = Build(Req(), One(), profileId: "wap",
+            channel: ChatChannel.WhatsApp, telegramProfileId: "tgp");
+        Assert.AreEqual("wap", (string)j["profileId"]);       // stays the WA profile
+        Assert.AreEqual("whatsapp", (string)j["channel"]);
+    }
+
+    [Test]
+    public void BotWaId_AlwaysPresent_EvenOnTelegram()
+    {
+        // botWaId == whatsappWorkflowId is ALWAYS sent (server's default WA RAG branch / backward compat).
+        var j = Build(Req(), One(), botWaId: "wf_wa", channel: ChatChannel.Telegram);
+        Assert.AreEqual("wf_wa", (string)j["botWaId"]);
+    }
+
+    [Test]
+    public void BotTgId_CarriesTelegramWorkflowId()
+    {
+        var j = Build(Req(), One(), channel: ChatChannel.Telegram, telegramWorkflowId: "wf_tg");
+        Assert.AreEqual("wf_tg", (string)j["botTgId"]);
+    }
+
+    [Test]
+    public void TelegramOnlyBot_WaSentinelPassesThrough()
+    {
+        // The TG-only bot from the CONTEXT matrix: no WA workflow (sentinel), a live TG workflow.
+        var j = Build(Req(), One(),
+            botWaId: "-1", channel: ChatChannel.Telegram,
+            telegramProfileId: "tgp", telegramWorkflowId: "wf_tg");
+        Assert.AreEqual("tgp", (string)j["profileId"]);
+        Assert.AreEqual("-1", (string)j["botWaId"]);          // WA sentinel verbatim (server skips WA RAG)
+        Assert.AreEqual("wf_tg", (string)j["botTgId"]);
+        Assert.AreEqual("telegram", (string)j["channel"]);
+    }
+
+    [Test]
+    public void ChannelField_IsLowercaseEnumDerived()
+    {
+        var wa = Build(Req(), One(), channel: ChatChannel.WhatsApp);
+        var tg = Build(Req(), One(), channel: ChatChannel.Telegram);
+        Assert.AreEqual("whatsapp", (string)wa["channel"]);
+        Assert.AreEqual("telegram", (string)tg["channel"]);
+        // Never the enum's PascalCase ToString() — the wire value is a fixed lowercase constant
+        // (T-07-01-01: no free-form / user-supplied string can select the server's RAG metadata key).
+        Assert.AreNotEqual("WhatsApp", (string)wa["channel"]);
+        Assert.AreNotEqual("Telegram", (string)tg["channel"]);
+    }
+
+    // --- additive-identity: a WhatsApp request is byte-identical to v1 --------
+
+    [Test]
+    public void WhatsAppRequest_AdditivelyIdenticalToV1()
+    {
+        var req = Req(seq: 42, steer: "оформить", lastIncoming: "в наличии?", chatId: "500@c.us");
+        var msgs = new List<MessageViewModel> { Msg("привет", true), Msg("здравствуйте", false) };
+        var j = Build(req, msgs,
+            profileId: "wap", botWaId: "wf_wa", businessTypeId: "flowers",
+            businessName: "Цветочный", ownerPrompt: "будь вежлив", catalog: "• Роза — 500",
+            channel: ChatChannel.WhatsApp, telegramProfileId: "tgp", telegramWorkflowId: "wf_tg");
+
+        // The two v1.1 keys ARE present on a WhatsApp request...
+        Assert.AreEqual("whatsapp", (string)j["channel"]);
+        Assert.IsNotNull(j["botTgId"]);
+        Assert.AreEqual("wf_tg", (string)j["botTgId"]);
+
+        // ...and removing EXACTLY those two yields the byte-identical frozen v1 object.
+        j.Remove("channel");
+        j.Remove("botTgId");
+
+        var expectedV1 = new JObject
+        {
+            ["v"]                = 1,
+            ["requestSeq"]       = 42L,
+            ["profileId"]        = "wap",
+            ["chatId"]           = "500@c.us",
+            ["botWaId"]          = "wf_wa",
+            ["businessTypeId"]   = "flowers",
+            ["businessName"]     = "Цветочный",
+            ["ownerPrompt"]      = "будь вежлив",
+            ["catalog"]          = "• Роза — 500",
+            ["steerTowardText"]  = "оформить",
+            ["lastIncomingText"] = "в наличии?",
+            ["messages"]         = new JArray
+            {
+                new JObject { ["role"] = "client",   ["text"] = "привет",       ["ts"] = 1000L },
+                new JObject { ["role"] = "business", ["text"] = "здравствуйте", ["ts"] = 1000L },
+            },
+        };
+
+        Assert.IsTrue(JToken.DeepEquals(expectedV1, j),
+            $"Residual object must deep-equal v1.\nExpected: {expectedV1}\nActual:   {j}");
+
+        // Belt-and-suspenders: the residual is EXACTLY the frozen 12-key v1 set (no rename, no extra add).
+        var residualKeys = j.Properties().Select(p => p.Name)
+            .OrderBy(n => n, System.StringComparer.Ordinal).ToArray();
+        var v1Keys = expectedV1.Properties().Select(p => p.Name)
+            .OrderBy(n => n, System.StringComparer.Ordinal).ToArray();
+        Assert.AreEqual(12, residualKeys.Length);
+        CollectionAssert.AreEqual(v1Keys, residualKeys);
     }
 }
