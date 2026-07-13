@@ -17,7 +17,12 @@ findings:
   warning: 1
   info: 3
   total: 4
-status: issues_found
+status: fixes_applied
+fixes:
+  applied_at: 2026-07-13
+  fixed: 4        # WR-01, IN-01, IN-02, IN-03 (all findings)
+  deferred: 0
+  wontfix: 0
 ---
 
 # Phase 7: Code Review Report
@@ -63,6 +68,8 @@ So the chat-switch guard covers cross-channel by construction: a channel switch 
 
 ### WR-01: `BindRow` throws on a null `profileId` outcome row, truncating the rendered list
 
+**Status:** FIXED (a5f4ee7) — `!string.IsNullOrEmpty(r.profileId)` short-circuits before the `map.TryGetValue` in `BindRow`, with a comment tying it to T-07-02-01 and the SpawnRows-truncation consequence. No new EditMode test: the guard is inline in a private MonoBehaviour UI method (BindRow needs an instantiated row-prefab hierarchy with `Transform.Find` children + PlayerPrefs + `ChatManager.Instance` — no pure seam reaches DashboardPage.cs:380); the null-profileId tolerance contract is already pure-seam-covered by `DashboardProfileMapTests.TryResolve_MissOrNullReturnsFalse` (same semantics, same map). The optional Parse-level row sanitization was deliberately NOT taken (minimal fix scope).
+
 **File:** `Assets/Scripts/Main/Dashboard/DashboardPage.cs:380`
 **Issue:** `map.TryGetValue(r.profileId, out var pref)` throws `ArgumentNullException` when an outcome row has a null `profileId` and the bot tag is shown (no bot filter + ≥2 bots — exactly the state where a null-profileId row survives filtering, since `FilterByProfiles` only excludes it when a filter set is active). `DashboardResponse.Parse` (`DashboardModels.cs:52-62`) tolerates the envelope but does not sanitize per-row fields, and `DashboardStore.Load` can replay such a row from disk cache indefinitely. The exception escapes `BindRow` inside `SpawnRows`' loop (`DashboardPage.cs:344-349`), so every row after the bad one silently fails to render. Notably, this phase hardened `DashboardProfileMap.TryResolve` (`DashboardProfileMap.cs:106`) against exactly this null (threat T-07-02-01), and the shape pre-dates Phase 7 — but the line was retyped in this diff (`out var bn` → `out var pref`) without receiving the same guard, leaving the hardening inconsistent within one feature.
 **Fix:**
@@ -77,17 +84,23 @@ if (botTag) { botTag.gameObject.SetActive(showBotTag);
 
 ### IN-01: `SessionChatMap.ResolveBotName` is now production-dead
 
+**Status:** FIXED (e0418a7) — annotate-not-delete: the class doc comment now marks SessionChatMap SUPERSEDED (Phase 7) by `DashboardProfileMap.TryResolve` and names it + SessionChatMapTests a cleanup candidate for a later hygiene pass. Deletion deliberately deferred out of this phase (scope). `FilterByProfile` kept as documented back-compat per the finding.
+
 **File:** `Assets/Scripts/Main/Dashboard/SessionChatMap.cs:7`
 **Issue:** `OpenChat` was its only production caller and now uses `DashboardProfileMap.TryResolve`; the sole remaining references are `SessionChatMapTests` and a doc-comment mention. `DashboardMetrics.FilterByProfile` (`DashboardMetrics.cs:46`) is similarly test-only now, though it is at least documented as a delegating convenience overload.
 **Fix:** Delete `SessionChatMap` + `SessionChatMapTests` (or annotate why the seam is retained). Keeping `FilterByProfile` is defensible as documented back-compat; if kept, no action needed.
 
 ### IN-02: Additive-identity test proves structural, not byte, identity
 
+**Status:** FIXED (602aa1f) — resolved by aligning the docstrings with the proof rather than adding an ordered assertion (fix-scope direction): `SuggestRepliesDtos.cs` (request-body summary), `N8nSuggestionsProvider.cs` (`BuildPayloadJson` doc), and the test's section header + inline comment now state that the enforced contract is STRUCTURAL identity (JToken.DeepEquals + exact key set), with byte order following separately — and un-enforced — from Json.NET's declaration-order emission over the appended-last v1.1 fields.
+
 **File:** `Assets/Tests/Editor/Chat/SuggestRepliesPayloadTests.cs:245-297` (`WhatsAppRequest_AdditivelyIdenticalToV1`)
 **Issue:** The docstrings (`SuggestRepliesDtos.cs:26-30`, `N8nSuggestionsProvider.cs:144`) claim "byte-identical", but `JToken.DeepEquals` is property-order-insensitive and the key-set assertion sorts before comparing — a future DTO field reorder (or an inserted-rather-than-appended key) would stay green while changing the emitted bytes. Harmless to any JSON parser, so Info only; flagging because the byte-identity claim is the stated contract.
 **Fix:** Add one ordered assertion, e.g. compare `j.Properties().Select(p => p.Name)` (unsorted) against the v1 key sequence, or assert the raw JSON string starts with the expected v1 prefix.
 
 ### IN-03: Channel-scope documentation drift
+
+**Status:** FIXED (b2aee8e) — CLAUDE.md's DashboardOutcomes bullet replaces "WhatsApp-only in v1" with: since Phase 7 `profileIds` carries BOTH channels' authed Wappi ids, and each row's bot + channel resolves client-side via `DashboardProfileMap` from WHICH local id matched (never the server payload). The `BindRow` comment is now "Real chat avatar…" and documents the dual-channel fallback (non-active-channel rows miss the chatId-keyed lookup and take the colored-initial default).
 
 **File:** `CLAUDE.md` (External APIs → `/webhook/DashboardOutcomes`); `Assets/Scripts/Main/Dashboard/DashboardPage.cs:382`
 **Issue:** CLAUDE.md still says DashboardOutcomes is "WhatsApp-only in v1", but DASH-01 now posts Telegram profile ids too; the `BindRow` comment still reads "Real WhatsApp avatar" though rows are now dual-channel (the avatar/title/time accessors are keyed by chatId in the ACTIVE channel's `chatLookup`, so non-active-channel rows gracefully fall back — TG ids pass through `ChatIdFormat.Recipient` unchanged). Per CLAUDE.md's self-maintenance policy, the API note should be updated.
