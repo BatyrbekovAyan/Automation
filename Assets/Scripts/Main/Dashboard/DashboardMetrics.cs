@@ -31,15 +31,23 @@ public static class DashboardMetrics
         }
     }
 
+    /// <summary>
+    /// Set-based bot filter (DASH-02): a null/empty set means "all bots"; otherwise keep
+    /// rows whose profileId is in the set. A dual-channel bot passes BOTH its profile ids
+    /// so its WhatsApp and Telegram rows show under one chip.
+    /// </summary>
+    public static IEnumerable<DashboardOutcome> FilterByProfiles(
+        IEnumerable<DashboardOutcome> rows, ISet<string> ids)
+        => (ids == null || ids.Count == 0)
+            ? rows
+            : rows.Where(r => ids.Contains(r.profileId));
+
+    /// <summary>Single-id convenience overload — delegates to <see cref="FilterByProfiles"/>.</summary>
     public static IEnumerable<DashboardOutcome> FilterByProfile(
         IEnumerable<DashboardOutcome> rows, string profileIdOrNull)
         => string.IsNullOrEmpty(profileIdOrNull)
             ? rows
-            : rows.Where(r => r.profileId == profileIdOrNull);
-
-    // TDD scaffold — implemented in the GREEN commit.
-    public static IEnumerable<DashboardOutcome> FilterByProfiles(
-        IEnumerable<DashboardOutcome> rows, ISet<string> ids) => rows;
+            : FilterByProfiles(rows, new HashSet<string> { profileIdOrNull });
 
     public static int CountOrders(IEnumerable<DashboardOutcome> rows, Window w)
         => rows.Count(r => r.Status == OutcomeStatus.OrderCollected
