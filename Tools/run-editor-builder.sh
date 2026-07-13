@@ -18,6 +18,8 @@
 # Usage:
 #   Tools/run-editor-builder.sh                                # ChannelSwitcherBuilder.BuildHeadless
 #   Tools/run-editor-builder.sh SomeOther.EntryMethod         # override -executeMethod target
+#                                                             # (sentinel auto-derives from the class segment)
+#   Tools/run-editor-builder.sh Some.Entry "custom sentinel"  # override the success sentinel too
 #   UNITY=/path/to/Unity Tools/run-editor-builder.sh          # override Unity binary
 #
 # Outputs (under Tools/test-output/, gitignored). NOT under Temp/ — Unity WIPES
@@ -37,15 +39,20 @@
 
 set -u
 
-# --- Success sentinel the builder logs on completion -----------------------
-SENTINEL="[ChannelSwitcherBuilder] Headless build + save complete"
-
 # --- Resolve project root (this script lives in <project>/Tools/) ----------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # --- Builder entry (optional override from $1) -----------------------------
 METHOD="${1:-ChannelSwitcherBuilder.BuildHeadless}"
+
+# --- Success sentinel the builder logs on completion -----------------------
+# Derived from the method's class segment: every headless builder in this
+# project logs the same shape, "[<Class>] Headless build + save complete".
+# A hardcoded sentinel would make every $1 override report NOT GREEN after the
+# scene had already been mutated AND saved — the opposite of reality.
+# $2 (optional) = explicit override for builders with a different log line.
+SENTINEL="${2:-[${METHOD%%.*}] Headless build + save complete}"
 
 # --- Resolve the matching Unity binary (env override wins) -----------------
 VERSION="$(grep -m1 '^m_EditorVersion:' "${PROJECT}/ProjectSettings/ProjectVersion.txt" 2>/dev/null | awk '{print $2}')"
