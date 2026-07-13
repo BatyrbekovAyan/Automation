@@ -127,25 +127,38 @@ public static class DashboardPageBuilder
         LoadAssets();
         _roundedToRefresh.Clear();
 
-        // Resolve the screen container from BottomTabManager (NavRestructureBuilder idiom).
+        // Resolve Screen_Dashboard via the «Сводка» tab, located by IDENTITY — tab
+        // indices shifted when 06-02 removed the Telegram tab, so never index into
+        // BottomTabManager.tabs (the old tabs[3] read reached the shared container
+        // only by coincidence and post-restructure pointed at Profile, not Bots).
         var tabManager = Object.FindFirstObjectByType<BottomTabManager>(FindObjectsInactive.Include);
         if (tabManager == null)
             throw new System.InvalidOperationException("BottomTabManager not found — is Main.unity open?");
         var tabsSo = new SerializedObject(tabManager);
         var tabsProp = tabsSo.FindProperty("tabs");
-        if (tabsProp == null || tabsProp.arraySize < 4)
-            throw new System.InvalidOperationException("BottomTabManager.tabs list is missing or too short.");
-        var screenBots = tabsProp.GetArrayElementAtIndex(3).FindPropertyRelative("screenPanel").objectReferenceValue as GameObject;
-        if (screenBots == null)
-            throw new System.InvalidOperationException("tabs[3].screenPanel (Screen_Bots) is unassigned.");
-        Transform container = screenBots.transform.parent;
-        if (container == null)
-            throw new System.InvalidOperationException("Screen_Bots has no parent container.");
+        if (tabsProp == null)
+            throw new System.InvalidOperationException("BottomTabManager.tabs list is missing.");
 
-        Transform screenT = container.Find("Screen_Dashboard");
-        if (screenT == null)
-            throw new System.InvalidOperationException("Screen_Dashboard not found under the screen container — run Tools/Nav Restructure/Build (Task B5) first.");
-        var screen = screenT.gameObject;
+        GameObject screen = null;
+        bool dashboardTabFound = false;
+        for (int i = 0; i < tabsProp.arraySize; i++)
+        {
+            var t = tabsProp.GetArrayElementAtIndex(i);
+            var panel = t.FindPropertyRelative("screenPanel").objectReferenceValue as GameObject;
+            if (t.FindPropertyRelative("tabName").stringValue == "Сводка"
+                || (panel != null && panel.name == "Screen_Dashboard"))
+            {
+                dashboardTabFound = true;
+                screen = panel;
+                break;
+            }
+        }
+        if (!dashboardTabFound)
+            throw new System.InvalidOperationException(
+                "«Сводка» tab not found in BottomTabManager.tabs — run Tools/Nav Restructure/Build (Task B5) first.");
+        if (screen == null)
+            throw new System.InvalidOperationException(
+                "«Сводка» tab's screenPanel is unassigned — re-run Tools/Nav Restructure/Build (Task B5).");
 
         Transform contentT = screen.transform.Find("Content");
         if (contentT == null)
