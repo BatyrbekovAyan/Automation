@@ -14,17 +14,17 @@ gate, because `secrets.json` is deny-ruled for Claude.
 
 ## Checklist (owner completes)
 
-- [ ] An **authorized dev Telegram profile** exists (authorize one in-app first if
+- [x] An **authorized dev Telegram profile** exists (authorize one in-app first if
       not — Settings → Telegram auth; use a dev account).
-- [ ] Ran `Tools/tapi/capture-shapes.sh` (optionally `--profile` / `--chats`).
-- [ ] Samples are present in `Tools/tapi/samples/` **with `INDEX.json`** (gitignored
+- [x] Ran `Tools/tapi/capture-shapes.sh` *(2026-07-13, owner-instructed, `--chats 8`, 26 samples)* (optionally `--profile` / `--chats`).
+- [x] Samples are present in `Tools/tapi/samples/` **with `INDEX.json`** (gitignored
       — confirm they are NOT staged for commit).
-- [ ] Coverage sanity: samples cover chats (all 3 list endpoints:
+- [x] Coverage sanity *(PARTIAL: text/image/document/poll captured; NO sticker/voice/video-note/GIF existed in the account — send those + re-run for Q2 completion)*: samples cover chats (all 3 list endpoints:
       `chats_get` / `chats_filter` / `chats_days_get`), `messages/get` across each
       distinct media `type` encountered, and a reply via `messages/id/get`.
-- [ ] All **13 `SHAPES.md` verdicts** are set — `confirmed shape` / `divergence` /
+- [x] All **13 `SHAPES.md` verdicts** are set *(Q1/Q3/Q4 divergence, Q5 mixed, Q6/Q8 confirmed, Q2/Q7 not-observed-partial, Q9-13 deferred)* — `confirmed shape` / `divergence` /
       `not-observed` for Q1–Q8, or left `DEFERRED` (with reason) for Q9–Q13.
-- [ ] The **Reactions-receive go/no-go** decision is recorded in `SHAPES.md`
+- [x] The **Reactions-receive go/no-go** decision is recorded — **GO** (reactions[] on target messages) in `SHAPES.md`
       (GO → build receive-side reactions in Phase 5; NO-GO → v2 `TG-REACT-RECV`).
 
 ## When all boxes are ticked

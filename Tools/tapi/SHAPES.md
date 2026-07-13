@@ -32,10 +32,27 @@ Phase 4) in real observed JSON instead of undocumented guesses.
   string? Is there `s3Info.url` (text shows `s3Info:{}`)? Where do thumbnail,
   dimensions, duration, file name and size live — `attaches`? flat fields?
 - **Evidence:** `INDEX.json` key `"1"` → `message_type_*.json`, `messages_*.json`.
-- **VERDICT:** `PENDING CAPTURE`
-- **Downstream impact:** Decides the whole Normalize port —
-  `ChatManager.cs:1414-1530` media branches (`body`-as-JObject, `s3Info.url`,
-  `media_info.duration`) (**CHAT-03**). Voice duration source feeds `TPL-03`.
+- **VERDICT:** `divergence` (captured 2026-07-13: image ×33, document ×27, text ×323, poll ×1 across 8 chats)
+  - Media `body` is **`null`** — NOT a JObject (WA), NOT base64, NO inline URL,
+    NO `JPEGThumbnail`. `s3Info` is `{}`; `attaches` is `null`. Media content is
+    reachable **only** via `message/media/download` by message id.
+  - **`media_info` EXISTS on the tapi sync API** (the docs-research claim of
+    "0 occurrences" was webhook-only): `{"width","height","size","duration",
+    "is_round","is_group","grouped_id"}` — image carries w/h/size; a video
+    carries `duration` (observed 11.4).
+  - Flat `mimetype` + `file_name` fields carry the media identity
+    (e.g. `"mimetype":"video/mp4","file_name":"<uuid>.mp4"`); `caption` is a flat
+    string (`""` when absent).
+  - **A phone-sent video arrived as `type:"document"` with `mimetype:"video/mp4"`**
+    — TG media kind detection must consider mimetype, not `type` alone.
+  - Redacted image excerpt: `{"type":"image","body":null,"s3Info":{},"attaches":null,
+    "media_info":{"width":600,"height":800,"size":149087,"duration":0,"is_round":false},
+    "mimetype":"image/jpeg","caption":"","file_name":""}`
+- **Downstream impact:** Normalize port (**CHAT-03**): NO inline thumbnails on TG —
+  bubbles render via the serial `media/download` queue + `MediaCacheManager`
+  (placeholder-first UX); dimensions/duration from `media_info`; media kind =
+  `type` ⊕ `mimetype`. Voice duration on the SYNC api = `media_info.duration`
+  (webhook `length_seconds` differs — the TPL-03 template fallback covers both).
 
 ### 2. Sticker + video-note + animated-emoji `type` strings
 
@@ -43,10 +60,15 @@ Phase 4) in real observed JSON instead of undocumented guesses.
   animated emoji use (none documented)? Does `isGif` mark GIFs that arrive as
   `type:"video"`?
 - **Evidence:** `INDEX.json` key `"2"` → `message_type_*.json`.
-- **VERDICT:** `PENDING CAPTURE`
-- **Downstream impact:** `ChatManager.cs:1613-1622` `ParseMessageType` needs a
-  `"text"` case + any new media `type` cases, else those messages map to
-  `MessageType.Unknown` and are dropped (**CHAT-03**).
+- **VERDICT:** `not-observed` (partial) — 384 captured messages contained **zero**
+  sticker / voice(ptt) / video-note (`is_round` always false) / GIF (`isGif`
+  always false) messages. New TG-only type observed: **`"poll"`** (unknown to
+  `ParseMessageType` → silently dropped; acceptable v1). Video-as-`document`
+  confirmed (see Q1). **Re-run needed:** send a sticker, a voice message, a
+  video-note (кружок), and a GIF to the dev account, then re-run
+  `capture-shapes.sh` — 2 minutes, script is idempotent.
+- **Downstream impact:** `ParseMessageType` `"text"` case shipped (05-03);
+  sticker/voice/video-note/GIF cases await the re-run (**CHAT-03**, 05-06).
 
 ### 3. Incoming reactions transport
 
@@ -55,11 +77,17 @@ Phase 4) in real observed JSON instead of undocumented guesses.
   `messages/id/get`, or via webhook only? What does `stanzaId` carry on TG?
 - **Evidence:** `INDEX.json` key `"3"` → `message_id_reactions.json`,
   `message_id_full.json`, `messages_*.json`.
-- **VERDICT:** `PENDING CAPTURE`
-- **Downstream impact:** `ChatManager.cs:1532` + the ReactionStore pipeline —
-  determines whether receive-side reactions are buildable on TG. Feeds the
-  **Reactions-receive go/no-go** section below and the v2 **TG-REACT-RECV**
-  requirement (send-side is **CHAT-08**, separate).
+- **VERDICT:** `divergence` (26 reacted messages captured) — reactions are **state
+  on the target message**, not live events: every `messages/get` message carries a
+  `reactions` field, `null` when unreacted, else an array of
+  `{"reaction":"👍","count":0,"user_id":"<numeric>","contact_name":"","type":"emoji"}`.
+  **No `type:"reaction"` message rows exist** on tapi (0 in 384), and `stanzaId`
+  is `""` throughout — the whole WA stanzaId/ReactionResolve transport does not
+  apply. Refreshing the open chat's window via `messages/get` refreshes reaction
+  state for free.
+- **Downstream impact:** receive-side reactions on TG = map `RawMessage.reactions[]`
+  → the existing per-message reaction state during Normalize (05-06); the WA
+  ReactionStore live-event path and resolver queue stay WhatsApp-only.
 
 ### 4. Group / channel dialogs
 
@@ -68,9 +96,20 @@ Phase 4) in real observed JSON instead of undocumented guesses.
   for TG groups, and whether `messages/get` `chat_id` accepts a group numeric id.
 - **Evidence:** `INDEX.json` key `"4"` → `chats_get.json`, `chats_filter.json`,
   `chats_days_get.json`, `messages_*.json`.
-- **VERDICT:** `PENDING CAPTURE`
-- **Downstream impact:** `ChatDialog.isGroup` is absent on tapi → groupness via
-  `type=="chat"` (**CHAT-01**); group guard affects the template (Phase 4).
+- **VERDICT:** `divergence` — THREE dialog types observed: `"user"` ×10,
+  `"chat"` ×1 (group, has nested `chat` obj + `participants[]`), and
+  **`"channel"` ×1** (a real third type the docs never showed; carries
+  `participants[]`, no `user`/`chat` obj in days/get). `messages/get` accepts the
+  group/channel numeric ids (both captured fine). Group message `from` = sender's
+  numeric id ≠ `chatId`; private incoming `from == chatId`; **own outgoing
+  (`fromMe:true`) messages carry `from` = own profile-user id ≠ `chatId` even in
+  private chats** — the n8n `If from == chatId` guard holds for *incoming private*
+  (the only case webhooks feed the bot) but e2e should confirm channels/groups
+  never reach the agent.
+- **Downstream impact:** `ChatIdFormat.IsGroup` currently treats only
+  `type=="chat"` as group — **`"channel"` must also classify as group-ish**
+  (sender headers, no per-chat suggestions) → 05-06 item. Template guard: verify
+  in the TPL-06 e2e (**Phase 4/8**).
 
 ### 5. Dialog `name` / `thumbnail` presence in chats/filter
 
@@ -80,10 +119,17 @@ Phase 4) in real observed JSON instead of undocumented guesses.
   `"id": ""` in the chats/filter example real or a doc bug?
 - **Evidence:** `INDEX.json` key `"5"` → `chats_filter.json`, `chats_get.json`,
   `chats_days_get.json`, `contact.json`.
-- **VERDICT:** `PENDING CAPTURE`
-- **Downstream impact:** `ChatManager.cs:288` numeric-id slice
-  (`chat.id[..^5]`) throws / corrupts on empty or short ids (**CHAT-02**); name
-  and avatar fallbacks feed the chat list (**CHAT-01**).
+- **VERDICT:** `confirmed shape` for names / `divergence` for avatars —
+  `name` **is populated in ALL three list endpoints** (the docs' empty-name and
+  `"id":""` examples were doc bugs; all 12 dialogs carry non-empty numeric ids,
+  shortest observed `777000` = 6 chars). BUT avatars are effectively absent:
+  `thumbnail: null` + `picture: ""` on every dialog in every endpoint, and
+  `contact/get` returned `picture: null`, `thumbnail: ""` too (`username` +
+  `pushname`/`firstName` populated).
+- **Downstream impact:** the `[..^5]` slice is already retired (05-03
+  `DisplayFallback`) — names make the fallback rare anyway (**CHAT-02**). Avatars:
+  do NOT rely on TG avatar URLs in v1 — the colored-initial default is the norm
+  (**CHAT-01**); revisit in device UAT with photo-having contacts.
 
 ### 6. `last_timestamp` runtime type under JsonUtility
 
@@ -91,10 +137,14 @@ Phase 4) in real observed JSON instead of undocumented guesses.
   empty string (not an exception) under JsonUtility, and decide between
   `last_time` (RFC3339) or a long-typed field for ordering.
 - **Evidence:** `INDEX.json` key `"6"` → `chats_get.json`, `chats_filter.json`.
-- **VERDICT:** `PENDING CAPTURE`
-- **Downstream impact:** `ChatDialog.last_timestamp` (string) + `ChatManager.cs:286`
-  `DateTimeOffset.TryParse` — wrong type → time labels/ordering break
-  (**CHAT-01**).
+- **VERDICT:** `confirmed shape` — `last_timestamp` is a **unix-seconds NUMBER**
+  (e.g. `1783527365`) and `last_time` is the RFC3339 string
+  (`"2026-07-08T16:16:05Z"`), the exact mirror of WhatsApp. JsonUtility leaves the
+  string-typed `last_timestamp` field empty on the number → the shipped 05-03
+  `ChatDialogTime.Resolve` fallback (try `last_timestamp`, else `last_time`) is
+  the correct design, no change needed.
+- **Downstream impact:** none further — already implemented + unit-tested
+  (**CHAT-01** shipped).
 
 ### 7. `isDeleted` semantics on TG
 
@@ -103,18 +153,29 @@ Phase 4) in real observed JSON instead of undocumented guesses.
 - **Evidence:** `INDEX.json` key `"7"` → `chats_get.json`, `chats_days_get.json`.
   (Semantics also need a manual before/after observation — delete a test chat in
   the TG app, re-run, compare.)
-- **VERDICT:** `PENDING CAPTURE`
-- **Downstream impact:** `ChatManager.cs:274` `ParseChatsJson` `isDeleted` skip;
-  no tapi `chat/delete` → swipe-to-delete is hidden on TG (**CHAT-10**).
+- **VERDICT:** `not-observed` (field confirmed, semantics untested) — every
+  dialog carries `isDeleted: false` / `isArchived: false`; no deleted chat existed
+  in the account to observe stickiness/revival. The existing `ParseChatsJson`
+  skip is safe either way (worst case: a TG-app-deleted chat keeps showing until
+  Wappi flags it). Optional follow-up: delete a junk chat in the TG app, re-run
+  the capture, diff.
+- **Downstream impact:** `ParseChatsJson` `isDeleted` skip already channel-neutral;
+  swipe-to-delete already hidden on TG (**CHAT-10** shipped).
 
 ### 8. Reply snapshot echo bug
 
 - **Question:** Does tapi `reply_message.body` ever echo the replying message's
   own text (the WhatsApp server quirk `ReplyParser` guards against)?
 - **Evidence:** `INDEX.json` key `"8"` → `message_id_reply.json`, `messages_*.json`.
-- **VERDICT:** `PENDING CAPTURE`
-- **Downstream impact:** `ReplyParser.cs` + `ChatManager.QuoteResolve.cs:96`
-  recovery path (fetch original via `messages/id/get`) (**CHAT-07**).
+- **VERDICT:** `confirmed shape`, no echo bug (28 reply messages captured) —
+  `reply_message` = `{id, type, body, caption, chatId, contact_name, username,
+  phone, timestamp, attaches}`; `body` is the QUOTED original's text (own-body ==
+  snapshot-body was FALSE on every sampled reply), `contact_name` populated,
+  `file_name` absent (as researched). `messages/id/get` works on tapi with the
+  same `{status, message:{...}}` envelope the WA recovery parser expects.
+- **Downstream impact:** `ReplyParser.FromSnapshot` maps cleanly; the WA
+  echo-blank guard simply never fires on TG (harmless); QuoteResolve recovery
+  path ports as-is (**CHAT-07** → 05-06 wiring only).
 
 ### 9. Resend-code behavior
 
@@ -176,10 +237,18 @@ Q3 evidence, was a viable tapi **receive-side** reaction transport observed?
   defer to the v2 requirement **TG-REACT-RECV**; incoming reactions stay out of
   v1.1. (Send-side reactions **CHAT-08** are unaffected — they ship regardless.)
 
-**VERDICT:** `PENDING CAPTURE`
+**VERDICT:** **GO** (2026-07-13) — a pollable transport exists and is BETTER than
+expected: `reactions[]` rides on every target message in the normal
+`messages/get` window (26 live examples), so the open chat's existing refresh
+loop delivers reaction updates with zero extra requests. Build receive-side
+reactions in **05-06** as a Normalize mapping (`RawMessage.reactions[]` → the
+per-message reaction state); the WA live-event/stanzaId transport stays
+WhatsApp-only. v2 requirement **TG-REACT-RECV** is superseded (promoted into
+05-06 scope).
 
-**Evidence:** `samples/message_id_reactions.json`, `samples/message_id_full.json`
-(the `reactions` field shape), and any reaction-typed rows in `messages_*.json`.
+**Evidence:** reaction-bearing rows in `samples/messages_*.json` (shape:
+`[{"reaction":"<emoji>","count":0,"user_id":"<numeric>","contact_name":"","type":"emoji"}]`);
+`samples/message_id_full.json` (`message.reactions` field on the by-id envelope).
 
 ---
 
