@@ -4,7 +4,7 @@ using NUnit.Framework;
 // channel switcher. Selected = this chip is the active channel (equality only); Muted =
 // this chip's OWN channel is unconnected (connectivity only). A chip can be both Selected
 // and Muted (active channel on a disconnected profile) — muted is never suppressed by
-// selection. Matrix: both chips × active ∈ {WhatsApp, Telegram} × connectivity (Tests A–E).
+// selection. Matrix: both chips × active ∈ {WhatsApp, Telegram} × connectivity (Tests A–F).
 public class ChannelSwitcherModelTests
 {
     private static ChannelChipState Wa(ChatChannel active, bool wa, bool tg)
@@ -81,5 +81,22 @@ public class ChannelSwitcherModelTests
         var tg = Tg(ChatChannel.WhatsApp, wa: false, tg: false);
         Assert.IsFalse(tg.Selected);
         Assert.IsTrue(tg.Muted);
+    }
+
+    // Test F: active=Telegram, wa=false, tg=false — the TG mirror of the selected+muted
+    // edge. Reachable in production: ChannelResolver.Resolve keeps a persisted Telegram
+    // choice when NEITHER channel is connected (e.g. Telegram connected → chosen →
+    // logged out), so the TG chip must render selected AND muted, WA muted-unselected.
+    // → TG chip {selected=true, muted=true}; WA chip {selected=false, muted=true}
+    [Test]
+    public void F_ActiveTelegram_NeitherConnected()
+    {
+        var tg = Tg(ChatChannel.Telegram, wa: false, tg: false);
+        Assert.IsTrue(tg.Selected, "TG chip selected (active) even though disconnected");
+        Assert.IsTrue(tg.Muted, "TG chip muted because Telegram is disconnected");
+
+        var wa = Wa(ChatChannel.Telegram, wa: false, tg: false);
+        Assert.IsFalse(wa.Selected, "WA chip not selected when Telegram is active");
+        Assert.IsTrue(wa.Muted, "WA chip muted when WhatsApp is disconnected");
     }
 }
