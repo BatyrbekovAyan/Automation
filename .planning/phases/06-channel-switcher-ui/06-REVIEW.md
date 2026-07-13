@@ -19,7 +19,12 @@ findings:
   warning: 3
   info: 5
   total: 8
-status: issues_found
+status: fixes_applied
+fixes:
+  applied_at: 2026-07-13
+  fixed: 8        # WR-01, WR-02, WR-03, IN-01, IN-02, IN-03, IN-04, IN-05
+  deferred: 0
+  tests: 901/901 green (baseline 900 + IN-03's Test F)
 ---
 
 # Phase 6: Code Review Report
@@ -49,6 +54,8 @@ The real residue lives in the **superseded Editor builders**: `NavRestructureBui
 
 ### WR-01: NavRestructureBuilder re-run silently corrupts the committed 4-tab scene
 
+**Status:** FIXED (7bcd0f5) — identity guard added in `BuildInternal` before ANY mutation: tabs[2] must be the pre-restructure "New" tab (`tabName == "New"` or screenPanel named `Screen_New`); otherwise throws `InvalidOperationException` («scene already restructured — aborting before save»). Both entry points call `BuildInternal` before their MarkSceneDirty/SaveScene, so a re-run against the committed 4-tab scene aborts with nothing dirtied and nothing saved. The `botsTab = tabs[3]` read now sits behind the guard, where tabs[3] is provably Bots.
+
 **File:** `Assets/Editor/NavRestructureBuilder.cs:139-140`
 **Issue:** `BuildInternal` still assumes the pre-06-02 5-tab layout: `newTab = tabsProp.GetArrayElementAtIndex(2)` and `botsTab = tabsProp.GetArrayElementAtIndex(3)`. Against the committed 4-tab scene, tabs[2] is **Bots** and tabs[3] is **Profile**. Every guard passes anyway (`arraySize < 4` → 4 tabs; `tabs[3].screenPanel` → Screen_Profile, non-null), so a re-run proceeds and: (1) `BuildDashboard` (line ~176 via `DestroyAllByName(container, "Screen_Dashboard")`) destroys the fully-built dashboard, leaving tabs[1].screenPanel dangling — the real «Сводка» tab goes dead; (2) `RewriteNewTabToDashboard` (line 384) renames the **Bots** tab to «Сводка» and points it at the bare placeholder — Bots becomes unreachable and the bar shows two «Сводка» tabs. `BuildHeadless` (line 79-85) then auto-saves the corrupted scene with a success log. This phase edited the file (ReorderScreens prune, line ~422) making re-run look supported while leaving the destructive path in place — the exact hazard flagged by 06-01.
 **Fix:** Add an identity guard before any mutation, mirroring ChannelSwitcherBuilder's guarded tab delete — fail loudly when the scene is already restructured:
@@ -66,6 +73,8 @@ if (!isPreRestructure)
 (Alternatively resolve the target tab by name instead of index.)
 
 ### WR-02: AssignDashboardIcons re-run stamps dashboard icons onto the Bots tab
+
+**Status:** FIXED (98b775d) — the «Сводка» slot is now resolved by identity (loop over `tabs`, match `tabName == "Сводка"` or screenPanel named `Screen_Dashboard`), throwing if not found — no hard bail, so the legitimate glyph-regeneration re-run keeps working wherever the tab sits. Success log no longer claims `tabs[2]`; the vestigial `arraySize < 3` guard was dropped (identity resolution subsumes it).
 
 **File:** `Assets/Editor/NavRestructureBuilder.cs:111`
 **Issue:** `var dashboardTab = tabsProp.GetArrayElementAtIndex(2);` — in the committed 4-tab scene, «Сводка» moved to index **1** and index 2 is **Bots**. Re-running `Tools/Nav Restructure/Assign Dashboard Icons` (e.g., after regenerating the glyphs, a legitimate use) overwrites the Bots tab's icons with the line-chart sprites and marks the scene dirty. The `arraySize < 3` guard (line 108) passes. Unlike WR-01 this entry point has a real future use, so a hard "already restructured" bail is wrong — it must find the right slot.
@@ -86,6 +95,8 @@ if (dashboardTab == null)
 
 ### WR-03: run-editor-builder.sh — method override always reports NOT GREEN after the scene was already mutated and saved
 
+**Status:** FIXED (efb60c7) — exactly the suggested shape: `SENTINEL="${2:-[${METHOD%%.*}] Headless build + save complete}"` (METHOD assignment moved above it), with `$2` as an explicit override for irregular builders; usage header documents both. Verified the derivation against all 5 existing headless builders' actual `Debug.Log` lines (ChannelSwitcher/NavRestructure/DashboardPage/ProfileSubPages/AttachSheet all log the `[<Class>] Headless build + save complete` prefix; `grep -qF` substring-matches the suffixed variants) — the default is byte-identical to the old hardcoded sentinel.
+
 **File:** `Tools/run-editor-builder.sh:41,48`
 **Issue:** The usage header (line 20) advertises `Tools/run-editor-builder.sh SomeOther.EntryMethod` to override the `-executeMethod` target, but `SENTINEL` (line 41) is hardcoded to ChannelSwitcherBuilder's log line. Running any other builder (e.g., `NavRestructureBuilder.BuildHeadless`) mutates **and saves** Main.unity, then the verdict grep never matches → exit 1 "NOT GREEN". An operator or agent trusting the exit code concludes the run failed and the scene is untouched — the opposite of reality. Combined with WR-01, `Tools/run-editor-builder.sh NavRestructureBuilder.BuildHeadless` corrupts the scene, saves it, and reports failure.
 **Fix:** Derive the sentinel from the method's class segment (both existing headless builders log the same shape, `[<Class>] Headless build + save complete`), and keep an explicit override for irregular builders:
@@ -99,11 +110,15 @@ SENTINEL="${2:-[${METHOD%%.*}] Headless build + save complete}"
 
 ### IN-01: DashboardPageBuilder resolves the container via a stale tab index that only works by coincidence
 
+**Status:** FIXED (63b0639) — `BuildInternal` now locates the «Сводка» tab by identity (same match as WR-02) and takes its screenPanel as Screen_Dashboard directly; the stale `screenBots`/`tabs[3]` read, the container hop, and the misleading "Screen_Bots is unassigned" error are gone. Two precise failure modes replace them: tab missing → «run Tools/Nav Restructure/Build (Task B5) first»; tab found but panel unassigned → «re-run B5» (the old name-based Find would have silently built into a placeholder the dangling tab never showed).
+
 **File:** `Assets/Editor/DashboardPageBuilder.cs:136-140`
 **Issue:** `tabsProp.GetArrayElementAtIndex(3).FindPropertyRelative("screenPanel")` is named `screenBots` and the error message says "tabs[3].screenPanel (Screen_Bots) is unassigned" — but post-restructure tabs[3] is **Profile**. The build still works because the value is only used to reach the shared parent container (`screenBots.transform.parent`), which is identical for every screen. A future reader (or a failure) gets a misleading picture. 06-01 flagged this line; unlike NavRestructureBuilder, re-running DashboardPageBuilder remains safe.
 **Fix:** Resolve the container index-agnostically and rename the variable, e.g. take `tabsProp.GetArrayElementAtIndex(0)`'s screenPanel as `anyTabScreen`, or find `Screen_Dashboard` by name directly and use its parent.
 
 ### IN-02: BottomTabManager field-initializer default selects Profile on a fresh component; stale comments
+
+**Status:** FIXED (e9b539f) — `defaultTabIndex = WhatsAppTabIndex` (const reference, launches on Chats) with a comment explaining the serialized-0-overrides-initializer relationship; the "5 tabs" file header is now count-agnostic. No behavior change: the committed scene serializes `defaultTabIndex: 0` (re-verified at Main.unity:135759).
 
 **File:** `Assets/Scripts/Main/BottomTabManager.cs:100` (also line 3)
 **Issue:** `[SerializeField] private int defaultTabIndex = 3; // 'Chats' matches WhatsApp default` — the comment is wrong and the value is stale: in the current 4-tab order index 3 is **Profile**. The committed scene serializes `defaultTabIndex: 0` (verified), so this is inert today, but any fresh add of the component (e.g., a future nav-bar rebuild) would boot on Profile with a comment claiming it's Chats. The class header (line 3) also still says "5 tabs". Pre-existing lines, but directly adjacent to this phase's `BotsTabIndex` edit and the same hazard class.
@@ -114,17 +129,23 @@ SENTINEL="${2:-[${METHOD%%.*}] Headless build + save complete}"
 
 ### IN-03: Model tests miss the Telegram mirror of the selected+muted edge
 
+**Status:** FIXED (8ec7de9) — Test F added (`F_ActiveTelegram_NeitherConnected`): active=Telegram, wa=false, tg=false → TG chip `{selected=true, muted=true}`, WA chip `{selected=false, muted=true}`; header matrix comment updated A–E → A–F. Exercises the Telegram side of the `chip == ChatChannel.Telegram ? tgConnected : waConnected` ternary under selection. Suite: 901/901 green.
+
 **File:** `Assets/Tests/Editor/Chat/ChannelSwitcherModelTests.cs:58-84`
 **Issue:** The matrix covers 5 of 8 (active × connectivity) rows. The untested mirror — `active=Telegram, tg=false` (TG chip selected+muted) — is reachable in production: `ChannelResolver.Resolve` keeps a persisted Telegram choice when **neither** channel is connected (ChatManager.Channel.cs:135), e.g. a bot whose Telegram was connected, chosen, then logged out. Tests D/E only exercise the WA-chip side of the `chip == ChatChannel.Telegram ? tgConnected : waConnected` ternary under selection.
 **Fix:** Add one mirror test: `active=Telegram, wa=false, tg=false` → TG chip `{selected=true, muted=true}`, WA chip `{selected=false, muted=true}`.
 
 ### IN-04: Selected+muted chip keeps its brand fill at full alpha — "muted" reads only in the label
 
+**Status:** FIXED (3a4b0f1) — took the first option: `f.a = state.Selected ? (state.Muted ? MutedAlpha : 1f) : 0f;` — the brand fill fades to the same shared `MutedAlpha` (0.40) constant the label multiplies by, so fill/label/icon fade in lockstep and the class doc's "renders MUTED (~40% alpha)" now holds for the whole segment. `ApplyChip`'s doc updated to state the fill fades too.
+
 **File:** `Assets/Scripts/UI/ChannelSwitcherView.cs:147-158` (doc at 10-11)
 **Issue:** `ApplyChip` sets the fill alpha purely from `Selected` (1 or 0); `Muted` fades only label (×0.40) and icon. In the reachable "active channel disconnected" state the chip shows a fully saturated brand fill with dim text — the class doc's claim that the segment "renders MUTED (~40% alpha)" only half-holds, and a saturated fill may not read as disconnected at a glance. The ApplyChip comment shows this is deliberate, so this is a design-judgment note, not a bug.
 **Fix:** Either fade the selected fill when muted (`f.a = state.Selected ? (state.Muted ? MutedAlpha : 1f) : 0f;`) or tighten the class doc to say only the label/icon fade.
 
 ### IN-05: Lock guard can false-positively match a sibling project path
+
+**Status:** FIXED (1446b42) — anchored ERE match: `grep -iE -- "-projectpath ${PROJECT_RE}/?( |\$)"` with a sed-regex-escaped `PROJECT_RE`. The optional `/?` keeps a trailing-slash launch refusing (fail-safe preserved). Verified against synthetic process lines: mid-args, EOL, and trailing-slash forms still block; `Automation2`/`AutomationBackup` siblings no longer do; `-batchmode` still excluded. (Note: `run-tests-headless.sh` carries the same unanchored pattern — out of this finding's cited scope, left untouched.)
 
 **File:** `Tools/run-editor-builder.sh:66-68`
 **Issue:** `grep -iF -- "-projectpath ${PROJECT}"` is an unanchored substring match — an Editor open on e.g. `/Users/ayan/Projects/Automation2` also matches and blocks a headless run for this project. Fails safe (refuses instead of colliding), so low priority.
