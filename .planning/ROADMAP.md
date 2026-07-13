@@ -112,7 +112,10 @@ Plans:
   2. Telegram suggestions are RAG-grounded via the `botTgId` metadata filter (channel-branched vector-store node; the single-key match-filter invariant is preserved).
   3. «Сводка» counts and lists Telegram conversations (telegram profile ids in the POSTed list + profile→bot map).
   4. A dual-channel bot shows exactly ONE filter chip covering both its profiles, and a Telegram outcome row deep-links straight to that Telegram chat (channel-aware `SetActiveBot`/channel/`SelectChat`).
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 07-01-PLAN.md — Channel-aware «Вместе» payload (additive `botTgId` + `channel`, channel-resolved profile id; `botWaId` always) + pure channel-selection matrix tests + SUGG live-verification note (client half; server RAG branch shipped Phase 4)
+- [ ] 07-02-PLAN.md — «Сводка» Telegram inclusion: pure both-channel profile map, bot-level chips (`FilterByProfiles` set semantics), channel-aware row deep-link (`SetActiveBot`→`SetActiveChannel`→`SelectChat`) + tests
 **UI hint**: yes
 
 ### Phase 8: Device UAT + Milestone Closeout
@@ -139,5 +142,5 @@ Phases execute in numeric order: 3 → 4 → 5 → 6 → 7 → 8. Phases 3 and 4
 | 4. n8n Telegram Template Parity (dev) | v1.1 | 2/2 | Complete    | 2026-07-12 |
 | 5. Channel-Aware ChatManager Core | v1.1 | 4/6 | In Progress | - |
 | 6. Channel Switcher UI | v1.1 | 2/2 | Complete    | 2026-07-13 |
-| 7. «Вместе» Suggestions + Dashboard on Telegram | v1.1 | 0/TBD | Not started | - |
+| 7. «Вместе» Suggestions + Dashboard on Telegram | v1.1 | 0/2 | Planned     | - |
 | 8. Device UAT + Milestone Closeout | v1.1 | 0/TBD | Not started | - |
