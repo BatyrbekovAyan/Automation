@@ -377,7 +377,10 @@ public class DashboardPage : MonoBehaviour
         if (pillLabel) { pillLabel.text = DashboardStatusInfo.Label(r.Status);
                          pillLabel.color = DashboardStatusInfo.FgColor(r.Status); }
         if (botTag) { botTag.gameObject.SetActive(showBotTag);
-            if (showBotTag && map.TryGetValue(r.profileId, out var pref))
+            // Null-guard mirrors DashboardProfileMap.TryResolve (T-07-02-01): a null-profileId
+            // row (server or replayed disk cache) must not throw here — the exception would
+            // escape SpawnRows' loop and silently truncate every row after the bad one.
+            if (showBotTag && !string.IsNullOrEmpty(r.profileId) && map.TryGetValue(r.profileId, out var pref))
                 botTag.text = PlayerPrefs.GetString(pref.botName + "Name", pref.botName); }
         // Real WhatsApp avatar when the chat list has it loaded/cached; else the
         // colored-initial default.
