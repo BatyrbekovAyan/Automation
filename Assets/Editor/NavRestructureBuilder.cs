@@ -419,7 +419,7 @@ public static class NavRestructureBuilder
         string[] order =
         {
             "Screen_Whatsapp",
-            "Screen_Telegram",
+            // (the Telegram placeholder screen was deleted in 06-02 by ChannelSwitcherBuilder)
             "Screen_Bots",
             "Screen_Profile",
             "Screen_Dashboard",
