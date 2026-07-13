@@ -21,11 +21,18 @@ public class SuggestRepliesPayloadTests
 
     private static List<MessageViewModel> One() => new List<MessageViewModel> { Msg("привет", true) };
 
+    // channel defaults to WhatsApp so every pre-v1.1 test stays byte-identical: the `profileId`
+    // arg maps to whatsappProfileId and `botWaId` to whatsappWorkflowId, so with channel=WhatsApp
+    // the emitted profileId==profileId and botWaId==botWaId exactly as before. Telegram ids default
+    // to distinct sentinels so a channel=Telegram test proves the SELECTION, not a coincidence.
     private static JObject Build(SuggestionRequest req, List<MessageViewModel> msgs,
         string profileId = "p1", string botWaId = "wf1", string businessTypeId = "auto_parts",
-        string businessName = "Магазин", string ownerPrompt = "", string catalog = "")
+        string businessName = "Магазин", string ownerPrompt = "", string catalog = "",
+        ChatChannel channel = ChatChannel.WhatsApp,
+        string telegramProfileId = "tgpid", string telegramWorkflowId = "wf_tg")
         => JObject.Parse(N8nSuggestionsProvider.BuildPayloadJson(
-            req, profileId, botWaId, businessTypeId, businessName, ownerPrompt, catalog, msgs));
+            req, channel, profileId, telegramProfileId, botWaId, telegramWorkflowId,
+            businessTypeId, businessName, ownerPrompt, catalog, msgs));
 
     // --- version + request passthrough ---------------------------------------
 

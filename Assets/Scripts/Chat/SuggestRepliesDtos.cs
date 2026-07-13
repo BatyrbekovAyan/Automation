@@ -22,15 +22,21 @@ public class WireMessage
     public long   ts;     // unix seconds (MessageViewModel.timestamp)
 }
 
-/// <summary>The full v1 request body — every field name is a locked wire key.</summary>
+/// <summary>
+/// The request body. v1 keys (<c>v</c>…<c>messages</c>) are a FROZEN wire contract — do NOT
+/// rename or reorder them. v1.1 appended two ADDITIVE keys (<c>botTgId</c>, <c>channel</c>) for
+/// Telegram «Вместе» parity: stripping exactly those two yields the byte-identical v1 object, and
+/// the server Prep defaults an absent <c>channel</c> to whatsapp (Phase 4). Field name IS the wire
+/// key here too — do NOT rename.
+/// </summary>
 [System.Serializable]
 public class SuggestRepliesRequestDto
 {
     public int    v;                 // == 1
     public long   requestSeq;        // correlation id, echoed verbatim (N8N-01)
-    public string profileId;         // active bot's whatsappProfileId
+    public string profileId;         // active bot's channel-appropriate profile id (WA: whatsappProfileId, TG: telegramProfileId)
     public string chatId;            // open chat id (scoping)
-    public string botWaId;           // active bot's whatsappWorkflowId; ""/"-1" => server skips RAG
+    public string botWaId;           // active bot's whatsappWorkflowId; ""/"-1" => server skips WA RAG (ALWAYS sent — backward compat)
     public string businessTypeId;    // kebab vertical id (e.g. auto_parts) or legacy/empty
     public string businessName;      // bot display name
     public string ownerPrompt;       // owner instructions, clamped <=500
@@ -38,6 +44,9 @@ public class SuggestRepliesRequestDto
     public string steerTowardText;   // picked reply for re-cluster (N8N-03); null = fresh set
     public string lastIncomingText;  // trigger message or null
     public List<WireMessage> messages = new();  // <=12, oldest->newest
+    // --- v1.1 additive keys (ADD-only; field name IS the wire key — do NOT rename) ---
+    public string botTgId;           // active bot's telegramWorkflowId; ""/"-1" => server skips TG RAG (mirrors botWaId sentinel)
+    public string channel;           // "whatsapp" | "telegram" (lowercase, enum-derived); absent => whatsapp (server Prep default, Phase 4)
 }
 
 /// <summary>One suggestion in the response envelope: server sends {text,label}.</summary>

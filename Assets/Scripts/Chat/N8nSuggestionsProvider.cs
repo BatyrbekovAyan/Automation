@@ -70,10 +70,16 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
         }
 
         string botName = bot.name;
+        // The open chat IS the active channel's chat (the seam guarantees it) — resolve the
+        // profile/workflow ids by the active channel; the pure builder does the selection.
+        ChatChannel channel = cm.ActiveChannel;
         string json = BuildPayloadJson(
             req,
-            profileId:      bot.whatsappProfileId,
-            botWaId:        bot.whatsappWorkflowId,   // == the n8n workflow id; ""/"-1" => server skips RAG
+            channel,
+            whatsappProfileId:  bot.whatsappProfileId,
+            telegramProfileId:  bot.telegramProfileId,
+            whatsappWorkflowId: bot.whatsappWorkflowId,   // n8n WA workflow id; ""/"-1" => server skips WA RAG
+            telegramWorkflowId: bot.telegramWorkflowId,   // n8n TG workflow id; ""/"-1" => server skips TG RAG
             businessTypeId: PlayerPrefs.GetString(botName + "BusinessType", ""),
             businessName:   PlayerPrefs.GetString(botName + "Name", ""),
             ownerPrompt:    PlayerPrefs.GetString(botName + "Prompt", ""),
@@ -126,28 +132,38 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
     // --- Pure payload builder (Unity-free except MessageViewModel, a plain data class) ---
 
     /// <summary>
-    /// Builds the frozen v1 request JSON: <c>v==1</c>; req fields passed through; the supplied
-    /// bot fields; <paramref name="ownerPrompt"/> clamped &lt;=500 and <paramref name="catalog"/>
-    /// &lt;=1500; messages = at most the LAST 12 of <paramref name="recentMessages"/>, oldest-&gt;newest,
-    /// each text media-mapped then clamped &lt;=500, role="client" if incoming else "business".
+    /// Builds the additive v1.1 request JSON: <c>v==1</c>; req fields passed through; the
+    /// channel-RESOLVED <paramref name="channel"/> selects profileId
+    /// (<paramref name="telegramProfileId"/> on Telegram, else <paramref name="whatsappProfileId"/>);
+    /// botWaId = <paramref name="whatsappWorkflowId"/> ALWAYS (backward compat) while botTgId =
+    /// <paramref name="telegramWorkflowId"/> (both keep the ""/"-1" skip-RAG sentinel); channel =
+    /// "telegram"|"whatsapp" (lowercase, derived ONLY from the enum — never a free-form string).
+    /// <paramref name="ownerPrompt"/> clamped &lt;=500 and <paramref name="catalog"/> &lt;=1500;
+    /// messages = at most the LAST 12 of <paramref name="recentMessages"/>, oldest-&gt;newest, each
+    /// text media-mapped then clamped &lt;=500, role="client" if incoming else "business".
+    /// Stripping channel+botTgId yields the byte-identical frozen v1 object.
     /// </summary>
     public static string BuildPayloadJson(
         SuggestionRequest req,
-        string profileId,
-        string botWaId,
+        ChatChannel channel,
+        string whatsappProfileId,
+        string telegramProfileId,
+        string whatsappWorkflowId,
+        string telegramWorkflowId,
         string businessTypeId,
         string businessName,
         string ownerPrompt,
         string catalog,
         List<MessageViewModel> recentMessages)
     {
+        bool isTelegram = channel == ChatChannel.Telegram;
         var dto = new SuggestRepliesRequestDto
         {
             v                = 1,
             requestSeq       = req != null ? req.requestSeq : 0L,
-            profileId        = profileId,
+            profileId        = isTelegram ? telegramProfileId : whatsappProfileId,   // channel-RESOLVED selection
             chatId           = req?.chatId,
-            botWaId          = botWaId,
+            botWaId          = whatsappWorkflowId,                                    // ALWAYS (server's default WA RAG branch)
             businessTypeId   = businessTypeId,
             businessName     = businessName,
             ownerPrompt      = Clamp(ownerPrompt, MaxPromptChars),
@@ -155,6 +171,8 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
             steerTowardText  = req?.steerTowardText,
             lastIncomingText = req?.lastIncomingText,
             messages         = ToWireMessages(recentMessages),
+            botTgId          = telegramWorkflowId,                                    // NEW; ""/"-1" => server skips TG RAG
+            channel          = isTelegram ? "telegram" : "whatsapp",                 // NEW; lowercase, enum-derived only
         };
         return JsonConvert.SerializeObject(dto);
     }
