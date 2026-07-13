@@ -73,3 +73,9 @@ on, is what closes the live-verification obligation for Phase 7's suggestions ha
 *Gate for Phase 07 («Вместе» suggestions + dashboard on Telegram) — suggestions
 half. Do NOT tick these on the owner's behalf; this is a live-account, human-run
 verification riding the Phase-4 TPL-06 dev-n8n session.*
+
+### Dashboard live-data pass (added at phase verification — rides the same dev session)
+
+- [ ] **TG rows appear:** after the TPL-06 e2e produces a real Telegram conversation, trigger «Сводка» refresh → the Telegram chat appears in counts + recent list (classification via DashboardOutcomes now receives both channels' profile ids).
+- [ ] **One chip per dual-channel bot:** a bot with both channels shows exactly ONE filter chip; selecting it shows BOTH channels' rows.
+- [ ] **TG deep-link:** tapping a Telegram outcome row lands in that Telegram chat («Чаты» tab, Telegram channel selected, chat open).
