@@ -70,8 +70,12 @@ fi
 # Authoritative signal = a non-batch Unity process holding THIS project.
 # The Hub GUI launches with lowercase '-projectpath'; AssetImportWorkers use
 # '-batchMode' and must be excluded. Match case-insensitively (verified fix).
+# The path match is ANCHORED (exact path, optional trailing '/', then space or
+# EOL) so a sibling project (e.g. .../Automation2) can't false-positively block
+# this project's run — while exact/trailing-slash forms still refuse (fail-safe).
+PROJECT_RE="$(printf '%s' "${PROJECT}" | sed -e 's/[][\.|$(){}?+*^]/\\&/g')"
 GUI_PROC="$(pgrep -fl 'Unity.app/Contents/MacOS/Unity' 2>/dev/null \
-  | grep -iF -- "-projectpath ${PROJECT}" \
+  | grep -iE -- "-projectpath ${PROJECT_RE}/?( |\$)" \
   | grep -viE -- '-batchmode|assetimportworker' || true)"
 
 if [ -n "${GUI_PROC}" ]; then
