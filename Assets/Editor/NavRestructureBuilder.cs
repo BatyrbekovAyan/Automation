@@ -136,7 +136,21 @@ public static class NavRestructureBuilder
         if (tabsProp == null || tabsProp.arraySize < 4)
             throw new System.InvalidOperationException("BottomTabManager.tabs list is missing or too short.");
 
+        // Identity guard: BuildInternal assumes the PRE-restructure 5-tab layout
+        // (tabs[2] = New, tabs[3] = Bots). Against the committed post-06-02 4-tab
+        // scene (tabs[2] = Bots) every size/null guard below still passes, so a
+        // blind re-run would destroy the real dashboard, rename the Bots tab to
+        // «Сводка» — and BuildHeadless would auto-save the corruption. Verify
+        // tab-2's identity and abort loudly BEFORE any mutation.
         var newTab = tabsProp.GetArrayElementAtIndex(2);
+        string tab2Name = newTab.FindPropertyRelative("tabName").stringValue;
+        var tab2Screen = newTab.FindPropertyRelative("screenPanel").objectReferenceValue as GameObject;
+        bool isPreRestructure = tab2Name == "New" || (tab2Screen != null && tab2Screen.name == "Screen_New");
+        if (!isPreRestructure)
+            throw new System.InvalidOperationException(
+                $"[NavRestructureBuilder] tabs[2] is '{tab2Name}', not the 'New' tab — scene already " +
+                "restructured (06-02) — aborting before save. Re-running would clobber the Bots tab; nothing to do.");
+
         var botsTab = tabsProp.GetArrayElementAtIndex(3);
 
         var screenBots = botsTab.FindPropertyRelative("screenPanel").objectReferenceValue as GameObject;
