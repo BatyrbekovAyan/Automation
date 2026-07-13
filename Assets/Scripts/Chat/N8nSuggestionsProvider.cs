@@ -141,7 +141,9 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
     /// <paramref name="ownerPrompt"/> clamped &lt;=500 and <paramref name="catalog"/> &lt;=1500;
     /// messages = at most the LAST 12 of <paramref name="recentMessages"/>, oldest-&gt;newest, each
     /// text media-mapped then clamped &lt;=500, role="client" if incoming else "business".
-    /// Stripping channel+botTgId yields the byte-identical frozen v1 object.
+    /// Stripping channel+botTgId yields the frozen v1 object again — structural identity
+    /// (JToken.DeepEquals + exact key set) is what the payload tests enforce; matching byte
+    /// order additionally follows from Json.NET's declaration-order field emission.
     /// </summary>
     public static string BuildPayloadJson(
         SuggestionRequest req,

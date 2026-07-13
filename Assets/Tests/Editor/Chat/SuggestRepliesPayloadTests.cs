@@ -243,7 +243,7 @@ public class SuggestRepliesPayloadTests
         Assert.AreNotEqual("Telegram", (string)tg["channel"]);
     }
 
-    // --- additive-identity: a WhatsApp request is byte-identical to v1 --------
+    // --- additive-identity: a WhatsApp request is structurally identical to v1 -
 
     [Test]
     public void WhatsAppRequest_AdditivelyIdenticalToV1()
@@ -260,7 +260,10 @@ public class SuggestRepliesPayloadTests
         Assert.IsNotNull(j["botTgId"]);
         Assert.AreEqual("wf_tg", (string)j["botTgId"]);
 
-        // ...and removing EXACTLY those two yields the byte-identical frozen v1 object.
+        // ...and removing EXACTLY those two yields the frozen v1 object again. This test proves
+        // STRUCTURAL identity: JToken.DeepEquals is property-order-insensitive and the key-set
+        // assertion below sorts before comparing — byte order is NOT asserted here (it follows
+        // separately from Json.NET's declaration-order emission over the appended-last v1.1 fields).
         j.Remove("channel");
         j.Remove("botTgId");
 

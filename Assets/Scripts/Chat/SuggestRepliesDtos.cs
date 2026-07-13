@@ -25,9 +25,13 @@ public class WireMessage
 /// <summary>
 /// The request body. v1 keys (<c>v</c>…<c>messages</c>) are a FROZEN wire contract — do NOT
 /// rename or reorder them. v1.1 appended two ADDITIVE keys (<c>botTgId</c>, <c>channel</c>) for
-/// Telegram «Вместе» parity: stripping exactly those two yields the byte-identical v1 object, and
-/// the server Prep defaults an absent <c>channel</c> to whatsapp (Phase 4). Field name IS the wire
-/// key here too — do NOT rename.
+/// Telegram «Вместе» parity: stripping exactly those two yields the frozen v1 object again —
+/// STRUCTURAL identity (same exact key set + values), which is what
+/// <c>SuggestRepliesPayloadTests.WhatsAppRequest_AdditivelyIdenticalToV1</c> enforces via
+/// JToken.DeepEquals + an exact key-set check. Matching v1's byte order additionally follows
+/// from Json.NET's declaration-order emission over these appended-last fields, but only the
+/// structural identity is test-enforced. The server Prep defaults an absent <c>channel</c> to
+/// whatsapp (Phase 4). Field name IS the wire key here too — do NOT rename.
 /// </summary>
 [System.Serializable]
 public class SuggestRepliesRequestDto
