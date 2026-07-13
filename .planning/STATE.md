@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
-status: executing
+status: ready_to_plan
 stopped_at: Completed 06-02-PLAN.md
 last_updated: "2026-07-13T11:02:43.839Z"
 last_activity: 2026-07-13
 progress:
   total_phases: 6
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 11
   completed_plans: 10
-  percent: 91
+  percent: 67
 ---
 
 # Project State
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 
 ## Current Position
 
-Phase: 6 of 8 (channel switcher UI)
-Plan: 2 of 2 complete (06-02 ChannelSwitcherBuilder + nav restructure — headless pill build into CenterZone, 6 refs stamped, Telegram tab + Screen_Telegram removed, tab 0 «Чаты»; scene 8f1d25f; 900/900 EditMode green)
-Status: Phase 6 code-complete — owner visual UAT gate open (06-HUMAN-UAT.md); Phase 7 next
+Phase: 7 of 8 («вместе» suggestions + dashboard on telegram)
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-07-13
 
 Progress: [█████████░] 91%
