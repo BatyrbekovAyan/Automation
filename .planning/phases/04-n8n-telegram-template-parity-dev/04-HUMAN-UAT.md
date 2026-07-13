@@ -64,6 +64,15 @@ dev n8n is not running and its API key lives in deny-ruled `secrets.json`
 
 ### 3. Import/update the 4 workflows by literal id (templates stay inactive)
 
+> **Shortcut (verified 2026-07-13):** dev n8n is reachable from Claude via the
+> `n8n-mcp` server, but these 4 workflows have **"Available in MCP" = off**, so
+> Claude cannot read/update them (confirmed live: `Workflow is not available in
+> MCP`). If you toggle **Available in MCP** ON for the 4 workflow cards
+> (`4VN3gsFaC2HUYmcc`, `Uz6HBBUpAiUqVysB`, `XuvOp7TxOImOAmlj`, `9PTyYcelRQI7bGDb`),
+> Claude can apply the canonical-file changes as targeted node updates and verify
+> them — turning this whole section into "flip 4 toggles, ask Claude to deploy."
+> Otherwise do it manually:
+
 - [ ] Import/update all 4 workflows above by their **literal ids**.
 - [ ] Keep the two bot templates **INACTIVE** (shared webhook path `0091024b-7b46`;
       only per-bot clones go active).
