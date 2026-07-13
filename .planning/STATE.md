@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
 status: executing
-stopped_at: Completed 05-04-PLAN.md
-last_updated: "2026-07-12T18:49:51.533Z"
-last_activity: 2026-07-12
+stopped_at: Completed 06-01-PLAN.md
+last_updated: "2026-07-13T10:36:26.327Z"
+last_activity: 2026-07-13
 progress:
   total_phases: 6
   completed_phases: 2
-  total_plans: 9
-  completed_plans: 8
-  percent: 89
+  total_plans: 11
+  completed_plans: 9
+  percent: 82
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-12)
 
 **Core value:** The owner stays in control along the automation↔semi-auto spectrum — the bot can answer autonomously, or propose replies the owner picks and refines, without losing trust or the ability to take over.
-**Current focus:** Phase 5 (Channel-Aware ChatManager Core) — 05-03 read-pipeline wiring + tapi parser divergences complete (8 non-send chat URLs via WappiEndpoints.Sync(ActiveChannel); DeleteChat no-op on Telegram via ActiveChannelSupportsChatDelete; ParseMessageType "text"=>Chat; last_timestamp→last_time fallback; DisplayFallback retires chat.id[..^5]; ChatIdFormat.IsGroup groupness; ChatViewModel.IsGroup at construction; pending/undelivered/error ticks; pure MessageTypeParser/ChatDialogTime seams; WhatsApp byte-identical, 878/878 EditMode green); next 05-04 send-path branches
+**Current focus:** Phase 6 (Channel Switcher UI) — 06-01 runtime half complete: pure `ChannelSwitcherModel` (selected=equality, muted=own-channel connectivity, both can hold) + event-driven `ChannelSwitcherView` TopBar binder driving `ChatManager.SetActiveChannel` (reads `ActiveChannel` read-only so SWITCH-03 persistence flows through; muted chips stay tappable → connect empty state for SWITCH-02; every ref null-guarded; field names are the 06-02 builder's SerializedObject contract); `BottomTabManager.BotsTabIndex` 3→2 locked by `TabIndexShiftTests` (all `SwitchTab` consumers already constant-based); no scene mutation, 900/900 EditMode green. Next 06-02 = `ChannelSwitcherBuilder` (pill into CenterZone) + nav restructure (remove Telegram tab, «Чаты», delete Screen_Telegram) + headless build, then marks SWITCH-01/04
 
 ## Current Position
 
-Phase: 5 of 8 (channel aware chatmanager core)
-Plan: 5 of 6 complete (05-01 seam primitives, 05-02 identity seam, 05-03 read-pipeline + parser divergences, 05-05 2FA fix) — next: 05-04
+Phase: 6 of 8 (channel switcher UI)
+Plan: 1 of 2 complete (06-01 channel-switcher runtime — pure ChannelSwitcherModel + event-driven ChannelSwitcherView binder + BotsTabIndex 3→2 audit; 900/900 EditMode green) — next: 06-02 (ChannelSwitcherBuilder + nav restructure)
 Status: Ready to execute
-Last activity: 2026-07-12
+Last activity: 2026-07-13
 
-Progress: [█████████░] 89%
+Progress: [████████░░] 82%
 
 ## Performance Metrics
 
@@ -62,6 +62,7 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [Phase 5]: 05-02 ChatManager identity seam — ActiveChannel persisted per bot ({botId}ActiveChatChannel), SetActiveChannel reuses SetActiveBot reset choreography + OnActiveChannelChanged; channel-aware GetActiveProfileId/GetCacheRoot (BotCache/{botId}/telegram/ isolation, CHAT-11)/empty-state/sync-gate; ResolveChannelForBot auto-selects connected channel on switch/startup; BotHasNoTelegram empty state; WhatsApp byte-identical, 854/854 EditMode green
 - [Phase 5]: 05-03 read pipeline + tapi parser divergences — 8 non-send chat URLs via WappiEndpoints.Sync(ActiveChannel); ActiveChannelSupportsChatDelete no-ops DeleteChat on Telegram; ParseMessageType 'text'=>Chat + last_timestamp->last_time fallback + DisplayFallback retires chat.id[..^5] + ChatIdFormat.IsGroup groupness; ChatViewModel.IsGroup at construction; pending/undelivered/error ticks; pure MessageTypeParser/ChatDialogTime seams; WhatsApp byte-identical, 878/878 EditMode green
 - [Phase 5]: 05-04 send-path channel branches — Telegram quoted reply => tapi message/reply {body, message_id} (no recipient); reaction body gains required recipient (NullValueHandling.Ignore, WA byte-identical); mark-read drops mark_all on Telegram; media EndpointFor 3-arg via (ChatChannel)entry.channel; text+media outbox snapshot channel, text retry rebuilds URL from entry.channel; last api/sync literals in ChatManager.cs retired; WhatsApp byte-identical, 888/888 EditMode green
+- [Phase 6]: 06-01 channel-switcher runtime — pure ChannelSwitcherModel (selected=equality, muted=own-channel connectivity, both can hold) + event-driven ChannelSwitcherView binder (reads ChatManager.ActiveChannel read-only so SWITCH-03 persistence flows through; muted chips stay tappable for SWITCH-02's connect empty state; every ref null-guarded; field names are the 06-02 builder's SerializedObject contract); BottomTabManager.BotsTabIndex 3→2 locked by TabIndexShiftTests (all SwitchTab consumers already constant-based, no literals); no scene mutation; SWITCH-01/04 land in 06-02; 900/900 EditMode green
 
 ### Pending Todos
 
@@ -99,11 +100,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 05 P02 | 19min | 3 tasks | 6 files |
 | Phase 05 P03 | 27min | 3 tasks | 13 files |
 | Phase 05 P04 | 9min | 3 tasks | 7 files |
+| Phase 06 P01 | 21min | 3 tasks | 5 files |
 
 ## Session Continuity
 
-Last session: 2026-07-12T18:49:51.516Z
-Stopped at: Completed 05-04-PLAN.md
+Last session: 2026-07-13T10:35:49.518Z
+Stopped at: Completed 06-01-PLAN.md
 Resume file: None
 
-**Planned Phase:** 5 (Channel-Aware ChatManager Core) — 6 plans — 2026-07-12T15:01:08.712Z
+**Planned Phase:** 6 (Channel Switcher UI) — 2 plans — 2026-07-12T19:35:08.582Z

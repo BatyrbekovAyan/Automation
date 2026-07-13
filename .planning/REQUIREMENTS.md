@@ -39,8 +39,8 @@
 ### Channel Switcher (SWITCH)
 
 - [ ] **SWITCH-01**: Owner can flip between the active bot's WhatsApp and Telegram chats via a TopBar segmented control (full list reset choreography, mid-flight-safe)
-- [ ] **SWITCH-02**: An unconnected channel's chip is visibly muted; tapping it shows that channel's empty state with a connect CTA (no more permanent "WhatsApp not connected" dead end for Telegram-only bots)
-- [ ] **SWITCH-03**: Last-used channel persists per bot across restarts; a bot with only one connected channel auto-selects it
+- [x] **SWITCH-02**: An unconnected channel's chip is visibly muted; tapping it shows that channel's empty state with a connect CTA (no more permanent "WhatsApp not connected" dead end for Telegram-only bots)
+- [x] **SWITCH-03**: Last-used channel persists per bot across restarts; a bot with only one connected channel auto-selects it
 - [ ] **SWITCH-04**: Telegram bottom-nav tab and the Screen_Telegram placeholder are removed; tab 0 reads «Чаты»
 
 ### n8n Telegram Template (TPL)
@@ -109,8 +109,8 @@
 | CHAT-11 | Phase 5 | Complete |
 | TGAUTH-01 | Phase 5 | Pending |
 | SWITCH-01 | Phase 6 | Pending |
-| SWITCH-02 | Phase 6 | Pending |
-| SWITCH-03 | Phase 6 | Pending |
+| SWITCH-02 | Phase 6 | Complete |
+| SWITCH-03 | Phase 6 | Complete |
 | SWITCH-04 | Phase 6 | Pending |
 | TPL-01 | Phase 4 | Complete |
 | TPL-02 | Phase 4 | Complete |
