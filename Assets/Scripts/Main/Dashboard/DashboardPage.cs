@@ -48,7 +48,7 @@ public class DashboardPage : MonoBehaviour
 
     private readonly List<DashboardOutcome> _all = new();
     private DashboardPeriod _period = DashboardPeriod.Today;
-    private string _botFilter;               // null = all bots
+    private ISet<string> _botFilter;         // null/empty = all bots (a bot's profile-id set otherwise)
     private bool _fetching;
     private const int TruncatedRefetchCap = 5;
 
@@ -78,37 +78,32 @@ public class DashboardPage : MonoBehaviour
 
     // ---- data ----------------------------------------------------------------
 
-    private List<string> AuthedProfiles()
+    // Impure adapter: snapshot live bots into the pure seam's input shape. All
+    // channel/sentinel selection logic lives in DashboardProfileMap, not here.
+    private List<BotProfiles> BotDescriptors()
     {
-        var list = new List<string>();
+        var list = new List<BotProfiles>();
         var parent = Manager.Instance != null ? Manager.Instance.BotsRoot : null;  // public Transform
         if (parent == null) return list;
         foreach (Transform t in parent)
         {
             var bot = t.GetComponent<Bot>();
             if (bot == null) continue;
-            string pid = bot.whatsappProfileId;
-            if (!string.IsNullOrEmpty(pid) && pid != Bot.UnauthedProfileSentinel)
-                list.Add(pid);
+            list.Add(new BotProfiles
+            {
+                botName = t.name,
+                whatsappProfileId = bot.whatsappProfileId,
+                telegramProfileId = bot.telegramProfileId,
+            });
         }
         return list;
     }
 
-    private Dictionary<string, string> ProfileToBot()
-    {
-        var map = new Dictionary<string, string>();
-        var parent = Manager.Instance != null ? Manager.Instance.BotsRoot : null;  // public Transform
-        if (parent == null) return map;
-        foreach (Transform t in parent)
-        {
-            var bot = t.GetComponent<Bot>();
-            if (bot == null) continue;
-            if (!string.IsNullOrEmpty(bot.whatsappProfileId) &&
-                bot.whatsappProfileId != Bot.UnauthedProfileSentinel)
-                map[bot.whatsappProfileId] = t.name;
-        }
-        return map;
-    }
+    // DASH-01: both channels' authed ids (sentinel-guarded in the pure seam).
+    private List<string> AuthedProfiles() => DashboardProfileMap.AuthedProfiles(BotDescriptors());
+
+    private Dictionary<string, DashboardProfileRef> ProfileToBot() =>
+        DashboardProfileMap.ProfileToBot(BotDescriptors());
 
     private IEnumerator FetchRoutine(int attempt)
     {
@@ -163,7 +158,7 @@ public class DashboardPage : MonoBehaviour
 
     private void Render()
     {
-        var rows = DashboardMetrics.FilterByProfile(_all, _botFilter).ToList();
+        var rows = DashboardMetrics.FilterByProfiles(_all, _botFilter).ToList();
         var w = DashboardMetrics.ComputeWindow(_period, NowMs(), TodayStartMs());
 
         int orders = DashboardMetrics.CountOrders(rows, w);
@@ -255,7 +250,7 @@ public class DashboardPage : MonoBehaviour
 
     public void SetPeriod(DashboardPeriod p) { _period = p; MovePeriodHighlight(); Render(); }
 
-    public void SetBotFilter(string profileIdOrNull) { _botFilter = profileIdOrNull; Render(); }
+    public void SetBotFilter(ISet<string> profileIdsOrNull) { _botFilter = profileIdsOrNull; Render(); }
 
     private void MovePeriodHighlight()
     {
@@ -276,20 +271,23 @@ public class DashboardPage : MonoBehaviour
             var c = chipsRow.GetChild(i).gameObject;
             if (c != chipPrefabHost) Destroy(c);
         }
-        var map = ProfileToBot();
-        // Chips hidden entirely with ≤1 bot.
-        chipsRow.gameObject.SetActive(map.Count > 1);
-        if (map.Count <= 1) return;
+        var chips = DashboardProfileMap.BotChips(BotDescriptors());
+        // Chips hidden entirely with ≤1 BOT. One chip per bot now, so a dual-channel
+        // bot no longer inflates this into a two-chip row (DASH-02).
+        chipsRow.gameObject.SetActive(chips.Count > 1);
+        if (chips.Count <= 1) return;
 
-        AddChip("Все боты", null, _botFilter == null);
-        foreach (var kv in map)
+        bool allOn = _botFilter == null || _botFilter.Count == 0;
+        AddChip("Все боты", null, allOn);
+        foreach (var chip in chips)
         {
-            string botName = PlayerPrefs.GetString(kv.Value + "Name", kv.Value);
-            AddChip(botName, kv.Key, _botFilter == kv.Key);
+            string botName = PlayerPrefs.GetString(chip.botName + "Name", chip.botName);
+            bool on = _botFilter != null && _botFilter.SetEquals(chip.profileIds);
+            AddChip(botName, chip.profileIds, on);
         }
     }
 
-    private void AddChip(string text, string profileId, bool on)
+    private void AddChip(string text, ISet<string> profileIds, bool on)
     {
         var go = Instantiate(chipPrefabHost, chipsRow);
         go.SetActive(true);
@@ -299,13 +297,13 @@ public class DashboardPage : MonoBehaviour
         var img = go.GetComponent<Image>();
         if (img) img.color = on ? DashboardStatusInfo.FgColor(OutcomeStatus.InDialog) : Color.white;
         var btn = go.GetComponent<Button>();
-        if (btn) { btn.onClick.AddListener(() => SetBotFilter(profileId)); btn.onClick.AddListener(BuildChips); }
+        if (btn) { btn.onClick.AddListener(() => SetBotFilter(profileIds)); btn.onClick.AddListener(BuildChips); }
     }
 
     public void OpenStatusList(OutcomeStatus status)
     {
         if (listPanel == null) return;
-        var rows = DashboardMetrics.FilterByProfile(_all, _botFilter)
+        var rows = DashboardMetrics.FilterByProfiles(_all, _botFilter)
             .Where(r => r.Status == status)
             .OrderByDescending(r => r.lastMessageAt).ToList();
         if (listTitle) listTitle.text = DashboardStatusInfo.Label(status);
@@ -339,8 +337,10 @@ public class DashboardPage : MonoBehaviour
             var c = root.GetChild(i).gameObject;
             if (c != template) Destroy(c);
         }
-        var map = ProfileToBot();
-        bool showBotTag = _botFilter == null && map.Count > 1;
+        var descriptors = BotDescriptors();
+        var map = DashboardProfileMap.ProfileToBot(descriptors);
+        int chipCount = DashboardProfileMap.BotChips(descriptors).Count;   // bots, not profiles
+        bool showBotTag = (_botFilter == null || _botFilter.Count == 0) && chipCount > 1;
         foreach (var r in rows)
         {
             var go = Instantiate(template, root);
@@ -349,7 +349,7 @@ public class DashboardPage : MonoBehaviour
         }
     }
 
-    private void BindRow(GameObject go, DashboardOutcome r, bool showBotTag, Dictionary<string,string> map)
+    private void BindRow(GameObject go, DashboardOutcome r, bool showBotTag, Dictionary<string, DashboardProfileRef> map)
     {
         var name = go.transform.Find("Name")?.GetComponent<TextMeshProUGUI>();
         var summary = go.transform.Find("Summary")?.GetComponent<TextMeshProUGUI>();
@@ -377,8 +377,8 @@ public class DashboardPage : MonoBehaviour
         if (pillLabel) { pillLabel.text = DashboardStatusInfo.Label(r.Status);
                          pillLabel.color = DashboardStatusInfo.FgColor(r.Status); }
         if (botTag) { botTag.gameObject.SetActive(showBotTag);
-            if (showBotTag && map.TryGetValue(r.profileId, out var bn))
-                botTag.text = PlayerPrefs.GetString(bn + "Name", bn); }
+            if (showBotTag && map.TryGetValue(r.profileId, out var pref))
+                botTag.text = PlayerPrefs.GetString(pref.botName + "Name", pref.botName); }
         // Real WhatsApp avatar when the chat list has it loaded/cached; else the
         // colored-initial default.
         if (avatar != null && ChatManager.Instance != null &&
@@ -401,16 +401,27 @@ public class DashboardPage : MonoBehaviour
 
     public void OpenChat(DashboardOutcome r)
     {
-        string botName = SessionChatMap.ResolveBotName(ProfileToBot(), r.profileId);
-        if (string.IsNullOrEmpty(botName) || ChatManager.Instance == null) return;
+        // Resolve (botName, channel) from the LOCAL map only — an unknown/forged
+        // profileId returns false ⇒ no-op, no NRE, no off-device navigation (T-07-02-01).
+        var map = ProfileToBot();
+        if (!DashboardProfileMap.TryResolve(map, r.profileId, out var botName, out var channel)
+            || ChatManager.Instance == null) return;
 
         if (ChatManager.Instance.CurrentBotId != botName)
-            ChatManager.Instance.SetActiveBot(botName);
+            ChatManager.Instance.SetActiveBot(botName);   // restores the bot's persisted channel FIRST
+
+        // THEN override to the row's channel (no-ops when already on it ⇒ a WhatsApp row
+        // on a WA-active bot is byte-identical to before). Accepted trade-off (plan-checker
+        // INFO): when the target bot's persisted channel differs from this row's channel,
+        // SetActiveBot loads once and this reloads — harmless (the fetch gate + coroutines
+        // were just reset and Screen_Dashboard isn't visible yet). Order is load-bearing:
+        // bot → channel → tab → select.
+        ChatManager.Instance.SetActiveChannel(channel);
 
         var tabs = FindFirstObjectByType<BottomTabManager>();
-        if (tabs != null) tabs.SwitchTab(BottomTabManager.WhatsAppTabIndex);
+        if (tabs != null) tabs.SwitchTab(BottomTabManager.WhatsAppTabIndex);   // now the «Чаты» tab (constant unchanged)
 
-        // Deferred one frame so the WhatsApp tab's own sync/list settles; if the chat
+        // Deferred one frame so the «Чаты» tab's own sync/list settles; if the chat
         // isn't present we just land on that bot's list (no error popup). Hosted on
         // ChatManager (always active): SwitchTab above just deactivated Screen_Dashboard,
         // and Unity refuses to start a coroutine on an inactive GameObject.
