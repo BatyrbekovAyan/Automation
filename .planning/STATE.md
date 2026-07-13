@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
 status: executing
-stopped_at: Completed 06-01-PLAN.md
-last_updated: "2026-07-13T10:36:26.327Z"
+stopped_at: Completed 06-02-PLAN.md
+last_updated: "2026-07-13T11:02:43.839Z"
 last_activity: 2026-07-13
 progress:
   total_phases: 6
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 11
-  completed_plans: 9
-  percent: 82
+  completed_plans: 10
+  percent: 91
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-12)
 
 **Core value:** The owner stays in control along the automation↔semi-auto spectrum — the bot can answer autonomously, or propose replies the owner picks and refines, without losing trust or the ability to take over.
-**Current focus:** Phase 6 (Channel Switcher UI) — 06-01 runtime half complete: pure `ChannelSwitcherModel` (selected=equality, muted=own-channel connectivity, both can hold) + event-driven `ChannelSwitcherView` TopBar binder driving `ChatManager.SetActiveChannel` (reads `ActiveChannel` read-only so SWITCH-03 persistence flows through; muted chips stay tappable → connect empty state for SWITCH-02; every ref null-guarded; field names are the 06-02 builder's SerializedObject contract); `BottomTabManager.BotsTabIndex` 3→2 locked by `TabIndexShiftTests` (all `SwitchTab` consumers already constant-based); no scene mutation, 900/900 EditMode green. Next 06-02 = `ChannelSwitcherBuilder` (pill into CenterZone) + nav restructure (remove Telegram tab, «Чаты», delete Screen_Telegram) + headless build, then marks SWITCH-01/04
+**Current focus:** Phase 6 (Channel Switcher UI) — **code-complete** (both plans executed). 06-01 shipped the runtime half (pure `ChannelSwitcherModel` + event-driven `ChannelSwitcherView` binder + `BotsTabIndex` 3→2 locked by `TabIndexShiftTests`). 06-02 built the scene half **headlessly**: a `ChannelSwitcherBuilder` builds the WhatsApp|Telegram segmented pill into `Screen_Whatsapp/ChatsPanel/TopBar/CenterZone` (two independent brand fills per the 06-01 binder contract, text-only chips mirroring ModeToggle), stamps all 6 `ChannelSwitcherView` refs via SerializedObject, and guardedly removes the Telegram bottom tab (tabs 5→4) + `Screen_Telegram` + `TelegramTab` and relabels tab 0 «Чаты»; new `Tools/run-editor-builder.sh` (Editor-closed, sentinel verdict) ran it, scene committed immediately (`8f1d25f`), suite **900/900 green** against the real 4-tab scene. SWITCH-01/04 marked. **Only the owner visual UAT gate (`06-HUMAN-UAT.md`) remains before phase close.** Next: Phase 7 («Вместе» suggestions + dashboard on Telegram).
 
 ## Current Position
 
 Phase: 6 of 8 (channel switcher UI)
-Plan: 1 of 2 complete (06-01 channel-switcher runtime — pure ChannelSwitcherModel + event-driven ChannelSwitcherView binder + BotsTabIndex 3→2 audit; 900/900 EditMode green) — next: 06-02 (ChannelSwitcherBuilder + nav restructure)
-Status: Ready to execute
+Plan: 2 of 2 complete (06-02 ChannelSwitcherBuilder + nav restructure — headless pill build into CenterZone, 6 refs stamped, Telegram tab + Screen_Telegram removed, tab 0 «Чаты»; scene 8f1d25f; 900/900 EditMode green)
+Status: Phase 6 code-complete — owner visual UAT gate open (06-HUMAN-UAT.md); Phase 7 next
 Last activity: 2026-07-13
 
-Progress: [████████░░] 82%
+Progress: [█████████░] 91%
 
 ## Performance Metrics
 
@@ -63,6 +63,7 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [Phase 5]: 05-03 read pipeline + tapi parser divergences — 8 non-send chat URLs via WappiEndpoints.Sync(ActiveChannel); ActiveChannelSupportsChatDelete no-ops DeleteChat on Telegram; ParseMessageType 'text'=>Chat + last_timestamp->last_time fallback + DisplayFallback retires chat.id[..^5] + ChatIdFormat.IsGroup groupness; ChatViewModel.IsGroup at construction; pending/undelivered/error ticks; pure MessageTypeParser/ChatDialogTime seams; WhatsApp byte-identical, 878/878 EditMode green
 - [Phase 5]: 05-04 send-path channel branches — Telegram quoted reply => tapi message/reply {body, message_id} (no recipient); reaction body gains required recipient (NullValueHandling.Ignore, WA byte-identical); mark-read drops mark_all on Telegram; media EndpointFor 3-arg via (ChatChannel)entry.channel; text+media outbox snapshot channel, text retry rebuilds URL from entry.channel; last api/sync literals in ChatManager.cs retired; WhatsApp byte-identical, 888/888 EditMode green
 - [Phase 6]: 06-01 channel-switcher runtime — pure ChannelSwitcherModel (selected=equality, muted=own-channel connectivity, both can hold) + event-driven ChannelSwitcherView binder (reads ChatManager.ActiveChannel read-only so SWITCH-03 persistence flows through; muted chips stay tappable for SWITCH-02's connect empty state; every ref null-guarded; field names are the 06-02 builder's SerializedObject contract); BottomTabManager.BotsTabIndex 3→2 locked by TabIndexShiftTests (all SwitchTab consumers already constant-based, no literals); no scene mutation; SWITCH-01/04 land in 06-02; 900/900 EditMode green
+- [Phase 6]: 06-02 channel switcher scene half — headless ChannelSwitcherBuilder builds the WhatsApp|Telegram segmented pill into TopBar CenterZone (two independent brand fills per 06-01 binder contract, text-only chips mirroring ModeToggle) + stamps all 6 ChannelSwitcherView refs via SerializedObject; guarded nav restructure removes Telegram tab (tabs 5→4) + Screen_Telegram + TelegramTab, relabels tab 0 «Чаты»; run-editor-builder.sh (Editor-closed, sentinel verdict); scene committed immediately 8f1d25f; 900/900 EditMode green; SWITCH-01/04 marked; owner UAT gate open
 
 ### Pending Todos
 
@@ -101,11 +102,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 05 P03 | 27min | 3 tasks | 13 files |
 | Phase 05 P04 | 9min | 3 tasks | 7 files |
 | Phase 06 P01 | 21min | 3 tasks | 5 files |
+| Phase 06 P02 | 10min | 3 tasks | 5 files |
 
 ## Session Continuity
 
-Last session: 2026-07-13T10:35:49.518Z
-Stopped at: Completed 06-01-PLAN.md
+Last session: 2026-07-13T11:02:26.643Z
+Stopped at: Completed 06-02-PLAN.md
 Resume file: None
 
 **Planned Phase:** 6 (Channel Switcher UI) — 2 plans — 2026-07-12T19:35:08.582Z

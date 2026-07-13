@@ -32,7 +32,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 - [x] **Phase 3: tapi Live-Shape Capture** - User-assisted read-only capture script + sanitized samples + recorded verdicts on the 13 open shape questions (incl. reactions-receive go/no-go); gates the media/Normalize parser work. (completed 2026-07-12)
 - [x] **Phase 4: n8n Telegram Template Parity (dev)** - Telegram_Bot template onto tapi bases (outbound URLs, `type:"text"`, sessionKey, voice duration) + RAG re-stamp on late channel auth; proven e2e against a real dev Telegram profile via tunnel. (completed 2026-07-12)
 - [ ] **Phase 5: Channel-Aware ChatManager Core** - The channel seam (`ChatChannel`, `SetActiveChannel`, `WappiEndpoints` builder, per-channel caches), all tapi parser/send divergences, and the Telegram 2FA auth fix — WhatsApp behavior unchanged, full suite green.
-- [ ] **Phase 6: Channel Switcher UI** - In-screen TopBar segmented WhatsApp|Telegram control with muted/connect affordances, per-bot channel persistence, and removal of the Telegram bottom tab.
+- [x] **Phase 6: Channel Switcher UI** - In-screen TopBar segmented WhatsApp|Telegram control with muted/connect affordances, per-bot channel persistence, and removal of the Telegram bottom tab. (code-complete 2026-07-13; owner visual UAT gate open in 06-HUMAN-UAT.md)
 - [ ] **Phase 7: «Вместе» Suggestions + Dashboard on Telegram** - Channel-aware suggestions payload + channel-branched RAG filter, and «Сводка» Telegram inclusion (bot-level chips, channel-aware deep-link). Dashboard is the milestone's cut line.
 - [ ] **Phase 8: Device UAT + Milestone Closeout** - On-device end-to-end Telegram pass (incl. carried v1.0 deferred UAT) + prod-replication checklist update; prod bagkz stays dormant.
 
@@ -100,7 +100,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 06-01-PLAN.md — Runtime: ChannelSwitcherModel (pure) + ChannelSwitcherView binder + tab-index-shift audit (BotsTabIndex 3→2) + EditMode tests (SWITCH-01/02/03, SWITCH-04 audit half)
-- [ ] 06-02-PLAN.md — ChannelSwitcherBuilder (pill into CenterZone) + nav restructure (remove Telegram tab, «Чаты», delete Screen_Telegram) + run-editor-builder.sh headless run + immediate scene commit + 06-HUMAN-UAT.md (SWITCH-01/04)
+- [x] 06-02-PLAN.md — ChannelSwitcherBuilder (pill into CenterZone) + nav restructure (remove Telegram tab, «Чаты», delete Screen_Telegram) + run-editor-builder.sh headless run + immediate scene commit + 06-HUMAN-UAT.md (SWITCH-01/04)
 **UI hint**: yes
 
 ### Phase 7: «Вместе» Suggestions + Dashboard on Telegram
@@ -138,6 +138,6 @@ Phases execute in numeric order: 3 → 4 → 5 → 6 → 7 → 8. Phases 3 and 4
 | 3. tapi Live-Shape Capture | v1.1 | 1/1 | Complete    | 2026-07-12 |
 | 4. n8n Telegram Template Parity (dev) | v1.1 | 2/2 | Complete    | 2026-07-12 |
 | 5. Channel-Aware ChatManager Core | v1.1 | 4/6 | In Progress | - |
-| 6. Channel Switcher UI | v1.1 | 1/2 | In Progress | - |
+| 6. Channel Switcher UI | v1.1 | 2/2 | Complete | 2026-07-13 |
 | 7. «Вместе» Suggestions + Dashboard on Telegram | v1.1 | 0/TBD | Not started | - |
 | 8. Device UAT + Milestone Closeout | v1.1 | 0/TBD | Not started | - |
