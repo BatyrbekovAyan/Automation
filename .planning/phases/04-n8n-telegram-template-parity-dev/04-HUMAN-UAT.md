@@ -64,21 +64,33 @@ dev n8n is not running and its API key lives in deny-ruled `secrets.json`
 
 ### 3. Import/update the 4 workflows by literal id (templates stay inactive)
 
-> **Shortcut (verified 2026-07-13):** dev n8n is reachable from Claude via the
-> `n8n-mcp` server, but these 4 workflows have **"Available in MCP" = off**, so
-> Claude cannot read/update them (confirmed live: `Workflow is not available in
-> MCP`). If you toggle **Available in MCP** ON for the 4 workflow cards
-> (`4VN3gsFaC2HUYmcc`, `Uz6HBBUpAiUqVysB`, `XuvOp7TxOImOAmlj`, `9PTyYcelRQI7bGDb`),
-> Claude can apply the canonical-file changes as targeted node updates and verify
-> them — turning this whole section into "flip 4 toggles, ask Claude to deploy."
-> Otherwise do it manually:
+> ✅ **DONE 2026-07-13 by Claude via n8n-mcp** (owner flipped the 4 "Available in
+> MCP" toggles; live state backed up first, then targeted node ops, then publish,
+> then re-fetch + structural asserts — ALL GREEN):
+> - `4VN3gsFaC2HUYmcc` Telegram Bot: 3 tapi outbound URLs, no `mark_all`,
+>   `chat OR text` on both Switches, `length_seconds` fallback, `chatId` sessionKey.
+>   Node order preserved (nodes[0]=Webhook, nodes[5]=AI Agent). **Stays INACTIVE.**
+> - `Uz6HBBUpAiUqVysB` + `XuvOp7TxOImOAmlj`: `Restamp RAG Chunks` inserted
+>   (parameterized, sentinel-guarded, cred `vvRrFiEXzLVqKjOx` — binding confirmed
+>   via no-op `setNodeCredential` republish), `Send New Workflows Id` → `.first()`.
+>   Both **published** (drafts == active versions).
+> - `9PTyYcelRQI7bGDb` Suggest Replies: channel-aware Prep, `If channel TG?` +
+>   `Retrieve RAG TG` (botTgId, single-key), channel-neutral Assemble. **Published**
+>   — note this also published your pending draft tweak (`If ok?` typeValidation
+>   loose→strict; behaviorally identical for booleans).
+> - Untouched on purpose: localhost self-API URLs, the (stale) tunnel host in
+>   `Set Wappi Webhook` — step 2's `rotate-tunnel.py` owns those.
+> - Pre-flight note: the credential RESOLVES and BINDS; the `UPDATE documents`
+>   GRANT probe in step 1 is still worth one click in the editor.
 
-- [ ] Import/update all 4 workflows above by their **literal ids**.
-- [ ] Keep the two bot templates **INACTIVE** (shared webhook path `0091024b-7b46`;
-      only per-bot clones go active).
+- [x] Import/update all 4 workflows above by their **literal ids**. *(via MCP, 2026-07-13)*
+- [x] Keep the two bot templates **INACTIVE** (shared webhook path `0091024b-7b46`;
+      only per-bot clones go active). *(verified: Telegram Bot `active: false`)*
 - [ ] **Recreate any pre-existing dev Telegram clone** — old clones carry the wrong
       `api/sync` outbound URLs and will silently fail to reply. Delete the old clone;
       a fresh bot-create off the fixed template produces a correct `tapi/sync` clone.
+      *(No TG clones existed on dev as of the 2026-07-13 workflow list — only recheck
+      if you created one since.)*
 
 ### 4. Authorize a dev Telegram profile + create a Telegram bot
 
