@@ -382,8 +382,9 @@ public class DashboardPage : MonoBehaviour
             // escape SpawnRows' loop and silently truncate every row after the bad one.
             if (showBotTag && !string.IsNullOrEmpty(r.profileId) && map.TryGetValue(r.profileId, out var pref))
                 botTag.text = PlayerPrefs.GetString(pref.botName + "Name", pref.botName); }
-        // Real WhatsApp avatar when the chat list has it loaded/cached; else the
-        // colored-initial default.
+        // Real chat avatar when the ACTIVE channel's chat list has it loaded/cached; else the
+        // colored-initial default (rows are dual-channel now — a non-active-channel row simply
+        // misses the chatId-keyed lookup and falls back here).
         if (avatar != null && ChatManager.Instance != null &&
             ChatManager.Instance.TryGetChatAvatar(r.chatId, out var avatarSprite) && avatarSprite != null)
         {
