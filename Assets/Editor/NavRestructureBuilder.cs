@@ -83,9 +83,10 @@ public static class NavRestructureBuilder
         Debug.Log("[NavRestructureBuilder] Headless build + save complete: dashboard, overlay chrome, empty state, tab rewired.");
     }
 
-    // Task B6: stamps the rendered line-chart glyphs into tabs[2]
-    // (inactiveIcon/activeIcon) now that the "Сводка" slot is rewired to
-    // Screen_Dashboard. Does not touch Build()/BuildInternal().
+    // Task B6: stamps the rendered line-chart glyphs into the «Сводка» tab
+    // (inactiveIcon/activeIcon), resolved by IDENTITY — tab indices shifted when
+    // 06-02 removed the Telegram tab (dashboard 2→1, Bots now at 2), so blind
+    // indexing would stamp the Bots tab. Does not touch Build()/BuildInternal().
     [MenuItem("Tools/Nav Restructure/Assign Dashboard Icons")]
     public static void AssignDashboardIcons()
     {
@@ -105,16 +106,33 @@ public static class NavRestructureBuilder
 
         var tabsSo = new SerializedObject(tabManager);
         var tabsProp = tabsSo.FindProperty("tabs");
-        if (tabsProp == null || tabsProp.arraySize < 3)
-            throw new System.InvalidOperationException("BottomTabManager.tabs list is missing or too short.");
+        if (tabsProp == null)
+            throw new System.InvalidOperationException("BottomTabManager.tabs list is missing.");
 
-        var dashboardTab = tabsProp.GetArrayElementAtIndex(2);
+        // Resolve the «Сводка» slot by identity, never by index — this entry point
+        // has legitimate re-run uses (glyph regeneration) and must find the right
+        // tab wherever it currently sits.
+        SerializedProperty dashboardTab = null;
+        for (int i = 0; i < tabsProp.arraySize; i++)
+        {
+            var t = tabsProp.GetArrayElementAtIndex(i);
+            var panel = t.FindPropertyRelative("screenPanel").objectReferenceValue as GameObject;
+            if (t.FindPropertyRelative("tabName").stringValue == "Сводка"
+                || (panel != null && panel.name == "Screen_Dashboard"))
+            {
+                dashboardTab = t;
+                break;
+            }
+        }
+        if (dashboardTab == null)
+            throw new System.InvalidOperationException("[NavRestructureBuilder] «Сводка» tab not found in BottomTabManager.tabs.");
+
         dashboardTab.FindPropertyRelative("inactiveIcon").objectReferenceValue = inactiveIcon;
         dashboardTab.FindPropertyRelative("activeIcon").objectReferenceValue = activeIcon;
         tabsSo.ApplyModifiedPropertiesWithoutUndo();
         EditorUtility.SetDirty(tabManager);
 
-        Debug.Log("[NavRestructureBuilder] Assign Dashboard Icons complete: tabs[2] inactiveIcon/activeIcon stamped. SAVE THE SCENE (Cmd+S).");
+        Debug.Log("[NavRestructureBuilder] Assign Dashboard Icons complete: «Сводка» tab inactiveIcon/activeIcon stamped. SAVE THE SCENE (Cmd+S).");
     }
 
     // ── Main build ──────────────────────────────────────────────────────────
