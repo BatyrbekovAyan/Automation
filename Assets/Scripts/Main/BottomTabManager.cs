@@ -71,7 +71,8 @@ public class BottomTabManager : MonoBehaviour
     /// Single source of truth for callers that need to switch to the bots
     /// tab without hardcoding the index (e.g. EmptyStateView, Manager).
     /// </summary>
-    public const int BotsTabIndex = 3;
+    // Post-06-02 nav restructure: Telegram tab (index 1) removed → Bots shifts 3→2.
+    public const int BotsTabIndex = 2;
 
     /// <summary>
     /// Index of the WhatsApp (Chats) tab in the navigation bar. Navigating to it
