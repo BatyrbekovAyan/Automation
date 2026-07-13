@@ -135,10 +135,11 @@ public class ChannelSwitcherView : MonoBehaviour
         !string.IsNullOrEmpty(profileId) && profileId != Bot.UnauthedProfileSentinel;
 
     /// <summary>
-    /// Paint one chip. Selected ⇒ brand fill visible (alpha 1) + white label;
-    /// unselected ⇒ transparent fill + neutral label. Muted ⇒ label and icon alpha
-    /// dropped to <see cref="MutedAlpha"/> (brand logos fade, never tint), applied on
-    /// top of the selection colors so a selected-but-unconnected chip still reads muted.
+    /// Paint one chip. Selected ⇒ brand fill visible + white label; unselected ⇒
+    /// transparent fill + neutral label. Muted ⇒ fill, label, and icon alpha dropped
+    /// to <see cref="MutedAlpha"/> (brand colors fade, never tint), applied on top of
+    /// the selection colors so a selected-but-unconnected chip reads muted as a whole —
+    /// a full-saturation brand fill with dim text would not read disconnected at a glance.
     /// Every ref is null-guarded (the 06-02 builder may leave the optional icon unset).
     /// </summary>
     private static void ApplyChip(Image fill, TextMeshProUGUI label, Image icon,
@@ -147,7 +148,7 @@ public class ChannelSwitcherView : MonoBehaviour
         if (fill != null)
         {
             Color f = selectedFill;
-            f.a = state.Selected ? 1f : 0f;
+            f.a = state.Selected ? (state.Muted ? MutedAlpha : 1f) : 0f;
             fill.color = f;
         }
 
