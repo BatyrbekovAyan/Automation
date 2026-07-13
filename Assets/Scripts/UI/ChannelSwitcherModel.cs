@@ -22,8 +22,10 @@ public static class ChannelSwitcherModel
     /// </summary>
     public static ChannelChipState StateFor(ChatChannel chip, ChatChannel active, bool waConnected, bool tgConnected)
     {
-        // Placeholder decision — real per-chip selection/muted logic lands next.
-        return new ChannelChipState(chip == active, waConnected && tgConnected);
+        bool selected = chip == active;                                   // equality only
+        bool ownChannelConnected = chip == ChatChannel.Telegram ? tgConnected : waConnected;
+        bool muted = !ownChannelConnected;                               // connectivity only — never suppressed by selection
+        return new ChannelChipState(selected, muted);
     }
 }
 
