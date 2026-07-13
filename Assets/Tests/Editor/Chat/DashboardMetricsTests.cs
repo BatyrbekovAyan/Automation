@@ -55,6 +55,24 @@ public class DashboardMetricsTests
         Assert.AreEqual(1, new List<DashboardOutcome>(DashboardMetrics.FilterByProfile(rows, "a")).Count);
     }
 
+    [Test] public void FilterByProfilesSetReturnsRowsWhoseProfileIsInSet()
+    {
+        // Set {"a","b"} models a dual-channel bot's two profile ids: both its rows
+        // must show under the one chip; the unrelated "c" row is excluded.
+        var rows = new List<DashboardOutcome>
+            { O("a","in_dialog",1,1), O("b","in_dialog",1,1), O("c","in_dialog",1,1) };
+        var set = new HashSet<string> { "a", "b" };
+        Assert.AreEqual(2, new List<DashboardOutcome>(DashboardMetrics.FilterByProfiles(rows, set)).Count);
+    }
+
+    [Test] public void FilterByProfilesNullOrEmptyReturnsAll()
+    {
+        var rows = new List<DashboardOutcome> { O("a","in_dialog",1,1), O("b","in_dialog",1,1) };
+        Assert.AreEqual(2, new List<DashboardOutcome>(DashboardMetrics.FilterByProfiles(rows, null)).Count);
+        Assert.AreEqual(2, new List<DashboardOutcome>(
+            DashboardMetrics.FilterByProfiles(rows, new HashSet<string>())).Count);
+    }
+
     [Test] public void CountsOrdersInPreviousWindow()
     {
         long now = 100_000_000_000L;

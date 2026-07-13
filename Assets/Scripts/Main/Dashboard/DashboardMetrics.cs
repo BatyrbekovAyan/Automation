@@ -37,6 +37,10 @@ public static class DashboardMetrics
             ? rows
             : rows.Where(r => r.profileId == profileIdOrNull);
 
+    // TDD scaffold — implemented in the GREEN commit.
+    public static IEnumerable<DashboardOutcome> FilterByProfiles(
+        IEnumerable<DashboardOutcome> rows, ISet<string> ids) => rows;
+
     public static int CountOrders(IEnumerable<DashboardOutcome> rows, Window w)
         => rows.Count(r => r.Status == OutcomeStatus.OrderCollected
                         && r.outcomeAt >= w.CurStart && r.outcomeAt <= w.CurEnd);
