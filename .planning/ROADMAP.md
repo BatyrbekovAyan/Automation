@@ -33,7 +33,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 - [x] **Phase 4: n8n Telegram Template Parity (dev)** - Telegram_Bot template onto tapi bases (outbound URLs, `type:"text"`, sessionKey, voice duration) + RAG re-stamp on late channel auth; proven e2e against a real dev Telegram profile via tunnel. (completed 2026-07-12)
 - [ ] **Phase 5: Channel-Aware ChatManager Core** - The channel seam (`ChatChannel`, `SetActiveChannel`, `WappiEndpoints` builder, per-channel caches), all tapi parser/send divergences, and the Telegram 2FA auth fix — WhatsApp behavior unchanged, full suite green.
 - [x] **Phase 6: Channel Switcher UI** - In-screen TopBar segmented WhatsApp|Telegram control with muted/connect affordances, per-bot channel persistence, and removal of the Telegram bottom tab. (code-complete 2026-07-13; owner visual UAT gate open in 06-HUMAN-UAT.md)
-- [ ] **Phase 7: «Вместе» Suggestions + Dashboard on Telegram** - Channel-aware suggestions payload + channel-branched RAG filter, and «Сводка» Telegram inclusion (bot-level chips, channel-aware deep-link). Dashboard is the milestone's cut line.
+- [x] **Phase 7: «Вместе» Suggestions + Dashboard on Telegram** - Channel-aware suggestions payload + channel-branched RAG filter, and «Сводка» Telegram inclusion (bot-level chips, channel-aware deep-link). Dashboard is the milestone's cut line. (code-complete 2026-07-13; 916/916 EditMode green; live TG grounding proof owner-gated in 07-HUMAN-UAT.md)
 - [ ] **Phase 8: Device UAT + Milestone Closeout** - On-device end-to-end Telegram pass (incl. carried v1.0 deferred UAT) + prod-replication checklist update; prod bagkz stays dormant.
 
 ## Phase Details
@@ -115,7 +115,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 07-01-PLAN.md — Channel-aware «Вместе» payload (additive `botTgId` + `channel`, channel-resolved profile id; `botWaId` always) + pure channel-selection matrix tests + SUGG live-verification note (client half; server RAG branch shipped Phase 4) (SUMMARY 2026-07-13; 908/908 EditMode green; SUGG-01/02 client half; live TG grounding rides TPL-06 in 07-HUMAN-UAT.md)
-- [ ] 07-02-PLAN.md — «Сводка» Telegram inclusion: pure both-channel profile map, bot-level chips (`FilterByProfiles` set semantics), channel-aware row deep-link (`SetActiveBot`→`SetActiveChannel`→`SelectChat`) + tests
+- [x] 07-02-PLAN.md — «Сводка» Telegram inclusion: pure both-channel profile map (`DashboardProfileMap`), bot-level chips (`FilterByProfiles` set semantics; dual-channel bot ⇒ one chip), channel-aware row deep-link (`SetActiveBot`→`SetActiveChannel`→`SwitchTab`→`SelectChat`) + tests (SUMMARY 2026-07-13; 916/916 EditMode green; DASH-01/02/03; server contract + Main.unity untouched)
 **UI hint**: yes
 
 ### Phase 8: Device UAT + Milestone Closeout
@@ -142,5 +142,5 @@ Phases execute in numeric order: 3 → 4 → 5 → 6 → 7 → 8. Phases 3 and 4
 | 4. n8n Telegram Template Parity (dev) | v1.1 | 2/2 | Complete    | 2026-07-12 |
 | 5. Channel-Aware ChatManager Core | v1.1 | 4/6 | In Progress | - |
 | 6. Channel Switcher UI | v1.1 | 2/2 | Complete    | 2026-07-13 |
-| 7. «Вместе» Suggestions + Dashboard on Telegram | v1.1 | 1/2 | In Progress | - |
+| 7. «Вместе» Suggestions + Dashboard on Telegram | v1.1 | 2/2 | Complete    | 2026-07-13 |
 | 8. Device UAT + Milestone Closeout | v1.1 | 0/TBD | Not started | - |

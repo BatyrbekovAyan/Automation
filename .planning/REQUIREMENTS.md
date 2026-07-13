@@ -72,9 +72,12 @@
 
 ### Dashboard (DASH)
 
-- [ ] **DASH-01**: «Сводка» counts and lists Telegram conversations (telegram profile ids in the POSTed list + profile→bot map)
-- [ ] **DASH-02**: Bot filter chips are bot-level — a dual-channel bot gets ONE chip covering both profiles
-- [ ] **DASH-03**: A Telegram outcome row deep-links to that Telegram chat (channel-aware SetActiveBot/channel/SelectChat)
+- [x] **DASH-01
+**: «Сводка» counts and lists Telegram conversations (telegram profile ids in the POSTed list + profile→bot map)
+- [x] **DASH-02
+**: Bot filter chips are bot-level — a dual-channel bot gets ONE chip covering both profiles
+- [x] **DASH-03
+**: A Telegram outcome row deep-links to that Telegram chat (channel-aware SetActiveBot/channel/SelectChat)
 
 ## v2 Requirements
 
@@ -122,9 +125,9 @@
 | TPL-06 | Phase 4 | Complete |
 | SUGG-01 | Phase 7 | Complete |
 | SUGG-02 | Phase 7 | Complete |
-| DASH-01 | Phase 7 | Pending |
-| DASH-02 | Phase 7 | Pending |
-| DASH-03 | Phase 7 | Pending |
+| DASH-01 | Phase 7 | Complete |
+| DASH-02 | Phase 7 | Complete |
+| DASH-03 | Phase 7 | Complete |
 
 **Coverage:**
 - v1.1 requirements: 29 total (enumerated REQ-IDs; the earlier "24 total" header was a miscount — CHAT has 11 items + SUGG/DASH add 5)
