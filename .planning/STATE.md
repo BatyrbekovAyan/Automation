@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
-status: executing
+status: ready_to_plan
 stopped_at: Completed 07-02-PLAN.md
 last_updated: "2026-07-13T12:48:15.513Z"
 last_activity: 2026-07-13
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 13
   completed_plans: 12
-  percent: 92
+  percent: 83
 ---
 
 # Project State
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 
 ## Current Position
 
-Phase: 7 of 8 («вместе» suggestions + dashboard on telegram) — all plans complete
-Plan: 07-02 complete — Phase 7 done; Phase 8 (prod replication) next
-Status: In progress
+Phase: 8 of 8 (device uat + milestone closeout)
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-07-13
 
 Progress: [█████████░] 92%
