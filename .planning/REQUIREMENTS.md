@@ -65,8 +65,10 @@
 
 ### «Вместе» Suggestions (SUGG)
 
-- [ ] **SUGG-01**: Suggestions populate for Telegram chats — provider payload carries channel-appropriate profile/workflow ids + `channel` field (additive v1.1 contract)
-- [ ] **SUGG-02**: Telegram suggestions are RAG-grounded via the `botTgId` metadata filter (channel-branched vector-store node; single-key invariant)
+- [x] **SUGG-01
+**: Suggestions populate for Telegram chats — provider payload carries channel-appropriate profile/workflow ids + `channel` field (additive v1.1 contract)
+- [x] **SUGG-02
+**: Telegram suggestions are RAG-grounded via the `botTgId` metadata filter (channel-branched vector-store node; single-key invariant)
 
 ### Dashboard (DASH)
 
@@ -118,8 +120,8 @@
 | TPL-04 | Phase 4 | Complete |
 | TPL-05 | Phase 4 | Complete |
 | TPL-06 | Phase 4 | Complete |
-| SUGG-01 | Phase 7 | Pending |
-| SUGG-02 | Phase 7 | Pending |
+| SUGG-01 | Phase 7 | Complete |
+| SUGG-02 | Phase 7 | Complete |
 | DASH-01 | Phase 7 | Pending |
 | DASH-02 | Phase 7 | Pending |
 | DASH-03 | Phase 7 | Pending |

@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
-status: ready_to_plan
-stopped_at: Completed 06-02-PLAN.md
-last_updated: "2026-07-13T11:02:43.839Z"
+status: executing
+stopped_at: Completed 07-01-PLAN.md
+last_updated: "2026-07-13T12:30:11.697Z"
 last_activity: 2026-07-13
 progress:
   total_phases: 6
-  completed_phases: 4
-  total_plans: 11
-  completed_plans: 10
-  percent: 67
+  completed_phases: 3
+  total_plans: 13
+  completed_plans: 11
+  percent: 85
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-12)
 
 **Core value:** The owner stays in control along the automation↔semi-auto spectrum — the bot can answer autonomously, or propose replies the owner picks and refines, without losing trust or the ability to take over.
-**Current focus:** Phase 6 (Channel Switcher UI) — **code-complete** (both plans executed). 06-01 shipped the runtime half (pure `ChannelSwitcherModel` + event-driven `ChannelSwitcherView` binder + `BotsTabIndex` 3→2 locked by `TabIndexShiftTests`). 06-02 built the scene half **headlessly**: a `ChannelSwitcherBuilder` builds the WhatsApp|Telegram segmented pill into `Screen_Whatsapp/ChatsPanel/TopBar/CenterZone` (two independent brand fills per the 06-01 binder contract, text-only chips mirroring ModeToggle), stamps all 6 `ChannelSwitcherView` refs via SerializedObject, and guardedly removes the Telegram bottom tab (tabs 5→4) + `Screen_Telegram` + `TelegramTab` and relabels tab 0 «Чаты»; new `Tools/run-editor-builder.sh` (Editor-closed, sentinel verdict) ran it, scene committed immediately (`8f1d25f`), suite **900/900 green** against the real 4-tab scene. SWITCH-01/04 marked. **Only the owner visual UAT gate (`06-HUMAN-UAT.md`) remains before phase close.** Next: Phase 7 («Вместе» suggestions + dashboard on Telegram).
+**Current focus:** Phase 7 («Вместе» suggestions + dashboard on Telegram). **07-01 done** (client suggestions half): `N8nSuggestionsProvider.BuildPayloadJson` is now channel-aware and pure — `profileId` channel-resolved (TG⇒`telegramProfileId`), `botWaId`=`whatsappWorkflowId` ALWAYS (server's default WA RAG branch / backward compat), new `botTgId`=`telegramWorkflowId`, new `channel` lowercase enum-derived only (T-07-01-01); the frozen v1 wire keys stay byte-identical (strip `channel`+`botTgId` ⇒ exact v1, proven by `WhatsAppRequest_AdditivelyIdenticalToV1`). `Run()` reads `ChatManager.ActiveChannel` at request-build time (Empty/drain-gate/`requestSeq` semantics unchanged). 7 new channel-matrix + additive-identity tests; full EditMode suite **908/908 green**. SUGG-01/02 client half marked; live TG RAG-grounding proof is owner-gated and rides the Phase-4 TPL-06 dev-n8n session (`07-HUMAN-UAT.md`). Next: 07-02 (dashboard «Сводка» counts/chips/deep-link on Telegram). Also still open: Phase 6 owner visual UAT (`06-HUMAN-UAT.md`).
 
 ## Current Position
 
 Phase: 7 of 8 («вместе» suggestions + dashboard on telegram)
-Plan: Not started
-Status: Ready to plan
+Plan: 07-01 complete — 07-02 (dashboard on Telegram) next
+Status: In progress
 Last activity: 2026-07-13
 
-Progress: [█████████░] 91%
+Progress: [█████████░] 85%
 
 ## Performance Metrics
 
@@ -64,6 +64,7 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [Phase 5]: 05-04 send-path channel branches — Telegram quoted reply => tapi message/reply {body, message_id} (no recipient); reaction body gains required recipient (NullValueHandling.Ignore, WA byte-identical); mark-read drops mark_all on Telegram; media EndpointFor 3-arg via (ChatChannel)entry.channel; text+media outbox snapshot channel, text retry rebuilds URL from entry.channel; last api/sync literals in ChatManager.cs retired; WhatsApp byte-identical, 888/888 EditMode green
 - [Phase 6]: 06-01 channel-switcher runtime — pure ChannelSwitcherModel (selected=equality, muted=own-channel connectivity, both can hold) + event-driven ChannelSwitcherView binder (reads ChatManager.ActiveChannel read-only so SWITCH-03 persistence flows through; muted chips stay tappable for SWITCH-02's connect empty state; every ref null-guarded; field names are the 06-02 builder's SerializedObject contract); BottomTabManager.BotsTabIndex 3→2 locked by TabIndexShiftTests (all SwitchTab consumers already constant-based, no literals); no scene mutation; SWITCH-01/04 land in 06-02; 900/900 EditMode green
 - [Phase 6]: 06-02 channel switcher scene half — headless ChannelSwitcherBuilder builds the WhatsApp|Telegram segmented pill into TopBar CenterZone (two independent brand fills per 06-01 binder contract, text-only chips mirroring ModeToggle) + stamps all 6 ChannelSwitcherView refs via SerializedObject; guarded nav restructure removes Telegram tab (tabs 5→4) + Screen_Telegram + TelegramTab, relabels tab 0 «Чаты»; run-editor-builder.sh (Editor-closed, sentinel verdict); scene committed immediately 8f1d25f; 900/900 EditMode green; SWITCH-01/04 marked; owner UAT gate open
+- [Phase 7]: 07-01 channel-aware «Вместе» payload — additive v1.1 wire (botTgId + channel appended after messages, v1 keys byte-identical; server Prep defaults absent channel=>whatsapp, Phase 4). BuildPayloadJson pure + channel-RESOLVED (profileId TG=>telegramProfileId, botWaId=whatsappWorkflowId ALWAYS for the default WA RAG branch, channel lowercase enum-derived ONLY per T-07-01-01); Run() reads ChatManager.ActiveChannel; 7 channel-matrix + additive-identity tests, 908/908 EditMode green; SUGG-01/02 client half, live TG grounding rides TPL-06 (07-HUMAN-UAT.md)
 
 ### Pending Todos
 
@@ -103,11 +104,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 05 P04 | 9min | 3 tasks | 7 files |
 | Phase 06 P01 | 21min | 3 tasks | 5 files |
 | Phase 06 P02 | 10min | 3 tasks | 5 files |
+| Phase 07 P01 | 7min | 3 tasks | 4 files |
 
 ## Session Continuity
 
-Last session: 2026-07-13T11:02:26.643Z
-Stopped at: Completed 06-02-PLAN.md
+Last session: 2026-07-13T12:29:13.742Z
+Stopped at: Completed 07-01-PLAN.md
 Resume file: None
 
-**Planned Phase:** 6 (Channel Switcher UI) — 2 plans — 2026-07-12T19:35:08.582Z
+**Planned Phase:** 7 («Вместе» Suggestions + Dashboard on Telegram) — 2 plans — 2026-07-13T12:16:27.814Z
