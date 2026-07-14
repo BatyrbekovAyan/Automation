@@ -5,8 +5,9 @@ using UnityEngine;
 /// <summary>
 /// Incoming-video thumbnail extraction, split out of ChatManager (mirrors
 /// ChatManager.MediaSend.cs / .BotState.cs). For every server-sourced video, natively
-/// extracts a frame from its remote URL and caches it under "vthumb://{id}", replacing
-/// Wappi's server JPEGThumbnail so previews never depend on the server providing one.
+/// extracts a frame from its remote URL and caches it under the VideoThumbKey-minted
+/// key ("vthumb://{id}" on WhatsApp; TG-namespaced on Telegram — see VideoThumbKey),
+/// replacing Wappi's server JPEGThumbnail so previews never depend on the server providing one.
 /// iOS does the extraction; Editor + Android fall back to the server thumb (see
 /// VideoThumbnailExtractor). Extraction coroutines run on 'this', so SetActiveBot's
 /// StopAllCoroutines cancels in-flight work on a bot switch; ClearVideoThumbQueue then
@@ -109,7 +110,7 @@ public partial class ChatManager
         // bubble shows a dark card + play button (HasUnextractableThumbnail) rather than spinning.
         if (_thumbUnextractableIds.Contains(vm.messageId)) return false;
 
-        string vthumbUrl = "vthumb://" + vm.messageId;
+        string vthumbUrl = VideoThumbKey.For(ActiveChannel, GetActiveProfileId(), vm.chatId, vm.messageId);
 
         // Durable de-dup: our frame was extracted in a prior session and persists on disk.
         if (MediaCacheManager.Instance.IsImageCached(vthumbUrl))
@@ -157,7 +158,7 @@ public partial class ChatManager
         }
 
         string cacheRoot = GetCacheRoot();
-        string vthumbUrl = "vthumb://" + messageId;
+        string vthumbUrl = VideoThumbKey.For(ActiveChannel, GetActiveProfileId(), vm.chatId, messageId);
         // Compute (and ensure the media dir exists) before the native atomic write.
         string finalPath = MediaCacheManager.Instance.GetFilePathFromUrl(vthumbUrl);
 
@@ -324,4 +325,23 @@ public partial class ChatManager
         _retriedUnavailableIds.Clear();
         _thumbUnextractableIds.Clear();
     }
+}
+
+/// <summary>
+/// Pure mint for the synthetic video-preview cache key (ChannelResolver/ChannelCachePath
+/// precedent: pure seam co-located with its consumer). WhatsApp keeps the legacy global
+/// "vthumb://{messageId}" — stanza ids are globally unique, so existing WA caches stay
+/// byte-identical and valid. Telegram message ids are 1-5 digit per-account/per-channel
+/// COUNTERS (SHAPES.md), so the same numeric id can name different videos across two TG
+/// bots, or across a channel post and a private chat in one account — and MediaCacheManager
+/// is a single global disk cache, so an un-namespaced key would silently and durably paint
+/// another message's frame (05-06-REVIEW WR-02). The TG key therefore namespaces by
+/// profile + chat. Null parts coalesce to "" so the key stays deterministic.
+/// </summary>
+public static class VideoThumbKey
+{
+    public static string For(ChatChannel channel, string profileId, string chatId, string messageId) =>
+        channel == ChatChannel.Telegram
+            ? $"vthumb://tg/{profileId ?? ""}/{chatId ?? ""}/{messageId}"
+            : "vthumb://" + messageId;
 }

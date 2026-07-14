@@ -74,6 +74,7 @@ None yet.
 
 ### Blockers/Concerns
 
+- [Gate/Phase 8 — 05-06-REVIEW WR-02]: TG message ids are 1-5 digit per-account/per-channel counters. The client-side vthumb cache key is now TG-namespaced (`vthumb://tg/{profileId}/{chatId}/{messageId}`), but `message/media/download` / `messages/id/get` carry NO chat id — device UAT must send videos into a TG channel post and a private chat with overlapping numeric message ids on the dev profile and confirm the download returns the right bytes; if it crosses, check whether tapi accepts a `chat_id` param on the download endpoint.
 - [Gate/Phase 3]: tapi media message shapes (messages/get) undocumented — Normalize/media work (Phase 5 CHAT-03) blocked until the owner runs the capture script against an authorized dev Telegram profile.
 - [Gate/Phase 4]: TPL-06 e2e needs dev n8n (localhost:5678) + tunnel + a real authorized Telegram profile (user-assisted).
 - [Constraint]: Assume Wappi response-crossing bugs apply to tapi — keep serial media queue + `_chatFetchesInFlight` gate; reset on channel switch like bot switch.
