@@ -29,5 +29,10 @@ public class NormalizedMessage
     public MessageType quotedType;
     public string      quotedThumbnailUrl;
 
+    // Telegram (tapi) reactions mapped from RawMessage.reactions[] at Normalize time.
+    // Null for WhatsApp (its reactions flow through ReactionStore instead) and for
+    // unreacted Telegram messages — so CreateViewModel copying null is byte-identical to today.
+    public System.Collections.Generic.List<MessageReaction> reactions;
+
     public DeliveryStatus deliveryStatus;
 }

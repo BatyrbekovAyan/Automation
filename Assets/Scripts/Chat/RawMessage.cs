@@ -36,4 +36,10 @@ public class RawMessage
 
     [JsonProperty("file_name")]
     public string fileName;
+
+    // Telegram (tapi) reactions ride ON the target message: an array of
+    // {reaction,count,user_id,contact_name,type:"emoji"}, null when unreacted. WhatsApp
+    // reactions arrive as separate type:"reaction" rows instead — read only on the Telegram path.
+    [JsonProperty("reactions")]
+    public JToken reactions;
 }

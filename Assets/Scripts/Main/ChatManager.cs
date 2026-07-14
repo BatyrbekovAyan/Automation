@@ -686,6 +686,13 @@ public partial class ChatManager : MonoBehaviour
                     {
                         hasStatusUpdates = true;
                     }
+                    // Telegram carries reactions[] on every message, so the latest-window sync
+                    // surfaces reaction changes on already-cached messages in place (WhatsApp: no-op).
+                    if (ActiveChannel == ChatChannel.Telegram &&
+                        RefreshCachedMessageReactions(reconcileNorm, cachedList))
+                    {
+                        hasStatusUpdates = true;
+                    }
 
                     // Adopt the server's canonical order keys. Optimistic sends
                     // carry a device-clock timestamp + a high local sequence
@@ -1247,6 +1254,13 @@ public partial class ChatManager : MonoBehaviour
                         {
                             cacheDirty = true;
                         }
+                        // Telegram carries reactions[] on every message, so a refresh surfaces
+                        // reaction changes on already-cached messages in place (WhatsApp: no-op).
+                        if (ActiveChannel == ChatChannel.Telegram &&
+                            RefreshCachedMessageReactions(reconcileNorm, _activeChatCache))
+                        {
+                            cacheDirty = true;
+                        }
                         continue;
                     }
 
@@ -1361,6 +1375,7 @@ public partial class ChatManager : MonoBehaviour
             fileSize = msg.fileSize,
             pageCount = msg.pageCount,
             deliveryStatus = msg.deliveryStatus,
+            reactions          = msg.reactions,   // Telegram receive-side reactions (null for WhatsApp)
             quotedMessageId    = msg.quotedMessageId,
             quotedSenderName   = msg.quotedSenderName,
             quotedText         = msg.quotedText,
@@ -1541,7 +1556,14 @@ if (msg.messageType == MessageType.Video)
         // no-op — supply file name/mime/size/duration/aspect from the flat fields + media_info,
         // channel-scoped so WhatsApp Normalize stays byte-identical.
         if (ActiveChannel == ChatChannel.Telegram)
+        {
             ApplyTelegramMediaShape(msg, raw);
+
+            // Receive-side reactions (SHAPES.md Q3, GO): tapi carries reactions[] on the target
+            // message itself, so map them into the shared display state here. WhatsApp reactions
+            // stay on the ReactionStore live-event path (this stays null for WhatsApp).
+            msg.reactions = TelegramReactionMapper.Map(raw.reactions);
+        }
 
         if (raw.type != "reaction")
         {
@@ -1671,6 +1693,35 @@ if (msg.messageType == MessageType.Video)
         || type == MessageType.Voice
         || type == MessageType.Sticker
         || type == MessageType.Document;
+
+    /// <summary>
+    /// Telegram-only: refresh an already-cached message's reactions from the freshly-Normalized
+    /// server view. tapi carries the full reactions[] on every messages/get, so a plain refresh
+    /// delivers reaction changes for free (SHAPES.md Q3). Mirrors RefreshCachedMessageMedia/Quote:
+    /// mutates the cached VM in place + fires OnMessageReactionsChanged so the bound pill re-renders.
+    /// The merge preserves the owner's optimistic "me" reaction until the server echoes the same
+    /// emoji (no flicker, stays toggleable). Returns true if the reactions changed.
+    /// WhatsApp never reaches here (its reactions flow through ReactionStore) — the caller gates on
+    /// ActiveChannel==Telegram, keeping WhatsApp byte-identical.
+    /// </summary>
+    private bool RefreshCachedMessageReactions(NormalizedMessage refreshed, List<MessageViewModel> cachedList)
+    {
+        if (refreshed == null || cachedList == null) return false;
+
+        for (int i = 0; i < cachedList.Count; i++)
+        {
+            var cached = cachedList[i];
+            if (cached.messageId != refreshed.id) continue;
+
+            var merged = TelegramReactionMerge.Merge(cached.reactions, refreshed.reactions);
+            if (TelegramReactionMerge.SameReactions(cached.reactions, merged)) return false;
+
+            cached.reactions = merged;
+            OnMessageReactionsChanged?.Invoke(cached);
+            return true;
+        }
+        return false;
+    }
 
     /// <summary>
     /// Mirrors RefreshCachedMessageMedia but for the reply quote. Cached histories that

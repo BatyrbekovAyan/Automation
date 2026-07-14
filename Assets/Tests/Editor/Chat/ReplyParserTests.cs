@@ -320,4 +320,30 @@ public class ReplyParserTests
         var vm = new MessageViewModel { messageId = "QU", type = MessageType.Image, thumbnailUrl = null, mediaUrl = "https://cdn/img.jpg", isIncoming = true };
         Assert.AreEqual("https://cdn/img.jpg", ReplyParser.Resolve(Reply("QU"), id => vm, StubParse).thumbnailUrl);
     }
+
+    // --- SHAPES.md Q8: tapi reply_message is healthy (no echo bug in 28 samples). A Telegram
+    // snapshot carries contact_name (not senderName) + no fromMe field, and body is the REAL
+    // quoted original (!= the replying message's own body), so the WhatsApp echo-blank guard
+    // never fires and the quoted card shows the real text. Locks that the shared path ports as-is. ---
+
+    [Test]
+    public void TelegramSnapshot_RealQuotedBody_ResolvesAndDoesNotBlank()
+    {
+        // reply_message keys per capture: {id, body, type, contact_name, ...}; no fromMe.
+        var snap = new JObject
+        {
+            ["id"] = "TG1",
+            ["type"] = "text",           // MessageTypeParser maps "text" => Chat (05-03)
+            ["body"] = "original text",   // the real quoted original
+            ["contact_name"] = "Sender"
+        };
+        // The replying message's OWN body differs from the snapshot body (no echo).
+        var raw = new RawMessage { type = "text", isReply = true, replyMessage = snap, body = "my reply" };
+
+        var preview = ReplyParser.Resolve(raw, _ => null, t => t == "text" ? MessageType.Chat : StubParse(t));
+
+        Assert.AreEqual("TG1", preview.messageId);
+        Assert.AreEqual("Sender", preview.senderName);   // from contact_name (incoming default)
+        Assert.AreEqual("original text", preview.text);  // NOT blanked — echo guard did not fire
+    }
 }
