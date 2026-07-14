@@ -81,4 +81,50 @@ public static class MessageMediaMerge
 
         return incoming;
     }
+
+    /// <summary>
+    /// Opposite direction from the floor: copies the presentation fields a fresh Normalize
+    /// now derives (Telegram-refined type, кружок/GIF flags, mime) onto an already-cached VM
+    /// of the same message. Cached histories written by an older build predate these fields
+    /// and would otherwise render the old presentation forever (05-07-REVIEW WR-01: a .tgs
+    /// cached pre-refine as Document keeps its document card, a video note stays a square
+    /// video, a GIF never gets its badge — including the exact UAT probe messages).
+    ///
+    /// WhatsApp-neutral by value: WA rows carry identical values on both sides (flags are
+    /// minted only in the Telegram Normalize gate so they are false/false, mime is stable per
+    /// message), so this never dirties a WA cache. JsonUtility round-trips a null string as
+    /// "", so the mime comparison treats null and empty as equal — otherwise every WA row
+    /// with no mime would churn on every sync. Returns true when anything changed (caller
+    /// marks the cache dirty and fires the re-bind event).
+    /// </summary>
+    public static bool RefreshPresentation(NormalizedMessage refreshed, MessageViewModel cached)
+    {
+        if (refreshed == null || cached == null) return false;
+
+        bool changed = false;
+
+        // Refined type (e.g. a pre-update .tgs cached as Document, a phone video cached as
+        // Document). isSticker is derived from the refined type at Normalize time, so it
+        // travels with the type — never on its own. Unknown never clobbers a cached type.
+        if (refreshed.messageType != MessageType.Unknown && cached.type != refreshed.messageType)
+        {
+            cached.type = refreshed.messageType;
+            cached.isSticker = refreshed.isSticker;
+            changed = true;
+        }
+
+        bool mimeDiffers = !string.Equals(cached.mimeType ?? "", refreshed.mimeType ?? "",
+                                          System.StringComparison.Ordinal);
+        if (cached.isVideoNote != refreshed.isVideoNote
+            || cached.isGif != refreshed.isGif
+            || mimeDiffers)
+        {
+            cached.isVideoNote = refreshed.isVideoNote;
+            cached.isGif = refreshed.isGif;
+            cached.mimeType = refreshed.mimeType;
+            changed = true;
+        }
+
+        return changed;
+    }
 }

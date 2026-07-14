@@ -95,4 +95,99 @@ public class MessageMediaMergeTests
         Assert.AreEqual("", incoming[0].thumbnailUrl);            // no id match -> unchanged
         Assert.AreEqual("", incoming[0].videoUrl);
     }
+
+    // --- RefreshPresentation (05-07-REVIEW WR-01): a sync that re-encounters a row cached by
+    // --- an older build must backfill the new presentation fields (refined type, кружок/GIF
+    // --- flags, mime) so the pre-update cache — the exact UAT probe messages — re-renders.
+
+    private static NormalizedMessage Norm(MessageType type, string mime = null,
+                                          bool note = false, bool gif = false, bool sticker = false) =>
+        new NormalizedMessage
+        {
+            id = "A", messageType = type, mimeType = mime,
+            isVideoNote = note, isGif = gif, isSticker = sticker
+        };
+
+    [Test]
+    public void RefreshPresentation_TgsCachedAsDocument_BecomesStickerWithIsSticker()
+    {
+        // Pre-refine cache: 05-06 stamped the tgs mime but typed the row Document.
+        var cached = new MessageViewModel { messageId = "A", type = MessageType.Document,
+                                            mimeType = "application/x-tgsticker" };
+        var fresh = Norm(MessageType.Sticker, "application/x-tgsticker", sticker: true);
+
+        Assert.IsTrue(MessageMediaMerge.RefreshPresentation(fresh, cached));
+        Assert.AreEqual(MessageType.Sticker, cached.type);
+        Assert.IsTrue(cached.isSticker);                          // travels with the type
+    }
+
+    [Test]
+    public void RefreshPresentation_BackfillsVideoNoteFlag_TypeUntouched()
+    {
+        // Pre-update cache: the note was already Video, but isVideoNote didn't exist yet.
+        var cached = new MessageViewModel { messageId = "A", type = MessageType.Video,
+                                            mimeType = "video/mp4" };
+        var fresh = Norm(MessageType.Video, "video/mp4", note: true);
+
+        Assert.IsTrue(MessageMediaMerge.RefreshPresentation(fresh, cached));
+        Assert.IsTrue(cached.isVideoNote);
+        Assert.AreEqual(MessageType.Video, cached.type);
+        Assert.IsFalse(cached.isSticker);                         // type unchanged => untouched
+    }
+
+    [Test]
+    public void RefreshPresentation_BackfillsGifFlagAndMime()
+    {
+        var cached = new MessageViewModel { messageId = "A", type = MessageType.Video, mimeType = "" };
+        var fresh = Norm(MessageType.Video, "video/mp4", gif: true);
+
+        Assert.IsTrue(MessageMediaMerge.RefreshPresentation(fresh, cached));
+        Assert.IsTrue(cached.isGif);
+        Assert.AreEqual("video/mp4", cached.mimeType);
+    }
+
+    [Test]
+    public void RefreshPresentation_WhatsAppRow_NoOp_NullVsEmptyMimeIsEqual()
+    {
+        // WA neutrality: flags are false on both sides, and JsonUtility round-trips a null
+        // mime as "" — that alone must NOT count as a change, or every no-mime WA media row
+        // would dirty the cache and re-bind on every sync.
+        var cached = new MessageViewModel { messageId = "A", type = MessageType.Image, mimeType = "" };
+        var fresh = Norm(MessageType.Image, mime: null);
+
+        Assert.IsFalse(MessageMediaMerge.RefreshPresentation(fresh, cached));
+        Assert.AreEqual(MessageType.Image, cached.type);
+        Assert.IsFalse(cached.isVideoNote);
+        Assert.IsFalse(cached.isGif);
+        Assert.AreEqual("", cached.mimeType);                     // not clobbered to null
+    }
+
+    [Test]
+    public void RefreshPresentation_SecondRun_IsIdempotent()
+    {
+        var cached = new MessageViewModel { messageId = "A", type = MessageType.Document,
+                                            mimeType = "application/x-tgsticker" };
+        var fresh = Norm(MessageType.Sticker, "application/x-tgsticker", sticker: true);
+
+        Assert.IsTrue(MessageMediaMerge.RefreshPresentation(fresh, cached));
+        Assert.IsFalse(MessageMediaMerge.RefreshPresentation(fresh, cached));   // converged
+    }
+
+    [Test]
+    public void RefreshPresentation_UnknownRefreshedType_NeverClobbersCachedType()
+    {
+        var cached = new MessageViewModel { messageId = "A", type = MessageType.Video,
+                                            mimeType = "video/mp4" };
+        var fresh = Norm(MessageType.Unknown, "video/mp4");
+
+        Assert.IsFalse(MessageMediaMerge.RefreshPresentation(fresh, cached));
+        Assert.AreEqual(MessageType.Video, cached.type);
+    }
+
+    [Test]
+    public void RefreshPresentation_NullArgs_False()
+    {
+        Assert.IsFalse(MessageMediaMerge.RefreshPresentation(null, new MessageViewModel()));
+        Assert.IsFalse(MessageMediaMerge.RefreshPresentation(Norm(MessageType.Video), null));
+    }
 }

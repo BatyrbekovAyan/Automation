@@ -1795,13 +1795,14 @@ if (msg.messageType == MessageType.Video)
 
     /// <summary>
     /// If `refreshed` matches an entry in `cachedList`, copy any
-    /// newly-available media URLs onto the cached entry in place. Used by
-    /// both SyncLatestMessages (latest-50 window) and GetMessagesRoutine
-    /// (paginated older pages) — anywhere we re-encounter an already-cached
-    /// message, we trust the server's fresh URL over whatever the cache
-    /// holds. Returns true if any field changed (caller should mark its
-    /// cache dirty). Fires OnMessageMediaRefreshed so rendered bubbles
-    /// re-bind under the new URL.
+    /// newly-available media URLs — plus the presentation fields a fresh
+    /// Normalize derives (refined type, кружок/GIF flags, mime) — onto the
+    /// cached entry in place. Used by both SyncLatestMessages (latest-50
+    /// window) and GetMessagesRoutine (paginated older pages) — anywhere we
+    /// re-encounter an already-cached message, we trust the server's fresh
+    /// view over whatever the cache holds. Returns true if any field changed
+    /// (caller should mark its cache dirty). Fires OnMessageMediaRefreshed
+    /// so rendered bubbles re-bind under the new URL/presentation.
     /// </summary>
     private bool RefreshCachedMessageMedia(NormalizedMessage refreshed, List<MessageViewModel> cachedList)
     {
@@ -1843,6 +1844,15 @@ if (msg.messageType == MessageType.Video)
                 cached.thumbnailUrl = refreshed.thumbnailUrl;
                 mediaRefreshed = true;
             }
+
+            // Presentation fields (Telegram-refined type, кружок/GIF flags, mime): rows cached
+            // by an older build predate these and would otherwise keep the old rendering
+            // forever — a pre-refine .tgs stays a document card, a note stays a square video
+            // (05-07-REVIEW WR-01; the UAT probe messages sit in exactly this state). Pure
+            // unit-tested seam; value-neutral for WhatsApp rows (flags false on both sides,
+            // mime stable), so WA never dirties. Rides the same dirty + re-bind machinery.
+            if (MessageMediaMerge.RefreshPresentation(refreshed, cached))
+                mediaRefreshed = true;
 
             // Cached videos bypass CreateViewModel (first screen + scrolled history are
             // served straight from ChatHistoryCache), so enqueue native thumbnail
