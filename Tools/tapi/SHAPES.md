@@ -69,6 +69,13 @@ Phase 4) in real observed JSON instead of undocumented guesses.
   `capture-shapes.sh` — 2 minutes, script is idempotent.
 - **Downstream impact:** `ParseMessageType` `"text"` case shipped (05-03);
   sticker/voice/video-note/GIF cases await the re-run (**CHAT-03**, 05-06).
+- **05-06 disposition (2026-07-14):** observed types shipped fully (image / document /
+  video-as-document via `TelegramMediaType.Refine` on `mimetype` / poll left dropped). The
+  UNOBSERVED types ship only DEFENSIVE mimetype-prefix handling (`audio/*` → Voice, `video/*`
+  → Video) with NO claimed shapes. **Owner media re-run still required before device UAT:**
+  send a sticker + voice + video-note (кружок) + GIF to the dev account and re-run
+  `capture-shapes.sh` to confirm the real `type` strings / `isGif` / `is_round` before trusting
+  those bubbles on device.
 
 ### 3. Incoming reactions transport
 

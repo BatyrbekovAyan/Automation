@@ -19,14 +19,14 @@
 **: Owner can see a Telegram-authed bot's chat list with names, avatars, unread counts, and correct timestamps (tapi `chats/filter`; `last_time` fallback; `type=="chat"` groupness)
 - [x] **CHAT-02
 **: Owner can open a Telegram chat and read paginated history (text renders via `type:"text"` mapping; numeric chat ids never sliced/crash)
-- [ ] **CHAT-03**: Telegram media messages (image, video, voice, document — sticker/GIF per capture verdicts) render with thumbnails, durations, and downloads per captured shapes
+- [x] **CHAT-03**: Telegram media messages (image, video, voice, document — sticker/GIF per capture verdicts) render with thumbnails, durations, and downloads per captured shapes
 - [x] **CHAT-04
 **: Owner can send text to a Telegram chat (tapi `message/send`), with outbox retry rebuilding the correct channel URL
 - [x] **CHAT-05
 **: Owner can send media (image/video/document) to a Telegram chat (channel-aware `WappiMediaRequestFactory`)
 - [x] **CHAT-06
 **: Owner can send a quoted reply in a Telegram chat (dedicated tapi `message/reply` endpoint)
-- [ ] **CHAT-07**: Incoming Telegram replies render quoted cards (snapshot + `messages/id/get` recovery)
+- [x] **CHAT-07**: Incoming Telegram replies render quoted cards (snapshot + `messages/id/get` recovery)
 - [x] **CHAT-08
 **: Owner can send/remove emoji reactions in Telegram chats (recipient-required tapi body)
 - [x] **CHAT-09
@@ -81,7 +81,7 @@
 
 ## v2 Requirements
 
-- **TG-REACT-RECV**: Render incoming Telegram reactions (only if capture shows a viable transport; else stays out)
+- ~~**TG-REACT-RECV**: Render incoming Telegram reactions (only if capture shows a viable transport; else stays out)~~ — **SUPERSEDED (promoted into v1.1 05-06, 2026-07-14).** The 2026-07-13 capture (SHAPES.md Q3) found a viable transport BETTER than expected: `reactions[]` rides on every `messages/get` target message, so receive-side reactions shipped in 05-06 (Normalize-time mapping + reconcile refresh). No longer a v2 item.
 - **SUPPRESS-01**: Server-side «Вместе» suppression (carried deferred item)
 - **PROD-01**: Prod bagkz bulk replication (all dev workflows incl. Telegram fixes)
 
@@ -103,11 +103,11 @@
 | VER-02 | Phase 3 | Complete |
 | CHAT-01 | Phase 5 | Complete |
 | CHAT-02 | Phase 5 | Complete |
-| CHAT-03 | Phase 5 | Pending |
+| CHAT-03 | Phase 5 | Complete |
 | CHAT-04 | Phase 5 | Complete |
 | CHAT-05 | Phase 5 | Complete |
 | CHAT-06 | Phase 5 | Complete |
-| CHAT-07 | Phase 5 | Pending |
+| CHAT-07 | Phase 5 | Complete |
 | CHAT-08 | Phase 5 | Complete |
 | CHAT-09 | Phase 5 | Complete |
 | CHAT-10 | Phase 5 | Pending |

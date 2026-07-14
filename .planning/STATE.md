@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
 status: ready_to_plan
-stopped_at: Completed 07-02-PLAN.md
-last_updated: "2026-07-13T12:48:15.513Z"
-last_activity: 2026-07-13
+stopped_at: Completed 05-06-PLAN.md (capture-gated backfill)
+last_updated: "2026-07-14T06:02:09.286Z"
+last_activity: 2026-07-14
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 13
-  completed_plans: 12
-  percent: 83
+  completed_plans: 13
+  percent: 100
 ---
 
 # Project State
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-12)
 
 **Core value:** The owner stays in control along the automation↔semi-auto spectrum — the bot can answer autonomously, or propose replies the owner picks and refines, without losing trust or the ability to take over.
-**Current focus:** Phase 7 («Вместе» suggestions + dashboard on Telegram) — **all plans complete**. **07-02 done** (dashboard «Сводка» on Telegram): new pure `DashboardProfileMap` seam collects BOTH channels' authed profile ids (WA-then-TG, `Bot.UnauthedProfileSentinel`-guarded) and maps each id → `(botName, channel)`; `DashboardMetrics.FilterByProfiles(ISet)` set filter (single-id `FilterByProfile` delegates). `DashboardPage` now POSTs Telegram ids (DASH-01 counts/lists), shows one chip per bot (DASH-02 — a dual-channel bot ⇒ a single set-valued chip, never two same-named chips), and deep-links channel-aware via `SetActiveBot → SetActiveChannel(channel) → SwitchTab(«Чаты») → deferred SelectChat` (DASH-03, order load-bearing); an unknown/forged profileId early-returns (T-07-02-01), the WhatsApp-only path is byte-identical, and the server contract (`DashboardModels`) + `Main.unity` are untouched. 8 new EditMode tests (Task 1 genuine RED→GREEN), full suite **916/916 green**. Telegram row cosmetics (raw-id name + silhouette) are the accepted v1 degradation (polish backlog). **07-01 done** earlier (channel-aware «Вместе» payload, 908 green). Next: Phase 8 (prod bagkz replication of Suggest_Replies + all Telegram fixes). Still open: Phase 6 owner visual UAT (`06-HUMAN-UAT.md`), live TG grounding proof (`07-HUMAN-UAT.md`, owner-gated).
+**Current focus:** Phase 7 («Вместе» suggestions + dashboard on Telegram) — **all plans complete**. **07-02 done** (dashboard «Сводка» on Telegram): new pure `DashboardProfileMap` seam collects BOTH channels' authed profile ids (WA-then-TG, `Bot.UnauthedProfileSentinel`-guarded) and maps each id → `(botName, channel)`; `DashboardMetrics.FilterByProfiles(ISet)` set filter (single-id `FilterByProfile` delegates). `DashboardPage` now POSTs Telegram ids (DASH-01 counts/lists), shows one chip per bot (DASH-02 — a dual-channel bot ⇒ a single set-valued chip, never two same-named chips), and deep-links channel-aware via `SetActiveBot → SetActiveChannel(channel) → SwitchTab(«Чаты») → deferred SelectChat` (DASH-03, order load-bearing); an unknown/forged profileId early-returns (T-07-02-01), the WhatsApp-only path is byte-identical, and the server contract (`DashboardModels`) + `Main.unity` are untouched. 8 new EditMode tests (Task 1 genuine RED→GREEN), full suite **916/916 green**. Telegram row cosmetics (raw-id name + silhouette) are the accepted v1 degradation (polish backlog). **07-01 done** earlier (channel-aware «Вместе» payload, 908 green). Next: Phase 8 (prod bagkz replication of Suggest_Replies + all Telegram fixes). **05-06 backfilled 2026-07-14** — the last capture-gated straggler is now done: after the owner's 2026-07-13 tapi capture (SHAPES.md verdicts), Telegram media Normalizes download-only (body:null+s3Info:{} → serial media/download-by-id; media_info dims/duration; video-as-document→Video), receive-side reactions BUILT (Q3 GO — reactions[] map + reconcile merge; v2 TG-REACT-RECV superseded), 'channel' dialogs render group-ish (Q4), reply Q8 no-echo verified, name/isDeleted verdict-resolved; CHAT-03/CHAT-07 complete; 957/957 EditMode green. **Phase 5 now 6/6 complete.** Still open: Phase 6 owner visual UAT (`06-HUMAN-UAT.md`), live TG grounding proof (`07-HUMAN-UAT.md`, owner-gated), and the owner media re-run (sticker/voice/video-note/GIF) that gates device UAT of the unobserved TG media types.
 
 ## Current Position
 
@@ -30,7 +30,7 @@ Plan: Not started
 Status: Ready to plan
 Last activity: 2026-07-13
 
-Progress: [█████████░] 92%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -66,6 +66,7 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [Phase 6]: 06-02 channel switcher scene half — headless ChannelSwitcherBuilder builds the WhatsApp|Telegram segmented pill into TopBar CenterZone (two independent brand fills per 06-01 binder contract, text-only chips mirroring ModeToggle) + stamps all 6 ChannelSwitcherView refs via SerializedObject; guarded nav restructure removes Telegram tab (tabs 5→4) + Screen_Telegram + TelegramTab, relabels tab 0 «Чаты»; run-editor-builder.sh (Editor-closed, sentinel verdict); scene committed immediately 8f1d25f; 900/900 EditMode green; SWITCH-01/04 marked; owner UAT gate open
 - [Phase 7]: 07-01 channel-aware «Вместе» payload — additive v1.1 wire (botTgId + channel appended after messages, v1 keys byte-identical; server Prep defaults absent channel=>whatsapp, Phase 4). BuildPayloadJson pure + channel-RESOLVED (profileId TG=>telegramProfileId, botWaId=whatsappWorkflowId ALWAYS for the default WA RAG branch, channel lowercase enum-derived ONLY per T-07-01-01); Run() reads ChatManager.ActiveChannel; 7 channel-matrix + additive-identity tests, 908/908 EditMode green; SUGG-01/02 client half, live TG grounding rides TPL-06 (07-HUMAN-UAT.md)
 - [Phase 7]: 07-02 dashboard «Сводка» on Telegram — pure DashboardProfileMap seam collects BOTH channels' authed ids + maps id→(botName,channel) (channel from the matched LOCAL entry, never the server payload; T-07-02-01); DashboardMetrics.FilterByProfiles(ISet) set filter, FilterByProfile delegates; DashboardPage POSTs TG ids (DASH-01), one chip per bot with a HashSet filter so a dual-channel bot is a single chip (DASH-02), and channel-aware OpenChat SetActiveBot→SetActiveChannel→SwitchTab(«Чаты»)→deferred SelectChat (DASH-03); WhatsApp byte-identical, server contract + Main.unity untouched; 916/916 EditMode green
+- [Phase 5]: 05-06 capture-gated media/reactions/reply — tapi media is download-only (body:null+s3Info:{} → existing serial media/download-by-id; metadata from media_info + flat name/mime; video-as-document→Video via mimetype); receive-side reactions BUILT (Q3 GO, v2 TG-REACT-RECV superseded) as a Normalize-time reactions[] map + reconcile merge preserving optimistic 'me'; ChatIdFormat classifies 'channel' dialogs group-ish (Q4); reply Q8 no-echo verified; name/isDeleted verdict-resolved (no change); WhatsApp byte-identical, 957/957 EditMode green
 
 ### Pending Todos
 
@@ -107,11 +108,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 06 P02 | 10min | 3 tasks | 5 files |
 | Phase 07 P01 | 7min | 3 tasks | 4 files |
 | Phase 07 P02 | 7min | 2 tasks | 5 files |
+| Phase 05 P06 | 42min | 3 tasks | 13 files |
 
 ## Session Continuity
 
-Last session: 2026-07-13T12:46:50.074Z
-Stopped at: Completed 07-02-PLAN.md
+Last session: 2026-07-14T06:02:01.459Z
+Stopped at: Completed 05-06-PLAN.md (capture-gated backfill)
 Resume file: None
 
 **Planned Phase:** 7 («Вместе» Suggestions + Dashboard on Telegram) — 2 plans — 2026-07-13T12:16:27.814Z
