@@ -1688,11 +1688,13 @@ if (msg.messageType == MessageType.Video)
         // Mirror the WhatsApp document caption==fileName dedup (that block reads the body JObject,
         // null on tapi, so it never runs for Telegram). Treat a caption that echoes the file name
         // as "no caption" so it doesn't render as a text line under the document card.
-        // ConvertRealEmojisToSprites prepends a zero-width space, so trim ZWS-aware.
+        // ConvertRealEmojisToSprites prepends a zero-width space (U+200B), so trim ZWS-aware —
+        // spelled as the visible escape, never a raw invisible literal that an editor/linter
+        // normalization could silently drop (05-06-REVIEW IN-02).
         if (msg.messageType == MessageType.Document &&
             !string.IsNullOrEmpty(msg.text) && !string.IsNullOrEmpty(msg.fileName))
         {
-            char[] trimChars = { '​', ' ', '\t', '\n', '\r' };
+            char[] trimChars = { '\u200B', ' ', '\t', '\n', '\r' };
             if (string.Equals(msg.text.Trim(trimChars), msg.fileName.Trim(trimChars),
                               System.StringComparison.OrdinalIgnoreCase))
                 msg.text = null;
