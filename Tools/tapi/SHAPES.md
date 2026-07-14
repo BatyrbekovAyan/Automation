@@ -76,23 +76,26 @@ Phase 4) in real observed JSON instead of undocumented guesses.
   - **video = `type:"video"`** + `mimetype:"video/mp4"` + `file_name:"video.mp4"`,
     `media_info` w/h/duration → `MessageType.Video`. (Video also still arrives as
     `type:"document"`+`video/mp4` when sent as a file — both handled.)
-  - **sticker = `type:"sticker"`**: a GIF / video-sticker came as
-    `type:"sticker"` + `mimetype:"video/mp4"` + `file_name:"mp4.mp4"` +
-    **`isGif:true`** + `media_info` 320×180 → `MessageType.Sticker` (`isSticker=true`).
+  - **GIF = `type:"sticker"` + `isGif:true`** + `mimetype:"video/mp4"` +
+    `file_name:"mp4.mp4"`, `media_info` 320×180 — Telegram GIFs (animations)
+    arrive sticker-typed with the isGif flag. (CORRECTED 2026-07-14 device UAT:
+    this message WAS the owner's GIF, not a "video-sticker".)
   - **animated `.tgs` sticker = `type:"document"`** + `mimetype:"application/x-tgsticker"`
-    + `file_name:"AnimatedSticker.tgs"` → `MessageType.Document`.
+    + `file_name:"AnimatedSticker.tgs"`. (.tgs = gzipped Lottie — undecodable in
+    Unity; sticker-placeholder treatment, see 05-HUMAN-UAT gap 1.)
   - **`type:"system"`** (service messages, `body` short text, no media) → Unknown →
     dropped (like `poll`). Acceptable v1.
-  - **`is_round` never observed true** — no video-note (кружок) landed in the
-    scanned window. Video-notes remain THE ONE unconfirmed shape (expected:
-    `type:"video"` + `media_info.is_round:true`).
-- **Downstream impact:** `MessageTypeParser.From` already maps
-  `ptt→Voice / video→Video / sticker→Sticker / document→Document` (05-03/05-06) —
-  **all observed types render correctly, no code change.** Accepted v1 cosmetic
-  limits (not blocking): a video/mp4 sticker or GIF routes through the still-image
-  sticker loader (may show a frame, not animate); a `.tgs` animated sticker renders
-  as a document card. Still-open: send a **video-note (кружок)** + re-run to confirm
-  the `is_round` bubble on device (**Phase 8 UAT**, minor).
+  - **VIDEO NOTE (кружок): CAPTURED but UNFLAGGED** (corrected 2026-07-14 — the
+    owner's note was the `type:"video"` 400×400/2s/`video.mp4` message).
+    **`is_round` is UNRELIABLE: false for a genuine кружок on BOTH `messages/get`
+    AND `messages/id/get`** (probe_23368.json). Detection = heuristic:
+    square + `file_name=="video.mp4"` + duration≤60 (see 05-HUMAN-UAT gap 2).
+- **Downstream impact:** type CLASSIFICATION is correct (05-03/05-06 mapping +
+  `video/*` defensive refine routes GIF/note into the working video pipeline) —
+  but the 2026-07-14 device UAT found three PRESENTATION gaps (.tgs as document
+  card, note as plain video card, GIF without badge): recorded in
+  `.planning/phases/05-channel-aware-chatmanager-core/05-HUMAN-UAT.md` with
+  detection signals + fix targets, closed by the Phase-5 gap-closure plan.
 
 ### 3. Incoming reactions transport
 
