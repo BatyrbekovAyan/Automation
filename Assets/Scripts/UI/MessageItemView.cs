@@ -1949,7 +1949,7 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
 
         TextMeshProUGUI label = GetOrCreateOverlayPill(container, "TgsStickerLabel",
             new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 20f),
-            new Vector2(180f, 52f), 30f, true);
+            new Vector2(180f, 52f), 30f);
         label.text = "Стикер";
         label.transform.parent.gameObject.SetActive(true);
     }
@@ -1962,9 +1962,9 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
 
         TextMeshProUGUI label = GetOrCreateOverlayPill(container, "NoteDurationBadge",
             new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 40f),
-            new Vector2(120f, 46f), 26f, true);
+            new Vector2(120f, 46f), 26f);
         TimeSpan t = TimeSpan.FromSeconds(Mathf.Max(0, durationSeconds));
-        label.text = string.Format("{0:D1}:{1:D2}", t.Minutes, t.Seconds);
+        label.text = $"{t.Minutes:D1}:{t.Seconds:D2}";
         label.transform.parent.gameObject.SetActive(true);
     }
 
@@ -1976,17 +1976,17 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
 
         TextMeshProUGUI label = GetOrCreateOverlayPill(container, "GifBadge",
             new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(16f, -16f),
-            new Vector2(84f, 46f), 26f, true);
+            new Vector2(84f, 46f), 26f);
         label.text = "GIF";
         label.fontStyle = FontStyles.Bold;
         label.transform.parent.gameObject.SetActive(true);
     }
 
-    // Create-or-reuse a maskable overlay pill (optional rounded translucent bg + centered white TMP)
+    // Create-or-reuse a maskable overlay pill (rounded translucent bg + centered white TMP)
     // under `parent`, anchored to a corner. Returns the label so the caller can set its text. Both
     // graphics are raycastTarget = false so the media's tap-to-play / tap-to-open still gets the tap.
     TextMeshProUGUI GetOrCreateOverlayPill(Transform parent, string name, Vector2 anchor, Vector2 pivot,
-                                           Vector2 offset, Vector2 size, float fontSize, bool withBackground)
+                                           Vector2 offset, Vector2 size, float fontSize)
     {
         Transform existing = parent.Find(name);
         if (existing != null) return existing.GetComponentInChildren<TextMeshProUGUI>(true);
@@ -1999,17 +1999,14 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
         rt.sizeDelta = size;
         rt.anchoredPosition = offset;
 
-        float labelInset = 0f;
-        if (withBackground)
-        {
-            var bg = root.AddComponent<Image>();
-            bg.color = new Color(0f, 0f, 0f, 0.55f);
-            bg.maskable = true;
-            bg.raycastTarget = false;
-            var rounded = root.AddComponent<ImageWithRoundedCorners>();
-            rounded.radius = size.y * 0.5f;   // full pill
-            labelInset = 14f;
-        }
+        var bg = root.AddComponent<Image>();
+        bg.color = new Color(0f, 0f, 0f, 0.55f);
+        bg.maskable = true;
+        bg.raycastTarget = false;
+        var rounded = root.AddComponent<ImageWithRoundedCorners>();
+        rounded.radius = size.y * 0.5f;   // full pill
+
+        const float labelInset = 14f;
 
         var labelGo = new GameObject("Label", typeof(RectTransform));
         var lrt = (RectTransform)labelGo.transform;

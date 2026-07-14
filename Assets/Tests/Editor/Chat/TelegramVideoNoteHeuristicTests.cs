@@ -70,6 +70,22 @@ public class TelegramVideoNoteHeuristicTests
     public void IsVideoNote_EmptyMediaInfo_False() =>
         Assert.IsFalse(TelegramVideoNoteHeuristic.IsVideoNote("video", "video.mp4", Info("{}")));
 
+    // --- Explicit 0×0 dims: rejected by the positivity guard BEFORE the square equality
+    // --- check, so 0 == 0 must never slip through as "square" ---
+    [Test]
+    public void IsVideoNote_ZeroDims_False() =>
+        Assert.IsFalse(TelegramVideoNoteHeuristic.IsVideoNote(
+            "video", "video.mp4", Info("{\"width\":0,\"height\":0,\"duration\":2}")));
+
+    // --- media_info present but NOT an object (array / bare string): rejected by the
+    // --- `is JObject` pattern, never throws ---
+    [Test]
+    public void IsVideoNote_NonObjectMediaInfo_False()
+    {
+        Assert.IsFalse(TelegramVideoNoteHeuristic.IsVideoNote("video", "video.mp4", Info("[400,400]")));
+        Assert.IsFalse(TelegramVideoNoteHeuristic.IsVideoNote("video", "video.mp4", Info("\"400x400\"")));
+    }
+
     // --- Zero duration (e.g. a still) is not a note ---
     [Test]
     public void IsVideoNote_ZeroDuration_False() =>
