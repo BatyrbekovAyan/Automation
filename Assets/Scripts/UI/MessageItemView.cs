@@ -881,14 +881,15 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
 
             DisposeOwned();
             messageImage.sprite = stickerPlaceholder;
-            fullScreenSprite = stickerPlaceholder;
             messageImage.color = Color.white;
             messageImage.preserveAspect = true;
 
-            var tgsBtn = messageImage.GetComponent<Button>();
-            if (!tgsBtn) tgsBtn = messageImage.gameObject.AddComponent<Button>();
-            tgsBtn.onClick.RemoveAllListeners();
-            tgsBtn.onClick.AddListener(() => OnVisualClicked(vm));
+            // Deliberately NO tap wiring and NO fullScreenSprite staging: OnVisualClicked only
+            // acts on Video/Image, so a Button here could never fire a behavior — and there is
+            // nothing to open for an undecodable .tgs anyway (05-07-REVIEW IN-02). A stale
+            // listener from a prior bind of this same row is impossible: the only branch flip
+            // into here is Document→Sticker (WR-01 cache backfill), and the document path
+            // never buttons messageImage.
         }
         else if (vm.type == MessageType.Sticker)
         {
