@@ -3776,10 +3776,15 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
 
         // Bubble keeps its incoming/outgoing colour in every state — both the
         // download button and the expired placeholder sit on top as cards instead
-        // of swapping the bubble to a dark fill. Stickers normally go transparent
-        // (the sticker IS the content), but while the placeholder card is showing
-        // the bubble has to be visible so the card has a colour to contrast with.
-        bool isTransparent = (currentVm.isSticker && !isPlaceholderActive) || hideBubble;
+        // of swapping the bubble to a dark fill. Stickers AND Telegram video notes
+        // (кружки) normally go transparent (the media IS the content — native TG
+        // shows NO bubble around a video-note circle), but while the placeholder
+        // card is showing the bubble has to be visible so the card has a colour to
+        // contrast with. Decision extracted to a pure seam so the WhatsApp-regression
+        // matrix (plain in/out NEVER transparent; isVideoNote is TG-only, default false)
+        // is unit-tested (BubbleTransparencyPolicyTests).
+        bool isTransparent = BubbleTransparencyPolicy.IsTransparent(
+            currentVm.isSticker, currentVm.isVideoNote, isPlaceholderActive, hideBubble);
 
         bubbleBackground.color = isTransparent
             ? Color.clear
