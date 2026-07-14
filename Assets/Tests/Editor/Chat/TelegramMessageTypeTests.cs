@@ -56,4 +56,32 @@ public class TelegramMessageTypeTests
     [TestCase(null)]
     public void Refine_EmptyMime_KeepsBaseType(string mime) =>
         Assert.AreEqual(MessageType.Document, TelegramMediaType.Refine(MessageType.Document, mime));
+
+    // --- Observed (05-HUMAN-UAT gap 1): an animated .tgs sticker arrives type:"document" +
+    //     mimetype:"application/x-tgsticker" and must refine to Sticker (placeholder path) ---
+    [Test]
+    public void Refine_DocumentWithTgsStickerMime_BecomesSticker() =>
+        Assert.AreEqual(MessageType.Sticker,
+            TelegramMediaType.Refine(MessageType.Document, TelegramMediaType.TgsStickerMime));
+
+    [Test]
+    public void Refine_TgsStickerMime_IsTheLiteralTapiValue() =>
+        Assert.AreEqual("application/x-tgsticker", TelegramMediaType.TgsStickerMime);
+
+    // --- A static webp sticker (type:"sticker" + image/webp) is NOT mis-refined — image/* is
+    //     neither the .tgs mime nor video/audio, so it stays Sticker ---
+    [Test]
+    public void Refine_StickerWithWebpMime_StaysSticker() =>
+        Assert.AreEqual(MessageType.Sticker, TelegramMediaType.Refine(MessageType.Sticker, "image/webp"));
+
+    // --- A GIF arrives sticker-typed with a video mime (SHAPES.md Q2) → routed to the video pipeline ---
+    [Test]
+    public void Refine_StickerWithVideoMime_BecomesVideo() =>
+        Assert.AreEqual(MessageType.Video, TelegramMediaType.Refine(MessageType.Sticker, "video/mp4"));
+
+    // --- Text is never reclassified even by the .tgs mime rule ---
+    [Test]
+    public void Refine_ChatType_TgsMime_NeverReclassified() =>
+        Assert.AreEqual(MessageType.Chat,
+            TelegramMediaType.Refine(MessageType.Chat, TelegramMediaType.TgsStickerMime));
 }

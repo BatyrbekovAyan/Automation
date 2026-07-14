@@ -37,6 +37,13 @@ public class RawMessage
     [JsonProperty("file_name")]
     public string fileName;
 
+    // Telegram GIFs (animations) arrive type:"sticker" + isGif:true + mimetype:"video/mp4"
+    // (SHAPES.md Q2 / 05-HUMAN-UAT gap 3). Refine routes them into the video pipeline; this flag
+    // (default false, absent key => false) drives the "GIF" badge overlay. Read only on the
+    // Telegram path — WhatsApp never sends it.
+    [JsonProperty("isGif")]
+    public bool isGif;
+
     // Telegram (tapi) reactions ride ON the target message: an array of
     // {reaction,count,user_id,contact_name,type:"emoji"}, null when unreacted. WhatsApp
     // reactions arrive as separate type:"reaction" rows instead — read only on the Telegram path.

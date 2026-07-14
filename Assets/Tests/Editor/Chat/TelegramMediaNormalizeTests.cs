@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 /// <summary>
@@ -108,5 +109,42 @@ public class TelegramMediaNormalizeTests
         var r = TelegramMediaShape.Resolve("", "image/jpeg", MediaInfo("{\"width\":100,\"height\":100,\"duration\":0}"));
         Assert.AreEqual(0, r.Duration);
         Assert.AreEqual(1.0f, r.AspectRatio);
+    }
+
+    // --- isGif JSON binding (SHAPES.md Q2 / 05-HUMAN-UAT gap 3): a GIF arrives type:"sticker"
+    //     + isGif:true + mimetype:"video/mp4". The [JsonProperty("isGif")] annotation must bind
+    //     the flag through JsonConvert (the messages parser); an absent key defaults to false. ---
+    [Test]
+    public void RawMessage_IsGif_BindsTrue()
+    {
+        var raw = JsonConvert.DeserializeObject<RawMessage>("{\"isGif\":true}");
+        Assert.IsTrue(raw.isGif);
+    }
+
+    [Test]
+    public void RawMessage_IsGif_AbsentDefaultsFalse()
+    {
+        var raw = JsonConvert.DeserializeObject<RawMessage>("{\"type\":\"video\"}");
+        Assert.IsFalse(raw.isGif);
+    }
+
+    [Test]
+    public void RawMessage_IsGif_ExplicitFalse()
+    {
+        var raw = JsonConvert.DeserializeObject<RawMessage>("{\"isGif\":false}");
+        Assert.IsFalse(raw.isGif);
+    }
+
+    // --- The full observed GIF shape binds coherently: sticker-typed, isGif flag, video mime ---
+    [Test]
+    public void RawMessage_GifShape_BindsAllFields()
+    {
+        var raw = JsonConvert.DeserializeObject<RawMessage>(
+            "{\"type\":\"sticker\",\"isGif\":true,\"mimetype\":\"video/mp4\",\"file_name\":\"mp4.mp4\"}");
+
+        Assert.IsTrue(raw.isGif);
+        Assert.AreEqual("sticker", raw.type);
+        Assert.AreEqual("video/mp4", raw.mimetype);
+        Assert.AreEqual("mp4.mp4", raw.fileName);
     }
 }

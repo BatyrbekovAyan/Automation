@@ -25,6 +25,11 @@ public class MessageViewModel
     public int duration;
     public float videoRotation; // degrees (0/90/180/270) from NativeGallery; 0 = unknown -> viewer heuristic
     public bool isSticker;
+    // Telegram-only presentation signals (flat primitives — JsonUtility-persisted via
+    // ChatHistoryCache, so they survive chat reopens). isVideoNote => circular кружок bubble;
+    // isGif => "GIF" corner badge. Default false, so every WhatsApp bubble is byte-identical.
+    public bool isVideoNote;
+    public bool isGif;
     public string senderName;
     
     public long expireTime;

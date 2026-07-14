@@ -17,6 +17,12 @@ public class NormalizedMessage
     public string videoUrl;  // Real link to the .mp4 file
     public int duration;     // In seconds (for Audio/Video)
     public bool isSticker;   // To toggle transparent background
+
+    // Telegram-only presentation signals, minted channel-gated in ChatManager.ApplyTelegramMediaShape.
+    // Default false for WhatsApp (and non-note / non-gif Telegram media), so copying them forward is
+    // byte-identical to today. isVideoNote = кружок (circular treatment); isGif = "GIF" badge overlay.
+    public bool isVideoNote;
+    public bool isGif;
     
     public long expireTime;
     public long fileSize;

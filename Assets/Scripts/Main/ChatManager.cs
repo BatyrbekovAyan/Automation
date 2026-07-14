@@ -1378,6 +1378,8 @@ public partial class ChatManager : MonoBehaviour
             videoUrl = msg.videoUrl,
             duration = msg.duration,
             isSticker = msg.isSticker,
+            isVideoNote = msg.isVideoNote,   // Telegram кружок (circular treatment)
+            isGif = msg.isGif,               // Telegram GIF ("GIF" badge)
             isIncoming = !msg.fromMe,
             timestamp = msg.time,
             fileSize = msg.fileSize,
@@ -1684,6 +1686,14 @@ if (msg.messageType == MessageType.Video)
         msg.fileSize = shape.FileSize;
         if (shape.Duration > 0) msg.duration = shape.Duration;
         if (shape.AspectRatio > 0) msg.aspectRatio = shape.AspectRatio;
+
+        // Telegram-only presentation signals (05-HUMAN-UAT gaps 2/3). Minted ONLY here — inside
+        // ApplyTelegramMediaShape, which is reached solely from the ActiveChannel==Telegram block —
+        // so a square WhatsApp video or a WhatsApp sticker is NEVER flagged (the WhatsApp regression
+        // net). isVideoNote is DERIVED from the raw shape (is_round is unreliable, so heuristic);
+        // isGif rides straight off the tapi flag. Both flow through CreateViewModel to the bubble.
+        msg.isVideoNote = TelegramVideoNoteHeuristic.IsVideoNote(raw.type, raw.fileName, raw.mediaInfo);
+        msg.isGif = raw.isGif;
 
         // Mirror the WhatsApp document caption==fileName dedup (that block reads the body JObject,
         // null on tapi, so it never runs for Telegram). Treat a caption that echoes the file name
