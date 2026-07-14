@@ -140,7 +140,7 @@ Phases execute in numeric order: 3 → 4 → 5 → 6 → 7 → 8. Phases 3 and 4
 | 2. n8n Live Wiring | v1.0 | 4/4 | Complete | 2026-07-10 |
 | 3. tapi Live-Shape Capture | v1.1 | 1/1 | Complete    | 2026-07-12 |
 | 4. n8n Telegram Template Parity (dev) | v1.1 | 2/2 | Complete    | 2026-07-12 |
-| 5. Channel-Aware ChatManager Core | v1.1 | 4/6 | In Progress | - |
+| 5. Channel-Aware ChatManager Core | v1.1 | 6/6 | Complete    | 2026-07-14 |
 | 6. Channel Switcher UI | v1.1 | 2/2 | Complete    | 2026-07-13 |
 | 7. «Вместе» Suggestions + Dashboard on Telegram | v1.1 | 2/2 | Complete    | 2026-07-13 |
 | 8. Device UAT + Milestone Closeout | v1.1 | 0/TBD | Not started | - |

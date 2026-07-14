@@ -110,9 +110,9 @@
 | CHAT-07 | Phase 5 | Complete |
 | CHAT-08 | Phase 5 | Complete |
 | CHAT-09 | Phase 5 | Complete |
-| CHAT-10 | Phase 5 | Pending |
+| CHAT-10 | Phase 5 | Complete |
 | CHAT-11 | Phase 5 | Complete |
-| TGAUTH-01 | Phase 5 | Pending |
+| TGAUTH-01 | Phase 5 | Complete |
 | SWITCH-01 | Phase 6 | Complete |
 | SWITCH-02 | Phase 6 | Complete |
 | SWITCH-03 | Phase 6 | Complete |
@@ -137,4 +137,4 @@
 
 ---
 *Requirements defined: 2026-07-12*
-*Last updated: 2026-07-12 (roadmap traceability — 29/29 mapped to Phases 3-8)*
+*Last updated: 2026-07-14 (Phase 5 verification — reconciled CHAT-10/TGAUTH-01 traceability rows from stale "Pending" to "Complete"; code-proven: ActiveChannelSupportsChatDelete guard (05-03) and the tapi/sync/auth/2fa cloud-password flow (05-05) are both shipped and unit-tested)*
