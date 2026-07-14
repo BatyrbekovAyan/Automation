@@ -26,7 +26,14 @@ public class RawMessage
 
     public JToken body;   // Contains the encrypted URL (bad)
     public JToken s3Info; // Contains the hosted URL (good)
-    
+
     [JsonProperty("media_info")] // ⬅️ Add this
     public JToken mediaInfo;
+
+    // Telegram (tapi) media carries file name + mime as FLAT top-level fields (WhatsApp
+    // carries them inside the body JObject). Read only on the Telegram Normalize path.
+    public string mimetype;
+
+    [JsonProperty("file_name")]
+    public string fileName;
 }

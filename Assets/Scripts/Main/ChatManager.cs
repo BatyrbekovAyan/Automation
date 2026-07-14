@@ -1382,7 +1382,7 @@ public partial class ChatManager : MonoBehaviour
             id = raw.id,
             chatId = raw.chatId,
             senderName = raw.senderName,
-            messageType = ParseMessageType(raw.type),
+            messageType = ResolveMessageType(raw),
             fromMe = raw.fromMe,
             time = raw.time
         };
@@ -1537,6 +1537,12 @@ if (msg.messageType == MessageType.Video)
             }
         }
 
+        // Telegram media shape: body:null + s3Info:{} means the WhatsApp media branches above
+        // no-op — supply file name/mime/size/duration/aspect from the flat fields + media_info,
+        // channel-scoped so WhatsApp Normalize stays byte-identical.
+        if (ActiveChannel == ChatChannel.Telegram)
+            ApplyTelegramMediaShape(msg, raw);
+
         if (raw.type != "reaction")
         {
             QuotedPreview quote = ReplyParser.Resolve(raw, FindActiveById, ParseMessageType);
@@ -1617,6 +1623,46 @@ if (msg.messageType == MessageType.Video)
 
     // Delegates to the pure MessageTypeParser seam (unit-tested; "text" => Chat for Telegram).
     MessageType ParseMessageType(string type) => MessageTypeParser.From(type);
+
+    // Telegram refines a phone-sent video (type:"document" + mimetype:"video/mp4") to Video
+    // via the mimetype (SHAPES.md Q1/Q2); WhatsApp uses the raw type verbatim (byte-identical).
+    MessageType ResolveMessageType(RawMessage raw) =>
+        ActiveChannel == ChatChannel.Telegram
+            ? TelegramMediaType.Refine(ParseMessageType(raw.type), raw.mimetype)
+            : ParseMessageType(raw.type);
+
+    /// <summary>
+    /// Telegram-only: fill a media message's flat metadata (file name, mime, size, duration,
+    /// aspect) from the tapi shape — body:null + s3Info:{}, with file name/mime as flat fields
+    /// and dimensions/size/duration in media_info. The WhatsApp branches above read these off
+    /// the body JObject, which is null on tapi, so they no-op for Telegram; this supplies them.
+    /// No inline URL exists — the bytes come later via message/media/download by id
+    /// (placeholder-first), so mediaUrl/videoUrl stay empty and the download-by-id path fills them.
+    /// </summary>
+    private static void ApplyTelegramMediaShape(NormalizedMessage msg, RawMessage raw)
+    {
+        if (!IsMediaMessageType(msg.messageType)) return;
+
+        TelegramMediaShape.Result shape = TelegramMediaShape.Resolve(raw.fileName, raw.mimetype, raw.mediaInfo);
+        msg.fileName = shape.FileName;
+        msg.mimeType = shape.MimeType;
+        msg.fileSize = shape.FileSize;
+        if (shape.Duration > 0) msg.duration = shape.Duration;
+        if (shape.AspectRatio > 0) msg.aspectRatio = shape.AspectRatio;
+
+        // Mirror the WhatsApp document caption==fileName dedup (that block reads the body JObject,
+        // null on tapi, so it never runs for Telegram). Treat a caption that echoes the file name
+        // as "no caption" so it doesn't render as a text line under the document card.
+        // ConvertRealEmojisToSprites prepends a zero-width space, so trim ZWS-aware.
+        if (msg.messageType == MessageType.Document &&
+            !string.IsNullOrEmpty(msg.text) && !string.IsNullOrEmpty(msg.fileName))
+        {
+            char[] trimChars = { '​', ' ', '\t', '\n', '\r' };
+            if (string.Equals(msg.text.Trim(trimChars), msg.fileName.Trim(trimChars),
+                              System.StringComparison.OrdinalIgnoreCase))
+                msg.text = null;
+        }
+    }
 
     static bool IsMediaMessageType(MessageType type) =>
         type == MessageType.Image
