@@ -13,6 +13,7 @@ using Newtonsoft.Json.Linq;
 /// tapi, so they no-op for Telegram — this seam supplies them instead. Unit-testable and
 /// null-tolerant: a missing <c>media_info</c> or any absent field degrades to a safe default
 /// (aspect 1.0, size/duration 0) and never throws. Duration is parsed as a double and rounded
+/// half-up (<see cref="MidpointRounding.AwayFromZero"/> — not the banker's-rounding default)
 /// because tapi reports fractional seconds (e.g. 11.4, 31.484).
 /// </summary>
 public static class TelegramMediaShape
@@ -50,7 +51,9 @@ public static class TelegramMediaShape
             fileSize = ParseLong(info["size"]);
 
             double seconds = ParseDouble(info["duration"]);
-            if (seconds > 0) duration = (int)Math.Round(seconds);
+            // Half-up, matching the display expectation (Math.Round's default is banker's
+            // rounding — 12.5 would round DOWN to 12; 05-06-REVIEW IN-01).
+            if (seconds > 0) duration = (int)Math.Round(seconds, MidpointRounding.AwayFromZero);
         }
 
         return new Result(fileName, mimetype, fileSize, duration, aspectRatio);

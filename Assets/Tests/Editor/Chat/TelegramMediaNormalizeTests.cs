@@ -46,6 +46,13 @@ public class TelegramMediaNormalizeTests
         Assert.AreEqual(31, r.Duration);
         var r2 = TelegramMediaShape.Resolve("a", "audio/ogg", MediaInfo("{\"duration\":40.6}"));
         Assert.AreEqual(41, r2.Duration);
+
+        // Midpoints prove half-up (AwayFromZero): banker's rounding would give 12.5 -> 12
+        // and the name of this test would lie (05-06-REVIEW IN-01).
+        var mid1 = TelegramMediaShape.Resolve("a", "audio/ogg", MediaInfo("{\"duration\":11.5}"));
+        Assert.AreEqual(12, mid1.Duration);
+        var mid2 = TelegramMediaShape.Resolve("a", "audio/ogg", MediaInfo("{\"duration\":12.5}"));
+        Assert.AreEqual(13, mid2.Duration);
     }
 
     // --- Document: flat file name + mime carried through; size from media_info ---
