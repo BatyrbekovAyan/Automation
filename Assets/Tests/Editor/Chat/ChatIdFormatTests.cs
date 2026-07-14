@@ -83,4 +83,16 @@ public class ChatIdFormatTests
 
     [Test] public void IsGroup_Full_NullId_ChatType_True() =>
         Assert.IsTrue(ChatIdFormat.IsGroup(null, "chat", false)); // suffix-less (TG-shaped) → trust type
+
+    // SHAPES.md Q4: "channel" is a real third Telegram dialog type (observed once in the
+    // capture) that must render group-style alongside "chat".
+    [Test] public void IsGroup_Full_TelegramChannelType_True() =>
+        Assert.IsTrue(ChatIdFormat.IsGroup("5127433588", "channel", false)); // TG channel (synthetic id)
+
+    [Test] public void IsGroup_Full_NullId_ChannelType_True() =>
+        Assert.IsTrue(ChatIdFormat.IsGroup(null, "channel", false)); // suffix-less → trust type
+
+    // WR-03: a WA-suffixed id must never flip to group off a "channel" type either.
+    [Test] public void IsGroup_Full_WaOneToOneSuffix_ChannelType_StaysNonGroup() =>
+        Assert.IsFalse(ChatIdFormat.IsGroup("79995579399@c.us", "channel", false));
 }

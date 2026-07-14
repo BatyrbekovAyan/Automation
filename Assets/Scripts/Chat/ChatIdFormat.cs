@@ -49,12 +49,14 @@ public static class ChatIdFormat
     /// <summary>
     /// Full groupness check (used by the chat list, which has the dialog).
     /// WhatsApp: <c>@g.us</c> suffix OR the dialog's isGroup flag.
-    /// Telegram: <c>dialogType == "chat"</c> — trusted ONLY for suffix-less (Telegram
-    /// numeric) ids, so a hypothetical WA-side <c>type:"chat"</c> field can never flip
-    /// suffixed WhatsApp ids to group rendering (WR-03).
+    /// Telegram: <c>dialogType == "chat"</c> (group) OR <c>"channel"</c> — the capture
+    /// (SHAPES.md Q4) confirmed <c>"channel"</c> is a real third dialog type that must render
+    /// group-style (sender headers, no per-chat suggestions). Both are trusted ONLY for
+    /// suffix-less (Telegram numeric) ids, so a hypothetical WA-side <c>type:"chat"</c> field
+    /// can never flip suffixed WhatsApp ids to group rendering (WR-03).
     /// </summary>
     public static bool IsGroup(string chatId, string dialogType, bool dialogIsGroup) =>
         IsGroup(chatId) || dialogIsGroup ||
-        // "chat" == Telegram group; only trust it for suffix-less (Telegram numeric) ids
-        (dialogType == "chat" && (chatId == null || chatId.IndexOf('@') < 0));
+        // "chat"/"channel" == Telegram group-ish; only trust for suffix-less (Telegram numeric) ids
+        ((dialogType == "chat" || dialogType == "channel") && (chatId == null || chatId.IndexOf('@') < 0));
 }
