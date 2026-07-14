@@ -2860,6 +2860,19 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
         bool stale = Mathf.Abs(actualSize.x - renderedSize.x) > 1f
                   || Mathf.Abs(actualSize.y - renderedSize.y) > 1f;
 
+        // The corner radius now varies between binds (кружок half-side 350 vs card 23), and a
+        // radius-only change on an identically-sized rect (700×700 note → 700×700 square video)
+        // would pass the size check above and keep the stale circular bake. z of
+        // _WidthHeightRadius carries the baked radius DOUBLED (the package writes radius * 2),
+        // so compare the live component against it too (05-07-REVIEW IN-01). Skipped when the
+        // rounding component is absent/disabled (sticker path bakes no corners at all).
+        if (!stale
+            && targetObject.TryGetComponent<ImageWithRoundedCorners>(out var rounded)
+            && rounded.enabled)
+        {
+            stale = Mathf.Abs(renderedSize.z - rounded.radius * 2f) > 0.5f;
+        }
+
         if (stale) maskable.RecalculateMasking();
     }
 
