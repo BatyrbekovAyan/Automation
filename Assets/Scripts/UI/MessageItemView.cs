@@ -840,6 +840,11 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             float realRatio = vm.aspectRatio > 0 ? vm.aspectRatio : 1.0f;
             float bubbleRatio = Mathf.Clamp(realRatio, MinAspectRatio, MaxAspectRatio);
 
+            // Telegram video note (кружок): force a square bubble so SetupMaskedLayout can crop it
+            // to a circle (half-side corner radius). A genuine note is already 1:1, but pin it so a
+            // slightly-off note never renders as a rounded rectangle. (05-HUMAN-UAT gap 2.)
+            if (vm.isVideoNote) bubbleRatio = 1.0f;
+
             // Hide everything initially and let the Smart Routine sequence the UI perfectly
             messageImage.gameObject.SetActive(false);
             downloadButton.gameObject.SetActive(false);
@@ -861,6 +866,29 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             if (!btn) btn = messageImage.gameObject.AddComponent<Button>();
             btn.onClick.RemoveAllListeners();
             btn.onClick.AddListener(() => OnVisualClicked(vm));
+        }
+        else if (vm.type == MessageType.Sticker && vm.mimeType == TelegramMediaType.TgsStickerMime)
+        {
+            // Telegram animated .tgs sticker = gzipped Lottie, undecodable in Unity. Render the
+            // deliberate borderless placeholder + «Стикер» (a sticker bubble, NOT a document card —
+            // 05-HUMAN-UAT gap 1) and DO NOT call LoadStickerViaDownload: the bytes can never decode,
+            // so a download would waste a request and dead-end in ShowStickerLoadFailed anyway.
+            // SetupMaskedLayout(...,true) stands up the borderless square + adds the «Стикер» label
+            // via ApplyTelegramMediaOverlays.
+            downloadButton.gameObject.SetActive(false);
+            messageImage.gameObject.SetActive(true);
+            SetupMaskedLayout(1f, 1f, true);
+
+            DisposeOwned();
+            messageImage.sprite = stickerPlaceholder;
+            fullScreenSprite = stickerPlaceholder;
+            messageImage.color = Color.white;
+            messageImage.preserveAspect = true;
+
+            var tgsBtn = messageImage.GetComponent<Button>();
+            if (!tgsBtn) tgsBtn = messageImage.gameObject.AddComponent<Button>();
+            tgsBtn.onClick.RemoveAllListeners();
+            tgsBtn.onClick.AddListener(() => OnVisualClicked(vm));
         }
         else if (vm.type == MessageType.Sticker)
         {
@@ -1876,8 +1904,128 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
         else
         {
             rounded.enabled = true;
-            rounded.radius = 23f;
+            // Telegram video note: a square bubble cropped to a circle via a half-side corner
+            // radius. Every other image/video keeps the 23f card radius. (05-HUMAN-UAT gap 2.)
+            rounded.radius = (currentVm != null && currentVm.isVideoNote)
+                ? mediaSize.x * 0.5f
+                : 23f;
         }
+
+        // Telegram-only overlays (кружок duration badge, GIF badge, .tgs «Стикер») — created here
+        // because the MediaContainer is guaranteed to exist now. Each toggles OFF when its signal is
+        // absent, so a recycled bubble never leaks a prior badge and WhatsApp media is untouched.
+        ApplyTelegramMediaOverlays(containerTr, currentVm);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Telegram-only media overlays (кружок duration badge, GIF badge, .tgs «Стикер» label).
+    // All three are additive, non-layout-affecting overlays created at bind time under the
+    // MediaContainer, mirroring the existing create-or-reuse precedent (find child by name → create
+    // if absent → toggle per vm). Every graphic child is maskable = true — the message scroll
+    // viewport's RectMask2D culls only Maskable graphics, so a non-maskable overlay would leak/jitter
+    // on scroll (project memory "Bubble graphics must be Maskable"). Each overlay is toggled OFF when
+    // its signal is absent so a recycled bubble never carries a prior message's badge (T-0507-04);
+    // WhatsApp media (all signals false) creates none — byte-identical.
+    // ---------------------------------------------------------------------------------------------
+    void ApplyTelegramMediaOverlays(Transform container, MessageViewModel vm)
+    {
+        if (container == null) return;
+
+        bool isTgs  = vm != null && vm.type == MessageType.Sticker && vm.mimeType == TelegramMediaType.TgsStickerMime;
+        bool isNote = vm != null && vm.isVideoNote;
+        bool isGif  = vm != null && vm.isGif;
+
+        ToggleStickerLabelOverlay(container, isTgs);
+        ToggleDurationBadgeOverlay(container, isNote, isNote ? vm.duration : 0);
+        ToggleGifBadgeOverlay(container, isGif);
+    }
+
+    // «Стикер» caption centered along the bottom of the .tgs placeholder square.
+    void ToggleStickerLabelOverlay(Transform container, bool show)
+    {
+        Transform existing = container.Find("TgsStickerLabel");
+        if (!show) { if (existing != null) existing.gameObject.SetActive(false); return; }
+
+        TextMeshProUGUI label = GetOrCreateOverlayPill(container, "TgsStickerLabel",
+            new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 20f),
+            new Vector2(180f, 52f), 30f, true);
+        label.text = "Стикер";
+        label.transform.parent.gameObject.SetActive(true);
+    }
+
+    // Duration badge (e.g. "0:02") bottom-center inside the кружок circle.
+    void ToggleDurationBadgeOverlay(Transform container, bool show, int durationSeconds)
+    {
+        Transform existing = container.Find("NoteDurationBadge");
+        if (!show) { if (existing != null) existing.gameObject.SetActive(false); return; }
+
+        TextMeshProUGUI label = GetOrCreateOverlayPill(container, "NoteDurationBadge",
+            new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 40f),
+            new Vector2(120f, 46f), 26f, true);
+        TimeSpan t = TimeSpan.FromSeconds(Mathf.Max(0, durationSeconds));
+        label.text = string.Format("{0:D1}:{1:D2}", t.Minutes, t.Seconds);
+        label.transform.parent.gameObject.SetActive(true);
+    }
+
+    // "GIF" corner badge, top-left of the video bubble.
+    void ToggleGifBadgeOverlay(Transform container, bool show)
+    {
+        Transform existing = container.Find("GifBadge");
+        if (!show) { if (existing != null) existing.gameObject.SetActive(false); return; }
+
+        TextMeshProUGUI label = GetOrCreateOverlayPill(container, "GifBadge",
+            new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(16f, -16f),
+            new Vector2(84f, 46f), 26f, true);
+        label.text = "GIF";
+        label.fontStyle = FontStyles.Bold;
+        label.transform.parent.gameObject.SetActive(true);
+    }
+
+    // Create-or-reuse a maskable overlay pill (optional rounded translucent bg + centered white TMP)
+    // under `parent`, anchored to a corner. Returns the label so the caller can set its text. Both
+    // graphics are raycastTarget = false so the media's tap-to-play / tap-to-open still gets the tap.
+    TextMeshProUGUI GetOrCreateOverlayPill(Transform parent, string name, Vector2 anchor, Vector2 pivot,
+                                           Vector2 offset, Vector2 size, float fontSize, bool withBackground)
+    {
+        Transform existing = parent.Find(name);
+        if (existing != null) return existing.GetComponentInChildren<TextMeshProUGUI>(true);
+
+        var root = new GameObject(name, typeof(RectTransform));
+        var rt = (RectTransform)root.transform;
+        rt.SetParent(parent, false);
+        rt.anchorMin = rt.anchorMax = anchor;
+        rt.pivot = pivot;
+        rt.sizeDelta = size;
+        rt.anchoredPosition = offset;
+
+        float labelInset = 0f;
+        if (withBackground)
+        {
+            var bg = root.AddComponent<Image>();
+            bg.color = new Color(0f, 0f, 0f, 0.55f);
+            bg.maskable = true;
+            bg.raycastTarget = false;
+            var rounded = root.AddComponent<ImageWithRoundedCorners>();
+            rounded.radius = size.y * 0.5f;   // full pill
+            labelInset = 14f;
+        }
+
+        var labelGo = new GameObject("Label", typeof(RectTransform));
+        var lrt = (RectTransform)labelGo.transform;
+        lrt.SetParent(rt, false);
+        lrt.anchorMin = Vector2.zero;
+        lrt.anchorMax = Vector2.one;
+        lrt.offsetMin = new Vector2(labelInset, 0f);
+        lrt.offsetMax = new Vector2(-labelInset, 0f);
+
+        var tmp = labelGo.AddComponent<TextMeshProUGUI>();
+        tmp.maskable = true;
+        tmp.raycastTarget = false;
+        tmp.enableAutoSizing = false;
+        tmp.fontSize = fontSize;
+        tmp.alignment = TextAlignmentOptions.Center;
+        tmp.color = Color.white;
+        return tmp;
     }
 
     void SetLayoutToButton()
