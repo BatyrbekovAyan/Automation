@@ -144,6 +144,20 @@ public class MessageItemView : MonoBehaviour
     private const float StickerWidth          = 396f;   // 0.37 × canvas — matches WhatsApp sticker size
     private const float StickerHeight         = 396f;
 
+    // .tgs placeholder CARD (05-08) — an undecodable Telegram animated sticker renders as a
+    // deliberate sticker-sized card, NOT the collapsed white silhouette + tiny pill the device
+    // showed. Warm neutral fill so it reads as a distinct card on the paper chat bg; caption dark,
+    // glyph mid-gray (never white — a white silhouette is what vanished). Reference units (1080).
+    private static readonly Color TgsCardFillColor    = new Color(0.878f, 0.863f, 0.835f, 1f);
+    private static readonly Color TgsCardCaptionColor = new Color(0.361f, 0.353f, 0.333f, 1f);
+    private static readonly Color TgsCardGlyphColor   = new Color(0.565f, 0.553f, 0.525f, 1f);
+    private const float TgsCardCornerRadius    = 40f;
+    private const float TgsCardGlyphSize       = 150f;
+    private const float TgsCardGlyphOffsetY    = 40f;    // glyph sits above the caption
+    private const float TgsCardCaptionHeight   = 60f;
+    private const float TgsCardCaptionOffsetY  = -96f;   // caption drops below the glyph (centered when no glyph)
+    private const float TgsCardCaptionFontSize = 46f;
+
     // === Document ===
     private const float DocumentWidth         = 810f;   // 0.75 × 1080 canvas — matches the app-wide ceiling (text + landscape video)
     private const float DocumentMinWidth      = 480f;
@@ -870,18 +884,23 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
         else if (vm.type == MessageType.Sticker && vm.mimeType == TelegramMediaType.TgsStickerMime)
         {
             // Telegram animated .tgs sticker = gzipped Lottie, undecodable in Unity. Render the
-            // deliberate borderless placeholder + «Стикер» (a sticker bubble, NOT a document card —
-            // 05-HUMAN-UAT gap 1) and DO NOT call LoadStickerViaDownload: the bytes can never decode,
-            // so a download would waste a request and dead-end in ShowStickerLoadFailed anyway.
-            // SetupMaskedLayout(...,true) stands up the borderless square + adds the «Стикер» label
-            // via ApplyTelegramMediaOverlays.
+            // deliberate sticker-sized placeholder CARD + «Стикер» (a sticker, NOT a document card —
+            // 05-HUMAN-UAT gap 1; and NOT the collapsed white-silhouette pill the device showed —
+            // 05-08 "sticker → sized card") and DO NOT call LoadStickerViaDownload: the bytes can
+            // never decode, so a download would waste a request and dead-end in ShowStickerLoadFailed.
+            // SetupMaskedLayout(...,true) stands up the 396² sticker slot; ApplyTelegramMediaOverlays
+            // (called at its tail) builds the card overlay, which carries its OWN fill.
             downloadButton.gameObject.SetActive(false);
             messageImage.gameObject.SetActive(true);
             SetupMaskedLayout(1f, 1f, true);
 
             DisposeOwned();
-            messageImage.sprite = stickerPlaceholder;
-            messageImage.color = Color.white;
+            // The card overlay (ToggleStickerPlaceholderCard) IS the visual. Clear messageImage so
+            // the old white stickerPlaceholder silhouette — invisible against the light chat bg on
+            // the transparent sticker bubble, which is why it "collapsed to a tiny pill" on device —
+            // never shows through the card.
+            messageImage.sprite = null;
+            messageImage.color = Color.clear;
             messageImage.preserveAspect = true;
 
             // Deliberately NO tap wiring and NO fullScreenSprite staging: OnVisualClicked only
@@ -1919,7 +1938,7 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
     }
 
     // ---------------------------------------------------------------------------------------------
-    // Telegram-only media overlays (кружок duration badge, GIF badge, .tgs «Стикер» label).
+    // Telegram-only media overlays (.tgs «Стикер» placeholder card, кружок duration badge, GIF badge).
     // All three are additive, non-layout-affecting overlays created at bind time under the
     // MediaContainer, mirroring the existing create-or-reuse precedent (find child by name → create
     // if absent → toggle per vm). Every graphic child is maskable = true — the message scroll
@@ -1936,22 +1955,84 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
         bool isNote = vm != null && vm.isVideoNote;
         bool isGif  = vm != null && vm.isGif;
 
-        ToggleStickerLabelOverlay(container, isTgs);
+        ToggleStickerPlaceholderCard(container, isTgs);
         ToggleDurationBadgeOverlay(container, isNote, isNote ? vm.duration : 0);
         ToggleGifBadgeOverlay(container, isGif);
     }
 
-    // «Стикер» caption centered along the bottom of the .tgs placeholder square.
-    void ToggleStickerLabelOverlay(Transform container, bool show)
+    // Deliberate sticker-sized placeholder CARD for an undecodable .tgs animated sticker (gzipped
+    // Lottie — no artwork renders in Unity without an rlottie-class plugin; native animation is a v2
+    // candidate). Fills the 396² sticker slot with a soft neutral rounded card that carries its OWN
+    // fill, so it reads on the transparent sticker bubble (the earlier white silhouette vanished
+    // against the light chat bg and collapsed to a tiny pill — 05-08 "sticker → sized card"). Content
+    // = a centered «Стикер» caption, plus the project sticker glyph above it tinted mid-gray ONLY when
+    // the placeholder sprite is assigned (text-only is the graceful fallback — project memory: never
+    // depend on a sprite/TMP-icon that may not render). Every graphic is maskable = true (the message
+    // scroll viewport's RectMask2D culls only Maskable graphics) + raycastTarget = false (there is
+    // nothing to tap on an undecodable .tgs). Toggled OFF when the signal is absent so a recycled
+    // bubble never leaks the card (T-0507-04); content is static so a reused card is just re-shown.
+    void ToggleStickerPlaceholderCard(Transform container, bool show)
     {
-        Transform existing = container.Find("TgsStickerLabel");
+        Transform existing = container.Find("TgsStickerCard");
         if (!show) { if (existing != null) existing.gameObject.SetActive(false); return; }
+        if (existing != null) { existing.gameObject.SetActive(true); return; }
 
-        TextMeshProUGUI label = GetOrCreateOverlayPill(container, "TgsStickerLabel",
-            new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 20f),
-            new Vector2(180f, 52f), 30f);
-        label.text = "Стикер";
-        label.transform.parent.gameObject.SetActive(true);
+        // Card root fills the sticker slot (396² from SetupMaskedLayout's StickerWidth/Height).
+        var cardGo = new GameObject("TgsStickerCard", typeof(RectTransform));
+        var cardRt = (RectTransform)cardGo.transform;
+        cardRt.SetParent(container, false);
+        cardRt.anchorMin = Vector2.zero;
+        cardRt.anchorMax = Vector2.one;
+        cardRt.offsetMin = Vector2.zero;
+        cardRt.offsetMax = Vector2.zero;
+
+        var cardBg = cardGo.AddComponent<Image>();
+        cardBg.color = TgsCardFillColor;
+        cardBg.maskable = true;
+        cardBg.raycastTarget = false;
+        cardGo.AddComponent<ImageWithRoundedCorners>().radius = TgsCardCornerRadius;
+
+        // Sticker glyph above the caption — mid-gray so it reads on the light card (NOT the white
+        // tint that made the old placeholder invisible). Guarded on the project sprite being present.
+        bool hasGlyph = stickerPlaceholder != null;
+        if (hasGlyph)
+        {
+            var glyphGo = new GameObject("Glyph", typeof(RectTransform));
+            var glyphRt = (RectTransform)glyphGo.transform;
+            glyphRt.SetParent(cardRt, false);
+            glyphRt.anchorMin = glyphRt.anchorMax = new Vector2(0.5f, 0.5f);
+            glyphRt.pivot = new Vector2(0.5f, 0.5f);
+            glyphRt.sizeDelta = new Vector2(TgsCardGlyphSize, TgsCardGlyphSize);
+            glyphRt.anchoredPosition = new Vector2(0f, TgsCardGlyphOffsetY);
+
+            var glyph = glyphGo.AddComponent<Image>();
+            glyph.sprite = stickerPlaceholder;
+            glyph.color = TgsCardGlyphColor;
+            glyph.preserveAspect = true;
+            glyph.maskable = true;
+            glyph.raycastTarget = false;
+        }
+
+        // Centered «Стикер» caption (centered on the card when there is no glyph).
+        var labelGo = new GameObject("Caption", typeof(RectTransform));
+        var labelRt = (RectTransform)labelGo.transform;
+        labelRt.SetParent(cardRt, false);
+        labelRt.anchorMin = new Vector2(0f, 0.5f);
+        labelRt.anchorMax = new Vector2(1f, 0.5f);
+        labelRt.pivot = new Vector2(0.5f, 0.5f);
+        labelRt.sizeDelta = new Vector2(0f, TgsCardCaptionHeight);
+        labelRt.anchoredPosition = new Vector2(0f, hasGlyph ? TgsCardCaptionOffsetY : 0f);
+
+        var caption = labelGo.AddComponent<TextMeshProUGUI>();
+        if (messageText != null) caption.font = messageText.font;   // guarantees the Cyrillic glyphs render
+        caption.text = "Стикер";
+        caption.fontSize = TgsCardCaptionFontSize;
+        caption.fontStyle = FontStyles.Bold;
+        caption.alignment = TextAlignmentOptions.Center;
+        caption.color = TgsCardCaptionColor;
+        caption.maskable = true;
+        caption.raycastTarget = false;
+        caption.enableAutoSizing = false;
     }
 
     // Duration badge (e.g. "0:02") bottom-center inside the кружок circle.
