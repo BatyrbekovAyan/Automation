@@ -31,7 +31,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 - [x] **Phase 3: tapi Live-Shape Capture** - User-assisted read-only capture script + sanitized samples + recorded verdicts on the 13 open shape questions (incl. reactions-receive go/no-go); gates the media/Normalize parser work. (completed 2026-07-12)
 - [x] **Phase 4: n8n Telegram Template Parity (dev)** - Telegram_Bot template onto tapi bases (outbound URLs, `type:"text"`, sessionKey, voice duration) + RAG re-stamp on late channel auth; proven e2e against a real dev Telegram profile via tunnel. (completed 2026-07-12)
-- [x] **Phase 5: Channel-Aware ChatManager Core** - The channel seam (`ChatChannel`, `SetActiveChannel`, `WappiEndpoints` builder, per-channel caches), all tapi parser/send divergences, and the Telegram 2FA auth fix — WhatsApp behavior unchanged, full suite green. (all 6 plans complete 2026-07-14; capture-gated 05-06 shipped media/reactions-receive/reply per SHAPES.md verdicts; 957/957 EditMode green)
+- [x] **Phase 5: Channel-Aware ChatManager Core** - The channel seam (`ChatChannel`, `SetActiveChannel`, `WappiEndpoints` builder, per-channel caches), all tapi parser/send divergences, and the Telegram 2FA auth fix — WhatsApp behavior unchanged, full suite green. (all 7 plans complete 2026-07-14; capture-gated 05-06 shipped media/reactions-receive/reply per SHAPES.md verdicts; gap-closure 05-07 shipped the .tgs/кружок/GIF presentation treatments off the device-UAT gaps; 988/988 EditMode green)
 - [x] **Phase 6: Channel Switcher UI** - In-screen TopBar segmented WhatsApp|Telegram control with muted/connect affordances, per-bot channel persistence, and removal of the Telegram bottom tab. (code-complete 2026-07-13; owner visual UAT gate open in 06-HUMAN-UAT.md)
 - [x] **Phase 7: «Вместе» Suggestions + Dashboard on Telegram** - Channel-aware suggestions payload + channel-branched RAG filter, and «Сводка» Telegram inclusion (bot-level chips, channel-aware deep-link). Dashboard is the milestone's cut line. (code-complete 2026-07-13; 916/916 EditMode green; live TG grounding proof owner-gated in 07-HUMAN-UAT.md)
 - [ ] **Phase 8: Device UAT + Milestone Closeout** - On-device end-to-end Telegram pass (incl. carried v1.0 deferred UAT) + prod-replication checklist update; prod bagkz stays dormant.
@@ -77,7 +77,7 @@ Plans:
   3. Opening an unread Telegram chat marks it read (no `mark_all` query); incoming Telegram replies render quoted cards (snapshot + `messages/id/get` recovery); swipe-to-delete is hidden on Telegram (no tapi endpoint) while WhatsApp delete is unchanged.
   4. One bot's WhatsApp and Telegram caches are isolated (`BotCache/{botId}/` vs `.../telegram/`), each channel opens offline from its own cache, purge/privacy clears cover both, and the existing 787-test suite stays green.
   5. A 2FA-protected Telegram account can authorize via a cloud-password step (`detail:"2fa"` → `tapi/sync/auth/2fa`) in both the code and QR flows.
-**Plans**: 6 plans
+**Plans**: 7 plans
 Plans:
 - [x] 05-01-PLAN.md — Foundations: ChatChannel enum, WappiEndpoints URL builder, ChatIdFormat (recipient/display-fallback/isGroup), channel-parameterized tab-state resolver, OutboxEntry.channel + full EditMode coverage (wave 1)
 - [x] 05-02-PLAN.md — ChatManager identity seam: ActiveChannel + persistence, SetActiveChannel reset choreography, OnActiveChannelChanged, channel-aware GetActiveProfileId/GetCacheRoot/empty-state/sync-gate, channel resolution, EmptyStateView Telegram copy (wave 2)
@@ -85,7 +85,8 @@ Plans:
 - [x] 05-04-PLAN.md — Send-path branches: tapi message/reply, reaction recipient, mark-read no-mark_all body, channel-aware media EndpointFor, outbox channel snapshot + retry rebuild (wave 4)
 - [x] 05-05-PLAN.md — Telegram 2FA auth fix (TGAUTH-01): pure TelegramAuthResponseParser + detail:"2fa" cloud-password branch in code + QR flows, tapi/sync/auth/2fa (wave 1, independent — Manager.cs only)
 - [x] 05-06-PLAN.md — CAPTURE-GATED (autonomous:false, depends on all): media Normalize port (body:null + s3Info:{} → download-by-id; media_info dims/duration; document+video/mp4 → Video), reactions-RECEIVE (GO — reactions[] on every message → Normalize-time map + reconcile refresh), "channel" groupness, reply Q8 lock (no echo bug), name/isDeleted verdict-resolved (no change) — capture gate opened 2026-07-13; 957/957 EditMode green (wave 5)
-**Flags**: CAPTURE-GATED — 05-06 blocked on the Phase-3 owner capture run (SHAPES.md verdicts); RESOLVED 2026-07-13 (owner ran capture-shapes.sh, all verdicts recorded), executed 2026-07-14. Q2 sticker/voice/video-note/GIF unobserved → defensive handling shipped; owner media re-run still gates device UAT. Plans 05-01..05-05 proceeded independently of capture.
+- [x] 05-07-PLAN.md — GAP CLOSURE (05-HUMAN-UAT device gaps): .tgs (application/x-tgsticker) → Sticker + borderless placeholder «Стикер» (no futile download); video note via pure IsVideoNote heuristic (square + video.mp4 + ≤60s, is_round ignored) → circular bubble + duration badge; GIF (isGif 4-layer flag) → "GIF" corner badge — all minted inside the Telegram gate, WhatsApp byte-identical; 988/988 EditMode green (executed 2026-07-14)
+**Flags**: CAPTURE-GATED — 05-06 blocked on the Phase-3 owner capture run (SHAPES.md verdicts); RESOLVED 2026-07-13 (owner ran capture-shapes.sh, all verdicts recorded), executed 2026-07-14. Q2 media re-run done 2026-07-14 (sticker/note/GIF observed → 05-HUMAN-UAT gaps → closed by 05-07); on-device visual confirmation of the three treatments rides Phase 8. Plans 05-01..05-05 proceeded independently of capture.
 **UI hint**: yes
 
 ### Phase 6: Channel Switcher UI
@@ -140,7 +141,7 @@ Phases execute in numeric order: 3 → 4 → 5 → 6 → 7 → 8. Phases 3 and 4
 | 2. n8n Live Wiring | v1.0 | 4/4 | Complete | 2026-07-10 |
 | 3. tapi Live-Shape Capture | v1.1 | 1/1 | Complete    | 2026-07-12 |
 | 4. n8n Telegram Template Parity (dev) | v1.1 | 2/2 | Complete    | 2026-07-12 |
-| 5. Channel-Aware ChatManager Core | v1.1 | 6/6 | Complete    | 2026-07-14 |
+| 5. Channel-Aware ChatManager Core | v1.1 | 7/7 | Complete    | 2026-07-14 |
 | 6. Channel Switcher UI | v1.1 | 2/2 | Complete    | 2026-07-13 |
 | 7. «Вместе» Suggestions + Dashboard on Telegram | v1.1 | 2/2 | Complete    | 2026-07-13 |
 | 8. Device UAT + Milestone Closeout | v1.1 | 0/TBD | Not started | - |
