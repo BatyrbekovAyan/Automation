@@ -21,7 +21,11 @@ findings:
   warning: 1
   info: 3
   total: 4
-status: issues_found
+status: fixes_applied
+fixes:
+  applied_at: 2026-07-14
+  fixed: 4        # WR-01, IN-01, IN-02, IN-03
+  tests: 997      # 988 baseline + 9 new (7 RefreshPresentation seam, 2 heuristic guards) — bridge run green
 ---
 
 # Phase 5 (05-07): Code Review Report — Telegram media presentation gaps
@@ -74,6 +78,8 @@ if (cached.isVideoNote != refreshed.isVideoNote || cached.isGif != refreshed.isG
 ```
 Alternative (blunter): bump the `ChatHistoryCache` file version/key so pre-update caches are discarded once. Either way, add a normalize-vs-cache merge test. If instead the team decides stale-cache staleness is acceptable, document it in 05-HUMAN-UAT so the re-test is done in a *fresh* chat or after «Очистить историю» — otherwise the UAT signal is corrupted.
 
+**Status:** FIXED (a2f84b4) — primary fix taken: `RefreshCachedMessageMedia` now calls the new pure `MessageMediaMerge.RefreshPresentation(refreshed, cached)` seam (added to the existing `MessageMediaMerge` seam file — 05-06 seam precedent, and no new .cs file to trip the import quirk) after the URL blocks and BEFORE the `EnqueueIncomingVideoThumb` line (so a Document→Video refine immediately queues its thumb), riding the same `mediaRefreshed` → dirty-cache → `OnMessageMediaRefreshed` re-bind machinery. Copies the refined type (Unknown never clobbers; `isSticker` travels WITH the type since it is type-derived at Normalize) + `isVideoNote`/`isGif`/`mimeType`. One deliberate deviation from the review snippet: the mime comparison treats null and "" as EQUAL — JsonUtility round-trips a null mime as "", so a strict Ordinal(null,"") mismatch would have dirtied + re-bound every no-mime WA media row on every sync, violating the WA-neutrality this review itself verified. 7 seam tests pin it (the .tgs Document→Sticker probe case, note/GIF flag backfill, WA null-vs-"" neutrality, idempotent second run, Unknown guard, null args). Works against the owner's device cache without a wipe; the on-device probe re-render is confirmed via the existing 05-HUMAN-UAT re-test.
+
 ## Info
 
 ### IN-01: Circle/card radius correctness silently depends on downstream `RefreshCorners` — and the stencil-copy staleness check compares size only, not radius
@@ -82,11 +88,15 @@ Alternative (blunter): bump the `ChatHistoryCache` file version/key so pre-updat
 **Issue:** This diff makes `rounded.radius` *vary* between binds for the first time (350 vs 23). `ImageWithRoundedCorners` does not rebake on a runtime `radius` assignment (package `Refresh()` fires only from `OnEnable`/`OnValidate`/`OnRectTransformDimensionsChange`), and `InvalidateStaleMaskMaterial` rebuilds the stencil copy only when the baked **width/height** drift — a radius-only change on an identically-sized rect (note 700×700 → square video 700×700) would keep the stale shape. Today this is unreachable: rows are never reused across messages, same-message rebinds can't flip `isVideoNote`, and every terminal path runs `ForceRebuildRoutine` → `RefreshCorners`. But the invariant is implicit and one refactor away from breaking (introducing row pooling, or any early-return path added to `SetupMaskedLayout` callers).
 **Fix:** Two cheap hardenings: (a) compare the radius component too in the staleness check — `|| Mathf.Abs(rendered.GetVector(CornerBakeProp).z - rounded.radius * 2f) > 0.5f`; (b) or call `RefreshCorners(messageImage.gameObject)` immediately after the radius assignment in `SetupMaskedLayout`. Either makes the radius self-consistent instead of convention-consistent.
 
+**Status:** FIXED (04baf2f) — hardening (a) applied: `InvalidateStaleMaskMaterial` now also compares `_WidthHeightRadius.z` (the baked radius DOUBLED — verified against the package's `Refresh()`, which writes `radius * 2`) against the live `rounded.radius * 2f` at 0.5f tolerance. Guarded on the `ImageWithRoundedCorners` component existing AND enabled, so the sticker path (rounded disabled, no corner bake) can't false-positive into material churn. Radius is now self-consistent instead of convention-consistent.
+
 ### IN-02: .tgs placeholder wires a tap listener that can never fire a behavior
 
 **File:** `Assets/Scripts/UI/MessageItemView.cs:884, 888-891`
 **Issue:** The branch stages `fullScreenSprite = stickerPlaceholder` and adds a `Button` → `OnVisualClicked(vm)`, but `OnVisualClicked` (:3676-3714) only handles `Video` and `Image` — for `Sticker` it falls through and does nothing. Dead wiring (mirrors the pre-existing regular-sticker branch, so it's consistent, not a regression).
 **Fix:** Either drop the button + `fullScreenSprite` staging from the `.tgs` branch, or leave as-is for symmetry with the WebP sticker branch — but don't expect a tap affordance on device.
+
+**Status:** FIXED (2484ae6) — first option taken: the Button wiring + `fullScreenSprite` staging are dropped from the `.tgs` branch, replaced by a comment documenting why no stale-listener path exists (the only same-row branch flip into `.tgs` is Document→Sticker via WR-01's cache backfill, and the document render path never buttons `messageImage`; `RemoveAllListeners` wouldn't strip prefab-serialized calls anyway). The pre-existing WebP sticker branch keeps its (equally inert) wiring untouched — outside this diff.
 
 ### IN-03: Minor quality notes in the new overlay code
 
@@ -94,8 +104,15 @@ Alternative (blunter): bump the `ChatHistoryCache` file version/key so pre-updat
 **Issue:** (a) `string.Format("{0:D1}:{1:D2}", ...)` — the global csharp-quality rule prefers interpolation: `$"{t.Minutes:D1}:{t.Seconds:D2}"`. (b) `withBackground` is `true` at all three call sites — a dead parameter until a caller needs a bare label. (c) Test-pinning gap: the heuristic handles `{"width":0,"height":0}` (rejected by `width <= 0` before the equality check) and non-object `media_info` (e.g. array/string — rejected by `is JObject`), but neither case is pinned by `TelegramVideoNoteHeuristicTests`; two one-line tests would lock the guard order.
 **Fix:** Interpolate the format string; optionally drop `withBackground` until needed; add `IsVideoNote_ZeroDims_False` and `IsVideoNote_NonObjectMediaInfo_False` cases.
 
+**Status:** FIXED (51e263d) — all three: (a) duration badge is now `$"{t.Minutes:D1}:{t.Seconds:D2}"`; (b) `withBackground` dropped from `GetOrCreateOverlayPill` (background unconditional, `labelInset` a const, 3 call sites updated — reintroduce the flag only when a bare-label caller exists); (c) `IsVideoNote_ZeroDims_False` (0×0 rejected by positivity BEFORE the square equality) + `IsVideoNote_NonObjectMediaInfo_False` (array + bare string rejected by the `is JObject` pattern) pin the guard order.
+
 ---
+
+## Fix verification
+
+Full EditMode suite via the in-Editor bridge (Editor was open — headless runner correctly refused on the live process): **997/997 green** (988 baseline + 7 `MessageMediaMerge.RefreshPresentation` tests + 2 heuristic guard tests), `editorAssemblyWrittenUtc 2026-07-14T16:16:45Z` — freshly compiled assemblies including all four fixes, no stale-green.
 
 _Reviewed: 2026-07-14T16:01:31Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
+_Fixes applied: 2026-07-14 (a2f84b4, 04baf2f, 2484ae6, 51e263d) — Claude (gsd-code-fixer)_
