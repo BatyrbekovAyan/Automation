@@ -45,6 +45,14 @@ public partial class ChatManager : MonoBehaviour
     private HashSet<string> seenMessageIds = new HashSet<string>();
     private readonly ReactionStore _reactions = new ReactionStore();
 
+    // The owner's Telegram profile-user id, learned opportunistically from fromMe rows
+    // (SHAPES.md Q4: every own outgoing tapi message carries from = own profile-user id,
+    // even in private chats). Lets TelegramReactionMapper tag the owner's echoed
+    // reactions[] element as "me" so toggle-off and the quick-bar highlight survive the
+    // echo (05-06-REVIEW WR-01). Null until learned; reset on bot/channel switch
+    // (identity is per-profile). WhatsApp never reads or writes it.
+    private string _tgOwnUserId;
+
     public static ChatManager Instance;
     
     // Events
@@ -1559,10 +1567,15 @@ if (msg.messageType == MessageType.Video)
         {
             ApplyTelegramMediaShape(msg, raw);
 
+            // Learn the owner's profile-user id from any own row (SHAPES.md Q4) so the
+            // reaction mapper below can identify the owner's echoed reactions[] element.
+            if (raw.fromMe && !string.IsNullOrEmpty(raw.from))
+                _tgOwnUserId = raw.from;
+
             // Receive-side reactions (SHAPES.md Q3, GO): tapi carries reactions[] on the target
             // message itself, so map them into the shared display state here. WhatsApp reactions
             // stay on the ReactionStore live-event path (this stays null for WhatsApp).
-            msg.reactions = TelegramReactionMapper.Map(raw.reactions);
+            msg.reactions = TelegramReactionMapper.Map(raw.reactions, _tgOwnUserId);
         }
 
         if (raw.type != "reaction")
@@ -1699,8 +1712,9 @@ if (msg.messageType == MessageType.Video)
     /// server view. tapi carries the full reactions[] on every messages/get, so a plain refresh
     /// delivers reaction changes for free (SHAPES.md Q3). Mirrors RefreshCachedMessageMedia/Quote:
     /// mutates the cached VM in place + fires OnMessageReactionsChanged so the bound pill re-renders.
-    /// The merge preserves the owner's optimistic "me" reaction until the server echoes the same
-    /// emoji (no flicker, stays toggleable). Returns true if the reactions changed.
+    /// The merge preserves the owner's fresh optimistic "me" reaction until the server echoes it
+    /// AS "me" (identity-keyed via the learned own user id — no flicker, stays toggleable).
+    /// Returns true if the reactions changed.
     /// WhatsApp never reaches here (its reactions flow through ReactionStore) — the caller gates on
     /// ActiveChannel==Telegram, keeping WhatsApp byte-identical.
     /// </summary>
@@ -1713,7 +1727,8 @@ if (msg.messageType == MessageType.Video)
             var cached = cachedList[i];
             if (cached.messageId != refreshed.id) continue;
 
-            var merged = TelegramReactionMerge.Merge(cached.reactions, refreshed.reactions);
+            var merged = TelegramReactionMerge.Merge(cached.reactions, refreshed.reactions,
+                                                     DateTimeOffset.UtcNow.ToUnixTimeSeconds());
             if (TelegramReactionMerge.SameReactions(cached.reactions, merged)) return false;
 
             cached.reactions = merged;

@@ -81,6 +81,7 @@ public partial class ChatManager
         ClearVideoThumbQueue();     // reset queue bookkeeping the cancelled coroutines never freed
         ClearMediaDownloadQueue();  // same for the serial media-download worker
         ClearResolveQueues();       // quote/reaction drain workers were just killed; reset their bookkeeping
+        _tgOwnUserId = null;        // owner identity is per-profile — never carry it across channels
         BeginLoadForActiveBot();
     }
 
