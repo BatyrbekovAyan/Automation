@@ -3,14 +3,18 @@ using System.Globalization;
 using Newtonsoft.Json.Linq;
 
 /// <summary>
-/// Pure resolver for a Telegram (tapi) media message's metadata. tapi delivers media with
-/// <c>body:null</c> and <c>s3Info:{}</c> (SHAPES.md Q1) — the bytes arrive later via
-/// <c>message/media/download</c> by id (placeholder-first UX), so there is no inline URL to
-/// read. File name + mime are flat top-level fields; dimensions / size / duration live in
-/// the flat <c>media_info</c> object (<c>{width,height,size,duration,...}</c>).
+/// Pure resolver for a Telegram (tapi) media message's metadata. On tapi the <c>body</c> is an
+/// empty string (not a JObject), and the media URL lives in <c>s3Info.url</c> when Wappi still
+/// hosts the object (a signed 48h S3 link + <c>s3Info.expire</c>) or <c>s3Info:{}</c> once
+/// evicted (SHAPES.md Q1, re-verified 2026-07-14). The URL/expire read is handled by the
+/// channel-agnostic <c>s3Info["url"]</c> branches in ChatManager.Normalize (with
+/// <c>message/media/download</c>-by-id as the fallback for evicted media) — this seam does NOT
+/// touch the URL. It only supplies the flat metadata: file name + mime are top-level fields;
+/// dimensions / size / duration live in the flat <c>media_info</c> object
+/// (<c>{width,height,size,duration,...}</c>).
 ///
-/// The WhatsApp Normalize branches read these off the <c>body</c> JObject, which is null on
-/// tapi, so they no-op for Telegram — this seam supplies them instead. Unit-testable and
+/// The WhatsApp Normalize branches read this metadata off the <c>body</c> JObject, which is not
+/// a JObject on tapi, so they no-op for Telegram — this seam supplies it instead. Unit-testable and
 /// null-tolerant: a missing <c>media_info</c> or any absent field degrades to a safe default
 /// (aspect 1.0, size/duration 0) and never throws. Duration is parsed as a double and rounded
 /// half-up (<see cref="MidpointRounding.AwayFromZero"/> — not the banker's-rounding default)

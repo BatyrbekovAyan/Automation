@@ -32,27 +32,35 @@ Phase 4) in real observed JSON instead of undocumented guesses.
   string? Is there `s3Info.url` (text shows `s3Info:{}`)? Where do thumbnail,
   dimensions, duration, file name and size live — `attaches`? flat fields?
 - **Evidence:** `INDEX.json` key `"1"` → `message_type_*.json`, `messages_*.json`.
-- **VERDICT:** `divergence` (captured 2026-07-13: image ×33, document ×27, text ×323, poll ×1 across 8 chats)
-  - Media `body` is **`null`** — NOT a JObject (WA), NOT base64, NO inline URL,
-    NO `JPEGThumbnail`. `s3Info` is `{}`; `attaches` is `null`. Media content is
-    reachable **only** via `message/media/download` by message id.
-  - **`media_info` EXISTS on the tapi sync API** (the docs-research claim of
-    "0 occurrences" was webhook-only): `{"width","height","size","duration",
-    "is_round","is_group","grouped_id"}` — image carries w/h/size; a video
-    carries `duration` (observed 11.4).
-  - Flat `mimetype` + `file_name` fields carry the media identity
-    (e.g. `"mimetype":"video/mp4","file_name":"<uuid>.mp4"`); `caption` is a flat
-    string (`""` when absent).
-  - **A phone-sent video arrived as `type:"document"` with `mimetype:"video/mp4"`**
-    — TG media kind detection must consider mimetype, not `type` alone.
-  - Redacted image excerpt: `{"type":"image","body":null,"s3Info":{},"attaches":null,
-    "media_info":{"width":600,"height":800,"size":149087,"duration":0,"is_round":false},
-    "mimetype":"image/jpeg","caption":"","file_name":""}`
-- **Downstream impact:** Normalize port (**CHAT-03**): NO inline thumbnails on TG —
-  bubbles render via the serial `media/download` queue + `MediaCacheManager`
-  (placeholder-first UX); dimensions/duration from `media_info`; media kind =
-  `type` ⊕ `mimetype`. Voice duration on the SYNC api = `media_info.duration`
-  (webhook `length_seconds` differs — the TPL-03 template fallback covers both).
+- **VERDICT:** `divergence` — **REVISED 2026-07-14 by the media re-run** (the
+  first capture's `s3Info:{}` reading was an artifact of stale media; see below).
+  - **`s3Info.url` IS populated for Wappi-hosted media** — a signed Yandex S3 URL
+    (`https://wapi-uploads….storage.yandexcloud.net/…?X-Amz-…`) + `s3Info.expire`
+    (unix; `X-Amz-Expires=172800` = 48h). Observed on 37/74 media messages
+    (image/video/ptt/sticker/document all carry it when fresh). `s3Info` is `{}`
+    **only after Wappi evicts the object** — presence tracks Wappi's S3 retention,
+    NOT strictly message age (fresh URLs minted on demand, `X-Amz-Date` = capture
+    time). `body` is the empty string `""` for media (not `null`; a JValue, not a
+    JObject → the WA `body is JObject` branches correctly skip).
+  - **`media_info` EXISTS on the tapi sync API**: `{width,height,size,duration,
+    is_round,is_group,grouped_id}`; image = w/h/size, video/voice = `duration`.
+  - Flat `mimetype` + `file_name` carry media identity; `caption` flat (`""` absent).
+  - **Media kind = `type` refined by `mimetype`** (a phone video came as
+    `type:"document"` + `video/mp4`).
+  - Redacted image excerpt: `{"type":"image","body":"","attaches":null,
+    "s3Info":{"url":"https://wapi-uploads….yandexcloud.net/….jpg?X-Amz-…","expire":1784296043},
+    "media_info":{"width":320,"height":320,"size":18809,"duration":0,"is_round":false},
+    "mimetype":"image/jpeg","file_name":""}`
+- **Downstream impact:** Normalize port (**CHAT-03**) — the shipped 05-06 code is
+  CORRECT against this: the **channel-agnostic `s3Info["url"]` reads**
+  (ChatManager.cs:1476/1502/1510/1556, which run BEFORE the `ActiveChannel==Telegram`
+  block) pick up the direct URL + `expire` for fresh media, and the serial
+  `message/media/download`-by-id queue is the fallback for evicted (`s3Info:{}`)
+  media; `expire` drives the existing refetch-by-id path (channel-aware via
+  `WappiEndpoints.Sync`). `ApplyTelegramMediaShape` supplies dims/duration/name/mime
+  from the flat fields. No inline `JPEGThumbnail` on TG (placeholder-first for
+  evicted media only). NO code change needed — the "download-only" framing was
+  over-stated from stale evidence.
 
 ### 2. Sticker + video-note + animated-emoji `type` strings
 
@@ -60,22 +68,31 @@ Phase 4) in real observed JSON instead of undocumented guesses.
   animated emoji use (none documented)? Does `isGif` mark GIFs that arrive as
   `type:"video"`?
 - **Evidence:** `INDEX.json` key `"2"` → `message_type_*.json`.
-- **VERDICT:** `not-observed` (partial) — 384 captured messages contained **zero**
-  sticker / voice(ptt) / video-note (`is_round` always false) / GIF (`isGif`
-  always false) messages. New TG-only type observed: **`"poll"`** (unknown to
-  `ParseMessageType` → silently dropped; acceptable v1). Video-as-`document`
-  confirmed (see Q1). **Re-run needed:** send a sticker, a voice message, a
-  video-note (кружок), and a GIF to the dev account, then re-run
-  `capture-shapes.sh` — 2 minutes, script is idempotent.
-- **Downstream impact:** `ParseMessageType` `"text"` case shipped (05-03);
-  sticker/voice/video-note/GIF cases await the re-run (**CHAT-03**, 05-06).
-- **05-06 disposition (2026-07-14):** observed types shipped fully (image / document /
-  video-as-document via `TelegramMediaType.Refine` on `mimetype` / poll left dropped). The
-  UNOBSERVED types ship only DEFENSIVE mimetype-prefix handling (`audio/*` → Voice, `video/*`
-  → Video) with NO claimed shapes. **Owner media re-run still required before device UAT:**
-  send a sticker + voice + video-note (кружок) + GIF to the dev account and re-run
-  `capture-shapes.sh` to confirm the real `type` strings / `isGif` / `is_round` before trusting
-  those bubbles on device.
+- **VERDICT:** **RESOLVED 2026-07-14 media re-run** — the owner sent the missing
+  types; all now `confirmed shape` EXCEPT video-note (still not-observed). The type
+  strings map correctly through the shipped `MessageTypeParser.From`:
+  - **voice = `type:"ptt"`** + `mimetype:"audio/ogg"`, `media_info.duration` (sec)
+    → `MessageType.Voice`. Same string as WhatsApp.
+  - **video = `type:"video"`** + `mimetype:"video/mp4"` + `file_name:"video.mp4"`,
+    `media_info` w/h/duration → `MessageType.Video`. (Video also still arrives as
+    `type:"document"`+`video/mp4` when sent as a file — both handled.)
+  - **sticker = `type:"sticker"`**: a GIF / video-sticker came as
+    `type:"sticker"` + `mimetype:"video/mp4"` + `file_name:"mp4.mp4"` +
+    **`isGif:true`** + `media_info` 320×180 → `MessageType.Sticker` (`isSticker=true`).
+  - **animated `.tgs` sticker = `type:"document"`** + `mimetype:"application/x-tgsticker"`
+    + `file_name:"AnimatedSticker.tgs"` → `MessageType.Document`.
+  - **`type:"system"`** (service messages, `body` short text, no media) → Unknown →
+    dropped (like `poll`). Acceptable v1.
+  - **`is_round` never observed true** — no video-note (кружок) landed in the
+    scanned window. Video-notes remain THE ONE unconfirmed shape (expected:
+    `type:"video"` + `media_info.is_round:true`).
+- **Downstream impact:** `MessageTypeParser.From` already maps
+  `ptt→Voice / video→Video / sticker→Sticker / document→Document` (05-03/05-06) —
+  **all observed types render correctly, no code change.** Accepted v1 cosmetic
+  limits (not blocking): a video/mp4 sticker or GIF routes through the still-image
+  sticker loader (may show a frame, not animate); a `.tgs` animated sticker renders
+  as a document card. Still-open: send a **video-note (кружок)** + re-run to confirm
+  the `is_round` bubble on device (**Phase 8 UAT**, minor).
 
 ### 3. Incoming reactions transport
 
