@@ -278,21 +278,15 @@ public partial class BotSettings
         {
             string response = www.downloadHandler.text;
 
-            if (response.Contains("\"authorized\":"))
+            // tapi get/status is pretty-printed with two "phone" keys — parse via the
+            // whitespace/order-agnostic WappiStatusParser instead of substring scanning.
+            if (WappiStatusParser.TryGetAuthorized(response, out bool isAuthorized))
             {
-                int startIndex = response.IndexOf("\"authorized\":") + 13;
-                int endIndex = response.IndexOf(",\"authorized_at\":");
-                int lenght = endIndex - startIndex;
-
-                if (response.Substring(startIndex, lenght).Equals("true"))
+                if (isAuthorized)
                 {
-                    if (response.Contains("\"phone\":") && response.Contains("\",\"platform\":"))
+                    if (WappiStatusParser.TryGetPhone(response, out string phone))
                     {
-                        startIndex = response.IndexOf("\"phone\":") + 9;
-                        endIndex = response.IndexOf("\",\"platform\":");
-                        lenght = endIndex - startIndex;
-
-                        TelegramNumberField.Value = response.Substring(startIndex, lenght);
+                        TelegramNumberField.Value = phone;
                         Manager.Instance.EnableSave();
                     }
                 }
@@ -361,24 +355,24 @@ public partial class BotSettings
         {
             string response = www.downloadHandler.text;
 
-            if (response.Contains("\"authorized\":"))
+            // tapi get/status is pretty-printed — the old substring parse THREW here (its
+            // ",\"authorized_at\":" guard never matches the pretty ",\n  \"authorized_at\":",
+            // so Substring got a negative length), silently breaking outside-app de-auth
+            // detection. Robust, throw-safe parse via WappiStatusParser; semantics preserved:
+            // act only when the profile reports NOT authorized and still has a real id.
+            if (WappiStatusParser.TryGetAuthorized(response, out bool isAuthorized)
+                && !isAuthorized
+                && !Manager.openBot.GetComponent<Bot>().telegramProfileId.Equals("-1"))
             {
-                int startIndex = response.IndexOf("\"authorized\":") + 13;
-                int endIndex = response.IndexOf(",\"authorized_at\":");
-                int lenght = endIndex - startIndex;
+                if (telegramRow != null) telegramRow.SetIsOnQuiet(false);
 
-                if (!response.Substring(startIndex, lenght).Equals("true") && !Manager.openBot.GetComponent<Bot>().telegramProfileId.Equals("-1"))
-                {
-                    if (telegramRow != null) telegramRow.SetIsOnQuiet(false);
+                TelegramNumberField.Value = "";
+                TelegramNumberField.gameObject.SetActive(false);
 
-                    TelegramNumberField.Value = "";
-                    TelegramNumberField.gameObject.SetActive(false);
+                PlayerPrefs.SetString(Manager.openBot.name + "TelegramNumber", "");
+                PlayerPrefs.SetInt(Manager.openBot.name + "isOnTelegram", 0);
 
-                    PlayerPrefs.SetString(Manager.openBot.name + "TelegramNumber", "");
-                    PlayerPrefs.SetInt(Manager.openBot.name + "isOnTelegram", 0);
-
-                    Manager.Instance.GetDeleteTelegramProfile(Manager.openBot.GetComponent<Bot>().telegramProfileId);
-                }
+                Manager.Instance.GetDeleteTelegramProfile(Manager.openBot.GetComponent<Bot>().telegramProfileId);
             }
         }
     }

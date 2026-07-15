@@ -393,7 +393,7 @@ public class Manager : MonoBehaviour
                 ApplyBusinessTypeToDropdown(recreatedBotSettings.BusinessTypeDropdown,
                     PlayerPrefs.GetString(recreatedBot.name + "BusinessType", ""));
                 recreatedBotSettings.WhatsappNumberField.Value = PlayerPrefs.GetString(recreatedBot.name + "WhatsappNumber", "");
-                recreatedBotSettings.TelegramNumberField.Value = PlayerPrefs.GetString(recreatedBot.name + "TelegramNumber", "");
+                recreatedBotSettings.TelegramNumberField.Value = PlausibleTelegramNumber(PlayerPrefs.GetString(recreatedBot.name + "TelegramNumber", ""));
 
                 recreatedBotSettings.WhatsappNumberField.gameObject.SetActive(!recreatedBotSettings.WhatsappNumberField.Value.Equals(""));
                 recreatedBotSettings.TelegramNumberField.gameObject.SetActive(!recreatedBotSettings.TelegramNumberField.Value.Equals(""));
@@ -812,7 +812,7 @@ public class Manager : MonoBehaviour
         ApplyBusinessTypeToDropdown(openBotSettings.BusinessTypeDropdown,
             PlayerPrefs.GetString(openBot.name + "BusinessType", ""));
         openBotSettings.WhatsappNumberField.Value = PlayerPrefs.GetString(openBot.name + "WhatsappNumber", "");
-        openBotSettings.TelegramNumberField.Value = PlayerPrefs.GetString(openBot.name + "TelegramNumber", "");
+        openBotSettings.TelegramNumberField.Value = PlausibleTelegramNumber(PlayerPrefs.GetString(openBot.name + "TelegramNumber", ""));
 
         openBotSettings.WhatsappNumberField.gameObject.SetActive(!openBotSettings.WhatsappNumberField.Value.Equals(""));
         openBotSettings.TelegramNumberField.gameObject.SetActive(!openBotSettings.TelegramNumberField.Value.Equals(""));
@@ -854,6 +854,14 @@ public class Manager : MonoBehaviour
         }
     }
 
+    // Self-heals a stale pre-fix status blob persisted in {bot}TelegramNumber: an
+    // implausible stored value (old raw-JSON substring) collapses to empty so the field
+    // hides via SetActive(!Value.Equals("")) and the dirty-check stays quiet. The correct
+    // number repopulates on the next tapi get/status via WappiStatusParser. Telegram-only —
+    // the WhatsApp number field is deliberately left untouched.
+    private static string PlausibleTelegramNumber(string stored) =>
+        WappiStatusParser.IsPlausiblePhone(stored) ? stored : "";
+
     public void EnableSave()
     {
         bool settingsChanged = false;
@@ -866,7 +874,7 @@ public class Manager : MonoBehaviour
             (businessTypes.TryGetByIndex(openBotSettings.BusinessTypeDropdown.value, out var dirtyBt)
                 && dirtyBt.id != PlayerPrefs.GetString(openBot.name + "BusinessType", "")) ||
             !openBotSettings.WhatsappNumberField.Value.Equals(PlayerPrefs.GetString(openBot.name + "WhatsappNumber", "")) ||
-            !openBotSettings.TelegramNumberField.Value.Equals(PlayerPrefs.GetString(openBot.name + "TelegramNumber", "")) ||
+            !openBotSettings.TelegramNumberField.Value.Equals(PlausibleTelegramNumber(PlayerPrefs.GetString(openBot.name + "TelegramNumber", ""))) ||
             !openBotSettings.BusinessField.Value.Equals(PlayerPrefs.GetString(openBot.name + "Business", "")) ||
             !openBotSettings.PromptField.Value.Equals(PlayerPrefs.GetString(openBot.name + "Prompt", "")))
         {
@@ -2588,29 +2596,18 @@ public class Manager : MonoBehaviour
             {
                 string response = www.downloadHandler.text;
 
-                if (response.Contains("\"authorized\":"))
+                // tapi get/status is pretty-printed with two "phone" keys — parse via the
+                // whitespace/order-agnostic WappiStatusParser instead of substring scanning.
+                if (WappiStatusParser.TryGetAuthorized(response, out bool isAuthorized) && isAuthorized)
                 {
-                    int startIndex = response.IndexOf("\"authorized\":") + 13;
-                    int endIndex = response.IndexOf(",\"authorized_at\":");
-                    int lenght = endIndex - startIndex;
+                    authorized = true;
 
-                    if (response.Substring(startIndex, lenght).Equals("true"))
-                    {
-                        authorized = true;
+                    if (WappiStatusParser.TryGetPhone(response, out string phone))
+                        TelegramNumberInput.text = phone;
 
-                        if (response.Contains("\"phone\":") && response.Contains("\",\"platform\":"))
-                        {
-                            startIndex = response.IndexOf("\"phone\":") + 9;
-                            endIndex = response.IndexOf("\",\"platform\":");
-                            lenght = endIndex - startIndex;
-
-                            TelegramNumberInput.text = response.Substring(startIndex, lenght);
-                        }
-
-                        // Show checkmark inside QR box, then navigate
-                        yield return StartCoroutine(ShowAuthSuccess(TelegramAuth, TelegramAuthSuccessPanel));
-                        telegramAuthCompleted = true;
-                    }
+                    // Show checkmark inside QR box, then navigate
+                    yield return StartCoroutine(ShowAuthSuccess(TelegramAuth, TelegramAuthSuccessPanel));
+                    telegramAuthCompleted = true;
                 }
             }
 
