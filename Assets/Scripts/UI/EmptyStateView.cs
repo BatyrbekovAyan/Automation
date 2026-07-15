@@ -19,10 +19,46 @@ public class EmptyStateView : MonoBehaviour
     private CanvasGroup canvasGroup;
     private EmptyStateReason? _lastReason;
 
+    // Authored (WhatsApp-green #25D366) fills of the two green accents on this empty state —
+    // the connect/create CTA and the placeholder icon tint — captured once at Awake so the
+    // Telegram-blue recolor maps from the real authored values (never a hardcoded scene green)
+    // and reverts exactly on the WhatsApp channel. Both refs are null-guarded end to end.
+    private Image primaryButtonImage;
+    private Color primaryButtonAuthoredColor;
+    private Color iconAuthoredColor;
+    private bool accentColorsCached;
+
     private void Awake()
     {
         canvasGroup = GetComponent<CanvasGroup>();
+        CacheAccentColors();
         Hide();
+    }
+
+    private void CacheAccentColors()
+    {
+        if (accentColorsCached) return;
+        accentColorsCached = true;
+        if (primaryButton != null) primaryButtonImage = primaryButton.GetComponent<Image>();
+        if (primaryButtonImage != null) primaryButtonAuthoredColor = primaryButtonImage.color;
+        if (iconImage != null) iconAuthoredColor = iconImage.color;
+    }
+
+    // Recolor the green accents for the active channel: Telegram ⇒ brand blue, WhatsApp ⇒
+    // the authored green (ChannelAccent passthrough). Runs at the tail of ConfigureForReason,
+    // which fires on every OnEnable/OnEmptyState — including after a channel switch — so the
+    // empty state matches the channel that surfaced it (BotHasNoTelegram only on TG, etc.).
+    private void ApplyChannelAccent()
+    {
+        CacheAccentColors();
+        ChatChannel channel = ChatManager.Instance != null
+            ? ChatManager.Instance.ActiveChannel
+            : ChatChannel.WhatsApp;
+
+        if (primaryButtonImage != null)
+            primaryButtonImage.color = ChannelAccent.Resolve(channel, primaryButtonAuthoredColor);
+        if (iconImage != null)
+            iconImage.color = ChannelAccent.Resolve(channel, iconAuthoredColor);
     }
 
     private void OnEnable()
@@ -140,6 +176,10 @@ public class EmptyStateView : MonoBehaviour
                 }
                 break;
         }
+
+        // All three reasons share the same green CTA/icon accents; recolor them per the
+        // active channel after the reason-specific text/wiring is set.
+        ApplyChannelAccent();
     }
 
     private void OpenCreateBotFlow()

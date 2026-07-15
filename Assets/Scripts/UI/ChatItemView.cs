@@ -490,6 +490,22 @@ public void Bind(ChatViewModel model)
     private static readonly Color UnreadTimeColor = new Color32(0x26, 0xB2, 0x5A, 0xFF);
     private static readonly Color ReadTimeColor = new Color32(0x66, 0x66, 0x66, 0xFF);
 
+    // The unread pill's authored (WhatsApp-green) fill, captured once from the scene so the
+    // Telegram-blue recolor never hardcodes a scene green: ChannelAccent.Resolve always maps
+    // from THIS authored value, so a pooled row that went blue on a Telegram bind reverts to
+    // the exact authored green on the next WhatsApp bind. Cached lazily on first ApplyUnreadBadge.
+    private Image unreadBadgeImage;
+    private Color unreadBadgeAuthoredColor;
+    private bool unreadBadgeColorCached;
+
+    private void CacheUnreadBadgeColor()
+    {
+        if (unreadBadgeColorCached || unreadBadge == null) return;
+        unreadBadgeImage = unreadBadge.GetComponent<Image>();
+        if (unreadBadgeImage != null) unreadBadgeAuthoredColor = unreadBadgeImage.color;
+        unreadBadgeColorCached = true;
+    }
+
     private void ApplyUnreadBadge(int count)
     {
         // Profile → Уведомления → «Счётчик непрочитанных»: treating the count
@@ -498,8 +514,19 @@ public void Bind(ChatViewModel model)
 
         bool hasUnread = count > 0;
 
+        // Telegram recolors the green unread accents to brand blue; WhatsApp keeps the
+        // authored green (ChannelAccent passthrough). Null-guard ChatManager (Editor/tests)
+        // ⇒ default WhatsApp ⇒ accents stay exactly as authored.
+        ChatChannel channel = ChatManager.Instance != null
+            ? ChatManager.Instance.ActiveChannel
+            : ChatChannel.WhatsApp;
+
         if (timeText != null)
-            timeText.color = hasUnread ? UnreadTimeColor : ReadTimeColor;
+            timeText.color = hasUnread ? ChannelAccent.Resolve(channel, UnreadTimeColor) : ReadTimeColor;
+
+        CacheUnreadBadgeColor();
+        if (unreadBadgeImage != null)
+            unreadBadgeImage.color = ChannelAccent.Resolve(channel, unreadBadgeAuthoredColor);
 
         if (unreadBadge == null) return;
         if (!hasUnread)
