@@ -3,9 +3,9 @@ status: resolved
 phase: 05-channel-aware-chatmanager-core
 source: [owner device screenshots 2026-07-14 19:38 + round-2 screenshot after 05-07, Tools/tapi/samples probe 23366/23368/23369]
 started: 2026-07-14T14:40:00Z
-updated: 2026-07-15T06:07:43Z
+updated: 2026-07-15T14:25:05Z
 resolved_by: 05-07 (gap-closure plan — commits e7dafa6 + 9194111, suite 988/988); round-2 polish 05-08 (commits 72a5909 + a27cf16, suite 1007/1007) refined the note + sticker treatments after an owner device screenshot; 05-09 (commits 584be1d + d68534f + e4f6451, suite 1028/1028) fixed the Telegram-number JSON blob + switcher chip-label padding from further owner Editor screenshots
-device_reverify: Phase 8 (visual confirmation of the three media treatments on device; incl. the 05-08 note-float + sticker-card refinements, the 05-09 Telegram-number field + switcher chip-label padding, AND the 05-10 channel-aware accent theming — unread badge/time + empty-state CTA/icon → Telegram blue)
+device_reverify: Phase 8 (visual confirmation of the three media treatments on device; incl. the 05-08 note-float + sticker-card refinements, the 05-09 Telegram-number field + switcher chip-label padding, the 05-10 channel-aware accent theming — unread badge/time + empty-state CTA/icon → Telegram blue, AND the 05-11 scroll-to-unread FAB unread-count badge → Telegram blue)
 ---
 
 # Phase 5 — Device UAT: Telegram media presentation gaps
@@ -155,3 +155,29 @@ device re-verify (Phase 8, visual):
      equivalents stay green.
   4. Confirm NOTHING else recolored: outgoing message bubbles stay green, the Авто/Вместе
      toggle stays green, the switcher chips keep their own brand colors.
+
+## 05-11 follow-up (scroll-to-unread FAB badge — accent gap-closure)
+
+Resolved in code (05-11, commit 7affb7b, suite 1036/1036 green). WhatsApp is
+byte-identical (the accent seam's WhatsApp branch returns the authored green
+untouched); no scene/prefab edits — the color is applied at runtime. This closes
+the one green accent 05-10 left on the messages view.
+
+### 8. Scroll-to-unread FAB's unread-count badge stays green on the Telegram channel
+expected: in an open chat on a bot's **Telegram** channel, when the floating "scroll to
+newest" button (bottom-right of the messages view) shows its unread-count pill, that pill
+renders in Telegram brand blue (#2AABEE); on the **WhatsApp** channel it stays the authored
+green. The FAB's white circle body, grey chevron, and white badge number are unchanged on
+both channels (only the pill fill is a green accent).
+result: **RESOLVED in code (05-11)** — `ScrollToBottomFab.ApplyChannelAccent` routes the badge
+pill through the same `ChannelAccent.Resolve` seam, caching the authored green once at Awake so
+WhatsApp reverts exactly and the persistent FAB never sticks blue after a switch. Applied at
+`MessageListView.OnChatSelected` (a channel switch closes+reopens the chat, so the reopen
+repaints). The badge is the exact same `#26B25A` UnreadGreen as the chat-list unread pill — the
+two now read as one brand. Scene audit confirmed the FAB body is a white circle and the button
+image is a transparent hit area, so neither was touched.
+device re-verify (Phase 8, visual):
+  1. Open a chat on a bot's **Telegram** channel that has unread messages below the fold, scroll
+     up so the FAB appears → its unread-count pill reads Telegram blue (not green).
+  2. Switch the same bot back to **WhatsApp**, repeat → the pill is the authored green again.
+  3. Confirm the FAB circle stays white and the badge number stays white/readable on both.
