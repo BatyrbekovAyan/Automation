@@ -15,7 +15,11 @@ findings:
   warning: 1
   info: 3
   total: 4
-status: issues_found
+status: fixes_applied
+fixes:
+  applied_at: 2026-07-15
+  fixed: 2        # WR-01 (c79fcf2), IN-01 (69ec217); IN-02 + IN-03 confirmed no-action
+  tests: 1029     # 1028 baseline + 1 new (TryGetPhone lone "+")
 ---
 
 # Phase 05-09: Code Review Report
@@ -98,6 +102,14 @@ if (WappiStatusParser.TryGetAuthorized(response, out bool isAuthorized)
 At minimum, confirm during device UAT that opening a healthy authorized bot's settings never
 returns a transient `authorized:false` (which would silently delete a live Telegram bot's profile).
 
+**Status:** FIXED (c79fcf2) — added the `PlayerPrefs.GetInt(Manager.openBot.name + "isOnTelegram", 0) == 1`
+gate to the branch condition, so the destructive `GetDeleteTelegramProfile` only fires for a bot the user
+actually has on Telegram. A code comment documents that this gate is DELIBERATELY stricter than the
+byte-identical WhatsApp twin (`CheckWhatsappUnauthorizationOutsideApp`) because this Telegram branch only
+just went live and has no field history. The WhatsApp twin was left byte-identical (not gated). A Phase-8
+device-UAT line was appended to 05-HUMAN-UAT.md (a healthy authorized Telegram bot must NOT trip
+outside-app de-auth on settings open).
+
 ## Info
 
 ### IN-01: `TryGetPhone` returns `true` with an empty phone for a lone `"+"` value (contract says false-when-no-value)
@@ -118,6 +130,12 @@ return true;
 ```
 Optionally add `TryGetPhone("{\"phone\":\"+\"}")` and `TryGetAuthorized("{\"authorized\":null}")` tests.
 
+**Status:** FIXED (69ec217) — after stripping the leading `+`, `TryGetPhone` now re-validates the
+remainder: a lone `"+"` strips to `""` and returns `false` (phone=""), honoring the false-when-no-value
+contract. Added `TryGetPhone_LonePlus_ReturnsFalseAndEmpty` (`{"phone":"+"}` → false, phone=""); the
+headless EditMode suite is GREEN at 1029 (1028 baseline + 1). The optional `authorized:null` test was
+left out of scope (only the "+" case was requested).
+
 ### IN-02: `git diff --stat` cannot confirm the Main.unity change is "scoped to the switcher" (16,072 lines = full-scene reserialization)
 
 **File:** `Assets/Scenes/Main.unity`
@@ -133,6 +151,12 @@ the diff for the switcher chip's `fileID`/GUID and the new label metrics (`m_fon
 committed here (not left uncommitted), clobber risk is contained — no action needed if the
 switcher payload verifies.
 
+**Status:** CONFIRMED — no code action. The executor verified the Main.unity change is switcher-scoped
+by grepping the diff for the switcher chip's fileID/GUID and the new label metrics (2× `m_fontSize: 22`,
+2× the ±12 / -24 sizeDelta label insets) rather than trusting the 16,072-line `--stat`. The scene
+mutation is already committed (e4f6451), so parallel-session clobber risk is contained. Payload verified;
+nothing unrelated changed.
+
 ### IN-03: WhatsApp `api/sync` status still uses the fragile substring parser (untouched — correct for this phase, but a tracked parity risk)
 
 **File:** `Assets/Scripts/Main/BotSettings.Auth.cs:111, 197`; `Assets/Scripts/Main/Manager.cs:1961, 2081`
@@ -143,6 +167,11 @@ Telegram bug this phase fixed. The parser's own doc comment already flags adopti
 for WhatsApp as a safe follow-up.
 **Fix:** No change this phase. Track migrating the four WhatsApp sites onto `WappiStatusParser`
 (the parser is endpoint-agnostic — both channels share the shape) as a future hardening pass.
+
+**Status:** CONFIRMED — no action this phase (correct). The four WhatsApp `api/sync` status sites were
+left byte-identical per requirement 4; they are safe today because `api/sync` returns compact JSON.
+Migrating them onto `WappiStatusParser` is already flagged as a safe follow-up in the parser's own doc
+comment — tracked, not actioned here.
 
 ---
 

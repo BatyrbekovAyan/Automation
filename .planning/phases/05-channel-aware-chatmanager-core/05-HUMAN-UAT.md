@@ -114,3 +114,14 @@ result: **RESOLVED in code (05-09)** — was: 28pt bold labels stretched edge-to
 a 162px chip reached the borders. Now `LabelSize` 22 + a 12px horizontal inset on the
 label rect (grep-verified in Main.unity: 2× fontSize-22 labels, 2× -24 sizeDelta insets).
 device re-verify: the WhatsApp|Telegram switcher labels have comfortable side margins.
+
+### 6. Telegram outside-app de-auth gate (WR-01 hardening, 05-09-REVIEW)
+expected: opening a healthy authorized Telegram bot's settings never clears the number,
+flips `isOnTelegram` off, or deletes the Wappi profile
+result: **HARDENED in code (05-09, commit c79fcf2)** — the throw-safe `WappiStatusParser`
+activated `CheckTelegramUnauthorizationOutsideApp`'s de-auth branch (previously dead — the old
+pretty-body parse always threw before it could run). The destructive `GetDeleteTelegramProfile`
+is now additionally gated on `isOnTelegram == 1` (defense-in-depth for this newly-live path;
+deliberately stricter than the byte-identical WhatsApp twin).
+device re-verify (Phase 8): confirm a healthy authorized Telegram bot does NOT trip outside-app
+de-auth on BotSettings open (number stays, toggle stays on, Wappi profile not deleted).
