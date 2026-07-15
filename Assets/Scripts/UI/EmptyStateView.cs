@@ -7,6 +7,10 @@ public class EmptyStateView : MonoBehaviour
 {
     [Header("UI references")]
     [SerializeField] private Image iconImage;
+    // The Telegram logo shown (UNTINTED) in place of the placeholder icon on the Telegram
+    // channel. Stamped into the scene by EmptyStateTelegramIconBuilder; a runtime script
+    // can't resolve an asset sprite (no Resources.Load), so it must be a serialized ref.
+    [SerializeField] private Sprite telegramIcon;
     [SerializeField] private TextMeshProUGUI titleLabel;
     [SerializeField] private TextMeshProUGUI bodyLabel;
     [SerializeField] private Button primaryButton;
@@ -19,13 +23,17 @@ public class EmptyStateView : MonoBehaviour
     private CanvasGroup canvasGroup;
     private EmptyStateReason? _lastReason;
 
-    // Authored (WhatsApp-green #25D366) fills of the two green accents on this empty state —
-    // the connect/create CTA and the placeholder icon tint — captured once at Awake so the
-    // Telegram-blue recolor maps from the real authored values (never a hardcoded scene green)
-    // and reverts exactly on the WhatsApp channel. Both refs are null-guarded end to end.
+    // Authored (WhatsApp) values captured once at Awake so the Telegram theming maps FROM the
+    // real authored state (never a hardcoded scene green) and reverts EXACTLY on the WhatsApp
+    // channel — the empty state is a persistent widget reused across channel switches. Covered:
+    // the connect/create CTA fill; the placeholder icon's sprite + color; and the disc BEHIND
+    // the icon (IconCircle, the pale-mint parent the owner sees as "green"). All null-guarded.
     private Image primaryButtonImage;
     private Color primaryButtonAuthoredColor;
     private Color iconAuthoredColor;
+    private Sprite iconAuthoredSprite;
+    private Image iconCircleImage;
+    private Color iconCircleAuthoredColor;
     private bool accentColorsCached;
 
     private void Awake()
@@ -41,13 +49,35 @@ public class EmptyStateView : MonoBehaviour
         accentColorsCached = true;
         if (primaryButton != null) primaryButtonImage = primaryButton.GetComponent<Image>();
         if (primaryButtonImage != null) primaryButtonAuthoredColor = primaryButtonImage.color;
-        if (iconImage != null) iconAuthoredColor = iconImage.color;
+        if (iconImage != null)
+        {
+            iconAuthoredColor = iconImage.color;
+            iconAuthoredSprite = iconImage.sprite;
+            iconCircleImage = ResolveIconCircle(iconImage);
+            if (iconCircleImage != null) iconCircleAuthoredColor = iconCircleImage.color;
+        }
     }
 
-    // Recolor the green accents for the active channel: Telegram ⇒ brand blue, WhatsApp ⇒
-    // the authored green (ChannelAccent passthrough). Runs at the tail of ConfigureForReason,
+    // The disc behind the icon is the icon's nearest ancestor Image (IconCircle in the
+    // EmptyState hierarchy). Walk up so a future non-Image wrapper wouldn't break resolution,
+    // but STOP before this view's own root so we never recolor the opaque white background.
+    private Image ResolveIconCircle(Image icon)
+    {
+        for (Transform t = icon.transform.parent; t != null && t != transform; t = t.parent)
+        {
+            Image img = t.GetComponent<Image>();
+            if (img != null) return img;
+        }
+        return null;
+    }
+
+    // Theme the empty state for the active channel. Runs at the tail of ConfigureForReason,
     // which fires on every OnEnable/OnEmptyState — including after a channel switch — so the
     // empty state matches the channel that surfaced it (BotHasNoTelegram only on TG, etc.).
+    //   • CTA fill  — recolors to Telegram blue on TG, authored green otherwise (05-10).
+    //   • Icon      — on TG shows the Telegram logo UNTINTED (its own colors); elsewhere the
+    //                 authored placeholder sprite + green tint, byte-identical.
+    //   • Icon disc — on TG the pale-mint parent circle turns Telegram blue; else authored.
     private void ApplyChannelAccent()
     {
         CacheAccentColors();
@@ -57,8 +87,27 @@ public class EmptyStateView : MonoBehaviour
 
         if (primaryButtonImage != null)
             primaryButtonImage.color = ChannelAccent.Resolve(channel, primaryButtonAuthoredColor);
-        if (iconImage != null)
-            iconImage.color = ChannelAccent.Resolve(channel, iconAuthoredColor);
+
+        if (channel == ChatChannel.Telegram)
+        {
+            if (iconImage != null)
+            {
+                if (telegramIcon != null) iconImage.sprite = telegramIcon;
+                iconImage.color = Color.white; // untinted → the logo's natural colors
+            }
+            if (iconCircleImage != null)
+                iconCircleImage.color = ChannelAccent.Resolve(ChatChannel.Telegram, iconCircleAuthoredColor);
+        }
+        else
+        {
+            if (iconImage != null)
+            {
+                iconImage.sprite = iconAuthoredSprite;
+                iconImage.color = iconAuthoredColor;
+            }
+            if (iconCircleImage != null)
+                iconCircleImage.color = iconCircleAuthoredColor;
+        }
     }
 
     private void OnEnable()
