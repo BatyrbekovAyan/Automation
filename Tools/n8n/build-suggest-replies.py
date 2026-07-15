@@ -23,6 +23,15 @@ Usage:
 Credential ids are resolved by NAME from the target instance's SQLite DB (dev) so the
 committed export carries the ids that actually work on the instance it was built on
 (matching the Dashboard Outcomes precedent); prod replication remaps by credential name.
+
+Prod-replication overrides (a Cloud target has no local SQLite, so the name->id lookup
+can't run — bind the real recreated-by-name ids explicitly instead of silently falling
+back to the pinned DEV ids):
+  --openai-cred ID   / env N8N_OPENAI_CRED_ID     prod OpenAi credential id
+  --supabase-cred ID / env N8N_SUPABASE_CRED_ID   prod Supabase credential id
+Precedence per credential: CLI flag > env var > SQLite-by-name > pinned DEV fallback. An
+explicit override short-circuits the SQLite lookup and is used verbatim; when no override
+is given the dev path is byte-identical to before.
 """
 import argparse
 import json
@@ -44,6 +53,13 @@ FALLBACK_CREDS = {
     "supabaseApi": ("vrywn6AxQMlvbbzC", "Supabase"),
 }
 
+# Explicit credential-id overrides for prod replication. main() fills this from the
+# --openai-cred / --supabase-cred flags or the N8N_OPENAI_CRED_ID / N8N_SUPABASE_CRED_ID
+# env vars (flag > env). Maps cred_type -> id; an entry short-circuits resolve_cred()'s
+# SQLite lookup so a Cloud target with no local DB binds the real recreated-by-name id
+# rather than the pinned DEV fallback. Empty on the dev path -> behavior is unchanged.
+CRED_OVERRIDES = {}
+
 ENUM_LABELS = ["Ответ", "Уточнить", "Вариант", "К заказу", "Отложить", "Отказ"]
 
 
@@ -63,9 +79,17 @@ def resolve_cred(cred_type):
     on an instance with several credentials of one type (e.g. prod: `OpenAi account`
     plus an older `OpenAi (old)`, or two Supabase projects), silently binding whichever
     sorts first would point the workflow at the wrong account/project with no error.
-    Only a missing or unreadable DB falls back to the pinned ids.
+    Only a missing or unreadable DB falls back to the pinned ids. A CRED_OVERRIDES entry
+    (prod --*-cred flag / env var) short-circuits all of the above and is used verbatim —
+    the intended path for a no-SQLite Cloud deploy.
     """
     want_id, want_name = FALLBACK_CREDS[cred_type]
+    override = CRED_OVERRIDES.get(cred_type)
+    if override:
+        # Explicit prod id (credential recreated BY NAME on Cloud): use verbatim, keep the
+        # pinned name, and skip the SQLite lookup entirely. "Fail loudly, never guess" is
+        # preserved — this is an operator-supplied id, not a silent first-match fallback.
+        return override, want_name
     if os.path.exists(DEV_DB):
         try:
             con = sqlite3.connect(DEV_DB)
@@ -584,7 +608,24 @@ def main():
     ap.add_argument("--update", dest="update_id", default=None)
     ap.add_argument("--id-file", default=None)
     ap.add_argument("--export", nargs=2, metavar=("ID", "OUT"), default=None)
+    ap.add_argument(
+        "--openai-cred", default=None,
+        help="prod OpenAi credential id to bind (else env N8N_OPENAI_CRED_ID, else "
+             "SQLite-by-name, else the pinned DEV id). For a Cloud target with no local SQLite.",
+    )
+    ap.add_argument(
+        "--supabase-cred", default=None,
+        help="prod Supabase credential id to bind (else env N8N_SUPABASE_CRED_ID, else "
+             "SQLite-by-name, else the pinned DEV id). For a Cloud target with no local SQLite.",
+    )
     args = ap.parse_args()
+    # flag > env; only set an override when one is actually supplied (empty -> dev path unchanged).
+    oa_cred = args.openai_cred or os.environ.get("N8N_OPENAI_CRED_ID")
+    sb_cred = args.supabase_cred or os.environ.get("N8N_SUPABASE_CRED_ID")
+    if oa_cred:
+        CRED_OVERRIDES["openAiApi"] = oa_cred
+    if sb_cred:
+        CRED_OVERRIDES["supabaseApi"] = sb_cred
     if args.export:
         export_canonical(args.export[0], args.export[1])
         return

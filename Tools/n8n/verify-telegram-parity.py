@@ -5,18 +5,29 @@ Proves the four canonical n8n workflow JSONs carry the Telegram-parity fixes and
 that the RAG re-stamp nodes are injection-safe. Run before deploying to dev n8n
 (the owner's 04-HUMAN-UAT step); no live n8n / network needed.
 
-Usage: python3 Tools/n8n/verify-telegram-parity.py
+Usage:
+  python3 Tools/n8n/verify-telegram-parity.py            # verify the committed workflows/
+  python3 Tools/n8n/verify-telegram-parity.py --dir DIR  # verify a prod re-export (go/no-go)
+
+--dir DIR overrides the workflow directory (default: the committed workflows/ next to this
+script). Point it at a prod re-export so the SAME structural asserts gate a prod import —
+catching a UI round-trip strip (dropped ai_embedding wiring, stripped top-level id, dropped
+mark_all guard, etc.). Absent --dir, behavior is byte-identical to before.
 
 Exits 0 and prints "ALL PARITY ASSERTS PASSED" when every assert holds.
 Exits 1 with "PARITY FAIL: <reason>" naming the first violated assert.
 """
+import argparse
 import json
 import os
 import sys
 
 # Resolve workflow paths from this script's own location so cwd does not matter.
+# WF defaults to the committed workflows/ dir; main() reassigns it from --dir so the same
+# asserts can gate a prod re-export. load() reads whatever WF points at.
 HERE = os.path.dirname(os.path.abspath(__file__))
-WF = os.path.join(HERE, "workflows")
+DEFAULT_WF = os.path.join(HERE, "workflows")
+WF = DEFAULT_WF
 
 TG_BOT = "4VN3gsFaC2HUYmcc-Telegram_Bot.json"
 CREATE_TG = "Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json"
@@ -206,6 +217,19 @@ def check_suggest_replies():
 
 
 def main():
+    global WF
+    ap = argparse.ArgumentParser(
+        description="Structural-assert verifier for the Telegram-parity workflow edits."
+    )
+    ap.add_argument(
+        "--dir",
+        default=DEFAULT_WF,
+        help="workflow directory to verify (default: the committed workflows/ next to this "
+             "script). Point at a prod re-export dir to run the parity asserts as a "
+             "post-import go/no-go.",
+    )
+    args = ap.parse_args()
+    WF = args.dir
     try:
         check_telegram_bot()
         check_restamp_orchestrator(CREATE_TG, "{botTgId}", "WhatsappWorkflowId")
