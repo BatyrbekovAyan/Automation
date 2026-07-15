@@ -45,7 +45,7 @@ public static class ChannelSwitcherBuilder
     private const float ChipWidth = 162f;
     private const float ChipHeight = 64f;
     private const float ChipGap = 4f;        // centre gap between the two chips
-    private const float LabelSize = 28f;     // matches ModeToggle label
+    private const float LabelSize = 22f;     // 28→22 so "WhatsApp"/"Telegram" clear the chip edges (05-09)
     private const float LabelSpacing = -2f;  // project text standard
 
     // Brand accents — mirror ChannelSwitcherView's selected fills (WA #25D366 / TG #2AABEE).
@@ -218,8 +218,10 @@ public static class ChannelSwitcherBuilder
         var rt = (RectTransform)go.transform;
         rt.anchorMin = Vector2.zero;
         rt.anchorMax = Vector2.one;
-        rt.offsetMin = Vector2.zero;
-        rt.offsetMax = Vector2.zero;
+        // Inset the centred label horizontally so "WhatsApp"/"Telegram" keep clear of the
+        // chip edges (05-09 device UAT); vertical stays full-height. Multiples-of-4 spacing.
+        rt.offsetMin = new Vector2(12f, 0f);
+        rt.offsetMax = new Vector2(-12f, 0f);
 
         var tmp = go.GetComponent<TextMeshProUGUI>();
         if (font != null) tmp.font = font;
