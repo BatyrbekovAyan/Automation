@@ -8,7 +8,7 @@ v1.0 shipped the semi-auto «Вместе» reply path on WhatsApp. v1.1 Telegra
 
 - ✅ **v1.0 Reply Suggestions** — Phases 1-2 (shipped 2026-07-11)
 - 🚧 **v1.1 Telegram Parity** — Phases 3-8 (in progress)
-- 📋 **v1.2 Semi-Auto Suppression** — Phase 9 (planned; spec + implementation plan committed, starts after v1.1 closes)
+- 📋 **v1.2 Reply-Trigger Discipline** — Phases 9-10 (planned; specs + plans committed, starts after v1.1 closes)
 
 ## Phases
 
@@ -37,9 +37,10 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 - [x] **Phase 7: «Вместе» Suggestions + Dashboard on Telegram** - Channel-aware suggestions payload + channel-branched RAG filter, and «Сводка» Telegram inclusion (bot-level chips, channel-aware deep-link). Dashboard is the milestone's cut line. (code-complete 2026-07-13; 916/916 EditMode green; live TG grounding proof owner-gated in 07-HUMAN-UAT.md)
 - [ ] **Phase 8: Device UAT + Milestone Closeout** - On-device end-to-end Telegram pass (incl. carried v1.0 deferred UAT) + prod-replication checklist update; prod bagkz stays dormant.
 
-### 📋 v1.2 Semi-Auto Suppression (Planned)
+### 📋 v1.2 Reply-Trigger Discipline (Planned)
 
 - [ ] **Phase 9: Semi-Auto Suppression Flag** - Wire the «Вместе» toggle to the server: `reply_mode_flags` table + `/webhook/SetReplyMode` sync + a fail-closed gate in both bot templates so a semi-auto chat gets no auto-reply while suggestions still work.
+- [ ] **Phase 10: Message Batching / Debounce** - A pre-generation debounce+dedupe stage in both bot templates so a multi-fragment customer message gets ONE combined reply, plus a client-side debounce in `SuggestionsController.HandleLive` so suggestions coalesce the same way.
 
 ## Phase Details
 
@@ -151,7 +152,20 @@ Plans:
   4. A freshly created bot inherits the gate via template cloning (verified on a new bot's cloned workflow); existing dev clones recreated.
   5. EditMode payload/hook tests green; n8n curl matrix (upsert, precedence, absence→reply, malformed→clean error) green.
 **Plans**: TBD (near-executable task breakdown already exists: `docs/superpowers/plans/2026-07-13-semi-auto-suppression-flag.md`)
-**Flags**: USER-ASSISTED e2e (dev n8n + tunnel + real profiles; bot clones active only during test windows). Template-change propagation: recreate dev clones; folds into the prod bagkz bulk copy. Out of scope: message batching/debounce (own design, sequenced after — pipeline order: group-chat If → suppression gate → debounce → agent).
+**Flags**: USER-ASSISTED e2e (dev n8n + tunnel + real profiles; bot clones active only during test windows). Template-change propagation: recreate dev clones; folds into the prod bagkz bulk copy. Out of scope: message batching/debounce (own design → Phase 10).
+
+### Phase 10: Message Batching / Debounce (v1.2)
+**Goal**: A customer's multi-fragment message gets ONE combined auto-reply (not one per fragment), and «Вместе» suggestions coalesce the same way — a pre-generation debounce+dedupe+combine stage in both bot templates, and a debounce timer in the suggestions client.
+**Depends on**: Phase 9 (edits the same reply-path region; the suppression gate must sit BEFORE the debounce). Needs dev n8n + tunnel + real WA/TG profiles for the e2e gates.
+**Requirements**: BATCH-01, BATCH-02, BATCH-03 (to be formalized in the v1.2 REQUIREMENTS.md; definitions locked in `10-CONTEXT.md`)
+**Success Criteria** (what must be TRUE):
+  1. Two+ text fragments sent within the debounce window produce exactly ONE bot reply whose agent input is the concatenation; aborted fragments never generate (verified via execution runData: earlier fragments abort at Is Latest?). Proven on BOTH channels (owner dev e2e).
+  2. A single complete message still gets one reply after the window; a bot/owner reply between fragments bounds the combined run; a new chat with no prior bot reply combines within the fetch limit.
+  3. The debounce sits AFTER the Phase-9 suppression gate (a semi-auto chat skips the whole path — no wait); the humanizer pauses are unchanged.
+  4. Suggestions coalesce: rapid incoming fragments issue exactly ONE live request after the ~2.5s client window; manual refresh and card-pick re-cluster still fire immediately.
+  5. EditMode debounce-gate test green (rapid incomings → one request; manual refresh immediate); n8n curl matrix (two fragments → one combined reply; single message → one reply; bot-reply boundary) green.
+**Plans**: TBD (design: `docs/superpowers/specs/2026-07-15-message-batching-debounce-design.md`)
+**Flags**: USER-ASSISTED e2e (dev n8n + tunnel + real profiles). Adds ~window-length latency to EVERY auto-reply (the tuning knob). v1 batches text only (media message = own trigger). Same both-template propagation + bulk-copy story as Phase 9.
 
 ## Progress
 
