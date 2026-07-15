@@ -5,7 +5,7 @@ source: [owner device screenshots 2026-07-14 19:38 + round-2 screenshot after 05
 started: 2026-07-14T14:40:00Z
 updated: 2026-07-15T06:07:43Z
 resolved_by: 05-07 (gap-closure plan — commits e7dafa6 + 9194111, suite 988/988); round-2 polish 05-08 (commits 72a5909 + a27cf16, suite 1007/1007) refined the note + sticker treatments after an owner device screenshot; 05-09 (commits 584be1d + d68534f + e4f6451, suite 1028/1028) fixed the Telegram-number JSON blob + switcher chip-label padding from further owner Editor screenshots
-device_reverify: Phase 8 (visual confirmation of the three media treatments on device; incl. the 05-08 note-float + sticker-card refinements AND the 05-09 Telegram-number field + switcher chip-label padding)
+device_reverify: Phase 8 (visual confirmation of the three media treatments on device; incl. the 05-08 note-float + sticker-card refinements, the 05-09 Telegram-number field + switcher chip-label padding, AND the 05-10 channel-aware accent theming — unread badge/time + empty-state CTA/icon → Telegram blue)
 ---
 
 # Phase 5 — Device UAT: Telegram media presentation gaps
@@ -125,3 +125,33 @@ is now additionally gated on `isOnTelegram == 1` (defense-in-depth for this newl
 deliberately stricter than the byte-identical WhatsApp twin).
 device re-verify (Phase 8): confirm a healthy authorized Telegram bot does NOT trip outside-app
 de-auth on BotSettings open (number stays, toggle stays on, Wappi profile not deleted).
+
+## 05-10 follow-up (channel-aware accent theming)
+
+Resolved in code (05-10, commit 861ddfe, suite 1036/1036 green). WhatsApp is
+byte-identical (the accent seam's WhatsApp branch returns the authored green
+untouched); no scene/prefab edits — all colors applied at runtime.
+
+### 7. Green accents don't switch to Telegram blue on the Telegram channel
+expected: on a bot's **Telegram** channel the WhatsApp-green accents render in Telegram
+brand blue (#2AABEE); on the **WhatsApp** channel they stay exactly the authored green.
+Scope is accents only — message bubbles, the Авто/Вместе mode toggle, and the
+channel/bot switcher chips are unchanged.
+result: **RESOLVED in code (05-10)** — new pure `ChannelAccent.Resolve` seam recolors two
+surfaces when `ChatManager.ActiveChannel == Telegram`, caching each authored green at runtime
+(so WhatsApp reverts exactly and pooled rows never stick blue):
+  - **Chat list (Чаты) unread accents** — the unread-count pill fill AND the unread
+    timestamp tint on a row with unread messages turn blue on the Telegram channel.
+  - **Empty-state connect/create CTA + icon** — the «Connect Telegram» / «Create a bot»
+    button fill and the placeholder icon turn blue (visible on the Telegram channel's
+    "Telegram not connected" empty state, and after switching a bot to Telegram).
+device re-verify (Phase 8, visual):
+  1. On a bot showing its **Telegram** channel with unread chats → the unread pill + the
+     unread-row time read Telegram blue (not green).
+  2. Switch the same bot back to **WhatsApp** → the same accents are green again (authored,
+     unchanged).
+  3. On a bot with no Telegram connected, switch to the Telegram chip → the "Telegram not
+     connected" empty state's connect button + icon are blue; the WhatsApp empty state's
+     equivalents stay green.
+  4. Confirm NOTHING else recolored: outgoing message bubbles stay green, the Авто/Вместе
+     toggle stays green, the switcher chips keep their own brand colors.
