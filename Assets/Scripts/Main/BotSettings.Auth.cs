@@ -360,8 +360,18 @@ public partial class BotSettings
             // so Substring got a negative length), silently breaking outside-app de-auth
             // detection. Robust, throw-safe parse via WappiStatusParser; semantics preserved:
             // act only when the profile reports NOT authorized and still has a real id.
+            //
+            // The extra isOnTelegram==1 gate is DELIBERATELY stricter than the WhatsApp twin
+            // (CheckWhatsappUnauthorizationOutsideApp): this Telegram branch only just went live
+            // — the old pretty-body parse always threw before it could run, so this destructive
+            // GetDeleteTelegramProfile path has NO field history. Requiring the bot to be a known
+            // Telegram bot means a transient / mid-pairing authorized:false (a reconnecting or
+            // abandoned-pairing profile whose id was never reset to "-1") cannot silently delete
+            // a live profile. The WhatsApp twin stays byte-identical (proven safe on compact
+            // api/sync JSON) and deliberately does NOT get this extra gate.
             if (WappiStatusParser.TryGetAuthorized(response, out bool isAuthorized)
                 && !isAuthorized
+                && PlayerPrefs.GetInt(Manager.openBot.name + "isOnTelegram", 0) == 1
                 && !Manager.openBot.GetComponent<Bot>().telegramProfileId.Equals("-1"))
             {
                 if (telegramRow != null) telegramRow.SetIsOnQuiet(false);
