@@ -127,6 +127,14 @@ public class WappiStatusParserTests
     }
 
     [Test]
+    public void TryGetPhone_LonePlus_ReturnsFalseAndEmpty()
+    {
+        // A lone "+" strips to "" — the contract returns false-when-no-value, never true+empty.
+        Assert.IsFalse(WappiStatusParser.TryGetPhone("{\"phone\":\"+\"}", out string phone));
+        Assert.AreEqual("", phone);
+    }
+
+    [Test]
     public void TryGetPhone_Missing_ReturnsFalseAndEmpty()
     {
         Assert.IsFalse(WappiStatusParser.TryGetPhone("{\"authorized\":true}", out string phone));

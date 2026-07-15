@@ -68,6 +68,8 @@ public static class WappiStatusParser
 
         raw = raw.Trim();
         phone = raw.StartsWith("+") ? raw.Substring(1) : raw;
+        // A lone "+" strips to "": the contract promises false-when-no-value, not true+empty.
+        if (string.IsNullOrEmpty(phone)) { phone = ""; return false; }
         return true;
     }
 
