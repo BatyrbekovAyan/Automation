@@ -197,6 +197,24 @@ public class MessageListView : MonoBehaviour
 
         Clear();
         ResetUnreadState();
+
+        // Paint the FAB's unread badge for this chat's channel (TG ⇒ blue, WA ⇒ authored green).
+        // The FAB persists across opens/channel switches, so we set it every open rather than leave it.
+        ApplyFabChannelAccent();
+    }
+
+    // Repaint the scroll-to-unread FAB's green unread-count badge for the OPEN chat's channel:
+    // Telegram ⇒ brand blue, WhatsApp ⇒ the authored green (ChannelAccent passthrough, byte-identical).
+    // The open chat is always on ActiveChannel, so reading it here is correct; ChatManager is
+    // null-guarded (Editor/tests ⇒ WhatsApp ⇒ authored green). A channel switch closes+reopens the
+    // chat, so OnChatSelected fires again on the reopen and this repaints the badge for the new channel.
+    void ApplyFabChannelAccent()
+    {
+        if (scrollToBottomFab == null) return;
+        ChatChannel channel = ChatManager.Instance != null
+            ? ChatManager.Instance.ActiveChannel
+            : ChatChannel.WhatsApp;
+        scrollToBottomFab.ApplyChannelAccent(channel);
     }
 
     void ResetUnreadState()
