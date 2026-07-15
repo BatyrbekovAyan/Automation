@@ -133,7 +133,11 @@ Plans:
   1. A Telegram-authed bot is exercised on-device end-to-end — auth (incl. 2FA), chat list/history/media, send/reply/reaction, channel switch, auto-reply, «Вместе», dashboard — with results recorded in a HUMAN-UAT doc.
   2. The carried v1.0 deferred device-UAT scenarios (Phases 01–02) are run or explicitly re-deferred with a reason.
   3. The prod bagkz bulk-replication checklist is updated to cover the Telegram template fixes + Suggest Replies channel-awareness (one bulk copy when dev is signed off; prod stays dormant this milestone).
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 08-01-PLAN.md — Consolidated owner-run device-UAT runbook (`08-DEVICE-UAT.md`) aggregating every open milestone gate (auth/2FA, chat+media incl. the 05-07/08 treatments, 05-09 fixes, vthumb probe, switcher, auto-reply e2e, live «Вместе»+dashboard, carried v1.0); owner-run gate
+- [ ] 08-02-PLAN.md — Prod bagkz replication runbook (`08-PROD-REPLICATION.md`) + prod-targetable verify/deployer tweaks; one-shot bulk copy, templates INACTIVE, header-auth follow-up flagged
+- [ ] 08-03-PLAN.md — Milestone-close prep (`08-MILESTONE-CLOSE.md`): gated checklist + carried-forward roll-forward, points at `/gsd-complete-milestone`
 **Flags**: DEVICE + USER-ASSISTED. No new v1.1 REQs (closeout phase).
 
 ### Phase 9: Semi-Auto Suppression Flag (v1.2)
@@ -163,4 +167,4 @@ Phases execute in numeric order: 3 → 4 → 5 → 6 → 7 → 8. Phases 3 and 4
 | 5. Channel-Aware ChatManager Core | v1.1 | 7/7 | Complete    | 2026-07-14 |
 | 6. Channel Switcher UI | v1.1 | 2/2 | Complete    | 2026-07-13 |
 | 7. «Вместе» Suggestions + Dashboard on Telegram | v1.1 | 2/2 | Complete    | 2026-07-13 |
-| 8. Device UAT + Milestone Closeout | v1.1 | 0/TBD | Not started | - |
+| 8. Device UAT + Milestone Closeout | v1.1 | 0/3 | Not started | - |
