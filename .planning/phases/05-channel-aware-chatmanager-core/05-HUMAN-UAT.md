@@ -3,9 +3,9 @@ status: resolved
 phase: 05-channel-aware-chatmanager-core
 source: [owner device screenshots 2026-07-14 19:38 + round-2 screenshot after 05-07, Tools/tapi/samples probe 23366/23368/23369]
 started: 2026-07-14T14:40:00Z
-updated: 2026-07-14T17:23:00Z
-resolved_by: 05-07 (gap-closure plan — commits e7dafa6 + 9194111, suite 988/988); round-2 polish 05-08 (commits 72a5909 + a27cf16, suite 1007/1007) refined the note + sticker treatments after an owner device screenshot
-device_reverify: Phase 8 (visual confirmation of the three treatments on device; incl. the 05-08 note-float + sticker-card refinements)
+updated: 2026-07-15T06:07:43Z
+resolved_by: 05-07 (gap-closure plan — commits e7dafa6 + 9194111, suite 988/988); round-2 polish 05-08 (commits 72a5909 + a27cf16, suite 1007/1007) refined the note + sticker treatments after an owner device screenshot; 05-09 (commits 584be1d + d68534f + e4f6451, suite 1028/1028) fixed the Telegram-number JSON blob + switcher chip-label padding from further owner Editor screenshots
+device_reverify: Phase 8 (visual confirmation of the three media treatments on device; incl. the 05-08 note-float + sticker-card refinements AND the 05-09 Telegram-number field + switcher chip-label padding)
 ---
 
 # Phase 5 — Device UAT: Telegram media presentation gaps
@@ -86,3 +86,31 @@ blocked: 0
   RawMessage → NormalizedMessage → MessageViewModel → MessageItemView.
 - Static webp stickers (`type:"sticker"` + `image/webp`) were NOT observed — the
   existing Sticker path + unity.webp should already handle them; verify in device UAT.
+
+## 05-09 follow-ups (owner Editor screenshots, 2026-07-14/15)
+
+Two more presentation bugs surfaced from owner Editor screenshots after 05-08.
+Both are **resolved in code** (05-09, suite 1028/1028) and need **Phase 8 device
+re-verify** (visual). WhatsApp is byte-identical; switcher geometry + nav untouched.
+
+### 4. Telegram number field shows a raw JSON blob
+expected: Bot Settings shows the authed Telegram phone number (e.g. bot "53")
+result: **RESOLVED in code (05-09)** — was: a huge raw-JSON slice rendered in the
+Telegram number field. Root cause: the tapi `get/status` body is PRETTY-PRINTED and
+carries TWO `phone` keys (`account.phone` + a top-level `phone` before `platform`);
+the old substring parse matched the wrong one and its no-whitespace `","platform":`
+guard never matched the pretty `",\n  "platform":`, so a JSON slice was stored in
+`{bot}TelegramNumber`. Now parsed by the pure `WappiStatusParser` (JObject, top-level
+phone wins, throw-safe) at both Telegram status sites; the stale stored blob self-heals
+to "" via `IsPlausiblePhone` (field hides, no re-auth) and the real number repopulates
+on the next status check. Also fixed a third Telegram status site that THREW on the
+pretty body (outside-app de-auth detection).
+device re-verify: open bot "53" settings → the field shows the real number (or is
+hidden), never a JSON blob; re-auth a Telegram bot → the field populates with the phone.
+
+### 5. Channel switcher chip labels too close to the chip edges
+expected: "WhatsApp"/"Telegram" sit centred with clear margin inside each chip
+result: **RESOLVED in code (05-09)** — was: 28pt bold labels stretched edge-to-edge in
+a 162px chip reached the borders. Now `LabelSize` 22 + a 12px horizontal inset on the
+label rect (grep-verified in Main.unity: 2× fontSize-22 labels, 2× -24 sizeDelta insets).
+device re-verify: the WhatsApp|Telegram switcher labels have comfortable side margins.

@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
 status: ready_to_plan
-stopped_at: Completed 05-08 (Telegram media device-UAT round-2 polish — note bubble-free + .tgs sized card)
-last_updated: "2026-07-14T17:23:25.000Z"
-last_activity: 2026-07-14
+stopped_at: Completed 05-09 (tapi status parse hardening — Telegram-number JSON blob fixed + switcher chip-label padding)
+last_updated: "2026-07-15T06:07:43.000Z"
+last_activity: 2026-07-15
 progress:
   total_phases: 6
   completed_phases: 5
@@ -68,6 +68,7 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [Phase 7]: 07-02 dashboard «Сводка» on Telegram — pure DashboardProfileMap seam collects BOTH channels' authed ids + maps id→(botName,channel) (channel from the matched LOCAL entry, never the server payload; T-07-02-01); DashboardMetrics.FilterByProfiles(ISet) set filter, FilterByProfile delegates; DashboardPage POSTs TG ids (DASH-01), one chip per bot with a HashSet filter so a dual-channel bot is a single chip (DASH-02), and channel-aware OpenChat SetActiveBot→SetActiveChannel→SwitchTab(«Чаты»)→deferred SelectChat (DASH-03); WhatsApp byte-identical, server contract + Main.unity untouched; 916/916 EditMode green
 - [Phase 5]: 05-06 capture-gated media/reactions/reply — tapi media is download-only (body:null+s3Info:{} → existing serial media/download-by-id; metadata from media_info + flat name/mime; video-as-document→Video via mimetype); receive-side reactions BUILT (Q3 GO, v2 TG-REACT-RECV superseded) as a Normalize-time reactions[] map + reconcile merge preserving optimistic 'me'; ChatIdFormat classifies 'channel' dialogs group-ish (Q4); reply Q8 no-echo verified; name/isDeleted verdict-resolved (no change); WhatsApp byte-identical, 957/957 EditMode green
 - [Phase 5]: 05-07 Telegram media presentation gap-closure — .tgs (application/x-tgsticker) refines to Sticker and renders a deliberate borderless placeholder + «Стикер» with NO download (gzipped Lottie undecodable; native animation = v2); video note detected by pure heuristic (square + video.mp4 + ≤60s — is_round deliberately ignored, unreliable per SHAPES.md Q2) and rendered as a circle (half-side RoundedCorners radius) + duration badge; GIF (isGif through all 4 layers) keeps the video pipeline + 'GIF' corner badge; flags minted ONLY inside ApplyTelegramMediaShape so WhatsApp is byte-identical; 988/988 EditMode green (966+22)
+- [Phase 5]: 05-09 tapi status parse hardening (off-plan, from owner Editor screenshots after 05-08) — new pure WappiStatusParser (Newtonsoft JObject, throw-safe): TryGetAuthorized / TryGetPhone (top-level `phone` wins over `account.phone`; the pretty tapi body carries TWO phone keys, which the old substring scan + no-whitespace `","platform":` guard mis-read into a stored JSON blob) / IsPlausiblePhone. Wired into the two named Telegram status sites (Manager.GetTelegramProfileStatus + BotSettings.CheckTelegramAuthorization); the stale `{bot}TelegramNumber` blob self-heals to "" via IsPlausiblePhone at the two field-load sites + the EnableSave dirty-check (no re-auth). Rule 1 deviations: a THIRD Telegram status site (CheckTelegramUnauthorizationOutsideApp) THREW on the pretty body (negative Substring) → same throw-safe parser; and the dirty-check was sanitized too so the load-sanitize doesn't spuriously light Save. WhatsApp api/sync parses byte-identical (safe future adopter). Fix B: channel-switcher chip labels padded (ChannelSwitcherBuilder LabelSize 28→22 + 12px label inset), Main.unity rebuilt headlessly + grep-verified (2× fontSize-22 labels, 2× -24 insets; nav a guarded no-op). 21 new parser tests, suite 1028/1028 EditMode green. commits 584be1d + d68534f + e4f6451. Pixel-perfect look + correct number = Phase 8 device re-verify (05-HUMAN-UAT gaps 4+5)
 - [Phase 5]: 05-08 media device-UAT round-2 polish (off-plan, from an owner device screenshot after 05-07) — (1) video note now floats BUBBLE-FREE: the transparency decision extracted to a pure seam BubbleTransparencyPolicy.IsTransparent(isSticker,isVideoNote,isPlaceholderActive,hideBubble) + isVideoNote, so the circle floats chrome-free like native TG (time stays readable via the existing Video+no-caption white-text/timeBackground media overlay; !isPlaceholderActive keeps an UNAVAILABLE note on a visible retry card); (2) .tgs sticker now renders a deliberate sticker-slot-sized (396²) neutral rounded CARD with its OWN fill + centered «Стикер» + mid-gray glyph (the 05-07 white-silhouette placeholder was invisible on the transparent bubble → collapsed to a tiny pill on device). Telegram-only (isVideoNote default-false; card gated on TgsStickerMime), WhatsApp byte-identical; verified via the sanctioned in-Editor bridge (owner's Editor was open, headless refuses on a held lock; gated on editorAssemblyWrittenUtc 17:06:24Z), 1007/1007 EditMode green (997+10). commits 72a5909 + a27cf16. Pixel-perfect look = Phase 8 device re-verify
 
 ### Pending Todos
@@ -115,11 +116,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 05 P06 | 42min | 3 tasks | 13 files |
 | Phase 05 P07 | 25min | 3 tasks | 12 files |
 | Phase 05 P08 | ~24min | 2 fixes | 3 files |
+| Phase 05 P09 | ~22min | 2 fixes | 6 files |
 
 ## Session Continuity
 
-Last session: 2026-07-14T17:23:25.000Z
-Stopped at: Completed 05-08 (Telegram media device-UAT round-2 polish — note bubble-free + .tgs sized card; 1007/1007 green via in-Editor bridge)
+Last session: 2026-07-15T06:07:43.000Z
+Stopped at: Completed 05-09 (tapi status parse hardening + switcher chip-label padding; 1028/1028 green via headless run — no Editor was open)
 Resume file: None
 
 **Planned Phase:** 7 («Вместе» Suggestions + Dashboard on Telegram) — 2 plans — 2026-07-13T12:16:27.814Z
