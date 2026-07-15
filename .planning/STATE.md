@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
-status: ready_to_plan
-stopped_at: Completed 05-09 (tapi status parse hardening — Telegram-number JSON blob fixed + switcher chip-label padding)
-last_updated: "2026-07-15T06:07:43.000Z"
-last_activity: 2026-07-15
+status: executing
+stopped_at: Phase 8 autonomous deliverables complete + verified (10/10 must-haves, 0 gaps; code review clean 0 crit/0 warn/2 info). Phase human_needed — 3 owner gates pending (device UAT → prod copy → milestone close). Prod bagkz still DORMANT; move to prod URLs is owner-explicit-only.
+last_updated: "2026-07-15T10:10:43Z"
+last_activity: 2026-07-15 -- Phase 08 autonomous execution complete; human_needed (3 owner gates)
 progress:
-  total_phases: 6
+  total_phases: 7
   completed_phases: 5
-  total_plans: 14
-  completed_plans: 14
-  percent: 100
+  total_plans: 17
+  completed_plans: 16
+  percent: 94
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-12)
 
 **Core value:** The owner stays in control along the automation↔semi-auto spectrum — the bot can answer autonomously, or propose replies the owner picks and refines, without losing trust or the ability to take over.
-**Current focus:** Phase 7 («Вместе» suggestions + dashboard on Telegram) — **all plans complete**. **07-02 done** (dashboard «Сводка» on Telegram): new pure `DashboardProfileMap` seam collects BOTH channels' authed profile ids (WA-then-TG, `Bot.UnauthedProfileSentinel`-guarded) and maps each id → `(botName, channel)`; `DashboardMetrics.FilterByProfiles(ISet)` set filter (single-id `FilterByProfile` delegates). `DashboardPage` now POSTs Telegram ids (DASH-01 counts/lists), shows one chip per bot (DASH-02 — a dual-channel bot ⇒ a single set-valued chip, never two same-named chips), and deep-links channel-aware via `SetActiveBot → SetActiveChannel(channel) → SwitchTab(«Чаты») → deferred SelectChat` (DASH-03, order load-bearing); an unknown/forged profileId early-returns (T-07-02-01), the WhatsApp-only path is byte-identical, and the server contract (`DashboardModels`) + `Main.unity` are untouched. 8 new EditMode tests (Task 1 genuine RED→GREEN), full suite **916/916 green**. Telegram row cosmetics (raw-id name + silhouette) are the accepted v1 degradation (polish backlog). **07-01 done** earlier (channel-aware «Вместе» payload, 908 green). Next: Phase 8 (prod bagkz replication of Suggest_Replies + all Telegram fixes). **05-06 backfilled 2026-07-14** — the last capture-gated straggler is now done: after the owner's 2026-07-13 tapi capture (SHAPES.md verdicts), Telegram media Normalizes download-only (body:null+s3Info:{} → serial media/download-by-id; media_info dims/duration; video-as-document→Video), receive-side reactions BUILT (Q3 GO — reactions[] map + reconcile merge; v2 TG-REACT-RECV superseded), 'channel' dialogs render group-ish (Q4), reply Q8 no-echo verified, name/isDeleted verdict-resolved; CHAT-03/CHAT-07 complete; 957/957 EditMode green. **Phase 5 now 7/7 complete.** The owner media re-run happened 2026-07-14 (sticker/note/GIF observed on device → three presentation gaps in `05-HUMAN-UAT.md`), and **05-07 closed all three the same day**: `.tgs` (`application/x-tgsticker`) → Sticker + deliberate borderless placeholder «Стикер» (no futile download — gzipped Lottie is undecodable; native animation = v2); video note via pure `TelegramVideoNoteHeuristic` (square + `video.mp4` + ≤60s; `is_round` deliberately ignored — unreliable per SHAPES.md Q2) → circular bubble (half-side RoundedCorners radius) + duration badge + tap-to-play; GIF (`isGif` carried through all four pipeline layers) → "GIF" corner badge on the untouched video pipeline. Flags minted ONLY inside `ApplyTelegramMediaShape` (Telegram-gated) so WhatsApp is byte-identical; **988/988 EditMode green** (966 + 22). Still open: Phase 6 owner visual UAT (`06-HUMAN-UAT.md`), live TG grounding proof (`07-HUMAN-UAT.md`, owner-gated), and Phase 8 device UAT (now including visual confirmation of the three 05-07 treatments).
+**Current focus:** Phase 08 (device UAT + milestone closeout) — autonomous deliverables done + verified; **human_needed**, awaiting the 3 owner-run gates (Gate A device UAT via `08-DEVICE-UAT.md` → Gate B prod copy via `08-PROD-REPLICATION.md` → Gate C close via `08-MILESTONE-CLOSE.md`). Prod stays DORMANT; the move to prod URLs is owner-explicit-only.
 
 ## Current Position
 
-Phase: 08 of 8 (device UAT + milestone closeout) — phases 3-7 all code-complete
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-07-14
+Phase: 08 (device-uat-milestone-closeout) — AUTONOMOUS COMPLETE, human_needed
+Plan: 3 of 3 authored (08-DEVICE-UAT.md; 08-PROD-REPLICATION.md + 2 dev-byte-identical script tweaks; 08-MILESTONE-CLOSE.md); each ends in a blocking owner gate
+Status: Awaiting 3 owner-run gates (device UAT → prod copy → milestone close). Do NOT mark phase/milestone complete until the owner signs off.
+Last activity: 2026-07-15 -- Phase 08 autonomous execution complete + verified (human_needed)
 
 Progress: [██████████] 100%
 
@@ -124,4 +124,4 @@ Last session: 2026-07-15T06:07:43.000Z
 Stopped at: Completed 05-09 (tapi status parse hardening + switcher chip-label padding; 1028/1028 green via headless run — no Editor was open)
 Resume file: None
 
-**Planned Phase:** 7 («Вместе» Suggestions + Dashboard on Telegram) — 2 plans — 2026-07-13T12:16:27.814Z
+**Planned Phase:** 8 (Device UAT + Milestone Closeout) — 3 plans — 2026-07-15T08:16:54.617Z
