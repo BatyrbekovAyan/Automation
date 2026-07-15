@@ -181,3 +181,37 @@ device re-verify (Phase 8, visual):
      up so the FAB appears → its unread-count pill reads Telegram blue (not green).
   2. Switch the same bot back to **WhatsApp**, repeat → the pill is the authored green again.
   3. Confirm the FAB circle stays white and the badge number stays white/readable on both.
+
+## 05-12 follow-up (empty-state hero — Telegram logo, owner refinement to 05-10)
+
+Resolved in code (05-12, commits 3206498/979f478/1e20dbb/c61a04b, suite 1036/1036 green).
+Owner refinement to 05-10: on the Telegram channel the empty-state hero icon should NOT be
+blue-tinted — it should show the Telegram logo in its own colors — and the (green) circle
+behind it should turn blue. WhatsApp is byte-identical (authored sprite + green tint + disc
+restored via the same channel branch).
+
+### 9. Empty-state hero shows the Telegram logo (untinted) on a blue circle — Telegram channel
+expected: on a bot's **Telegram** channel, the "Telegram not connected" empty state (and any
+empty state surfaced on Telegram) shows the hero icon as the **Telegram logo in its own colors**
+(NOT the 05-10 blue-tinted placeholder), sitting on a **Telegram-blue** circle (the pale-mint
+circle recolored). The «Connect Telegram» / «Create a bot» button stays blue (05-10, unchanged).
+On the **WhatsApp** channel the hero is unchanged — green placeholder icon on the pale-mint
+circle, green button.
+result: **RESOLVED in code (05-12)** — `EmptyStateView.ApplyChannelAccent` swaps the icon sprite
+to `Telegram_2019_Logo` at `Color.white` (untinted) and recolors the parent `IconCircle` to
+Telegram blue via `ChannelAccent.Resolve` on the Telegram branch; WhatsApp restores the authored
+sprite/color/disc byte-identically. The logo PNG was moved to Single-mode import and all three
+in-scene users (this hero + the TelegramAuth `Logo` + the Add-Bot form's Telegram `Icon`) now use
+the canonical Single sprite — visually identical for the two pre-existing users.
+**Blue-on-blue caveat (owner-ACCEPTED):** the tracked full-color logo is a blue disc + white
+paper-plane, so on a blue circle the discs merge and you mostly see a white plane on blue. The
+owner accepted this over substituting a different asset.
+device re-verify (Phase 8, visual):
+  1. On a bot's **Telegram** channel, open the "Telegram not connected" empty state → the hero
+     icon is the Telegram logo (not a blue square) on a blue circle; the connect button is blue.
+  2. Switch the same bot to **WhatsApp** → the hero icon reverts to the green placeholder on the
+     pale-mint circle; the button is green. Nothing else changed.
+  3. Confirm the two pre-existing Telegram logos still render correctly: the **TelegramAuth**
+     screen logo (QR/phone auth) and the **Add-Bot form** platform-select Telegram icon.
+  4. Judge the blue-on-blue: if the white paper-plane on the blue disc/circle reads poorly,
+     switch to a **white paper-plane glyph** (icon color white, no blue disc) on the blue circle.
