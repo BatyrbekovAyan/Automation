@@ -189,9 +189,9 @@ public class EmptyStateView : MonoBehaviour
         {
             case EmptyStateReason.NoBotsExist:
                 // if (iconImage != null) iconImage.sprite = iconNoBots;
-                if (titleLabel != null) titleLabel.text = "Create your first bot";
-                if (bodyLabel != null) bodyLabel.text = "An AI assistant that answers your customers on WhatsApp, day and night.";
-                if (primaryButtonLabel != null) primaryButtonLabel.text = "Create a bot";
+                if (titleLabel != null) titleLabel.text = "Создайте первого бота";
+                if (bodyLabel != null) bodyLabel.text = "ИИ-ассистент, который отвечает вашим клиентам в WhatsApp круглосуточно.";
+                if (primaryButtonLabel != null) primaryButtonLabel.text = "Создать бота";
                 if (primaryButton != null)
                 {
                     primaryButton.onClick.RemoveAllListeners();
@@ -201,9 +201,9 @@ public class EmptyStateView : MonoBehaviour
 
             case EmptyStateReason.BotHasNoWhatsApp:
                 // if (iconImage != null) iconImage.sprite = iconNoWhatsApp;
-                if (titleLabel != null) titleLabel.text = "WhatsApp not connected";
-                if (bodyLabel != null) bodyLabel.text = "Connect WhatsApp to this bot to see its chats.";
-                if (primaryButtonLabel != null) primaryButtonLabel.text = "Connect WhatsApp";
+                if (titleLabel != null) titleLabel.text = "WhatsApp не подключён";
+                if (bodyLabel != null) bodyLabel.text = "Подключите WhatsApp к этому боту, чтобы видеть его чаты.";
+                if (primaryButtonLabel != null) primaryButtonLabel.text = "Подключить WhatsApp";
                 if (primaryButton != null)
                 {
                     primaryButton.onClick.RemoveAllListeners();
@@ -213,9 +213,9 @@ public class EmptyStateView : MonoBehaviour
 
             case EmptyStateReason.BotHasNoTelegram:
                 // if (iconImage != null) iconImage.sprite = iconNoWhatsApp;
-                if (titleLabel != null) titleLabel.text = "Telegram not connected";
-                if (bodyLabel != null) bodyLabel.text = "Connect Telegram to this bot to see its chats.";
-                if (primaryButtonLabel != null) primaryButtonLabel.text = "Connect Telegram";
+                if (titleLabel != null) titleLabel.text = "Telegram не подключён";
+                if (bodyLabel != null) bodyLabel.text = "Подключите Telegram к этому боту, чтобы видеть его чаты.";
+                if (primaryButtonLabel != null) primaryButtonLabel.text = "Подключить Telegram";
                 if (primaryButton != null)
                 {
                     // Same CTA as WhatsApp — OpenCurrentBotAuth opens BotSettings; no
