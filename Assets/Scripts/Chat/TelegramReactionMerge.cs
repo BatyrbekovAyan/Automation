@@ -29,9 +29,13 @@ public static class TelegramReactionMerge
     /// <see cref="OptimisticGraceSeconds"/> of <paramref name="nowUnix"/>). A fresh non-empty
     /// "me" replaces the server's "me" element (stale echo during an emoji change) or rides
     /// alongside when the echo hasn't landed yet; a fresh EMPTY "me" is a removal tombstone
-    /// (D2) that SUPPRESSES the server's stale "me" echo so a just-removed reaction can't
-    /// resurrect. Returns null when the merged result is empty (so "all reactions removed"
-    /// clears the list).
+    /// (D2) that SUPPRESSES the server's stale "me" echo AND is carried into the result, so
+    /// every reconcile within the grace window keeps suppressing — the D5 live poll reconciles
+    /// every ~3 s, and a tombstone consumed by its first merge would let the very next poll's
+    /// still-echoed "me" resurrect the removed reaction (08-REVIEW WR-03). A tombstone-only
+    /// result is returned as-is (it renders as "no reactions" — ReactionSummary skips
+    /// empty-emoji entries); returns null only when the merged result is empty, so post-grace
+    /// "all reactions removed" still clears the list.
     /// </summary>
     public static List<MessageReaction> Merge(List<MessageReaction> cached, List<MessageReaction> server, long nowUnix)
     {
@@ -43,10 +47,15 @@ public static class TelegramReactionMerge
             int serverMine = IndexOfMine(result);
             if (string.IsNullOrEmpty(mine.emoji))
             {
-                // Fresh optimistic REMOVAL tombstone: drop the server's stale "me" echo and add
-                // nothing, so a reaction the owner just removed can't come back within the grace
-                // window (the server keeps echoing it for a cycle after a successful removal).
+                // Fresh optimistic REMOVAL tombstone: drop the server's stale "me" echo AND keep
+                // the tombstone in the result, so the NEXT reconcile (3 s later at the D5 poll
+                // cadence — the server keeps echoing for a cycle or more after a successful
+                // removal) still suppresses a late echo. Invisible by design: ReactionSummary
+                // hides empty-emoji entries and RenderReactions bases clearance on visible emoji.
+                // Once the grace lapses, the next merge drops the tombstone naturally (server
+                // list wins; a tombstone is never in the server list).
                 if (serverMine >= 0) result.RemoveAt(serverMine);
+                result.Add(mine);
             }
             else if (serverMine >= 0)
             {
