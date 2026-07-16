@@ -56,8 +56,11 @@ public partial class ChatManager
             // A chat is "open" only when its id is set AND its panel is on-screen — currentChatId
             // is sticky after ShowChatList (cleared only on channel switch), so the panel check
             // is what stops the poll from running while the owner browses the chat list.
+            // activeInHierarchy, NOT activeSelf: BottomTabManager hides screens by deactivating
+            // the whole screen panel, leaving MessageListPanel's own activeSelf true — the poll
+            // must pause while the owner is on another tab and resume when they return.
             bool chatIsOpen = !string.IsNullOrEmpty(currentChatId)
-                              && MessageListPanel != null && MessageListPanel.activeSelf;
+                              && MessageListPanel != null && MessageListPanel.activeInHierarchy;
 
             // Exactly the isSettled predicate SyncLatestMessages uses internally (Idle + not
             // sliding), minus Populate — the initial open already syncs during Populate, so the
