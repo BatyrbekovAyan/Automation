@@ -86,7 +86,7 @@ public class SwipeToDelete : MonoBehaviour,
     public void Close()
     {
         _snap?.Kill(); _btnSnap?.Kill();
-        _snap = _rt.DOAnchorPosX(0f, SnapSeconds).SetEase(Ease.OutCubic);
+        _snap = Rt.DOAnchorPosX(0f, SnapSeconds).SetEase(Ease.OutCubic);
         AnimateButtonTo(0f);
         IsOpen = false;
         if (_openInstance == this) _openInstance = null;
@@ -97,19 +97,21 @@ public class SwipeToDelete : MonoBehaviour,
         if (_openInstance != null && _openInstance != this) _openInstance.Close();
         _openInstance = this;
         _snap?.Kill(); _btnSnap?.Kill();
-        _snap = _rt.DOAnchorPosX(-revealWidth, SnapSeconds).SetEase(Ease.OutCubic);
+        _snap = Rt.DOAnchorPosX(-revealWidth, SnapSeconds).SetEase(Ease.OutCubic);
         AnimateButtonTo(-revealWidth);
         IsOpen = true;
     }
 
     public void OnInitializePotentialDrag(PointerEventData e)
     {
+        _scroll ??= GetComponentInParent<ScrollRect>(); // lazy — a pre-Awake drag can't NRE
         _gestureWasDrag = false; // new gesture
         _scroll?.OnInitializePotentialDrag(e);
     }
 
     public void OnBeginDrag(PointerEventData e)
     {
+        _scroll ??= GetComponentInParent<ScrollRect>(); // lazy — covers OnDrag/OnEndDrag this gesture
         _gestureWasDrag = true;
 
         // Starting any drag dismisses a different row that's open.
@@ -149,12 +151,20 @@ public class SwipeToDelete : MonoBehaviour,
         if (!_dragging) return;
         _dragging = false;
 
-        if (_rt.anchoredPosition.x <= -revealWidth * 0.5f) Open();
+        if (Rt.anchoredPosition.x <= -revealWidth * 0.5f) Open();
         else Close();
     }
 
+    // Lazily resolved so any public entry point that runs BEFORE Awake never dereferences a
+    // null _rt. ChatItemView.Bind → ResetClosed → SetContentX can fire on a row that was
+    // Instantiate()'d while the chat-list panel was inactive (Awake is deferred until the
+    // hierarchy activates) — that was the D6 post-bot-creation NullReferenceException. Awake
+    // still assigns _rt on the normal path; this is the pre-Awake safety net (channel-agnostic:
+    // the NRE fires on the WhatsApp path too, so the guard must protect both).
+    private RectTransform Rt => _rt != null ? _rt : (_rt = (RectTransform)transform);
+
     private void SetContentX(float x)
-        => _rt.anchoredPosition = new Vector2(x, _rt.anchoredPosition.y);
+        => Rt.anchoredPosition = new Vector2(x, Rt.anchoredPosition.y);
 
     // The DeleteButton (pivot/anchor on the right edge) is parked off-screen to the right at rest
     // (contentX 0 → buttonX +revealWidth) and slides flush to the right edge as the content slides
