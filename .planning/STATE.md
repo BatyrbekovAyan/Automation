@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
 status: executing
-stopped_at: Completed 08-05-PLAN.md (D7 TG service-dialog dedup + bleed; 1091/1091 green FRESH)
-last_updated: "2026-07-16T12:37:07.859Z"
+stopped_at: Completed 08-09-PLAN.md (D8 RU empty-state copy + D9 TG chat-list sync pill; 1091/1091 green FRESH)
+last_updated: "2026-07-16T13:05:04.000Z"
 last_activity: 2026-07-16
 progress:
   total_phases: 8
   completed_phases: 5
   total_plans: 29
-  completed_plans: 27
-  percent: 93
+  completed_plans: 28
+  percent: 97
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 ## Current Position
 
 Phase: 08 (device-uat-milestone-closeout) — EXECUTING
-Plan: 08-05 done (8/10 phase-08 plans complete; 08-09/10 remain)
-Status: Executing (gap-closure) — milestone NOT complete
+Plan: 08-09 done (9/10 phase-08 plans complete; only 08-10 device re-verify checkpoint remains)
+Status: Executing (gap-closure) — milestone NOT complete (owner device sign-off at 08-10 pending)
 Last activity: 2026-07-16
 
-Progress: [█████████░] 93%
+Progress: [█████████░] 97%
 
 ## Performance Metrics
 
@@ -78,6 +78,7 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [Phase 8]: 08-07 D3 gap-closure — Telegram video-note (кружок) presentation. Diagnosis-first, root cause = (ii): the incoming note IS flagged isVideoNote (the round crop the owner sees proves it), but unlike the outgoing note 05-08 verified (inline s3Info.url → media present at bind → floats), an INCOMING note is placeholder-first (tapi body:null + s3Info:{} → download-by-id), so isPlaceholderActive stays true UNDER the visible circle and the square bubble stays opaque = the 'white background bubble'. Fix D3b at the transparency CALL SITE (not the heuristic, not ChatManager): UpdateBubbleVisuals computes note-scoped effectivePlaceholderActive = isPlaceholderActive && !(isVideoNote && messageImage.activeInHierarchy), so once the round media surface is the visible content the circle floats — card-only states (messageImage hidden) keep the opaque retry card. D3a: ToggleDurationBadgeOverlay + new RefreshBadgeCornersDeferred refresh the badge pill's ImageWithRoundedCorners after layout (radius assigned post-AddComponent never re-bakes on a fixed-size point anchor → sharp ends); immediate RefreshCorners + one-frame-deferred pooled-bubble-guarded pass, radius/layout unchanged. Pure BubbleTransparencyPolicy/TelegramVideoNoteHeuristic seams untouched (is_round still ignored); WhatsApp byte-identical; 1063/1063 EditMode green FRESH. commits 161b540 (D3b) + 89479db (D3a). Device re-verify E1 float + B5 badge corners rides 08-10.
 - [Phase 8]: 08-08 D4+D6 gap-closure — chat-row swipe stack. D6: SwipeToDelete lifecycle null-guard — lazy Rt accessor (_rt != null ? _rt : (_rt=(RectTransform)transform)) backs every _rt deref + _scroll ??= lazy at drag entry points, so ChatItemView.Bind→ResetClosed→SetContentX no longer NREs when a fresh-sync row is Instantiated+Bound before Awake (inactive list panel); Awake still assigns on the normal path, channel-agnostic (fired on WhatsApp too). D4: new pure ChatRowSwipePolicy.Enabled(channel) (WhatsApp-only; mirrors ActiveChannelSupportsChatDelete) — ChatItemView.Bind gates the affordance on ActiveChannel per (pooled) bind: Telegram snaps shut + disables SwipeToDelete (no drag callbacks) + hides the red button; WhatsApp keeps ResetClosed()+wired button byte-identical (added enabled=true/SetActive(true) are idempotent no-ops). 2 ChatRowSwipePolicy tests; 1065/1065 EditMode green FRESH (1063+2); commits a12f467/fea922d/991bd2f. Device re-verify D4/D6 rides 08-10.
 - [Phase 8]: 08-05 D7 gap-closure — TG service-dialog dedup + cross-channel bleed. Diagnosis: (a) two id-forms of the 777000 service dialog (read-only capture shows only bare 777000; the twin is server/device-side — no in-app @c.us appender — leading hypothesis 777000@c.us; EXACT form to confirm at 08-10); (b) bleed = a pre-CHAT-11 legacy WhatsApp cache file still holding the TG dialog (today's sync path is channel-correct: GetCacheRoot/cachePath follow ActiveChannel, StopAllCoroutines guards a switch). Fix: pure ChatIdFormat.CanonicalKey(id, channel) (WhatsApp VERBATIM/byte-identical; Telegram strips a spurious @c.us/@g.us twin) + IsForeignToChannel(id, channel) (WhatsApp drops a bare no-'@' Telegram-form id — '@'-test keeps every genuine WA jid incl broadcast/newsletter/lid; Telegram NEVER rejects so the service dialog stays). ParseChatsJson keys chatLookup/serverIds/isDeleted/merge by the canonical id AND constructs the surviving VM with it (vm.ChatId==key ⇒ bare tapi id on TG, byte-identical on WA, every downstream chatLookup consumer resolves unchanged); GetChat + both ShouldNotify + DisplayFallback + IsGroup route through the canonical key. Holds under 08-04's repeating open-chat poll. 1091/1091 EditMode green FRESH (1065+26). commits f379a5f/cc04503/1c9d8fe. Device re-verify D7 + EXACT twin-form capture ride 08-10.
+- [Phase 8]: 08-09 D8+D9 gap-closure (low polish) — closes gap planning. D8: EmptyStateView.cs's 9 residual English empty-state literals Russianised across all three reasons (create-bot «Создайте первого бота»/«Создать бота»; WhatsApp + Telegram «… не подключён»/«Подключить …»); «WhatsApp»/«Telegram» brand names kept Latin; no English user-facing literal remains. D9: ChatManager gains channel-agnostic OnChatListSyncStart/OnChatListSyncEnd (fired UNCONDITIONALLY around SyncAllChats' try/finally) + an IsChatListSyncing getter; new ChatListSyncIndicator MonoBehaviour shows a spinner + «Синхронизация…» pill at the top of the list ONLY when ActiveChannel==Telegram (WhatsApp ignores the start signal → its window-based SyncingView untouched, byte-identical). Rule-2 deviation (T-08-09-01 stuck-pill mitigation, no architectural change): plan named only channel-switch-away as the extra hide trigger — also exposed IsChatListSyncing (OnEnable catch-up: ChatsPanel is inactive at scene load so a mid-flight sync fired Start before subscribe) AND subscribed the indicator to OnActiveBotChanged→Hide, because SetActiveBot/SetActiveChannel call StopAllCoroutines() which abandons the in-flight SyncAllChats WITHOUT running its finally (OnChatListSyncEnd would never fire on a bot switch); mirrors SyncingView. Scene: pill built by idempotent headless ChatListSyncIndicatorBuilder (rounded #EFEFF0 pill + #2AABEE ring spinner reusing Loading.png + TMP label, CanvasGroup alpha 0 default) as LAST child of Screen_Whatsapp/ChatsPanel; Editor was open so the stamp went through a scene-stamp checkpoint (owner-run Tools/Chat List Sync Indicator/Build via Unity MCP), committed immediately 7649da8 (GUID/name grep verified, no sibling clobber: SyncingView/EmptyStateView/ChannelSwitcherView each still 1). No stubs, no new threat surface (static copy + client-only display pill; no server/n8n changes). WhatsApp byte-identical; 1091/1091 EditMode green FRESH (in-Editor bridge; no .cs changed after the 12:53:27Z compile so the scene stamp is data-only). commits 8bf9271/9de709c/fd8772b/3ebe2ae/7649da8. Device re-verify of D8 (RU copy) + D9 (pill shows during TG sync, never sticks) rides 08-10.
 
 ### Pending Todos
 
@@ -132,11 +133,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 08 P08-07 | 20min | 2 tasks | 1 files |
 | Phase 08 P08-08 | ~11min | 2 tasks | 4 files |
 | Phase 08 P05 | 18min | 2 tasks | 4 files |
+| Phase 08 P08-09 | ~20min | 3 tasks | 5 files |
 
 ## Session Continuity
 
-Last session: 2026-07-16T12:37:07.832Z
-Stopped at: Completed 08-05-PLAN.md (D7 TG service-dialog dedup + bleed; 1091/1091 green FRESH)
+Last session: 2026-07-16T13:05:04.000Z
+Stopped at: Completed 08-09-PLAN.md (D8 RU empty-state copy + D9 TG chat-list sync pill; 1091/1091 green FRESH). Only 08-10 device re-verify checkpoint remains.
 Resume file: None
 
 **Planned Phase:** 08 () — 0 plans — 2026-07-16T10:01:11.226Z
