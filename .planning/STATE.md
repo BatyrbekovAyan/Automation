@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
 status: executing
-stopped_at: Phase 8 autonomous deliverables complete + verified (10/10 must-haves, 0 gaps; code review clean 0 crit/0 warn/2 info). Phase human_needed — 3 owner gates pending (device UAT → prod copy → milestone close). Prod bagkz still DORMANT; move to prod URLs is owner-explicit-only.
-last_updated: "2026-07-15T16:05:56Z"
-last_activity: 2026-07-15 -- 05-12 off-plan (Telegram empty-state hero: untinted logo on a blue circle, owner refinement to 05-10; healed 2 orphaned logo refs; suite 1036/1036 headless); Phase 08 still human_needed (3 owner gates)
+stopped_at: Phase 8 Gate A (device UAT) RUN by owner — Overall ISSUES. Defects D1–D8 recorded in 08-DEVICE-UAT.md §Defects (2 high — D5 live-incoming render, D7 chat duplication/cross-channel bleed; 4 medium — D1 REACTION_INVALID, D2 reaction-removal stuck, D3 video-note presentation, D6 bot-creation NRE; 2 approved polish — D4, D8). Next — /gsd-plan-phase 08 --gaps. Gates B (prod copy) + C (close) still pending; prod DORMANT, prod URLs owner-explicit-only. (Earlier same-day: 05-12 off-plan Telegram empty-state hero, 1036/1036 headless.)
+last_updated: "2026-07-16T09:00:00Z"
+last_activity: 2026-07-16 -- Gate A results recorded (ISSUES, D1–D8); gap-closure planning next
 progress:
   total_phases: 7
   completed_phases: 5
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 
 Phase: 08 (device-uat-milestone-closeout) — AUTONOMOUS COMPLETE, human_needed
 Plan: 3 of 3 authored (08-DEVICE-UAT.md; 08-PROD-REPLICATION.md + 2 dev-byte-identical script tweaks; 08-MILESTONE-CLOSE.md); each ends in a blocking owner gate
-Status: Awaiting 3 owner-run gates (device UAT → prod copy → milestone close). Do NOT mark phase/milestone complete until the owner signs off.
-Last activity: 2026-07-15 -- Phase 08 autonomous execution complete + verified (human_needed)
+Status: Gate A dispositioned ISSUES (D1–D8 in 08-DEVICE-UAT.md) → gap-closure planning (/gsd-plan-phase 08 --gaps). Gates B/C pending. Do NOT mark phase/milestone complete until the owner signs off.
+Last activity: 2026-07-16 -- Gate A results recorded; defects D1–D8 filed
 
 Progress: [██████████] 100%
 
@@ -80,8 +80,9 @@ None yet.
 
 ### Blockers/Concerns
 
-- [Gate/Phase 8 — 05-06-REVIEW WR-02]: TG message ids are 1-5 digit per-account/per-channel counters. The client-side vthumb cache key is now TG-namespaced (`vthumb://tg/{profileId}/{chatId}/{messageId}`), but `message/media/download` / `messages/id/get` carry NO chat id — device UAT must send videos into a TG channel post and a private chat with overlapping numeric message ids on the dev profile and confirm the download returns the right bytes; if it crosses, check whether tapi accepts a `chat_id` param on the download endpoint.
-- [UAT expectation/Phase 8 — 05-06-REVIEW IN-04+IN-05, accepted v1, NOT bugs]: TG reactions are poll-reconciled with no per-reaction timestamps, so (a) receive-side reactions update open-chat bubbles only — the chat-list preview row does NOT show "X reacted…" (WhatsApp parity gap, inherent to the transport); (b) removing your own reaction can transiently flicker back for one refresh cycle when a stale `messages/get` snapshot was in flight (self-heals next poll; mitigation on the shelf: per-message reconcile suppression for one cycle post-POST).
+- [RESOLVED-tentative 2026-07-16 — 05-06-REVIEW WR-02]: vthumb id-ambiguity probed in Gate A — owner: "seems ok, not really sure"; no crossing observed (low-confidence pass, no defect filed). Watch during normal use; if a crossing ever appears, check whether tapi accepts a `chat_id` param on `message/media/download`.
+- [PARTIALLY SUPERSEDED 2026-07-16 — 05-06-REVIEW IN-04+IN-05]: (a) IN-04 stands as accepted v1 (no "X reacted…" chat-list preview on TG). (b) IN-05 is WORSE than accepted on device: removing an own reaction NEVER clears in-app (not a one-cycle flicker) → now defect **D2** in 08-DEVICE-UAT.md; the shelved per-message reconcile-suppression mitigation is the starting hypothesis. Also new: most reaction emoji rejected by tapi with 400 REACTION_INVALID → **D1** (constrain TG reaction set + graceful 400 revert).
+- [Gate A result 2026-07-16]: device UAT RUN — Overall ISSUES; defects D1–D8 in 08-DEVICE-UAT.md §Defects (high: D5 incoming messages don't render in the open chat until re-enter + «Вместе» cards don't refresh; D7 a chat duplicated in the TG list AND visible in the WA list). Pending owner input: O1 "(not good)" clarification, D5 channel under test, D6 NRE stack/log, D7 chat identity. G6 reminder: deactivate the dev test clone. H2 re-test after RAG seeding.
 - [Gate/Phase 3]: tapi media message shapes (messages/get) undocumented — Normalize/media work (Phase 5 CHAT-03) blocked until the owner runs the capture script against an authorized dev Telegram profile.
 - [Gate/Phase 4]: TPL-06 e2e needs dev n8n (localhost:5678) + tunnel + a real authorized Telegram profile (user-assisted).
 - [Constraint]: Assume Wappi response-crossing bugs apply to tapi — keep serial media queue + `_chatFetchesInFlight` gate; reset on channel switch like bot switch.
