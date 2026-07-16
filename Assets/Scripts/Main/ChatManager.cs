@@ -223,6 +223,13 @@ public partial class ChatManager : MonoBehaviour
     {
         ShowChatList(true);
         StartCoroutine(InitializeActiveBotNextFrame());
+
+        // D5: start the always-running, self-gating open-chat live poll so a message arriving
+        // while a chat stays open renders on its own — no re-entry (see ChatManager.LivePoll.cs).
+        // Re-kicked after the StopAllCoroutines() in SetActiveBot / SetActiveChannel; the null
+        // guard keeps it a single instance.
+        if (_livePollRoutine != null) StopCoroutine(_livePollRoutine);
+        _livePollRoutine = StartCoroutine(OpenChatLivePollRoutine());
     }
 
     void OnEnable()
@@ -507,6 +514,9 @@ public partial class ChatManager : MonoBehaviour
         CancelReply();
 
         currentChatId = chatId;
+        // D5: baseline the live-poll throttle to chat-open so the open's own sync gets a full
+        // OpenChatLivePollGate.IntervalSeconds before the first repeating poll fires.
+        _lastLivePollTime = Time.realtimeSinceStartup;
         _lastFetchedServerPage = 0;
         _servedFromStore = 0;
         _chatFetchesInFlight = 0;   // a sync stopped mid-flight above never ran its decrement

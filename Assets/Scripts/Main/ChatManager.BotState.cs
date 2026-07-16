@@ -133,6 +133,11 @@ public partial class ChatManager
         ClearResolveQueues();       // quote/reaction drain workers were just killed; reset their bookkeeping
         _tgOwnUserId = null;        // owner identity is per-profile — never carry it across bots
 
+        // D5: StopAllCoroutines() above killed the open-chat live poll — re-kick it so a bot
+        // switch never strands it (guarded against duplicates).
+        if (_livePollRoutine != null) StopCoroutine(_livePollRoutine);
+        _livePollRoutine = StartCoroutine(OpenChatLivePollRoutine());
+
         // Restore the bot's persisted channel (auto-selecting the connected one if the
         // persisted channel is unconnected) BEFORE loading so the loaded channel matches.
         ActiveChannel = ResolveChannelForBot(botId);

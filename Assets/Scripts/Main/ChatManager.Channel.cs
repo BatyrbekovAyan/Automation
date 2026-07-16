@@ -82,6 +82,13 @@ public partial class ChatManager
         ClearMediaDownloadQueue();  // same for the serial media-download worker
         ClearResolveQueues();       // quote/reaction drain workers were just killed; reset their bookkeeping
         _tgOwnUserId = null;        // owner identity is per-profile — never carry it across channels
+
+        // D5: StopAllCoroutines() above killed the open-chat live poll — re-kick it so a channel
+        // switch never strands it (D5 is cross-channel; the poll must keep running on Telegram
+        // too). Guarded against duplicates.
+        if (_livePollRoutine != null) StopCoroutine(_livePollRoutine);
+        _livePollRoutine = StartCoroutine(OpenChatLivePollRoutine());
+
         BeginLoadForActiveBot();
     }
 
