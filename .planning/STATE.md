@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
-status: planning
-stopped_at: "Phase 8 gap planning COMPLETE — Gate A ran ISSUES (defects D1–D9 in 08-DEVICE-UAT.md), 7 gap plans 08-04..08-10 created + checker-PASSED (planner confirmed root causes: no open-chat poll for D5; SwipeToDelete pre-Awake Bind for D6; non-allowed emoji in quick-bar for D1; no removal state in reconcile for D2). Next: /gsd-execute-phase 08 --gaps-only. Gates B/C still pending; prod DORMANT, prod URLs owner-explicit-only. (Also completed off-plan: 05-12 Telegram empty-state hero, 1036/1036 green headless.)"
-last_updated: "2026-07-16T10:05:00Z"
-last_activity: 2026-07-16 -- Gap plans 08-04..08-10 planned + verified (D1–D9); ready to execute
+status: executing
+stopped_at: Completed 08-04-PLAN.md (D5 open-chat live poll; 1043/1043 green FRESH)
+last_updated: "2026-07-16T10:54:11.955Z"
+last_activity: 2026-07-16
 progress:
   total_phases: 8
   completed_phases: 5
   total_plans: 24
-  completed_plans: 22
-  percent: 92
+  completed_plans: 23
+  percent: 96
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-12)
 
 **Core value:** The owner stays in control along the automation↔semi-auto spectrum — the bot can answer autonomously, or propose replies the owner picks and refines, without losing trust or the ability to take over.
-**Current focus:** Phase 08 (device UAT + milestone closeout) — Gate A ran with ISSUES → **gap-closure round ready**: 7 gap plans (08-04..08-10) planned + checker-passed for defects D1–D9; waves 1–3 autonomous fixes, wave 4 = one consolidated owner device re-verify. Gate B (prod copy) + Gate C (close) still pending after. Prod stays DORMANT; the move to prod URLs is owner-explicit-only.
+**Current focus:** Phase 08 — device-uat-milestone-closeout
 
 ## Current Position
 
-Phase: 08 (device-uat-milestone-closeout) — GAP CLOSURE READY TO EXECUTE
-Plan: 3/10 complete (08-01..03 runbooks done); 7 gap plans 08-04..08-10 pending (D5 live-poll, D7 service-dialog dedup, D1+D2 reactions, D3 video-note, D4+D6 swipe stack, D8+D9 polish, re-verify checkpoint)
-Status: Run /gsd-execute-phase 08 --gaps-only (waves 1→3 autonomous; wave 4 = owner device re-verify). Gates B/C pending. Do NOT mark phase/milestone complete until the owner signs off.
-Last activity: 2026-07-16 -- Gap plans 08-04..08-10 planned + verified (D1–D9)
+Phase: 08 (device-uat-milestone-closeout) — EXECUTING
+Plan: 2 of 10
+Status: Ready to execute
+Last activity: 2026-07-16
 
-Progress: [██████████] 100%
+Progress: [██████████] 96%
 
 ## Performance Metrics
 
@@ -73,6 +73,7 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [Phase 5]: 05-11 scroll-to-unread FAB badge theming (off-plan, follow-on to 05-10) — the open-chat FAB's unread-count badge pill (same #26B25A UnreadGreen as the chat-list unread pill) was the last green accent 05-10 left on the messages view; now recolored via the SAME `ChannelAccent.Resolve` seam. New `ScrollToBottomFab.ApplyChannelAccent(ChatChannel)` caches the authored green once at Awake and re-applies EVERY call (the FAB is a persistent widget — never re-instantiated — so "leave it" would stick blue after a switch); `MessageListView.ApplyFabChannelAccent()` reads ChatManager.ActiveChannel (null-guarded) and repaints at OnChatSelected (a channel switch closes+reopens the chat → reopen repaints). SCENE AUDIT (UnreadMarkersBuilder + Main.unity) resolved the fix brief's incorrect premise ("green is on button.image"): the FAB body is a WHITE circle, the button image is a TRANSPARENT hit area — the badge pill is the ONLY green, so badge-only recolor per the "genuinely-green accents only / WA byte-identical" constraint; badge text stays white. No new test (MonoBehaviour glue through the already-tested seam); WhatsApp byte-identical, suite 1036/1036 EditMode green via in-Editor bridge (real Editor PID 22038 was open — headless refused correctly, lockfile untouched; editorAssemblyWrittenUtc 14:22:48Z postdates the edit). commit 7affb7b. Pixel-perfect blue = Phase 8 device re-verify (05-HUMAN-UAT §8)
 - [Phase 5]: 05-12 Telegram empty-state hero refinement (off-plan, owner refinement to 05-10) — on the Telegram channel the hero ICON now shows the `Telegram_2019_Logo` UNTINTED (`iconImage.sprite`=telegramIcon, `color`=Color.white → natural logo colors), REVERTING 05-10's blue icon TINT; the pale-mint parent disc (IconCircle) recolors green→blue via the same `ChannelAccent.Resolve`. 05-10 CTA blue kept as-is. `EmptyStateView.ApplyChannelAccent` branches on ActiveChannel: TG swaps sprite+white+blue disc; WA/default restores authored sprite+color+disc BYTE-IDENTICAL (persistent widget; authored state cached at Awake; disc code-resolved via icon's nearest-ancestor Image, bounded by the view root so the white bg is never recolored). New `telegramIcon` serialized field stamped into Main.unity by new headless `EmptyStateTelegramIconBuilder` ([MenuItem] + StampHeadless, ChannelSwitcherBuilder idiom). GOTCHA/Rule-1 heal: the required `spriteMode 2→1` (Single) removed the old Multiple sub-sprite fileID that TWO pre-existing Images used — TelegramAuth `Logo` + Add-Bot form Telegram `Icon`; both migrated to the canonical Single sprite 21300000 (visually identical). All 3 in-scene logo refs converge on 21300000; scene object count preserved (4918). Blue-on-blue owner-ACCEPTED (revisit w/ white paper-plane if it reads poorly on device). Env: Editor PID 22038 open the whole time (coordinator's "closed" report was stale) — code+builder committed autonomously, scene stamp via owner-run menu checkpoint, then owner quit (Don't Save, heal preserved) → suite 1036/1036 EditMode green HEADLESS (no new tests; MonoBehaviour glue). commits 3206498/979f478/1e20dbb/c61a04b. Pixel-perfect look = Phase 8 device re-verify (05-HUMAN-UAT §9)
 - [Phase 5]: 05-08 media device-UAT round-2 polish (off-plan, from an owner device screenshot after 05-07) — (1) video note now floats BUBBLE-FREE: the transparency decision extracted to a pure seam BubbleTransparencyPolicy.IsTransparent(isSticker,isVideoNote,isPlaceholderActive,hideBubble) + isVideoNote, so the circle floats chrome-free like native TG (time stays readable via the existing Video+no-caption white-text/timeBackground media overlay; !isPlaceholderActive keeps an UNAVAILABLE note on a visible retry card); (2) .tgs sticker now renders a deliberate sticker-slot-sized (396²) neutral rounded CARD with its OWN fill + centered «Стикер» + mid-gray glyph (the 05-07 white-silhouette placeholder was invisible on the transparent bubble → collapsed to a tiny pill on device). Telegram-only (isVideoNote default-false; card gated on TgsStickerMime), WhatsApp byte-identical; verified via the sanctioned in-Editor bridge (owner's Editor was open, headless refuses on a held lock; gated on editorAssemblyWrittenUtc 17:06:24Z), 1007/1007 EditMode green (997+10). commits 72a5909 + a27cf16. Pixel-perfect look = Phase 8 device re-verify
+- [Phase 8]: 08-04 D5 gap-closure — open-chat live poll. Root cause: SyncLatestMessages (the only OnLiveMessagesReceived/brandNew site, ChatManager.cs:789) is started once per open (OpenChatRoutine:943); no timer re-fetched the open chat, so incoming never rendered until re-entry and the «Вместе» payload (TryGetRecentMessages over _activeChatCache) stayed stale (H2). Fix: pure OpenChatLivePollGate (3s IntervalSeconds) + a single always-running self-gating OpenChatLivePollRoutine (ChatManager.LivePoll.cs) that REUSES SyncLatestMessages (no new messages/get caller — inherits currentChatId re-check, CrossChatResponseGuard, _chatFetchesInFlight serial gate). Foreground-gated (OnApplicationFocus/Pause); chatIsOpen also gated on MessageListPanel.activeSelf (currentChatId sticky after ShowChatList); re-kicked after StopAllCoroutines in SetActiveBot/SetActiveChannel (never stranded). Cross-channel (no ChatChannel branch). Cascades to bubbles + card refresh + fresh payload with zero wiring change. 1043/1043 EditMode green FRESH. Device re-verify (I.1 #3, I.2 #6, H2) rides 08-10. Push-based delivery stays v2.
 
 ### Pending Todos
 
@@ -122,11 +123,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 05 P07 | 25min | 3 tasks | 12 files |
 | Phase 05 P08 | ~24min | 2 fixes | 3 files |
 | Phase 05 P09 | ~22min | 2 fixes | 6 files |
+| Phase 08 P08-04 | ~22min | 2 tasks | 6 files |
 
 ## Session Continuity
 
-Last session: 2026-07-15T16:05:56Z
-Stopped at: Completed 05-12 (off-plan Telegram empty-state hero: untinted logo on a blue circle, owner refinement to 05-10; spriteMode→Single + healed 2 orphaned logo refs to canonical sprite 21300000; 1036/1036 green HEADLESS after owner quit the Editor). Phase 08 still human_needed (3 owner gates).
+Last session: 2026-07-16T10:54:11.832Z
+Stopped at: Completed 08-04-PLAN.md (D5 open-chat live poll; 1043/1043 green FRESH)
 Resume file: None
 
 **Planned Phase:** 08 () — 0 plans — 2026-07-16T10:01:11.226Z
