@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
-status: executing
-stopped_at: "08-10 owner device re-verify RUN 2026-07-17 (one Android build @ 1b2e60b, after 08-REVIEW WR-01/02/03 fixes, 1093/1093 green): 7/9 defects RESOLVED (D1, D3, D4, D5-core, D6, D7, D8; B7 webp PASS). Open → gap round 2: D2 refined (reaction identity/VS16 — count «2», both pills after change, two hearts; see 08-REVIEW IN-01/IN-06), D9 (pill never visible), NEW D10 (WA «Вместе» relevance), D11 (some video/GIF/note downloads fail — tapi suspect), D12 (TG create-bot CTA dead). Gate A stays ISSUES. Next: /gsd-plan-phase 08 --gaps. Gates B/C pending; prod DORMANT; deactivate the dev test clone."
-last_updated: "2026-07-16T13:05:04.000Z"
-last_activity: 2026-07-17 -- 08-10 device re-verify recorded (7/9 resolved; D2/D9 + D10-D12 open)
+status: planning
+stopped_at: "Gap round 2 PLANNED 2026-07-17: 6 plans 08-11..08-16 (waves 5-7) for D2/D9/D10/D11/D12 — checker passed (0 blockers; 2 warnings revised in a330aed). D2 root cause CONFIRMED from tapi samples (base-form ❤ echo + un-learned _tgOwnUserId). Next: /gsd-execute-phase 08 --gaps-only (waves 5-6 autonomous; wave 7 = owner device re-verify). Milestone NOT complete."
+last_updated: "2026-07-16T22:12:38.539Z"
+last_activity: 2026-07-17
 progress:
   total_phases: 8
   completed_phases: 5
-  total_plans: 29
+  total_plans: 35
   completed_plans: 29
-  percent: 99
+  percent: 83
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 
 ## Current Position
 
-Phase: 08 (device-uat-milestone-closeout) — GAP ROUND 2 TO PLAN
-Plan: 10/10 phase-08 plans executed (gap round 1 + re-verify done); Gate A still ISSUES
-Status: Run /gsd-plan-phase 08 --gaps for D2 (reaction identity/VS16), D9 (sync pill invisible), D10 (WA «Вместе» relevance), D11 (media downloads — instrument first, tapi suspect), D12 (TG create-bot CTA). Milestone NOT complete — do NOT close until Gate A flips PASS and Gates B/C run.
+Phase: 08 (device-uat-milestone-closeout) — GAP ROUND 2 READY TO EXECUTE
+Plan: 16 plans total — 10 executed (rounds 0-1 + re-verify), 6 round-2 pending (08-11..08-16)
+Status: Run /gsd-execute-phase 08 --gaps-only (wave 5: 08-11 D2 reaction identity, 08-12 D9 pill visibility, 08-13 D10 WA suggestions, 08-14 D12 TG create CTA; wave 6: 08-15 D11 media instrumentation; wave 7: 08-16 owner device re-verify). Milestone NOT complete — do NOT close until Gate A flips PASS and Gates B/C run.
 Last activity: 2026-07-17
 
-Progress: [█████████░] 97%
+Progress: [████████░░] 83%
 
 ## Performance Metrics
 
@@ -141,4 +141,4 @@ Last session: 2026-07-16T13:05:04.000Z
 Stopped at: 08-10 device re-verify recorded (2026-07-17): 7/9 resolved, Gate A stays ISSUES; next /gsd-plan-phase 08 --gaps for D2/D9/D10/D11/D12.
 Resume file: None
 
-**Planned Phase:** 08 () — 0 plans — 2026-07-16T10:01:11.226Z
+**Planned Phase:** 08 () — 0 plans — 2026-07-16T22:12:38.522Z
