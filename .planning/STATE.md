@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
 status: executing
-stopped_at: Completed 08-09-PLAN.md (D8 RU empty-state copy + D9 TG chat-list sync pill; 1091/1091 green FRESH)
+stopped_at: "08-10 owner device re-verify RUN 2026-07-17 (one Android build @ 1b2e60b, after 08-REVIEW WR-01/02/03 fixes, 1093/1093 green): 7/9 defects RESOLVED (D1, D3, D4, D5-core, D6, D7, D8; B7 webp PASS). Open → gap round 2: D2 refined (reaction identity/VS16 — count «2», both pills after change, two hearts; see 08-REVIEW IN-01/IN-06), D9 (pill never visible), NEW D10 (WA «Вместе» relevance), D11 (some video/GIF/note downloads fail — tapi suspect), D12 (TG create-bot CTA dead). Gate A stays ISSUES. Next: /gsd-plan-phase 08 --gaps. Gates B/C pending; prod DORMANT; deactivate the dev test clone."
 last_updated: "2026-07-16T13:05:04.000Z"
-last_activity: 2026-07-16
+last_activity: 2026-07-17 -- 08-10 device re-verify recorded (7/9 resolved; D2/D9 + D10-D12 open)
 progress:
   total_phases: 8
   completed_phases: 5
   total_plans: 29
-  completed_plans: 28
-  percent: 97
+  completed_plans: 29
+  percent: 99
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-12)
 
 **Core value:** The owner stays in control along the automation↔semi-auto spectrum — the bot can answer autonomously, or propose replies the owner picks and refines, without losing trust or the ability to take over.
-**Current focus:** Phase 08 — device-uat-milestone-closeout
+**Current focus:** Phase 08 — device-uat-milestone-closeout. Gap round 1 executed + owner re-verify RUN 2026-07-17: 7/9 defects resolved on device; Gate A stays ISSUES with a reduced open set (D2 refined reaction-identity/VS16, D9 invisible sync pill, D10 WA «Вместе» relevance, D11 media downloads, D12 TG create-bot CTA) → plan gap round 2 via /gsd-plan-phase 08 --gaps. Gates B (prod copy) + C (close) after Gate A flips PASS.
 
 ## Current Position
 
-Phase: 08 (device-uat-milestone-closeout) — EXECUTING
-Plan: 08-09 done (9/10 phase-08 plans complete; only 08-10 device re-verify checkpoint remains)
-Status: Executing (gap-closure) — milestone NOT complete (owner device sign-off at 08-10 pending)
-Last activity: 2026-07-16
+Phase: 08 (device-uat-milestone-closeout) — GAP ROUND 2 TO PLAN
+Plan: 10/10 phase-08 plans executed (gap round 1 + re-verify done); Gate A still ISSUES
+Status: Run /gsd-plan-phase 08 --gaps for D2 (reaction identity/VS16), D9 (sync pill invisible), D10 (WA «Вместе» relevance), D11 (media downloads — instrument first, tapi suspect), D12 (TG create-bot CTA). Milestone NOT complete — do NOT close until Gate A flips PASS and Gates B/C run.
+Last activity: 2026-07-17
 
 Progress: [█████████░] 97%
 
@@ -88,7 +88,7 @@ None yet.
 
 - [RESOLVED-tentative 2026-07-16 — 05-06-REVIEW WR-02]: vthumb id-ambiguity probed in Gate A — owner: "seems ok, not really sure"; no crossing observed (low-confidence pass, no defect filed). Watch during normal use; if a crossing ever appears, check whether tapi accepts a `chat_id` param on `message/media/download`.
 - [CODE-CLOSED 2026-07-16 — 08-06, device confirm rides 08-10]: **D1** (REACTION_INVALID) and **D2** (removal never clears) are fixed. D1: TG reaction bar+picker constrained to `TelegramReactionCatalog.AllowedSet` (standard free set; quick 6 swaps 😂→😁/😮→🔥) + a clean 400 revert of both the pill and the chat-list preview. D2: confirmed resurrection path (b) — a bare removal deletes the "me" entry so `Merge` returns the still-echoing server list; fixed with a fresh empty-emoji "me" tombstone (`StampRemovalTombstone`) + a removal branch in `TelegramReactionMerge.Merge`. WhatsApp byte-identical; 1063/1063 EditMode green FRESH. Remaining: IN-04 still accepted v1 (no "X reacted…" chat-list preview on TG receive-side); the allowed set is a starting point to re-confirm at 08-10 (B9 add / B13 remove).
-- [Gate A result 2026-07-16]: device UAT RUN — Overall ISSUES; defects D1–D9 in 08-DEVICE-UAT.md §Defects (high: D5 incoming never renders in the open chat until re-enter — owner-confirmed BOTH channels, «Вместе»/H2 suggestions stale as downstream; D7 TG service-dialog duplicated — logo-avatar + silhouette rows — and visible in the WA list). All owner clarifications received (D5 both-channels, D6 SwipeToDelete.SetContentX stack via ChatItemView.Bind←ParseChatsJson, D7 identity, O1→D9 TG sync indicator). G6 reminder: deactivate the dev test clone. Gap planning started.
+- [Gate A re-verify 2026-07-17 — 08-10 RUN]: 7/9 resolved on device (D1, D3a+b, D4, D5-core, D6, D7, D8; B7 webp PASS). OPEN for gap round 2: **D2 refined** (reaction identity/VS16 mismatch — own reaction counts «2», changed reaction leaves both pills, two different heart glyphs; hypothesis pre-flagged 08-REVIEW IN-01/IN-06 — capture exact tapi echo bytes), **D9** (sync pill never visible — sync-vs-paint timing / event-vs-OnEnable ordering / occlusion; consider minimum-visible-duration), **D10** (WA «Вместе» suggestions irrelevant, TG relevant — diff WA payload + dev-n8n Suggest_Replies WA branch against the working TG path), **D11** (some video/GIF/video-note downloads never complete — instrument message/media/download failures first, tapi suspect), **D12** (TG empty-state create-bot CTA dead — expected WhatsApp CTA flow with Telegram preselected). G6 reminder STILL OUTSTANDING: deactivate the dev test clone.
 - [Gate/Phase 3]: tapi media message shapes (messages/get) undocumented — Normalize/media work (Phase 5 CHAT-03) blocked until the owner runs the capture script against an authorized dev Telegram profile.
 - [Gate/Phase 4]: TPL-06 e2e needs dev n8n (localhost:5678) + tunnel + a real authorized Telegram profile (user-assisted).
 - [Constraint]: Assume Wappi response-crossing bugs apply to tapi — keep serial media queue + `_chatFetchesInFlight` gate; reset on channel switch like bot switch.
@@ -138,7 +138,7 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 ## Session Continuity
 
 Last session: 2026-07-16T13:05:04.000Z
-Stopped at: Completed 08-09-PLAN.md (D8 RU empty-state copy + D9 TG chat-list sync pill; 1091/1091 green FRESH). Only 08-10 device re-verify checkpoint remains.
+Stopped at: 08-10 device re-verify recorded (2026-07-17): 7/9 resolved, Gate A stays ISSUES; next /gsd-plan-phase 08 --gaps for D2/D9/D10/D11/D12.
 Resume file: None
 
 **Planned Phase:** 08 () — 0 plans — 2026-07-16T10:01:11.226Z
