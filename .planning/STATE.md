@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
 status: executing
-stopped_at: Completed 08-04-PLAN.md (D5 open-chat live poll; 1043/1043 green FRESH)
-last_updated: "2026-07-16T10:54:11.955Z"
+stopped_at: Completed 08-06-PLAN.md (D1+D2 Telegram reactions; 1063/1063 green FRESH)
+last_updated: "2026-07-16T11:24:12.623Z"
 last_activity: 2026-07-16
 progress:
   total_phases: 8
   completed_phases: 5
-  total_plans: 24
-  completed_plans: 23
-  percent: 96
+  total_plans: 29
+  completed_plans: 24
+  percent: 83
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 ## Current Position
 
 Phase: 08 (device-uat-milestone-closeout) — EXECUTING
-Plan: 2 of 10
-Status: Ready to execute
+Plan: 08-06 done (5/10 phase-08 plans complete; 08-05/07/08/09/10 remain)
+Status: Executing (gap-closure) — milestone NOT complete
 Last activity: 2026-07-16
 
-Progress: [██████████] 96%
+Progress: [████████░░] 83%
 
 ## Performance Metrics
 
@@ -74,6 +74,7 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [Phase 5]: 05-12 Telegram empty-state hero refinement (off-plan, owner refinement to 05-10) — on the Telegram channel the hero ICON now shows the `Telegram_2019_Logo` UNTINTED (`iconImage.sprite`=telegramIcon, `color`=Color.white → natural logo colors), REVERTING 05-10's blue icon TINT; the pale-mint parent disc (IconCircle) recolors green→blue via the same `ChannelAccent.Resolve`. 05-10 CTA blue kept as-is. `EmptyStateView.ApplyChannelAccent` branches on ActiveChannel: TG swaps sprite+white+blue disc; WA/default restores authored sprite+color+disc BYTE-IDENTICAL (persistent widget; authored state cached at Awake; disc code-resolved via icon's nearest-ancestor Image, bounded by the view root so the white bg is never recolored). New `telegramIcon` serialized field stamped into Main.unity by new headless `EmptyStateTelegramIconBuilder` ([MenuItem] + StampHeadless, ChannelSwitcherBuilder idiom). GOTCHA/Rule-1 heal: the required `spriteMode 2→1` (Single) removed the old Multiple sub-sprite fileID that TWO pre-existing Images used — TelegramAuth `Logo` + Add-Bot form Telegram `Icon`; both migrated to the canonical Single sprite 21300000 (visually identical). All 3 in-scene logo refs converge on 21300000; scene object count preserved (4918). Blue-on-blue owner-ACCEPTED (revisit w/ white paper-plane if it reads poorly on device). Env: Editor PID 22038 open the whole time (coordinator's "closed" report was stale) — code+builder committed autonomously, scene stamp via owner-run menu checkpoint, then owner quit (Don't Save, heal preserved) → suite 1036/1036 EditMode green HEADLESS (no new tests; MonoBehaviour glue). commits 3206498/979f478/1e20dbb/c61a04b. Pixel-perfect look = Phase 8 device re-verify (05-HUMAN-UAT §9)
 - [Phase 5]: 05-08 media device-UAT round-2 polish (off-plan, from an owner device screenshot after 05-07) — (1) video note now floats BUBBLE-FREE: the transparency decision extracted to a pure seam BubbleTransparencyPolicy.IsTransparent(isSticker,isVideoNote,isPlaceholderActive,hideBubble) + isVideoNote, so the circle floats chrome-free like native TG (time stays readable via the existing Video+no-caption white-text/timeBackground media overlay; !isPlaceholderActive keeps an UNAVAILABLE note on a visible retry card); (2) .tgs sticker now renders a deliberate sticker-slot-sized (396²) neutral rounded CARD with its OWN fill + centered «Стикер» + mid-gray glyph (the 05-07 white-silhouette placeholder was invisible on the transparent bubble → collapsed to a tiny pill on device). Telegram-only (isVideoNote default-false; card gated on TgsStickerMime), WhatsApp byte-identical; verified via the sanctioned in-Editor bridge (owner's Editor was open, headless refuses on a held lock; gated on editorAssemblyWrittenUtc 17:06:24Z), 1007/1007 EditMode green (997+10). commits 72a5909 + a27cf16. Pixel-perfect look = Phase 8 device re-verify
 - [Phase 8]: 08-04 D5 gap-closure — open-chat live poll. Root cause: SyncLatestMessages (the only OnLiveMessagesReceived/brandNew site, ChatManager.cs:789) is started once per open (OpenChatRoutine:943); no timer re-fetched the open chat, so incoming never rendered until re-entry and the «Вместе» payload (TryGetRecentMessages over _activeChatCache) stayed stale (H2). Fix: pure OpenChatLivePollGate (3s IntervalSeconds) + a single always-running self-gating OpenChatLivePollRoutine (ChatManager.LivePoll.cs) that REUSES SyncLatestMessages (no new messages/get caller — inherits currentChatId re-check, CrossChatResponseGuard, _chatFetchesInFlight serial gate). Foreground-gated (OnApplicationFocus/Pause); chatIsOpen also gated on MessageListPanel.activeSelf (currentChatId sticky after ShowChatList); re-kicked after StopAllCoroutines in SetActiveBot/SetActiveChannel (never stranded). Cross-channel (no ChatChannel branch). Cascades to bubbles + card refresh + fresh payload with zero wiring change. 1043/1043 EditMode green FRESH. Device re-verify (I.1 #3, I.2 #6, H2) rides 08-10. Push-based delivery stays v2.
+- [Phase 8]: 08-06 D1+D2 gap-closure — Telegram reaction set + removal tombstone. D1: pure TelegramReactionCatalog (standard free set + VS16-normalizing IsAllowed + TG-safe quick 6 [😂→😁, 😮→🔥] + FilterCategories); quick-bar reads ActiveQuickEmojis at click/render time, picker rebuilds per-channel (_builtForChannel) from FilterCategories on Telegram; PostReactionRoutine reverts BOTH pill and chat-list preview on a 400 (no stuck 'You reacted…'). D2: confirmed resurrection path (b) — a bare removal RemoveAt-deletes the 'me' entry so Merge sees no mine and returns the still-echoing server list verbatim; fix = empty-emoji 'me' tombstone (StampRemovalTombstone on Telegram toggle-off, persisted) + a removal branch in TelegramReactionMerge.Merge that suppresses the stale 'me' echo within the 90s grace. Rule-2: ReactionSummary counts only visible emoji + MessageItemView clearance follows visible emoji (empty-emoji tombstone never counts/reserves). WhatsApp byte-identical; 1063/1063 EditMode green FRESH (1043+20). Allowed set is a starting point — re-confirm at 08-10. Device re-verify B9/B13 rides 08-10.
 
 ### Pending Todos
 
@@ -82,7 +83,7 @@ None yet.
 ### Blockers/Concerns
 
 - [RESOLVED-tentative 2026-07-16 — 05-06-REVIEW WR-02]: vthumb id-ambiguity probed in Gate A — owner: "seems ok, not really sure"; no crossing observed (low-confidence pass, no defect filed). Watch during normal use; if a crossing ever appears, check whether tapi accepts a `chat_id` param on `message/media/download`.
-- [PARTIALLY SUPERSEDED 2026-07-16 — 05-06-REVIEW IN-04+IN-05]: (a) IN-04 stands as accepted v1 (no "X reacted…" chat-list preview on TG). (b) IN-05 is WORSE than accepted on device: removing an own reaction NEVER clears in-app (not a one-cycle flicker) → now defect **D2** in 08-DEVICE-UAT.md; the shelved per-message reconcile-suppression mitigation is the starting hypothesis. Also new: most reaction emoji rejected by tapi with 400 REACTION_INVALID → **D1** (constrain TG reaction set + graceful 400 revert).
+- [CODE-CLOSED 2026-07-16 — 08-06, device confirm rides 08-10]: **D1** (REACTION_INVALID) and **D2** (removal never clears) are fixed. D1: TG reaction bar+picker constrained to `TelegramReactionCatalog.AllowedSet` (standard free set; quick 6 swaps 😂→😁/😮→🔥) + a clean 400 revert of both the pill and the chat-list preview. D2: confirmed resurrection path (b) — a bare removal deletes the "me" entry so `Merge` returns the still-echoing server list; fixed with a fresh empty-emoji "me" tombstone (`StampRemovalTombstone`) + a removal branch in `TelegramReactionMerge.Merge`. WhatsApp byte-identical; 1063/1063 EditMode green FRESH. Remaining: IN-04 still accepted v1 (no "X reacted…" chat-list preview on TG receive-side); the allowed set is a starting point to re-confirm at 08-10 (B9 add / B13 remove).
 - [Gate A result 2026-07-16]: device UAT RUN — Overall ISSUES; defects D1–D9 in 08-DEVICE-UAT.md §Defects (high: D5 incoming never renders in the open chat until re-enter — owner-confirmed BOTH channels, «Вместе»/H2 suggestions stale as downstream; D7 TG service-dialog duplicated — logo-avatar + silhouette rows — and visible in the WA list). All owner clarifications received (D5 both-channels, D6 SwipeToDelete.SetContentX stack via ChatItemView.Bind←ParseChatsJson, D7 identity, O1→D9 TG sync indicator). G6 reminder: deactivate the dev test clone. Gap planning started.
 - [Gate/Phase 3]: tapi media message shapes (messages/get) undocumented — Normalize/media work (Phase 5 CHAT-03) blocked until the owner runs the capture script against an authorized dev Telegram profile.
 - [Gate/Phase 4]: TPL-06 e2e needs dev n8n (localhost:5678) + tunnel + a real authorized Telegram profile (user-assisted).
@@ -124,11 +125,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 05 P08 | ~24min | 2 fixes | 3 files |
 | Phase 05 P09 | ~22min | 2 fixes | 6 files |
 | Phase 08 P08-04 | ~22min | 2 tasks | 6 files |
+| Phase 08 P08-06 | 21min | 2 tasks | 10 files |
 
 ## Session Continuity
 
-Last session: 2026-07-16T10:54:11.832Z
-Stopped at: Completed 08-04-PLAN.md (D5 open-chat live poll; 1043/1043 green FRESH)
+Last session: 2026-07-16T11:24:12.220Z
+Stopped at: Completed 08-06-PLAN.md (D1+D2 Telegram reactions; 1063/1063 green FRESH)
 Resume file: None
 
 **Planned Phase:** 08 () — 0 plans — 2026-07-16T10:01:11.226Z
