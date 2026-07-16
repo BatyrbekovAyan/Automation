@@ -1,6 +1,6 @@
 # Phase 8 — Device UAT: v1.1 Telegram Parity milestone gate (consolidated, owner-run)
 
-**Status:** RUN 2026-07-15/16 — **Overall: ISSUES** (8 defect/scope rows D1–D8 in §Defects found; H2 pending re-test). This pass is the single source of truth for "is v1.1 shippable."
+**Status:** RUN 2026-07-15/16 — **Overall: ISSUES** (9 defect/scope rows D1–D9 in §Defects found; owner clarifications for D5/D6/D7/D9 recorded 2026-07-16). This pass is the single source of truth for "is v1.1 shippable."
 
 This is ONE ordered device pass that aggregates EVERY still-open device-verify gate
 across the whole v1.1 milestone (Phases 3–7) **plus** the carried v1.0 deferred UAT.
@@ -328,10 +328,12 @@ Item shape (every item):
    content → the server's `botTgId` RAG branch matched (not the WA branch, not skip-RAG). If no RAG
    data is seeded, record N/A (PENDING) and re-run after an Upload File on the TG bot.
    **how-to:** on a RAG-seeded TG bot, confirm a suggestion cites catalog/price content.
-   **verdict:** ☐ PASS ☐ FAIL ☑ N/A (PENDING) | **source:** 07-HUMAN-UAT.md (RAG-grounded suggestion)
-   **owner (2026-07-16):** "how to test?" — instructions provided in-session (upload a price-list
-   to the TG bot, then ask a price question with «Вместе» on and check a card cites the priced
-   item); re-run after seeding.
+   **verdict:** ☐ PASS ☑ FAIL ☐ N/A | **source:** 07-HUMAN-UAT.md (RAG-grounded suggestion)
+   **owner (2026-07-16):** initially "how to test?" (instructions provided in-session); follow-up
+   verdict: "suggested messages are not relevant to last incoming message" — relevance to the
+   newest incoming is broken, almost certainly DOWNSTREAM of **D5** (the suggestion payload is
+   built from the in-app transcript, which never ingests the new incoming until re-enter).
+   Re-test relevance AND RAG grounding together after the D5 fix.
 3. **«Сводка» counts/lists the real Telegram conversation.**
    **expected:** after the Group G e2e produces a real Telegram conversation, a «Сводка» refresh
    shows that Telegram chat in the counts + recent list (DashboardOutcomes receives both channels'
@@ -442,17 +444,16 @@ must reopen. (Empty = no defects.)
 | D2 | B9b + B13 — removing an own reaction succeeds in Telegram but NEVER clears in-app (worse than the accepted one-cycle flicker; never self-heals) | medium | 05-VERIFICATION.md #2 / STATE IN-05 (superseded) | yes — 05-06 reconcile merge preserves optimistic 'me' with no removal state → needs a removal tombstone/suppression |
 | D3 | B5 + E1 — video-note presentation: duration-badge left/right corners render SHARP (RoundedCorners refresh?); in a new TG bot a note renders as a round video ON a white background bubble instead of bubble-free | medium | 05-HUMAN-UAT.md #2 / 05-08 note-float | yes — suspect the incoming-bubble transparency path (05-08 tested outgoing) + badge RoundedCorners; repro axis likely incoming vs outgoing |
 | D4 | B12 + F8 — owner decision: REMOVE the per-row swipe-delete affordance on Telegram rows (the network guard already no-ops; the visual slide must go too) | low (approved scope) | 06-HUMAN-UAT.md Deferred polish | yes — hide the swipe visual on TG rows (ChatItemView / prefab) |
-| D5 | I.1 #3 + I.2 #6 — incoming messages do NOT render in the open chat until re-entering it; «Вместе» cards do not refresh on incoming | high | 01-HUMAN-UAT.md #3 / 02-HUMAN-UAT.md #2 | yes — diagnose the live-poll/dispatch path for the open chat (channel under test to be confirmed with owner — likely Telegram) |
-| D6 | Extra #1 — NullReferenceException surfaced after creating a bot, on the auto-return to the Bots page | medium | new (this pass) | yes — repro create-bot → Bots page; capture the stack (dev build / adb logcat) |
-| D7 | Extra #3 — one chat DUPLICATED in the Telegram list AND also visible in the WhatsApp list | high | new (this pass) / CHAT-11 cache isolation | yes — diagnose intra-TG duplication + possible cross-channel bleed (need the chat's identity from owner: same contact on both channels, or a TG-only chat leaking into WA?) |
+| D5 | I.1 #3 + I.2 #6 + H2 — incoming messages do NOT render in the open chat until re-entering it; «Вместе» cards do not refresh; suggestions are not relevant to the last incoming message (stale transcript in the payload). **Owner-confirmed 2026-07-16: happens on BOTH WhatsApp and Telegram** — not channel-specific | high | 01-HUMAN-UAT.md #3 / 02-HUMAN-UAT.md #2 / 07-HUMAN-UAT.md | yes — diagnose the open-chat live-refresh path end-to-end; acceptance = a new incoming renders in the open chat within one refresh cycle, «Вместе» refreshes, suggestions track the newest message. (Owner long-term preference: push-based delivery — n8n → device notification with the incoming text — instead of polling; recorded as a v2 design item in STATE Deferred Items, NOT this gap) |
+| D6 | Extra #1 — NullReferenceException after creating a bot, on the auto-return to the Bots page. Owner-provided stack: `SwipeToDelete.SetContentX` (Assets/Scripts/Chat/SwipeToDelete.cs:157) ← `ResetClosed` (:80) ← `ChatItemView.Bind` (Assets/Scripts/UI/ChatItemView.cs:122) ← `ChatListView.AddChat` (:61) ← `ChatManager.ParseChatsJson` (ChatManager.cs:351) ← `SyncAllChats` (:428) | medium | new (this pass) | yes — null content ref inside SwipeToDelete during row Bind on a fresh sync; fix alongside **D4** (same swipe stack on chat rows) |
+| D7 | Extra #3 — one chat DUPLICATED in the Telegram list AND also visible in the WhatsApp list. **Owner clarification 2026-07-16: it is Telegram's own SERVICE dialog** (login codes / device-confirmation messages; likely service user 777000 — confirm in capture): two rows in the TG list, one with the Telegram-logo avatar and one with the default silhouette (⇒ two distinct chat-id forms resolving to the same dialog), and the dialog also shows on the WhatsApp page | high | new (this pass) / CHAT-11 cache isolation | yes — diagnose the double id-form (dedup/normalize) + the cross-channel appearance (cache-root bleed, or a row synthesized under the wrong ActiveChannel) |
 | D8 | F9 — owner decision: KEEP the RU-localization sweep → Russianise the residual English empty-state copy (IN-09) | low (approved scope) | 06-HUMAN-UAT.md Deferred polish | yes — string sweep |
+| D9 | Extra #2 (was O1) — the Telegram chat list appears instantly with NO sync/loading indicator on initial load; owner: "the not-good part is that Telegram shows chats instantly with no sync indicator" | low (approved scope) | new (this pass) | yes — add a TG chat-list sync/loading indicator (WhatsApp-parity affordance) |
 
-**Observations (not defects yet — pending owner clarification):**
+**Observations — resolved 2026-07-16:**
 
-- **O1 (Extra #2):** "no 5 minute loading chats page like in whatsapp, so chats can be seen
-  instantly (not good)" — the Telegram chat list appears instantly with no WhatsApp-style
-  initial-sync gate. Clarify what the "(not good)" targets: a missing sync indicator on TG,
-  stale-looking instant data, or the WhatsApp 5-minute load itself. Possibly related to **D5**.
+- **O1 (Extra #2) → promoted to D9:** owner clarified — "the not-good part is that Telegram
+  shows chats instantly with no sync indicator". Filed as **D9** (TG chat-list sync indicator).
 
 **Pre-device notes (trivially-obvious fixes surfaced while authoring — NOT folded in):** none.
 
@@ -460,18 +461,22 @@ must reopen. (Empty = no defects.)
 
 **Overall:** ☐ PASS ☑ ISSUES
 
-- **Result:** ISSUES — 8 defect/scope rows (D1–D8): 2 high (D5 live-incoming render, D7 chat
-  duplication/cross-channel bleed), 4 medium (D1 REACTION_INVALID, D2 reaction-removal never
-  clears, D3 video-note presentation, D6 bot-creation NRE), 2 owner-approved polish scopes
-  (D4 remove TG swipe affordance, D8 RU empty-state copy). Everything else green: auth/2FA (A),
-  chat core (B1–4/6/8/10–12), 05-09 fixes (C), vthumb probe (D, low-confidence), switcher (F1–7),
-  auto-reply e2e (G1–4), «Вместе»+dashboard (H1/3/4/5), carried v1.0 (I mostly PASS).
+- **Result:** ISSUES — 9 defect/scope rows (D1–D9): 2 high (D5 live-incoming render on BOTH
+  channels — folds in H2's stale-suggestion relevance; D7 TG service-dialog duplication +
+  cross-channel bleed), 4 medium (D1 REACTION_INVALID, D2 reaction-removal never clears,
+  D3 video-note presentation, D6 bot-creation NRE — stack lands in SwipeToDelete), 3
+  owner-approved polish scopes (D4 remove TG swipe affordance, D8 RU empty-state copy,
+  D9 TG chat-list sync indicator). Everything else green: auth/2FA (A), chat core
+  (B1–4/6/8/10–12), 05-09 fixes (C), vthumb probe (D, low-confidence), switcher (F1–7),
+  auto-reply e2e (G1–4), dashboard (H3/4/5), carried v1.0 (I mostly PASS).
 - **Re-deferred carried-v1.0 items (with reasons):** I.3 #10 formal 01-VERIFICATION sign-off —
   RE-DEFER: blocked by D5 (I.1 #3 unconfirmable until live-incoming render is fixed);
   re-aggregate after gap closure.
 - **Notes:** B7 static-webp N/A (no sample at hand); G5 N/A (no stale clone to test);
   G6 n/a with an OUTSTANDING reminder to deactivate the test clone (bot-activation policy);
-  H2 N/A-PENDING (re-run after RAG seeding); prod bagkz untouched throughout.
+  H2 FAIL — downstream of D5, re-test relevance + RAG grounding together after the fix;
+  prod bagkz untouched throughout. Owner clarifications (D5 both-channels, D6 stack,
+  D7 service-dialog identity, O1→D9) received and folded in 2026-07-16.
 
 > Any **FAIL** spins its own gap-closure plan — run `/gsd-plan-phase 08 --gaps` and file the
 > specifics from the Defects table. Do NOT hand-patch fixes here; pre-planning those fixes is out

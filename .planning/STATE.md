@@ -82,7 +82,7 @@ None yet.
 
 - [RESOLVED-tentative 2026-07-16 — 05-06-REVIEW WR-02]: vthumb id-ambiguity probed in Gate A — owner: "seems ok, not really sure"; no crossing observed (low-confidence pass, no defect filed). Watch during normal use; if a crossing ever appears, check whether tapi accepts a `chat_id` param on `message/media/download`.
 - [PARTIALLY SUPERSEDED 2026-07-16 — 05-06-REVIEW IN-04+IN-05]: (a) IN-04 stands as accepted v1 (no "X reacted…" chat-list preview on TG). (b) IN-05 is WORSE than accepted on device: removing an own reaction NEVER clears in-app (not a one-cycle flicker) → now defect **D2** in 08-DEVICE-UAT.md; the shelved per-message reconcile-suppression mitigation is the starting hypothesis. Also new: most reaction emoji rejected by tapi with 400 REACTION_INVALID → **D1** (constrain TG reaction set + graceful 400 revert).
-- [Gate A result 2026-07-16]: device UAT RUN — Overall ISSUES; defects D1–D8 in 08-DEVICE-UAT.md §Defects (high: D5 incoming messages don't render in the open chat until re-enter + «Вместе» cards don't refresh; D7 a chat duplicated in the TG list AND visible in the WA list). Pending owner input: O1 "(not good)" clarification, D5 channel under test, D6 NRE stack/log, D7 chat identity. G6 reminder: deactivate the dev test clone. H2 re-test after RAG seeding.
+- [Gate A result 2026-07-16]: device UAT RUN — Overall ISSUES; defects D1–D9 in 08-DEVICE-UAT.md §Defects (high: D5 incoming never renders in the open chat until re-enter — owner-confirmed BOTH channels, «Вместе»/H2 suggestions stale as downstream; D7 TG service-dialog duplicated — logo-avatar + silhouette rows — and visible in the WA list). All owner clarifications received (D5 both-channels, D6 SwipeToDelete.SetContentX stack via ChatItemView.Bind←ParseChatsJson, D7 identity, O1→D9 TG sync indicator). G6 reminder: deactivate the dev test clone. Gap planning started.
 - [Gate/Phase 3]: tapi media message shapes (messages/get) undocumented — Normalize/media work (Phase 5 CHAT-03) blocked until the owner runs the capture script against an authorized dev Telegram profile.
 - [Gate/Phase 4]: TPL-06 e2e needs dev n8n (localhost:5678) + tunnel + a real authorized Telegram profile (user-assisted).
 - [Constraint]: Assume Wappi response-crossing bugs apply to tapi — keep serial media queue + `_chatFetchesInFlight` gate; reset on channel switch like bot switch.
@@ -103,6 +103,7 @@ Items acknowledged and carried forward:
 | Polish | POL-01 streaming/animated suggestion reveal | Deferred to v2 | v1.0 Init |
 | Milestone | Prod bagkz replication (Suggest Replies + all Telegram fixes) | pending → Phase 8 checklist | v1.1 start 2026-07-12 |
 | Milestone | Server-side «Вместе» suppression | pending (v2 SUPPRESS-01) | v1.0 close |
+| Design | Push-based incoming delivery (n8n → device push with the incoming text) to replace client polling — owner preference | Deferred to v2 (needs FCM/APNs + device-token registry + n8n hook; D5 gap fixes the existing refresh path first) | Gate A 2026-07-16 |
 
 Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG-01/02, Phase 7).
 | Phase 03 P01 | 10 min | 2 tasks | 5 files |
