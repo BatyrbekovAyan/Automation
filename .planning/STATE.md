@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
 status: executing
-stopped_at: Completed 08-06-PLAN.md (D1+D2 Telegram reactions; 1063/1063 green FRESH)
-last_updated: "2026-07-16T11:24:12.623Z"
+stopped_at: Completed 08-07-PLAN.md (D3 video-note presentation; 1063/1063 green FRESH)
+last_updated: "2026-07-16T11:53:35.862Z"
 last_activity: 2026-07-16
 progress:
   total_phases: 8
   completed_phases: 5
   total_plans: 29
-  completed_plans: 24
-  percent: 83
+  completed_plans: 25
+  percent: 86
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 ## Current Position
 
 Phase: 08 (device-uat-milestone-closeout) — EXECUTING
-Plan: 08-06 done (5/10 phase-08 plans complete; 08-05/07/08/09/10 remain)
+Plan: 08-07 done (6/10 phase-08 plans complete; 08-05/08/09/10 remain)
 Status: Executing (gap-closure) — milestone NOT complete
 Last activity: 2026-07-16
 
-Progress: [████████░░] 83%
+Progress: [████████░░] 86%
 
 ## Performance Metrics
 
@@ -75,6 +75,7 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [Phase 5]: 05-08 media device-UAT round-2 polish (off-plan, from an owner device screenshot after 05-07) — (1) video note now floats BUBBLE-FREE: the transparency decision extracted to a pure seam BubbleTransparencyPolicy.IsTransparent(isSticker,isVideoNote,isPlaceholderActive,hideBubble) + isVideoNote, so the circle floats chrome-free like native TG (time stays readable via the existing Video+no-caption white-text/timeBackground media overlay; !isPlaceholderActive keeps an UNAVAILABLE note on a visible retry card); (2) .tgs sticker now renders a deliberate sticker-slot-sized (396²) neutral rounded CARD with its OWN fill + centered «Стикер» + mid-gray glyph (the 05-07 white-silhouette placeholder was invisible on the transparent bubble → collapsed to a tiny pill on device). Telegram-only (isVideoNote default-false; card gated on TgsStickerMime), WhatsApp byte-identical; verified via the sanctioned in-Editor bridge (owner's Editor was open, headless refuses on a held lock; gated on editorAssemblyWrittenUtc 17:06:24Z), 1007/1007 EditMode green (997+10). commits 72a5909 + a27cf16. Pixel-perfect look = Phase 8 device re-verify
 - [Phase 8]: 08-04 D5 gap-closure — open-chat live poll. Root cause: SyncLatestMessages (the only OnLiveMessagesReceived/brandNew site, ChatManager.cs:789) is started once per open (OpenChatRoutine:943); no timer re-fetched the open chat, so incoming never rendered until re-entry and the «Вместе» payload (TryGetRecentMessages over _activeChatCache) stayed stale (H2). Fix: pure OpenChatLivePollGate (3s IntervalSeconds) + a single always-running self-gating OpenChatLivePollRoutine (ChatManager.LivePoll.cs) that REUSES SyncLatestMessages (no new messages/get caller — inherits currentChatId re-check, CrossChatResponseGuard, _chatFetchesInFlight serial gate). Foreground-gated (OnApplicationFocus/Pause); chatIsOpen also gated on MessageListPanel.activeSelf (currentChatId sticky after ShowChatList); re-kicked after StopAllCoroutines in SetActiveBot/SetActiveChannel (never stranded). Cross-channel (no ChatChannel branch). Cascades to bubbles + card refresh + fresh payload with zero wiring change. 1043/1043 EditMode green FRESH. Device re-verify (I.1 #3, I.2 #6, H2) rides 08-10. Push-based delivery stays v2.
 - [Phase 8]: 08-06 D1+D2 gap-closure — Telegram reaction set + removal tombstone. D1: pure TelegramReactionCatalog (standard free set + VS16-normalizing IsAllowed + TG-safe quick 6 [😂→😁, 😮→🔥] + FilterCategories); quick-bar reads ActiveQuickEmojis at click/render time, picker rebuilds per-channel (_builtForChannel) from FilterCategories on Telegram; PostReactionRoutine reverts BOTH pill and chat-list preview on a 400 (no stuck 'You reacted…'). D2: confirmed resurrection path (b) — a bare removal RemoveAt-deletes the 'me' entry so Merge sees no mine and returns the still-echoing server list verbatim; fix = empty-emoji 'me' tombstone (StampRemovalTombstone on Telegram toggle-off, persisted) + a removal branch in TelegramReactionMerge.Merge that suppresses the stale 'me' echo within the 90s grace. Rule-2: ReactionSummary counts only visible emoji + MessageItemView clearance follows visible emoji (empty-emoji tombstone never counts/reserves). WhatsApp byte-identical; 1063/1063 EditMode green FRESH (1043+20). Allowed set is a starting point — re-confirm at 08-10. Device re-verify B9/B13 rides 08-10.
+- [Phase 8]: 08-07 D3 gap-closure — Telegram video-note (кружок) presentation. Diagnosis-first, root cause = (ii): the incoming note IS flagged isVideoNote (the round crop the owner sees proves it), but unlike the outgoing note 05-08 verified (inline s3Info.url → media present at bind → floats), an INCOMING note is placeholder-first (tapi body:null + s3Info:{} → download-by-id), so isPlaceholderActive stays true UNDER the visible circle and the square bubble stays opaque = the 'white background bubble'. Fix D3b at the transparency CALL SITE (not the heuristic, not ChatManager): UpdateBubbleVisuals computes note-scoped effectivePlaceholderActive = isPlaceholderActive && !(isVideoNote && messageImage.activeInHierarchy), so once the round media surface is the visible content the circle floats — card-only states (messageImage hidden) keep the opaque retry card. D3a: ToggleDurationBadgeOverlay + new RefreshBadgeCornersDeferred refresh the badge pill's ImageWithRoundedCorners after layout (radius assigned post-AddComponent never re-bakes on a fixed-size point anchor → sharp ends); immediate RefreshCorners + one-frame-deferred pooled-bubble-guarded pass, radius/layout unchanged. Pure BubbleTransparencyPolicy/TelegramVideoNoteHeuristic seams untouched (is_round still ignored); WhatsApp byte-identical; 1063/1063 EditMode green FRESH. commits 161b540 (D3b) + 89479db (D3a). Device re-verify E1 float + B5 badge corners rides 08-10.
 
 ### Pending Todos
 
@@ -126,11 +127,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 05 P09 | ~22min | 2 fixes | 6 files |
 | Phase 08 P08-04 | ~22min | 2 tasks | 6 files |
 | Phase 08 P08-06 | 21min | 2 tasks | 10 files |
+| Phase 08 P08-07 | 20min | 2 tasks | 1 files |
 
 ## Session Continuity
 
-Last session: 2026-07-16T11:24:12.220Z
-Stopped at: Completed 08-06-PLAN.md (D1+D2 Telegram reactions; 1063/1063 green FRESH)
+Last session: 2026-07-16T11:52:40.451Z
+Stopped at: Completed 08-07-PLAN.md (D3 video-note presentation; 1063/1063 green FRESH)
 Resume file: None
 
 **Planned Phase:** 08 () — 0 plans — 2026-07-16T10:01:11.226Z
