@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
 status: executing
-stopped_at: Completed 08-08-PLAN.md (D4+D6 chat-row swipe stack; 1065/1065 green FRESH)
-last_updated: "2026-07-16T12:09:54.294Z"
+stopped_at: Completed 08-05-PLAN.md (D7 TG service-dialog dedup + bleed; 1091/1091 green FRESH)
+last_updated: "2026-07-16T12:37:07.859Z"
 last_activity: 2026-07-16
 progress:
   total_phases: 8
   completed_phases: 5
   total_plans: 29
-  completed_plans: 26
-  percent: 90
+  completed_plans: 27
+  percent: 93
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 ## Current Position
 
 Phase: 08 (device-uat-milestone-closeout) — EXECUTING
-Plan: 08-08 done (7/10 phase-08 plans complete; 08-05/09/10 remain)
+Plan: 08-05 done (8/10 phase-08 plans complete; 08-09/10 remain)
 Status: Executing (gap-closure) — milestone NOT complete
 Last activity: 2026-07-16
 
-Progress: [█████████░] 90%
+Progress: [█████████░] 93%
 
 ## Performance Metrics
 
@@ -77,6 +77,7 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [Phase 8]: 08-06 D1+D2 gap-closure — Telegram reaction set + removal tombstone. D1: pure TelegramReactionCatalog (standard free set + VS16-normalizing IsAllowed + TG-safe quick 6 [😂→😁, 😮→🔥] + FilterCategories); quick-bar reads ActiveQuickEmojis at click/render time, picker rebuilds per-channel (_builtForChannel) from FilterCategories on Telegram; PostReactionRoutine reverts BOTH pill and chat-list preview on a 400 (no stuck 'You reacted…'). D2: confirmed resurrection path (b) — a bare removal RemoveAt-deletes the 'me' entry so Merge sees no mine and returns the still-echoing server list verbatim; fix = empty-emoji 'me' tombstone (StampRemovalTombstone on Telegram toggle-off, persisted) + a removal branch in TelegramReactionMerge.Merge that suppresses the stale 'me' echo within the 90s grace. Rule-2: ReactionSummary counts only visible emoji + MessageItemView clearance follows visible emoji (empty-emoji tombstone never counts/reserves). WhatsApp byte-identical; 1063/1063 EditMode green FRESH (1043+20). Allowed set is a starting point — re-confirm at 08-10. Device re-verify B9/B13 rides 08-10.
 - [Phase 8]: 08-07 D3 gap-closure — Telegram video-note (кружок) presentation. Diagnosis-first, root cause = (ii): the incoming note IS flagged isVideoNote (the round crop the owner sees proves it), but unlike the outgoing note 05-08 verified (inline s3Info.url → media present at bind → floats), an INCOMING note is placeholder-first (tapi body:null + s3Info:{} → download-by-id), so isPlaceholderActive stays true UNDER the visible circle and the square bubble stays opaque = the 'white background bubble'. Fix D3b at the transparency CALL SITE (not the heuristic, not ChatManager): UpdateBubbleVisuals computes note-scoped effectivePlaceholderActive = isPlaceholderActive && !(isVideoNote && messageImage.activeInHierarchy), so once the round media surface is the visible content the circle floats — card-only states (messageImage hidden) keep the opaque retry card. D3a: ToggleDurationBadgeOverlay + new RefreshBadgeCornersDeferred refresh the badge pill's ImageWithRoundedCorners after layout (radius assigned post-AddComponent never re-bakes on a fixed-size point anchor → sharp ends); immediate RefreshCorners + one-frame-deferred pooled-bubble-guarded pass, radius/layout unchanged. Pure BubbleTransparencyPolicy/TelegramVideoNoteHeuristic seams untouched (is_round still ignored); WhatsApp byte-identical; 1063/1063 EditMode green FRESH. commits 161b540 (D3b) + 89479db (D3a). Device re-verify E1 float + B5 badge corners rides 08-10.
 - [Phase 8]: 08-08 D4+D6 gap-closure — chat-row swipe stack. D6: SwipeToDelete lifecycle null-guard — lazy Rt accessor (_rt != null ? _rt : (_rt=(RectTransform)transform)) backs every _rt deref + _scroll ??= lazy at drag entry points, so ChatItemView.Bind→ResetClosed→SetContentX no longer NREs when a fresh-sync row is Instantiated+Bound before Awake (inactive list panel); Awake still assigns on the normal path, channel-agnostic (fired on WhatsApp too). D4: new pure ChatRowSwipePolicy.Enabled(channel) (WhatsApp-only; mirrors ActiveChannelSupportsChatDelete) — ChatItemView.Bind gates the affordance on ActiveChannel per (pooled) bind: Telegram snaps shut + disables SwipeToDelete (no drag callbacks) + hides the red button; WhatsApp keeps ResetClosed()+wired button byte-identical (added enabled=true/SetActive(true) are idempotent no-ops). 2 ChatRowSwipePolicy tests; 1065/1065 EditMode green FRESH (1063+2); commits a12f467/fea922d/991bd2f. Device re-verify D4/D6 rides 08-10.
+- [Phase 8]: 08-05 D7 gap-closure — TG service-dialog dedup + cross-channel bleed. Diagnosis: (a) two id-forms of the 777000 service dialog (read-only capture shows only bare 777000; the twin is server/device-side — no in-app @c.us appender — leading hypothesis 777000@c.us; EXACT form to confirm at 08-10); (b) bleed = a pre-CHAT-11 legacy WhatsApp cache file still holding the TG dialog (today's sync path is channel-correct: GetCacheRoot/cachePath follow ActiveChannel, StopAllCoroutines guards a switch). Fix: pure ChatIdFormat.CanonicalKey(id, channel) (WhatsApp VERBATIM/byte-identical; Telegram strips a spurious @c.us/@g.us twin) + IsForeignToChannel(id, channel) (WhatsApp drops a bare no-'@' Telegram-form id — '@'-test keeps every genuine WA jid incl broadcast/newsletter/lid; Telegram NEVER rejects so the service dialog stays). ParseChatsJson keys chatLookup/serverIds/isDeleted/merge by the canonical id AND constructs the surviving VM with it (vm.ChatId==key ⇒ bare tapi id on TG, byte-identical on WA, every downstream chatLookup consumer resolves unchanged); GetChat + both ShouldNotify + DisplayFallback + IsGroup route through the canonical key. Holds under 08-04's repeating open-chat poll. 1091/1091 EditMode green FRESH (1065+26). commits f379a5f/cc04503/1c9d8fe. Device re-verify D7 + EXACT twin-form capture ride 08-10.
 
 ### Pending Todos
 
@@ -130,11 +131,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 08 P08-06 | 21min | 2 tasks | 10 files |
 | Phase 08 P08-07 | 20min | 2 tasks | 1 files |
 | Phase 08 P08-08 | ~11min | 2 tasks | 4 files |
+| Phase 08 P05 | 18min | 2 tasks | 4 files |
 
 ## Session Continuity
 
-Last session: 2026-07-16T12:09:54.269Z
-Stopped at: Completed 08-08-PLAN.md (D4+D6 chat-row swipe stack; 1065/1065 green FRESH)
+Last session: 2026-07-16T12:37:07.832Z
+Stopped at: Completed 08-05-PLAN.md (D7 TG service-dialog dedup + bleed; 1091/1091 green FRESH)
 Resume file: None
 
 **Planned Phase:** 08 () — 0 plans — 2026-07-16T10:01:11.226Z
