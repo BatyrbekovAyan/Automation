@@ -2046,7 +2046,37 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             new Vector2(120f, 46f), 26f);
         TimeSpan t = TimeSpan.FromSeconds(Mathf.Max(0, durationSeconds));
         label.text = $"{t.Minutes:D1}:{t.Seconds:D2}";
-        label.transform.parent.gameObject.SetActive(true);
+        Transform pillRoot = label.transform.parent;
+        pillRoot.gameObject.SetActive(true);
+
+        // D3a (badge left/right corners render sharp on device): ImageWithRoundedCorners bakes its
+        // radius against the rect INSIDE Refresh(), but GetOrCreateOverlayPill assigns the pill
+        // radius AFTER the component's AddComponent-time OnEnable already baked against radius 0 —
+        // and a fixed-size point-anchored pill's rect never changes to re-fire
+        // OnRectTransformDimensionsChange, so the radius is never re-baked and the ends stay square
+        // ("round corners needs refresh or something"). Refresh the corners now (rect is usually
+        // already sized) AND once more next frame (covers a cold open where the pill's rect is still
+        // 0×0 at creation, which would otherwise bake a stale size). Reuses the file's RefreshCorners
+        // idiom (radius rebake + Validate/Refresh + masked-stencil invalidation). Note-scoped
+        // Telegram overlay — WhatsApp media never creates this pill.
+        RefreshCorners(pillRoot.gameObject);
+        StartCoroutine(RefreshBadgeCornersDeferred((RectTransform)pillRoot));
+    }
+
+    // One-frame-deferred corner refresh for the кружок duration badge (D3a). The pill's rounded
+    // corners must bake against its FINAL rect; on a cold open the rect can still be 0×0 when the
+    // badge is first shown, so a second refresh after layout settles guarantees round ends. Pooled-
+    // bubble safe: the bubble is recycled, so re-verify the row is still a video note and the pill
+    // is still the live, active badge before touching it (a recycled row that moved off a note hides
+    // the pill via ToggleDurationBadgeOverlay(show:false), so this no-ops).
+    IEnumerator RefreshBadgeCornersDeferred(RectTransform pillRect)
+    {
+        yield return null;
+        if (this == null || pillRect == null) yield break;
+        if (currentVm == null || !currentVm.isVideoNote) yield break;
+        if (!pillRect.gameObject.activeInHierarchy) yield break;
+        LayoutRebuilder.ForceRebuildLayoutImmediate(pillRect);
+        RefreshCorners(pillRect.gameObject);
     }
 
     // "GIF" corner badge, top-left of the video bubble.
