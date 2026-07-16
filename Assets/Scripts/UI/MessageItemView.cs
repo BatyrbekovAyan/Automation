@@ -3864,8 +3864,26 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
         // contrast with. Decision extracted to a pure seam so the WhatsApp-regression
         // matrix (plain in/out NEVER transparent; isVideoNote is TG-only, default false)
         // is unit-tested (BubbleTransparencyPolicyTests).
+        //
+        // D3b (incoming кружок on a white bubble): an INCOMING note is placeholder-first
+        // (tapi body:null + s3Info:{} → download-by-id), unlike the OUTGOING note 05-08
+        // verified (inline s3Info.url → media present at bind → floats immediately). So an
+        // incoming note passes THROUGH a download/loading placeholder before its round preview
+        // shows, and once the round media surface is up a stray-active placeholder overlay (or a
+        // not-yet-cleared expired card) can leave isPlaceholderActive true UNDER the visible
+        // circle — the opaque square then reads as a "white background bubble" around the note.
+        // Fix: once the note's round media surface (messageImage) is actually the visible content,
+        // the circle IS the content and must float regardless of a lingering placeholder GameObject
+        // — matching the verified outgoing behavior. Genuinely card-only states keep the opaque
+        // retry card because they HIDE messageImage (ShowSmartLoadingCard / ShowUnavailableMediaPanel
+        // → activeInHierarchy false). Note-scoped (isVideoNote), so stickers and every WhatsApp
+        // bubble are byte-identical (isVideoNote default false ⇒ noteMediaShowing false ⇒ the
+        // placeholder input is unchanged).
+        bool noteMediaShowing = currentVm.isVideoNote
+            && messageImage != null && messageImage.gameObject.activeInHierarchy;
+        bool effectivePlaceholderActive = isPlaceholderActive && !noteMediaShowing;
         bool isTransparent = BubbleTransparencyPolicy.IsTransparent(
-            currentVm.isSticker, currentVm.isVideoNote, isPlaceholderActive, hideBubble);
+            currentVm.isSticker, currentVm.isVideoNote, effectivePlaceholderActive, hideBubble);
 
         bubbleBackground.color = isTransparent
             ? Color.clear
