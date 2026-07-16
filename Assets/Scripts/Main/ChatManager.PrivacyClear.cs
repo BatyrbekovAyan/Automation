@@ -83,6 +83,13 @@ public partial class ChatManager
         _chatListSyncing = false;
         ClearVideoThumbQueue();
         ClearMediaDownloadQueue();
+        ClearResolveQueues();       // quote/reaction drain workers were just killed; reset their bookkeeping
+
+        // D5: StopAllCoroutines() above killed the open-chat live poll — re-kick it, matching
+        // SetActiveBot / SetActiveChannel, so a privacy clear never strands the poll for the
+        // rest of the session (guarded against duplicates).
+        if (_livePollRoutine != null) StopCoroutine(_livePollRoutine);
+        _livePollRoutine = StartCoroutine(OpenChatLivePollRoutine());
 
         if (Directory.Exists(BotCacheRootDir))
         {

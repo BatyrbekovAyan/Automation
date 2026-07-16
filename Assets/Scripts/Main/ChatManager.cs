@@ -238,8 +238,8 @@ public partial class ChatManager : MonoBehaviour
 
         // D5: start the always-running, self-gating open-chat live poll so a message arriving
         // while a chat stays open renders on its own — no re-entry (see ChatManager.LivePoll.cs).
-        // Re-kicked after the StopAllCoroutines() in SetActiveBot / SetActiveChannel; the null
-        // guard keeps it a single instance.
+        // Re-kicked after the StopAllCoroutines() in SetActiveBot / SetActiveChannel /
+        // ClearAllLocalHistory; the null guard keeps it a single instance.
         if (_livePollRoutine != null) StopCoroutine(_livePollRoutine);
         _livePollRoutine = StartCoroutine(OpenChatLivePollRoutine());
     }

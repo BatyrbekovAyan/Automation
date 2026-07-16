@@ -33,7 +33,8 @@ public partial class ChatManager
 
     /// <summary>
     /// Handle to the single self-gating poll coroutine. Held so it can be re-kicked after every
-    /// StopAllCoroutines() (SetActiveBot / SetActiveChannel) without ever spawning a duplicate.
+    /// StopAllCoroutines() (SetActiveBot / SetActiveChannel / ClearAllLocalHistory) without ever
+    /// spawning a duplicate.
     /// </summary>
     private Coroutine _livePollRoutine;
 
