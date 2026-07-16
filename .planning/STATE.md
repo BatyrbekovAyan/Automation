@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
-status: executing
-stopped_at: Phase 8 Gate A (device UAT) RUN by owner — Overall ISSUES. Defects D1–D8 recorded in 08-DEVICE-UAT.md §Defects (2 high — D5 live-incoming render, D7 chat duplication/cross-channel bleed; 4 medium — D1 REACTION_INVALID, D2 reaction-removal stuck, D3 video-note presentation, D6 bot-creation NRE; 2 approved polish — D4, D8). Next — /gsd-plan-phase 08 --gaps. Gates B (prod copy) + C (close) still pending; prod DORMANT, prod URLs owner-explicit-only. (Earlier same-day: 05-12 off-plan Telegram empty-state hero, 1036/1036 headless.)
-last_updated: "2026-07-16T09:00:00Z"
-last_activity: 2026-07-16 -- Gate A results recorded (ISSUES, D1–D8); gap-closure planning next
+status: planning
+stopped_at: "Phase 8 gap planning COMPLETE — Gate A ran ISSUES (defects D1–D9 in 08-DEVICE-UAT.md), 7 gap plans 08-04..08-10 created + checker-PASSED (planner confirmed root causes: no open-chat poll for D5; SwipeToDelete pre-Awake Bind for D6; non-allowed emoji in quick-bar for D1; no removal state in reconcile for D2). Next: /gsd-execute-phase 08 --gaps-only. Gates B/C still pending; prod DORMANT, prod URLs owner-explicit-only. (Also completed off-plan: 05-12 Telegram empty-state hero, 1036/1036 green headless.)"
+last_updated: "2026-07-16T10:05:00Z"
+last_activity: 2026-07-16 -- Gap plans 08-04..08-10 planned + verified (D1–D9); ready to execute
 progress:
-  total_phases: 7
+  total_phases: 8
   completed_phases: 5
-  total_plans: 17
-  completed_plans: 16
-  percent: 94
+  total_plans: 24
+  completed_plans: 22
+  percent: 92
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-12)
 
 **Core value:** The owner stays in control along the automation↔semi-auto spectrum — the bot can answer autonomously, or propose replies the owner picks and refines, without losing trust or the ability to take over.
-**Current focus:** Phase 08 (device UAT + milestone closeout) — autonomous deliverables done + verified; **human_needed**, awaiting the 3 owner-run gates (Gate A device UAT via `08-DEVICE-UAT.md` → Gate B prod copy via `08-PROD-REPLICATION.md` → Gate C close via `08-MILESTONE-CLOSE.md`). Prod stays DORMANT; the move to prod URLs is owner-explicit-only.
+**Current focus:** Phase 08 (device UAT + milestone closeout) — Gate A ran with ISSUES → **gap-closure round ready**: 7 gap plans (08-04..08-10) planned + checker-passed for defects D1–D9; waves 1–3 autonomous fixes, wave 4 = one consolidated owner device re-verify. Gate B (prod copy) + Gate C (close) still pending after. Prod stays DORMANT; the move to prod URLs is owner-explicit-only.
 
 ## Current Position
 
-Phase: 08 (device-uat-milestone-closeout) — AUTONOMOUS COMPLETE, human_needed
-Plan: 3 of 3 authored (08-DEVICE-UAT.md; 08-PROD-REPLICATION.md + 2 dev-byte-identical script tweaks; 08-MILESTONE-CLOSE.md); each ends in a blocking owner gate
-Status: Gate A dispositioned ISSUES (D1–D8 in 08-DEVICE-UAT.md) → gap-closure planning (/gsd-plan-phase 08 --gaps). Gates B/C pending. Do NOT mark phase/milestone complete until the owner signs off.
-Last activity: 2026-07-16 -- Gate A results recorded; defects D1–D8 filed
+Phase: 08 (device-uat-milestone-closeout) — GAP CLOSURE READY TO EXECUTE
+Plan: 3/10 complete (08-01..03 runbooks done); 7 gap plans 08-04..08-10 pending (D5 live-poll, D7 service-dialog dedup, D1+D2 reactions, D3 video-note, D4+D6 swipe stack, D8+D9 polish, re-verify checkpoint)
+Status: Run /gsd-execute-phase 08 --gaps-only (waves 1→3 autonomous; wave 4 = owner device re-verify). Gates B/C pending. Do NOT mark phase/milestone complete until the owner signs off.
+Last activity: 2026-07-16 -- Gap plans 08-04..08-10 planned + verified (D1–D9)
 
 Progress: [██████████] 100%
 
@@ -129,4 +129,4 @@ Last session: 2026-07-15T16:05:56Z
 Stopped at: Completed 05-12 (off-plan Telegram empty-state hero: untinted logo on a blue circle, owner refinement to 05-10; spriteMode→Single + healed 2 orphaned logo refs to canonical sprite 21300000; 1036/1036 green HEADLESS after owner quit the Editor). Phase 08 still human_needed (3 owner gates).
 Resume file: None
 
-**Planned Phase:** 8 (Device UAT + Milestone Closeout) — 3 plans — 2026-07-15T08:16:54.617Z
+**Planned Phase:** 08 () — 0 plans — 2026-07-16T10:01:11.226Z
