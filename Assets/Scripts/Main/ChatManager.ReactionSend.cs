@@ -129,6 +129,16 @@ public partial class ChatManager
             OnMessageReactionsChanged?.Invoke(target);
             PersistReaction(sendCacheRoot, target);
         }
+
+        // Also revert the chat-list row preview (T-08-06-01). SendReaction optimistically set
+        // "You reacted …" on the row; a failed send must not leave that stuck. Mirror the pill
+        // revert — restore the prior reaction. An empty prior renders "Reaction removed", which
+        // the next chat-list sync overwrites with the real last message (the failed reaction
+        // never reached the server). No "You reacted …" row survives a 400.
+        var revertChatVm = GetChat(target.chatId);
+        if (revertChatVm != null)
+            revertChatVm.SetReactionPreview(
+                priorEmoji ?? "", true, target.text, ChatPreviewFormatter.TargetTypeKey(target.type));
     }
 
     /// <summary>

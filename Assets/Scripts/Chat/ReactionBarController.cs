@@ -17,6 +17,15 @@ public class ReactionBarController : MonoBehaviour
     // WhatsApp quick-reaction set (raw unicode; converted to TMP sprites at render).
     private static readonly string[] QuickEmojis = { "👍", "❤️", "😂", "😮", "😢", "🙏" };
 
+    // D1: on the Telegram channel the WhatsApp bar's 😂/😮 are REACTION_INVALID on tapi, so the
+    // quick 6 come from the Telegram-allowed set instead (both arrays are length 6, so the
+    // index-keyed buttons/labels stay valid). Read at click/render time — never cached in the
+    // Awake closure — so a channel switch is reflected without re-wiring the buttons.
+    private string[] ActiveQuickEmojis =>
+        ChatManager.Instance != null && ChatManager.Instance.ActiveChannel == ChatChannel.Telegram
+            ? TelegramReactionCatalog.QuickEmojis
+            : QuickEmojis;
+
     // Horizontal inset the floating bar/menu keep from the screen edges — matches the bubbles'.
     private const float EdgePadding = 40f;
     // Vertical gap between the pressed bubble and each floating panel (bar above, menu below).
@@ -61,7 +70,7 @@ public class ReactionBarController : MonoBehaviour
         {
             int idx = i;
             _labels[i] = emojiButtons[i].GetComponentInChildren<TextMeshProUGUI>(true);
-            emojiButtons[i].onClick.AddListener(() => OnEmojiTapped(QuickEmojis[idx]));
+            emojiButtons[i].onClick.AddListener(() => OnEmojiTapped(ActiveQuickEmojis[idx]));
         }
         if (plusButton != null) plusButton.onClick.AddListener(OnPlusTapped);
         if (replyAction != null) replyAction.onClick.AddListener(OnReplyTapped);
@@ -239,18 +248,20 @@ public class ReactionBarController : MonoBehaviour
 
     private void RenderEmojiLabels()
     {
+        var quick = ActiveQuickEmojis;
         for (int i = 0; i < _labels.Length; i++)
             if (_labels[i] != null)
-                _labels[i].text = UnicodeEmojiConverter.ConvertRealEmojisToSprites(QuickEmojis[i], MissingEmojiMode.Hide);
+                _labels[i].text = UnicodeEmojiConverter.ConvertRealEmojisToSprites(quick[i], MissingEmojiMode.Hide);
     }
 
     private void RefreshHighlight()
     {
         string mine = OutgoingReaction.CurrentMyEmoji(_target);
+        var quick = ActiveQuickEmojis;
         for (int i = 0; i < emojiButtons.Length && i < 6; i++)
         {
             var img = emojiButtons[i].targetGraphic as Image;
-            if (img != null) img.color = (mine != null && QuickEmojis[i] == mine) ? selectedTint : normalTint;
+            if (img != null) img.color = (mine != null && quick[i] == mine) ? selectedTint : normalTint;
         }
     }
 

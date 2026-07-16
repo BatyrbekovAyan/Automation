@@ -36,6 +36,7 @@ public class EmojiPickerController : MonoBehaviour
     private readonly List<TextMeshProUGUI> _cellLabels = new List<TextMeshProUGUI>();
     private readonly List<string> _cellEmojis = new List<string>();
     private bool _built;
+    private ChatChannel _builtForChannel;   // the channel the current grid was built for
 
     private void Awake()
     {
@@ -84,14 +85,46 @@ public class EmojiPickerController : MonoBehaviour
 
     private void BuildSectionsIfNeeded()
     {
-        if (_built || listContent == null) return;
+        if (listContent == null) return;
 
-        foreach (var category in ReactionEmojiCatalog.Categories)
+        // D1: on Telegram the picker offers only tapi-allowed emoji; WhatsApp keeps the full
+        // catalog. Rebuild when the channel differs from the grid we cached so the picker is
+        // never a stale WhatsApp grid on Telegram (or vice-versa).
+        ChatChannel channel = ChatManager.Instance != null
+            ? ChatManager.Instance.ActiveChannel
+            : ChatChannel.WhatsApp;
+        if (_built && _builtForChannel == channel) return;
+
+        if (_built) TearDownSections();
+
+        IReadOnlyList<ReactionEmojiCatalog.Category> categories =
+            channel == ChatChannel.Telegram
+                ? TelegramReactionCatalog.FilterCategories()
+                : ReactionEmojiCatalog.Categories;
+
+        foreach (var category in categories)
         {
             BuildHeader(category.Name);
             BuildGrid(category.Emojis);
         }
         _built = true;
+        _builtForChannel = channel;
+    }
+
+    // Detach + destroy the current sections so a channel switch rebuilds from scratch. Detach
+    // this frame (SetParent(null)) so the deferred Destroy can't leave a stale grid in the
+    // layout for a frame; the cell trackers are cleared to match.
+    private void TearDownSections()
+    {
+        for (int i = listContent.childCount - 1; i >= 0; i--)
+        {
+            var child = listContent.GetChild(i);
+            child.SetParent(null, false);
+            Destroy(child.gameObject);
+        }
+        _cellLabels.Clear();
+        _cellEmojis.Clear();
+        _built = false;
     }
 
     private void BuildHeader(string text)
