@@ -4607,7 +4607,10 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
     private void RenderReactions()
     {
         var reactions = currentVm != null ? currentVm.reactions : null;
-        bool hasReactions = reactions != null && reactions.Count > 0;
+        // Clearance follows VISIBLE reactions, not the raw list: a lone removal tombstone (D2,
+        // empty emoji) hides the pill, so it must not reserve empty space under the bubble.
+        var (visibleEmojis, _) = ReactionSummary.Build(reactions);
+        bool hasReactions = visibleEmojis.Count > 0;
 
         if (reactionPill != null) reactionPill.Render(reactions);
         ApplyReactionClearance(hasReactions);

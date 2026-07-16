@@ -56,6 +56,27 @@ public class ReactionSummaryTests
         });
         Assert.AreEqual(3, emojis.Count);                 // capped
         CollectionAssert.AreEqual(new[] { "😂", "❤️", "👍" }, emojis);
-        Assert.AreEqual(4, count);                        // count still counts everyone
+        Assert.AreEqual(4, count);                        // count still counts everyone visible
+    }
+
+    [Test]
+    public void Build_EmptyEmojiTombstone_ExcludedFromEmojisAndCount()
+    {
+        // D2: an empty-emoji "me" removal tombstone is not a real reaction — it must neither
+        // add a glyph nor inflate the reactor count.
+        var (emojis, count) = ReactionSummary.Build(new List<MessageReaction>
+        {
+            R("❤️", "999"), R("", "me")
+        });
+        CollectionAssert.AreEqual(new[] { "❤️" }, emojis);
+        Assert.AreEqual(1, count);
+    }
+
+    [Test]
+    public void Build_LoneTombstone_IsEmpty()
+    {
+        var (emojis, count) = ReactionSummary.Build(new List<MessageReaction> { R("", "me") });
+        Assert.AreEqual(0, emojis.Count);
+        Assert.AreEqual(0, count);
     }
 }

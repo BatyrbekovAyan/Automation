@@ -42,7 +42,21 @@ public partial class ChatManager
 
         // --- INSTANT UI: apply + notify + persist before any network call ---
         string sendCacheRoot = GetCacheRoot();
-        if (ReactionStore.ApplyToMessage(target, ev))
+        bool applied = ReactionStore.ApplyToMessage(target, ev);
+
+        // D2 removal tombstone (Telegram only): a bare removal leaves NO "me" entry, so the next
+        // reactions reconcile can't tell "just removed" from "never reacted" and tapi's stale
+        // echo resurrects the reaction. Leave a fresh empty-emoji "me" marker that
+        // TelegramReactionMerge suppresses within its grace window. WhatsApp reconciles through
+        // ReactionStore (no merge) and stays byte-identical.
+        if (ActiveChannel == ChatChannel.Telegram && ev.IsRemoval)
+        {
+            target.reactions ??= new List<MessageReaction>();
+            TelegramReactionMerge.StampRemovalTombstone(target.reactions, now);
+            applied = true;
+        }
+
+        if (applied)
         {
             OnMessageReactionsChanged?.Invoke(target);
             PersistReaction(sendCacheRoot, target);

@@ -26,24 +26,70 @@ public static class TelegramReactionMerge
 
     /// <summary>
     /// Server list wins for all reactions except a FRESH optimistic owner entry (tap within
-    /// <see cref="OptimisticGraceSeconds"/> of <paramref name="nowUnix"/>), which replaces the
-    /// server's "me" element (stale echo during an emoji change) or rides alongside when the
-    /// echo hasn't landed yet. Returns null when the merged result is empty (so "all reactions
-    /// removed" clears the list).
+    /// <see cref="OptimisticGraceSeconds"/> of <paramref name="nowUnix"/>). A fresh non-empty
+    /// "me" replaces the server's "me" element (stale echo during an emoji change) or rides
+    /// alongside when the echo hasn't landed yet; a fresh EMPTY "me" is a removal tombstone
+    /// (D2) that SUPPRESSES the server's stale "me" echo so a just-removed reaction can't
+    /// resurrect. Returns null when the merged result is empty (so "all reactions removed"
+    /// clears the list).
     /// </summary>
     public static List<MessageReaction> Merge(List<MessageReaction> cached, List<MessageReaction> server, long nowUnix)
     {
         var result = server != null ? new List<MessageReaction>(server) : new List<MessageReaction>();
 
         MessageReaction mine = FindMine(cached);
-        if (mine != null && !string.IsNullOrEmpty(mine.emoji) && IsFreshOptimistic(mine, nowUnix))
+        if (mine != null && IsFreshOptimistic(mine, nowUnix))
         {
             int serverMine = IndexOfMine(result);
-            if (serverMine >= 0) result[serverMine] = mine;   // fresh local emoji beats a stale echo
-            else result.Add(mine);                            // not yet echoed — keep the optimistic entry
+            if (string.IsNullOrEmpty(mine.emoji))
+            {
+                // Fresh optimistic REMOVAL tombstone: drop the server's stale "me" echo and add
+                // nothing, so a reaction the owner just removed can't come back within the grace
+                // window (the server keeps echoing it for a cycle after a successful removal).
+                if (serverMine >= 0) result.RemoveAt(serverMine);
+            }
+            else if (serverMine >= 0)
+            {
+                result[serverMine] = mine;   // fresh local emoji beats a stale echo
+            }
+            else
+            {
+                result.Add(mine);            // not yet echoed — keep the optimistic entry
+            }
         }
 
         return result.Count > 0 ? result : null;
+    }
+
+    /// <summary>
+    /// Stamp a FRESH optimistic-removal tombstone for the owner ("me") after a toggle-off: an
+    /// empty-emoji "me" entry carrying the tap time. <see cref="Merge"/> reads it as a removal
+    /// and suppresses the server's stale "me" echo within <see cref="OptimisticGraceSeconds"/>,
+    /// so a just-removed reaction cannot resurrect (D2). Reuses an existing "me" slot (blanking
+    /// it) rather than duplicating. Empty-emoji entries never render (ReactionSummary skips them).
+    /// No-ops on a null list — the caller owns the field and guarantees it is non-null.
+    /// </summary>
+    public static void StampRemovalTombstone(List<MessageReaction> reactions, long nowUnix)
+    {
+        if (reactions == null) return;
+
+        int idx = IndexOfMine(reactions);
+        if (idx >= 0)
+        {
+            reactions[idx].emoji = "";
+            reactions[idx].time = nowUnix;
+            reactions[idx].fromMe = true;
+            return;
+        }
+
+        reactions.Add(new MessageReaction
+        {
+            emoji = "",
+            reactorKey = OutgoingReaction.MeReactorKey,
+            senderName = "Me",
+            fromMe = true,
+            time = nowUnix
+        });
     }
 
     /// <summary>Order-insensitive equality by the (reactorKey, emoji) multiset — avoids a

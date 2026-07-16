@@ -13,12 +13,16 @@ public static class ReactionSummary
         var emojis = new List<string>();
         if (reactions == null || reactions.Count == 0) return (emojis, 0);
 
+        // Empty-emoji entries are removal tombstones (D2), not real reactions — they must not
+        // show a glyph OR inflate the reactor count, so the count tracks only visible emoji.
+        int count = 0;
         foreach (var r in reactions)
         {
             if (r == null || string.IsNullOrEmpty(r.emoji)) continue;
+            count++;
             if (emojis.Count < MaxEmojis && !emojis.Contains(r.emoji))
                 emojis.Add(r.emoji);
         }
-        return (emojis, reactions.Count);
+        return (emojis, count);
     }
 }
