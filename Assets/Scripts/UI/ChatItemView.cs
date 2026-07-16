@@ -119,12 +119,37 @@ public void Bind(ChatViewModel model)
         button.onClick.RemoveAllListeners();
         button.onClick.AddListener(OnClick);
 
-        if (swipeToDelete != null) swipeToDelete.ResetClosed();
+        // Swipe-to-delete is a WhatsApp-only affordance (Telegram has no chat/delete endpoint —
+        // the 05-03 network guard already no-ops it; the D4 owner decision removes the VISUAL
+        // slide on TG rows too). Rows are pooled and rebind across bots/channels, so set the
+        // enabled state EXPLICITLY on every Bind — never inherit the prior channel's state.
+        ChatChannel rowChannel = ChatManager.Instance != null
+            ? ChatManager.Instance.ActiveChannel
+            : ChatChannel.WhatsApp;
+        bool swipeEnabled = ChatRowSwipePolicy.Enabled(rowChannel);
+
+        // Snap shut first so a row swiped-open on WhatsApp closes before a channel-swap rebind
+        // (and stays closed when the affordance is then disabled on Telegram).
+        if (swipeToDelete != null)
+        {
+            swipeToDelete.ResetClosed();
+            swipeToDelete.enabled = swipeEnabled; // disabled ⇒ no drag callbacks ⇒ no slide
+        }
 
         if (deleteButton != null)
         {
             deleteButton.onClick.RemoveAllListeners();
-            deleteButton.onClick.AddListener(OnDeleteClicked);
+            if (swipeEnabled)
+            {
+                deleteButton.gameObject.SetActive(true);
+                deleteButton.onClick.AddListener(OnDeleteClicked);
+            }
+            else
+            {
+                // No reveal target on Telegram — hide the red button so a disabled swipe
+                // can never expose it on a pooled row that had been a WhatsApp row.
+                deleteButton.gameObject.SetActive(false);
+            }
         }
     }
 
