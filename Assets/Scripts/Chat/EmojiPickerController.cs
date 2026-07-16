@@ -100,7 +100,7 @@ public class EmojiPickerController : MonoBehaviour
         IReadOnlyList<ReactionEmojiCatalog.Category> categories =
             channel == ChatChannel.Telegram
                 ? TelegramReactionCatalog.FilterCategories()
-                : ReactionEmojiCatalog.Categories;
+                : (IReadOnlyList<ReactionEmojiCatalog.Category>)ReactionEmojiCatalog.Categories;
 
         foreach (var category in categories)
         {
