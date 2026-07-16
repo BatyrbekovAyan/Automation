@@ -95,4 +95,73 @@ public class ChatIdFormatTests
     // WR-03: a WA-suffixed id must never flip to group off a "channel" type either.
     [Test] public void IsGroup_Full_WaOneToOneSuffix_ChannelType_StaysNonGroup() =>
         Assert.IsFalse(ChatIdFormat.IsGroup("79995579399@c.us", "channel", false));
+
+    // --- CanonicalKey(id, channel): D7 dedup key — WhatsApp verbatim, Telegram twin collapses ---
+
+    // WhatsApp: byte-identical to chat.id (suffix + number are the identity).
+    [Test] public void CanonicalKey_Wa_OneToOne_Verbatim() =>
+        Assert.AreEqual("79995579399@c.us", ChatIdFormat.CanonicalKey("79995579399@c.us", ChatChannel.WhatsApp));
+
+    [Test] public void CanonicalKey_Wa_Group_Verbatim() =>
+        Assert.AreEqual("120363012345@g.us", ChatIdFormat.CanonicalKey("120363012345@g.us", ChatChannel.WhatsApp));
+
+    [Test] public void CanonicalKey_Wa_TwoDistinctIds_DifferentKeys() =>
+        Assert.AreNotEqual(ChatIdFormat.CanonicalKey("79995579399@c.us", ChatChannel.WhatsApp),
+                           ChatIdFormat.CanonicalKey("79115576367@c.us", ChatChannel.WhatsApp));
+
+    // Telegram: bare id unchanged; a spurious @c.us/@g.us twin collapses onto the bare id.
+    [Test] public void CanonicalKey_Tg_Bare_Verbatim() =>
+        Assert.AreEqual("777000", ChatIdFormat.CanonicalKey("777000", ChatChannel.Telegram));
+
+    [Test] public void CanonicalKey_Tg_SpuriousCUs_CollapsesToBare() =>
+        Assert.AreEqual("777000", ChatIdFormat.CanonicalKey("777000@c.us", ChatChannel.Telegram));
+
+    [Test] public void CanonicalKey_Tg_SpuriousGUs_CollapsesToBare() =>
+        Assert.AreEqual("777000", ChatIdFormat.CanonicalKey("777000@g.us", ChatChannel.Telegram));
+
+    [Test] public void CanonicalKey_Tg_TwinForms_SameKey() =>
+        Assert.AreEqual(ChatIdFormat.CanonicalKey("777000", ChatChannel.Telegram),
+                        ChatIdFormat.CanonicalKey("777000@c.us", ChatChannel.Telegram));
+
+    [Test] public void CanonicalKey_NullPassesThrough() =>
+        Assert.IsNull(ChatIdFormat.CanonicalKey(null, ChatChannel.Telegram));
+
+    [Test] public void CanonicalKey_EmptyPassesThrough() =>
+        Assert.AreEqual("", ChatIdFormat.CanonicalKey("", ChatChannel.WhatsApp));
+
+    [Test] public void CanonicalKey_NeverThrows_OnNullOrEmpty()
+    {
+        Assert.DoesNotThrow(() => ChatIdFormat.CanonicalKey(null, ChatChannel.WhatsApp));
+        Assert.DoesNotThrow(() => ChatIdFormat.CanonicalKey("", ChatChannel.Telegram));
+    }
+
+    // --- IsForeignToChannel(id, channel): D7 cross-channel bleed defence ---
+
+    // WhatsApp: a bare (Telegram-form) id bled in — reject it.
+    [Test] public void IsForeign_Wa_BareTelegramId_True() =>
+        Assert.IsTrue(ChatIdFormat.IsForeignToChannel("777000", ChatChannel.WhatsApp));
+
+    // WhatsApp: every genuine jid carries an '@' — never dropped.
+    [Test] public void IsForeign_Wa_OneToOne_False() =>
+        Assert.IsFalse(ChatIdFormat.IsForeignToChannel("79995579399@c.us", ChatChannel.WhatsApp));
+
+    [Test] public void IsForeign_Wa_Group_False() =>
+        Assert.IsFalse(ChatIdFormat.IsForeignToChannel("120363012345@g.us", ChatChannel.WhatsApp));
+
+    // Exotic-but-genuine WhatsApp jids (broadcast/newsletter/lid) all carry '@' — kept.
+    [Test] public void IsForeign_Wa_BroadcastJid_False() =>
+        Assert.IsFalse(ChatIdFormat.IsForeignToChannel("status@broadcast", ChatChannel.WhatsApp));
+
+    // Telegram never rejects — the bare id is native; a @c.us twin is merged, not dropped.
+    [Test] public void IsForeign_Tg_BareId_False() =>
+        Assert.IsFalse(ChatIdFormat.IsForeignToChannel("777000", ChatChannel.Telegram));
+
+    [Test] public void IsForeign_Tg_SpuriousCUsTwin_False() =>
+        Assert.IsFalse(ChatIdFormat.IsForeignToChannel("777000@c.us", ChatChannel.Telegram));
+
+    [Test] public void IsForeign_NullOrEmpty_False()
+    {
+        Assert.IsFalse(ChatIdFormat.IsForeignToChannel(null, ChatChannel.WhatsApp));
+        Assert.IsFalse(ChatIdFormat.IsForeignToChannel("", ChatChannel.WhatsApp));
+    }
 }
