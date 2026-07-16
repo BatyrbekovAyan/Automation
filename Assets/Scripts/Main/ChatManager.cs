@@ -249,7 +249,10 @@ public partial class ChatManager : MonoBehaviour
 
     public ChatViewModel GetChat(string chatId)
     {
-        if (chatLookup.TryGetValue(chatId, out var chat))
+        // D7: resolve through the same channel-canonical key the list is keyed by, so a caller
+        // passing a raw (possibly suffix-twinned) id still finds the deduped row. WhatsApp:
+        // CanonicalKey is verbatim ⇒ byte-identical to the previous raw lookup.
+        if (chatLookup.TryGetValue(ChatIdFormat.CanonicalKey(chatId, ActiveChannel), out var chat))
         {
             return chat;
         }
@@ -264,10 +267,13 @@ public partial class ChatManager : MonoBehaviour
         ChatsResponse response = JsonUtility.FromJson<ChatsResponse>(json);
         if (response?.dialogs == null) return;
 
-        // Ids the server currently lists (used by the stale-chat sweep below).
+        // Ids the server currently lists (used by the stale-chat sweep below). Keyed by the
+        // channel-canonical id so the sweep compares like-for-like against chatLookup (D7); a
+        // foreign-channel (bled) dialog never enters the set. WhatsApp: canonical == raw chat.id.
         var serverIds = new System.Collections.Generic.HashSet<string>();
         foreach (var d in response.dialogs)
-            if (d != null && d.id != null) serverIds.Add(d.id);
+            if (d != null && d.id != null && !ChatIdFormat.IsForeignToChannel(d.id, ActiveChannel))
+                serverIds.Add(ChatIdFormat.CanonicalKey(d.id, ActiveChannel));
 
         // ONLY clear the UI and memory if this is the very first instant load
         if (isInitialLoad)
@@ -283,16 +289,27 @@ public partial class ChatManager : MonoBehaviour
 
         foreach (var chat in response.dialogs)
         {
+            // D7 cross-channel bleed: a real WhatsApp id always carries an '@' jid suffix, so a
+            // bare (Telegram-form) id on the WhatsApp list is a leaked Telegram dialog — e.g. the
+            // 777000 service dialog persisted under the legacy WhatsApp cache root before CHAT-11.
+            // Drop it before it can spawn a row. No-op on live WhatsApp data and on Telegram.
+            if (ChatIdFormat.IsForeignToChannel(chat.id, ActiveChannel)) continue;
+
+            // D7 double id-form: two id-forms of the SAME dialog (the 777000 service dialog's bare
+            // row + its spurious @c.us twin) share one canonical key, so they dedup to a single row
+            // instead of spawning two. WhatsApp: canonical == chat.id (byte-identical keying).
+            string chatKey = ChatIdFormat.CanonicalKey(chat.id, ActiveChannel);
+
             // Honor Wappi's delete flag: a successful chat/delete sets isDeleted, so the chat stays
             // hidden across syncs, bot-switches, and restarts. (Deletes made directly in the WhatsApp
             // app do NOT set isDeleted and aren't visible to us — that case is unsupported.)
             if (chat.isDeleted)
             {
-                if (chatLookup.TryGetValue(chat.id, out var deletedVm))
+                if (chatLookup.TryGetValue(chatKey, out var deletedVm))
                 {
                     Chats.Remove(deletedVm);
-                    chatLookup.Remove(chat.id);
-                    OnChatRemoved?.Invoke(chat.id);
+                    chatLookup.Remove(chatKey);
+                    OnChatRemoved?.Invoke(chatKey);
                 }
                 continue;
             }
@@ -303,14 +320,15 @@ public partial class ChatManager : MonoBehaviour
 
             // DisplayFallback never slices a numeric/short/empty Telegram id (retires the crash-prone tail slice).
             string displayName = string.IsNullOrEmpty(chat.name)
-                ? ChatIdFormat.DisplayFallback(chat.id)
+                ? ChatIdFormat.DisplayFallback(chatKey)
                 : UnicodeEmojiConverter.ConvertRealEmojisToSprites(chat.name);
             string lastMsg = string.IsNullOrEmpty(chat.last_message_data) ? "" : UnicodeEmojiConverter.ConvertRealEmojisToSprites(chat.last_message_data);
 
             // Groupness: WhatsApp @g.us/isGroup flag; Telegram dialog type == "chat".
-            bool isGroup = ChatIdFormat.IsGroup(chat.id, chat.type, chat.isGroup);
+            // Derived from the canonical key so a stripped-suffix twin never mis-flags groupness.
+            bool isGroup = ChatIdFormat.IsGroup(chatKey, chat.type, chat.isGroup);
 
-            if (chatLookup.TryGetValue(chat.id, out var existingVm))
+            if (chatLookup.TryGetValue(chatKey, out var existingVm))
             {
                 // --- THE SMART MERGE ---
                 // The chat is already on the screen! Do not destroy the prefab!
@@ -339,13 +357,18 @@ public partial class ChatManager : MonoBehaviour
 
                 notifyIncoming |= IncomingNotifyPolicy.ShouldNotify(
                     isInitialLoad, lastIdChanged, mergedIsMine, chat.unread_count,
-                    chat.id, currentChatId, chatPanelVisible);
+                    chatKey, currentChatId, chatPanelVisible);
             }
             else
             {
                 // This is a brand new chat we haven't seen before, spawn it!
                 bool isMine = chat.last_message_sender != null && chat.last_message_sender.isMe;
-                var chatVM = new ChatViewModel(chat.id, displayName, chat.thumbnail, lastMsg, unixTime,
+                // Construct with the canonical key so vm.ChatId == the lookup key: on Telegram that
+                // is the bare tapi id (the correct deep-link / message-fetch / recipient id, never
+                // the spurious @c.us twin) regardless of which id-form arrived first; on WhatsApp it
+                // is byte-identical to chat.id. Every downstream chatLookup consumer (GetChat /
+                // SelectChat / Dashboard / DeleteChat) then resolves by vm.ChatId with no further change.
+                var chatVM = new ChatViewModel(chatKey, displayName, chat.thumbnail, lastMsg, unixTime,
                                                unreadCount: chat.unread_count,
                                                lastMessageId: chat.last_message_id,
                                                lastMessageType: chat.last_message_type,
@@ -354,12 +377,12 @@ public partial class ChatManager : MonoBehaviour
                                                lastMessageSenderName: chat.last_message_sender?.pushname,
                                                isGroup: isGroup);
                 Chats.Add(chatVM);
-                chatLookup[chat.id] = chatVM;
+                chatLookup[chatKey] = chatVM;
                 OnChatAdded?.Invoke(chatVM);
 
                 notifyIncoming |= IncomingNotifyPolicy.ShouldNotify(
                     isInitialLoad, lastIdChanged: true, lastMessageIsMine: isMine,
-                    unreadCount: chat.unread_count, chatId: chat.id,
+                    unreadCount: chat.unread_count, chatId: chatKey,
                     openChatId: currentChatId, chatPanelVisible: chatPanelVisible);
             }
         }
