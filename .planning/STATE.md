@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
 status: executing
-stopped_at: "Completed 08-13-PLAN.md (D10: WA «Вместе» relevance — Assemble prompt anchor)"
-last_updated: "2026-07-17T07:48:06.500Z"
+stopped_at: "Completed 08-14-PLAN.md (D12: channel-aware create-bot CTA — Telegram preselected)"
+last_updated: "2026-07-17T07:57:47.480Z"
 last_activity: 2026-07-17
 progress:
   total_phases: 8
   completed_phases: 5
   total_plans: 30
-  completed_plans: 32
+  completed_plans: 33
   percent: 100
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 ## Current Position
 
 Phase: 08 (device-uat-milestone-closeout) — EXECUTING
-Plan: 4 of 16
+Plan: 5 of 16
 Status: Ready to execute
 Last activity: 2026-07-17
 
@@ -82,6 +82,7 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [Phase 8]: 08-11 D2 refined (reaction identity/VS16) gap-closure — CONFIRMED from read-only tapi capture: (A) tapi echoes the heart as base ❤ U+2764 (bytes e2 9d a4) while the app stores qualified ❤️ U+2764 U+FE0F; (B) owner reactions key by user_id 1038376805 == the from on fromMe rows, but _tgOwnUserId was stranded null on switch. Fix A = new pure ReactionEmoji (CompareKey/SameEmoji/Canonical) threaded at every seam: mapper stores Canonical(reaction) (renders a sprite + matches optimistic), ReactionSummary dedups by CompareKey, Merge.Key gains a U+0001 separator (IN-06)+CompareKey, OutgoingReaction toggle-off + ReactionBar highlight use SameEmoji. Fix B = persist _tgOwnUserId per Telegram profile ({tgId}TgOwnUserId) + LOAD it at both SetActiveBot/SetActiveChannel resets reading the Telegram id EXPLICITLY (ActiveChannel still holds the old channel at reset) + a belt-and-suspenders same-canonical-emoji fold in Merge (collapses count-2 for the first-ever reaction, scoped to a fresh optimistic me). Reinterprets 05-06 WR-01 same-emoji 'keep both' as the owner's un-mapped echo. Editor-only #if UNITY_EDITOR echo-hex log for the 08-16 capture. WhatsApp byte-identical (compare-only); 1105/1105 EditMode green FRESH. commits 44b732e/de48f35/ee97391/1be6300/ab29bd6. Device re-verify (3 symptoms gone + echo hex/user_id capture) rides 08-16.
 - [Phase 8]: 08-12 D9 gap-closure (low, RE-FAIL) — Telegram sync pill was NEVER legibly visible. Diagnosis-first (Editor): H1 CONFIRMED primary (SyncAllChats always yields on SendWebRequest so the pill DOES render, but a fast cached-list load flashes it sub-legibly), H2 partial-but-benign (start+end before OnEnable only at startup, not the switch case), H3 REFUTED-as-race (ActiveChannel set BEFORE load at both startup and SetActiveChannel; re-sync always re-fires) but the switch-to-TG show added as defense-in-depth, H4 REFUTED (last-child + same CanvasGroup pattern as working SyncingView; flash proves alpha reaches screen → NO scene stamp), H5 CONFIRMED-SAFE (privacy-clear resync re-owns the pill; BeginSpin kills the pending deferred-hide). Fix = new pure ChatListSyncIndicatorGate (MinVisibleSeconds=0.6 floor, RemainingVisibleSeconds/ShouldHideNow) + ChatListSyncIndicator hides THROUGH the gate (WaitForSecondsRealtime deferred-hide, killed on Hide/OnDisable/OnActiveBotChanged/new-sync) + switch-to-Telegram-while-syncing BeginSpin. Code-only, WhatsApp byte-identical; 1111/1111 EditMode green FRESH (1105+6). commits 14ecfe8/d172213/4d189f3/328b809. Device re-verify (pill visible on fast TG load, WA none, never sticks) rides 08-16.
 - [Phase 8]: 08-13 D10 gap-closure (WA «Вместе» relevance) — DIAGNOSIS-FIRST. Confirmed client symmetric (BuildPayloadJson one builder; TryGetRecentMessages channel-agnostic; HandleLive sets lastIncomingText with no channel branch) AND workflow structurally symmetric (both RAG nodes → Assemble, single-key botWaId/botTgId filters, channel routing, Assemble reads p.messages/queryText/catalog from Prep path-independently, channel-neutral prompt) — all four pre-flagged hypotheses REFUTED (verifier already guarantees them). Sole WA-vs-TG runtime asymmetry = RAG retrieval: WA runs a live botWaId query (dev has stray WA chunks) while TG returns 0 rows on dev, and the newest incoming was only IMPLICIT in fenced.messages, so WA retrieval noise buried it → irrelevant. Fix = SHARED Assemble prompt anchor: РЕЛЕВАНТНОСТЬ (ГЛАВНОЕ) directive (answer the LAST incoming; catalog/RAG facts-only) + explicit fenced.lastClientMessage=p.queryText. Telegram byte-identical (git diff = only Assemble line 237; zero botTgId/Retrieve RAG TG/If channel TG bytes); verify-telegram-parity.py green; NO client change. commit fa2ac8c. Live dev-n8n deploy + WA relevance re-test ride 08-16.
+- [Phase 8]: 08-14 D12 gap-closure — Telegram create-bot CTA now channel-aware. Diagnosis-first: root cause (ii) opens-with-WhatsApp (NOT an inert handler) — the NoBotsExist «Создать бота» CTA is wired + interactable on EVERY channel (ConfigureForReason wiring is channel-agnostic, ApplyChannelAccent recolors only/never unwires, Show sets interactable+blocksRaycasts), and StartNewBot+AddBotPanel.Open are channel-agnostic; the SOLE bug was OpenCreateBotFlow hardcoding SelectPlatform(1). Fix = preselect from ChatManager.ActiveChannel (Telegram=>2, else=>1), both ChatManager/Manager null-guarded; WhatsApp byte-identical (still resolves 1), no scene change, no new test (MonoBehaviour glue through the already-tested ChatChannel enum). 1111/1111 EditMode green FRESH (Assembly-CSharp.dll recompiled 12:23:52->12:54:04). commit a52f385. Device re-verify (TG «Создать бота» opens the Add-Bot form with Telegram preselected; WA unchanged) rides 08-16.
 
 ### Pending Todos
 
@@ -140,11 +141,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 08 P08-11 | 13min | 2 tasks | 13 files |
 | Phase 08 P08-12 | 12min | 2 tasks | 5 files |
 | Phase 08 P08-13 | 13min | 2 tasks | 1 files |
+| Phase 08 P08-14 | 7min | 2 tasks | 1 files |
 
 ## Session Continuity
 
-Last session: 2026-07-17T07:47:42.106Z
-Stopped at: Completed 08-13-PLAN.md (D10: WA «Вместе» relevance — Assemble prompt anchor)
+Last session: 2026-07-17T07:57:47.463Z
+Stopped at: Completed 08-14-PLAN.md (D12: channel-aware create-bot CTA — Telegram preselected)
 Resume file: None
 
 **Planned Phase:** 08 () — 0 plans — 2026-07-16T22:12:38.522Z
