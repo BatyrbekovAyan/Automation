@@ -233,12 +233,26 @@ public class EmptyStateView : MonoBehaviour
 
     private void OpenCreateBotFlow()
     {
+#if UNITY_EDITOR
+        // [D12] Diagnosis pivot (08-18): D12 re-failed on device as INERT ("nothing happens").
+        // If this ENTRY log fires on tap, the button IS receiving the click — the cause is
+        // downstream (StartNewBot / AddBotPanel.Open). If it never fires, the tap is blocked
+        // BEFORE the button (raycast occlusion or a parent CanvasGroup). Editor-only, grep-removable.
+        Debug.Log($"[D12] OpenCreateBotFlow ENTRY ch={(ChatManager.Instance != null ? ChatManager.Instance.ActiveChannel.ToString() : "null")}");
+#endif
+
         // Reuse the exact add-bot entry the header "+" uses: StartNewBot ensures the
         // Bots tab is active, then opens the Add-Bot overlay directly. Find it
         // include-inactive so it works even if the Bots tab was never opened this
         // session (BotsPage.Instance is set only after Screen_Bots first activates).
         BotsPage botsPage = FindFirstObjectByType<BotsPage>(FindObjectsInactive.Include);
         if (botsPage != null) botsPage.StartNewBot();
+
+#if UNITY_EDITOR
+        // [D12] Did the overlay actually open? If botsPageFound is false OR panelOpen stays false
+        // after StartNewBot, the "swallowed effect" path (C3) is live — the Task 2 Open-guard covers it.
+        Debug.Log($"[D12] after StartNewBot botsPageFound={(botsPage != null)} panelOpen={(AddBotPanel.Instance != null && AddBotPanel.Instance.IsOpen)}");
+#endif
 
         // Preselect the platform for the channel the empty state surfaced on: Telegram (2)
         // from the Telegram channel, WhatsApp (1) otherwise. The empty state is themed for
@@ -248,6 +262,9 @@ public class EmptyStateView : MonoBehaviour
         // so the page is active and SelectPlatform's UI updates apply.
         int platform = (ChatManager.Instance != null
                         && ChatManager.Instance.ActiveChannel == ChatChannel.Telegram) ? 2 : 1;
+#if UNITY_EDITOR
+        Debug.Log($"[D12] SelectPlatform({platform}) manager={(Manager.Instance != null)}");
+#endif
         if (Manager.Instance != null) Manager.Instance.SelectPlatform(platform);
     }
 
