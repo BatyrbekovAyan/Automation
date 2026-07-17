@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
 status: executing
-stopped_at: "Completed 08-17-PLAN.md (D2-ext: loaded-window Telegram reaction reconcile)"
-last_updated: "2026-07-17T14:34:29.426Z"
+stopped_at: Completed 08-18-PLAN.md (D12 wide diagnosis + channel-switch re-wire)
+last_updated: "2026-07-17T15:14:45.630Z"
 last_activity: 2026-07-17
 progress:
   total_phases: 8
   completed_phases: 5
   total_plans: 35
-  completed_plans: 31
-  percent: 89
+  completed_plans: 37
+  percent: 100
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 ## Current Position
 
 Phase: 08 (device-uat-milestone-closeout) — EXECUTING
-Plan: 17 of 21 (round-3 gap plans 08-17..08-21 executing)
-Status: Executing round 3 (D2-ext / D12 / D13 + consolidated re-verify)
-Last activity: 2026-07-17 -- 08-17 complete (D2-ext loaded-window reaction reconcile)
+Plan: 18 of 21 (round-3 gap plans 08-17..08-21 executing)
+Status: Ready to execute
+Last activity: 2026-07-17
 
-Progress: [████████░░] 81%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -85,6 +85,7 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [Phase 8]: 08-14 D12 gap-closure — Telegram create-bot CTA now channel-aware. Diagnosis-first: root cause (ii) opens-with-WhatsApp (NOT an inert handler) — the NoBotsExist «Создать бота» CTA is wired + interactable on EVERY channel (ConfigureForReason wiring is channel-agnostic, ApplyChannelAccent recolors only/never unwires, Show sets interactable+blocksRaycasts), and StartNewBot+AddBotPanel.Open are channel-agnostic; the SOLE bug was OpenCreateBotFlow hardcoding SelectPlatform(1). Fix = preselect from ChatManager.ActiveChannel (Telegram=>2, else=>1), both ChatManager/Manager null-guarded; WhatsApp byte-identical (still resolves 1), no scene change, no new test (MonoBehaviour glue through the already-tested ChatChannel enum). 1111/1111 EditMode green FRESH (Assembly-CSharp.dll recompiled 12:23:52->12:54:04). commit a52f385. Device re-verify (TG «Создать бота» opens the Add-Bot form with Telegram preselected; WA unchanged) rides 08-16.
 - [Phase 8]: 08-15 D11 gap-closure (medium, NEW) — media-download instrumentation + one serial-safe transient retry. INSTRUMENT-FIRST (server-side cause suspected, unknown): new pure MediaDownloadFailure (Classify network/timeout|HTTP|no-link|parse + Snippet 256-char single-line null-safe cap + FormatLog) wired at all THREE previously-silent DownloadMediaRoutine exits — each Debug.LogWarning([MediaDownload] FAIL id=/http=/kind=/body=snippet) before onFailure, so the device pass can show WHY a video/GIF/кружок fails; NO File.WriteAllText added, pre-existing response.txt dumps untouched (T-08-15-01/IN-03). RETRY: at most 2 attempts, transient-only (NetworkOrTimeout OR HttpError>=500), INLINE fresh using-request in a for-loop (drain worker stays blocked — 0 new StartCoroutine, serial queue preserved per wappi-media-download-crossing), timeout=30 re-applied + 1.5s WaitForSeconds backoff between disposed requests (killed by StopAllCoroutines+ClearMediaDownloadQueue on switch); PERMANENT failures (4xx/no-link/parse) surface immediately with the capped log; onFailure exactly once (existing MessageItemView tap-to-retry card, no infinite spinner). WhatsApp+Telegram share the path, both benefit. 1121/1121 EditMode green FRESH (1111+10, twice). commits 4739e48(RED)/69f2f37(GREEN)/9e4e614(retry)/d665e3b(metas). Device D11 failure-log capture + server-side diagnosis ride 08-16.
 - [Phase 8]: 08-17 D2-ext gap-closure — reaction changes/removals made IN the Telegram app on a LOADED-but-older message now reconcile in-app. Diagnosis-first: H1 CONFIRMED (D5 poll re-fetches only the latest page offset=0 limit=50, and ValidateCachePageAgainstServer reconciled media+quote but NOT reactions, so older loaded messages' reaction deltas were stranded); H2/H3 REFUTED (within-window render + Merge absence-clears already correct). Fix = candidate A: pure ReactionReconcileWindow (NeedsWiderPass/PagesToCover) + Telegram-gated RefreshCachedMessageReactions added to ValidateCachePageAgainstServer + a throttled (12s) round-robin one-page-per-tick wider pass on the live poll reusing the serial seam (no new concurrent messages/get caller). WhatsApp byte-identical; ReactionStore untouched. 1124+10=1134 EditMode tests; fresh compile OK but bridge stalled at running (Editor unfocused) so final green PENDING. commits c78ac99(RED)/ba825d0(GREEN). Device re-verify rides 08-21.
+- [Phase 8]: 08-18 D12 gap-closure round-3 (RE-FAIL, inert TG «Создать бота») — DIAGNOSIS-FIRST wide, not another single-file read. C1 (raycast occlusion) + C2 (parent CanvasGroup) REFUTED with concrete scene evidence: ChatsPanel sibling z-order shows the only ACTIVE overlays above EmptyState are SyncingState (Awake→Hide clears alpha+blocksRaycasts, channel-agnostic), TopBar (top-only), and the ChatListSyncIndicator pill (Show() FORCES blocksRaycasts=false + top 380x76 geometry); all 13 Main.unity CanvasGroups mapped — NONE on the EmptyState→ChatsPanel(263910444)→Screen_Whatsapp(1992340357)→Canvas ancestor chain; button 1203410575 m_Interactable=1. C3 (swallowed exception) REFUTED (SelectPlatform benign + runs AFTER Open; StartNewBot/Open channel-agnostic). Named primary = C4: EmptyStateView never subscribed to OnActiveChannelChanged, and HandleEmptyState._lastReason guard early-returns the re-fired OnEmptyState, so ConfigureForReason (re-theme + RE-WIRE OpenCreateBotFlow + Show) is SKIPPED on a channel switch (WA+TG share Screen_Whatsapp so OnEnable never re-runs) — the class 08-14 missed by reading one file. Fix = subscribe to OnActiveChannelChanged → re-configure the visible reason (fresh theme+wire+Show; SetActiveChannel calls BeginLoadForActiveBot in the SAME synchronous stack right after, correcting any changed reason before render) + a defensive idempotent AddBotPanel.Open() guarantee (plan-sanctioned C3 hardening); 08-14 preselect (TG=2/else=1) preserved, WhatsApp byte-identical. ENTRY-log verdict PREDICTED/unconfirmed (no Play-mode/device this session) — guarded #if UNITY_EDITOR [D12] logs (ENTRY/after-StartNewBot/SelectPlatform) are the 08-21 device pivot (handler-runs vs tap-blocked). Secondary latent bug DOCUMENTED not fixed (scope+regression risk): BeginLoadForActiveBot resolves zero-bots via FindBotByName(DefaultBotId)==null → fires connect-state reason (BotHasNoTelegram, inert OpenCurrentBotAuth) instead of NoBotsExist — different label than the owner report; flag 08-19/08-21. Compile CLEAN (Assembly-CSharp.dll 20:04:58 postdates edits); full EditMode green PENDING (bridge stalled at running, Editor unfocused — mirrors 08-17). commits 791447b(instrument)/19c1ef2(fix). Device re-verify rides 08-21.
 
 ### Pending Todos
 
@@ -147,11 +148,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 08 P08-14 | 7min | 2 tasks | 1 files |
 | Phase 08 P08-15 | ~15min | 2 tasks | 3 files |
 | Phase 08 P08-17 | 22min | 2 tasks | 4 files |
+| Phase 08 P08-18 | ~50 min | 2 tasks | 1 files |
 
 ## Session Continuity
 
-Last session: 2026-07-17T14:33:36.861Z
-Stopped at: Completed 08-17-PLAN.md (D2-ext: loaded-window Telegram reaction reconcile)
+Last session: 2026-07-17T15:14:45.540Z
+Stopped at: Completed 08-18-PLAN.md (D12 wide diagnosis + channel-switch re-wire)
 Resume file: None
 
 **Planned Phase:** 08 () — 0 plans — 2026-07-17T13:58:49.184Z
