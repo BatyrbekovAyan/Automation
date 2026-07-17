@@ -37,6 +37,11 @@ public static class TelegramReactionMapper
             string emoji = obj["reaction"]?.ToString();
             if (string.IsNullOrEmpty(emoji)) continue;   // removal marker / malformed entry
 
+            // tapi echoes the BASE form (❤ U+2764, no VS16); requalify to the app's display form
+            // (❤️) so the cached echo matches the optimistic entry (kills symptom 3 at the source)
+            // and renders as a TMP sprite — the sprite name needs -fe0f (D2 root cause A).
+            emoji = ReactionEmoji.Canonical(emoji);
+
             string userId = obj["user_id"]?.ToString();
             string contact = obj["contact_name"]?.ToString();
             bool isOwn = !string.IsNullOrEmpty(ownUserId) && userId == ownUserId;

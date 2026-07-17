@@ -261,7 +261,9 @@ public class ReactionBarController : MonoBehaviour
         for (int i = 0; i < emojiButtons.Length && i < 6; i++)
         {
             var img = emojiButtons[i].targetGraphic as Image;
-            if (img != null) img.color = (mine != null && quick[i] == mine) ? selectedTint : normalTint;
+            // VS16-insensitive compare (D2 root cause A) so a stored base ❤ still highlights the
+            // qualified ❤️ quick-bar button.
+            if (img != null) img.color = (mine != null && ReactionEmoji.SameEmoji(quick[i], mine)) ? selectedTint : normalTint;
         }
     }
 

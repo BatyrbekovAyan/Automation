@@ -138,7 +138,10 @@ public static class TelegramReactionMerge
         return -1;
     }
 
-    private static string Key(MessageReaction r) => $"{r?.reactorKey}{r?.emoji}";
+    // IN-06: a U+0001 separator (a control char that can never appear in a reactorKey or emoji)
+    // so "me"+"❤" can't collide with a "me❤"-shaped reactorKey; the emoji is reduced to its
+    // VS16-insensitive compare key so base ❤ and qualified ❤️ count as the same reaction.
+    private static string Key(MessageReaction r) => $"{r?.reactorKey}\u0001{ReactionEmoji.CompareKey(r?.emoji)}";
 
     private static void Bump(Dictionary<string, int> map, string key, int delta) =>
         map[key] = (map.TryGetValue(key, out int v) ? v : 0) + delta;

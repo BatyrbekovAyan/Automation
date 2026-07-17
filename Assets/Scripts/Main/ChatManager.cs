@@ -1628,6 +1628,14 @@ if (msg.messageType == MessageType.Video)
             if (raw.fromMe && !string.IsNullOrEmpty(raw.from))
                 _tgOwnUserId = raw.from;
 
+#if UNITY_EDITOR
+            // D2 device evidence (08-16): one compact line per echoed reaction — the emoji's
+            // Unicode code points (to confirm tapi's base ❤ vs the app's qualified ❤️ FORM), the
+            // reactor user_id, and the currently-learned owner id (root cause B). Editor-only, no
+            // file write, never in a device build (IN-03: no full payloads).
+            LogTelegramReactionEcho(raw.reactions, _tgOwnUserId);
+#endif
+
             // Receive-side reactions (SHAPES.md Q3, GO): tapi carries reactions[] on the target
             // message itself, so map them into the shared display state here. WhatsApp reactions
             // stay on the ReactionStore live-event path (this stays null for WhatsApp).
@@ -1649,6 +1657,42 @@ if (msg.messageType == MessageType.Video)
 
         return msg;
     }
+
+#if UNITY_EDITOR
+    /// <summary>
+    /// Editor-only device-evidence log for D2 (08-16): one line per echoed tapi reaction, giving
+    /// the emoji's Unicode code points, the reactor user_id, and the currently-learned owner id.
+    /// Lets the owner confirm the live echo FORM (base vs qualified) + identity on device. No file
+    /// write, no full payload — never compiled into a device build.
+    /// </summary>
+    private static void LogTelegramReactionEcho(Newtonsoft.Json.Linq.JToken reactions, string ownUserId)
+    {
+        if (!(reactions is Newtonsoft.Json.Linq.JArray array) || array.Count == 0) return;
+        foreach (var element in array)
+        {
+            if (!(element is Newtonsoft.Json.Linq.JObject obj)) continue;
+            string emoji = obj["reaction"]?.ToString();
+            if (string.IsNullOrEmpty(emoji)) continue;
+            string userId = obj["user_id"]?.ToString();
+            Debug.Log($"[TG reaction echo] '{emoji}' [{CodePointHex(emoji)}] user_id={userId} ownId={ownUserId ?? "(null)"}");
+        }
+    }
+
+    /// <summary>Space-separated "U+XXXX" code points of a string (surrogate-pair aware) — makes a
+    /// trailing U+FE0F (the base-vs-qualified difference) visible in the Editor console.</summary>
+    private static string CodePointHex(string s)
+    {
+        var sb = new System.Text.StringBuilder();
+        for (int i = 0; i < s.Length; )
+        {
+            int cp = char.ConvertToUtf32(s, i);
+            if (sb.Length > 0) sb.Append(' ');
+            sb.Append("U+").Append(cp.ToString("X4"));
+            i += char.IsSurrogatePair(s, i) ? 2 : 1;
+        }
+        return sb.ToString();
+    }
+#endif
 
     /// <summary>
     /// Decodes a server <c>JPEGThumbnail</c> base64 payload, stages it in the media

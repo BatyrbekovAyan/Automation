@@ -25,7 +25,9 @@ public static class OutgoingReaction
     public static ReactionEvent Resolve(MessageViewModel target, string tappedEmoji, long timeUnix)
     {
         string current = CurrentMyEmoji(target);
-        bool toggleOff = !string.IsNullOrEmpty(current) && current == tappedEmoji;
+        // VS16-insensitive compare (D2 root cause A): a stored base ❤ still toggles off against a
+        // tapped qualified ❤️ (and vice-versa), so re-tapping your own reaction removes it.
+        bool toggleOff = !string.IsNullOrEmpty(current) && ReactionEmoji.SameEmoji(current, tappedEmoji);
         return new ReactionEvent
         {
             targetId   = target != null ? target.messageId : null,
