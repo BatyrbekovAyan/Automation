@@ -200,7 +200,15 @@ Plans:
   3. Successful auth on either channel shows «Бот подключён!» (DOTween check) whose primary CTA «Загрузить прайс-лист» deep-links into BotSettings → «Прайс-листы» (fallback «Открыть чаты» when files already exist); «Позже» defers to the checklist.
   4. BotsPage shows the «Первые шаги» card (4 derived-state steps; channel label from `isOnWhatsapp`/`isOnTelegram`; per-row deep links) that hides permanently at 4/4.
   5. Zero regression: empty state, AddBotPanel auto-open (post-onboarding), auth flows unchanged; full EditMode suite green.
-**Plans**: TBD (design: `docs/superpowers/specs/2026-07-17-first-run-onboarding-design.md`; context: `11-CONTEXT.md`; mockups: `.planning/sketches/onboarding/onboarding-proposal.html`)
+**Plans**: 7 plans
+Plans:
+- [ ] 11-01-PLAN.md — Pure-logic foundations (OnboardingGate/PageMath/SuccessCtaSelector/FirstStepsChecklist + tests) + code seams (Bot.OpenSettingsAtProductTab, ReorderScreens internal + Screen_Onboarding)
+- [ ] 11-02-PLAN.md — Carousel runtime: OnboardingPager (horizontal snap, NOT SnappyFlickScrollRect) + OnboardingScreen (dots + slide-3 CTA hand-off)
+- [ ] 11-03-PLAN.md — Screen_Onboarding builder + gate at RefreshEmptyState + existing-user auto-flag (ONB-01); scene committed immediately
+- [ ] 11-04-PLAN.md — Manager ShowAuthSuccess re-sequencing: interactive «Бот подключён!» once on final auth after bot exists + SuccessCtaSelector deep-link (ONB-03 logic; riskiest change)
+- [ ] 11-05-PLAN.md — OnboardingAuthBlocksBuilder: index-safe «Это безопасно» trust cards (both channels) + success CTAs stamped to Manager (ONB-02, ONB-03 scene)
+- [ ] 11-06-PLAN.md — «Первые шаги» derived-state checklist card + FirstStepsCardBuilder on BotsPage (ONB-04)
+- [ ] 11-07-PLAN.md — 11-HUMAN-UAT.md owner device gate (checkpoint) — closes the phase (ONB-01..ONB-05)
 **Flags**: UI-heavy — new `OnboardingScreenBuilder` (NavRestructureBuilder pattern); `Screen_Onboarding` ordered BEFORE the auth screens (auth stays LAST) and `ReorderScreens` must learn it; scene mutations committed immediately after builder runs. Device visual pass required.
 
 ## Progress
