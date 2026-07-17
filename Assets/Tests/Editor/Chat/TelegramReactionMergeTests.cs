@@ -264,4 +264,76 @@ public class TelegramReactionMergeTests
         Assert.AreEqual(1, merged.Count);
         Assert.AreEqual("999", merged[0].reactorKey);
     }
+
+    // --- ReactionReconcileWindow: the D2-ext loaded-window decision (candidate A) ---
+    // The D5 live poll re-fetches only the latest page (messages/get offset=0 limit=MessagesPerPage),
+    // so a reaction changed/removed IN the Telegram app on a LOADED-but-older message is never
+    // re-synced by the poll. This pure seam decides whether the loaded window spills past the latest
+    // page and, if so, how many server pages it spans — driving a bounded, throttled background
+    // reconcile over the older pages. Telegram-only; WhatsApp reactions flow through ReactionStore.
+
+    [Test]
+    public void NeedsWiderPass_LoadedEqualsLatestPage_False()
+    {
+        // Exactly one page loaded — the latest-window poll already covers it.
+        Assert.IsFalse(ReactionReconcileWindow.NeedsWiderPass(50, 50));
+    }
+
+    [Test]
+    public void NeedsWiderPass_LoadedExceedsLatestPage_True()
+    {
+        // One message past the latest page → that older message needs a wider pass.
+        Assert.IsTrue(ReactionReconcileWindow.NeedsWiderPass(51, 50));
+    }
+
+    [Test]
+    public void NeedsWiderPass_LoadedBelowLatestPage_False()
+    {
+        Assert.IsFalse(ReactionReconcileWindow.NeedsWiderPass(30, 50));
+    }
+
+    [Test]
+    public void NeedsWiderPass_EmptyCache_False()
+    {
+        Assert.IsFalse(ReactionReconcileWindow.NeedsWiderPass(0, 50));
+    }
+
+    [Test]
+    public void NeedsWiderPass_NonPositivePageSize_False()
+    {
+        // Guard: a zero/negative page size can never define a "wider" window.
+        Assert.IsFalse(ReactionReconcileWindow.NeedsWiderPass(50, 0));
+    }
+
+    [Test]
+    public void PagesToCover_ExactlyOnePage_ReturnsOne()
+    {
+        Assert.AreEqual(1, ReactionReconcileWindow.PagesToCover(50, 50));
+    }
+
+    [Test]
+    public void PagesToCover_JustOverOnePage_ReturnsTwo()
+    {
+        // Ceil: 51 and a full 100 both span two server pages.
+        Assert.AreEqual(2, ReactionReconcileWindow.PagesToCover(51, 50));
+        Assert.AreEqual(2, ReactionReconcileWindow.PagesToCover(100, 50));
+    }
+
+    [Test]
+    public void PagesToCover_JustOverTwoPages_ReturnsThree()
+    {
+        Assert.AreEqual(3, ReactionReconcileWindow.PagesToCover(101, 50));
+    }
+
+    [Test]
+    public void PagesToCover_EmptyCache_ReturnsZero()
+    {
+        Assert.AreEqual(0, ReactionReconcileWindow.PagesToCover(0, 50));
+    }
+
+    [Test]
+    public void PagesToCover_NonPositivePageSize_ReturnsZero()
+    {
+        Assert.AreEqual(0, ReactionReconcileWindow.PagesToCover(50, 0));
+    }
 }
