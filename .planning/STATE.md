@@ -41,6 +41,10 @@ Progress: [██████████] 100%
 
 ## Accumulated Context
 
+### Roadmap Evolution
+
+- Phase 11 added (2026-07-17): First-Run Onboarding Flow — registered under new planned milestone v1.3; design approved same day (spec `docs/superpowers/specs/2026-07-17-first-run-onboarding-design.md`, context `11-CONTEXT.md`, mockups `.planning/sketches/onboarding/onboarding-proposal.html`); pure client UI, schedulable before or after v1.2.
+
 ### Decisions
 
 Decisions are logged in PROJECT.md Key Decisions table.

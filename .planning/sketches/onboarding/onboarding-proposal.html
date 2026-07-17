@@ -1,0 +1,501 @@
+<title>Онбординг — дизайн-предложение</title>
+<style>
+  :root {
+    --bg: #F4F6F9;
+    --surface: #FFFFFF;
+    --ink: #1A1A2E;
+    --muted: #65676B;
+    --line: #E2E6EC;
+    --primary: #1B7CEB;
+    --primary-soft: #D6E4FB;
+    --good: #2E9E5B;
+    --warn: #C77B2B;
+    --phone-frame: #22232E;
+    --code-bg: #EDF1F6;
+    --shadow: 0 10px 30px rgba(27, 60, 110, .08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161C;
+      --surface: #1E2129;
+      --ink: #E9ECF2;
+      --muted: #9AA1AD;
+      --line: #2E323C;
+      --primary: #4E9BF5;
+      --primary-soft: #1F3556;
+      --good: #4CC97E;
+      --warn: #DFA05C;
+      --phone-frame: #05060A;
+      --code-bg: #262A34;
+      --shadow: 0 10px 30px rgba(0, 0, 0, .35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14161C; --surface: #1E2129; --ink: #E9ECF2; --muted: #9AA1AD;
+    --line: #2E323C; --primary: #4E9BF5; --primary-soft: #1F3556;
+    --good: #4CC97E; --warn: #DFA05C; --phone-frame: #05060A;
+    --code-bg: #262A34; --shadow: 0 10px 30px rgba(0,0,0,.35);
+  }
+  :root[data-theme="light"] {
+    --bg: #F4F6F9; --surface: #FFFFFF; --ink: #1A1A2E; --muted: #65676B;
+    --line: #E2E6EC; --primary: #1B7CEB; --primary-soft: #D6E4FB;
+    --good: #2E9E5B; --warn: #C77B2B; --phone-frame: #22232E;
+    --code-bg: #EDF1F6; --shadow: 0 10px 30px rgba(27,60,110,.08);
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.55;
+    margin: 0;
+    padding: 0 20px 96px;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; }
+
+  header.top { padding: 56px 0 8px; }
+  .eyebrow {
+    font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--primary); font-weight: 700; margin: 0 0 10px;
+  }
+  h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.15; margin: 0 0 14px; text-wrap: balance; letter-spacing: -.01em; }
+  .lede { font-size: 17px; color: var(--muted); max-width: 640px; margin: 0; }
+
+  h2 { font-size: 22px; margin: 64px 0 6px; letter-spacing: -.01em; }
+  h2 + p.sub { margin: 0 0 24px; color: var(--muted); font-size: 15px; max-width: 640px; }
+
+  /* ── Flow strip ── */
+  .flow { display: flex; gap: 10px; align-items: stretch; overflow-x: auto; padding: 12px 2px 18px; }
+  .flow-step {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+    padding: 14px 16px; min-width: 148px; flex: 1 0 auto; box-shadow: var(--shadow);
+  }
+  .flow-step .n { font-size: 11px; font-weight: 700; color: var(--primary); letter-spacing: .08em; text-transform: uppercase; }
+  .flow-step .t { font-weight: 650; font-size: 14.5px; margin-top: 4px; }
+  .flow-step .d { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+  .flow-step.now { border-color: var(--primary); }
+  .flow-arrow { align-self: center; color: var(--muted); flex: 0 0 auto; font-size: 15px; }
+
+  /* ── Phones ── */
+  .phones { display: flex; gap: 26px; overflow-x: auto; padding: 10px 2px 26px; align-items: flex-start; }
+  .phone-slot { flex: 0 0 auto; width: 264px; }
+  .phone-cap { margin: 14px 4px 0; }
+  .phone-cap .t { font-weight: 650; font-size: 14.5px; }
+  .phone-cap .d { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+
+  .phone {
+    width: 264px; height: 572px; background: #FFFFFF; border-radius: 30px;
+    border: 7px solid var(--phone-frame); box-shadow: var(--shadow);
+    overflow: hidden; position: relative; display: flex; flex-direction: column;
+    color: #1A1A2E;
+  }
+  .statusbar {
+    height: 24px; display: flex; justify-content: space-between; align-items: center;
+    padding: 0 16px; font-size: 9px; font-weight: 600; color: #1A1A2E; flex: 0 0 auto;
+  }
+  .homebar { position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%);
+    width: 84px; height: 3.5px; border-radius: 2px; background: rgba(26,26,46,.25); }
+
+  .scr { flex: 1; display: flex; flex-direction: column; padding: 0 22px; position: relative; }
+
+  .hero-zone { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; }
+  .ob-title { font-size: 16.5px; font-weight: 700; text-align: center; line-height: 1.25; margin: 0 0 8px; letter-spacing: -.01em; }
+  .ob-body { font-size: 11px; color: #65676B; text-align: center; line-height: 1.45; margin: 0 auto 18px; max-width: 200px; }
+  .dots { display: flex; gap: 5px; justify-content: center; margin-bottom: 16px; }
+  .dot { width: 5px; height: 5px; border-radius: 50%; background: #D5DAE1; }
+  .dot.on { background: #1B7CEB; width: 14px; border-radius: 3px; }
+  .cta {
+    height: 37px; border-radius: 12px; background: #1B7CEB; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11.5px; font-weight: 600; margin-bottom: 8px;
+  }
+  .cta.ghost { background: transparent; color: #65676B; font-weight: 500; margin-bottom: 12px; height: 30px; }
+  .cta.green { background: #23A55A; }
+
+  /* mini chat mock on slide 1 */
+  .mini-chat { width: 196px; display: flex; flex-direction: column; gap: 6px; }
+  .mbub { max-width: 78%; padding: 7px 9px; border-radius: 11px; font-size: 9.5px; line-height: 1.35; }
+  .mbub.in { background: #F0F2F5; align-self: flex-start; border-bottom-left-radius: 4px; }
+  .mbub.out { background: #D6E4FB; align-self: flex-end; border-bottom-right-radius: 4px; }
+  .mbub .who { font-size: 8px; color: #1B7CEB; font-weight: 700; margin-bottom: 2px; display: flex; align-items: center; gap: 3px; }
+  .typing { display: flex; gap: 2.5px; padding: 8px 10px; background: #D6E4FB; border-radius: 11px; border-bottom-right-radius: 4px; align-self: flex-end; }
+  .typing i { width: 4px; height: 4px; border-radius: 50%; background: #1B7CEB; opacity: .5; }
+  .typing i:nth-child(2) { opacity: .75; } .typing i:nth-child(3) { opacity: 1; }
+
+  /* slide 2 mode cards */
+  .mode-cards { width: 200px; display: flex; flex-direction: column; gap: 9px; }
+  .mode-card { border: 1px solid #E4E6EB; border-radius: 13px; padding: 10px 11px; background: #fff; }
+  .mode-card.sel { border-color: #1B7CEB; background: #F4F8FE; }
+  .mode-card .mt { font-size: 10.5px; font-weight: 700; display: flex; align-items: center; gap: 5px; }
+  .mode-card .md { font-size: 9px; color: #65676B; margin-top: 3px; line-height: 1.35; }
+  .radio { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid #C6CBD3; margin-left: auto; }
+  .radio.on { border-color: #1B7CEB; background: radial-gradient(circle at center, #1B7CEB 0 44%, transparent 46%); }
+
+  /* slide 3 channel cards */
+  .chan-cards { width: 204px; display: flex; flex-direction: column; gap: 9px; }
+  .chan-card { border: 1px solid #E4E6EB; border-radius: 13px; padding: 10px 11px; background: #fff; display: flex; align-items: center; gap: 9px; }
+  .chan-ic { width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+  .chan-ic.wa { background: #E8F8EE; }
+  .chan-ic.tg { background: #E7F3FB; }
+  .chan-t { font-size: 10.5px; font-weight: 700; }
+  .chan-d { font-size: 8.5px; color: #65676B; margin-top: 1px; }
+  .chan-check { margin-left: auto; }
+
+  /* telegram code entry */
+  .code-boxes { display: flex; gap: 6px; justify-content: center; margin: 2px 0 8px; }
+  .cbox { width: 26px; height: 33px; border-radius: 9px; background: #F0F2F5; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #1A1A2E; }
+  .cbox.active { background: #fff; outline: 1.5px solid #1B7CEB; }
+  .resend { text-align: center; font-size: 8.5px; color: #65676B; margin-bottom: 10px; }
+
+  /* auth screen */
+  .auth-title { font-size: 14.5px; font-weight: 700; margin: 6px 0 2px; }
+  .auth-sub { font-size: 10px; color: #65676B; margin: 0 0 12px; line-height: 1.4; }
+  .code-pill {
+    background: #F0F2F5; border-radius: 12px; text-align: center; padding: 12px 0 10px; margin-bottom: 10px;
+  }
+  .code-pill .c { font-size: 19px; font-weight: 700; letter-spacing: .18em; font-variant-numeric: tabular-nums; color: #1A1A2E; }
+  .code-pill .l { font-size: 8.5px; color: #65676B; margin-top: 2px; }
+  .steps { display: flex; flex-direction: column; gap: 7px; margin-bottom: 12px; }
+  .step { display: flex; gap: 8px; align-items: flex-start; font-size: 9.5px; line-height: 1.35; color: #3A3D46; }
+  .step .b { width: 15px; height: 15px; border-radius: 50%; background: #D6E4FB; color: #1B7CEB; font-weight: 700; font-size: 8.5px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; margin-top: .5px; }
+  .trust {
+    margin-top: auto; margin-bottom: 10px; background: #F2F8F2; border: 1px solid #DCEDDD; border-radius: 12px; padding: 9px 11px;
+  }
+  .trust .tt { font-size: 9.5px; font-weight: 700; color: #23713A; display: flex; gap: 5px; align-items: center; margin-bottom: 3px; }
+  .trust .td { font-size: 8.5px; color: #3E6B4C; line-height: 1.4; }
+
+  /* success screen */
+  .success-circle { width: 84px; height: 84px; border-radius: 50%; background: #E7F6EC; display: flex; align-items: center; justify-content: center; margin: 0 auto; }
+
+  /* checklist on bots page */
+  .page-head { font-size: 15px; font-weight: 700; padding: 8px 0 10px; }
+  .check-card { background: #fff; border: 1px solid #E4E6EB; border-radius: 14px; padding: 12px 13px; box-shadow: 0 5px 16px rgba(27,60,110,.07); margin-bottom: 12px; }
+  .check-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .check-head .t { font-size: 11.5px; font-weight: 700; }
+  .check-head .p { font-size: 9px; color: #1B7CEB; font-weight: 650; }
+  .progress { height: 4px; border-radius: 2px; background: #EDEFF3; margin: 6px 0 10px; overflow: hidden; }
+  .progress i { display: block; height: 100%; width: 50%; background: #1B7CEB; border-radius: 2px; }
+  .ck-row { display: flex; align-items: center; gap: 9px; padding: 6px 0; font-size: 10px; border-top: 1px solid #F3F4F7; }
+  .ck-row .cir { width: 16px; height: 16px; border-radius: 50%; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; }
+  .ck-row.done .cir { background: #23A55A; }
+  .ck-row.todo .cir { border: 1.5px solid #C6CBD3; }
+  .ck-row.done span { color: #9AA0AA; text-decoration: line-through; }
+  .ck-row .chev { margin-left: auto; color: #C6CBD3; font-size: 11px; }
+  .bot-card { background: #fff; border: 1px solid #E4E6EB; border-radius: 14px; padding: 12px 13px; display: flex; align-items: center; gap: 10px; }
+  .bot-ava { width: 34px; height: 34px; border-radius: 50%; background: #D6E4FB; display: flex; align-items: center; justify-content: center; }
+  .bot-nm { font-size: 11px; font-weight: 650; }
+  .bot-st { font-size: 8.5px; color: #23A55A; margin-top: 1px; }
+  .tabbar { display: flex; justify-content: space-around; padding: 8px 4px 14px; border-top: 1px solid #EDEFF3; margin: auto -22px 0; background:#fff; }
+  .tab { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 7.5px; color: #8B909B; }
+  .tab.on { color: #1B7CEB; font-weight: 650; }
+  .tab svg { display: block; }
+
+  /* ── comparison table ── */
+  .tablebox { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
+  table { border-collapse: collapse; width: 100%; min-width: 680px; font-size: 14px; }
+  th, td { text-align: left; padding: 12px 16px; border-top: 1px solid var(--line); vertical-align: top; }
+  thead th { border-top: 0; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  td.k { font-weight: 650; white-space: nowrap; }
+  .pill { display: inline-block; font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 3px 10px; }
+  .pill.rec { background: color-mix(in srgb, var(--good) 14%, transparent); color: var(--good); }
+  .pill.no { background: color-mix(in srgb, var(--warn) 14%, transparent); color: var(--warn); }
+
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px 22px; box-shadow: var(--shadow); }
+  .card h3 { margin: 0 0 8px; font-size: 16px; }
+  .card p, .card li { font-size: 14px; color: var(--muted); }
+  .card ul { margin: 8px 0 0; padding-left: 18px; }
+  .card li { margin-bottom: 6px; }
+  .card li b { color: var(--ink); font-weight: 600; }
+  code { background: var(--code-bg); border-radius: 6px; padding: 1.5px 6px; font-size: .88em; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+
+  .copytable td:first-child { color: var(--muted); font-size: 13px; white-space: nowrap; }
+  .ru { font-weight: 550; }
+</style>
+
+<div class="wrap">
+<header class="top">
+  <p class="eyebrow">Дизайн-предложение · не реализовано</p>
+  <h1>Онбординг для приложения ботов</h1>
+  <p class="lede">Первый запуск для владельца малого бизнеса в КЗ: за 60 секунд понять ценность, без страха подключить свой WhatsApp или Telegram — и дойти до «ага-момента», когда бот отвечает первому сообщению.</p>
+</header>
+
+<h2>Путь пользователя</h2>
+<p class="sub">Онбординг — не отдельная карусель, а сопровождение существующего пути. Визард создания бота уже есть; добавляются рамка до него, доверие внутри него и закрепление после.</p>
+<div class="flow">
+  <div class="flow-step now"><div class="n">Новое</div><div class="t">Приветствие</div><div class="d">3 слайда · кнопка «Далее»</div></div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step"><div class="n">Есть</div><div class="t">Создание бота</div><div class="d">имя · сфера · канал: WhatsApp или Telegram</div></div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step now"><div class="n">Усилить</div><div class="t">Подключение</div><div class="d">код входа + блок «Это безопасно»</div></div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step now"><div class="n">Новое</div><div class="t">Успех</div><div class="d">подключён → загрузка прайс-листа</div></div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step now"><div class="n">Новое</div><div class="t">Первые шаги</div><div class="d">чек-лист на странице ботов</div></div>
+</div>
+
+<h2>Экраны</h2>
+<p class="sub">Масштаб 1:4 от канваса 1080×1920. Палитра, шрифтовая шкала и радиусы — из текущего приложения (#1B7CEB, Ink #1A1A2E, фон #F0F2F5).</p>
+
+<div class="phones">
+
+  <!-- Slide 1 -->
+  <div class="phone-slot">
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>◧ ⌁ ▮</span></div>
+      <div class="scr">        <div class="hero-zone">
+          <div class="mini-chat">
+            <div class="mbub in">Здравствуйте! Тормозные колодки на Camry 70 есть?</div>
+            <div class="mbub out"><div class="who"><svg width="9" height="9" viewBox="0 0 24 24" fill="#1B7CEB"><rect x="4" y="7" width="16" height="13" rx="4"/><circle cx="12" cy="3.5" r="2"/><rect x="11" y="4" width="2" height="4"/></svg> Бот-ассистент</div>Да, есть в наличии — 18 500 ₸. Оригинал и аналог. Какой подойдёт?</div>
+            <div class="typing"><i></i><i></i><i></i></div>
+          </div>
+        </div>
+        <p class="ob-title">Бот отвечает клиентам за вас</p>
+        <p class="ob-body">Круглосуточно, в WhatsApp и Telegram — на вашем обычном номере</p>
+        <div class="dots"><span class="dot on"></span><span class="dot"></span><span class="dot"></span></div>
+        <div class="cta">Далее</div>
+      </div>
+      <div class="homebar"></div>
+    </div>
+    <div class="phone-cap"><div class="t">1 · Ценность</div><div class="d">Живой мини-диалог вместо абстрактной иллюстрации: показываем продукт, а не рассказываем.</div></div>
+  </div>
+
+  <!-- Slide 2 -->
+  <div class="phone-slot">
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>◧ ⌁ ▮</span></div>
+      <div class="scr">        <div class="hero-zone">
+          <div class="mode-cards">
+            <div class="mode-card sel">
+              <div class="mt"><svg width="11" height="11" viewBox="0 0 24 24" fill="#1B7CEB"><path d="M13 2 3 14h7l-1 8 10-12h-7z"/></svg> Авто <span class="radio on"></span></div>
+              <div class="md">Бот отвечает сам — вы видите каждый диалог</div>
+            </div>
+            <div class="mode-card">
+              <div class="mt"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#65676B" stroke-width="2.4"><path d="M12 20v-8m0 0 4 4m-4-4-4 4"/><rect x="4" y="3" width="16" height="5" rx="2" fill="#65676B" stroke="none"/></svg> Вместе <span class="radio"></span></div>
+              <div class="md">Бот предлагает варианты — отправляете вы</div>
+            </div>
+          </div>
+        </div>
+        <p class="ob-title">Вы решаете, сколько доверить</p>
+        <p class="ob-body">Полный автопилот или подтверждение каждого ответа — можно менять в любой момент</p>
+        <div class="dots"><span class="dot"></span><span class="dot on"></span><span class="dot"></span></div>
+        <div class="cta">Далее</div>
+      </div>
+      <div class="homebar"></div>
+    </div>
+    <div class="phone-cap"><div class="t">2 · Контроль</div><div class="d">Главный страх владельца — «бот наговорит клиентам ерунды». Снимаем его до того, как попросим доступ.</div></div>
+  </div>
+
+  <!-- Slide 3 -->
+  <div class="phone-slot">
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>◧ ⌁ ▮</span></div>
+      <div class="scr">        <div class="hero-zone">
+          <div class="chan-cards">
+            <div class="chan-card">
+              <div class="chan-ic wa"><svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2z" fill="#25D366"/><path d="M9.3 7.2c2 4.2 3.3 5.5 7.5 7.5l1.2-2.3-2.6-1.1-1 .9c-1.3-.8-2.3-1.8-3.1-3.1l.9-1-1.1-2.6z" fill="#fff"/></svg></div>
+              <div><div class="chan-t">WhatsApp</div><div class="chan-d">Клиенты пишут на ваш номер</div></div>
+              <svg class="chan-check" width="13" height="13" viewBox="0 0 24 24" fill="#23A55A"><circle cx="12" cy="12" r="11"/><path d="m7 12.5 3.2 3.2L17 9" stroke="#fff" stroke-width="2.4" fill="none"/></svg>
+            </div>
+            <div class="chan-card">
+              <div class="chan-ic tg"><svg width="16" height="16" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#2AABEE"/><path d="m5.8 11.9 11.4-4.7-2.1 9.4-3.6-2.6-2 2-.6-3.1z" fill="#fff"/></svg></div>
+              <div><div class="chan-t">Telegram</div><div class="chan-d">Ваш личный аккаунт Telegram</div></div>
+              <svg class="chan-check" width="13" height="13" viewBox="0 0 24 24" fill="#23A55A"><circle cx="12" cy="12" r="11"/><path d="m7 12.5 3.2 3.2L17 9" stroke="#fff" stroke-width="2.4" fill="none"/></svg>
+            </div>
+          </div>
+        </div>
+        <p class="ob-title">Работает там, где ваши клиенты</p>
+        <p class="ob-body">Подключите WhatsApp, Telegram или оба сразу — канал выберете при создании бота</p>
+        <div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot on"></span></div>
+        <div class="cta">Создать бота</div>
+      </div>
+      <div class="homebar"></div>
+    </div>
+    <div class="phone-cap"><div class="t">3 · Каналы + CTA</div><div class="d">WhatsApp и Telegram предлагаются равноправно; выбор канала — в существующем визарде AddBotPanel, куда и ведёт кнопка.</div></div>
+  </div>
+
+  <!-- Auth trust -->
+  <div class="phone-slot">
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>◧ ⌁ ▮</span></div>
+      <div class="scr">
+        <p class="auth-title">Подключите WhatsApp</p>
+        <p class="auth-sub">Введите этот код в WhatsApp на этом же телефоне</p>
+        <div class="code-pill"><div class="c">HW4K-9PF2</div><div class="l">Код действует 2 минуты</div></div>
+        <div class="steps">
+          <div class="step"><div class="b">1</div><div>Откройте WhatsApp → Настройки → Связанные устройства</div></div>
+          <div class="step"><div class="b">2</div><div>Нажмите «Привязка устройства» → «Ввести код»</div></div>
+          <div class="step"><div class="b">3</div><div>Введите код и вернитесь в приложение</div></div>
+        </div>
+        <div class="trust">
+          <div class="tt"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#23713A" stroke-width="2.4"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg> Это безопасно</div>
+          <div class="td">Работает через официальные «Связанные устройства» WhatsApp. Переписка остаётся у вас, отключить бота можно в любой момент.</div>
+        </div>
+        <div class="cta ghost">Открыть WhatsApp</div>
+      </div>
+      <div class="homebar"></div>
+    </div>
+    <div class="phone-cap"><div class="t">4 · Подключение WhatsApp</div><div class="d">Существующий экран кода (QR-потока в приложении нет — только код) + новый зелёный блок доверия. Самый рискованный шаг воронки — здесь теряют людей.</div></div>
+  </div>
+
+  <!-- Telegram auth -->
+  <div class="phone-slot">
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>◧ ⌁ ▮</span></div>
+      <div class="scr">
+        <p class="auth-title">Подключите Telegram</p>
+        <p class="auth-sub">Код отправлен в Telegram на номер +7 707 ··· 42</p>
+        <div class="code-boxes">
+          <div class="cbox">4</div><div class="cbox">8</div><div class="cbox">2</div><div class="cbox active"></div><div class="cbox"></div>
+        </div>
+        <div class="resend">Отправить код ещё раз через 0:47</div>
+        <div class="trust">
+          <div class="tt"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#23713A" stroke-width="2.4"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg> Это безопасно</div>
+          <div class="td">Официальный вход Telegram: код приходит в само приложение. Переписка остаётся у вас, отключить бота можно в любой момент.</div>
+        </div>
+        <div class="cta ghost">Открыть Telegram</div>
+      </div>
+      <div class="homebar"></div>
+    </div>
+    <div class="phone-cap"><div class="t">5 · Подключение Telegram</div><div class="d">Существующий TelegramAuth (телефон → код, при необходимости облачный пароль 2FA) + тот же блок доверия.</div></div>
+  </div>
+
+  <!-- Success -->
+  <div class="phone-slot">
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>◧ ⌁ ▮</span></div>
+      <div class="scr">
+        <div class="hero-zone" style="flex-direction:column; gap:14px">
+          <div class="success-circle"><svg width="40" height="40" viewBox="0 0 24 24" fill="#23A55A"><circle cx="12" cy="12" r="11"/><path d="m7 12.5 3.2 3.2L17 9" stroke="#fff" stroke-width="2.4" fill="none"/></svg></div>
+          <div>
+            <p class="ob-title">Бот подключён!</p>
+            <p class="ob-body" style="margin-bottom:0">Осталось научить бота вашим ценам — загрузите прайс-лист, и он будет отвечать по вашим товарам</p>
+          </div>
+        </div>
+        <div class="cta">Загрузить прайс-лист</div>
+        <div class="cta ghost">Позже</div>
+      </div>
+      <div class="homebar"></div>
+    </div>
+    <div class="phone-cap"><div class="t">6 · Успех → прайс-лист</div><div class="d">Чек-круг DOScale 0.9→1 OutBack + фейд. Загрузка прайса предлагается строго после авторизации и ведёт в BotSettings → «Прайс-листы»; «Позже» оставляет шаг в чек-листе.</div></div>
+  </div>
+
+  <!-- Checklist -->
+  <div class="phone-slot">
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>◧ ⌁ ▮</span></div>
+      <div class="scr">
+        <div class="page-head">Боты</div>
+        <div class="check-card">
+          <div class="check-head"><div class="t">Первые шаги</div><div class="p">2 из 4</div></div>
+          <div class="progress"><i></i></div>
+          <div class="ck-row done" style="border-top:0"><div class="cir"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="m5 13 4 4L19 7"/></svg></div><span>Создать бота</span></div>
+          <div class="ck-row done"><div class="cir"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="m5 13 4 4L19 7"/></svg></div><span>Подключить WhatsApp</span></div>
+          <div class="ck-row todo"><div class="cir"></div>Загрузить прайс-лист<div class="chev">›</div></div>
+          <div class="ck-row todo"><div class="cir"></div>Получить первый ответ бота<div class="chev">›</div></div>
+        </div>
+        <div class="bot-card">
+          <div class="bot-ava"><svg width="16" height="16" viewBox="0 0 24 24" fill="#1B7CEB"><rect x="4" y="7" width="16" height="13" rx="4"/><circle cx="12" cy="3.5" r="2"/><rect x="11" y="4" width="2" height="4"/><circle cx="9" cy="13" r="1.6" fill="#fff"/><circle cx="15" cy="13" r="1.6" fill="#fff"/></svg></div>
+          <div><div class="bot-nm">Автозапчасти Алматы</div><div class="bot-st">● Бот работает</div></div>
+        </div>
+        <div class="tabbar">
+          <div class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-4-7.5L21 3l-1 5"/></svg>Чаты</div>
+          <div class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10m6 10V4m6 16v-7"/></svg>Сводка</div>
+          <div class="tab on"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="7" width="16" height="13" rx="4"/><circle cx="12" cy="3.5" r="2"/></svg>Боты</div>
+          <div class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-6 8-6s6.5 2 8 6"/></svg>Профиль</div>
+        </div>
+      </div>
+      <div class="homebar"></div>
+    </div>
+    <div class="phone-cap"><div class="t">7 · Первые шаги</div><div class="d">Карточка над списком ботов; подпись «Подключить WhatsApp» отражает фактический канал бота (или Telegram). Каждая строка — переход в нужный экран; исчезает после выполнения всех шагов.</div></div>
+  </div>
+</div>
+
+<h2>Три варианта подачи</h2>
+<p class="sub">Рекомендация — вариант B: онбординг, встроенный в реальный путь, с лёгкой каруселью впереди.</p>
+<div class="tablebox">
+  <table>
+    <thead><tr><th></th><th>A · Только карусель</th><th>B · Встроенный путь</th><th>C · Коуч-марки</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Что это</td><td>3–5 слайдов ценности перед приложением</td><td>Слайды (3) + доверие в подключении + успех с загрузкой прайса + чек-лист</td><td>Подсказки-стрелки поверх готового UI</td></tr>
+      <tr><td class="k">Стоимость</td><td>Низкая</td><td>Средняя (4 части, каждая маленькая)</td><td>Низкая</td></tr>
+      <tr><td class="k">Проблема</td><td>Слайды пролистывают не читая; трение в подключении не решает</td><td>—</td><td>В пустом приложении нечего показывать стрелками</td></tr>
+      <tr><td class="k">Что даёт</td><td>Первое впечатление</td><td>Ведёт до «ага-момента» и снимает страх на самом рискованном шаге</td><td>Обучение интерфейсу</td></tr>
+      <tr><td class="k">Вердикт</td><td><span class="pill no">частично</span></td><td><span class="pill rec">рекомендую</span></td><td><span class="pill no">не сейчас</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h2>Принципы</h2>
+<div class="grid2">
+  <div class="card">
+    <h3>Что делаем</h3>
+    <ul>
+      <li><b>Показываем, не рассказываем</b> — слайд 1 это живой мини-диалог с ботом, не абстрактная картинка.</li>
+      <li><b>Доверие до доступа</b> — «вы контролируете каждый ответ» звучит до того, как просим подключить WhatsApp или Telegram.</li>
+      <li><b>Оба канала равноправны</b> — блок доверия и экран успеха подстраиваются под канал, выбранный в визарде.</li>
+      <li><b>Прайс — после авторизации</b> — экран успеха сразу предлагает загрузить прайс-лист; первый ответ бота закрывает чек-лист.</li>
+      <li><b>Чек-лист доводит до ценности</b> — прайс-лист и первый ответ — то, что превращает установку в работающего бота.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Чего не делаем</h3>
+    <ul>
+      <li><b>Никакой регистрации/логина</b> — приложение работает без аккаунта, это преимущество, не трогаем.</li>
+      <li><b>Без кнопки «Пропустить» на слайдах</b> — три информационных экрана проходятся кнопкой «Далее»; выход из потока один — «Создать бота».</li>
+      <li><b>Не блокируем повторный вход</b> — карусель только при первом запуске (<code>PlayerPrefs</code>-флаг), повторно доступна из «О приложении».</li>
+      <li><b>Не дублируем визард</b> — AddBotPanel уже хороший, онбординг обрамляет его, а не заменяет.</li>
+      <li><b>Без видео и лотти</b> — статичные композиции + DOTween достаточно, вес приложения не растёт.</li>
+    </ul>
+  </div>
+</div>
+
+<h2>Тексты (RU)</h2>
+<div class="tablebox">
+  <table class="copytable">
+    <tbody>
+      <tr><td>Слайд 1 — заголовок</td><td class="ru">Бот отвечает клиентам за вас</td></tr>
+      <tr><td>Слайд 1 — текст</td><td class="ru">Круглосуточно, в WhatsApp и Telegram — на вашем обычном номере</td></tr>
+      <tr><td>Слайд 2 — заголовок</td><td class="ru">Вы решаете, сколько доверить</td></tr>
+      <tr><td>Слайд 2 — текст</td><td class="ru">Полный автопилот или подтверждение каждого ответа — можно менять в любой момент</td></tr>
+      <tr><td>Слайд 3 — заголовок</td><td class="ru">Работает там, где ваши клиенты</td></tr>
+      <tr><td>Слайд 3 — текст</td><td class="ru">Подключите WhatsApp, Telegram или оба сразу — канал выберете при создании бота</td></tr>
+      <tr><td>Слайд 3 — CTA</td><td class="ru">Создать бота</td></tr>
+      <tr><td>Блок доверия — заголовок</td><td class="ru">Это безопасно</td></tr>
+      <tr><td>Блок доверия (WhatsApp)</td><td class="ru">Работает через официальные «Связанные устройства» WhatsApp. Переписка остаётся у вас, отключить бота можно в любой момент.</td></tr>
+      <tr><td>Блок доверия (Telegram)</td><td class="ru">Официальный вход Telegram: код приходит в само приложение. Переписка остаётся у вас, отключить бота можно в любой момент.</td></tr>
+      <tr><td>Успех — заголовок</td><td class="ru">Бот подключён!</td></tr>
+      <tr><td>Успех — текст</td><td class="ru">Осталось научить бота вашим ценам — загрузите прайс-лист, и он будет отвечать по вашим товарам</td></tr>
+      <tr><td>Успех — кнопки</td><td class="ru">Загрузить прайс-лист · Позже</td></tr>
+      <tr><td>Чек-лист — заголовок</td><td class="ru">Первые шаги</td></tr>
+      <tr><td>Чек-лист — пункты</td><td class="ru">Создать бота · Подключить WhatsApp/Telegram · Загрузить прайс-лист · Получить первый ответ бота</td></tr>
+      <tr><td>Чек-лист — подсказка последнего шага</td><td class="ru">Попросите знакомого написать вам — и посмотрите, как бот ответит</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h2>Реализация (кратко)</h2>
+<div class="grid2">
+  <div class="card">
+    <h3>Структура</h3>
+    <ul>
+      <li><code>Screen_Onboarding</code> — новый экран, строится билдером <code>OnboardingScreenBuilder</code> по паттерну <code>NavRestructureBuilder</code>; в <code>ScreenContainer</code> до auth-экранов (WhatsappAuth/TelegramAuth остаются последними).</li>
+      <li>Карусель — существующий <code>SnappyFlickScrollRect</code> + точки-индикаторы.</li>
+      <li>Блок доверия — врезка в существующие auth-панели: код WhatsApp и телефон/код/2FA Telegram (QR-потока нет).</li>
+      <li>Успех — расширение <code>WhatsappAuthSuccessPanel</code> / <code>TelegramAuthSuccessPanel</code>; CTA ведёт в BotSettings → «Прайс-листы».</li>
+      <li>Чек-лист — префаб-карточка на <code>BotsPage</code> над списком ботов.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Состояние и анимация</h3>
+    <ul>
+      <li>Флаг <code>PlayerPrefs "OnboardingSeen"</code> — вне неймспейса ботов, не трогается при удалении бота; сбрасывается «Удалить все данные».</li>
+      <li>Шаги чек-листа выводятся из фактов: бот существует · канал авторизован · <code>UploadedFilesStore</code> непуст · первый входящий диалог с ответом бота; подпись канала — из <code>isOnWhatsapp</code>/<code>isOnTelegram</code>.</li>
+      <li>Переходы слайдов 0.3s OutCubic; чек успеха DOScale 0.9→1 OutBack; появление чек-листа — каскад 0.05s stagger.</li>
+      <li>Все размеры — в reference units канваса 1080×1920 (dp × 3), шкала типографики из <code>unity-ui-builder</code>.</li>
+    </ul>
+  </div>
+</div>
+
+<p style="margin-top:48px; color: var(--muted); font-size: 13px">Мокапы схематичны (1:4): финальные отступы и размеры — по шкале проекта при сборке билдером; иконки каналов условны.</p>
+</div>

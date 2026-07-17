@@ -9,6 +9,7 @@ v1.0 shipped the semi-auto «Вместе» reply path on WhatsApp. v1.1 Telegra
 - ✅ **v1.0 Reply Suggestions** — Phases 1-2 (shipped 2026-07-11)
 - 🚧 **v1.1 Telegram Parity** — Phases 3-8 (in progress)
 - 📋 **v1.2 Reply-Trigger Discipline** — Phases 9-10 (planned; specs + plans committed, starts after v1.1 closes)
+- 📋 **v1.3 First-Run Onboarding** — Phase 11 (planned; design spec + CONTEXT committed 2026-07-17; pure client UI, schedulable before or after v1.2)
 
 ## Phases
 
@@ -41,6 +42,10 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 - [ ] **Phase 9: Semi-Auto Suppression Flag** - Wire the «Вместе» toggle to the server: `reply_mode_flags` table + `/webhook/SetReplyMode` sync + a fail-closed gate in both bot templates so a semi-auto chat gets no auto-reply while suggestions still work.
 - [ ] **Phase 10: Message Batching / Debounce** - A pre-generation debounce+dedupe stage in both bot templates so a multi-fragment customer message gets ONE combined reply, plus a client-side debounce in `SuggestionsController.HandleLive` so suggestions coalesce the same way.
+
+### 📋 v1.3 First-Run Onboarding (Planned)
+
+- [ ] **Phase 11: First-Run Onboarding Flow** - One-time 3-slide welcome carousel (no skip) + «Это безопасно» trust blocks in both auth flows + success moment leading to price-list upload + derived-state «Первые шаги» checklist on BotsPage. (design approved 2026-07-17: `docs/superpowers/specs/2026-07-17-first-run-onboarding-design.md`)
 
 ## Phase Details
 
@@ -184,6 +189,19 @@ Plans:
   5. EditMode debounce-gate test green (rapid incomings → one request; manual refresh immediate); n8n curl matrix (two fragments → one combined reply; single message → one reply; bot-reply boundary) green.
 **Plans**: TBD (design: `docs/superpowers/specs/2026-07-15-message-batching-debounce-design.md`)
 **Flags**: USER-ASSISTED e2e (dev n8n + tunnel + real profiles). Adds ~window-length latency to EVERY auto-reply (the tuning knob). v1 batches text only (media message = own trigger). Same both-template propagation + bulk-copy story as Phase 9.
+
+### Phase 11: First-Run Onboarding Flow (v1.3)
+**Goal**: A brand-new user understands the product's value in under a minute, connects WhatsApp or Telegram without fear, and is guided past auth to a working bot — via a one-time 3-slide welcome carousel, channel-specific «Это безопасно» trust blocks, a success moment that leads into price-list upload, and a derived-state «Первые шаги» checklist on the Bots page.
+**Depends on**: v1.1 close (frames the shipped channel-switcher + Telegram auth surfaces). Independent of v1.2 — pure client UI, no n8n/template changes; schedulable before or after Phases 9–10.
+**Requirements**: ONB-01..ONB-05 (to be formalized at milestone start; definitions locked in the design spec)
+**Success Criteria** (what must be TRUE):
+  1. First launch (no bots, `OnboardingSeen` unset) shows the 3-slide carousel — Ценность → Контроль → Каналы (WhatsApp+Telegram) — advanced only by «Далее»/«Создать бота» (no skip); the CTA opens the existing AddBotPanel wizard; the carousel never re-appears (flag outside the bot key namespace; existing users with bots never see it; «Удалить все данные» re-runs it by design).
+  2. BOTH auth flows (WhatsApp pairing code; Telegram phone/code/2FA) show the «Это безопасно» trust block with channel-specific copy; no QR anywhere.
+  3. Successful auth on either channel shows «Бот подключён!» (DOTween check) whose primary CTA «Загрузить прайс-лист» deep-links into BotSettings → «Прайс-листы» (fallback «Открыть чаты» when files already exist); «Позже» defers to the checklist.
+  4. BotsPage shows the «Первые шаги» card (4 derived-state steps; channel label from `isOnWhatsapp`/`isOnTelegram`; per-row deep links) that hides permanently at 4/4.
+  5. Zero regression: empty state, AddBotPanel auto-open (post-onboarding), auth flows unchanged; full EditMode suite green.
+**Plans**: TBD (design: `docs/superpowers/specs/2026-07-17-first-run-onboarding-design.md`; context: `11-CONTEXT.md`; mockups: `.planning/sketches/onboarding/onboarding-proposal.html`)
+**Flags**: UI-heavy — new `OnboardingScreenBuilder` (NavRestructureBuilder pattern); `Screen_Onboarding` ordered BEFORE the auth screens (auth stays LAST) and `ReorderScreens` must learn it; scene mutations committed immediately after builder runs. Device visual pass required.
 
 ## Progress
 
