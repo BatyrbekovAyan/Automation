@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
-status: planning
-stopped_at: "Gap round 2 PLANNED 2026-07-17: 6 plans 08-11..08-16 (waves 5-7) for D2/D9/D10/D11/D12 — checker passed (0 blockers; 2 warnings revised in a330aed). D2 root cause CONFIRMED from tapi samples (base-form ❤ echo + un-learned _tgOwnUserId). Next: /gsd-execute-phase 08 --gaps-only (waves 5-6 autonomous; wave 7 = owner device re-verify). Milestone NOT complete."
-last_updated: "2026-07-16T22:12:38.539Z"
+status: executing
+stopped_at: "Completed 08-11-PLAN.md (D2 refined: reaction identity/VS16)"
+last_updated: "2026-07-17T07:06:16.603Z"
 last_activity: 2026-07-17
 progress:
   total_phases: 8
   completed_phases: 5
-  total_plans: 35
-  completed_plans: 29
-  percent: 83
+  total_plans: 30
+  completed_plans: 30
+  percent: 100
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-12)
 
 **Core value:** The owner stays in control along the automation↔semi-auto spectrum — the bot can answer autonomously, or propose replies the owner picks and refines, without losing trust or the ability to take over.
-**Current focus:** Phase 08 — device-uat-milestone-closeout. Gap round 1 executed + owner re-verify RUN 2026-07-17: 7/9 defects resolved on device; Gate A stays ISSUES with a reduced open set (D2 refined reaction-identity/VS16, D9 invisible sync pill, D10 WA «Вместе» relevance, D11 media downloads, D12 TG create-bot CTA) → plan gap round 2 via /gsd-plan-phase 08 --gaps. Gates B (prod copy) + C (close) after Gate A flips PASS.
+**Current focus:** Phase 08 — device-uat-milestone-closeout
 
 ## Current Position
 
-Phase: 08 (device-uat-milestone-closeout) — GAP ROUND 2 READY TO EXECUTE
-Plan: 16 plans total — 10 executed (rounds 0-1 + re-verify), 6 round-2 pending (08-11..08-16)
-Status: Run /gsd-execute-phase 08 --gaps-only (wave 5: 08-11 D2 reaction identity, 08-12 D9 pill visibility, 08-13 D10 WA suggestions, 08-14 D12 TG create CTA; wave 6: 08-15 D11 media instrumentation; wave 7: 08-16 owner device re-verify). Milestone NOT complete — do NOT close until Gate A flips PASS and Gates B/C run.
+Phase: 08 (device-uat-milestone-closeout) — EXECUTING
+Plan: 2 of 16
+Status: Ready to execute
 Last activity: 2026-07-17
 
-Progress: [████████░░] 83%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -79,6 +79,7 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [Phase 8]: 08-08 D4+D6 gap-closure — chat-row swipe stack. D6: SwipeToDelete lifecycle null-guard — lazy Rt accessor (_rt != null ? _rt : (_rt=(RectTransform)transform)) backs every _rt deref + _scroll ??= lazy at drag entry points, so ChatItemView.Bind→ResetClosed→SetContentX no longer NREs when a fresh-sync row is Instantiated+Bound before Awake (inactive list panel); Awake still assigns on the normal path, channel-agnostic (fired on WhatsApp too). D4: new pure ChatRowSwipePolicy.Enabled(channel) (WhatsApp-only; mirrors ActiveChannelSupportsChatDelete) — ChatItemView.Bind gates the affordance on ActiveChannel per (pooled) bind: Telegram snaps shut + disables SwipeToDelete (no drag callbacks) + hides the red button; WhatsApp keeps ResetClosed()+wired button byte-identical (added enabled=true/SetActive(true) are idempotent no-ops). 2 ChatRowSwipePolicy tests; 1065/1065 EditMode green FRESH (1063+2); commits a12f467/fea922d/991bd2f. Device re-verify D4/D6 rides 08-10.
 - [Phase 8]: 08-05 D7 gap-closure — TG service-dialog dedup + cross-channel bleed. Diagnosis: (a) two id-forms of the 777000 service dialog (read-only capture shows only bare 777000; the twin is server/device-side — no in-app @c.us appender — leading hypothesis 777000@c.us; EXACT form to confirm at 08-10); (b) bleed = a pre-CHAT-11 legacy WhatsApp cache file still holding the TG dialog (today's sync path is channel-correct: GetCacheRoot/cachePath follow ActiveChannel, StopAllCoroutines guards a switch). Fix: pure ChatIdFormat.CanonicalKey(id, channel) (WhatsApp VERBATIM/byte-identical; Telegram strips a spurious @c.us/@g.us twin) + IsForeignToChannel(id, channel) (WhatsApp drops a bare no-'@' Telegram-form id — '@'-test keeps every genuine WA jid incl broadcast/newsletter/lid; Telegram NEVER rejects so the service dialog stays). ParseChatsJson keys chatLookup/serverIds/isDeleted/merge by the canonical id AND constructs the surviving VM with it (vm.ChatId==key ⇒ bare tapi id on TG, byte-identical on WA, every downstream chatLookup consumer resolves unchanged); GetChat + both ShouldNotify + DisplayFallback + IsGroup route through the canonical key. Holds under 08-04's repeating open-chat poll. 1091/1091 EditMode green FRESH (1065+26). commits f379a5f/cc04503/1c9d8fe. Device re-verify D7 + EXACT twin-form capture ride 08-10.
 - [Phase 8]: 08-09 D8+D9 gap-closure (low polish) — closes gap planning. D8: EmptyStateView.cs's 9 residual English empty-state literals Russianised across all three reasons (create-bot «Создайте первого бота»/«Создать бота»; WhatsApp + Telegram «… не подключён»/«Подключить …»); «WhatsApp»/«Telegram» brand names kept Latin; no English user-facing literal remains. D9: ChatManager gains channel-agnostic OnChatListSyncStart/OnChatListSyncEnd (fired UNCONDITIONALLY around SyncAllChats' try/finally) + an IsChatListSyncing getter; new ChatListSyncIndicator MonoBehaviour shows a spinner + «Синхронизация…» pill at the top of the list ONLY when ActiveChannel==Telegram (WhatsApp ignores the start signal → its window-based SyncingView untouched, byte-identical). Rule-2 deviation (T-08-09-01 stuck-pill mitigation, no architectural change): plan named only channel-switch-away as the extra hide trigger — also exposed IsChatListSyncing (OnEnable catch-up: ChatsPanel is inactive at scene load so a mid-flight sync fired Start before subscribe) AND subscribed the indicator to OnActiveBotChanged→Hide, because SetActiveBot/SetActiveChannel call StopAllCoroutines() which abandons the in-flight SyncAllChats WITHOUT running its finally (OnChatListSyncEnd would never fire on a bot switch); mirrors SyncingView. Scene: pill built by idempotent headless ChatListSyncIndicatorBuilder (rounded #EFEFF0 pill + #2AABEE ring spinner reusing Loading.png + TMP label, CanvasGroup alpha 0 default) as LAST child of Screen_Whatsapp/ChatsPanel; Editor was open so the stamp went through a scene-stamp checkpoint (owner-run Tools/Chat List Sync Indicator/Build via Unity MCP), committed immediately 7649da8 (GUID/name grep verified, no sibling clobber: SyncingView/EmptyStateView/ChannelSwitcherView each still 1). No stubs, no new threat surface (static copy + client-only display pill; no server/n8n changes). WhatsApp byte-identical; 1091/1091 EditMode green FRESH (in-Editor bridge; no .cs changed after the 12:53:27Z compile so the scene stamp is data-only). commits 8bf9271/9de709c/fd8772b/3ebe2ae/7649da8. Device re-verify of D8 (RU copy) + D9 (pill shows during TG sync, never sticks) rides 08-10.
+- [Phase 8]: 08-11 D2 refined (reaction identity/VS16) gap-closure — CONFIRMED from read-only tapi capture: (A) tapi echoes the heart as base ❤ U+2764 (bytes e2 9d a4) while the app stores qualified ❤️ U+2764 U+FE0F; (B) owner reactions key by user_id 1038376805 == the from on fromMe rows, but _tgOwnUserId was stranded null on switch. Fix A = new pure ReactionEmoji (CompareKey/SameEmoji/Canonical) threaded at every seam: mapper stores Canonical(reaction) (renders a sprite + matches optimistic), ReactionSummary dedups by CompareKey, Merge.Key gains a U+0001 separator (IN-06)+CompareKey, OutgoingReaction toggle-off + ReactionBar highlight use SameEmoji. Fix B = persist _tgOwnUserId per Telegram profile ({tgId}TgOwnUserId) + LOAD it at both SetActiveBot/SetActiveChannel resets reading the Telegram id EXPLICITLY (ActiveChannel still holds the old channel at reset) + a belt-and-suspenders same-canonical-emoji fold in Merge (collapses count-2 for the first-ever reaction, scoped to a fresh optimistic me). Reinterprets 05-06 WR-01 same-emoji 'keep both' as the owner's un-mapped echo. Editor-only #if UNITY_EDITOR echo-hex log for the 08-16 capture. WhatsApp byte-identical (compare-only); 1105/1105 EditMode green FRESH. commits 44b732e/de48f35/ee97391/1be6300/ab29bd6. Device re-verify (3 symptoms gone + echo hex/user_id capture) rides 08-16.
 
 ### Pending Todos
 
@@ -134,11 +135,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 08 P08-08 | ~11min | 2 tasks | 4 files |
 | Phase 08 P05 | 18min | 2 tasks | 4 files |
 | Phase 08 P08-09 | ~20min | 3 tasks | 5 files |
+| Phase 08 P08-11 | 13min | 2 tasks | 13 files |
 
 ## Session Continuity
 
-Last session: 2026-07-16T13:05:04.000Z
-Stopped at: 08-10 device re-verify recorded (2026-07-17): 7/9 resolved, Gate A stays ISSUES; next /gsd-plan-phase 08 --gaps for D2/D9/D10/D11/D12.
+Last session: 2026-07-17T07:05:52.076Z
+Stopped at: Completed 08-11-PLAN.md (D2 refined: reaction identity/VS16)
 Resume file: None
 
 **Planned Phase:** 08 () — 0 plans — 2026-07-16T22:12:38.522Z
