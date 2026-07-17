@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
 status: executing
-stopped_at: "Completed 08-12-PLAN.md (D9: TG sync-pill min-visible-duration)"
-last_updated: "2026-07-17T07:28:55.097Z"
+stopped_at: "Completed 08-13-PLAN.md (D10: WA «Вместе» relevance — Assemble prompt anchor)"
+last_updated: "2026-07-17T07:48:06.500Z"
 last_activity: 2026-07-17
 progress:
   total_phases: 8
   completed_phases: 5
   total_plans: 30
-  completed_plans: 31
+  completed_plans: 32
   percent: 100
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 ## Current Position
 
 Phase: 08 (device-uat-milestone-closeout) — EXECUTING
-Plan: 3 of 16
+Plan: 4 of 16
 Status: Ready to execute
 Last activity: 2026-07-17
 
@@ -81,6 +81,7 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [Phase 8]: 08-09 D8+D9 gap-closure (low polish) — closes gap planning. D8: EmptyStateView.cs's 9 residual English empty-state literals Russianised across all three reasons (create-bot «Создайте первого бота»/«Создать бота»; WhatsApp + Telegram «… не подключён»/«Подключить …»); «WhatsApp»/«Telegram» brand names kept Latin; no English user-facing literal remains. D9: ChatManager gains channel-agnostic OnChatListSyncStart/OnChatListSyncEnd (fired UNCONDITIONALLY around SyncAllChats' try/finally) + an IsChatListSyncing getter; new ChatListSyncIndicator MonoBehaviour shows a spinner + «Синхронизация…» pill at the top of the list ONLY when ActiveChannel==Telegram (WhatsApp ignores the start signal → its window-based SyncingView untouched, byte-identical). Rule-2 deviation (T-08-09-01 stuck-pill mitigation, no architectural change): plan named only channel-switch-away as the extra hide trigger — also exposed IsChatListSyncing (OnEnable catch-up: ChatsPanel is inactive at scene load so a mid-flight sync fired Start before subscribe) AND subscribed the indicator to OnActiveBotChanged→Hide, because SetActiveBot/SetActiveChannel call StopAllCoroutines() which abandons the in-flight SyncAllChats WITHOUT running its finally (OnChatListSyncEnd would never fire on a bot switch); mirrors SyncingView. Scene: pill built by idempotent headless ChatListSyncIndicatorBuilder (rounded #EFEFF0 pill + #2AABEE ring spinner reusing Loading.png + TMP label, CanvasGroup alpha 0 default) as LAST child of Screen_Whatsapp/ChatsPanel; Editor was open so the stamp went through a scene-stamp checkpoint (owner-run Tools/Chat List Sync Indicator/Build via Unity MCP), committed immediately 7649da8 (GUID/name grep verified, no sibling clobber: SyncingView/EmptyStateView/ChannelSwitcherView each still 1). No stubs, no new threat surface (static copy + client-only display pill; no server/n8n changes). WhatsApp byte-identical; 1091/1091 EditMode green FRESH (in-Editor bridge; no .cs changed after the 12:53:27Z compile so the scene stamp is data-only). commits 8bf9271/9de709c/fd8772b/3ebe2ae/7649da8. Device re-verify of D8 (RU copy) + D9 (pill shows during TG sync, never sticks) rides 08-10.
 - [Phase 8]: 08-11 D2 refined (reaction identity/VS16) gap-closure — CONFIRMED from read-only tapi capture: (A) tapi echoes the heart as base ❤ U+2764 (bytes e2 9d a4) while the app stores qualified ❤️ U+2764 U+FE0F; (B) owner reactions key by user_id 1038376805 == the from on fromMe rows, but _tgOwnUserId was stranded null on switch. Fix A = new pure ReactionEmoji (CompareKey/SameEmoji/Canonical) threaded at every seam: mapper stores Canonical(reaction) (renders a sprite + matches optimistic), ReactionSummary dedups by CompareKey, Merge.Key gains a U+0001 separator (IN-06)+CompareKey, OutgoingReaction toggle-off + ReactionBar highlight use SameEmoji. Fix B = persist _tgOwnUserId per Telegram profile ({tgId}TgOwnUserId) + LOAD it at both SetActiveBot/SetActiveChannel resets reading the Telegram id EXPLICITLY (ActiveChannel still holds the old channel at reset) + a belt-and-suspenders same-canonical-emoji fold in Merge (collapses count-2 for the first-ever reaction, scoped to a fresh optimistic me). Reinterprets 05-06 WR-01 same-emoji 'keep both' as the owner's un-mapped echo. Editor-only #if UNITY_EDITOR echo-hex log for the 08-16 capture. WhatsApp byte-identical (compare-only); 1105/1105 EditMode green FRESH. commits 44b732e/de48f35/ee97391/1be6300/ab29bd6. Device re-verify (3 symptoms gone + echo hex/user_id capture) rides 08-16.
 - [Phase 8]: 08-12 D9 gap-closure (low, RE-FAIL) — Telegram sync pill was NEVER legibly visible. Diagnosis-first (Editor): H1 CONFIRMED primary (SyncAllChats always yields on SendWebRequest so the pill DOES render, but a fast cached-list load flashes it sub-legibly), H2 partial-but-benign (start+end before OnEnable only at startup, not the switch case), H3 REFUTED-as-race (ActiveChannel set BEFORE load at both startup and SetActiveChannel; re-sync always re-fires) but the switch-to-TG show added as defense-in-depth, H4 REFUTED (last-child + same CanvasGroup pattern as working SyncingView; flash proves alpha reaches screen → NO scene stamp), H5 CONFIRMED-SAFE (privacy-clear resync re-owns the pill; BeginSpin kills the pending deferred-hide). Fix = new pure ChatListSyncIndicatorGate (MinVisibleSeconds=0.6 floor, RemainingVisibleSeconds/ShouldHideNow) + ChatListSyncIndicator hides THROUGH the gate (WaitForSecondsRealtime deferred-hide, killed on Hide/OnDisable/OnActiveBotChanged/new-sync) + switch-to-Telegram-while-syncing BeginSpin. Code-only, WhatsApp byte-identical; 1111/1111 EditMode green FRESH (1105+6). commits 14ecfe8/d172213/4d189f3/328b809. Device re-verify (pill visible on fast TG load, WA none, never sticks) rides 08-16.
+- [Phase 8]: 08-13 D10 gap-closure (WA «Вместе» relevance) — DIAGNOSIS-FIRST. Confirmed client symmetric (BuildPayloadJson one builder; TryGetRecentMessages channel-agnostic; HandleLive sets lastIncomingText with no channel branch) AND workflow structurally symmetric (both RAG nodes → Assemble, single-key botWaId/botTgId filters, channel routing, Assemble reads p.messages/queryText/catalog from Prep path-independently, channel-neutral prompt) — all four pre-flagged hypotheses REFUTED (verifier already guarantees them). Sole WA-vs-TG runtime asymmetry = RAG retrieval: WA runs a live botWaId query (dev has stray WA chunks) while TG returns 0 rows on dev, and the newest incoming was only IMPLICIT in fenced.messages, so WA retrieval noise buried it → irrelevant. Fix = SHARED Assemble prompt anchor: РЕЛЕВАНТНОСТЬ (ГЛАВНОЕ) directive (answer the LAST incoming; catalog/RAG facts-only) + explicit fenced.lastClientMessage=p.queryText. Telegram byte-identical (git diff = only Assemble line 237; zero botTgId/Retrieve RAG TG/If channel TG bytes); verify-telegram-parity.py green; NO client change. commit fa2ac8c. Live dev-n8n deploy + WA relevance re-test ride 08-16.
 
 ### Pending Todos
 
@@ -138,11 +139,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 08 P08-09 | ~20min | 3 tasks | 5 files |
 | Phase 08 P08-11 | 13min | 2 tasks | 13 files |
 | Phase 08 P08-12 | 12min | 2 tasks | 5 files |
+| Phase 08 P08-13 | 13min | 2 tasks | 1 files |
 
 ## Session Continuity
 
-Last session: 2026-07-17T07:28:55.075Z
-Stopped at: Completed 08-12-PLAN.md (D9: TG sync-pill min-visible-duration)
+Last session: 2026-07-17T07:47:42.106Z
+Stopped at: Completed 08-13-PLAN.md (D10: WA «Вместе» relevance — Assemble prompt anchor)
 Resume file: None
 
 **Planned Phase:** 08 () — 0 plans — 2026-07-16T22:12:38.522Z
