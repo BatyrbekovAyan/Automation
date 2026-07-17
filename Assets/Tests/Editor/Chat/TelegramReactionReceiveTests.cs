@@ -133,19 +133,25 @@ public class TelegramReactionReceiveTests
     }
 
     [Test]
-    public void Merge_OtherUserSameEmoji_DoesNotConsumeMyEntry()
+    public void Merge_SameEmojiUnmappedEcho_FoldedIntoMe()
     {
-        // A DIFFERENT user reacted with the same emoji before my echo arrived. The old
-        // emoji-presence heuristic dropped my optimistic entry here (flicker-off + dead
-        // toggle); identity-keyed preservation keeps both reactors.
+        // D2 root cause B (supersedes the 05-06 WR-01 "keep both" assumption for the SAME-emoji
+        // case): a same-emoji server entry keyed by a numeric user_id, alongside a FRESH optimistic
+        // "me", is the owner's OWN echo that _tgOwnUserId couldn't map (reacted before any own row
+        // loaded) — folding it into "me" makes an own single reaction read as ONE, count 1 (symptom
+        // 1). The rare true-stranger-same-emoji collision self-corrects once the persisted id maps
+        // the real echo to "me" (server then carries a "me" entry ⇒ replace, not fold) or the grace
+        // lapses. A DIFFERENT-emoji stranger is never folded
+        // (Merge_MyEmojiNotYetEchoed_KeptAlongsideOthers), and nothing is folded without a fresh
+        // optimistic "me" (T-08-11-01, Merge_OtherUserSameEmoji_NoOptimisticMe_NotFolded).
         var merged = TelegramReactionMerge.Merge(
             new List<MessageReaction> { Me("👍") },
             new List<MessageReaction> { Other("👍", "999") },
             Now);
 
-        Assert.AreEqual(2, merged.Count);
-        Assert.IsTrue(merged.Exists(r => r.reactorKey == OutgoingReaction.MeReactorKey));
-        Assert.IsTrue(merged.Exists(r => r.reactorKey == "999"));
+        Assert.AreEqual(1, merged.Count);
+        Assert.AreEqual(OutgoingReaction.MeReactorKey, merged[0].reactorKey);
+        Assert.AreEqual(1, ReactionSummary.Build(merged).count);
     }
 
     [Test]

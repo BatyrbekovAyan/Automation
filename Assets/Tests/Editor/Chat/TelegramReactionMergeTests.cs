@@ -196,4 +196,72 @@ public class TelegramReactionMergeTests
         Assert.AreEqual("", merged[0].emoji);
         Assert.AreEqual(0, ReactionSummary.Build(merged).count);   // nothing visible, no reactor count
     }
+
+    // --- Fold: an un-mapped own echo collapsed into "me" (D2 root cause B) ---
+    // When the owner reacts in a chat/page with no own message loaded, _tgOwnUserId is unlearned,
+    // so tapi echoes the owner's reaction keyed by the numeric user_id (not "me") and it rides
+    // ALONGSIDE the optimistic "me" → count «2» (symptom 1). Merge folds a SINGLE same-canonical-
+    // emoji un-mapped server entry into the fresh optimistic "me" — belt-and-suspenders for the
+    // first-ever reaction, before the persisted-id fix maps the echo to "me" upstream.
+
+    [Test]
+    public void Merge_FreshOptimisticMe_PlusUnmappedSameEmojiEcho_CollapsesToOneMe()
+    {
+        // Owner reacted ❤️ (optimistic "me"); tapi's echo comes back as base ❤ keyed by a numeric
+        // user_id (id unlearned). Fold it into "me": exactly one glyph, count 1 (symptom 1 fixed).
+        var merged = TelegramReactionMerge.Merge(
+            new List<MessageReaction> { Me("❤️", Now) },
+            new List<MessageReaction> { Other("❤", "999") },
+            Now);
+
+        Assert.AreEqual(1, merged.Count);
+        Assert.AreEqual(OutgoingReaction.MeReactorKey, merged[0].reactorKey);
+        Assert.AreEqual(1, ReactionSummary.Build(merged).count);
+        Assert.AreEqual(1, ReactionSummary.Build(merged).emojis.Count);
+    }
+
+    [Test]
+    public void Merge_FreshChange_MappedEcho_LeavesOneMe()
+    {
+        // change-leaves-one: owner changed 👍→❤️; once _tgOwnUserId is persisted, tapi's stale 👍
+        // echo is mapped to "me" upstream, so the fresh ❤️ cleanly REPLACES it — one pill, not two.
+        var merged = TelegramReactionMerge.Merge(
+            new List<MessageReaction> { Me("❤️", Now) },
+            new List<MessageReaction> { Me("👍", time: 0) },   // old echo, mapped to "me" via persisted id
+            Now);
+
+        Assert.AreEqual(1, merged.Count);
+        Assert.AreEqual(OutgoingReaction.MeReactorKey, merged[0].reactorKey);
+        Assert.AreEqual("❤️", merged[0].emoji);
+    }
+
+    [Test]
+    public void Merge_FreshOptimisticMe_DifferentEmojiEcho_NotFolded()
+    {
+        // Scope guard: the fold is same-emoji ONLY. A DIFFERENT-emoji un-mapped entry (e.g. the
+        // owner's stale 👍 echo mid-change, still numeric-keyed) is NOT folded here — the
+        // persisted-id path maps it to "me" so it is cleanly replaced (Merge_FreshChange above).
+        var merged = TelegramReactionMerge.Merge(
+            new List<MessageReaction> { Me("❤️", Now) },
+            new List<MessageReaction> { Other("👍", "999") },
+            Now);
+
+        Assert.AreEqual(2, merged.Count);
+        Assert.IsTrue(merged.Exists(r => r.reactorKey == "999" && r.emoji == "👍"));
+        Assert.IsTrue(merged.Exists(r => r.reactorKey == OutgoingReaction.MeReactorKey && r.emoji == "❤️"));
+    }
+
+    [Test]
+    public void Merge_OtherUserSameEmoji_NoOptimisticMe_NotFolded()
+    {
+        // Spoofing guard (T-08-11-01): with NO fresh optimistic "me", a stranger's same-emoji
+        // reaction is never folded into "me" — a reaction the owner never made stays theirs.
+        var merged = TelegramReactionMerge.Merge(
+            null,
+            new List<MessageReaction> { Other("❤", "999") },
+            Now);
+
+        Assert.AreEqual(1, merged.Count);
+        Assert.AreEqual("999", merged[0].reactorKey);
+    }
 }
