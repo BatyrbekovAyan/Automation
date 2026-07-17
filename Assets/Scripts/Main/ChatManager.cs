@@ -2056,56 +2056,90 @@ if (msg.messageType == MessageType.Video)
             yield break;
         }
         string url = WappiEndpoints.Sync(ActiveChannel, $"message/media/download?profile_id={activeProfileId}&message_id={messageId}");
-        using UnityWebRequest www = UnityWebRequest.Get(url);
-        www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
-        www.timeout = 30;   // never let recovery / tap-to-retry hang the spinner indefinitely
-        yield return www.SendWebRequest();
 
-        // D11: every failure exit below logs one capped, actionable line (id + HTTP status +
-        // classified reason + a size-capped body snippet) so the device pass can show WHY a
-        // video/GIF/note failed. Capped by MediaDownloadFailure.Snippet — NEVER a full payload,
-        // NEVER a file write (do not grow into the pre-existing response.txt dumps, IN-03).
-        long httpStatus = www.responseCode;
-        string bodySnippet = MediaDownloadFailure.Snippet(www.downloadHandler?.text);
-
-        // (1) Transport/HTTP failure — network drop, timeout (responseCode 0), or a non-2xx status.
-        if (www.result != UnityWebRequest.Result.Success)
+        // D11: at most TWO attempts — the original plus ONE serial-safe retry for a TRANSIENT
+        // failure (network/timeout or HTTP 5xx). The retry is issued INLINE on this coroutine;
+        // the drain worker (DrainMediaDownloadQueue) stays blocked on it, so strict seriality
+        // holds — NO second concurrent request (Wappi cross-serves concurrent /media/download;
+        // memory wappi-media-download-crossing). PERMANENT failures (HTTP 4xx, empty 2xx body,
+        // malformed JSON) surface immediately — they are the likely server-side cause the owner
+        // suspects, and the capped log below captures WHY. The 1.5s backoff runs BETWEEN disposed
+        // requests (never holding one in flight) and is killed by SetActiveBot/SetActiveChannel's
+        // StopAllCoroutines on switch; ClearMediaDownloadQueue then resets the worker.
+        const int maxAttempts = 2;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            var kind = MediaDownloadFailure.Classify(false, httpStatus, false, false);
-            Debug.LogWarning(MediaDownloadFailure.FormatLog(messageId, httpStatus, kind, bodySnippet));
-            onFailure?.Invoke();
-            yield break;
+            bool retryTransient = false;
+
+            using (UnityWebRequest www = UnityWebRequest.Get(url))
+            {
+                www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
+                www.timeout = 30;   // never let recovery / tap-to-retry hang the spinner — re-applied on the retry too
+                yield return www.SendWebRequest();
+
+                // Capped, actionable diagnostics — NEVER a full payload, NEVER a file write
+                // (do not grow into the pre-existing response.txt dumps, IN-03).
+                long httpStatus = www.responseCode;
+                string bodySnippet = MediaDownloadFailure.Snippet(www.downloadHandler?.text);
+
+                if (www.result != UnityWebRequest.Result.Success)
+                {
+                    // (1) Transport/HTTP failure — network drop, timeout (responseCode 0), or non-2xx.
+                    var kind = MediaDownloadFailure.Classify(false, httpStatus, false, false);
+                    bool transient = kind == MediaDownloadFailureKind.NetworkOrTimeout
+                        || (kind == MediaDownloadFailureKind.HttpError && httpStatus >= 500);
+                    if (transient && attempt < maxAttempts)
+                    {
+                        Debug.LogWarning(MediaDownloadFailure.FormatLog(messageId, httpStatus, kind, bodySnippet)
+                            + " — transient, retrying once");
+                        retryTransient = true;   // fall through to the backoff (www disposed first)
+                    }
+                    else
+                    {
+                        Debug.LogWarning(MediaDownloadFailure.FormatLog(messageId, httpStatus, kind, bodySnippet));
+                        onFailure?.Invoke();
+                        yield break;
+                    }
+                }
+                else
+                {
+                    // 2xx — parse the body (no yield inside the try/catch).
+                    string fileLink = null;
+                    string fileB64 = null;
+                    bool parseThrew = false;
+                    try
+                    {
+                        JObject json = JObject.Parse(www.downloadHandler.text);
+                        fileLink = json["file_link"]?.ToString();
+                        fileB64 = json["file_b64"]?.ToString();
+                    }
+                    catch { parseThrew = true; }
+
+                    if (parseThrew)
+                    {
+                        // (3) ParseError — permanent (a retry cannot fix malformed JSON).
+                        Debug.LogWarning(MediaDownloadFailure.FormatLog(
+                            messageId, httpStatus, MediaDownloadFailureKind.ParseError, bodySnippet));
+                        onFailure?.Invoke();
+                        yield break;
+                    }
+
+                    if (!string.IsNullOrEmpty(fileLink)) { onSuccess?.Invoke(fileLink); yield break; }
+                    if (!string.IsNullOrEmpty(fileB64)) { onSuccess?.Invoke("base64://" + fileB64); yield break; }
+
+                    // (2) NoLinkInResponse — permanent (empty 2xx body; the likely server-side cause).
+                    var emptyKind = MediaDownloadFailure.Classify(true, httpStatus, false, false);
+                    Debug.LogWarning(MediaDownloadFailure.FormatLog(messageId, httpStatus, emptyKind, bodySnippet));
+                    onFailure?.Invoke();
+                    yield break;
+                }
+            }   // www disposed here — the backoff below holds NO in-flight request
+
+            // Reached only after a transient failure with a retry remaining.
+            if (retryTransient) yield return new WaitForSeconds(1.5f);
         }
-
-        // Parse the 2xx body (no yield inside the try/catch): a malformed body is a ParseError;
-        // a well-formed body with neither file_link nor file_b64 is NoLinkInResponse.
-        string fileLink = null;
-        string fileB64 = null;
-        bool parseThrew = false;
-        try
-        {
-            JObject json = JObject.Parse(www.downloadHandler.text);
-            fileLink = json["file_link"]?.ToString();
-            fileB64 = json["file_b64"]?.ToString();
-        }
-        catch { parseThrew = true; }
-
-        // (3) Parse exception — the 2xx body was not the expected JSON.
-        if (parseThrew)
-        {
-            Debug.LogWarning(MediaDownloadFailure.FormatLog(
-                messageId, httpStatus, MediaDownloadFailureKind.ParseError, bodySnippet));
-            onFailure?.Invoke();
-            yield break;
-        }
-
-        if (!string.IsNullOrEmpty(fileLink)) { onSuccess?.Invoke(fileLink); yield break; }
-        if (!string.IsNullOrEmpty(fileB64)) { onSuccess?.Invoke("base64://" + fileB64); yield break; }
-
-        // (2) Well-formed 2xx but empty — neither file_link nor file_b64 (the likely server-side cause).
-        var emptyKind = MediaDownloadFailure.Classify(true, httpStatus, false, false);
-        Debug.LogWarning(MediaDownloadFailure.FormatLog(messageId, httpStatus, emptyKind, bodySnippet));
-        onFailure?.Invoke();
+        // The loop always exits via yield break above (the final attempt never sets
+        // retryTransient), so control never falls past here.
     }
     
     public void SendTextMessage(string text)
