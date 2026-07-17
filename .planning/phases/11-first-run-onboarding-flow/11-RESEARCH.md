@@ -386,7 +386,14 @@ Not applicable in the usual sense — this is codebase archaeology, not evolving
 
 **Note:** The CONTEXT/spec claim "Carousel paging = existing `SnappyFlickScrollRect`" is **contradicted by the code** (Pitfall 1). This is not an assumption — it is a verified correction the planner must reconcile with the locked decision.
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+**Resolution (2026-07-17 — planning + revision iteration 1). All four decided; ship-as-is where noted.**
+
+- **Q1 — `Bot.OpenSettings` is `private`:** RESOLVED — Plan 11-01 adds public thin wrappers `Bot.OpenSettingsAtProductTab()` and `Bot.OpenSettingsAtGeneralTab()` that call the existing private `OpenSettings()` then select the tab (`OpenProductTab()` / `OpenGeneralTab()`). The Edit-button path is untouched; `OpenSettings` stays private. The checklist «Подключить {channel}» row (11-06 row 2) uses the General-tab entry; the success CTA + row 3 use the Product-tab entry.
+- **Q2 — where the interactive success CTA runs:** RESOLVED — Plan 11-04 fires `ShowInteractiveSuccessMoment` from `CreateBotFromForm` AFTER Step 6 (bot card exists), exactly once, on the final channel's own panel + per-channel field set. The moment reactivates the auth-page hierarchy that hosts the nested success panel and defers `authPage.SetActive(false)` to dismissal (fixes the nested-panel-never-renders hazard).
+- **Q3 — gate scope (auto-open only, or also explicit CTA taps):** RESOLVED — Plan 11-03 gates ONLY at the shared `BotsPage.RefreshEmptyState()` auto-open chokepoint. Every zero-bot path (including the Chats empty-state «Создать бота» CTA) routes through it via `SwitchTab(Bots) → RefreshEmptyState`, so no separate `StartNewBot` / `EmptyStateView` gate is needed.
+- **Q4 — checklist suppression for existing users mid-setup:** RESOLVED — **ship as-is** (acceptable). The «Первые шаги» card derives every row from real facts and hides permanently at 4/4 (`OnboardingChecklistDone`). An existing user with a bot but no files/reply seeing the remaining helpful steps matches the spec's intent; no "fresh-install" gate is added. (Note: the existing-user carousel auto-flag in 11-03 keys on live `BotsParent.childCount`, independent of this checklist decision.)
 
 1. **`Bot.OpenSettings` is `private`** — the success-panel «Загрузить прайс-лист» CTA and the checklist rows both need to open a *specific* bot's settings programmatically, but `OpenSettings` (Bot.cs:100) is private and only wired to the card's Edit button.
    - What we know: it sets `Manager.openBot`/`openBotSettings`, matches the paired `BotSettings` by sibling index, refreshes files, and slides in.
