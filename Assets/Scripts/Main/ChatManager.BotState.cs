@@ -135,12 +135,10 @@ public partial class ChatManager
         // Owner identity is per-profile — LOAD this bot's persisted Telegram owner-id instead of
         // stranding it null (D2 root cause B): a reaction sent before any own row is Normalized
         // would otherwise be keyed by the raw numeric user_id (not "me") and duplicate the
-        // optimistic "me". Read the TELEGRAM id EXPLICITLY — ActiveChannel still holds the OLD
-        // bot's channel here (it becomes ResolveChannelForBot(botId) below), so GetActiveProfileId()
-        // would resolve the wrong channel. Keyed per Telegram profile so ids never cross.
-        Bot bot = Manager.Instance != null ? Manager.Instance.FindBotByName(botId) : null;
-        string tgProfileId = bot != null ? ProfileIdForChannel(bot, ChatChannel.Telegram) : null;
-        _tgOwnUserId = LoadPersistedTgOwnUserId(tgProfileId);
+        // optimistic "me". (ActiveChannel still holds the OLD bot's channel here — it becomes
+        // ResolveChannelForBot(botId) below — which is why the shared helper reads the Telegram
+        // id explicitly, never via GetActiveProfileId().)
+        ReloadTgOwnUserIdFor(botId);
 
         // D5: StopAllCoroutines() above killed the open-chat live poll — re-kick it so a bot
         // switch never strands it (guarded against duplicates).
@@ -163,15 +161,31 @@ public partial class ChatManager
     /// <summary>
     /// Reads a Telegram profile's persisted owner user-id (learned from a fromMe row's <c>from</c>),
     /// keyed by <see cref="TgOwnUserIdKeySuffix"/>. Returns null (⇒ still-unlearned) when the bot
-    /// has no Telegram profile or nothing has been persisted yet. Shared by both reset sites
-    /// (SetActiveBot / SetActiveChannel); each passes the bot's Telegram id EXPLICITLY so the load
-    /// key always matches the learn key regardless of the currently-active channel (D2 root cause B).
+    /// has no Telegram profile or nothing has been persisted yet. Reached only through
+    /// <see cref="ReloadTgOwnUserIdFor"/>, which passes the bot's Telegram id EXPLICITLY so the
+    /// load key always matches the learn key regardless of the active channel (D2 root cause B).
     /// </summary>
     private static string LoadPersistedTgOwnUserId(string telegramProfileId)
     {
         if (string.IsNullOrEmpty(telegramProfileId)) return null;
         string stored = PlayerPrefs.GetString($"{telegramProfileId}{TgOwnUserIdKeySuffix}", "");
         return string.IsNullOrEmpty(stored) ? null : stored;
+    }
+
+    /// <summary>
+    /// (Re)loads <c>_tgOwnUserId</c> from the persisted per-profile store for the given bot,
+    /// resolving the bot's TELEGRAM profile id explicitly (never <see cref="GetActiveProfileId"/> —
+    /// the active channel may be WhatsApp, or mid-flip, at a call site). MUST be called by every
+    /// active-bot/channel (re)bind site — SetActiveBot, SetActiveChannel, and the cold-start
+    /// InitializeActiveBotNextFrame (08-REVIEW WR-05) — or the owner-id strands null until the
+    /// first own row happens to be Normalized, and a reaction sent in that window duplicates as
+    /// a phantom second entry (D2 root cause B).
+    /// </summary>
+    private void ReloadTgOwnUserIdFor(string botId)
+    {
+        Bot bot = Manager.Instance != null ? Manager.Instance.FindBotByName(botId) : null;
+        string tgProfileId = bot != null ? ProfileIdForChannel(bot, ChatChannel.Telegram) : null;
+        _tgOwnUserId = LoadPersistedTgOwnUserId(tgProfileId);
     }
 
     /// <summary>
@@ -328,6 +342,11 @@ public partial class ChatManager
             // announcing/loading, so subscribers reading ActiveChannel in OnActiveBotChanged
             // and the initial load both see the resolved channel.
             ActiveChannel = ResolveChannelForBot(CurrentBotId);
+            // Cold-start half of D2 root cause B (08-REVIEW WR-05): load the resolved bot's
+            // persisted Telegram owner-id BEFORE the initial load, mirroring the two switch
+            // sites — otherwise every relaunch strands _tgOwnUserId null until an own row is
+            // Normalized, and a reaction sent in that window duplicates as a phantom «2».
+            ReloadTgOwnUserIdFor(CurrentBotId);
             OnActiveBotChanged?.Invoke(CurrentBotId);
             BeginLoadForActiveBot();
         }

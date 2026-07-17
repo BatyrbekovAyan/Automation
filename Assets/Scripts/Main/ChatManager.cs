@@ -49,10 +49,11 @@ public partial class ChatManager : MonoBehaviour
     // (SHAPES.md Q4: every own outgoing tapi message carries from = own profile-user id,
     // even in private chats). Lets TelegramReactionMapper tag the owner's echoed
     // reactions[] element as "me" so toggle-off and the quick-bar highlight survive the
-    // echo (05-06-REVIEW WR-01). Null until learned; on bot/channel switch it is LOADED
-    // from PlayerPrefs (per Telegram profile) rather than stranded null (D2 root cause B),
-    // so a reaction sent before any own row is Normalized is still keyed "me". WhatsApp
-    // never reads or writes it.
+    // echo (05-06-REVIEW WR-01). Null until learned; every rebind site — SetActiveBot,
+    // SetActiveChannel, AND cold-start InitializeActiveBotNextFrame (08-REVIEW WR-05) — LOADS
+    // it from PlayerPrefs (per Telegram profile) via ReloadTgOwnUserIdFor rather than stranding
+    // it null (D2 root cause B), so a reaction sent before any own row is Normalized is still
+    // keyed "me". WhatsApp never reads or writes it.
     private string _tgOwnUserId;
 
     /// <summary>PlayerPrefs key suffix for a Telegram profile's persisted owner user-id.

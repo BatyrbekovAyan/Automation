@@ -84,11 +84,9 @@ public partial class ChatManager
 
         // Owner identity is per-profile — LOAD this bot's persisted Telegram owner-id rather than
         // stranding it null (D2 root cause B; see SetActiveBot). CurrentBotId is unchanged by a
-        // channel switch, so resolve the bot by it and read the Telegram id EXPLICITLY (the load
-        // key must be the Telegram profile id, matching the learn key — never GetActiveProfileId()).
-        Bot bot = Manager.Instance != null ? Manager.Instance.FindBotByName(CurrentBotId) : null;
-        string tgProfileId = bot != null ? ProfileIdForChannel(bot, ChatChannel.Telegram) : null;
-        _tgOwnUserId = LoadPersistedTgOwnUserId(tgProfileId);
+        // channel switch; the shared helper reads the Telegram id explicitly so the load key
+        // always matches the learn key (never GetActiveProfileId()).
+        ReloadTgOwnUserIdFor(CurrentBotId);
 
         // D5: StopAllCoroutines() above killed the open-chat live poll — re-kick it so a channel
         // switch never strands it (D5 is cross-channel; the poll must keep running on Telegram
