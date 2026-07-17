@@ -81,7 +81,14 @@ public partial class ChatManager
         ClearVideoThumbQueue();     // reset queue bookkeeping the cancelled coroutines never freed
         ClearMediaDownloadQueue();  // same for the serial media-download worker
         ClearResolveQueues();       // quote/reaction drain workers were just killed; reset their bookkeeping
-        _tgOwnUserId = null;        // owner identity is per-profile — never carry it across channels
+
+        // Owner identity is per-profile — LOAD this bot's persisted Telegram owner-id rather than
+        // stranding it null (D2 root cause B; see SetActiveBot). CurrentBotId is unchanged by a
+        // channel switch, so resolve the bot by it and read the Telegram id EXPLICITLY (the load
+        // key must be the Telegram profile id, matching the learn key — never GetActiveProfileId()).
+        Bot bot = Manager.Instance != null ? Manager.Instance.FindBotByName(CurrentBotId) : null;
+        string tgProfileId = bot != null ? ProfileIdForChannel(bot, ChatChannel.Telegram) : null;
+        _tgOwnUserId = LoadPersistedTgOwnUserId(tgProfileId);
 
         // D5: StopAllCoroutines() above killed the open-chat live poll — re-kick it so a channel
         // switch never strands it (D5 is cross-channel; the poll must keep running on Telegram

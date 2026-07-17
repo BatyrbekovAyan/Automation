@@ -63,7 +63,17 @@ public static class TelegramReactionMerge
             }
             else
             {
-                result.Add(mine);            // not yet echoed — keep the optimistic entry
+                // No server "me". Before keeping the optimistic entry as a SECOND row, try to FOLD
+                // a single un-mapped same-emoji server echo into "me" (D2 root cause B): when the
+                // owner reacted before their id was learned, tapi keys their echo by the numeric
+                // user_id, so it looks like a stranger's same-emoji reaction and rides alongside
+                // the optimistic "me" → count «2» (symptom 1). Same-canonical-emoji + a fresh
+                // optimistic "mine" ⇒ it is the owner's own echo — replace it in place, don't Add.
+                int echoIdx = IndexOfUnmappedSameEmoji(result, mine.emoji);
+                if (echoIdx >= 0)
+                    result[echoIdx] = mine;  // fold the owner's un-mapped echo into "me"
+                else
+                    result.Add(mine);        // genuinely not yet echoed — keep the optimistic entry
             }
         }
 
@@ -135,6 +145,25 @@ public static class TelegramReactionMerge
     {
         for (int i = 0; i < reactions.Count; i++)
             if (reactions[i] != null && reactions[i].reactorKey == OutgoingReaction.MeReactorKey) return i;
+        return -1;
+    }
+
+    /// <summary>
+    /// Index of a SINGLE server entry that is the owner's own echo keyed by a numeric user_id
+    /// instead of "me" (D2 root cause B: _tgOwnUserId was unlearned when the reaction was sent).
+    /// Matches the owner's optimistic emoji by canonical form (VS16-insensitive) and is NOT already
+    /// "me". Returns the first match, or -1. Callers invoke this only when a fresh optimistic "me"
+    /// is present and there is no server "me", consuming at most one entry — so a stranger's
+    /// same-emoji reaction on a message the owner did NOT react to is never folded (T-08-11-01).
+    /// </summary>
+    private static int IndexOfUnmappedSameEmoji(List<MessageReaction> reactions, string mineEmoji)
+    {
+        for (int i = 0; i < reactions.Count; i++)
+        {
+            MessageReaction r = reactions[i];
+            if (r == null || r.reactorKey == OutgoingReaction.MeReactorKey) continue;
+            if (ReactionEmoji.SameEmoji(r.emoji, mineEmoji)) return i;
+        }
         return -1;
     }
 

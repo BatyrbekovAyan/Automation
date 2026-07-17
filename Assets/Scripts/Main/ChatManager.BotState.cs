@@ -131,7 +131,16 @@ public partial class ChatManager
         ClearVideoThumbQueue();     // reset queue bookkeeping the cancelled coroutines never freed
         ClearMediaDownloadQueue();  // same for the serial media-download worker
         ClearResolveQueues();       // quote/reaction drain workers were just killed; reset their bookkeeping
-        _tgOwnUserId = null;        // owner identity is per-profile — never carry it across bots
+
+        // Owner identity is per-profile — LOAD this bot's persisted Telegram owner-id instead of
+        // stranding it null (D2 root cause B): a reaction sent before any own row is Normalized
+        // would otherwise be keyed by the raw numeric user_id (not "me") and duplicate the
+        // optimistic "me". Read the TELEGRAM id EXPLICITLY — ActiveChannel still holds the OLD
+        // bot's channel here (it becomes ResolveChannelForBot(botId) below), so GetActiveProfileId()
+        // would resolve the wrong channel. Keyed per Telegram profile so ids never cross.
+        Bot bot = Manager.Instance != null ? Manager.Instance.FindBotByName(botId) : null;
+        string tgProfileId = bot != null ? ProfileIdForChannel(bot, ChatChannel.Telegram) : null;
+        _tgOwnUserId = LoadPersistedTgOwnUserId(tgProfileId);
 
         // D5: StopAllCoroutines() above killed the open-chat live poll — re-kick it so a bot
         // switch never strands it (guarded against duplicates).
@@ -150,6 +159,20 @@ public partial class ChatManager
     /// </summary>
     private static bool IsValidProfileId(string profileId)
         => !string.IsNullOrEmpty(profileId) && profileId != Bot.UnauthedProfileSentinel;
+
+    /// <summary>
+    /// Reads a Telegram profile's persisted owner user-id (learned from a fromMe row's <c>from</c>),
+    /// keyed by <see cref="TgOwnUserIdKeySuffix"/>. Returns null (⇒ still-unlearned) when the bot
+    /// has no Telegram profile or nothing has been persisted yet. Shared by both reset sites
+    /// (SetActiveBot / SetActiveChannel); each passes the bot's Telegram id EXPLICITLY so the load
+    /// key always matches the learn key regardless of the currently-active channel (D2 root cause B).
+    /// </summary>
+    private static string LoadPersistedTgOwnUserId(string telegramProfileId)
+    {
+        if (string.IsNullOrEmpty(telegramProfileId)) return null;
+        string stored = PlayerPrefs.GetString($"{telegramProfileId}{TgOwnUserIdKeySuffix}", "");
+        return string.IsNullOrEmpty(stored) ? null : stored;
+    }
 
     /// <summary>
     /// Returns the active bot's profile ID for the ACTIVE channel (WhatsApp or Telegram),

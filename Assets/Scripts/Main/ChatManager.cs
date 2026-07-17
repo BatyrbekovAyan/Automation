@@ -49,9 +49,15 @@ public partial class ChatManager : MonoBehaviour
     // (SHAPES.md Q4: every own outgoing tapi message carries from = own profile-user id,
     // even in private chats). Lets TelegramReactionMapper tag the owner's echoed
     // reactions[] element as "me" so toggle-off and the quick-bar highlight survive the
-    // echo (05-06-REVIEW WR-01). Null until learned; reset on bot/channel switch
-    // (identity is per-profile). WhatsApp never reads or writes it.
+    // echo (05-06-REVIEW WR-01). Null until learned; on bot/channel switch it is LOADED
+    // from PlayerPrefs (per Telegram profile) rather than stranded null (D2 root cause B),
+    // so a reaction sent before any own row is Normalized is still keyed "me". WhatsApp
+    // never reads or writes it.
     private string _tgOwnUserId;
+
+    /// <summary>PlayerPrefs key suffix for a Telegram profile's persisted owner user-id.
+    /// Keyed by the Telegram profile id so a two-profile owner never crosses ids (T-08-11-04).</summary>
+    private const string TgOwnUserIdKeySuffix = "TgOwnUserId";
 
     public static ChatManager Instance;
     
@@ -1624,9 +1630,22 @@ if (msg.messageType == MessageType.Video)
             ApplyTelegramMediaShape(msg, raw);
 
             // Learn the owner's profile-user id from any own row (SHAPES.md Q4) so the
-            // reaction mapper below can identify the owner's echoed reactions[] element.
-            if (raw.fromMe && !string.IsNullOrEmpty(raw.from))
+            // reaction mapper below can identify the owner's echoed reactions[] element. Persist
+            // it per active Telegram profile (D2 root cause B) so the identity survives bot/channel
+            // switches and app relaunches — otherwise a reaction sent in a chat with no own message
+            // loaded is keyed by the numeric user_id (not "me") and rides alongside the optimistic
+            // "me" as a phantom second reaction. GetActiveProfileId() resolves the Telegram id here
+            // because this branch only runs while ActiveChannel is Telegram.
+            if (raw.fromMe && !string.IsNullOrEmpty(raw.from) && _tgOwnUserId != raw.from)
+            {
                 _tgOwnUserId = raw.from;
+                string tgProfileId = GetActiveProfileId();
+                if (!string.IsNullOrEmpty(tgProfileId))
+                {
+                    PlayerPrefs.SetString($"{tgProfileId}{TgOwnUserIdKeySuffix}", raw.from);
+                    PlayerPrefs.Save();
+                }
+            }
 
 #if UNITY_EDITOR
             // D2 device evidence (08-16): one compact line per echoed reaction — the emoji's
