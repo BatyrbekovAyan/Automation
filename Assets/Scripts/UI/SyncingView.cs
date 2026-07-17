@@ -5,10 +5,12 @@ using TMPro;
 using DG.Tweening;
 
 /// <summary>
-/// Drives the WhatsApp "Setting things up" syncing screen. Shows while the active
-/// bot is inside its fixed sync window, ticking a time-based progress bar and
-/// countdown, then hides when ChatManager signals the window has elapsed.
-/// Sibling of EmptyState under ChatsPanel; CanvasGroup-toggled like EmptyStateView.
+/// Drives the post-creation "setting things up" cover shared by BOTH channels
+/// (08-19 D13a). Shows while the active bot's ACTIVE channel is inside its fixed
+/// sync window, ticking a time-based progress bar and countdown, then hides when
+/// ChatManager signals the window has elapsed. Copy is channel-aware: WhatsApp
+/// keeps its original English wording byte-identically; Telegram shows Russian.
+/// Sibling of EmptyState under the shared ChatsPanel; CanvasGroup-toggled.
 /// </summary>
 [RequireComponent(typeof(CanvasGroup))]
 public class SyncingView : MonoBehaviour
@@ -39,9 +41,12 @@ public class SyncingView : MonoBehaviour
         ChatManager.Instance.OnWhatsAppSyncing += HandleSyncing;
         ChatManager.Instance.OnWhatsAppSyncReady += HandleReady;
         ChatManager.Instance.OnActiveBotChanged += HandleActiveBotChanged;
+        ChatManager.Instance.OnActiveChannelChanged += HandleActiveChannelChanged;
 
-        // Catch up: tab re-opened or app relaunched mid-window — resume without an event.
-        if (ChatManager.Instance.IsWhatsAppSyncing(ChatManager.Instance.CurrentBotId, out long untilMs))
+        // Catch up: tab re-opened or app relaunched mid-window — resume without an
+        // event, for whichever channel is active (the window is per-channel since 08-19).
+        if (ChatManager.Instance.IsChannelSyncing(
+                ChatManager.Instance.CurrentBotId, ChatManager.Instance.ActiveChannel, out long untilMs))
             HandleSyncing(untilMs);
     }
 
@@ -52,6 +57,7 @@ public class SyncingView : MonoBehaviour
             ChatManager.Instance.OnWhatsAppSyncing -= HandleSyncing;
             ChatManager.Instance.OnWhatsAppSyncReady -= HandleReady;
             ChatManager.Instance.OnActiveBotChanged -= HandleActiveBotChanged;
+            ChatManager.Instance.OnActiveChannelChanged -= HandleActiveChannelChanged;
         }
         StopTicking();
     }
@@ -59,6 +65,7 @@ public class SyncingView : MonoBehaviour
     private void HandleSyncing(long untilMs)
     {
         syncUntilUnixMs = untilMs;
+        ApplyCopy(); // re-resolve wording for the channel that is showing the cover
         Show();
         StopTicking();
         StartSpinner();
@@ -71,6 +78,12 @@ public class SyncingView : MonoBehaviour
     // syncing, BeginLoadForActiveBot fires OnWhatsAppSyncing right after and we re-show.
     private void HandleActiveBotChanged(string _) => Hide();
 
+    // A channel switch hides any stale cover the same way: SetActiveChannel calls
+    // BeginLoadForActiveBot in the SAME synchronous stack right after this event, so if
+    // the newly active channel is also mid-window we re-show with that channel's copy —
+    // through the load path's own guards (profile validity), never a duplicate of them.
+    private void HandleActiveChannelChanged(ChatChannel _) => Hide();
+
     private IEnumerator TickRoutine()
     {
         while (true)
@@ -81,7 +94,7 @@ public class SyncingView : MonoBehaviour
                 progressFill.fillAmount =
                     WhatsAppSyncGate.ProgressFraction(syncUntilUnixMs, now, ChatManager.WhatsAppSyncWindowSeconds);
             if (countdownLabel != null)
-                countdownLabel.text = WhatsAppSyncGate.FormatCountdown(remaining);
+                countdownLabel.text = FormatCountdownFor(ActiveChannelOrDefault(), remaining);
             if (remaining <= 0L) { tickRoutine = null; yield break; }
             yield return new WaitForSecondsRealtime(1f);
         }
@@ -109,11 +122,32 @@ public class SyncingView : MonoBehaviour
     /// (its English buckets are pinned by WhatsAppSyncGateTests); Telegram mirrors the same
     /// rounding buckets in Russian. Pure + static so EditMode tests pin both contracts.
     /// </summary>
-    public static string FormatCountdownFor(ChatChannel channel, long remainingMs) =>
-        WhatsAppSyncGate.FormatCountdown(remainingMs); // RED stub — the Telegram RU branch lands with the GREEN commit
+    public static string FormatCountdownFor(ChatChannel channel, long remainingMs)
+    {
+        if (channel != ChatChannel.Telegram) return WhatsAppSyncGate.FormatCountdown(remainingMs);
+        if (remainingMs <= 0L) return "Завершаем…";
+        int totalSeconds = (int)((remainingMs + 999L) / 1000L); // round up to whole seconds
+        if (totalSeconds <= 60) return "Осталось меньше минуты";
+        int minutes = (totalSeconds + 59) / 60;                 // round up to whole minutes
+        return $"Осталось около {minutes} мин";
+    }
+
+    /// <summary>Active channel, defaulting to WhatsApp when ChatManager is not up yet (Awake order).</summary>
+    private static ChatChannel ActiveChannelOrDefault() =>
+        ChatManager.Instance != null ? ChatManager.Instance.ActiveChannel : ChatChannel.WhatsApp;
 
     private void ApplyCopy()
     {
+        if (ActiveChannelOrDefault() == ChatChannel.Telegram)
+        {
+            // Telegram wording is Russian — the app's Telegram-facing copy language (D8).
+            if (titleLabel != null) titleLabel.text = "Готовим всё к работе";
+            if (bodyLabel != null) bodyLabel.text = "Импортируем ваши чаты и сообщения из Telegram.";
+            if (footnoteLabel != null) footnoteLabel.text = "Можно пользоваться приложением — чаты появятся здесь, когда будут готовы.";
+            return;
+        }
+
+        // WhatsApp copy — byte-identical to the original cover.
         if (titleLabel != null) titleLabel.text = "Setting things up";
         if (bodyLabel != null) bodyLabel.text = "We're importing your chats and messages from WhatsApp.";
         if (footnoteLabel != null) footnoteLabel.text = "You can keep using the app. Chats appear here when ready.";

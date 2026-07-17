@@ -1449,6 +1449,18 @@ public class Manager : MonoBehaviour
             PlayerPrefs.Save();
         }
 
+        // Same fixed window for a just-created Telegram bot (08-19 D13a): stamps the
+        // per-channel sibling key so the shared SyncingState cover (spinner + ~5-min
+        // progress slider) shows over the chats list on Telegram exactly like WhatsApp.
+        if (useTelegram)
+        {
+            long telegramSyncUntil = System.DateTimeOffset.UtcNow
+                .AddSeconds(ChatManager.WhatsAppSyncWindowSeconds)
+                .ToUnixTimeMilliseconds();
+            PlayerPrefs.SetString(newBot.name + "TelegramSyncUntil", telegramSyncUntil.ToString());
+            PlayerPrefs.Save();
+        }
+
         // Make the just-created bot the active one so the chat UI resolves to it
         // (syncing screen or chat list) the moment the user opens the WhatsApp tab.
         if (ChatManager.Instance != null)

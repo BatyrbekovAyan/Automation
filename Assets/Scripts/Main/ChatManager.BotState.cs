@@ -224,7 +224,7 @@ public partial class ChatManager
     /// Public + static so EditMode tests pin the key contract without an instance.
     /// </summary>
     public static string SyncUntilSuffixFor(ChatChannel channel) =>
-        SyncUntilKeySuffix; // RED stub — the Telegram branch lands with the GREEN commit
+        channel == ChatChannel.Telegram ? TelegramSyncUntilKeySuffix : SyncUntilKeySuffix;
 
     /// <summary>
     /// Pure parse+gate core shared by both channels: a stored sync-until value counts as
@@ -233,24 +233,31 @@ public partial class ChatManager
     /// </summary>
     public static bool IsSyncingRawValue(string raw, long nowUnixMs, out long syncUntilUnixMs)
     {
-        syncUntilUnixMs = 0L;
-        return false; // RED stub — parse + gate land with the GREEN commit
+        if (!long.TryParse(raw, out syncUntilUnixMs)) { syncUntilUnixMs = 0L; return false; }
+        return WhatsAppSyncGate.IsSyncing(syncUntilUnixMs, nowUnixMs);
     }
 
     private static long NowUnixMs() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
     /// <summary>
-    /// True when the given bot is still inside its fixed post-creation sync window.
-    /// Missing/unparseable key (e.g. bots created before this feature) ⇒ not syncing.
+    /// True when the given bot is inside its fixed post-creation sync window for the
+    /// given CHANNEL — WhatsApp reads the legacy key, Telegram its 08-19 sibling.
+    /// Bots created before that channel's stamp existed simply have no key ⇒ not syncing.
     /// </summary>
-    public bool IsWhatsAppSyncing(string botId, out long syncUntilUnixMs)
+    public bool IsChannelSyncing(string botId, ChatChannel channel, out long syncUntilUnixMs)
     {
         syncUntilUnixMs = 0L;
         if (string.IsNullOrEmpty(botId)) return false;
-        string raw = PlayerPrefs.GetString(botId + SyncUntilKeySuffix, "0");
-        if (!long.TryParse(raw, out syncUntilUnixMs)) { syncUntilUnixMs = 0L; return false; }
-        return WhatsAppSyncGate.IsSyncing(syncUntilUnixMs, NowUnixMs());
+        string raw = PlayerPrefs.GetString(botId + SyncUntilSuffixFor(channel), "0");
+        return IsSyncingRawValue(raw, NowUnixMs(), out syncUntilUnixMs);
     }
+
+    /// <summary>
+    /// WhatsApp form — byte-identical behaviour (same key, same parse, same gate math),
+    /// now delegating to the channel-aware gate.
+    /// </summary>
+    public bool IsWhatsAppSyncing(string botId, out long syncUntilUnixMs)
+        => IsChannelSyncing(botId, ChatChannel.WhatsApp, out syncUntilUnixMs);
 
     /// <summary>
     /// Returns the current empty-state reason without firing an event. Used by
@@ -264,10 +271,11 @@ public partial class ChatManager
         Transform root = Manager.Instance != null ? Manager.Instance.BotsRoot : null;
         int botCount = root != null ? root.childCount : 0;
 
-        // Channel-aware: hasChannel reflects the ACTIVE channel's profile; the sync
-        // window applies only to WhatsApp (no Telegram window is written at auth).
+        // Channel-aware: hasChannel reflects the ACTIVE channel's profile, and the
+        // post-creation sync window is per-channel too (08-19: a just-created Telegram
+        // bot stamps its own window, mirroring WhatsApp).
         bool hasChannel = IsValidProfileId(GetActiveProfileId());
-        bool syncing = ActiveChannel == ChatChannel.WhatsApp && hasChannel && IsWhatsAppSyncing(CurrentBotId, out _);
+        bool syncing = hasChannel && IsChannelSyncing(CurrentBotId, ActiveChannel, out _);
 
         return ChannelTabStateResolver.Resolve(botCount, hasChannel, syncing) switch
         {
@@ -292,9 +300,12 @@ public partial class ChatManager
             return;
         }
 
-        // Post-creation sync window is a WhatsApp-only concept — no Telegram window is
-        // written at auth, so Telegram skips the sync-gate and loads immediately.
-        if (ActiveChannel == ChatChannel.WhatsApp && IsWhatsAppSyncing(CurrentBotId, out long syncUntilUnixMs))
+        // Post-creation sync window is per-channel (08-19 D13a): WhatsApp keeps its
+        // legacy window byte-identically; a just-created Telegram bot now has its own.
+        // Fire the shared cover for whichever channel is active — the events keep their
+        // WhatsApp names (renaming would ripple into ChatManager.cs, which 08-20 owns)
+        // but now serve both channels.
+        if (IsChannelSyncing(CurrentBotId, ActiveChannel, out long syncUntilUnixMs))
         {
             OnWhatsAppSyncing?.Invoke(syncUntilUnixMs);
             if (_syncWaitRoutine != null) StopCoroutine(_syncWaitRoutine);
@@ -320,16 +331,16 @@ public partial class ChatManager
 
     /// <summary>
     /// Quietly re-sync the active bot's chat list against the server without
-    /// clearing the visible list. Called when the user navigates to the WhatsApp
-    /// tab so the list stays fresh between bot switches. No-ops when there is no
-    /// WhatsApp profile, the post-creation sync window is still open, or a
-    /// chat-list sync is already in flight.
+    /// clearing the visible list. Called when the user navigates to the chats
+    /// tab so the list stays fresh between bot switches. No-ops when the active
+    /// channel has no profile, that channel's post-creation sync window is still
+    /// open, or a chat-list sync is already in flight.
     /// </summary>
     public void RefreshActiveBotChats()
     {
         Bot bot = Manager.Instance != null ? Manager.Instance.FindBotByName(CurrentBotId) : null;
         if (bot == null || !IsValidProfileId(ProfileIdForChannel(bot, ActiveChannel))) return; // empty card already shown
-        if (ActiveChannel == ChatChannel.WhatsApp && IsWhatsAppSyncing(CurrentBotId, out _)) return; // syncing UI owns this (WhatsApp-only window)
+        if (IsChannelSyncing(CurrentBotId, ActiveChannel, out _)) return;    // syncing cover owns this (per-channel window)
         if (_chatListSyncing) return;                                        // collapse duplicate syncs
 
         string cachePath = Path.Combine(GetCacheRoot(), "chats.json");
