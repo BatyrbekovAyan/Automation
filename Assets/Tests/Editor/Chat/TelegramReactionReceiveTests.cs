@@ -75,6 +75,17 @@ public class TelegramReactionReceiveTests
     }
 
     [Test]
+    public void Map_BaseFormEcho_StoredAsCanonicalQualifiedForm()
+    {
+        // D2 root cause A: tapi echoes the heart as the base form ❤ (U+2764, no VS16); the
+        // mapper canonicalizes it to the qualified ❤️ so it dedups against the optimistic entry
+        // and renders as a TMP sprite (name needs -fe0f) instead of a literal text heart.
+        var list = TelegramReactionMapper.Map(Reactions("[{\"reaction\":\"❤\",\"user_id\":\"1\"}]"));
+        Assert.AreEqual(1, list.Count);
+        Assert.AreEqual("❤️", list[0].emoji);
+    }
+
+    [Test]
     public void Map_OwnUserId_MapsOwnElementToMe_OthersKeepTheirIds()
     {
         // The owner's echoed element (user_id == learned own id, SHAPES.md Q4) adopts the

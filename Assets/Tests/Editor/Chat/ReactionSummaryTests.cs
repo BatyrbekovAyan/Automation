@@ -79,4 +79,17 @@ public class ReactionSummaryTests
         Assert.AreEqual(0, emojis.Count);
         Assert.AreEqual(0, count);
     }
+
+    [Test]
+    public void Build_SameEmojiDifferentForms_DedupedAcrossForms()
+    {
+        // D2 root cause A: tapi's base ❤ and the app's qualified ❤️ are ONE reaction — one heart
+        // glyph, not two (symptom 3) — while the reactor count still reflects both people.
+        var (emojis, count) = ReactionSummary.Build(new List<MessageReaction>
+        {
+            R("❤️", "999"), R("❤", "me")
+        });
+        Assert.AreEqual(1, emojis.Count);   // deduped across forms
+        Assert.AreEqual(2, count);          // both reactors still counted
+    }
 }
