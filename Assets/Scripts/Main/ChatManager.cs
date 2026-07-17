@@ -122,18 +122,6 @@ public partial class ChatManager : MonoBehaviour
     /// <summary>Fires when the active bot's sync window has elapsed and chats are about to load.</summary>
     public event Action OnWhatsAppSyncReady;
 
-    /// <summary>
-    /// Fires around a chat-list sync (chats/filter) for BOTH channels — start right after the
-    /// in-flight flag is set, end in SyncAllChats' <c>finally</c> (so it always fires, even on an
-    /// early yield break / request failure). Consumed only by the Telegram
-    /// <see cref="ChatListSyncIndicator"/> (D9), which gates DISPLAY on the active channel — so
-    /// firing unconditionally keeps WhatsApp byte-identical (its SyncingView uses OnWhatsAppSync*).
-    /// </summary>
-    public event Action OnChatListSyncStart;
-
-    /// <summary>Companion to <see cref="OnChatListSyncStart"/>; fires when the sync settles.</summary>
-    public event Action OnChatListSyncEnd;
-
     // State
     /// <summary>
     /// Last server history page actually fetched for the open chat (1-based,
@@ -442,17 +430,9 @@ public partial class ChatManager : MonoBehaviour
     /// </summary>
     private bool _chatListSyncing;
 
-    /// <summary>
-    /// True while a chats/filter sync is in flight. Read by <see cref="ChatListSyncIndicator"/>'s
-    /// OnEnable to catch up when the chat panel activates mid-sync (the OnChatListSyncStart it
-    /// would have consumed fired before it subscribed).
-    /// </summary>
-    public bool IsChatListSyncing => _chatListSyncing;
-
     IEnumerator SyncAllChats(string cachePath, string cachedJson)
     {
         _chatListSyncing = true;
-        OnChatListSyncStart?.Invoke();
         try
         {
             string activeProfileId = GetActiveProfileId();
@@ -488,7 +468,6 @@ public partial class ChatManager : MonoBehaviour
         finally
         {
             _chatListSyncing = false;
-            OnChatListSyncEnd?.Invoke();
         }
     }
 
