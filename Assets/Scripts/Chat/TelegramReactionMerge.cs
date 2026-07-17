@@ -175,3 +175,34 @@ public static class TelegramReactionMerge
     private static void Bump(Dictionary<string, int> map, string key, int delta) =>
         map[key] = (map.TryGetValue(key, out int v) ? v : 0) + delta;
 }
+
+/// <summary>
+/// Pure, UnityEngine-free decision for the D2-ext loaded-window reaction reconcile. The D5 live
+/// poll re-fetches only the latest page (<c>messages/get?...&amp;limit=MessagesPerPage&amp;offset=0</c>),
+/// so a reaction changed or removed IN the Telegram app on a LOADED-but-older message — the owner
+/// scrolled up, or the cache alone already holds more than one page — is never re-synced by the
+/// poll and its pill never reconciles. This seam answers two questions the poll needs: does the
+/// loaded window spill past the latest page (<see cref="NeedsWiderPass"/>), and how many server
+/// pages does it span (<see cref="PagesToCover"/>) so a bounded, throttled background pass can walk
+/// the older pages. Telegram-only (WhatsApp reactions flow through <see cref="ReactionStore"/>);
+/// side-effect-free so the window math is fully EditMode-testable (mirrors
+/// <see cref="OpenChatLivePollGate"/> / <see cref="TelegramReactionMerge"/>).
+/// </summary>
+public static class ReactionReconcileWindow
+{
+    /// <summary>
+    /// True when the loaded message window exceeds the latest page, so older loaded messages need
+    /// a wider reaction-reconcile pass the latest-window poll can never reach. False for an empty
+    /// window, a single (or partial) page, or a non-positive page size.
+    /// </summary>
+    public static bool NeedsWiderPass(int loadedCount, int latestPageSize) =>
+        latestPageSize > 0 && loadedCount > latestPageSize;
+
+    /// <summary>
+    /// Number of server pages the loaded window spans — <c>ceil(loadedCount / pageSize)</c> — so the
+    /// wider pass knows the last older page to cover. 0 for an empty window or a non-positive page
+    /// size (nothing to walk).
+    /// </summary>
+    public static int PagesToCover(int loadedCount, int pageSize) =>
+        (pageSize <= 0 || loadedCount <= 0) ? 0 : (loadedCount + pageSize - 1) / pageSize;
+}

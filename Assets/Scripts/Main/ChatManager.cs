@@ -568,6 +568,10 @@ public partial class ChatManager : MonoBehaviour
         // D5: baseline the live-poll throttle to chat-open so the open's own sync gets a full
         // OpenChatLivePollGate.IntervalSeconds before the first repeating poll fires.
         _lastLivePollTime = Time.realtimeSinceStartup;
+        // D2-ext: give the loaded-window reaction reconcile a full interval after open and restart
+        // its older-page cursor, so the wider pass never races the open's own latest-window sync.
+        _lastWiderReactionReconcileTime = Time.realtimeSinceStartup;
+        _widerReactionReconcilePage = 2;
         _lastFetchedServerPage = 0;
         _servedFromStore = 0;
         _chatFetchesInFlight = 0;   // a sync stopped mid-flight above never ran its decrement
@@ -1227,6 +1231,16 @@ public partial class ChatManager : MonoBehaviour
                         cacheDirty = true;
                     }
                     if (RefreshCachedMessageQuote(norm, _activeChatCache))
+                    {
+                        cacheDirty = true;
+                    }
+                    // D2-ext: Telegram carries reactions[] on every message, so reconcile a reaction
+                    // change/removal made IN the Telegram app itself on this loaded-but-older page —
+                    // the latest-window live poll (offset=0 limit=MessagesPerPage) never reaches it.
+                    // Mirrors the two live reconcile sites; WhatsApp short-circuits (its reactions
+                    // flow through ReactionStore), so this stays byte-identical on the WhatsApp path.
+                    if (ActiveChannel == ChatChannel.Telegram &&
+                        RefreshCachedMessageReactions(norm, _activeChatCache))
                     {
                         cacheDirty = true;
                     }

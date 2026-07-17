@@ -32,6 +32,22 @@ public partial class ChatManager
     private float _lastLivePollTime;
 
     /// <summary>
+    /// D2-ext loaded-window reaction reconcile throttle. The wider pass is a background correction
+    /// (a reaction changed/removed IN the Telegram app on an OLDER loaded message the latest-window
+    /// poll never re-fetches), so it runs far slower than the 3s live poll. realtimeSinceStartup of
+    /// the last wider-pass issue; reset at chat-open (SelectChat) for a full interval of headroom.
+    /// </summary>
+    private const float WiderReactionReconcileIntervalSeconds = 12f;
+    private float _lastWiderReactionReconcileTime;
+
+    /// <summary>
+    /// Round-robin cursor over the older server pages (2..PagesToCover) the wider reaction pass
+    /// covers one-per-tick — so at most a single ValidateCachePageAgainstServer is ever in flight,
+    /// never a burst. Reset to the first older page at chat-open (SelectChat).
+    /// </summary>
+    private int _widerReactionReconcilePage = 2;
+
+    /// <summary>
     /// Handle to the single self-gating poll coroutine. Held so it can be re-kicked after every
     /// StopAllCoroutines() (SetActiveBot / SetActiveChannel / ClearAllLocalHistory) without ever
     /// spawning a duplicate.
@@ -71,24 +87,69 @@ public partial class ChatManager
             // guard anyway — SyncLatestMessages iterates cachedList and would NRE on null.
             if (_activeChatCache == null) continue;
 
-            if (!OpenChatLivePollGate.ShouldIssue(
+            if (OpenChatLivePollGate.ShouldIssue(
                     chatIsOpen: chatIsOpen,
                     appFocused: _appFocused,
                     fetchInFlight: _chatFetchesInFlight > 0,
                     chatOpenSettled: chatOpenSettled,
                     secondsSinceLastPoll: Time.realtimeSinceStartup - _lastLivePollTime))
-                continue;
+            {
+                _lastLivePollTime = Time.realtimeSinceStartup;
 
-            _lastLivePollTime = Time.realtimeSinceStartup;
+                // REUSE the one-shot open-chat sync — never a second messages/get caller. It
+                // re-checks currentChatId post-await, computes only brandNew, manages
+                // _chatFetchesInFlight, refreshes _activeChatCache, and fires OnLiveMessagesReceived.
+                // The gate guarantees no sync is in flight here, so StopCoroutine is a defensive
+                // no-op mirroring OpenChatRoutine's idiom (guards against any future overlap).
+                if (_activeSync != null) StopCoroutine(_activeSync);
+                _activeSync = StartCoroutine(SyncLatestMessages(currentChatId, _activeChatCache));
+            }
 
-            // REUSE the one-shot open-chat sync — never a second messages/get caller. It
-            // re-checks currentChatId post-await, computes only brandNew, manages
-            // _chatFetchesInFlight, refreshes _activeChatCache, and fires OnLiveMessagesReceived.
-            // The gate guarantees no sync is in flight here, so StopCoroutine is a defensive
-            // no-op mirroring OpenChatRoutine's idiom (guards against any future overlap).
-            if (_activeSync != null) StopCoroutine(_activeSync);
-            _activeSync = StartCoroutine(SyncLatestMessages(currentChatId, _activeChatCache));
+            // D2-ext: the latest-window sync above only re-fetches page 1 (offset 0). A reaction
+            // changed/removed IN the Telegram app on a LOADED-but-older message would never reflect,
+            // so run a bounded, throttled background pass over the older loaded pages. Serial-safe
+            // (reuses the ValidateCachePageAgainstServer seam, gated on no fetch in flight) and
+            // Telegram-only, so the WhatsApp path is byte-identical.
+            MaybeIssueWiderReactionReconcile(chatIsOpen, chatOpenSettled);
         }
+    }
+
+    /// <summary>
+    /// D2-ext loaded-window reaction reconcile. The latest-window poll re-fetches only page 1
+    /// (offset 0), so a reaction changed or removed IN the Telegram app on a loaded-but-older
+    /// message never reconciles. When the loaded window spills past the latest page
+    /// (<see cref="ReactionReconcileWindow.NeedsWiderPass"/>), this issues ONE
+    /// <c>ValidateCachePageAgainstServer</c> for the next older page (round-robin across ticks) —
+    /// REUSING that established serial background seam, which already inherits the
+    /// <c>_chatFetchesInFlight</c> gate, <c>CrossChatResponseGuard</c>, the post-await
+    /// <c>currentChatId</c> re-check, and never fires <c>OnBatchMessagesLoaded</c>. So NO new
+    /// concurrent messages/get caller is introduced (the pass only issues when nothing is in
+    /// flight, and covers one page per tick). Throttled far slower than the 3s live poll — a
+    /// background correction, not the hot path. Telegram-only: WhatsApp returns immediately (its
+    /// reactions flow through <see cref="ReactionStore"/>) → byte-identical. Killed on bot/channel
+    /// switch by the existing StopAllCoroutines (the coroutine + the poll are both torn down and
+    /// the poll re-kicked); the cursor/throttle re-baseline at the next chat-open.
+    /// </summary>
+    private void MaybeIssueWiderReactionReconcile(bool chatIsOpen, bool chatOpenSettled)
+    {
+        if (ActiveChannel != ChatChannel.Telegram) return;    // WhatsApp: no-op, byte-identical
+        if (!chatIsOpen || !chatOpenSettled || !_appFocused) return;
+        if (_chatFetchesInFlight > 0) return;                 // serial: never overlap another fetch
+        if (_activeChatCache == null) return;
+        if (Time.realtimeSinceStartup - _lastWiderReactionReconcileTime < WiderReactionReconcileIntervalSeconds)
+            return;
+        if (!ReactionReconcileWindow.NeedsWiderPass(_activeChatCache.Count, MessagesPerPage)) return;
+
+        _lastWiderReactionReconcileTime = Time.realtimeSinceStartup;
+
+        // Walk the older pages one-per-tick (page 1 is the latest-window sync above); wrap when the
+        // cursor passes the loaded window's last page or the window shrank under it.
+        int pages = ReactionReconcileWindow.PagesToCover(_activeChatCache.Count, MessagesPerPage);
+        if (_widerReactionReconcilePage < 2 || _widerReactionReconcilePage > pages)
+            _widerReactionReconcilePage = 2;
+
+        StartCoroutine(ValidateCachePageAgainstServer(currentChatId, _widerReactionReconcilePage));
+        _widerReactionReconcilePage++;
     }
 
     /// <summary>
