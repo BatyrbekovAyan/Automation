@@ -46,3 +46,61 @@ public class WhatsAppTabStateResolverTests
     [Test] public void Ready_WhenConnectedAndWindowClosed()
         => Assert.AreEqual(WhatsAppTabState.Ready, WhatsAppTabStateResolver.Resolve(1, true, false));
 }
+
+// 08-19 D13a: the post-creation sync window is per-channel — Telegram gets a sibling
+// PlayerPrefs key and the same gate math; WhatsApp stays byte-identical (legacy suffix,
+// same parse + WhatsAppSyncGate semantics).
+public class ChannelSyncGateTests
+{
+    [Test] public void SuffixFor_WhatsApp_KeepsLegacyKey()
+        => Assert.AreEqual("WhatsappSyncUntil", ChatManager.SyncUntilSuffixFor(ChatChannel.WhatsApp));
+
+    [Test] public void SuffixFor_Telegram_SiblingKey()
+        => Assert.AreEqual("TelegramSyncUntil", ChatManager.SyncUntilSuffixFor(ChatChannel.Telegram));
+
+    [Test] public void IsSyncingRawValue_FutureEpoch_TrueWithParsedUntil()
+    {
+        Assert.IsTrue(ChatManager.IsSyncingRawValue("2000", 1000L, out long until));
+        Assert.AreEqual(2000L, until);
+    }
+
+    [Test] public void IsSyncingRawValue_PastEpoch_FalseButUntilParsed()
+    {
+        Assert.IsFalse(ChatManager.IsSyncingRawValue("1000", 2000L, out long until));
+        Assert.AreEqual(1000L, until);
+    }
+
+    [Test] public void IsSyncingRawValue_MissingKeyDefault_False()
+        => Assert.IsFalse(ChatManager.IsSyncingRawValue("0", 1000L, out _));
+
+    [Test] public void IsSyncingRawValue_Unparseable_FailSafeFalse()
+    {
+        Assert.IsFalse(ChatManager.IsSyncingRawValue("", 1000L, out long until));
+        Assert.AreEqual(0L, until);
+        Assert.IsFalse(ChatManager.IsSyncingRawValue("garbage", 1000L, out until));
+        Assert.AreEqual(0L, until);
+    }
+}
+
+// 08-19 D13a: the cover's countdown label — WhatsApp keeps WhatsAppSyncGate's English
+// buckets byte-identically; Telegram mirrors the same rounding buckets in Russian
+// (the app's Telegram-facing copy is Russian, matching the RU title/body/footnote).
+public class SyncingCountdownCopyTests
+{
+    [Test] public void WhatsApp_DelegatesToGate_ByteIdentical()
+    {
+        Assert.AreEqual(WhatsAppSyncGate.FormatCountdown(0L),       SyncingView.FormatCountdownFor(ChatChannel.WhatsApp, 0L));
+        Assert.AreEqual(WhatsAppSyncGate.FormatCountdown(30_000L),  SyncingView.FormatCountdownFor(ChatChannel.WhatsApp, 30_000L));
+        Assert.AreEqual(WhatsAppSyncGate.FormatCountdown(90_000L),  SyncingView.FormatCountdownFor(ChatChannel.WhatsApp, 90_000L));
+        Assert.AreEqual(WhatsAppSyncGate.FormatCountdown(300_000L), SyncingView.FormatCountdownFor(ChatChannel.WhatsApp, 300_000L));
+    }
+
+    [Test] public void Telegram_RussianBuckets()
+    {
+        Assert.AreEqual("Завершаем…",             SyncingView.FormatCountdownFor(ChatChannel.Telegram, 0L));
+        Assert.AreEqual("Осталось меньше минуты", SyncingView.FormatCountdownFor(ChatChannel.Telegram, 30_000L));
+        Assert.AreEqual("Осталось меньше минуты", SyncingView.FormatCountdownFor(ChatChannel.Telegram, 60_000L));
+        Assert.AreEqual("Осталось около 2 мин",   SyncingView.FormatCountdownFor(ChatChannel.Telegram, 90_000L));
+        Assert.AreEqual("Осталось около 5 мин",   SyncingView.FormatCountdownFor(ChatChannel.Telegram, 300_000L));
+    }
+}

@@ -212,8 +212,30 @@ public partial class ChatManager
             ? EmptyStateReason.BotHasNoTelegram
             : EmptyStateReason.BotHasNoWhatsApp;
 
-    /// <summary>PlayerPrefs key suffix holding a bot's sync-window end (Unix ms).</summary>
+    /// <summary>PlayerPrefs key suffix holding a bot's WhatsApp sync-window end (Unix ms).</summary>
     private const string SyncUntilKeySuffix = "WhatsappSyncUntil";
+
+    /// <summary>PlayerPrefs key suffix holding a bot's Telegram sync-window end (Unix ms) — the 08-19 sibling.</summary>
+    private const string TelegramSyncUntilKeySuffix = "TelegramSyncUntil";
+
+    /// <summary>
+    /// Pure per-channel key-suffix resolver for the post-creation sync window.
+    /// WhatsApp keeps the legacy suffix byte-identically; Telegram gets its sibling.
+    /// Public + static so EditMode tests pin the key contract without an instance.
+    /// </summary>
+    public static string SyncUntilSuffixFor(ChatChannel channel) =>
+        SyncUntilKeySuffix; // RED stub — the Telegram branch lands with the GREEN commit
+
+    /// <summary>
+    /// Pure parse+gate core shared by both channels: a stored sync-until value counts as
+    /// syncing only when it parses AND the window is still open. Missing/unparseable raw
+    /// value ⇒ not syncing (fail-safe: reveal the list — T-08-19-01).
+    /// </summary>
+    public static bool IsSyncingRawValue(string raw, long nowUnixMs, out long syncUntilUnixMs)
+    {
+        syncUntilUnixMs = 0L;
+        return false; // RED stub — parse + gate land with the GREEN commit
+    }
 
     private static long NowUnixMs() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 

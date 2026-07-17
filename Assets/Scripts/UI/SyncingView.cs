@@ -104,6 +104,14 @@ public class SyncingView : MonoBehaviour
         spinnerTween = null;
     }
 
+    /// <summary>
+    /// Countdown label per channel: WhatsApp delegates to WhatsAppSyncGate byte-identically
+    /// (its English buckets are pinned by WhatsAppSyncGateTests); Telegram mirrors the same
+    /// rounding buckets in Russian. Pure + static so EditMode tests pin both contracts.
+    /// </summary>
+    public static string FormatCountdownFor(ChatChannel channel, long remainingMs) =>
+        WhatsAppSyncGate.FormatCountdown(remainingMs); // RED stub — the Telegram RU branch lands with the GREEN commit
+
     private void ApplyCopy()
     {
         if (titleLabel != null) titleLabel.text = "Setting things up";
