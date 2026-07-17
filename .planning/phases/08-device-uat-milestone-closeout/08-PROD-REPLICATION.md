@@ -52,7 +52,7 @@ already committed in `Tools/n8n/README.md` / `04-HUMAN-UAT.md`, and expose no to
 | `lmjYsdNcQA2IE5rl` | Delete Bot Files | webhook `DeleteBotFiles` — sweeps a deleted bot's chunks + stored originals | ACTIVE (webhook) |
 | `2htWSV5IHO8E2CgB` | Dashboard Outcomes | webhook `DashboardOutcomes` — classifies `conversation_outcomes` for «Сводка» | ACTIVE (webhook) |
 | `2islisFH7jjLoPQM` | Delete Orphan Profiles | **scheduled, hourly** (no webhook) — Wappi TTL sweep | ACTIVE (scheduled; see step 6) |
-| `9PTyYcelRQI7bGDb` | Suggest Replies (`Suggest_Replies`) | webhook `SuggestReplies` — 4-move «Вместе» reply suggestions | ACTIVE (webhook; deploy via `build-suggest-replies.py`, step 5) |
+| `9PTyYcelRQI7bGDb` | Suggest Replies (`Suggest_Replies`) | webhook `SuggestReplies` — 4-move «Вместе» reply suggestions | ACTIVE (webhook; `build-suggest-replies.py` imports the committed canonical + rebinds creds, step 5) |
 
 > ⚠ **`4wYitz5ek30SVNlT` (WhatsApp_Bot) and `4VN3gsFaC2HUYmcc` (Telegram_Bot) stay INACTIVE.**
 > They share webhook path `0091024b-7b46`; only per-bot clones (with rewritten paths) ever go
@@ -139,23 +139,32 @@ its own builder in step 5 (the only way to bind prod cred ids on a no-SQLite Clo
 ### 5. Deploy Suggest_Replies via the deployer (with the prod cred-id overrides)
 
 `Suggest_Replies` is the SHARED, always-active webhook — activating **it** is correct and is **NOT**
-a bot clone. Deploy with the prod ids recorded in step 2 so the RAG nodes bind the real
-recreated-by-name credentials (a no-SQLite Cloud target would otherwise silently fall back to dev ids
-— exactly what the step-1 tooling change prevents):
+a bot clone. The deployer imports the **committed canonical JSON**
+(`Tools/n8n/workflows/9PTyYcelRQI7bGDb-Suggest_Replies.json` — channel-branched RAG + the 08-13
+D10 «РЕЛЕВАНТНОСТЬ» newest-incoming anchor, both proven by the step-1 verifier) **verbatim**, and
+rebinds ONLY the OpenAi/Supabase credential ids to the prod ids recorded in step 2. There is no
+silent dev-id fallback: a no-SQLite Cloud target without both overrides is a **loud error**. (The
+old `--stage full` generate mode is retired — it rebuilt a pre-parity graph from stale Python
+literals and would have silently reverted the channel branch + D10; the script now refuses it.)
 
 ```bash
+# optional offline preview — prints the exact payload with the prod cred ids bound; no network:
+N8N_OPENAI_CRED_ID=<prod-openai-id> N8N_SUPABASE_CRED_ID=<prod-supabase-id> \
+python3 Tools/n8n/build-suggest-replies.py --dry-run
+
 N8N_BASE_URL=https://bagkz.app.n8n.cloud \
 N8N_API_KEY=<prod-key> \
 N8N_OPENAI_CRED_ID=<prod-openai-id> \
 N8N_SUPABASE_CRED_ID=<prod-supabase-id> \
-python3 Tools/n8n/build-suggest-replies.py --stage full
+python3 Tools/n8n/build-suggest-replies.py
 ```
 
 - ☐ Deployer prints `workflow created: id=<prod-id>` then `activated`. **Record `<prod-id>`** — it is
   reached by webhook PATH (`/webhook/SuggestReplies`), not by literal id, so a fresh prod id is fine;
   you export THIS id in step 7. (Equivalently, if you chose to import Suggest_Replies in step 4 to
-  keep id `9PTyYcelRQI7bGDb`, append `--update 9PTyYcelRQI7bGDb` to rebind creds in place.)
-- ☐ Its OpenAi/Supabase nodes bind the **prod** credential ids (not the pinned dev fallback).
+  keep id `9PTyYcelRQI7bGDb`, append `--update 9PTyYcelRQI7bGDb` — a PUT of the same canonical
+  content onto that id, creds rebound in place.)
+- ☐ Its OpenAi/Supabase nodes bind the **prod** credential ids (visible in the `--dry-run` payload).
 - ☐ **Seed RAG-with-data** on one prod bot (upload a real price-list) so grounding is testable — the
   deferred-from-dev item (dev RAG was catalog-only until `documents` were seeded).
 

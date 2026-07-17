@@ -15,13 +15,19 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
   and `audit-price-lists-bucket.sql` — cross-checks bucket objects against
   `documents.metadata->>'fileId'`. Invariant: zero `orphaned-unexpected`; image
   orphans are `orphaned-by-rejection` (422-rejected photos, kept for re-OCR by design).
-- `build-suggest-replies.py` — builds/deploys the shared **Suggest Replies** workflow (semi-auto
-  Phase 2). `--stage full` deploys the whole graph (Webhook → Prep → If invalid [known-garbage →
-  straight to Build Response's `generation_failed`, zero LLM spend] → If skipRag → conditional RAG
-  load → Assemble → LLM json_schema → Validate → retry-once → Build Response → Respond) to the
-  target n8n and activates it; `--export <id> <out>` re-emits the canonical JSON. Credential ids
-  resolve by exact name from the instance's SQLite DB (portable to prod replication; a
-  present-but-misnamed credential fails loudly listing the candidates instead of guessing).
+- `build-suggest-replies.py` — deploys/exports the shared **Suggest Replies** workflow. Deploy
+  imports the committed canonical `workflows/9PTyYcelRQI7bGDb-Suggest_Replies.json` VERBATIM
+  (Webhook → Prep → If invalid [known-garbage → straight to Build Response's `generation_failed`,
+  zero LLM spend] → If skipRag → If channel TG? → channel-scoped RAG load [`botTgId`|`botWaId`] →
+  Assemble [incl. the 08-13 D10 «РЕЛЕВАНТНОСТЬ» newest-incoming anchor] → LLM json_schema →
+  Validate → retry-once → Build Response → Respond), rebinds ONLY the credential ids for the
+  target, and activates it; `--update <id>` PUTs the same content onto an existing id; `--dry-run`
+  prints the exact payload offline; `--export <id> <out>` re-emits the canonical JSON. Credential
+  ids resolve flag/env (`--openai-cred`/`--supabase-cred`, `N8N_OPENAI_CRED_ID`/
+  `N8N_SUPABASE_CRED_ID`) > exact-NAME lookup in the local SQLite (misnamed fails loudly listing
+  candidates) > **loud error** — never a silent dev-id fallback. The old `--stage front/full`
+  generator literals predated the phase-4 channel branch + D10 and are retired (deploying them
+  silently reverted both); the flag now errors with guidance.
 - `apply-*.py` — idempotent migrations over `workflows/` (edit by node name, re-runnable);
   `verify_rag.py` asserts every applied invariant; `test-upload-e2e.sh` exercises the
   Upload/Delete webhooks end-to-end against a live instance (curl mimicking Unity's
@@ -49,7 +55,7 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
 | `lmjYsdNcQA2IE5rl` | Delete Bot Files | App webhook `DeleteBotFiles` — body `{ botWaId, botTgId }`; sweeps ALL of a deleted bot's RAG chunks + stored originals (guards the `"-1"` unauthed sentinel) |
 | `2htWSV5IHO8E2CgB` | Dashboard Outcomes | App webhook `DashboardOutcomes` — body `{ profileIds }`; classifies conversation outcomes from `n8n_chat_histories` into `conversation_outcomes`, returns them for the «Сводка» dashboard |
 | `2islisFH7jjLoPQM` | Delete Orphan Profiles | **Scheduled, hourly** (no webhook) — server-side TTL sweep deleting Wappi profiles that stay unauthorized ≥ 24h; see below |
-| `9PTyYcelRQI7bGDb` | Suggest Replies | App webhook `SuggestReplies` — body = frozen v1 request (`{ v, requestSeq, chatId, botWaId, businessTypeId, catalog, steerTowardText, messages… }`); known-invalid requests (v mismatch / missing `chatId` / empty `messages`) short-circuit straight to `generation_failed` — zero LLM spend on the unauthenticated webhook; optional tenant-scoped RAG pre-retrieval (single `botWaId` filter, topK 5, skipped on `""`/`"-1"`) → one gpt-4o-mini call (strict json_schema, closed 6-label enum) → Code validation (exactly 4 distinct enum-labeled moves, ≤300 clamp, markdown-strip, one retry then `generation_failed`) → returns `{ v:1, requestSeq, suggestions:[{text,label}×4] }` for the semi-auto «Вместе» reply panel. Built by `build-suggest-replies.py` (dev id here; prod bagkz replication pending). Adversarially verified on dev 2026-07-10 (6-case matrix — grounding / missing-data / steer / injection / trivial / sentinel — plus format-hijack + malformed→`generation_failed`, **zero fixes needed**); dev RAG grounding is **catalog-only** until Supabase `documents` are seeded — RAG-with-data deferred to prod replication |
+| `9PTyYcelRQI7bGDb` | Suggest Replies | App webhook `SuggestReplies` — body = frozen v1 request (`{ v, requestSeq, chatId, botWaId, businessTypeId, catalog, steerTowardText, messages… }`); known-invalid requests (v mismatch / missing `chatId` / empty `messages`) short-circuit straight to `generation_failed` — zero LLM spend on the unauthenticated webhook; optional channel-branched tenant-scoped RAG pre-retrieval (one single-key filter per channel: `botWaId` WA / `botTgId` TG, topK 5, skipped on `""`/`"-1"`) → one gpt-4o-mini call (strict json_schema, closed 6-label enum) → Code validation (exactly 4 distinct enum-labeled moves, ≤300 clamp, markdown-strip, one retry then `generation_failed`) → returns `{ v:1, requestSeq, suggestions:[{text,label}×4] }` for the semi-auto «Вместе» reply panel. Deployed from the committed canonical JSON by `build-suggest-replies.py` (dev id here; prod bagkz replication pending). Adversarially verified on dev 2026-07-10 (6-case matrix — grounding / missing-data / steer / injection / trivial / sentinel — plus format-hijack + malformed→`generation_failed`, **zero fixes needed**); dev RAG grounding is **catalog-only** until Supabase `documents` are seeded — RAG-with-data deferred to prod replication |
 
 > ⚠️ `4wYitz5ek30SVNlT` and `4VN3gsFaC2HUYmcc` are referenced by **literal id** inside the
 > two Create handlers. Never change their ids, or bot creation 404s on the clone step.

@@ -213,6 +213,16 @@ def check_suggest_replies():
     assemble = node(ns, "Assemble")["parameters"]["jsCode"]
     assert "со своего WhatsApp" not in assemble, f"{f}: Assemble still says «со своего WhatsApp»"
 
+    # (vi) D10 relevance anchor (08-13, commit fa2ac8c): the shared Assemble prompt must
+    # pin all 4 cards to the newest incoming client message and surface it inside the
+    # fenced data block as lastClientMessage. Any deploy path that regenerates Assemble
+    # from a pre-08-13 source drops this silently — asserting it here makes both runbook
+    # gates (step-1 committed pre-flight, step-7 prod re-export) catch a revert.
+    assert "РЕЛЕВАНТНОСТЬ (ГЛАВНОЕ)" in assemble, \
+        f"{f}: Assemble prompt missing the D10 «РЕЛЕВАНТНОСТЬ (ГЛАВНОЕ)» directive"
+    assert "lastClientMessage" in assemble, \
+        f"{f}: Assemble fenced block missing the D10 lastClientMessage anchor"
+
     print(f"OK  {f}")
 
 
