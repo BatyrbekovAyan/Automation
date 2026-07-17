@@ -17,10 +17,23 @@ public static class ChatListSyncIndicatorGate
     /// </summary>
     public const float MinVisibleSeconds = 0.6f;
 
-    // RED stub — intentionally wrong; the real logic lands in the GREEN commit.
+    /// <summary>
+    /// Seconds of the visible floor still owed, given when the pill was shown and the current time
+    /// (both <see cref="UnityEngine.Time.realtimeSinceStartup"/> in the caller). Clamps at 0 once the
+    /// floor is exceeded, so it is never negative.
+    /// </summary>
     public static float RemainingVisibleSeconds(float shownAtRealtime, float nowRealtime, float minVisible)
-        => minVisible;
+    {
+        float remaining = minVisible - (nowRealtime - shownAtRealtime);
+        return remaining < 0f ? 0f : remaining;
+    }
 
+    /// <summary>
+    /// True only when the pill may hide right now: the sync is settled
+    /// (<paramref name="syncStillInFlight"/> is false) AND the visible floor has fully elapsed
+    /// (<see cref="RemainingVisibleSeconds"/> is 0). Otherwise the caller defers the hide.
+    /// </summary>
     public static bool ShouldHideNow(float shownAtRealtime, float nowRealtime, float minVisible, bool syncStillInFlight)
-        => false;
+        => !syncStillInFlight
+           && RemainingVisibleSeconds(shownAtRealtime, nowRealtime, minVisible) <= 0f;
 }
