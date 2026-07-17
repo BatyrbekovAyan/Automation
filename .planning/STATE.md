@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
 status: executing
-stopped_at: Completed 08-19-PLAN.md (D13a Telegram cover parity)
-last_updated: "2026-07-17T16:03:38.222Z"
+stopped_at: Completed 08-20-PLAN.md (D13b pill removal; suite green pending Editor recovery)
+last_updated: "2026-07-17T16:32:46.961Z"
 last_activity: 2026-07-17
 progress:
   total_phases: 9
   completed_phases: 5
-  total_plans: 38
-  completed_plans: 38
-  percent: 100
+  total_plans: 42
+  completed_plans: 39
+  percent: 93
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 ## Current Position
 
 Phase: 08 (device-uat-milestone-closeout) — EXECUTING
-Plan: 19 of 21 (round-3 gap plans 08-17..08-21 executing)
+Plan: 20 of 21 (round-3 gap plans 08-17..08-21 executing)
 Status: Ready to execute
 Last activity: 2026-07-17
 
-Progress: [██████████] 100%
+Progress: [█████████░] 93%
 
 ## Performance Metrics
 
@@ -91,6 +91,7 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [Phase 8]: 08-17 D2-ext gap-closure — reaction changes/removals made IN the Telegram app on a LOADED-but-older message now reconcile in-app. Diagnosis-first: H1 CONFIRMED (D5 poll re-fetches only the latest page offset=0 limit=50, and ValidateCachePageAgainstServer reconciled media+quote but NOT reactions, so older loaded messages' reaction deltas were stranded); H2/H3 REFUTED (within-window render + Merge absence-clears already correct). Fix = candidate A: pure ReactionReconcileWindow (NeedsWiderPass/PagesToCover) + Telegram-gated RefreshCachedMessageReactions added to ValidateCachePageAgainstServer + a throttled (12s) round-robin one-page-per-tick wider pass on the live poll reusing the serial seam (no new concurrent messages/get caller). WhatsApp byte-identical; ReactionStore untouched. 1124+10=1134 EditMode tests; fresh compile OK but bridge stalled at running (Editor unfocused) so final green PENDING. commits c78ac99(RED)/ba825d0(GREEN). Device re-verify rides 08-21.
 - [Phase 8]: 08-18 D12 gap-closure round-3 (RE-FAIL, inert TG «Создать бота») — DIAGNOSIS-FIRST wide, not another single-file read. C1 (raycast occlusion) + C2 (parent CanvasGroup) REFUTED with concrete scene evidence: ChatsPanel sibling z-order shows the only ACTIVE overlays above EmptyState are SyncingState (Awake→Hide clears alpha+blocksRaycasts, channel-agnostic), TopBar (top-only), and the ChatListSyncIndicator pill (Show() FORCES blocksRaycasts=false + top 380x76 geometry); all 13 Main.unity CanvasGroups mapped — NONE on the EmptyState→ChatsPanel(263910444)→Screen_Whatsapp(1992340357)→Canvas ancestor chain; button 1203410575 m_Interactable=1. C3 (swallowed exception) REFUTED (SelectPlatform benign + runs AFTER Open; StartNewBot/Open channel-agnostic). Named primary = C4: EmptyStateView never subscribed to OnActiveChannelChanged, and HandleEmptyState._lastReason guard early-returns the re-fired OnEmptyState, so ConfigureForReason (re-theme + RE-WIRE OpenCreateBotFlow + Show) is SKIPPED on a channel switch (WA+TG share Screen_Whatsapp so OnEnable never re-runs) — the class 08-14 missed by reading one file. Fix = subscribe to OnActiveChannelChanged → re-configure the visible reason (fresh theme+wire+Show; SetActiveChannel calls BeginLoadForActiveBot in the SAME synchronous stack right after, correcting any changed reason before render) + a defensive idempotent AddBotPanel.Open() guarantee (plan-sanctioned C3 hardening); 08-14 preselect (TG=2/else=1) preserved, WhatsApp byte-identical. ENTRY-log verdict PREDICTED/unconfirmed (no Play-mode/device this session) — guarded #if UNITY_EDITOR [D12] logs (ENTRY/after-StartNewBot/SelectPlatform) are the 08-21 device pivot (handler-runs vs tap-blocked). Secondary latent bug DOCUMENTED not fixed (scope+regression risk): BeginLoadForActiveBot resolves zero-bots via FindBotByName(DefaultBotId)==null → fires connect-state reason (BotHasNoTelegram, inert OpenCurrentBotAuth) instead of NoBotsExist — different label than the owner report; flag 08-19/08-21. Compile CLEAN (Assembly-CSharp.dll 20:04:58 postdates edits); full EditMode green PENDING (bridge stalled at running, Editor unfocused — mirrors 08-17). commits 791447b(instrument)/19c1ef2(fix). Device re-verify rides 08-21.
 - [Phase 8]: 08-19 D13a gap-closure — Telegram post-creation cover parity. Task-1 confirmed the reuse premise (no Screen_Telegram; ONE full-stretch opaque SyncingState over the SHARED Screen_Whatsapp/ChatsPanel ⇒ code-only fix, no scene stamp) and pinned the three WA-only gates (Manager.cs:1443 stamp, BotState.cs:216 read key, :275/:248/:310 fires). Fix = per-channel window: wizard stamps {bot}TelegramSyncUntil (same 300s WhatsAppSyncWindowSeconds) under useTelegram, WA stamp untouched; pure SyncUntilSuffixFor + IsSyncingRawValue (fail-safe on unparseable, T-08-19-01) + instance IsChannelSyncing; IsWhatsAppSyncing delegates byte-identically; all three gates now fire on the ACTIVE channel reusing OnWhatsAppSyncing/WaitForWhatsAppSyncRoutine (events deliberately NOT renamed — ChatManager.cs is 08-20's file, untouched). SyncingView: channel-aware ApplyCopy on every show (RU title/body/footnote on TG, WA English byte-identical), RU countdown buckets via new pure SyncingView.FormatCountdownFor (WhatsAppSyncGate frozen), OnActiveChannelChanged hide-on-switch (BeginLoadForActiveBot re-fires in the same synchronous stack — mirrors bot-switch), channel-aware OnEnable catch-up. Rule-2: Bot.DeleteBot clears the new key (bot-persistence skill). Late auth stamps NO window on EITHER channel (exact parity; follow-up if ever wanted). TDD both phases bridge-VERIFIED fresh: RED 4 designed failures, filtered GREEN 31/31; FULL suite (expect 1142=1134+8) left in-flight — completes on next Editor focus, 08-20 should read Temp/claude/test-summary.json (the pre-RED full run 1134/1134 also retro-confirmed 08-17/08-18 greens). commits 3cd6537/91b97b3. Device re-verify rides 08-21.
+- [Phase 8]: 08-20 D13b gap-closure — D9 «Синхронизация…» pill REMOVED end-to-end (owner 08-16: cover only). Scene object stripped through the OPEN Editor (orchestrator mcp-unity delete_gameobject+save, committed immediately 1f28310 — a Main.unity text edit would have been re-materialized from the Editor's in-memory scene); 4 files + .meta git-rm'd and ChatManager pill-only plumbing (OnChatListSyncStart/End events+invokes, IsChatListSyncing getter) deleted d2c800a with an evidence-before-delete grep proving ChatListSyncIndicator was the SOLE consumer; _chatListSyncing field + duplicate-sync guard (BotState.cs:344) + all 3 resets PRESERVED (net ChatManager diff 2+/23−); WhatsApp byte-identical (SyncingView/WhatsAppSyncGate/BotState diff-empty vs 08-19). Baseline corrected: expected suite 1136 = 1142 (1134+8, 08-19 unconfirmed) − 6 deleted gate tests, NOT the plan's stale 1118. Final green PENDING an environmental Editor recovery (see blocker). Device confirm rides 08-21. commits 1f28310/d2c800a/5185620.
 
 ### Pending Todos
 
@@ -107,6 +108,7 @@ None yet.
 - [Constraint]: Assume Wappi response-crossing bugs apply to tapi — keep serial media queue + `_chatFetchesInFlight` gate; reset on channel switch like bot switch.
 - [Constraint]: Bot workflow clones stay INACTIVE except during active testing (real contacts!); prod bagkz stays dormant.
 - [Risk]: Any existing dev Telegram workflow clones carry wrong api/sync URLs — recreate after template fix.
+- [ENV 2026-07-17 ~16:20Z — blocks 08-20 green + any test run]: Unity Editor script-compile latched FAILED by an environmental Bee BuildProgram crash (exit 134, System.OverflowException at Interop.Sys.GetGroups in HostPlatform..cctor) — ZERO C# errors in Editor.log; repo state grep-consistent. Two identical crashes (21:22/21:27 local); bare re-trigger no-ops (bridge only refreshes; scriptCompilationFailed stays latched). RECOVERY: restart the Unity Editor (or try mcp-unity recompile_scripts first), then arm Temp/claude/run-tests.trigger with the Editor focused; gate = Assembly-CSharp.dll mtime > 16:27:09Z, expect 1136/1136 (this run also supersedes 08-19's unconfirmed 1142). The red 'Scripts failed to compile' in the console is NOT a code error.
 
 ## Deferred Items
 
@@ -155,11 +157,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 08 P08-17 | 22min | 2 tasks | 4 files |
 | Phase 08 P08-18 | ~50 min | 2 tasks | 1 files |
 | Phase 08 P19 | ~45min | 2 tasks | 5 files |
+| Phase 08 P20 | ~55min | 2 tasks | 10 files |
 
 ## Session Continuity
 
-Last session: 2026-07-17T16:03:22.325Z
-Stopped at: Completed 08-19-PLAN.md (D13a Telegram cover parity)
+Last session: 2026-07-17T16:32:46.938Z
+Stopped at: Completed 08-20-PLAN.md (D13b pill removal; suite green pending Editor recovery)
 Resume file: None
 
 **Planned Phase:** 08 () — 0 plans — 2026-07-17T13:58:49.184Z
