@@ -1,166 +1,146 @@
 ---
 phase: 08-device-uat-milestone-closeout
-reviewed: 2026-07-16T13:28:33Z
+reviewed: 2026-07-17T08:45:09Z
 depth: standard
-files_reviewed: 29
+files_reviewed: 20
 files_reviewed_list:
-  - Assets/Editor/ChatListSyncIndicatorBuilder.cs
-  - Assets/Scripts/Chat/ChatIdFormat.cs
-  - Assets/Scripts/Chat/ChatRowSwipePolicy.cs
-  - Assets/Scripts/Chat/EmojiPickerController.cs
-  - Assets/Scripts/Chat/OpenChatLivePollGate.cs
+  - Assets/Scripts/Chat/ChatListSyncIndicatorGate.cs
+  - Assets/Scripts/Chat/MediaDownloadFailure.cs
+  - Assets/Scripts/Chat/OutgoingReaction.cs
   - Assets/Scripts/Chat/ReactionBarController.cs
+  - Assets/Scripts/Chat/ReactionEmoji.cs
   - Assets/Scripts/Chat/ReactionSummary.cs
-  - Assets/Scripts/Chat/SwipeToDelete.cs
-  - Assets/Scripts/Chat/TelegramReactionCatalog.cs
+  - Assets/Scripts/Chat/TelegramReactionMapper.cs
   - Assets/Scripts/Chat/TelegramReactionMerge.cs
   - Assets/Scripts/Main/ChatManager.BotState.cs
   - Assets/Scripts/Main/ChatManager.Channel.cs
-  - Assets/Scripts/Main/ChatManager.LivePoll.cs
-  - Assets/Scripts/Main/ChatManager.ReactionSend.cs
   - Assets/Scripts/Main/ChatManager.cs
-  - Assets/Scripts/UI/ChatItemView.cs
   - Assets/Scripts/UI/ChatListSyncIndicator.cs
   - Assets/Scripts/UI/EmptyStateView.cs
-  - Assets/Scripts/UI/MessageItemView.cs
-  - Assets/Tests/Editor/Chat/ChatIdFormatTests.cs
-  - Assets/Tests/Editor/Chat/ChatListDedupTests.cs
-  - Assets/Tests/Editor/Chat/ChatRowSwipePolicyTests.cs
-  - Assets/Tests/Editor/Chat/OpenChatLivePollGateTests.cs
+  - Assets/Tests/Editor/Chat/ChatListSyncIndicatorGateTests.cs
+  - Assets/Tests/Editor/Chat/MediaDownloadFailureTests.cs
+  - Assets/Tests/Editor/Chat/ReactionEmojiTests.cs
   - Assets/Tests/Editor/Chat/ReactionSummaryTests.cs
-  - Assets/Tests/Editor/Chat/TelegramReactionCatalogTests.cs
   - Assets/Tests/Editor/Chat/TelegramReactionMergeTests.cs
-  - Tools/n8n/build-suggest-replies.py
-  - Tools/n8n/verify-telegram-parity.py
+  - Assets/Tests/Editor/Chat/TelegramReactionReceiveTests.cs
+  - Tools/n8n/workflows/9PTyYcelRQI7bGDb-Suggest_Replies.json
 findings:
   critical: 0
   warning: 3
-  info: 6
-  total: 9
+  info: 2
+  total: 5
 status: issues_found
 ---
 
-# Phase 8: Code Review Report
+# Phase 8: Code Review Report — Round 2 (gap-closure delta `44b732e^..HEAD`)
 
-**Reviewed:** 2026-07-16T13:28:33Z
+**Reviewed:** 2026-07-17T08:45:09Z
 **Depth:** standard
-**Files Reviewed:** 29
+**Files Reviewed:** 20
 **Status:** issues_found
 
-> Supersedes the 2026-07-15 partial review (2 files, Tools/n8n scripts only, plan 08-02). That
-> review's two informational notes are preserved: its IN-01 (argparse exit-2 on malformed CLI,
-> fail-closed, no change needed) stands as recorded; its IN-02 (override id bound verbatim,
-> by design) is folded into IN-04 below alongside a sharper adjacent edge.
+> NOTE: this review discusses invisible Unicode characters (VS16 U+FE0F, ZWJ U+200D,
+> the U+0001 key separator) — all such characters are written below in escaped `U+XXXX` /
+> `\uXXXX` ASCII notation, never as raw code points.
+
+> Supersedes the 2026-07-16 round-1 review (29 files, plans 08-04..08-09), whose findings were
+> dispositioned in `08-REVIEW-FIX.md` (commit 1b2e60b). This round covers ONLY the round-2
+> gap-closure delta (plans 08-11..08-15). Finding numbers CONTINUE round 1's sequence
+> (WR-04.., IN-07..) because code comments already cite round-1 ids ("08-REVIEW WR-03",
+> "IN-06" in TelegramReactionMerge.cs). Round-1 findings resolved *inside this delta* and
+> verified here: IN-01 (VS16 toggle/highlight equality — closed by the new `ReactionEmoji`
+> seam threaded through OutgoingReaction/ReactionBarController, with the residual gap noted
+> in WR-04 below) and IN-06 (`SameReactions` key separator — closed with a `"\u0001"`
+> separator + compare key). Round-1 WR-03 (tombstone carry) was fixed before this range and
+> its behavior is re-verified by the new `Merge_TwoSuccessivePolls_TombstoneKeepsSuppressing` test.
 
 ## Summary
 
-Reviewed the six device-UAT gap-closure plans (08-04 open-chat live poll, 08-05 canonical dedup + cross-channel bleed, 08-06 Telegram reaction catalog + removal tombstone, 08-07 video-note presentation, 08-08 swipe policy + lifecycle null-safety, 08-09 RU copy + sync indicator) plus the two Tools/n8n Python scripts from plan 08-02. Overall quality is high: the pure-seam pattern (ChatIdFormat, OpenChatLivePollGate, ChatRowSwipePolicy, TelegramReactionCatalog/Merge) is consistently applied with thorough EditMode coverage; the WhatsApp byte-identical invariant is honored (verified: CanonicalKey verbatim on WhatsApp with pinning tests; reaction bar/picker/tombstone all TG-gated; D9 sync indicator display-gated on the Telegram channel); new network code follows the UnityWebRequest+coroutine pattern with timeout, auth header, explicit Content-Type, and `using`; no secrets in source; the serial media-download queue is untouched.
+Reviewed the round-2 gap-closure delta: D2 reaction identity (canonical-emoji seam, persisted Telegram owner-id, un-mapped-echo fold — 08-11), D9 sync-pill minimum-visible-duration (08-12), D10 Suggest_Replies newest-incoming anchor (08-13), D12 channel-aware create-bot CTA (08-14), and D11 media-download diagnostics + one serial-safe retry (08-15). `ChatManager.cs` was reviewed via its three diff hunks plus the surrounding seams they interact with (SetActiveBot/SetActiveChannel reset choreography, SyncAllChats events, the merge/mapper/summary pipeline, the media-download drain worker).
 
-Three warnings — all in the D5 live poll's interaction with the rest of the system — would burn the owner device re-verify if they trigger: a privacy-clear path that permanently kills the poll (WR-01), a visibility check that keeps polling while the chat screen is hidden by a tab switch (WR-02), and the D2 removal tombstone being consumed on its first reconcile, which at the new 3-second poll cadence shrinks its designed 90-second grace window to a single cycle (WR-03). All three have small, local fixes.
+The delta is high quality. The pure seams (`ReactionEmoji`, `MediaDownloadFailure`, `ChatListSyncIndicatorGate`, the `Merge` fold) are null-tolerant, well-documented, and pinned by focused EditMode tests including the spoofing guard (T-08-11-01) and the information-disclosure cap (T-08-15-01). Verified specifically:
 
-Verified non-issues worth recording for the device pass:
+- **D11 retry seriality holds:** the transient retry runs inline on the drain worker's coroutine with the request disposed before the 1.5 s backoff — never two concurrent `/media/download` requests (the Wappi cross-serving constraint); the final attempt can never set `retryTransient`, so the loop provably exits via `yield break`; `timeout = 30` re-applied per attempt; queue bookkeeping reset covers all switch paths including `ClearAllLocalHistory`.
+- **T-08-15-01 enforced:** every `FormatLog` call site passes `Snippet(...)` output — capped 256 chars, single-line, no file writes, no full payloads (does not grow the pre-existing round-1 IN-03 `response.txt` dump, which remains open and out of this delta).
+- **D10 wired end-to-end:** the `Prep` node genuinely produces `queryText` (prefers `lastIncomingText`, else the newest client message via a backwards scan, 500-char cap); `Assemble` injects it as `fenced.lastClientMessage` *inside* the fenced untrusted block while the system prompt references it by field name only — the injection-fencing discipline is preserved.
+- **D12 CTA correct:** `Manager.SelectPlatform(2)` is the Telegram mode (1=WA, 2=TG, 3=both); WhatsApp resolves to 1 byte-identically; the zero-bots case correctly inherits the surviving `ActiveChannel` so the CTA matches the themed empty state.
+- **Owner-id key hygiene:** the learn key (`GetActiveProfileId()` under the TG-only Normalize branch) and both load keys (explicit `ProfileIdForChannel(bot, ChatChannel.Telegram)`) always resolve the same Telegram profile id; the unauthed `"-1"` sentinel is never written (learn side validates) and reads back null harmlessly; the `_tgOwnUserId != raw.from` guard limits `PlayerPrefs.Save()` to one write per profile.
+- **Deferred-hide lifecycle:** `KillDeferredHide` runs from `OnDisable`, `Hide`, and `BeginSpin`; `DeferredHideRoutine` uses `WaitForSecondsRealtime` and re-checks `IsChatListSyncing` at wake; the H5 privacy-clear rescue works because `ClearAllLocalHistory` always reaches a follow-on sync whose `OnChatListSyncStart` re-owns the pill.
 
-- **ChatManager lifecycle:** ChatManager lives on a root GameObject (`m_Father: {fileID: 0}`, `m_IsActive: 1` in Main.unity), so `OnApplicationFocus`/`OnApplicationPause` and the poll's host object are lifecycle-safe; the only poll-stranding paths are explicit `StopAllCoroutines()` calls (see WR-01).
-- **No inactive-StartCoroutine crash from hidden-screen polling:** `MessageListView` subscribes `HandleLiveMessages` in OnEnable and unsubscribes in OnDisable (MessageListView.cs:85-86, 107, 134), so live fires while the chat screen is hidden cannot reach `StartCoroutine`/`Instantiate` on an inactive hierarchy — WR-02's impact is wasted polling, not a crash.
-- **No mid-merge kill:** `SyncLatestMessages` has no yield points after its park-wait, so the poll's defensive `StopCoroutine(_activeSync)` can never kill a sync between `seenMessageIds` mutation and the cache write; the worst case is one dropped-and-refetched response.
-- **D6 coverage is complete:** `SwipeToDelete`'s lazy `Rt` property covers every pre-Awake entry point (`ResetClosed`, `Close`, `Open`, `OnEndDrag`, `SetContentX`), and `_scroll` is lazily resolved in both `OnInitializePotentialDrag` and `OnBeginDrag`; `OnDisable` resets `_openInstance`, tweens, and position.
-- **D4 tap/scroll semantics survive disabling the component:** with `SwipeToDelete.enabled = false` on Telegram rows, ExecuteEvents skips disabled Behaviours, so drags resolve to the parent ScrollRect; `pointerPress != pointerDrag` then makes the EventSystem clear `eligibleForClick`, so a scroll ending on a row does not open a chat — the bypassed `ConsumeDragFlag` protection is not needed on that path. The pooled-row rebind explicitly resets closed state and hides the delete button before disabling.
-- **D2 tombstone vs. toggle/highlight/revert:** `ReactionStore.ApplyToMessage` keys by `reactorKey`, so a failed-removal revert overwrites the tombstone in place; a re-tap after removal correctly resolves as an add (`CurrentMyEmoji` returns `""`, not the tapped emoji); `ReactionSummary`/`RenderReactions` keep a tombstone-bearing list invisible with no reserved clearance.
-- **D7 keying is consistent end-to-end within ParseChatsJson:** serverIds, the isDeleted branch, the smart merge, the spawn constructor, notify policy, and the stale sweep all use the same canonical key; `OnChatRemoved` and `ChatHistoryCache.DeleteHistory` receive the same key the vm was constructed with.
-- **Python tools:** `verify-telegram-parity.py` is fail-closed (`OSError`/`KeyError`/`IndexError`/`JSONDecodeError` all exit 1) with no injection surface; `build-suggest-replies.py`'s override precedence (flag > env > SQLite-by-name > pinned dev) is correctly ordered and inert on the `--export` path.
+Three warnings: a residual hole in the new VS16 normalizer for the one mid-sequence-FE0F emoji in the Telegram catalog (WR-04), the persisted owner-id never loading on the cold-start path (WR-05), and the sync-pill channel-switch catch-up stranding a permanently-visible pill on the designed tap-unconnected-Telegram flow (WR-06). Two bounded Info items.
 
 ## Warnings
 
-### WR-01: `ClearAllLocalHistory` kills the D5 live poll for the rest of the session
+### WR-04: VS16 normalizer misses mid-sequence FE0F — heart-on-fire reintroduces every D2 symptom for that emoji
 
-**File:** `Assets/Scripts/Main/ChatManager.PrivacyClear.cs:81` (interaction with `Assets/Scripts/Main/ChatManager.LivePoll.cs:38-46`)
-**Issue:** Plan 08-04 re-kicks `_livePollRoutine` after each of the three known `StopAllCoroutines()` sites — `Start()` (ChatManager.cs:243-244), `SetActiveBot` (ChatManager.BotState.cs:138-139), and `SetActiveChannel` (ChatManager.Channel.cs:89-90) — but the fourth site, `ClearAllLocalHistory()` (Профиль → Конфиденциальность → clear local history), calls `StopAllCoroutines()` at line 81 and never restarts the poll. After the owner runs a privacy clear, the open-chat live poll is dead until the next bot switch, channel switch, or app restart. For the common single-bot, single-channel owner there is no such switch — D5 silently regresses for the rest of the session, which is exactly the defect this phase closes. (Adjacent pre-existing gap in the same method: it also skips `ClearResolveQueues()`, unlike SetActiveBot/SetActiveChannel, so the killed quote/reaction drain workers' bookkeeping is never reset — worth fixing in the same touch.)
-**Fix:**
+**File:** `Assets/Scripts/Chat/ReactionEmoji.cs:38-44` (CompareKey), `:70-76` (BuildRequalify); catalog evidence `Assets/Scripts/Chat/TelegramReactionCatalog.cs:27`
+**Issue:** `ReactionEmoji.CompareKey` strips only a single *trailing* U+FE0F. The Telegram allowed set contains heart-on-fire = `U+2764 U+FE0F U+200D U+1F525` — verified to be the only catalog entry whose FE0F is mid-sequence (the shrug variants carry it trailing and are handled). Telegram's canonical reaction string for heart-on-fire is the FE0F-less `U+2764 U+200D U+1F525` — the same base-form convention tapi already exhibits for the plain heart (the observed root cause A). For this emoji:
+- `CompareKey` leaves both forms unchanged (the last char is the flame's low surrogate, not FE0F), so `SameEmoji(baseForm, qualifiedForm)` is **false** — the `ReactionSummary` dedup, the `IndexOfUnmappedSameEmoji` fold, `OutgoingReaction.Resolve` toggle-off, and the quick-bar highlight all miss;
+- the `Requalify` map key for heart-on-fire is the *unstripped* qualified form (built via `CompareKey`), so a base-form echo never matches — `Canonical` passes the base form through, and the pill renders a literal text glyph (the TMP sprite name requires the `-fe0f` segment — the exact constraint the class doc cites).
+Net: reacting with heart-on-fire on Telegram reproduces D2 symptoms 1/2/3 (double count, stale pill on change, literal-text glyph) that this delta fixes for the plain heart.
+**Fix:** Strip *all* FE0F occurrences in `CompareKey` — verified collision-free across the full 73-glyph catalog (all base forms stay unique after full-strip), and because `BuildRequalify` keys by `CompareKey`, this one change also fixes `Canonical` requalification:
 ```csharp
-// ChatManager.PrivacyClear.cs — ClearAllLocalHistory(), after StopAllCoroutines():
-StopAllCoroutines();
-_chatFetchesInFlight = 0;
-_chatListSyncing = false;
-ClearVideoThumbQueue();
-ClearMediaDownloadQueue();
-ClearResolveQueues();       // drain workers were just killed; reset their bookkeeping
-
-// D5: StopAllCoroutines() above killed the open-chat live poll — re-kick it, matching
-// SetActiveBot / SetActiveChannel.
-if (_livePollRoutine != null) StopCoroutine(_livePollRoutine);
-_livePollRoutine = StartCoroutine(OpenChatLivePollRoutine());
-```
-
-### WR-02: Live poll keeps issuing messages/get while the chat screen is hidden by a tab switch
-
-**File:** `Assets/Scripts/Main/ChatManager.LivePoll.cs:58-59`
-**Issue:** `chatIsOpen` gates on `MessageListPanel.activeSelf`. `BottomTabManager` hides screens by deactivating the whole screen panel (`tab.screenPanel.SetActive(isActive)`, BottomTabManager.cs:245); `MessageListPanel` is a child of `Screen_Whatsapp`, so its own `activeSelf` stays `true` while the screen is off. Flow: owner opens a chat, taps «Сводка»/«Боты»/«Профиль» → the poll keeps firing a messages/get every 3 seconds indefinitely (the app is still focused), violating the gate's own contract ("a chat is open and on-screen") and adding sustained Wappi/tapi request pressure and battery drain during normal multi-tab use. No crash results (`MessageListView` unsubscribes its live handler in OnDisable), but this is continuous background network churn in a very reachable state, and it also means `_activeChatCache`/history keep churning for a chat the owner is not looking at.
-**Fix:**
-```csharp
-// ChatManager.LivePoll.cs — OpenChatLivePollRoutine():
-bool chatIsOpen = !string.IsNullOrEmpty(currentChatId)
-                  && MessageListPanel != null && MessageListPanel.activeInHierarchy;
-```
-`activeInHierarchy` is false while any ancestor (the tab screen) is deactivated, so the poll pauses on tab-away and resumes when the owner returns. (The pre-existing `activeSelf` use for `chatPanelVisible` in `ParseChatsJson` line 300 has the same quirk but only affects a notification-cue heuristic — out of this phase's scope.)
-
-### WR-03: D2 removal tombstone is consumed by the first reconcile — the 90 s grace window is effectively one 3 s poll cycle
-
-**File:** `Assets/Scripts/Chat/TelegramReactionMerge.cs:44-50` (interaction with `Assets/Scripts/Main/ChatManager.cs:1796-1800` and the 08-04 poll cadence)
-**Issue:** `Merge` suppresses the server's stale "me" echo when a fresh tombstone exists, but never carries the tombstone into the merged result (pinned by test `Merge_LoneFreshRemoval_NoServer_IsNull`: "never lingers as its own entry"). `RefreshCachedMessageReactions` then assigns `cached.reactions = merged`, so the tombstone is gone after the FIRST reconcile. A fresh optimistic ADD, by contrast, survives every merge inside the grace window (`result.Add(mine)` / `result[serverMine] = mine`) — the removal path is asymmetric. Before this phase, reconciles ran only at chat open, so one suppression usually spanned the whole echo lifetime. With 08-04's 3-second live poll, reconciles now run every ~3 s: if tapi's stale echo outlives one poll interval — poll 1 consumes the tombstone; poll 2 sees no "me" in the cache and a still-echoed server "me" — the just-removed reaction resurrects: the exact D2 symptom, re-opened by D5. `OptimisticGraceSeconds = 90` documents 90 seconds of protection; the implementation delivers ~3.
-**Fix:** Carry the tombstone forward inside the grace window so every reconcile within 90 s keeps suppressing:
-```csharp
-if (string.IsNullOrEmpty(mine.emoji))
+public static string CompareKey(string emoji)
 {
-    // Fresh optimistic REMOVAL tombstone: drop the server's stale "me" echo AND keep the
-    // tombstone in the result, so the NEXT reconcile (3 s later at the D5 poll cadence)
-    // still suppresses a late echo. ReactionSummary hides empty-emoji entries and the
-    // RenderReactions clearance follows visible emoji, so a lingering tombstone never renders.
-    if (serverMine >= 0) result.RemoveAt(serverMine);
-    result.Add(mine);
+    if (string.IsNullOrEmpty(emoji)) return emoji;
+    if (emoji.IndexOf(VariationSelector16) < 0) return emoji;   // fast path, no alloc
+    return emoji.Replace("\uFE0F", "");
 }
 ```
-Display safety is already in place this phase: `ReactionSummary.Build` skips empty-emoji entries and `MessageItemView.RenderReactions` (lines 4655-4661) bases clearance on visible emoji, so a tombstone-only list renders as "no reactions" with no reserved space. Once the grace expires, the next merge drops the stale tombstone naturally (server list wins; a tombstone is never in the server list). Update `Merge_LoneFreshRemoval_NoServer_IsNull` and `StampThenMerge_EndToEnd_RemovedReactionStaysRemoved` to expect a tombstone-only list instead of null, and add a two-successive-reconciles test asserting no resurrection while fresh. Alternative (smaller, if the single-cycle echo assumption is confirmed at the 08-10 capture): re-stamp the tombstone in `RefreshCachedMessageReactions` when a merge consumed one that is still fresh.
+Add a test pair pinning it: `SameEmoji("\u2764\u200D\uD83D\uDD25", "\u2764\uFE0F\u200D\uD83D\uDD25")` is true, and `Canonical` of the base form returns the qualified catalog form. (`TelegramReactionCatalog.StripVariationSelector` shares the trailing-only limitation on the `IsAllowed` side — outside this delta, worth aligning in the same touch. The 08-16 device capture can confirm tapi's echoed form for ZWJ reactions.)
+
+### WR-05: Persisted Telegram owner-id is never loaded on cold start — the "survives app relaunches" claim holds only after a switch
+
+**File:** `Assets/Scripts/Main/ChatManager.BotState.cs:322-334` (`InitializeActiveBotNextFrame` / `ResolveInitialActiveBot`); loads exist only at `ChatManager.BotState.cs:143` and `ChatManager.Channel.cs:91`
+**Issue:** The D2 root-cause-B fix persists `_tgOwnUserId` per Telegram profile (`ChatManager.cs:1639-1648`) and loads it in `SetActiveBot` and `SetActiveChannel` — but the app-launch path (`Start()` → `InitializeActiveBotNextFrame` → `ResolveInitialActiveBot`) assigns `CurrentBotId` directly, never routes through `SetActiveBot` (whose `botId == CurrentBotId` guard would also early-return for the same bot later), and performs **no load**. After every relaunch `_tgOwnUserId` is null until an own (`fromMe`) row happens to be Normalized or the user switches bot/channel — so the exact D2-B repro (owner reacts in a chat with no own rows loaded) recurs in the first-session window after each relaunch, contradicting the learn-site comment ("survives bot/channel switches **and app relaunches**", `ChatManager.cs:1633-1636`). Impact is bounded — the `Merge` fold covers the count-«2» symptom within the 90 s grace and the id re-learns from the first own row — but the persistence half of the fix is inert on the most common entry path, and the un-mapped different-emoji change case (deliberately not folded, per `Merge_FreshOptimisticMe_DifferentEmojiEcho_NotFolded`) relies on the mapped-echo path that this gap disables.
+**Fix:** Load the persisted id when the initial bot resolves, mirroring the two switch sites:
+```csharp
+// InitializeActiveBotNextFrame, after ActiveChannel = ResolveChannelForBot(CurrentBotId);
+Bot bot = Manager.Instance != null ? Manager.Instance.FindBotByName(CurrentBotId) : null;
+string tgProfileId = bot != null ? ProfileIdForChannel(bot, ChatChannel.Telegram) : null;
+_tgOwnUserId = LoadPersistedTgOwnUserId(tgProfileId);
+```
+Consider extracting the three shared lines into a `ReloadTgOwnUserIdFor(string botId)` helper so no future reset site can miss it.
+
+### WR-06: Sync-pill H3 catch-up reads the doomed old-channel sync — stuck «Синхронизация…» pill on the tap-unconnected-Telegram path
+
+**File:** `Assets/Scripts/UI/ChatListSyncIndicator.cs:110-114` (`HandleActiveChannelChanged`); interacting order `Assets/Scripts/Main/ChatManager.Channel.cs:76-80` and `Assets/Scripts/Main/ChatManager.BotState.cs:250-257`
+**Issue:** `SetActiveChannel` fires `OnActiveChannelChanged` (Channel.cs:76) *before* it kills the in-flight sync and resets the flag (`StopAllCoroutines(); … _chatListSyncing = false;`, Channel.cs:78-80). So when the owner taps the Telegram chip while a WhatsApp `chats/filter` sync is in flight, the new H3 line sees `IsChatListSyncing == true` — but that flag describes the *old* channel's sync, killed two lines later **without ever firing `OnChatListSyncEnd`**. The pill shown by `BeginSpin()` is then owned by nobody unless a follow-on sync starts. `ChannelSwitcherView` deliberately keeps unconnected chips tappable ("tapping an unconnected channel is how the owner reaches its connect empty state", SWITCH-02) — and for an unconnected Telegram profile `BeginLoadForActiveBot` early-returns with `OnEmptyState` *before* any `SyncAllChats` (BotState.cs:253-257): no start, no end. Result: a permanently-spinning «Синхронизация…» pill over the «Подключите Telegram» empty state until the next bot/channel switch — the T-08-12-01 stuck-pill class this very plan mitigates elsewhere. Note the H3 line is also redundant in the connected case: `BeginLoadForActiveBot` → `StartCoroutine(SyncAllChats)` executes `_chatListSyncing = true; OnChatListSyncStart?.Invoke()` synchronously in the same `SetActiveChannel` call stack (the first yield is `SendWebRequest`), so `HandleSyncStart` → `BeginSpin` re-shows the pill moments after `HandleActiveChannelChanged` anyway.
+**Fix:** Remove the catch-up (the same-stack `OnChatListSyncStart` covers every connected-TG switch, including the mid-flight case the comment targets), or gate it on the new channel actually being loadable:
+```csharp
+private void HandleActiveChannelChanged(ChatChannel channel)
+{
+    if (channel != ChatChannel.Telegram) { Hide(); return; }
+    // No catch-up: the old channel's in-flight sync is about to be killed with no End
+    // event, and the follow-on TG SyncAllChats fires OnChatListSyncStart in this same
+    // call stack when a TG profile exists. Showing here strands the pill when it doesn't
+    // (BeginLoadForActiveBot -> empty state, no sync) — the SWITCH-02 unconnected tap.
+}
+```
+(The OnEnable catch-up at line 60 is unaffected and remains correct — there the in-flight sync genuinely belongs to the active Telegram channel.)
 
 ## Info
 
-### IN-01: Toggle-off/highlight emoji equality does not normalize the variation selector — verify echoed form at 08-10 capture
+### IN-07: Removal tombstone cannot suppress an un-mapped own echo — one-poll transient resurrection in the unlearned-id window
 
-**File:** `Assets/Scripts/Chat/OutgoingReaction.cs:27-28`, `Assets/Scripts/Chat/ReactionBarController.cs:259-265`
-**Issue:** `TelegramReactionCatalog.IsAllowed` deliberately normalizes the trailing U+FE0F ("Telegram accepts the unqualified form"), but `OutgoingReaction.Resolve`'s toggle-off check (`current == tappedEmoji`) and `RefreshHighlight`'s `quick[i] == mine` compare raw strings. If tapi echoes the owner's "❤️" back in base form "❤" (post-grace, when the server-mapped entry becomes "me"), the quick-bar highlight misses and the first toggle-off tap resolves as a re-send instead of a removal (self-corrects on the second tap).
-**Fix:** Route both comparisons through a shared VS16-stripping normalizer (promote `TelegramReactionCatalog.StripVariationSelector`). Confirm the echoed form in the 08-10 device capture first; if tapi echoes fully-qualified, no change is needed.
+**File:** `Assets/Scripts/Chat/TelegramReactionMerge.cs:48-59` (tombstone branch) vs `:66-77` (fold)
+**Issue:** The tombstone branch removes only a server entry keyed `"me"`. If the owner reacted *and* toggled off while `_tgOwnUserId` was still unlearned, tapi's stale echo is keyed by the numeric `user_id`, so the fresh tombstone rides alongside it — the just-removed reaction re-renders (glyph, count 1) for roughly one D5 poll cycle until the server stops echoing, after which the carried tombstone leaves the list empty. The fold cannot help here because the tombstone's emoji is `""` (nothing to match). Bounded, self-healing (3–6 s), and made rare by the persisted-id fix — recorded so the residual is not mistaken for a D2 regression during the 08-16 device pass.
+**Fix:** Accept as a documented residual, or carry the removed emoji on the tombstone (e.g. a non-serialized `removedEmoji` consumed only by `Merge`) so the tombstone branch can also fold a single un-mapped same-emoji echo.
 
-### IN-02: chatLookup keying asymmetry — only `GetChat` canonicalizes
+### IN-08: Editor-only `CodePointHex` throws on lone surrogates
 
-**File:** `Assets/Scripts/Main/ChatManager.cs:267` vs `ChatManager.cs:541` (SelectChat), `ChatManager.DeleteChat.cs:31,43`, `ChatManager.Dashboard.cs:11,22,34`
-**Issue:** D7 made `GetChat` resolve through `ChatIdFormat.CanonicalKey`, but `SelectChat`, `DeleteChat`, and the Dashboard `TryGet*` helpers still index `chatLookup` with the raw argument. All current callers pass `vm.ChatId` (already canonical) or bare server session ids, so nothing breaks today — but any future caller holding a suffix-twinned Telegram id will silently miss the row in those paths while `GetChat` finds it.
-**Fix:** Either canonicalize at each chatLookup entry point (`ChatIdFormat.CanonicalKey(chatId, ActiveChannel)`), or add a one-line comment on the `chatLookup` declaration stating "keys are channel-canonical ids; external ids must pass through CanonicalKey" so the convention survives future edits.
-
-### IN-03: `SyncAllChats` writes a full-payload `response.txt` dump on device (pre-existing)
-
-**File:** `Assets/Scripts/Main/ChatManager.cs:466-471`
-**Issue:** Adjacent to this phase's new sync events: the debug dump `File.WriteAllText(persistentDataPath + "/response.txt", text)` runs unconditionally on every chats/filter sync — unlike the equivalent dump in `SyncLatestMessages` (line 632), which is `#if UNITY_EDITOR`-gated. On device this is a synchronous main-thread disk write of the entire chat-list JSON per sync, plus a plaintext chat-metadata artifact on disk (mitigated: `ClearAllLocalHistory` deletes it). Pre-existing, not introduced this phase.
-**Fix:** Wrap the dump in `#if UNITY_EDITOR` to match the SyncLatestMessages precedent.
-
-### IN-04: build-suggest-replies.py — silent DEV-credential fallback on a no-SQLite prod target; unhandled URLError
-
-**File:** `Tools/n8n/build-suggest-replies.py:93-116, 119-130`
-**Issue:** (a) On a target with no local SQLite (n8n Cloud) and no `--openai-cred`/`--supabase-cred`/env override, `resolve_cred` silently falls back to the pinned DEV credential ids (line 116) — the deploy succeeds but the workflow fails at first execution with invalid credentials. The docstring documents the override path, but the script does not enforce it when the DB is simply absent. This is a sharper edge than the by-design verbatim-override binding the 2026-07-15 review recorded (that finding stands: an operator-supplied id cannot be validated against Cloud and is used verbatim, deliberately). (b) `req()` catches `HTTPError` only; a connection-refused/unreachable `BASE` raises an uncaught `urllib.error.URLError` traceback instead of a clean failure message.
-**Fix:** (a) In `resolve_cred`, when `not os.path.exists(DEV_DB)` and no override is set, fail loudly if `BASE` is not a localhost URL (mirror the existing "refusing to guess" `SystemExit`); optionally log the resolved `(id, name)` per credential in `deploy()` so bound ids are visible in deploy output. (b) Add `except urllib.error.URLError as e: raise SystemExit(f"cannot reach {url}: {e.reason}")` in `req()`.
-
-### IN-05: `ReactionPillView.HasReactions` counts removal tombstones
-
-**File:** `Assets/Scripts/UI/ReactionPillView.cs:40`
-**Issue:** `HasReactions => _last != null && _last.Count > 0` is raw-count based, so a lone D2 tombstone reports `true`. The consequence is benign today (it only gates the `OnEmojiReady` re-render, and `Render` itself correctly hides via `ReactionSummary.Build`), but it is now inconsistent with the "visible reactions" semantics this phase established in `ReactionSummary`/`RenderReactions` — and becomes load-bearing if WR-03's fix makes tombstone-only lists persist.
-**Fix:** `public bool HasReactions => ReactionSummary.Build(_last).emojis.Count > 0;` (or document the raw-count intent).
-
-### IN-06: `TelegramReactionMerge.Key` concatenates without a separator
-
-**File:** `Assets/Scripts/Chat/TelegramReactionMerge.cs:132`
-**Issue:** `Key` builds `$"{r?.reactorKey}{r?.emoji}"`, so `SameReactions` can theoretically collide across (reactorKey, emoji) boundaries (e.g. `"ab"+"c"` vs `"a"+"bc"`). Practically unreachable — reactor keys are numeric ids/"me" and emoji are non-ASCII glyphs — but a one-character fix removes the class.
-**Fix:** Insert a separator that cannot appear in a reactor key, e.g. `$"{r?.reactorKey}\u0001{r?.emoji}"`.
+**File:** `Assets/Scripts/Main/ChatManager.cs:1702-1713`
+**Issue:** `char.ConvertToUtf32(s, i)` throws `ArgumentException` on an unpaired surrogate. JSON can legally encode lone surrogates (`"\ud83d"` with no low-surrogate escape following) and Newtonsoft materializes them into the string, so a malformed tapi `reaction` value would throw *inside `Normalize`* — Editor-only (`#if UNITY_EDITOR`), but it would break message parsing for that batch precisely while diagnosing the malformed data the logger exists to capture.
+**Fix:** Guard the pair before converting:
+```csharp
+int cp = char.IsHighSurrogate(s[i]) && i + 1 < s.Length && char.IsLowSurrogate(s[i + 1])
+    ? char.ConvertToUtf32(s, i)
+    : s[i];                       // log the lone unit as-is
+i += (cp > 0xFFFF) ? 2 : 1;
+```
 
 ---
 
-_Reviewed: 2026-07-16T13:28:33Z_
+_Reviewed: 2026-07-17T08:45:09Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
