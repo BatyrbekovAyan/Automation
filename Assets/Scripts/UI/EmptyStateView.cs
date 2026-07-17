@@ -240,10 +240,15 @@ public class EmptyStateView : MonoBehaviour
         BotsPage botsPage = FindFirstObjectByType<BotsPage>(FindObjectsInactive.Include);
         if (botsPage != null) botsPage.StartNewBot();
 
-        // We launched from the WhatsApp page — preselect WhatsApp as the platform so the
-        // user lands on the form with it already chosen. StartNewBot switched to the form
-        // synchronously, so the page is active and SelectPlatform's UI updates apply.
-        if (Manager.Instance != null) Manager.Instance.SelectPlatform(1);
+        // Preselect the platform for the channel the empty state surfaced on: Telegram (2)
+        // from the Telegram channel, WhatsApp (1) otherwise. The empty state is themed for
+        // ActiveChannel (ApplyChannelAccent), so the form must open on the SAME platform the
+        // owner was viewing — otherwise the Telegram CTA looks dead (opens WhatsApp). WhatsApp
+        // still resolves to 1 (byte-identical). StartNewBot switched to the form synchronously,
+        // so the page is active and SelectPlatform's UI updates apply.
+        int platform = (ChatManager.Instance != null
+                        && ChatManager.Instance.ActiveChannel == ChatChannel.Telegram) ? 2 : 1;
+        if (Manager.Instance != null) Manager.Instance.SelectPlatform(platform);
     }
 
     private void OpenCurrentBotAuth()
