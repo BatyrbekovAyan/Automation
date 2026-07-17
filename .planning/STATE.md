@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
 status: executing
-stopped_at: "Completed 08-15-PLAN.md (D11: media-download instrumentation + serial-safe transient retry)"
-last_updated: "2026-07-17T08:19:30.228Z"
+stopped_at: "Completed 08-16-PLAN.md (round-2 device re-verify transcribed — Gate A stays ISSUES; round-3 scope D2-ext/D12/D13)"
+last_updated: "2026-07-17T13:25:00.000Z"
 last_activity: 2026-07-17
 progress:
   total_phases: 8
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 ## Current Position
 
 Phase: 08 (device-uat-milestone-closeout) — EXECUTING
-Plan: 6 of 16
-Status: Ready to execute
+Plan: 16 of 16 (all round-2 plans complete; Gate A still ISSUES)
+Status: Gap round 3 planning pending (D2-ext / D12 / D13)
 Last activity: 2026-07-17
 
 Progress: [██████████] 100%
@@ -94,6 +94,7 @@ None yet.
 - [RESOLVED-tentative 2026-07-16 — 05-06-REVIEW WR-02]: vthumb id-ambiguity probed in Gate A — owner: "seems ok, not really sure"; no crossing observed (low-confidence pass, no defect filed). Watch during normal use; if a crossing ever appears, check whether tapi accepts a `chat_id` param on `message/media/download`.
 - [CODE-CLOSED 2026-07-16 — 08-06, device confirm rides 08-10]: **D1** (REACTION_INVALID) and **D2** (removal never clears) are fixed. D1: TG reaction bar+picker constrained to `TelegramReactionCatalog.AllowedSet` (standard free set; quick 6 swaps 😂→😁/😮→🔥) + a clean 400 revert of both the pill and the chat-list preview. D2: confirmed resurrection path (b) — a bare removal deletes the "me" entry so `Merge` returns the still-echoing server list; fixed with a fresh empty-emoji "me" tombstone (`StampRemovalTombstone`) + a removal branch in `TelegramReactionMerge.Merge`. WhatsApp byte-identical; 1063/1063 EditMode green FRESH. Remaining: IN-04 still accepted v1 (no "X reacted…" chat-list preview on TG receive-side); the allowed set is a starting point to re-confirm at 08-10 (B9 add / B13 remove).
 - [Gate A re-verify 2026-07-17 — 08-10 RUN]: 7/9 resolved on device (D1, D3a+b, D4, D5-core, D6, D7, D8; B7 webp PASS). OPEN for gap round 2: **D2 refined** (reaction identity/VS16 mismatch — own reaction counts «2», changed reaction leaves both pills, two different heart glyphs; hypothesis pre-flagged 08-REVIEW IN-01/IN-06 — capture exact tapi echo bytes), **D9** (sync pill never visible — sync-vs-paint timing / event-vs-OnEnable ordering / occlusion; consider minimum-visible-duration), **D10** (WA «Вместе» suggestions irrelevant, TG relevant — diff WA payload + dev-n8n Suggest_Replies WA branch against the working TG path), **D11** (some video/GIF/video-note downloads never complete — instrument message/media/download failures first, tapi suspect), **D12** (TG empty-state create-bot CTA dead — expected WhatsApp CTA flow with Telegram preselected). G6 reminder STILL OUTSTANDING: deactivate the dev test clone.
+- [Gate A round-2 re-verify 2026-07-17 — 08-16 RUN]: **D10 + D11 RESOLVED** (owner "seems ok" on both; D11 produced no failure this pass — 08-15 instrumentation + serial retry stay armed); **D2 core RESOLVED** (count-«2»/both-pills/two-hearts gone) with NEW residual **D2-ext**: reaction changes/removals made IN the Telegram app itself may not reflect in-app (intermittent; hypothesis = poll-window absence-vs-removal semantics in TelegramReactionMerge; the 08-11 echo-hex capture is still wanted); **D12 RE-FAIL** — CTA is INERT on device ("nothing happens"), contradicting 08-14's opens-with-WhatsApp diagnosis → needs runtime/on-device diagnosis (raycast blocker / per-channel instance with unwired handler / AddBotPanel.Instance null / swallowed exception); **NEW D13** — freshly-created Telegram bot lacks the WhatsApp post-creation cover (~5-min slider over the chats list); OWNER DECISION "Cover only, remove pill": build the WhatsApp-parity cover for Telegram AND remove the D9 «Синхронизация…» pill as ONE item (D9 SUPERSEDED; owner's "pull-to-refresh does nothing" is expected — the gesture is not implemented). LEAD: the WA cover is SyncingState (built by Assets/Editor/SyncingStateBuilder.cs into Screen_Whatsapp/ChatsPanel, ProgressTrack/ProgressFill bar) driven by Assets/Scripts/UI/SyncingView.cs — find why it never fires for a TG-created bot, mirror on Telegram. Round-3 scope: D2-ext / D12 / D13. G6 dev-clone deactivation reminder STILL OUTSTANDING (owner did not confirm at checkpoint).
 - [Gate/Phase 3]: tapi media message shapes (messages/get) undocumented — Normalize/media work (Phase 5 CHAT-03) blocked until the owner runs the capture script against an authorized dev Telegram profile.
 - [Gate/Phase 4]: TPL-06 e2e needs dev n8n (localhost:5678) + tunnel + a real authorized Telegram profile (user-assisted).
 - [Constraint]: Assume Wappi response-crossing bugs apply to tapi — keep serial media queue + `_chatFetchesInFlight` gate; reset on channel switch like bot switch.
