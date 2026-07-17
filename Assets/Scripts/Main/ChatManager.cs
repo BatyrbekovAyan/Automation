@@ -2061,23 +2061,51 @@ if (msg.messageType == MessageType.Video)
         www.timeout = 30;   // never let recovery / tap-to-retry hang the spinner indefinitely
         yield return www.SendWebRequest();
 
+        // D11: every failure exit below logs one capped, actionable line (id + HTTP status +
+        // classified reason + a size-capped body snippet) so the device pass can show WHY a
+        // video/GIF/note failed. Capped by MediaDownloadFailure.Snippet — NEVER a full payload,
+        // NEVER a file write (do not grow into the pre-existing response.txt dumps, IN-03).
+        long httpStatus = www.responseCode;
+        string bodySnippet = MediaDownloadFailure.Snippet(www.downloadHandler?.text);
+
+        // (1) Transport/HTTP failure — network drop, timeout (responseCode 0), or a non-2xx status.
         if (www.result != UnityWebRequest.Result.Success)
         {
+            var kind = MediaDownloadFailure.Classify(false, httpStatus, false, false);
+            Debug.LogWarning(MediaDownloadFailure.FormatLog(messageId, httpStatus, kind, bodySnippet));
             onFailure?.Invoke();
             yield break;
         }
 
+        // Parse the 2xx body (no yield inside the try/catch): a malformed body is a ParseError;
+        // a well-formed body with neither file_link nor file_b64 is NoLinkInResponse.
+        string fileLink = null;
+        string fileB64 = null;
+        bool parseThrew = false;
         try
         {
             JObject json = JObject.Parse(www.downloadHandler.text);
-            string fileLink = json["file_link"]?.ToString();
-            string fileB64 = json["file_b64"]?.ToString();
-
-            if (!string.IsNullOrEmpty(fileLink)) onSuccess?.Invoke(fileLink);
-            else if (!string.IsNullOrEmpty(fileB64)) onSuccess?.Invoke("base64://" + fileB64);
-            else onFailure?.Invoke();
+            fileLink = json["file_link"]?.ToString();
+            fileB64 = json["file_b64"]?.ToString();
         }
-        catch { onFailure?.Invoke(); }
+        catch { parseThrew = true; }
+
+        // (3) Parse exception — the 2xx body was not the expected JSON.
+        if (parseThrew)
+        {
+            Debug.LogWarning(MediaDownloadFailure.FormatLog(
+                messageId, httpStatus, MediaDownloadFailureKind.ParseError, bodySnippet));
+            onFailure?.Invoke();
+            yield break;
+        }
+
+        if (!string.IsNullOrEmpty(fileLink)) { onSuccess?.Invoke(fileLink); yield break; }
+        if (!string.IsNullOrEmpty(fileB64)) { onSuccess?.Invoke("base64://" + fileB64); yield break; }
+
+        // (2) Well-formed 2xx but empty — neither file_link nor file_b64 (the likely server-side cause).
+        var emptyKind = MediaDownloadFailure.Classify(true, httpStatus, false, false);
+        Debug.LogWarning(MediaDownloadFailure.FormatLog(messageId, httpStatus, emptyKind, bodySnippet));
+        onFailure?.Invoke();
     }
     
     public void SendTextMessage(string text)
