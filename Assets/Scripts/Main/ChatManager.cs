@@ -425,8 +425,8 @@ public partial class ChatManager : MonoBehaviour
     /// <summary>
     /// True while a chats/filter sync is in flight. Guards RefreshActiveBotChats
     /// against launching overlapping syncs on rapid WhatsApp-tab re-entry. Reset
-    /// in SetActiveBot because StopAllCoroutines abandons the coroutine without
-    /// running its finally.
+    /// in SetActiveBot / SetActiveChannel / privacy-clear because StopAllCoroutines
+    /// abandons the in-flight SyncAllChats without running its finally.
     /// </summary>
     private bool _chatListSyncing;
 
