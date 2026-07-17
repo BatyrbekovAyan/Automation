@@ -103,14 +103,20 @@ public class ChatListSyncIndicator : MonoBehaviour
 
     // A switch AWAY from Telegram hides any stale pill immediately (guards the "stuck syncing"
     // case where StopAllCoroutines abandoned the in-flight SyncAllChats before its finally ran)
-    // and kills any pending deferred-hide. A switch TO Telegram while a chat-list sync is already
-    // in flight re-shows the pill (H3): HandleSyncStart already ran under the previous channel and
-    // its IsTelegram() gate dropped it; SetActiveChannel re-syncs after the flip, but this catches
-    // a sync that is mid-flight at the moment the channel event fires.
+    // and kills any pending deferred-hide. A switch TO Telegram deliberately has NO catch-up
+    // (08-REVIEW WR-06): at this moment IsChatListSyncing can only describe the OLD channel's
+    // sync — SetActiveChannel fires this event two lines before StopAllCoroutines kills that
+    // sync with no OnChatListSyncEnd, so a pill shown here would be owned by nobody. When the
+    // new Telegram channel IS connected, BeginLoadForActiveBot → SyncAllChats fires
+    // OnChatListSyncStart synchronously in this same call stack (its first yield is
+    // SendWebRequest) and HandleSyncStart shows the pill; when it is NOT connected (the
+    // SWITCH-02 tap-to-connect path) BeginLoadForActiveBot early-returns to the empty state
+    // with no sync at all — a pill shown here would spin forever over «Подключите Telegram».
+    // (The OnEnable catch-up above is different: there the in-flight sync genuinely belongs to
+    // the already-active Telegram channel and will fire its End.)
     private void HandleActiveChannelChanged(ChatChannel channel)
     {
-        if (channel != ChatChannel.Telegram) { Hide(); return; }
-        if (ChatManager.Instance != null && ChatManager.Instance.IsChatListSyncing) BeginSpin();
+        if (channel != ChatChannel.Telegram) Hide();
     }
 
     // A bot switch always rebuilds the list; hide any pill. If the new bot is TG-syncing, the
