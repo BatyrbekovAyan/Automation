@@ -14,6 +14,14 @@ public class ReactionEmojiTests
     private const string BaseHeart = "❤";              // ❤  (no variation selector)
     private const string QualifiedHeart = "❤️";   // ❤️ (VS16-qualified)
 
+    // Heart-on-fire — the ONE Telegram-catalog entry whose FE0F sits MID-sequence
+    // (U+2764 U+FE0F U+200D U+1F525, selector before the joiner), which a trailing-only strip
+    // missed (08-REVIEW WR-04). Composed from the annotated heart constants + an explicit ZWJ
+    // so the invisible difference between the two forms stays visible in review.
+    private static readonly string Zwj = ((char)0x200D).ToString();
+    private static readonly string BaseHeartOnFire = BaseHeart + Zwj + "🔥";           // U+2764 U+200D U+1F525
+    private static readonly string QualifiedHeartOnFire = QualifiedHeart + Zwj + "🔥"; // U+2764 U+FE0F U+200D U+1F525
+
     [Test]
     public void SameEmoji_BaseAndQualifiedHeart_AreEqual()
     {
@@ -41,6 +49,32 @@ public class ReactionEmojiTests
         // includes -fe0f; a stripped base form would render a literal text heart).
         Assert.AreEqual(QualifiedHeart, ReactionEmoji.Canonical(BaseHeart));
         Assert.AreEqual(QualifiedHeart, ReactionEmoji.Canonical(QualifiedHeart));   // idempotent
+    }
+
+    [Test]
+    public void SameEmoji_BaseAndQualifiedHeartOnFire_AreEqual()
+    {
+        // tapi echoes ZWJ reactions in the FE0F-less base form too; the mid-sequence selector
+        // must strip or every D2 symptom (double count, stale pill, text glyph) recurs here.
+        Assert.IsTrue(ReactionEmoji.SameEmoji(BaseHeartOnFire, QualifiedHeartOnFire));
+        Assert.IsTrue(ReactionEmoji.SameEmoji(QualifiedHeartOnFire, BaseHeartOnFire));
+    }
+
+    [Test]
+    public void CompareKey_DropsMidSequenceVariationSelector()
+    {
+        Assert.AreEqual(BaseHeartOnFire, ReactionEmoji.CompareKey(QualifiedHeartOnFire));
+        Assert.AreEqual(BaseHeartOnFire, ReactionEmoji.CompareKey(BaseHeartOnFire));   // idempotent
+    }
+
+    [Test]
+    public void Canonical_BaseHeartOnFire_RequalifiesToDisplayForm()
+    {
+        // BuildRequalify keys by CompareKey, so the full strip also fixes requalification: the
+        // base echo comes back as the sprite-renderable qualified catalog form (the TMP sprite
+        // name includes -fe0f), never as a literal text glyph.
+        Assert.AreEqual(QualifiedHeartOnFire, ReactionEmoji.Canonical(BaseHeartOnFire));
+        Assert.AreEqual(QualifiedHeartOnFire, ReactionEmoji.Canonical(QualifiedHeartOnFire));   // idempotent
     }
 
     [Test]

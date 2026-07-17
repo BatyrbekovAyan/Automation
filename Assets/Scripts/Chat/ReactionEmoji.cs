@@ -23,28 +23,37 @@ using System.Collections.Generic;
 /// </summary>
 public static class ReactionEmoji
 {
-    // Emoji-presentation selector. A trailing one distinguishes "❤️" from the base "❤"; both
-    // are the same reaction, so it is dropped to form the compare key.
+    // Emoji-presentation selector. It distinguishes "❤️" from the base "❤" — trailing on most
+    // qualified glyphs, MID-sequence in ZWJ sequences (heart-on-fire is U+2764 U+FE0F U+200D
+    // U+1F525, selector before the joiner; 08-REVIEW WR-04). Same reaction either way, so EVERY
+    // occurrence is dropped to form the compare key.
     private const char VariationSelector16 = '\uFE0F';
+
+    // string.Replace has no char-remove overload; the selector's string form is cached once so
+    // CompareKey's strip path allocates only the result. MUST stay declared before Requalify:
+    // static field initializers run in textual order and BuildRequalify calls CompareKey.
+    private static readonly string VariationSelector16String = VariationSelector16.ToString();
 
     // Base-form (VS16-stripped) => fully-qualified glyph, built once from the qualified reaction
     // set so tapi's base echo requalifies to the exact string the optimistic entry / catalog use.
     private static readonly Dictionary<string, string> Requalify = BuildRequalify();
 
     /// <summary>
-    /// VS16-insensitive equality/dedup key: drops a single trailing U+FE0F. Null/empty pass
-    /// through unchanged. Callers compare the returned strings ordinally.
+    /// VS16-insensitive equality/dedup key: drops EVERY U+FE0F — trailing AND mid-sequence.
+    /// Heart-on-fire (U+2764 U+FE0F U+200D U+1F525) carries its selector before the ZWJ, so a
+    /// trailing-only strip missed it and reintroduced every D2 symptom for that one emoji
+    /// (08-REVIEW WR-04). Verified collision-free: all 73 catalog entries keep unique base forms
+    /// after a full strip. Null/empty pass through unchanged; compare results ordinally.
     /// </summary>
     public static string CompareKey(string emoji)
     {
         if (string.IsNullOrEmpty(emoji)) return emoji;
-        return emoji[emoji.Length - 1] == VariationSelector16
-            ? emoji.Substring(0, emoji.Length - 1)
-            : emoji;
+        if (emoji.IndexOf(VariationSelector16) < 0) return emoji;   // fast path, no alloc
+        return emoji.Replace(VariationSelector16String, "");
     }
 
     /// <summary>
-    /// True when two emoji are the same reaction ignoring a trailing VS16. Null-safe: two
+    /// True when two emoji are the same reaction ignoring VS16 occurrences. Null-safe: two
     /// null/empty inputs compare equal (ordinal comparison of their compare keys).
     /// </summary>
     public static bool SameEmoji(string a, string b) =>
@@ -64,7 +73,7 @@ public static class ReactionEmoji
     }
 
     // Map each qualified reaction glyph's base form back to the qualified glyph. Only glyphs
-    // that actually carry a trailing VS16 differ from their base, but mapping every entry keeps
+    // that actually carry a VS16 differ from their base, but mapping every entry keeps
     // lookup uniform and self-heals if the source set changes. Base forms are unique in the set,
     // so there are no collisions.
     private static Dictionary<string, string> BuildRequalify()
