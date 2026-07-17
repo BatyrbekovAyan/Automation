@@ -5,13 +5,13 @@ milestone_name: Telegram Parity
 status: executing
 stopped_at: "Completed 08-17-PLAN.md (D2-ext: loaded-window Telegram reaction reconcile)"
 last_updated: "2026-07-17T14:34:29.426Z"
-last_activity: 2026-07-17 -- Phase --phase execution started
+last_activity: 2026-07-17
 progress:
   total_phases: 8
   completed_phases: 5
   total_plans: 35
-  completed_plans: 36
-  percent: 100
+  completed_plans: 31
+  percent: 89
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-12)
 
 **Core value:** The owner stays in control along the automation↔semi-auto spectrum — the bot can answer autonomously, or propose replies the owner picks and refines, without losing trust or the ability to take over.
-**Current focus:** Phase --phase — 08
+**Current focus:** Phase 08 — device-uat-milestone-closeout (round-3 gap closure)
 
 ## Current Position
 
-Phase: --phase (08) — EXECUTING
-Plan: 1 of --name
-Status: Executing Phase --phase
-Last activity: 2026-07-17 -- Phase --phase execution started
+Phase: 08 (device-uat-milestone-closeout) — EXECUTING
+Plan: 17 of 21 (round-3 gap plans 08-17..08-21 executing)
+Status: Executing round 3 (D2-ext / D12 / D13 + consolidated re-verify)
+Last activity: 2026-07-17 -- 08-17 complete (D2-ext loaded-window reaction reconcile)
 
-Progress: [██████████] 100%
+Progress: [████████░░] 81%
 
 ## Performance Metrics
 
