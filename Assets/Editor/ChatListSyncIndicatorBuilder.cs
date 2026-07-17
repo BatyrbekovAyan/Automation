@@ -81,6 +81,32 @@ public static class ChatListSyncIndicatorBuilder
         Debug.Log("[ChatListSyncIndicatorBuilder] Headless build + save complete: Telegram sync pill stamped.");
     }
 
+    // ── Removal (D13b — pill superseded by the 08-19 Telegram cover) ─────────
+    // Owner decision (08-16): "Cover only, remove pill." Delete-only, idempotent pass that
+    // strips the ChatListSyncIndicator GameObject from Screen_Whatsapp/ChatsPanel. Reuses the
+    // existing DestroyAllByName helper + name constants — no object is built.
+
+    [MenuItem("Tools/Chat List Sync Indicator/Remove")]
+    public static void Remove()
+    {
+        GameObject screen = FindByNameIncludeInactive(ScreenName);
+        bool removed = RemoveInternal();
+        if (screen != null) EditorSceneManager.MarkSceneDirty(screen.scene);
+        Debug.Log(removed
+            ? "[ChatListSyncIndicatorBuilder] Removed the Telegram sync pill (D13b). SAVE THE SCENE (Cmd+S)."
+            : "[ChatListSyncIndicatorBuilder] No Telegram sync pill found to remove (already gone).");
+    }
+
+    // Headless entry (Editor closed):
+    //   Tools/run-editor-builder.sh ChatListSyncIndicatorBuilder.RemoveHeadless
+    public static void RemoveHeadless()
+    {
+        var scene = EditorSceneManager.OpenScene("Assets/Scenes/Main.unity");
+        RemoveInternal();
+        EditorSceneManager.SaveScene(scene);
+        Debug.Log("[ChatListSyncIndicatorBuilder] Headless remove + save complete: Telegram sync pill stripped.");
+    }
+
     // ── Main build ──────────────────────────────────────────────────────────
 
     private static GameObject BuildInternal()
@@ -140,6 +166,32 @@ public static class ChatListSyncIndicatorBuilder
         RefreshRounded(pillRounded);
 
         return root;
+    }
+
+    // Idempotent delete-only pass: destroys the pill under ChatsPanel. Returns true if one was
+    // present (a re-run after removal is a clean no-op → false, 0 destroyed).
+    private static bool RemoveInternal()
+    {
+        GameObject screen = FindByNameIncludeInactive(ScreenName);
+        if (screen == null)
+            throw new InvalidOperationException($"[ChatListSyncIndicatorBuilder] '{ScreenName}' not found — open Main.unity.");
+
+        Transform chatsPanel = screen.transform.Find(ChatsPanelName);
+        if (chatsPanel == null)
+            throw new InvalidOperationException(
+                $"[ChatListSyncIndicatorBuilder] '{ScreenName}/{ChatsPanelName}' not found.");
+
+        int before = CountByName(chatsPanel, IndicatorName);
+        DestroyAllByName(chatsPanel, IndicatorName);
+        return before > 0;
+    }
+
+    private static int CountByName(Transform root, string name)
+    {
+        int count = 0;
+        foreach (var t in root.GetComponentsInChildren<Transform>(true))
+            if (t != null && t != root && t.name == name) count++;
+        return count;
     }
 
     private static RectTransform BuildSpinner(Transform parent)
