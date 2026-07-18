@@ -425,6 +425,22 @@ public class Manager : MonoBehaviour
             }
         }
 
+        // Existing-user auto-flag: users who already have bots must never see the
+        // first-run carousel — set OnboardingSeen so a later delete-all-bots in-session
+        // can't resurface it. Use the LIVE post-load bot count
+        // (BotsParent.transform.childCount, the container the loop instantiates into),
+        // NOT the loop bound `id`: `id` is a monotonic bot-creation counter that is never
+        // decremented, so a user who created then fully deleted their bot(s) would be
+        // wrongly auto-flagged and permanently lose the carousel despite having ZERO bots
+        // (violates ONB-01).
+        bool hasBotsNow = BotsParent != null && BotsParent.transform.childCount > 0;
+        if (OnboardingGate.ShouldAutoFlagSeen(hasBots: hasBotsNow,
+                seen: PlayerPrefs.GetInt(OnboardingKeys.Seen, 0) == 1))
+        {
+            PlayerPrefs.SetInt(OnboardingKeys.Seen, 1);
+            PlayerPrefs.Save();
+        }
+
         // Sweep profiles orphaned by an app death mid-wizard/mid-re-auth that
         // the quit-time settle (OnApplicationQuit) couldn't reach — on mobile
         // most kills run no code at all, so this launch-time pass stays the

@@ -12,6 +12,9 @@ public class BotsPage : MonoBehaviour
     [Tooltip("Parent holding the Bot cards (Manager.BotsParent).")]
     [SerializeField] private Transform botsParent;
 
+    [Tooltip("Screen_Onboarding root (first-run welcome carousel). Stamped by OnboardingScreenBuilder.")]
+    [SerializeField] private GameObject onboardingScreen;
+
     public static BotsPage Instance;
 
     void Start()
@@ -38,7 +41,23 @@ public class BotsPage : MonoBehaviour
     {
         bool hasBots = botsParent != null && botsParent.childCount > 0;
         if (emptyState != null) emptyState.SetActive(!hasBots);
-        if (!hasBots) StartNewBot();   // idempotent — no double-open if already open
+        if (!hasBots)
+        {
+            // Single zero-bot chokepoint (the Chats empty-state CTA also routes here
+            // via SwitchTab(Bots)→RefreshEmptyState): show the first-run carousel on a
+            // true first launch, otherwise fall back to the existing auto-open. The
+            // null-guard keeps a not-yet-built scene on the existing behaviour so a
+            // brand-new user is never trapped on a dead end.
+            bool seen = PlayerPrefs.GetInt(OnboardingKeys.Seen, 0) == 1;
+            if (onboardingScreen != null && OnboardingGate.ShouldShowCarousel(hasBots, seen))
+            {
+                onboardingScreen.SetActive(true);   // carousel instead of the auto-open
+            }
+            else
+            {
+                StartNewBot();                       // existing auto-open (idempotent, unchanged)
+            }
+        }
     }
 
     /// <summary>
