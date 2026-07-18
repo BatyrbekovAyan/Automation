@@ -1506,6 +1506,14 @@ public class Manager : MonoBehaviour
         // Step 6: Reset form
         ResetAddBotForm();
         isCreatingBot = false;
+
+        // Interactive success moment — final auth, bot now exists. Last channel to authorize
+        // is Telegram for TG-only and "both"; WhatsApp for WhatsApp-only. Reuses the local
+        // useTelegram (== selectedPlatform 2 || 3) captured before ResetAddBotForm cleared
+        // selectedPlatform. This is the ONE creation-flow site — ShowAuthSuccess never
+        // re-fires it (its else branch is gated on !isCreatingBot), so a "both" creation
+        // shows the moment exactly once.
+        yield return StartCoroutine(ShowInteractiveSuccessMoment(newBotComp, useTelegram));
     }
 
     /// <summary>
@@ -1644,45 +1652,55 @@ public class Manager : MonoBehaviour
 
     private IEnumerator ShowAuthSuccess(GameObject authPage, GameObject successPanel)
     {
-        if (successPanel != null)
+        // Compute the intermediate-step flag FIRST. The WhatsApp leg of a "both" creation is
+        // the ONLY case that keeps the old transient 2s success check + LoadingPanel cover +
+        // authPage deactivation (it covers the transition to the Telegram auth page). The
+        // final creating-bot auth AND settings re-auth hand off to the interactive success
+        // moment, which owns the panel show/dismiss AND the authPage deactivation — so they
+        // must NOT flash the 2s panel and must leave authPage ACTIVE (the panel is nested
+        // inside authPage; deactivating it now would hide the moment).
+        bool moreAuthSteps = isCreatingBot && selectedPlatform == 3 && authPage != TelegramAuth;
+
+        if (moreAuthSteps)
         {
-            // Block all interaction (back button, etc.) during the success animation
-            var cg = authPage.GetComponent<CanvasGroup>();
-            if (cg == null) cg = authPage.AddComponent<CanvasGroup>();
-            cg.interactable = false;
-            cg.blocksRaycasts = true;
+            if (successPanel != null)
+            {
+                // Block all interaction (back button, etc.) during the success animation
+                var cg = authPage.GetComponent<CanvasGroup>();
+                if (cg == null) cg = authPage.AddComponent<CanvasGroup>();
+                cg.interactable = false;
+                cg.blocksRaycasts = true;
 
-            // Scroll to top so the QR container (with checkmark) is visible
-            var scrollRect = authPage.GetComponentInChildren<ScrollRect>();
-            if (scrollRect != null)
-                scrollRect.normalizedPosition = Vector2.one;
+                // Scroll to top so the QR container (with checkmark) is visible
+                var scrollRect = authPage.GetComponentInChildren<ScrollRect>();
+                if (scrollRect != null)
+                    scrollRect.normalizedPosition = Vector2.one;
 
-            successPanel.SetActive(true);
-            yield return new WaitForSeconds(2f);
-            successPanel.SetActive(false);
+                successPanel.SetActive(true);
+                yield return new WaitForSeconds(2f);
+                successPanel.SetActive(false);
 
-            cg.interactable = true;
+                cg.interactable = true;
+            }
+
+            // Cover transition to the next auth page (Telegram), then deactivate this page.
+            LoadingPanel.SetActive(true);
+            authPage.SetActive(false);
         }
-
-        if (isCreatingBot)
+        else if (!isCreatingBot && Manager.openBot != null)
         {
-            bool moreAuthSteps = selectedPlatform == 3 && authPage != TelegramAuth;
-            if (moreAuthSteps)
-            {
-                // Cover transition to next auth page
-                LoadingPanel.SetActive(true);
-            }
-            else
-            {
-                // Final auth — close the Add-Bot overlay and land on the Bots tab.
-                AddBotPanel.Instance?.CloseImmediate();
-                var tabManager = FindFirstObjectByType<BottomTabManager>();
-                if (tabManager != null)
-                    tabManager.SwitchTab(BottomTabManager.BotsTabIndex);
-            }
+            // Settings re-auth: the Manager.openBot bot already exists → interactive moment
+            // with the files-exist fallback («Открыть чаты»). Re-authed channel = whichever
+            // authPage this is. authPage stays ACTIVE — the moment reactivates it and defers
+            // its deactivation via CloseSuccessAndOverlay. Gated on !isCreatingBot so the
+            // creation flow (which fires the moment from CreateBotFromForm) never double-fires.
+            StartCoroutine(ShowInteractiveSuccessMoment(Manager.openBot.GetComponent<Bot>(),
+                           /*useTelegram:*/ authPage == TelegramAuth));
         }
+        // else: final creating-bot auth — do nothing here. CreateBotFromForm fires the
+        // interactive moment after the bot card exists; authPage stays active for it.
 
-        authPage.SetActive(false);
+        yield break;
     }
 
     // Interactive «Бот подключён!» moment — the FINAL success beat after auth completes and
