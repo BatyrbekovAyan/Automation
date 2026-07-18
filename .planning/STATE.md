@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
 status: executing
-stopped_at: Completed 11-05-PLAN.md
-last_updated: "2026-07-18T16:28:04.262Z"
+stopped_at: Completed 11-06-PLAN.md
+last_updated: "2026-07-18T16:57:46.918Z"
 last_activity: 2026-07-18
 progress:
   total_phases: 9
   completed_phases: 5
   total_plans: 42
-  completed_plans: 44
+  completed_plans: 45
   percent: 100
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 ## Current Position
 
 Phase: 11 (first-run-onboarding-flow) — EXECUTING
-Plan: 6 of 7
+Plan: 7 of 7
 Status: Ready to execute
 Last activity: 2026-07-18
 
@@ -101,6 +101,9 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - 11-05: Trust cards injected index-safe via SetAsLastSibling under the code panels' VerticalLayoutGroup (WA/TG 9→10 children, TrustBlock last) — Manager's GetChild(3/4/5)/(3) auth flow byte-identical
 - 11-05: Check animation shipped as self-contained SuccessCheckPop (OnEnable DOScale 0.9→1 OutBack) attached by the builder — Plan 04's coroutine has no check field and Manager.cs stayed untouched
 - 11-05: No lock sprite existed — rendered Lock.png from new Tools/lock_icon.svg via the established resvg pipeline (white source, builder tints green); shield Security.png rejected as off-spec
+- 11-06: Checklist card is a BotsPage-level overlay sibling ordered before EmptyState (never a BotsParent child) — BotsParent.childCount stays the bot-exists fact and EmptyState remains the topmost zero-bot cover; card reserves the bots-list VLG top padding reversibly so the first bot card clears the banner
+- 11-06: Cascade = CanvasGroup DOFade with SetDelay(i*0.05f) — rows are VerticalLayoutGroup-owned so alpha, not position, is tweened; row-4 hint is an always-visible caption (zero extra visibility state)
+- 11-06: Only two PlayerPrefs latches exist (FirstBotReplySeen proxy + ChecklistDone 4/4) — per-step state derived LIVE every Refresh via pure FirstStepsChecklist (T-11-06-01), permanent hide early-returns at top of Refresh (T-11-06-02)
 
 ### Pending Todos
 
@@ -172,11 +175,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 11 P03 | ~27 min | 3 tasks | 8 files |
 | Phase 11 P04 | ~13min | 2 tasks | 1 files |
 | Phase 11 P05 | ~23min | 2 tasks | 10 files |
+| Phase 11 P06 | ~13 min | 2 tasks | 5 files |
 
 ## Session Continuity
 
-Last session: 2026-07-18T16:28:04.193Z
-Stopped at: Completed 11-05-PLAN.md
+Last session: 2026-07-18T16:57:46.853Z
+Stopped at: Completed 11-06-PLAN.md
 Resume file: None
 
 **Planned Phase:** 08 () — 0 plans — 2026-07-17T13:58:49.184Z

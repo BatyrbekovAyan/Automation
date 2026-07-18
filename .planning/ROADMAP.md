@@ -207,7 +207,7 @@ Plans:
 - [x] 11-03-PLAN.md — Screen_Onboarding builder + gate at RefreshEmptyState + existing-user auto-flag (ONB-01); scene committed immediately ✓ 2026-07-18
 - [x] 11-04-PLAN.md — Manager ShowAuthSuccess re-sequencing: interactive «Бот подключён!» once on final auth after bot exists + SuccessCtaSelector deep-link (ONB-03 logic; riskiest change) ✓ 2026-07-18
 - [x] 11-05-PLAN.md — OnboardingAuthBlocksBuilder: index-safe «Это безопасно» trust cards (both channels) + success CTAs stamped to Manager (ONB-02, ONB-03 scene) ✓ 2026-07-18
-- [ ] 11-06-PLAN.md — «Первые шаги» derived-state checklist card + FirstStepsCardBuilder on BotsPage (ONB-04)
+- [x] 11-06-PLAN.md — «Первые шаги» derived-state checklist card + FirstStepsCardBuilder on BotsPage (ONB-04) ✓ 2026-07-18
 - [ ] 11-07-PLAN.md — 11-HUMAN-UAT.md owner device gate (checkpoint) — closes the phase (ONB-01..ONB-05)
 **Flags**: UI-heavy — new `OnboardingScreenBuilder` (NavRestructureBuilder pattern); `Screen_Onboarding` ordered BEFORE the auth screens (auth stays LAST) and `ReorderScreens` must learn it; scene mutations committed immediately after builder runs. Device visual pass required.
 
