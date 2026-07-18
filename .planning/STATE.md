@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
 status: executing
-stopped_at: Completed 11-03-PLAN.md
-last_updated: "2026-07-18T15:36:57.873Z"
+stopped_at: Completed 11-04-PLAN.md
+last_updated: "2026-07-18T15:52:52.322Z"
 last_activity: 2026-07-18
 progress:
   total_phases: 9
   completed_phases: 5
   total_plans: 42
-  completed_plans: 42
+  completed_plans: 43
   percent: 100
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 ## Current Position
 
 Phase: 11 (first-run-onboarding-flow) — EXECUTING
-Plan: 4 of 7
+Plan: 5 of 7
 Status: Ready to execute
 Last activity: 2026-07-18
 
@@ -97,6 +97,7 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - 11-03: Onboarding auto-flag reads the LIVE BotsParent.transform.childCount, never the monotonic id counter — create-then-delete-all users keep carousel eligibility (ONB-01)
 - 11-03: Scene_Onboarding scene mutation committed alone+immediately after the builder run (parallel-scene-clobber rule overrode the plan's single five-file commit)
 - 11-03: Icon Multiple→Single import flips accepted without ref migration — internalIDToNameTable retains legacy sub-sprite fileIDs (05-12-proven configuration), all pre-existing refs still resolve
+- 11-04: interactive «Бот подключён!» moment fires ONCE on final auth after the bot exists (CreateBotFromForm post-Step-6) + on settings re-auth (ShowAuthSuccess else, gated !isCreatingBot) — no double-fire for 'both'; per-channel wa*/tg* field sets (separate nested panels); reactivates host authPage, defers deactivation to CloseSuccessAndOverlay; transient 2s check now moreAuthSteps-only; GetChild auth flow byte-identical; suite 1165/1165
 
 ### Pending Todos
 
@@ -166,11 +167,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 11 P01 | 19 min | 3 tasks | 11 files |
 | Phase 11 P02 | 8 min | 2 tasks | 2 files |
 | Phase 11 P03 | ~27 min | 3 tasks | 8 files |
+| Phase 11 P04 | ~13min | 2 tasks | 1 files |
 
 ## Session Continuity
 
-Last session: 2026-07-18T15:36:57.849Z
-Stopped at: Completed 11-03-PLAN.md
+Last session: 2026-07-18T15:52:52.284Z
+Stopped at: Completed 11-04-PLAN.md
 Resume file: None
 
 **Planned Phase:** 08 () — 0 plans — 2026-07-17T13:58:49.184Z
