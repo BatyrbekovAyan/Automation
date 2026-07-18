@@ -202,7 +202,7 @@ Plans:
   5. Zero regression: empty state, AddBotPanel auto-open (post-onboarding), auth flows unchanged; full EditMode suite green.
 **Plans**: 7 plans
 Plans:
-- [ ] 11-01-PLAN.md — Pure-logic foundations (OnboardingGate/PageMath/SuccessCtaSelector/FirstStepsChecklist + tests) + code seams (Bot.OpenSettingsAtProductTab, ReorderScreens internal + Screen_Onboarding)
+- [x] 11-01-PLAN.md — Pure-logic foundations (OnboardingGate/PageMath/SuccessCtaSelector/FirstStepsChecklist + tests) + code seams (Bot.OpenSettingsAtProductTab, ReorderScreens internal + Screen_Onboarding) ✓ 2026-07-18
 - [ ] 11-02-PLAN.md — Carousel runtime: OnboardingPager (horizontal snap, NOT SnappyFlickScrollRect) + OnboardingScreen (dots + slide-3 CTA hand-off)
 - [ ] 11-03-PLAN.md — Screen_Onboarding builder + gate at RefreshEmptyState + existing-user auto-flag (ONB-01); scene committed immediately
 - [ ] 11-04-PLAN.md — Manager ShowAuthSuccess re-sequencing: interactive «Бот подключён!» once on final auth after bot exists + SuccessCtaSelector deep-link (ONB-03 logic; riskiest change)
