@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
 status: executing
-stopped_at: Completed 11-02-PLAN.md
-last_updated: "2026-07-18T15:04:10.941Z"
+stopped_at: Completed 11-03-PLAN.md
+last_updated: "2026-07-18T15:36:57.873Z"
 last_activity: 2026-07-18
 progress:
   total_phases: 9
   completed_phases: 5
   total_plans: 42
-  completed_plans: 41
-  percent: 98
+  completed_plans: 42
+  percent: 100
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 ## Current Position
 
 Phase: 11 (first-run-onboarding-flow) — EXECUTING
-Plan: 3 of 7
+Plan: 4 of 7
 Status: Ready to execute
 Last activity: 2026-07-18
 
-Progress: [██████████] 98%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -94,6 +94,9 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [Phase 8]: 08-20 D13b gap-closure — D9 «Синхронизация…» pill REMOVED end-to-end (owner 08-16: cover only). Scene object stripped through the OPEN Editor (orchestrator mcp-unity delete_gameobject+save, committed immediately 1f28310 — a Main.unity text edit would have been re-materialized from the Editor's in-memory scene); 4 files + .meta git-rm'd and ChatManager pill-only plumbing (OnChatListSyncStart/End events+invokes, IsChatListSyncing getter) deleted d2c800a with an evidence-before-delete grep proving ChatListSyncIndicator was the SOLE consumer; _chatListSyncing field + duplicate-sync guard (BotState.cs:344) + all 3 resets PRESERVED (net ChatManager diff 2+/23−); WhatsApp byte-identical (SyncingView/WhatsAppSyncGate/BotState diff-empty vs 08-19). Baseline corrected: expected suite 1136 = 1142 (1134+8, 08-19 unconfirmed) − 6 deleted gate tests, NOT the plan's stale 1118. Final green PENDING an environmental Editor recovery (see blocker). Device confirm rides 08-21. commits 1f28310/d2c800a/5185620.
 - [Phase 11]: 11-01 onboarding pure-logic foundations + code seams — OnboardingGate/OnboardingPageMath/SuccessCtaSelector/FirstStepsChecklist pure static classes (runtime asm, global ns, zero PlayerPrefs/MonoBehaviour) + OnboardingKeys (Seen/ChecklistDone/FirstBotReplySeen global keys); 29 EditMode tests RED->GREEN; Bot.OpenSettingsAtProductTab/OpenSettingsAtGeneralTab additive deep-links (OpenSettings stays private); NavRestructureBuilder.ReorderScreens private->internal + Screen_Onboarding slot (after Screen_New, before auth). Full suite 1165/1165 green (baseline 1136+29). No scene mutation, no Manager.cs edit. Ran via in-Editor bridge (Editor was OPEN, not closed as context said; open -a Unity to focus, no Bee crash).
 - [Phase 11]: 11-02 onboarding carousel runtime — OnboardingPager (ScrollRect subclass, horizontal snap via Plan-01 OnboardingPageMath, 0.3s OutCubic, OnPageChanged event; horizontal-only/Clamped/no-inertia) + OnboardingScreen (dot binding + slide-3 «Создать бота» latches OnboardingSeen, hides Screen_Onboarding, hands off to BotsPage.StartNewBot). No scene mutation, no Manager/BotsPage edits; bound to Plan-01 seams + existing singletons only. Rule-1 reconciled 2 plan-internal grep contradictions (SnappyFlickScrollRect/skip documentary comment tokens). Suite 1165/1165 green; scene wiring lands in Plan 03.
+- 11-03: Onboarding auto-flag reads the LIVE BotsParent.transform.childCount, never the monotonic id counter — create-then-delete-all users keep carousel eligibility (ONB-01)
+- 11-03: Scene_Onboarding scene mutation committed alone+immediately after the builder run (parallel-scene-clobber rule overrode the plan's single five-file commit)
+- 11-03: Icon Multiple→Single import flips accepted without ref migration — internalIDToNameTable retains legacy sub-sprite fileIDs (05-12-proven configuration), all pre-existing refs still resolve
 
 ### Pending Todos
 
@@ -162,11 +165,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 08 P20 | ~55min | 2 tasks | 10 files |
 | Phase 11 P01 | 19 min | 3 tasks | 11 files |
 | Phase 11 P02 | 8 min | 2 tasks | 2 files |
+| Phase 11 P03 | ~27 min | 3 tasks | 8 files |
 
 ## Session Continuity
 
-Last session: 2026-07-18T15:04:10.903Z
-Stopped at: Completed 11-02-PLAN.md
+Last session: 2026-07-18T15:36:57.849Z
+Stopped at: Completed 11-03-PLAN.md
 Resume file: None
 
 **Planned Phase:** 08 () — 0 plans — 2026-07-17T13:58:49.184Z
