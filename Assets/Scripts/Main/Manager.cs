@@ -56,6 +56,25 @@ public class Manager : MonoBehaviour
     [SerializeField] private Button WhatsappAuthBackButton;
     [SerializeField] private GameObject TelegramAuthSuccessPanel;
     [SerializeField] private Button TelegramAuthBackButton;
+
+    // Interactive «Бот подключён!» success moment — PER-CHANNEL button/label field sets.
+    // WhatsappAuthSuccessPanel and TelegramAuthSuccessPanel are SEPARATE GameObjects in
+    // separate hierarchies, so a single shared label/Button cannot child both — each channel
+    // gets its own cluster, selected by useTelegram. All null-guarded: stamped by Plan 05's
+    // OnboardingAuthBlocksBuilder, so they are null in-scene until that wave runs.
+    [Header("Onboarding success moment — WhatsApp panel (stamped by OnboardingAuthBlocksBuilder)")]
+    [SerializeField] private TMPro.TextMeshProUGUI waSuccessTitleLabel;      // «Бот подключён!»
+    [SerializeField] private TMPro.TextMeshProUGUI waSuccessBodyLabel;       // price-list body
+    [SerializeField] private UnityEngine.UI.Button waSuccessPrimaryButton;   // «Загрузить прайс-лист» / «Открыть чаты»
+    [SerializeField] private TMPro.TextMeshProUGUI waSuccessPrimaryLabel;
+    [SerializeField] private UnityEngine.UI.Button waSuccessLaterButton;     // «Позже»
+
+    [Header("Onboarding success moment — Telegram panel (stamped by OnboardingAuthBlocksBuilder)")]
+    [SerializeField] private TMPro.TextMeshProUGUI tgSuccessTitleLabel;
+    [SerializeField] private TMPro.TextMeshProUGUI tgSuccessBodyLabel;
+    [SerializeField] private UnityEngine.UI.Button tgSuccessPrimaryButton;
+    [SerializeField] private TMPro.TextMeshProUGUI tgSuccessPrimaryLabel;
+    [SerializeField] private UnityEngine.UI.Button tgSuccessLaterButton;
     [SerializeField] private Button GetWhatsappCodeButton;
     [SerializeField] private Button GetTelegramCodeButton;
     [SerializeField] private Button SendTelegramCodeButton;
@@ -1664,6 +1683,82 @@ public class Manager : MonoBehaviour
         }
 
         authPage.SetActive(false);
+    }
+
+    // Interactive «Бот подключён!» moment — the FINAL success beat after auth completes and
+    // the bot exists. Replaces the old fixed 2s auto-dismiss with a wait-for-user panel whose
+    // primary CTA deep-links into the just-authed bot's «Прайс-листы» tab (fallback «Открыть
+    // чаты» when files already exist). Per-channel field sets are selected by useTelegram
+    // because the two success panels live in separate hierarchies. Fired from exactly two
+    // sites (CreateBotFromForm after creation; ShowAuthSuccess's else branch for settings
+    // re-auth) — never from BotSettings (this is a private Manager member).
+    private IEnumerator ShowInteractiveSuccessMoment(Bot bot, bool useTelegram)
+    {
+        if (bot == null) yield break;
+
+        // Per-channel selection (BLOCKER: separate panels/hierarchies/field sets).
+        GameObject authPage     = useTelegram ? TelegramAuth : WhatsappAuth;
+        GameObject successPanel = useTelegram ? TelegramAuthSuccessPanel : WhatsappAuthSuccessPanel;
+        var titleLabel   = useTelegram ? tgSuccessTitleLabel    : waSuccessTitleLabel;
+        var bodyLabel    = useTelegram ? tgSuccessBodyLabel     : waSuccessBodyLabel;
+        var primaryBtn   = useTelegram ? tgSuccessPrimaryButton : waSuccessPrimaryButton;
+        var primaryLabel = useTelegram ? tgSuccessPrimaryLabel  : waSuccessPrimaryLabel;
+        var laterBtn     = useTelegram ? tgSuccessLaterButton   : waSuccessLaterButton;
+        if (successPanel == null) yield break;
+
+        // BLOCKER FIX: the success panel is nested INSIDE authPage, which ShowAuthSuccess
+        // used to deactivate. Reactivate the hosting hierarchy so the panel can render;
+        // deactivation is deferred to dismissal (CloseSuccessAndOverlay).
+        if (authPage != null) authPage.SetActive(true);
+
+        // Files-exist fact (both content types) → CTA target.
+        bool hasFiles = UploadedFilesStore.Load(bot.name, "product").Count > 0
+                     || UploadedFilesStore.Load(bot.name, "service").Count > 0;
+        var cta = SuccessCtaSelector.Choose(hasFiles);
+
+        if (titleLabel != null) titleLabel.text = "Бот подключён!";
+        if (bodyLabel != null) bodyLabel.text =
+            "Осталось научить бота вашим ценам — загрузите прайс-лист, и он будет отвечать по вашим товарам";
+        if (primaryLabel != null) primaryLabel.text =
+            cta == SuccessCta.UploadPriceList ? "Загрузить прайс-лист" : "Открыть чаты";
+
+        // Wire buttons fresh each show (clear old listeners to avoid stacking).
+        bool dismissed = false;
+        if (primaryBtn != null)
+        {
+            primaryBtn.onClick.RemoveAllListeners();
+            primaryBtn.onClick.AddListener(() =>
+            {
+                dismissed = true;
+                CloseSuccessAndOverlay(authPage, successPanel);
+                if (cta == SuccessCta.UploadPriceList) bot.OpenSettingsAtProductTab();
+                else FindFirstObjectByType<BottomTabManager>()?.SwitchTab(BottomTabManager.WhatsAppTabIndex);
+            });
+        }
+        if (laterBtn != null)
+        {
+            laterBtn.onClick.RemoveAllListeners();
+            laterBtn.onClick.AddListener(() =>
+            {
+                dismissed = true;
+                CloseSuccessAndOverlay(authPage, successPanel);   // normal post-auth destination = Bots tab
+            });
+        }
+
+        successPanel.SetActive(true);
+        // No fixed auto-dismiss — WAIT for the user (replaces the old WaitForSeconds(2f)).
+        while (!dismissed) yield return null;
+    }
+
+    // Hide the success panel, deactivate the (now-deferred) auth-page host, close the
+    // Add-Bot overlay if open, land on Bots.
+    private void CloseSuccessAndOverlay(GameObject authPage, GameObject successPanel)
+    {
+        if (successPanel != null) successPanel.SetActive(false);
+        if (authPage != null) authPage.SetActive(false);   // deferred authPage deactivation
+        AddBotPanel.Instance?.CloseImmediate();
+        var tabs = FindFirstObjectByType<BottomTabManager>();
+        if (tabs != null) tabs.SwitchTab(BottomTabManager.BotsTabIndex);
     }
 
     private void ShowWhatsappAuth()
