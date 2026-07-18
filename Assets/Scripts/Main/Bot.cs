@@ -160,6 +160,24 @@ public class Bot : MonoBehaviour
         }
     }
 
+    // Public entry for onboarding deep-links (success CTA «Загрузить прайс-лист» +
+    // «Первые шаги» row 3). Reuses the exact Edit-button open path, then selects the
+    // Product tab which hosts «Прайс-листы» (BotSettings has no separate Files tab).
+    public void OpenSettingsAtProductTab()
+    {
+        OpenSettings();
+        if (Manager.openBotSettings != null) Manager.openBotSettings.OpenProductTab();
+    }
+
+    // Public entry for the «Первые шаги» «Подключить {channel}» row (row 2). Same open
+    // path, then the General tab — where the WhatsApp/Telegram connect toggles live
+    // (BotSettings.cs:403).
+    public void OpenSettingsAtGeneralTab()
+    {
+        OpenSettings();
+        if (Manager.openBotSettings != null) Manager.openBotSettings.OpenGeneralTab();
+    }
+
     // Made public so BotSettings' in-page Delete flow can reuse the exact
     // same teardown (PlayerPrefs cleanup + profile/workflow deletes + destroy
     // both the Bot card and its paired BotSettings GameObject).

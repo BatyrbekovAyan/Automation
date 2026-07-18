@@ -446,7 +446,10 @@ public static class NavRestructureBuilder
     // child. Unlisted/unexpected siblings stay at the front, and the listed
     // names end up in exactly the desired relative order. Names not present are
     // skipped with a warning.
-    private static void ReorderScreens(Transform container)
+    // internal (was private) so OnboardingScreenBuilder in the same editor assembly can
+    // call it directly — BuildInternal throws on the already-restructured scene, so the
+    // downstream onboarding builder must reach ReorderScreens without re-running Build().
+    internal static void ReorderScreens(Transform container)
     {
         string[] order =
         {
@@ -456,6 +459,7 @@ public static class NavRestructureBuilder
             "Screen_Profile",
             "Screen_Dashboard",
             "Screen_New",
+            "Screen_Onboarding",   // inserted after Screen_New, BEFORE auth pages
             "WhatsappAuth",
             "TelegramAuth",
         };
