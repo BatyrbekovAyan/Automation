@@ -203,7 +203,7 @@ Plans:
 **Plans**: 7 plans
 Plans:
 - [x] 11-01-PLAN.md — Pure-logic foundations (OnboardingGate/PageMath/SuccessCtaSelector/FirstStepsChecklist + tests) + code seams (Bot.OpenSettingsAtProductTab, ReorderScreens internal + Screen_Onboarding) ✓ 2026-07-18
-- [ ] 11-02-PLAN.md — Carousel runtime: OnboardingPager (horizontal snap, NOT SnappyFlickScrollRect) + OnboardingScreen (dots + slide-3 CTA hand-off)
+- [x] 11-02-PLAN.md — Carousel runtime: OnboardingPager (horizontal snap, NOT SnappyFlickScrollRect) + OnboardingScreen (dots + slide-3 CTA hand-off) ✓ 2026-07-18
 - [ ] 11-03-PLAN.md — Screen_Onboarding builder + gate at RefreshEmptyState + existing-user auto-flag (ONB-01); scene committed immediately
 - [ ] 11-04-PLAN.md — Manager ShowAuthSuccess re-sequencing: interactive «Бот подключён!» once on final auth after bot exists + SuccessCtaSelector deep-link (ONB-03 logic; riskiest change)
 - [ ] 11-05-PLAN.md — OnboardingAuthBlocksBuilder: index-safe «Это безопасно» trust cards (both channels) + success CTAs stamped to Manager (ONB-02, ONB-03 scene)
