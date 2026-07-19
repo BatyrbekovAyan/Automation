@@ -174,8 +174,14 @@ Plans:
   3. The gate is fail-closed with zero extra error wiring (a genuine Postgres read error halts the reply), and the app re-asserts the flag on chat open so a lost write self-heals.
   4. A freshly created bot inherits the gate via template cloning (verified on a new bot's cloned workflow); existing dev clones recreated.
   5. EditMode payload/hook tests green; n8n curl matrix (upsert, precedence, absence→reply, malformed→clean error) green.
-**Plans**: TBD (near-executable task breakdown already exists: `docs/superpowers/plans/2026-07-13-semi-auto-suppression-flag.md`)
-**Flags**: USER-ASSISTED e2e (dev n8n + tunnel + real profiles; bot clones active only during test windows). Template-change propagation: recreate dev clones; folds into the prod bagkz bulk copy. Out of scope: message batching/debounce (own design → Phase 10).
+**Plans**: 5 plans
+Plans:
+- [ ] 09-01-PLAN.md — reply_mode_flags DDL + Set Reply Mode webhook workflow/deployer (structural authoring; SUP-01/02/04)
+- [ ] 09-02-PLAN.md — fail-closed suppression gate spliced into BOTH bot templates (SUP-03/04)
+- [ ] 09-03-PLAN.md — Unity client: payload builder + Manager sync coroutine + 3 write-site wiring + EditMode tests (SUP-02)
+- [ ] 09-04-PLAN.md — [owner gate] [BLOCKING] DDL apply + Set Reply Mode deploy/curl matrix + template runData verify + fresh-bot propagation (SUP-01..05)
+- [ ] 09-05-PLAN.md — [owner gate] 09-HUMAN-UAT.md 5-scenario e2e on one build, both channels — closes the phase (SUP-03/05)
+**Flags**: USER-ASSISTED e2e (dev n8n + tunnel + real profiles; bot clones active only during test windows). Template-change propagation: recreate dev clones; folds into the prod bagkz bulk copy. Out of scope: message batching/debounce (own design → Phase 10). Planned via corrected breakdown (RESEARCH C1–C7 applied). Wave structure: {09-01, 09-02, 09-03} parallel (wave 1) → 09-04 (wave 2) → 09-05 (wave 3).
 
 ### Phase 10: Message Batching / Debounce (v1.2)
 **Goal**: A customer's multi-fragment message gets ONE combined auto-reply (not one per fragment), and «Вместе» suggestions coalesce the same way — a pre-generation debounce+dedupe+combine stage in both bot templates, and a debounce timer in the suggestions client.
