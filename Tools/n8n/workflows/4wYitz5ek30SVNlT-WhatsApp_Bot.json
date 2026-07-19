@@ -642,6 +642,64 @@
     },
     {
       "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "select coalesce(\n  (select suppressed from reply_mode_flags\n   where profile_id = $1 and chat_id in ($2, '*')\n   order by (chat_id = '*')   -- specific chat_id sorts before the '*' default\n   limit 1),\n  false\n) as suppressed;",
+        "options": {
+          "queryReplacement": "={{ $('Webhook').item.json.body.messages[0].profile_id }},{{ $('Webhook').item.json.body.messages[0].from }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -3456,
+        96
+      ],
+      "id": "958e4445-5408-4bd5-9997-066c831e0ec6",
+      "name": "Read Reply Mode",
+      "credentials": {
+        "postgres": {
+          "id": "1H5xlpFSESU4w6JH",
+          "name": "Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "2bb07c1a-0c55-4ea7-a2b8-4efbac21fd1d",
+              "leftValue": "={{ $json.suppressed }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -3360,
+        96
+      ],
+      "id": "89a56265-c06e-4405-960e-e9ff7d774aaf",
+      "name": "Suppressed?"
+    },
+    {
+      "parameters": {
         "model": {
           "__rl": true,
           "mode": "list",
@@ -989,6 +1047,29 @@
     },
     "If": {
       "main": [
+        [
+          {
+            "node": "Read Reply Mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Reply Mode": {
+      "main": [
+        [
+          {
+            "node": "Suppressed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Suppressed?": {
+      "main": [
+        [],
         [
           {
             "node": "Input type",
