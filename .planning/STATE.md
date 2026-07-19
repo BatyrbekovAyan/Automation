@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
 status: executing
-stopped_at: Completed 11-06-PLAN.md
-last_updated: "2026-07-18T16:57:46.918Z"
-last_activity: 2026-07-18
+stopped_at: Planned Phase 9 (5 plans)
+last_updated: "2026-07-19T11:22:41.765Z"
+last_activity: 2026-07-19
 progress:
   total_phases: 9
   completed_phases: 5
-  total_plans: 42
+  total_plans: 47
   completed_plans: 45
-  percent: 100
+  percent: 96
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-12)
 
 **Core value:** The owner stays in control along the automation↔semi-auto spectrum — the bot can answer autonomously, or propose replies the owner picks and refines, without losing trust or the ability to take over.
-**Current focus:** Phase 11 — first-run-onboarding-flow (executing; Phase 8 owner device gate 08-21 still open)
+**Current focus:** Phase 9 — semi-auto-suppression (planned 2026-07-19, ready to execute). Owner device gates still open: 08-21 (Phase 8 re-verify) + 11-07 (Phase 11 onboarding UAT) — deliberately deferred; Phase 9/10 proceed independently (roadmap: milestone boundary only).
 
 ## Current Position
 
-Phase: 11 (first-run-onboarding-flow) — EXECUTING
-Plan: 7 of 7
-Status: Ready to execute
-Last activity: 2026-07-18
+Phase: 9 (semi-auto-suppression) — PLANNED
+Plan: 0 of 5 executed
+Status: Ready to execute (wave 1 = 09-01/02/03 autonomous; 09-04/09-05 are owner gates)
+Last activity: 2026-07-19 (5 plans, 3 waves, plan-checker PASSED)
 
-Progress: [██████████] 100%
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -180,7 +180,7 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 ## Session Continuity
 
 Last session: 2026-07-18T16:57:46.853Z
-Stopped at: Completed 11-06-PLAN.md
+Stopped at: Planned Phase 9 (5 plans, plan-checker PASSED)
 Resume file: None
 
-**Planned Phase:** 08 () — 0 plans — 2026-07-17T13:58:49.184Z
+**Planned Phase:** 09 (semi-auto-suppression) — 5 plans — 2026-07-19T11:22:41.747Z
