@@ -42,6 +42,14 @@ public partial class ChatManager
         channel == ChatChannel.Telegram ? bot.telegramProfileId : bot.whatsappProfileId;
 
     /// <summary>
+    /// The active channel's profile id for the current bot, or null if missing/sentinel (C3).
+    /// Thin public wrapper over the private GetActiveProfileId so SUP-02's per-chat write site
+    /// (SuggestionsController.PushReplyModeForActiveChat) can resolve the profile to write for
+    /// without reaching ChatManager's private channel state.
+    /// </summary>
+    public string ActiveChannelProfileId() => GetActiveProfileId();
+
+    /// <summary>
     /// Switch the active channel for the current bot. Reuses SetActiveBot's full reset
     /// choreography so the guards, in-memory lists, queues and outbox never carry a
     /// stale channel's data across the switch. Persists the choice and fires

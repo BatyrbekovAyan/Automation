@@ -96,6 +96,7 @@ public class SuggestionsController : MonoBehaviour
         {
             ShowPanel();
             IssueRequest(null, null);
+            PushReplyModeForActiveChat(true);                 // SUP-02: heal a lost "back to Авто" write; ON-state only
         }
         else HidePanel();
     }
@@ -107,6 +108,7 @@ public class SuggestionsController : MonoBehaviour
         if (ChatManager.Instance == null) return;
         _semiAutoOn = desiredOn;
         SemiAutoStore.Set(ChatManager.Instance.CurrentBotId, ChatManager.Instance.CurrentChatId, desiredOn);   // persist
+        PushReplyModeForActiveChat(desiredOn);                 // SUP-02: mirror the per-chat override (ON and OFF) to the server
         if (_toggle != null) _toggle.SetLit(desiredOn);
         if (desiredOn)
         {
@@ -118,6 +120,21 @@ public class SuggestionsController : MonoBehaviour
             _requestSeq++;                                     // supersede any in-flight request — no late render
             HidePanel();                                       // D-11: off = hide; composer untouched
         }
+    }
+
+    // --- Server sync of the per-chat override (SUP-02, client half) ---
+    // Fire-and-forget write of the active chat's suppression flag for the ACTIVE channel's
+    // profile. Called from HandleToggle (explicit ON/OFF) and RestoreForActiveChat (ON heal).
+    // NEVER from HandleLive — the 3s open-chat LivePoll would storm the server (Pitfall 3).
+    private void PushReplyModeForActiveChat(bool suppressed)
+    {
+        var cm = ChatManager.Instance;
+        if (cm == null || Manager.Instance == null) return;
+        Bot bot = Manager.Instance.FindBotByName(cm.CurrentBotId);
+        if (bot == null) return;
+        string profileId = cm.ActiveChannelProfileId();       // C3 accessor, wraps GetActiveProfileId()
+        if (string.IsNullOrEmpty(profileId) || profileId == Bot.UnauthedProfileSentinel) return;
+        Manager.Instance.SyncReplyMode(new[] { profileId }, cm.CurrentChatId, suppressed);
     }
 
     // --- Issue + guard (DATA-03 — capture seq + chat, discard superseded/chat-switched) ---

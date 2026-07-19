@@ -66,6 +66,26 @@ public partial class Manager
         StartCoroutine(SyncReplyModeRoutine(BuildReplyModePayload(profileIds, chatId, suppressed)));
     }
 
+    // --- Bot-default flip hook (ReplyModeToggleBinder.OnReplyModeChanged) -----
+
+    // Manager declares its OWN OnEnable/OnDisable here (the primary file has none — C4) to
+    // subscribe the always-alive singleton to the built-but-unconsumed reply-mode event. A
+    // static event + singleton makes exactly-once subscribe/unsubscribe leak-free.
+    private void OnEnable()  => ReplyModeToggleBinder.OnReplyModeChanged += OnBotReplyModeChanged;
+    private void OnDisable() => ReplyModeToggleBinder.OnReplyModeChanged -= OnBotReplyModeChanged;
+
+    /// <summary>
+    /// A bot's default reply mode flipped: write the "*" bot-wide row for EVERY authed profile
+    /// of that bot (Semi ⇒ suppressed=true, Auto ⇒ suppressed=false). Sentinel/blank ids are
+    /// dropped by AuthedProfileIds; an all-unauthed bot no-ops inside SyncReplyMode.
+    /// </summary>
+    private void OnBotReplyModeChanged(string botId, ReplyModeToggleBinder.ReplyMode mode)
+    {
+        Bot bot = FindBotByName(botId);
+        if (bot == null) return;
+        SyncReplyMode(AuthedProfileIds(bot), "*", mode == ReplyModeToggleBinder.ReplyMode.Semi);
+    }
+
     // Copies DeleteBotFilesRoutine verbatim: POST the JSON to the unauthenticated
     // /webhook/SetReplyMode (NO auth header — every /webhook/* is open, R-02-01),
     // Content-Type: application/json (libcurl would otherwise stamp x-www-form-urlencoded
