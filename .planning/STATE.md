@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
 status: executing
-stopped_at: Completed 09-02-PLAN.md
-last_updated: "2026-07-19T12:27:37.706Z"
+stopped_at: Completed 09-03-PLAN.md
+last_updated: "2026-07-19T12:41:14.338Z"
 last_activity: 2026-07-19
 progress:
   total_phases: 9
   completed_phases: 5
   total_plans: 47
-  completed_plans: 47
+  completed_plans: 48
   percent: 100
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 ## Current Position
 
 Phase: 09 (semi-auto-suppression) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
 Last activity: 2026-07-19
 
@@ -108,6 +108,7 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [09-01] reply_mode_flags DDL: idempotent pk(profile_id, chat_id), chat_id default '*', suppressed bool, default-deny RLS + revoke anon/authenticated; apply through cred 1H5xlpFSESU4w6JH (the DB the gate reads)
 - [09-01] Set Reply Mode webhook: Validate fans out one item per surviving profileId; malformed body -> bad_request BEFORE any DB write; Upsert on conflict do update with $3::boolean cast (C6). Authoring only — live apply is 09-04
 - [09-02] Fail-closed suppression gate (Read Reply Mode Postgres + Suppressed? If) spliced byte-identically onto If.main[0] in BOTH bot templates; TRUE=dead-end (stays unread), FALSE=Input type; no continueOnFail/onError so a DB error halts the run (SUP-04). Live redeploy + runData branch confirm + fresh-bot propagation are 09-04.
+- [09-03] SUP-02 client write path: Manager partial (C2) with pure BuildReplyModePayload/AuthedProfileIds (sentinel-drop C1) + fire-and-forget SyncReplyMode POST to /webhook/SetReplyMode (DeleteBotFilesRoutine clone: no auth, json, timeout 30). Three intents wired — bot-default '*' via Manager's own OnEnable-subscribed OnBotReplyModeChanged, per-chat ON/OFF + re-assert-on-open heal via SuggestionsController.PushReplyModeForActiveChat (ChatManager.ActiveChannelProfileId C3); HandleLive untouched (Pitfall 3). 1170/1170 EditMode green. Live deploy/gate-verify is 09-04.
 
 ### Pending Todos
 
@@ -182,11 +183,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 11 P06 | ~13 min | 2 tasks | 5 files |
 | Phase 09 P01 | 6min | 2 tasks | 4 files |
 | Phase 09 P02 | 3min | 2 tasks | 2 files |
+| Phase 09 P03 | 9min | 2 tasks | 5 files |
 
 ## Session Continuity
 
-Last session: 2026-07-19T12:27:37.687Z
-Stopped at: Completed 09-02-PLAN.md
+Last session: 2026-07-19T12:41:14.320Z
+Stopped at: Completed 09-03-PLAN.md
 Resume file: None
 
 **Planned Phase:** 09 (semi-auto-suppression) — 5 plans — 2026-07-19T11:22:41.747Z
