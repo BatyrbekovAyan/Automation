@@ -11,7 +11,7 @@ using Automation.BotSettingsUI;
 using DG.Tweening;
 using Newtonsoft.Json;
 
-public class Manager : MonoBehaviour
+public partial class Manager : MonoBehaviour
 {
     #region
     // [SerializeField] private GameObject MainPage;
