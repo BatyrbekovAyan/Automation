@@ -176,7 +176,7 @@ Plans:
   5. EditMode payload/hook tests green; n8n curl matrix (upsert, precedence, absence→reply, malformed→clean error) green.
 **Plans**: 5 plans
 Plans:
-- [ ] 09-01-PLAN.md — reply_mode_flags DDL + Set Reply Mode webhook workflow/deployer (structural authoring; SUP-01/02/04)
+- [x] 09-01-PLAN.md — reply_mode_flags DDL + Set Reply Mode webhook workflow/deployer (structural authoring; SUP-01/02/04) (SUMMARY 2026-07-19; authoring-only, no live DB/n8n. `Tools/n8n/supabase/2026-07-19-reply-mode-flags.sql` [idempotent pk(profile_id,chat_id), chat_id default '*', suppressed bool, default-deny RLS + revoke anon/authenticated, apply-through cred 1H5xlpFSESU4w6JH]; `Tools/n8n/workflows/Set_Reply_Mode.json` [Webhook 2.1 → Validate 2 fan-out one item/profileId → If invalid? 2.2 → Respond-error / Upsert 2.6 on conflict do update with $3::boolean, Postgres cred by explicit id 1H5xlpFSESU4w6JH → Respond 1.5; malformed body → bad_request before any DB write]; `Tools/n8n/build-set-reply-mode.py` [mirrors build-suggest-replies, --postgres-cred/N8N_POSTGRES_CRED_ID default 1H5xlpFSESU4w6JH per C5, --dry-run verified]; README 12→13. C1–C7 corrections applied; commits dd8562c/69fa671; live DDL apply + curl matrix ride 09-04)
 - [ ] 09-02-PLAN.md — fail-closed suppression gate spliced into BOTH bot templates (SUP-03/04)
 - [ ] 09-03-PLAN.md — Unity client: payload builder + Manager sync coroutine + 3 write-site wiring + EditMode tests (SUP-02)
 - [ ] 09-04-PLAN.md — [owner gate] [BLOCKING] DDL apply + Set Reply Mode deploy/curl matrix + template runData verify + fresh-bot propagation (SUP-01..05)

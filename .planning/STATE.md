@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
 status: executing
-stopped_at: Planned Phase 9 (5 plans)
-last_updated: "2026-07-19T11:22:41.765Z"
+stopped_at: Completed 09-01-PLAN.md
+last_updated: "2026-07-19T12:20:20.479Z"
 last_activity: 2026-07-19
 progress:
   total_phases: 9
   completed_phases: 5
   total_plans: 47
-  completed_plans: 45
-  percent: 96
+  completed_plans: 46
+  percent: 98
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-12)
 
 **Core value:** The owner stays in control along the automation↔semi-auto spectrum — the bot can answer autonomously, or propose replies the owner picks and refines, without losing trust or the ability to take over.
-**Current focus:** Phase 9 — semi-auto-suppression (planned 2026-07-19, ready to execute). Owner device gates still open: 08-21 (Phase 8 re-verify) + 11-07 (Phase 11 onboarding UAT) — deliberately deferred; Phase 9/10 proceed independently (roadmap: milestone boundary only).
+**Current focus:** Phase 09 — semi-auto-suppression
 
 ## Current Position
 
-Phase: 9 (semi-auto-suppression) — PLANNED
-Plan: 0 of 5 executed
-Status: Ready to execute (wave 1 = 09-01/02/03 autonomous; 09-04/09-05 are owner gates)
-Last activity: 2026-07-19 (5 plans, 3 waves, plan-checker PASSED)
+Phase: 09 (semi-auto-suppression) — EXECUTING
+Plan: 2 of 5
+Status: Ready to execute
+Last activity: 2026-07-19
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██████████] 98%
 
 ## Performance Metrics
 
@@ -104,6 +104,9 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - 11-06: Checklist card is a BotsPage-level overlay sibling ordered before EmptyState (never a BotsParent child) — BotsParent.childCount stays the bot-exists fact and EmptyState remains the topmost zero-bot cover; card reserves the bots-list VLG top padding reversibly so the first bot card clears the banner
 - 11-06: Cascade = CanvasGroup DOFade with SetDelay(i*0.05f) — rows are VerticalLayoutGroup-owned so alpha, not position, is tweened; row-4 hint is an always-visible caption (zero extra visibility state)
 - 11-06: Only two PlayerPrefs latches exist (FirstBotReplySeen proxy + ChecklistDone 4/4) — per-step state derived LIVE every Refresh via pure FirstStepsChecklist (T-11-06-01), permanent hide early-returns at top of Refresh (T-11-06-02)
+- [09-01] Postgres cred bound by explicit id 1H5xlpFSESU4w6JH (not by name — two creds share the name 'Postgres') in both Set_Reply_Mode.json and the deployer default (C5)
+- [09-01] reply_mode_flags DDL: idempotent pk(profile_id, chat_id), chat_id default '*', suppressed bool, default-deny RLS + revoke anon/authenticated; apply through cred 1H5xlpFSESU4w6JH (the DB the gate reads)
+- [09-01] Set Reply Mode webhook: Validate fans out one item per surviving profileId; malformed body -> bad_request BEFORE any DB write; Upsert on conflict do update with $3::boolean cast (C6). Authoring only — live apply is 09-04
 
 ### Pending Todos
 
@@ -176,11 +179,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 11 P04 | ~13min | 2 tasks | 1 files |
 | Phase 11 P05 | ~23min | 2 tasks | 10 files |
 | Phase 11 P06 | ~13 min | 2 tasks | 5 files |
+| Phase 09 P01 | 6min | 2 tasks | 4 files |
 
 ## Session Continuity
 
-Last session: 2026-07-18T16:57:46.853Z
-Stopped at: Planned Phase 9 (5 plans, plan-checker PASSED)
+Last session: 2026-07-19T12:20:20.456Z
+Stopped at: Completed 09-01-PLAN.md
 Resume file: None
 
 **Planned Phase:** 09 (semi-auto-suppression) — 5 plans — 2026-07-19T11:22:41.747Z
