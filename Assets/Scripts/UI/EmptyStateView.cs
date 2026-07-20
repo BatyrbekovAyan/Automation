@@ -170,10 +170,15 @@ public class EmptyStateView : MonoBehaviour
 
     private void HandleEmptyState(EmptyStateReason reason)
     {
-        // Guard against double-fire during the OnEnable catch-up race: the
-        // catch-up call and a real OnEmptyState event can both deliver the
-        // same reason in the same frame. Reprocessing is safe but wasteful
-        // (re-applies sprites, re-binds button listeners).
+        // D12-ext (08-REVIEW CR-01): BeginLoadForActiveBot fires BotHasNo{Channel} even with ZERO bots,
+        // which would re-wire the CTA to OpenCurrentBotAuth (a silent no-op). Coerce back to NoBots when
+        // the authoritative resolver agrees, so «Создать бота» stays wired across channel switches.
+        if (reason != EmptyStateReason.NoBotsExist && ChatManager.Instance != null)
+            reason = EmptyStateReasonPolicy.Effective(reason, ChatManager.Instance.ComputeCurrentEmptyState());
+
+        // Guard against double-fire during the OnEnable catch-up race: the catch-up call and a real
+        // OnEmptyState event can both deliver the same reason in the same frame. Reprocessing is safe
+        // but wasteful (re-applies sprites, re-binds button listeners).
         if (_lastReason == reason) return;
         _lastReason = reason;
 
@@ -185,25 +190,26 @@ public class EmptyStateView : MonoBehaviour
 
     private void HandleChatAdded(ChatViewModel _) => Hide();
 
-    // D12 root cause (round 3): the empty state is a persistent widget SHARED by both channels —
-    // WhatsApp and Telegram render inside the SAME Screen_Whatsapp — so a channel switch never
-    // fires this view's OnEnable, and its OnEnable catch-up (which re-runs ConfigureForReason)
-    // never runs on a switch. SetActiveChannel DOES re-fire OnEmptyState(NoBotsExist), but the
-    // _lastReason guard in HandleEmptyState early-returns it, so ConfigureForReason — which
-    // re-themes, RE-WIRES OpenCreateBotFlow, and calls Show() — is skipped. The visible card then
-    // keeps the previous channel's state (stale accent + a stale/never-refreshed button wire),
-    // which surfaced on device as the Telegram «Создать бота» CTA doing nothing. 08-14 missed this
-    // because it only inspected EmptyStateView.cs in isolation, never the channel-switch event flow.
+    // D12-ext + WR-02: on a channel switch, re-DERIVE the reason from the authoritative resolver rather
+    // than replaying a stale _lastReason. The empty state is a persistent widget SHARED by both channels
+    // (WhatsApp and Telegram render inside the SAME Screen_Whatsapp) so a switch never fires OnEnable and
+    // its catch-up never re-runs ConfigureForReason. Replaying _lastReason kept the previous channel's
+    // reason — surfacing on device as a stale wrong-channel connect card (with its raycast block) sitting
+    // over the Telegram syncing cover for minutes, and, on zero bots, as an inert «Создать бота».
     //
-    // Fix: re-configure the CURRENTLY shown reason on every channel switch so the visible card is
-    // always freshly themed, freshly wired, and interactable (Show sets interactable/blocksRaycasts)
-    // for the channel now in view. No-ops when no empty state is showing (_lastReason null). WhatsApp
-    // is unaffected — this only fires when a bot's channel actually changes, and re-configuring a
-    // WhatsApp reason reproduces the identical green card + identical handler (byte-identical outcome).
+    // ComputeCurrentEmptyState is channel- & sync-window-aware and NoBots-wins: if the new channel has no
+    // empty card (syncing / has chats), HIDE; otherwise re-theme, RE-WIRE, and Show for the reason now in
+    // view. WhatsApp is unaffected — a WhatsApp reason re-derives to the identical green card + identical
+    // handler (byte-identical outcome).
     private void HandleActiveChannelChanged(ChatChannel _)
     {
-        if (!_lastReason.HasValue) return;
-        ConfigureForReason(_lastReason.Value);
+        if (!_lastReason.HasValue) return;              // nothing was showing → nothing to re-derive
+        EmptyStateReason? reason = ChatManager.Instance != null
+            ? ChatManager.Instance.ComputeCurrentEmptyState()
+            : _lastReason;                              // manager gone: fall back to the prior reason
+        if (!reason.HasValue) { Hide(); return; }       // new channel is syncing / has chats — no card
+        _lastReason = reason;
+        ConfigureForReason(reason.Value);
         Show();
     }
 
@@ -302,9 +308,17 @@ public class EmptyStateView : MonoBehaviour
 
     private void OpenCurrentBotAuth()
     {
-        if (ChatManager.Instance == null) return;
+        if (ChatManager.Instance == null)
+        {
+            Debug.LogWarning("[D12] OpenCurrentBotAuth aborted: ChatManager.Instance is null.");
+            return;
+        }
         Bot bot = Manager.Instance != null ? Manager.Instance.FindBotByName(ChatManager.Instance.CurrentBotId) : null;
-        if (bot == null) return;
+        if (bot == null)
+        {
+            Debug.LogWarning($"[D12] OpenCurrentBotAuth aborted: no bot for id '{ChatManager.Instance.CurrentBotId}' (connect CTA fired with no bot — see CR-01).");
+            return;
+        }
 
         // Switch to Screen_Bots first. SwitchTab toggles SetActive on the screen panels
         // synchronously, so by the next line Screen_Bots is the active screen container.
