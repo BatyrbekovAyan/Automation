@@ -25,6 +25,21 @@ public static class ChannelTabStateResolver
     }
 }
 
+/// <summary>
+/// Pure NoBots-coercion for the empty-state card (D12-ext / 08-REVIEW CR-01). BeginLoadForActiveBot
+/// fires BotHasNo{Channel} even when ZERO bots exist; that wrong reason re-wires the create-bot CTA
+/// to OpenCurrentBotAuth (a silent no-op with no bot). This promotes such a raw reason back to
+/// NoBotsExist ONLY when the authoritative resolver (ComputeCurrentEmptyState) also says NoBots —
+/// so a genuine connect card for a real bot is preserved byte-identically (WhatsApp invariant).
+/// </summary>
+public static class EmptyStateReasonPolicy
+{
+    public static EmptyStateReason Effective(EmptyStateReason raw, EmptyStateReason? resolved) =>
+        (raw != EmptyStateReason.NoBotsExist && resolved == EmptyStateReason.NoBotsExist)
+            ? EmptyStateReason.NoBotsExist
+            : raw;
+}
+
 /// <summary>The four mutually-exclusive states of the WhatsApp tab content area.</summary>
 public enum WhatsAppTabState
 {
