@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
 status: executing
-stopped_at: Completed 09-03-PLAN.md
-last_updated: "2026-07-20T09:44:37.589Z"
-last_activity: 2026-07-19
+stopped_at: Completed 08-22-PLAN.md
+last_updated: "2026-07-20T12:10:27.070Z"
+last_activity: 2026-07-20
 progress:
   total_phases: 9
   completed_phases: 5
-  total_plans: 51
-  completed_plans: 48
-  percent: 94
+  total_plans: 55
+  completed_plans: 50
+  percent: 91
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-12)
 
 **Core value:** The owner stays in control along the automation↔semi-auto spectrum — the bot can answer autonomously, or propose replies the owner picks and refines, without losing trust or the ability to take over.
-**Current focus:** Phase 09 — semi-auto-suppression
+**Current focus:** Phase 08 — device-uat-milestone-closeout (round-4 gap closure)
 
 ## Current Position
 
-Phase: 09 (semi-auto-suppression) — EXECUTING
-Plan: 4 of 5
+Phase: 08 (device-uat-milestone-closeout) — EXECUTING
+Plan: 23 of 25 (round-4 gap plans 08-22..08-25)
 Status: Ready to execute
-Last activity: 2026-07-19
+Last activity: 2026-07-20
 
-Progress: [██████████] 100%
+Progress: [█████████░] 91%
 
 ## Performance Metrics
 
@@ -109,6 +109,7 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [09-01] Set Reply Mode webhook: Validate fans out one item per surviving profileId; malformed body -> bad_request BEFORE any DB write; Upsert on conflict do update with $3::boolean cast (C6). Authoring only — live apply is 09-04
 - [09-02] Fail-closed suppression gate (Read Reply Mode Postgres + Suppressed? If) spliced byte-identically onto If.main[0] in BOTH bot templates; TRUE=dead-end (stays unread), FALSE=Input type; no continueOnFail/onError so a DB error halts the run (SUP-04). Live redeploy + runData branch confirm + fresh-bot propagation are 09-04.
 - [09-03] SUP-02 client write path: Manager partial (C2) with pure BuildReplyModePayload/AuthedProfileIds (sentinel-drop C1) + fire-and-forget SyncReplyMode POST to /webhook/SetReplyMode (DeleteBotFilesRoutine clone: no auth, json, timeout 30). Three intents wired — bot-default '*' via Manager's own OnEnable-subscribed OnBotReplyModeChanged, per-chat ON/OFF + re-assert-on-open heal via SuggestionsController.PushReplyModeForActiveChat (ChatManager.ActiveChannelProfileId C3); HandleLive untouched (Pitfall 3). 1170/1170 EditMode green. Live deploy/gate-verify is 09-04.
+- [08-22] D2-view gap-closure — Telegram reaction-bubble VISUAL repaint miss fixed in the VIEW/refresh layer ONLY (data layer proven correct, TelegramReactionMerge/reconcile untouched). ReactionPillView.ForceReRender (Render + SetAllDirty + ForceMeshUpdate regenerates the TMP pill mesh on the root canvas) + MessageItemView.RefreshReactionsVisual (public idempotent re-render of the CURRENT vm) + ReactionBarController captures _sourceView in Show and, after UnliftRow in Hide, StartCoroutine(RefreshSourceNextFrame) yields ONE frame so the deferred Destroy(_liftedCanvas) lands before re-rendering — the stale pill self-heals despite the dedup guard swallowing every future reconcile. Compiled (non-editor) capped [D2-view] log (id + count only, T-08-22-01) for the next UAT. Channel-agnostic + idempotent ⇒ WhatsApp byte-identical; 1170/1170 EditMode green FRESH (delta 0). commits be3caf4/1eaf81c. Device re-verify (tap A then open bar on B ⇒ A repaints) rides 08-25.
 
 ### Pending Todos
 
@@ -185,11 +186,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 09 P01 | 6min | 2 tasks | 4 files |
 | Phase 09 P02 | 3min | 2 tasks | 2 files |
 | Phase 09 P03 | 9min | 2 tasks | 5 files |
+| Phase 08 P08-22 | 8min | 2 tasks | 3 files |
 
 ## Session Continuity
 
-Last session: 2026-07-19T12:41:14.320Z
-Stopped at: Completed 09-03-PLAN.md
+Last session: 2026-07-20T12:10:26.892Z
+Stopped at: Completed 08-22-PLAN.md
 Resume file: None
 
 **Planned Phase:** 10 (message-batching-debounce) — 4 plans — 2026-07-20T09:44:37.569Z
