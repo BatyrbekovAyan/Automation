@@ -652,6 +652,15 @@ public partial class ChatManager : MonoBehaviour
                     responseIndex++;
                     int serverSequence = MessageOrder.WithinSecondSequence(responseTimes, responseIndex);
 
+                    // D15 diagnostic — WhatsApp reaction-REMOVAL ingest (08-REVIEW IN-02): a removal made in
+                    // the WhatsApp app never clears in-app. Log every WhatsApp reaction raw shape (BOTH the
+                    // unseen and the already-seen branch) so the round-5 device pass tells which of the three
+                    // candidates occurs: (a) re-emit under the SAME already-seen id, (b) no removal raw at
+                    // all, (c) missing stanzaId. Capped: ids + booleans only (never emoji/body content). seen
+                    // read via Contains (no mutation).
+                    if (ActiveChannel == ChatChannel.WhatsApp && raw.type == "reaction")
+                        Debug.Log($"[D15] wa-reaction rawId={raw.id} stanza={(string.IsNullOrEmpty(raw.stanzaId) ? "absent" : raw.stanzaId)} bodyEmpty={string.IsNullOrEmpty(raw.body?.ToString())} seen={seenMessageIds.Contains(raw.id)}");
+
                     // BRAND NEW message we missed: ghost-send recovery dedup.
                     // If a previous-session POST reached Wappi but the client
                     // never got the response, the outbox holds the tempId AND
@@ -719,6 +728,19 @@ public partial class ChatManager : MonoBehaviour
                         _reactions.DrainInto(newVm);
                         newVm.sequence = serverSequence;
                         newMessages.Add(newVm);
+                        continue;
+                    }
+
+                    // [D15] Candidate-(a) fix (08-REVIEW IN-02): a WhatsApp reaction REMOVAL can be re-emitted
+                    // under the SAME id as the original reaction, so seenMessageIds.Add above returned false and
+                    // the removal never reached HandleReactionEvent — the pill never clears. Re-run the reaction
+                    // event here for WhatsApp. ReactionStore.ApplyToMessage is idempotent (an unchanged reaction
+                    // returns false -> no event, no repaint), so this fires ONLY on a genuine change/removal and
+                    // cannot storm. Telegram carries reactions[] on the message (never a type==reaction raw) ->
+                    // WhatsApp-gated => Telegram byte-identical.
+                    if (ActiveChannel == ChatChannel.WhatsApp && raw.type == "reaction")
+                    {
+                        if (HandleReactionEvent(raw, cachedList, chatId)) hasStatusUpdates = true;
                         continue;
                     }
 
