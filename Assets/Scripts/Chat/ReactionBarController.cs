@@ -53,6 +53,7 @@ public class ReactionBarController : MonoBehaviour
     [SerializeField] private Color normalTint = Color.white;
 
     private MessageViewModel _target;
+    private MessageItemView _sourceView;   // the pressed row, re-rendered one frame after Hide (D2-view / WR-01)
     private readonly TextMeshProUGUI[] _labels = new TextMeshProUGUI[6];
     private Canvas _liftedCanvas;        // the pressed row's sort-override, raising it above the scrim
     private RectTransform _liftedRowRt;  // the pressed row, floated up when the menu would overflow
@@ -110,6 +111,7 @@ public class ReactionBarController : MonoBehaviour
     {
         if (source == null || source.BoundVm == null || source.BubbleRect == null) return;
         _target = source.BoundVm;
+        _sourceView = source;
 
         LiftRow(source);   // raise the pressed message above the dark scrim so it stays bright
 
@@ -146,6 +148,19 @@ public class ReactionBarController : MonoBehaviour
         _target = null;
         UnliftRow();
         if (content != null) content.SetActive(false);
+
+        // D2-view (08-REVIEW WR-01): the pill can render under the lifted overrideSorting Canvas
+        // that UnliftRow just queued for deferred destroy. Re-render the pressed bubble ONE FRAME
+        // later — after that Canvas is gone — so the mesh regenerates on the root canvas and the
+        // stale pill self-heals. The data-layer dedup guard would otherwise swallow every future
+        // reaction update (the VM data is already correct). Channel-agnostic + idempotent ⇒ WhatsApp unaffected.
+        if (_sourceView != null) { StartCoroutine(RefreshSourceNextFrame(_sourceView)); _sourceView = null; }
+    }
+
+    private System.Collections.IEnumerator RefreshSourceNextFrame(MessageItemView view)
+    {
+        yield return null;                       // let the deferred Canvas destroy land
+        if (view != null) view.RefreshReactionsVisual();
     }
 
     // Raises the long-pressed row's whole hierarchy above the dimming scrim (overrideSorting) so it
