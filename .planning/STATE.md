@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
-status: executing
-stopped_at: Completed 08-25-PLAN.md
+status: ready-to-execute
+stopped_at: Planned 08-26..08-29 (round-5 gap plans)
 last_updated: "2026-07-20T13:05:00.000Z"
 last_activity: 2026-07-20
 progress:
   total_phases: 9
   completed_phases: 5
-  total_plans: 55
+  total_plans: 59
   completed_plans: 53
-  percent: 96
+  percent: 90
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-12)
 
 **Core value:** The owner stays in control along the automation↔semi-auto spectrum — the bot can answer autonomously, or propose replies the owner picks and refines, without losing trust or the ability to take over.
-**Current focus:** Phase 08 — device-uat-milestone-closeout (round-4 gap closure)
+**Current focus:** Phase 08 — device-uat-milestone-closeout (round-5 gap closure)
 
 ## Current Position
 
-Phase: 08 (device-uat-milestone-closeout) — EXECUTING
-Plan: 25 of 25 (round-4 gap plans 08-22..08-25) — COMPLETE (checkpoint run)
-Status: 08-25 complete — round-4 device re-verify Overall ISSUES; Gate A stays ISSUES → round-5 gap planning next (D2-view / D15 / D16 + G6 BLOCKING) via `/gsd-plan-phase 08 --gaps`
+Phase: 08 (device-uat-milestone-closeout) — READY TO EXECUTE round 5
+Plan: 26 of 29 next (round-5 gap plans 08-26..08-29 planned, checker-passed after 1 wording fix)
+Status: Round-5 plans committed (ae0d1a4) — 08-26 D2-view poll-path re-render + converter hardening, 08-27 D15 instrument+candidate-(a) fix, 08-28 D16 late-auth TG sync stamp, 08-29 owner re-verify (G6 resolved, NOT carried). Execute via `/gsd-execute-phase 08 --gaps-only`
 Last activity: 2026-07-20
 
-Progress: [██████████] 96%
+Progress: [█████████░] 90%
 
 ## Performance Metrics
 
