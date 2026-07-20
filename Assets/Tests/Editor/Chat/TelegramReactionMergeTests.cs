@@ -89,31 +89,29 @@ public class TelegramReactionMergeTests
     }
 
     [Test]
-    public void Merge_OtherUserSameEmoji_NotConsumedByTombstone()
+    public void Merge_OtherUserSameEmoji_MyAbsenceConfirmed_DropsTombstone_OtherKept()
     {
-        // The tombstone is scoped to "me": another user's same-emoji reaction is never dropped.
+        // WR-01 + spoof guard: my "me" echo is absent (removal confirmed) so the tombstone drops, and the
+        // stranger's same-emoji reaction is neither dropped nor claimed as "me".
         var merged = TelegramReactionMerge.Merge(
             new List<MessageReaction> { Removal(Now) },
             new List<MessageReaction> { Other("👍", "999") },
             Now);
 
-        Assert.AreEqual(2, merged.Count);   // other's 👍 + carried tombstone
+        Assert.AreEqual(1, merged.Count);
         Assert.IsTrue(merged.Exists(r => r.reactorKey == "999" && r.emoji == "👍"));
-        Assert.AreEqual("", merged.Find(r => r.reactorKey == OutgoingReaction.MeReactorKey).emoji);
+        Assert.IsFalse(merged.Exists(r => r.reactorKey == OutgoingReaction.MeReactorKey));   // no "me" carried
     }
 
     [Test]
-    public void Merge_LoneFreshRemoval_NoServer_KeepsInvisibleTombstone()
+    public void Merge_LoneFreshRemoval_NoServerEcho_DropsTombstone_AbsenceConfirmed()
     {
-        // A fresh tombstone survives the merge even with nothing to suppress — the NEXT poll's
-        // late echo still needs it (WR-03). Invisible: renders as "no reactions".
+        // WR-01: with NO server "me" the server has CONFIRMED the removal — drop the tombstone instead of
+        // carrying it for the full 90 s (carrying it would suppress an external own re-add). A lone
+        // removal against an absent echo therefore clears to null.
         var merged = TelegramReactionMerge.Merge(
             new List<MessageReaction> { Removal(Now) }, null, Now);
-
-        Assert.AreEqual(1, merged.Count);
-        Assert.AreEqual(OutgoingReaction.MeReactorKey, merged[0].reactorKey);
-        Assert.AreEqual("", merged[0].emoji);
-        Assert.AreEqual(0, ReactionSummary.Build(merged).emojis.Count);
+        Assert.IsNull(merged);
     }
 
     [Test]
@@ -147,6 +145,21 @@ public class TelegramReactionMergeTests
             new List<MessageReaction> { Removal(agedTap) }, null, Now);
 
         Assert.IsNull(merged);
+    }
+
+    [Test]
+    public void Merge_FreshRemoval_AbsenceConfirmed_ThenExternalReAdd_Applies()
+    {
+        // WR-01 end-to-end: removal against no server echo drops the tombstone (null), then the owner
+        // RE-ADDS ❤ in the Telegram app — the re-add applies (not suppressed by a lingering tombstone).
+        var afterRemoval = TelegramReactionMerge.Merge(
+            new List<MessageReaction> { Removal(Now) }, null, Now + 3);
+        Assert.IsNull(afterRemoval);
+
+        var afterReAdd = TelegramReactionMerge.Merge(
+            afterRemoval, new List<MessageReaction> { Me("❤", time: 0) }, Now + 6);
+        Assert.AreEqual(1, afterReAdd.Count);
+        Assert.AreEqual("❤", afterReAdd[0].emoji);
     }
 
     // --- StampRemovalTombstone: the marker SendReaction leaves on toggle-off ---
