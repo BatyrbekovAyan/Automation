@@ -49,6 +49,22 @@ public class ReactionStoreTests
     }
 
     [Test]
+    public void Apply_RemovalThenRedelivery_SecondIsIdempotentNoOp()
+    {
+        var messages = new List<MessageViewModel> { Msg("m1") };
+        var store = new ReactionStore();
+
+        // A contact adds a reaction, then removes it (empty emoji) — the removal mutates the target.
+        Assert.IsNotNull(store.Apply(Ev("m1", "x", "contact-jid"), messages));
+        Assert.IsNotNull(store.Apply(Ev("m1", "", "contact-jid"), messages));
+        Assert.AreEqual(0, messages[0].reactions.Count);
+
+        // Candidate-(a) re-processes the same already-seen removal every poll — it MUST be a no-op (null),
+        // never a repeated OnMessageReactionsChanged fire.
+        Assert.IsNull(store.Apply(Ev("m1", "", "contact-jid"), messages));
+    }
+
+    [Test]
     public void Apply_DifferentReactorsAggregate()
     {
         var store = new ReactionStore();
