@@ -206,4 +206,53 @@ public class UnicodeEmojiConverterPatchTests
         StringAssert.Contains("30", result);
         Assert.IsFalse(hasMissing);
     }
+
+    // ---- Lone/unpaired surrogate hardening (WR-01 / D2-view / 08-REVIEW CR-01) ----------
+    // A malformed reaction-emoji payload from tapi can carry a lone (unpaired) surrogate.
+    // The unguarded char.ConvertToUtf32 walk threw ArgumentException on it, which aborted
+    // the OnMessageReactionsChanged multicast AND killed the SyncLatestMessages coroutine
+    // mid-loop. The converter must be throw-safe: emit the stray surrogate raw and advance.
+    // The converter prepends a zero-width space (U+200B), so assert Contains, not equality.
+
+    [Test]
+    public void Convert_LoneHighSurrogate_DoesNotThrow_Passthrough()
+    {
+        string result = null;
+        Assert.DoesNotThrow(() =>
+            result = UnicodeEmojiConverter.ConvertRealEmojisToSprites("\uD83D", MissingEmojiMode.Hide));
+
+        StringAssert.Contains("\uD83D", result);
+    }
+
+    [Test]
+    public void Convert_LoneLowSurrogateMidString_DoesNotThrow()
+    {
+        // A lone LOW surrogate wedged between two BMP letters.
+        string result = null;
+        Assert.DoesNotThrow(() =>
+            result = UnicodeEmojiConverter.ConvertRealEmojisToSprites("a\uDC00b", MissingEmojiMode.Hide));
+
+        StringAssert.Contains("a", result);
+        StringAssert.Contains("b", result);
+    }
+
+    [Test]
+    public void Convert_LoneLowSurrogateAtStart_DoesNotThrow()
+    {
+        // A lone low surrogate at index 0 — the walk must not throw entering the loop.
+        Assert.DoesNotThrow(() =>
+            UnicodeEmojiConverter.ConvertRealEmojisToSprites("\uDC00", MissingEmojiMode.Hide));
+    }
+
+    [Test]
+    public void Convert_ValidSurrogatePairEmoji_StillConverts_AfterGuard()
+    {
+        // Regression guard: the lone-surrogate guard must NOT skip a VALID surrogate pair
+        // (😀 = U+1F600 = high + low). The grinning face still resolves to its sprite tag.
+        EmojiSpriteRegistry.BuildFromNames(new[] { "1f600" });
+
+        var result = UnicodeEmojiConverter.ConvertRealEmojisToSprites("😀", MissingEmojiMode.Hide);
+
+        StringAssert.Contains("sprite", result);
+    }
 }
