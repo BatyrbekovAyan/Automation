@@ -1696,16 +1696,24 @@ public partial class Manager : MonoBehaviour
             // channel — mirrors the wizard stamp at Manager.cs:1490-1497 and reuses the already-tested
             // {bot}TelegramSyncUntil key (ChatManager.SyncUntilSuffixFor(Telegram); Bot.DeleteBot clears it).
             //
-            // PARITY DECISION (deliberate): stamp ONLY on late TELEGRAM auth, NOT on late WhatsApp auth.
-            // Stamping WhatsApp here would newly surface a WhatsApp cover where none has ever shown
-            // (unrequested behaviour change; breaks the WhatsApp byte-identical invariant). 08-19 kept exact
-            // no-stamp parity; D16 breaks it in Telegram's favour only, per the owner's report.
+            // COVER PARITY (D17, round-5 owner scope-override — SUPERSEDES the 08-28 Telegram-only parity
+            // decision): stamp on late auth of EITHER channel so the post-creation sync cover fires for both
+            // WhatsApp and Telegram every time a channel is added late (owner-approved, like D14). Each stamp is
+            // channel-gated by authPage and writes only its own per-channel {bot}...SyncUntil key.
             if (authPage == TelegramAuth)
             {
                 long telegramSyncUntil = System.DateTimeOffset.UtcNow
                     .AddSeconds(ChatManager.WhatsAppSyncWindowSeconds)
                     .ToUnixTimeMilliseconds();
                 PlayerPrefs.SetString(Manager.openBot.name + "TelegramSyncUntil", telegramSyncUntil.ToString());
+                PlayerPrefs.Save();
+            }
+            else if (authPage == WhatsappAuth)
+            {
+                long whatsappSyncUntil = System.DateTimeOffset.UtcNow
+                    .AddSeconds(ChatManager.WhatsAppSyncWindowSeconds)
+                    .ToUnixTimeMilliseconds();
+                PlayerPrefs.SetString(Manager.openBot.name + "WhatsappSyncUntil", whatsappSyncUntil.ToString());
                 PlayerPrefs.Save();
             }
 
