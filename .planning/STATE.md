@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
 status: executing
-stopped_at: Completed 08-22-PLAN.md
-last_updated: "2026-07-20T12:10:27.070Z"
+stopped_at: Completed 08-23-PLAN.md
+last_updated: "2026-07-20T12:28:12.147Z"
 last_activity: 2026-07-20
 progress:
   total_phases: 9
   completed_phases: 5
   total_plans: 55
-  completed_plans: 50
-  percent: 91
+  completed_plans: 51
+  percent: 93
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 ## Current Position
 
 Phase: 08 (device-uat-milestone-closeout) — EXECUTING
-Plan: 23 of 25 (round-4 gap plans 08-22..08-25)
+Plan: 24 of 25 (round-4 gap plans 08-22..08-25)
 Status: Ready to execute
 Last activity: 2026-07-20
 
-Progress: [█████████░] 91%
+Progress: [█████████░] 93%
 
 ## Performance Metrics
 
@@ -110,6 +110,7 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [09-02] Fail-closed suppression gate (Read Reply Mode Postgres + Suppressed? If) spliced byte-identically onto If.main[0] in BOTH bot templates; TRUE=dead-end (stays unread), FALSE=Input type; no continueOnFail/onError so a DB error halts the run (SUP-04). Live redeploy + runData branch confirm + fresh-bot propagation are 09-04.
 - [09-03] SUP-02 client write path: Manager partial (C2) with pure BuildReplyModePayload/AuthedProfileIds (sentinel-drop C1) + fire-and-forget SyncReplyMode POST to /webhook/SetReplyMode (DeleteBotFilesRoutine clone: no auth, json, timeout 30). Three intents wired — bot-default '*' via Manager's own OnEnable-subscribed OnBotReplyModeChanged, per-chat ON/OFF + re-assert-on-open heal via SuggestionsController.PushReplyModeForActiveChat (ChatManager.ActiveChannelProfileId C3); HandleLive untouched (Pitfall 3). 1170/1170 EditMode green. Live deploy/gate-verify is 09-04.
 - [08-22] D2-view gap-closure — Telegram reaction-bubble VISUAL repaint miss fixed in the VIEW/refresh layer ONLY (data layer proven correct, TelegramReactionMerge/reconcile untouched). ReactionPillView.ForceReRender (Render + SetAllDirty + ForceMeshUpdate regenerates the TMP pill mesh on the root canvas) + MessageItemView.RefreshReactionsVisual (public idempotent re-render of the CURRENT vm) + ReactionBarController captures _sourceView in Show and, after UnliftRow in Hide, StartCoroutine(RefreshSourceNextFrame) yields ONE frame so the deferred Destroy(_liftedCanvas) lands before re-rendering — the stale pill self-heals despite the dedup guard swallowing every future reconcile. Compiled (non-editor) capped [D2-view] log (id + count only, T-08-22-01) for the next UAT. Channel-agnostic + idempotent ⇒ WhatsApp byte-identical; 1170/1170 EditMode green FRESH (delta 0). commits be3caf4/1eaf81c. Device re-verify (tap A then open bar on B ⇒ A repaints) rides 08-25.
+- [08-23] D12-ext gap-closure — create-first-bot CTA now survives a WhatsApp↔Telegram chip switch. Root cause (08-REVIEW CR-01): on a zero-bots channel switch, SetActiveChannel fires OnActiveChannelChanged (08-18 re-wires the CTA) then BeginLoadForActiveBot resolves FindBotByName(default)==null and fires the WRONG reason (BotHasNo{Channel} not NoBotsExist), which slips past the _lastReason guard and re-wires the CTA to the silent OpenCurrentBotAuth → inert on both channels. Fix (view-layer defense, BeginLoadForActiveBot untouched per IN-01): new pure EmptyStateReasonPolicy.Effective(raw, resolved) folded into WhatsAppTabState.cs promotes a non-NoBots raw reason to NoBotsExist ONLY when the authoritative ComputeCurrentEmptyState() agrees (WhatsApp invariant — real WA-less bot keeps its connect card — pinned by test; null resolver trusts the raw reason), wired into HandleEmptyState. Folded WR-02: HandleActiveChannelChanged re-DERIVES the reason from ComputeCurrentEmptyState and Hides when the new channel has no card (kills the stale wrong-channel connect card + raycast block over the TG syncing cover) instead of replaying stale _lastReason. OpenCurrentBotAuth now LogWarnings on both early-returns (no silent dead CTA). WhatsApp byte-identical; suite 1176/1176 EditMode green FRESH (baseline 1170+6; Task-2 runtime edit freshness confirmed via Assembly-CSharp.dll mtime 12:22:18Z, editor stamp false-stales for runtime-only edits). commits 94e2e3a(RED)/382dc95(GREEN)/eb7ec56(fix). Device re-verify (CTA survives WA↔TG switch on both channels + no stale card over cover) rides 08-25.
 
 ### Pending Todos
 
@@ -187,11 +188,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 09 P02 | 3min | 2 tasks | 2 files |
 | Phase 09 P03 | 9min | 2 tasks | 5 files |
 | Phase 08 P08-22 | 8min | 2 tasks | 3 files |
+| Phase 08 P23 | 10min | 2 tasks | 3 files |
 
 ## Session Continuity
 
-Last session: 2026-07-20T12:10:26.892Z
-Stopped at: Completed 08-22-PLAN.md
+Last session: 2026-07-20T12:28:11.787Z
+Stopped at: Completed 08-23-PLAN.md
 Resume file: None
 
 **Planned Phase:** 10 (message-batching-debounce) — 4 plans — 2026-07-20T09:44:37.569Z
