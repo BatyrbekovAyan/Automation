@@ -71,7 +71,7 @@ completed: 2026-07-20
 | 4 | D12-ext — no stale card over cover (WR-02) | not explicitly verdicted | "if whatsapp channel exists and telegram channel is created its sunc cover page is not shown," | NEW defect **D16** |
 | 5 | D14 — Telegram cover blue | **PASS** | "PASS," | D14 RESOLVED |
 | 6 | D14 — WhatsApp cover byte-identical | **PASS** | "PASS," | WA cover unchanged |
-| 7 | G6 — deactivate dev clone (BLOCKING) | still-outstanding | "G6: what exactly should be done?" | NOT done — carry BLOCKING (4th consecutive) |
+| 7 | G6 — deactivate dev clone (BLOCKING) | **done** (post-checkpoint) | "G6: what exactly should be done?" → after explanation: "G6 done" | resolved 2026-07-20 same day — no round-5 carry |
 | 8 | D2-ext echo-hex (nice-to-have) | not captured | — | not captured (3rd consecutive) |
 
 **Two-message note:** the owner replied twice; the SECOND message is authoritative. The interrupted first draft had "4: PASS" (WR-02 stale-card) and "G6: done" — both were REPLACED in the second message (item 4 → the new late-channel-cover observation; G6 → the clarification question). Per the authoritative reply, WR-02 is NOT recorded as PASS and G6 is NOT recorded as done.
@@ -83,17 +83,17 @@ completed: 2026-07-20
 
 ## Round-5 Scope (as recorded in the UAT ledger)
 
-D2-view continued diagnosis on the poll-driven `HandleReactionsChanged` repaint path (NOT the merge — data layer proven); D15 WhatsApp reaction-removal propagation; D16 late-channel Telegram sync-cover stamp; G6 dev-clone deactivation carried BLOCKING again. Spin via `/gsd-plan-phase 08 --gaps`.
+D2-view continued diagnosis on the poll-driven `HandleReactionsChanged` repaint path (NOT the merge — data layer proven); D15 WhatsApp reaction-removal propagation; D16 late-channel Telegram sync-cover stamp. (G6 resolved post-checkpoint 2026-07-20 — no carry.) Spin via `/gsd-plan-phase 08 --gaps`.
 
 ## Gate A Disposition
 
-**ISSUES (unchanged).** 3 PASS (D12-ext CTA, D14 ×2), 1 FAIL (D2-view), 2 new defects (D15/D16), G6 still-outstanding. Gate A does NOT flip; Gates B/C (prod replication 08-02 / milestone close 08-03) and the I.3 #10 (01-VERIFICATION sign-off) re-aggregation stay blocked. Prod bagkz stays dormant. I.3 #10 was NOT re-aggregated.
+**ISSUES (unchanged).** 3 PASS (D12-ext CTA, D14 ×2), 1 FAIL (D2-view), 2 new defects (D15/D16), G6 done post-checkpoint. Gate A does NOT flip; Gates B/C (prod replication 08-02 / milestone close 08-03) and the I.3 #10 (01-VERIFICATION sign-off) re-aggregation stay blocked. Prod bagkz stays dormant. I.3 #10 was NOT re-aggregated.
 
 ## Decisions Made
 
 - Kept Gate A = ISSUES and did NOT touch Gates B/C or re-aggregate I.3 #10 (per plan: any FAIL keeps ISSUES).
 - Recorded item-4 WR-02 as "not explicitly verdicted" rather than PASS — the owner's authoritative second message substituted a new observation (D16) for the interrupted first-draft "PASS".
-- Recorded G6 as `still-outstanding` (owner asked for clarification), not `done`.
+- Recorded G6 as `still-outstanding` (owner asked for clarification), not `done`. **Amended same day:** after the deactivation steps were explained, the owner confirmed "G6 done" — disposition flipped to `done (post-checkpoint 2026-07-20)` in the ledger; no round-5 carry.
 
 ## Deviations from Plan
 
@@ -113,7 +113,7 @@ None — no code, no UI, no data sources; planning-doc transcription only.
 
 ## Next Phase Readiness
 
-- Round 5 is ready to plan: `/gsd-plan-phase 08 --gaps` for D2-view / D15 / D16, with G6 carried BLOCKING.
+- Round 5 is ready to plan: `/gsd-plan-phase 08 --gaps` for D2-view / D15 / D16 (G6 resolved — not carried).
 - Gate A remains the milestone-v1.1 gate; Gates B/C stay blocked until Gate A goes all-PASS.
 - Prod bagkz stays dormant until the 08-02 replication gate.
 

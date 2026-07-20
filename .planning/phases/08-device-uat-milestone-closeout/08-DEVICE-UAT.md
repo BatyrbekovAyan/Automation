@@ -526,14 +526,17 @@ Item shape (every item):
    `not-needed-this-pass-because-no-clone-active` / `still-outstanding`.
    **how-to:** after the test window, deactivate the clone (or confirm none was active); confirm prod
    bagkz untouched.
-   **disposition:** ☐ done ☐ not-needed-this-pass (no clone active) ☑ still-outstanding — owner
-   requested clarification; explained at checkpoint, awaiting confirmation
+   **disposition:** ☑ done (post-checkpoint 2026-07-20) ☐ not-needed-this-pass (no clone active)
+   ☐ still-outstanding
    **owner (2026-07-20):** "G6: what exactly should be done?" (**FOURTH consecutive checkpoint** carry —
    08-10 → 08-16 → 08-21 → 08-25). NOT recorded as done (the interrupted first-draft reply had "G6: done"
    before the owner substituted this clarification question in the authoritative message — the "done"
    draft is superseded and NOT recorded). G6 = after any dev-n8n test window, DEACTIVATE the per-bot
    Telegram/WhatsApp workflow clone (bot-activation policy — clones run against REAL contacts); prod bagkz
-   stays dormant. Carry to round 5 as BLOCKING again.
+   stays dormant. **RESOLVED same day post-checkpoint:** after the deactivation steps were explained
+   (in-app «Бот на паузе» / delete test bots, or toggle the clones inactive in dev n8n localhost:5678),
+   the owner confirmed verbatim: **"G6 done"** (2026-07-20). NO round-5 carry — the 4-checkpoint
+   outstanding streak ends here.
    **source:** 08-DEVICE-UAT.md G6 / 04-HUMAN-UAT.md #6
 8. **D2-ext echo-hex (NICE-TO-HAVE, non-blocking).**
    **expected:** if convenient during D2-view testing, capture the tapi reaction-echo hex from the
@@ -546,14 +549,14 @@ Item shape (every item):
 
 **Round-4 Overall:** ☐ PASS (all D2-view / D12-ext / D14 items PASS **and** G6 dispositioned) ☑ ISSUES
 — 3 PASS (D12-ext CTA #3, D14 #5, D14 #6), 1 FAIL (D2-view #1), 2 NEW defects (**D15** WhatsApp
-reaction-removal not propagated #2, **D16** late-channel Telegram sync cover #4), G6 still-outstanding
-(fourth consecutive carry), echo-hex not captured.
+reaction-removal not propagated #2, **D16** late-channel Telegram sync cover #4), G6 dispositioned
+**done** post-checkpoint same day (see #7 — streak ended), echo-hex not captured.
 **Round-4 Gate A disposition:** ☐ PASS (→ re-aggregate I.3 #10, unblock Gates B/C; prod bagkz stays
 dormant until 08-02) ☑ ISSUES → **Gate A STAYS ISSUES.** D2-view FAIL + D15 + D16 filed in §Defects with
 anchors; spin round 5 via `/gsd-plan-phase 08 --gaps`. Gates B/C + I.3 #10 re-aggregation stay blocked;
 prod bagkz stays dormant. **Round-5 scope:** D2-view continued diagnosis on the poll-driven
 `HandleReactionsChanged` repaint path (NOT the merge — data layer proven); D15 WhatsApp reaction-removal
-propagation; D16 late-channel Telegram sync-cover stamp; G6 dev-clone deactivation carried BLOCKING again.
+propagation; D16 late-channel Telegram sync-cover stamp. (G6 resolved post-checkpoint 2026-07-20 — no carry.)
 
 ---
 
