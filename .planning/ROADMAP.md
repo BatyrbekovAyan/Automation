@@ -193,7 +193,12 @@ Plans:
   3. The debounce sits AFTER the Phase-9 suppression gate (a semi-auto chat skips the whole path — no wait); the humanizer pauses are unchanged.
   4. Suggestions coalesce: rapid incoming fragments issue exactly ONE live request after the ~2.5s client window; manual refresh and card-pick re-cluster still fire immediately.
   5. EditMode debounce-gate test green (rapid incomings → one request; manual refresh immediate); n8n curl matrix (two fragments → one combined reply; single message → one reply; bot-reply boundary) green.
-**Plans**: TBD (design: `docs/superpowers/specs/2026-07-15-message-batching-debounce-design.md`)
+**Plans**: 4 plans (design: `docs/superpowers/specs/2026-07-15-message-batching-debounce-design.md`)
+Plans:
+- [ ] 10-01-PLAN.md — n8n debounce splice: apply-message-batching.py inserts Debounce Wait → Fetch Recent → Latest+Combine (re-emits body) → Is Latest? on the Suppressed? FALSE branch in BOTH templates + structural verifier (BATCH-01/02)
+- [ ] 10-02-PLAN.md — client debounce: pure IncomingDebounceGate (~2.5s, injectable clock) + tests, SuggestionsController.HandleLive coalesces via a poll coroutine; manual refresh + card-pick stay immediate; cancel on close/switch (BATCH-03)
+- [ ] 10-03-PLAN.md — [owner gate] redeploy both templates by literal id + recreate frozen clones + runData matrix (2-fragment combine / single / bot-boundary / id-equality) both channels + fresh-bot propagation (BATCH-01/02)
+- [ ] 10-04-PLAN.md — [owner gate] 10-HUMAN-UAT.md both-channel e2e (multi-fragment → one combined reply; suggestions coalesce; semi-auto skips the path) — closes the phase (BATCH-01/02/03)
 **Flags**: USER-ASSISTED e2e (dev n8n + tunnel + real profiles). Adds ~window-length latency to EVERY auto-reply (the tuning knob). v1 batches text only (media message = own trigger). Same both-template propagation + bulk-copy story as Phase 9.
 
 ### Phase 11: First-Run Onboarding Flow (v1.3)
