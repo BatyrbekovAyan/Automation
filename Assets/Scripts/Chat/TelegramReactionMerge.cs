@@ -32,14 +32,12 @@ public static class TelegramReactionMerge
     /// is a genuine external own-change that applies at once; only a DIFFERING echo within the window
     /// is suppressed (the fresh local wins — the stale-old-emoji echo the grace exists to defeat), and
     /// an un-echoed entry rides alongside until the server catches up. A fresh EMPTY "me" is a removal
-    /// tombstone
-    /// (D2) that SUPPRESSES the server's stale "me" echo AND is carried into the result, so
-    /// every reconcile within the grace window keeps suppressing — the D5 live poll reconciles
-    /// every ~3 s, and a tombstone consumed by its first merge would let the very next poll's
-    /// still-echoed "me" resurrect the removed reaction (08-REVIEW WR-03). A tombstone-only
-    /// result is returned as-is (it renders as "no reactions" — ReactionSummary skips
-    /// empty-emoji entries); returns null only when the merged result is empty, so post-grace
-    /// "all reactions removed" still clears the list.
+    /// tombstone (D2): WHILE the server STILL echoes the owner's "me" it SUPPRESSES that stale echo AND
+    /// is carried into the result so the next ~3 s poll keeps suppressing (08-REVIEW WR-03), but once
+    /// the server CONFIRMS the absence (no "me" echo) the tombstone is DROPPED so an external own re-add
+    /// applies (WR-01). A tombstone-only result is returned as-is (it renders as "no reactions" —
+    /// ReactionSummary skips empty-emoji entries); returns null when the merged result is empty, so a
+    /// confirmed-absence removal (and any post-grace "all reactions removed") clears the list.
     /// </summary>
     public static List<MessageReaction> Merge(List<MessageReaction> cached, List<MessageReaction> server, long nowUnix)
     {
@@ -51,15 +49,21 @@ public static class TelegramReactionMerge
             int serverMine = IndexOfMine(result);
             if (string.IsNullOrEmpty(mine.emoji))
             {
-                // Fresh optimistic REMOVAL tombstone: drop the server's stale "me" echo AND keep
-                // the tombstone in the result, so the NEXT reconcile (3 s later at the D5 poll
-                // cadence — the server keeps echoing for a cycle or more after a successful
-                // removal) still suppresses a late echo. Invisible by design: ReactionSummary
-                // hides empty-emoji entries and RenderReactions bases clearance on visible emoji.
-                // Once the grace lapses, the next merge drops the tombstone naturally (server
-                // list wins; a tombstone is never in the server list).
-                if (serverMine >= 0) result.RemoveAt(serverMine);
-                result.Add(mine);
+                if (serverMine >= 0)
+                {
+                    // Server STILL echoes the owner's stale "me": suppress it and CARRY the tombstone
+                    // so the next poll (~3 s at the D5 cadence — the server keeps echoing for a cycle
+                    // or more after a successful removal) keeps suppressing a late echo (WR-03).
+                    // Invisible by design: ReactionSummary hides empty-emoji entries and RenderReactions
+                    // bases clearance on visible emoji.
+                    result.RemoveAt(serverMine);
+                    result.Add(mine);
+                }
+                // else (WR-01): the server CONFIRMS the absence (no "me") — DROP the tombstone.
+                // Carrying it would suppress an external own re-add for the rest of the 90 s window;
+                // once an absence is observed a stale echo re-appearing at the 3 s poll cadence is
+                // pathological (WR-03's resurrect needs an echo AFTER an observed absence). A lone
+                // tombstone with no server echo clears to null.
             }
             else if (serverMine >= 0)
             {
