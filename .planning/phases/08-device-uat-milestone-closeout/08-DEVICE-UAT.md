@@ -1,6 +1,6 @@
 # Phase 8 — Device UAT: v1.1 Telegram Parity milestone gate (consolidated, owner-run)
 
-**Status:** RUN 2026-07-15/16 → re-verify 2026-07-17 (08-10) → round-2 re-verify 2026-07-17 (08-16) → round-3 re-verify 2026-07-20 (08-21) → **round-4 re-verify 2026-07-20 (08-25 — PENDING owner run, see §Round 4 re-verify)** — **Overall: ISSUES** (open: **D2-view**, **D12-ext**, **D14** — see §Defects; resolved through round 3: D1–D8 core set, D10, D11, D2 core, D2-ext data layer, D13 cover+pill; D9 SUPERSEDED by owner decision → D13 cover). This pass is the single source of truth for "is v1.1 shippable."
+**Status:** RUN 2026-07-15/16 → re-verify 2026-07-17 (08-10) → round-2 re-verify 2026-07-17 (08-16) → round-3 re-verify 2026-07-20 (08-21) → **round-4 re-verify 2026-07-20 (08-25 — RUN, see §Round 4 re-verify)** — **Overall: ISSUES** (open: **D2-view** (FAIL round 4), **D15** (new — WhatsApp reaction-removal not propagated), **D16** (new — late-channel Telegram sync cover) — see §Defects; resolved through round 4: D1–D8 core set, D10, D11, D2 core, D2-ext data layer, D13 cover+pill, **D12-ext CTA** (round-4 PASS), **D14 TG cover blue** (round-4 PASS); D9 SUPERSEDED by owner decision → D13 cover). This pass is the single source of truth for "is v1.1 shippable."
 
 This is ONE ordered device pass that aggregates EVERY still-open device-verify gate
 across the whole v1.1 milestone (Phases 3–7) **plus** the carried v1.0 deferred UAT.
@@ -435,13 +435,14 @@ Item shape (every item):
 
 ## Round 4 re-verify (2026-07-20) — D2-view / D12-ext / D14 + G6 (BLOCKING)
 
-> **PENDING owner run.** ONE Android build off the post-08-24 tree (fixes **08-22** D2-view +
-> **08-23** D12-ext + **08-24** D14 all merged) confirms the three round-4 residuals are closed,
-> mirroring the 08-10 / 08-16 / 08-21 passes. **Do NOT tick on the owner's behalf — every box below
-> ships blank.** Record EXACTLY ONE verdict per item (`PASS` / `FAIL` / `N/A`), transcribed VERBATIM;
-> any FAIL adds/updates a §Defects row with its source anchor. On all-PASS **and** an explicit G6
-> disposition → flip Gate A to PASS, re-aggregate I.3 #10, unblock Gates B/C; any FAIL → keep Gate A
-> = ISSUES and spin round 5 via `/gsd-plan-phase 08 --gaps`.
+> **RUN 2026-07-20 — Overall ISSUES** (verdicts transcribed below; 2 new defects **D15**/**D16** filed
+> in §Defects). ONE Android build off the post-08-24 tree (fixes **08-22** D2-view + **08-23** D12-ext +
+> **08-24** D14 all merged) to confirm the three round-4 residuals are closed, mirroring the
+> 08-10 / 08-16 / 08-21 passes. Record EXACTLY ONE verdict per item (`PASS` / `FAIL` / `N/A`),
+> transcribed VERBATIM; any FAIL adds/updates a §Defects row with its source anchor. On all-PASS **and**
+> an explicit G6 disposition → flip Gate A to PASS, re-aggregate I.3 #10, unblock Gates B/C; any FAIL →
+> keep Gate A = ISSUES and spin round 5 via `/gsd-plan-phase 08 --gaps`. **Outcome: D12-ext CTA + D14
+> PASS; D2-view still FAILS; two new defects; G6 still-outstanding → Gate A stays ISSUES.**
 >
 > **Pre-build gate (met):** EditMode suite **1176/1176 Passed, 0 failed** FRESH via the in-Editor
 > bridge (`Temp/claude/test-summary.json`, `editorAssemblyWrittenUtc` 2026-07-20T12:34:31Z —
@@ -460,11 +461,27 @@ Item shape (every item):
    on A — it does NOT stay stale. Repeat a few times (the old bug was intermittent).
    **how-to:** on a Telegram bot, react on bubble A, then open the bar on bubble B and react; watch
    A's pill. Repeat.
-   **verdict:** ☐ PASS ☐ FAIL ☐ N/A | **source:** 08-DEVICE-UAT.md D2-view / B9–B13
+   **verdict:** ☐ PASS ☑ FAIL ☐ N/A | **source:** 08-DEVICE-UAT.md D2-view / B9–B13
+   **owner (2026-07-20):** "no pass, still sometimes not updating bubble reaction when it is updated in
+   telegram even though logs show updated reaction." → **D2-view stays open** (see §Defects). The repro
+   is a reaction changed IN the Telegram app (remote change arriving via the live poll) with the new
+   compiled `[D2-view]` log firing on the correct data, yet the bubble pill sometimes doesn't repaint.
+   **ORCHESTRATOR HYPOTHESIS (not owner input, not asserted as fact):** the 08-22 fix defers a re-render
+   only on the reaction-BAR dismiss path (`ReactionBarController.Hide` → `RefreshSourceNextFrame`); the
+   poll-driven `HandleReactionsChanged` path may still repaint under whatever condition eats the mesh —
+   WR-01's mechanism may be incomplete or a SECOND mechanism exists. Round-5 diagnosis candidates: what
+   state the bubble/canvas is in when a poll-driven `HandleReactionsChanged` fires; RectMask2D / maskable
+   culling; view recycling.
 2. **D2-view — WhatsApp unaffected.**
    **expected:** on a WhatsApp bot, add/change a reaction — the pill repaints exactly as before.
    **how-to:** on a WhatsApp bot, add then change a reaction; confirm the pill updates as it always did.
-   **verdict:** ☐ PASS ☐ FAIL ☐ N/A | **source:** WhatsApp byte-identical invariant (08-22)
+   **verdict:** ☐ PASS ☐ FAIL ☐ N/A — *not-regressed-not-confirmed* (owner did not verdict the WA
+   add/change repaint check; instead reported a NEW WA removal defect) | **source:** WhatsApp byte-identical invariant (08-22)
+   **owner (2026-07-20):** "i noticed that if in whatsapp itself reaction is removed it is still not
+   removed in our app" → NEW defect **D15** (a reaction REMOVED in the WhatsApp app itself is not removed
+   in our app). Context: TG removal semantics were handled in **08-17**'s `TelegramReactionMerge`
+   absence-vs-removal work; the WA-side `ReactionStore` was deliberately left untouched throughout v1.1,
+   so WA removal propagation was likely NEVER implemented (**pre-existing, not a round-4 regression**).
 3. **D12-ext — create-bot CTA survives a channel switch (BOTH channels, zero bots).**
    **expected:** with NO bots, open the Chats screen; tap «Создать бота» → the Add-Bot form opens
    (this already worked). Then switch the WhatsApp↔Telegram chip and tap «Создать бота» again — it
@@ -472,23 +489,36 @@ Item shape (every item):
    and forth a couple of times to confirm it never goes dead.
    **how-to:** delete all bots, open Chats, tap the create CTA, switch the channel chip, tap it again;
    repeat on both channels.
-   **verdict:** ☐ PASS ☐ FAIL ☐ N/A | **source:** 08-DEVICE-UAT.md D12-ext / F-group
+   **verdict:** ☑ PASS ☐ FAIL ☐ N/A | **source:** 08-DEVICE-UAT.md D12-ext / F-group
+   **owner (2026-07-20):** "pass" → **D12-ext CTA RESOLVED** (the create-bot CTA survives a
+   WhatsApp↔Telegram chip switch on both channels; 08-23 `EmptyStateReasonPolicy` NoBots-coercion effective).
 4. **D12-ext — no stale wrong-channel card over the cover (WR-02).**
    **expected:** on a Telegram-only bot inside its ~5-min sync cover, flip to WhatsApp (its «WhatsApp
    не подключён» card shows), then flip back to Telegram — you see the Telegram syncing cover, NOT a
    leftover «WhatsApp не подключён» card sitting on top / blocking taps.
    **how-to:** create a fresh Telegram bot, and while the cover is up flip WA↔TG; confirm no stale WA
    card lingers over the Telegram cover.
-   **verdict:** ☐ PASS ☐ FAIL ☐ N/A | **source:** 08-DEVICE-UAT.md D12-ext / 08-REVIEW WR-02
+   **verdict:** ☐ PASS ☐ FAIL ☐ N/A — *not explicitly verdicted* (owner substituted a new
+   late-channel-cover observation; the interrupted first-draft reply had "4: PASS" for the WR-02
+   stale-card check but the owner REPLACED item 4 in the authoritative message — WR-02 is NOT recorded
+   as PASS on that basis) | **source:** 08-DEVICE-UAT.md D12-ext / 08-REVIEW WR-02
+   **owner (2026-07-20):** "if whatsapp channel exists and telegram channel is created its sunc cover
+   page is not shown," → NEW defect **D16** (late-channel Telegram auth shows no sync cover). This is the
+   KNOWN documented **08-19 deviation** ("late-channel auth stamps NO sync window on EITHER channel —
+   exact parity, follow-up noted" — see 08-19-SUMMARY.md Follow-ups); filed as a **promotion of a
+   documented follow-up, NOT a regression**.
 5. **D14 — Telegram cover reads Telegram-blue.**
    **expected:** create a fresh Telegram bot → the post-creation cover's spinner, progress fill, and
    countdown are Telegram brand blue (#2AABEE), matching the blue empty-state accent + switcher chip.
    **how-to:** create a fresh Telegram bot; inspect the cover's spinner/fill/countdown color.
-   **verdict:** ☐ PASS ☐ FAIL ☐ N/A | **source:** 08-DEVICE-UAT.md D14 / D13 cover
+   **verdict:** ☑ PASS ☐ FAIL ☐ N/A | **source:** 08-DEVICE-UAT.md D14 / D13 cover
+   **owner (2026-07-20):** "PASS," → **D14 RESOLVED** (fresh Telegram cover's spinner/fill/countdown read
+   brand blue #2AABEE).
 6. **D14 — WhatsApp cover byte-identical.**
    **expected:** a fresh WhatsApp bot's cover is unchanged — green spinner/fill, green countdown.
    **how-to:** create a fresh WhatsApp bot; confirm the cover stays green.
-   **verdict:** ☐ PASS ☐ FAIL ☐ N/A | **source:** WhatsApp byte-identical invariant (08-24)
+   **verdict:** ☑ PASS ☐ FAIL ☐ N/A | **source:** WhatsApp byte-identical invariant (08-24)
+   **owner (2026-07-20):** "PASS," → WhatsApp cover unchanged (green spinner/fill + green countdown).
 7. **G6 — deactivate the dev test clone (BLOCKING line item).**
    **expected:** once any dev-n8n test window closes, the per-bot Telegram/WhatsApp clone is
    DEACTIVATED (clones run against real contacts); prod bagkz stayed dormant. **This checkpoint does
@@ -496,19 +526,34 @@ Item shape (every item):
    `not-needed-this-pass-because-no-clone-active` / `still-outstanding`.
    **how-to:** after the test window, deactivate the clone (or confirm none was active); confirm prod
    bagkz untouched.
-   **disposition:** ☐ done ☐ not-needed-this-pass (no clone active) ☐ still-outstanding
+   **disposition:** ☐ done ☐ not-needed-this-pass (no clone active) ☑ still-outstanding — owner
+   requested clarification; explained at checkpoint, awaiting confirmation
+   **owner (2026-07-20):** "G6: what exactly should be done?" (**FOURTH consecutive checkpoint** carry —
+   08-10 → 08-16 → 08-21 → 08-25). NOT recorded as done (the interrupted first-draft reply had "G6: done"
+   before the owner substituted this clarification question in the authoritative message — the "done"
+   draft is superseded and NOT recorded). G6 = after any dev-n8n test window, DEACTIVATE the per-bot
+   Telegram/WhatsApp workflow clone (bot-activation policy — clones run against REAL contacts); prod bagkz
+   stays dormant. Carry to round 5 as BLOCKING again.
    **source:** 08-DEVICE-UAT.md G6 / 04-HUMAN-UAT.md #6
 8. **D2-ext echo-hex (NICE-TO-HAVE, non-blocking).**
    **expected:** if convenient during D2-view testing, capture the tapi reaction-echo hex from the
    `[TG reaction echo]` Editor log (ChatManager.cs) / `Tools/tapi/probe-message.sh`. Absence is fine.
    **how-to:** watch the Editor log while changing a reaction; note the echo hex, or record
    "not captured".
-   **verdict:** ☐ captured (hex: ______) ☐ not captured | **source:** 08-DEVICE-UAT.md D2-ext
+   **verdict:** ☐ captured (hex: ______) ☑ not captured | **source:** 08-DEVICE-UAT.md D2-ext
+   **owner (2026-07-20):** echo-hex not captured (THIRD consecutive checkpoint it went uncaptured;
+   nice-to-have only — the D2-ext data layer is already proven correct by the owner's log observation).
 
-**Round-4 Overall:** ☐ PASS (all D2-view / D12-ext / D14 items PASS **and** G6 dispositioned) ☐ ISSUES
+**Round-4 Overall:** ☐ PASS (all D2-view / D12-ext / D14 items PASS **and** G6 dispositioned) ☑ ISSUES
+— 3 PASS (D12-ext CTA #3, D14 #5, D14 #6), 1 FAIL (D2-view #1), 2 NEW defects (**D15** WhatsApp
+reaction-removal not propagated #2, **D16** late-channel Telegram sync cover #4), G6 still-outstanding
+(fourth consecutive carry), echo-hex not captured.
 **Round-4 Gate A disposition:** ☐ PASS (→ re-aggregate I.3 #10, unblock Gates B/C; prod bagkz stays
-dormant until 08-02) ☐ ISSUES (→ file FAIL specifics in §Defects with anchors, spin round 5 via
-`/gsd-plan-phase 08 --gaps`)
+dormant until 08-02) ☑ ISSUES → **Gate A STAYS ISSUES.** D2-view FAIL + D15 + D16 filed in §Defects with
+anchors; spin round 5 via `/gsd-plan-phase 08 --gaps`. Gates B/C + I.3 #10 re-aggregation stay blocked;
+prod bagkz stays dormant. **Round-5 scope:** D2-view continued diagnosis on the poll-driven
+`HandleReactionsChanged` repaint path (NOT the merge — data layer proven); D15 WhatsApp reaction-removal
+propagation; D16 late-channel Telegram sync-cover stamp; G6 dev-clone deactivation carried BLOCKING again.
 
 ---
 
@@ -535,7 +580,9 @@ must reopen. (Empty = no defects.)
 | D13 | New (this pass) — a freshly-created Telegram bot has NO post-creation cover page with the ~5-min loading slider over the chats list (WhatsApp has it; Telegram doesn't); owner "when telegram bot is just created there is no cover page with 5 minute loading slider on top of chats list page" | medium (owner-approved scope) | new (re-verify round-2 2026-07-17) | yes (round 3) — OWNER DECISION: build the WhatsApp-parity cover for Telegram (full overlay + ~5-min progress slider over the chats list) AND remove the D9 «Синхронизация…» pill as ONE work item. LEAD (confirm before mirroring): the WhatsApp cover is `SyncingState` — built by `Assets/Editor/SyncingStateBuilder.cs` into Screen_Whatsapp/ChatsPanel (ProgressTrack/ProgressFill = its time-based bar), driven at runtime by `Assets/Scripts/UI/SyncingView.cs`; find why it doesn't fire for a Telegram-created bot and mirror it on the Telegram channel → **RESOLVED @ re-verify round-3 2026-07-20 (08-21)** — cover (08-19): owner verbatim "works"; pill removal (08-20): owner verbatim "ok". NEW owner-approved polish spun off → **D14** (TG cover green elements → brand blue) |
 | D2-view | D2-ext residual (round-3 2026-07-20) — the reaction DATA always reconciles (logs correct) but the message-bubble VISUAL sometimes misses the update when a reaction is changed in the Telegram app. Owner repro hint: change a reaction on one bubble, then start changing a reaction on ANOTHER message bubble — the second may not repaint | medium | 08-21 / D2-ext (data layer resolved) | yes (round 4) — scope = the VIEW/refresh layer ONLY: the `OnMessageReactionsChanged` → bubble re-render path (event subscription/binding on pooled `MessageItemView` rows, repaint of a non-focused bubble while another bubble's reaction UI is active). Do NOT touch `TelegramReactionMerge`/reconcile — the data layer is proven correct by the owner's log observation |
 | D12-ext | D12 residual (round-3 2026-07-20) — the create-first-bot CTA works initially (08-18 fix effective) but after a WhatsApp↔Telegram chip switch it stops working on BOTH channels (owner: "works, but stops working when whatsapp/telegram chip is switched, both whatsapp and telegram create first bot button stops working.") | medium | 08-21 / D12 | yes (round 4) — LEAD: directly implicates the `OnActiveChannelChanged` re-configure path 08-18 added (`HandleActiveChannelChanged` → `ConfigureForReason(_lastReason)+Show`) — the failure onset is exactly that event, on both channels. Secondary named suspect (pre-flagged, documented-not-fixed in 08-18): `BeginLoadForActiveBot` resolves zero-bots via `FindBotByName(DefaultBotId)==null` → fires a connect-state reason instead of `NoBotsExist` on a channel switch with zero bots. The guarded `[D12]` ENTRY logs remain in place as the diagnosis pivot |
-| D14 | New (round-3 2026-07-20, owner-approved polish) — on the Telegram post-creation cover, the green-tinted elements must use Telegram brand blue instead of WhatsApp green (owner: "change the green colored objects at this page to telegrams brand blue. (spinner, sync)") | low (approved scope) | 08-21 / D13 cover | yes (round 4) — recolor the TG cover's spinner + sync-progress elements to brand blue #2AABEE; the established `ChannelAccent.Resolve(channel, authored)` seam (05-10/05-11/05-12) is the pattern — WhatsApp cover stays byte-identical |
+| D14 | New (round-3 2026-07-20, owner-approved polish) — on the Telegram post-creation cover, the green-tinted elements must use Telegram brand blue instead of WhatsApp green (owner: "change the green colored objects at this page to telegrams brand blue. (spinner, sync)") | low (approved scope) | 08-21 / D13 cover | yes (round 4) — recolor the TG cover's spinner + sync-progress elements to brand blue #2AABEE; the established `ChannelAccent.Resolve(channel, authored)` seam (05-10/05-11/05-12) is the pattern — WhatsApp cover stays byte-identical → **RESOLVED @ re-verify round-4 2026-07-20 (08-25)** (owner "PASS" — TG cover reads brand blue, WA cover unchanged green) |
+| D15 | Round-4 item 2 (NEW 2026-07-20) — a reaction REMOVED in the WhatsApp app itself is not removed in our app (owner: "i noticed that if in whatsapp itself reaction is removed it is still not removed in our app") | medium | 08-25 (round-4) / D2 (WhatsApp analogue) | yes (round 5) — WA-side reaction-removal propagation was likely NEVER implemented: TG removal semantics were built in **08-17** (`TelegramReactionMerge` absence-vs-removal) but the WhatsApp `ReactionStore` was deliberately left untouched throughout v1.1, so this is **PRE-EXISTING, not a round-4 regression**. Scope = mirror the TG removal-tombstone / absence-vs-removal reconcile on the WhatsApp reaction path (add/change already repaints; the WA repaint check itself was not-regressed-not-confirmed this pass) |
+| D16 | Round-4 item 4 (NEW 2026-07-20) — when a bot already has WhatsApp and Telegram is added later, the Telegram post-creation sync cover never shows (owner: "if whatsapp channel exists and telegram channel is created its sunc cover page is not shown") | medium | 08-25 (round-4) / D13 (08-19 late-channel follow-up) | yes (round 5) — **PROMOTION of a documented 08-19 follow-up, NOT a regression**: 08-19-SUMMARY.md explicitly noted "late-channel auth stamps NO window on EITHER channel (exact parity; follow-up if ever wanted)" — the wizard tail is the only site that stamps `{bot}TelegramSyncUntil`. Scope = stamp the per-channel sync window at the late-auth completion site (BotSettings Telegram auth success) so the cover fires when Telegram is connected after WhatsApp. WR-02's own stale-card check was not explicitly verdicted this pass (owner substituted this observation) |
 
 **Observations — resolved 2026-07-16:**
 
@@ -582,18 +629,24 @@ must reopen. (Empty = no defects.)
   untouched. The 08-20 1136-green gate was SUPERSEDED by later suite growth (Editor Bee crash
   resolved post-checkpoint; phase-9/11 sessions ran the grown suite green — 1165 @ 11-01,
   1170 @ 09-03).
-- **Round-4 re-verify 2026-07-20 (08-25, PENDING owner run — checkpoint prepared):** runbook written
-  above (§Round 4 re-verify) for ONE Android build off the post-08-24 tree (fixes 08-22 D2-view +
-  08-23 D12-ext + 08-24 D14 all merged). Pre-build gate MET — EditMode **1176/1176 Passed** FRESH via
-  the in-Editor bridge (`editorAssemblyWrittenUtc` 12:34:31Z postdates the last app edit 08-24
-  `e99ebaa`; baseline 1170 + 6 = 1176, the exact +6 the round-4 fixes add). **G6 dev-clone
-  deactivation is a BLOCKING line item this pass** (third consecutive carry; clones run against real
-  contacts). Awaiting owner verdicts for D2-view (bubble A repaints after reacting on B; WhatsApp
-  unchanged), D12-ext (create-bot CTA survives a WA↔TG chip switch on both channels + no stale
-  wrong-channel card over the cover), D14 (fresh TG cover reads brand blue; WhatsApp cover green) +
-  the G6 disposition + the (nice-to-have) D2-ext echo-hex note. All-PASS + G6 → Gate A flips to PASS
-  (re-aggregate I.3 #10, unblock Gates B/C); any FAIL → Gate A stays ISSUES, round 5 via
-  `/gsd-plan-phase 08 --gaps`. Prod bagkz stays dormant until 08-02.
+- **Round-4 re-verify 2026-07-20 (08-25, ONE Android build off the post-08-24 tree — fixes 08-22
+  D2-view + 08-23 D12-ext + 08-24 D14 all merged):** **Overall ISSUES** — 3 PASS, 1 FAIL, 2 NEW defects.
+  Pre-build gate had been MET (EditMode **1176/1176 Passed** FRESH; baseline 1170 + 6). **D12-ext CTA
+  RESOLVED** (owner "pass" — create-bot CTA survives a WA↔TG chip switch on both channels); **D14
+  RESOLVED both checks** (owner "PASS" — fresh TG cover reads brand blue #2AABEE, WhatsApp cover
+  unchanged green). **D2-view STILL FAILS** (owner: "no pass, still sometimes not updating bubble
+  reaction when it is updated in telegram even though logs show updated reaction" — the repro is a
+  reaction changed IN the Telegram app arriving via the live poll, with the new `[D2-view]` log firing
+  correctly, yet the bubble pill sometimes doesn't repaint; round-5 scope = the poll-driven
+  `HandleReactionsChanged` repaint path, NOT the merge). NEW **D15** (owner: a reaction REMOVED in the
+  WhatsApp app itself is not removed in our app — pre-existing, WA removal propagation likely never
+  implemented) + NEW **D16** (owner: a bot that already has WhatsApp shows NO Telegram sync cover when
+  Telegram is added later — promotion of the documented 08-19 late-channel follow-up, not a regression).
+  **Gate A stays ISSUES** — round 5: `/gsd-plan-phase 08 --gaps` for D2-view / D15 / D16. G6 dev-clone
+  deactivation STILL OUTSTANDING (**FOURTH consecutive checkpoint** — owner asked "what exactly should be
+  done?"; explained, awaiting confirmation; carry BLOCKING). Echo-hex NOT captured again (third
+  consecutive; nice-to-have — data layer proven). Gates B/C + I.3 #10 re-aggregation stay blocked;
+  prod bagkz stays dormant.
 - **Notes:** B7 static-webp N/A (no sample at hand); G5 N/A (no stale clone to test);
   G6 n/a with an OUTSTANDING reminder to deactivate the test clone (bot-activation policy);
   H2 FAIL — downstream of D5, re-test relevance + RAG grounding together after the fix;
