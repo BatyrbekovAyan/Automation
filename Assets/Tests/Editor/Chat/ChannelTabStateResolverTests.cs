@@ -25,3 +25,38 @@ public class ChannelTabStateResolverTests
         Assert.AreEqual(WhatsAppTabState.Ready,      WhatsAppTabStateResolver.Resolve(1, true, false));
     }
 }
+
+// D12-ext (08-REVIEW CR-01): the empty-state card's NoBots-coercion seam. BeginLoadForActiveBot
+// fires BotHasNo{Channel} even when ZERO bots exist (FindBotByName("_default") == null → the
+// connect reason), which re-wires the create-bot CTA to the silent OpenCurrentBotAuth. Effective
+// promotes such a raw reason back to NoBotsExist ONLY when the authoritative resolver
+// (ComputeCurrentEmptyState) also says NoBots — a genuine connect card for a real bot is preserved
+// byte-identically (the WhatsApp invariant, pinned below).
+public class EmptyStateReasonPolicyTests
+{
+    [Test] public void CoercesTelegramConnectReason_WhenResolverSaysNoBots()
+        => Assert.AreEqual(EmptyStateReason.NoBotsExist,
+            EmptyStateReasonPolicy.Effective(EmptyStateReason.BotHasNoTelegram, EmptyStateReason.NoBotsExist));
+
+    [Test] public void CoercesWhatsAppConnectReason_WhenResolverSaysNoBots()
+        => Assert.AreEqual(EmptyStateReason.NoBotsExist,
+            EmptyStateReasonPolicy.Effective(EmptyStateReason.BotHasNoWhatsApp, EmptyStateReason.NoBotsExist));
+
+    [Test] public void NoBots_StaysNoBots()
+        => Assert.AreEqual(EmptyStateReason.NoBotsExist,
+            EmptyStateReasonPolicy.Effective(EmptyStateReason.NoBotsExist, EmptyStateReason.NoBotsExist));
+
+    // WhatsApp INVARIANT: a real WA-less bot keeps its connect reason (resolver agrees) — never hijacked.
+    [Test] public void PreservesWhatsAppConnectReason_WhenResolverAgrees()
+        => Assert.AreEqual(EmptyStateReason.BotHasNoWhatsApp,
+            EmptyStateReasonPolicy.Effective(EmptyStateReason.BotHasNoWhatsApp, EmptyStateReason.BotHasNoWhatsApp));
+
+    [Test] public void PreservesTelegramConnectReason_WhenResolverAgrees()
+        => Assert.AreEqual(EmptyStateReason.BotHasNoTelegram,
+            EmptyStateReasonPolicy.Effective(EmptyStateReason.BotHasNoTelegram, EmptyStateReason.BotHasNoTelegram));
+
+    // Resolver undecided (null) ⇒ trust the raw event, never hijack the card.
+    [Test] public void TrustsRawReason_WhenResolverUndecided()
+        => Assert.AreEqual(EmptyStateReason.BotHasNoWhatsApp,
+            EmptyStateReasonPolicy.Effective(EmptyStateReason.BotHasNoWhatsApp, null));
+}
