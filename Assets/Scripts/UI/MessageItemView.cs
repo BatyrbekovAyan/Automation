@@ -4640,10 +4640,25 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
         FinalizeCustomVisuals();
     }
 
+    /// <summary>
+    /// Public re-render entry for the reaction bar (D2-view / 08-REVIEW WR-01): re-runs
+    /// RenderReactions + forces the pill mesh so a render lost under the bar's lifted Canvas
+    /// self-heals one frame after the bar dismisses. Idempotent — renders the CURRENT vm.
+    /// </summary>
+    public void RefreshReactionsVisual()
+    {
+        RenderReactions();
+        if (reactionPill != null) reactionPill.ForceReRender();
+    }
+
     private void HandleReactionsChanged(MessageViewModel changed)
     {
         if (currentVm == null || changed == null) return;
         if (currentVm.messageId != changed.messageId) return;
+
+        // [D2-view] Compiled (not editor-only) so the next UAT pass confirms the handler ran on device.
+        // Capped: message id + reaction count only — never emoji text or message body (T-08-22-01).
+        Debug.Log($"[D2-view] reactions changed id={changed.messageId} n={(changed.reactions?.Count ?? 0)}");
 
         // ChatManager mutates the cached VM in place, so currentVm.reactions is
         // already current. Re-render the pill + clearance, then rebuild the row so the

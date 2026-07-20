@@ -37,6 +37,18 @@ public class ReactionPillView : MonoBehaviour
             label.text = count >= 2 ? $"{sprites} {count}" : sprites;
     }
 
+    /// <summary>
+    /// Force a fresh render + TMP mesh regeneration of the current reactions. Used by the
+    /// reaction bar (D2-view / 08-REVIEW WR-01): the pill's mesh can be lost when it renders
+    /// under the bar's doomed overrideSorting Canvas; re-dirtying after that Canvas is gone
+    /// regenerates the mesh on the root canvas. Safe/idempotent when there are no reactions.
+    /// </summary>
+    public void ForceReRender()
+    {
+        Render(_last);
+        if (label != null) { label.SetAllDirty(); label.ForceMeshUpdate(); }
+    }
+
     public bool HasReactions => _last != null && _last.Count > 0;
 
     private void HandleEmojiReady(string spriteName)
