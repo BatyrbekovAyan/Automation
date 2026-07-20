@@ -1,6 +1,6 @@
 # Phase 8 — Device UAT: v1.1 Telegram Parity milestone gate (consolidated, owner-run)
 
-**Status:** RUN 2026-07-15/16 → re-verify 2026-07-17 (08-10) → round-2 re-verify 2026-07-17 (08-16) → round-3 re-verify 2026-07-20 (08-21) → round-4 re-verify 2026-07-20 (08-25 — RUN) → **round-5 re-verify 2026-07-21 (08-29 — RUN, see §Round 5 re-verify)** — **Overall: ISSUES** (open: **D2-view** (FAIL round 5 — relocated UPSTREAM to an own-reaction event-suppression), **D15** (FAIL round 5 — removal-shape answered: candidate (b) no removal raw), **D17** (new round 5 — late-WhatsApp-auth sync cover, owner scope-override superseding the 08-28 parity decision) — see §Defects; resolved through round 5: D1–D8 core set, D10, D11, D2 core, D2-ext data layer + echo-hex CAPTURED/CLOSED, D13 cover+pill, D12-ext CTA, D14 TG cover blue, **D16 late-TG cover** (round-5 PASS); D9 SUPERSEDED by owner decision → D13 cover). This pass is the single source of truth for "is v1.1 shippable."
+**Status:** RUN 2026-07-15/16 → re-verify 2026-07-17 (08-10) → round-2 re-verify 2026-07-17 (08-16) → round-3 re-verify 2026-07-20 (08-21) → round-4 re-verify 2026-07-20 (08-25 — RUN) → **round-5 re-verify 2026-07-21 (08-29 — RUN, see §Round 5 re-verify)** → **round-6 re-verify PENDING (08-33 — owner gate, see §Round 6 re-verify)** — **Overall: ISSUES** (open until the round-6 owner pass: **D2-view** (round-6 fix 08-30 — confirmation-clears-grace + WR-01 tombstone; awaiting Editor Play-Mode re-verify), **D15** (round-6 disposition 08-31 — WR-02 revert + [D15-probe]; awaiting platform-limit confirmation), **D17** (round-6 fix 08-32 — late-WhatsApp-auth sync cover stamp; awaiting Android-build re-verify) — see §Defects; resolved through round 5: D1–D8 core set, D10, D11, D2 core, D2-ext data layer + echo-hex CAPTURED/CLOSED, D13 cover+pill, D12-ext CTA, D14 TG cover blue, **D16 late-TG cover** (round-5 PASS); D9 SUPERSEDED by owner decision → D13 cover). This pass is the single source of truth for "is v1.1 shippable."
 
 This is ONE ordered device pass that aggregates EVERY still-open device-verify gate
 across the whole v1.1 milestone (Phases 3–7) **plus** the carried v1.0 deferred UAT.
@@ -745,6 +745,123 @@ EditMode test); **D15** absence-based WhatsApp removal reconcile (poll the targe
 clear the `ReactionStore` entry when the server no longer carries it — OR document as a Wappi WA platform limit);
 **D17** late-WhatsApp-auth cover stamp (`{bot}WhatsappSyncUntil`, exact mirror of 08-28's Telegram stamp — supersedes
 the 08-28 parity decision).
+
+---
+
+## Round 6 re-verify (2026-07-21) — D2-view / WR-02 / D17 / D15 disposition (Gate A — the milestone v1.1 gate)
+
+> **PENDING — owner-run gate (do NOT tick on the owner's behalf).** This runbook was written autonomously
+> (08-33); RUNNING it is the Gate A gate. The phase stays open until the owner records a verbatim verdict per
+> item below. Every checkbox ships blank. The owner verifies the round-6 fixes — **08-30** (D2-view
+> confirmation-clears-grace + WR-01 tombstone drop-on-confirmed-absence), **08-31** (WR-02 revert + the D15
+> platform-limit disposition + Editor `[D15-probe]`), **08-32** (D17 late-WhatsApp-auth sync-cover stamp) — all
+> merged on the tree at HEAD `5468d18`.
+>
+> **KEY CHANGE from prior rounds — Editor Play-Mode is sufficient for the fix items.** Round 5 proved BOTH
+> failing items (D2-view + WR-02) reproduce in the Unity Editor Console (the round-5 evidence was Editor Console
+> screenshots, not device logcat). So **items 1–2 (D2-view rapid-change repaint + WR-02 removal-stays-removed)
+> verify in the Editor Play Mode** — no device build needed for the fix loop — with **ONE Android build only for
+> the final Gate A confirmation sweep** (items 3–5: the WA/TG invariants + the D17 late-WA cover). Item 6 (the
+> D15 probe) captures in the Editor OR on the build; item 7 is a nice-to-have discriminator noted during item 1.
+>
+> **Pre-build/pre-verify gate (read FRESH — never hardcode):** confirm the EditMode suite is completed/Passed
+> with 0 failures at the CURRENT baseline before verifying/building — read the total FRESH from the in-Editor
+> bridge (`Temp/claude/test-summary.json`) or `Tools/run-tests-headless.sh` if the Editor is closed. Round-6
+> fixes add **+3** (08-30 net +3 — CR-01 +2 + WR-01 +1, with 2 tombstone-test renames flat / 08-31 **+0** — a
+> glue revert + an Editor-only probe / 08-32 **+0** — a PlayerPrefs stamp). Baseline was **1181** at round 5 →
+> **1184** at round 6 (per the three wave-15 summaries; 08-30/08-31/08-32 all read 1184/1184 FRESH). The suite
+> grows concurrently from the parallel phases (9/10/11), so the gate is "completed/Passed, 0 failures at the
+> current baseline", never a hardcoded absolute — re-read it at run time.
+>
+> **G6 is RESOLVED (no carry).** The owner confirmed "G6 done" post-08-25 — the four-checkpoint
+> dev-clone-deactivation streak ended; it is NOT a round-6 line item.
+>
+> **The D2-ext echo-hex is CLOSED (no carry).** It was CAPTURED at round 5 (tapi echoes carry BASE-form
+> codepoints U+1F44D/U+1F601/U+1F44C, `user_id == ownId`); the ask is closed and is NOT a round-6 line item.
+>
+> **Discriminating logs that make a FAIL diagnosable (round 6):** the Editor-only `[D2-merge]` log (08-30) fires
+> ONLY when a DIFFERING echo is suppressed within the grace — for a genuine external own-change it should NOT
+> fire (the change should just apply); its presence/absence tells whether the suppression path is still eating
+> the change. The Editor-only `[D15-probe]` log (08-31) / an Editor `response.txt` grep confirms whether a
+> WhatsApp per-message payload carries any reaction-state key (the D15 platform-limit disposition; expected
+> `reactionsKey=False reactionKey=False`). **On ANY D2-view or WR-02 FAIL, capture the relevant Console/logcat
+> line(s) and paste them into the Defects row** — that is the whole point of the discriminating logs.
+
+**— Editor Play-Mode items (1–2; Editor-reproducible — no device build needed for the fix loop) —**
+
+1. **D2-view — rapid own-reaction change in the Telegram app repaints EVERY time.**
+   **expected:** on a Telegram bot, tap a reaction on a message IN OUR app (arms the optimistic grace), then
+   within 90 s change your OWN reaction on that message IN the Telegram app 2–3 times (e.g. 👍 → 😁 → 👌). Each
+   change repaints the in-app bubble pill to the new emoji — no change is dropped after the first.
+   **how-to:** in the Editor Play Mode on a Telegram bot, tap a reaction in-app, then within 90 s change your own
+   reaction on that same message in the Telegram app 2–3 times; watch the in-app pill repaint on every change.
+   **IF FAIL:** capture any `[D2-merge] suppressed server-me '…' by fresh local '…' age=…s` line(s) (a genuine
+   external change should NOT log this — its presence means the suppression path is still eating the change) plus
+   the `[D2-view]`/`[TG reaction echo]` timeline — paste into the Defects row.
+   **verdict:** ☐ PASS ☐ FAIL ☐ N/A | **source:** 08-DEVICE-UAT.md D2-view / B9–B13
+2. **WR-02 regression — an own WhatsApp reaction removed in-app STAYS removed across polls.**
+   **expected:** on a WhatsApp bot, add a reaction in OUR app (or from the WhatsApp phone app), then REMOVE it in
+   OUR app — the pill clears and STAYS cleared across the next several poll cycles (it does NOT resurrect within
+   one poll as it did before the 08-31 revert).
+   **how-to:** in the Editor Play Mode on a WhatsApp bot, add a reaction in-app, then remove it in-app; watch the
+   pill through several poll cycles and confirm it never resurrects.
+   **IF FAIL:** capture the `[D15] wa-reaction rawId=… stanza=… bodyEmpty=… seen=…` line(s) around the
+   remove-then-poll window — paste into the Defects row.
+   **verdict:** ☐ PASS ☐ FAIL ☐ N/A | **source:** 08-DEVICE-UAT.md D15 / 08-REVIEW WR-02
+
+**— Android-build items (3–5; ONE build — the final Gate A confirmation sweep) —**
+
+3. **D2-view — WhatsApp add/change unaffected (invariant).**
+   **expected:** on a WhatsApp bot, add then change a reaction — the pill repaints exactly as before.
+   **how-to:** on a WhatsApp bot, add a reaction then change it; confirm the pill updates as it always did.
+   **verdict:** ☐ PASS ☐ FAIL ☐ N/A | **source:** WhatsApp byte-identical invariant (08-30/08-31)
+4. **Telegram add/change/remove still correct (invariant).**
+   **expected:** on a Telegram bot, add / change / remove your own reaction in OUR app — count is 1 (not «2»), a
+   change leaves ONE pill, a removal clears and stays cleared (the round-2/round-4 fixes still hold).
+   **how-to:** on a Telegram bot, add a reaction (count shows 1), change it (one pill), then remove it (clears
+   and stays cleared).
+   **verdict:** ☐ PASS ☐ FAIL ☐ N/A | **source:** WhatsApp/Telegram reaction invariants (08-06/08-11/08-17/08-30)
+5. **D17 — late WhatsApp auth on an existing bot shows the WhatsApp sync cover.**
+   **expected:** on a bot that already has Telegram, authorize WhatsApp from settings; when you open the bot's
+   WhatsApp channel, the ~5-min post-creation sync cover (spinner + progress + countdown) shows over the chat
+   list — mirroring the Telegram late-auth cover (D16). Also spot-check: a late Telegram auth on a WhatsApp-first
+   bot still shows the Telegram cover (D16 unchanged).
+   **how-to:** on a Telegram-only bot, open settings → authorize WhatsApp (code or QR); open the WhatsApp channel
+   and confirm the cover shows. Then spot-check the D16 mirror: on a WhatsApp-first bot, authorize Telegram later
+   and confirm the Telegram cover still shows.
+   **verdict:** ☐ PASS ☐ FAIL ☐ N/A | **source:** 08-DEVICE-UAT.md D17 / 08-REVIEW IN-02
+
+**— D15 disposition + nice-to-have (6–7; Editor probe OR build logcat) —**
+
+6. **D15 disposition — no WhatsApp reaction-state key surfaces (platform-limit confirmation).**
+   **expected:** with the Editor open (or on the build with logcat), capture the `[D15-probe] wa msgId=…
+   reactionsKey=False reactionKey=False` line(s) when a WhatsApp quote/message resolves — AND/OR grep an Editor
+   `response.txt` dump for a WhatsApp chat containing a reacted message for any `"reactions"` key on target rows.
+   If BOTH come back empty (as predicted): D15 is closed as a Wappi WA platform limit (keep the CLAUDE.md note).
+   If a reaction-state key DOES surface: revert the CLAUDE.md note and spin round 7 (absence-based WA reconcile).
+   **how-to:** trigger a WhatsApp quote/message resolve on a chat with a reacted message; read the `[D15-probe]`
+   line and/or grep the `response.txt` dump for a `"reactions"` key.
+   **disposition:** ☐ D15 closed platform-limited (probe empty — `reactionsKey=False reactionKey=False`, keep the
+   CLAUDE.md note) ☐ reaction-state key surfaced → round 7 (revert the CLAUDE.md note; absence-based WA reconcile)
+   | **source:** 08-DEVICE-UAT.md D15 / 08-REVIEW IN-01. NOTE: `secrets.json` is deny-ruled — any live
+   `messages/id/get` call is owner-run (the app authed in Play Mode, or a direct token call by the owner); the
+   executor never handles the token.
+7. **D2-view residual `[D2-merge]` discriminator (NICE-TO-HAVE).**
+   **expected:** if item 1 passes, note whether any `[D2-merge]` line fired during the rapid-change repro
+   (ideally none for genuine external changes). Absence is the expected healthy signal.
+   **how-to:** watch the Editor Console during item 1's rapid-change repro; record "not fired" or paste any
+   `[D2-merge]` lines seen.
+   **verdict:** ☐ `[D2-merge]` not fired (healthy — expected) ☐ fired (paste lines: ______) | **source:** 08-30 D2-merge log
+
+**Round-6 Overall:** ☐ PASS (all D2-view / WR-02 / D17 / invariant items PASS **and** the D15 disposition
+recorded) ☐ ISSUES (any FAIL) — *awaiting the owner run; verdicts transcribed VERBATIM here on completion, each
+mapped to its source anchor, with any FAIL's captured `[D2-merge]`/`[D15-probe]` line pasted into its §Defects row.*
+**Round-6 Gate A disposition:** ☐ PASS → flip Gate A to PASS, re-aggregate I.3 #10 (01-VERIFICATION sign-off,
+previously blocked by D5 — now unblocked), unblock Gates B (prod replication, 08-02) and C (milestone close,
+08-03); close D15 as platform-limited (keep the CLAUDE.md note); prod bagkz stays dormant until 08-02. ☐ ISSUES →
+keep Gate A = ISSUES; file the specifics in §Defects with anchors + the captured logs and spin round 7 via
+`/gsd-plan-phase 08 --gaps` (if the D15 probe surfaced a reaction-state key, revert the CLAUDE.md platform-limit
+note and scope the round-7 absence-reconcile). *G6 resolved, not carried; echo-hex closed, not carried.*
 
 ---
 
