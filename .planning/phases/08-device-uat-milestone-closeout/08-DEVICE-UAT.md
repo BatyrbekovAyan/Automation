@@ -1,6 +1,6 @@
 # Phase 8 — Device UAT: v1.1 Telegram Parity milestone gate (consolidated, owner-run)
 
-**Status:** RUN 2026-07-15/16 → re-verify 2026-07-17 (08-10) → round-2 re-verify 2026-07-17 (08-16) → round-3 re-verify 2026-07-20 (08-21) → **round-4 re-verify 2026-07-20 (08-25 — RUN, see §Round 4 re-verify)** — **Overall: ISSUES** (open: **D2-view** (FAIL round 4), **D15** (new — WhatsApp reaction-removal not propagated), **D16** (new — late-channel Telegram sync cover) — see §Defects; resolved through round 4: D1–D8 core set, D10, D11, D2 core, D2-ext data layer, D13 cover+pill, **D12-ext CTA** (round-4 PASS), **D14 TG cover blue** (round-4 PASS); D9 SUPERSEDED by owner decision → D13 cover). This pass is the single source of truth for "is v1.1 shippable."
+**Status:** RUN 2026-07-15/16 → re-verify 2026-07-17 (08-10) → round-2 re-verify 2026-07-17 (08-16) → round-3 re-verify 2026-07-20 (08-21) → **round-4 re-verify 2026-07-20 (08-25 — RUN, see §Round 4 re-verify)** → **round-5 re-verify 2026-07-20 (08-29 — PENDING owner run, see §Round 5 re-verify)** — **Overall: ISSUES** (open: **D2-view** (FAIL round 4), **D15** (new — WhatsApp reaction-removal not propagated), **D16** (new — late-channel Telegram sync cover) — see §Defects; resolved through round 4: D1–D8 core set, D10, D11, D2 core, D2-ext data layer, D13 cover+pill, **D12-ext CTA** (round-4 PASS), **D14 TG cover blue** (round-4 PASS); D9 SUPERSEDED by owner decision → D13 cover). This pass is the single source of truth for "is v1.1 shippable."
 
 This is ONE ordered device pass that aggregates EVERY still-open device-verify gate
 across the whole v1.1 milestone (Phases 3–7) **plus** the carried v1.0 deferred UAT.
@@ -557,6 +557,92 @@ anchors; spin round 5 via `/gsd-plan-phase 08 --gaps`. Gates B/C + I.3 #10 re-ag
 prod bagkz stays dormant. **Round-5 scope:** D2-view continued diagnosis on the poll-driven
 `HandleReactionsChanged` repaint path (NOT the merge — data layer proven); D15 WhatsApp reaction-removal
 propagation; D16 late-channel Telegram sync-cover stamp. (G6 resolved post-checkpoint 2026-07-20 — no carry.)
+
+---
+
+## Round 5 re-verify (2026-07-20) — D2-view / D15 / D16 (Gate A — the milestone v1.1 gate)
+
+> **PENDING owner run — verdicts BLANK below (do NOT tick on the owner's behalf).** ONE Android build off the
+> post-08-28 tree (fixes **08-26** D2-view poll-path re-render + **08-27** D15 WhatsApp reaction-removal ingest +
+> **08-28** D16 late-channel Telegram sync-cover stamp all merged) that the owner runs to confirm the three
+> round-5 residuals are closed, mirroring the 08-10 / 08-16 / 08-21 / 08-25 passes. Record EXACTLY ONE verdict
+> per item (`PASS` / `FAIL` / `N/A`), transcribed VERBATIM; any FAIL adds/updates a §Defects row with its source
+> anchor **and** pastes the captured `[D2-view]`/`[D15]` device-log line(s). On all-PASS → flip Gate A to PASS,
+> re-aggregate I.3 #10, unblock Gates B/C (prod bagkz stays dormant until 08-02); any FAIL → keep Gate A =
+> ISSUES and spin round 6 via `/gsd-plan-phase 08 --gaps` with the discriminating logs.
+>
+> **Pre-build gate (as authored — re-confirm FRESH before building):** EditMode suite **1181/1181 Passed,
+> 0 failed** per the three wave-13 summaries (08-26 → 1180, 08-27 → 1181, 08-28 → 1181 delta-0), FRESH via the
+> in-Editor bridge. Baseline = pre-round-5 **1176 + 5** = **1181**, exactly the +5 the round-5 fixes add
+> (08-26 **+4** D2-view converter tests / 08-27 **+1** D15 removal-redelivery pin / 08-28 **+0** D16). The suite
+> grows concurrently from the parallel phases (9/10/11) — read the total FRESH from `Temp/claude/test-summary.json`
+> (or `Tools/run-tests-headless.sh` if the Editor is closed) at run time; the gate is "completed/Passed,
+> 0 failures at the current baseline", never a hardcoded absolute.
+>
+> **G6 is RESOLVED (no carry).** The owner confirmed "G6 done" post-08-25 (commit 7c1ad48) — the
+> four-checkpoint dev-clone-deactivation streak ended; it is NOT a round-5 line item.
+>
+> **New this round — two device-log capture asks that make a FAIL discriminable rather than another guess:** the
+> `[D2-view] post-render` state log (08-26) reports pill active / label length / canvasRenderer.cull to tell
+> exception vs cull-state vs TMP submesh-churn; the `[D15] wa-reaction` log (08-27) records the removal shape
+> (rawId/stanzaId/bodyEmpty/seen) to tell which of the three IN-02 candidate removal shapes WhatsApp uses. **On
+> ANY D2-view or D15 FAIL, capture the relevant logcat line(s) and paste them into the Defects row** — that is
+> the whole point of the discriminating logs.
+
+1. **D2-view — reaction changed IN the Telegram app repaints the bubble (the round-4 repro).**
+   **expected:** on a Telegram bot, change a reaction on a message IN the Telegram app (a remote change arriving
+   via the live poll). The bubble pill in-app updates to the new emoji — it does NOT stay stale. Repeat a few
+   times, incl. changing on one bubble then another (the old bug was intermittent).
+   **how-to:** on a Telegram bot, change a reaction in the Telegram app on bubble A, watch A's pill repaint; then
+   change one on bubble B right after. Repeat several times.
+   **IF FAIL:** capture the `[D2-view] post-render id=… active=… len=… culled=…` logcat line (active/len/culled
+   discriminates TMP submesh-churn vs RectMask2D cull vs exception) and paste it into the Defects row.
+   **verdict:** ☐ PASS ☐ FAIL ☐ N/A | **source:** 08-DEVICE-UAT.md D2-view / B9–B13
+2. **D2-view — WhatsApp add/change unaffected.**
+   **expected:** on a WhatsApp bot, add then change a reaction — the pill repaints exactly as before (the
+   poll-path re-render is channel-agnostic + idempotent; the WhatsApp live path self-heals identically).
+   **how-to:** on a WhatsApp bot, add a reaction then change it; confirm the pill updates as it always did.
+   **verdict:** ☐ PASS ☐ FAIL ☐ N/A | **source:** WhatsApp byte-identical invariant (08-26)
+3. **D15 — a reaction REMOVED in the WhatsApp app clears in-app.**
+   **expected:** on a WhatsApp bot, add a reaction in the WhatsApp app, then REMOVE it in the WhatsApp app — the
+   pill disappears in-app within a poll cycle (candidate-a: an already-seen reaction raw re-emitted under the same
+   id now re-runs `HandleReactionEvent`; no longer sticks).
+   **how-to:** on a WhatsApp bot, add a reaction in the WhatsApp app, watch it appear in-app, then remove it in
+   the WhatsApp app; watch the pill clear within a poll cycle.
+   **IF FAIL:** capture the `[D15] wa-reaction rawId=… stanza=… bodyEmpty=… seen=…` line(s) for the removal —
+   they identify which of the three IN-02 shapes (a re-emit / no raw / missing stanza) WhatsApp uses — paste into
+   the Defects row so round 6 targets exactly one site.
+   **verdict:** ☐ PASS ☐ FAIL ☐ N/A | **source:** 08-DEVICE-UAT.md D15 / round-4 item 2
+4. **D15 — WhatsApp add/change reaction still repaints (invariant).**
+   **expected:** adding and changing a reaction in the WhatsApp app still updates the pill as before — the
+   unseen-id path is untouched, and re-processing an already-applied reaction is an idempotent no-op.
+   **how-to:** on a WhatsApp bot, add a reaction then change it; confirm the pill updates normally (no
+   double-pill, no stuck state).
+   **verdict:** ☐ PASS ☐ FAIL ☐ N/A | **source:** WhatsApp byte-identical invariant (08-27)
+5. **D16 — late Telegram auth on a WhatsApp bot shows the Telegram sync cover.**
+   **expected:** on a bot that already has WhatsApp, authorize Telegram from settings; when you open the bot's
+   Telegram channel, the ~5-min post-creation sync cover (spinner + progress + countdown, brand blue per D14)
+   shows over the chat list (`{bot}TelegramSyncUntil` now stamped at late-auth success).
+   **how-to:** on a WhatsApp-only bot, open settings → authorize Telegram (code or QR); switch to the Telegram
+   channel and confirm the sync cover shows.
+   **verdict:** ☐ PASS ☐ FAIL ☐ N/A | **source:** 08-DEVICE-UAT.md D16 / 08-19 late-channel follow-up
+6. **D16 — WhatsApp byte-identical: late WhatsApp auth shows NO new cover.**
+   **expected:** on a bot that already has Telegram, authorizing WhatsApp later does NOT newly show a WhatsApp
+   cover (the documented parity decision — no late-auth WhatsApp stamp; WhatsApp behaviour is unchanged).
+   **how-to:** on a Telegram-only bot, authorize WhatsApp later; confirm no new WhatsApp sync cover appears.
+   **verdict:** ☐ PASS ☐ FAIL ☐ N/A | **source:** WhatsApp byte-identical invariant (08-28) / parity decision
+7. **D2-ext echo-hex (NICE-TO-HAVE, non-blocking).**
+   **expected:** if convenient during D2-view testing, capture the tapi reaction-echo hex from the
+   `[TG reaction echo]` Editor log (ChatManager.cs) / `Tools/tapi/probe-message.sh`. Absence is fine — the D2-ext
+   data layer is already proven; record "not captured".
+   **how-to:** watch the Editor log while changing a reaction; note the echo hex, or record "not captured".
+   **verdict:** ☐ captured (hex: ______) ☐ not captured | **source:** 08-DEVICE-UAT.md D2-ext
+
+**Round-5 Overall:** ☐ PASS (all D2-view / D15 / D16 items PASS) ☐ ISSUES (any FAIL) — _pending owner run._
+**Round-5 Gate A disposition:** ☐ PASS (→ flip Gate A to PASS, re-aggregate I.3 #10, unblock Gates B
+[prod replication, 08-02] and C [milestone close, 08-03]; prod bagkz stays dormant until 08-02) ☐ ISSUES
+(→ keep Gate A = ISSUES; file the FAIL(s) in §Defects with anchors + the captured `[D2-view]`/`[D15]` log
+line(s); spin round 6 via `/gsd-plan-phase 08 --gaps`). _Pending owner run — G6 resolved, not carried._
 
 ---
 
