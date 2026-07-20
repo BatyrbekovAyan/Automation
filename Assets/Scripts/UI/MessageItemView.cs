@@ -4665,6 +4665,26 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
         // reserved space takes effect (this is a live update, not a full re-bind).
         RenderReactions();
         StartCoroutine(ForceRebuildRoutine());
+
+        // D2-view round 5 (08-REVIEW CR-01): OnMessageReactionsChanged is ONE-SHOT per change
+        // (the data-layer dedup guard), so a single lost repaint on the poll path is permanent. Harden it
+        // the same way the reaction-bar-dismiss path does — one frame later, clear of any same-frame
+        // canvas/cull/submesh churn. Idempotent; WhatsApp visual byte-identical.
+        StartCoroutine(RefreshReactionsNextFrame(changed.messageId));
+    }
+
+    private IEnumerator RefreshReactionsNextFrame(string id)
+    {
+        yield return null;
+        RefreshReactionsVisual();   // RenderReactions + reactionPill.ForceReRender (SetAllDirty + ForceMeshUpdate)
+
+        // [D2-view] Discriminate the round-5 residual (08-REVIEW CR-01): one frame AFTER the forced
+        // re-render, report the pill's live state. If it logs active + len>0 + culled=false while the
+        // screen shows stale -> below-CanvasRenderer (submesh churn); culled=true -> the bubble is
+        // scrolled out of the RectMask2D viewport; if this line never prints -> an exception killed the
+        // chain (WR-01). Capped: id + booleans/length only, never emoji or body content.
+        if (reactionPill != null)
+            Debug.Log($"[D2-view] post-render id={id} active={reactionPill.DiagnosticActive} len={reactionPill.DiagnosticLabelLength} culled={reactionPill.DiagnosticLabelCulled}");
     }
 
     private void RenderReactions()

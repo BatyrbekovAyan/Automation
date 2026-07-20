@@ -32,7 +32,19 @@ public class ReactionPillView : MonoBehaviour
         if (!gameObject.activeSelf) gameObject.SetActive(true);
 
         string raw = string.Concat(emojis);
-        string sprites = UnicodeEmojiConverter.ConvertRealEmojisToSprites(raw, MissingEmojiMode.Hide);
+        string sprites;
+        try
+        {
+            sprites = UnicodeEmojiConverter.ConvertRealEmojisToSprites(raw, MissingEmojiMode.Hide);
+        }
+        catch (System.Exception e)
+        {
+            // WR-01 (D2-view): never let a malformed emoji payload throw out of the reaction render —
+            // it would abort the OnMessageReactionsChanged multicast + the live-sync coroutine. Fall back
+            // to a count-only pill so the event chain survives.
+            Debug.LogError($"[ReactionPill] emoji convert failed: {e.Message}");
+            sprites = "";
+        }
         if (label != null)
             label.text = count >= 2 ? $"{sprites} {count}" : sprites;
     }
@@ -50,6 +62,11 @@ public class ReactionPillView : MonoBehaviour
     }
 
     public bool HasReactions => _last != null && _last.Count > 0;
+
+    // [D2-view] diagnostics for the one-frame-later state log (ids/booleans only, no emoji content).
+    public bool DiagnosticActive => gameObject.activeSelf;
+    public int DiagnosticLabelLength => label != null && label.text != null ? label.text.Length : -1;
+    public bool DiagnosticLabelCulled => label != null && label.canvasRenderer != null && label.canvasRenderer.cull;
 
     private void HandleEmojiReady(string spriteName)
     {
