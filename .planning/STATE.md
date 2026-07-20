@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
-status: ready-to-execute
-stopped_at: Planned 08-30..08-33 (round-6 gap plans)
-last_updated: "2026-07-21T00:00:00.000Z"
-last_activity: 2026-07-21
+status: executing
+stopped_at: Completed 08-30-PLAN.md (D2-view CR-01 + WR-01)
+last_updated: "2026-07-20T21:31:46.419Z"
+last_activity: 2026-07-20
 progress:
   total_phases: 9
   completed_phases: 5
   total_plans: 63
-  completed_plans: 57
-  percent: 90
+  completed_plans: 58
+  percent: 92
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 ## Current Position
 
 Phase: 08 (device-uat-milestone-closeout) — READY TO EXECUTE round 6
-Plan: 30 of 33 next (round-6 gap plans 08-30..08-33 planned, checker PASSED clean 1st iteration with hand-traced RED test)
-Status: Round-6 plans committed (ecc2ed5) — 08-30 CR-01 confirmation-clears-grace + WR-01 tombstone (TelegramReactionMerge.cs:62), 08-31 WR-02 revert + D15 probe/platform-limit doc, 08-32 D17 late-WA-auth cover stamp, 08-33 owner re-verify (Editor Play-Mode for fixes + ONE device build for Gate A sweep). Execute via `/gsd-execute-phase 08 --gaps-only`
-Last activity: 2026-07-21
+Plan: 31 of 33 next (round-6 gap plans 08-30..08-33 planned, checker PASSED clean 1st iteration with hand-traced RED test)
+Status: Ready to execute
+Last activity: 2026-07-20
 
-Progress: [█████████░] 90%
+Progress: [█████████░] 92%
 
 ## Performance Metrics
 
@@ -117,6 +117,7 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [Phase 8]: 08-27 D15 gap-closure — WhatsApp reaction-REMOVAL ingest. Diagnosis-first (08-REVIEW IN-02): removal machinery is correct (ReactionParser empty-body->IsRemoval, ReactionStore removes by reactorKey), the failure is at INGEST — WhatsApp live reactions entered ONLY via the unseen-id branch of SyncLatestMessages; the already-seen fall-through did media/quote + a Telegram-ONLY reaction refresh, dropping a WhatsApp reaction raw. Fix = (1) compiled capped [D15] log for every WhatsApp reaction raw (BOTH branches: rawId/stanzaId/bodyEmpty/seen) so round-5 device discriminates the three candidate shapes (a re-emit under same id / b no removal raw / c missing stanzaId); (2) candidate-(a) fix ONLY — already-seen WhatsApp reaction raws re-run HandleReactionEvent (idempotent: ReactionStore returns false on unchanged -> no event/repaint, cannot storm), pinned by Apply_RemovalThenRedelivery_SecondIsIdempotentNoOp. (b)/(c) not code-discriminable -> left to [D15] device logs (no blind fix). Both blocks WhatsApp-gated (ActiveChannel==WhatsApp && raw.type==reaction) -> Telegram byte-identical (reactions ride reactions[]). Suite 1181/1181 (1180+1) FRESH. commits 94fe649/96da6f4. Device re-verify (WA-app removal clears + shape capture) rides 08-29.
 - [08-28] D16 late-channel Telegram sync cover — ShowAuthSuccess settings-reauth branch stamps {bot}TelegramSyncUntil (300s, reuses SyncUntilSuffixFor(Telegram)) ONLY on late Telegram auth (authPage==TelegramAuth); WhatsApp byte-identical (NO late-auth WA stamp, documented parity decision IN-01); no new key/teardown (Bot.DeleteBot already clears it); suite 1181/1181 green FRESH; commit 75f87a8; device re-verify rides 08-29
 - [08-29] Round-5 owner device re-verify (checkpoint RUN 2026-07-21) — **Overall ISSUES, Gate A STAYS ISSUES.** Owner ran ONE build off the post-08-28 tree (08-26/08-27/08-28 merged) + returned verdicts WITH two Unity Editor Console screenshots (repro ran in the EDITOR — Editor-reproducible, makes round-6 fixes easier; device pass still gates Gate A). **D16 late-TG cover RESOLVED** (owner "pass" item 5). **D2-view STILL FAILS but mechanism REFUTED-and-RELOCATED UPSTREAM** — captured [D2-view] logs show a HEALTHY post-render on the first change (active=True len=24 culled=False → exception+cull refuted) but NO change event AT ALL for the two subsequent own-reaction emoji changes (only [TG reaction echo] at Normalize level); the view layer (08-22/08-26) is EXONERATED; round-6 target = own-reaction event-suppression in TelegramReactionMerge's 90s optimistic-grace window (HYPOTHESIS: grace should key on a pending LOCAL optimistic set, not mere own-identity; user_id==ownId in every echo). **D15 STILL FAILS, removal SHAPE ANSWERED = candidate (b) no removal raw** — [D15] logs show the ADD raw re-delivering bodyEmpty=False seen=True every poll, NO empty-body raw ever after the in-WhatsApp removal → 08-27's candidate-(a) re-process fix correct-but-INERT; round-6 = absence-based WA reconcile (poll reactions[] via messages/id/get or chats/filter, clear ReactionStore on absence) OR documented Wappi platform limit. **NEW D17** (owner SCOPE-OVERRIDE on the byte-identical check — "should be sync chats cover page for both channels every time they are just added"): SUPERSEDES the 08-28 parity decision; mirror the 08-28 Telegram stamp with {bot}WhatsappSyncUntil on late WhatsApp auth (authPage==WhatsappAuth). **Echo-hex CAPTURED at last, ask CLOSED** — tapi echoes BASE-form U+1F44D/U+1F601/U+1F44C (no FE0F), user_id==ownId 1038376805 (confirms 08-11); the echo-without-event evidence is what relocated D2-view. D2-view WA add/change + D15 WA add/change both PASS (items 2/4, WhatsApp byte-identical holds). Gates B/C + I.3 #10 re-aggregation stay blocked; prod bagkz dormant. Round 6 next via /gsd-plan-phase 08 --gaps for D2-view / D15 / D17. G6 resolved (not carried). No app code changed (planning docs only). commit pending.
+- [Phase 8]: 08-30 D2-view ROOT FIX (CR-01, milestone #1) — TelegramReactionMerge grace now ENDS on server confirmation: a SAME-emoji echo adopts the server 'me' element (time=0, non-fresh, still reactorKey 'me') so a subsequent external own-reaction change made IN the Telegram app applies (SameReactions false -> OnMessageReactionsChanged fires); a DIFFERING echo within the 90s window is still suppressed (fresh local wins, never-clear-on-differ — no D2 flicker regression); fold branch re-keys the un-mapped same-emoji echo to 'me' instead of pinning the fresh optimistic entry. WR-01 tombstone mirror: the empty-emoji removal tombstone is CARRIED only while the server still echoes 'me' (WR-03) and DROPPED once the server confirms the absence (serverMine<0) so an external own re-add applies. Editor-only [D2-merge] differ-suppress log (#if UNITY_EDITOR, class stays UnityEngine-free in ship). TDD RED->GREEN both tasks (Task1 744178e/b904106, Task2 801087f/cbe6695); full EditMode suite 1184/1184 FRESH (baseline 1181+3; 2 new CR-01 + 1 new WR-01 + 2 renamed). WhatsApp byte-identical (only TelegramReactionMerge.cs+tests changed; ReactionStore untouched). Device confirmation rides 08-33; [D2-merge] log tagged for removal at phase close (IN-03).
 
 ### Pending Todos
 
@@ -203,11 +204,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 08 P27 | 6min | 2 tasks | 2 files |
 | Phase 08 P28 | 2min | 1 tasks | 1 files |
 | Phase 08 P29 | ~15min | 1 tasks | 2 files |
+| Phase 08 P30 | 9min | 2 tasks | 2 files |
 
 ## Session Continuity
 
-Last session: 2026-07-21T00:00:00.000Z
-Stopped at: Completed 08-29-PLAN.md (round-5 checkpoint RUN — Gate A stays ISSUES)
-Resume file: None (next: /gsd-plan-phase 08 --gaps for round 6 — D2-view / D15 / D17)
+Last session: 2026-07-20T21:31:30.656Z
+Stopped at: Completed 08-30-PLAN.md (D2-view CR-01 + WR-01)
+Resume file: None
 
 **Planned Phase:** 10 (message-batching-debounce) — 4 plans — 2026-07-20T09:44:37.569Z
