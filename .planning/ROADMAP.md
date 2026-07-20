@@ -139,7 +139,7 @@ Plans:
   1. A Telegram-authed bot is exercised on-device end-to-end — auth (incl. 2FA), chat list/history/media, send/reply/reaction, channel switch, auto-reply, «Вместе», dashboard — with results recorded in a HUMAN-UAT doc.
   2. The carried v1.0 deferred device-UAT scenarios (Phases 01–02) are run or explicitly re-deferred with a reason.
   3. The prod bagkz bulk-replication checklist is updated to cover the Telegram template fixes + Suggest Replies channel-awareness (one bulk copy when dev is signed off; prod stays dormant this milestone).
-**Plans**: 3 plans + 7 gap-closure plans (08-04..08-10, from Gate-A defects D1–D9) + 6 round-2 gap-closure plans (08-11..08-16, from re-verify defects D2/D9/D10/D11/D12) + 5 round-3 gap-closure plans (08-17..08-21, from re-verify defects D2-ext/D12/D13)
+**Plans**: 3 plans + 7 gap-closure plans (08-04..08-10, from Gate-A defects D1–D9) + 6 round-2 gap-closure plans (08-11..08-16, from re-verify defects D2/D9/D10/D11/D12) + 5 round-3 gap-closure plans (08-17..08-21, from re-verify defects D2-ext/D12/D13) + 4 round-4 gap-closure plans (08-22..08-25, from re-verify residuals D2-view/D12-ext/D14)
 Plans:
 - [ ] 08-01-PLAN.md — Consolidated owner-run device-UAT runbook (`08-DEVICE-UAT.md`) aggregating every open milestone gate (auth/2FA, chat+media incl. the 05-07/08 treatments, 05-09 fixes, vthumb probe, switcher, auto-reply e2e, live «Вместе»+dashboard, carried v1.0); owner-run gate (Gate A RUN 2026-07-16 → ISSUES, D1–D9 filed)
 - [ ] 08-02-PLAN.md — Prod bagkz replication runbook (`08-PROD-REPLICATION.md`) + prod-targetable verify/deployer tweaks; one-shot bulk copy, templates INACTIVE, header-auth follow-up flagged
@@ -162,7 +162,11 @@ Plans:
 - [ ] 08-19-PLAN.md — [gap round 3] D13a (medium): WhatsApp-parity post-creation cover for Telegram — reuse the shared SyncingState overlay via runtime parameterization (per-channel {bot}TelegramSyncUntil stamp + channel-aware sync gate + channel-aware SyncingView copy); no new scene object; WhatsApp cover byte-identical (wave 8)
 - [ ] 08-20-PLAN.md — [gap round 3] D13b: REMOVE the D9 «Синхронизация…» pill entirely (scene object + ChatListSyncIndicator/Gate/Builder/tests + OnChatListSyncStart/End events + IsChatListSyncing getter) while PRESERVING _chatListSyncing + its duplicate-sync guard; baseline 1124−6=1118 (wave 9, depends 08-17/08-19)
 - [ ] 08-21-PLAN.md — [gap round 3] Consolidated owner device re-verify of D2-ext/D12/D13 on one build (checkpoint:human-verify; wave 10, depends 08-17..08-20); captures the D2-ext echo hex, carries the deactivate-dev-clone reminder; on all-PASS dispositions Gate A → PASS and unblocks Gates B/C
-**Flags**: DEVICE + USER-ASSISTED. No new v1.1 REQs (closeout phase). Gap-closure round 3 in progress (08-17..08-21, D2-ext/D12/D13; round 2 D2-core/D10/D11 resolved on device, D9→D13 owner decision "cover only, remove pill"; round 1 D1–D9 resolved 7/9).
+- [ ] 08-22-PLAN.md — [gap round 4] D2-view (medium): reaction-bubble VISUAL repaint miss — view/refresh layer only (one-frame-deferred pill re-render after the reaction bar's lifted Canvas is destroyed; ReactionPillView.ForceReRender + MessageItemView.RefreshReactionsVisual + compiled [D2-view] log); data layer untouched; WhatsApp byte-identical (wave 11)
+- [ ] 08-23-PLAN.md — [gap round 4] D12-ext (medium): create-bot CTA dies after a WhatsApp↔Telegram chip switch — pure EmptyStateReasonPolicy NoBots-coercion (CR-01) wired into HandleEmptyState + HandleActiveChannelChanged re-derive (WR-02) + non-silent OpenCurrentBotAuth; WhatsApp invariant pinned by test (wave 11)
+- [ ] 08-24-PLAN.md — [gap round 4] D14 (low, owner-approved): Telegram post-creation cover spinner/progress/countdown → brand blue #2AABEE via ChannelAccent.Resolve (code-only, no scene stamp); WhatsApp cover byte-identical (wave 11)
+- [ ] 08-25-PLAN.md — [gap round 4] Consolidated owner device re-verify of D2-view/D12-ext/D14 on one build (checkpoint:human-verify; wave 12, depends 08-22..08-24); G6 dev-clone deactivation is a BLOCKING line item, D2-ext echo-hex nice-to-have; on all-PASS Gate A → PASS + re-aggregates I.3 #10 + unblocks Gates B/C
+**Flags**: DEVICE + USER-ASSISTED. No new v1.1 REQs (closeout phase). Gap-closure round 4 in progress (08-22..08-25, D2-view/D12-ext/D14; round 3 D13 cover+pill resolved on device + D2-ext data layer resolved, residuals D2-view/D12-ext + owner-approved D14; round 2 D2-core/D10/D11 resolved; round 1 D1–D9 resolved 7/9).
 
 ### Phase 9: Semi-Auto Suppression Flag (v1.2)
 **Goal**: When a chat is in «Вместе» (semi-auto), the bot's autonomous n8n reply workflow stands down for that chat — no auto-reply, message stays unread, suggestions panel still works — identically on WhatsApp and Telegram. The «Бот работает/пауза» activation switch is untouched.
@@ -236,4 +240,4 @@ Phases execute in numeric order: 3 → 4 → 5 → 6 → 7 → 8. Phases 3 and 4
 | 5. Channel-Aware ChatManager Core | v1.1 | 7/7 | Complete    | 2026-07-14 |
 | 6. Channel Switcher UI | v1.1 | 2/2 | Complete    | 2026-07-13 |
 | 7. «Вместе» Suggestions + Dashboard on Telegram | v1.1 | 2/2 | Complete    | 2026-07-13 |
-| 8. Device UAT + Milestone Closeout | v1.1 | 10/10 | Re-verify run 2026-07-17: 7/9 resolved; open D2, D9, D10, D11, D12 → gap round 2 | - |
+| 8. Device UAT + Milestone Closeout | v1.1 | 14/14 | Round-3 re-verify 2026-07-20: D13 + D2-ext data layer resolved; round-4 gaps planned (08-22..08-25, D2-view/D12-ext/D14) | - |
