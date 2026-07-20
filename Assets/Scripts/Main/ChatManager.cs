@@ -731,19 +731,6 @@ public partial class ChatManager : MonoBehaviour
                         continue;
                     }
 
-                    // [D15] Candidate-(a) fix (08-REVIEW IN-02): a WhatsApp reaction REMOVAL can be re-emitted
-                    // under the SAME id as the original reaction, so seenMessageIds.Add above returned false and
-                    // the removal never reached HandleReactionEvent — the pill never clears. Re-run the reaction
-                    // event here for WhatsApp. ReactionStore.ApplyToMessage is idempotent (an unchanged reaction
-                    // returns false -> no event, no repaint), so this fires ONLY on a genuine change/removal and
-                    // cannot storm. Telegram carries reactions[] on the message (never a type==reaction raw) ->
-                    // WhatsApp-gated => Telegram byte-identical.
-                    if (ActiveChannel == ChatChannel.WhatsApp && raw.type == "reaction")
-                    {
-                        if (HandleReactionEvent(raw, cachedList, chatId)) hasStatusUpdates = true;
-                        continue;
-                    }
-
                     // Already-cached message: refresh stale media URLs and
                     // delivery_status. Wappi can return s3Info: null on first
                     // arrival and populate it later, or — seen in production —
