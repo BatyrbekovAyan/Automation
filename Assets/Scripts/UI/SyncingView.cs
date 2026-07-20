@@ -28,10 +28,22 @@ public class SyncingView : MonoBehaviour
     private Tween spinnerTween;
     private long syncUntilUnixMs;
 
+    // Authored (WhatsApp) accent colors captured ONCE at Awake so the Telegram recolor maps FROM
+    // the real authored greens (never a hardcoded scene value) and reverts BYTE-IDENTICAL on the
+    // WhatsApp channel — the cover is a persistent widget reused across channel switches (D14).
+    // Covered: the spinner ring Image (#25D366), the "sync" progress fill (#25D366), and the
+    // countdown label (#1FA855). All null-guarded. Mirrors EmptyStateView.CacheAccentColors.
+    private Image spinnerImage;                 // resolved from the spinner RectTransform at Awake
+    private Color spinnerAuthoredColor;
+    private Color progressFillAuthoredColor;
+    private Color countdownAuthoredColor;
+    private bool accentColorsCached;
+
     private void Awake()
     {
         canvasGroup = GetComponent<CanvasGroup>();
         ApplyCopy();
+        ApplyChannelAccent();
         Hide();
     }
 
@@ -65,7 +77,8 @@ public class SyncingView : MonoBehaviour
     private void HandleSyncing(long untilMs)
     {
         syncUntilUnixMs = untilMs;
-        ApplyCopy(); // re-resolve wording for the channel that is showing the cover
+        ApplyCopy();          // re-resolve wording for the channel that is showing the cover
+        ApplyChannelAccent(); // re-resolve accent (spinner/fill/countdown) for that same channel
         Show();
         StopTicking();
         StartSpinner();
@@ -151,6 +164,35 @@ public class SyncingView : MonoBehaviour
         if (titleLabel != null) titleLabel.text = "Setting things up";
         if (bodyLabel != null) bodyLabel.text = "We're importing your chats and messages from WhatsApp.";
         if (footnoteLabel != null) footnoteLabel.text = "You can keep using the app. Chats appear here when ready.";
+    }
+
+    // Capture each green element's OWN authored scene color once, so WhatsApp reverts
+    // byte-identically (never a hardcoded scene green). Mirrors EmptyStateView.CacheAccentColors.
+    private void CacheAccentColors()
+    {
+        if (accentColorsCached) return;
+        accentColorsCached = true;
+        if (spinner != null) spinnerImage = spinner.GetComponent<Image>();
+        if (spinnerImage != null) spinnerAuthoredColor = spinnerImage.color;
+        if (progressFill != null) progressFillAuthoredColor = progressFill.color;
+        if (countdownLabel != null) countdownAuthoredColor = countdownLabel.color;
+    }
+
+    /// <summary>
+    /// D14: recolor the cover's green elements (spinner ring, "sync" progress fill, countdown) to
+    /// Telegram brand blue on the Telegram channel; every other channel keeps its authored green
+    /// byte-identically (Resolve pass-through). Mirrors EmptyStateView.ApplyChannelAccent
+    /// — runtime only, no scene stamp. Re-applied whenever the cover (re)shows so a channel switch is
+    /// reflected without re-authoring the scene. TickRoutine sets countdownLabel.text and
+    /// progressFill.fillAmount but NOT their colors, so a one-time recolor at show holds all window.
+    /// </summary>
+    private void ApplyChannelAccent()
+    {
+        CacheAccentColors();
+        ChatChannel channel = ActiveChannelOrDefault();
+        if (spinnerImage != null)   spinnerImage.color   = ChannelAccent.Resolve(channel, spinnerAuthoredColor);
+        if (progressFill != null)   progressFill.color   = ChannelAccent.Resolve(channel, progressFillAuthoredColor);
+        if (countdownLabel != null) countdownLabel.color = ChannelAccent.Resolve(channel, countdownAuthoredColor);
     }
 
     private void Show()
