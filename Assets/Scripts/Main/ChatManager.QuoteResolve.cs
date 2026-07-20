@@ -139,6 +139,15 @@ public partial class ChatManager
                         {
                             QuotedPreview q = ReplyParser.FromFetchedMessage(msg, ParseMessageType);
                             text = q.text ?? ""; senderName = q.senderName ?? ""; type = q.type;
+#if UNITY_EDITOR
+                            // D15 probe (round-6, 08-REVIEW IN-01): does a WhatsApp messages/id/get message payload EVER carry
+                            // current reaction state? If a WA target row exposed a reactions[] key we could clear a reaction
+                            // REMOVED in the WhatsApp app (round-5 answered candidate (b): no removal raw ever arrives). Log
+                            // key-presence booleans only (never content); reuses THIS existing authed call — no new API request,
+                            // no token handling. Empty on every WA probe ⇒ the documented Wappi WA platform limit (Task 3).
+                            if (ActiveChannel == ChatChannel.WhatsApp)
+                                Debug.Log($"[D15-probe] wa msgId={qid} reactionsKey={msg["reactions"] != null} reactionKey={msg["reaction"] != null}");
+#endif
                         }
                         definitive = true; // a valid response (even empty/not-found) — cache it to stop refetching
                     }
