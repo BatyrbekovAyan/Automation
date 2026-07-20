@@ -408,20 +408,23 @@ private void HandleLive(List<MessageViewModel> msgs)
 | A4 | `messages/get` returns the trailing burst within `limit=15` in the common case (no bot reply for >15 incoming is rare). | BATCH-02 | Accepted v1 limitation (design: run bounded by fetch limit). Raise limit if long silent bursts appear. |
 | A5 | n8n dev runs in `main` mode with effectively unbounded concurrent webhook executions (no queue-mode concurrency cap throttling the concurrent waiters). | Pattern 1 | If a concurrency limit exists, later fragments queue behind earlier waiters and the abort/win timing skews. Default local n8n is main-mode/unbounded; confirm if the dev instance was reconfigured. |
 
-## Open Questions
+## Open Questions (all RESOLVED — resolution incorporated into the plans)
 
 1. **`messages/get` default sort order per channel**
    - What we know: the app calls it with no `order` param; `time` (unix sec) is present on both channels.
    - What's unclear: whether array[0] is newest or oldest on each base.
    - Recommendation: sort by `time` desc in the Code node (Pitfall 3) — sidesteps the question entirely.
+   - **RESOLVED:** `Latest+Combine` sorts `fetched` by `time` desc (10-01 Task 1 Code body: `fetched.sort((a,b) => (b.time||0) - (a.time||0))`), so per-channel array order is irrelevant — Q1 no longer matters.
 
 2. **Exact window values (8s / 2.5s)**
    - What we know: CONTEXT locks the ranges and marks exact values as Claude's discretion, to tune at e2e.
    - Recommendation: ship 8.0 / 2.5, expose each as a single named constant, tune during the owner e2e for perceived single-message latency.
+   - **RESOLVED:** shipped as `Debounce Wait amount: 8` (server, 10-01) + `IncomingDebounceGate.WindowSeconds = 2.5f` (client, 10-02), each a single named tunable; tuning at the owner e2e is wired into 10-03 Task 2 (server `amount`) and 10-04 Task 2 (client `WindowSeconds`).
 
 3. **Does the Phase-9 gate currently function on live clones?**
    - What we know: 09-01..03 are structural/client; 09-04 (live redeploy + runData) has NOT run per STATE.md.
    - Recommendation: fold a quick "does the pre-debounce gate route correctly" check into the same owner runData session; the body re-emit makes Phase 10 robust regardless.
+   - **RESOLVED:** 10-03 Task 1 runs `verify-message-batching.py` as a pre-deploy gate and the runData session (10-03 Task 2) confirms the `Suppressed?` routing sits before the debounce; the Code-node body re-emit keeps Phase 10 robust regardless of the gate's live state (Assumption A1).
 
 ## Environment Availability
 
