@@ -1,6 +1,6 @@
 # Phase 8 — Device UAT: v1.1 Telegram Parity milestone gate (consolidated, owner-run)
 
-**Status:** RUN 2026-07-15/16 → re-verify 2026-07-17 (08-10) → round-2 re-verify 2026-07-17 (08-16) → round-3 re-verify 2026-07-20 (08-21) — **Overall: ISSUES** (open: **D2-view**, **D12-ext**, **D14** — see §Defects; resolved through round 3: D1–D8 core set, D10, D11, D2 core, D2-ext data layer, D13 cover+pill; D9 SUPERSEDED by owner decision → D13 cover). This pass is the single source of truth for "is v1.1 shippable."
+**Status:** RUN 2026-07-15/16 → re-verify 2026-07-17 (08-10) → round-2 re-verify 2026-07-17 (08-16) → round-3 re-verify 2026-07-20 (08-21) → **round-4 re-verify 2026-07-20 (08-25 — PENDING owner run, see §Round 4 re-verify)** — **Overall: ISSUES** (open: **D2-view**, **D12-ext**, **D14** — see §Defects; resolved through round 3: D1–D8 core set, D10, D11, D2 core, D2-ext data layer, D13 cover+pill; D9 SUPERSEDED by owner decision → D13 cover). This pass is the single source of truth for "is v1.1 shippable."
 
 This is ONE ordered device pass that aggregates EVERY still-open device-verify gate
 across the whole v1.1 milestone (Phases 3–7) **plus** the carried v1.0 deferred UAT.
@@ -433,6 +433,85 @@ Item shape (every item):
 
 ---
 
+## Round 4 re-verify (2026-07-20) — D2-view / D12-ext / D14 + G6 (BLOCKING)
+
+> **PENDING owner run.** ONE Android build off the post-08-24 tree (fixes **08-22** D2-view +
+> **08-23** D12-ext + **08-24** D14 all merged) confirms the three round-4 residuals are closed,
+> mirroring the 08-10 / 08-16 / 08-21 passes. **Do NOT tick on the owner's behalf — every box below
+> ships blank.** Record EXACTLY ONE verdict per item (`PASS` / `FAIL` / `N/A`), transcribed VERBATIM;
+> any FAIL adds/updates a §Defects row with its source anchor. On all-PASS **and** an explicit G6
+> disposition → flip Gate A to PASS, re-aggregate I.3 #10, unblock Gates B/C; any FAIL → keep Gate A
+> = ISSUES and spin round 5 via `/gsd-plan-phase 08 --gaps`.
+>
+> **Pre-build gate (met):** EditMode suite **1176/1176 Passed, 0 failed** FRESH via the in-Editor
+> bridge (`Temp/claude/test-summary.json`, `editorAssemblyWrittenUtc` 2026-07-20T12:34:31Z —
+> postdates the last app edit 08-24 `e99ebaa`; no app code changed since). Baseline = pre-round-4
+> **1170 + 6** (08-23 `EmptyStateReasonPolicy` tests) = **1176**, exactly the +6 the round-4 fixes add
+> (08-22 +0 / 08-23 +6 / 08-24 +0). Owner re-confirms the suite green FRESH from the bridge at run
+> time before building (the total grows concurrently from parallel phases — read it, never hardcode).
+>
+> **G6 is a BLOCKING disposition item** — outstanding across THREE consecutive checkpoints
+> (08-10 → 08-16 → 08-21); clones run against REAL contacts (bot-activation policy). **This checkpoint
+> does NOT accept an all-PASS without an explicit G6 disposition.**
+
+1. **D2-view — reaction bubble repaint (the round-3 repro).**
+   **expected:** change a reaction on message bubble A (long-press → tap an emoji), then open the
+   reaction bar on ANOTHER bubble B and change its reaction. Bubble A's pill shows the emoji you set
+   on A — it does NOT stay stale. Repeat a few times (the old bug was intermittent).
+   **how-to:** on a Telegram bot, react on bubble A, then open the bar on bubble B and react; watch
+   A's pill. Repeat.
+   **verdict:** ☐ PASS ☐ FAIL ☐ N/A | **source:** 08-DEVICE-UAT.md D2-view / B9–B13
+2. **D2-view — WhatsApp unaffected.**
+   **expected:** on a WhatsApp bot, add/change a reaction — the pill repaints exactly as before.
+   **how-to:** on a WhatsApp bot, add then change a reaction; confirm the pill updates as it always did.
+   **verdict:** ☐ PASS ☐ FAIL ☐ N/A | **source:** WhatsApp byte-identical invariant (08-22)
+3. **D12-ext — create-bot CTA survives a channel switch (BOTH channels, zero bots).**
+   **expected:** with NO bots, open the Chats screen; tap «Создать бота» → the Add-Bot form opens
+   (this already worked). Then switch the WhatsApp↔Telegram chip and tap «Создать бота» again — it
+   STILL opens the form, on BOTH channels, with the channel you're viewing preselected. Switch back
+   and forth a couple of times to confirm it never goes dead.
+   **how-to:** delete all bots, open Chats, tap the create CTA, switch the channel chip, tap it again;
+   repeat on both channels.
+   **verdict:** ☐ PASS ☐ FAIL ☐ N/A | **source:** 08-DEVICE-UAT.md D12-ext / F-group
+4. **D12-ext — no stale wrong-channel card over the cover (WR-02).**
+   **expected:** on a Telegram-only bot inside its ~5-min sync cover, flip to WhatsApp (its «WhatsApp
+   не подключён» card shows), then flip back to Telegram — you see the Telegram syncing cover, NOT a
+   leftover «WhatsApp не подключён» card sitting on top / blocking taps.
+   **how-to:** create a fresh Telegram bot, and while the cover is up flip WA↔TG; confirm no stale WA
+   card lingers over the Telegram cover.
+   **verdict:** ☐ PASS ☐ FAIL ☐ N/A | **source:** 08-DEVICE-UAT.md D12-ext / 08-REVIEW WR-02
+5. **D14 — Telegram cover reads Telegram-blue.**
+   **expected:** create a fresh Telegram bot → the post-creation cover's spinner, progress fill, and
+   countdown are Telegram brand blue (#2AABEE), matching the blue empty-state accent + switcher chip.
+   **how-to:** create a fresh Telegram bot; inspect the cover's spinner/fill/countdown color.
+   **verdict:** ☐ PASS ☐ FAIL ☐ N/A | **source:** 08-DEVICE-UAT.md D14 / D13 cover
+6. **D14 — WhatsApp cover byte-identical.**
+   **expected:** a fresh WhatsApp bot's cover is unchanged — green spinner/fill, green countdown.
+   **how-to:** create a fresh WhatsApp bot; confirm the cover stays green.
+   **verdict:** ☐ PASS ☐ FAIL ☐ N/A | **source:** WhatsApp byte-identical invariant (08-24)
+7. **G6 — deactivate the dev test clone (BLOCKING line item).**
+   **expected:** once any dev-n8n test window closes, the per-bot Telegram/WhatsApp clone is
+   DEACTIVATED (clones run against real contacts); prod bagkz stayed dormant. **This checkpoint does
+   NOT accept an all-PASS without an explicit G6 disposition** — record one of: `done` /
+   `not-needed-this-pass-because-no-clone-active` / `still-outstanding`.
+   **how-to:** after the test window, deactivate the clone (or confirm none was active); confirm prod
+   bagkz untouched.
+   **disposition:** ☐ done ☐ not-needed-this-pass (no clone active) ☐ still-outstanding
+   **source:** 08-DEVICE-UAT.md G6 / 04-HUMAN-UAT.md #6
+8. **D2-ext echo-hex (NICE-TO-HAVE, non-blocking).**
+   **expected:** if convenient during D2-view testing, capture the tapi reaction-echo hex from the
+   `[TG reaction echo]` Editor log (ChatManager.cs) / `Tools/tapi/probe-message.sh`. Absence is fine.
+   **how-to:** watch the Editor log while changing a reaction; note the echo hex, or record
+   "not captured".
+   **verdict:** ☐ captured (hex: ______) ☐ not captured | **source:** 08-DEVICE-UAT.md D2-ext
+
+**Round-4 Overall:** ☐ PASS (all D2-view / D12-ext / D14 items PASS **and** G6 dispositioned) ☐ ISSUES
+**Round-4 Gate A disposition:** ☐ PASS (→ re-aggregate I.3 #10, unblock Gates B/C; prod bagkz stays
+dormant until 08-02) ☐ ISSUES (→ file FAIL specifics in §Defects with anchors, spin round 5 via
+`/gsd-plan-phase 08 --gaps`)
+
+---
+
 ## Defects found
 
 Log every FAIL here so it can spin its own gap-closure plan and stays traceable to the fix that
@@ -503,6 +582,18 @@ must reopen. (Empty = no defects.)
   untouched. The 08-20 1136-green gate was SUPERSEDED by later suite growth (Editor Bee crash
   resolved post-checkpoint; phase-9/11 sessions ran the grown suite green — 1165 @ 11-01,
   1170 @ 09-03).
+- **Round-4 re-verify 2026-07-20 (08-25, PENDING owner run — checkpoint prepared):** runbook written
+  above (§Round 4 re-verify) for ONE Android build off the post-08-24 tree (fixes 08-22 D2-view +
+  08-23 D12-ext + 08-24 D14 all merged). Pre-build gate MET — EditMode **1176/1176 Passed** FRESH via
+  the in-Editor bridge (`editorAssemblyWrittenUtc` 12:34:31Z postdates the last app edit 08-24
+  `e99ebaa`; baseline 1170 + 6 = 1176, the exact +6 the round-4 fixes add). **G6 dev-clone
+  deactivation is a BLOCKING line item this pass** (third consecutive carry; clones run against real
+  contacts). Awaiting owner verdicts for D2-view (bubble A repaints after reacting on B; WhatsApp
+  unchanged), D12-ext (create-bot CTA survives a WA↔TG chip switch on both channels + no stale
+  wrong-channel card over the cover), D14 (fresh TG cover reads brand blue; WhatsApp cover green) +
+  the G6 disposition + the (nice-to-have) D2-ext echo-hex note. All-PASS + G6 → Gate A flips to PASS
+  (re-aggregate I.3 #10, unblock Gates B/C); any FAIL → Gate A stays ISSUES, round 5 via
+  `/gsd-plan-phase 08 --gaps`. Prod bagkz stays dormant until 08-02.
 - **Notes:** B7 static-webp N/A (no sample at hand); G5 N/A (no stale clone to test);
   G6 n/a with an OUTSTANDING reminder to deactivate the test clone (bot-activation policy);
   H2 FAIL — downstream of D5, re-test relevance + RAG grounding together after the fix;
