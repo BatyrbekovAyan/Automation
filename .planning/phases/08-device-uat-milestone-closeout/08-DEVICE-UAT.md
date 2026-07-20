@@ -1,6 +1,6 @@
 # Phase 8 — Device UAT: v1.1 Telegram Parity milestone gate (consolidated, owner-run)
 
-**Status:** RUN 2026-07-15/16 → re-verify 2026-07-17 (08-10) → round-2 re-verify 2026-07-17 (08-16) → round-3 re-verify 2026-07-20 (08-21) → **round-4 re-verify 2026-07-20 (08-25 — RUN, see §Round 4 re-verify)** → **round-5 re-verify 2026-07-20 (08-29 — PENDING owner run, see §Round 5 re-verify)** — **Overall: ISSUES** (open: **D2-view** (FAIL round 4), **D15** (new — WhatsApp reaction-removal not propagated), **D16** (new — late-channel Telegram sync cover) — see §Defects; resolved through round 4: D1–D8 core set, D10, D11, D2 core, D2-ext data layer, D13 cover+pill, **D12-ext CTA** (round-4 PASS), **D14 TG cover blue** (round-4 PASS); D9 SUPERSEDED by owner decision → D13 cover). This pass is the single source of truth for "is v1.1 shippable."
+**Status:** RUN 2026-07-15/16 → re-verify 2026-07-17 (08-10) → round-2 re-verify 2026-07-17 (08-16) → round-3 re-verify 2026-07-20 (08-21) → round-4 re-verify 2026-07-20 (08-25 — RUN) → **round-5 re-verify 2026-07-21 (08-29 — RUN, see §Round 5 re-verify)** — **Overall: ISSUES** (open: **D2-view** (FAIL round 5 — relocated UPSTREAM to an own-reaction event-suppression), **D15** (FAIL round 5 — removal-shape answered: candidate (b) no removal raw), **D17** (new round 5 — late-WhatsApp-auth sync cover, owner scope-override superseding the 08-28 parity decision) — see §Defects; resolved through round 5: D1–D8 core set, D10, D11, D2 core, D2-ext data layer + echo-hex CAPTURED/CLOSED, D13 cover+pill, D12-ext CTA, D14 TG cover blue, **D16 late-TG cover** (round-5 PASS); D9 SUPERSEDED by owner decision → D13 cover). This pass is the single source of truth for "is v1.1 shippable."
 
 This is ONE ordered device pass that aggregates EVERY still-open device-verify gate
 across the whole v1.1 milestone (Phases 3–7) **plus** the carried v1.0 deferred UAT.
@@ -560,16 +560,19 @@ propagation; D16 late-channel Telegram sync-cover stamp. (G6 resolved post-check
 
 ---
 
-## Round 5 re-verify (2026-07-20) — D2-view / D15 / D16 (Gate A — the milestone v1.1 gate)
+## Round 5 re-verify (2026-07-21) — D2-view / D15 / D16 (Gate A — the milestone v1.1 gate)
 
-> **PENDING owner run — verdicts BLANK below (do NOT tick on the owner's behalf).** ONE Android build off the
-> post-08-28 tree (fixes **08-26** D2-view poll-path re-render + **08-27** D15 WhatsApp reaction-removal ingest +
-> **08-28** D16 late-channel Telegram sync-cover stamp all merged) that the owner runs to confirm the three
-> round-5 residuals are closed, mirroring the 08-10 / 08-16 / 08-21 / 08-25 passes. Record EXACTLY ONE verdict
-> per item (`PASS` / `FAIL` / `N/A`), transcribed VERBATIM; any FAIL adds/updates a §Defects row with its source
-> anchor **and** pastes the captured `[D2-view]`/`[D15]` device-log line(s). On all-PASS → flip Gate A to PASS,
-> re-aggregate I.3 #10, unblock Gates B/C (prod bagkz stays dormant until 08-02); any FAIL → keep Gate A =
-> ISSUES and spin round 6 via `/gsd-plan-phase 08 --gaps` with the discriminating logs.
+> **RUN 2026-07-21 — Overall ISSUES, Gate A STAYS ISSUES** (verdicts transcribed VERBATIM below WITH the
+> discriminating log captures; D2-view relocated UPSTREAM, D15 removal-shape answered, D17 minted, echo-hex CAPTURED).
+> ONE build off the post-08-28 tree (fixes **08-26** D2-view poll-path re-render + **08-27** D15 WhatsApp
+> reaction-removal ingest + **08-28** D16 late-channel Telegram sync-cover stamp all merged); the owner ran the pass
+> and returned per-item verdicts + two Unity Editor Console screenshots, mirroring the 08-10 / 08-16 / 08-21 / 08-25
+> passes. **NOTE: this round-5 repro session ran in the Unity EDITOR** (the screenshots are the Editor Console, not
+> device logcat) — the Editor reproduces both FAILs, which makes round-6 verification EASIER (Editor-reproducible; no
+> device build needed for the fix loop, though a device pass still gates Gate A). Verdicts transcribed VERBATIM; each
+> FAIL updates its §Defects row with the anchor **and** the captured `[D2-view]`/`[D15]` Console line(s). **Outcome:
+> item 2/4/5 PASS (incl. D16 late-TG cover RESOLVED); item 1 D2-view FAIL (relocated); item 3 D15 FAIL (candidate (b)
+> answered); item 6 owner SCOPE-OVERRIDE → new D17; item 7 echo-hex CAPTURED → Gate A stays ISSUES, round 6 next.**
 >
 > **Pre-build gate (as authored — re-confirm FRESH before building):** EditMode suite **1181/1181 Passed,
 > 0 failed** per the three wave-13 summaries (08-26 → 1180, 08-27 → 1181, 08-28 → 1181 delta-0), FRESH via the
@@ -597,12 +600,35 @@ propagation; D16 late-channel Telegram sync-cover stamp. (G6 resolved post-check
    change one on bubble B right after. Repeat several times.
    **IF FAIL:** capture the `[D2-view] post-render id=… active=… len=… culled=…` logcat line (active/len/culled
    discriminates TMP submesh-churn vs RectMask2D cull vs exception) and paste it into the Defects row.
-   **verdict:** ☐ PASS ☐ FAIL ☐ N/A | **source:** 08-DEVICE-UAT.md D2-view / B9–B13
+   **verdict:** ☐ PASS ☑ FAIL ☐ N/A | **source:** 08-DEVICE-UAT.md D2-view / B9–B13
+   **owner (2026-07-21):** "still not updating reaction when changed in telegram. logs show right reaction but it
+   doesnt update on message bubble. (Screenshot 1, logs update reaction, but not on screen.)"
+   **captured logs (Screenshot 1 — Unity Editor Console):** `[D2-view] reactions changed id=23475 n=1` →
+   `[D2-view] post-render id=23475 active=True len=24 culled=False` (00:24:00), then NO further `[D2-view]`
+   reactions-changed / post-render lines despite the emoji changing twice more (👍 → 😁 → 👌); every subsequent
+   change fired only `[TG reaction echo]` at Normalize level (full timeline in the log-evidence block below).
+   **ORCHESTRATOR ANALYSIS (labeled — not owner input):** **FAIL (4th round), but the mechanism class is now
+   REFUTED-and-relocated.** The captured logs show the first remote change fired `OnMessageReactionsChanged` and
+   the 08-26 hardened re-render reported a HEALTHY post-render (`active=True len=24 culled=False` → the exception
+   candidate is refuted [the log fired at all], the cull candidate is refuted [culled=False]). Decisively, the two
+   SUBSEQUENT emoji changes (😁 U+1F601, 👌 U+1F44C) produced `[TG reaction echo]` lines at Normalize level but NO
+   `OnMessageReactionsChanged` / `[D2-view]` events at all. The failure is UPSTREAM of the view: after the first
+   own-user remote reaction is applied, subsequent changes stop emitting change events. The 08-26 view hardening
+   STAYS (it fixed the one-shot-loss class and its diagnostic proved the relocation). **Evidence-backed HYPOTHESIS
+   for round 6 (labeled hypothesis, NOT fact):** the `TelegramReactionMerge` own-reaction optimistic-grace window
+   (90s, identity-keyed via `_tgOwnUserId` — note `user_id == ownId` in every echo) suppresses server-observed
+   changes to one's OWN reaction after the first apply; the owner's quick successive changes all fell inside the
+   window, which also retroactively explains the round-2..5 intermittency (waiting >90s between tests would make it
+   "work"). **Round-6 scope:** trace/fix the merge's own-reaction grace so a REMOTE own-user change to a DIFFERENT
+   emoji is never suppressed (grace should key on a pending LOCAL optimistic set, not mere own-identity), with an
+   EditMode test reproducing echo-without-event.
 2. **D2-view — WhatsApp add/change unaffected.**
    **expected:** on a WhatsApp bot, add then change a reaction — the pill repaints exactly as before (the
    poll-path re-render is channel-agnostic + idempotent; the WhatsApp live path self-heals identically).
    **how-to:** on a WhatsApp bot, add a reaction then change it; confirm the pill updates as it always did.
-   **verdict:** ☐ PASS ☐ FAIL ☐ N/A | **source:** WhatsApp byte-identical invariant (08-26)
+   **verdict:** ☑ PASS ☐ FAIL ☐ N/A | **source:** WhatsApp byte-identical invariant (08-26)
+   **owner (2026-07-21):** "pass" (item 2) → WhatsApp add/change reaction repaints unaffected; the 08-26 poll-path
+   re-render is channel-agnostic + idempotent (WhatsApp byte-identical holds).
 3. **D15 — a reaction REMOVED in the WhatsApp app clears in-app.**
    **expected:** on a WhatsApp bot, add a reaction in the WhatsApp app, then REMOVE it in the WhatsApp app — the
    pill disappears in-app within a poll cycle (candidate-a: an already-seen reaction raw re-emitted under the same
@@ -612,37 +638,113 @@ propagation; D16 late-channel Telegram sync-cover stamp. (G6 resolved post-check
    **IF FAIL:** capture the `[D15] wa-reaction rawId=… stanza=… bodyEmpty=… seen=…` line(s) for the removal —
    they identify which of the three IN-02 shapes (a re-emit / no raw / missing stanza) WhatsApp uses — paste into
    the Defects row so round 6 targets exactly one site.
-   **verdict:** ☐ PASS ☐ FAIL ☐ N/A | **source:** 08-DEVICE-UAT.md D15 / round-4 item 2
+   **verdict:** ☐ PASS ☑ FAIL ☐ N/A | **source:** 08-DEVICE-UAT.md D15 / round-4 item 2
+   **owner (2026-07-21):** "still same, removing reaction in whatsaap doesnt remove it in our app. (Screenshot 2)"
+   **captured logs (Screenshot 2 — Unity Editor Console):** `[D15] wa-reaction rawId=3A8976F33979EE5EE8EB
+   stanza=3AAFD6395EE4345C8EA0 bodyEmpty=False seen=False` (00:33:20, the ADD) → `[D2-view] reactions changed
+   id=3AAFD6395EE4345C8EA0 n=1` + `post-render active=True len=24 culled=False` (add applied) → `[D15] wa-reaction
+   rawId=… stanza=… bodyEmpty=False seen=True` (00:33:22) → the SAME add-raw re-delivered `bodyEmpty=False seen=True`
+   on every subsequent poll (00:33:25…). NO empty-body raw EVER arrives after the in-WhatsApp removal (full timeline
+   in the log-evidence block below).
+   **ORCHESTRATOR ANALYSIS (labeled — not owner input):** **FAIL, discriminator answered.** The in-WhatsApp removal
+   produces NO raw at all — no empty-body re-emit (`bodyEmpty` stays False), no new rawId; the original ADD raw
+   simply keeps re-delivering (`seen=True`) on every poll. IN-02 candidate **(a)** (same-id empty-body re-emit) is
+   **REFUTED by evidence** — the 08-27 re-process fix is correct-but-INERT for removal (harmless, idempotent). This
+   is candidate **(b)** (no removal raw) — Wappi WA sync never surfaces the removal. **Round-6 scope (diagnosis-first):**
+   absence-based reconcile for WhatsApp (mirror the Telegram approach — poll the target message's `reactions[]`
+   state if Wappi's WA sync exposes it: check `messages/id/get` or the `chats/filter` payload — and clear the
+   `ReactionStore` entry when the server state no longer carries the reaction), OR document as a platform limit if
+   Wappi WA truly never reflects a removal.
 4. **D15 — WhatsApp add/change reaction still repaints (invariant).**
    **expected:** adding and changing a reaction in the WhatsApp app still updates the pill as before — the
    unseen-id path is untouched, and re-processing an already-applied reaction is an idempotent no-op.
    **how-to:** on a WhatsApp bot, add a reaction then change it; confirm the pill updates normally (no
    double-pill, no stuck state).
-   **verdict:** ☐ PASS ☐ FAIL ☐ N/A | **source:** WhatsApp byte-identical invariant (08-27)
+   **verdict:** ☑ PASS ☐ FAIL ☐ N/A | **source:** WhatsApp byte-identical invariant (08-27)
+   **owner (2026-07-21):** "pass" (item 4) → WhatsApp add/change reaction still repaints normally; the unseen-id
+   path is untouched and re-processing an already-applied reaction is an idempotent no-op (confirmed by the
+   Screenshot-2 ADD applying cleanly through `[D2-view] reactions changed` + healthy post-render).
 5. **D16 — late Telegram auth on a WhatsApp bot shows the Telegram sync cover.**
    **expected:** on a bot that already has WhatsApp, authorize Telegram from settings; when you open the bot's
    Telegram channel, the ~5-min post-creation sync cover (spinner + progress + countdown, brand blue per D14)
    shows over the chat list (`{bot}TelegramSyncUntil` now stamped at late-auth success).
    **how-to:** on a WhatsApp-only bot, open settings → authorize Telegram (code or QR); switch to the Telegram
    channel and confirm the sync cover shows.
-   **verdict:** ☐ PASS ☐ FAIL ☐ N/A | **source:** 08-DEVICE-UAT.md D16 / 08-19 late-channel follow-up
+   **verdict:** ☑ PASS ☐ FAIL ☐ N/A | **source:** 08-DEVICE-UAT.md D16 / 08-19 late-channel follow-up
+   **owner (2026-07-21):** "pass" (item 5) → **D16 RESOLVED**: a WhatsApp-first bot that authorizes Telegram later
+   now shows the Telegram post-creation sync cover (the 08-28 `{bot}TelegramSyncUntil` late-auth stamp fires the
+   08-19 cover gate).
 6. **D16 — WhatsApp byte-identical: late WhatsApp auth shows NO new cover.**
    **expected:** on a bot that already has Telegram, authorizing WhatsApp later does NOT newly show a WhatsApp
    cover (the documented parity decision — no late-auth WhatsApp stamp; WhatsApp behaviour is unchanged).
    **how-to:** on a Telegram-only bot, authorize WhatsApp later; confirm no new WhatsApp sync cover appears.
-   **verdict:** ☐ PASS ☐ FAIL ☐ N/A | **source:** WhatsApp byte-identical invariant (08-28) / parity decision
+   **verdict:** ☐ PASS ☐ FAIL ☐ N/A — **owner SCOPE-OVERRIDE** (the 08-28 expected behaviour [no WA cover] was
+   CONFIRMED, but the owner has now OVERRIDDEN the parity decision → new work item **D17**) | **source:** WhatsApp
+   byte-identical invariant (08-28) / parity decision
+   **owner (2026-07-21):** "when telegram channel exist on bot and then when adding whatsapp channel to same bot
+   there is no sync chats cover page for whatsapp (should be sync chats cover page for both channels every time
+   they are just added)"
+   **ORCHESTRATOR ANALYSIS (labeled — not owner input):** the 08-28 documented parity decision (IN-01: NO late-auth
+   WhatsApp stamp) behaved EXACTLY as designed — no WhatsApp cover appeared — so this is NOT a defect against 08-28.
+   But the owner has now OVERRIDDEN the parity decision: covers must show for BOTH channels every time a channel is
+   late-added. This SUPERSEDES the 08-28 parity decision (owner-approved scope change, exactly like D14 was). Mint
+   NEW work item **D17**: stamp `{bot}WhatsappSyncUntil` on late WhatsApp auth — the exact mirror of 08-28's
+   Telegram stamp (ShowAuthSuccess settings-reauth branch, gated `authPage == WhatsappAuth`, 300s
+   `WhatsAppSyncWindowSeconds`, reuse `SyncUntilSuffixFor(WhatsApp)` + `Bot.DeleteBot` teardown). **Round-6 scope.**
 7. **D2-ext echo-hex (NICE-TO-HAVE, non-blocking).**
    **expected:** if convenient during D2-view testing, capture the tapi reaction-echo hex from the
    `[TG reaction echo]` Editor log (ChatManager.cs) / `Tools/tapi/probe-message.sh`. Absence is fine — the D2-ext
    data layer is already proven; record "not captured".
    **how-to:** watch the Editor log while changing a reaction; note the echo hex, or record "not captured".
-   **verdict:** ☐ captured (hex: ______) ☐ not captured | **source:** 08-DEVICE-UAT.md D2-ext
+   **verdict:** ☑ captured (hex: 👍 U+1F44D, 😁 U+1F601, 👌 U+1F44C — BASE form, no FE0F; `user_id == ownId`
+   1038376805) ☐ not captured | **source:** 08-DEVICE-UAT.md D2-ext
+   **owner (2026-07-21):** "screenshot 1 have [TG reaction echo] logs, hope it is what you need" → **echo-hex
+   CAPTURED at last** (previously uncaptured across 4 checkpoints). The `[TG reaction echo]` lines show tapi
+   reaction echoes carry BASE-form codepoints (U+1F44D / U+1F601 / U+1F44C — no U+FE0F qualifier) and
+   `user_id == ownId` for own reactions — consistent with the round-2 `ReactionEmoji` base-form finding (08-11).
+   **The echo-hex ask is now CLOSED.**
 
-**Round-5 Overall:** ☐ PASS (all D2-view / D15 / D16 items PASS) ☐ ISSUES (any FAIL) — _pending owner run._
+**Captured log evidence (round 5 — Unity Editor Console; the repro session ran in the EDITOR, not on a device):**
+
+> Both FAILs (D2-view + D15) were captured from screenshots of the Unity Editor **Console** — so this round-5 repro
+> ran in the Editor, not on a device build. The Editor reproduces BOTH failures, which makes round-6 verification
+> EASIER (Editor-reproducible → no device build needed for the fix loop). A device pass still gates Gate A.
+
+**Screenshot 1 (D2-view item 1 + echo-hex item 7) — timeline:**
+- 00:23:58 `[TG reaction echo] '👍' [U+1F44D] user_id=1038376805 ownId=1038376805`
+- 00:24:00 `[D2-view] reactions changed id=23475 n=1`
+- 00:24:00 `[D2-view] post-render id=23475 active=True len=24 culled=False`
+- 00:24:01 `[TG reaction echo] '👍' [U+1F44D] user_id=1038376805 ownId=1038376805`
+- 00:24:04 `[TG reaction echo] '😁' [U+1F601] user_id=1038376805 ownId=1038376805`
+- 00:24:07 `[TG reaction echo] '👌' [U+1F44C] user_id=1038376805 ownId=1038376805`
+- 00:24:10 / :13 / :16 / :19 / :22 `[TG reaction echo] '👌' [U+1F44C]` (same echo re-delivered each poll)
+- Echo-log stack: `ChatManager:LogTelegramReactionEcho` (ChatManager.cs:1712) ← `Normalize` (1671) ← `SyncLatestMessages` (754).
+- **KEY:** NO further `[D2-view] reactions changed` / `post-render` lines after 00:24:00 despite the emoji changing
+  twice more (1F601, then 1F44C) → the change event stops firing after the first own-user reaction applies
+  (upstream event-suppression, not a view repaint miss).
+
+**Screenshot 2 (D15 item 3) — timeline:**
+- 00:33:20 `[D15] wa-reaction rawId=3A8976F33979EE5EE8EB stanza=3AAFD6395EE4345C8EA0 bodyEmpty=False seen=False`
+- 00:33:20 `[D2-view] reactions changed id=3AAFD6395EE4345C8EA0 n=1` + `post-render … active=True len=24 culled=False` (the ADD applied)
+- 00:33:22 `[D15] wa-reaction rawId=3A8976F33979EE5EE8EB stanza=3AAFD6395EE4345C8EA0 bodyEmpty=False seen=True`
+- 00:33:25 `[D15] wa-reaction rawId=… bodyEmpty=False seen=True` (same add-raw re-delivered; NO empty-body raw EVER arrives after the in-WhatsApp removal)
+
+**Round-5 Overall:** ☐ PASS (all D2-view / D15 / D16 items PASS) ☑ ISSUES (any FAIL) — **RUN 2026-07-21**: 3 PASS
+(item 2 D2-view WA add/change, item 4 D15 WA add/change, item 5 **D16 late-TG cover RESOLVED**), 2 FAIL (item 1
+**D2-view** — relocated UPSTREAM to an own-reaction event-suppression, item 3 **D15** — removal-shape answered
+[candidate (b): no removal raw]), 1 owner SCOPE-OVERRIDE (item 6 → new **D17** late-WhatsApp-auth cover, supersedes
+the 08-28 parity decision), echo-hex **CAPTURED** (item 7, ask CLOSED). G6 resolved, not carried.
 **Round-5 Gate A disposition:** ☐ PASS (→ flip Gate A to PASS, re-aggregate I.3 #10, unblock Gates B
-[prod replication, 08-02] and C [milestone close, 08-03]; prod bagkz stays dormant until 08-02) ☐ ISSUES
-(→ keep Gate A = ISSUES; file the FAIL(s) in §Defects with anchors + the captured `[D2-view]`/`[D15]` log
-line(s); spin round 6 via `/gsd-plan-phase 08 --gaps`). _Pending owner run — G6 resolved, not carried._
+[prod replication, 08-02] and C [milestone close, 08-03]; prod bagkz stays dormant until 08-02) ☑ ISSUES →
+**Gate A STAYS ISSUES.** D2-view FAIL (relocated) + D15 FAIL (shape answered) + D17 minted, all filed/updated in
+§Defects with anchors + the captured `[D2-view]`/`[D15]` log lines; **spin round 6** via `/gsd-plan-phase 08 --gaps`.
+Gates B/C + I.3 #10 re-aggregation stay blocked; prod bagkz stays dormant. Do NOT touch Gates B/C or I.3 #10 this
+pass. **Round-6 scope:** **D2-view** upstream event-suppression fix (own-reaction grace in `TelegramReactionMerge`
+should key on a pending LOCAL optimistic set, not mere own-identity — evidence: echo-without-event; Editor-reproducible
+EditMode test); **D15** absence-based WhatsApp removal reconcile (poll the target message's `reactions[]` state and
+clear the `ReactionStore` entry when the server no longer carries it — OR document as a Wappi WA platform limit);
+**D17** late-WhatsApp-auth cover stamp (`{bot}WhatsappSyncUntil`, exact mirror of 08-28's Telegram stamp — supersedes
+the 08-28 parity decision).
 
 ---
 
@@ -665,13 +767,14 @@ must reopen. (Empty = no defects.)
 | D10 | H2 (WhatsApp half, split from D5) — «Вместе» suggestions are IRRELEVANT on the WhatsApp channel; Telegram suggestions are relevant, and live refresh + draft protection PASS on both channels | medium | 07-HUMAN-UAT.md / H2 (re-verify 2026-07-17) | yes — diagnose the WhatsApp-side payload (transcript freshness, botWaId/RAG branch inputs) AND the dev-n8n Suggest_Replies WhatsApp branch (prompt/RAG grounding); the Telegram path is the working reference to diff against → **RESOLVED @ re-verify round-2 2026-07-17** (08-16: owner "seems ok" — re-tested against dev n8n with the D10-fixed Suggest_Replies deployed by canonical PUT, activation preserved) |
 | D11 | B-group media — SOME video files never download (incl. GIFs and video notes); owner suspects a Wappi/tapi server-side cause | medium | new (re-verify 2026-07-17) | yes — instrument FIRST: capture failing message ids + HTTP status/body from `message/media/download` (expired s3 link? size cap? media type?); if server-side, add graceful retry/error UX + file a Wappi ticket; keep the download queue strictly serial per repo constraint → **RESOLVED @ re-verify round-2 2026-07-17** (08-16: owner "seems ok" — no download failure reproduced this pass, so no `[MediaDownload] FAIL` lines to capture; the 08-15 instrumentation + serial-safe transient retry stay armed for any future failure) |
 | D12 | F-group — the Telegram empty-state create-bot CTA does NOTHING; expected: same flow as the WhatsApp CTA but with Telegram preselected in the add-bot form | medium | new (re-verify 2026-07-17) | yes — wire the EmptyStateView create-CTA on the Telegram channel to open AddBotPanel with Telegram preselected (mirror the WhatsApp CTA handler; check whether 05-10/05-12's TG empty-state branches left the click handler unwired for the create reason) → **RE-FAIL @ re-verify round-2 2026-07-17** (08-16: owner "nothing happens when pressing the button" — CONTRADICTS 08-14's opens-with-WhatsApp diagnosis [the `SelectPlatform(1)`→`ActiveChannel` preselect fix]; the CTA is INERT on device, not merely mis-preselected. Round-3 on-device/runtime diagnosis: a raycast blocker over the button, a per-channel empty-state instance with an unwired handler, an `AddBotPanel.Instance` null path, or a swallowed exception) → **PARTIAL RE-FAIL @ re-verify round-3 2026-07-20 (08-21), residual → D12-ext** (owner verbatim: "works, but stops working when whatsapp/telegram chip is switched, both whatsapp and telegram create first bot button stops working." — the 08-18 fix is effective initially; the residual onset is exactly the channel-switch event whose handler 08-18 added) |
-| D2-ext | B9/B13 residual — reaction changes/removals performed IN the Telegram app itself may not reflect in our app (intermittent; owner "may not") | medium | new (re-verify round-2 2026-07-17) / D2 | yes (round 3) — HYPOTHESIS (not fact): poll-window absence-vs-removal semantics in `TelegramReactionMerge` — a server-originated reaction delta only reconciles if the message is inside the polled window, and a removal arriving as an empty `reactions[]` (absence) vs an explicit change may be dropped. Diagnose the poll refresh + Merge on server-originated deltas; the D2 echo-hex capture (08-11 `#if UNITY_EDITOR` log) is still wanted → **PARTIAL @ re-verify round-3 2026-07-20 (08-21): data layer RESOLVED, NEW residual → D2-view** (owner verbatim: "it seems working, but sometimes reaction on message bubble in our app is not updated when it is changed in telegram app. logs actually always shows correct reaction but on message bubble it is not changed sometimes (not sure but i guess reaction is not updating appears when i was first changing reaction on one bubble then started to change on another message bubble.)" — the 08-17 merge/reconcile is provably correct [logs always right]; the miss is the VIEW repaint. Echo-hex again NOT captured — downgraded to nice-to-have now the data layer is proven) |
+| D2-ext | B9/B13 residual — reaction changes/removals performed IN the Telegram app itself may not reflect in our app (intermittent; owner "may not") | medium | new (re-verify round-2 2026-07-17) / D2 | yes (round 3) — HYPOTHESIS (not fact): poll-window absence-vs-removal semantics in `TelegramReactionMerge` — a server-originated reaction delta only reconciles if the message is inside the polled window, and a removal arriving as an empty `reactions[]` (absence) vs an explicit change may be dropped. Diagnose the poll refresh + Merge on server-originated deltas; the D2 echo-hex capture (08-11 `#if UNITY_EDITOR` log) is still wanted → **PARTIAL @ re-verify round-3 2026-07-20 (08-21): data layer RESOLVED, NEW residual → D2-view** (owner verbatim: "it seems working, but sometimes reaction on message bubble in our app is not updated when it is changed in telegram app. logs actually always shows correct reaction but on message bubble it is not changed sometimes (not sure but i guess reaction is not updating appears when i was first changing reaction on one bubble then started to change on another message bubble.)" — the 08-17 merge/reconcile is provably correct [logs always right]; the miss is the VIEW repaint. Echo-hex again NOT captured — downgraded to nice-to-have now the data layer is proven) → **echo-hex CAPTURED @ round-5 2026-07-21 (08-29), ask CLOSED** (owner "screenshot 1 have [TG reaction echo] logs"): the `[TG reaction echo]` Console lines show tapi reaction echoes carry BASE-form codepoints (👍 U+1F44D / 😁 U+1F601 / 👌 U+1F44C — no U+FE0F qualifier) and `user_id == ownId` (1038376805) for own reactions — confirms the round-2 `ReactionEmoji` base-form finding (08-11). This same echo-WITHOUT-event evidence is what relocated **D2-view** upstream (own-reaction event-suppression, not a view miss) |
 | D13 | New (this pass) — a freshly-created Telegram bot has NO post-creation cover page with the ~5-min loading slider over the chats list (WhatsApp has it; Telegram doesn't); owner "when telegram bot is just created there is no cover page with 5 minute loading slider on top of chats list page" | medium (owner-approved scope) | new (re-verify round-2 2026-07-17) | yes (round 3) — OWNER DECISION: build the WhatsApp-parity cover for Telegram (full overlay + ~5-min progress slider over the chats list) AND remove the D9 «Синхронизация…» pill as ONE work item. LEAD (confirm before mirroring): the WhatsApp cover is `SyncingState` — built by `Assets/Editor/SyncingStateBuilder.cs` into Screen_Whatsapp/ChatsPanel (ProgressTrack/ProgressFill = its time-based bar), driven at runtime by `Assets/Scripts/UI/SyncingView.cs`; find why it doesn't fire for a Telegram-created bot and mirror it on the Telegram channel → **RESOLVED @ re-verify round-3 2026-07-20 (08-21)** — cover (08-19): owner verbatim "works"; pill removal (08-20): owner verbatim "ok". NEW owner-approved polish spun off → **D14** (TG cover green elements → brand blue) |
-| D2-view | D2-ext residual (round-3 2026-07-20) — the reaction DATA always reconciles (logs correct) but the message-bubble VISUAL sometimes misses the update when a reaction is changed in the Telegram app. Owner repro hint: change a reaction on one bubble, then start changing a reaction on ANOTHER message bubble — the second may not repaint | medium | 08-21 / D2-ext (data layer resolved) | yes (round 4) — scope = the VIEW/refresh layer ONLY: the `OnMessageReactionsChanged` → bubble re-render path (event subscription/binding on pooled `MessageItemView` rows, repaint of a non-focused bubble while another bubble's reaction UI is active). Do NOT touch `TelegramReactionMerge`/reconcile — the data layer is proven correct by the owner's log observation |
+| D2-view | D2-ext residual (round-3 2026-07-20) — the reaction DATA always reconciles (logs correct) but the message-bubble VISUAL sometimes misses the update when a reaction is changed in the Telegram app. Owner repro hint: change a reaction on one bubble, then start changing a reaction on ANOTHER message bubble — the second may not repaint | medium | 08-21 / D2-ext (data layer resolved) | yes (round 4) — scope = the VIEW/refresh layer ONLY: the `OnMessageReactionsChanged` → bubble re-render path (event subscription/binding on pooled `MessageItemView` rows, repaint of a non-focused bubble while another bubble's reaction UI is active). Do NOT touch `TelegramReactionMerge`/reconcile — the data layer is proven correct by the owner's log observation → **RE-FAIL @ round-4 2026-07-20 (08-25)** (owner "no pass, still sometimes not updating bubble reaction … even though logs show updated reaction"; 08-22 view-layer deferred re-render on the bar-dismiss path INSUFFICIENT) → 08-26 routed the poll-driven `HandleReactionsChanged` through the SAME hardened re-render + added a `[D2-view] post-render` state log → **RE-FAIL @ round-5 2026-07-21 (08-29), mechanism REFUTED-and-RELOCATED UPSTREAM.** Owner: "still not updating reaction when changed in telegram. logs show right reaction but it doesnt update on message bubble." **Captured `[D2-view]` logs (Screenshot 1):** first remote change fired `[D2-view] reactions changed id=23475 n=1` → `post-render id=23475 active=True len=24 culled=False` (HEALTHY — exception refuted [log fired], cull refuted [culled=False]); but the two SUBSEQUENT emoji changes (😁 U+1F601, 👌 U+1F44C) produced `[TG reaction echo]` lines at Normalize level and **NO `OnMessageReactionsChanged`/`[D2-view]` event at all**. Failure is UPSTREAM of the view — after the first own-user remote reaction applies, subsequent changes stop emitting change events. The 08-22/08-26 view hardening is CORRECT (fixed the one-shot-loss class + its diagnostic proved the relocation) — do NOT re-open it. **Round-6 scope (view layer EXONERATED):** own-reaction event-suppression in `TelegramReactionMerge`'s optimistic-grace window (90s, `_tgOwnUserId`-keyed — `user_id == ownId` in every echo). HYPOTHESIS (labeled): grace suppresses server-observed changes to one's OWN reaction after the first apply; fix = grace keys on a pending LOCAL optimistic set, not mere own-identity, so a REMOTE own-user change to a DIFFERENT emoji is never suppressed; Editor-reproducible EditMode test for echo-without-event |
+| D17 | Round-5 item 6 (NEW 2026-07-21, owner SCOPE-OVERRIDE) — a bot that already has Telegram and authorizes WhatsApp LATER shows NO WhatsApp sync cover; the owner overrode the 08-28 parity decision: covers must show for BOTH channels every time a channel is late-added (owner: "when telegram channel exist on bot and then when adding whatsapp channel to same bot there is no sync chats cover page for whatsapp (should be sync chats cover page for both channels every time they are just added)") | medium (owner-approved scope) | 08-29 (round-5) / 08-28 parity decision IN-01 (SUPERSEDED) | yes (round 6) — **SUPERSEDES the 08-28 documented parity decision** (which correctly showed NO WA cover, as designed — NOT a defect against 08-28; this is an owner-approved scope change, exactly like D14). Scope = stamp `{bot}WhatsappSyncUntil` on late WhatsApp auth — the EXACT mirror of 08-28's Telegram stamp: ShowAuthSuccess settings-reauth branch (`else if (!isCreatingBot && Manager.openBot != null)`), gated `authPage == WhatsappAuth`, 300s `WhatsAppSyncWindowSeconds`, reuse `SyncUntilSuffixFor(WhatsApp)` (`Bot.DeleteBot` already clears the WA key — verify) so the WhatsApp cover fires when WhatsApp is connected after Telegram |
 | D12-ext | D12 residual (round-3 2026-07-20) — the create-first-bot CTA works initially (08-18 fix effective) but after a WhatsApp↔Telegram chip switch it stops working on BOTH channels (owner: "works, but stops working when whatsapp/telegram chip is switched, both whatsapp and telegram create first bot button stops working.") | medium | 08-21 / D12 | yes (round 4) — LEAD: directly implicates the `OnActiveChannelChanged` re-configure path 08-18 added (`HandleActiveChannelChanged` → `ConfigureForReason(_lastReason)+Show`) — the failure onset is exactly that event, on both channels. Secondary named suspect (pre-flagged, documented-not-fixed in 08-18): `BeginLoadForActiveBot` resolves zero-bots via `FindBotByName(DefaultBotId)==null` → fires a connect-state reason instead of `NoBotsExist` on a channel switch with zero bots. The guarded `[D12]` ENTRY logs remain in place as the diagnosis pivot |
 | D14 | New (round-3 2026-07-20, owner-approved polish) — on the Telegram post-creation cover, the green-tinted elements must use Telegram brand blue instead of WhatsApp green (owner: "change the green colored objects at this page to telegrams brand blue. (spinner, sync)") | low (approved scope) | 08-21 / D13 cover | yes (round 4) — recolor the TG cover's spinner + sync-progress elements to brand blue #2AABEE; the established `ChannelAccent.Resolve(channel, authored)` seam (05-10/05-11/05-12) is the pattern — WhatsApp cover stays byte-identical → **RESOLVED @ re-verify round-4 2026-07-20 (08-25)** (owner "PASS" — TG cover reads brand blue, WA cover unchanged green) |
-| D15 | Round-4 item 2 (NEW 2026-07-20) — a reaction REMOVED in the WhatsApp app itself is not removed in our app (owner: "i noticed that if in whatsapp itself reaction is removed it is still not removed in our app") | medium | 08-25 (round-4) / D2 (WhatsApp analogue) | yes (round 5) — WA-side reaction-removal propagation was likely NEVER implemented: TG removal semantics were built in **08-17** (`TelegramReactionMerge` absence-vs-removal) but the WhatsApp `ReactionStore` was deliberately left untouched throughout v1.1, so this is **PRE-EXISTING, not a round-4 regression**. Scope = mirror the TG removal-tombstone / absence-vs-removal reconcile on the WhatsApp reaction path (add/change already repaints; the WA repaint check itself was not-regressed-not-confirmed this pass) |
-| D16 | Round-4 item 4 (NEW 2026-07-20) — when a bot already has WhatsApp and Telegram is added later, the Telegram post-creation sync cover never shows (owner: "if whatsapp channel exists and telegram channel is created its sunc cover page is not shown") | medium | 08-25 (round-4) / D13 (08-19 late-channel follow-up) | yes (round 5) — **PROMOTION of a documented 08-19 follow-up, NOT a regression**: 08-19-SUMMARY.md explicitly noted "late-channel auth stamps NO window on EITHER channel (exact parity; follow-up if ever wanted)" — the wizard tail is the only site that stamps `{bot}TelegramSyncUntil`. Scope = stamp the per-channel sync window at the late-auth completion site (BotSettings Telegram auth success) so the cover fires when Telegram is connected after WhatsApp. WR-02's own stale-card check was not explicitly verdicted this pass (owner substituted this observation) |
+| D15 | Round-4 item 2 (NEW 2026-07-20) — a reaction REMOVED in the WhatsApp app itself is not removed in our app (owner: "i noticed that if in whatsapp itself reaction is removed it is still not removed in our app") | medium | 08-25 (round-4) / D2 (WhatsApp analogue) | yes (round 5) — WA-side reaction-removal propagation was likely NEVER implemented: TG removal semantics were built in **08-17** (`TelegramReactionMerge` absence-vs-removal) but the WhatsApp `ReactionStore` was deliberately left untouched throughout v1.1, so this is **PRE-EXISTING, not a round-4 regression**. Scope = mirror the TG removal-tombstone / absence-vs-removal reconcile on the WhatsApp reaction path (add/change already repaints; the WA repaint check itself was not-regressed-not-confirmed this pass) → 08-27 shipped candidate-(a) already-seen re-process + a `[D15] wa-reaction` shape log → **RE-FAIL @ round-5 2026-07-21 (08-29), removal SHAPE ANSWERED = candidate (b) (no removal raw).** Owner: "still same, removing reaction in whatsaap doesnt remove it in our app." **Captured `[D15]` logs (Screenshot 2):** the ADD arrives (`rawId=3A8976F33979EE5EE8EB stanza=3AAFD6395EE4345C8EA0 bodyEmpty=False seen=False` → applies via `[D2-view] reactions changed` + healthy post-render), then the SAME add-raw re-delivers `bodyEmpty=False seen=True` every poll; **NO empty-body raw EVER arrives after the in-WhatsApp removal**. Candidate (a) (same-id empty-body re-emit) is REFUTED — the 08-27 re-process fix is correct-but-INERT for removal (harmless, idempotent). **Round-6 scope (diagnosis-first):** absence-based reconcile for WhatsApp — poll the target message's `reactions[]` state if Wappi's WA sync exposes it (`messages/id/get` or the `chats/filter` payload) and clear the `ReactionStore` entry when the server no longer carries the reaction; OR document as a Wappi WA platform limit if removal is truly never reflected |
+| D16 | Round-4 item 4 (NEW 2026-07-20) — when a bot already has WhatsApp and Telegram is added later, the Telegram post-creation sync cover never shows (owner: "if whatsapp channel exists and telegram channel is created its sunc cover page is not shown") | medium | 08-25 (round-4) / D13 (08-19 late-channel follow-up) | yes (round 5) — **PROMOTION of a documented 08-19 follow-up, NOT a regression**: 08-19-SUMMARY.md explicitly noted "late-channel auth stamps NO window on EITHER channel (exact parity; follow-up if ever wanted)" — the wizard tail is the only site that stamps `{bot}TelegramSyncUntil`. Scope = stamp the per-channel sync window at the late-auth completion site (BotSettings Telegram auth success) so the cover fires when Telegram is connected after WhatsApp → 08-28 stamped `{bot}TelegramSyncUntil` in the ShowAuthSuccess settings-reauth branch (Telegram-gated) → **RESOLVED @ round-5 2026-07-21 (08-29)** (owner "pass" item 5 — a WhatsApp-first bot that authorizes Telegram later now shows the Telegram post-creation sync cover). NOTE: the mirror WhatsApp late-auth cover (owner scope-override on the byte-identical check) → new **D17** |
 
 **Observations — resolved 2026-07-16:**
 
@@ -736,6 +839,29 @@ must reopen. (Empty = no defects.)
   done?"; explained, awaiting confirmation; carry BLOCKING). Echo-hex NOT captured again (third
   consecutive; nice-to-have — data layer proven). Gates B/C + I.3 #10 re-aggregation stay blocked;
   prod bagkz stays dormant.
+- **Round-5 re-verify 2026-07-21 (08-29, one build off the post-08-28 tree — fixes 08-26 D2-view poll-path
+  re-render + 08-27 D15 WA reaction-removal ingest + 08-28 D16 late-TG sync-cover stamp all merged; repro ran
+  in the Unity EDITOR — screenshots are the Editor Console):** **Overall ISSUES** — 3 PASS, 2 FAIL, 1 owner
+  scope-override, echo-hex CAPTURED. **D16 late-TG cover RESOLVED** (owner "pass" item 5 — a WhatsApp-first bot
+  authorizing Telegram later now shows the Telegram sync cover); D2-view WA add/change + D15 WA add/change both
+  PASS (items 2/4, WhatsApp byte-identical holds). **D2-view STILL FAILS but the mechanism is REFUTED-and-RELOCATED
+  UPSTREAM** (owner: "still not updating reaction when changed in telegram. logs show right reaction but it doesnt
+  update on message bubble." — captured `[D2-view]` logs show a HEALTHY post-render on the first change [active=True
+  len=24 culled=False] but NO change event AT ALL for the two subsequent emoji changes, only `[TG reaction echo]`
+  at Normalize level → the view layer is EXONERATED; round-6 target = own-reaction event-suppression in
+  `TelegramReactionMerge`'s 90s optimistic-grace window). **D15 STILL FAILS, removal SHAPE ANSWERED = candidate (b)
+  no removal raw** (owner: "still same, removing reaction in whatsaap doesnt remove it in our app." — captured
+  `[D15]` logs show the ADD raw re-delivering `bodyEmpty=False seen=True` every poll, NO empty-body raw ever after
+  the in-WhatsApp removal → 08-27's candidate-(a) fix is correct-but-inert; round-6 target = absence-based WA
+  reconcile OR documented Wappi platform limit). **NEW D17** (owner scope-override on the byte-identical check —
+  "should be sync chats cover page for both channels every time they are just added" — SUPERSEDES the 08-28 parity
+  decision; mirror the 08-28 Telegram stamp with `{bot}WhatsappSyncUntil` on late WhatsApp auth). **Echo-hex CAPTURED
+  at last** (item 7, ask CLOSED — tapi echoes carry BASE-form codepoints U+1F44D/U+1F601/U+1F44C, `user_id == ownId`;
+  the echo-without-event evidence is what relocated D2-view). **Gate A STAYS ISSUES** — round 6:
+  `/gsd-plan-phase 08 --gaps` for D2-view (upstream event-suppression) / D15 (absence-based WA reconcile or platform
+  limit) / D17 (late-WA-auth cover stamp). G6 resolved (not carried). The Editor reproduces both FAILs → round-6
+  fix loop is Editor-reproducible (no device build needed for the fix; a device pass still gates Gate A). Gates B/C +
+  I.3 #10 re-aggregation stay blocked; prod bagkz stays dormant.
 - **Notes:** B7 static-webp N/A (no sample at hand); G5 N/A (no stale clone to test);
   G6 n/a with an OUTSTANDING reminder to deactivate the test clone (bot-activation policy);
   H2 FAIL — downstream of D5, re-test relevance + RAG grounding together after the fix;
