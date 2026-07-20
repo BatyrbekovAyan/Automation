@@ -235,6 +235,45 @@ public class TelegramReactionMergeTests
         Assert.AreEqual("❤️", merged[0].emoji);
     }
 
+    // --- CR-01: the optimistic grace ENDS on server confirmation (D2-view root fix) ---
+
+    [Test]
+    public void Merge_SameEmojiEcho_ConsumesGrace_ThenExternalOwnChangeApplies()
+    {
+        // CR-01 (D2-view, milestone #1): the grace must END on server CONFIRMATION. Owner taps 👍
+        // in-app (fresh optimistic "me"); tapi echoes the SAME 👍 (grace's job done). If the grace is
+        // NOT consumed, a later EXTERNAL own-change to 😁 (made in the Telegram app) is discarded as a
+        // "stale echo" for the rest of the 90 s window — the captured echo-without-event.
+        var afterEcho = TelegramReactionMerge.Merge(
+            new List<MessageReaction> { Me("👍", Now) },
+            new List<MessageReaction> { Me("👍", time: 0) },   // echo lands => grace ends
+            Now + 3);
+        var afterExternal = TelegramReactionMerge.Merge(
+            afterEcho,
+            new List<MessageReaction> { Me("😁", time: 0) },   // owner changes to 😁 IN the Telegram app
+            Now + 8);
+
+        Assert.IsFalse(TelegramReactionMerge.SameReactions(afterEcho, afterExternal)); // FAILS today
+        Assert.AreEqual(1, afterExternal.Count);
+        Assert.AreEqual("😁", afterExternal[0].emoji);
+        Assert.AreEqual(OutgoingReaction.MeReactorKey, afterExternal[0].reactorKey);   // still toggleable
+    }
+
+    [Test]
+    public void Merge_DifferingEchoWithinGrace_StaleOldEmojiStillSuppressed()
+    {
+        // CR-01 boundary: do NOT clear the grace on a DIFFERING echo. Owner changed 👍→❤️ in-app; tapi
+        // still echoes the OLD 👍 mapped to "me" during the window — the fresh ❤️ must win or the pill
+        // flickers back to 👍 (the original D2 defect). Clearing on differ would regress it.
+        var merged = TelegramReactionMerge.Merge(
+            new List<MessageReaction> { Me("❤️", Now) },
+            new List<MessageReaction> { Me("👍", time: 0) },
+            Now + 3);
+
+        Assert.AreEqual(1, merged.Count);
+        Assert.AreEqual("❤️", merged[0].emoji);   // fresh local wins; stale echo suppressed
+    }
+
     [Test]
     public void Merge_FreshOptimisticMe_DifferentEmojiEcho_NotFolded()
     {
