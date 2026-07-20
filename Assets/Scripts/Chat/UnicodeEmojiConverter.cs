@@ -68,6 +68,25 @@ public static class UnicodeEmojiConverter
 
         while (i < input.Length)
         {
+            // WR-01 (D2-view / 08-REVIEW CR-01 candidate 1): a lone/unpaired surrogate in a malformed
+            // reaction-emoji payload makes char.ConvertToUtf32 throw ArgumentException, which aborts the
+            // whole OnMessageReactionsChanged multicast AND kills the SyncLatestMessages coroutine mid-loop.
+            // Emit the stray surrogate raw and advance one char so the walk is throw-safe. For well-formed
+            // text every char here is either a BMP scalar or the HIGH half of a valid pair, so both guards
+            // are false and behaviour is byte-identical (a valid pair keeps its normal path — the +2 read).
+            if (char.IsHighSurrogate(input[i]) && (i + 1 >= input.Length || !char.IsLowSurrogate(input[i + 1])))
+            {
+                sb.Append(input[i]);
+                i++;
+                continue;
+            }
+            if (char.IsLowSurrogate(input[i]))
+            {
+                sb.Append(input[i]);
+                i++;
+                continue;
+            }
+
             int codepoint = char.ConvertToUtf32(input, i);
             int length = char.IsHighSurrogate(input[i]) ? 2 : 1;
 
