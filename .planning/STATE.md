@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
-status: executing
-stopped_at: Completed 08-29-PLAN.md
+status: ready-to-execute
+stopped_at: Planned 08-30..08-33 (round-6 gap plans)
 last_updated: "2026-07-21T00:00:00.000Z"
 last_activity: 2026-07-21
 progress:
   total_phases: 9
   completed_phases: 5
-  total_plans: 59
+  total_plans: 63
   completed_plans: 57
-  percent: 97
+  percent: 90
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 
 ## Current Position
 
-Phase: 08 (device-uat-milestone-closeout) — round-5 re-verify RUN 2026-07-21 (08-29), **Gate A STAYS ISSUES**
-Plan: 08-29 COMPLETE (round-5 checkpoint). Next: `/gsd-plan-phase 08 --gaps` for round 6 (D2-view / D15 / D17)
-Status: Gate A ISSUES — round-6 gap planning next
+Phase: 08 (device-uat-milestone-closeout) — READY TO EXECUTE round 6
+Plan: 30 of 33 next (round-6 gap plans 08-30..08-33 planned, checker PASSED clean 1st iteration with hand-traced RED test)
+Status: Round-6 plans committed (ecc2ed5) — 08-30 CR-01 confirmation-clears-grace + WR-01 tombstone (TelegramReactionMerge.cs:62), 08-31 WR-02 revert + D15 probe/platform-limit doc, 08-32 D17 late-WA-auth cover stamp, 08-33 owner re-verify (Editor Play-Mode for fixes + ONE device build for Gate A sweep). Execute via `/gsd-execute-phase 08 --gaps-only`
 Last activity: 2026-07-21
 
-Progress: [██████████] 97%
+Progress: [█████████░] 90%
 
 ## Performance Metrics
 
