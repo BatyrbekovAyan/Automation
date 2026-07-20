@@ -1689,6 +1689,26 @@ public partial class Manager : MonoBehaviour
         }
         else if (!isCreatingBot && Manager.openBot != null)
         {
+            // D16 (08-REVIEW IN-01): a bot that already has WhatsApp gets NO Telegram sync cover when
+            // Telegram is authed later, because {bot}TelegramSyncUntil is stamped ONLY in the creation
+            // wizard (CreateBotFromForm). Stamp the same 300s per-channel window here on a late Telegram
+            // auth so the shared SyncingState cover fires when the user opens the newly-authed Telegram
+            // channel — mirrors the wizard stamp at Manager.cs:1490-1497 and reuses the already-tested
+            // {bot}TelegramSyncUntil key (ChatManager.SyncUntilSuffixFor(Telegram); Bot.DeleteBot clears it).
+            //
+            // PARITY DECISION (deliberate): stamp ONLY on late TELEGRAM auth, NOT on late WhatsApp auth.
+            // Stamping WhatsApp here would newly surface a WhatsApp cover where none has ever shown
+            // (unrequested behaviour change; breaks the WhatsApp byte-identical invariant). 08-19 kept exact
+            // no-stamp parity; D16 breaks it in Telegram's favour only, per the owner's report.
+            if (authPage == TelegramAuth)
+            {
+                long telegramSyncUntil = System.DateTimeOffset.UtcNow
+                    .AddSeconds(ChatManager.WhatsAppSyncWindowSeconds)
+                    .ToUnixTimeMilliseconds();
+                PlayerPrefs.SetString(Manager.openBot.name + "TelegramSyncUntil", telegramSyncUntil.ToString());
+                PlayerPrefs.Save();
+            }
+
             // Settings re-auth: the Manager.openBot bot already exists → interactive moment
             // with the files-exist fallback («Открыть чаты»). Re-authed channel = whichever
             // authPage this is. authPage stays ACTIVE — the moment reactivates it and defers
