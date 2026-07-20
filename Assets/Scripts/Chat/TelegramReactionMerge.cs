@@ -26,9 +26,13 @@ public static class TelegramReactionMerge
 
     /// <summary>
     /// Server list wins for all reactions except a FRESH optimistic owner entry (tap within
-    /// <see cref="OptimisticGraceSeconds"/> of <paramref name="nowUnix"/>). A fresh non-empty
-    /// "me" replaces the server's "me" element (stale echo during an emoji change) or rides
-    /// alongside when the echo hasn't landed yet; a fresh EMPTY "me" is a removal tombstone
+    /// <see cref="OptimisticGraceSeconds"/> of <paramref name="nowUnix"/>). For a fresh non-empty
+    /// "me" the grace ENDS on server confirmation: a SAME-emoji echo means the server has confirmed
+    /// the owner's reaction, so the server element is adopted (non-fresh) and the next differing echo
+    /// is a genuine external own-change that applies at once; only a DIFFERING echo within the window
+    /// is suppressed (the fresh local wins — the stale-old-emoji echo the grace exists to defeat), and
+    /// an un-echoed entry rides alongside until the server catches up. A fresh EMPTY "me" is a removal
+    /// tombstone
     /// (D2) that SUPPRESSES the server's stale "me" echo AND is carried into the result, so
     /// every reconcile within the grace window keeps suppressing — the D5 live poll reconciles
     /// every ~3 s, and a tombstone consumed by its first merge would let the very next poll's
@@ -59,7 +63,20 @@ public static class TelegramReactionMerge
             }
             else if (serverMine >= 0)
             {
-                result[serverMine] = mine;   // fresh local emoji beats a stale echo
+                // CR-01 (D2-view): the grace ENDS on server confirmation. A same-emoji echo means the
+                // server has confirmed the owner's optimistic reaction — ADOPT the server entry (time=0,
+                // non-fresh, still reactorKey "me") so the NEXT differing echo is a genuine external
+                // own-change and applies immediately. Only a DIFFERING echo within the window is the
+                // stale old-emoji echo the grace exists to suppress (clearing on differ would regress
+                // the D2 flicker — see Merge_DifferingEchoWithinGrace_StaleOldEmojiStillSuppressed).
+                if (!ReactionEmoji.SameEmoji(result[serverMine].emoji, mine.emoji))
+                {
+#if UNITY_EDITOR
+                    UnityEngine.Debug.Log($"[D2-merge] suppressed server-me '{result[serverMine].emoji}' by fresh local '{mine.emoji}' age={nowUnix - mine.time}s");
+#endif
+                    result[serverMine] = mine;   // differing echo during the window: stale-echo suppress (original D2 defense)
+                }
+                // else: same-emoji echo confirmed the optimistic set — keep the server element (freshness consumed).
             }
             else
             {
@@ -71,7 +88,14 @@ public static class TelegramReactionMerge
                 // optimistic "mine" ⇒ it is the owner's own echo — replace it in place, don't Add.
                 int echoIdx = IndexOfUnmappedSameEmoji(result, mine.emoji);
                 if (echoIdx >= 0)
-                    result[echoIdx] = mine;  // fold the owner's un-mapped echo into "me"
+                {
+                    // CR-01: a same-emoji un-mapped echo IS the owner's server-confirmed reaction —
+                    // adopt it as "me" (re-key so it stays toggleable via OutgoingReaction.CurrentMyEmoji)
+                    // instead of pinning the fresh optimistic entry, so the grace is consumed and the
+                    // next external own-change applies.
+                    result[echoIdx].reactorKey = OutgoingReaction.MeReactorKey;
+                    result[echoIdx].fromMe = true;
+                }
                 else
                     result.Add(mine);        // genuinely not yet echoed — keep the optimistic entry
             }
