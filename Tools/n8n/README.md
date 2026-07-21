@@ -62,8 +62,8 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
 | `TwWPW3gIyjZS3foR` | Edit Telegram Workflow | App webhook `/webhook/EditTelegramWorkflow` — edits a bot's system prompt |
 | `KoTuIlk4LMrlvnWI` | Upload File | App webhook `UploadFile` — ingests files into the Supabase vector store; stamps `botWaId`/`botTgId`/`fileId` on every chunk; extension routing is case-insensitive; archives the uploaded bytes to Storage `price-lists/{fileId}` (dead-end branch, `onError: continue` — never fails the upload); unsupported types get an explicit 415; photos (jpg/jpeg/png/webp client-side) route to OpenAI gpt-4o-mini vision extraction (422 `no_price_data` gate if unreadable), archived like all other uploads |
 | `ZTqpumOpL1rNDOp6` | Delete File | App webhook `DeleteFile` — body `{ fileId }`; deletes that file's chunks from `documents` AND its stored original `price-lists/{fileId}` (404 tolerated for pre-bucket files), returns `{ success, deletedChunks }` |
-| `4wYitz5ek30SVNlT` | WhatsApp Bot | **Clone source** for every WhatsApp bot (referenced by literal id in CreateWhatsappWorkflow); retrieval self-scoped by `botWaId = {{ $workflow.id }}` |
-| `4VN3gsFaC2HUYmcc` | Telegram Bot | **Clone source** for every Telegram bot (referenced by literal id in CreateTelegramWorkflow); retrieval self-scoped by `botTgId = {{ $workflow.id }}` |
+| `4wYitz5ek30SVNlT` | WhatsApp Bot | **Clone source** for every WhatsApp bot (referenced by literal id in CreateWhatsappWorkflow); retrieval self-scoped by `botWaId = {{ $workflow.id }}`; **Phase 10:** carries the pre-generation debounce+combine splice on the `Suppressed?` FALSE branch (see note below) |
+| `4VN3gsFaC2HUYmcc` | Telegram Bot | **Clone source** for every Telegram bot (referenced by literal id in CreateTelegramWorkflow); retrieval self-scoped by `botTgId = {{ $workflow.id }}`; **Phase 10:** carries the same debounce+combine splice on the `Suppressed?` FALSE branch (see note below) |
 | `lmjYsdNcQA2IE5rl` | Delete Bot Files | App webhook `DeleteBotFiles` — body `{ botWaId, botTgId }`; sweeps ALL of a deleted bot's RAG chunks + stored originals (guards the `"-1"` unauthed sentinel) |
 | `2htWSV5IHO8E2CgB` | Dashboard Outcomes | App webhook `DashboardOutcomes` — body `{ profileIds }`; classifies conversation outcomes from `n8n_chat_histories` into `conversation_outcomes`, returns them for the «Сводка» dashboard |
 | `2islisFH7jjLoPQM` | Delete Orphan Profiles | **Scheduled, hourly** (no webhook) — server-side TTL sweep deleting Wappi profiles that stay unauthorized ≥ 24h; see below |
@@ -74,6 +74,16 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
 > two Create handlers. Never change their ids, or bot creation 404s on the clone step.
 > Keep both **inactive** — they share webhook path `0091024b-7b46` and only the per-bot
 > clones (with rewritten paths) ever go active.
+
+> **Phase 10 — message-batching / debounce splice.** Both bot templates carry a pre-generation
+> `Debounce Wait → Fetch Recent → Latest+Combine → Is Latest?` stage on the `Suppressed?` FALSE
+> branch (before `Input type`) that coalesces a burst of multi-fragment customer messages into ONE
+> combined reply — only the last fragment's execution proceeds; earlier fragments dead-end. It is
+> authored by the idempotent `apply-message-batching.py` (edits both templates in place, by node
+> name). **Re-run `apply-message-batching.py` after any template re-import / UI round-trip**, then
+> run `verify-message-batching.py` to gate the splice (asserts the 4 nodes, the `Suppressed? →
+> Debounce Wait` rewire, the `messages/get` fetch with no `mark_all`, and the Code-node body
+> re-emit). This edits the two existing templates — **no new canonical workflow, the count stays 13.**
 
 ### Delete Orphan Profiles (scheduled sweep) — policy & gotchas
 
