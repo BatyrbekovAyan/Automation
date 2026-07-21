@@ -1,178 +1,145 @@
 ---
 phase: 08-device-uat-milestone-closeout
-reviewed: 2026-07-21T08:37:02Z
-depth: deep
-files_reviewed: 6
+reviewed: 2026-07-21T10:45:14Z
+depth: standard
+files_reviewed: 7
 files_reviewed_list:
+  - Assets/Scripts/Chat/MessageReaction.cs
   - Assets/Scripts/Chat/TelegramReactionMerge.cs
-  - Assets/Scripts/Chat/OutgoingReaction.cs
-  - Assets/Scripts/Chat/TelegramReactionMapper.cs
+  - Assets/Scripts/Main/ChatManager.ReactionSend.cs
   - Assets/Scripts/Main/ChatManager.cs
   - Assets/Scripts/Main/ChatManager.QuoteResolve.cs
-  - Assets/Scripts/Chat/ReactionBarController.cs
+  - Assets/Tests/Editor/Chat/TelegramReactionMergeTests.cs
+  - Assets/Tests/Editor/Chat/TelegramReactionReceiveTests.cs
 findings:
-  critical: 2
-  warning: 1
-  info: 3
-  total: 6
+  critical: 0
+  warning: 2
+  info: 6
+  total: 8
 status: issues_found
 ---
 
-# Phase 08: Code Review Report — Round-6 Diagnostic (D2-view residual / D15 probe)
+# Phase 08: Code Review Report (Round 7 — final quality pass)
 
-**Reviewed:** 2026-07-21T08:37:02Z
-**Depth:** deep
-**Files Reviewed:** 6 (+ cross-file trace through `ChatManager.ReactionSend.cs`, `ReactionStore.cs`, `MessageReaction.cs`, `ReactionEmoji.cs`, `TelegramReactionMergeTests.cs`)
-**Status:** issues_found
+**Reviewed:** 2026-07-21T10:45:14Z
+**Depth:** standard
+**Files Reviewed:** 7 (+ cross-checks in `ReactionStore.cs`, `ReactionEmoji.cs`, `ReactionPillView.cs`, `MessageItemView.cs`, `EmptyStateView.cs`, `WappiUnitySync.cs`, `Manager.cs`, `LocalDataWipe.cs`, `ChatManager.PrivacyClear.cs` for the cleanup inventory)
+**Status:** issues_found (cleanup debt only — no correctness defects in the shipped round-7 logic)
 
 ## Summary
 
-Round-6 pinned the D2-view residual exactly: `[D2-merge] suppressed server-me '🔥' by fresh local '🥺' age=9s` climbing every poll — tapi `reactions[]` is **current-state-only**, so in a rapid own-change the confirming same-emoji echo never exists and the 08-30 "confirmation ends the grace" fix is structurally unreachable. This review traced the optimistic path end-to-end and reaches two Critical verdicts for round 7:
+Round-7 scope (`5ac43d5..974b66b`, plan 08-34): `displacedEmoji` field on `MessageReaction`, displaced-gated differ suppression in `TelegramReactionMerge.Merge` (CR-01a), the pure `Reconcile` seam with always-adopt at `RefreshCachedMessageReactions` (CR-02), the WR-01 null-displaced pin, and the deterministic Editor-only `[D15-probe]`. Owner verified ALL-PASS on device/Editor; Gate A passed; suite 1191/1191.
 
-1. **CR-01 (the round-7 design decision): candidate (a) — displaced-emoji tracking — is the correct and only discriminating fix.** The displaced pre-tap value is *already captured* at the tap site (`priorEmoji`, ChatManager.ReactionSend.cs:40, snapshotted today for the failure revert); it threads into `Merge` by storing it ON the optimistic `MessageReaction` entry (survives the disk round-trip that a ChatManager-side map would lose). Candidates (b) and (c) are rejected with code evidence: (b) races the device-verified post-success echo lag (TelegramReactionMerge.cs:55-56) and any residual window re-admits the age=9s failure; (c) is refuted by the round-6 capture itself. Full spec + red/green test set below.
-2. **CR-02 (latent, found by deep call-chain trace): the shipped 08-30 CR-01 fix is dead code in the app.** `RefreshCachedMessageReactions` (ChatManager.cs:1864) discards Merge's output whenever `SameReactions` — which keys on (reactorKey, emoji) only, never `time` — reports the lists equal. The same-emoji confirm adopt (TelegramReactionMerge.cs:83) and the unmapped-echo fold re-key (:93-102) produce exactly such key-identical lists, so `cached.reactions = merged` at :1866 never executes and the freshness is never consumed through ANY of the three call sites (ChatManager.cs:752-753, 1230-1231, 1330-1331). The Merge-level unit test passes only because it chains Merge outputs directly (TelegramReactionMergeTests.cs:260-267), bypassing the guard. Round 7 must ship CR-01 and CR-02 together.
+**The shipped logic is sound.** Specific confirmations requested for this pass:
 
-Secondary: the deterministic `[D15-probe]` trigger is specced at IN-01 (insertion ChatManager.cs:661, reporting seam ChatManager.QuoteResolve.cs:148-149, no new secrets handling). Suite baseline 1184/1184; every finding carries an EditMode note.
+- **Removed `SameReactions` call-site guard — no other caller depended on it.** Full-source grep: `SameReactions` is now referenced only by `TelegramReactionMerge.Reconcile` (internal, `TelegramReactionMerge.cs:123`) and the two EditMode suites. `RefreshCachedMessageReactions` (`ChatManager.cs:1875-1894`) is the sole production consumer of the merge, and all three reconcile call sites (`ChatManager.cs:775`, `:1253`, `:1353`) route through it with the identical `Telegram`-gated pattern. Always-adopt + `renderChanged`-gated repaint preserves the anti-churn guard while consuming freshness — CR-02 is correctly closed.
+- **`displacedEmoji` on old cached entries is safe.** `MessageReaction` is `[Serializable]` with a public string; JsonUtility leaves the missing key null on legacy `ChatHistoryCache` entries, and `Merge` reads null-displaced as adopt-on-differ — the strictly-safer default. Pinned by `MessageReaction_JsonUtility_MissingDisplacedEmoji_DefaultsNull`. Server-mapped entries (`TelegramReactionMapper`) and the WhatsApp path never set it, matching the field's contract comment. `ReactionEmoji.SameEmoji(x, null)` is false for any non-empty server emoji (mapper skips empties), so a legacy fresh tombstone with null displaced degrades to adopt — a one-flip-at-upgrade worst case, exactly as specced in round 6.
+- **Failed-POST revert interplay is clean.** `PostReactionRoutine`'s revert goes through `ReactionStore.ApplyToMessage`, which reuses the "me" slot (`ReactionStore.cs:73-81`) without touching `displacedEmoji`. Traced all four cases (failed add / change / removal on Telegram; WhatsApp untouched): the leftover displaced value can only ever equal the reverted emoji or be null — both converge to same-emoji-confirm or third-value-adopt on the next poll. `Merge_RevertShapedFreshMe_NullDisplaced` pins the null case explicitly.
+- **Probe lifecycle is race-free.** The `[D15-probe]` arming block (`ChatManager.cs:667-684`) reuses the serial quote-resolve drain correctly: `_quoteResolveInFlight` prevents double-enqueue; cooperative coroutine scheduling means the drain's tail-clear runs synchronously after its `while` exits, so a just-enqueued probe id cannot be stranded mid-interleave; no waiter is registered so `ApplyResolvedQuote` no-ops on the probe id; the incidental `QuotedMessageCache.Put` of the reaction target is harmless (correct data under the right key, and warms a real future quote of that message). Bot/channel-switch cleanup is covered by the existing `ClearResolveQueues` fix.
 
-## Critical Issues
-
-### CR-01: Round-7 fix — discriminate stale echo from genuine external own-change via the DISPLACED pre-tap emoji (candidate (a))
-
-**File:** `Assets/Scripts/Chat/TelegramReactionMerge.cs:76-83` (differ-suppress), `:50-67` (tombstone), `:119-140` (stamp) · `Assets/Scripts/Main/ChatManager.ReactionSend.cs:39-57` (tap site) · `Assets/Scripts/Chat/MessageReaction.cs:11-15` (model)
-
-**Optimistic path, traced end-to-end:**
-
-1. **Tap:** `ReactionBarController.OnEmojiTapped` (ReactionBarController.cs:230-234) and `EmojiPickerController.cs:201` → `ChatManager.SendReaction` (ChatManager.ReactionSend.cs:16).
-2. **Displaced value IS available at the tap:** ReactionSend.cs:40 — `string priorEmoji = OutgoingReaction.CurrentMyEmoji(target);` (null ⇒ owner had no reaction). It is captured today solely for the failure revert; it is byte-for-byte the displaced pre-tap state candidate (a) needs.
-3. **Fresh local "me" entry:** ReactionSend.cs:41-45 — `OutgoingReaction.Resolve(target, tappedEmoji, now)` mints the event (`time = now`, unix seconds); `ReactionStore.ApplyToMessage` writes it into `target.reactions` (change path re-stamps `existing.time = ev.time`, ReactionStore.cs:76-77; add path ReactionStore.cs:83-90). Removals stamp the tombstone at ReactionSend.cs:52-57. `MessageReaction.time` is the freshness field `IsFreshOptimistic` reads (TelegramReactionMerge.cs:161-162). The entry is persisted to disk immediately (`PersistReaction`, ReactionSend.cs:62/163-177) — so freshness **survives a chat close/reopen and app relaunch** within the window.
-4. **POST success callback:** `PostReactionRoutine` — `ok = true` at ReactionSend.cs:110 (`status:"done"`), success exits at :129. Today success mutates NO local reaction state.
-
-**Candidate evaluation:**
-
-- **(a) Displaced-emoji tracking — RECOMMENDED.** Suppress a differing server-me ONLY when it equals the displaced pre-tap state (the genuine stale echo); any THIRD value is a genuinely newer external own-change → adopt (server element carries `time=0` ⇒ freshness consumed for free). Threading: store `displacedEmoji` on the optimistic `MessageReaction` entry itself — NOT a Merge parameter (the three `RefreshCachedMessageReactions` call sites have no tap context) and NOT a ChatManager dictionary (freshness persists to disk via `PersistReaction` and reloads from `ChatHistoryCache`; a memory-side displaced map would vanish on relaunch while `time` survives, resurrecting the bug). `MessageReaction` is `[Serializable]` public-fields JsonUtility (MessageReaction.cs:8-16) — a new `public string displacedEmoji` round-trips, and pre-upgrade cache entries deserialize it as null = "absence", which degrades to adopt-on-differ (at worst one visible flip inside a live 90 s window at upgrade; acceptable). Tombstone interplay: the tombstone's displaced = the just-removed emoji; a differing (third-value) "me" echo after a removal is a genuine external re-add → adopt + drop tombstone. Displaced-is-absence case: `SameEmoji(serverEmoji, null)` is false (ReactionEmoji.cs:59-60, ordinal; server emoji is never null/empty — the mapper skips empties, TelegramReactionMapper.cs:38) ⇒ any differing echo adopts, which is correct: with no pre-tap own reaction there is no non-empty stale echo to defend against (the stale state "no me" lands in the no-server-me branch, :85-105, unchanged). Fully pure ⇒ EditMode-testable. This fixes the exact round-6 capture: 🥺 tapped (displaced = ∅ or a prior emoji), server-me 🔥 at age=9s is a third value → adopt immediately; the follow-up 👎 applies at once (adopted entry is `time=0`, never fresh).
-- **(b) Clear grace on POST HTTP success — REJECTED as primary.** The callback site exists (ReactionSend.cs:110/129), but `status:"done"` ≠ `reactions[]` propagated. The device-verified Merge comment (TelegramReactionMerge.cs:55-56) records the server "keeps echoing for a cycle or more after a successful removal" — a ~3 s poll inside the POST-success→propagation gap still returns the pre-tap state, and a cleared grace would ADOPT it → precisely the D2 flicker the grace was built to prevent. A ~10 s residual covers the *observed* 1-2 cycle lag but has no evidenced upper bound (round-2's 90 s was chosen against multi-poll staleness), and inside any residual the discriminator problem is unsolved — the round-6 failure occurred at age=9s, INSIDE a 10 s residual. Also more plumbing than (a): the success callback must relocate the "me" entry in a possibly-replaced list and re-persist, and it is coroutine-timing-dependent, not purely testable.
-- **(c) Shorten the 90 s — REJECTED.** The 90 s protects the round-2 stale-echo defense (multi-poll stale echo of the pre-tap state). The round-6 capture kills (c) directly: the first wrong suppression was age=9s — any grace long enough to beat a 2-3-cycle stale echo (≥ ~10 s) still eats a rapid external change. Pure timing trade, no discriminator.
-
-**Recommendation: (a), grace constant unchanged at 90, shipped together with CR-02.** Known residual to document in the plan (not fixable with current-state-only `reactions[]`): an external own-change BACK TO the displaced emoji within the window is indistinguishable from the stale echo and stays suppressed until a confirming echo of the optimistic emoji or window expiry — narrow, bounded, accepted v1.
-
-**Fix spec (round-7 action text):**
-
-1. `MessageReaction.cs` — add after :15:
-```csharp
-public string displacedEmoji;  // Telegram-only: the owner's own PRE-TAP state this optimistic entry
-                               // displaced (null = had no reaction). Read by TelegramReactionMerge to
-                               // tell a stale pre-tap echo (suppress) from a genuinely newer external
-                               // own-change (adopt). Never set on server-mapped entries or WhatsApp.
-```
-2. `TelegramReactionMerge.cs` — differ branch (:76-82) becomes:
-```csharp
-if (!ReactionEmoji.SameEmoji(result[serverMine].emoji, mine.emoji))
-{
-    if (ReactionEmoji.SameEmoji(result[serverMine].emoji, mine.displacedEmoji))
-        result[serverMine] = mine;   // server still echoes the displaced pre-tap state:
-                                     // the stale echo the grace exists to defeat (round-2 D2 defense)
-    // else: a THIRD value — neither optimistic nor displaced — is a genuinely newer
-    // external own-change: keep the server element (time=0 ⇒ freshness consumed).
-}
-```
-   Tombstone branch (:52-61): gate identically — suppress-and-carry ONLY when `SameEmoji(result[serverMine].emoji, mine.displacedEmoji)`; a different-emoji "me" after a removal keeps the server element and DROPS the tombstone. `StampRemovalTombstone` gains a `string displacedEmoji` parameter, set in both the reuse (:126-129) and add (:132-139) branches. New helper:
-```csharp
-public static void StampDisplaced(List<MessageReaction> reactions, string displacedEmoji)
-{
-    if (reactions == null) return;
-    int idx = IndexOfMine(reactions);
-    if (idx >= 0) reactions[idx].displacedEmoji = displacedEmoji;
-}
-```
-   Update the class doc (:27-41) — the suppress condition is now "differing AND displaced-matching".
-3. `ChatManager.ReactionSend.cs` — removal call (:55): `StampRemovalTombstone(target.reactions, now, priorEmoji);`. Set path — add after :57 (inside `SendReaction`, after the apply):
-```csharp
-if (ActiveChannel == ChatChannel.Telegram && !ev.IsRemoval)
-    TelegramReactionMerge.StampDisplaced(target.reactions, priorEmoji);
-```
-   Revert path (:131-155): **no change.** A revert-created entry has `displacedEmoji = null` (adopt-on-differ ⇒ a ghost-landed reaction self-corrects, see WR-01); a revert-replaced entry keeps the tap's displaced (= priorEmoji = its own restored emoji), where every echo outcome is also correct (same-emoji ⇒ confirm; sent-emoji/third ⇒ adopt).
-4. **EditMode tests** (`Assets/Tests/Editor/Chat/TelegramReactionMergeTests.cs`) — RED today: `Merge_DifferingEcho_NoDisplacedMatch_AdoptsExternalOwnChange` (the round-6 repro: cached `Me("🥺", Now)` displaced=null, server `Me("🔥", 0)`, now+9 → single 🔥, `time==0`); same with displaced="👍" set (third value still adopts); `Merge_FreshRemoval_DifferentEmojiEcho_ExternalReAddAdopts_TombstoneDropped` (tombstone displaced="👍", server `Me("🔥",0)` → `[🔥]`). MUST STAY GREEN (updated to stamp displaced): `Merge_DifferingEchoWithinGrace_StaleOldEmojiStillSuppressed` (:276 — its 👍→❤️ scenario maps to displaced="👍"), `Merge_FreshRemoval_SuppressesServerEcho_NoResurrection` (:33) and `Merge_TwoSuccessivePolls_TombstoneKeepsSuppressing_NoResurrection` (:118) with displaced=removed emoji. Unchanged green: `Merge_SameEmojiEcho_ConsumesGrace_ThenExternalOwnChangeApplies` (:254), `Merge_LoneFreshRemoval_NoServerEcho_DropsTombstone_AbsenceConfirmed` (:107), `Merge_FreshRemoval_AbsenceConfirmed_ThenExternalReAdd_Applies` (:151), both fold tests (:221, :237), the spoof guard (:307). New VS16 seam test: displaced stored base "❤" still suppresses a qualified "❤️" echo. Extend both `StampRemovalTombstone_*` tests (:168, :181) to assert `displacedEmoji` is set.
-
-### CR-02: `RefreshCachedMessageReactions` discards Merge's freshness-consuming adoptions — the shipped 08-30 confirmation fix never lands through any call site
-
-**File:** `Assets/Scripts/Main/ChatManager.cs:1862-1866` · call sites `:752-753`, `:1230-1231`, `:1330-1331` · `Assets/Scripts/Chat/TelegramReactionMerge.cs:83, 93-102, 144-157, 201`
-
-**Issue:** `SameReactions` compares the (reactorKey, emoji-CompareKey) multiset only — `Key()` at TelegramReactionMerge.cs:201 excludes `time`. The two grace-consuming outcomes of `Merge` change ONLY `time`/identity metadata: the same-emoji confirm adopts the server element (`time=0`, :83) and the unmapped-echo fold re-keys the server element to "me" (:100-101). Both produce a merged list key-identical to the cached one ⇒ `SameReactions(cached.reactions, merged)` is true ⇒ ChatManager.cs:1864 `return false` **before** the `cached.reactions = merged` assignment at :1866. The cached fresh entry (original tap time) survives, the grace is never consumed, and the next differing echo is still suppressed for the full 90 s — so even in the slow-change case where the confirming echo DOES arrive, the shipped CR-01 behaves exactly like the pre-08-30 code. The round-6 device evidence ("confirming echo never arrived") masked this; the Merge unit test passes only because it chains `Merge` outputs directly (TelegramReactionMergeTests.cs:260-267), bypassing the call-site guard. All three reconcile sites funnel through this one method. Note: CR-01's third-value adoption changes the multiset and thus escapes the guard, but the confirm/fold consumption it relies on to narrow the back-to-displaced residual does not — CR-01 and CR-02 must land together.
-
-**Fix:** always adopt the merged list; keep the guard only for render/dirty gating. Make it pure for EditMode by extracting a seam:
-```csharp
-// TelegramReactionMerge.cs
-public static List<MessageReaction> Reconcile(List<MessageReaction> cached, List<MessageReaction> server,
-                                              long nowUnix, out bool renderChanged)
-{
-    List<MessageReaction> merged = Merge(cached, server, nowUnix);
-    renderChanged = !SameReactions(cached, merged);
-    return merged;
-}
-
-// ChatManager.cs:1862-1868
-var merged = TelegramReactionMerge.Reconcile(cached.reactions, refreshed.reactions,
-                                             DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-                                             out bool renderChanged);
-cached.reactions = merged;         // ALWAYS adopt — confirm/fold consume freshness even when
-                                   // the (reactorKey, emoji) multiset is unchanged (CR-02).
-if (!renderChanged) return false;  // no re-render, no dirty-mark — the anti-churn guard the
-                                   // round-4 WR fixes rely on stays intact.
-OnMessageReactionsChanged?.Invoke(cached);
-return true;
-```
-Caveat (accept + document): a visually-unchanged adoption is memory-only (`return false` ⇒ not persisted), so a relaunch inside the window reloads the fresh entry from disk — harmless once CR-01's displaced gating exists, which is another reason the two ship together.
-
-**EditMode:** `Reconcile_SameEmojiConfirm_AdoptsEvenWhenRenderUnchanged_ThenExternalChangeApplies` — step 1: cached `[Me("👍", Now)]`, server `[Me("👍", 0)]` ⇒ `renderChanged == false` BUT the returned list's me entry has `time == 0`; step 2: feed the returned list back with server `[Me("😁", 0)]` at Now+8 ⇒ `renderChanged == true`, emoji 😁. Red today at step 1's time assertion when driven through the guard semantics (the app-equivalent chain), green after.
+Remaining findings are **phase-close cleanup debt**: one un-gated production file dump (WR-01), the deliberately-compiled UAT diagnostics now due for stripping (WR-02), and six informational items. The definitive strip/keep inventory is in its own section below, followed by the D15 v1.2 riders.
 
 ## Warnings
 
-### WR-01: Failed-POST revert re-arms a fresh optimistic "me" with the original tap time — resolved as a side effect of CR-01, pin it with a test
+### WR-01: Un-gated `response.txt` full chat-list dump ships in device builds
 
-**File:** `Assets/Scripts/Main/ChatManager.ReactionSend.cs:132-145`
-**Issue:** The revert event carries `time = appliedTime` (the ORIGINAL tap time, :139), so a failed POST — including a 30 s timeout where the reaction actually landed server-side (Wappi accepted, response lost) — recreates a *fresh* "me" entry that today suppresses every differing server echo for the remainder of the 90 s window: the ghost-landed sent emoji, or an external own-change made mid-flight, is discarded exactly like the D2-view case. Contained (failure path only), but the same suppression family.
-**Fix:** none beyond CR-01 — a revert-created entry has `displacedEmoji = null` ⇒ any differing echo (ghost-landed sent emoji, external change) adopts immediately; the revert-replaced sub-path keeps displaced = its own restored emoji, where a matching echo hits the same-emoji confirm and a sent-emoji echo is a third value ⇒ adopt. Pin with `Merge_RevertShapedFreshMe_NullDisplaced_DifferingEchoAdopts`: cached `[Me("👍", Now)]` with `displacedEmoji=null`, server `[Me("🔥", 0)]`, now+5 ⇒ single 🔥. If round 7 wants belt-and-braces, the revert could stamp `time = 0` (server is the only truth after a failure) — optional, not required once CR-01 lands.
+**File:** `Assets/Scripts/Main/ChatManager.cs:456-461` (inside `SyncAllChats`)
+**Issue:** Unlike its two siblings (`:625-632` and `:1292-1299`, both `#if UNITY_EDITOR`), this dump has **no Editor guard**. Every background chat-list sync on device synchronously writes the entire `chats/filter` response — all chat names, ids, previews — to `persistentDataPath/response.txt` in plaintext, plus a `Debug.Log("Saved to: ...")`. That is main-thread blocking file I/O on a hot path and unencrypted PII at rest beyond what any feature needs (`LocalDataWipe.cs:24` and `ChatManager.PrivacyClear.cs:102-105` already treat this file as a liability to delete). Pre-existing (IN-03 lineage from earlier rounds), but v1.1 is now heading to prod — this is the one dump that actually executes on user devices.
+**Fix:**
+```csharp
+// SyncAllChats — delete lines 456-461 entirely, or at minimum:
+#if UNITY_EDITOR
+            System.IO.File.WriteAllText(
+                Application.persistentDataPath + "/response.txt",
+                www.downloadHandler.text);
+#endif
+```
+Keep the deleters in `LocalDataWipe`/`PrivacyClear` regardless — old installs still carry the file.
+**EditMode-testable:** No (coroutine + file I/O); verify by grep after cleanup.
+
+### WR-02: Compiled UAT diagnostics due for removal now Gate A has passed
+
+**Files:** `Assets/Scripts/Main/ChatManager.cs:658-665`, `Assets/Scripts/UI/MessageItemView.cs:4659-4661` and `:4681-4687`, `Assets/Scripts/UI/ReactionPillView.cs:66-69`
+**Issue:** Three log sites were *deliberately* compiled (not Editor-gated) so the device UAT pass could confirm behavior on-device — that purpose is now fulfilled:
+1. **`[D15]` wa-reaction shape log** (`ChatManager.cs:664-665`) — fires for **every** WhatsApp `type:"reaction"` raw on **every ~3 s live poll**, including the already-seen rows that round 5 proved re-deliver indefinitely (`seen=true` each poll). On device this is continuous log spam with per-call stack-capture cost for any chat holding a reaction in the latest window. The D15 conclusion is permanently recorded in CLAUDE.md; the evidence collector has no remaining purpose.
+2. **`[D2-view]` reactions-changed log** (`MessageItemView.cs:4661`) and **post-render state log** (`MessageItemView.cs:4687`) — fire on every reaction change plus one frame later. The content discipline held (ids/booleans/lengths only, per T-08-22-01), but they must not ship in v1.1 prod.
+3. **`ReactionPillView.DiagnosticActive/DiagnosticLabelLength/DiagnosticLabelCulled`** (`ReactionPillView.cs:66-69`) — public surface existing solely for log #2; dead code the moment it is stripped.
+
+**Fix:** Delete the three `Debug.Log` lines and the three `Diagnostic*` properties. Keep the *behavioral* hardening they were attached to: `HandleReactionsChanged`'s render chain, `RefreshReactionsNextFrame`'s `RefreshReactionsVisual()` call (the WR-01 pin), and `ForceReRender` all stay.
+**EditMode-testable:** No (log-only); verify by grep (`\[D15\]|\[D2-view\]|Diagnostic`) after cleanup.
 
 ## Info
 
-### IN-01: Deterministic `[D15-probe]` trigger — Editor-only one-shot auto-probe on the first WhatsApp reaction raw
+### IN-01: Inherent, bounded ambiguity — external own-change back to the displaced emoji is suppressed for the grace window
 
-**File:** insertion `Assets/Scripts/Main/ChatManager.cs:661-662` (the existing `[D15]` log block, before the `seenMessageIds.Add` branch at :672 so both seen/unseen raws arm it) · reporting seam `Assets/Scripts/Main/ChatManager.QuoteResolve.cs:142-150`
-**Issue:** The current `[D15-probe]` fires only opportunistically — when a WA *quote resolve* happens to drain (QuoteResolve.cs:148-149) — so a UAT pass can end without ever probing a reaction TARGET payload. Deterministic spec: on the first WA `type:"reaction"` raw of the Editor session, enqueue its TARGET id (`raw.stanzaId` — established as the target stanza id by the chat-list reaction-preview resolver) into the existing serial quote-resolve drain:
-```csharp
-#if UNITY_EDITOR
-    if (ActiveChannel == ChatChannel.WhatsApp && raw.type == "reaction"
-        && !_d15ProbeArmed && !string.IsNullOrEmpty(raw.stanzaId))
-    {
-        _d15ProbeArmed = true;   // one-shot per Editor session
-        Debug.Log($"[D15-probe] arming target-payload probe for stanza={raw.stanzaId}");
-        if (!_quoteResolveInFlight.Contains(raw.stanzaId))
-        {
-            _quoteResolveInFlight.Add(raw.stanzaId);
-            _quoteResolveQueue.Enqueue(raw.stanzaId);
-            if (!_quoteResolveDraining) StartCoroutine(DrainQuoteResolveQueue());
-        }
-    }
-#endif
-```
-with `private static bool _d15ProbeArmed;` (also `#if UNITY_EDITOR` to avoid an unused-field warning in builds). The drain then runs the EXISTING authed `messages/id/get` (Authorization header already set from `Manager.wappiAuthToken` at QuoteResolve.cs:129 — **no new request type, no new secrets handling**), serialized behind `WaitForChatFetchesToDrain` (:125, crossing-safe), and the existing `[D15-probe]` log at :148-149 reports `reactionsKey`/`reactionKey` presence booleans (never content) for the reaction's TARGET message — the exact D15 question. Deliberately bypassing `ResolveQuotedMessage`'s cache short-circuit guarantees the network fetch fires even for a previously-cached id; side effects are benign (the target's preview lands in `QuotedMessageCache` — a legitimate entry; no `_quoteWaiters` registered ⇒ `ApplyResolvedQuote` no-ops). Not unit-testable (network); one Editor session with a WA reaction raw closes it.
+**File:** `Assets/Scripts/Chat/TelegramReactionMerge.cs:53-66, 71-82`
+**Issue:** The displaced discrimination cannot distinguish a *stale echo of the pre-tap emoji* from a *genuine external own-change back to that same emoji* within the 90 s grace: (a) owner had 👍, taps ❤️ in-app, then re-selects 👍 in the Telegram app — the 👍 echo matches `displacedEmoji` and stays suppressed until grace lapses or a confirming ❤️ echo lands; (b) tombstone twin: owner removes 👍 in-app, then re-adds 👍 in the Telegram app within the window — same suppression. This is the exact residual round-6 CR-01 documented as accepted-v1 ("not fixable with current-state-only `reactions[]`"), strictly narrower than the pre-round-7 behavior (which suppressed *all* differing echoes), and self-heals in ≤90 s. Recorded here so the v1.2 follow-up doesn't rediscover it as a bug.
+**Fix:** None for v1.1. If v1.2 wants it: only an event transport (reaction rows with timestamps) can break the tie. The seam is pure; the case is trivially EditMode-pinnable — `Merge(cached=[Me("❤️", Now, "👍")], server=[Me("👍", 0)], Now+n)` asserting the current (suppressing) behavior would document it as a characterization test.
 
-### IN-02: `[D15]` device log at the poll cadence — schedule removal with D15 closure
+### IN-02: Freshness consumption is not persisted when `renderChanged` is false — verified safe
 
-**File:** `Assets/Scripts/Main/ChatManager.cs:661-662`
-**Issue:** Deliberately NOT `#if UNITY_EDITOR` (round-5 needed device capture) and content-safe (ids + booleans only), but it logs on every WA reaction raw at the ~3 s cadence in production builds. Carry-over of round-5 IN-03's second half (the `response.txt` dump at :622-628 also still stands as flagged there, preserved at d785061).
-**Fix:** Once the owner re-verifies IN-01's probe result and D15 is documented as the platform limit (already in CLAUDE.md), delete this log and the QuoteResolve/one-shot probe blocks in the same round-7 cleanup task. No test needed.
+**File:** `Assets/Scripts/Main/ChatManager.cs:1884-1891`
+**Issue:** On a same-emoji confirm or un-mapped-echo fold, `cached.reactions = merged` adopts in memory, but the call sites see `false` and skip the cache dirty-mark, so the adopted `time=0` is not written to `ChatHistoryCache` until something else dirties it. After an app kill + relaunch inside the grace window, the disk copy resurrects the fresh optimistic time. Traced the consequence: with the round-7 displaced discrimination, a resurrected-fresh entry still adopts any third-value external change immediately — the only divergence is the IN-01 ambiguity case, already bounded at 90 s from the original tap. The deliberate anti-churn tradeoff (avoiding a disk write per ~3 s poll per reacted message) is sound; documenting so nobody "fixes" it into per-poll saves.
+**Fix:** None required. Optionally extend the comment at `:1887-1889` with one line noting the persistence half of the tradeoff.
 
-### IN-03: `TelegramReactionMapper` fallback-key comment overstates what `{emoji}@tg` guarantees
+### IN-03: `[D15-probe]` one-shot semantics — comment inaccuracy and a silent-consume edge
 
-**File:** `Assets/Scripts/Chat/TelegramReactionMapper.cs:54-57`
-**Issue:** The comment says the emoji-scoped fallback key means "two same-emoji reactors with no id still don't collapse into one" — but two no-id reactors with the SAME emoji share the key `"{emoji}@tg"`. They don't collapse in `Map` itself (both are appended), which is why no behavior bug results today, but downstream identity consumers (`SameReactions` multiset, `IndexOfUnmappedSameEmoji`) treat them as indistinguishable — the key only separates *different-emoji* no-id reactors.
-**Fix:** Reword the comment ("distinguishes no-id reactors of different emojis; same-emoji no-id reactors are indistinguishable by design — tapi has shown no such shape"). Doc-only; no test.
+**File:** `Assets/Scripts/Main/ChatManager.cs:46-48, 667-684`; `Assets/Scripts/Main/ChatManager.QuoteResolve.cs:142-150`
+**Issue:** Two nits on the otherwise-clean probe: (1) `_d15ProbeArmed` is a static field, which resets on every domain reload — with default Editor settings that is one-shot **per Play-mode entry**, not "per Editor session" as commented (arguably better: each play re-probes; with domain-reload disabled it does behave per-session). (2) The probe consumes its shot at arming time, but the report only prints inside the `status=="done"` branch of `DrainQuoteResolveQueue` — a not-found target or network failure silently spends the shot with no `[D15-probe]` output for that play. Both acceptable for an Editor-only diagnostic.
+**Fix:** Correct the comment to "one-shot per domain load"; optionally log a `[D15-probe] target fetch not definitive` line in the failure branch. Recommend **keeping** the probe gated (see inventory) — it is the documented v1.2 detection seam.
+**EditMode-testable:** No (coroutine/network); comment-only change.
+
+### IN-04: Stale TDD-phase comments in the merge suite
+
+**File:** `Assets/Tests/Editor/Chat/TelegramReactionMergeTests.cs:271, 387`
+**Issue:** `// FAILS today` (line 271, `Merge_SameEmojiEcho_ConsumesGrace_ThenExternalOwnChangeApplies`) and `// <-- RED here` (line 387, `Reconcile_SameEmojiConfirm_AdoptsEvenWhenRenderUnchanged_ThenExternalChangeApplies`) date from the RED commit (`1de1252`); both assertions have been GREEN since `6aff076`/`d2576e7`. A future reader will waste time wondering whether the suite has known failures.
+**Fix:** Delete the two trailing markers (keep the explanatory comments themselves).
+
+### IN-05: Editor `response.txt` dump in `GetMessagesRoutine` still writes before the result check
+
+**File:** `Assets/Scripts/Main/ChatManager.cs:1292-1299`
+**Issue:** The round-5 note stands: the dump executes before the `www.result != Success` check at `:1301`, so a failed/timed-out request clobbers the last good dump with an empty body. It is now `#if UNITY_EDITOR`-gated, so device impact is zero — and since the sibling in `SyncLatestMessages` (`:625-632`, correctly ordered after its result check) dumps to the *same file path*, the debugging value is marginal anyway.
+**Fix:** Delete both Editor dumps (and their `Debug.Log("Saved to: ...")` companions) as part of the phase-close cleanup rather than reordering.
+
+### IN-06: Dead debug code with hardcoded profile ids and un-gated payload dumps
+
+**File:** `Assets/Scripts/Main/Manager.cs:3930-3970`; `Assets/Scripts/Main/WappiUnitySync.cs`
+**Issue:** Two legacy debug artifacts, both compiled into builds but currently unreachable: (1) `Manager.GetWhatsappMesseges()` has **zero callers**, hardcodes real Wappi profile ids/message ids in its request URLs (plus six more in commented variants), and writes `response.txt` un-gated. (2) `WappiUnitySync` is **not attached in Main.unity** (component GUID absent from the scene), but if ever re-added it would write `response.txt` un-gated and `Debug.Log` full message payloads (`Full Message Data: {msg}`, line 64 — PII) per message — and it uses async/await, violating the project's coroutine-only networking rule.
+**Fix:** Delete `GetWhatsappMesseges()` outright; delete `WappiUnitySync.cs` + `.meta` (or park the call-detection experiment outside `Assets/` if still wanted someday). Update the `WappiUnitySync` mention in `LocalDataWipe.cs:29`'s comment and CLAUDE.md's helper list when removed.
 
 ---
 
-**Checked clean (round-6 scope):** all three `RefreshCachedMessageReactions` call sites correctly gate on `ActiveChannel == ChatChannel.Telegram` (ChatManager.cs:752, 1230, 1330 — WhatsApp stays byte-identical); the `[D2-merge]` diagnostic (TelegramReactionMerge.cs:78-80) is `#if UNITY_EDITOR` with a fully-qualified `UnityEngine.Debug` so the class stays UnityEngine-free for EditMode; tombstone WR-01/WR-03 branches remain mutually consistent (`FindMine`/`IndexOfMine` single-me invariant holds — the mapper emits at most one own element); `ReactionBarController.RefreshSourceNextFrame` (:157-164) is safe — coroutine started on the always-active singleton root, `_sourceView` captured-then-nulled, one-frame delay lands after the deferred Canvas destroy; `ClearResolveQueues` (QuoteResolve.cs:81-91) covers the StopAllCoroutines stall; `SameEmoji` null semantics confirmed exactly right for the CR-01 displaced condition.
+## Phase-Close Cleanup Inventory (definitive strip list before v1.1 prod)
 
-_Reviewed: 2026-07-21T08:37:02Z_
+Post-cleanup verification: `grep -rn "\[D15\]\|\[D2-view\]\|\[D2-merge\]\|\[D12\]\|response\.txt\|Diagnostic" Assets/Scripts --include="*.cs"` should return only the KEEP rows.
+
+| # | Artifact | Location | Current guard | Action |
+|---|----------|----------|---------------|--------|
+| 1 | `[D2-view]` reactions-changed log | `MessageItemView.cs:4659-4661` | **Compiled** | **REMOVE** (WR-02). Keep the render chain around it. |
+| 2 | `[D2-view]` post-render state log | `MessageItemView.cs:4681-4687` | **Compiled** | **REMOVE** (WR-02). Keep `RefreshReactionsNextFrame`'s `RefreshReactionsVisual()` call — that is the WR-01 behavioral pin, not diagnostics. |
+| 3 | `Diagnostic*` properties | `ReactionPillView.cs:66-69` | Compiled (public) | **REMOVE** with #2 — dead once the log goes. |
+| 4 | `[D15]` wa-reaction shape log | `ChatManager.cs:658-665` | **Compiled** — fires per WA reaction raw per ~3 s poll | **REMOVE** (WR-02). Conclusion documented in CLAUDE.md (D15 platform limit). |
+| 5 | `[D15-probe]` arming block + `_d15ProbeArmed` | `ChatManager.cs:46-48, 667-684` | `#if UNITY_EDITOR` | **KEEP** gated — documented v1.2 detection seam for the absence-based WA reconcile. Fix the "per Editor session" comment (IN-03). |
+| 6 | `[D15-probe]` report | `ChatManager.QuoteResolve.cs:142-150` | `#if UNITY_EDITOR` | **KEEP** gated (pairs with #5). |
+| 7 | `[D2-merge]` suppression log | `TelegramReactionMerge.cs:75-77` | `#if UNITY_EDITOR` | **REMOVE** — the displaced discrimination is now pinned by the test suite; the log only adds noise to EditMode runs. |
+| 8 | `response.txt` dump, `SyncAllChats` | `ChatManager.cs:456-461` | **Compiled — NOT gated** | **GATE or DELETE** (WR-01 — the priority item). |
+| 9 | `response.txt` dump, `SyncLatestMessages` | `ChatManager.cs:625-632` | `#if UNITY_EDITOR` | **DELETE** (IN-03-lineage debt). |
+| 10 | `response.txt` dump, `GetMessagesRoutine` | `ChatManager.cs:1292-1299` | `#if UNITY_EDITOR`, pre-result-check | **DELETE** (IN-05). |
+| 11 | `Debug.Log("Saved to: ...")` companions | with #8/#9/#10 | mixed | **DELETE** with their dumps. |
+| 12 | `[D12]` flow-trace logs | `EmptyStateView.cs:266-271, 282-284, 303-304` | `#if UNITY_EDITOR` ("grep-removable" by design) | **REMOVE** — D12 closed in round 4. |
+| 13 | `[D12]` abort warnings | `EmptyStateView.cs:313, 319` | Compiled | **KEEP** — genuine error-path warnings, not diagnostics. Optionally retag `[EmptyStateView]`. |
+| 14 | `GetWhatsappMesseges()` | `Manager.cs:3930-3970` | Compiled, zero callers, hardcoded ids | **DELETE** (IN-06). |
+| 15 | `WappiUnitySync.cs` | whole file | Compiled, not in scene, full-payload PII logs | **DELETE** (IN-06). |
+| 16 | `response.txt` deleters | `LocalDataWipe.cs:24`, `ChatManager.PrivacyClear.cs:102-105` | Compiled | **KEEP** — old installs still carry the file. |
+
+## D15 Follow-up Riders (v1.2 — absence-based WA reconcile, deferred)
+
+- **Detection trigger stays live:** inventory #5/#6 (the Editor probe) is the tripwire — if a WhatsApp `messages/id/get` payload ever exposes a `reactions`/`reaction` key, an absence-based reconcile becomes possible. `RefreshCachedMessageReactions` is already channel-gated at every call site, so a WA branch has a natural, zero-risk insertion point mirroring `TelegramReactionMerge`'s pure-seam pattern.
+- **Carry IN-01 forward:** any future WA merge inherits the same displaced-emoji ambiguity; reuse the pure seam and its EditMode pins wholesale rather than re-deriving.
+- **Safe to strip #4 now:** the `[D15]` ingest evidence (add-raws re-deliver `seen=true` per poll, no removal raw, no empty-body row) is permanently recorded in CLAUDE.md's `message/reaction` section — the collector has no remaining purpose.
+
+---
+
+_Reviewed: 2026-07-21T10:45:14Z_
 _Reviewer: Claude (gsd-code-reviewer)_
-_Depth: deep_
+_Depth: standard_
