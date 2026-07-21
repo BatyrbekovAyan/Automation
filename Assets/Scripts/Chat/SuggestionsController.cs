@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
@@ -25,6 +26,15 @@ public class SuggestionsController : MonoBehaviour
     private long _requestSeq;          // monotonic; newest wins (A6)
     private bool _semiAutoOn;
     private Tweener _offsetTween;      // animates the message-list floor in sync with the panel slide
+
+    // BATCH-03 debounce: HandleLive pokes the gate; a single self-gating loop fires ONE coalesced
+    // request when the ~2.5s window settles. The window is cancelled + _pendingIncomingText cleared at
+    // all four lifecycle sites (close / bot switch / same-bot chat switch / toggle-off) so a pending
+    // fire can never carry the wrong chat's fragment (the seq guard catches a chat-switched RENDER,
+    // but NOT a stale lastIncomingText baked into the request payload at fire time).
+    private readonly IncomingDebounceGate _debounce = new IncomingDebounceGate();
+    private string _pendingIncomingText;   // latest incoming text captured for the eventual coalesced fire
+    private Coroutine _debounceLoop;
 
     void Awake()
     {
@@ -61,11 +71,15 @@ public class SuggestionsController : MonoBehaviour
     {
         if (ChatManager.Instance != null) ChatManager.Instance.OnLiveMessagesReceived += HandleLive;   // active-only
         if (_expandableInput != null) _expandableInput.OnPanelHeightChanged += HandleComposerHeight;
+        _debounceLoop = StartCoroutine(DebounceLoop());       // one always-running self-gating fire loop (BATCH-03)
     }
 
     void OnDisable()
     {
         _requestSeq++;                                         // supersede in-flight requests on deactivate (Render guards on this)
+        _debounce.Cancel();                                   // chat close: drop any pending coalesced fire (BATCH-03)
+        _pendingIncomingText = null;                          // ...and its stale text, so it can never land later
+        if (_debounceLoop != null) { StopCoroutine(_debounceLoop); _debounceLoop = null; }
         _offsetTween?.Kill();
         if (ChatManager.Instance != null) ChatManager.Instance.OnLiveMessagesReceived -= HandleLive;
         if (_expandableInput != null) _expandableInput.OnPanelHeightChanged -= HandleComposerHeight;
@@ -83,6 +97,8 @@ public class SuggestionsController : MonoBehaviour
     {
         _semiAutoOn = false;
         _requestSeq++;                                        // supersede any in-flight request
+        _debounce.Cancel();                                  // bot switch: drop a window pending from the previous bot's chat (BATCH-03)
+        _pendingIncomingText = null;
         if (_toggle != null) _toggle.SetLit(false);
         HidePanel();
     }
@@ -90,6 +106,11 @@ public class SuggestionsController : MonoBehaviour
     private void RestoreForActiveChat()
     {
         if (ChatManager.Instance == null) return;
+        // A same-bot chat switch fires this on EVERY OnChatSelected; a window still pending from the
+        // PREVIOUS chat must NOT fire into this one (its _pendingIncomingText is chat A's fragment while
+        // CurrentChatId is now chat B — a mixed-context call the seq guard cannot catch). Drop it. (BATCH-03)
+        _debounce.Cancel();
+        _pendingIncomingText = null;
         _semiAutoOn = SemiAutoStore.IsOn(ChatManager.Instance.CurrentBotId, ChatManager.Instance.CurrentChatId);
         if (_toggle != null) _toggle.SetLit(_semiAutoOn);     // default OFF → other chats stay manual (SEMI-03)
         if (_semiAutoOn)
@@ -118,6 +139,8 @@ public class SuggestionsController : MonoBehaviour
         else
         {
             _requestSeq++;                                     // supersede any in-flight request — no late render
+            _debounce.Cancel();                                // toggle-OFF: a stale window must not survive to fire after a later toggle-ON (BATCH-03)
+            _pendingIncomingText = null;
             HidePanel();                                       // D-11: off = hide; composer untouched
         }
     }
@@ -184,7 +207,8 @@ public class SuggestionsController : MonoBehaviour
     {
         if (!_semiAutoOn) return;                              // SEMI-03
         if (msgs == null || !msgs.Exists(m => m != null && m.isIncoming)) return;   // ignore outgoing echoes (Pitfall 7)
-        IssueRequest(steerTowardText: null, lastIncomingText: LastIncomingText(msgs));   // refreshes CARDS ONLY (INT-02)
+        _pendingIncomingText = LastIncomingText(msgs);        // capture latest for the eventual coalesced fire
+        _debounce.Poke(Time.time);                            // reset the ~2.5s window instead of firing per-fragment (BATCH-03)
     }
 
     private static string LastIncomingText(List<MessageViewModel> msgs)
@@ -192,6 +216,21 @@ public class SuggestionsController : MonoBehaviour
         for (int i = msgs.Count - 1; i >= 0; i--)
             if (msgs[i] != null && msgs[i].isIncoming) return msgs[i].text;
         return null;
+    }
+
+    // One always-running self-gating loop (mirrors ChatManager.LivePoll): polls the debounce gate a
+    // few times a second and, when the ~2.5s window has settled, fires the SINGLE coalesced request
+    // with the captured incoming text. Started in OnEnable, stopped in OnDisable. Manual refresh and
+    // card-pick never come through here — they call IssueRequest directly (INT-03/INT-04, immediate).
+    private IEnumerator DebounceLoop()
+    {
+        while (true)
+        {
+            yield return new WaitForSecondsRealtime(0.25f);   // fresh instance each loop (codebase idiom)
+            if (!_semiAutoOn) continue;                       // cheap guard; do not fire when off
+            if (_debounce.ShouldFire(Time.time))
+                IssueRequest(steerTowardText: null, lastIncomingText: _pendingIncomingText);   // coalesced single fire (INT-02)
+        }
     }
 
     // --- Panel show/hide coordinated with the composer top + message-list floor (FIX 1 & 2) ---
