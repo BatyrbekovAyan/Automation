@@ -72,9 +72,6 @@ public static class TelegramReactionMerge
                 {
                     if (ReactionEmoji.SameEmoji(result[serverMine].emoji, mine.displacedEmoji))
                     {
-#if UNITY_EDITOR
-                        UnityEngine.Debug.Log($"[D2-merge] suppressed stale displaced echo '{result[serverMine].emoji}' under fresh local '{mine.emoji}' age={nowUnix - mine.time}s");
-#endif
                         result[serverMine] = mine;   // stale echo of the displaced pre-tap state (round-2 D2 defense)
                     }
                     // else: a THIRD value (neither optimistic nor displaced) — a genuinely newer external

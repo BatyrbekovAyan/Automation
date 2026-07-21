@@ -4656,10 +4656,6 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
         if (currentVm == null || changed == null) return;
         if (currentVm.messageId != changed.messageId) return;
 
-        // [D2-view] Compiled (not editor-only) so the next UAT pass confirms the handler ran on device.
-        // Capped: message id + reaction count only — never emoji text or message body (T-08-22-01).
-        Debug.Log($"[D2-view] reactions changed id={changed.messageId} n={(changed.reactions?.Count ?? 0)}");
-
         // ChatManager mutates the cached VM in place, so currentVm.reactions is
         // already current. Re-render the pill + clearance, then rebuild the row so the
         // reserved space takes effect (this is a live update, not a full re-bind).
@@ -4670,21 +4666,13 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
         // (the data-layer dedup guard), so a single lost repaint on the poll path is permanent. Harden it
         // the same way the reaction-bar-dismiss path does — one frame later, clear of any same-frame
         // canvas/cull/submesh churn. Idempotent; WhatsApp visual byte-identical.
-        StartCoroutine(RefreshReactionsNextFrame(changed.messageId));
+        StartCoroutine(RefreshReactionsNextFrame());
     }
 
-    private IEnumerator RefreshReactionsNextFrame(string id)
+    private IEnumerator RefreshReactionsNextFrame()
     {
         yield return null;
         RefreshReactionsVisual();   // RenderReactions + reactionPill.ForceReRender (SetAllDirty + ForceMeshUpdate)
-
-        // [D2-view] Discriminate the round-5 residual (08-REVIEW CR-01): one frame AFTER the forced
-        // re-render, report the pill's live state. If it logs active + len>0 + culled=false while the
-        // screen shows stale -> below-CanvasRenderer (submesh churn); culled=true -> the bubble is
-        // scrolled out of the RectMask2D viewport; if this line never prints -> an exception killed the
-        // chain (WR-01). Capped: id + booleans/length only, never emoji or body content.
-        if (reactionPill != null)
-            Debug.Log($"[D2-view] post-render id={id} active={reactionPill.DiagnosticActive} len={reactionPill.DiagnosticLabelLength} culled={reactionPill.DiagnosticLabelCulled}");
     }
 
     private void RenderReactions()

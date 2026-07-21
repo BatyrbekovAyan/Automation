@@ -63,11 +63,6 @@ public class ReactionPillView : MonoBehaviour
 
     public bool HasReactions => _last != null && _last.Count > 0;
 
-    // [D2-view] diagnostics for the one-frame-later state log (ids/booleans only, no emoji content).
-    public bool DiagnosticActive => gameObject.activeSelf;
-    public int DiagnosticLabelLength => label != null && label.text != null ? label.text.Length : -1;
-    public bool DiagnosticLabelCulled => label != null && label.canvasRenderer != null && label.canvasRenderer.cull;
-
     private void HandleEmojiReady(string spriteName)
     {
         if (HasReactions) Render(_last);

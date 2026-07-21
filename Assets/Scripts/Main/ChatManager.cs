@@ -44,7 +44,7 @@ public partial class ChatManager : MonoBehaviour
     private Dictionary<string, ChatViewModel> chatLookup = new();
     private HashSet<string> seenMessageIds = new HashSet<string>();
 #if UNITY_EDITOR
-    private static bool _d15ProbeArmed;   // D15 (08-REVIEW IN-01): one-shot per Editor session
+    private static bool _d15ProbeArmed;   // D15 (08-REVIEW IN-01): one-shot per domain load
 #endif
     private readonly ReactionStore _reactions = new ReactionStore();
 
@@ -639,24 +639,15 @@ public partial class ChatManager : MonoBehaviour
                     responseIndex++;
                     int serverSequence = MessageOrder.WithinSecondSequence(responseTimes, responseIndex);
 
-                    // D15 diagnostic — WhatsApp reaction-REMOVAL ingest (08-REVIEW IN-02): a removal made in
-                    // the WhatsApp app never clears in-app. Log every WhatsApp reaction raw shape (BOTH the
-                    // unseen and the already-seen branch) so the round-5 device pass tells which of the three
-                    // candidates occurs: (a) re-emit under the SAME already-seen id, (b) no removal raw at
-                    // all, (c) missing stanzaId. Capped: ids + booleans only (never emoji/body content). seen
-                    // read via Contains (no mutation).
-                    if (ActiveChannel == ChatChannel.WhatsApp && raw.type == "reaction")
-                        Debug.Log($"[D15] wa-reaction rawId={raw.id} stanza={(string.IsNullOrEmpty(raw.stanzaId) ? "absent" : raw.stanzaId)} bodyEmpty={string.IsNullOrEmpty(raw.body?.ToString())} seen={seenMessageIds.Contains(raw.id)}");
-
 #if UNITY_EDITOR
                     // D15 (08-REVIEW IN-01): deterministic one-shot probe. On the FIRST WhatsApp reaction raw
-                    // of the Editor session, enqueue its TARGET stanza id into the EXISTING serial quote-resolve
+                    // of the domain load, enqueue its TARGET stanza id into the EXISTING serial quote-resolve
                     // drain so the [D15-probe] report (QuoteResolve.cs) fires without owner choreography —
                     // reusing the already-authed messages/id/get seam (no new request, no token handling).
                     if (ActiveChannel == ChatChannel.WhatsApp && raw.type == "reaction"
                         && !_d15ProbeArmed && !string.IsNullOrEmpty(raw.stanzaId))
                     {
-                        _d15ProbeArmed = true;   // one-shot per Editor session
+                        _d15ProbeArmed = true;   // one-shot per domain load
                         Debug.Log($"[D15-probe] arming target-payload probe for stanza={raw.stanzaId}");
                         if (!_quoteResolveInFlight.Contains(raw.stanzaId))
                         {
