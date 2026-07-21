@@ -268,7 +268,7 @@ public class TelegramReactionMergeTests
             new List<MessageReaction> { Me("😁", time: 0) },   // owner changes to 😁 IN the Telegram app
             Now + 8);
 
-        Assert.IsFalse(TelegramReactionMerge.SameReactions(afterEcho, afterExternal)); // FAILS today
+        Assert.IsFalse(TelegramReactionMerge.SameReactions(afterEcho, afterExternal));
         Assert.AreEqual(1, afterExternal.Count);
         Assert.AreEqual("😁", afterExternal[0].emoji);
         Assert.AreEqual(OutgoingReaction.MeReactorKey, afterExternal[0].reactorKey);   // still toggleable
@@ -384,7 +384,7 @@ public class TelegramReactionMergeTests
             new List<MessageReaction> { Me("👍", time: 0) },
             Now + 3, out bool changed1);
         Assert.IsFalse(changed1);                 // multiset unchanged ⇒ no repaint
-        Assert.AreEqual(0, step1[0].time);        // BUT freshness consumed (server element adopted)  <-- RED here
+        Assert.AreEqual(0, step1[0].time);        // BUT freshness consumed (server element adopted)
 
         var step2 = TelegramReactionMerge.Reconcile(
             step1,
