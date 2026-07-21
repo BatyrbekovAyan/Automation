@@ -43,6 +43,9 @@ public partial class ChatManager : MonoBehaviour
     public List<ChatViewModel> Chats = new();
     private Dictionary<string, ChatViewModel> chatLookup = new();
     private HashSet<string> seenMessageIds = new HashSet<string>();
+#if UNITY_EDITOR
+    private static bool _d15ProbeArmed;   // D15 (08-REVIEW IN-01): one-shot per Editor session
+#endif
     private readonly ReactionStore _reactions = new ReactionStore();
 
     // The owner's Telegram profile-user id, learned opportunistically from fromMe rows
@@ -660,6 +663,25 @@ public partial class ChatManager : MonoBehaviour
                     // read via Contains (no mutation).
                     if (ActiveChannel == ChatChannel.WhatsApp && raw.type == "reaction")
                         Debug.Log($"[D15] wa-reaction rawId={raw.id} stanza={(string.IsNullOrEmpty(raw.stanzaId) ? "absent" : raw.stanzaId)} bodyEmpty={string.IsNullOrEmpty(raw.body?.ToString())} seen={seenMessageIds.Contains(raw.id)}");
+
+#if UNITY_EDITOR
+                    // D15 (08-REVIEW IN-01): deterministic one-shot probe. On the FIRST WhatsApp reaction raw
+                    // of the Editor session, enqueue its TARGET stanza id into the EXISTING serial quote-resolve
+                    // drain so the [D15-probe] report (QuoteResolve.cs) fires without owner choreography —
+                    // reusing the already-authed messages/id/get seam (no new request, no token handling).
+                    if (ActiveChannel == ChatChannel.WhatsApp && raw.type == "reaction"
+                        && !_d15ProbeArmed && !string.IsNullOrEmpty(raw.stanzaId))
+                    {
+                        _d15ProbeArmed = true;   // one-shot per Editor session
+                        Debug.Log($"[D15-probe] arming target-payload probe for stanza={raw.stanzaId}");
+                        if (!_quoteResolveInFlight.Contains(raw.stanzaId))
+                        {
+                            _quoteResolveInFlight.Add(raw.stanzaId);
+                            _quoteResolveQueue.Enqueue(raw.stanzaId);
+                            if (!_quoteResolveDraining) StartCoroutine(DrainQuoteResolveQueue());
+                        }
+                    }
+#endif
 
                     // BRAND NEW message we missed: ghost-send recovery dedup.
                     // If a previous-session POST reached Wappi but the client
