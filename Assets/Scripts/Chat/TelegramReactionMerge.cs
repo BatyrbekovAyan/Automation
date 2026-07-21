@@ -116,7 +116,7 @@ public static class TelegramReactionMerge
     /// it) rather than duplicating. Empty-emoji entries never render (ReactionSummary skips them).
     /// No-ops on a null list — the caller owns the field and guarantees it is non-null.
     /// </summary>
-    public static void StampRemovalTombstone(List<MessageReaction> reactions, long nowUnix)
+    public static void StampRemovalTombstone(List<MessageReaction> reactions, long nowUnix, string displacedEmoji)
     {
         if (reactions == null) return;
 
@@ -126,6 +126,7 @@ public static class TelegramReactionMerge
             reactions[idx].emoji = "";
             reactions[idx].time = nowUnix;
             reactions[idx].fromMe = true;
+            reactions[idx].displacedEmoji = displacedEmoji;
             return;
         }
 
@@ -135,8 +136,21 @@ public static class TelegramReactionMerge
             reactorKey = OutgoingReaction.MeReactorKey,
             senderName = "Me",
             fromMe = true,
-            time = nowUnix
+            time = nowUnix,
+            displacedEmoji = displacedEmoji
         });
+    }
+
+    /// <summary>
+    /// Stamp the displaced pre-tap emoji onto the owner's fresh optimistic entry (add/change path). Merge
+    /// reads it to suppress a stale echo of the pre-tap state but adopt a genuinely newer external own-change.
+    /// No-ops when there is no own entry (guarded by the caller's optimistic apply).
+    /// </summary>
+    public static void StampDisplaced(List<MessageReaction> reactions, string displacedEmoji)
+    {
+        if (reactions == null) return;
+        int idx = IndexOfMine(reactions);
+        if (idx >= 0) reactions[idx].displacedEmoji = displacedEmoji;
     }
 
     /// <summary>Order-insensitive equality by the (reactorKey, emoji) multiset — avoids a

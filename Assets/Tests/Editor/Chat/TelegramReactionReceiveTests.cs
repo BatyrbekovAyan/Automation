@@ -19,8 +19,8 @@ public class TelegramReactionReceiveTests
 
     // Optimistic send entry by default (real tap time = fresh); pass time: 0 to model a
     // server-mapped "me" echo (TelegramReactionMapper emits time = 0).
-    private static MessageReaction Me(string emoji, long time = Now) => new MessageReaction
-    { emoji = emoji, reactorKey = OutgoingReaction.MeReactorKey, fromMe = true, time = time };
+    private static MessageReaction Me(string emoji, long time = Now, string displaced = null) => new MessageReaction
+    { emoji = emoji, reactorKey = OutgoingReaction.MeReactorKey, fromMe = true, time = time, displacedEmoji = displaced };
 
     private static MessageReaction Other(string emoji, string key) => new MessageReaction
     { emoji = emoji, reactorKey = key, fromMe = false };
@@ -192,7 +192,7 @@ public class TelegramReactionReceiveTests
         // Owner changed 👍→❤ post-echo; a stale in-flight snapshot still echoes 👍 as "me".
         // The fresh optimistic ❤ wins (no revert flicker); the server catches up next poll.
         var merged = TelegramReactionMerge.Merge(
-            new List<MessageReaction> { Me("❤") },
+            new List<MessageReaction> { Me("❤", displaced: "👍") },
             new List<MessageReaction> { Me("👍", time: 0) },
             Now);
 

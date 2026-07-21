@@ -13,4 +13,8 @@ public class MessageReaction
     public string senderName;  // Display name of the reactor.
     public bool fromMe;        // Reaction came from the account owner.
     public long time;          // Reaction event time (unix seconds).
+    public string displacedEmoji;  // Telegram-only: the owner's own PRE-TAP state this optimistic entry
+                                   // replaced (null = had no reaction). Read by TelegramReactionMerge to
+                                   // tell a stale pre-tap echo (suppress) from a genuinely newer external
+                                   // own-change (adopt). Never set on server-mapped entries or WhatsApp.
 }

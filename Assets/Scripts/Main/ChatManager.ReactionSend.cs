@@ -52,8 +52,14 @@ public partial class ChatManager
         if (ActiveChannel == ChatChannel.Telegram && ev.IsRemoval)
         {
             target.reactions ??= new List<MessageReaction>();
-            TelegramReactionMerge.StampRemovalTombstone(target.reactions, now);
+            TelegramReactionMerge.StampRemovalTombstone(target.reactions, now, priorEmoji);
             applied = true;
+        }
+        else if (ActiveChannel == ChatChannel.Telegram)
+        {
+            // CR-01a (D2-view): stamp the DISPLACED pre-tap emoji on the fresh optimistic "me" so Merge can
+            // tell a stale pre-tap echo (suppress) from a genuinely newer external own-change (adopt).
+            TelegramReactionMerge.StampDisplaced(target.reactions, priorEmoji);
         }
 
         if (applied)

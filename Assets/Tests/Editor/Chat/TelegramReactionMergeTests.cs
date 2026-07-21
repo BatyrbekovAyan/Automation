@@ -17,12 +17,12 @@ public class TelegramReactionMergeTests
 {
     private const long Now = 1_752_000_000;
 
-    private static MessageReaction Me(string emoji, long time = Now) => new MessageReaction
-    { emoji = emoji, reactorKey = OutgoingReaction.MeReactorKey, fromMe = true, time = time };
+    private static MessageReaction Me(string emoji, long time = Now, string displaced = null) => new MessageReaction
+    { emoji = emoji, reactorKey = OutgoingReaction.MeReactorKey, fromMe = true, time = time, displacedEmoji = displaced };
 
     // Fresh optimistic-removal tombstone: empty emoji, "me", real tap time.
-    private static MessageReaction Removal(long time = Now) => new MessageReaction
-    { emoji = "", reactorKey = OutgoingReaction.MeReactorKey, fromMe = true, time = time };
+    private static MessageReaction Removal(long time = Now, string displaced = null) => new MessageReaction
+    { emoji = "", reactorKey = OutgoingReaction.MeReactorKey, fromMe = true, time = time, displacedEmoji = displaced };
 
     private static MessageReaction Other(string emoji, string key) => new MessageReaction
     { emoji = emoji, reactorKey = key, fromMe = false };
@@ -35,7 +35,7 @@ public class TelegramReactionMergeTests
         // Owner just removed 👍; the server still echoes it as "me". The tombstone must drop the
         // echo AND survive the merge, staying armed for the next poll's reconcile (WR-03).
         var merged = TelegramReactionMerge.Merge(
-            new List<MessageReaction> { Removal(Now) },
+            new List<MessageReaction> { Removal(Now, "👍") },
             new List<MessageReaction> { Me("👍", time: 0) },
             Now);
 
@@ -49,7 +49,7 @@ public class TelegramReactionMergeTests
     public void Merge_FreshRemoval_WithOtherReactor_DropsOnlyMyEcho()
     {
         var merged = TelegramReactionMerge.Merge(
-            new List<MessageReaction> { Removal(Now) },
+            new List<MessageReaction> { Removal(Now, "👍") },
             new List<MessageReaction> { Me("👍", time: 0), Other("❤", "999") },
             Now);
 
@@ -121,7 +121,7 @@ public class TelegramReactionMergeTests
         // The tombstone must survive poll 1 so poll 2's still-echoed "me" is suppressed too —
         // consumed-on-first-merge shrank the 90 s grace window to a single cycle (WR-03).
         var afterPoll1 = TelegramReactionMerge.Merge(
-            new List<MessageReaction> { Removal(Now) },
+            new List<MessageReaction> { Removal(Now, "👍") },
             new List<MessageReaction> { Me("👍", time: 0) },
             Now);
 
@@ -168,26 +168,28 @@ public class TelegramReactionMergeTests
     public void StampRemovalTombstone_AddsFreshEmptyMeMarker()
     {
         var reactions = new List<MessageReaction>();
-        TelegramReactionMerge.StampRemovalTombstone(reactions, Now);
+        TelegramReactionMerge.StampRemovalTombstone(reactions, Now, "👍");
 
         Assert.AreEqual(1, reactions.Count);
         Assert.AreEqual(OutgoingReaction.MeReactorKey, reactions[0].reactorKey);
         Assert.AreEqual("", reactions[0].emoji);
         Assert.AreEqual(Now, reactions[0].time);
         Assert.IsTrue(reactions[0].fromMe);
+        Assert.AreEqual("👍", reactions[0].displacedEmoji);
     }
 
     [Test]
     public void StampRemovalTombstone_ReusesExistingMeSlot_NoDuplicate()
     {
         var reactions = new List<MessageReaction> { Me("👍", 1), Other("❤", "999") };
-        TelegramReactionMerge.StampRemovalTombstone(reactions, Now);
+        TelegramReactionMerge.StampRemovalTombstone(reactions, Now, "👍");
 
         // Still one "me" entry, now blanked; the other reactor is untouched.
         Assert.AreEqual(1, reactions.FindAll(r => r.reactorKey == OutgoingReaction.MeReactorKey).Count);
         var mine = reactions.Find(r => r.reactorKey == OutgoingReaction.MeReactorKey);
         Assert.AreEqual("", mine.emoji);
         Assert.AreEqual(Now, mine.time);
+        Assert.AreEqual("👍", mine.displacedEmoji);
         Assert.IsTrue(reactions.Exists(r => r.reactorKey == "999"));
     }
 
@@ -198,7 +200,7 @@ public class TelegramReactionMergeTests
         // reconcile against a still-echoing server suppresses the echo and keeps the invisible
         // tombstone armed for the following poll instead of resurrecting.
         var reactions = new List<MessageReaction> { Me("👍", Now - 5) };
-        TelegramReactionMerge.StampRemovalTombstone(reactions, Now);
+        TelegramReactionMerge.StampRemovalTombstone(reactions, Now, "👍");
 
         var merged = TelegramReactionMerge.Merge(
             reactions,
@@ -239,7 +241,7 @@ public class TelegramReactionMergeTests
         // change-leaves-one: owner changed 👍→❤️; once _tgOwnUserId is persisted, tapi's stale 👍
         // echo is mapped to "me" upstream, so the fresh ❤️ cleanly REPLACES it — one pill, not two.
         var merged = TelegramReactionMerge.Merge(
-            new List<MessageReaction> { Me("❤️", Now) },
+            new List<MessageReaction> { Me("❤️", Now, "👍") },
             new List<MessageReaction> { Me("👍", time: 0) },   // old echo, mapped to "me" via persisted id
             Now);
 
@@ -279,12 +281,93 @@ public class TelegramReactionMergeTests
         // still echoes the OLD 👍 mapped to "me" during the window — the fresh ❤️ must win or the pill
         // flickers back to 👍 (the original D2 defect). Clearing on differ would regress it.
         var merged = TelegramReactionMerge.Merge(
-            new List<MessageReaction> { Me("❤️", Now) },
+            new List<MessageReaction> { Me("❤️", Now, "👍") },
             new List<MessageReaction> { Me("👍", time: 0) },
             Now + 3);
 
         Assert.AreEqual(1, merged.Count);
         Assert.AreEqual("❤️", merged[0].emoji);   // fresh local wins; stale echo suppressed
+    }
+
+    [Test]
+    public void Merge_DifferingEcho_NoDisplacedMatch_AdoptsExternalOwnChange()
+    {
+        // CR-01a (D2-view, the round-6 capture): owner tapped 🥺 in-app (no prior reaction ⇒ displaced null);
+        // then changed their OWN reaction to 🔥 in the Telegram app. 🔥 is neither the optimistic 🥺 nor a
+        // displaced value ⇒ a genuinely newer external own-change ⇒ adopt at once (RED today: suppressed age=9s).
+        var merged = TelegramReactionMerge.Merge(
+            new List<MessageReaction> { Me("🥺", Now) },       // displaced null
+            new List<MessageReaction> { Me("🔥", time: 0) },
+            Now + 9);
+        Assert.AreEqual(1, merged.Count);
+        Assert.AreEqual("🔥", merged[0].emoji);
+        Assert.AreEqual(0, merged[0].time);   // adopted server element ⇒ freshness consumed
+    }
+
+    [Test]
+    public void Merge_DifferingEcho_ThirdValue_DisplacedSet_AdoptsExternalOwnChange()
+    {
+        // Even with a displaced value set, a THIRD emoji (neither optimistic nor displaced) is a genuine
+        // external own-change ⇒ adopt. Owner had 👍, changed to 🥺 in-app (displaced=👍), then to 🔥 in the TG app.
+        var merged = TelegramReactionMerge.Merge(
+            new List<MessageReaction> { Me("🥺", Now, "👍") },
+            new List<MessageReaction> { Me("🔥", time: 0) },
+            Now + 9);
+        Assert.AreEqual(1, merged.Count);
+        Assert.AreEqual("🔥", merged[0].emoji);
+    }
+
+    [Test]
+    public void Merge_FreshRemoval_DifferentEmojiEcho_ExternalReAddAdopts_TombstoneDropped()
+    {
+        // Tombstone displaced = the just-removed 👍. The server "me" is a DIFFERENT emoji 🔥 ⇒ a genuine
+        // external re-add ⇒ keep the server element and DROP the tombstone (not suppressed).
+        var merged = TelegramReactionMerge.Merge(
+            new List<MessageReaction> { Removal(Now, "👍") },
+            new List<MessageReaction> { Me("🔥", time: 0) },
+            Now);
+        Assert.AreEqual(1, merged.Count);
+        Assert.AreEqual("🔥", merged[0].emoji);
+        Assert.AreEqual(OutgoingReaction.MeReactorKey, merged[0].reactorKey);
+    }
+
+    [Test]
+    public void Merge_RevertShapedFreshMe_NullDisplaced_DifferingEchoAdopts()
+    {
+        // WR-01 / null-displaced property: a FRESH optimistic "me" with displacedEmoji null — a first-ever
+        // reaction (no pre-tap state to displace) or a failed-POST revert entry (ReactionStore.ApplyToMessage
+        // never sets displaced) — ADOPTS any differing echo (ghost-landed sent emoji, mid-flight external change)
+        // instead of being pinned for the window. (A real Telegram revert of a NON-null prior hits the CHANGE
+        // branch with displaced already stamped; this pins the null-displaced case.)
+        var merged = TelegramReactionMerge.Merge(
+            new List<MessageReaction> { Me("👍", Now) },       // Me() leaves displacedEmoji null
+            new List<MessageReaction> { Me("🔥", time: 0) },
+            Now + 5);
+        Assert.AreEqual(1, merged.Count);
+        Assert.AreEqual("🔥", merged[0].emoji);
+    }
+
+    [Test]
+    public void Merge_DisplacedBaseHeart_SuppressesQualifiedHeartEcho()
+    {
+        // VS16 seam: displaced stored as base "❤" (U+2764) still matches a qualified "❤️" echo — the fresh
+        // local wins (stale displaced echo suppressed) despite the variation-selector mismatch.
+        var merged = TelegramReactionMerge.Merge(
+            new List<MessageReaction> { Me("😁", Now, "❤") },
+            new List<MessageReaction> { Me("❤️", time: 0) },
+            Now + 3);
+        Assert.AreEqual(1, merged.Count);
+        Assert.AreEqual("😁", merged[0].emoji);   // displaced-match ⇒ suppressed
+    }
+
+    [Test]
+    public void MessageReaction_JsonUtility_MissingDisplacedEmoji_DefaultsNull()
+    {
+        // Old cached entries predate the field — JsonUtility leaves the missing key at its default (null),
+        // which Merge reads as "absence" ⇒ adopt-on-differ. No migration needed.
+        var legacy = UnityEngine.JsonUtility.FromJson<MessageReaction>(
+            "{\"emoji\":\"👍\",\"reactorKey\":\"me\",\"time\":5}");
+        Assert.IsNull(legacy.displacedEmoji);
     }
 
     [Test]
