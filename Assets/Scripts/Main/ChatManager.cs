@@ -453,13 +453,6 @@ public partial class ChatManager : MonoBehaviour
 
             if (www.result != UnityWebRequest.Result.Success) yield break;
 
-            var text = www.downloadHandler.text;
-            System.IO.File.WriteAllText(
-                Application.persistentDataPath + "/response.txt",
-                text
-            );
-            Debug.Log("Saved to: " + Application.persistentDataPath);
-
             string newJson = www.downloadHandler.text;
 
             if (newJson != cachedJson)
@@ -622,15 +615,6 @@ public partial class ChatManager : MonoBehaviour
         // phase we were waiting on.
         if (currentChatId != chatId) yield break;
 
-#if UNITY_EDITOR
-        var text = www.downloadHandler.text;
-        System.IO.File.WriteAllText(
-            Application.persistentDataPath + "/response.txt",
-            text
-        );
-        Debug.Log("Saved to: " + Application.persistentDataPath);
-#endif
-        
         List<MessageViewModel> newMessages = new List<MessageViewModel>();
         bool hasStatusUpdates = false;
 
@@ -1288,15 +1272,6 @@ public partial class ChatManager : MonoBehaviour
         _chatFetchesInFlight++;
         yield return www.SendWebRequest();
         _chatFetchesInFlight = Mathf.Max(0, _chatFetchesInFlight - 1);
-
-#if UNITY_EDITOR
-        var text = www.downloadHandler.text;
-        System.IO.File.WriteAllText(
-            Application.persistentDataPath + "/response.txt",
-            text
-        );
-        Debug.Log("Saved to: " + Application.persistentDataPath);
-#endif
 
         if (www.result != UnityWebRequest.Result.Success)
         {
