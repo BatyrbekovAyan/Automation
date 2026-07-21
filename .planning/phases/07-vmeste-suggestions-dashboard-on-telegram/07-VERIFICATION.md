@@ -1,7 +1,8 @@
 ---
 phase: 07-vmeste-suggestions-dashboard-on-telegram
 verified: 2026-07-13T13:16:00Z
-status: human_needed
+status: passed
+reconciled: 2026-07-21T00:00:00Z
 score: 18/18 must-haves verified (structural)
 overrides_applied: 0
 human_verification:
@@ -12,6 +13,15 @@ human_verification:
     expected: "Telegram-sourced conversations appear in counts/status rows/recent list after a live Dashboard_Outcomes classification pass; a dual-channel bot shows exactly ONE chip (not two) and toggling it surfaces both its WhatsApp and Telegram rows; tapping a Telegram outcome row switches to the «Чаты» tab showing that exact Telegram chat"
     why_human: "Requires a live n8n DashboardOutcomes classification run over real Supabase n8n_chat_histories data, a real authorized Telegram profile with message history, and an Editor Play/device session to observe the UI transition — not reproducible from static code analysis. No dedicated HUMAN-UAT doc exists for 07-02 (only 07-HUMAN-UAT.md for SUGG); this item is not yet tracked in a checklist doc."
 ---
+
+> ## Reconciliation closure — 2026-07-21
+>
+> **Owner decision (2026-07-21):** "yes, close Group 1 and 2. Group 3 i will close later after finish phase 10 and 11."
+>
+> Frontmatter `status:` advanced `human_needed → passed`. Context: dev-only operation, prod parked per owner, seven owner device rounds passed (08-DEVICE-UAT Gate A — round 7, 2026-07-21). The two `human_verification` items are dispositioned below; nothing marked PASS that was not actually verified.
+>
+> 1. **«Вместе» suggestions populate + are RAG-grounded on a real Telegram chat (SUGG-01/SUGG-02)** → split: **populate** = `resolved — superseded` (08-DEVICE-UAT §H #1 PASS; relevance path fixed — D5 core resolved round 1 / D10 resolved round 2, "Telegram suggestions relevant"); the **RAG-grounded-with-seeded-data** half = `waived — owner decision 2026-07-21` (never run with indexed RAG data on the TG bot — dev-only, prod parked).
+> 2. **«Сводка» dashboard counts/filters/deep-links real Telegram conversations (DASH-01/02/03)** → `resolved — superseded`: 08-DEVICE-UAT §H #3 (TG rows appear) + #4 (one chip per dual-channel bot) + #5 (TG outcome row deep-links into that TG chat) all PASS.
 
 # Phase 7: «Вместе» Suggestions + Dashboard on Telegram Verification Report
 

@@ -1,6 +1,14 @@
 # Phase 7 — Human UAT Gate: «Вместе» Suggestions on Telegram (SUGG-01 / SUGG-02 live proof)
 
-**Status:** OPEN (owner-run) — the LIVE half only. The CLIENT half is already proven.
+**Status:** RESOLVED (2026-07-21) — reconciled per owner decision; see closure block below.
+
+> ## Reconciliation closure — 2026-07-21
+>
+> **Owner decision (2026-07-21):** "yes, close Group 1 and 2. Group 3 i will close later after finish phase 10 and 11."
+>
+> This is a **Group 1** item (live TG suggestions + dashboard). Most of it was in fact device-verified in the shared dev-n8n window recorded in 08-DEVICE-UAT §G/§H — those rows are `[resolved — superseded]` with the specific PASS cited; only the RAG-grounded-with-seeded-data proof was never run and is `[waived — owner 2026-07-21]`. **No item is marked PASS that was not actually verified.**
+>
+> **Disposition tally:** 5 resolved—superseded (suggestions populate §H#1, clone-inactive via G6 "done" + standing bot-activation policy, «Сводка» TG rows §H#3, one-chip-per-dual-bot §H#4, TG deep-link §H#5) · 1 waived (RAG-grounded SUGG-02 — never run with seeded RAG data on the TG bot).
 
 ## What is already verified (no human needed)
 
@@ -38,28 +46,28 @@ profile**, and `secrets.json` (the n8n API key) is deny-ruled for Claude.
 
 ### Owner checklist (run during the TPL-06 dev-n8n session)
 
-- [ ] **Suggestions populate on Telegram.** Open a Telegram chat on a
+- [x] **Suggestions populate on Telegram.** Open a Telegram chat on a *[resolved — superseded: 08-DEVICE-UAT §H #1 "Suggestions populate in a real Telegram chat" PASS]*
       **Telegram-authed** bot, toggle «Вместе» (or open a chat while «Вместе» is
       the bot default) → **4 suggestions populate**. This proves the payload carried
       `channel == "telegram"` and `botTgId == telegramWorkflowId` and the server
-      accepted it. ☐ PASS ☐ FAIL
-- [ ] **Suggestion is RAG-grounded for a TG-only bot (SUGG-02).** On a bot whose
+      accepted it. ☑ PASS (via 08-DEVICE-UAT §H #1)
+- [x] **Suggestion is RAG-grounded for a TG-only bot (SUGG-02).** On a bot whose *[waived — owner 2026-07-21: never run with seeded RAG data on the TG bot; the relevance path was fixed (D5 core round 1 / D10 round 2) but explicit catalog-citation grounding was not device-confirmed]*
       **price-list/catalog is seeded** in the RAG store, confirm a suggestion
       reflects that catalog/price-list content → proves the server's **`botTgId`
       RAG branch matched** (not the WA branch, not skip-RAG). If no RAG data is
       seeded for that bot, record **PENDING** (grounding cannot be judged without
       indexed data — re-run after an Upload File on the TG bot).
-      ☐ PASS ☐ PENDING ☐ FAIL
-- [ ] **Clone stays INACTIVE outside the test window.** Per project policy, bot
+      waived — owner 2026-07-21 (dev-only, prod parked)
+- [x] **Clone stays INACTIVE outside the test window.** Per project policy, bot *[resolved — superseded: standing bot-activation policy; owner confirmed "G6 done" 2026-07-20 (08-DEVICE-UAT §G6) — dev clone deactivated, prod untouched]*
       workflow clones run against **real contacts** — activate only for the test,
-      **DEACTIVATE** after. Confirm prod bagkz was **not** touched. ☐ confirmed
+      **DEACTIVATE** after. Confirm prod bagkz was **not** touched. ☑ confirmed (G6 done)
 
 ## Result (owner marks)
 
-- **Overall:** ☐ PASS ☐ PARTIAL (grounding PENDING) ☐ FAIL
-- **suggestions populate on Telegram:** ☐ PASS ☐ FAIL
-- **RAG-grounded suggestion (SUGG-02):** ☐ PASS ☐ PENDING ☐ FAIL
-- **Notes:**
+- **Overall:** RESOLVED via reconciliation 2026-07-21 (5 resolved—superseded, 1 waived — not a fresh live PASS).
+- **suggestions populate on Telegram:** resolved — superseded (08-DEVICE-UAT §H #1 PASS).
+- **RAG-grounded suggestion (SUGG-02):** waived — owner 2026-07-21 (never run with seeded RAG data).
+- **Notes:** Group 1 closure. Dev-only operation; prod bagkz parked per owner. Nothing marked PASS that was not actually verified on device.
 
 ## Blocks
 
@@ -76,6 +84,6 @@ verification riding the Phase-4 TPL-06 dev-n8n session.*
 
 ### Dashboard live-data pass (added at phase verification — rides the same dev session)
 
-- [ ] **TG rows appear:** after the TPL-06 e2e produces a real Telegram conversation, trigger «Сводка» refresh → the Telegram chat appears in counts + recent list (classification via DashboardOutcomes now receives both channels' profile ids).
-- [ ] **One chip per dual-channel bot:** a bot with both channels shows exactly ONE filter chip; selecting it shows BOTH channels' rows.
-- [ ] **TG deep-link:** tapping a Telegram outcome row lands in that Telegram chat («Чаты» tab, Telegram channel selected, chat open).
+- [x] **TG rows appear:** after the TPL-06 e2e produces a real Telegram conversation, trigger «Сводка» refresh → the Telegram chat appears in counts + recent list (classification via DashboardOutcomes now receives both channels' profile ids). *[resolved — superseded: 08-DEVICE-UAT §H #3 "«Сводка» counts/lists the real Telegram conversation" PASS]*
+- [x] **One chip per dual-channel bot:** a bot with both channels shows exactly ONE filter chip; selecting it shows BOTH channels' rows. *[resolved — superseded: 08-DEVICE-UAT §H #4 PASS]*
+- [x] **TG deep-link:** tapping a Telegram outcome row lands in that Telegram chat («Чаты» tab, Telegram channel selected, chat open). *[resolved — superseded: 08-DEVICE-UAT §H #5 PASS]*

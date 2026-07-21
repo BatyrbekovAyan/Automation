@@ -1,7 +1,8 @@
 ---
 phase: 08-device-uat-milestone-closeout
 verified: 2026-07-21T18:00:00Z
-status: human_needed
+status: passed
+reconciled: 2026-07-21T00:00:00Z
 score: 11/11 autonomous must-haves verified (3 ROADMAP success criteria + 8 plan/phase-level truths); 0 failed; 1 pre-existing tooling-drift finding (not phase-08-caused, see Finding F-1); 3 owner-run items pending
 overrides_applied: 0
 supersedes: "08-VERIFICATION.md dated 2026-07-15T10:07:35Z (written when the phase was 3 plans / 1 Gate-A round; the phase since grew to 35 plans across 7 gap-closure rounds — that version is preserved in git history, this version is authoritative)"
@@ -16,6 +17,16 @@ human_verification:
     expected: "Once Gate A (PASSED, this verification) and Gate B are each dispositioned (PASS or explicit defer), the owner runs `/clear` then `/gsd-complete-milestone` for v1.1 \"Telegram Parity\", producing the PROJECT.md Active->Validated move, ROADMAP reorg, milestone.complete archival, RETROSPECTIVE.md update, and the `v1.1` git tag; SUPPRESS-01 is confirmed rolled forward into v1.2 Phase 9 (already true — Phase 9 is executing) and the D15 follow-up + any residual carried items land in STATE.md Deferred Items (already true)."
     why_human: "This is the actual milestone-close mechanics run (`/gsd-complete-milestone`), explicitly reserved for the owner by the checklist's own text (\"do NOT tick on the owner's behalf\"); it is also gated on Gate B being dispositioned first, which has not happened yet."
 ---
+
+> ## Reconciliation closure — 2026-07-21
+>
+> **Owner decision (2026-07-21):** "yes, close Group 1 and 2. Group 3 i will close later after finish phase 10 and 11."
+>
+> Gate A **PASSED** on the round-7 device re-verify (2026-07-21). The phase was **approved complete by the owner 2026-07-21**; frontmatter `status:` advanced `human_needed → passed`. The three `human_verification` items are operational disposition (not pass/fail) and are updated in place below — none is claimed PASS:
+>
+> 1. **Gate B — one-shot prod bagkz bulk replication (08-PROD-REPLICATION.md)** → **PARKED indefinitely per owner** (not pending). Prod bagkz stays dormant; the replication runbook is deferred with a recorded owner reason. (Finding F-1 pre-step — bump `verify-telegram-parity.py` `TG_BOT_NODE_COUNT` 24→26 — still applies whenever the copy is eventually run.)
+> 2. **Pre-Gate-B cleanup sweep (08-REVIEW.md Phase-Close Cleanup Inventory)** → **IN PROGRESS in a parallel session** (cleanup task spawned 2026-07-21).
+> 3. **Gate C — milestone close (`/gsd-complete-milestone`)** → **at owner discretion** (the milestone-close mechanics are owner-run; the owner runs `/gsd-complete-milestone` for v1.1 when ready).
 
 # Phase 8: Device UAT + Milestone Closeout Verification Report
 

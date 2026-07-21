@@ -1,6 +1,14 @@
 # Phase 4 — Human UAT Gate: n8n Telegram Template Parity + RAG Re-stamp (TPL-06)
 
-**Status:** OPEN (owner-run) — this gate CLOSES the phase.
+**Status:** RESOLVED (2026-07-21) — reconciled per owner decision; see closure block below.
+
+> ## Reconciliation closure — 2026-07-21
+>
+> **Owner decision (2026-07-21):** "yes, close Group 1 and 2. Group 3 i will close later after finish phase 10 and 11."
+>
+> This gate is a **Group 1** item (live dev-n8n e2e never run). Context: dev-only operation, the deploy-half was done 2026-07-13 (owner flipped the 4 "Available in MCP" toggles + n8n-mcp deploy), prod bagkz parked per owner, and seven owner device rounds passed (08-DEVICE-UAT Gate A — round 7, 2026-07-21). Every checkbox below is ticked with one of exactly two honest dispositions — `[resolved — superseded]` (substance verified elsewhere, cited) or `[waived — owner 2026-07-21]` (never run anywhere). **No item is marked PASS that was not actually verified.**
+>
+> **Disposition tally:** 3 resolved—superseded (text e2e via Gate A §G#1, clone-deactivation via G6 "done", prod-untouched vacuously true) · 10 waived (dev-n8n setup rows + voice / memory / pre-auth-file re-stamp e2e).
 
 Phase 4 is **code-complete** once the agent-side work is committed and the
 structural verifier is green: `04-01` fixed the four canonical workflow JSONs
@@ -36,11 +44,11 @@ dev n8n is not running and its API key lives in deny-ruled `secrets.json`
 
 ### 1. Pre-flight — verifier + Postgres credential resolve/UPDATE check
 
-- [ ] Run the structural verifier — **must exit 0** before deploying:
+- [x] Run the structural verifier — **must exit 0** before deploying: *[waived — owner 2026-07-21: dev-n8n setup step, never run live]*
       ```bash
       python3 Tools/n8n/verify-telegram-parity.py
       ```
-- [ ] On the dev n8n, confirm the executeQuery Postgres credential
+- [x] On the dev n8n, confirm the executeQuery Postgres credential *[waived — owner 2026-07-21: dev-n8n editor step never run live; cred RESOLVES + BINDS confirmed 2026-07-13 via no-op setNodeCredential republish]*
       (id `vvRrFiEXzLVqKjOx`, name **"Postgres"**) resolves on the
       `Restamp RAG Chunks` node in BOTH Create orchestrators, and that its DB role
       can `UPDATE documents`. Quick check: open `CreateTelegramWorkflow`
@@ -52,8 +60,8 @@ dev n8n is not running and its API key lives in deny-ruled `secrets.json`
 
 ### 2. Start dev n8n + tunnel, then re-point callbacks
 
-- [ ] Start the dev n8n at `localhost:5678` and a `cloudflared` quick tunnel.
-- [ ] Run:
+- [x] Start the dev n8n at `localhost:5678` and a `cloudflared` quick tunnel. *[waived — owner 2026-07-21: dev-n8n setup, never run live]*
+- [x] Run: *[waived — owner 2026-07-21: dev-n8n setup, never run live]*
       ```bash
       python3 Tools/n8n/rotate-tunnel.py
       ```
@@ -86,7 +94,7 @@ dev n8n is not running and its API key lives in deny-ruled `secrets.json`
 - [x] Import/update all 4 workflows above by their **literal ids**. *(via MCP, 2026-07-13)*
 - [x] Keep the two bot templates **INACTIVE** (shared webhook path `0091024b-7b46`;
       only per-bot clones go active). *(verified: Telegram Bot `active: false`)*
-- [ ] **Recreate any pre-existing dev Telegram clone** — old clones carry the wrong
+- [x] **Recreate any pre-existing dev Telegram clone** — old clones carry the wrong *[waived — owner 2026-07-21: never run; ledger G5 = N/A "couldn't test" (no stale clone at hand)]*
       `api/sync` outbound URLs and will silently fail to reply. Delete the old clone;
       a fresh bot-create off the fixed template produces a correct `tapi/sync` clone.
       *(No TG clones existed on dev as of the 2026-07-13 workflow list — only recheck
@@ -94,21 +102,21 @@ dev n8n is not running and its API key lives in deny-ruled `secrets.json`
 
 ### 4. Authorize a dev Telegram profile + create a Telegram bot
 
-- [ ] Authorize a **dev** Telegram profile in-app (the same one Phase 3 needs).
-- [ ] Create a Telegram bot from the app so a fresh clone off the fixed
+- [x] Authorize a **dev** Telegram profile in-app (the same one Phase 3 needs). *[waived — owner 2026-07-21: dev-n8n setup, never run live]*
+- [x] Create a Telegram bot from the app so a fresh clone off the fixed *[waived — owner 2026-07-21: dev-n8n setup, never run live]*
       `Telegram_Bot` template is generated and activated for the test window.
 
 ### 5. Conversation e2e — record PASS/FAIL for each
 
-- [ ] **text:** send a text message to the Telegram-authed bot → an AI reply arrives
+- [x] **text:** send a text message to the Telegram-authed bot → an AI reply arrives *[resolved — superseded: 08-DEVICE-UAT Gate A §G #1 "Text auto-reply arrives in Telegram" PASS; D10 relevance verified round 2]*
       **in Telegram**. (Proves tapi outbound `message/send` + `type:"text"` routing
       through the AI agent, not the fallback.)
-- [ ] **voice:** send a voice message → transcription + a humanized listening pause
+- [x] **voice:** send a voice message → transcription + a humanized listening pause *[waived — owner 2026-07-21: dev-n8n live e2e never run anywhere; dev-only, prod parked]*
       (the `length_seconds` fallback when `media_info.duration` is absent) → reply
       arrives.
-- [ ] **memory:** a multi-turn exchange stays coherent — no context fragmentation
+- [x] **memory:** a multi-turn exchange stays coherent — no context fragmentation *[waived — owner 2026-07-21: dev-n8n live e2e never run anywhere; dev-only, prod parked]*
       (session key is `profile_id + ':' + chatId`, stable on tapi).
-- [ ] **pre-auth file re-stamp:** upload a price-list file to a bot **BEFORE** authing
+- [x] **pre-auth file re-stamp:** upload a price-list file to a bot **BEFORE** authing *[waived — owner 2026-07-21: dev-n8n live e2e never run anywhere; dev-only, prod parked]*
       Telegram (chunks land with `botTgId = "-1"`), then auth Telegram / create the TG
       workflow, then ask a **price question in Telegram** → the answer is grounded in
       that file (chunks re-stamped from `"-1"` to the new TG workflow id).
@@ -120,18 +128,18 @@ dev n8n is not running and its API key lives in deny-ruled `secrets.json`
 
 ### 6. Deactivate the clone after the test window
 
-- [ ] **DEACTIVATE** the per-bot Telegram clone once testing is done. Bot workflows
+- [x] **DEACTIVATE** the per-bot Telegram clone once testing is done. Bot workflows *[resolved — superseded: owner confirmed "G6 done" 2026-07-20 (08-DEVICE-UAT §G6, commit 7c1ad48) — dev test clone deactivated]*
       stay inactive except during active testing — they run against **real contacts**.
-- [ ] Confirm prod bagkz was **not** touched (it stays dormant until Phase 8).
+- [x] Confirm prod bagkz was **not** touched (it stays dormant until Phase 8). *[resolved — superseded: vacuously true — nothing touched prod bagkz; replication parked per owner]*
 
 ## Result (owner marks)
 
-- **Overall:** ☐ PASS ☐ FAIL
-- **text:** ☐ PASS ☐ FAIL
-- **voice:** ☐ PASS ☐ FAIL
-- **memory:** ☐ PASS ☐ FAIL
-- **pre-auth file re-stamp:** ☐ PASS ☐ FAIL
-- **Notes:**
+- **Overall:** RESOLVED via reconciliation 2026-07-21 (not a live PASS — dispositioned, see closure block).
+- **text:** resolved — superseded (08-DEVICE-UAT Gate A §G #1 PASS).
+- **voice:** waived — owner 2026-07-21 (dev-n8n e2e never run anywhere).
+- **memory:** waived — owner 2026-07-21 (dev-n8n e2e never run anywhere).
+- **pre-auth file re-stamp:** waived — owner 2026-07-21 (dev-n8n e2e never run anywhere).
+- **Notes:** Group 1 closure. Dev-only operation; prod bagkz parked per owner. Nothing marked PASS that was not actually verified on device.
 
 ## Blocks
 

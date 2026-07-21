@@ -1,7 +1,8 @@
 ---
 phase: 03-tapi-live-shape-capture
 verified: 2026-07-12T18:00:00Z
-status: human_needed
+status: passed
+reconciled: 2026-07-21T00:00:00Z
 score: 5/6 must-haves verified programmatically (1/6 is the owner-run capture — human gate, by design)
 overrides_applied: 0
 human_verification:
@@ -15,6 +16,16 @@ human_verification:
     expected: "All 6 boxes checked; phase closes"
     why_human: "Explicit phase-closing gate, owner-attested by design"
 ---
+
+> ## Reconciliation closure — 2026-07-21
+>
+> **Owner decision (2026-07-21):** "yes, close Group 1 and 2. Group 3 i will close later after finish phase 10 and 11."
+>
+> Frontmatter `status:` advanced `human_needed → passed`. The three `human_verification` items are dispositioned below. STRICT honesty: nothing is marked PASS that was not actually verified — each item carries `resolved — superseded` (substance verified elsewhere, cited) only.
+>
+> 1. **Run capture against a real authorized dev Telegram profile** → `resolved — superseded`: the capture gate closed **2026-07-13** — the owner ran `Tools/tapi/capture-shapes.sh` against an authorized dev Telegram profile and produced sanitized samples (plus the **2026-07-14** media re-run).
+> 2. **Fill the 13 SHAPES.md verdicts + reactions go/no-go** → `resolved — superseded`: verdicts recorded in `Tools/tapi/SHAPES.md` off the 2026-07-13 capture; 03-VERIFICATION's `human_needed` marker clears against that recorded verdict set.
+> 3. **Tick 03-HUMAN-UAT.md checklist** → `resolved — superseded`: the phase's downstream substance (Phase-5 Normalize/media, CHAT-03/CHAT-07) was verified on device through 08-DEVICE-UAT Gate A (round 7, 2026-07-21, §B media all PASS).
 
 # Phase 3: tapi Live-Shape Capture Verification Report
 

@@ -1,7 +1,8 @@
 ---
 phase: 04-n8n-telegram-template-parity-dev
 verified: 2026-07-12T14:18:53Z
-status: human_needed
+status: passed
+reconciled: 2026-07-21T00:00:00Z
 score: 12/12 buildable must-haves verified (TPL-06 live e2e is the designed owner gate, not counted against score)
 overrides_applied: 0
 human_verification:
@@ -18,6 +19,17 @@ human_verification:
     expected: "The project compiles cleanly in the Unity Editor with the new AddField lines; no new warnings/errors"
     why_human: "Editor state was unknown during execution per the plan's hard constraint (do not run the Unity test suite / recompile mid-session); owner confirms as part of the TPL-06 gate"
 ---
+
+> ## Reconciliation closure — 2026-07-21
+>
+> **Owner decision (2026-07-21):** "yes, close Group 1 and 2. Group 3 i will close later after finish phase 10 and 11."
+>
+> Frontmatter `status:` advanced `human_needed → passed`. Context: dev-only operation, deploy-half done 2026-07-13 (owner flipped the 4 "Available in MCP" toggles + n8n-mcp deploy), prod bagkz parked per owner, and seven owner device rounds passed (08-DEVICE-UAT Gate A — round 7, 2026-07-21). The four `human_verification` items are dispositioned below; nothing is marked PASS that was not actually verified.
+>
+> 1. **Full TPL-06 owner runbook (text / voice / memory / pre-auth-file re-stamp e2e)** → split: **TEXT** = `resolved — superseded` (08-DEVICE-UAT Gate A §G #1 "Text auto-reply arrives in Telegram" PASS; D10 relevance verified round 2); **VOICE / MEMORY / PRE-AUTH-file-re-stamp** = `waived — owner decision 2026-07-21` (the live dev-n8n e2e was never run anywhere — dev-only operation, prod parked).
+> 2. **Postgres credential (vvRrFiEXzLVqKjOx) resolve + UPDATE pre-flight** → `waived — owner decision 2026-07-21` (dev-n8n editor step never run live; the credential RESOLVES + BINDS was confirmed 2026-07-13 via a no-op `setNodeCredential` republish).
+> 3. **Telegram voice-message type "ptt" confirm (IN-01)** → `waived — owner decision 2026-07-21` (live tapi webhook observation never run; the defensive `audio/*→Voice` / `ptt` Switch rule shipped and TG voice(ptt) rendered PASS in 08-DEVICE-UAT §B #3).
+> 4. **Manager.cs Editor/device compile pass** → `resolved — superseded`: the Unity build compiled and ran across seven owner device rounds (08-DEVICE-UAT Gate A, round 7, 2026-07-21) — the new `AddField` lines are in the shipped, device-verified build.
 
 # Phase 4: n8n Telegram Template Parity (dev) Verification Report
 

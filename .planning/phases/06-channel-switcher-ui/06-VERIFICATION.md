@@ -1,7 +1,8 @@
 ---
 phase: 06-channel-switcher-ui
 verified: 2026-07-13T11:42:24Z
-status: human_needed
+status: passed
+reconciled: 2026-07-21T00:00:00Z
 score: 4/4 must-haves verified (structural); 6 human verification items open
 overrides_applied: 0
 human_verification:
@@ -24,6 +25,19 @@ human_verification:
     expected: "The bot reopens on Telegram — the per-bot {botId}ActiveChatChannel choice survives the restart"
     why_human: "Cross-session PlayerPrefs persistence through an actual restart cannot be exercised by static code/scene inspection; requires a live stop/relaunch cycle"
 ---
+
+> ## Reconciliation closure — 2026-07-21
+>
+> **Owner decision (2026-07-21):** "yes, close Group 1 and 2. Group 3 i will close later after finish phase 10 and 11."
+>
+> Frontmatter `status:` advanced `human_needed → passed`. The switcher was central to seven owner device rounds and drew zero visual complaints; all six `human_verification` items map to a PASS in 08-DEVICE-UAT §F — `resolved — superseded`, cited below.
+>
+> 1. **Pill placement + styling** → `resolved — superseded`: 08-DEVICE-UAT §F #1 PASS (TopBar-centre placement, ModeToggle visual language, WA-green/TG-blue selected fills).
+> 2. **Switch swaps chat list (tap TG/WA; re-tap = no-op)** → `resolved — superseded`: 08-DEVICE-UAT §F #2 + #3 PASS (full reset choreography, no crossing/flicker; re-tap no-op).
+> 3. **Muted-but-tappable → connect empty state (both directions)** → `resolved — superseded`: 08-DEVICE-UAT §F #4 PASS (+ D12-ext CTA verified rounds 4–5).
+> 4. **Single-channel bot auto-selects its live channel** → `resolved — superseded`: 08-DEVICE-UAT §F #5 PASS.
+> 5. **Bottom nav: 4 tabs / tab 0 «Чаты» / correct routing / no pink TG screen** → `resolved — superseded`: 08-DEVICE-UAT §F #6 PASS.
+> 6. **Last-used channel persists per bot across restart** → `resolved — superseded`: 08-DEVICE-UAT §F #7 PASS.
 
 # Phase 6: Channel Switcher UI Verification Report
 

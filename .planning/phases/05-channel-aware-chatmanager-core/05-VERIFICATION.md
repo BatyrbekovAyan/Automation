@@ -1,7 +1,8 @@
 ---
 phase: 05-channel-aware-chatmanager-core
 verified: 2026-07-14T07:03:41Z
-status: human_needed
+status: passed
+reconciled: 2026-07-21T00:00:00Z
 score: 45/45 must-haves verified (5 ROADMAP success criteria + 40 plan-level truths across all 6 plans)
 overrides_applied: 0
 human_verification:
@@ -18,6 +19,17 @@ human_verification:
     expected: "message/media/download and messages/id/get resolve the correct video bytes per message even when two TG dialogs on the same profile have overlapping short numeric message ids (e.g. a channel post and a private chat); the TG-namespaced vthumb://tg/{profileId}/{chatId}/{messageId} client cache key already prevents client-side cross-painting (unit-tested) but server-side by-id disambiguation is unverified"
     why_human: "Telegram message ids are 1-5 digit per-dialog counters (confirmed in the capture) so collisions are plausible; probing requires live tapi requests against two real dialogs with colliding ids, which a read-only capture script cannot do (mutating requests are forbidden by that script's design)"
 ---
+
+> ## Reconciliation closure — 2026-07-21
+>
+> **Owner decision (2026-07-21):** "yes, close Group 1 and 2. Group 3 i will close later after finish phase 10 and 11."
+>
+> Frontmatter `status:` advanced `human_needed → passed`. All four `human_verification` items were verified on a real device build through 08-DEVICE-UAT Gate A (round 7, 2026-07-21) — `resolved — superseded`, cited below; nothing marked PASS that was not actually verified.
+>
+> 1. **Owner media re-run — unobserved Telegram media types (SHAPES.md Q2)** → `resolved — superseded`: the 2026-07-14 media re-run + 08-DEVICE-UAT §B media items (image / video / voice(ptt) / document) all PASS (round 1); .tgs sticker card + GIF badge PASS.
+> 2. **Telegram chat device UAT — send/receive parity** → `resolved — superseded`: 08-DEVICE-UAT §B — send text/media/quoted-reply PASS (#8), incoming reply → quoted card PASS (#10), open-unread marks read no `mark_all` PASS (#11); Gate A round 7 PASS.
+> 3. **Telegram 2FA live round-trip** → `resolved — superseded`: 08-DEVICE-UAT §A #1–#3 — 2FA cloud-password engages on both code-entry AND QR flows, wrong password re-prompts without loop/crash, `TelegramCodeInput` clears on every path, all PASS.
+> 4. **vthumb cache-key id-ambiguity probe (05-06-REVIEW WR-02)** → `resolved — superseded`: 08-DEVICE-UAT §D #1 owner low-confidence PASS ("seems ok, not really sure") — no crossing observed, no defect filed.
 
 # Phase 5: Channel-Aware ChatManager Core Verification Report
 
