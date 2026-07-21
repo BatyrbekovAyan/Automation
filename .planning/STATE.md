@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
 status: executing
-stopped_at: Completed 08-34-PLAN.md (round-7 D2-view + D15 code fix)
-last_updated: "2026-07-21T09:44:23.447Z"
+stopped_at: Completed 08-35-PLAN.md (round-7 owner re-verify — GATE A PASSED)
+last_updated: "2026-07-21T10:33:19Z"
 last_activity: 2026-07-21
 progress:
   total_phases: 9
   completed_phases: 5
   total_plans: 65
-  completed_plans: 62
-  percent: 95
+  completed_plans: 63
+  percent: 96
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-12)
 
 **Core value:** The owner stays in control along the automation↔semi-auto spectrum — the bot can answer autonomously, or propose replies the owner picks and refines, without losing trust or the ability to take over.
-**Current focus:** Phase 08 — device-uat-milestone-closeout (round-6 RUN → round-7 gap planning next: D2-view grace discrimination + D15 deterministic probe trigger)
+**Current focus:** Phase 08 — device-uat-milestone-closeout — **GATE A PASSED (round 7, 2026-07-21)**. Next: Gate B (`08-PROD-REPLICATION.md` owner-assisted runbook) then Gate C (`08-MILESTONE-CLOSE.md`) + `/gsd-complete-milestone`.
 
 ## Current Position
 
-Phase: 08 (device-uat-milestone-closeout) — READY TO EXECUTE round 7
-Plan: 35 of 35 next (round-7 gap plans planned; checker passed after 1 revision — sibling-test regression caught and folded in)
-Status: Ready to execute
+Phase: 08 (device-uat-milestone-closeout) — **GATE A PASSED; Gates B/C UNBLOCKED**
+Plan: 35 of 35 DONE (round-7 owner re-verify RUN → all-PASS → Gate A flipped to PASS)
+Status: Gate A PASSED — next is Gate B (08-PROD-REPLICATION.md runbook, owner-assisted), then Gate C (08-MILESTONE-CLOSE.md) and /gsd-complete-milestone. Prod bagkz stays dormant until the 08-PROD-REPLICATION runbook is run.
 Last activity: 2026-07-21
 
-Progress: [██████████] 95%
+Progress: [██████████] 96%
 
 ## Performance Metrics
 
@@ -122,10 +122,11 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [08-32] D17 late-WhatsApp-auth sync cover — ShowAuthSuccess settings-reauth branch gains an else if (authPage == WhatsappAuth) sibling stamp of {bot}WhatsappSyncUntil (300s, reuses SyncUntilSuffixFor(WhatsApp)), exact mirror of the 08-28 late-TG stamp; superseded 08-28 Telegram-only parity comment rewritten to the D17 both-channels rationale (owner round-5 scope-override, owner-approved like D14 — covers show for both channels on every late-add); Telegram stamp unchanged, no new key/teardown (Bot.DeleteBot already clears it); suite 1184/1184 green FRESH; commit b30718d; device re-verify rides 08-33
 - [08-33] Round-6 owner device re-verify (checkpoint RUN 2026-07-21) — **Overall ISSUES, Gate A STAYS ISSUES.** Owner ran the Editor Play-Mode pass (Editor-reproducible per round 5) + returned verdicts with two Unity Editor Console screenshots. **D17 RESOLVED** (owner "ok" item 5 — a Telegram-first bot authorizing WhatsApp later now shows the WhatsApp sync cover; the 08-32 {bot}WhatsappSyncUntil late-auth stamp fires the cover gate). **WR-02 RESOLVED** (owner item 2 — an own WhatsApp reaction removed IN-APP STAYS removed across polls; Screenshot 2 shows the removal n=0 applying against the still re-delivering stale add-raw; the 08-31 revert holds). WA add/change (item 3) + TG add/change/remove (item 4) invariants PASS. **D2-view STILL FAILS, residual now EXACT** (owner "still same behavior. see screenshot") — the [D2-merge] discriminator built in 08-30 fires on EVERY subsequent own-change (suppressed server-me '🔥' by fresh local '🥺' age=9s → '👎' age=21s, climbing): the round-6 confirmation-clears-grace fix is defeated because tapi reactions[] carries only the CURRENT state, so the confirming SAME-emoji echo of the in-app tap (🥺) NEVER arrives; the first server-me is already the newer differing Telegram-app emoji → the never-clear-on-differ branch eats it for the full 90s grace. **D15 probe DID NOT FIRE** (owner "do not see any reactionsKey=False" item 6) — the [D15-probe] only triggers on a WA quoted-reply resolve via messages/id/get, which didn't happen; disposition UNCONFIRMED-not-refuted, CLAUDE.md platform-limit note STAYS marked "probe confirmation pending". **Gate A stays ISSUES** — round 7: `/gsd-plan-phase 08 --gaps` for D2-view grace discrimination (candidates: (a) track the DISPLACED emoji, suppress only when server-me equals it, any THIRD value adopts+clears; (b) clear grace on reaction-send HTTP success; (c) shorten the 90s grace) + D15 deterministic Editor-only [D15-probe] trigger on the first WA type:"reaction" raw. G6 resolved (not carried); echo-hex closed (not carried). Gates B/C + I.3 #10 re-aggregation stay blocked; prod bagkz dormant. No app code changed (planning docs only). commit pending.
 - [08-34] D2-view root fix (CR-01a+CR-02, milestone #1 closed in code): MessageReaction.displacedEmoji rides the pre-tap emoji ON the persisted optimistic entry (JsonUtility, survives relaunch — a memory map would not); Merge suppresses a differing server 'me' ONLY when it equals displacedEmoji, any THIRD value adopts+consumes freshness (round-6 🥺→🔥 age=9s closed). New pure Reconcile(cached,server,now,out renderChanged) seam: RefreshCachedMessageReactions ALWAYS adopts, renderChanged gates the event — so the confirm/fold freshness the 08-30 fix silently discarded through all three call sites now lands; old SameReactions discard-guard gone. WR-01: null-displaced fresh 'me' (first-ever/failed-POST revert) adopts any differing echo. D15: Editor-only one-shot [D15-probe] on the first WhatsApp type:reaction raw enqueues raw.stanzaId into the existing authed messages/id/get drain (no new secret/endpoint). TDD RED→GREEN: Task1 5ac43d5/6aff076, Task2 1de1252/d2576e7, Task3 d939c19. Full suite 1191/1191 (baseline 1184+7); WhatsApp byte-identical. Verified via headless runner (Editor was closed). Owner re-verify rides 08-35.
+- [08-35] Round-7 owner device re-verify (checkpoint RUN 2026-07-21) — **Overall PASS, GATE A PASSED.** Owner ran the Editor Play-Mode pass + one Console screenshot and returned verdicts "1. seems ok / 2. ok / 3. ok / 4. ok / 5. screenshot added". **D2-view RESOLVED** (item 1, after SIX failing rounds — the 08-34 displaced-emoji discrimination + Reconcile always-adopt seam repaint every own-reaction change made in the Telegram app; corroborated by two successive `[D2-view] reactions changed` events with healthy post-renders `active=True len=30/24 culled=False`). Stale-echo sanity (2), WA+TG add/change/remove invariants (3), final device sweep (4) all PASS. **D15 disposition REVISED — NOT a platform limit → OPEN-DEFERRED tracked follow-up**: the deterministic `[D15-probe]` (08-34) fired without owner choreography and returned `[D15-probe] wa msgId=3AAFD6395EE4345C8EA0 reactionsKey=True reactionKey=False` — the WhatsApp `messages/id/get` target payload CARRIES a `reactions` key, so absence-based reconcile IS implementable (mirror of the Telegram approach). In-app removal still emits no raw in the polled stream (raw-event pipeline can't see it), but the target payload is a second workable signal. **Owner decision (asked explicitly after the probe): "Flip Gate A now"** → close Gate A, D15 becomes a v1.2/post-milestone follow-up (first step = capture the `reactions` key's SHAPE — probe proved presence only). **Gate A → PASS**: I.3 #10 (01-VERIFICATION formal sign-off) re-aggregated to PASS (blocker D5 resolved at 08-04); **Gate B (`08-PROD-REPLICATION.md`) + Gate C (`08-MILESTONE-CLOSE.md`) UNBLOCKED**; CLAUDE.md D15 note revised from "confirmed platform limit" to "in-app-removal gap — tracked follow-up". Prod bagkz stays dormant until the 08-PROD-REPLICATION runbook is run. `[D2-merge]`/`[D15-probe]`/`[D15]`/`[D2-view]` Editor diagnostics tagged for removal at phase close (08-REVIEW IN-02/IN-03). No app code changed (planning docs + CLAUDE.md only). commit pending.
 
 ### Pending Todos
 
-None yet.
+- **[D15 follow-up — v1.2/post-milestone]** WhatsApp absence-based reaction-removal reconcile. The round-7 `[D15-probe]` proved the `messages/id/get` target-message payload carries a `reactions` key (`reactionsKey=True`), so removal can be reconciled by fetching/polling the target's current `reactions[]` and clearing `ReactionStore` on absence (mirror of the Telegram approach). **FIRST step = capture the `reactions` key's SHAPE** (the probe proved presence only, not the array contents/format). NOT a Gate A blocker (owner deferred it explicitly). Also in Deferred Items.
 
 ### Blockers/Concerns
 
@@ -137,6 +138,7 @@ None yet.
 - [Gate A round-4 re-verify 2026-07-20 — 08-25 RUN]: **Overall ISSUES, Gate A STAYS ISSUES.** ONE Android build off the post-08-24 tree. **D12-ext CTA RESOLVED** (owner "pass") + **D14 RESOLVED both** (owner "PASS" — TG cover brand blue, WA cover green). **D2-view STILL FAILS** (owner: bubble reaction sometimes not updated when changed in the Telegram app even though the `[D2-view]` log shows the updated reaction — round-5 scope = poll-driven `HandleReactionsChanged` repaint path, NOT the merge; orchestrator hypothesis: 08-22 defers a re-render only on the reaction-bar dismiss path, the poll path may still eat the mesh). NEW **D15** (WhatsApp reaction REMOVED in the WhatsApp app itself not removed in-app — pre-existing, WA `ReactionStore` untouched; NOT a regression) + NEW **D16** (bot with WhatsApp shows NO Telegram sync cover when Telegram is added later — promotion of the documented 08-19 late-channel follow-up; NOT a regression). Round 5: `/gsd-plan-phase 08 --gaps` for D2-view / D15 / D16. **G6 dev-clone deactivation STILL OUTSTANDING (fourth consecutive checkpoint** — owner asked "what exactly should be done?"; make BLOCKING again in round 5). Echo-hex NOT captured again (third consecutive; nice-to-have). Gates B/C + I.3 #10 re-aggregation stay blocked; prod bagkz dormant.
 - [Gate A round-5 re-verify 2026-07-21 — 08-29 RUN]: **Overall ISSUES, Gate A STAYS ISSUES.** ONE build off the post-08-28 tree; owner returned verdicts + two Unity Editor Console screenshots with the discriminating logs (repro ran in the EDITOR — round-6 fix loop is Editor-reproducible; device pass still gates Gate A). **D16 RESOLVED** (late-TG cover). **D2-view FAIL — REFUTED-and-RELOCATED UPSTREAM**: captured logs show a healthy post-render then NO change event for subsequent own-reaction changes → view layer (08-22/08-26) EXONERATED; round-6 target = own-reaction event-suppression in TelegramReactionMerge's 90s grace (fix keys on a pending LOCAL optimistic set, not own-identity; Editor-reproducible echo-without-event test). **D15 FAIL — candidate (b) no removal raw**: the ADD raw re-delivers every poll, no empty-body raw ever after removal → 08-27 candidate-(a) fix correct-but-inert; round-6 = absence-based WA reconcile (poll reactions[], clear ReactionStore) OR documented Wappi platform limit. **NEW D17** (owner scope-override): late-WhatsApp-auth cover stamp {bot}WhatsappSyncUntil, exact mirror of 08-28's TG stamp — SUPERSEDES the 08-28 parity decision (owner-approved, like D14). **Echo-hex CAPTURED/CLOSED** (BASE-form codepoints, user_id==ownId; confirms 08-11). Round 6: `/gsd-plan-phase 08 --gaps` for D2-view / D15 / D17. G6 resolved (not carried). Gates B/C + I.3 #10 re-aggregation stay blocked; prod bagkz dormant.
 - [Gate A round-6 re-verify 2026-07-21 — 08-33 RUN]: **Overall ISSUES, Gate A STAYS ISSUES.** Owner ran the Editor Play-Mode pass + returned verdicts with two Unity Editor Console screenshots. **D17 RESOLVED** (owner "ok" — late-WhatsApp-auth WhatsApp cover shows) + **WR-02 RESOLVED** (owner item 2 — an own WhatsApp reaction removed IN-APP stays removed across polls; the 08-31 revert holds; Screenshot 2 removal n=0 sticks against the re-delivering stale add-raw). WA add/change + TG add/change/remove invariants PASS. **D2-view STILL FAILS, residual now EXACT (confirmed by [D2-merge])**: the 08-30 confirmation-clears-grace is defeated because tapi reactions[] is current-state-only — the confirming SAME-emoji echo of the in-app tap (🥺) NEVER arrives, so the first server-me is already the newer differing Telegram-app emoji and the never-clear-on-differ branch suppresses it for the full 90s grace ([D2-merge] suppressed server-me '🔥'/'👎' by fresh local '🥺' age 9s→21s climbing). **D15 probe DID NOT FIRE** (no WA quoted-reply resolve triggered the messages/id/get [D15-probe] seam) → disposition UNCONFIRMED-not-refuted; CLAUDE.md platform-limit note STAYS marked "probe confirmation pending". **Round 7: `/gsd-plan-phase 08 --gaps`** for D2-view grace discrimination (candidates: (a) track the DISPLACED emoji — suppress only when server-me equals it, any THIRD value adopts+clears; (b) clear grace on reaction-send HTTP success; (c) shorten the 90s grace) + D15 deterministic Editor-only [D15-probe] trigger on the first WA type:"reaction" raw. G6 resolved (not carried); echo-hex closed (not carried). Gates B/C + I.3 #10 re-aggregation stay blocked; prod bagkz dormant. **Do NOT touch Gates B/C or I.3 #10 this pass.**
+- [Gate A round-7 re-verify 2026-07-21 — 08-35 RUN — **RESOLVED: GATE A PASSED**]: Owner ran the Editor Play-Mode pass + one Console screenshot; verdicts "1. seems ok / 2. ok / 3. ok / 4. ok / 5. screenshot added". **D2-view RESOLVED** (six-round milestone #1 defect closed — 08-34 displaced-emoji discrimination + Reconcile always-adopt seam; every own-reaction change repaints), stale-echo sanity + WA+TG invariants + final device sweep all PASS. **D15 REVISED to OPEN-DEFERRED follow-up** — the deterministic `[D15-probe]` fired and returned `reactionsKey=True reactionKey=False`, so the WhatsApp target payload carries reaction state → NOT a platform limit; absence-based reconcile deferred to v1.2/post-milestone (first step = capture the key's SHAPE), not a Gate A blocker (owner "Flip Gate A now"). **Gate A → PASS**: I.3 #10 (01-VERIFICATION sign-off) re-aggregated to PASS (D5 blocker resolved); **Gates B (`08-PROD-REPLICATION.md`) + C (`08-MILESTONE-CLOSE.md`) UNBLOCKED**; CLAUDE.md D15 note revised. Prod bagkz stays dormant until the 08-PROD-REPLICATION runbook is run (owner-assisted). No app code changed (planning docs + CLAUDE.md only).
 - [Gate/Phase 3]: tapi media message shapes (messages/get) undocumented — Normalize/media work (Phase 5 CHAT-03) blocked until the owner runs the capture script against an authorized dev Telegram profile.
 - [Gate/Phase 4]: TPL-06 e2e needs dev n8n (localhost:5678) + tunnel + a real authorized Telegram profile (user-assisted).
 - [Constraint]: Assume Wappi response-crossing bugs apply to tapi — keep serial media queue + `_chatFetchesInFlight` gate; reset on channel switch like bot switch.
@@ -159,6 +161,7 @@ Items acknowledged and carried forward:
 | Milestone | Prod bagkz replication (Suggest Replies + all Telegram fixes) | pending → Phase 8 checklist | v1.1 start 2026-07-12 |
 | Milestone | Server-side «Вместе» suppression | pending (v2 SUPPRESS-01) | v1.0 close |
 | Design | Push-based incoming delivery (n8n → device push with the incoming text) to replace client polling — owner preference | Deferred to v2 (needs FCM/APNs + device-token registry + n8n hook; D5 gap fixes the existing refresh path first) | Gate A 2026-07-16 |
+| D15 follow-up | WhatsApp absence-based reaction-removal reconcile — in-WhatsApp-app removal emits no raw in the polled stream, but the `messages/id/get` target payload carries a `reactions` key (round-7 `[D15-probe]` proved `reactionsKey=True`), so removal can be reconciled by fetching/polling the target's `reactions[]` and clearing `ReactionStore` on absence (mirror of Telegram). FIRST step = capture the `reactions` key's SHAPE (probe proved presence only) | Deferred to v1.2/post-milestone (owner deferred at Gate A — not a blocker) | Gate A PASS round 7 2026-07-21 |
 
 Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG-01/02, Phase 7).
 | Phase 03 P01 | 10 min | 2 tasks | 5 files |
@@ -214,11 +217,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 08 P32 | ~3min | 1 tasks | 1 files |
 | Phase 08 P33 | ~10min | 1 tasks | 2 files |
 | Phase 08 P34 | 11min | 3 tasks | 6 files |
+| Phase 08 P35 | ~14min | 1 checkpoint | 4 files |
 
 ## Session Continuity
 
-Last session: 2026-07-21T09:44:23.427Z
-Stopped at: Completed 08-34-PLAN.md (round-7 D2-view + D15 code fix)
+Last session: 2026-07-21T10:33:19Z
+Stopped at: Completed 08-35-PLAN.md (round-7 owner re-verify — GATE A PASSED; Gates B/C unblocked)
 Resume file: None
 
 **Planned Phase:** 10 (message-batching-debounce) — 4 plans — 2026-07-20T09:44:37.569Z
