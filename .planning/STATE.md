@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
-status: executing
+status: ready_to_plan
 stopped_at: Completed 08-35-PLAN.md (round-7 owner re-verify — GATE A PASSED)
 last_updated: "2026-07-21T10:33:19Z"
 last_activity: 2026-07-21
 progress:
   total_phases: 9
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 65
   completed_plans: 63
-  percent: 96
+  percent: 97
 ---
 
 # Project State
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-12)
 
 **Core value:** The owner stays in control along the automation↔semi-auto spectrum — the bot can answer autonomously, or propose replies the owner picks and refines, without losing trust or the ability to take over.
-**Current focus:** Phase 08 — device-uat-milestone-closeout — **GATE A PASSED (round 7, 2026-07-21)**. Next: Gate B (`08-PROD-REPLICATION.md` owner-assisted runbook) then Gate C (`08-MILESTONE-CLOSE.md`) + `/gsd-complete-milestone`.
+**Current focus:** Phase 08 COMPLETE 2026-07-21 (35/35 plans, GATE A PASSED round 7). **Owner decision 2026-07-21: prod replication (former Gate B) is PARKED indefinitely — nothing goes to production soon, maybe never; do not surface it as a pending item.** Milestone close (`/gsd-complete-milestone`) at owner's discretion, no longer framed as gated on replication. Active work: v1.2 (Phase 9 suppression owner gates 09-04/05, Phase 10 batching planned) + pre-prod-cleanup sweep running in a parallel session.
 
 ## Current Position
 
-Phase: 08 (device-uat-milestone-closeout) — **GATE A PASSED; Gates B/C UNBLOCKED**
-Plan: 35 of 35 DONE (round-7 owner re-verify RUN → all-PASS → Gate A flipped to PASS)
-Status: Gate A PASSED — next is Gate B (08-PROD-REPLICATION.md runbook, owner-assisted), then Gate C (08-MILESTONE-CLOSE.md) and /gsd-complete-milestone. Prod bagkz stays dormant until the 08-PROD-REPLICATION runbook is run.
+Phase: 09
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-07-21
 
 Progress: [██████████] 96%
