@@ -108,12 +108,20 @@ public static class TelegramReactionMerge
         return result.Count > 0 ? result : null;
     }
 
+    /// <summary>
+    /// Reconcile a cached Telegram reaction list against a fresh server list AND report whether the result
+    /// differs enough to repaint. Callers MUST always adopt the returned list: a same-emoji confirm (adopts
+    /// the server element, time=0) and an un-mapped-echo fold (re-keys the server element to "me") consume the
+    /// optimistic freshness WITHOUT changing the (reactorKey, emoji) multiset, so a multiset-only equality would
+    /// discard those adoptions and re-suppress the next external own-change for the full grace (CR-02).
+    /// <paramref name="renderChanged"/> gates the event/repaint only.
+    /// </summary>
     public static List<MessageReaction> Reconcile(List<MessageReaction> cached, List<MessageReaction> server,
                                                   long nowUnix, out bool renderChanged)
     {
         List<MessageReaction> merged = Merge(cached, server, nowUnix);
         renderChanged = !SameReactions(cached, merged);
-        return renderChanged ? merged : cached;   // RED: today's guard discards the freshness-consuming adoption
+        return merged;
     }
 
     /// <summary>

@@ -1859,11 +1859,12 @@ if (msg.messageType == MessageType.Video)
             var cached = cachedList[i];
             if (cached.messageId != refreshed.id) continue;
 
-            var merged = TelegramReactionMerge.Merge(cached.reactions, refreshed.reactions,
-                                                     DateTimeOffset.UtcNow.ToUnixTimeSeconds());
-            if (TelegramReactionMerge.SameReactions(cached.reactions, merged)) return false;
-
-            cached.reactions = merged;
+            var merged = TelegramReactionMerge.Reconcile(cached.reactions, refreshed.reactions,
+                                                         DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                                                         out bool renderChanged);
+            cached.reactions = merged;          // ALWAYS adopt — confirm/fold consume freshness even when the
+                                                // (reactorKey, emoji) multiset is unchanged (CR-02).
+            if (!renderChanged) return false;   // no re-render, no dirty-mark — the anti-churn guard stays intact.
             OnMessageReactionsChanged?.Invoke(cached);
             return true;
         }
