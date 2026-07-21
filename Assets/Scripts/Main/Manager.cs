@@ -3926,46 +3926,4 @@ public partial class Manager : MonoBehaviour
             }
         });
     }
-
-    public IEnumerator GetWhatsappMesseges()
-     {
-         LoadingPanel.SetActive(true);
-         WWWForm form = new();
-     
-         // using UnityWebRequest www = UnityWebRequest.Get($"https://wappi.pro/api/sync/messages/all/get?profile_id=03c9cb54-8e39");
-         // using UnityWebRequest www = UnityWebRequest.Post($"https://wappi.pro/api/sync/chats/get?profile_id=03c9cb54-8e39", form);
-         // using UnityWebRequest www = UnityWebRequest.Get($"https://wappi.pro/api/sync/chats/filter?profile_id=ecd897e3-d1c8");
-         // using UnityWebRequest www = UnityWebRequest.Get($"https://wappi.pro/api/sync/messages/get?profile_id=ecd897e3-d1c8&chat_id=77026998844@c.us");
-         
-         // using UnityWebRequest www = UnityWebRequest.Get($"https://wappi.pro/api/sync/message/media/download?profile_id=cf87cc87-94ff&message_id=3ABD17EC4D6379CAB94F");
-         // using UnityWebRequest www = UnityWebRequest.Get($"https://wappi.pro/api/sync/contact/info?profile_id=af80627e-6d9d&user_id=77472714618@c.us");
-         using UnityWebRequest www = UnityWebRequest.Get($"https://wappi.pro/api/sync/messages/id/get?profile_id=cc905590-24d2&message_id=3AB0D7FD0B7D4523ED07");
-
-
-         www.SetRequestHeader("Authorization", wappiAuthToken);
-     
-         yield return www.SendWebRequest();
-     
-     
-         if (www.result != UnityWebRequest.Result.Success)
-         {
-             
-         }
-         else
-         {
-             var text = www.downloadHandler.text;
-             System.IO.File.WriteAllText(
-                 Application.persistentDataPath + "/response.txt",
-                 text
-             );
-             Debug.Log("Saved to: " + Application.persistentDataPath);
-             
-             
-             string response = www.downloadHandler.text;
-             
-             print(response);
-         }
-     
-         LoadingPanel.SetActive(false);
-     }
 }

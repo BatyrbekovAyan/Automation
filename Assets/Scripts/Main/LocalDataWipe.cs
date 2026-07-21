@@ -26,7 +26,8 @@ public static class LocalDataWipe
         Path.Combine(persistentDataPath, "all_chats_cache.json"),
     };
 
-    /// <summary>Matches WappiUnitySync's root-level sticker downloads (sticker_{id}.webp).</summary>
+    /// <summary>Matches legacy root-level sticker downloads (sticker_{id}.webp) left by the
+    /// removed WappiUnitySync debug helper — old installs may still carry them.</summary>
     public static bool IsStickerFile(string fileName) =>
         !string.IsNullOrEmpty(fileName)
         && fileName.StartsWith("sticker_", StringComparison.Ordinal)
