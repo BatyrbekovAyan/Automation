@@ -370,6 +370,30 @@ public class TelegramReactionMergeTests
         Assert.IsNull(legacy.displacedEmoji);
     }
 
+    // --- CR-02: the Reconcile seam (freshness consumption lands through the call sites) ---
+
+    [Test]
+    public void Reconcile_SameEmojiConfirm_AdoptsEvenWhenRenderUnchanged_ThenExternalChangeApplies()
+    {
+        // CR-02: a same-emoji confirm consumes the optimistic freshness but does NOT change the
+        // (reactorKey, emoji) multiset, so renderChanged is false — yet the adoption MUST be kept (time=0),
+        // or the next external own-change is re-suppressed for the full grace. This drives the seam the call
+        // site uses (RefreshCachedMessageReactions), NOT a bare Merge chain that bypasses the guard.
+        var step1 = TelegramReactionMerge.Reconcile(
+            new List<MessageReaction> { Me("👍", Now) },
+            new List<MessageReaction> { Me("👍", time: 0) },
+            Now + 3, out bool changed1);
+        Assert.IsFalse(changed1);                 // multiset unchanged ⇒ no repaint
+        Assert.AreEqual(0, step1[0].time);        // BUT freshness consumed (server element adopted)  <-- RED here
+
+        var step2 = TelegramReactionMerge.Reconcile(
+            step1,
+            new List<MessageReaction> { Me("😁", time: 0) },   // owner changes to 😁 in the Telegram app
+            Now + 8, out bool changed2);
+        Assert.IsTrue(changed2);                  // now it repaints
+        Assert.AreEqual("😁", step2[0].emoji);
+    }
+
     [Test]
     public void Merge_FreshOptimisticMe_DifferentEmojiEcho_NotFolded()
     {

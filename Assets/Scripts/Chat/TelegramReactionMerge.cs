@@ -108,6 +108,14 @@ public static class TelegramReactionMerge
         return result.Count > 0 ? result : null;
     }
 
+    public static List<MessageReaction> Reconcile(List<MessageReaction> cached, List<MessageReaction> server,
+                                                  long nowUnix, out bool renderChanged)
+    {
+        List<MessageReaction> merged = Merge(cached, server, nowUnix);
+        renderChanged = !SameReactions(cached, merged);
+        return renderChanged ? merged : cached;   // RED: today's guard discards the freshness-consuming adoption
+    }
+
     /// <summary>
     /// Stamp a FRESH optimistic-removal tombstone for the owner ("me") after a toggle-off: an
     /// empty-emoji "me" entry carrying the tap time. <see cref="Merge"/> reads it as a removal
