@@ -92,7 +92,7 @@
               "id": "c53cd9f9-77c1-4331-98ff-bfc9bdf95a3c",
               "name": "text",
               "type": "string",
-              "value": "={{ $('Webhook').item.json.body.messages[0].body }}"
+              "value": "={{ $json.combinedText ?? $json.body.messages[0].body }}"
             }
           ]
         },
@@ -809,6 +809,106 @@
           "name": "OpenAi account"
         }
       }
+    },
+    {
+      "parameters": {
+        "amount": 8
+      },
+      "id": "ffb0bb7b-8135-5c03-bc2e-581665b65c3e",
+      "name": "Debounce Wait",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        -3360,
+        316
+      ],
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://wappi.pro/api/sync/messages/get",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "profile_id",
+              "value": "={{ $('Webhook').item.json.body.messages[0].profile_id }}"
+            },
+            {
+              "name": "chat_id",
+              "value": "={{ $('Webhook').item.json.body.messages[0].chatId }}"
+            },
+            {
+              "name": "limit",
+              "value": "15"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9034ffd5-b755-5bea-8a7b-82a1f306033b",
+      "name": "Fetch Recent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -3152,
+        316
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "EuhhqAaV56DpoqAN",
+          "name": "WappiAuthToken"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const wh = $('Webhook').first().json;\nconst triggeringId = wh.body.messages[0].id;\n\nconst fetched = ($json.messages || []).slice();\nfetched.sort((a, b) => (b.time || 0) - (a.time || 0));\n\nconst isText = (m) => m && (m.type === 'chat' || m.type === 'text');\nconst incoming = fetched.filter(m => m && m.fromMe === false);\nconst newestIncoming = incoming[0];\n\nlet abort = false;\nlet combinedText = null;\n\nif (!newestIncoming || newestIncoming.id !== triggeringId) {\n  abort = true;\n} else if (isText(newestIncoming)) {\n  const parts = [];\n  for (const m of fetched) {\n    if (m.fromMe === true) break;\n    if (!isText(m)) break;\n    parts.push(typeof m.body === 'string' ? m.body : '');\n  }\n  parts.reverse();\n  combinedText = parts.join('\\n');\n}\n\nreturn [{ json: { ...wh, abort, combinedText } }];"
+      },
+      "id": "ef09ab57-cea2-5427-b236-f38c31b4ee9f",
+      "name": "Latest+Combine",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2944,
+        316
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5b3425cc-6649-5d4f-a4cd-fe8dbf070c63",
+              "leftValue": "={{ $json.abort }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b32abdea-ab84-52a6-a826-4d59d5f6b82d",
+      "name": "Is Latest?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2736,
+        316
+      ]
     }
   ],
   "connections": {
@@ -1072,7 +1172,7 @@
         [],
         [
           {
-            "node": "Input type",
+            "node": "Debounce Wait",
             "type": "main",
             "index": 0
           }
@@ -1118,6 +1218,51 @@
           {
             "node": "Supabase Vector Store",
             "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Debounce Wait": {
+      "main": [
+        [
+          {
+            "node": "Fetch Recent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Recent": {
+      "main": [
+        [
+          {
+            "node": "Latest+Combine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Latest+Combine": {
+      "main": [
+        [
+          {
+            "node": "Is Latest?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Latest?": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Input type",
+            "type": "main",
             "index": 0
           }
         ]
