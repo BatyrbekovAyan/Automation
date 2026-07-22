@@ -26,6 +26,8 @@ The owner stays in control along a spectrum from fully autonomous to hands-on: t
 **Research:** `.planning/research/telegram-parity/` (7 deep-read reports + Wappi tapi docs extract)
 **Strategy (locked):** Telegram ships on Wappi tapi; official business-bots path PARKED (client-side Premium paywall — memory `telegram-channel-strategy`)
 
+**Cross-milestone state (v1.2 Reply-Trigger Discipline):** Phase 10 message-batching-debounce COMPLETE 2026-07-22 — multi-fragment messages produce one combined auto-reply (both channels, runData + device verified); client «Вместе» suggestions coalesce shipped with EditMode coverage (on-device confirmation + composition check tracked as UAT debt behind Phase 9's open 09-04/09-05 gates).
+
 ## Requirements
 
 ### Validated
@@ -131,4 +133,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-12 after starting milestone v1.1 Telegram Parity*
+*Last updated: 2026-07-22 after completing Phase 10 (message-batching-debounce)*
