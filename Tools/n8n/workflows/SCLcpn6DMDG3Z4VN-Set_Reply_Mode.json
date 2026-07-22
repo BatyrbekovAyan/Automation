@@ -20,7 +20,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const b = $json.body || {};\nconst sentinel = (id) => !id || id === \"-1\";\nlet ids = Array.isArray(b.profileIds) ? b.profileIds.filter(x => typeof x === \"string\" && !sentinel(x)) : [];\nconst okChat = typeof b.chatId === \"string\" && b.chatId.length > 0;\nconst okSup  = typeof b.suppressed === \"boolean\";\nif (ids.length === 0 || !okChat || !okSup) return [{ json: { invalid: true } }];\nreturn ids.map(pid => ({ json: { profileId: pid, chatId: b.chatId, suppressed: b.suppressed } }));"
+        "jsCode": "const b = $json.body || {};\nconst sentinel = (id) => !id || id === \"-1\";\n// Harden against the Postgres node's queryReplacement comma-split (WR-03): a comma inside a\n// value shifts the positional $1,$2,$3 parameters. Legit Wappi ids never contain commas.\n// Length cap + slice(0, 10) bound the unauthenticated fan-out (IN-03); legit client sends <= 2.\nconst clean = (s) => typeof s === \"string\" && s.length > 0 && s.length <= 128 && !s.includes(\",\");\nlet ids = Array.isArray(b.profileIds) ? b.profileIds.filter(x => clean(x) && !sentinel(x)).slice(0, 10) : [];\nconst okChat = clean(b.chatId);\nconst okSup  = typeof b.suppressed === \"boolean\";\nif (ids.length === 0 || !okChat || !okSup) return [{ json: { invalid: true } }];\nreturn ids.map(pid => ({ json: { profileId: pid, chatId: b.chatId, suppressed: b.suppressed } }));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
