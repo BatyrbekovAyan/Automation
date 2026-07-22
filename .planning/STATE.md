@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
 status: executing
-stopped_at: "Completed 09-04-PLAN.md (owner gate — server side LIVE: SetReplyMode SCLcpn6DMDG3Z4VN, fail-closed runData both channels, fresh-bot gate inherited). Wave 2 complete; next = 09-05."
-last_updated: "2026-07-22T15:04:39.000Z"
-last_activity: 2026-07-22 -- Completed 09-04 live bring-up gate (Wave 2)
+stopped_at: "Completed 09-05-PLAN.md (phase-closing owner gate — 09-HUMAN-UAT ALL 5 scenarios PASS both channels, «Вместе»=no-reply+unread+suggestions, «Авто» restores, '*' default suppresses, absence→reply, activation switch independent; clone deactivated, prod dormant). Phase 09 execution complete (5/5, Wave 3 done); next = phase verification."
+last_updated: "2026-07-22T20:15:00.000Z"
+last_activity: 2026-07-22 -- Completed 09-05 phase-closing HUMAN-UAT gate (Wave 3) — Phase 09 execution done
 progress:
   total_phases: 9
   completed_phases: 7
   total_plans: 65
-  completed_plans: 68
+  completed_plans: 69
   percent: 100
 ---
 
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 
 ## Current Position
 
-Phase: 09 (semi-auto-suppression) — EXECUTING
-Plan: 4 of 5 complete (Wave 2 done) — next 09-05
-Status: Executing Phase 09 — Wave 2 (09-04 live bring-up) COMPLETE; 09-05 (behavioral HUMAN-UAT) next
-Last activity: 2026-07-22 -- Completed 09-04 live bring-up gate (Wave 2)
+Phase: 09 (semi-auto-suppression) — EXECUTION COMPLETE (5/5 plans, all 3 waves done) — next: phase verification
+Plan: 5 of 5 complete (Wave 3 done)
+Status: Phase 09 execution finished — 09-05 phase-closing HUMAN-UAT gate PASSED (all 5 scenarios, both channels; clone deactivated, prod dormant). Ready for phase verification → /gsd-secure-phase 09
+Last activity: 2026-07-22 -- Completed 09-05 phase-closing HUMAN-UAT gate (Wave 3)
 
 Progress: [██████████] 100%
 

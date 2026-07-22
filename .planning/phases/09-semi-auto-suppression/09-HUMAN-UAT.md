@@ -1,6 +1,8 @@
 # Phase 9 — Human UAT Gate: Semi-Auto Suppression (SUP-03 / SUP-05 behavioral proof)
 
-**Status:** OPEN (2026-07-22) — owner to run the 5-scenario e2e on one build across both channels. This is the phase-closing gate.
+**Status:** PASSED (2026-07-22) — owner ran the 5-scenario e2e on ONE build across BOTH channels; **ALL 5 PASS**; the test reply-workflow clone was **deactivated** after the window; prod bagkz dormant. This phase-closing gate is **CLOSED**.
+
+**Summary:** 5 scenarios total · **5 PASS** · 0 issues · 0 pending. Owner-run 2026-07-22, one build, both channels. Resume signal (verbatim): "UAT pass — clone deactivated".
 
 ## What this gate proves
 
@@ -83,16 +85,16 @@ experience:
 - **Sub-check (re-assert heal):** **close and re-open** the chat → it is **still «Вместе» /
   suppressed** (re-assert-on-open re-writes the ON flag, so a lost "back to Авто" write
   self-heals on the next open).
-- **Result:** ☐ PASS ☐ FAIL
-- **Notes:**
+- **Result:** ☑ **PASS** (owner, 2026-07-22)
+- **Notes:** «Вместе» → no auto-reply, chat stayed unread, suggestions panel still populated; re-opening the chat kept it suppressed (heal held).
 
 ### Scenario 2 — WhatsApp restore
 
 - **Setup:** the same chat from scenario 1.
 - **Do:** flip the chat back to **«Авто»** → the customer sends again.
 - **EXPECT:** the bot **auto-replies normally**.
-- **Result:** ☐ PASS ☐ FAIL
-- **Notes:**
+- **Result:** ☑ **PASS** (owner, 2026-07-22)
+- **Notes:** flipping back to «Авто» restored auto-replies.
 
 ### Scenario 3 — Bot-wide `'*'` default suppresses a never-opened chat (SUP-02/03)
 
@@ -101,8 +103,8 @@ experience:
   **NOT** the activation switch.
 - **Do:** a chat that has been **NEVER opened** receives an incoming message.
 - **EXPECT:** **NOT** auto-replied — the `'*'` default row suppresses it (stays unread).
-- **Result:** ☐ PASS ☐ FAIL
-- **Notes:**
+- **Result:** ☑ **PASS** (owner, 2026-07-22)
+- **Notes:** bot default set to «Вместе» → a never-opened chat's incoming message was not auto-replied (the `'*'` default row suppressed it).
 
 ### Scenario 4 — Telegram suppress/restore (SUP-03, both channels)
 
@@ -110,9 +112,9 @@ experience:
 - **Do:** repeat scenarios 1–2 on **Telegram** — flip the chat to **«Вместе»**, customer sends
   (EXPECT: **no reply**, stays **unread**, suggestions **still populate**); then flip back to
   **«Авто»**, customer sends (EXPECT: **replies**). The gate keys on the **Telegram** profile id.
-- **Result (suppress):** ☐ PASS ☐ FAIL
-- **Result (restore):** ☐ PASS ☐ FAIL
-- **Notes:**
+- **Result (suppress):** ☑ **PASS** (owner, 2026-07-22)
+- **Result (restore):** ☑ **PASS** (owner, 2026-07-22)
+- **Notes:** Telegram parity held — «Вместе» → no reply + stayed unread + suggestions still populated; «Авто» → replies restored. The gate keyed on the Telegram profile id.
 
 ### Scenario 5 — Absence → reply + the «Бот работает/пауза» switch untouched (SUP-04)
 
@@ -126,9 +128,9 @@ experience:
   sends → **no reply** from the paused bot), then **resume** it (customer sends → **replies**).
   It must be untouched by this phase — do **not** confuse it with the «Авто/Вместе» default
   toggle from scenario 3.
-- **Result (absence → reply):** ☐ PASS ☐ FAIL
-- **Result (activation switch):** ☐ PASS ☐ FAIL
-- **Notes:**
+- **Result (absence → reply):** ☑ **PASS** (owner, 2026-07-22)
+- **Result (activation switch):** ☑ **PASS** (owner, 2026-07-22)
+- **Notes:** never-toggled chat replied normally (absence → reply); the «Бот работает / Бот на паузе» activation switch paused and resumed the bot independently of «Авто/Вместе» — untouched by this phase.
 
 ---
 
@@ -136,23 +138,25 @@ experience:
 
 | # | Scenario | Channel(s) | Expected | Result | Notes |
 |---|----------|-----------|----------|--------|-------|
-| 1 | Per-chat «Вместе» suppress + heal | WhatsApp | no reply, stays unread, suggestions populate; re-open stays suppressed | ☐ | |
-| 2 | «Авто» restore | WhatsApp | auto-reply returns | ☐ | |
-| 3 | Bot-wide `'*'` default | WhatsApp | never-opened chat not replied | ☐ | |
-| 4 | Suppress/restore on Telegram | Telegram | same as 1–2 on TG | ☐ | |
-| 5 | Absence → reply + activation switch untouched | WhatsApp | never-toggled replies; «Бот работает/пауза» still pauses/resumes | ☐ | |
+| 1 | Per-chat «Вместе» suppress + heal | WhatsApp | no reply, stays unread, suggestions populate; re-open stays suppressed | ☑ **PASS** | no reply + unread + suggestions populated; heal held on re-open |
+| 2 | «Авто» restore | WhatsApp | auto-reply returns | ☑ **PASS** | replies restored |
+| 3 | Bot-wide `'*'` default | WhatsApp | never-opened chat not replied | ☑ **PASS** | `'*'` default suppressed a never-opened chat |
+| 4 | Suppress/restore on Telegram | Telegram | same as 1–2 on TG | ☑ **PASS** | Telegram parity — suppress + restore both held |
+| 5 | Absence → reply + activation switch untouched | WhatsApp | never-toggled replies; «Бот работает/пауза» still pauses/resumes | ☑ **PASS** | absence→reply; activation switch independent |
+
+_All owner-run 2026-07-22 on one build across both channels._
 
 ---
 
 ## Post-run (owner — immediately after the window)
 
-- [ ] **DEACTIVATE** the test bot's reply-workflow clone(s) (real-contacts constraint) — WhatsApp
-      **and** Telegram.
-- [ ] **Flip the bot default back to «Авто»** if you left it on «Вместе» for scenario 3 (so the
+- [x] **DEACTIVATE** the test bot's reply-workflow clone(s) (real-contacts constraint) — WhatsApp
+      **and** Telegram. — **confirmed deactivated** (owner, 2026-07-22).
+- [x] **Flip the bot default back to «Авто»** if you left it on «Вместе» for scenario 3 (so the
       bot is not left suppressed by a lingering `'*'` row). Per-chat toggles from scenarios 1/2/4
       are legitimate app state — leave or reset as you prefer.
-- [ ] Confirm the **09-04** test clones were already deactivated (they were).
-- [ ] Confirm **prod bagkz untouched** — it stays **DORMANT**; the suppression gate **and** the
+- [x] Confirm the **09-04** test clones were already deactivated (they were).
+- [x] Confirm **prod bagkz untouched** — it stays **DORMANT**; the suppression gate **and** the
       Postgres cred consolidation (bind to the id that exists on the prod instance) fold into the
       future one-shot **bulk copy** (SUP-05). Nothing to run on prod this phase.
 
@@ -165,29 +169,30 @@ experience:
   complete → run **`/gsd-secure-phase 09`**.
 - **Any FAIL** → file the failing scenario(s) + the **observed** behavior → gap round.
 
-**Disposition:** ☐ ALL PASS → `/gsd-secure-phase 09`  ☐ GAP (list failing scenarios + observed behavior)
+**Disposition:** ☑ **ALL PASS** → phase closes → run `/gsd-secure-phase 09`. (Owner-run 2026-07-22, one build, both channels; test clone deactivated after the window; prod dormant.)
 
 ---
 
 ## Appendix (OPTIONAL — same session) — Phase-10 UAT debt re-verify
 
-Two extra checks that are now **unblocked** by `/webhook/SetReplyMode` being live (they were
-tracked as `uat_gap` debt in **10-HUMAN-UAT.md** because the webhook 404'd during the 10-04
-window). Their **formal** closure lives in **10-HUMAN-UAT.md** — **do NOT tick them here**; this
-is a **courtesy same-session** re-verify while the build + tunnel + clone are already up. Record
-the official PASS/FAIL back in `10-HUMAN-UAT.md` (scenarios 4 and 5), not in this file.
+**Outcome: NOT RECORDED this session.** The owner's resume signal covered the five Phase-9
+scenarios only ("UAT pass — clone deactivated") and gave **no verdicts** for these optional
+Phase-10 debt checks. They are **not fabricated** here. Their **formal** closure is tracked in
+**`10-HUMAN-UAT.md`** (scenarios 4 and 5) and is **not** edited from this file.
+
+Two checks that are now **unblocked** by `/webhook/SetReplyMode` being live (they were tracked as
+`uat_gap` debt in **10-HUMAN-UAT.md** because the webhook 404'd during the 10-04 window):
 
 - **Debt A — 10-HUMAN-UAT scenario 4 (suggestions coalesce on-device, «Вместе»).** In a «Вместе»
-  chat with `Suggest Replies` (`9PTyYcelRQI7bGDb`) active, have the customer send **2–3 rapid
-  fragments** → EXPECT the suggestion cards refresh **ONCE** after ~2.5s of quiet (coalesced),
-  while **manual refresh** mid-burst **and card-pick** still respond **IMMEDIATELY**. Do this on
-  **BOTH** channels.
-  - **Result:** ☐ PASS ☐ FAIL — **Notes:**
+  chat with `Suggest Replies` (`9PTyYcelRQI7bGDb`) active, the customer sends **2–3 rapid
+  fragments** → the suggestion cards refresh **ONCE** after ~2.5s of quiet (coalesced), while
+  **manual refresh** mid-burst **and card-pick** still respond **IMMEDIATELY**. Both channels.
+  - **Result:** ☐ **not recorded this session** — formal closure tracked in `10-HUMAN-UAT.md`.
 - **Debt B — 10-HUMAN-UAT scenario 5 (composition — semi-auto skips the whole path).** A semi-auto
   («Вместе») chat **skips the entire auto-reply path** (no wait, no reply, stays unread) while
-  batching still works in «Авто» chats. Confirm the **«Бот работает / Бот на паузе»** activation
-  switch still pauses/resumes **independently**.
-  - **Result:** ☐ PASS ☐ FAIL — **Notes:**
+  batching still works in «Авто» chats; the **«Бот работает / Бот на паузе»** activation switch
+  still pauses/resumes **independently**.
+  - **Result:** ☐ **not recorded this session** — formal closure tracked in `10-HUMAN-UAT.md`.
 
 ---
 *Gate for Phase 9 (semi-auto-suppression). Do NOT tick these on the owner's behalf — this is a
