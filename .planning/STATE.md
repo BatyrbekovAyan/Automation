@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
-status: ready_to_plan
-stopped_at: "Completed 10-04-PLAN.md (partial: sc1-3 PASS, sc4 blocked-by-09-04, sc5 deferred)"
-last_updated: "2026-07-22T11:07:35.025Z"
-last_activity: 2026-07-22
+status: executing
+stopped_at: "Completed 09-04-PLAN.md (owner gate — server side LIVE: SetReplyMode SCLcpn6DMDG3Z4VN, fail-closed runData both channels, fresh-bot gate inherited). Wave 2 complete; next = 09-05."
+last_updated: "2026-07-22T15:04:39.000Z"
+last_activity: 2026-07-22 -- Completed 09-04 live bring-up gate (Wave 2)
 progress:
   total_phases: 9
-  completed_phases: 8
+  completed_phases: 7
   total_plans: 65
-  completed_plans: 67
-  percent: 89
+  completed_plans: 68
+  percent: 100
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-12)
 
 **Core value:** The owner stays in control along the automation↔semi-auto spectrum — the bot can answer autonomously, or propose replies the owner picks and refines, without losing trust or the ability to take over.
-**Current focus:** Phase 10 — message-batching-debounce
+**Current focus:** Phase 09 — semi-auto-suppression
 
 ## Current Position
 
-Phase: 11
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-07-22
+Phase: 09 (semi-auto-suppression) — EXECUTING
+Plan: 4 of 5 complete (Wave 2 done) — next 09-05
+Status: Executing Phase 09 — Wave 2 (09-04 live bring-up) COMPLETE; 09-05 (behavioral HUMAN-UAT) next
+Last activity: 2026-07-22 -- Completed 09-04 live bring-up gate (Wave 2)
 
 Progress: [██████████] 100%
 
@@ -109,6 +109,7 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [09-01] Set Reply Mode webhook: Validate fans out one item per surviving profileId; malformed body -> bad_request BEFORE any DB write; Upsert on conflict do update with $3::boolean cast (C6). Authoring only — live apply is 09-04
 - [09-02] Fail-closed suppression gate (Read Reply Mode Postgres + Suppressed? If) spliced byte-identically onto If.main[0] in BOTH bot templates; TRUE=dead-end (stays unread), FALSE=Input type; no continueOnFail/onError so a DB error halts the run (SUP-04). Live redeploy + runData branch confirm + fresh-bot propagation are 09-04.
 - [09-03] SUP-02 client write path: Manager partial (C2) with pure BuildReplyModePayload/AuthedProfileIds (sentinel-drop C1) + fire-and-forget SyncReplyMode POST to /webhook/SetReplyMode (DeleteBotFilesRoutine clone: no auth, json, timeout 30). Three intents wired — bot-default '*' via Manager's own OnEnable-subscribed OnBotReplyModeChanged, per-chat ON/OFF + re-assert-on-open heal via SuggestionsController.PushReplyModeForActiveChat (ChatManager.ActiveChannelProfileId C3); HandleLive untouched (Pitfall 3). 1170/1170 EditMode green. Live deploy/gate-verify is 09-04.
+- [09-04] Owner live bring-up gate CLOSED 2026-07-22 — server side of «Вместе» suppression is LIVE on dev. Task 1: reply_mode_flags DDL pre-applied mid-Phase-10 (10-03 Dev.2); delta verified via cred vvRrFiEXzLVqKjOx — probe insert→select=true→delete, relrowsecurity=true, anon select denied (default-deny RLS). Task 2: Set Reply Mode DEPLOYED+ACTIVATED id SCLcpn6DMDG3Z4VN (shared always-active, Upsert cred vvRrFiEXzLVqKjOx); curl (a){written:1}/(b){written:1}/(c){bad_request}; precedence false[override]/true[default]/false[absence] + count(*)=2 (malformed wrote NO row); repo finalized 605e399 (canonical SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json, provisional removed, CANONICAL+README repointed). Task 3: suppressed dead-end runData proven BOTH channels (only Read Reply Mode→Suppressed? ran; debounce chain+Input type+Mark Read+agent+send absent, stayed unread); suppressed:false→full reply path replied. A1 outcome: boolean came through CLEAN — NO suppressed::boolean cast needed. Fresh-bot grep PASSED on 10-03 clones fKCMIGXJSbLRimdR/pOMkkP8MYS8WhiNY (Read Reply Mode+Suppressed? fed by group-chat If). Test clones deactivated, suppression rows deleted. DEVIATION ec15832: Postgres cred consolidated repo-wide to vvRrFiEXzLVqKjOx — dev has a SINGLE Postgres cred; 1H5xlpFSESU4w6JH (plan/research C5 id) does NOT exist on the instance (ground-truthed SQLite credentials_entity + live bindings); same Supabase DB (A3), dangling-binding hazard only, no data risk. Stray-duplicate workflow from an accidental 2nd deploy owner-deleted (no impact). Pre-existing unrelated red verify-telegram-parity.py node-count 30!=24 (Phase 9 +2 / Phase 10 +4 splices) spun off to task_b8134810, NOT this plan. Unblocks 09-05 (behavioral HUMAN-UAT) + 10-04 sc4/sc5 UAT debt.
 - [08-22] D2-view gap-closure — Telegram reaction-bubble VISUAL repaint miss fixed in the VIEW/refresh layer ONLY (data layer proven correct, TelegramReactionMerge/reconcile untouched). ReactionPillView.ForceReRender (Render + SetAllDirty + ForceMeshUpdate regenerates the TMP pill mesh on the root canvas) + MessageItemView.RefreshReactionsVisual (public idempotent re-render of the CURRENT vm) + ReactionBarController captures _sourceView in Show and, after UnliftRow in Hide, StartCoroutine(RefreshSourceNextFrame) yields ONE frame so the deferred Destroy(_liftedCanvas) lands before re-rendering — the stale pill self-heals despite the dedup guard swallowing every future reconcile. Compiled (non-editor) capped [D2-view] log (id + count only, T-08-22-01) for the next UAT. Channel-agnostic + idempotent ⇒ WhatsApp byte-identical; 1170/1170 EditMode green FRESH (delta 0). commits be3caf4/1eaf81c. Device re-verify (tap A then open bar on B ⇒ A repaints) rides 08-25.
 - [08-23] D12-ext gap-closure — create-first-bot CTA now survives a WhatsApp↔Telegram chip switch. Root cause (08-REVIEW CR-01): on a zero-bots channel switch, SetActiveChannel fires OnActiveChannelChanged (08-18 re-wires the CTA) then BeginLoadForActiveBot resolves FindBotByName(default)==null and fires the WRONG reason (BotHasNo{Channel} not NoBotsExist), which slips past the _lastReason guard and re-wires the CTA to the silent OpenCurrentBotAuth → inert on both channels. Fix (view-layer defense, BeginLoadForActiveBot untouched per IN-01): new pure EmptyStateReasonPolicy.Effective(raw, resolved) folded into WhatsAppTabState.cs promotes a non-NoBots raw reason to NoBotsExist ONLY when the authoritative ComputeCurrentEmptyState() agrees (WhatsApp invariant — real WA-less bot keeps its connect card — pinned by test; null resolver trusts the raw reason), wired into HandleEmptyState. Folded WR-02: HandleActiveChannelChanged re-DERIVES the reason from ComputeCurrentEmptyState and Hides when the new channel has no card (kills the stale wrong-channel connect card + raycast block over the TG syncing cover) instead of replaying stale _lastReason. OpenCurrentBotAuth now LogWarnings on both early-returns (no silent dead CTA). WhatsApp byte-identical; suite 1176/1176 EditMode green FRESH (baseline 1170+6; Task-2 runtime edit freshness confirmed via Assembly-CSharp.dll mtime 12:22:18Z, editor stamp false-stales for runtime-only edits). commits 94e2e3a(RED)/382dc95(GREEN)/eb7ec56(fix). Device re-verify (CTA survives WA↔TG switch on both channels + no stale card over cover) rides 08-25.
 - [08-24] D14 gap-closure — Telegram post-creation cover green elements (spinner ring, sync progress fill, countdown) now recolor to Telegram brand blue #2AABEE at runtime via ChannelAccent.Resolve; WhatsApp byte-identical (#25D366 spinner/fill + #1FA855 countdown via pass-through). Code-only (no scene/builder stamp), mirroring EmptyStateView.ApplyChannelAccent: SyncingView.CacheAccentColors captures each element's OWN authored green once at Awake, ApplyChannelAccent recolors per active channel, called after ApplyCopy in BOTH Awake and HandleSyncing so a channel switch repaints on every show. 0 hardcoded color literals; ChannelAccentTests pins the WA pass-through invariant. Suite 1176/1176 EditMode green FRESH (delta 0 tests; Assembly-CSharp.dll mtime confirmed past the edit — runtime-only edit, editor stamp false-stales). commit e99ebaa. Device re-verify (fresh TG bot cover reads blue, WA unchanged) rides 08-25.
@@ -228,11 +229,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 10 P02 | 15 | 2 tasks | 3 files |
 | Phase 10 P03 | owner-gate | 2 tasks | 5 files |
 | Phase 10 P04 | owner-gate | 2 tasks | 1 files |
+| Phase 09 P04 | owner-gate | 3 tasks | 6 files |
 
 ## Session Continuity
 
-Last session: 2026-07-22T11:07:10.518Z
-Stopped at: Completed 10-04-PLAN.md (partial: sc1-3 PASS, sc4 blocked-by-09-04, sc5 deferred)
+Last session: 2026-07-22T15:04:39.000Z
+Stopped at: Completed 09-04-PLAN.md (owner gate — server side LIVE: SetReplyMode SCLcpn6DMDG3Z4VN, fail-closed runData both channels, fresh-bot gate inherited). Wave 2 complete; next = 09-05.
 Resume file: None
 
-**Planned Phase:** 10 (message-batching-debounce) — 4 plans — 2026-07-20T09:44:37.569Z
+**Planned Phase:** 09 (semi-auto-suppression) — 5 plans — Wave 2 complete; 09-05 (behavioral HUMAN-UAT, closes the phase) next
