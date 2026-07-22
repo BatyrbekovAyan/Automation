@@ -4,11 +4,12 @@
 -- table owner and is exempt from non-FORCE RLS (mirrors
 -- 2026-07-07-conversation-outcomes.sql). Only service_role/owner get through.
 --
--- APPLY THROUGH cred `1H5xlpFSESU4w6JH` (the bot-template Chat Memory Postgres
--- credential — the SAME DB the gate reads) — NOT the Dashboard/RAG cred
--- `vvRrFiEXzLVqKjOx`. Two credentials are both named "Postgres"; if this table is
--- created on the wrong DB the bot-template gate cannot see it and every reply
--- fails closed. (RESEARCH Pitfall 2 / A3.)
+-- APPLY THROUGH cred `vvRrFiEXzLVqKjOx` (the Postgres credential the bot templates'
+-- gate binds — the SAME DB the gate reads). Ground truth 2026-07-22: the dev instance
+-- has a SINGLE Postgres cred `vvRrFiEXzLVqKjOx`; the old `1H5xlpFSESU4w6JH` id from the
+-- C5 research/plan does NOT exist on the instance. Both ids always pointed at the same
+-- Supabase DB (RESEARCH A3), so applying here is correct; if this table is created on the
+-- wrong DB the gate cannot see it and every reply fails closed. (RESEARCH Pitfall 2 / A3.)
 
 -- Suppression flag per (profile_id, chat_id). chat_id = '*' is the bot-wide
 -- default row; a specific chat_id is a per-chat override. The gate resolves

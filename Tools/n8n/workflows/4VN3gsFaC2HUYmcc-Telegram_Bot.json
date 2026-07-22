@@ -616,7 +616,7 @@
       "name": "Chat Memory",
       "credentials": {
         "postgres": {
-          "id": "1H5xlpFSESU4w6JH",
+          "id": "vvRrFiEXzLVqKjOx",
           "name": "Postgres"
         }
       }
@@ -673,7 +673,7 @@
       "name": "Read Reply Mode",
       "credentials": {
         "postgres": {
-          "id": "1H5xlpFSESU4w6JH",
+          "id": "vvRrFiEXzLVqKjOx",
           "name": "Postgres"
         }
       }

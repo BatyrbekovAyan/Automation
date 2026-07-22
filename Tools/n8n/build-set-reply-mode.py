@@ -26,11 +26,14 @@ Reads the n8n API key from Assets/StreamingAssets/secrets.json (n8nAPIKey) or en
 N8N_API_KEY; targets the local dev instance (http://localhost:5678) unless N8N_BASE_URL
 is set (prod: https://bagkz.app.n8n.cloud).
 
-Credential binding (C5 — load-bearing): TWO credentials are both named "Postgres"
-(`1H5xlpFSESU4w6JH` = the bot-template Chat Memory DB where reply_mode_flags lives, and
-`vvRrFiEXzLVqKjOx` = the Dashboard/RAG DB). A by-NAME lookup is ambiguous, so this deployer
-binds the Postgres credential by explicit id, defaulting to `1H5xlpFSESU4w6JH` (the same DB
-the gate reads). Override for a different target:
+Credential binding (load-bearing): this deployer binds the Postgres credential by EXPLICIT
+id (never by name), defaulting to `vvRrFiEXzLVqKjOx`. Ground truth 2026-07-22: the dev
+instance has a SINGLE Postgres credential `vvRrFiEXzLVqKjOx` (SQLite `credentials_entity`
+plus the live bot-template bindings confirm it); the old `1H5xlpFSESU4w6JH` id from the C5
+research/plan does NOT exist on the instance, so importing a workflow that binds it would
+dangle. Both ids always pointed at the same Supabase DB (09-RESEARCH A3) — this is a
+reference-hygiene default, not a data move. Explicit id-binding stays load-bearing for prod
+(whose cred ids differ). Override for a different target:
   --postgres-cred ID / env N8N_POSTGRES_CRED_ID   Postgres credential id on the target
 """
 import argparse
@@ -46,10 +49,11 @@ SECRETS = os.path.join(REPO, "Assets/StreamingAssets/secrets.json")
 BASE = os.environ.get("N8N_BASE_URL", "http://localhost:5678").rstrip("/")
 CANONICAL = os.path.join(HERE, "workflows", "Set_Reply_Mode.json")
 
-# The Chat Memory Postgres credential id — the DB `reply_mode_flags` lives on and the bot
-# templates' gate reads. Bound by explicit id (never by ambiguous name — C5) and used as the
-# default when no --postgres-cred flag / N8N_POSTGRES_CRED_ID env is supplied.
-DEFAULT_POSTGRES_CRED_ID = "1H5xlpFSESU4w6JH"
+# The dev Postgres credential id — the DB `reply_mode_flags` lives on and the bot templates'
+# gate reads. As of 2026-07-22 the dev instance has a SINGLE Postgres cred `vvRrFiEXzLVqKjOx`
+# (the old `1H5xlpFSESU4w6JH` does not exist on the instance). Bound by explicit id (never by
+# name) and used as the default when no --postgres-cred flag / N8N_POSTGRES_CRED_ID is supplied.
+DEFAULT_POSTGRES_CRED_ID = "vvRrFiEXzLVqKjOx"
 
 # Credential NAME pins per type (name is what prod recreates in the Credentials UI). The id
 # is bound by CRED_OVERRIDES (always set — see main()) so resolve_cred never guesses by name.
@@ -61,8 +65,9 @@ OVERRIDE_HINT = {
 }
 
 # Explicit credential-id overrides. main() ALWAYS fills "postgres" (flag > env > default id)
-# because the two "Postgres"-named creds make a by-name lookup ambiguous — an override entry
-# short-circuits resolve_cred() and binds the id verbatim. Maps cred_type -> id.
+# so resolve_cred() binds the id verbatim instead of guessing by name — an override entry
+# short-circuits resolve_cred(). Deterministic id-binding stays load-bearing for prod (whose
+# cred ids differ from dev's single `vvRrFiEXzLVqKjOx`). Maps cred_type -> id.
 CRED_OVERRIDES = {}
 
 
@@ -78,10 +83,10 @@ def resolve_cred(cred_type):
     """Return (id, name) for a credential.
 
     For this workflow every credential type is bound by an explicit CRED_OVERRIDES id
-    (main() always sets "postgres" — flag > env > DEFAULT_POSTGRES_CRED_ID) because two
-    credentials share the name "Postgres" and a by-name lookup is ambiguous. The pinned name
-    from CRED_PINS is kept for traceability. A type with no override AND no pin is a hard
-    error (refuse to guess).
+    (main() always sets "postgres" — flag > env > DEFAULT_POSTGRES_CRED_ID) so a by-name
+    lookup is never needed — deterministic and portable to prod (whose cred ids differ). The
+    pinned name from CRED_PINS is kept for traceability. A type with no override AND no pin is
+    a hard error (refuse to guess).
     """
     if cred_type not in CRED_PINS:
         raise SystemExit(
@@ -213,8 +218,8 @@ def main():
     ap.add_argument(
         "--postgres-cred", default=None,
         help="target Postgres credential id to bind (else env N8N_POSTGRES_CRED_ID, else the "
-             f"default {DEFAULT_POSTGRES_CRED_ID}). Bound by id because two creds are named "
-             "'Postgres' (C5) — never resolved by name.",
+             f"default {DEFAULT_POSTGRES_CRED_ID}). Bound by explicit id, never by name — "
+             "deterministic and portable to prod (whose cred ids differ from dev's single one).",
     )
     args = ap.parse_args()
     # flag > env > default; always set so resolve_cred never guesses by name (C5).

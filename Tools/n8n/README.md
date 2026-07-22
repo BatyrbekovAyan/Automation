@@ -36,10 +36,12 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
   Respond), rebinds ONLY the Postgres credential id, and activates it; `--update <id>` PUTs the
   same content onto an existing id; `--dry-run` prints the exact payload offline; `--export
   <id> <out>` re-emits the canonical JSON. The Postgres cred is bound by **explicit id**
-  (default `1H5xlpFSESU4w6JH`, override `--postgres-cred` / `N8N_POSTGRES_CRED_ID`) — never by
-  name, because two credentials are both named "Postgres" (the Chat Memory DB the gate reads vs
-  the Dashboard/RAG DB). The DDL for `reply_mode_flags` lives in
-  `supabase/2026-07-19-reply-mode-flags.sql` (apply through cred `1H5xlpFSESU4w6JH`).
+  (default `vvRrFiEXzLVqKjOx`, override `--postgres-cred` / `N8N_POSTGRES_CRED_ID`) — never by
+  name, and id-binding stays load-bearing for prod (whose cred ids differ). Ground truth
+  2026-07-22: the dev instance has a SINGLE Postgres cred `vvRrFiEXzLVqKjOx`; the old
+  `1H5xlpFSESU4w6JH` id from the C5 research/plan does not exist on the instance (importing a
+  workflow that binds it would dangle). The DDL for `reply_mode_flags` lives in
+  `supabase/2026-07-19-reply-mode-flags.sql` (apply through cred `vvRrFiEXzLVqKjOx`).
 - `apply-*.py` — idempotent migrations over `workflows/` (edit by node name, re-runnable);
   `verify_rag.py` asserts every applied invariant; `test-upload-e2e.sh` exercises the
   Upload/Delete webhooks end-to-end against a live instance (curl mimicking Unity's
@@ -67,7 +69,7 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
 | `lmjYsdNcQA2IE5rl` | Delete Bot Files | App webhook `DeleteBotFiles` — body `{ botWaId, botTgId }`; sweeps ALL of a deleted bot's RAG chunks + stored originals (guards the `"-1"` unauthed sentinel) |
 | `2htWSV5IHO8E2CgB` | Dashboard Outcomes | App webhook `DashboardOutcomes` — body `{ profileIds }`; classifies conversation outcomes from `n8n_chat_histories` into `conversation_outcomes`, returns them for the «Сводка» dashboard |
 | `2islisFH7jjLoPQM` | Delete Orphan Profiles | **Scheduled, hourly** (no webhook) — server-side TTL sweep deleting Wappi profiles that stay unauthorized ≥ 24h; see below |
-| _(assigned on first deploy)_ | Set Reply Mode | App webhook `SetReplyMode` — shared always-active; body `{ profileIds:[...], chatId:"*"\|"<id>", suppressed:bool }`; validates (malformed → `bad_request` before any DB write), fans out one item per surviving profileId, upserts each into `reply_mode_flags` (on conflict do update). The semi-auto «Авто/Вместе» suppression write path (SUP-02); the bot templates' gate reads the same table. Deployed by `build-set-reply-mode.py` (Postgres cred bound by explicit id `1H5xlpFSESU4w6JH`); id assigned on first deploy, filename finalized to `<id>-Set_Reply_Mode.json` in 09-04 |
+| _(assigned on first deploy)_ | Set Reply Mode | App webhook `SetReplyMode` — shared always-active; body `{ profileIds:[...], chatId:"*"\|"<id>", suppressed:bool }`; validates (malformed → `bad_request` before any DB write), fans out one item per surviving profileId, upserts each into `reply_mode_flags` (on conflict do update). The semi-auto «Авто/Вместе» suppression write path (SUP-02); the bot templates' gate reads the same table. Deployed by `build-set-reply-mode.py` (Postgres cred bound by explicit id `vvRrFiEXzLVqKjOx` — dev's single Postgres cred as of 2026-07-22); id assigned on first deploy, filename finalized to `<id>-Set_Reply_Mode.json` in 09-04 |
 | `9PTyYcelRQI7bGDb` | Suggest Replies | App webhook `SuggestReplies` — body = frozen v1 request (`{ v, requestSeq, chatId, botWaId, businessTypeId, catalog, steerTowardText, messages… }`); known-invalid requests (v mismatch / missing `chatId` / empty `messages`) short-circuit straight to `generation_failed` — zero LLM spend on the unauthenticated webhook; optional channel-branched tenant-scoped RAG pre-retrieval (one single-key filter per channel: `botWaId` WA / `botTgId` TG, topK 5, skipped on `""`/`"-1"`) → one gpt-4o-mini call (strict json_schema, closed 6-label enum) → Code validation (exactly 4 distinct enum-labeled moves, ≤300 clamp, markdown-strip, one retry then `generation_failed`) → returns `{ v:1, requestSeq, suggestions:[{text,label}×4] }` for the semi-auto «Вместе» reply panel. Deployed from the committed canonical JSON by `build-suggest-replies.py` (dev id here; prod bagkz replication pending). Adversarially verified on dev 2026-07-10 (6-case matrix — grounding / missing-data / steer / injection / trivial / sentinel — plus format-hijack + malformed→`generation_failed`, **zero fixes needed**); dev RAG grounding is **catalog-only** until Supabase `documents` are seeded — RAG-with-data deferred to prod replication |
 
 > ⚠️ `4wYitz5ek30SVNlT` and `4VN3gsFaC2HUYmcc` are referenced by **literal id** inside the
