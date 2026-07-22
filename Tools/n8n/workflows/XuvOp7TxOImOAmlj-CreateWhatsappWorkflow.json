@@ -276,6 +276,12 @@
               "name": "nodes[5].parameters.options.systemMessage",
               "value": "=Business Type: {{ $('Unity Webhook').item.json.body.BusinessType }}\n\n{{ $('Vertical Prompt').first().json.verticalPrompt || $json.nodes[5].parameters.options.systemMessage.slice(1) }}\n\nAdditional Instructions: {{ $('Unity Webhook').item.json.body.Prompt }}  \n\nAbout Business: {{ $('Unity Webhook').item.json.body.Business }}\n\nProducts:\n{{ $('Unity Webhook').item.json.body.ProductsList }}\n\nServices:\n{{ $('Unity Webhook').item.json.body.ServicesList }}",
               "type": "string"
+            },
+            {
+              "id": "b2e63aaa-b0e7-5f59-91f7-de03ad43882d",
+              "name": "settings",
+              "value": "={{ Object.fromEntries(Object.entries($json.settings || {}).filter(([k]) => k !== 'binaryMode')) }}",
+              "type": "object"
             }
           ]
         },

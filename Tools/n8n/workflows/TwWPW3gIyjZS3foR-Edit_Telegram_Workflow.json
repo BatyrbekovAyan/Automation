@@ -97,6 +97,12 @@
               "name": "nodes[5].parameters.options.systemMessage",
               "value": "={{ $('Vertical Prompt').first().json.verticalPrompt ? \"Business Type: \" + $('Unity Webhook').first().json.body.BusinessType + \"\\n\\n\" + $('Vertical Prompt').first().json.verticalPrompt + \"\\n\" : $json.nodes[5].parameters.options.systemMessage.slice(0, $json.nodes[5].parameters.options.systemMessage.indexOf(\"\\n\" + \"Additional Instructions: \")) }}\nAdditional Instructions: {{ $('Unity Webhook').item.json.body.Prompt }}\n\nAbout Business: {{ $('Unity Webhook').item.json.body.Business }}\n\nProducts:\n{{ $('Unity Webhook').item.json.body.ProductsList }}\n\nServices:\n{{ $('Unity Webhook').item.json.body.ServicesList }}",
               "type": "string"
+            },
+            {
+              "id": "ae3b21e9-0f95-5cf2-b49d-17d23105a72e",
+              "name": "settings",
+              "value": "={{ Object.fromEntries(Object.entries($json.settings || {}).filter(([k]) => k !== 'binaryMode')) }}",
+              "type": "object"
             }
           ]
         },
@@ -123,6 +129,12 @@
               "name": "nodes[5].parameters.options.systemMessage",
               "value": "=Business Type: {{ $('Unity Webhook').item.json.body.BusinessType }}\n{{$json.nodes[5].parameters.options.systemMessage.slice($json.nodes[5].parameters.options.systemMessage.indexOf('\\n') + 1) }}",
               "type": "string"
+            },
+            {
+              "id": "0387110b-1b35-599e-8873-438408b0a5d8",
+              "name": "settings",
+              "value": "={{ Object.fromEntries(Object.entries($json.settings || {}).filter(([k]) => k !== 'binaryMode')) }}",
+              "type": "object"
             }
           ]
         },

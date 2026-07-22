@@ -86,6 +86,12 @@
               "name": "nodes[5].parameters.options.systemMessage",
               "value": "=Business Type: {{ $('Unity Webhook').item.json.body.BusinessType }}\n\n{{ $('Vertical Prompt').first().json.verticalPrompt || $json.nodes[5].parameters.options.systemMessage.slice(1) }}\n\nAdditional Instructions: {{ $('Unity Webhook').item.json.body.Prompt }}  \n\nAbout Business: {{ $('Unity Webhook').item.json.body.Business }}\n\nProducts:\n{{ $('Unity Webhook').item.json.body.ProductsList }}\n\nServices:\n{{ $('Unity Webhook').item.json.body.ServicesList }}",
               "type": "string"
+            },
+            {
+              "id": "c2a4e803-3a64-54e5-880f-7843b8de0e7b",
+              "name": "settings",
+              "value": "={{ Object.fromEntries(Object.entries($json.settings || {}).filter(([k]) => k !== 'binaryMode')) }}",
+              "type": "object"
             }
           ]
         },
