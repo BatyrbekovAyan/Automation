@@ -2898,12 +2898,14 @@ public partial class Manager : MonoBehaviour
         using UnityWebRequest www = UnityWebRequest.Post($"https://wappi.pro/api/profile/add?name={name}", form);
 
         www.SetRequestHeader("Authorization", wappiAuthToken);
+        www.timeout = 30;
 
         yield return www.SendWebRequest();
 
         if (www.result != UnityWebRequest.Result.Success)
         {
-
+            // WR-04: was a silent dead-end — profileId stays "-1" and the wizard stalls with no trace.
+            Debug.LogError($"[CreateWhatsappProfile] [{www.responseCode}] {www.url}: {www.error}");
         }
         else
         {
@@ -2973,12 +2975,14 @@ public partial class Manager : MonoBehaviour
         using UnityWebRequest www = UnityWebRequest.Post($"https://wappi.pro/tapi/profile/add?name={name}", form);
 
         www.SetRequestHeader("Authorization", wappiAuthToken);
+        www.timeout = 30;
 
         yield return www.SendWebRequest();
 
         if (www.result != UnityWebRequest.Result.Success)
         {
-
+            // WR-04: was a silent dead-end — profileId stays "-1" and the wizard stalls with no trace.
+            Debug.LogError($"[CreateTelegramProfile] [{www.responseCode}] {www.url}: {www.error}");
         }
         else
         {
