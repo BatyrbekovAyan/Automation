@@ -86,6 +86,21 @@ public partial class Manager
         SyncReplyMode(AuthedProfileIds(bot), "*", mode == ReplyModeToggleBinder.ReplyMode.Semi);
     }
 
+    /// <summary>
+    /// Late-auth seed (WR-02): a channel authed AFTER the owner set the bot default to Вместе
+    /// gets a real profile id but no "*" row — the gate would coalesce to false and the bot
+    /// auto-replies on the new channel while the app shows Вместе (double-reply risk). Called
+    /// fire-and-forget from the four workflow-creation success paths to re-assert the current
+    /// default for the newly-authed profile. Semi-only by design: absence already reads as
+    /// Авто, so the Auto case writes nothing (LOCKED absence→reply semantics).
+    /// </summary>
+    public void SeedReplyModeDefaultForProfile(string botId, string profileId)
+    {
+        if (!IsRealProfileId(profileId)) return;
+        if (ReplyModeToggleBinder.GetMode(botId) != ReplyModeToggleBinder.ReplyMode.Semi) return;
+        SyncReplyMode(new[] { profileId }, "*", true);
+    }
+
     // Copies DeleteBotFilesRoutine verbatim: POST the JSON to the unauthenticated
     // /webhook/SetReplyMode (NO auth header — every /webhook/* is open, R-02-01),
     // Content-Type: application/json (libcurl would otherwise stamp x-www-form-urlencoded

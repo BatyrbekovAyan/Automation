@@ -3086,6 +3086,7 @@ public partial class Manager : MonoBehaviour
                 PlayerPrefs.SetString(bot.name + "WhatsappWorkflowId", bot.GetComponent<Bot>().whatsappWorkflowId);
                 PlayerPrefs.SetString(bot.name + "WhatsappProfileId", bot.GetComponent<Bot>().whatsappProfileId);
                 PendingProfileLedger.MarkWhatsappClaimed();
+                SeedReplyModeDefaultForProfile(bot.name, bot.GetComponent<Bot>().whatsappProfileId);   // WR-02: '*' row for a channel authed after a Вместе default
             }
         }
 
@@ -3165,6 +3166,7 @@ public partial class Manager : MonoBehaviour
                 openBot.GetComponent<Bot>().whatsappWorkflowId = ExtractWorkflowId(response);
                 PlayerPrefs.SetString(openBot.name + "WhatsappWorkflowId", openBot.GetComponent<Bot>().whatsappWorkflowId);
                 PendingProfileLedger.MarkWhatsappClaimed();
+                SeedReplyModeDefaultForProfile(openBot.name, openBot.GetComponent<Bot>().whatsappProfileId);   // WR-02: '*' row for a channel authed after a Вместе default
 
                 CreateWhatsappWorkflowFromEditSuccess = true;
                 resolved = true;
@@ -3232,6 +3234,7 @@ public partial class Manager : MonoBehaviour
                 PlayerPrefs.SetString(bot.name + "TelegramWorkflowId", bot.GetComponent<Bot>().telegramWorkflowId);
                 PlayerPrefs.SetString(bot.name + "TelegramProfileId", bot.GetComponent<Bot>().telegramProfileId);
                 PendingProfileLedger.MarkTelegramClaimed();
+                SeedReplyModeDefaultForProfile(bot.name, bot.GetComponent<Bot>().telegramProfileId);   // WR-02: '*' row for a channel authed after a Вместе default
             }
         }
 
@@ -3311,6 +3314,7 @@ public partial class Manager : MonoBehaviour
                 openBot.GetComponent<Bot>().telegramWorkflowId = ExtractWorkflowId(response);
                 PlayerPrefs.SetString(openBot.name + "TelegramWorkflowId", openBot.GetComponent<Bot>().telegramWorkflowId);
                 PendingProfileLedger.MarkTelegramClaimed();
+                SeedReplyModeDefaultForProfile(openBot.name, openBot.GetComponent<Bot>().telegramProfileId);   // WR-02: '*' row for a channel authed after a Вместе default
 
                 CreateTelegramWorkflowFromEditSuccess = true;
                 resolved = true;
