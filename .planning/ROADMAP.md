@@ -40,7 +40,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 ### 📋 v1.2 Reply-Trigger Discipline (Planned)
 
-- [ ] **Phase 9: Semi-Auto Suppression Flag** - Wire the «Вместе» toggle to the server: `reply_mode_flags` table + `/webhook/SetReplyMode` sync + a fail-closed gate in both bot templates so a semi-auto chat gets no auto-reply while suggestions still work.
+- [x] **Phase 9: Semi-Auto Suppression Flag** - Wire the «Вместе» toggle to the server: `reply_mode_flags` table + `/webhook/SetReplyMode` sync + a fail-closed gate in both bot templates so a semi-auto chat gets no auto-reply while suggestions still work. (completed 2026-07-22)
 - [x] **Phase 10: Message Batching / Debounce** - A pre-generation debounce+dedupe stage in both bot templates so a multi-fragment customer message gets ONE combined reply, plus a client-side debounce in `SuggestionsController.HandleLive` so suggestions coalesce the same way. (completed 2026-07-22)
 
 ### 📋 v1.3 First-Run Onboarding (Planned)

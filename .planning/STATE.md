@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
-status: executing
+status: ready_to_plan
 stopped_at: "Completed 09-05-PLAN.md (phase-closing owner gate — 09-HUMAN-UAT ALL 5 scenarios PASS both channels, «Вместе»=no-reply+unread+suggestions, «Авто» restores, '*' default suppresses, absence→reply, activation switch independent; clone deactivated, prod dormant). Phase 09 execution complete (5/5, Wave 3 done); next = phase verification."
 last_updated: "2026-07-22T20:15:00.000Z"
 last_activity: 2026-07-22 -- Completed 09-05 phase-closing HUMAN-UAT gate (Wave 3) — Phase 09 execution done
 progress:
   total_phases: 9
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 65
   completed_plans: 69
-  percent: 100
+  percent: 89
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-12)
 
 **Core value:** The owner stays in control along the automation↔semi-auto spectrum — the bot can answer autonomously, or propose replies the owner picks and refines, without losing trust or the ability to take over.
-**Current focus:** Phase 09 — semi-auto-suppression
+**Current focus:** Phase 11 — first-run-onboarding-flow (v1.2 Phases 9+10 both complete 2026-07-22)
 
 ## Current Position
 
-Phase: 09 (semi-auto-suppression) — EXECUTION COMPLETE (5/5 plans, all 3 waves done) — next: phase verification
-Plan: 5 of 5 complete (Wave 3 done)
-Status: Phase 09 execution finished — 09-05 phase-closing HUMAN-UAT gate PASSED (all 5 scenarios, both channels; clone deactivated, prod dormant). Ready for phase verification → /gsd-secure-phase 09
-Last activity: 2026-07-22 -- Completed 09-05 phase-closing HUMAN-UAT gate (Wave 3)
+Phase: 11 (first-run-onboarding-flow)
+Plan: 6 of 7 complete
+Status: Executing — paused at owner device gate (11-HUMAN-UAT.md open; 11-07 remaining)
+Last activity: 2026-07-22 — Phase 09 verified passed + completed (5/5 plans; SetReplyMode live SCLcpn6DMDG3Z4VN; HUMAN-UAT all 5 PASS both channels)
 
 Progress: [██████████] 100%
 
