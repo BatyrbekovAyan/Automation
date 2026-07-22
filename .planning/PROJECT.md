@@ -26,7 +26,7 @@ The owner stays in control along a spectrum from fully autonomous to hands-on: t
 **Research:** `.planning/research/telegram-parity/` (7 deep-read reports + Wappi tapi docs extract)
 **Strategy (locked):** Telegram ships on Wappi tapi; official business-bots path PARKED (client-side Premium paywall — memory `telegram-channel-strategy`)
 
-**Cross-milestone state (v1.2 Reply-Trigger Discipline):** Phase 10 message-batching-debounce COMPLETE 2026-07-22 — multi-fragment messages produce one combined auto-reply (both channels, runData + device verified); client «Вместе» suggestions coalesce shipped with EditMode coverage (on-device confirmation + composition check tracked as UAT debt behind Phase 9's open 09-04/09-05 gates).
+**Cross-milestone state (v1.2 Reply-Trigger Discipline):** BOTH phases COMPLETE 2026-07-22. Phase 9 semi-auto-suppression — `reply_mode_flags` live (default-deny RLS), `/webhook/SetReplyMode` deployed (`SCLcpn6DMDG3Z4VN`), fail-closed gate runData-verified both channels, device HUMAN-UAT all 5 scenarios PASS («Вместе»=no reply+unread+suggestions; «Авто» restores; '*' default; absence→reply; activation switch independent). Phase 10 message-batching-debounce — multi-fragment messages produce one combined auto-reply (both channels, runData + device verified). Phase-10 UAT debt (suggestions-coalesce on-device + composition) is now UNBLOCKED by SetReplyMode being live — re-verify via 10-HUMAN-UAT.md. Code-review debt: 09-REVIEW.md 0C/4W (WR-01 heal tri-state collapse, WR-02 post-auth '*' gap) → /gsd-code-review-fix 9 available; /gsd-secure-phase 9 pending.
 
 ## Requirements
 
@@ -63,7 +63,7 @@ The owner stays in control along a spectrum from fully autonomous to hands-on: t
 
 - [ ] Detailed device UAT (v1.0 deferred items — folded into v1.1 closeout phase)
 - [ ] Prod bagkz replication (Suggest Replies + Telegram fixes; one bulk copy when dev is done — prod stays dormant)
-- [ ] Server-side «Вместе» suppression — an ACTIVE bot still auto-replies regardless of the client-side toggle (per-chat mode flag + bot-template check; deliberately deferred)
+- ~~Server-side «Вместе» suppression~~ ✓ Validated in Phase 9 (v1.2, 2026-07-22): fail-closed `Read Reply Mode`+`Suppressed?` gate in both templates; `reply_mode_flags` ('*' default + per-chat override) written via `/webhook/SetReplyMode` from all three client sites; behavioral e2e passed both channels
 
 ### Out of Scope
 
@@ -133,4 +133,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-22 after completing Phase 10 (message-batching-debounce)*
+*Last updated: 2026-07-22 after completing Phase 9 (semi-auto-suppression) — v1.2 Reply-Trigger Discipline phases both complete*
