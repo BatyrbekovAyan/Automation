@@ -212,7 +212,7 @@ Plans:
 - [x] 10-01-PLAN.md — n8n debounce splice: apply-message-batching.py inserts Debounce Wait → Fetch Recent → Latest+Combine (re-emits body) → Is Latest? on the Suppressed? FALSE branch in BOTH templates + structural verifier (BATCH-01/02) ✓ 2026-07-21
 - [x] 10-02-PLAN.md — client debounce: pure IncomingDebounceGate (~2.5s, injectable clock) + tests, SuggestionsController.HandleLive coalesces via a poll coroutine; manual refresh + card-pick stay immediate; cancel on close/switch (BATCH-03) ✓ 2026-07-21
 - [x] 10-03-PLAN.md — [owner gate] redeploy both templates by literal id + recreate frozen clones + runData matrix (2-fragment combine / single / bot-boundary / id-equality) both channels + fresh-bot propagation (BATCH-01/02) ✓ 2026-07-22
-- [ ] 10-04-PLAN.md — [owner gate] 10-HUMAN-UAT.md both-channel e2e (multi-fragment → one combined reply; suggestions coalesce; semi-auto skips the path) — closes the phase (BATCH-01/02/03)
+- [x] 10-04-PLAN.md — [owner gate] 10-HUMAN-UAT.md both-channel e2e — PARTIAL ✓ 2026-07-22: scenarios 1-3 PASS (auto-reply combine confirmed BOTH channels: multi-fragment → one combined reply; single → one reply; pauses unchanged); scenario 4 (suggestions coalesce) BLOCKED by open 09-04 SetReplyMode deploy (404, not a Phase-10 defect; BATCH-03 EditMode-covered 1197/1197); scenario 5 (semi-auto skips path) DEFERRED to post-Phase-9 per owner. Closed with 4-5 tracked as UAT debt (BATCH-01/02/03)
 **Flags**: USER-ASSISTED e2e (dev n8n + tunnel + real profiles). Adds ~window-length latency to EVERY auto-reply (the tuning knob). v1 batches text only (media message = own trigger). Same both-template propagation + bulk-copy story as Phase 9.
 
 ### Phase 11: First-Run Onboarding Flow (v1.3)

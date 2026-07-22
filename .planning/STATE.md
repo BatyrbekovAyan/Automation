@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
-status: executing
-stopped_at: Completed 10-03-PLAN.md
-last_updated: "2026-07-22T09:51:09.429Z"
+status: verifying
+stopped_at: "Completed 10-04-PLAN.md (partial: sc1-3 PASS, sc4 blocked-by-09-04, sc5 deferred)"
+last_updated: "2026-07-22T11:07:35.025Z"
 last_activity: 2026-07-22
 progress:
   total_phases: 9
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 65
-  completed_plans: 66
+  completed_plans: 67
   percent: 100
 ---
 
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 
 Phase: 10 (message-batching-debounce) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-07-22
 
 Progress: [██████████] 100%
@@ -126,6 +126,7 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [Phase 10]: 10-01 message-batching splice (BATCH-01/02) — apply-message-batching.py (idempotent, by-node-name) splices Debounce Wait(8s in-memory) -> Fetch Recent(messages/get, limit only, NO mark_all) -> Latest+Combine(Code: re-emits body {...wh,abort,combinedText}, sort by time desc, chat||text channel-agnostic, .first() not .item) -> Is Latest?(If $json.abort) onto Suppressed? main[1] before Input type in BOTH bot templates; Is Latest? main[0] dead-ends aborted fragments, main[1] -> Input type; Text set node value = combinedText ?? bare $json.body single-message fallback. Base derived per template from own Mark Read url (api/sync WA vs tapi/sync TG); ONE byte-identical Code body. verify-message-batching.py (--dir for prod re-export) gates the invariants (corruption-verified exit 1 on added mark_all). Idempotent (2nd run empty diff); README count stays 13. Live redeploy+runData = 10-03 owner gate.
 - [Phase 10]: 10-02 client «Вместе» debounce (BATCH-03) — pure STATEFUL IncomingDebounceGate (WindowSeconds=2.5f, injectable clock, no UnityEngine; first stateful member of the OpenChatLivePollGate pure-gate family) coalesces rapid incomings: SuggestionsController.HandleLive now Pokes the ~2.5s window + captures _pendingIncomingText instead of firing per-fragment, and a self-gating DebounceLoop (0.25s tick) fires the ONE coalesced IssueRequest when it settles. Cancel + _pendingIncomingText=null at ALL 4 lifecycle sites (OnDisable + StopCoroutine / ResetForNoOpenChat / RestoreForActiveChat at the top / HandleToggle OFF) alongside the existing _requestSeq++ — RestoreForActiveChat (same-bot chat switch A→B) is the BLOCKER the seq guard cannot cover (it catches a chat-switched RENDER, not a stale lastIncomingText baked into the payload at fire time; T-10-02-01). Manual refresh + card-pick stay IMMEDIATE (INT-03/04, untouched); NO network added (combine is free — payload already ships last <=12 msgs; T-10-02-03 accept). TDD: RED 87096bd (CS0103 compile-fail) -> GREEN c426c41 (6/6); Task 2 e75fea2; full EditMode 1197/1197 green (1191+6) via the in-Editor bridge (Editor was open — orchestrator brief stale; both editor-asm stamp + Assembly-CSharp.dll mtime advanced, real recompile). Live both-channel coalesce e2e + WindowSeconds tune ride the owner-run 10-04.
 - [Phase 10] 10-03 live runData gate PASSED both channels: two-fragment burst -> ONE combined reply (earlier fragment aborts at Is Latest?); id-equality holds (WA jid-hex, TG bare numeric) on all 6 winners; fresh clones inherit the debounce. Window stays 8s (no tuning). Two live-only blocking deviations fixed: n8n 2.27.4 binaryMode orchestrator 400 (d594f17: fix-orchestrator-settings.py strips binaryMode from the clone payload in all 4 Create/Edit orchestrators, --canonical+--live) and the still-open Phase-9 reply_mode_flags DDL (owner-applied mid-gate, fails-open). combinedText-4-line-repeat in scenario A is the correct run-walk over an un-replied burst, NOT a defect.
+- [Phase 10] 10-04 owner UAT gate CLOSED partial (2026-07-22): scenarios 1-3 PASS — auto-reply combine behaviorally confirmed BOTH channels (multi-fragment → ONE combined reply; single message → one reply; humanizer pauses unchanged, ~8s accepted). Scenario 4 (suggestions coalesce) BLOCKED by open Phase-9 09-04 SetReplyMode deploy (in-app Semi-auto toggle 404'd at Manager.ReplyModeSync.cs:105 — expected, not a Phase-10 defect; BATCH-03 stays EditMode-covered 1197/1197). Scenario 5 (semi-auto skips path) DEFERRED to post-Phase-9 by explicit owner decision. Owner authorized closing the plan now; scenarios 4-5 tracked as UAT debt, re-verify alongside 09-04/09-05. Ready for /gsd-secure-phase 10.
 
 ### Pending Todos
 
@@ -165,6 +166,8 @@ Items acknowledged and carried forward:
 | Milestone | Server-side «Вместе» suppression | pending (v2 SUPPRESS-01) | v1.0 close |
 | Design | Push-based incoming delivery (n8n → device push with the incoming text) to replace client polling — owner preference | Deferred to v2 (needs FCM/APNs + device-token registry + n8n hook; D5 gap fixes the existing refresh path first) | Gate A 2026-07-16 |
 | D15 follow-up | WhatsApp absence-based reaction-removal reconcile — in-WhatsApp-app removal emits no raw in the polled stream, but the `messages/id/get` target payload carries a `reactions` key (round-7 `[D15-probe]` proved `reactionsKey=True`), so removal can be reconciled by fetching/polling the target's `reactions[]` and clearing `ReactionStore` on absence (mirror of Telegram). FIRST step = capture the `reactions` key's SHAPE (probe proved presence only) | Deferred to v1.2/post-milestone (owner deferred at Gate A — not a blocker) | Gate A PASS round 7 2026-07-21 |
+| uat_gap | Phase 10: 10-HUMAN-UAT.md scenario 4 (suggestions coalesce, «Вместе», BATCH-03) — BLOCKED on-device by the open Phase-9 09-04 `/webhook/SetReplyMode` deploy (in-app Semi-auto toggle 404'd at `Manager.ReplyModeSync.cs:105` — expected, not a Phase-10 defect). BATCH-03 keeps full EditMode coverage (10-02, 6 tests, suite 1197/1197); re-runs trivially once 09-04 deploys SetReplyMode | blocked → re-verify with 09-04/09-05 | 10-04 close 2026-07-22 |
+| uat_gap | Phase 10: 10-HUMAN-UAT.md scenario 5 (semi-auto skips the path / gate-before-debounce ordering) — DEFERRED to post-Phase-9 by explicit owner decision; re-verifies alongside the 09-04/09-05 «Вместе» app-toggle e2e | deferred → post-Phase-9 | 10-04 close 2026-07-22 |
 
 Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG-01/02, Phase 7).
 | Phase 03 P01 | 10 min | 2 tasks | 5 files |
@@ -224,11 +227,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 10 P01 | 9min | 2 tasks | 5 files |
 | Phase 10 P02 | 15 | 2 tasks | 3 files |
 | Phase 10 P03 | owner-gate | 2 tasks | 5 files |
+| Phase 10 P04 | owner-gate | 2 tasks | 1 files |
 
 ## Session Continuity
 
-Last session: 2026-07-22T09:50:55.193Z
-Stopped at: Completed 10-03-PLAN.md
+Last session: 2026-07-22T11:07:10.518Z
+Stopped at: Completed 10-04-PLAN.md (partial: sc1-3 PASS, sc4 blocked-by-09-04, sc5 deferred)
 Resume file: None
 
 **Planned Phase:** 10 (message-batching-debounce) — 4 plans — 2026-07-20T09:44:37.569Z

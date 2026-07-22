@@ -1,6 +1,6 @@
 # Phase 10 — Human UAT Gate: Message Batching / Debounce (BATCH-01 / BATCH-02 / BATCH-03 live proof)
 
-**Status:** OPEN — awaiting owner device run. Fill in each PASS/FAIL below, then report back per the resume signal.
+**Status:** PARTIAL (2026-07-22) — scenarios 1–3 **PASS** (auto-combine half, both channels); scenario 4 **BLOCKED** by open Phase-9 gate 09-04 (SetReplyMode 404 — BATCH-03 stays EditMode-covered); scenario 5 **DEFERRED** to post-Phase-9 by owner decision. Plan closed with this debt tracked per the owner's explicit continue-decision.
 
 ## What this gate proves
 
@@ -92,8 +92,8 @@ suppressed chat skips the path), **not** the app-toggle round-trip.
 - **EXPECT:** exactly **ONE** bot reply arrives (after ~8s), and it answers **BOTH** фрагмента
   (grounded in the combined text) — **not** two replies, **not** an answer to only the first
   фрагмент.
-- **Result:** ☐ PASS ☐ FAIL
-- **Notes:**
+- **Result:** ☑ **PASS** (owner, 2026-07-22)
+- **Notes:** one combined reply, both fragments answered.
 
 ### Scenario 2 — WhatsApp single message (latency / humanizer unchanged)
 
@@ -101,16 +101,16 @@ suppressed chat skips the path), **not** the app-toggle round-trip.
 - **Do:** the customer sends **one complete** message.
 - **EXPECT:** exactly **one** reply after the window; the humanizer read/type pauses still
   feel **natural** (unchanged). The ~8s wait is expected — not a defect.
-- **Result:** ☐ PASS ☐ FAIL
-- **Notes (does single-message latency feel acceptable at 8s? if not, note a preferred value):**
+- **Result:** ☑ **PASS** (owner, 2026-07-22)
+- **Notes (does single-message latency feel acceptable at 8s? if not, note a preferred value):** one reply after the window; pauses feel natural; 8s accepted.
 
 ### Scenario 3 — Telegram multi-fragment combine (BATCH-01/02)
 
 - **Setup:** repeat scenario 1 on a **Telegram**-authed «Авто» bot; reply clone ACTIVE.
 - **Do:** the customer sends two фрагмента ~1s apart.
 - **EXPECT:** same as scenario 1 — exactly **ONE** combined reply on Telegram.
-- **Result:** ☐ PASS ☐ FAIL
-- **Notes:**
+- **Result:** ☑ **PASS** (owner, 2026-07-22)
+- **Notes:** one combined reply on Telegram.
 
 ### Scenario 4 — Suggestions coalesce in «Вместе» (BATCH-03) — BOTH channels
 
@@ -123,13 +123,24 @@ suppressed chat skips the path), **not** the app-toggle round-trip.
 - **EXPECT:** the suggestion cards refresh **ONCE** (after ~2.5s), grounded in the
   latest/combined incoming — **not** a flicker of N refreshes (коалесцированно, один раз).
 - **Sub-check A (manual refresh immediate):** tap the **manual refresh** mid-burst → it
-  responds **IMMEDIATELY** (not delayed by the debounce). ☐ PASS ☐ FAIL
+  responds **IMMEDIATELY** (not delayed by the debounce). ☐ not reached (blocked)
 - **Sub-check B (card-pick immediate):** tap a **card** → it re-clusters **IMMEDIATELY** (not
-  delayed by the debounce). ☐ PASS ☐ FAIL
+  delayed by the debounce). ☐ not reached (blocked)
 - **Do this on BOTH channels** (WhatsApp + Telegram).
-- **Result (coalesce, WhatsApp):** ☐ PASS ☐ FAIL
-- **Result (coalesce, Telegram):** ☐ PASS ☐ FAIL
-- **Notes (if ~2.5s feels off, note a preferred `WindowSeconds`):**
+- **Result (coalesce, WhatsApp):** ⛔ **BLOCKED by open Phase-9 gate 09-04** (owner, 2026-07-22)
+- **Result (coalesce, Telegram):** ⛔ **BLOCKED by open Phase-9 gate 09-04** (owner, 2026-07-22)
+- **Blocker evidence:** switching the toggle to Semi-auto errored on the server sync —
+  `[SetReplyMode] [404] http://localhost:5678/webhook/SetReplyMode: The requested webhook
+  "POST SetReplyMode" is not registered` (logged from `Manager/<SyncReplyModeRoutine>` at
+  `Assets/Scripts/Main/Manager.ReplyModeSync.cs:105`). This is the **EXPECTED** consequence of
+  `/webhook/SetReplyMode` not being deployed on dev (**09-04 Task 2, still open**) — **not a
+  Phase-10 defect**. The behavioral coalesce observation was therefore not completed.
+- **Automated coverage stands:** BATCH-03's client coalesce logic keeps full automated
+  coverage — 10-02's **6 EditMode tests** (incl. the burst-then-chat-switch regression), full
+  suite **1197/1197**. Only the on-device behavioral confirmation is outstanding; it re-runs
+  trivially once 09-04 deploys `SetReplyMode`. (Side note, no action: the `localhost` URL means
+  this ran on the Mac — Editor or iOS Simulator — which is legitimate for a client-side check.)
+- **Notes (if ~2.5s feels off, note a preferred `WindowSeconds`):** not reached — blocked before observation.
 
 ### Scenario 5 — Composition sanity: semi-auto skips the path
 
@@ -143,8 +154,10 @@ suppressed chat skips the path), **not** the app-toggle round-trip.
   activation switch still pauses/resumes the bot **independently** of «Авто/Вместе» — it must
   be untouched by this phase.
 - **Cleanup:** **delete** the SQL suppression row after.
-- **Result:** ☐ PASS ☐ FAIL
-- **Notes:**
+- **Result:** ⏸ **DEFERRED to post-Phase-9** (owner decision, 2026-07-22) — owner will verify
+  after Phase 9 finishes; asked to continue the phase now without this scenario and without
+  additional setup. Not a defect; tracked as debt until re-verified.
+- **Notes:** composition/ordering check re-runs alongside the 09-04/09-05 «Вместе» app-toggle e2e.
 
 ---
 
@@ -152,19 +165,19 @@ suppressed chat skips the path), **not** the app-toggle round-trip.
 
 | # | Scenario | Channel(s) | Expected | Result | Notes |
 |---|----------|-----------|----------|--------|-------|
-| 1 | Multi-fragment combine | WhatsApp | ONE combined reply | ☐ | |
-| 2 | Single message | WhatsApp | one reply, natural pauses | ☐ | |
-| 3 | Multi-fragment combine | Telegram | ONE combined reply | ☐ | |
-| 4 | Suggestions coalesce | WhatsApp + Telegram | ONE card refresh; manual/card immediate | ☐ | |
-| 5 | Semi-auto skips path | WhatsApp (SQL row) | no reply, stays unread, suggestions still populate, switch untouched | ☐ | |
+| 1 | Multi-fragment combine | WhatsApp | ONE combined reply | ☑ PASS | both fragments answered (2026-07-22) |
+| 2 | Single message | WhatsApp | one reply, natural pauses | ☑ PASS | 8s accepted; pauses natural |
+| 3 | Multi-fragment combine | Telegram | ONE combined reply | ☑ PASS | one combined reply on TG |
+| 4 | Suggestions coalesce | WhatsApp + Telegram | ONE card refresh; manual/card immediate | ⛔ BLOCKED (09-04) | SetReplyMode 404; BATCH-03 EditMode-covered 1197/1197 |
+| 5 | Semi-auto skips path | WhatsApp (SQL row) | no reply, stays unread, suggestions still populate, switch untouched | ⏸ DEFERRED | owner will verify post-Phase-9 |
 
 ---
 
 ## Post-run (owner — immediately after the window)
 
-- [ ] **DEACTIVATE** the test bot's reply-workflow clone (real-contacts constraint).
-- [ ] **Delete** any `reply_mode_flags` row inserted for scenario 5.
-- [ ] Confirm **prod bagkz untouched** — it stays **DORMANT**; this phase folds into the
+- [x] **DEACTIVATE** the test bot's reply-workflow clone (real-contacts constraint). — confirmed (owner, 2026-07-22)
+- [x] **Delete** any `reply_mode_flags` row inserted for scenario 5. — confirmed deleted (owner, 2026-07-22)
+- [x] Confirm **prod bagkz untouched** — it stays **DORMANT**; this phase folds into the
       future one-shot bulk copy (carry the debounce splice + the `binaryMode` orchestrator
       strip from 10-03).
 
@@ -172,12 +185,29 @@ suppressed chat skips the path), **not** the app-toggle round-trip.
 
 ## Final disposition
 
-- **ALL 5 PASS →** the batching feature is behaviorally complete → phase closes →
-  run **`/gsd-secure-phase 10`**.
-- **Any FAIL →** file a gap round with the failing scenario + observed behavior. A pure
-  window-tuning change (8s auto / 2.5s client) re-enters via a small gap plan
-  (`apply-message-batching.py`'s `Debounce Wait amount` + the client `WindowSeconds`), not
-  this gate.
+**Outcome (2026-07-22): PARTIAL — plan closed with tracked debt per explicit owner continue-decision.**
+
+- **Scenarios 1–3 PASS** → the **auto-reply combine half (BATCH-01/BATCH-02)** is behaviorally
+  confirmed on **both** channels (multi-fragment → ONE combined reply; single message → one
+  reply; humanizer pauses unchanged).
+- **Scenario 4 BLOCKED by 09-04** → the **suggestions-coalesce half (BATCH-03)** could not be
+  observed on-device because `/webhook/SetReplyMode` is not deployed on dev (Phase-9 09-04
+  Task 2, still open) — the toggle-to-Semi-auto sync 404'd. BATCH-03's client logic retains
+  full automated coverage (10-02, 6 EditMode tests, suite 1197/1197). Re-runs trivially once
+  09-04 deploys SetReplyMode.
+- **Scenario 5 DEFERRED** → the composition/ordering check is deferred to **post-Phase-9** by
+  explicit owner decision; owner will verify after Phase 9 finishes.
+- **Owner authorization (2026-07-22):** owner asked to continue/close the phase now without
+  scenarios 4–5 and without additional setup. This plan closes with scenarios 4 (blocked) and
+  5 (deferred) tracked as debt so they surface in `/gsd-progress` and `/gsd-audit-uat` until
+  re-verified alongside 09-04/09-05.
+- **Reference:** a pure window-tuning change (8s auto / 2.5s client) re-enters via a small gap
+  plan (`apply-message-batching.py`'s `Debounce Wait amount` + the client `WindowSeconds`),
+  not this gate.
+
+**Next step:** the auto-reply half is behaviorally proven; run **`/gsd-secure-phase 10`** to
+secure the phase, with scenarios 4–5 carried as tracked UAT debt re-verified once 09-04/09-05
+close.
 
 ---
 *Gate for Phase 10 (message-batching-debounce). Do NOT tick these on the owner's behalf —
