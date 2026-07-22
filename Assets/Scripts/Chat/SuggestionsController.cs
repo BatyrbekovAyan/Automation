@@ -113,11 +113,16 @@ public class SuggestionsController : MonoBehaviour
         _pendingIncomingText = null;
         _semiAutoOn = SemiAutoStore.IsOn(ChatManager.Instance.CurrentBotId, ChatManager.Instance.CurrentChatId);
         if (_toggle != null) _toggle.SetLit(_semiAutoOn);     // default OFF → other chats stay manual (SEMI-03)
+        // SUP-02 heal: re-assert only an EXPLICIT per-chat override (tri-state 1/2) — covers a lost
+        // «Вместе» (true) AND a lost «back to Авто» (false) write. Inherited chats (raw 0) push
+        // NOTHING: they rely on the '*' bot-default row alone; writing the collapsed boolean here
+        // would turn a mere chat-open into a sticky per-chat server row (WR-01).
+        if (SemiAutoStore.TryGetOverride(ChatManager.Instance.CurrentBotId, ChatManager.Instance.CurrentChatId, out bool overrideOn))
+            PushReplyModeForActiveChat(overrideOn);
         if (_semiAutoOn)
         {
             ShowPanel();
             IssueRequest(null, null);
-            PushReplyModeForActiveChat(true);                 // SUP-02: heal a lost "back to Авто" write; ON-state only
         }
         else HidePanel();
     }
@@ -147,7 +152,8 @@ public class SuggestionsController : MonoBehaviour
 
     // --- Server sync of the per-chat override (SUP-02, client half) ---
     // Fire-and-forget write of the active chat's suppression flag for the ACTIVE channel's
-    // profile. Called from HandleToggle (explicit ON/OFF) and RestoreForActiveChat (ON heal).
+    // profile. Called from HandleToggle (explicit ON/OFF) and RestoreForActiveChat (explicit-
+    // override heal, both states — inherited chats push nothing, WR-01).
     // NEVER from HandleLive — the 3s open-chat LivePoll would storm the server (Pitfall 3).
     private void PushReplyModeForActiveChat(bool suppressed)
     {

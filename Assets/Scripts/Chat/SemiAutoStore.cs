@@ -39,4 +39,18 @@ public static class SemiAutoStore
 
     public static void Set(string botId, string chatId, bool on)
         => SetIntAndSave(Key(botId, chatId), on ? 2 : 1);   // record an explicit per-chat override
+
+    /// <summary>
+    /// Raw tri-state read: true when the chat carries an EXPLICIT per-chat override
+    /// (<paramref name="on"/> = that override's value), false when unset (raw 0 — the chat
+    /// inherits the bot default). Callers that must not conflate inherited state with an
+    /// explicit choice (e.g. the on-open server heal, WR-01) use this instead of the
+    /// collapsed <see cref="IsOn"/>.
+    /// </summary>
+    public static bool TryGetOverride(string botId, string chatId, out bool on)
+    {
+        int raw = GetInt(Key(botId, chatId));
+        on = raw == 2;
+        return raw != 0;   // 0 = no explicit override
+    }
 }

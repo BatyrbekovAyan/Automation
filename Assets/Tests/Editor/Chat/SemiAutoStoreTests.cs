@@ -85,4 +85,29 @@ public class SemiAutoStoreTests
         SemiAutoStore.Set("Bot0", "c1@c.us", true);
         Assert.IsFalse(SemiAutoStore.IsOn("Bot0", "c2@c.us")); // different chat = independent key
     }
+
+    // --- TryGetOverride (raw tri-state; the on-open heal must not conflate inherited state, WR-01) ---
+
+    [Test]
+    public void TryGetOverride_NeverSet_ReturnsFalse_EvenWhenBotDefaultSemi()
+    {
+        SemiAutoStore.BotDefaultSemi = _ => true;               // inherited Semi is NOT an override
+        Assert.IsFalse(SemiAutoStore.TryGetOverride("Bot0", "c1@c.us", out _));
+    }
+
+    [Test]
+    public void TryGetOverride_ExplicitOn_ReturnsTrueWithOn()
+    {
+        SemiAutoStore.Set("Bot0", "c1@c.us", true);
+        Assert.IsTrue(SemiAutoStore.TryGetOverride("Bot0", "c1@c.us", out bool on));
+        Assert.IsTrue(on);
+    }
+
+    [Test]
+    public void TryGetOverride_ExplicitOff_ReturnsTrueWithOff()
+    {
+        SemiAutoStore.Set("Bot0", "c1@c.us", false);
+        Assert.IsTrue(SemiAutoStore.TryGetOverride("Bot0", "c1@c.us", out bool on));
+        Assert.IsFalse(on);
+    }
 }
