@@ -12,8 +12,8 @@ bot-default flip, a per-chat toggle, and a chat-open re-assert; the bot template
 the same table (SUP-01..SUP-04).
 
 This script does NOT generate the workflow. The single source of truth is the committed
-canonical export `Tools/n8n/workflows/Set_Reply_Mode.json` (provisional filename — the real
-n8n id is assigned on first deploy and the file is renamed <id>-Set_Reply_Mode.json in 09-04).
+canonical export `Tools/n8n/workflows/SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json` (the n8n id
+`SCLcpn6DMDG3Z4VN` was assigned on first deploy 2026-07-22 and the filename finalized in 09-04).
 Deploy imports that JSON verbatim and rebinds ONLY the credential ids for the target instance.
 
 Usage:
@@ -47,7 +47,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 SECRETS = os.path.join(REPO, "Assets/StreamingAssets/secrets.json")
 BASE = os.environ.get("N8N_BASE_URL", "http://localhost:5678").rstrip("/")
-CANONICAL = os.path.join(HERE, "workflows", "Set_Reply_Mode.json")
+CANONICAL = os.path.join(HERE, "workflows", "SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json")
 
 # The dev Postgres credential id — the DB `reply_mode_flags` lives on and the bot templates'
 # gate reads. As of 2026-07-22 the dev instance has a SINGLE Postgres cred `vvRrFiEXzLVqKjOx`
