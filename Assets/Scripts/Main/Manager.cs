@@ -57,24 +57,20 @@ public partial class Manager : MonoBehaviour
     [SerializeField] private GameObject TelegramAuthSuccessPanel;
     [SerializeField] private Button TelegramAuthBackButton;
 
-    // Interactive «Бот подключён!» success moment — PER-CHANNEL button/label field sets.
-    // WhatsappAuthSuccessPanel and TelegramAuthSuccessPanel are SEPARATE GameObjects in
-    // separate hierarchies, so a single shared label/Button cannot child both — each channel
-    // gets its own cluster, selected by useTelegram. All null-guarded: stamped by Plan 05's
-    // OnboardingAuthBlocksBuilder, so they are null in-scene until that wave runs.
-    [Header("Onboarding success moment — WhatsApp panel (stamped by OnboardingAuthBlocksBuilder)")]
-    [SerializeField] private TMPro.TextMeshProUGUI waSuccessTitleLabel;      // «Бот подключён!»
-    [SerializeField] private TMPro.TextMeshProUGUI waSuccessBodyLabel;       // price-list body
-    [SerializeField] private UnityEngine.UI.Button waSuccessPrimaryButton;   // «Загрузить прайс-лист» / «Открыть чаты»
-    [SerializeField] private TMPro.TextMeshProUGUI waSuccessPrimaryLabel;
-    [SerializeField] private UnityEngine.UI.Button waSuccessLaterButton;     // «Позже»
-
-    [Header("Onboarding success moment — Telegram panel (stamped by OnboardingAuthBlocksBuilder)")]
-    [SerializeField] private TMPro.TextMeshProUGUI tgSuccessTitleLabel;
-    [SerializeField] private TMPro.TextMeshProUGUI tgSuccessBodyLabel;
-    [SerializeField] private UnityEngine.UI.Button tgSuccessPrimaryButton;
-    [SerializeField] private TMPro.TextMeshProUGUI tgSuccessPrimaryLabel;
-    [SerializeField] private UnityEngine.UI.Button tgSuccessLaterButton;
+    // Interactive «Бот подключён!» success moment — ONE field set on a NEW standalone
+    // full-screen overlay (SuccessOverlay). D2 relocation (owner decision 2026-07-18): the
+    // overlay is a Canvas-level sibling of the ScreenContainer rendered ABOVE the auth pages,
+    // so the celebration reads clean instead of stacked over the still-visible code UI. Because
+    // the overlay is a single shared hierarchy, one label/button set serves BOTH channels —
+    // replacing the ten per-channel wa*/tg* fields. All null-guarded: stamped by
+    // OnboardingAuthBlocksBuilder, so they are null in-scene until that builder runs.
+    [Header("Onboarding success moment — standalone overlay (stamped by OnboardingAuthBlocksBuilder)")]
+    [SerializeField] private GameObject SuccessOverlay;                       // standalone full-screen overlay root
+    [SerializeField] private TMPro.TextMeshProUGUI successTitleLabel;         // «Бот подключён!»
+    [SerializeField] private TMPro.TextMeshProUGUI successBodyLabel;          // price-list body
+    [SerializeField] private UnityEngine.UI.Button successPrimaryButton;      // «Загрузить прайс-лист» / «Открыть чаты»
+    [SerializeField] private TMPro.TextMeshProUGUI successPrimaryLabel;
+    [SerializeField] private UnityEngine.UI.Button successLaterButton;        // «Позже»
     [SerializeField] private Button GetWhatsappCodeButton;
     [SerializeField] private Button GetTelegramCodeButton;
     [SerializeField] private Button SendTelegramCodeButton;
@@ -1507,13 +1503,11 @@ public partial class Manager : MonoBehaviour
         ResetAddBotForm();
         isCreatingBot = false;
 
-        // Interactive success moment — final auth, bot now exists. Last channel to authorize
-        // is Telegram for TG-only and "both"; WhatsApp for WhatsApp-only. Reuses the local
-        // useTelegram (== selectedPlatform 2 || 3) captured before ResetAddBotForm cleared
-        // selectedPlatform. This is the ONE creation-flow site — ShowAuthSuccess never
-        // re-fires it (its else branch is gated on !isCreatingBot), so a "both" creation
-        // shows the moment exactly once.
-        yield return StartCoroutine(ShowInteractiveSuccessMoment(newBotComp, useTelegram));
+        // Interactive success moment — final auth, bot now exists. D2: the moment renders on a
+        // standalone full-screen overlay (channel-agnostic), so it no longer takes a channel arg.
+        // This is the ONE creation-flow site — ShowAuthSuccess never re-fires it (its else branch
+        // is gated on !isCreatingBot), so a "both" creation shows the moment exactly once.
+        yield return StartCoroutine(ShowInteractiveSuccessMoment(newBotComp));
     }
 
     /// <summary>
@@ -1718,12 +1712,11 @@ public partial class Manager : MonoBehaviour
             }
 
             // Settings re-auth: the Manager.openBot bot already exists → interactive moment
-            // with the files-exist fallback («Открыть чаты»). Re-authed channel = whichever
-            // authPage this is. authPage stays ACTIVE — the moment reactivates it and defers
-            // its deactivation via CloseSuccessAndOverlay. Gated on !isCreatingBot so the
-            // creation flow (which fires the moment from CreateBotFromForm) never double-fires.
-            StartCoroutine(ShowInteractiveSuccessMoment(Manager.openBot.GetComponent<Bot>(),
-                           /*useTelegram:*/ authPage == TelegramAuth));
+            // with the files-exist fallback («Открыть чаты»). D2: the moment renders on the
+            // standalone overlay (channel-agnostic) and deactivates both auth hierarchies itself,
+            // so no channel arg and no authPage hand-off. Gated on !isCreatingBot so the creation
+            // flow (which fires the moment from CreateBotFromForm) never double-fires.
+            StartCoroutine(ShowInteractiveSuccessMoment(Manager.openBot.GetComponent<Bot>()));
         }
         // else: final creating-bot auth — do nothing here. CreateBotFromForm fires the
         // interactive moment after the bot card exists; authPage stays active for it.
@@ -1732,76 +1725,71 @@ public partial class Manager : MonoBehaviour
     }
 
     // Interactive «Бот подключён!» moment — the FINAL success beat after auth completes and
-    // the bot exists. Replaces the old fixed 2s auto-dismiss with a wait-for-user panel whose
-    // primary CTA deep-links into the just-authed bot's «Прайс-листы» tab (fallback «Открыть
-    // чаты» when files already exist). Per-channel field sets are selected by useTelegram
-    // because the two success panels live in separate hierarchies. Fired from exactly two
-    // sites (CreateBotFromForm after creation; ShowAuthSuccess's else branch for settings
-    // re-auth) — never from BotSettings (this is a private Manager member).
-    private IEnumerator ShowInteractiveSuccessMoment(Bot bot, bool useTelegram)
+    // the bot exists. D2 (owner decision 2026-07-18): the moment now lives on a STANDALONE
+    // full-screen overlay (SuccessOverlay), a Canvas-level sibling of the ScreenContainer that
+    // renders ABOVE the auth pages — so NOTHING of the code-entry UI shows beneath it. The old
+    // authPage-reactivation hack is gone: the overlay is a single shared hierarchy, so one field
+    // set serves both channels (channel-agnostic — no useTelegram arg). Replaces the fixed 2s
+    // auto-dismiss with a wait-for-user overlay whose primary CTA deep-links into the just-authed
+    // bot's «Прайс-листы» tab (fallback «Открыть чаты» when files already exist). Fired from
+    // exactly two sites (CreateBotFromForm after creation; ShowAuthSuccess's else branch for
+    // settings re-auth) — never from BotSettings (this is a private Manager member).
+    private IEnumerator ShowInteractiveSuccessMoment(Bot bot)
     {
         if (bot == null) yield break;
+        if (SuccessOverlay == null) yield break;
 
-        // Per-channel selection (BLOCKER: separate panels/hierarchies/field sets).
-        GameObject authPage     = useTelegram ? TelegramAuth : WhatsappAuth;
-        GameObject successPanel = useTelegram ? TelegramAuthSuccessPanel : WhatsappAuthSuccessPanel;
-        var titleLabel   = useTelegram ? tgSuccessTitleLabel    : waSuccessTitleLabel;
-        var bodyLabel    = useTelegram ? tgSuccessBodyLabel     : waSuccessBodyLabel;
-        var primaryBtn   = useTelegram ? tgSuccessPrimaryButton : waSuccessPrimaryButton;
-        var primaryLabel = useTelegram ? tgSuccessPrimaryLabel  : waSuccessPrimaryLabel;
-        var laterBtn     = useTelegram ? tgSuccessLaterButton   : waSuccessLaterButton;
-        if (successPanel == null) yield break;
-
-        // BLOCKER FIX: the success panel is nested INSIDE authPage, which ShowAuthSuccess
-        // used to deactivate. Reactivate the hosting hierarchy so the panel can render;
-        // deactivation is deferred to dismissal (CloseSuccessAndOverlay).
-        if (authPage != null) authPage.SetActive(true);
+        // D2: the overlay is standalone (Canvas-level, above the auth pages) — NO authPage
+        // reactivation. Deactivate BOTH auth hierarchies defensively (pre-phase behaviour) so
+        // nothing of the code-entry UI shows beneath the overlay.
+        if (WhatsappAuth != null) WhatsappAuth.SetActive(false);
+        if (TelegramAuth != null) TelegramAuth.SetActive(false);
 
         // Files-exist fact (both content types) → CTA target.
         bool hasFiles = UploadedFilesStore.Load(bot.name, "product").Count > 0
                      || UploadedFilesStore.Load(bot.name, "service").Count > 0;
         var cta = SuccessCtaSelector.Choose(hasFiles);
 
-        if (titleLabel != null) titleLabel.text = "Бот подключён!";
-        if (bodyLabel != null) bodyLabel.text =
+        if (successTitleLabel != null) successTitleLabel.text = "Бот подключён!";
+        if (successBodyLabel != null) successBodyLabel.text =
             "Осталось научить бота вашим ценам — загрузите прайс-лист, и он будет отвечать по вашим товарам";
-        if (primaryLabel != null) primaryLabel.text =
+        if (successPrimaryLabel != null) successPrimaryLabel.text =
             cta == SuccessCta.UploadPriceList ? "Загрузить прайс-лист" : "Открыть чаты";
 
         // Wire buttons fresh each show (clear old listeners to avoid stacking).
         bool dismissed = false;
-        if (primaryBtn != null)
+        if (successPrimaryButton != null)
         {
-            primaryBtn.onClick.RemoveAllListeners();
-            primaryBtn.onClick.AddListener(() =>
+            successPrimaryButton.onClick.RemoveAllListeners();
+            successPrimaryButton.onClick.AddListener(() =>
             {
                 dismissed = true;
-                CloseSuccessAndOverlay(authPage, successPanel);
+                CloseSuccessAndOverlay();
                 if (cta == SuccessCta.UploadPriceList) bot.OpenSettingsAtProductTab();
                 else FindFirstObjectByType<BottomTabManager>()?.SwitchTab(BottomTabManager.WhatsAppTabIndex);
             });
         }
-        if (laterBtn != null)
+        if (successLaterButton != null)
         {
-            laterBtn.onClick.RemoveAllListeners();
-            laterBtn.onClick.AddListener(() =>
+            successLaterButton.onClick.RemoveAllListeners();
+            successLaterButton.onClick.AddListener(() =>
             {
                 dismissed = true;
-                CloseSuccessAndOverlay(authPage, successPanel);   // normal post-auth destination = Bots tab
+                CloseSuccessAndOverlay();   // normal post-auth destination = Bots tab
             });
         }
 
-        successPanel.SetActive(true);
+        SuccessOverlay.SetActive(true);
         // No fixed auto-dismiss — WAIT for the user (replaces the old WaitForSeconds(2f)).
         while (!dismissed) yield return null;
     }
 
-    // Hide the success panel, deactivate the (now-deferred) auth-page host, close the
-    // Add-Bot overlay if open, land on Bots.
-    private void CloseSuccessAndOverlay(GameObject authPage, GameObject successPanel)
+    // Hide the standalone success overlay, close the Add-Bot overlay if open, land on Bots.
+    // D2: parameterless — the authPage-deferral hack died with the relocation (auth pages are
+    // deactivated up front in ShowInteractiveSuccessMoment).
+    private void CloseSuccessAndOverlay()
     {
-        if (successPanel != null) successPanel.SetActive(false);
-        if (authPage != null) authPage.SetActive(false);   // deferred authPage deactivation
+        if (SuccessOverlay != null) SuccessOverlay.SetActive(false);
         AddBotPanel.Instance?.CloseImmediate();
         var tabs = FindFirstObjectByType<BottomTabManager>();
         if (tabs != null) tabs.SwitchTab(BottomTabManager.BotsTabIndex);
