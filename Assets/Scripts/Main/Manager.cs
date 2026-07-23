@@ -1503,6 +1503,12 @@ public partial class Manager : MonoBehaviour
         ResetAddBotForm();
         isCreatingBot = false;
 
+        // D3: refresh the checklist underneath the success overlay so it already shows the
+        // correct «N из 4» (rows 1-2 checked) the moment the overlay dismisses onto Bots —
+        // the AddBotPanel is an overlay on the still-active Bots page, so OnEnable never
+        // re-fires. Fire-and-forget, null-guarded.
+        FirstStepsCard.Instance?.RefreshFromFacts();
+
         // Interactive success moment — final auth, bot now exists. D2: the moment renders on a
         // standalone full-screen overlay (channel-agnostic), so it no longer takes a channel arg.
         // This is the ONE creation-flow site — ShowAuthSuccess never re-fires it (its else branch
@@ -1519,6 +1525,10 @@ public partial class Manager : MonoBehaviour
     {
         if (isCreatingBot) CancelBotCreation();
         AddBotPanel.Instance?.Close();
+
+        // D1 belt-and-suspenders for the wizard back-out: refresh so the card hides if the
+        // back-out left zero bots, even if RefreshEmptyState does not re-run this frame.
+        FirstStepsCard.Instance?.RefreshFromFacts();
     }
 
     private void CancelBotCreation()
@@ -1710,6 +1720,10 @@ public partial class Manager : MonoBehaviour
                 PlayerPrefs.SetString(Manager.openBot.name + "WhatsappSyncUntil", whatsappSyncUntil.ToString());
                 PlayerPrefs.Save();
             }
+
+            // D3: a channel just authed on an existing bot → refresh the checklist so its
+            // «Подключить …» row flips to done immediately (fire-and-forget, null-guarded).
+            FirstStepsCard.Instance?.RefreshFromFacts();
 
             // Settings re-auth: the Manager.openBot bot already exists → interactive moment
             // with the files-exist fallback («Открыть чаты»). D2: the moment renders on the

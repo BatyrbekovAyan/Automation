@@ -758,6 +758,10 @@ public partial class BotSettings
             // pop) — the list is the upload confirmation, the button label
             // stays a constant call-to-action.
             CompletePendingFileRow(pendingRow, contentType);
+
+            // D3: the checklist's «Загрузить прайс-лист» row derives from UploadedFilesStore —
+            // refresh so it flips to done immediately (fire-and-forget, null-guarded).
+            FirstStepsCard.Instance?.RefreshFromFacts();
         }
     }
 

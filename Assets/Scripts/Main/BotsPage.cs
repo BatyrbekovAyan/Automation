@@ -41,6 +41,13 @@ public class BotsPage : MonoBehaviour
     {
         bool hasBots = botsParent != null && botsParent.childCount > 0;
         if (emptyState != null) emptyState.SetActive(!hasBots);
+
+        // D1 authority + return-to-Bots refresh: the checklist mirrors the live bot count.
+        // With zero bots the ShouldShow gate hides it so only the EmptyState renders (no
+        // overlap on the wizard back-out repro). Fire-and-forget; null-guarded no-op if the
+        // card is not yet awake.
+        FirstStepsCard.Instance?.RefreshFromFacts();
+
         if (!hasBots)
         {
             // Single zero-bot chokepoint (the Chats empty-state CTA also routes here
