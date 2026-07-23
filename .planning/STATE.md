@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
-status: ready_to_plan
-stopped_at: "Completed 09-05-PLAN.md (phase-closing owner gate — 09-HUMAN-UAT ALL 5 scenarios PASS both channels, «Вместе»=no-reply+unread+suggestions, «Авто» restores, '*' default suppresses, absence→reply, activation switch independent; clone deactivated, prod dormant). Phase 09 execution complete (5/5, Wave 3 done); next = phase verification."
-last_updated: "2026-07-22T20:15:00.000Z"
-last_activity: 2026-07-22 -- Completed 09-05 phase-closing HUMAN-UAT gate (Wave 3) — Phase 09 execution done
+status: paused
+stopped_at: Completed 11-08-PLAN.md (D2 gap-closure wave 1) — standalone SuccessOverlay above the auth pages; suite 1205/1205; next = 11-09 (D1+D3)
+last_updated: "2026-07-23T11:13:37.524Z"
+last_activity: 2026-07-22 — Phase 09 verified passed + completed (5/5 plans; SetReplyMode live SCLcpn6DMDG3Z4VN; HUMAN-UAT all 5 PASS both channels)
 progress:
   total_phases: 9
   completed_phases: 8
-  total_plans: 65
-  completed_plans: 69
-  percent: 89
+  total_plans: 68
+  completed_plans: 70
+  percent: 100
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 ## Current Position
 
 Phase: 11 (first-run-onboarding-flow)
-Plan: 6 of 7 complete
-Status: Executing — paused at owner device gate (11-HUMAN-UAT.md open; 11-07 remaining)
-Last activity: 2026-07-22 — Phase 09 verified passed + completed (5/5 plans; SetReplyMode live SCLcpn6DMDG3Z4VN; HUMAN-UAT all 5 PASS both channels)
+Plan: gap-closure round 1 (D1–D3) — 11-08 (D2) complete; 11-09 (D1+D3), 11-10 (re-verify) remain (originals 11-01..11-06 done; 11-07 = owner UAT gate)
+Status: Executing — gap-closure round 1; 11-08 done, 11-09 next
+Last activity: 2026-07-23 — Completed 11-08 (D2 gap-closure wave 1): «Бот подключён!» relocated onto a standalone SuccessOverlay above the auth pages; suite 1205/1205 green
 
 Progress: [██████████] 100%
 
@@ -128,6 +128,7 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [Phase 10]: 10-02 client «Вместе» debounce (BATCH-03) — pure STATEFUL IncomingDebounceGate (WindowSeconds=2.5f, injectable clock, no UnityEngine; first stateful member of the OpenChatLivePollGate pure-gate family) coalesces rapid incomings: SuggestionsController.HandleLive now Pokes the ~2.5s window + captures _pendingIncomingText instead of firing per-fragment, and a self-gating DebounceLoop (0.25s tick) fires the ONE coalesced IssueRequest when it settles. Cancel + _pendingIncomingText=null at ALL 4 lifecycle sites (OnDisable + StopCoroutine / ResetForNoOpenChat / RestoreForActiveChat at the top / HandleToggle OFF) alongside the existing _requestSeq++ — RestoreForActiveChat (same-bot chat switch A→B) is the BLOCKER the seq guard cannot cover (it catches a chat-switched RENDER, not a stale lastIncomingText baked into the payload at fire time; T-10-02-01). Manual refresh + card-pick stay IMMEDIATE (INT-03/04, untouched); NO network added (combine is free — payload already ships last <=12 msgs; T-10-02-03 accept). TDD: RED 87096bd (CS0103 compile-fail) -> GREEN c426c41 (6/6); Task 2 e75fea2; full EditMode 1197/1197 green (1191+6) via the in-Editor bridge (Editor was open — orchestrator brief stale; both editor-asm stamp + Assembly-CSharp.dll mtime advanced, real recompile). Live both-channel coalesce e2e + WindowSeconds tune ride the owner-run 10-04.
 - [Phase 10] 10-03 live runData gate PASSED both channels: two-fragment burst -> ONE combined reply (earlier fragment aborts at Is Latest?); id-equality holds (WA jid-hex, TG bare numeric) on all 6 winners; fresh clones inherit the debounce. Window stays 8s (no tuning). Two live-only blocking deviations fixed: n8n 2.27.4 binaryMode orchestrator 400 (d594f17: fix-orchestrator-settings.py strips binaryMode from the clone payload in all 4 Create/Edit orchestrators, --canonical+--live) and the still-open Phase-9 reply_mode_flags DDL (owner-applied mid-gate, fails-open). combinedText-4-line-repeat in scenario A is the correct run-walk over an un-replied burst, NOT a defect.
 - [Phase 10] 10-04 owner UAT gate CLOSED partial (2026-07-22): scenarios 1-3 PASS — auto-reply combine behaviorally confirmed BOTH channels (multi-fragment → ONE combined reply; single message → one reply; humanizer pauses unchanged, ~8s accepted). Scenario 4 (suggestions coalesce) BLOCKED by open Phase-9 09-04 SetReplyMode deploy (in-app Semi-auto toggle 404'd at Manager.ReplyModeSync.cs:105 — expected, not a Phase-10 defect; BATCH-03 stays EditMode-covered 1197/1197). Scenario 5 (semi-auto skips path) DEFERRED to post-Phase-9 by explicit owner decision. Owner authorized closing the plan now; scenarios 4-5 tracked as UAT debt, re-verify alongside 09-04/09-05. Ready for /gsd-secure-phase 10.
+- [Phase 11]: 11-08 D2 gap-closure — «Бот подключён!» success moment relocated OUT of the auth screens onto a NEW standalone full-screen SuccessOverlay (Canvas-level last sibling → renders above the auth pages; m_Father = root Canvas RectTransform 42635013). Ten per-channel waSuccess*/tgSuccess* fields collapsed to ONE set; ShowInteractiveSuccessMoment(Bot) drops useTelegram + the authPage.SetActive(true) hack (deactivates both auth hierarchies up front); parameterless CloseSuccessAndOverlay. Builder tears down both nested SuccessCta clusters (DIRECT-CHILD-only teardown so the same-named nested panels survive) + builds one root-Canvas overlay (GetComponentInParent<Canvas>(true).rootCanvas) + 6-field re-stamp; trust cards + auth GetChild(3/4/5) byte-identical. Scene committed alone a4fba79; suite 1205/1205 green. Device D2 verdict rides 11-10.
 
 ### Pending Todos
 
@@ -230,11 +231,12 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 10 P03 | owner-gate | 2 tasks | 5 files |
 | Phase 10 P04 | owner-gate | 2 tasks | 1 files |
 | Phase 09 P04 | owner-gate | 3 tasks | 6 files |
+| Phase 11 P08 | 26 min | 3 tasks | 3 files |
 
 ## Session Continuity
 
-Last session: 2026-07-22T15:04:39.000Z
-Stopped at: Completed 09-04-PLAN.md (owner gate — server side LIVE: SetReplyMode SCLcpn6DMDG3Z4VN, fail-closed runData both channels, fresh-bot gate inherited). Wave 2 complete; next = 09-05.
+Last session: 2026-07-23T11:13:37.436Z
+Stopped at: Completed 11-08-PLAN.md (D2 gap-closure wave 1) — standalone SuccessOverlay above the auth pages; suite 1205/1205; next = 11-09 (D1+D3)
 Resume file: None
 
 **Planned Phase:** 09 (semi-auto-suppression) — 5 plans — Wave 2 complete; 09-05 (behavioral HUMAN-UAT, closes the phase) next
