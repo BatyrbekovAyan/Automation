@@ -1,14 +1,18 @@
 ---
-status: diagnosed
+status: passed
 phase: 11-first-run-onboarding-flow
 source: [11-07-PLAN.md]
 requirements: [ONB-01, ONB-02, ONB-03, ONB-04, ONB-05]
 started: "2026-07-18"
+updated: "2026-07-23"
 ---
 
 # Phase 11 — Human UAT Gate: First-Run Onboarding Flow (ONB-01…05 device pass)
 
-**Status:** OPEN (owner-run) — this gate CLOSES Phase 11.
+**Status:** RUN 2026-07-18 (Round 1 → **ISSUES**, defects D1–D3) → gap closure `11-08`/`11-09`
+(+ Round-2 addendum `11-10`) → Round 2 RUN 2026-07-23 — **Overall: PASS** (owner replied
+**«approved»** 2026-07-23; D1–D3 verified fixed, no new defects). **This gate CLOSED Phase 11** —
+ONB-01..ONB-05 are proven.
 
 Phase 11 is **code-complete** once the agent-side work is committed and the
 EditMode suite is green: the pure onboarding logic (`OnboardingGate` /
@@ -210,6 +214,10 @@ do NOT hand-patch fixes in this runbook.
 
 ## Round 2 re-verify (D1–D3)
 
+> **Results recorded 2026-07-23:** the owner ran Round 2 and replied **«approved»** — D1–D3
+> verified fixed, no new defects reported. The ticks below are a transcription of the owner's
+> verdict (authoring shipped them blank).
+
 > **Authoring this addendum was autonomous; RUNNING it is the owner gate — every checkbox below
 > ships blank.** This is a **FOCUSED** re-verify of the three Round-1 defects (D1–D3) closed by
 > gap plans **11-08** (D2 standalone success overlay) and **11-09** (D1 zero-bot visibility + D3
@@ -225,17 +233,17 @@ code-entry UI** (title / code field / buttons / trust card all showing beneath).
 it to a **standalone full-screen `SuccessOverlay`** — a Canvas-level last sibling that renders
 ABOVE the auth pages, with both auth hierarchies deactivated up front.
 
-- [ ] On a **successful auth — verify BOTH a fresh creation auth AND a Settings → re-auth** —
+- [x] On a **successful auth — verify BOTH a fresh creation auth AND a Settings → re-auth** —
       «Бот подключён!» shows on a **clean standalone FULL-SCREEN overlay** with **NOTHING** of the
       code UI (screen title, code field, buttons, «Это безопасно» trust card) visible beneath it.
-      — **PASS** ☐  **FAIL** ☐
-- [ ] The primary **«Загрузить прайс-лист»** deep-links into **that bot's «Прайс-листы»** tab;
-      **«Позже»** dismisses cleanly to the **Bots** page (nothing lingers). — **PASS** ☐  **FAIL** ☐
-- [ ] On a **re-auth of a bot that ALREADY has a price list**, the primary CTA reads **«Открыть
-      чаты»** (files-exist fallback), not «Загрузить прайс-лист». — **PASS** ☐  **FAIL** ☐
-- [ ] The **green check still pops** (DOScale 0.9→1, OutBack). — **PASS** ☐  **FAIL** ☐
-- [ ] A **«both»-channel creation** (WhatsApp + Telegram in one wizard pass) shows the success
-      moment **exactly ONCE** (after the bot exists), not twice. — **PASS** ☐  **FAIL** ☐
+      — **PASS** ☑  **FAIL** ☐
+- [x] The primary **«Загрузить прайс-лист»** deep-links into **that bot's «Прайс-листы»** tab;
+      **«Позже»** dismisses cleanly to the **Bots** page (nothing lingers). — **PASS** ☑  **FAIL** ☐
+- [x] On a **re-auth of a bot that ALREADY has a price list**, the primary CTA reads **«Открыть
+      чаты»** (files-exist fallback), not «Загрузить прайс-лист». — **PASS** ☑  **FAIL** ☐
+- [x] The **green check still pops** (DOScale 0.9→1, OutBack). — **PASS** ☑  **FAIL** ☐
+- [x] A **«both»-channel creation** (WhatsApp + Telegram in one wizard pass) shows the success
+      moment **exactly ONCE** (after the bot exists), not twice. — **PASS** ☑  **FAIL** ☐
 
 > **Round-2 repro path (D2):** reach the final auth on either channel → on success the full-screen
 > «Бот подключён!» must cover everything with nothing beneath; «Позже» dismisses cleanly; repeat on
@@ -248,10 +256,10 @@ rendered, **overlapping**. 11-09 added the pure `FirstStepsCardVisibility.Should
 checklistDone)` gate (hide via CanvasGroup, root stays active) so the EmptyState owns the zero-bot
 screen.
 
-- [ ] With **ZERO bots** — finish the carousel → the wizard opens → **press back** — **ONLY the
-      EmptyState renders**; the «Первые шаги» card is **NOT visible** (no overlap). — **PASS** ☐
+- [x] With **ZERO bots** — finish the carousel → the wizard opens → **press back** — **ONLY the
+      EmptyState renders**; the «Первые шаги» card is **NOT visible** (no overlap). — **PASS** ☑
       **FAIL** ☐
-- [ ] The «Первые шаги» card **first appears once ≥1 bot exists**. — **PASS** ☐  **FAIL** ☐
+- [x] The «Первые шаги» card **first appears once ≥1 bot exists**. — **PASS** ☑  **FAIL** ☐
 
 > **Round-2 repro path (D1):** carousel → «Создать бота» → wizard → back → land on Боты with zero
 > bots → confirm the EmptyState alone shows, no «Первые шаги» card underneath/over it.
@@ -263,12 +271,12 @@ navigated away and back** (refresh only on re-enable). 11-09 added five fire-and
 `RefreshFromFacts()` hooks (bot-created, channel-authed, wizard back-out, price-list upload,
 return-to-Bots) so the card is a live mirror.
 
-- [ ] **Immediately after creating a bot** (no navigate-away-and-back), the card shows **«2 из 4»**
-      with **rows 1-2 checked**. — **PASS** ☐  **FAIL** ☐
-- [ ] **Uploading a price list** flips **«Загрузить прайс-лист»** to done and increments **«N из 4»**
-      live, **without a tab bounce**. — **PASS** ☐  **FAIL** ☐
-- [ ] After the **first outgoing bot reply** at **4/4** the card **hides** and **stays hidden on
-      relaunch** (permanent completion latch). — **PASS** ☐  **FAIL** ☐
+- [x] **Immediately after creating a bot** (no navigate-away-and-back), the card shows **«2 из 4»**
+      with **rows 1-2 checked**. — **PASS** ☑  **FAIL** ☐
+- [x] **Uploading a price list** flips **«Загрузить прайс-лист»** to done and increments **«N из 4»**
+      live, **without a tab bounce**. — **PASS** ☑  **FAIL** ☐
+- [x] After the **first outgoing bot reply** at **4/4** the card **hides** and **stays hidden on
+      relaunch** (permanent completion latch). — **PASS** ☑  **FAIL** ☐
 
 > **Round-2 repro path (D3):** create a bot → return to Боты → rows 1-2 already checked («2 из 4»)
 > without navigating away; upload a price list → row 3 («Загрузить прайс-лист») checks live.
@@ -277,27 +285,30 @@ return-to-Bots) so the card is a live mirror.
 
 Confirm the relocation (11-08) and the refresh hooks (11-09) broke nothing that already worked.
 
-- [ ] **Both auth flows** behave exactly as before — WhatsApp pairing-code; Telegram phone → code →
+- [x] **Both auth flows** behave exactly as before — WhatsApp pairing-code; Telegram phone → code →
       (optional 2FA) — **no shift/break** from the standalone-overlay relocation or the hooks. —
-      **PASS** ☐  **FAIL** ☐
-- [ ] The **Bots EmptyState** + the **AddBotPanel auto-open** (header `+`, empty-state CTA, zero-bot
-      auto-open) behave as before. — **PASS** ☐  **FAIL** ☐
-- [ ] The **EditMode suite is green** — record the count (expected **1209 / 1209**: the 1205 v1.2
+      **PASS** ☑  **FAIL** ☐
+- [x] The **Bots EmptyState** + the **AddBotPanel auto-open** (header `+`, empty-state CTA, zero-bot
+      auto-open) behave as before. — **PASS** ☑  **FAIL** ☐
+- [x] The **EditMode suite is green** — record the count (expected **1209 / 1209**: the 1205 v1.2
       baseline + the 4 new D1 `FirstStepsCardVisibility` tests from 11-09; the plan's earlier
       "1169" figure predates the v1.2 Phase 9/10 tests that lifted the baseline from 1165 to 1205):
-      ___ / ___. — **PASS** ☐  **FAIL** ☐
+      **1209** / **1209**. — **PASS** ☑  **FAIL** ☐
 
 ### Round 2 Overall
 
-**Round 2 Overall:** ☐ PASS  ☐ ISSUES
+**Round 2 Overall:** ☑ PASS  ☐ ISSUES
 
-- On a **green Round-2 (D1–D3 all PASS + zero-regression PASS)**, **Phase 11 (First-Run Onboarding
-  Flow) is complete** — reply **"approved"** to the executor checkpoint.
-- On **ISSUES**, paste the residual defects (screen + expected vs actual) to spin another
-  gap-closure round via `/gsd-plan-phase 11 --gaps`; do NOT hand-patch fixes in this runbook.
+- **Result:** PASS — **Round 2 approved by owner 2026-07-23** («approved»). D1–D3 verified fixed:
+  D2 standalone «Бот подключён!» overlay clean on both channels + settings re-auth (11-08); D1
+  EmptyState alone owns the zero-bot screen, card appears only with ≥1 bot (11-09); D3 checklist
+  mirrors facts live with no navigate-away bounce (11-09). Zero-regression re-check green; no new
+  defects reported.
+- **EditMode suite:** 1209 / 1209
+- **Phase 11 (First-Run Onboarding Flow) is complete** — ONB-01..ONB-05 proven on device
+  (Round-1 arc: ISSUES D1–D3 → gap plans 11-08..11-10 → Round-2 PASS).
 
 ---
 *Phase: 11-first-run-onboarding-flow — device/Game-view gate for the full onboarding surface*
-*(carousel `11-02/03`, trust blocks + success sheets `11-04/05`, checklist `11-06`). This gate closes the phase.*
-</content>
-</invoke>
+*(carousel `11-02/03`, trust blocks + success sheets `11-04/05`, checklist `11-06`, gap round `11-08..11-10`).*
+*This gate CLOSED the phase — Round 2 PASS, owner-approved 2026-07-23.*
