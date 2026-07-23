@@ -66,11 +66,31 @@ public class FirstStepsCard : MonoBehaviour
     private const string CardTitle = "Первые шаги";
     private const string Row4Hint = "Попросите знакомого написать вам — и посмотрите, как бот ответит";
 
+    /// <summary>Set in Awake so external fact-change hooks (bot created, channel
+    /// authed, wizard back-out, price-list uploaded, return to Bots) can call
+    /// <see cref="RefreshFromFacts"/> without a serialized reference. The card root is
+    /// always active in the scene, so Awake runs and Instance is always resolvable.</summary>
+    public static FirstStepsCard Instance;
+
+    private CanvasGroup _cg;
     private VerticalLayoutGroup _botsVlg;
     private int _origListTopPadding = -1;
     private bool _subscribed;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
+
+    private void Awake()
+    {
+        Instance = this;
+        _cg = GetComponent<CanvasGroup>();
+        if (_cg == null) _cg = gameObject.AddComponent<CanvasGroup>();
+    }
+
+    /// <summary>External refresh entry — invoked by every fact-changing moment so the
+    /// card is a live mirror of onboarding progress without waiting for OnEnable (the
+    /// AddBotPanel is an overlay on the still-active Bots page, so OnEnable never re-fires
+    /// after bot creation — D3).</summary>
+    public void RefreshFromFacts() => Refresh();
 
     private void OnEnable()
     {
@@ -120,15 +140,22 @@ public class FirstStepsCard : MonoBehaviour
 
     private void Refresh()
     {
-        // Permanent hide: once 4/4 latched, never resurrect even if data later changes.
-        if (PlayerPrefs.GetInt(OnboardingKeys.ChecklistDone, 0) == 1)
+        bool checklistDone = PlayerPrefs.GetInt(OnboardingKeys.ChecklistDone, 0) == 1;
+        bool botExists = botsParent != null && botsParent.childCount > 0;
+
+        // Single visibility gate — covers BOTH the D1 zero-bot hide (the EmptyState is the
+        // step-1 guidance) and the permanent 4/4 hide (ChecklistDone latched). The root
+        // stays ACTIVE so Instance/RefreshFromFacts survive; visibility is a CanvasGroup
+        // toggle only (a self-SetActive(false) root could never be re-shown by a hook).
+        if (!FirstStepsCardVisibility.ShouldShow(botExists, checklistDone))
         {
+            SetContentVisible(false);
             RestoreListPadding();
-            gameObject.SetActive(false);
             return;
         }
 
-        bool botExists = botsParent != null && botsParent.childCount > 0;
+        SetContentVisible(true);
+
         Bot bot = botExists ? botsParent.GetChild(0).GetComponent<Bot>() : null;
 
         bool isWa = bot != null && PlayerPrefs.GetInt(bot.name + "isOnWhatsapp", 1) == 1;
@@ -157,12 +184,14 @@ public class FirstStepsCard : MonoBehaviour
         if (hintLabel != null) hintLabel.text = Row4Hint;
 
         // Latch completion → permanent hide (spec: card never resurfaces after 4/4).
+        // ChecklistDone is now set, so the ShouldShow gate above keeps it hidden forever
+        // on every subsequent Refresh; hiding via CanvasGroup keeps the root reachable.
         if (FirstStepsChecklist.AllDone(steps))
         {
             PlayerPrefs.SetInt(OnboardingKeys.ChecklistDone, 1);
             PlayerPrefs.Save();
             RestoreListPadding();
-            gameObject.SetActive(false);
+            SetContentVisible(false);
         }
     }
 
@@ -273,6 +302,18 @@ public class FirstStepsCard : MonoBehaviour
         _botsVlg.padding.top = _origListTopPadding;
         LayoutRebuilder.MarkLayoutForRebuild(botsParent as RectTransform);
         _origListTopPadding = -1;
+    }
+
+    // ── Visibility (CanvasGroup, root stays active) ────────────────────────────
+
+    // Hiding via CanvasGroup (not SetActive) keeps the root active so Instance and
+    // RefreshFromFacts always resolve. alpha 0 + non-interactive = hidden + click-through.
+    private void SetContentVisible(bool visible)
+    {
+        if (_cg == null) return;
+        _cg.alpha = visible ? 1f : 0f;
+        _cg.blocksRaycasts = visible;
+        _cg.interactable = visible;
     }
 
     private static Color Hex(string hex)
