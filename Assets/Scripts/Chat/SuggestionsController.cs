@@ -211,12 +211,28 @@ public class SuggestionsController : MonoBehaviour
 
     private void HandleLive(List<MessageViewModel> msgs)
     {
-        if (!_semiAutoOn) return;                              // SEMI-03
-        if (msgs == null || !msgs.Exists(m => m != null && m.isIncoming)) return;   // ignore outgoing echoes (Pitfall 7)
-        for (int i = 0; i < msgs.Count; i++)                   // accumulate EVERY fragment, in arrival order
-            if (msgs[i] != null && msgs[i].isIncoming)
-                _pendingIncomingText = AppendBurst(_pendingIncomingText, msgs[i].text);
-        _debounce.Poke(Time.time);                            // reset the ~2.5s window instead of firing per-fragment (BATCH-03)
+        if (!_semiAutoOn || msgs == null) return;              // SEMI-03
+        bool sawIncoming = false;
+        for (int i = 0; i < msgs.Count; i++)                   // in arrival order — boundary-aware
+        {
+            var m = msgs[i];
+            if (m == null) continue;
+            if (m.isIncoming)
+            {
+                _pendingIncomingText = AppendBurst(_pendingIncomingText, m.text);
+                sawIncoming = true;
+            }
+            else
+            {
+                // An outgoing echo (owner or bot replied) BOUNDS the un-replied run: the pending
+                // burst is answered — drop it and any armed window so no stale fire follows.
+                // (This is the run boundary; firing suggestions for an answered burst is noise.)
+                _pendingIncomingText = null;
+                _debounce.Cancel();
+                sawIncoming = false;
+            }
+        }
+        if (sawIncoming) _debounce.Poke(Time.time);           // reset the ~2.5s window instead of firing per-fragment (BATCH-03)
     }
 
     /// <summary>Pure burst accumulator: append an incoming fragment to the pending coalesced text
@@ -243,10 +259,13 @@ public class SuggestionsController : MonoBehaviour
             yield return new WaitForSecondsRealtime(0.25f);   // fresh instance each loop (codebase idiom)
             if (!_semiAutoOn) continue;                       // cheap guard; do not fire when off
             if (_debounce.ShouldFire(Time.time))
-            {
-                IssueRequest(steerTowardText: null, lastIncomingText: _pendingIncomingText);   // coalesced single fire (INT-02)
-                _pendingIncomingText = null;                   // burst delivered — a later burst starts clean, no re-send
-            }
+                // NOTE: _pendingIncomingText deliberately survives the fire — it mirrors the
+                // UN-REPLIED trailing run, and a burst that straddles the window fires twice; the
+                // second fire must still carry the earlier fragments (the payload's history snapshot
+                // lags live messages, and the server dedups re-sent lines — observed live: exec 1168
+                // lost the roses question when the fire cleared it). It clears only at a run
+                // boundary: an outgoing reply (HandleLive) or the four lifecycle cancel sites.
+                IssueRequest(steerTowardText: null, lastIncomingText: _pendingIncomingText);   // coalesced fire (INT-02)
         }
     }
 
