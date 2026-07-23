@@ -227,8 +227,11 @@ def main():
             if args.dry_run:
                 print(f"[2] {label:38} would replace: {', '.join(stale)}")
                 continue
+            # GET returns settings.binaryMode, but PUT's schema rejects it as an
+            # unknown property (n8n API version mismatch) — strip before sending back.
+            settings = {k: v for k, v in w["settings"].items() if k != "binaryMode"}
             body = {"name": w["name"], "nodes": patched,
-                    "connections": w["connections"], "settings": w["settings"]}
+                    "connections": w["connections"], "settings": settings}
             status, resp = http("PUT", f"{N8N_API}/workflows/{w['id']}",
                                 n8n_headers(n8n_key), body)
             if status == 200:

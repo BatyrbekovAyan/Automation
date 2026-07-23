@@ -1922,6 +1922,8 @@ MonoBehaviour:
     duration: 0
     videoRotation: 0
     isSticker: 0
+    isVideoNote: 0
+    isGif: 0
     senderName: 
     expireTime: 0
     fileSize: 0

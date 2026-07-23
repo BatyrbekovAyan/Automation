@@ -1,0 +1,3423 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Артель</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     ARTEL — DESIGN TOKENS
+     ============================================================ */
+  :root {
+    /* --- Color tokens --- */
+    --color-paper: #F7F2E9;
+    --color-surface: #FFFCF5;
+    --color-ink: #2A2118;
+    --color-umber: #7C6F5C;
+    --color-hairline: #E6DCC8;
+    --color-rust: #EA580C;
+    --color-rust-tint: #FCE0C8;
+    --color-rust-rgb: 234, 88, 12;
+    --color-dormant: #C9BFA9;
+    --color-danger: #B3261E;
+    --color-scrim: rgba(42, 33, 24, 0.45);
+
+    /* --- Status colors (Сводка outcomes) --- */
+    --status-zayavka: #5B7A4F;      /* Заявка */
+    --status-vladelets: #CAA22B;    /* Нужен владелец */
+    --status-dialog: #4C6B8A;       /* В диалоге */
+    --status-silent: #948A7C;       /* Клиент замолчал */
+    --status-closed: #4F493F;       /* Вопрос закрыт */
+
+    /* --- Font family / weights --- */
+    --font-family: 'Golos Text', 'Helvetica Neue', Arial, sans-serif;
+    --weight-medium: 500;
+    --weight-semibold: 600;
+
+    /* --- Type scale (size / line-height) --- */
+    --text-caption-size: 13px;
+    --text-caption-line: 18px;
+    --text-body-size: 15px;
+    --text-body-line: 22px;
+    --text-title-size: 17px;
+    --text-title-line: 24px;
+    --text-headline-size: 24px;
+    --text-headline-line: 30px;
+
+    /* --- Spacing scale (8pt grid, 8 stops) --- */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+    --space-6: 32px;
+    --space-7: 48px;
+    --space-8: 64px;
+
+    /* --- Radii --- */
+    --radius-sm: 6px;    /* tags, pills, chips, status dots square-ish */
+    --radius-md: 10px;   /* buttons, inputs, list-row touch targets — hard cap for CTAs */
+    --radius-lg: 16px;   /* cards, bubbles, product/file/item rows */
+    --radius-xl: 24px;   /* sheets, modals, dialogs, floating panels */
+    --radius-full: 50%;  /* avatars, seal-ring, status dots */
+
+    /* --- Shadows (always Ink-tinted, never neutral gray) --- */
+    --shadow-resting: 0 1px 2px rgba(42, 33, 24, 0.08);
+    --shadow-raised: 0 1px 2px rgba(42, 33, 24, 0.08), 0 10px 28px rgba(42, 33, 24, 0.14);
+    --shadow-pressed: 0 1px 1px rgba(42, 33, 24, 0.10);
+    --shadow-cta-glow: 0 1px 2px rgba(42, 33, 24, 0.08), 0 8px 20px rgba(var(--color-rust-rgb), 0.20);
+
+    /* --- Structural (foundation-only, not part of identity spec) --- */
+    --tab-bar-height: 64px;
+    --phone-w: 390px;
+    --phone-h: 844px;
+    --phone-bezel: 12px;
+    --phone-radius-outer: 54px;
+    --phone-radius-inner: 42px;
+  }
+
+  /* ============================================================
+     PALETTE VARIANTS — for side-by-side comparison via the swatch
+     switcher (top-right of the phone screen). Each block overrides
+     only the accent + any status color that would otherwise collide
+     with it in hue; everything else (neutrals, other statuses,
+     spacing, type, radii, shadow recipe) stays identical across
+     palettes so the comparison isolates color alone.
+     ============================================================ */
+  body[data-theme="terracotta"] {
+    --color-rust: #9C3E1D;
+    --color-rust-tint: #F1DECD;
+    --color-rust-rgb: 156, 62, 29;
+  }
+  body[data-theme="orange"] {
+    --color-rust: #EA580C;
+    --color-rust-tint: #FCE0C8;
+    --color-rust-rgb: 234, 88, 12;
+  }
+  body[data-theme="forest"] {
+    --color-rust: #1F6F5C;
+    --color-rust-tint: #DCEEE7;
+    --color-rust-rgb: 31, 111, 92;
+    /* Заявка pulled toward olive/grass so it stays distinguishable from a teal-forest accent */
+    --status-zayavka: #74923F;
+  }
+  body[data-theme="indigo"] {
+    --color-rust: #35408F;
+    --color-rust-tint: #DDE1F5;
+    --color-rust-rgb: 53, 64, 143;
+    /* В диалоге shifted toward teal-gray so it stays distinguishable from an indigo accent */
+    --status-dialog: #5C8A80;
+  }
+  body[data-theme="plum"] {
+    --color-rust: #8C3F6B;
+    --color-rust-tint: #F1DCE7;
+    --color-rust-rgb: 140, 63, 107;
+  }
+
+  /* ============================================================
+     MINIMAL RESET
+     ============================================================ */
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body, h1, h2, h3, h4, p, ul, ol, figure { margin: 0; }
+  ul, ol { list-style: none; padding: 0; }
+  img, svg { display: block; max-width: 100%; }
+  a { color: inherit; text-decoration: none; }
+  button, input, textarea, select { font: inherit; color: inherit; }
+  button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  input, textarea { border: none; outline: none; background: none; }
+
+  /* ============================================================
+     BASE TYPOGRAPHY
+     ============================================================ */
+  body {
+    font-family: var(--font-family);
+    font-weight: var(--weight-medium);
+    font-size: var(--text-body-size);
+    line-height: var(--text-body-line);
+    color: var(--color-ink);
+    background: var(--color-paper);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .text-caption { font-size: var(--text-caption-size); line-height: var(--text-caption-line); font-weight: var(--weight-medium); }
+  .text-body     { font-size: var(--text-body-size);    line-height: var(--text-body-line);    font-weight: var(--weight-medium); }
+  .text-title    { font-size: var(--text-title-size);   line-height: var(--text-title-line);   font-weight: var(--weight-semibold); }
+  .text-headline { font-size: var(--text-headline-size);line-height: var(--text-headline-line);font-weight: var(--weight-semibold); }
+
+  .stat-number {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" on;
+  }
+
+  /* ============================================================
+     INTERACTIVE DEFAULTS — transitions + press states
+     ============================================================ */
+  button, a, .tab-btn, .btn, .card, .tappable {
+    transition: transform 0.15s ease, opacity 0.15s ease,
+                background-color 0.15s ease, box-shadow 0.15s ease,
+                border-color 0.15s ease, color 0.15s ease;
+  }
+  button:active, .tab-btn:active, .btn:active, .card:active, .tappable:active {
+    transform: scale(0.98);
+    box-shadow: var(--shadow-pressed);
+  }
+
+  /* ============================================================
+     PAGE BACKDROP + PHONE FRAME
+     ============================================================ */
+  .app-backdrop {
+    min-height: 100vh;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-7) var(--space-4);
+    background:
+      radial-gradient(circle at 50% 0%, #EFE9DC 0%, #DDD5C4 100%);
+  }
+
+  .phone-shell {
+    position: relative;
+    width: var(--phone-w);
+    height: var(--phone-h);
+    background: linear-gradient(160deg, #211a13 0%, #14100b 100%);
+    border-radius: var(--phone-radius-outer);
+    padding: var(--phone-bezel);
+    box-shadow:
+      0 2px 4px rgba(20, 16, 11, 0.3),
+      0 40px 80px rgba(20, 16, 11, 0.35),
+      0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+    flex-shrink: 0;
+  }
+
+  .phone-speaker {
+    position: absolute;
+    top: var(--phone-bezel);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 84px;
+    height: 22px;
+    background: #14100b;
+    border-radius: 0 0 16px 16px;
+    z-index: 5;
+  }
+
+  .phone-screen {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: var(--color-paper);
+    border-radius: var(--phone-radius-inner);
+    overflow: clip;
+  }
+
+  /* ============================================================
+     CONTENT VIEWPORT + TAB SCREENS
+     ============================================================ */
+  .content-viewport {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    bottom: var(--tab-bar-height);
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .content-viewport::-webkit-scrollbar { display: none; }
+  .content-viewport.scroll-locked { overflow: hidden; }
+
+  .screen {
+    display: none;
+    width: 100%;
+    min-height: 100%;
+    background: var(--color-paper);
+  }
+  .screen.active { display: block; }
+
+  @keyframes screenFadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .screen.screen-anim { animation: screenFadeIn 0.18s ease; }
+
+  /* ============================================================
+     BOTTOM TAB BAR
+     ============================================================ */
+  .tab-bar {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: var(--tab-bar-height);
+    display: flex;
+    align-items: stretch;
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-hairline);
+    z-index: 30;
+  }
+
+  .tab-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
+    color: var(--color-umber);
+  }
+
+  .tab-btn svg {
+    width: 24px;
+    height: 24px;
+    stroke: currentColor;
+    fill: none;
+    transition: transform 0.15s ease, stroke-width 0.15s ease;
+  }
+  .tab-btn svg path,
+  .tab-btn svg rect,
+  .tab-btn svg circle {
+    stroke-width: 1.75;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .tab-btn span {
+    font-size: var(--text-caption-size);
+    line-height: var(--text-caption-line);
+    font-weight: var(--weight-medium);
+  }
+
+  .tab-btn.active {
+    color: var(--color-rust);
+  }
+  .tab-btn.active svg {
+    transform: scale(1.08);
+  }
+  .tab-btn.active svg path,
+  .tab-btn.active svg rect,
+  .tab-btn.active svg circle {
+    stroke-width: 2.1;
+  }
+  .tab-btn.active span {
+    font-weight: var(--weight-semibold);
+  }
+
+  /* ============================================================
+     OVERLAY SCREENS (drill-in: conversation, settings)
+     ============================================================ */
+  .overlay-screen {
+    position: absolute;
+    inset: 0;
+    background: var(--color-paper);
+    transform: translateX(100%);
+    transition: transform 0.32s cubic-bezier(0.22, 0.9, 0.3, 1);
+    z-index: 40;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .overlay-screen.open {
+    transform: translateX(0);
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  /* ============================================================
+     DIALOG SYSTEM
+     ============================================================ */
+  .dialog-backdrop {
+    position: absolute;
+    inset: 0;
+    background: var(--color-scrim);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    z-index: 80;
+    pointer-events: none;
+  }
+  .dialog-backdrop.open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  #dialogs-root {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-5);
+    z-index: 90;
+    pointer-events: none;
+  }
+
+  .dialog-card {
+    width: 100%;
+    max-width: 320px;
+    background: var(--color-surface);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-raised);
+    padding: var(--space-5);
+    opacity: 0;
+    transform: scale(0.94) translateY(6px);
+    transition: opacity 0.2s ease, transform 0.22s cubic-bezier(0.22, 0.9, 0.3, 1);
+    pointer-events: none;
+    display: none;
+  }
+  .dialog-card.open {
+    display: block;
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    pointer-events: auto;
+  }
+
+  
+/* ============================================================
+   БОТЫ — screen layout
+   ============================================================ */
+.boti-screen {
+  position: relative;
+  padding: var(--space-6) var(--space-4) var(--space-5);
+  min-height: 100%;
+}
+
+.boti-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+
+.boti-title { color: var(--color-ink); }
+
+.boti-demo-cycle {
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 500;
+  color: var(--color-umber);
+  opacity: 0.4;
+  padding: 4px 6px;
+  letter-spacing: 0.02em;
+}
+.boti-demo-cycle:active {
+  opacity: 0.7;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ============================================================
+   STATE SWITCHING (populated / empty / loading)
+   ============================================================ */
+.boti-state { display: none; }
+.boti-screen[data-state="populated"] .boti-state--populated { display: block; }
+.boti-screen[data-state="empty"] .boti-state--empty { display: block; }
+.boti-screen[data-state="loading"] .boti-state--loading { display: block; }
+
+/* ============================================================
+   BOT LIST + CARD
+   ============================================================ */
+.bot-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.bot-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-resting);
+  padding: var(--space-4);
+  cursor: pointer;
+}
+.bot-card-skeleton { cursor: default; }
+
+.bot-card-identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.bot-name { color: var(--color-ink); }
+
+.bot-chips-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.chip-business {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--color-paper);
+  border: 1px solid var(--color-hairline);
+  color: var(--color-umber);
+}
+
+.channel-seal {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-resting);
+  flex-shrink: 0;
+}
+.channel-seal--wa { background: var(--color-umber); }
+.channel-seal--tg { background: var(--color-ink); }
+.channel-seal svg { width: 13px; height: 13px; }
+
+.stitch-divider {
+  border: none;
+  border-top: 1.5px dashed var(--color-hairline);
+  margin: var(--space-4) 0;
+}
+
+.bot-card-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.status-cluster {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* ============================================================
+   RUN-STATE PILL (ring-dial glyph reused)
+   ============================================================ */
+.run-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.run-pill-ring { width: 14px; height: 14px; flex-shrink: 0; }
+
+.run-pill--live { background: var(--color-rust-tint); color: var(--color-rust); }
+.run-pill--live .run-pill-ring circle { fill: var(--color-rust); }
+
+.run-pill--paused { background: var(--color-dormant); color: var(--color-umber); }
+.run-pill--paused .run-pill-ring circle { fill: none; stroke: var(--color-umber); stroke-width: 1.75; }
+
+/* ============================================================
+   PAUSE/RESUME SWITCH (thumb IS the ring-dial glyph)
+   ============================================================ */
+.run-switch {
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-hairline);
+  position: relative;
+  flex-shrink: 0;
+  padding: 0;
+}
+.run-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  transition: transform 0.22s cubic-bezier(0.22, 0.9, 0.3, 1);
+}
+.run-switch.is-on .run-switch-thumb { transform: translateX(20px); }
+
+.run-switch-thumb-glyph {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  box-sizing: border-box;
+  background: transparent;
+  border: 1.75px solid var(--color-umber);
+  transition: background-color 0.18s ease, border-color 0.18s ease;
+}
+.run-switch.is-on .run-switch-thumb-glyph {
+  background: var(--color-rust);
+  border-color: var(--color-rust);
+}
+
+@keyframes stampImpression {
+  0% { transform: scale(0.75); }
+  55% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+.stamp-impression { animation: stampImpression 0.22s cubic-bezier(0.22, 0.9, 0.3, 1); }
+
+/* ============================================================
+   MODE BADGE (read-only Авто / Вместе)
+   ============================================================ */
+.mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--color-paper);
+  border: 1px solid var(--color-hairline);
+  flex-shrink: 0;
+}
+.mode-badge span {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--color-ink);
+}
+.ring-glyph { width: 14px; height: 14px; flex-shrink: 0; }
+
+/* ============================================================
+   PRIMARY CTA BUTTON
+   ============================================================ */
+.btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-md);
+  background: var(--color-rust);
+  color: var(--color-surface);
+  font-size: 17px;
+  line-height: 24px;
+  font-weight: 600;
+  box-shadow: var(--shadow-cta-glow);
+}
+
+.boti-cta { margin-top: var(--space-6); }
+
+/* ============================================================
+   EMPTY STATE
+   ============================================================ */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--space-8) var(--space-2) var(--space-6);
+}
+.empty-state-icon {
+  width: 80px;
+  height: 80px;
+  margin-bottom: var(--space-7);
+}
+.empty-state-title {
+  color: var(--color-ink);
+  margin-bottom: var(--space-2);
+}
+.empty-state-sub {
+  color: var(--color-umber);
+  margin-bottom: var(--space-5);
+  max-width: 280px;
+}
+.empty-state .btn-primary { max-width: 320px; }
+
+/* ============================================================
+   SKELETON / LOADING STATE
+   ============================================================ */
+.skeleton-block {
+  background: linear-gradient(90deg, var(--color-hairline) 25%, var(--color-surface) 50%, var(--color-hairline) 75%);
+  background-size: 200% 100%;
+  animation: shimmerSweep 1.4s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+@keyframes shimmerSweep {
+  0% { background-position: 150% 0; }
+  100% { background-position: -150% 0; }
+}
+
+.sk-name { width: 46%; height: 20px; }
+.sk-chip { width: 110px; height: 22px; }
+.sk-seal { width: 24px; height: 24px; border-radius: 50%; }
+.sk-pill { width: 112px; height: 26px; }
+.sk-switch { width: 44px; height: 24px; border-radius: 999px; }
+.sk-mode { width: 72px; height: 22px; }
+
+/* ============================================================
+   ЧАТЫ — screen layout
+   ============================================================ */
+.chaty-screen {
+  position: relative;
+  padding: var(--space-6) var(--space-4) var(--space-5);
+  min-height: 100%;
+}
+.chaty-header { margin-bottom: var(--space-4); }
+.chaty-title { color: var(--color-ink); }
+
+/* ============================================================
+   BOT SWITCHER (compact chip row)
+   ============================================================ */
+.bot-switcher {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  margin-bottom: var(--space-4);
+}
+.bot-switcher::-webkit-scrollbar { display: none; }
+
+.bot-switcher-item {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-hairline);
+  color: var(--color-umber);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.bot-switcher-item.active {
+  background: var(--color-rust-tint);
+  border-color: var(--color-rust-tint);
+  color: var(--color-rust);
+  font-weight: 600;
+}
+
+/* ============================================================
+   MODE ROW — active bot label + Авто/Вместе segmented control
+   ============================================================ */
+.chaty-mode-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-resting);
+  margin-bottom: var(--space-5);
+}
+.chaty-mode-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.chaty-mode-info .chaty-active-bot-name {
+  color: var(--color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chaty-mode-info .chaty-mode-sub { color: var(--color-umber); }
+
+/* Segmented control — thumb reuses the seal ring-dial glyph */
+.mode-toggle {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-items: stretch;
+  width: 176px;
+  height: 44px;
+  border-radius: 999px;
+  background: var(--color-paper);
+  border: 1.5px solid var(--color-hairline);
+  padding: 3px;
+}
+.mode-toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  height: calc(100% - 6px);
+  border-radius: 999px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-resting);
+  transition: transform 0.24s cubic-bezier(0.22, 0.9, 0.3, 1);
+  z-index: 1;
+}
+.mode-toggle[data-mode="together"] .mode-toggle-thumb {
+  transform: translateX(100%);
+}
+.mode-toggle-seg {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--color-umber);
+  pointer-events: none;
+  white-space: nowrap;
+  transition: color 0.18s ease;
+}
+.mode-toggle-ring { width: 14px; height: 14px; flex-shrink: 0; }
+.mode-toggle[data-mode="auto"] .mode-toggle-seg--auto,
+.mode-toggle[data-mode="together"] .mode-toggle-seg--together {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+/* ============================================================
+   CHAT LIST
+   ============================================================ */
+.chat-list {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-resting);
+  overflow: hidden;
+}
+.chat-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  min-height: 44px;
+  border-bottom: 1px solid var(--color-hairline);
+  cursor: pointer;
+}
+.chat-row:last-child { border-bottom: none; }
+
+.chat-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-surface);
+  font-size: 17px;
+  font-weight: 600;
+}
+.chat-avatar--a { background: #A5623C; }
+.chat-avatar--b { background: #55705F; }
+.chat-avatar--c { background: #8A6A3E; }
+.chat-avatar--d { background: #5A5248; }
+.chat-avatar--e { background: #6E4630; }
+.chat-avatar--f { background: #47555C; }
+.chat-avatar--icon { padding: 0; }
+
+.chat-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.chat-row-line1 {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.chat-row-name {
+  color: var(--color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.chat-row-time {
+  color: var(--color-umber);
+  flex-shrink: 0;
+}
+.chat-row-line2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.chat-row-preview {
+  color: var(--color-umber);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1;
+}
+.chat-row-preview-prefix {
+  color: var(--color-umber);
+  font-weight: 600;
+}
+.chat-row--unread .chat-row-preview {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.chat-unread-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--color-rust);
+  color: var(--color-surface);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" on;
+}
+
+/* ============================================================
+   SHARED DIALOG PRIMITIVES (title / body / actions / secondary btn)
+   ============================================================ */
+.dialog-title {
+  color: var(--color-ink);
+  margin-bottom: var(--space-2);
+}
+.dialog-body {
+  color: var(--color-umber);
+  margin-bottom: var(--space-5);
+}
+.dialog-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.btn-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-umber);
+  font-size: 17px;
+  line-height: 24px;
+  font-weight: 600;
+}
+.btn-secondary:active {
+  background: var(--color-paper);
+}
+/* ============================================================
+   OPEN CONVERSATION (drill-in) — Айгерим thread
+   ============================================================ */
+.conv-screen {
+  position: relative;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-paper);
+}
+
+.conv-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-hairline);
+}
+.conv-back {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-ink);
+  margin-left: -10px;
+}
+.conv-back svg { width: 24px; height: 24px; }
+
+.conv-header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.conv-header-name {
+  color: var(--color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.conv-header-sub {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-umber);
+}
+.conv-channel-mini {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-umber);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.conv-channel-mini svg { width: 8px; height: 8px; }
+
+.conv-thread {
+  flex: 1 1 auto;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.conv-date-sep {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--space-1);
+}
+.conv-date-sep span {
+  background: var(--color-surface);
+  border: 1px solid var(--color-hairline);
+  color: var(--color-umber);
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+}
+
+.conv-bubble-row { display: flex; width: 100%; }
+.conv-bubble-row--in { justify-content: flex-start; }
+.conv-bubble-row--out { justify-content: flex-end; }
+
+.conv-bubble {
+  max-width: 78%;
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-resting);
+}
+.conv-bubble--in {
+  background: var(--color-surface);
+  border: 1px solid var(--color-hairline);
+  border-bottom-left-radius: 4px;
+}
+.conv-bubble--out {
+  background: var(--color-rust-tint);
+  border-bottom-right-radius: 4px;
+}
+
+.conv-bubble-text {
+  color: var(--color-ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+}
+.conv-bubble-caption { margin-top: var(--space-2); }
+
+.conv-bubble-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 4px;
+}
+.conv-bubble-time { color: var(--color-umber); }
+.conv-tick { width: 15px; height: 10px; color: var(--color-umber); flex-shrink: 0; }
+.conv-tick--read { color: var(--color-rust); }
+
+/* Reply / quote card (demonstrates the quoted-reply pattern) */
+.conv-quote-card {
+  display: flex;
+  gap: var(--space-2);
+  background: var(--color-paper);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.conv-quote-bar {
+  width: 3px;
+  border-radius: 2px;
+  background: var(--color-rust);
+  flex-shrink: 0;
+}
+.conv-quote-body { min-width: 0; }
+.conv-quote-label {
+  display: block;
+  color: var(--color-rust);
+  margin-bottom: 2px;
+}
+.conv-quote-text {
+  color: var(--color-umber);
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Image message bubble */
+.conv-bubble--media { padding: 6px 6px var(--space-3); }
+.conv-media-placeholder {
+  width: 220px;
+  max-width: 100%;
+  height: 150px;
+  border-radius: calc(var(--radius-lg) - 6px);
+  background: linear-gradient(135deg, #C98A63 0%, var(--color-rust) 55%, #6E4630 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.conv-media-placeholder svg { width: 36px; height: 36px; }
+.conv-bubble--media .conv-bubble-caption { padding: 0 var(--space-2); }
+.conv-bubble--media .conv-bubble-meta { padding: 0 var(--space-2); }
+
+/* Voice message bubble */
+.conv-bubble--voice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 208px;
+}
+.voice-play-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-rust);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.voice-play-btn svg { width: 13px; height: 13px; }
+.voice-waveform {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 2.5px;
+  height: 24px;
+}
+.voice-bar {
+  width: 2.5px;
+  border-radius: 2px;
+  background: var(--color-umber);
+  opacity: 0.55;
+  flex-shrink: 0;
+}
+.voice-duration { color: var(--color-umber); flex-shrink: 0; }
+
+/* Compose area + Вместе panel (hero moment) */
+.conv-compose-area {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  background: var(--color-paper);
+  border-top: 1px solid var(--color-hairline);
+}
+
+.vmeste-panel {
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-raised);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+.vmeste-panel.is-refreshing { opacity: 0.45; transform: scale(0.985); }
+
+.vmeste-panel-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.vmeste-panel-ring { width: 18px; height: 18px; flex-shrink: 0; }
+.vmeste-panel-label { color: var(--color-rust); }
+
+.vmeste-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.vmeste-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--color-paper);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+}
+.vmeste-card-text { color: var(--color-ink); margin: 0; }
+.vmeste-card--top {
+  background: var(--color-rust-tint);
+  border-color: var(--color-rust-tint);
+}
+.vmeste-card-rank {
+  display: block;
+  color: var(--color-rust);
+  margin-bottom: 2px;
+}
+
+.conv-input-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.conv-input-field {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+  padding: 0 var(--space-3);
+}
+.conv-input-field input {
+  flex: 1;
+  height: 44px;
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-line);
+  font-weight: var(--weight-medium);
+  color: var(--color-ink);
+}
+.conv-input-field input::placeholder { color: var(--color-umber); }
+
+.conv-send-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--color-rust);
+  box-shadow: var(--shadow-cta-glow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.conv-send-btn svg { width: 20px; height: 20px; }
+
+/* New bubble entrance (suggestion tap / manual send) */
+.conv-bubble-row--new { animation: convBubbleIn 0.28s cubic-bezier(0.22, 0.9, 0.3, 1); }
+@keyframes convBubbleIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+
+/* ============================================================
+   СВОДКА — screen layout
+   ============================================================ */
+.svodka-screen {
+  position: relative;
+  padding: var(--space-6) var(--space-4) var(--space-5);
+  min-height: 100%;
+}
+.svodka-header { margin-bottom: var(--space-5); }
+.svodka-title { color: var(--color-ink); }
+
+.svodka-section { margin-bottom: var(--space-5); }
+.svodka-section:last-child { margin-bottom: 0; }
+
+/* Ledger-tab section header motif — small Rust-tinted index-tab label */
+.section-tab-label {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--color-rust-tint);
+  color: var(--color-rust);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  margin-bottom: var(--space-3);
+}
+
+/* ============================================================
+   PERIOD SEGMENTED CONTROL (Сегодня / Неделя / Месяц)
+   ============================================================ */
+.period-toggle {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  height: 44px;
+  border-radius: 999px;
+  background: var(--color-paper);
+  border: 1.5px solid var(--color-hairline);
+  padding: 3px;
+  margin-bottom: var(--space-4);
+}
+.period-toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: calc((100% - 6px) / 3);
+  height: calc(100% - 6px);
+  border-radius: 999px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-resting);
+  transition: transform 0.24s cubic-bezier(0.22, 0.9, 0.3, 1);
+  z-index: 1;
+}
+.period-toggle[data-period="today"] .period-toggle-thumb { transform: translateX(0%); }
+.period-toggle[data-period="week"] .period-toggle-thumb { transform: translateX(100%); }
+.period-toggle[data-period="month"] .period-toggle-thumb { transform: translateX(200%); }
+
+.period-toggle-seg {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--color-umber);
+  white-space: nowrap;
+  transition: color 0.18s ease;
+}
+.period-toggle-seg.active {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+/* ============================================================
+   BOT FILTER (reuses .bot-switcher / .bot-switcher-item from Чаты)
+   ============================================================ */
+.svodka-bot-filter { margin-bottom: var(--space-5); }
+
+.bot-filter-ring {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: var(--space-1);
+  vertical-align: middle;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+.bot-filter-ring--live { background: var(--color-rust); }
+.bot-filter-ring--paused { background: transparent; border: 1.5px solid var(--color-umber); }
+
+/* ============================================================
+   HEADLINE STATS GRID
+   ============================================================ */
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+.stat-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-resting);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.stat-label { color: var(--color-umber); }
+.stat-value {
+  color: var(--color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stat-delta { color: var(--color-umber); }
+.stat-delta--positive { color: var(--status-zayavka); }
+
+/* ============================================================
+   OUTCOME DISTRIBUTION (stacked bar + legend chips)
+   ============================================================ */
+.outcome-bar {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  height: 14px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--color-hairline);
+}
+.outcome-bar-seg { height: 100%; }
+
+.outcome-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.legend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--color-paper);
+  border: 1px solid var(--color-hairline);
+}
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.legend-label { color: var(--color-ink); }
+.legend-count { color: var(--color-umber); }
+
+/* Shared semantic dot colors — reused by bar segments, legend, and status pills */
+.dot-zayavka { background: var(--status-zayavka); }
+.dot-vladelets { background: var(--status-vladelets); }
+.dot-dialog { background: var(--status-dialog); }
+.dot-silent { background: var(--status-silent); }
+.dot-closed { background: var(--status-closed); }
+
+/* ============================================================
+   RECENT CONVERSATIONS LIST
+   ============================================================ */
+.outcome-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.outcome-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-resting);
+  padding: var(--space-4);
+  cursor: pointer;
+}
+.outcome-row--claim {
+  background: rgba(91, 122, 79, 0.08);
+  box-shadow: 0 1px 2px rgba(42, 33, 24, 0.06);
+}
+.outcome-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.outcome-row-line1 {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.outcome-row-name {
+  color: var(--color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.outcome-row-time { color: var(--color-umber); flex-shrink: 0; }
+.outcome-row-summary {
+  color: var(--color-umber);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Status pill — plain solid dot + label; deliberately NOT the ring-dial glyph
+   (that shape is reserved for automation-spectrum state, not outcome status) */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--color-paper);
+  border: 1px solid var(--color-hairline);
+  align-self: flex-start;
+  margin-top: 2px;
+}
+.status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+
+/* ============================================================
+   BOT SETTINGS — drill-in screen
+   ============================================================ */
+.settings-screen {
+  position: relative;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-paper);
+}
+
+.settings-run-pill,
+#settings-run-pill { flex-shrink: 0; }
+
+.settings-content {
+  padding: var(--space-5) var(--space-4) var(--space-8);
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.stitch-divider { flex-shrink: 0; }
+
+/* --- fields (name / business type) --- */
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.settings-field-label { color: var(--color-umber); }
+
+.settings-input {
+  width: 100%;
+  min-height: 44px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+  padding: 0 var(--space-3);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-line);
+  font-weight: var(--weight-medium);
+  color: var(--color-ink);
+}
+.settings-input::placeholder { color: var(--color-umber); }
+.settings-input:focus { border-color: var(--color-rust); }
+
+.settings-select-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 44px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+  padding: 0 var(--space-3);
+  color: var(--color-ink);
+  text-align: left;
+}
+.settings-select-row svg {
+  width: 18px;
+  height: 18px;
+  color: var(--color-umber);
+  flex-shrink: 0;
+}
+
+/* --- channel connection rows --- */
+.settings-connections-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.settings-connection-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-resting);
+  padding: var(--space-3) var(--space-4);
+}
+.settings-connection-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.settings-connection-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--status-zayavka);
+  font-weight: 600;
+}
+.settings-reconnect-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-paper);
+  border: 1px solid var(--color-hairline);
+  color: var(--color-rust);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.settings-reconnect-btn:active { background: var(--color-rust-tint); }
+
+/* --- textareas (о бизнесе / промпт) --- */
+.settings-textarea {
+  width: 100%;
+  background: var(--color-surface);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-line);
+  font-weight: var(--weight-medium);
+  color: var(--color-ink);
+  resize: none;
+}
+.settings-textarea::placeholder { color: var(--color-umber); }
+.settings-textarea:focus { border-color: var(--color-rust); }
+
+/* --- products --- */
+.product-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.product-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-resting);
+  padding: var(--space-3) var(--space-4);
+}
+.product-name {
+  color: var(--color-ink);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.product-price { color: var(--color-ink); flex-shrink: 0; }
+
+/* --- price-list files --- */
+.file-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.file-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-resting);
+  padding: var(--space-3) var(--space-4);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.file-row.removing {
+  opacity: 0;
+  transform: scale(0.94);
+}
+.file-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--color-rust-tint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.file-icon svg { width: 18px; height: 18px; color: var(--color-rust); }
+.file-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.file-name {
+  color: var(--color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.file-meta { color: var(--color-umber); }
+.file-delete-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-umber);
+}
+.file-delete-btn:active { background: var(--color-paper); color: var(--color-danger); }
+.file-delete-btn svg { width: 14px; height: 14px; }
+
+/* --- generic dashed add-item affordance (products / files) --- */
+.add-item-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 44px;
+  border-radius: var(--radius-md);
+  border: 1.5px dashed var(--color-hairline);
+  background: transparent;
+  color: var(--color-umber);
+  font-size: var(--text-body-size);
+  font-weight: 600;
+}
+.add-item-btn:active { background: var(--color-surface); border-color: var(--color-rust-tint); }
+.add-item-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+/* reuse the existing convBubbleIn keyframe (defined for chat bubbles) for
+   newly-appended settings rows, without redefining the keyframe itself */
+.settings-row-enter { animation: convBubbleIn 0.28s cubic-bezier(0.22, 0.9, 0.3, 1); }
+
+/* --- danger zone: deliberately low-emphasis, small, hard to hit --- */
+.danger-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+}
+.danger-trigger {
+  color: var(--color-danger);
+  font-weight: 500;
+  padding: 8px 12px;
+}
+.danger-trigger.is-hidden { display: none; }
+.danger-confirm-row {
+  display: none;
+  align-items: center;
+  gap: var(--space-3);
+}
+.danger-confirm-row.is-open { display: flex; }
+.danger-confirm-label { color: var(--color-umber); }
+.danger-confirm-btn { color: var(--color-danger); font-weight: 600; padding: 8px 10px; }
+.danger-cancel-btn { color: var(--color-umber); font-weight: 600; padding: 8px 10px; }
+
+/* --- delete-bot toast --- */
+.settings-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 100px;
+  transform: translateX(-50%) translateY(12px);
+  background: var(--color-ink);
+  color: var(--color-surface);
+  padding: 12px 20px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-raised);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease, transform 0.22s ease;
+  z-index: 95;
+  font-size: var(--text-body-size);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.settings-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+
+/* ============================================================
+   ПРОФИЛЬ — visual stub
+   ============================================================ */
+.profile-screen {
+  position: relative;
+  padding: var(--space-6) var(--space-4) var(--space-5);
+  min-height: 100%;
+}
+.profile-header { margin-bottom: var(--space-5); }
+.profile-title { color: var(--color-ink); }
+
+.profile-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-resting);
+  padding: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+.profile-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-ink);
+  color: var(--color-surface);
+}
+.profile-identity-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.profile-name {
+  color: var(--color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.profile-phone { color: var(--color-umber); }
+
+.profile-section { margin-bottom: var(--space-5); }
+.profile-section:last-of-type { margin-bottom: 0; }
+
+.profile-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.profile-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-resting);
+  padding: var(--space-3) var(--space-4);
+}
+.profile-row-icon {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  background: var(--color-paper);
+  border: 1px solid var(--color-hairline);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.profile-row-icon svg { width: 18px; height: 18px; color: var(--color-umber); }
+.profile-row-label { flex: 1; min-width: 0; color: var(--color-ink); }
+.profile-row-chevron { width: 18px; height: 18px; flex-shrink: 0; color: var(--color-umber); }
+
+.profile-footer {
+  display: flex;
+  justify-content: center;
+  padding-top: var(--space-4);
+}
+.profile-version { color: var(--color-umber); }
+
+/* ============================================================
+   ADDITIVE — micro-interaction strengthening pass
+   (all rules below are new; nothing here restates an existing
+   declaration's value except where CSS's own shorthand mechanics
+   require it, noted inline)
+   ============================================================ */
+
+/* (1) Профиль rows — .bot-card / .chat-row / .outcome-row all declare
+   cursor:pointer explicitly; .profile-row was the one tappable row left
+   without it, even though it already inherits the .tappable:active press
+   state (scale 0.98 + shadow-pressed). Pure affordance addition. */
+.profile-row {
+  cursor: pointer;
+}
+
+/* (3) Overlay open/close (conversation + bot settings drill-ins) —
+   .overlay-screen only transitions `transform`, so `visibility` flips to
+   hidden the instant `.open` is removed and the slide-out is never seen
+   (confirmed via computed style: transition-property was "transform"
+   only). Adding visibility to the list lets the CSS spec's built-in
+   visible->hidden delay hold it visible until the transform transition
+   actually finishes closing; the hidden->visible flip on open still
+   happens immediately (unaffected, already correct). Duration/easing are
+   inherited from the existing `transition` shorthand via list-repetition,
+   not restated. A permanent `will-change: transform` hint was tried here too,
+   but pulled after review surfaced a transient off-center repaint on the
+   sibling dialog layer (#dialogs-root) when combined with .dialog-card's own
+   will-change + allow-discrete transition below; not reliably reproducible,
+   removed defensively since it was never required for the correctness fix
+   above (modern browsers already layer-promote an actively-transitioning
+   transform without a standing hint). */
+.overlay-screen {
+  transition-property: transform, visibility;
+}
+
+/* (3) Dialog open/close (mode-switch confirmation, and any future sheet
+   built on .dialog-card) — the card toggles `display: none/block`, which
+   isn't part of its transition list, so on close it vanished instantly
+   before opacity/scale-down could play, and on open there was no defined
+   "from" state to animate out of (a display:none element has no rendered
+   starting frame). Verified supported in-browser (CSS.supports and
+   @starting-style parsing both confirmed true/CSSStartingStyleRule).
+   Existing opacity/transform end-values are untouched. */
+.dialog-card {
+  transition-property: opacity, transform, display;
+  transition-behavior: allow-discrete;
+  will-change: opacity, transform;
+}
+@starting-style {
+  .dialog-card.open {
+    opacity: 0;
+    transform: scale(0.94) translateY(6px);
+  }
+}
+
+/* (4a) «На паузе» -> «Бот работает» micro-delight — the switch thumb
+   already pops (stamp-impression), but the status PILL itself never
+   reacted. A brief rust glow-ring on the pill, triggered only on the
+   pause->live edge (see JS below) — pausing stays calm/neutral per the
+   Dormant-token rule, so live->paused intentionally gets no glow. */
+@keyframes runPillActivateGlow {
+  0%   { box-shadow: 0 0 0 0 rgba(var(--color-rust-rgb), 0.38); }
+  70%  { box-shadow: 0 0 0 8px rgba(var(--color-rust-rgb), 0.10); }
+  100% { box-shadow: 0 0 0 0 rgba(var(--color-rust-rgb), 0); }
+}
+.run-pill--activate-glow {
+  animation: runPillActivateGlow 0.6s cubic-bezier(0.22, 0.9, 0.3, 1);
+}
+
+/* (4b) Fresh «Заявка» row micro-delight (Сводка) — only the small status
+   dot had a stamp pop (stamp-impression, already in the markup); the row
+   itself was static. Adds a quiet moss-green glow-ring that settles
+   exactly into the row's existing resting shadow, so there is no snap
+   when the animation ends. Replays every time the owner reopens
+   «Сводка», matching how .screen-anim already re-triggers on every tab
+   switch in this codebase (display:none -> block restarts a plain CSS
+   animation the same way). */
+@keyframes outcomeClaimGlowIn {
+  0%   { box-shadow: 0 0 0 0 rgba(91, 122, 79, 0.32), 0 1px 2px rgba(42, 33, 24, 0.06); }
+  100% { box-shadow: 0 0 0 0 rgba(91, 122, 79, 0),    0 1px 2px rgba(42, 33, 24, 0.06); }
+}
+.outcome-row--claim {
+  animation: outcomeClaimGlowIn 1s cubic-bezier(0.22, 0.9, 0.3, 1);
+}
+
+/* Palette comparison switcher (top-right of the phone screen, every tab/overlay) */
+.theme-switcher {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 252, 245, 0.82);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  padding: 6px;
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-raised);
+}
+.theme-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--swatch-color);
+  border: 2px solid transparent;
+  padding: 0;
+  flex-shrink: 0;
+}
+.theme-swatch.active {
+  border-color: var(--color-ink);
+  transform: scale(1.15);
+}
+
+/*SLOT:EXTRA-CSS*/
+</style>
+</head>
+<body data-theme="orange">
+
+  <div class="app-backdrop">
+    <div class="phone-shell">
+      <div class="phone-speaker"></div>
+
+      <div class="phone-screen">
+
+        <div class="theme-switcher" role="group" aria-label="Сравнить цветовые палитры">
+          <button type="button" class="theme-swatch active" style="--swatch-color:#EA580C" aria-label="Оранжевый (по умолчанию)" onclick="setAccentTheme('orange', this)"></button>
+          <button type="button" class="theme-swatch" style="--swatch-color:#9C3E1D" aria-label="Терракотовый" onclick="setAccentTheme('terracotta', this)"></button>
+          <button type="button" class="theme-swatch" style="--swatch-color:#1F6F5C" aria-label="Лесной зелёный" onclick="setAccentTheme('forest', this)"></button>
+          <button type="button" class="theme-swatch" style="--swatch-color:#35408F" aria-label="Индиго" onclick="setAccentTheme('indigo', this)"></button>
+          <button type="button" class="theme-swatch" style="--swatch-color:#8C3F6B" aria-label="Сливовый" onclick="setAccentTheme('plum', this)"></button>
+        </div>
+
+        <div class="content-viewport">
+
+          <section id="screen-boti" class="screen active" data-tab="boti"><!--SLOT:boti:START-->
+<!--SLOT:boti:START-->
+<div class="boti-screen" id="boti-root" data-state="populated">
+
+  <div class="boti-header">
+    <div class="text-headline boti-title">Боты</div>
+    <button type="button" class="boti-demo-cycle" onclick="cycleBotiDemoState()" aria-label="Демо-режим: переключить состояние">&#x27F3;</button>
+  </div>
+
+  <!-- ============ POPULATED STATE ============ -->
+  <div class="boti-state boti-state--populated">
+    <div class="bot-list">
+
+      <!-- Card 1: Гульдер -->
+      <div class="bot-card tappable" role="button" tabindex="0"
+           onclick="openOverlay('screen-settings')"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openOverlay('screen-settings');}">
+        <div class="bot-card-identity">
+          <div class="bot-name text-title">Гульдер</div>
+          <div class="bot-chips-row">
+            <span class="chip-business text-caption">Цветочный магазин</span>
+            <span class="channel-seal channel-seal--wa" aria-label="WhatsApp подключен">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5c-4.7 0-8.5 3.4-8.5 7.6 0 2.2 1 4.2 2.7 5.6-.1 1.1-.5 2.3-1.1 3.2 1.3-.2 2.6-.7 3.6-1.4.9.3 1.8.4 2.8.4h.5c4.7 0 8.5-3.4 8.5-7.6S17.2 3.5 12 3.5z" fill="var(--color-surface)"/></svg>
+            </span>
+            <span class="channel-seal channel-seal--tg" aria-label="Telegram подключен">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12.8 19.5 4.8l-3.2 15-4.6-4-3.1 2.6.2-3.9z" fill="var(--color-surface)"/></svg>
+            </span>
+          </div>
+        </div>
+
+        <div class="stitch-divider"></div>
+
+        <div class="bot-card-status-row">
+          <div class="status-cluster">
+            <span class="run-pill run-pill--live">
+              <svg class="run-pill-ring" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8"/></svg>
+              <span class="run-pill-label">Бот работает</span>
+            </span>
+            <button type="button" class="run-switch is-on" role="switch" aria-checked="true" aria-label="Приостановить бота"
+                    onclick="toggleRunSwitch(this, this.closest('.bot-card-status-row').querySelector('.run-pill'), event)">
+              <span class="run-switch-thumb"><span class="run-switch-thumb-glyph"></span></span>
+            </button>
+          </div>
+          <div class="mode-badge mode-badge--auto">
+            <svg class="ring-glyph" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="var(--color-rust)"/></svg>
+            <span>Авто</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Автозапчасти Алмас -->
+      <div class="bot-card tappable" role="button" tabindex="0"
+           onclick="openOverlay('screen-settings')"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openOverlay('screen-settings');}">
+        <div class="bot-card-identity">
+          <div class="bot-name text-title">Автозапчасти Алмас</div>
+          <div class="bot-chips-row">
+            <span class="chip-business text-caption">Автозапчасти</span>
+            <span class="channel-seal channel-seal--wa" aria-label="WhatsApp подключен">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5c-4.7 0-8.5 3.4-8.5 7.6 0 2.2 1 4.2 2.7 5.6-.1 1.1-.5 2.3-1.1 3.2 1.3-.2 2.6-.7 3.6-1.4.9.3 1.8.4 2.8.4h.5c4.7 0 8.5-3.4 8.5-7.6S17.2 3.5 12 3.5z" fill="var(--color-surface)"/></svg>
+            </span>
+          </div>
+        </div>
+
+        <div class="stitch-divider"></div>
+
+        <div class="bot-card-status-row">
+          <div class="status-cluster">
+            <span class="run-pill run-pill--paused">
+              <svg class="run-pill-ring" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8"/></svg>
+              <span class="run-pill-label">Бот на паузе</span>
+            </span>
+            <button type="button" class="run-switch" role="switch" aria-checked="false" aria-label="Возобновить бота"
+                    onclick="toggleRunSwitch(this, this.closest('.bot-card-status-row').querySelector('.run-pill'), event)">
+              <span class="run-switch-thumb"><span class="run-switch-thumb-glyph"></span></span>
+            </button>
+          </div>
+          <div class="mode-badge mode-badge--together">
+            <svg class="ring-glyph" viewBox="0 0 20 20" aria-hidden="true">
+              <circle cx="10" cy="10" r="8" fill="var(--color-rust-tint)"/>
+              <path d="M10,10 L10,2 A8,8 0 0,1 10,18 Z" fill="var(--color-rust)"/>
+            </svg>
+            <span>Вместе</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: Sapa Education -->
+      <div class="bot-card tappable" role="button" tabindex="0"
+           onclick="openOverlay('screen-settings')"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openOverlay('screen-settings');}">
+        <div class="bot-card-identity">
+          <div class="bot-name text-title">Sapa Education</div>
+          <div class="bot-chips-row">
+            <span class="chip-business text-caption">Языковые курсы</span>
+            <span class="channel-seal channel-seal--wa" aria-label="WhatsApp подключен">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5c-4.7 0-8.5 3.4-8.5 7.6 0 2.2 1 4.2 2.7 5.6-.1 1.1-.5 2.3-1.1 3.2 1.3-.2 2.6-.7 3.6-1.4.9.3 1.8.4 2.8.4h.5c4.7 0 8.5-3.4 8.5-7.6S17.2 3.5 12 3.5z" fill="var(--color-surface)"/></svg>
+            </span>
+          </div>
+        </div>
+
+        <div class="stitch-divider"></div>
+
+        <div class="bot-card-status-row">
+          <div class="status-cluster">
+            <span class="run-pill run-pill--live">
+              <svg class="run-pill-ring" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8"/></svg>
+              <span class="run-pill-label">Бот работает</span>
+            </span>
+            <button type="button" class="run-switch is-on" role="switch" aria-checked="true" aria-label="Приостановить бота"
+                    onclick="toggleRunSwitch(this, this.closest('.bot-card-status-row').querySelector('.run-pill'), event)">
+              <span class="run-switch-thumb"><span class="run-switch-thumb-glyph"></span></span>
+            </button>
+          </div>
+          <div class="mode-badge mode-badge--together">
+            <svg class="ring-glyph" viewBox="0 0 20 20" aria-hidden="true">
+              <circle cx="10" cy="10" r="8" fill="var(--color-rust-tint)"/>
+              <path d="M10,10 L10,2 A8,8 0 0,1 10,18 Z" fill="var(--color-rust)"/>
+            </svg>
+            <span>Вместе</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <button type="button" class="btn-primary boti-cta">Создать бота</button>
+  </div>
+
+  <!-- ============ EMPTY STATE ============ -->
+  <div class="boti-state boti-state--empty">
+    <div class="empty-state">
+      <svg class="empty-state-icon" viewBox="0 0 80 80" aria-hidden="true">
+        <circle cx="40" cy="40" r="36" fill="none" stroke="var(--color-umber)" stroke-width="1.75"/>
+        <rect x="27" y="30" width="26" height="20" rx="6" fill="none" stroke="var(--color-umber)" stroke-width="1.75"/>
+        <circle cx="34.5" cy="40" r="1.6" fill="var(--color-umber)"/>
+        <circle cx="45.5" cy="40" r="1.6" fill="var(--color-umber)"/>
+        <path d="M40 30v-4" stroke="var(--color-umber)" stroke-width="1.75" stroke-linecap="square"/>
+        <circle cx="40" cy="24" r="1.6" fill="var(--color-umber)"/>
+      </svg>
+      <div class="text-headline empty-state-title">Создайте первого бота</div>
+      <p class="text-body empty-state-sub">Бот-ассистент отвечает клиентам в WhatsApp круглосуточно</p>
+      <button type="button" class="btn-primary">Создать бота</button>
+    </div>
+  </div>
+
+  <!-- ============ LOADING STATE (skeleton) ============ -->
+  <div class="boti-state boti-state--loading">
+    <div class="bot-list" aria-hidden="true">
+
+      <div class="bot-card bot-card-skeleton">
+        <div class="bot-card-identity">
+          <div class="skeleton-block sk-name"></div>
+          <div class="bot-chips-row">
+            <div class="skeleton-block sk-chip"></div>
+            <div class="skeleton-block sk-seal"></div>
+            <div class="skeleton-block sk-seal"></div>
+          </div>
+        </div>
+        <div class="stitch-divider"></div>
+        <div class="bot-card-status-row">
+          <div class="status-cluster">
+            <div class="skeleton-block sk-pill"></div>
+            <div class="skeleton-block sk-switch"></div>
+          </div>
+          <div class="skeleton-block sk-mode"></div>
+        </div>
+      </div>
+
+      <div class="bot-card bot-card-skeleton">
+        <div class="bot-card-identity">
+          <div class="skeleton-block sk-name"></div>
+          <div class="bot-chips-row">
+            <div class="skeleton-block sk-chip"></div>
+            <div class="skeleton-block sk-seal"></div>
+          </div>
+        </div>
+        <div class="stitch-divider"></div>
+        <div class="bot-card-status-row">
+          <div class="status-cluster">
+            <div class="skeleton-block sk-pill"></div>
+            <div class="skeleton-block sk-switch"></div>
+          </div>
+          <div class="skeleton-block sk-mode"></div>
+        </div>
+      </div>
+
+      <div class="bot-card bot-card-skeleton">
+        <div class="bot-card-identity">
+          <div class="skeleton-block sk-name"></div>
+          <div class="bot-chips-row">
+            <div class="skeleton-block sk-chip"></div>
+            <div class="skeleton-block sk-seal"></div>
+          </div>
+        </div>
+        <div class="stitch-divider"></div>
+        <div class="bot-card-status-row">
+          <div class="status-cluster">
+            <div class="skeleton-block sk-pill"></div>
+            <div class="skeleton-block sk-switch"></div>
+          </div>
+          <div class="skeleton-block sk-mode"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+<!--SLOT:boti:END-->
+<!--SLOT:boti:END--></section>
+
+          <section id="screen-chaty" class="screen" data-tab="chaty"><!--SLOT:chaty:START-->
+<!--SLOT:chaty:START-->
+<div class="chaty-screen">
+
+  <div class="chaty-header">
+    <div class="text-headline chaty-title">Чаты</div>
+  </div>
+
+  <!-- ============ BOT SWITCHER ============ -->
+  <div class="bot-switcher" role="tablist" aria-label="Переключить бота">
+    <button type="button" class="bot-switcher-item active" role="tab" aria-selected="true" data-bot="gulder"
+            onclick="switchActiveBot(this, 'gulder')">Гульдер</button>
+    <button type="button" class="bot-switcher-item" role="tab" aria-selected="false" data-bot="almas"
+            onclick="switchActiveBot(this, 'almas')">Автозапчасти Алмас</button>
+    <button type="button" class="bot-switcher-item" role="tab" aria-selected="false" data-bot="sapa"
+            onclick="switchActiveBot(this, 'sapa')">Sapa Education</button>
+  </div>
+
+  <!-- ============ MODE ROW (bot-wide Авто/Вместе) ============ -->
+  <div class="chaty-mode-row">
+    <div class="chaty-mode-info">
+      <span class="text-title chaty-active-bot-name" id="chaty-active-bot-name">Гульдер</span>
+      <span class="text-caption chaty-mode-sub">Режим ответов</span>
+    </div>
+
+    <button type="button" class="mode-toggle" id="mode-toggle" data-mode="auto"
+            role="switch" aria-checked="true" aria-label="Режим ответов: Авто"
+            onclick="requestModeSwitch()">
+      <span class="mode-toggle-thumb"></span>
+      <span class="mode-toggle-seg mode-toggle-seg--auto">
+        <svg class="mode-toggle-ring" viewBox="0 0 20 20" aria-hidden="true">
+          <circle cx="10" cy="10" r="8" fill="var(--color-rust)"/>
+        </svg>
+        <span>Авто</span>
+      </span>
+      <span class="mode-toggle-seg mode-toggle-seg--together">
+        <svg class="mode-toggle-ring" viewBox="0 0 20 20" aria-hidden="true">
+          <circle cx="10" cy="10" r="8" fill="var(--color-rust-tint)"/>
+          <path d="M10,10 L10,2 A8,8 0 0,1 10,18 Z" fill="var(--color-rust)"/>
+        </svg>
+        <span>Вместе</span>
+      </span>
+    </button>
+  </div>
+
+  <!-- ============ CHAT LIST ============ -->
+  <ul class="chat-list">
+
+    <li class="chat-row chat-row--unread tappable" role="button" tabindex="0"
+        onclick="openConversation()"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openConversation();}">
+      <div class="chat-avatar chat-avatar--a" aria-hidden="true">А</div>
+      <div class="chat-row-main">
+        <div class="chat-row-line1">
+          <span class="chat-row-name text-title">Айгерим</span>
+          <span class="chat-row-time text-caption">2 мин</span>
+        </div>
+        <div class="chat-row-line2">
+          <span class="chat-row-preview text-body">Давайте 25 роз к 14:00</span>
+          <span class="chat-unread-badge" aria-label="1 непрочитанное сообщение">1</span>
+        </div>
+      </div>
+    </li>
+
+    <li class="chat-row tappable" role="button" tabindex="0"
+        onclick="openConversation()"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openConversation();}">
+      <div class="chat-avatar chat-avatar--b" aria-hidden="true">Д</div>
+      <div class="chat-row-main">
+        <div class="chat-row-line1">
+          <span class="chat-row-name text-title">Данияр</span>
+          <span class="chat-row-time text-caption">12 мин</span>
+        </div>
+        <div class="chat-row-line2">
+          <span class="chat-row-preview text-body"><span class="chat-row-preview-prefix">Бот: </span>Уточню у менеджера по колодкам для Camry 70</span>
+        </div>
+      </div>
+    </li>
+
+    <li class="chat-row tappable" role="button" tabindex="0"
+        onclick="openConversation()"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openConversation();}">
+      <div class="chat-avatar chat-avatar--c" aria-hidden="true">М</div>
+      <div class="chat-row-main">
+        <div class="chat-row-line1">
+          <span class="chat-row-name text-title">Мадина</span>
+          <span class="chat-row-time text-caption">1 ч</span>
+        </div>
+        <div class="chat-row-line2">
+          <span class="chat-row-preview text-body"><span class="chat-row-preview-prefix">Бот: </span>Ответила по расписанию IELTS</span>
+        </div>
+      </div>
+    </li>
+
+    <li class="chat-row tappable" role="button" tabindex="0"
+        onclick="openConversation()"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openConversation();}">
+      <div class="chat-avatar chat-avatar--d" aria-hidden="true">Е</div>
+      <div class="chat-row-main">
+        <div class="chat-row-line1">
+          <span class="chat-row-name text-title">Ерлан</span>
+          <span class="chat-row-time text-caption">вчера</span>
+        </div>
+        <div class="chat-row-line2">
+          <span class="chat-row-preview text-body">Узнал график работы, спасибо!</span>
+        </div>
+      </div>
+    </li>
+
+    <li class="chat-row chat-row--unread tappable" role="button" tabindex="0"
+        onclick="openConversation()"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openConversation();}">
+      <div class="chat-avatar chat-avatar--e" aria-hidden="true">А</div>
+      <div class="chat-row-main">
+        <div class="chat-row-line1">
+          <span class="chat-row-name text-title">Асель</span>
+          <span class="chat-row-time text-caption">вчера</span>
+        </div>
+        <div class="chat-row-line2">
+          <span class="chat-row-preview text-body">Здравствуйте, работаете сегодня?</span>
+          <span class="chat-unread-badge" aria-label="2 непрочитанных сообщения">2</span>
+        </div>
+      </div>
+    </li>
+
+    <li class="chat-row tappable" role="button" tabindex="0"
+        onclick="openConversation()"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openConversation();}">
+      <div class="chat-avatar chat-avatar--f chat-avatar--icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--color-surface)" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square">
+          <path d="M7 3h3l1.5 4-2 1.5a11 11 0 0 0 5 5l1.5-2 4 1.5v3a2 2 0 0 1-2 2A15 15 0 0 1 5 5a2 2 0 0 1 2-2z"/>
+        </svg>
+      </div>
+      <div class="chat-row-main">
+        <div class="chat-row-line1">
+          <span class="chat-row-name text-title">+7 707 555 12 34</span>
+          <span class="chat-row-time text-caption">2 дня</span>
+        </div>
+        <div class="chat-row-line2">
+          <span class="chat-row-preview text-body">Здравствуйте! Подскажите, пожалуйста, цены</span>
+        </div>
+      </div>
+    </li>
+
+  </ul>
+
+</div>
+<!--SLOT:chaty:END-->
+<!--SLOT:chaty:END--></section>
+
+          <section id="screen-svodka" class="screen" data-tab="svodka"><!--SLOT:svodka:START-->
+<!--SLOT:svodka:START-->
+<div class="svodka-screen">
+
+  <div class="svodka-header">
+    <div class="text-headline svodka-title">Сводка</div>
+  </div>
+
+  <!-- ============ PERIOD FILTER ============ -->
+  <div class="period-toggle" data-period="week" role="tablist" aria-label="Период: Неделя">
+    <span class="period-toggle-thumb" aria-hidden="true"></span>
+    <button type="button" class="period-toggle-seg" role="tab" aria-selected="false" data-value="today" onclick="switchPeriod(this,'today')">Сегодня</button>
+    <button type="button" class="period-toggle-seg active" role="tab" aria-selected="true" data-value="week" onclick="switchPeriod(this,'week')">Неделя</button>
+    <button type="button" class="period-toggle-seg" role="tab" aria-selected="false" data-value="month" onclick="switchPeriod(this,'month')">Месяц</button>
+  </div>
+
+  <!-- ============ PER-BOT FILTER ============ -->
+  <div class="bot-switcher svodka-bot-filter" role="tablist" aria-label="Фильтр по боту">
+    <button type="button" class="bot-switcher-item active" role="tab" aria-selected="true" onclick="switchDashboardBot(this)">Все боты</button>
+    <button type="button" class="bot-switcher-item" role="tab" aria-selected="false" onclick="switchDashboardBot(this)">
+      <span class="bot-filter-ring bot-filter-ring--live" aria-hidden="true"></span>Гульдер
+    </button>
+    <button type="button" class="bot-switcher-item" role="tab" aria-selected="false" onclick="switchDashboardBot(this)">
+      <span class="bot-filter-ring bot-filter-ring--paused" aria-hidden="true"></span>Автозапчасти Алмас
+    </button>
+    <button type="button" class="bot-switcher-item" role="tab" aria-selected="false" onclick="switchDashboardBot(this)">
+      <span class="bot-filter-ring bot-filter-ring--live" aria-hidden="true"></span>Sapa Education
+    </button>
+  </div>
+
+  <!-- ============ HEADLINE STATS ============ -->
+  <div class="svodka-section">
+    <div class="stat-grid">
+      <div class="stat-card">
+        <span class="stat-label text-caption">Заявки</span>
+        <span class="stat-value text-headline stat-number">14</span>
+        <span class="stat-delta stat-delta--positive text-caption stat-number">+3 за неделю</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label text-caption">Диалогов</span>
+        <span class="stat-value text-headline stat-number">47</span>
+        <span class="stat-delta text-caption stat-number">+9 за неделю</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label text-caption">Нужен владелец</span>
+        <span class="stat-value text-headline stat-number">3</span>
+        <span class="stat-delta text-caption stat-number">-1 за неделю</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label text-caption">Средний ответ</span>
+        <span class="stat-value text-headline stat-number">28 сек</span>
+        <span class="stat-delta text-caption stat-number">-4 сек за неделю</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ OUTCOME DISTRIBUTION ============ -->
+  <div class="svodka-section">
+    <div class="section-tab-label">Статусы диалогов</div>
+
+    <div class="outcome-bar" role="img" aria-label="Заявка 14, Нужен владелец 3, В диалоге 16, Клиент замолчал 9, Вопрос закрыт 5">
+      <span class="outcome-bar-seg dot-zayavka" style="width:29.79%"></span>
+      <span class="outcome-bar-seg dot-vladelets" style="width:6.38%"></span>
+      <span class="outcome-bar-seg dot-dialog" style="width:34.04%"></span>
+      <span class="outcome-bar-seg dot-silent" style="width:19.15%"></span>
+      <span class="outcome-bar-seg dot-closed" style="width:10.64%"></span>
+    </div>
+
+    <div class="outcome-legend">
+      <span class="legend-chip">
+        <span class="legend-dot dot-zayavka" aria-hidden="true"></span>
+        <span class="legend-label text-caption">Заявка</span>
+        <span class="legend-count text-caption stat-number">14</span>
+      </span>
+      <span class="legend-chip">
+        <span class="legend-dot dot-vladelets" aria-hidden="true"></span>
+        <span class="legend-label text-caption">Нужен владелец</span>
+        <span class="legend-count text-caption stat-number">3</span>
+      </span>
+      <span class="legend-chip">
+        <span class="legend-dot dot-dialog" aria-hidden="true"></span>
+        <span class="legend-label text-caption">В диалоге</span>
+        <span class="legend-count text-caption stat-number">16</span>
+      </span>
+      <span class="legend-chip">
+        <span class="legend-dot dot-silent" aria-hidden="true"></span>
+        <span class="legend-label text-caption">Клиент замолчал</span>
+        <span class="legend-count text-caption stat-number">9</span>
+      </span>
+      <span class="legend-chip">
+        <span class="legend-dot dot-closed" aria-hidden="true"></span>
+        <span class="legend-label text-caption">Вопрос закрыт</span>
+        <span class="legend-count text-caption stat-number">5</span>
+      </span>
+    </div>
+  </div>
+
+  <!-- ============ RECENT CONVERSATIONS ============ -->
+  <div class="svodka-section">
+    <div class="section-tab-label">Недавние диалоги</div>
+
+    <div class="outcome-list">
+
+      <div class="outcome-row outcome-row--claim tappable" role="button" tabindex="0"
+           onclick="openConversation()"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openConversation();}">
+        <div class="chat-avatar chat-avatar--a" aria-hidden="true">А</div>
+        <div class="outcome-row-main">
+          <div class="outcome-row-line1">
+            <span class="outcome-row-name text-title">Айгерим</span>
+            <span class="outcome-row-time text-caption">5 мин назад</span>
+          </div>
+          <p class="outcome-row-summary text-body">Заказ: букет 25 роз, доставка завтра к 14:00</p>
+          <span class="status-pill">
+            <span class="status-dot dot-zayavka stamp-impression" aria-hidden="true"></span>
+            <span class="text-caption">Заявка</span>
+          </span>
+        </div>
+      </div>
+
+      <div class="outcome-row tappable" role="button" tabindex="0"
+           onclick="openConversation()"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openConversation();}">
+        <div class="chat-avatar chat-avatar--b" aria-hidden="true">Д</div>
+        <div class="outcome-row-main">
+          <div class="outcome-row-line1">
+            <span class="outcome-row-name text-title">Данияр</span>
+            <span class="outcome-row-time text-caption">12 мин назад</span>
+          </div>
+          <p class="outcome-row-summary text-body">Колодки на Camry 70 - нет в базе, нужен ответ владельца</p>
+          <span class="status-pill">
+            <span class="status-dot dot-vladelets" aria-hidden="true"></span>
+            <span class="text-caption">Нужен владелец</span>
+          </span>
+        </div>
+      </div>
+
+      <div class="outcome-row tappable" role="button" tabindex="0"
+           onclick="openConversation()"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openConversation();}">
+        <div class="chat-avatar chat-avatar--c" aria-hidden="true">М</div>
+        <div class="outcome-row-main">
+          <div class="outcome-row-line1">
+            <span class="outcome-row-name text-title">Мадина</span>
+            <span class="outcome-row-time text-caption">1 ч назад</span>
+          </div>
+          <p class="outcome-row-summary text-body">Уточнила расписание IELTS, обещала подумать</p>
+          <span class="status-pill">
+            <span class="status-dot dot-silent" aria-hidden="true"></span>
+            <span class="text-caption">Клиент замолчал</span>
+          </span>
+        </div>
+      </div>
+
+      <div class="outcome-row tappable" role="button" tabindex="0"
+           onclick="openConversation()"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openConversation();}">
+        <div class="chat-avatar chat-avatar--d" aria-hidden="true">Е</div>
+        <div class="outcome-row-main">
+          <div class="outcome-row-line1">
+            <span class="outcome-row-name text-title">Ерлан</span>
+            <span class="outcome-row-time text-caption">вчера</span>
+          </div>
+          <p class="outcome-row-summary text-body">Узнал график работы</p>
+          <span class="status-pill">
+            <span class="status-dot dot-closed" aria-hidden="true"></span>
+            <span class="text-caption">Вопрос закрыт</span>
+          </span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+<!--SLOT:svodka:END-->
+<!--SLOT:svodka:END--></section>
+
+          <section id="screen-profile" class="screen" data-tab="profile"><!--SLOT:profile:START-->
+<!--SLOT:profile:START-->
+<div class="profile-screen">
+
+  <div class="profile-header">
+    <div class="text-headline profile-title">Профиль</div>
+  </div>
+
+  <div class="profile-identity">
+    <div class="profile-avatar text-headline" aria-hidden="true">НА</div>
+    <div class="profile-identity-info">
+      <div class="profile-name text-title">Нурлан Ахметов</div>
+      <div class="profile-phone text-caption stat-number">+7 701 222 33 44</div>
+    </div>
+  </div>
+
+  <div class="profile-section">
+    <div class="section-tab-label">Настройки</div>
+    <div class="profile-list">
+
+      <div class="profile-row tappable" role="button" tabindex="0">
+        <span class="profile-row-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="9.5" r="3.2" fill="none" stroke="currentColor" stroke-width="1.75"/><path d="M5.5 19c0-3.4 2.9-5.6 6.5-5.6s6.5 2.2 6.5 5.6" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="square"/></svg>
+        </span>
+        <span class="profile-row-label text-body">Аккаунт</span>
+        <svg class="profile-row-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l6 7-6 7" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="square" stroke-linejoin="round"/></svg>
+      </div>
+
+      <div class="profile-row tappable" role="button" tabindex="0">
+        <span class="profile-row-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 4.5c-2.4 0-4.3 1.9-4.3 4.3v3.2l-1.7 3h12l-1.7-3V8.8c0-2.4-1.9-4.3-4.3-4.3z" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="square"/><path d="M10.1 17.5a1.9 1.9 0 0 0 3.8 0" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+        </span>
+        <span class="profile-row-label text-body">Уведомления</span>
+        <svg class="profile-row-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l6 7-6 7" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="square" stroke-linejoin="round"/></svg>
+      </div>
+
+      <div class="profile-row tappable" role="button" tabindex="0">
+        <span class="profile-row-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 3.5l6.5 2.6v5.4c0 4.2-2.8 6.9-6.5 8.1-3.7-1.2-6.5-3.9-6.5-8.1V6.1z" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/></svg>
+        </span>
+        <span class="profile-row-label text-body">Конфиденциальность</span>
+        <svg class="profile-row-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l6 7-6 7" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="square" stroke-linejoin="round"/></svg>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="profile-section">
+    <div class="section-tab-label">Информация</div>
+    <div class="profile-list">
+
+      <div class="profile-row tappable" role="button" tabindex="0">
+        <span class="profile-row-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="1.75"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.75"/><path d="M12 4.5v3M12 16.5v3M4.5 12h3M16.5 12h3" stroke="currentColor" stroke-width="1.75" stroke-linecap="square"/></svg>
+        </span>
+        <span class="profile-row-label text-body">Поддержка</span>
+        <svg class="profile-row-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l6 7-6 7" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="square" stroke-linejoin="round"/></svg>
+      </div>
+
+      <div class="profile-row tappable" role="button" tabindex="0">
+        <span class="profile-row-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="1.75"/><circle cx="12" cy="8.3" r="1.1" fill="currentColor" stroke="none"/><path d="M12 11.5v5" stroke="currentColor" stroke-width="1.75" stroke-linecap="square"/></svg>
+        </span>
+        <span class="profile-row-label text-body">О приложении</span>
+        <svg class="profile-row-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l6 7-6 7" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="square" stroke-linejoin="round"/></svg>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="profile-footer">
+    <span class="text-caption profile-version">Артель · версия 1.0.0</span>
+  </div>
+
+</div>
+<!--SLOT:profile:END-->
+<!--SLOT:profile:END--></section>
+
+        </div>
+
+        <nav class="tab-bar">
+          <button class="tab-btn active" data-tab="boti" aria-label="Боты">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 2v3" stroke-linecap="square"/>
+              <circle cx="12" cy="3.3" r="1.15" fill="currentColor" stroke="none"/>
+              <rect x="4" y="6" width="16" height="13" rx="4"/>
+              <path d="M4 12H2M22 12h-2" stroke-linecap="square"/>
+              <circle cx="9" cy="12.5" r="1.3" fill="currentColor" stroke="none"/>
+              <circle cx="15" cy="12.5" r="1.3" fill="currentColor" stroke="none"/>
+            </svg>
+            <span>Боты</span>
+          </button>
+
+          <button class="tab-btn" data-tab="chaty" aria-label="Чаты">
+            <svg viewBox="0 0 24 24">
+              <rect x="4" y="5" width="16" height="11" rx="4"/>
+              <path d="M9 16v3.2L13.5 16" stroke-linejoin="round" stroke-linecap="square"/>
+            </svg>
+            <span>Чаты</span>
+          </button>
+
+          <button class="tab-btn" data-tab="svodka" aria-label="Сводка">
+            <svg viewBox="0 0 24 24">
+              <path d="M5 19V10M12 19V5M19 19v-6" stroke-linecap="square"/>
+              <path d="M3 19h18" stroke-linecap="square"/>
+            </svg>
+            <span>Сводка</span>
+          </button>
+
+          <button class="tab-btn" data-tab="profile" aria-label="Профиль">
+            <svg viewBox="0 0 24 24">
+              <circle cx="12" cy="8" r="3.4"/>
+              <path d="M5 19c0-3.6 3.13-6 7-6s7 2.4 7 6" stroke-linecap="square"/>
+            </svg>
+            <span>Профиль</span>
+          </button>
+        </nav>
+
+        <section id="screen-conversation" class="overlay-screen"><!--SLOT:conversation:START-->
+<!--SLOT:conversation:START-->
+<div class="conv-screen">
+
+  <header class="conv-header">
+    <button type="button" class="conv-back" aria-label="Назад" onclick="closeOverlay('screen-conversation')">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="square" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="conv-header-info">
+      <div class="conv-header-name text-title">Айгерим</div>
+      <div class="conv-header-sub text-caption">
+        <span class="conv-channel-mini" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 3.5c-4.7 0-8.5 3.4-8.5 7.6 0 2.2 1 4.2 2.7 5.6-.1 1.1-.5 2.3-1.1 3.2 1.3-.2 2.6-.7 3.6-1.4.9.3 1.8.4 2.8.4h.5c4.7 0 8.5-3.4 8.5-7.6S17.2 3.5 12 3.5z" fill="var(--color-surface)"/></svg>
+        </span>
+        Гульдер · WhatsApp
+      </div>
+    </div>
+  </header>
+
+  <div class="conv-thread" id="conv-thread">
+
+    <div class="conv-date-sep"><span class="text-caption">Сегодня</span></div>
+
+    <div class="conv-bubble-row conv-bubble-row--in">
+      <div class="conv-bubble conv-bubble--in">
+        <p class="conv-bubble-text text-body">Здравствуйте! Есть букет из роз на завтра? И сколько доставка по Алматы?</p>
+        <div class="conv-bubble-meta"><span class="conv-bubble-time text-caption">10:12</span></div>
+      </div>
+    </div>
+
+    <div class="conv-bubble-row conv-bubble-row--out">
+      <div class="conv-bubble conv-bubble--out">
+        <p class="conv-bubble-text text-body">Здравствуйте! Да, есть 🌹 15 роз — 12 500 ₸, 25 роз — 19 900 ₸. Доставка по Алматы — 1 500 ₸. Какой букет оформим?</p>
+        <div class="conv-bubble-meta">
+          <span class="conv-bubble-time text-caption">10:13</span>
+          <svg class="conv-tick conv-tick--read" viewBox="0 0 16 10" aria-hidden="true">
+            <path d="M1 5.5l2.6 3L9 2.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M6 5.5l2.6 3L15 2.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="conv-bubble-row conv-bubble-row--out">
+      <div class="conv-bubble conv-bubble--out conv-bubble--media">
+        <div class="conv-media-placeholder">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="8.5" cy="8.5" r="1.7" fill="var(--color-surface)"/>
+            <path d="M3.5 16.5l5-5.2 3.3 3.4L17.5 9l3 4.2" fill="none" stroke="var(--color-surface)" stroke-width="1.75" stroke-linecap="square" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <p class="conv-bubble-text conv-bubble-caption text-body">Розы в наличии — фото витрины</p>
+        <div class="conv-bubble-meta">
+          <span class="conv-bubble-time text-caption">10:13</span>
+          <svg class="conv-tick conv-tick--delivered" viewBox="0 0 16 10" aria-hidden="true">
+            <path d="M1 5.5l2.6 3L9 2.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M6 5.5l2.6 3L15 2.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="conv-bubble-row conv-bubble-row--in">
+      <div class="conv-bubble conv-bubble--in conv-bubble--voice">
+        <span class="voice-play-btn" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M8 5l12 7-12 7z" fill="var(--color-surface)"/></svg>
+        </span>
+        <span class="voice-waveform" aria-hidden="true">
+          <span class="voice-bar" style="height:7px"></span>
+          <span class="voice-bar" style="height:13px"></span>
+          <span class="voice-bar" style="height:19px"></span>
+          <span class="voice-bar" style="height:10px"></span>
+          <span class="voice-bar" style="height:22px"></span>
+          <span class="voice-bar" style="height:15px"></span>
+          <span class="voice-bar" style="height:9px"></span>
+          <span class="voice-bar" style="height:17px"></span>
+          <span class="voice-bar" style="height:12px"></span>
+          <span class="voice-bar" style="height:20px"></span>
+          <span class="voice-bar" style="height:8px"></span>
+          <span class="voice-bar" style="height:16px"></span>
+          <span class="voice-bar" style="height:11px"></span>
+          <span class="voice-bar" style="height:6px"></span>
+        </span>
+        <span class="voice-duration text-caption">0:32</span>
+      </div>
+    </div>
+
+    <div class="conv-bubble-row conv-bubble-row--in">
+      <div class="conv-bubble conv-bubble--in conv-bubble--reply">
+        <div class="conv-quote-card">
+          <span class="conv-quote-bar" aria-hidden="true"></span>
+          <div class="conv-quote-body">
+            <span class="conv-quote-label text-caption">Гульдер</span>
+            <p class="conv-quote-text text-caption">Здравствуйте! Да, есть 🌹 15 роз — 12 500 ₸, 25 роз — 19 900 ₸. Доставка по Алматы — 1 500 ₸. Какой букет оформим?</p>
+          </div>
+        </div>
+        <p class="conv-bubble-text text-body">Давайте 25 роз к 14:00</p>
+        <div class="conv-bubble-meta"><span class="conv-bubble-time text-caption">10:15</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="conv-compose-area">
+
+    <div class="vmeste-panel" id="vmeste-panel">
+      <div class="vmeste-panel-header">
+        <svg class="vmeste-panel-ring" viewBox="0 0 20 20" aria-hidden="true">
+          <circle cx="10" cy="10" r="8" fill="var(--color-rust-tint)"/>
+          <path d="M10,10 L10,2 A8,8 0 0,1 10,18 Z" fill="var(--color-rust)"/>
+        </svg>
+        <span class="vmeste-panel-label text-caption">Вместе — бот предлагает варианты ответа</span>
+      </div>
+
+      <div class="vmeste-suggestions" id="vmeste-suggestions">
+        <button type="button" class="vmeste-card vmeste-card--top" onclick="sendSuggestion(this)">
+          <span class="vmeste-card-rank text-caption">Топ вариант</span>
+          <p class="vmeste-card-text text-body">Отлично! 25 роз к 14:00 ✅ Подскажите адрес доставки?</p>
+        </button>
+        <button type="button" class="vmeste-card" onclick="sendSuggestion(this)">
+          <p class="vmeste-card-text text-body">Принято! Оплата Kaspi переводом или наличными курьеру?</p>
+        </button>
+        <button type="button" class="vmeste-card" onclick="sendSuggestion(this)">
+          <p class="vmeste-card-text text-body">Добавить открытку к букету? (+500 ₸)</p>
+        </button>
+      </div>
+    </div>
+
+    <div class="conv-input-row">
+      <div class="conv-input-field">
+        <input type="text" id="conv-text-input" placeholder="Сообщение" onkeydown="if(event.key==='Enter'){event.preventDefault();sendTextMessage();}">
+      </div>
+      <button type="button" class="conv-send-btn" aria-label="Отправить" onclick="sendTextMessage()">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V6M6 11l6-6 6 6" fill="none" stroke="var(--color-surface)" stroke-width="1.9" stroke-linecap="square" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+
+  </div>
+
+</div>
+<!--SLOT:conversation:END-->
+<!--SLOT:conversation:END--></section>
+
+        <section id="screen-settings" class="overlay-screen"><!--SLOT:settings:START-->
+<!--SLOT:settings:START-->
+<div class="settings-screen">
+
+  <header class="conv-header">
+    <button type="button" class="conv-back" aria-label="Назад" onclick="closeOverlay('screen-settings')">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="square" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="conv-header-info">
+      <div class="conv-header-name text-title">Гульдер</div>
+    </div>
+    <span class="run-pill run-pill--live" id="settings-run-pill">
+      <svg class="run-pill-ring" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8"/></svg>
+      <span class="run-pill-label">Бот работает</span>
+    </span>
+  </header>
+
+  <div class="settings-content">
+
+    <!-- ============ ОСНОВНОЕ ============ -->
+    <div class="settings-section">
+      <div class="section-tab-label">Основное</div>
+
+      <div class="settings-field">
+        <label class="settings-field-label text-caption" for="settings-bot-name">Название бота</label>
+        <input type="text" id="settings-bot-name" class="settings-input" value="Гульдер">
+      </div>
+
+      <div class="settings-field">
+        <span class="settings-field-label text-caption">Тип бизнеса</span>
+        <button type="button" class="settings-select-row">
+          <span class="text-body">Цветочный магазин</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="square" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+
+      <div class="settings-field">
+        <span class="settings-field-label text-caption">Каналы связи</span>
+        <div class="settings-connections-group">
+
+          <div class="settings-connection-row">
+            <span class="channel-seal channel-seal--wa" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 3.5c-4.7 0-8.5 3.4-8.5 7.6 0 2.2 1 4.2 2.7 5.6-.1 1.1-.5 2.3-1.1 3.2 1.3-.2 2.6-.7 3.6-1.4.9.3 1.8.4 2.8.4h.5c4.7 0 8.5-3.4 8.5-7.6S17.2 3.5 12 3.5z" fill="var(--color-surface)"/></svg>
+            </span>
+            <div class="settings-connection-info">
+              <span class="text-title">WhatsApp</span>
+              <span class="settings-connection-status text-caption">
+                <span class="status-dot dot-zayavka" aria-hidden="true"></span>Подключен
+              </span>
+            </div>
+            <button type="button" class="settings-reconnect-btn text-caption" onclick="reconnectChannel(this)">Переподключить</button>
+          </div>
+
+          <div class="settings-connection-row">
+            <span class="channel-seal channel-seal--tg" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4.5 12.8 19.5 4.8l-3.2 15-4.6-4-3.1 2.6.2-3.9z" fill="var(--color-surface)"/></svg>
+            </span>
+            <div class="settings-connection-info">
+              <span class="text-title">Telegram</span>
+              <span class="settings-connection-status text-caption">
+                <span class="status-dot dot-zayavka" aria-hidden="true"></span>Подключен
+              </span>
+            </div>
+            <button type="button" class="settings-reconnect-btn text-caption" onclick="reconnectChannel(this)">Переподключить</button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <hr class="stitch-divider">
+
+    <!-- ============ О БИЗНЕСЕ ============ -->
+    <div class="settings-section">
+      <div class="section-tab-label">О бизнесе</div>
+      <textarea class="settings-textarea text-body" rows="4">Цветочный магазин в центре Алматы. Работаем ежедневно с 9:00 до 20:00, доставляем свежие букеты по городу в день заказа.</textarea>
+    </div>
+
+    <hr class="stitch-divider">
+
+    <!-- ============ ТОВАРЫ И УСЛУГИ ============ -->
+    <div class="settings-section">
+      <div class="section-tab-label">Товары и услуги</div>
+
+      <div class="product-list" id="product-list">
+        <div class="product-card">
+          <span class="product-name text-body">Букет 15 роз</span>
+          <span class="product-price text-title stat-number">12 500 ₸</span>
+        </div>
+        <div class="product-card">
+          <span class="product-name text-body">Букет 25 роз</span>
+          <span class="product-price text-title stat-number">19 900 ₸</span>
+        </div>
+        <div class="product-card">
+          <span class="product-name text-body">Доставка по Алматы</span>
+          <span class="product-price text-title stat-number">1 500 ₸</span>
+        </div>
+
+        <button type="button" class="add-item-btn" id="add-product-btn" onclick="addPlaceholderProduct()">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="square"/></svg>
+          Добавить товар
+        </button>
+      </div>
+    </div>
+
+    <hr class="stitch-divider">
+
+    <!-- ============ ПРАЙС-ЛИСТЫ ============ -->
+    <div class="settings-section">
+      <div class="section-tab-label">Прайс-листы</div>
+
+      <div class="file-list" id="file-list">
+        <div class="file-row">
+          <span class="file-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/><path d="M14 3v4h4" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/></svg>
+          </span>
+          <div class="file-info">
+            <span class="file-name text-body">прайс_март.xlsx</span>
+            <span class="file-meta text-caption">48 КБ · 12 июля</span>
+          </div>
+          <button type="button" class="file-delete-btn" aria-label="Удалить файл" onclick="removeFileRow(this)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+
+        <button type="button" class="add-item-btn" id="add-file-btn" onclick="addPlaceholderFile()">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="square"/></svg>
+          Добавить файл
+        </button>
+      </div>
+    </div>
+
+    <hr class="stitch-divider">
+
+    <!-- ============ ПРОМПТ ============ -->
+    <div class="settings-section">
+      <div class="section-tab-label">Промпт</div>
+      <div class="settings-field">
+        <label class="settings-field-label text-caption" for="settings-prompt">Дополнительные инструкции</label>
+        <textarea id="settings-prompt" class="settings-textarea text-body" rows="3">Всегда уточняй желаемое время доставки и предлагай открытку к букету при заказе от 15 000 ₸.</textarea>
+      </div>
+    </div>
+
+    <hr class="stitch-divider">
+
+    <!-- ============ DANGER ZONE ============ -->
+    <div class="danger-zone">
+      <button type="button" class="danger-trigger text-caption" id="danger-trigger" onclick="requestDeleteBot()">Удалить бота</button>
+      <div class="danger-confirm-row" id="danger-confirm-row">
+        <span class="danger-confirm-label text-caption">Точно удалить?</span>
+        <button type="button" class="danger-confirm-btn text-caption" onclick="confirmDeleteBot()">Точно удалить</button>
+        <button type="button" class="danger-cancel-btn text-caption" onclick="cancelDeleteBot()">Отмена</button>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+<!--SLOT:settings:END-->
+<!--SLOT:settings:END--></section>
+
+        <div id="dialog-backdrop" class="dialog-backdrop"></div>
+        <div id="dialogs-root"><div class="dialog-card" id="dialog-mode-switch" role="alertdialog" aria-labelledby="dialog-mode-switch-title" aria-describedby="dialog-mode-switch-body">
+  <div class="dialog-title text-title" id="dialog-mode-switch-title">Сменить режим?</div>
+  <p class="dialog-body text-body" id="dialog-mode-switch-body">Бот перестанет отвечать сам — он будет предлагать варианты ответа, а вы выберете.</p>
+  <div class="dialog-actions">
+    <button type="button" class="btn-primary" onclick="confirmModeSwitch()">Сменить режим</button>
+    <button type="button" class="btn-secondary" onclick="closeDialog('dialog-mode-switch')">Отмена</button>
+  </div>
+</div>
+<div id="settings-toast" class="settings-toast" role="status" aria-live="polite">Бот удалён</div>
+<!--SLOT:DIALOGS--></div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============================================================
+    // TAB NAVIGATION
+    // ============================================================
+    function showTab(name) {
+      document.querySelectorAll('.screen').forEach(function (s) {
+        s.classList.remove('active', 'screen-anim');
+        s.style.display = 'none';
+      });
+
+      var target = document.getElementById('screen-' + name);
+      if (target) {
+        target.style.display = 'block';
+        target.classList.add('active');
+        // force reflow so the animation class re-triggers every time
+        void target.offsetWidth;
+        target.classList.add('screen-anim');
+      }
+
+      document.querySelectorAll('.tab-btn').forEach(function (btn) {
+        btn.classList.toggle('active', btn.dataset.tab === name);
+      });
+    }
+
+    // ============================================================
+    // OVERLAY SCREENS (drill-in navigation)
+    // ============================================================
+    function openOverlay(id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.classList.add('open');
+      var vp = document.querySelector('.content-viewport');
+      if (vp) vp.classList.add('scroll-locked');
+    }
+
+    function closeOverlay(id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.classList.remove('open');
+      var anyOpen = document.querySelector('.overlay-screen.open');
+      if (!anyOpen) {
+        var vp = document.querySelector('.content-viewport');
+        if (vp) vp.classList.remove('scroll-locked');
+      }
+    }
+
+    // ============================================================
+    // DIALOG SYSTEM
+    // ============================================================
+    function openDialog(id) {
+      var backdrop = document.getElementById('dialog-backdrop');
+      var card = document.getElementById(id);
+      if (backdrop) backdrop.classList.add('open');
+      if (card) card.classList.add('open');
+    }
+
+    function closeDialog(id) {
+      var card = document.getElementById(id);
+      if (card) card.classList.remove('open');
+      var anyOpen = document.querySelector('.dialog-card.open');
+      var backdrop = document.getElementById('dialog-backdrop');
+      if (!anyOpen && backdrop) backdrop.classList.remove('open');
+    }
+
+    (function () {
+      var backdrop = document.getElementById('dialog-backdrop');
+      if (backdrop) {
+        backdrop.addEventListener('click', function () {
+          document.querySelectorAll('.dialog-card.open').forEach(function (card) {
+            closeDialog(card.id);
+          });
+        });
+      }
+
+      document.querySelectorAll('.tab-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          showTab(btn.dataset.tab);
+        });
+      });
+    })();
+
+    
+// ============================================================
+// БОТЫ — pause/resume switch (per-card, independent of mode toggle)
+// ============================================================
+function toggleRunSwitch(switchEl, pillEl, evt) {
+  if (evt) evt.stopPropagation();
+  if (!switchEl || !pillEl) return;
+
+  var goingLive = !switchEl.classList.contains('is-on');
+  switchEl.classList.toggle('is-on', goingLive);
+  switchEl.setAttribute('aria-checked', goingLive ? 'true' : 'false');
+  switchEl.setAttribute('aria-label', goingLive ? 'Приостановить бота' : 'Возобновить бота');
+
+  pillEl.classList.toggle('run-pill--live', goingLive);
+  pillEl.classList.toggle('run-pill--paused', !goingLive);
+
+  var label = pillEl.querySelector('.run-pill-label');
+  if (label) label.textContent = goingLive ? 'Бот работает' : 'Бот на паузе';
+
+  if (goingLive) {
+    var glyph = switchEl.querySelector('.run-switch-thumb-glyph');
+    if (glyph) {
+      glyph.classList.remove('stamp-impression');
+      void glyph.offsetWidth;
+      glyph.classList.add('stamp-impression');
+    }
+  }
+}
+
+// ============================================================
+// БОТЫ — quiet demo-only state cycler (populated -> empty -> loading -> ...)
+// ============================================================
+function cycleBotiDemoState() {
+  var root = document.getElementById('boti-root');
+  if (!root) return;
+  var order = ['populated', 'empty', 'loading'];
+  var current = root.getAttribute('data-state') || 'populated';
+  var idx = order.indexOf(current);
+  var next = order[(idx + 1) % order.length];
+  root.setAttribute('data-state', next);
+}
+
+// ============================================================
+// ЧАТЫ — bot switcher (label + mode-toggle sync; list stays fixed)
+// ============================================================
+var CHATY_BOT_NAMES = { gulder: 'Гульдер', almas: 'Автозапчасти Алмас', sapa: 'Sapa Education' };
+var CHATY_BOT_MODES = { gulder: 'auto', almas: 'together', sapa: 'together' };
+
+function switchActiveBot(btnEl, botKey) {
+  document.querySelectorAll('.bot-switcher-item').forEach(function (el) {
+    el.classList.remove('active');
+    el.setAttribute('aria-selected', 'false');
+  });
+  btnEl.classList.add('active');
+  btnEl.setAttribute('aria-selected', 'true');
+
+  var nameEl = document.getElementById('chaty-active-bot-name');
+  if (nameEl) nameEl.textContent = CHATY_BOT_NAMES[botKey] || btnEl.textContent;
+
+  var toggle = document.getElementById('mode-toggle');
+  if (toggle) {
+    var mode = CHATY_BOT_MODES[botKey] || 'auto';
+    toggle.setAttribute('data-mode', mode);
+    toggle.setAttribute('aria-checked', mode === 'auto' ? 'true' : 'false');
+    toggle.setAttribute('aria-label', 'Режим ответов: ' + (mode === 'auto' ? 'Авто' : 'Вместе'));
+  }
+}
+
+// ============================================================
+// ЧАТЫ — Авто/Вместе mode switch (confirm-before-change)
+// ============================================================
+var chatyPendingMode = null;
+
+function requestModeSwitch() {
+  var toggle = document.getElementById('mode-toggle');
+  if (!toggle) return;
+  var current = toggle.getAttribute('data-mode') || 'auto';
+  var target = current === 'auto' ? 'together' : 'auto';
+  chatyPendingMode = target;
+
+  var bodyEl = document.getElementById('dialog-mode-switch-body');
+  if (bodyEl) {
+    bodyEl.textContent = target === 'together'
+      ? 'Бот перестанет отвечать сам — он будет предлагать варианты ответа, а вы выберете.'
+      : 'Бот перестанет предлагать варианты ответа — он будет отвечать клиентам самостоятельно.';
+  }
+
+  openDialog('dialog-mode-switch');
+}
+
+function confirmModeSwitch() {
+  var toggle = document.getElementById('mode-toggle');
+  if (toggle && chatyPendingMode) {
+    toggle.setAttribute('data-mode', chatyPendingMode);
+    toggle.setAttribute('aria-checked', chatyPendingMode === 'auto' ? 'true' : 'false');
+    toggle.setAttribute('aria-label', 'Режим ответов: ' + (chatyPendingMode === 'auto' ? 'Авто' : 'Вместе'));
+
+    var activeSeg = toggle.querySelector('.mode-toggle-seg--' + chatyPendingMode);
+    var ring = activeSeg ? activeSeg.querySelector('.mode-toggle-ring') : null;
+    if (ring) {
+      ring.classList.remove('stamp-impression');
+      void ring.getBBox && ring.getBBox();
+      ring.classList.add('stamp-impression');
+    }
+  }
+  chatyPendingMode = null;
+  closeDialog('dialog-mode-switch');
+}
+
+// ============================================================
+// ЧАТЫ — open a conversation thread
+// ============================================================
+function openConversation() {
+  openOverlay('screen-conversation');
+}
+// ============================================================
+// CONVERSATION — Вместе suggestion tap + manual send
+// ============================================================
+function convCurrentTime() {
+  var now = new Date();
+  var hh = now.getHours().toString().padStart(2, '0');
+  var mm = now.getMinutes().toString().padStart(2, '0');
+  return hh + ':' + mm;
+}
+
+function appendOutgoingBubble(messageText) {
+  if (!messageText) return;
+  var thread = document.getElementById('conv-thread');
+  if (!thread) return;
+
+  var row = document.createElement('div');
+  row.className = 'conv-bubble-row conv-bubble-row--out conv-bubble-row--new';
+  row.innerHTML =
+    '<div class="conv-bubble conv-bubble--out">' +
+      '<p class="conv-bubble-text text-body"></p>' +
+      '<div class="conv-bubble-meta">' +
+        '<span class="conv-bubble-time text-caption">' + convCurrentTime() + '</span>' +
+        '<svg class="conv-tick conv-tick--sent" viewBox="0 0 16 10" aria-hidden="true">' +
+          '<path d="M1 5.5l2.6 3L15 2.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
+        '</svg>' +
+      '</div>' +
+    '</div>';
+
+  row.querySelector('.conv-bubble-text').textContent = messageText;
+  thread.appendChild(row);
+
+  var overlay = document.getElementById('screen-conversation');
+  requestAnimationFrame(function () {
+    if (overlay) overlay.scrollTop = overlay.scrollHeight;
+  });
+}
+
+function sendSuggestion(cardEl) {
+  if (!cardEl) return;
+  var textEl = cardEl.querySelector('.vmeste-card-text');
+  var text = textEl ? textEl.textContent : '';
+
+  appendOutgoingBubble(text);
+
+  var panel = document.getElementById('vmeste-panel');
+  if (panel) {
+    panel.classList.add('is-refreshing');
+    setTimeout(function () {
+      panel.classList.remove('is-refreshing');
+    }, 320);
+  }
+}
+
+function sendTextMessage() {
+  var input = document.getElementById('conv-text-input');
+  if (!input) return;
+  var value = input.value.trim();
+  if (!value) return;
+  appendOutgoingBubble(value);
+  input.value = '';
+}
+
+
+// ============================================================
+// СВОДКА — period segmented control (Сегодня / Неделя / Месяц)
+// ============================================================
+function switchPeriod(btnEl, period) {
+  var toggle = btnEl.closest('.period-toggle');
+  if (!toggle) return;
+  toggle.setAttribute('data-period', period);
+  toggle.setAttribute('aria-label', 'Период: ' + btnEl.textContent.trim());
+  toggle.querySelectorAll('.period-toggle-seg').forEach(function (seg) {
+    var isActive = seg === btnEl;
+    seg.classList.toggle('active', isActive);
+    seg.setAttribute('aria-selected', isActive ? 'true' : 'false');
+  });
+}
+
+// ============================================================
+// СВОДКА — per-bot filter chips
+// ============================================================
+function switchDashboardBot(btnEl) {
+  var container = btnEl.closest('.svodka-bot-filter');
+  if (!container) return;
+  container.querySelectorAll('.bot-switcher-item').forEach(function (el) {
+    var isActive = el === btnEl;
+    el.classList.toggle('active', isActive);
+    el.setAttribute('aria-selected', isActive ? 'true' : 'false');
+  });
+}
+
+
+// ============================================================
+// BOT SETTINGS — channel reconnect (visual-only stamp-impression)
+// ============================================================
+function reconnectChannel(btnEl) {
+  var row = btnEl.closest('.settings-connection-row');
+  if (!row) return;
+  var seal = row.querySelector('.channel-seal');
+  if (seal) {
+    seal.classList.remove('stamp-impression');
+    void seal.offsetWidth;
+    seal.classList.add('stamp-impression');
+  }
+}
+
+// ============================================================
+// BOT SETTINGS — Товары и услуги: add placeholder product row
+// ============================================================
+function addPlaceholderProduct() {
+  var list = document.getElementById('product-list');
+  var addBtn = document.getElementById('add-product-btn');
+  if (!list || !addBtn) return;
+
+  var card = document.createElement('div');
+  card.className = 'product-card settings-row-enter';
+  card.innerHTML =
+    '<span class="product-name text-body">Новый товар</span>' +
+    '<span class="product-price text-title stat-number">0 ₸</span>';
+  list.insertBefore(card, addBtn);
+}
+
+// ============================================================
+// BOT SETTINGS — Прайс-листы: add / remove file rows
+// ============================================================
+function addPlaceholderFile() {
+  var list = document.getElementById('file-list');
+  var addBtn = document.getElementById('add-file-btn');
+  if (!list || !addBtn) return;
+
+  var row = document.createElement('div');
+  row.className = 'file-row settings-row-enter';
+  row.innerHTML =
+    '<span class="file-icon" aria-hidden="true">' +
+      '<svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/><path d="M14 3v4h4" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/></svg>' +
+    '</span>' +
+    '<div class="file-info">' +
+      '<span class="file-name text-body">Новый файл</span>' +
+      '<span class="file-meta text-caption">— · —</span>' +
+    '</div>' +
+    '<button type="button" class="file-delete-btn" aria-label="Удалить файл" onclick="removeFileRow(this)">' +
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>' +
+    '</button>';
+  list.insertBefore(row, addBtn);
+}
+
+function removeFileRow(btnEl) {
+  var row = btnEl.closest('.file-row');
+  if (!row) return;
+  row.classList.add('removing');
+  setTimeout(function () {
+    if (row.parentNode) row.parentNode.removeChild(row);
+  }, 200);
+}
+
+// ============================================================
+// BOT SETTINGS — danger zone: two-step inline delete confirm
+// ============================================================
+function requestDeleteBot() {
+  var trigger = document.getElementById('danger-trigger');
+  var row = document.getElementById('danger-confirm-row');
+  if (trigger) trigger.classList.add('is-hidden');
+  if (row) row.classList.add('is-open');
+}
+
+function cancelDeleteBot() {
+  var trigger = document.getElementById('danger-trigger');
+  var row = document.getElementById('danger-confirm-row');
+  if (row) row.classList.remove('is-open');
+  if (trigger) trigger.classList.remove('is-hidden');
+}
+
+function confirmDeleteBot() {
+  var toast = document.getElementById('settings-toast');
+  if (toast) {
+    toast.classList.remove('show');
+    void toast.offsetWidth;
+    toast.classList.add('show');
+  }
+  setTimeout(function () {
+    closeOverlay('screen-settings');
+    cancelDeleteBot();
+    if (toast) toast.classList.remove('show');
+  }, 900);
+}
+
+// ============================================================
+// ADDITIVE — micro-interaction strengthening pass
+// ============================================================
+
+// (4a) Wrap the existing toggleRunSwitch (defined earlier in this same
+// script) so a bot going "на паузе" -> "Бот работает" gets a brief glow
+// pulse on the status pill, in addition to the stamp-impression the
+// switch thumb already plays. The original function's behavior is fully
+// preserved and called as-is; this only adds a class toggle around it.
+(function () {
+  var baseToggleRunSwitch = window.toggleRunSwitch;
+  if (typeof baseToggleRunSwitch !== 'function') return;
+
+  window.toggleRunSwitch = function (switchEl, pillEl, evt) {
+    var wasLive = !!(switchEl && switchEl.classList.contains('is-on'));
+    baseToggleRunSwitch(switchEl, pillEl, evt);
+    var isLiveNow = !!(switchEl && switchEl.classList.contains('is-on'));
+
+    if (!wasLive && isLiveNow && pillEl) {
+      pillEl.classList.remove('run-pill--activate-glow');
+      void pillEl.offsetWidth;
+      pillEl.classList.add('run-pill--activate-glow');
+    }
+  };
+})();
+
+// Palette comparison switcher — swaps only the accent (+ any status color
+// that would otherwise collide with it) via body[data-theme]; layout,
+// content, and every other token stay identical across palettes.
+function setAccentTheme(name, btn) {
+  document.body.setAttribute('data-theme', name);
+  document.querySelectorAll('.theme-swatch').forEach(function (b) {
+    b.classList.remove('active');
+  });
+  if (btn) btn.classList.add('active');
+}
+
+//SLOT:EXTRA-JS
+  </script>
+
+</body>
+</html>
+<!--
+DESIGN TOKENS -- porting spec (Артель / "Lowercase lockup "артель" set in Golos Text SemiBold (600), −1% tracking, sitting on the baseline in Ink — signage, not app-label. To its left: the seal-ring badge — a 1.75px hairline circle (badge diameter = wordmark cap-height × 1.4) drawn with one fractionally-thinner arc and one micro-gap, so it reads as a hand-stamped ink seal rather than a vector-perfect logo mark. GRAFTED MECHANIC (from the Norma pitch's Ring Dial, folded into this seal rather than kept as a separate device): the ring is not static — it is a kinetic fill gauge with three states that map 1:1 onto the product's core spectrum. Empty hairline ring = «на паузе» (dormant, Umber stroke, no alarm color). Half-filled clockwise in Rust = «Вместе» (co-pilot — literally "half-automated," the dial visualizes the mode instead of just labeling it). Fully filled solid Rust disc = «Авто» / «Бот работает» (fully live). The same ring-fill glyph is reused everywhere a running/mode state must be shown: the wordmark badge itself (shown fully filled — "we are always on"), the WhatsApp/Telegram connection badges on bot cards (filled = authorized, hairline = disconnected/pending, with a brief 220ms stamp-impression scale+settle the instant a channel connects), the pause/resume switch (the switch thumb IS the ring, sliding along a Hairline track), the reply-mode segmented control (thumb again a ring, at half-fill or full-fill), the chat-list header pip, and the dashboard per-bot filter chip. One shape, learned once, read everywhere — the seal supplies the trust cue (notarized, official), the fill-gauge behavior supplies the product's signature promise (the automation spectrum, always one glance away). On dark/accent surfaces the badge inverts to paper-on-rust; the wordmark itself never inverts to a bright color — it stays Ink or Paper, always.")
+
+Rationale: DECISION: full commitment to Артель as the lead identity; nothing taken from Dala. Dala's kerege-lattice motif is the most regionally "authentic" pitch, but it is Kazakh-specific ornament layered onto a product also serving Russian-speaking wholesalers and Kaspi sellers CIS-wide, and the pitch itself names the folklore-kitsch risk — decorative-additive rather than earning its place through function. Артель instead builds trust from the objects of trust themselves (paper, ink, a stamped seal, a stitched ledger) and ties directly to the brief's own emotional brief ("a favorite neighborhood notary... whose competence is precisely why nobody worries") — that is a sharper, less risky answer than an ethnographic motif.
+
+ONE deliberate graft from Norma: its Ring Dial mechanic (a hairline circle that fills solid on "live") is folded INTO Артель's existing seal badge rather than imported as a separate logo trick — Норма earns its place here because it does real product work the plain seal didn't: it gives the Авто/Вместе spectrum and the Бот работает/на паузе state a single reusable kinetic shape instead of two different generic controls (an iOS switch + a segmented pill), directly satisfying the brief's demand that the mode be "glanceable everywhere" and that switching "feel safe and reversible." Norma's cool Prussian-Blue "bank statement" palette itself was rejected wholesale — the brief explicitly asks for "calm and warm," and blue-gray instrument-panel coolness reads closer to corporate SaaS than to a trusted craftsman, which is the exact generic-SaaS trap the brief warns against.
+
+Why this satisfies every Design Rule: 60/30/10 — 60% warm paper neutrals (Paper/Surface), 30% Ink/Umber text and dividers, 10% Rust reserved ONLY for primary CTAs, the live-fill state, the active tab, and the top Вместе suggestion — it never leaks into decoration. One accent — Rust, full stop; Danger red is a separate, rarely-seen token confined to the delete-bot zone so it never competes with Rust for the eye. Five status colors are re-tuned into one warm-muted family (moss/ochre/dusty-blue/taupe/charcoal) so the dashboard never reads as a bright infographic, while staying mutually distinguishable at a glance. 8pt grid spacing, tabular numerals for all ₸ figures and stat deltas, 2 weights × 4 sizes, buttons capped at a 10px radius (never pill) so the system reads as "well-made object" rather than toy, and destructive actions get no loud button at all — just the Danger token on small text/icon, deliberately hard to hit per the brief.
+
+Palette:
+  --Paper: #F7F2E9;  /* App background — the 60% base neutral every screen sits on; warm aged-paper, never clinical white */
+  --Surface: #FFFCF5;  /* Card, sheet, bottom-nav, and input fill — one shade warmer-white than Paper so cards lift without a cold contrast jump */
+  --Ink: #2A2118;  /* Primary text, icon fill, headings — warm near-black (old ledger ink), never pure #000 */
+  --Umber: #7C6F5C;  /* Secondary/meta text, timestamps, placeholder labels, inactive icon strokes, empty-ring dormant stroke — the 30% supporting neutral */
+  --Hairline: #E6DCC8;  /* Dividers, card borders, input outlines, stitch-dash section separators, switch/segmented-control tracks */
+  --Rust: #EA580C;  /* THE single accent (10%) — primary CTA fill, active tab, «Бот работает» full ring-fill, top Вместе suggestion highlight, focus states. Reserved exclusively; never decorative */
+  --Rust Tint: #FCE0C8;  /* Accent-tinted chip/pill backgrounds — running-state badge fill, selected filter chip, half-fill «Вместе» ring backdrop */
+  --Dormant: #C9BFA9;  /* «На паузе» switch-track and badge fill — a muted neutral (deliberately NOT red) so pausing never reads as an error; paired with Umber label text */
+  --Danger: #B3261E;  /* Reserved solely for the «Удалить бота» danger-zone label, icon, and its confirmation button — appears nowhere else, so its rare appearance stays meaningful and the section stays deliberately hard to hit */
+  --Scrim: rgba(42,33,24,0.45);  /* Modal/bottom-sheet backdrop overlay (Ink at 45% opacity) — behind the mode-switch confirmation dialog, item-edit sheets, focus scrims */
+
+Status colors:
+  Заявка: #5B7A4F
+  Нужен владелец: #CAA22B
+  В диалоге: #4C6B8A
+  Клиент замолчал: #948A7C
+  Вопрос закрыт: #4F493F
+
+Typography: Golos Text (Google Fonts, Cyrillic + Latin subset — drawn Cyrillic-native rather than Cyrillic-bolted-onto-Latin, so RU strings like «Бот перестанет отвечать сам» sit at true optical parity with Latin UI labels), weights Exactly two weights system-wide: 500 Medium for all body copy, list rows, chat bubbles, inputs, chip/tab labels, and meta text; 600 SemiBold for the wordmark, screen titles, section headers, button labels, prices, and every stat/number. `font-variant-numeric: tabular-nums` (or `font-feature-settings: "tnum" on`) is forced on all ₸ prices, counts, and deltas in both weights so stat columns and price lists always align like a ledger.
+Type scale: Caption 13px / line-height 18px / weight 500 — timestamps, meta labels, chip text, file size/date rows. Body 15px / line-height 22px / weight 500 — chat bubbles, list secondary lines, input fields, AI suggestion/summary text. Title 17px / line-height 24px / weight 600 — row titles, section headers, button labels, bot names, product names. Headline 24px / line-height 30px / weight 600 — dashboard stat numbers («Заявки 14»), product/price figures, screen titles. Only these 4 sizes × 2 weights exist anywhere in the system — no exceptions, no in-between sizes.
+
+Spacing scale: Strict 8pt grid, 8 stops: 4px (icon-to-label gaps, chip internal padding, badge micro-offsets) · 8px (tight stacks — timestamp under name, chip row gaps) · 12px (input/button internal padding, list-row internal gaps) · 16px (standard card padding, gutter margins, gap between stacked cards) · 24px (section-to-section spacing, sheet top padding, gap above the bottom-nav) · 32px (screen-top padding under status bar, empty-state icon-to-headline gap) · 48px (major section breaks, hero spacing on empty states) · 64px (top-of-scroll breathing room on the Сводка headline block). Touch targets never below 44pt regardless of the 8pt token used to space them.
+Radii: Four steps, applied by element weight, not whim: 6px — small tags, status pills, chips (kept tight so they read as printed labels, not bubbles). 10px — buttons, inputs, list-row touch targets; this is the hard cap for any primary CTA, explicitly never a pill/full-round shape — the single biggest lever keeping the system "serious craftsman" over "friendly toy." 16px — cards: bot cards, message bubbles, product/file/item rows. 24px — sheets, modals, the mode-switch confirmation dialog, the floating Вместе suggestion panel. True circles (no radius token, always 50%) are the one full-round exception: avatars, the seal-ring badge/ring-dial glyph, and status dots — each avatar gets a 1.5px Rust hairline ring when its channel is connected.
+Shadow recipe: Two-layer elevation, always tinted from Ink (#2A2118), never neutral gray. Resting (bot/product/file cards, list rows): `0 1px 2px rgba(42,33,24,0.08)` only — contact layer, just enough lift to read as an object on paper. Raised (open bottom sheets, the mode-switch confirmation dialog, the floating Вместе suggestion panel, popovers): `0 1px 2px rgba(42,33,24,0.08), 0 10px 28px rgba(42,33,24,0.14)` — contact + ambient layers stacked. Pressed state (any tappable row/card/button): drop the ambient layer entirely, compress the contact layer to `0 1px 1px rgba(42,33,24,0.10)` and apply a 2% scale-down (transform: scale(0.98)) — feedback reads as pressing a card flat onto a desk, never a glow/ripple. Rust-accent CTA in its raised/focus state swaps the ambient tint for a matching warm glow: `0 1px 2px rgba(42,33,24,0.08), 0 8px 20px rgba(234,88,12,0.20)`.
+Motif: (1) Seal-ring / ring-dial — the system's one recurring signature, described fully under wordmark: a hairline circle that sits empty (paused), half-fills clockwise in Rust (Вместе), or fully fills solid Rust (Авто/работает); reused identically across the wordmark badge, WhatsApp/Telegram connection badges, the pause/resume switch thumb, the reply-mode segmented-control thumb, the chat-list header pip, and the dashboard bot-filter chip — one shape, learned once. A 220ms stamp-impression scale+settle (never confetti) plays on the ring exactly at the moment a channel connects or a new «Заявка» lands. (2) Stitch-dash dividers — a fine dashed hairline (like ledger stitching) separating grouped BotSettings sections (Основное / О бизнесе / Товары и услуги / Прайс-листы / Промпт) instead of plain solid rules. (3) Ledger-tab section headers — small Rust-tinted tab-flag labels on section headers, echoing a bound notebook's index tabs. (4) Status dots — plain small solid discs in the five muted semantic hues, never icon-badges; quiet and legible. (5) One restrained gradient, and only one, anywhere in the system: a 4%-opacity Paper-to-transparent fade at the very top of scrollable lists, standing in for a physical page edge.
+Icon style: Line icons, 1.75px stroke, rounded joins but squared (never lollipop-rounded) caps and terminals, drawn on a 24px grid — approachable enough to tap, disciplined enough to trust with someone's only WhatsApp number. Filled glyphs are the rare exception, reserved for: the fully-filled ring-dial state, the five semantic status dots, and the single live-pulse micro-delight. Channel indicators (WhatsApp/Telegram) render as small stamped seals (the ring-dial glyph tinted per-channel) rather than generic colored dots, so connection state always speaks the same visual language as the rest of the system.
+
+Palette variants (for live comparison via the top-right swatch switcher; toggle in-browser with body[data-theme]) — only the accent + any colliding status hue change, everything else above is shared:
+  orange (default):    --color-rust #EA580C  --color-rust-tint #FCE0C8
+  terracotta (original): --color-rust #9C3E1D  --color-rust-tint #F1DECD
+  forest:               --color-rust #1F6F5C  --color-rust-tint #DCEEE7  --status-zayavka #74923F (Заявка pulled toward olive so it stays distinct from the teal-forest accent)
+  indigo:               --color-rust #35408F  --color-rust-tint #DDE1F5  --status-dialog #5C8A80 (В диалоге shifted toward teal-gray so it stays distinct from the indigo accent)
+  plum:                 --color-rust #8C3F6B  --color-rust-tint #F1DCE7
+-->
+
