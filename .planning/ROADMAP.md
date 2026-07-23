@@ -9,7 +9,7 @@ v1.0 shipped the semi-auto «Вместе» reply path on WhatsApp. v1.1 Telegra
 - ✅ **v1.0 Reply Suggestions** — Phases 1-2 (shipped 2026-07-11)
 - 🚧 **v1.1 Telegram Parity** — Phases 3-8 (in progress)
 - 📋 **v1.2 Reply-Trigger Discipline** — Phases 9-10 (planned; specs + plans committed, starts after v1.1 closes)
-- 📋 **v1.3 First-Run Onboarding** — Phase 11 (planned; design spec + CONTEXT committed 2026-07-17; pure client UI, schedulable before or after v1.2)
+- ✅ **v1.3 First-Run Onboarding** — Phase 11 (complete 2026-07-23; /gsd-secure-phase 11 pending; archive via /gsd-complete-milestone at owner discretion)
 
 ## Phases
 
@@ -43,9 +43,9 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 - [x] **Phase 9: Semi-Auto Suppression Flag** - Wire the «Вместе» toggle to the server: `reply_mode_flags` table + `/webhook/SetReplyMode` sync + a fail-closed gate in both bot templates so a semi-auto chat gets no auto-reply while suggestions still work. (completed 2026-07-22)
 - [x] **Phase 10: Message Batching / Debounce** - A pre-generation debounce+dedupe stage in both bot templates so a multi-fragment customer message gets ONE combined reply, plus a client-side debounce in `SuggestionsController.HandleLive` so suggestions coalesce the same way. (completed 2026-07-22)
 
-### 📋 v1.3 First-Run Onboarding (Planned)
+### ✅ v1.3 First-Run Onboarding (Complete 2026-07-23)
 
-- [ ] **Phase 11: First-Run Onboarding Flow** - One-time 3-slide welcome carousel (no skip) + «Это безопасно» trust blocks in both auth flows + success moment leading to price-list upload + derived-state «Первые шаги» checklist on BotsPage. (design approved 2026-07-17: `docs/superpowers/specs/2026-07-17-first-run-onboarding-design.md`)
+- [x] **Phase 11: First-Run Onboarding Flow** - One-time 3-slide welcome carousel (no skip) + «Это безопасно» trust blocks in both auth flows + standalone «Бот подключён!» success overlay leading to price-list upload + derived-state «Первые шаги» checklist on BotsPage. (completed 2026-07-23: 10/10 plans incl. gap round 11-08..11-10 off UAT Round-1 defects D1–D3; Round-2 owner-approved; verification PASSED 10/10; suite 1209/1209; review 0C/3W advisory; design 2026-07-17: `docs/superpowers/specs/2026-07-17-first-run-onboarding-design.md`)
 
 ## Phase Details
 

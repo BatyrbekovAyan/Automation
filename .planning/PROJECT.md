@@ -133,4 +133,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-22 after completing Phase 9 (semi-auto-suppression) — v1.2 Reply-Trigger Discipline phases both complete*
+*Last updated: 2026-07-23 after completing Phase 11 (first-run-onboarding-flow) — v1.3 First-Run Onboarding complete: one-time carousel, both-channel trust blocks, standalone success overlay → price-list, derived-state «Первые шаги» checklist; ONB-01..05 proven on device (UAT 2 rounds)*

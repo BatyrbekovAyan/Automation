@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
 status: executing
-stopped_at: Completed 11-07-PLAN.md (owner UAT gate) — 11-HUMAN-UAT Round 2 APPROVED by owner 2026-07-23 (D1–D3 verified fixed, no new defects; suite 1209/1209); ONB-01..05 proven, Phase 11 gate CLOSED; next = orchestrator phase-completion/verification step
-last_updated: "2026-07-23T12:09:35.000Z"
-last_activity: "2026-07-23 — Completed 11-07 (owner UAT gate): Round-2 approved — Round-1 ISSUES D1–D3 → gap round 11-08..11-10 → Round-2 PASS; verdicts transcribed into 11-HUMAN-UAT.md (status: passed), Round-1 record intact"
+stopped_at: Phase 11 COMPLETE 2026-07-23 — verification PASSED 10/10 (11-VERIFICATION.md); code review 0C/3W/8I advisory (11-REVIEW.md → /gsd-code-review-fix 11 available); /gsd-secure-phase 11 still owed
+last_updated: "2026-07-23T12:40:00.000Z"
+last_activity: "2026-07-23 — Phase 11 closed: UAT Round-2 owner-approved, gsd-verifier passed 10/10, ROADMAP/STATE/PROJECT completion records written"
 progress:
   total_phases: 9
-  completed_phases: 8
-  total_plans: 68
+  completed_phases: 9
+  total_plans: 73
   completed_plans: 73
   percent: 100
 ---
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-12)
 
 **Core value:** The owner stays in control along the automation↔semi-auto spectrum — the bot can answer autonomously, or propose replies the owner picks and refines, without losing trust or the ability to take over.
-**Current focus:** Phase 11 — first-run-onboarding-flow (v1.2 Phases 9+10 both complete 2026-07-22)
+**Current focus:** All planned phases complete (v1.2 done 2026-07-22; v1.3 Phase 11 done 2026-07-23). Open items: /gsd-secure-phase 11, optional /gsd-code-review-fix 11, and v1.1's Phase 8 owner device gate (08-21).
 
 ## Current Position
 
-Phase: 11 (first-run-onboarding-flow)
-Plan: ALL COMPLETE — originals 11-01..11-07 + gap round 11-08..11-10; the owner UAT gate (11-07 / 11-HUMAN-UAT.md) is CLOSED: Round 2 approved by owner 2026-07-23
-Status: Phase 11 execution complete — ONB-01..ONB-05 proven on device (Round-1 ISSUES D1–D3 → 11-08..11-10 → Round-2 PASS, suite 1209/1209); awaiting the orchestrator's phase-completion/verification step (then /gsd-secure-phase 11)
+Phase: 11 (first-run-onboarding-flow) — COMPLETE 2026-07-23
+Plan: 10/10 (11-01..11-07 + gap round 11-08..11-10); owner UAT gate closed (Round 2 approved); verification PASSED 10/10
+Status: Phase complete — ONB-01..ONB-05 proven on device; remaining: /gsd-secure-phase 11 (threat-model verification), optional /gsd-code-review-fix 11 (3 advisory warnings)
 Last activity: 2026-07-23 — Completed 11-07 (owner UAT gate): Round-2 «approved» transcribed into 11-HUMAN-UAT.md (status: passed, 13/13 Round-2 PASS, Round-1 record intact); 11-07-SUMMARY.md written
 
 Progress: [██████████] 100%
