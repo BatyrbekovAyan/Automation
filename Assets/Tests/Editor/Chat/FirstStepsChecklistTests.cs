@@ -6,24 +6,6 @@ using NUnit.Framework;
 public class FirstStepsChecklistTests
 {
     [Test]
-    public void ChannelLabel_WhatsAppOnly_WhatsApp()
-        => Assert.AreEqual("WhatsApp", FirstStepsChecklist.ChannelLabel(isOnWhatsapp: true, isOnTelegram: false));
-
-    [Test]
-    public void ChannelLabel_TelegramOnly_Telegram()
-        => Assert.AreEqual("Telegram", FirstStepsChecklist.ChannelLabel(isOnWhatsapp: false, isOnTelegram: true));
-
-    [Test]
-    public void ChannelLabel_Both_WhatsAppWins()
-        => Assert.AreEqual("WhatsApp", FirstStepsChecklist.ChannelLabel(isOnWhatsapp: true, isOnTelegram: true),
-            "WhatsApp wins the dual-channel case.");
-
-    [Test]
-    public void ChannelLabel_Neither_FallsBackToTelegram()
-        => Assert.AreEqual("Telegram", FirstStepsChecklist.ChannelLabel(isOnWhatsapp: false, isOnTelegram: false),
-            "Neither flag set ⇒ Telegram fallback (only reachable if both PlayerPrefs defaults were cleared).");
-
-    [Test]
     public void StepStates_ReturnsFourBoolsInOrder()
     {
         var steps = FirstStepsChecklist.StepStates(botExists: true, channelAuthed: false, hasFiles: true, firstReplySeen: false);

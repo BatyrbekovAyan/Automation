@@ -55,11 +55,13 @@ public class FirstStepsCard : MonoBehaviour
     private const float CascadeStagger = 0.05f;
     private const float CascadeDuration = 0.3f;
 
-    // Copy deck (spec §Screen specs). Row 1's channel label is filled at Refresh time.
+    // Copy deck (spec §Screen specs). Row 2 is deliberately channel-neutral:
+    // the product is two-channel, and a bot can hold both, so naming one
+    // messenger here is wrong or ambiguous (owner decision 2026-07-23).
     private static readonly string[] RowLabelsBase =
     {
         "Создать бота",
-        "Подключить {0}",
+        "Подключить мессенджер",
         "Загрузить прайс-лист",
         "Получить первый ответ бота",
     };
@@ -160,7 +162,6 @@ public class FirstStepsCard : MonoBehaviour
 
         bool isWa = bot != null && PlayerPrefs.GetInt(bot.name + "isOnWhatsapp", 1) == 1;
         bool isTg = bot != null && PlayerPrefs.GetInt(bot.name + "isOnTelegram", 1) == 1;
-        string channelLbl = FirstStepsChecklist.ChannelLabel(isWa, isTg);
 
         bool channelAuthed = bot != null && (
             (isWa && bot.whatsappProfileId != Bot.UnauthedProfileSentinel) ||
@@ -179,7 +180,7 @@ public class FirstStepsCard : MonoBehaviour
         SetProgress(done);
 
         ReserveListPadding();
-        RenderRows(steps, channelLbl);
+        RenderRows(steps);
 
         if (hintLabel != null) hintLabel.text = Row4Hint;
 
@@ -205,13 +206,13 @@ public class FirstStepsCard : MonoBehaviour
         rt.offsetMax = Vector2.zero;
     }
 
-    private void RenderRows(bool[] steps, string channelLbl)
+    private void RenderRows(bool[] steps)
     {
         if (rowsRoot == null) return;
         for (int i = 0; i < StepCount && i < rowsRoot.childCount; i++)
         {
             var row = rowsRoot.GetChild(i);
-            string label = i == 1 ? string.Format(RowLabelsBase[1], channelLbl) : RowLabelsBase[i];
+            string label = RowLabelsBase[i];
             BindRow(row, i, label, steps[i]);
             PlayCascade(row, i);
         }
@@ -269,7 +270,7 @@ public class FirstStepsCard : MonoBehaviour
             case 0:  // «Создать бота» → Add-Bot overlay
                 BotsPage.Instance?.StartNewBot();
                 break;
-            case 1:  // «Подключить {channel}» → bot settings GENERAL tab (connect toggle lives here)
+            case 1:  // «Подключить мессенджер» → bot settings GENERAL tab (connect toggles live here)
                 bot?.OpenSettingsAtGeneralTab();
                 break;
             case 2:  // «Загрузить прайс-лист» → bot settings PRODUCT tab («Прайс-листы»)

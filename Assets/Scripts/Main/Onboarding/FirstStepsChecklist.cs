@@ -7,15 +7,6 @@
 public static class FirstStepsChecklist
 {
     /// <summary>
-    /// Channel label from the bot's actual channel (CONTEXT: Telegram parity).
-    /// WhatsApp wins the dual case. Callers pass the persisted per-bot
-    /// <c>{bot.name}isOnWhatsapp</c> / <c>{bot.name}isOnTelegram</c> flags
-    /// (both default 1) — this pure method reads no persisted state itself.
-    /// </summary>
-    public static string ChannelLabel(bool isOnWhatsapp, bool isOnTelegram) =>
-        isOnWhatsapp ? "WhatsApp" : "Telegram";
-
-    /// <summary>
     /// The four checklist step states in copy-deck order:
     /// create bot · connect channel · upload price list · first reply.
     /// </summary>

@@ -68,7 +68,7 @@ public static class FirstStepsCardBuilder
     private static readonly string[] RowSeedLabels =
     {
         "Создать бота",
-        "Подключить WhatsApp",
+        "Подключить мессенджер",
         "Загрузить прайс-лист",
         "Получить первый ответ бота",
     };
