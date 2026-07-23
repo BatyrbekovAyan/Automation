@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
 status: executing
-stopped_at: Completed 11-09-PLAN.md (D1+D3 gap-closure wave 2) — «Первые шаги» card is now a live fact-mirror (pure FirstStepsCardVisibility gate + CanvasGroup hide + 5 RefreshFromFacts hooks); suite 1209/1209; next = 11-10 (Round-2 re-verify)
-last_updated: "2026-07-23T11:34:34.183Z"
-last_activity: "2026-07-23 — Completed 11-09 (D1+D3 gap-closure wave 2): checklist hidden on zero bots (D1) + live RefreshFromFacts on every fact change (D3); auth byte-identical; suite 1209/1209 green"
+stopped_at: Completed 11-10-PLAN.md (Round-2 re-verify addendum wave 3) — appended «Round 2 re-verify (D1–D3)» to 11-HUMAN-UAT.md (per-defect PASS/FAIL for D2/D1/D3 + zero-regression + Round-2 Overall); owner gate now runnable; suite target 1209/1209; next = owner runs Round-2 → reply "approved" to close Phase 11
+last_updated: "2026-07-23T11:40:26.000Z"
+last_activity: "2026-07-23 — Completed 11-10 (Round-2 re-verify addendum): focused D1/D2/D3 re-verify + zero-regression sweep appended to 11-HUMAN-UAT.md; Round-1 history byte-identical; suite target corrected 1169→1209"
 progress:
   total_phases: 9
   completed_phases: 8
   total_plans: 68
-  completed_plans: 71
+  completed_plans: 72
   percent: 100
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 ## Current Position
 
 Phase: 11 (first-run-onboarding-flow)
-Plan: gap-closure round 1 (D1–D3) — 11-08 (D2) + 11-09 (D1+D3) complete; 11-10 (Round-2 re-verify) remains (originals 11-01..11-06 done; 11-07 = owner UAT gate)
-Status: Executing — gap-closure round 1; 11-08 + 11-09 done, 11-10 next
-Last activity: 2026-07-23 — Completed 11-09 (D1+D3 gap-closure wave 2): «Первые шаги» card hidden on zero bots (D1, pure FirstStepsCardVisibility gate + CanvasGroup hide) + live RefreshFromFacts on bot-created/channel-authed/back-out/upload/return-to-Bots (D3); auth byte-identical; suite 1209/1209 green
+Plan: gap-closure round 1 (D1–D3) COMPLETE — 11-08 (D2) + 11-09 (D1+D3) + 11-10 (Round-2 re-verify addendum) all done; only the owner UAT gate (11-HUMAN-UAT.md Round-2) remains to close Phase 11 (originals 11-01..11-06 done; 11-07 = owner UAT gate)
+Status: Executing — gap-closure round 1 code+docs complete; awaiting owner Round-2 re-verify verdict ("approved" closes Phase 11)
+Last activity: 2026-07-23 — Completed 11-10 (Round-2 re-verify addendum): appended focused «Round 2 re-verify (D1–D3)» section to 11-HUMAN-UAT.md (per-defect PASS/FAIL tied to 11-08/11-09 + zero-regression, suite target 1209/1209), Round-1 defect table + Overall line byte-identical; owner gate now runnable
 
 Progress: [██████████] 100%
 
@@ -130,6 +130,7 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [Phase 10] 10-04 owner UAT gate CLOSED partial (2026-07-22): scenarios 1-3 PASS — auto-reply combine behaviorally confirmed BOTH channels (multi-fragment → ONE combined reply; single message → one reply; humanizer pauses unchanged, ~8s accepted). Scenario 4 (suggestions coalesce) BLOCKED by open Phase-9 09-04 SetReplyMode deploy (in-app Semi-auto toggle 404'd at Manager.ReplyModeSync.cs:105 — expected, not a Phase-10 defect; BATCH-03 stays EditMode-covered 1197/1197). Scenario 5 (semi-auto skips path) DEFERRED to post-Phase-9 by explicit owner decision. Owner authorized closing the plan now; scenarios 4-5 tracked as UAT debt, re-verify alongside 09-04/09-05. Ready for /gsd-secure-phase 10.
 - [Phase 11]: 11-08 D2 gap-closure — «Бот подключён!» success moment relocated OUT of the auth screens onto a NEW standalone full-screen SuccessOverlay (Canvas-level last sibling → renders above the auth pages; m_Father = root Canvas RectTransform 42635013). Ten per-channel waSuccess*/tgSuccess* fields collapsed to ONE set; ShowInteractiveSuccessMoment(Bot) drops useTelegram + the authPage.SetActive(true) hack (deactivates both auth hierarchies up front); parameterless CloseSuccessAndOverlay. Builder tears down both nested SuccessCta clusters (DIRECT-CHILD-only teardown so the same-named nested panels survive) + builds one root-Canvas overlay (GetComponentInParent<Canvas>(true).rootCanvas) + 6-field re-stamp; trust cards + auth GetChild(3/4/5) byte-identical. Scene committed alone a4fba79; suite 1205/1205 green. Device D2 verdict rides 11-10.
 - [Phase 11]: 11-09 D1+D3 gap-closure — «Первые шаги» card is now a live fact-mirror. D1: new pure FirstStepsCardVisibility.ShouldShow(hasBots, checklistDone) => hasBots && !checklistDone hides the card whenever no bots exist (EmptyState owns the zero-bot screen, no overlap) and forever after the 4/4 latch — both former hide reasons collapse into ONE gate at the top of Refresh. D3: FirstStepsCard gained static Instance + cached CanvasGroup (Awake) + public RefreshFromFacts(), hides via SetContentVisible (CanvasGroup alpha/blocksRaycasts/interactable) so the root NEVER self-deactivates (a self-SetActive(false) root could never be re-shown by a hook). Five fire-and-forget RefreshFromFacts hooks: BotsPage.RefreshEmptyState (D1 authority/zero-bot chokepoint + return-to-Bots), Manager.CreateBotFromForm (refresh under success overlay), ShowAuthSuccess else (late channel auth), CloseAddBotForm (back-out), BotSettings.Auth upload. Auth byte-identical (GetChild(3/4/5)=21, auth/code|auth/2fa=7 unchanged); no scene mutation; code-only. 4 new FirstStepsCardVisibility tests, suite 1209/1209 EditMode green FRESH. commits 18abd22(RED)/b0d0d7f(GREEN)/559b89d/c2b996c. Device re-verify (D1 no-overlap + D3 correct checks with no navigation) rides 11-10.
+- [Phase 11]: 11-10 Round-2 re-verify addendum (doc-only, wave 3) — appended a FOCUSED «Round 2 re-verify (D1–D3)» section to 11-HUMAN-UAT.md: per-defect blank PASS/FAIL items — D2 (standalone full-screen «Бот подключён!» overlay with nothing beneath, «Загрузить прайс-лист»→«Прайс-листы»/«Позже»→Bots, «Открыть чаты» files-exist fallback, green-check pop, both-channel-once → validates 11-08), D1 (zero bots → EmptyState only no «Первые шаги» overlap; card appears once ≥1 bot → validates 11-09), D3 (immediate «2 из 4» rows 1-2 checked, price-list flips row live, 4/4 permanent hide across relaunch → validates 11-09) + zero-regression (auth flows unchanged, EmptyState/AddBotPanel auto-open) + a Round-2 Overall verdict line + per-defect repro paths. Round-1 defect table + Overall line byte-identical (append-only, +90 lines). Suite regression target CORRECTED 1169→1209 (plan's 1165 baseline was pre-v1.2; real = 1205 + 4 new D1 tests). commit 70512cd. Owner gate now runnable — a green Round-2 ("approved") closes Phase 11.
 
 ### Pending Todos
 
