@@ -11,6 +11,5 @@
 /// </summary>
 public static class FirstStepsCardVisibility
 {
-    // RED stub — intentionally wrong (always hidden); corrected in the GREEN step.
-    public static bool ShouldShow(bool hasBots, bool checklistDone) => false;
+    public static bool ShouldShow(bool hasBots, bool checklistDone) => hasBots && !checklistDone;
 }
