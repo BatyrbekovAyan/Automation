@@ -207,6 +207,96 @@ list (screen + expected vs actual) to seed a gap-closure round via `/gsd-plan-ph
 do NOT hand-patch fixes in this runbook.
 
 ---
+
+## Round 2 re-verify (D1–D3)
+
+> **Authoring this addendum was autonomous; RUNNING it is the owner gate — every checkbox below
+> ships blank.** This is a **FOCUSED** re-verify of the three Round-1 defects (D1–D3) closed by
+> gap plans **11-08** (D2 standalone success overlay) and **11-09** (D1 zero-bot visibility + D3
+> live derived state), plus a zero-regression re-check — it is **NOT** a fresh full UAT (§1–§5
+> above already passed on Round 1 apart from the three logged defects). Before the **D1/D3**
+> checks, **reset to a true first run the sanctioned way** — **Профиль → Аккаунт → «Удалить все
+> данные»** (or a fresh install); do NOT hand-delete individual PlayerPrefs keys.
+
+### D2 re-verify — standalone «Бот подключён!» overlay (ONB-03 · closes D2 via 11-08)
+
+Round-1 D2 (high): the «Бот подключён!» sheet rendered **stacked ON TOP of the still-visible
+code-entry UI** (title / code field / buttons / trust card all showing beneath). 11-08 relocated
+it to a **standalone full-screen `SuccessOverlay`** — a Canvas-level last sibling that renders
+ABOVE the auth pages, with both auth hierarchies deactivated up front.
+
+- [ ] On a **successful auth — verify BOTH a fresh creation auth AND a Settings → re-auth** —
+      «Бот подключён!» shows on a **clean standalone FULL-SCREEN overlay** with **NOTHING** of the
+      code UI (screen title, code field, buttons, «Это безопасно» trust card) visible beneath it.
+      — **PASS** ☐  **FAIL** ☐
+- [ ] The primary **«Загрузить прайс-лист»** deep-links into **that bot's «Прайс-листы»** tab;
+      **«Позже»** dismisses cleanly to the **Bots** page (nothing lingers). — **PASS** ☐  **FAIL** ☐
+- [ ] On a **re-auth of a bot that ALREADY has a price list**, the primary CTA reads **«Открыть
+      чаты»** (files-exist fallback), not «Загрузить прайс-лист». — **PASS** ☐  **FAIL** ☐
+- [ ] The **green check still pops** (DOScale 0.9→1, OutBack). — **PASS** ☐  **FAIL** ☐
+- [ ] A **«both»-channel creation** (WhatsApp + Telegram in one wizard pass) shows the success
+      moment **exactly ONCE** (after the bot exists), not twice. — **PASS** ☐  **FAIL** ☐
+
+> **Round-2 repro path (D2):** reach the final auth on either channel → on success the full-screen
+> «Бот подключён!» must cover everything with nothing beneath; «Позже» dismisses cleanly; repeat on
+> both channels + a Settings re-auth.
+
+### D1 re-verify — zero-bot card visibility (ONB-04/05 · closes D1 via 11-09)
+
+Round-1 D1 (medium): with **zero bots** the EmptyState **and** the «Первые шаги» card both
+rendered, **overlapping**. 11-09 added the pure `FirstStepsCardVisibility.ShouldShow(hasBots,
+checklistDone)` gate (hide via CanvasGroup, root stays active) so the EmptyState owns the zero-bot
+screen.
+
+- [ ] With **ZERO bots** — finish the carousel → the wizard opens → **press back** — **ONLY the
+      EmptyState renders**; the «Первые шаги» card is **NOT visible** (no overlap). — **PASS** ☐
+      **FAIL** ☐
+- [ ] The «Первые шаги» card **first appears once ≥1 bot exists**. — **PASS** ☐  **FAIL** ☐
+
+> **Round-2 repro path (D1):** carousel → «Создать бота» → wizard → back → land on Боты with zero
+> bots → confirm the EmptyState alone shows, no «Первые шаги» card underneath/over it.
+
+### D3 re-verify — live derived state (ONB-04 · closes D3 via 11-09)
+
+Round-1 D3 (medium): after bot creation the checklist rows stayed **all-unchecked until you
+navigated away and back** (refresh only on re-enable). 11-09 added five fire-and-forget
+`RefreshFromFacts()` hooks (bot-created, channel-authed, wizard back-out, price-list upload,
+return-to-Bots) so the card is a live mirror.
+
+- [ ] **Immediately after creating a bot** (no navigate-away-and-back), the card shows **«2 из 4»**
+      with **rows 1-2 checked**. — **PASS** ☐  **FAIL** ☐
+- [ ] **Uploading a price list** flips **«Загрузить прайс-лист»** to done and increments **«N из 4»**
+      live, **without a tab bounce**. — **PASS** ☐  **FAIL** ☐
+- [ ] After the **first outgoing bot reply** at **4/4** the card **hides** and **stays hidden on
+      relaunch** (permanent completion latch). — **PASS** ☐  **FAIL** ☐
+
+> **Round-2 repro path (D3):** create a bot → return to Боты → rows 1-2 already checked («2 из 4»)
+> without navigating away; upload a price list → row 3 («Загрузить прайс-лист») checks live.
+
+### Zero regression re-check (ONB-05)
+
+Confirm the relocation (11-08) and the refresh hooks (11-09) broke nothing that already worked.
+
+- [ ] **Both auth flows** behave exactly as before — WhatsApp pairing-code; Telegram phone → code →
+      (optional 2FA) — **no shift/break** from the standalone-overlay relocation or the hooks. —
+      **PASS** ☐  **FAIL** ☐
+- [ ] The **Bots EmptyState** + the **AddBotPanel auto-open** (header `+`, empty-state CTA, zero-bot
+      auto-open) behave as before. — **PASS** ☐  **FAIL** ☐
+- [ ] The **EditMode suite is green** — record the count (expected **1209 / 1209**: the 1205 v1.2
+      baseline + the 4 new D1 `FirstStepsCardVisibility` tests from 11-09; the plan's earlier
+      "1169" figure predates the v1.2 Phase 9/10 tests that lifted the baseline from 1165 to 1205):
+      ___ / ___. — **PASS** ☐  **FAIL** ☐
+
+### Round 2 Overall
+
+**Round 2 Overall:** ☐ PASS  ☐ ISSUES
+
+- On a **green Round-2 (D1–D3 all PASS + zero-regression PASS)**, **Phase 11 (First-Run Onboarding
+  Flow) is complete** — reply **"approved"** to the executor checkpoint.
+- On **ISSUES**, paste the residual defects (screen + expected vs actual) to spin another
+  gap-closure round via `/gsd-plan-phase 11 --gaps`; do NOT hand-patch fixes in this runbook.
+
+---
 *Phase: 11-first-run-onboarding-flow — device/Game-view gate for the full onboarding surface*
 *(carousel `11-02/03`, trust blocks + success sheets `11-04/05`, checklist `11-06`). This gate closes the phase.*
 </content>
