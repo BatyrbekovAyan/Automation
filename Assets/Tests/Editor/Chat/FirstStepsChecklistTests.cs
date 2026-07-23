@@ -1,10 +1,27 @@
 using NUnit.Framework;
 
-// Covers FirstStepsChecklist — pure channel-label + step-state + completion
+// Covers FirstStepsChecklist — pure step-state + milestone + completion
 // derivation for the «Первые шаги» card. Facts (bot count, channel auth, uploaded
 // files, first-reply latch) are supplied by the MonoBehaviour; this class stays pure.
 public class FirstStepsChecklistTests
 {
+    [Test]
+    public void Milestone_LatchedStaysDone_EvenWhenLiveFactRegresses()
+        => Assert.IsTrue(FirstStepsChecklist.Milestone(latched: true, liveFact: false),
+            "A previously achieved step never regresses (messenger toggled off, files deleted).");
+
+    [Test]
+    public void Milestone_LiveFactAchieves()
+        => Assert.IsTrue(FirstStepsChecklist.Milestone(latched: false, liveFact: true));
+
+    [Test]
+    public void Milestone_NeitherIsNotDone()
+        => Assert.IsFalse(FirstStepsChecklist.Milestone(latched: false, liveFact: false));
+
+    [Test]
+    public void Milestone_BothIsDone()
+        => Assert.IsTrue(FirstStepsChecklist.Milestone(latched: true, liveFact: true));
+
     [Test]
     public void StepStates_ReturnsFourBoolsInOrder()
     {

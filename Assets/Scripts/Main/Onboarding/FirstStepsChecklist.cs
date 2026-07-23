@@ -15,6 +15,13 @@ public static class FirstStepsChecklist
         => new[] { botExists, channelAuthed, hasFiles, firstReplySeen };
 
     /// <summary>
+    /// Milestone semantics for a checklist step: once achieved (latched), it stays
+    /// achieved regardless of the live fact — toggling a messenger off or deleting
+    /// uploaded files must never regress onboarding progress (owner decision 2026-07-23).
+    /// </summary>
+    public static bool Milestone(bool latched, bool liveFact) => latched || liveFact;
+
+    /// <summary>
     /// True when every step is done. Uses <c>Array.TrueForAll</c> semantics, so an
     /// empty array is vacuously true — the card only latches
     /// <c>OnboardingKeys.ChecklistDone</c> at a real 4/4.

@@ -1,5 +1,5 @@
 /// <summary>
-/// The three GLOBAL PlayerPrefs keys the first-run onboarding flow reads/writes.
+/// The GLOBAL PlayerPrefs keys the first-run onboarding flow reads/writes.
 /// These sit OUTSIDE the per-bot "BotN…" namespace (verified collision-free —
 /// RESEARCH §Runtime State Inventory) and are wiped by PlayerPrefs.DeleteAll()
 /// in the «Удалить все данные» flow by design.
@@ -17,4 +17,12 @@ public static class OnboardingKeys
 
     /// <summary>Set to 1 once the bot has sent its first reply (global latch; isIncoming==false proxy).</summary>
     public const string FirstBotReplySeen = "FirstBotReplySeen";
+
+    /// <summary>Set to 1 once ANY channel profile has been authed (checklist row-2 milestone —
+    /// survives later channel-toggle flips / logout; owner decision 2026-07-23).</summary>
+    public const string ChannelConnectedSeen = "OnboardingChannelConnectedSeen";
+
+    /// <summary>Set to 1 once a price-list file has been uploaded (checklist row-3 milestone —
+    /// survives later file deletion).</summary>
+    public const string PriceListUploadedSeen = "OnboardingPriceListSeen";
 }

@@ -12,9 +12,14 @@ using UnityEngine.UI;
 /// rows with a 0.05s-stagger fade cascade, wires each row's deep-link, latches the
 /// first-reply proxy off ChatManager events, and permanently hides once 4/4 is done.
 ///
-/// Per-step state is NEVER stored — it is derived LIVE every Refresh (T-11-06-01).
-/// Only the 4/4 completion (<see cref="OnboardingKeys.ChecklistDone"/>) and the
-/// first-reply proxy (<see cref="OnboardingKeys.FirstBotReplySeen"/>) are latched.
+/// Steps are MILESTONES: each is derived from live facts every Refresh, but once a
+/// step has been achieved it latches (<see cref="OnboardingKeys"/>) and never
+/// regresses — toggling a messenger off or deleting uploaded files must not undo
+/// onboarding progress (owner decision 2026-07-23). Latches: row 2
+/// <see cref="OnboardingKeys.ChannelConnectedSeen"/>, row 3
+/// <see cref="OnboardingKeys.PriceListUploadedSeen"/>, row 4
+/// <see cref="OnboardingKeys.FirstBotReplySeen"/>, 4/4
+/// <see cref="OnboardingKeys.ChecklistDone"/>.
 ///
 /// Analogs: DashboardPage (row-template Find idiom, OnEnable refresh, per-row
 /// deep-links, DOTween) + BotStatusPill (Hex helper + static Color palette block).
@@ -142,6 +147,12 @@ public class FirstStepsCard : MonoBehaviour
 
     private void Refresh()
     {
+        // Re-arm the ChatManager subscription on every refresh (idempotent). OnEnable
+        // fires exactly once at scene load — possibly BEFORE ChatManager.Instance is
+        // assigned — and the always-active root never re-enables, so without this retry
+        // the row-4 first-reply latch is dead for the whole session (review WR-01).
+        Subscribe();
+
         bool checklistDone = PlayerPrefs.GetInt(OnboardingKeys.ChecklistDone, 0) == 1;
         bool botExists = botsParent != null && botsParent.childCount > 0;
 
@@ -160,15 +171,15 @@ public class FirstStepsCard : MonoBehaviour
 
         Bot bot = botExists ? botsParent.GetChild(0).GetComponent<Bot>() : null;
 
-        bool isWa = bot != null && PlayerPrefs.GetInt(bot.name + "isOnWhatsapp", 1) == 1;
-        bool isTg = bot != null && PlayerPrefs.GetInt(bot.name + "isOnTelegram", 1) == 1;
-
-        bool channelAuthed = bot != null && (
-            (isWa && bot.whatsappProfileId != Bot.UnauthedProfileSentinel) ||
-            (isTg && bot.telegramProfileId != Bot.UnauthedProfileSentinel));
-        bool hasFiles = bot != null && (
+        // "Connected" = ANY authed profile, independent of the current channel toggles —
+        // the toggles mean "use this channel", not "connected"; flipping one off must not
+        // uncheck the milestone.
+        bool channelAuthed = LatchedFact(OnboardingKeys.ChannelConnectedSeen, bot != null && (
+            bot.whatsappProfileId != Bot.UnauthedProfileSentinel ||
+            bot.telegramProfileId != Bot.UnauthedProfileSentinel));
+        bool hasFiles = LatchedFact(OnboardingKeys.PriceListUploadedSeen, bot != null && (
             UploadedFilesStore.Load(bot.name, "product").Count > 0 ||
-            UploadedFilesStore.Load(bot.name, "service").Count > 0);
+            UploadedFilesStore.Load(bot.name, "service").Count > 0));
         bool firstReply = PlayerPrefs.GetInt(OnboardingKeys.FirstBotReplySeen, 0) == 1;
 
         bool[] steps = FirstStepsChecklist.StepStates(botExists, channelAuthed, hasFiles, firstReply);
@@ -194,6 +205,20 @@ public class FirstStepsCard : MonoBehaviour
             RestoreListPadding();
             SetContentVisible(false);
         }
+    }
+
+    // Milestone latch: returns the step state per FirstStepsChecklist.Milestone and
+    // persists the latch the first time the live fact is observed true.
+    private static bool LatchedFact(string key, bool liveFact)
+    {
+        bool latched = PlayerPrefs.GetInt(key, 0) == 1;
+        bool state = FirstStepsChecklist.Milestone(latched, liveFact);
+        if (state && !latched)
+        {
+            PlayerPrefs.SetInt(key, 1);
+            PlayerPrefs.Save();
+        }
+        return state;
     }
 
     private void SetProgress(int done)
