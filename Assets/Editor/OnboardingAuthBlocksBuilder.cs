@@ -24,14 +24,17 @@ using UnityEngine.UI;
 ///      real auth code flow. Channel-specific verbatim copy, green-tinted card, a
 ///      lock icon (Image+sprite, never a TMP glyph). No linked-device-code text.
 ///
-///   B) Per-channel success sheets (ONB-03 scene half) — TWO independent
-///      «Загрузить прайс-лист» / «Позже» clusters, one built into the WhatsApp
-///      SuccessOverlay and a second into the Telegram SuccessOverlay (separate
-///      GameObjects in separate hierarchies — a shared label/button cannot child
-///      both, so Plan 04 declared per-channel wa*/tg* field sets). Each sheet has an
-///      animated green check (SuccessCheckPop → DOScale 0.9→1 OutBack), title, body,
-///      a full-width Primary CTA and a ghost «Позже» button. The clusters are stamped
-///      onto Manager's waSuccess* and tgSuccess* fields via SerializedObject.
+///   B) Standalone success overlay (ONB-03 scene half, D2 relocation) — ONE
+///      «Загрузить прайс-лист» / «Позже» celebration built as a DIRECT child of the
+///      root Canvas (a sibling of the ScreenContainer) and SetAsLastSibling, so it
+///      renders ABOVE the auth pages — closing UAT defect D2 (the moment used to live
+///      nested inside the auth scroll content and render stacked over the live code
+///      form). The two OLD nested SuccessCta clusters are torn down idempotently; the
+///      panels themselves stay (the moreAuthSteps 2s transient still uses one). The
+///      overlay has a full-screen opaque backdrop, an animated green check
+///      (a DOScale 0.9→1 OutBack pop), title, body, a full-width Primary CTA and a
+///      ghost «Позже» button, and is stamped onto Manager's single success field set
+///      via SerializedObject.
 ///
 /// All sizes in 1080×1920 canvas reference units. Save the scene after running
 /// (the headless entry saves automatically).
@@ -90,7 +93,7 @@ public static class OnboardingAuthBlocksBuilder
     {
         BuildInternal();
         EditorSceneManager.MarkAllScenesDirty();
-        Debug.Log("[OnboardingAuthBlocksBuilder] Built auth trust blocks + per-channel success CTAs — SAVE THE SCENE (Cmd+S).");
+        Debug.Log("[OnboardingAuthBlocksBuilder] Built auth trust blocks + standalone success overlay — SAVE THE SCENE (Cmd+S).");
     }
 
     // Headless entry (Editor closed):
@@ -132,22 +135,29 @@ public static class OnboardingAuthBlocksBuilder
         BuildTrustCard(waCodePanel, TrustBodyWhatsapp);
         BuildTrustCard(tgCodePanel, TrustBodyTelegram);
 
-        // B) Per-channel success sheets.
-        var wa = BuildSuccessSheet(waSuccessPanel);
-        var tg = BuildSuccessSheet(tgSuccessPanel);
+        // B) D2 relocation. Tear down the two OLD nested SuccessCta clusters (idempotent).
+        //    The success panels themselves STAY — the moreAuthSteps 2s transient still uses
+        //    WhatsappAuthSuccessPanel; only the injected SuccessCta child clusters are removed.
+        DestroyAllByName(waSuccessPanel.transform, "SuccessCta");
+        DestroyAllByName(tgSuccessPanel.transform, "SuccessCta");
 
-        // Stamp both clusters onto Manager's per-channel success-moment fields
-        // (the [SerializeField] private field NAMES are the builder↔component contract).
-        so.FindProperty("waSuccessTitleLabel").objectReferenceValue = wa.Title;
-        so.FindProperty("waSuccessBodyLabel").objectReferenceValue = wa.Body;
-        so.FindProperty("waSuccessPrimaryButton").objectReferenceValue = wa.PrimaryButton;
-        so.FindProperty("waSuccessPrimaryLabel").objectReferenceValue = wa.PrimaryLabel;
-        so.FindProperty("waSuccessLaterButton").objectReferenceValue = wa.LaterButton;
-        so.FindProperty("tgSuccessTitleLabel").objectReferenceValue = tg.Title;
-        so.FindProperty("tgSuccessBodyLabel").objectReferenceValue = tg.Body;
-        so.FindProperty("tgSuccessPrimaryButton").objectReferenceValue = tg.PrimaryButton;
-        so.FindProperty("tgSuccessPrimaryLabel").objectReferenceValue = tg.PrimaryLabel;
-        so.FindProperty("tgSuccessLaterButton").objectReferenceValue = tg.LaterButton;
+        // Build ONE standalone success overlay as a direct child of the ROOT Canvas (above the
+        // ScreenContainer), resolved from a Manager panel ref (never by name guessing).
+        var canvas = waCodePanel.GetComponentInParent<Canvas>(true);
+        if (canvas == null)
+            throw new System.InvalidOperationException(
+                "[OnboardingAuthBlocksBuilder] Root Canvas not found from WhatsappCodePanel — cannot build the standalone success overlay.");
+        canvas = canvas.rootCanvas; // parent the overlay to the ROOT canvas, above the ScreenContainer
+
+        var refs = BuildStandaloneOverlay(canvas, out var overlayGo);
+
+        // Stamp Manager's single success field set + overlay ref (the field NAMES are the contract).
+        so.FindProperty("SuccessOverlay").objectReferenceValue = overlayGo;
+        so.FindProperty("successTitleLabel").objectReferenceValue = refs.Title;
+        so.FindProperty("successBodyLabel").objectReferenceValue = refs.Body;
+        so.FindProperty("successPrimaryButton").objectReferenceValue = refs.PrimaryButton;
+        so.FindProperty("successPrimaryLabel").objectReferenceValue = refs.PrimaryLabel;
+        so.FindProperty("successLaterButton").objectReferenceValue = refs.LaterButton;
         so.ApplyModifiedPropertiesWithoutUndo();
         EditorUtility.SetDirty(manager);
 
@@ -156,7 +166,7 @@ public static class OnboardingAuthBlocksBuilder
         foreach (var rounded in _roundedToRefresh)
             RefreshRounded(rounded);
 
-        Debug.Log("[OnboardingAuthBlocksBuilder] Trust cards (WhatsApp + Telegram) + two per-channel success sheets built; Manager wa*/tg* fields stamped.");
+        Debug.Log("[OnboardingAuthBlocksBuilder] Trust cards (WhatsApp + Telegram) + one standalone success overlay built; Manager success fields stamped.");
     }
 
     // ── A) Trust card ──────────────────────────────────────────────────────────
@@ -225,7 +235,7 @@ public static class OnboardingAuthBlocksBuilder
         root.transform.SetAsLastSibling();
     }
 
-    // ── B) Success sheet ────────────────────────────────────────────────────────
+    // ── B) Standalone success overlay ────────────────────────────────────────────
 
     private struct SuccessRefs
     {
@@ -236,57 +246,67 @@ public static class OnboardingAuthBlocksBuilder
         public Button LaterButton;
     }
 
-    // Builds one independent «Бот подключён!» sheet into a SuccessOverlay panel. The
-    // sheet is a centred opaque card (larger than the small 520² panel it lives in;
-    // the panel has no mask) with an animated check, title, body, Primary CTA and a
-    // ghost «Позже». Idempotent via DestroyAllByName.
-    private static SuccessRefs BuildSuccessSheet(GameObject successPanel)
+    // Builds the ONE standalone «Бот подключён!» overlay as a direct child of the root
+    // Canvas (a sibling of the ScreenContainer, SetAsLastSibling) so it renders ABOVE the
+    // auth pages — D2. Full-screen opaque backdrop + centred celebration content in
+    // 1080×1920 reference units. Idempotent: a prior standalone overlay (a DIRECT child of
+    // the canvas) is removed first WITHOUT recursing — the two nested per-channel success
+    // panels are ALSO named "SuccessOverlay" and must survive.
+    private static SuccessRefs BuildStandaloneOverlay(Canvas canvas, out GameObject overlayGo)
     {
-        DestroyAllByName(successPanel.transform, "SuccessCta");
+        // Idempotent teardown — direct children only, so the nested per-channel panels survive.
+        for (int i = canvas.transform.childCount - 1; i >= 0; i--)
+        {
+            var existing = canvas.transform.GetChild(i);
+            if (existing != null && existing.name == "SuccessOverlay")
+                Object.DestroyImmediate(existing.gameObject);
+        }
 
-        var sheet = NewChild(successPanel, "SuccessCta", out var sheetRt);
-        SetAnchors(sheetRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
-        sheetRt.sizeDelta = new Vector2(880f, 1160f);
-        sheetRt.anchoredPosition = Vector2.zero;
-        var sheetBg = sheet.AddComponent<Image>();
-        sheetBg.color = SheetBg;
-        sheetBg.raycastTarget = true; // opaque sheet — covers the panel's vestigial content
-        AddRounded(sheet, 48f);
+        // Full-screen opaque backdrop (raycastTarget blocks anything beneath). Starts hidden;
+        // Manager.ShowInteractiveSuccessMoment activates it on a successful auth.
+        overlayGo = new GameObject("SuccessOverlay", typeof(RectTransform));
+        overlayGo.transform.SetParent(canvas.transform, false);
+        var overlayRt = overlayGo.GetComponent<RectTransform>();
+        StretchFill(overlayRt);
+        var backdrop = overlayGo.AddComponent<Image>();
+        backdrop.color = SheetBg;
+        backdrop.raycastTarget = true;
+        overlayGo.transform.SetAsLastSibling(); // draw above the ScreenContainer (auth pages stay last WITHIN it)
 
-        // Animated green check on a pale disc.
-        var disc = NewChild(sheet, "CheckDisc", out var discRt);
-        SetAnchors(discRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
-        discRt.anchoredPosition = new Vector2(0f, -72f);
-        discRt.sizeDelta = new Vector2(168f, 168f);
+        // Animated green check on a pale disc, high-centre.
+        var disc = NewChild(overlayGo, "CheckDisc", out var discRt);
+        SetAnchors(discRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+        discRt.anchoredPosition = new Vector2(0f, 400f);
+        discRt.sizeDelta = new Vector2(220f, 220f);
         disc.AddComponent<Image>().color = CheckDisc;
-        AddRounded(disc, 84f);
+        AddRounded(disc, 110f);
         disc.AddComponent<SuccessCheckPop>(); // DOScale 0.9→1 OutBack on every show
         var checkGo = NewChild(disc, "Check", out var checkRt);
-        StretchFill(checkRt, 40f);
+        StretchFill(checkRt, 52f);
         AddIconImage(checkGo, _check, Color.white); // check PNG is already green
 
         // Title «Бот подключён!» (Manager also sets this at runtime).
-        var titleGo = NewChild(sheet, "Title", out var titleRt);
-        SetAnchors(titleRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
-        titleRt.anchoredPosition = new Vector2(0f, -292f);
-        titleRt.sizeDelta = new Vector2(780f, 74f);
+        var titleGo = NewChild(overlayGo, "Title", out var titleRt);
+        SetAnchors(titleRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+        titleRt.anchoredPosition = new Vector2(0f, 210f);
+        titleRt.sizeDelta = new Vector2(920f, 84f);
         var titleTmp = AddText(titleGo, SuccessTitleText, 56f, _bold, Ink);
         titleTmp.alignment = TextAlignmentOptions.Center;
 
-        // Body.
-        var bodyGo = NewChild(sheet, "Body", out var bodyRt);
-        SetAnchors(bodyRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
-        bodyRt.anchoredPosition = new Vector2(0f, -388f);
-        bodyRt.sizeDelta = new Vector2(720f, 230f);
+        // Body (wrapped, centred just below the title).
+        var bodyGo = NewChild(overlayGo, "Body", out var bodyRt);
+        SetAnchors(bodyRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 1f));
+        bodyRt.anchoredPosition = new Vector2(0f, 110f);
+        bodyRt.sizeDelta = new Vector2(840f, 260f);
         var bodyTmp = AddText(bodyGo, SuccessBodyText, 34f, _regular, Muted);
         bodyTmp.alignment = TextAlignmentOptions.Top;
         bodyTmp.lineSpacing = 6f;
 
-        // Primary CTA «Загрузить прайс-лист».
-        var primary = NewChild(sheet, "PrimaryButton", out var primaryRt);
+        // Primary CTA «Загрузить прайс-лист» — full-width, thumb zone.
+        var primary = NewChild(overlayGo, "PrimaryButton", out var primaryRt);
         SetAnchors(primaryRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f));
-        primaryRt.anchoredPosition = new Vector2(0f, 184f);
-        primaryRt.sizeDelta = new Vector2(760f, 132f);
+        primaryRt.anchoredPosition = new Vector2(0f, 340f);
+        primaryRt.sizeDelta = new Vector2(900f, 140f);
         var primaryBg = primary.AddComponent<Image>();
         primaryBg.color = Primary;
         AddRounded(primary, CardRadius);
@@ -298,10 +318,10 @@ public static class OnboardingAuthBlocksBuilder
         primaryLabel.alignment = TextAlignmentOptions.Center;
 
         // Ghost «Позже».
-        var later = NewChild(sheet, "LaterButton", out var laterRt);
+        var later = NewChild(overlayGo, "LaterButton", out var laterRt);
         SetAnchors(laterRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f));
-        laterRt.anchoredPosition = new Vector2(0f, 60f);
-        laterRt.sizeDelta = new Vector2(760f, 104f);
+        laterRt.anchoredPosition = new Vector2(0f, 180f);
+        laterRt.sizeDelta = new Vector2(900f, 120f);
         var laterBg = later.AddComponent<Image>();
         laterBg.color = GhostBg;
         AddRounded(later, CardRadius);
@@ -312,7 +332,7 @@ public static class OnboardingAuthBlocksBuilder
         var laterLabel = AddText(laterLabelGo, SuccessLaterText, 36f, _semibold, Muted);
         laterLabel.alignment = TextAlignmentOptions.Center;
 
-        sheet.transform.SetAsLastSibling();
+        overlayGo.SetActive(false); // hidden until a successful auth shows it
 
         return new SuccessRefs
         {
