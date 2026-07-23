@@ -36,11 +36,25 @@ SUGGEST = "9PTyYcelRQI7bGDb-Suggest_Replies.json"
 
 # The executeQuery Postgres credential shared by Dashboard_Outcomes / Delete_File /
 # Delete_Bot_Files. The re-stamp nodes MUST use this, NOT the memoryPostgresChat cred.
+# Since ec15832 dev carries a single Postgres cred (vvRrFiEXzLVqKjOx); 1H5xlpFSESU4w6JH
+# no longer exists there — the negative assert below stays to catch re-introduction.
 PG_EXECUTEQUERY_CRED = "vvRrFiEXzLVqKjOx"
 PG_MEMORY_CRED = "1H5xlpFSESU4w6JH"
 
-# Pre-edit node count of the Telegram bot template (order invariant guard).
-TG_BOT_NODE_COUNT = 24
+# Expected node-name set of the Telegram bot template (insertion/rename/drop guard; the
+# index positions the orchestrator patches are asserted separately via nodes[0]/nodes[5]).
+# History: Phase 4 parity baseline = 24 nodes; Phase 9 suppression gate +2 (Read Reply
+# Mode, Suppressed?); Phase 10 debounce splice +4 (Debounce Wait, Fetch Recent,
+# Latest+Combine, Is Latest?). A future splice must extend this set deliberately.
+TG_BOT_NODE_NAMES = {
+    "Webhook", "HTTP Request", "Transcribe Audio", "Text", "Audio", "AI Agent",
+    "Input type", "Mark Read", "Typing", "Reading Pause", "Typing Pause",
+    "Pause Before Reading", "Ask to Send Text", "Input type2", "Count Output Words",
+    "Count Input Words", "Download Audio", "Listening Pause", "Chat Memory", "If",
+    "Read Reply Mode", "Suppressed?",
+    "OpenAI", "Supabase Vector Store", "Retrieve Answer", "OpenAI Embedding",
+    "Debounce Wait", "Fetch Recent", "Latest+Combine", "Is Latest?",
+}
 
 
 def load(fname):
@@ -60,9 +74,14 @@ def check_telegram_bot():
     wf = load(f)
     ns = wf["nodes"]
 
-    # (vi) node count + order invariant: Set Fields patches nodes[0]/nodes[5] by index.
-    assert len(ns) == TG_BOT_NODE_COUNT, \
-        f"{f}: node count {len(ns)} != {TG_BOT_NODE_COUNT} (order/insertion invariant broken)"
+    # (vi) node set + order invariant: Set Fields patches nodes[0]/nodes[5] by index.
+    names = [n["name"] for n in ns]
+    assert len(names) == len(TG_BOT_NODE_NAMES), \
+        f"{f}: node count {len(names)} != {len(TG_BOT_NODE_NAMES)} (insertion invariant broken)"
+    missing = TG_BOT_NODE_NAMES - set(names)
+    extra = set(names) - TG_BOT_NODE_NAMES
+    assert not missing and not extra, \
+        f"{f}: node-name set drift (missing={sorted(missing)}, extra={sorted(extra)})"
     assert ns[0]["name"] == "Webhook", f"{f}: nodes[0] is '{ns[0]['name']}', expected 'Webhook'"
     assert ns[5]["name"] == "AI Agent", f"{f}: nodes[5] is '{ns[5]['name']}', expected 'AI Agent'"
 
