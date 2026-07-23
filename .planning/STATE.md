@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
-status: paused
-stopped_at: Completed 11-08-PLAN.md (D2 gap-closure wave 1) — standalone SuccessOverlay above the auth pages; suite 1205/1205; next = 11-09 (D1+D3)
-last_updated: "2026-07-23T11:13:37.524Z"
-last_activity: 2026-07-22 — Phase 09 verified passed + completed (5/5 plans; SetReplyMode live SCLcpn6DMDG3Z4VN; HUMAN-UAT all 5 PASS both channels)
+status: executing
+stopped_at: Completed 11-09-PLAN.md (D1+D3 gap-closure wave 2) — «Первые шаги» card is now a live fact-mirror (pure FirstStepsCardVisibility gate + CanvasGroup hide + 5 RefreshFromFacts hooks); suite 1209/1209; next = 11-10 (Round-2 re-verify)
+last_updated: "2026-07-23T11:34:34.183Z"
+last_activity: "2026-07-23 — Completed 11-09 (D1+D3 gap-closure wave 2): checklist hidden on zero bots (D1) + live RefreshFromFacts on every fact change (D3); auth byte-identical; suite 1209/1209 green"
 progress:
   total_phases: 9
   completed_phases: 8
   total_plans: 68
-  completed_plans: 70
+  completed_plans: 71
   percent: 100
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 ## Current Position
 
 Phase: 11 (first-run-onboarding-flow)
-Plan: gap-closure round 1 (D1–D3) — 11-08 (D2) complete; 11-09 (D1+D3), 11-10 (re-verify) remain (originals 11-01..11-06 done; 11-07 = owner UAT gate)
-Status: Executing — gap-closure round 1; 11-08 done, 11-09 next
-Last activity: 2026-07-23 — Completed 11-08 (D2 gap-closure wave 1): «Бот подключён!» relocated onto a standalone SuccessOverlay above the auth pages; suite 1205/1205 green
+Plan: gap-closure round 1 (D1–D3) — 11-08 (D2) + 11-09 (D1+D3) complete; 11-10 (Round-2 re-verify) remains (originals 11-01..11-06 done; 11-07 = owner UAT gate)
+Status: Executing — gap-closure round 1; 11-08 + 11-09 done, 11-10 next
+Last activity: 2026-07-23 — Completed 11-09 (D1+D3 gap-closure wave 2): «Первые шаги» card hidden on zero bots (D1, pure FirstStepsCardVisibility gate + CanvasGroup hide) + live RefreshFromFacts on bot-created/channel-authed/back-out/upload/return-to-Bots (D3); auth byte-identical; suite 1209/1209 green
 
 Progress: [██████████] 100%
 
@@ -129,6 +129,7 @@ Recent decisions affecting current work (v1.1 design, spec §2):
 - [Phase 10] 10-03 live runData gate PASSED both channels: two-fragment burst -> ONE combined reply (earlier fragment aborts at Is Latest?); id-equality holds (WA jid-hex, TG bare numeric) on all 6 winners; fresh clones inherit the debounce. Window stays 8s (no tuning). Two live-only blocking deviations fixed: n8n 2.27.4 binaryMode orchestrator 400 (d594f17: fix-orchestrator-settings.py strips binaryMode from the clone payload in all 4 Create/Edit orchestrators, --canonical+--live) and the still-open Phase-9 reply_mode_flags DDL (owner-applied mid-gate, fails-open). combinedText-4-line-repeat in scenario A is the correct run-walk over an un-replied burst, NOT a defect.
 - [Phase 10] 10-04 owner UAT gate CLOSED partial (2026-07-22): scenarios 1-3 PASS — auto-reply combine behaviorally confirmed BOTH channels (multi-fragment → ONE combined reply; single message → one reply; humanizer pauses unchanged, ~8s accepted). Scenario 4 (suggestions coalesce) BLOCKED by open Phase-9 09-04 SetReplyMode deploy (in-app Semi-auto toggle 404'd at Manager.ReplyModeSync.cs:105 — expected, not a Phase-10 defect; BATCH-03 stays EditMode-covered 1197/1197). Scenario 5 (semi-auto skips path) DEFERRED to post-Phase-9 by explicit owner decision. Owner authorized closing the plan now; scenarios 4-5 tracked as UAT debt, re-verify alongside 09-04/09-05. Ready for /gsd-secure-phase 10.
 - [Phase 11]: 11-08 D2 gap-closure — «Бот подключён!» success moment relocated OUT of the auth screens onto a NEW standalone full-screen SuccessOverlay (Canvas-level last sibling → renders above the auth pages; m_Father = root Canvas RectTransform 42635013). Ten per-channel waSuccess*/tgSuccess* fields collapsed to ONE set; ShowInteractiveSuccessMoment(Bot) drops useTelegram + the authPage.SetActive(true) hack (deactivates both auth hierarchies up front); parameterless CloseSuccessAndOverlay. Builder tears down both nested SuccessCta clusters (DIRECT-CHILD-only teardown so the same-named nested panels survive) + builds one root-Canvas overlay (GetComponentInParent<Canvas>(true).rootCanvas) + 6-field re-stamp; trust cards + auth GetChild(3/4/5) byte-identical. Scene committed alone a4fba79; suite 1205/1205 green. Device D2 verdict rides 11-10.
+- [Phase 11]: 11-09 D1+D3 gap-closure — «Первые шаги» card is now a live fact-mirror. D1: new pure FirstStepsCardVisibility.ShouldShow(hasBots, checklistDone) => hasBots && !checklistDone hides the card whenever no bots exist (EmptyState owns the zero-bot screen, no overlap) and forever after the 4/4 latch — both former hide reasons collapse into ONE gate at the top of Refresh. D3: FirstStepsCard gained static Instance + cached CanvasGroup (Awake) + public RefreshFromFacts(), hides via SetContentVisible (CanvasGroup alpha/blocksRaycasts/interactable) so the root NEVER self-deactivates (a self-SetActive(false) root could never be re-shown by a hook). Five fire-and-forget RefreshFromFacts hooks: BotsPage.RefreshEmptyState (D1 authority/zero-bot chokepoint + return-to-Bots), Manager.CreateBotFromForm (refresh under success overlay), ShowAuthSuccess else (late channel auth), CloseAddBotForm (back-out), BotSettings.Auth upload. Auth byte-identical (GetChild(3/4/5)=21, auth/code|auth/2fa=7 unchanged); no scene mutation; code-only. 4 new FirstStepsCardVisibility tests, suite 1209/1209 EditMode green FRESH. commits 18abd22(RED)/b0d0d7f(GREEN)/559b89d/c2b996c. Device re-verify (D1 no-overlap + D3 correct checks with no navigation) rides 11-10.
 
 ### Pending Todos
 
@@ -232,6 +233,7 @@ Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG
 | Phase 10 P04 | owner-gate | 2 tasks | 1 files |
 | Phase 09 P04 | owner-gate | 3 tasks | 6 files |
 | Phase 11 P08 | 26 min | 3 tasks | 3 files |
+| Phase 11 P09 | ~14 min | 3 tasks | 6 files |
 
 ## Session Continuity
 
