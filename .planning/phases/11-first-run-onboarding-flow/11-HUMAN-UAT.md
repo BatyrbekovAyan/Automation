@@ -1,5 +1,5 @@
 ---
-status: open
+status: diagnosed
 phase: 11-first-run-onboarding-flow
 source: [11-07-PLAN.md]
 requirements: [ONB-01, ONB-02, ONB-03, ONB-04, ONB-05]
@@ -189,15 +189,17 @@ requirement/source it reopens. (Empty = no defects.)
 
 | # | Item (section + number) | Requirement | Screen — expected vs actual | Severity | → gap-closure? |
 |---|-------------------------|-------------|-----------------------------|----------|----------------|
-|   |                         |             |                             |          |                |
+| D1 | §4 checklist visibility | ONB-04/05 | Bots page, zero bots (back out of the wizard after the carousel): expected EmptyState only; actual EmptyState AND FirstStepsCard render overlapping each other | medium | yes — hide card when no bots (EmptyState active) |
+| D2 | §3 success moment | ONB-03 | Auth screen after final auth: expected a clean «Бот подключён!» moment; actual the success sheet renders stacked ON TOP of the still-visible code-entry UI (title/code field/buttons/trust card all visible beneath) | high | yes — owner decision 2026-07-18: relocate to a STANDALONE full-screen overlay outside the auth screens; single field set replaces the per-channel wa*/tg* sets |
+| D3 | §4 checklist derived state | ONB-04 | Bots page right after bot creation: expected rows 1-2 checked (2 из 4); actual all rows unchecked until you tap a row, navigate away and return (refresh only happens on re-enable) | medium | yes — refresh on fact-changing events (bot created, auth done, wizard closed, upload, first-reply latch), not OnEnable alone |
 
 ## Overall result
 
-**Overall:** ☐ PASS ☐ ISSUES
+**Overall:** ☐ PASS ☑ ISSUES
 
-- **Result:** ______________________________________________
-- **Issues found (if any):** ______________________________________________
-- **EditMode suite:** ______ / ______
+- **Result:** Round 1 run 2026-07-18 (Editor Game view + live auth) — carousel, trust blocks, and deep-links work; 3 defects logged (D1–D3), all routed to gap closure.
+- **Issues found (if any):** D1 EmptyState/FirstStepsCard overlap on zero bots; D2 success sheet stacked over auth content (→ standalone overlay per owner decision); D3 checklist rows stale until re-enable.
+- **EditMode suite:** 1165 / 1165
 
 On **PASS** (all ONB-01…ONB-05 sections green), Phase 11 (First-Run Onboarding Flow) is
 **complete** — reply **"approved"** to the executor checkpoint. On **ISSUES**, paste the defect
