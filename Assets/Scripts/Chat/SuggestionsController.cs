@@ -213,15 +213,23 @@ public class SuggestionsController : MonoBehaviour
     {
         if (!_semiAutoOn) return;                              // SEMI-03
         if (msgs == null || !msgs.Exists(m => m != null && m.isIncoming)) return;   // ignore outgoing echoes (Pitfall 7)
-        _pendingIncomingText = LastIncomingText(msgs);        // capture latest for the eventual coalesced fire
+        for (int i = 0; i < msgs.Count; i++)                   // accumulate EVERY fragment, in arrival order
+            if (msgs[i] != null && msgs[i].isIncoming)
+                _pendingIncomingText = AppendBurst(_pendingIncomingText, msgs[i].text);
         _debounce.Poke(Time.time);                            // reset the ~2.5s window instead of firing per-fragment (BATCH-03)
     }
 
-    private static string LastIncomingText(List<MessageViewModel> msgs)
+    /// <summary>Pure burst accumulator: append an incoming fragment to the pending coalesced text
+    /// unless it is already the tail line (live-poll re-delivery guard). The WHOLE burst — not just
+    /// the last fragment — must ride the request's lastIncomingText, because the payload's history
+    /// snapshot re-syncs on chat fetch, not on live poll, so it can lag behind the burst indefinitely
+    /// and the server-side run-walk cannot recover fragments that are in neither place.</summary>
+    public static string AppendBurst(string pending, string fragment)
     {
-        for (int i = msgs.Count - 1; i >= 0; i--)
-            if (msgs[i] != null && msgs[i].isIncoming) return msgs[i].text;
-        return null;
+        if (string.IsNullOrEmpty(fragment)) return pending;
+        if (string.IsNullOrEmpty(pending)) return fragment;
+        if (pending == fragment || pending.EndsWith("\n" + fragment)) return pending;   // re-delivered fragment
+        return pending + "\n" + fragment;
     }
 
     // One always-running self-gating loop (mirrors ChatManager.LivePoll): polls the debounce gate a
@@ -235,7 +243,10 @@ public class SuggestionsController : MonoBehaviour
             yield return new WaitForSecondsRealtime(0.25f);   // fresh instance each loop (codebase idiom)
             if (!_semiAutoOn) continue;                       // cheap guard; do not fire when off
             if (_debounce.ShouldFire(Time.time))
+            {
                 IssueRequest(steerTowardText: null, lastIncomingText: _pendingIncomingText);   // coalesced single fire (INT-02)
+                _pendingIncomingText = null;                   // burst delivered — a later burst starts clean, no re-send
+            }
         }
     }
 

@@ -78,3 +78,44 @@ public class IncomingDebounceGateTests
         Assert.IsTrue(gate.ShouldFire(100f + Window), "a fresh poke after a fire re-arms the window");
     }
 }
+
+// BATCH-03 content fix: the pure burst accumulator on SuggestionsController. The WHOLE burst — not
+// just the last fragment — must ride the coalesced request's lastIncomingText, because the payload's
+// history snapshot re-syncs on chat fetch (not live poll) and can lag behind the burst indefinitely;
+// a fragment in neither place is silently dropped from the suggestions (observed live: exec 1103
+// lost «бампер на бмв х5» entirely). Same pure-seam NUnit style as the gate tests above.
+public class SuggestionsBurstTextTests
+{
+    [Test] public void AppendBurst_FirstFragment_StartsThePending()
+    {
+        Assert.AreEqual("а", SuggestionsController.AppendBurst(null, "а"));
+    }
+
+    [Test] public void AppendBurst_SecondFragment_JoinsWithNewline()
+    {
+        Assert.AreEqual("а\nб", SuggestionsController.AppendBurst("а", "б"));
+    }
+
+    [Test] public void AppendBurst_ThreeFragments_PreserveArrivalOrder()
+    {
+        string pending = SuggestionsController.AppendBurst(null, "есть колодки");
+        pending = SuggestionsController.AppendBurst(pending, "на камри 70");
+        pending = SuggestionsController.AppendBurst(pending, "2007 года");
+        Assert.AreEqual("есть колодки\nна камри 70\n2007 года", pending);
+    }
+
+    // Live-poll re-delivery guard: the SAME tail fragment arriving again must not duplicate.
+    [Test] public void AppendBurst_RedeliveredTailFragment_NotDuplicated()
+    {
+        string pending = SuggestionsController.AppendBurst("а", "б");
+        Assert.AreEqual("а\nб", SuggestionsController.AppendBurst(pending, "б"));
+        Assert.AreEqual("б", SuggestionsController.AppendBurst("б", "б"), "single-line tail also guarded");
+    }
+
+    [Test] public void AppendBurst_NullOrEmptyFragment_LeavesPendingUntouched()
+    {
+        Assert.AreEqual("а", SuggestionsController.AppendBurst("а", null));
+        Assert.AreEqual("а", SuggestionsController.AppendBurst("а", ""));
+        Assert.IsNull(SuggestionsController.AppendBurst(null, null));
+    }
+}
