@@ -227,6 +227,13 @@ public partial class ChatManager : MonoBehaviour
         {
             MessageListPanel.SetActive(true);
         }
+
+        // «Первые шаги» row-4 latch listens at the SOURCE (OnboardingFirstReplyLatch):
+        // installed here — never unsubscribed — because ChatManager is alive on every
+        // screen, while the checklist card is only active on the Bots tab and message
+        // events only fire on the Chats tab (disjoint windows).
+        OnBatchMessagesLoaded += (msgs, _, __) => OnboardingFirstReplyLatch.TryLatch(msgs);
+        OnLiveMessagesReceived += OnboardingFirstReplyLatch.TryLatch;
     }
 
     public void Start()

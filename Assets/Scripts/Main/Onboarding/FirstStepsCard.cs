@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
@@ -8,9 +7,11 @@ using UnityEngine.UI;
 /// «Первые шаги» first-run checklist card (ONB-04), rendered above the bots list on
 /// BotsPage. A thin MonoBehaviour over the pure <see cref="FirstStepsChecklist"/>:
 /// it snapshots live facts (bot existence, channel auth, uploaded files, first-reply
-/// proxy), asks the pure class for the 4 step states + channel label, renders the
-/// rows with a 0.05s-stagger fade cascade, wires each row's deep-link, latches the
-/// first-reply proxy off ChatManager events, and permanently hides once 4/4 is done.
+/// latch), asks the pure class for the 4 step states, renders the rows with a
+/// 0.05s-stagger fade cascade, wires each row's deep-link, and permanently hides once
+/// 4/4 is done. The row-4 first-reply latch is written at the event SOURCE by
+/// <see cref="OnboardingFirstReplyLatch"/> (installed in ChatManager.Awake) — this
+/// card only READS it: the card is inactive on the Chats tab where messages arrive.
 ///
 /// Steps are MILESTONES: each is derived from live facts every Refresh, but once a
 /// step has been achieved it latches (<see cref="OnboardingKeys"/>) and never
@@ -82,7 +83,6 @@ public class FirstStepsCard : MonoBehaviour
     private CanvasGroup _cg;
     private VerticalLayoutGroup _botsVlg;
     private int _origListTopPadding = -1;
-    private bool _subscribed;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -101,58 +101,13 @@ public class FirstStepsCard : MonoBehaviour
 
     private void OnEnable()
     {
-        Subscribe();
         Refresh();
-    }
-
-    private void OnDisable()
-    {
-        Unsubscribe();
-    }
-
-    private void Subscribe()
-    {
-        if (_subscribed || ChatManager.Instance == null) return;
-        ChatManager.Instance.OnBatchMessagesLoaded += HandleBatch;
-        ChatManager.Instance.OnLiveMessagesReceived += LatchIfReplySeen;
-        _subscribed = true;
-    }
-
-    private void Unsubscribe()
-    {
-        if (!_subscribed || ChatManager.Instance == null) { _subscribed = false; return; }
-        ChatManager.Instance.OnBatchMessagesLoaded -= HandleBatch;
-        ChatManager.Instance.OnLiveMessagesReceived -= LatchIfReplySeen;
-        _subscribed = false;
-    }
-
-    // ── First-reply latch (Pitfall 5 proxy) ───────────────────────────────────
-
-    // OnBatchMessagesLoaded carries (msgs, _, _); adapt to the single-list latch.
-    private void HandleBatch(List<MessageViewModel> msgs, bool _, bool __) => LatchIfReplySeen(msgs);
-
-    // isIncoming==false is the spec's demonstrative proxy for "the bot has replied" —
-    // it also covers the owner's own outgoing message (accepted, T-11-06-03).
-    private void LatchIfReplySeen(List<MessageViewModel> msgs)
-    {
-        if (PlayerPrefs.GetInt(OnboardingKeys.FirstBotReplySeen, 0) == 1) return;
-        if (msgs == null || !msgs.Exists(m => m != null && !m.isIncoming)) return;
-
-        PlayerPrefs.SetInt(OnboardingKeys.FirstBotReplySeen, 1);
-        PlayerPrefs.Save();
-        if (isActiveAndEnabled) Refresh();
     }
 
     // ── Render ────────────────────────────────────────────────────────────────
 
     private void Refresh()
     {
-        // Re-arm the ChatManager subscription on every refresh (idempotent). OnEnable
-        // fires exactly once at scene load — possibly BEFORE ChatManager.Instance is
-        // assigned — and the always-active root never re-enables, so without this retry
-        // the row-4 first-reply latch is dead for the whole session (review WR-01).
-        Subscribe();
-
         bool checklistDone = PlayerPrefs.GetInt(OnboardingKeys.ChecklistDone, 0) == 1;
         bool botExists = botsParent != null && botsParent.childCount > 0;
 
