@@ -336,7 +336,11 @@ public static class BotSettingsRebuilder
                 }
             }
 
-            so.FindProperty("mainScrim").objectReferenceValue = mainScrim;
+            // The former top-level `mainScrim` field was dropped from BotSettings in the
+            // "thin controller" refactor (5d4eade); FindProperty("mainScrim") now returns
+            // null and stamping it NRE'd, aborting the whole rebuild before save. The
+            // FocusScrim is wired per-field via RewireEditableField, so there is no
+            // top-level scrim ref to stamp — the stale stamp is removed.
             so.FindProperty("BotNameField").objectReferenceValue          = generalFields.botName;
             so.FindProperty("BusinessTypeDropdown").objectReferenceValue  = generalFields.businessTypeDropdown;
             so.FindProperty("whatsappRow").objectReferenceValue           = generalFields.whatsappRow;
