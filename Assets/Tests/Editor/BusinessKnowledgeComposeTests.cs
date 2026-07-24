@@ -45,4 +45,21 @@ public class BusinessKnowledgeComposeTests
         var result = Manager.ComposeBusinessKnowledge("", "", "", "", "", "");
         Assert.AreEqual("About Business:\n", result);
     }
+
+    [Test]
+    public void BotSettingsPrefab_HasAllContactFieldRefs()
+    {
+        var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.GameObject>(
+            "Assets/Prefabs/BotSettings.prefab");
+        Assert.IsNotNull(prefab, "BotSettings.prefab not found");
+
+        var settings = prefab.GetComponent<BotSettings>();
+        Assert.IsNotNull(settings, "BotSettings component missing on prefab");
+        Assert.IsNotNull(settings.BusinessField,  "BusinessField not wired");
+        Assert.IsNotNull(settings.PhoneField,     "PhoneField not wired");
+        Assert.IsNotNull(settings.HoursField,     "HoursField not wired");
+        Assert.IsNotNull(settings.AddressField,   "AddressField not wired");
+        Assert.IsNotNull(settings.InstagramField, "InstagramField not wired");
+        Assert.IsNotNull(settings.EmailField,     "EmailField not wired");
+    }
 }
