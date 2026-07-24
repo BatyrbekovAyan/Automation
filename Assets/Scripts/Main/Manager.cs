@@ -415,11 +415,6 @@ public partial class Manager : MonoBehaviour
 
                 recreatedBotSettings.BusinessField.Value = PlayerPrefs.GetString(recreatedBot.name + "Business", "");
                 recreatedBotSettings.PromptField.Value = PlayerPrefs.GetString(recreatedBot.name + "Prompt", "");
-                recreatedBotSettings.PhoneField.Value     = PlayerPrefs.GetString(recreatedBot.name + "Phone", "");
-                recreatedBotSettings.HoursField.Value     = PlayerPrefs.GetString(recreatedBot.name + "Hours", "");
-                recreatedBotSettings.AddressField.Value   = PlayerPrefs.GetString(recreatedBot.name + "Address", "");
-                recreatedBotSettings.InstagramField.Value = PlayerPrefs.GetString(recreatedBot.name + "Instagram", "");
-                recreatedBotSettings.EmailField.Value     = PlayerPrefs.GetString(recreatedBot.name + "Email", "");
 
                 int ProductsNumber = PlayerPrefs.GetInt(recreatedBot.name + "ProductsNumber", 0);
                 for (int p = 0; p < ProductsNumber; p++)
@@ -747,11 +742,6 @@ public partial class Manager : MonoBehaviour
         PlayerPrefs.SetString(openBot.name + "Business", openBotSettings.BusinessField.Value);
 
         PlayerPrefs.SetString(openBot.name + "Prompt", openBotSettings.PromptField.Value);
-        PlayerPrefs.SetString(openBot.name + "Phone",     openBotSettings.PhoneField.Value);
-        PlayerPrefs.SetString(openBot.name + "Hours",     openBotSettings.HoursField.Value);
-        PlayerPrefs.SetString(openBot.name + "Address",   openBotSettings.AddressField.Value);
-        PlayerPrefs.SetString(openBot.name + "Instagram", openBotSettings.InstagramField.Value);
-        PlayerPrefs.SetString(openBot.name + "Email",     openBotSettings.EmailField.Value);
 
 
         for (int i = 0; i < openBotSettings.ProductsParent.transform.childCount; i++)
@@ -860,11 +850,6 @@ public partial class Manager : MonoBehaviour
 
         openBotSettings.BusinessField.Value = PlayerPrefs.GetString(openBot.name + "Business", "");
         openBotSettings.PromptField.Value = PlayerPrefs.GetString(openBot.name + "Prompt", "");
-        openBotSettings.PhoneField.Value     = PlayerPrefs.GetString(openBot.name + "Phone", "");
-        openBotSettings.HoursField.Value     = PlayerPrefs.GetString(openBot.name + "Hours", "");
-        openBotSettings.AddressField.Value   = PlayerPrefs.GetString(openBot.name + "Address", "");
-        openBotSettings.InstagramField.Value = PlayerPrefs.GetString(openBot.name + "Instagram", "");
-        openBotSettings.EmailField.Value     = PlayerPrefs.GetString(openBot.name + "Email", "");
 
 
         for (int p = 0; p < openBotSettings.ProductsParent.transform.childCount; p++)
@@ -936,12 +921,6 @@ public partial class Manager : MonoBehaviour
         return builder.ToString();
     }
 
-    // Convenience overload: pulls the six values off a BotSettings instance.
-    public static string ComposeBusinessKnowledge(BotSettings s) =>
-        ComposeBusinessKnowledge(
-            s.BusinessField.Value, s.PhoneField.Value, s.HoursField.Value,
-            s.AddressField.Value, s.InstagramField.Value, s.EmailField.Value);
-
     public void EnableSave()
     {
         bool settingsChanged = false;
@@ -956,12 +935,7 @@ public partial class Manager : MonoBehaviour
             !openBotSettings.WhatsappNumberField.Value.Equals(PlayerPrefs.GetString(openBot.name + "WhatsappNumber", "")) ||
             !openBotSettings.TelegramNumberField.Value.Equals(PlausibleTelegramNumber(PlayerPrefs.GetString(openBot.name + "TelegramNumber", ""))) ||
             !openBotSettings.BusinessField.Value.Equals(PlayerPrefs.GetString(openBot.name + "Business", "")) ||
-            !openBotSettings.PromptField.Value.Equals(PlayerPrefs.GetString(openBot.name + "Prompt", "")) ||
-            !openBotSettings.PhoneField.Value.Equals(PlayerPrefs.GetString(openBot.name + "Phone", "")) ||
-            !openBotSettings.HoursField.Value.Equals(PlayerPrefs.GetString(openBot.name + "Hours", "")) ||
-            !openBotSettings.AddressField.Value.Equals(PlayerPrefs.GetString(openBot.name + "Address", "")) ||
-            !openBotSettings.InstagramField.Value.Equals(PlayerPrefs.GetString(openBot.name + "Instagram", "")) ||
-            !openBotSettings.EmailField.Value.Equals(PlayerPrefs.GetString(openBot.name + "Email", "")))
+            !openBotSettings.PromptField.Value.Equals(PlayerPrefs.GetString(openBot.name + "Prompt", "")))
         {
             settingsChanged = true;
         }
@@ -3247,7 +3221,7 @@ public partial class Manager : MonoBehaviour
         string tgId = openBot.GetComponent<Bot>().telegramWorkflowId;
         form.AddField("TelegramWorkflowId", string.IsNullOrEmpty(tgId) ? Bot.UnauthedProfileSentinel : tgId);
 
-        form.AddField("Business", ComposeBusinessKnowledge(openBotSettings));
+        form.AddField("Business", "About Business:\n" + openBotSettings.BusinessField.Value);
         form.AddField("Prompt", openBotSettings.PromptField.Value);
         form.AddField("ProductsList", "Products:\n" + productsList);
         form.AddField("ServicesList", "Services:\n" + servicesList);
@@ -3405,7 +3379,7 @@ public partial class Manager : MonoBehaviour
         string waId = openBot.GetComponent<Bot>().whatsappWorkflowId;
         form.AddField("WhatsappWorkflowId", string.IsNullOrEmpty(waId) ? Bot.UnauthedProfileSentinel : waId);
 
-        form.AddField("Business", ComposeBusinessKnowledge(openBotSettings));
+        form.AddField("Business", "About Business:\n" + openBotSettings.BusinessField.Value);
         form.AddField("Prompt", openBotSettings.PromptField.Value);
         form.AddField("ProductsList", "Products:\n" + productsList);
         form.AddField("ServicesList", "Services:\n" + servicesList);
@@ -3646,7 +3620,7 @@ public partial class Manager : MonoBehaviour
         form.AddField("TelegramWorkflowId", telegramWorkflowId);
         form.AddField("Name", openBotSettings.BotNameField.Value);
         AddBusinessTypeFields(form);
-        form.AddField("Business", ComposeBusinessKnowledge(openBotSettings));
+        form.AddField("Business", openBotSettings.BusinessField.Value);
         form.AddField("Prompt", openBotSettings.PromptField.Value);
         form.AddField("ProductsList", productsList);
         form.AddField("ServicesList", servicesList);

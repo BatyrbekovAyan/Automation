@@ -303,8 +303,8 @@ public static class BotSettingsRebuilder
             if (stashedDropdown != null)
                 generalFields.businessTypeDropdown = stashedDropdown;
 
-            var businessRefs = BuildBusinessTab(tabs["Business"].content, mainScrim);
-            var promptField  = BuildBusinessOrPromptTab(tabs["Prompt"].content, "ПРОМПТ", "Промпт", mainScrim);
+            var businessField = BuildBusinessOrPromptTab(tabs["Business"].content, "ОПИСАНИЕ БИЗНЕСА", "Описание", mainScrim);
+            var promptField   = BuildBusinessOrPromptTab(tabs["Prompt"].content,   "ПРОМПТ",              "Промпт",    mainScrim);
             var productTabRefs = BuildProductOrServiceTab(tabs["Product"].content, isProducts: true);
             var serviceTabRefs = BuildProductOrServiceTab(tabs["Service"].content, isProducts: false);
 
@@ -336,24 +336,15 @@ public static class BotSettingsRebuilder
                 }
             }
 
-            // The former top-level `mainScrim` field was dropped from BotSettings in the
-            // "thin controller" refactor (5d4eade); FindProperty("mainScrim") now returns
-            // null and stamping it NRE'd, aborting the whole rebuild before save. The
-            // FocusScrim is wired per-field via RewireEditableField, so there is no
-            // top-level scrim ref to stamp — the stale stamp is removed.
+            so.FindProperty("mainScrim").objectReferenceValue = mainScrim;
             so.FindProperty("BotNameField").objectReferenceValue          = generalFields.botName;
             so.FindProperty("BusinessTypeDropdown").objectReferenceValue  = generalFields.businessTypeDropdown;
             so.FindProperty("whatsappRow").objectReferenceValue           = generalFields.whatsappRow;
             so.FindProperty("telegramRow").objectReferenceValue           = generalFields.telegramRow;
             so.FindProperty("WhatsappNumberField").objectReferenceValue   = generalFields.whatsappNumberField;
             so.FindProperty("TelegramNumberField").objectReferenceValue   = generalFields.telegramNumberField;
-            so.FindProperty("BusinessField").objectReferenceValue  = businessRefs.description;
-            so.FindProperty("PhoneField").objectReferenceValue     = businessRefs.phone;
-            so.FindProperty("HoursField").objectReferenceValue     = businessRefs.hours;
-            so.FindProperty("AddressField").objectReferenceValue   = businessRefs.address;
-            so.FindProperty("InstagramField").objectReferenceValue = businessRefs.instagram;
-            so.FindProperty("EmailField").objectReferenceValue     = businessRefs.email;
-            so.FindProperty("PromptField").objectReferenceValue    = promptField;
+            so.FindProperty("BusinessField").objectReferenceValue = businessField;
+            so.FindProperty("PromptField").objectReferenceValue   = promptField;
 
             var productPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(ProductPrefabPath);
             var servicePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(ServicePrefabPath);
@@ -491,11 +482,10 @@ public static class BotSettingsRebuilder
     private static Dictionary<string, TabRoots> BuildTabs(GameObject root)
     {
         var map = new Dictionary<string, TabRoots>();
-        // Prompt hosts a single multi-line input that scrolls internally via
-        // TMP_InputField + RectMask2D, so the tab itself does not need a
-        // ScrollRect — the page stays static. Business now holds multiple
-        // stacked fields (description + contact info) and needs to scroll.
-        var nonScrollableTabs = new HashSet<string> { "Prompt" };
+        // Business and Prompt host a single multi-line input that scrolls
+        // internally via TMP_InputField + RectMask2D, so the tab itself
+        // does not need a ScrollRect — the page stays static.
+        var nonScrollableTabs = new HashSet<string> { "Business", "Prompt" };
 
         foreach (var name in new[] { "General", "Business", "Product", "Service", "Prompt" })
         {
@@ -609,44 +599,6 @@ public static class BotSettingsRebuilder
         RewireEditableField(textArea, go, scrim);
         go.GetComponent<RectTransform>().sizeDelta = Sv(0, 240);
         return textArea;
-    }
-
-    private struct BusinessTabRefs
-    {
-        public EditableTextArea description;
-        public EditableField phone;
-        public EditableField hours;
-        public EditableField address;
-        public EditableField instagram;
-        public EditableField email;
-    }
-
-    private static BusinessTabRefs BuildBusinessTab(GameObject tab, FocusScrim scrim)
-    {
-        var refs = new BusinessTabRefs
-        {
-            description = BuildBusinessOrPromptTab(tab, "ОПИСАНИЕ БИЗНЕСА", "Описание", scrim)
-        };
-
-        AddSectionHeader(tab, "КОНТАКТЫ И ИНФОРМАЦИЯ");
-        refs.phone     = CreateEditableField(tab, "Телефон",     scrim, multiline: false);
-        refs.hours     = CreateEditableField(tab, "Часы работы", scrim, multiline: false);
-        refs.address   = CreateEditableField(tab, "Адрес",       scrim, multiline: false);
-        refs.instagram = CreateEditableField(tab, "Instagram",   scrim, multiline: false);
-        refs.email     = CreateEditableField(tab, "Email",       scrim, multiline: false);
-
-        ApplyKeyboard(refs.phone, TMP_InputField.ContentType.Standard, TouchScreenKeyboardType.PhonePad);
-        ApplyKeyboard(refs.email, TMP_InputField.ContentType.EmailAddress, TouchScreenKeyboardType.EmailAddress);
-        return refs;
-    }
-
-    private static void ApplyKeyboard(
-        EditableField field, TMP_InputField.ContentType contentType, TouchScreenKeyboardType keyboard)
-    {
-        var input = field.GetComponentInChildren<TMP_InputField>();
-        if (input == null) return;
-        input.contentType = contentType;
-        input.keyboardType = keyboard;
     }
 
     private static Button BuildDeleteBotButton(GameObject parent)
