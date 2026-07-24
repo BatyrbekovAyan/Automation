@@ -282,9 +282,17 @@ public class Bot : MonoBehaviour
         PlayerPrefs.SetInt(transform.name, enabled ? 1 : 0);
         Status.text = enabled ? active ? "Active" : "Connecting.." : "Not Active";
         Status.color = enabled ? active ? green : blue : red;
-        
-        Manager.Instance.GetEnableWhatsappWorkflow(whatsappWorkflowId, enabled);
-        Manager.Instance.GetEnableTelegramWorkflow(telegramWorkflowId, enabled);
+
+        // The master switch gates BOTH channels, but must not activate a channel the
+        // owner has toggled off: effective state = master AND that channel's toggle.
+        // (Off master → both false → deactivate; on master → only enabled channels run.)
+        bool whatsappOn = BotActivationPolicy.ChannelWorkflowActive(
+            enabled, PlayerPrefs.GetInt(transform.name + "isOnWhatsapp", 1) == 1);
+        bool telegramOn = BotActivationPolicy.ChannelWorkflowActive(
+            enabled, PlayerPrefs.GetInt(transform.name + "isOnTelegram", 1) == 1);
+
+        Manager.Instance.GetEnableWhatsappWorkflow(whatsappWorkflowId, whatsappOn);
+        Manager.Instance.GetEnableTelegramWorkflow(telegramWorkflowId, telegramOn);
     }
 
     private void ApplySwitchFooterLabel(bool isOn)
