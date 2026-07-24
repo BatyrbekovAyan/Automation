@@ -10,12 +10,17 @@ using UnityEngine.UI;
 public class OnboardingScreen : MonoBehaviour
 {
     [SerializeField] private OnboardingPager pager;
-    [SerializeField] private RectTransform[] dots;      // one per page; active dot = elongated Primary pill
+    [SerializeField] private RectTransform[] dots;      // one per page; active dot = wider Primary pill
     [SerializeField] private Button createBotButton;    // slide-3 «Создать бота»
-    [Tooltip("BottomNavPanel — hidden (not deactivated: BottomTabManager lives on it) while the " +
-             "full-screen carousel is up, restored whenever it hides. Stamped by OnboardingScreenBuilder.")]
-    [SerializeField] private GameObject bottomNav;
     // Optional «Далее» buttons (advance the pager); builder wires them to pager.GoToPage.
+
+    // Dot metrics (builder builds each dot at DotSize×DotSize with corner radius DotSize/2).
+    // The active dot becomes a wider pill by WIDTH — never a non-uniform localScale, which
+    // stretches the rounded caps and reads as a distorted oval.
+    private const float DotSize = 28f;
+    private const float ActiveDotWidth = 60f;
+    private static readonly Color DotActive = new Color(0.106f, 0.486f, 0.922f, 1f);    // #1B7CEB
+    private static readonly Color DotInactive = new Color(0.106f, 0.486f, 0.922f, 0.30f);
 
     private void OnEnable()
     {
@@ -24,27 +29,11 @@ public class OnboardingScreen : MonoBehaviour
             pager.OnPageChanged += UpdateDots;
             UpdateDots(pager.CurrentPage);
         }
-        // Full-screen first-run takeover: the nav must not show or be tappable while the
-        // carousel is up (there is no tab-switch mid-onboarding). Hide via CanvasGroup so
-        // BottomTabManager — which lives ON the nav panel — keeps running.
-        SetBottomNavVisible(false);
     }
 
     private void OnDisable()
     {
         if (pager != null) pager.OnPageChanged -= UpdateDots;
-        // Restore the nav whenever the carousel hides, for ANY exit path (CTA or otherwise).
-        SetBottomNavVisible(true);
-    }
-
-    private void SetBottomNavVisible(bool visible)
-    {
-        if (bottomNav == null) return;
-        var cg = bottomNav.GetComponent<CanvasGroup>();
-        if (cg == null) cg = bottomNav.AddComponent<CanvasGroup>();
-        cg.alpha = visible ? 1f : 0f;
-        cg.blocksRaycasts = visible;
-        cg.interactable = visible;
     }
 
     private void Start()
@@ -59,15 +48,16 @@ public class OnboardingScreen : MonoBehaviour
             SetDotActive(dots[i], i == page); // elongate/tint active per builder-baked visuals
     }
 
-    // Active dot = wider Primary #1B7CEB pill; inactive = short muted pill. The builder
-    // bakes both a wide + narrow width; here just toggle a child/scale flag it wired.
+    // Active dot = wider Primary #1B7CEB pill; inactive = muted circle. Elongate by WIDTH
+    // (keeps the corner radius = height/2, so the caps stay clean semicircles) — NOT by a
+    // non-uniform localScale, which stretches the rounded caps into a distorted oval.
     private void SetDotActive(RectTransform dot, bool isActive)
     {
         if (dot == null) return;
         var img = dot.GetComponent<Image>();
-        if (img != null) img.color = isActive ? new Color(0.106f, 0.486f, 0.922f, 1f) /*#1B7CEB*/
-                                              : new Color(0.106f, 0.486f, 0.922f, 0.30f);
-        dot.localScale = isActive ? new Vector3(2.4f, 1f, 1f) : Vector3.one; // elongate active
+        if (img != null) img.color = isActive ? DotActive : DotInactive;
+        dot.localScale = Vector3.one;
+        dot.sizeDelta = new Vector2(isActive ? ActiveDotWidth : DotSize, DotSize);
     }
 
     /// <summary>Slide-3 «Создать бота»: flag onboarding seen and open the existing wizard.</summary>
