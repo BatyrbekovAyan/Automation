@@ -12,6 +12,9 @@ public class OnboardingScreen : MonoBehaviour
     [SerializeField] private OnboardingPager pager;
     [SerializeField] private RectTransform[] dots;      // one per page; active dot = elongated Primary pill
     [SerializeField] private Button createBotButton;    // slide-3 «Создать бота»
+    [Tooltip("BottomNavPanel — hidden (not deactivated: BottomTabManager lives on it) while the " +
+             "full-screen carousel is up, restored whenever it hides. Stamped by OnboardingScreenBuilder.")]
+    [SerializeField] private GameObject bottomNav;
     // Optional «Далее» buttons (advance the pager); builder wires them to pager.GoToPage.
 
     private void OnEnable()
@@ -21,11 +24,27 @@ public class OnboardingScreen : MonoBehaviour
             pager.OnPageChanged += UpdateDots;
             UpdateDots(pager.CurrentPage);
         }
+        // Full-screen first-run takeover: the nav must not show or be tappable while the
+        // carousel is up (there is no tab-switch mid-onboarding). Hide via CanvasGroup so
+        // BottomTabManager — which lives ON the nav panel — keeps running.
+        SetBottomNavVisible(false);
     }
 
     private void OnDisable()
     {
         if (pager != null) pager.OnPageChanged -= UpdateDots;
+        // Restore the nav whenever the carousel hides, for ANY exit path (CTA or otherwise).
+        SetBottomNavVisible(true);
+    }
+
+    private void SetBottomNavVisible(bool visible)
+    {
+        if (bottomNav == null) return;
+        var cg = bottomNav.GetComponent<CanvasGroup>();
+        if (cg == null) cg = bottomNav.AddComponent<CanvasGroup>();
+        cg.alpha = visible ? 1f : 0f;
+        cg.blocksRaycasts = visible;
+        cg.interactable = visible;
     }
 
     private void Start()

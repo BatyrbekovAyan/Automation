@@ -180,6 +180,13 @@ public static class OnboardingScreenBuilder
         for (int i = 0; i < dots.Length; i++)
             dotsProp.GetArrayElementAtIndex(i).objectReferenceValue = dots[i];
         ctrlSo.FindProperty("createBotButton").objectReferenceValue = createBotButton;
+        // Stamp the BottomNavPanel so the carousel can hide it (full-screen takeover).
+        var bottomNav = ResolveBottomNav(botsPage.transform);
+        if (bottomNav != null)
+            ctrlSo.FindProperty("bottomNav").objectReferenceValue = bottomNav;
+        else
+            Debug.LogWarning("[OnboardingScreenBuilder] BottomNavPanel not found — carousel " +
+                             "will not hide the bottom nav. Onboarding still builds.");
         ctrlSo.ApplyModifiedPropertiesWithoutUndo();
 
         // «Далее» buttons advance the pager (persistent listeners survive serialization).
@@ -227,6 +234,15 @@ public static class OnboardingScreenBuilder
             p = p.parent;
         }
         return null;
+    }
+
+    // BottomNavPanel is a Canvas-level sibling of the ScreenContainer.
+    private static GameObject ResolveBottomNav(Transform botsPage)
+    {
+        Transform container = ResolveScreenContainer(botsPage);
+        Transform canvas = container != null ? container.parent : null;
+        Transform nav = canvas != null ? canvas.Find("BottomNavPanel") : null;
+        return nav != null ? nav.gameObject : null;
     }
 
     // ── Slide construction ───────────────────────────────────────────────────
