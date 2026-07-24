@@ -1748,10 +1748,37 @@ public partial class Manager : MonoBehaviour
     // bot's «Прайс-листы» tab (fallback «Открыть чаты» when files already exist). Fired from
     // exactly two sites (CreateBotFromForm after creation; ShowAuthSuccess's else branch for
     // settings re-auth) — never from BotSettings (this is a private Manager member).
+    // Dwell for the in-box QR/code checkmark shown before the standalone success page.
+    private const float SuccessInBoxCheckSeconds = 1.2f;
+
     private IEnumerator ShowInteractiveSuccessMoment(Bot bot)
     {
         if (bot == null) yield break;
         if (SuccessOverlay == null) yield break;
+
+        // Restore the pre-D2 in-box checkmark: before opening the standalone success page,
+        // flash the just-authed channel's nested success sheet (the original QR/code-box
+        // checkmark — 11-08 kept these panels, removed only their injected CTA) for a beat,
+        // exactly as it appeared before we split out a separate success page. The active
+        // auth page is the one that just authed; both are still active here (the creation
+        // final-auth and settings re-auth paths leave authPage active for this moment).
+        GameObject activeAuth =
+            (WhatsappAuth != null && WhatsappAuth.activeSelf) ? WhatsappAuth :
+            (TelegramAuth != null && TelegramAuth.activeSelf) ? TelegramAuth : null;
+        GameObject inBoxCheck =
+            activeAuth == WhatsappAuth ? WhatsappAuthSuccessPanel :
+            activeAuth == TelegramAuth ? TelegramAuthSuccessPanel : null;
+        if (activeAuth != null && inBoxCheck != null)
+        {
+            // Scroll the QR/code container to top so the check is on-screen (mirrors the
+            // surviving moreAuthSteps branch). This toggles only the success sheet + scroll —
+            // the auth CODE flow (GetChild states, requests) is never touched.
+            var sr = activeAuth.GetComponentInChildren<ScrollRect>();
+            if (sr != null) sr.normalizedPosition = Vector2.one;
+            inBoxCheck.SetActive(true);
+            yield return new WaitForSeconds(SuccessInBoxCheckSeconds);
+            inBoxCheck.SetActive(false);
+        }
 
         // D2: the overlay is standalone (Canvas-level, above the auth pages) — NO authPage
         // reactivation. Deactivate BOTH auth hierarchies defensively (pre-phase behaviour) so
