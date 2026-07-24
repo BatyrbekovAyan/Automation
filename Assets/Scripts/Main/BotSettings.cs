@@ -49,6 +49,11 @@ public partial class BotSettings : MonoBehaviour
     #region Serialized — Business / Prompt
     [SerializeField] public EditableTextArea BusinessField;
     [SerializeField] public EditableTextArea PromptField;
+    [SerializeField] public EditableField PhoneField;
+    [SerializeField] public EditableField HoursField;
+    [SerializeField] public EditableField AddressField;
+    [SerializeField] public EditableField InstagramField;
+    [SerializeField] public EditableField EmailField;
     #endregion
 
     #region Serialized — Products / Services
@@ -453,6 +458,16 @@ public partial class BotSettings : MonoBehaviour
             BusinessField.OnCommitted.AddListener(_ => Manager.Instance.EnableSave());
         if (PromptField != null)
             PromptField.OnCommitted.AddListener(_ => Manager.Instance.EnableSave());
+        if (PhoneField != null)
+            PhoneField.OnCommitted.AddListener(_ => Manager.Instance.EnableSave());
+        if (HoursField != null)
+            HoursField.OnCommitted.AddListener(_ => Manager.Instance.EnableSave());
+        if (AddressField != null)
+            AddressField.OnCommitted.AddListener(_ => Manager.Instance.EnableSave());
+        if (InstagramField != null)
+            InstagramField.OnCommitted.AddListener(_ => Manager.Instance.EnableSave());
+        if (EmailField != null)
+            EmailField.OnCommitted.AddListener(_ => Manager.Instance.EnableSave());
 
         if (BusinessTypeDropdown != null)
             BusinessTypeDropdown.onValueChanged.AddListener(_ => Manager.Instance.EnableSave());
