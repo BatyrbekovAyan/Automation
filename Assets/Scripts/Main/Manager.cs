@@ -1770,6 +1770,10 @@ public partial class Manager : MonoBehaviour
             activeAuth == TelegramAuth ? TelegramAuthSuccessPanel : null;
         if (activeAuth != null && inBoxCheck != null)
         {
+            // The loading cover is drawn above the screens — hide it so the in-box checkmark is
+            // actually visible for its full dwell instead of being instantly covered (the
+            // standalone overlay shown right after replaces it, so nothing flickers).
+            if (LoadingPanel != null) LoadingPanel.SetActive(false);
             // Scroll the QR/code container to top so the check is on-screen (mirrors the
             // surviving moreAuthSteps branch). This toggles only the success sheet + scroll —
             // the auth CODE flow (GetChild states, requests) is never touched.
