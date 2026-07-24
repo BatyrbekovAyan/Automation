@@ -196,6 +196,11 @@ public class Bot : MonoBehaviour
             PlayerPrefs.DeleteKey(transform.name + "TelegramNumber");
             PlayerPrefs.DeleteKey(transform.name + "Business");
             PlayerPrefs.DeleteKey(transform.name + "Prompt");
+            PlayerPrefs.DeleteKey(transform.name + "Phone");
+            PlayerPrefs.DeleteKey(transform.name + "Hours");
+            PlayerPrefs.DeleteKey(transform.name + "Address");
+            PlayerPrefs.DeleteKey(transform.name + "Instagram");
+            PlayerPrefs.DeleteKey(transform.name + "Email");
             PlayerPrefs.DeleteKey(transform.name + "WhatsappWorkflowId");
             PlayerPrefs.DeleteKey(transform.name + "WhatsappProfileId");
             PlayerPrefs.DeleteKey(transform.name + "TelegramWorkflowId");
