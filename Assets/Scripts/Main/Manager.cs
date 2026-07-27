@@ -164,6 +164,14 @@ public partial class Manager : MonoBehaviour
     private Coroutine _whatsappStatusCoroutine;
     private Coroutine _telegramStatusCoroutine;
     private Coroutine _whatsappQrCoroutine;
+    // Telegram twin of _whatsappQrCoroutine — without a stored handle the tapi QR loop could
+    // not be stopped on back-press, so it kept polling auth/qr against a profile the back
+    // handler was concurrently deleting (the IN-04 symptom, Telegram half).
+    private Coroutine _telegramQrCoroutine;
+    // Re-entrancy latch for the success moment. SuccessOverlay.activeSelf is NOT sufficient:
+    // the overlay only goes active AFTER the in-box checkmark dwell, leaving that window
+    // unguarded. Set once the moment commits, cleared in CloseSuccessAndOverlay.
+    private bool _successMomentRunning;
     // True once a pairing code was issued for the current WhatsApp profile.
     // WhatsApp refuses a repeat code for the same profile for ~2 minutes, so
     // the next code request silently swaps in a fresh profile instead.
@@ -1042,6 +1050,7 @@ public partial class Manager : MonoBehaviour
         // WhatsappAuth is deactivated — so without this the loop kept polling qr/get (up to
         // 5 × 3s) against a profile OnWhatsappAuthFromSettingsBack was concurrently deleting.
         if (_whatsappQrCoroutine != null) { StopCoroutine(_whatsappQrCoroutine); _whatsappQrCoroutine = null; }
+        if (_telegramQrCoroutine != null) { StopCoroutine(_telegramQrCoroutine); _telegramQrCoroutine = null; }
         if (_whatsappStatusCoroutine != null) { StopCoroutine(_whatsappStatusCoroutine); _whatsappStatusCoroutine = null; }
         if (_telegramStatusCoroutine != null) { StopCoroutine(_telegramStatusCoroutine); _telegramStatusCoroutine = null; }
         if (WhatsappAuth != null) WhatsappAuth.SetActive(false);
@@ -1578,6 +1587,7 @@ public partial class Manager : MonoBehaviour
         // Stop auth polling before deleting the profiles — the status loops only
         // exit on authorized:true, so they'd poll the deleted profiles forever.
         if (_whatsappQrCoroutine != null) { StopCoroutine(_whatsappQrCoroutine); _whatsappQrCoroutine = null; }
+        if (_telegramQrCoroutine != null) { StopCoroutine(_telegramQrCoroutine); _telegramQrCoroutine = null; }
         if (_whatsappStatusCoroutine != null) { StopCoroutine(_whatsappStatusCoroutine); _whatsappStatusCoroutine = null; }
         if (_telegramStatusCoroutine != null) { StopCoroutine(_telegramStatusCoroutine); _telegramStatusCoroutine = null; }
 
@@ -1800,10 +1810,13 @@ public partial class Manager : MonoBehaviour
         // closure captured by the button listeners; a second invocation would RemoveAllListeners
         // and rewire them to a NEW closure, so the first coroutine's flag could never flip and it
         // would yield forever (leaked coroutine). Unreachable today — the opaque overlay blocks
-        // input and both fire sites are gated — so this is defensive: an already-showing moment
-        // is never stacked on. The overlay ships inactive and CloseSuccessAndOverlay resets it,
-        // so this can only be true while a moment is genuinely on screen.
-        if (SuccessOverlay.activeSelf) yield break;
+        // input and both fire sites are gated — so this is defensive.
+        //
+        // Latched on a FIELD, not SuccessOverlay.activeSelf: the overlay only goes active after
+        // the in-box checkmark dwell below, so an activeSelf test would leave that ~1.2s window
+        // unguarded — exactly when a second invocation could still rewire the buttons.
+        if (_successMomentRunning) yield break;
+        _successMomentRunning = true;
 
         // Restore the pre-D2 in-box checkmark: before opening the standalone success page,
         // flash the just-authed channel's nested success sheet (the original QR/code-box
@@ -1897,8 +1910,13 @@ public partial class Manager : MonoBehaviour
     private void CloseSuccessAndOverlay()
     {
         if (SuccessOverlay != null) SuccessOverlay.SetActive(false);
+        _successMomentRunning = false;   // IN-03: release the re-entrancy latch
         AddBotPanel.Instance?.CloseImmediate();
         BottomTabManager.Instance?.SwitchTab(BottomTabManager.BotsTabIndex);   // IN-08
+        // IN-05 follow-up: the checklist's entrance cascade was consumed while the card sat
+        // behind this overlay (RefreshFromFacts runs right after bot creation), so the user
+        // never saw it. Replay it now that the Bots page is actually on screen.
+        FirstStepsCard.Instance?.ReplayEntrance();
     }
 
     private void ShowWhatsappAuth()
@@ -1983,7 +2001,8 @@ public partial class Manager : MonoBehaviour
 
         // Activate root LAST — everything appears in its final state
         TelegramAuth.SetActive(true);
-        StartCoroutine(OpenTelegramQRPanel());
+        if (_telegramQrCoroutine != null) StopCoroutine(_telegramQrCoroutine);
+        _telegramQrCoroutine = StartCoroutine(OpenTelegramQRPanel());
     }
 
     private IEnumerator OpenWhatsappQRPanel()
