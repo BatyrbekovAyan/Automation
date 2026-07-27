@@ -101,6 +101,70 @@ public static class WappiStatusParser
     }
 
     /// <summary>
+    /// True with <paramref name="profileId"/> set when the body carries a non-empty scalar
+    /// "profile_id" (the <c>profile/add</c> response for both channels).
+    ///
+    /// Replaces a `"profile_id":` +14 offset scan bounded by `","status":`, which had two
+    /// failure modes: if the server ever emitted <c>status</c> BEFORE <c>profile_id</c> the
+    /// length went negative and threw — killing a nested coroutine so its awaiting parent
+    /// (the creation wizard / resend-recreate) never resumed and the LoadingPanel hung
+    /// forever; and the hard-coded +14 assumed the compact <c>"profile_id":"</c> form, so a
+    /// pretty-printed body stored an id with a LEADING QUOTE, silently breaking every later
+    /// Wappi call for that bot with no trace at the point of corruption.
+    /// </summary>
+    public static bool TryGetProfileId(string json, out string profileId)
+    {
+        profileId = "";
+        var root = TryParse(json);
+        if (root == null) return false;
+
+        string raw = AsScalarString(root["profile_id"]);
+        if (string.IsNullOrWhiteSpace(raw)) return false;
+
+        profileId = raw.Trim();
+        return true;
+    }
+
+    /// <summary>
+    /// True with <paramref name="png"/> set to the DECODED image bytes when
+    /// <paramref name="key"/> holds a base64 PNG — WhatsApp <c>qr/get</c> returns it under
+    /// "qrCode" as a <c>data:image/png;base64,…</c> URI, Telegram <c>auth/qr</c> returns raw
+    /// base64 under "detail". An optional <c>data:…;base64,</c> prefix is stripped either way.
+    ///
+    /// Both the extraction AND the decode are guarded: the old code sliced between two literal
+    /// tokens (throwing a negative-length Substring if they ever appeared out of order) and then
+    /// called <c>Convert.FromBase64String</c> unguarded on the SUCCESS path, so a malformed or
+    /// non-base64 payload threw <see cref="System.FormatException"/> and killed the QR coroutine.
+    /// Anything unusable — bad JSON, missing key, non-base64 (e.g. Telegram's <c>detail:"2fa"</c>
+    /// or an <c>auth_success</c> string) — now simply returns false and the caller retries.
+    /// </summary>
+    public static bool TryGetQrPng(string json, string key, out byte[] png)
+    {
+        png = null;
+        if (string.IsNullOrEmpty(key)) return false;
+
+        var root = TryParse(json);
+        if (root == null) return false;
+
+        string raw = AsScalarString(root[key]);
+        if (string.IsNullOrWhiteSpace(raw)) return false;
+
+        raw = raw.Trim();
+
+        // Strip a data URI prefix if present ("data:image/png;base64,AAA…").
+        int comma = raw.IndexOf(',');
+        if (raw.StartsWith("data:") && comma >= 0 && comma + 1 < raw.Length)
+            raw = raw.Substring(comma + 1);
+
+        if (string.IsNullOrWhiteSpace(raw)) return false;
+
+        try { png = System.Convert.FromBase64String(raw); }
+        catch (System.FormatException) { png = null; return false; }
+
+        return png.Length > 0;
+    }
+
+    /// <summary>
     /// True only for a short, all-digit value (one optional leading '+'). Rejects empty,
     /// letters, JSON punctuation (<c>{ } " : ,</c>) and anything longer than
     /// <see cref="MaxPlausiblePhoneLength"/> — so a stale raw-JSON blob persisted in
