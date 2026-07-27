@@ -14,7 +14,7 @@ updated: 2026-07-27
 
 # Phase 11 — Code Review Fix Report
 
-Owner-directed scope, run in two passes: **WR-02** then **WR-03**. Remaining findings from `11-REVIEW.md` are dispositioned at the bottom — WR-01 was already resolved during the phase; the 8 Info items remain open.
+Owner-directed, run in successive passes: **WR-02** → **WR-03** → two parser follow-ups (pairing code, `profile_id`/QR/`detail`) → **all 8 Info items**. WR-01 was already resolved during the phase itself. **Every finding in `11-REVIEW.md` is now closed.**
 
 
 
