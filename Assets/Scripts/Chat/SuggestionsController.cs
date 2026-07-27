@@ -232,7 +232,10 @@ public class SuggestionsController : MonoBehaviour
                 sawIncoming = false;
             }
         }
-        if (sawIncoming) _debounce.Poke(Time.time);           // reset the ~2.5s window instead of firing per-fragment (BATCH-03)
+        // UNSCALED wall clock, matching DebounceLoop's WaitForSecondsRealtime tick and the
+        // ChatManager poll idiom: Time.time is maximumDeltaTime-capped (so a frame hitch or an
+        // app resume silently stretches the window) and stops entirely at timeScale 0.
+        if (sawIncoming) _debounce.Poke(Time.realtimeSinceStartup);   // reset the ~2.5s window instead of firing per-fragment (BATCH-03)
     }
 
     /// <summary>Pure burst accumulator: append an incoming fragment to the pending coalesced text
@@ -258,7 +261,7 @@ public class SuggestionsController : MonoBehaviour
         {
             yield return new WaitForSecondsRealtime(0.25f);   // fresh instance each loop (codebase idiom)
             if (!_semiAutoOn) continue;                       // cheap guard; do not fire when off
-            if (_debounce.ShouldFire(Time.time))
+            if (_debounce.ShouldFire(Time.realtimeSinceStartup))   // SAME clock as Poke (unscaled, matches this loop's tick)
                 // NOTE: _pendingIncomingText deliberately survives the fire — it mirrors the
                 // UN-REPLIED trailing run, and a burst that straddles the window fires twice; the
                 // second fire must still carry the earlier fragments (the payload's history snapshot
