@@ -208,7 +208,7 @@ so the migration isn't mistaken for complete:
 | ~~`Manager.cs` `GetWhatsappCode` — pairing-code read via a fixed `Substring(startIndex, 9)`~~ | ~~medium~~ | ✅ **FIXED** (`381c3cf`, owner-directed follow-up) — see below. |
 | ~~`Manager.cs` `CreateWhatsappProfile` / `CreateTelegramProfile` — `"profile_id":` +14 up to `,"status":`~~ | ~~low~~ | ✅ **FIXED** (`2cd53a2`) — see below. |
 | ~~The two QR base64 sites~~ | ~~low~~ | ✅ **FIXED** (`2cd53a2`) — extraction *and* decode guarded; see below. |
-| ~6 remaining `Contains`-guarded error-`detail` scrapes + a fixed `Substring(start, 4)` | low | **Still open.** Error/degraded paths only. Could route through the existing bounds-checked `TelegramAuthResponseParser.ExtractDetail`. |
+| ~~5 remaining `Contains`-guarded error-`detail` scrapes + a fixed `Substring(start, 4)`~~ | ~~low~~ | ✅ **FIXED** (`ea0e248`) — all five detail reads routed through the bounds-checked `TelegramAuthResponseParser.ExtractDetail` (bound-agnostic, so the uuid-vs-status bound mismatch is moot); the status read uses the new `WappiStatusParser.TryGetStatus`. **No hand-rolled Wappi response scrapes remain in `Manager.cs`.** |
 
 Two optional hardenings deliberately **not** taken (recorded, not silently dropped):
 - **Site B twin-parity gate.** The Telegram twin carries an extra `isOnTelegram == 1` gate on its
