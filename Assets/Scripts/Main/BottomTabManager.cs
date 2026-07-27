@@ -109,12 +109,23 @@ public class BottomTabManager : MonoBehaviour
     /// <summary>Index of the currently active tab (-1 = none selected yet).</summary>
     private int _activeTabIndex = -1;
 
+    /// <summary>
+    /// Singleton handle (project idiom: Manager.Instance / ChatManager.Instance / BotsPage.Instance).
+    /// IN-08: replaces the runtime <c>FindFirstObjectByType&lt;BottomTabManager&gt;()</c> calls on the
+    /// tap paths (checklist row 4, success-overlay CTA/dismiss, StartNewBot), which
+    /// <c>.claude/rules/unity-general.md</c> forbids. Assigned in Awake, so every tap path — all of
+    /// which run long after scene load — resolves it. Callers still null-condition it.
+    /// </summary>
+    public static BottomTabManager Instance;
+
     // ------------------------------------------------------------------ //
     //  Unity lifecycle                                                     //
     // ------------------------------------------------------------------ //
 
     private void Awake()
     {
+        Instance = this;
+
         // Validate configuration before wiring up buttons
         if (!ValidateTabData())
         {

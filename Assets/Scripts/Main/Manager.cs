@@ -1037,6 +1037,11 @@ public partial class Manager : MonoBehaviour
 
     private void OnSettingsAuthBackPressed()
     {
+        // IN-04: mirror CancelBotCreation and stop the QR loop too. OpenWhatsappQRPanel's
+        // early-exit checks WhatsappQRPanel.activeSelf, which stays TRUE when only the parent
+        // WhatsappAuth is deactivated — so without this the loop kept polling qr/get (up to
+        // 5 × 3s) against a profile OnWhatsappAuthFromSettingsBack was concurrently deleting.
+        if (_whatsappQrCoroutine != null) { StopCoroutine(_whatsappQrCoroutine); _whatsappQrCoroutine = null; }
         if (_whatsappStatusCoroutine != null) { StopCoroutine(_whatsappStatusCoroutine); _whatsappStatusCoroutine = null; }
         if (_telegramStatusCoroutine != null) { StopCoroutine(_telegramStatusCoroutine); _telegramStatusCoroutine = null; }
         if (WhatsappAuth != null) WhatsappAuth.SetActive(false);
@@ -1791,6 +1796,15 @@ public partial class Manager : MonoBehaviour
         if (bot == null) yield break;
         if (SuccessOverlay == null) yield break;
 
+        // IN-03: re-entrancy guard. The wait-for-dismiss loop below spins on a `dismissed`
+        // closure captured by the button listeners; a second invocation would RemoveAllListeners
+        // and rewire them to a NEW closure, so the first coroutine's flag could never flip and it
+        // would yield forever (leaked coroutine). Unreachable today — the opaque overlay blocks
+        // input and both fire sites are gated — so this is defensive: an already-showing moment
+        // is never stacked on. The overlay ships inactive and CloseSuccessAndOverlay resets it,
+        // so this can only be true while a moment is genuinely on screen.
+        if (SuccessOverlay.activeSelf) yield break;
+
         // Restore the pre-D2 in-box checkmark: before opening the standalone success page,
         // flash the just-authed channel's nested success sheet (the original QR/code-box
         // checkmark — 11-08 kept these panels, removed only their injected CTA) for a beat,
@@ -1840,8 +1854,12 @@ public partial class Manager : MonoBehaviour
         var cta = SuccessCtaSelector.Choose(hasFiles);
 
         if (successTitleLabel != null) successTitleLabel.text = "Бот подключён!";
-        if (successBodyLabel != null) successBodyLabel.text =
-            "Осталось научить бота вашим ценам — загрузите прайс-лист, и он будет отвечать по вашим товарам";
+        // IN-02: branch the BODY on the CTA too. It used to always urge «загрузите прайс-лист»
+        // even when the files-exist path had already switched the button to «Открыть чаты» —
+        // the body asked for an action the button no longer offered.
+        if (successBodyLabel != null) successBodyLabel.text = cta == SuccessCta.UploadPriceList
+            ? "Осталось научить бота вашим ценам — загрузите прайс-лист, и он будет отвечать по вашим товарам"
+            : "Бот уже знает ваши цены — откройте чаты и посмотрите, как он отвечает";
         if (successPrimaryLabel != null) successPrimaryLabel.text =
             cta == SuccessCta.UploadPriceList ? "Загрузить прайс-лист" : "Открыть чаты";
 
@@ -1855,7 +1873,7 @@ public partial class Manager : MonoBehaviour
                 dismissed = true;
                 CloseSuccessAndOverlay();
                 if (cta == SuccessCta.UploadPriceList) bot.OpenSettingsAtProductTab();
-                else FindFirstObjectByType<BottomTabManager>()?.SwitchTab(BottomTabManager.WhatsAppTabIndex);
+                else BottomTabManager.Instance?.SwitchTab(BottomTabManager.WhatsAppTabIndex);   // IN-08
             });
         }
         if (successLaterButton != null)
@@ -1880,8 +1898,7 @@ public partial class Manager : MonoBehaviour
     {
         if (SuccessOverlay != null) SuccessOverlay.SetActive(false);
         AddBotPanel.Instance?.CloseImmediate();
-        var tabs = FindFirstObjectByType<BottomTabManager>();
-        if (tabs != null) tabs.SwitchTab(BottomTabManager.BotsTabIndex);
+        BottomTabManager.Instance?.SwitchTab(BottomTabManager.BotsTabIndex);   // IN-08
     }
 
     private void ShowWhatsappAuth()
