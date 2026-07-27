@@ -15,10 +15,9 @@ public class OnboardingScreen : MonoBehaviour
     // Optional «Далее» buttons (advance the pager); builder wires them to pager.GoToPage.
 
     // Dot metrics (builder builds each dot at DotSize×DotSize with corner radius DotSize/2).
-    // The active dot becomes a wider pill by WIDTH — never a non-uniform localScale, which
-    // stretches the rounded caps and reads as a distorted oval.
+    // All dots stay uniform circles — active/inactive differ by FILL only (owner decision
+    // 2026-07-24). Never widen or localScale a dot: both distort the rounded caps.
     private const float DotSize = 28f;
-    private const float ActiveDotWidth = 60f;
     private static readonly Color DotActive = new Color(0.106f, 0.486f, 0.922f, 1f);    // #1B7CEB
     private static readonly Color DotInactive = new Color(0.106f, 0.486f, 0.922f, 0.30f);
 
@@ -48,16 +47,15 @@ public class OnboardingScreen : MonoBehaviour
             SetDotActive(dots[i], i == page); // elongate/tint active per builder-baked visuals
     }
 
-    // Active dot = wider Primary #1B7CEB pill; inactive = muted circle. Elongate by WIDTH
-    // (keeps the corner radius = height/2, so the caps stay clean semicircles) — NOT by a
-    // non-uniform localScale, which stretches the rounded caps into a distorted oval.
+    // Active dot = solid Primary #1B7CEB circle; inactive = the same circle at 30% alpha.
+    // Size and scale are pinned uniform so the dot never renders as a stretched oval.
     private void SetDotActive(RectTransform dot, bool isActive)
     {
         if (dot == null) return;
         var img = dot.GetComponent<Image>();
         if (img != null) img.color = isActive ? DotActive : DotInactive;
         dot.localScale = Vector3.one;
-        dot.sizeDelta = new Vector2(isActive ? ActiveDotWidth : DotSize, DotSize);
+        dot.sizeDelta = new Vector2(DotSize, DotSize);
     }
 
     /// <summary>Slide-3 «Создать бота»: flag onboarding seen and open the existing wizard.</summary>
