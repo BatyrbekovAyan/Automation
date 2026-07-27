@@ -2159,11 +2159,15 @@ public partial class Manager : MonoBehaviour
 
             string response = www.downloadHandler.text;
 
-            if (response.Contains("\"code\":\""))
+            // Same defect class as WR-03 (see 11-REVIEW-FIX.md): the old read was a hard-coded
+            // Substring(startIndex, 9) assuming the canonical "XXXX-XXXX" pairing code. A shorter
+            // code — or any truncated body — threw ArgumentOutOfRangeException here, killing this
+            // coroutine before LoadingPanel.SetActive(false) below and leaving the user with a
+            // stranded full-screen overlay AND a disabled request button. Bounded, throw-safe read;
+            // an unparseable body now just leaves the code label untouched.
+            if (WappiStatusParser.TryGetCode(response, out string pairingCode))
             {
-                int startIndex = response.IndexOf("\"code\":\"") + 8;
-
-                WhatsappCodePanel.transform.GetChild(4).GetChild(0).GetComponent<TextMeshProUGUI>().text = response.Substring(startIndex, 9);
+                WhatsappCodePanel.transform.GetChild(4).GetChild(0).GetComponent<TextMeshProUGUI>().text = pairingCode;
 
                 if (_whatsappStatusCoroutine != null) StopCoroutine(_whatsappStatusCoroutine);
                 _whatsappStatusCoroutine = StartCoroutine(GetWhatsappProfileStatus());

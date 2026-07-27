@@ -74,6 +74,33 @@ public static class WappiStatusParser
     }
 
     /// <summary>
+    /// True with <paramref name="code"/> set when the body carries a non-empty scalar "code" —
+    /// the WhatsApp pairing code the user types into WhatsApp (<c>auth/code</c>).
+    ///
+    /// Replaces a hard-coded <c>Substring(startIndex, 9)</c> that assumed the canonical
+    /// 9-character "XXXX-XXXX" shape: a SHORTER code (or a truncated body) threw
+    /// <see cref="System.ArgumentOutOfRangeException"/> mid-coroutine, stranding the
+    /// full-screen LoadingPanel with the request button already disabled. Returns the code
+    /// VERBATIM at whatever length the server sent, so a longer code is no longer silently
+    /// truncated and a shorter one no longer drags in trailing JSON.
+    ///
+    /// False (code="") when the key is absent, blank, non-scalar, or the JSON is invalid —
+    /// the caller then leaves the code label untouched instead of dying.
+    /// </summary>
+    public static bool TryGetCode(string json, out string code)
+    {
+        code = "";
+        var root = TryParse(json);
+        if (root == null) return false;
+
+        string raw = AsScalarString(root["code"]);
+        if (string.IsNullOrWhiteSpace(raw)) return false;
+
+        code = raw.Trim();
+        return true;
+    }
+
+    /// <summary>
     /// True only for a short, all-digit value (one optional leading '+'). Rejects empty,
     /// letters, JSON punctuation (<c>{ } " : ,</c>) and anything longer than
     /// <see cref="MaxPlausiblePhoneLength"/> — so a stale raw-JSON blob persisted in

@@ -15,6 +15,57 @@ using NUnit.Framework;
 /// </summary>
 public class WappiStatusParserTests
 {
+    // ── TryGetCode — WhatsApp pairing code (auth/code) ────────────────────────
+    // Regression cover for the hard-coded Substring(startIndex, 9) that threw
+    // ArgumentOutOfRangeException on any code shorter than "XXXX-XXXX", stranding the
+    // LoadingPanel with the request button disabled.
+
+    [Test]
+    public void TryGetCode_CanonicalNineCharCode_ReadsVerbatim()
+    {
+        Assert.IsTrue(WappiStatusParser.TryGetCode("{\"status\":\"done\",\"code\":\"ABCD-EFGH\"}", out string code));
+        Assert.AreEqual("ABCD-EFGH", code);
+    }
+
+    [Test]
+    public void TryGetCode_ShorterThanNine_ReadsExactValue_DoesNotThrow()
+    {
+        // The old fixed-length read threw here (fewer than 9 chars remained after the token).
+        Assert.IsTrue(WappiStatusParser.TryGetCode("{\"code\":\"12345\"}", out string code));
+        Assert.AreEqual("12345", code, "Short code must read exactly, not drag in trailing JSON.");
+    }
+
+    [Test]
+    public void TryGetCode_LongerThanNine_IsNotTruncated()
+    {
+        Assert.IsTrue(WappiStatusParser.TryGetCode("{\"code\":\"ABCDE-FGHIJ-KL\"}", out string code));
+        Assert.AreEqual("ABCDE-FGHIJ-KL", code);
+    }
+
+    [Test]
+    public void TryGetCode_PrettyPrintedBody_StillReads()
+    {
+        Assert.IsTrue(WappiStatusParser.TryGetCode("{\n  \"status\": \"done\",\n  \"code\": \"WXYZ-1234\"\n}", out string code));
+        Assert.AreEqual("WXYZ-1234", code);
+    }
+
+    [Test]
+    public void TryGetCode_MissingBlankOrMalformed_ReturnsFalse()
+    {
+        Assert.IsFalse(WappiStatusParser.TryGetCode("{\"status\":\"done\"}", out string missing));
+        Assert.AreEqual("", missing);
+        Assert.IsFalse(WappiStatusParser.TryGetCode("{\"code\":\"\"}", out _), "Blank code is not a code.");
+        Assert.IsFalse(WappiStatusParser.TryGetCode("{\"code\":\"   \"}", out _), "Whitespace-only is not a code.");
+        Assert.IsFalse(WappiStatusParser.TryGetCode("not json at all", out _));
+        Assert.IsFalse(WappiStatusParser.TryGetCode("", out _));
+        Assert.IsFalse(WappiStatusParser.TryGetCode(null, out _));
+    }
+
+    [Test]
+    public void TryGetCode_NonScalarCode_ReturnsFalse()
+        => Assert.IsFalse(WappiStatusParser.TryGetCode("{\"code\":{\"value\":\"ABCD-EFGH\"}}", out _),
+            "An object/array 'code' is treated as absent rather than stringified into the label.");
+
     // Distinct redacted digits so a test can prove top-level phone wins over account.phone.
     private const string TopLevelPhone = "70000000009";
     private const string AccountPhone = "70000000001";
