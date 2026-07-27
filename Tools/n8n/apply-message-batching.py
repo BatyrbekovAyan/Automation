@@ -99,7 +99,12 @@ if (!newestIncoming || newestIncoming.id !== triggeringId) {
 
 // foreignFetched rides along purely as an observability flag: runData shows > 0 exactly when a
 // crossed messages/get response reached this node.
-return [{ json: { ...wh, abort, combinedText, foreignFetched } }];"""
+// pairedItem is EXPLICIT (same idiom as the orchestrators' Vertical Prompt node): every node
+// below the splice back-references the trigger with an .item lookup on the Webhook node, which
+// needs an unbroken paired-item chain. Without it Mark Read / Typing / Chat Memory / send all
+// depend on n8n's implicit auto-pairing surviving Wait -> HTTP -> Code -> If, and a break kills
+// every reply with "paired item data unavailable".
+return [{ json: { ...wh, abort, combinedText, foreignFetched }, pairedItem: { item: 0 } }];"""
 
 
 def load(fname):

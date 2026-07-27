@@ -125,6 +125,10 @@ def check_bot(f, base):
                 f"{f}: Latest+Combine does not filter the fetch down to the requested chat")
     assert_that("foreignFetched" in js,
                 f"{f}: Latest+Combine does not emit foreignFetched (crossing observability)")
+    # Explicit paired-item linkage: every node below the splice resolves $('Webhook').item
+    # through this Code node (review WR-04; same idiom as the orchestrators' Vertical Prompt).
+    assert_that("pairedItem: { item: 0 }" in js,
+                f"{f}: Latest+Combine omits an explicit pairedItem (downstream $('Webhook').item is implicit)")
 
     # Is Latest? boolean condition reads $json.abort.
     cond = il["parameters"]["conditions"]["conditions"][0]
