@@ -2,9 +2,9 @@
 phase: 11
 slug: first-run-onboarding-flow
 status: partial
-fix_scope: targeted (WR-02, WR-03, + pairing-code follow-up; owner-directed)
-findings_in_scope: 3
-fixed: 3
+fix_scope: targeted (WR-02, WR-03, + pairing-code and profile_id/QR follow-ups; owner-directed)
+findings_in_scope: 4
+fixed: 4
 skipped: 0
 iteration: 2
 source_review: 11-REVIEW.md
@@ -156,6 +156,39 @@ No Telegram twin exists for this — Telegram delivers its code in-app rather th
 
 ---
 
+### Follow-up — `profile_id` scrape + QR base64 decode (owner-directed)
+
+**Severity:** low–medium · **Commit:** `2cd53a2`
+**Files:** `WappiStatusParser.cs`, `Manager.cs`, `WappiStatusParserTests.cs`
+
+**`profile_id` (2 sites — `CreateWhatsappProfile`, `CreateTelegramProfile`).** The
+`"profile_id":` **+14** offset scan bounded by `","status":` had two failure modes: if the
+server ever emitted `status` **before** `profile_id` the length went negative and threw —
+killing a *nested* coroutine, so its awaiting parent (creation wizard / resend-recreate) never
+resumed and the LoadingPanel hung **unrecoverably**; and the hard-coded offset assumed the
+compact `"profile_id":"` form, so a pretty-printed body would store an id with a **leading
+quote**, silently breaking every later Wappi call for that bot with no trace at the point of
+corruption. → `WappiStatusParser.TryGetProfileId`.
+
+**QR base64 (2 sites).** The two endpoints differ in both key and shape — WhatsApp `qr/get`
+returns a `data:image/png;base64,…` URI under **`qrCode`**, Telegram `auth/qr` returns **raw**
+base64 under **`detail`**. Each sliced the payload between two literal tokens (negative length
+if ever out of order — and note the WhatsApp bound `","task_id":` does **not** appear in the
+documented response shape at all), then called `Convert.FromBase64String` **unguarded on the
+success path**, so a malformed or non-base64 payload threw `FormatException` and killed the QR
+coroutine with the spinner still on screen. → `WappiStatusParser.TryGetQrPng(json, key, out
+byte[] png)` guards **extraction and decode**, strips an optional data-URI prefix, and returns
+false for anything unusable. The Telegram `detail:"2fa"` divert that runs *ahead* of this block
+is untouched.
+
+**Verification.** 9 new EditMode tests — reversed key order (the negative-length case),
+pretty-printed body (the leading-quote case), WA data-URI vs TG raw base64, key-order
+independence, and the `detail:"2fa"` / `auth_success` / non-base64 payloads that used to throw.
+Suite **1241/1241 green** (+9, exactly the new tests). Auth request code untouched
+(`auth/code`+`auth/2fa` = 7, `GetChild(3/4/5)` = 21).
+
+---
+
 ## Not in scope this run
 
 | Finding | Severity | Status |
@@ -173,8 +206,9 @@ so the migration isn't mistaken for complete:
 | Site | Risk | Note |
 |---|---|---|
 | ~~`Manager.cs` `GetWhatsappCode` — pairing-code read via a fixed `Substring(startIndex, 9)`~~ | ~~medium~~ | ✅ **FIXED** (`381c3cf`, owner-directed follow-up) — see below. |
-| `Manager.cs` `CreateWhatsappProfile` / `CreateTelegramProfile` — `"profile_id":` +14 up to `,"status":` | low | Negative length (hangs the parent coroutine) if the server ever emits `status` before `profile_id`; the `+14` also hard-codes the compact form, so a pretty body would store an id with a leading quote and silently break every later call for that bot. |
-| ~8 further `Contains`-guarded scrapes (error `detail` extraction, QR base64, a fixed `Substring(start, 4)`) | low | Mostly error/degraded paths. The `detail` sites could route through the existing bounds-checked `TelegramAuthResponseParser.ExtractDetail`; the two QR sites should also wrap `Convert.FromBase64String` in try/catch. |
+| ~~`Manager.cs` `CreateWhatsappProfile` / `CreateTelegramProfile` — `"profile_id":` +14 up to `,"status":`~~ | ~~low~~ | ✅ **FIXED** (`2cd53a2`) — see below. |
+| ~~The two QR base64 sites~~ | ~~low~~ | ✅ **FIXED** (`2cd53a2`) — extraction *and* decode guarded; see below. |
+| ~6 remaining `Contains`-guarded error-`detail` scrapes + a fixed `Substring(start, 4)` | low | **Still open.** Error/degraded paths only. Could route through the existing bounds-checked `TelegramAuthResponseParser.ExtractDetail`. |
 
 Two optional hardenings deliberately **not** taken (recorded, not silently dropped):
 - **Site B twin-parity gate.** The Telegram twin carries an extra `isOnTelegram == 1` gate on its
