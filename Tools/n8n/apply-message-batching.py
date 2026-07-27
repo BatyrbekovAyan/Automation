@@ -19,7 +19,13 @@ Telegram `text`); only the Fetch Recent base URL differs (api/sync vs tapi/sync)
 derived per template from that template's own Mark Read url.
 
 Edits Tools/n8n/workflows/{WhatsApp,Telegram}_Bot.json IN PLACE, preserving
-indent=2 / ensure_ascii=False formatting. Re-runnable: running twice is a no-op.
+indent=2 / ensure_ascii=False formatting.
+
+The four spliced nodes are OWNED by this script: every run UPSERTS them (rewrites
+`parameters` + node-level keys from the specs below, preserving only the stable
+uuid5 `id` and the node's `position`). So a fix made HERE always materializes in
+both templates, and re-running with no source change is still a byte-level no-op.
+Corollary: never hand-edit the four managed nodes in the JSON — a re-run reverts it.
 
 Live deploy + runData verification is plan 10-03 (owner gate). This script only
 edits the committed JSON; it never touches the live n8n instance.
@@ -101,6 +107,27 @@ def splice(wf):
         # Stable per-template node id so re-runs are byte-stable and both templates differ.
         return str(uuid.uuid5(uuid.NAMESPACE_DNS, wf["id"] + "-" + suffix))
 
+    def managed(spec):
+        """Upsert one script-owned node, in place, preserving its id + position.
+
+        A guarded add (`if find(...) is None: append`) would make every later edit to a
+        spec a silent no-op on templates that already carry the node. Instead the spec is
+        the source of truth: an existing node is REPLACED at its current list index (so
+        node order is stable) while keeping its `id` (stable uuid5) and `position` (the
+        owner may have dragged it in the n8n UI). Any other hand-edit to a managed node is
+        deliberately overwritten. Same input -> byte-identical output (idempotent).
+        """
+        existing = find(nodes, name=spec["name"])
+        if existing is None:
+            nodes.append(spec)
+            return
+        spec["id"] = existing["id"]                                  # keep the deployed id
+        spec["position"] = existing.get("position", spec["position"])  # keep a UI-dragged position
+        for i, n in enumerate(nodes):
+            if n is existing:
+                nodes[i] = spec
+                break
+
     # (1) Derive the channel base from THIS template's own Mark Read node.
     #     WhatsApp -> https://wappi.pro/api/sync/ ; Telegram -> https://wappi.pro/tapi/sync/
     mark_read = find(nodes, name="Mark Read")
@@ -109,76 +136,72 @@ def splice(wf):
     # Offset the new nodes below the Suppressed? gate so the graph stays readable.
     sx, sy = find(nodes, name="Suppressed?")["position"]
 
-    # (2) Add the 4 nodes (each guarded so a re-run is a no-op).
-    if find(nodes, name="Debounce Wait") is None:
-        nodes.append({
-            "parameters": {"amount": DEBOUNCE_SECONDS},
-            "id": nid("Debounce Wait"),
-            "name": "Debounce Wait",
-            "type": "n8n-nodes-base.wait",
-            "position": [sx, sy + 220],
-            "typeVersion": 1.1,
-        })
+    # (2) Upsert the 4 managed nodes (spec is source of truth; see managed()).
+    managed({
+        "parameters": {"amount": DEBOUNCE_SECONDS},
+        "id": nid("Debounce Wait"),
+        "name": "Debounce Wait",
+        "type": "n8n-nodes-base.wait",
+        "position": [sx, sy + 220],
+        "typeVersion": 1.1,
+    })
 
-    if find(nodes, name="Fetch Recent") is None:
-        nodes.append({
-            "parameters": {
-                "method": "GET",
-                "url": base + "messages/get",
-                "authentication": "genericCredentialType",
-                "genericAuthType": "httpHeaderAuth",
-                "sendQuery": True,
-                "queryParameters": {"parameters": [
-                    {"name": "profile_id", "value": "={{ $('Webhook').item.json.body.messages[0].profile_id }}"},
-                    {"name": "chat_id", "value": "={{ $('Webhook').item.json.body.messages[0].chatId }}"},
-                    {"name": "limit", "value": "15"},
-                ]},
-                "options": {},
-            },
-            "id": nid("Fetch Recent"),
-            "name": "Fetch Recent",
-            "type": "n8n-nodes-base.httpRequest",
-            "typeVersion": 4.2,
-            "position": [sx + 208, sy + 220],
-            "credentials": WAPPI_CRED,
-        })
+    managed({
+        "parameters": {
+            "method": "GET",
+            "url": base + "messages/get",
+            "authentication": "genericCredentialType",
+            "genericAuthType": "httpHeaderAuth",
+            "sendQuery": True,
+            "queryParameters": {"parameters": [
+                {"name": "profile_id", "value": "={{ $('Webhook').item.json.body.messages[0].profile_id }}"},
+                {"name": "chat_id", "value": "={{ $('Webhook').item.json.body.messages[0].chatId }}"},
+                {"name": "limit", "value": "15"},
+            ]},
+            "options": {},
+        },
+        "id": nid("Fetch Recent"),
+        "name": "Fetch Recent",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [sx + 208, sy + 220],
+        "credentials": WAPPI_CRED,
+    })
 
-    if find(nodes, name="Latest+Combine") is None:
-        nodes.append({
-            "parameters": {"jsCode": LATEST_COMBINE_JS},
-            "id": nid("Latest+Combine"),
-            "name": "Latest+Combine",
-            "type": "n8n-nodes-base.code",
-            "typeVersion": 2,
-            "position": [sx + 416, sy + 220],
-        })
+    managed({
+        "parameters": {"jsCode": LATEST_COMBINE_JS},
+        "id": nid("Latest+Combine"),
+        "name": "Latest+Combine",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [sx + 416, sy + 220],
+    })
 
-    if find(nodes, name="Is Latest?") is None:
-        nodes.append({
-            "parameters": {
-                "conditions": {
-                    "options": {
-                        "caseSensitive": True,
-                        "leftValue": "",
-                        "typeValidation": "loose",
-                        "version": 2,
-                    },
-                    "conditions": [{
-                        "id": nid("is-latest-cond"),
-                        "leftValue": "={{ $json.abort }}",
-                        "rightValue": "",
-                        "operator": {"type": "boolean", "operation": "true", "singleValue": True},
-                    }],
-                    "combinator": "and",
+    managed({
+        "parameters": {
+            "conditions": {
+                "options": {
+                    "caseSensitive": True,
+                    "leftValue": "",
+                    "typeValidation": "loose",
+                    "version": 2,
                 },
-                "options": {},
+                "conditions": [{
+                    "id": nid("is-latest-cond"),
+                    "leftValue": "={{ $json.abort }}",
+                    "rightValue": "",
+                    "operator": {"type": "boolean", "operation": "true", "singleValue": True},
+                }],
+                "combinator": "and",
             },
-            "id": nid("Is Latest?"),
-            "name": "Is Latest?",
-            "type": "n8n-nodes-base.if",
-            "typeVersion": 2.2,
-            "position": [sx + 624, sy + 220],
-        })
+            "options": {},
+        },
+        "id": nid("Is Latest?"),
+        "name": "Is Latest?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [sx + 624, sy + 220],
+    })
 
     # (3) Rewire connections (overwrite idiom — re-point the FALSE branch through the chain).
     #     Suppressed? main[0] TRUE (semi-auto) stays a dead-end; main[1] FALSE -> Debounce Wait.
