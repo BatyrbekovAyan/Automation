@@ -38,7 +38,10 @@ public class IncomingDebounceGateTests
         gate.Poke(0f);
         gate.Poke(0.1f);
         gate.Poke(0.2f);
-        Assert.IsFalse(gate.ShouldFire(2.4f), "window keeps resetting off the latest poke -> not yet");
+        // Derived from the LAST poke + Window, never a literal: WindowSeconds is the documented
+        // single tunable, and a hard-coded 2.4f would flip this assert (failing the suite for the
+        // wrong reason) the moment the window is tuned below ~2.3s at e2e.
+        Assert.IsFalse(gate.ShouldFire(0.2f + Window - 0.1f), "window keeps resetting off the latest poke -> not yet");
         Assert.IsTrue(gate.ShouldFire(0.2f + Window), "fires once, WindowSeconds after the LAST poke");
         Assert.IsFalse(gate.ShouldFire(0.2f + Window), "coalesced to a SINGLE fire");
     }
