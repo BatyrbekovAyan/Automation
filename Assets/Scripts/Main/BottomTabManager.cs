@@ -122,6 +122,15 @@ public class BottomTabManager : MonoBehaviour
     //  Unity lifecycle                                                     //
     // ------------------------------------------------------------------ //
 
+    private void OnDestroy()
+    {
+        // Clear the singleton so a destroyed manager can't be reached through it. Matters
+        // because C#'s ?. bypasses UnityEngine.Object's null-equality overload: a stale
+        // Instance would throw MissingReferenceException where the old FindFirstObjectByType
+        // lookup simply returned null. (Unreachable in this single-scene app — defensive.)
+        if (Instance == this) Instance = null;
+    }
+
     private void Awake()
     {
         Instance = this;

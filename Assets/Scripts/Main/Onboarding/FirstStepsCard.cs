@@ -103,6 +103,16 @@ public class FirstStepsCard : MonoBehaviour
     /// after bot creation — D3).</summary>
     public void RefreshFromFacts() => Refresh();
 
+    /// <summary>Re-arm the entrance so the next refresh replays the row cascade. Called once the
+    /// success overlay closes: bot creation refreshes this card while it is still hidden behind
+    /// that overlay, which would otherwise consume the entrance off-screen and the user would
+    /// never see the cascade on the primary first-bot path.</summary>
+    public void ReplayEntrance()
+    {
+        _wasVisible = false;
+        Refresh();
+    }
+
     private void OnEnable()
     {
         Refresh();
