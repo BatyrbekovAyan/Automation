@@ -1,12 +1,12 @@
 ---
 phase: 11
 slug: first-run-onboarding-flow
-status: partial
-fix_scope: targeted (WR-02, WR-03, + pairing-code and profile_id/QR follow-ups; owner-directed)
-findings_in_scope: 4
-fixed: 4
+status: all_fixed
+fix_scope: full (WR-02, WR-03, all 8 Info, + 2 parser follow-ups; owner-directed)
+findings_in_scope: 12
+fixed: 12
 skipped: 0
-iteration: 2
+iteration: 3
 source_review: 11-REVIEW.md
 created: 2026-07-27
 updated: 2026-07-27
@@ -189,13 +189,45 @@ Suite **1241/1241 green** (+9, exactly the new tests). Auth request code untouch
 
 ---
 
+### All 8 Info findings (owner-directed)
+
+**Commits:** `0c4eb02` (the eight) + `6539959` (gaps found by the verification pass)
+
+| # | Fix |
+|---|---|
+| IN-01 | `Bot.DeleteBot` now deletes the bare `"BotN"` activation key. Activation lives under **two** keys (bare name written by `EnableBot`/read by `SetSwitches`; `"{name}isOn"` at creation/read by `LoadBots`) and only the latter was cleaned, so the bare one leaked on every per-bot delete. Safe because slot names are never reused — the `"ids"` counter is monotonic. |
+| IN-02 | Success-overlay **body** now branches on the CTA. The files-exist path showed «Открыть чаты» while the body still urged «загрузите прайс-лист» — an action the button no longer offered. |
+| IN-03 | Re-entrancy latch on `ShowInteractiveSuccessMoment`. Verification caught that an `activeSelf` test left the ~1.2s in-box-checkmark dwell unguarded (the overlay only activates *after* it), so it is a **field** set when the moment commits and cleared in `CloseSuccessAndOverlay`. |
+| IN-04 | `OnSettingsAuthBackPressed` stops the QR loop like `CancelBotCreation` does. Verification found the **Telegram half had the same defect with no stored handle at all** — added `_telegramQrCoroutine`, stopped in both cancel paths. |
+| IN-05 | Row cascade plays only on a hidden→visible entrance (it used to reset all rows to alpha 0 and re-fade on *every* refresh — a visible blink); tweens now `SetLink` to their row. Verification found the entrance was being consumed **off-screen** on the primary first-bot path, so `CloseSuccessAndOverlay` now calls `FirstStepsCard.ReplayEntrance()` once the Bots page is actually visible. |
+| IN-06 | Dropped the dead `isActiveAndEnabled` guard in `BotsPage.OnEnable` (always true there). |
+| IN-07 | New `OnboardingPagerEditor` draws `pageCount`, which `ScrollRect`'s custom editor hides — previously reachable only through the builder's `SerializedObject` stamp, leaving no hand-editable path if the slide count changed. |
+| IN-08 | Added `BottomTabManager.Instance` (project singleton idiom) and routed the four scoped tap-path lookups through it, per `.claude/rules/unity-general.md`. Cleared in `OnDestroy` — C#'s `?.` bypasses Unity's null-equality overload, so a stale `Instance` would throw where the old lookup returned null. |
+
+**Copy-deck addition (bookkeeping).** IN-02 introduces a **new** user-facing string not in the
+phase's locked copy deck: «Бот уже знает ваши цены — откройте чаты и посмотрите, как он отвечает»
+(files-exist body variant). Grammar/register match the deck (formal «вы», same em-dash
+construction, no terminal period). One nuance for a future copy pass: `hasFiles` is also true when
+only a **service** list was uploaded, where «знает ваши цены» reads slightly product-flavoured.
+
+**Verification.** Three-lens adversarial pass — all three returned **SOLID** (no regressions from
+the eight). The five low-severity observations it raised are either fixed in `6539959` (four of
+them) or recorded above (the copy-deck entry). Suite **1246/1246 green**; auth request code
+untouched (`auth/code`+`auth/2fa` = 7, `GetChild(3/4/5)` = 21).
+
+Two `FindFirstObjectByType<BottomTabManager>` calls remain in `EmptyStateView.cs` and
+`DashboardPage.cs` — pre-existing, from earlier phases, outside this review's scope
+(`EmptyStateView`'s `FindObjectsInactive.Include` variant also has different semantics).
+
+---
+
 ## Not in scope this run
 
 | Finding | Severity | Status |
 |---|---|---|
 | WR-01 — `FirstStepsCard` event subscription one-shot / silently dead | warning | **Already resolved** during the phase (commit `26ab638`): the first-reply latch moved to the event SOURCE (`OnboardingFirstReplyLatch`, installed in `ChatManager.Awake`, never unsubscribed), which removes the subscription-lifecycle failure mode entirely rather than patching it. Stale in `11-REVIEW.md`. |
 | WR-03 — fragile `IndexOf`/`Substring` status parsing can throw mid-coroutine | warning | **Fixed** — see above (`28f3a84`). |
-| 8 × Info findings | info | **Open.** Includes the orphaned bare `"BotN"` activation key on `Bot.DeleteBot`, success-overlay body copy vs the «Открыть чаты» CTA, settings-back not stopping `_whatsappQrCoroutine`, checklist cascade replaying on every refresh, and the inert `LayoutElement` on the carousel dots. Run with `--all` to include. |
+| 8 × Info findings | info | ✅ **ALL FIXED** (`0c4eb02` + `6539959`) — see below. |
 
 ### Follow-ups surfaced by the WR-03 verification (new — not in `11-REVIEW.md`)
 
