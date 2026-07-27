@@ -20,7 +20,9 @@ public class SuggestionsController : MonoBehaviour
     [SerializeField] private SemiAutoToggle _toggle;
     [SerializeField] private MessagesBottomPanel _bottomPanel;
     [SerializeField] private ExpandableInput _expandableInput;   // composer growth → panel rides its top + list makes room
-    [SerializeField] private float _mockLatencySeconds = 1.0f;
+    // NOTE: the old _mockLatencySeconds knob is gone — MockSuggestionsProvider has not been
+    // constructed here since the Phase-2 swap to N8nSuggestionsProvider (it owns its own latency
+    // default), so the field was dead inspector surface.
 
     private ISuggestionsProvider _provider;
     private long _requestSeq;          // monotonic; newest wins (A6)
