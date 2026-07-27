@@ -118,13 +118,22 @@ def save(fname, wf):
         json.dump(wf, f, indent=2, ensure_ascii=False)  # match source: no trailing newline
 
 
-def find(nodes, name=None, type_suffix=None):
+def find(nodes, name):
+    """The node called `name`, or None. Only `managed()` wants the None (upsert-or-append)."""
     for n in nodes:
-        if name is not None and n["name"] == name:
-            return n
-        if type_suffix is not None and n["type"].endswith(type_suffix):
+        if n["name"] == name:
             return n
     return None
+
+
+def require(wf, name):
+    """find() for the PRE-EXISTING nodes this splice hangs off. A raw `find(...)["parameters"]`
+    on a renamed node dies with an opaque `TypeError: 'NoneType' object is not subscriptable`;
+    name the missing node instead (same idiom as verify-message-batching.py's node())."""
+    n = find(wf["nodes"], name)
+    if n is None:   # not `assert` — that vanishes under python -O
+        raise AssertionError(f"{wf['id']}: '{name}' node not found (renamed in the n8n UI?)")
+    return n
 
 
 def splice(wf):
@@ -146,7 +155,7 @@ def splice(wf):
         owner may have dragged it in the n8n UI). Any other hand-edit to a managed node is
         deliberately overwritten. Same input -> byte-identical output (idempotent).
         """
-        existing = find(nodes, name=spec["name"])
+        existing = find(nodes, spec["name"])
         if existing is None:
             nodes.append(spec)
             return
@@ -159,11 +168,10 @@ def splice(wf):
 
     # (1) Derive the channel base from THIS template's own Mark Read node.
     #     WhatsApp -> https://wappi.pro/api/sync/ ; Telegram -> https://wappi.pro/tapi/sync/
-    mark_read = find(nodes, name="Mark Read")
-    base = mark_read["parameters"]["url"].rsplit("message/mark/read", 1)[0]
+    base = require(wf, "Mark Read")["parameters"]["url"].rsplit("message/mark/read", 1)[0]
 
     # Offset the new nodes below the Suppressed? gate so the graph stays readable.
-    sx, sy = find(nodes, name="Suppressed?")["position"]
+    sx, sy = require(wf, "Suppressed?")["position"]
 
     # (2) Upsert the 4 managed nodes (spec is source of truth; see managed()).
     # Every pre-existing Wait node in both templates carries a webhookId; this one must too.
@@ -252,7 +260,7 @@ def splice(wf):
     #     fallback reads bare $json.body (NOT $('Webhook').item): Latest+Combine re-emits body
     #     onto the current item, matching how Input type / Download Audio read $json.body, and
     #     avoiding fragile paired-item resolution across the inserted Wait+HTTP+Code nodes.
-    find(nodes, name="Text")["parameters"]["assignments"]["assignments"][0]["value"] = \
+    require(wf, "Text")["parameters"]["assignments"]["assignments"][0]["value"] = \
         "={{ $json.combinedText ?? $json.body.messages[0].body }}"
 
     return wf
