@@ -1401,6 +1401,11 @@ public partial class Manager : MonoBehaviour
                 if (!isCreatingBot) yield break;
                 yield return new WaitForSeconds(0.5f);
             }
+            // WR-02: the loop exits on whatsappAuthCompleted WITHOUT re-testing isCreatingBot, so a
+            // back-press landing in the auth-completion → resume gap (up to ~0.5s) would run
+            // CancelBotCreation — deleting the just-authorized profile — and still fall through to
+            // Step 3, persisting a bot card pointing at a deleted profile. Re-check before continuing.
+            if (!isCreatingBot) yield break;
         }
 
         // Step 2: Create Telegram profile and authenticate
@@ -1419,6 +1424,8 @@ public partial class Manager : MonoBehaviour
                 if (!isCreatingBot) yield break;
                 yield return new WaitForSeconds(0.5f);
             }
+            // WR-02 (Telegram leg — same completion → resume gap as the WhatsApp loop above).
+            if (!isCreatingBot) yield break;
         }
 
         // Step 3: Instantiate bot
