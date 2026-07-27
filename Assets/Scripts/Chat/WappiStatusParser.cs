@@ -101,6 +101,28 @@ public static class WappiStatusParser
     }
 
     /// <summary>
+    /// True with <paramref name="status"/> set when the body carries a non-empty scalar "status"
+    /// (Wappi's ubiquitous <c>"done"</c> / error marker).
+    ///
+    /// Replaces a fixed <c>Substring(startIndex, 4)</c> read that assumed at least four characters
+    /// followed <c>"status":"</c> — a shorter or truncated value threw
+    /// <see cref="System.ArgumentOutOfRangeException"/>. Comparing the whole value is also more
+    /// honest than a 4-char prefix test, which matched any status merely STARTING with "done".
+    /// </summary>
+    public static bool TryGetStatus(string json, out string status)
+    {
+        status = "";
+        var root = TryParse(json);
+        if (root == null) return false;
+
+        string raw = AsScalarString(root["status"]);
+        if (string.IsNullOrWhiteSpace(raw)) return false;
+
+        status = raw.Trim();
+        return true;
+    }
+
+    /// <summary>
     /// True with <paramref name="profileId"/> set when the body carries a non-empty scalar
     /// "profile_id" (the <c>profile/add</c> response for both channels).
     ///
