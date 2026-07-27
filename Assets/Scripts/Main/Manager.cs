@@ -893,6 +893,34 @@ public partial class Manager : MonoBehaviour
     private static string PlausibleTelegramNumber(string stored) =>
         WappiStatusParser.IsPlausiblePhone(stored) ? stored : "";
 
+    // Builds the free-text business knowledge sent to n8n as the "Business" field:
+    // the description (existing format) plus a labeled contact block. Empty contact
+    // lines — and the whole block if no contact is set — are omitted. Pure/static
+    // so it is unit-testable without a Manager instance.
+    public static string ComposeBusinessKnowledge(
+        string description, string phone, string hours, string address, string instagram, string email)
+    {
+        var builder = new System.Text.StringBuilder();
+        builder.Append("About Business:\n").Append(description ?? "");
+
+        var contactLines = new System.Collections.Generic.List<string>();
+        void AddContact(string label, string value)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+                contactLines.Add($"{label}: {value.Trim()}");
+        }
+        AddContact("Телефон", phone);
+        AddContact("Часы работы", hours);
+        AddContact("Адрес", address);
+        AddContact("Instagram", instagram);
+        AddContact("Email", email);
+
+        if (contactLines.Count > 0)
+            builder.Append("\n\nКонтакты:\n").Append(string.Join("\n", contactLines));
+
+        return builder.ToString();
+    }
+
     public void EnableSave()
     {
         bool settingsChanged = false;
@@ -1774,6 +1802,14 @@ public partial class Manager : MonoBehaviour
             // actually visible for its full dwell instead of being instantly covered (the
             // standalone overlay shown right after replaces it, so nothing flickers).
             if (LoadingPanel != null) LoadingPanel.SetActive(false);
+            // LoadingPanel used to block input here; keep the auth page uninteractable for the
+            // dwell (the create-workflow webhook is still in flight — a stray back/tap must not
+            // land) — mirrors the moreAuthSteps guard. Restore interactable before moving on so
+            // a later re-auth on the same page isn't left stuck.
+            var authCg = activeAuth.GetComponent<CanvasGroup>();
+            if (authCg == null) authCg = activeAuth.AddComponent<CanvasGroup>();
+            authCg.interactable = false;
+            authCg.blocksRaycasts = true;
             // Scroll the QR/code container to top so the check is on-screen (mirrors the
             // surviving moreAuthSteps branch). This toggles only the success sheet + scroll —
             // the auth CODE flow (GetChild states, requests) is never touched.
@@ -1782,6 +1818,7 @@ public partial class Manager : MonoBehaviour
             inBoxCheck.SetActive(true);
             yield return new WaitForSeconds(SuccessInBoxCheckSeconds);
             inBoxCheck.SetActive(false);
+            authCg.interactable = true;
         }
 
         // D2: the overlay is standalone (Canvas-level, above the auth pages) — NO authPage
