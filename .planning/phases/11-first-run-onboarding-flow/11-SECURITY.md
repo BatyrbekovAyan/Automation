@@ -5,6 +5,7 @@ status: verified
 threats_open: 0
 asvs_level: 1
 created: 2026-07-23
+reaudited: 2026-07-27
 ---
 
 # Phase 11 — Security
@@ -66,6 +67,7 @@ created: 2026-07-23
 | T-11-09-03 | Information disclosure | Card resurrects after 4/4 hide | accept | `ShouldShow` false when `ChecklistDone` latched (monotonic, never un-set) | closed |
 | T-11-10-01 | Tampering | Round-1 UAT history overwritten | mitigate | Append-only; Round-1 defect table + Overall line preserved | closed |
 | T-11-10-02 | Repudiation | Owner verdict ambiguous | accept | Each item is a PASS/FAIL tied to a requirement; Round-2 overall recorded | closed |
+| T-11-11-01 | Denial of service | WhatsApp de-auth probe lacks the Telegram twin's `isOnWhatsapp == 1` gate | accept | Added by the 2026-07-27 re-audit. Post-WR-03 the WhatsApp destructive path is strictly NARROWER than the old scan (malformed bodies can no longer delete), but its exposure widened in exactly one direction: a pretty-printed `authorized:false` previously threw before reaching the delete and now performs it. Requires Wappi switching the `api/sync` body to pretty-print AND a transient/mid-pairing `authorized:false`. The twin gate was a deliberately-not-taken hardening (recorded in `11-REVIEW-FIX.md`) because adding it would change behaviour beyond the finding. | closed |
 
 *Status: open · closed*
 *Disposition: mitigate (implementation required) · accept (documented risk) · transfer (third-party)*
@@ -94,6 +96,57 @@ created: 2026-07-23
 | Audit Date | Threats Total | Closed | Open | Run By |
 |------------|---------------|--------|------|--------|
 | 2026-07-23 | 34 | 34 | 0 | gsd-security-auditor (State B, from PLAN threat models + current code) |
+| 2026-07-27 | 35 | 35 | 0 | gsd-security-auditor (State A re-audit at HEAD `36e846e` — 12 code commits had landed since the original pass, several rewriting auth-adjacent parsing) |
+
+### Re-audit 2026-07-27 — why, and what was proven
+
+The original certificate was stamped at `dfdfa1b`. Twelve commits landed after it (`5013eac` … `6539959`),
+including the WR-02 cancel-race fix, the WR-03 migration of **all four** WhatsApp `get/status` parses,
+new `WappiStatusParser` readers (code / profile_id / QR base64 / status), the `ExtractDetail` migration,
+and the eight Info fixes. Those touch the trust boundaries this register covers, so the certificate was
+re-verified rather than assumed to carry forward.
+
+All 34 prior dispositions **remain CLOSED**; one new accept-class row (T-11-11-01) was added. Evidence
+was produced empirically, not by inspection alone:
+
+- **Destructive delete path** (`CheckWhatsappUnauthorizationOutsideApp` — deletes the Wappi profile,
+  clears the number, sets `isOnWhatsapp=0`): the shipped `WappiStatusParser` was compiled against the
+  project's real Newtonsoft 13.0.4 and the exact caller predicate run over **28 adversarial bodies**.
+  The delete fires on **exactly 5**, all definitively-parsed `authorized:false` (bool, bool-parseable
+  string, pretty-printed, duplicate-key last-wins). `null`, `0`, `1`, `"yes"`, `""`, `{}`, `[]`,
+  nested-only `account.authorized`, wrong-case, array root, malformed, empty and C# `null` **never**
+  delete. A 5000-deep nested body returns false without crashing (Newtonsoft's `MaxDepth=64` throws,
+  swallowed by `TryParse`) — no stack-overflow DoS from a hostile status body.
+- **Base64 decode** (`TryGetQrPng`): 16 payloads, **no exception escaped**. Worst case is `false` (loop
+  retries) or garbage bytes rejected by the existing `LoadImage` check. Allocation is proportional (3/4),
+  not amplifying. Strictly better than the old unguarded path, which threw and killed the coroutine.
+- **Auth REQUEST invariant** — proven by **line-level diff**, not by counting (a count can hold while a
+  line changes): all **15** Wappi request-construction lines (`auth/code`, `auth/2fa`, `auth/phone`,
+  `auth/qr`, `qr/get`, `get/status`, `profile/add|delete|logout`) are **byte-identical** to `dfdfa1b`.
+  `GetChild(3/4/5)` is 21 vs 21 with **exactly one** line differing — the pairing-code label's RHS
+  (`Substring(startIndex, 9)` → `pairingCode`). Scene child order re-parsed: auth pages still last.
+- **Cancel race**: `isCreatingBot` is cleared at exactly two sites, so the new post-loop re-checks can
+  only follow `CancelBotCreation`, which already deletes the profiles and settles the ledger — no
+  stranded profile, no bot persisting against a deleted profile.
+- **Dwell input block**: scene-verified that both auth back buttons live inside their auth-page subtrees
+  with no `ignoreParentGroups` CanvasGroup and no non-`Selectable` pointer handlers, so
+  `authCg.interactable = false` genuinely blocks them; the restore always runs.
+
+**Test coverage added as a result** (`WappiStatusParserTests`): the re-audit noted the 42 existing tests
+did **not** cover `authorized: null` / `0` / non-parseable strings / nested-only — the exact inputs whose
+safety the destructive path depends on. 14 cases now lock that property in, so a future refactor of
+`TryGetAuthorized` cannot silently start deleting authorized users' profiles. Suite **1260/1260 green**
+(cold headless, compiled from source).
+
+### Advisories from the re-audit (non-blocking, below `block_on: high`)
+
+1. **`ExtractDetail` widens server text reaching TMP labels.** More error bodies now render than under the
+   old token-bounded scrape; server-controlled text into a rich-text-enabled `TextMeshProUGUI` is a
+   theoretical tag-injection/spoofing surface. Pre-existing in kind; source is wappi.pro over TLS with an
+   `Authorization` header. Info-level.
+2. **`{bot}WhatsappNumber` self-heal gap** — the Telegram number is sanitised through `IsPlausiblePhone`
+   on load, WhatsApp's is not, so a legacy `+`-prefixed value could sit permanently dirty against the new
+   normalised read. Latent only; both documented samples are bare digits. Also recorded in `11-REVIEW-FIX.md`.
 
 **Load-bearing evidence — auth flow byte-identical through Phase 11:** `git blame` on every auth-critical line in `Manager.cs` shows all predate Phase 11's first commit (2026-07-17): `auth/code` GET (line 2045, 2026-04-13), `auth/code` POST (2540, 2026-04-07), `auth/2fa` POST (2660, 2026-07-12 Phase 8), `auth/phone` POST (2435, pre-11), and the `WhatsappCodePanel.GetChild(3/4/5)` state toggles (1823-1825/2079-2081/2091, 2026-04-13/15). The onboarding trust cards, relocated success overlay, and first-reply latch are all additive and never touch these lines.
 
