@@ -15,6 +15,97 @@ using NUnit.Framework;
 /// </summary>
 public class WappiStatusParserTests
 {
+    // ── TryGetProfileId — profile/add (both channels) ─────────────────────────
+    // Regression cover for the "+14 up to \",\"status\":" scan: negative length (throw,
+    // hanging the awaiting parent coroutine) on reversed key order, and a leading-quote
+    // corrupted id from a pretty-printed body.
+
+    [Test]
+    public void TryGetProfileId_CompactBody_ReadsId()
+    {
+        Assert.IsTrue(WappiStatusParser.TryGetProfileId("{\"profile_id\":\"abc123\",\"status\":\"done\"}", out string id));
+        Assert.AreEqual("abc123", id);
+    }
+
+    [Test]
+    public void TryGetProfileId_StatusBeforeProfileId_ReadsId_DoesNotThrow()
+    {
+        // Reversed order made the old scan compute a NEGATIVE length and throw.
+        Assert.IsTrue(WappiStatusParser.TryGetProfileId("{\"status\":\"done\",\"profile_id\":\"abc123\"}", out string id));
+        Assert.AreEqual("abc123", id);
+    }
+
+    [Test]
+    public void TryGetProfileId_PrettyPrinted_HasNoLeadingQuote()
+    {
+        Assert.IsTrue(WappiStatusParser.TryGetProfileId("{\n  \"profile_id\": \"abc123\",\n  \"status\": \"done\"\n}", out string id));
+        Assert.AreEqual("abc123", id, "The old +14 offset stored a leading quote from a pretty body.");
+    }
+
+    [Test]
+    public void TryGetProfileId_MissingBlankOrMalformed_ReturnsFalse()
+    {
+        Assert.IsFalse(WappiStatusParser.TryGetProfileId("{\"status\":\"done\"}", out string missing));
+        Assert.AreEqual("", missing);
+        Assert.IsFalse(WappiStatusParser.TryGetProfileId("{\"profile_id\":\"\"}", out _));
+        Assert.IsFalse(WappiStatusParser.TryGetProfileId("not json", out _));
+        Assert.IsFalse(WappiStatusParser.TryGetProfileId(null, out _));
+    }
+
+    // ── TryGetQrPng — WA qr/get ("qrCode", data URI) + tapi auth/qr ("detail", raw) ──
+    // Regression cover for the unguarded Convert.FromBase64String on the SUCCESS path
+    // (FormatException killed the QR coroutine, leaving the spinner up forever).
+
+    // "hi" base64-encoded — a valid, non-empty payload; LoadImage rejecting it is the
+    // caller's already-checked concern, decoding without throwing is this method's.
+    private const string ValidBase64 = "aGk=";
+
+    [Test]
+    public void TryGetQrPng_WhatsAppDataUri_StripsPrefixAndDecodes()
+    {
+        Assert.IsTrue(WappiStatusParser.TryGetQrPng(
+            "{\"status\":\"done\",\"qrCode\":\"data:image/png;base64," + ValidBase64 + "\",\"uuid\":\"x\"}",
+            "qrCode", out byte[] png));
+        Assert.AreEqual(new byte[] { 0x68, 0x69 }, png);
+    }
+
+    [Test]
+    public void TryGetQrPng_TelegramRawBase64UnderDetail_Decodes()
+    {
+        Assert.IsTrue(WappiStatusParser.TryGetQrPng(
+            "{\"detail\":\"" + ValidBase64 + "\",\"uuid\":\"x\"}", "detail", out byte[] png));
+        Assert.AreEqual(new byte[] { 0x68, 0x69 }, png);
+    }
+
+    [Test]
+    public void TryGetQrPng_NonBase64Detail_ReturnsFalse_DoesNotThrow()
+    {
+        // The exact payloads that used to throw FormatException on the success path.
+        Assert.IsFalse(WappiStatusParser.TryGetQrPng("{\"detail\":\"2fa\"}", "detail", out byte[] a));
+        Assert.IsNull(a);
+        Assert.IsFalse(WappiStatusParser.TryGetQrPng("{\"detail\":\"auth_success\"}", "detail", out _));
+        Assert.IsFalse(WappiStatusParser.TryGetQrPng("{\"detail\":\"not base64 !!\"}", "detail", out _));
+    }
+
+    [Test]
+    public void TryGetQrPng_KeyOrderIrrelevant()
+        => Assert.IsTrue(WappiStatusParser.TryGetQrPng(
+            "{\"uuid\":\"x\",\"status\":\"done\",\"qrCode\":\"data:image/png;base64," + ValidBase64 + "\"}",
+            "qrCode", out _), "Old slice was bounded by a token that had to come AFTER the payload.");
+
+    [Test]
+    public void TryGetQrPng_MissingKeyBlankOrMalformed_ReturnsFalse()
+    {
+        Assert.IsFalse(WappiStatusParser.TryGetQrPng("{\"status\":\"done\"}", "qrCode", out _));
+        Assert.IsFalse(WappiStatusParser.TryGetQrPng("{\"qrCode\":\"\"}", "qrCode", out _));
+        Assert.IsFalse(WappiStatusParser.TryGetQrPng("{\"qrCode\":\"data:image/png;base64,\"}", "qrCode", out _),
+            "A data URI with an empty payload is not a QR.");
+        Assert.IsFalse(WappiStatusParser.TryGetQrPng("not json", "qrCode", out _));
+        Assert.IsFalse(WappiStatusParser.TryGetQrPng(null, "qrCode", out _));
+        Assert.IsFalse(WappiStatusParser.TryGetQrPng("{\"qrCode\":\"" + ValidBase64 + "\"}", null, out _),
+            "A null key is a caller bug, not a crash.");
+    }
+
     // ── TryGetCode — WhatsApp pairing code (auth/code) ────────────────────────
     // Regression cover for the hard-coded Substring(startIndex, 9) that threw
     // ArgumentOutOfRangeException on any code shorter than "XXXX-XXXX", stranding the

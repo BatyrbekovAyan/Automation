@@ -2000,13 +2000,14 @@ public partial class Manager : MonoBehaviour
                 {
                     string response = www.downloadHandler.text;
 
-                    if (response.Contains("data:image/png;base64,") && response.Contains("\",\"task_id\":"))
+                    // Throw-safe extract + decode (WA qr/get returns the PNG as a data URI under
+                    // "qrCode"). The old slice was bounded by a literal ",\"task_id\":" token —
+                    // absent from the documented response shape, so a body without it went
+                    // negative-length — and Convert.FromBase64String ran UNGUARDED on the success
+                    // path, throwing FormatException on any malformed payload. Either throw killed
+                    // this coroutine, leaving the QR spinner up forever.
+                    if (WappiStatusParser.TryGetQrPng(response, "qrCode", out byte[] imageBytes))
                     {
-                        int startIndex = response.IndexOf("data:image/png;base64,") + 22;
-                        int endIndex = response.IndexOf("\",\"task_id\":");
-                        int length = endIndex - startIndex;
-
-                        byte[] imageBytes = Convert.FromBase64String(response.Substring(startIndex, length));
                         Texture2D texture = new(2, 2);
 
                         if (texture.LoadImage(imageBytes))
@@ -2385,13 +2386,13 @@ public partial class Manager : MonoBehaviour
                         yield break;
                     }
 
-                    if (response.Contains("\"detail\":\"") && response.Contains("\",\"uuid\":"))
+                    // Throw-safe extract + decode (tapi auth/qr returns RAW base64 under "detail").
+                    // The 2fa divert is handled above; any other non-base64 "detail" (an error
+                    // string, auth_success) now fails the decode gracefully and the retry loop
+                    // continues, instead of FormatException killing this coroutine with the
+                    // QR spinner still on screen.
+                    if (WappiStatusParser.TryGetQrPng(response, "detail", out byte[] imageBytes))
                     {
-                        int startIndex = response.IndexOf("\"detail\":\"") + 10;
-                        int endIndex = response.IndexOf("\",\"uuid\":");
-                        int length = endIndex - startIndex;
-
-                        byte[] imageBytes = Convert.FromBase64String(response.Substring(startIndex, length));
                         Texture2D texture = new(2, 2);
 
                         if (texture.LoadImage(imageBytes))
@@ -2987,13 +2988,13 @@ public partial class Manager : MonoBehaviour
         {
             string response = www.downloadHandler.text;
 
-            if (response.Contains("\"profile_id\":") && response.Contains("\",\"status\":"))
+            // Throw-safe, order/whitespace-agnostic read of the profile/add response. The old
+            // "+14 up to \",\"status\":" scan went negative-length (throw, hanging this nested
+            // coroutine and its awaiting parent with the LoadingPanel up) if the server ever
+            // emitted status first, and its hard-coded offset would store an id with a leading
+            // quote from a pretty-printed body — corrupting every later Wappi call for this bot.
+            if (WappiStatusParser.TryGetProfileId(response, out string createdWhatsappProfileId))
             {
-                int startIndex = response.IndexOf("\"profile_id\":") + 14;
-                int endIndex = response.IndexOf("\",\"status\":");
-                int lenght = endIndex - startIndex;
-
-                string createdWhatsappProfileId = response.Substring(startIndex, lenght);
 
                 if (localId)
                 {
@@ -3064,13 +3065,9 @@ public partial class Manager : MonoBehaviour
         {
             string response = www.downloadHandler.text;
 
-            if (response.Contains("\"profile_id\":") && response.Contains("\",\"status\":"))
+            // Throw-safe read — see the WhatsApp twin in CreateWhatsappProfile.
+            if (WappiStatusParser.TryGetProfileId(response, out string createdTelegramProfileId))
             {
-                int startIndex = response.IndexOf("\"profile_id\":") + 14;
-                int endIndex = response.IndexOf("\",\"status\":");
-                int lenght = endIndex - startIndex;
-
-                string createdTelegramProfileId = response.Substring(startIndex, lenght);
 
                 if (localId)
                 {
