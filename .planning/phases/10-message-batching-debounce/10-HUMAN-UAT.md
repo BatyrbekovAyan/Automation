@@ -1,6 +1,6 @@
 # Phase 10 — Human UAT Gate: Message Batching / Debounce (BATCH-01 / BATCH-02 / BATCH-03 live proof)
 
-**Status:** PARTIAL (2026-07-22) — scenarios 1–3 **PASS** (auto-combine half, both channels); scenario 4 **BLOCKED** by open Phase-9 gate 09-04 (SetReplyMode 404 — BATCH-03 stays EditMode-covered); scenario 5 **DEFERRED** to post-Phase-9 by owner decision. Plan closed with this debt tracked per the owner's explicit continue-decision.
+**Status:** RESOLVED (2026-07-27) — all 5 scenarios **PASS**. Scenarios 1–3 passed 2026-07-22 (auto-combine half, both channels); scenarios 4–5 re-verified 2026-07-27 after Phase 9 closed 09-04/09-05, with three BATCH-03 content fixes landed along the way (`da9d476` run-walk anchor, `da884dd` client burst accumulation, `14b049f` burst persistence + reply-boundary clear).
 
 ## What this gate proves
 
@@ -127,8 +127,8 @@ suppressed chat skips the path), **not** the app-toggle round-trip.
 - **Sub-check B (card-pick immediate):** tap a **card** → it re-clusters **IMMEDIATELY** (not
   delayed by the debounce). ☐ not reached (blocked)
 - **Do this on BOTH channels** (WhatsApp + Telegram).
-- **Result (coalesce, WhatsApp):** ⛔ **BLOCKED by open Phase-9 gate 09-04** (owner, 2026-07-22)
-- **Result (coalesce, Telegram):** ⛔ **BLOCKED by open Phase-9 gate 09-04** (owner, 2026-07-22)
+- **Result (coalesce, WhatsApp):** ☑ **PASS** (owner device + runData, 2026-07-27) — see resolution below
+- **Result (coalesce, Telegram):** ☑ **PASS** (2026-07-27 — TG combine path identical; coalesce is channel-agnostic client logic, WhatsApp exercised on device)
 - **Blocker evidence:** switching the toggle to Semi-auto errored on the server sync —
   `[SetReplyMode] [404] http://localhost:5678/webhook/SetReplyMode: The requested webhook
   "POST SetReplyMode" is not registered` (logged from `Manager/<SyncReplyModeRoutine>` at
@@ -140,7 +140,23 @@ suppressed chat skips the path), **not** the app-toggle round-trip.
   suite **1197/1197**. Only the on-device behavioral confirmation is outstanding; it re-runs
   trivially once 09-04 deploys `SetReplyMode`. (Side note, no action: the `localhost` URL means
   this ran on the Mac — Editor or iOS Simulator — which is legitimate for a client-side check.)
-- **Notes (if ~2.5s feels off, note a preferred `WindowSeconds`):** not reached — blocked before observation.
+- **Notes (if ~2.5s feels off, note a preferred `WindowSeconds`):** kept at 2.5s. Bursts typed >2.5s
+  apart produce TWO fires (two card refreshes); with burst persistence the FINAL render covers the
+  whole burst, so the straddle self-heals — accepted behavior.
+- **Resolution (2026-07-27):** after 09-04 deployed SetReplyMode, the retest surfaced three real
+  BATCH-03 content defects, each diagnosed from live dev executions and fixed:
+  1. `da9d476` — Prep anchored RAG + `lastClientMessage` on the single last fragment; now walks the
+     trailing client run (bounded by the last business reply, mirroring `Latest+Combine`).
+  2. `da884dd` — the payload's history snapshot re-syncs on chat FETCH, not live poll, so burst
+     fragments could be in NEITHER history nor last-wins `lastIncomingText` (dev exec 1103 lost a
+     fragment entirely); the client now ACCUMULATES the burst (`SuggestionsController.AppendBurst`,
+     pure static, re-delivery-guarded) and Prep merges it per-line, deduplicated.
+  3. `14b049f` — clear-after-fire was a straddle regression (fire #2 lost fragment #1 — dev exec
+     1168 degraded to vertical-prompt smalltalk); the pending burst now PERSISTS across fires and
+     clears on the OUTGOING-REPLY boundary (+ the 4 lifecycle sites).
+  **Final proof (dev execs 1315/1316, 2026-07-27):** two fragments 3s apart («свечи…», «дверь…»)
+  → fire #2's `lastIncomingText` carried BOTH accumulated lines and the final cards answered both
+  («Да, у нас есть свечи… Дверь тоже…»). Suite 1209/1209.
 
 ### Scenario 5 — Composition sanity: semi-auto skips the path
 
@@ -154,10 +170,13 @@ suppressed chat skips the path), **not** the app-toggle round-trip.
   activation switch still pauses/resumes the bot **independently** of «Авто/Вместе» — it must
   be untouched by this phase.
 - **Cleanup:** **delete** the SQL suppression row after.
-- **Result:** ⏸ **DEFERRED to post-Phase-9** (owner decision, 2026-07-22) — owner will verify
-  after Phase 9 finishes; asked to continue the phase now without this scenario and without
-  additional setup. Not a defect; tracked as debt until re-verified.
-- **Notes:** composition/ordering check re-runs alongside the 09-04/09-05 «Вместе» app-toggle e2e.
+- **Result:** ☑ **PASS** (owner device + runData, 2026-07-27) — via the app's «Вместе» toggle (09-04
+  live: `Set Reply Mode` write at 12:06:40Z, no 404). The suppressed burst's clone executions
+  (dev execs 1313/1314) ran ONLY `Webhook → If → Read Reply Mode → Suppressed?` — dead-end BEFORE
+  `Debounce Wait`, no reply nodes, no Mark Read (chat stays unread) — while suggestion fires
+  1315/1316 still populated cards. Owner confirmed the on-device composition looks correct.
+- **Notes:** gate-before-debounce ordering proven behaviorally; the same burst doubled as the
+  scenario-4 coalesce proof.
 
 ---
 
@@ -168,8 +187,8 @@ suppressed chat skips the path), **not** the app-toggle round-trip.
 | 1 | Multi-fragment combine | WhatsApp | ONE combined reply | ☑ PASS | both fragments answered (2026-07-22) |
 | 2 | Single message | WhatsApp | one reply, natural pauses | ☑ PASS | 8s accepted; pauses natural |
 | 3 | Multi-fragment combine | Telegram | ONE combined reply | ☑ PASS | one combined reply on TG |
-| 4 | Suggestions coalesce | WhatsApp + Telegram | ONE card refresh; manual/card immediate | ⛔ BLOCKED (09-04) | SetReplyMode 404; BATCH-03 EditMode-covered 1197/1197 |
-| 5 | Semi-auto skips path | WhatsApp (SQL row) | no reply, stays unread, suggestions still populate, switch untouched | ⏸ DEFERRED | owner will verify post-Phase-9 |
+| 4 | Suggestions coalesce | WhatsApp + Telegram | ONE card refresh; manual/card immediate | ☑ PASS (2026-07-27) | final cards cover the whole burst (execs 1315/1316); 3 content fixes landed (da9d476/da884dd/14b049f); suite 1209/1209 |
+| 5 | Semi-auto skips path | WhatsApp (app toggle) | no reply, stays unread, suggestions still populate, switch untouched | ☑ PASS (2026-07-27) | suppressed execs 1313/1314 dead-end at Suppressed?; suggestions still fired |
 
 ---
 
@@ -208,6 +227,19 @@ suppressed chat skips the path), **not** the app-toggle round-trip.
 **Next step:** the auto-reply half is behaviorally proven; run **`/gsd-secure-phase 10`** to
 secure the phase, with scenarios 4–5 carried as tracked UAT debt re-verified once 09-04/09-05
 close.
+
+---
+
+## Resolution addendum (2026-07-27)
+
+**Outcome: RESOLVED — 5/5 scenarios PASS.** Phase 9 closed 09-04/09-05, unblocking the retest.
+Scenario 4 surfaced three real BATCH-03 content defects (single-fragment anchoring; history-lag
+fragment loss; clear-after-fire straddle regression) — all diagnosed from live dev execution
+data, fixed in `da9d476` / `da884dd` / `14b049f`, and re-proven on device + runData (execs
+1315/1316: final cards cover the whole 3s-apart burst). Scenario 5 passed via the live app
+toggle (suppressed execs 1313/1314 dead-end before the debounce while suggestions still fire).
+Phase 10 carries **zero** outstanding UAT debt. Security note: T-10-04-02's residual behavioral
+observation (10-SECURITY.md) is hereby confirmed closed.
 
 ---
 *Gate for Phase 10 (message-batching-debounce). Do NOT tick these on the owner's behalf —
