@@ -107,6 +107,10 @@ def check_bot(f, base):
                 f"{f}: Latest+Combine is not channel-agnostic (missing chat || text)")
     assert_that("...wh" in js and "abort" in js and "combinedText" in js,
                 f"{f}: Latest+Combine does not re-emit body ({{ ...wh, abort, combinedText }})")
+    # An empty combine run must stay NULLISH: `''` would win the Text node's `??` fallback and
+    # feed the agent an empty prompt (review WR-01).
+    assert_that(r"combinedText = parts.length > 0 ? parts.join('\n') : null;" in js,
+                f"{f}: Latest+Combine joins an empty run to '' (defeats the Text node ?? fallback)")
 
     # Is Latest? boolean condition reads $json.abort.
     cond = il["parameters"]["conditions"]["conditions"][0]

@@ -73,7 +73,10 @@ if (!newestIncoming || newestIncoming.id !== triggeringId) {
     parts.push(typeof m.body === 'string' ? m.body : '');
   }
   parts.reverse();
-  combinedText = parts.join('\n');
+  // '' would beat the Text node's `?? $json.body.messages[0].body` fallback (?? is nullish-only)
+  // and hand the agent an EMPTY prompt whenever the loop breaks on iteration 1 — e.g. a humanizer
+  // reply to an earlier fragment lands inside this fragment's window. Stay nullish when empty.
+  combinedText = parts.length > 0 ? parts.join('\n') : null;
 }
 
 return [{ json: { ...wh, abort, combinedText } }];"""
