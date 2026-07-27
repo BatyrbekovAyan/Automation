@@ -105,21 +105,28 @@ public partial class BotSettings
         {
             string response = www.downloadHandler.text;
 
-            if (response.Contains("\"authorized\":"))
+            // WR-03: parse through the throw-safe, whitespace/order-agnostic WappiStatusParser
+            // (already adopted by the Telegram twin below). The old scan derived a length from an
+            // UNGUARDED IndexOf, so any body carrying "authorized": without the exact compact
+            // ",\"authorized_at\":" token threw a negative-length Substring — killing this
+            // coroutine before LoadingPanel.SetActive(false) and stranding the full-screen overlay.
+            //
+            // Two intended deltas vs the old scan (both fail-safer, see 11-REVIEW-FIX.md):
+            //  • a present-but-non-boolean "authorized" (e.g. null) now takes NEITHER branch,
+            //    where the old slice fell into the re-auth branch;
+            //  • the phone is read whenever the body carries one, instead of requiring the
+            //    adjacent ",\"platform\":" token the WhatsApp body may not even contain.
+            // The write is dirty-checked so a background status probe can never light Save on
+            // its own (EnableSave compares against PlayerPrefs, and the server may format the
+            // number differently from what the wizard stored).
+            if (WappiStatusParser.TryGetAuthorized(response, out bool isAuthorized))
             {
-                int startIndex = response.IndexOf("\"authorized\":") + 13;
-                int endIndex = response.IndexOf(",\"authorized_at\":");
-                int lenght = endIndex - startIndex;
-
-                if (response.Substring(startIndex, lenght).Equals("true"))
+                if (isAuthorized)
                 {
-                    if (response.Contains("\"phone\":") && response.Contains("\",\"platform\":"))
+                    if (WappiStatusParser.TryGetPhone(response, out string phone)
+                        && WhatsappNumberField.Value != phone)
                     {
-                        startIndex = response.IndexOf("\"phone\":") + 9;
-                        endIndex = response.IndexOf("\",\"platform\":");
-                        lenght = endIndex - startIndex;
-
-                        WhatsappNumberField.Value = response.Substring(startIndex, lenght);
+                        WhatsappNumberField.Value = phone;
                         Manager.Instance.EnableSave();
                     }
                 }
@@ -191,13 +198,15 @@ public partial class BotSettings
         {
             string response = www.downloadHandler.text;
 
-            if (response.Contains("\"authorized\":"))
+            // WR-03 (same defect class as CheckWhatsappAuthorization — this THIRD site was not in
+            // the review). Note the deliberate shape: this path is DESTRUCTIVE (it deletes the
+            // Wappi profile and clears the saved number), so it must fire ONLY on a definitively
+            // parsed authorized:false. A missing/unparseable body leaves the profile untouched —
+            // identical to the old Contains-guard, and the reason this is not folded into a single
+            // `!TryGetAuthorized(...) || !isAuthorized` condition.
+            if (WappiStatusParser.TryGetAuthorized(response, out bool isAuthorized))
             {
-                int startIndex = response.IndexOf("\"authorized\":") + 13;
-                int endIndex = response.IndexOf(",\"authorized_at\":");
-                int lenght = endIndex - startIndex;
-
-                if (!response.Substring(startIndex, lenght).Equals("true") && !Manager.openBot.GetComponent<Bot>().whatsappProfileId.Equals("-1"))
+                if (!isAuthorized && !Manager.openBot.GetComponent<Bot>().whatsappProfileId.Equals("-1"))
                 {
                     if (whatsappRow != null) whatsappRow.SetIsOnQuiet(false);
 

@@ -2203,14 +2203,15 @@ public partial class Manager : MonoBehaviour
         if (www.result == UnityWebRequest.Result.Success)
         {
             string response = www.downloadHandler.text;
-            int startIndex = response.IndexOf("\"authorized\":");
-            int endIndex = response.IndexOf(",\"authorized_at\":");
-
-            if (startIndex >= 0 && endIndex > startIndex)
-            {
-                startIndex += 13;
-                authorized = response.Substring(startIndex, endIndex - startIndex).Equals("true");
-            }
+            // WR-03 (4th site — length-guarded, so it never threw, but migrated anyway because
+            // "cannot throw" is the wrong bar HERE): this bool is the pre-delete guard for the
+            // resend-code path, whose whole job is to stop a just-authorized profile from being
+            // deleted + recreated. The hand-rolled scan needed the EXACT compact
+            // ",\"authorized_at\":" token, so a pretty-printed or key-reordered body silently read
+            // as NOT authorized — and that false negative destroys a live pairing (the same
+            // pretty-print shape that broke the tapi twin and prompted this parser). Unparseable
+            // still yields false, identical to the old guard's miss behaviour.
+            authorized = WappiStatusParser.TryGetAuthorized(response, out bool parsed) && parsed;
         }
 
         callback?.Invoke(authorized);
@@ -2321,29 +2322,23 @@ public partial class Manager : MonoBehaviour
             {
                 string response = www.downloadHandler.text;
 
-                if (response.Contains("\"authorized\":"))
+                // WR-03: throw-safe parse (mirrors the Telegram twin in GetTelegramProfileStatus).
+                // The old unguarded IndexOf/Substring could throw a negative-length Substring and
+                // kill this POLLING coroutine outright — after which a successful QR/code auth was
+                // never detected and the wizard hung indefinitely. Unparseable body ⇒ not
+                // authorized ⇒ keep polling, exactly as before.
+                if (WappiStatusParser.TryGetAuthorized(response, out bool isAuthorized) && isAuthorized)
                 {
-                    int startIndex = response.IndexOf("\"authorized\":") + 13;
-                    int endIndex = response.IndexOf(",\"authorized_at\":");
-                    int lenght = endIndex - startIndex;
+                    authorized = true;
 
-                    if (response.Substring(startIndex, lenght).Equals("true"))
+                    if (WappiStatusParser.TryGetPhone(response, out string phone))
                     {
-                        authorized = true;
-
-                        if (response.Contains("\"phone\":") && response.Contains("\",\"platform\":"))
-                        {
-                            startIndex = response.IndexOf("\"phone\":") + 9;
-                            endIndex = response.IndexOf("\",\"platform\":");
-                            lenght = endIndex - startIndex;
-
-                            WhatsappNumberInput.text = response.Substring(startIndex, lenght);
-                        }
-
-                        // Show checkmark inside QR box, then navigate
-                        yield return StartCoroutine(ShowAuthSuccess(WhatsappAuth, WhatsappAuthSuccessPanel));
-                        whatsappAuthCompleted = true;
+                        WhatsappNumberInput.text = phone;
                     }
+
+                    // Show checkmark inside QR box, then navigate
+                    yield return StartCoroutine(ShowAuthSuccess(WhatsappAuth, WhatsappAuthSuccessPanel));
+                    whatsappAuthCompleted = true;
                 }
             }
 
