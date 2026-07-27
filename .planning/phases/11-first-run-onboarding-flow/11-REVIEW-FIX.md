@@ -2,9 +2,9 @@
 phase: 11
 slug: first-run-onboarding-flow
 status: partial
-fix_scope: targeted (WR-02 then WR-03, owner-directed)
-findings_in_scope: 2
-fixed: 2
+fix_scope: targeted (WR-02, WR-03, + pairing-code follow-up; owner-directed)
+findings_in_scope: 3
+fixed: 3
 skipped: 0
 iteration: 2
 source_review: 11-REVIEW.md
@@ -128,6 +128,34 @@ the old scan, which deleted on any `"authorized":` slice that merely differed fr
 
 ---
 
+### Follow-up — WhatsApp pairing-code read (same defect class as WR-03, not in `11-REVIEW.md`)
+
+**Severity:** medium (surfaced by the WR-03 verification pass, fixed on owner request)
+**Commit:** `381c3cf`
+**Files:** `Assets/Scripts/Chat/WappiStatusParser.cs`, `Assets/Scripts/Main/Manager.cs`, `Assets/Tests/Editor/Chat/WappiStatusParserTests.cs`
+
+**Defect.** `GetWhatsappCode` displayed the pairing code with a hard-coded
+`response.Substring(startIndex, 9)` — assuming the canonical 9-char `XXXX-XXXX` shape behind
+nothing but a `Contains("\"code\":\"")` guard. A shorter code, or any truncated body, threw
+`ArgumentOutOfRangeException` and killed the coroutine **before** `LoadingPanel.SetActive(false)`,
+leaving a stranded full-screen overlay *and* a disabled request button — the same soft-lock WR-03
+was raised to eliminate, in the same code-panel flow.
+
+**Fix.** New `WappiStatusParser.TryGetCode` (JObject-based, whitespace/order-agnostic, throw-safe,
+consistent with the four WR-03 sites). It reads the code **verbatim at whatever length the server
+sends**, so a longer code is no longer silently truncated and a shorter one no longer drags in
+trailing JSON. Absent / blank / non-scalar / unparseable ⇒ returns false and the label is left
+untouched instead of the coroutine dying.
+
+**Verification.** 6 new EditMode tests — canonical 9-char, **short code (the case that used to
+throw)**, longer-than-9, pretty-printed body, missing/blank/whitespace/malformed/null, and
+non-scalar. Suite **1232/1232 green**. Auth request code untouched (`auth/code`+`auth/2fa` = 7,
+`GetChild(3/4/5)` = 21).
+
+No Telegram twin exists for this — Telegram delivers its code in-app rather than displaying one.
+
+---
+
 ## Not in scope this run
 
 | Finding | Severity | Status |
@@ -144,7 +172,7 @@ so the migration isn't mistaken for complete:
 
 | Site | Risk | Note |
 |---|---|---|
-| `Manager.cs` `GetWhatsappCode` — pairing-code read via a fixed `Substring(startIndex, 9)` | **medium** | Throws `ArgumentOutOfRangeException` if fewer than 9 chars follow the token (short/empty code). The throw strands the LoadingPanel **and** leaves `GetWhatsappCodeButton` disabled — the exact soft-lock WR-03 exists to eliminate. Same code-panel flow. Best next candidate. |
+| ~~`Manager.cs` `GetWhatsappCode` — pairing-code read via a fixed `Substring(startIndex, 9)`~~ | ~~medium~~ | ✅ **FIXED** (`381c3cf`, owner-directed follow-up) — see below. |
 | `Manager.cs` `CreateWhatsappProfile` / `CreateTelegramProfile` — `"profile_id":` +14 up to `,"status":` | low | Negative length (hangs the parent coroutine) if the server ever emits `status` before `profile_id`; the `+14` also hard-codes the compact form, so a pretty body would store an id with a leading quote and silently break every later call for that bot. |
 | ~8 further `Contains`-guarded scrapes (error `detail` extraction, QR base64, a fixed `Substring(start, 4)`) | low | Mostly error/degraded paths. The `detail` sites could route through the existing bounds-checked `TelegramAuthResponseParser.ExtractDetail`; the two QR sites should also wrap `Convert.FromBase64String` in try/catch. |
 
