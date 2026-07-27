@@ -122,3 +122,92 @@ public class SuggestionsBurstTextTests
         Assert.IsNull(SuggestionsController.AppendBurst(null, null));
     }
 }
+
+// BATCH-03 run-boundary rule (the subtlest rule of the phase, previously untested — see
+// 10-LEARNINGS.md). The pending burst deliberately SURVIVES a debounce fire, because a burst
+// straddling the ~2.5s window fires twice and the second fire must still carry the earlier
+// fragments (live exec 1168 lost a fragment when the fire cleared it). It therefore clears at
+// exactly one in-batch place: an OUTGOING echo — the owner or the bot replied — which bounds the
+// un-replied run. `FoldLiveBatch` is the pure, clock-free seam holding that rule.
+public class SuggestionsLiveBatchFoldTests
+{
+    private static MessageViewModel In(string text) => new MessageViewModel { isIncoming = true, text = text };
+    private static MessageViewModel Out(string text) => new MessageViewModel { isIncoming = false, text = text };
+
+    // A burst of incoming fragments accumulates and arms the window.
+    [Test] public void IncomingFragments_AccumulateAndArm()
+    {
+        var fold = SuggestionsController.FoldLiveBatch(null, new[] { In("есть колодки"), In("на камри 70") });
+        Assert.AreEqual("есть колодки\nна камри 70", fold.Pending);
+        Assert.IsTrue(fold.Arm, "an incoming fragment must (re)start the coalesce window");
+        Assert.IsFalse(fold.Cancel);
+    }
+
+    // THE RULE: a reply (owner or bot) bounds the run — pending is dropped and the window cancelled.
+    [Test] public void OutgoingEcho_ClearsPendingAndCancels()
+    {
+        var fold = SuggestionsController.FoldLiveBatch("есть колодки", new[] { Out("Да, есть") });
+        Assert.IsNull(fold.Pending, "an answered burst must not linger");
+        Assert.IsFalse(fold.Arm);
+        Assert.IsTrue(fold.Cancel, "a pending window must be dropped once the run is answered");
+    }
+
+    // Incoming then a reply within one batch: the reply still wins — no fire follows an answer.
+    [Test] public void IncomingThenOutgoing_EndsAnswered_NoArm()
+    {
+        var fold = SuggestionsController.FoldLiveBatch(null, new[] { In("есть колодки"), Out("Да, есть") });
+        Assert.IsNull(fold.Pending);
+        Assert.IsFalse(fold.Arm, "the batch ended answered → nothing to suggest for");
+        Assert.IsTrue(fold.Cancel);
+    }
+
+    // A reply followed by a NEW question starts a fresh run — the old burst must not leak into it.
+    [Test] public void OutgoingThenIncoming_StartsFreshRun()
+    {
+        var fold = SuggestionsController.FoldLiveBatch("старый вопрос", new[] { Out("Ответил"), In("а есть дверь?") });
+        Assert.AreEqual("а есть дверь?", fold.Pending, "the answered burst must not survive into the new run");
+        Assert.IsTrue(fold.Arm);
+        Assert.IsFalse(fold.Cancel, "a re-arm supersedes the cancel — Poke() re-arms unconditionally");
+    }
+
+    // The straddle guarantee, at fold level: with no reply between them, a later batch ADDS to the
+    // pending burst rather than replacing it — so a second fire still carries the first fragment.
+    [Test] public void PendingSurvivesAcrossBatches_WhenNoReplyIntervenes()
+    {
+        var first = SuggestionsController.FoldLiveBatch(null, new[] { In("есть колодки") });
+        var second = SuggestionsController.FoldLiveBatch(first.Pending, new[] { In("на камри 70") });
+        Assert.AreEqual("есть колодки\nна камри 70", second.Pending,
+            "a fire between batches must not cost the earlier fragments (live exec 1168 regression)");
+        Assert.IsTrue(second.Arm);
+    }
+
+    // An outgoing bounds the run regardless of its text (media replies carry no text).
+    [Test] public void OutgoingWithoutText_StillBoundsTheRun()
+    {
+        var fold = SuggestionsController.FoldLiveBatch("вопрос", new[] { Out(null) });
+        Assert.IsNull(fold.Pending);
+        Assert.IsTrue(fold.Cancel);
+    }
+
+    // Live-poll re-delivery of the same tail fragment must not duplicate it.
+    [Test] public void RedeliveredFragment_DoesNotDuplicate()
+    {
+        var fold = SuggestionsController.FoldLiveBatch("есть колодки", new[] { In("есть колодки") });
+        Assert.AreEqual("есть колодки", fold.Pending);
+        Assert.IsTrue(fold.Arm, "a re-delivery still counts as activity and resets the window");
+    }
+
+    // Defensive: a null batch or null entries are no-ops, never a clear.
+    [Test] public void NullBatchOrEntries_LeavePendingIntact()
+    {
+        var nullBatch = SuggestionsController.FoldLiveBatch("вопрос", null);
+        Assert.AreEqual("вопрос", nullBatch.Pending);
+        Assert.IsFalse(nullBatch.Arm);
+        Assert.IsFalse(nullBatch.Cancel);
+
+        var withNulls = SuggestionsController.FoldLiveBatch("вопрос", new MessageViewModel[] { null, null });
+        Assert.AreEqual("вопрос", withNulls.Pending, "null entries must never bound the run");
+        Assert.IsFalse(withNulls.Arm);
+        Assert.IsFalse(withNulls.Cancel);
+    }
+}
