@@ -2028,12 +2028,13 @@ public partial class Manager : MonoBehaviour
                 else if (www.result == UnityWebRequest.Result.ProtocolError && www.downloadHandler != null)
                 {
                     string errResp = www.downloadHandler.text;
-                    if (errResp.Contains("\"detail\":") && errResp.Contains("\",\"status\":"))
-                    {
-                        int si = errResp.IndexOf("\"detail\":") + 10;
-                        int ei = errResp.IndexOf("\",\"status\":");
-                        lastError = errResp.Substring(si, ei - si) + ".";
-                    }
+                    // Bounds-checked, never-throws detail read (the helper this file already uses
+                    // for the tapi auth flow). The old slice required a literal ",\"status\":" to
+                    // FOLLOW the value, so a body bounded differently — or with the keys reordered —
+                    // computed a negative length and threw ON AN ERROR PATH, turning a readable
+                    // message into a dead coroutine. Not found ⇒ keep the existing fallback text.
+                    string errDetail = TelegramAuthResponseParser.ExtractDetail(errResp);
+                    if (!string.IsNullOrEmpty(errDetail)) lastError = errDetail + ".";
                 }
             }
 
@@ -2134,12 +2135,10 @@ public partial class Manager : MonoBehaviour
             else if (www.result == UnityWebRequest.Result.ProtocolError && www.downloadHandler != null)
             {
                 string response = www.downloadHandler.text;
-                if (response.Contains("\"detail\":") && response.Contains("\",\"uuid\":"))
-                {
-                    int startIndex = response.IndexOf("\"detail\":") + 10;
-                    int endIndex = response.IndexOf("\",\"uuid\":");
-                    errorMsg = response.Substring(startIndex, endIndex - startIndex);
-                }
+                // Bounds-checked, never-throws detail read — see the QR twin above. Bound-agnostic,
+                // so it no longer matters whether the body follows the value with "uuid" or "status".
+                string errDetail = TelegramAuthResponseParser.ExtractDetail(response);
+                if (!string.IsNullOrEmpty(errDetail)) errorMsg = errDetail;
             }
 
             yield return StartCoroutine(FlashWhatsappCodeError(errorMsg, originalWaBtnText));
@@ -2413,12 +2412,13 @@ public partial class Manager : MonoBehaviour
                 else if (www.result == UnityWebRequest.Result.ProtocolError && www.downloadHandler != null)
                 {
                     string errResp = www.downloadHandler.text;
-                    if (errResp.Contains("\"detail\":") && errResp.Contains("\",\"status\":"))
-                    {
-                        int si = errResp.IndexOf("\"detail\":") + 10;
-                        int ei = errResp.IndexOf("\",\"status\":");
-                        lastError = errResp.Substring(si, ei - si) + ".";
-                    }
+                    // Bounds-checked, never-throws detail read (the helper this file already uses
+                    // for the tapi auth flow). The old slice required a literal ",\"status\":" to
+                    // FOLLOW the value, so a body bounded differently — or with the keys reordered —
+                    // computed a negative length and threw ON AN ERROR PATH, turning a readable
+                    // message into a dead coroutine. Not found ⇒ keep the existing fallback text.
+                    string errDetail = TelegramAuthResponseParser.ExtractDetail(errResp);
+                    if (!string.IsNullOrEmpty(errDetail)) lastError = errDetail + ".";
                 }
             }
 
@@ -2526,12 +2526,9 @@ public partial class Manager : MonoBehaviour
             else if (www.result == UnityWebRequest.Result.ProtocolError && www.downloadHandler != null)
             {
                 string response = www.downloadHandler.text;
-                if (response.Contains("\"detail\":") && response.Contains("\",\"status\":"))
-                {
-                    int startIndex = response.IndexOf("\"detail\":") + 10;
-                    int endIndex = response.IndexOf("\",\"status\":");
-                    errorMsg = response.Substring(startIndex, endIndex - startIndex);
-                }
+                // Bounds-checked, never-throws detail read — see the QR twin above.
+                string errDetail = TelegramAuthResponseParser.ExtractDetail(response);
+                if (!string.IsNullOrEmpty(errDetail)) errorMsg = errDetail;
             }
 
             SetButtonText(GetTelegramCodeButton, errorMsg);
@@ -2563,14 +2560,13 @@ public partial class Manager : MonoBehaviour
 
             // Show "Sent" confirmation briefly, then set persistent "another code" text
             string response = www.downloadHandler.text;
-            if (response.Contains("\"status\":\""))
+            // Bounds-checked status read: the old fixed Substring(startIndex, 4) threw if fewer
+            // than four characters followed "status":" , and a 4-char prefix test matched any
+            // status merely STARTING with "done". Compares the whole value instead.
+            if (WappiStatusParser.TryGetStatus(response, out string sendStatus) && sendStatus == "done")
             {
-                int startIndex = response.IndexOf("\"status\":\"") + 10;
-                if (response.Substring(startIndex, 4).Equals("done"))
-                {
-                    SetButtonText(GetTelegramCodeButton, "Sent");
-                    yield return new WaitForSeconds(2f);
-                }
+                SetButtonText(GetTelegramCodeButton, "Sent");
+                yield return new WaitForSeconds(2f);
             }
             SetButtonText(GetTelegramCodeButton, "Получить другой код");
         }
@@ -2631,12 +2627,10 @@ public partial class Manager : MonoBehaviour
             else if (www.result == UnityWebRequest.Result.ProtocolError && www.downloadHandler != null)
             {
                 string response = www.downloadHandler.text;
-                if (response.Contains("\"detail\":") && response.Contains("\",\"uuid\":"))
-                {
-                    int startIndex = response.IndexOf("\"detail\":") + 10;
-                    int endIndex = response.IndexOf("\",\"uuid\":");
-                    errorMsg = response.Substring(startIndex, endIndex - startIndex);
-                }
+                // Bounds-checked, never-throws detail read — see the QR twin above. Bound-agnostic,
+                // so it no longer matters whether the body follows the value with "uuid" or "status".
+                string errDetail = TelegramAuthResponseParser.ExtractDetail(response);
+                if (!string.IsNullOrEmpty(errDetail)) errorMsg = errDetail;
             }
 
             SetButtonText(SendTelegramCodeButton, errorMsg);

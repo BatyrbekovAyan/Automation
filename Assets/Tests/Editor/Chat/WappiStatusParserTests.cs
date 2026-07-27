@@ -15,6 +15,49 @@ using NUnit.Framework;
 /// </summary>
 public class WappiStatusParserTests
 {
+    // ── TryGetStatus — the ubiquitous "status" marker ─────────────────────────
+    // Regression cover for the fixed Substring(startIndex, 4): threw when fewer than four
+    // chars followed "status":" , and its prefix test matched any status STARTING with "done".
+
+    [Test]
+    public void TryGetStatus_Done_ReadsWholeValue()
+    {
+        Assert.IsTrue(WappiStatusParser.TryGetStatus("{\"status\":\"done\",\"uuid\":\"x\"}", out string s));
+        Assert.AreEqual("done", s);
+    }
+
+    [Test]
+    public void TryGetStatus_ShorterThanFourChars_DoesNotThrow()
+    {
+        // The old fixed-length read threw here.
+        Assert.IsTrue(WappiStatusParser.TryGetStatus("{\"status\":\"ok\"}", out string s));
+        Assert.AreEqual("ok", s);
+    }
+
+    [Test]
+    public void TryGetStatus_DonePrefixedValue_IsNotMistakenForDone()
+    {
+        Assert.IsTrue(WappiStatusParser.TryGetStatus("{\"status\":\"done_with_errors\"}", out string s));
+        Assert.AreNotEqual("done", s, "The old 4-char prefix test matched this as 'done'.");
+    }
+
+    [Test]
+    public void TryGetStatus_PrettyPrintedAndReordered_StillReads()
+    {
+        Assert.IsTrue(WappiStatusParser.TryGetStatus("{\n  \"uuid\": \"x\",\n  \"status\": \"done\"\n}", out string s));
+        Assert.AreEqual("done", s);
+    }
+
+    [Test]
+    public void TryGetStatus_MissingBlankOrMalformed_ReturnsFalse()
+    {
+        Assert.IsFalse(WappiStatusParser.TryGetStatus("{\"uuid\":\"x\"}", out string missing));
+        Assert.AreEqual("", missing);
+        Assert.IsFalse(WappiStatusParser.TryGetStatus("{\"status\":\"\"}", out _));
+        Assert.IsFalse(WappiStatusParser.TryGetStatus("not json", out _));
+        Assert.IsFalse(WappiStatusParser.TryGetStatus(null, out _));
+    }
+
     // ── TryGetProfileId — profile/add (both channels) ─────────────────────────
     // Regression cover for the "+14 up to \",\"status\":" scan: negative length (throw,
     // hanging the awaiting parent coroutine) on reversed key order, and a leading-quote
