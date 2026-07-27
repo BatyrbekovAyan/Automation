@@ -24,6 +24,7 @@ import copy
 import json
 import os
 import sys
+import uuid
 
 # Resolve workflow paths from this script's own location so cwd does not matter.
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -64,6 +65,16 @@ def assert_that(cond, reason):
         raise AssertionError(reason)
 
 
+def is_uuid(value):
+    if not isinstance(value, str) or not value:
+        return False
+    try:
+        uuid.UUID(value)
+    except ValueError:
+        return False
+    return True
+
+
 def check_bot(f, base):
     wf = load(f)
     ns = wf["nodes"]
@@ -79,6 +90,12 @@ def check_bot(f, base):
     assert_that(dw["type"] == "n8n-nodes-base.wait", f"{f}: Debounce Wait is not a wait node")
     assert_that(dw["parameters"].get("amount") == DEBOUNCE_AMOUNT,
                 f"{f}: Debounce Wait amount != {DEBOUNCE_AMOUNT}")
+    # ...and carries a webhookId like every other Wait node in both templates (review IN-03): dead
+    # weight at 8s, but the resume URL n8n registers once DEBOUNCE_SECONDS is tuned to >= 65s.
+    # Presence + uuid shape only, deliberately NOT an exact value: this same verifier gates a prod
+    # RE-EXPORT via --dir, and an importer re-minting the id must not read as a no-go.
+    assert_that(is_uuid(dw.get("webhookId")),
+                f"{f}: Debounce Wait has no valid webhookId (breaks webhook-resume if the window is tuned >= 65s)")
 
     # (3) Fetch Recent: GET <base>messages/get, cred EuhhqAaV56DpoqAN, query params exactly
     #     {profile_id, chat_id, limit} with NO mark_all (Pitfall 5 — marking read during the

@@ -37,7 +37,8 @@ WF = os.path.join(REPO, "Tools/n8n/workflows")
 BOT_IDS = ("4wYitz5ek30SVNlT-WhatsApp_Bot.json", "4VN3gsFaC2HUYmcc-Telegram_Bot.json")
 
 # ~8s auto-reply debounce window (< 65s -> n8n Wait resumes in memory, no DB offload).
-# Single tunable per CONTEXT; tuned at the owner e2e (10-03).
+# Single tunable per CONTEXT; tuned at the owner e2e (10-03). Raising it past 65s flips n8n to
+# webhook-resume + DB offload — which is why Debounce Wait also carries a `webhookId` below.
 DEBOUNCE_SECONDS = 8
 
 # Fetch Recent reuses the WappiAuthToken credential already bound in both templates.
@@ -165,12 +166,18 @@ def splice(wf):
     sx, sy = find(nodes, name="Suppressed?")["position"]
 
     # (2) Upsert the 4 managed nodes (spec is source of truth; see managed()).
+    # Every pre-existing Wait node in both templates carries a webhookId; this one must too.
+    # Harmless at 8s (n8n resumes a sub-65s Wait in memory and never registers the webhook), but
+    # DEBOUNCE_SECONDS is THE tunable: at >= 65s n8n switches to webhook-resume + DB offload, and a
+    # Wait node with no webhookId has no resume URL to register. uuid5 off the node name keeps it
+    # byte-stable across re-runs (and distinct per template), like every other id this script emits.
     managed({
         "parameters": {"amount": DEBOUNCE_SECONDS},
         "id": nid("Debounce Wait"),
         "name": "Debounce Wait",
         "type": "n8n-nodes-base.wait",
         "position": [sx, sy + 220],
+        "webhookId": nid("Debounce Wait-webhook"),
         "typeVersion": 1.1,
     })
 
