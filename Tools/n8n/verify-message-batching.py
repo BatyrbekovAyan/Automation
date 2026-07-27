@@ -24,6 +24,7 @@ import copy
 import json
 import os
 import sys
+import uuid
 
 # Resolve workflow paths from this script's own location so cwd does not matter.
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -42,6 +43,8 @@ BOTS = [
 
 WAPPI_CRED_ID = "EuhhqAaV56DpoqAN"       # WappiAuthToken, already bound in both templates
 DEBOUNCE_AMOUNT = 8                       # ~8s in-memory Wait window
+FETCH_MAX_TRIES = 3                       # Fetch Recent hot-path retry (review WR-03)
+FETCH_WAIT_MS = 1000
 TEXT_VALUE = "={{ $json.combinedText ?? $json.body.messages[0].body }}"
 
 
@@ -62,6 +65,16 @@ def assert_that(cond, reason):
         raise AssertionError(reason)
 
 
+def is_uuid(value):
+    if not isinstance(value, str) or not value:
+        return False
+    try:
+        uuid.UUID(value)
+    except ValueError:
+        return False
+    return True
+
+
 def check_bot(f, base):
     wf = load(f)
     ns = wf["nodes"]
@@ -77,6 +90,12 @@ def check_bot(f, base):
     assert_that(dw["type"] == "n8n-nodes-base.wait", f"{f}: Debounce Wait is not a wait node")
     assert_that(dw["parameters"].get("amount") == DEBOUNCE_AMOUNT,
                 f"{f}: Debounce Wait amount != {DEBOUNCE_AMOUNT}")
+    # ...and carries a webhookId like every other Wait node in both templates (review IN-03): dead
+    # weight at 8s, but the resume URL n8n registers once DEBOUNCE_SECONDS is tuned to >= 65s.
+    # Presence + uuid shape only, deliberately NOT an exact value: this same verifier gates a prod
+    # RE-EXPORT via --dir, and an importer re-minting the id must not read as a no-go.
+    assert_that(is_uuid(dw.get("webhookId")),
+                f"{f}: Debounce Wait has no valid webhookId (breaks webhook-resume if the window is tuned >= 65s)")
 
     # (3) Fetch Recent: GET <base>messages/get, cred EuhhqAaV56DpoqAN, query params exactly
     #     {profile_id, chat_id, limit} with NO mark_all (Pitfall 5 — marking read during the
@@ -92,6 +111,12 @@ def check_bot(f, base):
                 f"{f}: Fetch Recent query params {qp_names} != ['profile_id','chat_id','limit']")
     assert_that("mark_all" not in qp_names,
                 f"{f}: Fetch Recent carries mark_all (would mark the chat read during the wait — Pitfall 5)")
+    # Hot-path retry: an un-retried transient Wappi failure drops the customer's message
+    # outright (review WR-03).
+    assert_that(fr.get("retryOnFail") is True, f"{f}: Fetch Recent is not retryOnFail (hot reply path)")
+    assert_that(fr.get("maxTries") == FETCH_MAX_TRIES, f"{f}: Fetch Recent maxTries != {FETCH_MAX_TRIES}")
+    assert_that(fr.get("waitBetweenTries") == FETCH_WAIT_MS,
+                f"{f}: Fetch Recent waitBetweenTries != {FETCH_WAIT_MS}")
 
     # (4) Latest+Combine jsCode: .first() not .item (paired-item safety, Pitfall 1/anti-pattern);
     #     a time sort (Pitfall 3); the chat||text channel-agnostic test (Pitfall 4); and it
@@ -107,6 +132,20 @@ def check_bot(f, base):
                 f"{f}: Latest+Combine is not channel-agnostic (missing chat || text)")
     assert_that("...wh" in js and "abort" in js and "combinedText" in js,
                 f"{f}: Latest+Combine does not re-emit body ({{ ...wh, abort, combinedText }})")
+    # An empty combine run must stay NULLISH: `''` would win the Text node's `??` fallback and
+    # feed the agent an empty prompt (review WR-01).
+    assert_that(r"combinedText = parts.length > 0 ? parts.join('\n') : null;" in js,
+                f"{f}: Latest+Combine joins an empty run to '' (defeats the Text node ?? fallback)")
+    # Crossed-response guard: rows naming a FOREIGN chat are dropped before the is-latest /
+    # combine computation, so a crossed messages/get can never decide either (review WR-03).
+    assert_that("m.chatId !== triggeringChatId" in js and "fetchedAll.filter" in js,
+                f"{f}: Latest+Combine does not filter the fetch down to the requested chat")
+    assert_that("foreignFetched" in js,
+                f"{f}: Latest+Combine does not emit foreignFetched (crossing observability)")
+    # Explicit paired-item linkage: every node below the splice resolves $('Webhook').item
+    # through this Code node (review WR-04; same idiom as the orchestrators' Vertical Prompt).
+    assert_that("pairedItem: { item: 0 }" in js,
+                f"{f}: Latest+Combine omits an explicit pairedItem (downstream $('Webhook').item is implicit)")
 
     # Is Latest? boolean condition reads $json.abort.
     cond = il["parameters"]["conditions"]["conditions"][0]

@@ -20,7 +20,9 @@ public class SuggestionsController : MonoBehaviour
     [SerializeField] private SemiAutoToggle _toggle;
     [SerializeField] private MessagesBottomPanel _bottomPanel;
     [SerializeField] private ExpandableInput _expandableInput;   // composer growth → panel rides its top + list makes room
-    [SerializeField] private float _mockLatencySeconds = 1.0f;
+    // NOTE: the old _mockLatencySeconds knob is gone — MockSuggestionsProvider has not been
+    // constructed here since the Phase-2 swap to N8nSuggestionsProvider (it owns its own latency
+    // default), so the field was dead inspector surface.
 
     private ISuggestionsProvider _provider;
     private long _requestSeq;          // monotonic; newest wins (A6)
@@ -211,28 +213,67 @@ public class SuggestionsController : MonoBehaviour
 
     private void HandleLive(List<MessageViewModel> msgs)
     {
-        if (!_semiAutoOn || msgs == null) return;              // SEMI-03
-        bool sawIncoming = false;
-        for (int i = 0; i < msgs.Count; i++)                   // in arrival order — boundary-aware
+        if (!_semiAutoOn) return;                              // SEMI-03
+        var fold = FoldLiveBatch(_pendingIncomingText, msgs);
+        _pendingIncomingText = fold.Pending;
+        if (fold.Cancel) _debounce.Cancel();
+        // UNSCALED wall clock, matching DebounceLoop's WaitForSecondsRealtime tick and the
+        // ChatManager poll idiom: Time.time is maximumDeltaTime-capped (so a frame hitch or an
+        // app resume silently stretches the window) and stops entirely at timeScale 0.
+        if (fold.Arm) _debounce.Poke(Time.realtimeSinceStartup);   // reset the ~2.5s window instead of firing per-fragment (BATCH-03)
+    }
+
+    /// <summary>Outcome of folding one live batch over the pending burst: the new pending text, and
+    /// whether the coalesce window should be armed or dropped.</summary>
+    public readonly struct LiveBatchFold
+    {
+        public readonly string Pending;
+        public readonly bool Arm;      // an incoming fragment survived the batch → (re)start the window
+        public readonly bool Cancel;   // the batch ended on an outgoing echo → drop any armed window
+
+        public LiveBatchFold(string pending, bool arm, bool cancel)
         {
-            var m = msgs[i];
+            Pending = pending;
+            Arm = arm;
+            Cancel = cancel;
+        }
+    }
+
+    /// <summary>Pure fold of ONE live batch over the pending burst (BATCH-03), in arrival order.
+    ///
+    /// Incoming fragments accumulate (see <see cref="AppendBurst"/>). An OUTGOING echo — the owner or
+    /// the bot replied — is the run BOUNDARY: it drops the pending burst and disarms, because
+    /// suggestions for an already-answered burst are noise. Incoming fragments arriving after that
+    /// echo start a fresh run.
+    ///
+    /// This is the counterpart to the deliberate NON-clear in <see cref="DebounceLoop"/>: the pending
+    /// text must SURVIVE a fire (a burst straddling the window fires twice and the second fire still
+    /// has to carry the earlier fragments), so the ONLY places it clears are this boundary and the four
+    /// lifecycle sites. Keeping the rule here — pure and clock-free — is what makes it testable.</summary>
+    public static LiveBatchFold FoldLiveBatch(string pending, IReadOnlyList<MessageViewModel> batch)
+    {
+        if (batch == null) return new LiveBatchFold(pending, false, false);
+        bool arm = false;
+        bool sawOutgoing = false;
+        for (int i = 0; i < batch.Count; i++)
+        {
+            var m = batch[i];
             if (m == null) continue;
             if (m.isIncoming)
             {
-                _pendingIncomingText = AppendBurst(_pendingIncomingText, m.text);
-                sawIncoming = true;
+                pending = AppendBurst(pending, m.text);
+                arm = true;
             }
             else
             {
-                // An outgoing echo (owner or bot replied) BOUNDS the un-replied run: the pending
-                // burst is answered — drop it and any armed window so no stale fire follows.
-                // (This is the run boundary; firing suggestions for an answered burst is noise.)
-                _pendingIncomingText = null;
-                _debounce.Cancel();
-                sawIncoming = false;
+                pending = null;
+                arm = false;               // a later incoming in the same batch re-arms below
+                sawOutgoing = true;
             }
         }
-        if (sawIncoming) _debounce.Poke(Time.time);           // reset the ~2.5s window instead of firing per-fragment (BATCH-03)
+        // Cancel only matters when nothing re-armed: Poke() re-arms unconditionally, so a
+        // Cancel-then-Poke pair would be indistinguishable from a bare Poke.
+        return new LiveBatchFold(pending, arm, !arm && sawOutgoing);
     }
 
     /// <summary>Pure burst accumulator: append an incoming fragment to the pending coalesced text
@@ -258,7 +299,7 @@ public class SuggestionsController : MonoBehaviour
         {
             yield return new WaitForSecondsRealtime(0.25f);   // fresh instance each loop (codebase idiom)
             if (!_semiAutoOn) continue;                       // cheap guard; do not fire when off
-            if (_debounce.ShouldFire(Time.time))
+            if (_debounce.ShouldFire(Time.realtimeSinceStartup))   // SAME clock as Poke (unscaled, matches this loop's tick)
                 // NOTE: _pendingIncomingText deliberately survives the fire — it mirrors the
                 // UN-REPLIED trailing run, and a burst that straddles the window fires twice; the
                 // second fire must still carry the earlier fragments (the payload's history snapshot

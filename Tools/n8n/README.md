@@ -82,10 +82,14 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
 > branch (before `Input type`) that coalesces a burst of multi-fragment customer messages into ONE
 > combined reply — only the last fragment's execution proceeds; earlier fragments dead-end. It is
 > authored by the idempotent `apply-message-batching.py` (edits both templates in place, by node
-> name). **Re-run `apply-message-batching.py` after any template re-import / UI round-trip**, then
-> run `verify-message-batching.py` to gate the splice (asserts the 4 nodes, the `Suppressed? →
-> Debounce Wait` rewire, the `messages/get` fetch with no `mark_all`, and the Code-node body
-> re-emit). This edits the two existing templates — **no new canonical workflow, the count stays 13.**
+> name). The script OWNS those 4 nodes: every run upserts them from its own specs, preserving only
+> the stable uuid5 `id` and the node `position` — so never hand-edit them in the JSON (a re-run
+> reverts it), change the script instead. **Re-run `apply-message-batching.py` after any template
+> re-import / UI round-trip**, then run `verify-message-batching.py` to gate the splice (asserts the
+> 4 nodes, the `Suppressed? → Debounce Wait` rewire, the `messages/get` fetch with no `mark_all` and
+> its hot-path `retryOnFail`, and the Code-node body re-emit + nullish empty combine + requested-chat
+> filter + explicit `pairedItem`). This edits the two existing templates — **no new canonical
+> workflow, the count stays 13.**
 
 ### Delete Orphan Profiles (scheduled sweep) — policy & gotchas
 

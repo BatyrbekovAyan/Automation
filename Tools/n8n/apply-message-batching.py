@@ -19,7 +19,13 @@ Telegram `text`); only the Fetch Recent base URL differs (api/sync vs tapi/sync)
 derived per template from that template's own Mark Read url.
 
 Edits Tools/n8n/workflows/{WhatsApp,Telegram}_Bot.json IN PLACE, preserving
-indent=2 / ensure_ascii=False formatting. Re-runnable: running twice is a no-op.
+indent=2 / ensure_ascii=False formatting.
+
+The four spliced nodes are OWNED by this script: every run UPSERTS them (rewrites
+`parameters` + node-level keys from the specs below, preserving only the stable
+uuid5 `id` and the node's `position`). So a fix made HERE always materializes in
+both templates, and re-running with no source change is still a byte-level no-op.
+Corollary: never hand-edit the four managed nodes in the JSON — a re-run reverts it.
 
 Live deploy + runData verification is plan 10-03 (owner gate). This script only
 edits the committed JSON; it never touches the live n8n instance.
@@ -31,11 +37,17 @@ WF = os.path.join(REPO, "Tools/n8n/workflows")
 BOT_IDS = ("4wYitz5ek30SVNlT-WhatsApp_Bot.json", "4VN3gsFaC2HUYmcc-Telegram_Bot.json")
 
 # ~8s auto-reply debounce window (< 65s -> n8n Wait resumes in memory, no DB offload).
-# Single tunable per CONTEXT; tuned at the owner e2e (10-03).
+# Single tunable per CONTEXT; tuned at the owner e2e (10-03). Raising it past 65s flips n8n to
+# webhook-resume + DB offload — which is why Debounce Wait also carries a `webhookId` below.
 DEBOUNCE_SECONDS = 8
 
 # Fetch Recent reuses the WappiAuthToken credential already bound in both templates.
 WAPPI_CRED = {"httpHeaderAuth": {"id": "EuhhqAaV56DpoqAN", "name": "WappiAuthToken"}}
+
+# Fetch Recent sits on the HOT reply path: an un-retried transient Wappi 5xx/timeout errors the
+# execution and the customer's message is silently dropped (a failure mode the pre-splice pipeline
+# did not have). Same node-level retry idiom as the Delete Orphan Profiles sweep.
+FETCH_RETRY = {"retryOnFail": True, "maxTries": 3, "waitBetweenTries": 1000}
 
 # Latest+Combine Code body (channel-agnostic; re-emits webhook body). VERBATIM from
 # 10-RESEARCH.md Code Examples. Raw string so the JS `'\n'` join delimiter stays a
@@ -46,8 +58,21 @@ WAPPI_CRED = {"httpHeaderAuth": {"id": "EuhhqAaV56DpoqAN", "name": "WappiAuthTok
 #   - return [{ json: { ...wh, ... } }]    -> RE-EMIT body so Input type/Download Audio/Text resolve $json.body (Pitfall 1)
 LATEST_COMBINE_JS = r"""const wh = $('Webhook').first().json;
 const triggeringId = wh.body.messages[0].id;
+const triggeringChatId = wh.body.messages[0].chatId;
 
-const fetched = ($json.messages || []).slice();
+// Wappi/tapi CROSS concurrent same-endpoint responses (project-confirmed; the Unity client
+// defends with CrossChatResponseGuard). Two chats bursting at once now issue messages/get
+// concurrently from n8n too, so drop any row naming a FOREIGN chat before it can drive the
+// is-latest decision or leak another chat's text into the combine. Conservative, mirroring
+// CrossChatResponseGuard: a row with no chatId is KEPT (never discard on missing data), so a
+// non-crossed fetch filters to itself and behavior is unchanged. A fully crossed payload
+// filters to empty -> newestIncoming undefined -> abort (the pre-existing id-mismatch
+// outcome: this fragment dead-ends; never a second reply).
+const fetchedAll = ($json.messages || []).slice();
+const isForeign = (m) => m && m.chatId && triggeringChatId && m.chatId !== triggeringChatId;
+const fetched = fetchedAll.filter(m => !isForeign(m));
+const foreignFetched = fetchedAll.length - fetched.length;
+
 fetched.sort((a, b) => (b.time || 0) - (a.time || 0));
 
 const isText = (m) => m && (m.type === 'chat' || m.type === 'text');
@@ -67,10 +92,20 @@ if (!newestIncoming || newestIncoming.id !== triggeringId) {
     parts.push(typeof m.body === 'string' ? m.body : '');
   }
   parts.reverse();
-  combinedText = parts.join('\n');
+  // '' would beat the Text node's `?? $json.body.messages[0].body` fallback (?? is nullish-only)
+  // and hand the agent an EMPTY prompt whenever the loop breaks on iteration 1 — e.g. a humanizer
+  // reply to an earlier fragment lands inside this fragment's window. Stay nullish when empty.
+  combinedText = parts.length > 0 ? parts.join('\n') : null;
 }
 
-return [{ json: { ...wh, abort, combinedText } }];"""
+// foreignFetched rides along purely as an observability flag: runData shows > 0 exactly when a
+// crossed messages/get response reached this node.
+// pairedItem is EXPLICIT (same idiom as the orchestrators' Vertical Prompt node): every node
+// below the splice back-references the trigger with an .item lookup on the Webhook node, which
+// needs an unbroken paired-item chain. Without it Mark Read / Typing / Chat Memory / send all
+// depend on n8n's implicit auto-pairing surviving Wait -> HTTP -> Code -> If, and a break kills
+// every reply with "paired item data unavailable".
+return [{ json: { ...wh, abort, combinedText, foreignFetched }, pairedItem: { item: 0 } }];"""
 
 
 def load(fname):
@@ -83,13 +118,22 @@ def save(fname, wf):
         json.dump(wf, f, indent=2, ensure_ascii=False)  # match source: no trailing newline
 
 
-def find(nodes, name=None, type_suffix=None):
+def find(nodes, name):
+    """The node called `name`, or None. Only `managed()` wants the None (upsert-or-append)."""
     for n in nodes:
-        if name is not None and n["name"] == name:
-            return n
-        if type_suffix is not None and n["type"].endswith(type_suffix):
+        if n["name"] == name:
             return n
     return None
+
+
+def require(wf, name):
+    """find() for the PRE-EXISTING nodes this splice hangs off. A raw `find(...)["parameters"]`
+    on a renamed node dies with an opaque `TypeError: 'NoneType' object is not subscriptable`;
+    name the missing node instead (same idiom as verify-message-batching.py's node())."""
+    n = find(wf["nodes"], name)
+    if n is None:   # not `assert` — that vanishes under python -O
+        raise AssertionError(f"{wf['id']}: '{name}' node not found (renamed in the n8n UI?)")
+    return n
 
 
 def splice(wf):
@@ -101,84 +145,107 @@ def splice(wf):
         # Stable per-template node id so re-runs are byte-stable and both templates differ.
         return str(uuid.uuid5(uuid.NAMESPACE_DNS, wf["id"] + "-" + suffix))
 
+    def managed(spec):
+        """Upsert one script-owned node, in place, preserving its id + position.
+
+        A guarded add (`if find(...) is None: append`) would make every later edit to a
+        spec a silent no-op on templates that already carry the node. Instead the spec is
+        the source of truth: an existing node is REPLACED at its current list index (so
+        node order is stable) while keeping its `id` (stable uuid5) and `position` (the
+        owner may have dragged it in the n8n UI). Any other hand-edit to a managed node is
+        deliberately overwritten. Same input -> byte-identical output (idempotent).
+        """
+        existing = find(nodes, spec["name"])
+        if existing is None:
+            nodes.append(spec)
+            return
+        spec["id"] = existing["id"]                                  # keep the deployed id
+        spec["position"] = existing.get("position", spec["position"])  # keep a UI-dragged position
+        for i, n in enumerate(nodes):
+            if n is existing:
+                nodes[i] = spec
+                break
+
     # (1) Derive the channel base from THIS template's own Mark Read node.
     #     WhatsApp -> https://wappi.pro/api/sync/ ; Telegram -> https://wappi.pro/tapi/sync/
-    mark_read = find(nodes, name="Mark Read")
-    base = mark_read["parameters"]["url"].rsplit("message/mark/read", 1)[0]
+    base = require(wf, "Mark Read")["parameters"]["url"].rsplit("message/mark/read", 1)[0]
 
     # Offset the new nodes below the Suppressed? gate so the graph stays readable.
-    sx, sy = find(nodes, name="Suppressed?")["position"]
+    sx, sy = require(wf, "Suppressed?")["position"]
 
-    # (2) Add the 4 nodes (each guarded so a re-run is a no-op).
-    if find(nodes, name="Debounce Wait") is None:
-        nodes.append({
-            "parameters": {"amount": DEBOUNCE_SECONDS},
-            "id": nid("Debounce Wait"),
-            "name": "Debounce Wait",
-            "type": "n8n-nodes-base.wait",
-            "position": [sx, sy + 220],
-            "typeVersion": 1.1,
-        })
+    # (2) Upsert the 4 managed nodes (spec is source of truth; see managed()).
+    # Every pre-existing Wait node in both templates carries a webhookId; this one must too.
+    # Harmless at 8s (n8n resumes a sub-65s Wait in memory and never registers the webhook), but
+    # DEBOUNCE_SECONDS is THE tunable: at >= 65s n8n switches to webhook-resume + DB offload, and a
+    # Wait node with no webhookId has no resume URL to register. uuid5 off the node name keeps it
+    # byte-stable across re-runs (and distinct per template), like every other id this script emits.
+    managed({
+        "parameters": {"amount": DEBOUNCE_SECONDS},
+        "id": nid("Debounce Wait"),
+        "name": "Debounce Wait",
+        "type": "n8n-nodes-base.wait",
+        "position": [sx, sy + 220],
+        "webhookId": nid("Debounce Wait-webhook"),
+        "typeVersion": 1.1,
+    })
 
-    if find(nodes, name="Fetch Recent") is None:
-        nodes.append({
-            "parameters": {
-                "method": "GET",
-                "url": base + "messages/get",
-                "authentication": "genericCredentialType",
-                "genericAuthType": "httpHeaderAuth",
-                "sendQuery": True,
-                "queryParameters": {"parameters": [
-                    {"name": "profile_id", "value": "={{ $('Webhook').item.json.body.messages[0].profile_id }}"},
-                    {"name": "chat_id", "value": "={{ $('Webhook').item.json.body.messages[0].chatId }}"},
-                    {"name": "limit", "value": "15"},
-                ]},
-                "options": {},
-            },
-            "id": nid("Fetch Recent"),
-            "name": "Fetch Recent",
-            "type": "n8n-nodes-base.httpRequest",
-            "typeVersion": 4.2,
-            "position": [sx + 208, sy + 220],
-            "credentials": WAPPI_CRED,
-        })
+    managed({
+        "parameters": {
+            "method": "GET",
+            "url": base + "messages/get",
+            "authentication": "genericCredentialType",
+            "genericAuthType": "httpHeaderAuth",
+            "sendQuery": True,
+            "queryParameters": {"parameters": [
+                {"name": "profile_id", "value": "={{ $('Webhook').item.json.body.messages[0].profile_id }}"},
+                {"name": "chat_id", "value": "={{ $('Webhook').item.json.body.messages[0].chatId }}"},
+                {"name": "limit", "value": "15"},
+            ]},
+            "options": {},
+        },
+        "id": nid("Fetch Recent"),
+        "name": "Fetch Recent",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [sx + 208, sy + 220],
+        "credentials": WAPPI_CRED,
+        **FETCH_RETRY,
+    })
 
-    if find(nodes, name="Latest+Combine") is None:
-        nodes.append({
-            "parameters": {"jsCode": LATEST_COMBINE_JS},
-            "id": nid("Latest+Combine"),
-            "name": "Latest+Combine",
-            "type": "n8n-nodes-base.code",
-            "typeVersion": 2,
-            "position": [sx + 416, sy + 220],
-        })
+    managed({
+        "parameters": {"jsCode": LATEST_COMBINE_JS},
+        "id": nid("Latest+Combine"),
+        "name": "Latest+Combine",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [sx + 416, sy + 220],
+    })
 
-    if find(nodes, name="Is Latest?") is None:
-        nodes.append({
-            "parameters": {
-                "conditions": {
-                    "options": {
-                        "caseSensitive": True,
-                        "leftValue": "",
-                        "typeValidation": "loose",
-                        "version": 2,
-                    },
-                    "conditions": [{
-                        "id": nid("is-latest-cond"),
-                        "leftValue": "={{ $json.abort }}",
-                        "rightValue": "",
-                        "operator": {"type": "boolean", "operation": "true", "singleValue": True},
-                    }],
-                    "combinator": "and",
+    managed({
+        "parameters": {
+            "conditions": {
+                "options": {
+                    "caseSensitive": True,
+                    "leftValue": "",
+                    "typeValidation": "loose",
+                    "version": 2,
                 },
-                "options": {},
+                "conditions": [{
+                    "id": nid("is-latest-cond"),
+                    "leftValue": "={{ $json.abort }}",
+                    "rightValue": "",
+                    "operator": {"type": "boolean", "operation": "true", "singleValue": True},
+                }],
+                "combinator": "and",
             },
-            "id": nid("Is Latest?"),
-            "name": "Is Latest?",
-            "type": "n8n-nodes-base.if",
-            "typeVersion": 2.2,
-            "position": [sx + 624, sy + 220],
-        })
+            "options": {},
+        },
+        "id": nid("Is Latest?"),
+        "name": "Is Latest?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [sx + 624, sy + 220],
+    })
 
     # (3) Rewire connections (overwrite idiom — re-point the FALSE branch through the chain).
     #     Suppressed? main[0] TRUE (semi-auto) stays a dead-end; main[1] FALSE -> Debounce Wait.
@@ -193,7 +260,7 @@ def splice(wf):
     #     fallback reads bare $json.body (NOT $('Webhook').item): Latest+Combine re-emits body
     #     onto the current item, matching how Input type / Download Audio read $json.body, and
     #     avoiding fragile paired-item resolution across the inserted Wait+HTTP+Code nodes.
-    find(nodes, name="Text")["parameters"]["assignments"]["assignments"][0]["value"] = \
+    require(wf, "Text")["parameters"]["assignments"]["assignments"][0]["value"] = \
         "={{ $json.combinedText ?? $json.body.messages[0].body }}"
 
     return wf

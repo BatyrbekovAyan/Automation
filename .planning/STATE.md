@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Telegram Parity
-status: executing
-stopped_at: Phase 11 COMPLETE 2026-07-23 — verification PASSED 10/10 (11-VERIFICATION.md); code review 0C/3W/8I advisory (11-REVIEW.md → /gsd-code-review-fix 11 available); /gsd-secure-phase 11 still owed
-last_updated: "2026-07-23T12:40:00.000Z"
-last_activity: "2026-07-23 — Phase 11 closed: UAT Round-2 owner-approved, gsd-verifier passed 10/10, ROADMAP/STATE/PROJECT completion records written"
+status: verifying
+stopped_at: Completed 11-07-PLAN.md (owner UAT gate) — Round 2 approved 2026-07-23; Phase 11 gate closed; next = orchestrator phase-completion step
+last_updated: "2026-07-27T15:12:23.459Z"
+last_activity: 2026-07-27
 progress:
   total_phases: 9
   completed_phases: 9
-  total_plans: 73
+  total_plans: 68
   completed_plans: 73
   percent: 100
 ---
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 Phase: 11 (first-run-onboarding-flow) — COMPLETE 2026-07-23
 Plan: 10/10 (11-01..11-07 + gap round 11-08..11-10); owner UAT gate closed (Round 2 approved); verification PASSED 10/10
 Status: Phase complete — ONB-01..ONB-05 proven on device; remaining: /gsd-secure-phase 11 (threat-model verification), optional /gsd-code-review-fix 11 (3 advisory warnings)
-Last activity: 2026-07-23 — Completed 11-07 (owner UAT gate): Round-2 «approved» transcribed into 11-HUMAN-UAT.md (status: passed, 13/13 Round-2 PASS, Round-1 record intact); 11-07-SUMMARY.md written
+Last activity: 2026-07-27
 
 Progress: [██████████] 100%
 
@@ -171,8 +171,8 @@ Items acknowledged and carried forward:
 | Milestone | Server-side «Вместе» suppression | pending (v2 SUPPRESS-01) | v1.0 close |
 | Design | Push-based incoming delivery (n8n → device push with the incoming text) to replace client polling — owner preference | Deferred to v2 (needs FCM/APNs + device-token registry + n8n hook; D5 gap fixes the existing refresh path first) | Gate A 2026-07-16 |
 | D15 follow-up | WhatsApp absence-based reaction-removal reconcile — in-WhatsApp-app removal emits no raw in the polled stream, but the `messages/id/get` target payload carries a `reactions` key (round-7 `[D15-probe]` proved `reactionsKey=True`), so removal can be reconciled by fetching/polling the target's `reactions[]` and clearing `ReactionStore` on absence (mirror of Telegram). FIRST step = capture the `reactions` key's SHAPE (probe proved presence only) | Deferred to v1.2/post-milestone (owner deferred at Gate A — not a blocker) | Gate A PASS round 7 2026-07-21 |
-| uat_gap | Phase 10: 10-HUMAN-UAT.md scenario 4 (suggestions coalesce, «Вместе», BATCH-03) — BLOCKED on-device by the open Phase-9 09-04 `/webhook/SetReplyMode` deploy (in-app Semi-auto toggle 404'd at `Manager.ReplyModeSync.cs:105` — expected, not a Phase-10 defect). BATCH-03 keeps full EditMode coverage (10-02, 6 tests, suite 1197/1197); re-runs trivially once 09-04 deploys SetReplyMode | blocked → re-verify with 09-04/09-05 | 10-04 close 2026-07-22 |
-| uat_gap | Phase 10: 10-HUMAN-UAT.md scenario 5 (semi-auto skips the path / gate-before-debounce ordering) — DEFERRED to post-Phase-9 by explicit owner decision; re-verifies alongside the 09-04/09-05 «Вместе» app-toggle e2e | deferred → post-Phase-9 | 10-04 close 2026-07-22 |
+| uat_gap | Phase 10: 10-HUMAN-UAT.md scenario 4 (suggestions coalesce, «Вместе», BATCH-03) — RESOLVED 2026-07-27 after 09-04 deployed SetReplyMode: retest surfaced 3 real content defects (single-fragment anchoring / history-lag fragment loss / clear-after-fire straddle), fixed in da9d476+da884dd+14b049f, re-proven on device + dev execs 1315/1316 (final cards cover the whole burst); suite 1209/1209 | ✅ RESOLVED 2026-07-27 | 10-04 close 2026-07-22 |
+| uat_gap | Phase 10: 10-HUMAN-UAT.md scenario 5 (semi-auto skips the path / gate-before-debounce ordering) — RESOLVED 2026-07-27 via the live app «Вместе» toggle: suppressed execs 1313/1314 dead-end at Suppressed? before Debounce Wait (no reply, stays unread) while suggestions still populate | ✅ RESOLVED 2026-07-27 | 10-04 close 2026-07-22 |
 
 Note: POL-02 "Telegram chat support for the panel" graduated to v1.1 scope (SUGG-01/02, Phase 7).
 | Phase 03 P01 | 10 min | 2 tasks | 5 files |

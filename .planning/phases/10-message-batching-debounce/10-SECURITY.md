@@ -57,11 +57,33 @@ created: 2026-07-22
 | Risk ID | Threat Ref | Rationale | Accepted By | Date |
 |---------|------------|-----------|-------------|------|
 | R-10-01 | T-10-01-01 | The `Latest+Combine` Code node introduces no NEW prompt-injection channel — it only concatenates fragments (`Text` set node) that the AI Agent already receives today, one at a time, across sequential executions. Combining them into one string does not change what content reaches the LLM, only the batching. Prompt/agent-input hardening is out of this phase's scope and unchanged by the splice. | Owner (via 10-01-PLAN threat model + secure-phase run) | 2026-07-22 |
-| R-10-02 | T-10-01-04 | A rapid-fragment flood produces one `Debounce Wait` execution per fragment, but each aborts after a single `Fetch Recent` call (no retry, no loop) and the `Wait` itself is sub-65s so n8n resumes in-memory with no DB offload/queue growth. Blast radius is bounded by the dev-only n8n instance (prod `bagkz` stays dormant for this entire phase — see R-10-04); a real production DoS-hardening pass (rate limiting, per-profile fragment caps) is deferred to a milestone-level decision, not a per-phase fix. | Owner (via 10-01-PLAN threat model + secure-phase run) | 2026-07-22 |
+| R-10-02 | T-10-01-04 | ⚠️ **AMENDED 2026-07-27 — see the amendment note below the table; the original "no retry" premise no longer holds.** A rapid-fragment flood produces one `Debounce Wait` execution per fragment, but each aborts after a single `Fetch Recent` call (no retry, no loop) and the `Wait` itself is sub-65s so n8n resumes in-memory with no DB offload/queue growth. Blast radius is bounded by the dev-only n8n instance (prod `bagkz` stays dormant for this entire phase — see R-10-04); a real production DoS-hardening pass (rate limiting, per-profile fragment caps) is deferred to a milestone-level decision, not a per-phase fix. | Owner (via 10-01-PLAN threat model + secure-phase run) | 2026-07-22 |
 | R-10-03 | T-10-02-03 | `IncomingDebounceGate` is a pure C# timer (`Poke`/`Cancel`/`ShouldFire`) holding only a `float` deadline and a `bool` armed flag — no new secret, no new network call, no new endpoint. Confirmed by direct read of `IncomingDebounceGate.cs` (no `using UnityEngine`, no I/O) and by the 10-02-SUMMARY's own diff audit (`grep -c UnityWebRequest` = 0 in the changed files). The «Вместе» suggestions payload already ships the last ≤12 messages before this phase; coalescing only changes the firing cadence. | Owner (via 10-02-PLAN threat model + secure-phase run) | 2026-07-22 |
 | R-10-04 | T-10-03-04, T-10-04-03 | Prod (`bagkz`) stays dormant for the entirety of Phase 10 — all template redeploy, `fix-orchestrator-settings.py --live` repair, runData matrix, and the 5-scenario device UAT targeted dev exclusively (owner-confirmed in 10-03-SUMMARY and `10-HUMAN-UAT.md` post-run block: "prod bagkz untouched"). The debounce splice AND the `binaryMode` orchestrator strip are explicitly folded into a future one-shot prod bulk-copy, not executed this phase. Accidental-prod-target risk is operationally mitigated by dormancy (same class of risk as R-09-03 in `09-SECURITY.md`), tracked here as accepted pending that future replication task. | Owner (via 10-03/10-04-PLAN threat models + secure-phase run) | 2026-07-22 |
 
 *Accepted risks do not resurface in future audit runs.*
+
+### Amendment to R-10-02 — 2026-07-27 (post-audit code change invalidated the original rationale)
+
+**What changed.** R-10-02 was accepted on 2026-07-22 *specifically because* each flooded fragment
+"aborts after a single `Fetch Recent` call (no retry, no loop)". Code-review fix `201e209`
+(2026-07-27, finding WR-03) added `retryOnFail: true, maxTries: 3, waitBetweenTries: 1000` to that
+exact node, so a failing fetch now costs **up to 3 Wappi calls per fragment instead of 1**, with up
+to 2s of extra in-memory wait per retrying execution.
+
+**Re-assessment: still ACCEPTED, with corrected reasoning.** The amplification is bounded and
+constant (3×, not unbounded — n8n's node-level retry does not re-enter the Wait, so there is no loop
+and no new execution per retry); retries fire only on transport failure, so the steady-state cost of
+a flood is unchanged; the `Wait` is still sub-65s with no DB offload or queue growth; and the blast
+radius is still the dev-only instance (prod `bagkz` dormant — R-10-04). The retry also *reduces* a
+different, higher-probability harm the original rationale never weighed: without it, a single
+transient `messages/get` failure silently drops a real customer's message on the hot reply path.
+
+**Standing note for future audits.** An accepted risk whose rationale cites a specific code property
+must be re-checked whenever that property changes. This one was caught during the Phase-10 learnings
+extraction, five days after `threats_open: 0` was signed off — nothing in the pipeline flagged it,
+because a code-review fix is not itself a security-gate trigger. `threats_open` remains **0**: this
+is a rationale correction, not a newly-opened threat.
 
 ---
 
@@ -83,6 +105,25 @@ created: 2026-07-22
 | Open | 0 |
 
 Auditor: gsd-security-auditor (first `SECURITY.md` for this phase, built from the 4 plans' threat models — 10-01 through 10-04). Verification was evidence-grounded: `mitigate` threats verified by direct read of the implementation this session — both bot template JSONs (`Tools/n8n/workflows/4wYitz5ek30SVNlT-WhatsApp_Bot.json`, `4VN3gsFaC2HUYmcc-Telegram_Bot.json`), `Tools/n8n/verify-message-batching.py` (re-run, exit 0), `Assets/Scripts/Chat/IncomingDebounceGate.cs`, `Assets/Scripts/Chat/SuggestionsController.cs`, and `Assets/Tests/Editor/Chat/IncomingDebounceGateTests.cs`; `accept`-disposition threats closed by authoring the Accepted Risks Log above, per the `R-09-*` precedent established in `09-SECURITY.md`; live-instance-only claims (runData id-equality, clone deactivation, device UAT verdicts) accepted from the owner-recorded evidence in `10-03-SUMMARY.md`, `10-04-SUMMARY.md`, and `10-HUMAN-UAT.md` per the audit's environment constraints — no live n8n/device access from this session. One threat (T-10-04-02) is closed-with-residual: its structural mitigation is directly verified, but the on-device behavioral confirmation is owner-deferred tracked debt (not an implementation gap) — documented above rather than silently marked fully closed.
+
+---
+
+## Security Audit 2026-07-27 (amendment pass)
+
+| Metric | Count |
+|--------|-------|
+| Threats found | 14 |
+| Closed | 14 |
+| Open | 0 |
+
+Triggered by the Phase-10 learnings extraction, which found that code-review fix `201e209` had
+invalidated the stated rationale of accepted risk R-10-02 (added `retryOnFail`/`maxTries: 3` to the
+`Fetch Recent` node whose acceptance rested on "no retry, no loop"). R-10-02 was re-assessed and
+remains accepted with corrected reasoning — see the amendment note under the Accepted Risks Log. No
+threat status changed; `threats_open` stays 0. Also re-verified in the same pass: the four
+lifecycle cancel sites for T-10-02-01 are intact after the post-audit `HandleLive` refactor, and the
+run-boundary clear rule that the refactor extracted is now covered by 8 EditMode tests
+(`SuggestionsLiveBatchFoldTests`) — it previously had none.
 
 ---
 
