@@ -29,7 +29,8 @@ public class BotsPage : MonoBehaviour
         // Deferred one frame so a tab switch settles and freshly-created/deleted
         // cards are counted. RefreshEmptyState both toggles the empty UI and, when
         // there are zero bots, auto-opens the Add-Bot overlay.
-        if (isActiveAndEnabled) Invoke(nameof(RefreshEmptyState), 0f);
+        // IN-06: no isActiveAndEnabled guard — it is always true inside OnEnable.
+        Invoke(nameof(RefreshEmptyState), 0f);
     }
 
     void OnDisable()
@@ -74,7 +75,7 @@ public class BotsPage : MonoBehaviour
     /// </summary>
     public void StartNewBot()
     {
-        var tabs = FindFirstObjectByType<BottomTabManager>();
+        var tabs = BottomTabManager.Instance;   // IN-08
         if (tabs != null && tabs.ActiveTabIndex != BottomTabManager.BotsTabIndex)
             tabs.SwitchTab(BottomTabManager.BotsTabIndex);
         AddBotPanel.Instance?.Open();

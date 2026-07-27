@@ -84,6 +84,10 @@ public class FirstStepsCard : MonoBehaviour
     private VerticalLayoutGroup _botsVlg;
     private int _origListTopPadding = -1;
 
+    // IN-05: tracks the previous visible state so the row cascade plays only on a
+    // hidden→visible transition (an entrance), not on every fact refresh.
+    private bool _wasVisible;
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     private void Awake()
@@ -119,10 +123,14 @@ public class FirstStepsCard : MonoBehaviour
         {
             SetContentVisible(false);
             RestoreListPadding();
+            _wasVisible = false;
             return;
         }
 
+        // IN-05: an entrance (hidden→visible) plays the cascade; a plain fact refresh does not.
+        bool isEntrance = !_wasVisible;
         SetContentVisible(true);
+        _wasVisible = true;
 
         Bot bot = botExists ? botsParent.GetChild(0).GetComponent<Bot>() : null;
 
@@ -146,7 +154,7 @@ public class FirstStepsCard : MonoBehaviour
         SetProgress(done);
 
         ReserveListPadding();
-        RenderRows(steps);
+        RenderRows(steps, isEntrance);
 
         if (hintLabel != null) hintLabel.text = Row4Hint;
 
@@ -159,6 +167,7 @@ public class FirstStepsCard : MonoBehaviour
             PlayerPrefs.Save();
             RestoreListPadding();
             SetContentVisible(false);
+            _wasVisible = false;
         }
     }
 
@@ -186,7 +195,12 @@ public class FirstStepsCard : MonoBehaviour
         rt.offsetMax = Vector2.zero;
     }
 
-    private void RenderRows(bool[] steps)
+    // IN-05: the cascade is an ENTRANCE animation, so it plays only on a hidden→visible
+    // transition. It used to run on every RenderRows call — i.e. every RefreshFromFacts
+    // (each return to the Bots tab, every fact change, and the live first-reply latch while
+    // the card is on screen) — resetting all four rows to alpha 0 and re-fading them, a
+    // visible blink when nothing had changed.
+    private void RenderRows(bool[] steps, bool playCascade)
     {
         if (rowsRoot == null) return;
         for (int i = 0; i < StepCount && i < rowsRoot.childCount; i++)
@@ -194,8 +208,19 @@ public class FirstStepsCard : MonoBehaviour
             var row = rowsRoot.GetChild(i);
             string label = RowLabelsBase[i];
             BindRow(row, i, label, steps[i]);
-            PlayCascade(row, i);
+            if (playCascade) PlayCascade(row, i);
+            else EnsureRowVisible(row);
         }
+    }
+
+    // A refresh that does not re-run the cascade must still leave rows fully opaque — a
+    // previous cascade could have been interrupted mid-fade.
+    private static void EnsureRowVisible(Transform row)
+    {
+        var cg = row.GetComponent<CanvasGroup>();
+        if (cg == null) return;
+        cg.DOKill();
+        cg.alpha = 1f;
     }
 
     private void BindRow(Transform row, int index, string label, bool done)
@@ -234,7 +259,10 @@ public class FirstStepsCard : MonoBehaviour
         if (cg == null) return;
         cg.DOKill();
         cg.alpha = 0f;
-        cg.DOFade(1f, CascadeDuration).SetDelay(index * CascadeStagger).SetEase(Ease.OutCubic);
+        cg.DOFade(1f, CascadeDuration)
+          .SetDelay(index * CascadeStagger)
+          .SetEase(Ease.OutCubic)
+          .SetLink(row.gameObject);   // IN-05: kill the tween with its row (matches SuccessCheckPop)
     }
 
     // ── Per-row deep-links ─────────────────────────────────────────────────────
@@ -257,7 +285,7 @@ public class FirstStepsCard : MonoBehaviour
                 bot?.OpenSettingsAtProductTab();
                 break;
             case 3:  // «Получить первый ответ бота» → Chats tab (hint stays visible under the row)
-                FindFirstObjectByType<BottomTabManager>()?.SwitchTab(BottomTabManager.WhatsAppTabIndex);
+                BottomTabManager.Instance?.SwitchTab(BottomTabManager.WhatsAppTabIndex);   // IN-08
                 break;
         }
     }

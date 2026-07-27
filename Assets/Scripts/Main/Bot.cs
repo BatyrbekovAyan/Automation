@@ -185,6 +185,13 @@ public class Bot : MonoBehaviour
     {
         if (PlayerPrefs.HasKey(transform.name + "Name"))
         {
+            // IN-01: activation state lives under TWO keys — the bare bot name (written by
+            // EnableBot, read by SetSwitches) and "{name}isOn" (written at creation, read by
+            // LoadBots). Only the latter was deleted, so the bare key leaked on every per-bot
+            // delete and was cleaned only by the full PlayerPrefs.DeleteAll() wipe. Harmless
+            // today because slot names are never reused (the "ids" counter is monotonic), but
+            // it is exactly the key drift the bot-persistence skill warns about.
+            PlayerPrefs.DeleteKey(transform.name);
             PlayerPrefs.DeleteKey(transform.name + "Name");
             PlayerPrefs.DeleteKey(transform.name + "isOn");
             PlayerPrefs.DeleteKey(transform.name + "Status");
