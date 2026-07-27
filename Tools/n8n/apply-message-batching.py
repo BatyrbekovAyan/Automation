@@ -43,6 +43,11 @@ DEBOUNCE_SECONDS = 8
 # Fetch Recent reuses the WappiAuthToken credential already bound in both templates.
 WAPPI_CRED = {"httpHeaderAuth": {"id": "EuhhqAaV56DpoqAN", "name": "WappiAuthToken"}}
 
+# Fetch Recent sits on the HOT reply path: an un-retried transient Wappi 5xx/timeout errors the
+# execution and the customer's message is silently dropped (a failure mode the pre-splice pipeline
+# did not have). Same node-level retry idiom as the Delete Orphan Profiles sweep.
+FETCH_RETRY = {"retryOnFail": True, "maxTries": 3, "waitBetweenTries": 1000}
+
 # Latest+Combine Code body (channel-agnostic; re-emits webhook body). VERBATIM from
 # 10-RESEARCH.md Code Examples. Raw string so the JS `'\n'` join delimiter stays a
 # two-char escape (backslash+n) rather than a real newline.
@@ -52,8 +57,21 @@ WAPPI_CRED = {"httpHeaderAuth": {"id": "EuhhqAaV56DpoqAN", "name": "WappiAuthTok
 #   - return [{ json: { ...wh, ... } }]    -> RE-EMIT body so Input type/Download Audio/Text resolve $json.body (Pitfall 1)
 LATEST_COMBINE_JS = r"""const wh = $('Webhook').first().json;
 const triggeringId = wh.body.messages[0].id;
+const triggeringChatId = wh.body.messages[0].chatId;
 
-const fetched = ($json.messages || []).slice();
+// Wappi/tapi CROSS concurrent same-endpoint responses (project-confirmed; the Unity client
+// defends with CrossChatResponseGuard). Two chats bursting at once now issue messages/get
+// concurrently from n8n too, so drop any row naming a FOREIGN chat before it can drive the
+// is-latest decision or leak another chat's text into the combine. Conservative, mirroring
+// CrossChatResponseGuard: a row with no chatId is KEPT (never discard on missing data), so a
+// non-crossed fetch filters to itself and behavior is unchanged. A fully crossed payload
+// filters to empty -> newestIncoming undefined -> abort (the pre-existing id-mismatch
+// outcome: this fragment dead-ends; never a second reply).
+const fetchedAll = ($json.messages || []).slice();
+const isForeign = (m) => m && m.chatId && triggeringChatId && m.chatId !== triggeringChatId;
+const fetched = fetchedAll.filter(m => !isForeign(m));
+const foreignFetched = fetchedAll.length - fetched.length;
+
 fetched.sort((a, b) => (b.time || 0) - (a.time || 0));
 
 const isText = (m) => m && (m.type === 'chat' || m.type === 'text');
@@ -79,7 +97,9 @@ if (!newestIncoming || newestIncoming.id !== triggeringId) {
   combinedText = parts.length > 0 ? parts.join('\n') : null;
 }
 
-return [{ json: { ...wh, abort, combinedText } }];"""
+// foreignFetched rides along purely as an observability flag: runData shows > 0 exactly when a
+// crossed messages/get response reached this node.
+return [{ json: { ...wh, abort, combinedText, foreignFetched } }];"""
 
 
 def load(fname):
@@ -169,6 +189,7 @@ def splice(wf):
         "typeVersion": 4.2,
         "position": [sx + 208, sy + 220],
         "credentials": WAPPI_CRED,
+        **FETCH_RETRY,
     })
 
     managed({
