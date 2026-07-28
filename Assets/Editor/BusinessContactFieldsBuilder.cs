@@ -335,9 +335,23 @@ public static class BusinessContactFieldsBuilder
         var modified = false;
         foreach (var input in prefabRoot.GetComponentsInChildren<TMP_InputField>(true))
         {
-            if (input.contentType != TMP_InputField.ContentType.Standard)
+            if (input.contentType != TMP_InputField.ContentType.Standard
+                && input.contentType != TMP_InputField.ContentType.Custom)
             {
                 input.contentType = TMP_InputField.ContentType.Standard;
+                modified = true;
+            }
+            // AUTOCORRECT OFF (InputType.Standard). TMP's Standard contentType
+            // silently enables iOS autocorrection, and iOS runs the predictive
+            // session on the ONE hidden native text field every Unity input
+            // shares — on focus switches it can replay/commit the previous
+            // field's content into the newly focused one (device repro:
+            // rapid cross-taps duplicate text between fields). Assigning
+            // inputType flips contentType to Custom, which keeps the other
+            // traits.
+            if (input.inputType != TMP_InputField.InputType.Standard)
+            {
+                input.inputType = TMP_InputField.InputType.Standard;
                 modified = true;
             }
             if (input.keyboardType != TouchScreenKeyboardType.Default)

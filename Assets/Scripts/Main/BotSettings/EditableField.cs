@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
@@ -50,6 +51,11 @@ namespace Automation.BotSettingsUI
         // unwired field is never "healed" to empty.
         private string expectedUnfocusedText;
 
+        // All live fields, so the FOCUSED-field guard can recognize another
+        // field's content landing here wholesale (iOS shared-keyboard replay).
+        private static readonly List<EditableField> liveFields = new List<EditableField>();
+        private string prevFocusedText;
+
         public virtual string Value
         {
             get => input != null ? input.text : string.Empty;
@@ -78,6 +84,10 @@ namespace Automation.BotSettingsUI
             input.onEndEdit.AddListener(HandleEndEdit);
             expectedUnfocusedText = input.text;
         }
+
+        protected virtual void OnEnable() => liveFields.Add(this);
+
+        protected virtual void OnDisable() => liveFields.Remove(this);
 
         private void Update()
         {
@@ -142,6 +152,41 @@ namespace Automation.BotSettingsUI
             {
                 input.text = expectedUnfocusedText;
             }
+
+            // Focused-field guard: revert a wholesale swap of this field's
+            // text to exactly another live field's content (iOS shared-
+            // keyboard replay). Keystrokes can never match (length ±1), so
+            // real typing is untouched.
+            if (isFocused && prevFocusedText != null)
+            {
+                var focusedText = input.text;
+                if (focusedText != prevFocusedText)
+                {
+                    if (ForeignSwapGuard.IsForeignSwap(
+                            focusedText, prevFocusedText, OtherFieldTexts()))
+                    {
+                        input.text = prevFocusedText;
+                        input.MoveTextEnd(false);
+                    }
+                    else
+                    {
+                        prevFocusedText = input.text;
+                    }
+                }
+            }
+        }
+
+        private static readonly List<string> otherTextsScratch = new List<string>();
+
+        private List<string> OtherFieldTexts()
+        {
+            otherTextsScratch.Clear();
+            foreach (var field in liveFields)
+            {
+                if (field == null || field == this || field.input == null) continue;
+                otherTextsScratch.Add(field.input.text);
+            }
+            return otherTextsScratch;
         }
 
         protected virtual void OnDestroy()
@@ -156,6 +201,7 @@ namespace Automation.BotSettingsUI
             if (isFocused) return;
             isFocused = true;
             focusValue = input.text;
+            prevFocusedText = input.text;
             OnFocused();
             if (scrim != null)
                 scrim.Show(GetComponent<RectTransform>(), () => Blur(commit: true));
@@ -178,6 +224,18 @@ namespace Automation.BotSettingsUI
             isFocused = false;
 
             var current = input.text;
+
+            // Last-chance foreign-swap check: bleed can land in the same
+            // frame as the blur, before the Update guard ever sees it —
+            // without this the corrupted text would be committed AND become
+            // the expected value the heal then enforces.
+            var lastGood = prevFocusedText ?? focusValue;
+            if (ForeignSwapGuard.IsForeignSwap(current, lastGood, OtherFieldTexts()))
+            {
+                current = lastGood ?? string.Empty;
+                input.text = current;
+            }
+
             expectedUnfocusedText = current;
             if (commit && current != focusValue)
                 OnCommitted.Invoke(current);

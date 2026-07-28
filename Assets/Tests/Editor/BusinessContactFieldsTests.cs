@@ -153,9 +153,10 @@ public class BusinessContactFieldsTests
             var where = $"'{input.transform.parent.name}/{input.name}'";
             Assert.AreNotEqual(TMPro.TMP_InputField.LineType.SingleLine, input.lineType,
                 $"{where} is SingleLine — mixed line types restart the IME on switch.");
-            Assert.AreEqual(TMPro.TMP_InputField.ContentType.Standard, input.contentType,
-                $"{where} has a non-Standard contentType — a per-field keyboard " +
-                "restarts the IME on switch (text duplication).");
+            Assert.AreEqual(TMPro.TMP_InputField.InputType.Standard, input.inputType,
+                $"{where} has autocorrection enabled — iOS runs the predictive session " +
+                "on the shared hidden text field and replays content across focus " +
+                "switches (text duplication).");
             Assert.AreEqual(TouchScreenKeyboardType.Default, input.keyboardType,
                 $"{where} has a custom keyboardType — a per-field keypad " +
                 "restarts the IME on switch (text duplication).");
