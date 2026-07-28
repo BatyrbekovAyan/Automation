@@ -1,6 +1,7 @@
 ---
 phase: 11-first-run-onboarding-flow
 verified: 2026-07-23T18:00:00Z
+amended: 2026-07-28  # two evidence claims went stale hours after this stamp — see the amendment note at the end
 status: passed
 score: 10/10 must-haves verified
 overrides_applied: 0
@@ -115,3 +116,35 @@ No gaps found. All ROADMAP success criteria (1-5) and all PLAN-frontmatter must-
 
 _Verified: 2026-07-23T18:00:00Z_
 _Verifier: Claude (gsd-verifier)_
+
+
+---
+
+## Amendment — 2026-07-28 (two evidence claims went stale after the stamp)
+
+This certificate was stamped `2026-07-23T18:00:00Z`. Two commits landed the SAME EVENING and
+invalidated parts of its evidence. Nothing here changes the verdict — the phase goal was achieved and
+the score stands at 10/10 — but the following statements are no longer true of the code:
+
+| Claim in this document | Reality at HEAD (2026-07-28) |
+|---|---|
+| Truth 4: row 2's label is derived via `FirstStepsChecklist.ChannelLabel` | **Deleted.** `84f38d0` (2026-07-23 19:20) replaced the derivation with the static «Подключить мессенджер» and removed `ChannelLabel` plus its 4 tests as dead code. `grep -rn ChannelLabel Assets/` now returns nothing. |
+| Artifact row: `OnboardingKeys.cs` holds **3** global PlayerPrefs key constants | **6 constants.** `5bda504` (2026-07-23 20:01) added `OnboardingChannelConnectedSeen` and `OnboardingPriceListSeen` when checklist rows 2–3 became milestone latches. |
+
+Both changes were deliberate owner polish, recorded in `11-LEARNINGS.md` under Decisions. The
+underlying must-haves are still satisfied — row 2 still renders a correct label and the checklist still
+derives its state — but a reader auditing this certificate against the code would find two mismatches
+and be right to distrust it.
+
+`.planning/milestones/v1.3-ROADMAP.md` success criterion 4 ("channel label from
+`isOnWhatsapp`/`isOnTelegram`") is stale for the same reason.
+
+**Why this matters beyond the two rows.** This is the SECOND occurrence of the same failure mode in
+consecutive phases: Phase 10's accepted risk `R-10-02` was likewise invalidated by a later commit and
+amended on 2026-07-27. Phase 11 caught it for its SECURITY certificate — which was deliberately
+re-audited at HEAD and found a widened destructive path — but not for this one. The countermeasure is
+in `11-LEARNINGS.md` (Repeats #1): **on any post-close commit, re-open every certificate whose evidence
+names the changed code, not only SECURITY.**
+
+Surfaced by the Phase-11 learnings extraction, five days after the stamp; nothing in the pipeline
+flagged it, because owner-polish commits are not a verification-gate trigger.
