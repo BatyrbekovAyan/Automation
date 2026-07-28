@@ -133,4 +133,18 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-23 after completing Phase 11 (first-run-onboarding-flow) — v1.3 First-Run Onboarding complete: one-time carousel, both-channel trust blocks, standalone success overlay → price-list, derived-state «Первые шаги» checklist; ONB-01..05 proven on device (UAT 2 rounds)*
+## Current State (2026-07-28)
+
+**Four milestones shipped and archived: v1.0, v1.1, v1.2, v1.3.** `.planning/phases/` is empty — every phase artifact lives under `.planning/milestones/v*-phases/`, with per-milestone roadmaps in `.planning/milestones/v*-ROADMAP.md` and the historical record in `.planning/MILESTONES.md`.
+
+- **v1.0 Reply Suggestions** (2026-07-11) — semi-auto «Вместе» reply path on WhatsApp.
+- **v1.1 Telegram Parity** (2026-07-21) — Telegram on Wappi tapi at full parity: chat client, auto-replies, suggestions, dashboard. Gate A passed round 7.
+- **v1.2 Reply-Trigger Discipline** (2026-07-27) — server-side semi-auto suppression + message batching, so the bot answers at the right moment and only when it should.
+- **v1.3 First-Run Onboarding** (2026-07-23) — welcome carousel, trust blocks, success moment, first-steps checklist.
+
+**No milestone is active.** `REQUIREMENTS.md` is intentionally absent (archived at `.planning/milestones/v1.1-REQUIREMENTS.md`); `/gsd-new-milestone` creates a fresh one. Next phase number is **12**.
+
+**Carried open items** (not closed by any milestone): v1.0-era UAT debt on phases 01/02 plus `01-VERIFICATION`; D15 WhatsApp in-app reaction removal (fixable — probe returned `reactionsKey=True`, capture the `reactions[]` shape first); prod bagkz replication PARKED indefinitely per owner.
+
+---
+*Last updated: 2026-07-28 after archiving milestones v1.1, v1.2 and v1.3 (previously: 2026-07-23 after completing Phase 11 — v1.3 First-Run Onboarding: one-time carousel, both-channel trust blocks, standalone success overlay → price-list, derived-state «Первые шаги» checklist; ONB-01..05 proven on device across 2 UAT rounds)*

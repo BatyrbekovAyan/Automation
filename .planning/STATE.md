@@ -1,9 +1,9 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.3
-milestone_name: First-Run Onboarding
-status: complete
-stopped_at: All roadmap phases (3–11) complete across v1.1/v1.2/v1.3. Phase 11 closed 2026-07-23 (verification 10/10, security 34/34 threats_open 0, review all_fixed); Phase 10 closed 2026-07-27 (verification 5/5, UAT 5/5, security 14/14, review dispositioned, learnings extracted). No phase gate outstanding — next action is milestone archiving via /gsd-complete-milestone, at owner discretion.
+milestone: none
+milestone_name: (between milestones — v1.3 archived 2026-07-28)
+status: milestone_complete
+stopped_at: v1.0–v1.3 ALL SHIPPED AND ARCHIVED 2026-07-28 (tags v1.0..v1.3; .planning/phases/ empty). All roadmap phases (3–11) complete across v1.1/v1.2/v1.3. Phase 11 closed 2026-07-23 (verification 10/10, security 34/34 threats_open 0, review all_fixed); Phase 10 closed 2026-07-27 (verification 5/5, UAT 5/5, security 14/14, review dispositioned, learnings extracted). No phase gate outstanding — next action is milestone archiving via /gsd-complete-milestone, at owner discretion.
 last_updated: "2026-07-27T16:45:00.000Z"
 last_activity: 2026-07-27
 progress:
@@ -21,11 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-12)
 
 **Core value:** The owner stays in control along the automation↔semi-auto spectrum — the bot can answer autonomously, or propose replies the owner picks and refines, without losing trust or the ability to take over.
-**Current focus:** All planned phases complete (v1.2 done 2026-07-22; v1.3 Phase 11 done 2026-07-23). Open items: /gsd-secure-phase 11, optional /gsd-code-review-fix 11, and v1.1's Phase 8 owner device gate (08-21).
+**Current focus:** Planning the next milestone. v1.0–v1.3 are all shipped and ARCHIVED (2026-07-28) — `.planning/phases/` is empty and every phase artifact now lives under `.planning/milestones/v*-phases/`. No milestone is active; `REQUIREMENTS.md` is intentionally absent until `/gsd-new-milestone` creates a fresh one.
 
 ## Current Position
 
-Phase: 11 (first-run-onboarding-flow) — COMPLETE 2026-07-23 — and it was the LAST phase on the roadmap (3–11 all complete)
+Phase: — none active. All 11 phases complete across four shipped milestones (v1.0–v1.3), all archived 2026-07-28. Next: `/gsd-new-milestone` (next phase number is 12).
+
+Phase 11 (first-run-onboarding-flow) — COMPLETE 2026-07-23 — was the LAST phase on the roadmap (3–11 all complete)
 Plan: 10/10 (11-01..11-07 + gap round 11-08..11-10); owner UAT gate closed (Round 2 approved); verification PASSED 10/10
 Status: Phase 11 fully closed — ONB-01..ONB-05 proven on device; `/gsd-secure-phase 11` DONE (11-SECURITY.md `verified`, threats_open 0, 34/34) and `/gsd-code-review-fix 11` DONE (11-REVIEW-FIX.md `all_fixed`), both completed 2026-07-27. Nothing outstanding for phase 11 except an optional `11-LEARNINGS.md` (phase 10 has one).
 Last activity: 2026-07-27 — bookkeeping reconciliation: phases 10 + 11 audited, no gate owed; STATE milestone pointer corrected v1.1 → v1.3 (it had lagged two milestones); plan counters reconciled.
