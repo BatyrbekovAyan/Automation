@@ -85,6 +85,43 @@ public class KeyboardLiftMathTests
         }
     }
 
+    // ---- ScrollDeltaNormalized -------------------------------------------
+
+    [Test]
+    public void Scroll_KeyboardDown_NoScroll()
+    {
+        var delta = KeyboardLiftMath.ScrollDeltaNormalized(
+            slotBottomY: 100f, keyboardTopY: 0f, clearance: 48f, scrollableRange: 500f);
+        Assert.AreEqual(0f, delta);
+    }
+
+    [Test]
+    public void Scroll_SlotAlreadyClear_NoScroll()
+    {
+        var delta = KeyboardLiftMath.ScrollDeltaNormalized(
+            slotBottomY: 1200f, keyboardTopY: 800f, clearance: 48f, scrollableRange: 500f);
+        Assert.AreEqual(0f, delta);
+    }
+
+    [Test]
+    public void Scroll_NothingToScroll_ReturnsZero()
+    {
+        // Content shorter than the viewport: no scrolling possible, and the
+        // division must not blow up.
+        var delta = KeyboardLiftMath.ScrollDeltaNormalized(
+            slotBottomY: 100f, keyboardTopY: 800f, clearance: 48f, scrollableRange: 0f);
+        Assert.AreEqual(0f, delta);
+    }
+
+    [Test]
+    public void Scroll_CoveredSlot_ScrollsProportionally()
+    {
+        // Needs 748 units of travel over a 1496-unit scrollable range = 0.5.
+        var delta = KeyboardLiftMath.ScrollDeltaNormalized(
+            slotBottomY: 100f, keyboardTopY: 800f, clearance: 48f, scrollableRange: 1496f);
+        Assert.AreEqual(0.5f, delta, 0.0001f);
+    }
+
     // ---- ScreenPxToCanvas ------------------------------------------------
 
     [Test]

@@ -40,11 +40,22 @@ namespace Automation.BotSettingsUI
         private RectTransform canvasRect;
         private readonly Vector3[] corners = new Vector3[4];
 
+        // The tab the raised field came from. When it scrolls, the whole form
+        // moves to clear the keyboard and the raised card rides along with its
+        // placeholder — so the focused card never floats alone above a frozen
+        // page. Null for a non-scrolling tab (Промпт), which falls back to
+        // lifting the card on its own.
+        private ScrollRect ownerScroll;
+        private VerticalLayoutGroup ownerLayout;
+        private int originalBottomPadding;
+        private bool paddingApplied;
+
         // Captured once per raise, with the field at rest. The field's own
         // transform is never written (we move raisedLayer instead), so its
         // geometry is constant for the whole raise — no per-frame re-measure,
         // and the lift can't chase its own movement.
         private float restBottomY;
+        private float slotStartY;
         private float maxLift;
         private float liftY;
         private float liftVelocity;
@@ -98,10 +109,18 @@ namespace Automation.BotSettingsUI
             // the layer settles. Reachable whenever a previous raise ended
             // without a layout rebuild (swipe-back closes settings mid-lift:
             // SwipeBack raycasts above the scrim).
+            RestoreKeyboardPadding();
             ResetLift();
 
             field.SetParent(raisedLayer, worldPositionStays: true);
             field.SetAsLastSibling();
+
+            ownerScroll = originalParent != null
+                ? originalParent.GetComponentInParent<ScrollRect>()
+                : null;
+            ownerLayout = originalParent != null
+                ? originalParent.GetComponent<VerticalLayoutGroup>()
+                : null;
 
             CaptureLiftGeometry(field);
 
@@ -128,6 +147,7 @@ namespace Automation.BotSettingsUI
             // re-entrant guard in Show, and OnDisable), and the OnDisable path
             // fires with the owning tab already deactivated — no layout
             // rebuild will correct a lift left behind.
+            RestoreKeyboardPadding();
             ResetLift();
 
             if (fingerUp != null)
@@ -178,14 +198,91 @@ namespace Automation.BotSettingsUI
                 canvasHeight: canvasRect.rect.height,
                 screenHeight: Screen.height);
 
+            if (ownerScroll != null)
+            {
+                ApplyKeyboardPadding(keyboardCanvas);
+                ScrollSlotClear(keyboardCanvas);
+                TrackSlot();
+                return;
+            }
+
+            // Non-scrolling tab: nothing to scroll, so lift the card itself.
             var target = KeyboardLiftMath.RequiredLift(
                 restBottomY, keyboardCanvas, keyboardClearance, maxLift);
-
             liftY = Mathf.SmoothDamp(
                 liftY, target, ref liftVelocity, liftSmoothTime,
                 Mathf.Infinity, Time.unscaledDeltaTime);
-
             raisedLayer.anchoredPosition = new Vector2(raisedLayer.anchoredPosition.x, liftY);
+        }
+
+        // Grow the form's bottom padding by the keyboard height so the LAST
+        // card still has somewhere to scroll to. Restored in Hide().
+        private void ApplyKeyboardPadding(float keyboardCanvas)
+        {
+            if (ownerLayout == null) return;
+
+            var wanted = keyboardCanvas > 0f;
+            if (wanted == paddingApplied) return;
+
+            var pad = ownerLayout.padding;
+            ownerLayout.padding = new RectOffset(
+                pad.left, pad.right, pad.top,
+                wanted ? originalBottomPadding + Mathf.CeilToInt(keyboardCanvas)
+                       : originalBottomPadding);
+            LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)originalParent);
+            paddingApplied = wanted;
+        }
+
+        // Scrolls the form so the focused field's slot clears the keyboard.
+        // Every card moves together — the raised one included, via TrackSlot.
+        private void ScrollSlotClear(float keyboardCanvas)
+        {
+            if (placeholder == null || ownerScroll.content == null) return;
+
+            var viewport = ownerScroll.viewport != null
+                ? ownerScroll.viewport
+                : (RectTransform)ownerScroll.transform;
+            var scrollable = ownerScroll.content.rect.height - viewport.rect.height;
+
+            var delta = KeyboardLiftMath.ScrollDeltaNormalized(
+                SlotBottomY(), keyboardCanvas, keyboardClearance, scrollable);
+            if (delta <= 0f) return;
+
+            var target = Mathf.Clamp01(ownerScroll.verticalNormalizedPosition - delta);
+            ownerScroll.verticalNormalizedPosition = Mathf.MoveTowards(
+                ownerScroll.verticalNormalizedPosition, target,
+                Mathf.Max(0.0001f, Time.unscaledDeltaTime / Mathf.Max(0.01f, liftSmoothTime)));
+        }
+
+        // Keeps the raised card pinned to the slot it left behind, so it
+        // travels with the form instead of hanging in mid-air.
+        private void TrackSlot()
+        {
+            liftY = SlotBottomY() - slotStartY;
+            raisedLayer.anchoredPosition = new Vector2(raisedLayer.anchoredPosition.x, liftY);
+        }
+
+        private float SlotBottomY()
+        {
+            if (placeholder == null || canvasRect == null) return slotStartY;
+            placeholder.GetWorldCorners(corners);
+            return canvasRect.InverseTransformPoint(corners[0]).y
+                   + canvasRect.rect.height * canvasRect.pivot.y;
+        }
+
+        private void RestoreKeyboardPadding()
+        {
+            if (!paddingApplied || ownerLayout == null)
+            {
+                paddingApplied = false;
+                return;
+            }
+
+            var pad = ownerLayout.padding;
+            ownerLayout.padding = new RectOffset(pad.left, pad.right, pad.top, originalBottomPadding);
+            if (originalParent is RectTransform parentRect && originalParent.gameObject.activeInHierarchy)
+                LayoutRebuilder.ForceRebuildLayoutImmediate(parentRect);
+            paddingApplied = false;
         }
 
         // Measures the raised field at rest, in canvas-bottom-relative units.
@@ -196,6 +293,8 @@ namespace Automation.BotSettingsUI
         {
             restBottomY = 0f;
             maxLift = 0f;
+            originalBottomPadding = ownerLayout != null ? ownerLayout.padding.bottom : 0;
+            slotStartY = SlotBottomY();
             if (canvasRect == null) return;
 
             field.GetWorldCorners(corners);

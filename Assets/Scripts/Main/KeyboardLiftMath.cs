@@ -73,4 +73,31 @@ public static class KeyboardLiftMath
         var ceiling = Math.Max(0f, maxLift);
         return needed < ceiling ? needed : ceiling;
     }
+
+    /// <summary>
+    /// How far to scroll a form so the focused field's slot clears the
+    /// keyboard, expressed as a delta to SUBTRACT from a ScrollRect's
+    /// verticalNormalizedPosition (which runs 1 = top, 0 = bottom).
+    ///
+    /// slotBottomY     — bottom edge of the field's slot, canvas units from
+    ///                   the canvas bottom.
+    /// scrollableRange — content height minus viewport height, in canvas
+    ///                   units. 0 when everything already fits.
+    ///
+    /// Returns 0 when the keyboard is down, when the slot is already clear,
+    /// or when there is nothing to scroll — callers clamp the final position.
+    /// </summary>
+    public static float ScrollDeltaNormalized(
+        float slotBottomY,
+        float keyboardTopY,
+        float clearance,
+        float scrollableRange)
+    {
+        if (keyboardTopY <= 0f || scrollableRange <= 0f) return 0f;
+
+        var needed = keyboardTopY + clearance - slotBottomY;
+        if (needed <= 0f) return 0f;
+
+        return needed / scrollableRange;
+    }
 }
