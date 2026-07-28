@@ -24,6 +24,24 @@ public class DeferredDismissInputField : TMP_InputField
 {
     private bool dismissPending;
 
+    // ── activation keyboard-text sync ────────────────────────────────
+    // Android's shared IME session can deliver the PREVIOUS field's buffer
+    // into a freshly activated field: TouchScreenKeyboard.Open sets the
+    // native text asynchronously, and until the set lands the native getter
+    // still returns the old session's text — which TMP's LateUpdate then
+    // ingests into this field ("text copied between fields" device bug).
+    // Heuristic guards at the wrapper layer missed it (the restore can
+    // arrive late or in chunks), so this kills it at the source: from
+    // activation until the native keyboard ECHOES this field's own text,
+    // that text is authoritative — any foreign ingestion is undone and the
+    // session buffer overwritten, every frame. Update runs before TMP's
+    // LateUpdate ingestion, so the stomp always wins the frame.
+    private bool syncingKeyboardText;
+    private string keyboardSyncTarget;
+    private float keyboardSyncStart;
+    private bool wasFocusedLastFrame;
+    private const float KeyboardSyncTimeoutSeconds = 1f;
+
     public override void OnDeselect(BaseEventData eventData)
     {
         dismissPending = true;
@@ -48,6 +66,8 @@ public class DeferredDismissInputField : TMP_InputField
 
     private void Update()
     {
+        SyncKeyboardTextOnActivation();
+
         if (!dismissPending) return;
         if (IsPointerPressed()) return;
 
@@ -76,6 +96,45 @@ public class DeferredDismissInputField : TMP_InputField
         }
 
         base.OnDeselect(new BaseEventData(EventSystem.current));
+    }
+
+    private void SyncKeyboardTextOnActivation()
+    {
+        var focusedNow = isFocused;
+        if (focusedNow && !wasFocusedLastFrame)
+        {
+            // Activation edge: this field's CURRENT text is the truth the
+            // native session must converge to. Captured once — comparing
+            // against live `text` would chase our own corrections after a
+            // foreign ingestion slipped through.
+            syncingKeyboardText = true;
+            keyboardSyncTarget = text;
+            keyboardSyncStart = Time.unscaledTime;
+        }
+        wasFocusedLastFrame = focusedNow;
+
+        if (!syncingKeyboardText) return;
+
+        // The user cannot meaningfully type before the keyboard has even
+        // synced, so holding the target text authoritative here is safe; the
+        // timeout covers the Editor / hardware keyboards where m_SoftKeyboard
+        // never appears.
+        if (!focusedNow || Time.unscaledTime - keyboardSyncStart > KeyboardSyncTimeoutSeconds)
+        {
+            syncingKeyboardText = false;
+            return;
+        }
+        if (m_SoftKeyboard == null) return; // not open yet — keep waiting
+
+        if (m_SoftKeyboard.text == keyboardSyncTarget)
+        {
+            syncingKeyboardText = false; // native echoed our text — hand over
+            return;
+        }
+
+        if (text != keyboardSyncTarget)
+            text = keyboardSyncTarget;            // undo stale ingestion
+        m_SoftKeyboard.text = keyboardSyncTarget; // overwrite the stale session buffer
     }
 
     private static bool IsPointerPressed()

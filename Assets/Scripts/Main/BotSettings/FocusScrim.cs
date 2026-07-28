@@ -26,10 +26,11 @@ namespace Automation.BotSettingsUI
         // needs no re-stamp (a new SerializeField OBJECT reference would
         // deserialize null until a builder ran, and the full BotSettings
         // rebuild is destructive — see BusinessContactFieldsBuilder).
-        // Settle margin for a covered field (canvas units). Tuned on device:
-        // 48 overshot enough that the next card's label peeked above the
-        // keyboard — the requested 8 less lands the field cleanly.
-        [SerializeField] private float keyboardClearance = 40f;
+        // Settle margin for a covered field (canvas units). Tuned on device
+        // over two rounds: 48 let the next card's label peek above the
+        // keyboard, 40 was still "too high" by the owner's eye — 32 lands the
+        // field right above the keyboard as requested.
+        [SerializeField] private float keyboardClearance = 32f;
         [SerializeField] private float liftSmoothTime = 0.10f;
 
         private RectTransform raisedField;
@@ -236,8 +237,14 @@ namespace Automation.BotSettingsUI
 
             if (ownerScroll != null)
             {
-                ApplyKeyboardPadding(keyboardCanvas);
-                ScrollSlotClear(keyboardCanvas);
+                // Covered is judged from the REST slot (slotStartY), never the
+                // live one — once the form scrolls, the live slot rises above
+                // the keyboard and a live check would flap padding/scroll off
+                // mid-raise. A field visible at rest gets NOTHING applied (no
+                // padding, no scroll), so activating it cannot move the page.
+                var covered = keyboardCanvas > 0f && slotStartY < keyboardCanvas;
+                ApplyKeyboardPadding(covered ? keyboardCanvas : 0f);
+                if (covered) ScrollSlotClear(keyboardCanvas);
                 TrackSlot();
                 return;
             }
