@@ -160,7 +160,7 @@ namespace Automation.BotSettingsUI
                 OnCommitted.Invoke(current);
 
             if (deactivateInput) input.DeactivateInputField();
-            if (scrim != null && scrim.IsShowing) scrim.Hide();
+            if (OwnsScrim()) scrim.Hide();
             OnBlurred();
             Blurred?.Invoke(this);
         }
@@ -191,7 +191,21 @@ namespace Automation.BotSettingsUI
                 input.DeactivateInputField();
 
             input.ReleaseSelection();
+
+            // Release the scrim too. Without this a force-blurred field stays
+            // raised — and, since FocusScrim keeps the raised layer lifted
+            // above the keyboard while it is showing, it would go on lifting a
+            // field the user has already dismissed.
+            isFocused = false;
+            if (OwnsScrim()) scrim.Hide();
         }
+
+        // Only the field that actually raised the scrim may hide it. There is
+        // a single shared FocusScrim, so an unguarded Hide() from any field
+        // would drop another field's raise.
+        private bool OwnsScrim() =>
+            scrim != null && scrim.IsShowing
+            && scrim.RaisedField == (RectTransform)transform;
 
         protected virtual void OnFocused() { }
         protected virtual void OnBlurred() { }
