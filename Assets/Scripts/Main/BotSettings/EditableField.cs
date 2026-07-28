@@ -62,6 +62,8 @@ namespace Automation.BotSettingsUI
             set
             {
                 if (input == null) return;
+                if (input.text != (value ?? string.Empty))
+                    KbTrace.Log($"{name} VALUE-WRITE '{KbTrace.T(input.text)}' -> '{KbTrace.T(value)}'");
                 input.text = value ?? string.Empty;
                 expectedUnfocusedText = input.text;
             }
@@ -150,6 +152,7 @@ namespace Automation.BotSettingsUI
             if (!isFocused && expectedUnfocusedText != null
                 && input.text != expectedUnfocusedText)
             {
+                KbTrace.Log($"{name} BLUR-HEAL '{KbTrace.T(input.text)}' -> '{KbTrace.T(expectedUnfocusedText)}'");
                 input.text = expectedUnfocusedText;
             }
 
@@ -165,11 +168,13 @@ namespace Automation.BotSettingsUI
                     if (ForeignSwapGuard.IsForeignSwap(
                             focusedText, prevFocusedText, OtherFieldTexts()))
                     {
+                        KbTrace.Log($"{name} FOCUSED-FOREIGN-REVERT '{KbTrace.T(focusedText)}' -> '{KbTrace.T(prevFocusedText)}'");
                         input.text = prevFocusedText;
                         input.MoveTextEnd(false);
                     }
                     else
                     {
+                        KbTrace.Log($"{name} FOCUSED-EDIT '{KbTrace.T(prevFocusedText)}' -> '{KbTrace.T(focusedText)}'");
                         prevFocusedText = input.text;
                     }
                 }
@@ -202,6 +207,7 @@ namespace Automation.BotSettingsUI
             isFocused = true;
             focusValue = input.text;
             prevFocusedText = input.text;
+            KbTrace.Log($"{name} WRAPPER-SELECT focusValue='{KbTrace.T(focusValue)}'");
             OnFocused();
             if (scrim != null)
                 scrim.Show(GetComponent<RectTransform>(), () => Blur(commit: true));
@@ -232,10 +238,12 @@ namespace Automation.BotSettingsUI
             var lastGood = prevFocusedText ?? focusValue;
             if (ForeignSwapGuard.IsForeignSwap(current, lastGood, OtherFieldTexts()))
             {
+                KbTrace.Log($"{name} BLUR-FOREIGN-REVERT '{KbTrace.T(current)}' -> '{KbTrace.T(lastGood)}'");
                 current = lastGood ?? string.Empty;
                 input.text = current;
             }
 
+            KbTrace.Log($"{name} BLUR commit={commit} text='{KbTrace.T(current)}'");
             expectedUnfocusedText = current;
             if (commit && current != focusValue)
                 OnCommitted.Invoke(current);

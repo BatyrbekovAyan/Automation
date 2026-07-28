@@ -36,8 +36,17 @@ public class DeferredDismissInputField : TMP_InputField
     private const float ActivationSpacingSeconds = 0.25f;
     private Coroutine pendingActivation;
 
+    // ── [KB] diagnostic state (see KbTrace) ──────────────────────────
+    private string traceLastText;
+    private string traceLastKbText;
+    private bool traceLastFocus;
+
+    private string Who() =>
+        transform.parent != null ? $"{transform.parent.name}/{name}" : name;
+
     public override void OnDeselect(BaseEventData eventData)
     {
+        KbTrace.Log($"{Who()} DESELECT (dismissPending) sel={KbTrace.Sel()}");
         dismissPending = true;
     }
 
@@ -48,11 +57,13 @@ public class DeferredDismissInputField : TMP_InputField
         var wait = ActivationSpacingSeconds - (Time.unscaledTime - lastActivationTime);
         if (wait <= 0f)
         {
+            KbTrace.Log($"{Who()} SELECT->activate text='{KbTrace.T(text)}'");
             lastActivationTime = Time.unscaledTime;
             base.OnSelect(eventData);
             return;
         }
 
+        KbTrace.Log($"{Who()} SELECT->deferred {wait:F3}s text='{KbTrace.T(text)}'");
         if (pendingActivation != null) StopCoroutine(pendingActivation);
         pendingActivation = StartCoroutine(ActivateAfterSpacing(wait));
     }
@@ -66,8 +77,12 @@ public class DeferredDismissInputField : TMP_InputField
         // only the final selection of the burst may open a keyboard session.
         var eventSystem = EventSystem.current;
         if (eventSystem == null || eventSystem.currentSelectedGameObject != gameObject)
+        {
+            KbTrace.Log($"{Who()} deferred-activation SUPERSEDED sel={KbTrace.Sel()}");
             yield break;
+        }
 
+        KbTrace.Log($"{Who()} deferred-activation FIRE text='{KbTrace.T(text)}'");
         lastActivationTime = Time.unscaledTime;
         base.OnSelect(new BaseEventData(eventSystem));
     }
@@ -90,6 +105,8 @@ public class DeferredDismissInputField : TMP_InputField
 
     private void Update()
     {
+        if (KbTrace.Enabled) TraceState();
+
         if (!dismissPending) return;
         if (IsPointerPressed()) return;
 
@@ -98,6 +115,7 @@ public class DeferredDismissInputField : TMP_InputField
         var sel = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
         if (sel != null && sel != gameObject && sel.GetComponent<TMP_InputField>() != null)
         {
+            KbTrace.Log($"{Who()} SMOOTH-SWITCH SilentCaretStop -> sel={KbTrace.Sel()}");
             // Smooth-switch: another TMP_InputField has taken focus (and on
             // iOS is now driving the shared hidden UITextField). We must NOT
             // call base.OnDeselect — its DeactivateInputField path sets
@@ -117,7 +135,38 @@ public class DeferredDismissInputField : TMP_InputField
             return;
         }
 
+        KbTrace.Log($"{Who()} REAL-DISMISS base.OnDeselect sel={KbTrace.Sel()}");
         base.OnDeselect(new BaseEventData(EventSystem.current));
+    }
+
+    // Logs every mutation of this field's text, its native keyboard-session
+    // buffer, and its TMP focus flag — delta-based, so quiet frames log
+    // nothing. The KBBUF lines are the smoking gun for the shared-session
+    // replay: they show which wrapper's buffer changes to what, and when,
+    // relative to TEXT ingestions.
+    private void TraceState()
+    {
+        if (isFocused != traceLastFocus)
+        {
+            KbTrace.Log($"{Who()} FOCUS={isFocused} text='{KbTrace.T(text)}' sel={KbTrace.Sel()}");
+            traceLastFocus = isFocused;
+        }
+
+        if (text != traceLastText)
+        {
+            KbTrace.Log($"{Who()} TEXT '{KbTrace.T(traceLastText)}' -> '{KbTrace.T(text)}' " +
+                        $"focused={isFocused} sel={KbTrace.Sel()}");
+            traceLastText = text;
+        }
+
+        var kbText = m_SoftKeyboard != null ? m_SoftKeyboard.text : null;
+        if (kbText != traceLastKbText)
+        {
+            var active = m_SoftKeyboard != null && m_SoftKeyboard.active;
+            KbTrace.Log($"{Who()} KBBUF '{KbTrace.T(traceLastKbText)}' -> '{KbTrace.T(kbText)}' " +
+                        $"kbActive={active} focused={isFocused}");
+            traceLastKbText = kbText;
+        }
     }
 
     private static bool IsPointerPressed()
