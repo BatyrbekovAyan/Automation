@@ -42,10 +42,23 @@ namespace Automation.BotSettingsUI
         protected string focusValue;
         protected bool isFocused;
 
+        // What this field's text must be while it is NOT focused. User input
+        // only reaches the focused field and app writes go through the Value
+        // setter, so any other change to a blurred field's text is keyboard-
+        // session bleed from a rapid field switch — healed every frame in
+        // Update. Null until initialized (Awake / first write) so an
+        // unwired field is never "healed" to empty.
+        private string expectedUnfocusedText;
+
         public virtual string Value
         {
             get => input != null ? input.text : string.Empty;
-            set { if (input != null) input.text = value ?? string.Empty; }
+            set
+            {
+                if (input == null) return;
+                input.text = value ?? string.Empty;
+                expectedUnfocusedText = input.text;
+            }
         }
 
         public string Label
@@ -63,6 +76,7 @@ namespace Automation.BotSettingsUI
             if (input == null) return;
             input.onSelect.AddListener(HandleSelect);
             input.onEndEdit.AddListener(HandleEndEdit);
+            expectedUnfocusedText = input.text;
         }
 
         private void Update()
@@ -120,6 +134,14 @@ namespace Automation.BotSettingsUI
             {
                 Blur(commit: true, deactivateInput: false);
             }
+
+            // Heal keyboard-session bleed: a blurred field's text may only be
+            // what was last committed or written through Value.
+            if (!isFocused && expectedUnfocusedText != null
+                && input.text != expectedUnfocusedText)
+            {
+                input.text = expectedUnfocusedText;
+            }
         }
 
         protected virtual void OnDestroy()
@@ -156,6 +178,7 @@ namespace Automation.BotSettingsUI
             isFocused = false;
 
             var current = input.text;
+            expectedUnfocusedText = current;
             if (commit && current != focusValue)
                 OnCommitted.Invoke(current);
 
@@ -197,6 +220,7 @@ namespace Automation.BotSettingsUI
             // above the keyboard while it is showing, it would go on lifting a
             // field the user has already dismissed.
             isFocused = false;
+            expectedUnfocusedText = input.text;
             if (OwnsScrim()) scrim.Hide();
         }
 

@@ -24,6 +24,18 @@ public class DeferredDismissInputField : TMP_InputField
 {
     private bool dismissPending;
 
+    // ── serialized keyboard activations ──────────────────────────────
+    // Two TMP activations close together put two async TouchScreenKeyboard
+    // text-sets in flight on Android's single native IME session; whichever
+    // lands LAST is then polled back by the OTHER field's ingestion, so text
+    // jumps between the two rapidly tapped fields (device repro: "double-tap
+    // but on two different fields" — either direction, any starting field).
+    // Spacing activations out keeps at most ONE native set in flight, and a
+    // tap burst activates only the last-selected field.
+    private static float lastActivationTime = float.NegativeInfinity;
+    private const float ActivationSpacingSeconds = 0.25f;
+    private Coroutine pendingActivation;
+
     public override void OnDeselect(BaseEventData eventData)
     {
         dismissPending = true;
@@ -32,11 +44,41 @@ public class DeferredDismissInputField : TMP_InputField
     public override void OnSelect(BaseEventData eventData)
     {
         dismissPending = false;
-        base.OnSelect(eventData);
+
+        var wait = ActivationSpacingSeconds - (Time.unscaledTime - lastActivationTime);
+        if (wait <= 0f)
+        {
+            lastActivationTime = Time.unscaledTime;
+            base.OnSelect(eventData);
+            return;
+        }
+
+        if (pendingActivation != null) StopCoroutine(pendingActivation);
+        pendingActivation = StartCoroutine(ActivateAfterSpacing(wait));
+    }
+
+    private System.Collections.IEnumerator ActivateAfterSpacing(float wait)
+    {
+        yield return new WaitForSecondsRealtime(wait);
+        pendingActivation = null;
+
+        // Superseded: the user has tapped yet another field during the wait —
+        // only the final selection of the burst may open a keyboard session.
+        var eventSystem = EventSystem.current;
+        if (eventSystem == null || eventSystem.currentSelectedGameObject != gameObject)
+            yield break;
+
+        lastActivationTime = Time.unscaledTime;
+        base.OnSelect(new BaseEventData(eventSystem));
     }
 
     protected override void OnDisable()
     {
+        if (pendingActivation != null)
+        {
+            StopCoroutine(pendingActivation);
+            pendingActivation = null;
+        }
         if (dismissPending)
         {
             dismissPending = false;
