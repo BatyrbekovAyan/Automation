@@ -114,7 +114,7 @@ public static class BusinessContactFieldsBuilder
             modified |= ShrinkDescription(descriptionRt);
             modified |= MakeTabScrollable(tab, content);
             modified |= AddContactSection(settings, content);
-            modified |= UnifyLineTypes(prefabRoot);
+            modified |= UnifyKeyboardConfig(prefabRoot);
             modified |= DetachScrimEditInline(prefabRoot, tab);
 
             if (modified)
@@ -286,7 +286,6 @@ public static class BusinessContactFieldsBuilder
             }
 
             modified |= ApplyPlaceholder(field, contact.Placeholder);
-            modified |= ApplyKeyboard(field, contact.Property);
 
             if (prop.objectReferenceValue != field)
             {
@@ -320,45 +319,39 @@ public static class BusinessContactFieldsBuilder
         return true;
     }
 
-    // TMP's contentType setter overwrites inputType/keyboardType/validation,
-    // so contentType must be assigned BEFORE keyboardType or the keypad
-    // choice is silently reverted.
-    private static bool ApplyKeyboard(EditableField field, string property)
+    // ONE keyboard configuration for every input — total products-sheet
+    // parity. ANY per-field difference restarts the IME session on a focus
+    // switch, and the restart redelivers pending composition into the newly
+    // focused field (the cross-field text duplication):
+    //   • mixed LINE types swap the native input view type → restart;
+    //   • mixed KEYBOARD/content types swap the keypad layout → restart,
+    //     even while the keyboard visibly stays up. This is why the PhonePad
+    //     and EmailAddress keypads had to go — the sheet is clean precisely
+    //     because all its fields share one Standard/Default keyboard.
+    // Single-line-looking fields use MultiLineSubmit (Enter still submits);
+    // real textareas keep MultiLineNewline.
+    private static bool UnifyKeyboardConfig(GameObject prefabRoot)
     {
-        var input = field.InputField;
-        if (input == null) return false;
-
-        var contentType = TMP_InputField.ContentType.Standard;
-        var keyboard = TouchScreenKeyboardType.Default;
-        switch (property)
+        var modified = false;
+        foreach (var input in prefabRoot.GetComponentsInChildren<TMP_InputField>(true))
         {
-            case "PhoneField":
-                keyboard = TouchScreenKeyboardType.PhonePad;
-                break;
-            case "EmailField":
-                contentType = TMP_InputField.ContentType.EmailAddress;
-                keyboard = TouchScreenKeyboardType.EmailAddress;
-                break;
+            if (input.contentType != TMP_InputField.ContentType.Standard)
+            {
+                input.contentType = TMP_InputField.ContentType.Standard;
+                modified = true;
+            }
+            if (input.keyboardType != TouchScreenKeyboardType.Default)
+            {
+                input.keyboardType = TouchScreenKeyboardType.Default;
+                modified = true;
+            }
+            if (input.lineType == TMP_InputField.LineType.SingleLine)
+            {
+                input.lineType = TMP_InputField.LineType.MultiLineSubmit;
+                modified = true;
+            }
         }
-
-        if (input.contentType == contentType
-            && input.keyboardType == keyboard
-            && input.lineType == TMP_InputField.LineType.MultiLineSubmit)
-        {
-            return false;
-        }
-
-        // MultiLineSubmit, NOT SingleLine: mixed line types make the OS swap
-        // the native input view type on focus switches (products-sheet bug),
-        // restarting the IME session — the restart is the keyboard dip AND
-        // the cross-field text-corruption window. Order matters: contentType
-        // is assigned first (its setter overwrites lineType), and assigning
-        // lineType after flips a non-Standard contentType to Custom while
-        // keeping the chosen keyboard and validation.
-        input.contentType = contentType;
-        input.keyboardType = keyboard;
-        input.lineType = TMP_InputField.LineType.MultiLineSubmit;
-        return true;
+        return modified;
     }
 
     // Products-sheet parity: fields edit INLINE — no scrim, no raise. The
@@ -394,20 +387,5 @@ public static class BusinessContactFieldsBuilder
         return modified;
     }
 
-    // Re-applies the products-sheet line-type fix prefab-wide: the full
-    // rebuild recreated every input as SingleLine, undoing it. Single-line-
-    // looking fields become MultiLineSubmit; real textareas keep
-    // MultiLineNewline.
-    private static bool UnifyLineTypes(GameObject prefabRoot)
-    {
-        var modified = false;
-        foreach (var input in prefabRoot.GetComponentsInChildren<TMP_InputField>(true))
-        {
-            if (input.lineType != TMP_InputField.LineType.SingleLine) continue;
-            input.lineType = TMP_InputField.LineType.MultiLineSubmit;
-            modified = true;
-        }
-        return modified;
-    }
 }
 #endif

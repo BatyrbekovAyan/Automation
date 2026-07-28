@@ -143,16 +143,22 @@ public class BusinessContactFieldsTests
     // on MultiLineSubmit; the full rebuild silently wiped that fix
     // (re-applied 2026-07-28). SingleLine is banned prefab-wide.
     [Test]
-    public void BotSettingsPrefab_NoSingleLineInputs()
+    public void BotSettingsPrefab_UniformKeyboardConfig()
     {
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
         Assert.IsNotNull(prefab);
 
         foreach (var input in prefab.GetComponentsInChildren<TMPro.TMP_InputField>(true))
         {
+            var where = $"'{input.transform.parent.name}/{input.name}'";
             Assert.AreNotEqual(TMPro.TMP_InputField.LineType.SingleLine, input.lineType,
-                $"'{input.transform.parent.name}/{input.name}' is SingleLine — " +
-                "mixed line types reintroduce the IME restart dip + text corruption.");
+                $"{where} is SingleLine — mixed line types restart the IME on switch.");
+            Assert.AreEqual(TMPro.TMP_InputField.ContentType.Standard, input.contentType,
+                $"{where} has a non-Standard contentType — a per-field keyboard " +
+                "restarts the IME on switch (text duplication).");
+            Assert.AreEqual(TouchScreenKeyboardType.Default, input.keyboardType,
+                $"{where} has a custom keyboardType — a per-field keypad " +
+                "restarts the IME on switch (text duplication).");
         }
     }
 
