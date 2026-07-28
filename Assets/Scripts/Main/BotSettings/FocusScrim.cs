@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace Automation.BotSettingsUI
@@ -49,6 +51,9 @@ namespace Automation.BotSettingsUI
         private VerticalLayoutGroup ownerLayout;
         private int originalBottomPadding;
         private bool paddingApplied;
+        private bool preservePaddingOnce;
+
+        private static readonly List<RaycastResult> raycastResults = new List<RaycastResult>();
 
         // Captured once per raise, with the field at rest. The field's own
         // transform is never written (we move raisedLayer instead), so its
@@ -82,6 +87,14 @@ namespace Automation.BotSettingsUI
 
         public void Show(RectTransform field, Action onOutsideTap)
         {
+            // Handoff (field-to-field switch while already showing): keep the
+            // dim up without restarting its fade, and carry the keyboard
+            // padding across the Hide/Show pair when the new field lives in
+            // the same form — otherwise the content shrinks for a frame and
+            // the scroll position jumps between fields.
+            var wasShowing = IsShowing;
+            preservePaddingOnce = wasShowing && field != null && field.parent == originalParent;
+
             if (IsShowing) Hide();
 
             raisedField = field;
@@ -136,14 +149,16 @@ namespace Automation.BotSettingsUI
 
             scrimRoot.SetActive(true);
             scrimGroup.DOKill();
-            scrimGroup.alpha = 0f;
+            // On a handoff the dim is already up — restarting the fade from 0
+            // would flash the whole page bright for a frame.
+            if (!wasShowing) scrimGroup.alpha = 0f;
             scrimGroup.DOFade(targetAlpha, fadeInDuration).SetEase(Ease.OutQuad);
 
             if (fingerUp == null)
                 fingerUp = scrimImage.gameObject.GetComponent<DelayedFingerUpAction>()
                            ?? scrimImage.gameObject.AddComponent<DelayedFingerUpAction>();
             onOutsideTapCached = onOutsideTap;
-            fingerUp.OnRealRelease += HandleOutsideTap;
+            fingerUp.OnRealReleaseAt += HandleOutsideTap;
 
             IsShowing = true;
         }
@@ -161,7 +176,7 @@ namespace Automation.BotSettingsUI
             ResetLift();
 
             if (fingerUp != null)
-                fingerUp.OnRealRelease -= HandleOutsideTap;
+                fingerUp.OnRealReleaseAt -= HandleOutsideTap;
             onOutsideTapCached = null;
 
             scrimGroup.DOKill();
@@ -185,9 +200,68 @@ namespace Automation.BotSettingsUI
             IsShowing = false;
         }
 
-        private void HandleOutsideTap()
+        private void HandleOutsideTap(Vector2 releasePosition)
         {
+            var next = FindHandoffTarget(releasePosition);
+            if (next != null)
+            {
+                HandoffTo(next);
+                return;
+            }
             onOutsideTapCached?.Invoke();
+        }
+
+        // Raycasts beneath the scrim at the release point. Returns the tapped
+        // card when the "outside" tap actually landed on another field wired
+        // to this scrim; null means a genuine dismiss. The topmost meaningful
+        // hit decides, so a tap on any overlay above a card stays a dismiss.
+        private EditableField FindHandoffTarget(Vector2 screenPosition)
+        {
+            var eventSystem = EventSystem.current;
+            if (eventSystem == null) return null;
+
+            raycastResults.Clear();
+            eventSystem.RaycastAll(
+                new PointerEventData(eventSystem) { position = screenPosition }, raycastResults);
+
+            foreach (var hit in raycastResults)
+            {
+                if (hit.gameObject == null) continue;
+                var hitTransform = hit.gameObject.transform;
+                if (scrimRoot != null && hitTransform.IsChildOf(scrimRoot.transform)) continue;
+                if (raisedLayer != null && hitTransform.IsChildOf(raisedLayer)) continue;
+
+                var field = hit.gameObject.GetComponentInParent<EditableField>();
+                if (field == null) return null;
+                if ((RectTransform)field.transform == raisedField) return null;
+                return field.Scrim == this ? field : null;
+            }
+            return null;
+        }
+
+        // Switches focus straight from the raised field to the tapped one,
+        // without cycling the OS keyboard. The current field commits via
+        // CommitForHandoff (no DeactivateInputField); the EventSystem deselect
+        // that follows routes its input through DeferredDismissInputField's
+        // smooth-switch branch, so the keyboard stays up — no dip, and no
+        // dismiss/reopen IME restart race to bleed one field's buffer into
+        // the next. The new field's activation then re-raises the scrim via
+        // its own HandleSelect → Show path.
+        private void HandoffTo(EditableField next)
+        {
+            var input = next.InputField;
+            if (input == null)
+            {
+                onOutsideTapCached?.Invoke();
+                return;
+            }
+
+            var current = raisedField != null ? raisedField.GetComponent<EditableField>() : null;
+            current?.CommitForHandoff();
+
+            var eventSystem = EventSystem.current;
+            if (eventSystem != null) eventSystem.SetSelectedGameObject(input.gameObject);
+            input.ActivateInputField();
         }
 
         // Raises the layer just enough to clear the keyboard. No field-switch
@@ -282,6 +356,16 @@ namespace Automation.BotSettingsUI
 
         private void RestoreKeyboardPadding()
         {
+            // Handoff within the same form: the keyboard is staying up, so
+            // the padding must survive the Hide/Show pair — restoring it here
+            // would shrink the content, clamp the scroll, and make the form
+            // jump between fields.
+            if (preservePaddingOnce)
+            {
+                preservePaddingOnce = false;
+                return;
+            }
+
             if (!paddingApplied || ownerLayout == null)
             {
                 paddingApplied = false;
@@ -307,7 +391,11 @@ namespace Automation.BotSettingsUI
         {
             restBottomY = 0f;
             maxLift = 0f;
-            originalBottomPadding = ownerLayout != null ? ownerLayout.padding.bottom : 0;
+            // While the keyboard padding is applied (handoff), padding.bottom
+            // reads the PADDED value — recapturing it as "original" would make
+            // the eventual restore bake the keyboard height in permanently.
+            if (!paddingApplied)
+                originalBottomPadding = ownerLayout != null ? ownerLayout.padding.bottom : 0;
             slotStartY = SlotBottomY();
             if (canvasRect == null) return;
 

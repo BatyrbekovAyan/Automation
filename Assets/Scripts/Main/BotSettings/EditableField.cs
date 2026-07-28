@@ -58,6 +58,31 @@ namespace Automation.BotSettingsUI
 
         public TMP_InputField InputField => input;
 
+        /// <summary>The scrim this field raises onto (null for sheet fields).</summary>
+        public FocusScrim Scrim => scrim;
+
+        // Commit-without-dismiss, for FocusScrim's field-to-field handoff.
+        // The input is deliberately NOT deactivated: the EventSystem deselect
+        // that follows routes it through DeferredDismissInputField's
+        // smooth-switch branch (SilentCaretStop), which keeps the OS keyboard
+        // up and nulls m_SoftKeyboard so this field can't ingest the shared
+        // keyboard buffer once the next field starts driving it. No
+        // scrim.Hide either — the scrim orchestrates the visual swap itself.
+        // Setting isFocused=false first makes the later event-path Blur
+        // (ReleaseSelection → onEndEdit → HandleEndEdit) a no-op.
+        public void CommitForHandoff()
+        {
+            if (!isFocused) return;
+            isFocused = false;
+
+            var current = input != null ? input.text : focusValue;
+            if (current != focusValue)
+                OnCommitted.Invoke(current);
+
+            OnBlurred();
+            Blurred?.Invoke(this);
+        }
+
         protected virtual void Awake()
         {
             if (input == null) return;

@@ -24,6 +24,12 @@ public class DelayedFingerUpAction : MonoBehaviour, IPointerDownHandler, IPointe
 {
     public event Action OnRealRelease;
     /// <summary>
+    /// Same contract as <see cref="OnRealRelease"/> but carries the screen
+    /// position of the release, for owners that need to know WHAT was under
+    /// the finger (e.g. FocusScrim deciding dismiss vs field handoff).
+    /// </summary>
+    public event Action<Vector2> OnRealReleaseAt;
+    /// <summary>
     /// Fires synchronously inside OnPointerDown — before any guard logic.
     /// Lets owners observe the moment the press lands so they can record
     /// surrounding state (e.g. "was the keyboard already dismissing when
@@ -67,5 +73,6 @@ public class DelayedFingerUpAction : MonoBehaviour, IPointerDownHandler, IPointe
         if (!RectTransformUtility.RectangleContainsScreenPoint(rt, releasePosition, pressCamera)) yield break;
 
         OnRealRelease?.Invoke();
+        OnRealReleaseAt?.Invoke(releasePosition);
     }
 }

@@ -112,8 +112,11 @@ public static class BotSettingsScrollableTextAreaBuilder
         }
 
         // 2. Revert any prior ScrollableInputField swap back to stock
-        // TMP_InputField. DragShield supersedes the subclass.
-        if (input.GetType() != typeof(TMP_InputField))
+        // TMP_InputField. DragShield supersedes the subclass. Target ONLY
+        // ScrollableInputField — a blanket "not stock TMP" check would also
+        // downgrade DeferredDismissInputField, which every bot-settings input
+        // deliberately uses so field switches keep the OS keyboard up.
+        if (input is ScrollableInputField)
         {
             var tmpScript = GetMonoScriptForType(typeof(TMP_InputField));
             if (tmpScript != null)

@@ -93,6 +93,26 @@ public class BusinessContactFieldsTests
         }
     }
 
+    // Every bot-settings input must be DeferredDismissInputField: the
+    // FocusScrim field-to-field handoff relies on its smooth-switch branch to
+    // keep the OS keyboard up (no dip) and to null the deselected field's
+    // soft-keyboard reference (no cross-field text bleed). A rebuild or
+    // builder step that recreates an input as stock TMP_InputField silently
+    // reintroduces both device bugs.
+    [Test]
+    public void BotSettingsPrefab_AllInputsAreDeferredDismiss()
+    {
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
+        Assert.IsNotNull(prefab);
+
+        foreach (var input in prefab.GetComponentsInChildren<TMPro.TMP_InputField>(true))
+        {
+            Assert.IsInstanceOf<DeferredDismissInputField>(input,
+                $"'{input.transform.parent.name}/{input.name}' is a stock TMP_InputField — " +
+                "keyboard smooth-switch needs DeferredDismissInputField.");
+        }
+    }
+
     // Cloning a card copies the source's placeholder, so without an explicit
     // pass every contact field showed the bot-name hint («Ассистент»).
     [Test]
