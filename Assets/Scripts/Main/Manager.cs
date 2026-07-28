@@ -172,6 +172,13 @@ public partial class Manager : MonoBehaviour
     // the overlay only goes active AFTER the in-box checkmark dwell, leaving that window
     // unguarded. Set once the moment commits, cleared in CloseSuccessAndOverlay.
     private bool _successMomentRunning;
+    // False only while the success moment's in-box checkmark is actually dwelling.
+    // ShowAuthSuccess's settings-re-auth branch waits on this before returning, because the
+    // completion signal its caller raises kicks off the workflow POST — whose LoadingPanel
+    // cover is drawn above the auth pages and would hide the checkmark. Starts true so a
+    // moment that never reaches the dwell (early return, or no in-box panel to show) is not
+    // waited on. See ShowInteractiveSuccessMoment.
+    private bool _inBoxCheckDone = true;
     // True once a pairing code was issued for the current WhatsApp profile.
     // WhatsApp refuses a repeat code for the same profile for ~2 minutes, so
     // the next code request silently swaps in a fresh profile instead.
@@ -1829,6 +1836,33 @@ public partial class Manager : MonoBehaviour
             // so no channel arg and no authPage hand-off. Gated on !isCreatingBot so the creation
             // flow (which fires the moment from CreateBotFromForm) never double-fires.
             StartCoroutine(ShowInteractiveSuccessMoment(Manager.openBot.GetComponent<Bot>()));
+
+            // …then HOLD until that moment's in-box checkmark has had its full dwell. Returning
+            // immediately let our caller raise whatsappAuthCompleted/telegramAuthCompleted, which
+            // runs the settings onDone → Create*WorkflowFromEdit → LoadingPanel.SetActive(true)
+            // a frame or two into the 1.2s dwell; the cover is a Canvas child ABOVE the auth
+            // pages, so the checkmark was hidden almost immediately. The wizard never had this
+            // problem because it fires the moment AFTER its workflow POST is already in flight.
+            //
+            // Deliberately fixed by DELAYING the signal rather than by moving the moment to fire
+            // after onDone (the wizard's literal ordering): that alternative leaves the whole
+            // multi-second workflow POST running with no full-screen cover, and
+            // Create*WorkflowFromEdit dereferences the mutable static Manager.openBot AFTER its
+            // yield — a back-press out of BotSettings (SettleClosedInstant nulls openBot) would
+            // then NRE past the workflow-id write and PendingProfileLedger.MarkWhatsappClaimed(),
+            // stranding a dead channel and letting the quit/launch sweep delete the profile the
+            // user just connected. Holding here keeps the cover up for the POST exactly as before.
+            //
+            // Bounded: the flag starts true and is cleared only for the duration of a dwell that
+            // actually runs, so this normally costs SuccessInBoxCheckSeconds and nothing when
+            // there is no checkmark to show. The cap is a backstop — a moment killed mid-dwell
+            // must not hang the auth hand-off (no workflow would ever be created).
+            float inBoxWaited = 0f;
+            while (!_inBoxCheckDone && inBoxWaited < SuccessInBoxCheckSeconds + 1f)
+            {
+                inBoxWaited += Time.unscaledDeltaTime;
+                yield return null;
+            }
         }
         // else: final creating-bot auth — do nothing here. CreateBotFromForm fires the
         // interactive moment after the bot card exists; authPage stays active for it.
@@ -1846,11 +1880,22 @@ public partial class Manager : MonoBehaviour
     // bot's «Прайс-листы» tab (fallback «Открыть чаты» when files already exist). Fired from
     // exactly two sites (CreateBotFromForm after creation; ShowAuthSuccess's else branch for
     // settings re-auth) — never from BotSettings (this is a private Manager member).
+    //
+    // The in-box checkmark dwell below must run with NO loading cover over it. The wizard gets
+    // that for free (it fires this moment after its workflow POST is already in flight, so the
+    // cover is up before we lower it and nothing raises it again). Settings re-auth instead
+    // holds its auth-completion signal until _inBoxCheckDone flips back — see ShowAuthSuccess.
     // Dwell for the in-box QR/code checkmark shown before the standalone success page.
     private const float SuccessInBoxCheckSeconds = 1.2f;
 
     private IEnumerator ShowInteractiveSuccessMoment(Bot bot)
     {
+        // Nothing is dwelling until the checkmark branch below actually starts. Reset up front
+        // (this runs synchronously inside StartCoroutine) so ShowAuthSuccess's settings branch,
+        // which waits on this flag right after starting us, never waits on a stale value or on a
+        // moment that returns early.
+        _inBoxCheckDone = true;
+
         if (bot == null) yield break;
         if (SuccessOverlay == null) yield break;
 
@@ -1880,6 +1925,9 @@ public partial class Manager : MonoBehaviour
             activeAuth == TelegramAuth ? TelegramAuthSuccessPanel : null;
         if (activeAuth != null && inBoxCheck != null)
         {
+            // Settings re-auth holds its auth-completion signal until this clears again, so the
+            // workflow POST that signal kicks off cannot raise the cover mid-dwell.
+            _inBoxCheckDone = false;
             // The loading cover is drawn above the screens — hide it so the in-box checkmark is
             // actually visible for its full dwell instead of being instantly covered (the
             // standalone overlay shown right after replaces it, so nothing flickers).
@@ -1901,6 +1949,8 @@ public partial class Manager : MonoBehaviour
             yield return new WaitForSeconds(SuccessInBoxCheckSeconds);
             inBoxCheck.SetActive(false);
             authCg.interactable = true;
+            // Dwell served — release ShowAuthSuccess's settings-re-auth hold.
+            _inBoxCheckDone = true;
         }
 
         // D2: the overlay is standalone (Canvas-level, above the auth pages) — NO authPage
