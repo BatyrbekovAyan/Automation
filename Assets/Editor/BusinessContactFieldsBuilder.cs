@@ -115,6 +115,7 @@ public static class BusinessContactFieldsBuilder
             modified |= MakeTabScrollable(tab, content);
             modified |= AddContactSection(settings, content);
             modified |= UnifyLineTypes(prefabRoot);
+            modified |= DetachScrimEditInline(prefabRoot, tab);
 
             if (modified)
             {
@@ -358,6 +359,39 @@ public static class BusinessContactFieldsBuilder
         input.keyboardType = keyboard;
         input.lineType = TMP_InputField.LineType.MultiLineSubmit;
         return true;
+    }
+
+    // Products-sheet parity: fields edit INLINE — no scrim, no raise. The
+    // scrim's modal design forced a full keyboard dismiss/reopen on every
+    // field switch, and that IME session restart is the window where the
+    // shared native buffer erases/copies text across fields; three rounds of
+    // guards lost to it, while the scrimless sheet never exhibits it. The
+    // FocusScrim component stays in the prefab (dormant, zero consumers);
+    // FormKeyboardScroll on the tab takes over the scroll-above-keyboard
+    // behaviour for covered fields.
+    private static bool DetachScrimEditInline(GameObject prefabRoot, RectTransform tab)
+    {
+        var modified = false;
+
+        foreach (var field in prefabRoot.GetComponentsInChildren<EditableField>(true))
+        {
+            var so = new SerializedObject(field);
+            var scrimProp = so.FindProperty("scrim");
+            if (scrimProp != null && scrimProp.objectReferenceValue != null)
+            {
+                scrimProp.objectReferenceValue = null;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                modified = true;
+            }
+        }
+
+        if (tab.GetComponent<FormKeyboardScroll>() == null)
+        {
+            tab.gameObject.AddComponent<FormKeyboardScroll>();
+            modified = true;
+        }
+
+        return modified;
     }
 
     // Re-applies the products-sheet line-type fix prefab-wide: the full

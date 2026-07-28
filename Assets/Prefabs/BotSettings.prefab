@@ -2407,7 +2407,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Automation.BotSettingsUI.EditableField
   labelText: {fileID: 2113330196780881858}
   input: {fileID: 7203445819349771215}
-  scrim: {fileID: 9062441906662607028}
+  scrim: {fileID: 0}
   OnCommitted:
     m_PersistentCalls:
       m_Calls: []
@@ -5636,6 +5636,7 @@ GameObject:
   - component: {fileID: 3661819442003621159}
   - component: {fileID: 3172813945875998591}
   - component: {fileID: 6728124882812639136}
+  - component: {fileID: 8303508772120647504}
   m_Layer: 0
   m_Name: Business
   m_TagString: Untagged
@@ -5745,6 +5746,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.RectMask2D
   m_Padding: {x: 0, y: 0, z: 0, w: 0}
   m_Softness: {x: 0, y: 0}
+--- !u!114 &8303508772120647504
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1668379651407309887}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e8a4dca159a5e4195a05c8be030f0c8c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Automation.BotSettingsUI.FormKeyboardScroll
+  clearance: 32
+  releaseHoldSeconds: 0.25
+  scrollSeconds: 0.15
 --- !u!1 &1669703735867938084
 GameObject:
   m_ObjectHideFlags: 0
@@ -5837,7 +5853,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Automation.BotSettingsUI.EditableField
   labelText: {fileID: 1112105281473034796}
   input: {fileID: 3928539762694330618}
-  scrim: {fileID: 9062441906662607028}
+  scrim: {fileID: 0}
   OnCommitted:
     m_PersistentCalls:
       m_Calls: []
@@ -7887,7 +7903,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Automation.BotSettingsUI.EditableTextArea
   labelText: {fileID: 0}
   input: {fileID: 3376632651108436728}
-  scrim: {fileID: 9062441906662607028}
+  scrim: {fileID: 0}
   OnCommitted:
     m_PersistentCalls:
       m_Calls: []
@@ -8327,7 +8343,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Automation.BotSettingsUI.EditableTextArea
   labelText: {fileID: 0}
   input: {fileID: 3886578207566943389}
-  scrim: {fileID: 9062441906662607028}
+  scrim: {fileID: 0}
   OnCommitted:
     m_PersistentCalls:
       m_Calls: []
@@ -27066,7 +27082,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Automation.BotSettingsUI.EditableField
   labelText: {fileID: 1672029671800063895}
   input: {fileID: 4504608012535524971}
-  scrim: {fileID: 9062441906662607028}
+  scrim: {fileID: 0}
   OnCommitted:
     m_PersistentCalls:
       m_Calls: []
@@ -30707,7 +30723,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Automation.BotSettingsUI.EditableField
   labelText: {fileID: 962113767742241759}
   input: {fileID: 4347022726739021195}
-  scrim: {fileID: 9062441906662607028}
+  scrim: {fileID: 0}
   OnCommitted:
     m_PersistentCalls:
       m_Calls: []
@@ -33580,7 +33596,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Automation.BotSettingsUI.EditableField
   labelText: {fileID: 8713156444980122039}
   input: {fileID: 5922906002667707207}
-  scrim: {fileID: 9062441906662607028}
+  scrim: {fileID: 0}
   OnCommitted:
     m_PersistentCalls:
       m_Calls: []
@@ -34078,7 +34094,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Automation.BotSettingsUI.EditableField
   labelText: {fileID: 8695025945010880734}
   input: {fileID: 3726603906960611021}
-  scrim: {fileID: 9062441906662607028}
+  scrim: {fileID: 0}
   OnCommitted:
     m_PersistentCalls:
       m_Calls: []

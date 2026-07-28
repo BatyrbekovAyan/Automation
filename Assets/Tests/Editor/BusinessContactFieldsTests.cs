@@ -113,6 +113,30 @@ public class BusinessContactFieldsTests
         }
     }
 
+    // Products-sheet parity: fields edit inline, no scrim. The scrim's modal
+    // dismiss/reopen cycle restarted the IME session on every field switch —
+    // the window where text erased/copied across fields. Re-wiring any field
+    // to a scrim reintroduces that cycle.
+    [Test]
+    public void BotSettingsPrefab_FieldsEditInline_NoScrim()
+    {
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
+        Assert.IsNotNull(prefab);
+
+        foreach (var field in prefab.GetComponentsInChildren<EditableField>(true))
+        {
+            var scrimRef = new UnityEditor.SerializedObject(field).FindProperty("scrim");
+            Assert.IsNotNull(scrimRef, "EditableField no longer has a 'scrim' field?");
+            Assert.IsNull(scrimRef.objectReferenceValue,
+                $"'{field.name}' is wired to a FocusScrim — inline editing (sheet parity) bans the scrim.");
+        }
+
+        var businessTab = prefab.GetComponent<BotSettings>().BusinessField
+            .transform.parent.parent;
+        Assert.IsNotNull(businessTab.GetComponent<FormKeyboardScroll>(),
+            "Business tab lost FormKeyboardScroll — covered fields would sit under the keyboard.");
+    }
+
     // Mixed line types make the OS swap the native input view type on focus
     // switches — a full IME session restart that both dips the keyboard and
     // corrupts text across fields. The products sheet fixed this by unifying

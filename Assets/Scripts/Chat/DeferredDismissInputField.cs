@@ -40,7 +40,13 @@ public class DeferredDismissInputField : TMP_InputField
     private string keyboardSyncTarget;
     private float keyboardSyncStart;
     private bool wasFocusedLastFrame;
+    private int keyboardEchoFrames;
     private const float KeyboardSyncTimeoutSeconds = 1f;
+    // The stale restore can arrive AFTER an initial correct echo (an empty
+    // target matches an empty fresh session instantly, then the old session's
+    // buffer lands late). Hand over only after the echo holds this many
+    // consecutive frames.
+    private const int KeyboardEchoStableFrames = 8;
 
     public override void OnDeselect(BaseEventData eventData)
     {
@@ -111,6 +117,7 @@ public class DeferredDismissInputField : TMP_InputField
         syncingKeyboardText = true;
         keyboardSyncTarget = text;
         keyboardSyncStart = Time.unscaledTime;
+        keyboardEchoFrames = 0;
     }
 
     private void SyncKeyboardTextOnActivation()
@@ -138,10 +145,13 @@ public class DeferredDismissInputField : TMP_InputField
 
         if (m_SoftKeyboard.text == keyboardSyncTarget)
         {
-            syncingKeyboardText = false; // native echoed our text — hand over
+            keyboardEchoFrames++;
+            if (keyboardEchoFrames >= KeyboardEchoStableFrames)
+                syncingKeyboardText = false; // echo held — hand over for real
             return;
         }
 
+        keyboardEchoFrames = 0;
         if (text != keyboardSyncTarget)
             text = keyboardSyncTarget;            // undo stale ingestion
         m_SoftKeyboard.text = keyboardSyncTarget; // overwrite the stale session buffer
