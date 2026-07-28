@@ -93,6 +93,31 @@ public class BusinessContactFieldsTests
         }
     }
 
+    // Cloning a card copies the source's placeholder, so without an explicit
+    // pass every contact field showed the bot-name hint («Ассистент»).
+    [Test]
+    public void ContactFields_HaveDistinctPlaceholders()
+    {
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
+        var settings = prefab.GetComponent<BotSettings>();
+        var contacts = settings.ContactFields;
+
+        var seen = new System.Collections.Generic.HashSet<string>();
+        for (int i = 0; i < contacts.Length; i++)
+        {
+            Assert.IsNotNull(contacts[i], $"{BotSettings.ContactKeys[i]} not wired");
+            var placeholder = contacts[i].InputField.placeholder as TMPro.TMP_Text;
+            Assert.IsNotNull(placeholder, $"{BotSettings.ContactKeys[i]} has no placeholder");
+
+            var text = placeholder.text;
+            Assert.IsNotEmpty(text, $"{BotSettings.ContactKeys[i]} placeholder is empty");
+            Assert.AreNotEqual("Ассистент", text,
+                $"{BotSettings.ContactKeys[i]} still carries the cloned bot-name placeholder.");
+            Assert.IsTrue(seen.Add(text),
+                $"Placeholder '{text}' is used by more than one contact field.");
+        }
+    }
+
     // The earlier attempt broke the settings screen by running the FULL
     // rebuild, which destroys every top-level child and drops the wiring a
     // dozen other builders apply. This pins the pieces that regressed.

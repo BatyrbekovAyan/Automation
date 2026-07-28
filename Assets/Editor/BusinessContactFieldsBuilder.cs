@@ -48,22 +48,28 @@ public static class BusinessContactFieldsBuilder
         public readonly string Property;
         public readonly string Label;
         public readonly string GoName;
+        public readonly string Placeholder;
 
-        public ContactField(string property, string label, string goName)
+        public ContactField(string property, string label, string goName, string placeholder)
         {
             Property = property;
             Label = label;
             GoName = goName;
+            Placeholder = placeholder;
         }
     }
 
+    // Placeholders are concrete example values, not a repeat of the label —
+    // they teach the expected format (KZ phone shape, opening-hours phrasing,
+    // city-first address). Cloning carries the source card's placeholder
+    // over, so each one must be set explicitly or all five read «Ассистент».
     private static readonly ContactField[] Contacts =
     {
-        new ContactField("PhoneField",     "Телефон",     "Field_Телефон"),
-        new ContactField("HoursField",     "Часы работы", "Field_ЧасыРаботы"),
-        new ContactField("AddressField",   "Адрес",       "Field_Адрес"),
-        new ContactField("InstagramField", "Instagram",   "Field_Instagram"),
-        new ContactField("EmailField",     "Email",       "Field_Email"),
+        new ContactField("PhoneField",     "Телефон",     "Field_Телефон",     "+7 707 123 45 67"),
+        new ContactField("HoursField",     "Часы работы", "Field_ЧасыРаботы",  "Пн–Сб 09:00–19:00"),
+        new ContactField("AddressField",   "Адрес",       "Field_Адрес",       "г. Алматы, ул. Толе би 285"),
+        new ContactField("InstagramField", "Instagram",   "Field_Instagram",   "@my_shop"),
+        new ContactField("EmailField",     "Email",       "Field_Email",       "info@company.kz"),
     };
 
     [MenuItem("Tools/BotSettings/Add Business Contact Fields")]
@@ -205,10 +211,7 @@ public static class BusinessContactFieldsBuilder
     private static bool AddContactSection(BotSettings settings, RectTransform content)
     {
         var so = new SerializedObject(settings);
-        if (AllContactsWired(so))
-        {
-            return false;
-        }
+        var modified = false;
 
         // Section header — clone the existing one so typography/spacing match.
         var sourceHeader = settings.BusinessField.transform.parent.GetComponentInChildren<SectionHeader>();
@@ -217,15 +220,28 @@ public static class BusinessContactFieldsBuilder
             Debug.LogError("[BusinessContactFields] No SectionHeader to clone; aborting.");
             return false;
         }
-        if (content.Find(ContactSectionGoName) == null)
+        var existingHeader = content.Find(ContactSectionGoName);
+        if (existingHeader == null)
         {
             var header = Object.Instantiate(sourceHeader, content);
             header.gameObject.name = ContactSectionGoName;
             header.Text = ContactSectionTitle;
             header.transform.SetAsLastSibling();
+            modified = true;
+        }
+        else
+        {
+            var header = existingHeader.GetComponent<SectionHeader>();
+            if (header != null && header.Text != ContactSectionTitle)
+            {
+                header.Text = ContactSectionTitle;
+                modified = true;
+            }
         }
 
-        // Contact cards — clone the canonical single-line field.
+        // Contact cards — clone the canonical single-line field. Labels,
+        // placeholders and keyboards are re-applied on every run (not just at
+        // creation) so this tool stays the single source of truth for them.
         foreach (var contact in Contacts)
         {
             var prop = so.FindProperty(contact.Property);
@@ -233,68 +249,107 @@ public static class BusinessContactFieldsBuilder
             {
                 Debug.LogError($"[BusinessContactFields] BotSettings has no '{contact.Property}' field. " +
                                "Add the serialized fields to BotSettings.cs first.");
-                return false;
+                return modified;
             }
 
             var existing = content.Find(contact.GoName);
-            EditableField field = existing != null
-                ? existing.GetComponent<EditableField>()
-                : Object.Instantiate(settings.BotNameField, content);
+            EditableField field;
+            if (existing != null)
+            {
+                field = existing.GetComponent<EditableField>();
+            }
+            else
+            {
+                field = Object.Instantiate(settings.BotNameField, content);
+                field.gameObject.name = contact.GoName;
+                field.transform.SetAsLastSibling();
+                modified = true;
+            }
 
             if (field == null)
             {
                 Debug.LogError($"[BusinessContactFields] Could not create {contact.GoName}; aborting.");
-                return false;
+                return modified;
             }
 
-            field.gameObject.name = contact.GoName;
-            field.Label = contact.Label;
-            field.Value = string.Empty;
-            field.transform.SetAsLastSibling();
-            ApplyKeyboard(field, contact.Property);
+            if (field.Label != contact.Label)
+            {
+                field.Label = contact.Label;
+                modified = true;
+            }
+            if (!string.IsNullOrEmpty(field.Value))
+            {
+                field.Value = string.Empty;
+                modified = true;
+            }
 
-            prop.objectReferenceValue = field;
+            modified |= ApplyPlaceholder(field, contact.Placeholder);
+            modified |= ApplyKeyboard(field, contact.Property);
+
+            if (prop.objectReferenceValue != field)
+            {
+                prop.objectReferenceValue = field;
+                modified = true;
+            }
         }
 
-        so.ApplyModifiedPropertiesWithoutUndo();
-        Debug.Log($"[BusinessContactFields] Added {Contacts.Length} contact fields + section header.");
-        return true;
+        if (modified)
+        {
+            so.ApplyModifiedPropertiesWithoutUndo();
+            Debug.Log($"[BusinessContactFields] Applied {Contacts.Length} contact fields + section header.");
+        }
+        return modified;
     }
 
-    private static bool AllContactsWired(SerializedObject so)
+    // The cloned card carries the SOURCE field's placeholder ("Ассистент"),
+    // which is why every contact card read the same hint before this ran.
+    private static bool ApplyPlaceholder(EditableField field, string placeholder)
     {
-        foreach (var contact in Contacts)
+        var input = field.InputField;
+        var target = input != null ? input.placeholder as TMP_Text : null;
+        if (target == null)
         {
-            var prop = so.FindProperty(contact.Property);
-            if (prop == null || prop.objectReferenceValue == null) return false;
+            Debug.LogWarning($"[BusinessContactFields] {field.name} has no TMP placeholder to set.");
+            return false;
         }
+        if (target.text == placeholder) return false;
+
+        target.text = placeholder;
         return true;
     }
 
     // TMP's contentType setter overwrites inputType/keyboardType/validation,
     // so contentType must be assigned BEFORE keyboardType or the keypad
     // choice is silently reverted.
-    private static void ApplyKeyboard(EditableField field, string property)
+    private static bool ApplyKeyboard(EditableField field, string property)
     {
         var input = field.InputField;
-        if (input == null) return;
+        if (input == null) return false;
 
+        var contentType = TMP_InputField.ContentType.Standard;
+        var keyboard = TouchScreenKeyboardType.Default;
         switch (property)
         {
             case "PhoneField":
-                input.contentType = TMP_InputField.ContentType.Standard;
-                input.keyboardType = TouchScreenKeyboardType.PhonePad;
+                keyboard = TouchScreenKeyboardType.PhonePad;
                 break;
             case "EmailField":
-                input.contentType = TMP_InputField.ContentType.EmailAddress;
-                input.keyboardType = TouchScreenKeyboardType.EmailAddress;
-                break;
-            default:
-                input.contentType = TMP_InputField.ContentType.Standard;
-                input.keyboardType = TouchScreenKeyboardType.Default;
+                contentType = TMP_InputField.ContentType.EmailAddress;
+                keyboard = TouchScreenKeyboardType.EmailAddress;
                 break;
         }
+
+        if (input.contentType == contentType
+            && input.keyboardType == keyboard
+            && input.lineType == TMP_InputField.LineType.SingleLine)
+        {
+            return false;
+        }
+
+        input.contentType = contentType;
+        input.keyboardType = keyboard;
         input.lineType = TMP_InputField.LineType.SingleLine;
+        return true;
     }
 }
 #endif
