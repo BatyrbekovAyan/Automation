@@ -7,9 +7,9 @@ v1.0 shipped the semi-auto «Вместе» reply path on WhatsApp. v1.1 Telegra
 ## Milestones
 
 - ✅ **v1.0 Reply Suggestions** — Phases 1-2 (shipped 2026-07-11)
-- 🚧 **v1.1 Telegram Parity** — Phases 3-8 (in progress)
-- 📋 **v1.2 Reply-Trigger Discipline** — Phases 9-10 (planned; specs + plans committed, starts after v1.1 closes)
-- ✅ **v1.3 First-Run Onboarding** — Phase 11 (complete 2026-07-23; /gsd-secure-phase 11 pending; archive via /gsd-complete-milestone at owner discretion)
+- ✅ **v1.1 Telegram Parity** — Phases 3-8 (all phases complete; Phase 8 Gate A passed 2026-07-21, close artifact `08-MILESTONE-CLOSE.md` ready; prod replication PARKED indefinitely per owner — not a pending item; archive via /gsd-complete-milestone at owner discretion)
+- ✅ **v1.2 Reply-Trigger Discipline** — Phases 9-10 (complete: Phase 9 2026-07-22, Phase 10 2026-07-27 — verification 5/5, UAT 5/5, security 14/14, review dispositioned, learnings extracted; archive via /gsd-complete-milestone at owner discretion)
+- ✅ **v1.3 First-Run Onboarding** — Phase 11 (complete 2026-07-23; secure-phase + code-review-fix both DONE 2026-07-27 — 34/34 threats_open 0, review all_fixed; archive via /gsd-complete-milestone at owner discretion)
 
 ## Phases
 

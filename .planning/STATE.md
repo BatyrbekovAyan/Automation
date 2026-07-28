@@ -1,15 +1,15 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Telegram Parity
-status: verifying
-stopped_at: Completed 11-07-PLAN.md (owner UAT gate) — Round 2 approved 2026-07-23; Phase 11 gate closed; next = orchestrator phase-completion step
-last_updated: "2026-07-27T15:12:23.459Z"
+milestone: v1.3
+milestone_name: First-Run Onboarding
+status: complete
+stopped_at: All roadmap phases (3–11) complete across v1.1/v1.2/v1.3. Phase 11 closed 2026-07-23 (verification 10/10, security 34/34 threats_open 0, review all_fixed); Phase 10 closed 2026-07-27 (verification 5/5, UAT 5/5, security 14/14, review dispositioned, learnings extracted). No phase gate outstanding — next action is milestone archiving via /gsd-complete-milestone, at owner discretion.
+last_updated: "2026-07-27T16:45:00.000Z"
 last_activity: 2026-07-27
 progress:
   total_phases: 9
   completed_phases: 9
-  total_plans: 68
+  total_plans: 73
   completed_plans: 73
   percent: 100
 ---
@@ -25,10 +25,12 @@ See: .planning/PROJECT.md (updated 2026-07-12)
 
 ## Current Position
 
-Phase: 11 (first-run-onboarding-flow) — COMPLETE 2026-07-23
+Phase: 11 (first-run-onboarding-flow) — COMPLETE 2026-07-23 — and it was the LAST phase on the roadmap (3–11 all complete)
 Plan: 10/10 (11-01..11-07 + gap round 11-08..11-10); owner UAT gate closed (Round 2 approved); verification PASSED 10/10
-Status: Phase complete — ONB-01..ONB-05 proven on device; remaining: /gsd-secure-phase 11 (threat-model verification), optional /gsd-code-review-fix 11 (3 advisory warnings)
-Last activity: 2026-07-27
+Status: Phase 11 fully closed — ONB-01..ONB-05 proven on device; `/gsd-secure-phase 11` DONE (11-SECURITY.md `verified`, threats_open 0, 34/34) and `/gsd-code-review-fix 11` DONE (11-REVIEW-FIX.md `all_fixed`), both completed 2026-07-27. Nothing outstanding for phase 11 except an optional `11-LEARNINGS.md` (phase 10 has one).
+Last activity: 2026-07-27 — bookkeeping reconciliation: phases 10 + 11 audited, no gate owed; STATE milestone pointer corrected v1.1 → v1.3 (it had lagged two milestones); plan counters reconciled.
+
+**Phase 10 (message-batching-debounce) — FULLY CLOSED 2026-07-27.** Verification PASSED 5/5; HUMAN-UAT 5/5 (scenarios 4–5 resolved once Phase 9's 09-04 unblocked them, after 3 BATCH-03 content fixes); SECURITY secured 14/14 threats_open 0 (R-10-02 rationale amended 2026-07-27 — the WR-03 retry invalidated its "no retry, no loop" premise; re-assessed, still accepted); code review dispositioned (8 fixed / 3 accepted-with-rationale, 0 critical); 10-LEARNINGS.md extracted, and both follow-ups it surfaced are fixed (run-boundary rule now has a pure seam + 8 tests). Suite 1226/1226.
 
 Progress: [██████████] 100%
 
