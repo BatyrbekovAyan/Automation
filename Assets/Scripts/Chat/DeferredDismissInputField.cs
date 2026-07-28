@@ -50,6 +50,11 @@ public class DeferredDismissInputField : TMP_InputField
     public override void OnSelect(BaseEventData eventData)
     {
         dismissPending = false;
+        // Capture the sync target BEFORE activation opens/reuses the native
+        // keyboard: stale-buffer ingestion can land in the SAME LateUpdate
+        // that activates the field — the focused-edge fallback in Update
+        // would then capture the already-corrupted text as the "truth".
+        BeginKeyboardSync();
         base.OnSelect(eventData);
     }
 
@@ -98,19 +103,24 @@ public class DeferredDismissInputField : TMP_InputField
         base.OnDeselect(new BaseEventData(EventSystem.current));
     }
 
+    private void BeginKeyboardSync()
+    {
+        // The field's text at this moment is the truth the native session
+        // must converge to. Captured once — comparing against live `text`
+        // would chase our own corrections after a foreign ingestion.
+        syncingKeyboardText = true;
+        keyboardSyncTarget = text;
+        keyboardSyncStart = Time.unscaledTime;
+    }
+
     private void SyncKeyboardTextOnActivation()
     {
         var focusedNow = isFocused;
-        if (focusedNow && !wasFocusedLastFrame)
-        {
-            // Activation edge: this field's CURRENT text is the truth the
-            // native session must converge to. Captured once — comparing
-            // against live `text` would chase our own corrections after a
-            // foreign ingestion slipped through.
-            syncingKeyboardText = true;
-            keyboardSyncTarget = text;
-            keyboardSyncStart = Time.unscaledTime;
-        }
+        // Fallback for programmatic activations that never route through
+        // OnSelect. Skipped when OnSelect already captured (its capture is
+        // earlier and therefore pristine).
+        if (focusedNow && !wasFocusedLastFrame && !syncingKeyboardText)
+            BeginKeyboardSync();
         wasFocusedLastFrame = focusedNow;
 
         if (!syncingKeyboardText) return;

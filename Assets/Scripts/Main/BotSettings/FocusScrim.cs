@@ -55,6 +55,18 @@ namespace Automation.BotSettingsUI
         private bool paddingApplied;
         private bool preservePaddingOnce;
 
+        // Coverage latch. The decision "is this field's rest slot under the
+        // keyboard" is made once per raise, and only from a SETTLED keyboard
+        // height: the keyboard's rise (and its transient suggestion-strip
+        // overshoot) crosses borderline slots mid-animation, which scrolled a
+        // visible field a little and dropped it back (Часы работы bounce).
+        // The latch may escalate to covered later (a suggestion strip can
+        // genuinely cover a borderline field) but never reverts mid-raise.
+        private bool coveredLatched;
+        private float lastKeyboardCanvas;
+        private int keyboardStableFrames;
+        private const int CoveredDecisionFrames = 4;
+
         // Captured once per raise, with the field at rest. The field's own
         // transform is never written (we move raisedLayer instead), so its
         // geometry is constant for the whole raise — no per-frame re-measure,
@@ -237,14 +249,9 @@ namespace Automation.BotSettingsUI
 
             if (ownerScroll != null)
             {
-                // Covered is judged from the REST slot (slotStartY), never the
-                // live one — once the form scrolls, the live slot rises above
-                // the keyboard and a live check would flap padding/scroll off
-                // mid-raise. A field visible at rest gets NOTHING applied (no
-                // padding, no scroll), so activating it cannot move the page.
-                var covered = keyboardCanvas > 0f && slotStartY < keyboardCanvas;
-                ApplyKeyboardPadding(covered ? keyboardCanvas : 0f);
-                if (covered) ScrollSlotClear(keyboardCanvas);
+                UpdateCoveredLatch(keyboardCanvas);
+                ApplyKeyboardPadding(coveredLatched ? keyboardCanvas : 0f);
+                if (coveredLatched) ScrollSlotClear(keyboardCanvas);
                 TrackSlot();
                 return;
             }
@@ -350,6 +357,9 @@ namespace Automation.BotSettingsUI
         {
             restBottomY = 0f;
             maxLift = 0f;
+            coveredLatched = false;
+            keyboardStableFrames = 0;
+            lastKeyboardCanvas = 0f;
             // While the keyboard padding is applied (handoff), padding.bottom
             // reads the PADDED value — recapturing it as "original" would make
             // the eventual restore bake the keyboard height in permanently.
@@ -381,6 +391,24 @@ namespace Automation.BotSettingsUI
             owner.GetWorldCorners(corners);
             return canvasRect.InverseTransformPoint(corners[1]).y
                    + canvasRect.rect.height * canvasRect.pivot.y;
+        }
+
+        private void UpdateCoveredLatch(float keyboardCanvas)
+        {
+            if (coveredLatched) return;
+            if (keyboardCanvas <= 0f)
+            {
+                keyboardStableFrames = 0;
+                lastKeyboardCanvas = 0f;
+                return;
+            }
+
+            if (Mathf.Abs(keyboardCanvas - lastKeyboardCanvas) < 1f) keyboardStableFrames++;
+            else keyboardStableFrames = 0;
+            lastKeyboardCanvas = keyboardCanvas;
+
+            if (keyboardStableFrames >= CoveredDecisionFrames && slotStartY < keyboardCanvas)
+                coveredLatched = true;
         }
 
         private void ResetLift()

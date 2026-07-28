@@ -113,6 +113,25 @@ public class BusinessContactFieldsTests
         }
     }
 
+    // Mixed line types make the OS swap the native input view type on focus
+    // switches — a full IME session restart that both dips the keyboard and
+    // corrupts text across fields. The products sheet fixed this by unifying
+    // on MultiLineSubmit; the full rebuild silently wiped that fix
+    // (re-applied 2026-07-28). SingleLine is banned prefab-wide.
+    [Test]
+    public void BotSettingsPrefab_NoSingleLineInputs()
+    {
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
+        Assert.IsNotNull(prefab);
+
+        foreach (var input in prefab.GetComponentsInChildren<TMPro.TMP_InputField>(true))
+        {
+            Assert.AreNotEqual(TMPro.TMP_InputField.LineType.SingleLine, input.lineType,
+                $"'{input.transform.parent.name}/{input.name}' is SingleLine — " +
+                "mixed line types reintroduce the IME restart dip + text corruption.");
+        }
+    }
+
     // Cloning a card copies the source's placeholder, so without an explicit
     // pass every contact field showed the bot-name hint («Ассистент»).
     [Test]

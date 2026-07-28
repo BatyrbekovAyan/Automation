@@ -58,13 +58,6 @@ namespace Automation.BotSettingsUI
 
         public TMP_InputField InputField => input;
 
-        // Android IME text-bleed guard state. lastDismissedText is shared
-        // across all fields on purpose: the bleed carries the PREVIOUS
-        // field's buffer into whichever field is focused next.
-        private static string lastDismissedText;
-        private float focusStartTime;
-        private string guardPrevText;
-
         protected virtual void Awake()
         {
             if (input == null) return;
@@ -127,25 +120,6 @@ namespace Automation.BotSettingsUI
             {
                 Blur(commit: true, deactivateInput: false);
             }
-
-            // Android IME bleed guard: right after focus, a dismiss/reopen
-            // restart race can replace this field's text wholesale with the
-            // previously dismissed field's buffer. Detect and discard it.
-            if (isFocused)
-            {
-                var currentText = input.text;
-                if (KeyboardTextBleedGuard.ShouldRevert(
-                        currentText, guardPrevText, lastDismissedText,
-                        Time.unscaledTime - focusStartTime))
-                {
-                    input.text = guardPrevText;
-                    input.MoveTextEnd(false);
-                }
-                else
-                {
-                    guardPrevText = currentText;
-                }
-            }
         }
 
         protected virtual void OnDestroy()
@@ -160,8 +134,6 @@ namespace Automation.BotSettingsUI
             if (isFocused) return;
             isFocused = true;
             focusValue = input.text;
-            focusStartTime = Time.unscaledTime;
-            guardPrevText = input.text;
             OnFocused();
             if (scrim != null)
                 scrim.Show(GetComponent<RectTransform>(), () => Blur(commit: true));
@@ -184,7 +156,6 @@ namespace Automation.BotSettingsUI
             isFocused = false;
 
             var current = input.text;
-            lastDismissedText = current;
             if (commit && current != focusValue)
                 OnCommitted.Invoke(current);
 

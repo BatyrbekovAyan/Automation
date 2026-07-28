@@ -114,6 +114,7 @@ public static class BusinessContactFieldsBuilder
             modified |= ShrinkDescription(descriptionRt);
             modified |= MakeTabScrollable(tab, content);
             modified |= AddContactSection(settings, content);
+            modified |= UnifyLineTypes(prefabRoot);
 
             if (modified)
             {
@@ -341,15 +342,38 @@ public static class BusinessContactFieldsBuilder
 
         if (input.contentType == contentType
             && input.keyboardType == keyboard
-            && input.lineType == TMP_InputField.LineType.SingleLine)
+            && input.lineType == TMP_InputField.LineType.MultiLineSubmit)
         {
             return false;
         }
 
+        // MultiLineSubmit, NOT SingleLine: mixed line types make the OS swap
+        // the native input view type on focus switches (products-sheet bug),
+        // restarting the IME session — the restart is the keyboard dip AND
+        // the cross-field text-corruption window. Order matters: contentType
+        // is assigned first (its setter overwrites lineType), and assigning
+        // lineType after flips a non-Standard contentType to Custom while
+        // keeping the chosen keyboard and validation.
         input.contentType = contentType;
         input.keyboardType = keyboard;
-        input.lineType = TMP_InputField.LineType.SingleLine;
+        input.lineType = TMP_InputField.LineType.MultiLineSubmit;
         return true;
+    }
+
+    // Re-applies the products-sheet line-type fix prefab-wide: the full
+    // rebuild recreated every input as SingleLine, undoing it. Single-line-
+    // looking fields become MultiLineSubmit; real textareas keep
+    // MultiLineNewline.
+    private static bool UnifyLineTypes(GameObject prefabRoot)
+    {
+        var modified = false;
+        foreach (var input in prefabRoot.GetComponentsInChildren<TMP_InputField>(true))
+        {
+            if (input.lineType != TMP_InputField.LineType.SingleLine) continue;
+            input.lineType = TMP_InputField.LineType.MultiLineSubmit;
+            modified = true;
+        }
+        return modified;
     }
 }
 #endif
