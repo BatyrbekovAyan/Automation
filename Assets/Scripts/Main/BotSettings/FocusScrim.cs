@@ -1,8 +1,6 @@
 using System;
-using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace Automation.BotSettingsUI
@@ -28,7 +26,10 @@ namespace Automation.BotSettingsUI
         // needs no re-stamp (a new SerializeField OBJECT reference would
         // deserialize null until a builder ran, and the full BotSettings
         // rebuild is destructive — see BusinessContactFieldsBuilder).
-        [SerializeField] private float keyboardClearance = 48f;
+        // Settle margin for a covered field (canvas units). Tuned on device:
+        // 48 overshot enough that the next card's label peeked above the
+        // keyboard — the requested 8 less lands the field cleanly.
+        [SerializeField] private float keyboardClearance = 40f;
         [SerializeField] private float liftSmoothTime = 0.10f;
 
         private RectTransform raisedField;
@@ -52,8 +53,6 @@ namespace Automation.BotSettingsUI
         private int originalBottomPadding;
         private bool paddingApplied;
         private bool preservePaddingOnce;
-
-        private static readonly List<RaycastResult> raycastResults = new List<RaycastResult>();
 
         // Captured once per raise, with the field at rest. The field's own
         // transform is never written (we move raisedLayer instead), so its
@@ -158,7 +157,7 @@ namespace Automation.BotSettingsUI
                 fingerUp = scrimImage.gameObject.GetComponent<DelayedFingerUpAction>()
                            ?? scrimImage.gameObject.AddComponent<DelayedFingerUpAction>();
             onOutsideTapCached = onOutsideTap;
-            fingerUp.OnRealReleaseAt += HandleOutsideTap;
+            fingerUp.OnRealRelease += HandleOutsideTap;
 
             IsShowing = true;
         }
@@ -176,7 +175,7 @@ namespace Automation.BotSettingsUI
             ResetLift();
 
             if (fingerUp != null)
-                fingerUp.OnRealReleaseAt -= HandleOutsideTap;
+                fingerUp.OnRealRelease -= HandleOutsideTap;
             onOutsideTapCached = null;
 
             scrimGroup.DOKill();
@@ -191,6 +190,12 @@ namespace Automation.BotSettingsUI
 
             if (placeholder != null)
             {
+                // Detach BEFORE the deferred Destroy: the dying placeholder
+                // stays a layout child until end-of-frame, so a fast re-raise
+                // in the same frame would lay the form out with BOTH the old
+                // and new placeholder present — capturing a slot one card off
+                // and displacing the raised field inside the page.
+                placeholder.SetParent(null, worldPositionStays: false);
                 Destroy(placeholder.gameObject);
                 placeholder = null;
             }
@@ -200,68 +205,15 @@ namespace Automation.BotSettingsUI
             IsShowing = false;
         }
 
-        private void HandleOutsideTap(Vector2 releasePosition)
+        // Every tap outside the raised field dismisses — including taps on
+        // other cards (the user re-taps to focus the next field). A raycast
+        // handoff that transferred focus directly was tried and did not
+        // behave on device; the dismiss semantics are the accepted UX, and
+        // the IME text-bleed that the dismiss/reopen cycle can cause is
+        // guarded at the input layer instead (KeyboardTextBleedGuard).
+        private void HandleOutsideTap()
         {
-            var next = FindHandoffTarget(releasePosition);
-            if (next != null)
-            {
-                HandoffTo(next);
-                return;
-            }
             onOutsideTapCached?.Invoke();
-        }
-
-        // Raycasts beneath the scrim at the release point. Returns the tapped
-        // card when the "outside" tap actually landed on another field wired
-        // to this scrim; null means a genuine dismiss. The topmost meaningful
-        // hit decides, so a tap on any overlay above a card stays a dismiss.
-        private EditableField FindHandoffTarget(Vector2 screenPosition)
-        {
-            var eventSystem = EventSystem.current;
-            if (eventSystem == null) return null;
-
-            raycastResults.Clear();
-            eventSystem.RaycastAll(
-                new PointerEventData(eventSystem) { position = screenPosition }, raycastResults);
-
-            foreach (var hit in raycastResults)
-            {
-                if (hit.gameObject == null) continue;
-                var hitTransform = hit.gameObject.transform;
-                if (scrimRoot != null && hitTransform.IsChildOf(scrimRoot.transform)) continue;
-                if (raisedLayer != null && hitTransform.IsChildOf(raisedLayer)) continue;
-
-                var field = hit.gameObject.GetComponentInParent<EditableField>();
-                if (field == null) return null;
-                if ((RectTransform)field.transform == raisedField) return null;
-                return field.Scrim == this ? field : null;
-            }
-            return null;
-        }
-
-        // Switches focus straight from the raised field to the tapped one,
-        // without cycling the OS keyboard. The current field commits via
-        // CommitForHandoff (no DeactivateInputField); the EventSystem deselect
-        // that follows routes its input through DeferredDismissInputField's
-        // smooth-switch branch, so the keyboard stays up — no dip, and no
-        // dismiss/reopen IME restart race to bleed one field's buffer into
-        // the next. The new field's activation then re-raises the scrim via
-        // its own HandleSelect → Show path.
-        private void HandoffTo(EditableField next)
-        {
-            var input = next.InputField;
-            if (input == null)
-            {
-                onOutsideTapCached?.Invoke();
-                return;
-            }
-
-            var current = raisedField != null ? raisedField.GetComponent<EditableField>() : null;
-            current?.CommitForHandoff();
-
-            var eventSystem = EventSystem.current;
-            if (eventSystem != null) eventSystem.SetSelectedGameObject(input.gameObject);
-            input.ActivateInputField();
         }
 
         // Raises the layer just enough to clear the keyboard. No field-switch

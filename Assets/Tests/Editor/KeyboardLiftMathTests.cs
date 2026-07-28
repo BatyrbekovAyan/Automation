@@ -37,11 +37,30 @@ public class KeyboardLiftMathTests
     }
 
     [Test]
-    public void FieldAtKeyboardTop_LiftsByClearanceOnly()
+    public void FieldAtKeyboardTop_NoLift()
     {
+        // clearance is a settle margin for covered fields, not a trigger
+        // threshold: a field whose bottom already clears the keyboard top
+        // must not creep upward (device report: Адрес lifted while visible).
         var lift = KeyboardLiftMath.RequiredLift(
             fieldBottomAtRestY: 800f, keyboardTopY: 800f, clearance: 48f, maxLift: NoCeiling);
-        Assert.AreEqual(48f, lift);
+        Assert.AreEqual(0f, lift);
+    }
+
+    [Test]
+    public void FieldJustAboveKeyboard_NoLift_EvenWithinClearance()
+    {
+        var lift = KeyboardLiftMath.RequiredLift(
+            fieldBottomAtRestY: 810f, keyboardTopY: 800f, clearance: 48f, maxLift: NoCeiling);
+        Assert.AreEqual(0f, lift);
+    }
+
+    [Test]
+    public void FieldJustCovered_LiftsToClearance()
+    {
+        var lift = KeyboardLiftMath.RequiredLift(
+            fieldBottomAtRestY: 799f, keyboardTopY: 800f, clearance: 48f, maxLift: NoCeiling);
+        Assert.AreEqual(49f, lift);
     }
 
     [Test]
@@ -100,6 +119,14 @@ public class KeyboardLiftMathTests
     {
         var delta = KeyboardLiftMath.ScrollDeltaNormalized(
             slotBottomY: 1200f, keyboardTopY: 800f, clearance: 48f, scrollableRange: 500f);
+        Assert.AreEqual(0f, delta);
+    }
+
+    [Test]
+    public void Scroll_SlotJustAboveKeyboard_NoScroll_EvenWithinClearance()
+    {
+        var delta = KeyboardLiftMath.ScrollDeltaNormalized(
+            slotBottomY: 810f, keyboardTopY: 800f, clearance: 48f, scrollableRange: 1496f);
         Assert.AreEqual(0f, delta);
     }
 

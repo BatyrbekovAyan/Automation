@@ -58,30 +58,12 @@ namespace Automation.BotSettingsUI
 
         public TMP_InputField InputField => input;
 
-        /// <summary>The scrim this field raises onto (null for sheet fields).</summary>
-        public FocusScrim Scrim => scrim;
-
-        // Commit-without-dismiss, for FocusScrim's field-to-field handoff.
-        // The input is deliberately NOT deactivated: the EventSystem deselect
-        // that follows routes it through DeferredDismissInputField's
-        // smooth-switch branch (SilentCaretStop), which keeps the OS keyboard
-        // up and nulls m_SoftKeyboard so this field can't ingest the shared
-        // keyboard buffer once the next field starts driving it. No
-        // scrim.Hide either — the scrim orchestrates the visual swap itself.
-        // Setting isFocused=false first makes the later event-path Blur
-        // (ReleaseSelection → onEndEdit → HandleEndEdit) a no-op.
-        public void CommitForHandoff()
-        {
-            if (!isFocused) return;
-            isFocused = false;
-
-            var current = input != null ? input.text : focusValue;
-            if (current != focusValue)
-                OnCommitted.Invoke(current);
-
-            OnBlurred();
-            Blurred?.Invoke(this);
-        }
+        // Android IME text-bleed guard state. lastDismissedText is shared
+        // across all fields on purpose: the bleed carries the PREVIOUS
+        // field's buffer into whichever field is focused next.
+        private static string lastDismissedText;
+        private float focusStartTime;
+        private string guardPrevText;
 
         protected virtual void Awake()
         {
@@ -145,6 +127,25 @@ namespace Automation.BotSettingsUI
             {
                 Blur(commit: true, deactivateInput: false);
             }
+
+            // Android IME bleed guard: right after focus, a dismiss/reopen
+            // restart race can replace this field's text wholesale with the
+            // previously dismissed field's buffer. Detect and discard it.
+            if (isFocused)
+            {
+                var currentText = input.text;
+                if (KeyboardTextBleedGuard.ShouldRevert(
+                        currentText, guardPrevText, lastDismissedText,
+                        Time.unscaledTime - focusStartTime))
+                {
+                    input.text = guardPrevText;
+                    input.MoveTextEnd(false);
+                }
+                else
+                {
+                    guardPrevText = currentText;
+                }
+            }
         }
 
         protected virtual void OnDestroy()
@@ -159,6 +160,8 @@ namespace Automation.BotSettingsUI
             if (isFocused) return;
             isFocused = true;
             focusValue = input.text;
+            focusStartTime = Time.unscaledTime;
+            guardPrevText = input.text;
             OnFocused();
             if (scrim != null)
                 scrim.Show(GetComponent<RectTransform>(), () => Blur(commit: true));
@@ -181,6 +184,7 @@ namespace Automation.BotSettingsUI
             isFocused = false;
 
             var current = input.text;
+            lastDismissedText = current;
             if (commit && current != focusValue)
                 OnCommitted.Invoke(current);
 

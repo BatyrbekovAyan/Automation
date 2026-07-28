@@ -67,6 +67,11 @@ public static class KeyboardLiftMath
         // device as a twitch when the keyboard dismisses.
         if (keyboardTopY <= 0f) return 0f;
 
+        // Fully visible above the keyboard: leave it exactly where it is.
+        // clearance is a SETTLE margin for covered fields, not a trigger
+        // threshold — a field sitting just above the keyboard must not creep.
+        if (fieldBottomAtRestY >= keyboardTopY) return 0f;
+
         var needed = keyboardTopY + clearance - fieldBottomAtRestY;
         if (needed <= 0f) return 0f;
 
@@ -94,6 +99,10 @@ public static class KeyboardLiftMath
         float scrollableRange)
     {
         if (keyboardTopY <= 0f || scrollableRange <= 0f) return 0f;
+
+        // Same visibility rule as RequiredLift: a slot already above the
+        // keyboard top must not trigger any scroll.
+        if (slotBottomY >= keyboardTopY) return 0f;
 
         var needed = keyboardTopY + clearance - slotBottomY;
         if (needed <= 0f) return 0f;
