@@ -423,6 +423,7 @@ public partial class Manager : MonoBehaviour
 
                 recreatedBotSettings.BusinessField.Value = PlayerPrefs.GetString(recreatedBot.name + "Business", "");
                 recreatedBotSettings.PromptField.Value = PlayerPrefs.GetString(recreatedBot.name + "Prompt", "");
+                LoadContactFields(recreatedBotSettings, recreatedBot.name);
 
                 int ProductsNumber = PlayerPrefs.GetInt(recreatedBot.name + "ProductsNumber", 0);
                 for (int p = 0; p < ProductsNumber; p++)
@@ -751,6 +752,13 @@ public partial class Manager : MonoBehaviour
 
         PlayerPrefs.SetString(openBot.name + "Prompt", openBotSettings.PromptField.Value);
 
+        var contactFieldsToSave = openBotSettings.ContactFields;
+        for (int c = 0; c < contactFieldsToSave.Length; c++)
+        {
+            if (contactFieldsToSave[c] == null) continue;
+            PlayerPrefs.SetString(openBot.name + global::BotSettings.ContactKeys[c], contactFieldsToSave[c].Value);
+        }
+
 
         for (int i = 0; i < openBotSettings.ProductsParent.transform.childCount; i++)
         {
@@ -858,6 +866,7 @@ public partial class Manager : MonoBehaviour
 
         openBotSettings.BusinessField.Value = PlayerPrefs.GetString(openBot.name + "Business", "");
         openBotSettings.PromptField.Value = PlayerPrefs.GetString(openBot.name + "Prompt", "");
+        LoadContactFields(openBotSettings, openBot.name);
 
 
         for (int p = 0; p < openBotSettings.ProductsParent.transform.childCount; p++)
@@ -929,6 +938,44 @@ public partial class Manager : MonoBehaviour
         return builder.ToString();
     }
 
+    // Convenience overload: pulls the six values off a BotSettings instance.
+    // Null-tolerant per field so a prefab that predates the contact cards
+    // (or a bot opened before the builder ran) still composes its description.
+    public static string ComposeBusinessKnowledge(global::BotSettings settings)
+    {
+        var contacts = settings.ContactFields;
+        string Read(int index) =>
+            contacts[index] != null ? contacts[index].Value : "";
+
+        return ComposeBusinessKnowledge(
+            settings.BusinessField.Value,
+            Read(0), Read(1), Read(2), Read(3), Read(4));
+    }
+
+    // Fills the contact cards from PlayerPrefs. Shared by the bot-recreate
+    // path and the revert-on-close path.
+    private static void LoadContactFields(global::BotSettings settings, string botName)
+    {
+        var contacts = settings.ContactFields;
+        for (int c = 0; c < contacts.Length; c++)
+        {
+            if (contacts[c] == null) continue;
+            contacts[c].Value = PlayerPrefs.GetString(botName + global::BotSettings.ContactKeys[c], "");
+        }
+    }
+
+    private static bool ContactFieldsChanged(global::BotSettings settings, string botName)
+    {
+        var contacts = settings.ContactFields;
+        for (int c = 0; c < contacts.Length; c++)
+        {
+            if (contacts[c] == null) continue;
+            if (!contacts[c].Value.Equals(PlayerPrefs.GetString(botName + global::BotSettings.ContactKeys[c], "")))
+                return true;
+        }
+        return false;
+    }
+
     public void EnableSave()
     {
         bool settingsChanged = false;
@@ -943,7 +990,8 @@ public partial class Manager : MonoBehaviour
             !openBotSettings.WhatsappNumberField.Value.Equals(PlayerPrefs.GetString(openBot.name + "WhatsappNumber", "")) ||
             !openBotSettings.TelegramNumberField.Value.Equals(PlausibleTelegramNumber(PlayerPrefs.GetString(openBot.name + "TelegramNumber", ""))) ||
             !openBotSettings.BusinessField.Value.Equals(PlayerPrefs.GetString(openBot.name + "Business", "")) ||
-            !openBotSettings.PromptField.Value.Equals(PlayerPrefs.GetString(openBot.name + "Prompt", "")))
+            !openBotSettings.PromptField.Value.Equals(PlayerPrefs.GetString(openBot.name + "Prompt", "")) ||
+            ContactFieldsChanged(openBotSettings, openBot.name))
         {
             settingsChanged = true;
         }
@@ -3254,7 +3302,7 @@ public partial class Manager : MonoBehaviour
         string tgId = openBot.GetComponent<Bot>().telegramWorkflowId;
         form.AddField("TelegramWorkflowId", string.IsNullOrEmpty(tgId) ? Bot.UnauthedProfileSentinel : tgId);
 
-        form.AddField("Business", "About Business:\n" + openBotSettings.BusinessField.Value);
+        form.AddField("Business", ComposeBusinessKnowledge(openBotSettings));
         form.AddField("Prompt", openBotSettings.PromptField.Value);
         form.AddField("ProductsList", "Products:\n" + productsList);
         form.AddField("ServicesList", "Services:\n" + servicesList);
@@ -3412,7 +3460,7 @@ public partial class Manager : MonoBehaviour
         string waId = openBot.GetComponent<Bot>().whatsappWorkflowId;
         form.AddField("WhatsappWorkflowId", string.IsNullOrEmpty(waId) ? Bot.UnauthedProfileSentinel : waId);
 
-        form.AddField("Business", "About Business:\n" + openBotSettings.BusinessField.Value);
+        form.AddField("Business", ComposeBusinessKnowledge(openBotSettings));
         form.AddField("Prompt", openBotSettings.PromptField.Value);
         form.AddField("ProductsList", "Products:\n" + productsList);
         form.AddField("ServicesList", "Services:\n" + servicesList);
@@ -3653,7 +3701,7 @@ public partial class Manager : MonoBehaviour
         form.AddField("TelegramWorkflowId", telegramWorkflowId);
         form.AddField("Name", openBotSettings.BotNameField.Value);
         AddBusinessTypeFields(form);
-        form.AddField("Business", openBotSettings.BusinessField.Value);
+        form.AddField("Business", ComposeBusinessKnowledge(openBotSettings));
         form.AddField("Prompt", openBotSettings.PromptField.Value);
         form.AddField("ProductsList", productsList);
         form.AddField("ServicesList", servicesList);

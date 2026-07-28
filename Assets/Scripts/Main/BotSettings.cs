@@ -49,6 +49,25 @@ public partial class BotSettings : MonoBehaviour
     #region Serialized — Business / Prompt
     [SerializeField] public EditableTextArea BusinessField;
     [SerializeField] public EditableTextArea PromptField;
+
+    // Contact cards under «КОНТАКТЫ И ИНФОРМАЦИЯ» on the Бизнес tab.
+    // Built + wired by Tools/BotSettings/Add Business Contact Fields.
+    [SerializeField] public EditableField PhoneField;
+    [SerializeField] public EditableField HoursField;
+    [SerializeField] public EditableField AddressField;
+    [SerializeField] public EditableField InstagramField;
+    [SerializeField] public EditableField EmailField;
+
+    // The five cards and their PlayerPrefs key suffixes, index-aligned.
+    // Every consumer (wiring, save, revert, dirty-check, delete, and the
+    // composed contact block) walks these instead of repeating the list,
+    // so a field can never be persisted under the wrong key or forgotten
+    // at one of the sites. Order is also the display/compose order.
+    public static readonly string[] ContactKeys =
+        { "Phone", "Hours", "Address", "Instagram", "Email" };
+
+    public EditableField[] ContactFields =>
+        new[] { PhoneField, HoursField, AddressField, InstagramField, EmailField };
     #endregion
 
     #region Serialized — Products / Services
@@ -453,6 +472,12 @@ public partial class BotSettings : MonoBehaviour
             BusinessField.OnCommitted.AddListener(_ => Manager.Instance.EnableSave());
         if (PromptField != null)
             PromptField.OnCommitted.AddListener(_ => Manager.Instance.EnableSave());
+
+        foreach (var contactField in ContactFields)
+        {
+            if (contactField != null)
+                contactField.OnCommitted.AddListener(_ => Manager.Instance.EnableSave());
+        }
 
         if (BusinessTypeDropdown != null)
             BusinessTypeDropdown.onValueChanged.AddListener(_ => Manager.Instance.EnableSave());
