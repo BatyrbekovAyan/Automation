@@ -15,6 +15,45 @@ using NUnit.Framework;
 /// </summary>
 public class WappiStatusParserTests
 {
+    // ── TryGetAuthorized — DESTRUCTIVE-PATH SAFETY ────────────────────────────
+    // CheckWhatsappUnauthorizationOutsideApp deletes the Wappi profile, clears the saved
+    // number and sets isOnWhatsapp=0 when this returns true with authorized==false. The
+    // 2026-07-27 security re-audit proved empirically (28 adversarial bodies) that a
+    // malformed / missing / non-boolean body can NEVER reach that delete — but nothing
+    // guarded the property. These lock it in: a future refactor that makes any of these
+    // return true would silently start deleting authorized users' profiles.
+
+    [TestCase("{\"authorized\":null}")]
+    [TestCase("{\"authorized\":0}")]
+    [TestCase("{\"authorized\":1}")]
+    [TestCase("{\"authorized\":\"yes\"}")]
+    [TestCase("{\"authorized\":\"\"}")]
+    [TestCase("{\"account\":{\"authorized\":false}}")]   // nested-only — not the top-level key
+    [TestCase("{\"AUTHORIZED\":false}")]                 // wrong case
+    [TestCase("[{\"authorized\":false}]")]               // array root
+    [TestCase("{\"status\":\"error\",\"detail\":\"boom\"}")]
+    [TestCase("{broken")]
+    [TestCase("not json")]
+    [TestCase("")]
+    [TestCase(null)]
+    public void TryGetAuthorized_NonBooleanOrMalformed_ReturnsFalse_SoTheDestructivePathCannotFire(string body)
+        => Assert.IsFalse(WappiStatusParser.TryGetAuthorized(body, out _),
+            "A body that is not a definitive boolean must NOT be treated as a parsed answer — " +
+            "the caller's delete branch fires only inside the true-return.");
+
+    [Test]
+    public void TryGetAuthorized_DefinitiveFalse_IsTheOnlyDeleteTrigger()
+    {
+        Assert.IsTrue(WappiStatusParser.TryGetAuthorized("{\"authorized\":false}", out bool boolFalse));
+        Assert.IsFalse(boolFalse);
+        // Documented, deliberately-safer delta: a bool-parseable STRING also counts.
+        Assert.IsTrue(WappiStatusParser.TryGetAuthorized("{\"authorized\":\"false\"}", out bool strFalse));
+        Assert.IsFalse(strFalse);
+        // Pretty-printed must parse too — the shape that used to throw.
+        Assert.IsTrue(WappiStatusParser.TryGetAuthorized("{\n  \"authorized\": false\n}", out bool pretty));
+        Assert.IsFalse(pretty);
+    }
+
     // ── TryGetStatus — the ubiquitous "status" marker ─────────────────────────
     // Regression cover for the fixed Substring(startIndex, 4): threw when fewer than four
     // chars followed "status":" , and its prefix test matched any status STARTING with "done".
