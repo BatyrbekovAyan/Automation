@@ -123,9 +123,9 @@ suppressed chat skips the path), **not** the app-toggle round-trip.
 - **EXPECT:** the suggestion cards refresh **ONCE** (after ~2.5s), grounded in the
   latest/combined incoming — **not** a flicker of N refreshes (коалесцированно, один раз).
 - **Sub-check A (manual refresh immediate):** tap the **manual refresh** mid-burst → it
-  responds **IMMEDIATELY** (not delayed by the debounce). ☐ not reached (blocked)
+  responds **IMMEDIATELY** (not delayed by the debounce). ☑ **PASS** (owner, 2026-07-28 — closed during the v1.0 UAT-debt closeout)
 - **Sub-check B (card-pick immediate):** tap a **card** → it re-clusters **IMMEDIATELY** (not
-  delayed by the debounce). ☐ not reached (blocked)
+  delayed by the debounce). ☑ **PASS** (owner, 2026-07-28 — closed during the v1.0 UAT-debt closeout)
 - **Do this on BOTH channels** (WhatsApp + Telegram).
 - **Result (coalesce, WhatsApp):** ☑ **PASS** (owner device + runData, 2026-07-27) — see resolution below
 - **Result (coalesce, Telegram):** ☑ **PASS** (2026-07-27 — TG combine path identical; coalesce is channel-agnostic client logic, WhatsApp exercised on device)

@@ -1,8 +1,8 @@
 ---
 phase: 01-polished-suggestions-panel-on-mock-data
 verified: 2026-06-25T13:05:00Z
-status: human_needed
-score: 17/17 must-haves verified (programmatic); 4 runtime/visual items routed to human
+status: passed
+score: 17/17 must-haves verified (programmatic); 4 runtime/visual items CLOSED 2026-07-28 (2 owner-verified, 1 superseded by Phase 9 UAT, 1 accepted deviation)
 overrides_applied: 0
 human_verification:
   - test: "Per-chat semi-auto persistence survives an app restart"
@@ -151,3 +151,25 @@ The phase is **goal-complete at the code/wiring level**. Status is `human_needed
 
 _Verified: 2026-06-25T13:05:00Z_
 _Verifier: Claude (gsd-verifier)_
+
+
+---
+
+## Human Verification — CLOSED 2026-07-28
+
+All 4 items routed to human at v1.0 are now dispositioned (details and verdicts in
+`01-HUMAN-UAT.md`, which is `status: resolved`):
+
+1. **Restart persistence (SC-1)** — SUPERSEDED by Phase 9's UAT (09-05, 5/5 both channels: per-chat
+   override, `'*'` default, absence fallback) plus the `RestoreForActiveChat` re-assert-on-open heal
+   that post-dates v1.0.
+2. **Visual state machine (SC-2 / PANEL-04 / PANEL-06)** — PARTIAL, accepted. Error/empty/card states
+   render and recover. Truncation was never implemented (`SuggestionCard.Setup` assigns the text with
+   no clamp) and the owner accepted the current behavior on 2026-07-28 — a deliberate deviation from
+   the original contract, not a defect. The «Рекомендуем» badge clause is obsolete: the badge was
+   replaced by the mint tint on the top card.
+3. **Hand-off + auto-populate (INT-01/02/04)** — PASS (owner, 2026-07-28); card tap fills the composer
+   immediately with no auto-send. Draft protection superseded by Phase 10's `HandleLive` rewrite.
+4. **Stale-response discard under load (SC-5 / DATA-03)** — PASS (owner, 2026-07-28).
+
+The original note held up: *"nothing here is a known defect."* Nothing found in the closeout either.

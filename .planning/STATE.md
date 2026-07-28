@@ -167,9 +167,9 @@ Items acknowledged and carried forward:
 |----------|------|--------|-------------|
 | Feedback | FB-01 thumbs-up/down to improve ranking | Deferred to v2 | v1.0 Init |
 | Insight | FB-02 per-chat/per-bot suggestion analytics | Deferred to v2 | v1.0 Init |
-| uat_gap | Phase 01: 01-HUMAN-UAT.md — 4 pending device scenarios | partial → Phase 8 | v1.0 close 2026-07-11 |
-| uat_gap | Phase 02: 02-HUMAN-UAT.md — 4 pending device scenarios | partial → Phase 8 | v1.0 close 2026-07-11 |
-| verification_gap | Phase 01: 01-VERIFICATION.md awaits device confirmation | human_needed → Phase 8 | v1.0 close 2026-07-11 |
+| uat_gap | Phase 01: 01-HUMAN-UAT.md — 4 device scenarios | ✅ RESOLVED 2026-07-28 (2 owner-verified PASS, 1 superseded by Phase 9 UAT, 1 accepted deviation: card text does not truncate, owner accepted as-is) | v1.0 close 2026-07-11 |
+| uat_gap | Phase 02: 02-HUMAN-UAT.md — 5 device scenarios | ✅ RESOLVED 2026-07-28 (4 PASS incl. the never-before-tested airplane-mode error path, 1 superseded by Phase 10) | v1.0 close 2026-07-11 |
+| verification_gap | Phase 01: 01-VERIFICATION.md awaited device confirmation | ✅ RESOLVED 2026-07-28 — status passed; all 4 human items dispositioned | v1.0 close 2026-07-11 |
 | Polish | POL-01 streaming/animated suggestion reveal | Deferred to v2 | v1.0 Init |
 | Milestone | Prod bagkz replication (Suggest Replies + all Telegram fixes) | pending → Phase 8 checklist | v1.1 start 2026-07-12 |
 | Milestone | Server-side «Вместе» suppression | pending (v2 SUPPRESS-01) | v1.0 close |

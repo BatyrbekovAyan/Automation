@@ -98,6 +98,6 @@ None active. Run `/gsd-new-milestone` to start the next one (questioning → res
 
 Not closed by any milestone — carried forward:
 
-- **v1.0 UAT debt:** `01-HUMAN-UAT.md` and `02-HUMAN-UAT.md` remain `status: partial` (device scenarios never fully run), and `01-VERIFICATION.md` still awaits device confirmation. Routed to Phase 8 at v1.0 close; Phase 8's Gate A superseded the v1.1 verification debt (phases 03-08) but not these.
+- ~~**v1.0 UAT debt**~~ — **CLOSED 2026-07-28.** All three artifacts (`01-HUMAN-UAT.md`, `02-HUMAN-UAT.md`, `01-VERIFICATION.md`) are now `resolved`/`passed`. Run against current behavior rather than the stale v1.0 scripts: owner verified the airplane-mode error path (never tested by any phase before), stale/crossed-response discard under rapid picks, and card-tap/manual-refresh immediacy — which also closed Phase 10's last two open sub-checks. One accepted deviation recorded: suggestion cards do not truncate long replies (SC-2/PANEL-04 asked for ~2 lines + ellipsis); owner accepted current behavior, so it is a deliberate deviation, not a defect.
 - **D15 (WhatsApp in-app reaction removal):** open-deferred follow-up. The probe returned `reactionsKey=True`, so an absence-based reconcile IS possible — capture the `reactions[]` shape first.
 - **Prod bagkz replication:** PARKED indefinitely per owner. Not pending work; listed only so it is not rediscovered as a surprise.
