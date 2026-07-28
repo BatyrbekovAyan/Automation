@@ -122,6 +122,16 @@ namespace Automation.BotSettingsUI
                 ? originalParent.GetComponent<VerticalLayoutGroup>()
                 : null;
 
+            // Lay the placeholder out into the field's real slot NOW. It was
+            // created this frame with default (centered) anchors, so reading
+            // it before a layout pass returns the middle of the form — the
+            // captured slot start would then be wrong and TrackSlot would
+            // teleport the raised card on the next frame, yanking it out from
+            // under the finger mid-tap. That cancels the click, so the input
+            // never activates and the keyboard never opens.
+            if (originalParent is RectTransform formRect && formRect.gameObject.activeInHierarchy)
+                LayoutRebuilder.ForceRebuildLayoutImmediate(formRect);
+
             CaptureLiftGeometry(field);
 
             scrimRoot.SetActive(true);
@@ -280,8 +290,12 @@ namespace Automation.BotSettingsUI
 
             var pad = ownerLayout.padding;
             ownerLayout.padding = new RectOffset(pad.left, pad.right, pad.top, originalBottomPadding);
-            if (originalParent is RectTransform parentRect && originalParent.gameObject.activeInHierarchy)
-                LayoutRebuilder.ForceRebuildLayoutImmediate(parentRect);
+            // Rebuild the layout whose padding was just restored — NOT
+            // originalParent, which by the Show-path call has already been
+            // repointed at the new field's form.
+            var layoutRect = (RectTransform)ownerLayout.transform;
+            if (layoutRect.gameObject.activeInHierarchy)
+                LayoutRebuilder.ForceRebuildLayoutImmediate(layoutRect);
             paddingApplied = false;
         }
 
