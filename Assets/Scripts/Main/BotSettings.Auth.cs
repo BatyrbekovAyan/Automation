@@ -428,25 +428,24 @@ public partial class BotSettings
     // boards reach the iPhone Photos library, not just the document picker.
     private void UploadPriceList()
     {
-        ShowUploadSourceSheet("product", UploadProductsPriceListButton);
+        ShowUploadSourceSheet("product");
     }
 
     private void UploadServiceList()
     {
-        ShowUploadSourceSheet("service", UploadServicesPriceListButton);
+        ShowUploadSourceSheet("service");
     }
 
-    private void ShowUploadSourceSheet(string contentType, Button targetButton)
+    private void ShowUploadSourceSheet(string contentType)
     {
         pendingUploadContentType = contentType;
-        pendingUploadButton = targetButton;
 
         // No sheet baked into this prefab yet — degrade gracefully to the old
         // direct-picker behaviour so uploads still work.
         if (uploadSourceSheet == null)
         {
             InitializeFilePickerTypes();
-            PickMediaFile(contentType, targetButton);
+            PickMediaFile(contentType);
             return;
         }
 
@@ -459,21 +458,20 @@ public partial class BotSettings
     {
         if (uploadSourceSheet != null) uploadSourceSheet.Hide();
         InitializeFilePickerTypes();
-        PickMediaFile(pendingUploadContentType, pendingUploadButton);
+        PickMediaFile(pendingUploadContentType);
     }
 
     // Wired to the sheet's «Фото из галереи» button (via
     // UploadSourceSheet.OnGalleryPressed). Multi-selects photos and reuses the
-    // same UploadFile coroutine — the image branch there decodes/downscales and
+    // same upload path — UploadPayloadBuilder decodes/downscales each photo and
     // the workflow's vision branch extracts the prices.
     public void OnUploadSourceGalleryPressed()
     {
         if (uploadSourceSheet != null) uploadSourceSheet.Hide();
 
         // Snapshot the pending context: the callback runs asynchronously and a
-        // later tap could overwrite the fields before it fires.
+        // later tap could overwrite the field before it fires.
         string contentType = pendingUploadContentType;
-        Button targetButton = pendingUploadButton;
 
         NativeGallery.GetImagesFromGallery(paths =>
         {
@@ -499,7 +497,7 @@ public partial class BotSettings
                 string displayName = GalleryPhotoNamer.DisplayName(System.DateTime.Now, index, paths.Length, takenNames);
                 takenNames.Add(displayName);
                 index++;
-                StartCoroutine(UploadFile(path, contentType, targetButton, displayName));
+                StartCoroutine(BeginUpload(path, contentType, displayName));
             }
         }, "Выберите фото прайс-листа");
     }
@@ -524,7 +522,7 @@ public partial class BotSettings
         heic = NativeFilePicker.ConvertExtensionToFileType("heic");
     }
 
-    private void PickMediaFile(string contentType, Button targetButton)
+    private void PickMediaFile(string contentType)
     {
 #if UNITY_ANDROID
 				// Use MIMEs on Android
@@ -546,13 +544,18 @@ public partial class BotSettings
                 for (int i = 0; i < paths.Length; i++)
                 {
                     Debug.Log("Picked file: " + paths[i]);
-                    StartCoroutine(UploadFile(paths[i], contentType, targetButton));
+                    StartCoroutine(BeginUpload(paths[i], contentType));
                 }
             }
         }, fileTypes);
     }
 
-    private IEnumerator UploadFile(string filePath, string contentType, Button targetButton, string displayNameOverride = null)
+    // Asks the one question that needs the user (replace an existing file?),
+    // then hands the upload to UploadCenter. The transfer itself deliberately
+    // does NOT run here: this MonoBehaviour's coroutines are killed the moment
+    // the settings screen is deactivated, which used to abandon the upload
+    // mid-request while n8n finished ingesting it anyway.
+    private IEnumerator BeginUpload(string filePath, string contentType, string displayNameOverride = null)
     {
         Bot openBot = Manager.openBot != null ? Manager.openBot.GetComponent<Bot>() : null;
         if (openBot == null)
@@ -565,10 +568,6 @@ public partial class BotSettings
         // all named pickedMediaN.jpg (reused every session), which both looks
         // broken in the list and cross-matches the replace-by-name flow.
         string fileName = displayNameOverride ?? Path.GetFileName(filePath);
-        // Lowercased: mobile pickers filter by MIME/UTI, not by name, so a
-        // "MENU.PDF" is perfectly pickable — and an ordinal Equals(".pdf")
-        // would match no branch and post the form with no file attached.
-        string fileExtension = Path.GetExtension(filePath).ToLowerInvariant();
 
         // A same-named upload replaces the existing file's knowledge — ask
         // before uploading anything. Cancel = no upload, the old file stays.
@@ -579,211 +578,7 @@ public partial class BotSettings
             if (!replaceConfirmed) yield break;
         }
 
-        // Optimistic feedback: the row appears in «Прайс-листы» immediately, in
-        // an uploading state — the n8n webhook takes a few seconds (extraction +
-        // embedding) and a silent gap reads as "did my tap even register?".
-        GameObject pendingRow = AddPendingFileRow(contentType, fileName);
-        System.Action retryUpload = () => StartCoroutine(UploadFile(filePath, contentType, targetButton, displayNameOverride));
-
-        byte[] fileData = ReadFileOrNull(filePath);
-        if (fileData == null)
-        {
-            MarkPendingRowFailed(pendingRow, contentType, retryUpload);
-            yield break;
-        }
-
-        WWWForm form = new();
-
-        form.AddField("whatsappWorkflowId", openBot.whatsappWorkflowId);
-        form.AddField("telegramWorkflowId", openBot.telegramWorkflowId);
-        form.AddField("contentType", contentType);
-
-        // Mint a stable per-file id up front and send it with the upload. The n8n
-        // UploadFile workflow stamps this onto every RAG chunk (metadata.fileId), so
-        // the per-file delete (X) can later remove exactly this file's chunks.
-        string fileId = System.Guid.NewGuid().ToString();
-        form.AddField("fileId", fileId);
-
-        // Every non-PDF format converts to plain text ON-DEVICE (the workflow
-        // only ingests text/plain + PDF). Converted text is validated below:
-        // an empty conversion or a converter throw fails the row honestly
-        // instead of uploading zero knowledge or hanging the coroutine.
-        byte[] payloadBytes = null;
-        string payloadName = null;
-        string payloadMime = null;
-        string convertedText = null;
-        string failReason = null;   // dev-facing, goes to the error log
-        string failReasonRu = null; // user-facing, shown in the row (deterministic failures)
-
-        try
-        {
-            if (fileExtension.Equals(".pdf"))
-            {
-                payloadBytes = fileData;
-                payloadName = fileName;
-                payloadMime = "application/pdf";
-            }
-            else if (fileExtension.Equals(".txt"))
-            {
-                // Old-Notepad/1C TXT is often windows-1251 or UTF-16 — the
-                // workflow assumes UTF-8, so those used to ingest as mojibake.
-                convertedText = TextEncodingSniffer.Decode(fileData);
-                payloadName = fileName;
-            }
-            else if (fileExtension.Equals(".rtf"))
-            {
-                convertedText = RtfToTextConverter.Convert(fileData);
-                payloadName = fileName + ".txt";
-            }
-            else if (fileExtension.Equals(".xml"))
-            {
-                // Byte overload honors the prolog's declared encoding
-                // (1C/CommerceML exports are commonly windows-1251).
-                convertedText = XmlToTextConverter.ConvertXmlToText(fileData);
-                payloadName = Path.ChangeExtension(fileName, ".txt");
-            }
-            else if (fileExtension.Equals(".csv") || fileExtension.Equals(".tsv")
-                || fileExtension.Equals(".xls") || fileExtension.Equals(".xlsx") || fileExtension.Equals(".xlsm"))
-            {
-                convertedText = TableToTextConverter.Convert(fileData, fileName, contentType);
-                payloadName = fileName + ".txt";
-            }
-            else if (fileExtension.Equals(".html") || fileExtension.Equals(".htm"))
-            {
-                convertedText = HtmlTableToTextConverter.Convert(fileData, contentType);
-                payloadName = fileName + ".txt";
-            }
-            else if (fileExtension.Equals(".docx"))
-            {
-                convertedText = DocxToTextConverter.Convert(fileData);
-                payloadName = fileName + ".txt";
-            }
-            else if (fileExtension.Equals(".jpg") || fileExtension.Equals(".jpeg") || fileExtension.Equals(".png")
-                || fileExtension.Equals(".webp") || fileExtension.Equals(".heic"))
-            {
-                // Photos of menus/price boards: decode (HEIC included on device),
-                // downscale, re-encode JPEG; the workflow's vision branch extracts text.
-                payloadBytes = ImageUploadPreprocessor.ToJpegPayload(filePath);
-                if (payloadBytes == null)
-                {
-                    failReason = "image decode/downscale/re-encode failed (undecodable, missing, or degenerate)";
-                    failReasonRu = UploadFailureText.PhotoUndecodable;
-                }
-                else
-                {
-                    // Route on the NAME's final extension (synthesized gallery
-                    // names already end in .jpg regardless of the temp file's
-                    // real extension) — the workflow's Switch reads the name.
-                    payloadName = fileName.EndsWith(".jpg", System.StringComparison.OrdinalIgnoreCase)
-                        ? fileName
-                        : fileName + ".jpg";
-                    payloadMime = "image/jpeg";
-                }
-            }
-            else
-            {
-                // Android pickers can ignore the MIME filter — without this
-                // guard the form would post with no file part at all.
-                failReason = fileExtension.Equals(".doc")
-                    ? "'.doc' (Word 97-2003) is not supported — ask the user to re-save as .docx or PDF"
-                    : $"unsupported file type '{fileExtension}'";
-                failReasonRu = UploadFailureText.UnsupportedFormat(fileExtension);
-            }
-
-            if (failReason == null && payloadBytes == null)
-            {
-                if (string.IsNullOrWhiteSpace(convertedText))
-                {
-                    failReason = "converted to empty text (nothing to ingest)";
-                    failReasonRu = UploadFailureText.EmptyFile;
-                }
-                else
-                {
-                    payloadBytes = Encoding.UTF8.GetBytes(convertedText);
-                    payloadMime = "text/plain";
-                }
-            }
-        }
-        catch (System.Exception exception)
-        {
-            failReason = $"conversion failed: {exception.Message}";
-            failReasonRu = UploadFailureText.Unreadable;
-        }
-
-        if (failReason != null)
-        {
-            // Deterministic: the same file will fail the same way, so the row
-            // shows WHY (in Russian) and offers no retry — only the ✕.
-            Debug.LogError($"[UploadFile] '{fileName}': {failReason} — upload aborted.");
-            MarkPendingRowFailed(pendingRow, contentType, retry: null, failReasonRu);
-            yield break;
-        }
-
-        form.AddBinaryData("data", payloadBytes, payloadName, payloadMime);
-
-        using UnityWebRequest www = UnityWebRequest.Post($"{Manager.n8nBaseUrl}/webhook/UploadFile", form);
-
-        yield return www.SendWebRequest();
-
-        if (www.result != UnityWebRequest.Result.Success)
-        {
-            // Deterministic server verdicts (e.g. a photo with no visible prices)
-            // retrying the same file cannot fix — surface the specific reason and
-            // suppress retry, same as the client-side deterministic failures above.
-            string deterministicReason = UploadFailureText.ReasonForHttpResponse(www.responseCode, www.downloadHandler?.text);
-            if (deterministicReason != null)
-            {
-                Debug.LogError($"[UploadFile] '{fileName}': {deterministicReason} ({www.responseCode})");
-                MarkPendingRowFailed(pendingRow, contentType, retry: null, deterministicReason);
-                yield break;
-            }
-
-            Debug.LogError($"[UploadFile] Upload failed ({www.responseCode} {www.result}): {www.error}\n{www.downloadHandler?.text}");
-            MarkPendingRowFailed(pendingRow, contentType, retryUpload);
-        }
-        else
-        {
-            // Re-uploading a same-named file REPLACES it: delete the superseded
-            // upload's RAG chunks (by old fileId), or stale and current prices would
-            // coexist in the vector store and retrieval could quote either. The new
-            // chunks are already inserted under a fresh fileId, so this is safe.
-            foreach (UploadedFileEntry stale in UploadedFilesStore.FindByName(openBot.name, contentType, fileName))
-            {
-                if (stale.Id == fileId) continue; // never target the fresh upload
-                StartCoroutine(DeleteReplacedFileRoutine(openBot.name, contentType, stale.Id));
-            }
-
-            // Remember the upload on-device so the file survives closing/reopening the bot,
-            // and so the per-file delete (X) can target this fileId in the RAG store.
-            UploadedFilesStore.Add(openBot.name, contentType, new UploadedFileEntry
-            {
-                Id = fileId,
-                Name = fileName,
-                Size = fileData.Length,
-                DateUnixMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-            });
-
-            // The pending row settles into the real stored row (with a small
-            // pop) — the list is the upload confirmation, the button label
-            // stays a constant call-to-action.
-            CompletePendingFileRow(pendingRow, contentType);
-
-            // D3: the checklist's «Загрузить прайс-лист» row derives from UploadedFilesStore —
-            // refresh so it flips to done immediately (fire-and-forget, null-guarded).
-            FirstStepsCard.Instance?.RefreshFromFacts();
-        }
+        UploadCenter.Instance?.StartUpload(openBot.name, contentType, filePath, fileName, displayNameOverride);
     }
 
-    private static byte[] ReadFileOrNull(string filePath)
-    {
-        try
-        {
-            return File.ReadAllBytes(filePath);
-        }
-        catch (System.Exception exception)
-        {
-            Debug.LogError($"[UploadFile] Could not read '{filePath}': {exception.Message}");
-            return null;
-        }
-    }
 }

@@ -264,6 +264,10 @@ public class Bot : MonoBehaviour
             UploadedFilesStore.Clear(transform.name, "service");
         }
 
+        // Uploads outlive this screen and this bot — drop any still in flight
+        // so a late completion can't rewrite the keys just deleted above.
+        if (UploadCenter.Existing != null) UploadCenter.Existing.CancelForBot(transform.name);
+
         if (ChatManager.Instance != null)
         {
             ChatManager.Instance.PurgeCacheForBot(transform.name);

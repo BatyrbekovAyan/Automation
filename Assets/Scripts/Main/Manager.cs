@@ -485,6 +485,38 @@ public partial class Manager : MonoBehaviour
         {
             StartCoroutine(DeleteTelegramProfile(orphanedTelegramProfileId, true));
         }
+
+        SweepPendingUploads();
+    }
+
+    // Same safety net, one layer down: an upload whose process died between the
+    // POST and the local record leaves n8n holding RAG chunks under a fileId
+    // nothing on-device references — the bot would answer from a price list the
+    // app can neither list nor delete, and index it again on the next upload.
+    //
+    // Deletes, never resumes: the job's file path is the picker's temp copy, and
+    // iOS reuses pickedMediaN.jpg across sessions, so re-reading it here could
+    // upload an entirely different file.
+    private void SweepPendingUploads()
+    {
+        foreach (PendingUploadEntry entry in PendingUploadLedger.LoadAll())
+        {
+            // Recorded after all (the kill landed between the store write and
+            // the ledger clear) — settle it, deleting would make the bot forget
+            // a file the user can still see.
+            if (!PendingUploadLedger.IsOrphan(entry))
+            {
+                PendingUploadLedger.Remove(entry.FileId);
+                continue;
+            }
+
+            string fileId = entry.FileId;
+            Debug.Log($"[PendingUploads] Sweeping orphaned upload {fileId} ({entry.BotName}/{entry.ContentType}).");
+            // Keeps the entry when the delete fails (offline at launch) so the
+            // next launch retries it.
+            UploadCenter.Instance?.DeleteFile(entry.BotName, entry.ContentType, fileId,
+                deleted => { if (deleted) PendingUploadLedger.Remove(fileId); });
+        }
     }
 
     // ── App lifecycle: orphaned-profile cleanup ──

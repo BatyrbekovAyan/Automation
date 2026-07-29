@@ -112,7 +112,7 @@ public partial class BotSettings : MonoBehaviour
     [SerializeField] private UploadSourceSheet uploadSourceSheet;
     #endregion
 
-    // Needed for PickMediaFile / UploadFile logic that references file extension fields
+    // Picker type filters — resolved by InitializeFilePickerTypes, consumed by PickMediaFile.
     private string pdf;
     private string txt;
     private string rtf;
@@ -123,23 +123,21 @@ public partial class BotSettings : MonoBehaviour
     private string xlsx;
     private string xlsm;
     private string docx;
-    // .doc is NOT ingestible — it's pickable on purpose so UploadFile can fail
+    // .doc is NOT ingestible — it's pickable on purpose so the upload can fail
     // the row with the "re-save as .docx or PDF" reason instead of the OS
     // picker graying the file out with no explanation.
     private string doc;
     private string html;
     // Image types added to the picker's «Файл» branch and used by the gallery
-    // branch (jpg also covers .jpeg, resolved by extension in UploadFile).
+    // branch (jpg also covers .jpeg, resolved by extension in UploadPayloadBuilder).
     private string jpg;
     private string png;
     private string webp;
     private string heic;
 
-    // Source-sheet context: which list («product»/«service») and which button
-    // the pending upload targets. Set when the sheet opens, consumed by the
-    // two source handlers so they can resume the existing UploadFile flow.
+    // Source-sheet context: which list («product»/«service») the pending upload
+    // targets. Set when the sheet opens, consumed by the two source handlers.
     private string pendingUploadContentType;
-    private Button pendingUploadButton;
 
     // Each bot has its own BotSettings prefab instance, so a write-on-Awake
     // singleton would race the same way SwipeToBackBotSettings.Instance did
@@ -383,6 +381,7 @@ public partial class BotSettings : MonoBehaviour
         StartCoroutine(CheckWhatsappUnauthorizationOutsideApp());
         StartCoroutine(CheckTelegramUnauthorizationOutsideApp());
         SyncHeaderTitle();
+        BindUploadCenter(); // uploads run outside this screen — re-attach to their progress
         RefreshUploadedFiles();
     }
     
@@ -397,7 +396,14 @@ public partial class BotSettings : MonoBehaviour
         headerTitle.text = BotNameField.Value;
     }
 
-    public void OnDisable() => OpenGeneralTab();
+    public void OnDisable()
+    {
+        OpenGeneralTab();
+        UnbindUploadCenter();
+        // This screen's coroutines are dead the moment it deactivates, so any
+        // latch one of them was holding has to be released here.
+        ResetReplacePopupState();
+    }
 
     // Returns the vertical ScrollRect under the currently-active tab root, if
     // any. Used by SwipeToBackBotSettings to disable vertical scrolling during
