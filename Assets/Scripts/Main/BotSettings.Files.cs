@@ -1,18 +1,19 @@
 using System.Collections;
 using System.Collections.Generic;
-using System.Text;
 using DG.Tweening;
-using Newtonsoft.Json;
 using TMPro;
 using UnityEngine;
-using UnityEngine.Networking;
 using UnityEngine.UI;
 
-// Uploaded price-list files: the per-tab "Прайс-листы" section (rows spawned
-// from UploadedFilesStore) and the per-file delete flow (X → confirm popup →
-// n8n DeleteFile webhook → row + local record removed). UI is baked into
-// BotSettings.prefab by BotSettingsUploadedFilesBuilder; this partial only
-// binds data and behavior.
+// Uploaded price-list files: the per-tab "Прайс-листы" section and the
+// per-file delete flow (✕ → confirm popup → n8n DeleteFile webhook → row +
+// local record removed). UI is baked into BotSettings.prefab by
+// BotSettingsUploadedFilesBuilder; this partial only binds data and behavior.
+//
+// Rows are rendered from two sources and OWN neither: finished uploads come
+// from UploadedFilesStore, in-flight and failed ones from UploadCenter.Jobs.
+// The screen used to hold in-flight state itself, which is why leaving it
+// mid-upload stranded the row forever — see UploadJobRegistry.
 public partial class BotSettings
 {
     #region Serialized — Uploaded files (wired by BotSettingsUploadedFilesBuilder)
@@ -34,14 +35,11 @@ public partial class BotSettings
 
     private readonly List<GameObject> spawnedProductFileRows = new();
     private readonly List<GameObject> spawnedServiceFileRows = new();
-    private readonly List<GameObject> pendingProductFileRows = new();
-    private readonly List<GameObject> pendingServiceFileRows = new();
     private UploadedFileEntry pendingDeleteEntry;
     private string pendingDeleteContentType;
-    private GameObject pendingDeleteRow;
-    private bool deleteFileInFlight;
     private bool replacePopupBusy;
     private bool? replaceDecision;
+    private bool uploadEventsBound;
 
     private static readonly string[] RuMonthsShort =
         { "янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек" };
@@ -72,6 +70,65 @@ public partial class BotSettings
             uploadSourceSheet.OnFilePressed += OnUploadSourceFilePressed;
             uploadSourceSheet.OnGalleryPressed += OnUploadSourceGalleryPressed;
         }
+
+        BindUploadCenter();
+    }
+
+    // Uploads outlive this screen, so their progress arrives as events rather
+    // than as the return of a coroutine we own.
+    private void BindUploadCenter()
+    {
+        if (uploadEventsBound || UploadCenter.Instance == null) return;
+
+        UploadCenter.Instance.Jobs.OnChanged += RefreshUploadedFiles;
+        UploadCenter.Instance.OnUploadCompleted += OnUploadCompleted;
+        uploadEventsBound = true;
+    }
+
+    private void UnbindUploadCenter()
+    {
+        UploadCenter center = UploadCenter.Existing;
+        if (!uploadEventsBound || center == null) return;
+
+        center.Jobs.OnChanged -= RefreshUploadedFiles;
+        center.OnUploadCompleted -= OnUploadCompleted;
+        uploadEventsBound = false;
+    }
+
+    // An upload that finished while this bot's settings are open settles into
+    // its stored row with a small pop — the list is the upload confirmation.
+    // Located by fileId, not by "the last row": other uploads may still be in
+    // flight below it, and those rows are rendered after the stored ones.
+    private void OnUploadCompleted(string botName, string contentType, string fileId)
+    {
+        Bot openBot = Manager.openBot != null ? Manager.openBot.GetComponent<Bot>() : null;
+        if (openBot == null || openBot.name != botName) return;
+
+        // Stored rows are spawned first and in store order, so the entry's
+        // index in the store is its index in the spawned list.
+        int index = UploadedFilesStore.Load(botName, contentType).FindIndex(entry => entry.Id == fileId);
+        if (index < 0) return;
+
+        var spawned = contentType == "product" ? spawnedProductFileRows : spawnedServiceFileRows;
+        if (index < spawned.Count && spawned[index] != null)
+            spawned[index].transform.DOPunchScale(Vector3.one * 0.05f, 0.25f);
+    }
+
+    // Leaving the screen kills this coroutine mid-question, so the latch it
+    // holds has to be released here or every later same-named upload would
+    // wait forever on a popup that is no longer on screen.
+    private void ResetReplacePopupState()
+    {
+        if (replaceFileConfirmPopup != null)
+        {
+            // Instant, not PopupUI.Hide: the whole screen is going inactive, so
+            // an animated close would just leave a tween running on a dead
+            // hierarchy. PopupUI.Show re-initializes everything on the next open.
+            replaceFileConfirmPopup.transform.DOKill();
+            replaceFileConfirmPopup.SetActive(false);
+        }
+        replacePopupBusy = false;
+        replaceDecision = null;
     }
 
     // Uploading a file whose name is already in the list REPLACES the old
@@ -103,37 +160,42 @@ public partial class BotSettings
         replaceDecision = replace;
     }
 
-    // Rebuilds both tabs' file rows from the store. Cheap (a handful of rows),
-    // so a full rebuild on every change keeps state trivially correct.
+    // Rebuilds both tabs' file rows from the store and the in-flight registry.
+    // Cheap (a handful of rows), so a full rebuild on every change keeps state
+    // trivially correct.
     public void RefreshUploadedFiles()
     {
         Bot openBot = Manager.openBot != null ? Manager.openBot.GetComponent<Bot>() : null;
         RefreshFilesTab(openBot, "product", uploadedProductFilesSection, uploadedProductFilesParent,
-                        uploadedProductFileRowTemplate, spawnedProductFileRows, pendingProductFileRows);
+                        uploadedProductFileRowTemplate, spawnedProductFileRows);
         RefreshFilesTab(openBot, "service", uploadedServiceFilesSection, uploadedServiceFilesParent,
-                        uploadedServiceFileRowTemplate, spawnedServiceFileRows, pendingServiceFileRows);
+                        uploadedServiceFileRowTemplate, spawnedServiceFileRows);
     }
 
     private void RefreshFilesTab(Bot openBot, string contentType, GameObject section,
                                  RectTransform rowsParent, GameObject template,
-                                 List<GameObject> spawned, List<GameObject> pending)
+                                 List<GameObject> spawned)
     {
         if (section == null || rowsParent == null || template == null) return;
 
         foreach (var row in spawned)
             if (row != null) Destroy(row);
         spawned.Clear();
-        pending.RemoveAll(row => row == null);
 
         var files = openBot != null
             ? UploadedFilesStore.Load(openBot.name, contentType)
             : new List<UploadedFileEntry>();
 
-        // Pending (uploading/failed) rows are not in the store but keep the
-        // section alive so in-flight feedback stays visible.
-        section.SetActive(files.Count + pending.Count > 0);
-        if (files.Count + pending.Count == 0) return;
+        // In-flight/failed uploads are not in the store — they live in the
+        // registry and keep the section alive so their feedback stays visible.
+        var jobs = openBot != null && UploadCenter.Existing != null
+            ? UploadCenter.Existing.Jobs.JobsFor(openBot.name, contentType)
+            : new List<UploadJob>();
 
+        section.SetActive(files.Count + jobs.Count > 0);
+        if (files.Count + jobs.Count == 0) return;
+
+        // Stored rows first, in-flight uploads last (newest activity at the bottom).
         foreach (var entry in files)
         {
             var row = Instantiate(template, rowsParent);
@@ -142,9 +204,13 @@ public partial class BotSettings
             spawned.Add(row);
         }
 
-        // Stored rows first, in-flight uploads last (newest activity at the bottom).
-        foreach (var row in pending)
-            row.transform.SetAsLastSibling();
+        foreach (var job in jobs)
+        {
+            var row = Instantiate(template, rowsParent);
+            row.SetActive(true);
+            BindJobRow(row, job);
+            spawned.Add(row);
+        }
 
         RebuildTabLayout(rowsParent);
     }
@@ -161,16 +227,77 @@ public partial class BotSettings
         if (metaLabel != null) metaLabel.text = FormatFileMeta(entry);
 
         if (removeButton != null)
-            PopupUI.WireFingerUp(removeButton, () => RequestDeleteUploadedFile(entry, contentType, row));
+            PopupUI.WireFingerUp(removeButton, () => RequestDeleteUploadedFile(entry, contentType));
     }
 
-    private void RequestDeleteUploadedFile(UploadedFileEntry entry, string contentType, GameObject row)
+    ////////////////////////// UPLOAD-IN-PROGRESS ROWS //////////////////////////
+
+    // Optimistic feedback: the row appears the moment a file is picked, with
+    // pulsing dots instead of the ✕ and «Загрузка…» instead of size · date.
+    // A failure flips it red rather than making it vanish — a network failure
+    // (CanRetry) shows the tap-to-retry hint and re-runs the upload on tap; a
+    // deterministic one shows the specific reason instead, because retrying a
+    // wrong format or an empty file can only fail again.
+    private void BindJobRow(GameObject row, UploadJob job)
     {
-        if (deleteFileInFlight) return;
+        var badge = row.transform.Find("Badge")?.GetComponent<Image>();
+        var badgeLabel = row.transform.Find("Badge/Label")?.GetComponent<TextMeshProUGUI>();
+        var nameLabel = row.transform.Find("Texts/Name")?.GetComponent<TextMeshProUGUI>();
+        var metaLabel = row.transform.Find("Texts/Meta")?.GetComponent<TextMeshProUGUI>();
+        var removeButton = row.transform.Find("RemoveButton")?.GetComponent<Button>();
+        var rowButton = row.GetComponent<Button>();
+
+        bool failed = job.State == UploadJobState.Failed;
+
+        if (badgeLabel != null)
+        {
+            badgeLabel.text = ExtensionBadge(job.FileName);
+            if (failed) badgeLabel.color = FailedAccent;
+        }
+        if (badge != null && failed) badge.color = FailedBadgeBg;
+
+        if (nameLabel != null)
+        {
+            nameLabel.text = job.FileName;
+            var color = nameLabel.color;
+            color.a = failed ? 1f : 0.75f;
+            nameLabel.color = color;
+        }
+        if (metaLabel != null)
+        {
+            metaLabel.text = failed ? job.FailureReason ?? UploadFailureText.TapToRetry : "Загрузка…";
+            metaLabel.color = failed ? FailedAccent : UploadingAccent;
+            if (failed) metaLabel.textWrappingMode = TextWrappingModes.Normal;
+        }
+
+        SetRowTrailing(row, showDots: !failed, removeInteractable: failed,
+                       barColor: failed ? FailedAccent : (Color?)null);
+
+        if (removeButton != null && failed)
+            PopupUI.WireFingerUp(removeButton, () => UploadCenter.Instance?.Dismiss(job));
+
+        if (rowButton != null)
+        {
+            rowButton.interactable = failed && job.CanRetry;
+            if (failed && job.CanRetry)
+                PopupUI.WireFingerUp(rowButton, () => UploadCenter.Instance?.Retry(job));
+        }
+
+        // A specific reason can wrap to a second line — release the baked
+        // fixed row height so the card grows to fit instead of the meta text
+        // clipping past its bottom edge (minHeight keeps it from shrinking).
+        if (failed && job.FailureReason != null && row.TryGetComponent(out LayoutElement rowLayout))
+            rowLayout.preferredHeight = -1f;
+    }
+
+    ////////////////////////////// PER-FILE DELETE //////////////////////////////
+
+    private void RequestDeleteUploadedFile(UploadedFileEntry entry, string contentType)
+    {
+        if (UploadCenter.Existing != null && UploadCenter.Existing.IsDeleting(entry.Id)) return;
 
         pendingDeleteEntry = entry;
         pendingDeleteContentType = contentType;
-        pendingDeleteRow = row;
 
         if (deleteFileConfirmBody != null)
             deleteFileConfirmBody.text = $"Бот перестанет использовать «{entry.Name}» в ответах. Это действие необратимо.";
@@ -182,175 +309,20 @@ public partial class BotSettings
         if (deleteFileConfirmPopup != null) PopupUI.Hide(deleteFileConfirmPopup);
         pendingDeleteEntry = default;
         pendingDeleteContentType = null;
-        pendingDeleteRow = null;
     }
 
+    // Server first: the local record and the row are dropped only after the
+    // server confirms, and the request itself runs on UploadCenter so leaving
+    // the screen mid-delete can't strand it.
     private void ConfirmDeleteUploadedFile()
     {
         if (deleteFileConfirmPopup != null) PopupUI.Hide(deleteFileConfirmPopup);
         if (string.IsNullOrEmpty(pendingDeleteEntry.Id)) return;
-        StartCoroutine(DeleteUploadedFileRoutine(pendingDeleteEntry, pendingDeleteContentType, pendingDeleteRow));
-    }
 
-    // The X-button delete flow: server first, then local record + row are
-    // dropped only after the server confirms.
-    private IEnumerator DeleteUploadedFileRoutine(UploadedFileEntry entry, string contentType, GameObject row)
-    {
         Bot openBot = Manager.openBot != null ? Manager.openBot.GetComponent<Bot>() : null;
-        if (openBot == null) yield break;
+        if (openBot == null) return;
 
-        deleteFileInFlight = true;
-        bool deleted = false;
-        yield return DeleteFileChunksRequest(entry.Id, success => deleted = success);
-        deleteFileInFlight = false;
-
-        if (!deleted) yield break; // keep the row — the bot still knows this file
-
-        // deletedChunks == 0 means the chunks were already gone server-side;
-        // still drop the local record so the list reflects reality.
-        UploadedFilesStore.Remove(openBot.name, contentType, entry.Id);
-
-        if (row != null)
-        {
-            row.SetActive(false); // VLG skips inactive children — reflow now, not end-of-frame
-            Destroy(row);
-        }
-        RefreshUploadedFiles();
-    }
-
-    // Replace-on-reupload: a fresh upload with the same file name superseded this
-    // entry, so its stale RAG chunks (old prices!) must not keep answering. No
-    // popup/row here, and no deleteFileInFlight gate — it targets a different
-    // fileId than any X-button delete. Keeps the record on failure so a later
-    // manual X can retry the cleanup.
-    public IEnumerator DeleteReplacedFileRoutine(string botName, string contentType, string staleFileId)
-    {
-        bool deleted = false;
-        yield return DeleteFileChunksRequest(staleFileId, success => deleted = success);
-        if (!deleted) yield break;
-
-        UploadedFilesStore.Remove(botName, contentType, staleFileId);
-        RefreshUploadedFiles();
-    }
-
-    ////////////////////////// UPLOAD-IN-PROGRESS ROWS //////////////////////////
-
-    // Optimistic feedback: the row appears the moment a file is picked, with
-    // pulsing dots instead of the ✕ and «Загрузка…» instead of size · date.
-    // Not in UploadedFilesStore — tracked in the pending lists so
-    // RefreshUploadedFiles keeps it (and the section) alive during the upload.
-    public GameObject AddPendingFileRow(string contentType, string fileName)
-    {
-        bool isProduct = contentType == "product";
-        var section = isProduct ? uploadedProductFilesSection : uploadedServiceFilesSection;
-        var parent = isProduct ? uploadedProductFilesParent : uploadedServiceFilesParent;
-        var template = isProduct ? uploadedProductFileRowTemplate : uploadedServiceFileRowTemplate;
-        var pending = isProduct ? pendingProductFileRows : pendingServiceFileRows;
-        if (section == null || parent == null || template == null) return null;
-
-        var row = Instantiate(template, parent);
-        row.SetActive(true);
-
-        var nameLabel = row.transform.Find("Texts/Name")?.GetComponent<TextMeshProUGUI>();
-        var metaLabel = row.transform.Find("Texts/Meta")?.GetComponent<TextMeshProUGUI>();
-        var badgeLabel = row.transform.Find("Badge/Label")?.GetComponent<TextMeshProUGUI>();
-
-        if (badgeLabel != null) badgeLabel.text = ExtensionBadge(fileName);
-        if (nameLabel != null)
-        {
-            nameLabel.text = fileName;
-            var dimmed = nameLabel.color; dimmed.a = 0.75f; nameLabel.color = dimmed;
-        }
-        if (metaLabel != null)
-        {
-            metaLabel.text = "Загрузка…";
-            metaLabel.color = UploadingAccent;
-        }
-        SetRowTrailing(row, showDots: true, removeInteractable: false);
-
-        pending.Add(row);
-        section.SetActive(true);
-        RebuildTabLayout(parent);
-        return row;
-    }
-
-    // Upload confirmed: the pending row is replaced by the real stored row
-    // (caller has already added the store entry), with a small settle pop.
-    public void CompletePendingFileRow(GameObject row, string contentType)
-    {
-        DropPendingRow(row, contentType);
-        var spawned = contentType == "product" ? spawnedProductFileRows : spawnedServiceFileRows;
-        if (spawned.Count > 0 && spawned[^1] != null)
-            spawned[^1].transform.DOPunchScale(Vector3.one * 0.05f, 0.25f);
-    }
-
-    // Upload failed: the row flips to a red state instead of vanishing. A
-    // network failure (retry != null) shows the tap-to-retry hint and re-runs
-    // the upload on tap; a deterministic failure (retry == null) shows the
-    // specific reason instead — retrying a wrong format or an empty file can
-    // only fail again, so the row isn't tappable and the ✕ is the only exit.
-    public void MarkPendingRowFailed(GameObject row, string contentType, System.Action retry,
-                                     string reason = null)
-    {
-        if (row == null) return;
-
-        var nameLabel = row.transform.Find("Texts/Name")?.GetComponent<TextMeshProUGUI>();
-        var metaLabel = row.transform.Find("Texts/Meta")?.GetComponent<TextMeshProUGUI>();
-        var badge = row.transform.Find("Badge")?.GetComponent<Image>();
-        var badgeLabel = row.transform.Find("Badge/Label")?.GetComponent<TextMeshProUGUI>();
-
-        if (nameLabel != null)
-        {
-            var full = nameLabel.color; full.a = 1f; nameLabel.color = full;
-        }
-        if (metaLabel != null)
-        {
-            metaLabel.text = reason ?? UploadFailureText.TapToRetry;
-            metaLabel.color = FailedAccent;
-            metaLabel.textWrappingMode = TextWrappingModes.Normal;
-        }
-        if (badge != null) badge.color = FailedBadgeBg;
-        if (badgeLabel != null) badgeLabel.color = FailedAccent;
-
-        SetRowTrailing(row, showDots: false, removeInteractable: true, barColor: FailedAccent);
-
-        var removeButton = row.transform.Find("RemoveButton")?.GetComponent<Button>();
-        if (removeButton != null)
-            PopupUI.WireFingerUp(removeButton, () => DropPendingRow(row, contentType));
-
-        var rowButton = row.GetComponent<Button>();
-        if (rowButton != null)
-        {
-            rowButton.interactable = retry != null;
-            if (retry != null)
-                PopupUI.WireFingerUp(rowButton, () =>
-                {
-                    DropPendingRow(row, contentType);
-                    retry.Invoke();
-                });
-        }
-
-        // A specific reason can wrap to a second line — release the baked
-        // fixed row height so the card grows to fit instead of the meta text
-        // clipping past its bottom edge (minHeight keeps it from shrinking).
-        if (reason != null)
-        {
-            if (row.TryGetComponent(out LayoutElement rowLayout))
-                rowLayout.preferredHeight = -1f;
-            RebuildTabLayout(row.transform.parent as RectTransform);
-        }
-    }
-
-    private void DropPendingRow(GameObject row, string contentType)
-    {
-        var pending = contentType == "product" ? pendingProductFileRows : pendingServiceFileRows;
-        pending.Remove(row);
-        if (row != null)
-        {
-            row.SetActive(false); // VLG skips inactive children — reflow now
-            Destroy(row);
-        }
-        RefreshUploadedFiles();
+        UploadCenter.Instance?.DeleteFile(openBot.name, pendingDeleteContentType, pendingDeleteEntry.Id);
     }
 
     // The trailing 48-unit slot holds both the ✕ bars and the pulsing dots, so
@@ -376,31 +348,6 @@ public partial class BotSettings
         }
 
         if (removeButton.TryGetComponent(out Button button)) button.interactable = removeInteractable;
-    }
-
-    // POST {n8nBaseUrl}/webhook/DeleteFile { fileId } — the n8n workflow removes
-    // every RAG chunk tagged with this fileId, so the bot genuinely forgets the
-    // file. Shared by the X-button delete and the replace-on-reupload path.
-    private IEnumerator DeleteFileChunksRequest(string fileId, System.Action<bool> callback)
-    {
-        string url = $"{Manager.n8nBaseUrl}/webhook/DeleteFile";
-        string body = JsonConvert.SerializeObject(new { fileId });
-
-        using var request = new UnityWebRequest(url, "POST");
-        request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(body));
-        request.downloadHandler = new DownloadHandlerBuffer();
-        request.SetRequestHeader("Content-Type", "application/json");
-        request.timeout = 30;
-        yield return request.SendWebRequest();
-
-        if (request.result != UnityWebRequest.Result.Success)
-        {
-            Debug.LogError($"[DeleteFile] [{request.responseCode}] {url}: {request.error}\n{request.downloadHandler?.text}");
-            callback?.Invoke(false);
-            yield break;
-        }
-
-        callback?.Invoke(true);
     }
 
     private static string ExtensionBadge(string fileName)
