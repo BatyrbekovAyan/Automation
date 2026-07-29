@@ -36,6 +36,51 @@ public class DeferredDismissInputField : TMP_InputField
     private const float ActivationSpacingSeconds = 0.25f;
     private Coroutine pendingActivation;
 
+    // Every live instance, for the single-focus invariant below.
+    private static readonly System.Collections.Generic.List<DeferredDismissInputField> liveInputs =
+        new System.Collections.Generic.List<DeferredDismissInputField>();
+
+    protected override void OnEnable()
+    {
+        base.OnEnable();
+        liveInputs.Add(this);
+    }
+
+    // Device trace f3678 (iOS): with two fields TMP-focused at once — the old
+    // one's deferred release lags a couple of frames behind the new one's
+    // activation — BOTH poll the ONE shared native keyboard buffer, and the
+    // stale field ingests the fresh field's text (the cross-field copy).
+    // Before this field activates by ANY path, force every other instance to
+    // silently stop (SilentCaretStop: no keyboard dismiss, m_SoftKeyboard
+    // nulled so it stops polling). At most one field ever reads the buffer.
+    private void ReleaseOtherFocusedInputs()
+    {
+        foreach (var other in liveInputs)
+        {
+            if (other == null || other == this) continue;
+            if (!other.isFocused && other.m_SoftKeyboard == null) continue;
+            KbTrace.Log($"{Who()} RELEASE-OTHER {other.Who()} (focused={other.isFocused})");
+            other.dismissPending = false;
+            other.SilentCaretStop();
+        }
+    }
+
+    // TMP activates directly from OnPointerClick — a path the OnSelect gate
+    // never sees (device trace: FOCUS=True while the activation was still
+    // deferred). Route it through the same rules: while a deferred
+    // activation is pending, the click must not activate; otherwise enforce
+    // the single-focus invariant first.
+    public override void OnPointerClick(PointerEventData eventData)
+    {
+        if (pendingActivation != null)
+        {
+            KbTrace.Log($"{Who()} POINTER-CLICK swallowed (activation deferred)");
+            return;
+        }
+        ReleaseOtherFocusedInputs();
+        base.OnPointerClick(eventData);
+    }
+
     // ── [KB] diagnostic state (see KbTrace) ──────────────────────────
     private string traceLastText;
     private string traceLastKbText;
@@ -59,6 +104,7 @@ public class DeferredDismissInputField : TMP_InputField
         {
             KbTrace.Log($"{Who()} SELECT->activate text='{KbTrace.T(text)}'");
             lastActivationTime = Time.unscaledTime;
+            ReleaseOtherFocusedInputs();
             base.OnSelect(eventData);
             return;
         }
@@ -84,11 +130,13 @@ public class DeferredDismissInputField : TMP_InputField
 
         KbTrace.Log($"{Who()} deferred-activation FIRE text='{KbTrace.T(text)}'");
         lastActivationTime = Time.unscaledTime;
+        ReleaseOtherFocusedInputs();
         base.OnSelect(new BaseEventData(eventSystem));
     }
 
     protected override void OnDisable()
     {
+        liveInputs.Remove(this);
         if (pendingActivation != null)
         {
             StopCoroutine(pendingActivation);

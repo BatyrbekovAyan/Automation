@@ -148,8 +148,14 @@ namespace Automation.BotSettingsUI
             }
 
             // Heal keyboard-session bleed: a blurred field's text may only be
-            // what was last committed or written through Value.
-            if (!isFocused && expectedUnfocusedText != null
+            // what was last committed or written through Value. NEVER while
+            // the underlying TMP is still focused — writing a TMP-focused
+            // field pushes the value into the ONE shared iOS keyboard buffer,
+            // which the truly-focused field then ingests (device trace f3679:
+            // the heal's '' wiped the phone number in the other field). The
+            // TMP focus lags the wrapper blur by a few frames; the heal waits
+            // them out.
+            if (!isFocused && !input.isFocused && expectedUnfocusedText != null
                 && input.text != expectedUnfocusedText)
             {
                 KbTrace.Log($"{name} BLUR-HEAL '{KbTrace.T(input.text)}' -> '{KbTrace.T(expectedUnfocusedText)}'");
@@ -240,7 +246,12 @@ namespace Automation.BotSettingsUI
             {
                 KbTrace.Log($"{name} BLUR-FOREIGN-REVERT '{KbTrace.T(current)}' -> '{KbTrace.T(lastGood)}'");
                 current = lastGood ?? string.Empty;
-                input.text = current;
+                // Write only when TMP has already let go — a write to a
+                // TMP-focused field feeds the shared iOS keyboard buffer and
+                // corrupts the newly focused field. Otherwise the deferred
+                // heal applies expectedUnfocusedText once TMP unfocuses.
+                if (!input.isFocused)
+                    input.text = current;
             }
 
             KbTrace.Log($"{name} BLUR commit={commit} text='{KbTrace.T(current)}'");
