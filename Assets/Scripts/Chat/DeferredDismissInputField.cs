@@ -36,6 +36,55 @@ public class DeferredDismissInputField : TMP_InputField
     private const float ActivationSpacingSeconds = 0.25f;
     private Coroutine pendingActivation;
 
+    // ── orphaned-keyboard watchdog ───────────────────────────────────
+    // A smooth switch hands the OS keyboard from the old field to the newly
+    // selected one WITHOUT closing it: SilentCaretStop nulls the old field's
+    // m_SoftKeyboard on the assumption the adopter is about to activate. The
+    // rapid-tap paths broke that assumption — a deferred activation can be
+    // superseded, or the burst can end outside any field — leaving the
+    // keyboard ORPHANED: no field references it, so no blur/back/teardown
+    // can ever close it (device repro: rapid field taps, then Back — the
+    // keyboard stays up). Park the reference when orphaning; every real
+    // activation adopts (clears) it; if nobody adopts within the grace, or
+    // a field is disabled with an orphan parked, close it.
+    private static TouchScreenKeyboard orphanedKeyboard;
+    private static float orphanedAtTime;
+    private static int orphanCheckFrame = -1;
+    private const float OrphanGraceSeconds = 0.4f; // > ActivationSpacingSeconds
+
+    private static void ParkOrphan(TouchScreenKeyboard keyboard)
+    {
+        if (keyboard == null) return;
+        orphanedKeyboard = keyboard;
+        orphanedAtTime = Time.unscaledTime;
+    }
+
+    private static void CloseOrphanIfAbandoned()
+    {
+        if (orphanedKeyboard == null) return;
+        if (Time.frameCount == orphanCheckFrame) return;
+        orphanCheckFrame = Time.frameCount;
+
+        // Someone owns the (singleton) OS keyboard after all — a live field
+        // is focused. Closing the parked wrapper would yank the keyboard out
+        // from under it, so just release the slot.
+        foreach (var field in liveInputs)
+        {
+            if (field != null && field.isFocused)
+            {
+                orphanedKeyboard = null;
+                return;
+            }
+        }
+
+        if (Time.unscaledTime - orphanedAtTime < OrphanGraceSeconds) return;
+
+        // No adopter arrived: nobody references this keyboard anymore, so
+        // this is the only place left that can dismiss it.
+        orphanedKeyboard.active = false;
+        orphanedKeyboard = null;
+    }
+
     // Every live instance, for the single-focus invariant below.
     private static readonly System.Collections.Generic.List<DeferredDismissInputField> liveInputs =
         new System.Collections.Generic.List<DeferredDismissInputField>();
@@ -73,6 +122,7 @@ public class DeferredDismissInputField : TMP_InputField
     {
         if (pendingActivation != null) return;
         ReleaseOtherFocusedInputs();
+        orphanedKeyboard = null; // adopted
         base.OnPointerClick(eventData);
     }
 
@@ -90,6 +140,7 @@ public class DeferredDismissInputField : TMP_InputField
         {
             lastActivationTime = Time.unscaledTime;
             ReleaseOtherFocusedInputs();
+            orphanedKeyboard = null; // adopted: this activation now owns the OS keyboard
             base.OnSelect(eventData);
             return;
         }
@@ -111,12 +162,23 @@ public class DeferredDismissInputField : TMP_InputField
 
         lastActivationTime = Time.unscaledTime;
         ReleaseOtherFocusedInputs();
+        orphanedKeyboard = null; // adopted
         base.OnSelect(new BaseEventData(eventSystem));
     }
 
     protected override void OnDisable()
     {
         liveInputs.Remove(this);
+
+        // Screen/tab teardown with an orphan still parked: no Update will run
+        // to watchdog it, so close it now (Back pressed during the defer
+        // window would otherwise leave the keyboard up forever).
+        if (orphanedKeyboard != null)
+        {
+            orphanedKeyboard.active = false;
+            orphanedKeyboard = null;
+        }
+
         if (pendingActivation != null)
         {
             StopCoroutine(pendingActivation);
@@ -133,6 +195,8 @@ public class DeferredDismissInputField : TMP_InputField
 
     private void Update()
     {
+        CloseOrphanIfAbandoned();
+
         if (!dismissPending) return;
         if (IsPointerPressed()) return;
 
@@ -193,6 +257,7 @@ public class DeferredDismissInputField : TMP_InputField
     //      since DeactivateInputField re-sets m_SelectionStillActive=true.
     private void SilentCaretStop()
     {
+        ParkOrphan(m_SoftKeyboard);
         m_SoftKeyboard = null;
         DeactivateInputField();
         ReleaseSelection();
