@@ -12,6 +12,12 @@ public class DragShield : MonoBehaviour, IPointerDownHandler, IPointerUpHandler,
     public ScrollRect parentScrollRect;
     public TMP_InputField inputField;
 
+    // The next ScrollRect ABOVE the input's own text scroller (e.g. the
+    // Бизнес tab's page scroll). When the text has nothing hidden to reveal,
+    // drags route here so the card doesn't swallow page scrolling.
+    private ScrollRect pageScrollRect;
+    private ScrollRect activeDragTarget;
+
     [Header("Tap Settings")]
     public float doubleTapThreshold = 0.3f;
     public float tapTimeThreshold = 0.25f;
@@ -31,7 +37,26 @@ public class DragShield : MonoBehaviour, IPointerDownHandler, IPointerUpHandler,
         if (parentScrollRect == null)
             parentScrollRect = GetComponentInParent<ScrollRect>();
 
+        if (parentScrollRect != null && parentScrollRect.transform.parent != null)
+            pageScrollRect = parentScrollRect.transform.parent.GetComponentInParent<ScrollRect>();
+
         GetComponent<Image>().raycastTarget = true;
+    }
+
+    // Scroll the TEXT only when some of it is hidden; otherwise the gesture
+    // belongs to the page (if there is one). Resolved once per gesture so a
+    // drag never switches targets midway.
+    private ScrollRect ResolveDragTarget()
+    {
+        if (parentScrollRect != null && parentScrollRect.content != null)
+        {
+            var viewport = parentScrollRect.viewport != null
+                ? parentScrollRect.viewport
+                : (RectTransform)parentScrollRect.transform;
+            if (parentScrollRect.content.rect.height > viewport.rect.height + 1f)
+                return parentScrollRect;
+        }
+        return pageScrollRect != null ? pageScrollRect : parentScrollRect;
     }
 
     public void OnPointerDown(PointerEventData eventData)
@@ -247,20 +272,24 @@ IEnumerator HandleDoubleTap(PointerEventData eventData)
 
     public void OnInitializePotentialDrag(PointerEventData eventData)
     {
+        // Stop momentum on both candidates — the real target is chosen at
+        // drag-begin.
         if (parentScrollRect != null) parentScrollRect.OnInitializePotentialDrag(eventData);
+        if (pageScrollRect != null) pageScrollRect.OnInitializePotentialDrag(eventData);
     }
 
     public void OnBeginDrag(PointerEventData eventData)
     {
         isDragging = true;
-        if (parentScrollRect != null) parentScrollRect.OnBeginDrag(eventData);
+        activeDragTarget = ResolveDragTarget();
+        if (activeDragTarget != null) activeDragTarget.OnBeginDrag(eventData);
     }
 
     public void OnDrag(PointerEventData eventData)
     {
         var dist = Vector2.Distance(eventData.position, pointerDownPosition);
         if (dist > maxMoveFromDown) maxMoveFromDown = dist;
-        if (parentScrollRect != null) parentScrollRect.OnDrag(eventData);
+        if (activeDragTarget != null) activeDragTarget.OnDrag(eventData);
     }
 
     public void OnEndDrag(PointerEventData eventData)
@@ -270,6 +299,6 @@ IEnumerator HandleDoubleTap(PointerEventData eventData)
         // before OnPointerUp, and OnPointerUp relies on isDragging to
         // distinguish a scroll gesture from a tap. OnPointerDown resets
         // the flag at the start of the next gesture.
-        if (parentScrollRect != null) parentScrollRect.OnEndDrag(eventData);
+        if (activeDragTarget != null) activeDragTarget.OnEndDrag(eventData);
     }
 }

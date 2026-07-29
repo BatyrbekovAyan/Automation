@@ -37,6 +37,31 @@ namespace Automation.BotSettingsUI
             ResizeContent(inputField.text);
         }
 
+        private void OnEnable()
+        {
+            // Re-measure whenever the tab activates: text loaded while the
+            // card was inactive never triggered onValueChanged, and the very
+            // first activation measures against a ~2px pre-layout width
+            // (known ScrollRect measure-timing gotcha) — wait for the real
+            // width before sizing, or long text can end up unscrollable.
+            if (viewport != null)
+                StartCoroutine(ResizeWhenWidthSettles());
+        }
+
+        private void OnDisable()
+        {
+            // The snap coroutine died with the deactivation — reset its latch.
+            scrollSnapPending = false;
+        }
+
+        private IEnumerator ResizeWhenWidthSettles()
+        {
+            for (var i = 0; i < 60 && viewport.rect.width < 100f; i++)
+                yield return null;
+            if (viewport.rect.width >= 100f)
+                ResizeContent(inputField.text);
+        }
+
         private void OnDestroy()
         {
             if (inputField != null)
