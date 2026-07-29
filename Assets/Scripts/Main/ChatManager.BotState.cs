@@ -293,6 +293,12 @@ public partial class ChatManager
 
     private void BeginLoadForActiveBot()
     {
+        // Entering a (re)load makes any previous window's wait obsolete. Stop AND null
+        // it here: SetActiveChannel / privacy-clear kill it via StopAllCoroutines
+        // without nulling the field, and a stale non-null handle would make
+        // EnsureSyncWaitArmed refuse to arm a later window.
+        if (_syncWaitRoutine != null) { StopCoroutine(_syncWaitRoutine); _syncWaitRoutine = null; }
+
         Bot bot = Manager.Instance != null ? Manager.Instance.FindBotByName(CurrentBotId) : null;
         if (bot == null || !IsValidProfileId(ProfileIdForChannel(bot, ActiveChannel)))
         {
@@ -308,7 +314,6 @@ public partial class ChatManager
         if (IsChannelSyncing(CurrentBotId, ActiveChannel, out long syncUntilUnixMs))
         {
             OnWhatsAppSyncing?.Invoke(syncUntilUnixMs);
-            if (_syncWaitRoutine != null) StopCoroutine(_syncWaitRoutine);
             _syncWaitRoutine = StartCoroutine(WaitForWhatsAppSyncRoutine(syncUntilUnixMs));
             return;
         }
@@ -356,6 +361,21 @@ public partial class ChatManager
         OnWhatsAppSyncReady?.Invoke();
         _syncWaitRoutine = null;
         LoadChatsForActiveBot();
+    }
+
+    /// <summary>
+    /// Arms the sync-window wait — the SOLE producer of OnWhatsAppSyncReady — for the
+    /// active bot+channel when its window is open and no wait is already running.
+    /// Windows can be stamped outside BeginLoadForActiveBot (the settings late-auth
+    /// stamp writes {bot}…SyncUntil with no ChatManager call), so SyncingView's
+    /// OnEnable catch-up calls this whenever it re-shows the cover, guaranteeing the
+    /// ready signal + post-window chat load always arrive. Idempotent.
+    /// </summary>
+    public void EnsureSyncWaitArmed()
+    {
+        if (_syncWaitRoutine != null) return;
+        if (!IsChannelSyncing(CurrentBotId, ActiveChannel, out long syncUntilUnixMs)) return;
+        _syncWaitRoutine = StartCoroutine(WaitForWhatsAppSyncRoutine(syncUntilUnixMs));
     }
 
     /// <summary>

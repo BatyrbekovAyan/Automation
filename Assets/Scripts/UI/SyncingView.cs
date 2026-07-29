@@ -49,17 +49,32 @@ public class SyncingView : MonoBehaviour
 
     private void OnEnable()
     {
-        if (ChatManager.Instance == null) return;
-        ChatManager.Instance.OnWhatsAppSyncing += HandleSyncing;
-        ChatManager.Instance.OnWhatsAppSyncReady += HandleReady;
-        ChatManager.Instance.OnActiveBotChanged += HandleActiveBotChanged;
-        ChatManager.Instance.OnActiveChannelChanged += HandleActiveChannelChanged;
+        if (ChatManager.Instance != null)
+        {
+            ChatManager.Instance.OnWhatsAppSyncing += HandleSyncing;
+            ChatManager.Instance.OnWhatsAppSyncReady += HandleReady;
+            ChatManager.Instance.OnActiveBotChanged += HandleActiveBotChanged;
+            ChatManager.Instance.OnActiveChannelChanged += HandleActiveChannelChanged;
 
-        // Catch up: tab re-opened or app relaunched mid-window — resume without an
-        // event, for whichever channel is active (the window is per-channel since 08-19).
-        if (ChatManager.Instance.IsChannelSyncing(
-                ChatManager.Instance.CurrentBotId, ChatManager.Instance.ActiveChannel, out long untilMs))
-            HandleSyncing(untilMs);
+            // Catch up: tab re-opened or app relaunched mid-window — resume without an
+            // event, for whichever channel is active (the window is per-channel since 08-19).
+            if (ChatManager.Instance.IsChannelSyncing(
+                    ChatManager.Instance.CurrentBotId, ChatManager.Instance.ActiveChannel, out long untilMs))
+            {
+                // Windows can open outside BeginLoadForActiveBot (the settings late-auth
+                // stamp writes {bot}…SyncUntil with no ChatManager call), so a shown cover
+                // is not guaranteed a running OnWhatsAppSyncReady producer — arm it here.
+                ChatManager.Instance.EnsureSyncWaitArmed();
+                HandleSyncing(untilMs);
+                return;
+            }
+        }
+
+        // Not inside a window (or no gate to ask): hide. OnWhatsAppSyncReady is a
+        // one-shot this view unsubscribes from in OnDisable, so a window that expired
+        // while the screen was inactive already fired it into nobody — a cover left
+        // visible at disable time would otherwise be stranded until app restart.
+        Hide();
     }
 
     private void OnDisable()
