@@ -57,9 +57,11 @@ public class DeferredDismissInputField : TMP_InputField
     private static int orphanCheckFrame = -1;
     private const float OrphanGraceSeconds = 0.35f;
 
-    // Temporary diagnostic for the stuck-keyboard hunt — keyboard lifecycle
-    // events only (no per-frame spam). Strip once device-confirmed.
-    private const bool TraceKeyboard = true;
+    // Keyboard-lifecycle diagnostic (activate/release/park/adopt/close).
+    // Both device bugs it was built for — cross-field text duplication and
+    // the stuck keyboard — are confirmed fixed; flip on again if either
+    // ever resurfaces.
+    private const bool TraceKeyboard = false;
 
     private static void Trace(string message)
     {
