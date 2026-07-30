@@ -105,11 +105,17 @@ public class DeferredDismissInputField : TMP_InputField
         dismissPendingSince = Time.unscaledTime;
     }
 
+    // NOTE: activation must NOT clear the parked keyboard ("adopt") here.
+    // Activation is a promise — the actual keyboard-open happens a LateUpdate
+    // later, and a rapid next tap can cancel it before it ever opens. The
+    // device trace showed exactly that: clearing on the promise discarded the
+    // only handle to the still-visible keyboard, leaving it unkillable. The
+    // watchdog performs the adoption instead, once a field's focus has
+    // MATERIALIZED (see CloseOrphanIfAbandoned).
     public override void OnSelect(BaseEventData eventData)
     {
         dismissPending = false;
         ReleaseOtherFocusedInputs();
-        orphanedKeyboard = null; // adopted: this activation owns the OS keyboard
         Trace($"{Who()} activate (select)");
         base.OnSelect(eventData);
     }
@@ -119,7 +125,6 @@ public class DeferredDismissInputField : TMP_InputField
     public override void OnPointerClick(PointerEventData eventData)
     {
         ReleaseOtherFocusedInputs();
-        orphanedKeyboard = null; // adopted
         base.OnPointerClick(eventData);
     }
 
@@ -180,13 +185,16 @@ public class DeferredDismissInputField : TMP_InputField
         if (Time.frameCount == orphanCheckFrame) return;
         orphanCheckFrame = Time.frameCount;
 
-        // A live field is focused — it owns the (singleton) OS keyboard.
-        // Closing the parked wrapper would yank it out from under them;
-        // just release the slot.
+        // Adoption happens HERE, not at activation: only once a field's focus
+        // has MATERIALIZED does the (singleton) OS keyboard truly have an
+        // owner whose own reference can dismiss it. Releasing the slot any
+        // earlier — e.g. on the activation promise — discards the only
+        // handle if that activation gets canceled by the next rapid tap.
         foreach (var field in liveInputs)
         {
             if (field != null && field.isFocused)
             {
+                Trace($"orphan adopted ({field.Who()} focused)");
                 orphanedKeyboard = null;
                 return;
             }
