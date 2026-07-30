@@ -114,7 +114,7 @@ public static class BusinessContactFieldsBuilder
             modified |= ShrinkDescription(descriptionRt);
             modified |= MakeTabScrollable(tab, content);
             modified |= AddContactSection(settings, content);
-            modified |= UnifyKeyboardConfig(prefabRoot);
+            modified |= UnifyKeyboardConfig(prefabRoot, settings);
             modified |= DetachScrimEditInline(prefabRoot, tab);
 
             if (modified)
@@ -319,19 +319,23 @@ public static class BusinessContactFieldsBuilder
         return true;
     }
 
-    // ONE keyboard configuration for every input — total products-sheet
-    // parity. ANY per-field difference restarts the IME session on a focus
-    // switch, and the restart redelivers pending composition into the newly
-    // focused field (the cross-field text duplication):
-    //   • mixed LINE types swap the native input view type → restart;
-    //   • mixed KEYBOARD/content types swap the keypad layout → restart,
-    //     even while the keyboard visibly stays up. This is why the PhonePad
-    //     and EmailAddress keypads had to go — the sheet is clean precisely
-    //     because all its fields share one Standard/Default keyboard.
-    // Single-line-looking fields use MultiLineSubmit (Enter still submits);
-    // real textareas keep MultiLineNewline.
-    private static bool UnifyKeyboardConfig(GameObject prefabRoot)
+    // Uniform keyboard configuration with two DELIBERATE exceptions.
+    // Mandatory everywhere (pinned by tests, do not relax):
+    //   • no SingleLine — mixed line types swap the native input view type on
+    //     focus switches (products-sheet bug);
+    //   • inputType Standard — autocorrect off; iOS runs the predictive
+    //     session on the ONE hidden native text field every input shares.
+    // Exceptions: Телефон gets PhonePad and Email gets the EmailAddress
+    // keyboard. A keypad-layout switch does restart the IME session, but the
+    // cross-field duplication was trace-proven to come from DUAL FOCUS on the
+    // shared buffer — fixed by DeferredDismissInputField's single-focus
+    // invariant, which doesn't depend on avoiding restarts. Device-verified
+    // with the rapid-switch repro after restoring the keypads.
+    private static bool UnifyKeyboardConfig(GameObject prefabRoot, BotSettings settings)
     {
+        var phoneInput = settings.PhoneField != null ? settings.PhoneField.InputField : null;
+        var emailInput = settings.EmailField != null ? settings.EmailField.InputField : null;
+
         var modified = false;
         foreach (var input in prefabRoot.GetComponentsInChildren<TMP_InputField>(true))
         {
@@ -341,24 +345,23 @@ public static class BusinessContactFieldsBuilder
                 input.contentType = TMP_InputField.ContentType.Standard;
                 modified = true;
             }
-            // AUTOCORRECT OFF (InputType.Standard). TMP's Standard contentType
-            // silently enables iOS autocorrection, and iOS runs the predictive
-            // session on the ONE hidden native text field every Unity input
-            // shares — on focus switches it can replay/commit the previous
-            // field's content into the newly focused one (device repro:
-            // rapid cross-taps duplicate text between fields). Assigning
-            // inputType flips contentType to Custom, which keeps the other
-            // traits.
+            // Assigning inputType/keyboardType flips contentType to Custom,
+            // which keeps the other traits — order is deliberate.
             if (input.inputType != TMP_InputField.InputType.Standard)
             {
                 input.inputType = TMP_InputField.InputType.Standard;
                 modified = true;
             }
-            if (input.keyboardType != TouchScreenKeyboardType.Default)
+
+            var desiredKeyboard = input == phoneInput ? TouchScreenKeyboardType.PhonePad
+                : input == emailInput ? TouchScreenKeyboardType.EmailAddress
+                : TouchScreenKeyboardType.Default;
+            if (input.keyboardType != desiredKeyboard)
             {
-                input.keyboardType = TouchScreenKeyboardType.Default;
+                input.keyboardType = desiredKeyboard;
                 modified = true;
             }
+
             if (input.lineType == TMP_InputField.LineType.SingleLine)
             {
                 input.lineType = TMP_InputField.LineType.MultiLineSubmit;

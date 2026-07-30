@@ -148,6 +148,10 @@ public class BusinessContactFieldsTests
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
         Assert.IsNotNull(prefab);
 
+        var settings = prefab.GetComponent<BotSettings>();
+        var phoneInput = settings.PhoneField != null ? settings.PhoneField.InputField : null;
+        var emailInput = settings.EmailField != null ? settings.EmailField.InputField : null;
+
         foreach (var input in prefab.GetComponentsInChildren<TMPro.TMP_InputField>(true))
         {
             var where = $"'{input.transform.parent.name}/{input.name}'";
@@ -157,9 +161,15 @@ public class BusinessContactFieldsTests
                 $"{where} has autocorrection enabled — iOS runs the predictive session " +
                 "on the shared hidden text field and replays content across focus " +
                 "switches (text duplication).");
-            Assert.AreEqual(TouchScreenKeyboardType.Default, input.keyboardType,
-                $"{where} has a custom keyboardType — a per-field keypad " +
-                "restarts the IME on switch (text duplication).");
+
+            // Exactly two deliberate keypad exceptions (device-verified with
+            // the rapid-switch repro); everything else stays Default.
+            var expectedKeyboard = input == phoneInput ? TouchScreenKeyboardType.PhonePad
+                : input == emailInput ? TouchScreenKeyboardType.EmailAddress
+                : TouchScreenKeyboardType.Default;
+            Assert.AreEqual(expectedKeyboard, input.keyboardType,
+                $"{where} has an unexpected keyboardType — the keypad map is " +
+                "Телефон=PhonePad, Email=EmailAddress, everything else Default.");
         }
     }
 
