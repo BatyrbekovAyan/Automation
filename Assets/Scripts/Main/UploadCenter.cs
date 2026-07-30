@@ -59,10 +59,12 @@ public class UploadCenter : MonoBehaviour
 
     ////////////////////////////////// UPLOAD //////////////////////////////////
 
+    /// <param name="replaceConfirmed">The user answered «Заменить?» for this name. Only then
+    /// may the completed upload delete the same-named file's chunks.</param>
     public void StartUpload(string botName, string contentType, string filePath, string fileName,
-                            string displayNameOverride = null)
+                            string displayNameOverride = null, bool replaceConfirmed = false)
     {
-        UploadJob job = Jobs.Add(botName, contentType, filePath, fileName, displayNameOverride);
+        UploadJob job = Jobs.Add(botName, contentType, filePath, fileName, displayNameOverride, replaceConfirmed);
         if (job != null) StartCoroutine(RunUpload(job));
     }
 
@@ -147,14 +149,34 @@ public class UploadCenter : MonoBehaviour
             yield break;
         }
 
+        // The bot can be deleted (or the row dismissed) while these bytes are on
+        // the wire. Delisting the job does NOT stop this coroutine — it lives on
+        // UploadCenter — so without this check the writes below would re-create
+        // the very PlayerPrefs keys Bot.DeleteBot just removed. The ledger entry
+        // is deliberately left behind: the launch sweep reclaims the chunks.
+        if (job.Cancelled || Manager.Instance == null || Manager.Instance.FindBotByName(job.BotName) == null)
+        {
+            Debug.LogWarning($"[UploadFile] '{job.FileName}' completed after its bot went away — " +
+                             "discarding the local record; the launch sweep will reclaim the chunks.");
+            Jobs.Remove(job);
+            yield break;
+        }
+
         // Re-uploading a same-named file REPLACES it: delete the superseded
         // upload's RAG chunks (by old fileId), or stale and current prices would
         // coexist in the vector store and retrieval could quote either. The new
         // chunks are already inserted under a fresh fileId, so this is safe.
-        foreach (UploadedFileEntry stale in UploadedFilesStore.FindByName(job.BotName, job.ContentType, job.FileName))
+        // ONLY with consent: Retry re-enters this coroutine below the «Заменить?»
+        // question, and a same-named file can appear between the pick and the
+        // completion. Deleting on a bare name match would then destroy a file the
+        // user never agreed to replace. Without consent both copies simply stay.
+        if (job.ReplaceConfirmed)
         {
-            if (stale.Id == job.FileId) continue; // never target the fresh upload
-            StartCoroutine(DeleteReplacedFileRoutine(job.BotName, job.ContentType, stale.Id));
+            foreach (UploadedFileEntry stale in UploadedFilesStore.FindByName(job.BotName, job.ContentType, job.FileName))
+            {
+                if (stale.Id == job.FileId) continue; // never target the fresh upload
+                StartCoroutine(DeleteReplacedFileRoutine(job.BotName, job.ContentType, stale.Id));
+            }
         }
 
         // Remember the upload on-device so the file survives closing/reopening the bot,
@@ -201,7 +223,8 @@ public class UploadCenter : MonoBehaviour
     /// confirms. Hosted here so backing out mid-delete can't strand it (that
     /// used to leave a latch stuck true and silently kill every later delete).
     /// </summary>
-    public void DeleteFile(string botName, string contentType, string fileId, System.Action<bool> onDone = null)
+    /// <param name="onDone">(deleted, deletedChunks) — deletedChunks is -1 when the reply was unreadable.</param>
+    public void DeleteFile(string botName, string contentType, string fileId, System.Action<bool, int> onDone = null)
     {
         if (string.IsNullOrEmpty(fileId) || !deletesInFlight.Add(fileId)) return;
 
@@ -211,18 +234,23 @@ public class UploadCenter : MonoBehaviour
     public bool IsDeleting(string fileId) => fileId != null && deletesInFlight.Contains(fileId);
 
     private IEnumerator DeleteFileRoutine(string botName, string contentType, string fileId,
-                                          System.Action<bool> onDone)
+                                          System.Action<bool, int> onDone)
     {
         bool deleted = false;
-        yield return DeleteFileChunksRequest(fileId, success => deleted = success);
+        int deletedChunks = -1;
+        yield return DeleteFileChunksRequest(fileId, (success, chunks) =>
+        {
+            deleted = success;
+            deletedChunks = chunks;
+        });
         deletesInFlight.Remove(fileId);
 
-        // deletedChunks == 0 means the chunks were already gone server-side;
-        // still drop the local record so the list reflects reality. A failure
-        // keeps the row — the bot still knows this file.
+        // For a user-initiated delete, zero chunks means they were already gone
+        // server-side — still drop the local record so the list reflects reality.
+        // A failure keeps the row: the bot still knows this file.
         if (deleted) UploadedFilesStore.Remove(botName, contentType, fileId);
 
-        onDone?.Invoke(deleted);
+        onDone?.Invoke(deleted, deletedChunks);
         if (deleted && Manager.openBotSettings != null) Manager.openBotSettings.RefreshUploadedFiles();
     }
 
@@ -235,7 +263,7 @@ public class UploadCenter : MonoBehaviour
     private IEnumerator DeleteReplacedFileRoutine(string botName, string contentType, string staleFileId)
     {
         bool deleted = false;
-        yield return DeleteFileChunksRequest(staleFileId, success => deleted = success);
+        yield return DeleteFileChunksRequest(staleFileId, (success, _) => deleted = success);
         if (!deleted) yield break;
 
         UploadedFilesStore.Remove(botName, contentType, staleFileId);
@@ -244,7 +272,7 @@ public class UploadCenter : MonoBehaviour
 
     // POST {n8nBaseUrl}/webhook/DeleteFile { fileId } — the n8n workflow removes
     // every RAG chunk tagged with this fileId, so the bot genuinely forgets the file.
-    private IEnumerator DeleteFileChunksRequest(string fileId, System.Action<bool> callback)
+    private IEnumerator DeleteFileChunksRequest(string fileId, System.Action<bool, int> callback)
     {
         string url = $"{Manager.n8nBaseUrl}/webhook/DeleteFile";
         string body = JsonConvert.SerializeObject(new { fileId });
@@ -259,10 +287,10 @@ public class UploadCenter : MonoBehaviour
         if (request.result != UnityWebRequest.Result.Success)
         {
             Debug.LogError($"[DeleteFile] [{request.responseCode}] {url}: {request.error}\n{request.downloadHandler?.text}");
-            callback?.Invoke(false);
+            callback?.Invoke(false, -1);
             yield break;
         }
 
-        callback?.Invoke(true);
+        callback?.Invoke(true, DeleteFileResponse.ParseDeletedChunks(request.downloadHandler?.text));
     }
 }

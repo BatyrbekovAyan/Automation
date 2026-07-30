@@ -194,6 +194,58 @@ public class PendingUploadLedgerTests
         }
     }
 
+    ///////////////////////////// SWEEP ATTEMPTS /////////////////////////////
+    // A sweep that lands mid-ingest deletes zero chunks. The entry must survive
+    // to be retried — but only a bounded number of times, or a legitimately
+    // chunk-less fileId (a deterministically failed upload) would be retried on
+    // every launch forever.
+
+    [Test]
+    public void Add_StartsWithZeroAttempts()
+    {
+        PendingUploadLedger.Add("file-1", "Bot0", "product");
+
+        Assert.AreEqual(0, PendingUploadLedger.LoadAll()[0].Attempts);
+    }
+
+    [Test]
+    public void RecordAttempt_IncrementsAndReturnsTheNewCount()
+    {
+        PendingUploadLedger.Add("file-1", "Bot0", "product");
+
+        Assert.AreEqual(1, PendingUploadLedger.RecordAttempt("file-1"));
+        Assert.AreEqual(2, PendingUploadLedger.RecordAttempt("file-1"));
+    }
+
+    // Persisted, so the count survives the process kill that motivated all this.
+    [Test]
+    public void RecordAttempt_PersistsAcrossReload()
+    {
+        PendingUploadLedger.Add("file-1", "Bot0", "product");
+        PendingUploadLedger.RecordAttempt("file-1");
+
+        Assert.AreEqual(1, PendingUploadLedger.LoadAll()[0].Attempts);
+    }
+
+    [Test]
+    public void RecordAttempt_OnlyTouchesTheNamedEntry()
+    {
+        PendingUploadLedger.Add("file-1", "Bot0", "product");
+        PendingUploadLedger.Add("file-2", "Bot0", "product");
+
+        PendingUploadLedger.RecordAttempt("file-1");
+
+        var byId = PendingUploadLedger.LoadAll();
+        Assert.AreEqual(1, byId.Find(e => e.FileId == "file-1").Attempts);
+        Assert.AreEqual(0, byId.Find(e => e.FileId == "file-2").Attempts);
+    }
+
+    [Test]
+    public void RecordAttempt_UnknownFileId_ReturnsZero()
+    {
+        Assert.AreEqual(0, PendingUploadLedger.RecordAttempt("nope"));
+    }
+
     // Same fileId under the other tab must not count as recorded.
     [Test]
     public void IsOrphan_True_WhenOnlyTheOtherContentTypeRecordedIt()

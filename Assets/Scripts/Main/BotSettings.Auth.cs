@@ -483,12 +483,16 @@ public partial class BotSettings
             // flow — a later photo would silently replace an earlier one's
             // knowledge (see GalleryPhotoNamer).
             Bot openBot = Manager.openBot != null ? Manager.openBot.GetComponent<Bot>() : null;
-            var takenNames = new HashSet<string>();
-            if (openBot != null)
-            {
-                foreach (UploadedFileEntry entry in UploadedFilesStore.Load(openBot.name, contentType))
-                    takenNames.Add(entry.Name);
-            }
+            // Stored AND in-flight: the store is only written on completion, so
+            // seeding from it alone let a photo picked while another was still
+            // uploading collide with it (both stamped to the same minute).
+            var takenNames = openBot != null
+                ? UploadNameSet.TakenNames(
+                      UploadedFilesStore.Load(openBot.name, contentType),
+                      UploadCenter.Existing != null
+                          ? UploadCenter.Existing.Jobs.JobsFor(openBot.name, contentType)
+                          : null)
+                : new HashSet<string>();
 
             int index = 0;
             foreach (string path in paths)
@@ -571,14 +575,18 @@ public partial class BotSettings
 
         // A same-named upload replaces the existing file's knowledge — ask
         // before uploading anything. Cancel = no upload, the old file stays.
+        // The answer travels with the job: it is the ONLY thing that authorises
+        // deleting the old file's chunks once this upload lands, and a retry
+        // re-enters the upload below this point.
+        bool replaceConfirmed = false;
         if (UploadedFilesStore.FindByName(openBot.name, contentType, fileName).Count > 0)
         {
-            bool replaceConfirmed = false;
             yield return RequestReplaceFileDecision(fileName, decision => replaceConfirmed = decision);
             if (!replaceConfirmed) yield break;
         }
 
-        UploadCenter.Instance?.StartUpload(openBot.name, contentType, filePath, fileName, displayNameOverride);
+        UploadCenter.Instance?.StartUpload(openBot.name, contentType, filePath, fileName,
+                                           displayNameOverride, replaceConfirmed);
     }
 
 }

@@ -511,11 +511,21 @@ public partial class Manager : MonoBehaviour
             }
 
             string fileId = entry.FileId;
-            Debug.Log($"[PendingUploads] Sweeping orphaned upload {fileId} ({entry.BotName}/{entry.ContentType}).");
-            // Keeps the entry when the delete fails (offline at launch) so the
-            // next launch retries it.
+            // Counted before the call so a kill mid-sweep cannot reset the tally.
+            int attempts = PendingUploadLedger.RecordAttempt(fileId);
+            Debug.Log($"[PendingUploads] Sweeping orphaned upload {fileId} " +
+                      $"({entry.BotName}/{entry.ContentType}), attempt {attempts}.");
+
+            // Settling on a bare HTTP 200 would be wrong: a sweep that lands
+            // while n8n is still ingesting deletes zero chunks, yet the webhook's
+            // parallel branch still removes the archived original — so the entry
+            // survives for another launch instead. See UploadSweepPolicy.
             UploadCenter.Instance?.DeleteFile(entry.BotName, entry.ContentType, fileId,
-                deleted => { if (deleted) PendingUploadLedger.Remove(fileId); });
+                (deleted, deletedChunks) =>
+                {
+                    if (UploadSweepPolicy.ShouldSettle(deleted, deletedChunks, attempts))
+                        PendingUploadLedger.Remove(fileId);
+                });
         }
     }
 

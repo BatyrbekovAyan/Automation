@@ -7,6 +7,7 @@ public struct PendingUploadEntry
     public string FileId;       // matches metadata.fileId on every RAG chunk the upload created
     public string BotName;
     public string ContentType;  // "product" | "service"
+    public int Attempts;        // sweeps made for this fileId — see UploadSweepPolicy
 }
 
 /// <summary>
@@ -61,6 +62,26 @@ public static class PendingUploadLedger
         return true;
     }
 
+    /// <summary>
+    /// Counts one sweep of this fileId and returns the new total. Persisted, so
+    /// a kill mid-sweep cannot reset the count and make an entry immortal.
+    /// Returns 0 for an unknown fileId.
+    /// </summary>
+    public static int RecordAttempt(string fileId)
+    {
+        if (string.IsNullOrEmpty(fileId)) return 0;
+
+        var entries = LoadAll();
+        int index = entries.FindIndex(entry => entry.FileId == fileId);
+        if (index < 0) return 0;
+
+        PendingUploadEntry counted = entries[index];
+        counted.Attempts++;
+        entries[index] = counted;
+        Persist(entries);
+        return counted.Attempts;
+    }
+
     public static List<PendingUploadEntry> LoadAll()
     {
         var entries = new List<PendingUploadEntry>();
@@ -75,7 +96,8 @@ public static class PendingUploadLedger
             {
                 FileId = fileId,
                 BotName = PlayerPrefs.GetString($"{ItemPrefix}{i}Bot", ""),
-                ContentType = PlayerPrefs.GetString($"{ItemPrefix}{i}Type", "")
+                ContentType = PlayerPrefs.GetString($"{ItemPrefix}{i}Type", ""),
+                Attempts = PlayerPrefs.GetInt($"{ItemPrefix}{i}Tries", 0)
             });
         }
         return entries;
@@ -118,6 +140,7 @@ public static class PendingUploadLedger
             PlayerPrefs.SetString($"{ItemPrefix}{i}", entries[i].FileId);
             PlayerPrefs.SetString($"{ItemPrefix}{i}Bot", entries[i].BotName ?? "");
             PlayerPrefs.SetString($"{ItemPrefix}{i}Type", entries[i].ContentType ?? "");
+            PlayerPrefs.SetInt($"{ItemPrefix}{i}Tries", entries[i].Attempts);
         }
         for (int i = entries.Count; i < oldCount; i++) DeleteItemKeys(i);
 
@@ -133,5 +156,6 @@ public static class PendingUploadLedger
         PlayerPrefs.DeleteKey($"{ItemPrefix}{index}");
         PlayerPrefs.DeleteKey($"{ItemPrefix}{index}Bot");
         PlayerPrefs.DeleteKey($"{ItemPrefix}{index}Type");
+        PlayerPrefs.DeleteKey($"{ItemPrefix}{index}Tries");
     }
 }

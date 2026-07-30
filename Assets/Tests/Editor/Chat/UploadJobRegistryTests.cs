@@ -253,4 +253,80 @@ public class UploadJobRegistryTests
         Assert.AreEqual("Прайс 1.jpg", job.FileName);
         Assert.AreEqual("Прайс 1.jpg", job.DisplayNameOverride);
     }
+
+    /////////////////////////////// CANCELLATION ///////////////////////////////
+    // Removing a job from the list does NOT stop the coroutine uploading it —
+    // that coroutine lives on UploadCenter and holds its own reference. Without
+    // a sticky flag on the job itself, deleting a bot mid-upload let the success
+    // path re-create the PlayerPrefs keys the delete had just removed.
+
+    [Test]
+    public void Add_StartsNotCancelled()
+    {
+        Assert.IsFalse(AddJob().Cancelled);
+    }
+
+    [Test]
+    public void RemoveForBot_MarksTheRemovedJobsCancelled()
+    {
+        UploadJob mine = AddJob(bot: BotA);
+        UploadJob other = AddJob(bot: BotB);
+
+        registry.RemoveForBot(BotA);
+
+        Assert.IsTrue(mine.Cancelled, "a deleted bot's in-flight upload must be flagged, not just delisted");
+        Assert.IsFalse(other.Cancelled);
+    }
+
+    [Test]
+    public void Remove_MarksTheJobCancelled()
+    {
+        UploadJob job = AddJob();
+
+        registry.Remove(job);
+
+        Assert.IsTrue(job.Cancelled);
+    }
+
+    // Cancellation is terminal: a retry must never revive a job whose bot is gone.
+    [Test]
+    public void MarkUploading_DoesNotUncancel()
+    {
+        UploadJob job = AddJob();
+        registry.RemoveForBot(BotA);
+
+        registry.MarkUploading(job);
+
+        Assert.IsTrue(job.Cancelled);
+    }
+
+    ///////////////////////////// REPLACE CONSENT /////////////////////////////
+    // The stale-chunk delete after a successful upload may only run when the
+    // user actually answered «Заменить?». Retry re-enters the upload BELOW that
+    // question, so without carrying the answer a retry deleted silently.
+
+    [Test]
+    public void Add_DefaultsToNoReplaceConsent()
+    {
+        Assert.IsFalse(AddJob().ReplaceConfirmed);
+    }
+
+    [Test]
+    public void Add_CarriesReplaceConsent()
+    {
+        UploadJob job = registry.Add(BotA, Product, "/tmp/p.pdf", "p.pdf", null, replaceConfirmed: true);
+
+        Assert.IsTrue(job.ReplaceConfirmed);
+    }
+
+    [Test]
+    public void MarkUploading_PreservesReplaceConsentAcrossRetry()
+    {
+        UploadJob job = registry.Add(BotA, Product, "/tmp/p.pdf", "p.pdf", null, replaceConfirmed: true);
+        registry.MarkFailed(job, UploadFailureText.TapToRetry, canRetry: true);
+
+        registry.MarkUploading(job);
+
+        Assert.IsTrue(job.ReplaceConfirmed, "consent given at pick time still stands for the retry");
+    }
 }

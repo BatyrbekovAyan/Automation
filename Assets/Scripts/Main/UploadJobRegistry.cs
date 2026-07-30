@@ -18,6 +18,20 @@ public class UploadJob
     public UploadJobState State;
     public string FailureReason;          // user-facing RU; null while uploading
     public bool CanRetry;                 // false for deterministic failures (bad format, empty file)
+
+    /// <summary>
+    /// The user answered «Заменить?» for this file. Gates the post-upload delete
+    /// of same-named chunks — retry re-enters the upload BELOW that question, so
+    /// without carrying the answer a retry would delete someone's file silently.
+    /// </summary>
+    public bool ReplaceConfirmed;
+
+    /// <summary>
+    /// Set when the job is delisted (bot deleted, row dismissed). Sticky, and
+    /// checked by the running coroutine: delisting cannot stop a coroutine that
+    /// lives on UploadCenter and holds its own reference to this job.
+    /// </summary>
+    public bool Cancelled;
 }
 
 /// <summary>
@@ -43,7 +57,7 @@ public class UploadJobRegistry
     public event System.Action OnChanged;
 
     public UploadJob Add(string botName, string contentType, string filePath, string fileName,
-                         string displayNameOverride = null)
+                         string displayNameOverride = null, bool replaceConfirmed = false)
     {
         if (string.IsNullOrEmpty(botName) || string.IsNullOrEmpty(contentType))
             return null;
@@ -56,6 +70,7 @@ public class UploadJobRegistry
             FileName = fileName,
             DisplayNameOverride = displayNameOverride,
             FileId = NewFileId(),
+            ReplaceConfirmed = replaceConfirmed,
             State = UploadJobState.Uploading
         };
         jobs.Add(job);
@@ -104,16 +119,28 @@ public class UploadJobRegistry
     {
         if (job == null || !jobs.Remove(job)) return false;
 
+        job.Cancelled = true;
         OnChanged?.Invoke();
         return true;
     }
 
-    /// <summary>Drops a deleted bot's jobs so a late completion can't resurrect its PlayerPrefs keys.</summary>
+    /// <summary>
+    /// Drops a deleted bot's jobs and FLAGS them cancelled. The flag is the part
+    /// that matters: their upload coroutines run on UploadCenter and are not
+    /// stopped by delisting, so without it a completion arriving after
+    /// Bot.DeleteBot would re-create the PlayerPrefs keys the delete just removed.
+    /// </summary>
     public void RemoveForBot(string botName)
     {
         if (string.IsNullOrEmpty(botName)) return;
-        if (jobs.RemoveAll(job => job.BotName == botName) > 0)
-            OnChanged?.Invoke();
+
+        int removed = jobs.RemoveAll(job =>
+        {
+            if (job.BotName != botName) return false;
+            job.Cancelled = true;
+            return true;
+        });
+        if (removed > 0) OnChanged?.Invoke();
     }
 
     private static string NewFileId() => System.Guid.NewGuid().ToString();
