@@ -35,8 +35,11 @@ public class ChatItemView : MonoBehaviour
     
 public void Bind(ChatViewModel model)
     {
+        // includeInactive: the initial cache load binds rows while the chat panel is
+        // still hidden — the default overload would return null there and leave the
+        // row detached from its list until a later rebind.
         if (parentList == null)
-            parentList = GetComponentInParent<ChatListView>();
+            parentList = GetComponentInParent<ChatListView>(true);
 
         if (vm != null)
         {
@@ -215,24 +218,15 @@ public void Bind(ChatViewModel model)
 
     private void OnLastMessageChanged(ChatViewModel vmRef)
     {
-        // Move this row to the top — header-aware via ChatListView so a
-        // ChatsSearchBar at sibling index 0 isn't pushed out of the way.
+        // Ask the list for a data-driven resort (coalesced per frame) instead of a
+        // positional self-move — per-row insert-at-top reversed every chat that
+        // changed within one multi-chat sync pass. Re-resolve with includeInactive:
+        // Bind can run while the chat panel is hidden, where the default
+        // GetComponentInParent skips inactive ancestors and returns null.
+        if (parentList == null)
+            parentList = GetComponentInParent<ChatListView>(true);
         if (parentList != null)
-        {
-            parentList.RaiseToTop(this);
-            return;
-        }
-
-        // Fallback before our list ref resolves: still respect a ChatsSearchBar
-        // pinned at sibling 0 so we don't shove it into the middle of the list.
-        Transform parent = transform.parent;
-        int target = 0;
-        if (parent != null && parent.childCount > 0 &&
-            parent.GetChild(0).GetComponent<ChatSearchBar>() != null)
-        {
-            target = 1;
-        }
-        transform.SetSiblingIndex(target);
+            parentList.RequestResort();
     }
 
     // Title/preview emoji are converted in Hide mode so a sprite that has not

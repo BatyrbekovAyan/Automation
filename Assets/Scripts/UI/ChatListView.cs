@@ -15,6 +15,11 @@ public class ChatListView : MonoBehaviour
 
     private Dictionary<string, ChatItemView> itemsByChatId = new();
 
+    // Coalesced data-driven ordering: any number of same-frame triggers (a multi-chat
+    // sync pass, the initial cache rebuild, a live send) collapse into ONE resort,
+    // applied in LateUpdate before the frame renders.
+    private bool resortPending;
+
     private ChatSearchBar searchBar;
     private string currentQuery = "";
     private static readonly CompareInfo Ci = CultureInfo.InvariantCulture.CompareInfo;
@@ -61,8 +66,9 @@ public class ChatListView : MonoBehaviour
         item.Bind(vm);
         itemsByChatId[vm.ChatId] = item;
 
-        // Since Manager sends them in order, SetAsLastSibling
-        // puts them in the correct sequence. Empty chats will naturally pile at the bottom.
+        // Provisional position only — the coalesced resort below places the row by
+        // last-message time. Server order is NOT trusted: a brand-new chat arriving
+        // mid-session would otherwise land at the bottom of the list.
         item.transform.SetAsLastSibling();
         item.transform.localScale = Vector3.one;
 
@@ -70,8 +76,10 @@ public class ChatListView : MonoBehaviour
         // the user has typed (e.g. after a bot switch with a query still set).
         ApplyMatchToItem(item, vm);
 
-        // Row movement on update is handled inside ChatItemView.OnVmUpdated, which
-        // unsubscribes itself in OnDestroy. Don't re-subscribe here — that leaks closures.
+        RequestResort();
+
+        // Row movement on update is handled inside ChatItemView.OnLastMessageChanged,
+        // which unsubscribes itself in OnDestroy. Don't re-subscribe here — that leaks closures.
     }
 
     private void HandleEmptyState(EmptyStateReason _)
@@ -135,27 +143,77 @@ public class ChatListView : MonoBehaviour
         return false;
     }
 
-    // Header-aware bubble-to-top. When a ChatsSearchBar header sits at
-    // sibling index 0, chat rows must land at index 1 so the search row
-    // stays pinned to the top of the scroll content.
-    public void RaiseToTop(ChatItemView item)
+    /// <summary>
+    /// Schedules a data-driven resort of the list (newest last-message first, via
+    /// ChatListOrder). Coalesced: any number of same-frame requests — one per changed
+    /// chat in a sync pass, one per row of the initial rebuild — apply as a single
+    /// pass in LateUpdate, before the frame renders. Replaces the old per-row
+    /// insert-at-top (RaiseToTop), which REVERSED every chat that changed within one
+    /// multi-chat sync pass: ParseChatsJson iterates newest-first, so the newest row
+    /// was raised first and each older row then landed above it.
+    /// </summary>
+    public void RequestResort()
     {
-        if (item == null || content == null) return;
+        resortPending = true;
+    }
 
-        int firstChatIndex = 0;
-        if (content.childCount > 0)
+    void LateUpdate()
+    {
+        if (!resortPending) return;
+        resortPending = false;
+        ApplyOrderNow();
+    }
+
+    private void ApplyOrderNow()
+    {
+        if (content == null) return;
+
+        // Rows in current visual order. Skips non-row children (the pinned
+        // ChatsSearchBar header) and rows already collapsing out after a delete
+        // (removed from itemsByChatId but alive until their tween completes).
+        var rows = new List<ChatItemView>();
+        for (int i = 0; i < content.childCount; i++)
         {
-            var first = content.GetChild(0);
-            if (first != null && first.GetComponent<ChatSearchBar>() != null)
-                firstChatIndex = 1;
+            var item = TrackedRowAt(i);
+            if (item != null) rows.Add(item);
         }
 
-        item.transform.SetSiblingIndex(firstChatIndex);
+        var ordered = ChatListOrder.Apply(rows, r => r.Vm.LastMessageTime);
 
-        // The chat's last message just changed — its visibility under the
-        // active query may have flipped (e.g. it now matches and should
-        // appear, or no longer matches and should hide).
-        ApplyMatchToItem(item, item.Vm);
+        // Fill ONLY the slots currently held by tracked rows, top-down, re-scanning
+        // trackedness live because slots shift as rows move. Untracked children —
+        // the pinned ChatsSearchBar header and any delete-collapsing row — keep
+        // their own slots; assigning a contiguous block instead would expel a
+        // mid-collapse row to the list bottom whenever a resort lands inside its
+        // 0.2s tween (deterministically so on the same-frame RollbackDelete path).
+        // Rows only ever move UP to their slot, so placed slots are never disturbed.
+        int orderedIdx = 0;
+        for (int slot = 0; slot < content.childCount && orderedIdx < ordered.Count; slot++)
+        {
+            if (TrackedRowAt(slot) == null) continue;
+
+            var row = ordered[orderedIdx++];
+            if (row.transform.GetSiblingIndex() != slot)
+                row.transform.SetSiblingIndex(slot);
+
+            // A row's last message may have changed since the previous pass — its
+            // visibility under the active search query can flip either way.
+            ApplyMatchToItem(row, row.Vm);
+        }
+    }
+
+    /// <summary>
+    /// The tracked chat row at a content child index, or null when that child is
+    /// not a row this view owns (the ChatsSearchBar header, a row mid-collapse
+    /// after RemoveChat, or a stale row a rollback re-add has already superseded).
+    /// </summary>
+    private ChatItemView TrackedRowAt(int childIndex)
+    {
+        var item = content.GetChild(childIndex).GetComponent<ChatItemView>();
+        if (item == null || item.Vm == null) return null;
+        return itemsByChatId.TryGetValue(item.Vm.ChatId, out var tracked) && tracked == item
+            ? item
+            : null;
     }
 
     // Collapse the row out, then destroy it. The scroll content uses a layout group
