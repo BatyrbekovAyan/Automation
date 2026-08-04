@@ -55,12 +55,12 @@ public static class ThemeAssetsBuilder
     {
         t.background   = Hex("#F0F2F5");
         t.surface      = Hex("#FFFFFF");
-        t.hairline     = Hex("#E4E6EB");
+        t.hairline     = Hex("#CCCCCC");
         t.border       = Hex("#E1E5EC");
         t.inputBorder  = Hex("#C6CBD3");
 
-        t.inkPrimary   = Hex("#1A1A2E");
-        t.inkSecondary = Hex("#65676B");
+        t.inkPrimary   = Hex("#000000");
+        t.inkSecondary = Hex("#666666");
         t.inkTertiary  = Hex("#8E8E93");
 
         t.accentFill   = Hex("#1B7CEB");
@@ -75,7 +75,7 @@ public static class ThemeAssetsBuilder
         t.statusClientSilent   = Hex("#8E8E93");
         t.statusQuestionClosed = Hex("#65676B");
 
-        t.destructive = Hex("#E53935");
+        t.destructive = Hex("#E24848");
         t.positiveBg  = Hex("#E8F8EE");
         t.positiveInk = Hex("#206A2C");
 

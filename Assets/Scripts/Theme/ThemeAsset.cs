@@ -20,13 +20,13 @@ public class ThemeAsset : ScriptableObject
     [Header("Surfaces")]
     public Color background   = Hex("#F0F2F5");
     public Color surface      = Hex("#FFFFFF");
-    public Color hairline     = Hex("#E4E6EB");
+    public Color hairline     = Hex("#CCCCCC"); // ChatItem divider — scene value
     public Color border       = Hex("#E1E5EC");
     public Color inputBorder  = Hex("#C6CBD3");
 
     [Header("Ink")]
-    public Color inkPrimary   = Hex("#1A1A2E");
-    public Color inkSecondary = Hex("#65676B");
+    public Color inkPrimary   = Hex("#000000"); // ChatItem Name — scene value
+    public Color inkSecondary = Hex("#666666"); // ChatItem Message/Time — scene value
     public Color inkTertiary  = Hex("#8E8E93");
 
     [Header("Accent")]
@@ -45,7 +45,7 @@ public class ThemeAsset : ScriptableObject
     public Color statusQuestionClosed = Hex("#65676B");
 
     [Header("Semantic moments")]
-    public Color destructive = Hex("#E53935");
+    public Color destructive = Hex("#E24848"); // ChatItem DeleteButton — scene value
     public Color positiveBg  = Hex("#E8F8EE");
     public Color positiveInk = Hex("#206A2C");
 

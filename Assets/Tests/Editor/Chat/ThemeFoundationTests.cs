@@ -73,8 +73,8 @@ public class ThemeFoundationTests
         // intentional palette flip, update the expected values together with it.
         var t = Track(ScriptableObject.CreateInstance<ThemeAsset>());
         Assert.AreEqual("1B7CEB", ColorUtility.ToHtmlStringRGB(t.accentFill));
-        Assert.AreEqual("1A1A2E", ColorUtility.ToHtmlStringRGB(t.inkPrimary));
-        Assert.AreEqual("65676B", ColorUtility.ToHtmlStringRGB(t.inkSecondary));
+        Assert.AreEqual("000000", ColorUtility.ToHtmlStringRGB(t.inkPrimary));
+        Assert.AreEqual("666666", ColorUtility.ToHtmlStringRGB(t.inkSecondary));
         Assert.AreEqual("F5F2EA", ColorUtility.ToHtmlStringRGB(t.chatWallpaper));
         Assert.AreEqual("C5EEB6", ColorUtility.ToHtmlStringRGB(t.bubbleOutgoing));
         Assert.AreEqual("34C759", ColorUtility.ToHtmlStringRGB(t.statusOrderCollected));

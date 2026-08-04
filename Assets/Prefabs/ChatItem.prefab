@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 8595693988264632151}
   - component: {fileID: 8025866483209582393}
   - component: {fileID: 961442951432429151}
+  - component: {fileID: 4491647323755284181}
   m_Layer: 0
   m_Name: SwipeContent
   m_TagString: Untagged
@@ -164,6 +165,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SwipeToDelete
   revealWidth: 200
   deleteButton: {fileID: 1019844133813764623}
+--- !u!114 &4491647323755284181
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1470522379604991325}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 1
+  target: {fileID: 4786109855251234336}
+  preserveAlpha: 1
 --- !u!1 &1819799078354378700
 GameObject:
   m_ObjectHideFlags: 0
@@ -353,6 +369,7 @@ GameObject:
   - component: {fileID: 2849901625712580442}
   - component: {fileID: 3767985109878901295}
   - component: {fileID: 8697655043783026320}
+  - component: {fileID: 7141784221545280203}
   m_Layer: 0
   m_Name: CountText
   m_TagString: Untagged
@@ -499,6 +516,21 @@ MonoBehaviour:
   m_FlexibleWidth: -1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+--- !u!114 &7141784221545280203
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2185535906237622057}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 10
+  target: {fileID: 3767985109878901295}
+  preserveAlpha: 1
 --- !u!1 &2557976006274912287
 GameObject:
   m_ObjectHideFlags: 0
@@ -511,6 +543,7 @@ GameObject:
   - component: {fileID: 2502472237220761757}
   - component: {fileID: 8628231199100471197}
   - component: {fileID: 6445913795376177815}
+  - component: {fileID: 5384505370202558135}
   m_Layer: 5
   m_Name: Message
   m_TagString: Untagged
@@ -657,6 +690,21 @@ MonoBehaviour:
   m_FlexibleWidth: 1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+--- !u!114 &5384505370202558135
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2557976006274912287}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 6
+  target: {fileID: 8628231199100471197}
+  preserveAlpha: 1
 --- !u!1 &2574563822215346943
 GameObject:
   m_ObjectHideFlags: 0
@@ -823,6 +871,7 @@ GameObject:
   - component: {fileID: 5219368573622719035}
   - component: {fileID: 6657732197914577240}
   - component: {fileID: 8517407792353308382}
+  - component: {fileID: 8894055075169017709}
   m_Layer: 5
   m_Name: Name
   m_TagString: Untagged
@@ -969,6 +1018,21 @@ MonoBehaviour:
   m_FlexibleWidth: 1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+--- !u!114 &8894055075169017709
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4433936647465619727}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 5
+  target: {fileID: 6657732197914577240}
+  preserveAlpha: 1
 --- !u!1 &4466615832559121115
 GameObject:
   m_ObjectHideFlags: 0
@@ -1157,6 +1221,7 @@ GameObject:
   - component: {fileID: 4464866184642676994}
   - component: {fileID: 3378207120820653715}
   - component: {fileID: 6407618462864421580}
+  - component: {fileID: 3103665579153046461}
   m_Layer: 0
   m_Name: DeleteButton
   m_TagString: Untagged
@@ -1266,6 +1331,21 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &3103665579153046461
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5038490196017459120}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 17
+  target: {fileID: 3378207120820653715}
+  preserveAlpha: 1
 --- !u!1 &6304886812454078821
 GameObject:
   m_ObjectHideFlags: 0
@@ -1279,6 +1359,7 @@ GameObject:
   - component: {fileID: 3372718771179633208}
   - component: {fileID: 6128567587283086139}
   - component: {fileID: 3075749631875751382}
+  - component: {fileID: 1243455001691133966}
   m_Layer: 5
   m_Name: Divider
   m_TagString: Untagged
@@ -1377,6 +1458,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PixelSnapLine
   axis: 0
   designThicknessUnits: 1
+--- !u!114 &1243455001691133966
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6304886812454078821}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 2
+  target: {fileID: 3372718771179633208}
+  preserveAlpha: 1
 --- !u!1 &6531132163249758345
 GameObject:
   m_ObjectHideFlags: 0
@@ -1663,6 +1759,7 @@ GameObject:
   - component: {fileID: 2051558561102727733}
   - component: {fileID: 7557634574412974995}
   - component: {fileID: 3383761662805184388}
+  - component: {fileID: 212138195171979160}
   m_Layer: 0
   m_Name: Label
   m_TagString: Untagged
@@ -1789,6 +1886,21 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &212138195171979160
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6876497743294441067}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 10
+  target: {fileID: 3383761662805184388}
+  preserveAlpha: 1
 --- !u!1 &7688528482463201855
 GameObject:
   m_ObjectHideFlags: 0
