@@ -323,6 +323,10 @@ public partial class ChatManager
 
     private void LoadChatsForActiveBot()
     {
+        // The single funnel for rebuilding the list under a different bot/channel — drop the
+        // read acks with it, so one context's message ids can never mask another's unread.
+        _readAcks.Clear();
+
         string cachePath = Path.Combine(GetCacheRoot(), "chats.json");
         string cachedJson = "";
         if (File.Exists(cachePath))

@@ -157,6 +157,15 @@ public partial class ChatManager : MonoBehaviour
     private string currentChatId;
 
     /// <summary>
+    /// Newest message id acked as read per chat (see ReadAckLedger). Wappi's chats/filter
+    /// keeps reporting the pre-ack unread_count for a moment after message/mark/read, and
+    /// that moment is exactly when the back-navigation sync lands — so ParseChatsJson reads
+    /// the count through this ledger instead of straight off the payload. Cleared whenever
+    /// the list is rebuilt for a different bot/channel (LoadChatsForActiveBot).
+    /// </summary>
+    private readonly ReadAckLedger _readAcks = new ReadAckLedger();
+
+    /// <summary>
     /// Order tiebreak for optimistic local sends (see MessageOrder). Starts
     /// high so an unacked send sorts after any server message in the same
     /// second; increments preserve send order across rapid sends. The first
@@ -345,6 +354,14 @@ public partial class ChatManager : MonoBehaviour
             // Derived from the canonical key so a stripped-suffix twin never mis-flags groupness.
             bool isGroup = ChatIdFormat.IsGroup(chatKey, chat.type, chat.isGroup);
 
+            // Read the unread count through our own ack ledger: while this row's last message
+            // is one the owner already read on screen, it counts as 0 no matter what the server
+            // still says. Without it, a message that arrived DURING an open chat repaints the
+            // badge and fires the cue the moment the owner navigates back — the panel is already
+            // hidden by then, so IncomingNotifyPolicy can no longer suppress it. Self-clearing:
+            // a genuinely newer message doesn't match the acked id and reports normally.
+            int effectiveUnread = _readAcks.EffectiveUnread(chatKey, chat.last_message_id, chat.unread_count);
+
             if (chatLookup.TryGetValue(chatKey, out var existingVm))
             {
                 // --- THE SMART MERGE ---
@@ -355,7 +372,7 @@ public partial class ChatManager : MonoBehaviour
                 bool lastIdChanged = existingVm.LastMessageId != chat.last_message_id;
 
                 existingVm.UpdateLastMessage(lastMsg, unixTime);
-                existingVm.UpdateUnreadCount(chat.unread_count);
+                existingVm.UpdateUnreadCount(effectiveUnread);
                 existingVm.UpdateLastMessageId(chat.last_message_id);
                 bool mergedIsMine = chat.last_message_sender != null && chat.last_message_sender.isMe;
                 existingVm.UpdateLastMessageMeta(chat.last_message_type, chat.last_message_delivery_status, mergedIsMine);
@@ -373,7 +390,7 @@ public partial class ChatManager : MonoBehaviour
                 }
 
                 notifyIncoming |= IncomingNotifyPolicy.ShouldNotify(
-                    isInitialLoad, lastIdChanged, mergedIsMine, chat.unread_count,
+                    isInitialLoad, lastIdChanged, mergedIsMine, effectiveUnread,
                     chatKey, currentChatId, chatPanelVisible);
             }
             else
@@ -386,7 +403,7 @@ public partial class ChatManager : MonoBehaviour
                 // is byte-identical to chat.id. Every downstream chatLookup consumer (GetChat /
                 // SelectChat / Dashboard / DeleteChat) then resolves by vm.ChatId with no further change.
                 var chatVM = new ChatViewModel(chatKey, displayName, chat.thumbnail, lastMsg, unixTime,
-                                               unreadCount: chat.unread_count,
+                                               unreadCount: effectiveUnread,
                                                lastMessageId: chat.last_message_id,
                                                lastMessageType: chat.last_message_type,
                                                lastMessageDeliveryStatus: chat.last_message_delivery_status,
@@ -399,7 +416,7 @@ public partial class ChatManager : MonoBehaviour
 
                 notifyIncoming |= IncomingNotifyPolicy.ShouldNotify(
                     isInitialLoad, lastIdChanged: true, lastMessageIsMine: isMine,
-                    unreadCount: chat.unread_count, chatId: chatKey,
+                    unreadCount: effectiveUnread, chatId: chatKey,
                     openChatId: currentChatId, chatPanelVisible: chatPanelVisible);
             }
         }
@@ -535,7 +552,7 @@ public partial class ChatManager : MonoBehaviour
 
             if (hadUnread)
             {
-                StartCoroutine(MarkChatAsRead(chatId));
+                StartCoroutine(MarkChatAsRead(chatId, selectedVm.LastMessageId));
             }
         }
         else
@@ -844,6 +861,11 @@ public partial class ChatManager : MonoBehaviour
             if (isSettled)
             {
                 OnLiveMessagesReceived?.Invoke(brandNew);
+
+                // These bubbles are on screen now, so they are read. SelectChat's one-shot ack
+                // only ever covered what was unread at open — without this the server's
+                // unread_count keeps climbing for the whole time the chat stays open.
+                MarkOpenChatArrivalsRead(chatId, brandNew);
             }
             else
             {
@@ -858,6 +880,32 @@ public partial class ChatManager : MonoBehaviour
             // already refreshed any visible bubbles in place.
             ChatHistoryCache.SaveHistory(GetCacheRoot(), chatId, cachedList);
         }
+    }
+
+    /// <summary>
+    /// Acks messages that arrived while the owner was looking at the chat. Called from the two
+    /// places brand-new arrivals actually reach the screen — the settled live fire in
+    /// SyncLatestMessages (the D5 open-chat poll) and PopulateBubbles' drain of what landed
+    /// mid-slide. No-ops for a chat that is no longer current or whose panel is off-screen
+    /// (a background sync, or the owner on another tab), and for a batch of our own echoes.
+    ///
+    /// Without this the read state stops at chat-open: everything received during the visit
+    /// stays unread on the server, so the back-navigation chats/filter repaints the badge and
+    /// trips the incoming cue for messages the owner just watched arrive.
+    /// </summary>
+    private void MarkOpenChatArrivalsRead(string chatId, List<MessageViewModel> arrivals)
+    {
+        if (chatId != currentChatId) return;
+        if (MessageListPanel == null || !MessageListPanel.activeInHierarchy) return;
+
+        string newestIncomingId = ReadAckLedger.NewestIncomingId(arrivals);
+        if (string.IsNullOrEmpty(newestIncomingId)) return;
+
+        // Optimistic local zeroing, mirroring SelectChat: the row must never flash a badge on
+        // the way back, even in the window before the ledger correction is consulted.
+        if (chatLookup.TryGetValue(chatId, out var vm)) vm.UpdateUnreadCount(0);
+
+        StartCoroutine(MarkChatAsRead(chatId, newestIncomingId));
     }
 
     /// <summary>
@@ -1107,6 +1155,7 @@ public partial class ChatManager : MonoBehaviour
         if (_pendingLiveSyncMessages != null && _pendingLiveSyncMessages.Count > 0)
         {
             OnLiveMessagesReceived?.Invoke(_pendingLiveSyncMessages);
+            MarkOpenChatArrivalsRead(chatId, _pendingLiveSyncMessages);
             _pendingLiveSyncMessages = null;
         }
 
@@ -2319,29 +2368,32 @@ private IEnumerator PostTextMessageRoutine(
 }
 
 /// <summary>
-/// Tells Wappi the user has read the given chat. Fire-and-forget — on failure,
-/// the next /chats/filter sync corrects any drift.
+/// Tells Wappi the owner has read this chat up to <paramref name="messageId"/>. The id is
+/// passed in rather than read off the row: ChatViewModel.LastMessageId only ever advances in
+/// ParseChatsJson, so while a chat stays open it is frozen at whatever was newest when the
+/// chat was opened — acking that would leave everything received since still unread.
+/// Fire-and-forget on the wire; the local ledger entry is recorded up front because the
+/// owner HAS read these messages whether or not Wappi accepts the POST.
 /// </summary>
-private IEnumerator MarkChatAsRead(string chatId)
+private IEnumerator MarkChatAsRead(string chatId, string messageId)
 {
     if (string.IsNullOrEmpty(chatId)) yield break;
+
+    if (string.IsNullOrEmpty(messageId))
+    {
+        Debug.LogWarning($"[ChatManager.MarkChatAsRead] Chat {chatId} has no message id to ack; skipping.");
+        yield break;
+    }
+
+    // Recorded before the request, not after it: this is local read truth, so a failed or
+    // slow ack must not let the next chats/filter resurrect the badge (and the cue) for
+    // messages the owner watched arrive. See ReadAckLedger.
+    _readAcks.Record(chatId, messageId);
 
     string activeProfileId = GetActiveProfileId();
     if (string.IsNullOrEmpty(activeProfileId))
     {
         Debug.LogWarning($"[ChatManager.MarkChatAsRead] No active profile_id; skipping for chat {chatId}.");
-        yield break;
-    }
-
-    if (!chatLookup.TryGetValue(chatId, out var vm))
-    {
-        Debug.LogWarning($"[ChatManager.MarkChatAsRead] Chat {chatId} not in lookup; skipping.");
-        yield break;
-    }
-
-    if (string.IsNullOrEmpty(vm.LastMessageId))
-    {
-        Debug.LogWarning($"[ChatManager.MarkChatAsRead] Chat {chatId} has no LastMessageId; skipping.");
         yield break;
     }
 
@@ -2352,7 +2404,7 @@ private IEnumerator MarkChatAsRead(string chatId)
         ? $"message/mark/read?profile_id={activeProfileId}"
         : $"message/mark/read?profile_id={activeProfileId}&mark_all=true";
     string url = WappiEndpoints.Sync(ActiveChannel, markReadPath);
-    string jsonPayload = JsonConvert.SerializeObject(new { message_id = vm.LastMessageId });
+    string jsonPayload = JsonConvert.SerializeObject(new { message_id = messageId });
 
     using UnityWebRequest www = new UnityWebRequest(url, "POST");
     byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(jsonPayload);
