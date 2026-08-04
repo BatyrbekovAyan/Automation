@@ -92,6 +92,48 @@ public class ThemeFoundationTests
         // Telegram blue must be the SAME value ChannelAccent already uses.
         Assert.AreEqual(ChannelAccent.TelegramBlue, Theme.Fixed.TelegramBlue);
         Assert.AreEqual("2AABEE", ColorUtility.ToHtmlStringRGB(Theme.Fixed.TelegramBlue));
+        // The chat-row unread accent, byte-identical to the value ChatItemView
+        // used as a local constant before it moved onto the theme layer.
+        Assert.AreEqual("26B25A", ColorUtility.ToHtmlStringRGB(Theme.Fixed.UnreadAccentWhatsApp));
+    }
+
+    [Test]
+    public void UnreadAccent_IsFixed_NotThemeable_AndSurvivesChannelSwap()
+    {
+        // It is one end of the CHANNEL accent pair: WhatsApp keeps it byte-identical,
+        // Telegram maps it to brand blue. Theming it would make the two channels
+        // disagree about what "unread" looks like.
+        var wa = ChannelAccent.Resolve(ChatChannel.WhatsApp, Theme.Fixed.UnreadAccentWhatsApp);
+        Assert.AreEqual(Theme.Fixed.UnreadAccentWhatsApp, wa, "WhatsApp must pass through unchanged");
+
+        var tg = ChannelAccent.Resolve(ChatChannel.Telegram, Theme.Fixed.UnreadAccentWhatsApp);
+        Assert.AreEqual("2AABEE", ColorUtility.ToHtmlStringRGB(tg));
+
+        // Same value under either theme — it is a constant, not a token.
+        var light = Track(ScriptableObject.CreateInstance<ThemeAsset>());
+        var dark = Track(ScriptableObject.CreateInstance<ThemeAsset>());
+        Theme.OverrideForTests(light, dark, ThemeMode.Light);
+        var underLight = Theme.Fixed.UnreadAccentWhatsApp;
+        Theme.SetMode(ThemeMode.Dark);
+        Assert.AreEqual(underLight, Theme.Fixed.UnreadAccentWhatsApp);
+    }
+
+    [Test]
+    public void ReadTimeColour_ResolvesToInkSecondary_AndFollowsTheTheme()
+    {
+        // ChatItemView's read-state timestamp now reads InkSecondary instead of a
+        // local #666666 constant. Light must still be exactly #666666 (no-op today),
+        // and the dark theme must actually move it.
+        var light = Track(ScriptableObject.CreateInstance<ThemeAsset>());
+        var dark = Track(ScriptableObject.CreateInstance<ThemeAsset>());
+        dark.inkSecondary = new Color(0.6f, 0.65f, 0.72f, 1f);
+        Theme.OverrideForTests(light, dark, ThemeMode.Light);
+
+        Assert.AreEqual("666666", ColorUtility.ToHtmlStringRGB(Theme.Color(ThemeRole.InkSecondary)),
+            "light read-time must stay byte-identical to today's value");
+
+        Theme.SetMode(ThemeMode.Dark);
+        Assert.AreNotEqual("666666", ColorUtility.ToHtmlStringRGB(Theme.Color(ThemeRole.InkSecondary)));
     }
 
     // ---------------------------------------------------------------- prefs

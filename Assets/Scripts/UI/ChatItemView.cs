@@ -421,14 +421,29 @@ public void Bind(ChatViewModel model)
     }
     private void OnEnable()
     {
+        // Repaint the runtime-tinted bits on a light/dark switch. The static
+        // graphics carry their own ThemedColor bindings; these two are painted
+        // here at bind time, so they need the event to stay in sync while the
+        // list is on screen instead of waiting for the next rebind.
+        Theme.Changed += HandleThemeChanged;
+
         if (!pendingAvatarLoad) return;
         pendingAvatarLoad = false;
         if (vm == null || vm.AvatarSprite != null || string.IsNullOrEmpty(vm.AvatarUrl)) return;
         avatarLoadCoroutine = StartCoroutine(LoadAvatar(vm));
     }
 
+    private void OnDisable()
+    {
+        Theme.Changed -= HandleThemeChanged;
+    }
+
+    /// <summary>Re-run the runtime tint pass with the row's current unread count.</summary>
+    private void HandleThemeChanged() => ApplyUnreadBadge(lastUnreadCount);
+
     void OnDestroy()
     {
+        Theme.Changed -= HandleThemeChanged;
         EmojiPatchService.OnEmojiReady -= HandleEmojiReady;
         if (vm != null)
         {
@@ -503,30 +518,37 @@ public void Bind(ChatViewModel model)
         }
     }
 
-    // WhatsApp-style time-color toggle. When the row carries unread messages
-    // the timestamp on the right shifts to WhatsApp green; on read it returns
-    // to the muted gray defined on the prefab.
-    private static readonly Color UnreadTimeColor = new Color32(0x26, 0xB2, 0x5A, 0xFF);
-    private static readonly Color ReadTimeColor = new Color32(0x66, 0x66, 0x66, 0xFF);
+    // WhatsApp-style time-color toggle. When the row carries unread messages the
+    // timestamp on the right shifts to the channel's unread accent; on read it
+    // returns to the muted secondary ink.
+    //
+    // Both now come from the theme layer rather than local constants, so the
+    // light/dark switch reaches them. The values are unchanged: UnreadAccentWhatsApp
+    // is #26B25A (fixed — it is one end of the ChannelAccent pair, see Theme.Fixed)
+    // and InkSecondary resolves to #666666 under the light theme.
+    private static Color UnreadTimeColor => Theme.Fixed.UnreadAccentWhatsApp;
+    private static Color ReadTimeColor => Theme.Color(ThemeRole.InkSecondary);
 
-    // The unread pill's authored (WhatsApp-green) fill, captured once from the scene so the
-    // Telegram-blue recolor never hardcodes a scene green: ChannelAccent.Resolve always maps
-    // from THIS authored value, so a pooled row that went blue on a Telegram bind reverts to
-    // the exact authored green on the next WhatsApp bind. Cached lazily on first ApplyUnreadBadge.
+    // The unread pill's fill. Sourced from the theme's fixed channel accent rather than
+    // captured off the Image: ChannelAccent.Resolve maps from THIS value, so a pooled row
+    // that went blue on a Telegram bind reverts to the exact green on the next WhatsApp
+    // bind — and unlike the old lazy capture it cannot latch an already-recolored value.
     private Image unreadBadgeImage;
-    private Color unreadBadgeAuthoredColor;
-    private bool unreadBadgeColorCached;
+
+    // Last count this row was bound with, so a light/dark switch can repaint the
+    // runtime-tinted bits without waiting for the next rebind.
+    private int lastUnreadCount;
 
     private void CacheUnreadBadgeColor()
     {
-        if (unreadBadgeColorCached || unreadBadge == null) return;
-        unreadBadgeImage = unreadBadge.GetComponent<Image>();
-        if (unreadBadgeImage != null) unreadBadgeAuthoredColor = unreadBadgeImage.color;
-        unreadBadgeColorCached = true;
+        if (unreadBadgeImage == null && unreadBadge != null)
+            unreadBadgeImage = unreadBadge.GetComponent<Image>();
     }
 
     private void ApplyUnreadBadge(int count)
     {
+        lastUnreadCount = count;
+
         // Profile → Уведомления → «Счётчик непрочитанных»: treating the count
         // as zero also reverts the green time tint, covering both call sites.
         if (!NotifPrefs.UnreadBadgeEnabled) count = 0;
@@ -545,7 +567,7 @@ public void Bind(ChatViewModel model)
 
         CacheUnreadBadgeColor();
         if (unreadBadgeImage != null)
-            unreadBadgeImage.color = ChannelAccent.Resolve(channel, unreadBadgeAuthoredColor);
+            unreadBadgeImage.color = ChannelAccent.Resolve(channel, Theme.Fixed.UnreadAccentWhatsApp);
 
         if (unreadBadge == null) return;
         if (!hasUnread)

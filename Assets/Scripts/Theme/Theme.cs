@@ -74,6 +74,21 @@ public static class Theme
         /// green, in every theme (BotCardFooterBuilder.TrackOnColor today).
         /// </summary>
         public static readonly Color SwitchOnGreen = FromHex("#34C759");
+
+        /// <summary>
+        /// The WhatsApp-channel unread accent: chat-row unread pill fill and the
+        /// green timestamp tint. Fixed rather than themeable because it is one end
+        /// of the CHANNEL accent pair — <see cref="ChannelAccent.Resolve"/> maps it
+        /// to Telegram blue on that channel, so theming it would make the two
+        /// channels disagree about what "unread" looks like.
+        ///
+        /// Verified to work on both grounds as a fill: 2.76:1 on the light row
+        /// (#FFFFFF) and 6.19:1 on the dark row (#171C24), so it needs no dark
+        /// sibling. NOTE: white text on this green is 2.76:1 — a PRE-EXISTING
+        /// shortfall against the 4.5:1 floor, carried unchanged here on purpose
+        /// and queued for the chats-list redesign.
+        /// </summary>
+        public static readonly Color UnreadAccentWhatsApp = FromHex("#26B25A");
     }
 
     private static ThemeAsset LoadOrDefault(string path)
