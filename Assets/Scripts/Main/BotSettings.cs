@@ -463,27 +463,42 @@ public partial class BotSettings : MonoBehaviour
 
     //////////////////////////////////////// FIELDS ////////////////////////////////////////
 
+    // Every editable field recomputes the Save verdict on BOTH signals:
+    //   • OnCommitted     — the field lost focus holding a changed value;
+    //   • onValueChanged  — every keystroke, while the keyboard is still up.
+    //
+    // The keystroke hook is what lets Save light up AS the user types. With
+    // only the commit hook, Save stayed dim until the field was blurred, so
+    // typing a value and reaching straight for «Сохранить» met a disabled
+    // button: that tap blurred the field instead of saving, and Save had to be
+    // pressed a second time. Relying on blur is not fixable by tap ordering
+    // either — DeferredDismissInputField defers its dismiss until the Input
+    // System reports no finger pressed, which on iOS can lag behind the tap.
+    //
+    // Safe because the dirty check reads TMP_InputField.text live, so an
+    // in-progress edit compares exactly as a committed one would, and
+    // Manager.SaveSettings persists from the same live .Value — an uncommitted
+    // edit is saved correctly. EnableSave is null-guarded, so the programmatic
+    // .text writes that also raise onValueChanged (the revert in
+    // Manager.CloseSettings, LoadBots' hydration) are harmless.
+    private static void WireDirtyOnEdit(EditableField field)
+    {
+        if (field == null) return;
+        field.OnCommitted.AddListener(_ => Manager.Instance.EnableSave());
+        if (field.InputField != null)
+            field.InputField.onValueChanged.AddListener(_ => Manager.Instance.EnableSave());
+    }
+
     private void WireFields()
     {
-        if (BotNameField != null)
-        {
-            BotNameField.OnCommitted.AddListener(_ => Manager.Instance.EnableSave());
-        }
-        if (WhatsappNumberField != null)
-            WhatsappNumberField.OnCommitted.AddListener(_ => Manager.Instance.EnableSave());
-        if (TelegramNumberField != null)
-            TelegramNumberField.OnCommitted.AddListener(_ => Manager.Instance.EnableSave());
-
-        if (BusinessField != null)
-            BusinessField.OnCommitted.AddListener(_ => Manager.Instance.EnableSave());
-        if (PromptField != null)
-            PromptField.OnCommitted.AddListener(_ => Manager.Instance.EnableSave());
+        WireDirtyOnEdit(BotNameField);
+        WireDirtyOnEdit(WhatsappNumberField);
+        WireDirtyOnEdit(TelegramNumberField);
+        WireDirtyOnEdit(BusinessField);
+        WireDirtyOnEdit(PromptField);
 
         foreach (var contactField in ContactFields)
-        {
-            if (contactField != null)
-                contactField.OnCommitted.AddListener(_ => Manager.Instance.EnableSave());
-        }
+            WireDirtyOnEdit(contactField);
 
         if (BusinessTypeDropdown != null)
             BusinessTypeDropdown.onValueChanged.AddListener(_ => Manager.Instance.EnableSave());

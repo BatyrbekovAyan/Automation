@@ -16,28 +16,37 @@ public partial class BotSettings
     // done/back buttons were deleted together with the
     // WhatsappAuthorization / TelegramAuthorization GameObjects.
 
+    // BOTH directions must recompute the Save verdict. Only the OFF branch used
+    // to, so turning a channel back ON — which returns the row to its persisted
+    // value and must DIM Save again — left the button showing the pre-toggle
+    // state, and turning ON a channel that was saved OFF left Save dim on a
+    // genuine change (the toggle then silently reverted on back). The
+    // authorization check is a separate, network-dependent concern: it may
+    // fail, time out, or take neither branch, so the dirty check must never
+    // depend on it.
     public void WhatsappChannelToggleChanged(bool isOn)
     {
-        if (isOn)
-        {
-            StartCoroutine(CheckWhatsappAuthorization());
-        }
-        else
-        {
-            Manager.Instance.EnableSave();
-        }
+        Manager.Instance.EnableSave();
+        if (isOn) StartCoroutine(CheckWhatsappAuthorization());
     }
 
     public void TelegramChannelToggleChanged(bool isOn)
     {
-        if (isOn)
-        {
-            StartCoroutine(CheckTelegramAuthorization());
-        }
-        else
-        {
-            Manager.Instance.EnableSave();
-        }
+        Manager.Instance.EnableSave();
+        if (isOn) StartCoroutine(CheckTelegramAuthorization());
+    }
+
+    // Forces a channel row to a state without re-entering the auth flow, then
+    // recomputes Save. ToggleRow.SetIsOnQuiet goes through
+    // Toggle.SetIsOnWithoutNotify, so the toggle listener — and with it the
+    // dirty check — never runs. Most call sites also rewrite the bot's
+    // PlayerPrefs right before calling this; the profile-creation-timeout
+    // bail-outs don't, and there the recompute correctly re-lights Save when
+    // the snapped-off row no longer matches a saved ON.
+    private static void SetChannelRowQuiet(ToggleRow row, bool isOn)
+    {
+        if (row != null) row.SetIsOnQuiet(isOn);
+        Manager.Instance.EnableSave();
     }
 
     public void OpenConfirmChangeWhatsappNumberPopup() => PopupUI.Show(ConfirmChangeWhatsappNumberPopup);
@@ -84,7 +93,7 @@ public partial class BotSettings
 
             if (bot.whatsappProfileId.Equals("-1"))
             {
-                if (whatsappRow != null) whatsappRow.SetIsOnQuiet(false);
+                SetChannelRowQuiet(whatsappRow, false);
                 yield break;
             }
 
@@ -157,16 +166,15 @@ public partial class BotSettings
         PlayerPrefs.SetInt(Manager.openBot.name + "isOnWhatsapp", 1);
         PlayerPrefs.SetString(Manager.openBot.name + "WhatsappProfileId", Manager.openBot.GetComponent<Bot>().whatsappProfileId);
 
+        // A successful auth persists the channel itself, so the screen is back
+        // in agreement with disk on these fields — recompute rather than leave
+        // whatever verdict the pre-auth toggle flip produced.
+        Manager.Instance.EnableSave();
         Manager.Instance.GetCreateWhatsappWorkflow();
     }
 
     private void OnWhatsappAuthFromSettingsBack()
     {
-        // whatsappRow.SetIsOnQuiet updates isOn AND moves the thumb/retints
-        // the track in one call; plain Toggle.SetIsOnWithoutNotify skips the
-        // ToggleRow animation listener, leaving the control looking "on".
-        if (whatsappRow != null) whatsappRow.SetIsOnQuiet(false);
-
         if (WhatsappNumberField != null)
         {
             WhatsappNumberField.Value = "";
@@ -176,7 +184,11 @@ public partial class BotSettings
         PlayerPrefs.SetString(Manager.openBot.name + "WhatsappNumber", "");
         PlayerPrefs.SetInt(Manager.openBot.name + "isOnWhatsapp", 0);
 
-        Manager.Instance.EnableSave();
+        // SetChannelRowQuiet updates isOn AND moves the thumb/retints the track
+        // in one call (plain Toggle.SetIsOnWithoutNotify skips the ToggleRow
+        // animation listener, leaving the control looking "on"), then
+        // recomputes Save against the prefs written just above.
+        SetChannelRowQuiet(whatsappRow, false);
         Manager.Instance.GetDeleteWhatsappProfile(Manager.openBot.GetComponent<Bot>().whatsappProfileId);
     }
 
@@ -208,14 +220,19 @@ public partial class BotSettings
             {
                 if (!isAuthorized && !Manager.openBot.GetComponent<Bot>().whatsappProfileId.Equals("-1"))
                 {
-                    if (whatsappRow != null) whatsappRow.SetIsOnQuiet(false);
-
                     WhatsappNumberField.Value = "";
                     WhatsappNumberField.gameObject.SetActive(false);
 
                     PlayerPrefs.SetString(Manager.openBot.name + "WhatsappNumber", "");
                     PlayerPrefs.SetInt(Manager.openBot.name + "isOnWhatsapp", 0);
 
+                    // This probe lands ~a network round-trip after the screen
+                    // opened and rewrites both the row and the prefs behind the
+                    // user's back, so the Save verdict has to be recomputed —
+                    // otherwise a toggle the user had just flipped stayed lit
+                    // even though the probe brought screen and prefs back into
+                    // agreement.
+                    SetChannelRowQuiet(whatsappRow, false);
                     Manager.Instance.GetDeleteWhatsappProfile(Manager.openBot.GetComponent<Bot>().whatsappProfileId);
                 }
             }
@@ -241,6 +258,9 @@ public partial class BotSettings
 
             PlayerPrefs.SetString(Manager.openBot.name + "WhatsappNumber", "");
             PlayerPrefs.SetInt(Manager.openBot.name + "isOnWhatsapp", 0);
+
+            // Logout rewrote the number field and both prefs — recompute Save.
+            Manager.Instance.EnableSave();
         }
 
         Manager.Instance.LoadingPanel.SetActive(false);
@@ -266,7 +286,7 @@ public partial class BotSettings
 
             if (bot.telegramProfileId.Equals("-1"))
             {
-                if (telegramRow != null) telegramRow.SetIsOnQuiet(false);
+                SetChannelRowQuiet(telegramRow, false);
                 yield break;
             }
 
@@ -326,13 +346,13 @@ public partial class BotSettings
         PlayerPrefs.SetInt(Manager.openBot.name + "isOnTelegram", 1);
         PlayerPrefs.SetString(Manager.openBot.name + "TelegramProfileId", Manager.openBot.GetComponent<Bot>().telegramProfileId);
 
+        // Recompute Save — see the WhatsApp twin above.
+        Manager.Instance.EnableSave();
         Manager.Instance.GetCreateTelegramWorkflow();
     }
 
     private void OnTelegramAuthFromSettingsBack()
     {
-        if (telegramRow != null) telegramRow.SetIsOnQuiet(false);
-
         if (TelegramNumberField != null)
         {
             TelegramNumberField.Value = "";
@@ -342,7 +362,7 @@ public partial class BotSettings
         PlayerPrefs.SetString(Manager.openBot.name + "TelegramNumber", "");
         PlayerPrefs.SetInt(Manager.openBot.name + "isOnTelegram", 0);
 
-        Manager.Instance.EnableSave();
+        SetChannelRowQuiet(telegramRow, false);
         Manager.Instance.GetDeleteTelegramProfile(Manager.openBot.GetComponent<Bot>().telegramProfileId);
     }
 
@@ -383,14 +403,14 @@ public partial class BotSettings
                 && PlayerPrefs.GetInt(Manager.openBot.name + "isOnTelegram", 0) == 1
                 && !Manager.openBot.GetComponent<Bot>().telegramProfileId.Equals("-1"))
             {
-                if (telegramRow != null) telegramRow.SetIsOnQuiet(false);
-
                 TelegramNumberField.Value = "";
                 TelegramNumberField.gameObject.SetActive(false);
 
                 PlayerPrefs.SetString(Manager.openBot.name + "TelegramNumber", "");
                 PlayerPrefs.SetInt(Manager.openBot.name + "isOnTelegram", 0);
 
+                // Recompute Save — see the WhatsApp twin above.
+                SetChannelRowQuiet(telegramRow, false);
                 Manager.Instance.GetDeleteTelegramProfile(Manager.openBot.GetComponent<Bot>().telegramProfileId);
             }
         }
@@ -415,6 +435,9 @@ public partial class BotSettings
 
             PlayerPrefs.SetString(Manager.openBot.name + "TelegramNumber", "");
             PlayerPrefs.SetInt(Manager.openBot.name + "isOnTelegram", 0);
+
+            // Recompute Save — see the WhatsApp twin above.
+            Manager.Instance.EnableSave();
         }
 
         Manager.Instance.LoadingPanel.SetActive(false);

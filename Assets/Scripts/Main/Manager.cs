@@ -629,39 +629,12 @@ public partial class Manager : MonoBehaviour
         return go.GetComponent<BotSettings>();
     }
 
-    // Counts only cards whose Name is non-empty. Mirrors the predicate at
-    // SaveSettings (`!card.Name.Equals("")`) that gates whether per-slot
-    // PlayerPrefs keys are written. Decoupling the saved count from
-    // ProductsParent.transform.childCount prevents the count drift that
-    // would otherwise let an in-list blank card poison save→reload (the
-    // skipped slot would hydrate as an empty card on next LoadBots).
-    private static int CountNonEmptyProductCards(Transform parent)
-    {
-        if (parent == null) return 0;
-        int count = 0;
-        for (int i = 0; i < parent.childCount; i++)
-        {
-            var card = parent.GetChild(i).GetComponent<ProductCardView>();
-            if (card != null && !string.IsNullOrEmpty(card.Name)) count++;
-        }
-        return count;
-    }
-
-    // Service-side mirror of CountNonEmptyProductCards. Two helpers
-    // (rather than a generic) because ProductCardView and ServiceCardView
-    // do not share a common base/interface exposing Name; introducing one
-    // would be a larger refactor unrelated to this fix.
-    private static int CountNonEmptyServiceCards(Transform parent)
-    {
-        if (parent == null) return 0;
-        int count = 0;
-        for (int i = 0; i < parent.childCount; i++)
-        {
-            var card = parent.GetChild(i).GetComponent<ServiceCardView>();
-            if (card != null && !string.IsNullOrEmpty(card.Name)) count++;
-        }
-        return count;
-    }
+    // NOTE: CountNonEmptyProductCards / CountNonEmptyServiceCards lived here.
+    // They existed only to decouple the saved *count* from childCount while
+    // the slot *keys* were still written at the child index — a mismatch that
+    // dropped a product whenever a blank card preceded it. SaveSettings now
+    // writes contiguous slots and the running slot counter IS the count, so
+    // the helpers had nothing left to compute.
 
     // Compacts a saved bot's product slot keys: walks PlayerPrefs entries
     // 0..oldCount-1, collects non-empty slots (Name key non-empty per
@@ -787,8 +760,24 @@ public partial class Manager : MonoBehaviour
                 PlayerPrefs.SetString(openBot.name + "BusinessType", bt.id);
         }
         openBot.GetComponent<Bot>()?.RefreshBusinessIcon();
-        //PlayerPrefs.SetInt(openBot.name + "isOnWhatsapp", openBotSettings.WhatsappToggle.isOn ? 1 : 0);
-        //PlayerPrefs.SetInt(openBot.name + "isOnTelegram", openBotSettings.TelegramToggle.isOn ? 1 : 0);
+
+        // Both channel toggles are persisted HERE, synchronously, before this
+        // method's trailing EnableSave(). They used to be written inside
+        // SaveWorkflows instead, which broke the Save button two ways:
+        //   • isOnTelegram was written only AFTER that coroutine's first
+        //     network round-trip, so the dirty re-check below still read the
+        //     pre-save value and re-lit the button the save had just cleaned —
+        //     the user had to press Save a second time to make it dim;
+        //   • both writes sat inside the "channel has a real n8n workflow id"
+        //     branch, so for a channel whose id is ""/"-1" the toggle change
+        //     was never persisted at all and was silently dropped on close.
+        // SaveWorkflows still needs the PRE-save values to decide whether a
+        // workflow must be (de)activated — GetSaveSettings snapshots them and
+        // passes them in, so this write cannot race that decision.
+        if (openBotSettings.WhatsappToggle != null)
+            PlayerPrefs.SetInt(openBot.name + "isOnWhatsapp", openBotSettings.WhatsappToggle.isOn ? 1 : 0);
+        if (openBotSettings.TelegramToggle != null)
+            PlayerPrefs.SetInt(openBot.name + "isOnTelegram", openBotSettings.TelegramToggle.isOn ? 1 : 0);
 
         PlayerPrefs.SetString(openBot.name + "WhatsappNumber", openBotSettings.WhatsappNumberField.Value);
         PlayerPrefs.SetString(openBot.name + "TelegramNumber", openBotSettings.TelegramNumberField.Value);
@@ -809,88 +798,18 @@ public partial class Manager : MonoBehaviour
         }
 
 
-        for (int i = 0; i < openBotSettings.ProductsParent.transform.childCount; i++)
-        {
-            Transform product = openBotSettings.ProductsParent.transform.GetChild(i);
-            var card = product.GetComponent<ProductCardView>();
-            // Trim once into a local. Use the trimmed value for BOTH the
-            // empty-check and the SetString write so leading/trailing
-            // whitespace doesn't survive into PlayerPrefs.
-            // Note: CountNonEmptyProductCards (the Fix C count helper) does
-            // NOT trim — its predicate is !IsNullOrEmpty(raw). The 1-off
-            // count drift in the whitespace-only case is unreachable in
-            // practice (ItemEditSheet.Commit's IsNullOrWhiteSpace fallback
-            // prevents whitespace-only Names from being committed).
-            var name = card.Name?.Trim() ?? string.Empty;
-            if (!string.IsNullOrEmpty(name))
-            {
-                PlayerPrefs.SetString(openBot.name + "Product" + i, name);
-                PlayerPrefs.SetString(openBot.name + "Product" + i + "Price", card.Price);
-                PlayerPrefs.SetString(openBot.name + "Product" + i + "Description", card.Description);
-            }
-        }
+        // Both lists go through BotSettingsListSlots, which is also what the
+        // dirty check reads — one definition of "which rows get saved and
+        // where", so a saved screen always evaluates back to clean. Slots are
+        // written CONTIGUOUSLY: the old loop wrote each row at its CHILD index
+        // while the stored count only counted non-empty rows, so one blank card
+        // in the list put the real row at a slot the next load never read (the
+        // row vanished) and pinned the Save button lit.
+        BotSettingsListSlots.Persist(openBot.name, "Product", "ProductsNumber",
+            BotSettingsListSlots.Persistable(ReadProductCards(openBotSettings.ProductsParent)));
 
-        //delete not used keyes
-        if (PlayerPrefs.GetInt(openBot.name + "ProductsNumber", 0) > openBotSettings.ProductsParent.transform.childCount)
-        {
-            for (int p = openBotSettings.ProductsParent.transform.childCount; p < PlayerPrefs.GetInt(openBot.name + "ProductsNumber", 0); p++)
-            {
-                if (PlayerPrefs.HasKey(openBot.name + "Product" + p))
-                {
-                    PlayerPrefs.DeleteKey(openBot.name + "Product" + p);
-                }
-
-                if (PlayerPrefs.HasKey(openBot.name + "Product" + p + "Price"))
-                {
-                    PlayerPrefs.DeleteKey(openBot.name + "Product" + p + "Price");
-                }
-
-                if (PlayerPrefs.HasKey(openBot.name + "Product" + p + "Description"))
-                {
-                    PlayerPrefs.DeleteKey(openBot.name + "Product" + p + "Description");
-                }
-            }
-        }
-
-        PlayerPrefs.SetInt(openBot.name + "ProductsNumber", CountNonEmptyProductCards(openBotSettings.ProductsParent));
-
-
-        for (int i = 0; i < openBotSettings.ServicesParent.transform.childCount; i++)
-        {
-            Transform service = openBotSettings.ServicesParent.transform.GetChild(i);
-            var card = service.GetComponent<ServiceCardView>();
-            var name = card.Name?.Trim() ?? string.Empty;
-            if (!string.IsNullOrEmpty(name))
-            {
-                PlayerPrefs.SetString(openBot.name + "Service" + i, name);
-                PlayerPrefs.SetString(openBot.name + "Service" + i + "Price", card.Price);
-                PlayerPrefs.SetString(openBot.name + "Service" + i + "Description", card.Description);
-            }
-        }
-
-        //delete not used keyes
-        if (PlayerPrefs.GetInt(openBot.name + "ServicesNumber", 0) > openBotSettings.ServicesParent.transform.childCount)
-        {
-            for (int s = openBotSettings.ServicesParent.transform.childCount; s < PlayerPrefs.GetInt(openBot.name + "ServicesNumber", 0); s++)
-            {
-                if (PlayerPrefs.HasKey(openBot.name + "Service" + s))
-                {
-                    PlayerPrefs.DeleteKey(openBot.name + "Service" + s);
-                }
-
-                if (PlayerPrefs.HasKey(openBot.name + "Service" + s + "Price"))
-                {
-                    PlayerPrefs.DeleteKey(openBot.name + "Service" + s + "Price");
-                }
-
-                if (PlayerPrefs.HasKey(openBot.name + "Service" + s + "Description"))
-                {
-                    PlayerPrefs.DeleteKey(openBot.name + "Service" + s + "Description");
-                }
-            }
-        }
-
-        PlayerPrefs.SetInt(openBot.name + "ServicesNumber", CountNonEmptyServiceCards(openBotSettings.ServicesParent));
+        BotSettingsListSlots.Persist(openBot.name, "Service", "ServicesNumber",
+            BotSettingsListSlots.Persistable(ReadServiceCards(openBotSettings.ServicesParent)));
 
 
         PlayerPrefs.Save(); // Ensure changes are written to disk
@@ -1013,42 +932,133 @@ public partial class Manager : MonoBehaviour
         }
     }
 
-    private static bool ContactFieldsChanged(global::BotSettings settings, string botName)
-    {
-        var contacts = settings.ContactFields;
-        for (int c = 0; c < contacts.Length; c++)
-        {
-            if (contacts[c] == null) continue;
-            if (!contacts[c].Value.Equals(PlayerPrefs.GetString(botName + global::BotSettings.ContactKeys[c], "")))
-                return true;
-        }
-        return false;
-    }
-
+    // Recomputes the Save button's interactable state from scratch: dirty when
+    // ANY value on the screen differs from what is persisted, clean the moment
+    // every value is back at its saved state. Call this after ANY mutation of
+    // the screen or of the bot's PlayerPrefs — including the ones that bypass
+    // the UI listeners (Toggle.SetIsOnWithoutNotify, direct PlayerPrefs writes
+    // from the auth flows), which is exactly where the button used to go stale.
     public void EnableSave()
     {
-        bool settingsChanged = false;
+        // Auth probes and the save flow can land after the screen closed;
+        // a missing open bot is normal here, not an error.
+        if (openBot == null || openBotSettings == null) return;
 
-        if (!openBotSettings.BotNameField.Value.Equals(PlayerPrefs.GetString(openBot.name + "Name", "")) ||
-            openBotSettings.WhatsappToggle.isOn != (PlayerPrefs.GetInt(openBot.name + "isOnWhatsapp", 1) == 1) ||
-            openBotSettings.TelegramToggle.isOn != (PlayerPrefs.GetInt(openBot.name + "isOnTelegram", 1) == 1) ||
-            // Placeholder selected (legacy/unknown saved id) counts as unchanged:
-            // saving would keep the stored id anyway.
-            (businessTypes.TryGetByIndex(openBotSettings.BusinessTypeDropdown.value, out var dirtyBt)
-                && dirtyBt.id != PlayerPrefs.GetString(openBot.name + "BusinessType", "")) ||
-            !openBotSettings.WhatsappNumberField.Value.Equals(PlayerPrefs.GetString(openBot.name + "WhatsappNumber", "")) ||
-            !openBotSettings.TelegramNumberField.Value.Equals(PlausibleTelegramNumber(PlayerPrefs.GetString(openBot.name + "TelegramNumber", ""))) ||
-            !openBotSettings.BusinessField.Value.Equals(PlayerPrefs.GetString(openBot.name + "Business", "")) ||
-            !openBotSettings.PromptField.Value.Equals(PlayerPrefs.GetString(openBot.name + "Prompt", "")) ||
-            ContactFieldsChanged(openBotSettings, openBot.name))
+        SetBotSettingsSaveInteractable(IsBotSettingsDirty());
+
+        // A card destroyed this frame still counts in childCount until the end
+        // of the frame, so run the SAME verdict again once the hierarchy has
+        // settled. Only one re-check is ever in flight.
+        if (_dirtyRecheck != null) StopCoroutine(_dirtyRecheck);
+        _dirtyRecheck = StartCoroutine(RecheckBotSettingsDirtyAfterFrame());
+    }
+
+    private Coroutine _dirtyRecheck;
+
+    private IEnumerator RecheckBotSettingsDirtyAfterFrame()
+    {
+        yield return new WaitForEndOfFrame();
+        _dirtyRecheck = null;
+        if (openBot == null || openBotSettings == null) yield break;
+        SetBotSettingsSaveInteractable(IsBotSettingsDirty());
+    }
+
+    public bool IsBotSettingsDirty() =>
+        BotSettingsDirtyPolicy.IsDirty(BuildEditedSettingsSnapshot(),
+                                       ReadSavedSettings(openBot.name));
+
+    // The live screen. Values are normalized to what SaveSettings would
+    // actually persist (trimmed list names, non-empty rows only) so "saved,
+    // nothing left to write" always evaluates to clean.
+    private BotSettingsSnapshot BuildEditedSettingsSnapshot()
+    {
+        var snapshot = new BotSettingsSnapshot
         {
-            settingsChanged = true;
+            Name = openBotSettings.BotNameField != null ? openBotSettings.BotNameField.Value : "",
+            WhatsappOn = openBotSettings.WhatsappToggle != null && openBotSettings.WhatsappToggle.isOn,
+            TelegramOn = openBotSettings.TelegramToggle != null && openBotSettings.TelegramToggle.isOn,
+            WhatsappNumber = openBotSettings.WhatsappNumberField != null ? openBotSettings.WhatsappNumberField.Value : "",
+            TelegramNumber = openBotSettings.TelegramNumberField != null ? openBotSettings.TelegramNumberField.Value : "",
+            Business = openBotSettings.BusinessField != null ? openBotSettings.BusinessField.Value : "",
+            Prompt = openBotSettings.PromptField != null ? openBotSettings.PromptField.Value : "",
+        };
+
+        // Left null when the dropdown resolves to no known type — the
+        // placeholder a legacy stored id selects. BotSettingsDirtyPolicy
+        // skips a null, matching SaveSettings, which keeps the stored id.
+        if (openBotSettings.BusinessTypeDropdown != null
+            && businessTypes != null
+            && businessTypes.TryGetByIndex(openBotSettings.BusinessTypeDropdown.value, out var editedBt))
+        {
+            snapshot.BusinessTypeId = editedBt.id;
         }
 
+        var contactFields = openBotSettings.ContactFields;
+        snapshot.Contacts = new string[contactFields.Length];
+        for (int c = 0; c < contactFields.Length; c++)
+            snapshot.Contacts[c] = contactFields[c] != null ? contactFields[c].Value : null;
 
-        SetBotSettingsSaveInteractable(settingsChanged);
+        // Same filter the save path uses, so a blank card the user added and
+        // abandoned reads as clean — it is never written, so there is nothing
+        // to save.
+        snapshot.Products = BotSettingsListSlots.Persistable(ReadProductCards(openBotSettings.ProductsParent));
+        snapshot.Services = BotSettingsListSlots.Persistable(ReadServiceCards(openBotSettings.ServicesParent));
 
-        StartCoroutine(CheckProductsOrServicesChanged());
+        return snapshot;
+    }
+
+    // Raw card data, in list order. ProductCardView and ServiceCardView share
+    // no base type exposing Name, hence the two near-identical readers.
+    private static List<BotSettingsListItem> ReadProductCards(RectTransform parent)
+    {
+        var rows = new List<BotSettingsListItem>();
+        if (parent == null) return rows;
+        for (int i = 0; i < parent.childCount; i++)
+        {
+            var card = parent.GetChild(i).GetComponent<ProductCardView>();
+            if (card != null) rows.Add(new BotSettingsListItem(card.Name, card.Price, card.Description));
+        }
+        return rows;
+    }
+
+    private static List<BotSettingsListItem> ReadServiceCards(RectTransform parent)
+    {
+        var rows = new List<BotSettingsListItem>();
+        if (parent == null) return rows;
+        for (int i = 0; i < parent.childCount; i++)
+        {
+            var card = parent.GetChild(i).GetComponent<ServiceCardView>();
+            if (card != null) rows.Add(new BotSettingsListItem(card.Name, card.Price, card.Description));
+        }
+        return rows;
+    }
+
+    // What is on disk for this bot. Defaults mirror the load path
+    // (CloseSettings / LoadBots) so a freshly opened, untouched screen is clean.
+    // Public so tests can assert the real saved-side read rather than a
+    // hand-built stand-in that could drift from it.
+    public static BotSettingsSnapshot ReadSavedSettings(string botName)
+    {
+        var snapshot = new BotSettingsSnapshot
+        {
+            Name = PlayerPrefs.GetString(botName + "Name", ""),
+            BusinessTypeId = PlayerPrefs.GetString(botName + "BusinessType", ""),
+            WhatsappOn = PlayerPrefs.GetInt(botName + "isOnWhatsapp", 1) == 1,
+            TelegramOn = PlayerPrefs.GetInt(botName + "isOnTelegram", 1) == 1,
+            WhatsappNumber = PlayerPrefs.GetString(botName + "WhatsappNumber", ""),
+            TelegramNumber = PlausibleTelegramNumber(PlayerPrefs.GetString(botName + "TelegramNumber", "")),
+            Business = PlayerPrefs.GetString(botName + "Business", ""),
+            Prompt = PlayerPrefs.GetString(botName + "Prompt", ""),
+        };
+
+        snapshot.Contacts = new string[global::BotSettings.ContactKeys.Length];
+        for (int c = 0; c < snapshot.Contacts.Length; c++)
+            snapshot.Contacts[c] = PlayerPrefs.GetString(botName + global::BotSettings.ContactKeys[c], "");
+
+        snapshot.Products = BotSettingsListSlots.Read(botName, "Product", "ProductsNumber");
+        snapshot.Services = BotSettingsListSlots.Read(botName, "Service", "ServicesNumber");
+
+        return snapshot;
     }
 
     private void SetBotSettingsSaveInteractable(bool interactable)
@@ -1178,42 +1188,16 @@ public partial class Manager : MonoBehaviour
         }
     }
 
-    public IEnumerator CheckProductsOrServicesChanged()
-    {
-        yield return new WaitForEndOfFrame();
-
-        if (openBotSettings.ProductsParent.transform.childCount != PlayerPrefs.GetInt(openBot.name + "ProductsNumber", 0) ||
-            openBotSettings.ServicesParent.transform.childCount != PlayerPrefs.GetInt(openBot.name + "ServicesNumber", 0))
-        {
-            SetBotSettingsSaveInteractable(true);
-        }
-
-        else if (openBotSettings.ProductsParent.transform.childCount == PlayerPrefs.GetInt(openBot.name + "ProductsNumber", 0))
-        {
-            for (int p = 0; p < openBotSettings.ProductsParent.transform.childCount; p++)
-            {
-                if (!openBotSettings.ProductsParent.transform.GetChild(p).GetComponent<ProductCardView>().Name.Equals(PlayerPrefs.GetString(openBot.name + "Product" + p, "")) ||
-                    !openBotSettings.ProductsParent.transform.GetChild(p).GetComponent<ProductCardView>().Price.Equals(PlayerPrefs.GetString(openBot.name + "Product" + p + "Price", "")) ||
-                    !openBotSettings.ProductsParent.transform.GetChild(p).GetComponent<ProductCardView>().Description.Equals(PlayerPrefs.GetString(openBot.name + "Product" + p + "Description", "")))
-                {
-                    SetBotSettingsSaveInteractable(true);
-                }
-            }
-        }
-
-        else if (openBotSettings.ServicesParent.transform.childCount == PlayerPrefs.GetInt(openBot.name + "ServicesNumber", 0))
-        {
-            for (int s = 0; s < openBotSettings.ServicesParent.transform.childCount; s++)
-            {
-                if (!openBotSettings.ServicesParent.transform.GetChild(s).GetComponent<ServiceCardView>().Name.Equals(PlayerPrefs.GetString(openBot.name + "Service" + s, "")) ||
-                    !openBotSettings.ServicesParent.transform.GetChild(s).GetComponent<ServiceCardView>().Price.Equals(PlayerPrefs.GetString(openBot.name + "Service" + s + "Price", "")) ||
-                    !openBotSettings.ServicesParent.transform.GetChild(s).GetComponent<ServiceCardView>().Description.Equals(PlayerPrefs.GetString(openBot.name + "Service" + s + "Description", "")))
-                {
-                    SetBotSettingsSaveInteractable(true);
-                }
-            }
-        }
-    }
+    // NOTE: the old CheckProductsOrServicesChanged lived here. It was an
+    // if/else-if chain whose second branch (`products.childCount == saved`) was
+    // tautologically true once the first branch's count-mismatch test failed,
+    // so the third branch — the only place a service card's content was ever
+    // compared — was unreachable dead code: editing an existing service's
+    // name/price/description could not light Save and the edit was lost on
+    // back. It also only ever set the button ON, never OFF, and compared raw
+    // childCount against the non-empty saved count, so one blank card pinned
+    // Save lit for the rest of the session. Both lists are now part of the
+    // single two-way verdict in BotSettingsDirtyPolicy.
 
 
     //////////////////////////////////////////////////////////CREATE BOT//////////////////////////////////////////////////////////
@@ -3087,7 +3071,21 @@ public partial class Manager : MonoBehaviour
 
     public void GetSaveSettings(string whatsappWorkflowId, string telegramWorkflowId)
     {
-        StartCoroutine(SaveWorkflows(whatsappWorkflowId, telegramWorkflowId));
+        // Snapshot the persisted channel state BEFORE SaveSettings overwrites
+        // it. SaveWorkflows decides whether a channel's n8n workflow has to be
+        // (de)activated by comparing against this pre-save value, and its
+        // Telegram branch only reaches that decision after a network
+        // round-trip — reading PlayerPrefs there would read back what
+        // SaveSettings had already written and never fire the activation.
+        // Default 1 matches every other reader of these keys (CloseSettings,
+        // LoadBots, the dirty check): a missing key means the channel reads as
+        // ON, so a still-ON toggle is "unchanged" and no workflow is activated
+        // behind the user's back.
+        bool previousWhatsappOn = PlayerPrefs.GetInt(openBot.name + "isOnWhatsapp", 1) == 1;
+        bool previousTelegramOn = PlayerPrefs.GetInt(openBot.name + "isOnTelegram", 1) == 1;
+
+        StartCoroutine(SaveWorkflows(whatsappWorkflowId, telegramWorkflowId,
+                                     previousWhatsappOn, previousTelegramOn));
 
         SaveSettings();
     }
@@ -3744,7 +3742,12 @@ public partial class Manager : MonoBehaviour
         }
     }
 
-    private IEnumerator SaveWorkflows(string whatsappWorkflowId, string telegramWorkflowId)
+    // previousWhatsappOn / previousTelegramOn are the persisted channel states
+    // as they were BEFORE this save (snapshotted by GetSaveSettings). They are
+    // passed in rather than read here because SaveSettings persists the new
+    // values synchronously while this coroutine is suspended on a web request.
+    private IEnumerator SaveWorkflows(string whatsappWorkflowId, string telegramWorkflowId,
+                                      bool previousWhatsappOn, bool previousTelegramOn)
     {
         LoadingPanel.SetActive(true);
 
@@ -3823,7 +3826,7 @@ public partial class Manager : MonoBehaviour
         }
         else
         {
-            if (PlayerPrefs.GetInt(openBot.name + "isOnWhatsapp", 0) != (openBotSettings.WhatsappToggle.isOn ? 1 : 0))
+            if (previousWhatsappOn != openBotSettings.WhatsappToggle.isOn)
             {
                 StartCoroutine(EnableWhatsappWorkflow(whatsappWid,
                     BotActivationPolicy.ChannelWorkflowActive(masterOn, openBotSettings.WhatsappToggle.isOn)));
@@ -3833,8 +3836,8 @@ public partial class Manager : MonoBehaviour
                 EnableWhatsappWorkflowSaved = true;
             }
 
-            PlayerPrefs.SetInt(openBot.name + "isOnWhatsapp", openBotSettings.WhatsappToggle.isOn ? 1 : 0);
-
+            // isOnWhatsapp is persisted by SaveSettings, not here — see the
+            // comment beside those two SetInt calls.
 
             using UnityWebRequest editWhatsappRequest = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/EditWhatsappWorkflow", form);
 
@@ -3861,7 +3864,7 @@ public partial class Manager : MonoBehaviour
         }
         else
         {
-            if (PlayerPrefs.GetInt(openBot.name + "isOnTelegram", 0) != (openBotSettings.TelegramToggle.isOn ? 1 : 0))
+            if (previousTelegramOn != openBotSettings.TelegramToggle.isOn)
             {
                 StartCoroutine(EnableTelegramWorkflow(telegramWid,
                     BotActivationPolicy.ChannelWorkflowActive(masterOn, openBotSettings.TelegramToggle.isOn)));
@@ -3871,8 +3874,9 @@ public partial class Manager : MonoBehaviour
                 EnableTelegramWorkflowSaved = true;
             }
 
-            PlayerPrefs.SetInt(openBot.name + "isOnTelegram", openBotSettings.TelegramToggle.isOn ? 1 : 0);
-
+            // isOnTelegram is persisted by SaveSettings, not here — writing it
+            // at this point (after the WhatsApp Edit round-trip) is what forced
+            // the user to press Save twice before the button dimmed.
 
             using UnityWebRequest editTelegramRequest = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/EditTelegramWorkflow", form);
 

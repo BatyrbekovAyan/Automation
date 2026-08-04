@@ -164,6 +164,22 @@ public class DeferredDismissInputField : TMP_InputField
 
         Trace($"{Who()} real dismiss");
         base.OnDeselect(new BaseEventData(EventSystem.current));
+
+        // ReleaseSelection is what fires SendOnEndEdit — in this TMP version it
+        // is that method's ONLY caller, and the DeactivateInputField inside
+        // base.OnDeselect deliberately skips it while `Reset On Deactivation`
+        // is off (which it is on every input in this project, see
+        // EditableField.ForceBlur). Without this line an outside tap ended the
+        // editing session without ever raising onEndEdit, so
+        // EditableField.HandleEndEdit → Blur → OnCommitted never ran: the typed
+        // value was never committed, the Save button never lit, and the edit
+        // was silently discarded on close. The smooth-switch branch above
+        // already calls it for exactly this reason (SilentCaretStop step 3) —
+        // which is why the bug only showed when the next tap was NOT another
+        // input field, e.g. tapping Save itself. Keyboard lifecycle is
+        // untouched: base.OnDeselect has already closed and nulled
+        // m_SoftKeyboard, and ReleaseSelection never looks at it.
+        ReleaseSelection();
     }
 
     // Silences every other focused instance so at most one field reads the
