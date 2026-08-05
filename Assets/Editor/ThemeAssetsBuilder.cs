@@ -55,7 +55,7 @@ public static class ThemeAssetsBuilder
     {
         t.background   = Hex("#F0F2F5");
         t.surface      = Hex("#FFFFFF");
-        t.hairline     = Hex("#CCCCCC");
+        t.hairline     = Hex("#E4E6EB");
         t.border       = Hex("#E1E5EC");
         t.inputBorder  = Hex("#C6CBD3");
 

@@ -20,7 +20,7 @@ public class ThemeAsset : ScriptableObject
     [Header("Surfaces")]
     public Color background   = Hex("#F0F2F5");
     public Color surface      = Hex("#FFFFFF");
-    public Color hairline     = Hex("#CCCCCC"); // ChatItem divider — scene value
+    public Color hairline     = Hex("#E4E6EB"); // phase-3: lightened from the #CCCCCC scene value
     public Color border       = Hex("#E1E5EC");
     public Color inputBorder  = Hex("#C6CBD3");
 

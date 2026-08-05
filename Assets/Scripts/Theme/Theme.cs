@@ -82,13 +82,13 @@ public static class Theme
         /// to Telegram blue on that channel, so theming it would make the two
         /// channels disagree about what "unread" looks like.
         ///
-        /// Verified to work on both grounds as a fill: 2.76:1 on the light row
-        /// (#FFFFFF) and 6.19:1 on the dark row (#171C24), so it needs no dark
-        /// sibling. NOTE: white text on this green is 2.76:1 — a PRE-EXISTING
-        /// shortfall against the 4.5:1 floor, carried unchanged here on purpose
-        /// and queued for the chats-list redesign.
+        /// Darkened from #26B25A during the phase-3 redesign: the old value put
+        /// white badge text at 2.76:1, well under the 4.5:1 floor. #17803F clears
+        /// it at 5.00:1 while staying in the same green family. (#1F8F4A was tried
+        /// first and measured 4.13:1 — still failing.) Needs no dark sibling: it
+        /// still clears the 3:1 fill floor on the dark row surface at 3.42:1.
         /// </summary>
-        public static readonly Color UnreadAccentWhatsApp = FromHex("#26B25A");
+        public static readonly Color UnreadAccentWhatsApp = FromHex("#17803F");
     }
 
     private static ThemeAsset LoadOrDefault(string path)

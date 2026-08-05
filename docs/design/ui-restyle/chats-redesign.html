@@ -1,0 +1,191 @@
+<title>Chats list — redesign proposal (light)</title>
+<style>
+:root{
+  --g:#F2F4F8; --g2:#E7EAF1; --rl:#D3D9E4; --k:#10141C; --k2:#4A5364; --k3:#7C8698;
+  --ac:#1B5CEB; --acs:#DDE6FB;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  --pad:clamp(20px,4vw,56px);
+}
+@media (prefers-color-scheme:dark){:root{--g:#0C0F16;--g2:#141926;--rl:#232B3B;--k:#EEF1F7;
+--k2:#A2ACC0;--k3:#6C7689;--ac:#6FA0FF;--acs:#17233D;}}
+:root[data-theme="dark"]{--g:#0C0F16;--g2:#141926;--rl:#232B3B;--k:#EEF1F7;--k2:#A2ACC0;
+--k3:#6C7689;--ac:#6FA0FF;--acs:#17233D;}
+:root[data-theme="light"]{--g:#F2F4F8;--g2:#E7EAF1;--rl:#D3D9E4;--k:#10141C;--k2:#4A5364;
+--k3:#7C8698;--ac:#1B5CEB;--acs:#DDE6FB;}
+*{box-sizing:border-box}
+.page{background:var(--g);color:var(--k);font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+-webkit-font-smoothing:antialiased;min-height:100vh}
+.mast{max-width:1280px;margin:0 auto;padding:clamp(40px,6vw,80px) var(--pad) clamp(24px,3vw,36px);
+border-bottom:1px solid var(--rl)}
+.eb{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--k3);margin:0 0 16px}
+.mast h1{font-weight:800;font-size:clamp(28px,4.6vw,46px);line-height:1.05;letter-spacing:-.035em;
+margin:0 0 18px;max-width:20ch;text-wrap:balance}
+.mast h1 em{font-style:normal;color:var(--k3)}
+.lede{max-width:66ch;font-size:16.5px;color:var(--k2);margin:0 0 12px}
+.lede strong{color:var(--k);font-weight:600}
+.wrap{max-width:1280px;margin:0 auto;padding:clamp(32px,4vw,56px) var(--pad)}
+.row2{display:flex;gap:clamp(28px,5vw,72px);flex-wrap:wrap;align-items:flex-start}
+.col{display:flex;flex-direction:column;gap:14px;align-items:center}
+.cap{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--k3)}
+.cap b{color:var(--k);font-weight:600}
+
+/* phone — 375px stands for 1080 reference units (x0.3472) */
+.phone{width:375px;height:720px;border-radius:44px;padding:10px;
+background:linear-gradient(160deg,#3A3F4A,#16181D 40%,#2A2E36);
+box-shadow:0 2px 4px rgba(0,0,0,.3),0 22px 42px -12px rgba(10,14,24,.45);flex-shrink:0}
+.scr{width:100%;height:100%;border-radius:35px;overflow:hidden;background:#FFF;color:#000;
+display:flex;flex-direction:column;font-size:13px}
+.sb{display:flex;justify-content:space-between;align-items:center;padding:12px 22px 4px;font-size:11px;font-weight:600}
+.top{display:flex;align-items:center;gap:9px;padding:8px 16px 10px;border-bottom:1px solid rgba(204,204,204,.51)}
+.top .bn{flex:1;font-size:15.3px;font-weight:700;color:#000}
+.top .chev{width:8px;height:8px;border-right:1.8px solid #666;border-bottom:1.8px solid #666;transform:rotate(45deg);margin-top:-4px}
+.top .mode{font-size:10px;font-weight:700;color:#FFF;background:#2FB344;border-radius:999px;padding:4px 10px}
+.search{margin:8px 16px;padding:7px 12px;border-radius:999px;background:#F1F1F1;color:#8E8E93;font-size:12px}
+.list{flex:1;overflow:hidden}
+
+/* ---------- BEFORE: measured from ChatItem.prefab ---------- */
+.b .r{height:69.4px;display:flex;align-items:center;gap:11px;padding:0 16px;position:relative;background:#FFF}
+.b .r::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:#CCC}
+.b .av{width:48.6px;height:48.6px;border-radius:50%;flex-shrink:0;display:grid;place-items:center;
+color:#FFF;font-weight:700;font-size:16px}
+.b .mid{flex:1;min-width:0}
+.b .nm{font-size:15.3px;font-weight:400;color:#000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.b .pv{font-size:13.2px;color:#666;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.b .rt{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0}
+.b .tm{font-size:13.2px;font-weight:700;color:#666}
+.b .tm.un{color:#26B25A}
+.b .bg{min-width:16.7px;height:16.7px;padding:0 5px;border-radius:999px;background:#26B25A;color:#FFF;
+font-size:11.1px;font-weight:700;display:grid;place-items:center}
+
+/* ---------- AFTER: proposal ---------- */
+.a .r{height:69.4px;display:flex;align-items:center;gap:12px;padding:0 16px;position:relative;background:#FFF}
+.a .r::after{content:"";position:absolute;left:76.6px;right:0;bottom:0;height:1px;background:#E4E6EB}
+.a .r:last-child::after{display:none}
+.a .av{width:48.6px;height:48.6px;border-radius:50%;flex-shrink:0;display:grid;place-items:center;
+color:#FFF;font-weight:700;font-size:16px}
+.a .mid{flex:1;min-width:0}
+.a .nm{font-size:16px;font-weight:600;color:#000;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.a .pv{font-size:12.5px;color:#666;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.a .rt{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0}
+.a .tm{font-size:10.4px;font-weight:500;color:#666666}
+.a .tm.un{color:#17803F;font-weight:600}
+.a .bg{min-width:18px;height:18px;padding:0 6px;border-radius:999px;background:#17803F;color:#FFF;
+font-size:11px;font-weight:700;display:grid;place-items:center}
+
+.tbl{max-width:1280px;margin:0 auto;padding:0 var(--pad) clamp(56px,7vw,96px)}
+.tbl h2{font-weight:800;font-size:clamp(21px,2.8vw,30px);letter-spacing:-.03em;margin:0 0 18px}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--rl);vertical-align:top}
+th{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--k3);
+font-weight:500;background:var(--g2)}
+td:first-child{font-weight:650;color:var(--k);white-space:nowrap}
+td{color:var(--k2)}
+td b{color:var(--k);font-weight:600}
+.note{max-width:66ch;color:var(--k2);font-size:15.5px;margin:22px 0 0}
+.note strong{color:var(--k);font-weight:600}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="page">
+<header class="mast">
+  <p class="eb">Фаза 3 · список чатов · светлая тема · предложение</p>
+  <h1>Same bones, <em>fixed hierarchy.</em></h1>
+  <p class="lede">Left is the app today, drawn from the measured prefab — row 200u, avatar 140u, name 44u,
+  preview 38u, timestamp 38u bold, badge 48u. Right is the proposal. <strong>Colours are unchanged</strong>
+  — this is layout and type only; the palette flip to «Чернильный» is the next phase.</p>
+  <p class="lede">Nothing moves that does not need to: the row height, the avatar size and the overall
+  structure are kept, so the screen stays familiar to someone who uses it every day.</p>
+</header>
+
+<div class="wrap">
+ <div class="row2">
+  <figure class="col">
+   <div class="phone"><div class="scr b">
+     <div class="sb"><span>9:41</span><span>▮▮▮</span></div>
+     <div class="top"><span class="bn">Цветы Алматы</span><span class="chev"></span><span class="mode">Авто</span></div>
+     <div class="search">Поиск</div>
+     <div class="list">
+      <div class="r"><span class="av" style="background:linear-gradient(150deg,#F3A26D,#D9722F)">А</span>
+        <span class="mid"><div class="nm">Айгерим</div><div class="pv">Да, успеем к 18:00. Уточните…</div></span>
+        <span class="rt"><span class="tm un">10:26</span><span class="bg">2</span></span></div>
+      <div class="r"><span class="av" style="background:linear-gradient(150deg,#7FC4F5,#3B82C4)">Д</span>
+        <span class="mid"><div class="nm">Даурен</div><div class="pv">Спасибо! Заеду завтра</div></span>
+        <span class="rt"><span class="tm">09:41</span></span></div>
+      <div class="r"><span class="av" style="background:linear-gradient(150deg,#B79BE8,#7B57C9)">М</span>
+        <span class="mid"><div class="nm">Марат Ж.</div><div class="pv">Какая цена на 51 розу?</div></span>
+        <span class="rt"><span class="tm un">Вчера</span><span class="bg">1</span></span></div>
+      <div class="r"><span class="av" style="background:linear-gradient(150deg,#8FD8A8,#3E9B62)">Г</span>
+        <span class="mid"><div class="nm">Гүлнұр</div><div class="pv">Отправила адрес доставки</div></span>
+        <span class="rt"><span class="tm">Вчера</span></span></div>
+      <div class="r"><span class="av" style="background:linear-gradient(150deg,#F0A0B4,#CC5C7B)">С</span>
+        <span class="mid"><div class="nm">Сауле</div><div class="pv">Добрый день! Можно счёт?</div></span>
+        <span class="rt"><span class="tm">Пн</span></span></div>
+     </div>
+   </div></div>
+   <figcaption class="cap"><b>Сейчас</b> · измерено из префаба</figcaption>
+  </figure>
+
+  <figure class="col">
+   <div class="phone"><div class="scr a">
+     <div class="sb"><span>9:41</span><span>▮▮▮</span></div>
+     <div class="top"><span class="bn">Цветы Алматы</span><span class="chev"></span><span class="mode">Авто</span></div>
+     <div class="search">Поиск</div>
+     <div class="list">
+      <div class="r"><span class="av" style="background:linear-gradient(150deg,#F3A26D,#D9722F)">А</span>
+        <span class="mid"><div class="nm">Айгерим</div><div class="pv">Да, успеем к 18:00. Уточните…</div></span>
+        <span class="rt"><span class="tm un">10:26</span><span class="bg">2</span></span></div>
+      <div class="r"><span class="av" style="background:linear-gradient(150deg,#7FC4F5,#3B82C4)">Д</span>
+        <span class="mid"><div class="nm">Даурен</div><div class="pv">Спасибо! Заеду завтра</div></span>
+        <span class="rt"><span class="tm">09:41</span></span></div>
+      <div class="r"><span class="av" style="background:linear-gradient(150deg,#B79BE8,#7B57C9)">М</span>
+        <span class="mid"><div class="nm">Марат Ж.</div><div class="pv">Какая цена на 51 розу?</div></span>
+        <span class="rt"><span class="tm un">Вчера</span><span class="bg">1</span></span></div>
+      <div class="r"><span class="av" style="background:linear-gradient(150deg,#8FD8A8,#3E9B62)">Г</span>
+        <span class="mid"><div class="nm">Гүлнұр</div><div class="pv">Отправила адрес доставки</div></span>
+        <span class="rt"><span class="tm">Вчера</span></span></div>
+      <div class="r"><span class="av" style="background:linear-gradient(150deg,#F0A0B4,#CC5C7B)">С</span>
+        <span class="mid"><div class="nm">Сауле</div><div class="pv">Добрый день! Можно счёт?</div></span>
+        <span class="rt"><span class="tm">Пн</span></span></div>
+     </div>
+   </div></div>
+   <figcaption class="cap"><b>Предложение</b> · только вёрстка и типографика</figcaption>
+  </figure>
+ </div>
+</div>
+
+<div class="tbl">
+ <h2>Every change, and why</h2>
+ <table>
+  <thead><tr><th>Element</th><th>Now</th><th>Proposed</th><th>Reason</th></tr></thead>
+  <tbody>
+   <tr><td>Timestamp</td><td>38u, <b>bold</b>, #666666</td><td>30u, medium, #666666 (unchanged ink)</td>
+       <td>Today it is the same size as the message preview and bolder than the contact name — the least
+       important text on the row is drawn the loudest. Size and weight alone fix the hierarchy; the ink stays
+       #666666 because lightening it to #8E8E93 would drop it to 3.26:1 and fail the text floor.</td></tr>
+   <tr><td>Contact name</td><td>44u, regular</td><td>46u, <b>semibold</b></td>
+       <td>Name-to-preview ratio is 1.16× today, which is not enough to read as hierarchy. Weight does the
+       work rather than size, so the row height is unaffected.</td></tr>
+   <tr><td>Preview</td><td>38u</td><td>36u</td>
+       <td>Widens the gap to the name to 1.28× without shrinking legibility below the 12sp floor.</td></tr>
+   <tr><td>Divider</td><td>full-bleed, #CCCCCC</td><td>inset to the text column, #E4E6EB</td>
+       <td>Inset dividers let the avatar column read as one continuous rail — the standard iOS/WhatsApp
+       treatment. The lighter value stops the separator competing with content.</td></tr>
+   <tr><td>Unread badge</td><td>48u, #26B25A, white text <b>2.76:1</b></td><td>52u, #17803F, white text <b>5.00:1</b></td>
+       <td>Fixes a real accessibility failure carried over from today. Same green family, darkened until white text clears 4.5:1.
+       (#1F8F4A was tried first and measured 4.13:1 — still failing.)</td></tr>
+   <tr><td>Unread timestamp</td><td>#26B25A, <b>2.76:1</b></td><td>#17803F, <b>5.00:1</b></td>
+       <td>Same failure, same fix. Still reads as "unread green".</td></tr>
+   <tr><td>Row height</td><td>200u</td><td>200u — unchanged</td>
+       <td>Deliberately untouched. Density is what a daily user has muscle memory for.</td></tr>
+   <tr><td>Avatar</td><td>140u</td><td>140u — unchanged</td><td>Same reasoning.</td></tr>
+  </tbody>
+ </table>
+ <p class="note"><strong>What this is not.</strong> No colour flip, no new components, no structural
+ rework — the wirer bindings from phase 2 all still apply. The only new token needed is a darker unread
+ green; everything else is a size, weight or inset change on objects that already exist.</p>
+ <p class="note"><strong>The one thing that needs your eye:</strong> the unread green moves from #26B25A to
+ #17803F to fix the contrast failure. It is a visibly deeper green. If you would rather keep the exact
+ WhatsApp-ish green and accept 2.76:1, say so — the alternative is darkening the badge text instead of the
+ fill, which reads less like WhatsApp but keeps the brighter green.</p>
+</div>
+</div>

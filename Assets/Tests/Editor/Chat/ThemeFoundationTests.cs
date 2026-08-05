@@ -92,9 +92,9 @@ public class ThemeFoundationTests
         // Telegram blue must be the SAME value ChannelAccent already uses.
         Assert.AreEqual(ChannelAccent.TelegramBlue, Theme.Fixed.TelegramBlue);
         Assert.AreEqual("2AABEE", ColorUtility.ToHtmlStringRGB(Theme.Fixed.TelegramBlue));
-        // The chat-row unread accent, byte-identical to the value ChatItemView
-        // used as a local constant before it moved onto the theme layer.
-        Assert.AreEqual("26B25A", ColorUtility.ToHtmlStringRGB(Theme.Fixed.UnreadAccentWhatsApp));
+        // The chat-row unread accent. Darkened in phase 3 so white badge text
+        // clears 4.5:1 (was #26B25A at 2.76:1).
+        Assert.AreEqual("17803F", ColorUtility.ToHtmlStringRGB(Theme.Fixed.UnreadAccentWhatsApp));
     }
 
     [Test]
