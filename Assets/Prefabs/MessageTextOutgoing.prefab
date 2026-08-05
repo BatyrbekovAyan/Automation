@@ -5153,6 +5153,7 @@ GameObject:
   - component: {fileID: 2714765114493926254}
   - component: {fileID: 7970628125348624906}
   - component: {fileID: 218606391020125534}
+  - component: {fileID: 6376673157444290924}
   m_Layer: 0
   m_Name: Snippet
   m_TagString: Untagged
@@ -5299,6 +5300,21 @@ MonoBehaviour:
   m_FlexibleWidth: -1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+--- !u!114 &6376673157444290924
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7673110182995199227}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 6
+  target: {fileID: 7970628125348624906}
+  preserveAlpha: 1
 --- !u!1 &8577990949230852126
 GameObject:
   m_ObjectHideFlags: 0

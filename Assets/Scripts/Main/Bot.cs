@@ -335,7 +335,11 @@ public class Bot : MonoBehaviour
         switchBackgroundImage = switchHandle.parent.GetComponent<Image>();
         switchHandleImage = switchHandle.GetComponent<Image>();
 
-        backgroundDefaultColor = switchBackgroundImage.color;
+        // The OFF-track colour is theme-owned (SwitchOffTrack role), not captured
+        // from the Image: the track is STATE-driven by this class (green when ON),
+        // so it must not carry a ThemedColor binding — a re-enable would paint the
+        // off colour over an ON switch. The ON green stays a fixed identity colour.
+        backgroundDefaultColor = Theme.Color(ThemeRole.SwitchOffTrack);
         handleDefaultColor = switchHandleImage.color;
 
         if (PlayerPrefs.GetInt(transform.name, 1) == 1)
@@ -364,6 +368,10 @@ public class Bot : MonoBehaviour
             ActivationSwitch.isOn = false;
             Status.text = "Not Active";
             Status.color = red;
+
+            // Paint the off state explicitly — the prefab's authored track colour
+            // is the light literal and would leak into dark mode otherwise.
+            switchBackgroundImage.color = backgroundDefaultColor;
 
             ApplySwitchFooterLabel(false);
         }

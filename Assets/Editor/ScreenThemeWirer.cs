@@ -425,6 +425,14 @@ public static class ScreenThemeWirer
         ("MessagesPanel", "MovingArea/BottomPanel/HorizontalLayout/MicButton/Image",    ThemeRole.InkPrimary),
         ("MessagesPanel", "MovingArea/BottomPanel/HorizontalLayout/SendButton/Circle",  ThemeRole.SendButton),
         ("MessagesPanel", "MovingArea/QuickReplyPanel",        ThemeRole.ChatWallpaper),
+        // Owner round 4. The composer ring (#DDD9D8) reads as a decorative
+        // outline, not a 3:1 affordance — Border keeps it subtle in both modes.
+        // Typed text was #323232 (fine on white, invisible on dark); the caret
+        // follows it via customCaretColor=false in ExpandableInput. The chats
+        // search pill (#F1F1F1) becomes an inset well like the composer's.
+        ("MessagesPanel", "MovingArea/BottomPanel/HorizontalLayout/InputOutline", ThemeRole.Border),
+        ("MessagesPanel", "MovingArea/BottomPanel/HorizontalLayout/InputOutline/Input/InputField/Text Area/Text", ThemeRole.InkPrimary),
+        ("ChatsPanel",    "Scroll/Viewport/Content/ChatsSearchBar/Pill", ThemeRole.Background),
     };
 
     private static readonly (string prefab, string child, ThemeRole role)[] PrefabNamedSpec =
@@ -434,6 +442,10 @@ public static class ScreenThemeWirer
         // was still authored light — the "wrong colour" glow behind dark bubbles.
         ("Assets/Prefabs/MessageTextIncoming.prefab", "TailOutline", ThemeRole.BubbleBorder),
         ("Assets/Prefabs/MessageTextOutgoing.prefab", "TailOutline", ThemeRole.BubbleBorder),
+        // Quoted-reply snippet: authored #4D4D4D — InkSecondary is a ΔE≈1 no-op
+        // in light and readable on the dark bubble.
+        ("Assets/Prefabs/MessageTextIncoming.prefab", "Bubble/QuotedCard/TextColumn/Snippet", ThemeRole.InkSecondary),
+        ("Assets/Prefabs/MessageTextOutgoing.prefab", "Bubble/QuotedCard/TextColumn/Snippet", ThemeRole.InkSecondary),
     };
 
     [MenuItem("Tools/Theme/Screens/Audit Shell — nav, headers, profile, inputs (dry run)")]
@@ -510,6 +522,115 @@ public static class ScreenThemeWirer
 
         Debug.Log(sb.ToString());
         if (apply) Debug.Log($"[ScreenThemeWirer] Shell applied. {total} binding(s).");
+    }
+
+    // ── Always-dark overlays ───────────────────────────────────────────────
+    //
+    // The attachment preview, photo viewer and video player are media overlays
+    // that are DARK IN BOTH THEMES — like every messenger's. The value sweep
+    // couldn't know that and bound their black bars as "ink" (#000000 is a
+    // mapped ink value), so in dark mode the bars resolved near-WHITE and the
+    // owner saw the screen invert. This pass strips every ThemedColor under
+    // them, and restyles the attachment screen's authored blacks onto the
+    // «Графит» dark set — static colours, deliberately NOT roles.
+    //
+    // Bot.prefab's activation-switch track binding is removed here too: the
+    // track is STATE-driven by Bot.cs (fixed green when ON), which now resolves
+    // SwitchOffTrack itself for the off state.
+    private static readonly string[] AlwaysDarkRoots =
+    {
+        "AttachmentPreviewScreen", "PhotoViewerPanel", "VideoPlayerPanel",
+    };
+
+    private static readonly (string path, string hex)[] AttachmentRefine =
+    {
+        ("Root",                          "#0E1116"),
+        ("Root/TopBar",                   "#0E1116"),
+        ("Root/BottomBar",                "#0E1116"),
+        ("Root/BottomBar/Background",     "#0E1116"),
+        ("Root/BottomBar/CaptionScroll",  "#171C24"),
+        ("Root/TopBar/Content/BackButton","#171C24"), // keeps its authored 0.8 alpha
+    };
+
+    [MenuItem("Tools/Theme/Screens/Audit Always-Dark Overlays (dry run)")]
+    public static void AuditAlwaysDark() => RunAlwaysDark(apply: false);
+
+    [MenuItem("Tools/Theme/Screens/Apply Always-Dark Overlays")]
+    public static void ApplyAlwaysDark() => RunAlwaysDark(apply: true);
+
+    private static void RunAlwaysDark(bool apply)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"[ScreenThemeWirer] ALWAYS-DARK {(apply ? "APPLY" : "AUDIT")}");
+        int removed = 0, recoloured = 0;
+
+        var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+        foreach (var rootName in AlwaysDarkRoots)
+        {
+            GameObject root = null;
+            foreach (var go in scene.GetRootGameObjects())
+            {
+                root = FindDeep(go.transform, rootName);
+                if (root != null) break;
+            }
+            if (root == null) { sb.AppendLine($"    {rootName}: NOT FOUND"); continue; }
+
+            foreach (var tc in root.GetComponentsInChildren<ThemedColor>(includeInactive: true))
+            {
+                var so = new SerializedObject(tc);
+                var roleProp = so.FindProperty("role");
+                sb.AppendLine($"    REMOVE {(ThemeRole)roleProp.enumValueIndex} on " +
+                              $"{TransformPath(tc.transform, root.transform.parent)}");
+                if (apply) Object.DestroyImmediate(tc);
+                removed++;
+            }
+
+            if (rootName != "AttachmentPreviewScreen") continue;
+            foreach (var (path, hex) in AttachmentRefine)
+            {
+                var t = root.transform.Find(path);
+                var g = t != null ? t.GetComponent<Graphic>() : null;
+                if (g == null) { sb.AppendLine($"    REFINE MISS: {path}"); continue; }
+                if (!ColorUtility.TryParseHtmlString(hex, out var c)) continue;
+                sb.AppendLine($"    REFINE {rootName}/{path}: " +
+                              $"#{ColorUtility.ToHtmlStringRGB(g.color)} -> {hex} (alpha kept)");
+                if (apply) g.color = new Color(c.r, c.g, c.b, g.color.a);
+                recoloured++;
+            }
+        }
+        if (apply)
+        {
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+        }
+
+        // Bot.prefab activation-switch track binding
+        var botRoot = PrefabUtility.LoadPrefabContents("Assets/Prefabs/Bot.prefab");
+        if (botRoot != null)
+        {
+            try
+            {
+                var track = botRoot.transform.Find("FooterRow/ActivationSwitch/Background");
+                var tc = track != null ? track.GetComponent<ThemedColor>() : null;
+                if (tc != null)
+                {
+                    sb.AppendLine("    REMOVE SwitchOffTrack binding on Bot.prefab " +
+                                  "FooterRow/ActivationSwitch/Background (state-driven by Bot.cs)");
+                    if (apply)
+                    {
+                        Object.DestroyImmediate(tc);
+                        PrefabUtility.SaveAsPrefabAsset(botRoot, "Assets/Prefabs/Bot.prefab");
+                    }
+                    removed++;
+                }
+                else sb.AppendLine("    Bot.prefab switch track: no binding (already clean)");
+            }
+            finally { PrefabUtility.UnloadPrefabContents(botRoot); }
+        }
+
+        Debug.Log(sb.ToString());
+        if (apply) Debug.Log($"[ScreenThemeWirer] Always-dark applied. " +
+                             $"{removed} binding(s) removed, {recoloured} colour(s) refined.");
     }
 
     private static int BindNamed(Graphic g, ThemeRole role, bool apply, StringBuilder sb, string label)

@@ -52,6 +52,10 @@ public class ExpandableInput : MonoBehaviour
     void Start()
     {
         baseInputFieldHeight = inputFieldRect.rect.height;
+
+        // Caret follows the (theme-bound) text ink instead of a custom colour —
+        // dark ink in light, light ink in dark, and no more stray green caret.
+        inputField.customCaretColor = false;
         minHeight = bottomPanelRect.rect.height;
         heightPadding = minHeight - baseInputFieldHeight;
         singleLineTextHeight = GetAccurateTextHeight("A");
