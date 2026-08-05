@@ -19695,6 +19695,7 @@ GameObject:
   - component: {fileID: 1583915860828218916}
   - component: {fileID: 7253661095848903236}
   - component: {fileID: 3054071970010334942}
+  - component: {fileID: 660895131057041019}
   m_Layer: 0
   m_Name: StickyFooter
   m_TagString: Untagged
@@ -19762,6 +19763,21 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!114 &660895131057041019
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4567561751712527233}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 0
+  target: {fileID: 3054071970010334942}
+  preserveAlpha: 1
 --- !u!1 &4569497751480798941
 GameObject:
   m_ObjectHideFlags: 0
@@ -29689,6 +29705,7 @@ GameObject:
   - component: {fileID: 3368345057339012724}
   - component: {fileID: 745942016367891167}
   - component: {fileID: 2521682540532320545}
+  - component: {fileID: 221018521246965164}
   m_Layer: 0
   m_Name: StickyFooter
   m_TagString: Untagged
@@ -29756,6 +29773,21 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!114 &221018521246965164
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7109265324456647724}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 0
+  target: {fileID: 2521682540532320545}
+  preserveAlpha: 1
 --- !u!1 &7163038093235625145
 GameObject:
   m_ObjectHideFlags: 0

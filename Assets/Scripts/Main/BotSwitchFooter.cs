@@ -10,8 +10,12 @@ public static class BotSwitchFooter
     /// <summary>Gap between the handle's edge and the track's edge at rest.</summary>
     public const float HandleEdgeInset = 5f;
 
-    private static readonly Color OnColor  = new Color32(0x3A, 0x3A, 0x3C, 0xFF);
-    private static readonly Color OffColor = new Color32(0x8E, 0x8E, 0x93, 0xFF);
+    // Theme-routed: this stamp runs on every activation refresh and used to
+    // write the light literals over the label's ThemedColor binding — «Бот
+    // работает» came out near-black on the dark card. The roles keep the same
+    // on/off hierarchy (secondary ink when running, tertiary when paused).
+    private static Color OnColor  => Theme.Color(ThemeRole.InkSecondary);
+    private static Color OffColor => Theme.Color(ThemeRole.InkTertiary);
 
     public static string TextFor(bool isOn) => isOn ? "Бот работает" : "Бот на паузе";
 

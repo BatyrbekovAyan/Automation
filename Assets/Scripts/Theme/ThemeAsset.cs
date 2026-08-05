@@ -59,6 +59,8 @@ public class ThemeAsset : ScriptableObject
     public Color chatWallpaperInk = Hex("#FFFFFF");
     public Color bubbleBorder     = Hex("#D9D4CA"); // MessageItemView's border literal
     public Color sendButton       = Hex("#1FAA61"); // composer send circle
+    public Color accentSoft       = Hex("#E8F2FD"); // edit-button chip
+    public Color destructiveSoft  = Hex("#FFCED5"); // «Удалить все данные» chip
     public Color Resolve(ThemeRole role) => role switch
     {
         ThemeRole.Background           => background,
@@ -87,6 +89,8 @@ public class ThemeAsset : ScriptableObject
         ThemeRole.ChatWallpaperInk     => chatWallpaperInk,
         ThemeRole.BubbleBorder         => bubbleBorder,
         ThemeRole.SendButton           => sendButton,
+        ThemeRole.AccentSoft           => accentSoft,
+        ThemeRole.DestructiveSoft      => destructiveSoft,
         _                              => Color.magenta, // unmapped role — loud sentinel, tests assert it never happens
     };
 

@@ -79,6 +79,8 @@ public static class ThemeAssetsBuilder
         t.chatWallpaperInk = Hex("#FFFFFF");  // baked doodle art passes through
         t.bubbleBorder = Hex("#D9D4CA");      // MessageItemView's light border
         t.sendButton = Hex("#1FAA61");        // today's send-circle green
+        t.accentSoft = Hex("#E8F2FD");        // today's edit-button chip
+        t.destructiveSoft = Hex("#FFCED5");   // today's delete-button chip
 
     }
 
@@ -102,7 +104,10 @@ public static class ThemeAssetsBuilder
         t.statusInDialog = Hex("#8F7AFA");
         t.statusClientSilent = Hex("#8A94A6");
         t.statusQuestionClosed = Hex("#9B5DE0");
-        t.destructive = Hex("#A01B12");
+        // Lifted from the light theme's #A01B12, which measured 2.17:1 on the
+        // dark card — unreadable, and it is the INK that sits on destructiveSoft.
+        // #F2555A gives 5.07:1 on the chip and ~5.6:1 on the page ground.
+        t.destructive = Hex("#F2555A");
         t.positiveBg = Hex("#123324");
         t.positiveInk = Hex("#57DE95");
         t.chatWallpaper = Hex("#090B0E");
@@ -113,6 +118,8 @@ public static class ThemeAssetsBuilder
         t.chatWallpaperInk = Hex("#1F2A3B");
         t.bubbleBorder = Hex("#333B45");      // a step lighter than the bubble fill
         t.sendButton = Hex("#128A50");        // same hue, dropped for the dark panel
+        t.accentSoft = Hex("#1E2A44");        // navy-tinted chip on the dark card
+        t.destructiveSoft = Hex("#2A1719");   // red-tinted chip; 5.07:1 under destructive
 
     }
 

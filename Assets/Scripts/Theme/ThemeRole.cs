@@ -51,4 +51,6 @@ public enum ThemeRole
     ChatWallpaperInk,  // tint on the baked doodle art; light = white passthrough
     BubbleBorder,      // hairline border around message bubbles
     SendButton,        // composer send-circle fill (green in both, darker in dark)
+    AccentSoft,        // soft accent chip behind an accent glyph (edit buttons)
+    DestructiveSoft,   // soft destructive tint behind Destructive ink
 }

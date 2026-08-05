@@ -80,6 +80,10 @@ public static class ScreenThemeWirer
         ("#EFEFF0", ThemeRole.Background),   // search pill well (the "input field" gap)
         ("#1A1A1A", ThemeRole.InkPrimary),   // bot-switcher sheet ink variant
         ("#3A3A3C", ThemeRole.InkSecondary),
+        // soft chips — previously "unmapped, needs a design call"; owner round 6
+        // forces it: both stay light in dark without a role of their own.
+        ("#E8F2FD", ThemeRole.AccentSoft),      // edit-button chip (profile + account)
+        ("#FFCED5", ThemeRole.DestructiveSoft), // «Удалить все данные» chip
         // thread chrome (owner round 2: «messages page looks wrong»)
         ("#E9EDEF", ThemeRole.Hairline),     // action-menu dividers
         ("#6E6E73", ThemeRole.InkSecondary), // composer/attach icon tints
@@ -449,6 +453,12 @@ public static class ScreenThemeWirer
         // in light and readable on the dark bubble.
         ("Assets/Prefabs/MessageTextIncoming.prefab", "Bubble/QuotedCard/TextColumn/Snippet", ThemeRole.InkSecondary),
         ("Assets/Prefabs/MessageTextOutgoing.prefab", "Bubble/QuotedCard/TextColumn/Snippet", ThemeRole.InkSecondary),
+        // The products/services bottom fade is WHITE ART with an alpha ramp
+        // (Blur.png), so it themes by TINT — no new art needed. Background, not
+        // Surface: its job is to dissolve the list into the panel ground, which
+        // is #F0F2F5 -> Background. Named because the whites rule skips sprites.
+        ("Assets/Prefabs/BotSettings.prefab", "Product/StickyFooter", ThemeRole.Background),
+        ("Assets/Prefabs/BotSettings.prefab", "Service/StickyFooter", ThemeRole.Background),
     };
 
     [MenuItem("Tools/Theme/Screens/Audit Shell — nav, headers, profile, inputs (dry run)")]
