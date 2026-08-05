@@ -292,10 +292,13 @@ public class DashboardPage : MonoBehaviour
         var go = Instantiate(chipPrefabHost, chipsRow);
         go.SetActive(true);
         var lbl = go.GetComponentInChildren<TextMeshProUGUI>();
-        // White label on the selected (blue) chip; muted ink on the unselected (white) chip.
+        // White label on the selected (blue) chip; muted ink on the unselected chip.
+        // The unselected fill routes through Theme.Surface (not literal white) so a
+        // rebuilt chip row is correct in dark mode — chips are runtime-stamped, so
+        // they are deliberately NOT ThemedColor-bound (the stamp would fight it).
         if (lbl) { lbl.text = text; lbl.color = on ? Color.white : DashboardStatusInfo.FgColor(OutcomeStatus.QuestionClosed); }
         var img = go.GetComponent<Image>();
-        if (img) img.color = on ? DashboardStatusInfo.FgColor(OutcomeStatus.InDialog) : Color.white;
+        if (img) img.color = on ? DashboardStatusInfo.FgColor(OutcomeStatus.InDialog) : Theme.Color(ThemeRole.Surface);
         var btn = go.GetComponent<Button>();
         if (btn) { btn.onClick.AddListener(() => SetBotFilter(profileIds)); btn.onClick.AddListener(BuildChips); }
     }

@@ -683,6 +683,7 @@ GameObject:
   - component: {fileID: 6384308342826073552}
   - component: {fileID: 8787975438129350565}
   - component: {fileID: 225508384341119978}
+  - component: {fileID: 8519673098271147998}
   m_Layer: 0
   m_Name: Service
   m_TagString: Untagged
@@ -840,6 +841,21 @@ MonoBehaviour:
   descLabel: {fileID: 8462514178915169862}
   thumb: {fileID: 555193110397506564}
   rootButton: {fileID: 8787975438129350565}
+--- !u!114 &8519673098271147998
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6052032443035616758}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 1
+  target: {fileID: 6847571650295840188}
+  preserveAlpha: 1
 --- !u!1 &6783333791870360159
 GameObject:
   m_ObjectHideFlags: 0

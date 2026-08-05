@@ -72,6 +72,14 @@ public static class ScreenThemeWirer
         ("#E53935", ThemeRole.Destructive),
         ("#EB4545", ThemeRole.Destructive),
         ("#F0F0F2", ThemeRole.Background),
+        // dashboard period-selector track — previously "needs a design call";
+        // dark coverage forces the call: it is ground, and without it the
+        // segment labels (already ink-bound) wash out on a light track in dark
+        ("#EDEFF3", ThemeRole.Background),
+        // chats-panel shell leftovers surfaced by the shell audit
+        ("#EFEFF0", ThemeRole.Background),   // search pill well (the "input field" gap)
+        ("#1A1A1A", ThemeRole.InkPrimary),   // bot-switcher sheet ink variant
+        ("#3A3A3C", ThemeRole.InkSecondary),
     };
 
     /// <summary>
@@ -343,5 +351,160 @@ public static class ScreenThemeWirer
             if (f != null) return f;
         }
         return null;
+    }
+
+    // ── Shell pass: the surfaces dark mode was missing ─────────────────────
+    //
+    // Screens' TEXT went through the value passes, but their white chrome never
+    // did — #FFFFFF is never value-mapped. Result in dark: light ink on white
+    // cards, white nav/header bars on a dark ground. This pass binds white
+    // SURFACES to ThemeRole.Surface under a tight structural rule instead of a
+    // value rule:
+    //
+    //   Image + sprite == null + white + alpha ≥ 0.9
+    //
+    // which on this project singles out exactly the null-sprite+RoundedCorners
+    // card/bar/pill fills. Sprited whites (icons, thumbnails) never match.
+    // Name filters then drop the known non-surfaces:
+    //   • Thumb/Knob — switch knobs must stay white on their track
+    //   • Emoji*     — runtime-sprite targets; white is tint, not fill
+    //   • *Icon* or under an "Icon" node — glyph art built from white bars
+    //   • FullScreenImage — the photo viewer's texture target
+    //   • SuggestionCard — the LOCKED suggestions system stamps card fills
+    //     (rank tint) at runtime; a binding would fight it on every refresh
+    //
+    // The ValueMap sweep also runs on these roots so their non-white chrome
+    // (profile bg, dividers, chevrons, track greys) binds in the same pass.
+    private static readonly string[] ShellSceneRoots =
+    {
+        "Screen_Profile", "Screen_Bots", "Screen_Dashboard",
+        "BottomNavPanel", "LoadingPanel", "ChatsPanel", "MessagesPanel",
+    };
+
+    /// <summary>
+    /// Scene-root exclusions for the shell ValueMap sweep. #34C759 on toggles is
+    /// the switch-ON green (Theme.Fixed), same ambiguity as Bot.prefab; the chat
+    /// roots keep the chat exclusions (suggestions greens, wallpaper, ticks).
+    /// </summary>
+    private static string[] ShellExclusions(string root) => root switch
+    {
+        "Screen_Profile" => new[] { "#34C759" },
+        "ChatsPanel" or "MessagesPanel" => ChatExclusions.Concat(new[] { "#34C759" }).ToArray(),
+        _ => System.Array.Empty<string>(),
+    };
+
+    [MenuItem("Tools/Theme/Screens/Audit Shell — nav, headers, profile, inputs (dry run)")]
+    public static void AuditShell() => RunShell(apply: false);
+
+    [MenuItem("Tools/Theme/Screens/Apply Shell — nav, headers, profile, inputs")]
+    public static void ApplyShell() => RunShell(apply: true);
+
+    private static void RunShell(bool apply)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"[ScreenThemeWirer] SHELL {(apply ? "APPLY" : "AUDIT")} v2");
+        int total = 0;
+
+        var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+        foreach (var rootName in ShellSceneRoots)
+        {
+            GameObject root = null;
+            foreach (var go in scene.GetRootGameObjects())
+            {
+                root = FindDeep(go.transform, rootName);
+                if (root != null) break;
+            }
+            if (root == null) { sb.AppendLine($"\n### {rootName}: NOT FOUND"); continue; }
+
+            total += BindWhiteSurfaces(root, apply, sb, rootName);
+            total += BindSubtree(root, apply, sb, rootName, ShellExclusions(rootName));
+        }
+        if (apply)
+        {
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+        }
+
+        // Prefab cards live the same problem: bound ink on unbound white fills.
+        foreach (var path in Prefabs)
+        {
+            var root = PrefabUtility.LoadPrefabContents(path);
+            if (root == null) continue;
+            try
+            {
+                int n = BindWhiteSurfaces(root, apply, sb, System.IO.Path.GetFileName(path));
+                total += n;
+                if (apply && n > 0) PrefabUtility.SaveAsPrefabAsset(root, path);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        Debug.Log(sb.ToString());
+        if (apply) Debug.Log($"[ScreenThemeWirer] Shell applied. {total} binding(s).");
+    }
+
+    /// <summary>
+    /// The 9-sliced rounded-rect card sprite. On it, white TINT is the card fill
+    /// (Profile's main-list cards, EditPopup) — so it counts as a surface even
+    /// though it is sprited. Any other sprite keeps the "white = no tint" rule.
+    /// </summary>
+    private const string CardSpriteGuid = "7b3e9d159c0fd461e9bccc29d18eafdb";
+
+    private static int BindWhiteSurfaces(GameObject root, bool apply, StringBuilder sb, string label)
+    {
+        int added = 0;
+        var lines = new List<string>();
+        foreach (var img in root.GetComponentsInChildren<Image>(includeInactive: true))
+        {
+            if (img.sprite != null && !IsCardSprite(img.sprite)) continue;
+            var c = img.color;
+            if (c.r < 0.999f || c.g < 0.999f || c.b < 0.999f || c.a < 0.9f) continue;
+            if (SkipAsWhiteSurface(img.transform)) continue;
+            if (img.GetComponent<ThemedColor>() != null) continue;
+
+            lines.Add($"    {TransformPath(img.transform, root.transform)} -> Surface");
+            if (apply)
+            {
+                var binding = img.gameObject.AddComponent<ThemedColor>();
+                var so = new SerializedObject(binding);
+                so.FindProperty("role").enumValueIndex = (int)ThemeRole.Surface;
+                so.FindProperty("target").objectReferenceValue = img;
+                so.FindProperty("preserveAlpha").boolValue = true;
+                so.ApplyModifiedPropertiesWithoutUndo();
+            }
+            added++;
+        }
+        if (lines.Count > 0)
+        {
+            sb.AppendLine($"\n### {label} — white surfaces ({added})");
+            foreach (var l in lines) sb.AppendLine(l);
+        }
+        return added;
+    }
+
+    private static bool IsCardSprite(Sprite s) =>
+        AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(s)) == CardSpriteGuid;
+
+    private static bool SkipAsWhiteSurface(Transform t)
+    {
+        string n = t.name;
+        // Handle = the activation-switch knob (Bot.prefab names it Handle, not Knob).
+        // Chip = dashboard bot-filter chips, runtime-stamped by DashboardPage —
+        // their off-state fill is theme-routed in code instead of bound.
+        // Default = the thread top-bar avatar placeholder (white is sprite tint).
+        if (n == "Thumb" || n == "Knob" || n == "Handle" || n == "Chip" ||
+            n == "Default" || n == "FullScreenImage" || n == "SuggestionCard") return true;
+        if (n.Contains("Icon") || n.StartsWith("Emoji")) return true;
+        for (var p = t.parent; p != null; p = p.parent)
+            if (p.name == "Icon") return true;
+        return false;
+    }
+
+    private static string TransformPath(Transform t, Transform stopAt)
+    {
+        var parts = new List<string>();
+        for (var cur = t; cur != null && cur != stopAt; cur = cur.parent) parts.Add(cur.name);
+        parts.Reverse();
+        return string.Join("/", parts);
     }
 }

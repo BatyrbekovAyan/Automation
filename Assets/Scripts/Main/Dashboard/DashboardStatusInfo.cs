@@ -35,14 +35,21 @@ public static class DashboardStatusInfo
         _                            => "#E4E6EB",
     });
 
-    public static Color FgColor(OutcomeStatus s) => Hex(s switch
+    // Theme-routed: the dashboard's status elements were bound to the Status*
+    // roles by the theme pass, but this stamp used to write the pre-theme iOS
+    // constants back over them on every refresh — quietly undoing the palette in
+    // light and breaking contrast in dark. FgColor now resolves the same roles
+    // the bindings use, so a refresh and a binding can never disagree.
+    // BgColor stays static for now: the 4 non-positive soft tints have no roles
+    // yet, and a light pill with a dark-sibling label stays readable in dark.
+    public static Color FgColor(OutcomeStatus s) => Theme.Color(s switch
     {
-        OutcomeStatus.OrderCollected => "#34C759",
-        OutcomeStatus.OwnerNeeded    => "#F57C00",
-        OutcomeStatus.InDialog       => "#007AFF",
-        OutcomeStatus.ClientSilent   => "#8E8E93",
-        OutcomeStatus.QuestionClosed => "#65676B",
-        _                            => "#65676B",
+        OutcomeStatus.OrderCollected => ThemeRole.StatusOrderCollected,
+        OutcomeStatus.OwnerNeeded    => ThemeRole.StatusOwnerNeeded,
+        OutcomeStatus.InDialog       => ThemeRole.StatusInDialog,
+        OutcomeStatus.ClientSilent   => ThemeRole.StatusClientSilent,
+        OutcomeStatus.QuestionClosed => ThemeRole.StatusQuestionClosed,
+        _                            => ThemeRole.StatusQuestionClosed,
     });
 
     private static Color Hex(string hex)

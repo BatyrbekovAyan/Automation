@@ -10,10 +10,17 @@ public class DashboardStatusInfoTests
         Assert.AreEqual("Клиент замолчал", DashboardStatusInfo.Label(OutcomeStatus.ClientSilent));
     }
 
-    [Test] public void OrderCollectedUsesPillGreen()
+    // FgColor is theme-routed (it must agree with the ThemedColor bindings on the
+    // same elements), so the contract is "resolves the status role under the
+    // active theme", not any literal hex.
+    [Test] public void FgColorFollowsTheThemeStatusRoles()
     {
-        ColorUtility.TryParseHtmlString("#34C759", out var fg);
-        Assert.AreEqual(fg, DashboardStatusInfo.FgColor(OutcomeStatus.OrderCollected));
+        Assert.AreEqual(Theme.Color(ThemeRole.StatusOrderCollected),
+                        DashboardStatusInfo.FgColor(OutcomeStatus.OrderCollected));
+        Assert.AreEqual(Theme.Color(ThemeRole.StatusInDialog),
+                        DashboardStatusInfo.FgColor(OutcomeStatus.InDialog));
+        Assert.AreEqual(Theme.Color(ThemeRole.StatusQuestionClosed),
+                        DashboardStatusInfo.FgColor(OutcomeStatus.QuestionClosed));
     }
 
     [Test] public void OrderedHasFiveStatusesOrderCollectedFirst()

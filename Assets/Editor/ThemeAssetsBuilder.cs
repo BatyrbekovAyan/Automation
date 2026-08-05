@@ -75,7 +75,7 @@ public static class ThemeAssetsBuilder
         t.positiveInk = Hex("#0A6B3E");
         t.chatWallpaper = Hex("#F5F2EA");
         t.bubbleIncoming = Hex("#FFFFFF");
-        t.bubbleOutgoing = Hex("#E0E3EC");
+        t.bubbleOutgoing = Hex("#D8FDD4");
 
     }
 
@@ -104,7 +104,7 @@ public static class ThemeAssetsBuilder
         t.positiveInk = Hex("#57DE95");
         t.chatWallpaper = Hex("#090B0E");
         t.bubbleIncoming = Hex("#252A31");
-        t.bubbleOutgoing = Hex("#202F59");
+        t.bubbleOutgoing = Hex("#005C4B");
 
     }
 

@@ -15,6 +15,7 @@ GameObject:
   - component: {fileID: 7032202525717405737}
   - component: {fileID: 1468307029602423280}
   - component: {fileID: 738515962740551439}
+  - component: {fileID: 4543988472139631339}
   m_Layer: 5
   m_Name: Bot
   m_TagString: Untagged
@@ -187,6 +188,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithRoundedCorners
   radius: 40
   image: {fileID: 4867084298983615997}
+--- !u!114 &4543988472139631339
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2727805288597207}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 1
+  target: {fileID: 4867084298983615997}
+  preserveAlpha: 1
 --- !u!1 &657172822754789858
 GameObject:
   m_ObjectHideFlags: 0

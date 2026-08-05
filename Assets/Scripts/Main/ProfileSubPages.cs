@@ -40,9 +40,12 @@ public partial class ProfileSubPages : MonoBehaviour
     private const float SlideInDuration = 0.3f;
     private const float SlideOutDuration = 0.25f;
 
-    private static readonly Color InkColor = new Color32(0x1A, 0x1A, 0x2E, 0xFF);
-    private static readonly Color MutedColor = new Color32(0x65, 0x67, 0x6B, 0xFF);
-    private static readonly Color DisabledColor = new Color32(0xC7, 0xC7, 0xCC, 0xFF);
+    // Theme-routed so runtime stamps (privacy cache labels, toast) are correct in
+    // both modes. Stamps run in OnPageOpened, AFTER the panel's ThemedColor
+    // bindings applied on activation — so a state stamp always wins on open.
+    private static Color InkColor => Theme.Color(ThemeRole.InkPrimary);
+    private static Color MutedColor => Theme.Color(ThemeRole.InkSecondary);
+    private static Color DisabledColor => Theme.Color(ThemeRole.InkTertiary);
 
     private Canvas _rootCanvas;
     private Action _pendingConfirmAction;

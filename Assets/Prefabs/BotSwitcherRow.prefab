@@ -418,6 +418,7 @@ GameObject:
   - component: {fileID: 3304938001568349409}
   - component: {fileID: 7545909436262011442}
   - component: {fileID: 4165200677766212766}
+  - component: {fileID: 7735839457762641220}
   m_Layer: 0
   m_Name: CardBg
   m_TagString: Untagged
@@ -524,6 +525,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithRoundedCorners
   radius: 48
   image: {fileID: 3304938001568349409}
+--- !u!114 &7735839457762641220
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3583726286885878125}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 1
+  target: {fileID: 3304938001568349409}
+  preserveAlpha: 1
 --- !u!1 &4336962885764411545
 GameObject:
   m_ObjectHideFlags: 0

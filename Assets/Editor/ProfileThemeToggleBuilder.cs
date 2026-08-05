@@ -77,6 +77,42 @@ public static class ProfileThemeToggleBuilder
             if (label != null) label.text = "Тёмная тема";
         }
 
+        // The first build got the geometry wrong twice over. The template row
+        // came out of PanelNotifications, whose rows are 100 tall — Section1's
+        // rows are 150, and its VerticalLayoutGroup has childControlHeight OFF,
+        // so the clone's own sizeDelta is what renders. And Section1 itself was
+        // never grown, so Content's layout kept packing Section2 right on top of
+        // the new row. Match the sibling height, then resize the section to fit
+        // exactly what it contains.
+        var rowRt = (RectTransform)row.transform;
+        float siblingHeight = section.Cast<Transform>()
+            .Where(t => t != row.transform && t.name.EndsWith("Row"))
+            .Select(t => ((RectTransform)t).sizeDelta.y)
+            .DefaultIfEmpty(150f)
+            .First();
+        rowRt.sizeDelta = new Vector2(rowRt.sizeDelta.x, siblingHeight);
+
+        var vlg = section.GetComponent<UnityEngine.UI.VerticalLayoutGroup>();
+        float height = vlg != null ? vlg.padding.vertical : 0f;
+        int visible = 0;
+        foreach (Transform child in section)
+        {
+            if (!child.gameObject.activeSelf) continue;
+            height += ((RectTransform)child).sizeDelta.y;
+            visible++;
+        }
+        if (vlg != null) height += vlg.spacing * Mathf.Max(0, visible - 1);
+
+        var sectionRt = (RectTransform)section;
+        sectionRt.sizeDelta = new Vector2(sectionRt.sizeDelta.x, height);
+        var layoutElement = section.GetComponent<UnityEngine.UI.LayoutElement>();
+        if (layoutElement != null)
+        {
+            layoutElement.minHeight = height;
+            layoutElement.preferredHeight = height;
+        }
+        Debug.Log($"[ProfileThemeToggle] Row height {siblingHeight}, Section1 sized to {height}.");
+
         var so = new SerializedObject(subPages);
         var prop = so.FindProperty("darkThemeToggle");
         if (prop == null) { Debug.LogError("[ProfileThemeToggle] darkThemeToggle field missing — compile first"); return; }

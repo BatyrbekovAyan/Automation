@@ -52,7 +52,7 @@ public class ThemeAsset : ScriptableObject
     [Header("Chat thread")]
     public Color chatWallpaper  = Hex("#F5F2EA");
     public Color bubbleIncoming = Hex("#FFFFFF");
-    public Color bubbleOutgoing = Hex("#E0E3EC");
+    public Color bubbleOutgoing = Hex("#D8FDD4"); // the app's real outgoing bubble
     public Color Resolve(ThemeRole role) => role switch
     {
         ThemeRole.Background           => background,

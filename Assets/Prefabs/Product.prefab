@@ -79,6 +79,7 @@ GameObject:
   - component: {fileID: 1500835673559648474}
   - component: {fileID: 7136595092186353893}
   - component: {fileID: 4543308672509365011}
+  - component: {fileID: 1712958690591944074}
   m_Layer: 0
   m_Name: Product
   m_TagString: Untagged
@@ -236,6 +237,21 @@ MonoBehaviour:
   descLabel: {fileID: 8645481522434613693}
   thumb: {fileID: 6487673181297672586}
   rootButton: {fileID: 7136595092186353893}
+--- !u!114 &1712958690591944074
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2693734264793909060}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 1
+  target: {fileID: 2148831220505778555}
+  preserveAlpha: 1
 --- !u!1 &4062049378960221429
 GameObject:
   m_ObjectHideFlags: 0
