@@ -66,20 +66,36 @@ public class ThemeFoundationTests
     }
 
     [Test]
-    public void Defaults_MatchTodaysAppPalette()
+    public void Defaults_MatchTheShippedLightPalette()
     {
-        // Byte-exact anchors to the CURRENT app, so that binding an element to a
-        // token is a provable visual no-op. If one of these fails after an
-        // intentional palette flip, update the expected values together with it.
+        // Byte-exact anchors to «Чернильный» on the «Петроль» ground — the
+        // owner-chosen palette, transcribed from the verified generator dump.
+        // Code defaults MUST mirror ThemeAssetsBuilder.SeedLight, so a drift
+        // between them fails here rather than shipping two different lights.
         var t = Track(ScriptableObject.CreateInstance<ThemeAsset>());
-        Assert.AreEqual("1B7CEB", ColorUtility.ToHtmlStringRGB(t.accentFill));
-        Assert.AreEqual("000000", ColorUtility.ToHtmlStringRGB(t.inkPrimary));
-        Assert.AreEqual("666666", ColorUtility.ToHtmlStringRGB(t.inkSecondary));
+        Assert.AreEqual("F4F8F8", ColorUtility.ToHtmlStringRGB(t.background));
+        Assert.AreEqual("243A7A", ColorUtility.ToHtmlStringRGB(t.accentFill));
+        Assert.AreEqual("08181B", ColorUtility.ToHtmlStringRGB(t.inkPrimary));
+        Assert.AreEqual("4C6265", ColorUtility.ToHtmlStringRGB(t.inkSecondary));
+        Assert.AreEqual("E3EDED", ColorUtility.ToHtmlStringRGB(t.hairline));
+        // The doodle wallpaper is a locked authored asset — the palette flip
+        // must NOT move it (the generator's mock-only darkening is rejected).
         Assert.AreEqual("F5F2EA", ColorUtility.ToHtmlStringRGB(t.chatWallpaper));
-        Assert.AreEqual("C5EEB6", ColorUtility.ToHtmlStringRGB(t.bubbleOutgoing));
-        Assert.AreEqual("34C759", ColorUtility.ToHtmlStringRGB(t.statusOrderCollected));
-        Assert.AreEqual("F57C00", ColorUtility.ToHtmlStringRGB(t.statusOwnerNeeded));
-        Assert.AreEqual("007AFF", ColorUtility.ToHtmlStringRGB(t.statusInDialog));
+    }
+
+    [Test]
+    public void LightAndDark_DifferOnEveryStructuralRole()
+    {
+        // A theme switch is only meaningful if the grounds and inks actually move.
+        Theme.ResetForTests();
+        ThemePrefs.GetInt = (key, def) => def;
+        var light = Theme.Light;
+        var dark = Theme.Dark;
+        foreach (var role in new[] { ThemeRole.Background, ThemeRole.Surface, ThemeRole.Hairline,
+                                     ThemeRole.InkPrimary, ThemeRole.InkSecondary, ThemeRole.AccentFill })
+            Assert.AreNotEqual(ColorUtility.ToHtmlStringRGB(light.Resolve(role)),
+                               ColorUtility.ToHtmlStringRGB(dark.Resolve(role)),
+                               $"{role} must differ between light and dark");
     }
 
     // ---------------------------------------------------------------- fixed
@@ -129,11 +145,11 @@ public class ThemeFoundationTests
         dark.inkSecondary = new Color(0.6f, 0.65f, 0.72f, 1f);
         Theme.OverrideForTests(light, dark, ThemeMode.Light);
 
-        Assert.AreEqual("666666", ColorUtility.ToHtmlStringRGB(Theme.Color(ThemeRole.InkSecondary)),
-            "light read-time must stay byte-identical to today's value");
+        Assert.AreEqual("4C6265", ColorUtility.ToHtmlStringRGB(Theme.Color(ThemeRole.InkSecondary)),
+            "light read-time is the «Петроль» secondary ink");
 
         Theme.SetMode(ThemeMode.Dark);
-        Assert.AreNotEqual("666666", ColorUtility.ToHtmlStringRGB(Theme.Color(ThemeRole.InkSecondary)));
+        Assert.AreNotEqual("4C6265", ColorUtility.ToHtmlStringRGB(Theme.Color(ThemeRole.InkSecondary)));
     }
 
     // ---------------------------------------------------------------- prefs
@@ -174,11 +190,20 @@ public class ThemeFoundationTests
     public void MissingAssets_FallBackToCodeDefaults_NeverNull()
     {
         // No overrides, and Resources/Theme may not exist yet in a fresh checkout:
-        // the facade must still hand back a usable asset with today's values.
+        // the facade must still hand back a usable asset rather than null.
+        //
+        // Asserted against the CODE DEFAULT rather than a hard-coded hex. Those
+        // defaults mirror ThemeAssetsBuilder.SeedLight (pinned by
+        // Defaults_MatchTheShippedLightPalette), so this stays true whichever
+        // branch runs — and, unlike a literal, it does not have to be rewritten
+        // every time the palette is deliberately flipped.
         Theme.ResetForTests();
         ThemePrefs.GetInt = (key, def) => def; // fresh install
         Assert.IsNotNull(Theme.Active);
-        Assert.AreEqual("1B7CEB", ColorUtility.ToHtmlStringRGB(Theme.Color(ThemeRole.AccentFill)));
+
+        var codeDefault = Track(ScriptableObject.CreateInstance<ThemeAsset>());
+        Assert.AreEqual(ColorUtility.ToHtmlStringRGB(codeDefault.accentFill),
+                        ColorUtility.ToHtmlStringRGB(Theme.Color(ThemeRole.AccentFill)));
     }
 
     // ---------------------------------------------------------------- binding

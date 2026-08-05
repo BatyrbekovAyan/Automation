@@ -18,43 +18,41 @@ using UnityEngine;
 public class ThemeAsset : ScriptableObject
 {
     [Header("Surfaces")]
-    public Color background   = Hex("#F0F2F5");
+    public Color background   = Hex("#F4F8F8");
     public Color surface      = Hex("#FFFFFF");
-    public Color hairline     = Hex("#E4E6EB"); // phase-3: lightened from the #CCCCCC scene value
-    public Color border       = Hex("#E1E5EC");
-    public Color inputBorder  = Hex("#C6CBD3");
+    public Color hairline     = Hex("#E3EDED");
+    public Color border       = Hex("#C4D6D7");
+    public Color inputBorder  = Hex("#6F9B9D");
 
     [Header("Ink")]
-    public Color inkPrimary   = Hex("#000000"); // ChatItem Name — scene value
-    public Color inkSecondary = Hex("#666666"); // ChatItem Message/Time — scene value
-    public Color inkTertiary  = Hex("#8E8E93");
+    public Color inkPrimary   = Hex("#08181B");
+    public Color inkSecondary = Hex("#4C6265");
+    public Color inkTertiary  = Hex("#64797C");
 
     [Header("Accent")]
-    public Color accentFill   = Hex("#1B7CEB");
-    public Color accentText   = Hex("#1B7CEB");
+    public Color accentFill   = Hex("#243A7A");
+    public Color accentText   = Hex("#243A7A");
     public Color accentOnFill = Hex("#FFFFFF");
 
     [Header("Controls")]
-    public Color switchOffTrack = Hex("#E9E9EA"); // BotCardFooterBuilder.TrackOffColor
+    public Color switchOffTrack = Hex("#6F9B9D");
 
     [Header("Dashboard statuses (FG dots/pills — see DashboardStatusInfo)")]
-    public Color statusOrderCollected = Hex("#34C759");
-    public Color statusOwnerNeeded    = Hex("#F57C00");
-    public Color statusInDialog       = Hex("#007AFF");
+    public Color statusOrderCollected = Hex("#3A934C");
+    public Color statusOwnerNeeded    = Hex("#E46602");
+    public Color statusInDialog       = Hex("#3B72E6");
     public Color statusClientSilent   = Hex("#8E8E93");
     public Color statusQuestionClosed = Hex("#65676B");
 
     [Header("Semantic moments")]
-    public Color destructive = Hex("#E24848"); // ChatItem DeleteButton — scene value
-    public Color positiveBg  = Hex("#E8F8EE");
-    public Color positiveInk = Hex("#206A2C");
+    public Color destructive = Hex("#A01B12");
+    public Color positiveBg  = Hex("#E6F6EE");
+    public Color positiveInk = Hex("#0A6B3E");
 
     [Header("Chat thread")]
-    public Color chatWallpaper  = Hex("#F5F2EA"); // doodle paper (dark theme needs its own wallpaper asset later)
+    public Color chatWallpaper  = Hex("#F5F2EA");
     public Color bubbleIncoming = Hex("#FFFFFF");
-    public Color bubbleOutgoing = Hex("#C5EEB6");
-
-    /// <summary>Resolve a semantic role to this theme's colour.</summary>
+    public Color bubbleOutgoing = Hex("#E0E3EC");
     public Color Resolve(ThemeRole role) => role switch
     {
         ThemeRole.Background           => background,

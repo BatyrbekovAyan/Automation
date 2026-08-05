@@ -11,9 +11,9 @@ using UnityEngine;
 /// Idempotent: re-running overwrites the token VALUES on the existing assets
 /// (keeping their GUIDs, so nothing referencing them breaks).
 ///
-/// Light = today's app palette (identical to ThemeAsset's code defaults) —
-/// creating it changes nothing visually. Dark = the approved
-/// «Графит» × «Чернильный» set from docs/design/ui-restyle (gen-accent dump).
+/// Both themes are the owner-chosen «Чернильный» palette, transcribed from the
+/// verified generator dump in docs/design/ui-restyle (every value cleared the
+/// contrast + collision gates there). Light = «Петроль» ground, dark = «Графит».
 /// </summary>
 public static class ThemeAssetsBuilder
 {
@@ -53,70 +53,59 @@ public static class ThemeAssetsBuilder
     /// <summary>Today's app values — MUST stay byte-identical to ThemeAsset's code defaults.</summary>
     private static void SeedLight(ThemeAsset t)
     {
-        t.background   = Hex("#F0F2F5");
-        t.surface      = Hex("#FFFFFF");
-        t.hairline     = Hex("#E4E6EB");
-        t.border       = Hex("#E1E5EC");
-        t.inputBorder  = Hex("#C6CBD3");
-
-        t.inkPrimary   = Hex("#000000");
-        t.inkSecondary = Hex("#666666");
-        t.inkTertiary  = Hex("#8E8E93");
-
-        t.accentFill   = Hex("#1B7CEB");
-        t.accentText   = Hex("#1B7CEB");
+        t.background = Hex("#F4F8F8");
+        t.surface = Hex("#FFFFFF");
+        t.hairline = Hex("#E3EDED");
+        t.border = Hex("#C4D6D7");
+        t.inputBorder = Hex("#6F9B9D");
+        t.inkPrimary = Hex("#08181B");
+        t.inkSecondary = Hex("#4C6265");
+        t.inkTertiary = Hex("#64797C");
+        t.accentFill = Hex("#243A7A");
+        t.accentText = Hex("#243A7A");
         t.accentOnFill = Hex("#FFFFFF");
-
-        t.switchOffTrack = Hex("#E9E9EA");
-
-        t.statusOrderCollected = Hex("#34C759");
-        t.statusOwnerNeeded    = Hex("#F57C00");
-        t.statusInDialog       = Hex("#007AFF");
-        t.statusClientSilent   = Hex("#8E8E93");
+        t.switchOffTrack = Hex("#6F9B9D");
+        t.statusOrderCollected = Hex("#3A934C");
+        t.statusOwnerNeeded = Hex("#E46602");
+        t.statusInDialog = Hex("#3B72E6");
+        t.statusClientSilent = Hex("#8E8E93");
         t.statusQuestionClosed = Hex("#65676B");
-
-        t.destructive = Hex("#E24848");
-        t.positiveBg  = Hex("#E8F8EE");
-        t.positiveInk = Hex("#206A2C");
-
-        t.chatWallpaper  = Hex("#F5F2EA");
+        t.destructive = Hex("#A01B12");
+        t.positiveBg = Hex("#E6F6EE");
+        t.positiveInk = Hex("#0A6B3E");
+        t.chatWallpaper = Hex("#F5F2EA");
         t.bubbleIncoming = Hex("#FFFFFF");
-        t.bubbleOutgoing = Hex("#C5EEB6");
+        t.bubbleOutgoing = Hex("#E0E3EC");
+
     }
 
     /// <summary>«Графит» × «Чернильный» — approved dark set (docs/design/ui-restyle).</summary>
     private static void SeedDark(ThemeAsset t)
     {
-        t.background   = Hex("#0E1116");
-        t.surface      = Hex("#171C24");
-        t.hairline     = Hex("#242C38");
-        t.border       = Hex("#333E4E");
-        t.inputBorder  = Hex("#556882");
-
-        t.inkPrimary   = Hex("#ECF0F6");
+        t.background = Hex("#0E1116");
+        t.surface = Hex("#171C24");
+        t.hairline = Hex("#242C38");
+        t.border = Hex("#333E4E");
+        t.inputBorder = Hex("#556882");
+        t.inkPrimary = Hex("#ECF0F6");
         t.inkSecondary = Hex("#9AA6B8");
-        t.inkTertiary  = Hex("#79869A");
-
-        t.accentFill   = Hex("#3E61C6");
-        t.accentText   = Hex("#5981D6");
+        t.inkTertiary = Hex("#79869A");
+        t.accentFill = Hex("#3E61C6");
+        t.accentText = Hex("#5981D6");
         t.accentOnFill = Hex("#FFFFFF");
-
         t.switchOffTrack = Hex("#556882");
-
-        // Dark-theme status siblings: same semantics, tuned for the dark ground.
         t.statusOrderCollected = Hex("#3A934C");
-        t.statusOwnerNeeded    = Hex("#E46602");
-        t.statusInDialog       = Hex("#8F7AFA");
-        t.statusClientSilent   = Hex("#8A94A6");
+        t.statusOwnerNeeded = Hex("#E46602");
+        t.statusInDialog = Hex("#8F7AFA");
+        t.statusClientSilent = Hex("#8A94A6");
         t.statusQuestionClosed = Hex("#9B5DE0");
-
         t.destructive = Hex("#A01B12");
-        t.positiveBg  = Hex("#123324");
+        t.positiveBg = Hex("#123324");
         t.positiveInk = Hex("#57DE95");
-
-        t.chatWallpaper  = Hex("#090B0E"); // authored dark doodle wallpaper is a follow-up asset
+        t.chatWallpaper = Hex("#090B0E");
         t.bubbleIncoming = Hex("#252A31");
         t.bubbleOutgoing = Hex("#202F59");
+
     }
 
     private static Color Hex(string hex) =>
