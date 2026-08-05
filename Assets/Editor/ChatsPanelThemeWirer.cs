@@ -30,8 +30,8 @@ public static class ChatsPanelThemeWirer
 
     /// <summary>
     /// Path relative to the ChatsPanel GameObject → semantic role.
-    /// Everything here is a verified visual no-op (Δ ≤ 1/255 per channel). The
-    /// Chevron is included at Δ5 / ΔE 0.7 — below any perceptual threshold.
+    /// Everything except the two InkPrimary entries is a verified visual no-op
+    /// (dE <= 0.7). Those two are an owner-approved unification — see below.
     /// </summary>
     private static readonly (string path, ThemeRole role)[] Spec =
     {
@@ -42,21 +42,9 @@ public static class ChatsPanelThemeWirer
         ("TopBar/LeftZone/BotSwitcherTitle/Chevron",                  ThemeRole.InkSecondary),
         ("Scroll/Viewport/Content/ChatsSearchBar/Pill/Magnifier",      ThemeRole.InkTertiary),
         ("Scroll/Viewport/Content/ChatsSearchBar/Pill/Input/Text Area/Placeholder", ThemeRole.InkTertiary),
-    };
-
-    /// <summary>
-    /// Held back pending an explicit decision — these are NOT no-ops.
-    /// The app carries five different "primary ink" values (#000000 #111111
-    /// #1A1A1A #1C1C1F #1A1A2E). Unifying them onto InkPrimary (#000000, the
-    /// chat-row value) makes these two elements visibly blacker:
-    ///   BotName      #1A1A1A → #000000   ΔE 21.8   (17.40:1 → 21.00:1 on white)
-    ///   Search Text  #111111 → #000000   ΔE 17.8   (18.88:1 → 21.00:1 on white)
-    /// Both MUST be bound before dark mode ships — left unbound they would stay
-    /// near-black on a dark ground and disappear. Move them into Spec once the
-    /// owner has signed off on the unification.
-    /// </summary>
-    private static readonly (string path, ThemeRole role)[] PendingDecision =
-    {
+        // Owner-approved unification onto a single InkPrimary (#000000). These two
+        // are the app's only remaining near-black variants on this screen; both get
+        // marginally blacker, and both must be bound for dark mode to work at all.
         ("TopBar/LeftZone/BotSwitcherTitle/BotName",                            ThemeRole.InkPrimary),
         ("Scroll/Viewport/Content/ChatsSearchBar/Pill/Input/Text Area/Text",    ThemeRole.InkPrimary),
     };
@@ -129,19 +117,6 @@ public static class ChatsPanelThemeWirer
 
         sb.AppendLine();
         sb.AppendLine($"bound: {bound}   to add: {toAdd}   mismatches: {mismatches.Count}   missing: {missing.Count}");
-        if (PendingDecision.Length > 0)
-        {
-            sb.AppendLine();
-            sb.AppendLine("HELD BACK — real repaints, awaiting an explicit decision:");
-            foreach (var (pendPath, pendRole) in PendingDecision)
-            {
-                var pt = panel.transform.Find(pendPath);
-                var pg = pt != null ? pt.GetComponent<Graphic>() : null;
-                if (pg == null) { sb.AppendLine($"  {pendPath}: NOT FOUND"); continue; }
-                var tok = Theme.Light.Resolve(pendRole);
-                sb.AppendLine($"  {pendPath}: {Hex(pg.color)} -> {Hex(tok)} (delta {MaxByteDelta(pg.color, tok)}, {pendRole})");
-            }
-        }
         if (mismatches.Count > 0)
         {
             sb.AppendLine();
