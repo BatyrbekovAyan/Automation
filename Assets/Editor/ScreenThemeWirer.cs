@@ -62,6 +62,33 @@ public static class ScreenThemeWirer
         ("#007AFF", ThemeRole.StatusInDialog),
         // success-pill tint (CLAUDE.md soft tints)
         ("#E8F8EE", ThemeRole.PositiveBg),
+        // found on the settings/list prefabs
+        ("#636366", ThemeRole.InkSecondary),
+        ("#ECECEE", ThemeRole.Hairline),
+        ("#D9D9D9", ThemeRole.InputBorder),
+        ("#E9E9EA", ThemeRole.SwitchOffTrack),   // BotCardFooterBuilder.TrackOffColor
+        ("#E9E9EB", ThemeRole.Hairline),         // BotCardFooterBuilder.DividerColor — NOT the track
+        // destructive: two red variants in BotSettings, unified onto one role
+        ("#E53935", ThemeRole.Destructive),
+        ("#EB4545", ThemeRole.Destructive),
+        ("#F0F0F2", ThemeRole.Background),
+    };
+
+    /// <summary>
+    /// Per-target extra exclusions. #34C759 is genuinely AMBIGUOUS: on the
+    /// dashboard it is the order-collected status, but on Bot.prefab it is the
+    /// activation switch's ON green — which must never follow the theme, or
+    /// «Бот работает» stops meaning one fixed thing. Value-mapping cannot tell
+    /// them apart, so the switch's owner excludes it explicitly.
+    /// </summary>
+    private static readonly Dictionary<string, string[]> ExtraExclusions = new()
+    {
+        ["Assets/Prefabs/Bot.prefab"] = new[]
+        {
+            "#34C759", // activation switch ON — Theme.Fixed.SwitchOnGreen
+            "#00FF00", // pure debug green left in the prefab; not a theme colour
+            "#2E9BE0", // channel-ish blue; needs a design call, not a guess
+        },
     };
 
     /// <summary>
@@ -73,11 +100,50 @@ public static class ScreenThemeWirer
         "#FFFFFF", "#25D366", "#2AABEE", "#34B7F1", "#00A884", "#2FB344", "#1FA855",
     };
 
+    private static readonly string[] Prefabs =
+    {
+        "Assets/Prefabs/BotSettings.prefab",
+        "Assets/Prefabs/Bot.prefab",
+        "Assets/Prefabs/Product.prefab",
+        "Assets/Prefabs/Service.prefab",
+        "Assets/Prefabs/BotSwitcherRow.prefab",
+    };
+
     [MenuItem("Tools/Theme/Screens/Audit Bots + Dashboard (dry run)")]
     public static void AuditAll() => Run(new[] { "Screen_Bots", "Screen_Dashboard" }, apply: false);
 
     [MenuItem("Tools/Theme/Screens/Apply Bots + Dashboard (adopt palette)")]
     public static void ApplyAll() => Run(new[] { "Screen_Bots", "Screen_Dashboard" }, apply: true);
+
+    [MenuItem("Tools/Theme/Screens/Audit Prefabs (dry run)")]
+    public static void AuditPrefabs() => RunPrefabs(apply: false);
+
+    [MenuItem("Tools/Theme/Screens/Apply Prefabs (adopt palette)")]
+    public static void ApplyPrefabs() => RunPrefabs(apply: true);
+
+    private static void RunPrefabs(bool apply)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"[ScreenThemeWirer] PREFABS {(apply ? "APPLY" : "AUDIT")}");
+        int total = 0;
+
+        foreach (var path in Prefabs)
+        {
+            var root = PrefabUtility.LoadPrefabContents(path);
+            if (root == null) { sb.AppendLine($"\n### {path}: NOT FOUND"); continue; }
+            try
+            {
+                ExtraExclusions.TryGetValue(path, out var extra);
+                int added = BindSubtree(root, apply, sb, path, extra ?? System.Array.Empty<string>());
+                total += added;
+                if (apply && added > 0) PrefabUtility.SaveAsPrefabAsset(root, path);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        Debug.Log(sb.ToString());
+        if (apply) Debug.Log($"[ScreenThemeWirer] Prefabs applied. {total} binding(s) added.");
+    }
 
     private static void Run(string[] roots, bool apply)
     {
@@ -100,51 +166,7 @@ public static class ScreenThemeWirer
                 continue;
             }
 
-            var mapped = new Dictionary<ThemeRole, int>();
-            var unmapped = new Dictionary<string, int>();
-            int added = 0, already = 0;
-
-            foreach (var g in root.GetComponentsInChildren<Graphic>(includeInactive: true))
-            {
-                string hex = "#" + ColorUtility.ToHtmlStringRGB(g.color);
-                if (NeverMap.Contains(hex)) continue;
-
-                var hit = ValueMap.FirstOrDefault(m => m.hex == hex);
-                if (hit.hex == null)
-                {
-                    unmapped.TryGetValue(hex, out var n);
-                    unmapped[hex] = n + 1;
-                    continue;
-                }
-
-                mapped.TryGetValue(hit.role, out var c);
-                mapped[hit.role] = c + 1;
-
-                if (g.GetComponent<ThemedColor>() != null) { already++; continue; }
-                if (!apply) { added++; continue; }
-
-                var binding = g.gameObject.AddComponent<ThemedColor>();
-                var so = new SerializedObject(binding);
-                so.FindProperty("role").enumValueIndex = (int)hit.role;
-                so.FindProperty("target").objectReferenceValue = g;
-                so.FindProperty("preserveAlpha").boolValue = true;
-                so.ApplyModifiedPropertiesWithoutUndo();
-                added++;
-            }
-
-            totalAdded += added;
-            sb.AppendLine($"\n### {rootName}  —  bound {added}, already {already}");
-            foreach (var kv in mapped.OrderByDescending(k => k.Value))
-            {
-                var tok = Theme.Light.Resolve(kv.Key);
-                sb.AppendLine($"    {kv.Key,-24} x{kv.Value,-4} -> {"#" + ColorUtility.ToHtmlStringRGB(tok)}");
-            }
-            if (unmapped.Count > 0)
-            {
-                sb.AppendLine("    unmapped (left alone — bind by hand if they are real surfaces):");
-                foreach (var kv in unmapped.OrderByDescending(k => k.Value).Take(12))
-                    sb.AppendLine($"       {kv.Key} x{kv.Value}");
-            }
+            totalAdded += BindSubtree(root, apply, sb, rootName, System.Array.Empty<string>());
         }
 
         Debug.Log(sb.ToString());
@@ -154,6 +176,55 @@ public static class ScreenThemeWirer
         EditorSceneManager.SaveScene(scene);
         Debug.Log($"[ScreenThemeWirer] Applied + scene saved. {totalAdded} binding(s) added. " +
                   "No objects created/destroyed/moved.");
+    }
+
+    /// <summary>Shared binding pass — used for both scene roots and prefabs.</summary>
+    private static int BindSubtree(GameObject root, bool apply, StringBuilder sb,
+                                   string label, string[] extraExclusions)
+    {
+        var mapped = new Dictionary<ThemeRole, int>();
+        var unmapped = new Dictionary<string, int>();
+        int added = 0, already = 0;
+
+        foreach (var g in root.GetComponentsInChildren<Graphic>(includeInactive: true))
+        {
+            string hex = "#" + ColorUtility.ToHtmlStringRGB(g.color);
+            if (NeverMap.Contains(hex) || extraExclusions.Contains(hex)) continue;
+
+            var hit = ValueMap.FirstOrDefault(m => m.hex == hex);
+            if (hit.hex == null)
+            {
+                unmapped.TryGetValue(hex, out var n);
+                unmapped[hex] = n + 1;
+                continue;
+            }
+
+            mapped.TryGetValue(hit.role, out var c);
+            mapped[hit.role] = c + 1;
+
+            if (g.GetComponent<ThemedColor>() != null) { already++; continue; }
+            if (!apply) { added++; continue; }
+
+            var binding = g.gameObject.AddComponent<ThemedColor>();
+            var so = new SerializedObject(binding);
+            so.FindProperty("role").enumValueIndex = (int)hit.role;
+            so.FindProperty("target").objectReferenceValue = g;
+            so.FindProperty("preserveAlpha").boolValue = true;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            added++;
+        }
+
+        sb.AppendLine($"\n### {label}  —  bound {added}, already {already}");
+        foreach (var kv in mapped.OrderByDescending(k => k.Value))
+            sb.AppendLine($"    {kv.Key,-24} x{kv.Value,-4} -> " +
+                          $"{"#" + ColorUtility.ToHtmlStringRGB(Theme.Light.Resolve(kv.Key))}");
+        if (unmapped.Count > 0)
+        {
+            sb.AppendLine("    unmapped (left alone — needs a design call):");
+            foreach (var kv in unmapped.OrderByDescending(k => k.Value).Take(10))
+                sb.AppendLine($"       {kv.Key} x{kv.Value}");
+        }
+        return added;
     }
 
     private static GameObject FindDeep(Transform t, string name)

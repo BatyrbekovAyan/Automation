@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 8397728018434904008}
   - component: {fileID: 6810939684674441037}
   - component: {fileID: 739567510714851380}
+  - component: {fileID: 8663096275831196434}
   m_Layer: 0
   m_Name: Label
   m_TagString: Untagged
@@ -137,6 +138,21 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &8663096275831196434
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1855656861524671511}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 7
+  target: {fileID: 739567510714851380}
+  preserveAlpha: 1
 --- !u!1 &2161084395907499559
 GameObject:
   m_ObjectHideFlags: 0
@@ -151,6 +167,7 @@ GameObject:
   - component: {fileID: 5851052700179278150}
   - component: {fileID: 2237629613529674264}
   - component: {fileID: 7261212935278599158}
+  - component: {fileID: 1960538196952275080}
   m_Layer: 0
   m_Name: Chip_Telegram
   m_TagString: Untagged
@@ -277,6 +294,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithRoundedCorners
   radius: 33
   image: {fileID: 9033049217554776668}
+--- !u!114 &1960538196952275080
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2161084395907499559}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 2
+  target: {fileID: 9033049217554776668}
+  preserveAlpha: 1
 --- !u!1 &2269050709132569628
 GameObject:
   m_ObjectHideFlags: 0
@@ -665,6 +697,7 @@ GameObject:
   - component: {fileID: 7379255040405445388}
   - component: {fileID: 7420136542150743919}
   - component: {fileID: 6434487639770323921}
+  - component: {fileID: 7364668331092384196}
   m_Layer: 0
   m_Name: Avatar
   m_TagString: Untagged
@@ -764,6 +797,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithRoundedCorners
   radius: 72
   image: {fileID: 7379255040405445388}
+--- !u!114 &7364668331092384196
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5436895852752937776}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 4
+  target: {fileID: 7379255040405445388}
+  preserveAlpha: 1
 --- !u!1 &5504362051765111313
 GameObject:
   m_ObjectHideFlags: 0
@@ -776,6 +824,7 @@ GameObject:
   - component: {fileID: 3416733884556338083}
   - component: {fileID: 1009894459499536645}
   - component: {fileID: 9034402267089520778}
+  - component: {fileID: 6751617251896535992}
   m_Layer: 0
   m_Name: SelectedBadge
   m_TagString: Untagged
@@ -855,6 +904,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithRoundedCorners
   radius: 30
   image: {fileID: 1009894459499536645}
+--- !u!114 &6751617251896535992
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5504362051765111313}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 8
+  target: {fileID: 1009894459499536645}
+  preserveAlpha: 1
 --- !u!1 &5738896876517096053
 GameObject:
   m_ObjectHideFlags: 0
@@ -946,6 +1010,7 @@ GameObject:
   - component: {fileID: 1111458370143551316}
   - component: {fileID: 2325357604841119344}
   - component: {fileID: 682020448778543077}
+  - component: {fileID: 6399856124167431852}
   m_Layer: 0
   m_Name: BotSwitcherRow
   m_TagString: Untagged
@@ -1135,6 +1200,21 @@ MonoBehaviour:
   disconnectedBg: {r: 0.925, g: 0.925, b: 0.933, a: 1}
   disconnectedLabel: {r: 0.557, g: 0.557, b: 0.576, a: 1}
   disconnectedIconAlpha: 0.35
+--- !u!114 &6399856124167431852
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5784907989570623368}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 5
+  target: {fileID: 2763013869602995250}
+  preserveAlpha: 1
 --- !u!1 &6489841062653901957
 GameObject:
   m_ObjectHideFlags: 0
@@ -1242,6 +1322,7 @@ GameObject:
   - component: {fileID: 2064041202763215717}
   - component: {fileID: 6350285245811637169}
   - component: {fileID: 1191823199099706893}
+  - component: {fileID: 6570146769860599675}
   m_Layer: 0
   m_Name: Label
   m_TagString: Untagged
@@ -1368,6 +1449,21 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &6570146769860599675
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7084093435484261552}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 7
+  target: {fileID: 1191823199099706893}
+  preserveAlpha: 1
 --- !u!1 &7217110082827701734
 GameObject:
   m_ObjectHideFlags: 0
@@ -1379,6 +1475,7 @@ GameObject:
   - component: {fileID: 3195882819238662122}
   - component: {fileID: 9145540768597287961}
   - component: {fileID: 5426271722986814013}
+  - component: {fileID: 937788491106797667}
   m_Layer: 0
   m_Name: Name
   m_TagString: Untagged
@@ -1505,6 +1602,21 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &937788491106797667
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7217110082827701734}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 5
+  target: {fileID: 5426271722986814013}
+  preserveAlpha: 1
 --- !u!1 &7768407488765368826
 GameObject:
   m_ObjectHideFlags: 0
@@ -1583,6 +1695,7 @@ GameObject:
   - component: {fileID: 4751032231446321787}
   - component: {fileID: 4027201588415563448}
   - component: {fileID: 5604075247318560447}
+  - component: {fileID: 4386087663408756635}
   m_Layer: 0
   m_Name: Chip_WhatsApp
   m_TagString: Untagged
@@ -1709,3 +1822,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithRoundedCorners
   radius: 33
   image: {fileID: 5219956745086030077}
+--- !u!114 &4386087663408756635
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8342944177246262412}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 2
+  target: {fileID: 5219956745086030077}
+  preserveAlpha: 1

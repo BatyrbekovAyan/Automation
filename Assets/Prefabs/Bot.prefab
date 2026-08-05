@@ -198,6 +198,7 @@ GameObject:
   - component: {fileID: 7816218962543294658}
   - component: {fileID: 75267570621179566}
   - component: {fileID: 4856111006223051069}
+  - component: {fileID: 5824812014484629967}
   m_Layer: 5
   m_Name: Icon
   m_TagString: Untagged
@@ -262,6 +263,21 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!114 &5824812014484629967
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 657172822754789858}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 6
+  target: {fileID: 4856111006223051069}
+  preserveAlpha: 1
 --- !u!1 &955953186585996715
 GameObject:
   m_ObjectHideFlags: 0
@@ -628,6 +644,7 @@ GameObject:
   - component: {fileID: 2690040702235036065}
   - component: {fileID: 7607908171405797066}
   - component: {fileID: 7588365586414003002}
+  - component: {fileID: 5718545168985081486}
   m_Layer: 5
   m_Name: StatusPill
   m_TagString: Untagged
@@ -743,6 +760,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithRoundedCorners
   radius: 33
   image: {fileID: 2690040702235036065}
+--- !u!114 &5718545168985081486
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2133407027076269597}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 18
+  target: {fileID: 2690040702235036065}
+  preserveAlpha: 1
 --- !u!1 &2157024186822878465
 GameObject:
   m_ObjectHideFlags: 0
@@ -755,6 +787,7 @@ GameObject:
   - component: {fileID: 1579661072863347249}
   - component: {fileID: 3856524340184447983}
   - component: {fileID: 3427499302684796465}
+  - component: {fileID: 6337870622462967328}
   m_Layer: 5
   m_Name: Background
   m_TagString: Untagged
@@ -834,6 +867,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithRoundedCorners
   radius: 42
   image: {fileID: 3856524340184447983}
+--- !u!114 &6337870622462967328
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2157024186822878465}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 11
+  target: {fileID: 3856524340184447983}
+  preserveAlpha: 1
 --- !u!1 &2447570566907358966
 GameObject:
   m_ObjectHideFlags: 0
@@ -846,6 +894,7 @@ GameObject:
   - component: {fileID: 5296194842189290401}
   - component: {fileID: 7738574221928317928}
   - component: {fileID: 3404011885649522940}
+  - component: {fileID: 6011518819825343953}
   m_Layer: 5
   m_Name: Divider
   m_TagString: Untagged
@@ -924,6 +973,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PixelSnapLine
   axis: 0
   designThicknessUnits: 2
+--- !u!114 &6011518819825343953
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2447570566907358966}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 2
+  target: {fileID: 7738574221928317928}
+  preserveAlpha: 1
 --- !u!1 &3128666919321547283
 GameObject:
   m_ObjectHideFlags: 0
@@ -1434,6 +1498,7 @@ GameObject:
   - component: {fileID: 8698439697572278797}
   - component: {fileID: 8141626005627473746}
   - component: {fileID: 572993902141511618}
+  - component: {fileID: 19327983499019164}
   m_Layer: 5
   m_Name: BotDesc
   m_TagString: Untagged
@@ -1580,6 +1645,21 @@ MonoBehaviour:
   m_FlexibleWidth: -1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+--- !u!114 &19327983499019164
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4596174374992560218}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 7
+  target: {fileID: 8141626005627473746}
+  preserveAlpha: 1
 --- !u!1 &4888480173887043339
 GameObject:
   m_ObjectHideFlags: 0
@@ -1649,6 +1729,7 @@ GameObject:
   - component: {fileID: 9088106236232253468}
   - component: {fileID: 791043435354458910}
   - component: {fileID: 6460356195657324742}
+  - component: {fileID: 1630841173932276463}
   m_Layer: 5
   m_Name: BotName
   m_TagString: Untagged
@@ -1795,6 +1876,21 @@ MonoBehaviour:
   m_FlexibleWidth: -1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+--- !u!114 &1630841173932276463
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5899807650583588680}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 5
+  target: {fileID: 791043435354458910}
+  preserveAlpha: 1
 --- !u!1 &6492819320955520526
 GameObject:
   m_ObjectHideFlags: 0
