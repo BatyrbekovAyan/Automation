@@ -12,10 +12,13 @@ using UnityEngine;
 /// to read as hierarchy.
 ///
 /// Applied here (type only — no geometry, no colour):
-///   Name     44u regular -> 46u Bold
 ///   Message  38u         -> 36u
 ///   Time     38u Bold    -> 30u regular
-/// giving a 1.28x name/preview ratio and a clearly recessive timestamp.
+///
+/// The Name change (44u regular -> 46u Bold) shipped and was then REVERTED on
+/// owner review 2026-08-05 — the bolded name read as off-brand next to the rest
+/// of the app. Name stays 44u regular; the spec below matches the reverted
+/// state so a re-run cannot resurrect the rejected look.
 ///
 /// NOT done here, deliberately:
 ///   • Divider inset — it is ALREADY inset. Divider's parent is TextBlock, which
@@ -35,7 +38,7 @@ public static class ChatsListRedesign
 
     private static readonly (string path, float size, FontStyles style)[] TypeSpec =
     {
-        ("SwipeContent/TextBlock/TopRow/Name",      46f, FontStyles.Bold),
+        ("SwipeContent/TextBlock/TopRow/Name",      44f, FontStyles.Normal),
         ("SwipeContent/TextBlock/Message",          36f, FontStyles.Normal),
         ("SwipeContent/TextBlock/TopRow/Time/Text", 30f, FontStyles.Normal),
     };
