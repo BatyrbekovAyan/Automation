@@ -206,6 +206,29 @@ public class ThemeFoundationTests
                         ColorUtility.ToHtmlStringRGB(Theme.Color(ThemeRole.AccentFill)));
     }
 
+    [Test]
+    public void ToggleContract_RestoringPersistedStateDoesNotRewriteIt()
+    {
+        // The Profile row restores its position from the persisted mode on Awake.
+        // If that restore went through the normal onValueChanged path it would call
+        // SetMode and write the value straight back — harmless when equal, but it
+        // would also fire Changed and repaint every binding for nothing. The page
+        // uses SetIsOnQuiet; this pins the underlying invariant it relies on.
+        var light = Track(ScriptableObject.CreateInstance<ThemeAsset>());
+        var dark = Track(ScriptableObject.CreateInstance<ThemeAsset>());
+        Theme.OverrideForTests(light, dark, ThemeMode.Dark);
+
+        int fired = 0;
+        Theme.Changed += () => fired++;
+
+        Theme.SetMode(ThemeMode.Dark);   // what a re-assert of the persisted value looks like
+        Assert.AreEqual(0, fired, "re-asserting the current mode must not repaint");
+
+        Theme.SetMode(ThemeMode.Light);
+        Assert.AreEqual(1, fired);
+        Assert.AreEqual(ThemeMode.Light, ThemePrefs.Mode, "the flip must persist for next launch");
+    }
+
     // ---------------------------------------------------------------- binding
     //
     // EditMode never dispatches Awake/OnEnable/OnDisable to plain MonoBehaviours,

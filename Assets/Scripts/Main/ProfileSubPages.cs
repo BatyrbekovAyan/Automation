@@ -74,6 +74,8 @@ public partial class ProfileSubPages : MonoBehaviour
         WirePrivacy();
         WireSupport();
         WireAbout();
+        WireAppearance();
+        RefreshAppearanceToggle(); // restore the persisted light/dark choice
     }
 
     // ── Navigation ─────────────────────────────────────────────────────────
