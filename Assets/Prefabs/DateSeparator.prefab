@@ -251,6 +251,7 @@ GameObject:
   - component: {fileID: 5166408777842310348}
   - component: {fileID: 7939826499926454687}
   - component: {fileID: 3103378375665321410}
+  - component: {fileID: 2104817159343863095}
   m_Layer: 5
   m_Name: Text (TMP)
   m_TagString: Untagged
@@ -377,3 +378,18 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &2104817159343863095
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8151523956309008408}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 5
+  target: {fileID: 3103378375665321410}
+  preserveAlpha: 1

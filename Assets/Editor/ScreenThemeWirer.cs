@@ -115,6 +115,113 @@ public static class ScreenThemeWirer
     [MenuItem("Tools/Theme/Screens/Apply Bots + Dashboard (adopt palette)")]
     public static void ApplyAll() => Run(new[] { "Screen_Bots", "Screen_Dashboard" }, apply: true);
 
+    /// <summary>
+    /// Chat-thread colours that must NOT be value-mapped.
+    ///   • suggestions greens — a LOCKED, research-backed palette for «Бот предлагает
+    ///     ответ»; it is deliberate design, not drift, and must be swapped as a block.
+    ///   • wallpaper family — the doodle paper/ink is a light-only authored asset.
+    ///   • bubble fills — bound BY NAME below instead, since #FFFFFF on this surface
+    ///     is overwhelmingly sprite tint (Thumbnail/PreviewImage/DocIcon/PlayOverlay).
+    ///   • #1FA855 / #C5CDD2 — delivery-tick and accent greens/greys that need a
+    ///     design call rather than a guess.
+    /// </summary>
+    private static readonly string[] ChatExclusions =
+    {
+        "#5E7C6E", "#DCEAE2", "#14241D", "#3E6B57", "#DCEFE6",   // suggestions — LOCKED
+        "#F3F1EB", "#D9D4CA",                                     // doodle paper + ink
+        "#D8FDD4",                                                // outgoing bubble (bound by name)
+        "#1FA855", "#C5CDD2",                                     // ticks / ambiguous
+    };
+
+    /// <summary>Bubble fills, bound by NAME because their value is ambiguous.</summary>
+    private static readonly (string prefab, string[] names, ThemeRole role)[] BubbleSpec =
+    {
+        ("Assets/Prefabs/MessageTextIncoming.prefab", new[] { "Bubble", "Tail" }, ThemeRole.BubbleIncoming),
+        ("Assets/Prefabs/MessageTextOutgoing.prefab", new[] { "Bubble", "Tail" }, ThemeRole.BubbleOutgoing),
+    };
+
+    [MenuItem("Tools/Theme/Screens/Audit Chat Thread (dry run)")]
+    public static void AuditChat() => RunChat(apply: false);
+
+    [MenuItem("Tools/Theme/Screens/Apply Chat Thread")]
+    public static void ApplyChat() => RunChat(apply: true);
+
+    private static void RunChat(bool apply)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"[ScreenThemeWirer] CHAT {(apply ? "APPLY" : "AUDIT")}");
+        int total = 0;
+
+        // (a) bubbles, by name
+        foreach (var (path, names, role) in BubbleSpec)
+        {
+            var root = PrefabUtility.LoadPrefabContents(path);
+            if (root == null) { sb.AppendLine($"### {path}: NOT FOUND"); continue; }
+            try
+            {
+                int n = 0;
+                foreach (var g in root.GetComponentsInChildren<Graphic>(includeInactive: true))
+                {
+                    if (!names.Contains(g.name)) continue;
+                    if (g.GetComponent<ThemedColor>() != null) continue;
+                    sb.AppendLine($"    {System.IO.Path.GetFileName(path)}/{g.name}  " +
+                                  $"#{ColorUtility.ToHtmlStringRGB(g.color)} -> {role} " +
+                                  $"(#{ColorUtility.ToHtmlStringRGB(Theme.Light.Resolve(role))})");
+                    if (!apply) { n++; continue; }
+                    var b = g.gameObject.AddComponent<ThemedColor>();
+                    var so = new SerializedObject(b);
+                    so.FindProperty("role").enumValueIndex = (int)role;
+                    so.FindProperty("target").objectReferenceValue = g;
+                    so.FindProperty("preserveAlpha").boolValue = true;
+                    so.ApplyModifiedPropertiesWithoutUndo();
+                    n++;
+                }
+                total += n;
+                if (apply && n > 0) PrefabUtility.SaveAsPrefabAsset(root, path);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        // (b) safe inks in the message prefabs + separators
+        foreach (var path in new[]
+        {
+            "Assets/Prefabs/MessageTextIncoming.prefab", "Assets/Prefabs/MessageTextOutgoing.prefab",
+            "Assets/Prefabs/DateSeparator.prefab", "Assets/Prefabs/UnreadSeparator.prefab",
+        })
+        {
+            var root = PrefabUtility.LoadPrefabContents(path);
+            if (root == null) continue;
+            try
+            {
+                int n = BindSubtree(root, apply, sb, System.IO.Path.GetFileName(path), ChatExclusions);
+                total += n;
+                if (apply && n > 0) PrefabUtility.SaveAsPrefabAsset(root, path);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        // (c) MessagesPanel in the scene
+        var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+        GameObject panel = null;
+        foreach (var r in scene.GetRootGameObjects())
+        {
+            panel = FindDeep(r.transform, "MessagesPanel");
+            if (panel != null) break;
+        }
+        if (panel != null)
+        {
+            total += BindSubtree(panel, apply, sb, "MessagesPanel", ChatExclusions);
+            if (apply)
+            {
+                EditorSceneManager.MarkSceneDirty(scene);
+                EditorSceneManager.SaveScene(scene);
+            }
+        }
+
+        Debug.Log(sb.ToString());
+        if (apply) Debug.Log($"[ScreenThemeWirer] Chat thread applied. {total} binding(s).");
+    }
+
     [MenuItem("Tools/Theme/Screens/Audit Prefabs (dry run)")]
     public static void AuditPrefabs() => RunPrefabs(apply: false);
 

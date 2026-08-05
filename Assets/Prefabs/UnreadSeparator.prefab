@@ -83,6 +83,7 @@ GameObject:
   - component: {fileID: 7240008195611629276}
   - component: {fileID: 8638053664100235190}
   - component: {fileID: 3156852167621542779}
+  - component: {fileID: 1121392964205819901}
   m_Layer: 0
   m_Name: BottomLine
   m_TagString: Untagged
@@ -161,6 +162,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PixelSnapLine
   axis: 0
   designThicknessUnits: 1
+--- !u!114 &1121392964205819901
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5451330513821429014}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 5
+  target: {fileID: 8638053664100235190}
+  preserveAlpha: 1
 --- !u!1 &5790199503079909455
 GameObject:
   m_ObjectHideFlags: 0
@@ -249,6 +265,7 @@ GameObject:
   - component: {fileID: 3706015126166507770}
   - component: {fileID: 3545654859090339880}
   - component: {fileID: 4922750092064600464}
+  - component: {fileID: 617548099837637683}
   m_Layer: 0
   m_Name: Label
   m_TagString: Untagged
@@ -375,3 +392,18 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &617548099837637683
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8245677149670175339}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 5
+  target: {fileID: 4922750092064600464}
+  preserveAlpha: 1
