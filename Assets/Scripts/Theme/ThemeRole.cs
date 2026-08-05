@@ -50,4 +50,5 @@ public enum ThemeRole
     // new roles must only ever be added at the END, never inserted).
     ChatWallpaperInk,  // tint on the baked doodle art; light = white passthrough
     BubbleBorder,      // hairline border around message bubbles
+    SendButton,        // composer send-circle fill (green in both, darker in dark)
 }

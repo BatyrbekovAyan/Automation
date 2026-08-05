@@ -58,6 +58,7 @@ public class ThemeAsset : ScriptableObject
     // and the dark value multiplies the strokes down to a subtle dark hatch.
     public Color chatWallpaperInk = Hex("#FFFFFF");
     public Color bubbleBorder     = Hex("#D9D4CA"); // MessageItemView's border literal
+    public Color sendButton       = Hex("#1FAA61"); // composer send circle
     public Color Resolve(ThemeRole role) => role switch
     {
         ThemeRole.Background           => background,
@@ -85,6 +86,7 @@ public class ThemeAsset : ScriptableObject
         ThemeRole.BubbleOutgoing       => bubbleOutgoing,
         ThemeRole.ChatWallpaperInk     => chatWallpaperInk,
         ThemeRole.BubbleBorder         => bubbleBorder,
+        ThemeRole.SendButton           => sendButton,
         _                              => Color.magenta, // unmapped role — loud sentinel, tests assert it never happens
     };
 

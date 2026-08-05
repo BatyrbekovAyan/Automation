@@ -78,6 +78,7 @@ public static class ThemeAssetsBuilder
         t.bubbleOutgoing = Hex("#D8FDD4");
         t.chatWallpaperInk = Hex("#FFFFFF");  // baked doodle art passes through
         t.bubbleBorder = Hex("#D9D4CA");      // MessageItemView's light border
+        t.sendButton = Hex("#1FAA61");        // today's send-circle green
 
     }
 
@@ -111,6 +112,7 @@ public static class ThemeAssetsBuilder
         // paper-vs-ink ΔL the light wallpaper has, no dark art regen needed.
         t.chatWallpaperInk = Hex("#1F2A3B");
         t.bubbleBorder = Hex("#333B45");      // a step lighter than the bubble fill
+        t.sendButton = Hex("#128A50");        // same hue, dropped for the dark panel
 
     }
 

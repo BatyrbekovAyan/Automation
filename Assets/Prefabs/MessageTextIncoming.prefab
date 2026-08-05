@@ -2625,6 +2625,7 @@ GameObject:
   - component: {fileID: 6360713954897296453}
   - component: {fileID: 7370656234179097376}
   - component: {fileID: 5885506073356549427}
+  - component: {fileID: 837199609151618343}
   m_Layer: 5
   m_Name: TailOutline
   m_TagString: Untagged
@@ -2709,6 +2710,21 @@ MonoBehaviour:
   m_FlexibleWidth: -1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+--- !u!114 &837199609151618343
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4474779760315351930}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 24
+  target: {fileID: 7370656234179097376}
+  preserveAlpha: 1
 --- !u!1 &4699892529112971100
 GameObject:
   m_ObjectHideFlags: 0

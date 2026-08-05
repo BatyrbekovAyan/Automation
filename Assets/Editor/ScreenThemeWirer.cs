@@ -415,11 +415,25 @@ public static class ScreenThemeWirer
         ("MessagesPanel", "TopBar/Background",                 ThemeRole.ChatWallpaper),
         ("MessagesPanel", "MovingArea/BottomPanel/Background", ThemeRole.ChatWallpaper),
         ("BottomNavPanel", "Line",                             ThemeRole.Hairline),
+        // Owner round 3 — thread chrome details. The composer icons are WHITE
+        // art with a white authored tint (the dark look in light mode was an
+        // unsaved hand tint); InkPrimary gives dark-in-light / light-in-dark.
+        // The back circle sits at alpha 0.8 (below the whites-rule threshold) —
+        // preserveAlpha keeps that. The QuickReply root is paper-coloured.
+        ("MessagesPanel", "TopBar/LeftZone/BackButton",        ThemeRole.Surface),
+        ("MessagesPanel", "MovingArea/BottomPanel/HorizontalLayout/AttachButton/Image", ThemeRole.InkPrimary),
+        ("MessagesPanel", "MovingArea/BottomPanel/HorizontalLayout/MicButton/Image",    ThemeRole.InkPrimary),
+        ("MessagesPanel", "MovingArea/BottomPanel/HorizontalLayout/SendButton/Circle",  ThemeRole.SendButton),
+        ("MessagesPanel", "MovingArea/QuickReplyPanel",        ThemeRole.ChatWallpaper),
     };
 
     private static readonly (string prefab, string child, ThemeRole role)[] PrefabNamedSpec =
     {
         ("Assets/Prefabs/DateSeparator.prefab", "BackgroundPill", ThemeRole.Surface),
+        // The tail's border-coloured outline sits BEHIND the themed tail fill and
+        // was still authored light — the "wrong colour" glow behind dark bubbles.
+        ("Assets/Prefabs/MessageTextIncoming.prefab", "TailOutline", ThemeRole.BubbleBorder),
+        ("Assets/Prefabs/MessageTextOutgoing.prefab", "TailOutline", ThemeRole.BubbleBorder),
     };
 
     [MenuItem("Tools/Theme/Screens/Audit Shell — nav, headers, profile, inputs (dry run)")]

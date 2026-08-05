@@ -111,9 +111,14 @@ public class QuickReplyPanel : MonoBehaviour
 
     private QuickReplyButton CreateButton(Transform parent, string text, bool isOutgoing)
     {
-        Color bgColor = isOutgoing ? outgoingBgColor : incomingBgColor;
-        Color textColor = isOutgoing ? outgoingTextColor : incomingTextColor;
-        Color arrowBgColor = isOutgoing ? outgoingArrowBgColor : incomingArrowBgColor;
+        // The incoming (white card / dark ink) style is theme-routed so the grid
+        // works in dark mode — buttons are created fresh per SetReplies, so they
+        // pick up the active theme at build time. The outgoing teal is a
+        // deliberate semi-auto identity colour and stays on the serialized
+        // fields; white text on it reads fine in both modes.
+        Color bgColor = isOutgoing ? outgoingBgColor : Theme.Color(ThemeRole.Surface);
+        Color textColor = isOutgoing ? outgoingTextColor : Theme.Color(ThemeRole.InkPrimary);
+        Color arrowBgColor = isOutgoing ? outgoingArrowBgColor : Theme.Color(ThemeRole.Background);
 
         // --- Root button container ---
         GameObject root = new GameObject("QuickReplyBtn", typeof(RectTransform), typeof(Image));
