@@ -80,6 +80,12 @@ public static class ScreenThemeWirer
         ("#EFEFF0", ThemeRole.Background),   // search pill well (the "input field" gap)
         ("#1A1A1A", ThemeRole.InkPrimary),   // bot-switcher sheet ink variant
         ("#3A3A3C", ThemeRole.InkSecondary),
+        // thread chrome (owner round 2: «messages page looks wrong»)
+        ("#E9EDEF", ThemeRole.Hairline),     // action-menu dividers
+        ("#6E6E73", ThemeRole.InkSecondary), // composer/attach icon tints
+        ("#73737A", ThemeRole.InkSecondary),
+        ("#667781", ThemeRole.InkSecondary), // WA meta grey
+        ("#111B21", ThemeRole.InkPrimary),   // WA near-black ink
     };
 
     /// <summary>
@@ -393,6 +399,29 @@ public static class ScreenThemeWirer
         _ => System.Array.Empty<string>(),
     };
 
+    /// <summary>
+    /// Explicit path bindings that no value/whites rule can decide:
+    ///   • the thread's paper-coloured chrome (#F3F1EB is deliberately excluded
+    ///     from the value sweep — QuickReplyPanel shares it and is runtime-stamped)
+    ///   • the doodle art, themed by TINT (white passthrough / dark multiplier)
+    ///   • the nav bar hairline (#CCCCCC would be too broad as a value rule)
+    /// QuickReplyPanel itself is deliberately absent: QuickReplyPanel.cs stamps
+    /// its root/cards with in/out variants and needs its own routing pass.
+    /// </summary>
+    private static readonly (string root, string path, ThemeRole role)[] SceneNamedSpec =
+    {
+        ("MessagesPanel", "MovingArea/Background",             ThemeRole.ChatWallpaper),
+        ("MessagesPanel", "MovingArea/Background/Image",       ThemeRole.ChatWallpaperInk),
+        ("MessagesPanel", "TopBar/Background",                 ThemeRole.ChatWallpaper),
+        ("MessagesPanel", "MovingArea/BottomPanel/Background", ThemeRole.ChatWallpaper),
+        ("BottomNavPanel", "Line",                             ThemeRole.Hairline),
+    };
+
+    private static readonly (string prefab, string child, ThemeRole role)[] PrefabNamedSpec =
+    {
+        ("Assets/Prefabs/DateSeparator.prefab", "BackgroundPill", ThemeRole.Surface),
+    };
+
     [MenuItem("Tools/Theme/Screens/Audit Shell — nav, headers, profile, inputs (dry run)")]
     public static void AuditShell() => RunShell(apply: false);
 
@@ -418,6 +447,15 @@ public static class ScreenThemeWirer
 
             total += BindWhiteSurfaces(root, apply, sb, rootName);
             total += BindSubtree(root, apply, sb, rootName, ShellExclusions(rootName));
+
+            foreach (var (specRoot, path, role) in SceneNamedSpec)
+            {
+                if (specRoot != rootName) continue;
+                var t = root.transform.Find(path);
+                var g = t != null ? t.GetComponent<Graphic>() : null;
+                if (g == null) { sb.AppendLine($"    NAMED MISS: {rootName}/{path}"); continue; }
+                total += BindNamed(g, role, apply, sb, $"{rootName}/{path}");
+            }
         }
         if (apply)
         {
@@ -439,8 +477,40 @@ public static class ScreenThemeWirer
             finally { PrefabUtility.UnloadPrefabContents(root); }
         }
 
+        foreach (var (prefabPath, child, role) in PrefabNamedSpec)
+        {
+            var root = PrefabUtility.LoadPrefabContents(prefabPath);
+            if (root == null) continue;
+            try
+            {
+                var t = root.transform.Find(child);
+                var g = t != null ? t.GetComponent<Graphic>() : null;
+                if (g == null) { sb.AppendLine($"    NAMED MISS: {prefabPath}/{child}"); continue; }
+                int n = BindNamed(g, role, apply, sb,
+                    $"{System.IO.Path.GetFileName(prefabPath)}/{child}");
+                total += n;
+                if (apply && n > 0) PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
         Debug.Log(sb.ToString());
         if (apply) Debug.Log($"[ScreenThemeWirer] Shell applied. {total} binding(s).");
+    }
+
+    private static int BindNamed(Graphic g, ThemeRole role, bool apply, StringBuilder sb, string label)
+    {
+        if (g.GetComponent<ThemedColor>() != null) return 0;
+        sb.AppendLine($"    NAMED: {label}  #{ColorUtility.ToHtmlStringRGB(g.color)} -> {role} " +
+                      $"(#{ColorUtility.ToHtmlStringRGB(Theme.Light.Resolve(role))})");
+        if (!apply) return 1;
+        var binding = g.gameObject.AddComponent<ThemedColor>();
+        var so = new SerializedObject(binding);
+        so.FindProperty("role").enumValueIndex = (int)role;
+        so.FindProperty("target").objectReferenceValue = g;
+        so.FindProperty("preserveAlpha").boolValue = true;
+        so.ApplyModifiedPropertiesWithoutUndo();
+        return 1;
     }
 
     /// <summary>

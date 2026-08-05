@@ -97,6 +97,8 @@ public class MessageItemView : MonoBehaviour
     private Image _highlightOverlay;
 
     [Header("Settings")]
+    // Superseded by Theme.Color(BubbleIncoming/Outgoing) at the stamp site —
+    // kept only because they are serialized on the prefab; not read anymore.
     public Color incomingColor = Color.white;
     public Color outgoingColor = new Color(0.8f, 1f, 0.8f);
     private static readonly Color downloadButtonFillColor = new Color32(0xF1, 0xF1, 0xF1, 0xFF);
@@ -1426,7 +1428,7 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             if (isDownloadActive || isExpiredActive)
             {
                 // The download/expired card uses a white background — white time would vanish.
-                timeText.color = new Color(0.4f, 0.4f, 0.4f, 1f);
+                timeText.color = Theme.Color(ThemeRole.InkSecondary);
                 if (timeBackground != null) timeBackground.SetActive(false);
             }
             else if ((type == MessageType.Image || type == MessageType.Video) && !hasCaption)
@@ -1437,8 +1439,8 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
             }
             else
             {
-                // WITH CAPTION (or normal text): Time is gray and sits neatly underneath!
-                timeText.color = new Color(0.4f, 0.4f, 0.4f, 1f);
+                // WITH CAPTION (or normal text): time in secondary ink on the bubble.
+                timeText.color = Theme.Color(ThemeRole.InkSecondary);
                 if (timeBackground != null) timeBackground.SetActive(false);
             }
         }
@@ -3915,9 +3917,15 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
         bool isTransparent = BubbleTransparencyPolicy.IsTransparent(
             currentVm.isSticker, currentVm.isVideoNote, effectivePlaceholderActive, hideBubble);
 
+        // Theme-routed: the bubble fills carry ThemedColor bindings, but this stamp
+        // runs on every bind and used to write the serialized light literals back
+        // over them — light bubbles under dark ink. Resolving the same roles the
+        // bindings use means stamp and binding can never disagree. (Transparent
+        // stickers stay safe on theme switch too: ThemedColor preserves the
+        // target's alpha, so a cleared bubble stays cleared.)
         bubbleBackground.color = isTransparent
             ? Color.clear
-            : (currentVm.isIncoming ? incomingColor : outgoingColor);
+            : Theme.Color(currentVm.isIncoming ? ThemeRole.BubbleIncoming : ThemeRole.BubbleOutgoing);
 
         if (!bubbleBackground.TryGetComponent<ImageWithRoundedCornersBordered>(out var bubbleBordered))
             bubbleBordered = bubbleBackground.gameObject.AddComponent<ImageWithRoundedCornersBordered>();
@@ -3931,7 +3939,7 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
         {
             bubbleBordered.enabled = true;
             bubbleBordered.radius = 28f;
-            bubbleBordered.borderColor = new Color(0.851f, 0.831f, 0.792f, 1f);
+            bubbleBordered.borderColor = Theme.Color(ThemeRole.BubbleBorder);
             bubbleBordered.designBorderUnits = 1f;
             bubbleBordered.Validate();
             bubbleBordered.Refresh();

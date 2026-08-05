@@ -73,9 +73,11 @@ public static class ThemeAssetsBuilder
         t.destructive = Hex("#A01B12");
         t.positiveBg = Hex("#E6F6EE");
         t.positiveInk = Hex("#0A6B3E");
-        t.chatWallpaper = Hex("#F5F2EA");
+        t.chatWallpaper = Hex("#F3F1EB");     // scene truth: paper + thread bars
         t.bubbleIncoming = Hex("#FFFFFF");
         t.bubbleOutgoing = Hex("#D8FDD4");
+        t.chatWallpaperInk = Hex("#FFFFFF");  // baked doodle art passes through
+        t.bubbleBorder = Hex("#D9D4CA");      // MessageItemView's light border
 
     }
 
@@ -105,6 +107,10 @@ public static class ThemeAssetsBuilder
         t.chatWallpaper = Hex("#090B0E");
         t.bubbleIncoming = Hex("#252A31");
         t.bubbleOutgoing = Hex("#005C4B");
+        // Multiplies the baked #E5DAC6 strokes down to ≈#1C242E — the same subtle
+        // paper-vs-ink ΔL the light wallpaper has, no dark art regen needed.
+        t.chatWallpaperInk = Hex("#1F2A3B");
+        t.bubbleBorder = Hex("#333B45");      // a step lighter than the bubble fill
 
     }
 

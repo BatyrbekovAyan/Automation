@@ -121,6 +121,7 @@ GameObject:
   - component: {fileID: 6596333323400173341}
   - component: {fileID: 7849141120563551586}
   - component: {fileID: 6661023317290542530}
+  - component: {fileID: 2814346054247388}
   m_Layer: 5
   m_Name: BackgroundPill
   m_TagString: Untagged
@@ -240,6 +241,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithRoundedCorners
   radius: 20
   image: {fileID: 8099925873984198908}
+--- !u!114 &2814346054247388
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7628533171429083747}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 1
+  target: {fileID: 8099925873984198908}
+  preserveAlpha: 1
 --- !u!1 &8151523956309008408
 GameObject:
   m_ObjectHideFlags: 0

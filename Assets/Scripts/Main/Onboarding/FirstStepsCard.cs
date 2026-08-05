@@ -52,10 +52,14 @@ public class FirstStepsCard : MonoBehaviour
     [SerializeField] private int reservedListTopPadding = 700;
 
     // Palette (mockup: onboarding-proposal.html §checklist).
+    // Theme-routed (except the completion green, which is fixed identity): the
+    // rows' labels are also ThemedColor-bound, and RefreshFromFacts re-stamps
+    // them on every refresh — static literals here meant pending-row ink went
+    // invisible on the dark card. Resolving roles keeps stamp and binding agreed.
     private static readonly Color DoneCircle = Hex("#23A55A");
-    private static readonly Color TodoCircle = Hex("#E1E5EC");
-    private static readonly Color InkLabel = Hex("#1A1A2E");
-    private static readonly Color DoneLabel = Hex("#9AA0AA");
+    private static Color TodoCircle => Theme.Color(ThemeRole.Border);
+    private static Color InkLabel => Theme.Color(ThemeRole.InkPrimary);
+    private static Color DoneLabel => Theme.Color(ThemeRole.InkTertiary);
 
     private const int StepCount = 4;
     private const float CascadeStagger = 0.05f;

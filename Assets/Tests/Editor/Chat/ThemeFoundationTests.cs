@@ -80,7 +80,7 @@ public class ThemeFoundationTests
         Assert.AreEqual("E3EDED", ColorUtility.ToHtmlStringRGB(t.hairline));
         // The doodle wallpaper is a locked authored asset — the palette flip
         // must NOT move it (the generator's mock-only darkening is rejected).
-        Assert.AreEqual("F5F2EA", ColorUtility.ToHtmlStringRGB(t.chatWallpaper));
+        Assert.AreEqual("F3F1EB", ColorUtility.ToHtmlStringRGB(t.chatWallpaper));
     }
 
     [Test]

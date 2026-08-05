@@ -45,4 +45,9 @@ public enum ThemeRole
     ChatWallpaper,
     BubbleIncoming,
     BubbleOutgoing,
+
+    // Appended after ship (ThemedColor stores the enum ORDINAL in the scene —
+    // new roles must only ever be added at the END, never inserted).
+    ChatWallpaperInk,  // tint on the baked doodle art; light = white passthrough
+    BubbleBorder,      // hairline border around message bubbles
 }

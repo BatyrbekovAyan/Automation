@@ -50,9 +50,14 @@ public class ThemeAsset : ScriptableObject
     public Color positiveInk = Hex("#0A6B3E");
 
     [Header("Chat thread")]
-    public Color chatWallpaper  = Hex("#F5F2EA");
+    public Color chatWallpaper  = Hex("#F3F1EB"); // scene truth (paper + thread bars)
     public Color bubbleIncoming = Hex("#FFFFFF");
     public Color bubbleOutgoing = Hex("#D8FDD4"); // the app's real outgoing bubble
+    // The doodle texture ships with its ink BAKED IN (#E5DAC6 strokes), so the
+    // ink role works by TINT: white passes the art through unchanged in light,
+    // and the dark value multiplies the strokes down to a subtle dark hatch.
+    public Color chatWallpaperInk = Hex("#FFFFFF");
+    public Color bubbleBorder     = Hex("#D9D4CA"); // MessageItemView's border literal
     public Color Resolve(ThemeRole role) => role switch
     {
         ThemeRole.Background           => background,
@@ -78,6 +83,8 @@ public class ThemeAsset : ScriptableObject
         ThemeRole.ChatWallpaper        => chatWallpaper,
         ThemeRole.BubbleIncoming       => bubbleIncoming,
         ThemeRole.BubbleOutgoing       => bubbleOutgoing,
+        ThemeRole.ChatWallpaperInk     => chatWallpaperInk,
+        ThemeRole.BubbleBorder         => bubbleBorder,
         _                              => Color.magenta, // unmapped role — loud sentinel, tests assert it never happens
     };
 
