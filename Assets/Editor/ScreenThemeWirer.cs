@@ -309,6 +309,7 @@ public static class ScreenThemeWirer
 
         foreach (var g in root.GetComponentsInChildren<Graphic>(includeInactive: true))
         {
+            if (InAlwaysDarkOverlay(g.transform)) continue;
             string hex = "#" + ColorUtility.ToHtmlStringRGB(g.color);
             if (NeverMap.Contains(hex) || extraExclusions.Contains(hex)) continue;
 
@@ -381,10 +382,12 @@ public static class ScreenThemeWirer
     //
     // The ValueMap sweep also runs on these roots so their non-white chrome
     // (profile bg, dividers, chevrons, track greys) binds in the same pass.
+    // LoadingPanel is deliberately NOT here: it is an always-dark scrim (see
+    // AlwaysDarkRoots) — sweeping it is what wrongly bound its black cover as ink.
     private static readonly string[] ShellSceneRoots =
     {
         "Screen_Profile", "Screen_Bots", "Screen_Dashboard",
-        "BottomNavPanel", "LoadingPanel", "ChatsPanel", "MessagesPanel",
+        "BottomNavPanel", "ChatsPanel", "MessagesPanel",
     };
 
     /// <summary>
@@ -540,17 +543,32 @@ public static class ScreenThemeWirer
     private static readonly string[] AlwaysDarkRoots =
     {
         "AttachmentPreviewScreen", "PhotoViewerPanel", "VideoPlayerPanel",
+        "LoadingPanel", // near-opaque black loading cover — dark in both themes
     };
 
-    private static readonly (string path, string hex)[] AttachmentRefine =
+    /// <summary>Static «Графит» recolours for always-dark chrome. Empty path = the root itself.</summary>
+    private static readonly (string root, string path, string hex)[] OverlayRefine =
     {
-        ("Root",                          "#0E1116"),
-        ("Root/TopBar",                   "#0E1116"),
-        ("Root/BottomBar",                "#0E1116"),
-        ("Root/BottomBar/Background",     "#0E1116"),
-        ("Root/BottomBar/CaptionScroll",  "#171C24"),
-        ("Root/TopBar/Content/BackButton","#171C24"), // keeps its authored 0.8 alpha
+        ("LoadingPanel", "",                                       "#0E1116"), // keeps 0.98 alpha
+        ("AttachmentPreviewScreen", "Root",                        "#0E1116"),
+        ("AttachmentPreviewScreen", "Root/TopBar",                 "#0E1116"),
+        ("AttachmentPreviewScreen", "Root/BottomBar",              "#0E1116"),
+        ("AttachmentPreviewScreen", "Root/BottomBar/Background",   "#0E1116"),
+        ("AttachmentPreviewScreen", "Root/BottomBar/CaptionScroll","#171C24"),
+        ("AttachmentPreviewScreen", "Root/TopBar/Content/BackButton","#171C24"), // keeps 0.8 alpha
     };
+
+    /// <summary>
+    /// True when a graphic lives inside an always-dark overlay. The shell/chat
+    /// sweeps must skip these subtrees, or every apply would re-bind exactly the
+    /// bindings the always-dark pass removes.
+    /// </summary>
+    private static bool InAlwaysDarkOverlay(Transform t)
+    {
+        for (var p = t; p != null; p = p.parent)
+            if (System.Array.IndexOf(AlwaysDarkRoots, p.name) >= 0) return true;
+        return false;
+    }
 
     [MenuItem("Tools/Theme/Screens/Audit Always-Dark Overlays (dry run)")]
     public static void AuditAlwaysDark() => RunAlwaysDark(apply: false);
@@ -585,13 +603,14 @@ public static class ScreenThemeWirer
                 removed++;
             }
 
-            if (rootName != "AttachmentPreviewScreen") continue;
-            foreach (var (path, hex) in AttachmentRefine)
+            foreach (var (specRoot, path, hex) in OverlayRefine)
             {
-                var t = root.transform.Find(path);
+                if (specRoot != rootName) continue;
+                var t = path.Length == 0 ? root.transform : root.transform.Find(path);
                 var g = t != null ? t.GetComponent<Graphic>() : null;
-                if (g == null) { sb.AppendLine($"    REFINE MISS: {path}"); continue; }
+                if (g == null) { sb.AppendLine($"    REFINE MISS: {rootName}/{path}"); continue; }
                 if (!ColorUtility.TryParseHtmlString(hex, out var c)) continue;
+                if (ColorUtility.ToHtmlStringRGB(g.color) == hex.TrimStart('#')) continue; // already done
                 sb.AppendLine($"    REFINE {rootName}/{path}: " +
                               $"#{ColorUtility.ToHtmlStringRGB(g.color)} -> {hex} (alpha kept)");
                 if (apply) g.color = new Color(c.r, c.g, c.b, g.color.a);
@@ -661,6 +680,7 @@ public static class ScreenThemeWirer
         var lines = new List<string>();
         foreach (var img in root.GetComponentsInChildren<Image>(includeInactive: true))
         {
+            if (InAlwaysDarkOverlay(img.transform)) continue;
             if (img.sprite != null && !IsCardSprite(img.sprite)) continue;
             var c = img.color;
             if (c.r < 0.999f || c.g < 0.999f || c.b < 0.999f || c.a < 0.9f) continue;
