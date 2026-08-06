@@ -1228,7 +1228,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
-  role: 5
+  role: 28
   target: {fileID: 2763013869602995250}
   preserveAlpha: 1
 --- !u!1 &6489841062653901957

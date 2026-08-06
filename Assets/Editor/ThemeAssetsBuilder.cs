@@ -81,6 +81,7 @@ public static class ThemeAssetsBuilder
         t.sendButton = Hex("#1FAA61");        // today's send-circle green
         t.accentSoft = Hex("#E8F2FD");        // today's edit-button chip
         t.destructiveSoft = Hex("#FFCED5");   // today's delete-button chip
+        t.scrim = Hex("#000000");             // modal veil
 
     }
 
@@ -120,6 +121,9 @@ public static class ThemeAssetsBuilder
         t.sendButton = Hex("#128A50");        // same hue, dropped for the dark panel
         t.accentSoft = Hex("#1E2A44");        // navy-tinted chip on the dark card
         t.destructiveSoft = Hex("#2A1719");   // red-tinted chip; 5.07:1 under destructive
+        // Deliberately identical to light: a veil is black in both themes. The
+        // dimmed dark ground still separates from the #171C24 card above it.
+        t.scrim = Hex("#000000");
 
     }
 

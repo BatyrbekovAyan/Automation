@@ -61,6 +61,7 @@ public class ThemeAsset : ScriptableObject
     public Color sendButton       = Hex("#1FAA61"); // composer send circle
     public Color accentSoft       = Hex("#E8F2FD"); // edit-button chip
     public Color destructiveSoft  = Hex("#FFCED5"); // «Удалить все данные» chip
+    public Color scrim            = Hex("#000000"); // modal veil — black in both
     public Color Resolve(ThemeRole role) => role switch
     {
         ThemeRole.Background           => background,
@@ -91,6 +92,7 @@ public class ThemeAsset : ScriptableObject
         ThemeRole.SendButton           => sendButton,
         ThemeRole.AccentSoft           => accentSoft,
         ThemeRole.DestructiveSoft      => destructiveSoft,
+        ThemeRole.Scrim                => scrim,
         _                              => Color.magenta, // unmapped role — loud sentinel, tests assert it never happens
     };
 

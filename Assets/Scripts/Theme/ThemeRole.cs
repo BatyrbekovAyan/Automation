@@ -53,4 +53,8 @@ public enum ThemeRole
     SendButton,        // composer send-circle fill (green in both, darker in dark)
     AccentSoft,        // soft accent chip behind an accent glyph (edit buttons)
     DestructiveSoft,   // soft destructive tint behind Destructive ink
+    // A dimming veil behind modals/sheets. Black in BOTH themes — it is not ink,
+    // and mapping it as ink is what turned every scrim into a white wash in dark.
+    // Its alpha is authored per-scrim and preserved by ThemedColor.
+    Scrim,
 }

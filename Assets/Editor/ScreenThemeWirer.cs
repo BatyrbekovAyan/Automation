@@ -371,6 +371,8 @@ public static class ScreenThemeWirer
             var role = hit.role;
             if (overrides != null && overrides.TryGetValue(hex, out var scoped)) role = scoped;
             if (g is TMP_Text && StructuralRoles.Contains(role)) role = ThemeRole.InkTertiary;
+            // A near-black spriteless fill is a veil, not ink — see IsScrim.
+            if (InkRoles.Contains(role) && IsScrim(g)) role = ThemeRole.Scrim;
 
             mapped.TryGetValue(role, out var c);
             mapped[role] = c + 1;
@@ -675,6 +677,25 @@ public static class ScreenThemeWirer
         ("Screen_New", ThemeRole.StatusInDialog, ThemeRole.AccentFill),
     };
 
+    /// <summary>
+    /// A scrim is an Image with NO SPRITE and a near-black fill. The null-sprite
+    /// test is what separates it from a black-tinted GLYPH (the composer's plus
+    /// and mic are near-black too, and those genuinely are ink — they must keep
+    /// following it). Alpha is not part of the test: PopupUI fades its backdrops
+    /// up from 0, so many scrims sit at alpha 0 at rest.
+    /// </summary>
+    private static bool IsScrim(Graphic g)
+    {
+        if (g is not Image img || img.sprite != null) return false;
+        var c = img.color;
+        return c.r < 0.2f && c.g < 0.2f && c.b < 0.2f;
+    }
+
+    private static readonly ThemeRole[] InkRoles =
+    {
+        ThemeRole.InkPrimary, ThemeRole.InkSecondary, ThemeRole.InkTertiary,
+    };
+
     [MenuItem("Tools/Theme/Screens/Audit Role Repairs (dry run)")]
     public static void AuditRepairs() => RunRepairs(apply: false);
 
@@ -688,6 +709,22 @@ public static class ScreenThemeWirer
         int n = 0;
 
         var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+
+        // Scrims, scene-wide + in the prefabs that own their own modals.
+        n += RepairScrims(scene.GetRootGameObjects(), apply, sb, "Main.unity");
+        foreach (var path in Prefabs)
+        {
+            var root = PrefabUtility.LoadPrefabContents(path);
+            if (root == null) continue;
+            try
+            {
+                int k = RepairScrims(new[] { root }, apply, sb, System.IO.Path.GetFileName(path));
+                n += k;
+                if (apply && k > 0) PrefabUtility.SaveAsPrefabAsset(root, path);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
         foreach (var (rootSpec, from, to) in RoleRepairs)
         {
             var root = ResolveRoot(scene, rootSpec);
@@ -715,6 +752,35 @@ public static class ScreenThemeWirer
         }
         Debug.Log(sb.ToString());
         if (apply) Debug.Log($"[ScreenThemeWirer] Role repairs applied. {n} binding(s) re-scoped.");
+    }
+
+    private static int RepairScrims(GameObject[] roots, bool apply, StringBuilder sb, string label)
+    {
+        int n = 0;
+        foreach (var root in roots)
+        {
+            foreach (var tc in root.GetComponentsInChildren<ThemedColor>(includeInactive: true))
+            {
+                var so = new SerializedObject(tc);
+                var roleProp = so.FindProperty("role");
+                var role = (ThemeRole)roleProp.enumValueIndex;
+                if (!InkRoles.Contains(role)) continue;
+
+                var target = so.FindProperty("target").objectReferenceValue as Graphic
+                             ?? tc.GetComponent<Graphic>();
+                if (target == null || !IsScrim(target)) continue;
+
+                sb.AppendLine($"    SCRIM {label}/{TransformPath(tc.transform, root.transform)}: " +
+                              $"{role} -> Scrim  (a={target.color.a:0.##})");
+                if (apply)
+                {
+                    roleProp.enumValueIndex = (int)ThemeRole.Scrim;
+                    so.ApplyModifiedPropertiesWithoutUndo();
+                }
+                n++;
+            }
+        }
+        return n;
     }
 
     [MenuItem("Tools/Theme/Screens/Audit Always-Dark Overlays (dry run)")]
