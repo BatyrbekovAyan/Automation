@@ -5,34 +5,39 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Drives the chats-list header's reply-mode toggle — a sliding-knob switch
-/// between Automation ("Авто") and Semi-auto ("Полу"). The mode is a per-bot
-/// default persisted in PlayerPrefs under "&lt;botName&gt;ReplyMode"
-/// (0 = Авто, 1 = Полу; default Авто). Авто sits on the RIGHT, Полу on the
-/// LEFT: the white thumb covers the active word and slides across on switch
-/// while the track recolours green↔amber.
+/// Drives the chats-header «Авто» button — the autopilot switch that replaced
+/// the two-word Авто/Вместе sliding toggle in the 2026-08 top-bar restyle
+/// (docs/design/ui-restyle/chats-topbar-spec.md). Semi-auto is the silent
+/// default state and never appears as a word on this screen; the pill reads
+/// «Авто» with a state lamp — filled dot on PositiveBg when the bot answers
+/// clients itself, hollow dot in an outlined pill when it only proposes.
 ///
-/// Switching EITHER direction asks for confirmation via the shared
-/// <see cref="PopupUI"/>; on confirm it commits optimistically, persists, and
-/// raises <see cref="OnReplyModeChanged"/> so the autonomous-vs-suggestions
-/// backend (semi-auto phase) can react when it lands.
+/// The mode stays a per-bot default persisted under "&lt;botName&gt;ReplyMode"
+/// (0 = auto ON, 1 = semi; unset reads SEMI — <see cref="AutoButtonModel.DefaultMode"/>,
+/// the owner-approved default flip). ENABLING routes through the confirm popup
+/// (the bot starts messaging real clients); DISABLING commits instantly — the
+/// deliberate asymmetry pinned by AutoButtonModelTests. The popup targets an
+/// explicit bot, so Sheet_BotSwitcher's per-row chips reuse it via
+/// <see cref="RequestEnableAuto"/> / <see cref="DisableAuto"/>.
 ///
-/// Built and wired by Assets/Editor/ReplyModeToggleBuilder.cs.
+/// CLASS NAME UNCHANGED on purpose: the scene serialises the component by
+/// class, and SemiAutoStore / Manager.ReplyModeSync consume <see cref="GetMode"/>.
+/// Built and wired by Assets/Editor/ChatsTopBarRestyleBuilder.cs.
 /// </summary>
 [RequireComponent(typeof(Button))]
 public class ReplyModeToggleBinder : MonoBehaviour
 {
     public enum ReplyMode { Auto = 0, Semi = 1 }
 
-    [Header("Toggle")]
-    [SerializeField] private Image trackImage;
+    [Header("Auto button")]
     [SerializeField] private Button toggleButton;
-    [SerializeField] private RectTransform thumb;
-    [SerializeField] private TextMeshProUGUI thumbLabel;
-    [SerializeField] private TextMeshProUGUI faintAvto;
-    [SerializeField] private TextMeshProUGUI faintPolu;
+    [SerializeField] private Image ringImage;   // outer rounded rect: Border OFF / PositiveBg ON
+    [SerializeField] private Image fillImage;   // inner rounded rect: Surface OFF / PositiveBg ON
+    [SerializeField] private TextMeshProUGUI label;
+    [SerializeField] private Image dotRing;     // 18u state lamp: InkTertiary hollow OFF / PositiveInk ON
+    [SerializeField] private Image dotCore;     // the hollow's hole: matches fill OFF / PositiveInk ON
 
-    [Header("Confirm popup")]
+    [Header("Confirm popup (enable only)")]
     [SerializeField] private GameObject confirmPopup;
     [SerializeField] private TextMeshProUGUI confirmTitle;
     [SerializeField] private TextMeshProUGUI confirmBody;
@@ -44,38 +49,76 @@ public class ReplyModeToggleBinder : MonoBehaviour
 
     private const string KeySuffix = "ReplyMode";
     private const float AnimDuration = 0.22f;
-    private const float ThumbXAuto = 70f;   // right half — Авто lives on the right
-    private const float ThumbXSemi = -70f;  // left half  — Вместе lives on the left
+    private const string EnableTitle = "Включить авто-режим?";
+    private const string EnableBody =
+        "Бот будет отвечать клиентам сам. Выключить можно в любой момент — этой же кнопкой.";
 
-    private static readonly Color TrackAuto = Hex("#2FB344");
-    private static readonly Color TrackSemi = Hex("#007AFF");
-    private static readonly Color InkAuto = Hex("#206A2C");
-    private static readonly Color InkSemi = Hex("#004C99");
-    private static readonly Color FaintOnAuto = Hex("#C3EFCB");
-    private static readonly Color FaintOnSemi = Hex("#A8CFFF");
+    private static ReplyModeToggleBinder instance;
 
     private string currentBotId;
-    private ReplyMode currentMode = ReplyMode.Auto;
-    private ReplyMode pendingMode = ReplyMode.Auto;
+    private ReplyMode currentMode = AutoButtonModel.DefaultMode;
+    private string pendingBotId;   // popup target — may be a non-active bot (sheet chip)
     private bool popupWired;
 
-    /// <summary>Reads a bot's persisted reply mode (defaults to Авто).</summary>
+    /// <summary>Reads a bot's persisted reply mode (unset ⇒ semi-auto, the silent default).</summary>
     public static ReplyMode GetMode(string botName) =>
-        (ReplyMode)PlayerPrefs.GetInt(botName + KeySuffix, (int)ReplyMode.Auto);
+        (ReplyMode)PlayerPrefs.GetInt(botName + KeySuffix, (int)AutoButtonModel.DefaultMode);
+
+    /// <summary>
+    /// Persist + notify, no questions asked. The header button repaints itself
+    /// when the committed bot is the one it currently shows.
+    /// </summary>
+    public static void CommitMode(string botName, ReplyMode mode)
+    {
+        if (string.IsNullOrEmpty(botName)) return;
+
+        PlayerPrefs.SetInt(botName + KeySuffix, (int)mode);
+        PlayerPrefs.Save();
+        OnReplyModeChanged?.Invoke(botName, mode);
+
+        if (instance != null && botName == instance.currentBotId)
+            instance.SetVisualMode(mode, animate: true);
+    }
+
+    /// <summary>Instant OFF — the safe direction never confirms (spec asymmetry).</summary>
+    public static void DisableAuto(string botName) => CommitMode(botName, ReplyMode.Semi);
+
+    /// <summary>
+    /// Route an enable request through the confirm popup (falls back to a direct
+    /// commit when no popup is wired, e.g. before the builder ran).
+    /// </summary>
+    public static void RequestEnableAuto(string botName)
+    {
+        if (string.IsNullOrEmpty(botName)) return;
+
+        if (instance != null && instance.confirmPopup != null)
+            instance.ShowEnableConfirm(botName);
+        else
+            CommitMode(botName, ReplyMode.Auto);
+    }
 
     private void Awake()
     {
+        instance = this;
+
         if (toggleButton == null) toggleButton = GetComponent<Button>();
         if (toggleButton != null)
         {
             toggleButton.onClick.RemoveAllListeners();
-            toggleButton.onClick.AddListener(OnTogglePressed);
+            toggleButton.onClick.AddListener(OnButtonPressed);
         }
         WirePopupButtons();
     }
 
+    private void OnDestroy()
+    {
+        if (instance == this) instance = null;
+    }
+
     private void OnEnable()
     {
+        Theme.Changed += RepaintForTheme;
+
         if (ChatManager.Instance == null) return;
         ChatManager.Instance.OnActiveBotChanged += Refresh;
         Refresh(ChatManager.Instance.CurrentBotId);
@@ -83,11 +126,12 @@ public class ReplyModeToggleBinder : MonoBehaviour
 
     private void OnDisable()
     {
+        Theme.Changed -= RepaintForTheme;
+
         if (ChatManager.Instance != null)
             ChatManager.Instance.OnActiveBotChanged -= Refresh;
 
-        if (thumb != null) thumb.DOKill();
-        if (trackImage != null) trackImage.DOKill();
+        KillColorTweens();
         transform.DOKill();
         transform.localScale = Vector3.one;
     }
@@ -105,92 +149,89 @@ public class ReplyModeToggleBinder : MonoBehaviour
     private void Refresh(string botId)
     {
         currentBotId = botId;
-        SetMode(GetMode(botId), animate: false, persist: false);
+        SetVisualMode(GetMode(botId), animate: false);
     }
 
-    private void OnTogglePressed()
-    {
-        pendingMode = currentMode == ReplyMode.Auto ? ReplyMode.Semi : ReplyMode.Auto;
+    private void RepaintForTheme() => ApplyVisuals(currentMode, animate: false);
 
+    private void OnButtonPressed()
+    {
         transform.DOKill();
         transform.localScale = Vector3.one;
         transform.DOPunchScale(Vector3.one * -0.04f, 0.18f, 1, 0.5f);
 
-        // No confirm dialog wired — commit straight away.
-        if (confirmPopup == null)
-        {
-            SetMode(pendingMode, animate: true, persist: true);
-            return;
-        }
+        if (string.IsNullOrEmpty(currentBotId)) return;
 
-        bool toSemi = pendingMode == ReplyMode.Semi;
-        if (confirmTitle != null) confirmTitle.text = "Сменить режим?";
-        if (confirmBody != null)
-            confirmBody.text = toSemi
-                ? "Бот перестанет отвечать сам — он будет предлагать варианты ответа, а вы выберете."
-                : "Бот снова будет отвечать клиентам автоматически.";
+        if (AutoButtonModel.ConfirmRequired(currentMode))
+            RequestEnableAuto(currentBotId);
+        else
+            DisableAuto(currentBotId);   // instant — CommitMode repaints us
+    }
 
+    private void ShowEnableConfirm(string botName)
+    {
+        pendingBotId = botName;
+        if (confirmTitle != null) confirmTitle.text = EnableTitle;
+        if (confirmBody != null) confirmBody.text = EnableBody;
         PopupUI.Show(confirmPopup);
     }
 
     private void OnConfirm()
     {
         if (confirmPopup != null) PopupUI.Hide(confirmPopup);
-        SetMode(pendingMode, animate: true, persist: true);
+        if (string.IsNullOrEmpty(pendingBotId)) return;
+
+        CommitMode(pendingBotId, ReplyMode.Auto);
+        pendingBotId = null;
     }
 
     private void OnCancel()
     {
         if (confirmPopup != null) PopupUI.Hide(confirmPopup);
+        pendingBotId = null;
     }
 
-    private void SetMode(ReplyMode mode, bool animate, bool persist)
+    private void SetVisualMode(ReplyMode mode, bool animate)
     {
         currentMode = mode;
         ApplyVisuals(mode, animate);
-
-        if (!persist || string.IsNullOrEmpty(currentBotId)) return;
-        PlayerPrefs.SetInt(currentBotId + KeySuffix, (int)mode);
-        PlayerPrefs.Save();
-        OnReplyModeChanged?.Invoke(currentBotId, mode);
     }
 
     private void ApplyVisuals(ReplyMode mode, bool animate)
     {
-        bool isAuto = mode == ReplyMode.Auto;
-        Color track = isAuto ? TrackAuto : TrackSemi;
-        float thumbX = isAuto ? ThumbXAuto : ThumbXSemi;
-        Color faint = isAuto ? FaintOnAuto : FaintOnSemi;
+        bool on = AutoButtonModel.IsAutoOn(mode);
 
-        if (thumbLabel != null)
+        Color fill = on ? Theme.Color(ThemeRole.PositiveBg) : Theme.Color(ThemeRole.Surface);
+        Color ring = on ? Theme.Color(ThemeRole.PositiveBg) : Theme.Color(ThemeRole.Border);
+        Color ink = on ? Theme.Color(ThemeRole.PositiveInk) : Theme.Color(ThemeRole.InkSecondary);
+        Color lamp = on ? Theme.Color(ThemeRole.PositiveInk) : Theme.Color(ThemeRole.InkTertiary);
+        Color lampCore = on ? Theme.Color(ThemeRole.PositiveInk) : fill;
+
+        KillColorTweens();
+
+        if (!animate)
         {
-            thumbLabel.text = isAuto ? "Авто" : "Вместе";
-            thumbLabel.color = isAuto ? InkAuto : InkSemi;
-        }
-        if (faintAvto != null) faintAvto.color = faint;
-        if (faintPolu != null) faintPolu.color = faint;
-
-        if (thumb != null) thumb.DOKill();
-        if (trackImage != null) trackImage.DOKill();
-
-        if (animate)
-        {
-            if (thumb != null)
-                thumb.DOAnchorPosX(thumbX, AnimDuration).SetEase(Ease.OutCubic);
-            if (trackImage != null)
-                trackImage.DOColor(track, AnimDuration).SetEase(Ease.OutCubic);
+            if (fillImage != null) fillImage.color = fill;
+            if (ringImage != null) ringImage.color = ring;
+            if (label != null) label.color = ink;
+            if (dotRing != null) dotRing.color = lamp;
+            if (dotCore != null) dotCore.color = lampCore;
             return;
         }
 
-        if (thumb != null)
-        {
-            Vector2 p = thumb.anchoredPosition;
-            p.x = thumbX;
-            thumb.anchoredPosition = p;
-        }
-        if (trackImage != null) trackImage.color = track;
+        if (fillImage != null) fillImage.DOColor(fill, AnimDuration).SetEase(Ease.OutCubic);
+        if (ringImage != null) ringImage.DOColor(ring, AnimDuration).SetEase(Ease.OutCubic);
+        if (label != null) label.DOColor(ink, AnimDuration).SetEase(Ease.OutCubic);
+        if (dotRing != null) dotRing.DOColor(lamp, AnimDuration).SetEase(Ease.OutCubic);
+        if (dotCore != null) dotCore.DOColor(lampCore, AnimDuration).SetEase(Ease.OutCubic);
     }
 
-    private static Color Hex(string hex) =>
-        ColorUtility.TryParseHtmlString(hex, out var c) ? c : Color.magenta;
+    private void KillColorTweens()
+    {
+        if (fillImage != null) fillImage.DOKill();
+        if (ringImage != null) ringImage.DOKill();
+        if (label != null) label.DOKill();
+        if (dotRing != null) dotRing.DOKill();
+        if (dotCore != null) dotCore.DOKill();
+    }
 }

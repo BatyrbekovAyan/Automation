@@ -88,8 +88,9 @@ public partial class ChatManager
     /// Strips path separators and invalid filename characters from a bot id.
     /// Falls back to the default sentinel if the input is empty or fully invalid.
     /// Defense-in-depth: PlayerPrefs are user-editable on disk.
+    /// Public so BotChatStats can resolve OTHER bots' cache paths identically.
     /// </summary>
-    private static string SanitizeBotId(string botId)
+    public static string SanitizeBotId(string botId)
     {
         if (string.IsNullOrEmpty(botId)) return DefaultBotId;
 
