@@ -77,6 +77,13 @@ rejected L/M/N placements; title-placement round on J's chassis:
 - **Q: Внизу** — tiny title bottom-right after the text, like a signature; reply text starts
   immediately at the top.
 
+Round 6 (final) — owner picked P; the border-legend moved around the frame to confirm:
+
+- **R: Центр рамки** — legend centered on the top border, plaque/engraving style.
+- **S: Рамка справа** — legend on the top border, right side; line starts stay clear.
+- **T: Нижняя рамка** — legend on the bottom border, right; signature-under-the-reply feel
+  (interacts with the scroll cut: the last card's label sits in the fade).
+
 ## What to Look For
 
 - Which one you'd want under your thumb mid-conversation (chat visibility vs reply readability).

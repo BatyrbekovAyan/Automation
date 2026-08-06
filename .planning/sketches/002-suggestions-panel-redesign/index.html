@@ -365,6 +365,12 @@
   .q-int { text-align:right; font-size:8.5px; font-weight:700; letter-spacing:.06em;
            text-transform:uppercase; color: var(--ink-3); margin-top:3px; }
   .syn-card.top .q-int { color: var(--positive-ink); }
+  /* R–T — border-legend position modifiers on P */
+  .p-int.c { left:50%; transform:translateX(-50%); }
+  .p-int.r { left:auto; right:11px; }
+  .p-int.b { top:auto; bottom:-7px; left:auto; right:11px; }
+  .syn-card.top .p-int.b { background: linear-gradient(to bottom, var(--positive-bg) 50%, var(--surface) 50%); }
+  .t-pad .syn-cards { gap:10px; padding-bottom:11px; }   /* room for labels poking below each card */
 
   /* ============ sketch toolbar ============ */
   #sketch-tools { position:fixed; bottom:12px; right:12px; z-index:9999; font-size:12px;
@@ -409,6 +415,10 @@
     <button class="variant-tab" data-v="o" onclick="showVariant('o',this)">O · Слово-акцент</button>
     <button class="variant-tab" data-v="p" onclick="showVariant('p',this)">P · На рамке</button>
     <button class="variant-tab" data-v="q" onclick="showVariant('q',this)">Q · Внизу</button>
+    <span style="align-self:center; font-size:11px; color:var(--page-ink-2); margin:0 2px 0 6px;">P-места:</span>
+    <button class="variant-tab" data-v="r" onclick="showVariant('r',this)">R · Центр рамки</button>
+    <button class="variant-tab" data-v="s" onclick="showVariant('s',this)">S · Рамка справа</button>
+    <button class="variant-tab" data-v="t" onclick="showVariant('t',this)">T · Нижняя рамка</button>
   </div>
   <div id="caption"></div>
 </div>
@@ -460,6 +470,9 @@ const CAPTIONS = {
   o:`<b>O · Слово-акцент (на J).</b> Ярлык как в L — слово в начале первой строки, но в акцентном тёмно-синем «Чернильного» вместо серого/зелёного. Зелёным остаётся только лучший ответ (✦ и заливка) — категория и рекомендация больше не спорят за один цвет. <b>Смотрите на:</b> отделяется ли синее слово от текста и как синий уживается с зелёным.`,
   p:`<b>P · На рамке (на J).</b> Ярлык сидит прямо на верхней рамке карточки — как подпись на границе, не занимая места внутри. Такое возможно именно на J: у карточек есть рамки. <b>Смотрите на:</b> аккуратность «разрыва» рамки и читаемость мелкого ярлыка.`,
   q:`<b>Q · Внизу (на J).</b> Ярлык — мелко в правом нижнем углу карточки, как подпись после текста. Ответ начинается сразу с первого слова, категория вторична. <b>Смотрите на:</b> не теряется ли ярлык, когда он после текста.`,
+  r:`<b>R · Ярлык по центру рамки.</b> P, но ярлык — по центру верхней рамки, как гравировка на табличке. Симметрично и спокойно; ✦ лучшего — внутри ярлыка. <b>Смотрите на:</b> не спорит ли центрированный ярлык с левым началом текста под ним.`,
+  s:`<b>S · Ярлык на рамке справа.</b> P, но ярлык — на верхней рамке справа: начало каждой строки свободно, категория на периферии. <b>Смотрите на:</b> удобно ли сканировать категории, когда они все справа.`,
+  t:`<b>T · Ярлык на нижней рамке.</b> P, но ярлык — на нижней рамке справа, как подпись под ответом. Текст начинается сразу от верха карточки. <b>Смотрите на:</b> считывается ли категория после текста и как ярлыки живут со срезом при прокрутке.`,
 };
 
 /* ================= svg helpers ================= */
@@ -809,6 +822,14 @@ function panelQ(){
     `<div class="syn-txt">${s.t}</div><div class="q-int">${s.top? svg.spark('var(--positive-ink)',9)+' ' : ''}${s.i}</div>`)).join(''));
 }
 
+/* R/S/T — P's border legend in other spots: top-center / top-right / bottom-right */
+const legendPanel = (posCls, padCls) => jShell(SUGGESTIONS.map(s=>jCard(s,
+  `<span class="p-int ${posCls}">${s.top? svg.spark('var(--positive-ink)',9) : ''}${s.i}</span><div class="syn-txt">${s.t}</div>`,
+  'p-card')).join(''), padCls);
+function panelR(){ return legendPanel('c', 'p-pad'); }
+function panelS(){ return legendPanel('r', 'p-pad'); }
+function panelT(){ return legendPanel('b', 't-pad'); }
+
 /* ================= build ================= */
 document.getElementById('stage').innerHTML =
   frame('now', panelNow(), 168) +
@@ -828,7 +849,10 @@ document.getElementById('stage').innerHTML =
   frame('n',   panelN(),   296) +
   frame('o',   panelO(),   296) +
   frame('p',   panelP(),   296) +
-  frame('q',   panelQ(),   296);
+  frame('q',   panelQ(),   296) +
+  frame('r',   panelR(),   296) +
+  frame('s',   panelS(),   296) +
+  frame('t',   panelT(),   296);
 document.querySelectorAll('.syn-fix').forEach(sc => kUpd(sc));   // seed «ещё N» counters
 document.getElementById('caption').innerHTML = CAPTIONS.now;
 
