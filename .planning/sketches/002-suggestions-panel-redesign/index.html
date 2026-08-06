@@ -344,6 +344,14 @@
             border-radius:10px; cursor:pointer; box-shadow: var(--shadow-sm);
             transition: opacity .2s ease; }
   .k-more.gone { opacity:0; pointer-events:none; }
+  /* L–N — title-placement round on K's chassis */
+  .syn-fix.cap { height:auto; max-height:246px; }   /* cap, not fixed: with slim titles all 4 fit */
+  .rin { font-size:9.5px; font-weight:800; letter-spacing:.05em; text-transform:uppercase;
+         color: var(--ink-3); margin-right:7px; }
+  .syn-card.top .rin { color: var(--positive-ink); }
+  .m-int { float:right; font-size:8.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+           color: var(--ink-3); margin: 2px 0 3px 10px; }
+  .syn-card.top .m-int { color: var(--positive-ink); }
 
   /* ============ sketch toolbar ============ */
   #sketch-tools { position:fixed; bottom:12px; right:12px; z-index:9999; font-size:12px;
@@ -380,6 +388,10 @@
     <button class="variant-tab" data-v="i" onclick="showVariant('i',this)">I · Всё видно</button>
     <button class="variant-tab" data-v="j" onclick="showVariant('j',this)">J · Фикс + скролл</button>
     <button class="variant-tab" data-v="k" onclick="showVariant('k',this)">K · Фикс, спокойный</button>
+    <span style="align-self:center; font-size:11px; color:var(--page-ink-2); margin:0 2px 0 6px;">ярлык:</span>
+    <button class="variant-tab" data-v="l" onclick="showVariant('l',this)">L · В строке</button>
+    <button class="variant-tab" data-v="m" onclick="showVariant('m',this)">M · В углу</button>
+    <button class="variant-tab" data-v="n" onclick="showVariant('n',this)">N · Без ярлыка</button>
   </div>
   <div id="caption"></div>
 </div>
@@ -425,6 +437,9 @@ const CAPTIONS = {
   i:`<b>I · Синтез E+G: всё видно.</b> Карточки с ярлыком сверху и полным текстом — на листе с заголовком и тихим обновлением (как в E). Естественная высота: все 4 карточки сразу, лист самый высокий (~⅓ экрана). <b>Смотрите на:</b> стоит ли полная видимость всех ответов такой высоты.`,
   j:`<b>J · Синтез: фикс-высота + скролл.</b> Тот же синтез, но лист всегда одной высоты (~285): видны 2–3 карточки, остальное — прокрутка внутри. Намёк на жест — срезанная карточка, растворение снизу, тонкий скроллбар. Фикс-высота совпадает с текущей архитектурой панели (footprint не меняется между состояниями). <b>Смотрите на:</b> очевидно ли, что внутри есть ещё.`,
   k:`<b>K · Синтез: фикс-высота, спокойный скин.</b> Как J, но карточки без рамок — мягкие серые «вставки», а вместо растворения — счётчик «ещё N» внизу (тап по нему листает). <b>Смотрите на:</b> какой скин карточек и какой намёк на прокрутку убедительнее — J или K.`,
+  l:`<b>L · Ярлык в строке.</b> K, но ярлык — маленькое цветное слово в начале первой строки текста (текст обтекает его — это не чип-колонка, как было в G). Карточка ниже на высоту ярлыка: все 4 влезают в ту же высоту листа без прокрутки. <b>Смотрите на:</b> не мешает ли слово чтению начала ответа.`,
+  m:`<b>M · Ярлык в углу.</b> K, но ярлык — мелко в правом верхнем углу карточки, как время в пузыре сообщения. Первая строка текста чуть короче, остальные — во всю ширину; все 4 карточки тоже влезают без прокрутки. <b>Смотрите на:</b> считывается ли ярлык, когда он не в начале.`,
+  n:`<b>N · Без ярлыка.</b> K вообще без ярлыков намерения: только текст ответа, у лучшего — ✦ и зелёная заливка. Максимум места тексту; намерение угадывается из самого ответа. <b>Смотрите на:</b> нужны ли ярлыки вообще, или текст говорит сам за себя.`,
 };
 
 /* ================= svg helpers ================= */
@@ -433,7 +448,7 @@ const svg = {
   refresh:(c,s)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none"><path d="M20 12a8 8 0 1 1-2.34-5.66" stroke="${c}" stroke-width="2.4" stroke-linecap="round"/><path d="M20 3v5h-5" stroke="${c}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   clip:   c=>`<svg class="comp-clip" viewBox="0 0 24 24" fill="none"><path d="M21 12.5l-8.6 8.6a6 6 0 0 1-8.5-8.5l8.6-8.6a4 4 0 0 1 5.7 5.7l-8.7 8.6a2 2 0 0 1-2.8-2.8l8-8" stroke="${c}" stroke-width="1.7" stroke-linecap="round"/></svg>`,
   send:   ()=>`<svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M3.5 12L21 3l-4.5 18-5.2-6.2L3.5 12z" fill="#fff"/></svg>`,
-  spark:  c=>`<svg class="sparkle" viewBox="0 0 24 24"><path d="M12 2l2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4z" fill="${c}"/></svg>`,
+  spark:  (c,s=11)=>`<svg class="sparkle" style="width:${s}px;height:${s}px;vertical-align:-1px" viewBox="0 0 24 24"><path d="M12 2l2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4z" fill="${c}"/></svg>`,
   sb:     c=>`<svg width="46" height="12" viewBox="0 0 46 12" fill="${c}"><rect x="0" y="6" width="2.5" height="5" rx="1"/><rect x="4" y="4" width="2.5" height="7" rx="1"/><rect x="8" y="2" width="2.5" height="9" rx="1"/><rect x="12" y="0" width="2.5" height="11" rx="1"/><path d="M20 5a7 7 0 0 1 9 0l-1.5 1.9a4.6 4.6 0 0 0-6 0z"/><circle cx="24.5" cy="9.5" r="1.6"/><rect x="33" y="2" width="11" height="8" rx="2.4" fill="none" stroke="${c}" stroke-width="1.1"/><rect x="34.5" y="3.5" width="6.5" height="5" rx="1.2"/><rect x="44.6" y="4.5" width="1.4" height="3" rx=".7"/></svg>`,
 };
 
@@ -708,6 +723,39 @@ function kScroll(chip){
   chip.closest('.syn-fixwrap').querySelector('.syn-fix').scrollBy({top:138, behavior:'smooth'});
 }
 
+/* ================= title-placement round (L–N) on K's chassis ================= */
+function capShell(cards){
+  const chev = `<svg width="8" height="8" viewBox="0 0 24 24" fill="none"><path d="M5 9l7 7 7-7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const body = `
+    <div class="syn-fixwrap">
+      <div class="syn-fix cap" onscroll="kUpd(this)"><div class="syn-cards">${cards}</div></div>
+      <div class="k-more" onclick="kScroll(this)"><span>ещё 0</span>${chev}</div>
+    </div>`;
+  const load = `
+    <div class="syn-fixwrap">
+      <div class="syn-fix cap"><div class="syn-cards">${synSk(true,4)}</div></div>
+    </div>`;
+  return sheetShell(body, load, FIX_EMPTY, FIX_ERROR);
+}
+const capCard = (s, inner) =>
+  `<div class="syn-card k${s.top?' top':''}" onclick="pick(this,'${esc(s.t)}')"><div class="syn-txt">${inner}</div></div>`;
+
+/* L — run-in title at the start of the text line */
+function panelL(){
+  return capShell(SUGGESTIONS.map(s=>capCard(s,
+    `<span class="rin">${s.top? svg.spark('var(--positive-ink)',9)+' ' : ''}${s.i}</span>${s.t}`)).join(''));
+}
+/* M — tiny corner title, first line flows beside it (float) */
+function panelM(){
+  return capShell(SUGGESTIONS.map(s=>capCard(s,
+    `<span class="m-int">${s.top? svg.spark('var(--positive-ink)',9)+' ' : ''}${s.i}</span>${s.t}`)).join(''));
+}
+/* N — no title at all; ✦ inline on the recommended card only */
+function panelN(){
+  return capShell(SUGGESTIONS.map(s=>capCard(s,
+    `${s.top? svg.spark('var(--positive-ink)',10)+' ' : ''}${s.t}`)).join(''));
+}
+
 /* ================= build ================= */
 document.getElementById('stage').innerHTML =
   frame('now', panelNow(), 168) +
@@ -721,7 +769,10 @@ document.getElementById('stage').innerHTML =
   frame('h',   panelH(),   232) +
   frame('i',   panelI(),   345) +
   frame('j',   panelJ(),   296) +
-  frame('k',   panelK(),   296);
+  frame('k',   panelK(),   296) +
+  frame('l',   panelL(),   296) +
+  frame('m',   panelM(),   296) +
+  frame('n',   panelN(),   296);
 document.querySelectorAll('.syn-fix').forEach(sc => kUpd(sc));   // seed «ещё N» counters
 document.getElementById('caption').innerHTML = CAPTIONS.now;
 

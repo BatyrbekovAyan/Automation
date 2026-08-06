@@ -58,6 +58,15 @@ with inner scrolling):
 - **K: Фикс, спокойный** — fixed sheet with borderless soft-fill cards and an «ещё N» counter
   chip (tap scrolls) instead of the fade.
 
+Round 4 — title placement on K's chassis (owner picked K but the intent overline costs too
+much height; each option below saves ~13px/card, so all four cards fit the capped sheet with
+no scrolling for typical content):
+
+- **L: В строке** — run-in title: small colored uppercase word at the start of the text line,
+  text flows around it (not a chip column like G had).
+- **M: В углу** — tiny title floated in the card's top-right corner, like a bubble timestamp.
+- **N: Без ярлыка** — no intent titles at all; the recommended card keeps only ✦ + green fill.
+
 ## What to Look For
 
 - Which one you'd want under your thumb mid-conversation (chat visibility vs reply readability).
