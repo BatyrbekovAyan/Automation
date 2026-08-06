@@ -1,0 +1,58 @@
+{
+ "190": {
+  "source": "Tools/sheets/food_cuts/c000.png",
+  "label": "candy"
+ },
+ "191": {
+  "source": "Tools/sheets/food_cuts/c004.png",
+  "label": "chocolate bar"
+ },
+ "192": {
+  "source": "Tools/sheets/food_cuts/c008.png",
+  "label": "watermelon"
+ },
+ "193": {
+  "source": "Tools/sheets/food_cuts/c029.png",
+  "label": "croissant"
+ },
+ "194": {
+  "source": "Tools/sheets/food_cuts/c040.png",
+  "label": "donut"
+ },
+ "195": {
+  "source": "Tools/sheets/food_cuts/c059.png",
+  "label": "cocktail"
+ },
+ "196": {
+  "source": "Tools/sheets/food_cuts/c061.png",
+  "label": "orange"
+ },
+ "197": {
+  "source": "Tools/sheets/food_cuts/c062.png",
+  "label": "pizza"
+ },
+ "198": {
+  "source": "Tools/sheets/food_cuts/c070.png",
+  "label": "skewer"
+ },
+ "199": {
+  "source": "Tools/sheets/food_cuts/c073.png",
+  "label": "soda cup"
+ },
+ "200": {
+  "source": "Tools/sheets/food_cuts/c075.png",
+  "label": "ice cream"
+ },
+ "201": {
+  "source": "Tools/sheets/food_cuts/c080.png",
+  "label": "avocado"
+ },
+ "202": {
+  "source": "Tools/sheets/food_cuts/c085.png",
+  "label": "apple"
+ },
+ "203": {
+  "source": "Tools/sheets/food_cuts/c086.png",
+  "label": "cake"
+ }
+}

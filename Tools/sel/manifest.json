@@ -1,0 +1,272 @@
+[
+ {
+  "sid": 0,
+  "label": "chat",
+  "src": "classic#8",
+  "file": "Tools/sel/s00.png"
+ },
+ {
+  "sid": 1,
+  "label": "phone",
+  "src": "classic#14",
+  "file": "Tools/sel/s01.png"
+ },
+ {
+  "sid": 2,
+  "label": "wifi",
+  "src": "classic#15",
+  "file": "Tools/sel/s02.png"
+ },
+ {
+  "sid": 3,
+  "label": "leaf",
+  "src": "classic#22",
+  "file": "Tools/sel/s03.png"
+ },
+ {
+  "sid": 4,
+  "label": "bulb",
+  "src": "classic#23",
+  "file": "Tools/sel/s04.png"
+ },
+ {
+  "sid": 5,
+  "label": "rain-cloud",
+  "src": "classic#30",
+  "file": "Tools/sel/s05.png"
+ },
+ {
+  "sid": 6,
+  "label": "coffee",
+  "src": "classic#31",
+  "file": "Tools/sel/s06.png"
+ },
+ {
+  "sid": 7,
+  "label": "dog",
+  "src": "classic#40",
+  "file": "Tools/sel/s07.png"
+ },
+ {
+  "sid": 8,
+  "label": "ice-cream",
+  "src": "classic#43",
+  "file": "Tools/sel/s08.png"
+ },
+ {
+  "sid": 9,
+  "label": "pizza",
+  "src": "classic#45",
+  "file": "Tools/sel/s09.png"
+ },
+ {
+  "sid": 10,
+  "label": "pizza-slice",
+  "src": "classic#48",
+  "file": "Tools/sel/s10.png"
+ },
+ {
+  "sid": 11,
+  "label": "donut",
+  "src": "classic#52",
+  "file": "Tools/sel/s11.png"
+ },
+ {
+  "sid": 12,
+  "label": "tree",
+  "src": "classic#54",
+  "file": "Tools/sel/s12.png"
+ },
+ {
+  "sid": 13,
+  "label": "burger",
+  "src": "classic#58",
+  "file": "Tools/sel/s13.png"
+ },
+ {
+  "sid": 14,
+  "label": "cone",
+  "src": "classic#59",
+  "file": "Tools/sel/s14.png"
+ },
+ {
+  "sid": 15,
+  "label": "clock",
+  "src": "classic#64",
+  "file": "Tools/sel/s15.png"
+ },
+ {
+  "sid": 16,
+  "label": "headphones",
+  "src": "classic#66",
+  "file": "Tools/sel/s16.png"
+ },
+ {
+  "sid": 17,
+  "label": "plane",
+  "src": "classic#70",
+  "file": "Tools/sel/s17.png"
+ },
+ {
+  "sid": 18,
+  "label": "book",
+  "src": "classic#76",
+  "file": "Tools/sel/s18.png"
+ },
+ {
+  "sid": 19,
+  "label": "paper-plane",
+  "src": "classic#77",
+  "file": "Tools/sel/s19.png"
+ },
+ {
+  "sid": 20,
+  "label": "cloud",
+  "src": "classic#81",
+  "file": "Tools/sel/s20.png"
+ },
+ {
+  "sid": 21,
+  "label": "camera",
+  "src": "classic#90",
+  "file": "Tools/sel/s21.png"
+ },
+ {
+  "sid": 22,
+  "label": "music",
+  "src": "classic#93",
+  "file": "Tools/sel/s22.png"
+ },
+ {
+  "sid": 23,
+  "label": "globe",
+  "src": "classic#94",
+  "file": "Tools/sel/s23.png"
+ },
+ {
+  "sid": 24,
+  "label": "palette",
+  "src": "classic#95",
+  "file": "Tools/sel/s24.png"
+ },
+ {
+  "sid": 25,
+  "label": "brush",
+  "src": "classic#99",
+  "file": "Tools/sel/s25.png"
+ },
+ {
+  "sid": 26,
+  "label": "backpack",
+  "src": "classic#101",
+  "file": "Tools/sel/s26.png"
+ },
+ {
+  "sid": 27,
+  "label": "sailboat",
+  "src": "classic#118",
+  "file": "Tools/sel/s27.png"
+ },
+ {
+  "sid": 28,
+  "label": "handshake",
+  "src": "classic#121",
+  "file": "Tools/sel/s28.png"
+ },
+ {
+  "sid": 29,
+  "label": "rocket",
+  "src": "classic#123",
+  "file": "Tools/sel/s29.png"
+ },
+ {
+  "sid": 30,
+  "label": "moon",
+  "src": "classic#124",
+  "file": "Tools/sel/s30.png"
+ },
+ {
+  "sid": 31,
+  "label": "glasses",
+  "src": "classic#125",
+  "file": "Tools/sel/s31.png"
+ },
+ {
+  "sid": 32,
+  "label": "flag",
+  "src": "classic#126",
+  "file": "Tools/sel/s32.png"
+ },
+ {
+  "sid": 33,
+  "label": "gift",
+  "src": "classic#128",
+  "file": "Tools/sel/s33.png"
+ },
+ {
+  "sid": 34,
+  "label": "palette-brush",
+  "src": "classic#141",
+  "file": "Tools/sel/s34.png"
+ },
+ {
+  "sid": 35,
+  "label": "megaphone",
+  "src": "classic#142",
+  "file": "Tools/sel/s35.png"
+ },
+ {
+  "sid": 36,
+  "label": "pencil",
+  "src": "classic#143",
+  "file": "Tools/sel/s36.png"
+ },
+ {
+  "sid": 37,
+  "label": "ghost",
+  "src": "sheet#156",
+  "file": "Tools/sel/s37.png"
+ },
+ {
+  "sid": 38,
+  "label": "bow",
+  "src": "sheet#180",
+  "file": "Tools/sel/s38.png"
+ },
+ {
+  "sid": 39,
+  "label": "candy",
+  "src": "sheet#190",
+  "file": "Tools/sel/s39.png"
+ },
+ {
+  "sid": 40,
+  "label": "watermelon",
+  "src": "sheet#192",
+  "file": "Tools/sel/s40.png"
+ },
+ {
+  "sid": 41,
+  "label": "ice-cream2",
+  "src": "sheet#200",
+  "file": "Tools/sel/s41.png"
+ },
+ {
+  "sid": 42,
+  "label": "owl",
+  "src": "dense:owl",
+  "file": "Tools/sel/s42.png"
+ },
+ {
+  "sid": 43,
+  "label": "balloon",
+  "src": "dense:balloon",
+  "file": "Tools/sel/s43.png"
+ },
+ {
+  "sid": 44,
+  "label": "guitar",
+  "src": "dense:guitar",
+  "file": "Tools/sel/s44.png"
+ }
+]
