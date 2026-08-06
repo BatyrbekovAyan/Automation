@@ -1,0 +1,60 @@
+/* ============================================================
+   Theme: ink-dark — the APPROVED «Графит» × «Чернильный» set.
+   Values converted 1:1 from Assets/Resources/Theme/Theme_Dark.asset.
+   Switch to this theme to preview each variant under the upcoming
+   dark restyle (palette flip is step 4 of the restyle plan).
+   ============================================================ */
+:root {
+  /* Surfaces */
+  --bg: #0E1116;
+  --surface: #171C24;
+  --hairline: #242C38;
+  --border: #333E4E;
+  --input-border: #556882;
+
+  /* Ink */
+  --ink: #ECF0F6;
+  --ink-2: #9AA6B8;
+  --ink-3: #79869A;
+
+  /* Accent («Чернильный») */
+  --accent-fill: #3E61C6;
+  --accent-text: #5981D6;
+  --accent-on-fill: #FFFFFF;
+  --accent-soft: #1E2A44;
+
+  /* Semantic */
+  --positive-bg: #123324;
+  --positive-ink: #57DE95;
+  --destructive: #F2555A;
+
+  /* Chat thread */
+  --chat-wallpaper: #090B0E;
+  --chat-wallpaper-ink: #1F2A3B;
+  --bubble-in: #252A31;
+  --bubble-out: #005C4B;
+  --bubble-border: #333B45;
+  --send: #128A50;
+
+  /* Fixed identity — never themed (Theme.Fixed) */
+  --wa-green: #25D366;
+  --switch-on: #34C759;
+  --mode-auto-track: #2FB344;
+  --mode-auto-ink: #206A2C;
+  --mode-auto-faint: #C3EFCB;
+  --mode-semi-track: #007AFF;
+  --mode-semi-ink: #004C99;
+  --mode-semi-faint: #A8CFFF;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.45);
+  --shadow-up: 0 -6px 20px rgba(0, 0, 0, 0.45);
+
+  /* Sketch page chrome (outside the phones) */
+  --page-bg: #12161C;
+  --page-surface: #1A2028;
+  --page-ink: #E2E8F0;
+  --page-ink-2: #93A1B3;
+  --page-line: #2A3340;
+}

@@ -1,0 +1,59 @@
+/* ============================================================
+   Theme: default (light) — TODAY'S app palette.
+   Values converted 1:1 from Assets/Resources/Theme/Theme_Light.asset
+   (the token set seeded from the live scene) + locked fixed colors.
+   ============================================================ */
+:root {
+  /* Surfaces */
+  --bg: #F4F8F8;
+  --surface: #FFFFFF;
+  --hairline: #E3EDED;
+  --border: #C4D6D7;
+  --input-border: #6F9B9D;
+
+  /* Ink */
+  --ink: #08181B;
+  --ink-2: #4C6265;
+  --ink-3: #64797C;
+
+  /* Accent («Чернильный» navy) */
+  --accent-fill: #243A7A;
+  --accent-text: #243A7A;
+  --accent-on-fill: #FFFFFF;
+  --accent-soft: #E8F2FD;
+
+  /* Semantic */
+  --positive-bg: #E6F6EE;
+  --positive-ink: #0A6B3E;
+  --destructive: #A01B12;
+
+  /* Chat thread */
+  --chat-wallpaper: #F3F1EB;
+  --chat-wallpaper-ink: #E5DAC6;  /* locked doodle ink */
+  --bubble-in: #FFFFFF;
+  --bubble-out: #D8FDD4;
+  --bubble-border: #D9D4CA;
+  --send: #1FAA61;
+
+  /* Fixed identity — never themed (Theme.Fixed) */
+  --wa-green: #25D366;
+  --switch-on: #34C759;
+  --mode-auto-track: #2FB344;
+  --mode-auto-ink: #206A2C;
+  --mode-auto-faint: #C3EFCB;
+  --mode-semi-track: #007AFF;
+  --mode-semi-ink: #004C99;
+  --mode-semi-faint: #A8CFFF;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px rgba(15, 35, 30, 0.07);
+  --shadow-md: 0 4px 14px rgba(15, 35, 30, 0.10);
+  --shadow-up: 0 -6px 20px rgba(15, 35, 30, 0.10);
+
+  /* Sketch page chrome (outside the phones) */
+  --page-bg: #EEF1F1;
+  --page-surface: #FFFFFF;
+  --page-ink: #1C2B2E;
+  --page-ink-2: #5C6E71;
+  --page-line: #DDE4E4;
+}

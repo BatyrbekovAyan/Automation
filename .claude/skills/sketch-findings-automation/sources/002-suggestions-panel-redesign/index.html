@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 002 — Панель подсказок: варианты</title>
+<link rel="stylesheet" href="../themes/default.css" id="theme-link">
+<style>
+  /* ============ page chrome ============ */
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, 'SF Pro Text', Roboto, 'Segoe UI', system-ui, sans-serif;
+    background: var(--page-bg); color: var(--page-ink);
+    padding: 158px 16px 40px; display: flex; flex-direction: column; align-items: center;
+    transition: background .2s;
+  }
+  #variant-nav {
+    position: fixed; top:0; left:0; right:0; z-index: 9998;
+    background: var(--page-surface); border-bottom: 1px solid var(--page-line);
+    padding: 10px 16px 8px; display:flex; flex-direction:column; gap:6px;
+  }
+  .nav-row { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  .nav-title { font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--page-ink-2); margin-right:8px; }
+  .variant-tab {
+    font-family: inherit; font-size:13px; padding:6px 12px; border-radius: 8px;
+    border:1px solid var(--page-line); background:transparent; color:var(--page-ink);
+    cursor:pointer; transition: all .15s ease;
+  }
+  .variant-tab:hover { border-color: var(--page-ink-2); }
+  .variant-tab.active { background: var(--page-ink); color: var(--page-bg); border-color: var(--page-ink); }
+  #caption { font-size: 12.5px; line-height:1.45; color: var(--page-ink-2); max-width: 720px; }
+  #caption b { color: var(--page-ink); }
+
+  .variant { display:none; }
+  .variant.active { display:block; }
+
+  /* ============ phone frame ============ */
+  .phone {
+    width: 360px; height: 762px; border-radius: 34px; overflow: hidden;
+    border: 9px solid #0B0D10; box-shadow: 0 18px 50px rgba(0,0,0,.28);
+    display:flex; flex-direction:column; background: var(--surface); position:relative;
+  }
+  .statusbar {
+    height: 26px; background: var(--surface); display:flex; align-items:center;
+    justify-content:space-between; padding: 2px 16px 0; font-size:11.5px; font-weight:600; color:var(--ink);
+    flex: 0 0 auto;
+  }
+  .sb-icons { display:flex; gap:4px; align-items:center; }
+  .topbar {
+    height: 56px; background: var(--surface); border-bottom:1px solid var(--hairline);
+    display:flex; align-items:center; gap:9px; padding: 0 10px; flex:0 0 auto;
+  }
+  .tb-back { width:22px; height:22px; flex:0 0 auto; cursor:pointer; }
+  .tb-ava {
+    width:35px; height:35px; border-radius:50%; flex:0 0 auto;
+    background: linear-gradient(135deg,#E8A2B8,#C96A8B); color:#fff;
+    display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:600;
+  }
+  .tb-col { display:flex; flex-direction:column; gap:1px; min-width:0; }
+  .tb-name { font-size:15px; font-weight:600; color:var(--ink); white-space:nowrap; }
+  .tb-sub  { font-size:11px; color: var(--ink-3); }
+
+  /* --- reply-mode switch (Вместе ⇄ Авто) — fixed identity colors --- */
+  .sw { margin-left:auto; flex:0 0 auto; width:76px; height:22px; border-radius:11px;
+        background: var(--mode-semi-track); position:relative; cursor:pointer;
+        transition: background .25s ease; }
+  .sw-faint { position:absolute; top:0; height:22px; width:38px; display:flex; align-items:center;
+              justify-content:center; font-size:9px; font-weight:400; pointer-events:none; }
+  .sw-faint.l { left:0;  color: var(--mode-semi-faint); }
+  .sw-faint.r { right:0; color: var(--mode-semi-faint); }
+  .sw-thumb { position:absolute; top:2.5px; left:2.5px; width:36px; height:17px; border-radius:8.5px;
+              background:#fff; display:flex; align-items:center; justify-content:center;
+              font-size:9px; font-weight:700; color: var(--mode-semi-ink);
+              transition: transform .25s cubic-bezier(.33,1,.68,1), color .25s; box-shadow: 0 1px 2px rgba(0,0,0,.18); }
+  .sw .lab-a { display:none; } .sw .lab-s { display:block; }
+  .phone.auto .sw { background: var(--mode-auto-track); }
+  .phone.auto .sw-thumb { transform: translateX(34.5px); color: var(--mode-auto-ink); }
+  .phone.auto .sw .lab-a { display:block; } .phone.auto .sw .lab-s { display:none; }
+  .phone.auto .sw-faint { color: var(--mode-auto-faint); }
+
+  /* --- chat thread --- */
+  .chat {
+    flex:1; position:relative; overflow:hidden;
+    background-color: var(--chat-wallpaper);
+    background-image:
+      radial-gradient(color-mix(in srgb, var(--chat-wallpaper-ink) 55%, transparent) 1px, transparent 1.5px),
+      radial-gradient(color-mix(in srgb, var(--chat-wallpaper-ink) 35%, transparent) 1px, transparent 1.5px);
+    background-size: 24px 24px, 24px 24px; background-position: 0 0, 12px 12px;
+  }
+  .msgs { position:absolute; left:0; right:0; top:0; bottom: var(--clearance, 158px);
+          display:flex; flex-direction:column; justify-content:flex-end; gap:5px;
+          padding: 10px 12px 8px; transition: bottom .25s ease; }
+  .datepill { align-self:center; background: var(--bubble-in); border:1px solid var(--bubble-border);
+              color: var(--ink-3); font-size:10px; padding:3px 9px; border-radius:8px;
+              box-shadow: var(--shadow-sm); margin-bottom:3px; }
+  .bubble { max-width:76%; padding:6px 9px 4px; border-radius:10px; font-size:13px; line-height:1.35;
+            color:var(--ink); border:1px solid var(--bubble-border); box-shadow: var(--shadow-sm); }
+  .bubble .t { display:block; text-align:right; font-size:9.5px; color:var(--ink-3); margin-top:1px; }
+  .bubble .t .ticks { color:#53BDEB; letter-spacing:-1px; }
+  .in  { align-self:flex-start; background: var(--bubble-in); border-bottom-left-radius:3px; }
+  .out { align-self:flex-end;   background: var(--bubble-out); border-bottom-right-radius:3px; }
+
+  /* --- composer --- */
+  .composer { flex:0 0 auto; background: var(--surface); border-top:1px solid var(--hairline);
+              display:flex; align-items:center; gap:8px; padding: 8px 10px; }
+  .comp-clip { width:23px; height:23px; flex:0 0 auto; opacity:.85; }
+  .comp-input { flex:1; min-height:36px; background: var(--bg); border:1px solid var(--hairline);
+                border-radius:18px; padding: 8px 13px; font-size:13px; color: var(--ink-3);
+                display:flex; align-items:center; transition: color .2s, border-color .2s;
+                overflow:hidden; }
+  .comp-input .input-text { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .comp-input.filled { color: var(--ink); border-color: var(--input-border); }
+  .comp-send { width:40px; height:40px; border-radius:50%; background: var(--send); flex:0 0 auto;
+               display:flex; align-items:center; justify-content:center; cursor:pointer;
+               transition: transform .15s ease; }
+  .comp-send:hover { transform: scale(1.06); }
+  .comp-send.pulse { animation: pulse .5s ease 2; }
+  @keyframes pulse { 0%{transform:scale(1)} 50%{transform:scale(1.14)} 100%{transform:scale(1)} }
+  .homebar { flex:0 0 auto; height:20px; background: var(--surface); display:flex; align-items:center; justify-content:center; }
+  .homebar i { width:118px; height:4px; border-radius:2px; background: color-mix(in srgb, var(--ink) 26%, transparent); }
+
+  /* --- suggestion zone (shared shell) --- */
+  .suggest-zone { position:absolute; left:0; right:0; bottom:0; z-index:5;
+                  transition: transform .25s cubic-bezier(.33,1,.68,1), opacity .25s ease; }
+  .suggest-zone.away, .phone.auto .suggest-zone { transform: translateY(112%); opacity:0; pointer-events:none; }
+  .suggest-zone.enter { animation: slideup .28s cubic-bezier(.33,1,.68,1); }
+  @keyframes slideup { from { transform: translateY(112%); } to { transform: translateY(0); } }
+
+  .st { display:none; } [data-state="cards"] .st-cards { display:block; }
+  [data-state="load"] .st-load { display:block; } [data-state="empty"] .st-empty { display:block; }
+  [data-state="error"] .st-error { display:block; }
+
+  /* thinking dots (ThinkingDotsSkeleton identity) */
+  .dots { display:flex; gap:5px; align-items:center; justify-content:center; }
+  .dots i { width:7px; height:7px; border-radius:50%; display:block; animation: bounce 1s ease infinite; }
+  .dots i:nth-child(2) { animation-delay:.15s; } .dots i:nth-child(3) { animation-delay:.3s; }
+  @keyframes bounce { 0%,60%,100% { transform:translateY(0);} 30% { transform: translateY(-4px);} }
+
+  .sparkle { width:11px; height:11px; flex:0 0 auto; }
+
+  /* generic state block for sheet-type variants */
+  .state-box { height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; padding: 0 24px; text-align:center; }
+  .state-h { font-size:13.5px; font-weight:700; color: var(--ink); }
+  .state-b { font-size:11.5px; color: var(--ink-2); }
+  .state-retry { margin-top:7px; font-family:inherit; font-size:12px; font-weight:600; color: var(--accent-text);
+                 background:transparent; border:1px solid var(--input-border); border-radius:12px;
+                 padding: 6px 16px; cursor:pointer; transition: all .15s ease; }
+  .state-retry:hover { background: var(--accent-soft); }
+
+  /* ============ Variant «Сейчас» — mint baseline (deliberately hardcoded: this IS today's app) ============ */
+  .now-panel { height:151px; background:#EAF6F0; border-radius:12px 12px 0 0; position:relative; }
+  .now-fab { position:absolute; top:-48px; right:8px; width:40px; height:40px; border-radius:50%;
+             background:#18A06B; display:flex; align-items:center; justify-content:center;
+             cursor:pointer; transition: transform .15s ease; box-shadow: 0 2px 6px rgba(20,60,45,.25); }
+  .now-fab:hover { transform: rotate(40deg); }
+  .now-grid { position:absolute; inset:8px; display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:8px; }
+  .now-card { background:#FFFFFF; border-radius:8px; position:relative; padding:10px 7px 5px; cursor:pointer;
+              transition: transform .12s ease; min-height:0; }   /* no overflow clip — the intent pill straddles the edge */
+  .now-card:hover { transform: scale(.985); }
+  .now-card.top { background:#C9EFD9; }
+  .now-pill { position:absolute; top:0; left:50%; transform:translate(-50%,-55%); background:#DCEFE6;
+              color:#3E6B57; font-size:9px; font-weight:700; padding:2.5px 9px; border-radius:9px; white-space:nowrap; }
+  .now-txt { height:100%; overflow-y:auto; font-size:12.5px; line-height:1.3; color:#14241D; scrollbar-width:none; }
+  .now-txt::-webkit-scrollbar { display:none; }
+  .now-sk { background:#DCEAE2; border-radius:8px; } .now-sk .dots { height:100%; } .now-sk .dots i { background:#5E7C6E; }
+  .now-state-h { color:#14241D; } .now-state-b { color:#5E7C6E; }
+  .now-retry { color:#3E6B57; background:#DCEFE6; border:none; }
+  .now-retry:hover { background:#cfe8dc; }
+
+  /* ============ Variant A — chips row ============ */
+  .a-zone { padding: 6px 0 8px; }
+  .a-scroll { display:flex; gap:6px; overflow-x:auto; padding: 4px 10px; align-items:stretch; scrollbar-width:none; }
+  .a-scroll::-webkit-scrollbar { display:none; }
+  .a-chip { flex:0 0 auto; max-width:252px; background: var(--surface); border:1px solid var(--border);
+            border-radius:15px; padding: 7px 12px; font-size:12.5px; line-height:1.3; color: var(--ink);
+            box-shadow: var(--shadow-sm); cursor:pointer; display:flex; gap:6px; align-items:flex-start;
+            transition: transform .12s ease, border-color .15s; }
+  .a-chip:hover { transform: translateY(-1px); border-color: var(--input-border); }
+  .a-chip span { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .a-chip.top { background: var(--positive-bg); border-color: color-mix(in srgb, var(--positive-ink) 45%, transparent); }
+  .a-chip.top .sparkle { margin-top:2px; }
+  .a-round { flex:0 0 auto; width:34px; border-radius:17px; background: var(--surface); border:1px solid var(--border);
+             display:flex; align-items:center; justify-content:center; cursor:pointer; transition: all .15s ease; }
+  .a-round:hover { background: var(--bg); }
+  .a-statepill { margin: 4px auto; width:max-content; max-width:320px; background: var(--surface); border:1px solid var(--border);
+                 border-radius:15px; padding: 8px 14px; font-size:12px; color: var(--ink-2); box-shadow: var(--shadow-sm);
+                 display:flex; gap:8px; align-items:center; }
+  .a-statepill b { color: var(--ink); font-weight:600; }
+  .a-statepill .lnk { color: var(--accent-text); font-weight:600; cursor:pointer; }
+  .a-sk { width:120px; } .a-sk .dots i { background: var(--ink-3); }
+
+  /* ============ Variant B — full-width row sheet ============ */
+  .b-sheet { background: var(--surface); border-radius:16px 16px 0 0; box-shadow: var(--shadow-up); }
+  .b-grab { width:36px; height:4px; border-radius:2px; background: var(--border); margin: 6px auto 2px; }
+  .b-head { display:flex; align-items:center; gap:5px; padding: 2px 12px 4px; }
+  .b-title { font-size:9.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color: var(--ink-3); }
+  .b-refresh { margin-left:auto; width:26px; height:26px; border-radius:50%; display:flex; align-items:center;
+               justify-content:center; cursor:pointer; transition: background .15s; }
+  .b-refresh:hover { background: var(--bg); }
+  .b-rows { padding-bottom:6px; }
+  .b-row { display:flex; gap:8px; padding: 8px 12px 8px 14px; align-items:flex-start; position:relative;
+           cursor:pointer; transition: background .12s; }
+  .b-row:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); }
+  .b-row + .b-row { border-top:1px solid var(--hairline); }
+  .b-int { flex:0 0 auto; font-size:8.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+           color: var(--ink-2); background: color-mix(in srgb, var(--ink-3) 13%, transparent);
+           padding: 3px 7px; border-radius:8px; margin-top:1.5px; }
+  .b-txt { font-size:12.5px; line-height:1.35; color: var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .b-row.top { background: color-mix(in srgb, var(--positive-bg) 62%, transparent); }
+  .b-row.top:hover { background: var(--positive-bg); }
+  .b-row.top::before { content:''; position:absolute; left:0; top:7px; bottom:7px; width:3px; border-radius:0 2px 2px 0;
+                       background: var(--positive-ink); }
+  .b-row.top .b-int { color: var(--positive-ink); background: color-mix(in srgb, var(--positive-ink) 14%, transparent); }
+  .b-row.top .b-txt { white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+                      font-size:13px; }
+  .b-skrow { display:flex; gap:8px; padding: 11px 14px; align-items:center; }
+  .b-skrow + .b-skrow { border-top:1px solid var(--hairline); }
+  .b-skbar { height:9px; border-radius:5px; background: color-mix(in srgb, var(--ink-3) 16%, transparent); }
+  .b-state { padding: 16px 0 20px; }
+
+  /* ============ Variant C — carousel ============ */
+  .c-zone { padding: 4px 0 6px; }
+  .c-car { display:flex; gap:8px; overflow-x:auto; scroll-snap-type:x mandatory; padding: 6px 12px;
+           scrollbar-width:none; }
+  .c-car::-webkit-scrollbar { display:none; }
+  .c-card { flex:0 0 294px; scroll-snap-align:center; background: var(--surface); border:1px solid var(--hairline);
+            border-radius:14px; padding: 9px 12px 10px; box-shadow: var(--shadow-md); min-height:96px;
+            cursor:pointer; transition: transform .12s ease; display:flex; flex-direction:column; }
+  .c-card:hover { transform: translateY(-1px); }
+  .c-card.top { border-color: color-mix(in srgb, var(--positive-ink) 55%, transparent); }
+  .c-head { display:flex; align-items:center; gap:6px; margin-bottom:5px; }
+  .c-int { font-size:8.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color: var(--ink-2);
+           background: color-mix(in srgb, var(--ink-3) 13%, transparent); padding: 3px 7px; border-radius:8px; }
+  .c-card.top .c-int { color: var(--positive-ink); background: color-mix(in srgb, var(--positive-ink) 14%, transparent); }
+  .c-txt { font-size:13px; line-height:1.42; color: var(--ink); }
+  .c-foot { position:relative; display:flex; align-items:center; justify-content:center; gap:5px; padding: 6px 12px 0; }
+  .c-dot { width:5px; height:5px; border-radius:3px; background: var(--border); transition: all .2s ease; }
+  .c-dot.on { width:14px; background: var(--positive-ink); }
+  .c-refresh { position:absolute; right:12px; top:1px; width:26px; height:26px; border-radius:50%;
+               display:flex; align-items:center; justify-content:center; cursor:pointer; transition: background .15s; }
+  .c-refresh:hover { background: color-mix(in srgb, var(--surface) 70%, transparent); }
+  .c-skcard { min-height:96px; display:flex; align-items:center; justify-content:center; }
+  .c-skcard .dots i { background: var(--ink-3); }
+  .c-statecard { flex:0 0 336px; }
+
+  /* ============ Variant D — native-skin 2×2 grid ============ */
+  .d-panel { height:151px; background: var(--bg); border-top:1px solid var(--hairline);
+             border-radius:12px 12px 0 0; box-shadow: var(--shadow-up); position:relative; }
+  .d-fab { position:absolute; top:-48px; right:8px; width:40px; height:40px; border-radius:50%;
+           background: var(--surface); border:1px solid var(--border); box-shadow: var(--shadow-sm);
+           display:flex; align-items:center; justify-content:center; cursor:pointer; transition: transform .15s ease; }
+  .d-fab:hover { transform: rotate(40deg); }
+  .d-grid { position:absolute; inset:8px; display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:8px; }
+  .d-card { background: var(--surface); border:1px solid var(--hairline); border-radius:10px;
+            padding: 6px 8px; display:flex; flex-direction:column; gap:2px; cursor:pointer;
+            transition: transform .12s ease, border-color .15s; overflow:hidden; min-height:0; }
+  .d-card:hover { transform: scale(.985); border-color: var(--border); }
+  .d-int { font-size:8px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color: var(--ink-3); flex:0 0 auto; }
+  .d-txt { font-size:12px; line-height:1.3; color: var(--ink); flex:1; min-height:0; overflow-y:auto; scrollbar-width:none; }
+  .d-txt::-webkit-scrollbar { display:none; }
+  .d-card.top { background: var(--positive-bg); border-color: color-mix(in srgb, var(--positive-ink) 40%, transparent); }
+  .d-card.top .d-int { color: var(--positive-ink); display:flex; align-items:center; gap:3px; }
+  .d-sk { background: var(--surface); border:1px solid var(--hairline); border-radius:10px; }
+  .d-sk .dots { height:100%; } .d-sk .dots i { background: var(--ink-3); }
+
+  /* ============ Variants E–H — «4 строки» refinement round ============ */
+  /* E — sheet, roomy rows, intent overline, text up to 3 lines */
+  .e-row { display:block; padding: 7px 14px 8px; position:relative; cursor:pointer; transition: background .12s; }
+  .e-row:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); }
+  .e-row + .e-row { border-top:1px solid var(--hairline); }
+  .e-int { display:flex; align-items:center; gap:4px; font-size:8.5px; font-weight:700; letter-spacing:.06em;
+           text-transform:uppercase; color: var(--ink-3); margin-bottom:2px; }
+  .e-txt { font-size:13px; line-height:1.38; color: var(--ink);
+           display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+  .e-row.top { background: color-mix(in srgb, var(--positive-bg) 62%, transparent); }
+  .e-row.top:hover { background: var(--positive-bg); }
+  .e-row.top::before { content:''; position:absolute; left:0; top:6px; bottom:6px; width:3px;
+                       border-radius:0 2px 2px 0; background: var(--positive-ink); }
+  .e-row.top .e-int { color: var(--positive-ink); }
+
+  /* F — sheet, dense single-line rows */
+  .f-row { display:flex; gap:8px; padding: 8px 12px 8px 14px; align-items:center; position:relative;
+           cursor:pointer; transition: background .12s; }
+  .f-row:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); }
+  .f-row + .f-row { border-top:1px solid var(--hairline); }
+  .f-txt { font-size:12.5px; color: var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .f-row.top { background: color-mix(in srgb, var(--positive-bg) 62%, transparent); }
+  .f-row.top::before { content:''; position:absolute; left:0; top:6px; bottom:6px; width:3px;
+                       border-radius:0 2px 2px 0; background: var(--positive-ink); }
+  .f-row.top .f-txt { font-weight:600; }
+  .f-row.top .b-int { color: var(--positive-ink); background: color-mix(in srgb, var(--positive-ink) 14%, transparent); }
+
+  /* G — no sheet: stack of row-cards on the wallpaper */
+  .g-zone { padding: 2px 10px 8px; display:flex; flex-direction:column; gap:6px; position:relative; }
+  .g-card { background: var(--surface); border:1px solid var(--border); border-radius:14px;
+            padding: 8px 11px; box-shadow: var(--shadow-sm); display:flex; gap:8px; align-items:flex-start;
+            cursor:pointer; transition: transform .12s ease, border-color .15s; }
+  .g-card:hover { transform: translateY(-1px); border-color: var(--input-border); }
+  .g-txt { font-size:12.5px; line-height:1.35; color: var(--ink);
+           display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .g-card.top { background: var(--positive-bg); border-color: color-mix(in srgb, var(--positive-ink) 45%, transparent); }
+  .g-card.top .b-int { color: var(--positive-ink); background: color-mix(in srgb, var(--positive-ink) 14%, transparent); }
+  .g-refresh { position:absolute; top:-32px; right:10px; width:28px; height:28px; border-radius:50%;
+               background: var(--surface); border:1px solid var(--border); box-shadow: var(--shadow-sm);
+               display:flex; align-items:center; justify-content:center; cursor:pointer; transition: transform .15s ease; }
+  .g-refresh:hover { transform: rotate(40deg); }
+
+  /* H — sheet, recommended row = filled green action block */
+  .h-top { margin: 2px 8px 5px; background: var(--send); border-radius:12px; padding: 8px 11px;
+           cursor:pointer; box-shadow: var(--shadow-sm); transition: transform .12s ease; }
+  .h-top:hover { transform: scale(.99); }
+  .h-top .h-int { display:inline-flex; align-items:center; gap:4px; font-size:8.5px; font-weight:700;
+                  letter-spacing:.06em; text-transform:uppercase; color:#fff;
+                  background: rgba(255,255,255,.22); padding: 2.5px 7px; border-radius:8px; margin-bottom:4px; }
+  .h-top .h-txt { font-size:13px; font-weight:600; line-height:1.35; color:#fff;
+                  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+
+  /* ============ Variants I–K — synthesis round: E's sheet+overline+full text × G's cards ============ */
+  .syn-cards { padding: 2px 8px 8px; display:flex; flex-direction:column; gap:5px; }
+  .syn-card { background: var(--surface); border:1px solid var(--border); border-radius:14px;
+              padding: 8px 11px 9px; cursor:pointer; transition: transform .12s ease, border-color .15s, background .15s; }
+  .syn-card:hover { transform: translateY(-1px); border-color: var(--input-border); }
+  .syn-int { display:flex; align-items:center; gap:4px; font-size:8.5px; font-weight:700;
+             letter-spacing:.06em; text-transform:uppercase; color: var(--ink-3); margin-bottom:2px; }
+  .syn-txt { font-size:12.5px; line-height:1.36; color: var(--ink); }
+  .syn-card.top { background: var(--positive-bg); border-color: color-mix(in srgb, var(--positive-ink) 45%, transparent); }
+  .syn-card.top .syn-int { color: var(--positive-ink); }
+  /* K skin: borderless soft-fill "inset" cards */
+  .syn-card.k { border:none; background: var(--bg); }
+  .syn-card.k:hover { background: color-mix(in srgb, var(--ink) 6%, var(--bg)); transform:none; }
+  .syn-card.k.top { background: var(--positive-bg); }
+  .syn-card.k.top:hover { background: color-mix(in srgb, var(--positive-ink) 10%, var(--positive-bg)); }
+  /* fixed-height interior scroll */
+  .syn-fixwrap { position:relative; }
+  .syn-fix { height:246px; overflow-y:auto; scrollbar-width:none; }
+  .syn-fix.bar { scrollbar-width:thin; scrollbar-color: var(--border) transparent; }
+  .syn-fix.bar::-webkit-scrollbar { width:3px; } .syn-fix::-webkit-scrollbar { width:0; }
+  .syn-fix.bar::-webkit-scrollbar-thumb { background: var(--border); border-radius:2px; }
+  .syn-fade { position:absolute; left:0; right:0; bottom:0; height:24px; pointer-events:none;
+              background: linear-gradient(transparent, var(--surface)); }
+  .k-more { position:absolute; left:50%; transform:translateX(-50%); bottom:7px; display:flex; gap:4px;
+            align-items:center; background: color-mix(in srgb, var(--ink) 74%, transparent);
+            color: var(--surface); font-size:9.5px; font-weight:600; padding: 3.5px 10px;
+            border-radius:10px; cursor:pointer; box-shadow: var(--shadow-sm);
+            transition: opacity .2s ease; }
+  .k-more.gone { opacity:0; pointer-events:none; }
+  /* L–N — title-placement round on K's chassis */
+  .syn-fix.cap { height:auto; max-height:246px; }   /* cap, not fixed: with slim titles all 4 fit */
+  .rin { font-size:9.5px; font-weight:800; letter-spacing:.05em; text-transform:uppercase;
+         color: var(--ink-3); margin-right:7px; }
+  .syn-card.top .rin { color: var(--positive-ink); }
+  .m-int { float:right; font-size:8.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+           color: var(--ink-3); margin: 2px 0 3px 10px; }
+  .syn-card.top .m-int { color: var(--positive-ink); }
+  /* O–Q — title placement on J's bordered chassis */
+  .rin.acc, .syn-card.top .rin.acc { color: var(--accent-text); }   /* run-in in «Чернильный» navy on every card */
+  .p-card { position:relative; overflow:visible; }
+  .p-int { position:absolute; top:-7px; left:11px; padding:0 5px; font-size:8.5px; font-weight:700;
+           letter-spacing:.06em; text-transform:uppercase; color: var(--ink-2); line-height:13px;
+           display:flex; gap:3px; align-items:center;
+           background: linear-gradient(to bottom, var(--surface) 50%, var(--surface) 50%); }
+  .syn-card.top .p-int { color: var(--positive-ink);
+           background: linear-gradient(to bottom, var(--surface) 50%, var(--positive-bg) 50%); }
+  .p-pad .syn-cards { padding-top:9px; gap:10px; }   /* room for the legend poking above each card */
+  .q-int { text-align:right; font-size:8.5px; font-weight:700; letter-spacing:.06em;
+           text-transform:uppercase; color: var(--ink-3); margin-top:3px; }
+  .syn-card.top .q-int { color: var(--positive-ink); }
+  /* R–T — border-legend position modifiers on P */
+  .p-int.c { left:50%; transform:translateX(-50%); }
+  .p-int.r { left:auto; right:11px; }
+  .p-int.b { top:auto; bottom:-7px; left:auto; right:11px; }
+  .syn-card.top .p-int.b { background: linear-gradient(to bottom, var(--positive-bg) 50%, var(--surface) 50%); }
+  .t-pad .syn-cards { gap:10px; padding-bottom:11px; }   /* room for labels poking below each card */
+
+  /* ============ sketch toolbar ============ */
+  #sketch-tools { position:fixed; bottom:12px; right:12px; z-index:9999; font-size:12px;
+                  background: rgba(12,16,20,.82); color:#fff; padding: 10px 12px; border-radius:10px;
+                  opacity:.5; transition: opacity .2s; display:flex; flex-direction:column; gap:8px;
+                  backdrop-filter: blur(6px); }
+  #sketch-tools:hover { opacity:1; }
+  .tool-row { display:flex; gap:6px; align-items:center; }
+  .tool-lab { font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:#9fb0c0; width:58px; }
+  #sketch-tools select { font-family:inherit; font-size:12px; background:#1d2630; color:#fff;
+                         border:1px solid #37445a; border-radius:6px; padding:3px 6px; }
+  .tool-btn { font-family:inherit; font-size:11px; background:#1d2630; color:#cfd8e3; border:1px solid #37445a;
+              border-radius:6px; padding: 3px 8px; cursor:pointer; transition: all .15s; }
+  .tool-btn:hover { border-color:#5a6c88; }
+  .tool-btn.on { background:#3E61C6; border-color:#3E61C6; color:#fff; }
+</style>
+</head>
+<body>
+
+<div id="variant-nav">
+  <div class="nav-row">
+    <span class="nav-title">Панель подсказок</span>
+    <button class="variant-tab active" data-v="now" onclick="showVariant('now',this)">Сейчас (мятная)</button>
+    <button class="variant-tab" data-v="a" onclick="showVariant('a',this)">A · Чипы</button>
+    <button class="variant-tab" data-v="b" onclick="showVariant('b',this)">B · Список</button>
+    <button class="variant-tab" data-v="c" onclick="showVariant('c',this)">C · Карусель</button>
+    <button class="variant-tab" data-v="d" onclick="showVariant('d',this)">D · Родная сетка</button>
+    <span style="align-self:center; font-size:11px; color:var(--page-ink-2); margin:0 2px 0 6px;">4 строки:</span>
+    <button class="variant-tab" data-v="e" onclick="showVariant('e',this)">E · Полный текст</button>
+    <button class="variant-tab" data-v="f" onclick="showVariant('f',this)">F · Компакт</button>
+    <button class="variant-tab" data-v="g" onclick="showVariant('g',this)">G · Карточки</button>
+    <button class="variant-tab" data-v="h" onclick="showVariant('h',this)">H · Акцент</button>
+    <span style="align-self:center; font-size:11px; color:var(--page-ink-2); margin:0 2px 0 6px;">синтез E+G:</span>
+    <button class="variant-tab" data-v="i" onclick="showVariant('i',this)">I · Всё видно</button>
+    <button class="variant-tab" data-v="j" onclick="showVariant('j',this)">J · Фикс + скролл</button>
+    <button class="variant-tab" data-v="k" onclick="showVariant('k',this)">K · Фикс, спокойный</button>
+    <span style="align-self:center; font-size:11px; color:var(--page-ink-2); margin:0 2px 0 6px;">ярлык:</span>
+    <button class="variant-tab" data-v="l" onclick="showVariant('l',this)">L · В строке</button>
+    <button class="variant-tab" data-v="m" onclick="showVariant('m',this)">M · В углу</button>
+    <button class="variant-tab" data-v="n" onclick="showVariant('n',this)">N · Без ярлыка</button>
+    <span style="align-self:center; font-size:11px; color:var(--page-ink-2); margin:0 2px 0 6px;">ярлык на J:</span>
+    <button class="variant-tab" data-v="o" onclick="showVariant('o',this)">O · Слово-акцент</button>
+    <button class="variant-tab" data-v="p" onclick="showVariant('p',this)">P · На рамке ★</button>
+    <button class="variant-tab" data-v="q" onclick="showVariant('q',this)">Q · Внизу</button>
+    <span style="align-self:center; font-size:11px; color:var(--page-ink-2); margin:0 2px 0 6px;">P-места:</span>
+    <button class="variant-tab" data-v="r" onclick="showVariant('r',this)">R · Центр рамки</button>
+    <button class="variant-tab" data-v="s" onclick="showVariant('s',this)">S · Рамка справа</button>
+    <button class="variant-tab" data-v="t" onclick="showVariant('t',this)">T · Нижняя рамка</button>
+  </div>
+  <div id="caption"></div>
+</div>
+
+<div id="stage"></div>
+
+<div id="sketch-tools">
+  <div class="tool-row">
+    <span class="tool-lab">Тема</span>
+    <select onchange="document.getElementById('theme-link').href='../themes/'+this.value+'.css'">
+      <option value="default">Светлая (сегодня)</option>
+      <option value="ink-dark">«Чернильный» (тёмная)</option>
+    </select>
+  </div>
+  <div class="tool-row">
+    <span class="tool-lab">Состояние</span>
+    <button class="tool-btn on" data-st="cards" onclick="setStateAll('cards',this)">Ответы</button>
+    <button class="tool-btn" data-st="load" onclick="setStateAll('load',this)">Думает</button>
+    <button class="tool-btn" data-st="empty" onclick="setStateAll('empty',this)">Пусто</button>
+    <button class="tool-btn" data-st="error" onclick="setStateAll('error',this)">Ошибка</button>
+  </div>
+</div>
+
+<script>
+/* ================= data ================= */
+const SUGGESTIONS = [
+  { i:'Цена',         t:'Букет из 25 пионов — 22 500 ₸. Успеем к 18:00, доставка по Алматы — 2 000 ₸. Оформляем? 🌸', top:true },
+  { i:'Доставка',     t:'Доставка сегодня возможна с 17:00 до 20:00, курьер позвонит за час до приезда.' },
+  { i:'Уточнение',    t:'Подскажите, пожалуйста, адрес — посчитаю точную стоимость и время доставки.' },
+  { i:'Альтернатива', t:'Есть похожий букет из 19 пионов за 18 900 ₸ — тоже очень пышный. Показать фото?' },
+];
+
+const CAPTIONS = {
+  now:`<b>Точка отсчёта — как в приложении сегодня.</b> Мятный лист 452u, сетка 2×2, ярлычки-«язычки» на кромке, зелёный FAB обновления. Текст в карточках прокручивается внутри. Сравнивайте варианты с этим.`,
+  a:`<b>A · Чипы.</b> Минимальный след: подсказки — ряд чипов прямо над полем ввода, без листа; чат почти не перекрыт. Лучший ответ залит зелёным со звёздочкой. <b>Смотрите на:</b> хватает ли 2 строк текста и не жалко ли потерять ярлыки намерений.`,
+  b:`<b>B · Список.</b> Лист со строками во всю ширину: лучший ответ — крупно, в 2 строки, с зелёной рейкой; остальные — в 1 строку. Читается без внутренней прокрутки, обновление — тихая иконка в заголовке. <b>Смотрите на:</b> высоту листа и то, как быстро глаз находит лучший ответ.`,
+  c:`<b>C · Карусель.</b> Одна крупная карточка, остальные — свайпом вбок; точки показывают позицию. Максимальная читаемость каждого ответа. <b>Смотрите на:</b> нормально ли, что варианты 2–4 скрыты за свайпом.`,
+  d:`<b>D · Родная сетка.</b> Геометрия как сейчас (2×2 + FAB), но в родной палитре приложения: белые карточки с тонкой рамкой, ярлык намерения внутри, зелёным выделен только лучший ответ. <b>Смотрите на:</b> вопрос «дело было в мятной палитре или в самой сетке?».`,
+  e:`<b>E · 4 строки, полный текст.</b> Лист со строками во всю ширину: ярлык намерения сверху, текст до 3 строк — всё читается сразу, без прокрутки и «…». Самый высокий вариант (~⅓ экрана). <b>Смотрите на:</b> не давит ли лист на переписку.`,
+  f:`<b>F · 4 строки, компакт.</b> Все 4 ответа в одну строку с ярлыками — высота почти как у сегодняшней панели, но без внутренней прокрутки. Лучший — жирнее, с рейкой. <b>Смотрите на:</b> хватает ли одной строки, чтобы уверенно выбрать ответ.`,
+  g:`<b>G · 4 строки, карточки.</b> Без листа: каждая подсказка — отдельная карточка прямо на обоях, лучшая — зелёная. Воздушнее, чем лист; обновление — кружок над стопкой. <b>Смотрите на:</b> читаемость карточек на пёстрых обоях и ощущение «стопки».`,
+  h:`<b>H · 4 строки, акцент.</b> Лучший ответ — залитая зелёная кнопка («жми сюда»), остальные — тихие строки в одну линию. Максимально явная иерархия при умеренной высоте. <b>Смотрите на:</b> помогает ли заливка или выглядит навязчиво.`,
+  i:`<b>I · Синтез E+G: всё видно.</b> Карточки с ярлыком сверху и полным текстом — на листе с заголовком и тихим обновлением (как в E). Естественная высота: все 4 карточки сразу, лист самый высокий (~⅓ экрана). <b>Смотрите на:</b> стоит ли полная видимость всех ответов такой высоты.`,
+  j:`<b>J · Синтез: фикс-высота + скролл.</b> Тот же синтез, но лист всегда одной высоты (~285): видны 2–3 карточки, остальное — прокрутка внутри. Намёк на жест — срезанная карточка, растворение снизу, тонкий скроллбар. Фикс-высота совпадает с текущей архитектурой панели (footprint не меняется между состояниями). <b>Смотрите на:</b> очевидно ли, что внутри есть ещё.`,
+  k:`<b>K · Синтез: фикс-высота, спокойный скин.</b> Как J, но карточки без рамок — мягкие серые «вставки», а вместо растворения — счётчик «ещё N» внизу (тап по нему листает). <b>Смотрите на:</b> какой скин карточек и какой намёк на прокрутку убедительнее — J или K.`,
+  l:`<b>L · Ярлык в строке.</b> K, но ярлык — маленькое цветное слово в начале первой строки текста (текст обтекает его — это не чип-колонка, как было в G). Карточка ниже на высоту ярлыка: все 4 влезают в ту же высоту листа без прокрутки. <b>Смотрите на:</b> не мешает ли слово чтению начала ответа.`,
+  m:`<b>M · Ярлык в углу.</b> K, но ярлык — мелко в правом верхнем углу карточки, как время в пузыре сообщения. Первая строка текста чуть короче, остальные — во всю ширину; все 4 карточки тоже влезают без прокрутки. <b>Смотрите на:</b> считывается ли ярлык, когда он не в начале.`,
+  n:`<b>N · Без ярлыка.</b> K вообще без ярлыков намерения: только текст ответа, у лучшего — ✦ и зелёная заливка. Максимум места тексту; намерение угадывается из самого ответа. <b>Смотрите на:</b> нужны ли ярлыки вообще, или текст говорит сам за себя.`,
+  o:`<b>O · Слово-акцент (на J).</b> Ярлык как в L — слово в начале первой строки, но в акцентном тёмно-синем «Чернильного» вместо серого/зелёного. Зелёным остаётся только лучший ответ (✦ и заливка) — категория и рекомендация больше не спорят за один цвет. <b>Смотрите на:</b> отделяется ли синее слово от текста и как синий уживается с зелёным.`,
+  p:`<b>★ ВЫБРАНО · P · На рамке (на J).</b> Ярлык сидит прямо на верхней рамке карточки (слева) — как подпись на границе, не занимая места внутри. Итоговое направление: шасси J (фикс-лист + прокрутка, карточки с рамками) + ярлык-«легенда» слева на рамке. Зафиксировано 2026-08-07.`,
+  q:`<b>Q · Внизу (на J).</b> Ярлык — мелко в правом нижнем углу карточки, как подпись после текста. Ответ начинается сразу с первого слова, категория вторична. <b>Смотрите на:</b> не теряется ли ярлык, когда он после текста.`,
+  r:`<b>R · Ярлык по центру рамки.</b> P, но ярлык — по центру верхней рамки, как гравировка на табличке. Симметрично и спокойно; ✦ лучшего — внутри ярлыка. <b>Смотрите на:</b> не спорит ли центрированный ярлык с левым началом текста под ним.`,
+  s:`<b>S · Ярлык на рамке справа.</b> P, но ярлык — на верхней рамке справа: начало каждой строки свободно, категория на периферии. <b>Смотрите на:</b> удобно ли сканировать категории, когда они все справа.`,
+  t:`<b>T · Ярлык на нижней рамке.</b> P, но ярлык — на нижней рамке справа, как подпись под ответом. Текст начинается сразу от верха карточки. <b>Смотрите на:</b> считывается ли категория после текста и как ярлыки живут со срезом при прокрутке.`,
+};
+
+/* ================= svg helpers ================= */
+const svg = {
+  back:   c=>`<svg class="tb-back" viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="${c}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  refresh:(c,s)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none"><path d="M20 12a8 8 0 1 1-2.34-5.66" stroke="${c}" stroke-width="2.4" stroke-linecap="round"/><path d="M20 3v5h-5" stroke="${c}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  clip:   c=>`<svg class="comp-clip" viewBox="0 0 24 24" fill="none"><path d="M21 12.5l-8.6 8.6a6 6 0 0 1-8.5-8.5l8.6-8.6a4 4 0 0 1 5.7 5.7l-8.7 8.6a2 2 0 0 1-2.8-2.8l8-8" stroke="${c}" stroke-width="1.7" stroke-linecap="round"/></svg>`,
+  send:   ()=>`<svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M3.5 12L21 3l-4.5 18-5.2-6.2L3.5 12z" fill="#fff"/></svg>`,
+  spark:  (c,s=11)=>`<svg class="sparkle" style="width:${s}px;height:${s}px;vertical-align:-1px" viewBox="0 0 24 24"><path d="M12 2l2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4z" fill="${c}"/></svg>`,
+  sb:     c=>`<svg width="46" height="12" viewBox="0 0 46 12" fill="${c}"><rect x="0" y="6" width="2.5" height="5" rx="1"/><rect x="4" y="4" width="2.5" height="7" rx="1"/><rect x="8" y="2" width="2.5" height="9" rx="1"/><rect x="12" y="0" width="2.5" height="11" rx="1"/><path d="M20 5a7 7 0 0 1 9 0l-1.5 1.9a4.6 4.6 0 0 0-6 0z"/><circle cx="24.5" cy="9.5" r="1.6"/><rect x="33" y="2" width="11" height="8" rx="2.4" fill="none" stroke="${c}" stroke-width="1.1"/><rect x="34.5" y="3.5" width="6.5" height="5" rx="1.2"/><rect x="44.6" y="4.5" width="1.4" height="3" rx=".7"/></svg>`,
+};
+
+/* ================= shared chrome ================= */
+function stateBlocks(kind){
+  // kind: 'sheet' → tall centered; 'chip' → compact pill; 'car' → card-shaped
+  const retryAttr = `onclick="refreshFrame(this)"`;
+  if (kind==='chip') return `
+    <div class="st st-load"><div class="a-statepill"><div class="dots a-sk-dots"><i style="background:var(--ink-3)"></i><i style="background:var(--ink-3)"></i><i style="background:var(--ink-3)"></i></div> Подбираю ответы…</div></div>
+    <div class="st st-empty"><div class="a-statepill"><b>Нет предложений</b> — напишите вручную</div></div>
+    <div class="st st-error"><div class="a-statepill">Не удалось загрузить <span class="lnk" ${retryAttr}>Обновить</span></div></div>`;
+  if (kind==='car') return `
+    <div class="st st-load"><div class="c-car"><div class="c-card c-skcard c-statecard"><div class="dots"><i></i><i></i><i></i></div></div></div></div>
+    <div class="st st-empty"><div class="c-car"><div class="c-card c-statecard"><div class="state-box" style="min-height:78px"><div class="state-h">Нет предложений</div><div class="state-b">Напишите ответ вручную</div></div></div></div></div>
+    <div class="st st-error"><div class="c-car"><div class="c-card c-statecard"><div class="state-box" style="min-height:78px"><div class="state-h">Не удалось загрузить</div><div class="state-b">Проверьте соединение</div><button class="state-retry" ${retryAttr}>Обновить</button></div></div></div></div>`;
+  return ''; // sheet variants inline their own
+}
+
+function frame(id, panelHTML, clearance){
+  return `
+  <div class="variant${id==='now'?' active':''}" id="variant-${id}">
+    <div class="phone" data-frame="${id}">
+      <div class="statusbar"><span>14:05</span><span class="sb-icons">${svg.sb('currentColor')}</span></div>
+      <div class="topbar">
+        ${svg.back('var(--ink)')}
+        <div class="tb-ava">А</div>
+        <div class="tb-col"><span class="tb-name">Айгерим</span><span class="tb-sub">в сети</span></div>
+        <div class="sw" onclick="toggleMode(this)" title="Режим ответа: Вместе / Авто">
+          <span class="sw-faint l lab-hide-semi">Вместе</span>
+          <span class="sw-faint r">Авто</span>
+          <span class="sw-thumb"><span class="lab-s">Вместе</span><span class="lab-a">Авто</span></span>
+        </div>
+      </div>
+      <div class="chat" style="--clearance:${clearance}px">
+        <div class="msgs">
+          <div class="datepill">Сегодня</div>
+          <div class="bubble in">Здравствуйте! А есть букеты из пионов?<span class="t">13:58</span></div>
+          <div class="bubble out">Добрый день! Да, есть 🌸 Какой бюджет рассматриваете?<span class="t">13:59 <span class="ticks">✓✓</span></span></div>
+          <div class="bubble in">До 25 000 тг. И можно доставку сегодня к 18:00?<span class="t">14:02</span></div>
+        </div>
+        <div class="suggest-zone enter" data-state="cards">${panelHTML}</div>
+      </div>
+      <div class="composer">
+        ${svg.clip('var(--ink-3)')}
+        <div class="comp-input"><span class="input-text">Сообщение</span></div>
+        <div class="comp-send">${svg.send()}</div>
+      </div>
+      <div class="homebar"><i></i></div>
+    </div>
+  </div>`;
+}
+
+/* ================= variant panels ================= */
+const esc = s => s.replace(/'/g,'’');
+
+/* «Сейчас» — mint baseline */
+function panelNow(){
+  const cards = SUGGESTIONS.map(s=>`
+    <div class="now-card${s.top?' top':''}" onclick="pick(this,'${esc(s.t)}')">
+      <span class="now-pill">${s.i}</span><div class="now-txt">${s.t}</div>
+    </div>`).join('');
+  const sk = [0,1,2,3].map(()=>`<div class="now-sk"><div class="dots"><i></i><i></i><i></i></div></div>`).join('');
+  return `
+  <div class="now-panel">
+    <div class="now-fab" onclick="refreshFrame(this)">${svg.refresh('#FFFFFF',26)}</div>
+    <div class="st st-cards" style="height:100%"><div class="now-grid">${cards}</div></div>
+    <div class="st st-load"  style="height:100%"><div class="now-grid">${sk}</div></div>
+    <div class="st st-empty" style="height:100%"><div class="state-box"><div class="state-h now-state-h">Нет предложений</div><div class="state-b now-state-b">Напишите ответ вручную</div></div></div>
+    <div class="st st-error" style="height:100%"><div class="state-box"><div class="state-h now-state-h">Не удалось загрузить</div><div class="state-b now-state-b">Проверьте соединение и попробуйте снова</div><button class="state-retry now-retry" onclick="refreshFrame(this)">Обновить</button></div></div>
+  </div>`;
+}
+
+/* A — chips */
+function panelA(){
+  const chips = SUGGESTIONS.map(s=>`
+    <div class="a-chip${s.top?' top':''}" onclick="pick(this,'${esc(s.t)}')">
+      ${s.top? svg.spark('var(--positive-ink)') : ''}<span>${s.t}</span>
+    </div>`).join('');
+  const sk = [140,110,90].map(w=>`<div class="a-chip" style="width:${w}px; justify-content:center; align-items:center"><div class="dots"><i style="background:var(--ink-3)"></i><i style="background:var(--ink-3)"></i><i style="background:var(--ink-3)"></i></div></div>`).join('');
+  return `
+  <div class="a-zone">
+    <div class="st st-cards"><div class="a-scroll">${chips}<div class="a-round" onclick="refreshFrame(this)">${svg.refresh('var(--ink-2)',15)}</div></div></div>
+    <div class="st st-load"><div class="a-scroll">${sk}</div></div>
+    ${stateBlocks('chip')}
+  </div>`;
+}
+
+/* B — full-width rows sheet */
+function panelB(){
+  const rows = SUGGESTIONS.map(s=>`
+    <div class="b-row${s.top?' top':''}" onclick="pick(this,'${esc(s.t)}')">
+      <span class="b-int">${s.i}</span><span class="b-txt">${s.t}</span>
+    </div>`).join('');
+  const sk = [ [46,72], [40,58], [52,64], [44,50] ].map(([a,b])=>`
+    <div class="b-skrow"><span class="b-skbar" style="width:${a}px"></span><span class="b-skbar" style="width:${b}%"></span></div>`).join('');
+  const head = `<div class="b-head">${svg.spark('var(--positive-ink)')}<span class="b-title">Предложения</span><div class="b-refresh" onclick="refreshFrame(this)">${svg.refresh('var(--ink-2)',14)}</div></div>`;
+  return `
+  <div class="b-sheet">
+    <div class="b-grab"></div>${head}
+    <div class="st st-cards"><div class="b-rows">${rows}</div></div>
+    <div class="st st-load"><div class="b-rows">${sk}</div></div>
+    <div class="st st-empty"><div class="state-box b-state"><div class="state-h">Нет предложений</div><div class="state-b">Напишите ответ вручную</div></div></div>
+    <div class="st st-error"><div class="state-box b-state"><div class="state-h">Не удалось загрузить</div><div class="state-b">Проверьте соединение и попробуйте снова</div><button class="state-retry" onclick="refreshFrame(this)">Обновить</button></div></div>
+  </div>`;
+}
+
+/* C — carousel */
+function panelC(){
+  const cards = SUGGESTIONS.map(s=>`
+    <div class="c-card${s.top?' top':''}" onclick="pick(this,'${esc(s.t)}')">
+      <div class="c-head"><span class="c-int">${s.i}</span>${s.top? svg.spark('var(--positive-ink)') : ''}</div>
+      <div class="c-txt">${s.t}</div>
+    </div>`).join('');
+  const dots = SUGGESTIONS.map((_,n)=>`<span class="c-dot${n===0?' on':''}"></span>`).join('');
+  return `
+  <div class="c-zone">
+    <div class="st st-cards">
+      <div class="c-car" onscroll="carDots(this)">${cards}</div>
+      <div class="c-foot">${dots}<div class="c-refresh" onclick="refreshFrame(this)">${svg.refresh('var(--ink-2)',14)}</div></div>
+    </div>
+    ${stateBlocks('car')}
+  </div>`;
+}
+
+/* D — native-skin grid */
+function panelD(){
+  const cards = SUGGESTIONS.map(s=>`
+    <div class="d-card${s.top?' top':''}" onclick="pick(this,'${esc(s.t)}')">
+      <span class="d-int">${s.top? svg.spark('var(--positive-ink)') : ''}${s.i}</span><div class="d-txt">${s.t}</div>
+    </div>`).join('');
+  const sk = [0,1,2,3].map(()=>`<div class="d-sk"><div class="dots"><i></i><i></i><i></i></div></div>`).join('');
+  return `
+  <div class="d-panel">
+    <div class="d-fab" onclick="refreshFrame(this)">${svg.refresh('var(--ink-2)',18)}</div>
+    <div class="st st-cards" style="height:100%"><div class="d-grid">${cards}</div></div>
+    <div class="st st-load"  style="height:100%"><div class="d-grid">${sk}</div></div>
+    <div class="st st-empty" style="height:100%"><div class="state-box"><div class="state-h">Нет предложений</div><div class="state-b">Напишите ответ вручную</div></div></div>
+    <div class="st st-error" style="height:100%"><div class="state-box"><div class="state-h">Не удалось загрузить</div><div class="state-b">Проверьте соединение и попробуйте снова</div><button class="state-retry" onclick="refreshFrame(this)">Обновить</button></div></div>
+  </div>`;
+}
+
+/* ================= «4 строки» round (E–H) ================= */
+const skRows = n => Array.from({length:n}, (_,i)=>`
+    <div class="b-skrow"><span class="b-skbar" style="width:${[46,40,52,44][i%4]}px"></span><span class="b-skbar" style="width:${[68,54,62,48][i%4]}%"></span></div>`).join('');
+
+function sheetShell(bodyCards, bodyLoad, bodyEmpty, bodyError){
+  const empty = bodyEmpty || `<div class="state-box b-state"><div class="state-h">Нет предложений</div><div class="state-b">Напишите ответ вручную</div></div>`;
+  const error = bodyError || `<div class="state-box b-state"><div class="state-h">Не удалось загрузить</div><div class="state-b">Проверьте соединение и попробуйте снова</div><button class="state-retry" onclick="refreshFrame(this)">Обновить</button></div>`;
+  return `
+  <div class="b-sheet">
+    <div class="b-grab"></div>
+    <div class="b-head">${svg.spark('var(--positive-ink)')}<span class="b-title">Предложения</span><div class="b-refresh" onclick="refreshFrame(this)">${svg.refresh('var(--ink-2)',14)}</div></div>
+    <div class="st st-cards">${bodyCards}</div>
+    <div class="st st-load">${bodyLoad}</div>
+    <div class="st st-empty">${empty}</div>
+    <div class="st st-error">${error}</div>
+  </div>`;
+}
+
+/* E — roomy rows, intent overline, full text */
+function panelE(){
+  const rows = SUGGESTIONS.map(s=>`
+    <div class="e-row${s.top?' top':''}" onclick="pick(this,'${esc(s.t)}')">
+      <span class="e-int">${s.top? svg.spark('var(--positive-ink)') : ''}${s.i}</span>
+      <div class="e-txt">${s.t}</div>
+    </div>`).join('');
+  return sheetShell(`<div style="padding-bottom:6px">${rows}</div>`, skRows(4));
+}
+
+/* F — dense single-line rows */
+function panelF(){
+  const rows = SUGGESTIONS.map(s=>`
+    <div class="f-row${s.top?' top':''}" onclick="pick(this,'${esc(s.t)}')">
+      <span class="b-int">${s.i}</span><span class="f-txt">${s.t}</span>
+    </div>`).join('');
+  return sheetShell(`<div style="padding-bottom:6px">${rows}</div>`, skRows(4));
+}
+
+/* G — stack of row-cards, no sheet */
+function panelG(){
+  const cards = SUGGESTIONS.map(s=>`
+    <div class="g-card${s.top?' top':''}" onclick="pick(this,'${esc(s.t)}')">
+      ${s.top? svg.spark('var(--positive-ink)') : ''}<span class="b-int">${s.i}</span><span class="g-txt">${s.t}</span>
+    </div>`).join('');
+  const sk = [0,1,2].map(()=>`<div class="g-card" style="justify-content:center; padding:14px"><div class="dots"><i style="background:var(--ink-3)"></i><i style="background:var(--ink-3)"></i><i style="background:var(--ink-3)"></i></div></div>`).join('');
+  return `
+  <div class="g-zone">
+    <div class="st st-cards"><div class="g-refresh" onclick="refreshFrame(this)">${svg.refresh('var(--ink-2)',14)}</div>${cards}</div>
+    <div class="st st-load">${sk}</div>
+    ${stateBlocks('chip')}
+  </div>`;
+}
+
+/* H — filled recommended block + quiet rows */
+function panelH(){
+  const top = SUGGESTIONS[0];
+  const rows = SUGGESTIONS.slice(1).map(s=>`
+    <div class="f-row" onclick="pick(this,'${esc(s.t)}')">
+      <span class="b-int">${s.i}</span><span class="f-txt">${s.t}</span>
+    </div>`).join('');
+  const topBlock = `
+    <div class="h-top" onclick="pick(this,'${esc(top.t)}')">
+      <span class="h-int">${svg.spark('#FFFFFF')}${top.i}</span>
+      <div class="h-txt">${top.t}</div>
+    </div>`;
+  return sheetShell(`${topBlock}<div style="padding-bottom:6px">${rows}</div>`, skRows(4));
+}
+
+/* ================= synthesis round (I–K): E's sheet + G's cards ================= */
+function synCards(kSkin){
+  return SUGGESTIONS.map(s=>`
+    <div class="syn-card${kSkin?' k':''}${s.top?' top':''}" onclick="pick(this,'${esc(s.t)}')">
+      <span class="syn-int">${s.top? svg.spark('var(--positive-ink)') : ''}${s.i}</span>
+      <div class="syn-txt">${s.t}</div>
+    </div>`).join('');
+}
+const synSk = (kSkin,n) => Array.from({length:n},()=>`
+    <div class="syn-card${kSkin?' k':''}" style="display:flex;align-items:center;justify-content:center;padding:15px">
+      <div class="dots"><i style="background:var(--ink-3)"></i><i style="background:var(--ink-3)"></i><i style="background:var(--ink-3)"></i></div>
+    </div>`).join('');
+const fixBox = inner => `<div class="syn-fixwrap"><div class="state-box" style="height:246px">${inner}</div></div>`;
+const FIX_EMPTY = fixBox(`<div class="state-h">Нет предложений</div><div class="state-b">Напишите ответ вручную</div>`);
+const FIX_ERROR = fixBox(`<div class="state-h">Не удалось загрузить</div><div class="state-b">Проверьте соединение и попробуйте снова</div><button class="state-retry" onclick="refreshFrame(this)">Обновить</button>`);
+
+/* I — natural height, everything visible */
+function panelI(){
+  return sheetShell(`<div class="syn-cards">${synCards(false)}</div>`,
+                    `<div class="syn-cards">${synSk(false,4)}</div>`);
+}
+
+/* J — fixed-height sheet, inner scroll, cut-card + fade + thin bar */
+function panelJ(){
+  const body = `
+    <div class="syn-fixwrap">
+      <div class="syn-fix bar"><div class="syn-cards">${synCards(false)}</div></div>
+      <div class="syn-fade"></div>
+    </div>`;
+  const load = `
+    <div class="syn-fixwrap">
+      <div class="syn-fix"><div class="syn-cards">${synSk(false,4)}</div></div>
+      <div class="syn-fade"></div>
+    </div>`;
+  return sheetShell(body, load, FIX_EMPTY, FIX_ERROR);
+}
+
+/* K — fixed-height sheet, soft borderless cards, «ещё N» counter chip */
+function panelK(){
+  const chev = `<svg width="8" height="8" viewBox="0 0 24 24" fill="none"><path d="M5 9l7 7 7-7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const body = `
+    <div class="syn-fixwrap">
+      <div class="syn-fix" onscroll="kUpd(this)"><div class="syn-cards">${synCards(true)}</div></div>
+      <div class="k-more" onclick="kScroll(this)"><span>ещё 2</span>${chev}</div>
+    </div>`;
+  const load = `
+    <div class="syn-fixwrap">
+      <div class="syn-fix"><div class="syn-cards">${synSk(true,4)}</div></div>
+    </div>`;
+  return sheetShell(body, load, FIX_EMPTY, FIX_ERROR);
+}
+
+/* «ещё N» counter: cards still below the fold of the fixed scroller */
+function kUpd(sc){
+  const chip = sc.closest('.syn-fixwrap').querySelector('.k-more');
+  if (!chip) return;
+  const fold = sc.scrollTop + sc.clientHeight;
+  let n = 0;   // a card counts as unseen until ~85% of it is above the fold
+  sc.querySelectorAll('.syn-card').forEach(c => { if (fold - c.offsetTop < c.offsetHeight * 0.85) n++; });
+  chip.querySelector('span').textContent = `ещё ${n}`;
+  chip.classList.toggle('gone', n === 0);
+}
+function kScroll(chip){
+  chip.closest('.syn-fixwrap').querySelector('.syn-fix').scrollBy({top:138, behavior:'smooth'});
+}
+
+/* ================= title-placement round (L–N) on K's chassis ================= */
+function capShell(cards){
+  const chev = `<svg width="8" height="8" viewBox="0 0 24 24" fill="none"><path d="M5 9l7 7 7-7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const body = `
+    <div class="syn-fixwrap">
+      <div class="syn-fix cap" onscroll="kUpd(this)"><div class="syn-cards">${cards}</div></div>
+      <div class="k-more" onclick="kScroll(this)"><span>ещё 0</span>${chev}</div>
+    </div>`;
+  const load = `
+    <div class="syn-fixwrap">
+      <div class="syn-fix cap"><div class="syn-cards">${synSk(true,4)}</div></div>
+    </div>`;
+  return sheetShell(body, load, FIX_EMPTY, FIX_ERROR);
+}
+const capCard = (s, inner) =>
+  `<div class="syn-card k${s.top?' top':''}" onclick="pick(this,'${esc(s.t)}')"><div class="syn-txt">${inner}</div></div>`;
+
+/* L — run-in title at the start of the text line */
+function panelL(){
+  return capShell(SUGGESTIONS.map(s=>capCard(s,
+    `<span class="rin">${s.top? svg.spark('var(--positive-ink)',9)+' ' : ''}${s.i}</span>${s.t}`)).join(''));
+}
+/* M — tiny corner title, first line flows beside it (float) */
+function panelM(){
+  return capShell(SUGGESTIONS.map(s=>capCard(s,
+    `<span class="m-int">${s.top? svg.spark('var(--positive-ink)',9)+' ' : ''}${s.i}</span>${s.t}`)).join(''));
+}
+/* N — no title at all; ✦ inline on the recommended card only */
+function panelN(){
+  return capShell(SUGGESTIONS.map(s=>capCard(s,
+    `${s.top? svg.spark('var(--positive-ink)',10)+' ' : ''}${s.t}`)).join(''));
+}
+
+/* ================= title-placement round on J (O–Q) ================= */
+function jShell(cards, extraCls){
+  const body = `
+    <div class="syn-fixwrap ${extraCls||''}">
+      <div class="syn-fix bar"><div class="syn-cards">${cards}</div></div>
+      <div class="syn-fade"></div>
+    </div>`;
+  const load = `
+    <div class="syn-fixwrap ${extraCls||''}">
+      <div class="syn-fix"><div class="syn-cards">${synSk(false,4)}</div></div>
+      <div class="syn-fade"></div>
+    </div>`;
+  return sheetShell(body, load, FIX_EMPTY, FIX_ERROR);
+}
+const jCard = (s, inner, cls) =>
+  `<div class="syn-card${cls?' '+cls:''}${s.top?' top':''}" onclick="pick(this,'${esc(s.t)}')">${inner}</div>`;
+
+/* O — L's run-in placement, recolored to the «Чернильный» accent */
+function panelO(){
+  return jShell(SUGGESTIONS.map(s=>jCard(s,
+    `<div class="syn-txt"><span class="rin acc">${s.top? svg.spark('var(--positive-ink)',9)+' ' : ''}${s.i}</span>${s.t}</div>`)).join(''));
+}
+/* P — legend-style: the title sits ON the card's top border */
+function panelP(){
+  return jShell(SUGGESTIONS.map(s=>jCard(s,
+    `<span class="p-int">${s.top? svg.spark('var(--positive-ink)',9) : ''}${s.i}</span><div class="syn-txt">${s.t}</div>`, 'p-card')).join(''), 'p-pad');
+}
+/* Q — footer meta: tiny title bottom-right, after the text */
+function panelQ(){
+  return jShell(SUGGESTIONS.map(s=>jCard(s,
+    `<div class="syn-txt">${s.t}</div><div class="q-int">${s.top? svg.spark('var(--positive-ink)',9)+' ' : ''}${s.i}</div>`)).join(''));
+}
+
+/* R/S/T — P's border legend in other spots: top-center / top-right / bottom-right */
+const legendPanel = (posCls, padCls) => jShell(SUGGESTIONS.map(s=>jCard(s,
+  `<span class="p-int ${posCls}">${s.top? svg.spark('var(--positive-ink)',9) : ''}${s.i}</span><div class="syn-txt">${s.t}</div>`,
+  'p-card')).join(''), padCls);
+function panelR(){ return legendPanel('c', 'p-pad'); }
+function panelS(){ return legendPanel('r', 'p-pad'); }
+function panelT(){ return legendPanel('b', 't-pad'); }
+
+/* ================= build ================= */
+document.getElementById('stage').innerHTML =
+  frame('now', panelNow(), 168) +
+  frame('a',   panelA(),   84)  +
+  frame('b',   panelB(),   218) +
+  frame('c',   panelC(),   176) +
+  frame('d',   panelD(),   168) +
+  frame('e',   panelE(),   330) +
+  frame('f',   panelF(),   205) +
+  frame('g',   panelG(),   282) +
+  frame('h',   panelH(),   232) +
+  frame('i',   panelI(),   345) +
+  frame('j',   panelJ(),   296) +
+  frame('k',   panelK(),   296) +
+  frame('l',   panelL(),   296) +
+  frame('m',   panelM(),   296) +
+  frame('n',   panelN(),   296) +
+  frame('o',   panelO(),   296) +
+  frame('p',   panelP(),   296) +
+  frame('q',   panelQ(),   296) +
+  frame('r',   panelR(),   296) +
+  frame('s',   panelS(),   296) +
+  frame('t',   panelT(),   296);
+document.querySelectorAll('.syn-fix').forEach(sc => kUpd(sc));   // seed «ещё N» counters
+document.getElementById('caption').innerHTML = CAPTIONS.now;
+
+/* deep-link: ?v=a|b|c|d|now&theme=ink-dark (used by headless renders + shareable) */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const v = q.get('v'), th = q.get('theme');
+  if (th) { document.getElementById('theme-link').href = '../themes/' + th + '.css';
+            const sel = document.querySelector('#sketch-tools select'); if (sel) sel.value = th; }
+  if (v && CAPTIONS[v]) showVariant(v, document.querySelector(`.variant-tab[data-v="${v}"]`));
+  const st = q.get('st'); if (st) setStateAll(st, document.querySelector(`#sketch-tools [data-st="${st}"]`));
+})();
+
+/* ================= interactions ================= */
+function showVariant(id, btn){
+  document.querySelectorAll('.variant').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.variant-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('variant-'+id).classList.add('active');
+  btn.classList.add('active');
+  document.getElementById('caption').innerHTML = CAPTIONS[id];
+  const z = document.querySelector('#variant-'+id+' .suggest-zone');
+  z.classList.remove('enter'); void z.offsetWidth; z.classList.add('enter');   // replay slide-up
+  z.querySelectorAll('.syn-fix').forEach(sc => kUpd(sc));   // hidden tabs measure 0 — recount now
+}
+
+function setStateAll(st, btn){
+  document.querySelectorAll('.suggest-zone').forEach(z=>z.dataset.state = st);
+  document.querySelectorAll('#sketch-tools .tool-btn').forEach(b=>b.classList.toggle('on', b===btn));
+}
+
+const frameTimers = new WeakMap();
+function pick(el, text){
+  const ph = el.closest('.phone');
+  const input = ph.querySelector('.comp-input'), zone = ph.querySelector('.suggest-zone');
+  input.querySelector('.input-text').textContent = text;
+  input.classList.add('filled');
+  zone.classList.remove('enter'); zone.classList.add('away');
+  const send = ph.querySelector('.comp-send');
+  send.classList.remove('pulse'); void send.offsetWidth; send.classList.add('pulse');
+  clearTimeout(frameTimers.get(ph));
+  frameTimers.set(ph, setTimeout(()=>{                       // reset so the demo can be replayed
+    input.querySelector('.input-text').textContent = 'Сообщение';
+    input.classList.remove('filled');
+    zone.classList.remove('away'); void zone.offsetWidth; zone.classList.add('enter');
+  }, 2200));
+}
+
+function refreshFrame(el){
+  const ph = el.closest('.phone'), zone = ph.querySelector('.suggest-zone');
+  zone.dataset.state = 'load';
+  clearTimeout(frameTimers.get(zone));
+  frameTimers.set(zone, setTimeout(()=>{ zone.dataset.state = 'cards'; }, 950));
+}
+
+function toggleMode(sw){ sw.closest('.phone').classList.toggle('auto'); }
+
+function carDots(car){
+  const idx = Math.round(car.scrollLeft / (294+8));
+  car.parentElement.parentElement.querySelectorAll('.c-dot').forEach((d,n)=>d.classList.toggle('on', n===idx));
+}
+</script>
+</body>
+</html>
