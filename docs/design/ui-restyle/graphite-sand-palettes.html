@@ -1,0 +1,339 @@
+<title>Графит и Песок — варианты</title><style>
+:root{--g:#F4F6FA;--g2:#E8ECF3;--rl:#D5DBE6;--k:#0D1119;--k2:#4C5568;--k3:#7D8698;
+--ac:#1B5CEB;--acs:#DFE8FC;--mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+--pad:clamp(20px,4vw,60px);}
+@media (prefers-color-scheme:dark){:root{--g:#0B0E14;--g2:#131822;--rl:#222937;--k:#EDF0F6;
+--k2:#A0AABD;--k3:#6B7587;--ac:#7AA5FF;--acs:#16223A;}}
+:root[data-theme="dark"]{--g:#0B0E14;--g2:#131822;--rl:#222937;--k:#EDF0F6;--k2:#A0AABD;
+--k3:#6B7587;--ac:#7AA5FF;--acs:#16223A;}
+:root[data-theme="light"]{--g:#F4F6FA;--g2:#E8ECF3;--rl:#D5DBE6;--k:#0D1119;--k2:#4C5568;
+--k3:#7D8698;--ac:#1B5CEB;--acs:#DFE8FC;}
+*{box-sizing:border-box}
+.page{background:var(--g);color:var(--k);font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+-webkit-font-smoothing:antialiased;min-height:100vh}
+.mast{max-width:1460px;margin:0 auto;padding:clamp(44px,7vw,92px) var(--pad) clamp(26px,4vw,42px);
+border-bottom:1px solid var(--rl)}
+.eb{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--k3);margin:0 0 16px}
+.mast h1{font-weight:800;font-size:clamp(29px,5.2vw,54px);line-height:1.04;letter-spacing:-.035em;
+text-wrap:balance;margin:0 0 18px;max-width:19ch}
+.mast h1 em{font-style:normal;color:var(--k3)}
+.lede{max-width:66ch;font-size:clamp(15.5px,1.75vw,18px);color:var(--k2);margin:0 0 12px}
+.lede strong{color:var(--k);font-weight:600}
+.fam{max-width:1460px;margin:0 auto;padding:clamp(38px,5vw,62px) var(--pad) 0}
+.fam h2{font-weight:800;font-size:clamp(19px,2.3vw,25px);letter-spacing:-.025em;margin:0 0 6px}
+.fam p{color:var(--k2);font-size:15.5px;margin:0;max-width:68ch}
+.pal{max-width:1460px;margin:0 auto;padding:clamp(24px,3vw,38px) var(--pad) clamp(32px,4vw,50px);
+border-bottom:1px solid var(--rl)}
+.ph{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,340px);gap:clamp(20px,3vw,52px);
+align-items:start;margin-bottom:24px}
+@media(max-width:1000px){.ph{grid-template-columns:minmax(0,1fr)}}
+.ph h3{font-weight:750;font-size:clamp(20px,2.4vw,27px);letter-spacing:-.025em;margin:0 0 8px}
+.ph h3 span{color:var(--k3);font-weight:500}
+.ph .blurb{color:var(--k2);font-size:15.5px;margin:0 0 12px;max-width:60ch}
+.ph .rk{font-size:14px;color:var(--k2);margin:0;padding:9px 13px;border-radius:8px;background:var(--g2);
+max-width:60ch;border-left:2px solid var(--k3)}
+.ph .rk b{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--k3)}
+.swr{display:flex;flex-wrap:wrap;gap:7px;margin:14px 0 0}
+.sw{display:flex;flex-direction:column;gap:5px;font-family:var(--mono);font-size:9.5px;
+letter-spacing:.03em;color:var(--k3);line-height:1.4}
+.sw i{display:block;width:54px;height:32px;border-radius:6px;border:1px solid rgba(128,128,128,.28)}
+table.cx{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px}
+table.cx caption{text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:.12em;
+text-transform:uppercase;color:var(--k3);padding-bottom:7px}
+table.cx td{padding:4px 0;border-bottom:1px solid var(--rl);color:var(--k2)}
+table.cx td:last-child{text-align:right;font-variant-numeric:tabular-nums;color:var(--k)}
+table.cx td.ok:last-child::after{content:" ✓";color:#12A150}
+.row{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start}
+.pw{display:flex;flex-direction:column;gap:11px;align-items:center;margin:0}
+.pc{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--k3)}
+.close{max-width:1460px;margin:0 auto;padding:clamp(38px,5vw,68px) var(--pad) clamp(54px,7vw,96px)}
+.close h2{font-weight:800;font-size:clamp(21px,2.8vw,30px);letter-spacing:-.03em;margin:0 0 14px}
+.close p{max-width:68ch;color:var(--k2);font-size:16px;margin:0 0 13px}
+.close p strong{color:var(--k);font-weight:600}
+.close code{font-family:var(--mono);font-size:.88em}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+.phone{width:320px;height:665px;border-radius:44px;padding:10px;
+background:linear-gradient(160deg,#3A3F4A,#16181D 40%,#2A2E36);
+box-shadow:0 2px 4px rgba(0,0,0,.3),0 20px 40px -12px rgba(10,14,24,.45),0 48px 76px -30px rgba(10,14,24,.3);
+flex-shrink:0}
+.scr{width:100%;height:100%;border-radius:35px;overflow:hidden;display:flex;flex-direction:column;
+font-size:12.5px;isolation:isolate;color:var(--ink);background:var(--bgS)}
+.sb{display:flex;justify-content:space-between;align-items:center;padding:12px 21px 3px;
+font-size:11px;font-weight:600;flex-shrink:0}
+.sg{display:flex;gap:3px;align-items:flex-end}
+.sg i{display:block;width:3px;border-radius:1px;background:currentColor}
+.sg i:nth-child(1){height:4px}.sg i:nth-child(2){height:6px}.sg i:nth-child(3){height:8px}.sg i:nth-child(4){height:10px}
+.bt{width:19px;height:10px;border:1.2px solid currentColor;border-radius:3px;padding:1.4px;margin-left:5px}
+.bt i{display:block;height:100%;width:72%;border-radius:1px;background:currentColor}
+.ah{display:flex;align-items:center;justify-content:space-between;padding:9px 18px 11px;flex-shrink:0}
+.ah h3{margin:0;font-size:20px;font-weight:700;letter-spacing:-.025em}
+.ah.s h3{font-size:16px;flex:1;margin:0 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hb{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-size:17px;line-height:1;
+flex-shrink:0;background:var(--sf);border:1px solid var(--bdI);color:var(--ink2);box-shadow:var(--e1)}
+.bd{flex:1;overflow:hidden;padding:2px 15px 8px;display:flex;flex-direction:column;gap:12px}
+.cs{display:flex;gap:7px}
+.cp{padding:6px 12px;border-radius:999px;font-size:11px;font-weight:600;white-space:nowrap;
+background:var(--sf);color:var(--ink2);border:1px solid var(--bd);box-shadow:var(--e1)}
+.cp.on{background:var(--chipBg);border-color:var(--chipBg);color:var(--chipInk);box-shadow:var(--e2)}
+.hero{padding:15px 17px 14px;display:flex;flex-direction:column;gap:2px;border-radius:16px;
+background:var(--sf);border:1px solid var(--bd);box-shadow:var(--e2)}
+.hero .l{font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3)}
+.hero .n{font-size:38px;font-weight:800;line-height:1.04;letter-spacing:-.045em;
+font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:9px;color:var(--ink)}
+.hero .n small{font-size:12px;font-weight:700;padding:3px 8px;border-radius:999px;
+background:var(--goodBg);color:var(--goodInk)}
+.hero .s{font-size:12px;color:var(--ink2)}
+.spk{display:flex;align-items:flex-end;gap:4px;height:28px;margin-top:9px}
+.spk i{flex:1;border-radius:2px 2px 1px 1px;display:block;background:var(--hl)}
+.spk i:nth-child(n+6){background:var(--acc)}
+.rws{display:flex;flex-direction:column;gap:7px}
+.rw{display:flex;align-items:center;gap:10px;padding:10px 13px;border-radius:11px;
+background:var(--sf);border:1px solid var(--hl);box-shadow:var(--e1)}
+.rw .d{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.rw .m{flex:1;font-size:12.5px;font-weight:500;color:var(--ink)}
+.rw .c{font-size:13.5px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink)}
+.av{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:14px;
+font-weight:700;flex-shrink:0;color:#FFF;box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
+.av.wa{background:linear-gradient(150deg,#2FE07E,#14A85C)}
+.av.tg{background:linear-gradient(150deg,#54C8F5,#1E96D6)}
+.bm{flex:1;min-width:0}
+.bm b{display:block;font-size:13px;font-weight:650;letter-spacing:-.01em;color:var(--ink);
+white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bm em{display:block;font-size:11px;margin-top:2px;font-style:normal;color:var(--ink2);
+white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cd{width:6px;height:6px;border-radius:50%;display:inline-block;vertical-align:middle;margin:-1px 4px 0 0}
+.cd.wa{background:#25D366}.cd.tg{background:#2AABEE}
+.sx{width:42px;height:25px;border-radius:999px;position:relative;flex-shrink:0;background:var(--swOn);
+box-shadow:inset 0 1px 2px rgba(0,0,0,.14)}
+.sx b{position:absolute;top:3px;right:3px;width:19px;height:19px;border-radius:50%;display:block;
+background:#FFF;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.sx.off{background:var(--swOff)}.sx.off b{left:3px;right:auto}
+.bc{padding:12px 13px;display:flex;align-items:center;gap:11px;border-radius:14px;
+background:var(--sf);border:1px solid var(--bd);box-shadow:var(--e1)}
+.card{border-radius:14px;background:var(--sf);border:1px solid var(--bd);box-shadow:var(--e1)}
+.ct{display:flex;align-items:center;gap:11px;padding:12px 13px}
+.cv{height:1px;margin:0 13px;background:var(--hl)}
+.cf{display:flex;justify-content:space-between;align-items:center;padding:9px 13px 11px;
+font-size:11.5px;font-weight:600}
+.cf .on{color:var(--goodInk)}.cf .of{color:var(--ink3)}
+.ch{width:7px;height:7px;border-right:1.8px solid currentColor;border-bottom:1.8px solid currentColor;
+display:inline-block;opacity:.5;flex-shrink:0;color:var(--ink2)}
+.ch.r{transform:rotate(-45deg)}.ch.d{transform:rotate(45deg);margin-top:-3px}.ch.l{transform:rotate(135deg);margin-left:2px}
+.on-pill{font-size:9.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--goodBg);
+color:var(--goodInk);flex-shrink:0}
+.seg{display:flex;border-bottom:1px solid var(--hl)}
+.sg1{flex:1;text-align:center;font-size:9px;font-weight:600;padding:7px 0 8px;white-space:nowrap;
+color:var(--ink3);border-bottom:2px solid transparent;margin-bottom:-1px}
+.sg1.on{color:var(--ink);border-bottom-color:var(--acc);font-weight:700}
+.fg{display:flex;flex-direction:column;gap:6px}
+.fl{font-size:9.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;padding:0 2px;color:var(--ink3)}
+.wl{padding:11px 13px;border-radius:10px;font-size:12px;min-height:40px;display:flex;align-items:center;
+justify-content:space-between;gap:8px;color:var(--ink);background:var(--sf);border:1px solid var(--bdI);box-shadow:var(--e1)}
+.wl.a{align-items:flex-start;font-size:11.5px;line-height:1.45;min-height:58px}
+.tr{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 13px;
+border-radius:14px;font-size:12px;font-weight:550;color:var(--ink);background:var(--sf);
+border:1px solid var(--bd);box-shadow:var(--e1)}
+.sv{margin-top:auto;text-align:center;padding:12px;border-radius:11px;font-size:13px;font-weight:700;
+background:var(--saveBg);color:var(--saveInk);box-shadow:var(--e2)}
+.tb{display:flex;padding:8px 8px 15px;flex-shrink:0;background:var(--sf);border-top:1px solid var(--hl)}
+.tb a{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:9px;
+font-weight:600;color:var(--ink3);text-decoration:none}
+.tb a i{width:20px;height:20px;border-radius:6px;border:2px solid currentColor;display:block}
+.tb a.on{color:var(--acc)}.tb a.on i{border-radius:7px}
+.d-order{background:#16A75C}.d-owner{background:#E07612}.d-dialog{background:#3B82F6}
+.d-silent{background:#8A94A6}.d-closed{background:#9B5DE0}
+
+.coll{margin-top:14px;padding:11px 13px;border-radius:9px;background:var(--g2);max-width:62ch}
+.coll .h{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+color:var(--k3);margin:0 0 7px}
+.coll p.sv{margin:0 0 9px;font-size:13.5px;color:var(--k2)}
+.coll .pair{display:flex;gap:14px;flex-wrap:wrap}
+.coll .one{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--k2)}
+.coll .one i{width:22px;height:22px;border-radius:6px;display:block;flex-shrink:0;
+border:1px solid rgba(128,128,128,.3)}
+.fmly{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.1em;
+text-transform:uppercase;color:var(--k3);border:1px solid var(--rl);border-radius:999px;
+padding:3px 9px;margin-left:8px;vertical-align:middle}
+.p-inej{--bgS:#0E1116;--sf:#171C24;--hl:#252D3A;--bd:#5D687A;--bdI:#5D687A;--ink:#ECF0F6;--ink2:#B9BEC6;--ink3:#90969F;--acc:#5FF4FA;--chipBg:#023536;--chipInk:#7CE1E3;--saveBg:#29EEED;--saveInk:#080B10;--swOn:#34C759;--swOff:#616977;--goodBg:#093122;--goodInk:#73E8BB;--e1:0 1px 2px rgba(0,0,0,.5);--e2:0 1px 2px rgba(0,0,0,.55),0 10px 24px -10px rgba(0,0,0,.6);}
+.p-inej .spk i:nth-child(n+6){background:#29EEED}
+.p-inej .d-owner{background:#FFB068}
+.p-inej .d-dialog{background:#E19FF0}
+.p-inej .d-order{background:#00976B}
+.p-siren{--bgS:#08111A;--sf:#101E2B;--hl:#1C3042;--bd:#546C82;--bdI:#546C82;--ink:#E9EFF6;--ink2:#B5BFC9;--ink3:#8C96A1;--acc:#F599ED;--chipBg:#392440;--chipInk:#EDBDFC;--saveBg:#E099FD;--saveInk:#050C13;--swOn:#34C759;--swOff:#596B7C;--goodBg:#053121;--goodInk:#73E8BB;--e1:0 1px 2px rgba(0,0,0,.5);--e2:0 1px 2px rgba(0,0,0,.55),0 10px 24px -10px rgba(0,0,0,.6);}
+.p-siren .spk i:nth-child(n+6){background:#E099FD}
+.p-siren .d-owner{background:#FFAB68}
+.p-siren .d-dialog{background:#4EDDD8}
+.p-siren .d-order{background:#00976B}
+.p-polnoch{--bgS:#131015;--sf:#1F1B22;--hl:#322B36;--bd:#6E6575;--bdI:#6E6575;--ink:#EFEDF4;--ink2:#BFBCC6;--ink3:#96939E;--acc:#E396FF;--chipBg:#2A2A49;--chipInk:#CECAFF;--saveBg:#1C6FD2;--saveInk:#FBF9FE;--swOn:#34C759;--swOff:#6D6672;--goodBg:#093122;--goodInk:#73E8BB;--e1:0 1px 2px rgba(0,0,0,.5);--e2:0 1px 2px rgba(0,0,0,.55),0 10px 24px -10px rgba(0,0,0,.6);}
+.p-polnoch .spk i:nth-child(n+6){background:#1C6FD2}
+.p-polnoch .d-owner{background:#FFB163}
+.p-polnoch .d-dialog{background:#4EDDD8}
+.p-polnoch .d-order{background:#00976B}
+.p-kinovar-graphite{--bgS:#0C1116;--sf:#161D23;--hl:#212D38;--bd:#5E6E7E;--bdI:#5E6E7E;--ink:#EBF0F6;--ink2:#B7BFC6;--ink3:#8E969E;--acc:#FF996C;--chipBg:#212D38;--chipInk:#C4CBD3;--saveBg:#FD8358;--saveInk:#091017;--swOn:#34C759;--swOff:#586B7D;--goodBg:#0A2B1E;--goodInk:#7DEABD;--e1:0 1px 2px rgba(0,0,0,.5);--e2:0 1px 2px rgba(0,0,0,.55),0 10px 24px -10px rgba(0,0,0,.6);}
+.p-kinovar-graphite .spk i:nth-child(n+6){background:#FD8358}
+.p-kinovar-graphite .d-owner{background:#F4D078}
+.p-kinovar-graphite .d-dialog{background:#ACCAFF}
+.p-kinovar-graphite .d-order{background:#7AF1CE}
+.p-polyn{--bgS:#F8F5EF;--sf:#FEFCF8;--hl:#ECE8DE;--bd:#918C7F;--bdI:#918C7F;--ink:#1F1D17;--ink2:#4A453B;--ink3:#5F5A50;--acc:#02680C;--chipBg:#E6EDE3;--chipInk:#17552A;--saveBg:#006913;--saveInk:#F3F7F1;--swOn:#34C759;--swOff:#9B917B;--goodBg:#DCEBE4;--goodInk:#006945;--e1:0 1px 2px rgba(60,52,36,.055);--e2:0 1px 2px rgba(60,52,36,.055),0 4px 8px -2px rgba(60,52,36,.05),0 16px 28px -12px rgba(60,52,36,.095);}
+.p-polyn .spk i:nth-child(n+6){background:#006913}
+.p-polyn .d-owner{background:#D34113}
+.p-polyn .d-dialog{background:#2E57CC}
+.p-polyn .d-order{background:#009765}
+.p-oliva{--bgS:#F7F3EC;--sf:#FEFCF8;--hl:#EAE5DB;--bd:#918B7E;--bdI:#918B7E;--ink:#201D17;--ink2:#4B453B;--ink3:#605A50;--acc:#3B6C02;--chipBg:#EAECE0;--chipInk:#475408;--saveBg:#857221;--saveInk:#FBFBF7;--swOn:#34C759;--swOff:#9C8F7A;--goodBg:#DAEBED;--goodInk:#006572;--e1:0 1px 2px rgba(72,62,40,.055);--e2:0 1px 2px rgba(72,62,40,.055),0 4px 8px -2px rgba(72,62,40,.05),0 16px 28px -12px rgba(72,62,40,.095);}
+.p-oliva .spk i:nth-child(n+6){background:#857221}
+.p-oliva .d-owner{background:#D34113}
+.p-oliva .d-dialog{background:#1E5BC5}
+.p-oliva .d-order{background:#00879B}
+.p-sliva{--bgS:#F7F3ED;--sf:#FEFBF8;--hl:#EAE4DB;--bd:#918A7E;--bdI:#918A7E;--ink:#201D17;--ink2:#4A453B;--ink3:#5F5A50;--acc:#622576;--chipBg:#F0E7F2;--chipInk:#652C76;--saveBg:#763888;--saveInk:#F8F4F9;--swOn:#34C759;--swOff:#9E917D;--goodBg:#DDEBE2;--goodInk:#006936;--e1:0 1px 2px rgba(64,56,44,.055);--e2:0 1px 2px rgba(64,56,44,.055),0 4px 8px -2px rgba(64,56,44,.05),0 16px 28px -12px rgba(64,56,44,.095);}
+.p-sliva .spk i:nth-child(n+6){background:#763888}
+.p-sliva .d-owner{background:#D34113}
+.p-sliva .d-dialog{background:#0063C1}
+.p-sliva .d-order{background:#047B55}
+</style><div class="page"><header class="mast">
+ <p class="eb">Refined Modern · два направления · 7 вариантов</p>
+ <h1>Cool dark and warm paper, <em>past the obvious version.</em></h1>
+ <p class="lede">Both directions you liked, extended — same Refined Modern material, same three screens.
+ The dashboard now shows <strong>four statuses instead of three</strong>, because both of these accents
+ collide with a colour that already means something, and a mock that hides the collision is useless.</p>
+ <p class="lede"><strong>«Графит» has a blue problem:</strong> Telegram blue and «В диалоге» are both blue.
+ <strong>«Песок» has a green problem, and it is worse:</strong> WhatsApp green, the «бот работает» switch and
+ «Заказ собран» are three greens that may never move. Every palette states how it separated the brand from
+ them, and the distance to both channel colours is measured in ΔE.</p>
+</header><section class="fam"><h2>«Графит» — прохладная тёмная</h2><p>The cool dark you liked, pushed across its real range. The ground temperature does as much work as the accent: blue-black, slate and violet-black are three different products before the accent lands. Note that a blue brand has to fight Telegram blue and the «В диалоге» status — the non-blue accents sidestep that fight entirely.</p></section><section class="pal p-inej">
+ <div class="ph"><div>
+   <p class="eb">01 — палитра</p>
+   <h3>«Иней» <span>— Frost</span><span class="fmly">aqua-cyan (OKLCH L83 C0.115 H197)</span></h3>
+   <p class="blurb">Blue-black paper with exactly one lit thing on it: an aqua that reads like edge-lit glass rather than paint. Everything else is ink and hairline, so the single cold accent does all the pointing and the app looks like an instrument that is switched on.</p>
+   <p class="rk"><b>Risk</b><br>Aqua is the coldest of the three — on a tool sold to a 55-year-old parts seller it can read as laboratory equipment rather than something that belongs to him.</p>
+   <div class="swr"><span class="sw"><i style="background:#0E1116"></i>#0E1116<br>ground</span><span class="sw"><i style="background:#171C24"></i>#171C24<br>surface</span><span class="sw"><i style="background:#5D687A"></i>#5D687A<br>input bd</span><span class="sw"><i style="background:#29EEED"></i>#29EEED<br>accent fill</span><span class="sw"><i style="background:#5FF4FA"></i>#5FF4FA<br>accent text</span><span class="sw"><i style="background:#ECF0F6"></i>#ECF0F6<br>ink</span></div><div class="coll"><p class="h">Collision solve</p><p class="sv">A blue brand is not available: Telegram (L70/H238) and in_dialog (L62/H260) sit only ΔE 11 apart and jointly blank the cool band at every lightness that passes fill contrast, so the brand steps sideways to aqua L83/H197 — ΔE 15.6 from Telegram, 16.5 from WhatsApp, 17.9 from the switch green. in_dialog then leaves blue entirely for light orchid L83/H320 (ΔE 22.0 from Telegram, 21.6 from the brand, 23.6 clear of question_closed's purple by lightness), and order_collected drops to jade L60/H164 — 18.3 from WhatsApp green and 15.4 from the activation switch, neither of which moves a step.</p><div class="pair"><span class="one"><i style="background:#29EEED"></i>бренд</span><span class="one"><i style="background:#FFB068"></i>Нужен владелец</span><span class="one"><i style="background:#E19FF0"></i>В диалоге</span><span class="one"><i style="background:#00976B"></i>Заказ собран</span><span class="one"><i style="background:#F66C6D"></i>Удалить</span></div><p class="sv" style="margin:9px 0 0;font-family:var(--mono);font-size:11px">vs WhatsApp 17ΔE · vs Telegram 19ΔE</p></div>
+  </div><div><table class="cx"><caption>Measured contrast</caption><tbody><tr><td>accent FILL / surface</td><td class="ok">11.85</td></tr><tr><td>body ink / surface</td><td class="ok">14.95</td></tr><tr><td>secondary ink / surface</td><td class="ok">9.16</td></tr><tr><td>tertiary ink / surface</td><td class="ok">5.74</td></tr><tr><td>accent TEXT / surface</td><td class="ok">12.87</td></tr><tr><td>button label / fill</td><td class="ok">13.65</td></tr><tr><td>chip label / chip fill</td><td class="ok">8.78</td></tr><tr><td>status ink / status bg</td><td class="ok">9.49</td></tr><tr><td>input border / surface</td><td class="ok">3.03</td></tr><tr><td>body ink / ground</td><td class="ok">16.54</td></tr><tr><td>switch OFF track / surface</td><td class="ok">3.09</td></tr></tbody></table></div></div>
+ <div class="row"><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div><div class="ah"><h3>Сводка</h3><span class="hb">+</span></div><div class="bd"><div class="cs"><span class="cp on">7 дней</span><span class="cp">30 дней</span><span class="cp">Всё время</span></div><div class="hero"><span class="l">Заказов собрано</span><span class="n">24<small>+8</small></span><span class="s">за неделю · 62 диалога</span><span class="spk"><i style="height:38%"></i><i style="height:52%"></i><i style="height:31%"></i><i style="height:64%"></i><i style="height:45%"></i><i style="height:78%"></i><i style="height:100%"></i></span></div><div class="rws"><div class="rw"><span class="d d-order"></span><span class="m">Заказ собран</span><span class="c">24</span></div><div class="rw"><span class="d d-owner"></span><span class="m">Нужен владелец</span><span class="c">3</span></div><div class="rw"><span class="d d-dialog"></span><span class="m">В диалоге</span><span class="c">11</span></div><div class="rw"><span class="d d-closed"></span><span class="m">Вопрос закрыт</span><span class="c">18</span></div></div><div class="bc"><span class="av wa">Ц</span><span class="bm"><b>Цветы Алматы</b><em><i class="cd wa"></i>WhatsApp · Работает</em></span><span class="sx"><b></b></span></div></div><div class="tb"><a><i></i>Чаты</a><a><i></i>Боты</a><a class="on"><i></i>Сводка</a><a><i></i>Профиль</a></div></div></div><figcaption class="pc">Сводка</figcaption></figure><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div><div class="ah"><h3>Боты</h3><span class="hb">+</span></div><div class="bd"><div class="card"><div class="ct"><span class="av wa">Ц</span><span class="bm"><b>Цветы Алматы</b><em><i class="cd wa"></i>WhatsApp</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="on">Бот работает</span><span class="sx"><b></b></span></div></div><div class="card"><div class="ct"><span class="av wa">А</span><span class="bm"><b>Автозапчасти 4х4</b><em><i class="cd wa"></i>WhatsApp&nbsp;&nbsp;<i class="cd tg"></i>Telegram</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="on">Бот работает</span><span class="sx"><b></b></span></div></div><div class="card"><div class="ct"><span class="av tg">У</span><span class="bm"><b>Учебный центр</b><em><i class="cd tg"></i>Telegram</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="of">Бот на паузе</span><span class="sx off"><b></b></span></div></div></div><div class="tb"><a class=""><i></i>Чаты</a><a class="on"><i></i>Боты</a><a class=""><i></i>Сводка</a><a class=""><i></i>Профиль</a></div></div></div><figcaption class="pc">Боты</figcaption></figure><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div>
+<div class="ah s"><span class="hb"><i class="ch l"></i></span><h3>Цветы Алматы</h3>
+ <span class="on-pill">Онлайн</span></div>
+<div class="bd">
+ <div class="seg"><span class="sg1 on">Общие</span><span class="sg1">Бизнес</span><span class="sg1">Товары</span><span class="sg1">Услуги</span><span class="sg1">Промпты</span></div>
+ <div class="fg"><span class="fl">Название бота</span><div class="wl">Цветы Алматы</div></div>
+ <div class="fg"><span class="fl">Тип бизнеса</span><div class="wl">Цветы и подарки<i class="ch d"></i></div></div>
+ <div class="fg"><span class="fl">Приветствие</span><div class="wl a">Здравствуйте! Это «Цветы Алматы» 🌸 Подскажу букет, цену и доставку.</div></div>
+ <div class="tr">Уведомления о заказах<span class="sx"><b></b></span></div>
+ <div class="sv">Сохранить</div>
+</div></div></div><figcaption class="pc">Настройки</figcaption></figure></div></section><section class="pal p-siren">
+ <div class="ph"><div>
+   <p class="eb">02 — палитра</p>
+   <h3>«Сирень» <span>— Lilac & Slate</span><span class="fmly">orchid-lilac (OKLCH L79 C0.14 H318)</span></h3>
+   <p class="blurb">The slate ground is the cool they liked turned up until it is unmistakably blue, and the lilac on it behaves like light rather than pigment. It is the only one of the three a non-technical owner would call beautiful instead of merely correct.</p>
+   <p class="rk"><b>Risk</b><br>Lilac is the most fashion-dependent choice here — it will date faster than a neutral graphite, and a minority of owners will read it as feminine rather than premium.</p>
+   <div class="swr"><span class="sw"><i style="background:#08111A"></i>#08111A<br>ground</span><span class="sw"><i style="background:#101E2B"></i>#101E2B<br>surface</span><span class="sw"><i style="background:#546C82"></i>#546C82<br>input bd</span><span class="sw"><i style="background:#E099FD"></i>#E099FD<br>accent fill</span><span class="sw"><i style="background:#F599ED"></i>#F599ED<br>accent text</span><span class="sw"><i style="background:#E9EFF6"></i>#E9EFF6<br>ink</span></div><div class="coll"><p class="h">Collision solve</p><p class="sv">The brand abandons the contested band altogether — orchid L79/H318 sits ΔE 20.2 from Telegram, 34.1 from WhatsApp, 33.9 from the switch green and 19.5 from question_closed's purple (which stays exactly where it is, separated by 18 points of lightness). That frees the cool side, so in_dialog moves to cyan L82/H192 and clears Telegram by ΔE 15.7 — the blue-on-blue pileup is dissolved without touching a channel colour — while order_collected goes jade L60/H164, 18.3 from WhatsApp green and 15.4 from the switch.</p><div class="pair"><span class="one"><i style="background:#E099FD"></i>бренд</span><span class="one"><i style="background:#FFAB68"></i>Нужен владелец</span><span class="one"><i style="background:#4EDDD8"></i>В диалоге</span><span class="one"><i style="background:#00976B"></i>Заказ собран</span><span class="one"><i style="background:#F26966"></i>Удалить</span></div><p class="sv" style="margin:9px 0 0;font-family:var(--mono);font-size:11px">vs WhatsApp 36ΔE · vs Telegram 21ΔE</p></div>
+  </div><div><table class="cx"><caption>Measured contrast</caption><tbody><tr><td>accent FILL / surface</td><td class="ok">8.16</td></tr><tr><td>body ink / surface</td><td class="ok">14.6</td></tr><tr><td>secondary ink / surface</td><td class="ok">9.06</td></tr><tr><td>tertiary ink / surface</td><td class="ok">5.63</td></tr><tr><td>accent TEXT / surface</td><td class="ok">8.58</td></tr><tr><td>button label / fill</td><td class="ok">9.49</td></tr><tr><td>chip label / chip fill</td><td class="ok">8.85</td></tr><tr><td>status ink / status bg</td><td class="ok">9.53</td></tr><tr><td>input border / surface</td><td class="ok">3.09</td></tr><tr><td>body ink / ground</td><td class="ok">16.41</td></tr><tr><td>switch OFF track / surface</td><td class="ok">3.07</td></tr></tbody></table></div></div>
+ <div class="row"><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div><div class="ah"><h3>Сводка</h3><span class="hb">+</span></div><div class="bd"><div class="cs"><span class="cp on">7 дней</span><span class="cp">30 дней</span><span class="cp">Всё время</span></div><div class="hero"><span class="l">Заказов собрано</span><span class="n">24<small>+8</small></span><span class="s">за неделю · 62 диалога</span><span class="spk"><i style="height:38%"></i><i style="height:52%"></i><i style="height:31%"></i><i style="height:64%"></i><i style="height:45%"></i><i style="height:78%"></i><i style="height:100%"></i></span></div><div class="rws"><div class="rw"><span class="d d-order"></span><span class="m">Заказ собран</span><span class="c">24</span></div><div class="rw"><span class="d d-owner"></span><span class="m">Нужен владелец</span><span class="c">3</span></div><div class="rw"><span class="d d-dialog"></span><span class="m">В диалоге</span><span class="c">11</span></div><div class="rw"><span class="d d-closed"></span><span class="m">Вопрос закрыт</span><span class="c">18</span></div></div><div class="bc"><span class="av wa">Ц</span><span class="bm"><b>Цветы Алматы</b><em><i class="cd wa"></i>WhatsApp · Работает</em></span><span class="sx"><b></b></span></div></div><div class="tb"><a><i></i>Чаты</a><a><i></i>Боты</a><a class="on"><i></i>Сводка</a><a><i></i>Профиль</a></div></div></div><figcaption class="pc">Сводка</figcaption></figure><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div><div class="ah"><h3>Боты</h3><span class="hb">+</span></div><div class="bd"><div class="card"><div class="ct"><span class="av wa">Ц</span><span class="bm"><b>Цветы Алматы</b><em><i class="cd wa"></i>WhatsApp</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="on">Бот работает</span><span class="sx"><b></b></span></div></div><div class="card"><div class="ct"><span class="av wa">А</span><span class="bm"><b>Автозапчасти 4х4</b><em><i class="cd wa"></i>WhatsApp&nbsp;&nbsp;<i class="cd tg"></i>Telegram</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="on">Бот работает</span><span class="sx"><b></b></span></div></div><div class="card"><div class="ct"><span class="av tg">У</span><span class="bm"><b>Учебный центр</b><em><i class="cd tg"></i>Telegram</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="of">Бот на паузе</span><span class="sx off"><b></b></span></div></div></div><div class="tb"><a class=""><i></i>Чаты</a><a class="on"><i></i>Боты</a><a class=""><i></i>Сводка</a><a class=""><i></i>Профиль</a></div></div></div><figcaption class="pc">Боты</figcaption></figure><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div>
+<div class="ah s"><span class="hb"><i class="ch l"></i></span><h3>Цветы Алматы</h3>
+ <span class="on-pill">Онлайн</span></div>
+<div class="bd">
+ <div class="seg"><span class="sg1 on">Общие</span><span class="sg1">Бизнес</span><span class="sg1">Товары</span><span class="sg1">Услуги</span><span class="sg1">Промпты</span></div>
+ <div class="fg"><span class="fl">Название бота</span><div class="wl">Цветы Алматы</div></div>
+ <div class="fg"><span class="fl">Тип бизнеса</span><div class="wl">Цветы и подарки<i class="ch d"></i></div></div>
+ <div class="fg"><span class="fl">Приветствие</span><div class="wl a">Здравствуйте! Это «Цветы Алматы» 🌸 Подскажу букет, цену и доставку.</div></div>
+ <div class="tr">Уведомления о заказах<span class="sx"><b></b></span></div>
+ <div class="sv">Сохранить</div>
+</div></div></div><figcaption class="pc">Настройки</figcaption></figure></div></section><section class="pal p-polnoch">
+ <div class="ph"><div>
+   <p class="eb">03 — палитра</p>
+   <h3>«Полночь» <span>— Midnight & Indigo</span><span class="fmly">deep azure-indigo (OKLCH L55 C0.171 H256)</span></h3>
+   <p class="blurb">Violet-black ground and the blue they actually asked for — but sunk into the page as a deep saturated fill carrying white type, not floated on top as a glow. Buttons feel stamped rather than lit, and the register is quiet authority instead of dashboard neon.</p>
+   <p class="rk"><b>Risk</b><br>The primary fill clears the 3:1 floor at only 3.44:1, so in direct Almaty sunlight the button's edge is the first thing to wash out, and a dark accent gives the interface less visible energy than the two light-accent options.</p>
+   <div class="swr"><span class="sw"><i style="background:#131015"></i>#131015<br>ground</span><span class="sw"><i style="background:#1F1B22"></i>#1F1B22<br>surface</span><span class="sw"><i style="background:#6E6575"></i>#6E6575<br>input bd</span><span class="sw"><i style="background:#1C6FD2"></i>#1C6FD2<br>accent fill</span><span class="sw"><i style="background:#E396FF"></i>#E396FF<br>accent text</span><span class="sw"><i style="background:#EFEDF4"></i>#EFEDF4<br>ink</span></div><div class="coll"><p class="h">Collision solve</p><p class="sv">Blue is kept, but moved BELOW the collision instead of around it: the fill sits at L55, under Telegram (L70) and under question_closed (L61), which buys ΔE 16.5 and 15.7 on lightness alone while white type still passes at 4.94:1 — the one blue band the fixed colours do not own. in_dialog vacates blue for cyan L82/H192 (15.7 from Telegram, 31.5 from the brand), the brand's TEXT tint rotates 34° to periwinkle L82/H290 so links can never be mistaken for Telegram (ΔE 16.3), and order_collected drops to the same jade L60/H164 that clears WhatsApp by 18.3 and the switch by 15.4.</p><div class="pair"><span class="one"><i style="background:#1C6FD2"></i>бренд</span><span class="one"><i style="background:#FFB163"></i>Нужен владелец</span><span class="one"><i style="background:#4EDDD8"></i>В диалоге</span><span class="one"><i style="background:#00976B"></i>Заказ собран</span><span class="one"><i style="background:#F66B71"></i>Удалить</span></div><p class="sv" style="margin:9px 0 0;font-family:var(--mono);font-size:11px">vs WhatsApp 37ΔE · vs Telegram 17ΔE</p></div>
+  </div><div><table class="cx"><caption>Measured contrast</caption><tbody><tr><td>accent FILL / surface</td><td class="ok">3.44</td></tr><tr><td>body ink / surface</td><td class="ok">14.61</td></tr><tr><td>secondary ink / surface</td><td class="ok">9.07</td></tr><tr><td>tertiary ink / surface</td><td class="ok">5.62</td></tr><tr><td>accent TEXT / surface</td><td class="ok">8.14</td></tr><tr><td>button label / fill</td><td class="ok">4.72</td></tr><tr><td>chip label / chip fill</td><td class="ok">8.86</td></tr><tr><td>status ink / status bg</td><td class="ok">9.49</td></tr><tr><td>input border / surface</td><td class="ok">3.05</td></tr><tr><td>body ink / ground</td><td class="ok">16.26</td></tr><tr><td>switch OFF track / surface</td><td class="ok">3.06</td></tr></tbody></table></div></div>
+ <div class="row"><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div><div class="ah"><h3>Сводка</h3><span class="hb">+</span></div><div class="bd"><div class="cs"><span class="cp on">7 дней</span><span class="cp">30 дней</span><span class="cp">Всё время</span></div><div class="hero"><span class="l">Заказов собрано</span><span class="n">24<small>+8</small></span><span class="s">за неделю · 62 диалога</span><span class="spk"><i style="height:38%"></i><i style="height:52%"></i><i style="height:31%"></i><i style="height:64%"></i><i style="height:45%"></i><i style="height:78%"></i><i style="height:100%"></i></span></div><div class="rws"><div class="rw"><span class="d d-order"></span><span class="m">Заказ собран</span><span class="c">24</span></div><div class="rw"><span class="d d-owner"></span><span class="m">Нужен владелец</span><span class="c">3</span></div><div class="rw"><span class="d d-dialog"></span><span class="m">В диалоге</span><span class="c">11</span></div><div class="rw"><span class="d d-closed"></span><span class="m">Вопрос закрыт</span><span class="c">18</span></div></div><div class="bc"><span class="av wa">Ц</span><span class="bm"><b>Цветы Алматы</b><em><i class="cd wa"></i>WhatsApp · Работает</em></span><span class="sx"><b></b></span></div></div><div class="tb"><a><i></i>Чаты</a><a><i></i>Боты</a><a class="on"><i></i>Сводка</a><a><i></i>Профиль</a></div></div></div><figcaption class="pc">Сводка</figcaption></figure><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div><div class="ah"><h3>Боты</h3><span class="hb">+</span></div><div class="bd"><div class="card"><div class="ct"><span class="av wa">Ц</span><span class="bm"><b>Цветы Алматы</b><em><i class="cd wa"></i>WhatsApp</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="on">Бот работает</span><span class="sx"><b></b></span></div></div><div class="card"><div class="ct"><span class="av wa">А</span><span class="bm"><b>Автозапчасти 4х4</b><em><i class="cd wa"></i>WhatsApp&nbsp;&nbsp;<i class="cd tg"></i>Telegram</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="on">Бот работает</span><span class="sx"><b></b></span></div></div><div class="card"><div class="ct"><span class="av tg">У</span><span class="bm"><b>Учебный центр</b><em><i class="cd tg"></i>Telegram</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="of">Бот на паузе</span><span class="sx off"><b></b></span></div></div></div><div class="tb"><a class=""><i></i>Чаты</a><a class="on"><i></i>Боты</a><a class=""><i></i>Сводка</a><a class=""><i></i>Профиль</a></div></div></div><figcaption class="pc">Боты</figcaption></figure><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div>
+<div class="ah s"><span class="hb"><i class="ch l"></i></span><h3>Цветы Алматы</h3>
+ <span class="on-pill">Онлайн</span></div>
+<div class="bd">
+ <div class="seg"><span class="sg1 on">Общие</span><span class="sg1">Бизнес</span><span class="sg1">Товары</span><span class="sg1">Услуги</span><span class="sg1">Промпты</span></div>
+ <div class="fg"><span class="fl">Название бота</span><div class="wl">Цветы Алматы</div></div>
+ <div class="fg"><span class="fl">Тип бизнеса</span><div class="wl">Цветы и подарки<i class="ch d"></i></div></div>
+ <div class="fg"><span class="fl">Приветствие</span><div class="wl a">Здравствуйте! Это «Цветы Алматы» 🌸 Подскажу букет, цену и доставку.</div></div>
+ <div class="tr">Уведомления о заказах<span class="sx"><b></b></span></div>
+ <div class="sv">Сохранить</div>
+</div></div></div><figcaption class="pc">Настройки</figcaption></figure></div></section><section class="pal p-kinovar-graphite">
+ <div class="ph"><div>
+   <p class="eb">04 — палитра</p>
+   <h3>«Киноварь» <span>— Cinnabar & Graphite</span><span class="fmly">cinnabar red-orange</span></h3>
+   <p class="blurb">Cinnabar — the red-orange of old lacquer — struck once against a steel-black ground. It is the warmest and most human of the three, the only one that looks like a person picked it rather than a contrast checker.</p>
+   <p class="rk"><b>Risk</b><br>The brand is the most urgent-looking colour on screen, so a calm bot card can read as an alert; it also sits ΔE 16.8 from the destructive crimson, which is comfortable in isolation but tight if a delete button ever shares a row with a primary.</p>
+   <div class="swr"><span class="sw"><i style="background:#0C1116"></i>#0C1116<br>ground</span><span class="sw"><i style="background:#161D23"></i>#161D23<br>surface</span><span class="sw"><i style="background:#5E6E7E"></i>#5E6E7E<br>input bd</span><span class="sw"><i style="background:#FD8358"></i>#FD8358<br>accent fill</span><span class="sw"><i style="background:#FF996C"></i>#FF996C<br>accent text</span><span class="sw"><i style="background:#EBF0F6"></i>#EBF0F6<br>ink</span></div><div class="coll"><p class="h">Collision solve</p><p class="sv">Against the fixed set the brand is trivially clear — ΔE 29.8 to WhatsApp, 28.7 to the switch green, 30.2 to Telegram — so the collision is internal: a cinnabar brand and an orange alarm cannot share the band, and the brand wins the red-orange while owner_needed takes amber #F4D078 at L87 (ΔE 17.7 from brand, and at 11.5:1 it becomes the brightest mark in a status row instead of the dimmest, which is what 'needs you' should be). Destructive drops to crimson #EE3174 (ΔE 33.8 from the alarm, 16.8 from the brand), order_collected becomes cool mint #7AF1CE (ΔE 15.6 from WhatsApp, 17.9 from the switch) and in_dialog ice blue #A8CEFF (ΔE 15.4 from Telegram).</p><div class="pair"><span class="one"><i style="background:#FD8358"></i>бренд</span><span class="one"><i style="background:#F4D078"></i>Нужен владелец</span><span class="one"><i style="background:#ACCAFF"></i>В диалоге</span><span class="one"><i style="background:#7AF1CE"></i>Заказ собран</span><span class="one"><i style="background:#F2357C"></i>Удалить</span></div><p class="sv" style="margin:9px 0 0;font-family:var(--mono);font-size:11px">vs WhatsApp 30ΔE · vs Telegram 30ΔE</p></div>
+  </div><div><table class="cx"><caption>Measured contrast</caption><tbody><tr><td>accent FILL / surface</td><td class="ok">6.94</td></tr><tr><td>body ink / surface</td><td class="ok">14.85</td></tr><tr><td>secondary ink / surface</td><td class="ok">9.14</td></tr><tr><td>tertiary ink / surface</td><td class="ok">5.68</td></tr><tr><td>accent TEXT / surface</td><td class="ok">8.12</td></tr><tr><td>button label / fill</td><td class="ok">7.8</td></tr><tr><td>chip label / chip fill</td><td class="ok">8.57</td></tr><tr><td>status ink / status bg</td><td class="ok">10.44</td></tr><tr><td>input border / surface</td><td class="ok">3.25</td></tr><tr><td>body ink / ground</td><td class="ok">16.55</td></tr><tr><td>switch OFF track / surface</td><td class="ok">3.09</td></tr></tbody></table></div></div>
+ <div class="row"><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div><div class="ah"><h3>Сводка</h3><span class="hb">+</span></div><div class="bd"><div class="cs"><span class="cp on">7 дней</span><span class="cp">30 дней</span><span class="cp">Всё время</span></div><div class="hero"><span class="l">Заказов собрано</span><span class="n">24<small>+8</small></span><span class="s">за неделю · 62 диалога</span><span class="spk"><i style="height:38%"></i><i style="height:52%"></i><i style="height:31%"></i><i style="height:64%"></i><i style="height:45%"></i><i style="height:78%"></i><i style="height:100%"></i></span></div><div class="rws"><div class="rw"><span class="d d-order"></span><span class="m">Заказ собран</span><span class="c">24</span></div><div class="rw"><span class="d d-owner"></span><span class="m">Нужен владелец</span><span class="c">3</span></div><div class="rw"><span class="d d-dialog"></span><span class="m">В диалоге</span><span class="c">11</span></div><div class="rw"><span class="d d-closed"></span><span class="m">Вопрос закрыт</span><span class="c">18</span></div></div><div class="bc"><span class="av wa">Ц</span><span class="bm"><b>Цветы Алматы</b><em><i class="cd wa"></i>WhatsApp · Работает</em></span><span class="sx"><b></b></span></div></div><div class="tb"><a><i></i>Чаты</a><a><i></i>Боты</a><a class="on"><i></i>Сводка</a><a><i></i>Профиль</a></div></div></div><figcaption class="pc">Сводка</figcaption></figure><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div><div class="ah"><h3>Боты</h3><span class="hb">+</span></div><div class="bd"><div class="card"><div class="ct"><span class="av wa">Ц</span><span class="bm"><b>Цветы Алматы</b><em><i class="cd wa"></i>WhatsApp</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="on">Бот работает</span><span class="sx"><b></b></span></div></div><div class="card"><div class="ct"><span class="av wa">А</span><span class="bm"><b>Автозапчасти 4х4</b><em><i class="cd wa"></i>WhatsApp&nbsp;&nbsp;<i class="cd tg"></i>Telegram</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="on">Бот работает</span><span class="sx"><b></b></span></div></div><div class="card"><div class="ct"><span class="av tg">У</span><span class="bm"><b>Учебный центр</b><em><i class="cd tg"></i>Telegram</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="of">Бот на паузе</span><span class="sx off"><b></b></span></div></div></div><div class="tb"><a class=""><i></i>Чаты</a><a class="on"><i></i>Боты</a><a class=""><i></i>Сводка</a><a class=""><i></i>Профиль</a></div></div></div><figcaption class="pc">Боты</figcaption></figure><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div>
+<div class="ah s"><span class="hb"><i class="ch l"></i></span><h3>Цветы Алматы</h3>
+ <span class="on-pill">Онлайн</span></div>
+<div class="bd">
+ <div class="seg"><span class="sg1 on">Общие</span><span class="sg1">Бизнес</span><span class="sg1">Товары</span><span class="sg1">Услуги</span><span class="sg1">Промпты</span></div>
+ <div class="fg"><span class="fl">Название бота</span><div class="wl">Цветы Алматы</div></div>
+ <div class="fg"><span class="fl">Тип бизнеса</span><div class="wl">Цветы и подарки<i class="ch d"></i></div></div>
+ <div class="fg"><span class="fl">Приветствие</span><div class="wl a">Здравствуйте! Это «Цветы Алматы» 🌸 Подскажу букет, цену и доставку.</div></div>
+ <div class="tr">Уведомления о заказах<span class="sx"><b></b></span></div>
+ <div class="sv">Сохранить</div>
+</div></div></div><figcaption class="pc">Настройки</figcaption></figure></div></section><section class="fam"><h2>«Песок» — тёплая светлая</h2><p>The warm paper you liked. The hard constraint here is green: WhatsApp green, the «бот работает» switch and «Заказ собран» are all green and none of them may move, so a green brand has to be unmistakably deeper and duller than all three. The non-green options test whether the feeling you liked came from the sage or from the paper and the restraint.</p></section><section class="pal p-polyn">
+ <div class="ph"><div>
+   <p class="eb">05 — палитра</p>
+   <h3>«Полынь» <span>— Wormwood & Sand</span><span class="fmly">deep forest green</span></h3>
+   <p class="blurb">The sage they liked, pushed down until it stops competing — a forest green so deep it behaves like ink with chlorophyll in it, sitting on paper that still smells warm. Primary buttons land at 9.6:1 and feel carved into the page rather than printed on it.</p>
+   <p class="rk"><b>Risk</b><br>At OKLCH L37 it reads as very dark green ink rather than legible 'sage', and it is only ΔE 16.4 from the body-text ink, so on a dense screen the brand can quietly dissolve into the type.</p>
+   <div class="swr"><span class="sw"><i style="background:#F8F5EF"></i>#F8F5EF<br>ground</span><span class="sw"><i style="background:#FEFCF8"></i>#FEFCF8<br>surface</span><span class="sw"><i style="background:#918C7F"></i>#918C7F<br>input bd</span><span class="sw"><i style="background:#006913"></i>#006913<br>accent fill</span><span class="sw"><i style="background:#02680C"></i>#02680C<br>accent text</span><span class="sw"><i style="background:#1F1D17"></i>#1F1D17<br>ink</span></div><div class="coll"><p class="h">Collision solve</p><p class="sv">Separation is by lightness, not hue: WhatsApp #25D366, the switch #34C759 and every bright green live at L 73–76 while the brand sits at L 37 (ΔE 40.4 and 37.2). order_collected is rotated and lifted to a deep emerald #008B59 (H162, L56), clearing the brand by 19.3, WhatsApp by 21.4 and the switch by 18.4 — so green on screen only ever means channel, running, or order, never brand.</p><div class="pair"><span class="one"><i style="background:#006913"></i>бренд</span><span class="one"><i style="background:#D34113"></i>Нужен владелец</span><span class="one"><i style="background:#2E57CC"></i>В диалоге</span><span class="one"><i style="background:#009765"></i>Заказ собран</span><span class="one"><i style="background:#A70D2C"></i>Удалить</span></div><p class="sv" style="margin:9px 0 0;font-family:var(--mono);font-size:11px">vs WhatsApp 31ΔE · vs Telegram 33ΔE</p></div>
+  </div><div><table class="cx"><caption>Measured contrast</caption><tbody><tr><td>accent FILL / surface</td><td class="ok">6.76</td></tr><tr><td>body ink / surface</td><td class="ok">16.44</td></tr><tr><td>secondary ink / surface</td><td class="ok">9.29</td></tr><tr><td>tertiary ink / surface</td><td class="ok">6.69</td></tr><tr><td>accent TEXT / surface</td><td class="ok">6.86</td></tr><tr><td>button label / fill</td><td class="ok">6.4</td></tr><tr><td>chip label / chip fill</td><td class="ok">7.42</td></tr><tr><td>status ink / status bg</td><td class="ok">5.49</td></tr><tr><td>input border / surface</td><td class="ok">3.27</td></tr><tr><td>body ink / ground</td><td class="ok">15.48</td></tr><tr><td>switch OFF track / surface</td><td class="ok">3.05</td></tr></tbody></table></div></div>
+ <div class="row"><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div><div class="ah"><h3>Сводка</h3><span class="hb">+</span></div><div class="bd"><div class="cs"><span class="cp on">7 дней</span><span class="cp">30 дней</span><span class="cp">Всё время</span></div><div class="hero"><span class="l">Заказов собрано</span><span class="n">24<small>+8</small></span><span class="s">за неделю · 62 диалога</span><span class="spk"><i style="height:38%"></i><i style="height:52%"></i><i style="height:31%"></i><i style="height:64%"></i><i style="height:45%"></i><i style="height:78%"></i><i style="height:100%"></i></span></div><div class="rws"><div class="rw"><span class="d d-order"></span><span class="m">Заказ собран</span><span class="c">24</span></div><div class="rw"><span class="d d-owner"></span><span class="m">Нужен владелец</span><span class="c">3</span></div><div class="rw"><span class="d d-dialog"></span><span class="m">В диалоге</span><span class="c">11</span></div><div class="rw"><span class="d d-closed"></span><span class="m">Вопрос закрыт</span><span class="c">18</span></div></div><div class="bc"><span class="av wa">Ц</span><span class="bm"><b>Цветы Алматы</b><em><i class="cd wa"></i>WhatsApp · Работает</em></span><span class="sx"><b></b></span></div></div><div class="tb"><a><i></i>Чаты</a><a><i></i>Боты</a><a class="on"><i></i>Сводка</a><a><i></i>Профиль</a></div></div></div><figcaption class="pc">Сводка</figcaption></figure><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div><div class="ah"><h3>Боты</h3><span class="hb">+</span></div><div class="bd"><div class="card"><div class="ct"><span class="av wa">Ц</span><span class="bm"><b>Цветы Алматы</b><em><i class="cd wa"></i>WhatsApp</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="on">Бот работает</span><span class="sx"><b></b></span></div></div><div class="card"><div class="ct"><span class="av wa">А</span><span class="bm"><b>Автозапчасти 4х4</b><em><i class="cd wa"></i>WhatsApp&nbsp;&nbsp;<i class="cd tg"></i>Telegram</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="on">Бот работает</span><span class="sx"><b></b></span></div></div><div class="card"><div class="ct"><span class="av tg">У</span><span class="bm"><b>Учебный центр</b><em><i class="cd tg"></i>Telegram</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="of">Бот на паузе</span><span class="sx off"><b></b></span></div></div></div><div class="tb"><a class=""><i></i>Чаты</a><a class="on"><i></i>Боты</a><a class=""><i></i>Сводка</a><a class=""><i></i>Профиль</a></div></div></div><figcaption class="pc">Боты</figcaption></figure><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div>
+<div class="ah s"><span class="hb"><i class="ch l"></i></span><h3>Цветы Алматы</h3>
+ <span class="on-pill">Онлайн</span></div>
+<div class="bd">
+ <div class="seg"><span class="sg1 on">Общие</span><span class="sg1">Бизнес</span><span class="sg1">Товары</span><span class="sg1">Услуги</span><span class="sg1">Промпты</span></div>
+ <div class="fg"><span class="fl">Название бота</span><div class="wl">Цветы Алматы</div></div>
+ <div class="fg"><span class="fl">Тип бизнеса</span><div class="wl">Цветы и подарки<i class="ch d"></i></div></div>
+ <div class="fg"><span class="fl">Приветствие</span><div class="wl a">Здравствуйте! Это «Цветы Алматы» 🌸 Подскажу букет, цену и доставку.</div></div>
+ <div class="tr">Уведомления о заказах<span class="sx"><b></b></span></div>
+ <div class="sv">Сохранить</div>
+</div></div></div><figcaption class="pc">Настройки</figcaption></figure></div></section><section class="pal p-oliva">
+ <div class="ph"><div>
+   <p class="eb">06 — палитра</p>
+   <h3>«Олива» <span>— Olive & Oat</span><span class="fmly">olive-moss (yellow-green)</span></h3>
+   <p class="blurb">Green kept, but moved to the yellow half of the wheel — a dry moss-olive on oat paper, the colour of a warehouse ledger rather than a wellness app. It is the only one of the three that still reads unmistakably as green from arm's length in sunlight.</p>
+   <p class="rk"><b>Risk</b><br>H118 at C0.105 can tip toward 'military surplus' instead of 'herbal', and its 5.2:1 fill gives the primary button noticeably less authority than the other two.</p>
+   <div class="swr"><span class="sw"><i style="background:#F7F3EC"></i>#F7F3EC<br>ground</span><span class="sw"><i style="background:#FEFCF8"></i>#FEFCF8<br>surface</span><span class="sw"><i style="background:#918B7E"></i>#918B7E<br>input bd</span><span class="sw"><i style="background:#857221"></i>#857221<br>accent fill</span><span class="sw"><i style="background:#3B6C02"></i>#3B6C02<br>accent text</span><span class="sw"><i style="background:#201D17"></i>#201D17<br>ink</span></div><div class="coll"><p class="h">Collision solve</p><p class="sv">The green band is split down the middle: the brand takes the yellow side (H118, L52) and order_collected is moved out of green entirely to a deep sea-teal #00879B (H208), ΔE 15.8 from the brand and 26.0 from WhatsApp. The two untouchable greens clear the brand on lightness alone (ΔE 26.7 and 23.6), so nothing yellow-green and nothing blue-green can be mistaken for each other.</p><div class="pair"><span class="one"><i style="background:#857221"></i>бренд</span><span class="one"><i style="background:#D34113"></i>Нужен владелец</span><span class="one"><i style="background:#1E5BC5"></i>В диалоге</span><span class="one"><i style="background:#00879B"></i>Заказ собран</span><span class="one"><i style="background:#A70D2C"></i>Удалить</span></div><p class="sv" style="margin:9px 0 0;font-family:var(--mono);font-size:11px">vs WhatsApp 26ΔE · vs Telegram 28ΔE</p></div>
+  </div><div><table class="cx"><caption>Measured contrast</caption><tbody><tr><td>accent FILL / surface</td><td class="ok">4.63</td></tr><tr><td>body ink / surface</td><td class="ok">16.4</td></tr><tr><td>secondary ink / surface</td><td class="ok">9.26</td></tr><tr><td>tertiary ink / surface</td><td class="ok">6.66</td></tr><tr><td>accent TEXT / surface</td><td class="ok">6.15</td></tr><tr><td>button label / fill</td><td class="ok">4.57</td></tr><tr><td>chip label / chip fill</td><td class="ok">6.92</td></tr><tr><td>status ink / status bg</td><td class="ok">5.5</td></tr><tr><td>input border / surface</td><td class="ok">3.31</td></tr><tr><td>body ink / ground</td><td class="ok">15.19</td></tr><tr><td>switch OFF track / surface</td><td class="ok">3.09</td></tr></tbody></table></div></div>
+ <div class="row"><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div><div class="ah"><h3>Сводка</h3><span class="hb">+</span></div><div class="bd"><div class="cs"><span class="cp on">7 дней</span><span class="cp">30 дней</span><span class="cp">Всё время</span></div><div class="hero"><span class="l">Заказов собрано</span><span class="n">24<small>+8</small></span><span class="s">за неделю · 62 диалога</span><span class="spk"><i style="height:38%"></i><i style="height:52%"></i><i style="height:31%"></i><i style="height:64%"></i><i style="height:45%"></i><i style="height:78%"></i><i style="height:100%"></i></span></div><div class="rws"><div class="rw"><span class="d d-order"></span><span class="m">Заказ собран</span><span class="c">24</span></div><div class="rw"><span class="d d-owner"></span><span class="m">Нужен владелец</span><span class="c">3</span></div><div class="rw"><span class="d d-dialog"></span><span class="m">В диалоге</span><span class="c">11</span></div><div class="rw"><span class="d d-closed"></span><span class="m">Вопрос закрыт</span><span class="c">18</span></div></div><div class="bc"><span class="av wa">Ц</span><span class="bm"><b>Цветы Алматы</b><em><i class="cd wa"></i>WhatsApp · Работает</em></span><span class="sx"><b></b></span></div></div><div class="tb"><a><i></i>Чаты</a><a><i></i>Боты</a><a class="on"><i></i>Сводка</a><a><i></i>Профиль</a></div></div></div><figcaption class="pc">Сводка</figcaption></figure><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div><div class="ah"><h3>Боты</h3><span class="hb">+</span></div><div class="bd"><div class="card"><div class="ct"><span class="av wa">Ц</span><span class="bm"><b>Цветы Алматы</b><em><i class="cd wa"></i>WhatsApp</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="on">Бот работает</span><span class="sx"><b></b></span></div></div><div class="card"><div class="ct"><span class="av wa">А</span><span class="bm"><b>Автозапчасти 4х4</b><em><i class="cd wa"></i>WhatsApp&nbsp;&nbsp;<i class="cd tg"></i>Telegram</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="on">Бот работает</span><span class="sx"><b></b></span></div></div><div class="card"><div class="ct"><span class="av tg">У</span><span class="bm"><b>Учебный центр</b><em><i class="cd tg"></i>Telegram</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="of">Бот на паузе</span><span class="sx off"><b></b></span></div></div></div><div class="tb"><a class=""><i></i>Чаты</a><a class="on"><i></i>Боты</a><a class=""><i></i>Сводка</a><a class=""><i></i>Профиль</a></div></div></div><figcaption class="pc">Боты</figcaption></figure><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div>
+<div class="ah s"><span class="hb"><i class="ch l"></i></span><h3>Цветы Алматы</h3>
+ <span class="on-pill">Онлайн</span></div>
+<div class="bd">
+ <div class="seg"><span class="sg1 on">Общие</span><span class="sg1">Бизнес</span><span class="sg1">Товары</span><span class="sg1">Услуги</span><span class="sg1">Промпты</span></div>
+ <div class="fg"><span class="fl">Название бота</span><div class="wl">Цветы Алматы</div></div>
+ <div class="fg"><span class="fl">Тип бизнеса</span><div class="wl">Цветы и подарки<i class="ch d"></i></div></div>
+ <div class="fg"><span class="fl">Приветствие</span><div class="wl a">Здравствуйте! Это «Цветы Алматы» 🌸 Подскажу букет, цену и доставку.</div></div>
+ <div class="tr">Уведомления о заказах<span class="sx"><b></b></span></div>
+ <div class="sv">Сохранить</div>
+</div></div></div><figcaption class="pc">Настройки</figcaption></figure></div></section><section class="pal p-sliva">
+ <div class="ph"><div>
+   <p class="eb">07 — палитра</p>
+   <h3>«Слива» <span>— Plum & Greige</span><span class="fmly">muted plum-violet</span></h3>
+   <p class="blurb">The honest answer: three fixed greens already own that hue, so the brand walks away and takes a dried-plum violet instead — deep, dusty, unhurried, nearer a botanical dye than to software. On mineral greige paper it keeps «Песок»'s calm and can never be misread as a status.</p>
+   <p class="rk"><b>Risk</b><br>It gives up the green the owner actually liked, and plum can read boutique rather than workshop to a 55-year-old auto-parts seller in Almaty.</p>
+   <div class="swr"><span class="sw"><i style="background:#F7F3ED"></i>#F7F3ED<br>ground</span><span class="sw"><i style="background:#FEFBF8"></i>#FEFBF8<br>surface</span><span class="sw"><i style="background:#918A7E"></i>#918A7E<br>input bd</span><span class="sw"><i style="background:#763888"></i>#763888<br>accent fill</span><span class="sw"><i style="background:#622576"></i>#622576<br>accent text</span><span class="sw"><i style="background:#201D17"></i>#201D17<br>ink</span></div><div class="coll"><p class="h">Collision solve</p><p class="sv">The brand vacates green and blue completely (H318, L46), so green stays purely semantic — WhatsApp, the activation switch and order_collected #008349 keep their meaning with no brand anywhere near them (ΔE 45.6 / 43.1 / 28.1). question_closed gives up purple for a deep teal #006268 so it cannot be confused with the new brand, and in_dialog drops to #0063C1, ΔE 20.4 clear of Telegram.</p><div class="pair"><span class="one"><i style="background:#763888"></i>бренд</span><span class="one"><i style="background:#D34113"></i>Нужен владелец</span><span class="one"><i style="background:#0063C1"></i>В диалоге</span><span class="one"><i style="background:#047B55"></i>Заказ собран</span><span class="one"><i style="background:#A70D2C"></i>Удалить</span></div><p class="sv" style="margin:9px 0 0;font-family:var(--mono);font-size:11px">vs WhatsApp 46ΔE · vs Telegram 31ΔE</p></div>
+  </div><div><table class="cx"><caption>Measured contrast</caption><tbody><tr><td>accent FILL / surface</td><td class="ok">7.57</td></tr><tr><td>body ink / surface</td><td class="ok">16.3</td></tr><tr><td>secondary ink / surface</td><td class="ok">9.24</td></tr><tr><td>tertiary ink / surface</td><td class="ok">6.65</td></tr><tr><td>accent TEXT / surface</td><td class="ok">9.96</td></tr><tr><td>button label / fill</td><td class="ok">7.17</td></tr><tr><td>chip label / chip fill</td><td class="ok">8.01</td></tr><tr><td>status ink / status bg</td><td class="ok">5.55</td></tr><tr><td>input border / surface</td><td class="ok">3.32</td></tr><tr><td>body ink / ground</td><td class="ok">15.2</td></tr><tr><td>switch OFF track / surface</td><td class="ok">3.0</td></tr></tbody></table></div></div>
+ <div class="row"><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div><div class="ah"><h3>Сводка</h3><span class="hb">+</span></div><div class="bd"><div class="cs"><span class="cp on">7 дней</span><span class="cp">30 дней</span><span class="cp">Всё время</span></div><div class="hero"><span class="l">Заказов собрано</span><span class="n">24<small>+8</small></span><span class="s">за неделю · 62 диалога</span><span class="spk"><i style="height:38%"></i><i style="height:52%"></i><i style="height:31%"></i><i style="height:64%"></i><i style="height:45%"></i><i style="height:78%"></i><i style="height:100%"></i></span></div><div class="rws"><div class="rw"><span class="d d-order"></span><span class="m">Заказ собран</span><span class="c">24</span></div><div class="rw"><span class="d d-owner"></span><span class="m">Нужен владелец</span><span class="c">3</span></div><div class="rw"><span class="d d-dialog"></span><span class="m">В диалоге</span><span class="c">11</span></div><div class="rw"><span class="d d-closed"></span><span class="m">Вопрос закрыт</span><span class="c">18</span></div></div><div class="bc"><span class="av wa">Ц</span><span class="bm"><b>Цветы Алматы</b><em><i class="cd wa"></i>WhatsApp · Работает</em></span><span class="sx"><b></b></span></div></div><div class="tb"><a><i></i>Чаты</a><a><i></i>Боты</a><a class="on"><i></i>Сводка</a><a><i></i>Профиль</a></div></div></div><figcaption class="pc">Сводка</figcaption></figure><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div><div class="ah"><h3>Боты</h3><span class="hb">+</span></div><div class="bd"><div class="card"><div class="ct"><span class="av wa">Ц</span><span class="bm"><b>Цветы Алматы</b><em><i class="cd wa"></i>WhatsApp</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="on">Бот работает</span><span class="sx"><b></b></span></div></div><div class="card"><div class="ct"><span class="av wa">А</span><span class="bm"><b>Автозапчасти 4х4</b><em><i class="cd wa"></i>WhatsApp&nbsp;&nbsp;<i class="cd tg"></i>Telegram</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="on">Бот работает</span><span class="sx"><b></b></span></div></div><div class="card"><div class="ct"><span class="av tg">У</span><span class="bm"><b>Учебный центр</b><em><i class="cd tg"></i>Telegram</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="of">Бот на паузе</span><span class="sx off"><b></b></span></div></div></div><div class="tb"><a class=""><i></i>Чаты</a><a class="on"><i></i>Боты</a><a class=""><i></i>Сводка</a><a class=""><i></i>Профиль</a></div></div></div><figcaption class="pc">Боты</figcaption></figure><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div>
+<div class="ah s"><span class="hb"><i class="ch l"></i></span><h3>Цветы Алматы</h3>
+ <span class="on-pill">Онлайн</span></div>
+<div class="bd">
+ <div class="seg"><span class="sg1 on">Общие</span><span class="sg1">Бизнес</span><span class="sg1">Товары</span><span class="sg1">Услуги</span><span class="sg1">Промпты</span></div>
+ <div class="fg"><span class="fl">Название бота</span><div class="wl">Цветы Алматы</div></div>
+ <div class="fg"><span class="fl">Тип бизнеса</span><div class="wl">Цветы и подарки<i class="ch d"></i></div></div>
+ <div class="fg"><span class="fl">Приветствие</span><div class="wl a">Здравствуйте! Это «Цветы Алматы» 🌸 Подскажу букет, цену и доставку.</div></div>
+ <div class="tr">Уведомления о заказах<span class="sx"><b></b></span></div>
+ <div class="sv">Сохранить</div>
+</div></div></div><figcaption class="pc">Настройки</figcaption></figure></div></section><section class="close">
+ <h2>How to choose</h2>
+ <p><strong>Judge the Настройки screen and the four status dots together.</strong> The dashboard is where a
+ brand that competes with a channel colour or a status gives itself away — if you have to look twice to tell
+ the brand from «Заказ собран», that palette is out no matter how good the form looks.</p>
+ <p><strong>For «Песок», the real question is whether you liked the sage or the paper.</strong> Half the
+ options below keep the green and fight for separation; half drop it entirely and keep the warm ground. Both
+ preserve the calm — only one of them keeps the brand out of WhatsApp's territory.</p>
+ <p>Whichever wins becomes one token block in <code>Assets/Scripts/Theme/</code>, read by every
+ <code>[MenuItem]</code> builder.</p>
+</section></div>

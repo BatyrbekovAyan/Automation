@@ -1,0 +1,1113 @@
+<title>Five Directions — UI Restyle Pitch</title>
+
+<style>
+/* ============================================================
+   PAGE CHROME — deliberately quiet. The phones carry all colour.
+   Neutral is biased toward the app's blue so it reads chosen.
+   ============================================================ */
+:root {
+  --ground:      #F2F4F8;
+  --ground-2:    #E7EAF1;
+  --rule:        #D3D9E4;
+  --ink:         #10141C;
+  --ink-2:       #4A5364;
+  --ink-3:       #7C8698;
+  --accent:      #1B5CEB;
+  --accent-soft: #DDE6FB;
+
+  --f-display: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --f-body:    -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --f-mono:    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  --pad: clamp(20px, 5vw, 64px);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground:      #0C0F16;
+    --ground-2:    #141926;
+    --rule:        #232B3B;
+    --ink:         #EEF1F7;
+    --ink-2:       #A2ACC0;
+    --ink-3:       #6C7689;
+    --accent:      #6FA0FF;
+    --accent-soft: #17233D;
+  }
+}
+:root[data-theme="dark"] {
+  --ground:      #0C0F16;
+  --ground-2:    #141926;
+  --rule:        #232B3B;
+  --ink:         #EEF1F7;
+  --ink-2:       #A2ACC0;
+  --ink-3:       #6C7689;
+  --accent:      #6FA0FF;
+  --accent-soft: #17233D;
+}
+:root[data-theme="light"] {
+  --ground:      #F2F4F8;
+  --ground-2:    #E7EAF1;
+  --rule:        #D3D9E4;
+  --ink:         #10141C;
+  --ink-2:       #4A5364;
+  --ink-3:       #7C8698;
+  --accent:      #1B5CEB;
+  --accent-soft: #DDE6FB;
+}
+
+* { box-sizing: border-box; }
+
+.page {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+/* ---------- masthead ---------- */
+.masthead {
+  padding: clamp(48px, 9vw, 112px) var(--pad) clamp(32px, 5vw, 56px);
+  border-bottom: 1px solid var(--rule);
+  max-width: 1440px;
+  margin: 0 auto;
+}
+.eyebrow {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0 0 20px;
+}
+.masthead h1 {
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: clamp(34px, 6.5vw, 68px);
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+  margin: 0 0 24px;
+  max-width: 15ch;
+}
+.masthead h1 em { font-style: normal; color: var(--ink-3); }
+.standfirst {
+  max-width: 62ch;
+  font-size: clamp(16px, 1.9vw, 19px);
+  color: var(--ink-2);
+  margin: 0;
+}
+.standfirst strong { color: var(--ink); font-weight: 600; }
+.standfirst code { font-family: var(--f-mono); font-size: 0.88em; }
+
+.meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 28px;
+  margin-top: 32px;
+  font-family: var(--f-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.05em;
+  color: var(--ink-3);
+}
+.meta-row span b { color: var(--ink-2); font-weight: 500; }
+
+/* ---------- plates ---------- */
+.plates { max-width: 1440px; margin: 0 auto; }
+
+.plate {
+  display: grid;
+  grid-template-columns: minmax(0, 340px) minmax(0, 1fr);
+  gap: clamp(28px, 5vw, 72px);
+  align-items: start;
+  padding: clamp(44px, 7vw, 88px) var(--pad);
+  border-bottom: 1px solid var(--rule);
+}
+@media (max-width: 900px) {
+  .plate { grid-template-columns: minmax(0, 1fr); }
+  .plate-stage { justify-self: center; }
+}
+
+.plate-stage { position: sticky; top: 32px; }
+@media (max-width: 900px) { .plate-stage { position: static; } }
+
+/* ---------- editorial column ---------- */
+.plate-copy h2 {
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: clamp(27px, 3.6vw, 40px);
+  letter-spacing: -0.03em;
+  line-height: 1.06;
+  margin: 0 0 6px;
+  text-wrap: balance;
+}
+.tagline { font-size: 17px; color: var(--ink-2); margin: 0 0 26px; max-width: 46ch; }
+.thesis { font-size: 16.5px; color: var(--ink-2); max-width: 60ch; margin: 0 0 28px; }
+.thesis strong { color: var(--ink); font-weight: 600; }
+
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 28px; }
+.sw {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  line-height: 1.45;
+}
+.sw i {
+  display: block;
+  width: 62px;
+  height: 40px;
+  border-radius: 7px;
+  border: 1px solid rgba(128, 128, 128, 0.22);
+}
+
+.specs { border-top: 1px solid var(--rule); margin: 0 0 24px; }
+.specs > div {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 16px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 14.5px;
+  color: var(--ink-2);
+}
+.specs dt {
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding-top: 3px;
+}
+.specs dd { margin: 0; }
+
+.verdict {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  padding: 15px 18px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  font-size: 15px;
+  color: var(--ink);
+  max-width: 60ch;
+  margin: 0;
+}
+.verdict b {
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   PHONE SHELL — identical geometry for all five, so the only
+   perceived variable is the material treatment.
+   340 x 707 CSS px stands in for the 1080 x 1920 Unity canvas.
+   ============================================================ */
+.phone {
+  width: 340px;
+  height: 707px;
+  border-radius: 46px;
+  padding: 11px;
+  background: linear-gradient(160deg, #3A3F4A, #16181D 40%, #2A2E36);
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.3),
+    0 26px 48px -12px rgba(10, 14, 24, 0.5),
+    0 60px 90px -30px rgba(10, 14, 24, 0.35);
+  flex-shrink: 0;
+}
+.screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 36px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  isolation: isolate;
+}
+
+.statusbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 13px 22px 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.sigs { display: flex; gap: 3px; align-items: flex-end; }
+.sigs i { display: block; width: 3px; border-radius: 1px; background: currentColor; }
+.sigs i:nth-child(1) { height: 4px; }
+.sigs i:nth-child(2) { height: 6px; }
+.sigs i:nth-child(3) { height: 8px; }
+.sigs i:nth-child(4) { height: 10px; }
+.batt {
+  width: 20px; height: 10px;
+  border: 1.2px solid currentColor;
+  border-radius: 3px;
+  padding: 1.4px;
+  margin-left: 5px;
+}
+.batt i { display: block; height: 100%; width: 72%; border-radius: 1px; background: currentColor; }
+
+.apphead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px 12px;
+  flex-shrink: 0;
+}
+.apphead h3 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+.head-btn {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.body {
+  flex: 1;
+  overflow: hidden;
+  padding: 2px 16px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.chips { display: flex; gap: 7px; }
+.chip { padding: 6px 13px; border-radius: 999px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+
+.hero { padding: 16px 18px 15px; display: flex; flex-direction: column; gap: 2px; }
+.hero .lbl { font-size: 10.5px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; }
+.hero .num {
+  font-size: 42px;
+  font-weight: 800;
+  line-height: 1.04;
+  letter-spacing: -0.045em;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+}
+.hero .num small { font-size: 12.5px; font-weight: 700; letter-spacing: -0.01em; padding: 3px 8px; border-radius: 999px; }
+.hero .sub { font-size: 12.5px; }
+
+.spark { display: flex; align-items: flex-end; gap: 4px; height: 30px; margin-top: 9px; }
+.spark i { flex: 1; border-radius: 2px 2px 1px 1px; display: block; }
+
+.rows { display: flex; flex-direction: column; gap: 7px; }
+.row { display: flex; align-items: center; gap: 11px; padding: 11px 14px; }
+.row .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.row .nm { flex: 1; font-size: 13px; font-weight: 500; }
+.row .ct { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.botcard { padding: 13px 14px; display: flex; align-items: center; gap: 12px; }
+.avatar {
+  width: 40px; height: 40px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.botmeta { flex: 1; min-width: 0; }
+.botmeta b {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.botmeta em {
+  display: block;
+  font-size: 11.5px;
+  margin-top: 2px;
+  font-style: normal;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.botmeta em i {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  vertical-align: middle;
+  margin: -1px 5px 0 0;
+}
+.switch { width: 44px; height: 26px; border-radius: 999px; position: relative; flex-shrink: 0; }
+.switch b { position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; border-radius: 50%; display: block; }
+
+.tabbar { display: flex; padding: 9px 8px 17px; flex-shrink: 0; }
+.tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 9.5px;
+  font-weight: 600;
+}
+.tab i { width: 21px; height: 21px; border-radius: 6px; border: 2px solid currentColor; display: block; }
+.tab.on i { border-radius: 8px; }
+
+/* =========================================================
+   01 — SPATIAL DEPTH
+   Dimmed substrate, panes on distinct z-tiers, one overhead
+   key light, ambient occlusion pooled under every plate.
+   ========================================================= */
+.s-spatial .screen {
+  color: #F4F7FF;
+  background:
+    radial-gradient(120% 70% at 50% -8%, rgba(120, 170, 255, 0.30), transparent 62%),
+    radial-gradient(90% 55% at 88% 22%, rgba(37, 211, 102, 0.16), transparent 60%),
+    linear-gradient(178deg, #131A2C 0%, #0A0E1A 52%, #070A13 100%);
+}
+.s-spatial .head-btn {
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+.s-spatial .chip {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  color: rgba(244, 247, 255, 0.74);
+}
+.s-spatial .chip.on {
+  background: rgba(255, 255, 255, 0.94);
+  border-color: transparent;
+  color: #0B1020;
+  box-shadow: 0 6px 18px -4px rgba(0, 0, 0, 0.6);
+}
+.s-spatial .hero {
+  border-radius: 24px;
+  background: linear-gradient(168deg, rgba(255, 255, 255, 0.155), rgba(255, 255, 255, 0.055));
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow:
+    inset 0 1.4px 0 rgba(255, 255, 255, 0.34),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.22),
+    0 20px 44px -14px rgba(0, 0, 0, 0.78),
+    0 3px 8px -2px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(22px) saturate(1.5);
+  -webkit-backdrop-filter: blur(22px) saturate(1.5);
+}
+.s-spatial .hero .lbl { color: rgba(226, 235, 255, 0.66); }
+.s-spatial .hero .num small { background: rgba(37, 211, 102, 0.22); color: #7CF3AC; }
+.s-spatial .hero .sub { color: rgba(226, 235, 255, 0.6); }
+.s-spatial .spark i { background: linear-gradient(180deg, rgba(140, 190, 255, 0.95), rgba(140, 190, 255, 0.18)); }
+.s-spatial .row, .s-spatial .botcard {
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.085);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.13), 0 9px 22px -10px rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.s-spatial .row .ct { color: #FFFFFF; }
+.s-spatial .avatar {
+  background: linear-gradient(150deg, #2FE07E, #14A85C);
+  color: #04240F;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 5px 14px -4px rgba(20, 168, 92, 0.75);
+}
+.s-spatial .botmeta em { color: rgba(226, 235, 255, 0.62); }
+.s-spatial .switch {
+  background: linear-gradient(150deg, #2FE07E, #16A65C);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 4px 12px -3px rgba(24, 178, 98, 0.7);
+}
+.s-spatial .switch b { background: #FFFFFF; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35); }
+.s-spatial .tabbar {
+  margin: 0 12px 10px;
+  border-radius: 26px;
+  padding: 10px 6px 11px;
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  box-shadow: inset 0 1.2px 0 rgba(255, 255, 255, 0.26), 0 16px 34px -12px rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(26px) saturate(1.5);
+  -webkit-backdrop-filter: blur(26px) saturate(1.5);
+}
+.s-spatial .tab { color: rgba(226, 235, 255, 0.5); }
+.s-spatial .tab.on { color: #FFFFFF; }
+
+/* =========================================================
+   02 — LIQUID GLASS
+   Optics, not opacity: specular top edge, darker inner
+   bottom edge, tint sampled from the backdrop, squircles.
+   ========================================================= */
+.s-glass .screen {
+  color: #0D1526;
+  background:
+    radial-gradient(75% 48% at 12% 4%, #6FD4FF 0%, transparent 58%),
+    radial-gradient(68% 42% at 92% 16%, #B8F5C8 0%, transparent 55%),
+    radial-gradient(85% 55% at 72% 96%, #C9D8FF 0%, transparent 60%),
+    linear-gradient(172deg, #EAF4FF, #F6FAFF 46%, #EDF6F1);
+}
+.s-glass .head-btn {
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 4px 12px -3px rgba(20, 50, 90, 0.22), inset 0 1px 0 #FFFFFF;
+  backdrop-filter: blur(14px) saturate(1.7);
+  -webkit-backdrop-filter: blur(14px) saturate(1.7);
+}
+.s-glass .chip {
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  color: rgba(13, 21, 38, 0.68);
+  backdrop-filter: blur(12px) saturate(1.6);
+  -webkit-backdrop-filter: blur(12px) saturate(1.6);
+}
+.s-glass .chip.on { background: #0D1526; border-color: #0D1526; color: #FFFFFF; }
+.s-glass .hero {
+  border-radius: 26px;
+  background: linear-gradient(158deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.42));
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  box-shadow:
+    inset 0 1.6px 0 rgba(255, 255, 255, 1),
+    inset 0 -1.4px 2px rgba(90, 130, 180, 0.16),
+    inset 1.4px 0 0 rgba(255, 255, 255, 0.6),
+    0 14px 34px -12px rgba(24, 62, 110, 0.34),
+    0 2px 6px -1px rgba(24, 62, 110, 0.16);
+  backdrop-filter: blur(24px) saturate(1.9);
+  -webkit-backdrop-filter: blur(24px) saturate(1.9);
+}
+.s-glass .hero .lbl { color: rgba(13, 21, 38, 0.56); }
+.s-glass .hero .num small { background: rgba(16, 160, 88, 0.16); color: #0A6B3B; }
+.s-glass .hero .sub { color: rgba(13, 21, 38, 0.6); }
+.s-glass .spark i { background: linear-gradient(180deg, #2C93F5, rgba(44, 147, 245, 0.22)); }
+.s-glass .row, .s-glass .botcard {
+  border-radius: 19px;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: inset 0 1.2px 0 rgba(255, 255, 255, 0.95), 0 7px 18px -9px rgba(24, 62, 110, 0.3);
+  backdrop-filter: blur(16px) saturate(1.7);
+  -webkit-backdrop-filter: blur(16px) saturate(1.7);
+}
+.s-glass .row .nm { color: rgba(13, 21, 38, 0.88); }
+.s-glass .avatar {
+  background: linear-gradient(150deg, #34E17F, #10A65C);
+  color: #FFFFFF;
+  box-shadow: inset 0 1.4px 0 rgba(255, 255, 255, 0.6), 0 5px 13px -4px rgba(16, 166, 92, 0.6);
+}
+.s-glass .botmeta em { color: rgba(13, 21, 38, 0.6); }
+.s-glass .switch {
+  background: linear-gradient(150deg, #34E17F, #12AC5F);
+  box-shadow: inset 0 1.4px 0 rgba(255, 255, 255, 0.55), 0 4px 11px -3px rgba(18, 172, 95, 0.55);
+}
+.s-glass .switch b { background: #FFFFFF; box-shadow: 0 2px 5px rgba(20, 60, 40, 0.3); }
+.s-glass .tabbar {
+  margin: 0 11px 10px;
+  border-radius: 28px;
+  padding: 10px 6px 11px;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.52));
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow:
+    inset 0 1.6px 0 #FFFFFF,
+    inset 0 -1.4px 2px rgba(90, 130, 180, 0.15),
+    0 12px 30px -12px rgba(24, 62, 110, 0.42);
+  backdrop-filter: blur(28px) saturate(2);
+  -webkit-backdrop-filter: blur(28px) saturate(2);
+}
+.s-glass .tab { color: rgba(13, 21, 38, 0.48); }
+.s-glass .tab.on { color: #0A5FC8; }
+
+/* =========================================================
+   03 — NEUMORPHISM (hybrid, affordance-corrected)
+   One light source, top-left. Every control keeps a real
+   border plus one saturated accent so taps stay honest.
+   ========================================================= */
+.s-neu .screen { color: #2B3245; background: #E7EBF3; }
+.s-neu .head-btn {
+  background: #E7EBF3;
+  color: #47506A;
+  border: 1px solid #D5DAE6;
+  box-shadow: 4px 4px 9px rgba(157, 168, 190, 0.6), -4px -4px 9px rgba(255, 255, 255, 0.95);
+}
+.s-neu .chip {
+  background: #E7EBF3;
+  color: #5B647E;
+  border: 1px solid #D8DDE9;
+  box-shadow: 3px 3px 7px rgba(157, 168, 190, 0.5), -3px -3px 7px rgba(255, 255, 255, 0.9);
+}
+.s-neu .chip.on {
+  background: #1B5CEB;
+  color: #FFFFFF;
+  border-color: #1748C4;
+  box-shadow:
+    inset 2px 2px 5px rgba(9, 40, 110, 0.5),
+    inset -1px -1px 3px rgba(255, 255, 255, 0.25),
+    0 3px 8px -2px rgba(27, 92, 235, 0.5);
+}
+.s-neu .hero {
+  border-radius: 22px;
+  background: #E7EBF3;
+  border: 1px solid #DBE0EB;
+  box-shadow: 7px 7px 15px rgba(157, 168, 190, 0.65), -7px -7px 15px rgba(255, 255, 255, 0.98);
+}
+.s-neu .hero .lbl { color: #6E778F; }
+.s-neu .hero .num { color: #232A3C; }
+.s-neu .hero .num small { background: #D6EFDF; color: #12683A; border: 1px solid #BEE3CD; }
+.s-neu .hero .sub { color: #6E778F; }
+.s-neu .spark i { background: linear-gradient(180deg, #4B7BF0, #9FB8F5); box-shadow: 1px 1px 2px rgba(157, 168, 190, 0.55); }
+/* rows are inset — pressed into the sheet, the counterpart of the raised hero */
+.s-neu .row {
+  border-radius: 15px;
+  background: #E7EBF3;
+  box-shadow: inset 3px 3px 6px rgba(157, 168, 190, 0.55), inset -3px -3px 6px rgba(255, 255, 255, 0.95);
+}
+.s-neu .row .nm { color: #39415A; }
+.s-neu .row .ct { color: #232A3C; }
+.s-neu .botcard {
+  border-radius: 19px;
+  background: #E7EBF3;
+  border: 1px solid #DBE0EB;
+  box-shadow: 6px 6px 13px rgba(157, 168, 190, 0.6), -6px -6px 13px rgba(255, 255, 255, 0.98);
+}
+.s-neu .avatar {
+  background: #E7EBF3;
+  color: #12683A;
+  border: 1px solid #D3D9E6;
+  box-shadow: inset 2px 2px 4px rgba(157, 168, 190, 0.5), inset -2px -2px 4px rgba(255, 255, 255, 0.95);
+}
+.s-neu .botmeta b { color: #232A3C; }
+.s-neu .botmeta em { color: #6E778F; }
+.s-neu .switch {
+  background: #1B8F4C;
+  border: 1px solid #146E39;
+  box-shadow: inset 2px 2px 5px rgba(9, 70, 35, 0.45), inset -1px -1px 3px rgba(255, 255, 255, 0.28);
+}
+.s-neu .switch b { background: #F3F6FB; box-shadow: 1px 1px 3px rgba(9, 70, 35, 0.45); }
+.s-neu .tabbar { background: #E7EBF3; box-shadow: 0 -5px 14px rgba(157, 168, 190, 0.35); }
+.s-neu .tab { color: #79839C; }
+.s-neu .tab.on { color: #1B5CEB; }
+.s-neu .tab.on i { box-shadow: 2px 2px 5px rgba(157, 168, 190, 0.6), -2px -2px 5px rgba(255, 255, 255, 0.95); }
+
+/* =========================================================
+   04 — NEO-SKEUOMORPHISM
+   Honest materials: felt ground, matte-plastic plates,
+   milled switch, real bevels, grain across the whole screen.
+   ========================================================= */
+.s-skeu .screen {
+  color: #2A2119;
+  background-color: #C9BCA6;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E"),
+    radial-gradient(115% 65% at 50% -6%, rgba(255, 246, 226, 0.85), transparent 60%),
+    linear-gradient(180deg, #D5C8B2, #B9AB93);
+  background-blend-mode: overlay, normal, normal;
+}
+.s-skeu .apphead h3 { text-shadow: 0 1px 0 rgba(255, 250, 236, 0.75); }
+.s-skeu .head-btn {
+  background: linear-gradient(180deg, #FCF8EF, #DED3BE);
+  color: #4A3D2C;
+  border: 1px solid #A2957D;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 2px rgba(120, 105, 80, 0.3), 0 2px 3px rgba(80, 68, 48, 0.35);
+}
+.s-skeu .chip {
+  background: linear-gradient(180deg, #F7F1E3, #DED2BB);
+  color: #55482F;
+  border: 1px solid #A2957D;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 1.5px 2.5px rgba(80, 68, 48, 0.32);
+}
+.s-skeu .chip.on {
+  background: linear-gradient(180deg, #2C7A48, #1C5F35);
+  color: #F4FFF6;
+  border-color: #124A28;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.4);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), inset 0 -2px 4px rgba(0, 0, 0, 0.3), 0 1.5px 2.5px rgba(60, 50, 34, 0.4);
+}
+.s-skeu .hero {
+  border-radius: 15px;
+  background: linear-gradient(180deg, #FDFAF2 0%, #F1E9D8 52%, #E4DAC4 100%);
+  border: 1px solid #A99C84;
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 1),
+    inset 0 -2px 3px rgba(140, 124, 96, 0.28),
+    0 3px 5px rgba(72, 60, 42, 0.3),
+    0 9px 18px -8px rgba(72, 60, 42, 0.45);
+}
+.s-skeu .hero .lbl { color: #7A6B4F; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.85); }
+.s-skeu .hero .num { color: #2E2517; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.85); }
+.s-skeu .hero .num small {
+  background: linear-gradient(180deg, #3E9159, #2A7444);
+  color: #FFFFFF;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 1px 2px rgba(60, 50, 34, 0.4);
+}
+.s-skeu .hero .sub { color: #63563E; }
+.s-skeu .spark i {
+  background: linear-gradient(180deg, #4E8F5F, #2F6B41);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 1px 1.5px rgba(60, 50, 34, 0.4);
+}
+.s-skeu .row {
+  border-radius: 11px;
+  background: linear-gradient(180deg, #FBF6EA, #EDE3CF);
+  border: 1px solid #ADA089;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 2px 3px rgba(72, 60, 42, 0.26);
+}
+.s-skeu .row .nm { color: #443826; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7); }
+.s-skeu .row .ct { color: #2E2517; }
+.s-skeu .botcard {
+  border-radius: 14px;
+  background: linear-gradient(180deg, #FDFAF2, #EBE1CC);
+  border: 1px solid #A99C84;
+  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 1), 0 3px 5px rgba(72, 60, 42, 0.3);
+}
+.s-skeu .avatar {
+  background: linear-gradient(180deg, #43A55E, #22633A);
+  color: #FFFFFF;
+  border: 1px solid #175030;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.45), inset 0 -2px 4px rgba(0, 0, 0, 0.28), 0 2px 3px rgba(60, 50, 34, 0.4);
+}
+.s-skeu .botmeta b { color: #2E2517; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7); }
+.s-skeu .botmeta em { color: #63563E; }
+.s-skeu .switch {
+  background: linear-gradient(180deg, #2E7F49, #1D5C33);
+  border: 1px solid #124A28;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.38), inset 0 -1px 0 rgba(255, 255, 255, 0.18);
+}
+.s-skeu .switch b {
+  background: linear-gradient(180deg, #FFFFFF, #D9D2C2);
+  border: 1px solid #9C917B;
+  box-shadow: inset 0 1px 0 #FFFFFF, 0 1.5px 3px rgba(0, 0, 0, 0.4);
+}
+.s-skeu .tabbar {
+  background: linear-gradient(180deg, #E6DBC5, #CFC2A9);
+  border-top: 1px solid #F5EEDF;
+  box-shadow: 0 -2px 5px rgba(72, 60, 42, 0.22), inset 0 -1px 0 rgba(120, 105, 80, 0.25);
+}
+.s-skeu .tab { color: #6E6047; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6); }
+.s-skeu .tab.on { color: #1A5730; }
+
+/* =========================================================
+   05 — REFINED MODERN
+   No gimmick material. Wins on hairlines, tinted neutrals,
+   three-layer shadows, tabular figures, optical spacing.
+   ========================================================= */
+.s-mod .screen { color: #0D1220; background: #FAFBFD; }
+.s-mod .apphead h3 { letter-spacing: -0.035em; }
+.s-mod .head-btn { background: #FFFFFF; color: #38415A; border: 1px solid #E4E8F0; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05); }
+.s-mod .chip { background: #FFFFFF; color: #59637C; border: 1px solid #E4E8F0; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04); }
+.s-mod .chip.on {
+  background: #0D1220;
+  border-color: #0D1220;
+  color: #FFFFFF;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.16), 0 4px 10px -3px rgba(16, 24, 40, 0.22);
+}
+.s-mod .hero {
+  border-radius: 16px;
+  background: #FFFFFF;
+  border: 1px solid #E7EAF1;
+  box-shadow:
+    0 1px 2px rgba(16, 24, 40, 0.05),
+    0 4px 8px -2px rgba(16, 24, 40, 0.05),
+    0 16px 28px -12px rgba(16, 24, 40, 0.09);
+}
+.s-mod .hero .lbl { color: #79839B; letter-spacing: 0.1em; }
+.s-mod .hero .num { color: #0D1220; }
+.s-mod .hero .num small { background: #E7F7EE; color: #0A6B3B; }
+.s-mod .hero .sub { color: #626B80; }
+.s-mod .spark i { background: #E7EAF1; }
+.s-mod .spark i:nth-child(n+6) { background: #1B5CEB; }
+.s-mod .row { border-radius: 11px; background: #FFFFFF; border: 1px solid #EDF0F5; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.035); }
+.s-mod .row .nm { color: #2A3242; }
+.s-mod .row .ct { color: #0D1220; }
+.s-mod .botcard {
+  border-radius: 14px;
+  background: #FFFFFF;
+  border: 1px solid #E7EAF1;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 6px 14px -6px rgba(16, 24, 40, 0.08);
+}
+.s-mod .avatar { background: #E7F7EE; color: #0A6B3B; border-radius: 12px; }
+.s-mod .botmeta b { color: #0D1220; }
+.s-mod .botmeta em { color: #626B80; }
+.s-mod .switch { background: #16A75C; box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.12); }
+.s-mod .switch b { background: #FFFFFF; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.24); }
+.s-mod .tabbar { background: #FFFFFF; border-top: 1px solid #EDF0F5; }
+.s-mod .tab { color: #8B94A8; }
+.s-mod .tab.on { color: #1B5CEB; }
+
+/* Status semantics are set once and survive every material —
+   the five dashboard outcomes must never depend on the skin. */
+.d-order  { background: #16A75C; }
+.d-owner  { background: #E07612; }
+.d-dialog { background: #1B5CEB; }
+.d-silent { background: #7C8698; }
+.d-closed { background: #8B4FD4; }
+
+/* ---------- closing ---------- */
+.closer { max-width: 1440px; margin: 0 auto; padding: clamp(48px, 8vw, 96px) var(--pad) clamp(64px, 10vw, 120px); }
+.closer h2 {
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: clamp(24px, 3.4vw, 36px);
+  letter-spacing: -0.03em;
+  margin: 0 0 20px;
+  text-wrap: balance;
+}
+.closer p { max-width: 66ch; color: var(--ink-2); font-size: 16.5px; margin: 0 0 18px; }
+.closer p strong { color: var(--ink); font-weight: 600; }
+.tblwrap { overflow-x: auto; margin-top: 32px; border: 1px solid var(--rule); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; min-width: 700px; font-size: 14.5px; }
+th, td { text-align: left; padding: 13px 16px; border-bottom: 1px solid var(--rule); }
+th {
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 500;
+  background: var(--ground-2);
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody td:first-child { font-weight: 650; color: var(--ink); white-space: nowrap; }
+td { color: var(--ink-2); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+</style>
+
+<div class="page">
+
+  <header class="masthead">
+    <p class="eyebrow">Направления оформления · Five directions · 2026</p>
+    <h1>The same screen, <em>five different beliefs</em> about what a screen is.</h1>
+    <p class="standfirst">
+      One dashboard — «Сводка» — rendered in five material systems on identical geometry, so the only thing that
+      changes is the treatment. Content, type scale and status colours are held constant and drawn from the app's
+      real palette, which means what you are comparing is <strong>material and light</strong>, not decoration.
+      Each direction has a full build prompt behind it in <code>MASTER-PROMPT.md</code>.
+    </p>
+    <div class="meta-row">
+      <span><b>Canvas</b> 1080 × 1920 · Unity UGUI</span>
+      <span><b>Body type</b> 42 units</span>
+      <span><b>Grid</b> 4 dp × 3</span>
+      <span><b>Locale</b> ru-RU</span>
+    </div>
+  </header>
+
+  <div class="plates">
+
+    <!-- ============ 01 SPATIAL ============ -->
+    <article class="plate s-spatial">
+      <div class="plate-stage">
+        <div class="phone"><div class="screen">
+          <div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+          <div class="apphead"><h3>Сводка</h3><span class="head-btn">+</span></div>
+          <div class="body">
+            <div class="chips"><span class="chip on">7 дней</span><span class="chip">30 дней</span><span class="chip">Всё время</span></div>
+            <div class="hero">
+              <span class="lbl">Заказов собрано</span>
+              <span class="num">24<small>+8</small></span>
+              <span class="sub">за неделю · 62 диалога</span>
+              <span class="spark"><i style="height:38%"></i><i style="height:52%"></i><i style="height:31%"></i><i style="height:64%"></i><i style="height:45%"></i><i style="height:78%"></i><i style="height:100%"></i></span>
+            </div>
+            <div class="rows">
+              <div class="row"><span class="dot d-owner"></span><span class="nm">Нужен владелец</span><span class="ct">3</span></div>
+              <div class="row"><span class="dot d-dialog"></span><span class="nm">В диалоге</span><span class="ct">11</span></div>
+              <div class="row"><span class="dot d-closed"></span><span class="nm">Вопрос закрыт</span><span class="ct">18</span></div>
+            </div>
+            <div class="botcard">
+              <span class="avatar">Ц</span>
+              <span class="botmeta"><b>Цветы Алматы</b><em><i class="d-order"></i>WhatsApp · Работает</em></span>
+              <span class="switch"><b></b></span>
+            </div>
+          </div>
+          <div class="tabbar">
+            <span class="tab"><i></i>Чаты</span><span class="tab"><i></i>Боты</span><span class="tab on"><i></i>Сводка</span><span class="tab"><i></i>Профиль</span>
+          </div>
+        </div></div>
+      </div>
+      <div class="plate-copy">
+        <p class="eyebrow">01 — направление</p>
+        <h2>Spatial Depth</h2>
+        <p class="tagline">Panes of light held apart in the dark</p>
+        <p class="thesis">
+          Depth carries the hierarchy so colour does not have to. Every surface sits on a declared z-tier — the hero
+          pane catches the most light and throws the longest shadow, list rows recede, the tab bar floats free of the
+          content behind it. On a flat phone that reads as <strong>calm and engineered</strong>, and it makes "what is
+          on top of what" legible without drawing a single border.
+        </p>
+        <div class="swatches">
+          <span class="sw"><i style="background:#0A0E1A"></i>#0A0E1A<br>substrate</span>
+          <span class="sw"><i style="background:#131A2C"></i>#131A2C<br>tier 0</span>
+          <span class="sw"><i style="background:#25D366"></i>#25D366<br>channel</span>
+          <span class="sw"><i style="background:#7CF3AC"></i>#7CF3AC<br>positive</span>
+          <span class="sw"><i style="background:#F4F7FF"></i>#F4F7FF<br>ink</span>
+        </div>
+        <dl class="specs">
+          <div><dt>Material</dt><dd>Pane = 6% white fill, 22 px backdrop blur, 1.4 px inset top highlight, 0 20 44 −14 ambient shadow.</dd></div>
+          <div><dt>Motion</dt><dd>Tiers parallax at 1.0 / 0.72 / 0.45 on scroll. Screens enter by advancing in z, never by sliding in x.</dd></div>
+          <div><dt>Risk</dt><dd>Dark UI plus live blur is the heaviest option on mid-range Android; needs a pre-baked backdrop.</dd></div>
+        </dl>
+        <p class="verdict"><b>Verdict</b><span>The most premium-feeling of the five, and the most expensive to run.</span></p>
+      </div>
+    </article>
+
+    <!-- ============ 02 LIQUID GLASS ============ -->
+    <article class="plate s-glass">
+      <div class="plate-stage">
+        <div class="phone"><div class="screen">
+          <div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+          <div class="apphead"><h3>Сводка</h3><span class="head-btn">+</span></div>
+          <div class="body">
+            <div class="chips"><span class="chip on">7 дней</span><span class="chip">30 дней</span><span class="chip">Всё время</span></div>
+            <div class="hero">
+              <span class="lbl">Заказов собрано</span>
+              <span class="num">24<small>+8</small></span>
+              <span class="sub">за неделю · 62 диалога</span>
+              <span class="spark"><i style="height:38%"></i><i style="height:52%"></i><i style="height:31%"></i><i style="height:64%"></i><i style="height:45%"></i><i style="height:78%"></i><i style="height:100%"></i></span>
+            </div>
+            <div class="rows">
+              <div class="row"><span class="dot d-owner"></span><span class="nm">Нужен владелец</span><span class="ct">3</span></div>
+              <div class="row"><span class="dot d-dialog"></span><span class="nm">В диалоге</span><span class="ct">11</span></div>
+              <div class="row"><span class="dot d-closed"></span><span class="nm">Вопрос закрыт</span><span class="ct">18</span></div>
+            </div>
+            <div class="botcard">
+              <span class="avatar">Ц</span>
+              <span class="botmeta"><b>Цветы Алматы</b><em><i class="d-order"></i>WhatsApp · Работает</em></span>
+              <span class="switch"><b></b></span>
+            </div>
+          </div>
+          <div class="tabbar">
+            <span class="tab"><i></i>Чаты</span><span class="tab"><i></i>Боты</span><span class="tab on"><i></i>Сводка</span><span class="tab"><i></i>Профиль</span>
+          </div>
+        </div></div>
+      </div>
+      <div class="plate-copy">
+        <p class="eyebrow">02 — направление</p>
+        <h2>Liquid Glass</h2>
+        <p class="tagline">Optics, not opacity — light bending at every edge</p>
+        <p class="thesis">
+          What separates this from a frosted white rectangle is the edge: a specular top highlight, a darker inner
+          bottom edge, and a tint that samples whatever sits behind it. Glass belongs to the <strong>navigation
+          layer</strong> — chips, tab bar, sheets — and never to content. That single rule is what stops the style
+          collapsing into blur soup, and it is the rule most implementations break.
+        </p>
+        <div class="swatches">
+          <span class="sw"><i style="background:#EAF4FF"></i>#EAF4FF<br>ground</span>
+          <span class="sw"><i style="background:#6FD4FF"></i>#6FD4FF<br>refract A</span>
+          <span class="sw"><i style="background:#B8F5C8"></i>#B8F5C8<br>refract B</span>
+          <span class="sw"><i style="background:#0A5FC8"></i>#0A5FC8<br>active</span>
+          <span class="sw"><i style="background:#0D1526"></i>#0D1526<br>ink</span>
+        </div>
+        <dl class="specs">
+          <div><dt>Material</dt><dd>Glass = 55% white, 24 px blur, ×1.9 saturation, 1 px #FFF border, inset 1.6 px specular top edge.</dd></div>
+          <div><dt>Motion</dt><dd>Materials merge and split under gesture. Sheets lift 0.94 → 1.0 over 0.25 s OutBack.</dd></div>
+          <div><dt>Risk</dt><dd>Text over an unknown backdrop. Requires a mandatory scrim and a Reduce Transparency solid fallback.</dd></div>
+        </dl>
+        <p class="verdict"><b>Verdict</b><span>Reads current and Apple-adjacent. Legibility discipline is the whole game.</span></p>
+      </div>
+    </article>
+
+    <!-- ============ 03 NEUMORPHISM ============ -->
+    <article class="plate s-neu">
+      <div class="plate-stage">
+        <div class="phone"><div class="screen">
+          <div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+          <div class="apphead"><h3>Сводка</h3><span class="head-btn">+</span></div>
+          <div class="body">
+            <div class="chips"><span class="chip on">7 дней</span><span class="chip">30 дней</span><span class="chip">Всё время</span></div>
+            <div class="hero">
+              <span class="lbl">Заказов собрано</span>
+              <span class="num">24<small>+8</small></span>
+              <span class="sub">за неделю · 62 диалога</span>
+              <span class="spark"><i style="height:38%"></i><i style="height:52%"></i><i style="height:31%"></i><i style="height:64%"></i><i style="height:45%"></i><i style="height:78%"></i><i style="height:100%"></i></span>
+            </div>
+            <div class="rows">
+              <div class="row"><span class="dot d-owner"></span><span class="nm">Нужен владелец</span><span class="ct">3</span></div>
+              <div class="row"><span class="dot d-dialog"></span><span class="nm">В диалоге</span><span class="ct">11</span></div>
+              <div class="row"><span class="dot d-closed"></span><span class="nm">Вопрос закрыт</span><span class="ct">18</span></div>
+            </div>
+            <div class="botcard">
+              <span class="avatar">Ц</span>
+              <span class="botmeta"><b>Цветы Алматы</b><em><i class="d-order"></i>WhatsApp · Работает</em></span>
+              <span class="switch"><b></b></span>
+            </div>
+          </div>
+          <div class="tabbar">
+            <span class="tab"><i></i>Чаты</span><span class="tab"><i></i>Боты</span><span class="tab on"><i></i>Сводка</span><span class="tab"><i></i>Профиль</span>
+          </div>
+        </div></div>
+      </div>
+      <div class="plate-copy">
+        <p class="eyebrow">03 — направление</p>
+        <h2>Neumorphism</h2>
+        <p class="tagline">Controls sculpted out of the surface itself</p>
+        <p class="thesis">
+          Raised means available, inset means containing or already pressed — the whole interface becomes one moulded
+          sheet lit from the top-left. Pure neumorphism fails accessibility badly, so what is shown here is the
+          <strong>corrected hybrid</strong>: soft extrusion for surfaces, but every interactive control keeps a real
+          1 px border and one saturated accent, so a first-time user can still tell what is tappable.
+        </p>
+        <div class="swatches">
+          <span class="sw"><i style="background:#E7EBF3"></i>#E7EBF3<br>base</span>
+          <span class="sw"><i style="background:#FFFFFF"></i>#FFFFFF<br>light src</span>
+          <span class="sw"><i style="background:#9DA8BE"></i>#9DA8BE<br>shadow</span>
+          <span class="sw"><i style="background:#1B5CEB"></i>#1B5CEB<br>accent</span>
+          <span class="sw"><i style="background:#232A3C"></i>#232A3C<br>ink</span>
+        </div>
+        <dl class="specs">
+          <div><dt>Material</dt><dd>Raised = 7 7 15 rgba(157,168,190,.65) plus −7 −7 15 rgba(255,255,255,.98). Inset halves both offsets.</dd></div>
+          <div><dt>Motion</dt><dd>Press crossfades raised → inset over 0.12 s. That crossfade is the entire personality of the style.</dd></div>
+          <div><dt>Risk</dt><dd>Base must stay in a narrow light band; it dies on pure white, on black, and on top of photography.</dd></div>
+        </dl>
+        <p class="verdict"><b>Verdict</b><span>Distinctive and tactile — but only viable as the corrected hybrid, never pure.</span></p>
+      </div>
+    </article>
+
+    <!-- ============ 04 NEO-SKEUOMORPHISM ============ -->
+    <article class="plate s-skeu">
+      <div class="plate-stage">
+        <div class="phone"><div class="screen">
+          <div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+          <div class="apphead"><h3>Сводка</h3><span class="head-btn">+</span></div>
+          <div class="body">
+            <div class="chips"><span class="chip on">7 дней</span><span class="chip">30 дней</span><span class="chip">Всё время</span></div>
+            <div class="hero">
+              <span class="lbl">Заказов собрано</span>
+              <span class="num">24<small>+8</small></span>
+              <span class="sub">за неделю · 62 диалога</span>
+              <span class="spark"><i style="height:38%"></i><i style="height:52%"></i><i style="height:31%"></i><i style="height:64%"></i><i style="height:45%"></i><i style="height:78%"></i><i style="height:100%"></i></span>
+            </div>
+            <div class="rows">
+              <div class="row"><span class="dot d-owner"></span><span class="nm">Нужен владелец</span><span class="ct">3</span></div>
+              <div class="row"><span class="dot d-dialog"></span><span class="nm">В диалоге</span><span class="ct">11</span></div>
+              <div class="row"><span class="dot d-closed"></span><span class="nm">Вопрос закрыт</span><span class="ct">18</span></div>
+            </div>
+            <div class="botcard">
+              <span class="avatar">Ц</span>
+              <span class="botmeta"><b>Цветы Алматы</b><em><i class="d-order"></i>WhatsApp · Работает</em></span>
+              <span class="switch"><b></b></span>
+            </div>
+          </div>
+          <div class="tabbar">
+            <span class="tab"><i></i>Чаты</span><span class="tab"><i></i>Боты</span><span class="tab on"><i></i>Сводка</span><span class="tab"><i></i>Профиль</span>
+          </div>
+        </div></div>
+      </div>
+      <div class="plate-copy">
+        <p class="eyebrow">04 — направление</p>
+        <h2>Neo-Skeuomorphism</h2>
+        <p class="tagline">Materials that admit they are objects</p>
+        <p class="thesis">
+          Felt ground, matte-plastic plates, a milled switch, fine grain across the whole screen, one consistent
+          overhead light. The 2010 failure was kitsch — stitched leather on a calendar. The modern version is
+          <strong>material honesty</strong>: surfaces behave like a substance, but nothing pretends to be an object it
+          is not. Affordance comes free, which matters a great deal for a non-technical owner.
+        </p>
+        <div class="swatches">
+          <span class="sw"><i style="background:#C9BCA6"></i>#C9BCA6<br>felt</span>
+          <span class="sw"><i style="background:#FDFAF2"></i>#FDFAF2<br>plate</span>
+          <span class="sw"><i style="background:#A99C84"></i>#A99C84<br>edge</span>
+          <span class="sw"><i style="background:#1D5C33"></i>#1D5C33<br>action</span>
+          <span class="sw"><i style="background:#2E2517"></i>#2E2517<br>ink</span>
+        </div>
+        <dl class="specs">
+          <div><dt>Material</dt><dd>Plate = 3-stop vertical gradient, 1 px #A99C84 edge, inset 1.5 px white top, 0 3 5 cast shadow.</dd></div>
+          <div><dt>Motion</dt><dd>Weight. A press travels 2 units down and darkens, then releases with a small overshoot. Pair with haptics.</dd></div>
+          <div><dt>Risk</dt><dd>Highest asset count — grain, bevels and metal need authored sprites, and texture ages fastest.</dd></div>
+        </dl>
+        <p class="verdict"><b>Verdict</b><span>The most memorable and most opinionated. Also the one that ages fastest.</span></p>
+      </div>
+    </article>
+
+    <!-- ============ 05 REFINED MODERN ============ -->
+    <article class="plate s-mod">
+      <div class="plate-stage">
+        <div class="phone"><div class="screen">
+          <div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+          <div class="apphead"><h3>Сводка</h3><span class="head-btn">+</span></div>
+          <div class="body">
+            <div class="chips"><span class="chip on">7 дней</span><span class="chip">30 дней</span><span class="chip">Всё время</span></div>
+            <div class="hero">
+              <span class="lbl">Заказов собрано</span>
+              <span class="num">24<small>+8</small></span>
+              <span class="sub">за неделю · 62 диалога</span>
+              <span class="spark"><i style="height:38%"></i><i style="height:52%"></i><i style="height:31%"></i><i style="height:64%"></i><i style="height:45%"></i><i style="height:78%"></i><i style="height:100%"></i></span>
+            </div>
+            <div class="rows">
+              <div class="row"><span class="dot d-owner"></span><span class="nm">Нужен владелец</span><span class="ct">3</span></div>
+              <div class="row"><span class="dot d-dialog"></span><span class="nm">В диалоге</span><span class="ct">11</span></div>
+              <div class="row"><span class="dot d-closed"></span><span class="nm">Вопрос закрыт</span><span class="ct">18</span></div>
+            </div>
+            <div class="botcard">
+              <span class="avatar">Ц</span>
+              <span class="botmeta"><b>Цветы Алматы</b><em><i class="d-order"></i>WhatsApp · Работает</em></span>
+              <span class="switch"><b></b></span>
+            </div>
+          </div>
+          <div class="tabbar">
+            <span class="tab"><i></i>Чаты</span><span class="tab"><i></i>Боты</span><span class="tab on"><i></i>Сводка</span><span class="tab"><i></i>Профиль</span>
+          </div>
+        </div></div>
+      </div>
+      <div class="plate-copy">
+        <p class="eyebrow">05 — направление</p>
+        <h2>Refined Modern</h2>
+        <p class="tagline">No material at all — only craft</p>
+        <p class="thesis">
+          Nothing here is a gimmick, so everything has to be exact: hairline borders at a true 1 px, neutrals tinted
+          toward the brand blue instead of pure grey, three stacked shadows rather than one, tabular figures wherever
+          numbers align, inner radius derived as outer minus padding. This is the direction that
+          <strong>survives</strong> Russian string lengths, dark mode, and five years of feature creep.
+        </p>
+        <div class="swatches">
+          <span class="sw"><i style="background:#FAFBFD"></i>#FAFBFD<br>ground</span>
+          <span class="sw"><i style="background:#FFFFFF"></i>#FFFFFF<br>surface</span>
+          <span class="sw"><i style="background:#E7EAF1"></i>#E7EAF1<br>hairline</span>
+          <span class="sw"><i style="background:#1B5CEB"></i>#1B5CEB<br>accent</span>
+          <span class="sw"><i style="background:#0D1220"></i>#0D1220<br>ink</span>
+        </div>
+        <dl class="specs">
+          <div><dt>Material</dt><dd>Elevation 2 = 0 1 2 .05 + 0 4 8 −2 .05 + 0 16 28 −12 .09, every layer tinted rgba(16,24,40).</dd></div>
+          <div><dt>Motion</dt><dd>Restrained: 0.18 s state changes, 0.05 s list stagger, skeleton placeholders instead of spinners.</dd></div>
+          <div><dt>Risk</dt><dd>Lowest ceiling on distinctiveness — without obsessive detail it lands as default and forgettable.</dd></div>
+        </dl>
+        <p class="verdict"><b>Verdict</b><span>The safe, shippable bar — and the best base to layer one of the other four onto.</span></p>
+      </div>
+    </article>
+
+  </div>
+
+  <section class="closer">
+    <h2>Choosing between them</h2>
+    <p>
+      The product truth constrains the aesthetics. A shop owner is handing their real customer conversations to an AI,
+      running on their own phone number. Every direction has to make that feel <strong>controlled</strong>, not clever.
+      Two of the five carry genuine risk against that goal, and the table says which.
+    </p>
+    <div class="tblwrap">
+      <table>
+        <thead>
+          <tr><th>Direction</th><th>Feeling</th><th>Build cost</th><th>GPU cost</th><th>Best-fit surface</th><th>Principal risk</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Spatial Depth</td><td>Calm, premium, engineered</td><td>High</td><td>High</td><td>Dashboard, onboarding</td><td>Blur cost on mid-range Android</td></tr>
+          <tr><td>Liquid Glass</td><td>Current, optical, Apple-adjacent</td><td>High</td><td>High</td><td>Tab bar, sheets, chat overlay</td><td>Text legibility over media</td></tr>
+          <tr><td>Neumorphism</td><td>Quiet, tactile, unusual</td><td>Medium</td><td>Low</td><td>Settings, toggles, wizard</td><td>Affordance and contrast</td></tr>
+          <tr><td>Neo-Skeuomorphism</td><td>Warm, physical, memorable</td><td>Very high</td><td>Medium</td><td>Onboarding, empty states</td><td>Asset count; ages fastest</td></tr>
+          <tr><td>Refined Modern</td><td>Precise, trustworthy, durable</td><td>Low</td><td>Very low</td><td>Every screen</td><td>Lands as generic without rigour</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</div>

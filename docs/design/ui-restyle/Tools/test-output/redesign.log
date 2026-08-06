@@ -1,0 +1,27 @@
+Unity Editor version:    6000.3.9f1 (7a9955a4f2fa)
+Branch:                  6000.3/staging
+Build type:              Release
+Batch mode:              YES
+macOS version:           Version 26.5.2 (Build 25F84)
+Darwin version:          25.5.0
+Architecture:            x86_64
+Running under Rosetta:   NO
+Available memory:        16384 MB
+Date:                    2026-08-05T07:25:28Z
+[Licensing::Module] Trying to connect to existing licensing client channel...
+[Licensing::IpcConnector] Successfully connected to: "LicenseClient-ayan" at "2026-08-05T07:25:28.350889Z"
+Launching external process: /Applications/Unity/Hub/Editor/6000.3.9f1/Unity.app/Contents/Resources/PackageManager/Server/UnityPackageManager
+
+COMMAND LINE ARGUMENTS:
+/Applications/Unity/Hub/Editor/6000.3.9f1/Unity.app/Contents/MacOS/Unity
+-batchmode
+-nographics
+-projectPath
+.
+-executeMethod
+ChatsListRedesign.Apply
+-quit
+-logFile
+Tools/test-output/redesign.log
+Couldn't set project path to: /Users/ayan/Projects/Automation/docs/design/ui-restyle
+[Package Manager] Server process was shutdown

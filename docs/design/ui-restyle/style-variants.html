@@ -1,0 +1,1120 @@
+<title>Three Finalists × Nine Palettes</title>
+<style>
+:root {
+  --ground:      #F2F4F8;
+  --ground-2:    #E7EAF1;
+  --rule:        #D3D9E4;
+  --pink:        #10141C;
+  --pink-2:      #4A5364;
+  --pink-3:      #7C8698;
+  --paccent:     #1B5CEB;
+  --paccent-soft:#DDE6FB;
+  --f-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --pad: clamp(20px, 4vw, 56px);
+}
+@media (prefers-color-scheme: dark) {
+  :root { --ground:#0C0F16; --ground-2:#141926; --rule:#232B3B; --pink:#EEF1F7;
+          --pink-2:#A2ACC0; --pink-3:#6C7689; --paccent:#6FA0FF; --paccent-soft:#17233D; }
+}
+:root[data-theme="dark"] { --ground:#0C0F16; --ground-2:#141926; --rule:#232B3B; --pink:#EEF1F7;
+          --pink-2:#A2ACC0; --pink-3:#6C7689; --paccent:#6FA0FF; --paccent-soft:#17233D; }
+:root[data-theme="light"] { --ground:#F2F4F8; --ground-2:#E7EAF1; --rule:#D3D9E4; --pink:#10141C;
+          --pink-2:#4A5364; --pink-3:#7C8698; --paccent:#1B5CEB; --paccent-soft:#DDE6FB; }
+
+* { box-sizing: border-box; }
+.page { background: var(--ground); color: var(--pink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+
+.masthead { padding: clamp(44px,7vw,88px) var(--pad) clamp(28px,4vw,44px);
+  border-bottom: 1px solid var(--rule); max-width: 1440px; margin: 0 auto; }
+.eyebrow { font-family: var(--f-mono); font-size: 11px; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--pink-3); margin: 0 0 18px; }
+.masthead h1 { font-weight: 800; font-size: clamp(30px,5.4vw,56px); line-height: 1.04;
+  letter-spacing: -.035em; text-wrap: balance; margin: 0 0 20px; max-width: 20ch; }
+.masthead h1 em { font-style: normal; color: var(--pink-3); }
+.standfirst { max-width: 64ch; font-size: clamp(15.5px,1.8vw,18px); color: var(--pink-2); margin: 0; }
+.standfirst strong { color: var(--pink); font-weight: 600; }
+
+.stylehead { max-width: 1440px; margin: 0 auto;
+  padding: clamp(44px,6vw,72px) var(--pad) 6px; }
+.stylehead .eyebrow { margin-bottom: 12px; }
+.stylehead h2 { font-weight: 800; font-size: clamp(26px,3.4vw,38px); letter-spacing: -.03em;
+  margin: 0 0 10px; }
+.stylehead p { max-width: 70ch; color: var(--pink-2); font-size: 16px; margin: 0; }
+.stylehead p strong { color: var(--pink); font-weight: 600; }
+
+.variant { max-width: 1440px; margin: 0 auto;
+  padding: clamp(26px,3.4vw,44px) var(--pad) clamp(34px,4.6vw,56px);
+  border-bottom: 1px solid var(--rule); }
+.vhead { margin-bottom: 26px; max-width: 900px; }
+.vhead .eyebrow { margin-bottom: 8px; }
+.vhead h3 { font-weight: 750; font-size: 22px; letter-spacing: -.02em; margin: 0 0 8px; }
+.vhead p { color: var(--pink-2); font-size: 15.5px; margin: 0 0 16px; max-width: 62ch; }
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.sw { display: flex; flex-direction: column; gap: 5px; font-family: var(--f-mono);
+  font-size: 9.5px; letter-spacing: .04em; color: var(--pink-3); line-height: 1.4; }
+.sw i { display: block; width: 56px; height: 34px; border-radius: 6px;
+  border: 1px solid rgba(128,128,128,.25); }
+
+.vrow { display: flex; gap: 26px; flex-wrap: wrap; align-items: flex-start; }
+.pwrap { display: flex; flex-direction: column; gap: 12px; align-items: center; margin: 0; }
+.pcap { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--pink-3); }
+
+.closer { max-width: 1440px; margin: 0 auto;
+  padding: clamp(40px,6vw,72px) var(--pad) clamp(56px,8vw,104px); }
+.closer h2 { font-weight: 800; font-size: clamp(22px,3vw,32px); letter-spacing: -.03em; margin: 0 0 16px; }
+.closer p { max-width: 66ch; color: var(--pink-2); font-size: 16px; margin: 0 0 14px; }
+.closer p strong { color: var(--pink); font-weight: 600; }
+.closer code { font-family: var(--f-mono); font-size: .88em; }
+
+@media (prefers-reduced-motion: reduce) { * { animation:none!important; transition:none!important; } }
+
+
+.phone { width: 320px; height: 665px; border-radius: 44px; padding: 10px;
+  background: linear-gradient(160deg,#3A3F4A,#16181D 40%,#2A2E36);
+  box-shadow: 0 2px 4px rgba(0,0,0,.3), 0 22px 42px -12px rgba(10,14,24,.5),
+              0 52px 80px -30px rgba(10,14,24,.32);
+  flex-shrink: 0; }
+.screen { position: relative; width: 100%; height: 100%; border-radius: 35px; overflow: hidden;
+  display: flex; flex-direction: column; font-size: 12.5px; isolation: isolate;
+  color: var(--ink); background: var(--bgS); }
+
+.statusbar { display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 21px 3px; font-size: 11px; font-weight: 600; flex-shrink: 0; }
+.sigs { display: flex; gap: 3px; align-items: flex-end; }
+.sigs i { display: block; width: 3px; border-radius: 1px; background: currentColor; }
+.sigs i:nth-child(1){height:4px} .sigs i:nth-child(2){height:6px}
+.sigs i:nth-child(3){height:8px} .sigs i:nth-child(4){height:10px}
+.batt { width: 19px; height: 10px; border: 1.2px solid currentColor; border-radius: 3px;
+  padding: 1.4px; margin-left: 5px; }
+.batt i { display: block; height: 100%; width: 72%; border-radius: 1px; background: currentColor; }
+
+.apphead { display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 18px 11px; flex-shrink: 0; }
+.apphead h3 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
+.apphead.sub h3 { font-size: 16px; flex: 1; margin: 0 10px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; }
+.head-btn { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 17px; font-weight: 400; line-height: 1; flex-shrink: 0; }
+
+.body { flex: 1; overflow: hidden; padding: 2px 15px 8px;
+  display: flex; flex-direction: column; gap: 12px; }
+
+.chips { display: flex; gap: 7px; }
+.chip { padding: 6px 12px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+
+.hero { padding: 15px 17px 14px; display: flex; flex-direction: column; gap: 2px; }
+.hero .lbl { font-size: 10px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--ink2); }
+.hero .num { font-size: 38px; font-weight: 800; line-height: 1.04; letter-spacing: -.045em;
+  font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: 9px; }
+.hero .num small { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 999px;
+  background: var(--good-bg); color: var(--good-ink); }
+.hero .sub { font-size: 12px; color: var(--ink2); }
+.spark { display: flex; align-items: flex-end; gap: 4px; height: 28px; margin-top: 9px; }
+.spark i { flex: 1; border-radius: 2px 2px 1px 1px; display: block; background: var(--spark); }
+
+.rows { display: flex; flex-direction: column; gap: 7px; }
+.row { display: flex; align-items: center; gap: 10px; padding: 10px 13px; }
+.row .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.row .nm { flex: 1; font-size: 12.5px; font-weight: 500; }
+.row .ct { font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.avatar { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center;
+  font-size: 14px; font-weight: 700; flex-shrink: 0; color: #FFFFFF;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.4); }
+.avatar.wa { background: linear-gradient(150deg,#2FE07E,#14A85C); }
+.avatar.tg { background: linear-gradient(150deg,#54C8F5,#1E96D6); }
+.botmeta { flex: 1; min-width: 0; }
+.botmeta b { display: block; font-size: 13px; font-weight: 650; letter-spacing: -.01em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.botmeta em { display: block; font-size: 11px; margin-top: 2px; font-style: normal;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink2); }
+.chdot { width: 6px; height: 6px; border-radius: 50%; display: inline-block;
+  vertical-align: middle; margin: -1px 4px 0 0; }
+.chdot.wa { background: #25D366; } .chdot.tg { background: #2AABEE; }
+
+.switch { width: 42px; height: 25px; border-radius: 999px; position: relative; flex-shrink: 0;
+  background: var(--switch-on); }
+.switch b { position: absolute; top: 3px; right: 3px; width: 19px; height: 19px;
+  border-radius: 50%; display: block; background: #FFFFFF;
+  box-shadow: 0 2px 4px rgba(0,0,0,.3); }
+.switch.off { background: var(--switch-off); }
+.switch.off b { left: 3px; right: auto; }
+
+.botcard { padding: 12px 13px; display: flex; align-items: center; gap: 11px; }
+
+.bcard { padding: 0; }
+.btop { display: flex; align-items: center; gap: 11px; padding: 12px 13px; }
+.bdiv { height: 1px; margin: 0 13px; }
+.bfoot { display: flex; justify-content: space-between; align-items: center;
+  padding: 9px 13px 11px; font-size: 11.5px; font-weight: 600; }
+.bstat.on { color: var(--good-ink); } .bstat.off { color: var(--ink3); }
+
+.chev { width: 7px; height: 7px; border-right: 1.8px solid currentColor;
+  border-bottom: 1.8px solid currentColor; display: inline-block; opacity: .5; flex-shrink: 0; }
+.chev.r { transform: rotate(-45deg); } .chev.d { transform: rotate(45deg); margin-top: -3px; }
+.chev.l { transform: rotate(135deg); margin-left: 2px; }
+
+.pill-on { font-size: 9.5px; font-weight: 700; padding: 4px 9px; border-radius: 999px;
+  background: var(--good-bg); color: var(--good-ink); flex-shrink: 0; }
+
+.tseg { display: flex; gap: 2px; padding: 3px; border-radius: 12px; }
+.ts { flex: 1; text-align: center; font-size: 9px; font-weight: 600; padding: 6px 0;
+  border-radius: 9px; white-space: nowrap; color: var(--ink2); }
+
+.fgroup { display: flex; flex-direction: column; gap: 6px; }
+.flabel { font-size: 9.5px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase;
+  padding: 0 2px; color: var(--ink3); }
+.well { padding: 11px 13px; border-radius: 12px; font-size: 12px; min-height: 40px;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--ink); }
+.well.area { align-items: flex-start; font-size: 11.5px; line-height: 1.45; min-height: 58px; }
+.trow { display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  padding: 10px 13px; border-radius: 12px; font-size: 12px; font-weight: 550; }
+.savebtn { margin-top: auto; text-align: center; padding: 12px; border-radius: 13px;
+  font-size: 13px; font-weight: 700; letter-spacing: .01em;
+  background: var(--save-bg); color: var(--save-ink, #FFFFFF); }
+
+.tabbar { display: flex; padding: 8px 8px 15px; flex-shrink: 0; }
+.tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  font-size: 9px; font-weight: 600; color: var(--ink3); }
+.tab i { width: 20px; height: 20px; border-radius: 6px; border: 2px solid currentColor; display: block; }
+.tab.on i { border-radius: 7px; }
+
+/* semantic status colors — identical across every style and palette */
+.d-order{background:#16A75C} .d-owner{background:#E07612} .d-dialog{background:#1B5CEB}
+.d-silent{background:#7C8698} .d-closed{background:#8B4FD4}
+
+
+/* ============ 01 SPATIAL DEPTH — fixed material, palette moves the light ============ */
+.s-spatial {
+  --ink:#F4F7FF; --ink2:rgba(226,235,255,.62); --ink3:rgba(226,235,255,.44);
+  --chipon-bg:rgba(255,255,255,.94); --chipon-ink:#0B1020;
+  --pane-bg:linear-gradient(168deg,rgba(255,255,255,.155),rgba(255,255,255,.055));
+  --pane-bd:rgba(255,255,255,.16);
+  --card-bg:rgba(255,255,255,.055); --card-bd:rgba(255,255,255,.085);
+  --well-bg:rgba(0,0,0,.30); --well-bd:rgba(255,255,255,.10);
+  --seg-bg:rgba(255,255,255,.07); --seg-bd:rgba(255,255,255,.11);
+  --switch-on:linear-gradient(150deg,#2FE07E,#16A65C); --switch-off:rgba(255,255,255,.16);
+  --good-bg:rgba(37,211,102,.22); --good-ink:#7CF3AC;
+}
+.s-spatial .head-btn { background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.16);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.22); }
+.s-spatial .chip { background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.11);
+  color: rgba(244,247,255,.74); }
+.s-spatial .chip.on { background: var(--chipon-bg); border-color: transparent;
+  color: var(--chipon-ink); box-shadow: 0 6px 18px -4px rgba(0,0,0,.6); }
+.s-spatial .hero { border-radius: 22px; background: var(--pane-bg);
+  border: 1px solid var(--pane-bd);
+  box-shadow: inset 0 1.4px 0 rgba(255,255,255,.34), inset 0 -1px 0 rgba(0,0,0,.22),
+              0 18px 40px -14px rgba(0,0,0,.78), 0 3px 8px -2px rgba(0,0,0,.5);
+  backdrop-filter: blur(22px) saturate(1.5); -webkit-backdrop-filter: blur(22px) saturate(1.5); }
+.s-spatial .row, .s-spatial .botcard, .s-spatial .bcard, .s-spatial .trow {
+  border-radius: 17px; background: var(--card-bg); border: 1px solid var(--card-bd);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.13), 0 9px 22px -10px rgba(0,0,0,.7);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.s-spatial .bdiv { background: rgba(255,255,255,.08); }
+.s-spatial .well { background: var(--well-bg); border: 1px solid var(--well-bd);
+  box-shadow: inset 0 2px 6px rgba(0,0,0,.45), inset 0 -1px 0 rgba(255,255,255,.06); }
+.s-spatial .tseg { background: var(--seg-bg); border: 1px solid var(--seg-bd);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.15); }
+.s-spatial .ts.on { background: var(--chipon-bg); color: var(--chipon-ink);
+  box-shadow: 0 4px 12px -4px rgba(0,0,0,.6); }
+.s-spatial .savebtn { box-shadow: inset 0 1.4px 0 rgba(255,255,255,.35),
+  0 12px 28px -8px var(--save-sh); }
+.s-spatial .tabbar { margin: 0 11px 9px; border-radius: 24px; padding: 9px 6px 10px;
+  background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.13);
+  box-shadow: inset 0 1.2px 0 rgba(255,255,255,.26), 0 16px 34px -12px rgba(0,0,0,.8);
+  backdrop-filter: blur(26px) saturate(1.5); -webkit-backdrop-filter: blur(26px) saturate(1.5); }
+.s-spatial .tab.on { color: #FFFFFF; }
+
+/* ============ 02 LIQUID GLASS — colorless glass, palette repaints the backdrop ============ */
+.s-glass {
+  --pane-bg:linear-gradient(158deg,rgba(255,255,255,.78),rgba(255,255,255,.42));
+  --pane-bd:rgba(255,255,255,.92);
+  --card-bg:rgba(255,255,255,.55); --card-bd:rgba(255,255,255,.8);
+  --well-bg:rgba(255,255,255,.72); --well-bd:rgba(255,255,255,.95);
+  --seg-bg:linear-gradient(160deg,rgba(255,255,255,.7),rgba(255,255,255,.45));
+  --seg-bd:rgba(255,255,255,.9);
+  --switch-on:linear-gradient(150deg,#34E17F,#12AC5F); --switch-off:rgba(20,25,40,.18);
+  --good-bg:rgba(16,160,88,.15); --good-ink:#0A6B3B;
+}
+.s-glass .head-btn { background: rgba(255,255,255,.62); border: 1px solid rgba(255,255,255,.9);
+  box-shadow: 0 4px 12px -3px var(--gsh), inset 0 1px 0 #FFFFFF;
+  backdrop-filter: blur(14px) saturate(1.7); -webkit-backdrop-filter: blur(14px) saturate(1.7); }
+.s-glass .chip { background: rgba(255,255,255,.5); border: 1px solid rgba(255,255,255,.85);
+  color: var(--ink2);
+  backdrop-filter: blur(12px) saturate(1.6); -webkit-backdrop-filter: blur(12px) saturate(1.6); }
+.s-glass .chip.on { background: var(--chipon-bg); border-color: var(--chipon-bg);
+  color: var(--chipon-ink); }
+.s-glass .hero { border-radius: 24px; background: var(--pane-bg); border: 1px solid var(--pane-bd);
+  box-shadow: inset 0 1.6px 0 rgba(255,255,255,1), inset 0 -1.4px 2px rgba(90,130,180,.16),
+              inset 1.4px 0 0 rgba(255,255,255,.6),
+              0 14px 32px -12px var(--gsh), 0 2px 6px -1px var(--gsh);
+  backdrop-filter: blur(24px) saturate(1.9); -webkit-backdrop-filter: blur(24px) saturate(1.9); }
+.s-glass .row, .s-glass .botcard, .s-glass .bcard, .s-glass .trow {
+  border-radius: 18px; background: var(--card-bg); border: 1px solid var(--card-bd);
+  box-shadow: inset 0 1.2px 0 rgba(255,255,255,.95), 0 7px 18px -9px var(--gsh);
+  backdrop-filter: blur(16px) saturate(1.7); -webkit-backdrop-filter: blur(16px) saturate(1.7); }
+.s-glass .bdiv { background: rgba(20,30,50,.09); }
+.s-glass .well { background: var(--well-bg); border: 1px solid var(--well-bd);
+  box-shadow: inset 0 1.2px 0 rgba(255,255,255,.95), inset 0 -1px 2px rgba(90,130,180,.12);
+  backdrop-filter: blur(12px) saturate(1.5); -webkit-backdrop-filter: blur(12px) saturate(1.5); }
+.s-glass .tseg { background: var(--seg-bg); border: 1px solid var(--seg-bd);
+  box-shadow: inset 0 1.4px 0 #FFFFFF, 0 6px 16px -8px var(--gsh);
+  backdrop-filter: blur(16px) saturate(1.8); -webkit-backdrop-filter: blur(16px) saturate(1.8); }
+.s-glass .ts.on { background: var(--chipon-bg); color: var(--chipon-ink); }
+.s-glass .savebtn { box-shadow: 0 10px 24px -8px var(--save-sh), inset 0 1px 0 rgba(255,255,255,.25); }
+.s-glass .tabbar { margin: 0 10px 9px; border-radius: 26px; padding: 9px 6px 10px;
+  background: linear-gradient(160deg,rgba(255,255,255,.82),rgba(255,255,255,.52));
+  border: 1px solid rgba(255,255,255,.95);
+  box-shadow: inset 0 1.6px 0 #FFFFFF, inset 0 -1.4px 2px rgba(90,130,180,.15),
+              0 12px 30px -12px var(--gsh);
+  backdrop-filter: blur(28px) saturate(2); -webkit-backdrop-filter: blur(28px) saturate(2); }
+.s-glass .tab.on { color: var(--acc); }
+
+/* ============ 03 REFINED MODERN — pure tokens; palette = one token-file swap ============ */
+.s-mod .head-btn { background: var(--card-bg); border: 1px solid var(--card-bd);
+  color: var(--ink2); box-shadow: var(--e1); }
+.s-mod .chip { background: var(--card-bg); color: var(--ink2); border: 1px solid var(--card-bd);
+  box-shadow: var(--e1); }
+.s-mod .chip.on { background: var(--chipon-bg); border-color: var(--chipon-bg);
+  color: var(--chipon-ink); box-shadow: 0 1px 2px rgba(16,24,40,.16), 0 4px 10px -3px rgba(16,24,40,.22); }
+.s-mod .hero { border-radius: 16px; background: var(--card-bg); border: 1px solid var(--card-bd);
+  box-shadow: var(--e2); }
+.s-mod .spark i { background: var(--sparkdim); }
+.s-mod .spark i:nth-child(n+6) { background: var(--acc); }
+.s-mod .row { border-radius: 11px; background: var(--card-bg); border: 1px solid var(--hairline);
+  box-shadow: var(--e1); }
+.s-mod .botcard, .s-mod .bcard, .s-mod .trow { border-radius: 14px; background: var(--card-bg);
+  border: 1px solid var(--card-bd); box-shadow: var(--e1); }
+.s-mod .bdiv { background: var(--hairline); }
+.s-mod .avatar { border-radius: 12px; }
+.s-mod .well { background: var(--well-bg); border: 1px solid var(--well-bd); box-shadow: var(--e1);
+  border-radius: 10px; }
+.s-mod .tseg { padding: 0; border-radius: 0; gap: 0; border-bottom: 1px solid var(--hairline); }
+.s-mod .ts { border-radius: 0; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  padding: 7px 0 8px; color: var(--ink3); }
+.s-mod .ts.on { color: var(--ink); border-bottom-color: var(--acc); font-weight: 700; }
+.s-mod .savebtn { border-radius: 11px;
+  box-shadow: 0 1px 2px rgba(16,24,40,.2), 0 8px 18px -6px var(--save-sh); }
+.s-mod .tabbar { background: var(--card-bg); border-top: 1px solid var(--hairline); }
+.s-mod .tab.on { color: var(--acc); }
+
+.v-sp-a {
+  --bgS: radial-gradient(120% 70% at 50% -8%, rgba(120,170,255,.30), transparent 62%), radial-gradient(90% 55% at 88% 22%, rgba(37,211,102,.16), transparent 60%), linear-gradient(178deg,#131A2C 0%,#0A0E1A 52%,#070A13 100%);
+  --spark: linear-gradient(180deg, rgba(140,190,255,.95), rgba(140,190,255,.18));
+  --acc: #8CBEFF;
+  --save-bg: linear-gradient(150deg,#4C8DFF,#1B5CEB);
+  --save-sh: rgba(27,92,235,.55);
+}
+.v-sp-b {
+  --bgS: radial-gradient(120% 70% at 50% -8%, rgba(80,230,150,.26), transparent 62%), radial-gradient(90% 55% at 88% 22%, rgba(42,171,238,.13), transparent 60%), linear-gradient(178deg,#0F231B 0%,#08150F 52%,#05100B 100%);
+  --spark: linear-gradient(180deg, rgba(120,240,180,.95), rgba(120,240,180,.16));
+  --acc: #7CF3AC;
+  --save-bg: linear-gradient(150deg,#2FE07E,#149A57);
+  --save-sh: rgba(32,200,110,.5);
+}
+.v-sp-c {
+  --bgS: radial-gradient(120% 70% at 50% -8%, rgba(190,140,255,.30), transparent 62%), radial-gradient(90% 55% at 88% 22%, rgba(255,120,190,.13), transparent 60%), linear-gradient(178deg,#1B1233 0%,#100A20 52%,#0A0616 100%);
+  --spark: linear-gradient(180deg, rgba(200,160,255,.95), rgba(200,160,255,.18));
+  --acc: #C9A6FF;
+  --save-bg: linear-gradient(150deg,#9D6BFF,#6D32E8);
+  --save-sh: rgba(124,58,237,.55);
+}
+.v-gl-a {
+  --bgS: radial-gradient(75% 48% at 12% 4%, #6FD4FF 0%, transparent 58%), radial-gradient(68% 42% at 92% 16%, #B8F5C8 0%, transparent 55%), radial-gradient(85% 55% at 72% 96%, #C9D8FF 0%, transparent 60%), linear-gradient(172deg,#EAF4FF,#F6FAFF 46%,#EDF6F1);
+  --ink: #0D1526;
+  --ink2: rgba(13,21,38,.62);
+  --ink3: rgba(13,21,38,.45);
+  --acc: #0A5FC8;
+  --spark: linear-gradient(180deg,#2C93F5,rgba(44,147,245,.22));
+  --gsh: rgba(24,62,110,.30);
+  --chipon-bg: #0D1526;
+  --chipon-ink: #FFFFFF;
+  --save-bg: #0D1526;
+  --save-sh: rgba(13,21,38,.4);
+}
+.v-gl-b {
+  --bgS: radial-gradient(75% 48% at 12% 4%, #FFD3AE 0%, transparent 58%), radial-gradient(68% 42% at 92% 16%, #FFC4D4 0%, transparent 55%), radial-gradient(85% 55% at 72% 96%, #FFE5C2 0%, transparent 60%), linear-gradient(172deg,#FFF3EA,#FFFAF4 46%,#FBEFE4);
+  --ink: #2B1710;
+  --ink2: rgba(43,23,16,.64);
+  --ink3: rgba(43,23,16,.46);
+  --acc: #B5431A;
+  --spark: linear-gradient(180deg,#E8703A,rgba(232,112,58,.22));
+  --gsh: rgba(150,70,25,.26);
+  --chipon-bg: #2B1710;
+  --chipon-ink: #FFF8F4;
+  --save-bg: #2B1710;
+  --save-sh: rgba(43,23,16,.4);
+}
+.v-gl-c {
+  --bgS: radial-gradient(75% 48% at 12% 4%, #93F0C4 0%, transparent 58%), radial-gradient(68% 42% at 92% 16%, #C9F7E4 0%, transparent 55%), radial-gradient(85% 55% at 72% 96%, #B7EFD4 0%, transparent 60%), linear-gradient(172deg,#E7FBF0,#F6FEFA 46%,#E2F7EB);
+  --ink: #0A1F16;
+  --ink2: rgba(10,31,22,.64);
+  --ink3: rgba(10,31,22,.46);
+  --acc: #0B7A4A;
+  --spark: linear-gradient(180deg,#17B56E,rgba(23,181,110,.22));
+  --gsh: rgba(12,110,70,.24);
+  --chipon-bg: #0A1F16;
+  --chipon-ink: #F2FFF8;
+  --save-bg: #0C7C4A;
+  --save-sh: rgba(12,124,74,.45);
+}
+.v-md-a {
+  --bgS: #FAFBFD;
+  --ink: #0D1220;
+  --ink2: #626B80;
+  --ink3: #8B94A8;
+  --acc: #1B5CEB;
+  --sparkdim: #E7EAF1;
+  --card-bg: #FFFFFF;
+  --card-bd: #E7EAF1;
+  --hairline: #EDF0F5;
+  --well-bg: #FFFFFF;
+  --well-bd: #E1E6EF;
+  --chipon-bg: #0D1220;
+  --chipon-ink: #FFFFFF;
+  --save-bg: #1B5CEB;
+  --save-sh: rgba(27,92,235,.45);
+  --switch-on: #16A75C;
+  --switch-off: #D6DBE4;
+  --good-bg: #E7F7EE;
+  --good-ink: #0A6B3B;
+  --e1: 0 1px 2px rgba(16,24,40,.05);
+  --e2: 0 1px 2px rgba(16,24,40,.05), 0 4px 8px -2px rgba(16,24,40,.05), 0 16px 28px -12px rgba(16,24,40,.09);
+}
+.v-md-b {
+  --bgS: #FAF8F4;
+  --ink: #211B12;
+  --ink2: #6F6555;
+  --ink3: #9C9181;
+  --acc: #1E6B4F;
+  --sparkdim: #EAE3D7;
+  --card-bg: #FFFFFF;
+  --card-bd: #EAE3D7;
+  --hairline: #EFEAE0;
+  --well-bg: #FFFFFF;
+  --well-bd: #E4DCCD;
+  --chipon-bg: #211B12;
+  --chipon-ink: #FFFDF9;
+  --save-bg: #1E6B4F;
+  --save-sh: rgba(30,107,79,.45);
+  --switch-on: #1E8A55;
+  --switch-off: #D9D2C4;
+  --good-bg: #E4F2E6;
+  --good-ink: #175C40;
+  --e1: 0 1px 2px rgba(63,52,34,.06);
+  --e2: 0 1px 2px rgba(63,52,34,.06), 0 4px 8px -2px rgba(63,52,34,.05), 0 16px 28px -12px rgba(63,52,34,.10);
+}
+.v-md-c {
+  --bgS: #0E1116;
+  --ink: #ECF0F6;
+  --ink2: #9AA6B8;
+  --ink3: #66788D;
+  --acc: #7CA8FF;
+  --sparkdim: #242C38;
+  --card-bg: #171C24;
+  --card-bd: #242C38;
+  --hairline: #232B36;
+  --well-bg: #131820;
+  --well-bd: #2A3340;
+  --chipon-bg: #ECF0F6;
+  --chipon-ink: #0E1116;
+  --save-bg: #2E6BFF;
+  --save-sh: rgba(46,107,255,.5);
+  --switch-on: #22B368;
+  --switch-off: #2E3844;
+  --good-bg: rgba(34,179,104,.16);
+  --good-ink: #57DE95;
+  --e1: 0 1px 2px rgba(0,0,0,.45);
+  --e2: 0 1px 2px rgba(0,0,0,.5), 0 10px 24px -10px rgba(0,0,0,.55);
+}</style>
+<div class="page">
+<header class="masthead">
+  <p class="eyebrow">Финалисты · Three styles · Nine palettes · 2026</p>
+  <h1>Three finalists, <em>nine ways to color them.</em></h1>
+  <p class="standfirst">Spatial Depth, Liquid Glass and Refined Modern — each in three palettes, each palette
+  shown across three real screens: <strong>«Сводка»</strong> (dashboard), <strong>«Боты»</strong> (bot list with
+  activation switches) and <strong>настройки бота</strong> (the 5-tab form). Within a style the material recipe
+  is frozen; only the color tokens change — which is exactly how the Unity theme system will work.
+  Status colors, the activation-switch green and channel dots are held constant everywhere: semantics never
+  follow fashion.</p>
+</header>
+<section class="stylehead">
+  <p class="eyebrow">01 — направление</p>
+  <h2>Spatial Depth</h2>
+  <p>Palette changes the light, not the material. All three variants share the identical recipe — <strong>6% white panes, 22 px backdrop blur, the same shadow stack</strong> — only the substrate and the key light move. Note how the glass hero pane automatically takes on each variant's glow through the blur.</p>
+</section>
+<section class="variant s-spatial v-sp-a">
+  <div class="vhead">
+    <p class="eyebrow">01 · A</p>
+    <h3>«Полночь» — Midnight Cobalt</h3>
+    <p>The engineering default: a cold cobalt key light from above, a whisper of channel green at the right shoulder. Reads as a professional night console — precise, unemotional, trustworthy.</p>
+    <div class="swatches"><span class="sw"><i style="background:#0A0E1A"></i>#0A0E1A<br>substrate</span><span class="sw"><i style="background:#131A2C"></i>#131A2C<br>tier 0</span><span class="sw"><i style="background:#8CBEFF"></i>#8CBEFF<br>key light</span><span class="sw"><i style="background:#1B5CEB"></i>#1B5CEB<br>action</span><span class="sw"><i style="background:#F4F7FF"></i>#F4F7FF<br>ink</span></div>
+  </div>
+  <div class="vrow"><figure class="pwrap"><div class="phone"><div class="screen"><div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+<div class="apphead"><h3>Сводка</h3><span class="head-btn">+</span></div>
+<div class="body">
+  <div class="chips"><span class="chip on">7 дней</span><span class="chip">30 дней</span><span class="chip">Всё время</span></div>
+  <div class="hero">
+    <span class="lbl">Заказов собрано</span>
+    <span class="num">24<small>+8</small></span>
+    <span class="sub">за неделю · 62 диалога</span>
+    <span class="spark"><i style="height:38%"></i><i style="height:52%"></i><i style="height:31%"></i><i style="height:64%"></i><i style="height:45%"></i><i style="height:78%"></i><i style="height:100%"></i></span>
+  </div>
+  <div class="rows">
+    <div class="row"><span class="dot d-owner"></span><span class="nm">Нужен владелец</span><span class="ct">3</span></div>
+    <div class="row"><span class="dot d-dialog"></span><span class="nm">В диалоге</span><span class="ct">11</span></div>
+    <div class="row"><span class="dot d-closed"></span><span class="nm">Вопрос закрыт</span><span class="ct">18</span></div>
+  </div>
+  <div class="botcard">
+    <span class="avatar wa">Ц</span>
+    <span class="botmeta"><b>Цветы Алматы</b><em><i class="chdot wa"></i>WhatsApp · Работает</em></span>
+    <span class="switch on"><b></b></span>
+  </div>
+</div><div class="tabbar"><span class="tab"><i></i>Чаты</span><span class="tab"><i></i>Боты</span><span class="tab on"><i></i>Сводка</span><span class="tab"><i></i>Профиль</span></div></div></div><figcaption class="pcap">Сводка</figcaption></figure><figure class="pwrap"><div class="phone"><div class="screen"><div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+<div class="apphead"><h3>Боты</h3><span class="head-btn">+</span></div>
+<div class="body">
+<div class="bcard">
+  <div class="btop">
+    <span class="avatar wa">Ц</span>
+    <span class="botmeta"><b>Цветы Алматы</b><em><i class="chdot wa"></i>WhatsApp</em></span>
+    <i class="chev r"></i>
+  </div>
+  <div class="bdiv"></div>
+  <div class="bfoot"><span class="bstat on">Бот работает</span><span class="switch on"><b></b></span></div>
+</div>
+<div class="bcard">
+  <div class="btop">
+    <span class="avatar wa">А</span>
+    <span class="botmeta"><b>Автозапчасти 4x4</b><em><i class="chdot wa"></i>WhatsApp&nbsp;&nbsp;<i class="chdot tg"></i>Telegram</em></span>
+    <i class="chev r"></i>
+  </div>
+  <div class="bdiv"></div>
+  <div class="bfoot"><span class="bstat on">Бот работает</span><span class="switch on"><b></b></span></div>
+</div>
+<div class="bcard">
+  <div class="btop">
+    <span class="avatar tg">У</span>
+    <span class="botmeta"><b>Учебный центр</b><em><i class="chdot tg"></i>Telegram</em></span>
+    <i class="chev r"></i>
+  </div>
+  <div class="bdiv"></div>
+  <div class="bfoot"><span class="bstat off">Бот на паузе</span><span class="switch off"><b></b></span></div>
+</div>
+</div><div class="tabbar"><span class="tab"><i></i>Чаты</span><span class="tab on"><i></i>Боты</span><span class="tab"><i></i>Сводка</span><span class="tab"><i></i>Профиль</span></div></div></div><figcaption class="pcap">Боты</figcaption></figure><figure class="pwrap"><div class="phone"><div class="screen"><div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+<div class="apphead sub">
+  <span class="head-btn"><i class="chev l"></i></span>
+  <h3>Цветы Алматы</h3>
+  <span class="pill-on">Онлайн</span>
+</div>
+<div class="body">
+  <div class="tseg"><span class="ts on">Общие</span><span class="ts">Бизнес</span><span class="ts">Товары</span><span class="ts">Услуги</span><span class="ts">Промпты</span></div>
+  <div class="fgroup"><label class="flabel">Название бота</label><div class="well">Цветы Алматы</div></div>
+  <div class="fgroup"><label class="flabel">Тип бизнеса</label><div class="well">Цветы и подарки<i class="chev d"></i></div></div>
+  <div class="fgroup"><label class="flabel">Приветствие</label><div class="well area">Здравствуйте! Это «Цветы Алматы» 🌸 Подскажу букет, цену и доставку.</div></div>
+  <div class="trow">Уведомления о заказах<span class="switch on"><b></b></span></div>
+  <div class="savebtn">Сохранить</div>
+</div></div></div><figcaption class="pcap">Настройки</figcaption></figure></div>
+</section>
+<section class="variant s-spatial v-sp-b">
+  <div class="vhead">
+    <p class="eyebrow">01 · B</p>
+    <h3>«Изумрудная ночь» — Emerald Nocturne</h3>
+    <p>The brand becomes the light source: WhatsApp green is the key light, the substrate is a deep forest-black. The most channel-native of the nine — the whole app glows the color of the product.</p>
+    <div class="swatches"><span class="sw"><i style="background:#05100B"></i>#05100B<br>substrate</span><span class="sw"><i style="background:#0F231B"></i>#0F231B<br>tier 0</span><span class="sw"><i style="background:#7CF3AC"></i>#7CF3AC<br>key light</span><span class="sw"><i style="background:#149A57"></i>#149A57<br>action</span><span class="sw"><i style="background:#F2FFF7"></i>#F2FFF7<br>ink</span></div>
+  </div>
+  <div class="vrow"><figure class="pwrap"><div class="phone"><div class="screen"><div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+<div class="apphead"><h3>Сводка</h3><span class="head-btn">+</span></div>
+<div class="body">
+  <div class="chips"><span class="chip on">7 дней</span><span class="chip">30 дней</span><span class="chip">Всё время</span></div>
+  <div class="hero">
+    <span class="lbl">Заказов собрано</span>
+    <span class="num">24<small>+8</small></span>
+    <span class="sub">за неделю · 62 диалога</span>
+    <span class="spark"><i style="height:38%"></i><i style="height:52%"></i><i style="height:31%"></i><i style="height:64%"></i><i style="height:45%"></i><i style="height:78%"></i><i style="height:100%"></i></span>
+  </div>
+  <div class="rows">
+    <div class="row"><span class="dot d-owner"></span><span class="nm">Нужен владелец</span><span class="ct">3</span></div>
+    <div class="row"><span class="dot d-dialog"></span><span class="nm">В диалоге</span><span class="ct">11</span></div>
+    <div class="row"><span class="dot d-closed"></span><span class="nm">Вопрос закрыт</span><span class="ct">18</span></div>
+  </div>
+  <div class="botcard">
+    <span class="avatar wa">Ц</span>
+    <span class="botmeta"><b>Цветы Алматы</b><em><i class="chdot wa"></i>WhatsApp · Работает</em></span>
+    <span class="switch on"><b></b></span>
+  </div>
+</div><div class="tabbar"><span class="tab"><i></i>Чаты</span><span class="tab"><i></i>Боты</span><span class="tab on"><i></i>Сводка</span><span class="tab"><i></i>Профиль</span></div></div></div><figcaption class="pcap">Сводка</figcaption></figure><figure class="pwrap"><div class="phone"><div class="screen"><div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+<div class="apphead"><h3>Боты</h3><span class="head-btn">+</span></div>
+<div class="body">
+<div class="bcard">
+  <div class="btop">
+    <span class="avatar wa">Ц</span>
+    <span class="botmeta"><b>Цветы Алматы</b><em><i class="chdot wa"></i>WhatsApp</em></span>
+    <i class="chev r"></i>
+  </div>
+  <div class="bdiv"></div>
+  <div class="bfoot"><span class="bstat on">Бот работает</span><span class="switch on"><b></b></span></div>
+</div>
+<div class="bcard">
+  <div class="btop">
+    <span class="avatar wa">А</span>
+    <span class="botmeta"><b>Автозапчасти 4x4</b><em><i class="chdot wa"></i>WhatsApp&nbsp;&nbsp;<i class="chdot tg"></i>Telegram</em></span>
+    <i class="chev r"></i>
+  </div>
+  <div class="bdiv"></div>
+  <div class="bfoot"><span class="bstat on">Бот работает</span><span class="switch on"><b></b></span></div>
+</div>
+<div class="bcard">
+  <div class="btop">
+    <span class="avatar tg">У</span>
+    <span class="botmeta"><b>Учебный центр</b><em><i class="chdot tg"></i>Telegram</em></span>
+    <i class="chev r"></i>
+  </div>
+  <div class="bdiv"></div>
+  <div class="bfoot"><span class="bstat off">Бот на паузе</span><span class="switch off"><b></b></span></div>
+</div>
+</div><div class="tabbar"><span class="tab"><i></i>Чаты</span><span class="tab on"><i></i>Боты</span><span class="tab"><i></i>Сводка</span><span class="tab"><i></i>Профиль</span></div></div></div><figcaption class="pcap">Боты</figcaption></figure><figure class="pwrap"><div class="phone"><div class="screen"><div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+<div class="apphead sub">
+  <span class="head-btn"><i class="chev l"></i></span>
+  <h3>Цветы Алматы</h3>
+  <span class="pill-on">Онлайн</span>
+</div>
+<div class="body">
+  <div class="tseg"><span class="ts on">Общие</span><span class="ts">Бизнес</span><span class="ts">Товары</span><span class="ts">Услуги</span><span class="ts">Промпты</span></div>
+  <div class="fgroup"><label class="flabel">Название бота</label><div class="well">Цветы Алматы</div></div>
+  <div class="fgroup"><label class="flabel">Тип бизнеса</label><div class="well">Цветы и подарки<i class="chev d"></i></div></div>
+  <div class="fgroup"><label class="flabel">Приветствие</label><div class="well area">Здравствуйте! Это «Цветы Алматы» 🌸 Подскажу букет, цену и доставку.</div></div>
+  <div class="trow">Уведомления о заказах<span class="switch on"><b></b></span></div>
+  <div class="savebtn">Сохранить</div>
+</div></div></div><figcaption class="pcap">Настройки</figcaption></figure></div>
+</section>
+<section class="variant s-spatial v-sp-c">
+  <div class="vhead">
+    <p class="eyebrow">01 · C</p>
+    <h3>«Аметист» — Amethyst Hour</h3>
+    <p>Dusk violet with a rose spill — deliberately far from both channel colors, so the app carries its own identity above WhatsApp and Telegram. The most «premium tool», least utility-like mood.</p>
+    <div class="swatches"><span class="sw"><i style="background:#0A0616"></i>#0A0616<br>substrate</span><span class="sw"><i style="background:#1B1233"></i>#1B1233<br>tier 0</span><span class="sw"><i style="background:#C9A6FF"></i>#C9A6FF<br>key light</span><span class="sw"><i style="background:#6D32E8"></i>#6D32E8<br>action</span><span class="sw"><i style="background:#F6F2FF"></i>#F6F2FF<br>ink</span></div>
+  </div>
+  <div class="vrow"><figure class="pwrap"><div class="phone"><div class="screen"><div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+<div class="apphead"><h3>Сводка</h3><span class="head-btn">+</span></div>
+<div class="body">
+  <div class="chips"><span class="chip on">7 дней</span><span class="chip">30 дней</span><span class="chip">Всё время</span></div>
+  <div class="hero">
+    <span class="lbl">Заказов собрано</span>
+    <span class="num">24<small>+8</small></span>
+    <span class="sub">за неделю · 62 диалога</span>
+    <span class="spark"><i style="height:38%"></i><i style="height:52%"></i><i style="height:31%"></i><i style="height:64%"></i><i style="height:45%"></i><i style="height:78%"></i><i style="height:100%"></i></span>
+  </div>
+  <div class="rows">
+    <div class="row"><span class="dot d-owner"></span><span class="nm">Нужен владелец</span><span class="ct">3</span></div>
+    <div class="row"><span class="dot d-dialog"></span><span class="nm">В диалоге</span><span class="ct">11</span></div>
+    <div class="row"><span class="dot d-closed"></span><span class="nm">Вопрос закрыт</span><span class="ct">18</span></div>
+  </div>
+  <div class="botcard">
+    <span class="avatar wa">Ц</span>
+    <span class="botmeta"><b>Цветы Алматы</b><em><i class="chdot wa"></i>WhatsApp · Работает</em></span>
+    <span class="switch on"><b></b></span>
+  </div>
+</div><div class="tabbar"><span class="tab"><i></i>Чаты</span><span class="tab"><i></i>Боты</span><span class="tab on"><i></i>Сводка</span><span class="tab"><i></i>Профиль</span></div></div></div><figcaption class="pcap">Сводка</figcaption></figure><figure class="pwrap"><div class="phone"><div class="screen"><div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+<div class="apphead"><h3>Боты</h3><span class="head-btn">+</span></div>
+<div class="body">
+<div class="bcard">
+  <div class="btop">
+    <span class="avatar wa">Ц</span>
+    <span class="botmeta"><b>Цветы Алматы</b><em><i class="chdot wa"></i>WhatsApp</em></span>
+    <i class="chev r"></i>
+  </div>
+  <div class="bdiv"></div>
+  <div class="bfoot"><span class="bstat on">Бот работает</span><span class="switch on"><b></b></span></div>
+</div>
+<div class="bcard">
+  <div class="btop">
+    <span class="avatar wa">А</span>
+    <span class="botmeta"><b>Автозапчасти 4x4</b><em><i class="chdot wa"></i>WhatsApp&nbsp;&nbsp;<i class="chdot tg"></i>Telegram</em></span>
+    <i class="chev r"></i>
+  </div>
+  <div class="bdiv"></div>
+  <div class="bfoot"><span class="bstat on">Бот работает</span><span class="switch on"><b></b></span></div>
+</div>
+<div class="bcard">
+  <div class="btop">
+    <span class="avatar tg">У</span>
+    <span class="botmeta"><b>Учебный центр</b><em><i class="chdot tg"></i>Telegram</em></span>
+    <i class="chev r"></i>
+  </div>
+  <div class="bdiv"></div>
+  <div class="bfoot"><span class="bstat off">Бот на паузе</span><span class="switch off"><b></b></span></div>
+</div>
+</div><div class="tabbar"><span class="tab"><i></i>Чаты</span><span class="tab on"><i></i>Боты</span><span class="tab"><i></i>Сводка</span><span class="tab"><i></i>Профиль</span></div></div></div><figcaption class="pcap">Боты</figcaption></figure><figure class="pwrap"><div class="phone"><div class="screen"><div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+<div class="apphead sub">
+  <span class="head-btn"><i class="chev l"></i></span>
+  <h3>Цветы Алматы</h3>
+  <span class="pill-on">Онлайн</span>
+</div>
+<div class="body">
+  <div class="tseg"><span class="ts on">Общие</span><span class="ts">Бизнес</span><span class="ts">Товары</span><span class="ts">Услуги</span><span class="ts">Промпты</span></div>
+  <div class="fgroup"><label class="flabel">Название бота</label><div class="well">Цветы Алматы</div></div>
+  <div class="fgroup"><label class="flabel">Тип бизнеса</label><div class="well">Цветы и подарки<i class="chev d"></i></div></div>
+  <div class="fgroup"><label class="flabel">Приветствие</label><div class="well area">Здравствуйте! Это «Цветы Алматы» 🌸 Подскажу букет, цену и доставку.</div></div>
+  <div class="trow">Уведомления о заказах<span class="switch on"><b></b></span></div>
+  <div class="savebtn">Сохранить</div>
+</div></div></div><figcaption class="pcap">Настройки</figcaption></figure></div>
+</section>
+<section class="stylehead">
+  <p class="eyebrow">02 — направление</p>
+  <h2>Liquid Glass</h2>
+  <p>The glass itself is colorless; the world behind it is not. The white-glass recipe — <strong>specular top edge, darker inner bottom edge, 24 px blur at ×1.9 saturation</strong> — never changes. Each palette repaints the backdrop the glass refracts, and the ink family shifts with it.</p>
+</section>
+<section class="variant s-glass v-gl-a">
+  <div class="vhead">
+    <p class="eyebrow">02 · A</p>
+    <h3>«Рассвет» — Aurora</h3>
+    <p>Cyan and mint morning light under colorless glass — cool, optimistic, the closest to Apple's own reading of the material. Ink is a deep navy; the action color is a compressed cobalt.</p>
+    <div class="swatches"><span class="sw"><i style="background:#EAF4FF"></i>#EAF4FF<br>ground</span><span class="sw"><i style="background:#6FD4FF"></i>#6FD4FF<br>refract A</span><span class="sw"><i style="background:#B8F5C8"></i>#B8F5C8<br>refract B</span><span class="sw"><i style="background:#0A5FC8"></i>#0A5FC8<br>action</span><span class="sw"><i style="background:#0D1526"></i>#0D1526<br>ink</span></div>
+  </div>
+  <div class="vrow"><figure class="pwrap"><div class="phone"><div class="screen"><div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+<div class="apphead"><h3>Сводка</h3><span class="head-btn">+</span></div>
+<div class="body">
+  <div class="chips"><span class="chip on">7 дней</span><span class="chip">30 дней</span><span class="chip">Всё время</span></div>
+  <div class="hero">
+    <span class="lbl">Заказов собрано</span>
+    <span class="num">24<small>+8</small></span>
+    <span class="sub">за неделю · 62 диалога</span>
+    <span class="spark"><i style="height:38%"></i><i style="height:52%"></i><i style="height:31%"></i><i style="height:64%"></i><i style="height:45%"></i><i style="height:78%"></i><i style="height:100%"></i></span>
+  </div>
+  <div class="rows">
+    <div class="row"><span class="dot d-owner"></span><span class="nm">Нужен владелец</span><span class="ct">3</span></div>
+    <div class="row"><span class="dot d-dialog"></span><span class="nm">В диалоге</span><span class="ct">11</span></div>
+    <div class="row"><span class="dot d-closed"></span><span class="nm">Вопрос закрыт</span><span class="ct">18</span></div>
+  </div>
+  <div class="botcard">
+    <span class="avatar wa">Ц</span>
+    <span class="botmeta"><b>Цветы Алматы</b><em><i class="chdot wa"></i>WhatsApp · Работает</em></span>
+    <span class="switch on"><b></b></span>
+  </div>
+</div><div class="tabbar"><span class="tab"><i></i>Чаты</span><span class="tab"><i></i>Боты</span><span class="tab on"><i></i>Сводка</span><span class="tab"><i></i>Профиль</span></div></div></div><figcaption class="pcap">Сводка</figcaption></figure><figure class="pwrap"><div class="phone"><div class="screen"><div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+<div class="apphead"><h3>Боты</h3><span class="head-btn">+</span></div>
+<div class="body">
+<div class="bcard">
+  <div class="btop">
+    <span class="avatar wa">Ц</span>
+    <span class="botmeta"><b>Цветы Алматы</b><em><i class="chdot wa"></i>WhatsApp</em></span>
+    <i class="chev r"></i>
+  </div>
+  <div class="bdiv"></div>
+  <div class="bfoot"><span class="bstat on">Бот работает</span><span class="switch on"><b></b></span></div>
+</div>
+<div class="bcard">
+  <div class="btop">
+    <span class="avatar wa">А</span>
+    <span class="botmeta"><b>Автозапчасти 4x4</b><em><i class="chdot wa"></i>WhatsApp&nbsp;&nbsp;<i class="chdot tg"></i>Telegram</em></span>
+    <i class="chev r"></i>
+  </div>
+  <div class="bdiv"></div>
+  <div class="bfoot"><span class="bstat on">Бот работает</span><span class="switch on"><b></b></span></div>
+</div>
+<div class="bcard">
+  <div class="btop">
+    <span class="avatar tg">У</span>
+    <span class="botmeta"><b>Учебный центр</b><em><i class="chdot tg"></i>Telegram</em></span>
+    <i class="chev r"></i>
+  </div>
+  <div class="bdiv"></div>
+  <div class="bfoot"><span class="bstat off">Бот на паузе</span><span class="switch off"><b></b></span></div>
+</div>
+</div><div class="tabbar"><span class="tab"><i></i>Чаты</span><span class="tab on"><i></i>Боты</span><span class="tab"><i></i>Сводка</span><span class="tab"><i></i>Профиль</span></div></div></div><figcaption class="pcap">Боты</figcaption></figure><figure class="pwrap"><div class="phone"><div class="screen"><div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+<div class="apphead sub">
+  <span class="head-btn"><i class="chev l"></i></span>
+  <h3>Цветы Алматы</h3>
+  <span class="pill-on">Онлайн</span>
+</div>
+<div class="body">
+  <div class="tseg"><span class="ts on">Общие</span><span class="ts">Бизнес</span><span class="ts">Товары</span><span class="ts">Услуги</span><span class="ts">Промпты</span></div>
+  <div class="fgroup"><label class="flabel">Название бота</label><div class="well">Цветы Алматы</div></div>
+  <div class="fgroup"><label class="flabel">Тип бизнеса</label><div class="well">Цветы и подарки<i class="chev d"></i></div></div>
+  <div class="fgroup"><label class="flabel">Приветствие</label><div class="well area">Здравствуйте! Это «Цветы Алматы» 🌸 Подскажу букет, цену и доставку.</div></div>
+  <div class="trow">Уведомления о заказах<span class="switch on"><b></b></span></div>
+  <div class="savebtn">Сохранить</div>
+</div></div></div><figcaption class="pcap">Настройки</figcaption></figure></div>
+</section>
+<section class="variant s-glass v-gl-b">
+  <div class="vhead">
+    <p class="eyebrow">02 · B</p>
+    <h3>«Персиковый свет» — Peach Light</h3>
+    <p>A warm sunrise wash — peach, rose, soft amber — under the same glass. Hospitality energy: perfect for the flowers and education verticals, and the friendliest face the app can wear.</p>
+    <div class="swatches"><span class="sw"><i style="background:#FFF3EA"></i>#FFF3EA<br>ground</span><span class="sw"><i style="background:#FFD3AE"></i>#FFD3AE<br>refract A</span><span class="sw"><i style="background:#FFC4D4"></i>#FFC4D4<br>refract B</span><span class="sw"><i style="background:#B5431A"></i>#B5431A<br>action</span><span class="sw"><i style="background:#2B1710"></i>#2B1710<br>ink</span></div>
+  </div>
+  <div class="vrow"><figure class="pwrap"><div class="phone"><div class="screen"><div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+<div class="apphead"><h3>Сводка</h3><span class="head-btn">+</span></div>
+<div class="body">
+  <div class="chips"><span class="chip on">7 дней</span><span class="chip">30 дней</span><span class="chip">Всё время</span></div>
+  <div class="hero">
+    <span class="lbl">Заказов собрано</span>
+    <span class="num">24<small>+8</small></span>
+    <span class="sub">за неделю · 62 диалога</span>
+    <span class="spark"><i style="height:38%"></i><i style="height:52%"></i><i style="height:31%"></i><i style="height:64%"></i><i style="height:45%"></i><i style="height:78%"></i><i style="height:100%"></i></span>
+  </div>
+  <div class="rows">
+    <div class="row"><span class="dot d-owner"></span><span class="nm">Нужен владелец</span><span class="ct">3</span></div>
+    <div class="row"><span class="dot d-dialog"></span><span class="nm">В диалоге</span><span class="ct">11</span></div>
+    <div class="row"><span class="dot d-closed"></span><span class="nm">Вопрос закрыт</span><span class="ct">18</span></div>
+  </div>
+  <div class="botcard">
+    <span class="avatar wa">Ц</span>
+    <span class="botmeta"><b>Цветы Алматы</b><em><i class="chdot wa"></i>WhatsApp · Работает</em></span>
+    <span class="switch on"><b></b></span>
+  </div>
+</div><div class="tabbar"><span class="tab"><i></i>Чаты</span><span class="tab"><i></i>Боты</span><span class="tab on"><i></i>Сводка</span><span class="tab"><i></i>Профиль</span></div></div></div><figcaption class="pcap">Сводка</figcaption></figure><figure class="pwrap"><div class="phone"><div class="screen"><div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+<div class="apphead"><h3>Боты</h3><span class="head-btn">+</span></div>
+<div class="body">
+<div class="bcard">
+  <div class="btop">
+    <span class="avatar wa">Ц</span>
+    <span class="botmeta"><b>Цветы Алматы</b><em><i class="chdot wa"></i>WhatsApp</em></span>
+    <i class="chev r"></i>
+  </div>
+  <div class="bdiv"></div>
+  <div class="bfoot"><span class="bstat on">Бот работает</span><span class="switch on"><b></b></span></div>
+</div>
+<div class="bcard">
+  <div class="btop">
+    <span class="avatar wa">А</span>
+    <span class="botmeta"><b>Автозапчасти 4x4</b><em><i class="chdot wa"></i>WhatsApp&nbsp;&nbsp;<i class="chdot tg"></i>Telegram</em></span>
+    <i class="chev r"></i>
+  </div>
+  <div class="bdiv"></div>
+  <div class="bfoot"><span class="bstat on">Бот работает</span><span class="switch on"><b></b></span></div>
+</div>
+<div class="bcard">
+  <div class="btop">
+    <span class="avatar tg">У</span>
+    <span class="botmeta"><b>Учебный центр</b><em><i class="chdot tg"></i>Telegram</em></span>
+    <i class="chev r"></i>
+  </div>
+  <div class="bdiv"></div>
+  <div class="bfoot"><span class="bstat off">Бот на паузе</span><span class="switch off"><b></b></span></div>
+</div>
+</div><div class="tabbar"><span class="tab"><i></i>Чаты</span><span class="tab on"><i></i>Боты</span><span class="tab"><i></i>Сводка</span><span class="tab"><i></i>Профиль</span></div></div></div><figcaption class="pcap">Боты</figcaption></figure><figure class="pwrap"><div class="phone"><div class="screen"><div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+<div class="apphead sub">
+  <span class="head-btn"><i class="chev l"></i></span>
+  <h3>Цветы Алматы</h3>
+  <span class="pill-on">Онлайн</span>
+</div>
+<div class="body">
+  <div class="tseg"><span class="ts on">Общие</span><span class="ts">Бизнес</span><span class="ts">Товары</span><span class="ts">Услуги</span><span class="ts">Промпты</span></div>
+  <div class="fgroup"><label class="flabel">Название бота</label><div class="well">Цветы Алматы</div></div>
+  <div class="fgroup"><label class="flabel">Тип бизнеса</label><div class="well">Цветы и подарки<i class="chev d"></i></div></div>
+  <div class="fgroup"><label class="flabel">Приветствие</label><div class="well area">Здравствуйте! Это «Цветы Алматы» 🌸 Подскажу букет, цену и доставку.</div></div>
+  <div class="trow">Уведомления о заказах<span class="switch on"><b></b></span></div>
+  <div class="savebtn">Сохранить</div>
+</div></div></div><figcaption class="pcap">Настройки</figcaption></figure></div>
+</section>
+<section class="variant s-glass v-gl-c">
+  <div class="vhead">
+    <p class="eyebrow">02 · C</p>
+    <h3>«Мята» — Fresh Mint</h3>
+    <p>A channel-native green wash — the WhatsApp association is instant but kept pastel, so the glass stays airy instead of corporate. The action color drops to a deep pine for contrast.</p>
+    <div class="swatches"><span class="sw"><i style="background:#E7FBF0"></i>#E7FBF0<br>ground</span><span class="sw"><i style="background:#93F0C4"></i>#93F0C4<br>refract A</span><span class="sw"><i style="background:#C9F7E4"></i>#C9F7E4<br>refract B</span><span class="sw"><i style="background:#0B7A4A"></i>#0B7A4A<br>action</span><span class="sw"><i style="background:#0A1F16"></i>#0A1F16<br>ink</span></div>
+  </div>
+  <div class="vrow"><figure class="pwrap"><div class="phone"><div class="screen"><div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+<div class="apphead"><h3>Сводка</h3><span class="head-btn">+</span></div>
+<div class="body">
+  <div class="chips"><span class="chip on">7 дней</span><span class="chip">30 дней</span><span class="chip">Всё время</span></div>
+  <div class="hero">
+    <span class="lbl">Заказов собрано</span>
+    <span class="num">24<small>+8</small></span>
+    <span class="sub">за неделю · 62 диалога</span>
+    <span class="spark"><i style="height:38%"></i><i style="height:52%"></i><i style="height:31%"></i><i style="height:64%"></i><i style="height:45%"></i><i style="height:78%"></i><i style="height:100%"></i></span>
+  </div>
+  <div class="rows">
+    <div class="row"><span class="dot d-owner"></span><span class="nm">Нужен владелец</span><span class="ct">3</span></div>
+    <div class="row"><span class="dot d-dialog"></span><span class="nm">В диалоге</span><span class="ct">11</span></div>
+    <div class="row"><span class="dot d-closed"></span><span class="nm">Вопрос закрыт</span><span class="ct">18</span></div>
+  </div>
+  <div class="botcard">
+    <span class="avatar wa">Ц</span>
+    <span class="botmeta"><b>Цветы Алматы</b><em><i class="chdot wa"></i>WhatsApp · Работает</em></span>
+    <span class="switch on"><b></b></span>
+  </div>
+</div><div class="tabbar"><span class="tab"><i></i>Чаты</span><span class="tab"><i></i>Боты</span><span class="tab on"><i></i>Сводка</span><span class="tab"><i></i>Профиль</span></div></div></div><figcaption class="pcap">Сводка</figcaption></figure><figure class="pwrap"><div class="phone"><div class="screen"><div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+<div class="apphead"><h3>Боты</h3><span class="head-btn">+</span></div>
+<div class="body">
+<div class="bcard">
+  <div class="btop">
+    <span class="avatar wa">Ц</span>
+    <span class="botmeta"><b>Цветы Алматы</b><em><i class="chdot wa"></i>WhatsApp</em></span>
+    <i class="chev r"></i>
+  </div>
+  <div class="bdiv"></div>
+  <div class="bfoot"><span class="bstat on">Бот работает</span><span class="switch on"><b></b></span></div>
+</div>
+<div class="bcard">
+  <div class="btop">
+    <span class="avatar wa">А</span>
+    <span class="botmeta"><b>Автозапчасти 4x4</b><em><i class="chdot wa"></i>WhatsApp&nbsp;&nbsp;<i class="chdot tg"></i>Telegram</em></span>
+    <i class="chev r"></i>
+  </div>
+  <div class="bdiv"></div>
+  <div class="bfoot"><span class="bstat on">Бот работает</span><span class="switch on"><b></b></span></div>
+</div>
+<div class="bcard">
+  <div class="btop">
+    <span class="avatar tg">У</span>
+    <span class="botmeta"><b>Учебный центр</b><em><i class="chdot tg"></i>Telegram</em></span>
+    <i class="chev r"></i>
+  </div>
+  <div class="bdiv"></div>
+  <div class="bfoot"><span class="bstat off">Бот на паузе</span><span class="switch off"><b></b></span></div>
+</div>
+</div><div class="tabbar"><span class="tab"><i></i>Чаты</span><span class="tab on"><i></i>Боты</span><span class="tab"><i></i>Сводка</span><span class="tab"><i></i>Профиль</span></div></div></div><figcaption class="pcap">Боты</figcaption></figure><figure class="pwrap"><div class="phone"><div class="screen"><div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+<div class="apphead sub">
+  <span class="head-btn"><i class="chev l"></i></span>
+  <h3>Цветы Алматы</h3>
+  <span class="pill-on">Онлайн</span>
+</div>
+<div class="body">
+  <div class="tseg"><span class="ts on">Общие</span><span class="ts">Бизнес</span><span class="ts">Товары</span><span class="ts">Услуги</span><span class="ts">Промпты</span></div>
+  <div class="fgroup"><label class="flabel">Название бота</label><div class="well">Цветы Алматы</div></div>
+  <div class="fgroup"><label class="flabel">Тип бизнеса</label><div class="well">Цветы и подарки<i class="chev d"></i></div></div>
+  <div class="fgroup"><label class="flabel">Приветствие</label><div class="well area">Здравствуйте! Это «Цветы Алматы» 🌸 Подскажу букет, цену и доставку.</div></div>
+  <div class="trow">Уведомления о заказах<span class="switch on"><b></b></span></div>
+  <div class="savebtn">Сохранить</div>
+</div></div></div><figcaption class="pcap">Настройки</figcaption></figure></div>
+</section>
+<section class="stylehead">
+  <p class="eyebrow">03 — направление</p>
+  <h2>Refined Modern</h2>
+  <p>Pure tokens. Same hairline logic, same three-layer elevation, same radius math — each palette is <strong>one token-file swap</strong>, including the dark theme, which costs nothing extra once tokens exist. This is the architecture the Unity restyle needs regardless of which style wins.</p>
+</section>
+<section class="variant s-mod v-md-a">
+  <div class="vhead">
+    <p class="eyebrow">03 · A</p>
+    <h3>«Кобальт» — Slate & Cobalt</h3>
+    <p>Blue-tinted neutrals, one cobalt accent, hairlines at a true 1 px. The reference token set — everything else in this row is derived from it by swapping primitives.</p>
+    <div class="swatches"><span class="sw"><i style="background:#FAFBFD"></i>#FAFBFD<br>ground</span><span class="sw"><i style="background:#FFFFFF"></i>#FFFFFF<br>surface</span><span class="sw"><i style="background:#E7EAF1"></i>#E7EAF1<br>hairline</span><span class="sw"><i style="background:#1B5CEB"></i>#1B5CEB<br>accent</span><span class="sw"><i style="background:#0D1220"></i>#0D1220<br>ink</span></div>
+  </div>
+  <div class="vrow"><figure class="pwrap"><div class="phone"><div class="screen"><div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+<div class="apphead"><h3>Сводка</h3><span class="head-btn">+</span></div>
+<div class="body">
+  <div class="chips"><span class="chip on">7 дней</span><span class="chip">30 дней</span><span class="chip">Всё время</span></div>
+  <div class="hero">
+    <span class="lbl">Заказов собрано</span>
+    <span class="num">24<small>+8</small></span>
+    <span class="sub">за неделю · 62 диалога</span>
+    <span class="spark"><i style="height:38%"></i><i style="height:52%"></i><i style="height:31%"></i><i style="height:64%"></i><i style="height:45%"></i><i style="height:78%"></i><i style="height:100%"></i></span>
+  </div>
+  <div class="rows">
+    <div class="row"><span class="dot d-owner"></span><span class="nm">Нужен владелец</span><span class="ct">3</span></div>
+    <div class="row"><span class="dot d-dialog"></span><span class="nm">В диалоге</span><span class="ct">11</span></div>
+    <div class="row"><span class="dot d-closed"></span><span class="nm">Вопрос закрыт</span><span class="ct">18</span></div>
+  </div>
+  <div class="botcard">
+    <span class="avatar wa">Ц</span>
+    <span class="botmeta"><b>Цветы Алматы</b><em><i class="chdot wa"></i>WhatsApp · Работает</em></span>
+    <span class="switch on"><b></b></span>
+  </div>
+</div><div class="tabbar"><span class="tab"><i></i>Чаты</span><span class="tab"><i></i>Боты</span><span class="tab on"><i></i>Сводка</span><span class="tab"><i></i>Профиль</span></div></div></div><figcaption class="pcap">Сводка</figcaption></figure><figure class="pwrap"><div class="phone"><div class="screen"><div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+<div class="apphead"><h3>Боты</h3><span class="head-btn">+</span></div>
+<div class="body">
+<div class="bcard">
+  <div class="btop">
+    <span class="avatar wa">Ц</span>
+    <span class="botmeta"><b>Цветы Алматы</b><em><i class="chdot wa"></i>WhatsApp</em></span>
+    <i class="chev r"></i>
+  </div>
+  <div class="bdiv"></div>
+  <div class="bfoot"><span class="bstat on">Бот работает</span><span class="switch on"><b></b></span></div>
+</div>
+<div class="bcard">
+  <div class="btop">
+    <span class="avatar wa">А</span>
+    <span class="botmeta"><b>Автозапчасти 4x4</b><em><i class="chdot wa"></i>WhatsApp&nbsp;&nbsp;<i class="chdot tg"></i>Telegram</em></span>
+    <i class="chev r"></i>
+  </div>
+  <div class="bdiv"></div>
+  <div class="bfoot"><span class="bstat on">Бот работает</span><span class="switch on"><b></b></span></div>
+</div>
+<div class="bcard">
+  <div class="btop">
+    <span class="avatar tg">У</span>
+    <span class="botmeta"><b>Учебный центр</b><em><i class="chdot tg"></i>Telegram</em></span>
+    <i class="chev r"></i>
+  </div>
+  <div class="bdiv"></div>
+  <div class="bfoot"><span class="bstat off">Бот на паузе</span><span class="switch off"><b></b></span></div>
+</div>
+</div><div class="tabbar"><span class="tab"><i></i>Чаты</span><span class="tab on"><i></i>Боты</span><span class="tab"><i></i>Сводка</span><span class="tab"><i></i>Профиль</span></div></div></div><figcaption class="pcap">Боты</figcaption></figure><figure class="pwrap"><div class="phone"><div class="screen"><div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+<div class="apphead sub">
+  <span class="head-btn"><i class="chev l"></i></span>
+  <h3>Цветы Алматы</h3>
+  <span class="pill-on">Онлайн</span>
+</div>
+<div class="body">
+  <div class="tseg"><span class="ts on">Общие</span><span class="ts">Бизнес</span><span class="ts">Товары</span><span class="ts">Услуги</span><span class="ts">Промпты</span></div>
+  <div class="fgroup"><label class="flabel">Название бота</label><div class="well">Цветы Алматы</div></div>
+  <div class="fgroup"><label class="flabel">Тип бизнеса</label><div class="well">Цветы и подарки<i class="chev d"></i></div></div>
+  <div class="fgroup"><label class="flabel">Приветствие</label><div class="well area">Здравствуйте! Это «Цветы Алматы» 🌸 Подскажу букет, цену и доставку.</div></div>
+  <div class="trow">Уведомления о заказах<span class="switch on"><b></b></span></div>
+  <div class="savebtn">Сохранить</div>
+</div></div></div><figcaption class="pcap">Настройки</figcaption></figure></div>
+</section>
+<section class="variant s-mod v-md-b">
+  <div class="vhead">
+    <p class="eyebrow">03 · B</p>
+    <h3>«Тёплый камень» — Warm Stone</h3>
+    <p>Greige neutrals warmed toward paper, with a forest-green accent that quietly agrees with WhatsApp without wearing its logo. The calmest and most human of the modern set.</p>
+    <div class="swatches"><span class="sw"><i style="background:#FAF8F4"></i>#FAF8F4<br>ground</span><span class="sw"><i style="background:#FFFFFF"></i>#FFFFFF<br>surface</span><span class="sw"><i style="background:#EAE3D7"></i>#EAE3D7<br>hairline</span><span class="sw"><i style="background:#1E6B4F"></i>#1E6B4F<br>accent</span><span class="sw"><i style="background:#211B12"></i>#211B12<br>ink</span></div>
+  </div>
+  <div class="vrow"><figure class="pwrap"><div class="phone"><div class="screen"><div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+<div class="apphead"><h3>Сводка</h3><span class="head-btn">+</span></div>
+<div class="body">
+  <div class="chips"><span class="chip on">7 дней</span><span class="chip">30 дней</span><span class="chip">Всё время</span></div>
+  <div class="hero">
+    <span class="lbl">Заказов собрано</span>
+    <span class="num">24<small>+8</small></span>
+    <span class="sub">за неделю · 62 диалога</span>
+    <span class="spark"><i style="height:38%"></i><i style="height:52%"></i><i style="height:31%"></i><i style="height:64%"></i><i style="height:45%"></i><i style="height:78%"></i><i style="height:100%"></i></span>
+  </div>
+  <div class="rows">
+    <div class="row"><span class="dot d-owner"></span><span class="nm">Нужен владелец</span><span class="ct">3</span></div>
+    <div class="row"><span class="dot d-dialog"></span><span class="nm">В диалоге</span><span class="ct">11</span></div>
+    <div class="row"><span class="dot d-closed"></span><span class="nm">Вопрос закрыт</span><span class="ct">18</span></div>
+  </div>
+  <div class="botcard">
+    <span class="avatar wa">Ц</span>
+    <span class="botmeta"><b>Цветы Алматы</b><em><i class="chdot wa"></i>WhatsApp · Работает</em></span>
+    <span class="switch on"><b></b></span>
+  </div>
+</div><div class="tabbar"><span class="tab"><i></i>Чаты</span><span class="tab"><i></i>Боты</span><span class="tab on"><i></i>Сводка</span><span class="tab"><i></i>Профиль</span></div></div></div><figcaption class="pcap">Сводка</figcaption></figure><figure class="pwrap"><div class="phone"><div class="screen"><div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+<div class="apphead"><h3>Боты</h3><span class="head-btn">+</span></div>
+<div class="body">
+<div class="bcard">
+  <div class="btop">
+    <span class="avatar wa">Ц</span>
+    <span class="botmeta"><b>Цветы Алматы</b><em><i class="chdot wa"></i>WhatsApp</em></span>
+    <i class="chev r"></i>
+  </div>
+  <div class="bdiv"></div>
+  <div class="bfoot"><span class="bstat on">Бот работает</span><span class="switch on"><b></b></span></div>
+</div>
+<div class="bcard">
+  <div class="btop">
+    <span class="avatar wa">А</span>
+    <span class="botmeta"><b>Автозапчасти 4x4</b><em><i class="chdot wa"></i>WhatsApp&nbsp;&nbsp;<i class="chdot tg"></i>Telegram</em></span>
+    <i class="chev r"></i>
+  </div>
+  <div class="bdiv"></div>
+  <div class="bfoot"><span class="bstat on">Бот работает</span><span class="switch on"><b></b></span></div>
+</div>
+<div class="bcard">
+  <div class="btop">
+    <span class="avatar tg">У</span>
+    <span class="botmeta"><b>Учебный центр</b><em><i class="chdot tg"></i>Telegram</em></span>
+    <i class="chev r"></i>
+  </div>
+  <div class="bdiv"></div>
+  <div class="bfoot"><span class="bstat off">Бот на паузе</span><span class="switch off"><b></b></span></div>
+</div>
+</div><div class="tabbar"><span class="tab"><i></i>Чаты</span><span class="tab on"><i></i>Боты</span><span class="tab"><i></i>Сводка</span><span class="tab"><i></i>Профиль</span></div></div></div><figcaption class="pcap">Боты</figcaption></figure><figure class="pwrap"><div class="phone"><div class="screen"><div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+<div class="apphead sub">
+  <span class="head-btn"><i class="chev l"></i></span>
+  <h3>Цветы Алматы</h3>
+  <span class="pill-on">Онлайн</span>
+</div>
+<div class="body">
+  <div class="tseg"><span class="ts on">Общие</span><span class="ts">Бизнес</span><span class="ts">Товары</span><span class="ts">Услуги</span><span class="ts">Промпты</span></div>
+  <div class="fgroup"><label class="flabel">Название бота</label><div class="well">Цветы Алматы</div></div>
+  <div class="fgroup"><label class="flabel">Тип бизнеса</label><div class="well">Цветы и подарки<i class="chev d"></i></div></div>
+  <div class="fgroup"><label class="flabel">Приветствие</label><div class="well area">Здравствуйте! Это «Цветы Алматы» 🌸 Подскажу букет, цену и доставку.</div></div>
+  <div class="trow">Уведомления о заказах<span class="switch on"><b></b></span></div>
+  <div class="savebtn">Сохранить</div>
+</div></div></div><figcaption class="pcap">Настройки</figcaption></figure></div>
+</section>
+<section class="variant s-mod v-md-c">
+  <div class="vhead">
+    <p class="eyebrow">03 · C</p>
+    <h3>«Графит» — Graphite Dark</h3>
+    <p>The dark theme the token system produces for free: same hairline logic, same elevation tiers, borders doing the work shadows can't do on black. Accent lifts to a lighter cobalt for contrast.</p>
+    <div class="swatches"><span class="sw"><i style="background:#0E1116"></i>#0E1116<br>ground</span><span class="sw"><i style="background:#171C24"></i>#171C24<br>surface</span><span class="sw"><i style="background:#242C38"></i>#242C38<br>hairline</span><span class="sw"><i style="background:#7CA8FF"></i>#7CA8FF<br>accent</span><span class="sw"><i style="background:#ECF0F6"></i>#ECF0F6<br>ink</span></div>
+  </div>
+  <div class="vrow"><figure class="pwrap"><div class="phone"><div class="screen"><div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+<div class="apphead"><h3>Сводка</h3><span class="head-btn">+</span></div>
+<div class="body">
+  <div class="chips"><span class="chip on">7 дней</span><span class="chip">30 дней</span><span class="chip">Всё время</span></div>
+  <div class="hero">
+    <span class="lbl">Заказов собрано</span>
+    <span class="num">24<small>+8</small></span>
+    <span class="sub">за неделю · 62 диалога</span>
+    <span class="spark"><i style="height:38%"></i><i style="height:52%"></i><i style="height:31%"></i><i style="height:64%"></i><i style="height:45%"></i><i style="height:78%"></i><i style="height:100%"></i></span>
+  </div>
+  <div class="rows">
+    <div class="row"><span class="dot d-owner"></span><span class="nm">Нужен владелец</span><span class="ct">3</span></div>
+    <div class="row"><span class="dot d-dialog"></span><span class="nm">В диалоге</span><span class="ct">11</span></div>
+    <div class="row"><span class="dot d-closed"></span><span class="nm">Вопрос закрыт</span><span class="ct">18</span></div>
+  </div>
+  <div class="botcard">
+    <span class="avatar wa">Ц</span>
+    <span class="botmeta"><b>Цветы Алматы</b><em><i class="chdot wa"></i>WhatsApp · Работает</em></span>
+    <span class="switch on"><b></b></span>
+  </div>
+</div><div class="tabbar"><span class="tab"><i></i>Чаты</span><span class="tab"><i></i>Боты</span><span class="tab on"><i></i>Сводка</span><span class="tab"><i></i>Профиль</span></div></div></div><figcaption class="pcap">Сводка</figcaption></figure><figure class="pwrap"><div class="phone"><div class="screen"><div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+<div class="apphead"><h3>Боты</h3><span class="head-btn">+</span></div>
+<div class="body">
+<div class="bcard">
+  <div class="btop">
+    <span class="avatar wa">Ц</span>
+    <span class="botmeta"><b>Цветы Алматы</b><em><i class="chdot wa"></i>WhatsApp</em></span>
+    <i class="chev r"></i>
+  </div>
+  <div class="bdiv"></div>
+  <div class="bfoot"><span class="bstat on">Бот работает</span><span class="switch on"><b></b></span></div>
+</div>
+<div class="bcard">
+  <div class="btop">
+    <span class="avatar wa">А</span>
+    <span class="botmeta"><b>Автозапчасти 4x4</b><em><i class="chdot wa"></i>WhatsApp&nbsp;&nbsp;<i class="chdot tg"></i>Telegram</em></span>
+    <i class="chev r"></i>
+  </div>
+  <div class="bdiv"></div>
+  <div class="bfoot"><span class="bstat on">Бот работает</span><span class="switch on"><b></b></span></div>
+</div>
+<div class="bcard">
+  <div class="btop">
+    <span class="avatar tg">У</span>
+    <span class="botmeta"><b>Учебный центр</b><em><i class="chdot tg"></i>Telegram</em></span>
+    <i class="chev r"></i>
+  </div>
+  <div class="bdiv"></div>
+  <div class="bfoot"><span class="bstat off">Бот на паузе</span><span class="switch off"><b></b></span></div>
+</div>
+</div><div class="tabbar"><span class="tab"><i></i>Чаты</span><span class="tab on"><i></i>Боты</span><span class="tab"><i></i>Сводка</span><span class="tab"><i></i>Профиль</span></div></div></div><figcaption class="pcap">Боты</figcaption></figure><figure class="pwrap"><div class="phone"><div class="screen"><div class="statusbar"><span>9:41</span><span class="sigs"><i></i><i></i><i></i><i></i><span class="batt"><i></i></span></span></div>
+<div class="apphead sub">
+  <span class="head-btn"><i class="chev l"></i></span>
+  <h3>Цветы Алматы</h3>
+  <span class="pill-on">Онлайн</span>
+</div>
+<div class="body">
+  <div class="tseg"><span class="ts on">Общие</span><span class="ts">Бизнес</span><span class="ts">Товары</span><span class="ts">Услуги</span><span class="ts">Промпты</span></div>
+  <div class="fgroup"><label class="flabel">Название бота</label><div class="well">Цветы Алматы</div></div>
+  <div class="fgroup"><label class="flabel">Тип бизнеса</label><div class="well">Цветы и подарки<i class="chev d"></i></div></div>
+  <div class="fgroup"><label class="flabel">Приветствие</label><div class="well area">Здравствуйте! Это «Цветы Алматы» 🌸 Подскажу букет, цену и доставку.</div></div>
+  <div class="trow">Уведомления о заказах<span class="switch on"><b></b></span></div>
+  <div class="savebtn">Сохранить</div>
+</div></div></div><figcaption class="pcap">Настройки</figcaption></figure></div>
+</section>
+<section class="closer">
+  <h2>How to read this page</h2>
+  <p>Compare vertically, not horizontally: pick the screen you care about most (the Settings form is where the
+  styles differ hardest) and scan it down through all nine variants. A palette that wins on the dashboard but
+  fails on the form is not a winner.</p>
+  <p><strong>What is deliberately constant everywhere:</strong> the five outcome-status colors, the green
+  activation switch, WhatsApp/Telegram channel dots, type sizes, spacing, and touch-target geometry.
+  If a variant looks different in those, that would be a bug — meaning is never allowed to change with the skin.</p>
+  <p>The build prompts behind each style live in <code>docs/design/ui-restyle/MASTER-PROMPT.md</code>;
+  every palette above corresponds to one token block that drops into its style's module.</p>
+</section>
+</div>

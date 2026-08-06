@@ -1,0 +1,512 @@
+<title>Orange — Refined Modern variants</title><style>
+:root{--g:#F4F6FA;--g2:#E8ECF3;--rl:#D5DBE6;--k:#0D1119;--k2:#4C5568;--k3:#7D8698;
+--ac:#1B5CEB;--acs:#DFE8FC;--mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+--pad:clamp(20px,4vw,60px);}
+@media (prefers-color-scheme:dark){:root{--g:#0B0E14;--g2:#131822;--rl:#222937;--k:#EDF0F6;
+--k2:#A0AABD;--k3:#6B7587;--ac:#7AA5FF;--acs:#16223A;}}
+:root[data-theme="dark"]{--g:#0B0E14;--g2:#131822;--rl:#222937;--k:#EDF0F6;--k2:#A0AABD;
+--k3:#6B7587;--ac:#7AA5FF;--acs:#16223A;}
+:root[data-theme="light"]{--g:#F4F6FA;--g2:#E8ECF3;--rl:#D5DBE6;--k:#0D1119;--k2:#4C5568;
+--k3:#7D8698;--ac:#1B5CEB;--acs:#DFE8FC;}
+*{box-sizing:border-box}
+.page{background:var(--g);color:var(--k);font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+-webkit-font-smoothing:antialiased;min-height:100vh}
+.mast{max-width:1460px;margin:0 auto;padding:clamp(44px,7vw,92px) var(--pad) clamp(26px,4vw,42px);
+border-bottom:1px solid var(--rl)}
+.eb{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--k3);margin:0 0 16px}
+.mast h1{font-weight:800;font-size:clamp(29px,5.2vw,54px);line-height:1.04;letter-spacing:-.035em;
+text-wrap:balance;margin:0 0 18px;max-width:19ch}
+.mast h1 em{font-style:normal;color:var(--k3)}
+.lede{max-width:66ch;font-size:clamp(15.5px,1.75vw,18px);color:var(--k2);margin:0 0 12px}
+.lede strong{color:var(--k);font-weight:600}
+.fam{max-width:1460px;margin:0 auto;padding:clamp(38px,5vw,62px) var(--pad) 0}
+.fam h2{font-weight:800;font-size:clamp(19px,2.3vw,25px);letter-spacing:-.025em;margin:0 0 6px}
+.fam p{color:var(--k2);font-size:15.5px;margin:0;max-width:68ch}
+.pal{max-width:1460px;margin:0 auto;padding:clamp(24px,3vw,38px) var(--pad) clamp(32px,4vw,50px);
+border-bottom:1px solid var(--rl)}
+.ph{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,340px);gap:clamp(20px,3vw,52px);
+align-items:start;margin-bottom:24px}
+@media(max-width:1000px){.ph{grid-template-columns:minmax(0,1fr)}}
+.ph h3{font-weight:750;font-size:clamp(20px,2.4vw,27px);letter-spacing:-.025em;margin:0 0 8px}
+.ph h3 span{color:var(--k3);font-weight:500}
+.ph .blurb{color:var(--k2);font-size:15.5px;margin:0 0 12px;max-width:60ch}
+.ph .rk{font-size:14px;color:var(--k2);margin:0;padding:9px 13px;border-radius:8px;background:var(--g2);
+max-width:60ch;border-left:2px solid var(--k3)}
+.ph .rk b{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--k3)}
+.swr{display:flex;flex-wrap:wrap;gap:7px;margin:14px 0 0}
+.sw{display:flex;flex-direction:column;gap:5px;font-family:var(--mono);font-size:9.5px;
+letter-spacing:.03em;color:var(--k3);line-height:1.4}
+.sw i{display:block;width:54px;height:32px;border-radius:6px;border:1px solid rgba(128,128,128,.28)}
+table.cx{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px}
+table.cx caption{text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:.12em;
+text-transform:uppercase;color:var(--k3);padding-bottom:7px}
+table.cx td{padding:4px 0;border-bottom:1px solid var(--rl);color:var(--k2)}
+table.cx td:last-child{text-align:right;font-variant-numeric:tabular-nums;color:var(--k)}
+table.cx td.ok:last-child::after{content:" ✓";color:#12A150}
+.row{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start}
+.pw{display:flex;flex-direction:column;gap:11px;align-items:center;margin:0}
+.pc{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--k3)}
+.close{max-width:1460px;margin:0 auto;padding:clamp(38px,5vw,68px) var(--pad) clamp(54px,7vw,96px)}
+.close h2{font-weight:800;font-size:clamp(21px,2.8vw,30px);letter-spacing:-.03em;margin:0 0 14px}
+.close p{max-width:68ch;color:var(--k2);font-size:16px;margin:0 0 13px}
+.close p strong{color:var(--k);font-weight:600}
+.close code{font-family:var(--mono);font-size:.88em}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+.phone{width:320px;height:665px;border-radius:44px;padding:10px;
+background:linear-gradient(160deg,#3A3F4A,#16181D 40%,#2A2E36);
+box-shadow:0 2px 4px rgba(0,0,0,.3),0 20px 40px -12px rgba(10,14,24,.45),0 48px 76px -30px rgba(10,14,24,.3);
+flex-shrink:0}
+.scr{width:100%;height:100%;border-radius:35px;overflow:hidden;display:flex;flex-direction:column;
+font-size:12.5px;isolation:isolate;color:var(--ink);background:var(--bgS)}
+.sb{display:flex;justify-content:space-between;align-items:center;padding:12px 21px 3px;
+font-size:11px;font-weight:600;flex-shrink:0}
+.sg{display:flex;gap:3px;align-items:flex-end}
+.sg i{display:block;width:3px;border-radius:1px;background:currentColor}
+.sg i:nth-child(1){height:4px}.sg i:nth-child(2){height:6px}.sg i:nth-child(3){height:8px}.sg i:nth-child(4){height:10px}
+.bt{width:19px;height:10px;border:1.2px solid currentColor;border-radius:3px;padding:1.4px;margin-left:5px}
+.bt i{display:block;height:100%;width:72%;border-radius:1px;background:currentColor}
+.ah{display:flex;align-items:center;justify-content:space-between;padding:9px 18px 11px;flex-shrink:0}
+.ah h3{margin:0;font-size:20px;font-weight:700;letter-spacing:-.025em}
+.ah.s h3{font-size:16px;flex:1;margin:0 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hb{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-size:17px;line-height:1;
+flex-shrink:0;background:var(--sf);border:1px solid var(--bdI);color:var(--ink2);box-shadow:var(--e1)}
+.bd{flex:1;overflow:hidden;padding:2px 15px 8px;display:flex;flex-direction:column;gap:12px}
+.cs{display:flex;gap:7px}
+.cp{padding:6px 12px;border-radius:999px;font-size:11px;font-weight:600;white-space:nowrap;
+background:var(--sf);color:var(--ink2);border:1px solid var(--bd);box-shadow:var(--e1)}
+.cp.on{background:var(--chipBg);border-color:var(--chipBg);color:var(--chipInk);box-shadow:var(--e2)}
+.hero{padding:15px 17px 14px;display:flex;flex-direction:column;gap:2px;border-radius:16px;
+background:var(--sf);border:1px solid var(--bd);box-shadow:var(--e2)}
+.hero .l{font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3)}
+.hero .n{font-size:38px;font-weight:800;line-height:1.04;letter-spacing:-.045em;
+font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:9px;color:var(--ink)}
+.hero .n small{font-size:12px;font-weight:700;padding:3px 8px;border-radius:999px;
+background:var(--goodBg);color:var(--goodInk)}
+.hero .s{font-size:12px;color:var(--ink2)}
+.spk{display:flex;align-items:flex-end;gap:4px;height:28px;margin-top:9px}
+.spk i{flex:1;border-radius:2px 2px 1px 1px;display:block;background:var(--hl)}
+.spk i:nth-child(n+6){background:var(--acc)}
+.rws{display:flex;flex-direction:column;gap:7px}
+.rw{display:flex;align-items:center;gap:10px;padding:10px 13px;border-radius:11px;
+background:var(--sf);border:1px solid var(--hl);box-shadow:var(--e1)}
+.rw .d{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.rw .m{flex:1;font-size:12.5px;font-weight:500;color:var(--ink)}
+.rw .c{font-size:13.5px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink)}
+.av{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:14px;
+font-weight:700;flex-shrink:0;color:#FFF;box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
+.av.wa{background:linear-gradient(150deg,#2FE07E,#14A85C)}
+.av.tg{background:linear-gradient(150deg,#54C8F5,#1E96D6)}
+.bm{flex:1;min-width:0}
+.bm b{display:block;font-size:13px;font-weight:650;letter-spacing:-.01em;color:var(--ink);
+white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bm em{display:block;font-size:11px;margin-top:2px;font-style:normal;color:var(--ink2);
+white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cd{width:6px;height:6px;border-radius:50%;display:inline-block;vertical-align:middle;margin:-1px 4px 0 0}
+.cd.wa{background:#25D366}.cd.tg{background:#2AABEE}
+.sx{width:42px;height:25px;border-radius:999px;position:relative;flex-shrink:0;background:var(--swOn);
+box-shadow:inset 0 1px 2px rgba(0,0,0,.14)}
+.sx b{position:absolute;top:3px;right:3px;width:19px;height:19px;border-radius:50%;display:block;
+background:#FFF;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.sx.off{background:var(--swOff)}.sx.off b{left:3px;right:auto}
+.bc{padding:12px 13px;display:flex;align-items:center;gap:11px;border-radius:14px;
+background:var(--sf);border:1px solid var(--bd);box-shadow:var(--e1)}
+.card{border-radius:14px;background:var(--sf);border:1px solid var(--bd);box-shadow:var(--e1)}
+.ct{display:flex;align-items:center;gap:11px;padding:12px 13px}
+.cv{height:1px;margin:0 13px;background:var(--hl)}
+.cf{display:flex;justify-content:space-between;align-items:center;padding:9px 13px 11px;
+font-size:11.5px;font-weight:600}
+.cf .on{color:var(--goodInk)}.cf .of{color:var(--ink3)}
+.ch{width:7px;height:7px;border-right:1.8px solid currentColor;border-bottom:1.8px solid currentColor;
+display:inline-block;opacity:.5;flex-shrink:0;color:var(--ink2)}
+.ch.r{transform:rotate(-45deg)}.ch.d{transform:rotate(45deg);margin-top:-3px}.ch.l{transform:rotate(135deg);margin-left:2px}
+.on-pill{font-size:9.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--goodBg);
+color:var(--goodInk);flex-shrink:0}
+.seg{display:flex;border-bottom:1px solid var(--hl)}
+.sg1{flex:1;text-align:center;font-size:9px;font-weight:600;padding:7px 0 8px;white-space:nowrap;
+color:var(--ink3);border-bottom:2px solid transparent;margin-bottom:-1px}
+.sg1.on{color:var(--ink);border-bottom-color:var(--acc);font-weight:700}
+.fg{display:flex;flex-direction:column;gap:6px}
+.fl{font-size:9.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;padding:0 2px;color:var(--ink3)}
+.wl{padding:11px 13px;border-radius:10px;font-size:12px;min-height:40px;display:flex;align-items:center;
+justify-content:space-between;gap:8px;color:var(--ink);background:var(--sf);border:1px solid var(--bdI);box-shadow:var(--e1)}
+.wl.a{align-items:flex-start;font-size:11.5px;line-height:1.45;min-height:58px}
+.tr{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 13px;
+border-radius:14px;font-size:12px;font-weight:550;color:var(--ink);background:var(--sf);
+border:1px solid var(--bd);box-shadow:var(--e1)}
+.sv{margin-top:auto;text-align:center;padding:12px;border-radius:11px;font-size:13px;font-weight:700;
+background:var(--saveBg);color:var(--saveInk);box-shadow:var(--e2)}
+.tb{display:flex;padding:8px 8px 15px;flex-shrink:0;background:var(--sf);border-top:1px solid var(--hl)}
+.tb a{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:9px;
+font-weight:600;color:var(--ink3);text-decoration:none}
+.tb a i{width:20px;height:20px;border-radius:6px;border:2px solid currentColor;display:block}
+.tb a.on{color:var(--acc)}.tb a.on i{border-radius:7px}
+.d-order{background:#16A75C}.d-owner{background:#E07612}.d-dialog{background:#3B82F6}
+.d-silent{background:#8A94A6}.d-closed{background:#9B5DE0}
+
+.coll{margin-top:14px;padding:11px 13px;border-radius:9px;background:var(--g2);max-width:60ch}
+.coll .h{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+color:var(--k3);margin:0 0 8px}
+.coll .pair{display:flex;gap:16px;flex-wrap:wrap}
+.coll .one{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--k2)}
+.coll .one i{width:26px;height:26px;border-radius:7px;display:block;flex-shrink:0;
+border:1px solid rgba(128,128,128,.3)}
+.coll .sep{font-family:var(--mono);font-size:11px;color:var(--k3);margin:9px 0 0}
+.fmly{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.1em;
+text-transform:uppercase;color:var(--k3);border:1px solid var(--rl);border-radius:999px;
+padding:3px 9px;margin-left:8px;vertical-align:middle}
+.p-copper-charred-oak{--bgS:#14110D;--sf:#1E1915;--hl:#2C2621;--bd:#3B332B;--bdI:#736354;--ink:#F3ECE3;--ink2:#C4B8AB;--ink3:#9A8D7F;--acc:#D9884A;--chipBg:#3A2919;--chipInk:#EFB77E;--saveBg:#C97B3C;--saveInk:#1B1512;--swOn:#2FA96A;--swOff:#453D34;--goodBg:#16301E;--goodInk:#63D497;--e1:0 1px 2px rgba(0,0,0,.5);--e2:0 1px 2px rgba(0,0,0,.55),0 10px 24px -10px rgba(0,0,0,.6);}
+.p-copper-charred-oak .spk i:nth-child(n+6){background:#C97B3C}
+.p-copper-charred-oak .d-owner{background:#F2C13E}
+.p-copper-greige{--bgS:#E7E1D6;--sf:#F4F0E7;--hl:#DDD5C7;--bd:#CAC1B1;--bdI:#988768;--ink:#211C16;--ink2:#4F473C;--ink3:#6D6353;--acc:#8A4A1C;--chipBg:#F0E2D2;--chipInk:#7A4318;--saveBg:#A65E28;--saveInk:#FFFAF5;--swOn:#157F4A;--swOff:#C5BCAB;--goodBg:#DFEAD5;--goodInk:#1B6132;--e1:0 1px 2px rgba(62,46,30,.055);--e2:0 1px 2px rgba(62,46,30,.055),0 4px 8px -2px rgba(62,46,30,.05),0 16px 28px -12px rgba(62,46,30,.095);}
+.p-copper-greige .spk i:nth-child(n+6){background:#A65E28}
+.p-copper-greige .d-owner{background:#D81B60}
+.p-brass-rice-paper{--bgS:#F6F1E8;--sf:#FFFCF6;--hl:#E9E1D3;--bd:#DAD0BE;--bdI:#A68E63;--ink:#201A12;--ink2:#564B3C;--ink3:#776851;--acc:#8A6608;--chipBg:#F2E4C2;--chipInk:#6A4C06;--saveBg:#BA8620;--saveInk:#201804;--swOn:#17864B;--swOff:#CDC4B2;--goodBg:#E4EEDA;--goodInk:#1B6634;--e1:0 1px 2px rgba(82,64,40,.055);--e2:0 1px 2px rgba(82,64,40,.055),0 4px 8px -2px rgba(82,64,40,.05),0 16px 28px -12px rgba(82,64,40,.095);}
+.p-brass-rice-paper .spk i:nth-child(n+6){background:#BA8620}
+.p-brass-rice-paper .d-owner{background:#D81B60}
+.p-kiln-clay{--bgS:#201712;--sf:#2C211B;--hl:#3D3029;--bd:#514239;--bdI:#81695B;--ink:#F5EFE9;--ink2:#CDC3B9;--ink3:#A99C90;--acc:#E38866;--chipBg:#582E1F;--chipInk:#FDAC86;--saveBg:#B05539;--saveInk:#FFF9F4;--swOn:#54AE70;--swOff:#4B3D35;--goodBg:#25402D;--goodInk:#7AC895;--e1:0 1px 2px rgba(0,0,0,.5);--e2:0 1px 2px rgba(0,0,0,.55),0 10px 24px -10px rgba(0,0,0,.6);}
+.p-kiln-clay .spk i:nth-child(n+6){background:#B05539}
+.p-kiln-clay .d-owner{background:#F6C04A}
+.p-whitewash-brick{--bgS:#F8F4F1;--sf:#FEFCF9;--hl:#E3DBD3;--bd:#D7CBC0;--bdI:#A78D75;--ink:#251C16;--ink2:#564A41;--ink3:#796A5E;--acc:#A55727;--chipBg:#F6E5D1;--chipInk:#954B1E;--saveBg:#AB5C2B;--saveInk:#FFFAF5;--swOn:#257B47;--swOff:#D7CCC3;--goodBg:#DFF3E2;--goodInk:#14683D;--e1:0 1px 2px rgba(64,44,28,.055);--e2:0 1px 2px rgba(64,44,28,.055),0 4px 8px -2px rgba(64,44,28,.05),0 16px 28px -12px rgba(64,44,28,.095);}
+.p-whitewash-brick .spk i:nth-child(n+6){background:#AB5C2B}
+.p-whitewash-brick .d-owner{background:#D81B60}
+.p-tobacco-char{--bgS:#120F0C;--sf:#1E1814;--hl:#322A24;--bd:#463B33;--bdI:#756355;--ink:#F2EEE8;--ink2:#C2BBB2;--ink3:#9A9086;--acc:#C78958;--chipBg:#492E19;--chipInk:#F4B98A;--saveBg:#9A5E2B;--saveInk:#FAF2EB;--swOn:#48A467;--swOff:#3D332C;--goodBg:#1A3321;--goodInk:#72BF8A;--e1:0 1px 2px rgba(0,0,0,.5);--e2:0 1px 2px rgba(0,0,0,.55),0 10px 24px -10px rgba(0,0,0,.6);}
+.p-tobacco-char .spk i:nth-child(n+6){background:#9A5E2B}
+.p-tobacco-char .d-owner{background:#EABF3A}
+.p-live-wire{--bgS:#100E0C;--sf:#1A1613;--hl:#282320;--bd:#3C342D;--bdI:#706154;--ink:#F6F1EB;--ink2:#C6BDB4;--ink3:#9C928A;--acc:#ED8439;--chipBg:#3D2510;--chipInk:#FFBC7E;--saveBg:#ED8439;--saveInk:#1A1006;--swOn:#2FBF6B;--swOff:#443C34;--goodBg:#122E1E;--goodInk:#4FD888;--e1:0 1px 2px rgba(0,0,0,.5);--e2:0 1px 2px rgba(0,0,0,.55),0 10px 24px -10px rgba(0,0,0,.6);}
+.p-live-wire .spk i:nth-child(n+6){background:#ED8439}
+.p-live-wire .d-owner{background:#FFD870}
+</style><div class="page"><header class="mast">
+ <p class="eb">Refined Modern · оранжевое направление · 7 вариантов</p>
+ <h1>Orange, <em>taken seriously.</em></h1>
+ <p class="lede">You picked «Эспрессо». These are the directions worth seeing before committing — the same
+ Refined Modern material and the same three screens, with the orange moved across its real perceptual
+ families: <strong>amber, tangerine, burnt sienna, terracotta, copper and ochre</strong>.</p>
+ <p class="lede">Orange has the narrowest safe contrast band of any hue, so every palette carries
+ <strong>two orange shades</strong> — a vivid fill for buttons and bars, and a separate burnt shade that
+ survives as text at 4.5:1. Both are shown; every pair is measured, not asserted.</p>
+ <p class="lede"><strong>What orange forces on us:</strong> «Нужен владелец» — the status meaning a real
+ customer is waiting for a human — was itself orange. A brand cannot wear the same colour as an alarm. In
+ every palette below that alarm has moved, and the distance between the two is stated in degrees of hue.</p>
+</header><section class="fam"><h2>Тёмные — оранжевый на тёплой основе</h2><p>Orange belongs on a warm ground. On cool charcoal it reads as a warning light; on a brown-black it reads as a lit filament. Every dark option here keeps real brown in the neutral ramp — that warmth is as much of what you liked about «Эспрессо» as the amber itself.</p></section><section class="pal p-copper-charred-oak">
+ <div class="ph">
+  <div>
+   <p class="eb">01 — палитра</p>
+   <h3>«Медь и обожжённый дуб» <span>— Copper & Charred Oak</span><span class="fmly">copper</span></h3>
+   <p class="blurb">Charred-oak near-black with a copper pitched at the red end of the metal band — the colour of a cask hoop catching one lamp, not a sale banner. Rotating the brand off amber toward copper also walks the palette away from Beeline's black-and-yellow, which the owner's Espresso & Amber was structurally imitating.</p>
+   <p class="rk"><b>Risk</b><br>Copper and any credible red converge under deuteranopia (ΔE 6.6 fill / 8.9 ink versus the destructive), so delete must stay text-and-outline with «Удалить» carrying the meaning, never a filled red button.</p>
+   <div class="swr"><span class="sw"><i style="background:#14110D"></i>#14110D<br>ground</span><span class="sw"><i style="background:#1E1915"></i>#1E1915<br>surface</span><span class="sw"><i style="background:#736354"></i>#736354<br>input bd</span><span class="sw"><i style="background:#C97B3C"></i>#C97B3C<br>orange fill</span><span class="sw"><i style="background:#D9884A"></i>#D9884A<br>orange text</span><span class="sw"><i style="background:#F3ECE3"></i>#F3ECE3<br>ink</span></div>
+   <div class="coll"><p class="h">Collision resolved — brand vs alarm</p>
+<div class="pair">
+ <span class="one"><i style="background:#C97B3C"></i>бренд #C97B3C</span>
+ <span class="one"><i style="background:#F2C13E"></i>Нужен владелец #F2C13E</span>
+ <span class="one"><i style="background:#EA4070"></i>Удалить #EA4070</span>
+</div>
+<p class="sep">separation: 16.9° hue · 1.95:1 luminance</p></div>
+  </div>
+  <div><table class="cx"><caption>Measured contrast</caption><tbody><tr><td>orange FILL / surface</td><td class="ok">5.3</td></tr><tr><td>body ink / surface</td><td class="ok">14.87</td></tr><tr><td>secondary ink / surface</td><td class="ok">8.95</td></tr><tr><td>tertiary ink / surface</td><td class="ok">5.39</td></tr><tr><td>orange as TEXT / surface</td><td class="ok">6.28</td></tr><tr><td>button label / orange fill</td><td class="ok">5.49</td></tr><tr><td>chip label / chip fill</td><td class="ok">7.77</td></tr><tr><td>status ink / status bg</td><td class="ok">7.72</td></tr><tr><td>input border / surface</td><td class="ok">3.02</td></tr><tr><td>body ink / ground</td><td class="ok">16.06</td></tr></tbody></table></div>
+ </div>
+ <div class="row"><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div>
+<div class="ah"><h3>Сводка</h3><span class="hb">+</span></div>
+<div class="bd">
+ <div class="cs"><span class="cp on">7 дней</span><span class="cp">30 дней</span><span class="cp">Всё время</span></div>
+ <div class="hero"><span class="l">Заказов собрано</span><span class="n">24<small>+8</small></span>
+  <span class="s">за неделю · 62 диалога</span>
+  <span class="spk"><i style="height:38%"></i><i style="height:52%"></i><i style="height:31%"></i><i style="height:64%"></i><i style="height:45%"></i><i style="height:78%"></i><i style="height:100%"></i></span></div>
+ <div class="rws">
+  <div class="rw"><span class="d d-owner"></span><span class="m">Нужен владелец</span><span class="c">3</span></div>
+  <div class="rw"><span class="d d-dialog"></span><span class="m">В диалоге</span><span class="c">11</span></div>
+  <div class="rw"><span class="d d-closed"></span><span class="m">Вопрос закрыт</span><span class="c">18</span></div>
+ </div>
+ <div class="bc"><span class="av wa">Ц</span>
+  <span class="bm"><b>Цветы Алматы</b><em><i class="cd wa"></i>WhatsApp · Работает</em></span>
+  <span class="sx"><b></b></span></div>
+</div><div class="tb"><a class=""><i></i>Чаты</a><a class=""><i></i>Боты</a><a class="on"><i></i>Сводка</a><a class=""><i></i>Профиль</a></div></div></div><figcaption class="pc">Сводка</figcaption></figure><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div><div class="ah"><h3>Боты</h3><span class="hb">+</span></div><div class="bd"><div class="card"><div class="ct"><span class="av wa">Ц</span><span class="bm"><b>Цветы Алматы</b><em><i class="cd wa"></i>WhatsApp</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="on">Бот работает</span><span class="sx"><b></b></span></div></div><div class="card"><div class="ct"><span class="av wa">А</span><span class="bm"><b>Автозапчасти 4х4</b><em><i class="cd wa"></i>WhatsApp&nbsp;&nbsp;<i class="cd tg"></i>Telegram</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="on">Бот работает</span><span class="sx"><b></b></span></div></div><div class="card"><div class="ct"><span class="av tg">У</span><span class="bm"><b>Учебный центр</b><em><i class="cd tg"></i>Telegram</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="of">Бот на паузе</span><span class="sx off"><b></b></span></div></div></div><div class="tb"><a class=""><i></i>Чаты</a><a class="on"><i></i>Боты</a><a class=""><i></i>Сводка</a><a class=""><i></i>Профиль</a></div></div></div><figcaption class="pc">Боты</figcaption></figure><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div>
+<div class="ah s"><span class="hb"><i class="ch l"></i></span><h3>Цветы Алматы</h3>
+ <span class="on-pill">Онлайн</span></div>
+<div class="bd">
+ <div class="seg"><span class="sg1 on">Общие</span><span class="sg1">Бизнес</span><span class="sg1">Товары</span><span class="sg1">Услуги</span><span class="sg1">Промпты</span></div>
+ <div class="fg"><span class="fl">Название бота</span><div class="wl">Цветы Алматы</div></div>
+ <div class="fg"><span class="fl">Тип бизнеса</span><div class="wl">Цветы и подарки<i class="ch d"></i></div></div>
+ <div class="fg"><span class="fl">Приветствие</span><div class="wl a">Здравствуйте! Это «Цветы Алматы» 🌸 Подскажу букет, цену и доставку.</div></div>
+ <div class="tr">Уведомления о заказах<span class="sx"><b></b></span></div>
+ <div class="sv">Сохранить</div>
+</div></div></div><figcaption class="pc">Настройки</figcaption></figure></div>
+</section><section class="fam"><h2>Светлые — оранжевый при дневном свете</h2><p>The harder problem, and the one that matters for a seller reading a phone in Almaty sunlight, where a near-black screen becomes a mirror. Orange loses contrast fast on paper, so the fill and the text shade part company: the button stays vivid while the text drops to a burnt cognac that still passes 4.5:1.</p></section><section class="pal p-copper-greige">
+ <div class="ph">
+  <div>
+   <p class="eb">02 — палитра</p>
+   <h3>«Медь и серый камень» <span>— Copper & Greige</span><span class="fmly">copper (light sibling)</span></h3>
+   <p class="blurb">The best accent in the set moved onto the most original surface anyone proposed — a greige faceplate rather than white paper, so the copper sits on stone instead of floating on a page. This is the daylight half of «Медь и обожжённый дуб», for the windscreen-at-noon case where a near-black screen turns into a mirror.</p>
+   <p class="rk"><b>Risk</b><br>A mid-tone ground spends contrast everywhere: it carries the least headroom of the light options, so the four inherited status colours need their darker light-theme siblings before this ships.</p>
+   <div class="swr"><span class="sw"><i style="background:#E7E1D6"></i>#E7E1D6<br>ground</span><span class="sw"><i style="background:#F4F0E7"></i>#F4F0E7<br>surface</span><span class="sw"><i style="background:#988768"></i>#988768<br>input bd</span><span class="sw"><i style="background:#A65E28"></i>#A65E28<br>orange fill</span><span class="sw"><i style="background:#8A4A1C"></i>#8A4A1C<br>orange text</span><span class="sw"><i style="background:#211C16"></i>#211C16<br>ink</span></div>
+   <div class="coll"><p class="h">Collision resolved — brand vs alarm</p>
+<div class="pair">
+ <span class="one"><i style="background:#A65E28"></i>бренд #A65E28</span>
+ <span class="one"><i style="background:#D81B60"></i>Нужен владелец #D81B60</span>
+ <span class="one"><i style="background:#A01B12"></i>Удалить #A01B12</span>
+</div>
+<p class="sep">separation: 47.6° hue · 1.0:1 luminance</p></div>
+  </div>
+  <div><table class="cx"><caption>Measured contrast</caption><tbody><tr><td>orange FILL / surface</td><td class="ok">4.34</td></tr><tr><td>body ink / surface</td><td class="ok">14.86</td></tr><tr><td>secondary ink / surface</td><td class="ok">8.03</td></tr><tr><td>tertiary ink / surface</td><td class="ok">5.19</td></tr><tr><td>orange as TEXT / surface</td><td class="ok">6.0</td></tr><tr><td>button label / orange fill</td><td class="ok">4.76</td></tr><tr><td>chip label / chip fill</td><td class="ok">6.25</td></tr><tr><td>status ink / status bg</td><td class="ok">6.02</td></tr><tr><td>input border / surface</td><td class="ok">3.08</td></tr><tr><td>body ink / ground</td><td class="ok">12.99</td></tr></tbody></table></div>
+ </div>
+ <div class="row"><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div>
+<div class="ah"><h3>Сводка</h3><span class="hb">+</span></div>
+<div class="bd">
+ <div class="cs"><span class="cp on">7 дней</span><span class="cp">30 дней</span><span class="cp">Всё время</span></div>
+ <div class="hero"><span class="l">Заказов собрано</span><span class="n">24<small>+8</small></span>
+  <span class="s">за неделю · 62 диалога</span>
+  <span class="spk"><i style="height:38%"></i><i style="height:52%"></i><i style="height:31%"></i><i style="height:64%"></i><i style="height:45%"></i><i style="height:78%"></i><i style="height:100%"></i></span></div>
+ <div class="rws">
+  <div class="rw"><span class="d d-owner"></span><span class="m">Нужен владелец</span><span class="c">3</span></div>
+  <div class="rw"><span class="d d-dialog"></span><span class="m">В диалоге</span><span class="c">11</span></div>
+  <div class="rw"><span class="d d-closed"></span><span class="m">Вопрос закрыт</span><span class="c">18</span></div>
+ </div>
+ <div class="bc"><span class="av wa">Ц</span>
+  <span class="bm"><b>Цветы Алматы</b><em><i class="cd wa"></i>WhatsApp · Работает</em></span>
+  <span class="sx"><b></b></span></div>
+</div><div class="tb"><a class=""><i></i>Чаты</a><a class=""><i></i>Боты</a><a class="on"><i></i>Сводка</a><a class=""><i></i>Профиль</a></div></div></div><figcaption class="pc">Сводка</figcaption></figure><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div><div class="ah"><h3>Боты</h3><span class="hb">+</span></div><div class="bd"><div class="card"><div class="ct"><span class="av wa">Ц</span><span class="bm"><b>Цветы Алматы</b><em><i class="cd wa"></i>WhatsApp</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="on">Бот работает</span><span class="sx"><b></b></span></div></div><div class="card"><div class="ct"><span class="av wa">А</span><span class="bm"><b>Автозапчасти 4х4</b><em><i class="cd wa"></i>WhatsApp&nbsp;&nbsp;<i class="cd tg"></i>Telegram</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="on">Бот работает</span><span class="sx"><b></b></span></div></div><div class="card"><div class="ct"><span class="av tg">У</span><span class="bm"><b>Учебный центр</b><em><i class="cd tg"></i>Telegram</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="of">Бот на паузе</span><span class="sx off"><b></b></span></div></div></div><div class="tb"><a class=""><i></i>Чаты</a><a class="on"><i></i>Боты</a><a class=""><i></i>Сводка</a><a class=""><i></i>Профиль</a></div></div></div><figcaption class="pc">Боты</figcaption></figure><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div>
+<div class="ah s"><span class="hb"><i class="ch l"></i></span><h3>Цветы Алматы</h3>
+ <span class="on-pill">Онлайн</span></div>
+<div class="bd">
+ <div class="seg"><span class="sg1 on">Общие</span><span class="sg1">Бизнес</span><span class="sg1">Товары</span><span class="sg1">Услуги</span><span class="sg1">Промпты</span></div>
+ <div class="fg"><span class="fl">Название бота</span><div class="wl">Цветы Алматы</div></div>
+ <div class="fg"><span class="fl">Тип бизнеса</span><div class="wl">Цветы и подарки<i class="ch d"></i></div></div>
+ <div class="fg"><span class="fl">Приветствие</span><div class="wl a">Здравствуйте! Это «Цветы Алматы» 🌸 Подскажу букет, цену и доставку.</div></div>
+ <div class="tr">Уведомления о заказах<span class="sx"><b></b></span></div>
+ <div class="sv">Сохранить</div>
+</div></div></div><figcaption class="pc">Настройки</figcaption></figure></div>
+</section><section class="pal p-brass-rice-paper">
+ <div class="ph">
+  <div>
+   <p class="eb">03 — палитра</p>
+   <h3>«Латунь и рисовая бумага» <span>— Brass & Rice Paper</span><span class="fmly">ochre</span></h3>
+   <p class="blurb">Warm rice-paper ground and antique brass — letterpress restraint, an engraved instrument plate rather than a promotion, with the ink kept brown-black so nothing on the page is truly grey. It is also the only one of the three that survives an Almaty windscreen at noon, where a near-black screen becomes a mirror.</p>
+   <p class="rk"><b>Risk</b><br>Brass fill clears only 3.15:1 on paper so the primary button leans on its dark engraved label and hairline for edge definition, and the four non-owner status colours need darker light-theme siblings before this ships.</p>
+   <div class="swr"><span class="sw"><i style="background:#F6F1E8"></i>#F6F1E8<br>ground</span><span class="sw"><i style="background:#FFFCF6"></i>#FFFCF6<br>surface</span><span class="sw"><i style="background:#A68E63"></i>#A68E63<br>input bd</span><span class="sw"><i style="background:#BA8620"></i>#BA8620<br>orange fill</span><span class="sw"><i style="background:#8A6608"></i>#8A6608<br>orange text</span><span class="sw"><i style="background:#201A12"></i>#201A12<br>ink</span></div>
+   <div class="coll"><p class="h">Collision resolved — brand vs alarm</p>
+<div class="pair">
+ <span class="one"><i style="background:#BA8620"></i>бренд #BA8620</span>
+ <span class="one"><i style="background:#D81B60"></i>Нужен владелец #D81B60</span>
+ <span class="one"><i style="background:#A01B12"></i>Удалить #A01B12</span>
+</div>
+<p class="sep">separation: 61.6° hue · 1.54:1 luminance</p></div>
+  </div>
+  <div><table class="cx"><caption>Measured contrast</caption><tbody><tr><td>orange FILL / surface</td><td class="ok">3.15</td></tr><tr><td>body ink / surface</td><td class="ok">16.84</td></tr><tr><td>secondary ink / surface</td><td class="ok">8.31</td></tr><tr><td>tertiary ink / surface</td><td class="ok">5.28</td></tr><tr><td>orange as TEXT / surface</td><td class="ok">5.15</td></tr><tr><td>button label / orange fill</td><td class="ok">5.46</td></tr><tr><td>chip label / chip fill</td><td class="ok">6.29</td></tr><tr><td>status ink / status bg</td><td class="ok">5.85</td></tr><tr><td>input border / surface</td><td class="ok">3.07</td></tr><tr><td>body ink / ground</td><td class="ok">15.33</td></tr></tbody></table></div>
+ </div>
+ <div class="row"><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div>
+<div class="ah"><h3>Сводка</h3><span class="hb">+</span></div>
+<div class="bd">
+ <div class="cs"><span class="cp on">7 дней</span><span class="cp">30 дней</span><span class="cp">Всё время</span></div>
+ <div class="hero"><span class="l">Заказов собрано</span><span class="n">24<small>+8</small></span>
+  <span class="s">за неделю · 62 диалога</span>
+  <span class="spk"><i style="height:38%"></i><i style="height:52%"></i><i style="height:31%"></i><i style="height:64%"></i><i style="height:45%"></i><i style="height:78%"></i><i style="height:100%"></i></span></div>
+ <div class="rws">
+  <div class="rw"><span class="d d-owner"></span><span class="m">Нужен владелец</span><span class="c">3</span></div>
+  <div class="rw"><span class="d d-dialog"></span><span class="m">В диалоге</span><span class="c">11</span></div>
+  <div class="rw"><span class="d d-closed"></span><span class="m">Вопрос закрыт</span><span class="c">18</span></div>
+ </div>
+ <div class="bc"><span class="av wa">Ц</span>
+  <span class="bm"><b>Цветы Алматы</b><em><i class="cd wa"></i>WhatsApp · Работает</em></span>
+  <span class="sx"><b></b></span></div>
+</div><div class="tb"><a class=""><i></i>Чаты</a><a class=""><i></i>Боты</a><a class="on"><i></i>Сводка</a><a class=""><i></i>Профиль</a></div></div></div><figcaption class="pc">Сводка</figcaption></figure><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div><div class="ah"><h3>Боты</h3><span class="hb">+</span></div><div class="bd"><div class="card"><div class="ct"><span class="av wa">Ц</span><span class="bm"><b>Цветы Алматы</b><em><i class="cd wa"></i>WhatsApp</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="on">Бот работает</span><span class="sx"><b></b></span></div></div><div class="card"><div class="ct"><span class="av wa">А</span><span class="bm"><b>Автозапчасти 4х4</b><em><i class="cd wa"></i>WhatsApp&nbsp;&nbsp;<i class="cd tg"></i>Telegram</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="on">Бот работает</span><span class="sx"><b></b></span></div></div><div class="card"><div class="ct"><span class="av tg">У</span><span class="bm"><b>Учебный центр</b><em><i class="cd tg"></i>Telegram</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="of">Бот на паузе</span><span class="sx off"><b></b></span></div></div></div><div class="tb"><a class=""><i></i>Чаты</a><a class="on"><i></i>Боты</a><a class=""><i></i>Сводка</a><a class=""><i></i>Профиль</a></div></div></div><figcaption class="pc">Боты</figcaption></figure><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div>
+<div class="ah s"><span class="hb"><i class="ch l"></i></span><h3>Цветы Алматы</h3>
+ <span class="on-pill">Онлайн</span></div>
+<div class="bd">
+ <div class="seg"><span class="sg1 on">Общие</span><span class="sg1">Бизнес</span><span class="sg1">Товары</span><span class="sg1">Услуги</span><span class="sg1">Промпты</span></div>
+ <div class="fg"><span class="fl">Название бота</span><div class="wl">Цветы Алматы</div></div>
+ <div class="fg"><span class="fl">Тип бизнеса</span><div class="wl">Цветы и подарки<i class="ch d"></i></div></div>
+ <div class="fg"><span class="fl">Приветствие</span><div class="wl a">Здравствуйте! Это «Цветы Алматы» 🌸 Подскажу букет, цену и доставку.</div></div>
+ <div class="tr">Уведомления о заказах<span class="sx"><b></b></span></div>
+ <div class="sv">Сохранить</div>
+</div></div></div><figcaption class="pc">Настройки</figcaption></figure></div>
+</section><section class="pal p-kiln-clay">
+ <div class="ph">
+  <div>
+   <p class="eb">04 — палитра</p>
+   <h3>«Обожжённая глина» <span>— Fired Clay</span><span class="fmly">burnt sienna</span></h3>
+   <p class="blurb">A dark theme with no black anywhere in it — the ground is unglazed clay-brown, so the screen reads as a fired pot rather than a switched-off display, and the warm neutrals never go cold at the bottom of the ramp. The terracotta fill takes a cream label the way Hermès packaging does, and the amber status floats two full stops above it on a 3.6× luminance gap.</p>
+   <p class="rk"><b>Risk</b><br>The lifted brown ground spends contrast headroom everywhere: the accent fill clears the 3:1 affordance floor by only 0.14, so darkening the accent even slightly breaks it.</p>
+   <div class="swr"><span class="sw"><i style="background:#201712"></i>#201712<br>ground</span><span class="sw"><i style="background:#2C211B"></i>#2C211B<br>surface</span><span class="sw"><i style="background:#81695B"></i>#81695B<br>input bd</span><span class="sw"><i style="background:#B05539"></i>#B05539<br>orange fill</span><span class="sw"><i style="background:#E38866"></i>#E38866<br>orange text</span><span class="sw"><i style="background:#F5EFE9"></i>#F5EFE9<br>ink</span></div>
+   <div class="coll"><p class="h">Collision resolved — brand vs alarm</p>
+<div class="pair">
+ <span class="one"><i style="background:#B05539"></i>бренд #B05539</span>
+ <span class="one"><i style="background:#F6C04A"></i>Нужен владелец #F6C04A</span>
+ <span class="one"><i style="background:#EF5363"></i>Удалить #EF5363</span>
+</div>
+<p class="sep">separation: 27.0° hue · 2.99:1 luminance</p></div>
+  </div>
+  <div><table class="cx"><caption>Measured contrast</caption><tbody><tr><td>orange FILL / surface</td><td class="ok">3.14</td></tr><tr><td>body ink / surface</td><td class="ok">13.73</td></tr><tr><td>secondary ink / surface</td><td class="ok">9.03</td></tr><tr><td>tertiary ink / surface</td><td class="ok">5.85</td></tr><tr><td>orange as TEXT / surface</td><td class="ok">5.95</td></tr><tr><td>button label / orange fill</td><td class="ok">4.78</td></tr><tr><td>chip label / chip fill</td><td class="ok">6.26</td></tr><tr><td>status ink / status bg</td><td class="ok">5.69</td></tr><tr><td>input border / surface</td><td class="ok">3.06</td></tr><tr><td>body ink / ground</td><td class="ok">15.43</td></tr></tbody></table></div>
+ </div>
+ <div class="row"><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div>
+<div class="ah"><h3>Сводка</h3><span class="hb">+</span></div>
+<div class="bd">
+ <div class="cs"><span class="cp on">7 дней</span><span class="cp">30 дней</span><span class="cp">Всё время</span></div>
+ <div class="hero"><span class="l">Заказов собрано</span><span class="n">24<small>+8</small></span>
+  <span class="s">за неделю · 62 диалога</span>
+  <span class="spk"><i style="height:38%"></i><i style="height:52%"></i><i style="height:31%"></i><i style="height:64%"></i><i style="height:45%"></i><i style="height:78%"></i><i style="height:100%"></i></span></div>
+ <div class="rws">
+  <div class="rw"><span class="d d-owner"></span><span class="m">Нужен владелец</span><span class="c">3</span></div>
+  <div class="rw"><span class="d d-dialog"></span><span class="m">В диалоге</span><span class="c">11</span></div>
+  <div class="rw"><span class="d d-closed"></span><span class="m">Вопрос закрыт</span><span class="c">18</span></div>
+ </div>
+ <div class="bc"><span class="av wa">Ц</span>
+  <span class="bm"><b>Цветы Алматы</b><em><i class="cd wa"></i>WhatsApp · Работает</em></span>
+  <span class="sx"><b></b></span></div>
+</div><div class="tb"><a class=""><i></i>Чаты</a><a class=""><i></i>Боты</a><a class="on"><i></i>Сводка</a><a class=""><i></i>Профиль</a></div></div></div><figcaption class="pc">Сводка</figcaption></figure><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div><div class="ah"><h3>Боты</h3><span class="hb">+</span></div><div class="bd"><div class="card"><div class="ct"><span class="av wa">Ц</span><span class="bm"><b>Цветы Алматы</b><em><i class="cd wa"></i>WhatsApp</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="on">Бот работает</span><span class="sx"><b></b></span></div></div><div class="card"><div class="ct"><span class="av wa">А</span><span class="bm"><b>Автозапчасти 4х4</b><em><i class="cd wa"></i>WhatsApp&nbsp;&nbsp;<i class="cd tg"></i>Telegram</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="on">Бот работает</span><span class="sx"><b></b></span></div></div><div class="card"><div class="ct"><span class="av tg">У</span><span class="bm"><b>Учебный центр</b><em><i class="cd tg"></i>Telegram</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="of">Бот на паузе</span><span class="sx off"><b></b></span></div></div></div><div class="tb"><a class=""><i></i>Чаты</a><a class="on"><i></i>Боты</a><a class=""><i></i>Сводка</a><a class=""><i></i>Профиль</a></div></div></div><figcaption class="pc">Боты</figcaption></figure><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div>
+<div class="ah s"><span class="hb"><i class="ch l"></i></span><h3>Цветы Алматы</h3>
+ <span class="on-pill">Онлайн</span></div>
+<div class="bd">
+ <div class="seg"><span class="sg1 on">Общие</span><span class="sg1">Бизнес</span><span class="sg1">Товары</span><span class="sg1">Услуги</span><span class="sg1">Промпты</span></div>
+ <div class="fg"><span class="fl">Название бота</span><div class="wl">Цветы Алматы</div></div>
+ <div class="fg"><span class="fl">Тип бизнеса</span><div class="wl">Цветы и подарки<i class="ch d"></i></div></div>
+ <div class="fg"><span class="fl">Приветствие</span><div class="wl a">Здравствуйте! Это «Цветы Алматы» 🌸 Подскажу букет, цену и доставку.</div></div>
+ <div class="tr">Уведомления о заказах<span class="sx"><b></b></span></div>
+ <div class="sv">Сохранить</div>
+</div></div></div><figcaption class="pc">Настройки</figcaption></figure></div>
+</section><section class="pal p-whitewash-brick">
+ <div class="ph">
+  <div>
+   <p class="eb">05 — палитра</p>
+   <h3>«Извёстка и кирпич» <span>— Whitewash & Brick</span><span class="fmly">terracotta</span></h3>
+   <p class="blurb">Lime-washed paper, warm the whole way down with no dead grey anywhere, holding a burnt sienna that reads as fired brick in daylight instead of a discount sticker. This is the sunlight palette — body ink at 16.3:1, every label above 5:1, and a copper button with a warm-white face that a 55-year-old can find outdoors without squinting.</p>
+   <p class="rk"><b>Risk</b><br>The oxblood owner_needed and the destructive red share a hue family and separate only by a 1.7× lightness step, so they must never wear the same shape — outlined pill with a glyph versus plain text.</p>
+   <div class="swr"><span class="sw"><i style="background:#F8F4F1"></i>#F8F4F1<br>ground</span><span class="sw"><i style="background:#FEFCF9"></i>#FEFCF9<br>surface</span><span class="sw"><i style="background:#A78D75"></i>#A78D75<br>input bd</span><span class="sw"><i style="background:#AB5C2B"></i>#AB5C2B<br>orange fill</span><span class="sw"><i style="background:#A55727"></i>#A55727<br>orange text</span><span class="sw"><i style="background:#251C16"></i>#251C16<br>ink</span></div>
+   <div class="coll"><p class="h">Collision resolved — brand vs alarm</p>
+<div class="pair">
+ <span class="one"><i style="background:#AB5C2B"></i>бренд #AB5C2B</span>
+ <span class="one"><i style="background:#D81B60"></i>Нужен владелец #D81B60</span>
+ <span class="one"><i style="background:#A01B12"></i>Удалить #A01B12</span>
+</div>
+<p class="sep">separation: 44.9° hue · 1.01:1 luminance</p></div>
+  </div>
+  <div><table class="cx"><caption>Measured contrast</caption><tbody><tr><td>orange FILL / surface</td><td class="ok">4.77</td></tr><tr><td>body ink / surface</td><td class="ok">16.32</td></tr><tr><td>secondary ink / surface</td><td class="ok">8.36</td></tr><tr><td>tertiary ink / surface</td><td class="ok">5.08</td></tr><tr><td>orange as TEXT / surface</td><td class="ok">5.14</td></tr><tr><td>button label / orange fill</td><td class="ok">4.71</td></tr><tr><td>chip label / chip fill</td><td class="ok">5.16</td></tr><tr><td>status ink / status bg</td><td class="ok">5.87</td></tr><tr><td>input border / surface</td><td class="ok">3.06</td></tr><tr><td>body ink / ground</td><td class="ok">15.28</td></tr></tbody></table></div>
+ </div>
+ <div class="row"><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div>
+<div class="ah"><h3>Сводка</h3><span class="hb">+</span></div>
+<div class="bd">
+ <div class="cs"><span class="cp on">7 дней</span><span class="cp">30 дней</span><span class="cp">Всё время</span></div>
+ <div class="hero"><span class="l">Заказов собрано</span><span class="n">24<small>+8</small></span>
+  <span class="s">за неделю · 62 диалога</span>
+  <span class="spk"><i style="height:38%"></i><i style="height:52%"></i><i style="height:31%"></i><i style="height:64%"></i><i style="height:45%"></i><i style="height:78%"></i><i style="height:100%"></i></span></div>
+ <div class="rws">
+  <div class="rw"><span class="d d-owner"></span><span class="m">Нужен владелец</span><span class="c">3</span></div>
+  <div class="rw"><span class="d d-dialog"></span><span class="m">В диалоге</span><span class="c">11</span></div>
+  <div class="rw"><span class="d d-closed"></span><span class="m">Вопрос закрыт</span><span class="c">18</span></div>
+ </div>
+ <div class="bc"><span class="av wa">Ц</span>
+  <span class="bm"><b>Цветы Алматы</b><em><i class="cd wa"></i>WhatsApp · Работает</em></span>
+  <span class="sx"><b></b></span></div>
+</div><div class="tb"><a class=""><i></i>Чаты</a><a class=""><i></i>Боты</a><a class="on"><i></i>Сводка</a><a class=""><i></i>Профиль</a></div></div></div><figcaption class="pc">Сводка</figcaption></figure><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div><div class="ah"><h3>Боты</h3><span class="hb">+</span></div><div class="bd"><div class="card"><div class="ct"><span class="av wa">Ц</span><span class="bm"><b>Цветы Алматы</b><em><i class="cd wa"></i>WhatsApp</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="on">Бот работает</span><span class="sx"><b></b></span></div></div><div class="card"><div class="ct"><span class="av wa">А</span><span class="bm"><b>Автозапчасти 4х4</b><em><i class="cd wa"></i>WhatsApp&nbsp;&nbsp;<i class="cd tg"></i>Telegram</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="on">Бот работает</span><span class="sx"><b></b></span></div></div><div class="card"><div class="ct"><span class="av tg">У</span><span class="bm"><b>Учебный центр</b><em><i class="cd tg"></i>Telegram</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="of">Бот на паузе</span><span class="sx off"><b></b></span></div></div></div><div class="tb"><a class=""><i></i>Чаты</a><a class="on"><i></i>Боты</a><a class=""><i></i>Сводка</a><a class=""><i></i>Профиль</a></div></div></div><figcaption class="pc">Боты</figcaption></figure><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div>
+<div class="ah s"><span class="hb"><i class="ch l"></i></span><h3>Цветы Алматы</h3>
+ <span class="on-pill">Онлайн</span></div>
+<div class="bd">
+ <div class="seg"><span class="sg1 on">Общие</span><span class="sg1">Бизнес</span><span class="sg1">Товары</span><span class="sg1">Услуги</span><span class="sg1">Промпты</span></div>
+ <div class="fg"><span class="fl">Название бота</span><div class="wl">Цветы Алматы</div></div>
+ <div class="fg"><span class="fl">Тип бизнеса</span><div class="wl">Цветы и подарки<i class="ch d"></i></div></div>
+ <div class="fg"><span class="fl">Приветствие</span><div class="wl a">Здравствуйте! Это «Цветы Алматы» 🌸 Подскажу букет, цену и доставку.</div></div>
+ <div class="tr">Уведомления о заказах<span class="sx"><b></b></span></div>
+ <div class="sv">Сохранить</div>
+</div></div></div><figcaption class="pc">Настройки</figcaption></figure></div>
+</section><section class="pal p-tobacco-char">
+ <div class="ph">
+  <div>
+   <p class="eb">06 — палитра</p>
+   <h3>«Табак и уголь» <span>— Tobacco & Char</span><span class="fmly">copper</span></h3>
+   <p class="blurb">A near-black char ground carrying a smoky tobacco-copper that behaves like worn saddle leather rather than a sale banner — deliberately the least saturated accent of the three (okC 0.10) so the amber status pill can outrank it without a fight. The accent-as-text lands at 5.98:1, bright enough to survive Almaty window glare, while the fill stays dark and matte with a cream label at 4.7:1.</p>
+   <p class="rk"><b>Risk</b><br>The most restrained accent in the set: a deep bronze fill sitting 3.4:1 above the surface can read as 'brown button' rather than 'the brand colour' to anyone expecting a vivid orange.</p>
+   <div class="swr"><span class="sw"><i style="background:#120F0C"></i>#120F0C<br>ground</span><span class="sw"><i style="background:#1E1814"></i>#1E1814<br>surface</span><span class="sw"><i style="background:#756355"></i>#756355<br>input bd</span><span class="sw"><i style="background:#9A5E2B"></i>#9A5E2B<br>orange fill</span><span class="sw"><i style="background:#C78958"></i>#C78958<br>orange text</span><span class="sw"><i style="background:#F2EEE8"></i>#F2EEE8<br>ink</span></div>
+   <div class="coll"><p class="h">Collision resolved — brand vs alarm</p>
+<div class="pair">
+ <span class="one"><i style="background:#9A5E2B"></i>бренд #9A5E2B</span>
+ <span class="one"><i style="background:#EABF3A"></i>Нужен владелец #EABF3A</span>
+ <span class="one"><i style="background:#EA5459"></i>Удалить #EA5459</span>
+</div>
+<p class="sep">separation: 17.8° hue · 3.0:1 luminance</p></div>
+  </div>
+  <div><table class="cx"><caption>Measured contrast</caption><tbody><tr><td>orange FILL / surface</td><td class="ok">3.35</td></tr><tr><td>body ink / surface</td><td class="ok">15.19</td></tr><tr><td>secondary ink / surface</td><td class="ok">9.24</td></tr><tr><td>tertiary ink / surface</td><td class="ok">5.61</td></tr><tr><td>orange as TEXT / surface</td><td class="ok">5.98</td></tr><tr><td>button label / orange fill</td><td class="ok">4.73</td></tr><tr><td>chip label / chip fill</td><td class="ok">7.2</td></tr><tr><td>status ink / status bg</td><td class="ok">6.19</td></tr><tr><td>input border / surface</td><td class="ok">3.07</td></tr><tr><td>body ink / ground</td><td class="ok">16.53</td></tr></tbody></table></div>
+ </div>
+ <div class="row"><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div>
+<div class="ah"><h3>Сводка</h3><span class="hb">+</span></div>
+<div class="bd">
+ <div class="cs"><span class="cp on">7 дней</span><span class="cp">30 дней</span><span class="cp">Всё время</span></div>
+ <div class="hero"><span class="l">Заказов собрано</span><span class="n">24<small>+8</small></span>
+  <span class="s">за неделю · 62 диалога</span>
+  <span class="spk"><i style="height:38%"></i><i style="height:52%"></i><i style="height:31%"></i><i style="height:64%"></i><i style="height:45%"></i><i style="height:78%"></i><i style="height:100%"></i></span></div>
+ <div class="rws">
+  <div class="rw"><span class="d d-owner"></span><span class="m">Нужен владелец</span><span class="c">3</span></div>
+  <div class="rw"><span class="d d-dialog"></span><span class="m">В диалоге</span><span class="c">11</span></div>
+  <div class="rw"><span class="d d-closed"></span><span class="m">Вопрос закрыт</span><span class="c">18</span></div>
+ </div>
+ <div class="bc"><span class="av wa">Ц</span>
+  <span class="bm"><b>Цветы Алматы</b><em><i class="cd wa"></i>WhatsApp · Работает</em></span>
+  <span class="sx"><b></b></span></div>
+</div><div class="tb"><a class=""><i></i>Чаты</a><a class=""><i></i>Боты</a><a class="on"><i></i>Сводка</a><a class=""><i></i>Профиль</a></div></div></div><figcaption class="pc">Сводка</figcaption></figure><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div><div class="ah"><h3>Боты</h3><span class="hb">+</span></div><div class="bd"><div class="card"><div class="ct"><span class="av wa">Ц</span><span class="bm"><b>Цветы Алматы</b><em><i class="cd wa"></i>WhatsApp</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="on">Бот работает</span><span class="sx"><b></b></span></div></div><div class="card"><div class="ct"><span class="av wa">А</span><span class="bm"><b>Автозапчасти 4х4</b><em><i class="cd wa"></i>WhatsApp&nbsp;&nbsp;<i class="cd tg"></i>Telegram</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="on">Бот работает</span><span class="sx"><b></b></span></div></div><div class="card"><div class="ct"><span class="av tg">У</span><span class="bm"><b>Учебный центр</b><em><i class="cd tg"></i>Telegram</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="of">Бот на паузе</span><span class="sx off"><b></b></span></div></div></div><div class="tb"><a class=""><i></i>Чаты</a><a class="on"><i></i>Боты</a><a class=""><i></i>Сводка</a><a class=""><i></i>Профиль</a></div></div></div><figcaption class="pc">Боты</figcaption></figure><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div>
+<div class="ah s"><span class="hb"><i class="ch l"></i></span><h3>Цветы Алматы</h3>
+ <span class="on-pill">Онлайн</span></div>
+<div class="bd">
+ <div class="seg"><span class="sg1 on">Общие</span><span class="sg1">Бизнес</span><span class="sg1">Товары</span><span class="sg1">Услуги</span><span class="sg1">Промпты</span></div>
+ <div class="fg"><span class="fl">Название бота</span><div class="wl">Цветы Алматы</div></div>
+ <div class="fg"><span class="fl">Тип бизнеса</span><div class="wl">Цветы и подарки<i class="ch d"></i></div></div>
+ <div class="fg"><span class="fl">Приветствие</span><div class="wl a">Здравствуйте! Это «Цветы Алматы» 🌸 Подскажу букет, цену и доставку.</div></div>
+ <div class="tr">Уведомления о заказах<span class="sx"><b></b></span></div>
+ <div class="sv">Сохранить</div>
+</div></div></div><figcaption class="pc">Настройки</figcaption></figure></div>
+</section><section class="pal p-live-wire">
+ <div class="ph">
+  <div>
+   <p class="eb">07 — палитра</p>
+   <h3>«Под напряжением» <span>— Live Wire</span><span class="fmly">true orange (re-cut off Tailwind/Dodo)</span></h3>
+   <p class="blurb">A warm near-black with almost no colour left in it, then one true orange at full chroma — the screen is brown-grey restraint until the button, which lands like a switch being thrown. Every orange fill carries a near-black label, so nothing goes white-hot and nothing halates on OLED.</p>
+   <p class="rk"><b>Risk</b><br>Its original #FF7A1F was ΔE 1.9 from Tailwind orange-500 and 3.2 from Dodo Pizza; this is re-cut to okC 0.155 / okH 53 to clear them. Still the hottest accent here — keep it under roughly a tenth of the screen or it reads as a sale banner rather than a tool.</p>
+   <div class="swr"><span class="sw"><i style="background:#100E0C"></i>#100E0C<br>ground</span><span class="sw"><i style="background:#1A1613"></i>#1A1613<br>surface</span><span class="sw"><i style="background:#706154"></i>#706154<br>input bd</span><span class="sw"><i style="background:#ED8439"></i>#ED8439<br>orange fill</span><span class="sw"><i style="background:#ED8439"></i>#ED8439<br>orange text</span><span class="sw"><i style="background:#F6F1EB"></i>#F6F1EB<br>ink</span></div>
+   <div class="coll"><p class="h">Collision resolved — brand vs alarm</p>
+<div class="pair">
+ <span class="one"><i style="background:#ED8439"></i>бренд #ED8439</span>
+ <span class="one"><i style="background:#FFD870"></i>Нужен владелец #FFD870</span>
+ <span class="one"><i style="background:#E8425F"></i>Удалить #E8425F</span>
+</div>
+<p class="sep">separation: 18.6° hue · 1.92:1 luminance</p></div>
+  </div>
+  <div><table class="cx"><caption>Measured contrast</caption><tbody><tr><td>orange FILL / surface</td><td class="ok">6.81</td></tr><tr><td>body ink / surface</td><td class="ok">16.01</td></tr><tr><td>secondary ink / surface</td><td class="ok">9.71</td></tr><tr><td>tertiary ink / surface</td><td class="ok">5.9</td></tr><tr><td>orange as TEXT / surface</td><td class="ok">6.81</td></tr><tr><td>button label / orange fill</td><td class="ok">7.1</td></tr><tr><td>chip label / chip fill</td><td class="ok">8.67</td></tr><tr><td>status ink / status bg</td><td class="ok">8.02</td></tr><tr><td>input border / surface</td><td class="ok">3.02</td></tr><tr><td>body ink / ground</td><td class="ok">17.15</td></tr></tbody></table></div>
+ </div>
+ <div class="row"><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div>
+<div class="ah"><h3>Сводка</h3><span class="hb">+</span></div>
+<div class="bd">
+ <div class="cs"><span class="cp on">7 дней</span><span class="cp">30 дней</span><span class="cp">Всё время</span></div>
+ <div class="hero"><span class="l">Заказов собрано</span><span class="n">24<small>+8</small></span>
+  <span class="s">за неделю · 62 диалога</span>
+  <span class="spk"><i style="height:38%"></i><i style="height:52%"></i><i style="height:31%"></i><i style="height:64%"></i><i style="height:45%"></i><i style="height:78%"></i><i style="height:100%"></i></span></div>
+ <div class="rws">
+  <div class="rw"><span class="d d-owner"></span><span class="m">Нужен владелец</span><span class="c">3</span></div>
+  <div class="rw"><span class="d d-dialog"></span><span class="m">В диалоге</span><span class="c">11</span></div>
+  <div class="rw"><span class="d d-closed"></span><span class="m">Вопрос закрыт</span><span class="c">18</span></div>
+ </div>
+ <div class="bc"><span class="av wa">Ц</span>
+  <span class="bm"><b>Цветы Алматы</b><em><i class="cd wa"></i>WhatsApp · Работает</em></span>
+  <span class="sx"><b></b></span></div>
+</div><div class="tb"><a class=""><i></i>Чаты</a><a class=""><i></i>Боты</a><a class="on"><i></i>Сводка</a><a class=""><i></i>Профиль</a></div></div></div><figcaption class="pc">Сводка</figcaption></figure><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div><div class="ah"><h3>Боты</h3><span class="hb">+</span></div><div class="bd"><div class="card"><div class="ct"><span class="av wa">Ц</span><span class="bm"><b>Цветы Алматы</b><em><i class="cd wa"></i>WhatsApp</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="on">Бот работает</span><span class="sx"><b></b></span></div></div><div class="card"><div class="ct"><span class="av wa">А</span><span class="bm"><b>Автозапчасти 4х4</b><em><i class="cd wa"></i>WhatsApp&nbsp;&nbsp;<i class="cd tg"></i>Telegram</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="on">Бот работает</span><span class="sx"><b></b></span></div></div><div class="card"><div class="ct"><span class="av tg">У</span><span class="bm"><b>Учебный центр</b><em><i class="cd tg"></i>Telegram</em></span><i class="ch r"></i></div><div class="cv"></div><div class="cf"><span class="of">Бот на паузе</span><span class="sx off"><b></b></span></div></div></div><div class="tb"><a class=""><i></i>Чаты</a><a class="on"><i></i>Боты</a><a class=""><i></i>Сводка</a><a class=""><i></i>Профиль</a></div></div></div><figcaption class="pc">Боты</figcaption></figure><figure class="pw"><div class="phone"><div class="scr"><div class="sb"><span>9:41</span><span class="sg"><i></i><i></i><i></i><i></i><span class="bt"><i></i></span></span></div>
+<div class="ah s"><span class="hb"><i class="ch l"></i></span><h3>Цветы Алматы</h3>
+ <span class="on-pill">Онлайн</span></div>
+<div class="bd">
+ <div class="seg"><span class="sg1 on">Общие</span><span class="sg1">Бизнес</span><span class="sg1">Товары</span><span class="sg1">Услуги</span><span class="sg1">Промпты</span></div>
+ <div class="fg"><span class="fl">Название бота</span><div class="wl">Цветы Алматы</div></div>
+ <div class="fg"><span class="fl">Тип бизнеса</span><div class="wl">Цветы и подарки<i class="ch d"></i></div></div>
+ <div class="fg"><span class="fl">Приветствие</span><div class="wl a">Здравствуйте! Это «Цветы Алматы» 🌸 Подскажу букет, цену и доставку.</div></div>
+ <div class="tr">Уведомления о заказах<span class="sx"><b></b></span></div>
+ <div class="sv">Сохранить</div>
+</div></div></div><figcaption class="pc">Настройки</figcaption></figure></div>
+</section><section class="close">
+ <h2>Choosing inside the orange family</h2>
+ <p><strong>The neutral decides whether orange reads premium or discount.</strong> The same orange on a
+ brown-black looks like a lit instrument; on a cool grey it looks like a hazard sign. If you like «Эспрессо»,
+ you like the warm ground at least as much as the amber — protect that first.</p>
+ <p><strong>Judge the Настройки screen.</strong> A dashboard gives orange a big empty stage. A dense form is
+ where a saturated orange starts to buzz against text, and where the burnt text shade has to carry links, the
+ active tab underline and the field labels without shouting.</p>
+ <p><strong>On the moved alarm:</strong> «Нужен владелец» is the one status the owner must never miss. Giving
+ the brand its orange means that alarm has to move somewhere unmistakable — check that it still catches your
+ eye in the dashboard list before approving a palette.</p>
+ <p>Whichever wins becomes one token block in <code>Assets/Scripts/Theme/</code>, read by every
+ <code>[MenuItem]</code> builder, so a later change costs one file instead of fifty-five.</p>
+</section></div>

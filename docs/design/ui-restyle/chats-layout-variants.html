@@ -1,0 +1,1124 @@
+<title>Чаты — варианты компоновки</title>
+<style>
+/* ============================================================
+   GALLERY CHROME
+   Deliberately cool-slate + rust. Rust is chosen because it is
+   maximally distinct from every colour the app itself uses
+   (navy #243A7A, WA green #25D366, TG blue #2AABEE) — a gallery
+   accent must never be mistaken for an app accent.
+   ============================================================ */
+:root{
+  --g-ground:#F6F7F8; --g-panel:#FFFFFF; --g-panel-2:#EFF1F3;
+  --g-rule:#DEE3E7; --g-rule-2:#C9D0D6;
+  --g-ink:#131A20; --g-ink-2:#5A656E; --g-ink-3:#8B959D;
+  --g-mark:#A94D1D; --g-mark-soft:#F7ECE5;
+  --g-ok:#1F6B45; --g-ok-soft:#E7F2EC;
+  --g-warn:#8A5B08; --g-warn-soft:#F8EFDC;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --g-ground:#0E1216; --g-panel:#161B21; --g-panel-2:#1D242B;
+    --g-rule:#262D35; --g-rule-2:#39434D;
+    --g-ink:#E7ECF0; --g-ink-2:#95A0A9; --g-ink-3:#6B757D;
+    --g-mark:#E08B57; --g-mark-soft:#2B1E15;
+    --g-ok:#63C795; --g-ok-soft:#14261D;
+    --g-warn:#D6A657; --g-warn-soft:#2A2214;
+  }
+}
+:root[data-theme="dark"]{
+  --g-ground:#0E1216; --g-panel:#161B21; --g-panel-2:#1D242B;
+  --g-rule:#262D35; --g-rule-2:#39434D;
+  --g-ink:#E7ECF0; --g-ink-2:#95A0A9; --g-ink-3:#6B757D;
+  --g-mark:#E08B57; --g-mark-soft:#2B1E15;
+  --g-ok:#63C795; --g-ok-soft:#14261D;
+  --g-warn:#D6A657; --g-warn-soft:#2A2214;
+}
+:root[data-theme="light"]{
+  --g-ground:#F6F7F8; --g-panel:#FFFFFF; --g-panel-2:#EFF1F3;
+  --g-rule:#DEE3E7; --g-rule-2:#C9D0D6;
+  --g-ink:#131A20; --g-ink-2:#5A656E; --g-ink-3:#8B959D;
+  --g-mark:#A94D1D; --g-mark-soft:#F7ECE5;
+  --g-ok:#1F6B45; --g-ok-soft:#E7F2EC;
+  --g-warn:#8A5B08; --g-warn-soft:#F8EFDC;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--g-ground); color:var(--g-ink);
+  font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1240px;margin:0 auto;padding:0 28px 120px}
+.mono{font-family:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+      font-variant-numeric:tabular-nums;font-size:.86em;letter-spacing:-.01em}
+
+/* ---------- masthead ---------- */
+.mast{padding:72px 0 40px;border-bottom:1px solid var(--g-rule)}
+.eyebrow{font-size:12px;font-weight:650;letter-spacing:.14em;text-transform:uppercase;color:var(--g-mark);margin:0 0 18px}
+h1{font-size:clamp(32px,4.4vw,52px);line-height:1.06;margin:0 0 20px;letter-spacing:-.025em;font-weight:700;text-wrap:balance;max-width:20ch}
+.lede{font-size:18px;line-height:1.6;color:var(--g-ink-2);max-width:64ch;margin:0 0 28px}
+.lede strong{color:var(--g-ink);font-weight:620}
+
+.diag{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:1px;background:var(--g-rule);
+      border:1px solid var(--g-rule);border-radius:12px;overflow:hidden;margin-top:32px}
+.diag > div{background:var(--g-panel);padding:18px 20px}
+.diag dt{font-size:11px;font-weight:650;letter-spacing:.1em;text-transform:uppercase;color:var(--g-ink-3);margin:0 0 7px}
+.diag dd{margin:0;font-size:14px;color:var(--g-ink-2);line-height:1.5}
+.diag dd b{color:var(--g-ink);font-weight:620}
+
+/* ---------- sticky nav ---------- */
+nav{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--g-ground) 92%,transparent);
+    backdrop-filter:blur(12px);border-bottom:1px solid var(--g-rule);margin-bottom:8px}
+nav .inner{max-width:1240px;margin:0 auto;padding:0 28px;display:flex;gap:4px;overflow-x:auto;
+           scrollbar-width:none}
+nav .inner::-webkit-scrollbar{display:none}
+nav a{flex:0 0 auto;padding:14px 13px;font-size:13px;font-weight:560;color:var(--g-ink-2);
+      text-decoration:none;border-bottom:2px solid transparent;white-space:nowrap}
+nav a:hover{color:var(--g-ink);border-bottom-color:var(--g-rule-2)}
+nav a:focus-visible{outline:2px solid var(--g-mark);outline-offset:-3px;border-radius:4px}
+
+/* ---------- sections ---------- */
+section{padding:64px 0;border-bottom:1px solid var(--g-rule);scroll-margin-top:56px}
+.shead{display:flex;flex-wrap:wrap;align-items:baseline;gap:14px;margin-bottom:10px}
+.snum{font-size:12px;font-weight:700;letter-spacing:.1em;color:var(--g-mark);
+      background:var(--g-mark-soft);padding:5px 10px;border-radius:6px;white-space:nowrap}
+h2{font-size:clamp(24px,2.8vw,34px);margin:0;letter-spacing:-.02em;font-weight:680;line-height:1.15}
+h2 .ru{color:var(--g-ink-3);font-weight:450}
+h3{font-size:17px;margin:44px 0 14px;letter-spacing:-.01em;font-weight:650}
+.idea{font-size:17px;line-height:1.6;color:var(--g-ink-2);max-width:66ch;margin:0 0 6px}
+.idea strong{color:var(--g-ink);font-weight:620}
+
+.tags{display:flex;flex-wrap:wrap;gap:7px;margin:20px 0 4px}
+.tag{font-size:12px;font-weight:580;padding:5px 11px;border-radius:999px;border:1px solid var(--g-rule-2);color:var(--g-ink-2)}
+.tag.ok{background:var(--g-ok-soft);border-color:transparent;color:var(--g-ok)}
+.tag.warn{background:var(--g-warn-soft);border-color:transparent;color:var(--g-warn)}
+.tag.mark{background:var(--g-mark-soft);border-color:transparent;color:var(--g-mark)}
+
+/* ---------- layout: phones + notes ---------- */
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,340px);gap:44px;align-items:start;margin-top:30px}
+@media (max-width:940px){ .split{grid-template-columns:1fr;gap:32px} }
+
+.stage{display:flex;flex-wrap:wrap;gap:26px}
+.unit{display:flex;flex-direction:column;gap:9px}
+.ulabel{font-size:11px;font-weight:650;letter-spacing:.1em;text-transform:uppercase;color:var(--g-ink-3)}
+.bezel{padding:8px;background:var(--g-rule);border-radius:30px;
+       box-shadow:0 10px 30px -12px rgba(0,0,0,.28)}
+
+/* the phone is authored in 1080×1920 canvas units and scaled down,
+   so every number in this file is a real Unity spec value */
+.pw{width:346px;height:614px;overflow:hidden;border-radius:22px;position:relative}
+.pw.tall{height:700px}
+.phone{width:1080px;height:1920px;transform:scale(.32);transform-origin:top left;
+       position:relative;overflow:hidden;background:var(--bg);line-height:1.2;
+       font-family:-apple-system,"Helvetica Neue",Arial,sans-serif;color:var(--ink)}
+
+.notes{position:sticky;top:76px}
+.notes ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:0}
+.notes li{padding:13px 0;border-bottom:1px solid var(--g-rule);font-size:14px;color:var(--g-ink-2);line-height:1.5}
+.notes li:first-child{padding-top:0}
+.notes li b{display:block;color:var(--g-ink);font-weight:620;font-size:13px;margin-bottom:3px}
+.notes li .mono{color:var(--g-ink);background:var(--g-panel-2);padding:1px 5px;border-radius:4px}
+.cost{margin-top:22px;padding:16px 18px;background:var(--g-panel);border:1px solid var(--g-rule);border-radius:11px}
+.cost dt{font-size:11px;font-weight:650;letter-spacing:.1em;text-transform:uppercase;color:var(--g-ink-3);margin:0 0 6px}
+.cost dd{margin:0;font-size:13.5px;line-height:1.55;color:var(--g-ink-2)}
+.cost dd + dt{margin-top:14px}
+
+/* ---------- component grids ---------- */
+.cgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:22px;margin-top:28px}
+@media (min-width:820px){ .cgrid.pairs{grid-template-columns:1fr 1fr} }
+.card{background:var(--g-panel);border:1px solid var(--g-rule);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+.card .top{padding:18px 20px 14px}
+.card .top h4{margin:0 0 5px;font-size:15px;font-weight:650;letter-spacing:-.01em}
+.card .top p{margin:0;font-size:13.5px;color:var(--g-ink-2);line-height:1.5}
+.card .demo{background:var(--g-panel-2);border-top:1px solid var(--g-rule);padding:24px 20px;
+            display:flex;flex-direction:column;gap:18px;align-items:center}
+.card .demo.flush{padding:0;gap:0;overflow:hidden}
+.demo-pair{display:flex;flex-direction:column;gap:8px;align-items:center;width:100%}
+.demo-cap{font-size:10.5px;font-weight:650;letter-spacing:.09em;text-transform:uppercase;color:var(--g-ink-3)}
+.crop{overflow:hidden;border-radius:10px;box-shadow:0 2px 10px -4px rgba(0,0,0,.25)}
+.crop > .phone{transform:scale(.30);transform-origin:top left}
+.card .verdict{padding:14px 20px;border-top:1px solid var(--g-rule);font-size:13px;color:var(--g-ink-2);line-height:1.5}
+.card .verdict b{color:var(--g-ink);font-weight:620}
+
+/* ---------- closing ---------- */
+.rec{background:var(--g-panel);border:1px solid var(--g-rule);border-radius:14px;padding:30px 32px;margin-top:30px}
+.rec h3{margin-top:0}
+.rec ol{margin:0;padding-left:22px}
+.rec li{margin-bottom:12px;color:var(--g-ink-2);line-height:1.6}
+.rec li b{color:var(--g-ink);font-weight:620}
+table{width:100%;border-collapse:collapse;margin-top:26px;font-size:13.5px}
+.tscroll{overflow-x:auto}
+th,td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--g-rule);vertical-align:top}
+th{font-size:11px;font-weight:650;letter-spacing:.09em;text-transform:uppercase;color:var(--g-ink-3);white-space:nowrap}
+td b{font-weight:620}
+td:first-child{white-space:nowrap}
+
+/* ============================================================
+   APP PALETTE — «Чернильный», copied byte-for-byte from
+   Assets/Resources/Theme/Theme_Light.asset & Theme_Dark.asset
+   ============================================================ */
+.ph-light{
+  --bg:#F4F8F8; --surface:#FFFFFF; --hairline:#E3EDED; --border:#C4D6D7;
+  --input-border:#6F9B9D;
+  --ink:#08181B; --ink2:#4C6265; --ink3:#64797C;
+  --accent:#243A7A; --accent-text:#243A7A; --on-accent:#FFFFFF; --accent-soft:#E8F2FD;
+  --pos-bg:#E6F6EE; --pos-ink:#0A6B3E; --destructive:#A01B12;
+  --shadow:0 3px 12px rgba(8,24,27,.10); --shadow-lg:0 -6px 34px rgba(8,24,27,.16);
+  --scrim:rgba(8,24,27,.42);
+}
+.ph-dark{
+  --bg:#0E1116; --surface:#171C24; --hairline:#242C38; --border:#333E4E;
+  --input-border:#556882;
+  --ink:#ECF0F6; --ink2:#9AA6B8; --ink3:#79869A;
+  --accent:#3E61C6; --accent-text:#5981D6; --on-accent:#FFFFFF; --accent-soft:#1E2A44;
+  --pos-bg:#123324; --pos-ink:#57DE95; --destructive:#F2555A;
+  --shadow:0 3px 12px rgba(0,0,0,.5); --shadow-lg:0 -6px 34px rgba(0,0,0,.6);
+  --scrim:rgba(0,0,0,.62);
+}
+.phone{--wa:#25D366; --tg:#2AABEE; --on-green:#34C759}
+
+/* ---------- phone: status bar ---------- */
+.sb{height:100px;display:flex;align-items:flex-end;justify-content:space-between;
+    padding:0 56px 14px;color:var(--ink);font-size:34px;font-weight:600;letter-spacing:.5px}
+.sb .r{display:flex;gap:12px;align-items:center}
+.sb .bars{display:flex;gap:5px;align-items:flex-end;height:26px}
+.sb .bars i{width:7px;background:currentColor;border-radius:2px;display:block}
+.sb .bat{width:52px;height:26px;border:3px solid currentColor;border-radius:8px;position:relative;opacity:.9}
+.sb .bat::after{content:"";position:absolute;left:4px;top:4px;bottom:4px;width:26px;background:currentColor;border-radius:3px}
+
+/* ---------- phone: top bar ---------- */
+.bar{background:var(--surface);position:relative}
+.bar::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:var(--hairline)}
+.tier{display:flex;align-items:center;padding:0 40px}
+
+/* bot identity chip */
+.bot{display:flex;align-items:center;gap:20px;min-width:0}
+.av{border-radius:999px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+    font-weight:700;color:#fff;position:relative}
+.bot .nm{font-weight:600;color:var(--ink);letter-spacing:-.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chev{flex:0 0 auto;opacity:.55}
+.sub{font-size:26px;color:var(--ink3);white-space:nowrap;margin-top:2px}
+
+/* mode chip */
+.mchip{display:inline-flex;align-items:center;gap:14px;height:68px;border-radius:34px;
+       padding:0 28px;font-size:30px;font-weight:600;white-space:nowrap}
+.mchip .dot{width:18px;height:18px;border-radius:999px;background:currentColor;flex:0 0 auto}
+.mchip.auto{background:var(--pos-bg);color:var(--pos-ink)}
+.mchip.semi{background:var(--accent-soft);color:var(--accent-text)}
+.mchip.outline{background:transparent;color:var(--ink2);box-shadow:inset 0 0 0 3px var(--border)}
+
+/* segmented well */
+.seg{display:flex;background:var(--bg);border-radius:48px;height:96px;padding:5px;
+     box-shadow:inset 0 0 0 2px var(--hairline)}
+.seg > div{flex:1;display:flex;align-items:center;justify-content:center;gap:14px;
+           border-radius:43px;font-size:32px;font-weight:600;color:var(--ink3)}
+.seg > div.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.seg .cnt{font-size:28px;font-weight:600;color:var(--ink3);opacity:.85}
+.gdot{width:20px;height:20px;border-radius:999px;flex:0 0 auto}
+
+/* underline tabs */
+.tabs{display:flex;height:100%}
+.tabs > div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;
+            gap:16px;font-size:34px;font-weight:600;color:var(--ink3);position:relative}
+.tabs > div.on{color:var(--ink)}
+.tabs .u{width:150px;height:7px;border-radius:4px;background:transparent}
+.tabs .lbl{display:flex;align-items:center;gap:12px}
+.badge-i{font-size:26px;font-weight:700;padding:4px 14px;border-radius:999px}
+
+/* channel icon buttons */
+.iconbtn{width:84px;height:84px;border-radius:999px;display:flex;align-items:center;justify-content:center;
+         flex:0 0 auto;background:var(--bg);color:var(--ink3);box-shadow:inset 0 0 0 2px var(--hairline)}
+.iconbtn.on{box-shadow:none;color:#fff}
+
+/* status strip */
+.strip{display:flex;align-items:center;justify-content:space-between;height:88px;padding:0 44px;
+       font-size:30px;position:relative}
+.strip::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:var(--hairline)}
+.strip .act{font-weight:650;color:var(--accent-text)}
+
+/* filter chips */
+.chips{display:flex;align-items:center;gap:16px;height:132px;padding:0 40px;overflow:hidden}
+.chip{display:inline-flex;align-items:center;gap:14px;height:84px;border-radius:42px;padding:0 32px;
+      font-size:30px;font-weight:600;white-space:nowrap;flex:0 0 auto;
+      background:var(--surface);color:var(--ink2);box-shadow:inset 0 0 0 3px var(--hairline)}
+.chip.on{box-shadow:none;color:#fff}
+.chip .n{opacity:.75;font-weight:600}
+.chipdiv{width:3px;height:48px;background:var(--hairline);flex:0 0 auto;margin:0 8px}
+
+/* ---------- phone: list ---------- */
+.list{background:var(--surface)}
+.search{height:124px;display:flex;align-items:center;padding:0 50px;background:var(--surface)}
+.search .pill{flex:1;height:92px;border-radius:46px;background:var(--bg);display:flex;align-items:center;
+              gap:18px;padding:0 26px;color:var(--ink3);font-size:38px;box-shadow:inset 0 0 0 2px var(--hairline)}
+.row{height:200px;display:flex;align-items:center;padding:0 40px;gap:32px;position:relative;background:var(--surface)}
+.row::after{content:"";position:absolute;left:212px;right:0;bottom:0;height:2px;background:var(--hairline)}
+.row:last-child::after{display:none}
+.rav{width:140px;height:140px;flex:0 0 auto;position:relative}
+.rav .av{width:140px;height:140px;font-size:52px}
+.cbadge{position:absolute;right:-2px;bottom:-2px;width:46px;height:46px;border-radius:999px;
+        display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 6px var(--surface)}
+.cbadge.sm{width:30px;height:30px;right:0;bottom:0;box-shadow:0 0 0 5px var(--surface)}
+.rtx{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+.rtop{display:flex;align-items:baseline;gap:16px}
+.rname{font-size:44px;font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;letter-spacing:-.4px}
+.rtime{font-size:30px;color:var(--ink3);flex:0 0 auto}
+.rbot{display:flex;align-items:center;gap:16px}
+.rmsg{font-size:36px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+.ubadge{min-width:48px;height:48px;border-radius:24px;background:var(--accent);color:var(--on-accent);
+        display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:650;padding:0 14px;flex:0 0 auto}
+
+/* ---------- phone: bottom nav ---------- */
+.nav{position:absolute;left:0;right:0;bottom:0;height:210px;background:var(--surface);
+     display:flex;padding-bottom:70px}
+.nav::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:var(--hairline)}
+.nav > div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+           color:var(--ink3);font-size:26px;font-weight:500}
+.nav > div.on{color:var(--accent-text)}
+
+/* ---------- phone: bot sheet ---------- */
+.sheet-scrim{position:absolute;inset:0;background:var(--scrim)}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--bg);
+       border-radius:56px 56px 0 0;box-shadow:var(--shadow-lg);display:flex;flex-direction:column}
+.grab{height:72px;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.grab i{width:108px;height:12px;border-radius:6px;background:var(--border);display:block}
+.stitle{padding:6px 48px 26px;font-size:44px;font-weight:650;color:var(--ink);letter-spacing:-.5px}
+.stitle small{display:block;font-size:28px;font-weight:400;color:var(--ink3);margin-top:6px;letter-spacing:0}
+.slist{padding:0 40px 40px;display:flex;flex-direction:column;gap:20px}
+.brow{background:var(--surface);border-radius:40px;display:flex;align-items:center;gap:28px;
+      padding:0 32px;height:152px;position:relative;overflow:hidden;box-shadow:inset 0 0 0 2px var(--hairline)}
+.brow.on{box-shadow:inset 0 0 0 4px var(--accent)}
+.brow.on .rail{position:absolute;left:0;top:0;bottom:0;width:10px;background:var(--accent)}
+.brow .av{width:100px;height:100px;font-size:40px}
+.bmeta{flex:1;min-width:0}
+.bname{font-size:40px;font-weight:600;color:var(--ink);letter-spacing:-.4px}
+.bsub{display:flex;align-items:center;gap:12px;font-size:28px;color:var(--ink3);margin-top:6px}
+.check{width:56px;height:56px;border-radius:999px;background:var(--accent);color:var(--on-accent);
+       display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.minisegwrap{display:flex;align-items:center;gap:18px}
+.miniseg{display:flex;background:var(--bg);border-radius:32px;height:64px;padding:4px;width:260px;
+         box-shadow:inset 0 0 0 2px var(--hairline);flex:0 0 auto}
+.miniseg > div{flex:1;display:flex;align-items:center;justify-content:center;border-radius:28px;
+               font-size:26px;font-weight:600;color:var(--ink3)}
+.miniseg > div.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.miniseg > div.on.pos{background:var(--pos-bg);color:var(--pos-ink);box-shadow:none}
+.bgrid{padding:0 40px 40px;display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.btile{background:var(--surface);border-radius:44px;padding:36px 24px 30px;display:flex;flex-direction:column;
+       align-items:center;gap:16px;position:relative;box-shadow:inset 0 0 0 2px var(--hairline)}
+.btile.on{box-shadow:inset 0 0 0 5px var(--accent)}
+.btile .av{width:132px;height:132px;font-size:50px}
+.btile .bname{font-size:36px;text-align:center}
+.btile .check{position:absolute;top:20px;right:20px;width:52px;height:52px}
+
+/* incumbent controls, rendered for a fair comparison */
+.old-seg{width:340px;height:76px;border-radius:38px;background:#EFEFF0;display:flex;padding:6px;flex:0 0 auto}
+.old-seg > div{flex:1;display:flex;align-items:center;justify-content:center;border-radius:32px;
+               font-size:22px;font-weight:700;color:#3A3A3C}
+.old-seg > div.on{background:var(--wa);color:#fff}
+.old-seg > div.on.tg{background:var(--tg)}
+.old-toggle{width:280px;height:72px;border-radius:36px;background:#2FB344;position:relative;flex:0 0 auto;
+            display:flex;align-items:center}
+.old-toggle > span{flex:1;text-align:center;font-size:28px;color:#C3EFCB;font-weight:500}
+.old-toggle .thumb{position:absolute;right:8px;width:124px;height:56px;border-radius:28px;background:#fff;
+                   display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:#206A2C}
+
+svg{display:block}
+.hidden-defs{position:absolute;width:0;height:0;overflow:hidden}
+</style>
+
+<svg class="hidden-defs" aria-hidden="true">
+  <symbol id="wa" viewBox="0 0 24 24"><path fill="currentColor" d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.16-.17.2-.35.22-.64.08-.3-.15-1.26-.46-2.39-1.48-.88-.79-1.48-1.76-1.65-2.06-.17-.3-.02-.46.13-.61.13-.13.3-.35.44-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.61-.92-2.21-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.07 2.87 1.21 3.07.15.2 2.1 3.2 5.08 4.49.71.3 1.26.49 1.69.62.71.23 1.36.2 1.87.12.57-.09 1.76-.72 2-1.41.25-.7.25-1.29.18-1.42-.08-.12-.28-.2-.57-.35M12.05 21.8h-.01a9.87 9.87 0 0 1-5.03-1.38l-.36-.21-3.74.98 1-3.65-.24-.37a9.86 9.86 0 0 1-1.51-5.26c0-5.45 4.44-9.89 9.89-9.89 2.64 0 5.12 1.03 6.99 2.9a9.83 9.83 0 0 1 2.89 6.99c0 5.45-4.44 9.89-9.88 9.89m8.41-18.3A11.82 11.82 0 0 0 12.05 0C5.5 0 .16 5.34.16 11.89c0 2.1.55 4.14 1.59 5.95L.06 24l6.3-1.65a11.88 11.88 0 0 0 5.69 1.45c6.55 0 11.89-5.34 11.89-11.89 0-3.18-1.24-6.17-3.48-8.41"/></symbol>
+  <symbol id="tg" viewBox="0 0 24 24"><path fill="currentColor" d="M21.94 4.3 18.6 20.05c-.25 1.11-.91 1.39-1.84.86l-5.09-3.75-2.45 2.36c-.27.27-.5.5-1.03.5l.37-5.2 9.47-8.56c.41-.37-.09-.57-.64-.2L5.68 13.44.65 11.86c-1.1-.34-1.12-1.09.23-1.62l19.67-7.58c.91-.34 1.71.2 1.39 1.64"/></symbol>
+  <symbol id="chev" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="check" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" d="m5 13 5 5L19 7"/></symbol>
+  <symbol id="search" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></g></symbol>
+  <symbol id="filter" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M3 6h18M6 12h12M10 18h4"/></g></symbol>
+  <symbol id="plus" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5Z"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V10M12 20V4M19 20v-7"/></g></symbol>
+  <symbol id="i-bot" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="4"/><path d="M12 4v4M9 14h.01M15 14h.01"/></g></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></g></symbol>
+</svg>
+
+<nav>
+  <div class="inner">
+    <a href="#now">Сейчас</a>
+    <a href="#v1">1 · Два этажа</a>
+    <a href="#v2">2 · Вкладки</a>
+    <a href="#v3">3 · Одна строка</a>
+    <a href="#v4">4 · Фильтры в ленте</a>
+    <a href="#v5">5 · Единый список</a>
+    <a href="#brand">Цвет каналов</a>
+    <a href="#mode">Режим ответа</a>
+    <a href="#sheet">Шторка ботов</a>
+    <a href="#pick">Что выбрать</a>
+  </div>
+</nav>
+
+<div class="wrap">
+
+<header class="mast">
+  <p class="eyebrow">Экран «Чаты» · палитра «Чернильный»</p>
+  <h1>Пять способов разложить одну шапку</h1>
+  <p class="lede">Переключатель каналов, тумблер «Авто / Вместе» и шторка выбора бота — это <strong>три разные вещи</strong>, которые сегодня стоят в один ряд, одного размера и все четыре цвета сразу. Ниже — сегодняшний экран и пять вариантов, каждый со своим принципом упорядочивания. Все макеты нарисованы в единицах канваса 1080×1920 и в реальных токенах темы, так что размеры отсюда переносятся в Unity как есть.</p>
+
+  <div class="diag">
+    <div><dt>Что не так</dt><dd>В шапке <b>четыре насыщенных цвета</b> — зелень WhatsApp, синь Telegram, зелень тумблера и синь тумблера. Ни один не из палитры «Чернильный».</dd></div>
+    <div><dt>Ранг</dt><dd>Личность бота, фильтр по каналу и режим ответа <b>весят одинаково</b>, хотя это область / выборка / поведение.</dd></div>
+    <div><dt>Противоречие</dt><dd>Тумблер режима выглядит как «щёлк», но <b>каждое переключение</b> проходит через диалог подтверждения. Форма врёт о поведении.</dd></div>
+    <div><dt>Тесно</dt><dd>Три зоны по <b>360 ед.</b> на 1080 — имя бота обрезается уже на «Автозапчасти KZ».</dd></div>
+  </div>
+</header>
+
+<!-- ============================== СЕЙЧАС ============================== -->
+<section id="now">
+  <div class="shead"><span class="snum">ИСХОДНОЕ</span><h2>Как это выглядит сейчас</h2></div>
+  <p class="idea">Собрано по сцене: <span class="mono">TopBar</span> 250 ед. — три зоны по 360, сегмент-пилюля 340×76 с фирменными заливками по центру, тумблер 280×72 справа. Отрисовано в новой палитре, чтобы конфликт был виден честно.</p>
+
+  <div class="split">
+    <div class="stage">
+      <div class="unit"><span class="ulabel">Светлая</span><div class="bezel"><div class="pw"><div class="phone ph-light">
+        <div class="bar" style="height:250px">
+          <div class="sb"><span>9:41</span><span class="r"><span class="bars"><i style="height:10px"></i><i style="height:15px"></i><i style="height:20px"></i><i style="height:26px"></i></span><span class="bat"></span></span></div>
+          <div class="tier" style="height:150px;justify-content:space-between;gap:16px">
+            <div class="bot" style="gap:14px;max-width:330px">
+              <div class="av" style="width:84px;height:84px;font-size:34px;background:#B08048">А</div>
+              <span class="nm" style="font-size:44px">Автозапча…</span>
+              <svg class="chev" width="30" height="30"><use href="#chev"/></svg>
+            </div>
+            <div class="old-seg"><div class="on"><svg width="26" height="26"><use href="#wa"/></svg>WhatsApp</div><div>Telegram</div></div>
+            <div class="old-toggle"><span>Вместе</span><span></span><div class="thumb">Авто</div></div>
+          </div>
+        </div>
+        <div class="list">
+          <div class="search"><div class="pill"><svg width="40" height="40"><use href="#search"/></svg>Поиск</div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#C0705F">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Айгерим Сериковна</span><span class="rtime">14:32</span></div><div class="rbot"><span class="rmsg">Здравствуйте! Есть фильтр на Camry 2018?</span><span class="ubadge">3</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#5E8B7E">Д</div></div><div class="rtx"><div class="rtop"><span class="rname">Данияр</span><span class="rtime">13:58</span></div><div class="rbot"><span class="rmsg">Спасибо, оформил заказ 👍</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#7B6BA8">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Магазин «Автомир»</span><span class="rtime">12:10</span></div><div class="rbot"><span class="rmsg">Отправьте, пожалуйста, прайс</span><span class="ubadge">1</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#A8794A">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Асель</span><span class="rtime">11:47</span></div><div class="rbot"><span class="rmsg">А доставка по Алматы сколько стоит?</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#4F7CA3">Н</div></div><div class="rtx"><div class="rtop"><span class="rname">Нурлан Ж.</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Понял, жду счёт</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#9C5F76">М</div></div><div class="rtx"><div class="rtop"><span class="rname">Мадина</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Добрый день!</span></div></div></div>
+        </div>
+        <div class="nav"><div class="on"><svg width="60" height="60"><use href="#i-chat"/></svg>Чаты</div><div><svg width="60" height="60"><use href="#i-chart"/></svg>Сводка</div><div><svg width="60" height="60"><use href="#i-bot"/></svg>Боты</div><div><svg width="60" height="60"><use href="#i-user"/></svg>Профиль</div></div>
+      </div></div></div></div>
+
+      <div class="unit"><span class="ulabel">Тёмная</span><div class="bezel"><div class="pw"><div class="phone ph-dark">
+        <div class="bar" style="height:250px">
+          <div class="sb"><span>9:41</span><span class="r"><span class="bars"><i style="height:10px"></i><i style="height:15px"></i><i style="height:20px"></i><i style="height:26px"></i></span><span class="bat"></span></span></div>
+          <div class="tier" style="height:150px;justify-content:space-between;gap:16px">
+            <div class="bot" style="gap:14px;max-width:330px">
+              <div class="av" style="width:84px;height:84px;font-size:34px;background:#B08048">А</div>
+              <span class="nm" style="font-size:44px">Автозапча…</span>
+              <svg class="chev" width="30" height="30"><use href="#chev"/></svg>
+            </div>
+            <div class="old-seg"><div class="on"><svg width="26" height="26"><use href="#wa"/></svg>WhatsApp</div><div>Telegram</div></div>
+            <div class="old-toggle"><span>Вместе</span><span></span><div class="thumb">Авто</div></div>
+          </div>
+        </div>
+        <div class="list">
+          <div class="search"><div class="pill"><svg width="40" height="40"><use href="#search"/></svg>Поиск</div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#C0705F">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Айгерим Сериковна</span><span class="rtime">14:32</span></div><div class="rbot"><span class="rmsg">Здравствуйте! Есть фильтр на Camry 2018?</span><span class="ubadge">3</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#5E8B7E">Д</div></div><div class="rtx"><div class="rtop"><span class="rname">Данияр</span><span class="rtime">13:58</span></div><div class="rbot"><span class="rmsg">Спасибо, оформил заказ 👍</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#7B6BA8">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Магазин «Автомир»</span><span class="rtime">12:10</span></div><div class="rbot"><span class="rmsg">Отправьте, пожалуйста, прайс</span><span class="ubadge">1</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#A8794A">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Асель</span><span class="rtime">11:47</span></div><div class="rbot"><span class="rmsg">А доставка по Алматы сколько стоит?</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#4F7CA3">Н</div></div><div class="rtx"><div class="rtop"><span class="rname">Нурлан Ж.</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Понял, жду счёт</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#9C5F76">М</div></div><div class="rtx"><div class="rtop"><span class="rname">Мадина</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Добрый день!</span></div></div></div>
+        </div>
+        <div class="nav"><div class="on"><svg width="60" height="60"><use href="#i-chat"/></svg>Чаты</div><div><svg width="60" height="60"><use href="#i-chart"/></svg>Сводка</div><div><svg width="60" height="60"><use href="#i-bot"/></svg>Боты</div><div><svg width="60" height="60"><use href="#i-user"/></svg>Профиль</div></div>
+      </div></div></div></div>
+    </div>
+
+    <div class="notes">
+      <ul>
+        <li><b>Шапка 250 ед.</b> Из них ~100 съедает статус-бар, значит на управление остаётся 150.</li>
+        <li><b>Четыре акцента в одной полосе</b> <span class="mono">#25D366</span>, <span class="mono">#2AABEE</span>, <span class="mono">#2FB344</span>, <span class="mono">#007AFF</span> — и ни один не связан с новым <span class="mono">#243A7A</span>.</li>
+        <li><b>Имя бота обрезается</b> Левая зона 360 ед. минус аватар 84 и шеврон 32 — на имя остаётся ~230.</li>
+        <li><b>Тумблер врёт</b> Оба направления открывают <span class="mono">ReplyModeConfirmPopup</span>. Форма «щёлк» обещает мгновенность, которой нет.</li>
+        <li><b>Пилюля кричит</b> Заливка бренда во всю ширину сегмента — самое яркое пятно экрана уходит на фильтр, а не на список.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== V1 ============================== -->
+<section id="v1">
+  <div class="shead"><span class="snum">ВАРИАНТ 1</span><h2>Два этажа <span class="ru">· каждому по своему весу</span></h2></div>
+  <p class="idea">Принцип: <strong>ранг решает всё.</strong> Личность бота — крупнее всех (46 ед.), потому что это область. Канал — широкий утопленный сегмент во всю ширину: он читается как «границы того, что ниже». Режим — маленькая плашка-статус, а не тумблер, потому что менять его всё равно через подтверждение.</p>
+  <div class="tags"><span class="tag mark">Цвет: палитра приложения</span><span class="tag">Шапка 400 ед.</span><span class="tag ok">Имя бота не обрезается</span><span class="tag warn">+150 ед. высоты</span></div>
+
+  <div class="split">
+    <div class="stage">
+      <div class="unit"><span class="ulabel">Светлая</span><div class="bezel"><div class="pw"><div class="phone ph-light">
+        <div class="bar" style="height:400px">
+          <div class="sb"><span>9:41</span><span class="r"><span class="bars"><i style="height:10px"></i><i style="height:15px"></i><i style="height:20px"></i><i style="height:26px"></i></span><span class="bat"></span></span></div>
+          <div class="tier" style="height:156px;justify-content:space-between;gap:24px">
+            <div class="bot">
+              <div class="av" style="width:88px;height:88px;font-size:36px;background:#B08048">А</div>
+              <span class="nm" style="font-size:46px">Автозапчасти KZ</span>
+              <svg class="chev" width="28" height="28"><use href="#chev"/></svg>
+            </div>
+            <div class="mchip auto"><span class="dot"></span>Авто</div>
+          </div>
+          <div class="tier" style="height:144px;padding:0 40px">
+            <div class="seg" style="flex:1">
+              <div class="on"><span class="gdot" style="background:var(--wa)"></span>WhatsApp<span class="cnt">4</span></div>
+              <div><span class="gdot" style="background:var(--tg);opacity:.4"></span>Telegram</div>
+            </div>
+          </div>
+        </div>
+        <div class="list">
+          <div class="search"><div class="pill"><svg width="40" height="40"><use href="#search"/></svg>Поиск</div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#C0705F">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Айгерим Сериковна</span><span class="rtime">14:32</span></div><div class="rbot"><span class="rmsg">Здравствуйте! Есть фильтр на Camry 2018?</span><span class="ubadge">3</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#5E8B7E">Д</div></div><div class="rtx"><div class="rtop"><span class="rname">Данияр</span><span class="rtime">13:58</span></div><div class="rbot"><span class="rmsg">Спасибо, оформил заказ 👍</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#7B6BA8">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Магазин «Автомир»</span><span class="rtime">12:10</span></div><div class="rbot"><span class="rmsg">Отправьте, пожалуйста, прайс</span><span class="ubadge">1</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#A8794A">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Асель</span><span class="rtime">11:47</span></div><div class="rbot"><span class="rmsg">А доставка по Алматы сколько стоит?</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#4F7CA3">Н</div></div><div class="rtx"><div class="rtop"><span class="rname">Нурлан Ж.</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Понял, жду счёт</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#9C5F76">М</div></div><div class="rtx"><div class="rtop"><span class="rname">Мадина</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Добрый день!</span></div></div></div>
+        </div>
+        <div class="nav"><div class="on"><svg width="60" height="60"><use href="#i-chat"/></svg>Чаты</div><div><svg width="60" height="60"><use href="#i-chart"/></svg>Сводка</div><div><svg width="60" height="60"><use href="#i-bot"/></svg>Боты</div><div><svg width="60" height="60"><use href="#i-user"/></svg>Профиль</div></div>
+      </div></div></div></div>
+
+      <div class="unit"><span class="ulabel">Тёмная</span><div class="bezel"><div class="pw"><div class="phone ph-dark">
+        <div class="bar" style="height:400px">
+          <div class="sb"><span>9:41</span><span class="r"><span class="bars"><i style="height:10px"></i><i style="height:15px"></i><i style="height:20px"></i><i style="height:26px"></i></span><span class="bat"></span></span></div>
+          <div class="tier" style="height:156px;justify-content:space-between;gap:24px">
+            <div class="bot">
+              <div class="av" style="width:88px;height:88px;font-size:36px;background:#B08048">А</div>
+              <span class="nm" style="font-size:46px">Автозапчасти KZ</span>
+              <svg class="chev" width="28" height="28"><use href="#chev"/></svg>
+            </div>
+            <div class="mchip auto"><span class="dot"></span>Авто</div>
+          </div>
+          <div class="tier" style="height:144px;padding:0 40px">
+            <div class="seg" style="flex:1">
+              <div class="on"><span class="gdot" style="background:var(--wa)"></span>WhatsApp<span class="cnt">4</span></div>
+              <div><span class="gdot" style="background:var(--tg);opacity:.4"></span>Telegram</div>
+            </div>
+          </div>
+        </div>
+        <div class="list">
+          <div class="search"><div class="pill"><svg width="40" height="40"><use href="#search"/></svg>Поиск</div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#C0705F">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Айгерим Сериковна</span><span class="rtime">14:32</span></div><div class="rbot"><span class="rmsg">Здравствуйте! Есть фильтр на Camry 2018?</span><span class="ubadge">3</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#5E8B7E">Д</div></div><div class="rtx"><div class="rtop"><span class="rname">Данияр</span><span class="rtime">13:58</span></div><div class="rbot"><span class="rmsg">Спасибо, оформил заказ 👍</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#7B6BA8">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Магазин «Автомир»</span><span class="rtime">12:10</span></div><div class="rbot"><span class="rmsg">Отправьте, пожалуйста, прайс</span><span class="ubadge">1</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#A8794A">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Асель</span><span class="rtime">11:47</span></div><div class="rbot"><span class="rmsg">А доставка по Алматы сколько стоит?</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#4F7CA3">Н</div></div><div class="rtx"><div class="rtop"><span class="rname">Нурлан Ж.</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Понял, жду счёт</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#9C5F76">М</div></div><div class="rtx"><div class="rtop"><span class="rname">Мадина</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Добрый день!</span></div></div></div>
+        </div>
+        <div class="nav"><div class="on"><svg width="60" height="60"><use href="#i-chat"/></svg>Чаты</div><div><svg width="60" height="60"><use href="#i-chart"/></svg>Сводка</div><div><svg width="60" height="60"><use href="#i-bot"/></svg>Боты</div><div><svg width="60" height="60"><use href="#i-user"/></svg>Профиль</div></div>
+      </div></div></div></div>
+    </div>
+
+    <div class="notes">
+      <ul>
+        <li><b>Этаж 1 — 156 ед.</b> Аватар 88, имя 46 полужирным, шеврон 28. Вся связка — одна цель нажатия.</li>
+        <li><b>Этаж 2 — 144 ед.</b> Сегмент 1000×96, радиус 48, утоплен в <span class="mono">background</span> с внутренней обводкой <span class="mono">hairline</span>.</li>
+        <li><b>Выбранный сегмент</b> — белая карточка <span class="mono">surface</span> с мягкой тенью. Физическая метафора вместо цветной заливки; синий <span class="mono">#243A7A</span> остаётся за действиями.</li>
+        <li><b>Бренд = точка 20 ед.</b> Узнаваемость сохраняется, громкость — нет. Невыбранная точка на 40 % прозрачности.</li>
+        <li><b>Счётчик в сегменте</b> «WhatsApp 4» — число непрочитанных прямо в фильтре, видно ещё до переключения.</li>
+        <li><b>Режим — плашка-статус</b> <span class="mono">positiveBg</span> / <span class="mono">positiveInk</span> для «Авто», <span class="mono">accentSoft</span> / <span class="mono">accentText</span> для «Вместе». Нажатие открывает тот же диалог, что и сейчас.</li>
+      </ul>
+      <dl class="cost">
+        <dt>Что переделывать</dt>
+        <dd><span class="mono">ChannelSwitcherBuilder</span> — новая геометрия и снятие фирменных заливок. <span class="mono">ReplyModeToggleBinder</span> — форма меняется с ползунка на плашку, логика и <span class="mono">PlayerPrefs</span> те же.</dd>
+        <dt>Риск</dt>
+        <dd>Шапка выше на 150 ед. — это ~¾ строки чата. Список начинается ниже.</dd>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== V2 ============================== -->
+<section id="v2">
+  <div class="shead"><span class="snum">ВАРИАНТ 2</span><h2>Вкладки <span class="ru">· родной язык мессенджеров</span></h2></div>
+  <p class="idea">Принцип: <strong>канал — это не фильтр, а вкладка.</strong> Самый привычный паттерн: имя бота по центру как заголовок экрана, под ним две вкладки с подчёркиванием. Фирменный цвет живёт ровно в двух местах — полоска подчёркивания и счётчик непрочитанных, по 7 и 40 ед. соответственно.</p>
+  <div class="tags"><span class="tag mark">Цвет: бренд как индикатор</span><span class="tag">Шапка 380 ед.</span><span class="tag ok">Знакомый жест — свайп между вкладками</span><span class="tag warn">Заголовок по центру спорит с плашкой справа</span></div>
+
+  <div class="split">
+    <div class="stage">
+      <div class="unit"><span class="ulabel">Светлая</span><div class="bezel"><div class="pw"><div class="phone ph-light">
+        <div class="bar" style="height:380px">
+          <div class="sb"><span>9:41</span><span class="r"><span class="bars"><i style="height:10px"></i><i style="height:15px"></i><i style="height:20px"></i><i style="height:26px"></i></span><span class="bat"></span></span></div>
+          <div class="tier" style="height:150px;position:relative;justify-content:center">
+            <div class="bot" style="gap:16px">
+              <div class="av" style="width:76px;height:76px;font-size:32px;background:#B08048">А</div>
+              <span class="nm" style="font-size:46px">Автозапчасти KZ</span>
+              <svg class="chev" width="28" height="28"><use href="#chev"/></svg>
+            </div>
+            <div class="mchip outline" style="position:absolute;right:40px"><span class="dot"></span>Авто</div>
+          </div>
+          <div class="tier" style="height:130px;padding:0">
+            <div class="tabs">
+              <div class="on"><span class="lbl">WhatsApp<span class="badge-i" style="background:rgba(37,211,102,.16);color:#0E7A3E">4</span></span><span class="u" style="background:var(--wa)"></span></div>
+              <div><span class="lbl">Telegram</span><span class="u"></span></div>
+            </div>
+          </div>
+        </div>
+        <div class="list">
+          <div class="search"><div class="pill"><svg width="40" height="40"><use href="#search"/></svg>Поиск</div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#C0705F">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Айгерим Сериковна</span><span class="rtime">14:32</span></div><div class="rbot"><span class="rmsg">Здравствуйте! Есть фильтр на Camry 2018?</span><span class="ubadge">3</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#5E8B7E">Д</div></div><div class="rtx"><div class="rtop"><span class="rname">Данияр</span><span class="rtime">13:58</span></div><div class="rbot"><span class="rmsg">Спасибо, оформил заказ 👍</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#7B6BA8">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Магазин «Автомир»</span><span class="rtime">12:10</span></div><div class="rbot"><span class="rmsg">Отправьте, пожалуйста, прайс</span><span class="ubadge">1</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#A8794A">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Асель</span><span class="rtime">11:47</span></div><div class="rbot"><span class="rmsg">А доставка по Алматы сколько стоит?</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#4F7CA3">Н</div></div><div class="rtx"><div class="rtop"><span class="rname">Нурлан Ж.</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Понял, жду счёт</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#9C5F76">М</div></div><div class="rtx"><div class="rtop"><span class="rname">Мадина</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Добрый день!</span></div></div></div>
+        </div>
+        <div class="nav"><div class="on"><svg width="60" height="60"><use href="#i-chat"/></svg>Чаты</div><div><svg width="60" height="60"><use href="#i-chart"/></svg>Сводка</div><div><svg width="60" height="60"><use href="#i-bot"/></svg>Боты</div><div><svg width="60" height="60"><use href="#i-user"/></svg>Профиль</div></div>
+      </div></div></div></div>
+
+      <div class="unit"><span class="ulabel">Тёмная · вкладка Telegram</span><div class="bezel"><div class="pw"><div class="phone ph-dark">
+        <div class="bar" style="height:380px">
+          <div class="sb"><span>9:41</span><span class="r"><span class="bars"><i style="height:10px"></i><i style="height:15px"></i><i style="height:20px"></i><i style="height:26px"></i></span><span class="bat"></span></span></div>
+          <div class="tier" style="height:150px;position:relative;justify-content:center">
+            <div class="bot" style="gap:16px">
+              <div class="av" style="width:76px;height:76px;font-size:32px;background:#B08048">А</div>
+              <span class="nm" style="font-size:46px">Автозапчасти KZ</span>
+              <svg class="chev" width="28" height="28"><use href="#chev"/></svg>
+            </div>
+            <div class="mchip outline" style="position:absolute;right:40px"><span class="dot"></span>Авто</div>
+          </div>
+          <div class="tier" style="height:130px;padding:0">
+            <div class="tabs">
+              <div><span class="lbl">WhatsApp<span class="badge-i" style="background:rgba(37,211,102,.18);color:#3FD98A">4</span></span><span class="u"></span></div>
+              <div class="on"><span class="lbl">Telegram</span><span class="u" style="background:var(--tg)"></span></div>
+            </div>
+          </div>
+        </div>
+        <div class="list">
+          <div class="search"><div class="pill"><svg width="40" height="40"><use href="#search"/></svg>Поиск</div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#4F7CA3">Т</div></div><div class="rtx"><div class="rtop"><span class="rname">Тимур Ак.</span><span class="rtime">14:05</span></div><div class="rbot"><span class="rmsg">Скиньте каталог, пожалуйста</span><span class="ubadge">2</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#9C5F76">Ж</div></div><div class="rtx"><div class="rtop"><span class="rname">Жанна</span><span class="rtime">13:20</span></div><div class="rbot"><span class="rmsg">Хорошо, приеду к 18:00</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#5E8B7E">С</div></div><div class="rtx"><div class="rtop"><span class="rname">СТО «Барыс»</span><span class="rtime">11:02</span></div><div class="rbot"><span class="rmsg">Есть колодки на Sonata?</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#7B6BA8">Е</div></div><div class="rtx"><div class="rtop"><span class="rname">Ерлан</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Спасибо!</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#A8794A">К</div></div><div class="rtx"><div class="rtop"><span class="rname">Камила</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Подскажите режим работы</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#C0705F">Б</div></div><div class="rtx"><div class="rtop"><span class="rname">Бекзат</span><span class="rtime">пн</span></div><div class="rbot"><span class="rmsg">Оплатил, жду отправку</span></div></div></div>
+        </div>
+        <div class="nav"><div class="on"><svg width="60" height="60"><use href="#i-chat"/></svg>Чаты</div><div><svg width="60" height="60"><use href="#i-chart"/></svg>Сводка</div><div><svg width="60" height="60"><use href="#i-bot"/></svg>Боты</div><div><svg width="60" height="60"><use href="#i-user"/></svg>Профиль</div></div>
+      </div></div></div></div>
+    </div>
+
+    <div class="notes">
+      <ul>
+        <li><b>Вкладки 130 ед.</b> Подпись 34 полужирным, подчёркивание 150×7, радиус 4. Анимация — сдвиг полоски за 0,22 с.</li>
+        <li><b>Счётчик у вкладки</b> 40 ед. высотой, фон = бренд на 16 %, текст — затемнённый бренд. Видно, где ждут ответа, не переключаясь.</li>
+        <li><b>Свайп между каналами</b> Вкладки оправдывают горизонтальный свайп списка — жест, которого сейчас нет.</li>
+        <li><b>Плашка режима — контурная</b> Чтобы не спорить с центрированным заголовком, здесь она без заливки: обводка <span class="mono">border</span> 3 ед.</li>
+        <li><b>Оговорка</b> Заголовок по центру + элемент справа — асимметрия. Если имя длинное, оно съедет; нужен клэмп по ширине как сейчас.</li>
+      </ul>
+      <dl class="cost">
+        <dt>Что переделывать</dt>
+        <dd>Тот же объём, что в варианте 1, плюс горизонтальный свайп списка, если брать жест. Счётчики по каналам требуют читать непрочитанные обоих профилей — данные уже есть в кэше.</dd>
+        <dt>Риск</dt>
+        <dd>Вкладки читаются как «разделы приложения». Пользователь может решить, что Telegram — это другой экран, а не другой канал того же бота.</dd>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== V3 ============================== -->
+<section id="v3">
+  <div class="shead"><span class="snum">ВАРИАНТ 3</span><h2>Одна строка <span class="ru">· шапка ниже, чем сейчас</span></h2></div>
+  <p class="idea">Принцип: <strong>верните высоту списку.</strong> Шапка сжимается до 240 ед. — на 10 меньше сегодняшней. Канал становится парой круглых кнопок (единственное место, где фирменная заливка уместна: она маленькая и не спорит с типографикой). Режим уезжает в полосу-предложение под шапкой, которая уходит вверх при прокрутке — то есть высоту не занимает.</p>
+  <div class="tags"><span class="tag mark">Цвет: фирменная заливка, но мелко</span><span class="tag ok">Шапка 240 ед. — меньше нынешней</span><span class="tag ok">Режим объяснён словами</span><span class="tag warn">Иконки без подписи</span></div>
+
+  <div class="split">
+    <div class="stage">
+      <div class="unit"><span class="ulabel">Светлая</span><div class="bezel"><div class="pw"><div class="phone ph-light">
+        <div class="bar" style="height:240px">
+          <div class="sb"><span>9:41</span><span class="r"><span class="bars"><i style="height:10px"></i><i style="height:15px"></i><i style="height:20px"></i><i style="height:26px"></i></span><span class="bat"></span></span></div>
+          <div class="tier" style="height:140px;justify-content:space-between;gap:20px">
+            <div class="bot" style="gap:22px">
+              <div style="position:relative;flex:0 0 auto">
+                <div class="av" style="width:96px;height:96px;font-size:38px;background:#B08048">А</div>
+                <span class="cbadge" style="width:34px;height:34px;background:var(--wa);box-shadow:0 0 0 5px var(--surface)"></span>
+              </div>
+              <div style="min-width:0">
+                <div class="nm" style="font-size:44px;display:flex;align-items:center;gap:12px">Автозапчасти KZ<svg class="chev" width="26" height="26"><use href="#chev"/></svg></div>
+                <div class="sub">6 чатов · 4 новых</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:16px;flex:0 0 auto">
+              <div class="iconbtn on" style="background:var(--wa)"><svg width="46" height="46"><use href="#wa"/></svg></div>
+              <div class="iconbtn"><svg width="46" height="46"><use href="#tg"/></svg></div>
+            </div>
+          </div>
+        </div>
+        <div class="list">
+          <div class="strip" style="background:var(--pos-bg)"><span style="color:var(--pos-ink)">Бот отвечает клиентам сам</span><span class="act" style="color:var(--pos-ink)">Изменить</span></div>
+          <div class="search"><div class="pill"><svg width="40" height="40"><use href="#search"/></svg>Поиск</div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#C0705F">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Айгерим Сериковна</span><span class="rtime">14:32</span></div><div class="rbot"><span class="rmsg">Здравствуйте! Есть фильтр на Camry 2018?</span><span class="ubadge">3</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#5E8B7E">Д</div></div><div class="rtx"><div class="rtop"><span class="rname">Данияр</span><span class="rtime">13:58</span></div><div class="rbot"><span class="rmsg">Спасибо, оформил заказ 👍</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#7B6BA8">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Магазин «Автомир»</span><span class="rtime">12:10</span></div><div class="rbot"><span class="rmsg">Отправьте, пожалуйста, прайс</span><span class="ubadge">1</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#A8794A">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Асель</span><span class="rtime">11:47</span></div><div class="rbot"><span class="rmsg">А доставка по Алматы сколько стоит?</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#4F7CA3">Н</div></div><div class="rtx"><div class="rtop"><span class="rname">Нурлан Ж.</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Понял, жду счёт</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#9C5F76">М</div></div><div class="rtx"><div class="rtop"><span class="rname">Мадина</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Добрый день!</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#6E8AA5">Р</div></div><div class="rtx"><div class="rtop"><span class="rname">Рустем</span><span class="rtime">пн</span></div><div class="rbot"><span class="rmsg">Добавьте в чёрный список, спасибо</span></div></div></div>
+        </div>
+        <div class="nav"><div class="on"><svg width="60" height="60"><use href="#i-chat"/></svg>Чаты</div><div><svg width="60" height="60"><use href="#i-chart"/></svg>Сводка</div><div><svg width="60" height="60"><use href="#i-bot"/></svg>Боты</div><div><svg width="60" height="60"><use href="#i-user"/></svg>Профиль</div></div>
+      </div></div></div></div>
+
+      <div class="unit"><span class="ulabel">Тёмная · режим «Вместе»</span><div class="bezel"><div class="pw"><div class="phone ph-dark">
+        <div class="bar" style="height:240px">
+          <div class="sb"><span>9:41</span><span class="r"><span class="bars"><i style="height:10px"></i><i style="height:15px"></i><i style="height:20px"></i><i style="height:26px"></i></span><span class="bat"></span></span></div>
+          <div class="tier" style="height:140px;justify-content:space-between;gap:20px">
+            <div class="bot" style="gap:22px">
+              <div style="position:relative;flex:0 0 auto">
+                <div class="av" style="width:96px;height:96px;font-size:38px;background:#B08048">А</div>
+                <span class="cbadge" style="width:34px;height:34px;background:var(--wa);box-shadow:0 0 0 5px var(--surface)"></span>
+              </div>
+              <div style="min-width:0">
+                <div class="nm" style="font-size:44px;display:flex;align-items:center;gap:12px">Автозапчасти KZ<svg class="chev" width="26" height="26"><use href="#chev"/></svg></div>
+                <div class="sub">6 чатов · 4 новых</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:16px;flex:0 0 auto">
+              <div class="iconbtn on" style="background:var(--wa)"><svg width="46" height="46"><use href="#wa"/></svg></div>
+              <div class="iconbtn"><svg width="46" height="46"><use href="#tg"/></svg></div>
+            </div>
+          </div>
+        </div>
+        <div class="list">
+          <div class="strip" style="background:var(--accent-soft)"><span style="color:var(--accent-text)">Бот предлагает ответы — отправляете вы</span><span class="act">Изменить</span></div>
+          <div class="search"><div class="pill"><svg width="40" height="40"><use href="#search"/></svg>Поиск</div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#C0705F">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Айгерим Сериковна</span><span class="rtime">14:32</span></div><div class="rbot"><span class="rmsg">Здравствуйте! Есть фильтр на Camry 2018?</span><span class="ubadge">3</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#5E8B7E">Д</div></div><div class="rtx"><div class="rtop"><span class="rname">Данияр</span><span class="rtime">13:58</span></div><div class="rbot"><span class="rmsg">Спасибо, оформил заказ 👍</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#7B6BA8">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Магазин «Автомир»</span><span class="rtime">12:10</span></div><div class="rbot"><span class="rmsg">Отправьте, пожалуйста, прайс</span><span class="ubadge">1</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#A8794A">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Асель</span><span class="rtime">11:47</span></div><div class="rbot"><span class="rmsg">А доставка по Алматы сколько стоит?</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#4F7CA3">Н</div></div><div class="rtx"><div class="rtop"><span class="rname">Нурлан Ж.</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Понял, жду счёт</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#9C5F76">М</div></div><div class="rtx"><div class="rtop"><span class="rname">Мадина</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Добрый день!</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#6E8AA5">Р</div></div><div class="rtx"><div class="rtop"><span class="rname">Рустем</span><span class="rtime">пн</span></div><div class="rbot"><span class="rmsg">Добавьте в чёрный список, спасибо</span></div></div></div>
+        </div>
+        <div class="nav"><div class="on"><svg width="60" height="60"><use href="#i-chat"/></svg>Чаты</div><div><svg width="60" height="60"><use href="#i-chart"/></svg>Сводка</div><div><svg width="60" height="60"><use href="#i-bot"/></svg>Боты</div><div><svg width="60" height="60"><use href="#i-user"/></svg>Профиль</div></div>
+      </div></div></div></div>
+    </div>
+
+    <div class="notes">
+      <ul>
+        <li><b>Шапка 240 ед.</b> На 10 ед. ниже сегодняшней и при этом вмещает больше смысла.</li>
+        <li><b>Подстрочник под именем</b> «6 чатов · 4 новых» — 26 ед., <span class="mono">inkTertiary</span>. Аватар получает микро-значок канала 34 ед. с кольцом 5 ед. в цвете <span class="mono">surface</span>.</li>
+        <li><b>Кнопки канала 84 ед.</b> Активная — фирменная заливка с белым глифом, неактивная — <span class="mono">background</span> с обводкой. Цель нажатия 84 ед. ≈ 28 dp; на грани, но выше порога 44 pt по факту рендера.</li>
+        <li><b>Полоса режима — предложение</b> «Бот отвечает клиентам сам» / «Бот предлагает ответы — отправляете вы». Пользователь читает следствие, а не название режима.</li>
+        <li><b>Полоса прокручивается</b> Она — первый элемент содержимого, а не часть шапки. Постоянной высоты не занимает.</li>
+      </ul>
+      <dl class="cost">
+        <dt>Что переделывать</dt>
+        <dd>Больше всего перекладок: <span class="mono">ReplyModeToggleBinder</span> переезжает из <span class="mono">TopBar/RightZone</span> в содержимое скролла. Нужен новый элемент-полоса и подсчёт «6 чатов · 4 новых».</dd>
+        <dt>Риск</dt>
+        <dd>Два глифа без подписей. WhatsApp и Telegram узнаются мгновенно — но неактивная кнопка серая, и «какой сейчас включён» читается только по заливке.</dd>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== V4 ============================== -->
+<section id="v4">
+  <div class="shead"><span class="snum">ВАРИАНТ 4</span><h2>Фильтры в ленте <span class="ru">· шапка только про бота</span></h2></div>
+  <p class="idea">Принцип: <strong>шапка — это подпись экрана, а не панель управления.</strong> В ней остаётся только бот, зато крупно и с воздухом (имя 50 ед. — самое большое из всех вариантов). Канал и режим спускаются в ленту как чипы-фильтры вместе с ещё одним полезным — «Непрочитанные». Здесь фирменная заливка звучит громче всего, и это допустимо: чипы маленькие и уезжают при прокрутке.</p>
+  <div class="tags"><span class="tag mark">Цвет: полная фирменная заливка</span><span class="tag ok">Шапка 240 ед.</span><span class="tag ok">Место под будущие фильтры</span><span class="tag warn">Состояние канала уезжает при прокрутке</span></div>
+
+  <div class="split">
+    <div class="stage">
+      <div class="unit"><span class="ulabel">Светлая</span><div class="bezel"><div class="pw"><div class="phone ph-light">
+        <div class="bar" style="height:240px">
+          <div class="sb"><span>9:41</span><span class="r"><span class="bars"><i style="height:10px"></i><i style="height:15px"></i><i style="height:20px"></i><i style="height:26px"></i></span><span class="bat"></span></span></div>
+          <div class="tier" style="height:140px;justify-content:space-between;gap:20px;padding:0 40px 0 48px">
+            <div class="bot" style="gap:24px">
+              <div style="position:relative;flex:0 0 auto">
+                <div class="av" style="width:104px;height:104px;font-size:42px;background:#B08048">А</div>
+                <span class="cbadge" style="width:36px;height:36px;background:var(--wa);box-shadow:0 0 0 5px var(--surface)"></span>
+              </div>
+              <span class="nm" style="font-size:50px">Автозапчасти KZ</span>
+              <svg class="chev" width="30" height="30"><use href="#chev"/></svg>
+            </div>
+            <div class="iconbtn" style="flex:0 0 auto"><svg width="44" height="44"><use href="#plus"/></svg></div>
+          </div>
+        </div>
+        <div class="list">
+          <div class="chips">
+            <span class="chip on" style="background:var(--wa)"><svg width="34" height="34"><use href="#wa"/></svg>WhatsApp<span class="n">4</span></span>
+            <span class="chip"><svg width="34" height="34" style="color:var(--tg)"><use href="#tg"/></svg>Telegram</span>
+            <span class="chipdiv"></span>
+            <span class="chip" style="background:var(--pos-bg);color:var(--pos-ink);box-shadow:none"><span class="gdot" style="background:currentColor"></span>Авто</span>
+            <span class="chip">Непрочит.</span>
+          </div>
+          <div class="search"><div class="pill"><svg width="40" height="40"><use href="#search"/></svg>Поиск</div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#C0705F">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Айгерим Сериковна</span><span class="rtime">14:32</span></div><div class="rbot"><span class="rmsg">Здравствуйте! Есть фильтр на Camry 2018?</span><span class="ubadge">3</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#5E8B7E">Д</div></div><div class="rtx"><div class="rtop"><span class="rname">Данияр</span><span class="rtime">13:58</span></div><div class="rbot"><span class="rmsg">Спасибо, оформил заказ 👍</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#7B6BA8">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Магазин «Автомир»</span><span class="rtime">12:10</span></div><div class="rbot"><span class="rmsg">Отправьте, пожалуйста, прайс</span><span class="ubadge">1</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#A8794A">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Асель</span><span class="rtime">11:47</span></div><div class="rbot"><span class="rmsg">А доставка по Алматы сколько стоит?</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#4F7CA3">Н</div></div><div class="rtx"><div class="rtop"><span class="rname">Нурлан Ж.</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Понял, жду счёт</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#9C5F76">М</div></div><div class="rtx"><div class="rtop"><span class="rname">Мадина</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Добрый день!</span></div></div></div>
+        </div>
+        <div class="nav"><div class="on"><svg width="60" height="60"><use href="#i-chat"/></svg>Чаты</div><div><svg width="60" height="60"><use href="#i-chart"/></svg>Сводка</div><div><svg width="60" height="60"><use href="#i-bot"/></svg>Боты</div><div><svg width="60" height="60"><use href="#i-user"/></svg>Профиль</div></div>
+      </div></div></div></div>
+
+      <div class="unit"><span class="ulabel">Тёмная</span><div class="bezel"><div class="pw"><div class="phone ph-dark">
+        <div class="bar" style="height:240px">
+          <div class="sb"><span>9:41</span><span class="r"><span class="bars"><i style="height:10px"></i><i style="height:15px"></i><i style="height:20px"></i><i style="height:26px"></i></span><span class="bat"></span></span></div>
+          <div class="tier" style="height:140px;justify-content:space-between;gap:20px;padding:0 40px 0 48px">
+            <div class="bot" style="gap:24px">
+              <div style="position:relative;flex:0 0 auto">
+                <div class="av" style="width:104px;height:104px;font-size:42px;background:#B08048">А</div>
+                <span class="cbadge" style="width:36px;height:36px;background:var(--wa);box-shadow:0 0 0 5px var(--surface)"></span>
+              </div>
+              <span class="nm" style="font-size:50px">Автозапчасти KZ</span>
+              <svg class="chev" width="30" height="30"><use href="#chev"/></svg>
+            </div>
+            <div class="iconbtn" style="flex:0 0 auto"><svg width="44" height="44"><use href="#plus"/></svg></div>
+          </div>
+        </div>
+        <div class="list">
+          <div class="chips">
+            <span class="chip on" style="background:var(--wa)"><svg width="34" height="34"><use href="#wa"/></svg>WhatsApp<span class="n">4</span></span>
+            <span class="chip"><svg width="34" height="34" style="color:var(--tg)"><use href="#tg"/></svg>Telegram</span>
+            <span class="chipdiv"></span>
+            <span class="chip" style="background:var(--pos-bg);color:var(--pos-ink);box-shadow:none"><span class="gdot" style="background:currentColor"></span>Авто</span>
+            <span class="chip">Непрочит.</span>
+          </div>
+          <div class="search"><div class="pill"><svg width="40" height="40"><use href="#search"/></svg>Поиск</div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#C0705F">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Айгерим Сериковна</span><span class="rtime">14:32</span></div><div class="rbot"><span class="rmsg">Здравствуйте! Есть фильтр на Camry 2018?</span><span class="ubadge">3</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#5E8B7E">Д</div></div><div class="rtx"><div class="rtop"><span class="rname">Данияр</span><span class="rtime">13:58</span></div><div class="rbot"><span class="rmsg">Спасибо, оформил заказ 👍</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#7B6BA8">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Магазин «Автомир»</span><span class="rtime">12:10</span></div><div class="rbot"><span class="rmsg">Отправьте, пожалуйста, прайс</span><span class="ubadge">1</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#A8794A">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Асель</span><span class="rtime">11:47</span></div><div class="rbot"><span class="rmsg">А доставка по Алматы сколько стоит?</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#4F7CA3">Н</div></div><div class="rtx"><div class="rtop"><span class="rname">Нурлан Ж.</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Понял, жду счёт</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#9C5F76">М</div></div><div class="rtx"><div class="rtop"><span class="rname">Мадина</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Добрый день!</span></div></div></div>
+        </div>
+        <div class="nav"><div class="on"><svg width="60" height="60"><use href="#i-chat"/></svg>Чаты</div><div><svg width="60" height="60"><use href="#i-chart"/></svg>Сводка</div><div><svg width="60" height="60"><use href="#i-bot"/></svg>Боты</div><div><svg width="60" height="60"><use href="#i-user"/></svg>Профиль</div></div>
+      </div></div></div></div>
+    </div>
+
+    <div class="notes">
+      <ul>
+        <li><b>Имя бота 50 ед.</b> Самое крупное из всех вариантов — экран однозначно «про этого бота».</li>
+        <li><b>Чипы 84 ед.</b> Радиус 42, отступы 32, промежуток 16. Разделитель 3×48 отделяет «что показать» от «как отвечает».</li>
+        <li><b>Ряд растяжимый</b> Сюда без перестройки лягут «Заказы», «Ждут ответа», «Диалог идёт» — статусы из «Сводки» уже есть.</li>
+        <li><b>Микро-значок на аватаре</b> компенсирует уезжающие чипы: активный канал виден в шапке всегда.</li>
+        <li><b>Кнопка «+»</b> Заготовка под «новый чат» — <span class="mono">NewChatButton</span> в сцене уже есть, просто выключена.</li>
+      </ul>
+      <dl class="cost">
+        <dt>Что переделывать</dt>
+        <dd>Новый горизонтальный ряд чипов в содержимом скролла над <span class="mono">ChatsSearchBar</span>. <span class="mono">ChannelSwitcherView</span> перевешивается на чип. Логика фильтров — та же, что и сейчас.</dd>
+        <dt>Риск</dt>
+        <dd>Прокрутил вниз — не видишь, какой канал открыт. Значок на аватаре чинит это, но он мелкий (36 ед.).</dd>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== V5 ============================== -->
+<section id="v5">
+  <div class="shead"><span class="snum">ВАРИАНТ 5</span><h2>Единый список <span class="ru">· переключателя каналов нет вообще</span></h2></div>
+  <p class="idea">Принцип: <strong>уберите вопрос, а не улучшайте ответ.</strong> Владельцу бизнеса не важно, откуда пришло сообщение — важно, что клиент ждёт. Один список, отсортированный по времени; канал живёт значком 46 ед. на аватаре. Режим переезжает в шторку ботов. В шапке остаются бот и кнопка фильтра — на случай, когда канал всё-таки нужен.</p>
+  <div class="tags"><span class="tag mark">Цвет: бренд только на значке строки</span><span class="tag ok">Шапка 240 ед., ноль переключателей</span><span class="tag ok">Ни один клиент не потеряется во второй вкладке</span><span class="tag warn">Требует правок в слое данных</span></div>
+
+  <div class="split">
+    <div class="stage">
+      <div class="unit"><span class="ulabel">Светлая</span><div class="bezel"><div class="pw"><div class="phone ph-light">
+        <div class="bar" style="height:240px">
+          <div class="sb"><span>9:41</span><span class="r"><span class="bars"><i style="height:10px"></i><i style="height:15px"></i><i style="height:20px"></i><i style="height:26px"></i></span><span class="bat"></span></span></div>
+          <div class="tier" style="height:140px;justify-content:space-between;gap:20px">
+            <div class="bot" style="gap:22px">
+              <div class="av" style="width:96px;height:96px;font-size:38px;background:#B08048">А</div>
+              <div style="min-width:0">
+                <div class="nm" style="font-size:44px;display:flex;align-items:center;gap:12px">Автозапчасти KZ<svg class="chev" width="26" height="26"><use href="#chev"/></svg></div>
+                <div class="sub" style="display:flex;align-items:center;gap:10px"><span class="gdot" style="width:16px;height:16px;background:var(--wa)"></span>WhatsApp<span style="opacity:.5">·</span><span class="gdot" style="width:16px;height:16px;background:var(--tg)"></span>Telegram</div>
+              </div>
+            </div>
+            <div class="iconbtn" style="flex:0 0 auto"><svg width="44" height="44"><use href="#filter"/></svg></div>
+          </div>
+        </div>
+        <div class="list">
+          <div class="search"><div class="pill"><svg width="40" height="40"><use href="#search"/></svg>Поиск по всем каналам</div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#C0705F">А</div><span class="cbadge" style="background:var(--wa);color:#fff"><svg width="26" height="26"><use href="#wa"/></svg></span></div><div class="rtx"><div class="rtop"><span class="rname">Айгерим Сериковна</span><span class="rtime">14:32</span></div><div class="rbot"><span class="rmsg">Здравствуйте! Есть фильтр на Camry 2018?</span><span class="ubadge">3</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#4F7CA3">Т</div><span class="cbadge" style="background:var(--tg);color:#fff"><svg width="26" height="26"><use href="#tg"/></svg></span></div><div class="rtx"><div class="rtop"><span class="rname">Тимур Ак.</span><span class="rtime">14:05</span></div><div class="rbot"><span class="rmsg">Скиньте каталог, пожалуйста</span><span class="ubadge">2</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#5E8B7E">Д</div><span class="cbadge" style="background:var(--wa);color:#fff"><svg width="26" height="26"><use href="#wa"/></svg></span></div><div class="rtx"><div class="rtop"><span class="rname">Данияр</span><span class="rtime">13:58</span></div><div class="rbot"><span class="rmsg">Спасибо, оформил заказ 👍</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#9C5F76">Ж</div><span class="cbadge" style="background:var(--tg);color:#fff"><svg width="26" height="26"><use href="#tg"/></svg></span></div><div class="rtx"><div class="rtop"><span class="rname">Жанна</span><span class="rtime">13:20</span></div><div class="rbot"><span class="rmsg">Хорошо, приеду к 18:00</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#7B6BA8">А</div><span class="cbadge" style="background:var(--wa);color:#fff"><svg width="26" height="26"><use href="#wa"/></svg></span></div><div class="rtx"><div class="rtop"><span class="rname">Магазин «Автомир»</span><span class="rtime">12:10</span></div><div class="rbot"><span class="rmsg">Отправьте, пожалуйста, прайс</span><span class="ubadge">1</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#5E8B7E">С</div><span class="cbadge" style="background:var(--tg);color:#fff"><svg width="26" height="26"><use href="#tg"/></svg></span></div><div class="rtx"><div class="rtop"><span class="rname">СТО «Барыс»</span><span class="rtime">11:02</span></div><div class="rbot"><span class="rmsg">Есть колодки на Sonata?</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#A8794A">А</div><span class="cbadge" style="background:var(--wa);color:#fff"><svg width="26" height="26"><use href="#wa"/></svg></span></div><div class="rtx"><div class="rtop"><span class="rname">Асель</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">А доставка по Алматы сколько стоит?</span></div></div></div>
+        </div>
+        <div class="nav"><div class="on"><svg width="60" height="60"><use href="#i-chat"/></svg>Чаты</div><div><svg width="60" height="60"><use href="#i-chart"/></svg>Сводка</div><div><svg width="60" height="60"><use href="#i-bot"/></svg>Боты</div><div><svg width="60" height="60"><use href="#i-user"/></svg>Профиль</div></div>
+      </div></div></div></div>
+
+      <div class="unit"><span class="ulabel">Тёмная</span><div class="bezel"><div class="pw"><div class="phone ph-dark">
+        <div class="bar" style="height:240px">
+          <div class="sb"><span>9:41</span><span class="r"><span class="bars"><i style="height:10px"></i><i style="height:15px"></i><i style="height:20px"></i><i style="height:26px"></i></span><span class="bat"></span></span></div>
+          <div class="tier" style="height:140px;justify-content:space-between;gap:20px">
+            <div class="bot" style="gap:22px">
+              <div class="av" style="width:96px;height:96px;font-size:38px;background:#B08048">А</div>
+              <div style="min-width:0">
+                <div class="nm" style="font-size:44px;display:flex;align-items:center;gap:12px">Автозапчасти KZ<svg class="chev" width="26" height="26"><use href="#chev"/></svg></div>
+                <div class="sub" style="display:flex;align-items:center;gap:10px"><span class="gdot" style="width:16px;height:16px;background:var(--wa)"></span>WhatsApp<span style="opacity:.5">·</span><span class="gdot" style="width:16px;height:16px;background:var(--tg)"></span>Telegram</div>
+              </div>
+            </div>
+            <div class="iconbtn" style="flex:0 0 auto"><svg width="44" height="44"><use href="#filter"/></svg></div>
+          </div>
+        </div>
+        <div class="list">
+          <div class="search"><div class="pill"><svg width="40" height="40"><use href="#search"/></svg>Поиск по всем каналам</div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#C0705F">А</div><span class="cbadge" style="background:var(--wa);color:#fff"><svg width="26" height="26"><use href="#wa"/></svg></span></div><div class="rtx"><div class="rtop"><span class="rname">Айгерим Сериковна</span><span class="rtime">14:32</span></div><div class="rbot"><span class="rmsg">Здравствуйте! Есть фильтр на Camry 2018?</span><span class="ubadge">3</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#4F7CA3">Т</div><span class="cbadge" style="background:var(--tg);color:#fff"><svg width="26" height="26"><use href="#tg"/></svg></span></div><div class="rtx"><div class="rtop"><span class="rname">Тимур Ак.</span><span class="rtime">14:05</span></div><div class="rbot"><span class="rmsg">Скиньте каталог, пожалуйста</span><span class="ubadge">2</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#5E8B7E">Д</div><span class="cbadge" style="background:var(--wa);color:#fff"><svg width="26" height="26"><use href="#wa"/></svg></span></div><div class="rtx"><div class="rtop"><span class="rname">Данияр</span><span class="rtime">13:58</span></div><div class="rbot"><span class="rmsg">Спасибо, оформил заказ 👍</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#9C5F76">Ж</div><span class="cbadge" style="background:var(--tg);color:#fff"><svg width="26" height="26"><use href="#tg"/></svg></span></div><div class="rtx"><div class="rtop"><span class="rname">Жанна</span><span class="rtime">13:20</span></div><div class="rbot"><span class="rmsg">Хорошо, приеду к 18:00</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#7B6BA8">А</div><span class="cbadge" style="background:var(--wa);color:#fff"><svg width="26" height="26"><use href="#wa"/></svg></span></div><div class="rtx"><div class="rtop"><span class="rname">Магазин «Автомир»</span><span class="rtime">12:10</span></div><div class="rbot"><span class="rmsg">Отправьте, пожалуйста, прайс</span><span class="ubadge">1</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#5E8B7E">С</div><span class="cbadge" style="background:var(--tg);color:#fff"><svg width="26" height="26"><use href="#tg"/></svg></span></div><div class="rtx"><div class="rtop"><span class="rname">СТО «Барыс»</span><span class="rtime">11:02</span></div><div class="rbot"><span class="rmsg">Есть колодки на Sonata?</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#A8794A">А</div><span class="cbadge" style="background:var(--wa);color:#fff"><svg width="26" height="26"><use href="#wa"/></svg></span></div><div class="rtx"><div class="rtop"><span class="rname">Асель</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">А доставка по Алматы сколько стоит?</span></div></div></div>
+        </div>
+        <div class="nav"><div class="on"><svg width="60" height="60"><use href="#i-chat"/></svg>Чаты</div><div><svg width="60" height="60"><use href="#i-chart"/></svg>Сводка</div><div><svg width="60" height="60"><use href="#i-bot"/></svg>Боты</div><div><svg width="60" height="60"><use href="#i-user"/></svg>Профиль</div></div>
+      </div></div></div></div>
+    </div>
+
+    <div class="notes">
+      <ul>
+        <li><b>Значок канала 46 ед.</b> В правом нижнем углу аватара, кольцо 6 ед. цветом <span class="mono">surface</span>. Бренд читается на каждой строке — но занимает 0,2 % площади.</li>
+        <li><b>Сортировка по времени</b> Один порядок вместо двух. Клиент, написавший в Telegram, не «прячется» за вкладкой.</li>
+        <li><b>Подстрочник в шапке</b> перечисляет подключённые каналы точками. Если подключён один — строка исчезает, и вопрос «где второй» не возникает.</li>
+        <li><b>Кнопка фильтра</b> открывает меню «Все · WhatsApp · Telegram · Непрочитанные». Прежнее поведение доступно, но не навязано.</li>
+        <li><b>Поиск шире</b> «Поиск по всем каналам» — одно поле вместо двух областей поиска.</li>
+      </ul>
+      <dl class="cost">
+        <dt>Что переделывать</dt>
+        <dd>Единственный вариант, задевающий данные. Сейчас <span class="mono">ChatManager.ActiveChannel</span> держит один канал, а <span class="mono">ChatListView</span> рисует один список. Нужно: тянуть оба профиля, помечать каждый <span class="mono">ChatViewModel</span> каналом, сливать по <span class="mono">lastActivity</span> и направлять нажатие в нужный профиль. Кэш <span class="mono">BotCache/{botId}/chats.json</span> — по файлу на канал, слияние на чтении.</dd>
+        <dt>Риск</dt>
+        <dd>Самый большой объём работ и новый класс ошибок: перепутанный канал = отправка не туда. Требует отдельного прогона тестов на маршрутизацию отправки.</dd>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== BRAND ============================== -->
+<section id="brand">
+  <div class="shead"><span class="snum">ЦВЕТ</span><h2>Три отношения к фирменному цвету</h2></div>
+  <p class="idea">Одна и та же форма — сегмент из варианта 1 — в трёх обработках, чтобы вопрос цвета решался отдельно от вопроса компоновки. Слева направо громкость падает, совместимость с «Чернильным» растёт.</p>
+
+  <div class="cgrid">
+    <div class="card">
+      <div class="top"><h4>А · Фирменная заливка</h4><p>Выбранный сегмент залит цветом канала, подпись белая. Ровно то, что сейчас.</p></div>
+      <div class="demo">
+        <div class="demo-pair"><span class="demo-cap">Светлая</span><div class="crop" style="width:312px;height:32px"><div class="phone ph-light" style="width:1040px;height:106px;background:var(--surface);padding:5px 0">
+          <div class="seg"><div class="on" style="background:var(--wa);color:#fff;box-shadow:none"><svg width="30" height="30"><use href="#wa"/></svg>WhatsApp<span class="cnt" style="color:rgba(255,255,255,.8)">4</span></div><div>Telegram</div></div>
+        </div></div></div>
+        <div class="demo-pair"><span class="demo-cap">Тёмная</span><div class="crop" style="width:312px;height:32px"><div class="phone ph-dark" style="width:1040px;height:106px;background:var(--surface);padding:5px 0">
+          <div class="seg"><div class="on" style="background:var(--wa);color:#08181B;box-shadow:none"><svg width="30" height="30"><use href="#wa"/></svg>WhatsApp<span class="cnt" style="color:rgba(8,24,27,.7)">4</span></div><div>Telegram</div></div>
+        </div></div></div>
+      </div>
+      <div class="verdict"><b>Плюс:</b> узнаётся с метра. <b>Минус:</b> самое яркое пятно экрана достаётся фильтру, а насыщенная зелень рядом с тёмно-синим <span class="mono">#243A7A</span> даёт третий несогласованный акцент. В тёмной теме <span class="mono">#25D366</span> ещё и слишком светлый — подпись приходится делать тёмной.</div>
+    </div>
+
+    <div class="card">
+      <div class="top"><h4>Б · Бренд как индикатор</h4><p>Сегмент — белая карточка, фирменный цвет живёт в полоске под подписью и в счётчике.</p></div>
+      <div class="demo">
+        <div class="demo-pair"><span class="demo-cap">Светлая</span><div class="crop" style="width:312px;height:32px"><div class="phone ph-light" style="width:1040px;height:106px;background:var(--surface);padding:5px 0">
+          <div class="seg"><div class="on" style="flex-direction:column;gap:6px"><span style="display:flex;align-items:center;gap:12px">WhatsApp<span class="badge-i" style="background:rgba(37,211,102,.16);color:#0E7A3E">4</span></span><span style="width:120px;height:6px;border-radius:3px;background:var(--wa)"></span></div><div>Telegram</div></div>
+        </div></div></div>
+        <div class="demo-pair"><span class="demo-cap">Тёмная</span><div class="crop" style="width:312px;height:32px"><div class="phone ph-dark" style="width:1040px;height:106px;background:var(--surface);padding:5px 0">
+          <div class="seg"><div class="on" style="flex-direction:column;gap:6px"><span style="display:flex;align-items:center;gap:12px">WhatsApp<span class="badge-i" style="background:rgba(37,211,102,.18);color:#3FD98A">4</span></span><span style="width:120px;height:6px;border-radius:3px;background:var(--wa)"></span></div><div>Telegram</div></div>
+        </div></div></div>
+      </div>
+      <div class="verdict"><b>Плюс:</b> бренд присутствует и не спорит. <b>Минус:</b> полоска внутри пилюли — гибрид вкладок и сегмента; чище смотрится в варианте 2, где вкладки настоящие.</div>
+    </div>
+
+    <div class="card">
+      <div class="top"><h4>В · Палитра приложения</h4><p>Бренд сжат до точки 20 ед. Выбор показан «физически»: белая карточка в утопленном жёлобе.</p></div>
+      <div class="demo">
+        <div class="demo-pair"><span class="demo-cap">Светлая</span><div class="crop" style="width:312px;height:32px"><div class="phone ph-light" style="width:1040px;height:106px;background:var(--surface);padding:5px 0">
+          <div class="seg"><div class="on"><span class="gdot" style="background:var(--wa)"></span>WhatsApp<span class="cnt">4</span></div><div><span class="gdot" style="background:var(--tg);opacity:.4"></span>Telegram</div></div>
+        </div></div></div>
+        <div class="demo-pair"><span class="demo-cap">Тёмная</span><div class="crop" style="width:312px;height:32px"><div class="phone ph-dark" style="width:1040px;height:106px;background:var(--surface);padding:5px 0">
+          <div class="seg"><div class="on"><span class="gdot" style="background:var(--wa)"></span>WhatsApp<span class="cnt">4</span></div><div><span class="gdot" style="background:var(--tg);opacity:.4"></span>Telegram</div></div>
+        </div></div></div>
+      </div>
+      <div class="verdict"><b>Плюс:</b> единственный вариант, где <span class="mono">#243A7A</span> остаётся исключительно цветом действия — а значит кнопка «Отправить» и бейдж непрочитанных читаются как главное. <b>Минус:</b> на скриншоте из магазина приложений экран выглядит скромнее.</div>
+    </div>
+  </div>
+
+  <p class="idea" style="margin-top:28px"><strong>Отдельно:</strong> заливать выбранный сегмент цветом <span class="mono">#243A7A</span> — соблазнительно, но неверно. Синий из палитры означает «действие»: кнопки, активные плашки, бейдж непрочитанных. Фильтр — не действие, а состояние. Если синим красить и то и другое, роль цвета размывается, и «Отправить» перестаёт выделяться.</p>
+</section>
+
+<!-- ============================== MODE ============================== -->
+<section id="mode">
+  <div class="shead"><span class="snum">РЕЖИМ</span><h2>Четыре способа показать «Авто / Вместе»</h2></div>
+  <p class="idea">Главный аргумент против нынешнего ползунка — не внешность, а честность. <span class="mono">ReplyModeToggleBinder</span> открывает <span class="mono">ReplyModeConfirmPopup</span> в обе стороны. Форма «щёлк» обещает мгновенность, которой нет. Всё, что ниже, — формы, которые выглядят как «нажми, чтобы решить», а не «сдвинь, чтобы сделать».</p>
+
+  <div class="cgrid pairs">
+    <div class="card">
+      <div class="top"><h4>Сейчас · ползунок 280×72</h4><p>Трек перекрашивается зелёный ↔ синий, белый бегунок ездит на ±70.</p></div>
+      <div class="demo">
+        <div class="demo-pair"><span class="demo-cap">Авто · Вместе</span><div class="crop" style="width:264px;height:34px"><div class="phone ph-light" style="width:880px;height:112px;background:var(--surface);display:flex;align-items:center;justify-content:center;gap:40px">
+          <div class="old-toggle"><span>Вместе</span><span></span><div class="thumb">Авто</div></div>
+          <div class="old-toggle" style="background:#007AFF"><span></span><span style="color:#A8CFFF">Авто</span><div class="thumb" style="right:auto;left:8px;color:#004C99">Вместе</div></div>
+        </div></div></div>
+      </div>
+      <div class="verdict"><b>Проблема:</b> два насыщенных цвета в шапке, форма врёт о поведении, «Вместе» в бегунке 124 ед. набрано в 28 — на грани читаемости.</div>
+    </div>
+
+    <div class="card">
+      <div class="top"><h4>1 · Плашка-статус</h4><p>Читается как состояние. Нажатие открывает тот же диалог. Варианты 1 и 2.</p></div>
+      <div class="demo">
+        <div class="demo-pair"><span class="demo-cap">Светлая</span><div class="crop" style="width:264px;height:34px"><div class="phone ph-light" style="width:880px;height:112px;background:var(--surface);display:flex;align-items:center;justify-content:center;gap:40px">
+          <div class="mchip auto"><span class="dot"></span>Авто</div><div class="mchip semi"><span class="dot"></span>Вместе</div><div class="mchip outline"><span class="dot"></span>Авто</div>
+        </div></div></div>
+        <div class="demo-pair"><span class="demo-cap">Тёмная</span><div class="crop" style="width:264px;height:34px"><div class="phone ph-dark" style="width:880px;height:112px;background:var(--surface);display:flex;align-items:center;justify-content:center;gap:40px">
+          <div class="mchip auto"><span class="dot"></span>Авто</div><div class="mchip semi"><span class="dot"></span>Вместе</div><div class="mchip outline"><span class="dot"></span>Авто</div>
+        </div></div></div>
+      </div>
+      <div class="verdict"><b>Цвета из палитры:</b> <span class="mono">positiveBg/positiveInk</span> для «Авто», <span class="mono">accentSoft/accentText</span> для «Вместе». Ноль новых токенов.</div>
+    </div>
+
+    <div class="card">
+      <div class="top"><h4>2 · Полоса-предложение</h4><p>Говорит следствием, а не названием режима. Прокручивается вместе со списком. Вариант 3.</p></div>
+      <div class="demo">
+        <div class="demo-pair"><span class="demo-cap">Светлая</span><div class="crop" style="width:324px;height:56px"><div class="phone ph-light" style="width:1080px;height:186px;background:var(--surface)">
+          <div class="strip" style="background:var(--pos-bg)"><span style="color:var(--pos-ink)">Бот отвечает клиентам сам</span><span class="act" style="color:var(--pos-ink)">Изменить</span></div>
+          <div class="strip" style="background:var(--accent-soft)"><span style="color:var(--accent-text)">Бот предлагает ответы — отправляете вы</span><span class="act">Изменить</span></div>
+        </div></div></div>
+        <div class="demo-pair"><span class="demo-cap">Тёмная</span><div class="crop" style="width:324px;height:56px"><div class="phone ph-dark" style="width:1080px;height:186px;background:var(--surface)">
+          <div class="strip" style="background:var(--pos-bg)"><span style="color:var(--pos-ink)">Бот отвечает клиентам сам</span><span class="act" style="color:var(--pos-ink)">Изменить</span></div>
+          <div class="strip" style="background:var(--accent-soft)"><span style="color:var(--accent-text)">Бот предлагает ответы — отправляете вы</span><span class="act">Изменить</span></div>
+        </div></div></div>
+      </div>
+      <div class="verdict"><b>Лучше всего объясняет.</b> Новый владелец бота понимает, что происходит, без обучения. Стоит 88 ед. прокручиваемой высоты.</div>
+    </div>
+
+    <div class="card">
+      <div class="top"><h4>3 · Строка в шторке ботов</h4><p>Режим становится свойством бота и живёт там же, где выбирается бот. Варианты 3 и 5.</p></div>
+      <div class="demo">
+        <div class="demo-pair"><span class="demo-cap">Светлая</span><div class="crop" style="width:324px;height:70px"><div class="phone ph-light" style="width:1080px;height:232px;background:var(--bg);padding:16px 40px">
+          <div class="brow on" style="height:200px"><span class="rail"></span><div class="av" style="background:#B08048">А</div><div class="bmeta"><div class="bname">Автозапчасти KZ</div><div class="bsub"><span class="gdot" style="width:16px;height:16px;background:var(--wa)"></span><span class="gdot" style="width:16px;height:16px;background:var(--tg)"></span>6 чатов</div></div><div class="miniseg"><div class="on pos">Авто</div><div>Вместе</div></div></div>
+        </div></div></div>
+        <div class="demo-pair"><span class="demo-cap">Тёмная</span><div class="crop" style="width:324px;height:70px"><div class="phone ph-dark" style="width:1080px;height:232px;background:var(--bg);padding:16px 40px">
+          <div class="brow on" style="height:200px"><span class="rail"></span><div class="av" style="background:#B08048">А</div><div class="bmeta"><div class="bname">Автозапчасти KZ</div><div class="bsub"><span class="gdot" style="width:16px;height:16px;background:var(--wa)"></span><span class="gdot" style="width:16px;height:16px;background:var(--tg)"></span>6 чатов</div></div><div class="miniseg"><div class="on pos">Авто</div><div>Вместе</div></div></div>
+        </div></div></div>
+      </div>
+      <div class="verdict"><b>Плюс:</b> видно режим всех ботов сразу — сегодня это нигде не показано. <b>Минус:</b> два касания вместо одного.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== SHEET ============================== -->
+<section id="sheet">
+  <div class="shead"><span class="snum">ШТОРКА</span><h2>Выбор бота <span class="ru">· сегодня 1180 ед. на четыре карточки</span></h2></div>
+  <p class="idea">Нынешняя шторка — панель 1180 ед. с карточками по 228 и аватарами 144. У владельца с пятью ботами список уже скроллится, хотя выбор из пяти строк должен помещаться целиком. Три альтернативы ниже отличаются плотностью и тем, отвечает ли шторка ещё за что-то, кроме выбора.</p>
+
+  <div class="cgrid">
+    <div class="card">
+      <div class="top"><h4>А · Компактный список</h4><p>Строка 152 ед. вместо 228, аватар 100 вместо 144. Панель 900 ед. вмещает шесть ботов без прокрутки.</p></div>
+      <div class="demo flush">
+        <div class="bezel" style="border-radius:0;background:none;padding:0;box-shadow:none"><div class="pw" style="width:300px;height:534px;border-radius:0"><div class="phone ph-light" style="transform:scale(.278)">
+          <div class="bar" style="height:240px"><div class="sb"><span>9:41</span><span class="r"><span class="bars"><i style="height:10px"></i><i style="height:15px"></i><i style="height:20px"></i><i style="height:26px"></i></span><span class="bat"></span></span></div>
+            <div class="tier" style="height:140px"><div class="bot"><div class="av" style="width:96px;height:96px;font-size:38px;background:#B08048">А</div><span class="nm" style="font-size:44px">Автозапчасти KZ</span><svg class="chev" width="26" height="26"><use href="#chev"/></svg></div></div>
+          </div>
+          <div class="list"><div class="search"><div class="pill"><svg width="40" height="40"><use href="#search"/></svg>Поиск</div></div>
+            <div class="row"><div class="rav"><div class="av" style="background:#C0705F">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Айгерим Сериковна</span><span class="rtime">14:32</span></div><div class="rbot"><span class="rmsg">Есть фильтр на Camry?</span><span class="ubadge">3</span></div></div></div>
+            <div class="row"><div class="rav"><div class="av" style="background:#5E8B7E">Д</div></div><div class="rtx"><div class="rtop"><span class="rname">Данияр</span><span class="rtime">13:58</span></div><div class="rbot"><span class="rmsg">Спасибо, оформил заказ 👍</span></div></div></div>
+          </div>
+          <div class="sheet-scrim"></div>
+          <div class="sheet" style="height:900px">
+            <div class="grab"><i></i></div>
+            <div class="stitle">Ваши боты<small>Выберите, чьи чаты показать</small></div>
+            <div class="slist">
+              <div class="brow on"><span class="rail"></span><div class="av" style="background:#B08048">А</div><div class="bmeta"><div class="bname">Автозапчасти KZ</div><div class="bsub"><span class="gdot" style="width:16px;height:16px;background:var(--wa)"></span><span class="gdot" style="width:16px;height:16px;background:var(--tg)"></span>6 чатов · 4 новых</div></div><div class="check"><svg width="30" height="30"><use href="#check"/></svg></div></div>
+              <div class="brow"><div class="av" style="background:#C05F7E">Ц</div><div class="bmeta"><div class="bname">Цветы Астана</div><div class="bsub"><span class="gdot" style="width:16px;height:16px;background:var(--wa)"></span>12 чатов · 2 новых</div></div></div>
+              <div class="brow"><div class="av" style="background:#4F7CA3">Р</div><div class="bmeta"><div class="bname">Ремонт телефонов</div><div class="bsub"><span class="gdot" style="width:16px;height:16px;background:var(--tg)"></span>3 чата</div></div></div>
+              <div class="brow"><div class="av" style="background:#6E8AA5">О</div><div class="bmeta"><div class="bname">Оптом KZ</div><div class="bsub"><span class="gdot" style="width:16px;height:16px;background:var(--border)"></span>Каналы не подключены</div></div></div>
+            </div>
+          </div>
+        </div></div></div>
+      </div>
+      <div class="verdict"><b>Выбран</b> — обводка <span class="mono">accentFill</span> 4 ед. плюс рейка 10 ед. слева и галочка 56. <b>Не подключён</b> — серая точка и прямая формулировка вместо блёклых чипов.</div>
+    </div>
+
+    <div class="card">
+      <div class="top"><h4>Б · Центр управления</h4><p>Строка 200 ед.: тот же выбор плюс режим ответа для каждого бота. Пара к вариантам 3 и 5.</p></div>
+      <div class="demo flush">
+        <div class="bezel" style="border-radius:0;background:none;padding:0;box-shadow:none"><div class="pw" style="width:300px;height:534px;border-radius:0"><div class="phone ph-dark" style="transform:scale(.278)">
+          <div class="bar" style="height:240px"><div class="sb"><span>9:41</span><span class="r"><span class="bars"><i style="height:10px"></i><i style="height:15px"></i><i style="height:20px"></i><i style="height:26px"></i></span><span class="bat"></span></span></div>
+            <div class="tier" style="height:140px"><div class="bot"><div class="av" style="width:96px;height:96px;font-size:38px;background:#B08048">А</div><span class="nm" style="font-size:44px">Автозапчасти KZ</span><svg class="chev" width="26" height="26"><use href="#chev"/></svg></div></div>
+          </div>
+          <div class="list"><div class="search"><div class="pill"><svg width="40" height="40"><use href="#search"/></svg>Поиск</div></div>
+            <div class="row"><div class="rav"><div class="av" style="background:#C0705F">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Айгерим Сериковна</span><span class="rtime">14:32</span></div><div class="rbot"><span class="rmsg">Есть фильтр на Camry?</span><span class="ubadge">3</span></div></div></div>
+          </div>
+          <div class="sheet-scrim"></div>
+          <div class="sheet" style="height:1080px">
+            <div class="grab"><i></i></div>
+            <div class="stitle">Ваши боты<small>Выбор чатов и режим ответа</small></div>
+            <div class="slist">
+              <div class="brow on" style="height:200px"><span class="rail"></span><div class="av" style="background:#B08048">А</div><div class="bmeta"><div class="bname">Автозапчасти KZ</div><div class="bsub"><span class="gdot" style="width:16px;height:16px;background:var(--wa)"></span><span class="gdot" style="width:16px;height:16px;background:var(--tg)"></span>6 чатов</div></div><div class="miniseg"><div class="on pos">Авто</div><div>Вместе</div></div></div>
+              <div class="brow" style="height:200px"><div class="av" style="background:#C05F7E">Ц</div><div class="bmeta"><div class="bname">Цветы Астана</div><div class="bsub"><span class="gdot" style="width:16px;height:16px;background:var(--wa)"></span>12 чатов</div></div><div class="miniseg"><div>Авто</div><div class="on">Вместе</div></div></div>
+              <div class="brow" style="height:200px"><div class="av" style="background:#4F7CA3">Р</div><div class="bmeta"><div class="bname">Ремонт телефонов</div><div class="bsub"><span class="gdot" style="width:16px;height:16px;background:var(--tg)"></span>3 чата</div></div><div class="miniseg"><div class="on pos">Авто</div><div>Вместе</div></div></div>
+              <div class="brow" style="height:200px"><div class="av" style="background:#6E8AA5">О</div><div class="bmeta"><div class="bname">Оптом KZ</div><div class="bsub"><span class="gdot" style="width:16px;height:16px;background:var(--border)"></span>Не подключён</div></div></div>
+            </div>
+          </div>
+        </div></div></div>
+      </div>
+      <div class="verdict"><b>Единственное место в приложении</b>, где режим всех ботов виден одним взглядом. Ради этого шторка вырастает до 1080 ед. — всё равно меньше нынешних 1180.</div>
+    </div>
+
+    <div class="card">
+      <div class="top"><h4>В · Сетка</h4><p>Плитки 500×340 в два столбца. Шесть ботов на экран без прокрутки, выбор — по аватару, а не по чтению.</p></div>
+      <div class="demo flush">
+        <div class="bezel" style="border-radius:0;background:none;padding:0;box-shadow:none"><div class="pw" style="width:300px;height:534px;border-radius:0"><div class="phone ph-light" style="transform:scale(.278)">
+          <div class="bar" style="height:240px"><div class="sb"><span>9:41</span><span class="r"><span class="bars"><i style="height:10px"></i><i style="height:15px"></i><i style="height:20px"></i><i style="height:26px"></i></span><span class="bat"></span></span></div>
+            <div class="tier" style="height:140px"><div class="bot"><div class="av" style="width:96px;height:96px;font-size:38px;background:#B08048">А</div><span class="nm" style="font-size:44px">Автозапчасти KZ</span><svg class="chev" width="26" height="26"><use href="#chev"/></svg></div></div>
+          </div>
+          <div class="list"><div class="search"><div class="pill"><svg width="40" height="40"><use href="#search"/></svg>Поиск</div></div>
+            <div class="row"><div class="rav"><div class="av" style="background:#C0705F">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Айгерим Сериковна</span><span class="rtime">14:32</span></div><div class="rbot"><span class="rmsg">Есть фильтр на Camry?</span><span class="ubadge">3</span></div></div></div>
+          </div>
+          <div class="sheet-scrim"></div>
+          <div class="sheet" style="height:1000px">
+            <div class="grab"><i></i></div>
+            <div class="stitle">Ваши боты<small>Выберите, чьи чаты показать</small></div>
+            <div class="bgrid">
+              <div class="btile on"><div class="check"><svg width="28" height="28"><use href="#check"/></svg></div><div class="av" style="background:#B08048">А</div><div class="bname">Автозапчасти KZ</div><div class="bsub"><span class="gdot" style="width:16px;height:16px;background:var(--wa)"></span><span class="gdot" style="width:16px;height:16px;background:var(--tg)"></span>4 новых</div></div>
+              <div class="btile"><div class="av" style="background:#C05F7E">Ц</div><div class="bname">Цветы Астана</div><div class="bsub"><span class="gdot" style="width:16px;height:16px;background:var(--wa)"></span>2 новых</div></div>
+              <div class="btile"><div class="av" style="background:#4F7CA3">Р</div><div class="bname">Ремонт телефонов</div><div class="bsub"><span class="gdot" style="width:16px;height:16px;background:var(--tg)"></span>3 чата</div></div>
+              <div class="btile"><div class="av" style="background:#6E8AA5">О</div><div class="bname">Оптом KZ</div><div class="bsub"><span class="gdot" style="width:16px;height:16px;background:var(--border)"></span>Не подключён</div></div>
+            </div>
+          </div>
+        </div></div></div>
+      </div>
+      <div class="verdict"><b>Хороша от пяти ботов.</b> При двух — половина шторки пустая, а имена в две строки читаются хуже, чем в списке. Стоит брать, только если у владельцев реально много ботов.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== PICK ============================== -->
+<section id="pick" style="border-bottom:0">
+  <div class="shead"><span class="snum">ИТОГ</span><h2>Что бы взял я</h2></div>
+
+  <div class="rec">
+    <h3 style="margin-top:0">Рекомендация</h3>
+    <ol>
+      <li><b>Компоновка — вариант 3 «Одна строка».</b> Единственный, который делает шапку <em>ниже</em> сегодняшней и при этом добавляет смысла: подстрочник «6 чатов · 4 новых», значок канала на аватаре, режим объяснённый словами. Список — главное на этом экране, и он получает больше места, а не меньше.</li>
+      <li><b>Цвет — обработка В «Палитра приложения»,</b> но с оговоркой: в варианте 3 канал показан круглыми кнопками, где заливка мелкая, поэтому фирменный цвет там уместен. Правило простое — <b>фирменный цвет допустим на площади меньше ~90×90 ед.</b> Всё, что крупнее, красим палитрой.</li>
+      <li><b>Режим — полоса-предложение.</b> Ползунок обещает мгновенность, которой нет. Полоса говорит следствием: «Бот отвечает клиентам сам». И она прокручивается, то есть постоянной высоты не стоит.</li>
+      <li><b>Шторка — вариант А «Компактный список»,</b> с прицелом на Б, когда режим переедет туда окончательно. Строка 152 вместо 228 — это шесть ботов вместо четырёх на том же экране.</li>
+      <li><b>Если хочется поспорить — вариант 5.</b> Он лучший по продуктовой логике (владельцу неважно, откуда пришло сообщение) и худший по цене: правки в слое данных и риск отправить ответ не в тот канал. Разумно отложить до отдельной фазы, а сейчас взять 3.</li>
+    </ol>
+  </div>
+
+  <h3>Сравнение</h3>
+  <div class="tscroll">
+  <table>
+    <tr><th>Вариант</th><th>Шапка</th><th>Фирменный цвет</th><th>Где режим</th><th>Объём работ</th><th>Главный риск</th></tr>
+    <tr><td><b>Сейчас</b></td><td>250 ед.</td><td>Заливка сегмента</td><td>Ползунок в шапке</td><td>—</td><td>Четыре акцента, обрезанное имя</td></tr>
+    <tr><td><b>1 · Два этажа</b></td><td>400 ед.</td><td>Точка 20 ед.</td><td>Плашка в шапке</td><td>Средний — сцена</td><td>+150 ед. высоты</td></tr>
+    <tr><td><b>2 · Вкладки</b></td><td>380 ед.</td><td>Подчёркивание 7 ед.</td><td>Плашка в шапке</td><td>Средний + свайп</td><td>Читается как «разные экраны»</td></tr>
+    <tr><td><b>3 · Одна строка</b></td><td><b>240 ед.</b></td><td>Кнопка 84 ед.</td><td>Полоса в ленте</td><td>Выше среднего — переезды</td><td>Иконки без подписей</td></tr>
+    <tr><td><b>4 · Фильтры в ленте</b></td><td>240 ед.</td><td>Заливка чипа</td><td>Чип в ленте</td><td>Средний</td><td>Состояние уезжает при прокрутке</td></tr>
+    <tr><td><b>5 · Единый список</b></td><td>240 ед.</td><td>Значок 46 ед.</td><td>Шторка ботов</td><td><b>Высокий — слой данных</b></td><td>Отправка не в тот канал</td></tr>
+  </table>
+  </div>
+
+  <h3>Что верно для любого варианта</h3>
+  <div class="notes" style="position:static;max-width:70ch">
+    <ul>
+      <li><b>Строка чата не меняется</b> 200 ед., аватар 140, имя 44, превью 36, время 30. Это уже отлажено — трогать незачем.</li>
+      <li><b>Бейдж непрочитанных — <span class="mono">accentFill</span></b> Роль в перечислении так и описана: «заливка кнопок, активные плашки, бейджи непрочитанных». Зелёный <span class="mono">#26B25A</span> из старой версии — четвёртый акцент, от которого стоит избавиться.</li>
+      <li><b>Только один канал подключён</b> — переключатель не показываем вовсе. Сегодня он рисуется приглушённым на 40 %; вместо этого лучше отдать место списку, а подключение вести из карточки бота.</li>
+      <li><b>Три фиксированных цвета</b> <span class="mono">#25D366</span>, <span class="mono">#2AABEE</span>, <span class="mono">#34C759</span> живут в <span class="mono">Theme.Fixed</span> и не участвуют в теме — это правильно и остаётся так.</li>
+      <li><b>Правки только поверх сцены</b> Ни один вариант не требует пересборки экрана билдером: <span class="mono">Main.unity</span> содержит ручную донастройку, которую старые билдеры затрут.</li>
+    </ul>
+  </div>
+</section>
+
+</div>
