@@ -57,7 +57,7 @@ Reuse `ChatsPanel/ReplyModeConfirmPopup` (720×440). New copy:
 - Avatar **100** (icon ~65).
 - Name **40 semibold** `InkPrimary`.
 - Subline **28** `InkTertiary`: channel dots **16** (brand color when connected; single `Border`-colored dot when none) + «N чатов[ · M новых]», or «Не подключён».
-- **Selected row**: 4u inset ring `AccentFill` + left rail 10u `AccentFill`. No check badge (trailing slot belongs to the chip).
+- **Selected row**: 4u inset ring `AccentFill` only. No check badge (trailing slot belongs to the chip). *(Amended 2026-08-06 after the device pass: the left rail was cut — the ring alone carries selection.)*
 - **Auto mini-chip** (trailing): 60h, radius 30, padding-x 22, label «Авто» **26**, dot **14**; same ON/OFF token treatment as the header pill; chip root ≥88 hit area. Hidden for bots with no connected channel.
 - Taps: row (outside chip) → `SetActiveBot` + close (existing). Chip → mode change for THAT bot: enable → shared popup, disable → instant.
 - Sheet height becomes content-driven (~920 for 4 bots; scrolls beyond 6). `BotSwitcherSheet` slide-distance constant (1180) must follow the real panel height. Cascade row animation kept.

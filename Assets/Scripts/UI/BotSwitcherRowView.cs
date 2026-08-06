@@ -23,8 +23,6 @@ public class BotSwitcherRowView : MonoBehaviour
 {
     [Header("Row")]
     [SerializeField] private Image ringImage;      // root image — AccentFill when selected, clear otherwise
-    [SerializeField] private GameObject railObject; // 10u left rail, selected only
-    [SerializeField] private Image railImage;
     [SerializeField] private CanvasGroup canvasGroup;
     [SerializeField] private Button rowButton;
 
@@ -134,14 +132,12 @@ public class BotSwitcherRowView : MonoBehaviour
         }
     }
 
+    // Selection is the 4u AccentFill inset ring alone (owner dropped the left
+    // rail after the device pass — don't reintroduce it).
     private void ApplySelection()
     {
         if (ringImage != null)
             ringImage.color = isSelected ? Theme.Color(ThemeRole.AccentFill) : Color.clear;
-        if (railImage != null)
-            railImage.color = Theme.Color(ThemeRole.AccentFill);
-        if (railObject != null)
-            railObject.SetActive(isSelected);
     }
 
     // Mirrors ReplyModeToggleBinder.ApplyVisuals — the chip IS the header button,

@@ -648,20 +648,9 @@ public static class ChatsTopBarRestyleBuilder
                 cardHlg.spacing = 28f;
             }
 
-            // Selection rail (idempotent rebuild), sits over the card's left edge.
+            // Selection = the 4u AccentFill ring alone; the left rail was cut by
+            // the owner after the device pass (destroy covers older prefab saves).
             DestroyExisting(root.transform, "Rail");
-            var rail = NewUiChild(root.transform, "Rail", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
-            var railRt = (RectTransform)rail.transform;
-            railRt.anchorMin = new Vector2(0f, 0f);
-            railRt.anchorMax = new Vector2(0f, 1f);
-            railRt.pivot = new Vector2(0f, 0.5f);
-            railRt.sizeDelta = new Vector2(10f, -8f);
-            railRt.anchoredPosition = new Vector2(4f, 0f);
-            var railImage = rail.GetComponent<Image>();
-            railImage.color = LAccentFill;
-            railImage.raycastTarget = false;
-            SetRoundedRadius(rail, 5f);
-            rail.SetActive(false);
 
             // Avatar 144→100.
             var avatarLe = avatar.GetComponent<LayoutElement>();
@@ -738,8 +727,6 @@ public static class ChatsTopBarRestyleBuilder
             // Rewire the view.
             var so = new SerializedObject(view);
             SetRef(so, "ringImage", root.GetComponent<Image>());
-            SetRef(so, "railObject", rail);
-            SetRef(so, "railImage", railImage);
             SetRef(so, "canvasGroup", root.GetComponent<CanvasGroup>());
             SetRef(so, "rowButton", root.GetComponent<Button>());
             SetRef(so, "avatarImage", avatar.GetComponent<Image>());
