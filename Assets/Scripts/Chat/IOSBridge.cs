@@ -73,9 +73,10 @@ public static class IOSBridge
     private static extern void _SetDarkKeyboard(bool enable);
 #endif
 
-    // Overrides the window interface style so the system keyboard renders dark
-    // (WhatsApp attachment-preview parity). Callers must pair enable=true with
-    // enable=false on every exit path, or all keyboards in the app stay dark.
+    // Overrides the window interface style so the system keyboard renders dark.
+    // Do NOT call this directly — go through SystemKeyboardAppearance, which
+    // resolves the app theme against any always-dark screen's override; a raw
+    // SetDarkKeyboard(false) would kick the keyboard to light in dark theme.
     // No-op on Android/Editor: Android offers no API to theme the IME.
     public static void SetDarkKeyboard(bool enable)
     {
