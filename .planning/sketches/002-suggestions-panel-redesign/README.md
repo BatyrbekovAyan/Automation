@@ -46,6 +46,18 @@ Round 2 — «4 строки» refinements (owner asked to explore the 4-row for
 - **H: Акцент** — recommended reply as a filled green action block (white text), the other
   three as quiet single-line rows.
 
+Round 3 — synthesis (owner liked E's sheet/overline/full-text/refresh + G's individual cards;
+disliked E's flat list look, G's inline chips and truncation; suggested a fixed-height sheet
+with inner scrolling):
+
+- **I: Всё видно** — the synthesis at natural height: bordered cards with intent overline +
+  full text on E's sheet; all four visible, tallest option.
+- **J: Фикс + скролл** — same cards in a fixed ~285 sheet; cards scroll inside; the affordance
+  is a cut-off card + bottom fade + thin scrollbar. Matches the panel's fixed-footprint
+  architecture (D-12) — the sheet never changes height between states.
+- **K: Фикс, спокойный** — fixed sheet with borderless soft-fill cards and an «ещё N» counter
+  chip (tap scrolls) instead of the fade.
+
 ## What to Look For
 
 - Which one you'd want under your thumb mid-conversation (chat visibility vs reply readability).

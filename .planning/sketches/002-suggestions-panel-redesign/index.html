@@ -315,6 +315,36 @@
   .h-top .h-txt { font-size:13px; font-weight:600; line-height:1.35; color:#fff;
                   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 
+  /* ============ Variants I–K — synthesis round: E's sheet+overline+full text × G's cards ============ */
+  .syn-cards { padding: 2px 8px 8px; display:flex; flex-direction:column; gap:5px; }
+  .syn-card { background: var(--surface); border:1px solid var(--border); border-radius:14px;
+              padding: 8px 11px 9px; cursor:pointer; transition: transform .12s ease, border-color .15s, background .15s; }
+  .syn-card:hover { transform: translateY(-1px); border-color: var(--input-border); }
+  .syn-int { display:flex; align-items:center; gap:4px; font-size:8.5px; font-weight:700;
+             letter-spacing:.06em; text-transform:uppercase; color: var(--ink-3); margin-bottom:2px; }
+  .syn-txt { font-size:12.5px; line-height:1.36; color: var(--ink); }
+  .syn-card.top { background: var(--positive-bg); border-color: color-mix(in srgb, var(--positive-ink) 45%, transparent); }
+  .syn-card.top .syn-int { color: var(--positive-ink); }
+  /* K skin: borderless soft-fill "inset" cards */
+  .syn-card.k { border:none; background: var(--bg); }
+  .syn-card.k:hover { background: color-mix(in srgb, var(--ink) 6%, var(--bg)); transform:none; }
+  .syn-card.k.top { background: var(--positive-bg); }
+  .syn-card.k.top:hover { background: color-mix(in srgb, var(--positive-ink) 10%, var(--positive-bg)); }
+  /* fixed-height interior scroll */
+  .syn-fixwrap { position:relative; }
+  .syn-fix { height:246px; overflow-y:auto; scrollbar-width:none; }
+  .syn-fix.bar { scrollbar-width:thin; scrollbar-color: var(--border) transparent; }
+  .syn-fix.bar::-webkit-scrollbar { width:3px; } .syn-fix::-webkit-scrollbar { width:0; }
+  .syn-fix.bar::-webkit-scrollbar-thumb { background: var(--border); border-radius:2px; }
+  .syn-fade { position:absolute; left:0; right:0; bottom:0; height:24px; pointer-events:none;
+              background: linear-gradient(transparent, var(--surface)); }
+  .k-more { position:absolute; left:50%; transform:translateX(-50%); bottom:7px; display:flex; gap:4px;
+            align-items:center; background: color-mix(in srgb, var(--ink) 74%, transparent);
+            color: var(--surface); font-size:9.5px; font-weight:600; padding: 3.5px 10px;
+            border-radius:10px; cursor:pointer; box-shadow: var(--shadow-sm);
+            transition: opacity .2s ease; }
+  .k-more.gone { opacity:0; pointer-events:none; }
+
   /* ============ sketch toolbar ============ */
   #sketch-tools { position:fixed; bottom:12px; right:12px; z-index:9999; font-size:12px;
                   background: rgba(12,16,20,.82); color:#fff; padding: 10px 12px; border-radius:10px;
@@ -346,6 +376,10 @@
     <button class="variant-tab" data-v="f" onclick="showVariant('f',this)">F · Компакт</button>
     <button class="variant-tab" data-v="g" onclick="showVariant('g',this)">G · Карточки</button>
     <button class="variant-tab" data-v="h" onclick="showVariant('h',this)">H · Акцент</button>
+    <span style="align-self:center; font-size:11px; color:var(--page-ink-2); margin:0 2px 0 6px;">синтез E+G:</span>
+    <button class="variant-tab" data-v="i" onclick="showVariant('i',this)">I · Всё видно</button>
+    <button class="variant-tab" data-v="j" onclick="showVariant('j',this)">J · Фикс + скролл</button>
+    <button class="variant-tab" data-v="k" onclick="showVariant('k',this)">K · Фикс, спокойный</button>
   </div>
   <div id="caption"></div>
 </div>
@@ -388,6 +422,9 @@ const CAPTIONS = {
   f:`<b>F · 4 строки, компакт.</b> Все 4 ответа в одну строку с ярлыками — высота почти как у сегодняшней панели, но без внутренней прокрутки. Лучший — жирнее, с рейкой. <b>Смотрите на:</b> хватает ли одной строки, чтобы уверенно выбрать ответ.`,
   g:`<b>G · 4 строки, карточки.</b> Без листа: каждая подсказка — отдельная карточка прямо на обоях, лучшая — зелёная. Воздушнее, чем лист; обновление — кружок над стопкой. <b>Смотрите на:</b> читаемость карточек на пёстрых обоях и ощущение «стопки».`,
   h:`<b>H · 4 строки, акцент.</b> Лучший ответ — залитая зелёная кнопка («жми сюда»), остальные — тихие строки в одну линию. Максимально явная иерархия при умеренной высоте. <b>Смотрите на:</b> помогает ли заливка или выглядит навязчиво.`,
+  i:`<b>I · Синтез E+G: всё видно.</b> Карточки с ярлыком сверху и полным текстом — на листе с заголовком и тихим обновлением (как в E). Естественная высота: все 4 карточки сразу, лист самый высокий (~⅓ экрана). <b>Смотрите на:</b> стоит ли полная видимость всех ответов такой высоты.`,
+  j:`<b>J · Синтез: фикс-высота + скролл.</b> Тот же синтез, но лист всегда одной высоты (~285): видны 2–3 карточки, остальное — прокрутка внутри. Намёк на жест — срезанная карточка, растворение снизу, тонкий скроллбар. Фикс-высота совпадает с текущей архитектурой панели (footprint не меняется между состояниями). <b>Смотрите на:</b> очевидно ли, что внутри есть ещё.`,
+  k:`<b>K · Синтез: фикс-высота, спокойный скин.</b> Как J, но карточки без рамок — мягкие серые «вставки», а вместо растворения — счётчик «ещё N» внизу (тап по нему листает). <b>Смотрите на:</b> какой скин карточек и какой намёк на прокрутку убедительнее — J или K.`,
 };
 
 /* ================= svg helpers ================= */
@@ -542,15 +579,17 @@ function panelD(){
 const skRows = n => Array.from({length:n}, (_,i)=>`
     <div class="b-skrow"><span class="b-skbar" style="width:${[46,40,52,44][i%4]}px"></span><span class="b-skbar" style="width:${[68,54,62,48][i%4]}%"></span></div>`).join('');
 
-function sheetShell(bodyCards, bodyLoad){
+function sheetShell(bodyCards, bodyLoad, bodyEmpty, bodyError){
+  const empty = bodyEmpty || `<div class="state-box b-state"><div class="state-h">Нет предложений</div><div class="state-b">Напишите ответ вручную</div></div>`;
+  const error = bodyError || `<div class="state-box b-state"><div class="state-h">Не удалось загрузить</div><div class="state-b">Проверьте соединение и попробуйте снова</div><button class="state-retry" onclick="refreshFrame(this)">Обновить</button></div>`;
   return `
   <div class="b-sheet">
     <div class="b-grab"></div>
     <div class="b-head">${svg.spark('var(--positive-ink)')}<span class="b-title">Предложения</span><div class="b-refresh" onclick="refreshFrame(this)">${svg.refresh('var(--ink-2)',14)}</div></div>
     <div class="st st-cards">${bodyCards}</div>
     <div class="st st-load">${bodyLoad}</div>
-    <div class="st st-empty"><div class="state-box b-state"><div class="state-h">Нет предложений</div><div class="state-b">Напишите ответ вручную</div></div></div>
-    <div class="st st-error"><div class="state-box b-state"><div class="state-h">Не удалось загрузить</div><div class="state-b">Проверьте соединение и попробуйте снова</div><button class="state-retry" onclick="refreshFrame(this)">Обновить</button></div></div>
+    <div class="st st-empty">${empty}</div>
+    <div class="st st-error">${error}</div>
   </div>`;
 }
 
@@ -603,6 +642,72 @@ function panelH(){
   return sheetShell(`${topBlock}<div style="padding-bottom:6px">${rows}</div>`, skRows(4));
 }
 
+/* ================= synthesis round (I–K): E's sheet + G's cards ================= */
+function synCards(kSkin){
+  return SUGGESTIONS.map(s=>`
+    <div class="syn-card${kSkin?' k':''}${s.top?' top':''}" onclick="pick(this,'${esc(s.t)}')">
+      <span class="syn-int">${s.top? svg.spark('var(--positive-ink)') : ''}${s.i}</span>
+      <div class="syn-txt">${s.t}</div>
+    </div>`).join('');
+}
+const synSk = (kSkin,n) => Array.from({length:n},()=>`
+    <div class="syn-card${kSkin?' k':''}" style="display:flex;align-items:center;justify-content:center;padding:15px">
+      <div class="dots"><i style="background:var(--ink-3)"></i><i style="background:var(--ink-3)"></i><i style="background:var(--ink-3)"></i></div>
+    </div>`).join('');
+const fixBox = inner => `<div class="syn-fixwrap"><div class="state-box" style="height:246px">${inner}</div></div>`;
+const FIX_EMPTY = fixBox(`<div class="state-h">Нет предложений</div><div class="state-b">Напишите ответ вручную</div>`);
+const FIX_ERROR = fixBox(`<div class="state-h">Не удалось загрузить</div><div class="state-b">Проверьте соединение и попробуйте снова</div><button class="state-retry" onclick="refreshFrame(this)">Обновить</button>`);
+
+/* I — natural height, everything visible */
+function panelI(){
+  return sheetShell(`<div class="syn-cards">${synCards(false)}</div>`,
+                    `<div class="syn-cards">${synSk(false,4)}</div>`);
+}
+
+/* J — fixed-height sheet, inner scroll, cut-card + fade + thin bar */
+function panelJ(){
+  const body = `
+    <div class="syn-fixwrap">
+      <div class="syn-fix bar"><div class="syn-cards">${synCards(false)}</div></div>
+      <div class="syn-fade"></div>
+    </div>`;
+  const load = `
+    <div class="syn-fixwrap">
+      <div class="syn-fix"><div class="syn-cards">${synSk(false,4)}</div></div>
+      <div class="syn-fade"></div>
+    </div>`;
+  return sheetShell(body, load, FIX_EMPTY, FIX_ERROR);
+}
+
+/* K — fixed-height sheet, soft borderless cards, «ещё N» counter chip */
+function panelK(){
+  const chev = `<svg width="8" height="8" viewBox="0 0 24 24" fill="none"><path d="M5 9l7 7 7-7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const body = `
+    <div class="syn-fixwrap">
+      <div class="syn-fix" onscroll="kUpd(this)"><div class="syn-cards">${synCards(true)}</div></div>
+      <div class="k-more" onclick="kScroll(this)"><span>ещё 2</span>${chev}</div>
+    </div>`;
+  const load = `
+    <div class="syn-fixwrap">
+      <div class="syn-fix"><div class="syn-cards">${synSk(true,4)}</div></div>
+    </div>`;
+  return sheetShell(body, load, FIX_EMPTY, FIX_ERROR);
+}
+
+/* «ещё N» counter: cards still below the fold of the fixed scroller */
+function kUpd(sc){
+  const chip = sc.closest('.syn-fixwrap').querySelector('.k-more');
+  if (!chip) return;
+  const fold = sc.scrollTop + sc.clientHeight;
+  let n = 0;   // a card counts as unseen until ~85% of it is above the fold
+  sc.querySelectorAll('.syn-card').forEach(c => { if (fold - c.offsetTop < c.offsetHeight * 0.85) n++; });
+  chip.querySelector('span').textContent = `ещё ${n}`;
+  chip.classList.toggle('gone', n === 0);
+}
+function kScroll(chip){
+  chip.closest('.syn-fixwrap').querySelector('.syn-fix').scrollBy({top:138, behavior:'smooth'});
+}
+
 /* ================= build ================= */
 document.getElementById('stage').innerHTML =
   frame('now', panelNow(), 168) +
@@ -613,7 +718,11 @@ document.getElementById('stage').innerHTML =
   frame('e',   panelE(),   330) +
   frame('f',   panelF(),   205) +
   frame('g',   panelG(),   282) +
-  frame('h',   panelH(),   232);
+  frame('h',   panelH(),   232) +
+  frame('i',   panelI(),   345) +
+  frame('j',   panelJ(),   296) +
+  frame('k',   panelK(),   296);
+document.querySelectorAll('.syn-fix').forEach(sc => kUpd(sc));   // seed «ещё N» counters
 document.getElementById('caption').innerHTML = CAPTIONS.now;
 
 /* deep-link: ?v=a|b|c|d|now&theme=ink-dark (used by headless renders + shareable) */
@@ -635,6 +744,7 @@ function showVariant(id, btn){
   document.getElementById('caption').innerHTML = CAPTIONS[id];
   const z = document.querySelector('#variant-'+id+' .suggest-zone');
   z.classList.remove('enter'); void z.offsetWidth; z.classList.add('enter');   // replay slide-up
+  z.querySelectorAll('.syn-fix').forEach(sc => kUpd(sc));   // hidden tabs measure 0 — recount now
 }
 
 function setStateAll(st, btn){
