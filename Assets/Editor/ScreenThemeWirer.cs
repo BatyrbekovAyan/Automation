@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -84,6 +85,19 @@ public static class ScreenThemeWirer
         // forces it: both stay light in dark without a role of their own.
         ("#E8F2FD", ThemeRole.AccentSoft),      // edit-button chip (profile + account)
         ("#FFCED5", ThemeRole.DestructiveSoft), // «Удалить все данные» chip
+        // Auth-page TrustBlock — a nested green callout (band > fill > disc).
+        // Each layer keeps a DISTINCT role so the stack survives; flattening all
+        // three onto PositiveBg would collapse the card into one flat green.
+        ("#DCEDDD", ThemeRole.PositiveBg),   // outer band
+        ("#F2F8F2", ThemeRole.Surface),      // inner fill
+        ("#E3F1E4", ThemeRole.PositiveBg),   // lock disc
+        ("#15633A", ThemeRole.PositiveInk),  // title
+        ("#1F8A46", ThemeRole.PositiveInk),  // lock glyph
+        // Onboarding hero illustrations (mock chat/cards) + wizard chevrons
+        ("#D6E4FB", ThemeRole.AccentSoft),
+        ("#E7F3FB", ThemeRole.AccentSoft),
+        ("#F4F8FE", ThemeRole.Background),
+        ("#575757", ThemeRole.InkSecondary), // form-row chevrons
         // thread chrome (owner round 2: «messages page looks wrong»)
         ("#E9EDEF", ThemeRole.Hairline),     // action-menu dividers
         ("#6E6E73", ThemeRole.InkSecondary), // composer/attach icon tints
@@ -116,6 +130,15 @@ public static class ScreenThemeWirer
     private static readonly string[] NeverMap =
     {
         "#FFFFFF", "#25D366", "#2AABEE", "#34B7F1", "#00A884", "#2FB344", "#1FA855",
+    };
+
+    /// <summary>Roles that paint SURFACES. On a glyph they demote to ink (see BindSubtree).</summary>
+    private static readonly HashSet<ThemeRole> StructuralRoles = new()
+    {
+        ThemeRole.Background, ThemeRole.Surface, ThemeRole.Hairline, ThemeRole.Border,
+        ThemeRole.InputBorder, ThemeRole.SwitchOffTrack, ThemeRole.AccentSoft,
+        ThemeRole.DestructiveSoft, ThemeRole.PositiveBg, ThemeRole.ChatWallpaper,
+        ThemeRole.BubbleIncoming, ThemeRole.BubbleOutgoing,
     };
 
     private static readonly string[] Prefabs =
@@ -325,15 +348,22 @@ public static class ScreenThemeWirer
                 continue;
             }
 
-            mapped.TryGetValue(hit.role, out var c);
-            mapped[hit.role] = c + 1;
+            // A colour's role depends on WHAT it paints. #C7C7CC is InputBorder
+            // on a well, but on TEXT it is a placeholder — binding it to a 3:1
+            // affordance role would visibly darken placeholders in light mode.
+            // Structural roles never belong on glyphs, so they demote to ink.
+            var role = hit.role;
+            if (g is TMP_Text && StructuralRoles.Contains(role)) role = ThemeRole.InkTertiary;
+
+            mapped.TryGetValue(role, out var c);
+            mapped[role] = c + 1;
 
             if (g.GetComponent<ThemedColor>() != null) { already++; continue; }
             if (!apply) { added++; continue; }
 
             var binding = g.gameObject.AddComponent<ThemedColor>();
             var so = new SerializedObject(binding);
-            so.FindProperty("role").enumValueIndex = (int)hit.role;
+            so.FindProperty("role").enumValueIndex = (int)role;
             so.FindProperty("target").objectReferenceValue = g;
             so.FindProperty("preserveAlpha").boolValue = true;
             so.ApplyModifiedPropertiesWithoutUndo();
@@ -392,6 +422,9 @@ public static class ScreenThemeWirer
     {
         "Screen_Profile", "Screen_Bots", "Screen_Dashboard",
         "BottomNavPanel", "ChatsPanel", "MessagesPanel",
+        // Owner round 7 — the screens the sweep had never covered.
+        "Screen_New", "WhatsappAuth", "TelegramAuth", "Screen_Onboarding",
+        "SuccessOverlay",
     };
 
     /// <summary>

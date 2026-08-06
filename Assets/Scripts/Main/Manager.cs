@@ -1282,7 +1282,7 @@ public partial class Manager : MonoBehaviour
         {
             formBotName = botNamePopupInput.text.Trim();
             botNameValueText.text = formBotName;
-            botNameValueText.color = new Color32(28, 28, 30, 255); // --text-primary
+            botNameValueText.color = Theme.Color(ThemeRole.InkPrimary); // --text-primary
         }
 
         CloseBotNameInput();
@@ -1345,7 +1345,10 @@ public partial class Manager : MonoBehaviour
         {
             selectedBusinessId = businessTypes.All[0].id;
             if (businessTypeButtons.Count > 0)
-                businessButtonDefaultColor = businessTypeButtons[0].GetComponent<Image>().color;
+                // Theme-owned, not captured from the Image: the tiles are
+                // STATE-stamped below (selected vs default), so they carry no
+                // ThemedColor binding — capturing would freeze the light fill.
+                businessButtonDefaultColor = Theme.Color(ThemeRole.Background);
         }
         else
         {
@@ -1413,7 +1416,7 @@ public partial class Manager : MonoBehaviour
         if (businessTypeValueText != null)
         {
             businessTypeValueText.text = entry.displayName;
-            businessTypeValueText.color = new Color32(28, 28, 30, 255);
+            businessTypeValueText.color = Theme.Color(ThemeRole.InkPrimary);
         }
 
         CloseBusinessSelector();
@@ -1441,12 +1444,12 @@ public partial class Manager : MonoBehaviour
             if (!string.IsNullOrEmpty(formDescription))
             {
                 descriptionValueText.text = formDescription;
-                descriptionValueText.color = new Color32(28, 28, 30, 255);
+                descriptionValueText.color = Theme.Color(ThemeRole.InkPrimary);
             }
             else
             {
                 descriptionValueText.text = "Необязательно";
-                descriptionValueText.color = new Color32(199, 199, 204, 255); // --text-tertiary
+                descriptionValueText.color = Theme.Color(ThemeRole.InkTertiary); // --text-tertiary
             }
         }
 
@@ -1702,7 +1705,7 @@ public partial class Manager : MonoBehaviour
         if (platformValueText != null)
         {
             platformValueText.text = "Выберите";
-            platformValueText.color = new Color32(142, 142, 147, 255);
+            platformValueText.color = Theme.Color(ThemeRole.InkTertiary);
             platformValueText.gameObject.SetActive(true);
         }
         if (platformWhatsappGroup != null) platformWhatsappGroup.SetActive(false);
@@ -1711,17 +1714,17 @@ public partial class Manager : MonoBehaviour
         if (botNameValueText != null)
         {
             botNameValueText.text = "Введите имя";
-            botNameValueText.color = new Color32(142, 142, 147, 255);
+            botNameValueText.color = Theme.Color(ThemeRole.InkTertiary);
         }
         if (businessTypeValueText != null)
         {
             businessTypeValueText.text = "Выберите тип";
-            businessTypeValueText.color = new Color32(142, 142, 147, 255);
+            businessTypeValueText.color = Theme.Color(ThemeRole.InkTertiary);
         }
         if (descriptionValueText != null)
         {
             descriptionValueText.text = "Необязательно";
-            descriptionValueText.color = new Color32(199, 199, 204, 255);
+            descriptionValueText.color = Theme.Color(ThemeRole.InkTertiary);
         }
 
         if (WhatsappNumberInput != null) WhatsappNumberInput.text = "";
