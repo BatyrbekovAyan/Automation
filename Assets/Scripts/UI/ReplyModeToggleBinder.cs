@@ -57,7 +57,7 @@ public class ReplyModeToggleBinder : MonoBehaviour
 
     private string currentBotId;
     private ReplyMode currentMode = AutoButtonModel.DefaultMode;
-    private string pendingBotId;   // popup target — may be a non-active bot (sheet chip)
+    private Action pendingConfirm;   // armed by ShowConfirm, fired by the popup's confirm button
     private bool popupWired;
 
     /// <summary>Reads a bot's persisted reply mode (unset ⇒ semi-auto, the silent default).</summary>
@@ -91,10 +91,56 @@ public class ReplyModeToggleBinder : MonoBehaviour
     {
         if (string.IsNullOrEmpty(botName)) return;
 
-        if (instance != null && instance.confirmPopup != null)
-            instance.ShowEnableConfirm(botName);
-        else
+        if (!ShowConfirm(EnableTitle, EnableBody, () => CommitMode(botName, ReplyMode.Auto)))
             CommitMode(botName, ReplyMode.Auto);
+    }
+
+    /// <summary>
+    /// Show the shared confirm popup with caller-supplied copy; <paramref name="onConfirm"/>
+    /// runs only when the user confirms. Returns false when no popup is wired —
+    /// callers then commit directly. Also serves SemiAutoToggle's per-chat gate.
+    /// </summary>
+    public static bool ShowConfirm(string title, string body, Action onConfirm)
+    {
+        if (instance == null || instance.confirmPopup == null) return false;
+
+        instance.pendingConfirm = onConfirm;
+        if (instance.confirmTitle != null) instance.confirmTitle.text = title;
+        if (instance.confirmBody != null) instance.confirmBody.text = body;
+        PopupUI.Show(instance.confirmPopup);
+        return true;
+    }
+
+    /// <summary>
+    /// The single source of the «Авто» chip's state colors — used by the header
+    /// button, the sheet's per-bot chips, and the per-chat SemiAutoToggle so the
+    /// three controls can never drift apart. ON = PositiveBg pill + filled lamp;
+    /// OFF = Border ring on Surface + hollow lamp. Every ref is null-guarded.
+    /// </summary>
+    public static void PaintChip(bool on, Image ring, Image fill, TextMeshProUGUI chipLabel,
+        Image lampRing, Image lampCore, bool animate, float duration = AnimDuration)
+    {
+        Color fillColor = on ? Theme.Color(ThemeRole.PositiveBg) : Theme.Color(ThemeRole.Surface);
+        Color ringColor = on ? Theme.Color(ThemeRole.PositiveBg) : Theme.Color(ThemeRole.Border);
+        Color inkColor = on ? Theme.Color(ThemeRole.PositiveInk) : Theme.Color(ThemeRole.InkSecondary);
+        Color lampColor = on ? Theme.Color(ThemeRole.PositiveInk) : Theme.Color(ThemeRole.InkTertiary);
+        Color lampCoreColor = on ? lampColor : fillColor;
+
+        if (!animate)
+        {
+            if (fill != null) fill.color = fillColor;
+            if (ring != null) ring.color = ringColor;
+            if (chipLabel != null) chipLabel.color = inkColor;
+            if (lampRing != null) lampRing.color = lampColor;
+            if (lampCore != null) lampCore.color = lampCoreColor;
+            return;
+        }
+
+        if (fill != null) fill.DOColor(fillColor, duration).SetEase(Ease.OutCubic);
+        if (ring != null) ring.DOColor(ringColor, duration).SetEase(Ease.OutCubic);
+        if (chipLabel != null) chipLabel.DOColor(inkColor, duration).SetEase(Ease.OutCubic);
+        if (lampRing != null) lampRing.DOColor(lampColor, duration).SetEase(Ease.OutCubic);
+        if (lampCore != null) lampCore.DOColor(lampCoreColor, duration).SetEase(Ease.OutCubic);
     }
 
     private void Awake()
@@ -168,27 +214,18 @@ public class ReplyModeToggleBinder : MonoBehaviour
             DisableAuto(currentBotId);   // instant — CommitMode repaints us
     }
 
-    private void ShowEnableConfirm(string botName)
-    {
-        pendingBotId = botName;
-        if (confirmTitle != null) confirmTitle.text = EnableTitle;
-        if (confirmBody != null) confirmBody.text = EnableBody;
-        PopupUI.Show(confirmPopup);
-    }
-
     private void OnConfirm()
     {
         if (confirmPopup != null) PopupUI.Hide(confirmPopup);
-        if (string.IsNullOrEmpty(pendingBotId)) return;
-
-        CommitMode(pendingBotId, ReplyMode.Auto);
-        pendingBotId = null;
+        Action confirmed = pendingConfirm;
+        pendingConfirm = null;
+        confirmed?.Invoke();
     }
 
     private void OnCancel()
     {
         if (confirmPopup != null) PopupUI.Hide(confirmPopup);
-        pendingBotId = null;
+        pendingConfirm = null;
     }
 
     private void SetVisualMode(ReplyMode mode, bool animate)
@@ -199,31 +236,8 @@ public class ReplyModeToggleBinder : MonoBehaviour
 
     private void ApplyVisuals(ReplyMode mode, bool animate)
     {
-        bool on = AutoButtonModel.IsAutoOn(mode);
-
-        Color fill = on ? Theme.Color(ThemeRole.PositiveBg) : Theme.Color(ThemeRole.Surface);
-        Color ring = on ? Theme.Color(ThemeRole.PositiveBg) : Theme.Color(ThemeRole.Border);
-        Color ink = on ? Theme.Color(ThemeRole.PositiveInk) : Theme.Color(ThemeRole.InkSecondary);
-        Color lamp = on ? Theme.Color(ThemeRole.PositiveInk) : Theme.Color(ThemeRole.InkTertiary);
-        Color lampCore = on ? Theme.Color(ThemeRole.PositiveInk) : fill;
-
         KillColorTweens();
-
-        if (!animate)
-        {
-            if (fillImage != null) fillImage.color = fill;
-            if (ringImage != null) ringImage.color = ring;
-            if (label != null) label.color = ink;
-            if (dotRing != null) dotRing.color = lamp;
-            if (dotCore != null) dotCore.color = lampCore;
-            return;
-        }
-
-        if (fillImage != null) fillImage.DOColor(fill, AnimDuration).SetEase(Ease.OutCubic);
-        if (ringImage != null) ringImage.DOColor(ring, AnimDuration).SetEase(Ease.OutCubic);
-        if (label != null) label.DOColor(ink, AnimDuration).SetEase(Ease.OutCubic);
-        if (dotRing != null) dotRing.DOColor(lamp, AnimDuration).SetEase(Ease.OutCubic);
-        if (dotCore != null) dotCore.DOColor(lampCore, AnimDuration).SetEase(Ease.OutCubic);
+        PaintChip(AutoButtonModel.IsAutoOn(mode), ringImage, fillImage, label, dotRing, dotCore, animate);
     }
 
     private void KillColorTweens()

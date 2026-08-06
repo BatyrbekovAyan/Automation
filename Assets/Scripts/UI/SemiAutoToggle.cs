@@ -1,84 +1,107 @@
 using System;
+using DG.Tweening;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using DG.Tweening;
 
 /// <summary>
-/// Per-chat reply-mode switch in the open-chat top bar (SEMI-01). A COMPACT sibling of the
-/// chats-list <see cref="ReplyModeToggleBinder"/> — same sliding-knob form and color language so
-/// the two read as one control (bot-wide default vs this conversation). "Авто" (green) on the
-/// RIGHT, "Вместе" (semi-auto, blue) on the LEFT; the white thumb covers the active word and
-/// slides on switch while the track recolours. View only: it raises <see cref="OnToggled"/> with
-/// the desired state on tap; SuggestionsController persists it (SemiAutoStore) and drives the panel.
+/// Per-chat «Авто» chip in the open-chat top bar — the conversation-scoped
+/// sibling of the chats-list <see cref="ReplyModeToggleBinder"/> button, sharing
+/// its exact visual language via <see cref="ReplyModeToggleBinder.PaintChip"/>
+/// (2026-08 restyle): PositiveBg pill + filled lamp when the bot answers THIS
+/// client itself, outlined pill + hollow lamp when it only proposes replies.
+///
+/// View only, same contract as the sliding-knob era: it raises
+/// <see cref="OnToggled"/> with the DESIRED semi-auto state on tap;
+/// SuggestionsController persists it (SemiAutoStore, explicit per-chat
+/// override) and drives the suggestions panel. The header's confirm asymmetry
+/// applies per chat too: enabling auto for the chat (desired semi = false)
+/// routes through the shared confirm popup with chat-scoped copy; disabling is
+/// instant. Rebuilt + wired by ChatsTopBarRestyleBuilder.
 /// </summary>
 public class SemiAutoToggle : MonoBehaviour
 {
-    [SerializeField] private Button toggleButton;          // whole switch is the tap target
-    [SerializeField] private Image trackImage;             // recolours green (Auto) ↔ blue (Semi)
-    [SerializeField] private RectTransform thumb;          // slides right (Auto) ↔ left (Semi)
-    [SerializeField] private TextMeshProUGUI thumbLabel;   // active word, covered by the thumb
-    [SerializeField] private TextMeshProUGUI faintAvto;    // recessive "Авто" on the right
-    [SerializeField] private TextMeshProUGUI faintVmeste;  // recessive "Вместе" on the left
-    [SerializeField] private float thumbX = 54f;           // ± slide distance (set by the builder)
+    [SerializeField] private Button toggleButton;
+    [SerializeField] private Image ringImage;
+    [SerializeField] private Image fillImage;
+    [SerializeField] private TextMeshProUGUI label;
+    [SerializeField] private Image dotRing;
+    [SerializeField] private Image dotCore;
 
-    private bool _on;                                       // true = semi-auto on
-    public event Action<bool> OnToggled;                   // fires desired state on tap
+    /// <summary>Fires the desired semi-auto state on tap (after the confirm gate).</summary>
+    public event Action<bool> OnToggled;
 
-    // Match ReplyModeToggleBinder exactly so the two switches share one color language.
-    private static readonly Color TrackAuto  = new Color32(0x2F, 0xB3, 0x44, 0xFF);
-    private static readonly Color TrackSemi  = new Color32(0x00, 0x7A, 0xFF, 0xFF);
-    private static readonly Color InkAuto    = new Color32(0x20, 0x6A, 0x2C, 0xFF);
-    private static readonly Color InkSemi    = new Color32(0x00, 0x4C, 0x99, 0xFF);
-    private static readonly Color FaintAuto  = new Color32(0xC3, 0xEF, 0xCB, 0xFF);
-    private static readonly Color FaintSemi  = new Color32(0xA8, 0xCF, 0xFF, 0xFF);
-    private const float AnimDuration = 0.22f;
+    private const string EnableTitle = "Включить авто-режим в этом чате?";
+    private const string EnableBody =
+        "Бот будет сам отвечать этому клиенту. Выключить можно в любой момент — этой же кнопкой.";
 
-    void Awake()
+    private bool _on;   // true = semi-auto on for this chat (the «Авто» chip reads unlit)
+
+    private void Awake()
     {
-        if (toggleButton != null) toggleButton.onClick.AddListener(() => OnToggled?.Invoke(!_on));
+        if (toggleButton == null) toggleButton = GetComponent<Button>();
+        if (toggleButton != null)
+        {
+            toggleButton.onClick.RemoveAllListeners();
+            toggleButton.onClick.AddListener(HandlePressed);
+        }
     }
 
-    void OnDisable()
+    private void OnEnable()
     {
-        if (thumb != null) thumb.DOKill();
-        if (trackImage != null) trackImage.DOKill();
+        Theme.Changed += RepaintForTheme;
+        ApplyVisuals(_on, animate: false);
     }
 
-    /// <summary>Sets the visual state. <paramref name="on"/> = semi-auto ("Вместе"/blue/left).</summary>
+    private void OnDisable()
+    {
+        Theme.Changed -= RepaintForTheme;
+        KillColorTweens();
+        transform.DOKill();
+        transform.localScale = Vector3.one;
+    }
+
+    /// <summary>Sets the visual state. <paramref name="on"/> = semi-auto (chip unlit).</summary>
     public void SetLit(bool on)
     {
-        bool animate = _on != on && gameObject.activeInHierarchy;   // slide only on a real, visible change
+        bool animate = _on != on && gameObject.activeInHierarchy;   // animate only a real, visible change
         _on = on;
         ApplyVisuals(on, animate);
     }
 
+    private void RepaintForTheme() => ApplyVisuals(_on, animate: false);
+
+    private void HandlePressed()
+    {
+        transform.DOKill();
+        transform.localScale = Vector3.one;
+        transform.DOPunchScale(Vector3.one * -0.04f, 0.18f, 1, 0.5f);
+
+        bool desiredSemi = !_on;
+        if (desiredSemi)
+        {
+            OnToggled?.Invoke(true);   // turning auto OFF for this chat — safe, instant
+            return;
+        }
+
+        // Turning auto ON for this chat — the bot starts writing this client, so
+        // the same confirm gate as the header button, scoped to one conversation.
+        if (!ReplyModeToggleBinder.ShowConfirm(EnableTitle, EnableBody, () => OnToggled?.Invoke(false)))
+            OnToggled?.Invoke(false);  // no popup wired — commit straight away
+    }
+
     private void ApplyVisuals(bool semi, bool animate)
     {
-        Color track = semi ? TrackSemi : TrackAuto;
-        float x = semi ? -thumbX : thumbX;                          // Вместе left, Авто right
-        Color faint = semi ? FaintSemi : FaintAuto;
+        KillColorTweens();
+        ReplyModeToggleBinder.PaintChip(!semi, ringImage, fillImage, label, dotRing, dotCore, animate);
+    }
 
-        if (thumbLabel != null)
-        {
-            thumbLabel.text = semi ? "Вместе" : "Авто";
-            thumbLabel.color = semi ? InkSemi : InkAuto;
-        }
-        if (faintAvto != null) faintAvto.color = faint;
-        if (faintVmeste != null) faintVmeste.color = faint;
-
-        if (thumb != null) thumb.DOKill();
-        if (trackImage != null) trackImage.DOKill();
-
-        if (animate)
-        {
-            if (thumb != null) thumb.DOAnchorPosX(x, AnimDuration).SetEase(Ease.OutCubic);
-            if (trackImage != null) trackImage.DOColor(track, AnimDuration).SetEase(Ease.OutCubic);
-        }
-        else
-        {
-            if (thumb != null) { Vector2 p = thumb.anchoredPosition; p.x = x; thumb.anchoredPosition = p; }
-            if (trackImage != null) trackImage.color = track;
-        }
+    private void KillColorTweens()
+    {
+        if (fillImage != null) fillImage.DOKill();
+        if (ringImage != null) ringImage.DOKill();
+        if (label != null) label.DOKill();
+        if (dotRing != null) dotRing.DOKill();
+        if (dotCore != null) dotCore.DOKill();
     }
 }

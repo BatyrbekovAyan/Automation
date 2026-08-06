@@ -270,14 +270,23 @@ public static class ChatsTopBarRestyleBuilder
 
     private static GameObject RestyleConfirmPopup(Transform chatsPanel)
     {
+        // The popup may already have been lifted to the screen root (see below) —
+        // look in both homes so re-runs stay idempotent.
         Transform popup = chatsPanel.Find("ReplyModeConfirmPopup");
+        if (popup == null && chatsPanel.parent != null)
+            popup = chatsPanel.parent.Find("ReplyModeConfirmPopup");
         if (popup == null)
         {
             Debug.LogWarning("[ChatsTopBarRestyle] ReplyModeConfirmPopup not found — binder falls back to instant commits.");
             return null;
         }
 
-        popup.SetAsLastSibling();   // must render ABOVE Sheet_BotSwitcher (chip confirms)
+        // Lift the popup to the screen root: as a ChatsPanel child it would render
+        // BEHIND MessagesPanel, and the per-chat SemiAutoToggle confirms from the
+        // open conversation. Last sibling ⇒ above both panels and the bot sheet.
+        if (chatsPanel.parent != null && popup.parent != chatsPanel.parent)
+            popup.SetParent(chatsPanel.parent, worldPositionStays: false);
+        popup.SetAsLastSibling();
 
         Transform card = popup.Find("Content");
         if (card != null)
@@ -311,6 +320,90 @@ public static class ChatsTopBarRestyleBuilder
         }
 
         return popup.gameObject;
+    }
+
+    // ---- Conversation-screen per-chat chip -------------------------------
+
+    [MenuItem("Tools/Chats Top Bar/Restyle Conversation Auto Chip")]
+    public static void BuildConversationChip()
+    {
+        var toggle = UnityEngine.Object.FindFirstObjectByType<SemiAutoToggle>(FindObjectsInactive.Include);
+        if (toggle == null)
+        {
+            Debug.LogError("[ChatsTopBarRestyle] SemiAutoToggle not found — open Main.unity first.");
+            return;
+        }
+
+        TMP_FontAsset font = LoadHeaderFont();
+        GameObject go = toggle.gameObject;
+
+        // The old sliding knob was 220×60; the chip keeps that footprint's slot
+        // but grows the hit target to 88 (sheet-chip metrics: 60u visual pill).
+        var rt = (RectTransform)go.transform;
+        rt.sizeDelta = new Vector2(170f, 88f);
+
+        var hit = go.GetComponent<Image>();
+        if (hit == null) hit = go.AddComponent<Image>();
+        hit.color = new Color(0f, 0f, 0f, 0f);
+        hit.raycastTarget = true;
+
+        var button = go.GetComponent<Button>();
+        if (button == null) button = go.AddComponent<Button>();
+        button.transition = Selectable.Transition.None;
+        button.targetGraphic = hit;
+
+        // The knob's Thumb/Faint* children retire wholesale.
+        for (int i = go.transform.childCount - 1; i >= 0; i--)
+            UnityEngine.Object.DestroyImmediate(go.transform.GetChild(i).gameObject);
+
+        // The root's old rounded-track component would clip the transparent hit
+        // rect oddly — retune it to the new rect (harmless if absent).
+        SetRoundedRadius(go, 44f);
+
+        var pill = NewUiChild(go.transform, "Pill", typeof(RectTransform));
+        var pillRt = (RectTransform)pill.transform;
+        pillRt.anchorMin = new Vector2(0f, 0.5f);
+        pillRt.anchorMax = new Vector2(1f, 0.5f);
+        pillRt.pivot = new Vector2(0.5f, 0.5f);
+        pillRt.sizeDelta = new Vector2(0f, 60f);
+        pillRt.anchoredPosition = Vector2.zero;
+
+        Image ring = BuildStretchedImage(pill.transform, "Ring", LBorder, 30f, Vector2.zero);
+        Image fill = BuildStretchedImage(pill.transform, "Fill", LSurface, 27f, new Vector2(3f, 3f));
+
+        var content = NewUiChild(pill.transform, "Content", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+        Stretch((RectTransform)content.transform, Vector2.zero);
+        var hlg = content.GetComponent<HorizontalLayoutGroup>();
+        hlg.childAlignment = TextAnchor.MiddleCenter;
+        hlg.spacing = 10f;
+        hlg.childControlWidth = false;
+        hlg.childControlHeight = false;
+        hlg.childForceExpandWidth = false;
+        hlg.childForceExpandHeight = false;
+
+        (Image dotRing, Image dotCore) = BuildLamp(content.transform, 14f, 3f, LInkTertiary, LSurface);
+        TextMeshProUGUI label = BuildTmp(content.transform, "Label", "Авто", 26f, FontStyles.Bold,
+            LInkSecondary, font, new Vector2(70f, 34f));
+
+        var so = new SerializedObject(toggle);
+        SetRef(so, "toggleButton", button);
+        SetRef(so, "ringImage", ring);
+        SetRef(so, "fillImage", fill);
+        SetRef(so, "label", label);
+        SetRef(so, "dotRing", dotRing);
+        SetRef(so, "dotCore", dotCore);
+        so.ApplyModifiedPropertiesWithoutUndo();
+
+        // The chip confirms from the open conversation — the shared popup must
+        // sit above MessagesPanel. Locate ChatsPanel via the channel switcher.
+        var switcherView = UnityEngine.Object.FindFirstObjectByType<ChannelSwitcherView>(FindObjectsInactive.Include);
+        Transform chatsPanel = switcherView != null ? switcherView.transform.parent?.parent?.parent : null;
+        if (chatsPanel != null) RestyleConfirmPopup(chatsPanel);
+
+        Canvas.ForceUpdateCanvases();
+        EditorSceneManager.MarkSceneDirty(go.scene);
+        EditorSceneManager.SaveOpenScenes();
+        Debug.Log("[ChatsTopBarRestyle] Conversation SemiAutoToggle rebuilt as the «Авто» chip and rewired.");
     }
 
     // ---- Channel well ----------------------------------------------------

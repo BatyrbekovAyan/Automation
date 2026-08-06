@@ -155,17 +155,8 @@ public class BotSwitcherRowView : MonoBehaviour
         if (!visible) return;
 
         bool on = AutoButtonModel.IsAutoOn(ReplyModeToggleBinder.GetMode(botId));
-
-        Color fill = on ? Theme.Color(ThemeRole.PositiveBg) : Theme.Color(ThemeRole.Surface);
-        Color ring = on ? Theme.Color(ThemeRole.PositiveBg) : Theme.Color(ThemeRole.Border);
-        Color ink = on ? Theme.Color(ThemeRole.PositiveInk) : Theme.Color(ThemeRole.InkSecondary);
-        Color lamp = on ? Theme.Color(ThemeRole.PositiveInk) : Theme.Color(ThemeRole.InkTertiary);
-
-        if (chipFill != null) chipFill.color = fill;
-        if (chipRing != null) chipRing.color = ring;
-        if (chipLabel != null) chipLabel.color = ink;
-        if (chipDotRing != null) chipDotRing.color = lamp;
-        if (chipDotCore != null) chipDotCore.color = on ? lamp : fill;
+        ReplyModeToggleBinder.PaintChip(on, chipRing, chipFill, chipLabel,
+            chipDotRing, chipDotCore, animate: false);
     }
 
     private void HandleModeChanged(string changedBotId, ReplyModeToggleBinder.ReplyMode _)
