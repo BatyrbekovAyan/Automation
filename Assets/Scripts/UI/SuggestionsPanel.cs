@@ -35,6 +35,14 @@ public class SuggestionsPanel : MonoBehaviour
     public float Footprint => rt != null ? rt.rect.height : 0f;
     private float HiddenY => _restY - Footprint;
 
+    /// <summary>True while the sheet is (or is animating) open. Hide() flips it immediately.</summary>
+    public bool IsShown => _visible;
+
+    /// <summary>0 at rest → 1 fully dragged down. Read by the grab handle's close decision.</summary>
+    public float DragProgress => rt == null || Footprint <= 0f
+        ? 0f
+        : Mathf.Clamp01((_restY - rt.anchoredPosition.y) / Footprint);
+
     void Awake()
     {
         if (refreshButton != null) refreshButton.onClick.AddListener(() => OnRefreshRequested?.Invoke());
@@ -160,6 +168,33 @@ public class SuggestionsPanel : MonoBehaviour
                             .OnComplete(() => { _sliding = false; gameObject.SetActive(false); });
         }
         else gameObject.SetActive(false);
+    }
+
+    // --- Grab-handle drag (SheetDragHandle drives; the panel owns its tween state) ----------
+
+    /// <summary>Finger down on the grab zone — stop any running slide so the drag owns the position.</summary>
+    public void BeginHandleDrag()
+    {
+        _slideTween?.Kill();
+        _slideTween = null;
+        _sliding = false;
+    }
+
+    /// <summary>Follow the finger: <paramref name="draggedDown"/> ≥ 0 units below the rest position.</summary>
+    public void DragBy(float draggedDown)
+    {
+        if (rt == null) return;
+        float y = Mathf.Clamp(_restY - Mathf.Max(0f, draggedDown), HiddenY, _restY);
+        rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, y);
+    }
+
+    /// <summary>Released without committing a close — spring back to the rest position.</summary>
+    public void SnapBack()
+    {
+        if (rt == null) return;
+        _slideTween?.Kill();
+        _sliding = true;
+        _slideTween = rt.DOAnchorPosY(_restY, 0.2f).SetEase(Ease.OutCubic).OnComplete(() => _sliding = false);
     }
 
     // --- Skeleton shimmer (neutral, no spinner) -----------------------------

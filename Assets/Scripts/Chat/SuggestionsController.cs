@@ -350,4 +350,19 @@ public class SuggestionsController : MonoBehaviour
     {
         if (_semiAutoOn) IssueRequest(steerTowardText: null, lastIncomingText: null);
     }
+
+    // --- Manual sheet show/hide (grab-handle close + composer toggle button) ---
+    // Routes through ShowPanel/HidePanel so the message-list floor always follows the sheet.
+    // Only meaningful in «Вместе» — in Авто there is no suggestions flow to reveal. A manual
+    // close is a soft dismiss: later results keep rendering silently and the next chat-open or
+    // toggle-ON re-shows as before.
+
+    public void SetSheetOpen(bool open)
+    {
+        if (!_semiAutoOn) return;
+        if (open) ShowPanel();
+        else HidePanel();
+    }
+
+    public void ToggleSheet() => SetSheetOpen(!(_panel != null && _panel.IsShown));
 }

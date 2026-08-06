@@ -21,7 +21,8 @@ public class SuggestionCard : MonoBehaviour
     [SerializeField] private TextMeshProUGUI intentLabel;  // legend label on the top border
     [SerializeField] private Image cardBackground;         // inner fill (Surface / PositiveBg)
     [SerializeField] private Image borderImage;            // outer ring (Border / PositiveInk-tinted)
-    [SerializeField] private Image legendLowerStrip;       // legend half below the border — matches the fill
+    [SerializeField] private Image legendPillBorder;       // legend pill ring — matches the card border
+    [SerializeField] private Image legendPillFill;         // legend pill interior — matches the card fill
     [SerializeField] private GameObject sparkIcon;         // ✦ in the legend, recommended card only
 
     public event Action<string> OnTapped;
@@ -60,7 +61,8 @@ public class SuggestionCard : MonoBehaviour
             : Theme.Color(ThemeRole.Border);
         if (cardBackground != null) cardBackground.color = fill;
         if (borderImage != null) borderImage.color = border;
-        if (legendLowerStrip != null) legendLowerStrip.color = fill;   // legend blends into the card
+        if (legendPillBorder != null) legendPillBorder.color = border;   // pill reads as part of the border system
+        if (legendPillFill != null) legendPillFill.color = fill;
         if (intentLabel != null)
             intentLabel.color = isTop ? Theme.Color(ThemeRole.PositiveInk) : Theme.Color(ThemeRole.InkSecondary);
     }

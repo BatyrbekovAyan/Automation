@@ -36,14 +36,17 @@ public static class SuggestionsPanelBuilder
     private const float HeaderSparkSize = 33f, HeaderTitleSize = 28f;
     private const float RefreshHit = 120f, RefreshIconSize = 44f;
     private const string RefreshIconGuid = "aabd39746767444e984449139c957125";   // "relaod 1.png" — owner-assigned refresh sprite
-    private const float ContentSidePad = 24f, ContentTopPad = 27f, ContentBottomPad = 27f, CardGap = 15f;
+    // CardGap 30 (sketch P's 10px gap) so the legend pill clears the previous card's bottom edge.
+    private const float ContentSidePad = 24f, ContentTopPad = 27f, ContentBottomPad = 27f, CardGap = 30f;
     private const float CardRadius = 42f, CardBorder = 3f;
     private const float CardPadSide = 33f, CardPadTop = 24f, CardPadBottom = 27f;
     private const float ReplySize = 38f;
     private const float LegendInsetX = 33f, LegendFont = 26f, LegendPadSide = 15f, LegendSparkSize = 27f;
+    private const float LegendPillRadius = 21f;    // ≈ half the pill height → capsule
     private const float FadeHeight = 72f;
     private const float ScrollbarW = 9f;
-    private const float SkeletonHeight = 150f;
+    private const float SkeletonHeight = 144f;     // 4×144 + 3×30 gaps + 54 pads = 720 ≤ 738 viewport
+    private const float SwipeProxyWidth = 150f;    // matches the global SwipeBack strip width
     private const float StateSize = 39f, RetryFont = 36f, RetryRadius = 36f;
 
     // Reply-mode switch (built only if absent — legacy geometry, untouched by the redesign).
@@ -122,6 +125,7 @@ public static class SuggestionsPanelBuilder
             panelGo.transform.SetSiblingIndex(quickReplySibling.GetSiblingIndex() + 1);
 
         BuildGrabber(panelGo.transform);
+        SheetDragHandle dragHandle = BuildGrabZone(panelGo.transform);
         Button refreshButton = null;
         BuildHeader(panelGo.transform, sparkle, ref refreshButton);
 
@@ -139,6 +143,8 @@ public static class SuggestionsPanelBuilder
         Button errorRetry;
         GameObject error = BuildErrorState(panelGo.transform, viewportRt, out errorRetry);
 
+        BuildSwipeBackProxy(panelGo.transform, cardsContainer);
+
         var panel = panelGo.AddComponent<SuggestionsPanel>();
         var so = new SerializedObject(panel);
         so.FindProperty("cardsContainer").objectReferenceValue = cardsContainer;
@@ -154,6 +160,44 @@ public static class SuggestionsPanelBuilder
         so.FindProperty("rt").objectReferenceValue = rt;
         so.FindProperty("canvasGroup").objectReferenceValue = canvasGroup;
         so.ApplyModifiedPropertiesWithoutUndo();
+
+        // The grab zone follows the panel it lives on; its controller ref is stamped by the wirer.
+        var hso = new SerializedObject(dragHandle);
+        hso.FindProperty("panel").objectReferenceValue = panel;
+        hso.ApplyModifiedPropertiesWithoutUndo();
+    }
+
+    // Full-width transparent strip over the chrome (grabber + header): drag it to move the sheet.
+    // Earlier sibling than the header, so the refresh button still wins its own raycast.
+    private static SheetDragHandle BuildGrabZone(Transform panel)
+    {
+        GameObject go = ImageGo("GrabZone", panel, new Color(0, 0, 0, 0));
+        var rt = (RectTransform)go.transform;
+        rt.anchorMin = new Vector2(0, 1); rt.anchorMax = new Vector2(1, 1); rt.pivot = new Vector2(0.5f, 1);
+        rt.sizeDelta = new Vector2(0, ChromeHeight);
+        rt.anchoredPosition = Vector2.zero;
+        return go.AddComponent<SheetDragHandle>();
+    }
+
+    // Left-edge strip over the card viewport that re-routes gestures: horizontal-right → the global
+    // SwipeToBack (chat slides out under the sheet), vertical → the cards ScrollRect. Taps pass
+    // through to the cards via ClickPassthrough (the SwipeBack strip's own pattern).
+    private static void BuildSwipeBackProxy(Transform panel, Transform cardsContainer)
+    {
+        GameObject go = ImageGo("SwipeBackProxy", panel, new Color(0, 0, 0, 0));
+        var rt = (RectTransform)go.transform;
+        rt.anchorMin = new Vector2(0, 0); rt.anchorMax = new Vector2(0, 1); rt.pivot = new Vector2(0, 0.5f);
+        rt.sizeDelta = new Vector2(SwipeProxyWidth, -ChromeHeight);   // viewport region only — the grab zone owns the chrome
+        rt.anchoredPosition = new Vector2(0, -ChromeHeight / 2f);
+
+        var proxy = go.AddComponent<SuggestionsSheetSwipeProxy>();
+        var so = new SerializedObject(proxy);
+        so.FindProperty("verticalTarget").objectReferenceValue =
+            cardsContainer.GetComponentInParent<UnityEngine.UI.ScrollRect>(true);
+        so.ApplyModifiedPropertiesWithoutUndo();
+
+        var pass = go.AddComponent<ClickPassthrough>();
+        pass.allowedPanel = panel;   // taps may only land inside the sheet (card buttons)
     }
 
     private static void BuildGrabber(Transform panel)
@@ -318,11 +362,11 @@ public static class SuggestionsPanelBuilder
         reply.raycastTarget = false;
         Themed(reply.gameObject, ThemeRole.InkPrimary);
 
-        // Legend — sits ON the card's top border (zero interior height). Two half-height strips
-        // blend it into what's behind: upper = sheet Surface (static), lower = the card's own fill
-        // (stamped per state in SuggestionCard.Setup, like the border/fill themselves).
-        Image lowerStrip; GameObject spark; TextMeshProUGUI label;
-        BuildLegend(card.transform, sparkle, out lowerStrip, out spark, out label);
+        // Legend — a bordered pill sitting ON the card's top border (zero interior height). Ring +
+        // fill are stamped per state in SuggestionCard.Setup so the pill reads as part of the card's
+        // own border system (owner revision: pill, not flat strips — strips looked like an overlay).
+        Image pillBorder; Image pillFill; GameObject spark; TextMeshProUGUI label;
+        BuildLegend(card.transform, sparkle, out pillBorder, out pillFill, out spark, out label);
 
         var button = card.AddComponent<Button>();
         button.transition = Selectable.Transition.None;
@@ -334,7 +378,8 @@ public static class SuggestionsPanelBuilder
         so.FindProperty("intentLabel").objectReferenceValue = label;
         so.FindProperty("cardBackground").objectReferenceValue = fill.GetComponent<Image>();
         so.FindProperty("borderImage").objectReferenceValue = borderImg;
-        so.FindProperty("legendLowerStrip").objectReferenceValue = lowerStrip;
+        so.FindProperty("legendPillBorder").objectReferenceValue = pillBorder;
+        so.FindProperty("legendPillFill").objectReferenceValue = pillFill;
         so.FindProperty("sparkIcon").objectReferenceValue = spark;
         so.ApplyModifiedPropertiesWithoutUndo();
 
@@ -343,16 +388,21 @@ public static class SuggestionsPanelBuilder
     }
 
     private static void BuildLegend(Transform card, Sprite sparkle,
-        out Image lowerStrip, out GameObject spark, out TextMeshProUGUI label)
+        out Image pillBorder, out Image pillFill, out GameObject spark, out TextMeshProUGUI label)
     {
-        GameObject legend = Rect("Legend", card);
+        // Capsule pill: ring Image on the root (color = card border, stamped in Setup) + inset
+        // fill (color = card fill). Hugs its content via CSF; radius ≈ half height → pill.
+        GameObject legend = ImageGo("Legend", card, Color.white);
+        pillBorder = legend.GetComponent<Image>();
+        pillBorder.raycastTarget = false;
+        AddRounded(legend, LegendPillRadius);
         var lrt = (RectTransform)legend.transform;
         lrt.anchorMin = new Vector2(0, 1); lrt.anchorMax = new Vector2(0, 1); lrt.pivot = new Vector2(0, 0.5f);
         lrt.anchoredPosition = new Vector2(LegendInsetX, 0f);   // centered ON the top border, left-inset
         var le = legend.AddComponent<LayoutElement>();
         le.ignoreLayout = true;
         var hlg = legend.AddComponent<HorizontalLayoutGroup>();
-        hlg.padding = new RectOffset((int)LegendPadSide, (int)LegendPadSide, 2, 2);
+        hlg.padding = new RectOffset((int)LegendPadSide, (int)LegendPadSide, 4, 4);
         hlg.spacing = 6;
         hlg.childAlignment = TextAnchor.MiddleCenter;
         hlg.childControlWidth = true; hlg.childControlHeight = true;
@@ -361,22 +411,14 @@ public static class SuggestionsPanelBuilder
         csf.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
         csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-        // Background strips (excluded from layout, stretched to the legend rect).
-        GameObject upper = ImageGo("StripUpper", legend.transform, Color.white);
-        upper.AddComponent<LayoutElement>().ignoreLayout = true;
-        var urt = (RectTransform)upper.transform;
-        urt.anchorMin = new Vector2(0, 0.5f); urt.anchorMax = Vector2.one;
-        urt.offsetMin = Vector2.zero; urt.offsetMax = Vector2.zero;
-        upper.GetComponent<Image>().raycastTarget = false;
-        Themed(upper, ThemeRole.Surface);           // what's behind the border above = the sheet
-
-        GameObject lower = ImageGo("StripLower", legend.transform, Color.white);
-        lower.AddComponent<LayoutElement>().ignoreLayout = true;
-        var drt = (RectTransform)lower.transform;
-        drt.anchorMin = Vector2.zero; drt.anchorMax = new Vector2(1, 0.5f);
-        drt.offsetMin = Vector2.zero; drt.offsetMax = Vector2.zero;
-        lowerStrip = lower.GetComponent<Image>();
-        lowerStrip.raycastTarget = false;           // color stamped in Setup (= card fill)
+        GameObject fillGo = ImageGo("PillFill", legend.transform, Color.white);
+        fillGo.AddComponent<LayoutElement>().ignoreLayout = true;
+        var frt = (RectTransform)fillGo.transform;
+        frt.anchorMin = Vector2.zero; frt.anchorMax = Vector2.one;
+        frt.offsetMin = new Vector2(CardBorder, CardBorder); frt.offsetMax = new Vector2(-CardBorder, -CardBorder);
+        pillFill = fillGo.GetComponent<Image>();
+        pillFill.raycastTarget = false;             // color stamped in Setup (= card fill)
+        AddRounded(fillGo, LegendPillRadius - CardBorder);
 
         spark = ImageGo("Spark", legend.transform, Color.white);
         Image sparkImg = spark.GetComponent<Image>();
@@ -391,8 +433,7 @@ public static class SuggestionsPanelBuilder
             FontStyles.Bold | FontStyles.UpperCase, TextAlignmentOptions.Center);
         label.characterSpacing = 6f;
         label.raycastTarget = false;                // color stamped in Setup (InkSecondary / PositiveInk)
-        upper.transform.SetAsFirstSibling();        // strips behind, then spark, then label on top
-        lower.transform.SetSiblingIndex(1);
+        fillGo.transform.SetAsFirstSibling();       // fill behind, then spark, then label on top
     }
 
     // Thinking-dots skeleton: card-shaped (same two-layer border look) with 3 bouncing dots.
