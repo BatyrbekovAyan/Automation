@@ -7,49 +7,56 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// [MenuItem] builder that constructs the Reply Suggestions Panel (PANEL-01..06) and the
-/// semi-auto top-bar toggle (SEMI-01) into Screen_Whatsapp/MessagesPanel of Main.unity, with
-/// RoundedCorners surfaces and SerializedObject-wired refs. Build-time only; no networking.
-/// Models on ChatsSearchBarBuilder (skeleton + wiring) and BotSwitcherSheetBuilder (RoundedCorners).
+/// [MenuItem] builder that constructs the Reply Suggestions Panel into
+/// Screen_Whatsapp/MessagesPanel of Main.unity. Implements the LOCKED sketch-002 winner "P"
+/// (see .claude/skills/sketch-findings-automation/references/suggestions-panel.md):
+/// a fixed-height Surface sheet (grabber + «✦ ПРЕДЛОЖЕНИЯ» header + quiet refresh icon) whose
+/// full-text bordered cards scroll INSIDE a fixed viewport (cut card + bottom fade + thin bar
+/// as the affordance); intent titles sit ON each card's top border (legend), and the
+/// recommended card is tint-only (PositiveBg/PositiveInk + ✦). All static chrome binds theme
+/// tokens via ThemedColor; per-card dynamic colors are resolved from Theme in
+/// SuggestionCard.Setup. Build-time only; no networking.
+///
+/// The SemiAutoToggle is NOT part of this redesign: an existing toggle in the scene is left
+/// untouched (scene is source of truth); it is built only if absent.
 /// </summary>
 public static class SuggestionsPanelBuilder
 {
     private const string PanelName  = "SuggestionsPanel";
     private const string ToggleName = "SemiAutoToggle";
-    private const string ToggleA11y = "Полуавтоматический режим"; // SEMI-01 accessible label
-    private const string RefreshA11y = "Обновить";                // INT-03 accessible label
+    private const string ToggleA11y = "Полуавтоматический режим";
+    private const string RefreshA11y = "Обновить";
 
-    // --- UI-SPEC colors -----------------------------------------------------
-    // Mint-fresh palette (owner pick) — see suggestions_palette_options_round3.
-    private static readonly Color PanelSurface = Hex("#EAF6F0");        // pale mint sheet
-    private static readonly Color CardSurface  = Hex("#FFFFFF");        // white cards
-    private static readonly Color RecommendedSurface = Hex("#C9EFD9");  // top-card mint tint = "best pick"
-    private static readonly Color ChipFill     = Hex("#DCEFE6");        // intent tab fill
-    private static readonly Color ChipLabel    = Hex("#3E6B57");        // intent tab label
-    private static readonly Color BodyText     = Hex("#14241D");        // deep green-ink reply text
-    private static readonly Color Secondary    = Hex("#5E7C6E");        // muted green-gray (icons, state body, dots)
-    private static readonly Color SkeletonBase = Hex("#DCEAE2");        // mint skeleton card base
-    private static readonly Color Accent       = Hex("#18A06B");        // refresh FAB / primary action (mint green)
-    // Reply-mode switch colors — FIXED green/blue matching the chats-list ReplyModeToggleBinder (NOT the
-    // panel palette), so the per-chat switch and the bot-default switch always read as one control.
-    private static readonly Color SwitchTrackAuto = Hex("#2FB344");     // default (Auto) track; runtime re-resolves
-    private static readonly Color SwitchInkAuto   = Hex("#206A2C");     // active "Авто" ink
-    private static readonly Color SwitchFaintAuto = Hex("#C3EFCB");     // recessive word on green
-
-    // --- Reference-unit sizes (1080×1920, dp×3) -----------------------------
-    private const float Sm = 24f, Md = 48f, Lg = 72f;     // spacing tokens
-    private const float CellHeight = 190f;         // 2×2 grid cell height
-    private const float CellWidth = 504f, GridGap = 24f;   // 2 columns across the tighter ~1032u content width
-    private const float ReplyMinHeight = 50f;      // min scroll height; the scroll flexes to fill the card
-    private const float CardRadius = 24f, PanelTopRadius = 36f;
-    private const float ReplySize = 38f, ChipSize = 26f, StateSize = 39f;   // smaller for narrow grid cards
-    private const float RefreshHit = 120f;
-    private const float RefreshIconSize = 90f;                                   // owner-tuned FAB icon size (was 56)
+    // --- Reference-unit sizes (1080×1920, sketch CSS px × 3) ----------------
+    private const float PanelHeight = 852f;        // 114 chrome + 738 card viewport (fixed footprint)
+    private const float ChromeHeight = 114f;       // grabber zone + header row
+    private const float SheetTopRadius = 48f;
+    private const float GrabberW = 108f, GrabberH = 12f;
+    private const float HeaderTop = 30f, HeaderH = 84f;
+    private const float HeaderSparkSize = 33f, HeaderTitleSize = 28f;
+    private const float RefreshHit = 120f, RefreshIconSize = 44f;
     private const string RefreshIconGuid = "aabd39746767444e984449139c957125";   // "relaod 1.png" — owner-assigned refresh sprite
-    // Compact per-chat reply-mode switch (open-chat header) — a smaller sibling of the chats-list switch.
+    private const float ContentSidePad = 24f, ContentTopPad = 27f, ContentBottomPad = 27f, CardGap = 15f;
+    private const float CardRadius = 42f, CardBorder = 3f;
+    private const float CardPadSide = 33f, CardPadTop = 24f, CardPadBottom = 27f;
+    private const float ReplySize = 38f;
+    private const float LegendInsetX = 33f, LegendFont = 26f, LegendPadSide = 15f, LegendSparkSize = 27f;
+    private const float FadeHeight = 72f;
+    private const float ScrollbarW = 9f;
+    private const float SkeletonHeight = 150f;
+    private const float StateSize = 39f, RetryFont = 36f, RetryRadius = 36f;
+
+    // Reply-mode switch (built only if absent — legacy geometry, untouched by the redesign).
+    private static readonly Color SwitchTrackAuto = Hex("#2FB344");
+    private static readonly Color SwitchInkAuto   = Hex("#206A2C");
+    private static readonly Color SwitchFaintAuto = Hex("#C3EFCB");
     private const float SwitchW = 220f, SwitchH = 60f, SwitchThumbW = 100f, SwitchThumbH = 48f;
-    private const float SwitchSlideX = 54f, SwitchFont = 24f;   // ±54 → thumb end-caps concentric with the track (uniform 6u gap)
-    private const float PanelHeight = 452f;        // hugs content: grid 404 + top/bottom pad 24 (refresh is now a FAB)
+    private const float SwitchSlideX = 54f, SwitchFont = 24f;
+
+    // Generated sprite assets (created once, then reused by guid-stable path).
+    private const string SpriteFolder = "Assets/Sprites/Suggestions";
+    private const string SparklePath = SpriteFolder + "/suggest_sparkle.png";
+    private const string FadePath    = SpriteFolder + "/suggest_fade.png";
 
     [MenuItem("Tools/UI/Build Suggestions Panel")]
     public static void Build()
@@ -69,87 +76,72 @@ public static class SuggestionsPanelBuilder
             return;
         }
 
-        // Idempotent re-run: delete any prior build, then construct fresh (no Undo grouping —
-        // registering created objects for undo causes "dangling component" warnings on
-        // post-create AddComponent; this is a delete-and-rebuild construction tool).
+        Sprite sparkle = EnsureSparkleSprite();
+        Sprite fade = EnsureFadeSprite();
+
+        // Idempotent re-run for the PANEL only (delete-and-rebuild construction tool, no Undo
+        // grouping). The toggle is deliberately preserved when present — it carries hand-tuning
+        // and is not part of the sketch-002 redesign.
         Transform priorPanel = FindChildRecursive(host.transform, PanelName);
         if (priorPanel != null) Object.DestroyImmediate(priorPanel.gameObject);
-        Transform priorToggle = FindChildRecursive(host.transform, ToggleName);
-        if (priorToggle != null) Object.DestroyImmediate(priorToggle.gameObject);
 
-        // Place the panel as a sibling of quickReplyPanel (above the composer, in the same render
-        // layer as the messages/composer so it is NOT occluded), per UI-SPEC. Fall back to the
-        // MessagesPanel host if quickReplyPanel is absent.
         Transform quickReply = FindChildRecursive(host.transform, "QuickReplyPanel");
         Transform panelParent = quickReply != null ? quickReply.parent : host.transform;
 
-        BuildPanel(panelParent, quickReply);
-        BuildToggle(topBar);
+        BuildPanel(panelParent, quickReply, sparkle, fade);
+
+        if (FindChildRecursive(host.transform, ToggleName) == null) BuildToggle(topBar);
 
         EditorUtility.SetDirty(host);
         EditorSceneManager.MarkSceneDirty(host.scene);
-        Debug.Log("SuggestionsPanelBuilder: built SuggestionsPanel + SemiAutoToggle.");
+        Debug.Log("SuggestionsPanelBuilder: built SuggestionsPanel (sketch-002 winner P).");
     }
 
     // === Panel ==============================================================
 
-    private static void BuildPanel(Transform parent, Transform quickReplySibling)
+    private static void BuildPanel(Transform parent, Transform quickReplySibling, Sprite sparkle, Sprite fade)
     {
-        // Sheet: white surface, top-rounded, slide root + fade group. Bottom-anchored, fixed footprint.
-        GameObject panelGo = ImageGo(PanelName, parent, PanelSurface);
+        // Sheet: Surface, top-rounded, slide root + fade group. Bottom-anchored, FIXED footprint.
+        GameObject panelGo = ImageGo(PanelName, parent, Color.white);
+        Themed(panelGo, ThemeRole.Surface);
         var rt = (RectTransform)panelGo.transform;
         rt.anchorMin = new Vector2(0, 0);
         rt.anchorMax = new Vector2(1, 0);
         rt.pivot = new Vector2(0.5f, 0);
         rt.sizeDelta = new Vector2(0, PanelHeight);
-        rt.anchoredPosition = new Vector2(0, 204f);     // above the composer (user-tuned)
-        AddRoundedTop(panelGo, PanelTopRadius);
+        rt.anchoredPosition = new Vector2(0, 204f);     // above the composer (controller re-seats via SetComposerHeight)
+        AddRoundedTop(panelGo, SheetTopRadius);
         var canvasGroup = panelGo.AddComponent<CanvasGroup>();
 
-        // Render the sheet ABOVE the messages AND the invisible left-edge SwipeBack strip. SwipeBack's
-        // SwipeToBack forwards vertical drags to the message list, so if the panel sat below it a vertical
-        // drag on the LEFT card (which overlaps the ~150u strip) would scroll the messages instead of the
-        // card. Placing the panel just after SwipeBack lets the card's own ReplyScroll win the raycast; it
-        // stays below the scroll-FAB and the attach-sheet, and it's SetActive(false) when hidden so it
-        // never blocks SwipeBack while closed. Fall back to just-after-quickReply if the strip is absent.
+        // Same render-order rule as before: just above the SwipeBack strip so the viewport's own
+        // ScrollRect wins vertical drags over SwipeToBack's forwarding.
         Transform swipeStrip = parent.Find("SwipeBack");
         if (swipeStrip != null)
             panelGo.transform.SetSiblingIndex(swipeStrip.GetSiblingIndex() + 1);
         else if (quickReplySibling != null)
             panelGo.transform.SetSiblingIndex(quickReplySibling.GetSiblingIndex() + 1);
 
-        // Refresh control — a circular FAB floating just ABOVE the sheet's top-right (child of the panel
-        // so it slides + fades with it). Moving it out of the sheet frees the top row → tighter top padding.
-        Button refreshButton = BuildRefreshFab(panelGo.transform);
+        BuildGrabber(panelGo.transform);
+        Button refreshButton = null;
+        BuildHeader(panelGo.transform, sparkle, ref refreshButton);
 
-        // Cards container — 2×2 grid (revises D-04's vertical stack per owner; cards scroll internally
-        // so they no longer need full width). Best-first reads top-left → Z-order.
-        GameObject cards = Rect("CardsContainer", panelGo.transform);
-        var crt = (RectTransform)cards.transform;
-        crt.anchorMin = new Vector2(0, 0); crt.anchorMax = new Vector2(1, 1); crt.pivot = new Vector2(0.5f, 1);
-        crt.offsetMin = new Vector2(Sm, Sm);                       // left/bottom inset (tightened)
-        crt.offsetMax = new Vector2(-Sm, -Sm);                     // right/top inset (refresh moved to a FAB → tight top)
-        var grid = cards.AddComponent<GridLayoutGroup>();
-        grid.cellSize = new Vector2(CellWidth, CellHeight);
-        grid.spacing = new Vector2(GridGap, GridGap);
-        grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-        grid.constraintCount = 2;
-        grid.childAlignment = TextAnchor.UpperCenter;
+        // Fixed card viewport — the ONLY thing that scrolls; the sheet never changes height (D-12).
+        RectTransform viewportRt;
+        Transform cardsContainer = BuildCardViewport(panelGo.transform, out viewportRt);
 
-        // 4 skeleton placeholders (D-12) + the card template (cardPrefab).
         var skeletons = new List<GameObject>();
-        for (int i = 0; i < 4; i++) skeletons.Add(BuildSkeleton(cards.transform, i));
-        SuggestionCard cardTemplate = BuildCard(cards.transform, isTemplate: true);
+        for (int i = 0; i < 4; i++) skeletons.Add(BuildSkeleton(cardsContainer, i));
+        SuggestionCard cardTemplate = BuildCard(cardsContainer, sparkle);
 
-        // Empty + error states overlay the cards area (ignored by the layout group).
-        GameObject empty = BuildEmptyState(panelGo.transform, crt);
+        BuildFadeOverlay(panelGo.transform, fade);
+
+        GameObject empty = BuildEmptyState(panelGo.transform, viewportRt);
         Button errorRetry;
-        GameObject error = BuildErrorState(panelGo.transform, crt, out errorRetry);
+        GameObject error = BuildErrorState(panelGo.transform, viewportRt, out errorRetry);
 
-        // Component + SerializedObject wiring (builders MUST rewire serialized consumers).
         var panel = panelGo.AddComponent<SuggestionsPanel>();
         var so = new SerializedObject(panel);
-        so.FindProperty("cardsContainer").objectReferenceValue = cards.transform;
+        so.FindProperty("cardsContainer").objectReferenceValue = cardsContainer;
         so.FindProperty("cardPrefab").objectReferenceValue = cardTemplate;
         var skProp = so.FindProperty("skeletonCards");
         skProp.arraySize = skeletons.Count;
@@ -164,50 +156,173 @@ public static class SuggestionsPanelBuilder
         so.ApplyModifiedPropertiesWithoutUndo();
     }
 
-    private static Button BuildRefreshFab(Transform panel)
+    private static void BuildGrabber(Transform panel)
     {
-        // Circular accent FAB pinned just ABOVE the panel's top-right corner: pivot at its own bottom-right,
-        // lifted by Sm above the top edge. The panel has no mask, so it renders above the sheet and slides
-        // + fades with it (it's a panel child).
-        GameObject go = ImageGo("RefreshFab", panel, Accent);
+        GameObject go = ImageGo("Grabber", panel, Color.white);
+        Themed(go, ThemeRole.Border);
+        go.GetComponent<Image>().raycastTarget = false;
         var rt = (RectTransform)go.transform;
-        rt.anchorMin = new Vector2(1, 1); rt.anchorMax = new Vector2(1, 1); rt.pivot = new Vector2(1, 0);
-        rt.sizeDelta = new Vector2(RefreshHit, RefreshHit);
-        rt.anchoredPosition = new Vector2(-Sm, Sm);      // inset from the right; lifted above the panel top
-        AddRounded(go, RefreshHit / 2f);                 // full circle
-        // Icon = the owner-assigned circular-arrow refresh sprite (guid-loaded so rebuilds keep it), white
-        // tint on the accent FAB, 90×90 + preserveAspect — restored owner tuning (a rebuild had reset it to a
-        // 56×56 null-sprite placeholder).
-        Image icon = ImageGo("Icon", go.transform, Color.white).GetComponent<Image>();
+        rt.anchorMin = new Vector2(0.5f, 1f); rt.anchorMax = new Vector2(0.5f, 1f); rt.pivot = new Vector2(0.5f, 1f);
+        rt.sizeDelta = new Vector2(GrabberW, GrabberH);
+        rt.anchoredPosition = new Vector2(0f, -12f);
+        AddRounded(go, GrabberH / 2f);
+    }
+
+    private static void BuildHeader(Transform panel, Sprite sparkle, ref Button refreshButton)
+    {
+        GameObject header = Rect("Header", panel);
+        var rt = (RectTransform)header.transform;
+        rt.anchorMin = new Vector2(0, 1); rt.anchorMax = new Vector2(1, 1); rt.pivot = new Vector2(0.5f, 1);
+        rt.sizeDelta = new Vector2(0, HeaderH);
+        rt.anchoredPosition = new Vector2(0, -HeaderTop);
+        var hlg = header.AddComponent<HorizontalLayoutGroup>();
+        hlg.padding = new RectOffset((int)LegendInsetX, (int)ContentSidePad, 0, 0);
+        hlg.spacing = 12;
+        hlg.childAlignment = TextAnchor.MiddleLeft;
+        hlg.childControlWidth = true; hlg.childControlHeight = true;
+        hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
+
+        // ✦ + «ПРЕДЛОЖЕНИЯ» overline.
+        Image spark = ImageGo("Spark", header.transform, Color.white).GetComponent<Image>();
+        spark.sprite = sparkle; spark.preserveAspect = true; spark.raycastTarget = false;
+        Themed(spark.gameObject, ThemeRole.PositiveInk);
+        var sparkLe = spark.gameObject.AddComponent<LayoutElement>();
+        sparkLe.preferredWidth = HeaderSparkSize; sparkLe.preferredHeight = HeaderSparkSize;
+        sparkLe.minWidth = HeaderSparkSize; sparkLe.minHeight = HeaderSparkSize;
+
+        TextMeshProUGUI title = Text("Title", header.transform, "ПРЕДЛОЖЕНИЯ", HeaderTitleSize, Color.black,
+            FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
+        title.characterSpacing = 9f;
+        title.raycastTarget = false;
+        Themed(title.gameObject, ThemeRole.InkTertiary);
+
+        GameObject spacer = Rect("Spacer", header.transform);
+        spacer.AddComponent<LayoutElement>().flexibleWidth = 1f;
+
+        // Quiet refresh: full-size invisible hit target (≥120u), small glyph inside. Replaces the FAB.
+        GameObject hit = ImageGo("RefreshButton", header.transform, new Color(0, 0, 0, 0));
+        var hitLe = hit.AddComponent<LayoutElement>();
+        hitLe.preferredWidth = RefreshHit; hitLe.preferredHeight = RefreshHit;
+        hitLe.minWidth = RefreshHit; hitLe.minHeight = RefreshHit;
+        Image icon = ImageGo("Icon", hit.transform, Color.white).GetComponent<Image>();
         icon.sprite = LoadSpriteByGuid(RefreshIconGuid);
-        icon.preserveAspect = true;
+        icon.preserveAspect = true; icon.raycastTarget = false;
+        Themed(icon.gameObject, ThemeRole.InkSecondary);
         var irt = (RectTransform)icon.transform; irt.sizeDelta = new Vector2(RefreshIconSize, RefreshIconSize); Center(irt);
-        Rect("A11y:" + RefreshA11y, go.transform);       // accessible label node
-        return go.AddComponent<Button>();
+        Rect("A11y:" + RefreshA11y, hit.transform);
+        refreshButton = hit.AddComponent<Button>();
+        refreshButton.transition = Selectable.Transition.None;
+    }
+
+    // The fixed-height scroll region below the chrome. Returns the content (cards container).
+    private static Transform BuildCardViewport(Transform panel, out RectTransform viewportRt)
+    {
+        GameObject viewport = ImageGo("CardsViewport", panel, new Color(0, 0, 0, 0));
+        viewportRt = (RectTransform)viewport.transform;
+        viewportRt.anchorMin = new Vector2(0, 0); viewportRt.anchorMax = new Vector2(1, 1);
+        viewportRt.offsetMin = Vector2.zero;
+        viewportRt.offsetMax = new Vector2(0, -ChromeHeight);
+        viewport.GetComponent<Image>().raycastTarget = true;    // drag anywhere in the region scrolls
+        viewport.AddComponent<RectMask2D>();
+
+        var scroll = viewport.AddComponent<ScrollRect>();
+        scroll.horizontal = false; scroll.vertical = true;
+        scroll.movementType = ScrollRect.MovementType.Clamped;
+        scroll.scrollSensitivity = 30f;
+
+        GameObject content = Rect("CardsContainer", viewport.transform);
+        var crt = (RectTransform)content.transform;
+        crt.anchorMin = new Vector2(0, 1); crt.anchorMax = new Vector2(1, 1); crt.pivot = new Vector2(0.5f, 1);
+        crt.sizeDelta = Vector2.zero;
+        var vlg = content.AddComponent<VerticalLayoutGroup>();
+        vlg.padding = new RectOffset((int)ContentSidePad, (int)ContentSidePad, (int)ContentTopPad, (int)ContentBottomPad);
+        vlg.spacing = CardGap;
+        vlg.childAlignment = TextAnchor.UpperCenter;
+        vlg.childControlWidth = true; vlg.childControlHeight = true;
+        vlg.childForceExpandWidth = true; vlg.childForceExpandHeight = false;
+        content.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        scroll.viewport = viewportRt;
+        scroll.content = crt;
+
+        // Thin overlay scrollbar (sketch detail): AutoHide keeps it away when content fits.
+        GameObject barGo = ImageGo("Scrollbar", viewport.transform, new Color(0, 0, 0, 0));
+        var brt = (RectTransform)barGo.transform;
+        brt.anchorMin = new Vector2(1, 0); brt.anchorMax = new Vector2(1, 1); brt.pivot = new Vector2(1, 0.5f);
+        brt.sizeDelta = new Vector2(ScrollbarW, -12f);
+        brt.anchoredPosition = new Vector2(-3f, 0f);
+        var bar = barGo.AddComponent<Scrollbar>();
+        bar.direction = Scrollbar.Direction.BottomToTop;
+        GameObject slide = Rect("SlidingArea", barGo.transform);
+        Stretch((RectTransform)slide.transform);
+        GameObject handleGo = ImageGo("Handle", slide.transform, Color.white);
+        Themed(handleGo, ThemeRole.Border);
+        handleGo.GetComponent<Image>().raycastTarget = false;
+        Stretch((RectTransform)handleGo.transform);
+        AddRounded(handleGo, ScrollbarW / 2f);
+        bar.handleRect = (RectTransform)handleGo.transform;
+        bar.targetGraphic = handleGo.GetComponent<Image>();
+        scroll.verticalScrollbar = bar;
+        scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
+
+        return content.transform;
+    }
+
+    private static void BuildFadeOverlay(Transform panel, Sprite fadeSprite)
+    {
+        // Surface→transparent wash over the viewport's bottom edge — the "there's more" cue.
+        // Per-pixel alpha comes from the generated sprite; ThemedColor repaints the hue only.
+        GameObject go = ImageGo("BottomFade", panel, Color.white);
+        Image img = go.GetComponent<Image>();
+        img.sprite = fadeSprite;
+        img.raycastTarget = false;
+        Themed(go, ThemeRole.Surface);
+        var rt = (RectTransform)go.transform;
+        rt.anchorMin = new Vector2(0, 0); rt.anchorMax = new Vector2(1, 0); rt.pivot = new Vector2(0.5f, 0);
+        rt.sizeDelta = new Vector2(0, FadeHeight);
+        rt.anchoredPosition = Vector2.zero;
     }
 
     // === Card ===============================================================
 
-    private static SuggestionCard BuildCard(Transform parent, bool isTemplate)
+    private static SuggestionCard BuildCard(Transform parent, Sprite sparkle)
     {
-        GameObject card = ImageGo("SuggestionCard", parent, CardSurface);
-        Image cardBg = card.GetComponent<Image>();
+        // Two-layer bordered card: root Image = border ring (rounded 42), inset "Fill" = surface
+        // (rounded 39). The root's VerticalLayoutGroup sizes the card to the FULL reply text — no
+        // per-card scrolling, no truncation; the padding bakes in the 3u border inset.
+        GameObject card = ImageGo("SuggestionCard", parent, Color.white);
+        Image borderImg = card.GetComponent<Image>();
         AddRounded(card, CardRadius);
-        // The grid sizes the card to the cell — no LayoutElement needed.
         var vlg = card.AddComponent<VerticalLayoutGroup>();
-        vlg.padding = new RectOffset(20, 20, 14, 14);   // reply fills near the top; the tab is lifted clear above it
-        vlg.spacing = 8;
+        vlg.padding = new RectOffset(
+            (int)(CardPadSide + CardBorder), (int)(CardPadSide + CardBorder),
+            (int)(CardPadTop + CardBorder), (int)(CardPadBottom + CardBorder));
         vlg.childAlignment = TextAnchor.UpperLeft;
-        vlg.childForceExpandWidth = false; vlg.childForceExpandHeight = false;   // reply fills; chip is an overlay
         vlg.childControlWidth = true; vlg.childControlHeight = true;
+        vlg.childForceExpandWidth = true; vlg.childForceExpandHeight = false;
 
-        // No badge: the top (recommended) card is tinted at runtime (SuggestionCard.Setup) so the reply text
-        // owns the whole card. The reply scroll is the ONLY laid-out child, so it fills the card from the top;
-        // the intent pill is lifted above the card's top-center edge (mostly outside) so it clears the text.
-        TextMeshProUGUI reply = BuildReplyScroll(card.transform);
+        GameObject fill = ImageGo("Fill", card.transform, Color.white);
+        fill.AddComponent<LayoutElement>().ignoreLayout = true;
+        var frt = (RectTransform)fill.transform;
+        frt.anchorMin = Vector2.zero; frt.anchorMax = Vector2.one;
+        frt.offsetMin = new Vector2(CardBorder, CardBorder); frt.offsetMax = new Vector2(-CardBorder, -CardBorder);
+        fill.GetComponent<Image>().raycastTarget = false;
+        AddRounded(fill, CardRadius - CardBorder);
+        fill.transform.SetAsFirstSibling();
 
-        // Intent pill — solid tab straddling the card's top-center edge, opaque label (D-06, per owner).
-        TextMeshProUGUI chipLabel = BuildChip(card.transform);
+        // Full reply text — the card's only laid-out child (drives the card height).
+        TextMeshProUGUI reply = Text("ReplyText", card.transform, "—", ReplySize, Color.black,
+            FontStyles.Normal, TextAlignmentOptions.TopLeft);
+        reply.textWrappingMode = TextWrappingModes.Normal;
+        reply.overflowMode = TextOverflowModes.Overflow;
+        reply.raycastTarget = false;
+        Themed(reply.gameObject, ThemeRole.InkPrimary);
+
+        // Legend — sits ON the card's top border (zero interior height). Two half-height strips
+        // blend it into what's behind: upper = sheet Surface (static), lower = the card's own fill
+        // (stamped per state in SuggestionCard.Setup, like the border/fill themselves).
+        Image lowerStrip; GameObject spark; TextMeshProUGUI label;
+        BuildLegend(card.transform, sparkle, out lowerStrip, out spark, out label);
 
         var button = card.AddComponent<Button>();
         button.transition = Selectable.Transition.None;
@@ -216,89 +331,88 @@ public static class SuggestionsPanelBuilder
         var so = new SerializedObject(comp);
         so.FindProperty("cardButton").objectReferenceValue = button;
         so.FindProperty("replyText").objectReferenceValue = reply;
-        so.FindProperty("intentLabel").objectReferenceValue = chipLabel;
-        so.FindProperty("cardBackground").objectReferenceValue = cardBg;
-        so.FindProperty("normalColor").colorValue = CardSurface;
-        so.FindProperty("recommendedColor").colorValue = RecommendedSurface;
+        so.FindProperty("intentLabel").objectReferenceValue = label;
+        so.FindProperty("cardBackground").objectReferenceValue = fill.GetComponent<Image>();
+        so.FindProperty("borderImage").objectReferenceValue = borderImg;
+        so.FindProperty("legendLowerStrip").objectReferenceValue = lowerStrip;
+        so.FindProperty("sparkIcon").objectReferenceValue = spark;
         so.ApplyModifiedPropertiesWithoutUndo();
 
-        if (isTemplate) card.SetActive(false);   // template — instantiated per item at runtime
+        card.SetActive(false);   // template — instantiated per item at runtime
         return comp;
     }
 
-    // Fixed-height vertical scroller holding the FULL reply text. Returns the inner TMP (the
-    // SuggestionCard.replyText ref). Tap on the card still selects (Button bubbling); drag scrolls.
-    private static TextMeshProUGUI BuildReplyScroll(Transform cardParent)
+    private static void BuildLegend(Transform card, Sprite sparkle,
+        out Image lowerStrip, out GameObject spark, out TextMeshProUGUI label)
     {
-        GameObject scrollGo = Rect("ReplyScroll", cardParent);
-        var scrollLe = scrollGo.AddComponent<LayoutElement>();
-        scrollLe.minHeight = ReplyMinHeight; scrollLe.flexibleHeight = 1f; scrollLe.flexibleWidth = 1f;   // fills the card
-        var scroll = scrollGo.AddComponent<ScrollRect>();
-        scroll.horizontal = false; scroll.vertical = true;
-        scroll.movementType = ScrollRect.MovementType.Clamped;
-        scroll.scrollSensitivity = 30f;
-
-        // Viewport masks the content; transparent raycast target so a drag scrolls.
-        GameObject viewport = ImageGo("Viewport", scrollGo.transform, new Color(0, 0, 0, 0));
-        Stretch((RectTransform)viewport.transform);
-        viewport.GetComponent<Image>().raycastTarget = true;
-        viewport.AddComponent<RectMask2D>();
-
-        // Content = the reply TMP itself, top-anchored, sized to the full text by a ContentSizeFitter.
-        TextMeshProUGUI reply = Text("ReplyText", viewport.transform, "—", ReplySize, BodyText,
-            FontStyles.Normal, TextAlignmentOptions.TopLeft);
-        reply.textWrappingMode = TextWrappingModes.Normal;
-        reply.overflowMode = TextOverflowModes.Overflow;     // no ellipsis/cap — the scroll reveals overflow
-        var rrt = (RectTransform)reply.transform;
-        rrt.anchorMin = new Vector2(0, 1); rrt.anchorMax = new Vector2(1, 1); rrt.pivot = new Vector2(0.5f, 1);
-        rrt.sizeDelta = new Vector2(0f, 0f);             // full viewport width (TMP defaults to 200 → it overflowed); height driven below
-        rrt.anchoredPosition = Vector2.zero;
-        reply.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-        scroll.viewport = (RectTransform)viewport.transform;
-        scroll.content = rrt;
-        return reply;
-    }
-
-    private static TextMeshProUGUI BuildChip(Transform parent)
-    {
-        // Intent pill: a ribbon/tab that STRADDLES the card's top-center edge — anchored top-center with the
-        // pivot at the pill's own center, so half sits inside the card and half pokes above it. ignoreLayout
-        // keeps it out of the card's vertical flow (the reply scroll still owns the card); BuildCard's top
-        // padding clears the tab's inner half so it never covers the first reply line. Solid fill + opaque
-        // label = a crisp tab. Added after ReplyScroll => later sibling => draws on top.
-        GameObject chip = ImageGo("IntentChip", parent, ChipFill);   // solid pill fill
-        var le = chip.AddComponent<LayoutElement>();
-        le.ignoreLayout = true;                          // overlay — excluded from the card's vertical layout
-        AddRounded(chip, 22f);                           // radius ≈ half height => pill
-        var hlg = chip.AddComponent<HorizontalLayoutGroup>();
-        hlg.padding = new RectOffset(18, 18, 4, 4);
+        GameObject legend = Rect("Legend", card);
+        var lrt = (RectTransform)legend.transform;
+        lrt.anchorMin = new Vector2(0, 1); lrt.anchorMax = new Vector2(0, 1); lrt.pivot = new Vector2(0, 0.5f);
+        lrt.anchoredPosition = new Vector2(LegendInsetX, 0f);   // centered ON the top border, left-inset
+        var le = legend.AddComponent<LayoutElement>();
+        le.ignoreLayout = true;
+        var hlg = legend.AddComponent<HorizontalLayoutGroup>();
+        hlg.padding = new RectOffset((int)LegendPadSide, (int)LegendPadSide, 2, 2);
+        hlg.spacing = 6;
         hlg.childAlignment = TextAnchor.MiddleCenter;
         hlg.childControlWidth = true; hlg.childControlHeight = true;
         hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
-        var csf = chip.AddComponent<ContentSizeFitter>();
+        var csf = legend.AddComponent<ContentSizeFitter>();
         csf.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
-        csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;   // hug the label in both axes
-        // Straddle the card's top-center edge: anchor top-center, pivot at the pill's center, zero offset.
-        var crt = (RectTransform)chip.transform;
-        crt.anchorMin = new Vector2(0.5f, 1f); crt.anchorMax = new Vector2(0.5f, 1f); crt.pivot = new Vector2(0.5f, 0.5f);
-        crt.anchoredPosition = new Vector2(0f, 12f);     // lifted higher: mostly above the card top edge
-        return Text("Label", chip.transform, "Цена", ChipSize, ChipLabel,   // opaque label
-            FontStyles.Bold, TextAlignmentOptions.Center);
+        csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        // Background strips (excluded from layout, stretched to the legend rect).
+        GameObject upper = ImageGo("StripUpper", legend.transform, Color.white);
+        upper.AddComponent<LayoutElement>().ignoreLayout = true;
+        var urt = (RectTransform)upper.transform;
+        urt.anchorMin = new Vector2(0, 0.5f); urt.anchorMax = Vector2.one;
+        urt.offsetMin = Vector2.zero; urt.offsetMax = Vector2.zero;
+        upper.GetComponent<Image>().raycastTarget = false;
+        Themed(upper, ThemeRole.Surface);           // what's behind the border above = the sheet
+
+        GameObject lower = ImageGo("StripLower", legend.transform, Color.white);
+        lower.AddComponent<LayoutElement>().ignoreLayout = true;
+        var drt = (RectTransform)lower.transform;
+        drt.anchorMin = Vector2.zero; drt.anchorMax = new Vector2(1, 0.5f);
+        drt.offsetMin = Vector2.zero; drt.offsetMax = Vector2.zero;
+        lowerStrip = lower.GetComponent<Image>();
+        lowerStrip.raycastTarget = false;           // color stamped in Setup (= card fill)
+
+        spark = ImageGo("Spark", legend.transform, Color.white);
+        Image sparkImg = spark.GetComponent<Image>();
+        sparkImg.sprite = sparkle; sparkImg.preserveAspect = true; sparkImg.raycastTarget = false;
+        Themed(spark, ThemeRole.PositiveInk);
+        var sle = spark.AddComponent<LayoutElement>();
+        sle.preferredWidth = LegendSparkSize; sle.preferredHeight = LegendSparkSize;
+        sle.minWidth = LegendSparkSize; sle.minHeight = LegendSparkSize;
+        spark.SetActive(false);                     // recommended card only (toggled in Setup)
+
+        label = Text("Label", legend.transform, "ЦЕНА", LegendFont, Color.black,
+            FontStyles.Bold | FontStyles.UpperCase, TextAlignmentOptions.Center);
+        label.characterSpacing = 6f;
+        label.raycastTarget = false;                // color stamped in Setup (InkSecondary / PositiveInk)
+        upper.transform.SetAsFirstSibling();        // strips behind, then spark, then label on top
+        lower.transform.SetSiblingIndex(1);
     }
 
-    // Thinking-dots skeleton (D-12): each placeholder shows a centered row of 3 dots that bounce in
-    // sequence (ThinkingDotsSkeleton) to signal the AI is composing replies. (Caption omitted — it would
-    // repeat across all 4 cards; a single shared caption can be added to the panel if wanted.)
+    // Thinking-dots skeleton: card-shaped (same two-layer border look) with 3 bouncing dots.
     private static GameObject BuildSkeleton(Transform parent, int index)
     {
-        GameObject sk = ImageGo("Skeleton" + index, parent, SkeletonBase);
+        GameObject sk = ImageGo("Skeleton" + index, parent, Color.white);
+        Themed(sk, ThemeRole.Border);
         AddRounded(sk, CardRadius);
         var le = sk.AddComponent<LayoutElement>();
-        le.minHeight = CellHeight; le.flexibleWidth = 1f;   // grid overrides size; harmless
-        sk.AddComponent<CanvasGroup>();                 // toggled with the skeleton; kept at full opacity
+        le.preferredHeight = SkeletonHeight; le.minHeight = SkeletonHeight; le.flexibleWidth = 1f;
+        sk.AddComponent<CanvasGroup>();
 
-        // Centered row of 3 dots.
+        GameObject fill = ImageGo("Fill", sk.transform, Color.white);
+        var frt = (RectTransform)fill.transform;
+        frt.anchorMin = Vector2.zero; frt.anchorMax = Vector2.one;
+        frt.offsetMin = new Vector2(CardBorder, CardBorder); frt.offsetMax = new Vector2(-CardBorder, -CardBorder);
+        fill.GetComponent<Image>().raycastTarget = false;
+        AddRounded(fill, CardRadius - CardBorder);
+        Themed(fill, ThemeRole.Surface);
+
         GameObject row = Rect("Dots", sk.transform);
         var rrt = (RectTransform)row.transform; Center(rrt); rrt.sizeDelta = new Vector2(140f, 40f);
         var hlg = row.AddComponent<HorizontalLayoutGroup>();
@@ -308,8 +422,9 @@ public static class SuggestionsPanelBuilder
         var dots = new Graphic[3];
         for (int i = 0; i < 3; i++)
         {
-            GameObject d = ImageGo("Dot" + i, row.transform, Secondary);
-            AddRounded(d, 11f);                          // 22 dia => circle
+            GameObject d = ImageGo("Dot" + i, row.transform, Color.white);
+            Themed(d, ThemeRole.InkTertiary);
+            AddRounded(d, 11f);
             var dle = d.AddComponent<LayoutElement>();
             dle.preferredWidth = 22f; dle.minWidth = 22f; dle.preferredHeight = 22f; dle.minHeight = 22f;
             dots[i] = d.GetComponent<Image>();
@@ -331,13 +446,15 @@ public static class SuggestionsPanelBuilder
         GameObject go = Rect("EmptyState", panel);
         OverlayOver(go, area);
         var vlg = go.AddComponent<VerticalLayoutGroup>();
-        vlg.childAlignment = TextAnchor.MiddleCenter; vlg.spacing = Sm;
+        vlg.childAlignment = TextAnchor.MiddleCenter; vlg.spacing = 24f;
         vlg.childForceExpandWidth = true; vlg.childForceExpandHeight = false;
         vlg.childControlWidth = true; vlg.childControlHeight = true;
-        Text("Heading", go.transform, "Нет предложений", StateSize, BodyText,
+        TextMeshProUGUI head = Text("Heading", go.transform, "Нет предложений", StateSize, Color.black,
             FontStyles.Bold, TextAlignmentOptions.Center);
-        Text("Body", go.transform, "Напишите ответ вручную", StateSize, Secondary,
+        Themed(head.gameObject, ThemeRole.InkPrimary);
+        TextMeshProUGUI body = Text("Body", go.transform, "Напишите ответ вручную", StateSize, Color.black,
             FontStyles.Normal, TextAlignmentOptions.Center);
+        Themed(body.gameObject, ThemeRole.InkSecondary);
         go.SetActive(false);
         return go;
     }
@@ -347,38 +464,49 @@ public static class SuggestionsPanelBuilder
         GameObject go = Rect("ErrorState", panel);
         OverlayOver(go, area);
         var vlg = go.AddComponent<VerticalLayoutGroup>();
-        vlg.childAlignment = TextAnchor.MiddleCenter; vlg.spacing = Sm;
+        vlg.childAlignment = TextAnchor.MiddleCenter; vlg.spacing = 24f;
         vlg.childForceExpandWidth = true; vlg.childForceExpandHeight = false;
         vlg.childControlWidth = true; vlg.childControlHeight = true;
-        Text("Heading", go.transform, "Не удалось загрузить", StateSize, BodyText,
+        TextMeshProUGUI head = Text("Heading", go.transform, "Не удалось загрузить", StateSize, Color.black,
             FontStyles.Bold, TextAlignmentOptions.Center);
-        Text("Body", go.transform, "Проверьте соединение и попробуйте снова", StateSize, Secondary,
+        Themed(head.gameObject, ThemeRole.InkPrimary);
+        TextMeshProUGUI body = Text("Body", go.transform, "Проверьте соединение и попробуйте снова", StateSize, Color.black,
             FontStyles.Normal, TextAlignmentOptions.Center);
+        Themed(body.gameObject, ThemeRole.InkSecondary);
 
-        GameObject retryGo = ImageGo("RetryButton", go.transform, ChipFill);
-        var le = retryGo.AddComponent<LayoutElement>(); le.minHeight = RefreshHit; le.minWidth = 240f;
-        AddRounded(retryGo, 28f);
-        TextMeshProUGUI rt = Text("Label", retryGo.transform, "Обновить", ChipSize, ChipLabel,
+        // Ghost retry: InputBorder outline ring + Surface fill + AccentText label (spec state style).
+        GameObject retryGo = ImageGo("RetryButton", go.transform, Color.white);
+        Themed(retryGo, ThemeRole.InputBorder);
+        var le = retryGo.AddComponent<LayoutElement>(); le.minHeight = RefreshHit; le.minWidth = 280f;
+        AddRounded(retryGo, RetryRadius);
+        GameObject rfill = ImageGo("Fill", retryGo.transform, Color.white);
+        var frt = (RectTransform)rfill.transform;
+        frt.anchorMin = Vector2.zero; frt.anchorMax = Vector2.one;
+        frt.offsetMin = new Vector2(CardBorder, CardBorder); frt.offsetMax = new Vector2(-CardBorder, -CardBorder);
+        rfill.GetComponent<Image>().raycastTarget = false;
+        AddRounded(rfill, RetryRadius - CardBorder);
+        Themed(rfill, ThemeRole.Surface);
+        TextMeshProUGUI lab = Text("Label", retryGo.transform, "Обновить", RetryFont, Color.black,
             FontStyles.Bold, TextAlignmentOptions.Center);
-        Stretch((RectTransform)rt.transform);
+        lab.raycastTarget = false;
+        Themed(lab.gameObject, ThemeRole.AccentText);
+        Stretch((RectTransform)lab.transform);
         retry = retryGo.AddComponent<Button>();
+        retry.transition = Selectable.Transition.None;
         go.SetActive(false);
         return go;
     }
 
-    // === Toggle (open-chat top bar) ========================================
+    // === Toggle (built only if absent — untouched by the redesign) =========
 
     private static void BuildToggle(Transform topBar)
     {
-        // Compact sliding-knob switch — a smaller sibling of the chats-list ReplyModeToggleBinder. The
-        // track is the tap target + recolouring Image; both words sit inside; the thumb (added last → on
-        // top) covers the active one. Default = Авто (green, thumb right); SemiAutoToggle re-resolves per chat.
         GameObject go = ImageGo(ToggleName, topBar, SwitchTrackAuto);
         var rt = (RectTransform)go.transform;
         rt.anchorMin = new Vector2(1, 0.5f); rt.anchorMax = new Vector2(1, 0.5f); rt.pivot = new Vector2(1, 0.5f);
         rt.sizeDelta = new Vector2(SwitchW, SwitchH);
-        rt.anchoredPosition = new Vector2(-Md, -40f);   // right side of the header; tune at checkpoint
-        AddRounded(go, SwitchH / 2f);                   // pill track
+        rt.anchoredPosition = new Vector2(-48f, -40f);
+        AddRounded(go, SwitchH / 2f);
 
         var button = go.AddComponent<Button>();
         button.transition = Selectable.Transition.None;
@@ -391,14 +519,14 @@ public static class SuggestionsPanelBuilder
         var thumbRt = (RectTransform)thumbGo.transform;
         thumbRt.anchorMin = new Vector2(0.5f, 0.5f); thumbRt.anchorMax = new Vector2(0.5f, 0.5f); thumbRt.pivot = new Vector2(0.5f, 0.5f);
         thumbRt.sizeDelta = new Vector2(SwitchThumbW, SwitchThumbH);
-        thumbRt.anchoredPosition = new Vector2(SwitchSlideX, 0f);   // right half — default Авто
+        thumbRt.anchoredPosition = new Vector2(SwitchSlideX, 0f);
         thumbGo.GetComponent<Image>().raycastTarget = false;
         AddRounded(thumbGo, SwitchThumbH / 2f);
 
         TextMeshProUGUI thumbLabel = BuildSwitchLabel("ThumbLabel", thumbGo.transform, "Авто", 0f, FontStyles.Bold, SwitchInkAuto);
-        Stretch((RectTransform)thumbLabel.transform);              // fill the thumb (centered active word)
+        Stretch((RectTransform)thumbLabel.transform);
 
-        Rect("A11y:" + ToggleA11y, go.transform);       // accessible label node
+        Rect("A11y:" + ToggleA11y, go.transform);
 
         var comp = go.AddComponent<SemiAutoToggle>();
         var so = new SerializedObject(comp);
@@ -426,7 +554,83 @@ public static class SuggestionsPanelBuilder
         return tmp;
     }
 
+    // === Generated sprites ==================================================
+
+    // 4-point star (✦), white on transparent — tinted at use sites (PositiveInk).
+    private static Sprite EnsureSparkleSprite()
+    {
+        Sprite existing = AssetDatabase.LoadAssetAtPath<Sprite>(SparklePath);
+        if (existing != null) return existing;
+        const int size = 64;
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        float half = size / 2f;
+        for (int y = 0; y < size; y++)
+        for (int x = 0; x < size; x++)
+        {
+            // Concave-diamond star: |x|^p + |y|^p ≤ r^p with p<1 pinches the diagonals into a ✦.
+            float nx = Mathf.Abs(x + 0.5f - half) / half;
+            float ny = Mathf.Abs(y + 0.5f - half) / half;
+            float v = Mathf.Pow(nx, 0.55f) + Mathf.Pow(ny, 0.55f);
+            float a = Mathf.Clamp01((1f - v) * 8f);          // soft edge
+            tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+        }
+        return SaveSprite(tex, SparklePath);
+    }
+
+    // Vertical alpha gradient — opaque at the bottom row, transparent at the top.
+    private static Sprite EnsureFadeSprite()
+    {
+        Sprite existing = AssetDatabase.LoadAssetAtPath<Sprite>(FadePath);
+        if (existing != null) return existing;
+        const int w = 4, h = 64;
+        var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+        for (int y = 0; y < h; y++)
+        {
+            float a = 1f - (y / (float)(h - 1));
+            for (int x = 0; x < w; x++) tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+        }
+        return SaveSprite(tex, FadePath);
+    }
+
+    private static Sprite SaveSprite(Texture2D tex, string path)
+    {
+        if (!AssetDatabase.IsValidFolder(SpriteFolder))
+        {
+            if (!AssetDatabase.IsValidFolder("Assets/Sprites")) AssetDatabase.CreateFolder("Assets", "Sprites");
+            AssetDatabase.CreateFolder("Assets/Sprites", "Suggestions");
+        }
+        System.IO.File.WriteAllBytes(path, tex.EncodeToPNG());
+        Object.DestroyImmediate(tex);
+        AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+        var importer = (TextureImporter)AssetImporter.GetAtPath(path);
+        importer.textureType = TextureImporterType.Sprite;
+        importer.spriteImportMode = SpriteImportMode.Single;
+        importer.mipmapEnabled = false;
+        importer.alphaIsTransparency = true;
+        importer.SaveAndReimport();
+        return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+    }
+
     // === Helpers ============================================================
+
+    private static void Themed(GameObject go, ThemeRole role)
+    {
+        var themed = go.GetComponent<ThemedColor>();
+        if (themed == null) themed = go.AddComponent<ThemedColor>();
+        var so = new SerializedObject(themed);
+        so.FindProperty("role").enumValueIndex = (int)role;
+        so.FindProperty("target").objectReferenceValue = go.GetComponent<Graphic>();
+        so.FindProperty("preserveAlpha").boolValue = true;
+        so.ApplyModifiedPropertiesWithoutUndo();
+        // Stamp the resolved colour now so the Editor scene shows the design without entering play mode.
+        Graphic g = go.GetComponent<Graphic>();
+        if (g != null)
+        {
+            Color c = Theme.Color(role);
+            c.a = g.color.a;
+            g.color = c;
+        }
+    }
 
     private static GameObject Rect(string name, Transform parent)
     {

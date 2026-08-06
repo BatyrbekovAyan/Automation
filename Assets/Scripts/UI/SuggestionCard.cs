@@ -5,23 +5,29 @@ using TMPro;
 using DG.Tweening;
 
 /// <summary>
-/// One reply-suggestion card (PANEL-02/03/06). The WHOLE card is a single tap target
-/// (D-01 — no dual-action arrow). Shows the full reply text and a muted intent caption.
-/// The top (recommended) card is tinted green instead of carrying a separate badge, so the
-/// reply text gets the whole card (D-07 revised per owner). Pure view: it raises
-/// <see cref="OnTapped"/> with the reply text; Plan 04's controller does the composer
+/// One reply-suggestion card (sketch-002 winner P). The WHOLE card is a single tap target
+/// (D-01 — no dual-action arrow). Shows the FULL reply text (no truncation, no inner scroll)
+/// in a bordered card whose intent title sits ON the top border (legend). The top
+/// (recommended) card is tint-only — PositiveBg fill, PositiveInk border/legend and a ✦
+/// sparkle — never a badge or a numeric % (D-07 revised per owner). Colors resolve from
+/// <see cref="Theme"/> at bind time so both palettes work without a rebuild. Pure view: it
+/// raises <see cref="OnTapped"/> with the reply text; the controller does the composer
 /// hand-off + re-cluster. Binds only Plan-01 seam types — no networking.
 /// </summary>
 public class SuggestionCard : MonoBehaviour
 {
     [SerializeField] private Button cardButton;            // whole card is the tap target
-    [SerializeField] private TextMeshProUGUI replyText;    // full reply, fills the card (builder)
-    [SerializeField] private TextMeshProUGUI intentLabel;  // muted one-word intent caption
-    [SerializeField] private Image cardBackground;         // recolored on the top (recommended) card
-    [SerializeField] private Color normalColor = Color.white;                                // #FFFFFF (builder-driven)
-    [SerializeField] private Color recommendedColor = new Color(0.788f, 0.937f, 0.851f, 1f); // #C9EFD9 mint (builder-driven)
+    [SerializeField] private TextMeshProUGUI replyText;    // full reply, drives the card height (builder)
+    [SerializeField] private TextMeshProUGUI intentLabel;  // legend label on the top border
+    [SerializeField] private Image cardBackground;         // inner fill (Surface / PositiveBg)
+    [SerializeField] private Image borderImage;            // outer ring (Border / PositiveInk-tinted)
+    [SerializeField] private Image legendLowerStrip;       // legend half below the border — matches the fill
+    [SerializeField] private GameObject sparkIcon;         // ✦ in the legend, recommended card only
 
     public event Action<string> OnTapped;
+
+    // Recommended border = PositiveInk washed toward Surface (the sketch's 45% color-mix).
+    private const float RecommendedBorderMix = 0.45f;
 
     void OnDisable()
     {
@@ -34,13 +40,28 @@ public class SuggestionCard : MonoBehaviour
     {
         if (item == null) return;
         replyText.text = item.text;
-        intentLabel.text = item.intentLabel;
-        if (cardBackground != null) cardBackground.color = isTop ? recommendedColor : normalColor;  // mint tint = recommended
+        intentLabel.text = item.intentLabel;   // rendered uppercase via the label's FontStyles
+        ApplyColors(isTop);
+        if (sparkIcon != null) sparkIcon.SetActive(isTop);
         cardButton.onClick.RemoveAllListeners();
         cardButton.onClick.AddListener(() =>
         {
             transform.DOPunchScale(Vector3.one * -0.03f, 0.15f, 0, 0).SetEase(Ease.OutQuad); // 0.97 punch
             OnTapped?.Invoke(item.text);
         });
+    }
+
+    private void ApplyColors(bool isTop)
+    {
+        Color surface = Theme.Color(ThemeRole.Surface);
+        Color fill = isTop ? Theme.Color(ThemeRole.PositiveBg) : surface;
+        Color border = isTop
+            ? Color.Lerp(surface, Theme.Color(ThemeRole.PositiveInk), RecommendedBorderMix)
+            : Theme.Color(ThemeRole.Border);
+        if (cardBackground != null) cardBackground.color = fill;
+        if (borderImage != null) borderImage.color = border;
+        if (legendLowerStrip != null) legendLowerStrip.color = fill;   // legend blends into the card
+        if (intentLabel != null)
+            intentLabel.color = isTop ? Theme.Color(ThemeRole.PositiveInk) : Theme.Color(ThemeRole.InkSecondary);
     }
 }
