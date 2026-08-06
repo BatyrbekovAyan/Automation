@@ -17,3 +17,4 @@ comparison.
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
 | 001 | ai-assistant-redesign | Full-app visual identity candidate ("Артель") for the WhatsApp/Telegram AI sales-assistant redesign | N/A — single full-app candidate, judged externally against other platforms | full-app, identity, redesign |
+| 002 | suggestions-panel-redesign | What form factor + skin for the reply-suggestions panel on the messages page (baseline + chips / list / carousel / native-skin grid, light + «Чернильный» themes) | TBD — awaiting owner pick | suggestions, chat, panel, restyle |

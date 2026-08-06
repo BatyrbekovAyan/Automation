@@ -1,0 +1,53 @@
+---
+sketch: 002
+name: suggestions-panel-redesign
+question: "What form factor and skin should the reply-suggestions panel («Вместе» mode) have on the messages page?"
+winner: null
+tags: [suggestions, chat, panel, restyle]
+---
+
+# Sketch 002: Suggestions Panel Redesign
+
+## Design Question
+
+The owner dislikes how the current suggestions panel looks (mint 2×2 grid sheet built by
+`SuggestionsPanelBuilder`). Which form factor reads best for 4 AI reply suggestions above
+the composer — and is the problem the mint palette, the grid, or both?
+
+## How to View
+
+open .planning/sketches/002-suggestions-panel-redesign/index.html
+
+Deep links: `?v=a|b|c|d|now`, `&theme=ink-dark`, `&st=load|empty|error`.
+
+## Variants
+
+- **Сейчас (baseline)** — faithful reproduction of today's panel: mint sheet #EAF6F0, 2×2 white
+  cards with internal scroll, straddling intent pills, mint FAB. Not a candidate — the reference.
+- **A: Чипы** — one row of tappable chips floating over the wallpaper, no sheet. Smallest
+  footprint; recommended chip = green fill + ✦; intent labels dropped; refresh = trailing circle.
+- **B: Список** — surface sheet with grabber + «✦ ПРЕДЛОЖЕНИЯ» header; full-width rows with
+  intent chips; recommended row = 2 lines + green rail + wash, others 1-line ellipsis; quiet
+  refresh icon in the header.
+- **C: Карусель** — one large fully readable card, others behind horizontal swipe (snap +
+  dots); recommended = first card, green border + ✦.
+- **D: Родная сетка** — today's exact geometry (2×2 + FAB) reskinned to the app token palette:
+  white cards, hairline borders, intent label inside, green only on the recommended card,
+  neutral FAB. Isolates "palette vs layout".
+
+## What to Look For
+
+- Which one you'd want under your thumb mid-conversation (chat visibility vs reply readability).
+- A drops intent labels; B truncates rows 2–4 to one line; C hides options 2–4 behind swipe;
+  D keeps internal card scrolling. Which trade-off feels acceptable?
+- Flip the theme to «Чернильный» — variants A–D restyle automatically via tokens; the mint
+  baseline deliberately clashes (it's hardcoded, like the real builder today).
+- Everything is tappable: pick a suggestion (fills the composer, panel slides away), refresh
+  (skeleton dots), switch «Вместе ⇄ Авто» in the header, cycle states from the toolbar.
+
+## Grounding
+
+All geometry converted from `SuggestionsPanelBuilder.cs` reference units (÷3); theme tokens
+from `Theme_Light.asset` / `Theme_Dark.asset`; mode-switch colors from `ReplyModeToggleBinder`.
+Locked decisions respected: no numeric confidence %, no recommended badge (tint only),
+whole card = single tap target, fixed footprint per state.
