@@ -2,11 +2,31 @@
 sketch: 002
 name: suggestions-panel-redesign
 question: "What form factor and skin should the reply-suggestions panel («Вместе» mode) have on the messages page?"
-winner: null
+winner: "P"
 tags: [suggestions, chat, panel, restyle]
 ---
 
 # Sketch 002: Suggestions Panel Redesign
+
+## Decision — LOCKED 2026-08-07
+
+**Winner: P** (tab «P · На рамке ★»). The locked direction, composed across rounds:
+
+- **Chassis (from J):** bottom sheet on `Surface` with grabber + «✦ ПРЕДЛОЖЕНИЯ» overline
+  header + quiet refresh icon (no FAB); FIXED sheet height ≈ 285 CSS px ≈ 855u (38px chrome +
+  246px card viewport); cards scroll INSIDE; scroll affordance = cut-off card + 24px bottom
+  fade + thin scrollbar. Fixed height matches the panel's existing fixed-footprint invariant.
+- **Cards:** full-width individual cards, `Surface` fill + 1px `Border` outline, radius 14px
+  (42u), padding 8/11px; full reply text, no truncation, no internal per-card scroll.
+- **Title:** intent label as a border-legend — sits ON the card's top border, left (11px inset),
+  8.5px uppercase, `InkSecondary`; occupies zero interior height (fieldset-legend look, bg
+  gradient trick for the green card).
+- **Recommended card:** first, `PositiveBg` fill + `PositiveInk`-tinted border, ✦ sparkle in
+  the legend, legend in `PositiveInk`. No badge, no numeric % (locked earlier).
+- Works in both themes via tokens (verified in «Чернильный» dark).
+
+Next: `/gsd-sketch-wrap-up` to package into a build-ready spec for the
+`SuggestionsPanelBuilder` restyle.
 
 ## Design Question
 
