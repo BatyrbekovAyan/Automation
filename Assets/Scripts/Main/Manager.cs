@@ -1312,11 +1312,20 @@ public partial class Manager : MonoBehaviour
         BusinessTypeButtonTemplate.SetActive(false);
         businessTypeButtons.Clear();
 
+        // Resolved BEFORE the loop so every clone can be painted as it is made.
+        // The tiles are state-stamped (selected vs default) and so carry no
+        // ThemedColor binding; without this they kept the template's light fill
+        // until the user selected something.
+        businessButtonDefaultColor = Theme.Color(ThemeRole.Background);
+
         foreach (var entry in businessTypes.All)
         {
             var go = Instantiate(BusinessTypeButtonTemplate, BusinessTypesParent);
             go.SetActive(true);
             go.name = entry.id;
+
+            var tileImage = go.GetComponent<Image>();
+            if (tileImage != null) tileImage.color = businessButtonDefaultColor;
 
             var label = go.GetComponentInChildren<TextMeshProUGUI>(true);
             if (label != null) label.text = entry.displayName;
@@ -1341,19 +1350,7 @@ public partial class Manager : MonoBehaviour
             businessTypeButtons.Add(btn);
         }
 
-        if (businessTypes.Count > 0)
-        {
-            selectedBusinessId = businessTypes.All[0].id;
-            if (businessTypeButtons.Count > 0)
-                // Theme-owned, not captured from the Image: the tiles are
-                // STATE-stamped below (selected vs default), so they carry no
-                // ThemedColor binding — capturing would freeze the light fill.
-                businessButtonDefaultColor = Theme.Color(ThemeRole.Background);
-        }
-        else
-        {
-            selectedBusinessId = "";
-        }
+        selectedBusinessId = businessTypes.Count > 0 ? businessTypes.All[0].id : "";
     }
 
     private void PopulateBusinessDropdown(TMP_Dropdown dd)
@@ -1410,7 +1407,12 @@ public partial class Manager : MonoBehaviour
         {
             var btn = businessTypeButtons[i];
             var img = btn.GetComponent<Image>();
-            img.color = (btn.gameObject.name == id) ? Color.green : businessButtonDefaultColor;
+            // Selection used a raw Color.green, which is neither a theme colour
+            // nor the app's own green — it read as placeholder art. AccentSoft is
+            // the same "selected chip" treatment the rest of the app uses.
+            img.color = (btn.gameObject.name == id)
+                ? Theme.Color(ThemeRole.AccentSoft)
+                : businessButtonDefaultColor;
         }
 
         if (businessTypeValueText != null)

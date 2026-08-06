@@ -60,7 +60,12 @@ public static class ScreenThemeWirer
         // dashboard statuses (DashboardStatusInfo FG values)
         ("#34C759", ThemeRole.StatusOrderCollected),
         ("#F57C00", ThemeRole.StatusOwnerNeeded),
-        ("#007AFF", ThemeRole.StatusInDialog),
+        // #007AFF is AMBIGUOUS, and mapping it globally to StatusInDialog was a
+        // real bug: on the dashboard it IS the in-dialog status, but everywhere
+        // else it is just iOS blue on buttons — and StatusInDialog resolves
+        // PURPLE (#8F7AFA) in dark, which is what turned the wizard's buttons
+        // purple. Default to the accent; the dashboard opts back in below.
+        ("#007AFF", ThemeRole.AccentFill),
         // success-pill tint (CLAUDE.md soft tints)
         ("#E8F8EE", ThemeRole.PositiveBg),
         // found on the settings/list prefabs
@@ -130,6 +135,16 @@ public static class ScreenThemeWirer
     private static readonly string[] NeverMap =
     {
         "#FFFFFF", "#25D366", "#2AABEE", "#34B7F1", "#00A884", "#2FB344", "#1FA855",
+    };
+
+    /// <summary>
+    /// Per-root role overrides for colours whose meaning is screen-dependent.
+    /// The dashboard is the ONLY place #007AFF means "in dialog"; the global
+    /// map treats it as the accent.
+    /// </summary>
+    private static readonly Dictionary<string, Dictionary<string, ThemeRole>> RootRoleOverrides = new()
+    {
+        ["Screen_Dashboard"] = new() { ["#007AFF"] = ThemeRole.StatusInDialog },
     };
 
     /// <summary>Roles that paint SURFACES. On a glyph they demote to ink (see BindSubtree).</summary>
@@ -330,6 +345,7 @@ public static class ScreenThemeWirer
     private static int BindSubtree(GameObject root, bool apply, StringBuilder sb,
                                    string label, string[] extraExclusions)
     {
+        RootRoleOverrides.TryGetValue(label, out var overrides);
         var mapped = new Dictionary<ThemeRole, int>();
         var unmapped = new Dictionary<string, int>();
         int added = 0, already = 0;
@@ -353,6 +369,7 @@ public static class ScreenThemeWirer
             // affordance role would visibly darken placeholders in light mode.
             // Structural roles never belong on glyphs, so they demote to ink.
             var role = hit.role;
+            if (overrides != null && overrides.TryGetValue(hex, out var scoped)) role = scoped;
             if (g is TMP_Text && StructuralRoles.Contains(role)) role = ThemeRole.InkTertiary;
 
             mapped.TryGetValue(role, out var c);
@@ -394,6 +411,36 @@ public static class ScreenThemeWirer
         return null;
     }
 
+    /// <summary>
+    /// Resolve a root spec. A bare name is a depth-first search (fine when the
+    /// name is unique); a spec containing '/' is an exact path, which is the
+    /// only safe form when several objects share a name.
+    /// </summary>
+    private static GameObject ResolveRoot(UnityEngine.SceneManagement.Scene scene, string spec)
+    {
+        foreach (var go in scene.GetRootGameObjects())
+        {
+            if (!spec.Contains('/'))
+            {
+                var hit = FindDeep(go.transform, spec);
+                if (hit != null) return hit;
+                continue;
+            }
+            int slash = spec.IndexOf('/');
+            var head = FindDeep(go.transform, spec.Substring(0, slash));
+            var tail = head != null ? head.transform.Find(spec.Substring(slash + 1)) : null;
+            if (tail != null) return tail.gameObject;
+        }
+        return null;
+    }
+
+    /// <summary>Short display label for a root spec (last path segment).</summary>
+    private static string RootLabel(string spec)
+    {
+        int i = spec.LastIndexOf('/');
+        return i < 0 ? spec : spec.Substring(i + 1);
+    }
+
     // ── Shell pass: the surfaces dark mode was missing ─────────────────────
     //
     // Screens' TEXT went through the value passes, but their white chrome never
@@ -424,7 +471,10 @@ public static class ScreenThemeWirer
         "BottomNavPanel", "ChatsPanel", "MessagesPanel",
         // Owner round 7 — the screens the sweep had never covered.
         "Screen_New", "WhatsappAuth", "TelegramAuth", "Screen_Onboarding",
-        "SuccessOverlay",
+        // PATH, not bare name: three GameObjects are called "SuccessOverlay" and
+        // the depth-first search hit WhatsappAuth's nested QR one first, leaving
+        // the real success screen with nothing.
+        "ScreenContainer/SuccessOverlay",
     };
 
     /// <summary>
@@ -473,6 +523,10 @@ public static class ScreenThemeWirer
         ("MessagesPanel", "MovingArea/BottomPanel/HorizontalLayout/InputOutline", ThemeRole.Border),
         ("MessagesPanel", "MovingArea/BottomPanel/HorizontalLayout/InputOutline/Input/InputField/Text Area/Text", ThemeRole.InkPrimary),
         ("ChatsPanel",    "Scroll/Viewport/Content/ChatsSearchBar/Pill", ThemeRole.Background),
+        // The business-tile TEMPLATE. Instantiate copies components, so binding
+        // the template propagates to every runtime clone — the tiles themselves
+        // stay unbound because Manager state-stamps their fill.
+        ("Screen_New", "BusinessSelectorPanel/Content/BusinessTypesParent/BusinessTypeButtonTemplate/Text (TMP)", ThemeRole.InkPrimary),
     };
 
     private static readonly (string prefab, string child, ThemeRole role)[] PrefabNamedSpec =
@@ -507,15 +561,11 @@ public static class ScreenThemeWirer
         int total = 0;
 
         var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
-        foreach (var rootName in ShellSceneRoots)
+        foreach (var rootSpec in ShellSceneRoots)
         {
-            GameObject root = null;
-            foreach (var go in scene.GetRootGameObjects())
-            {
-                root = FindDeep(go.transform, rootName);
-                if (root != null) break;
-            }
-            if (root == null) { sb.AppendLine($"\n### {rootName}: NOT FOUND"); continue; }
+            var root = ResolveRoot(scene, rootSpec);
+            string rootName = RootLabel(rootSpec);
+            if (root == null) { sb.AppendLine($"\n### {rootSpec}: NOT FOUND"); continue; }
 
             total += BindWhiteSurfaces(root, apply, sb, rootName);
             total += BindSubtree(root, apply, sb, rootName, ShellExclusions(rootName));
@@ -611,6 +661,60 @@ public static class ScreenThemeWirer
         for (var p = t; p != null; p = p.parent)
             if (System.Array.IndexOf(AlwaysDarkRoots, p.name) >= 0) return true;
         return false;
+    }
+
+    // ── Repair: re-scope bindings whose role was wrong for their screen ─────
+    //
+    // Adding or correcting a ValueMap entry only affects FUTURE applies — the
+    // ThemedColor components already in the scene keep the role they were given.
+    // This rewrites them in place. It exists because #007AFF was globally mapped
+    // to StatusInDialog, which is purple in dark, so six generic accent controls
+    // in the wizard came out purple.
+    private static readonly (string root, ThemeRole from, ThemeRole to)[] RoleRepairs =
+    {
+        ("Screen_New", ThemeRole.StatusInDialog, ThemeRole.AccentFill),
+    };
+
+    [MenuItem("Tools/Theme/Screens/Audit Role Repairs (dry run)")]
+    public static void AuditRepairs() => RunRepairs(apply: false);
+
+    [MenuItem("Tools/Theme/Screens/Apply Role Repairs")]
+    public static void ApplyRepairs() => RunRepairs(apply: true);
+
+    private static void RunRepairs(bool apply)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"[ScreenThemeWirer] ROLE REPAIR {(apply ? "APPLY" : "AUDIT")}");
+        int n = 0;
+
+        var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+        foreach (var (rootSpec, from, to) in RoleRepairs)
+        {
+            var root = ResolveRoot(scene, rootSpec);
+            if (root == null) { sb.AppendLine($"    {rootSpec}: NOT FOUND"); continue; }
+
+            foreach (var tc in root.GetComponentsInChildren<ThemedColor>(includeInactive: true))
+            {
+                var so = new SerializedObject(tc);
+                var roleProp = so.FindProperty("role");
+                if ((ThemeRole)roleProp.enumValueIndex != from) continue;
+                sb.AppendLine($"    {RootLabel(rootSpec)}/{TransformPath(tc.transform, root.transform)}: " +
+                              $"{from} -> {to}");
+                if (apply)
+                {
+                    roleProp.enumValueIndex = (int)to;
+                    so.ApplyModifiedPropertiesWithoutUndo();
+                }
+                n++;
+            }
+        }
+        if (apply)
+        {
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+        }
+        Debug.Log(sb.ToString());
+        if (apply) Debug.Log($"[ScreenThemeWirer] Role repairs applied. {n} binding(s) re-scoped.");
     }
 
     [MenuItem("Tools/Theme/Screens/Audit Always-Dark Overlays (dry run)")]
