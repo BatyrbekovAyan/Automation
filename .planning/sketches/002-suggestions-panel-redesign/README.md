@@ -67,6 +67,16 @@ no scrolling for typical content):
 - **M: В углу** — tiny title floated in the card's top-right corner, like a bubble timestamp.
 - **N: Без ярлыка** — no intent titles at all; the recommended card keeps only ✦ + green fill.
 
+Round 5 — owner switched preference to J (bordered cards, fixed sheet + inner scroll) and
+rejected L/M/N placements; title-placement round on J's chassis:
+
+- **O: Слово-акцент** — L's run-in placement recolored to the «Чернильный» navy accent
+  (`AccentText`) on every card; green stays exclusive to the recommended card (✦ + fill).
+- **P: На рамке** — legend-style title sitting ON the card's top border (fieldset look),
+  zero interior height; only possible on J's bordered cards.
+- **Q: Внизу** — tiny title bottom-right after the text, like a signature; reply text starts
+  immediately at the top.
+
 ## What to Look For
 
 - Which one you'd want under your thumb mid-conversation (chat visibility vs reply readability).

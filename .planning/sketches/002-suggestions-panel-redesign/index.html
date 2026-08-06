@@ -352,6 +352,19 @@
   .m-int { float:right; font-size:8.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
            color: var(--ink-3); margin: 2px 0 3px 10px; }
   .syn-card.top .m-int { color: var(--positive-ink); }
+  /* O–Q — title placement on J's bordered chassis */
+  .rin.acc, .syn-card.top .rin.acc { color: var(--accent-text); }   /* run-in in «Чернильный» navy on every card */
+  .p-card { position:relative; overflow:visible; }
+  .p-int { position:absolute; top:-7px; left:11px; padding:0 5px; font-size:8.5px; font-weight:700;
+           letter-spacing:.06em; text-transform:uppercase; color: var(--ink-2); line-height:13px;
+           display:flex; gap:3px; align-items:center;
+           background: linear-gradient(to bottom, var(--surface) 50%, var(--surface) 50%); }
+  .syn-card.top .p-int { color: var(--positive-ink);
+           background: linear-gradient(to bottom, var(--surface) 50%, var(--positive-bg) 50%); }
+  .p-pad .syn-cards { padding-top:9px; gap:10px; }   /* room for the legend poking above each card */
+  .q-int { text-align:right; font-size:8.5px; font-weight:700; letter-spacing:.06em;
+           text-transform:uppercase; color: var(--ink-3); margin-top:3px; }
+  .syn-card.top .q-int { color: var(--positive-ink); }
 
   /* ============ sketch toolbar ============ */
   #sketch-tools { position:fixed; bottom:12px; right:12px; z-index:9999; font-size:12px;
@@ -392,6 +405,10 @@
     <button class="variant-tab" data-v="l" onclick="showVariant('l',this)">L · В строке</button>
     <button class="variant-tab" data-v="m" onclick="showVariant('m',this)">M · В углу</button>
     <button class="variant-tab" data-v="n" onclick="showVariant('n',this)">N · Без ярлыка</button>
+    <span style="align-self:center; font-size:11px; color:var(--page-ink-2); margin:0 2px 0 6px;">ярлык на J:</span>
+    <button class="variant-tab" data-v="o" onclick="showVariant('o',this)">O · Слово-акцент</button>
+    <button class="variant-tab" data-v="p" onclick="showVariant('p',this)">P · На рамке</button>
+    <button class="variant-tab" data-v="q" onclick="showVariant('q',this)">Q · Внизу</button>
   </div>
   <div id="caption"></div>
 </div>
@@ -440,6 +457,9 @@ const CAPTIONS = {
   l:`<b>L · Ярлык в строке.</b> K, но ярлык — маленькое цветное слово в начале первой строки текста (текст обтекает его — это не чип-колонка, как было в G). Карточка ниже на высоту ярлыка: все 4 влезают в ту же высоту листа без прокрутки. <b>Смотрите на:</b> не мешает ли слово чтению начала ответа.`,
   m:`<b>M · Ярлык в углу.</b> K, но ярлык — мелко в правом верхнем углу карточки, как время в пузыре сообщения. Первая строка текста чуть короче, остальные — во всю ширину; все 4 карточки тоже влезают без прокрутки. <b>Смотрите на:</b> считывается ли ярлык, когда он не в начале.`,
   n:`<b>N · Без ярлыка.</b> K вообще без ярлыков намерения: только текст ответа, у лучшего — ✦ и зелёная заливка. Максимум места тексту; намерение угадывается из самого ответа. <b>Смотрите на:</b> нужны ли ярлыки вообще, или текст говорит сам за себя.`,
+  o:`<b>O · Слово-акцент (на J).</b> Ярлык как в L — слово в начале первой строки, но в акцентном тёмно-синем «Чернильного» вместо серого/зелёного. Зелёным остаётся только лучший ответ (✦ и заливка) — категория и рекомендация больше не спорят за один цвет. <b>Смотрите на:</b> отделяется ли синее слово от текста и как синий уживается с зелёным.`,
+  p:`<b>P · На рамке (на J).</b> Ярлык сидит прямо на верхней рамке карточки — как подпись на границе, не занимая места внутри. Такое возможно именно на J: у карточек есть рамки. <b>Смотрите на:</b> аккуратность «разрыва» рамки и читаемость мелкого ярлыка.`,
+  q:`<b>Q · Внизу (на J).</b> Ярлык — мелко в правом нижнем углу карточки, как подпись после текста. Ответ начинается сразу с первого слова, категория вторична. <b>Смотрите на:</b> не теряется ли ярлык, когда он после текста.`,
 };
 
 /* ================= svg helpers ================= */
@@ -756,6 +776,39 @@ function panelN(){
     `${s.top? svg.spark('var(--positive-ink)',10)+' ' : ''}${s.t}`)).join(''));
 }
 
+/* ================= title-placement round on J (O–Q) ================= */
+function jShell(cards, extraCls){
+  const body = `
+    <div class="syn-fixwrap ${extraCls||''}">
+      <div class="syn-fix bar"><div class="syn-cards">${cards}</div></div>
+      <div class="syn-fade"></div>
+    </div>`;
+  const load = `
+    <div class="syn-fixwrap ${extraCls||''}">
+      <div class="syn-fix"><div class="syn-cards">${synSk(false,4)}</div></div>
+      <div class="syn-fade"></div>
+    </div>`;
+  return sheetShell(body, load, FIX_EMPTY, FIX_ERROR);
+}
+const jCard = (s, inner, cls) =>
+  `<div class="syn-card${cls?' '+cls:''}${s.top?' top':''}" onclick="pick(this,'${esc(s.t)}')">${inner}</div>`;
+
+/* O — L's run-in placement, recolored to the «Чернильный» accent */
+function panelO(){
+  return jShell(SUGGESTIONS.map(s=>jCard(s,
+    `<div class="syn-txt"><span class="rin acc">${s.top? svg.spark('var(--positive-ink)',9)+' ' : ''}${s.i}</span>${s.t}</div>`)).join(''));
+}
+/* P — legend-style: the title sits ON the card's top border */
+function panelP(){
+  return jShell(SUGGESTIONS.map(s=>jCard(s,
+    `<span class="p-int">${s.top? svg.spark('var(--positive-ink)',9) : ''}${s.i}</span><div class="syn-txt">${s.t}</div>`, 'p-card')).join(''), 'p-pad');
+}
+/* Q — footer meta: tiny title bottom-right, after the text */
+function panelQ(){
+  return jShell(SUGGESTIONS.map(s=>jCard(s,
+    `<div class="syn-txt">${s.t}</div><div class="q-int">${s.top? svg.spark('var(--positive-ink)',9)+' ' : ''}${s.i}</div>`)).join(''));
+}
+
 /* ================= build ================= */
 document.getElementById('stage').innerHTML =
   frame('now', panelNow(), 168) +
@@ -772,7 +825,10 @@ document.getElementById('stage').innerHTML =
   frame('k',   panelK(),   296) +
   frame('l',   panelL(),   296) +
   frame('m',   panelM(),   296) +
-  frame('n',   panelN(),   296);
+  frame('n',   panelN(),   296) +
+  frame('o',   panelO(),   296) +
+  frame('p',   panelP(),   296) +
+  frame('q',   panelQ(),   296);
 document.querySelectorAll('.syn-fix').forEach(sc => kUpd(sc));   // seed «ещё N» counters
 document.getElementById('caption').innerHTML = CAPTIONS.now;
 
