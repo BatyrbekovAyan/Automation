@@ -1360,6 +1360,7 @@ GameObject:
   - component: {fileID: 7367828921676779890}
   - component: {fileID: 6517443088912644852}
   - component: {fileID: 5087727677083257789}
+  - component: {fileID: 1932808051582471270}
   m_Layer: 5
   m_Name: SwitchLabel
   m_TagString: Untagged
@@ -1486,6 +1487,21 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &1932808051582471270
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4154915776904938149}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 6
+  target: {fileID: 5087727677083257789}
+  preserveAlpha: 1
 --- !u!1 &4596174374992560218
 GameObject:
   m_ObjectHideFlags: 0

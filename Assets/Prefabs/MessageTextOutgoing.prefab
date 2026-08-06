@@ -921,6 +921,7 @@ GameObject:
   - component: {fileID: 6877965338357934801}
   - component: {fileID: 3668105395897242433}
   - component: {fileID: 1520478743032394636}
+  - component: {fileID: 5300592864180324477}
   m_Layer: 5
   m_Name: Duration
   m_TagString: Untagged
@@ -1047,6 +1048,21 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &5300592864180324477
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1232923811252141548}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 6
+  target: {fileID: 1520478743032394636}
+  preserveAlpha: 1
 --- !u!1 &1479527923809592970
 GameObject:
   m_ObjectHideFlags: 0
@@ -1555,6 +1571,7 @@ GameObject:
   - component: {fileID: 4099453847084831943}
   - component: {fileID: 2800615554344804799}
   - component: {fileID: 4370245158412594734}
+  - component: {fileID: 7090885900681433492}
   m_Layer: 0
   m_Name: Label
   m_TagString: Untagged
@@ -1681,6 +1698,21 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &7090885900681433492
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2583848110326566323}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 5
+  target: {fileID: 4370245158412594734}
+  preserveAlpha: 1
 --- !u!1 &2737418425210134167
 GameObject:
   m_ObjectHideFlags: 0
@@ -3141,6 +3173,7 @@ GameObject:
   - component: {fileID: 5775587430800522912}
   - component: {fileID: 7300991485360175306}
   - component: {fileID: 3590784607254387063}
+  - component: {fileID: 2064149411921697336}
   m_Layer: 0
   m_Name: PillFill
   m_TagString: Untagged
@@ -3260,6 +3293,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithRoundedCorners
   radius: 25
   image: {fileID: 5740574527247901734}
+--- !u!114 &2064149411921697336
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5209824005244756513}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 21
+  target: {fileID: 5740574527247901734}
+  preserveAlpha: 1
 --- !u!1 &5211343212929432221
 GameObject:
   m_ObjectHideFlags: 0
@@ -3423,6 +3471,7 @@ GameObject:
   - component: {fileID: 264361195790620527}
   - component: {fileID: 676966563592822089}
   - component: {fileID: 7038443151430542772}
+  - component: {fileID: 7027085940489275444}
   m_Layer: 5
   m_Name: PreviewDomain
   m_TagString: Untagged
@@ -3549,6 +3598,21 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &7027085940489275444
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5944902695912642091}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 7
+  target: {fileID: 7038443151430542772}
+  preserveAlpha: 1
 --- !u!1 &6059671617072941053
 GameObject:
   m_ObjectHideFlags: 0
@@ -3847,6 +3911,7 @@ GameObject:
   - component: {fileID: 2316162283701114703}
   - component: {fileID: 2375068442089122994}
   - component: {fileID: 1305253543003840461}
+  - component: {fileID: 7237829457209425534}
   m_Layer: 5
   m_Name: PreviewDescription
   m_TagString: Untagged
@@ -3973,6 +4038,21 @@ MonoBehaviour:
   m_hasFontAssetChanged: 1
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &7237829457209425534
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6410130126344940730}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 6
+  target: {fileID: 1305253543003840461}
+  preserveAlpha: 1
 --- !u!1 &6575307786457928669
 GameObject:
   m_ObjectHideFlags: 0
@@ -4706,6 +4786,7 @@ GameObject:
   - component: {fileID: 2431789907409298110}
   - component: {fileID: 5199066616168667469}
   - component: {fileID: 9121600081857471628}
+  - component: {fileID: 713593713675022500}
   m_Layer: 0
   m_Name: ReactionPill
   m_TagString: Untagged
@@ -4858,6 +4939,21 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ReactionPillView
   label: {fileID: 4370245158412594734}
+--- !u!114 &713593713675022500
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7449673317494612134}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 24
+  target: {fileID: 269429730453269647}
+  preserveAlpha: 1
 --- !u!1 &7540258077339744636
 GameObject:
   m_ObjectHideFlags: 0

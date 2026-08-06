@@ -103,6 +103,19 @@ public static class ScreenThemeWirer
         ("#E7F3FB", ThemeRole.AccentSoft),
         ("#F4F8FE", ThemeRole.Background),
         ("#575757", ThemeRole.InkSecondary), // form-row chevrons
+        // Round 10 leftovers. Each was checked for a second owner elsewhere in
+        // the app before being added — the ones that DID have one (#ECECEC on
+        // the state-stamped business tiles, #808080 on the nav labels, #D9D4CA
+        // on the doodle ink) are bound by name instead, below.
+        ("#DFF0FF", ThemeRole.AccentSoft),   // settings add/upload buttons
+        ("#DAF2FF", ThemeRole.AccentSoft),   // business-type field chip
+        ("#DFF3EA", ThemeRole.PositiveBg),   // chats empty-state icon circle
+        ("#EDEDED", ThemeRole.Background),   // delete-chat cancel button
+        ("#C8C8CC", ThemeRole.InputBorder),  // sheet grabber
+        ("#646468", ThemeRole.InkSecondary), // reply-mode popup body
+        ("#676767", ThemeRole.InkSecondary), // thread top-bar status
+        ("#4C4C4C", ThemeRole.InkSecondary), // link-preview description
+        ("#353535", ThemeRole.InkTertiary),  // link-preview domain
         // thread chrome (owner round 2: «messages page looks wrong»)
         ("#E9EDEF", ThemeRole.Hairline),     // action-menu dividers
         ("#6E6E73", ThemeRole.InkSecondary), // composer/attach icon tints
@@ -125,6 +138,11 @@ public static class ScreenThemeWirer
             "#34C759", // activation switch ON — Theme.Fixed.SwitchOnGreen
             "#00FF00", // pure debug green left in the prefab; not a theme colour
             "#2E9BE0", // channel-ish blue; needs a design call, not a guess
+            // The OFF track. Its binding was deliberately REMOVED in the
+            // always-dark pass because Bot.cs state-stamps the track; without
+            // this exclusion a re-run of the prefab sweep would re-add it and
+            // repaint the off colour over switches that are ON.
+            "#E9E9EA",
         },
     };
 
@@ -529,6 +547,9 @@ public static class ScreenThemeWirer
         // the template propagates to every runtime clone — the tiles themselves
         // stay unbound because Manager state-stamps their fill.
         ("Screen_New", "BusinessSelectorPanel/Content/BusinessTypesParent/BusinessTypeButtonTemplate/Text (TMP)", ThemeRole.InkPrimary),
+        // #ECECEC by name: the same grey is the business tiles' fill, and those
+        // are state-stamped and must stay unbound.
+        ("ChatsPanel", "SyncingState/Hero/ProgressTrack", ThemeRole.Hairline),
     };
 
     private static readonly (string prefab, string child, ThemeRole role)[] PrefabNamedSpec =
@@ -548,6 +569,15 @@ public static class ScreenThemeWirer
         // is #F0F2F5 -> Background. Named because the whites rule skips sprites.
         ("Assets/Prefabs/BotSettings.prefab", "Product/StickyFooter", ThemeRole.Background),
         ("Assets/Prefabs/BotSettings.prefab", "Service/StickyFooter", ThemeRole.Background),
+        // Reaction pill — by name because #D9D4CA is ALSO the doodle wallpaper
+        // ink (excluded from the chat sweep) and its fill is plain white.
+        ("Assets/Prefabs/MessageTextIncoming.prefab", "Bubble/ReactionPill", ThemeRole.BubbleBorder),
+        ("Assets/Prefabs/MessageTextOutgoing.prefab", "Bubble/ReactionPill", ThemeRole.BubbleBorder),
+        ("Assets/Prefabs/MessageTextIncoming.prefab", "Bubble/ReactionPill/PillFill", ThemeRole.BubbleIncoming),
+        ("Assets/Prefabs/MessageTextOutgoing.prefab", "Bubble/ReactionPill/PillFill", ThemeRole.BubbleIncoming),
+        // #808080 by name — the same grey is the nav bar's labels.
+        ("Assets/Prefabs/MessageTextIncoming.prefab", "Bubble/Audio/Duration", ThemeRole.InkSecondary),
+        ("Assets/Prefabs/MessageTextOutgoing.prefab", "Bubble/Audio/Duration", ThemeRole.InkSecondary),
     };
 
     [MenuItem("Tools/Theme/Screens/Audit Shell — nav, headers, profile, inputs (dry run)")]

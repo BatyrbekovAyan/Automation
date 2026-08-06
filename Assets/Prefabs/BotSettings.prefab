@@ -1899,6 +1899,7 @@ GameObject:
   - component: {fileID: 2492871464304610568}
   - component: {fileID: 3376419876409497603}
   - component: {fileID: 8081291939311495922}
+  - component: {fileID: 3306445570816814318}
   m_Layer: 5
   m_Name: Item Checkmark
   m_TagString: Untagged
@@ -1963,6 +1964,21 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!114 &3306445570816814318
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 430059125974787739}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 26
+  target: {fileID: 8081291939311495922}
+  preserveAlpha: 1
 --- !u!1 &457330039010992252
 GameObject:
   m_ObjectHideFlags: 0
@@ -1977,6 +1993,7 @@ GameObject:
   - component: {fileID: 3460622675539671194}
   - component: {fileID: 1030092887125171890}
   - component: {fileID: 7641821247371818716}
+  - component: {fileID: 1939073150948407933}
   m_Layer: 0
   m_Name: UploadPriceListButton
   m_TagString: Untagged
@@ -2116,6 +2133,21 @@ MonoBehaviour:
   OnTap:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &1939073150948407933
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 457330039010992252}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 26
+  target: {fileID: 8921942788389344442}
+  preserveAlpha: 1
 --- !u!1 &478163735276651738
 GameObject:
   m_ObjectHideFlags: 0
@@ -7813,6 +7845,7 @@ GameObject:
   - component: {fileID: 4389502186766815867}
   - component: {fileID: 6908150323872498738}
   - component: {fileID: 3805328483109316720}
+  - component: {fileID: 5537969455416725143}
   m_Layer: 0
   m_Name: Badge
   m_TagString: Untagged
@@ -7912,6 +7945,21 @@ MonoBehaviour:
   m_FlexibleWidth: -1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+--- !u!114 &5537969455416725143
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1908968433654984533}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 26
+  target: {fileID: 4389502186766815867}
+  preserveAlpha: 1
 --- !u!1 &1981479430755837831
 GameObject:
   m_ObjectHideFlags: 0
@@ -25969,6 +26017,7 @@ GameObject:
   - component: {fileID: 5114876254371008803}
   - component: {fileID: 5851368273241778585}
   - component: {fileID: 5437883457970256437}
+  - component: {fileID: 7791202912694664436}
   m_Layer: 0
   m_Name: AddProductButton
   m_TagString: Untagged
@@ -26108,6 +26157,21 @@ MonoBehaviour:
   OnTap:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &7791202912694664436
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5902676133034732583}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 26
+  target: {fileID: 1425457932706714485}
+  preserveAlpha: 1
 --- !u!1 &5902963874336627046
 GameObject:
   m_ObjectHideFlags: 0
@@ -26534,6 +26598,7 @@ GameObject:
   - component: {fileID: 866021225388472397}
   - component: {fileID: 101563447573204646}
   - component: {fileID: 8620766860706315105}
+  - component: {fileID: 2777794527430031065}
   m_Layer: 0
   m_Name: AddServiceButton
   m_TagString: Untagged
@@ -26673,6 +26738,21 @@ MonoBehaviour:
   OnTap:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &2777794527430031065
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6031108767345883933}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 26
+  target: {fileID: 3409130227282487688}
+  preserveAlpha: 1
 --- !u!1 &6129886156124213138
 GameObject:
   m_ObjectHideFlags: 0
@@ -26738,6 +26818,7 @@ GameObject:
   - component: {fileID: 4364834224705701190}
   - component: {fileID: 4528505125884896351}
   - component: {fileID: 1971721163204257003}
+  - component: {fileID: 4648963869169906745}
   m_Layer: 0
   m_Name: Badge
   m_TagString: Untagged
@@ -26837,6 +26918,21 @@ MonoBehaviour:
   m_FlexibleWidth: -1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+--- !u!114 &4648963869169906745
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6156028612174431443}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 26
+  target: {fileID: 4364834224705701190}
+  preserveAlpha: 1
 --- !u!1 &6173924944387822863
 GameObject:
   m_ObjectHideFlags: 0
@@ -35897,6 +35993,7 @@ GameObject:
   - component: {fileID: 4858423838196713824}
   - component: {fileID: 5789443664586970033}
   - component: {fileID: 8478358523297473460}
+  - component: {fileID: 2421479674162230361}
   m_Layer: 0
   m_Name: UploadPriceListButton
   m_TagString: Untagged
@@ -36036,6 +36133,21 @@ MonoBehaviour:
   OnTap:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &2421479674162230361
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8374754201980013706}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87ebcd35ffbf8446498b6a2ba8809666, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThemedColor
+  role: 26
+  target: {fileID: 8378952204820645956}
+  preserveAlpha: 1
 --- !u!1 &8396811649613001117
 GameObject:
   m_ObjectHideFlags: 0
