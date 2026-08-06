@@ -263,6 +263,58 @@
   .d-sk { background: var(--surface); border:1px solid var(--hairline); border-radius:10px; }
   .d-sk .dots { height:100%; } .d-sk .dots i { background: var(--ink-3); }
 
+  /* ============ Variants E–H — «4 строки» refinement round ============ */
+  /* E — sheet, roomy rows, intent overline, text up to 3 lines */
+  .e-row { display:block; padding: 7px 14px 8px; position:relative; cursor:pointer; transition: background .12s; }
+  .e-row:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); }
+  .e-row + .e-row { border-top:1px solid var(--hairline); }
+  .e-int { display:flex; align-items:center; gap:4px; font-size:8.5px; font-weight:700; letter-spacing:.06em;
+           text-transform:uppercase; color: var(--ink-3); margin-bottom:2px; }
+  .e-txt { font-size:13px; line-height:1.38; color: var(--ink);
+           display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+  .e-row.top { background: color-mix(in srgb, var(--positive-bg) 62%, transparent); }
+  .e-row.top:hover { background: var(--positive-bg); }
+  .e-row.top::before { content:''; position:absolute; left:0; top:6px; bottom:6px; width:3px;
+                       border-radius:0 2px 2px 0; background: var(--positive-ink); }
+  .e-row.top .e-int { color: var(--positive-ink); }
+
+  /* F — sheet, dense single-line rows */
+  .f-row { display:flex; gap:8px; padding: 8px 12px 8px 14px; align-items:center; position:relative;
+           cursor:pointer; transition: background .12s; }
+  .f-row:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); }
+  .f-row + .f-row { border-top:1px solid var(--hairline); }
+  .f-txt { font-size:12.5px; color: var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .f-row.top { background: color-mix(in srgb, var(--positive-bg) 62%, transparent); }
+  .f-row.top::before { content:''; position:absolute; left:0; top:6px; bottom:6px; width:3px;
+                       border-radius:0 2px 2px 0; background: var(--positive-ink); }
+  .f-row.top .f-txt { font-weight:600; }
+  .f-row.top .b-int { color: var(--positive-ink); background: color-mix(in srgb, var(--positive-ink) 14%, transparent); }
+
+  /* G — no sheet: stack of row-cards on the wallpaper */
+  .g-zone { padding: 2px 10px 8px; display:flex; flex-direction:column; gap:6px; position:relative; }
+  .g-card { background: var(--surface); border:1px solid var(--border); border-radius:14px;
+            padding: 8px 11px; box-shadow: var(--shadow-sm); display:flex; gap:8px; align-items:flex-start;
+            cursor:pointer; transition: transform .12s ease, border-color .15s; }
+  .g-card:hover { transform: translateY(-1px); border-color: var(--input-border); }
+  .g-txt { font-size:12.5px; line-height:1.35; color: var(--ink);
+           display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .g-card.top { background: var(--positive-bg); border-color: color-mix(in srgb, var(--positive-ink) 45%, transparent); }
+  .g-card.top .b-int { color: var(--positive-ink); background: color-mix(in srgb, var(--positive-ink) 14%, transparent); }
+  .g-refresh { position:absolute; top:-32px; right:10px; width:28px; height:28px; border-radius:50%;
+               background: var(--surface); border:1px solid var(--border); box-shadow: var(--shadow-sm);
+               display:flex; align-items:center; justify-content:center; cursor:pointer; transition: transform .15s ease; }
+  .g-refresh:hover { transform: rotate(40deg); }
+
+  /* H — sheet, recommended row = filled green action block */
+  .h-top { margin: 2px 8px 5px; background: var(--send); border-radius:12px; padding: 8px 11px;
+           cursor:pointer; box-shadow: var(--shadow-sm); transition: transform .12s ease; }
+  .h-top:hover { transform: scale(.99); }
+  .h-top .h-int { display:inline-flex; align-items:center; gap:4px; font-size:8.5px; font-weight:700;
+                  letter-spacing:.06em; text-transform:uppercase; color:#fff;
+                  background: rgba(255,255,255,.22); padding: 2.5px 7px; border-radius:8px; margin-bottom:4px; }
+  .h-top .h-txt { font-size:13px; font-weight:600; line-height:1.35; color:#fff;
+                  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+
   /* ============ sketch toolbar ============ */
   #sketch-tools { position:fixed; bottom:12px; right:12px; z-index:9999; font-size:12px;
                   background: rgba(12,16,20,.82); color:#fff; padding: 10px 12px; border-radius:10px;
@@ -289,6 +341,11 @@
     <button class="variant-tab" data-v="b" onclick="showVariant('b',this)">B · Список</button>
     <button class="variant-tab" data-v="c" onclick="showVariant('c',this)">C · Карусель</button>
     <button class="variant-tab" data-v="d" onclick="showVariant('d',this)">D · Родная сетка</button>
+    <span style="align-self:center; font-size:11px; color:var(--page-ink-2); margin:0 2px 0 6px;">4 строки:</span>
+    <button class="variant-tab" data-v="e" onclick="showVariant('e',this)">E · Полный текст</button>
+    <button class="variant-tab" data-v="f" onclick="showVariant('f',this)">F · Компакт</button>
+    <button class="variant-tab" data-v="g" onclick="showVariant('g',this)">G · Карточки</button>
+    <button class="variant-tab" data-v="h" onclick="showVariant('h',this)">H · Акцент</button>
   </div>
   <div id="caption"></div>
 </div>
@@ -327,6 +384,10 @@ const CAPTIONS = {
   b:`<b>B · Список.</b> Лист со строками во всю ширину: лучший ответ — крупно, в 2 строки, с зелёной рейкой; остальные — в 1 строку. Читается без внутренней прокрутки, обновление — тихая иконка в заголовке. <b>Смотрите на:</b> высоту листа и то, как быстро глаз находит лучший ответ.`,
   c:`<b>C · Карусель.</b> Одна крупная карточка, остальные — свайпом вбок; точки показывают позицию. Максимальная читаемость каждого ответа. <b>Смотрите на:</b> нормально ли, что варианты 2–4 скрыты за свайпом.`,
   d:`<b>D · Родная сетка.</b> Геометрия как сейчас (2×2 + FAB), но в родной палитре приложения: белые карточки с тонкой рамкой, ярлык намерения внутри, зелёным выделен только лучший ответ. <b>Смотрите на:</b> вопрос «дело было в мятной палитре или в самой сетке?».`,
+  e:`<b>E · 4 строки, полный текст.</b> Лист со строками во всю ширину: ярлык намерения сверху, текст до 3 строк — всё читается сразу, без прокрутки и «…». Самый высокий вариант (~⅓ экрана). <b>Смотрите на:</b> не давит ли лист на переписку.`,
+  f:`<b>F · 4 строки, компакт.</b> Все 4 ответа в одну строку с ярлыками — высота почти как у сегодняшней панели, но без внутренней прокрутки. Лучший — жирнее, с рейкой. <b>Смотрите на:</b> хватает ли одной строки, чтобы уверенно выбрать ответ.`,
+  g:`<b>G · 4 строки, карточки.</b> Без листа: каждая подсказка — отдельная карточка прямо на обоях, лучшая — зелёная. Воздушнее, чем лист; обновление — кружок над стопкой. <b>Смотрите на:</b> читаемость карточек на пёстрых обоях и ощущение «стопки».`,
+  h:`<b>H · 4 строки, акцент.</b> Лучший ответ — залитая зелёная кнопка («жми сюда»), остальные — тихие строки в одну линию. Максимально явная иерархия при умеренной высоте. <b>Смотрите на:</b> помогает ли заливка или выглядит навязчиво.`,
 };
 
 /* ================= svg helpers ================= */
@@ -477,13 +538,82 @@ function panelD(){
   </div>`;
 }
 
+/* ================= «4 строки» round (E–H) ================= */
+const skRows = n => Array.from({length:n}, (_,i)=>`
+    <div class="b-skrow"><span class="b-skbar" style="width:${[46,40,52,44][i%4]}px"></span><span class="b-skbar" style="width:${[68,54,62,48][i%4]}%"></span></div>`).join('');
+
+function sheetShell(bodyCards, bodyLoad){
+  return `
+  <div class="b-sheet">
+    <div class="b-grab"></div>
+    <div class="b-head">${svg.spark('var(--positive-ink)')}<span class="b-title">Предложения</span><div class="b-refresh" onclick="refreshFrame(this)">${svg.refresh('var(--ink-2)',14)}</div></div>
+    <div class="st st-cards">${bodyCards}</div>
+    <div class="st st-load">${bodyLoad}</div>
+    <div class="st st-empty"><div class="state-box b-state"><div class="state-h">Нет предложений</div><div class="state-b">Напишите ответ вручную</div></div></div>
+    <div class="st st-error"><div class="state-box b-state"><div class="state-h">Не удалось загрузить</div><div class="state-b">Проверьте соединение и попробуйте снова</div><button class="state-retry" onclick="refreshFrame(this)">Обновить</button></div></div>
+  </div>`;
+}
+
+/* E — roomy rows, intent overline, full text */
+function panelE(){
+  const rows = SUGGESTIONS.map(s=>`
+    <div class="e-row${s.top?' top':''}" onclick="pick(this,'${esc(s.t)}')">
+      <span class="e-int">${s.top? svg.spark('var(--positive-ink)') : ''}${s.i}</span>
+      <div class="e-txt">${s.t}</div>
+    </div>`).join('');
+  return sheetShell(`<div style="padding-bottom:6px">${rows}</div>`, skRows(4));
+}
+
+/* F — dense single-line rows */
+function panelF(){
+  const rows = SUGGESTIONS.map(s=>`
+    <div class="f-row${s.top?' top':''}" onclick="pick(this,'${esc(s.t)}')">
+      <span class="b-int">${s.i}</span><span class="f-txt">${s.t}</span>
+    </div>`).join('');
+  return sheetShell(`<div style="padding-bottom:6px">${rows}</div>`, skRows(4));
+}
+
+/* G — stack of row-cards, no sheet */
+function panelG(){
+  const cards = SUGGESTIONS.map(s=>`
+    <div class="g-card${s.top?' top':''}" onclick="pick(this,'${esc(s.t)}')">
+      ${s.top? svg.spark('var(--positive-ink)') : ''}<span class="b-int">${s.i}</span><span class="g-txt">${s.t}</span>
+    </div>`).join('');
+  const sk = [0,1,2].map(()=>`<div class="g-card" style="justify-content:center; padding:14px"><div class="dots"><i style="background:var(--ink-3)"></i><i style="background:var(--ink-3)"></i><i style="background:var(--ink-3)"></i></div></div>`).join('');
+  return `
+  <div class="g-zone">
+    <div class="st st-cards"><div class="g-refresh" onclick="refreshFrame(this)">${svg.refresh('var(--ink-2)',14)}</div>${cards}</div>
+    <div class="st st-load">${sk}</div>
+    ${stateBlocks('chip')}
+  </div>`;
+}
+
+/* H — filled recommended block + quiet rows */
+function panelH(){
+  const top = SUGGESTIONS[0];
+  const rows = SUGGESTIONS.slice(1).map(s=>`
+    <div class="f-row" onclick="pick(this,'${esc(s.t)}')">
+      <span class="b-int">${s.i}</span><span class="f-txt">${s.t}</span>
+    </div>`).join('');
+  const topBlock = `
+    <div class="h-top" onclick="pick(this,'${esc(top.t)}')">
+      <span class="h-int">${svg.spark('#FFFFFF')}${top.i}</span>
+      <div class="h-txt">${top.t}</div>
+    </div>`;
+  return sheetShell(`${topBlock}<div style="padding-bottom:6px">${rows}</div>`, skRows(4));
+}
+
 /* ================= build ================= */
 document.getElementById('stage').innerHTML =
   frame('now', panelNow(), 168) +
   frame('a',   panelA(),   84)  +
   frame('b',   panelB(),   218) +
   frame('c',   panelC(),   176) +
-  frame('d',   panelD(),   168);
+  frame('d',   panelD(),   168) +
+  frame('e',   panelE(),   330) +
+  frame('f',   panelF(),   205) +
+  frame('g',   panelG(),   282) +
+  frame('h',   panelH(),   232);
 document.getElementById('caption').innerHTML = CAPTIONS.now;
 
 /* deep-link: ?v=a|b|c|d|now&theme=ink-dark (used by headless renders + shareable) */

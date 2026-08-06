@@ -35,6 +35,17 @@ Deep links: `?v=a|b|c|d|now`, `&theme=ink-dark`, `&st=load|empty|error`.
   white cards, hairline borders, intent label inside, green only on the recommended card,
   neutral FAB. Isolates "palette vs layout".
 
+Round 2 — «4 строки» refinements (owner asked to explore the 4-row form factor):
+
+- **E: Полный текст** — sheet rows with intent overline + full reply text (≤3 lines), no
+  truncation, rail + wash on the recommended. Tallest (~⅓ of the screen) but everything reads.
+- **F: Компакт** — all four rows single-line with inline intent chips; height close to today's
+  panel; recommended = bold + rail + wash.
+- **G: Карточки** — no sheet: four full-width row-cards floating on the wallpaper, recommended
+  = green card + ✦; refresh circle above the stack.
+- **H: Акцент** — recommended reply as a filled green action block (white text), the other
+  three as quiet single-line rows.
+
 ## What to Look For
 
 - Which one you'd want under your thumb mid-conversation (chat visibility vs reply readability).
