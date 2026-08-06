@@ -1,0 +1,873 @@
+<title>Чаты — раунд 2 · Два этажа</title>
+<style>
+/* ============================================================
+   GALLERY CHROME — same cool-slate + rust system as round 1
+   ============================================================ */
+:root{
+  --g-ground:#F6F7F8; --g-panel:#FFFFFF; --g-panel-2:#EFF1F3;
+  --g-rule:#DEE3E7; --g-rule-2:#C9D0D6;
+  --g-ink:#131A20; --g-ink-2:#5A656E; --g-ink-3:#8B959D;
+  --g-mark:#A94D1D; --g-mark-soft:#F7ECE5;
+  --g-ok:#1F6B45; --g-ok-soft:#E7F2EC;
+  --g-warn:#8A5B08; --g-warn-soft:#F8EFDC;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --g-ground:#0E1216; --g-panel:#161B21; --g-panel-2:#1D242B;
+    --g-rule:#262D35; --g-rule-2:#39434D;
+    --g-ink:#E7ECF0; --g-ink-2:#95A0A9; --g-ink-3:#6B757D;
+    --g-mark:#E08B57; --g-mark-soft:#2B1E15;
+    --g-ok:#63C795; --g-ok-soft:#14261D;
+    --g-warn:#D6A657; --g-warn-soft:#2A2214;
+  }
+}
+:root[data-theme="dark"]{
+  --g-ground:#0E1216; --g-panel:#161B21; --g-panel-2:#1D242B;
+  --g-rule:#262D35; --g-rule-2:#39434D;
+  --g-ink:#E7ECF0; --g-ink-2:#95A0A9; --g-ink-3:#6B757D;
+  --g-mark:#E08B57; --g-mark-soft:#2B1E15;
+  --g-ok:#63C795; --g-ok-soft:#14261D;
+  --g-warn:#D6A657; --g-warn-soft:#2A2214;
+}
+:root[data-theme="light"]{
+  --g-ground:#F6F7F8; --g-panel:#FFFFFF; --g-panel-2:#EFF1F3;
+  --g-rule:#DEE3E7; --g-rule-2:#C9D0D6;
+  --g-ink:#131A20; --g-ink-2:#5A656E; --g-ink-3:#8B959D;
+  --g-mark:#A94D1D; --g-mark-soft:#F7ECE5;
+  --g-ok:#1F6B45; --g-ok-soft:#E7F2EC;
+  --g-warn:#8A5B08; --g-warn-soft:#F8EFDC;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--g-ground); color:var(--g-ink);
+  font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1240px;margin:0 auto;padding:0 28px 120px}
+.mono{font-family:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+      font-variant-numeric:tabular-nums;font-size:.86em;letter-spacing:-.01em}
+
+.mast{padding:72px 0 40px;border-bottom:1px solid var(--g-rule)}
+.eyebrow{font-size:12px;font-weight:650;letter-spacing:.14em;text-transform:uppercase;color:var(--g-mark);margin:0 0 18px}
+h1{font-size:clamp(32px,4.4vw,52px);line-height:1.06;margin:0 0 20px;letter-spacing:-.025em;font-weight:700;text-wrap:balance;max-width:22ch}
+.lede{font-size:18px;line-height:1.6;color:var(--g-ink-2);max-width:64ch;margin:0 0 28px}
+.lede strong{color:var(--g-ink);font-weight:620}
+
+.diag{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:1px;background:var(--g-rule);
+      border:1px solid var(--g-rule);border-radius:12px;overflow:hidden;margin-top:32px}
+.diag > div{background:var(--g-panel);padding:18px 20px}
+.diag dt{font-size:11px;font-weight:650;letter-spacing:.1em;text-transform:uppercase;color:var(--g-ink-3);margin:0 0 7px}
+.diag dd{margin:0;font-size:14px;color:var(--g-ink-2);line-height:1.5}
+.diag dd b{color:var(--g-ink);font-weight:620}
+.diag .lock{color:var(--g-ok);font-weight:650}
+
+nav{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--g-ground) 92%,transparent);
+    backdrop-filter:blur(12px);border-bottom:1px solid var(--g-rule);margin-bottom:8px}
+nav .inner{max-width:1240px;margin:0 auto;padding:0 28px;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+nav .inner::-webkit-scrollbar{display:none}
+nav a{flex:0 0 auto;padding:14px 13px;font-size:13px;font-weight:560;color:var(--g-ink-2);
+      text-decoration:none;border-bottom:2px solid transparent;white-space:nowrap}
+nav a:hover{color:var(--g-ink);border-bottom-color:var(--g-rule-2)}
+nav a:focus-visible{outline:2px solid var(--g-mark);outline-offset:-3px;border-radius:4px}
+
+section{padding:64px 0;border-bottom:1px solid var(--g-rule);scroll-margin-top:56px}
+.shead{display:flex;flex-wrap:wrap;align-items:baseline;gap:14px;margin-bottom:10px}
+.snum{font-size:12px;font-weight:700;letter-spacing:.1em;color:var(--g-mark);
+      background:var(--g-mark-soft);padding:5px 10px;border-radius:6px;white-space:nowrap}
+h2{font-size:clamp(24px,2.8vw,34px);margin:0;letter-spacing:-.02em;font-weight:680;line-height:1.15}
+h2 .ru{color:var(--g-ink-3);font-weight:450}
+h3{font-size:17px;margin:44px 0 14px;letter-spacing:-.01em;font-weight:650}
+.idea{font-size:17px;line-height:1.6;color:var(--g-ink-2);max-width:66ch;margin:0 0 6px}
+.idea strong{color:var(--g-ink);font-weight:620}
+
+.tags{display:flex;flex-wrap:wrap;gap:7px;margin:20px 0 4px}
+.tag{font-size:12px;font-weight:580;padding:5px 11px;border-radius:999px;border:1px solid var(--g-rule-2);color:var(--g-ink-2)}
+.tag.ok{background:var(--g-ok-soft);border-color:transparent;color:var(--g-ok)}
+.tag.warn{background:var(--g-warn-soft);border-color:transparent;color:var(--g-warn)}
+.tag.mark{background:var(--g-mark-soft);border-color:transparent;color:var(--g-mark)}
+
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,340px);gap:44px;align-items:start;margin-top:30px}
+@media (max-width:940px){ .split{grid-template-columns:1fr;gap:32px} }
+.stage{display:flex;flex-wrap:wrap;gap:26px}
+.unit{display:flex;flex-direction:column;gap:9px}
+.ulabel{font-size:11px;font-weight:650;letter-spacing:.1em;text-transform:uppercase;color:var(--g-ink-3)}
+.bezel{padding:8px;background:var(--g-rule);border-radius:30px;box-shadow:0 10px 30px -12px rgba(0,0,0,.28)}
+.pw{width:346px;height:614px;overflow:hidden;border-radius:22px;position:relative}
+.phone{width:1080px;height:1920px;transform:scale(.32);transform-origin:top left;
+       position:relative;overflow:hidden;background:var(--bg);line-height:1.2;
+       font-family:-apple-system,"Helvetica Neue",Arial,sans-serif;color:var(--ink)}
+
+.notes{position:sticky;top:76px}
+.notes ul{list-style:none;padding:0;margin:0}
+.notes li{padding:13px 0;border-bottom:1px solid var(--g-rule);font-size:14px;color:var(--g-ink-2);line-height:1.5}
+.notes li:first-child{padding-top:0}
+.notes li b{display:block;color:var(--g-ink);font-weight:620;font-size:13px;margin-bottom:3px}
+.notes li .mono{color:var(--g-ink);background:var(--g-panel-2);padding:1px 5px;border-radius:4px}
+.cost{margin-top:22px;padding:16px 18px;background:var(--g-panel);border:1px solid var(--g-rule);border-radius:11px}
+.cost dt{font-size:11px;font-weight:650;letter-spacing:.1em;text-transform:uppercase;color:var(--g-ink-3);margin:0 0 6px}
+.cost dd{margin:0;font-size:13.5px;line-height:1.55;color:var(--g-ink-2)}
+.cost dd + dt{margin-top:14px}
+
+.cgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:22px;margin-top:28px}
+@media (min-width:820px){ .cgrid.pairs{grid-template-columns:1fr 1fr} }
+.card{background:var(--g-panel);border:1px solid var(--g-rule);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+.card .top{padding:18px 20px 14px}
+.card .top h4{margin:0 0 5px;font-size:15px;font-weight:650;letter-spacing:-.01em}
+.card .top p{margin:0;font-size:13.5px;color:var(--g-ink-2);line-height:1.5}
+.card .demo{background:var(--g-panel-2);border-top:1px solid var(--g-rule);padding:24px 20px;
+            display:flex;flex-direction:column;gap:18px;align-items:center;flex:1;justify-content:center}
+.card .demo.flush{padding:0;gap:0;overflow:hidden}
+.demo-pair{display:flex;flex-direction:column;gap:8px;align-items:center;width:100%}
+.demo-cap{font-size:10.5px;font-weight:650;letter-spacing:.09em;text-transform:uppercase;color:var(--g-ink-3)}
+.crop{overflow:hidden;border-radius:10px;box-shadow:0 2px 10px -4px rgba(0,0,0,.25)}
+.crop > .phone{transform:scale(.30);transform-origin:top left}
+.card .verdict{padding:14px 20px;border-top:1px solid var(--g-rule);font-size:13px;color:var(--g-ink-2);line-height:1.5}
+.card .verdict b{color:var(--g-ink);font-weight:620}
+
+.rec{background:var(--g-panel);border:1px solid var(--g-rule);border-radius:14px;padding:30px 32px;margin-top:30px}
+.rec h3{margin-top:0}
+.rec ol{margin:0;padding-left:22px}
+.rec li{margin-bottom:12px;color:var(--g-ink-2);line-height:1.6}
+.rec li b{color:var(--g-ink);font-weight:620}
+table{width:100%;border-collapse:collapse;margin-top:26px;font-size:13.5px}
+.tscroll{overflow-x:auto}
+th,td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--g-rule);vertical-align:top}
+th{font-size:11px;font-weight:650;letter-spacing:.09em;text-transform:uppercase;color:var(--g-ink-3);white-space:nowrap}
+td b{font-weight:620}
+td:first-child{white-space:nowrap}
+
+/* ============================================================
+   APP PALETTE — «Чернильный», byte-for-byte from the theme assets
+   ============================================================ */
+.ph-light{
+  --bg:#F4F8F8; --surface:#FFFFFF; --hairline:#E3EDED; --border:#C4D6D7;
+  --ink:#08181B; --ink2:#4C6265; --ink3:#64797C;
+  --accent:#243A7A; --accent-text:#243A7A; --on-accent:#FFFFFF; --accent-soft:#E8F2FD;
+  --pos-bg:#E6F6EE; --pos-ink:#0A6B3E; --destructive:#A01B12;
+  --shadow:0 3px 12px rgba(8,24,27,.10); --shadow-lg:0 -6px 34px rgba(8,24,27,.16);
+  --scrim:rgba(8,24,27,.42);
+}
+.ph-dark{
+  --bg:#0E1116; --surface:#171C24; --hairline:#242C38; --border:#333E4E;
+  --ink:#ECF0F6; --ink2:#9AA6B8; --ink3:#79869A;
+  --accent:#3E61C6; --accent-text:#5981D6; --on-accent:#FFFFFF; --accent-soft:#1E2A44;
+  --pos-bg:#123324; --pos-ink:#57DE95; --destructive:#F2555A;
+  --shadow:0 3px 12px rgba(0,0,0,.5); --shadow-lg:0 -6px 34px rgba(0,0,0,.6);
+  --scrim:rgba(0,0,0,.62);
+}
+.phone{--wa:#25D366; --tg:#2AABEE}
+
+/* status bar */
+.sb{height:100px;display:flex;align-items:flex-end;justify-content:space-between;
+    padding:0 56px 14px;color:var(--ink);font-size:34px;font-weight:600;letter-spacing:.5px}
+.sb .r{display:flex;gap:12px;align-items:center}
+.sb .bars{display:flex;gap:5px;align-items:flex-end;height:26px}
+.sb .bars i{width:7px;background:currentColor;border-radius:2px;display:block}
+.sb .bat{width:52px;height:26px;border:3px solid currentColor;border-radius:8px;position:relative;opacity:.9}
+.sb .bat::after{content:"";position:absolute;left:4px;top:4px;bottom:4px;width:26px;background:currentColor;border-radius:3px}
+
+/* top bar */
+.bar{background:var(--surface);position:relative}
+.bar::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:var(--hairline)}
+.tier{display:flex;align-items:center;padding:0 40px}
+.bot{display:flex;align-items:center;gap:20px;min-width:0}
+.av{border-radius:999px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+    font-weight:700;color:#fff;position:relative}
+.bot .nm{font-weight:600;color:var(--ink);letter-spacing:-.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chev{flex:0 0 auto;opacity:.55}
+.sub{font-size:26px;color:var(--ink3);white-space:nowrap;margin-top:4px}
+
+/* recessed channel segment */
+.seg{display:flex;background:var(--bg);border-radius:48px;height:96px;padding:5px;
+     box-shadow:inset 0 0 0 2px var(--hairline)}
+.seg > div{flex:1;display:flex;align-items:center;justify-content:center;gap:14px;
+           border-radius:43px;font-size:32px;font-weight:600;color:var(--ink3)}
+.seg > div.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.seg .cnt{font-size:28px;font-weight:600;color:var(--ink3);opacity:.85}
+.gdot{width:20px;height:20px;border-radius:999px;flex:0 0 auto}
+.segdiv{width:3px;background:var(--hairline);margin:14px 6px;flex:0 0 auto;border-radius:2px}
+.seg .autocell{flex:0 0 206px;border-radius:43px}
+.seg .autocell.on-a{background:var(--pos-bg);color:var(--pos-ink)}
+
+/* the Auto button — pill form */
+.abtn{display:inline-flex;align-items:center;gap:14px;height:76px;border-radius:38px;padding:0 30px;
+      font-size:30px;font-weight:600;color:var(--ink2);box-shadow:inset 0 0 0 3px var(--border);
+      white-space:nowrap;flex:0 0 auto}
+.abtn .dot{width:18px;height:18px;border-radius:999px;box-shadow:inset 0 0 0 4px var(--ink3);flex:0 0 auto}
+.abtn.on{background:var(--pos-bg);color:var(--pos-ink);box-shadow:none}
+.abtn.on .dot{background:currentColor;box-shadow:none}
+.abtn.big{height:96px;border-radius:48px;padding:0 36px;font-size:32px}
+
+/* the Auto button — icon form */
+.pbtn{width:96px;height:96px;border-radius:999px;display:flex;align-items:center;justify-content:center;
+      flex:0 0 auto;color:var(--ink3);box-shadow:inset 0 0 0 3px var(--border)}
+.pbtn.on{background:var(--pos-ink);color:var(--surface);box-shadow:none}
+
+/* list */
+.list{background:var(--surface)}
+.search{height:124px;display:flex;align-items:center;padding:0 50px;background:var(--surface)}
+.search .pill{flex:1;height:92px;border-radius:46px;background:var(--bg);display:flex;align-items:center;
+              gap:18px;padding:0 26px;color:var(--ink3);font-size:38px;box-shadow:inset 0 0 0 2px var(--hairline)}
+.row{height:200px;display:flex;align-items:center;padding:0 40px;gap:32px;position:relative;background:var(--surface)}
+.row::after{content:"";position:absolute;left:212px;right:0;bottom:0;height:2px;background:var(--hairline)}
+.row:last-child::after{display:none}
+.rav{width:140px;height:140px;flex:0 0 auto;position:relative}
+.rav .av{width:140px;height:140px;font-size:52px}
+.rtx{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+.rtop{display:flex;align-items:baseline;gap:16px}
+.rname{font-size:44px;font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;letter-spacing:-.4px}
+.rtime{font-size:30px;color:var(--ink3);flex:0 0 auto}
+.rbot{display:flex;align-items:center;gap:16px}
+.rmsg{font-size:36px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+.ubadge{min-width:48px;height:48px;border-radius:24px;background:var(--accent);color:var(--on-accent);
+        display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:650;padding:0 14px;flex:0 0 auto}
+
+/* bottom nav */
+.nav{position:absolute;left:0;right:0;bottom:0;height:210px;background:var(--surface);display:flex;padding-bottom:70px}
+.nav::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:var(--hairline)}
+.nav > div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+           color:var(--ink3);font-size:26px;font-weight:500}
+.nav > div.on{color:var(--accent-text)}
+
+/* bot sheet */
+.sheet-scrim{position:absolute;inset:0;background:var(--scrim)}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--bg);
+       border-radius:56px 56px 0 0;box-shadow:var(--shadow-lg);display:flex;flex-direction:column}
+.grab{height:72px;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.grab i{width:108px;height:12px;border-radius:6px;background:var(--border);display:block}
+.stitle{padding:6px 48px 26px;font-size:44px;font-weight:650;color:var(--ink);letter-spacing:-.5px}
+.stitle small{display:block;font-size:28px;font-weight:400;color:var(--ink3);margin-top:6px;letter-spacing:0}
+.slist{padding:0 40px 40px;display:flex;flex-direction:column;gap:20px}
+.brow{background:var(--surface);border-radius:40px;display:flex;align-items:center;gap:28px;
+      padding:0 32px;height:152px;position:relative;overflow:hidden;box-shadow:inset 0 0 0 2px var(--hairline)}
+.brow.on{box-shadow:inset 0 0 0 4px var(--accent)}
+.brow.on .rail{position:absolute;left:0;top:0;bottom:0;width:10px;background:var(--accent)}
+.brow .av{width:100px;height:100px;font-size:40px}
+.bmeta{flex:1;min-width:0}
+.bname{font-size:40px;font-weight:600;color:var(--ink);letter-spacing:-.4px}
+.bsub{display:flex;align-items:center;gap:12px;font-size:28px;color:var(--ink3);margin-top:6px}
+.check{width:56px;height:56px;border-radius:999px;background:var(--accent);color:var(--on-accent);
+       display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.brow.add{background:transparent;box-shadow:inset 0 0 0 3px var(--border);height:120px;justify-content:center;
+          gap:16px;color:var(--accent-text);font-size:32px;font-weight:600}
+
+/* per-row mini Auto chip inside the sheet */
+.mauto{display:inline-flex;align-items:center;gap:10px;height:60px;border-radius:30px;padding:0 22px;
+       font-size:26px;font-weight:600;color:var(--ink3);box-shadow:inset 0 0 0 3px var(--border);flex:0 0 auto}
+.mauto .dot{width:14px;height:14px;border-radius:999px;box-shadow:inset 0 0 0 3px var(--ink3);flex:0 0 auto}
+.mauto.on{background:var(--pos-bg);color:var(--pos-ink);box-shadow:none}
+.mauto.on .dot{background:currentColor;box-shadow:none}
+
+/* confirm popup mock */
+.popwrap{width:1080px;height:600px;background:var(--scrim);display:flex;align-items:center;justify-content:center}
+.pop{width:760px;border-radius:48px;background:var(--surface);padding:56px 48px 40px;text-align:center}
+.pop h5{margin:0 0 18px;font-size:38px;font-weight:650;color:var(--ink);letter-spacing:-.4px}
+.pop p{margin:0 0 44px;font-size:30px;line-height:1.45;color:var(--ink2)}
+.pop .btns{display:flex;gap:20px}
+.pop .btns > div{flex:1;height:104px;border-radius:52px;display:flex;align-items:center;justify-content:center;
+                 font-size:32px;font-weight:600}
+.pop .cancel{background:var(--bg);color:var(--ink2);box-shadow:inset 0 0 0 3px var(--hairline)}
+.pop .go{background:var(--accent);color:var(--on-accent)}
+
+svg{display:block}
+.hidden-defs{position:absolute;width:0;height:0;overflow:hidden}
+</style>
+
+<svg class="hidden-defs" aria-hidden="true">
+  <symbol id="chev" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="check" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" d="m5 13 5 5L19 7"/></symbol>
+  <symbol id="search" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></g></symbol>
+  <symbol id="plus" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="spark" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2.2l2.1 5.6 5.7 2.2-5.7 2.2L12 17.8l-2.1-5.6-5.7-2.2 5.7-2.2L12 2.2zM19 15.4l1.05 2.75L22.8 19.2l-2.75 1.05L19 23l-1.05-2.75L15.2 19.2l2.75-1.05L19 15.4z"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5Z"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V10M12 20V4M19 20v-7"/></g></symbol>
+  <symbol id="i-bot" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="4"/><path d="M12 4v4M9 14h.01M15 14h.01"/></g></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></g></symbol>
+</svg>
+
+<nav>
+  <div class="inner">
+    <a href="#dir">Направление</a>
+    <a href="#a">A · Кнопка напротив имени</a>
+    <a href="#b">B · Имени вся ширина</a>
+    <a href="#c">C · Искра</a>
+    <a href="#d">D · Один жёлоб</a>
+    <a href="#btn">Кнопка крупно</a>
+    <a href="#sheet2">Шторка</a>
+    <a href="#pick2">Что выбрать</a>
+  </div>
+</nav>
+
+<div class="wrap">
+
+<header class="mast">
+  <p class="eyebrow">Экран «Чаты» · раунд 2</p>
+  <h1>«Два этажа», доведённый до выбора</h1>
+  <p class="lede">Направление зафиксировано: двухэтажная шапка в палитре приложения, компактная шторка ботов — и новое правило для режима: <strong>«Вместе» из интерфейса исчезает.</strong> Полуавтомат — молчаливое обычное состояние; в шапке живёт одна кнопка «Авто», которую включают и выключают. Ниже — четыре места и формы для этой кнопки, её состояния крупным планом и три отделки шторки.</p>
+
+  <div class="diag">
+    <div><dt>Компоновка</dt><dd><span class="lock">Зафиксировано</span> — «Два этажа»: личность бота сверху, канал — утопленный сегмент во всю ширину ниже.</dd></div>
+    <div><dt>Цвет</dt><dd><span class="lock">Зафиксировано</span> — палитра приложения; бренд каналов = точка 20 ед. Синий <b>#243A7A</b> остаётся только за действиями.</dd></div>
+    <div><dt>Режим</dt><dd><span class="lock">Новое правило</span> — никакого «Вместе» на экране. Кнопка «Авто»: <b>вкл</b> = бот отвечает сам, <b>выкл</b> = обычный полуавтомат.</dd></div>
+    <div><dt>Шторка</dt><dd><span class="lock">Зафиксировано</span> — «Компактный список», строка 152 ед. Здесь — три отделки на выбор.</dd></div>
+  </div>
+</header>
+
+<!-- ============================== DIRECTION NOTE ============================== -->
+<section id="dir">
+  <div class="shead"><span class="snum">СЕМАНТИКА</span><h2>Что меняет кнопка вместо тумблера</h2></div>
+  <p class="idea">Тумблер говорил «выбери один из двух режимов» — и требовал показывать оба слова. Кнопка говорит <strong>«включи автопилот, когда готов»</strong> — и слово нужно одно. Выключенная кнопка ничего не обещает: приложение просто работает как обычно, бот предлагает ответы, отправляете вы. Это честнее и к поведению: нажатие открывает знакомый диалог подтверждения, то есть форма «нажми, чтобы решить» совпадает с тем, что происходит.</p>
+  <p class="idea">Состояние «вкл» окрашено парой <span class="mono">positiveBg / positiveInk</span> — это цвет статуса «всё хорошо», а не синий действия и не зелёный выключателя активации бота (<span class="mono">#34C759</span> из <span class="mono">Theme.Fixed</span> остаётся только у «Бот работает»). Выключенная кнопка — контур <span class="mono">border</span> с пустой точкой: видно, что это выключатель, а не украшение. Точка — «лампочка» состояния: залита = работает.</p>
+</section>
+
+<!-- ============================== VARIANT A ============================== -->
+<section id="a">
+  <div class="shead"><span class="snum">ВАРИАНТ A</span><h2>Кнопка напротив имени <span class="ru">· прямое развитие раунда 1</span></h2></div>
+  <p class="idea">Этаж 1 отвечает на вопросы «чей это экран» и «как он отвечает» — личность слева, поведение справа. Этаж 2 — только фильтр. Ранги не смешиваются: у каждой строки одна тема.</p>
+  <div class="tags"><span class="tag ok">Авто видно всегда</span><span class="tag">Шапка 400 ед.</span><span class="tag">Имя до ~600 ед.</span></div>
+
+  <div class="split">
+    <div class="stage">
+      <div class="unit"><span class="ulabel">Светлая · авто включён</span><div class="bezel"><div class="pw"><div class="phone ph-light">
+        <div class="bar" style="height:400px">
+          <div class="sb"><span>9:41</span><span class="r"><span class="bars"><i style="height:10px"></i><i style="height:15px"></i><i style="height:20px"></i><i style="height:26px"></i></span><span class="bat"></span></span></div>
+          <div class="tier" style="height:156px;justify-content:space-between;gap:24px">
+            <div class="bot">
+              <div class="av" style="width:88px;height:88px;font-size:36px;background:#B08048">А</div>
+              <span class="nm" style="font-size:46px">Автозапчасти KZ</span>
+              <svg class="chev" width="28" height="28"><use href="#chev"/></svg>
+            </div>
+            <div class="abtn on"><span class="dot"></span>Авто</div>
+          </div>
+          <div class="tier" style="height:144px;padding:0 40px">
+            <div class="seg" style="flex:1">
+              <div class="on"><span class="gdot" style="background:var(--wa)"></span>WhatsApp<span class="cnt">4</span></div>
+              <div><span class="gdot" style="background:var(--tg);opacity:.4"></span>Telegram</div>
+            </div>
+          </div>
+        </div>
+        <div class="list">
+          <div class="search"><div class="pill"><svg width="40" height="40"><use href="#search"/></svg>Поиск</div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#C0705F">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Айгерим Сериковна</span><span class="rtime">14:32</span></div><div class="rbot"><span class="rmsg">Здравствуйте! Есть фильтр на Camry 2018?</span><span class="ubadge">3</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#5E8B7E">Д</div></div><div class="rtx"><div class="rtop"><span class="rname">Данияр</span><span class="rtime">13:58</span></div><div class="rbot"><span class="rmsg">Спасибо, оформил заказ 👍</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#7B6BA8">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Магазин «Автомир»</span><span class="rtime">12:10</span></div><div class="rbot"><span class="rmsg">Отправьте, пожалуйста, прайс</span><span class="ubadge">1</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#A8794A">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Асель</span><span class="rtime">11:47</span></div><div class="rbot"><span class="rmsg">А доставка по Алматы сколько стоит?</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#4F7CA3">Н</div></div><div class="rtx"><div class="rtop"><span class="rname">Нурлан Ж.</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Понял, жду счёт</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#9C5F76">М</div></div><div class="rtx"><div class="rtop"><span class="rname">Мадина</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Добрый день!</span></div></div></div>
+        </div>
+        <div class="nav"><div class="on"><svg width="60" height="60"><use href="#i-chat"/></svg>Чаты</div><div><svg width="60" height="60"><use href="#i-chart"/></svg>Сводка</div><div><svg width="60" height="60"><use href="#i-bot"/></svg>Боты</div><div><svg width="60" height="60"><use href="#i-user"/></svg>Профиль</div></div>
+      </div></div></div></div>
+
+      <div class="unit"><span class="ulabel">Тёмная · авто выключен</span><div class="bezel"><div class="pw"><div class="phone ph-dark">
+        <div class="bar" style="height:400px">
+          <div class="sb"><span>9:41</span><span class="r"><span class="bars"><i style="height:10px"></i><i style="height:15px"></i><i style="height:20px"></i><i style="height:26px"></i></span><span class="bat"></span></span></div>
+          <div class="tier" style="height:156px;justify-content:space-between;gap:24px">
+            <div class="bot">
+              <div class="av" style="width:88px;height:88px;font-size:36px;background:#B08048">А</div>
+              <span class="nm" style="font-size:46px">Автозапчасти KZ</span>
+              <svg class="chev" width="28" height="28"><use href="#chev"/></svg>
+            </div>
+            <div class="abtn"><span class="dot"></span>Авто</div>
+          </div>
+          <div class="tier" style="height:144px;padding:0 40px">
+            <div class="seg" style="flex:1">
+              <div class="on"><span class="gdot" style="background:var(--wa)"></span>WhatsApp<span class="cnt">4</span></div>
+              <div><span class="gdot" style="background:var(--tg);opacity:.4"></span>Telegram</div>
+            </div>
+          </div>
+        </div>
+        <div class="list">
+          <div class="search"><div class="pill"><svg width="40" height="40"><use href="#search"/></svg>Поиск</div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#C0705F">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Айгерим Сериковна</span><span class="rtime">14:32</span></div><div class="rbot"><span class="rmsg">Здравствуйте! Есть фильтр на Camry 2018?</span><span class="ubadge">3</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#5E8B7E">Д</div></div><div class="rtx"><div class="rtop"><span class="rname">Данияр</span><span class="rtime">13:58</span></div><div class="rbot"><span class="rmsg">Спасибо, оформил заказ 👍</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#7B6BA8">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Магазин «Автомир»</span><span class="rtime">12:10</span></div><div class="rbot"><span class="rmsg">Отправьте, пожалуйста, прайс</span><span class="ubadge">1</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#A8794A">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Асель</span><span class="rtime">11:47</span></div><div class="rbot"><span class="rmsg">А доставка по Алматы сколько стоит?</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#4F7CA3">Н</div></div><div class="rtx"><div class="rtop"><span class="rname">Нурлан Ж.</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Понял, жду счёт</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#9C5F76">М</div></div><div class="rtx"><div class="rtop"><span class="rname">Мадина</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Добрый день!</span></div></div></div>
+        </div>
+        <div class="nav"><div class="on"><svg width="60" height="60"><use href="#i-chat"/></svg>Чаты</div><div><svg width="60" height="60"><use href="#i-chart"/></svg>Сводка</div><div><svg width="60" height="60"><use href="#i-bot"/></svg>Боты</div><div><svg width="60" height="60"><use href="#i-user"/></svg>Профиль</div></div>
+      </div></div></div></div>
+    </div>
+
+    <div class="notes">
+      <ul>
+        <li><b>Кнопка 76 ед. высотой</b> Радиус 38, отступы 30, подпись 30, точка 18. Вкл — <span class="mono">positiveBg/positiveInk</span>, выкл — контур <span class="mono">border</span> 3 ед., подпись <span class="mono">inkSecondary</span>, точка пустая.</li>
+        <li><b>Ранги не смешаны</b> Этаж 1 — «кто и как», этаж 2 — «что показываем». Кнопка поведения не соседствует с фильтром.</li>
+        <li><b>Имя до ~600 ед.</b> Аватар 88 + шеврон 28 + кнопка ~210: «Автозапчасти KZ» помещается, длиннее — многоточие.</li>
+        <li><b>Цель нажатия</b> 76 ед. видимых + прозрачные поля до 96 — стандартный приём проекта (хит-зона больше визуала).</li>
+      </ul>
+      <dl class="cost">
+        <dt>Что переделывать</dt>
+        <dd><span class="mono">ReplyModeToggleBinder</span>: вместо ползунка — кнопка с двумя состояниями; логика, ключ <span class="mono">PlayerPrefs</span> и диалог те же. Сегмент — по чертежу раунда 1.</dd>
+        <dt>Риск</dt>
+        <dd>Минимальный из четырёх. Единственная жертва — имя делит этаж с кнопкой.</dd>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== VARIANT B ============================== -->
+<section id="b">
+  <div class="shead"><span class="snum">ВАРИАНТ B</span><h2>Имени — вся ширина <span class="ru">· управление одной строкой</span></h2></div>
+  <p class="idea">Этаж 1 — чистая личность: аватар 92 и имя 48 без соседей, обрезать нечем даже «Цветы и подарки Астана». Этаж 2 собирает оба контрола: сегмент каналов тянется, кнопка «Авто» прижата справа той же высоты 96 — одна панель управления под подписью экрана.</p>
+  <div class="tags"><span class="tag ok">Имя до ~840 ед. — не обрезается никогда</span><span class="tag">Шапка 400 ед.</span><span class="tag warn">Фильтр и поведение в одной строке</span></div>
+
+  <div class="split">
+    <div class="stage">
+      <div class="unit"><span class="ulabel">Светлая · авто включён</span><div class="bezel"><div class="pw"><div class="phone ph-light">
+        <div class="bar" style="height:400px">
+          <div class="sb"><span>9:41</span><span class="r"><span class="bars"><i style="height:10px"></i><i style="height:15px"></i><i style="height:20px"></i><i style="height:26px"></i></span><span class="bat"></span></span></div>
+          <div class="tier" style="height:156px">
+            <div class="bot">
+              <div class="av" style="width:92px;height:92px;font-size:38px;background:#B08048">А</div>
+              <span class="nm" style="font-size:48px">Автозапчасти KZ</span>
+              <svg class="chev" width="30" height="30"><use href="#chev"/></svg>
+            </div>
+          </div>
+          <div class="tier" style="height:144px;padding:0 40px;gap:20px">
+            <div class="seg" style="flex:1">
+              <div class="on"><span class="gdot" style="background:var(--wa)"></span>WhatsApp<span class="cnt">4</span></div>
+              <div><span class="gdot" style="background:var(--tg);opacity:.4"></span>Telegram</div>
+            </div>
+            <div class="abtn big on"><span class="dot"></span>Авто</div>
+          </div>
+        </div>
+        <div class="list">
+          <div class="search"><div class="pill"><svg width="40" height="40"><use href="#search"/></svg>Поиск</div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#C0705F">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Айгерим Сериковна</span><span class="rtime">14:32</span></div><div class="rbot"><span class="rmsg">Здравствуйте! Есть фильтр на Camry 2018?</span><span class="ubadge">3</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#5E8B7E">Д</div></div><div class="rtx"><div class="rtop"><span class="rname">Данияр</span><span class="rtime">13:58</span></div><div class="rbot"><span class="rmsg">Спасибо, оформил заказ 👍</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#7B6BA8">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Магазин «Автомир»</span><span class="rtime">12:10</span></div><div class="rbot"><span class="rmsg">Отправьте, пожалуйста, прайс</span><span class="ubadge">1</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#A8794A">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Асель</span><span class="rtime">11:47</span></div><div class="rbot"><span class="rmsg">А доставка по Алматы сколько стоит?</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#4F7CA3">Н</div></div><div class="rtx"><div class="rtop"><span class="rname">Нурлан Ж.</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Понял, жду счёт</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#9C5F76">М</div></div><div class="rtx"><div class="rtop"><span class="rname">Мадина</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Добрый день!</span></div></div></div>
+        </div>
+        <div class="nav"><div class="on"><svg width="60" height="60"><use href="#i-chat"/></svg>Чаты</div><div><svg width="60" height="60"><use href="#i-chart"/></svg>Сводка</div><div><svg width="60" height="60"><use href="#i-bot"/></svg>Боты</div><div><svg width="60" height="60"><use href="#i-user"/></svg>Профиль</div></div>
+      </div></div></div></div>
+
+      <div class="unit"><span class="ulabel">Тёмная · авто выключен</span><div class="bezel"><div class="pw"><div class="phone ph-dark">
+        <div class="bar" style="height:400px">
+          <div class="sb"><span>9:41</span><span class="r"><span class="bars"><i style="height:10px"></i><i style="height:15px"></i><i style="height:20px"></i><i style="height:26px"></i></span><span class="bat"></span></span></div>
+          <div class="tier" style="height:156px">
+            <div class="bot">
+              <div class="av" style="width:92px;height:92px;font-size:38px;background:#B08048">А</div>
+              <span class="nm" style="font-size:48px">Автозапчасти KZ</span>
+              <svg class="chev" width="30" height="30"><use href="#chev"/></svg>
+            </div>
+          </div>
+          <div class="tier" style="height:144px;padding:0 40px;gap:20px">
+            <div class="seg" style="flex:1">
+              <div class="on"><span class="gdot" style="background:var(--wa)"></span>WhatsApp<span class="cnt">4</span></div>
+              <div><span class="gdot" style="background:var(--tg);opacity:.4"></span>Telegram</div>
+            </div>
+            <div class="abtn big"><span class="dot"></span>Авто</div>
+          </div>
+        </div>
+        <div class="list">
+          <div class="search"><div class="pill"><svg width="40" height="40"><use href="#search"/></svg>Поиск</div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#C0705F">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Айгерим Сериковна</span><span class="rtime">14:32</span></div><div class="rbot"><span class="rmsg">Здравствуйте! Есть фильтр на Camry 2018?</span><span class="ubadge">3</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#5E8B7E">Д</div></div><div class="rtx"><div class="rtop"><span class="rname">Данияр</span><span class="rtime">13:58</span></div><div class="rbot"><span class="rmsg">Спасибо, оформил заказ 👍</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#7B6BA8">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Магазин «Автомир»</span><span class="rtime">12:10</span></div><div class="rbot"><span class="rmsg">Отправьте, пожалуйста, прайс</span><span class="ubadge">1</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#A8794A">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Асель</span><span class="rtime">11:47</span></div><div class="rbot"><span class="rmsg">А доставка по Алматы сколько стоит?</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#4F7CA3">Н</div></div><div class="rtx"><div class="rtop"><span class="rname">Нурлан Ж.</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Понял, жду счёт</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#9C5F76">М</div></div><div class="rtx"><div class="rtop"><span class="rname">Мадина</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Добрый день!</span></div></div></div>
+        </div>
+        <div class="nav"><div class="on"><svg width="60" height="60"><use href="#i-chat"/></svg>Чаты</div><div><svg width="60" height="60"><use href="#i-chart"/></svg>Сводка</div><div><svg width="60" height="60"><use href="#i-bot"/></svg>Боты</div><div><svg width="60" height="60"><use href="#i-user"/></svg>Профиль</div></div>
+      </div></div></div></div>
+    </div>
+
+    <div class="notes">
+      <ul>
+        <li><b>Кнопка 96 ед.</b> Та же высота, что у жёлоба сегмента — строка читается ровной. Радиус 48, отступы 36.</li>
+        <li><b>Сегмент сжимается до ~700</b> Ячейки по ~345 — «WhatsApp 4» помещается с запасом (нужно ~290).</li>
+        <li><b>Разные заливки — разные роли</b> Жёлоб утоплен в <span class="mono">background</span>, кнопка — контурная поверх <span class="mono">surface</span>. Даже рядом они не читаются одним контролом.</li>
+        <li><b>Компромисс</b> «Что показываем» и «как отвечает» всё же соседи по строке — слабее разделение, чем в A.</li>
+      </ul>
+      <dl class="cost">
+        <dt>Что переделывать</dt>
+        <dd>То же, что A, плюс: зоны этажа 2 перестраиваются (сегмент flex + кнопка), имя переезжает в свою строку.</dd>
+        <dt>Риск</dt>
+        <dd>Кнопка у правого края — дальше от большого пальца левши; и соседство с сегментом чуть повышает шанс промаха по «Telegram».</dd>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== VARIANT C ============================== -->
+<section id="c">
+  <div class="shead"><span class="snum">ВАРИАНТ C</span><h2>Искра <span class="ru">· иконка вместо слова</span></h2></div>
+  <p class="idea">Максимально тихая шапка: кнопка — круг 96 ед. с глифом «искра» (ИИ отвечает сам). Слово «Авто» появляется только в диалоге подтверждения. Освободившееся место отдано подстрочнику «6 чатов · 4 новых» под именем — шапка сообщает больше, управляет тише.</p>
+  <div class="tags"><span class="tag ok">Самая тихая шапка</span><span class="tag ok">Подстрочник со счётчиками</span><span class="tag">Шапка 400 ед.</span><span class="tag warn">Глиф надо выучить</span></div>
+
+  <div class="split">
+    <div class="stage">
+      <div class="unit"><span class="ulabel">Светлая · авто включён</span><div class="bezel"><div class="pw"><div class="phone ph-light">
+        <div class="bar" style="height:400px">
+          <div class="sb"><span>9:41</span><span class="r"><span class="bars"><i style="height:10px"></i><i style="height:15px"></i><i style="height:20px"></i><i style="height:26px"></i></span><span class="bat"></span></span></div>
+          <div class="tier" style="height:170px;justify-content:space-between;gap:24px">
+            <div class="bot">
+              <div class="av" style="width:96px;height:96px;font-size:38px;background:#B08048">А</div>
+              <div style="min-width:0">
+                <div class="nm" style="font-size:46px;display:flex;align-items:center;gap:12px">Автозапчасти KZ<svg class="chev" width="28" height="28"><use href="#chev"/></svg></div>
+                <div class="sub">6 чатов · 4 новых</div>
+              </div>
+            </div>
+            <div class="pbtn on"><svg width="48" height="48"><use href="#spark"/></svg></div>
+          </div>
+          <div class="tier" style="height:130px;padding:0 40px">
+            <div class="seg" style="flex:1">
+              <div class="on"><span class="gdot" style="background:var(--wa)"></span>WhatsApp<span class="cnt">4</span></div>
+              <div><span class="gdot" style="background:var(--tg);opacity:.4"></span>Telegram</div>
+            </div>
+          </div>
+        </div>
+        <div class="list">
+          <div class="search"><div class="pill"><svg width="40" height="40"><use href="#search"/></svg>Поиск</div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#C0705F">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Айгерим Сериковна</span><span class="rtime">14:32</span></div><div class="rbot"><span class="rmsg">Здравствуйте! Есть фильтр на Camry 2018?</span><span class="ubadge">3</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#5E8B7E">Д</div></div><div class="rtx"><div class="rtop"><span class="rname">Данияр</span><span class="rtime">13:58</span></div><div class="rbot"><span class="rmsg">Спасибо, оформил заказ 👍</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#7B6BA8">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Магазин «Автомир»</span><span class="rtime">12:10</span></div><div class="rbot"><span class="rmsg">Отправьте, пожалуйста, прайс</span><span class="ubadge">1</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#A8794A">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Асель</span><span class="rtime">11:47</span></div><div class="rbot"><span class="rmsg">А доставка по Алматы сколько стоит?</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#4F7CA3">Н</div></div><div class="rtx"><div class="rtop"><span class="rname">Нурлан Ж.</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Понял, жду счёт</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#9C5F76">М</div></div><div class="rtx"><div class="rtop"><span class="rname">Мадина</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Добрый день!</span></div></div></div>
+        </div>
+        <div class="nav"><div class="on"><svg width="60" height="60"><use href="#i-chat"/></svg>Чаты</div><div><svg width="60" height="60"><use href="#i-chart"/></svg>Сводка</div><div><svg width="60" height="60"><use href="#i-bot"/></svg>Боты</div><div><svg width="60" height="60"><use href="#i-user"/></svg>Профиль</div></div>
+      </div></div></div></div>
+
+      <div class="unit"><span class="ulabel">Тёмная · авто выключен</span><div class="bezel"><div class="pw"><div class="phone ph-dark">
+        <div class="bar" style="height:400px">
+          <div class="sb"><span>9:41</span><span class="r"><span class="bars"><i style="height:10px"></i><i style="height:15px"></i><i style="height:20px"></i><i style="height:26px"></i></span><span class="bat"></span></span></div>
+          <div class="tier" style="height:170px;justify-content:space-between;gap:24px">
+            <div class="bot">
+              <div class="av" style="width:96px;height:96px;font-size:38px;background:#B08048">А</div>
+              <div style="min-width:0">
+                <div class="nm" style="font-size:46px;display:flex;align-items:center;gap:12px">Автозапчасти KZ<svg class="chev" width="28" height="28"><use href="#chev"/></svg></div>
+                <div class="sub">6 чатов · 4 новых</div>
+              </div>
+            </div>
+            <div class="pbtn"><svg width="48" height="48"><use href="#spark"/></svg></div>
+          </div>
+          <div class="tier" style="height:130px;padding:0 40px">
+            <div class="seg" style="flex:1">
+              <div class="on"><span class="gdot" style="background:var(--wa)"></span>WhatsApp<span class="cnt">4</span></div>
+              <div><span class="gdot" style="background:var(--tg);opacity:.4"></span>Telegram</div>
+            </div>
+          </div>
+        </div>
+        <div class="list">
+          <div class="search"><div class="pill"><svg width="40" height="40"><use href="#search"/></svg>Поиск</div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#C0705F">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Айгерим Сериковна</span><span class="rtime">14:32</span></div><div class="rbot"><span class="rmsg">Здравствуйте! Есть фильтр на Camry 2018?</span><span class="ubadge">3</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#5E8B7E">Д</div></div><div class="rtx"><div class="rtop"><span class="rname">Данияр</span><span class="rtime">13:58</span></div><div class="rbot"><span class="rmsg">Спасибо, оформил заказ 👍</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#7B6BA8">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Магазин «Автомир»</span><span class="rtime">12:10</span></div><div class="rbot"><span class="rmsg">Отправьте, пожалуйста, прайс</span><span class="ubadge">1</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#A8794A">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Асель</span><span class="rtime">11:47</span></div><div class="rbot"><span class="rmsg">А доставка по Алматы сколько стоит?</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#4F7CA3">Н</div></div><div class="rtx"><div class="rtop"><span class="rname">Нурлан Ж.</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Понял, жду счёт</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#9C5F76">М</div></div><div class="rtx"><div class="rtop"><span class="rname">Мадина</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Добрый день!</span></div></div></div>
+        </div>
+        <div class="nav"><div class="on"><svg width="60" height="60"><use href="#i-chat"/></svg>Чаты</div><div><svg width="60" height="60"><use href="#i-chart"/></svg>Сводка</div><div><svg width="60" height="60"><use href="#i-bot"/></svg>Боты</div><div><svg width="60" height="60"><use href="#i-user"/></svg>Профиль</div></div>
+      </div></div></div></div>
+    </div>
+
+    <div class="notes">
+      <ul>
+        <li><b>Круг 96 ед., глиф 48</b> Вкл — заливка <span class="mono">positiveInk</span> с белой искрой (в тёмной теме — яркая зелень с тёмным глифом), выкл — контурный круг, глиф <span class="mono">inkTertiary</span>.</li>
+        <li><b>Почему искра, а не робот</b> Робот занят иконкой вкладки «Боты» — тот же глиф сверху и снизу экрана путал бы. Искра = «ИИ работает».</li>
+        <li><b>Подстрочник 26 ед.</b> «6 чатов · 4 новых» — из варианта 3 раунда 1; здесь он помещается без удорожания, этаж 1 растёт до 170.</li>
+        <li><b>Обучение</b> Первый запуск после обновления стоит встретить одноразовой подсказкой-облачком у кнопки — иначе искра прочитается как украшение.</li>
+      </ul>
+      <dl class="cost">
+        <dt>Что переделывать</dt>
+        <dd>То же, что A, плюс спрайт искры и подсчёт «N чатов · M новых» (данные уже в кэше чатов). Подсказка — если возьмём.</dd>
+        <dt>Риск</dt>
+        <dd>Иконка без слова — единственный обучаемый элемент во всех вариантах. Всё остальное читается сразу.</dd>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== VARIANT D ============================== -->
+<section id="d">
+  <div class="shead"><span class="snum">ВАРИАНТ D</span><h2>Один жёлоб <span class="ru">· всё управление в одной полосе</span></h2></div>
+  <p class="idea">Спорный, но честный вариант: ячейка «Авто» живёт в том же утопленном жёлобе, что и каналы, отделённая штрихом. Одна полоса — весь пульт. Форма максимально простая; расплата — фильтр и поведение снова в одном контроле, как в сегодняшней шапке, только тише.</p>
+  <div class="tags"><span class="tag ok">Одна полоса управления</span><span class="tag">Шапка 400 ед.</span><span class="tag warn">Смыслы смешаны — против этого мы шли</span></div>
+
+  <div class="split">
+    <div class="stage">
+      <div class="unit"><span class="ulabel">Светлая · авто включён</span><div class="bezel"><div class="pw"><div class="phone ph-light">
+        <div class="bar" style="height:400px">
+          <div class="sb"><span>9:41</span><span class="r"><span class="bars"><i style="height:10px"></i><i style="height:15px"></i><i style="height:20px"></i><i style="height:26px"></i></span><span class="bat"></span></span></div>
+          <div class="tier" style="height:156px">
+            <div class="bot">
+              <div class="av" style="width:92px;height:92px;font-size:38px;background:#B08048">А</div>
+              <span class="nm" style="font-size:48px">Автозапчасти KZ</span>
+              <svg class="chev" width="30" height="30"><use href="#chev"/></svg>
+            </div>
+          </div>
+          <div class="tier" style="height:144px;padding:0 40px">
+            <div class="seg" style="flex:1">
+              <div class="on"><span class="gdot" style="background:var(--wa)"></span>WhatsApp<span class="cnt">4</span></div>
+              <div><span class="gdot" style="background:var(--tg);opacity:.4"></span>Telegram</div>
+              <span class="segdiv"></span>
+              <div class="autocell on-a"><span class="gdot" style="background:currentColor"></span>Авто</div>
+            </div>
+          </div>
+        </div>
+        <div class="list">
+          <div class="search"><div class="pill"><svg width="40" height="40"><use href="#search"/></svg>Поиск</div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#C0705F">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Айгерим Сериковна</span><span class="rtime">14:32</span></div><div class="rbot"><span class="rmsg">Здравствуйте! Есть фильтр на Camry 2018?</span><span class="ubadge">3</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#5E8B7E">Д</div></div><div class="rtx"><div class="rtop"><span class="rname">Данияр</span><span class="rtime">13:58</span></div><div class="rbot"><span class="rmsg">Спасибо, оформил заказ 👍</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#7B6BA8">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Магазин «Автомир»</span><span class="rtime">12:10</span></div><div class="rbot"><span class="rmsg">Отправьте, пожалуйста, прайс</span><span class="ubadge">1</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#A8794A">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Асель</span><span class="rtime">11:47</span></div><div class="rbot"><span class="rmsg">А доставка по Алматы сколько стоит?</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#4F7CA3">Н</div></div><div class="rtx"><div class="rtop"><span class="rname">Нурлан Ж.</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Понял, жду счёт</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#9C5F76">М</div></div><div class="rtx"><div class="rtop"><span class="rname">Мадина</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Добрый день!</span></div></div></div>
+        </div>
+        <div class="nav"><div class="on"><svg width="60" height="60"><use href="#i-chat"/></svg>Чаты</div><div><svg width="60" height="60"><use href="#i-chart"/></svg>Сводка</div><div><svg width="60" height="60"><use href="#i-bot"/></svg>Боты</div><div><svg width="60" height="60"><use href="#i-user"/></svg>Профиль</div></div>
+      </div></div></div></div>
+
+      <div class="unit"><span class="ulabel">Тёмная · Telegram · авто выключен</span><div class="bezel"><div class="pw"><div class="phone ph-dark">
+        <div class="bar" style="height:400px">
+          <div class="sb"><span>9:41</span><span class="r"><span class="bars"><i style="height:10px"></i><i style="height:15px"></i><i style="height:20px"></i><i style="height:26px"></i></span><span class="bat"></span></span></div>
+          <div class="tier" style="height:156px">
+            <div class="bot">
+              <div class="av" style="width:92px;height:92px;font-size:38px;background:#B08048">А</div>
+              <span class="nm" style="font-size:48px">Автозапчасти KZ</span>
+              <svg class="chev" width="30" height="30"><use href="#chev"/></svg>
+            </div>
+          </div>
+          <div class="tier" style="height:144px;padding:0 40px">
+            <div class="seg" style="flex:1">
+              <div><span class="gdot" style="background:var(--wa);opacity:.4"></span>WhatsApp<span class="cnt">4</span></div>
+              <div class="on"><span class="gdot" style="background:var(--tg)"></span>Telegram</div>
+              <span class="segdiv"></span>
+              <div class="autocell"><span class="gdot" style="background:var(--ink3);opacity:.5"></span>Авто</div>
+            </div>
+          </div>
+        </div>
+        <div class="list">
+          <div class="search"><div class="pill"><svg width="40" height="40"><use href="#search"/></svg>Поиск</div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#4F7CA3">Т</div></div><div class="rtx"><div class="rtop"><span class="rname">Тимур Ак.</span><span class="rtime">14:05</span></div><div class="rbot"><span class="rmsg">Скиньте каталог, пожалуйста</span><span class="ubadge">2</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#9C5F76">Ж</div></div><div class="rtx"><div class="rtop"><span class="rname">Жанна</span><span class="rtime">13:20</span></div><div class="rbot"><span class="rmsg">Хорошо, приеду к 18:00</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#5E8B7E">С</div></div><div class="rtx"><div class="rtop"><span class="rname">СТО «Барыс»</span><span class="rtime">11:02</span></div><div class="rbot"><span class="rmsg">Есть колодки на Sonata?</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#7B6BA8">Е</div></div><div class="rtx"><div class="rtop"><span class="rname">Ерлан</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Спасибо!</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#A8794A">К</div></div><div class="rtx"><div class="rtop"><span class="rname">Камила</span><span class="rtime">вчера</span></div><div class="rbot"><span class="rmsg">Подскажите режим работы</span></div></div></div>
+          <div class="row"><div class="rav"><div class="av" style="background:#C0705F">Б</div></div><div class="rtx"><div class="rtop"><span class="rname">Бекзат</span><span class="rtime">пн</span></div><div class="rbot"><span class="rmsg">Оплатил, жду отправку</span></div></div></div>
+        </div>
+        <div class="nav"><div class="on"><svg width="60" height="60"><use href="#i-chat"/></svg>Чаты</div><div><svg width="60" height="60"><use href="#i-chart"/></svg>Сводка</div><div><svg width="60" height="60"><use href="#i-bot"/></svg>Боты</div><div><svg width="60" height="60"><use href="#i-user"/></svg>Профиль</div></div>
+      </div></div></div></div>
+    </div>
+
+    <div class="notes">
+      <ul>
+        <li><b>Ячейка 206 ед.</b> Отделена штрихом 3×68. Вкл — <span class="mono">positiveBg</span>-карточка с зелёной точкой; выкл — плоская, точка серая.</li>
+        <li><b>Ячейки каналов ~360</b> Почти как сегодняшние зоны — «WhatsApp 4» дышит.</li>
+        <li><b>Главное возражение</b> Мы разводили «что показываем» и «как отвечает» — здесь они снова в одном контроле. Зелёная карточка рядом с белой читается как «третья вкладка», и первое касание по «Авто» кто-то сделает, ожидая фильтр.</li>
+        <li><b>Когда он всё же хорош</b> Если важнее всего минимум форм в шапке: две полосы — имя и пульт, ничего больше.</li>
+      </ul>
+      <dl class="cost">
+        <dt>Что переделывать</dt>
+        <dd>Как A, но кнопка становится третьей ячейкой внутри геометрии сегмента — один контейнер, чуть меньше объектов сцены.</dd>
+        <dt>Риск</dt>
+        <dd>Семантический, не технический: «Авто» в ряду фильтров будут первое время нажимать как фильтр.</dd>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== BUTTON CLOSE-UP ============================== -->
+<section id="btn">
+  <div class="shead"><span class="snum">КНОПКА</span><h2>«Авто» крупным планом</h2></div>
+  <p class="idea">Обе формы в обоих состояниях и темах — и диалоги, которые несут слова, убранные с экрана. Правило состояний одно: <strong>вкл = заливка <span class="mono">positiveBg</span>, выкл = контур с пустой точкой.</strong> Выключенная кнопка обязана выглядеть нажимаемой, но не «сломанной» — поэтому контур, а не серая заливка.</p>
+
+  <div class="cgrid pairs">
+    <div class="card">
+      <div class="top"><h4>Пилюля с точкой · варианты A и B</h4><p>Точка — лампочка состояния: залита = бот отвечает сам, пустая = ждёт вас.</p></div>
+      <div class="demo">
+        <div class="demo-pair"><span class="demo-cap">Светлая · вкл / выкл</span><div class="crop" style="width:324px;height:45px"><div class="phone ph-light" style="width:1080px;height:150px;background:var(--surface);display:flex;align-items:center;justify-content:center;gap:48px">
+          <div class="abtn on"><span class="dot"></span>Авто</div>
+          <div class="abtn"><span class="dot"></span>Авто</div>
+        </div></div></div>
+        <div class="demo-pair"><span class="demo-cap">Тёмная · вкл / выкл</span><div class="crop" style="width:324px;height:45px"><div class="phone ph-dark" style="width:1080px;height:150px;background:var(--surface);display:flex;align-items:center;justify-content:center;gap:48px">
+          <div class="abtn on"><span class="dot"></span>Авто</div>
+          <div class="abtn"><span class="dot"></span>Авто</div>
+        </div></div></div>
+      </div>
+      <div class="verdict"><b>Базовая рекомендация.</b> Слово + лампочка = ноль обучения. Контраст пары <span class="mono">positiveInk</span> на <span class="mono">positiveBg</span> — 6,7:1 в светлой, 8,2:1 в тёмной.</div>
+    </div>
+
+    <div class="card">
+      <div class="top"><h4>Искра · вариант C</h4><p>Круг 96, глиф 48. Слово живёт в диалоге подтверждения.</p></div>
+      <div class="demo">
+        <div class="demo-pair"><span class="demo-cap">Светлая · вкл / выкл</span><div class="crop" style="width:324px;height:45px"><div class="phone ph-light" style="width:1080px;height:150px;background:var(--surface);display:flex;align-items:center;justify-content:center;gap:48px">
+          <div class="pbtn on"><svg width="48" height="48"><use href="#spark"/></svg></div>
+          <div class="pbtn"><svg width="48" height="48"><use href="#spark"/></svg></div>
+        </div></div></div>
+        <div class="demo-pair"><span class="demo-cap">Тёмная · вкл / выкл</span><div class="crop" style="width:324px;height:45px"><div class="phone ph-dark" style="width:1080px;height:150px;background:var(--surface);display:flex;align-items:center;justify-content:center;gap:48px">
+          <div class="pbtn on"><svg width="48" height="48"><use href="#spark"/></svg></div>
+          <div class="pbtn"><svg width="48" height="48"><use href="#spark"/></svg></div>
+        </div></div></div>
+      </div>
+      <div class="verdict"><b>Красивее, но дороже во внедрении смысла.</b> Нужна одноразовая подсказка. Реализация — спрайт (TMP-иконки в проекте не рендерятся), вкл-заливка <span class="mono">positiveInk</span>.</div>
+    </div>
+
+    <div class="card">
+      <div class="top"><h4>Ячейка в жёлобе · вариант D</h4><p>Третья ячейка за штрихом-разделителем. Зелёная карточка против белой карточки выбора канала.</p></div>
+      <div class="demo">
+        <div class="demo-pair"><span class="demo-cap">Светлая · вкл</span><div class="crop" style="width:324px;height:45px"><div class="phone ph-light" style="width:1080px;height:150px;background:var(--surface);padding:27px 40px">
+          <div class="seg"><div class="on"><span class="gdot" style="background:var(--wa)"></span>WhatsApp<span class="cnt">4</span></div><div><span class="gdot" style="background:var(--tg);opacity:.4"></span>Telegram</div><span class="segdiv"></span><div class="autocell on-a"><span class="gdot" style="background:currentColor"></span>Авто</div></div>
+        </div></div></div>
+        <div class="demo-pair"><span class="demo-cap">Тёмная · выкл</span><div class="crop" style="width:324px;height:45px"><div class="phone ph-dark" style="width:1080px;height:150px;background:var(--surface);padding:27px 40px">
+          <div class="seg"><div class="on"><span class="gdot" style="background:var(--wa)"></span>WhatsApp<span class="cnt">4</span></div><div><span class="gdot" style="background:var(--tg);opacity:.4"></span>Telegram</div><span class="segdiv"></span><div class="autocell"><span class="gdot" style="background:var(--ink3);opacity:.5"></span>Авто</div></div>
+        </div></div></div>
+      </div>
+      <div class="verdict"><b>Зелёное ≠ белое</b> — заливки различают «состояние» и «выбор», это спасает форму. Но соседство по жёлобу всё равно шепчет «я тоже фильтр».</div>
+    </div>
+
+    <div class="card">
+      <div class="top"><h4>Диалоги · слова переезжают сюда</h4><p>Существующий <span class="mono">ReplyModeConfirmPopup</span>, новые тексты. Диалог остаётся только на включение; выключение — мгновенное.</p></div>
+      <div class="demo">
+        <div class="demo-pair"><span class="demo-cap">Включение — единственный диалог</span><div class="crop" style="width:324px;height:180px"><div class="phone ph-light" style="height:600px">
+          <div class="popwrap"><div class="pop">
+            <h5>Включить авто-режим?</h5>
+            <p>Бот будет отвечать клиентам сам. Выключить можно в любой момент — этой же кнопкой.</p>
+            <div class="btns"><div class="cancel">Отмена</div><div class="go">Включить</div></div>
+          </div></div>
+        </div></div></div>
+        <div class="demo-pair"><span class="demo-cap">Тёмная</span><div class="crop" style="width:324px;height:180px"><div class="phone ph-dark" style="height:600px">
+          <div class="popwrap"><div class="pop">
+            <h5>Включить авто-режим?</h5>
+            <p>Бот будет отвечать клиентам сам. Выключить можно в любой момент — этой же кнопкой.</p>
+            <div class="btns"><div class="cancel">Отмена</div><div class="go">Включить</div></div>
+          </div></div>
+        </div></div></div>
+      </div>
+      <div class="verdict"><b>Асимметрия сознательная.</b> Включение — рискованное направление (бот начнёт писать живым клиентам), подтверждаем. Выключение безопасно (вы просто забираете руль) — мгновенно, кнопка гаснет сразу. Сегодня попап стоит в обе стороны — одну убираем.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== SHEET ROUND 2 ============================== -->
+<section id="sheet2">
+  <div class="shead"><span class="snum">ШТОРКА</span><h2>Компактный список <span class="ru">· три отделки</span></h2></div>
+  <p class="idea">База зафиксирована: строка 152 ед., аватар 100, выбранный бот — обводка с рейкой и галочкой. Разница между отделками — что строка несёт <strong>кроме</strong> выбора: ничего, кнопку «Авто» каждого бота, или счётчики непрочитанных с кнопкой «Новый бот».</p>
+
+  <div class="cgrid">
+    <div class="card">
+      <div class="top"><h4>А1 · Чистый выбор</h4><p>Ровно раунд 1: имя, каналы точками, счётчик чатов. Ничего лишнего.</p></div>
+      <div class="demo flush">
+        <div class="pw" style="width:300px;height:534px;border-radius:0"><div class="phone ph-light" style="transform:scale(.278)">
+          <div class="bar" style="height:240px"><div class="sb"><span>9:41</span><span class="r"><span class="bars"><i style="height:10px"></i><i style="height:15px"></i><i style="height:20px"></i><i style="height:26px"></i></span><span class="bat"></span></span></div>
+            <div class="tier" style="height:140px"><div class="bot"><div class="av" style="width:96px;height:96px;font-size:38px;background:#B08048">А</div><span class="nm" style="font-size:44px">Автозапчасти KZ</span><svg class="chev" width="26" height="26"><use href="#chev"/></svg></div></div>
+          </div>
+          <div class="list"><div class="search"><div class="pill"><svg width="40" height="40"><use href="#search"/></svg>Поиск</div></div>
+            <div class="row"><div class="rav"><div class="av" style="background:#C0705F">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Айгерим Сериковна</span><span class="rtime">14:32</span></div><div class="rbot"><span class="rmsg">Есть фильтр на Camry?</span><span class="ubadge">3</span></div></div></div>
+            <div class="row"><div class="rav"><div class="av" style="background:#5E8B7E">Д</div></div><div class="rtx"><div class="rtop"><span class="rname">Данияр</span><span class="rtime">13:58</span></div><div class="rbot"><span class="rmsg">Спасибо, оформил заказ 👍</span></div></div></div>
+          </div>
+          <div class="sheet-scrim"></div>
+          <div class="sheet" style="height:920px">
+            <div class="grab"><i></i></div>
+            <div class="stitle">Ваши боты<small>Выберите, чьи чаты показать</small></div>
+            <div class="slist">
+              <div class="brow on"><span class="rail"></span><div class="av" style="background:#B08048">А</div><div class="bmeta"><div class="bname">Автозапчасти KZ</div><div class="bsub"><span class="gdot" style="width:16px;height:16px;background:var(--wa)"></span><span class="gdot" style="width:16px;height:16px;background:var(--tg)"></span>6 чатов · 4 новых</div></div><div class="check"><svg width="30" height="30"><use href="#check"/></svg></div></div>
+              <div class="brow"><div class="av" style="background:#C05F7E">Ц</div><div class="bmeta"><div class="bname">Цветы Астана</div><div class="bsub"><span class="gdot" style="width:16px;height:16px;background:var(--wa)"></span>12 чатов · 2 новых</div></div></div>
+              <div class="brow"><div class="av" style="background:#4F7CA3">Р</div><div class="bmeta"><div class="bname">Ремонт телефонов</div><div class="bsub"><span class="gdot" style="width:16px;height:16px;background:var(--tg)"></span>3 чата</div></div></div>
+              <div class="brow"><div class="av" style="background:#6E8AA5">О</div><div class="bmeta"><div class="bname">Оптом KZ</div><div class="bsub"><span class="gdot" style="width:16px;height:16px;background:var(--border)"></span>Каналы не подключены</div></div></div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+      <div class="verdict"><b>Одна строка — одно касание, одна цель.</b> Самая быстрая шторка; всё остальное про ботов живёт на вкладке «Боты».</div>
+    </div>
+
+    <div class="card">
+      <div class="top"><h4>А2 · С кнопкой «Авто»</h4><p>Та же строка + мини-кнопка справа. Видно и управляется авто-режим всех ботов, не покидая шторку.</p></div>
+      <div class="demo flush">
+        <div class="pw" style="width:300px;height:534px;border-radius:0"><div class="phone ph-dark" style="transform:scale(.278)">
+          <div class="bar" style="height:240px"><div class="sb"><span>9:41</span><span class="r"><span class="bars"><i style="height:10px"></i><i style="height:15px"></i><i style="height:20px"></i><i style="height:26px"></i></span><span class="bat"></span></span></div>
+            <div class="tier" style="height:140px"><div class="bot"><div class="av" style="width:96px;height:96px;font-size:38px;background:#B08048">А</div><span class="nm" style="font-size:44px">Автозапчасти KZ</span><svg class="chev" width="26" height="26"><use href="#chev"/></svg></div></div>
+          </div>
+          <div class="list"><div class="search"><div class="pill"><svg width="40" height="40"><use href="#search"/></svg>Поиск</div></div>
+            <div class="row"><div class="rav"><div class="av" style="background:#C0705F">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Айгерим Сериковна</span><span class="rtime">14:32</span></div><div class="rbot"><span class="rmsg">Есть фильтр на Camry?</span><span class="ubadge">3</span></div></div></div>
+            <div class="row"><div class="rav"><div class="av" style="background:#5E8B7E">Д</div></div><div class="rtx"><div class="rtop"><span class="rname">Данияр</span><span class="rtime">13:58</span></div><div class="rbot"><span class="rmsg">Спасибо, оформил заказ 👍</span></div></div></div>
+          </div>
+          <div class="sheet-scrim"></div>
+          <div class="sheet" style="height:920px">
+            <div class="grab"><i></i></div>
+            <div class="stitle">Ваши боты<small>Чаты и авто-режим</small></div>
+            <div class="slist">
+              <div class="brow on"><span class="rail"></span><div class="av" style="background:#B08048">А</div><div class="bmeta"><div class="bname">Автозапчасти KZ</div><div class="bsub"><span class="gdot" style="width:16px;height:16px;background:var(--wa)"></span><span class="gdot" style="width:16px;height:16px;background:var(--tg)"></span>6 чатов</div></div><div class="mauto on"><span class="dot"></span>Авто</div></div>
+              <div class="brow"><div class="av" style="background:#C05F7E">Ц</div><div class="bmeta"><div class="bname">Цветы Астана</div><div class="bsub"><span class="gdot" style="width:16px;height:16px;background:var(--wa)"></span>12 чатов</div></div><div class="mauto"><span class="dot"></span>Авто</div></div>
+              <div class="brow"><div class="av" style="background:#4F7CA3">Р</div><div class="bmeta"><div class="bname">Ремонт телефонов</div><div class="bsub"><span class="gdot" style="width:16px;height:16px;background:var(--tg)"></span>3 чата</div></div><div class="mauto on"><span class="dot"></span>Авто</div></div>
+              <div class="brow"><div class="av" style="background:#6E8AA5">О</div><div class="bmeta"><div class="bname">Оптом KZ</div><div class="bsub"><span class="gdot" style="width:16px;height:16px;background:var(--border)"></span>Не подключён</div></div></div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+      <div class="verdict"><b>Кнопка шапки, размноженная по флоту.</b> Мини-кнопка 60 ед. (хит-зона до 88) открывает тот же диалог включения. У неподключённого бота кнопки нет. Два касаемых элемента в строке — выбор по строке, режим по кнопке.</div>
+    </div>
+
+    <div class="card">
+      <div class="top"><h4>А3 · Непрочитанные и «Новый бот»</h4><p>Строка ведёт счёт: бейдж непрочитанных вместо текста. Внизу — призрачная кнопка добавления.</p></div>
+      <div class="demo flush">
+        <div class="pw" style="width:300px;height:534px;border-radius:0"><div class="phone ph-light" style="transform:scale(.278)">
+          <div class="bar" style="height:240px"><div class="sb"><span>9:41</span><span class="r"><span class="bars"><i style="height:10px"></i><i style="height:15px"></i><i style="height:20px"></i><i style="height:26px"></i></span><span class="bat"></span></span></div>
+            <div class="tier" style="height:140px"><div class="bot"><div class="av" style="width:96px;height:96px;font-size:38px;background:#B08048">А</div><span class="nm" style="font-size:44px">Автозапчасти KZ</span><svg class="chev" width="26" height="26"><use href="#chev"/></svg></div></div>
+          </div>
+          <div class="list"><div class="search"><div class="pill"><svg width="40" height="40"><use href="#search"/></svg>Поиск</div></div>
+            <div class="row"><div class="rav"><div class="av" style="background:#C0705F">А</div></div><div class="rtx"><div class="rtop"><span class="rname">Айгерим Сериковна</span><span class="rtime">14:32</span></div><div class="rbot"><span class="rmsg">Есть фильтр на Camry?</span><span class="ubadge">3</span></div></div></div>
+            <div class="row"><div class="rav"><div class="av" style="background:#5E8B7E">Д</div></div><div class="rtx"><div class="rtop"><span class="rname">Данияр</span><span class="rtime">13:58</span></div><div class="rbot"><span class="rmsg">Спасибо, оформил заказ 👍</span></div></div></div>
+          </div>
+          <div class="sheet-scrim"></div>
+          <div class="sheet" style="height:1010px">
+            <div class="grab"><i></i></div>
+            <div class="stitle">Ваши боты<small>Выберите, чьи чаты показать</small></div>
+            <div class="slist">
+              <div class="brow on"><span class="rail"></span><div class="av" style="background:#B08048">А</div><div class="bmeta"><div class="bname">Автозапчасти KZ</div><div class="bsub"><span class="gdot" style="width:16px;height:16px;background:var(--wa)"></span><span class="gdot" style="width:16px;height:16px;background:var(--tg)"></span>6 чатов</div></div><div class="check"><svg width="30" height="30"><use href="#check"/></svg></div></div>
+              <div class="brow"><div class="av" style="background:#C05F7E">Ц</div><div class="bmeta"><div class="bname">Цветы Астана</div><div class="bsub"><span class="gdot" style="width:16px;height:16px;background:var(--wa)"></span>12 чатов</div></div><div class="ubadge">2</div></div>
+              <div class="brow"><div class="av" style="background:#4F7CA3">Р</div><div class="bmeta"><div class="bname">Ремонт телефонов</div><div class="bsub"><span class="gdot" style="width:16px;height:16px;background:var(--tg)"></span>3 чата</div></div></div>
+              <div class="brow"><div class="av" style="background:#6E8AA5">О</div><div class="bmeta"><div class="bname">Оптом KZ</div><div class="bsub"><span class="gdot" style="width:16px;height:16px;background:var(--border)"></span>Не подключён</div></div></div>
+              <div class="brow add"><svg width="34" height="34"><use href="#plus"/></svg>Новый бот</div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+      <div class="verdict"><b>Шторка-навигатор:</b> бейдж <span class="mono">accentFill</span> отвечает на «куда смотреть дальше», не переключаясь. «Новый бот» открывает тот же <span class="mono">AddBotPanel</span>, что и «+» на вкладке «Боты» — второй вход, не новый экран.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== PICK ============================== -->
+<section id="pick2" style="border-bottom:0">
+  <div class="shead"><span class="snum">ИТОГ</span><h2>Что бы взял я</h2></div>
+
+  <div class="rec">
+    <h3 style="margin-top:0">Рекомендация</h3>
+    <ol>
+      <li><b>Шапка — вариант A.</b> Он сохраняет главный принцип «Двух этажей»: у каждой строки одна тема. Кнопка напротив имени связывает поведение с личностью бота — «этот бот отвечает сам» читается как одна фраза. B — запасной, если владельцы с длинными именами ботов окажутся частыми; C — если захочется самой тихой шапки и не жалко одной подсказки; D не советую — он возвращает смешение, от которого ушли.</li>
+      <li><b>Форма кнопки — пилюля с точкой.</b> Слово + лампочка, ноль обучения. Искру можно вернуть позже как иконку в пилюле, если она приживётся в другом месте.</li>
+      <li><b>Диалог — только на включение.</b> Включить «Авто» = бот начнёт сам писать живым клиентам, это стоит одного «точно?». Выключение — забрать руль — безопасно и должно быть мгновенным. Сегодняшний попап в обе стороны упрощается до одной.</li>
+      <li><b>Шторка — А2.</b> Она повторяет кнопку шапки в каждой строке: один язык, и впервые видно авто-режим всего флота ботов сразу. Если покажется перегруженной — А1 без потерь, А3 оставить как идею на потом (бейджи можно добавить и в А2).</li>
+    </ol>
+  </div>
+
+  <h3>Сравнение</h3>
+  <div class="tscroll">
+  <table>
+    <tr><th>Вариант</th><th>Кнопка</th><th>Имя бота</th><th>Разделение смыслов</th><th>Обучение</th><th>Риск</th></tr>
+    <tr><td><b>A · Напротив имени</b></td><td>Пилюля 76, этаж 1</td><td>до ~600 ед.</td><td><b>Полное</b> — этаж 1 «кто и как», этаж 2 «что»</td><td>Не нужно</td><td>Минимальный</td></tr>
+    <tr><td><b>B · Имени вся ширина</b></td><td>Пилюля 96, этаж 2</td><td><b>до ~840 ед.</b></td><td>Фильтр и поведение соседи</td><td>Не нужно</td><td>Промах в «Telegram»</td></tr>
+    <tr><td><b>C · Искра</b></td><td>Круг 96, этаж 1</td><td>до ~700 + счётчики</td><td>Полное</td><td><b>Подсказка</b></td><td>Глиф-загадка</td></tr>
+    <tr><td><b>D · Один жёлоб</b></td><td>Ячейка 206 в сегменте</td><td>до ~840 ед.</td><td><b>Смешано</b> — как сегодня</td><td>Не нужно</td><td>«Авто» нажмут как фильтр</td></tr>
+  </table>
+  </div>
+
+  <h3>Что верно для любого варианта</h3>
+  <div class="notes" style="position:static;max-width:70ch">
+    <ul>
+      <li><b>Хранение не меняется</b> Тот же ключ <span class="mono">&lt;botName&gt;ReplyMode</span> (0/1) и событие <span class="mono">OnReplyModeChanged</span> — кнопка лишь презентация. Одна оговорка: в коде дефолт чтения сегодня <span class="mono">0 = Авто</span>; раз по продукту обычное состояние — полуавтомат, дефолт меняется на «выключено» одной строкой в <span class="mono">ReplyModeToggleBinder</span> — решение стоит принять сознательно, оно коснётся существующих ботов без сохранённого значения.</li>
+      <li><b>Пер-чатный override не трогаем</b> Тумблер в открытом чате (<span class="mono">SemiAutoToggle</span>, tri-state на чат) — отдельная история; когда дойдём, его язык приводится к этой же кнопке.</li>
+      <li><b>Попап уже есть</b> <span class="mono">ReplyModeConfirmPopup</span> 720×440 переиспользуем — меняются тексты и то, что он больше не вызывается на выключение.</li>
+      <li><b>Сцена — только поверх</b> Кнопка строится добавлением в существующий <span class="mono">TopBar</span>; старые билдеры не перезапускаем. Строки шторки — правка префаба <span class="mono">BotSwitcherRow.prefab</span> + <span class="mono">BotSwitcherRowView</span>.</li>
+      <li><b>Зелёный зелёному рознь</b> Кнопка «Авто» — токены <span class="mono">positiveBg/positiveInk</span>; выключатель активации бота на вкладке «Боты» остаётся на фиксированном <span class="mono">#34C759</span>. Они рядом не появляются.</li>
+    </ul>
+  </div>
+</section>
+
+</div>
