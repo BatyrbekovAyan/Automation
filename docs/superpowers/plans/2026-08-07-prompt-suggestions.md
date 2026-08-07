@@ -975,6 +975,10 @@ namespace Automation.BotSettingsUI
 
         public PromptSuggestion Suggestion => suggestion;
 
+        /// <summary>Width the label wants, for the cloud's row packing.</summary>
+        public float PreferredLabelWidth =>
+            label != null ? label.GetPreferredValues(label.text).x : 0f;
+
         private void Awake()
         {
             if (button != null) button.onClick.AddListener(HandlePressed);
@@ -1093,6 +1097,17 @@ namespace Automation.BotSettingsUI
             if (moreButton != null) moreButton.onClick.AddListener(() => OnMorePressed?.Invoke());
         }
 
+        // Bind() usually lands while this object is inactive — Bot Settings opens
+        // on the «Основное» tab — so BuildChips cannot start the fit coroutine.
+        // Re-run it when the Промпты tab actually appears, or the cloud renders
+        // its raw candidate list with no row cap and a stale «Ещё N ›».
+        private void OnEnable()
+        {
+            if (candidates.Count == 0) return;
+            if (layoutRoutine != null) StopCoroutine(layoutRoutine);
+            layoutRoutine = StartCoroutine(FitAfterLayout());
+        }
+
         private void OnDisable()
         {
             // This screen's coroutines die with it; drop the handle so a later
@@ -1170,12 +1185,8 @@ namespace Automation.BotSettingsUI
             Refresh();
         }
 
-        private float MeasureChipWidth(PromptSuggestionChip chip)
-        {
-            var text = chip.GetComponentInChildren<TextMeshProUGUI>(includeInactive: true);
-            var labelWidth = text != null ? text.GetPreferredValues(text.text).x : 0f;
-            return labelWidth + glyphWidth + chipHorizontalPadding * 2f;
-        }
+        private float MeasureChipWidth(PromptSuggestionChip chip) =>
+            chip.PreferredLabelWidth + glyphWidth + chipHorizontalPadding * 2f;
 
         private void HandleChipPressed(PromptSuggestion suggestion)
         {
