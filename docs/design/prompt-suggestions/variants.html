@@ -1,0 +1,391 @@
+<meta charset="utf-8">
+<title>Промпт — подсказки: UI варианты</title>
+<style>
+  :root{
+    --bg:#0E1116; --surface:#171C24; --hairline:#242C38; --border:#333E4E;
+    --inputBorder:#556882; --ink:#ECF0F6; --ink2:#9AA6B8; --ink3:#79869A;
+    --accent:#3E61C6; --accentText:#5981D6; --accentSoft:#1E2A44;
+    --posBg:#123324; --posInk:#57DE95; --danger:#F2555A;
+    --page:#0a0c10;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--ink);
+    font:400 15px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text","Inter",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1340px;margin:0 auto;padding:40px 28px 80px}
+  h1{font-size:30px;letter-spacing:-.02em;margin:0 0 6px}
+  .lede{color:var(--ink2);max-width:760px;margin:0 0 10px;font-size:15px}
+  .meta{color:var(--ink3);font-size:13px;margin:0 0 34px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(392px,1fr));gap:34px 30px}
+  .card{background:#11141a;border:1px solid var(--hairline);border-radius:18px;padding:20px 20px 22px;
+        display:flex;flex-direction:column}
+  .card h2{font-size:17px;margin:0 0 2px;letter-spacing:-.01em;display:flex;align-items:baseline;gap:9px}
+  .tag{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+       color:var(--accentText);background:var(--accentSoft);padding:3px 8px;border-radius:6px}
+  .sub{color:var(--ink2);font-size:13.5px;margin:6px 0 16px;min-height:38px}
+  .phonewrap{display:flex;justify-content:center}
+  .facts{margin-top:16px;border-top:1px solid var(--hairline);padding-top:13px;
+         display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:12.5px}
+  .facts dt{color:var(--ink3)} .facts dd{margin:0;color:var(--ink2)}
+  .good{color:var(--posInk)} .warn{color:#E9A23B} .bad{color:var(--danger)}
+
+  /* ---------- phone ---------- */
+  .phone{width:352px;height:762px;background:var(--bg);border-radius:34px;position:relative;
+         overflow:hidden;border:1px solid #232a35;box-shadow:0 18px 50px rgba(0,0,0,.55)}
+  .status{height:38px;display:flex;align-items:flex-end;justify-content:space-between;
+          padding:0 20px 5px;font-size:12px;color:var(--ink2);font-weight:600}
+  .hdr{height:50px;display:flex;align-items:center;padding:0 14px;gap:10px}
+  .hdr .ttl{flex:1;text-align:center;font-size:16px;font-weight:600}
+  .hdr .save{font-size:14px;color:var(--accentText);font-weight:600}
+  .tabs{display:flex;padding:0 6px;border-bottom:1px solid var(--hairline)}
+  .tabs div{flex:1;text-align:center;font-size:11.5px;color:var(--ink3);padding:8px 0 9px;position:relative}
+  .tabs div.on{color:var(--accentText);font-weight:600}
+  .tabs div.on:after{content:"";position:absolute;left:14%;right:14%;bottom:-1px;height:2px;
+                     background:var(--accentText);border-radius:2px}
+  .body{padding:16px 16px 0}
+  .sec{font-size:10.5px;letter-spacing:.10em;color:var(--ink3);font-weight:700;margin:0 0 8px}
+  .sec.row{display:flex;justify-content:space-between;align-items:center}
+  .sec .more{color:var(--accentText);letter-spacing:0;font-size:11.5px;font-weight:600}
+
+  .field{background:var(--surface);border:1px solid var(--hairline);border-radius:13px;padding:11px 13px}
+  .field .lbl{font-size:10.5px;color:var(--ink3);letter-spacing:.06em;font-weight:700;margin-bottom:6px}
+  .field .val{font-size:13.5px;line-height:1.45;color:var(--ink)}
+  .field .val .ph{color:var(--ink3)}
+  .cursor{display:inline-block;width:1.5px;height:14px;background:var(--accentText);
+          vertical-align:-2px;animation:bl 1.1s steps(1) infinite}
+  @keyframes bl{50%{opacity:0}}
+
+  /* chips */
+  .chips{display:flex;flex-wrap:wrap;gap:7px}
+  .chip{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:17px;
+        background:var(--surface);border:1px solid var(--border);font-size:12.5px;color:var(--ink);
+        white-space:nowrap}
+  .chip .pl{color:var(--accentText);font-size:14px;font-weight:600;line-height:0;margin-top:-1px}
+  .chip.added{background:var(--accentSoft);border-color:transparent;color:var(--ink2)}
+  .chip.added .pl{color:var(--posInk)}
+  .chip.ghost{background:transparent;border-style:dashed;color:var(--accentText)}
+  .chip.cat{height:30px;font-size:12px;color:var(--ink2);background:transparent}
+  .chip.cat.on{background:var(--accentSoft);border-color:transparent;color:var(--accentText);font-weight:600}
+
+  .rail{display:flex;gap:7px;overflow:hidden;position:relative}
+  .rail:after{content:"";position:absolute;right:0;top:0;bottom:0;width:44px;
+              background:linear-gradient(90deg,transparent,var(--bg))}
+
+  /* list rows */
+  .list{background:var(--surface);border:1px solid var(--hairline);border-radius:13px;overflow:hidden}
+  .row{display:flex;align-items:center;gap:10px;padding:11px 13px;border-bottom:1px solid var(--hairline)}
+  .row:last-child{border-bottom:none}
+  .row .txt{flex:1;font-size:13.5px;line-height:1.35}
+  .row .txt.dim{color:var(--ink3)}
+  .add{width:28px;height:28px;border-radius:14px;background:var(--accentSoft);flex:none;
+       display:grid;place-items:center;color:var(--accentText);font-size:16px;font-weight:600;line-height:0}
+  .add.done{background:var(--posBg);color:var(--posInk);font-size:13px}
+  .grouplbl{font-size:10px;letter-spacing:.09em;font-weight:700;color:var(--ink3);
+            padding:9px 13px 5px;background:rgba(255,255,255,.02)}
+
+  .btn{height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:8px;
+       font-size:13.5px;font-weight:600}
+  .btn.dash{border:1.5px dashed var(--border);color:var(--accentText);background:transparent}
+  .btn.fill{background:var(--accent);color:#fff}
+
+  /* toggles */
+  .tgl{width:40px;height:24px;border-radius:12px;background:var(--inputBorder);position:relative;flex:none}
+  .tgl:after{content:"";position:absolute;width:20px;height:20px;border-radius:10px;background:#fff;top:2px;left:2px}
+  .tgl.on{background:var(--accent)} .tgl.on:after{left:18px}
+
+  /* checkbox */
+  .cb{width:22px;height:22px;border-radius:7px;border:1.5px solid var(--border);flex:none}
+  .cb.on{background:var(--accent);border-color:var(--accent);display:grid;place-items:center}
+  .cb.on:after{content:"";width:11px;height:6px;border-left:2px solid #fff;border-bottom:2px solid #fff;
+               transform:rotate(-45deg) translate(1px,-2px)}
+
+  /* sheet + keyboard */
+  .scrim{position:absolute;inset:0;background:rgba(0,0,0,.55)}
+  .sheet{position:absolute;left:0;right:0;bottom:0;background:var(--bg);border-radius:20px 20px 0 0;
+         border-top:1px solid var(--hairline);padding:8px 16px 0;display:flex;flex-direction:column}
+  .grab{width:38px;height:4px;border-radius:2px;background:var(--border);margin:2px auto 12px}
+  .search{height:36px;border-radius:10px;background:var(--surface);border:1px solid var(--hairline);
+          display:flex;align-items:center;gap:8px;padding:0 11px;color:var(--ink3);font-size:13px}
+  .kbd{position:absolute;left:0;right:0;bottom:0;height:270px;background:#1b1e24;
+       display:flex;flex-direction:column;justify-content:center;gap:9px;padding:10px 5px 26px}
+  .krow{display:flex;gap:5px;justify-content:center}
+  .key{height:38px;flex:1;max-width:32px;border-radius:6px;background:#3a3f47;
+       display:grid;place-items:center;font-size:13px;color:#e9edf3}
+  .key.wide{max-width:120px}
+  .accessory{position:absolute;left:0;right:0;bottom:270px;background:var(--bg);
+             border-top:1px solid var(--hairline);padding:8px 0 9px}
+  .accessory .rail{padding:0 14px}
+  .fade-b{position:absolute;left:0;right:0;bottom:0;height:60px;
+          background:linear-gradient(transparent,var(--bg))}
+  .scrollarea{position:relative;max-height:214px;overflow:hidden}
+
+  table{border-collapse:collapse;width:100%;margin-top:14px;font-size:13.5px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--hairline);vertical-align:top}
+  th{color:var(--ink3);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:700}
+  td:first-child{font-weight:600;white-space:nowrap}
+  .rec{margin-top:34px;background:#11141a;border:1px solid var(--hairline);border-radius:18px;padding:22px 24px}
+  .rec h3{margin:0 0 8px;font-size:18px}
+  .rec p{color:var(--ink2);margin:0 0 10px}
+  .rec b{color:var(--ink)}
+</style>
+
+<div class="wrap">
+  <h1>«Промпт» → подсказки под полем</h1>
+  <p class="lede">Шесть направлений для тапабельных мини-промптов под основным полем «Промпт» в настройках бота.
+     Всё нарисовано в текущей тёмной теме приложения (Theme_Dark), в реальных пропорциях экрана и с реальными
+     русскими строками.</p>
+  <p class="meta">Свободного места под полем сегодня ≈ 334 dp (≈ 925 ref units) — хватает на 3 ряда чипов или список из 5–6 строк без сжатия поля «Промпт».</p>
+
+<div class="grid">
+
+<!-- ============ V1 ============ -->
+<div class="card">
+  <h2><span class="tag">V1</span> Облако чипов</h2>
+  <p class="sub">Пилюли переносятся по строкам прямо под полем. Тап = строка добавляется в конец промпта, чип помечается галочкой. «Ещё 26» открывает полный список.</p>
+  <div class="phonewrap"><div class="phone">
+    <div class="status"><span>9:41</span><span>▮▮▮ ⌁</span></div>
+    <div class="hdr"><span style="color:var(--accentText);font-size:20px">‹</span><span class="ttl">ShopBot</span><span class="save">Сохранить</span></div>
+    <div class="tabs"><div>Основное</div><div>Бизнес</div><div>Продукты</div><div>Услуги</div><div class="on">Промпты</div></div>
+    <div class="body">
+      <p class="sec">ПРОМПТ</p>
+      <div class="field" style="height:196px">
+        <div class="lbl">ПРОМПТ</div>
+        <div class="val">Ты — консультант магазина автозапчастей. Помогай подобрать деталь по марке, модели и году авто.<br><br>Отвечай коротко, до 2 предложений.</div>
+      </div>
+      <p class="sec row" style="margin:16px 0 8px">ПОДСКАЗКИ<span class="more">Ещё 26 ›</span></p>
+      <div class="chips">
+        <span class="chip added"><span class="pl">✓</span>Отвечай коротко</span>
+        <span class="chip"><span class="pl">+</span>Обращайся на «вы»</span>
+        <span class="chip"><span class="pl">+</span>Заканчивай вопросом</span>
+        <span class="chip"><span class="pl">+</span>Уточняй марку авто</span>
+        <span class="chip"><span class="pl">+</span>Предлагай аналоги</span>
+        <span class="chip"><span class="pl">+</span>Проси номер телефона</span>
+        <span class="chip"><span class="pl">+</span>Не выдумывай цены</span>
+        <span class="chip"><span class="pl">+</span>Пиши без канцелярита</span>
+        <span class="chip"><span class="pl">+</span>Отвечай на языке клиента</span>
+      </div>
+    </div>
+  </div></div>
+  <dl class="facts">
+    <dt>Место</dt><dd>≈ 150 dp, поле не трогаем</dd>
+    <dt>Ёмкость</dt><dd>9–12 на виду, остальное за «Ещё»</dd>
+    <dt>Клавиатура</dt><dd class="warn">чипы скрыты, пока идёт ввод</dd>
+    <dt>Работа</dt><dd class="good">малая — один prefab-чип + flow-layout</dd>
+  </dl>
+</div>
+
+<!-- ============ V2 ============ -->
+<div class="card">
+  <h2><span class="tag">V2</span> Горизонтальная лента + категории</h2>
+  <p class="sub">Один ряд, скролл вбок, сверху фильтр категорий. Занимает минимум высоты и легко переносится наверх клавиатуры (см. V5).</p>
+  <div class="phonewrap"><div class="phone">
+    <div class="status"><span>9:41</span><span>▮▮▮ ⌁</span></div>
+    <div class="hdr"><span style="color:var(--accentText);font-size:20px">‹</span><span class="ttl">ShopBot</span><span class="save">Сохранить</span></div>
+    <div class="tabs"><div>Основное</div><div>Бизнес</div><div>Продукты</div><div>Услуги</div><div class="on">Промпты</div></div>
+    <div class="body">
+      <p class="sec">ПРОМПТ</p>
+      <div class="field" style="height:250px">
+        <div class="lbl">ПРОМПТ</div>
+        <div class="val">Ты — консультант магазина автозапчастей. Помогай подобрать деталь по марке, модели и году авто.</div>
+      </div>
+      <p class="sec" style="margin:16px 0 8px">ПОДСКАЗКИ</p>
+      <div class="rail" style="margin-bottom:9px">
+        <span class="chip cat on">Все</span>
+        <span class="chip cat">Тон</span>
+        <span class="chip cat">Формат</span>
+        <span class="chip cat">Продажи</span>
+        <span class="chip cat">Ограничения</span>
+      </div>
+      <div class="rail">
+        <span class="chip"><span class="pl">+</span>Отвечай коротко</span>
+        <span class="chip"><span class="pl">+</span>Обращайся на «вы»</span>
+        <span class="chip"><span class="pl">+</span>Заканчивай вопросом</span>
+      </div>
+    </div>
+  </div></div>
+  <dl class="facts">
+    <dt>Место</dt><dd class="good">≈ 90 dp — самый компактный</dd>
+    <dt>Ёмкость</dt><dd>любая, но 3 на виду → много свайпов</dd>
+    <dt>Клавиатура</dt><dd>лента = готовый accessory-бар</dd>
+    <dt>Работа</dt><dd class="good">малая — ScrollRect + чипы</dd>
+  </dl>
+</div>
+
+<!-- ============ V3 ============ -->
+<div class="card">
+  <h2><span class="tag">V3</span> Список строк с «+» <span style="font-size:11px;color:var(--ink3);font-weight:400">≈ референс</span></h2>
+  <p class="sub">Ближе всего к присланным скриншотам, но с группировкой и без дублирующей кнопки «копировать». Своя прокручиваемая область под полем.</p>
+  <div class="phonewrap"><div class="phone">
+    <div class="status"><span>9:41</span><span>▮▮▮ ⌁</span></div>
+    <div class="hdr"><span style="color:var(--accentText);font-size:20px">‹</span><span class="ttl">ShopBot</span><span class="save">Сохранить</span></div>
+    <div class="tabs"><div>Основное</div><div>Бизнес</div><div>Продукты</div><div>Услуги</div><div class="on">Промпты</div></div>
+    <div class="body">
+      <p class="sec">ПРОМПТ</p>
+      <div class="field" style="height:150px">
+        <div class="lbl">ПРОМПТ</div>
+        <div class="val">Ты — консультант магазина автозапчастей. Помогай подобрать деталь по марке, модели и году авто.</div>
+      </div>
+      <p class="sec row" style="margin:16px 0 8px">ПОДСКАЗКИ<span class="more">Все 35 ›</span></p>
+      <div class="scrollarea">
+        <div class="list">
+          <div class="grouplbl">ТОН ОБЩЕНИЯ</div>
+          <div class="row"><span class="txt">Отвечай коротко, до 2 предложений</span><span class="add done">✓</span></div>
+          <div class="row"><span class="txt">Обращайся к клиенту на «вы»</span><span class="add">+</span></div>
+          <div class="row"><span class="txt">Пиши дружелюбно, без канцелярита</span><span class="add">+</span></div>
+          <div class="grouplbl">ПРОДАЖИ</div>
+          <div class="row"><span class="txt">Предлагай аналоги подешевле</span><span class="add">+</span></div>
+          <div class="row"><span class="txt">Проси номер телефона для заказа</span><span class="add">+</span></div>
+          <div class="row"><span class="txt">Уточняй марку и год авто</span><span class="add">+</span></div>
+        </div>
+        <div class="fade-b"></div>
+      </div>
+    </div>
+  </div></div>
+  <dl class="facts">
+    <dt>Место</dt><dd class="warn">≈ 215 dp + поле сжимается до 150</dd>
+    <dt>Ёмкость</dt><dd class="good">высокая, читаются длинные строки</dd>
+    <dt>Клавиатура</dt><dd class="warn">скрыт при вводе</dd>
+    <dt>Работа</dt><dd>средняя — вложенный ScrollRect в нескроллящейся вкладке</dd>
+  </dl>
+</div>
+
+<!-- ============ V4 ============ -->
+<div class="card">
+  <h2><span class="tag">V4</span> Шторка с мультивыбором</h2>
+  <p class="sub">Под полем — одна кнопка. Она открывает лист с поиском, категориями и чекбоксами: выбрал 3 → «Добавить» вставит все три строки разом.</p>
+  <div class="phonewrap"><div class="phone">
+    <div class="status"><span>9:41</span><span>▮▮▮ ⌁</span></div>
+    <div class="hdr"><span style="color:var(--accentText);font-size:20px">‹</span><span class="ttl">ShopBot</span><span class="save">Сохранить</span></div>
+    <div class="tabs"><div>Основное</div><div>Бизнес</div><div>Продукты</div><div>Услуги</div><div class="on">Промпты</div></div>
+    <div class="body">
+      <p class="sec">ПРОМПТ</p>
+      <div class="field" style="height:180px">
+        <div class="lbl">ПРОМПТ</div>
+        <div class="val">Ты — консультант магазина автозапчастей.</div>
+      </div>
+      <div class="btn dash" style="margin-top:14px">＋ Добавить подсказку</div>
+    </div>
+    <div class="scrim"></div>
+    <div class="sheet" style="height:474px">
+      <div class="grab"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px">
+        <b style="font-size:16px">Подсказки</b><span style="color:var(--ink3);font-size:13px">выбрано 3</span>
+      </div>
+      <div class="search">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>Поиск
+      </div>
+      <div class="rail" style="margin:11px 0 10px">
+        <span class="chip cat on">Все</span><span class="chip cat">Тон</span><span class="chip cat">Формат</span><span class="chip cat">Продажи</span>
+      </div>
+      <div class="list" style="border:none;background:transparent">
+        <div class="row" style="padding-left:0;padding-right:0"><span class="cb on"></span><span class="txt">Отвечай коротко, до 2 предложений</span></div>
+        <div class="row" style="padding-left:0;padding-right:0"><span class="cb on"></span><span class="txt">Обращайся к клиенту на «вы»</span></div>
+        <div class="row" style="padding-left:0;padding-right:0"><span class="cb"></span><span class="txt">Пиши дружелюбно, без канцелярита</span></div>
+        <div class="row" style="padding-left:0;padding-right:0"><span class="cb on"></span><span class="txt">Заканчивай сообщение вопросом</span></div>
+        <div class="row" style="padding-left:0;padding-right:0"><span class="cb"></span><span class="txt">Не выдумывай цены — только из прайса</span></div>
+      </div>
+      <div class="btn fill" style="margin:6px 0 16px">Добавить 3 подсказки</div>
+    </div>
+  </div></div>
+  <dl class="facts">
+    <dt>Место</dt><dd class="good">≈ 44 dp на вкладке</dd>
+    <dt>Ёмкость</dt><dd class="good">100+, поиск и категории</dd>
+    <dt>Клавиатура</dt><dd class="good">не конфликтует — поле теряет фокус при открытии</dd>
+    <dt>Работа</dt><dd class="warn">высокая — новый лист, поиск, мультивыбор</dd>
+  </dl>
+</div>
+
+<!-- ============ V5 ============ -->
+<div class="card">
+  <h2><span class="tag">V5</span> Лента над клавиатурой</h2>
+  <p class="sub">Подсказки живут над клавиатурой, пока пользователь печатает — вставка идёт в позицию курсора, как QuickType в iOS. Максимально «взрослое» решение и самое дорогое.</p>
+  <div class="phonewrap"><div class="phone">
+    <div class="status"><span>9:41</span><span>▮▮▮ ⌁</span></div>
+    <div class="hdr"><span style="color:var(--accentText);font-size:20px">‹</span><span class="ttl">ShopBot</span><span class="save">Сохранить</span></div>
+    <div class="tabs"><div>Основное</div><div>Бизнес</div><div>Продукты</div><div>Услуги</div><div class="on">Промпты</div></div>
+    <div class="body">
+      <p class="sec">ПРОМПТ</p>
+      <div class="field" style="height:238px;border-color:var(--inputBorder)">
+        <div class="lbl" style="color:var(--accentText)">ПРОМПТ</div>
+        <div class="val">Ты — консультант магазина автозапчастей. Помогай подобрать деталь по марке, модели и году авто.<br><br>Отвечай коротко, до 2 предложений.<span class="cursor"></span></div>
+      </div>
+    </div>
+    <div class="accessory">
+      <div class="rail">
+        <span class="chip"><span class="pl">+</span>Обращайся на «вы»</span>
+        <span class="chip"><span class="pl">+</span>Заканчивай вопросом</span>
+        <span class="chip"><span class="pl">+</span>Уточняй</span>
+      </div>
+    </div>
+    <div class="kbd">
+      <div class="krow"><span class="key">й</span><span class="key">ц</span><span class="key">у</span><span class="key">к</span><span class="key">е</span><span class="key">н</span><span class="key">г</span><span class="key">ш</span><span class="key">щ</span><span class="key">з</span></div>
+      <div class="krow"><span class="key">ф</span><span class="key">ы</span><span class="key">в</span><span class="key">а</span><span class="key">п</span><span class="key">р</span><span class="key">о</span><span class="key">л</span><span class="key">д</span></div>
+      <div class="krow"><span class="key">⇧</span><span class="key">я</span><span class="key">ч</span><span class="key">с</span><span class="key">м</span><span class="key">и</span><span class="key">т</span><span class="key">ь</span><span class="key">⌫</span></div>
+      <div class="krow"><span class="key wide">пробел</span><span class="key">↵</span></div>
+    </div>
+  </div></div>
+  <dl class="facts">
+    <dt>Место</dt><dd class="good">0 dp в покое</dd>
+    <dt>Ёмкость</dt><dd>3 на виду + скролл</dd>
+    <dt>Клавиатура</dt><dd class="good">единственный вариант со вставкой по курсору</dd>
+    <dt>Работа</dt><dd class="bad">высокая — высота клавиатуры, запись в сфокусированное поле (iOS-инвариант)</dd>
+  </dl>
+</div>
+
+<!-- ============ V6 ============ -->
+<div class="card">
+  <h2><span class="tag">V6</span> Правила-переключатели</h2>
+  <p class="sub">Не «вставка текста», а набор правил: включил — вошло в промпт, выключил — вышло. Ничего не дублируется, всё обратимо, но текст правил пользователь не редактирует.</p>
+  <div class="phonewrap"><div class="phone">
+    <div class="status"><span>9:41</span><span>▮▮▮ ⌁</span></div>
+    <div class="hdr"><span style="color:var(--accentText);font-size:20px">‹</span><span class="ttl">ShopBot</span><span class="save">Сохранить</span></div>
+    <div class="tabs"><div>Основное</div><div>Бизнес</div><div>Продукты</div><div>Услуги</div><div class="on">Промпты</div></div>
+    <div class="body">
+      <p class="sec">ПРОМПТ</p>
+      <div class="field" style="height:150px">
+        <div class="lbl">ПРОМПТ</div>
+        <div class="val">Ты — консультант магазина автозапчастей. Помогай подобрать деталь по марке, модели и году авто.</div>
+      </div>
+      <p class="sec row" style="margin:16px 0 8px">ПРАВИЛА<span class="more">Все 35 ›</span></p>
+      <div class="list">
+        <div class="row"><span class="txt">Отвечай коротко</span><span class="tgl on"></span></div>
+        <div class="row"><span class="txt">Обращайся на «вы»</span><span class="tgl on"></span></div>
+        <div class="row"><span class="txt dim">Заканчивай вопросом</span><span class="tgl"></span></div>
+        <div class="row"><span class="txt dim">Предлагай аналоги</span><span class="tgl"></span></div>
+        <div class="row"><span class="txt dim">Не выдумывай цены</span><span class="tgl"></span></div>
+      </div>
+      <p style="font-size:11.5px;color:var(--ink3);margin:9px 2px 0;line-height:1.4">
+        Включённые правила добавятся к промпту при сохранении.</p>
+    </div>
+  </div></div>
+  <dl class="facts">
+    <dt>Место</dt><dd class="warn">≈ 230 dp + поле сжимается</dd>
+    <dt>Ёмкость</dt><dd>средняя (5–6 на виду)</dd>
+    <dt>Клавиатура</dt><dd class="good">поле вообще не трогаем — нет iOS-риска</dd>
+    <dt>Работа</dt><dd class="warn">средняя + новая модель данных (флаги правил в PlayerPrefs)</dd>
+  </dl>
+</div>
+
+</div><!-- /grid -->
+
+<table>
+  <tr><th>Вариант</th><th>Сильная сторона</th><th>Слабое место</th></tr>
+  <tr><td>V1 Облако чипов</td><td>Видно много вариантов сразу, лёгкий вид, не давит на поле</td><td>Длинные строки («Не обсуждай политику и религию») ломают ритм чипов</td></tr>
+  <tr><td>V2 Лента</td><td>Минимум высоты, готова к переносу над клавиатурой</td><td>3 подсказки на виду — остальные надо искать свайпом</td></tr>
+  <tr><td>V3 Список</td><td>Читаются любые длинные строки, привычно по референсу</td><td>Ест больше всего места, вкладку придётся делать скроллящейся</td></tr>
+  <tr><td>V4 Шторка</td><td>Масштабируется на 100+ подсказок, поиск, добавление пачкой</td><td>Подсказки не видны, пока не откроешь — их «не заметят»</td></tr>
+  <tr><td>V5 Над клавиатурой</td><td>Единственный со вставкой в позицию курсора</td><td>Дороже всех и трогает самый хрупкий кусок (iOS-фокус)</td></tr>
+  <tr><td>V6 Правила</td><td>Обратимость, нет дублей, нулевой риск по клавиатуре</td><td>Это уже другая фича: правила ≠ свободный текст</td></tr>
+</table>
+
+<div class="rec">
+  <h3>Что рекомендую</h3>
+  <p><b>V1 + V4</b>: облако чипов под полем показывает 8–10 самых полезных подсказок (их видно сразу — фича себя продаёт),
+     а «Ещё 26 ›» открывает шторку из V4 с поиском, категориями и мультивыбором. Обе части живут на одной модели данных,
+     шторку можно сделать вторым шагом.</p>
+  <p>Подсказки при этом стоит фильтровать по типу бизнеса бота — у автозапчастей и у цветов разные полезные строки,
+     а вертикали в проекте уже есть.</p>
+  <p style="margin:0;color:var(--ink3);font-size:13px">Отдельно решим: тап дописывает строку в конец промпта с новой строки;
+     уже добавленная строка помечается галочкой; повторный тап — убирает её обратно.</p>
+</div>
+</div>
