@@ -547,9 +547,9 @@ namespace Automation.BotSettingsUI
             Core("sales_ask_phone", "Для оформления заказа проси номер телефона", "Проси номер телефона", Sales, featured: true),
             Core("sales_offer_alternatives", "Предлагай альтернативу, если нужной позиции нет", "Предлагай альтернативу", Sales, featured: true),
             Core("sales_ask_budget", "Уточняй бюджет клиента перед подбором", "Уточняй бюджет", Sales),
-            Core("sales_upsell", "Предлагай сопутствующие товары к заказу", "Предлагай сопутствующее", Sales),
+            Core("sales_upsell", "Предлагай сопутствующие товары к заказу", "Сопутствующие товары", Sales),
             Core("sales_confirm_order", "Перед оформлением повтори состав и сумму заказа", "Повторяй состав заказа", Sales),
-            Core("sales_stock_warning", "Если позиция заканчивается — скажи об этом", "Предупреждай об остатке", Sales),
+            Core("sales_stock_warning", "Если позиция заканчивается — скажи об этом", "Говори об остатках", Sales),
 
             Core("lim_no_invented_prices", "Не выдумывай цены — бери только из прайса", "Не выдумывай цены", Limits, featured: true),
             Core("lim_escalate", "Если не знаешь ответ — предложи связать с менеджером", "Зови менеджера", Limits, featured: true),
