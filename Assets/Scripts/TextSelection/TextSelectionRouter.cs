@@ -45,8 +45,10 @@ public class TextSelectionRouter : MonoBehaviour
     static readonly FieldInfo KbField = typeof(TMP_InputField).GetField(
         "m_SoftKeyboard", BindingFlags.Instance | BindingFlags.NonPublic);
 
-    readonly SelectionGestureMachine _machine = new SelectionGestureMachine(
-        0.45f, 0.3f, 10f * (Screen.dpi > 0 ? Screen.dpi : 160f) / 160f); // 10 dp slop in px
+    // Constructed in Awake — Screen.dpi is forbidden in MonoBehaviour field
+    // initializers (UnityException), and a throwing initializer would poison
+    // every field declared after it.
+    SelectionGestureMachine _machine;
 
     SelectionOverlay _overlay;
     SelectionMenuView _menu;
@@ -66,6 +68,8 @@ public class TextSelectionRouter : MonoBehaviour
     {
         if (_instance != null && _instance != this) { Destroy(gameObject); return; }
         _instance = this;
+        float slopPixels = 10f * (Screen.dpi > 0 ? Screen.dpi : 160f) / 160f;   // 10 dp
+        _machine = new SelectionGestureMachine(0.45f, 0.3f, slopPixels);
         Theme.Changed += OnThemeChanged;
     }
 
@@ -85,6 +89,7 @@ public class TextSelectionRouter : MonoBehaviour
 
     void Update()
     {
+        if (_machine == null) return;   // destroyed-duplicate edge: Awake early-returned
         var pointer = InputPointer.current;
         if (pointer == null) return;
 
