@@ -18,6 +18,13 @@ using InputPointer = UnityEngine.InputSystem.Pointer;
 /// programmatic selection change through KeyboardSelectionSync so the hidden
 /// native keyboard buffer stays honest (spike-verified 2026-08-07, all
 /// checks PASS — see the 2026-08-07 spec).
+///
+/// Runs BEFORE default-order scripts (notably DeferredDismissInputField):
+/// pressing our pins/menu makes the EventSystem deselect the field, and the
+/// deferred-dismiss machinery would close the keyboard on release. Running
+/// first lets EnforceOwnUiSelection re-select the field and clear the
+/// pending dismissal before it can fire.
+[DefaultExecutionOrder(-50)]
 public class TextSelectionRouter : MonoBehaviour
 {
     static TextSelectionRouter _instance;
@@ -61,6 +68,10 @@ public class TextSelectionRouter : MonoBehaviour
     float _pendingDeadline;
     bool _applyingEdit;                // our own mutation → not an external text change
     bool _menuPendingOnRelease;
+    bool _ownUiPressActive;            // current press began on our pins/menu
+    bool _extendArmed;                 // long-press drag-extension unlocked by real movement
+    Vector2 _commitPos;                // finger position at long-press/double-tap commit
+    float _slopPixels;
     int _lastAnchor = -1;
     int _lastFocus = -1;
 
@@ -68,8 +79,8 @@ public class TextSelectionRouter : MonoBehaviour
     {
         if (_instance != null && _instance != this) { Destroy(gameObject); return; }
         _instance = this;
-        float slopPixels = 10f * (Screen.dpi > 0 ? Screen.dpi : 160f) / 160f;   // 10 dp
-        _machine = new SelectionGestureMachine(0.45f, 0.3f, slopPixels);
+        _slopPixels = 10f * (Screen.dpi > 0 ? Screen.dpi : 160f) / 160f;   // 10 dp
+        _machine = new SelectionGestureMachine(0.45f, 0.3f, _slopPixels);
         Theme.Changed += OnThemeChanged;
     }
 
@@ -103,10 +114,20 @@ public class TextSelectionRouter : MonoBehaviour
             HandleGesture(_machine.Move(pos, now), pos);
             HandleGesture(_machine.Tick(now), pos);
             if (_machine.LongPressActive && _pressField != null && _pendingField == null)
-                ExtendSelectionTo(_pressField, pos);
+            {
+                // iOS parity: the committed word selection holds until the
+                // finger actually MOVES; only then does drag-extension start
+                // (a stationary hold must not collapse the selection to the
+                // finger's character).
+                if (!_extendArmed && (pos - _commitPos).sqrMagnitude > _slopPixels * _slopPixels)
+                    _extendArmed = true;
+                if (_extendArmed)
+                    ExtendSelectionTo(_pressField, pos);
+            }
         }
         else if (pointer.press.wasReleasedThisFrame)
         {
+            _ownUiPressActive = false;
             HandleGesture(_machine.Release(pos, now), pos);
             if (_menuPendingOnRelease)
             {
@@ -115,6 +136,7 @@ public class TextSelectionRouter : MonoBehaviour
             }
         }
 
+        EnforceOwnUiSelection();
         ProcessPendingFocusSelect();
         WatchExternalSelection();
         WatchFieldLifecycle();
@@ -129,7 +151,11 @@ public class TextSelectionRouter : MonoBehaviour
     void HandlePress(Vector2 pos, float now)
     {
         _pressField = ResolvePress(pos, out bool overOwnUi);
-        if (overOwnUi) return;                       // pins/menu handle their own input
+        if (overOwnUi)
+        {
+            _ownUiPressActive = true;                // pins/menu handle their own input
+            return;
+        }
 
         var result = _machine.Press(pos, now);
         if (_pressField == null && result != SelectionGestureMachine.Result.DoubleTap)
@@ -180,6 +206,8 @@ public class TextSelectionRouter : MonoBehaviour
             case SelectionGestureMachine.Result.LongPress:
             case SelectionGestureMachine.Result.DoubleTap:
                 if (_pressField == null) break;
+                _extendArmed = false;
+                _commitPos = pos;
                 if (!_pressField.isFocused)
                 {
                     // Normal activation path — DeferredDismissInputField.OnSelect
@@ -369,6 +397,25 @@ public class TextSelectionRouter : MonoBehaviour
         _menu?.Hide();
         _overlay?.HideHandles();
         RememberSelection(field);
+    }
+
+    /// While our pins/menu are engaged, the EventSystem must keep treating
+    /// the active field as the selected object — a press on any overlay
+    /// element deselects it (module behavior), and DeferredDismissInputField
+    /// would then close the OS keyboard when its deferred dismissal fires.
+    /// Re-selecting runs the field's OnSelect, which clears that pending
+    /// dismissal; this component's execution order guarantees it happens
+    /// before the dismissal check each frame. TMP skips re-activation while
+    /// the field is still focused, so caret and selection are untouched.
+    void EnforceOwnUiSelection()
+    {
+        if (_activeField == null || EventSystem.current == null) return;
+        bool ownUiEngaged = _ownUiPressActive
+            || (_menu != null && _menu.IsVisible)
+            || (_overlay != null && _overlay.HandlesVisible);
+        if (!ownUiEngaged) return;
+        if (EventSystem.current.currentSelectedGameObject != _activeField.gameObject)
+            EventSystem.current.SetSelectedGameObject(_activeField.gameObject);
     }
 
     // ---------- watching ----------
