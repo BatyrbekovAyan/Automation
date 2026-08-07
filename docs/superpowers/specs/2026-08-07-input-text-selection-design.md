@@ -102,3 +102,15 @@ If (a) or (b) fails: fallback design is `onValueChanged` diff-correction (detect
 3. **Phase C — device passes + polish**: both platforms, auto-scroll tuning, menu edge cases.
 
 No server/n8n involvement anywhere.
+
+## Spike verdict — 2026-08-07, owner's iPhone (development build)
+
+**GO.** All four checks passed on device:
+
+- **A: PASS** — `canSetSelection=True`, `canGetSelection=True` with hidden input.
+- **B: PASS** — after programmatic word selection + `KeyboardSelectionSync.Push`, the next typed character **replaced** the selection (`alpha ZZy gamma`-style result observed).
+- **C: PASS** — after a full-text write + `stringPosition` + push (the paste path), the next typed character landed exactly at the parked caret.
+- **D: PASS** — emoji surrogate-pair string indices stayed honest through select/substring (len=4 for 😂👍).
+- **Bonus:** spacebar-trackpad DOES drive our caret through TMP's read-back sync, but with end-of-gesture granularity — the Unity-side caret updates when the finger is released, not live during the slide. Acceptable; no v1 work planned on it.
+
+Fallback design (onValueChanged diff-correction) is NOT needed. Task 9 proceeds on the primary design.
