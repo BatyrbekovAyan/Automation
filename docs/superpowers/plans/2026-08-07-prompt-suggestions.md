@@ -1342,6 +1342,11 @@ namespace Automation.BotSettingsUI
             if (scrimBehindFinger != null) scrimBehindFinger.OnRealRelease += Hide;
         }
 
+        private void OnDestroy()
+        {
+            if (scrimBehindFinger != null) scrimBehindFinger.OnRealRelease -= Hide;
+        }
+
         public void Show(string verticalId)
         {
             entries = PromptSuggestionCatalog.ForVertical(verticalId ?? string.Empty);
@@ -1357,7 +1362,8 @@ namespace Automation.BotSettingsUI
             if (scrimBehindGroup != null)
             {
                 scrimBehindGroup.alpha = 0f;
-                scrimBehindGroup.DOFade(scrimAlpha, slideDuration);
+                scrimBehindGroup.DOKill();   // else a fast close-then-open races two fades
+                scrimBehindGroup.DOFade(scrimAlpha, slideDuration).SetEase(Ease.OutQuad);
             }
 
             positionTween?.Kill();
@@ -1384,7 +1390,11 @@ namespace Automation.BotSettingsUI
                     OnClosed?.Invoke();
                 });
 
-            if (scrimBehindGroup != null) scrimBehindGroup.DOFade(0f, slideDuration);
+            if (scrimBehindGroup != null)
+            {
+                scrimBehindGroup.DOKill();
+                scrimBehindGroup.DOFade(0f, slideDuration).SetEase(Ease.InQuad);
+            }
         }
 
         private void BuildCategories()
