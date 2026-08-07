@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -22,14 +23,20 @@ public class SuggestionsPanel : MonoBehaviour
     [SerializeField] private Button errorRetryButton;      // «Обновить» retry in the error state
     [SerializeField] private RectTransform rt;             // slide root
     [SerializeField] private CanvasGroup canvasGroup;      // fade
+    [SerializeField] private RectTransform cardsViewport;  // fixed scroll region (chrome = -offsetMax.y)
+    [SerializeField] private GameObject bottomFade;        // "more below" wash — hidden when nothing overflows
 
     public event Action<string> OnCardTapped;
     public event Action OnRefreshRequested;
 
+    private const float TopSafeClearance = 180f;   // expansion never grows closer than this to the parent top
+
     private readonly List<SuggestionCard> _cards = new();
     private float _restY;            // panel bottom sits on the composer's top edge (set by the controller)
+    private float _baseHeight;       // authored sheet height — the collapsed detent (captured in Awake)
     private bool _visible, _sliding;
     private Tweener _slideTween;     // Tweener (not Tween) so ChangeEndValue is available for live retargeting
+    private Tweener _heightTween;    // expand/collapse settle
 
     /// <summary>Full sheet height — the clearance the message list must leave above the composer.</summary>
     public float Footprint => rt != null ? rt.rect.height : 0f;
@@ -45,6 +52,7 @@ public class SuggestionsPanel : MonoBehaviour
 
     void Awake()
     {
+        if (rt != null) _baseHeight = rt.sizeDelta.y;
         if (refreshButton != null) refreshButton.onClick.AddListener(() => OnRefreshRequested?.Invoke());
         if (errorRetryButton != null) errorRetryButton.onClick.AddListener(() => OnRefreshRequested?.Invoke());
     }
@@ -53,6 +61,8 @@ public class SuggestionsPanel : MonoBehaviour
     {
         _slideTween?.Kill();
         _slideTween = null;
+        _heightTween?.Kill();
+        _heightTween = null;
         _sliding = false;
         if (canvasGroup != null) canvasGroup.DOKill();
         StopShimmer();
@@ -82,6 +92,9 @@ public class SuggestionsPanel : MonoBehaviour
         SetActiveSafe(errorState, false);
         SetSkeletons(true);
         StartShimmer();
+        // A re-cluster resets an expanded sheet — the skeletons fit the base detent.
+        if (_visible && CurrentHeight > BaseHeight + 1f) SettleSheetHeight(BaseHeight);
+        UpdateFadeVisibility();
     }
 
     public void Render(SuggestionResult result)
@@ -111,6 +124,7 @@ public class SuggestionsPanel : MonoBehaviour
             card.OnTapped += HandleCardTapped;
             _cards.Add(card);
         }
+        if (gameObject.activeInHierarchy) StartCoroutine(UpdateFadeNextFrame());
     }
 
     private void RenderEmpty()
@@ -147,6 +161,10 @@ public class SuggestionsPanel : MonoBehaviour
         gameObject.SetActive(true);
         _visible = true;
         _slideTween?.Kill();
+        _heightTween?.Kill();
+        if (rt != null && BaseHeight > 0f)
+            rt.sizeDelta = new Vector2(rt.sizeDelta.x, BaseHeight);   // fresh open = collapsed detent
+        UpdateFadeVisibility();
         if (canvasGroup != null) canvasGroup.alpha = 1f;     // no fade — pure slide up from behind the composer
         if (rt != null)
         {
@@ -170,14 +188,73 @@ public class SuggestionsPanel : MonoBehaviour
         else gameObject.SetActive(false);
     }
 
-    // --- Grab-handle drag (SheetDragHandle drives; the panel owns its tween state) ----------
+    // --- Grab-handle drag + expansion (SheetDragHandle drives; the panel owns its tween state) ---
+
+    /// <summary>The collapsed detent — the sheet's authored height.</summary>
+    public float BaseHeight => _baseHeight > 0f ? _baseHeight : (rt != null ? rt.sizeDelta.y : 0f);
+
+    /// <summary>Current sheet height (the drag works in height space above the base detent).</summary>
+    public float CurrentHeight => rt != null ? rt.sizeDelta.y : 0f;
+
+    /// <summary>
+    /// The expanded detent: just tall enough that ALL cards are visible (chrome + content),
+    /// never below the base height and never closer than <see cref="TopSafeClearance"/> to the
+    /// parent's top edge. Equals the base height when the cards already fit — no expansion then.
+    /// </summary>
+    public float ExpandedFitHeight()
+    {
+        float baseH = BaseHeight;
+        if (rt == null || cardsViewport == null || cardsContainer == null) return baseH;
+        float chrome = -cardsViewport.offsetMax.y;
+        float contentH = UnityEngine.UI.LayoutUtility.GetPreferredHeight((RectTransform)cardsContainer);
+        float fit = chrome + contentH;
+        var parentRt = rt.parent as RectTransform;
+        float cap = parentRt != null ? parentRt.rect.height - _restY - TopSafeClearance : fit;
+        return Mathf.Max(baseH, Mathf.Min(fit, cap));
+    }
 
     /// <summary>Finger down on the grab zone — stop any running slide so the drag owns the position.</summary>
     public void BeginHandleDrag()
     {
         _slideTween?.Kill();
         _slideTween = null;
+        _heightTween?.Kill();
+        _heightTween = null;
         _sliding = false;
+    }
+
+    /// <summary>Live height while dragging upward (no tween). The bottom edge stays on the composer.</summary>
+    public void SetSheetHeight(float height)
+    {
+        if (rt == null) return;
+        rt.sizeDelta = new Vector2(rt.sizeDelta.x, height);
+        UpdateFadeVisibility();
+    }
+
+    /// <summary>Released in the expansion zone — settle to a detent (base or expanded-fit).</summary>
+    public void SettleSheetHeight(float height)
+    {
+        if (rt == null) return;
+        _heightTween?.Kill();
+        _heightTween = rt.DOSizeDelta(new Vector2(rt.sizeDelta.x, height), 0.25f)
+                         .SetEase(Ease.OutCubic)
+                         .OnUpdate(UpdateFadeVisibility)
+                         .OnComplete(UpdateFadeVisibility);
+    }
+
+    // The fade is a lie once everything is visible — show it only while content overflows.
+    private void UpdateFadeVisibility()
+    {
+        if (bottomFade == null || cardsViewport == null || cardsContainer == null) return;
+        float contentH = UnityEngine.UI.LayoutUtility.GetPreferredHeight((RectTransform)cardsContainer);
+        bool overflows = contentH > cardsViewport.rect.height + 1f;
+        if (bottomFade.activeSelf != overflows) bottomFade.SetActive(overflows);
+    }
+
+    private IEnumerator UpdateFadeNextFrame()
+    {
+        yield return null;   // let the freshly-instantiated cards' TMP layout settle
+        UpdateFadeVisibility();
     }
 
     /// <summary>Follow the finger: <paramref name="draggedDown"/> ≥ 0 units below the rest position.</summary>

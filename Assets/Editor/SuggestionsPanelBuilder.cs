@@ -116,10 +116,18 @@ public static class SuggestionsPanelBuilder
         AddRoundedTop(panelGo, SheetTopRadius);
         var canvasGroup = panelGo.AddComponent<CanvasGroup>();
 
-        // Same render-order rule as before: just above the SwipeBack strip so the viewport's own
-        // ScrollRect wins vertical drags over SwipeToBack's forwarding.
+        // Render order (owner revision): the sheet must slide away BEHIND the composer, so both the
+        // SwipeBack strip and the panel sit just BEFORE BottomPanel — panel above the strip (its own
+        // left-edge proxy owns gestures over the sheet), composer above the panel (input never covered).
         Transform swipeStrip = parent.Find("SwipeBack");
-        if (swipeStrip != null)
+        Transform bottomPanel = parent.Find("BottomPanel");
+        if (bottomPanel != null)
+        {
+            if (swipeStrip != null && swipeStrip.GetSiblingIndex() > bottomPanel.GetSiblingIndex())
+                swipeStrip.SetSiblingIndex(bottomPanel.GetSiblingIndex());
+            panelGo.transform.SetSiblingIndex(bottomPanel.GetSiblingIndex());
+        }
+        else if (swipeStrip != null)
             panelGo.transform.SetSiblingIndex(swipeStrip.GetSiblingIndex() + 1);
         else if (quickReplySibling != null)
             panelGo.transform.SetSiblingIndex(quickReplySibling.GetSiblingIndex() + 1);
@@ -137,7 +145,7 @@ public static class SuggestionsPanelBuilder
         for (int i = 0; i < 4; i++) skeletons.Add(BuildSkeleton(cardsContainer, i));
         SuggestionCard cardTemplate = BuildCard(cardsContainer, sparkle);
 
-        BuildFadeOverlay(panelGo.transform, fade);
+        GameObject bottomFade = BuildFadeOverlay(panelGo.transform, fade);
 
         GameObject empty = BuildEmptyState(panelGo.transform, viewportRt);
         Button errorRetry;
@@ -159,6 +167,8 @@ public static class SuggestionsPanelBuilder
         so.FindProperty("errorRetryButton").objectReferenceValue = errorRetry;
         so.FindProperty("rt").objectReferenceValue = rt;
         so.FindProperty("canvasGroup").objectReferenceValue = canvasGroup;
+        so.FindProperty("cardsViewport").objectReferenceValue = viewportRt;
+        so.FindProperty("bottomFade").objectReferenceValue = bottomFade;
         so.ApplyModifiedPropertiesWithoutUndo();
 
         // The grab zone follows the panel it lives on; its controller ref is stamped by the wirer.
@@ -312,7 +322,7 @@ public static class SuggestionsPanelBuilder
         return content.transform;
     }
 
-    private static void BuildFadeOverlay(Transform panel, Sprite fadeSprite)
+    private static GameObject BuildFadeOverlay(Transform panel, Sprite fadeSprite)
     {
         // Surface→transparent wash over the viewport's bottom edge — the "there's more" cue.
         // Per-pixel alpha comes from the generated sprite; ThemedColor repaints the hue only.
@@ -325,6 +335,7 @@ public static class SuggestionsPanelBuilder
         rt.anchorMin = new Vector2(0, 0); rt.anchorMax = new Vector2(1, 0); rt.pivot = new Vector2(0.5f, 0);
         rt.sizeDelta = new Vector2(0, FadeHeight);
         rt.anchoredPosition = Vector2.zero;
+        return go;
     }
 
     // === Card ===============================================================
