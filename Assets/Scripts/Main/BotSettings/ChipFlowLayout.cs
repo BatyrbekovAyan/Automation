@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -19,6 +20,7 @@ namespace Automation.BotSettingsUI
         [SerializeField] private float rowHeight = 108f;
 
         private readonly List<float> widths = new List<float>();
+        private int[] rowIndices = Array.Empty<int>();
         private int rowCount;
 
         /// <summary>Rows produced by the last layout pass.</summary>
@@ -37,38 +39,53 @@ namespace Automation.BotSettingsUI
             SetLayoutInputForAxis(height, height, -1, 1);
         }
 
-        public override void SetLayoutHorizontal() => Arrange();
-
-        public override void SetLayoutVertical() => Arrange();
-
-        private void Arrange()
+        /// <summary>
+        /// Measures every child once, resolves row assignment, and places
+        /// children along the horizontal axis. Runs before
+        /// <see cref="CalculateLayoutInputVertical"/> and
+        /// <see cref="SetLayoutVertical"/> in Unity's rebuild phase order, so
+        /// <see cref="rowCount"/> and <see cref="rowIndices"/> are populated
+        /// before either reads them.
+        /// </summary>
+        public override void SetLayoutHorizontal()
         {
             widths.Clear();
-            var children = new List<RectTransform>();
             for (var i = 0; i < rectChildren.Count; i++)
             {
-                var child = rectChildren[i];
-                children.Add(child);
-                widths.Add(LayoutUtility.GetPreferredWidth(child));
+                widths.Add(LayoutUtility.GetPreferredWidth(rectChildren[i]));
             }
 
             var rowWidth = rectTransform.rect.width - padding.horizontal;
-            var rows = PromptSuggestionCloudFit.RowOf(widths, rowWidth, spacingX);
-            rowCount = rows.Length == 0 ? 0 : rows[rows.Length - 1] + 1;
+            rowIndices = PromptSuggestionCloudFit.RowOf(widths, rowWidth, spacingX);
+            rowCount = rowIndices.Length == 0 ? 0 : rowIndices[rowIndices.Length - 1] + 1;
 
             var x = (float)padding.left;
             var currentRow = 0;
-            for (var i = 0; i < children.Count; i++)
+            for (var i = 0; i < rectChildren.Count; i++)
             {
-                if (rows[i] != currentRow)
+                if (rowIndices[i] != currentRow)
                 {
-                    currentRow = rows[i];
+                    currentRow = rowIndices[i];
                     x = padding.left;
                 }
-                var y = padding.top + currentRow * (rowHeight + spacingY);
-                SetChildAlongAxis(children[i], 0, x, widths[i]);
-                SetChildAlongAxis(children[i], 1, y, rowHeight);
+                SetChildAlongAxis(rectChildren[i], 0, x, widths[i]);
                 x += widths[i] + spacingX;
+            }
+        }
+
+        /// <summary>
+        /// Places children along the vertical axis using the row assignment
+        /// already computed by <see cref="SetLayoutHorizontal"/> — no
+        /// re-measuring. Defensively no-ops for any child index beyond what
+        /// <see cref="rowIndices"/> covers, in case a rebuild ever lands
+        /// vertical-first.
+        /// </summary>
+        public override void SetLayoutVertical()
+        {
+            for (var i = 0; i < rectChildren.Count && i < rowIndices.Length; i++)
+            {
+                var y = padding.top + rowIndices[i] * (rowHeight + spacingY);
+                SetChildAlongAxis(rectChildren[i], 1, y, rowHeight);
             }
         }
     }
