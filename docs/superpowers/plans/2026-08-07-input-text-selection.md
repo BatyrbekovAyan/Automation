@@ -1970,3 +1970,13 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ```
 
 - [ ] **Step 4: Close out** — record the device-pass result in the spec file; update the `project_text_selection_gap` memory to SHIPPED status.
+
+---
+
+## Execution findings (2026-08-07, Tasks 1–8)
+
+- `activeInputHandler: 1` — the project runs the **new Input System only**. Task 9's input pump must NOT use legacy `Input.*`; use the repo idiom (see `MessageBubbleLongPress.cs`, `DeferredDismissInputField.IsPointerPressed`): `Pointer.current.press.wasPressedThisFrame / isPressed / wasReleasedThisFrame` + `Pointer.current.position.ReadValue()`, null-guarded, with `Touchscreen.current.primaryTouch` as the touch-specific check. Add `using UnityEngine.InputSystem;`.
+- The spike builder was corrected accordingly: `InputSystemUIInputModule` (namespace `UnityEngine.InputSystem.UI`), not `StandaloneInputModule`, and builds ADDITIVELY (create → populate → save → close) so the open Main scene is never touched.
+- Theme substitutions resolved in Tasks 7–8: `ThemeRole.AccentFill` (pins + selection tint), `ThemeRole.Surface` (menu pill), `ThemeRole.InkPrimary` (labels), `ThemeRole.Hairline` (separators). `Theme.Changed` is `event Action`. Overlay `SortingOrder = 4` (main canvas is 0; reaction-bar runtime canvas is 5).
+- `SelectionOverlay.PositionHandle` dropped the redundant `stemUp` parameter — pin direction is baked at Build time.
+- Full suite after Task 8: **1506/1506** (1471 pre-existing + 35 new).

@@ -3,6 +3,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
@@ -18,7 +19,10 @@ public static class TextSelectionSpikeBuilder
     {
         var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
 
-        var es = new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+        // InputSystemUIInputModule, NOT StandaloneInputModule: the project runs
+        // the new Input System only (activeInputHandler: 1) — the legacy module
+        // would leave the spike scene without any working input on device.
+        var es = new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
         SceneManager.MoveGameObjectToScene(es, scene);
 
         var canvasGo = new GameObject("Canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
