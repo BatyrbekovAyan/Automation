@@ -26,6 +26,10 @@ namespace Automation.BotSettingsUI
 
         public PromptSuggestion Suggestion => suggestion;
 
+        /// <summary>Width the label wants, for the cloud's row packing.</summary>
+        public float PreferredLabelWidth =>
+            label != null ? label.GetPreferredValues(label.text).x : 0f;
+
         private void Awake()
         {
             if (button != null) button.onClick.AddListener(HandlePressed);
