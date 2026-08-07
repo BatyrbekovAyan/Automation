@@ -34,8 +34,10 @@ public static class TextSelectionSpikeBuilder
         scaler.referenceResolution = new Vector2(1080, 1920);
         scaler.matchWidthOrHeight = 0.5f;
 
-        var plain = BuildField(canvasGo.transform, "PlainField", new Vector2(0, 500), "alpha beta gamma");
-        var emoji = BuildField(canvasGo.transform, "EmojiField", new Vector2(0, 280), "hi \U0001F602\U0001F44D end");
+        // Fields sit BELOW the probe's on-screen instruction panel (OnGUI,
+        // top ~40% of the screen) and above the keyboard.
+        var plain = BuildField(canvasGo.transform, "PlainField", new Vector2(0, 180), "alpha beta gamma");
+        var emoji = BuildField(canvasGo.transform, "EmojiField", new Vector2(0, 20), "hi \U0001F602\U0001F44D end");
 
         var probeGo = new GameObject("SpikeProbe", typeof(TextSelectionSpikeProbe));
         SceneManager.MoveGameObjectToScene(probeGo, scene);
