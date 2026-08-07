@@ -1,0 +1,17 @@
+<linker>
+  <!-- TextSelection layer: TextSelectionRouter has ZERO scene references by
+       design (runtime bootstrap via RuntimeInitializeOnLoadMethod), so guard
+       the whole subsystem against IL2CPP managed stripping on device builds. -->
+  <assembly fullname="Assembly-CSharp">
+    <type fullname="TextSelectionRouter" preserve="all"/>
+    <type fullname="KeyboardSelectionSync" preserve="all"/>
+    <type fullname="SelectionOverlay" preserve="all"/>
+    <type fullname="SelectionHandleView" preserve="all"/>
+    <type fullname="SelectionMenuView" preserve="all"/>
+    <type fullname="WordBoundary" preserve="all"/>
+    <type fullname="SelectionActions" preserve="all"/>
+    <type fullname="SelectionEdit" preserve="all"/>
+    <type fullname="SelectionMenuPolicy" preserve="all"/>
+    <type fullname="SelectionGestureMachine" preserve="all"/>
+  </assembly>
+</linker>

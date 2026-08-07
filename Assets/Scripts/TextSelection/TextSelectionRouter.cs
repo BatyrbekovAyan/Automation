@@ -36,7 +36,11 @@ public class TextSelectionRouter : MonoBehaviour
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    static void Bootstrap() { var _ = Instance; }
+    static void Bootstrap()
+    {
+        var _ = Instance;
+        Debug.Log("[TextSelection] Router bootstrapped");   // build-verification beacon (Editor + Xcode console)
+    }
 
     static readonly FieldInfo KbField = typeof(TMP_InputField).GetField(
         "m_SoftKeyboard", BindingFlags.Instance | BindingFlags.NonPublic);
