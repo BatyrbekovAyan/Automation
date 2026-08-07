@@ -52,7 +52,7 @@ public class PromptSuggestionCatalogTests
     public void FeaturedFlag_IsCoreOnly_AndPlentiful()
     {
         var featured = PromptSuggestionCatalog.All.Where(e => e.Featured).ToList();
-        Assert.GreaterOrEqual(featured.Count, 8);
+        Assert.AreEqual(10, featured.Count, "the catalog's documented shape is exactly 10 Featured core entries");
         foreach (var entry in featured)
             Assert.IsEmpty(entry.VerticalId, $"{entry.Id}: Featured must be core-only");
     }
