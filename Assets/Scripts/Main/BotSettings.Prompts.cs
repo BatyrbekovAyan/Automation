@@ -87,9 +87,15 @@ public partial class BotSettings
             yield return null;   // let the release land before touching .text
         }
 
-        if (PromptField != null) PromptField.Value = transform(PromptField.Value);
+        try
+        {
+            if (PromptField != null) PromptField.Value = transform(PromptField.Value);
+        }
+        finally
+        {
+            promptMutation = null;
+        }
 
-        promptMutation = null;
         RefreshPromptSuggestionStates();
     }
 }
