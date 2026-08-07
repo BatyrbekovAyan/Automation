@@ -62,12 +62,13 @@ namespace Automation.BotSettingsUI
         // Bind() usually lands while this object is inactive — Bot Settings opens
         // on the «Основное» tab — so BuildChips cannot start the fit coroutine.
         // Re-run it when the Промпты tab actually appears, or the cloud renders
-        // its raw candidate list with no row cap and a stale «Ещё N ›».
+        // its raw candidate list with no row cap and a stale «Ещё N ›». Going
+        // through BuildChips rather than StartCoroutine keeps its null-guard on
+        // the only path that reaches FitAfterLayout.
         private void OnEnable()
         {
             if (candidates.Count == 0) return;
-            if (layoutRoutine != null) StopCoroutine(layoutRoutine);
-            layoutRoutine = StartCoroutine(FitAfterLayout());
+            BuildChips();
         }
 
         public void Bind(string verticalId)
