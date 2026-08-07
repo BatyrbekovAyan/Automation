@@ -389,7 +389,7 @@ public class PromptSuggestionCatalogTests
     public void FeaturedFlag_IsCoreOnly_AndPlentiful()
     {
         var featured = PromptSuggestionCatalog.All.Where(e => e.Featured).ToList();
-        Assert.GreaterOrEqual(featured.Count, 8);
+        Assert.AreEqual(10, featured.Count, "the catalog's documented shape is exactly 10 Featured core entries");
         foreach (var entry in featured)
             Assert.IsEmpty(entry.VerticalId, $"{entry.Id}: Featured must be core-only");
     }
@@ -581,10 +581,10 @@ namespace Automation.BotSettingsUI
             Vertical("fl_ask_occasion", "flowers", "Уточняй повод и для кого букет", "Уточняй повод", Sales),
             Vertical("fl_ask_budget_range", "flowers", "Предлагай варианты в трёх ценовых диапазонах", "Три ценовых варианта", Sales),
             Vertical("fl_card_text", "flowers", "Предлагай добавить открытку с текстом", "Предлагай открытку", Sales),
-            Vertical("fl_ask_date_time", "flowers", "Спрашивай дату и время доставки", "Дата и время", Order),
+            Vertical("fl_ask_date_time", "flowers", "Спрашивай дату и время доставки", "Дата и время доставки", Order),
             Vertical("fl_seasonal", "flowers", "Предупреждай, если цветы сезонные и возможна замена", "Про сезонность", Limits),
 
-            Vertical("ks_ask_model", "kaspi_seller", "Уточняй точную модель и цвет товара", "Модель и цвет", Sales),
+            Vertical("ks_ask_model", "kaspi_seller", "Уточняй точную модель и цвет товара", "Уточняй модель и цвет", Sales),
             Vertical("ks_warranty", "kaspi_seller", "Отвечай на вопросы о гарантии и возврате", "Гарантия и возврат", Sales),
             Vertical("ks_kaspi_red", "kaspi_seller", "Расскажи про рассрочку Kaspi Red, если спросят про оплату", "Про Kaspi Red", Order),
             Vertical("ks_delivery_or_pickup", "kaspi_seller", "Уточняй, доставка или самовывоз", "Доставка или самовывоз", Order),

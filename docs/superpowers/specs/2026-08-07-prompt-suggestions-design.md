@@ -233,7 +233,7 @@ Chip height 108 · corner radius 54 · horizontal padding 36 · glyph 42 with 18
 |---|---|---|---|
 | `wh_min_order` | Сразу озвучивай минимальную партию | Минимальная партия | Sales |
 | `wh_ask_volume` | Уточняй объём закупки, чтобы назвать цену | Уточняй объём | Sales |
-| `wh_price_tiers` | Называй цену за единицу и за упаковку | Цена за единицу и упак. | Format |
+| `wh_price_tiers` | Называй цену за единицу и за упаковку | Цена за ед. и упак. | Format |
 | `wh_ask_company` | Спрашивай, нужны ли документы для юрлица | Документы для юрлица | Order |
 | `wh_delivery_regions` | Уточняй регион отгрузки | Уточняй регион | Order |
 
@@ -295,7 +295,7 @@ Counts: 27 core (10 `Featured`) + 6 × 5 vertical = **57**. A vertical bot sees 
 - All `Id`s unique; no empty `Id`, `Text`, or `ShortLabel`.
 - Every `ShortLabel` ≤ 22 characters.
 - Every non-empty `VerticalId` is one of the six ids in `BusinessTypes.asset` (read from the asset, so a rename breaks the test).
-- `Featured` is only set on core entries, and there are ≥ 8 of them.
+- `Featured` is only set on core entries, and there are exactly 10.
 - `ForVertical("auto_parts")` puts all five `auto_parts` entries before every core entry and returns 32 items.
 - `ForVertical("")` and `ForVertical("car_service")` (legacy id) both return exactly the 27 core entries.
 - `CloudCandidates` respects `max`, is vertical-first, and contains no duplicates.
