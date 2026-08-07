@@ -18,7 +18,16 @@
 - **Never write `.text` into a focused TMP field.** Every prompt mutation blurs first and waits one frame. This is an iOS shared-keyboard-buffer invariant, not a style preference.
 - **No new PlayerPrefs keys. No n8n change.** The prompt reaches the server exactly as before.
 - **Namespace `Automation.BotSettingsUI`** for every new runtime class (matches `EditableField`, `UploadSourceSheet`). Test classes are global-namespace with `using Automation.BotSettingsUI;`, matching `Assets/Tests/Editor/Chat/*Tests.cs`.
-- **New `.cs` files are silently excluded from compilation until Unity imports them.** After creating any new file, run an asset refresh and confirm the `.cs.meta` exists before expecting tests to see the type.
+- **Running tests: the Unity Editor is OPEN, so `Tools/run-tests-headless.sh` refuses** (batch mode cannot take the project lock). Every `Tools/run-tests-headless.sh …` command in the tasks below means: write the class name (empty = whole suite) into `Temp/claude/run-tests.trigger`, then poll `Temp/claude/test-summary.json` until `status` is `completed`:
+
+```bash
+printf 'PromptTextComposerTests' > Temp/claude/run-tests.trigger
+for i in $(seq 1 40); do sleep 1.5; python3 -c "import json;s=json.load(open('Temp/claude/test-summary.json'));print(s['status'])" | grep -q completed && break; done
+cat Temp/claude/test-summary.json
+```
+
+  The bridge refreshes assets and waits for a clean compile before it runs, so it also imports brand-new `.cs` files — no separate refresh step is needed. It aborts the run on a compile error rather than testing stale assemblies, so a `status` that never leaves `running` means compilation failed: read the Unity console.
+- **A stale `test-summary.json` reads as a pass.** Confirm `finishedAt` advanced and `total` matches the class you filtered on before believing a green result.
 - **Commit `.cs` and `.cs.meta` together.** Before every commit run `git rev-parse --abbrev-ref HEAD` — another session shares this worktree and HEAD can move mid-task. Commit on whatever branch HEAD reports; do not `git checkout -b`.
 - **NEVER run `Tools/Rebuild Bot Settings Prefabs`.** It is destructive and wipes a dozen builders' wiring. The builder in Task 7 is additive only.
 - **Russian copy is fixed by the spec table.** Do not paraphrase, re-translate, or "improve" a string.
@@ -960,15 +969,9 @@ namespace Automation.BotSettingsUI
         [SerializeField] private Image outline;
         [SerializeField] private Button button;
 
-        [SerializeField] private Color normalBackground = new Color(0.090f, 0.110f, 0.141f);
-        [SerializeField] private Color addedBackground = new Color(0.118f, 0.165f, 0.267f);
-        [SerializeField] private Color normalLabel = new Color(0.925f, 0.941f, 0.965f);
-        [SerializeField] private Color addedLabel = new Color(0.604f, 0.651f, 0.722f);
-        [SerializeField] private Color plusTint = new Color(0.349f, 0.506f, 0.839f);
-        [SerializeField] private Color checkTint = new Color(0.341f, 0.871f, 0.584f);
-
         private PromptSuggestion suggestion;
         private Action<PromptSuggestion> pressed;
+        private bool added;
 
         public PromptSuggestion Suggestion => suggestion;
 
@@ -977,6 +980,17 @@ namespace Automation.BotSettingsUI
             if (button != null) button.onClick.AddListener(HandlePressed);
         }
 
+        // This component owns every colour that varies with the added state, so
+        // these graphics carry NO ThemedColor binding — two owners would fight
+        // and a theme switch would repaint an added chip back to Surface.
+        private void OnEnable()
+        {
+            Theme.Changed += ApplyColors;
+            ApplyColors();
+        }
+
+        private void OnDisable() => Theme.Changed -= ApplyColors;
+
         public void Bind(PromptSuggestion value, Action<PromptSuggestion> onPressed)
         {
             suggestion = value;
@@ -984,21 +998,37 @@ namespace Automation.BotSettingsUI
             if (label != null) label.text = value.ShortLabel;
         }
 
-        public void SetAdded(bool added)
+        public void SetAdded(bool value)
         {
-            if (background != null) background.color = added ? addedBackground : normalBackground;
-            if (label != null) label.color = added ? addedLabel : normalLabel;
-            if (outline != null) outline.enabled = !added;
+            added = value;
+            ApplyColors();
+        }
+
+        private void ApplyColors()
+        {
+            var fill = added ? Theme.Color(ThemeRole.AccentSoft) : Theme.Color(ThemeRole.Surface);
+            if (background != null) background.color = fill;
+
+            // The ring is the Button's targetGraphic and the chip's only raycast
+            // target — never disable it, or an added chip stops accepting the tap
+            // that would remove it. It hides by matching the fill instead.
+            if (outline != null) outline.color = added ? fill : Theme.Color(ThemeRole.Border);
+
+            if (label != null)
+                label.color = added
+                    ? Theme.Color(ThemeRole.InkSecondary)
+                    : Theme.Color(ThemeRole.InkPrimary);
+
             if (plusGlyph != null)
             {
                 plusGlyph.enabled = !added;
-                plusGlyph.color = plusTint;
+                plusGlyph.color = Theme.Color(ThemeRole.AccentText);
             }
-            if (tickGlyph != null)
-            {
-                tickGlyph.SetActive(added);
-                foreach (var bar in tickGlyph.GetComponentsInChildren<Image>(true)) bar.color = checkTint;
-            }
+
+            if (tickGlyph == null) return;
+            tickGlyph.SetActive(added);
+            var tick = Theme.Color(ThemeRole.PositiveInk);
+            foreach (var bar in tickGlyph.GetComponentsInChildren<Image>(true)) bar.color = tick;
         }
 
         private void HandlePressed() => pressed?.Invoke(suggestion);
@@ -2223,11 +2253,6 @@ On the objects the builder created, add a `ThemedColor` component with `preserve
 
 | Object | Role |
 |---|---|
-| Chip inner fill (`Fill`) | `Surface` |
-| Chip outer ring | `Border` |
-| Chip label | `InkPrimary` |
-| `+` glyph | `AccentText` |
-| Chip tick — both `ArmShort` and `ArmLong` | `PositiveInk` |
 | «ПОДСКАЗКИ» header text | `InkTertiary` |
 | «Ещё N ›» label | `AccentText` |
 | Sheet background | `Background` |
@@ -2241,7 +2266,7 @@ On the objects the builder created, add a `ThemedColor` component with `preserve
 | Apply button label | `AccentOnFill` |
 | Sheet scrim | `Scrim` |
 
-The chip's added/normal colours are also stamped in code by `PromptSuggestionChip.SetAdded`; keep the serialized defaults in that component equal to the dark-theme values listed in Task 5 so the two never disagree on first paint.
+**Do NOT put `ThemedColor` on any chip graphic** (fill, ring, label, `+`, tick arms). `PromptSuggestionChip` owns those colours because they vary with the added state and reads them from `Theme.Color(...)` itself, re-applying on `Theme.Changed`. A second owner would repaint an added chip back to `Surface` on a theme switch. The builder's palette constants are authoring-time defaults only.
 
 - [ ] **Step 2: Run the full suite one final time**
 
