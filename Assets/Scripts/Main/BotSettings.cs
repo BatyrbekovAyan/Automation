@@ -403,6 +403,7 @@ public partial class BotSettings : MonoBehaviour
         // This screen's coroutines are dead the moment it deactivates, so any
         // latch one of them was holding has to be released here.
         ResetReplacePopupState();
+        ResetPromptMutationState();
     }
 
     // Returns the vertical ScrollRect under the currently-active tab root, if
@@ -429,7 +430,11 @@ public partial class BotSettings : MonoBehaviour
     public void OpenBusinessTab() => SetActiveTab(business: true);
     public void OpenProductTab()  => SetActiveTab(product: true);
     public void OpenServiceTab()  => SetActiveTab(service: true);
-    public void OpenPromptTab()   => SetActiveTab(prompt: true);
+    public void OpenPromptTab()
+    {
+        SetActiveTab(prompt: true);
+        RefreshPromptSuggestionStates();
+    }
 
     private void SetActiveTab(bool general = false, bool business = false,
                               bool product = false, bool service = false,
@@ -507,6 +512,8 @@ public partial class BotSettings : MonoBehaviour
             WhatsappToggle.onValueChanged.AddListener(WhatsappChannelToggleChanged);
         if (TelegramToggle != null)
             TelegramToggle.onValueChanged.AddListener(TelegramChannelToggleChanged);
+
+        WirePromptSuggestions();
     }
 
     //////////////////////////////////////// PRODUCTS / SERVICES ////////////////////////////////////////

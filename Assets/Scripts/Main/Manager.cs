@@ -834,6 +834,7 @@ public partial class Manager : MonoBehaviour
 
         openBotSettings.BusinessField.Value = PlayerPrefs.GetString(openBot.name + "Business", "");
         openBotSettings.PromptField.Value = PlayerPrefs.GetString(openBot.name + "Prompt", "");
+        openBotSettings.RefreshPromptSuggestions();
         LoadContactFields(openBotSettings, openBot.name);
 
 
