@@ -1104,8 +1104,7 @@ namespace Automation.BotSettingsUI
         private void OnEnable()
         {
             if (candidates.Count == 0) return;
-            if (layoutRoutine != null) StopCoroutine(layoutRoutine);
-            layoutRoutine = StartCoroutine(FitAfterLayout());
+            BuildChips();   // its null-guard must stay on the only path to the fit
         }
 
         private void OnDisable()
