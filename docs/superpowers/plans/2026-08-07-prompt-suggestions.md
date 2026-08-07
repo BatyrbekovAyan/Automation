@@ -1628,9 +1628,17 @@ public partial class BotSettings
             yield return null;   // let the release land before touching .text
         }
 
-        if (PromptField != null) PromptField.Value = transform(PromptField.Value);
+        // finally, not a plain assignment: if a caller's transform throws, the
+        // latch would stay set and every later chip tap would silently no-op.
+        try
+        {
+            if (PromptField != null) PromptField.Value = transform(PromptField.Value);
+        }
+        finally
+        {
+            promptMutation = null;
+        }
 
-        promptMutation = null;
         RefreshPromptSuggestionStates();
     }
 }
