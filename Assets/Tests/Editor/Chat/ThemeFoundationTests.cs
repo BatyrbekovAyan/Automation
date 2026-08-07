@@ -154,10 +154,19 @@ public class ThemeFoundationTests
 
     // ---------------------------------------------------------------- prefs
 
+    // Pins the deliberate 2026-08-07 flip: a fresh install opens DARK. The
+    // foundation originally defaulted Light so each binding step was a provable
+    // no-op; with the shell fully bound, dark is the intended default. If this
+    // fails, someone reverted the default — do not "fix" the test.
     [Test]
-    public void Prefs_DefaultToLight_AndPersistDark()
+    public void Prefs_DefaultToDark_AndPersistExplicitLight()
     {
-        Assert.AreEqual(ThemeMode.Light, ThemePrefs.Mode, "fresh install must be today's look");
+        Assert.AreEqual(ThemeMode.Dark, ThemePrefs.Mode, "fresh install must open dark");
+
+        ThemePrefs.Mode = ThemeMode.Light;   // an explicit choice must survive the default
+        Assert.AreEqual((int)ThemeMode.Light, _store[ThemePrefs.ModeKey]);
+        Assert.AreEqual(ThemeMode.Light, ThemePrefs.Mode);
+
         ThemePrefs.Mode = ThemeMode.Dark;
         Assert.AreEqual((int)ThemeMode.Dark, _store[ThemePrefs.ModeKey]);
         Assert.AreEqual(ThemeMode.Dark, ThemePrefs.Mode);
@@ -197,8 +206,14 @@ public class ThemeFoundationTests
         // Defaults_MatchTheShippedLightPalette), so this stays true whichever
         // branch runs — and, unlike a literal, it does not have to be rewritten
         // every time the palette is deliberately flipped.
+        //
+        // The mode is pinned to Light EXPLICITLY because the code defaults mirror
+        // the LIGHT palette; comparing against them in dark mode is meaningless.
+        // This used to lean on the fresh-install default being Light, which broke
+        // silently when that default flipped to Dark — which mode ships by default
+        // is Prefs_DefaultToDark_AndPersistExplicitLight's job, not this test's.
         Theme.ResetForTests();
-        ThemePrefs.GetInt = (key, def) => def; // fresh install
+        ThemePrefs.GetInt = (key, def) => (int)ThemeMode.Light;
         Assert.IsNotNull(Theme.Active);
 
         var codeDefault = Track(ScriptableObject.CreateInstance<ThemeAsset>());

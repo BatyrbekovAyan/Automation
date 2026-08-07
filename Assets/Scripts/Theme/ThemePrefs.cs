@@ -9,10 +9,17 @@ public enum ThemeMode
 }
 
 /// <summary>
-/// PlayerPrefs-backed theme choice. Defaults to Light — today's look — so the
-/// foundation ships with zero visible change. Static Func/Action seams follow
-/// the NotifPrefs/SemiAutoStore pattern so EditMode tests can swap in an
-/// in-memory store without touching real prefs.
+/// PlayerPrefs-backed theme choice. Defaults to <b>Dark</b> (owner decision,
+/// 2026-08-07) — the restyle's foundation shipped Light-default so binding
+/// elements one screen at a time stayed a provable visual no-op; now that the
+/// whole shell is bound, dark is the intended first impression.
+///
+/// An owner who EXPLICITLY picked light keeps it: the setter always writes, so
+/// a stored 0 wins over this default. Only installs that never touched the
+/// switch move to dark on update.
+///
+/// Static Func/Action seams follow the NotifPrefs/SemiAutoStore pattern so
+/// EditMode tests can swap in an in-memory store without touching real prefs.
 /// </summary>
 public static class ThemePrefs
 {
@@ -28,7 +35,7 @@ public static class ThemePrefs
 
     public static ThemeMode Mode
     {
-        get => GetInt(ModeKey, (int)ThemeMode.Light) == (int)ThemeMode.Dark
+        get => GetInt(ModeKey, (int)ThemeMode.Dark) == (int)ThemeMode.Dark
             ? ThemeMode.Dark
             : ThemeMode.Light;
         set => SetIntAndSave(ModeKey, (int)value);
