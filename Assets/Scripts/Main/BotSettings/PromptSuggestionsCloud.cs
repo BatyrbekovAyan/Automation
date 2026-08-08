@@ -127,7 +127,11 @@ namespace Automation.BotSettingsUI
             var rowWidth = chipsParent.rect.width;
             var widths = new List<float>(candidates.Count);
             for (var i = 0; i < candidates.Count; i++)
-                widths.Add(MeasureChipWidth(pool[i]));
+            {
+                var width = MeasureChipWidth(pool[i]);
+                pool[i].SetPreferredWidth(width);
+                widths.Add(width);
+            }
 
             var visible = PromptSuggestionCloudFit.Take(widths, rowWidth, chipSpacing, MaxRows);
             for (var i = 0; i < pool.Count; i++)

@@ -272,6 +272,12 @@ public static class PromptSuggestionsBuilder
         var button = chip.AddComponent<Button>();
         button.targetGraphic = outline;   // the outer image is the raycast target
 
+        // The ring Image has no sprite, so its ILayoutElement.preferredWidth is
+        // 0 — this LayoutElement is the chip's real preferred width, published
+        // at runtime by PromptSuggestionsCloud.SetPreferredWidth so ChipFlowLayout's
+        // LayoutUtility.GetPreferredWidth agrees with the row packer's measurement.
+        var layoutElement = chip.AddComponent<LayoutElement>();
+
         var component = chip.AddComponent<PromptSuggestionChip>();
         var so = new SerializedObject(component);
         so.FindProperty("label").objectReferenceValue = label;
@@ -280,6 +286,7 @@ public static class PromptSuggestionsBuilder
         so.FindProperty("background").objectReferenceValue = background;
         so.FindProperty("outline").objectReferenceValue = outline;
         so.FindProperty("button").objectReferenceValue = button;
+        so.FindProperty("layoutElement").objectReferenceValue = layoutElement;
         so.ApplyModifiedPropertiesWithoutUndo();
 
         chip.SetActive(false);

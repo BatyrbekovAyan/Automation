@@ -19,6 +19,9 @@ namespace Automation.BotSettingsUI
         [SerializeField] private Image background;
         [SerializeField] private Image outline;
         [SerializeField] private Button button;
+        // The ring Image carries no sprite, so its own ILayoutElement reports a
+        // preferred width of 0. This is where the chip's real width lives.
+        [SerializeField] private LayoutElement layoutElement;
 
         private PromptSuggestion suggestion;
         private Action<PromptSuggestion> pressed;
@@ -29,6 +32,18 @@ namespace Automation.BotSettingsUI
         /// <summary>Width the label wants, for the cloud's row packing.</summary>
         public float PreferredLabelWidth =>
             label != null ? label.GetPreferredValues(label.text).x : 0f;
+
+        /// <summary>
+        /// Publishes the width the cloud measured so ChipFlowLayout's
+        /// LayoutUtility.GetPreferredWidth call returns the SAME number the row
+        /// packer used. Without it the chip has no ILayoutElement with a real
+        /// preferred width — the ring Image has no sprite — and every chip is
+        /// laid out at width 0.
+        /// </summary>
+        public void SetPreferredWidth(float width)
+        {
+            if (layoutElement != null) layoutElement.preferredWidth = width;
+        }
 
         private void Awake()
         {
