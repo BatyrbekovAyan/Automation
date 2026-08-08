@@ -760,6 +760,10 @@ public partial class Manager : MonoBehaviour
                 PlayerPrefs.SetString(openBot.name + "BusinessType", bt.id);
         }
         openBot.GetComponent<Bot>()?.RefreshBusinessIcon();
+        // The suggestion cloud is vertical-keyed off the id written above — a
+        // saved business-type change must re-bind it, or the user sits in front
+        // of the old vertical's chips until the next settings open.
+        openBotSettings.RefreshPromptSuggestions();
 
         // Both channel toggles are persisted HERE, synchronously, before this
         // method's trailing EnableSave(). They used to be written inside

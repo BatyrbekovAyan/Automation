@@ -120,8 +120,15 @@ public class Bot : MonoBehaviour
                     // openBot and hid the "Прайс-листы" section. Re-run now that
                     // the pairing is authoritative (same pattern as
                     // RefreshBusinessIcon: Manager writes, then explicit refresh).
+                    // RefreshPromptSuggestions has the same dependency: it reads
+                    // openBot's BusinessType to bind the suggestion cloud, and
+                    // this is the only call on the FIRST open (CloseSettings
+                    // covers later cycles).
                     if (Manager.openBotSettings != null)
+                    {
                         Manager.openBotSettings.RefreshUploadedFiles();
+                        Manager.openBotSettings.RefreshPromptSuggestions();
+                    }
 
                     // Each BotSettings prefab has its own SwipeBack child. Resolve
                     // the right one explicitly instead of relying on the static
