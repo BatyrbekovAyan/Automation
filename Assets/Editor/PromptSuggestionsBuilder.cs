@@ -1,5 +1,6 @@
 #if UNITY_EDITOR
 using System;
+using System.Reflection;
 using Automation.BotSettingsUI;
 using TMPro;
 using UnityEditor;
@@ -138,13 +139,41 @@ public static class PromptSuggestionsBuilder
         }
         var component = go.GetComponent(type) ?? go.AddComponent(type);
         type.GetField("radius")?.SetValue(component, radius);
-        type.GetField("image")?.SetValue(component, go.GetComponent<Image>());
+        // "image" is private on ImageWithRoundedCorners — default GetField binding
+        // flags (public only) miss it silently, making this write a permanent no-op.
+        type.GetField("image", BindingFlags.Instance | BindingFlags.NonPublic)?.SetValue(component, go.GetComponent<Image>());
+    }
+
+    /// <summary>
+    /// Binds a graphic to a semantic theme role: get-or-add <see cref="ThemedColor"/>,
+    /// then write role/target/preserveAlpha via SerializedObject only — never
+    /// <see cref="ThemedColor.Configure"/>, which repaints immediately and would
+    /// rewrite the authored colour float. The runtime OnEnable / Theme.Changed
+    /// handler does the actual painting. Get-or-add matters here: SheetRoot and
+    /// ScrimBehind arrive from Instantiate(UploadSourceSheet) already carrying a
+    /// ThemedColor, and the component is [DisallowMultipleComponent].
+    /// </summary>
+    private static void BindTheme(GameObject go, ThemeRole role, bool preserveAlpha = true)
+    {
+        var graphic = go.GetComponent<Graphic>();
+        var themed = go.GetComponent<ThemedColor>();
+        if (themed == null) themed = go.AddComponent<ThemedColor>();
+
+        var so = new SerializedObject(themed);
+        so.FindProperty("role").enumValueIndex = (int)role;
+        so.FindProperty("target").objectReferenceValue = graphic;
+        so.FindProperty("preserveAlpha").boolValue = preserveAlpha;
+        so.ApplyModifiedPropertiesWithoutUndo();
     }
 
     /// <summary>
     /// A tick drawn as two rotated bars. The project ships no monochrome tick
     /// sprite, and the green PNGs in Assets/Images/Icons cannot be re-tinted
     /// per theme role. Returns the container to toggle with SetActive.
+    /// Never themed inside this method — callers bind the two arms themselves,
+    /// so the chip's own (never-themed) tick and the sheet row's (themed) tick
+    /// can share one builder without either accidentally acquiring the other's
+    /// binding.
     /// </summary>
     private static GameObject BuildTick(Transform parent, Color color, float size)
     {
@@ -152,13 +181,17 @@ public static class PromptSuggestionsBuilder
         rootRt.sizeDelta = new Vector2(size, size);
 
         var shortArm = NewChild(root.transform, "ArmShort", out var shortRt);
-        shortArm.AddComponent<Image>().color = color;
+        var shortImage = shortArm.AddComponent<Image>();
+        shortImage.color = color;
+        shortImage.raycastTarget = false;
         shortRt.sizeDelta = new Vector2(size * 0.42f, size * 0.16f);
         shortRt.anchoredPosition = new Vector2(-size * 0.22f, -size * 0.12f);
         shortRt.localRotation = Quaternion.Euler(0, 0, 45f);
 
         var longArm = NewChild(root.transform, "ArmLong", out var longRt);
-        longArm.AddComponent<Image>().color = color;
+        var longImage = longArm.AddComponent<Image>();
+        longImage.color = color;
+        longImage.raycastTarget = false;
         longRt.sizeDelta = new Vector2(size * 0.72f, size * 0.16f);
         longRt.anchoredPosition = new Vector2(size * 0.08f, size * 0.04f);
         longRt.localRotation = Quaternion.Euler(0, 0, -45f);
@@ -190,6 +223,8 @@ public static class PromptSuggestionsBuilder
         text.fontSize = 30f;
         text.color = InkTertiary;
         text.characterSpacing = 10f;
+
+        BindTheme(header, ThemeRole.InkTertiary);
     }
 
     private static PromptSuggestionChip BuildChipTemplate(Transform parent)
@@ -231,7 +266,7 @@ public static class PromptSuggestionsBuilder
 
         var labelGo = NewChild(chip.transform, "Label", out var labelRt);
         var label = AddText(labelGo, "Подсказка", 36f, InkPrimary, TextAlignmentOptions.MidlineLeft);
-        label.enableWordWrapping = false;
+        label.textWrappingMode = TextWrappingModes.NoWrap;
         Stretch(labelRt, left: 36f + 42f + 18f, right: 36f);
 
         var button = chip.AddComponent<Button>();
@@ -275,6 +310,7 @@ public static class PromptSuggestionsBuilder
         var moreLabelGo = NewChild(more.transform, "Label", out var moreLabelRt);
         var moreLabel = AddText(moreLabelGo, "Ещё 0 ›", 32f, AccentText, TextAlignmentOptions.MidlineRight);
         Stretch(moreLabelRt);
+        BindTheme(moreLabelGo, ThemeRole.AccentText);
 
         var component = cloud.AddComponent<PromptSuggestionsCloud>();
         var so = new SerializedObject(component);
@@ -317,6 +353,10 @@ public static class PromptSuggestionsBuilder
         var sheetBackground = sheetRoot.GetComponent<Image>();
         if (sheetBackground != null) sheetBackground.color = Background;
         EnsureRounded(sheetRoot.gameObject, 60f);
+        // Overrides the Surface role this SheetRoot inherited by being cloned from
+        // UploadSourceSheet — this full-height catalog sheet reads as its own
+        // screen rather than an elevated card, so it binds Background instead.
+        BindTheme(sheetRoot.gameObject, ThemeRole.Background);
 
         var grabber = NewChild(sheetRoot, "Grabber", out var grabberRt);
         grabber.AddComponent<Image>().color = Border;
@@ -325,6 +365,7 @@ public static class PromptSuggestionsBuilder
         grabberRt.anchoredPosition = new Vector2(0f, -24f);
         grabberRt.sizeDelta = new Vector2(105f, 12f);
         EnsureRounded(grabber, 6f);
+        BindTheme(grabber, ThemeRole.Border);
 
         var titleGo = NewChild(sheetRoot, "Title", out var titleRt);
         var title = AddText(titleGo, "Подсказки", 44f, InkPrimary, TextAlignmentOptions.MidlineLeft);
@@ -335,6 +376,7 @@ public static class PromptSuggestionsBuilder
         titleRt.offsetMax = new Vector2(-48f, 0f);
         titleRt.anchoredPosition = new Vector2(0f, -66f);
         titleRt.sizeDelta = new Vector2(titleRt.sizeDelta.x, 60f);
+        BindTheme(titleGo, ThemeRole.InkPrimary);
 
         var countGo = NewChild(sheetRoot, "SelectedCount", out var countRt);
         var countLabel = AddText(countGo, "выбрано 0", 32f, InkTertiary, TextAlignmentOptions.MidlineRight);
@@ -345,6 +387,7 @@ public static class PromptSuggestionsBuilder
         countRt.offsetMax = new Vector2(-48f, 0f);
         countRt.anchoredPosition = new Vector2(0f, -66f);
         countRt.sizeDelta = new Vector2(countRt.sizeDelta.x, 60f);
+        BindTheme(countGo, ThemeRole.InkTertiary);
 
         var categories = NewChild(sheetRoot, "Categories", out var categoriesRt);
         categoriesRt.anchorMin = new Vector2(0f, 1f);
@@ -392,11 +435,13 @@ public static class PromptSuggestionsBuilder
         var image = go.AddComponent<Image>();
         image.color = Surface;
         EnsureRounded(go, 42f);
+        BindTheme(go, ThemeRole.Surface);
 
         var labelGo = NewChild(go.transform, "Label", out var labelRt);
         var label = AddText(labelGo, "Категория", 32f, InkPrimary, TextAlignmentOptions.Midline);
-        label.enableWordWrapping = false;
+        label.textWrappingMode = TextWrappingModes.NoWrap;
         Stretch(labelRt, left: 30f, right: 30f);
+        BindTheme(labelGo, ThemeRole.InkPrimary);
 
         var button = go.AddComponent<Button>();
         button.targetGraphic = image;
@@ -450,6 +495,7 @@ public static class PromptSuggestionsBuilder
         separatorRt.anchorMax = new Vector2(1f, 0f);
         separatorRt.pivot = new Vector2(0.5f, 0f);
         separatorRt.sizeDelta = new Vector2(0f, 2f);
+        BindTheme(separatorGo, ThemeRole.Hairline);
 
         // The box outline is always visible; only the accent fill toggles, so
         // an unchecked row still shows a target to tap.
@@ -460,6 +506,7 @@ public static class PromptSuggestionsBuilder
         boxRt.anchoredPosition = new Vector2(0f, 0f);
         boxRt.sizeDelta = new Vector2(66f, 66f);
         EnsureRounded(boxGo, 20f);
+        BindTheme(boxGo, ThemeRole.Border);
 
         var boxFillGo = NewChild(boxGo.transform, "Fill", out var boxFillRt);
         var boxFill = boxFillGo.AddComponent<Image>();
@@ -467,17 +514,23 @@ public static class PromptSuggestionsBuilder
         boxFill.raycastTarget = false;
         Stretch(boxFillRt, left: 3f, right: 3f, top: 3f, bottom: 3f);
         EnsureRounded(boxFillGo, 17f);
+        BindTheme(boxFillGo, ThemeRole.AccentFill);
 
         var tick = BuildTick(boxGo.transform, OnAccent, 40f);
         var tickRt = tick.GetComponent<RectTransform>();
         tickRt.anchorMin = tickRt.anchorMax = new Vector2(0.5f, 0.5f);
         tickRt.anchoredPosition = Vector2.zero;
+        // This row checkbox's tick IS themed (unlike the chip's) — both arms sit
+        // on the AccentFill box, so their glyph colour is AccentOnFill.
+        BindTheme(tick.transform.Find("ArmShort").gameObject, ThemeRole.AccentOnFill);
+        BindTheme(tick.transform.Find("ArmLong").gameObject, ThemeRole.AccentOnFill);
 
         var labelGo = NewChild(row.transform, "Label", out var labelRt);
         var label = AddText(labelGo, "Текст подсказки", 38f, InkPrimary, TextAlignmentOptions.MidlineLeft);
-        label.enableWordWrapping = true;
+        label.textWrappingMode = TextWrappingModes.Normal;
         label.overflowMode = TextOverflowModes.Ellipsis;
         Stretch(labelRt, left: 66f + 30f, right: 0f, top: 18f, bottom: 18f);
+        BindTheme(labelGo, ThemeRole.InkPrimary);
 
         var button = row.AddComponent<Button>();
         button.targetGraphic = rowImage;
@@ -505,10 +558,12 @@ public static class PromptSuggestionsBuilder
         var image = go.AddComponent<Image>();
         image.color = AccentFill;
         EnsureRounded(go, 30f);
+        BindTheme(go, ThemeRole.AccentFill);
 
         var labelGo = NewChild(go.transform, "Label", out var labelRt);
         applyLabel = AddText(labelGo, "Добавить 0", 38f, OnAccent, TextAlignmentOptions.Midline);
         Stretch(labelRt);
+        BindTheme(labelGo, ThemeRole.AccentOnFill);
 
         var button = go.AddComponent<Button>();
         button.targetGraphic = image;
