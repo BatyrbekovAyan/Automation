@@ -62,8 +62,8 @@ public static class PromptSuggestionsBuilder
             DestroyIfPresent(promptContent, MoreGoName);
             DestroyIfPresent(prefabRoot.transform, SheetGoName);
 
-            BuildHeader(promptContent);
-            var cloud = BuildCloud(promptContent);
+            var header = BuildHeader(promptContent);
+            var cloud = BuildCloud(promptContent, header);
             var sheet = BuildSheet(prefabRoot.transform);
             if (cloud == null || sheet == null) return;
 
@@ -199,7 +199,7 @@ public static class PromptSuggestionsBuilder
         return root;
     }
 
-    private static void BuildHeader(Transform promptContent)
+    private static GameObject BuildHeader(Transform promptContent)
     {
         var source = promptContent.Find("SectionHeader_ПРОМПТ");
         GameObject header;
@@ -218,13 +218,15 @@ public static class PromptSuggestionsBuilder
         header.transform.SetAsLastSibling();
 
         var text = header.GetComponentInChildren<TextMeshProUGUI>(true);
-        if (text == null) return;
-        text.text = "ПОДСКАЗКИ";
-        text.fontSize = 30f;
-        text.color = InkTertiary;
-        text.characterSpacing = 10f;
-
-        BindTheme(header, ThemeRole.InkTertiary);
+        if (text != null)
+        {
+            text.text = "ПОДСКАЗКИ";
+            text.fontSize = 30f;
+            text.color = InkTertiary;
+            text.characterSpacing = 10f;
+            BindTheme(header, ThemeRole.InkTertiary);
+        }
+        return header;
     }
 
     private static PromptSuggestionChip BuildChipTemplate(Transform parent)
@@ -293,10 +295,17 @@ public static class PromptSuggestionsBuilder
         return component;
     }
 
-    private static PromptSuggestionsCloud BuildCloud(Transform promptContent)
+    private static PromptSuggestionsCloud BuildCloud(Transform promptContent, GameObject header)
     {
         var cloud = NewChild(promptContent, CloudGoName, out var cloudRt);
         cloudRt.sizeDelta = new Vector2(0f, 108f);
+
+        // Prompt/Content's VLG has childControlHeight OFF — it lays children out
+        // by their rect height. Without this fitter the cloud's rect would stay
+        // one row tall while ChipFlowLayout renders three, and the next sibling
+        // would be positioned on top of rows two and three.
+        var fitter = cloud.AddComponent<ContentSizeFitter>();
+        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
         var flow = cloud.AddComponent<ChipFlowLayout>();
         var flowSo = new SerializedObject(flow);
@@ -307,8 +316,16 @@ public static class PromptSuggestionsBuilder
 
         var chipTemplate = BuildChipTemplate(cloud.transform);
 
-        var more = NewChild(promptContent, MoreGoName, out var moreRt);
-        moreRt.sizeDelta = new Vector2(0f, 90f);
+        // «Ещё N ›» lives right-aligned INSIDE the header row (per the spec's
+        // «ПОДСКАЗКИ … Ещё N ›» line), not as its own layout row. The header is
+        // only 50 tall, so the invisible hit area extends past it to keep the
+        // 132-unit touch target; nothing in this hierarchy masks, so the
+        // overflow is safe.
+        var more = NewChild(header.transform, MoreGoName, out var moreRt);
+        moreRt.anchorMin = moreRt.anchorMax = new Vector2(1f, 0.5f);
+        moreRt.pivot = new Vector2(1f, 0.5f);
+        moreRt.anchoredPosition = Vector2.zero;
+        moreRt.sizeDelta = new Vector2(360f, 132f);
         var moreImage = more.AddComponent<Image>();
         moreImage.color = new Color(1f, 1f, 1f, 0f);   // invisible but raycastable
         var moreButton = more.AddComponent<Button>();
@@ -444,6 +461,12 @@ public static class PromptSuggestionsBuilder
         EnsureRounded(go, 42f);
         BindTheme(go, ThemeRole.Surface);
 
+        // The rail's HLG controls child width, and a sprite-less Image reports
+        // preferredWidth 0 — without a LayoutElement every pill collapses to
+        // nothing. The sheet stamps preferredWidth per label at bind time.
+        var element = go.AddComponent<LayoutElement>();
+        element.preferredHeight = 84f;
+
         var labelGo = NewChild(go.transform, "Label", out var labelRt);
         var label = AddText(labelGo, "Категория", 32f, InkPrimary, TextAlignmentOptions.Midline);
         label.textWrappingMode = TextWrappingModes.NoWrap;
@@ -461,12 +484,15 @@ public static class PromptSuggestionsBuilder
         var scrollGo = NewChild(sheetRoot, "RowsScroll", out var scrollRt);
         scrollRt.anchorMin = new Vector2(0f, 0f);
         scrollRt.anchorMax = new Vector2(1f, 1f);
-        scrollRt.offsetMin = new Vector2(48f, 200f);    // above the apply button
+        scrollRt.offsetMin = new Vector2(48f, 272f);    // above the apply button
         scrollRt.offsetMax = new Vector2(-48f, -264f);  // below the category rail
         var scroll = scrollGo.AddComponent<ScrollRect>();
         scroll.horizontal = false;
         scroll.vertical = true;
         scroll.movementType = ScrollRect.MovementType.Elastic;
+        // Rows consult ScrollClickBlocker.IsBlocking so a tap that catches a
+        // flicked list stops it instead of toggling the row under the finger.
+        scrollGo.AddComponent<ScrollClickBlocker>();
 
         var viewportGo = NewChild(scrollGo.transform, "Viewport", out var viewportRt);
         Stretch(viewportRt);
@@ -560,8 +586,10 @@ public static class PromptSuggestionsBuilder
         rt.anchorMin = new Vector2(0f, 0f);
         rt.anchorMax = new Vector2(1f, 0f);
         rt.pivot = new Vector2(0.5f, 0f);
-        rt.offsetMin = new Vector2(48f, 48f);
-        rt.offsetMax = new Vector2(-48f, 48f + 132f);
+        // 120 up from the sheet bottom clears the iPhone home-indicator zone
+        // (~102 units); this project bakes safe areas in statically.
+        rt.offsetMin = new Vector2(48f, 120f);
+        rt.offsetMax = new Vector2(-48f, 120f + 132f);
         var image = go.AddComponent<Image>();
         image.color = AccentFill;
         EnsureRounded(go, 30f);

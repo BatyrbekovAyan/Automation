@@ -26,6 +26,9 @@ namespace Automation.BotSettingsUI
         [SerializeField] private float slideDuration = 0.28f;
         [SerializeField] private float scrimAlpha = 0.5f;
 
+        // Mirrors the builder's category-label side inset (Stretch left/right 30).
+        private const float CategoryLabelPadding = 30f;
+
         [SerializeField] private RectTransform rowsParent;
         [SerializeField] private PromptSuggestionRowView rowTemplate;
         [SerializeField] private RectTransform categoriesParent;
@@ -142,9 +145,20 @@ namespace Automation.BotSettingsUI
                 var category = categories[i];
                 var text = categoryPool[i].GetComponentInChildren<TextMeshProUGUI>(includeInactive: true);
                 if (text != null)
+                {
                     text.text = category.HasValue
                         ? PromptSuggestionCategoryLabels.Ru(category.Value)
                         : "Все";
+
+                    // The pill's own Image is sprite-less, so its ILayoutElement
+                    // preferred width is 0 and the rail's HLG would collapse every
+                    // pill to nothing — publish the measured label width instead,
+                    // the same contract the chips use.
+                    var element = categoryPool[i].GetComponent<LayoutElement>();
+                    if (element != null)
+                        element.preferredWidth =
+                            text.GetPreferredValues(text.text).x + CategoryLabelPadding * 2f;
+                }
 
                 categoryPool[i].onClick.RemoveAllListeners();
                 categoryPool[i].onClick.AddListener(() =>

@@ -21,7 +21,15 @@ namespace Automation.BotSettingsUI
 
         private void Awake()
         {
-            if (button != null) button.onClick.AddListener(() => toggled?.Invoke(suggestion));
+            if (button != null) button.onClick.AddListener(HandlePressed);
+        }
+
+        private void HandlePressed()
+        {
+            // A tap that lands to CATCH a flicked list must stop it, not toggle
+            // the row under the finger — same guard as ChatItemView.
+            if (ScrollClickBlocker.IsBlocking) return;
+            toggled?.Invoke(suggestion);
         }
 
         public void Bind(PromptSuggestion value, bool checkedNow, Action<PromptSuggestion> onToggled)
