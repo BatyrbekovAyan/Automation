@@ -10,8 +10,9 @@ using Nobi.UiRoundedCorners;
 /// reports taps; owns no clipboard/selection logic. Labels use the focused
 /// field's own font so Cyrillic always renders.
 ///
-/// Structure: root (positioning + drag) → Shadow (elevation, so the pill
-/// reads as a pill even when Surface ≈ Background) → Pill (bg + items).
+/// Structure: root (positioning + drag) → Pill (bg + items); the pill's
+/// fill is lifted off Surface so it reads as a pill even when Surface ≈
+/// Background.
 /// When the pill is wider than the screen it starts left-aligned (first
 /// items visible) and can be dragged horizontally, clamped so the first and
 /// last items are always reachable — iOS overflow behavior. A drag past the
@@ -22,10 +23,8 @@ public class SelectionMenuView : MonoBehaviour, IBeginDragHandler, IDragHandler
     const float Radius = 52f;
     const float ItemPad = 24f;
     const float LabelSize = 36f;
-    const float Gap = 64f;               // clears the start pin's dot above the line
+    const float Gap = 44f;               // clears the start pin's dot above the line
     const float EdgeMargin = 24f;
-    const float ShadowPad = 14f;
-    const float ShadowDrop = 7f;
     const float ClickSuppressPixels = 20f;
 
     public System.Action<SelectionMenuItems> ItemTapped;
@@ -33,9 +32,7 @@ public class SelectionMenuView : MonoBehaviour, IBeginDragHandler, IDragHandler
 
     RectTransform _rt;
     RectTransform _pillRt;
-    RectTransform _shadowRt;
     Image _bg;
-    Image _shadow;
     float _baseX;
     float _dragMinX;
     float _dragMaxX;
@@ -65,15 +62,6 @@ public class SelectionMenuView : MonoBehaviour, IBeginDragHandler, IDragHandler
         go.transform.SetParent(parent, false);
         var view = go.GetComponent<SelectionMenuView>();
         view._rt = (RectTransform)go.transform;
-
-        var shadowGo = new GameObject("Shadow", typeof(RectTransform), typeof(Image));
-        shadowGo.transform.SetParent(go.transform, false);
-        view._shadowRt = (RectTransform)shadowGo.transform;
-        view._shadow = shadowGo.GetComponent<Image>();
-        view._shadow.sprite = null;
-        view._shadow.raycastTarget = false;
-        view._shadow.color = new Color(0f, 0f, 0f, 0.30f);
-        shadowGo.AddComponent<ImageWithRoundedCorners>().radius = Radius + ShadowPad / 2f;
 
         var pillGo = new GameObject("Pill",
             typeof(RectTransform), typeof(Image), typeof(HorizontalLayoutGroup), typeof(ContentSizeFitter));
@@ -168,8 +156,6 @@ public class SelectionMenuView : MonoBehaviour, IBeginDragHandler, IDragHandler
         }
         TrimTrailingHairlines();
         LayoutRebuilder.ForceRebuildLayoutImmediate(_pillRt);
-        _shadowRt.sizeDelta = new Vector2(_pillRt.rect.width + ShadowPad, Height + ShadowPad);
-        _shadowRt.anchoredPosition = new Vector2(0, -ShadowDrop);
 
         var parent = (RectTransform)_rt.parent;
         RectTransformUtility.ScreenPointToLocalPointInRectangle(parent, screenAnchorTop, null, out var top);
@@ -234,8 +220,7 @@ public class SelectionMenuView : MonoBehaviour, IBeginDragHandler, IDragHandler
     public void ApplyTheme()
     {
         // Surface can sit visually on Background (dark theme) — lift the
-        // pill toward ink so it reads as an elevated element; the shadow
-        // does the rest.
+        // pill toward ink so it still reads as a distinct element.
         var surface = Theme.Color(ThemeRole.Surface);
         var ink = Theme.Color(ThemeRole.InkPrimary);
         _bg.color = Color.Lerp(surface, ink, 0.12f);
