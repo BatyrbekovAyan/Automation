@@ -210,4 +210,19 @@ public class SuggestionsLiveBatchFoldTests
         Assert.IsFalse(withNulls.Arm);
         Assert.IsFalse(withNulls.Cancel);
     }
+
+    // Audit F11: an in-flight request issued BEFORE the owner's reply must be superseded on the
+    // echo (the controller bumps its seq on this flag). Cancel alone cannot carry that signal —
+    // it goes false when a new question re-arms in the same batch, yet the pre-reply in-flight
+    // request still answers a burst that is already handled.
+    [Test] public void SawOutgoing_TrueOnAnyOutgoingEcho_EvenWhenReArmed()
+    {
+        Assert.IsFalse(SuggestionsController.FoldLiveBatch(null, new[] { In("вопрос") }).SawOutgoing);
+        Assert.IsTrue(SuggestionsController.FoldLiveBatch("вопрос", new[] { Out("ответ") }).SawOutgoing);
+        Assert.IsTrue(SuggestionsController.FoldLiveBatch(null, new[] { In("q"), Out("a") }).SawOutgoing);
+        Assert.IsTrue(
+            SuggestionsController.FoldLiveBatch("старый", new[] { Out("ответ"), In("новый") }).SawOutgoing,
+            "a re-arm (Cancel=false) must not hide the reply from the supersede signal");
+        Assert.IsFalse(SuggestionsController.FoldLiveBatch("вопрос", new MessageViewModel[] { null }).SawOutgoing);
+    }
 }

@@ -216,6 +216,10 @@ public class SuggestionsController : MonoBehaviour
         if (!_semiAutoOn) return;                              // SEMI-03
         var fold = FoldLiveBatch(_pendingIncomingText, msgs);
         _pendingIncomingText = fold.Pending;
+        // The owner (or bot) replied: a request already in flight was issued for a burst that is
+        // now answered — supersede it so its cards can never render post-answer (audit F11). The
+        // sheet itself stays as-is (no auto-dismiss — owner decision 2026-08-10).
+        if (fold.SawOutgoing) _requestSeq++;
         if (fold.Cancel) _debounce.Cancel();
         // UNSCALED wall clock, matching DebounceLoop's WaitForSecondsRealtime tick and the
         // ChatManager poll idiom: Time.time is maximumDeltaTime-capped (so a frame hitch or an
@@ -228,14 +232,16 @@ public class SuggestionsController : MonoBehaviour
     public readonly struct LiveBatchFold
     {
         public readonly string Pending;
-        public readonly bool Arm;      // an incoming fragment survived the batch → (re)start the window
-        public readonly bool Cancel;   // the batch ended on an outgoing echo → drop any armed window
+        public readonly bool Arm;         // an incoming fragment survived the batch → (re)start the window
+        public readonly bool Cancel;      // the batch ended on an outgoing echo → drop any armed window
+        public readonly bool SawOutgoing; // ANY outgoing echo in the batch → supersede in-flight requests (audit F11)
 
-        public LiveBatchFold(string pending, bool arm, bool cancel)
+        public LiveBatchFold(string pending, bool arm, bool cancel, bool sawOutgoing)
         {
             Pending = pending;
             Arm = arm;
             Cancel = cancel;
+            SawOutgoing = sawOutgoing;
         }
     }
 
@@ -252,7 +258,7 @@ public class SuggestionsController : MonoBehaviour
     /// lifecycle sites. Keeping the rule here — pure and clock-free — is what makes it testable.</summary>
     public static LiveBatchFold FoldLiveBatch(string pending, IReadOnlyList<MessageViewModel> batch)
     {
-        if (batch == null) return new LiveBatchFold(pending, false, false);
+        if (batch == null) return new LiveBatchFold(pending, false, false, false);
         bool arm = false;
         bool sawOutgoing = false;
         for (int i = 0; i < batch.Count; i++)
@@ -272,8 +278,9 @@ public class SuggestionsController : MonoBehaviour
             }
         }
         // Cancel only matters when nothing re-armed: Poke() re-arms unconditionally, so a
-        // Cancel-then-Poke pair would be indistinguishable from a bare Poke.
-        return new LiveBatchFold(pending, arm, !arm && sawOutgoing);
+        // Cancel-then-Poke pair would be indistinguishable from a bare Poke. SawOutgoing is
+        // reported raw — the supersede signal must survive a re-arm (audit F11).
+        return new LiveBatchFold(pending, arm, !arm && sawOutgoing, sawOutgoing);
     }
 
     /// <summary>Pure burst accumulator: append an incoming fragment to the pending coalesced text
