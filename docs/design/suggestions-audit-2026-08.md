@@ -1,5 +1,14 @@
 # Reply-Suggestions Audit («Вместе» mode) — 2026-08-10
 
+> **Implementation status (same day, commits `4b48e12..cdc0a90`):** top-5 #1/#2/#4 and the
+> safe-write half of #3 are SHIPPED (+ quick wins: clamps, timeout, theme re-apply,
+> empty-retry code, probe harness `Tools/n8n/probe-suggest-replies.py`; dev n8n redeployed
+> and probe-verified — fabricated address/hours/open-now/рассрочка-denial all fixed).
+> **Owner call: NO sheet dismissal anywhere yet** — the dismissal halves of #3/#5 (F12/F13)
+> are deliberately NOT implemented. Still open: F15 list lamp, F16 nudge, §7 metrics, the
+> empty-state builder RUN (code committed; run after the QuickReplyPanel-deletion session
+> merges), §9 device pass.
+
 Deep evidence-based audit of the full suggestions loop: app pipeline, n8n generation,
 UI, and owner journeys. Benchmarked against Gmail Smart Reply/Compose, Superhuman,
 Intercom copilot inbox, Front — adapted to a one-handed owner answering WhatsApp/Telegram
