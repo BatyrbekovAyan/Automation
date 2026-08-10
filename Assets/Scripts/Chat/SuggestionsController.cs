@@ -238,12 +238,32 @@ public class SuggestionsController : MonoBehaviour
     private void HandleCardTapped(string replyText)
     {
         if (_bottomPanel != null && _bottomPanel.inputField != null)
-        {
-            _bottomPanel.inputField.text = replyText;          // OVERWRITE composer (deliberate, D-02)
-            _bottomPanel.inputField.ActivateInputField();      // focus for edit
-        }
+            StartCoroutine(WriteComposerRoutine(_bottomPanel.inputField, replyText));
         IssueRequest(steerTowardText: replyText, lastIncomingText: null);   // re-cluster toward the pick (INT-04/D-01)
         // NEVER auto-send — only the existing composer Send button delivers a message (D-03).
+        // The sheet deliberately stays open on a pick (owner decision 2026-08-10 — no dismissal).
+    }
+
+    // Audit F14. iOS shares ONE native keyboard buffer: writing .text into a still-FOCUSED
+    // TMP field round-trips through it and lands wrong (input invariants; same ordering as
+    // BotSettings.Prompts' MutatePromptRoutine — blur, let the release land, THEN write).
+    // After refocus the caret is placed programmatically, so it must sync the hidden native
+    // buffer via KeyboardSelectionSync.Push (TextSelection invariant #1) or the next
+    // keystroke edits at the stale native caret.
+    private static IEnumerator WriteComposerRoutine(TMPro.TMP_InputField field, string text)
+    {
+        if (field.isFocused)
+        {
+            field.DeactivateInputField();
+            yield return null;                       // let the release land before touching .text
+        }
+        if (field == null) yield break;              // chat closed under us mid-frame
+        field.text = text;                           // OVERWRITE composer (deliberate, D-02)
+        field.ActivateInputField();                  // focus for edit
+        yield return null;                           // activation is a promise — focus lands end-of-frame
+        if (field == null || !field.isFocused) yield break;
+        field.caretPosition = field.text.Length;     // deterministic caret at end
+        KeyboardSelectionSync.Push(field);
     }
 
     // --- Auto-populate on incoming (INT-02, incoming-only, NEVER writes composer — Pitfall 7) ---
