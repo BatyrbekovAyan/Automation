@@ -1,7 +1,7 @@
 # Input Text Selection — iOS-Style Select / Cut / Copy / Paste
 
 **Date:** 2026-08-07
-**Status:** Approved design, pre-implementation
+**Status:** SHIPPED — iOS device-verified 2026-08-10 after five tuning rounds (see the plan's completion log). Android pass outstanding.
 **Owner ask:** "After typing text in any of the input text fields I can't select, cut, copy, paste it. I want it easy, intuitive and similar to how iPhone handles it. Especially selecting."
 
 ## Problem

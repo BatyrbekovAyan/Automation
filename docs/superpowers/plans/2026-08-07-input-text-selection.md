@@ -1980,3 +1980,27 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 - Theme substitutions resolved in Tasks 7–8: `ThemeRole.AccentFill` (pins + selection tint), `ThemeRole.Surface` (menu pill), `ThemeRole.InkPrimary` (labels), `ThemeRole.Hairline` (separators). `Theme.Changed` is `event Action`. Overlay `SortingOrder = 4` (main canvas is 0; reaction-bar runtime canvas is 5).
 - `SelectionOverlay.PositionHandle` dropped the redundant `stemUp` parameter — pin direction is baked at Build time.
 - Full suite after Task 8: **1506/1506** (1471 pre-existing + 35 new).
+
+---
+
+## Completion log (2026-08-07 → 2026-08-10)
+
+**Status: iOS SHIPPED.** Tasks 1–10 landed as planned; Task 11 (device pass) ran five tuning rounds against owner testing on iPhone. Android pass still outstanding.
+
+Device-pass fixes, in order (each was a real device-only defect):
+
+1. `90f17a5` — `Screen.dpi` in a MonoBehaviour field initializer throws, aborting the constructor and leaving every later field null (NRE cascade on first touch). Construct the gesture machine in `Awake`.
+2. `4a569d6` — a stationary long-press collapsed the committed word selection (drag-extension ran every frame); extension now arms only after real movement past slop. Pressing pins/menu deselected the field, so `DeferredDismissInputField`'s deferred dismissal closed the keyboard; router moved to `[DefaultExecutionOrder(-50)]` and re-selects the field while its UI is engaged.
+3. `7b42851` — **the load-bearing pair.** TMP repaints selection geometry only on its own pointer paths, so a programmatic selection was invisible → `KeyboardSelectionSync.Push` now also invokes `MarkGeometryAsDirty`. And TMP overwrites its Unity-side selection from the native iOS keyboard *every frame*, collapsing ours on finger-up → the router owns the selection while pins are up (`EnforceIntendedSelection`: drift with unchanged text = clobber, re-assert).
+4. `f91c37f` — menu pill restyled to read as a pill in dark theme + horizontal drag-to-reveal when wider than the screen; pin blink traced to read-back clobber between Update and pin positioning → enforce in `LateUpdate` too.
+5. `a224692` — TMP's read-back (order 0) still won frames after the router (-50): added a `+50` `LateSelectionEnforcer` so the router always has the last word, and hid the caret entirely while pins are up (iOS shows none).
+6. `48de628`, `8be3888`, `e540785` — pin polish: clamp drags to the visible text viewport (scrolled-out lines are still geometrically alive above it — the "line 0" jump); fan grab zones vertically *and* horizontally so adjacent pins stay grabbable; grab offset so a press at the far side of the wide zone doesn't teleport the selection edge; drop the leftover opaque root Image on each pin.
+7. `3dd0b4b`, `88f3ffc` — menu 20 units lower, shadow removed, lifted pill fill kept.
+
+Cleanup (this commit): spike scene, probe, and builder deleted; spec/plan stamped.
+
+**Deliberately left as-is:**
+- Typing over a selection can capitalize the next letter — iOS autocapitalization inside TMP's native flow, reproducible without this layer; not worth touching the uniform keyboard config.
+- A caret appears after the first tap of a double-tap — iOS behaves identically (tap places a caret; the second tap upgrades to word selection).
+- Spacebar-trackpad caret movement updates on finger release (TMP read-back granularity).
+- `Debug.Log("[TextSelection] Router bootstrapped")` in `TextSelectionRouter.Bootstrap` — kept as a build-verification beacon; drop it whenever prod log noise matters.
