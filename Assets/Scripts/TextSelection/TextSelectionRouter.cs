@@ -77,6 +77,9 @@ public class TextSelectionRouter : MonoBehaviour
     int _intendedAnchor = -1;          // the selection the router owns while pins are up
     int _intendedFocus = -1;
     string _intendedText;
+    bool _caretHidden;                 // caret suppressed while pins are up (iOS shows none)
+    bool _savedCustomCaret;
+    Color _savedCaretColor;
 
     void Awake()
     {
@@ -85,6 +88,13 @@ public class TextSelectionRouter : MonoBehaviour
         _slopPixels = 10f * (Screen.dpi > 0 ? Screen.dpi : 160f) / 160f;   // 10 dp
         _machine = new SelectionGestureMachine(0.45f, 0.3f, _slopPixels);
         Theme.Changed += OnThemeChanged;
+
+        // TMP's keyboard read-back runs at execution order 0 — AFTER this
+        // component's -50 — so it would get the last word each frame and a
+        // collapsed caret could render for a frame or two until the native
+        // side reflects our pushed selection. The +50 enforcer re-asserts
+        // after TMP and before the canvas renders, so TMP never wins a frame.
+        gameObject.AddComponent<LateSelectionEnforcer>().Router = this;
     }
 
     void OnDestroy()
@@ -444,13 +454,51 @@ public class TextSelectionRouter : MonoBehaviour
         _intendedAnchor = field.selectionStringAnchorPosition;
         _intendedFocus = field.selectionStringFocusPosition;
         _intendedText = field.text;
+        HideCaretWhileSelectionUi(field);
     }
 
     void ClearIntent()
     {
+        RestoreCaret();
         _intendedAnchor = -1;
         _intendedFocus = -1;
         _intendedText = null;
+    }
+
+    /// iOS shows no caret while a selection with pins is active — hiding it
+    /// also guarantees that no clobbered frame can ever paint a stray caret
+    /// at the tap position.
+    void HideCaretWhileSelectionUi(TMP_InputField field)
+    {
+        if (_caretHidden) return;
+        _savedCustomCaret = field.customCaretColor;
+        _savedCaretColor = field.caretColor;
+        field.customCaretColor = true;
+        field.caretColor = new Color(0f, 0f, 0f, 0f);
+        _caretHidden = true;
+    }
+
+    void RestoreCaret()
+    {
+        if (!_caretHidden) return;
+        if (_activeField != null)
+        {
+            _activeField.customCaretColor = _savedCustomCaret;
+            _activeField.caretColor = _savedCaretColor;
+        }
+        _caretHidden = false;
+    }
+
+    internal void LateEnforce() => EnforceIntendedSelection();
+
+    /// Runs AFTER TMP_InputField's LateUpdate (order 0): the final word on
+    /// the selection each frame belongs to the router, not to the iOS
+    /// keyboard read-back. Lives on the router's own GameObject.
+    [DefaultExecutionOrder(50)]
+    class LateSelectionEnforcer : MonoBehaviour
+    {
+        public TextSelectionRouter Router;
+        void LateUpdate() => Router?.LateEnforce();
     }
 
     /// On iOS with the keyboard open, TMP overwrites its Unity-side selection
@@ -601,6 +649,7 @@ public class TextSelectionRouter : MonoBehaviour
 
     void DismissAll()
     {
+        ClearIntent();                  // FIRST — RestoreCaret needs _activeField alive
         _menu?.Hide();
         _overlay?.HideHandles();
         _menuPendingOnRelease = false;
@@ -608,6 +657,5 @@ public class TextSelectionRouter : MonoBehaviour
         _activeField = null;
         _lastAnchor = -1;
         _lastFocus = -1;
-        ClearIntent();
     }
 }
