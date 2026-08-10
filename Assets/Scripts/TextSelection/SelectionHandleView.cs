@@ -24,12 +24,13 @@ public class SelectionHandleView : MonoBehaviour,
 
     public static SelectionHandleView Build(Transform parent, bool isStart)
     {
+        // Root carries NO Image — it only positions. (An Image here renders an
+        // opaque white square: the hit area lives on the Hit child below.)
         var go = new GameObject(isStart ? "HandleStart" : "HandleEnd",
-            typeof(RectTransform), typeof(Image), typeof(SelectionHandleView));
+            typeof(RectTransform), typeof(SelectionHandleView));
         go.transform.SetParent(parent, false);
         var rt = (RectTransform)go.transform;
         rt.sizeDelta = new Vector2(HitSize, HitSize);
-        go.GetComponent<Image>().raycastTarget = false;   // root is positioning only
 
         var view = go.GetComponent<SelectionHandleView>();
         view.IsStart = isStart;
@@ -52,6 +53,7 @@ public class SelectionHandleView : MonoBehaviour,
         view._head = NewChildImage(go.transform, "Head", new Vector2(HeadSize, HeadSize));
         view._head.gameObject.AddComponent<ImageWithRoundedCorners>().radius = HeadSize / 2f;
         view.SetStemHeight(64f);
+        view.SetColor(Theme.Color(ThemeRole.AccentFill));   // no white frame before the first reposition
 
         go.SetActive(false);
         return view;
