@@ -150,7 +150,13 @@ public class TextSelectionRouter : MonoBehaviour
     void LateUpdate()
     {
         if (_overlay != null && _overlay.HandlesVisible && _activeField != null)
+        {
+            // TMP's keyboard read-back can clobber the selection between our
+            // Update and this point (device-visible as a one-frame pin blink
+            // at the tap position) — re-assert right before positioning.
+            EnforceIntendedSelection();
             RepositionHandles();
+        }
     }
 
     void HandlePress(Vector2 pos, float now)

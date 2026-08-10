@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using Nobi.UiRoundedCorners;
 
@@ -8,7 +9,14 @@ using Nobi.UiRoundedCorners;
 /// Выделить всё»). Pure view: renders whichever items the policy allows and
 /// reports taps; owns no clipboard/selection logic. Labels use the focused
 /// field's own font so Cyrillic always renders.
-public class SelectionMenuView : MonoBehaviour
+///
+/// Structure: root (positioning + drag) → Shadow (elevation, so the pill
+/// reads as a pill even when Surface ≈ Background) → Pill (bg + items).
+/// When the pill is wider than the screen it starts left-aligned (first
+/// items visible) and can be dragged horizontally, clamped so the first and
+/// last items are always reachable — iOS overflow behavior. A drag past the
+/// threshold swallows the release-click so paging never triggers an action.
+public class SelectionMenuView : MonoBehaviour, IBeginDragHandler, IDragHandler
 {
     const float Height = 104f;
     const float Radius = 52f;
@@ -16,12 +24,23 @@ public class SelectionMenuView : MonoBehaviour
     const float LabelSize = 36f;
     const float Gap = 64f;               // clears the start pin's dot above the line
     const float EdgeMargin = 24f;
+    const float ShadowPad = 14f;
+    const float ShadowDrop = 7f;
+    const float ClickSuppressPixels = 20f;
 
     public System.Action<SelectionMenuItems> ItemTapped;
     public bool IsVisible => gameObject.activeSelf;
 
     RectTransform _rt;
+    RectTransform _pillRt;
+    RectTransform _shadowRt;
     Image _bg;
+    Image _shadow;
+    float _baseX;
+    float _dragMinX;
+    float _dragMaxX;
+    float _dragOffset;
+    bool _suppressNextClick;
     readonly List<Entry> _entries = new List<Entry>();
 
     struct Entry
@@ -42,32 +61,43 @@ public class SelectionMenuView : MonoBehaviour
 
     public static SelectionMenuView Build(RectTransform parent)
     {
-        var go = new GameObject("SelectionMenu",
-            typeof(RectTransform), typeof(Image), typeof(SelectionMenuView),
-            typeof(HorizontalLayoutGroup), typeof(ContentSizeFitter));
+        var go = new GameObject("SelectionMenu", typeof(RectTransform), typeof(SelectionMenuView));
         go.transform.SetParent(parent, false);
-
         var view = go.GetComponent<SelectionMenuView>();
         view._rt = (RectTransform)go.transform;
-        view._bg = go.GetComponent<Image>();
-        view._bg.sprite = null;
-        go.AddComponent<ImageWithRoundedCorners>().radius = Radius;
 
-        var layout = go.GetComponent<HorizontalLayoutGroup>();
+        var shadowGo = new GameObject("Shadow", typeof(RectTransform), typeof(Image));
+        shadowGo.transform.SetParent(go.transform, false);
+        view._shadowRt = (RectTransform)shadowGo.transform;
+        view._shadow = shadowGo.GetComponent<Image>();
+        view._shadow.sprite = null;
+        view._shadow.raycastTarget = false;
+        view._shadow.color = new Color(0f, 0f, 0f, 0.30f);
+        shadowGo.AddComponent<ImageWithRoundedCorners>().radius = Radius + ShadowPad / 2f;
+
+        var pillGo = new GameObject("Pill",
+            typeof(RectTransform), typeof(Image), typeof(HorizontalLayoutGroup), typeof(ContentSizeFitter));
+        pillGo.transform.SetParent(go.transform, false);
+        view._pillRt = (RectTransform)pillGo.transform;
+        view._bg = pillGo.GetComponent<Image>();
+        view._bg.sprite = null;
+        pillGo.AddComponent<ImageWithRoundedCorners>().radius = Radius;
+
+        var layout = pillGo.GetComponent<HorizontalLayoutGroup>();
         layout.childAlignment = TextAnchor.MiddleCenter;
         layout.childControlWidth = true;
         layout.childControlHeight = true;
         layout.childForceExpandWidth = false;
         layout.childForceExpandHeight = false;
 
-        var fitter = go.GetComponent<ContentSizeFitter>();
+        var fitter = pillGo.GetComponent<ContentSizeFitter>();
         fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
-        view._rt.sizeDelta = new Vector2(0, Height);
+        view._pillRt.sizeDelta = new Vector2(0, Height);
 
         foreach (var (item, label) in Order)
         {
-            if (view._entries.Count > 0) view.BuildHairline(go.transform);
-            view.BuildItem(go.transform, item, label);
+            if (view._entries.Count > 0) view.BuildHairline(pillGo.transform);
+            view.BuildItem(pillGo.transform, item, label);
         }
 
         go.SetActive(false);
@@ -78,9 +108,9 @@ public class SelectionMenuView : MonoBehaviour
     {
         var sep = new GameObject("Hairline", typeof(RectTransform), typeof(Image), typeof(LayoutElement));
         sep.transform.SetParent(parent, false);
-        var le = sep.GetComponent<LayoutElement>();
-        le.preferredWidth = 2f;
-        le.preferredHeight = Height * 0.55f;
+        var layoutElement = sep.GetComponent<LayoutElement>();
+        layoutElement.preferredWidth = 2f;
+        layoutElement.preferredHeight = Height * 0.5f;
         var img = sep.GetComponent<Image>();
         img.sprite = null;
         img.raycastTarget = false;
@@ -108,7 +138,11 @@ public class SelectionMenuView : MonoBehaviour
         labelGo.GetComponent<LayoutElement>().preferredHeight = Height;
 
         var captured = item;
-        itemGo.GetComponent<Button>().onClick.AddListener(() => ItemTapped?.Invoke(captured));
+        itemGo.GetComponent<Button>().onClick.AddListener(() =>
+        {
+            if (_suppressNextClick) { _suppressNextClick = false; return; }
+            ItemTapped?.Invoke(captured);
+        });
         _entries.Add(new Entry { Item = item, Root = itemGo, Label = tmp });
     }
 
@@ -132,28 +166,40 @@ public class SelectionMenuView : MonoBehaviour
             if (visible && font != null) entry.Label.font = font;
             if (visible) previousWasVisibleItem = true;
         }
-        TrimLeadingAndTrailingHairlines();
-        LayoutRebuilder.ForceRebuildLayoutImmediate(_rt);
+        TrimTrailingHairlines();
+        LayoutRebuilder.ForceRebuildLayoutImmediate(_pillRt);
+        _shadowRt.sizeDelta = new Vector2(_pillRt.rect.width + ShadowPad, Height + ShadowPad);
+        _shadowRt.anchoredPosition = new Vector2(0, -ShadowDrop);
 
         var parent = (RectTransform)_rt.parent;
         RectTransformUtility.ScreenPointToLocalPointInRectangle(parent, screenAnchorTop, null, out var top);
         RectTransformUtility.ScreenPointToLocalPointInRectangle(parent, screenAnchorBottom, null, out var bottom);
 
-        float halfWidth = _rt.rect.width / 2f;
-        float x = Mathf.Clamp(top.x,
-            -parent.rect.width / 2f + halfWidth + EdgeMargin,
-            parent.rect.width / 2f - halfWidth - EdgeMargin);
+        float pillHalf = _pillRt.rect.width / 2f;
+        float usableHalf = parent.rect.width / 2f - EdgeMargin;
+        if (pillHalf <= usableHalf)
+        {
+            _baseX = Mathf.Clamp(top.x, -usableHalf + pillHalf, usableHalf - pillHalf);
+            _dragMinX = _dragMaxX = _baseX;   // fits — no paging
+        }
+        else
+        {
+            _baseX = -usableHalf + pillHalf;  // left-aligned: first item visible
+            _dragMaxX = _baseX;
+            _dragMinX = usableHalf - pillHalf; // dragged fully left: last item visible
+        }
+        _dragOffset = 0f;
+        _suppressNextClick = false;
+
         float yAbove = top.y + Gap + Height / 2f;
         float y = (yAbove + Height / 2f + EdgeMargin > parent.rect.height / 2f)
             ? bottom.y - Gap - Height / 2f
             : yAbove;
-        _rt.anchoredPosition = new Vector2(x, y);
+        _rt.anchoredPosition = new Vector2(_baseX, y);
     }
 
-    void TrimLeadingAndTrailingHairlines()
+    void TrimTrailingHairlines()
     {
-        // A hairline whose FOLLOWING item is hidden must hide too (covers the
-        // trailing edge and any run of hidden items).
         bool nextItemSeen = false;
         for (int i = _entries.Count - 1; i >= 0; i--)
         {
@@ -170,14 +216,32 @@ public class SelectionMenuView : MonoBehaviour
         }
     }
 
+    public void OnBeginDrag(PointerEventData eventData) { }
+
+    public void OnDrag(PointerEventData eventData)
+    {
+        if (_dragMinX >= _dragMaxX) return;   // pill fits — nothing to reveal
+        var canvas = GetComponentInParent<Canvas>();
+        float scale = canvas != null && canvas.scaleFactor > 0f ? canvas.scaleFactor : 1f;
+        _dragOffset += eventData.delta.x / scale;
+        if (Mathf.Abs(_dragOffset) > ClickSuppressPixels) _suppressNextClick = true;
+        float x = Mathf.Clamp(_baseX + _dragOffset, _dragMinX, _dragMaxX);
+        _rt.anchoredPosition = new Vector2(x, _rt.anchoredPosition.y);
+    }
+
     public void Hide() => gameObject.SetActive(false);
 
     public void ApplyTheme()
     {
-        _bg.color = Theme.Color(ThemeRole.Surface);
+        // Surface can sit visually on Background (dark theme) — lift the
+        // pill toward ink so it reads as an elevated element; the shadow
+        // does the rest.
+        var surface = Theme.Color(ThemeRole.Surface);
+        var ink = Theme.Color(ThemeRole.InkPrimary);
+        _bg.color = Color.Lerp(surface, ink, 0.12f);
         foreach (var entry in _entries)
         {
-            if (entry.Label != null) entry.Label.color = Theme.Color(ThemeRole.InkPrimary);
+            if (entry.Label != null) entry.Label.color = ink;
             if (entry.Hairline != null) entry.Hairline.color = Theme.Color(ThemeRole.Hairline);
         }
     }
