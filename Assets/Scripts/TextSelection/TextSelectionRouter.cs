@@ -341,6 +341,7 @@ public class TextSelectionRouter : MonoBehaviour
 
     int StringIndexAt(TMP_InputField field, Vector2 screenPos)
     {
+        screenPos = ClampToViewport(field, screenPos);
         int charIndex = TMP_TextUtilities.GetCursorIndexFromPosition(
             field.textComponent, screenPos, FieldCamera(field), out CaretPosition side);
         var info = field.textComponent.textInfo;
@@ -358,6 +359,28 @@ public class TextSelectionRouter : MonoBehaviour
         var canvas = field.GetComponentInParent<Canvas>();
         return canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay
             ? canvas.worldCamera : null;
+    }
+
+    /// In scrollable fields the text component extends beyond the visible
+    /// viewport — lines scrolled out still exist geometrically, so an
+    /// unclamped drag can hit-test into a hidden line (device-observed: the
+    /// start pin jumping one line above the first visible line). Clamping
+    /// keeps selection on what's visible; auto-scroll reveals the rest
+    /// progressively, exactly like iOS.
+    static Vector2 ClampToViewport(TMP_InputField field, Vector2 screenPos)
+    {
+        var viewport = field.textViewport != null
+            ? field.textViewport
+            : (RectTransform)field.textComponent.transform;
+        var corners = new Vector3[4];
+        viewport.GetWorldCorners(corners);
+        var cam = FieldCamera(field);
+        Vector2 min = RectTransformUtility.WorldToScreenPoint(cam, corners[0]);
+        Vector2 max = RectTransformUtility.WorldToScreenPoint(cam, corners[2]);
+        const float inset = 4f;
+        return new Vector2(
+            Mathf.Clamp(screenPos.x, min.x + inset, max.x - inset),
+            Mathf.Clamp(screenPos.y, min.y + inset, max.y - inset));
     }
 
     // ---------- menu ----------

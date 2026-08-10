@@ -29,14 +29,24 @@ public class SelectionHandleView : MonoBehaviour,
         go.transform.SetParent(parent, false);
         var rt = (RectTransform)go.transform;
         rt.sizeDelta = new Vector2(HitSize, HitSize);
-
-        var hit = go.GetComponent<Image>();
-        hit.color = Color.clear;           // raycast target, invisible
-        hit.raycastTarget = true;
+        go.GetComponent<Image>().raycastTarget = false;   // root is positioning only
 
         var view = go.GetComponent<SelectionHandleView>();
         view.IsStart = isStart;
         view._dir = isStart ? 1f : -1f;   // start: head above the line, end: below
+
+        // Asymmetric grab zone (iOS anatomy): the start pin's touch area
+        // shifts UP toward its dot, the end pin's DOWN — so two pins on a
+        // short selection never cover each other's hit areas.
+        var hitGo = new GameObject("Hit", typeof(RectTransform), typeof(Image));
+        hitGo.transform.SetParent(go.transform, false);
+        var hitRt = (RectTransform)hitGo.transform;
+        hitRt.sizeDelta = new Vector2(HitSize, HitSize);
+        hitRt.anchoredPosition = new Vector2(0, view._dir * 44f);
+        var hitImg = hitGo.GetComponent<Image>();
+        hitImg.color = Color.clear;        // raycast target, invisible
+        hitImg.sprite = null;
+        hitImg.raycastTarget = true;
 
         view._stem = NewChildImage(go.transform, "Stem", new Vector2(StemWidth, 64f));
         view._head = NewChildImage(go.transform, "Head", new Vector2(HeadSize, HeadSize));
