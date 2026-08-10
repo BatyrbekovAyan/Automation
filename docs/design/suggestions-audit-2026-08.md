@@ -5,9 +5,9 @@
 > empty-retry code, probe harness `Tools/n8n/probe-suggest-replies.py`; dev n8n redeployed
 > and probe-verified — fabricated address/hours/open-now/рассрочка-denial all fixed).
 > **Owner call: NO sheet dismissal anywhere yet** — the dismissal halves of #3/#5 (F12/F13)
-> are deliberately NOT implemented. Still open: F15 list lamp, F16 nudge, §7 metrics, the
-> empty-state builder RUN (code committed; run after the QuickReplyPanel-deletion session
-> merges), §9 device pass.
+> are deliberately NOT implemented. Builder + wirer re-run and scene committed `bad213a`
+> (empty-state «Обновить» live, all refs verified). Still open: F15 list lamp, F16 nudge,
+> §7 metrics, §9 device pass.
 
 Deep evidence-based audit of the full suggestions loop: app pipeline, n8n generation,
 UI, and owner journeys. Benchmarked against Gmail Smart Reply/Compose, Superhuman,
