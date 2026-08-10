@@ -2003,4 +2003,4 @@ Cleanup (this commit): spike scene, probe, and builder deleted; spec/plan stampe
 - Typing over a selection can capitalize the next letter — iOS autocapitalization inside TMP's native flow, reproducible without this layer; not worth touching the uniform keyboard config.
 - A caret appears after the first tap of a double-tap — iOS behaves identically (tap places a caret; the second tap upgrades to word selection).
 - Spacebar-trackpad caret movement updates on finger release (TMP read-back granularity).
-- `Debug.Log("[TextSelection] Router bootstrapped")` in `TextSelectionRouter.Bootstrap` — kept as a build-verification beacon; drop it whenever prod log noise matters.
+(The `[TextSelection] Router bootstrapped` beacon log that served the device rounds was removed at the owner's request once the layer was verified.)
