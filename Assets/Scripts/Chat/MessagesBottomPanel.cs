@@ -14,9 +14,6 @@ public class MessagesBottomPanel : MonoBehaviour
     public Button attachButton;
     [SerializeField] private AttachSheet attachSheet;
 
-    [Header("Quick Replies")]
-    public QuickReplyPanel quickReplyPanel;
-
     [Header("Reply Preview")]
     [SerializeField] private GameObject replyPreviewBar;
     [SerializeField] private TextMeshProUGUI replyPreviewSender;

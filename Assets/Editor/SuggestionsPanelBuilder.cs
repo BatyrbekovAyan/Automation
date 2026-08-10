@@ -88,10 +88,16 @@ public static class SuggestionsPanelBuilder
         Transform priorPanel = FindChildRecursive(host.transform, PanelName);
         if (priorPanel != null) Object.DestroyImmediate(priorPanel.gameObject);
 
-        Transform quickReply = FindChildRecursive(host.transform, "QuickReplyPanel");
-        Transform panelParent = quickReply != null ? quickReply.parent : host.transform;
+        // The sheet belongs to MovingArea — the container that rides the keyboard. Parenting
+        // it to MessagesPanel instead would leave the sheet behind when the keyboard opens.
+        Transform movingArea = FindChildRecursive(host.transform, "MovingArea");
+        if (movingArea == null)
+        {
+            Debug.LogError("SuggestionsPanelBuilder: MessagesPanel has no 'MovingArea' child to host the panel.");
+            return;
+        }
 
-        BuildPanel(panelParent, quickReply, sparkle, fade);
+        BuildPanel(movingArea, sparkle, fade);
 
         if (FindChildRecursive(host.transform, ToggleName) == null) BuildToggle(topBar);
 
@@ -102,7 +108,7 @@ public static class SuggestionsPanelBuilder
 
     // === Panel ==============================================================
 
-    private static void BuildPanel(Transform parent, Transform quickReplySibling, Sprite sparkle, Sprite fade)
+    private static void BuildPanel(Transform parent, Sprite sparkle, Sprite fade)
     {
         // Sheet: Surface, top-rounded, slide root + fade group. Bottom-anchored, FIXED footprint.
         GameObject panelGo = ImageGo(PanelName, parent, Color.white);
@@ -129,8 +135,6 @@ public static class SuggestionsPanelBuilder
         }
         else if (swipeStrip != null)
             panelGo.transform.SetSiblingIndex(swipeStrip.GetSiblingIndex() + 1);
-        else if (quickReplySibling != null)
-            panelGo.transform.SetSiblingIndex(quickReplySibling.GetSiblingIndex() + 1);
 
         BuildGrabber(panelGo.transform);
         SheetDragHandle dragHandle = BuildGrabZone(panelGo.transform);

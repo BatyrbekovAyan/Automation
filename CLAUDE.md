@@ -50,7 +50,7 @@ EditMode tests live in `Assets/Tests/Editor/Chat/` (no asmdef — they compile i
 
 - `Chat/` — Chat system
   - Data models: `RawMessage`, `NormalizedMessage`, `ChatDialog`, `ChatsResponse`, `MessagesResponseRaw`, `MessageType` enum (Chat, Image, Video, Audio, Voice, Sticker, Document, Unknown).
-  - Views/controls: `MessageHeaderView`, `DateSeparatorView`, `PhotoViewer`, `VideoController`, `AudioController`, `ExpandableInput`, `KeyboardAwarePanel`, `MessagesBottomPanel`, `QuickReplyPanel`, `QuickReplyButton`.
+  - Views/controls: `MessageHeaderView`, `DateSeparatorView`, `PhotoViewer`, `VideoController`, `AudioController`, `ExpandableInput`, `KeyboardAwarePanel`, `MessagesBottomPanel`.
   - Gesture/touch helpers: `SwipeToBack`, `SwipeToClose`, `DragShield`, `ClickPassthrough`, `ScrollClickBlocker`, `MirrorSize`, `NativeHairline`, `TMPLinkHandler`.
   - Caching: `MediaCacheManager` (disk cache keyed by URL/`thumb://id`), `ChatHistoryCache` (per-chat, max 100 messages).
   - Platform bridges: `AndroidBridge`, `IOSBridge`, `IOSAudioFix`.

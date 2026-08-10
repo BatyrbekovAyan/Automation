@@ -512,11 +512,9 @@ public static class ScreenThemeWirer
     /// <summary>
     /// Explicit path bindings that no value/whites rule can decide:
     ///   • the thread's paper-coloured chrome (#F3F1EB is deliberately excluded
-    ///     from the value sweep — QuickReplyPanel shares it and is runtime-stamped)
+    ///     from the value sweep — it is the light-only doodle wallpaper's paper)
     ///   • the doodle art, themed by TINT (white passthrough / dark multiplier)
     ///   • the nav bar hairline (#CCCCCC would be too broad as a value rule)
-    /// QuickReplyPanel itself is deliberately absent: QuickReplyPanel.cs stamps
-    /// its root/cards with in/out variants and needs its own routing pass.
     /// </summary>
     private static readonly (string root, string path, ThemeRole role)[] SceneNamedSpec =
     {
@@ -529,12 +527,11 @@ public static class ScreenThemeWirer
         // art with a white authored tint (the dark look in light mode was an
         // unsaved hand tint); InkPrimary gives dark-in-light / light-in-dark.
         // The back circle sits at alpha 0.8 (below the whites-rule threshold) —
-        // preserveAlpha keeps that. The QuickReply root is paper-coloured.
+        // preserveAlpha keeps that.
         ("MessagesPanel", "TopBar/LeftZone/BackButton",        ThemeRole.Surface),
         ("MessagesPanel", "MovingArea/BottomPanel/HorizontalLayout/AttachButton/Image", ThemeRole.InkPrimary),
         ("MessagesPanel", "MovingArea/BottomPanel/HorizontalLayout/MicButton/Image",    ThemeRole.InkPrimary),
         ("MessagesPanel", "MovingArea/BottomPanel/HorizontalLayout/SendButton/Circle",  ThemeRole.SendButton),
-        ("MessagesPanel", "MovingArea/QuickReplyPanel",        ThemeRole.ChatWallpaper),
         // Owner round 4. The composer ring (#DDD9D8) reads as a decorative
         // outline, not a 3:1 affordance — Border keeps it subtle in both modes.
         // Typed text was #323232 (fine on white, invisible on dark); the caret
