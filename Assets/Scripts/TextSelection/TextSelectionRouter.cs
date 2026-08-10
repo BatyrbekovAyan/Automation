@@ -64,6 +64,12 @@ public class TextSelectionRouter : MonoBehaviour
     float _pendingDeadline;
     bool _applyingEdit;                // our own mutation → not an external text change
     bool _menuPendingOnRelease;
+
+    // Where the selection sat when the menu opened; a bigger move than this
+    // means the text scrolled under it. A few pixels of slack absorbs caret
+    // re-measurement jitter without missing a real scroll.
+    Vector2 _menuAnchor;
+    const float MenuAnchorToleranceSq = 16f;
     bool _ownUiPressActive;            // current press began on our pins/menu
     bool _extendArmed;                 // long-press drag-extension unlocked by real movement
     Vector2 _commitPos;                // finger position at long-press/double-tap commit
@@ -163,6 +169,22 @@ public class TextSelectionRouter : MonoBehaviour
             EnforceIntendedSelection();
             RepositionHandles();
         }
+
+        HideMenuIfSelectionMoved();
+    }
+
+    // The menu is parked where the selection sat when it opened and does not
+    // follow it. Once the text scrolls — the card's own scroll, the page, or a
+    // keyboard-driven shift — a menu left behind reads as a popup stuck over
+    // unrelated UI, so dismiss it (iOS does the same on scroll). Pin drags
+    // don't trip this: the menu is already hidden for the duration of a drag
+    // and re-opens, re-anchored, on release.
+    void HideMenuIfSelectionMoved()
+    {
+        if (_menu == null || !_menu.IsVisible || _activeField == null) return;
+
+        var (top, _) = SelectionScreenBounds(_activeField);
+        if ((top - _menuAnchor).sqrMagnitude > MenuAnchorToleranceSq) _menu.Hide();
     }
 
     void HandlePress(Vector2 pos, float now)
@@ -395,6 +417,7 @@ public class TextSelectionRouter : MonoBehaviour
         if (items == SelectionMenuItems.None) return;
         var (top, bottom) = SelectionScreenBounds(_activeField);
         _menu.Show(items, top, bottom, _activeField.textComponent.font);
+        _menuAnchor = top;   // watched by HideMenuIfSelectionMoved
     }
 
     void OnMenuItem(SelectionMenuItems item)
@@ -595,6 +618,18 @@ public class TextSelectionRouter : MonoBehaviour
 
     void RepositionHandles()
     {
+        // Clip FIRST: the pins are children of the clip rect, so their local
+        // positions below are resolved against it — moving it afterwards would
+        // drag them with it.
+        //
+        // Pins sit on the overlay canvas, so none of the field's RectMask2D
+        // clipping reaches them: a pin whose line scrolls to the card's edge
+        // would hang its dot over the neighbouring UI. Confining them to the
+        // area the text is actually visible in cuts the dot at the edge and
+        // culls it once fully outside, and a pin mid-drag keeps working
+        // because nothing gets deactivated.
+        _overlay.SetHandleClip(SelectionHandleClipping.VisibleScreenRect(_activeField));
+
         var (startTop, startBottom, endTop, endBottom) = SelectionEdgeWorldCorners(_activeField);
         _overlay.PositionHandle(_overlay.StartHandle, startTop, startBottom);
         _overlay.PositionHandle(_overlay.EndHandle, endTop, endBottom);

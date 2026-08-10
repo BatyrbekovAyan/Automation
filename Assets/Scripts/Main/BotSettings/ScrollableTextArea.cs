@@ -56,10 +56,20 @@ namespace Automation.BotSettingsUI
 
         private IEnumerator ResizeWhenWidthSettles()
         {
-            for (var i = 0; i < 60 && viewport.rect.width < 100f; i++)
+            for (var i = 0; i < 60 && !ScrollableTextAreaMetrics.WidthSettled(TextLayoutWidth()); i++)
                 yield return null;
-            if (viewport.rect.width >= 100f)
+            if (ScrollableTextAreaMetrics.WidthSettled(TextLayoutWidth()))
                 ResizeContent(inputField.text);
+        }
+
+        // The column the text actually wraps in: TMP's text rect minus its
+        // horizontal margins — narrower than the card by Text Area's inset.
+        private float TextLayoutWidth()
+        {
+            var text = inputField.textComponent;
+            if (text == null) return 0f;
+            var margin = text.margin;
+            return text.rectTransform.rect.width - margin.x - margin.z;
         }
 
         private void OnDestroy()
@@ -94,10 +104,25 @@ namespace Automation.BotSettingsUI
 
         private void ResizeContent(string text)
         {
-            var width = viewport.rect.width;
+            var width = ScrollableTextAreaMetrics.MeasureWidth(TextLayoutWidth(), viewport.rect.width);
             var preferred = inputField.textComponent.GetPreferredValues(MeasureText(text), width, 0f).y;
-            var target = Mathf.Max(viewport.rect.height, preferred + bottomPadding);
+            var target = ScrollableTextAreaMetrics.ContentHeight(
+                preferred, TextAreaChromeHeight(), bottomPadding, viewport.rect.height);
             content.sizeDelta = new Vector2(content.sizeDelta.x, target);
+        }
+
+        // Vertical space the content spends on things that are not the text
+        // column: TMP's Text Area is stretch-anchored inside the content and
+        // inset from it, so this difference is constant as the content grows.
+        // Sizing the content without it leaves the text viewport shorter than
+        // the text and hands scrolling to TMP, which strands the first row.
+        private float TextAreaChromeHeight()
+        {
+            var textArea = inputField.textViewport;
+            if (textArea == null) return 0f;
+
+            var margin = inputField.textComponent != null ? inputField.textComponent.margin : Vector4.zero;
+            return Mathf.Max(0f, content.rect.height - textArea.rect.height) + margin.y + margin.w;
         }
 
         // TMPro.GetPreferredValues drops a trailing empty line from its

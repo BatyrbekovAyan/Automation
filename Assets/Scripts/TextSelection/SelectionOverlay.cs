@@ -14,6 +14,7 @@ public class SelectionOverlay : MonoBehaviour
 
     public SelectionHandleView StartHandle { get; private set; }
     public SelectionHandleView EndHandle { get; private set; }
+    public RectTransform HandleClip { get; private set; }
     public RectTransform MenuRoot { get; private set; }
     public Canvas Canvas { get; private set; }
 
@@ -35,8 +36,22 @@ public class SelectionOverlay : MonoBehaviour
         scaler.referenceResolution = new Vector2(1080, 1920);
         scaler.matchWidthOrHeight = 0.5f;
 
-        overlay.StartHandle = SelectionHandleView.Build(go.transform, isStart: true);
-        overlay.EndHandle = SelectionHandleView.Build(go.transform, isStart: false);
+        // The pins live under a RectMask2D driven to the field's visible area
+        // (SetHandleClip). Without it nothing clips them to the field — they
+        // render on this canvas, not inside the card — so a pin whose line
+        // scrolls to the card's edge would hang its dot over the neighbouring
+        // UI. Masking (rather than hiding) gives the iOS behavior: the dot is
+        // cut at the card edge and culled once fully outside, and a pin being
+        // dragged keeps working the whole time.
+        var clipGo = new GameObject("HandleClip", typeof(RectTransform), typeof(RectMask2D));
+        clipGo.transform.SetParent(go.transform, false);
+        overlay.HandleClip = (RectTransform)clipGo.transform;
+        overlay.HandleClip.anchorMin = new Vector2(0.5f, 0.5f);
+        overlay.HandleClip.anchorMax = new Vector2(0.5f, 0.5f);
+        overlay.HandleClip.pivot = new Vector2(0.5f, 0.5f);
+
+        overlay.StartHandle = SelectionHandleView.Build(clipGo.transform, isStart: true);
+        overlay.EndHandle = SelectionHandleView.Build(clipGo.transform, isStart: false);
 
         var menuRoot = new GameObject("MenuRoot", typeof(RectTransform));
         menuRoot.transform.SetParent(go.transform, false);
@@ -53,6 +68,35 @@ public class SelectionOverlay : MonoBehaviour
     {
         StartHandle.gameObject.SetActive(true);
         EndHandle.gameObject.SetActive(true);
+    }
+
+    /// <summary>
+    /// Confines the pins to the area the field's text is actually visible in,
+    /// in screen space. Called every reposition — the card scrolls, so the
+    /// window moves.
+    /// </summary>
+    public void SetHandleClip(Rect screenRect)
+    {
+        if (HandleClip == null) return;
+
+        var root = (RectTransform)transform;
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(
+            root, new Vector2(screenRect.xMin, screenRect.yMin), null, out var min);
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(
+            root, new Vector2(screenRect.xMax, screenRect.yMax), null, out var max);
+
+        // A field scrolled entirely out of its page yields disjoint rects;
+        // collapse to zero so the mask culls the pins instead of flipping
+        // inside out.
+        var size = new Vector2(Mathf.Max(0f, max.x - min.x), Mathf.Max(0f, max.y - min.y));
+        var center = (min + max) * 0.5f;
+
+        // Runs every frame a selection is up — only touch the RectTransform on
+        // a real change, or each frame marks the canvas for rebuild.
+        if ((HandleClip.anchoredPosition - center).sqrMagnitude > 0.01f)
+            HandleClip.anchoredPosition = center;
+        if ((HandleClip.sizeDelta - size).sqrMagnitude > 0.01f)
+            HandleClip.sizeDelta = size;
     }
 
     public void HideHandles()
@@ -75,8 +119,10 @@ public class SelectionOverlay : MonoBehaviour
         var rt = (RectTransform)handle.transform;
         Vector2 screenTop = RectTransformUtility.WorldToScreenPoint(null, worldTop);
         Vector2 screenBottom = RectTransformUtility.WorldToScreenPoint(null, worldBottom);
+        // Relative to the pin's own parent (HandleClip), which moves with the
+        // field — not to the overlay root.
         RectTransformUtility.ScreenPointToLocalPointInRectangle(
-            (RectTransform)transform, (screenTop + screenBottom) * 0.5f, null, out var local);
+            (RectTransform)rt.parent, (screenTop + screenBottom) * 0.5f, null, out var local);
         rt.anchoredPosition = local;
         handle.SetStemHeight(Mathf.Abs(screenTop.y - screenBottom.y) / CanvasScale());
         handle.SetColor(Theme.Color(ThemeRole.AccentFill));

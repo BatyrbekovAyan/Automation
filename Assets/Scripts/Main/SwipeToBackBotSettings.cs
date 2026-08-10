@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -40,7 +41,14 @@ public class SwipeToBackBotSettings : MonoBehaviour,
     private bool isHorizontalDrag;
     private float dragStartTime;
     private Vector2 dragStartPos;
+
+    // The tab's page scroll — frozen while a back-swipe is in flight.
+    private ScrollRect pageScrollRect;
+    // Where a VERTICAL drag goes. Not always the page: this strip is a
+    // full-height band over the left edge that sits above the tab content, so
+    // it wins the raycast over whatever the user actually aimed at.
     private ScrollRect dragScrollRect;
+    private readonly List<RaycastResult> hitsUnderFinger = new List<RaycastResult>();
 
     public bool IsAnimating => snapCoroutine != null;
 
@@ -138,8 +146,58 @@ public class SwipeToBackBotSettings : MonoBehaviour,
     public void OnInitializePotentialDrag(PointerEventData eventData)
     {
         dragDecided = false;
-        dragScrollRect = BotSettings.Instance != null ? BotSettings.Instance.CurrentTabScrollRect : null;
+        pageScrollRect = BotSettings.Instance != null ? BotSettings.Instance.CurrentTabScrollRect : null;
+        dragScrollRect = ResolveVerticalTarget(eventData);
+
+        // Stop momentum on both candidates — the real target is chosen at
+        // drag-begin.
         if (dragScrollRect != null) dragScrollRect.OnInitializePotentialDrag(eventData);
+        if (pageScrollRect != null && pageScrollRect != dragScrollRect)
+            pageScrollRect.OnInitializePotentialDrag(eventData);
+    }
+
+    /// <summary>
+    /// Which ScrollRect a vertical drag starting on this strip belongs to.
+    ///
+    /// The strip is a transparent full-height band over the left edge of the
+    /// screen, and it is a later sibling than the tab content, so it wins the
+    /// pointer raycast over every card beneath it — the card's own DragShield
+    /// never sees the gesture. Forwarding blindly to the page (which is what
+    /// this used to do) meant a vertical drag anywhere in that band scrolled
+    /// the page even when the finger was on a text card with more text than it
+    /// can show. Look past ourselves at what the user actually touched and
+    /// apply the same ownership rule DragShield uses.
+    /// </summary>
+    private ScrollRect ResolveVerticalTarget(PointerEventData eventData)
+    {
+        if (EventSystem.current == null) return pageScrollRect;
+
+        hitsUnderFinger.Clear();
+        EventSystem.current.RaycastAll(eventData, hitsUnderFinger);
+
+        foreach (var hit in hitsUnderFinger)
+        {
+            if (hit.gameObject == gameObject) continue;
+
+            var scroll = hit.gameObject.GetComponentInParent<ScrollRect>();
+            if (scroll == null) continue;
+
+            // First scroller under the finger decides: either it is the page
+            // itself, or it is the card the user is pointing at.
+            if (scroll == pageScrollRect) return pageScrollRect;
+
+            var viewport = scroll.viewport != null ? scroll.viewport : (RectTransform)scroll.transform;
+            var hasHiddenText = scroll.content != null && DragScrollRouting.HasHiddenText(
+                scroll.content.rect.height, viewport.rect.height);
+
+            return DragScrollRouting.Resolve(
+                hasInnerScroll: true, hasHiddenText, hasPageScroll: pageScrollRect != null)
+                    == DragScrollRouting.Target.InnerText
+                ? scroll
+                : pageScrollRect;
+        }
+
+        return pageScrollRect;
     }
 
     public void OnBeginDrag(PointerEventData eventData)
@@ -152,7 +210,7 @@ public class SwipeToBackBotSettings : MonoBehaviour,
         {
             isHorizontalDrag = true;
             if (snapCoroutine != null) { StopCoroutine(snapCoroutine); snapCoroutine = null; }
-            if (dragScrollRect != null) dragScrollRect.vertical = false;
+            SetVerticalScrolling(false);
             var bgPanel = BotsPagePanel;
             if (bgPanel != null) bgPanel.gameObject.SetActive(true);
         }
@@ -206,7 +264,7 @@ public class SwipeToBackBotSettings : MonoBehaviour,
             else
                 snapCoroutine = StartCoroutine(SnapToPosition(0f, commitBack: false));
 
-            if (dragScrollRect != null) dragScrollRect.vertical = true;
+            SetVerticalScrolling(true);
         }
         else if (dragScrollRect != null)
         {
@@ -215,5 +273,14 @@ public class SwipeToBackBotSettings : MonoBehaviour,
 
         dragDecided = false;
         isHorizontalDrag = false;
+    }
+
+    // A back-swipe must not leave either candidate free-scrolling underneath
+    // it — the page, and the card the gesture would otherwise have driven.
+    private void SetVerticalScrolling(bool enabled)
+    {
+        if (pageScrollRect != null) pageScrollRect.vertical = enabled;
+        if (dragScrollRect != null && dragScrollRect != pageScrollRect)
+            dragScrollRect.vertical = enabled;
     }
 }

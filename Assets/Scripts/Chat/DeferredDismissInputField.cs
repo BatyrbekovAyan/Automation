@@ -2,6 +2,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 /// <summary>
 /// TMP_InputField subclass that defers keyboard dismissal from PointerDown to
@@ -34,8 +35,50 @@ using UnityEngine.InputSystem;
 /// keep their immediate-dismiss semantics.
 /// </summary>
 [DefaultExecutionOrder(-50)]
-public class DeferredDismissInputField : TMP_InputField
+public class DeferredDismissInputField : TMP_InputField,
+    IInitializePotentialDragHandler
 {
+    // ── drag scrolls, it does not select ─────────────────────────────────
+    // On a touch screen, a finger dragged across a field scrolls whatever the
+    // field sits in; selecting text is the long-press + pins layer
+    // (Scripts/TextSelection). TMP's own drag handlers only move the
+    // selection, and since the EventSystem hands a drag to the nearest
+    // IDragHandler ancestor — this field — the surrounding ScrollRect never
+    // sees the gesture and the form just stands still under the finger.
+    // Fields inside a scrollable card (Описание/Промпт) have a DragShield
+    // that wins the raycast and routes ahead of us; this covers all the rest.
+    // Resolved once per gesture so a drag never switches targets midway.
+    private ScrollRect dragTarget;
+
+    public void OnInitializePotentialDrag(PointerEventData eventData)
+    {
+        // Kill any fling in progress, exactly as ScrollRect would have.
+        // Explicit null check, not `?.` — that bypasses Unity's Object
+        // lifetime comparison.
+        var target = DragScrollRouting.ResolveTarget(transform);
+        if (target != null) target.OnInitializePotentialDrag(eventData);
+    }
+
+    public override void OnBeginDrag(PointerEventData eventData)
+    {
+        dragTarget = DragScrollRouting.ResolveTarget(transform);
+        if (dragTarget == null) { base.OnBeginDrag(eventData); return; }
+        dragTarget.OnBeginDrag(eventData);
+    }
+
+    public override void OnDrag(PointerEventData eventData)
+    {
+        if (dragTarget == null) { base.OnDrag(eventData); return; }
+        dragTarget.OnDrag(eventData);
+    }
+
+    public override void OnEndDrag(PointerEventData eventData)
+    {
+        if (dragTarget == null) { base.OnEndDrag(eventData); return; }
+        dragTarget.OnEndDrag(eventData);
+        dragTarget = null;
+    }
+
     private bool dismissPending;
     private float dismissPendingSince;
     // Rapid taps can leak a stuck "pressed" flag out of the Input System on

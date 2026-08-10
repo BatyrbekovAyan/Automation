@@ -45,19 +45,26 @@ public class DragShield : MonoBehaviour, IPointerDownHandler, IPointerUpHandler,
 
     // Scroll the TEXT only when some of it is hidden; otherwise the gesture
     // belongs to the page (if there is one). Resolved once per gesture so a
-    // drag never switches targets midway.
+    // drag never switches targets midway. Policy lives in DragScrollRouting
+    // so it is unit-testable.
     private ScrollRect ResolveDragTarget()
     {
-        if (parentScrollRect != null && parentScrollRect.content != null)
+        var hasInnerScroll = parentScrollRect != null && parentScrollRect.content != null;
+        var hasHiddenText = hasInnerScroll && DragScrollRouting.HasHiddenText(
+            parentScrollRect.content.rect.height, InnerViewport().rect.height);
+
+        switch (DragScrollRouting.Resolve(hasInnerScroll, hasHiddenText, pageScrollRect != null))
         {
-            var viewport = parentScrollRect.viewport != null
-                ? parentScrollRect.viewport
-                : (RectTransform)parentScrollRect.transform;
-            if (parentScrollRect.content.rect.height > viewport.rect.height + 1f)
-                return parentScrollRect;
+            case DragScrollRouting.Target.InnerText: return parentScrollRect;
+            case DragScrollRouting.Target.Page: return pageScrollRect;
+            default: return parentScrollRect;
         }
-        return pageScrollRect != null ? pageScrollRect : parentScrollRect;
     }
+
+    private RectTransform InnerViewport() =>
+        parentScrollRect.viewport != null
+            ? parentScrollRect.viewport
+            : (RectTransform)parentScrollRect.transform;
 
     public void OnPointerDown(PointerEventData eventData)
     {
