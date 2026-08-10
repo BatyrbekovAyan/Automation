@@ -26,6 +26,12 @@ namespace Automation.BotSettingsUI
         /// <summary>Rows produced by the last layout pass.</summary>
         public int RowCount => rowCount;
 
+        /// <summary>Exposed so the cloud can compute the height N rows need.</summary>
+        public float RowHeight => rowHeight;
+
+        /// <summary>Vertical gap between rows, exposed for the same height math.</summary>
+        public float SpacingY => spacingY;
+
         public override void CalculateLayoutInputHorizontal()
         {
             base.CalculateLayoutInputHorizontal();

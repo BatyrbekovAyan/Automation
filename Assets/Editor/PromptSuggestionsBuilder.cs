@@ -20,6 +20,8 @@ public static class PromptSuggestionsBuilder
 {
     private const string PrefabPath = "Assets/Prefabs/BotSettings.prefab";
     private const string PlusSpritePath = "Assets/Images/New/plus.png";
+    private const string TickSpritePath =
+        "Assets/Images/Icons/[CITYPNG.COM]HD Green Check True Tick Mark Icon Sign PNG - 3000x3000.png";
     private const string HeaderGoName = "SuggestionsHeader";
     private const string CloudGoName = "SuggestionsCloud";
     private const string MoreGoName = "SuggestionsMoreButton";
@@ -177,25 +179,18 @@ public static class PromptSuggestionsBuilder
     /// </summary>
     private static GameObject BuildTick(Transform parent, Color color, float size)
     {
+        // The project's check sprite — owner's call after the two-rotated-bars
+        // version read as an arrow on device. White tint shows it as authored;
+        // the chip re-tints its copy via Theme anyway.
         var root = NewChild(parent, "Tick", out var rootRt);
         rootRt.sizeDelta = new Vector2(size, size);
-
-        var shortArm = NewChild(root.transform, "ArmShort", out var shortRt);
-        var shortImage = shortArm.AddComponent<Image>();
-        shortImage.color = color;
-        shortImage.raycastTarget = false;
-        shortRt.sizeDelta = new Vector2(size * 0.42f, size * 0.16f);
-        shortRt.anchoredPosition = new Vector2(-size * 0.22f, -size * 0.12f);
-        shortRt.localRotation = Quaternion.Euler(0, 0, 45f);
-
-        var longArm = NewChild(root.transform, "ArmLong", out var longRt);
-        var longImage = longArm.AddComponent<Image>();
-        longImage.color = color;
-        longImage.raycastTarget = false;
-        longRt.sizeDelta = new Vector2(size * 0.72f, size * 0.16f);
-        longRt.anchoredPosition = new Vector2(size * 0.08f, size * 0.04f);
-        longRt.localRotation = Quaternion.Euler(0, 0, -45f);
-
+        var image = root.AddComponent<Image>();
+        image.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(TickSpritePath);
+        image.color = color;
+        image.raycastTarget = false;
+        image.preserveAspect = true;
+        if (image.sprite == null)
+            Debug.LogWarning($"[PromptSuggestions] Tick sprite missing at {TickSpritePath} — tick will be a plain square.");
         return root;
     }
 
@@ -298,14 +293,12 @@ public static class PromptSuggestionsBuilder
     private static PromptSuggestionsCloud BuildCloud(Transform promptContent, GameObject header)
     {
         var cloud = NewChild(promptContent, CloudGoName, out var cloudRt);
+        // One row tall until the first fit; PromptSuggestionsCloud sets the real
+        // height itself after packing. Deliberately NO ContentSizeFitter here —
+        // under a VLG the fitter grows the rect around its centre pivot AFTER
+        // the VLG has already placed it, which pushed the chips 132 units up
+        // over the header row.
         cloudRt.sizeDelta = new Vector2(0f, 108f);
-
-        // Prompt/Content's VLG has childControlHeight OFF — it lays children out
-        // by their rect height. Without this fitter the cloud's rect would stay
-        // one row tall while ChipFlowLayout renders three, and the next sibling
-        // would be positioned on top of rows two and three.
-        var fitter = cloud.AddComponent<ContentSizeFitter>();
-        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
         var flow = cloud.AddComponent<ChipFlowLayout>();
         var flowSo = new SerializedObject(flow);
@@ -318,14 +311,14 @@ public static class PromptSuggestionsBuilder
 
         // «Ещё N ›» lives right-aligned INSIDE the header row (per the spec's
         // «ПОДСКАЗКИ … Ещё N ›» line), not as its own layout row. The header is
-        // only 50 tall, so the invisible hit area extends past it to keep the
-        // 132-unit touch target; nothing in this hierarchy masks, so the
-        // overflow is safe.
+        // only 50 tall, so the invisible hit area overflows it — capped at 108
+        // (the chip height) so it stays inside the 30-unit gaps to the field
+        // above and the first chip row below and never shadows either.
         var more = NewChild(header.transform, MoreGoName, out var moreRt);
         moreRt.anchorMin = moreRt.anchorMax = new Vector2(1f, 0.5f);
         moreRt.pivot = new Vector2(1f, 0.5f);
         moreRt.anchoredPosition = Vector2.zero;
-        moreRt.sizeDelta = new Vector2(360f, 132f);
+        moreRt.sizeDelta = new Vector2(360f, 108f);
         var moreImage = more.AddComponent<Image>();
         moreImage.color = new Color(1f, 1f, 1f, 0f);   // invisible but raycastable
         var moreButton = more.AddComponent<Button>();
@@ -413,6 +406,10 @@ public static class PromptSuggestionsBuilder
         countRt.sizeDelta = new Vector2(countRt.sizeDelta.x, 60f);
         BindTheme(countGo, ThemeRole.InkTertiary);
 
+        // The six pills sum to ~1390 units against a 984-unit rail, so the rail
+        // scrolls horizontally (mockup behaviour). Same no-reparent idiom as the
+        // Бизнес tab: the Categories object is the ScrollRect AND the viewport
+        // (RectMask2D needs no Graphic), with a CSF-sized Rail as content.
         var categories = NewChild(sheetRoot, "Categories", out var categoriesRt);
         categoriesRt.anchorMin = new Vector2(0f, 1f);
         categoriesRt.anchorMax = new Vector2(1f, 1f);
@@ -421,14 +418,30 @@ public static class PromptSuggestionsBuilder
         categoriesRt.offsetMax = new Vector2(-48f, 0f);
         categoriesRt.anchoredPosition = new Vector2(0f, -150f);
         categoriesRt.sizeDelta = new Vector2(categoriesRt.sizeDelta.x, 84f);
-        var categoriesLayout = categories.AddComponent<HorizontalLayoutGroup>();
+        categories.AddComponent<RectMask2D>();
+        var categoriesScroll = categories.AddComponent<ScrollRect>();
+        categoriesScroll.horizontal = true;
+        categoriesScroll.vertical = false;
+        categoriesScroll.movementType = ScrollRect.MovementType.Elastic;
+
+        var rail = NewChild(categories.transform, "Rail", out var railRt);
+        railRt.anchorMin = new Vector2(0f, 0f);
+        railRt.anchorMax = new Vector2(0f, 1f);
+        railRt.pivot = new Vector2(0f, 0.5f);
+        railRt.offsetMin = Vector2.zero;
+        railRt.offsetMax = Vector2.zero;
+        var categoriesLayout = rail.AddComponent<HorizontalLayoutGroup>();
         categoriesLayout.spacing = 18f;
         categoriesLayout.childForceExpandWidth = false;
         categoriesLayout.childForceExpandHeight = false;
         categoriesLayout.childControlWidth = true;
         categoriesLayout.childControlHeight = true;
+        rail.AddComponent<ContentSizeFitter>().horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-        var categoryTemplate = BuildCategoryTemplate(categories.transform);
+        categoriesScroll.viewport = categoriesRt;
+        categoriesScroll.content = railRt;
+
+        var categoryTemplate = BuildCategoryTemplate(rail.transform);
         var rowTemplate = BuildRowTemplate(out var rowsParent, sheetRoot);
         var applyButton = BuildApplyButton(sheetRoot, out var applyLabel);
 
@@ -441,7 +454,7 @@ public static class PromptSuggestionsBuilder
         so.FindProperty("closeButton").objectReferenceValue = null;   // grabber is decorative; tap-outside closes
         so.FindProperty("rowsParent").objectReferenceValue = rowsParent;
         so.FindProperty("rowTemplate").objectReferenceValue = rowTemplate;
-        so.FindProperty("categoriesParent").objectReferenceValue = categoriesRt;
+        so.FindProperty("categoriesParent").objectReferenceValue = railRt;   // pills spawn inside the scrolling rail
         so.FindProperty("categoryTemplate").objectReferenceValue = categoryTemplate;
         so.FindProperty("selectedCountLabel").objectReferenceValue = countLabel;
         so.FindProperty("applyButton").objectReferenceValue = applyButton;
@@ -553,10 +566,10 @@ public static class PromptSuggestionsBuilder
         var tickRt = tick.GetComponent<RectTransform>();
         tickRt.anchorMin = tickRt.anchorMax = new Vector2(0.5f, 0.5f);
         tickRt.anchoredPosition = Vector2.zero;
-        // This row checkbox's tick IS themed (unlike the chip's) — both arms sit
-        // on the AccentFill box, so their glyph colour is AccentOnFill.
-        BindTheme(tick.transform.Find("ArmShort").gameObject, ThemeRole.AccentOnFill);
-        BindTheme(tick.transform.Find("ArmLong").gameObject, ThemeRole.AccentOnFill);
+        // This row checkbox's tick IS themed (unlike the chip's, whose colours
+        // PromptSuggestionChip owns). AccentOnFill is white in both themes, so
+        // the check sprite renders as authored on the AccentFill box.
+        BindTheme(tick, ThemeRole.AccentOnFill);
 
         var labelGo = NewChild(row.transform, "Label", out var labelRt);
         var label = AddText(labelGo, "Текст подсказки", 38f, InkPrimary, TextAlignmentOptions.MidlineLeft);

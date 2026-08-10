@@ -137,12 +137,38 @@ namespace Automation.BotSettingsUI
             for (var i = 0; i < pool.Count; i++)
                 pool[i].gameObject.SetActive(i < visible);
 
-            if (flowLayout != null) LayoutRebuilder.MarkLayoutForRebuild(chipsParent);
+            ApplyCloudHeight(widths, rowWidth, visible);
             if (moreLabel != null) moreLabel.text = $"Ещё {Mathf.Max(totalForBot - visible, 0)} ›";
             if (moreButton != null) moreButton.gameObject.SetActive(totalForBot > visible);
 
             layoutRoutine = null;
             Refresh();
+        }
+
+        // The parent VLG has childControlHeight OFF, so it positions this rect
+        // by its own height — and a ContentSizeFitter can't be trusted here (the
+        // VLG placed us BEFORE the fitter grew the rect around its centre pivot,
+        // which is exactly how the chips ended up 132 units up over the header).
+        // Set the height explicitly, then re-run the parent's layout so the VLG
+        // repositions us with the final size.
+        private void ApplyCloudHeight(List<float> chipWidths, float rowWidth, int visible)
+        {
+            if (flowLayout == null) return;
+
+            var rows = 1;
+            if (visible > 0)
+            {
+                var rowOf = PromptSuggestionCloudFit.RowOf(
+                    chipWidths.GetRange(0, visible), rowWidth, chipSpacing);
+                rows = rowOf[rowOf.Length - 1] + 1;
+            }
+
+            var height = rows * flowLayout.RowHeight + (rows - 1) * flowLayout.SpacingY;
+            chipsParent.sizeDelta = new Vector2(chipsParent.sizeDelta.x, height);
+
+            LayoutRebuilder.MarkLayoutForRebuild(chipsParent);
+            if (chipsParent.parent is RectTransform parent)
+                LayoutRebuilder.MarkLayoutForRebuild(parent);
         }
 
         private float MeasureChipWidth(PromptSuggestionChip chip) =>
