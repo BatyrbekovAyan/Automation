@@ -38,6 +38,11 @@ public class SuggestionsController : MonoBehaviour
     private string _pendingIncomingText;   // latest incoming text captured for the eventual coalesced fire
     private Coroutine _debounceLoop;
 
+    // Audit F9: last rendered set per chat, keyed by the history tail. A re-open with an
+    // unmoved tail renders instantly and issues NO request; any tail drift = miss = today's
+    // skeleton+request path. Cleared on bot switch (chat ids recur across bots).
+    private readonly SuggestionCache _cache = new SuggestionCache();
+
     void Awake()
     {
         _provider = new N8nSuggestionsProvider();   // Phase-2 live provider (N8N-02 single-line swap); coroutine runs on ChatManager.Instance
@@ -101,6 +106,7 @@ public class SuggestionsController : MonoBehaviour
         _requestSeq++;                                        // supersede any in-flight request
         _debounce.Cancel();                                  // bot switch: drop a window pending from the previous bot's chat (BATCH-03)
         _pendingIncomingText = null;
+        _cache.Clear();                                      // chat ids recur across bots — entries must not outlive the bot (F9)
         if (_toggle != null) _toggle.SetLit(false);
         HidePanel();
     }
@@ -124,9 +130,32 @@ public class SuggestionsController : MonoBehaviour
         if (_semiAutoOn)
         {
             ShowPanel();
-            IssueRequest(null, null);
+            // F9: an unmoved history tail renders the cached set instantly — no skeleton, no
+            // paid call. Any drift (new message, owner reply, first visit) = miss = fresh request.
+            if (!TryRenderCached()) IssueRequest(null, null);
         }
         else HidePanel();
+    }
+
+    // Renders the cached set for the open chat when its tail key still matches. False = issue.
+    private bool TryRenderCached()
+    {
+        var cm = ChatManager.Instance;
+        if (cm == null || _panel == null) return false;
+        string tailKey = CurrentTailKey();
+        if (tailKey == null || !_cache.TryGet(cm.CurrentChatId, tailKey, out var cached)) return false;
+        _panel.Render(cached);
+        return true;
+    }
+
+    // Tail identity of the OPEN chat's freshest message, or null when there is none to key on.
+    private static string CurrentTailKey()
+    {
+        var cm = ChatManager.Instance;
+        if (cm == null) return null;
+        if (!cm.TryGetRecentMessages(cm.CurrentChatId, 1, out var tail) || tail == null || tail.Count == 0)
+            return null;
+        return SuggestionCache.TailKey(tail[tail.Count - 1]);
     }
 
     // --- Toggle on/off (SEMI-01 / D-08/09/10/11) ---
@@ -184,16 +213,24 @@ public class SuggestionsController : MonoBehaviour
             lastIncomingText = lastIncomingText,
             requestSeq = seq
         };
-        _provider.Request(req, result => OnResult(seq, chatId, result));
+        // F9 capture-at-issue: the tail this request answers. Verified again at store time —
+        // either drift direction degrades to a cache miss, never to stale cards.
+        string tailKey = CurrentTailKey();
+        _provider.Request(req, result => OnResult(seq, chatId, tailKey, result));
     }
 
-    private void OnResult(long seq, string capturedChatId, SuggestionResult result)
+    private void OnResult(long seq, string capturedChatId, string capturedTailKey, SuggestionResult result)
     {
         if (!_semiAutoOn) return;                              // user opted out mid-flight → never render
         string currentChatId = ChatManager.Instance != null ? ChatManager.Instance.CurrentChatId : null;
         if (!SuggestionSequenceGuard.IsCurrent(seq, _requestSeq, capturedChatId, currentChatId))
             return;                                            // superseded / chat switched → DISCARD
         if (_panel != null) _panel.Render(result);            // skeleton → cards | empty | error
+        // F9 verify-at-store: cache only when the tail is STILL the one this request answered —
+        // a message that landed mid-flight makes this set already-stale, so let it render (the
+        // corrective fire is coming) but never persist it. Store ignores non-Ok results itself.
+        if (capturedTailKey != null && capturedTailKey == CurrentTailKey())
+            _cache.Store(capturedChatId, capturedTailKey, result);
     }
 
     // --- Card tap (INT-01 + INT-04 unified, D-01/D-02/D-03) ---
