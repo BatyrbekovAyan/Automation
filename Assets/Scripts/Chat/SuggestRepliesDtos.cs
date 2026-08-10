@@ -47,10 +47,13 @@ public class SuggestRepliesRequestDto
     public string catalog;           // "• name — price" lines, clamped <=1500
     public string steerTowardText;   // picked reply for re-cluster (N8N-03); null = fresh set
     public string lastIncomingText;  // trigger message or null
-    public List<WireMessage> messages = new();  // <=12, oldest->newest
+    public List<WireMessage> messages = new();  // <=24, oldest->newest (12 until the 2026-08 audit F8)
     // --- v1.1 additive keys (ADD-only; field name IS the wire key — do NOT rename) ---
     public string botTgId;           // active bot's telegramWorkflowId; ""/"-1" => server skips TG RAG (mirrors botWaId sentinel)
     public string channel;           // "whatsapp" | "telegram" (lowercase, enum-derived); absent => whatsapp (server Prep default, Phase 4)
+    // --- v1.2 additive keys (2026-08 audit F1/F2 grounding; ADD-only, same rules) ---
+    public string businessKnowledge; // ComposeBusinessKnowledge output (description + Контакты block), clamped <=1200; "" when unset
+    public string now;               // device local time "yyyy-MM-dd HH:mm, <ru day>"; server sanitizes before prompt use
 }
 
 /// <summary>One suggestion in the response envelope: server sends {text,label}.</summary>

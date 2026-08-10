@@ -30,10 +30,12 @@ public class SuggestRepliesPayloadTests
         string profileId = "p1", string botWaId = "wf1", string businessTypeId = "auto_parts",
         string businessName = "Магазин", string ownerPrompt = "", string catalog = "",
         ChatChannel channel = ChatChannel.WhatsApp,
-        string telegramProfileId = "tgpid", string telegramWorkflowId = "wf_tg")
+        string telegramProfileId = "tgpid", string telegramWorkflowId = "wf_tg",
+        string businessKnowledge = "", string now = "")
         => JObject.Parse(N8nSuggestionsProvider.BuildPayloadJson(
             req, channel, profileId, telegramProfileId, botWaId, telegramWorkflowId,
-            businessTypeId, businessName, ownerPrompt, catalog, msgs));
+            businessTypeId, businessName, ownerPrompt, catalog, msgs,
+            businessKnowledge, now));
 
     // --- version + request passthrough ---------------------------------------
 
@@ -85,17 +87,18 @@ public class SuggestRepliesPayloadTests
         Assert.AreEqual(1712345678L, (long)arr[0]["ts"]);
     }
 
-    // --- <=12 cap keeps the NEWEST twelve, still oldest->newest --------------
+    // --- <=24 cap keeps the NEWEST twenty-four, still oldest->newest ---------
+    // (Raised from 12 in the 2026-08 audit F8 — order threads outgrow 12 turns.)
 
     [Test]
-    public void Cap12_KeepsNewestTwelve_OldestToNewest()
+    public void Cap24_KeepsNewestTwentyFour_OldestToNewest()
     {
         var msgs = new List<MessageViewModel>();
-        for (int i = 0; i < 15; i++) msgs.Add(Msg("m" + i, true));
+        for (int i = 0; i < 30; i++) msgs.Add(Msg("m" + i, true));
         var arr = (JArray)Build(Req(), msgs)["messages"];
-        Assert.AreEqual(12, arr.Count);
-        Assert.AreEqual("m3", (string)arr[0]["text"]);    // m0,m1,m2 dropped
-        Assert.AreEqual("m14", (string)arr[11]["text"]);  // newest kept, last
+        Assert.AreEqual(24, arr.Count);
+        Assert.AreEqual("m6", (string)arr[0]["text"]);    // m0..m5 dropped
+        Assert.AreEqual("m29", (string)arr[23]["text"]);  // newest kept, last
     }
 
     // --- media placeholders ---------------------------------------------------
@@ -132,17 +135,18 @@ public class SuggestRepliesPayloadTests
     // --- truncations ----------------------------------------------------------
 
     [Test]
-    public void OwnerPrompt_ClampedTo500()
+    public void OwnerPrompt_ClampedTo2000()
     {
-        var j = Build(Req(), One(), ownerPrompt: new string('п', 600));
-        Assert.AreEqual(500, ((string)j["ownerPrompt"]).Length);
+        // 500 silently truncated chip-composed prompts mid-line (audit F8).
+        var j = Build(Req(), One(), ownerPrompt: new string('п', 2200));
+        Assert.AreEqual(2000, ((string)j["ownerPrompt"]).Length);
     }
 
     [Test]
-    public void Catalog_ClampedTo1500()
+    public void Catalog_ClampedTo2500()
     {
-        var j = Build(Req(), One(), catalog: new string('к', 2000));
-        Assert.AreEqual(1500, ((string)j["catalog"]).Length);
+        var j = Build(Req(), One(), catalog: new string('к', 3000));
+        Assert.AreEqual(2500, ((string)j["catalog"]).Length);
     }
 
     [Test]
@@ -243,6 +247,45 @@ public class SuggestRepliesPayloadTests
         Assert.AreNotEqual("Telegram", (string)tg["channel"]);
     }
 
+    // --- v1.2 grounding keys (audit F1/F2: the Авто-bot's knowledge + local time) ---
+
+    [Test]
+    public void BusinessKnowledge_Passthrough()
+    {
+        var j = Build(Req(), One(), businessKnowledge: "About Business:\nЦветы\n\nКонтакты:\nАдрес: ул. Абая 1");
+        Assert.AreEqual("About Business:\nЦветы\n\nКонтакты:\nАдрес: ул. Абая 1", (string)j["businessKnowledge"]);
+    }
+
+    [Test]
+    public void BusinessKnowledge_ComposedValue_CarriesContactBlock()
+    {
+        // verify-the-composed-output: the payload must carry the SAME composed string the
+        // Авто-mode workflows ingest — assert the composed VALUE end-to-end, not just a key.
+        string composed = Manager.ComposeBusinessKnowledge(
+            "Магазин цветов в Астане", "+7 777 123 45 67", "09:00–19:00", "ул. Абая 1", "", "");
+        var j = Build(Req(), One(), businessKnowledge: composed);
+        var wire = (string)j["businessKnowledge"];
+        StringAssert.Contains("About Business:\nМагазин цветов в Астане", wire);
+        StringAssert.Contains("Контакты:", wire);
+        StringAssert.Contains("Телефон: +7 777 123 45 67", wire);
+        StringAssert.Contains("Часы работы: 09:00–19:00", wire);
+        StringAssert.Contains("Адрес: ул. Абая 1", wire);
+    }
+
+    [Test]
+    public void BusinessKnowledge_ClampedTo1200()
+    {
+        var j = Build(Req(), One(), businessKnowledge: new string('б', 1500));
+        Assert.AreEqual(1200, ((string)j["businessKnowledge"]).Length);
+    }
+
+    [Test]
+    public void Now_Passthrough()
+    {
+        var j = Build(Req(), One(), now: "2026-08-10 15:04, воскресенье");
+        Assert.AreEqual("2026-08-10 15:04, воскресенье", (string)j["now"]);
+    }
+
     // --- additive-identity: a WhatsApp request is structurally identical to v1 -
 
     [Test]
@@ -253,19 +296,24 @@ public class SuggestRepliesPayloadTests
         var j = Build(req, msgs,
             profileId: "wap", botWaId: "wf_wa", businessTypeId: "flowers",
             businessName: "Цветочный", ownerPrompt: "будь вежлив", catalog: "• Роза — 500",
-            channel: ChatChannel.WhatsApp, telegramProfileId: "tgp", telegramWorkflowId: "wf_tg");
+            channel: ChatChannel.WhatsApp, telegramProfileId: "tgp", telegramWorkflowId: "wf_tg",
+            businessKnowledge: "About Business:\nЦветы", now: "2026-08-10 15:04, воскресенье");
 
-        // The two v1.1 keys ARE present on a WhatsApp request...
+        // The v1.1 keys (channel/botTgId) AND v1.2 keys (businessKnowledge/now) ARE present...
         Assert.AreEqual("whatsapp", (string)j["channel"]);
         Assert.IsNotNull(j["botTgId"]);
         Assert.AreEqual("wf_tg", (string)j["botTgId"]);
+        Assert.IsNotNull(j["businessKnowledge"]);
+        Assert.IsNotNull(j["now"]);
 
-        // ...and removing EXACTLY those two yields the frozen v1 object again. This test proves
+        // ...and removing EXACTLY those four yields the frozen v1 object again. This test proves
         // STRUCTURAL identity: JToken.DeepEquals is property-order-insensitive and the key-set
         // assertion below sorts before comparing — byte order is NOT asserted here (it follows
-        // separately from Json.NET's declaration-order emission over the appended-last v1.1 fields).
+        // separately from Json.NET's declaration-order emission over the appended-last fields).
         j.Remove("channel");
         j.Remove("botTgId");
+        j.Remove("businessKnowledge");
+        j.Remove("now");
 
         var expectedV1 = new JObject
         {

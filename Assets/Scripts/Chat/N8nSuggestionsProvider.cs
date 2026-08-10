@@ -22,10 +22,14 @@ using UnityEngine.Networking;
 /// </summary>
 public class N8nSuggestionsProvider : ISuggestionsProvider
 {
-    private const int MaxMessages     = 12;
-    private const int MaxTextChars    = 500;
-    private const int MaxPromptChars  = 500;
-    private const int MaxCatalogChars = 1500;
+    // Context ceilings raised in the 2026-08 audit (F8): 12 messages starved real order
+    // threads, 500 truncated chip-composed prompts mid-line. Server Prep slices MUST match
+    // (24/2000/2500/1200) — the smaller of the two always wins on the wire.
+    private const int MaxMessages       = 24;
+    private const int MaxTextChars      = 500;
+    private const int MaxPromptChars    = 2000;
+    private const int MaxCatalogChars   = 2500;
+    private const int MaxKnowledgeChars = 1200;
 
     // --- ISuggestionsProvider ------------------------------------------------
 
@@ -84,13 +88,15 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
             businessName:   PlayerPrefs.GetString(botName + "Name", ""),
             ownerPrompt:    PlayerPrefs.GetString(botName + "Prompt", ""),
             catalog:        BuildCatalog(botName),
-            recentMessages: msgs);
+            recentMessages: msgs,
+            businessKnowledge: BuildBusinessKnowledge(botName),
+            now:               LocalNowString());
 
         using var www = new UnityWebRequest($"{Manager.n8nBaseUrl}/webhook/SuggestReplies", "POST");
         www.uploadHandler   = new UploadHandlerRaw(Encoding.UTF8.GetBytes(json));
         www.downloadHandler = new DownloadHandlerBuffer();
         www.SetRequestHeader("Content-Type", "application/json");   // REQUIRED — libcurl else stamps x-www-form-urlencoded => n8n mis-parse
-        www.timeout = 30;
+        www.timeout = 15;   // server p95 ≈ 4s; 30s was a very long skeleton before the error state (audit F17c)
         yield return www.SendWebRequest();
 
         if (www.result != UnityWebRequest.Result.Success)
@@ -129,6 +135,30 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
         }
     }
 
+    // The SAME composed knowledge the Авто-mode workflows ingest as their "Business" field
+    // (audit F2): description + labeled Контакты block, via the pure Manager seam. Reads the
+    // exact keys LoadContactFields uses — {botName}Business + {botName}{BotSettings.ContactKeys[i]}
+    // (Phone/Hours/Address/Instagram/Email, in ComposeBusinessKnowledge's parameter order).
+    private static string BuildBusinessKnowledge(string botName)
+    {
+        return Manager.ComposeBusinessKnowledge(
+            PlayerPrefs.GetString(botName + "Business", ""),
+            PlayerPrefs.GetString(botName + global::BotSettings.ContactKeys[0], ""),
+            PlayerPrefs.GetString(botName + global::BotSettings.ContactKeys[1], ""),
+            PlayerPrefs.GetString(botName + global::BotSettings.ContactKeys[2], ""),
+            PlayerPrefs.GetString(botName + global::BotSettings.ContactKeys[3], ""),
+            PlayerPrefs.GetString(botName + global::BotSettings.ContactKeys[4], ""));
+    }
+
+    // Device-local timestamp for the ВРЕМЯ grounding rule ("вы сейчас работаете?" — audit F1):
+    // the server can't know the owner's timezone. RU day name so the model needn't map it.
+    private static string LocalNowString()
+    {
+        var n = System.DateTime.Now;
+        string day = n.ToString("dddd", new System.Globalization.CultureInfo("ru-RU"));
+        return n.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture) + ", " + day;
+    }
+
     // --- Pure payload builder (Unity-free except MessageViewModel, a plain data class) ---
 
     /// <summary>
@@ -138,10 +168,12 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
     /// botWaId = <paramref name="whatsappWorkflowId"/> ALWAYS (backward compat) while botTgId =
     /// <paramref name="telegramWorkflowId"/> (both keep the ""/"-1" skip-RAG sentinel); channel =
     /// "telegram"|"whatsapp" (lowercase, derived ONLY from the enum — never a free-form string).
-    /// <paramref name="ownerPrompt"/> clamped &lt;=500 and <paramref name="catalog"/> &lt;=1500;
-    /// messages = at most the LAST 12 of <paramref name="recentMessages"/>, oldest-&gt;newest, each
+    /// <paramref name="ownerPrompt"/> clamped &lt;=2000 and <paramref name="catalog"/> &lt;=2500;
+    /// messages = at most the LAST 24 of <paramref name="recentMessages"/>, oldest-&gt;newest, each
     /// text media-mapped then clamped &lt;=500, role="client" if incoming else "business".
-    /// Stripping channel+botTgId yields the frozen v1 object again — structural identity
+    /// v1.2 (audit F1/F2): <paramref name="businessKnowledge"/> (clamped &lt;=1200) and
+    /// <paramref name="now"/> append after the v1.1 keys. Stripping channel+botTgId+
+    /// businessKnowledge+now yields the frozen v1 object again — structural identity
     /// (JToken.DeepEquals + exact key set) is what the payload tests enforce; matching byte
     /// order additionally follows from Json.NET's declaration-order field emission.
     /// </summary>
@@ -156,7 +188,9 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
         string businessName,
         string ownerPrompt,
         string catalog,
-        List<MessageViewModel> recentMessages)
+        List<MessageViewModel> recentMessages,
+        string businessKnowledge,
+        string now)
     {
         bool isTelegram = channel == ChatChannel.Telegram;
         var dto = new SuggestRepliesRequestDto
@@ -173,8 +207,10 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
             steerTowardText  = req?.steerTowardText,
             lastIncomingText = req?.lastIncomingText,
             messages         = ToWireMessages(recentMessages),
-            botTgId          = telegramWorkflowId,                                    // NEW; ""/"-1" => server skips TG RAG
-            channel          = isTelegram ? "telegram" : "whatsapp",                 // NEW; lowercase, enum-derived only
+            botTgId          = telegramWorkflowId,                                    // v1.1; ""/"-1" => server skips TG RAG
+            channel          = isTelegram ? "telegram" : "whatsapp",                 // v1.1; lowercase, enum-derived only
+            businessKnowledge = Clamp(businessKnowledge, MaxKnowledgeChars),          // v1.2; Авто-parity grounding (audit F2)
+            now              = now,                                                   // v1.2; server sanitizes before prompt use
         };
         return JsonConvert.SerializeObject(dto);
     }
