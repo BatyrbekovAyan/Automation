@@ -151,7 +151,8 @@ public static class SuggestionsPanelBuilder
 
         GameObject bottomFade = BuildFadeOverlay(panelGo.transform, fade);
 
-        GameObject empty = BuildEmptyState(panelGo.transform, viewportRt);
+        Button emptyRetry;
+        GameObject empty = BuildEmptyState(panelGo.transform, viewportRt, out emptyRetry);
         Button errorRetry;
         GameObject error = BuildErrorState(panelGo.transform, viewportRt, out errorRetry);
 
@@ -169,6 +170,7 @@ public static class SuggestionsPanelBuilder
         so.FindProperty("errorState").objectReferenceValue = error;
         so.FindProperty("refreshButton").objectReferenceValue = refreshButton;
         so.FindProperty("errorRetryButton").objectReferenceValue = errorRetry;
+        so.FindProperty("emptyRetryButton").objectReferenceValue = emptyRetry;   // audit F17b
         so.FindProperty("rt").objectReferenceValue = rt;
         so.FindProperty("canvasGroup").objectReferenceValue = canvasGroup;
         so.FindProperty("cardsViewport").objectReferenceValue = viewportRt;
@@ -497,7 +499,7 @@ public static class SuggestionsPanelBuilder
 
     // === Empty / Error overlays ============================================
 
-    private static GameObject BuildEmptyState(Transform panel, RectTransform area)
+    private static GameObject BuildEmptyState(Transform panel, RectTransform area, out Button retry)
     {
         GameObject go = Rect("EmptyState", panel);
         OverlayOver(go, area);
@@ -511,6 +513,8 @@ public static class SuggestionsPanelBuilder
         TextMeshProUGUI body = Text("Body", go.transform, "Напишите ответ вручную", StateSize, Color.black,
             FontStyles.Normal, TextAlignmentOptions.Center);
         Themed(body.gameObject, ThemeRole.InkSecondary);
+        // Audit F17b: the empty state was a dead end — same ghost «Обновить» as the error state.
+        retry = BuildGhostRetry(go.transform);
         go.SetActive(false);
         return go;
     }
@@ -529,9 +533,16 @@ public static class SuggestionsPanelBuilder
         TextMeshProUGUI body = Text("Body", go.transform, "Проверьте соединение и попробуйте снова", StateSize, Color.black,
             FontStyles.Normal, TextAlignmentOptions.Center);
         Themed(body.gameObject, ThemeRole.InkSecondary);
+        retry = BuildGhostRetry(go.transform);
+        go.SetActive(false);
+        return go;
+    }
 
-        // Ghost retry: InputBorder outline ring + Surface fill + AccentText label (spec state style).
-        GameObject retryGo = ImageGo("RetryButton", go.transform, Color.white);
+    // Ghost retry: InputBorder outline ring + Surface fill + AccentText label (spec state style).
+    // Shared by the error and empty states so the two «Обновить» buttons can never drift apart.
+    private static Button BuildGhostRetry(Transform parent)
+    {
+        GameObject retryGo = ImageGo("RetryButton", parent, Color.white);
         Themed(retryGo, ThemeRole.InputBorder);
         var le = retryGo.AddComponent<LayoutElement>(); le.minHeight = RefreshHit; le.minWidth = 280f;
         AddRounded(retryGo, RetryRadius);
@@ -547,10 +558,9 @@ public static class SuggestionsPanelBuilder
         lab.raycastTarget = false;
         Themed(lab.gameObject, ThemeRole.AccentText);
         Stretch((RectTransform)lab.transform);
-        retry = retryGo.AddComponent<Button>();
+        Button retry = retryGo.AddComponent<Button>();
         retry.transition = Selectable.Transition.None;
-        go.SetActive(false);
-        return go;
+        return retry;
     }
 
     // === Toggle (built only if absent — untouched by the redesign) =========

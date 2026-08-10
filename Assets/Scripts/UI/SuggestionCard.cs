@@ -30,16 +30,29 @@ public class SuggestionCard : MonoBehaviour
     // Recommended border = PositiveInk washed toward Surface (the sketch's 45% color-mix).
     private const float RecommendedBorderMix = 0.45f;
 
+    private bool _isTop;   // remembered so a theme flip can re-resolve the bind-time colors (audit F17a)
+
+    void OnEnable()
+    {
+        Theme.Changed += RepaintForTheme;
+    }
+
     void OnDisable()
     {
+        Theme.Changed -= RepaintForTheme;
         // The card is Destroy()'d on every re-cluster (panel Clear); kill the tap-punch tween
         // so it doesn't tick on a destroyed RectTransform (the DOTWEEN "target destroyed" errors).
         transform.DOKill();
     }
 
+    // Cards bind colors at Setup; without this, a Profile-tab theme flip left already-rendered
+    // cards in the old palette until the next request re-instantiated them.
+    private void RepaintForTheme() => ApplyColors(_isTop);
+
     public void Setup(SuggestionItem item, bool isTop)
     {
         if (item == null) return;
+        _isTop = isTop;
         replyText.text = item.text;
         intentLabel.text = item.intentLabel;   // rendered uppercase via the label's FontStyles
         ApplyColors(isTop);

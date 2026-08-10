@@ -21,6 +21,7 @@ public class SuggestionsPanel : MonoBehaviour
     [SerializeField] private GameObject errorState;        // «Не удалось загрузить» + «Обновить»
     [SerializeField] private Button refreshButton;         // manual refresh (INT-03)
     [SerializeField] private Button errorRetryButton;      // «Обновить» retry in the error state
+    [SerializeField] private Button emptyRetryButton;      // «Обновить» in the empty state (audit F17b; wired by the builder)
     [SerializeField] private RectTransform rt;             // slide root
     [SerializeField] private CanvasGroup canvasGroup;      // fade
     [SerializeField] private RectTransform cardsViewport;  // fixed scroll region (chrome = -offsetMax.y)
@@ -55,6 +56,7 @@ public class SuggestionsPanel : MonoBehaviour
         if (rt != null) _baseHeight = rt.sizeDelta.y;
         if (refreshButton != null) refreshButton.onClick.AddListener(() => OnRefreshRequested?.Invoke());
         if (errorRetryButton != null) errorRetryButton.onClick.AddListener(() => OnRefreshRequested?.Invoke());
+        if (emptyRetryButton != null) emptyRetryButton.onClick.AddListener(() => OnRefreshRequested?.Invoke());
     }
 
     void OnDisable()
