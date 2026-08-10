@@ -21,6 +21,7 @@ public class SelectionHandleView : MonoBehaviour,
     Image _stem;
     Image _head;
     float _dir;                          // +1 head above the line (start), -1 below (end)
+    Vector2 _grabOffset;                 // press point → pin position, captured on grab
 
     public static SelectionHandleView Build(Transform parent, bool isStart)
     {
@@ -36,14 +37,18 @@ public class SelectionHandleView : MonoBehaviour,
         view.IsStart = isStart;
         view._dir = isStart ? 1f : -1f;   // start: head above the line, end: below
 
-        // Asymmetric grab zone (iOS anatomy): the start pin's touch area
-        // shifts UP toward its dot, the end pin's DOWN — so two pins on a
-        // short selection never cover each other's hit areas.
+        // Asymmetric grab zone (iOS anatomy): each pin's touch area fans AWAY
+        // from its twin — vertically toward its own dot, horizontally outward,
+        // so the dot sits on the INNER edge of its zone (start pin's zone
+        // extends left, end pin's right). Two pins on a one-character
+        // selection then barely overlap and both stay grabbable.
+        float outward = isStart ? -1f : 1f;
         var hitGo = new GameObject("Hit", typeof(RectTransform), typeof(Image));
         hitGo.transform.SetParent(go.transform, false);
         var hitRt = (RectTransform)hitGo.transform;
         hitRt.sizeDelta = new Vector2(HitSize, HitSize);
-        hitRt.anchoredPosition = new Vector2(0, view._dir * 44f);
+        hitRt.anchoredPosition = new Vector2(
+            outward * (HitSize / 2f - HeadSize / 2f), view._dir * 44f);
         var hitImg = hitGo.GetComponent<Image>();
         hitImg.color = Color.clear;        // raycast target, invisible
         hitImg.sprite = null;
@@ -82,7 +87,17 @@ public class SelectionHandleView : MonoBehaviour,
             new Vector2(0, _dir * (height / 2f + HeadSize / 2f - 3f));
     }
 
-    public void OnBeginDrag(PointerEventData e) => DragMoved?.Invoke(this, e.position);
-    public void OnDrag(PointerEventData e) => DragMoved?.Invoke(this, e.position);
+    /// The grab zone is deliberately wide and offset, so the press can land
+    /// far from the dot. Reporting the raw finger position would teleport the
+    /// selection edge under the finger; instead the pin keeps its own
+    /// position and moves by the finger's delta (iOS behavior).
+    public void OnBeginDrag(PointerEventData e)
+    {
+        Vector2 pinScreen = RectTransformUtility.WorldToScreenPoint(null, transform.position);
+        _grabOffset = pinScreen - e.position;
+        DragMoved?.Invoke(this, e.position + _grabOffset);
+    }
+
+    public void OnDrag(PointerEventData e) => DragMoved?.Invoke(this, e.position + _grabOffset);
     public void OnEndDrag(PointerEventData e) => DragEnded?.Invoke(this);
 }
