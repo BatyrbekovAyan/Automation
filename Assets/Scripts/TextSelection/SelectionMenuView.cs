@@ -10,9 +10,7 @@ using Nobi.UiRoundedCorners;
 /// reports taps; owns no clipboard/selection logic. Labels use the focused
 /// field's own font so Cyrillic always renders.
 ///
-/// Structure: root (positioning + drag) → Pill (bg + items); the pill's
-/// fill is lifted off Surface so it reads as a pill even when Surface ≈
-/// Background.
+/// Structure: root (positioning + drag) → Pill (flat Surface fill + items).
 /// When the pill is wider than the screen it starts left-aligned (first
 /// items visible) and can be dragged horizontally, clamped so the first and
 /// last items are always reachable — iOS overflow behavior. A drag past the
@@ -219,11 +217,8 @@ public class SelectionMenuView : MonoBehaviour, IBeginDragHandler, IDragHandler
 
     public void ApplyTheme()
     {
-        // Surface can sit visually on Background (dark theme) — lift the
-        // pill toward ink so it still reads as a distinct element.
-        var surface = Theme.Color(ThemeRole.Surface);
         var ink = Theme.Color(ThemeRole.InkPrimary);
-        _bg.color = Color.Lerp(surface, ink, 0.12f);
+        _bg.color = Theme.Color(ThemeRole.Surface);
         foreach (var entry in _entries)
         {
             if (entry.Label != null) entry.Label.color = ink;
