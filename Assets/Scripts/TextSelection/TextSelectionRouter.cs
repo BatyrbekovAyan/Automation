@@ -74,6 +74,9 @@ public class TextSelectionRouter : MonoBehaviour
     float _slopPixels;
     int _lastAnchor = -1;
     int _lastFocus = -1;
+    int _intendedAnchor = -1;          // the selection the router owns while pins are up
+    int _intendedFocus = -1;
+    string _intendedText;
 
     void Awake()
     {
@@ -132,11 +135,13 @@ public class TextSelectionRouter : MonoBehaviour
             if (_menuPendingOnRelease)
             {
                 _menuPendingOnRelease = false;
+                EnforceIntendedSelection();   // undo any same-frame clobber BEFORE the menu reads the selection
                 ShowMenuForActiveField();
             }
         }
 
         EnforceOwnUiSelection();
+        EnforceIntendedSelection();
         ProcessPendingFocusSelect();
         WatchExternalSelection();
         WatchFieldLifecycle();
@@ -227,8 +232,10 @@ public class TextSelectionRouter : MonoBehaviour
                 break;
 
             case SelectionGestureMachine.Result.Tap:
-                if (_pressField == null || _pressField != _activeField) DismissAll();
-                else _menu?.Hide();                  // caret moved inside the active field
+                // iOS parity: a tap dismisses the selection UI wherever it
+                // lands — inside the active field it collapses to the tapped
+                // caret (TMP already moved it on pointer-down).
+                DismissAll();
                 break;
 
             case SelectionGestureMachine.Result.Cancel:
@@ -263,6 +270,7 @@ public class TextSelectionRouter : MonoBehaviour
             field.stringPosition = start;
             KeyboardSelectionSync.Push(field);
             _overlay?.HideHandles();
+            ClearIntent();
         }
         else
         {
@@ -271,6 +279,7 @@ public class TextSelectionRouter : MonoBehaviour
             KeyboardSelectionSync.Push(field);
             EnsureOverlay();
             _overlay.ShowHandles();
+            SetIntent(field);
         }
         RememberSelection(field);
     }
@@ -286,6 +295,7 @@ public class TextSelectionRouter : MonoBehaviour
         {
             EnsureOverlay();
             _overlay.ShowHandles();
+            SetIntent(field);
         }
         RememberSelection(field);
     }
@@ -306,6 +316,7 @@ public class TextSelectionRouter : MonoBehaviour
         _activeField.selectionStringAnchorPosition = lo;
         _activeField.selectionStringFocusPosition = hi;
         KeyboardSelectionSync.Push(_activeField);
+        SetIntent(_activeField);
         RememberSelection(_activeField);
         AutoScrollTowards(_activeField, screenPos);
     }
@@ -379,6 +390,7 @@ public class TextSelectionRouter : MonoBehaviour
                 field.selectionStringAnchorPosition = 0;
                 field.selectionStringFocusPosition = field.text.Length;
                 KeyboardSelectionSync.Push(field);
+                SetIntent(field);
                 RememberSelection(field);
                 EnsureOverlay();
                 _overlay.ShowHandles();
@@ -396,6 +408,7 @@ public class TextSelectionRouter : MonoBehaviour
         _applyingEdit = false;
         _menu?.Hide();
         _overlay?.HideHandles();
+        ClearIntent();
         RememberSelection(field);
     }
 
@@ -420,6 +433,41 @@ public class TextSelectionRouter : MonoBehaviour
 
     // ---------- watching ----------
 
+    void SetIntent(TMP_InputField field)
+    {
+        _intendedAnchor = field.selectionStringAnchorPosition;
+        _intendedFocus = field.selectionStringFocusPosition;
+        _intendedText = field.text;
+    }
+
+    void ClearIntent()
+    {
+        _intendedAnchor = -1;
+        _intendedFocus = -1;
+        _intendedText = null;
+    }
+
+    /// On iOS with the keyboard open, TMP overwrites its Unity-side selection
+    /// from the native keyboard EVERY frame (UpdateStringPositionFromKeyboard)
+    /// — a race that collapses a programmatic selection right after the
+    /// finger lifts. While our pins are up, the router OWNS the selection:
+    /// drift from the intended range with UNCHANGED text is clobber, not user
+    /// input (typing changes the text and dismisses; taps dismiss in the same
+    /// frame's pump, before this runs), so re-assert and re-push.
+    void EnforceIntendedSelection()
+    {
+        if (_activeField == null || _intendedAnchor < 0) return;
+        if (_overlay == null || !_overlay.HandlesVisible) return;
+        if (_machine.IsPressed && !_machine.LongPressActive && !_ownUiPressActive) return;
+        if (_activeField.text != _intendedText) return;   // real edit — lifecycle watcher dismisses
+        if (_activeField.selectionStringAnchorPosition == _intendedAnchor &&
+            _activeField.selectionStringFocusPosition == _intendedFocus) return;
+        _activeField.selectionStringAnchorPosition = _intendedAnchor;
+        _activeField.selectionStringFocusPosition = _intendedFocus;
+        KeyboardSelectionSync.Push(_activeField);
+        RememberSelection(_activeField);
+    }
+
     /// A TMP-originated selection (e.g. drag-select in the composer) also
     /// deserves pins + menu, whatever gesture created it.
     void WatchExternalSelection()
@@ -433,6 +481,7 @@ public class TextSelectionRouter : MonoBehaviour
         {
             EnsureOverlay();
             _overlay.ShowHandles();
+            SetIntent(_activeField);
             ShowMenuForActiveField();
         }
     }
@@ -553,5 +602,6 @@ public class TextSelectionRouter : MonoBehaviour
         _activeField = null;
         _lastAnchor = -1;
         _lastFocus = -1;
+        ClearIntent();
     }
 }

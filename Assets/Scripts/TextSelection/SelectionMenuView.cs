@@ -10,11 +10,11 @@ using Nobi.UiRoundedCorners;
 /// field's own font so Cyrillic always renders.
 public class SelectionMenuView : MonoBehaviour
 {
-    const float Height = 120f;
-    const float Radius = 60f;
-    const float ItemPad = 40f;
-    const float LabelSize = 44f;
-    const float Gap = 24f;
+    const float Height = 104f;
+    const float Radius = 52f;
+    const float ItemPad = 24f;
+    const float LabelSize = 36f;
+    const float Gap = 64f;               // clears the start pin's dot above the line
     const float EdgeMargin = 24f;
 
     public System.Action<SelectionMenuItems> ItemTapped;

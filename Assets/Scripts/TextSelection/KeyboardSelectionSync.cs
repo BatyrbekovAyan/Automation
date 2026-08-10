@@ -14,14 +14,22 @@ public static class KeyboardSelectionSync
     static readonly MethodInfo PushMethod = typeof(TMP_InputField).GetMethod(
         "UpdateKeyboardStringPosition", BindingFlags.Instance | BindingFlags.NonPublic);
 
+    // TMP's pointer paths call MarkGeometryAsDirty explicitly after selection
+    // changes — the public selection setters never repaint on their own, so a
+    // programmatic selection would stay INVISIBLE (device-verified: pins
+    // showed, highlight didn't). Push therefore also schedules the repaint.
+    static readonly MethodInfo MarkDirtyMethod = typeof(TMP_InputField).GetMethod(
+        "MarkGeometryAsDirty", BindingFlags.Instance | BindingFlags.NonPublic);
+
     internal static System.Action<TMP_InputField> PushOverrideForTests;
 
-    public static bool TargetExists => PushMethod != null;
+    public static bool TargetExists => PushMethod != null && MarkDirtyMethod != null;
 
     public static void Push(TMP_InputField field)
     {
         if (field == null) return;
         if (PushOverrideForTests != null) { PushOverrideForTests(field); return; }
         PushMethod?.Invoke(field, null);
+        MarkDirtyMethod?.Invoke(field, null);
     }
 }

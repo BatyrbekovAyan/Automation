@@ -11,8 +11,8 @@ public class SelectionHandleView : MonoBehaviour,
     IBeginDragHandler, IDragHandler, IEndDragHandler
 {
     public const float HitSize = 132f;
-    public const float HeadSize = 48f;
-    public const float StemWidth = 6f;
+    public const float HeadSize = 30f;   // WhatsApp-style dot, not a lollipop head
+    public const float StemWidth = 5f;
 
     public bool IsStart { get; private set; }
     public System.Action<SelectionHandleView, Vector2> DragMoved;
@@ -20,6 +20,7 @@ public class SelectionHandleView : MonoBehaviour,
 
     Image _stem;
     Image _head;
+    float _dir;                          // +1 head above the line (start), -1 below (end)
 
     public static SelectionHandleView Build(Transform parent, bool isStart)
     {
@@ -35,13 +36,12 @@ public class SelectionHandleView : MonoBehaviour,
 
         var view = go.GetComponent<SelectionHandleView>();
         view.IsStart = isStart;
+        view._dir = isStart ? 1f : -1f;   // start: head above the line, end: below
 
         view._stem = NewChildImage(go.transform, "Stem", new Vector2(StemWidth, 64f));
         view._head = NewChildImage(go.transform, "Head", new Vector2(HeadSize, HeadSize));
         view._head.gameObject.AddComponent<ImageWithRoundedCorners>().radius = HeadSize / 2f;
-
-        float dir = isStart ? 1f : -1f;   // start: head above the line, end: below
-        ((RectTransform)view._head.transform).anchoredPosition = new Vector2(0, dir * (32f + HeadSize / 2f));
+        view.SetStemHeight(64f);
 
         go.SetActive(false);
         return view;
@@ -60,8 +60,15 @@ public class SelectionHandleView : MonoBehaviour,
 
     public void SetColor(Color c) { _stem.color = c; _head.color = c; }
 
-    public void SetStemHeight(float h) =>
-        ((RectTransform)_stem.transform).sizeDelta = new Vector2(StemWidth, Mathf.Max(24f, h));
+    public void SetStemHeight(float h)
+    {
+        float height = Mathf.Max(24f, h);
+        ((RectTransform)_stem.transform).sizeDelta = new Vector2(StemWidth, height);
+        // The dot hugs its line end (iOS/WhatsApp anatomy) whatever the
+        // field's line height is.
+        ((RectTransform)_head.transform).anchoredPosition =
+            new Vector2(0, _dir * (height / 2f + HeadSize / 2f - 3f));
+    }
 
     public void OnBeginDrag(PointerEventData e) => DragMoved?.Invoke(this, e.position);
     public void OnDrag(PointerEventData e) => DragMoved?.Invoke(this, e.position);
