@@ -43,6 +43,11 @@ public class SuggestionsController : MonoBehaviour
     // skeleton+request path. Cleared on bot switch (chat ids recur across bots).
     private readonly SuggestionCache _cache = new SuggestionCache();
 
+    // Flow decision 2026-08-11: an ANSWERED run fully hides the sheet, leaving the pre-send
+    // set rendered but stale. This latch makes the next manual ✦ open regenerate instead of
+    // showing those stale cards; any IssueRequest clears it (a fresh set is on its way).
+    private bool _answeredIdle;
+
     void Awake()
     {
         _provider = new N8nSuggestionsProvider();   // Phase-2 live provider (N8N-02 single-line swap); coroutine runs on ChatManager.Instance
@@ -106,6 +111,7 @@ public class SuggestionsController : MonoBehaviour
         _requestSeq++;                                        // supersede any in-flight request
         _debounce.Cancel();                                  // bot switch: drop a window pending from the previous bot's chat (BATCH-03)
         _pendingIncomingText = null;
+        _answeredIdle = false;
         _cache.Clear();                                      // chat ids recur across bots — entries must not outlive the bot (F9)
         if (_toggle != null) _toggle.SetLit(false);
         HidePanel();
@@ -119,6 +125,7 @@ public class SuggestionsController : MonoBehaviour
         // CurrentChatId is now chat B — a mixed-context call the seq guard cannot catch). Drop it. (BATCH-03)
         _debounce.Cancel();
         _pendingIncomingText = null;
+        _answeredIdle = false;   // per-chat latch — never carries into another chat's open
         _semiAutoOn = SemiAutoStore.IsOn(ChatManager.Instance.CurrentBotId, ChatManager.Instance.CurrentChatId);
         if (_toggle != null) _toggle.SetLit(_semiAutoOn);     // default OFF → other chats stay manual (SEMI-03)
         // SUP-02 heal: re-assert only an EXPLICIT per-chat override (tri-state 1/2) — covers a lost
@@ -202,6 +209,7 @@ public class SuggestionsController : MonoBehaviour
     private void IssueRequest(string steerTowardText, string lastIncomingText)
     {
         if (ChatManager.Instance == null || _provider == null) return;
+        _answeredIdle = false;                                 // a fresh set is on its way — stale latch off
         long seq = ++_requestSeq;                              // newest wins (also supersedes any in-flight)
         string chatId = ChatManager.Instance.CurrentChatId;
         if (string.IsNullOrEmpty(chatId)) return;             // no open chat → nothing to scope a request to (WR-02)
@@ -241,29 +249,45 @@ public class SuggestionsController : MonoBehaviour
             StartCoroutine(WriteComposerRoutine(_bottomPanel.inputField, replyText));
         IssueRequest(steerTowardText: replyText, lastIncomingText: null);   // re-cluster toward the pick (INT-04/D-01)
         // NEVER auto-send — only the existing composer Send button delivers a message (D-03).
-        // The sheet deliberately stays open on a pick (owner decision 2026-08-10 — no dismissal).
+        // The sheet stays open on a pick so a re-clustered variant is one tap to swap in;
+        // it hides on the OUTGOING echo instead (flow decision 2026-08-11).
     }
 
-    // Audit F14. iOS shares ONE native keyboard buffer: writing .text into a still-FOCUSED
-    // TMP field round-trips through it and lands wrong (input invariants; same ordering as
-    // BotSettings.Prompts' MutatePromptRoutine — blur, let the release land, THEN write).
-    // After refocus the caret is placed programmatically, so it must sync the hidden native
-    // buffer via KeyboardSelectionSync.Push (TextSelection invariant #1) or the next
-    // keystroke edits at the stale native caret.
-    private static IEnumerator WriteComposerRoutine(TMPro.TMP_InputField field, string text)
+    // Audit F14 + flow decision 2026-08-11. iOS shares ONE native keyboard buffer: writing
+    // .text into a still-FOCUSED TMP field round-trips through it and lands wrong (input
+    // invariants; same ordering as BotSettings.Prompts' MutatePromptRoutine — blur, let the
+    // release land, THEN write). A pick must NOT open the keyboard: send-as-is is tap-card →
+    // tap-Send with the thread visible; editing starts by tapping the composer, where TMP's
+    // own pointer path seats the caret and native buffer. Only a field that was ALREADY in
+    // edit mode gets its focus restored — and then the programmatic caret must sync via
+    // KeyboardSelectionSync.Push (TextSelection invariant #1).
+    private IEnumerator WriteComposerRoutine(TMPro.TMP_InputField field, string text)
     {
-        if (field.isFocused)
+        bool wasFocused = field.isFocused;
+        if (wasFocused)
         {
             field.DeactivateInputField();
             yield return null;                       // let the release land before touching .text
         }
         if (field == null) yield break;              // chat closed under us mid-frame
         field.text = text;                           // OVERWRITE composer (deliberate, D-02)
-        field.ActivateInputField();                  // focus for edit
+        PulseSendButton();                           // after the write: the button exists once text is in
+        if (!wasFocused) yield break;                // keyboard stays CLOSED — the pick is not an edit
+        field.ActivateInputField();                  // owner was mid-edit — keep them in edit mode
         yield return null;                           // activation is a promise — focus lands end-of-frame
         if (field == null || !field.isFocused) yield break;
         field.caretPosition = field.text.Length;     // deterministic caret at end
         KeyboardSelectionSync.Push(field);
+    }
+
+    // The send-as-is path is two taps (card → Send); the pulse advertises the second one.
+    private void PulseSendButton()
+    {
+        var send = _bottomPanel != null ? _bottomPanel.sendButton : null;
+        if (send == null || !send.gameObject.activeInHierarchy) return;
+        send.transform.DOKill();
+        send.transform.localScale = Vector3.one;
+        send.transform.DOPunchScale(Vector3.one * 0.12f, 0.35f, 6, 0.6f);
     }
 
     // --- Auto-populate on incoming (INT-02, incoming-only, NEVER writes composer — Pitfall 7) ---
@@ -274,10 +298,18 @@ public class SuggestionsController : MonoBehaviour
         var fold = FoldLiveBatch(_pendingIncomingText, msgs);
         _pendingIncomingText = fold.Pending;
         // The owner (or bot) replied: a request already in flight was issued for a burst that is
-        // now answered — supersede it so its cards can never render post-answer (audit F11). The
-        // sheet itself stays as-is (no auto-dismiss — owner decision 2026-08-10).
+        // now answered — supersede it so its cards can never render post-answer (audit F11).
         if (fold.SawOutgoing) _requestSeq++;
-        if (fold.Cancel) _debounce.Cancel();
+        if (fold.Cancel)
+        {
+            _debounce.Cancel();
+            // Flow decision 2026-08-11: the batch ended ANSWERED with nothing re-armed — the
+            // chat is quiet, so the sheet fully hides. (A reply followed by a NEW question in
+            // the same batch re-arms instead: Cancel is false and the sheet stays for the
+            // fresh set.) The next incoming re-shows it at the debounce fire.
+            _answeredIdle = true;
+            SetSheetOpen(false);
+        }
         // UNSCALED wall clock, matching DebounceLoop's WaitForSecondsRealtime tick and the
         // ChatManager poll idiom: Time.time is maximumDeltaTime-capped (so a frame hitch or an
         // app resume silently stretches the window) and stops entirely at timeScale 0.
@@ -364,6 +396,11 @@ public class SuggestionsController : MonoBehaviour
             yield return new WaitForSecondsRealtime(0.25f);   // fresh instance each loop (codebase idiom)
             if (!_semiAutoOn) continue;                       // cheap guard; do not fire when off
             if (_debounce.ShouldFire(Time.realtimeSinceStartup))   // SAME clock as Poke (unscaled, matches this loop's tick)
+            {
+                // A new incoming after an answered-and-hidden run re-opens the sheet HERE, at the
+                // fire — arriving together with the skeleton, never flashing the stale pre-send
+                // set for the window's 2.5s (flow decision 2026-08-11).
+                if (_panel != null && !_panel.IsShown) ShowPanel();
                 // NOTE: _pendingIncomingText deliberately survives the fire — it mirrors the
                 // UN-REPLIED trailing run, and a burst that straddles the window fires twice; the
                 // second fire must still carry the earlier fragments (the payload's history snapshot
@@ -371,6 +408,7 @@ public class SuggestionsController : MonoBehaviour
                 // lost the roses question when the fire cleared it). It clears only at a run
                 // boundary: an outgoing reply (HandleLive) or the four lifecycle cancel sites.
                 IssueRequest(steerTowardText: null, lastIncomingText: _pendingIncomingText);   // coalesced fire (INT-02)
+            }
         }
     }
 
@@ -424,7 +462,13 @@ public class SuggestionsController : MonoBehaviour
     public void SetSheetOpen(bool open)
     {
         if (!_semiAutoOn) return;
-        if (open) ShowPanel();
+        if (open)
+        {
+            ShowPanel();
+            // Re-opening after an answered run: the rendered cards are the stale pre-send set —
+            // regenerate for "what's next" instead of showing them (flow decision 2026-08-11).
+            if (_answeredIdle) IssueRequest(steerTowardText: null, lastIncomingText: null);
+        }
         else HidePanel();
     }
 
