@@ -116,6 +116,21 @@ public class DeferredDismissInputField : TMP_InputField,
     private string Who() =>
         transform.parent != null ? $"{transform.parent.name}/{name}" : name;
 
+    // OnFillVBO paints the caret quad for as long as this flag is set, so it —
+    // not isFocused — is the real "would this field still show a caret?"
+    // question. TMP keeps it private, hence reflection (same idiom as
+    // KeyboardSelectionSync); a Unity/uGUI upgrade that renames it falls back
+    // to the isFocused approximation below and fails loudly in
+    // InputFieldHideCaretTests rather than silently bringing the ghost back.
+    private static readonly System.Reflection.FieldInfo SelectionStillActiveField =
+        typeof(TMP_InputField).GetField("m_SelectionStillActive",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+    private bool CaretStillPainting(bool fallback) =>
+        SelectionStillActiveField != null
+            ? (bool)SelectionStillActiveField.GetValue(this)
+            : fallback;
+
     protected override void OnEnable()
     {
         base.OnEnable();
@@ -135,6 +150,10 @@ public class DeferredDismissInputField : TMP_InputField,
             orphanedKeyboard = null;
         }
 
+        // Captured before the teardown below runs: DeactivateInputField clears
+        // the flag behind isFocused on its way out.
+        bool wasEditing = isFocused || dismissPending;
+
         if (dismissPending)
         {
             dismissPending = false;
@@ -142,6 +161,35 @@ public class DeferredDismissInputField : TMP_InputField,
                 base.OnDeselect(new BaseEventData(EventSystem.current));
         }
         base.OnDisable();
+
+        // A tab or page switch hides the field with SetActive(false) — every
+        // navigation path in the app does (BottomTabManager.SwitchTab,
+        // AddBotPanel.Close/CloseImmediate, ProfileSubPages.Close,
+        // BotSettings.SetActiveTab and the Bot Settings close) — so an
+        // editing session can end HERE, without ever passing the pointer paths
+        // above. Both of those release the selection after deactivating; this
+        // one did not, and `Reset On Deactivation` is off on every input in
+        // this project, so DeactivateInputField left m_SelectionStillActive
+        // set. OnFillVBO's guard is `if (!isFocused && !m_SelectionStillActive)
+        // return empty`, so the caret quad went on being re-emitted at its last
+        // position and the page came back showing a static ghost caret in a
+        // field nobody was editing. TMP's own self-heal (LateUpdate) only
+        // releases when Reset On Deactivation is on — and a disabled object
+        // gets no LateUpdate regardless.
+        //
+        // ReleaseSelection is also what raises onEndEdit, so a page hidden
+        // mid-edit now COMMITS the typed value through
+        // EditableField.HandleEndEdit → Blur instead of silently discarding it
+        // — the same reasoning as the real-dismiss path in Update().
+        //
+        // Gated on the paint flag rather than on wasEditing so that a field
+        // deactivated explicitly a moment BEFORE its screen closed is covered
+        // too (AttachmentPreviewScreen does exactly that with the caption
+        // field: by the time we get here isFocused is already false, but the
+        // caret is still painting). A field nobody touched has the flag clear
+        // and stays quiet, so no onEndEdit is raised for a value nobody typed.
+        // Ordered after base.OnDisable, which would otherwise re-set the flag.
+        if (CaretStillPainting(fallback: wasEditing)) ReleaseSelection();
     }
 
     public override void OnDeselect(BaseEventData eventData)

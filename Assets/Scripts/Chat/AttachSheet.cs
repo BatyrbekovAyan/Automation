@@ -75,7 +75,30 @@ public class AttachSheet : MonoBehaviour
         // Decouple from input field: always dismiss the keyboard. iOS animates
         // the slide-down naturally; KeyboardAwarePanel's rawKb tracking drops
         // the input bar to the base by itself.
-        if (inputField != null) inputField.DeactivateInputField();
+        //
+        // ReleaseSelection is what stops the caret. `Reset On Deactivation` is
+        // off on every input in this project, and with it off TMP's
+        // DeactivateInputField sets m_SelectionStillActive = true and
+        // deliberately skips the release. OnFillVBO's guard is `if (!isFocused
+        // && !m_SelectionStillActive) return empty`, so the composer went on
+        // re-emitting its caret quad at the last position on every canvas
+        // rebuild — a static ghost caret sitting behind the sheet and still
+        // there after it dismisses, until the composer is tapped again (real
+        // focus) or the chat screen is hidden. The equivalent release in
+        // DeferredDismissInputField.OnDisable cannot cover this path: nothing
+        // is SetActive(false) here.
+        //
+        // Order matters — ReleaseSelection AFTER DeactivateInputField, which
+        // re-sets the flag on its way out (same rule as SilentCaretStop).
+        // ReleaseSelection also raises onEndEdit; the composer has no
+        // onEndEdit listener (the project's only one is
+        // EditableField.HandleEndEdit, on Bot Settings fields), so nothing is
+        // committed here — check that still holds before adding one.
+        if (inputField != null)
+        {
+            inputField.DeactivateInputField();
+            inputField.ReleaseSelection();
+        }
 
         gameObject.SetActive(true);
         if (backdrop != null) backdrop.SetActive(true);
