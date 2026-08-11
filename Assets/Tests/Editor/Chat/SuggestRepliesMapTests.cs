@@ -78,9 +78,40 @@ public class SuggestRepliesMapTests
         Assert.AreEqual(SuggestionStatus.Error, N8nSuggestionsProvider.MapResponse(null, 7).status);
 
     [Test]
-    public void EmptySuggestionsArray_MapsToError() =>
+    public void EmptySuggestionsArray_WithoutAbstain_MapsToError() =>
         Assert.AreEqual(SuggestionStatus.Error,
             N8nSuggestionsProvider.MapResponse("{\"v\":1,\"requestSeq\":7,\"suggestions\":[]}", 7).status);
+
+    // --- abstain envelope (owner decision 2026-08-11: non-business messages get NO cards) ---
+
+    [Test]
+    public void Abstain_EmptyList_MapsToEmpty_NotError()
+    {
+        // The server deliberately returned zero cards (personal/non-business message). The panel
+        // must show the quiet «Нет предложений» state, never the error+retry state.
+        var r = N8nSuggestionsProvider.MapResponse(
+            "{\"v\":1,\"requestSeq\":7,\"suggestions\":[],\"abstain\":true}", 4);
+        Assert.AreEqual(SuggestionStatus.Empty, r.status);
+        Assert.IsNull(r.items);
+        Assert.AreEqual(4L, r.requestSeq);
+    }
+
+    [Test]
+    public void Abstain_WithCards_CardsWin()
+    {
+        // Defensive: a contradictory envelope (abstain + cards) renders the cards — the
+        // abstain flag is only honored when the list is genuinely empty.
+        var r = N8nSuggestionsProvider.MapResponse(
+            "{\"v\":1,\"requestSeq\":1,\"suggestions\":[{\"text\":\"a\",\"label\":\"Ответ\"}],\"abstain\":true}", 2);
+        Assert.AreEqual(SuggestionStatus.Ok, r.status);
+        Assert.AreEqual(1, r.items.Count);
+    }
+
+    [Test]
+    public void Abstain_WithErrorField_ErrorWins() =>
+        Assert.AreEqual(SuggestionStatus.Error,
+            N8nSuggestionsProvider.MapResponse(
+                "{\"v\":1,\"requestSeq\":7,\"suggestions\":[],\"abstain\":true,\"error\":\"generation_failed\"}", 7).status);
 
     [Test]
     public void MissingSuggestions_MapsToError() =>

@@ -271,7 +271,9 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
     /// null-suggestions/0-valid => <see cref="SuggestionStatus.Error"/>; 1–4 valid {text,label}
     /// => <see cref="SuggestionStatus.Ok"/> ({text,label} -&gt; {text,intentLabel}, order preserved);
     /// &gt;4 valid => the FIRST 4 (the wire contract's upper bound, enforced client-side so a
-    /// misbehaving server can never overflow the fixed-footprint panel).
+    /// misbehaving server can never overflow the fixed-footprint panel). A deliberate
+    /// <c>abstain</c> envelope (empty list + abstain=true, no error) => <see cref="SuggestionStatus.Empty"/>
+    /// — the model judged the message non-business; the quiet state, never the retry nag.
     /// <paramref name="requestSeq"/> is stamped from the REQUEST, not the server echo.
     /// </summary>
     public static SuggestionResult MapResponse(string json, long requestSeq)
@@ -281,6 +283,9 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
 
         if (r == null || !string.IsNullOrEmpty(r.error) || r.suggestions == null)
             return new SuggestionResult { items = null, requestSeq = requestSeq, status = SuggestionStatus.Error };
+
+        if (r.abstain && r.suggestions.Count == 0)
+            return new SuggestionResult { items = null, requestSeq = requestSeq, status = SuggestionStatus.Empty };
 
         var items = r.suggestions
             .Where(s => s != null && !string.IsNullOrEmpty(s.text) && !string.IsNullOrEmpty(s.label))

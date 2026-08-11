@@ -7,13 +7,16 @@ Run BEFORE and AFTER every prompt/Prep/Assemble change to the canonical
     python3 Tools/n8n/probe-suggest-replies.py            # http://localhost:5678
     N8N_BASE_URL=... python3 Tools/n8n/probe-suggest-replies.py
 
-Each probe POSTs a realistic payload and prints the 4 cards. Checks come in two
-severities: STRUCT (exactly 4 cards) fails the run with exit 1; heuristic checks
-print OK/WARN only — LLM output is sampled at temperature 0.4, so treat a WARN as
-"re-run and read the cards", not as a hard regression. The probe matrix encodes the
-2026-08 audit failure modes (docs/design/suggestions-audit-2026-08.md):
-fabricated contacts/hours (B/B2/J/J2), false-negative availability (A/K),
-media over-confidence (D), steer echo (H), language mirroring + greeting spam (G).
+Each probe POSTs a realistic payload and prints the returned cards. Checks come in two
+severities: STRUCT fails the run with exit 1 — a "cards" probe must return 1–4 cards
+(variable count is the 2026-08-11 contract; >4 or an unexpected abstain is structural),
+an "abstain" probe must return the empty abstain envelope; heuristic checks print
+OK/WARN only — LLM output is sampled at temperature 0.4, so treat a WARN as "re-run and
+read the cards", not as a hard regression. The probe matrix encodes the 2026-08 audit
+failure modes (docs/design/suggestions-audit-2026-08.md): fabricated contacts/hours
+(B/B2/J/J2), false-negative availability (A/K), media over-confidence (D), steer echo
+(H), language mirroring + greeting spam (G), filler-card padding (F), non-business
+abstain (N).
 
 This workflow only calls OpenAI and returns JSON — probing it never messages anyone.
 """
@@ -106,29 +109,46 @@ PROBES = [
          m("client", "уже 15:30!!! где мой заказ??? я вам два раза писала!!")]), [
         ("no_upsell_to_angry", lambda c: not re.search(r"могу предложить|как вам такая идея", c[0]["text"].lower())),
     ]),
+    ("F_trivial_thanks_small_set", base("education", "SmartKids", "• Английский, группа (мес) — 20000 тг",
+        [m("client", "сколько стоит английский для ребенка?"),
+         m("business", "Группа — 20000 тг/мес."),
+         m("client", "спасибо")]), [
+        ("at_most_two_cards", lambda c: len(c) <= 2),
+    ]),
 ]
+
+# Non-business messages must return the deliberate abstain envelope (empty suggestions,
+# abstain=true, no error) — the client renders the quiet «Нет предложений» state.
+ABSTAIN_PROBES = [
+    ("N_personal_abstain", base("flowers", "Цветы Астана", FLOWER_CAT,
+        [m("client", "братан ну что, идём сегодня на футбол вечером? все наши собираются")])),
+]
+
+
+def post(payload):
+    req = urllib.request.Request(URL, json.dumps(payload).encode("utf-8"),
+                                 {"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=40) as resp:
+        return json.loads(resp.read().decode("utf-8"))
 
 
 def main():
     struct_fails = 0
     warns = 0
     for name, payload, checks in PROBES:
-        req = urllib.request.Request(URL, json.dumps(payload).encode("utf-8"),
-                                     {"Content-Type": "application/json"})
         t0 = time.time()
         try:
-            with urllib.request.urlopen(req, timeout=40) as resp:
-                body = json.loads(resp.read().decode("utf-8"))
+            body = post(payload)
         except Exception as e:
             print(f"\n### {name} REQUEST-ERROR {e}")
             struct_fails += 1
             continue
         cards = body.get("suggestions") or []
-        print(f"\n### {name} ({time.time() - t0:.1f}s)" + ("" if cards else f"  ERR:{body.get('error')}"))
+        print(f"\n### {name} ({time.time() - t0:.1f}s)" + ("" if cards else f"  ERR:{body.get('error')} abstain:{body.get('abstain')}"))
         for c in cards:
             print(f"  [{c.get('label', '?')}] {c.get('text', '')}")
-        if len(cards) != 4:
-            print("  !! STRUCT-FAIL: expected exactly 4 cards")
+        if not 1 <= len(cards) <= 4 or body.get("abstain"):
+            print("  !! STRUCT-FAIL: expected 1-4 cards without abstain")
             struct_fails += 1
             continue
         for label, fn in checks:
@@ -138,6 +158,21 @@ def main():
                 ok = False
             print(f"  {'OK  ' if ok else 'WARN'} {label}")
             warns += 0 if ok else 1
+    for name, payload in ABSTAIN_PROBES:
+        t0 = time.time()
+        try:
+            body = post(payload)
+        except Exception as e:
+            print(f"\n### {name} REQUEST-ERROR {e}")
+            struct_fails += 1
+            continue
+        cards = body.get("suggestions") or []
+        print(f"\n### {name} ({time.time() - t0:.1f}s) abstain:{body.get('abstain')} cards:{len(cards)}")
+        for c in cards:
+            print(f"  [{c.get('label', '?')}] {c.get('text', '')}")
+        ok = body.get("abstain") is True and len(cards) == 0 and not body.get("error")
+        print(f"  {'OK  ' if ok else 'WARN'} abstain_envelope")
+        warns += 0 if ok else 1
     print(f"\nprobes done: struct_fails={struct_fails}, heuristic_warns={warns}")
     sys.exit(1 if struct_fails else 0)
 

@@ -66,7 +66,10 @@ public class SuggestReplyDto
 
 /// <summary>
 /// The v1 success/failure envelope. A non-empty <c>error</c> OR a null/empty
-/// <c>suggestions</c> list maps to <see cref="SuggestionStatus.Error"/>.
+/// <c>suggestions</c> list maps to <see cref="SuggestionStatus.Error"/> — EXCEPT the
+/// deliberate <c>abstain</c> envelope (owner decision 2026-08-11): an empty list with
+/// <c>abstain=true</c> means "this message needs no business reply" and maps to
+/// <see cref="SuggestionStatus.Empty"/> (the quiet «Нет предложений» state, no retry nag).
 /// </summary>
 [System.Serializable]
 public class SuggestRepliesResponse
@@ -74,5 +77,6 @@ public class SuggestRepliesResponse
     public int    v;
     public long   requestSeq;   // server echo (validated for logging only)
     public string error;        // e.g. "generation_failed"; non-empty => Error
+    public bool   abstain;      // true + empty suggestions => Empty (non-business message)
     public List<SuggestReplyDto> suggestions = new();
 }
