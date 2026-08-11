@@ -8313,7 +8313,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: -80, y: -64.00001}
+  m_SizeDelta: {x: -80, y: -48}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &4451495542062716025
 MonoBehaviour:
@@ -9392,7 +9392,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
   m_AnchoredPosition: {x: 642, y: -540}
-  m_SizeDelta: {x: 1184, y: 360}
+  m_SizeDelta: {x: 1184, y: 340}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &4609109541665313857
 CanvasRenderer:
@@ -9521,7 +9521,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3312d7739989d2b4e91e6319e9a96d76, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.RectMask2D
-  m_Padding: {x: 0, y: 0, z: 0, w: 0}
+  m_Padding: {x: 0, y: 8, z: 0, w: 8}
   m_Softness: {x: 0, y: 0}
 --- !u!114 &9038762566544662070
 MonoBehaviour:
@@ -10102,7 +10102,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: adb30198aa32dd140b5750692dd48104, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithRoundedCorners
-  radius: 10
+  radius: 40
   image: {fileID: 2068684323596302596}
 --- !u!114 &8847309828305455980
 MonoBehaviour:
@@ -10179,7 +10179,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3312d7739989d2b4e91e6319e9a96d76, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.RectMask2D
-  m_Padding: {x: 0, y: 0, z: 0, w: 0}
+  m_Padding: {x: 0, y: 8, z: 0, w: 8}
   m_Softness: {x: 0, y: 0}
 --- !u!114 &4573253290881079597
 MonoBehaviour:
@@ -14130,10 +14130,10 @@ RectTransform:
   - {fileID: 65515284267416378}
   m_Father: {fileID: 8164761987902764484}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 108}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 642, y: -1104}
+  m_SizeDelta: {x: 1184, y: 108}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &9125678827924739794
 MonoBehaviour:
@@ -18689,14 +18689,14 @@ MonoBehaviour:
       m_Calls: []
   m_text: "\u0415\u0449\u0451 0 \u203A"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 0}
-  m_sharedMaterial: {fileID: 0}
+  m_fontAsset: {fileID: 11400000, guid: e0cdfe2d6a51446bcba7d2df147e2415, type: 2}
+  m_sharedMaterial: {fileID: 2232284572483422210, guid: e0cdfe2d6a51446bcba7d2df147e2415, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4292247897
   m_fontColor: {r: 0.349, g: 0.506, b: 0.839, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -18709,7 +18709,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -18737,13 +18737,13 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
-  m_ActiveFontFeatures: 00000000
+  m_ActiveFontFeatures: 
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1
   m_EmojiFallbackSupport: 1
   m_parseCtrlCharacters: 1
-  m_isOrthographic: 0
+  m_isOrthographic: 1
   m_isCullingEnabled: 0
   m_horizontalMapping: 0
   m_verticalMapping: 0
@@ -19855,7 +19855,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 642, y: -85}
+  m_AnchoredPosition: {x: 642, y: -995}
   m_SizeDelta: {x: 1184, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &5131023581709318946
@@ -19895,7 +19895,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4287860366
+    rgba: 4288317049
   m_fontColor: {r: 0.475, g: 0.525, b: 0.604, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -28797,7 +28797,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: -80, y: -64.00001}
+  m_SizeDelta: {x: -80, y: -48}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2043542326733597319
 MonoBehaviour:
