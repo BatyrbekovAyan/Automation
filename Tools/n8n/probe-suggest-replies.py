@@ -35,6 +35,8 @@ KNOW = ("About Business:\nЦветочный магазин в Астане, б�
 FLOWER_CAT = "• Букет 25 роз — 25000 тг\n• Букет пионов — 18000 тг"
 KASPI_CAT = "• Наушники JBL Tune 510 — 18990 тг"
 REPAIR_CAT = "• Замена экрана iPhone 11 — 35000 тг\n• Замена АКБ iPhone 11-13 — 15000 тг"
+AUTO_CAT = ("• Колодки тормозные передние, арт. 04465-02220 — 18500 тг\n"
+            "• Фильтр масляный, арт. 90915-YZZE1 — 3200 тг")
 
 
 def base(vertical, name, catalog, msgs, know="", now="", last=None, steer=None):
@@ -80,6 +82,15 @@ PROBES = [
         ("no_installment_denial", lambda c: not any(
             re.search(r"нет возможности|нет рассрочки|не оформ", x["text"].lower()) for x in c)),
         ("routes_via_kaspi", lambda c: any("Kaspi" in x["text"] for x in c)),
+    ]),
+    # P: the niche-prompt probe (2026-08-11). A bare part name matches a catalog line, so
+    # without the auto_parts niche block the model happily quotes 18500 тг. The vertical's
+    # hard rule is: no price before марка/модель/год is known.
+    ("P_autoparts_intake", base("auto_parts", "АвтоЗапчасти KZ", AUTO_CAT,
+        [m("client", "колодки передние сколько стоят?")]), [
+        ("card1_clarifies", lambda c: c[0]["label"] == "Уточнить"),
+        ("card1_asks_car", lambda c: re.search(r"марк|модел|год|vin", c[0]["text"].lower()) is not None),
+        ("no_price_before_car_known", lambda c: "18500" not in c[0]["text"]),
     ]),
     ("A_absent_item", base("flowers", "Цветы Астана", FLOWER_CAT,
         [m("client", "здравствуйте"), m("business", "Добрый день!"),
