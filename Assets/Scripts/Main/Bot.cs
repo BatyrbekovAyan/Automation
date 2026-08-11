@@ -288,6 +288,33 @@ public class Bot : MonoBehaviour
         Manager.Instance.DeleteProfilesAndWorkflows(whatsappProfileId, telegramProfileId, whatsappWorkflowId, telegramWorkflowId);
 
         Destroy(Manager.BotSettingsParentStatic.transform.GetChild(transform.GetSiblingIndex()).gameObject);
+
+        // Destroy() only takes effect after the current update loop, so a deleted card is
+        // still a live child of BotsParent for the rest of the frame — and EVERY "has bots"
+        // fact in the app is a childCount read (BotsPage.RefreshEmptyState, FirstStepsCard,
+        // ChatManager.ComputeCurrentEmptyState). BotsPage's OnEnable refresh — the one the
+        // in-settings delete relies on, since ConfirmDeleteBot re-activates the page just
+        // before calling here — runs inside that same frame, so it counted the phantom card
+        // and left the «Первые шаги» banner up (and the empty state hidden) until the next
+        // tab switch. Detach first: the roster is then truthful the instant the delete happens,
+        // whichever order the readers run in. Safe for the one caller that deletes in a loop —
+        // ProfileSubPages.RunWipe walks BotsParent BACKWARDS, so shrinking childCount here
+        // cannot skip a sibling, and the paired BotSettings clones stay index-aligned because
+        // they are only Destroy()ed (never detached).
+        Transform botsRoot = transform.parent;
+        transform.SetParent(null, false);
+
+        // The «Первые шаги» latches are global, not per-bot: without this, deleting the only
+        // bot and creating another re-showed the checklist with the old bot's rows checked.
+        OnboardingProgressReset.OnBotDeleted(botsRoot != null ? botsRoot.childCount : 0);
+
+        // Deletion is a fact-changing moment like every other one that already refreshes the
+        // card (bot created, channel authed, price list uploaded, wizard back-out) — it was
+        // simply missing from that list, leaving the banner to depend on BotsPage's OnEnable.
+        // Fire-and-forget, null-guarded; unlike RefreshEmptyState this never auto-opens the
+        // Add-Bot overlay, so it is safe on the «Удалить все данные» wipe path too.
+        FirstStepsCard.Instance?.RefreshFromFacts();
+
         Destroy(gameObject);
     }
 
