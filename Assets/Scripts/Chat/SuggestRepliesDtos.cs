@@ -54,6 +54,7 @@ public class SuggestRepliesRequestDto
     // --- v1.2 additive keys (2026-08 audit F1/F2 grounding; ADD-only, same rules) ---
     public string businessKnowledge; // ComposeBusinessKnowledge output (description + Контакты block), clamped <=1200; "" when unset
     public string now;               // device local time "yyyy-MM-dd HH:mm, <ru day>"; server sanitizes before prompt use
+    public string pickStats;         // per-bot pick counters "Ответ:12,К заказу:8" (preference learning v1, 2026-08-11); "" when none
 }
 
 /// <summary>One suggestion in the response envelope: server sends {text,label}.</summary>

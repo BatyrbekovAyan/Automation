@@ -48,6 +48,15 @@ public class SuggestionsController : MonoBehaviour
     // showing those stale cards; any IssueRequest clears it (a fresh set is on its way).
     private bool _answeredIdle;
 
+    // Rounds flow (2026-08-11): each pick steers the NEXT set toward the chosen card; the
+    // stack remembers the rounds being left so ‹ restores them instantly (no LLM call, no
+    // skeleton, composer untouched). _currentSteer is the direction that produced the round
+    // ON SCREEN (null = fresh set) — refresh re-rolls it; _currentRendered is the last Ok
+    // set, i.e. what Push records when a pick moves forward.
+    private readonly SuggestionRoundStack _rounds = new SuggestionRoundStack();
+    private string _currentSteer;
+    private SuggestionResult _currentRendered;
+
     void Awake()
     {
         _provider = new N8nSuggestionsProvider();   // Phase-2 live provider (N8N-02 single-line swap); coroutine runs on ChatManager.Instance
@@ -61,6 +70,7 @@ public class SuggestionsController : MonoBehaviour
         {
             _panel.OnCardTapped += HandleCardTapped;
             _panel.OnRefreshRequested += HandleManualRefresh;
+            _panel.OnBackRequested += HandleBack;
         }
     }
 
@@ -76,6 +86,7 @@ public class SuggestionsController : MonoBehaviour
         {
             _panel.OnCardTapped -= HandleCardTapped;
             _panel.OnRefreshRequested -= HandleManualRefresh;
+            _panel.OnBackRequested -= HandleBack;
         }
     }
 
@@ -112,6 +123,7 @@ public class SuggestionsController : MonoBehaviour
         _debounce.Cancel();                                  // bot switch: drop a window pending from the previous bot's chat (BATCH-03)
         _pendingIncomingText = null;
         _answeredIdle = false;
+        StartFreshRound();
         _cache.Clear();                                      // chat ids recur across bots — entries must not outlive the bot (F9)
         if (_toggle != null) _toggle.SetLit(false);
         HidePanel();
@@ -126,6 +138,7 @@ public class SuggestionsController : MonoBehaviour
         _debounce.Cancel();
         _pendingIncomingText = null;
         _answeredIdle = false;   // per-chat latch — never carries into another chat's open
+        StartFreshRound();       // rounds are per-question, never per-app — a chat open starts at round 1
         _semiAutoOn = SemiAutoStore.IsOn(ChatManager.Instance.CurrentBotId, ChatManager.Instance.CurrentChatId);
         if (_toggle != null) _toggle.SetLit(_semiAutoOn);     // default OFF → other chats stay manual (SEMI-03)
         // SUP-02 heal: re-assert only an EXPLICIT per-chat override (tri-state 1/2) — covers a lost
@@ -177,6 +190,7 @@ public class SuggestionsController : MonoBehaviour
         if (desiredOn)
         {
             ShowPanel();
+            StartFreshRound();                                 // explicit turn-on = round 1
             IssueRequest(null, null);                          // first set on turn-on
         }
         else
@@ -234,6 +248,9 @@ public class SuggestionsController : MonoBehaviour
         if (!SuggestionSequenceGuard.IsCurrent(seq, _requestSeq, capturedChatId, currentChatId))
             return;                                            // superseded / chat switched → DISCARD
         if (_panel != null) _panel.Render(result);            // skeleton → cards | empty | error
+        // Rounds: only an Ok set becomes the restorable "current round" — an error/empty render
+        // leaves _currentRendered on the last good set, so a pick-after-retry still pushes it.
+        if (result != null && result.status == SuggestionStatus.Ok) _currentRendered = result;
         // F9 verify-at-store: cache only when the tail is STILL the one this request answered —
         // a message that landed mid-flight makes this set already-stale, so let it render (the
         // corrective fire is coming) but never persist it. Store ignores non-Ok results itself.
@@ -247,10 +264,63 @@ public class SuggestionsController : MonoBehaviour
     {
         if (_bottomPanel != null && _bottomPanel.inputField != null)
             StartCoroutine(WriteComposerRoutine(_bottomPanel.inputField, replyText));
-        IssueRequest(steerTowardText: replyText, lastIncomingText: null);   // re-cluster toward the pick (INT-04/D-01)
+        // Rounds flow: record the round being left so ‹ can restore it locally, remember the
+        // new direction for refresh re-rolls, and count the pick for preference learning.
+        _rounds.Push(_currentRendered, _currentSteer);
+        _currentSteer = replyText;
+        RecordPick(replyText);
+        UpdateBackUi();
+        IssueRequest(steerTowardText: replyText, lastIncomingText: null);   // next round steers toward the pick (INT-04/D-01)
         // NEVER auto-send — only the existing composer Send button delivers a message (D-03).
         // The sheet stays open on a pick so a re-clustered variant is one tap to swap in;
         // it hides on the OUTGOING echo instead (flow decision 2026-08-11).
+    }
+
+    // ‹ pressed: restore the previous round's cards INSTANTLY — no LLM call, no skeleton.
+    // The seq bump kills any in-flight forward/refresh result so it cannot overwrite the
+    // restored round. The composer is deliberately untouched: back changes the CARDS only
+    // (an owner edit in the composer must never be destroyed by navigation).
+    private void HandleBack()
+    {
+        if (!_semiAutoOn) return;
+        if (!_rounds.TryPop(out SuggestionResult previous, out string previousSteer)) return;
+        _requestSeq++;
+        _currentSteer = previousSteer;
+        _currentRendered = previous;
+        if (_panel != null) _panel.Render(previous);
+        UpdateBackUi();
+    }
+
+    // Preference learning v1 (2026-08-11): count which MOVE the owner picks, per bot. The tap
+    // carries only the text, so the label is resolved from the set on screen; texts within one
+    // set are distinct by generation. Read back by N8nSuggestionsProvider.BuildPickStats.
+    private void RecordPick(string replyText)
+    {
+        if (_currentRendered?.items == null || ChatManager.Instance == null) return;
+        string botName = ChatManager.Instance.CurrentBotId;
+        if (string.IsNullOrEmpty(botName)) return;
+        foreach (var item in _currentRendered.items)
+        {
+            if (item == null || item.text != replyText) continue;
+            string key = botName + "SuggestPick" + item.intentLabel;
+            PlayerPrefs.SetInt(key, PlayerPrefs.GetInt(key, 0) + 1);
+            PlayerPrefs.Save();   // mobile apps get killed — flush (bot-persistence)
+            return;
+        }
+    }
+
+    // A fresh round 1: new incoming, chat/bot switch, explicit toggle-on, answered run.
+    private void StartFreshRound()
+    {
+        _rounds.Clear();
+        _currentSteer = null;
+        _currentRendered = null;
+        UpdateBackUi();
+    }
+
+    private void UpdateBackUi()
+    {
+        if (_panel != null) _panel.SetBackVisible(_rounds.CanGoBack);
     }
 
     // Audit F14 + flow decision 2026-08-11. iOS shares ONE native keyboard buffer: writing
@@ -308,6 +378,7 @@ public class SuggestionsController : MonoBehaviour
             // the same batch re-arms instead: Cancel is false and the sheet stays for the
             // fresh set.) The next incoming re-shows it at the debounce fire.
             _answeredIdle = true;
+            StartFreshRound();   // the question was answered — its refinement rounds are over
             SetSheetOpen(false);
         }
         // UNSCALED wall clock, matching DebounceLoop's WaitForSecondsRealtime tick and the
@@ -401,6 +472,7 @@ public class SuggestionsController : MonoBehaviour
                 // fire — arriving together with the skeleton, never flashing the stale pre-send
                 // set for the window's 2.5s (flow decision 2026-08-11).
                 if (_panel != null && !_panel.IsShown) ShowPanel();
+                StartFreshRound();   // a new client message is a NEW question — round 1 again
                 // NOTE: _pendingIncomingText deliberately survives the fire — it mirrors the
                 // UN-REPLIED trailing run, and a burst that straddles the window fires twice; the
                 // second fire must still carry the earlier fragments (the payload's history snapshot
@@ -447,10 +519,13 @@ public class SuggestionsController : MonoBehaviour
     }
 
     // --- Manual refresh (INT-03) ---
+    // Re-rolls the CURRENT round: same steer, new sampling (rounds flow 2026-08-11). Round 1
+    // has a null steer, so there it stays the old fresh-set refresh. Never pushed — a refresh
+    // replaces the round in place, it is not forward movement.
 
     private void HandleManualRefresh()
     {
-        if (_semiAutoOn) IssueRequest(steerTowardText: null, lastIncomingText: null);
+        if (_semiAutoOn) IssueRequest(steerTowardText: _currentSteer, lastIncomingText: null);
     }
 
     // --- Manual sheet show/hide (grab-handle close + composer toggle button) ---

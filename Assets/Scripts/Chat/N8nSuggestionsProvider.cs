@@ -90,7 +90,8 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
             catalog:        BuildCatalog(botName),
             recentMessages: msgs,
             businessKnowledge: BuildBusinessKnowledge(botName),
-            now:               LocalNowString());
+            now:               LocalNowString(),
+            pickStats:         BuildPickStats(botName));
 
         using var www = new UnityWebRequest($"{Manager.n8nBaseUrl}/webhook/SuggestReplies", "POST");
         www.uploadHandler   = new UploadHandlerRaw(Encoding.UTF8.GetBytes(json));
@@ -159,6 +160,26 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
         return n.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture) + ", " + day;
     }
 
+    // The closed move taxonomy — MUST mirror the server enum (Validate node) verbatim.
+    private static readonly string[] MoveLabels =
+        { "Ответ", "Уточнить", "Вариант", "К заказу", "Отложить", "Отказ" };
+
+    // Preference learning v1 (2026-08-11): per-bot pick counters, written by
+    // SuggestionsController.RecordPick under {botName}SuggestPick{label}. Emitted as a
+    // compact "label:count" ranking hint; empty string when the owner has never picked.
+    private static string BuildPickStats(string botName)
+    {
+        var sb = new StringBuilder();
+        foreach (string label in MoveLabels)
+        {
+            int count = PlayerPrefs.GetInt(botName + "SuggestPick" + label, 0);
+            if (count <= 0) continue;
+            if (sb.Length > 0) sb.Append(',');
+            sb.Append(label).Append(':').Append(count);
+        }
+        return sb.ToString();
+    }
+
     // --- Pure payload builder (Unity-free except MessageViewModel, a plain data class) ---
 
     /// <summary>
@@ -171,11 +192,12 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
     /// <paramref name="ownerPrompt"/> clamped &lt;=2000 and <paramref name="catalog"/> &lt;=2500;
     /// messages = at most the LAST 24 of <paramref name="recentMessages"/>, oldest-&gt;newest, each
     /// text media-mapped then clamped &lt;=500, role="client" if incoming else "business".
-    /// v1.2 (audit F1/F2): <paramref name="businessKnowledge"/> (clamped &lt;=1200) and
-    /// <paramref name="now"/> append after the v1.1 keys. Stripping channel+botTgId+
-    /// businessKnowledge+now yields the frozen v1 object again — structural identity
-    /// (JToken.DeepEquals + exact key set) is what the payload tests enforce; matching byte
-    /// order additionally follows from Json.NET's declaration-order field emission.
+    /// v1.2 (audit F1/F2 + preference learning): <paramref name="businessKnowledge"/>
+    /// (clamped &lt;=1200), <paramref name="now"/> and <paramref name="pickStats"/> append
+    /// after the v1.1 keys. Stripping channel+botTgId+businessKnowledge+now+pickStats yields
+    /// the frozen v1 object again — structural identity (JToken.DeepEquals + exact key set)
+    /// is what the payload tests enforce; matching byte order additionally follows from
+    /// Json.NET's declaration-order field emission.
     /// </summary>
     public static string BuildPayloadJson(
         SuggestionRequest req,
@@ -190,7 +212,8 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
         string catalog,
         List<MessageViewModel> recentMessages,
         string businessKnowledge,
-        string now)
+        string now,
+        string pickStats)
     {
         bool isTelegram = channel == ChatChannel.Telegram;
         var dto = new SuggestRepliesRequestDto
@@ -211,6 +234,7 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
             channel          = isTelegram ? "telegram" : "whatsapp",                 // v1.1; lowercase, enum-derived only
             businessKnowledge = Clamp(businessKnowledge, MaxKnowledgeChars),          // v1.2; Авто-parity grounding (audit F2)
             now              = now,                                                   // v1.2; server sanitizes before prompt use
+            pickStats        = Clamp(pickStats, 200),                                 // v1.2; preference-learning ranking hint
         };
         return JsonConvert.SerializeObject(dto);
     }

@@ -22,6 +22,7 @@ public class SuggestionsPanel : MonoBehaviour
     [SerializeField] private Button refreshButton;         // manual refresh (INT-03)
     [SerializeField] private Button errorRetryButton;      // «Обновить» retry in the error state
     [SerializeField] private Button emptyRetryButton;      // «Обновить» in the empty state (audit F17b; wired by the builder)
+    [SerializeField] private Button backButton;            // ‹ previous round, header left (rounds flow 2026-08-11; hidden at round 1)
     [SerializeField] private RectTransform rt;             // slide root
     [SerializeField] private CanvasGroup canvasGroup;      // fade
     [SerializeField] private RectTransform cardsViewport;  // fixed scroll region (chrome = -offsetMax.y)
@@ -29,6 +30,7 @@ public class SuggestionsPanel : MonoBehaviour
 
     public event Action<string> OnCardTapped;
     public event Action OnRefreshRequested;
+    public event Action OnBackRequested;   // ‹ tap — the controller restores the previous round locally
 
     private const float TopSafeClearance = 180f;   // expansion never grows closer than this to the parent top
 
@@ -57,6 +59,7 @@ public class SuggestionsPanel : MonoBehaviour
         if (refreshButton != null) refreshButton.onClick.AddListener(() => OnRefreshRequested?.Invoke());
         if (errorRetryButton != null) errorRetryButton.onClick.AddListener(() => OnRefreshRequested?.Invoke());
         if (emptyRetryButton != null) emptyRetryButton.onClick.AddListener(() => OnRefreshRequested?.Invoke());
+        if (backButton != null) backButton.onClick.AddListener(() => OnBackRequested?.Invoke());
     }
 
     void OnDisable()
@@ -144,6 +147,13 @@ public class SuggestionsPanel : MonoBehaviour
     }
 
     private void HandleCardTapped(string text) => OnCardTapped?.Invoke(text);
+
+    /// <summary>Show the ‹ previous-round button only when there is a round to return to.</summary>
+    public void SetBackVisible(bool visible)
+    {
+        if (backButton != null && backButton.gameObject.activeSelf != visible)
+            backButton.gameObject.SetActive(visible);
+    }
 
     public void Clear()
     {

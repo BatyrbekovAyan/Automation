@@ -31,11 +31,11 @@ public class SuggestRepliesPayloadTests
         string businessName = "Магазин", string ownerPrompt = "", string catalog = "",
         ChatChannel channel = ChatChannel.WhatsApp,
         string telegramProfileId = "tgpid", string telegramWorkflowId = "wf_tg",
-        string businessKnowledge = "", string now = "")
+        string businessKnowledge = "", string now = "", string pickStats = "")
         => JObject.Parse(N8nSuggestionsProvider.BuildPayloadJson(
             req, channel, profileId, telegramProfileId, botWaId, telegramWorkflowId,
             businessTypeId, businessName, ownerPrompt, catalog, msgs,
-            businessKnowledge, now));
+            businessKnowledge, now, pickStats));
 
     // --- version + request passthrough ---------------------------------------
 
@@ -286,6 +286,14 @@ public class SuggestRepliesPayloadTests
         Assert.AreEqual("2026-08-10 15:04, воскресенье", (string)j["now"]);
     }
 
+    [Test]
+    public void PickStats_Passthrough()
+    {
+        // Preference learning v1 (2026-08-11): per-bot pick counters ride as a ranking hint.
+        var j = Build(Req(), One(), pickStats: "Ответ:12,К заказу:8");
+        Assert.AreEqual("Ответ:12,К заказу:8", (string)j["pickStats"]);
+    }
+
     // --- additive-identity: a WhatsApp request is structurally identical to v1 -
 
     [Test]
@@ -297,16 +305,18 @@ public class SuggestRepliesPayloadTests
             profileId: "wap", botWaId: "wf_wa", businessTypeId: "flowers",
             businessName: "Цветочный", ownerPrompt: "будь вежлив", catalog: "• Роза — 500",
             channel: ChatChannel.WhatsApp, telegramProfileId: "tgp", telegramWorkflowId: "wf_tg",
-            businessKnowledge: "About Business:\nЦветы", now: "2026-08-10 15:04, воскресенье");
+            businessKnowledge: "About Business:\nЦветы", now: "2026-08-10 15:04, воскресенье",
+            pickStats: "Ответ:3");
 
-        // The v1.1 keys (channel/botTgId) AND v1.2 keys (businessKnowledge/now) ARE present...
+        // The v1.1 keys (channel/botTgId) AND v1.2 keys (businessKnowledge/now/pickStats) ARE present...
         Assert.AreEqual("whatsapp", (string)j["channel"]);
         Assert.IsNotNull(j["botTgId"]);
         Assert.AreEqual("wf_tg", (string)j["botTgId"]);
         Assert.IsNotNull(j["businessKnowledge"]);
         Assert.IsNotNull(j["now"]);
+        Assert.IsNotNull(j["pickStats"]);
 
-        // ...and removing EXACTLY those four yields the frozen v1 object again. This test proves
+        // ...and removing EXACTLY those five yields the frozen v1 object again. This test proves
         // STRUCTURAL identity: JToken.DeepEquals is property-order-insensitive and the key-set
         // assertion below sorts before comparing — byte order is NOT asserted here (it follows
         // separately from Json.NET's declaration-order emission over the appended-last fields).
@@ -314,6 +324,7 @@ public class SuggestRepliesPayloadTests
         j.Remove("botTgId");
         j.Remove("businessKnowledge");
         j.Remove("now");
+        j.Remove("pickStats");
 
         var expectedV1 = new JObject
         {

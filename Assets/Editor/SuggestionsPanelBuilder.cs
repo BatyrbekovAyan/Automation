@@ -139,7 +139,8 @@ public static class SuggestionsPanelBuilder
         BuildGrabber(panelGo.transform);
         SheetDragHandle dragHandle = BuildGrabZone(panelGo.transform);
         Button refreshButton = null;
-        BuildHeader(panelGo.transform, sparkle, ref refreshButton);
+        Button backButton = null;
+        BuildHeader(panelGo.transform, sparkle, ref refreshButton, ref backButton);
 
         // Fixed card viewport — the ONLY thing that scrolls; the sheet never changes height (D-12).
         RectTransform viewportRt;
@@ -169,6 +170,7 @@ public static class SuggestionsPanelBuilder
         so.FindProperty("emptyState").objectReferenceValue = empty;
         so.FindProperty("errorState").objectReferenceValue = error;
         so.FindProperty("refreshButton").objectReferenceValue = refreshButton;
+        so.FindProperty("backButton").objectReferenceValue = backButton;         // rounds flow 2026-08-11
         so.FindProperty("errorRetryButton").objectReferenceValue = errorRetry;
         so.FindProperty("emptyRetryButton").objectReferenceValue = emptyRetry;   // audit F17b
         so.FindProperty("rt").objectReferenceValue = rt;
@@ -228,7 +230,7 @@ public static class SuggestionsPanelBuilder
         AddRounded(go, GrabberH / 2f);
     }
 
-    private static void BuildHeader(Transform panel, Sprite sparkle, ref Button refreshButton)
+    private static void BuildHeader(Transform panel, Sprite sparkle, ref Button refreshButton, ref Button backButton)
     {
         GameObject header = Rect("Header", panel);
         var rt = (RectTransform)header.transform;
@@ -241,6 +243,25 @@ public static class SuggestionsPanelBuilder
         hlg.childAlignment = TextAnchor.MiddleLeft;
         hlg.childControlWidth = true; hlg.childControlHeight = true;
         hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
+
+        // ‹ previous round (rounds flow 2026-08-11): first in the row, just before the ✦ +
+        // «ПРЕДЛОЖЕНИЯ» cluster. Mirrors the quiet refresh (invisible full-size hit target,
+        // small InkSecondary glyph). Built INACTIVE — SuggestionsPanel.SetBackVisible shows it
+        // from round 2 on; an inactive first child is skipped by the layout, so round 1 keeps
+        // today's header geometry exactly.
+        GameObject backHit = ImageGo("BackButton", header.transform, new Color(0, 0, 0, 0));
+        var backLe = backHit.AddComponent<LayoutElement>();
+        backLe.preferredWidth = RefreshHit; backLe.preferredHeight = RefreshHit;
+        backLe.minWidth = RefreshHit; backLe.minHeight = RefreshHit;
+        Image backIcon = ImageGo("Icon", backHit.transform, Color.white).GetComponent<Image>();
+        backIcon.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Images/Chat/chevron-left.png");
+        backIcon.preserveAspect = true; backIcon.raycastTarget = false;
+        Themed(backIcon.gameObject, ThemeRole.InkSecondary);
+        var birt = (RectTransform)backIcon.transform; birt.sizeDelta = new Vector2(RefreshIconSize, RefreshIconSize); Center(birt);
+        Rect("A11y:Назад", backHit.transform);
+        backButton = backHit.AddComponent<Button>();
+        backButton.transition = Selectable.Transition.None;
+        backHit.SetActive(false);
 
         // ✦ + «ПРЕДЛОЖЕНИЯ» overline.
         Image spark = ImageGo("Spark", header.transform, Color.white).GetComponent<Image>();
