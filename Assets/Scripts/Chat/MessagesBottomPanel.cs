@@ -14,6 +14,10 @@ public class MessagesBottomPanel : MonoBehaviour
     public Button attachButton;
     [SerializeField] private AttachSheet attachSheet;
 
+    /// <summary>The composer's attach sheet — the suggestions controller watches it for slot
+    /// exclusivity (the «+» sheet displaces the panel exactly like the keyboard does).</summary>
+    public AttachSheet AttachSheet => attachSheet;
+
     [Header("Reply Preview")]
     [SerializeField] private GameObject replyPreviewBar;
     [SerializeField] private TextMeshProUGUI replyPreviewSender;

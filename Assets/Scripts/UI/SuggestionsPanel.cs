@@ -70,7 +70,13 @@ public class SuggestionsPanel : MonoBehaviour
     {
         _slotCanvasPx = slotCanvasPx;
         _safeInsetCanvasPx = safeInsetCanvasPx;
-        if (rt != null) rt.sizeDelta = new Vector2(rt.sizeDelta.x, slotCanvasPx);
+        // The panel is TALLER than the slot by the safe inset. The native keyboard covers the
+        // composer's baked bottom pad (KeyboardAwarePanel subtracts the safe area from the
+        // rise, so the pad "slides under the keyboard"); a tenant of the same slot must cover
+        // that same strip, or it shows as a dead gap between the composer pill and the panel
+        // chrome (device finding 2026-08-12). The pad is 108u, the safe inset ≈94u — the pill
+        // itself starts above the pad, so the overlap can never touch it.
+        if (rt != null) rt.sizeDelta = new Vector2(rt.sizeDelta.x, slotCanvasPx + safeInsetCanvasPx);
         ApplySafeInset(safeInsetCanvasPx);
         if (gameObject.activeInHierarchy) StartCoroutine(UpdateFadeNextFrame());
         else UpdateFadeVisibility();
@@ -114,15 +120,19 @@ public class SuggestionsPanel : MonoBehaviour
     }
 
     /// <summary>
-    /// Glue the panel's top edge to the composer's bottom edge: the composer sits
-    /// <paramref name="appliedInsetCanvasPx"/> above its rest position (KeyboardAwarePanel's
-    /// APPLIED rise, smoothing and all), so the panel's top must sit exactly there.
-    /// With bottom-anchored pivot: y = applied − slot.
+    /// Glue the panel to the composer as it rides KeyboardAwarePanel's APPLIED rise (smoothing
+    /// and all). Fully open, the panel's top edge sits at applied + safe — overlapping the
+    /// composer's baked bottom pad by exactly the safe inset, the same strip the native
+    /// keyboard covers. The overlap blends out on the way down (the panel travels ~12% faster
+    /// than the composer — imperceptible), so fully closed it is fully off-screen instead of
+    /// leaving a safe-height sliver poking over the pad.
     /// </summary>
     public void FollowInset(float appliedInsetCanvasPx)
     {
         if (rt == null) return;
-        rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, appliedInsetCanvasPx - _slotCanvasPx);
+        float openRatio = _slotCanvasPx > 0f ? Mathf.Clamp01(appliedInsetCanvasPx / _slotCanvasPx) : 0f;
+        float y = appliedInsetCanvasPx - _slotCanvasPx - _safeInsetCanvasPx * (1f - openRatio);
+        rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, y);
     }
 
     // --- 5-state machine ----------------------------------------------------

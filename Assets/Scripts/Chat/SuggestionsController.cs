@@ -531,11 +531,13 @@ public class SuggestionsController : MonoBehaviour
     {
         if (_panel == null) return;
         bool kbVisible = _keyboardMover != null && _keyboardMover.NativeKeyboardVisible;
-        if (kbVisible && !claimSlotFromKeyboard)
+        if ((kbVisible || AttachOpen) && !claimSlotFromKeyboard)
         {
-            _pendingShow = true;
+            _pendingShow = true;   // never steal the slot from a typing owner or an open «+» sheet
             return;
         }
+        // Explicit ✦ while the attach sheet is up: the sheet hands the slot over, like the keyboard.
+        if (AttachOpen) _bottomPanel.AttachSheet.Close();
 
         float kbCanvas = _keyboardMover != null ? _keyboardMover.EffectiveAreaCanvasPx : 0f;
         _slotCanvasPx = SuggestionSlotSwap.SlotForOpen(kbVisible, kbCanvas, SuggestionSlotHeight.Remembered);
@@ -639,8 +641,18 @@ public class SuggestionsController : MonoBehaviour
             }
         }
 
-        // A parked auto-show lands the moment the keyboard leaves the slot.
-        if (!kbVisible && _kbWasVisible && _pendingShow && _semiAutoOn && !_sheetOpen)
+        // The «+» attach sheet is slot-exclusive too (device finding 2026-08-12): opening it
+        // over the panel must swap exactly like the keyboard — panel slides away, sheet rises.
+        // The show is parked and lands again when the sheet closes.
+        bool attachOpen = AttachOpen;
+        if (attachOpen && _sheetOpen)
+        {
+            HidePanel();
+            _pendingShow = true;   // after HidePanel — it clears the flag
+        }
+
+        // A parked auto-show lands the moment nothing else owns the slot.
+        if (_pendingShow && _semiAutoOn && !_sheetOpen && !_yieldingToKeyboard && !kbVisible && !attachOpen)
         {
             _pendingShow = false;
             ShowPanel(claimSlotFromKeyboard: false);
@@ -648,6 +660,9 @@ public class SuggestionsController : MonoBehaviour
 
         _kbWasVisible = kbVisible;
     }
+
+    private bool AttachOpen =>
+        _bottomPanel != null && _bottomPanel.AttachSheet != null && _bottomPanel.AttachSheet.IsOpen;
 
     // Glue: the panel's top edge tracks the composer's bottom edge exactly — smoothing, live
     // keyboard motion and all. KeyboardAwarePanel applies its inset in Update; LateUpdate runs

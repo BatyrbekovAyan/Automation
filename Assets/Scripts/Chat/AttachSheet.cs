@@ -27,6 +27,9 @@ public class AttachSheet : MonoBehaviour
 
     public event Action<AttachmentPick> OnPicked;
 
+    /// <summary>True while the sheet is up — the suggestions slot yields to it (slot exclusivity).</summary>
+    public bool IsOpen => _isOpen;
+
     private RectTransform _rt;
     private bool          _isOpen;
     private Tween         _slideTween;
