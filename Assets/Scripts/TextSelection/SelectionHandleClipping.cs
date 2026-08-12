@@ -55,6 +55,25 @@ public static class SelectionHandleClipping
         return IsEmpty(clip) ? Rect.zero : clip;
     }
 
+    /// <summary>
+    /// Grants the window the slack the pins' dots need. A dot is drawn PAST its
+    /// caret line by design (SelectionHandleView.DotOverhang), so a window sized
+    /// to the visible TEXT cuts it wherever the line reaches the window's edge —
+    /// and in a field only one line tall, the chat composer, the line IS the
+    /// window, so both dots came out half-cut no matter where anything scrolled.
+    ///
+    /// Vertical only: the dot overhangs the line, not the text column.
+    ///
+    /// Empty stays empty — a field scrolled off its page must still cull its
+    /// pins, and padding a disjoint window back into existence would float them
+    /// over whatever took its place.
+    /// </summary>
+    public static Rect WithHandleOverhang(Rect visible, float overhang) =>
+        IsEmpty(visible)
+            ? Rect.zero
+            : Rect.MinMaxRect(visible.xMin, visible.yMin - overhang,
+                              visible.xMax, visible.yMax + overhang);
+
     private static Rect ScreenRect(RectTransform rt)
     {
         rt.GetWorldCorners(Corners);

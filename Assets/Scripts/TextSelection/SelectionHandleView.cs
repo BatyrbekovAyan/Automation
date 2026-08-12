@@ -14,6 +14,15 @@ public class SelectionHandleView : MonoBehaviour,
     public const float HeadSize = 30f;   // WhatsApp-style dot, not a lollipop head
     public const float StemWidth = 5f;
 
+    /// How far the dot reaches PAST its caret line, read straight off
+    /// SetStemHeight: the head is centred at halfLine + HeadSize/2 - 3 and is
+    /// HeadSize tall, so it clears the line by HeadSize - 3. Anything that
+    /// clips the pins has to grant this much slack, or a field only one line
+    /// tall — the chat composer — cuts both of its own dots.
+    /// (Exact while the line is at least the 24-unit stem floor below; every
+    /// input in the app runs 40pt+, so the floor never engages.)
+    public const float DotOverhang = HeadSize - 3f;
+
     public bool IsStart { get; private set; }
     public System.Action<SelectionHandleView, Vector2> DragMoved;
     public System.Action<SelectionHandleView> DragEnded;

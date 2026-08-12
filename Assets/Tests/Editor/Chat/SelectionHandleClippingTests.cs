@@ -135,4 +135,86 @@ public class SelectionHandleClippingTests
     {
         Assert.IsTrue(SelectionHandleClipping.IsEmpty(SelectionHandleClipping.VisibleScreenRect(null)));
     }
+
+    // ── The dot's overhang: a one-line field is not allowed to cut its own pins ──
+
+    /// The chat composer: an 834x74 field — ONE line tall — inside the scroll
+    /// frame that hugs it. Nothing here is scrolled or occluded, so both dots
+    /// must be whole.
+    private TMP_InputField BuildComposer()
+    {
+        LogAssert.ignoreFailingMessages = true;   // uGUI Selectable list, EditMode
+
+        _card = new GameObject("Input", typeof(RectTransform), typeof(RectMask2D));
+        var frameRt = (RectTransform)_card.transform;
+        frameRt.sizeDelta = new Vector2(820f, 74f);
+
+        var inputGo = new GameObject("InputField", typeof(RectTransform));
+        inputGo.transform.SetParent(_card.transform, false);
+        ((RectTransform)inputGo.transform).sizeDelta = new Vector2(834f, 74f);
+        var field = inputGo.AddComponent<TMP_InputField>();
+
+        var textArea = new GameObject("Text Area", typeof(RectTransform), typeof(RectMask2D));
+        textArea.transform.SetParent(inputGo.transform, false);
+        var areaRt = (RectTransform)textArea.transform;
+        areaRt.anchorMin = Vector2.zero;
+        areaRt.anchorMax = Vector2.one;
+        areaRt.sizeDelta = new Vector2(-48f, 0f);   // inset 24 per side, NO vertical inset
+        field.textViewport = areaRt;
+
+        return field;
+    }
+
+    // 44pt composer text, ascender → descender.
+    private const float ComposerLineHeight = 50f;
+
+    /// The reported bug: the window was the field's own box, so it cut both
+    /// dots roughly in half and scrolling never helped — the box never grows.
+    [Test]
+    public void ComposerSizedField_WindowHoldsTheWholeDot()
+    {
+        var window = SelectionHandleClipping.WithHandleOverhang(
+            SelectionHandleClipping.VisibleScreenRect(BuildComposer()),
+            SelectionHandleView.DotOverhang);
+
+        // The line sits centred in the field, so the dot reaches this far from
+        // the window's centre.
+        float dotReach = ComposerLineHeight / 2f + SelectionHandleView.DotOverhang;
+
+        Assert.GreaterOrEqual(window.height / 2f, dotReach,
+            "A one-line field must not clip the dot its own pins draw past the line.");
+    }
+
+    [Test]
+    public void HandleOverhang_GrowsVerticallyOnly()
+    {
+        var padded = SelectionHandleClipping.WithHandleOverhang(Card, 27f);
+
+        Assert.AreEqual(Card.height + 54f, padded.height, 0.01f);
+        Assert.AreEqual(Card.width, padded.width, 0.01f, "The dot overhangs the line, not the column.");
+        Assert.AreEqual(Card.yMin - 27f, padded.yMin, 0.01f);
+        Assert.AreEqual(Card.yMax + 27f, padded.yMax, 0.01f);
+    }
+
+    // A field scrolled off its page must still cull its pins — padding an empty
+    // window back into existence would float them over unrelated UI.
+    [Test]
+    public void HandleOverhang_LeavesAnEmptyWindowEmpty()
+    {
+        Assert.IsTrue(SelectionHandleClipping.IsEmpty(
+            SelectionHandleClipping.WithHandleOverhang(Rect.zero, 27f)));
+        Assert.IsTrue(SelectionHandleClipping.IsEmpty(
+            SelectionHandleClipping.WithHandleOverhang(Rect.MinMaxRect(900f, 800f, 100f, 500f), 27f)));
+    }
+
+    // The card still bounds the pins — it just grants them the dot's own slack,
+    // so a pin on the last visible row shows a whole dot instead of a sliver.
+    [Test]
+    public void CardWindow_KeepsItsBoundsPlusTheDotSlack()
+    {
+        var window = SelectionHandleClipping.WithHandleOverhang(
+            SelectionHandleClipping.VisibleScreenRect(BuildCard()), SelectionHandleView.DotOverhang);
+
+        Assert.AreEqual(360f + 2f * SelectionHandleView.DotOverhang, window.height, 0.01f);
+    }
 }

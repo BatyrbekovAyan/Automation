@@ -628,7 +628,13 @@ public class TextSelectionRouter : MonoBehaviour
         // area the text is actually visible in cuts the dot at the edge and
         // culls it once fully outside, and a pin mid-drag keeps working
         // because nothing gets deactivated.
-        _overlay.SetHandleClip(SelectionHandleClipping.VisibleScreenRect(_activeField));
+        //
+        // Plus the dot's own overhang: it is drawn past its caret line by
+        // design, so a window sized to the text alone cuts it — fatally in the
+        // one-line composer, where the line fills the field.
+        _overlay.SetHandleClip(SelectionHandleClipping.WithHandleOverhang(
+            SelectionHandleClipping.VisibleScreenRect(_activeField),
+            SelectionHandleView.DotOverhang * _overlay.CanvasScale));
 
         var (startTop, startBottom, endTop, endBottom) = SelectionEdgeWorldCorners(_activeField);
         _overlay.PositionHandle(_overlay.StartHandle, startTop, startBottom);

@@ -124,9 +124,11 @@ public class SelectionOverlay : MonoBehaviour
         RectTransformUtility.ScreenPointToLocalPointInRectangle(
             (RectTransform)rt.parent, (screenTop + screenBottom) * 0.5f, null, out var local);
         rt.anchoredPosition = local;
-        handle.SetStemHeight(Mathf.Abs(screenTop.y - screenBottom.y) / CanvasScale());
+        handle.SetStemHeight(Mathf.Abs(screenTop.y - screenBottom.y) / CanvasScale);
         handle.SetColor(Theme.Color(ThemeRole.AccentFill));
     }
 
-    float CanvasScale() => Canvas.scaleFactor <= 0f ? 1f : Canvas.scaleFactor;
+    /// Screen pixels per canvas unit — the pins are sized in canvas units, the
+    /// rects they are placed and clipped by arrive in screen pixels.
+    public float CanvasScale => Canvas == null || Canvas.scaleFactor <= 0f ? 1f : Canvas.scaleFactor;
 }
