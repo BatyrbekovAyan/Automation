@@ -30,7 +30,7 @@ calibrated scale in `unity-ui-builder` (body 38–42u, 4dp-grid ×3 spacing).
 
 | Area | Reference | Key Decision |
 |------|-----------|--------------|
-| Suggestions panel (messages page) | references/suggestions-panel.md | LOCKED winner P: fixed-height Surface sheet + inner-scrolling bordered full-text cards + border-legend intent titles (top-left) + tint-only recommended card |
+| Suggestions panel (messages page) | references/suggestions-panel.md | Cards LOCKED (winner P: bordered full-text cards + border-legend titles + tint-only recommended); chassis since 2026-08-12 = KEYBOARD-SLOT tenant (sketch 003 winner A): panel sits in the keyboard's slot, mutually exclusive with it, ✦⇄⌨ key inside the composer field |
 
 ## Theme
 

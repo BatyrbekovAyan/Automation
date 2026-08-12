@@ -1,15 +1,13 @@
 using UnityEditor;
-using UnityEditor.Events;
 using UnityEditor.SceneManagement;
 using UnityEngine;
-using UnityEngine.UI;
 
 /// <summary>
 /// [MenuItem] that attaches <see cref="SuggestionsController"/> to the composer host and wires its
-/// serialized refs (panel, toggle, MessagesBottomPanel) via SerializedObject; also stamps the
-/// sheet grab-handle's controller ref and repurposes the parked composer MicButton as the
-/// suggestions-sheet toggle (owner request 2026-08-07). Build-time only, idempotent (reuses an
-/// existing controller). Pure Editor wiring tool — no networking.
+/// serialized refs via SerializedObject: panel, toggle, MessagesBottomPanel, the MovingArea's
+/// <see cref="KeyboardAwarePanel"/> (the slot-inset target since sketch-003) and the composer's
+/// <see cref="ComposerSlotKey"/>. Build-time only, idempotent (reuses an existing controller).
+/// Run AFTER 'Tools/UI/Build Suggestions Panel'. Pure Editor wiring tool — no networking.
 /// </summary>
 public static class SuggestionsControllerWirer
 {
@@ -29,12 +27,22 @@ public static class SuggestionsControllerWirer
             return;
         }
 
-        // The composer's ExpandableInput lives on the same GameObject as MessagesBottomPanel —
-        // the controller drives it so the messages make room + the panel rides the composer top.
-        var expandable = bottomPanel.GetComponent<ExpandableInput>();
-        if (expandable == null)
+        // The slot swap drives the MovingArea's rider — the composer's own parent chain owns it
+        // (the AttachmentPreviewScreen has a separate KeyboardAwarePanel; parent lookup can
+        // never confuse the two).
+        var keyboardMover = bottomPanel.GetComponentInParent<KeyboardAwarePanel>(true);
+        if (keyboardMover == null)
         {
-            Debug.LogError("SuggestionsControllerWirer: MessagesBottomPanel has no ExpandableInput component.");
+            Debug.LogError("SuggestionsControllerWirer: no KeyboardAwarePanel above MessagesBottomPanel (MovingArea).");
+            return;
+        }
+
+        // The ✦⇄⌨ key lives inside the composer's input field (built by SuggestionsPanelBuilder).
+        var slotKey = bottomPanel.GetComponentInChildren<ComposerSlotKey>(true);
+        if (slotKey == null)
+        {
+            Debug.LogError("SuggestionsControllerWirer: no ComposerSlotKey under MessagesBottomPanel — " +
+                           "run 'Tools/UI/Build Suggestions Panel' with the current builder first.");
             return;
         }
 
@@ -48,76 +56,14 @@ public static class SuggestionsControllerWirer
         so.FindProperty("_panel").objectReferenceValue = panel;
         so.FindProperty("_toggle").objectReferenceValue = toggle;
         so.FindProperty("_bottomPanel").objectReferenceValue = bottomPanel;
-        so.FindProperty("_expandableInput").objectReferenceValue = expandable;
+        so.FindProperty("_keyboardMover").objectReferenceValue = keyboardMover;
+        so.FindProperty("_slotKey").objectReferenceValue = slotKey;
         so.ApplyModifiedPropertiesWithoutUndo();
-
-        // Grab-handle close routes through the controller (so the message-list floor follows).
-        var dragHandle = panel.GetComponentInChildren<SheetDragHandle>(true);
-        if (dragHandle != null)
-        {
-            var hso = new SerializedObject(dragHandle);
-            hso.FindProperty("controller").objectReferenceValue = controller;
-            hso.ApplyModifiedPropertiesWithoutUndo();
-        }
-        else Debug.LogWarning("SuggestionsControllerWirer: no SheetDragHandle under the panel — " +
-                              "run 'Tools/UI/Build Suggestions Panel' with the current builder first.");
-
-        WireSheetToggleButton(controller, bottomPanel.transform);
 
         EditorUtility.SetDirty(controller);
         EditorSceneManager.MarkSceneDirty(controller.gameObject.scene);
         Selection.activeGameObject = controller.gameObject;
         Debug.Log("SuggestionsControllerWirer: wired SuggestionsController (panel, toggle, bottomPanel, " +
-                  "grab handle, sheet-toggle button).");
-    }
-
-    // Repurpose the parked (inactive) composer MicButton: activate it, swap its glyph for the
-    // suggestions ✦ sparkle (InkSecondary via ThemedColor), and wire onClick → ToggleSheet as a
-    // persistent listener. Idempotent: skips the listener if already wired.
-    private static void WireSheetToggleButton(SuggestionsController controller, Transform bottomPanel)
-    {
-        Transform mic = FindChildRecursive(bottomPanel, "MicButton");
-        if (mic == null)
-        {
-            Debug.LogWarning("SuggestionsControllerWirer: MicButton not found under MessagesBottomPanel — " +
-                             "sheet-toggle button not wired.");
-            return;
-        }
-
-        mic.gameObject.SetActive(true);
-        Button button = mic.GetComponent<Button>();
-        if (button == null) button = mic.gameObject.AddComponent<Button>();
-
-        // Deepest Image is the glyph (root-first order from GetComponentsInChildren).
-        Image[] images = mic.GetComponentsInChildren<Image>(true);
-        Image glyph = images.Length > 0 ? images[images.Length - 1] : null;
-        if (glyph != null)
-        {
-            var sparkle = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Suggestions/suggest_sparkle.png");
-            if (sparkle != null) glyph.sprite = sparkle;
-            glyph.preserveAspect = true;
-            var themed = glyph.GetComponent<ThemedColor>();
-            if (themed == null) themed = glyph.gameObject.AddComponent<ThemedColor>();
-            themed.Configure(ThemeRole.InkSecondary, glyph);
-            glyph.color = new Color(Theme.Color(ThemeRole.InkSecondary).r, Theme.Color(ThemeRole.InkSecondary).g,
-                Theme.Color(ThemeRole.InkSecondary).b, glyph.color.a);   // show the design without play mode
-            EditorUtility.SetDirty(themed);
-        }
-
-        bool alreadyWired = false;
-        for (int i = 0; i < button.onClick.GetPersistentEventCount(); i++)
-            if (button.onClick.GetPersistentMethodName(i) == nameof(SuggestionsController.ToggleSheet))
-                alreadyWired = true;
-        if (!alreadyWired)
-            UnityEventTools.AddVoidPersistentListener(button.onClick, controller.ToggleSheet);
-
-        EditorUtility.SetDirty(mic.gameObject);
-    }
-
-    private static Transform FindChildRecursive(Transform parent, string name)
-    {
-        foreach (Transform child in parent.GetComponentsInChildren<Transform>(true))
-            if (child != parent && child.name == name) return child;
-        return null;
+                  "keyboardMover, slotKey).");
     }
 }

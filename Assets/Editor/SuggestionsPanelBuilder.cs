@@ -8,14 +8,16 @@ using UnityEngine.UI;
 
 /// <summary>
 /// [MenuItem] builder that constructs the Reply Suggestions Panel into
-/// Screen_Whatsapp/MessagesPanel of Main.unity. Implements the LOCKED sketch-002 winner "P"
-/// (see .claude/skills/sketch-findings-automation/references/suggestions-panel.md):
-/// a fixed-height Surface sheet (grabber + «✦ ПРЕДЛОЖЕНИЯ» header + quiet refresh icon) whose
-/// full-text bordered cards scroll INSIDE a fixed viewport (cut card + bottom fade + thin bar
-/// as the affordance); intent titles sit ON each card's top border (legend), and the
-/// recommended card is tint-only (PositiveBg/PositiveInk + ✦). All static chrome binds theme
-/// tokens via ThemedColor; per-card dynamic colors are resolved from Theme in
-/// SuggestionCard.Setup. Build-time only; no networking.
+/// Screen_Whatsapp/MessagesPanel of Main.unity — since sketch-003 (variant A, «Прямая замена»)
+/// as a KEYBOARD-SLOT tenant: the sheet lives at the very bottom of the screen OUTSIDE the
+/// MovingArea (sibling right after it), exactly where the native keyboard sits; opening it
+/// raises the MovingArea by the slot height (KeyboardAwarePanel.VirtualBottomInset) the same
+/// way the keyboard does. Cards keep the LOCKED sketch-002 winner "P" design (bordered
+/// full-text cards, legend pills on the top border, tint-only recommended card, header
+/// «‹ ✦ ПРЕДЛОЖЕНИЯ ↻») — only the chassis changed. Also builds the ✦⇄⌨ ComposerSlotKey
+/// INSIDE the composer input field and retires the old mic-slot sheet toggle.
+/// All static chrome binds theme tokens via ThemedColor; per-card dynamic colors are resolved
+/// from Theme in SuggestionCard.Setup. Build-time only; no networking.
 ///
 /// The SemiAutoToggle is NOT part of this redesign: an existing toggle in the scene is left
 /// untouched (scene is source of truth); it is built only if absent.
@@ -23,16 +25,18 @@ using UnityEngine.UI;
 public static class SuggestionsPanelBuilder
 {
     private const string PanelName  = "SuggestionsPanel";
+    private const string SlotKeyName = "SlotKey";
     private const string ToggleName = "SemiAutoToggle";
     private const string ToggleA11y = "Полуавтоматический режим";
     private const string RefreshA11y = "Обновить";
 
     // --- Reference-unit sizes (1080×1920, sketch CSS px × 3) ----------------
-    private const float PanelHeight = 852f;        // 114 chrome + 738 card viewport (fixed footprint)
-    private const float ChromeHeight = 114f;       // grabber zone + header row
-    private const float SheetTopRadius = 48f;
-    private const float GrabberW = 108f, GrabberH = 12f;
-    private const float HeaderTop = 30f, HeaderH = 84f;
+    // The slot height is RUNTIME state (the measured keyboard height); the authored height is
+    // only the pre-first-measurement stand-in so the scene shows sane geometry.
+    private static readonly float AuthoredSlotHeight = SuggestionSlotHeight.FallbackCanvasPx;
+    private const float HeaderTop = 18f, HeaderH = 84f;
+    private const float ChromeHeight = HeaderTop + HeaderH;   // header only — the grabber died with the sheet chassis
+    private const float HairlineH = 2f;
     private const float HeaderSparkSize = 33f, HeaderTitleSize = 28f;
     private const float RefreshHit = 120f, RefreshIconSize = 44f;
     private const string RefreshIconGuid = "aabd39746767444e984449139c957125";   // "relaod 1.png" — owner-assigned refresh sprite
@@ -45,9 +49,15 @@ public static class SuggestionsPanelBuilder
     private const float LegendPillRadius = 21f;    // ≈ half the pill height → capsule
     private const float FadeHeight = 72f;
     private const float ScrollbarW = 9f;
-    private const float SkeletonHeight = 144f;     // 4×144 + 3×30 gaps + 54 pads = 720 ≤ 738 viewport
-    private const float SwipeProxyWidth = 150f;    // matches the global SwipeBack strip width
+    private const float SkeletonHeight = 144f;
     private const float StateSize = 39f, RetryFont = 36f, RetryRadius = 36f;
+
+    // Composer slot key (✦⇄⌨ inside the input field, sketch-003 A).
+    private const float SlotKeyHit = 96f;          // raycast target (overflows the 74u field — no mask clips it)
+    private const float SlotKeyGlyph = 52f;
+    private const float SlotKeyCenterX = 60f;      // from the field's left edge
+    private const float TextAreaLeftInset = 120f;  // text starts right of the key (was 24)
+    private const float TextAreaRightInset = 24f;
 
     // Reply-mode switch (built only if absent — legacy geometry, untouched by the redesign).
     private static readonly Color SwitchTrackAuto = Hex("#2FB344");
@@ -60,6 +70,7 @@ public static class SuggestionsPanelBuilder
     private const string SpriteFolder = "Assets/Sprites/Suggestions";
     private const string SparklePath = SpriteFolder + "/suggest_sparkle.png";
     private const string FadePath    = SpriteFolder + "/suggest_fade.png";
+    private const string KeyboardPath = SpriteFolder + "/suggest_keyboard.png";
 
     [MenuItem("Tools/UI/Build Suggestions Panel")]
     public static void Build()
@@ -79,70 +90,75 @@ public static class SuggestionsPanelBuilder
             return;
         }
 
-        Sprite sparkle = EnsureSparkleSprite();
-        Sprite fade = EnsureFadeSprite();
-
-        // Idempotent re-run for the PANEL only (delete-and-rebuild construction tool, no Undo
-        // grouping). The toggle is deliberately preserved when present — it carries hand-tuning
-        // and is not part of the sketch-002 redesign.
-        Transform priorPanel = FindChildRecursive(host.transform, PanelName);
-        if (priorPanel != null) Object.DestroyImmediate(priorPanel.gameObject);
-
-        // The sheet belongs to MovingArea — the container that rides the keyboard. Parenting
-        // it to MessagesPanel instead would leave the sheet behind when the keyboard opens.
-        Transform movingArea = FindChildRecursive(host.transform, "MovingArea");
+        // The slot panel is a sibling of the MovingArea, NOT a child: the MovingArea rises with
+        // the keyboard/slot inset while the panel must stay glued to the screen bottom.
+        Transform movingArea = host.transform.Find("MovingArea");
         if (movingArea == null)
         {
-            Debug.LogError("SuggestionsPanelBuilder: MessagesPanel has no 'MovingArea' child to host the panel.");
+            Debug.LogError("SuggestionsPanelBuilder: MessagesPanel has no direct 'MovingArea' child.");
             return;
         }
 
-        BuildPanel(movingArea, sparkle, fade);
+        Sprite sparkle = EnsureSparkleSprite();
+        Sprite fade = EnsureFadeSprite();
+        Sprite keyboard = EnsureKeyboardSprite();
+
+        // Idempotent re-run for the PANEL only (delete-and-rebuild construction tool, no Undo
+        // grouping) — finds the old panel wherever it lives (pre-slot builds parented it under
+        // MovingArea). The toggle is deliberately preserved when present.
+        Transform priorPanel = FindChildRecursive(host.transform, PanelName);
+        if (priorPanel != null) Object.DestroyImmediate(priorPanel.gameObject);
+
+        BuildPanel(host.transform, movingArea, sparkle, fade);
+        BuildComposerKey(movingArea, sparkle, keyboard);
+        RetireMicToggle(movingArea);
 
         if (FindChildRecursive(host.transform, ToggleName) == null) BuildToggle(topBar);
 
         EditorUtility.SetDirty(host);
         EditorSceneManager.MarkSceneDirty(host.scene);
-        Debug.Log("SuggestionsPanelBuilder: built SuggestionsPanel (sketch-002 winner P).");
+        Debug.Log("SuggestionsPanelBuilder: built SuggestionsPanel as a keyboard-slot tenant (sketch-003 A) " +
+                  "+ ComposerSlotKey; mic-slot toggle retired.");
     }
 
     // === Panel ==============================================================
 
-    private static void BuildPanel(Transform parent, Sprite sparkle, Sprite fade)
+    private static void BuildPanel(Transform host, Transform movingArea, Sprite sparkle, Sprite fade)
     {
-        // Sheet: Surface, top-rounded, slide root + fade group. Bottom-anchored, FIXED footprint.
-        GameObject panelGo = ImageGo(PanelName, parent, Color.white);
+        // Slot tray: Surface, SQUARE top (it is a keyboard tray, not a floating sheet), bottom-
+        // anchored to the screen. Height/position are runtime state (SetSlotMetrics/FollowInset);
+        // the authored values just keep the scene legible.
+        GameObject panelGo = ImageGo(PanelName, host, Color.white);
         Themed(panelGo, ThemeRole.Surface);
         var rt = (RectTransform)panelGo.transform;
         rt.anchorMin = new Vector2(0, 0);
         rt.anchorMax = new Vector2(1, 0);
         rt.pivot = new Vector2(0.5f, 0);
-        rt.sizeDelta = new Vector2(0, PanelHeight);
-        rt.anchoredPosition = new Vector2(0, 204f);     // above the composer (controller re-seats via SetComposerHeight)
-        AddRoundedTop(panelGo, SheetTopRadius);
+        rt.sizeDelta = new Vector2(0, AuthoredSlotHeight);
+        rt.anchoredPosition = Vector2.zero;
         var canvasGroup = panelGo.AddComponent<CanvasGroup>();
 
-        // Render order (owner revision): the sheet must slide away BEHIND the composer, so both the
-        // SwipeBack strip and the panel sit just BEFORE BottomPanel — panel above the strip (its own
-        // left-edge proxy owns gestures over the sheet), composer above the panel (input never covered).
-        Transform swipeStrip = parent.Find("SwipeBack");
-        Transform bottomPanel = parent.Find("BottomPanel");
-        if (bottomPanel != null)
-        {
-            if (swipeStrip != null && swipeStrip.GetSiblingIndex() > bottomPanel.GetSiblingIndex())
-                swipeStrip.SetSiblingIndex(bottomPanel.GetSiblingIndex());
-            panelGo.transform.SetSiblingIndex(bottomPanel.GetSiblingIndex());
-        }
-        else if (swipeStrip != null)
-            panelGo.transform.SetSiblingIndex(swipeStrip.GetSiblingIndex() + 1);
+        // Render order: right AFTER the MovingArea (over its composer background skirt, which
+        // hangs 1000u below the composer and would otherwise cover the slot), and BEFORE the
+        // TopBar/overlays. No overlap with the composer itself — the panel's top edge is glued
+        // to the composer's bottom at runtime.
+        panelGo.transform.SetSiblingIndex(movingArea.GetSiblingIndex() + 1);
 
-        BuildGrabber(panelGo.transform);
-        SheetDragHandle dragHandle = BuildGrabZone(panelGo.transform);
+        // Hairline across the slot's top edge — reads as the keyboard tray's divider.
+        GameObject hairline = ImageGo("TopHairline", panelGo.transform, Color.white);
+        Themed(hairline, ThemeRole.Hairline);
+        hairline.GetComponent<Image>().raycastTarget = false;
+        var hrt = (RectTransform)hairline.transform;
+        hrt.anchorMin = new Vector2(0, 1); hrt.anchorMax = new Vector2(1, 1); hrt.pivot = new Vector2(0.5f, 1);
+        hrt.sizeDelta = new Vector2(0, HairlineH);
+        hrt.anchoredPosition = Vector2.zero;
+
         Button refreshButton = null;
         Button backButton = null;
         BuildHeader(panelGo.transform, sparkle, ref refreshButton, ref backButton);
 
-        // Fixed card viewport — the ONLY thing that scrolls; the sheet never changes height (D-12).
+        // Fixed card viewport — the ONLY thing that scrolls; the slot never changes height
+        // between states (D-12 lives on).
         RectTransform viewportRt;
         Transform cardsContainer = BuildCardViewport(panelGo.transform, out viewportRt);
 
@@ -156,8 +172,6 @@ public static class SuggestionsPanelBuilder
         GameObject empty = BuildEmptyState(panelGo.transform, viewportRt, out emptyRetry);
         Button errorRetry;
         GameObject error = BuildErrorState(panelGo.transform, viewportRt, out errorRetry);
-
-        BuildSwipeBackProxy(panelGo.transform, cardsContainer);
 
         var panel = panelGo.AddComponent<SuggestionsPanel>();
         var so = new SerializedObject(panel);
@@ -179,55 +193,10 @@ public static class SuggestionsPanelBuilder
         so.FindProperty("bottomFade").objectReferenceValue = bottomFade;
         so.ApplyModifiedPropertiesWithoutUndo();
 
-        // The grab zone follows the panel it lives on; its controller ref is stamped by the wirer.
-        var hso = new SerializedObject(dragHandle);
-        hso.FindProperty("panel").objectReferenceValue = panel;
-        hso.ApplyModifiedPropertiesWithoutUndo();
-    }
-
-    // Full-width transparent strip over the chrome (grabber + header): drag it to move the sheet.
-    // Earlier sibling than the header, so the refresh button still wins its own raycast.
-    private static SheetDragHandle BuildGrabZone(Transform panel)
-    {
-        GameObject go = ImageGo("GrabZone", panel, new Color(0, 0, 0, 0));
-        var rt = (RectTransform)go.transform;
-        rt.anchorMin = new Vector2(0, 1); rt.anchorMax = new Vector2(1, 1); rt.pivot = new Vector2(0.5f, 1);
-        rt.sizeDelta = new Vector2(0, ChromeHeight);
-        rt.anchoredPosition = Vector2.zero;
-        return go.AddComponent<SheetDragHandle>();
-    }
-
-    // Left-edge strip over the card viewport that re-routes gestures: horizontal-right → the global
-    // SwipeToBack (chat slides out under the sheet), vertical → the cards ScrollRect. Taps pass
-    // through to the cards via ClickPassthrough (the SwipeBack strip's own pattern).
-    private static void BuildSwipeBackProxy(Transform panel, Transform cardsContainer)
-    {
-        GameObject go = ImageGo("SwipeBackProxy", panel, new Color(0, 0, 0, 0));
-        var rt = (RectTransform)go.transform;
-        rt.anchorMin = new Vector2(0, 0); rt.anchorMax = new Vector2(0, 1); rt.pivot = new Vector2(0, 0.5f);
-        rt.sizeDelta = new Vector2(SwipeProxyWidth, -ChromeHeight);   // viewport region only — the grab zone owns the chrome
-        rt.anchoredPosition = new Vector2(0, -ChromeHeight / 2f);
-
-        var proxy = go.AddComponent<SuggestionsSheetSwipeProxy>();
-        var so = new SerializedObject(proxy);
-        so.FindProperty("verticalTarget").objectReferenceValue =
-            cardsContainer.GetComponentInParent<UnityEngine.UI.ScrollRect>(true);
-        so.ApplyModifiedPropertiesWithoutUndo();
-
-        var pass = go.AddComponent<ClickPassthrough>();
-        pass.allowedPanel = panel;   // taps may only land inside the sheet (card buttons)
-    }
-
-    private static void BuildGrabber(Transform panel)
-    {
-        GameObject go = ImageGo("Grabber", panel, Color.white);
-        Themed(go, ThemeRole.Border);
-        go.GetComponent<Image>().raycastTarget = false;
-        var rt = (RectTransform)go.transform;
-        rt.anchorMin = new Vector2(0.5f, 1f); rt.anchorMax = new Vector2(0.5f, 1f); rt.pivot = new Vector2(0.5f, 1f);
-        rt.sizeDelta = new Vector2(GrabberW, GrabberH);
-        rt.anchoredPosition = new Vector2(0f, -12f);
-        AddRounded(go, GrabberH / 2f);
+        // Parked inactive: at rest (inset 0) the slot region overlaps the composer's screen
+        // space, so an active panel would cover it in the Scene view. The controller activates
+        // it on ShowPanel; enable it manually to design-check.
+        panelGo.SetActive(false);
     }
 
     private static void BuildHeader(Transform panel, Sprite sparkle, ref Button refreshButton, ref Button backButton)
@@ -280,7 +249,7 @@ public static class SuggestionsPanelBuilder
         GameObject spacer = Rect("Spacer", header.transform);
         spacer.AddComponent<LayoutElement>().flexibleWidth = 1f;
 
-        // Quiet refresh: full-size invisible hit target (≥120u), small glyph inside. Replaces the FAB.
+        // Quiet refresh: full-size invisible hit target (≥120u), small glyph inside.
         GameObject hit = ImageGo("RefreshButton", header.transform, new Color(0, 0, 0, 0));
         var hitLe = hit.AddComponent<LayoutElement>();
         hitLe.preferredWidth = RefreshHit; hitLe.preferredHeight = RefreshHit;
@@ -301,7 +270,7 @@ public static class SuggestionsPanelBuilder
         GameObject viewport = ImageGo("CardsViewport", panel, new Color(0, 0, 0, 0));
         viewportRt = (RectTransform)viewport.transform;
         viewportRt.anchorMin = new Vector2(0, 0); viewportRt.anchorMax = new Vector2(1, 1);
-        viewportRt.offsetMin = Vector2.zero;
+        viewportRt.offsetMin = Vector2.zero;                    // bottom offset = runtime safe-area pad (SetSlotMetrics)
         viewportRt.offsetMax = new Vector2(0, -ChromeHeight);
         viewport.GetComponent<Image>().raycastTarget = true;    // drag anywhere in the region scrolls
         viewport.AddComponent<RectMask2D>();
@@ -353,6 +322,7 @@ public static class SuggestionsPanelBuilder
     {
         // Surface→transparent wash over the viewport's bottom edge — the "there's more" cue.
         // Per-pixel alpha comes from the generated sprite; ThemedColor repaints the hue only.
+        // Anchored to the panel bottom; SetSlotMetrics lifts it by the safe-area pad.
         GameObject go = ImageGo("BottomFade", panel, Color.white);
         Image img = go.GetComponent<Image>();
         img.sprite = fadeSprite;
@@ -363,6 +333,84 @@ public static class SuggestionsPanelBuilder
         rt.sizeDelta = new Vector2(0, FadeHeight);
         rt.anchoredPosition = Vector2.zero;
         return go;
+    }
+
+    // === Composer slot key (sketch-003 A) ===================================
+
+    // The ✦⇄⌨ key INSIDE the composer input field's left end, like WhatsApp/Telegram in-field
+    // icons: a 96u invisible hit circle with a 52u glyph, pinned to the field's bottom-left so
+    // multi-line growth keeps it on the entry line. The field's Text Area is inset to start
+    // right of it. Idempotent: rebuilds the key, sets the inset absolutely.
+    private static void BuildComposerKey(Transform movingArea, Sprite sparkle, Sprite keyboard)
+    {
+        Transform field = FindChildRecursive(movingArea, "InputField");
+        if (field == null || field.GetComponent<TMP_InputField>() == null)
+        {
+            Debug.LogError("SuggestionsPanelBuilder: composer InputField not found under MovingArea — slot key not built.");
+            return;
+        }
+
+        Transform prior = field.Find(SlotKeyName);
+        if (prior != null) Object.DestroyImmediate(prior.gameObject);
+
+        GameObject keyGo = ImageGo(SlotKeyName, field, new Color(0, 0, 0, 0));   // invisible hit target
+        var rt = (RectTransform)keyGo.transform;
+        rt.anchorMin = new Vector2(0, 0); rt.anchorMax = new Vector2(0, 0); rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = new Vector2(SlotKeyHit, SlotKeyHit);
+        rt.anchoredPosition = new Vector2(SlotKeyCenterX, 37f);   // centered on the field's one-line height (74/2)
+
+        Image sparkGlyph = ImageGo("SparkGlyph", keyGo.transform, Color.white).GetComponent<Image>();
+        sparkGlyph.sprite = sparkle; sparkGlyph.preserveAspect = true; sparkGlyph.raycastTarget = false;
+        Themed(sparkGlyph.gameObject, ThemeRole.PositiveInk);   // the suggestions identity, same as the header ✦
+        var srt = (RectTransform)sparkGlyph.transform; srt.sizeDelta = new Vector2(SlotKeyGlyph, SlotKeyGlyph); Center(srt);
+
+        Image kbGlyph = ImageGo("KeyboardGlyph", keyGo.transform, Color.white).GetComponent<Image>();
+        kbGlyph.sprite = keyboard; kbGlyph.preserveAspect = true; kbGlyph.raycastTarget = false;
+        Themed(kbGlyph.gameObject, ThemeRole.InkSecondary);
+        var krt = (RectTransform)kbGlyph.transform; krt.sizeDelta = new Vector2(SlotKeyGlyph, SlotKeyGlyph); Center(krt);
+        kbGlyph.gameObject.SetActive(false);   // ✦ is the default face (slot closed)
+
+        Rect("A11y:Подсказки", keyGo.transform);
+        var button = keyGo.AddComponent<Button>();
+        button.transition = Selectable.Transition.None;
+
+        var key = keyGo.AddComponent<ComposerSlotKey>();
+        var so = new SerializedObject(key);
+        so.FindProperty("button").objectReferenceValue = button;
+        so.FindProperty("sparkleGlyph").objectReferenceValue = sparkGlyph.gameObject;
+        so.FindProperty("keyboardGlyph").objectReferenceValue = kbGlyph.gameObject;
+        so.ApplyModifiedPropertiesWithoutUndo();
+
+        // Text starts right of the key. Absolute offsets — idempotent across re-runs.
+        Transform textArea = field.Find("Text Area");
+        if (textArea != null)
+        {
+            var taRt = (RectTransform)textArea;
+            taRt.offsetMin = new Vector2(TextAreaLeftInset, taRt.offsetMin.y);
+            taRt.offsetMax = new Vector2(-TextAreaRightInset, taRt.offsetMax.y);
+        }
+        else Debug.LogWarning("SuggestionsPanelBuilder: InputField has no 'Text Area' child — left inset not applied.");
+
+        // The key must win the raycast over the field's own graphic and the DragShield.
+        keyGo.transform.SetAsLastSibling();
+    }
+
+    // The pre-slot ✦ toggle lived in the composer's mic slot (SuggestionsControllerWirer,
+    // owner request 2026-08-07) and vanished whenever text was typed. The in-field key replaces
+    // it: strip the persistent ToggleSheet listener and park the button again.
+    private static void RetireMicToggle(Transform movingArea)
+    {
+        Transform mic = FindChildRecursive(movingArea, "MicButton");
+        if (mic == null) return;
+        Button button = mic.GetComponent<Button>();
+        if (button != null)
+        {
+            for (int i = button.onClick.GetPersistentEventCount() - 1; i >= 0; i--)
+                if (button.onClick.GetPersistentMethodName(i) == "ToggleSheet")
+                    UnityEditor.Events.UnityEventTools.RemovePersistentListener(button.onClick, i);
+        }
+        mic.gameObject.SetActive(false);
+        EditorUtility.SetDirty(mic.gameObject);
     }
 
     // === Card ===============================================================
@@ -679,6 +727,58 @@ public static class SuggestionsPanelBuilder
         return SaveSprite(tex, FadePath);
     }
 
+    // ⌨ glyph: rounded-rect keyboard outline + two key rows + a space bar, white on transparent
+    // (tinted at the use site). TMP glyphs don't render in this project — sprites only.
+    private static Sprite EnsureKeyboardSprite()
+    {
+        Sprite existing = AssetDatabase.LoadAssetAtPath<Sprite>(KeyboardPath);
+        if (existing != null) return existing;
+        const int size = 64;
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        for (int y = 0; y < size; y++)
+        for (int x = 0; x < size; x++)
+        {
+            float px = x + 0.5f, py = y + 0.5f;
+            // Body: rounded rect ring, 52×36 centered (14..50 vertically), stroke ~4.
+            float ring = RoundedRectRing(px, py, 32f, 32f, 26f, 18f, 6f, 4f);
+            // Key dots: two rows of four, r≈2.2.
+            float dots = 0f;
+            for (int i = 0; i < 4; i++)
+            {
+                float dx = 20f + i * 8f;
+                dots = Mathf.Max(dots, Disc(px, py, dx, 38f, 2.2f));
+                dots = Mathf.Max(dots, Disc(px, py, dx, 30f, 2.2f));
+            }
+            // Space bar: horizontal capsule near the bottom of the body.
+            float bar = RoundedRectFill(px, py, 32f, 21.5f, 12f, 1.8f, 1.8f);
+            float a = Mathf.Max(ring, Mathf.Max(dots, bar));
+            tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+        }
+        return SaveSprite(tex, KeyboardPath);
+    }
+
+    // Signed-distance helpers for the keyboard glyph (1px feathered alpha).
+    private static float RoundedRectSdf(float px, float py, float cx, float cy, float halfW, float halfH, float r)
+    {
+        float qx = Mathf.Abs(px - cx) - (halfW - r);
+        float qy = Mathf.Abs(py - cy) - (halfH - r);
+        float outside = new Vector2(Mathf.Max(qx, 0f), Mathf.Max(qy, 0f)).magnitude;
+        float inside = Mathf.Min(Mathf.Max(qx, qy), 0f);
+        return outside + inside - r;
+    }
+
+    private static float RoundedRectRing(float px, float py, float cx, float cy, float halfW, float halfH, float r, float stroke)
+    {
+        float d = Mathf.Abs(RoundedRectSdf(px, py, cx, cy, halfW, halfH, r)) - stroke / 2f;
+        return Mathf.Clamp01(-d);   // 1px feather
+    }
+
+    private static float RoundedRectFill(float px, float py, float cx, float cy, float halfW, float halfH, float r)
+        => Mathf.Clamp01(-RoundedRectSdf(px, py, cx, cy, halfW, halfH, r));
+
+    private static float Disc(float px, float py, float cx, float cy, float r)
+        => Mathf.Clamp01(r - Mathf.Sqrt((px - cx) * (px - cx) + (py - cy) * (py - cy)) + 0.5f);
+
     private static Sprite SaveSprite(Texture2D tex, string path)
     {
         if (!AssetDatabase.IsValidFolder(SpriteFolder))
@@ -757,14 +857,6 @@ public static class SuggestionsPanelBuilder
     {
         string path = AssetDatabase.GUIDToAssetPath(guid);
         return string.IsNullOrEmpty(path) ? null : AssetDatabase.LoadAssetAtPath<Sprite>(path);
-    }
-
-    private static void AddRoundedTop(GameObject go, float radius)
-    {
-        var rounded = go.AddComponent<ImageWithIndependentRoundedCorners>();
-        rounded.r = new Vector4(radius, radius, 0f, 0f); // top-left, top-right only
-        rounded.Validate();
-        rounded.Refresh();
     }
 
     private static void Stretch(RectTransform rt)

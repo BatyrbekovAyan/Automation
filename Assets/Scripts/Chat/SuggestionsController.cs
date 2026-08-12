@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 /// <summary>
 /// The semi-auto mediator (Wave 3). Ties the <see cref="ISuggestionsProvider"/> seam (Plan 01),
@@ -19,7 +20,8 @@ public class SuggestionsController : MonoBehaviour
     [SerializeField] private SuggestionsPanel _panel;
     [SerializeField] private SemiAutoToggle _toggle;
     [SerializeField] private MessagesBottomPanel _bottomPanel;
-    [SerializeField] private ExpandableInput _expandableInput;   // composer growth → panel rides its top + list makes room
+    [SerializeField] private KeyboardAwarePanel _keyboardMover;  // MovingArea rider — owns the bottom inset the slot swap drives
+    [SerializeField] private ComposerSlotKey _slotKey;           // ✦⇄⌨ key inside the composer field (sketch-003 A)
     // NOTE: the old _mockLatencySeconds knob is gone — MockSuggestionsProvider has not been
     // constructed here since the Phase-2 swap to N8nSuggestionsProvider (it owns its own latency
     // default), so the field was dead inspector surface.
@@ -27,7 +29,20 @@ public class SuggestionsController : MonoBehaviour
     private ISuggestionsProvider _provider;
     private long _requestSeq;          // monotonic; newest wins (A6)
     private bool _semiAutoOn;
-    private Tweener _offsetTween;      // animates the message-list floor in sync with the panel slide
+
+    // Keyboard-slot tenancy (sketch-003 variant A). _sheetOpen is the INTENT — the panel view
+    // can be active-but-covered while the native keyboard slides over it. _yieldingToKeyboard
+    // bridges the handoff where the panel has conceded the slot but the held inset must not
+    // drop until the keyboard actually arrives (SuggestionSlotSwap.ShouldReleaseHold — the
+    // no-dip rule). _pendingShow parks an auto-show that found the keyboard owning the slot
+    // (an auto-show never steals the slot from a typing owner) until the keyboard leaves.
+    private bool _sheetOpen;
+    private bool _yieldingToKeyboard;
+    private float _yieldStartedAt;
+    private bool _kbWasVisible;
+    private bool _pendingShow;
+    private float _slotCanvasPx;
+    private Tweener _insetTween;       // slot open/close inset animation (handoffs never tween — they hold)
 
     // BATCH-03 debounce: HandleLive pokes the gate; a single self-gating loop fires ONE coalesced
     // request when the ~2.5s window settles. The window is cancelled + _pendingIncomingText cleared at
@@ -72,6 +87,7 @@ public class SuggestionsController : MonoBehaviour
             _panel.OnRefreshRequested += HandleManualRefresh;
             _panel.OnBackRequested += HandleBack;
         }
+        if (_slotKey != null) _slotKey.Tapped += HandleSlotKeyTapped;
     }
 
     void OnDestroy()
@@ -88,12 +104,12 @@ public class SuggestionsController : MonoBehaviour
             _panel.OnRefreshRequested -= HandleManualRefresh;
             _panel.OnBackRequested -= HandleBack;
         }
+        if (_slotKey != null) _slotKey.Tapped -= HandleSlotKeyTapped;
     }
 
     void OnEnable()
     {
         if (ChatManager.Instance != null) ChatManager.Instance.OnLiveMessagesReceived += HandleLive;   // active-only
-        if (_expandableInput != null) _expandableInput.OnPanelHeightChanged += HandleComposerHeight;
         _debounceLoop = StartCoroutine(DebounceLoop());       // one always-running self-gating fire loop (BATCH-03)
     }
 
@@ -103,9 +119,16 @@ public class SuggestionsController : MonoBehaviour
         _debounce.Cancel();                                   // chat close: drop any pending coalesced fire (BATCH-03)
         _pendingIncomingText = null;                          // ...and its stale text, so it can never land later
         if (_debounceLoop != null) { StopCoroutine(_debounceLoop); _debounceLoop = null; }
-        _offsetTween?.Kill();
+        _insetTween?.Kill();
+        _insetTween = null;
+        // Chat screen closing mid-tenancy: drop the slot claim so the MovingArea settles back to
+        // rest for the next chat, and reset the swap state with it.
+        if (_keyboardMover != null) _keyboardMover.VirtualBottomInset = 0f;
+        _sheetOpen = false;
+        _yieldingToKeyboard = false;
+        _pendingShow = false;
+        if (_panel != null) _panel.Deactivate();
         if (ChatManager.Instance != null) ChatManager.Instance.OnLiveMessagesReceived -= HandleLive;
-        if (_expandableInput != null) _expandableInput.OnPanelHeightChanged -= HandleComposerHeight;
     }
 
     // --- State restore on chat-open / bot-switch (SEMI-02/SEMI-03) ---
@@ -126,6 +149,7 @@ public class SuggestionsController : MonoBehaviour
         StartFreshRound();
         _cache.Clear();                                      // chat ids recur across bots — entries must not outlive the bot (F9)
         if (_toggle != null) _toggle.SetLit(false);
+        if (_slotKey != null) _slotKey.SetVisible(false);
         HidePanel();
     }
 
@@ -138,6 +162,7 @@ public class SuggestionsController : MonoBehaviour
         _debounce.Cancel();
         _pendingIncomingText = null;
         _answeredIdle = false;   // per-chat latch — never carries into another chat's open
+        _pendingShow = false;    // a parked auto-show must not leak into another chat's open
         StartFreshRound();       // rounds are per-question, never per-app — a chat open starts at round 1
         _semiAutoOn = SemiAutoStore.IsOn(ChatManager.Instance.CurrentBotId, ChatManager.Instance.CurrentChatId);
         if (_toggle != null) _toggle.SetLit(_semiAutoOn);     // default OFF → other chats stay manual (SEMI-03)
@@ -147,9 +172,10 @@ public class SuggestionsController : MonoBehaviour
         // would turn a mere chat-open into a sticky per-chat server row (WR-01).
         if (SemiAutoStore.TryGetOverride(ChatManager.Instance.CurrentBotId, ChatManager.Instance.CurrentChatId, out bool overrideOn))
             PushReplyModeForActiveChat(overrideOn);
+        if (_slotKey != null) _slotKey.SetVisible(_semiAutoOn);
         if (_semiAutoOn)
         {
-            ShowPanel();
+            ShowPanel(claimSlotFromKeyboard: false);
             // F9: an unmoved history tail renders the cached set instantly — no skeleton, no
             // paid call. Any drift (new message, owner reply, first visit) = miss = fresh request.
             if (!TryRenderCached()) IssueRequest(null, null);
@@ -187,9 +213,10 @@ public class SuggestionsController : MonoBehaviour
         SemiAutoStore.Set(ChatManager.Instance.CurrentBotId, ChatManager.Instance.CurrentChatId, desiredOn);   // persist
         PushReplyModeForActiveChat(desiredOn);                 // SUP-02: mirror the per-chat override (ON and OFF) to the server
         if (_toggle != null) _toggle.SetLit(desiredOn);
+        if (_slotKey != null) _slotKey.SetVisible(desiredOn);
         if (desiredOn)
         {
-            ShowPanel();
+            ShowPanel(claimSlotFromKeyboard: false);           // gentle: an open keyboard keeps the slot until it closes
             StartFreshRound();                                 // explicit turn-on = round 1
             IssueRequest(null, null);                          // first set on turn-on
         }
@@ -198,6 +225,7 @@ public class SuggestionsController : MonoBehaviour
             _requestSeq++;                                     // supersede any in-flight request — no late render
             _debounce.Cancel();                                // toggle-OFF: a stale window must not survive to fire after a later toggle-ON (BATCH-03)
             _pendingIncomingText = null;
+            _pendingShow = false;
             HidePanel();                                       // D-11: off = hide; composer untouched
         }
     }
@@ -470,8 +498,9 @@ public class SuggestionsController : MonoBehaviour
             {
                 // A new incoming after an answered-and-hidden run re-opens the sheet HERE, at the
                 // fire — arriving together with the skeleton, never flashing the stale pre-send
-                // set for the window's 2.5s (flow decision 2026-08-11).
-                if (_panel != null && !_panel.IsShown) ShowPanel();
+                // set for the window's 2.5s (flow decision 2026-08-11). Never steals the slot
+                // from an open keyboard — ShowPanel parks the show until the keyboard leaves.
+                if (!_sheetOpen) ShowPanel(claimSlotFromKeyboard: false);
                 StartFreshRound();   // a new client message is a NEW question — round 1 again
                 // NOTE: _pendingIncomingText deliberately survives the fire — it mirrors the
                 // UN-REPLIED trailing run, and a burst that straddles the window fires twice; the
@@ -484,38 +513,184 @@ public class SuggestionsController : MonoBehaviour
         }
     }
 
-    // --- Panel show/hide coordinated with the composer top + message-list floor (FIX 1 & 2) ---
+    // --- Keyboard-slot tenancy (sketch-003 variant A) -----------------------
+    // The bottom slot has exactly one tenant: the native keyboard or the suggestions panel.
+    // The panel sits at the screen bottom OUTSIDE the MovingArea; opening it raises the
+    // MovingArea by the slot height via KeyboardAwarePanel.VirtualBottomInset — exactly what
+    // the keyboard does — and LateUpdate glues the panel's top edge to the composer's bottom.
+    // Swaps hold the LARGER claim until the incoming tenant arrives (the no-dip rule,
+    // SuggestionSlotSwap), so the composer and thread never move during a handoff.
 
-    private void ShowPanel()
+    /// <summary>
+    /// Open the slot for the panel. Auto-shows (chat open, toggle-on, debounce fire) pass
+    /// false and PARK the show while the keyboard owns the slot — stealing it mid-typing is
+    /// never acceptable; the parked show lands when the keyboard leaves. The explicit ✦ tap
+    /// passes true: it dismisses the keyboard and takes the slot at the keyboard's own height.
+    /// </summary>
+    private void ShowPanel(bool claimSlotFromKeyboard)
     {
         if (_panel == null) return;
-        if (_expandableInput != null)
-            _panel.SetComposerHeight(_expandableInput.CurrentPanelHeight);   // panel bottom rides the composer top
-        AnimateListOffset(_panel.Footprint, 0.25f, Ease.OutCubic);          // messages slide up with the panel (no jump)
-        _panel.Show();
+        bool kbVisible = _keyboardMover != null && _keyboardMover.NativeKeyboardVisible;
+        if (kbVisible && !claimSlotFromKeyboard)
+        {
+            _pendingShow = true;
+            return;
+        }
+
+        float kbCanvas = _keyboardMover != null ? _keyboardMover.EffectiveAreaCanvasPx : 0f;
+        _slotCanvasPx = SuggestionSlotSwap.SlotForOpen(kbVisible, kbCanvas, SuggestionSlotHeight.Remembered);
+        _panel.SetSlotMetrics(_slotCanvasPx, _keyboardMover != null ? _keyboardMover.SafeBottomCanvasPx : 0f);
+        _panel.ShowInSlot();
+        _sheetOpen = true;
+        _yieldingToKeyboard = false;
+        _pendingShow = false;
+        if (_slotKey != null) _slotKey.SetSlotOpen(true);
+
+        _insetTween?.Kill();
+        if (_keyboardMover == null) return;
+        if (kbVisible)
+        {
+            // Handoff FROM the keyboard: hold the inset where the keyboard already has it and
+            // dismiss — the composer must not move a pixel while the keyboard slides away.
+            _keyboardMover.VirtualBottomInset = _slotCanvasPx;
+            DismissComposerKeyboard();
+        }
+        else
+        {
+            _insetTween = DOTween.To(
+                    () => _keyboardMover.VirtualBottomInset,
+                    v => _keyboardMover.VirtualBottomInset = v,
+                    _slotCanvasPx, 0.25f)
+                .SetEase(Ease.OutCubic);
+        }
     }
 
     private void HidePanel()
     {
-        AnimateListOffset(0f, 0.20f, Ease.InCubic);                         // messages slide back down with the panel
-        if (_panel != null) _panel.Hide();
+        _sheetOpen = false;
+        _pendingShow = false;
+        if (_slotKey != null) _slotKey.SetSlotOpen(false);
+        if (_yieldingToKeyboard) return;   // the keyboard is mid-takeover — the yield watcher finishes the handoff
+        _insetTween?.Kill();
+        if (_keyboardMover != null && _keyboardMover.VirtualBottomInset > 0.5f)
+        {
+            _insetTween = DOTween.To(
+                    () => _keyboardMover.VirtualBottomInset,
+                    v => _keyboardMover.VirtualBottomInset = v,
+                    0f, 0.20f)
+                .SetEase(Ease.InCubic)
+                .OnComplete(() => { if (_panel != null) _panel.Deactivate(); });
+        }
+        else if (_panel != null) _panel.Deactivate();
     }
 
-    // Animate the message-list floor (ExpandableInput's extra bottom offset) so the messages
-    // follow the panel smoothly, the way the stack follows the keyboard — not an instant jump.
-    private void AnimateListOffset(float target, float duration, Ease ease)
+    // The swap watcher. Runs every frame the chat screen is up: measures the live keyboard for
+    // the next slot open, detects the keyboard claiming the slot (⌨ key or a direct composer
+    // tap — both just activate the field; the rise is detected here), completes or reinstates
+    // a yield, and lands a parked auto-show once the keyboard leaves.
+    void Update()
     {
-        if (_expandableInput == null) return;
-        _offsetTween?.Kill();
-        _offsetTween = DOVirtual.Float(_expandableInput.ExtraBottomOffset, target, duration,
-            v => _expandableInput.SetExtraBottomOffset(v)).SetEase(ease);
+        if (_keyboardMover == null) return;
+
+#if UNITY_EDITOR
+        // Editor parity: focusing the composer must claim the slot like the device keyboard
+        // does. K still toggles the simulated keyboard manually.
+        if (ComposerFocused && !_keyboardMover.NativeKeyboardVisible)
+            _keyboardMover.SetSimulatedKeyboard(true);
+#endif
+
+        bool kbVisible = _keyboardMover.NativeKeyboardVisible;
+        float kbCanvas = _keyboardMover.EffectiveAreaCanvasPx;
+
+        if (kbVisible && SuggestionSlotHeight.IsValid(kbCanvas))
+            SuggestionSlotHeight.Remember(kbCanvas);   // measure while it's up — the next slot open matches exactly
+
+        bool keyboardClaimsSlot = kbVisible && _sheetOpen && !_yieldingToKeyboard
+                                  && (!_kbWasVisible || ComposerFocused);
+        if (keyboardClaimsSlot)
+        {
+            // The keyboard is rising into the slot: the sheet yields, but the held inset must
+            // NOT drop until the keyboard is actually there (no-dip). The panel stays active
+            // underneath — the native keyboard renders above everything and covers it.
+            _sheetOpen = false;
+            _yieldingToKeyboard = true;
+            _yieldStartedAt = Time.realtimeSinceStartup;
+            _insetTween?.Kill();
+            if (_slotKey != null) _slotKey.SetSlotOpen(false);
+        }
+
+        if (_yieldingToKeyboard)
+        {
+            if (!kbVisible)
+            {
+                // The keyboard bounced away before taking the slot — the panel is still in
+                // place and holding the inset: reinstate it instead of dropping the slot.
+                _yieldingToKeyboard = false;
+                _sheetOpen = true;
+                if (_slotKey != null) _slotKey.SetSlotOpen(true);
+            }
+            else if (SuggestionSlotSwap.ShouldReleaseHold(
+                         kbVisible, kbCanvas, _keyboardMover.VirtualBottomInset,
+                         Time.realtimeSinceStartup - _yieldStartedAt))
+            {
+                _yieldingToKeyboard = false;
+                _keyboardMover.VirtualBottomInset = 0f;   // the real keyboard owns the inset now
+                if (_panel != null) _panel.Deactivate();
+            }
+        }
+
+        // A parked auto-show lands the moment the keyboard leaves the slot.
+        if (!kbVisible && _kbWasVisible && _pendingShow && _semiAutoOn && !_sheetOpen)
+        {
+            _pendingShow = false;
+            ShowPanel(claimSlotFromKeyboard: false);
+        }
+
+        _kbWasVisible = kbVisible;
     }
 
-    // Composer grew/shrank (multi-line) → keep the panel riding its top edge. The message-list
-    // floor auto-updates inside ExpandableInput (it re-adds _extraBottomOffset on each height change).
-    private void HandleComposerHeight(float composerHeight)
+    // Glue: the panel's top edge tracks the composer's bottom edge exactly — smoothing, live
+    // keyboard motion and all. KeyboardAwarePanel applies its inset in Update; LateUpdate runs
+    // after every Update, so the glue always reads this frame's applied value.
+    void LateUpdate()
     {
-        if (_panel != null) _panel.SetComposerHeight(composerHeight);
+        if (_panel != null && _panel.IsShown && _keyboardMover != null)
+            _panel.FollowInset(_keyboardMover.AppliedBottomInset);
+    }
+
+    private bool ComposerFocused =>
+        _bottomPanel != null && _bottomPanel.inputField != null && _bottomPanel.inputField.isFocused;
+
+    // AttachSheet's sanctioned dismissal pair — ReleaseSelection AFTER DeactivateInputField
+    // (ghost-caret rule; `Reset On Deactivation` is off on every input in this project).
+    private void DismissComposerKeyboard()
+    {
+        var field = _bottomPanel != null ? _bottomPanel.inputField : null;
+        if (field == null) return;
+        field.DeactivateInputField();
+        field.ReleaseSelection();
+#if UNITY_EDITOR
+        if (_keyboardMover != null) _keyboardMover.SetSimulatedKeyboard(false);
+#endif
+    }
+
+    // The ✦ ⇄ ⌨ key inside the composer field: ✦ (slot closed) opens the panel — over the
+    // keyboard if one is up; ⌨ (slot open) hands the slot back to the keyboard by activating
+    // the composer — the rise is detected and choreographed by the Update watcher.
+    private void HandleSlotKeyTapped()
+    {
+        if (!_semiAutoOn) return;
+        if (_sheetOpen)
+        {
+            var field = _bottomPanel != null ? _bottomPanel.inputField : null;
+            if (field == null) return;
+            if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(field.gameObject);
+            field.ActivateInputField();
+#if UNITY_EDITOR
+            if (_keyboardMover != null) _keyboardMover.SetSimulatedKeyboard(true);
+#endif
+        }
+        else SetSheetOpen(true);
     }
 
     // --- Manual refresh (INT-03) ---
@@ -528,10 +703,10 @@ public class SuggestionsController : MonoBehaviour
         if (_semiAutoOn) IssueRequest(steerTowardText: _currentSteer, lastIncomingText: null);
     }
 
-    // --- Manual sheet show/hide (grab-handle close + composer toggle button) ---
-    // Routes through ShowPanel/HidePanel so the message-list floor always follows the sheet.
-    // Only meaningful in «Вместе» — in Авто there is no suggestions flow to reveal. A manual
-    // close is a soft dismiss: later results keep rendering silently and the next chat-open or
+    // --- Manual sheet show/hide (✦ key + any legacy toggle listeners) ---
+    // Routes through ShowPanel/HidePanel so the slot inset always follows the sheet. Only
+    // meaningful in «Вместе» — in Авто there is no suggestions flow to reveal. A manual close
+    // is a soft dismiss: later results keep rendering silently and the next chat-open or
     // toggle-ON re-shows as before.
 
     public void SetSheetOpen(bool open)
@@ -539,7 +714,7 @@ public class SuggestionsController : MonoBehaviour
         if (!_semiAutoOn) return;
         if (open)
         {
-            ShowPanel();
+            ShowPanel(claimSlotFromKeyboard: true);   // explicit ask — the keyboard hands the slot over
             // Re-opening after an answered run: the rendered cards are the stale pre-send set —
             // regenerate for "what's next" instead of showing them (flow decision 2026-08-11).
             if (_answeredIdle) IssueRequest(steerTowardText: null, lastIncomingText: null);
@@ -547,5 +722,5 @@ public class SuggestionsController : MonoBehaviour
         else HidePanel();
     }
 
-    public void ToggleSheet() => SetSheetOpen(!(_panel != null && _panel.IsShown));
+    public void ToggleSheet() => SetSheetOpen(!_sheetOpen);
 }

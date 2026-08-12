@@ -6,10 +6,14 @@ using UnityEngine.UI;
 using DG.Tweening;
 
 /// <summary>
-/// The suggestions panel view (PANEL-01..05). A white sheet above the composer that renders a
-/// best-first vertical stack of 4 cards and a 5-state machine (skeleton / cards / empty / error)
-/// at a FIXED footprint — no layout pop (D-12). Slides in/out via DOTween. Pure view: it raises
-/// <see cref="OnCardTapped"/> / <see cref="OnRefreshRequested"/>; Plan 04's controller drives it.
+/// The suggestions panel view — since sketch-003 (variant A) a KEYBOARD-SLOT tenant: it sits at
+/// the very bottom of the screen, exactly where (and exactly as tall as) the native keyboard,
+/// below the composer instead of above it. It renders a best-first vertical stack of cards and
+/// a state machine (skeleton / cards / empty / error) inside that fixed slot. It does NOT move
+/// itself: the controller drives the MovingArea inset (KeyboardAwarePanel.VirtualBottomInset)
+/// and glues this panel's top edge to the composer's bottom via <see cref="FollowInset"/> every
+/// LateUpdate. Pure view: it raises <see cref="OnCardTapped"/> / <see cref="OnRefreshRequested"/>
+/// / <see cref="OnBackRequested"/>; the controller owns all slot/keyboard choreography.
 /// Binds only Plan-01 seam types — no live-backend / messaging-API / web-request reference.
 /// </summary>
 public class SuggestionsPanel : MonoBehaviour
@@ -23,8 +27,8 @@ public class SuggestionsPanel : MonoBehaviour
     [SerializeField] private Button errorRetryButton;      // «Обновить» retry in the error state
     [SerializeField] private Button emptyRetryButton;      // «Обновить» in the empty state (audit F17b; wired by the builder)
     [SerializeField] private Button backButton;            // ‹ previous round, header left (rounds flow 2026-08-11; hidden at round 1)
-    [SerializeField] private RectTransform rt;             // slide root
-    [SerializeField] private CanvasGroup canvasGroup;      // fade
+    [SerializeField] private RectTransform rt;             // slot root (bottom-anchored, height = slot)
+    [SerializeField] private CanvasGroup canvasGroup;      // kept at 1 — the slot swap is positional, not a fade
     [SerializeField] private RectTransform cardsViewport;  // fixed scroll region (chrome = -offsetMax.y)
     [SerializeField] private GameObject bottomFade;        // "more below" wash — hidden when nothing overflows
 
@@ -32,60 +36,93 @@ public class SuggestionsPanel : MonoBehaviour
     public event Action OnRefreshRequested;
     public event Action OnBackRequested;   // ‹ tap — the controller restores the previous round locally
 
-    private const float TopSafeClearance = 180f;   // expansion never grows closer than this to the parent top
-
     private readonly List<SuggestionCard> _cards = new();
-    private float _restY;            // panel bottom sits on the composer's top edge (set by the controller)
-    private float _baseHeight;       // authored sheet height — the collapsed detent (captured in Awake)
-    private bool _visible, _sliding;
-    private Tweener _slideTween;     // Tweener (not Tween) so ChangeEndValue is available for live retargeting
-    private Tweener _heightTween;    // expand/collapse settle
+    private float _slotCanvasPx;       // panel height — the keyboard slot's effective height
+    private float _safeInsetCanvasPx;  // home-bar clearance applied inside the slot
 
-    /// <summary>Full sheet height — the clearance the message list must leave above the composer.</summary>
-    public float Footprint => rt != null ? rt.rect.height : 0f;
-    private float HiddenY => _restY - Footprint;
+    /// <summary>View-level visibility. The controller owns INTENT (its own sheet-open state) —
+    /// the panel can be active-but-covered while the native keyboard slides over it.</summary>
+    public bool IsShown => gameObject.activeSelf;
 
-    /// <summary>True while the sheet is (or is animating) open. Hide() flips it immediately.</summary>
-    public bool IsShown => _visible;
-
-    /// <summary>0 at rest → 1 fully dragged down. Read by the grab handle's close decision.</summary>
-    public float DragProgress => rt == null || Footprint <= 0f
-        ? 0f
-        : Mathf.Clamp01((_restY - rt.anchoredPosition.y) / Footprint);
+    /// <summary>The slot height the panel currently occupies (canvas px).</summary>
+    public float SlotCanvasPx => _slotCanvasPx;
 
     void Awake()
     {
-        if (rt != null) _baseHeight = rt.sizeDelta.y;
         if (refreshButton != null) refreshButton.onClick.AddListener(() => OnRefreshRequested?.Invoke());
         if (errorRetryButton != null) errorRetryButton.onClick.AddListener(() => OnRefreshRequested?.Invoke());
         if (emptyRetryButton != null) emptyRetryButton.onClick.AddListener(() => OnRefreshRequested?.Invoke());
         if (backButton != null) backButton.onClick.AddListener(() => OnBackRequested?.Invoke());
     }
 
-    void OnDisable()
+    void OnDisable() => StopShimmer();
+
+    // --- Slot chassis (sketch-003 variant A) --------------------------------
+
+    /// <summary>
+    /// Size the panel for the slot it is about to occupy: <paramref name="slotCanvasPx"/> is the
+    /// keyboard-equivalent height (safe-adjusted, same space as KeyboardAwarePanel's inset) and
+    /// <paramref name="safeInsetCanvasPx"/> the home-bar clearance kept content-free at the
+    /// panel's bottom — the slot background still fills to the true screen bottom, like the
+    /// keyboard's own tray does.
+    /// </summary>
+    public void SetSlotMetrics(float slotCanvasPx, float safeInsetCanvasPx)
     {
-        _slideTween?.Kill();
-        _slideTween = null;
-        _heightTween?.Kill();
-        _heightTween = null;
-        _sliding = false;
-        if (canvasGroup != null) canvasGroup.DOKill();
-        StopShimmer();
+        _slotCanvasPx = slotCanvasPx;
+        _safeInsetCanvasPx = safeInsetCanvasPx;
+        if (rt != null) rt.sizeDelta = new Vector2(rt.sizeDelta.x, slotCanvasPx);
+        ApplySafeInset(safeInsetCanvasPx);
+        if (gameObject.activeInHierarchy) StartCoroutine(UpdateFadeNextFrame());
+        else UpdateFadeVisibility();
+    }
+
+    // The safe pad lives on the CONTENT region, not the panel rect: viewport, the fade glued to
+    // its bottom edge, and the empty/error overlays (built with the viewport's own offsets).
+    private void ApplySafeInset(float safePx)
+    {
+        if (cardsViewport != null)
+            cardsViewport.offsetMin = new Vector2(cardsViewport.offsetMin.x, safePx);
+        if (bottomFade != null)
+        {
+            var fadeRt = (RectTransform)bottomFade.transform;
+            fadeRt.anchoredPosition = new Vector2(fadeRt.anchoredPosition.x, safePx);
+        }
+        ApplyStateInset(emptyState, safePx);
+        ApplyStateInset(errorState, safePx);
+    }
+
+    private static void ApplyStateInset(GameObject state, float safePx)
+    {
+        if (state == null) return;
+        var stateRt = (RectTransform)state.transform;
+        stateRt.offsetMin = new Vector2(stateRt.offsetMin.x, safePx);
+    }
+
+    /// <summary>Occupy the slot. Position comes from <see cref="FollowInset"/> — activate first,
+    /// then the controller's LateUpdate glue takes over the same frame.</summary>
+    public void ShowInSlot()
+    {
+        gameObject.SetActive(true);
+        if (canvasGroup != null) canvasGroup.alpha = 1f;
+        FollowInset(0f);   // safe default until the first glue tick (fully below the composer's rest position)
+    }
+
+    /// <summary>Leave the slot (fully closed / the keyboard finished taking over).</summary>
+    public void Deactivate()
+    {
+        if (gameObject.activeSelf) gameObject.SetActive(false);
     }
 
     /// <summary>
-    /// Controller-fed: the panel's bottom edge must sit at the composer's TOP edge, i.e. at
-    /// `composerHeight` units above the MovingArea bottom. Repositions live when shown, retargets
-    /// the slide if mid-animation, or stores it for the next Show when hidden.
+    /// Glue the panel's top edge to the composer's bottom edge: the composer sits
+    /// <paramref name="appliedInsetCanvasPx"/> above its rest position (KeyboardAwarePanel's
+    /// APPLIED rise, smoothing and all), so the panel's top must sit exactly there.
+    /// With bottom-anchored pivot: y = applied − slot.
     /// </summary>
-    public void SetComposerHeight(float composerHeight)
+    public void FollowInset(float appliedInsetCanvasPx)
     {
-        _restY = composerHeight;
         if (rt == null) return;
-        if (_visible && !_sliding)
-            rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, _restY);
-        else if (_sliding && _slideTween != null && _slideTween.IsActive())
-            _slideTween.ChangeEndValue(new Vector2(rt.anchoredPosition.x, _visible ? _restY : HiddenY), true);
+        rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, appliedInsetCanvasPx - _slotCanvasPx);
     }
 
     // --- 5-state machine ----------------------------------------------------
@@ -97,8 +134,6 @@ public class SuggestionsPanel : MonoBehaviour
         SetActiveSafe(errorState, false);
         SetSkeletons(true);
         StartShimmer();
-        // A re-cluster resets an expanded sheet — the skeletons fit the base detent.
-        if (_visible && CurrentHeight > BaseHeight + 1f) SettleSheetHeight(BaseHeight);
         UpdateFadeVisibility();
     }
 
@@ -166,94 +201,6 @@ public class SuggestionsPanel : MonoBehaviour
         _cards.Clear();
     }
 
-    // --- Show / hide (DOTween slide + fade) ---------------------------------
-
-    public void Show()
-    {
-        gameObject.SetActive(true);
-        _visible = true;
-        _slideTween?.Kill();
-        _heightTween?.Kill();
-        if (rt != null && BaseHeight > 0f)
-            rt.sizeDelta = new Vector2(rt.sizeDelta.x, BaseHeight);   // fresh open = collapsed detent
-        UpdateFadeVisibility();
-        if (canvasGroup != null) canvasGroup.alpha = 1f;     // no fade — pure slide up from behind the composer
-        if (rt != null)
-        {
-            rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, HiddenY);   // start behind composer, slide up to rest-Y
-            _sliding = true;
-            _slideTween = rt.DOAnchorPosY(_restY, 0.25f).SetEase(Ease.OutCubic).OnComplete(() => _sliding = false);
-        }
-    }
-
-    public void Hide()
-    {
-        if (!gameObject.activeSelf) return;
-        _visible = false;
-        _slideTween?.Kill();
-        if (rt != null)
-        {
-            _sliding = true;
-            _slideTween = rt.DOAnchorPosY(HiddenY, 0.20f).SetEase(Ease.InCubic)   // slide back down behind the composer
-                            .OnComplete(() => { _sliding = false; gameObject.SetActive(false); });
-        }
-        else gameObject.SetActive(false);
-    }
-
-    // --- Grab-handle drag + expansion (SheetDragHandle drives; the panel owns its tween state) ---
-
-    /// <summary>The collapsed detent — the sheet's authored height.</summary>
-    public float BaseHeight => _baseHeight > 0f ? _baseHeight : (rt != null ? rt.sizeDelta.y : 0f);
-
-    /// <summary>Current sheet height (the drag works in height space above the base detent).</summary>
-    public float CurrentHeight => rt != null ? rt.sizeDelta.y : 0f;
-
-    /// <summary>
-    /// The expanded detent: just tall enough that ALL cards are visible (chrome + content),
-    /// never below the base height and never closer than <see cref="TopSafeClearance"/> to the
-    /// parent's top edge. Equals the base height when the cards already fit — no expansion then.
-    /// </summary>
-    public float ExpandedFitHeight()
-    {
-        float baseH = BaseHeight;
-        if (rt == null || cardsViewport == null || cardsContainer == null) return baseH;
-        float chrome = -cardsViewport.offsetMax.y;
-        float contentH = UnityEngine.UI.LayoutUtility.GetPreferredHeight((RectTransform)cardsContainer);
-        float fit = chrome + contentH;
-        var parentRt = rt.parent as RectTransform;
-        float cap = parentRt != null ? parentRt.rect.height - _restY - TopSafeClearance : fit;
-        return Mathf.Max(baseH, Mathf.Min(fit, cap));
-    }
-
-    /// <summary>Finger down on the grab zone — stop any running slide so the drag owns the position.</summary>
-    public void BeginHandleDrag()
-    {
-        _slideTween?.Kill();
-        _slideTween = null;
-        _heightTween?.Kill();
-        _heightTween = null;
-        _sliding = false;
-    }
-
-    /// <summary>Live height while dragging upward (no tween). The bottom edge stays on the composer.</summary>
-    public void SetSheetHeight(float height)
-    {
-        if (rt == null) return;
-        rt.sizeDelta = new Vector2(rt.sizeDelta.x, height);
-        UpdateFadeVisibility();
-    }
-
-    /// <summary>Released in the expansion zone — settle to a detent (base or expanded-fit).</summary>
-    public void SettleSheetHeight(float height)
-    {
-        if (rt == null) return;
-        _heightTween?.Kill();
-        _heightTween = rt.DOSizeDelta(new Vector2(rt.sizeDelta.x, height), 0.25f)
-                         .SetEase(Ease.OutCubic)
-                         .OnUpdate(UpdateFadeVisibility)
-                         .OnComplete(UpdateFadeVisibility);
-    }
-
     // The fade is a lie once everything is visible — show it only while content overflows.
     private void UpdateFadeVisibility()
     {
@@ -267,23 +214,6 @@ public class SuggestionsPanel : MonoBehaviour
     {
         yield return null;   // let the freshly-instantiated cards' TMP layout settle
         UpdateFadeVisibility();
-    }
-
-    /// <summary>Follow the finger: <paramref name="draggedDown"/> ≥ 0 units below the rest position.</summary>
-    public void DragBy(float draggedDown)
-    {
-        if (rt == null) return;
-        float y = Mathf.Clamp(_restY - Mathf.Max(0f, draggedDown), HiddenY, _restY);
-        rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, y);
-    }
-
-    /// <summary>Released without committing a close — spring back to the rest position.</summary>
-    public void SnapBack()
-    {
-        if (rt == null) return;
-        _slideTween?.Kill();
-        _sliding = true;
-        _slideTween = rt.DOAnchorPosY(_restY, 0.2f).SetEase(Ease.OutCubic).OnComplete(() => _sliding = false);
     }
 
     // --- Skeleton shimmer (neutral, no spinner) -----------------------------

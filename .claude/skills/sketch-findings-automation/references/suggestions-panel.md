@@ -4,6 +4,21 @@ Winner **P** of sketch 002 (6 rounds, locked 2026-08-07). Replaces the mint 2×2
 currently produced by `SuggestionsPanelBuilder`. Interactive reference:
 `sources/002-suggestions-panel-redesign/index.html?v=p` (tab «P · На рамке ★»).
 
+> **CHASSIS SUPERSEDED 2026-08-12 — sketch 003 winner A («Прямая замена»).** The CARD design
+> below (bordered full-text cards, border-legend pills, tint-only recommended, header
+> «‹ ✦ ПРЕДЛОЖЕНИЯ ↻», 4 states) remains LOCKED and unchanged, but the sheet no longer floats
+> ABOVE the composer: the panel is now a KEYBOARD-SLOT tenant at the very bottom of the screen —
+> exactly where and exactly as tall as the native keyboard, mutually exclusive with it, switched
+> by a ✦ ⇄ ⌨ key inside the composer input field (like WhatsApp's in-field icons). Slot height =
+> last measured keyboard height (`SuggestionSlotHeight`, fallback 780u); swaps hold
+> `max(keyboard, slot)` on `KeyboardAwarePanel.VirtualBottomInset` so the composer never moves
+> during a handoff (no-dip; `SuggestionSlotSwap`). Grabber, drag-to-dismiss, drag-to-expand and
+> the sheet's left-edge swipe proxy died with the sheet chassis; the mic-slot ✦ toggle was
+> retired for the in-field key (which survives typing — the mic-slot one vanished with text).
+> Reference: `.planning/sketches/003-suggestions-keyboard-slot/` (variant A) + its README
+> Decision block. Sections below describe the still-valid card/skin spec + the OLD chassis for
+> history.
+
 ## Design Decisions
 
 **Chassis — bottom sheet, FIXED height, cards scroll inside:**

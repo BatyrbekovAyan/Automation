@@ -12,6 +12,12 @@ using UnityEngine.InputSystem;
 ///
 /// Safe area: the bottom safe-zone gap (home bar inset) is subtracted from
 /// the rise amount, so it slides under the keyboard and stays invisible.
+///
+/// Slot tenancy (sketch-003): the suggestions panel can occupy the keyboard's
+/// slot while the keyboard is away. <see cref="VirtualBottomInset"/> is that
+/// tenant's claim in canvas units; the applied rise is max(keyboard, virtual),
+/// so during a keyboard ⇄ panel handoff the larger claim holds the panel still
+/// (the no-dip invariant — see SuggestionSlotSwap).
 /// </summary>
 [RequireComponent(typeof(RectTransform))]
 public class KeyboardAwarePanel : MonoBehaviour
@@ -29,8 +35,34 @@ public class KeyboardAwarePanel : MonoBehaviour
     private float _currentY;
     private float _velocityY;
 
-    /// <summary>Last computed effective keyboard area in canvas-space pixels. Updated every frame.</summary>
+    /// <summary>Last computed effective KEYBOARD area in canvas-space pixels (safe-adjusted;
+    /// excludes any virtual tenant). Updated every frame.</summary>
     public float EffectiveAreaCanvasPx { get; private set; }
+
+    /// <summary>A non-keyboard slot tenant's claim on the bottom inset, canvas px (0 = none).
+    /// The applied rise is max(keyboard, this).</summary>
+    public float VirtualBottomInset { get; set; }
+
+    /// <summary>The rise actually applied to the panel THIS frame, canvas px — smoothing and
+    /// all. Slot tenants glue their top edge to this so they track the composer exactly.</summary>
+    public float AppliedBottomInset => _panel != null ? _panel.anchoredPosition.y - _baseY : 0f;
+
+    /// <summary>True while the native keyboard is up (Editor: the simulated one).</summary>
+    public bool NativeKeyboardVisible
+    {
+        get
+        {
+#if UNITY_EDITOR
+            return _editorKbVisible;
+#else
+            return TouchScreenKeyboard.visible;
+#endif
+        }
+    }
+
+    /// <summary>The bottom safe-area inset (home bar) in canvas px — what a slot tenant adds
+    /// below its content so it fills to the true screen bottom like the keyboard does.</summary>
+    public float SafeBottomCanvasPx => RawToCanvas(Screen.safeArea.y);
 
     // Editor simulation
 #if UNITY_EDITOR
@@ -62,35 +94,43 @@ public class KeyboardAwarePanel : MonoBehaviour
         _editorSimulated = Mathf.MoveTowards(_editorSimulated, editorTarget,
                                              EditorKbSpeed * Time.unscaledDeltaTime);
         EffectiveAreaCanvasPx = ConvertToCanvasSpace(_editorSimulated);
-        ApplyAndroid(_editorSimulated);
+        ApplyInstant(EffectiveTarget);
 
 #elif UNITY_ANDROID
         float liveAndroid = GetAndroidLiveHeight();
         EffectiveAreaCanvasPx = ConvertToCanvasSpace(liveAndroid);
-        ApplyAndroid(liveAndroid);
+        ApplyInstant(EffectiveTarget);
 
 #elif UNITY_IOS
         float targetIos = GetIOSTargetHeight();
         EffectiveAreaCanvasPx = ConvertToCanvasSpace(targetIos);
-        ApplyIOS(targetIos);
+        ApplyIOS(EffectiveTarget);
 
 #endif
     }
 
+    // The one place keyboard and slot-tenant claims merge (no-dip max rule).
+    private float EffectiveTarget => Mathf.Max(EffectiveAreaCanvasPx, VirtualBottomInset);
+
+#if UNITY_EDITOR
+    /// <summary>Editor-only device parity: lets slot-swap code drive the simulated keyboard the
+    /// way ActivateInputField/DeactivateInputField drive the real one. K still toggles manually.</summary>
+    public void SetSimulatedKeyboard(bool visible) => _editorKbVisible = visible;
+#endif
+
     // ── platform implementations ───────────────────────────────────
 
-    void ApplyAndroid(float liveKeyboardHeight)
+    void ApplyInstant(float offsetCanvasPx)
     {
-        float offset = ConvertToCanvasSpace(liveKeyboardHeight);
         _panel.anchoredPosition = new Vector2(
             _panel.anchoredPosition.x,
-            _baseY + offset
+            _baseY + offsetCanvasPx
         );
     }
 
-    void ApplyIOS(float targetKeyboardHeight)
+    void ApplyIOS(float offsetCanvasPx)
     {
-        float targetY = _baseY + ConvertToCanvasSpace(targetKeyboardHeight);
+        float targetY = _baseY + offsetCanvasPx;
 
         _currentY = Mathf.SmoothDamp(
             _currentY, targetY,
@@ -133,17 +173,22 @@ public class KeyboardAwarePanel : MonoBehaviour
         // only rises by the amount that covers NEW screen space.
         // The safe-zone gap slides under the keyboard instead of floating above it.
         float safeBottom = Screen.safeArea.y;           // px — 0 on devices with no home bar
-        float adjusted   = Mathf.Max(0f, screenPixels - safeBottom);
+        return RawToCanvas(Mathf.Max(0f, screenPixels - safeBottom));
+    }
+
+    float RawToCanvas(float screenPixels)
+    {
+        if (screenPixels <= 0f || _canvas == null) return 0f;
 
         if (_canvas.renderMode == RenderMode.ScreenSpaceOverlay)
         {
-            return adjusted / _canvas.scaleFactor;
+            return screenPixels / _canvas.scaleFactor;
         }
         else
         {
             float screenH = Screen.height;
             float canvasH = _canvas.GetComponent<RectTransform>().rect.height;
-            return adjusted * (canvasH / screenH);
+            return screenPixels * (canvasH / screenH);
         }
     }
 }

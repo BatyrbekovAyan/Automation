@@ -102,9 +102,11 @@ public class MessagesBottomPanel : MonoBehaviour
 
     private void UpdateButtonState(string currentText)
     {
-        bool hasText = !string.IsNullOrWhiteSpace(currentText);
-        sendButton.gameObject.SetActive(hasText);
-        micButton.gameObject.SetActive(!hasText);
+        // Slot-key era (sketch-003 A): Send is ALWAYS visible (OnSendClicked no-ops on empty
+        // text) and the mic slot stays parked — the ✦⇄⌨ suggestions key lives INSIDE the input
+        // field now, so nothing needs to time-share the right-hand button slot anymore.
+        if (!sendButton.gameObject.activeSelf) sendButton.gameObject.SetActive(true);
+        if (micButton != null && micButton.gameObject.activeSelf) micButton.gameObject.SetActive(false);
     }
 
     private void OnSendClicked()
