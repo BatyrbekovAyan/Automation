@@ -2397,13 +2397,9 @@ private IEnumerator MarkChatAsRead(string chatId, string messageId)
         yield break;
     }
 
-    // tapi mark/read documents no mark_all query param (its bulk-read lever is
-    // mark_all on messages/get instead); WhatsApp keeps mark_all=true. Body {message_id}
-    // is identical on both channels.
-    string markReadPath = ActiveChannel == ChatChannel.Telegram
-        ? $"message/mark/read?profile_id={activeProfileId}"
-        : $"message/mark/read?profile_id={activeProfileId}&mark_all=true";
-    string url = WappiEndpoints.Sync(ActiveChannel, markReadPath);
+    // Query shape (incl. the WhatsApp-only mark_all lever) lives in MarkReadRequest so it
+    // is unit-testable; the body {message_id} is identical on both channels.
+    string url = WappiEndpoints.Sync(ActiveChannel, MarkReadRequest.Path(ActiveChannel, activeProfileId));
     string jsonPayload = JsonConvert.SerializeObject(new { message_id = messageId });
 
     using UnityWebRequest www = new UnityWebRequest(url, "POST");
