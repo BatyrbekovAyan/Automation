@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 006 — Карточка бота: свитч → капсула «Авто»</title>
+<link rel="stylesheet" href="../themes/ink-dark.css" id="theme-link">
+<style>
+  /* ============ page chrome ============ */
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, 'SF Pro Text', Roboto, 'Segoe UI', system-ui, sans-serif;
+    background: var(--page-bg); color: var(--page-ink);
+    padding: 148px 16px 40px; display:flex; flex-direction:column; align-items:center;
+    transition: background .2s;
+  }
+  #variant-nav {
+    position: fixed; top:0; left:0; right:0; z-index: 9998;
+    background: var(--page-surface); border-bottom: 1px solid var(--page-line);
+    padding: 10px 16px 8px; display:flex; flex-direction:column; gap:6px;
+  }
+  .nav-row { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  .nav-title { font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--page-ink-2); margin-right:8px; }
+  .variant-tab {
+    font-family: inherit; font-size:13px; padding:6px 12px; border-radius: 8px;
+    border:1px solid var(--page-line); background:transparent; color:var(--page-ink);
+    cursor:pointer; transition: all .15s ease;
+  }
+  .variant-tab:hover { border-color: var(--page-ink-2); }
+  .variant-tab.active { background: var(--page-ink); color: var(--page-bg); border-color: var(--page-ink); }
+  #model-line { font-size:11.5px; color: var(--page-ink-2); max-width:820px; }
+  #model-line b { color: var(--page-ink); }
+  #caption { font-size:12.5px; line-height:1.45; color: var(--page-ink-2); max-width:820px; }
+  #caption b { color: var(--page-ink); }
+
+  .variant { display:none; } .variant.active { display:block; }
+
+  /* ============ phone frame ============ */
+  .phone {
+    width: 360px; height: 762px; border-radius: 34px; overflow: hidden;
+    border: 9px solid #0B0D10; box-shadow: 0 18px 50px rgba(0,0,0,.28);
+    display:flex; flex-direction:column; background: var(--bg); position:relative;
+  }
+  .statusbar {
+    height: 26px; background: var(--bg); display:flex; align-items:center;
+    justify-content:space-between; padding: 2px 16px 0; font-size:11.5px; font-weight:600; color:var(--ink);
+    flex: 0 0 auto;
+  }
+  .pagehead {
+    flex:0 0 auto; display:flex; align-items:center; justify-content:space-between;
+    padding: 8px 13px 10px; background: var(--bg);
+  }
+  .pagehead h1 { font-size:21px; font-weight:700; color:var(--ink); letter-spacing:-.3px; }
+  .addbtn {
+    width:32px; height:32px; border-radius:50%; background:var(--accent-fill); color:var(--accent-on-fill);
+    display:flex; align-items:center; justify-content:center; font-size:19px; font-weight:400;
+    padding-bottom:2px; cursor:pointer;
+  }
+
+  .botlist { flex:1 1 auto; min-height:0; overflow-y:auto; padding: 2px 13px 12px;
+             display:flex; flex-direction:column; gap:9px; }
+
+  /* ============ bot card — shared ============ */
+  .bcard { background: var(--surface); border-radius: 13px; box-shadow: var(--shadow-sm); overflow:hidden; }
+  .brow  { display:flex; align-items:center; gap:10px; padding: 0 14px; height:77px; cursor:pointer; }
+  .bava  { width:40px; height:40px; border-radius:12px; flex:0 0 auto; position:relative;
+           display:flex; align-items:center; justify-content:center; font-size:20px; }
+  .avdot { position:absolute; right:-2.5px; bottom:-2.5px; width:11px; height:11px; border-radius:50%;
+           border:2px solid var(--surface); }
+  .avdot.ok   { background: var(--positive-ink); }
+  .avdot.conn { background: var(--mode-semi-track); animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  .binfo { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2.5px; }
+  .bname { font-size:14.5px; font-weight:600; color:var(--ink);
+           white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .bdesc { font-size:11px; color:var(--ink-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .bdesc.connecting { color: var(--mode-semi-track); }
+  .chev  { flex:0 0 auto; color:var(--ink-3); display:flex; }
+
+  /* status pill («Активен» / «Подключение» / «Неактивен») */
+  .spill { flex:0 0 auto; height:19px; padding:0 7px; border-radius:10px;
+           font-size:9.3px; font-weight:600; display:inline-flex; align-items:center; white-space:nowrap; }
+  .spill.ok   { background: var(--positive-bg); color: var(--positive-ink); }
+  .spill.conn { background: color-mix(in srgb, var(--mode-semi-track) 16%, var(--surface)); color: var(--mode-semi-track); }
+  .spill.off  { background: color-mix(in srgb, var(--destructive) 14%, var(--surface)); color: var(--destructive); }
+
+  /* footer band */
+  .bfoot { position:relative; height:42px; display:flex; align-items:center;
+           justify-content:space-between; padding: 0 14px; }
+  .bfoot::before { content:''; position:absolute; left:14px; right:14px; top:0; height:1px;
+                   background: var(--hairline); }
+  .flab { font-size:12.7px; }
+  .flab.on  { color: var(--ink-2); }
+  .flab.off { color: var(--ink-3); }
+
+  /* ============ baseline: iOS switch ============ */
+  .iosw { width:50px; height:28px; border-radius:14px; background:var(--border); position:relative;
+          cursor:pointer; transition: background .2s ease; flex:0 0 auto; }
+  .iosw.on { background: var(--switch-on); }
+  .iosw i { position:absolute; top:1.7px; left:1.7px; width:24.7px; height:24.7px; border-radius:50%;
+            background:#fff; box-shadow:0 1px 2.5px rgba(0,0,0,.28); transition: transform .2s ease; }
+  .iosw.on i { transform: translateX(22px); }
+
+  /* ============ A: the top-bar «Авто» pill, 1:1 ============ */
+  .apill { display:inline-flex; align-items:center; gap:4.7px; height:25.3px; border-radius:12.7px;
+           padding: 0 10px; font-size:10px; font-weight:600; color:var(--ink-2);
+           box-shadow: inset 0 0 0 1px var(--border); cursor:pointer; white-space:nowrap;
+           transition: all .18s ease; flex:0 0 auto; background:transparent; }
+  .apill .dot { width:6px; height:6px; border-radius:50%; box-shadow: inset 0 0 0 1.3px var(--ink-3);
+                flex:0 0 auto; transition: all .18s ease; }
+  .apill.on { background: var(--positive-bg); color: var(--positive-ink); box-shadow:none; }
+  .apill.on .dot { background: currentColor; box-shadow:none; }
+
+  /* ============ B: recessed segment «Авто | Пауза» ============ */
+  .segwell { flex:1 1 auto; height:32px; background:var(--bg); border-radius:16px;
+             box-shadow: inset 0 0 0 1px var(--hairline); padding:1.7px; display:flex; }
+  .segcell { flex:1; border-radius:14.3px; display:flex; align-items:center; justify-content:center;
+             gap:5px; font-size:10.7px; font-weight:600; color:var(--ink-3); cursor:pointer;
+             transition: all .18s ease; }
+  .segcell .dot { width:6.7px; height:6.7px; border-radius:50%;
+                  box-shadow: inset 0 0 0 1.3px var(--ink-3); transition: all .18s ease; }
+  .segcell.sel-auto { background: var(--positive-bg); color: var(--positive-ink); }
+  .segcell.sel-auto .dot { background: currentColor; box-shadow:none; }
+  .segcell.sel-pause { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); }
+
+  .punch { animation: punch .18s ease; }
+  @keyframes punch { 0%{transform:scale(1)} 35%{transform:scale(.9)} 100%{transform:scale(1)} }
+
+  /* ============ confirm dialog (per phone) ============ */
+  .dlg-scrim { position:absolute; inset:0; background:rgba(0,0,0,.42); display:none;
+               align-items:center; justify-content:center; z-index:20; }
+  .dlg-scrim.open { display:flex; }
+  .dlg { width:240px; background:var(--surface); border-radius:19px; padding:17px 16px 13px;
+         box-shadow: var(--shadow-md); animation: dlgin .16s ease; }
+  @keyframes dlgin { from{transform:scale(.94); opacity:0} to{transform:scale(1); opacity:1} }
+  .dlg h4 { font-size:14.7px; font-weight:650; color:var(--ink); margin-bottom:7px; }
+  .dlg p  { font-size:11px; line-height:1.45; color:var(--ink-2); margin-bottom:13px; }
+  .dlg-btns { display:flex; gap:8px; }
+  .dlg-btn { flex:1; height:32px; border-radius:16px; font-size:11px; font-weight:600;
+             display:flex; align-items:center; justify-content:center; cursor:pointer;
+             transition: filter .15s; }
+  .dlg-btn:hover { filter: brightness(1.06); }
+  .dlg-btn.ghost { background:var(--bg); box-shadow: inset 0 0 0 1px var(--hairline); color:var(--ink-2); }
+  .dlg-btn.fill  { background:var(--accent-fill); color:var(--accent-on-fill); }
+
+  /* ============ bottom nav ============ */
+  .nav { flex:0 0 auto; height:56px; background:var(--surface); border-top:1px solid var(--hairline);
+         display:flex; padding-bottom:8px; }
+  .nav > div { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+               gap:2px; font-size:8.7px; font-weight:500; color:var(--ink-3); }
+  .nav > div.on { color: var(--accent-text); }
+  .nav svg { width:19px; height:19px; }
+
+  /* ============ sketch toolbar ============ */
+  #sketch-tools {
+    position:fixed; bottom:12px; right:12px; z-index:9999; font-family:system-ui; font-size:12px;
+    background:rgba(0,0,0,0.72); color:#fff; padding:8px 12px; border-radius:8px;
+    opacity:.45; transition:opacity .2s; display:flex; gap:8px; align-items:center;
+  }
+  #sketch-tools:hover { opacity:1; }
+  #sketch-tools select { font-size:12px; }
+</style>
+</head>
+<body>
+
+<div id="variant-nav">
+  <div class="nav-row">
+    <span class="nav-title">Sketch 006 · Карточка бота: капсула «Авто»</span>
+    <button class="variant-tab active" onclick="showVariant('base', this)">Сегодня (baseline)</button>
+    <button class="variant-tab" onclick="showVariant('a', this)">A: Пилюля из шапки</button>
+    <button class="variant-tab" onclick="showVariant('b', this)">B: Сегмент Авто | Пауза</button>
+    <button class="variant-tab" onclick="showVariant('c', this)">C: Компакт без футера</button>
+  </div>
+  <div id="model-line"><b>Семантика:</b> капсула = тот же авто-режим, что кнопка «Авто» в шапке чатов. Выкл → вкл — диалог подтверждения (как в шапке); вкл → выкл — мгновенно. Состояния ботов общие между вкладками — переключите и сравните.</div>
+  <div id="caption"></div>
+</div>
+
+<div class="variant active" id="variant-base"></div>
+<div class="variant" id="variant-a"></div>
+<div class="variant" id="variant-b"></div>
+<div class="variant" id="variant-c"></div>
+
+<div id="sketch-tools">
+  <span>Тема</span>
+  <select onchange="document.getElementById('theme-link').href='../themes/'+this.value+'.css'">
+    <option value="ink-dark" selected>Тёмная (по умолч. в апке)</option>
+    <option value="default">Светлая</option>
+  </select>
+</div>
+
+<script>
+/* ---------- shared state ---------- */
+const bots = [
+  { id:1, name:'Цветы Астана',    desc:'Цветы · WhatsApp',            emoji:'🌸', tint:'linear-gradient(135deg,#E8A2B8,#C96A8B)', auto:true,  conn:'ok' },
+  { id:2, name:'Автозапчасти KZ', desc:'Автозапчасти · WhatsApp',     emoji:'⚙️', tint:'linear-gradient(135deg,#8FB8E8,#5E86C0)', auto:false, conn:'ok' },
+  { id:3, name:'Ремонт телефонов',desc:'Ремонт техники · Telegram',   emoji:'📱', tint:'linear-gradient(135deg,#A8E6C3,#5FBF8A)', auto:true,  conn:'connecting' },
+];
+
+const captions = {
+  base: '<b>Как сейчас:</b> iOS-свитч (150×84) + подпись «Бот работает / Бот на паузе» + статус-пилюля в строке. Одно состояние — три сигнала: выключите свитч у первого бота и посчитайте, сколько элементов поменялось. Переключение мгновенное в обе стороны.',
+  a: '<b>Минимальный ход:</b> свитч заменён точной пилюлей из шапки чатов (76h: точка + «Авто»; вкл = PositiveBg/PositiveInk, выкл = кольцо Border + полая точка). Подпись и статус-пилюля не тронуты. Один и тот же контрол теперь везде — но обратите внимание: у паузы карточка всё ещё дублирует сигнал красной пилюлей «Неактивен».',
+  b: '<b>Футер = сегмент «Авто | Пауза»</b> — язык утопленной лунки переключателя каналов из той же шапки. Контрол сам себя называет, отдельная подпись не нужна; оба состояния видны и «куда нажать, чтобы выключить» очевидно. Самая большая цель касания из всех вариантов.',
+  c: '<b>Радикально:</b> футер убран, карточка 360 → 232 ед. Капсула «Авто» встала в строку, а статус-пилюля растворилась — связь показывает точка на аватаре (зелёная = подключён, синяя мигает = подключение), авто-режим показывает капсула. Один сигнал на одно понятие, список в полтора раза плотнее.',
+};
+
+let lastPunch = null;   // {variant, id} — the control to punch after re-render
+let pending  = null;    // {variant, id} — confirm-dialog target
+
+/* ---------- svg bits ---------- */
+const svgChev = '<svg viewBox="0 0 8 14" width="7" height="12"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const navIcons = {
+  bots:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="7" width="14" height="11" rx="3"/><circle cx="9.5" cy="12.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="14.5" cy="12.5" r="1.2" fill="currentColor" stroke="none"/><path d="M12 7V4.5"/><circle cx="12" cy="3.5" r="1" fill="currentColor" stroke="none"/></svg>',
+  chats: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6.5A2.5 2.5 0 016.5 4h11A2.5 2.5 0 0120 6.5v8a2.5 2.5 0 01-2.5 2.5H9l-4 3.5V6.5z"/></svg>',
+  stats: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 19V12M12 19V5M19 19v-9"/></svg>',
+  prof:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c1.3-3.2 4-4.8 7-4.8s5.7 1.6 7 4.8"/></svg>',
+};
+
+/* ---------- state helpers ---------- */
+function statusOf(b) {
+  if (!b.auto) return { cls:'off',  label:'Неактивен' };
+  if (b.conn === 'ok') return { cls:'ok', label:'Активен' };
+  return { cls:'conn', label:'Подключение' };
+}
+const punchCls = (v, id) => (lastPunch && lastPunch.variant === v && lastPunch.id === id) ? ' punch' : '';
+
+/* ---------- card renderers ---------- */
+function rowTop(b, opts = {}) {
+  const st = statusOf(b);
+  const dot = opts.avatarDot
+    ? `<span class="avdot ${b.conn === 'ok' ? 'ok' : 'conn'}"></span>` : '';
+  const descCls = (opts.connInDesc && b.conn === 'connecting') ? 'bdesc connecting' : 'bdesc';
+  const descTxt = (opts.connInDesc && b.conn === 'connecting') ? 'Подключение…' : b.desc;
+  const pill = opts.statusPill ? `<span class="spill ${st.cls}">${st.label}</span>` : '';
+  const trailing = opts.trailing || '';
+  return `<div class="brow">
+      <div class="bava" style="background:${b.tint}">${b.emoji}${dot}</div>
+      <div class="binfo"><span class="bname">${b.name}</span><span class="${descCls}">${descTxt}</span></div>
+      ${pill}${trailing}<span class="chev">${svgChev}</span>
+    </div>`;
+}
+
+function cardBase(b) {
+  return `<div class="bcard">${rowTop(b, { statusPill:true })}
+    <div class="bfoot">
+      <span class="flab ${b.auto ? 'on' : 'off'}">${b.auto ? 'Бот работает' : 'Бот на паузе'}</span>
+      <div class="iosw ${b.auto ? 'on' : ''}${punchCls('base', b.id)}" onclick="attempt('base', ${b.id})"><i></i></div>
+    </div></div>`;
+}
+
+function cardA(b) {
+  return `<div class="bcard">${rowTop(b, { statusPill:true })}
+    <div class="bfoot">
+      <span class="flab ${b.auto ? 'on' : 'off'}">${b.auto ? 'Бот работает' : 'Бот на паузе'}</span>
+      <div class="apill ${b.auto ? 'on' : ''}${punchCls('a', b.id)}" onclick="attempt('a', ${b.id})"><span class="dot"></span>Авто</div>
+    </div></div>`;
+}
+
+function cardB(b) {
+  return `<div class="bcard">${rowTop(b, { statusPill:true })}
+    <div class="bfoot" style="padding:0 10px">
+      <div class="segwell${punchCls('b', b.id)}">
+        <div class="segcell ${b.auto ? 'sel-auto' : ''}" onclick="attempt('b', ${b.id}, true)"><span class="dot"></span>Авто</div>
+        <div class="segcell ${b.auto ? '' : 'sel-pause'}" onclick="attempt('b', ${b.id}, false)">Пауза</div>
+      </div>
+    </div></div>`;
+}
+
+function cardC(b) {
+  const pill = `<div class="apill ${b.auto ? 'on' : ''}${punchCls('c', b.id)}" onclick="attempt('c', ${b.id})"><span class="dot"></span>Авто</div>`;
+  return `<div class="bcard">${rowTop(b, { avatarDot:true, connInDesc:true, trailing:pill })}</div>`;
+}
+
+/* ---------- phone renderer ---------- */
+function phone(variant, renderCard) {
+  return `<div class="phone" data-variant="${variant}">
+    <div class="statusbar"><span>9:41</span><span style="letter-spacing:1px">●●● ▮</span></div>
+    <div class="pagehead"><h1>Боты</h1><div class="addbtn">+</div></div>
+    <div class="botlist">${bots.map(renderCard).join('')}</div>
+    <div class="dlg-scrim" id="dlg-${variant}">
+      <div class="dlg">
+        <h4>Включить авто-режим?</h4>
+        <p>Бот будет отвечать клиентам сам. Выключить можно в любой момент — этой же кнопкой.</p>
+        <div class="dlg-btns">
+          <div class="dlg-btn ghost" onclick="cancelDlg()">Отмена</div>
+          <div class="dlg-btn fill" onclick="confirmDlg()">Включить</div>
+        </div>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="on">${navIcons.bots}<span>Боты</span></div>
+      <div>${navIcons.chats}<span>Чаты</span></div>
+      <div>${navIcons.stats}<span>Сводка</span></div>
+      <div>${navIcons.prof}<span>Профиль</span></div>
+    </div>
+  </div>`;
+}
+
+const renderers = { base: cardBase, a: cardA, b: cardB, c: cardC };
+
+function renderAll() {
+  for (const v of Object.keys(renderers)) {
+    document.getElementById('variant-' + v).innerHTML = phone(v, renderers[v]);
+  }
+  lastPunch = null;
+}
+
+/* ---------- interactions ---------- */
+function attempt(variant, id, targetOn) {
+  const b = bots.find(x => x.id === id);
+  const want = (targetOn === undefined) ? !b.auto : targetOn;
+  if (want === b.auto) return;
+  if (want && variant !== 'base') {           // enabling needs confirmation (as in the top bar)
+    pending = { variant, id };
+    document.getElementById('dlg-' + variant).classList.add('open');
+    return;
+  }
+  b.auto = want;                              // disable (or baseline) — instant
+  lastPunch = { variant, id };
+  renderAll();
+}
+
+function confirmDlg() {
+  if (!pending) return;
+  const b = bots.find(x => x.id === pending.id);
+  b.auto = true;
+  lastPunch = { variant: pending.variant, id: pending.id };
+  pending = null;
+  renderAll();
+}
+
+function cancelDlg() {
+  if (pending) document.getElementById('dlg-' + pending.variant).classList.remove('open');
+  pending = null;
+}
+
+function showVariant(v, tabEl) {
+  document.querySelectorAll('.variant').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.variant-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('variant-' + v).classList.add('active');
+  tabEl.classList.add('active');
+  document.getElementById('caption').innerHTML = captions[v];
+}
+
+renderAll();
+document.getElementById('caption').innerHTML = captions.base;
+</script>
+</body>
+</html>
