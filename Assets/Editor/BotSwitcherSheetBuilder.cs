@@ -21,8 +21,8 @@ public static class BotSwitcherSheetBuilder
     // The sheet lives inside the chats-list panel (the screen it serves), the
     // same way AttachSheet lives inside MessagesPanel — not at canvas root.
     private const string ParentName = "ChatsPanel";
-    private const string WaSpritePath = "Assets/Images/Icons/WhatsApp.svg.png";
-    private const string TgSpritePath = "Assets/Images/Icons/Telegram_2019_Logo.svg.png";
+    private const string WaSpritePath = "Assets/Images/Icons/WhatsApp Glowing.png";
+    private const string TgSpritePath = "Assets/Images/Icons/Telegram.png";
 
     // All sizes in 1080x1920 canvas reference units (1 dp ~= 3 units).
     private const float SheetHeight = 1180f;

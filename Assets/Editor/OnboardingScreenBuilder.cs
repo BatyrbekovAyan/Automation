@@ -61,8 +61,8 @@ public static class OnboardingScreenBuilder
     private const string SemiboldGuid = "a2b0b38b6764047da9250bcff1b0f432";
     private const string BoldGuid = "1cd715823fef34be4a3d3f3c5572594c";
 
-    private const string WhatsappIconPath = "Assets/Images/Icons/WhatsApp.svg.png";
-    private const string TelegramIconPath = "Assets/Images/Icons/Telegram_2019_Logo.svg.png";
+    private const string WhatsappIconPath = "Assets/Images/Icons/WhatsApp Glowing.png";
+    private const string TelegramIconPath = "Assets/Images/Icons/Telegram.png";
     private const string CheckIconPath = "Assets/Images/Icons/[CITYPNG.COM]HD Green Check True Tick Mark Icon Sign PNG - 3000x3000.png";
 
     private static TMP_FontAsset _regular, _semibold, _bold;

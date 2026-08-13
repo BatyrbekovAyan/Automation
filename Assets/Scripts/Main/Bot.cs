@@ -23,9 +23,18 @@ public class Bot : MonoBehaviour
     [SerializeField] private Image autoPillDotRing;
     [SerializeField] private Image autoPillDotCore;
 
-    [Header("Channel icons (C2 subline — white glyphs tinted by state)")]
+    [Header("Channel icons (C2 subline — ready-made sprites, NEVER tinted)")]
     [SerializeField] private Image waChannelIcon;
     [SerializeField] private Image tgChannelIcon;
+
+    [Tooltip("Brand-colored sprite for a connected + enabled channel.")]
+    [SerializeField] private Sprite waIconColored;
+    [SerializeField] private Sprite tgIconColored;
+
+    [Tooltip("Ready-made gray sprite for a channel that is connected but toggled off " +
+             "in Bot Settings. A tint would muddy the multi-color logos — swap, don't color.")]
+    [SerializeField] private Sprite waIconGray;
+    [SerializeField] private Sprite tgIconGray;
 
     [Header("Business Icon")]
     [SerializeField] private Image BotIconTile;
@@ -452,16 +461,16 @@ public class Bot : MonoBehaviour
         {
             var c = BotDesc.color;
             BotDesc.color = new Color(ConnectingInk.r, ConnectingInk.g, ConnectingInk.b, c.a);
-            SetIconState(waChannelIcon, BotChannelIconState.Hidden, Color.clear);
-            SetIconState(tgChannelIcon, BotChannelIconState.Hidden, Color.clear);
+            SetIconState(waChannelIcon, BotChannelIconState.Hidden, null);
+            SetIconState(tgChannelIcon, BotChannelIconState.Hidden, null);
             EnsureSublineBlink();
         }
         else
         {
             KillSublineBlink();
             BotDesc.color = Theme.Color(ThemeRole.InkTertiary);
-            ApplyChannelIcon(waChannelIcon, whatsappProfileId, "isOnWhatsapp", Theme.Fixed.WhatsAppGreen);
-            ApplyChannelIcon(tgChannelIcon, telegramProfileId, "isOnTelegram", Theme.Fixed.TelegramBlue);
+            ApplyChannelIcon(waChannelIcon, whatsappProfileId, "isOnWhatsapp", waIconColored, waIconGray);
+            ApplyChannelIcon(tgChannelIcon, telegramProfileId, "isOnTelegram", tgIconColored, tgIconGray);
         }
 
         bool anyIcon = (waChannelIcon != null && waChannelIcon.gameObject.activeSelf)
@@ -476,21 +485,28 @@ public class Bot : MonoBehaviour
             subRow.gameObject.SetActive(hasText || anyIcon);
     }
 
-    private void ApplyChannelIcon(Image icon, string profileId, string channelKeySuffix, Color brand)
+    private void ApplyChannelIcon(Image icon, string profileId, string channelKeySuffix,
+        Sprite coloredSprite, Sprite graySprite)
     {
         if (icon == null) return;
         var state = BotCardModel.IconState(profileId,
             PlayerPrefs.GetInt(transform.name + channelKeySuffix, 1) == 1);
-        Color tint = state == BotChannelIconState.Colored ? brand : Theme.Color(ThemeRole.InkTertiary);
-        SetIconState(icon, state, tint);
+        SetIconState(icon, state,
+            state == BotChannelIconState.Colored ? coloredSprite : graySprite);
     }
 
-    private static void SetIconState(Image icon, BotChannelIconState state, Color tint)
+    // The two states are two authored sprites — the Image tint stays white so
+    // the multi-color logos render exactly as designed (a Color multiply would
+    // dirty the white glyph inside Telegram's disc).
+    private static void SetIconState(Image icon, BotChannelIconState state, Sprite sprite)
     {
         if (icon == null) return;
         bool visible = state != BotChannelIconState.Hidden;
         icon.gameObject.SetActive(visible);
-        if (visible) icon.color = tint;
+        if (!visible) return;
+
+        if (sprite != null) icon.sprite = sprite;
+        icon.color = Color.white;
     }
 
     private string BusinessTypeDisplayName()

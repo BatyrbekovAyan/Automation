@@ -13,7 +13,8 @@ using UnityEngine.UI;
 /// avatar · name/subline · «Авто» capsule · chevron. The capsule is the
 /// chats-header pill 1:1 (76u, ring/fill + lamp + label, painted at runtime by
 /// ReplyModeToggleBinder.PaintChip); the subline hosts the business type and
-/// the WA/TG white-glyph icons that Bot.cs tints per state.
+/// the WA/TG channel icons, which Bot.cs SWAPS between the project's brand and
+/// ready-made gray sprites (never tinted).
 ///
 /// Supersedes BotCardFooterBuilder (deleted with the footer). Idempotent:
 /// parks BotDesc, deletes previous SubRow/AutoPill, rebuilds. Prefab-only —
@@ -24,9 +25,15 @@ using UnityEngine.UI;
 public static class BotCardAutoPillBuilder
 {
     private const string PrefabPath = "Assets/Prefabs/Bot.prefab";
-    private const string WaGlyphPath = "Assets/Images/Icons/ChannelGlyph_WA.png";
-    private const string TgGlyphPath = "Assets/Images/Icons/ChannelGlyph_TG.png";
     private const string HeaderFontGuid = "a2b0b38b6764047da9250bcff1b0f432"; // BotName / header semibold
+
+    // The project's existing channel logos — brand + ready-made gray, both
+    // authored. The card SWAPS between them and never tints (owner's call:
+    // a Color multiply muddies the multi-color marks).
+    private const string WaColoredPath = "Assets/Images/Icons/Whatsapp.png";
+    private const string WaGrayPath = "Assets/Images/Icons/Whatsapp gray.png";
+    private const string TgColoredPath = "Assets/Images/Icons/Telegram.png";
+    private const string TgGrayPath = "Assets/Images/Icons/Telegram gray.png";
 
     private const float CardHeight = 232f;
     private const float SublineIconSize = 38f;   // optically matches the 36u subline text
@@ -44,9 +51,6 @@ public static class BotCardAutoPillBuilder
     [MenuItem("Tools/Bots Page/Build Bot Card Auto Pill (C2)")]
     public static void Build()
     {
-        EnsureGlyphImportSettings(WaGlyphPath);
-        EnsureGlyphImportSettings(TgGlyphPath);
-
         GameObject root = PrefabUtility.LoadPrefabContents(PrefabPath);
         try
         {
@@ -134,29 +138,41 @@ public static class BotCardAutoPillBuilder
         var themed = desc.GetComponent<ThemedColor>();
         if (themed != null) UnityEngine.Object.DestroyImmediate(themed);
 
-        Image waIcon = BuildChannelIcon(subRow.transform, "WaIcon", WaGlyphPath);
-        Image tgIcon = BuildChannelIcon(subRow.transform, "TgIcon", TgGlyphPath);
+        Sprite waColored = LoadSprite(WaColoredPath);
+        Sprite waGray = LoadSprite(WaGrayPath);
+        Sprite tgColored = LoadSprite(TgColoredPath);
+        Sprite tgGray = LoadSprite(TgGrayPath);
+
+        Image waIcon = BuildChannelIcon(subRow.transform, "WaIcon", waColored);
+        Image tgIcon = BuildChannelIcon(subRow.transform, "TgIcon", tgColored);
 
         var so = new SerializedObject(bot);
         SetRef(so, "waChannelIcon", waIcon);
         SetRef(so, "tgChannelIcon", tgIcon);
+        SetRef(so, "waIconColored", waColored);
+        SetRef(so, "waIconGray", waGray);
+        SetRef(so, "tgIconColored", tgColored);
+        SetRef(so, "tgIconGray", tgGray);
         so.ApplyModifiedPropertiesWithoutUndo();
     }
 
-    private static Image BuildChannelIcon(Transform parent, string name, string spritePath)
+    private static Sprite LoadSprite(string path)
     {
-        var sprite = AssetDatabase.LoadAssetAtPath<Sprite>(spritePath);
+        var sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
         if (sprite == null)
-            throw new InvalidOperationException($"Channel glyph sprite missing at {spritePath} — " +
-                                                "run Tools/render_channel_icons.js and reimport.");
+            throw new InvalidOperationException($"Channel sprite missing at {path}.");
+        return sprite;
+    }
 
+    private static Image BuildChannelIcon(Transform parent, string name, Sprite sprite)
+    {
         var go = NewUiChild(parent, name,
             typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(LayoutElement));
         var image = go.GetComponent<Image>();
         image.sprite = sprite;
         image.preserveAspect = true;
         image.raycastTarget = false;
-        image.color = LInkTertiary;   // runtime tints per state (brand / gray / hidden)
+        image.color = Color.white;   // sprites carry their own color — never tinted
 
         var le = go.GetComponent<LayoutElement>();
         le.minWidth = le.preferredWidth = SublineIconSize;
@@ -227,33 +243,6 @@ public static class BotCardAutoPillBuilder
         SetRef(so, "autoPillDotRing", dotRing);
         SetRef(so, "autoPillDotCore", dotCore);
         so.ApplyModifiedPropertiesWithoutUndo();
-    }
-
-    // ---- Import settings for the white glyphs ---------------------------
-
-    private static void EnsureGlyphImportSettings(string assetPath)
-    {
-        var importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
-        if (importer == null)
-        {
-            Debug.LogWarning($"[BotCardAutoPillBuilder] No TextureImporter at {assetPath} — " +
-                             "asset not imported yet? Run Assets/Refresh first.");
-            return;
-        }
-
-        bool dirty = importer.textureType != TextureImporterType.Sprite
-                     || importer.spriteImportMode != SpriteImportMode.Single
-                     || importer.mipmapEnabled
-                     || !importer.alphaIsTransparency
-                     || importer.maxTextureSize != 256;
-        if (!dirty) return;
-
-        importer.textureType = TextureImporterType.Sprite;
-        importer.spriteImportMode = SpriteImportMode.Single;
-        importer.mipmapEnabled = false;
-        importer.alphaIsTransparency = true;
-        importer.maxTextureSize = 256;
-        importer.SaveAndReimport();
     }
 
     // ---- Shared helpers (ChatsTopBarRestyleBuilder patterns) -------------

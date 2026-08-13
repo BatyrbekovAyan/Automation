@@ -1,15 +1,15 @@
 fileFormatVersion: 2
-guid: cee100f5bfdd848ccb770f9e96e64a5a
+guid: 3ff37de31fbab4f1fa25e41a9b22592e
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -3702629612883576132
-    second: Telegram_2019_Logo.svg_0
+      213: 2268249470045313098
+    second: WhatsApp.svg_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
     mipMapMode: 0
-    enableMipMap: 0
+    enableMipMap: 1
     sRGBTexture: 1
     linearTexture: 0
     fadeOut: 0
@@ -126,13 +126,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Telegram_2019_Logo.svg_0
+      name: WhatsApp.svg_0
       rect:
         serializedVersion: 2
-        x: 0
-        y: 0
-        width: 1024
-        height: 1024
+        x: 63
+        y: 65
+        width: 1797
+        height: 1800
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -141,8 +141,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: cba7b350cfd9d9cc0800000000000000
-      internalID: -3702629612883576132
+      spriteID: a48d40410e07a7f10800000000000000
+      internalID: 2268249470045313098
       vertices: []
       indices: 
       edges: []
@@ -161,7 +161,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Telegram_2019_Logo.svg_0: -3702629612883576132
+      WhatsApp.svg_0: 2268249470045313098
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
