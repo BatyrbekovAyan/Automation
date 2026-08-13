@@ -47,7 +47,12 @@ ONLY via the handle. Slot states: `panel` · `keyboard` · `expanded` · `collap
   emoji-key): while panel/expanded is up → ⌨ in neutral `InkTertiary`, no tint (tap =
   keyboard + focus); while collapsed or keyboard → ✦ in `PositiveInk` on a 13% tint circle
   (tap = panel). Hidden in «Авто».
-- **Pick** still slides the slot away (locked flow 2026-08-11: pick opens NO keyboard).
+- **Pick** — CORRECTED 2026-08-13 during implementation. The sketch closed the slot on a pick, but that was
+  demo scaffolding (so the loop could replay); the SHIPPED locked flow wins: a pick opens NO keyboard AND
+  **keeps the panel open**, so a re-clustered variant is one tap away (`HandleCardTapped`,
+  SuggestionsController.cs:291 + the flow comment at :302-304). The panel drops to **collapsed** later, on
+  the outgoing echo (the «answered run» hide, `HandleLive` → :410) — which is precisely the state rule 9's
+  auto-raise fires from, so the two rules interlock.
 - **Incoming message auto-raise — DECIDED 2026-08-13: only-if-collapsed.** A new client
   message raises the panel ONLY when the slot is collapsed. Keyboard up ⇒ nothing moves
   (no steal; no parking needed — in this model dismissing the keyboard lands on the panel
@@ -61,14 +66,33 @@ ONLY via the handle. Slot states: `panel` · `keyboard` · `expanded` · `collap
 header + cards content height, cap ≈ leave ≥ ~360u of thread visible (sketch: 470px cap on a
 762px phone). If content fits under the standard detent, the third detent collapses into it.
 
+**Collapsed is a STATE, not just a geometry.** Today `HidePanel` produces slot 0 + panel Deactivated, and
+that same geometry is what «Авто», a bot switch and the attach-sheet swap produce — so the shipped
+`_sheetOpen` bool cannot express «the owner collapsed it». Model E needs an explicit 4-state field
+(Collapsed | Panel | Expanded | Keyboard), because rules 3/4/5/9 all key off «collapsed» specifically.
+Collapsed does NOT keep the handle on screen (the panel leaves with the slot) — that is intended: the three
+ways back are the thread tap, the composer tap and the ✦ key. Collapsed does not persist across a chat or
+bot switch; every chat opens with the panel as the default tenant.
+
 **Unity implementation notes (delta over the shipped 003-A build):**
 - `ComposerSlotKey` already does destination-glyph morphing — MOVE it to the field END
   (Text Area RIGHT inset 24→120 instead of the left one) and add the state styling: tint
   circle only under ✦; ⌨ neutral.
 - «Raise without focus»: a tap on the collapsed composer's field must NOT activate the TMP
-  input — gate the activation path (`DeferredDismissInputField`/`OnPointerClick`) on
-  slot-collapsed and route to the controller's ShowPanel; remember the single-focus and
-  materialized-focus invariants.
+  input. **CORRECTED 2026-08-13 — gating `OnPointerClick` alone is provably insufficient**: TMP
+  reaches activation by THREE routes — its own `OnPointerDown` calls
+  `EventSystem.SetSelectedGameObject` (TMP_InputField.cs:1982) → `OnSelect` → activate; the
+  overridden `OnPointerClick` (DeferredDismissInputField.cs:218); and `TextSelectionRouter`'s
+  long-press/double-tap path, which calls `SetSelectedGameObject` + `ActivateInputField`
+  directly (TextSelectionRouter.cs:255-256). The veto must therefore be a pointer-scoped
+  predicate consulted from an overridden `OnPointerDown` AND `OnPointerClick`, default-null so
+  the other ~12 scene fields are untouched, installed by the controller on the composer field
+  only, false whenever `!semiAutoOn` or the field is already focused. Do NOT gate `OnSelect` —
+  that would break the ⌨ key (SuggestionsController.cs:702), the post-Send re-focus
+  (MessagesBottomPanel.cs:138) and the reply focus (:164), all of which must keep working.
+  Note also `DragShield` does not cover the field's full width (x∈[24,790] of 834), so a tap at
+  either edge reaches TMP directly — the veto must live on the field, not on the shield.
+  Respect the single-focus and materialized-focus invariants throughout.
 - Thread-tap raise rides the existing keyboard-dismiss path; must not fire on ScrollRect
   drags (tap ≠ drag).
 - The handle drives `VirtualBottomInset` LIVE during drag (bypass SmoothDamp while
