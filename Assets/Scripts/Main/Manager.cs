@@ -393,14 +393,9 @@ public partial class Manager : MonoBehaviour
                 var recreatedBotComp = recreatedBot.GetComponent<Bot>();
                 if (recreatedBotComp.BotName != null)
                     recreatedBotComp.BotName.text = PlayerPrefs.GetString(recreatedBot.name + "Name", "");
-                if (recreatedBotComp.BotDesc != null)
-                {
-                    var business = PlayerPrefs.GetString(recreatedBot.name + "Business", "");
-                    recreatedBotComp.BotDesc.text = business;
-                    recreatedBotComp.BotDesc.gameObject.SetActive(!string.IsNullOrWhiteSpace(business));
-                }
-                if (recreatedBotComp.ActivationSwitch != null)
-                    recreatedBotComp.ActivationSwitch.isOn = PlayerPrefs.GetInt(recreatedBot.name + "isOn", 1) == 1;
+                // C2 card: the subline (business type + channel icons) is owned by
+                // Bot.RefreshCardSubline — it derives itself one frame after the
+                // rename above, so no BotDesc/activation writes are needed here.
                 if (recreatedBotComp.Status != null)
                     recreatedBotComp.Status.text = PlayerPrefs.GetString(recreatedBot.name + "Status", "");
                 recreatedBot.GetComponent<Bot>().active = PlayerPrefs.GetInt(recreatedBot.name + "Active", 0) == 1;
@@ -746,13 +741,9 @@ public partial class Manager : MonoBehaviour
         openBotSettings.SyncHeaderTitle();
         var openBotComp = openBot.GetComponent<Bot>();
         if (openBotComp.BotName != null) openBotComp.BotName.text = newName;
-        // Refresh the card's description from the about-business text.
-        if (openBotComp.BotDesc != null)
-        {
-            var business = openBotSettings.BusinessField.Value;
-            openBotComp.BotDesc.text = business;
-            openBotComp.BotDesc.gameObject.SetActive(!string.IsNullOrWhiteSpace(business));
-        }
+        // C2 card: the subline shows the business TYPE (+ channel icons), not the
+        // description — let the card re-derive it from the just-saved prefs.
+        openBotComp.RefreshCardSubline();
 
         {
             var dd = openBotSettings.BusinessTypeDropdown;
@@ -1543,15 +1534,12 @@ public partial class Manager : MonoBehaviour
 
         var newBotComp = newBot.GetComponent<Bot>();
         if (newBotComp.BotName != null) newBotComp.BotName.text = formBotName;
-        // The Add Bot form captures an optional description in formDescription.
-        // Propagate it so the card renders it immediately (matches the LoadBots
-        // path which reads PlayerPrefs "Business").
-        if (newBotComp.BotDesc != null) newBotComp.BotDesc.text = formDescription;
-        if (newBotComp.ActivationSwitch != null) newBotComp.ActivationSwitch.isOn = true;
+        // C2 card: the subline derives itself (business type + channel icons) one
+        // frame after the rename — no BotDesc/master-key writes needed here.
         if (newBotComp.Status != null) newBotComp.Status.text = "Connecting..";
         newBot.GetComponent<Bot>().active = false;
         newBot.GetComponent<Bot>().EditButton.interactable = false;
-        newBot.GetComponent<Bot>().ActivationSwitch.interactable = false;
+        newBotComp.SetActivationInteractable(false);
         newBot.GetComponent<Bot>().whatsappProfileId = whatsappProfileId;
         newBot.GetComponent<Bot>().telegramProfileId = telegramProfileId;
 
@@ -3329,7 +3317,7 @@ public partial class Manager : MonoBehaviour
             bot.GetComponent<Bot>().Status.GetComponent<TextMeshProUGUI>().color = new(0, 1, 0);
 
             bot.GetComponent<Bot>().EditButton.interactable = true;
-            bot.GetComponent<Bot>().ActivationSwitch.interactable = true;
+            bot.GetComponent<Bot>().SetActivationInteractable(true);
 
 
             string response = www.downloadHandler.text;
@@ -3487,9 +3475,9 @@ public partial class Manager : MonoBehaviour
             bot.GetComponent<Bot>().Status.GetComponent<TextMeshProUGUI>().color = new(0, 1, 0);
 
             bot.GetComponent<Bot>().EditButton.interactable = true;
-            bot.GetComponent<Bot>().ActivationSwitch.interactable = true;
+            bot.GetComponent<Bot>().SetActivationInteractable(true);
 
-            
+
             string response = www.downloadHandler.text;
             
             if (response.Contains("\"id\":"))

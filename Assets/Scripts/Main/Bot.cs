@@ -7,17 +7,25 @@ using TMPro;
 public class Bot : MonoBehaviour
 {
     [SerializeField] public TextMeshProUGUI BotName;
+
+    [Tooltip("C2 subline label: the business type name, or the blinking «Подключение…». " +
+             "Bot owns its text and color now — Manager no longer writes it directly.")]
     [SerializeField] public TextMeshProUGUI BotDesc;
+
     [SerializeField] public TextMeshProUGUI Status;
     [SerializeField] public Button EditButton;
-    [SerializeField] public Toggle ActivationSwitch;
 
-    [Tooltip("Footer caption under the divider: «Бот работает» / «Бот на паузе». " +
-             "Wired by BotCardFooterBuilder.")]
-    [SerializeField] private TextMeshProUGUI SwitchFooterLabel;
+    [Header("Auto capsule (C2 card — wired by BotCardAutoPillBuilder)")]
+    [SerializeField] private Button autoPillButton;
+    [SerializeField] private Image autoPillRing;
+    [SerializeField] private Image autoPillFill;
+    [SerializeField] private TextMeshProUGUI autoPillLabel;
+    [SerializeField] private Image autoPillDotRing;
+    [SerializeField] private Image autoPillDotCore;
 
-    [SerializeField] private Color backgroundActiveColor;
-    [SerializeField] private Color handleActiveColor;
+    [Header("Channel icons (C2 subline — white glyphs tinted by state)")]
+    [SerializeField] private Image waChannelIcon;
+    [SerializeField] private Image tgChannelIcon;
 
     [Header("Business Icon")]
     [SerializeField] private Image BotIconTile;
@@ -72,28 +80,45 @@ public class Bot : MonoBehaviour
     public string whatsappWorkflowId;
     public string telegramWorkflowId;
 
-    private RectTransform switchHandle;
-    private Image switchBackgroundImage, switchHandleImage;
-    private Color backgroundDefaultColor, handleDefaultColor;
-    private Vector2 switchHandlePosition;
-
     private Color green = new(0, 1, 0);
     private Color red = new(1, 0, 0);
     private Color blue = new(0, 0.6980392f, 1);
 
+    // Display blue of the blinking «Подключение…» word (the retired status
+    // pill's FgConnecting; the hidden Status data channel keeps its own blue).
+    private static readonly Color ConnectingInk = new Color32(0x00, 0x7A, 0xFF, 0xFF);
+
+    private Tween sublineBlink;
+    private Color lastObservedStatusColor = new(-1f, -1f, -1f);
+    private bool cardStateReady;
+
 
     private void Awake ()
     {
-        StartCoroutine(SetSwitches());
+        StartCoroutine(InitCardState());
         ApplyBusinessIcon();
 
-
-        ActivationSwitch.onValueChanged.AddListener(EnableBot);
+        if (autoPillButton != null)
+            autoPillButton.onClick.AddListener(OnAutoPillTapped);
 
         if (EditButton != null)
         {
             EditButton.onClick.AddListener(OpenSettings);
         }
+    }
+
+    private void OnEnable()
+    {
+        Theme.Changed += HandleThemeChanged;
+        // Returning to the Боты tab after Bot Settings: the channel toggles or
+        // the business type may have changed while this card was inactive.
+        if (cardStateReady) RefreshCardState(animatePill: false);
+    }
+
+    private void OnDisable()
+    {
+        Theme.Changed -= HandleThemeChanged;
+        KillSublineBlink();
     }
 
 
@@ -318,17 +343,47 @@ public class Bot : MonoBehaviour
         Destroy(gameObject);
     }
 
-    private void EnableBot (bool enabled)
+    /// <summary>
+    /// The master activation state (bare botName key, default ON) — the same
+    /// store the old iOS switch drove; only the control changed clothes.
+    /// </summary>
+    private bool MasterOn => PlayerPrefs.GetInt(transform.name, 1) == 1;
+
+    /// <summary>Manager gates the capsule while workflows are being created
+    /// (the old switch did this via Toggle.interactable).</summary>
+    public void SetActivationInteractable(bool value)
     {
-        switchHandle.DOAnchorPos (enabled ? switchHandlePosition * -1 : switchHandlePosition, .4f).SetEase (Ease.InOutBack);
-        switchBackgroundImage.DOColor (enabled ? backgroundActiveColor : backgroundDefaultColor, .6f);
-        switchHandleImage.DOColor (enabled ? handleActiveColor : handleDefaultColor, .4f);
+        if (autoPillButton != null) autoPillButton.interactable = value;
+    }
 
-        ApplySwitchFooterLabel(enabled);
+    private void OnAutoPillTapped()
+    {
+        if (!cardStateReady) return;
 
+        autoPillButton.transform.DOKill();
+        autoPillButton.transform.localScale = Vector3.one;
+        autoPillButton.transform.DOPunchScale(Vector3.one * -0.04f, 0.18f, 1, 0.5f);
+
+        // The header pill's asymmetry: enabling confirms (the bot starts
+        // messaging real clients), pausing commits instantly.
+        if (BotCardModel.ConfirmRequired(MasterOn))
+            BotActivationConfirm.Show(BotName != null ? BotName.font : null, () =>
+            {
+                if (this != null) ApplyActivation(true);   // card may die before confirm
+            });
+        else
+            ApplyActivation(false);
+    }
+
+    private void ApplyActivation(bool enabled)
+    {
         PlayerPrefs.SetInt(transform.name, enabled ? 1 : 0);
+        PlayerPrefs.Save();
+
         Status.text = enabled ? active ? "Active" : "Connecting.." : "Not Active";
         Status.color = enabled ? active ? green : blue : red;
+
+        RefreshCardState(animatePill: true);
 
         // The master switch gates BOTH channels, but must not activate a channel the
         // owner has toggled off: effective state = master AND that channel's toggle.
@@ -342,74 +397,135 @@ public class Bot : MonoBehaviour
         Manager.Instance.GetEnableTelegramWorkflow(telegramWorkflowId, telegramOn);
     }
 
-    private void ApplySwitchFooterLabel(bool isOn)
-    {
-        if (SwitchFooterLabel == null) return;
-
-        SwitchFooterLabel.text = BotSwitchFooter.TextFor(isOn);
-        SwitchFooterLabel.color = BotSwitchFooter.ColorFor(isOn);
-    }
-
-    private IEnumerator SetSwitches()
+    // Deferred one frame: Manager renames the instantiated card and writes its
+    // PlayerPrefs after Instantiate, so an Awake-time read would see another
+    // bot's defaults (the old SetSwitches used the same trick).
+    private IEnumerator InitCardState()
     {
         yield return new WaitForEndOfFrame();
 
-        switchHandle = ActivationSwitch.transform.GetChild(0).GetChild(0).GetComponent<RectTransform>();
+        cardStateReady = true;
+        bool on = MasterOn;
+        Status.text = on ? active ? "Active" : "Connecting.." : "Not Active";
+        Status.color = on ? active ? green : blue : red;
 
-        var track = ActivationSwitch.transform.GetChild(0).GetComponent<RectTransform>();
-        // anchoredPosition, NOT localPosition: the handle anchors to the track's
-        // CENTER while the track's pivot is its LEFT edge, so a local-space write
-        // lands (trackWidth/2) off-target and the ON tween mirrors the error.
-        switchHandle.anchoredPosition = new Vector2(
-            -BotSwitchFooter.RestOffset(track.rect.width, switchHandle.rect.width),
-            switchHandle.anchoredPosition.y);
+        RefreshCardState(animatePill: false);
+    }
 
-        switchHandlePosition = switchHandle.anchoredPosition;
+    /// <summary>Manager entry: re-derive the subline (business type + channel
+    /// icons) after it renames/creates a bot or saves settings.</summary>
+    public void RefreshCardSubline() => RefreshCardState(animatePill: false);
 
-        switchBackgroundImage = switchHandle.parent.GetComponent<Image>();
-        switchHandleImage = switchHandle.GetComponent<Image>();
+    private void HandleThemeChanged() => RefreshCardState(animatePill: false);
 
-        // The OFF-track colour is theme-owned (SwitchOffTrack role), not captured
-        // from the Image: the track is STATE-driven by this class (green when ON),
-        // so it must not carry a ThemedColor binding — a re-enable would paint the
-        // off colour over an ON switch. The ON green stays a fixed identity colour.
-        backgroundDefaultColor = Theme.Color(ThemeRole.SwitchOffTrack);
-        handleDefaultColor = switchHandleImage.color;
+    // Manager writes Status directly on auth success (and this class writes it
+    // on activation changes) — mirror the color like the retired BotStatusPill
+    // did, so every writer repaints the card without knowing about it.
+    private void LateUpdate()
+    {
+        if (!cardStateReady || Status == null) return;
+        if (ColorsClose(Status.color, lastObservedStatusColor)) return;
+        RefreshCardState(animatePill: false);
+    }
 
-        if (PlayerPrefs.GetInt(transform.name, 1) == 1)
+    private void RefreshCardState(bool animatePill)
+    {
+        if (!cardStateReady) return;
+        if (Status != null) lastObservedStatusColor = Status.color;
+
+        // The capsule is the chats-header «Авто» pill 1:1 — one painter, one look.
+        ReplyModeToggleBinder.PaintChip(MasterOn, autoPillRing, autoPillFill,
+            autoPillLabel, autoPillDotRing, autoPillDotCore, animatePill);
+
+        RefreshSubline();
+    }
+
+    private void RefreshSubline()
+    {
+        if (BotDesc == null) return;
+
+        bool connecting = Status != null && ColorsClose(Status.color, blue);
+        string typeName = connecting ? "" : BusinessTypeDisplayName();
+        BotDesc.text = BotCardModel.SublineText(connecting, typeName);
+
+        if (connecting)
         {
-            ActivationSwitch.isOn = true;
-
-            switchHandle.DOAnchorPos(switchHandlePosition * -1, .4f).SetEase(Ease.InOutBack);
-            switchBackgroundImage.DOColor(backgroundActiveColor, .6f);
-            switchHandleImage.DOColor(handleActiveColor, .4f);
-
-            ApplySwitchFooterLabel(true);
-
-            if (active)
-            {
-                Status.text = "Active";
-                Status.color = green;
-            }
-            else
-            {
-                Status.text = "Connecting..";
-                Status.color = blue;
-            }
+            var c = BotDesc.color;
+            BotDesc.color = new Color(ConnectingInk.r, ConnectingInk.g, ConnectingInk.b, c.a);
+            SetIconState(waChannelIcon, BotChannelIconState.Hidden, Color.clear);
+            SetIconState(tgChannelIcon, BotChannelIconState.Hidden, Color.clear);
+            EnsureSublineBlink();
         }
         else
         {
-            ActivationSwitch.isOn = false;
-            Status.text = "Not Active";
-            Status.color = red;
+            KillSublineBlink();
+            BotDesc.color = Theme.Color(ThemeRole.InkTertiary);
+            ApplyChannelIcon(waChannelIcon, whatsappProfileId, "isOnWhatsapp", Theme.Fixed.WhatsAppGreen);
+            ApplyChannelIcon(tgChannelIcon, telegramProfileId, "isOnTelegram", Theme.Fixed.TelegramBlue);
+        }
 
-            // Paint the off state explicitly — the prefab's authored track colour
-            // is the light literal and would leak into dark mode otherwise.
-            switchBackgroundImage.color = backgroundDefaultColor;
+        bool anyIcon = (waChannelIcon != null && waChannelIcon.gameObject.activeSelf)
+                    || (tgChannelIcon != null && tgChannelIcon.gameObject.activeSelf);
+        bool hasText = !string.IsNullOrEmpty(BotDesc.text);
+        BotDesc.gameObject.SetActive(hasText);
 
-            ApplySwitchFooterLabel(false);
+        // Collapse the whole subline row when it is empty — but only when the
+        // builder has run (BotDesc's parent is the SubRow, never BotDetails).
+        Transform subRow = BotDesc.transform.parent;
+        if (subRow != null && subRow.name == "SubRow")
+            subRow.gameObject.SetActive(hasText || anyIcon);
+    }
+
+    private void ApplyChannelIcon(Image icon, string profileId, string channelKeySuffix, Color brand)
+    {
+        if (icon == null) return;
+        var state = BotCardModel.IconState(profileId,
+            PlayerPrefs.GetInt(transform.name + channelKeySuffix, 1) == 1);
+        Color tint = state == BotChannelIconState.Colored ? brand : Theme.Color(ThemeRole.InkTertiary);
+        SetIconState(icon, state, tint);
+    }
+
+    private static void SetIconState(Image icon, BotChannelIconState state, Color tint)
+    {
+        if (icon == null) return;
+        bool visible = state != BotChannelIconState.Hidden;
+        icon.gameObject.SetActive(visible);
+        if (visible) icon.color = tint;
+    }
+
+    private string BusinessTypeDisplayName()
+    {
+        if (businessTypes == null) return "";
+        var id = PlayerPrefs.GetString(transform.name + "BusinessType", "");
+        return businessTypes.TryGetById(id, out var entry) ? entry.displayName : "";
+    }
+
+    private void EnsureSublineBlink()
+    {
+        if (sublineBlink != null && sublineBlink.IsActive()) return;
+        sublineBlink = BotDesc.DOFade(0.35f, 0.55f)
+            .SetLoops(-1, LoopType.Yoyo)
+            .SetEase(Ease.InOutSine);
+    }
+
+    private void KillSublineBlink()
+    {
+        if (sublineBlink != null)
+        {
+            sublineBlink.Kill();
+            sublineBlink = null;
+        }
+        if (BotDesc != null)
+        {
+            var c = BotDesc.color;
+            BotDesc.color = new Color(c.r, c.g, c.b, 1f);
         }
     }
+
+    private static bool ColorsClose(Color a, Color b) =>
+        Mathf.Abs(a.r - b.r) < 0.01f &&
+        Mathf.Abs(a.g - b.g) < 0.01f &&
+        Mathf.Abs(a.b - b.b) < 0.01f;
 
     public void RefreshBusinessIcon() => ApplyBusinessIcon();
 
@@ -435,6 +551,7 @@ public class Bot : MonoBehaviour
 
     private void OnDestroy ()
     {
-        ActivationSwitch.onValueChanged.RemoveListener (EnableBot);
+        if (autoPillButton != null) autoPillButton.onClick.RemoveListener(OnAutoPillTapped);
+        KillSublineBlink();
     }
 }
