@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 003 — Подсказки вместо клавиатуры: варианты</title>
+<link rel="stylesheet" href="../themes/default.css" id="theme-link">
+<style>
+  /* ============ page chrome ============ */
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, 'SF Pro Text', Roboto, 'Segoe UI', system-ui, sans-serif;
+    background: var(--page-bg); color: var(--page-ink);
+    padding: 132px 16px 40px; display:flex; flex-direction:column; align-items:center;
+    transition: background .2s;
+  }
+  #variant-nav {
+    position: fixed; top:0; left:0; right:0; z-index: 9998;
+    background: var(--page-surface); border-bottom: 1px solid var(--page-line);
+    padding: 10px 16px 8px; display:flex; flex-direction:column; gap:6px;
+  }
+  .nav-row { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  .nav-title { font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--page-ink-2); margin-right:8px; }
+  .variant-tab {
+    font-family: inherit; font-size:13px; padding:6px 12px; border-radius: 8px;
+    border:1px solid var(--page-line); background:transparent; color:var(--page-ink);
+    cursor:pointer; transition: all .15s ease;
+  }
+  .variant-tab:hover { border-color: var(--page-ink-2); }
+  .variant-tab.active { background: var(--page-ink); color: var(--page-bg); border-color: var(--page-ink); }
+  #caption { font-size: 12.5px; line-height:1.45; color: var(--page-ink-2); max-width: 780px; }
+  #caption b { color: var(--page-ink); }
+
+  .variant { display:none; } .variant.active { display:block; }
+
+  /* ============ phone frame ============ */
+  .phone {
+    width: 360px; height: 762px; border-radius: 34px; overflow: hidden;
+    border: 9px solid #0B0D10; box-shadow: 0 18px 50px rgba(0,0,0,.28);
+    display:flex; flex-direction:column; background: var(--surface); position:relative;
+    /* the keyboard tray tint — panel and keyboard share it, so the swap reads as one surface */
+    --tray: color-mix(in srgb, var(--ink) 9%, var(--bg));
+    --keycap: var(--surface);
+  }
+  .statusbar {
+    height: 26px; background: var(--surface); display:flex; align-items:center;
+    justify-content:space-between; padding: 2px 16px 0; font-size:11.5px; font-weight:600; color:var(--ink);
+    flex: 0 0 auto;
+  }
+  .topbar {
+    height: 56px; background: var(--surface); border-bottom:1px solid var(--hairline);
+    display:flex; align-items:center; gap:9px; padding: 0 10px; flex:0 0 auto;
+  }
+  .tb-back { width:22px; height:22px; flex:0 0 auto; cursor:pointer; }
+  .tb-ava { width:35px; height:35px; border-radius:50%; flex:0 0 auto;
+            background: linear-gradient(135deg,#E8A2B8,#C96A8B); color:#fff;
+            display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:600; }
+  .tb-col { display:flex; flex-direction:column; gap:1px; min-width:0; }
+  .tb-name { font-size:15px; font-weight:600; color:var(--ink); white-space:nowrap; }
+  .tb-sub  { font-size:11px; color: var(--ink-3); }
+
+  /* --- reply-mode switch (Вместе ⇄ Авто) — fixed identity colors --- */
+  .sw { margin-left:auto; flex:0 0 auto; width:76px; height:22px; border-radius:11px;
+        background: var(--mode-semi-track); position:relative; cursor:pointer; transition: background .25s ease; }
+  .sw-faint { position:absolute; top:0; height:22px; width:38px; display:flex; align-items:center;
+              justify-content:center; font-size:9px; pointer-events:none; }
+  .sw-faint.l { left:0;  color: var(--mode-semi-faint); }
+  .sw-faint.r { right:0; color: var(--mode-semi-faint); }
+  .sw-thumb { position:absolute; top:2.5px; left:2.5px; width:36px; height:17px; border-radius:8.5px;
+              background:#fff; display:flex; align-items:center; justify-content:center;
+              font-size:9px; font-weight:700; color: var(--mode-semi-ink);
+              transition: transform .25s cubic-bezier(.33,1,.68,1), color .25s; box-shadow: 0 1px 2px rgba(0,0,0,.18); }
+  .sw .lab-a { display:none; } .sw .lab-s { display:block; }
+  .phone.auto .sw { background: var(--mode-auto-track); }
+  .phone.auto .sw-thumb { transform: translateX(34.5px); color: var(--mode-auto-ink); }
+  .phone.auto .sw .lab-a { display:block; } .phone.auto .sw .lab-s { display:none; }
+  .phone.auto .sw-faint { color: var(--mode-auto-faint); }
+
+  /* --- chat thread: a FLEX item, so the slot below physically pushes it --- */
+  .chat {
+    flex:1 1 auto; min-height:0; position:relative; overflow:hidden; cursor:default;
+    background-color: var(--chat-wallpaper);
+    background-image:
+      radial-gradient(color-mix(in srgb, var(--chat-wallpaper-ink) 55%, transparent) 1px, transparent 1.5px),
+      radial-gradient(color-mix(in srgb, var(--chat-wallpaper-ink) 35%, transparent) 1px, transparent 1.5px);
+    background-size: 24px 24px, 24px 24px; background-position: 0 0, 12px 12px;
+  }
+  .msgs { position:absolute; left:0; right:0; top:0; bottom: var(--clearance, 0px);
+          display:flex; flex-direction:column; justify-content:flex-end; gap:5px;
+          padding: 10px 12px 8px; transition: bottom .25s ease; }
+  .datepill { align-self:center; background: var(--bubble-in); border:1px solid var(--bubble-border);
+              color: var(--ink-3); font-size:10px; padding:3px 9px; border-radius:8px;
+              box-shadow: var(--shadow-sm); margin-bottom:3px; }
+  .bubble { max-width:76%; padding:6px 9px 4px; border-radius:10px; font-size:13px; line-height:1.35;
+            color:var(--ink); border:1px solid var(--bubble-border); box-shadow: var(--shadow-sm); }
+  .bubble .t { display:block; text-align:right; font-size:9.5px; color:var(--ink-3); margin-top:1px; }
+  .bubble .t .ticks { color:#53BDEB; letter-spacing:-1px; }
+  .in  { align-self:flex-start; background: var(--bubble-in); border-bottom-left-radius:3px; }
+  .out { align-self:flex-end;   background: var(--bubble-out); border-bottom-right-radius:3px; }
+
+  /* --- composer --- */
+  .composer { flex:0 0 auto; background: var(--surface); border-top:1px solid var(--hairline);
+              display:flex; align-items:center; gap:8px; padding: 8px 10px; z-index:3; }
+  .comp-clip { width:23px; height:23px; flex:0 0 auto; opacity:.85; }
+  .comp-input { flex:1; min-height:36px; background: var(--bg); border:1px solid var(--hairline);
+                border-radius:18px; padding: 7px 13px 7px 6px; font-size:13px; color: var(--ink-3);
+                display:flex; align-items:center; gap:6px; cursor:text;
+                transition: color .2s, border-color .2s; overflow:hidden; }
+  .comp-input .input-text { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .comp-input.filled { color: var(--ink); border-color: var(--input-border); }
+  .comp-input.focus  { border-color: var(--input-border); }
+  .comp-input.focus .input-text::after { content:''; display:inline-block; width:1.5px; height:14px;
+        background: var(--accent-text); vertical-align:-3px; margin-left:1px; animation: caret 1.05s steps(1) infinite; }
+  @keyframes caret { 0%,50%{opacity:1} 51%,100%{opacity:0} }
+  /* the ✦ ⇄ ⌨ key — lives inside the field's left edge (WhatsApp/Telegram convention) */
+  .comp-key { width:27px; height:27px; border-radius:50%; flex:0 0 auto; cursor:pointer;
+              display:flex; align-items:center; justify-content:center;
+              transition: background .15s ease, transform .15s ease; }
+  .comp-key:hover { background: color-mix(in srgb, var(--ink) 7%, transparent); }
+  .comp-key .ic-kb { display:none; }
+  .phone[data-slot="sg"] .comp-key .ic-kb { display:block; }
+  .phone[data-slot="sg"] .comp-key .ic-sp { display:none; }
+  .phone[data-slot="sg"] .comp-key { background: color-mix(in srgb, var(--positive-ink) 13%, transparent); }
+  .comp-send { width:40px; height:40px; border-radius:50%; background: var(--send); flex:0 0 auto;
+               display:flex; align-items:center; justify-content:center; cursor:pointer; transition: transform .15s ease; }
+  .comp-send:hover { transform: scale(1.06); }
+  .comp-send.pulse { animation: pulse .5s ease 2; }
+  @keyframes pulse { 0%{transform:scale(1)} 50%{transform:scale(1.14)} 100%{transform:scale(1)} }
+  .homebar { flex:0 0 auto; height:20px; background: var(--tray); display:flex; align-items:center; justify-content:center; z-index:2; }
+  .phone[data-slot="none"] .homebar { background: var(--surface); }
+  .homebar i { width:118px; height:4px; border-radius:2px; background: color-mix(in srgb, var(--ink) 26%, transparent); }
+
+  /* ============ THE SLOT — one box, two possible tenants ============ */
+  .slot { flex:0 0 auto; height:0; position:relative; overflow:hidden; background: var(--tray);
+          transition: height .26s cubic-bezier(.33,1,.68,1); z-index:2; }
+  .phone[data-slot="kb"] .slot, .phone[data-slot="sg"] .slot { height: 244px; }
+  .layer { position:absolute; left:0; right:0; top:0; height:244px; opacity:0; pointer-events:none;
+           transform: translateY(7px); transition: opacity .15s ease, transform .15s ease;
+           display:flex; flex-direction:column; }
+  .phone[data-slot="kb"] .kb, .phone[data-slot="sg"] .sg { opacity:1; pointer-events:auto; transform:none; }
+
+  /* ---- fake iOS ЙЦУКЕН keyboard ---- */
+  .kb { padding: 0 3px 9px; }
+  .kb-acc { height:34px; flex:0 0 auto; display:flex; align-items:center; justify-content:center; gap:8px;
+            border-bottom:.5px solid color-mix(in srgb, var(--ink) 12%, transparent); }
+  .kb-pred { font-size:12.5px; color: var(--ink-2); padding: 0 14px; }
+  .kb-pred + .kb-pred { border-left:.5px solid color-mix(in srgb, var(--ink) 14%, transparent); }
+  /* the QuickType slot doubles as the panel's entry point while typing */
+  .kb-hook { display:flex; align-items:center; gap:5px; background: var(--positive-bg);
+             color: var(--positive-ink); font-size:11.5px; font-weight:600; padding: 4px 10px;
+             border-radius:11px; cursor:pointer; transition: transform .12s ease; }
+  .kb-hook:hover { transform: translateY(-1px); }
+  .kb-rows { flex:1; display:flex; flex-direction:column; justify-content:center; gap:9px; padding-top:6px; }
+  .kb-row { display:flex; gap:3px; justify-content:center; }
+  .kb-row.r2 { padding: 0 14px; }
+  .key { flex:1 1 0; height:42px; border-radius:5px; background: var(--keycap); color: var(--ink);
+         display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:400;
+         box-shadow: 0 1px 0 color-mix(in srgb, var(--ink) 28%, transparent); cursor:default; }
+  .key.fn { background: color-mix(in srgb, var(--ink) 16%, transparent); box-shadow:none; font-size:14px; }
+  .key.w40 { flex:0 0 40px; } .key.w38 { flex:0 0 38px; font-size:12px; }
+  .key.space { flex:1 1 auto; font-size:12px; color: var(--ink-3); }
+  .key.ret { flex:0 0 62px; font-size:12px; }
+
+  /* ---- suggestions layer: shared bits ---- */
+  .sg { }
+  .sg-head { height:32px; flex:0 0 auto; display:flex; align-items:center; gap:6px; padding: 0 8px 0 6px; }
+  .sg-title { font-size:9.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color: var(--ink-3); }
+  .icobtn { width:26px; height:26px; border-radius:50%; flex:0 0 auto; display:flex; align-items:center;
+            justify-content:center; cursor:pointer; transition: background .15s ease, transform .15s ease; }
+  .icobtn:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+  .icobtn.right { margin-left:auto; }
+
+  .fixwrap { position:relative; flex:1 1 auto; min-height:0; }
+  .fix { height:100%; overflow-y:auto; scrollbar-width:thin; scrollbar-color: var(--border) transparent; }
+  .fix::-webkit-scrollbar { width:3px; }
+  .fix::-webkit-scrollbar-thumb { background: var(--border); border-radius:2px; }
+  .fade { position:absolute; left:0; right:0; bottom:0; height:24px; pointer-events:none;
+          background: linear-gradient(transparent, var(--tray)); }
+
+  /* cards = the LOCKED «P» design (bordered card + legend on the top border, left) */
+  .cards { padding: 12px 8px 8px; display:flex; flex-direction:column; gap:10px; }
+  .card { position:relative; overflow:visible; background: var(--surface);
+          border:1px solid var(--border); border-radius:14px; padding: 8px 11px 9px; cursor:pointer;
+          transition: transform .12s ease, border-color .15s, background .15s; }
+  .card:hover { transform: translateY(-1px); border-color: var(--input-border); }
+  .card.top { background: var(--positive-bg); border-color: color-mix(in srgb, var(--positive-ink) 45%, transparent); }
+  .leg { position:absolute; top:-7px; left:11px; padding:0 5px; font-size:8.5px; font-weight:700;
+         letter-spacing:.06em; text-transform:uppercase; color: var(--ink-2); line-height:13px;
+         display:flex; gap:3px; align-items:center;
+         background: linear-gradient(to bottom, var(--tray) 50%, var(--surface) 50%); }
+  .card.top .leg { color: var(--positive-ink);
+         background: linear-gradient(to bottom, var(--tray) 50%, var(--positive-bg) 50%); }
+  .txt { font-size:12.5px; line-height:1.36; color: var(--ink); }
+
+  /* system row — the keyboard's own bottom bar (⌨ globe-key position) */
+  .sysrow { height:44px; flex:0 0 auto; display:flex; align-items:center; gap:6px; padding: 0 8px;
+            border-top:.5px solid color-mix(in srgb, var(--ink) 12%, transparent); }
+  .sysrow .icobtn { width:30px; height:30px; }
+  .sys-title { font-size:9.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase;
+               color: var(--ink-3); display:flex; align-items:center; gap:4px; }
+
+  /* states */
+  .st { display:none; } [data-state="cards"] .st-cards { display:block; }
+  [data-state="load"] .st-load { display:block; } [data-state="empty"] .st-empty { display:block; }
+  [data-state="error"] .st-error { display:block; }
+  .st-cards, .st-load, .st-empty, .st-error { height:100%; }
+  .dots { display:flex; gap:5px; align-items:center; justify-content:center; }
+  .dots i { width:7px; height:7px; border-radius:50%; display:block; background: var(--ink-3); animation: bounce 1s ease infinite; }
+  .dots i:nth-child(2) { animation-delay:.15s; } .dots i:nth-child(3) { animation-delay:.3s; }
+  @keyframes bounce { 0%,60%,100% { transform:translateY(0);} 30% { transform: translateY(-4px);} }
+  .sk { background: var(--surface); border:1px solid var(--hairline); border-radius:14px;
+        padding: 15px; display:flex; align-items:center; justify-content:center; }
+  .state-box { height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center;
+               gap:4px; padding: 0 26px; text-align:center; }
+  .state-h { font-size:13.5px; font-weight:700; color: var(--ink); }
+  .state-b { font-size:11.5px; color: var(--ink-2); }
+  .state-retry { margin-top:8px; font-family:inherit; font-size:12px; font-weight:600; color: var(--accent-text);
+                 background:transparent; border:1px solid var(--input-border); border-radius:12px;
+                 padding: 6px 16px; cursor:pointer; transition: all .15s ease; }
+  .state-retry:hover { background: var(--accent-soft); }
+
+  /* ============ Variant «Сейчас» — today: sheet ABOVE the composer ============ */
+  .now-sheet { position:absolute; left:0; right:0; bottom:0; height:284px; z-index:5;
+               background: var(--surface); border-radius:16px 16px 0 0; box-shadow: var(--shadow-up);
+               display:flex; flex-direction:column;
+               transition: transform .26s cubic-bezier(.33,1,.68,1); }
+  .phone[data-sheet="off"] .now-sheet { transform: translateY(101%); }
+  .phone[data-sheet="off"] .msgs { bottom:0; }
+  .now-sheet .leg { background: linear-gradient(to bottom, var(--surface) 50%, var(--surface) 50%); }
+  .now-sheet .card.top .leg { background: linear-gradient(to bottom, var(--surface) 50%, var(--positive-bg) 50%); }
+  .now-sheet .fade { background: linear-gradient(transparent, var(--surface)); }
+  .grab { width:36px; height:4px; border-radius:2px; background: var(--border); margin: 6px auto 0; flex:0 0 auto; }
+  .squeeze { position:absolute; left:0; right:0; top:0; bottom:284px; display:flex; align-items:center;
+             justify-content:center; pointer-events:none; opacity:0; transition: opacity .2s; }
+  .phone.warn .squeeze { opacity:1; }
+  .squeeze span { background: color-mix(in srgb, var(--destructive) 92%, transparent); color:#fff;
+                  font-size:10px; font-weight:600; padding:3px 9px; border-radius:8px; }
+
+  /* ============ Variant C — one big reply + intent pills in the system row ============ */
+  .c-body { flex:1 1 auto; min-height:0; position:relative; padding: 14px 14px 6px; cursor:pointer;
+            display:flex; flex-direction:column; }
+  .c-body:hover .c-big { border-color: var(--input-border); }
+  .c-leg { font-size:9px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
+           color: var(--ink-2); display:flex; align-items:center; gap:4px; margin-bottom:6px; }
+  .c-body.top .c-leg { color: var(--positive-ink); }
+  .c-big { flex:1 1 auto; min-height:0; overflow-y:auto; background: var(--surface); border:1px solid var(--border);
+           border-radius:14px; padding: 11px 13px; font-size:14px; line-height:1.42; color: var(--ink);
+           transition: border-color .15s; scrollbar-width:thin; }
+  .c-body.top .c-big { background: var(--positive-bg); border-color: color-mix(in srgb, var(--positive-ink) 45%, transparent); }
+  .c-hint { flex:0 0 auto; text-align:center; font-size:10px; color: var(--ink-3); padding-top:6px; }
+  .pills { flex:1 1 auto; min-width:0; display:flex; gap:5px; overflow-x:auto; scrollbar-width:none;
+           align-items:center; padding-right:4px; }
+  .pills::-webkit-scrollbar { display:none; }
+  .pill { flex:0 0 auto; font-size:10.5px; font-weight:600; padding: 5px 10px; border-radius:11px;
+          color: var(--ink-2); background: color-mix(in srgb, var(--ink) 8%, transparent);
+          cursor:pointer; display:flex; align-items:center; gap:3px; transition: all .15s ease; white-space:nowrap; }
+  .pill:hover { background: color-mix(in srgb, var(--ink) 14%, transparent); }
+  .pill.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); }
+  .pill.on.rec { background: var(--positive-bg); color: var(--positive-ink); }
+
+  /* ============ Variant D — explicit segmented switch at the top of the slot ============ */
+  .seg { height:38px; flex:0 0 auto; display:flex; align-items:center; gap:6px; padding: 0 8px; }
+  .segctl { flex:1 1 auto; height:26px; display:flex; background: color-mix(in srgb, var(--ink) 9%, transparent);
+            border-radius:8px; padding:2px; position:relative; cursor:pointer; }
+  .segctl i { position:absolute; top:2px; bottom:2px; left:2px; width:calc(50% - 2px); border-radius:6px;
+              background: var(--surface); box-shadow: var(--shadow-sm); transition: transform .22s cubic-bezier(.33,1,.68,1); }
+  .segctl span { flex:1; z-index:1; display:flex; align-items:center; justify-content:center;
+                 font-size:11px; font-weight:600; color: var(--ink-2); transition: color .2s; }
+  .segctl span.on { color: var(--ink); }
+
+  /* ============ sketch toolbar ============ */
+  #sketch-tools { position:fixed; bottom:12px; right:12px; z-index:9999; font-size:12px;
+                  background: rgba(12,16,20,.82); color:#fff; padding: 10px 12px; border-radius:10px;
+                  opacity:.5; transition: opacity .2s; display:flex; flex-direction:column; gap:8px;
+                  backdrop-filter: blur(6px); }
+  #sketch-tools:hover { opacity:1; }
+  .tool-row { display:flex; gap:6px; align-items:center; }
+  .tool-lab { font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:#9fb0c0; width:74px; }
+  #sketch-tools select { font-family:inherit; font-size:12px; background:#1d2630; color:#fff;
+                         border:1px solid #37445a; border-radius:6px; padding:3px 6px; }
+  .tool-btn { font-family:inherit; font-size:11px; background:#1d2630; color:#cfd8e3; border:1px solid #37445a;
+              border-radius:6px; padding: 3px 8px; cursor:pointer; transition: all .15s; }
+  .tool-btn:hover { border-color:#5a6c88; }
+  .tool-btn.on { background:#3E61C6; border-color:#3E61C6; color:#fff; }
+</style>
+</head>
+<body>
+
+<div id="variant-nav">
+  <div class="nav-row">
+    <span class="nav-title">Подсказки в слоте клавиатуры</span>
+    <button class="variant-tab active" data-v="now" onclick="showVariant('now',this)">Сейчас (над полем)</button>
+    <button class="variant-tab" data-v="a" onclick="showVariant('a',this)">A · Прямая замена</button>
+    <button class="variant-tab" data-v="b" onclick="showVariant('b',this)">B · Клавиатурная</button>
+    <button class="variant-tab" data-v="c" onclick="showVariant('c',this)">C · Вкладки намерений</button>
+    <button class="variant-tab" data-v="d" onclick="showVariant('d',this)">D · Явный переключатель</button>
+  </div>
+  <div id="caption"></div>
+</div>
+
+<div id="stage"></div>
+
+<div id="sketch-tools">
+  <div class="tool-row">
+    <span class="tool-lab">Тема</span>
+    <select onchange="document.getElementById('theme-link').href='../themes/'+this.value+'.css'">
+      <option value="default">Светлая (сегодня)</option>
+      <option value="ink-dark">«Чернильный» (тёмная)</option>
+    </select>
+  </div>
+  <div class="tool-row">
+    <span class="tool-lab">В слоте</span>
+    <button class="tool-btn on" data-sl="sg" onclick="setSlotAll('sg',this)">Подсказки</button>
+    <button class="tool-btn" data-sl="kb" onclick="setSlotAll('kb',this)">Клавиатура</button>
+    <button class="tool-btn" data-sl="none" onclick="setSlotAll('none',this)">Закрыто</button>
+  </div>
+  <div class="tool-row">
+    <span class="tool-lab">Состояние</span>
+    <button class="tool-btn on" data-st="cards" onclick="setStateAll('cards',this)">Ответы</button>
+    <button class="tool-btn" data-st="load" onclick="setStateAll('load',this)">Думает</button>
+    <button class="tool-btn" data-st="empty" onclick="setStateAll('empty',this)">Пусто</button>
+    <button class="tool-btn" data-st="error" onclick="setStateAll('error',this)">Ошибка</button>
+  </div>
+  <div class="tool-row">
+    <span class="tool-lab">Демо</span>
+    <button class="tool-btn" onclick="demoSwap()">Проиграть переключение</button>
+  </div>
+</div>
+
+<script>
+/* ================= data ================= */
+const SUGGESTIONS = [
+  { i:'Цена',         t:'Букет из 25 пионов — 22 500 ₸. Успеем к 18:00, доставка по Алматы — 2 000 ₸. Оформляем? 🌸', top:true },
+  { i:'Доставка',     t:'Доставка сегодня возможна с 17:00 до 20:00, курьер позвонит за час до приезда.' },
+  { i:'Уточнение',    t:'Подскажите, пожалуйста, адрес — посчитаю точную стоимость и время доставки.' },
+  { i:'Альтернатива', t:'Есть похожий букет из 19 пионов за 18 900 ₸ — тоже очень пышный. Показать фото?' },
+];
+
+const CAPTIONS = {
+  now:`<b>Точка отсчёта — как в приложении сегодня.</b> Лист подсказок висит НАД полем ввода, а клавиатура поднимает и поле, и лист. Нажмите на поле ввода — увидите проблему: композер + лист + клавиатура съедают экран, от переписки остаётся полоска ~70px. Именно это и лечит идея «подсказки вместо клавиатуры».`,
+  a:`<b>A · Прямая замена.</b> Тот же зафиксированный дизайн карточек (лист P), но он переехал ВНИЗ — в слот клавиатуры, ровно её высотой (244px). Переключение — клавиша ✦ ⇄ ⌨ внутри поля ввода, как эмодзи в WhatsApp/Telegram. Слот один, высота не меняется → при переключении переписка не дёргается ни на пиксель. Шапка листа (‹ · ПРЕДЛОЖЕНИЯ · ↻) осталась сверху. <b>Смотрите на:</b> достаточно ли одной клавиши ✦, чтобы понять, что подсказки вообще есть.`,
+  b:`<b>B · Клавиатурная.</b> Шапки нет — вместо неё нижний системный ряд, как у настоящей клавиатуры (там, где ⌨/🌐): слева выход на клавиатуру, справа обновление, между ними — «‹» и подпись. Карточки получают всю высоту сверху, а управление стоит там, где уже лежит палец. <b>Смотрите на:</b> читается ли нижний ряд как «часть клавиатуры» и не мешает ли он тапать по нижней карточке.`,
+  c:`<b>C · Вкладки намерений.</b> Модель эмодзи-клавиатуры: внизу — категории (Цена / Доставка / …) как паки стикеров, в теле — ОДИН ответ крупно (14px вместо 12.5) и целиком, тап по нему вставляет текст. Максимальная читаемость, но остальные три ответа не видны одновременно. <b>Смотрите на:</b> терпимо ли переключаться между ответами вместо того, чтобы окинуть их взглядом.`,
+  d:`<b>D · Явный переключатель.</b> A + вверху слота сегмент «Подсказки | Клавиатура» — переключение видно всегда, а не спрятано в мелкой клавише. Стоит 38px высоты карточек. <b>Смотрите на:</b> стоит ли явность этих 38px, или клавиши ✦ в поле хватает.`,
+};
+
+/* ================= svg ================= */
+const svg = {
+  back:   c=>`<svg class="tb-back" viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="${c}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  chev:   (c,s=15)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="${c}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  refresh:(c,s=14)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none"><path d="M20 12a8 8 0 1 1-2.34-5.66" stroke="${c}" stroke-width="2.4" stroke-linecap="round"/><path d="M20 3v5h-5" stroke="${c}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  clip:   c=>`<svg class="comp-clip" viewBox="0 0 24 24" fill="none"><path d="M21 12.5l-8.6 8.6a6 6 0 0 1-8.5-8.5l8.6-8.6a4 4 0 0 1 5.7 5.7l-8.7 8.6a2 2 0 0 1-2.8-2.8l8-8" stroke="${c}" stroke-width="1.7" stroke-linecap="round"/></svg>`,
+  send:   ()=>`<svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M3.5 12L21 3l-4.5 18-5.2-6.2L3.5 12z" fill="#fff"/></svg>`,
+  spark:  (c,s=11)=>`<svg style="width:${s}px;height:${s}px;flex:0 0 auto;vertical-align:-1px" viewBox="0 0 24 24"><path d="M12 2l2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4z" fill="${c}"/></svg>`,
+  kbd:    (c,s=17)=>`<svg style="width:${s}px;height:${s}px" viewBox="0 0 24 24" fill="none"><rect x="2" y="5.5" width="20" height="13" rx="2.4" stroke="${c}" stroke-width="1.7"/><path d="M6 9.5h.01M9.5 9.5h.01M13 9.5h.01M16.5 9.5h.01M6 12.8h.01M9.5 12.8h.01M13 12.8h.01M16.5 12.8h.01M8 15.8h8" stroke="${c}" stroke-width="1.9" stroke-linecap="round"/></svg>`,
+  sb:     c=>`<svg width="46" height="12" viewBox="0 0 46 12" fill="${c}"><rect x="0" y="6" width="2.5" height="5" rx="1"/><rect x="4" y="4" width="2.5" height="7" rx="1"/><rect x="8" y="2" width="2.5" height="9" rx="1"/><rect x="12" y="0" width="2.5" height="11" rx="1"/><path d="M20 5a7 7 0 0 1 9 0l-1.5 1.9a4.6 4.6 0 0 0-6 0z"/><circle cx="24.5" cy="9.5" r="1.6"/><rect x="33" y="2" width="11" height="8" rx="2.4" fill="none" stroke="${c}" stroke-width="1.1"/><rect x="34.5" y="3.5" width="6.5" height="5" rx="1.2"/><rect x="44.6" y="4.5" width="1.4" height="3" rx=".7"/></svg>`,
+};
+const esc = s => s.replace(/'/g,'’');
+
+/* ================= keyboard ================= */
+const KB_ROWS = ['йцукенгшщзхъ', 'фывапролджэ', 'ячсмитьбю'];
+function keyboard(){
+  const r1 = [...KB_ROWS[0]].map(k=>`<div class="key">${k}</div>`).join('');
+  const r2 = [...KB_ROWS[1]].map(k=>`<div class="key">${k}</div>`).join('');
+  const r3 = [...KB_ROWS[2]].map(k=>`<div class="key">${k}</div>`).join('');
+  return `
+  <div class="kb layer">
+    <div class="kb-acc">
+      <span class="kb-pred">Да</span><span class="kb-pred">Хорошо</span>
+      <span class="kb-hook" onclick="slot(this,'sg')">${svg.spark('var(--positive-ink)',10)} 4 подсказки</span>
+    </div>
+    <div class="kb-rows">
+      <div class="kb-row">${r1}</div>
+      <div class="kb-row r2">${r2}</div>
+      <div class="kb-row"><div class="key fn w40">⇧</div>${r3}<div class="key fn w40">⌫</div></div>
+      <div class="kb-row">
+        <div class="key fn w38">123</div><div class="key fn w40">🌐</div>
+        <div class="key space">пробел</div><div class="key fn ret">Ввод</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ================= suggestion pieces ================= */
+const cardsHTML = () => `<div class="cards">` + SUGGESTIONS.map(s=>`
+  <div class="card${s.top?' top':''}" onclick="pick(this,'${esc(s.t)}')">
+    <span class="leg">${s.top? svg.spark('var(--positive-ink)',9) : ''}${s.i}</span>
+    <div class="txt">${s.t}</div>
+  </div>`).join('') + `</div>`;
+
+const skHTML = () => `<div class="cards">` + Array.from({length:3},()=>`
+  <div class="sk"><div class="dots"><i></i><i></i><i></i></div></div>`).join('') + `</div>`;
+
+const EMPTY = `<div class="state-box"><div class="state-h">Нет предложений</div><div class="state-b">Напишите ответ вручную</div></div>`;
+const ERROR = `<div class="state-box"><div class="state-h">Не удалось загрузить</div><div class="state-b">Проверьте соединение и попробуйте снова</div><button class="state-retry" onclick="refreshFrame(this)">Обновить</button></div>`;
+
+/* scrolling card viewport + fade, wrapped in the 4-state machine */
+function viewport(){
+  return `
+  <div class="fixwrap">
+    <div class="st st-cards" style="position:relative;height:100%">
+      <div class="fix">${cardsHTML()}</div><div class="fade"></div>
+    </div>
+    <div class="st st-load"><div class="fix">${skHTML()}</div></div>
+    <div class="st st-empty">${EMPTY}</div>
+    <div class="st st-error">${ERROR}</div>
+  </div>`;
+}
+
+const headRow = () => `
+  <div class="sg-head">
+    <span class="icobtn" onclick="flash(this)">${svg.chev('var(--ink-2)')}</span>
+    ${svg.spark('var(--positive-ink)',11)}<span class="sg-title">Предложения</span>
+    <span class="icobtn right" onclick="refreshFrame(this)">${svg.refresh('var(--ink-2)')}</span>
+  </div>`;
+
+const sysRow = (middle) => `
+  <div class="sysrow">
+    <span class="icobtn" onclick="slot(this,'kb')" title="Вернуться к клавиатуре">${svg.kbd('var(--ink-2)')}</span>
+    ${middle}
+    <span class="icobtn right" onclick="refreshFrame(this)">${svg.refresh('var(--ink-2)')}</span>
+  </div>`;
+
+/* ---- A: locked sheet, moved into the slot ---- */
+const panelA = () => `<div class="sg layer" data-state="cards">${headRow()}${viewport()}</div>`;
+
+/* ---- B: no header, keyboard-style bottom system row ---- */
+const panelB = () => `<div class="sg layer" data-state="cards">${viewport()}
+  ${sysRow(`<span class="icobtn" onclick="flash(this)">${svg.chev('var(--ink-2)',14)}</span>
+            <span class="sys-title">${svg.spark('var(--positive-ink)',10)} Предложения</span>`)}</div>`;
+
+/* ---- C: one big reply + intent pills in the system row ---- */
+function panelC(){
+  const pills = SUGGESTIONS.map((s,n)=>`
+    <span class="pill${n===0?' on'+(s.top?' rec':''):''}" onclick="cTab(this,${n})">${s.top? svg.spark('var(--positive-ink)',9):''}${s.i}</span>`).join('');
+  return `<div class="sg layer" data-state="cards">
+    <div class="st st-cards" style="flex:1 1 auto;min-height:0;display:flex;flex-direction:column">
+      <div class="c-body top" onclick="pick(this, this.querySelector('.c-big').textContent)">
+        <span class="c-leg">${svg.spark('var(--positive-ink)',10)}<span class="c-name">Цена</span></span>
+        <div class="c-big">${SUGGESTIONS[0].t}</div>
+        <div class="c-hint">Нажмите, чтобы вставить в поле</div>
+      </div>
+    </div>
+    <div class="st st-load" style="flex:1 1 auto"><div class="state-box"><div class="dots"><i></i><i></i><i></i></div></div></div>
+    <div class="st st-empty" style="flex:1 1 auto">${EMPTY}</div>
+    <div class="st st-error" style="flex:1 1 auto">${ERROR}</div>
+    ${sysRow(`<div class="pills">${pills}</div>`)}
+  </div>`;
+}
+
+/* ---- D: explicit segmented switch at the top of the slot ---- */
+const panelD = () => `<div class="sg layer" data-state="cards">
+  <div class="seg">
+    <div class="segctl" onclick="slot(this,'kb')"><i></i><span class="on">Подсказки</span><span>Клавиатура</span></div>
+    <span class="icobtn" onclick="refreshFrame(this)">${svg.refresh('var(--ink-2)')}</span>
+  </div>
+  ${viewport()}</div>`;
+
+/* ================= frames ================= */
+function frame(id, panelHTML, opts={}){
+  const key = opts.noKey ? '' :
+    `<span class="comp-key" onclick="event.stopPropagation();toggleKey(this)">
+       <span class="ic-sp">${svg.spark('var(--positive-ink)',17)}</span><span class="ic-kb">${svg.kbd('var(--positive-ink)',17)}</span>
+     </span>`;
+  const sheet = opts.sheet ? `
+      <div class="squeeze"><span>переписка ≈ 71px</span></div>
+      <div class="now-sheet" data-state="cards">
+        <div class="grab"></div>${headRow()}${viewport()}
+      </div>` : '';
+  return `
+  <div class="variant${id==='now'?' active':''}" id="variant-${id}">
+    <div class="phone" data-frame="${id}" data-slot="${opts.sheet?'none':'sg'}" data-sheet="on">
+      <div class="statusbar"><span>14:05</span><span class="sb-icons">${svg.sb('currentColor')}</span></div>
+      <div class="topbar">
+        ${svg.back('var(--ink)')}
+        <div class="tb-ava">А</div>
+        <div class="tb-col"><span class="tb-name">Айгерим</span><span class="tb-sub">в сети</span></div>
+        <div class="sw" onclick="toggleMode(this)" title="Режим ответа: Вместе / Авто">
+          <span class="sw-faint l">Вместе</span><span class="sw-faint r">Авто</span>
+          <span class="sw-thumb"><span class="lab-s">Вместе</span><span class="lab-a">Авто</span></span>
+        </div>
+      </div>
+      <div class="chat" onclick="closeSlot(this)" style="--clearance:${opts.sheet?284:0}px">
+        <div class="msgs">
+          <div class="datepill">Сегодня</div>
+          <div class="bubble in">Здравствуйте! А есть букеты из пионов?<span class="t">13:58</span></div>
+          <div class="bubble out">Добрый день! Да, есть 🌸 Какой бюджет рассматриваете?<span class="t">13:59 <span class="ticks">✓✓</span></span></div>
+          <div class="bubble in">До 25 000 тг. И можно доставку сегодня к 18:00?<span class="t">14:02</span></div>
+        </div>
+        ${sheet}
+      </div>
+      <div class="composer">
+        ${svg.clip('var(--ink-3)')}
+        <div class="comp-input" onclick="focusInput(this)">${key}<span class="input-text">Сообщение</span></div>
+        <div class="comp-send">${svg.send()}</div>
+      </div>
+      <div class="slot">${keyboard()}${panelHTML}</div>
+      <div class="homebar"><i></i></div>
+    </div>
+  </div>`;
+}
+
+/* ================= build ================= */
+document.getElementById('stage').innerHTML =
+  frame('now', '', {sheet:true, noKey:true}) +
+  frame('a', panelA()) +
+  frame('b', panelB()) +
+  frame('c', panelC()) +
+  frame('d', panelD());
+document.getElementById('caption').innerHTML = CAPTIONS.now;
+
+/* deep-link: ?v=a|b|c|d|now&theme=ink-dark&sl=kb|sg|none&st=cards|load|empty|error */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const v = q.get('v'), th = q.get('theme'), sl = q.get('sl'), st = q.get('st');
+  if (th) { document.getElementById('theme-link').href = '../themes/' + th + '.css';
+            const sel = document.querySelector('#sketch-tools select'); if (sel) sel.value = th; }
+  if (v && CAPTIONS[v]) showVariant(v, document.querySelector(`.variant-tab[data-v="${v}"]`));
+  if (sl) setSlotAll(sl, document.querySelector(`#sketch-tools [data-sl="${sl}"]`));
+  if (st) setStateAll(st, document.querySelector(`#sketch-tools [data-st="${st}"]`));
+})();
+
+/* ================= interactions ================= */
+function showVariant(id, btn){
+  document.querySelectorAll('.variant').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.variant-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('variant-'+id).classList.add('active');
+  btn.classList.add('active');
+  document.getElementById('caption').innerHTML = CAPTIONS[id];
+}
+
+function setSlotAll(mode, btn){
+  document.querySelectorAll('.phone').forEach(ph=>setSlot(ph, mode));
+  document.querySelectorAll('#sketch-tools [data-sl]').forEach(b=>b.classList.toggle('on', b===btn));
+}
+function setStateAll(st, btn){
+  document.querySelectorAll('.sg, .now-sheet').forEach(z=>z.dataset.state = st);
+  document.querySelectorAll('#sketch-tools [data-st]').forEach(b=>b.classList.toggle('on', b===btn));
+}
+
+/* the whole idea in one function: the slot holds exactly one tenant */
+function setSlot(ph, mode){
+  ph.dataset.slot = mode;
+  const inp = ph.querySelector('.comp-input');
+  inp.classList.toggle('focus', mode === 'kb');
+  const seg = ph.querySelector('.segctl');
+  if (seg){ const kb = mode === 'kb';
+            seg.querySelector('i').style.transform = kb ? 'translateX(100%)' : 'none';
+            seg.querySelectorAll('span').forEach((s,n)=>s.classList.toggle('on', n === (kb?1:0))); }
+}
+const slot = (el, mode) => setSlot(el.closest('.phone'), mode);
+function focusInput(el){ setSlot(el.closest('.phone'), 'kb'); }
+function closeSlot(el){ setSlot(el.closest('.phone'), 'none'); }
+function toggleKey(el){
+  const ph = el.closest('.phone');
+  setSlot(ph, ph.dataset.slot === 'sg' ? 'kb' : 'sg');
+}
+function toggleMode(sw){
+  const ph = sw.closest('.phone');
+  ph.classList.toggle('auto');
+  const auto = ph.classList.contains('auto');
+  if (ph.dataset.frame === 'now') ph.dataset.sheet = auto ? 'off' : 'on';       // «Авто» hides the sheet
+  else if (auto && ph.dataset.slot === 'sg') setSlot(ph, 'none');
+}
+
+/* C — intent tabs swap the single big reply */
+function cTab(el, n){
+  const ph = el.closest('.phone'), s = SUGGESTIONS[n];
+  ph.querySelectorAll('.pill').forEach(p=>p.classList.remove('on','rec'));
+  el.classList.add('on'); if (s.top) el.classList.add('rec');
+  const body = ph.querySelector('.c-body');
+  body.classList.toggle('top', !!s.top);
+  body.querySelector('.c-name').textContent = s.i;
+  body.querySelector('.c-leg').firstElementChild.style.display = s.top ? 'inline' : 'none';
+  const big = body.querySelector('.c-big');
+  big.style.opacity = 0; setTimeout(()=>{ big.textContent = s.t; big.style.opacity = 1; }, 110);
+  big.style.transition = 'opacity .11s ease';
+}
+
+const timers = new WeakMap();
+function pick(el, text){
+  const ph = el.closest('.phone');
+  const input = ph.querySelector('.comp-input');
+  input.querySelector('.input-text').textContent = text;
+  input.classList.add('filled');
+  const send = ph.querySelector('.comp-send');
+  send.classList.remove('pulse'); void send.offsetWidth; send.classList.add('pulse');
+  // locked flow (2026-08-11): a pick must NOT open the keyboard — the thread stays visible
+  if (ph.dataset.frame === 'now') ph.dataset.sheet = 'off'; else setSlot(ph, 'none');
+  clearTimeout(timers.get(ph));
+  timers.set(ph, setTimeout(()=>{                              // reset so the demo can be replayed
+    input.querySelector('.input-text').textContent = 'Сообщение';
+    input.classList.remove('filled');
+    if (ph.dataset.frame === 'now') ph.dataset.sheet = 'on'; else setSlot(ph, 'sg');
+  }, 2400));
+}
+
+function refreshFrame(el){
+  const z = el.closest('.sg') || el.closest('.now-sheet');
+  z.dataset.state = 'load';
+  clearTimeout(timers.get(z));
+  timers.set(z, setTimeout(()=>{ z.dataset.state = 'cards'; }, 950));
+}
+function flash(el){ el.style.background = 'color-mix(in srgb, var(--ink) 16%, transparent)';
+                    setTimeout(()=>el.style.background = '', 180); }
+
+/* auto-demo: keyboard → panel → keyboard on the visible phone */
+function demoSwap(){
+  const ph = document.querySelector('.variant.active .phone');
+  if (!ph) return;
+  const seq = ph.dataset.frame === 'now'
+    ? [['none',0],['kb',450],['kb',1500]]                       // today: the sheet just stays stacked
+    : [['kb',0],['sg',900],['kb',1900],['sg',2800]];
+  seq.forEach(([m,d])=>setTimeout(()=>setSlot(ph,m), d));
+}
+
+/* today's frame keeps the sheet glued above the composer — flag the squeeze when the kb is up */
+new MutationObserver(muts=>muts.forEach(m=>{
+  const ph = m.target;
+  if (ph.dataset.frame === 'now')
+    ph.classList.toggle('warn', ph.dataset.slot === 'kb' && ph.dataset.sheet === 'on');
+})).observe(document.getElementById('stage'), {subtree:true, attributes:true, attributeFilter:['data-slot','data-sheet']});
+</script>
+</body>
+</html>

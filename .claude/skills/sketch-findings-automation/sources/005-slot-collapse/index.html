@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 005 — Спустить всё вниз: механизм сворачивания слота</title>
+<link rel="stylesheet" href="../themes/default.css" id="theme-link">
+<style>
+  /* ============ page chrome ============ */
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, 'SF Pro Text', Roboto, 'Segoe UI', system-ui, sans-serif;
+    background: var(--page-bg); color: var(--page-ink);
+    padding: 152px 16px 40px; display:flex; flex-direction:column; align-items:center;
+    transition: background .2s;
+  }
+  #variant-nav {
+    position: fixed; top:0; left:0; right:0; z-index: 9998;
+    background: var(--page-surface); border-bottom: 1px solid var(--page-line);
+    padding: 10px 16px 8px; display:flex; flex-direction:column; gap:6px;
+  }
+  .nav-row { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  .nav-title { font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--page-ink-2); margin-right:8px; }
+  .variant-tab {
+    font-family: inherit; font-size:13px; padding:6px 12px; border-radius: 8px;
+    border:1px solid var(--page-line); background:transparent; color:var(--page-ink);
+    cursor:pointer; transition: all .15s ease;
+  }
+  .variant-tab:hover { border-color: var(--page-ink-2); }
+  .variant-tab.active { background: var(--page-ink); color: var(--page-bg); border-color: var(--page-ink); }
+  #model-line { font-size:11.5px; color: var(--page-ink-2); max-width:780px; }
+  #model-line b { color: var(--page-ink); }
+  #caption { font-size: 12.5px; line-height:1.45; color: var(--page-ink-2); max-width: 780px; }
+  #caption b { color: var(--page-ink); }
+
+  .variant { display:none; } .variant.active { display:block; }
+
+  /* ============ phone frame ============ */
+  .phone {
+    width: 360px; height: 762px; border-radius: 34px; overflow: hidden;
+    border: 9px solid #0B0D10; box-shadow: 0 18px 50px rgba(0,0,0,.28);
+    display:flex; flex-direction:column; background: var(--surface); position:relative;
+    --tray: color-mix(in srgb, var(--ink) 9%, var(--bg));
+    --keycap: var(--surface);
+  }
+  .statusbar {
+    height: 26px; background: var(--surface); display:flex; align-items:center;
+    justify-content:space-between; padding: 2px 16px 0; font-size:11.5px; font-weight:600; color:var(--ink);
+    flex: 0 0 auto;
+  }
+  .topbar {
+    height: 56px; background: var(--surface); border-bottom:1px solid var(--hairline);
+    display:flex; align-items:center; gap:9px; padding: 0 10px; flex:0 0 auto;
+  }
+  .tb-back { width:22px; height:22px; flex:0 0 auto; cursor:pointer; }
+  .tb-ava { width:35px; height:35px; border-radius:50%; flex:0 0 auto;
+            background: linear-gradient(135deg,#E8A2B8,#C96A8B); color:#fff;
+            display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:600; }
+  .tb-col { display:flex; flex-direction:column; gap:1px; min-width:0; }
+  .tb-name { font-size:15px; font-weight:600; color:var(--ink); white-space:nowrap; }
+  .tb-sub  { font-size:11px; color: var(--ink-3); }
+
+  /* --- reply-mode switch (Вместе ⇄ Авто) — fixed identity colors --- */
+  .sw { margin-left:auto; flex:0 0 auto; width:76px; height:22px; border-radius:11px;
+        background: var(--mode-semi-track); position:relative; cursor:pointer; transition: background .25s ease; }
+  .sw-faint { position:absolute; top:0; height:22px; width:38px; display:flex; align-items:center;
+              justify-content:center; font-size:9px; pointer-events:none; }
+  .sw-faint.l { left:0;  color: var(--mode-semi-faint); }
+  .sw-faint.r { right:0; color: var(--mode-semi-faint); }
+  .sw-thumb { position:absolute; top:2.5px; left:2.5px; width:36px; height:17px; border-radius:8.5px;
+              background:#fff; display:flex; align-items:center; justify-content:center;
+              font-size:9px; font-weight:700; color: var(--mode-semi-ink);
+              transition: transform .25s cubic-bezier(.33,1,.68,1), color .25s; box-shadow: 0 1px 2px rgba(0,0,0,.18); }
+  .sw .lab-a { display:none; } .sw .lab-s { display:block; }
+  .phone.auto .sw { background: var(--mode-auto-track); }
+  .phone.auto .sw-thumb { transform: translateX(34.5px); color: var(--mode-auto-ink); }
+  .phone.auto .sw .lab-a { display:block; } .phone.auto .sw .lab-s { display:none; }
+  .phone.auto .sw-faint { color: var(--mode-auto-faint); }
+  .phone.auto .comp-key { display:none !important; }
+
+  /* --- chat thread --- */
+  .chat {
+    flex:1 1 auto; min-height:0; position:relative; overflow:hidden; cursor:default;
+    background-color: var(--chat-wallpaper);
+    background-image:
+      radial-gradient(color-mix(in srgb, var(--chat-wallpaper-ink) 55%, transparent) 1px, transparent 1.5px),
+      radial-gradient(color-mix(in srgb, var(--chat-wallpaper-ink) 35%, transparent) 1px, transparent 1.5px);
+    background-size: 24px 24px, 24px 24px; background-position: 0 0, 12px 12px;
+  }
+  .msgs { position:absolute; left:0; right:0; top:0; bottom:0;
+          display:flex; flex-direction:column; justify-content:flex-end; gap:5px;
+          padding: 10px 12px 8px; }
+  .datepill { align-self:center; background: var(--bubble-in); border:1px solid var(--bubble-border);
+              color: var(--ink-3); font-size:10px; padding:3px 9px; border-radius:8px;
+              box-shadow: var(--shadow-sm); margin-bottom:3px; }
+  .bubble { max-width:76%; padding:6px 9px 4px; border-radius:10px; font-size:13px; line-height:1.35;
+            color:var(--ink); border:1px solid var(--bubble-border); box-shadow: var(--shadow-sm); }
+  .bubble .t { display:block; text-align:right; font-size:9.5px; color:var(--ink-3); margin-top:1px; }
+  .bubble .t .ticks { color:#53BDEB; letter-spacing:-1px; }
+  .in  { align-self:flex-start; background: var(--bubble-in); border-bottom-left-radius:3px; }
+  .out { align-self:flex-end;   background: var(--bubble-out); border-bottom-right-radius:3px; }
+
+  /* --- composer: «+» | field | send --- */
+  .composer { flex:0 0 auto; background: var(--surface); border-top:1px solid var(--hairline);
+              display:flex; align-items:center; gap:8px; padding: 8px 10px; z-index:3; }
+  .comp-attach { width:23px; height:23px; flex:0 0 auto; opacity:.85; }
+  .comp-input { flex:1; min-height:36px; background: var(--bg); border:1px solid var(--hairline);
+                border-radius:18px; padding: 7px 13px; font-size:13px; color: var(--ink-3);
+                display:flex; align-items:center; gap:6px; cursor:text;
+                transition: color .2s, border-color .2s; overflow:hidden; }
+  .comp-input .input-text { flex:1 1 auto; min-width:0;
+                display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .comp-input.filled { color: var(--ink); border-color: var(--input-border); }
+  .comp-input.focus  { border-color: var(--input-border); }
+  .comp-input.focus .input-text::after { content:''; display:inline-block; width:1.5px; height:14px;
+        background: var(--accent-text); vertical-align:-3px; margin-left:1px; animation: caret 1.05s steps(1) infinite; }
+  @keyframes caret { 0%,50%{opacity:1} 51%,100%{opacity:0} }
+
+  /* the composer key (rendered at the field END — 004's working position; the 004 question stays orthogonal) */
+  .comp-key { width:27px; height:27px; border-radius:50%; flex:0 0 auto; cursor:pointer;
+              display:flex; align-items:center; justify-content:center;
+              transition: background .15s ease, transform .15s ease; }
+  .comp-key:hover { background: color-mix(in srgb, var(--ink) 7%, transparent); }
+  .comp-key .ic-dn { display:none; }
+  .phone[data-frame="a"] .comp-input, .phone[data-frame="b"] .comp-input,
+  .phone[data-frame="c"] .comp-input { padding-right:6px; }
+  /* A/B: the key is a pure ENTRY affordance — hidden while the panel already holds the slot */
+  .phone[data-frame="a"][data-slot="sg"] .comp-key, .phone[data-frame="b"][data-slot="sg"] .comp-key { display:none; }
+  .phone[data-frame="a"][data-slot="sg"] .comp-input, .phone[data-frame="b"][data-slot="sg"] .comp-input { padding-right:13px; }
+  /* C: chameleon — ✦ when the panel is down, ˅ (collapse) while it is up */
+  .phone[data-frame="c"][data-slot="sg"] .comp-key .ic-sp { display:none; }
+  .phone[data-frame="c"][data-slot="sg"] .comp-key .ic-dn { display:block; }
+  .phone[data-frame="c"][data-slot="sg"] .comp-key { background: color-mix(in srgb, var(--positive-ink) 13%, transparent); }
+
+  .comp-send { width:40px; height:40px; border-radius:50%; background: var(--send); flex:0 0 auto;
+               display:flex; align-items:center; justify-content:center; cursor:pointer; transition: transform .15s ease; }
+  .comp-send:hover { transform: scale(1.06); }
+  .comp-send.pulse { animation: pulse .5s ease 2; }
+  @keyframes pulse { 0%{transform:scale(1)} 50%{transform:scale(1.14)} 100%{transform:scale(1)} }
+  .homebar { flex:0 0 auto; height:20px; background: var(--tray); display:flex; align-items:center; justify-content:center; z-index:2; }
+  .phone[data-slot="none"] .homebar { background: var(--surface); }
+  .homebar i { width:118px; height:4px; border-radius:2px; background: color-mix(in srgb, var(--ink) 26%, transparent); }
+
+  /* ============ THE SLOT — keyboard | panel | peek strip | closed ============ */
+  .slot { flex:0 0 auto; height:0; position:relative; overflow:hidden; background: var(--tray);
+          transition: height .26s cubic-bezier(.33,1,.68,1); z-index:2; }
+  .phone[data-slot="kb"] .slot, .phone[data-slot="sg"] .slot { height: 244px; }
+  .phone[data-slot="peek"] .slot { height: 26px; }
+  .layer { position:absolute; left:0; right:0; top:0; height:244px; opacity:0; pointer-events:none;
+           transform: translateY(7px); transition: opacity .15s ease, transform .15s ease;
+           display:flex; flex-direction:column; }
+  .phone[data-slot="kb"] .kb, .phone[data-slot="sg"] .sg { opacity:1; pointer-events:auto; transform:none; }
+  .phone[data-slot="peek"] .pk { opacity:1; pointer-events:auto; transform:none; }
+
+  /* ---- E: ONE morphing key at the field's end — it always shows the DESTINATION
+         (panel up → ⌨ «к клавиатуре»; otherwise → ✦ «к подсказкам»), like WhatsApp's emoji key ---- */
+  .phone[data-frame="e"] .comp-input { padding-right:6px; }
+  .phone[data-frame="e"] .comp-key .ic-kb { display:none; }
+  .phone[data-frame="e"] .comp-key { background: color-mix(in srgb, var(--positive-ink) 13%, transparent); }
+  .phone[data-frame="e"][data-slot="sg"] .comp-key .ic-sp,
+  .phone[data-frame="e"][data-slot="sgx"] .comp-key .ic-sp { display:none; }
+  .phone[data-frame="e"][data-slot="sg"] .comp-key .ic-kb,
+  .phone[data-frame="e"][data-slot="sgx"] .comp-key .ic-kb { display:block; }
+  .phone[data-frame="e"][data-slot="sg"] .comp-key,
+  .phone[data-frame="e"][data-slot="sgx"] .comp-key { background:transparent; }
+
+  /* ---- E: expanded detent + draggable handle on the panel's top edge ---- */
+  .sg.layer { height:100%; }                       /* the panel follows the slot, so the handle can resize it live */
+  .phone[data-slot="sgx"] .sg { opacity:1; pointer-events:auto; transform:none; }
+  .phone[data-slot="sgx"] .fade { display:none; }  /* nothing is cut when everything fits */
+  .phone.dragging .slot { transition:none; }
+  .grabrow { height:14px; flex:0 0 auto; display:flex; align-items:center; justify-content:center;
+             cursor:grab; touch-action:none; }
+  .grabrow:active { cursor:grabbing; }
+  .grabrow i { width:36px; height:4px; border-radius:2px; background: var(--border); pointer-events:none;
+               transition: background .15s ease; }
+  .grabrow:hover i { background: var(--ink-3); }
+
+  /* ---- peek strip (variant D's collapsed form) ---- */
+  .pk { height:26px; flex-direction:row; align-items:center; gap:5px; padding: 0 12px; cursor:pointer; }
+  .pk-title { font-size:9px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color: var(--ink-3); }
+  .pk-count { font-size:9px; font-weight:700; color: var(--positive-ink); }
+  .pk-up { margin-left:auto; display:flex; align-items:center; }
+
+  /* ---- fake iOS ЙЦУКЕН keyboard (plain QuickType — «✦ N» chip is NOT buildable on iOS) ---- */
+  .kb { padding: 0 3px 9px; }
+  .kb-acc { height:34px; flex:0 0 auto; display:flex; align-items:center; justify-content:center; gap:8px;
+            border-bottom:.5px solid color-mix(in srgb, var(--ink) 12%, transparent); }
+  .kb-pred { font-size:12.5px; color: var(--ink-2); padding: 0 14px; }
+  .kb-pred + .kb-pred { border-left:.5px solid color-mix(in srgb, var(--ink) 14%, transparent); }
+  .kb-rows { flex:1; display:flex; flex-direction:column; justify-content:center; gap:9px; padding-top:6px; }
+  .kb-row { display:flex; gap:3px; justify-content:center; }
+  .kb-row.r2 { padding: 0 14px; }
+  .key { flex:1 1 0; height:42px; border-radius:5px; background: var(--keycap); color: var(--ink);
+         display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:400;
+         box-shadow: 0 1px 0 color-mix(in srgb, var(--ink) 28%, transparent); cursor:default; }
+  .key.fn { background: color-mix(in srgb, var(--ink) 16%, transparent); box-shadow:none; font-size:14px; }
+  .key.w40 { flex:0 0 40px; } .key.w38 { flex:0 0 38px; font-size:12px; }
+  .key.space { flex:1 1 auto; font-size:12px; color: var(--ink-3); }
+  .key.ret { flex:0 0 62px; font-size:12px; }
+
+  /* ---- suggestions layer (locked chassis A: header ‹ ✦ ПРЕДЛОЖЕНИЯ ↻) ---- */
+  .sg-head { height:32px; flex:0 0 auto; display:flex; align-items:center; gap:6px; padding: 0 8px 0 6px; }
+  .sg-title { font-size:9.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color: var(--ink-3); }
+  .icobtn { width:26px; height:26px; border-radius:50%; flex:0 0 auto; display:flex; align-items:center;
+            justify-content:center; cursor:pointer; transition: background .15s ease, transform .15s ease; }
+  .icobtn:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+  .icobtn.right { margin-left:auto; }
+
+  .fixwrap { position:relative; flex:1 1 auto; min-height:0; }
+  .fix { height:100%; overflow-y:auto; scrollbar-width:thin; scrollbar-color: var(--border) transparent; }
+  .fix::-webkit-scrollbar { width:3px; }
+  .fix::-webkit-scrollbar-thumb { background: var(--border); border-radius:2px; }
+  .fade { position:absolute; left:0; right:0; bottom:0; height:24px; pointer-events:none;
+          background: linear-gradient(transparent, var(--tray)); }
+
+  /* cards = the LOCKED «P» design */
+  .cards { padding: 12px 8px 8px; display:flex; flex-direction:column; gap:10px; }
+  .card { position:relative; overflow:visible; background: var(--surface);
+          border:1px solid var(--border); border-radius:14px; padding: 8px 11px 9px; cursor:pointer;
+          transition: transform .12s ease, border-color .15s, background .15s; }
+  .card:hover { transform: translateY(-1px); border-color: var(--input-border); }
+  .card.top { background: var(--positive-bg); border-color: color-mix(in srgb, var(--positive-ink) 45%, transparent); }
+  .leg { position:absolute; top:-7px; left:11px; padding:0 5px; font-size:8.5px; font-weight:700;
+         letter-spacing:.06em; text-transform:uppercase; color: var(--ink-2); line-height:13px;
+         display:flex; gap:3px; align-items:center;
+         background: linear-gradient(to bottom, var(--tray) 50%, var(--surface) 50%); }
+  .card.top .leg { color: var(--positive-ink);
+         background: linear-gradient(to bottom, var(--tray) 50%, var(--positive-bg) 50%); }
+  .txt { font-size:12.5px; line-height:1.36; color: var(--ink); }
+
+  /* states */
+  .st { display:none; } [data-state="cards"] .st-cards { display:block; }
+  [data-state="load"] .st-load { display:block; } [data-state="empty"] .st-empty { display:block; }
+  [data-state="error"] .st-error { display:block; }
+  .st-cards, .st-load, .st-empty, .st-error { height:100%; }
+  .dots { display:flex; gap:5px; align-items:center; justify-content:center; }
+  .dots i { width:7px; height:7px; border-radius:50%; display:block; background: var(--ink-3); animation: bounce 1s ease infinite; }
+  .dots i:nth-child(2) { animation-delay:.15s; } .dots i:nth-child(3) { animation-delay:.3s; }
+  @keyframes bounce { 0%,60%,100% { transform:translateY(0);} 30% { transform: translateY(-4px);} }
+  .sk { background: var(--surface); border:1px solid var(--hairline); border-radius:14px;
+        padding: 15px; display:flex; align-items:center; justify-content:center; }
+  .state-box { height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center;
+               gap:4px; padding: 0 26px; text-align:center; }
+  .state-h { font-size:13.5px; font-weight:700; color: var(--ink); }
+  .state-b { font-size:11.5px; color: var(--ink-2); }
+  .state-retry { margin-top:8px; font-family:inherit; font-size:12px; font-weight:600; color: var(--accent-text);
+                 background:transparent; border:1px solid var(--input-border); border-radius:12px;
+                 padding: 6px 16px; cursor:pointer; transition: all .15s ease; }
+  .state-retry:hover { background: var(--accent-soft); }
+
+  /* ============ sketch toolbar ============ */
+  #sketch-tools { position:fixed; bottom:12px; right:12px; z-index:9999; font-size:12px;
+                  background: rgba(12,16,20,.82); color:#fff; padding: 10px 12px; border-radius:10px;
+                  opacity:.5; transition: opacity .2s; display:flex; flex-direction:column; gap:8px;
+                  backdrop-filter: blur(6px); }
+  #sketch-tools:hover { opacity:1; }
+  .tool-row { display:flex; gap:6px; align-items:center; }
+  .tool-lab { font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:#9fb0c0; width:74px; }
+  #sketch-tools select { font-family:inherit; font-size:12px; background:#1d2630; color:#fff;
+                         border:1px solid #37445a; border-radius:6px; padding:3px 6px; }
+  .tool-btn { font-family:inherit; font-size:11px; background:#1d2630; color:#cfd8e3; border:1px solid #37445a;
+              border-radius:6px; padding: 3px 8px; cursor:pointer; transition: all .15s; }
+  .tool-btn:hover { border-color:#5a6c88; }
+  .tool-btn.on { background:#3E61C6; border-color:#3E61C6; color:#fff; }
+</style>
+</head>
+<body>
+
+<div id="variant-nav">
+  <div class="nav-row">
+    <span class="nav-title">Спустить всё вниз</span>
+    <button class="variant-tab" data-v="a" onclick="showVariant('a',this)">A · Тап по переписке</button>
+    <button class="variant-tab" data-v="b" onclick="showVariant('b',this)">B · Шеврон в шапке</button>
+    <button class="variant-tab" data-v="c" onclick="showVariant('c',this)">C · Клавиша-хамелеон</button>
+    <button class="variant-tab" data-v="d" onclick="showVariant('d',this)">D · Свернуть в полоску</button>
+    <button class="variant-tab active" data-v="e" onclick="showVariant('e',this)">E · Синтез: тап + ручка ★</button>
+  </div>
+  <div id="model-line"><b>Модель (дано):</b> клавиатура — только пока поле в фокусе; в остальное время в слоте живёт панель. Вопрос скетча: чем спустить ВСЁ (и панель, и клавиатуру), чтобы composer лёг на низ экрана — и чем вернуть панель обратно.</div>
+  <div id="caption"></div>
+</div>
+
+<div id="stage"></div>
+
+<div id="sketch-tools">
+  <div class="tool-row">
+    <span class="tool-lab">Тема</span>
+    <select onchange="document.getElementById('theme-link').href='../themes/'+this.value+'.css'">
+      <option value="default">Светлая (сегодня)</option>
+      <option value="ink-dark">«Чернильный» (тёмная)</option>
+    </select>
+  </div>
+  <div class="tool-row">
+    <span class="tool-lab">В слоте</span>
+    <button class="tool-btn on" data-sl="sg" onclick="setSlotAll('sg',this)">Подсказки</button>
+    <button class="tool-btn" data-sl="kb" onclick="setSlotAll('kb',this)">Клавиатура</button>
+    <button class="tool-btn" data-sl="none" onclick="setSlotAll('none',this)">Закрыто</button>
+  </div>
+  <div class="tool-row">
+    <span class="tool-lab">Состояние</span>
+    <button class="tool-btn on" data-st="cards" onclick="setStateAll('cards',this)">Ответы</button>
+    <button class="tool-btn" data-st="load" onclick="setStateAll('load',this)">Думает</button>
+    <button class="tool-btn" data-st="empty" onclick="setStateAll('empty',this)">Пусто</button>
+    <button class="tool-btn" data-st="error" onclick="setStateAll('error',this)">Ошибка</button>
+  </div>
+  <div class="tool-row">
+    <span class="tool-lab">Демо</span>
+    <button class="tool-btn" onclick="demoSwap()">Полный цикл</button>
+    <button class="tool-btn" onclick="demoIncoming()">＋ Входящее</button>
+  </div>
+</div>
+
+<script>
+/* ================= data ================= */
+const SUGGESTIONS = [
+  { i:'Цена',         t:'Букет из 25 пионов — 22 500 ₸. Успеем к 18:00, доставка по Алматы — 2 000 ₸. Оформляем? 🌸', top:true },
+  { i:'Доставка',     t:'Доставка сегодня возможна с 17:00 до 20:00, курьер позвонит за час до приезда.' },
+  { i:'Уточнение',    t:'Подскажите, пожалуйста, адрес — посчитаю точную стоимость и время доставки.' },
+  { i:'Альтернатива', t:'Есть похожий букет из 19 пионов за 18 900 ₸ — тоже очень пышный. Показать фото?' },
+];
+
+const CAPTIONS = {
+  a:`<b>A · Тап по переписке — ступенькой вниз.</b> Ноль нового UI. Тап по треду опускает то, что сверху, на одну ступень: клавиатура → панель, панель → всё закрыто. Первый тап из набора текста возвращает панель (она — жилец по умолчанию), второй прячет и её — composer ложится на низ. Вернуть панель — маленькая ✦ в конце поля (видна только, пока панель спрятана). <b>Смотрите на:</b> не будет ли случайных сворачиваний при тапах по треду, и считывается ли «двухступенчатость» без обучения.`,
+  b:`<b>B · Шеврон в шапке панели.</b> Явная кнопка ˅ в шапке справа (рядом с ↻): тап — слот схлопывается целиком, composer внизу. Тап по треду закрывает только клавиатуру — к панели, а не в ноль (сама панель от тапа по треду НЕ прячется — только ˅). Вернуть панель — ✦ в конце поля, появляется, когда панель спрятана. <b>Смотрите на:</b> читается ли ˅ как «спрятать панель», и не далеко ли тянуться к шапке слота ради частого жеста.`,
+  c:`<b>C · Клавиша-хамелеон в поле.</b> Одна клавиша в конце поля живёт ВСЕГДА, но меняет смысл: панель открыта → ˅ (спрятать всё, composer вниз); панель спрятана — в том числе пока печатаете — → ✦ (поднять панель). Тап по треду закрывает только клавиатуру. Один орган управления на оба направления, в одном и том же месте. <b>Смотрите на:</b> не смущает ли смена глифа ✦⇄˅ и хватает ли цели 27px для самого частого жеста в чате.`,
+  d:`<b>D · Свернуть в полоску.</b> Панель не исчезает совсем: ˅ в шапке схлопывает её в полоску 26px «✦ ПРЕДЛОЖЕНИЯ · 4» над самым низом; тап по полоске раскрывает обратно. В composer'е — ни одной иконки вообще: поле всегда чистое, все органы — на самой панели. Плата: composer не ложится на самый низ, под ним всегда 26px. <b>Смотрите на:</b> честная ли это цена за постоянную видимость подсказок и очевидный путь назад.`,
+  e:`<b>E · Синтез: тап + ручка + одна клавиша-хамелеон (раунд 4).</b> Тап по треду только ПОДНИМАЕТ панель; повторный тап ничего не прячет. Когда composer ВНИЗУ, тап по нему поднимает ПАНЕЛЬ — поле не фокусируется, клавиатура не открывается; тап по полю при открытой панели — уже клавиатура. В конце поля — ОДНА клавиша, показывающая, КУДА она ведёт (как кнопка эмодзи в WhatsApp): панель открыта → ⌨ (тап = клавиатура), в остальных состояниях → ✦ с зелёным тинтом (тап = подсказки). Под composer'ом — РУЧКА с тремя фиксациями: вниз — свёрнуто (composer на низу), середина — стандарт, вверх — все карточки без скролла. <b>Смотрите на:</b> не сбивает ли смена глифа ✦⇄⌨ в одной точке, и верна ли грамматика «глиф = пункт назначения» (альтернатива — «глиф = где вы сейчас»).`,
+};
+
+/* ================= svg ================= */
+const svg = {
+  back:   c=>`<svg class="tb-back" viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="${c}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  chev:   (c,s=15)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="${c}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  chevDn: (c,s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none"><path d="M5 9l7 7 7-7" stroke="${c}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  chevUp: (c,s=13)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none"><path d="M5 15l7-7 7 7" stroke="${c}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  kbd:    (c,s=17)=>`<svg style="width:${s}px;height:${s}px" viewBox="0 0 24 24" fill="none"><rect x="2" y="5.5" width="20" height="13" rx="2.4" stroke="${c}" stroke-width="1.7"/><path d="M6 9.5h.01M9.5 9.5h.01M13 9.5h.01M16.5 9.5h.01M6 12.8h.01M9.5 12.8h.01M13 12.8h.01M16.5 12.8h.01M8 15.8h8" stroke="${c}" stroke-width="1.9" stroke-linecap="round"/></svg>`,
+  refresh:(c,s=14)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none"><path d="M20 12a8 8 0 1 1-2.34-5.66" stroke="${c}" stroke-width="2.4" stroke-linecap="round"/><path d="M20 3v5h-5" stroke="${c}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  plus:   c=>`<svg class="comp-attach" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="${c}" stroke-width="1.9" stroke-linecap="round"/></svg>`,
+  send:   ()=>`<svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M3.5 12L21 3l-4.5 18-5.2-6.2L3.5 12z" fill="#fff"/></svg>`,
+  spark:  (c,s=11)=>`<svg style="width:${s}px;height:${s}px;flex:0 0 auto;vertical-align:-1px" viewBox="0 0 24 24"><path d="M12 2l2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4z" fill="${c}"/></svg>`,
+  sb:     c=>`<svg width="46" height="12" viewBox="0 0 46 12" fill="${c}"><rect x="0" y="6" width="2.5" height="5" rx="1"/><rect x="4" y="4" width="2.5" height="7" rx="1"/><rect x="8" y="2" width="2.5" height="9" rx="1"/><rect x="12" y="0" width="2.5" height="11" rx="1"/><path d="M20 5a7 7 0 0 1 9 0l-1.5 1.9a4.6 4.6 0 0 0-6 0z"/><circle cx="24.5" cy="9.5" r="1.6"/><rect x="33" y="2" width="11" height="8" rx="2.4" fill="none" stroke="${c}" stroke-width="1.1"/><rect x="34.5" y="3.5" width="6.5" height="5" rx="1.2"/><rect x="44.6" y="4.5" width="1.4" height="3" rx=".7"/></svg>`,
+};
+const esc = s => s.replace(/'/g,'’');
+
+/* ================= keyboard ================= */
+const KB_ROWS = ['йцукенгшщзхъ', 'фывапролджэ', 'ячсмитьбю'];
+function keyboard(){
+  const r1 = [...KB_ROWS[0]].map(k=>`<div class="key">${k}</div>`).join('');
+  const r2 = [...KB_ROWS[1]].map(k=>`<div class="key">${k}</div>`).join('');
+  const r3 = [...KB_ROWS[2]].map(k=>`<div class="key">${k}</div>`).join('');
+  return `
+  <div class="kb layer">
+    <div class="kb-acc">
+      <span class="kb-pred">Да</span><span class="kb-pred">Хорошо</span><span class="kb-pred">Спасибо</span>
+    </div>
+    <div class="kb-rows">
+      <div class="kb-row">${r1}</div>
+      <div class="kb-row r2">${r2}</div>
+      <div class="kb-row"><div class="key fn w40">⇧</div>${r3}<div class="key fn w40">⌫</div></div>
+      <div class="kb-row">
+        <div class="key fn w38">123</div><div class="key fn w40">🌐</div>
+        <div class="key space">пробел</div><div class="key fn ret">Ввод</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ================= suggestion pieces (locked chassis A + cards P) ================= */
+const cardsHTML = () => `<div class="cards">` + SUGGESTIONS.map(s=>`
+  <div class="card${s.top?' top':''}" onclick="pick(this,'${esc(s.t)}')">
+    <span class="leg">${s.top? svg.spark('var(--positive-ink)',9) : ''}${s.i}</span>
+    <div class="txt">${s.t}</div>
+  </div>`).join('') + `</div>`;
+
+const skHTML = () => `<div class="cards">` + Array.from({length:3},()=>`
+  <div class="sk"><div class="dots"><i></i><i></i><i></i></div></div>`).join('') + `</div>`;
+
+const EMPTY = `<div class="state-box"><div class="state-h">Нет предложений</div><div class="state-b">Напишите ответ вручную</div></div>`;
+const ERROR = `<div class="state-box"><div class="state-h">Не удалось загрузить</div><div class="state-b">Проверьте соединение и попробуйте снова</div><button class="state-retry" onclick="refreshFrame(this)">Обновить</button></div>`;
+
+function viewport(){
+  return `
+  <div class="fixwrap">
+    <div class="st st-cards" style="position:relative;height:100%">
+      <div class="fix">${cardsHTML()}</div><div class="fade"></div>
+    </div>
+    <div class="st st-load"><div class="fix">${skHTML()}</div></div>
+    <div class="st st-empty">${EMPTY}</div>
+    <div class="st st-error">${ERROR}</div>
+  </div>`;
+}
+
+/* header «‹ ✦ ПРЕДЛОЖЕНИЯ … ↻ [˅]» — collapse chevron only in variants B and D */
+const headRow = (collapse=false) => `
+  <div class="sg-head">
+    <span class="icobtn" onclick="flash(this)">${svg.chev('var(--ink-2)')}</span>
+    ${svg.spark('var(--positive-ink)',11)}<span class="sg-title">Предложения</span>
+    <span class="icobtn right" onclick="refreshFrame(this)">${svg.refresh('var(--ink-2)')}</span>
+    ${collapse ? `<span class="icobtn" onclick="slot(this,'none')" title="Спрятать">${svg.chevDn('var(--ink-2)')}</span>` : ''}
+  </div>`;
+
+const panel = (collapse=false) => `<div class="sg layer" data-state="cards">${headRow(collapse)}${viewport()}</div>`;
+
+/* E: the panel wears a draggable handle on its top edge, right under the composer */
+const panelE = () => `<div class="sg layer" data-state="cards">
+  <div class="grabrow" onpointerdown="grabStart(this, event)" title="Потяните вверх или вниз"><i></i></div>
+  ${headRow(false)}${viewport()}</div>`;
+
+/* peek strip — variant D's collapsed form */
+const peek = () => `
+  <div class="pk layer" onclick="slot(this,'sg')" title="Развернуть подсказки">
+    ${svg.spark('var(--positive-ink)',10)}<span class="pk-title">Предложения</span><span class="pk-count">· 4</span>
+    <span class="pk-up">${svg.chevUp('var(--ink-3)')}</span>
+  </div>`;
+
+/* ================= frames ================= */
+function frame(id){
+  const key = id==='d' ? '' : id==='e' ? `
+    <span class="comp-key" title="Подсказки / клавиатура" onclick="event.stopPropagation();keyTap(this)">
+      <span class="ic-sp">${svg.spark('var(--positive-ink)',16)}</span><span class="ic-kb">${svg.kbd('var(--ink-3)',17)}</span>
+    </span>` : `
+    <span class="comp-key" onclick="event.stopPropagation();keyTap(this)">
+      <span class="ic-sp">${svg.spark('var(--positive-ink)',17)}</span><span class="ic-dn">${svg.chevDn('var(--positive-ink)',17)}</span>
+    </span>`;
+  return `
+  <div class="variant${id==='e'?' active':''}" id="variant-${id}">
+    <div class="phone" data-frame="${id}" data-slot="sg">
+      <div class="statusbar"><span>14:05</span><span class="sb-icons">${svg.sb('currentColor')}</span></div>
+      <div class="topbar">
+        ${svg.back('var(--ink)')}
+        <div class="tb-ava">А</div>
+        <div class="tb-col"><span class="tb-name">Айгерим</span><span class="tb-sub">в сети</span></div>
+        <div class="sw" onclick="toggleMode(this)" title="Режим ответа: Вместе / Авто">
+          <span class="sw-faint l">Вместе</span><span class="sw-faint r">Авто</span>
+          <span class="sw-thumb"><span class="lab-s">Вместе</span><span class="lab-a">Авто</span></span>
+        </div>
+      </div>
+      <div class="chat" onclick="chatTap(this)">
+        <div class="msgs">
+          <div class="datepill">Сегодня</div>
+          <div class="bubble in">Здравствуйте! А есть букеты из пионов?<span class="t">13:58</span></div>
+          <div class="bubble out">Добрый день! Да, есть 🌸 Какой бюджет рассматриваете?<span class="t">13:59 <span class="ticks">✓✓</span></span></div>
+          <div class="bubble in">До 25 000 тг. И можно доставку сегодня к 18:00?<span class="t">14:02</span></div>
+        </div>
+      </div>
+      <div class="composer">
+        ${svg.plus('var(--ink-3)')}
+        <div class="comp-input" onclick="focusInput(this)"><span class="input-text">Сообщение</span>${key}</div>
+        <div class="comp-send">${svg.send()}</div>
+      </div>
+      <div class="slot">${keyboard()}${id==='e' ? panelE() : panel(id==='b' || id==='d')}${id==='d' ? peek() : ''}</div>
+      <div class="homebar"><i></i></div>
+    </div>
+  </div>`;
+}
+
+/* ================= build ================= */
+document.getElementById('stage').innerHTML =
+  frame('a') + frame('b') + frame('c') + frame('d') + frame('e');
+document.getElementById('caption').innerHTML = CAPTIONS.e;
+
+/* deep-link: ?v=a|b|c|d&theme=ink-dark&sl=kb|sg|none|peek&st=cards|load|empty|error */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const v = q.get('v'), th = q.get('theme'), sl = q.get('sl'), st = q.get('st');
+  if (th) { document.getElementById('theme-link').href = '../themes/' + th + '.css';
+            const sel = document.querySelector('#sketch-tools select'); if (sel) sel.value = th; }
+  if (v && CAPTIONS[v]) showVariant(v, document.querySelector(`.variant-tab[data-v="${v}"]`));
+  if (sl) setSlotAll(sl, document.querySelector(`#sketch-tools [data-sl="${sl==='peek'?'none':sl}"]`));
+  if (st) setStateAll(st, document.querySelector(`#sketch-tools [data-st="${st}"]`));
+})();
+
+/* ================= interactions ================= */
+function showVariant(id, btn){
+  document.querySelectorAll('.variant').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.variant-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('variant-'+id).classList.add('active');
+  btn.classList.add('active');
+  document.getElementById('caption').innerHTML = CAPTIONS[id];
+}
+
+/* ================= state machine ================= */
+/* the model: kb only while the field is focused; sg is the DEFAULT tenant; none = deliberately collapsed;
+   sgx (E only) = expanded to full card height — the handle's upper detent */
+function setSlot(ph, mode){
+  if (ph.dataset.frame === 'd' && mode === 'none') mode = 'peek';     // D never fully vanishes
+  if (ph.dataset.frame !== 'd' && mode === 'peek') mode = 'none';
+  if (ph.dataset.frame !== 'e' && mode === 'sgx') mode = 'sg';
+  // sgx has no CSS height rule (it is content-driven) — the inline height IS the state
+  ph.querySelector('.slot').style.height = (mode === 'sgx') ? expandedHeight(ph) + 'px' : '';
+  ph.dataset.slot = mode;
+  ph.querySelector('.comp-input').classList.toggle('focus', mode === 'kb');
+}
+
+/* E: full-content height — grabber + header + every card, capped so a strip of thread survives */
+function expandedHeight(ph){
+  const fix = ph.querySelector('.sg .st-cards .fix');
+  return Math.min(14 + 32 + (fix ? fix.scrollHeight : 300), 470);
+}
+
+/* E: the handle — live drag between 0 and expanded, snap to the nearest of three detents */
+function grabStart(el, ev){
+  ev.preventDefault();
+  const ph = el.closest('.phone');
+  const slotEl = ph.querySelector('.slot');
+  const exp = expandedHeight(ph);
+  const startY = ev.clientY;
+  const startH = slotEl.getBoundingClientRect().height;
+  ph.classList.add('dragging');
+  try { el.setPointerCapture(ev.pointerId); } catch(_){}
+  const move = e => {
+    slotEl.style.height = Math.max(0, Math.min(exp, startH + (startY - e.clientY))) + 'px';
+  };
+  const up = () => {
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    window.removeEventListener('pointercancel', up);
+    const h = slotEl.getBoundingClientRect().height;
+    ph.classList.remove('dragging');
+    slotEl.style.height = '';
+    const detents = [[0,'none'],[244,'sg'],[exp,'sgx']];
+    detents.sort((p,q)=>Math.abs(p[0]-h)-Math.abs(q[0]-h));
+    setSlot(ph, detents[0][1]);
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+  window.addEventListener('pointercancel', up);
+}
+const slot = (el, mode) => setSlot(el.closest('.phone'), mode);
+
+/* E: a tap on the LOWERED composer raises the PANEL, not the keyboard — the field is not
+   focused; only a tap on the field while the panel is already up focuses it (second step) */
+function focusInput(el){
+  const ph = el.closest('.phone');
+  if (ph.dataset.frame === 'e' && !ph.classList.contains('auto') && ph.dataset.slot === 'none'){
+    setSlot(ph, 'sg'); return;
+  }
+  setSlot(ph, 'kb');
+}
+
+
+/* tap on the thread: blur first; in A it also steps the panel down (kb → sg → none);
+   in E it only ever RAISES — keyboard → panel, collapsed → panel, open panel stays put */
+function chatTap(el){
+  const ph = el.closest('.phone');
+  const s = ph.dataset.slot;
+  if (ph.classList.contains('auto')) { if (s === 'kb') setSlot(ph, 'none'); return; }
+  if (s === 'kb') setSlot(ph, 'sg');
+  else if (ph.dataset.frame === 'a' && s === 'sg') setSlot(ph, 'none');
+  else if (ph.dataset.frame === 'e' && s === 'none') setSlot(ph, 'sg');
+}
+
+/* composer key: A/B — pure entry (✦); C — chameleon (✦ raises, ˅ collapses);
+   E — one key showing the DESTINATION: panel up → keyboard, otherwise → panel */
+function keyTap(el){
+  const ph = el.closest('.phone'), s = ph.dataset.slot;
+  if (ph.dataset.frame === 'c' && s === 'sg') setSlot(ph, 'none');
+  else if (ph.dataset.frame === 'e') setSlot(ph, (s === 'sg' || s === 'sgx') ? 'kb' : 'sg');
+  else setSlot(ph, 'sg');
+}
+
+function toggleMode(sw){
+  const ph = sw.closest('.phone');
+  ph.classList.toggle('auto');
+  if (ph.classList.contains('auto')) { ph.dataset.slot = 'none';       // Авто: панели нет вовсе (и не peek)
+    ph.querySelector('.comp-input').classList.remove('focus'); }
+  else setSlot(ph, 'sg');                                              // назад во «Вместе» — панель по умолчанию
+}
+
+function setSlotAll(mode, btn){
+  document.querySelectorAll('.phone').forEach(ph=>setSlot(ph, mode));
+  document.querySelectorAll('#sketch-tools [data-sl]').forEach(b=>b.classList.toggle('on', b===btn));
+}
+function setStateAll(st, btn){
+  document.querySelectorAll('.sg').forEach(z=>z.dataset.state = st);
+  document.querySelectorAll('#sketch-tools [data-st]').forEach(b=>b.classList.toggle('on', b===btn));
+}
+
+const timers = new WeakMap();
+function pick(el, text){
+  const ph = el.closest('.phone');
+  const input = ph.querySelector('.comp-input');
+  input.querySelector('.input-text').textContent = text;
+  input.classList.add('filled');
+  const send = ph.querySelector('.comp-send');
+  send.classList.remove('pulse'); void send.offsetWidth; send.classList.add('pulse');
+  // locked flow (2026-08-11): a pick must NOT open the keyboard — the thread stays visible
+  setSlot(ph, 'none');
+  clearTimeout(timers.get(ph));
+  timers.set(ph, setTimeout(()=>{                              // reset so the demo can be replayed
+    input.querySelector('.input-text').textContent = 'Сообщение';
+    input.classList.remove('filled');
+    setSlot(ph, 'sg');
+  }, 2400));
+}
+
+function refreshFrame(el){
+  const z = el.closest('.sg');
+  z.dataset.state = 'load';
+  clearTimeout(timers.get(z));
+  timers.set(z, setTimeout(()=>{ z.dataset.state = 'cards'; }, 950));
+}
+function flash(el){ el.style.background = 'color-mix(in srgb, var(--ink) 16%, transparent)';
+                    setTimeout(()=>el.style.background = '', 180); }
+
+/* full cycle: panel → keyboard (focus) → panel (thread tap) → collapsed (the mechanism) → panel;
+   E adds the expanded detent before collapsing */
+function demoSwap(){
+  const ph = document.querySelector('.variant.active .phone');
+  if (!ph) return;
+  const seq = ph.dataset.frame === 'e'
+    ? [['sg',0],['kb',900],['sg',1900],['sgx',2900],['none',4300],['sg',5400]]
+    : [['sg',0],['kb',900],['sg',1900],['none',2900],['sg',4200]];
+  seq.forEach(([m,d])=>setTimeout(()=>setSlot(ph,m), d));
+}
+
+/* an incoming message raises the panel with fresh cards — unless the owner is typing */
+function demoIncoming(){
+  const ph = document.querySelector('.variant.active .phone');
+  if (!ph || ph.classList.contains('auto')) return;
+  const msgs = ph.querySelector('.msgs');
+  if (msgs.children.length > 7) msgs.children[1].remove();
+  const b = document.createElement('div');
+  b.className = 'bubble in';
+  b.innerHTML = 'А открытку к букету можно добавить?<span class="t">14:07</span>';
+  msgs.appendChild(b);
+  const z = ph.querySelector('.sg');
+  z.dataset.state = 'load';
+  if (ph.dataset.slot !== 'kb' && ph.dataset.slot !== 'sgx') setSlot(ph, 'sg');
+  clearTimeout(timers.get(z));
+  timers.set(z, setTimeout(()=>{ z.dataset.state = 'cards'; }, 900));
+}
+</script>
+</body>
+</html>
