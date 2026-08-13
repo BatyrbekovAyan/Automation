@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 007 — Карточка товара/услуги в настройках бота</title>
+<style>
+  /* Fallback = ink-dark tokens (copy of ../themes/ink-dark.css). Applies only when the
+     linked theme file can't load (e.g. data:-snapshot preview); the <link> below wins
+     the cascade whenever it loads, so the theme switcher keeps working. */
+  :root {
+    --bg:#0E1116; --surface:#171C24; --hairline:#242C38; --border:#333E4E; --input-border:#556882;
+    --ink:#ECF0F6; --ink-2:#9AA6B8; --ink-3:#79869A;
+    --accent-fill:#3E61C6; --accent-text:#5981D6; --accent-on-fill:#FFFFFF; --accent-soft:#1E2A44;
+    --positive-bg:#123324; --positive-ink:#57DE95; --destructive:#F2555A;
+    --wa-green:#25D366; --switch-on:#34C759;
+    --shadow-sm:0 1px 2px rgba(0,0,0,.35); --shadow-md:0 4px 14px rgba(0,0,0,.45); --shadow-up:0 -6px 20px rgba(0,0,0,.45);
+    --page-bg:#12161C; --page-surface:#1A2028; --page-ink:#E2E8F0; --page-ink-2:#93A1B3; --page-line:#2A3340;
+  }
+</style>
+<link rel="stylesheet" href="../themes/ink-dark.css" id="theme-link">
+<style>
+  /* ============ page chrome ============ */
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, 'SF Pro Text', Roboto, 'Segoe UI', system-ui, sans-serif;
+    background: var(--page-bg); color: var(--page-ink);
+    padding: 128px 16px 40px; display:flex; flex-direction:column; align-items:center;
+    transition: background .2s;
+  }
+  #variant-nav {
+    position: fixed; top:0; left:0; right:0; z-index: 9998;
+    background: var(--page-surface); border-bottom: 1px solid var(--page-line);
+    padding: 10px 16px 8px; display:flex; flex-direction:column; gap:6px;
+  }
+  .nav-row { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  .nav-title { font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--page-ink-2); margin-right:8px; }
+  .variant-tab {
+    font-family: inherit; font-size:13px; padding:6px 12px; border-radius: 8px;
+    border:1px solid var(--page-line); background:transparent; color:var(--page-ink);
+    cursor:pointer; transition: all .15s ease;
+  }
+  .variant-tab:hover { border-color: var(--page-ink-2); }
+  .variant-tab.active { background: var(--page-ink); color: var(--page-bg); border-color: var(--page-ink); }
+  #caption { font-size:12.5px; line-height:1.45; color: var(--page-ink-2); max-width:840px; }
+  #caption b { color: var(--page-ink); }
+
+  .variant { display:none; } .variant.active { display:block; }
+
+  /* ============ phone frame (per sketch 006 conventions) ============ */
+  .phone {
+    width: 360px; height: 762px; border-radius: 34px; overflow: hidden;
+    border: 9px solid #0B0D10; box-shadow: 0 18px 50px rgba(0,0,0,.28);
+    display:flex; flex-direction:column; background: var(--bg); position:relative;
+  }
+  .statusbar {
+    height: 26px; background: var(--bg); display:flex; align-items:center;
+    justify-content:space-between; padding: 2px 16px 0; font-size:11.5px; font-weight:600; color:var(--ink);
+    flex: 0 0 auto;
+  }
+  .pagehead {
+    flex:0 0 auto; display:flex; align-items:center; gap:10px;
+    padding: 8px 13px 6px; background: var(--bg);
+  }
+  .backchev { color: var(--accent-text); display:flex; cursor:pointer; }
+  .pagehead h1 { font-size:19px; font-weight:700; color:var(--ink); letter-spacing:-.3px; }
+
+  /* bot-settings tab bar: Основное | Бизнес | Продукты | Услуги | Промпты */
+  .tabbar { flex:0 0 auto; display:flex; background: var(--bg); padding: 0 6px;
+            border-bottom: 1px solid var(--hairline); }
+  .tab { flex:1 1 auto; text-align:center; font-size:11px; font-weight:600; color:var(--ink-3);
+         padding: 8px 2px 9px; position:relative; cursor:default; white-space:nowrap; }
+  .tab.live { cursor:pointer; }
+  .tab.active { color: var(--accent-text); }
+  .tab.active::after { content:''; position:absolute; left:14%; right:14%; bottom:0; height:2.5px;
+                       border-radius: 2px 2px 0 0; background: var(--accent-text); }
+
+  .listwrap { flex:1 1 auto; min-height:0; overflow-y:auto; padding: 12px 13px 20px; }
+
+  .seccount { font-size:11px; font-weight:600; letter-spacing:.05em; text-transform:uppercase;
+              color:var(--ink-3); padding: 0 2px 8px; }
+
+  /* ============ shared bits ============ */
+  .pressable { cursor:pointer; transition: transform .12s ease, filter .15s ease, background .15s ease; }
+  .pressable:hover { filter: brightness(1.03); }
+  .pressable:active { transform: scale(.985); }
+
+  .mono { width:40px; height:40px; border-radius:12px; flex:0 0 auto;
+          display:flex; align-items:center; justify-content:center;
+          font-size:16px; font-weight:700; }
+
+  .price-num { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; white-space:nowrap; }
+
+  /* empty state (shared skeleton, per-variant CTA) */
+  .empty { display:flex; flex-direction:column; align-items:center; text-align:center;
+           padding: 64px 28px 24px; gap: 6px; }
+  .empty svg { color: var(--ink-3); opacity:.7; margin-bottom: 8px; }
+  .empty h3 { font-size:15px; font-weight:700; color:var(--ink); }
+  .empty p { font-size:12px; line-height:1.5; color:var(--ink-3); max-width: 230px; }
+  .empty .cta { margin-top:14px; height:40px; padding: 0 18px; border-radius: 20px;
+                background: var(--accent-fill); color: var(--accent-on-fill);
+                font-size:13px; font-weight:600; display:flex; align-items:center; gap:6px; }
+
+  /* ============ BASELINE: today's card ============ */
+  .b0-list { display:flex; flex-direction:column; gap: 9px; }
+  .b0-card { background: var(--surface); border-radius: 8px; box-shadow: var(--shadow-sm);
+             height: 67px; display:flex; align-items:center; padding: 0 12px 0 8px; gap: 9px; }
+  .b0-thumb { width:53px; height:53px; border-radius: 8px; background: var(--bg); flex:0 0 auto;
+              display:flex; align-items:center; justify-content:center; color: var(--ink-3); }
+  .b0-info { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2px; }
+  .b0-name { font-size:15px; font-weight:700; color:var(--ink);
+             white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .b0-desc { font-size:12px; color:var(--ink-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .b0-price { flex:0 0 auto; font-size:13px; font-weight:700; color:var(--ink); }
+  .b0-chev { flex:0 0 auto; color:var(--ink-3); display:flex; margin-left:2px; }
+  .b0-add { border: 1.5px dashed var(--border); border-radius: 8px; height: 52px;
+            display:flex; align-items:center; justify-content:center; gap:6px;
+            color: var(--ink-2); font-size:13.5px; font-weight:600; background:transparent; }
+
+  /* ============ A: «Реестр» — grouped hairline list ============ */
+  .a-group { background: var(--surface); border-radius: 14px; box-shadow: var(--shadow-sm); overflow:hidden; }
+  .a-row { display:flex; align-items:center; gap: 12px; padding: 12px 14px; position:relative; }
+  .a-row + .a-row::before, .a-addrow::before {
+    content:''; position:absolute; left:14px; right:0; top:0; height:1px; background: var(--hairline); }
+  .a-info { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2.5px; }
+  .a-name { font-size:14.5px; font-weight:600; color:var(--ink);
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .a-desc { font-size:11.5px; color:var(--ink-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .a-price { flex:0 0 auto; font-size:14px; font-weight:700; color:var(--ink); }
+  .a-addrow { display:flex; align-items:center; justify-content:center; gap:6px; padding: 13px 14px;
+              color: var(--accent-text); font-size:13.5px; font-weight:600; position:relative; }
+
+  /* ============ B: «Ценник» — monogram + price pill ============ */
+  .b-list { display:flex; flex-direction:column; gap: 9px; }
+  .b-card { background: var(--surface); border-radius: 13px; box-shadow: var(--shadow-sm);
+            display:flex; align-items:center; gap: 11px; padding: 12px 12px 12px 12px; min-height: 64px; }
+  .b-info { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:3px; }
+  .b-name { font-size:14px; font-weight:650; color:var(--ink); line-height:1.25;
+            display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .b-desc { font-size:11.5px; color:var(--ink-3); line-height:1.35;
+            display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .b-pill { flex:0 0 auto; align-self:center; height: 24px; padding: 0 10px; border-radius: 12px;
+            background: var(--accent-soft); color: var(--accent-text);
+            font-size:12px; font-weight:700; display:inline-flex; align-items:center; }
+  .b-add { border: 1.5px dashed var(--border); border-radius: 13px; height: 52px;
+           display:flex; align-items:center; justify-content:center; gap:6px;
+           color: var(--accent-text); font-size:13.5px; font-weight:600; background:transparent; }
+
+  /* ============ C: «Витрина» — 2-column grid ============ */
+  .c-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+  .c-card { background: var(--surface); border-radius: 14px; box-shadow: var(--shadow-sm);
+            overflow:hidden; display:flex; flex-direction:column; }
+  .c-hero { height: 84px; display:flex; align-items:center; justify-content:center;
+            font-size:26px; font-weight:700; }
+  .c-body { padding: 9px 12px 12px; display:flex; flex-direction:column; gap:4px; flex:1; }
+  .c-name { font-size:12.5px; font-weight:600; color:var(--ink); line-height:1.3; min-height: 2.6em;
+            display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .c-price { font-size:14.5px; font-weight:750; color:var(--ink); margin-top:auto; }
+  .c-add { border: 1.5px dashed var(--border); border-radius: 14px; min-height: 148px;
+           display:flex; flex-direction:column; align-items:center; justify-content:center; gap:7px;
+           color: var(--accent-text); font-size:12.5px; font-weight:600; background:transparent; }
+  .c-add .plusring { width:34px; height:34px; border-radius:50%; background: var(--accent-soft);
+                     display:flex; align-items:center; justify-content:center; }
+
+  /* ============ edit sheet mock (shared) ============ */
+  .sheet-scrim { position:absolute; inset:0; background: rgba(0,0,0,.45); opacity:0;
+                 pointer-events:none; transition: opacity .22s ease; z-index: 40; }
+  .sheet { position:absolute; left:0; right:0; bottom:0; z-index:41;
+           background: var(--surface); border-radius: 18px 18px 0 0;
+           padding: 8px 16px 18px; transform: translateY(105%); transition: transform .25s ease;
+           box-shadow: var(--shadow-up); }
+  .phone.sheet-open .sheet { transform: translateY(0); }
+  .phone.sheet-open .sheet-scrim { opacity:1; pointer-events:auto; }
+  .sheet .handle { width:36px; height:4px; border-radius:2px; background: var(--border); margin: 0 auto 12px; }
+  .sheet h2 { font-size:16px; font-weight:700; color:var(--ink); margin-bottom: 12px; }
+  .sheet label { display:block; font-size:11px; font-weight:600; letter-spacing:.04em;
+                 text-transform:uppercase; color:var(--ink-3); margin: 10px 2px 5px; }
+  .sheet input, .sheet textarea {
+    width:100%; background: var(--bg); border:1px solid var(--hairline); border-radius: 10px;
+    padding: 10px 12px; font-size:14px; color: var(--ink); font-family:inherit; outline:none;
+    transition: border-color .15s ease; resize:none;
+  }
+  .sheet input:focus, .sheet textarea:focus { border-color: var(--input-border); }
+  .sheet .pricewrap { position:relative; }
+  .sheet .pricewrap::after { content:'₸'; position:absolute; right:12px; top:50%; transform:translateY(-50%);
+                             color: var(--ink-3); font-size:14px; }
+  .sheet .done { margin-top:16px; width:100%; height:46px; border-radius: 12px; border:none;
+                 background: var(--accent-fill); color: var(--accent-on-fill);
+                 font-size:15px; font-weight:600; font-family:inherit; cursor:pointer; }
+  .sheet .done:active { transform: scale(.99); }
+  .sheet .del { margin-top:8px; width:100%; height:38px; border-radius:12px; border:none; background:transparent;
+                color: var(--destructive); font-size:13.5px; font-weight:600; font-family:inherit; cursor:pointer; }
+
+  /* ============ sketch toolbar ============ */
+  #sketch-tools {
+    position:fixed; bottom:12px; right:12px; z-index:9999; font-family:system-ui; font-size:12px;
+    background:rgba(0,0,0,0.72); color:#fff; padding:8px 12px; border-radius:8px;
+    opacity:0.45; transition:opacity .2s; display:flex; gap:8px; align-items:center;
+  }
+  #sketch-tools:hover { opacity:1; }
+  #sketch-tools select, #sketch-tools button {
+    font-family:inherit; font-size:12px; background:#1c1c1e; color:#fff;
+    border:1px solid #3a3a3c; border-radius:6px; padding:3px 7px; cursor:pointer;
+  }
+</style>
+</head>
+<body>
+
+<div id="variant-nav">
+  <div class="nav-row">
+    <span class="nav-title">Sketch 007 · Карточка товара/услуги</span>
+    <button class="variant-tab active" onclick="showVariant('base', this)">Baseline: Сегодня</button>
+    <button class="variant-tab" onclick="showVariant('a', this)">A: Реестр</button>
+    <button class="variant-tab" onclick="showVariant('b', this)">B: Ценник</button>
+    <button class="variant-tab" onclick="showVariant('c', this)">C: Витрина</button>
+  </div>
+  <div id="caption"></div>
+</div>
+
+<!-- variants are stamped from this template by JS -->
+<div id="variants-host"></div>
+
+<template id="phone-tpl">
+  <div class="phone">
+    <div class="statusbar"><span>9:41</span><span>●●●● ᯤ ▮</span></div>
+    <div class="pagehead">
+      <span class="backchev">
+        <svg width="11" height="18" viewBox="0 0 11 18" fill="none"><path d="M9 2L3 9l6 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <h1>Настройки бота</h1>
+    </div>
+    <div class="tabbar">
+      <div class="tab">Основное</div>
+      <div class="tab">Бизнес</div>
+      <div class="tab live" data-kind="products">Продукты</div>
+      <div class="tab live" data-kind="services">Услуги</div>
+      <div class="tab">Промпты</div>
+    </div>
+    <div class="listwrap"><div class="listbody"></div></div>
+
+    <div class="sheet-scrim"></div>
+    <div class="sheet">
+      <div class="handle"></div>
+      <h2 class="sheet-title">Товар</h2>
+      <label>Название</label>
+      <input class="f-name" type="text">
+      <label>Цена</label>
+      <div class="pricewrap"><input class="f-price" type="text" inputmode="numeric"></div>
+      <label>Описание</label>
+      <textarea class="f-desc" rows="2"></textarea>
+      <button class="done">Готово</button>
+      <button class="del">Удалить</button>
+    </div>
+  </div>
+</template>
+
+<div id="sketch-tools">
+  <span>Тема</span>
+  <select onchange="document.getElementById('theme-link').href='../themes/'+this.value+'.css'">
+    <option value="ink-dark">Тёмная (дефолт)</option>
+    <option value="default">Светлая</option>
+  </select>
+  <button onclick="clearList()">Очистить список</button>
+  <button onclick="resetData()">Сбросить данные</button>
+</div>
+
+<script>
+/* ================= data (shared across variants) ================= */
+const DEFAULT_DATA = {
+  products: [
+    { name: 'Колодки Bosch передние',            price: 18500, desc: 'Toyota Camry 50/55, керамика' },
+    { name: 'Масло Mobil 1 ESP 5W-30, 4 л',      price: 24900, desc: 'Оригинал, допуск MB 229.51' },
+    { name: 'Фильтр воздушный MANN C25114',      price: 6200,  desc: '' },
+    { name: 'Аккумулятор Varta Blue 60 Ач',      price: 42000, desc: 'Гарантия 2 года, обмен старого' },
+    { name: 'Свечи NGK Laser Iridium, 4 шт',     price: 16800, desc: 'Комплект на моторы 1.6–2.0 л' },
+  ],
+  services: [
+    { name: 'Замена масла и фильтра',   price: 5000,  desc: '≈30 минут, масло клиента' },
+    { name: 'Диагностика ходовой',      price: 8000,  desc: 'Подъёмник, отчёт с фото' },
+    { name: 'Замена тормозных колодок', price: 12000, desc: 'Цена за одну ось' },
+    { name: 'Развал-схождение 3D',      price: 15000, desc: '' },
+  ],
+};
+let data = JSON.parse(JSON.stringify(DEFAULT_DATA));
+let kind = 'products';                       // products | services — shared by all variants
+
+const CAPTIONS = {
+  base: '<b>Сегодня.</b> Строка-«настройка»: серый квадрат-заглушка (фото у товаров в данных нет), имя + описание в одну строку, цена мелко у шеврона. Точка отсчёта — сравнивайте остальные с ней.',
+  a: '<b>А «Реестр».</b> Муляж-иконка удалена совсем. Одна сгруппированная карточка, строки через hairline — плотный спокойный список «как Настройки/Wallet». Цена — табличные цифры справа, самый тихий и самый ёмкий вариант: ~8 позиций на экран.',
+  b: '<b>B «Ценник».</b> Отдельные карточки остаются, но квадрат-заглушку заменяет цветная монограмма (детерминированный цвет от названия), а цена становится пилюлей-ценником. Имя и описание могут занимать 2 строки. «Тёплый каталог».',
+  c: '<b>C «Витрина».</b> Сетка 2 колонки, как мини-маркетплейс: цветная зона с монограммой сверху, название, крупная цена. Описание в карточке не показывается (только в редакторе). Заодно отвечает на вопрос «нужны ли товарам фото» — зона под них уже есть.',
+};
+
+/* ================= monogram palette ================= */
+const HUES = ['#E4572E', '#2E86AB', '#7E52A0', '#1B998B', '#C1666B', '#6A8532'];
+function hueFor(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return HUES[h % HUES.length];
+}
+function monoStyle(name) {
+  const c = hueFor(name);
+  return `background: color-mix(in srgb, ${c} 22%, var(--surface));` +
+         `color: color-mix(in srgb, ${c} 72%, var(--ink));`;
+}
+
+const fmt = n => n.toLocaleString('ru-RU') + ' ₸';
+const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const addLabel = () => kind === 'products' ? 'Добавить товар' : 'Добавить услугу';
+const nounEmpty = () => kind === 'products'
+  ? ['Пока нет товаров', 'Добавьте товары — бот будет предлагать их клиентам и называть точные цены.']
+  : ['Пока нет услуг', 'Добавьте услуги — бот будет рассказывать о них клиентам и называть точные цены.'];
+
+const PLUS = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1.5v11M1.5 7h11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+const CHEV = '<svg width="7" height="12" viewBox="0 0 7 12" fill="none"><path d="M1 1l5 5-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const PHOTO = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="15" rx="2.5" stroke="currentColor" stroke-width="1.7"/><circle cx="9" cy="10.5" r="1.6" fill="currentColor"/><path d="M4 17l4.5-4 3.5 3 3.5-3.5L20 17" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>';
+const BOX = '<svg width="44" height="44" viewBox="0 0 24 24" fill="none"><path d="M3.5 7.5L12 3l8.5 4.5v9L12 21l-8.5-4.5v-9z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M3.5 7.5L12 12l8.5-4.5M12 12v9" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+
+/* ================= renderers ================= */
+function emptyHtml() {
+  const [h, p] = nounEmpty();
+  return `<div class="empty">${BOX}<h3>${h}</h3><p>${p}</p>
+    <div class="cta pressable" onclick="addItem(this)">${PLUS}<span>${addLabel()}</span></div></div>`;
+}
+
+const RENDER = {
+  base(items) {
+    if (!items.length) return emptyHtml();
+    const rows = items.map((it, i) => `
+      <div class="b0-card pressable" onclick="openSheet(this, ${i})">
+        <div class="b0-thumb">${PHOTO}</div>
+        <div class="b0-info">
+          <div class="b0-name">${esc(it.name)}</div>
+          ${it.desc ? `<div class="b0-desc">${esc(it.desc)}</div>` : ''}
+        </div>
+        <div class="b0-price price-num">${fmt(it.price)}</div>
+        <div class="b0-chev">${CHEV}</div>
+      </div>`).join('');
+    return `<div class="b0-list">${rows}
+      <div class="b0-add pressable" onclick="addItem(this)">${PLUS}<span>${addLabel()}</span></div></div>`;
+  },
+
+  a(items) {
+    if (!items.length) return emptyHtml();
+    const rows = items.map((it, i) => `
+      <div class="a-row pressable" onclick="openSheet(this, ${i})">
+        <div class="a-info">
+          <div class="a-name">${esc(it.name)}</div>
+          ${it.desc ? `<div class="a-desc">${esc(it.desc)}</div>` : ''}
+        </div>
+        <div class="a-price price-num">${fmt(it.price)}</div>
+      </div>`).join('');
+    const count = kind === 'products'
+      ? `${items.length} ${plural(items.length, 'товар', 'товара', 'товаров')}`
+      : `${items.length} ${plural(items.length, 'услуга', 'услуги', 'услуг')}`;
+    return `<div class="seccount">${count}</div>
+      <div class="a-group">${rows}
+        <div class="a-addrow pressable" onclick="addItem(this)">${PLUS}<span>${addLabel()}</span></div>
+      </div>`;
+  },
+
+  b(items) {
+    if (!items.length) return emptyHtml();
+    const rows = items.map((it, i) => `
+      <div class="b-card pressable" onclick="openSheet(this, ${i})">
+        <div class="mono" style="${monoStyle(it.name)}">${esc(it.name[0].toUpperCase())}</div>
+        <div class="b-info">
+          <div class="b-name">${esc(it.name)}</div>
+          ${it.desc ? `<div class="b-desc">${esc(it.desc)}</div>` : ''}
+        </div>
+        <div class="b-pill price-num">${fmt(it.price)}</div>
+      </div>`).join('');
+    return `<div class="b-list">${rows}
+      <div class="b-add pressable" onclick="addItem(this)">${PLUS}<span>${addLabel()}</span></div></div>`;
+  },
+
+  c(items) {
+    if (!items.length) return emptyHtml();
+    const cells = items.map((it, i) => `
+      <div class="c-card pressable" onclick="openSheet(this, ${i})">
+        <div class="c-hero" style="${monoStyle(it.name)}">${esc(it.name[0].toUpperCase())}</div>
+        <div class="c-body">
+          <div class="c-name">${esc(it.name)}</div>
+          <div class="c-price price-num">${fmt(it.price)}</div>
+        </div>
+      </div>`).join('');
+    return `<div class="c-grid">${cells}
+      <div class="c-add pressable" onclick="addItem(this)">
+        <div class="plusring">${PLUS}</div><span>${addLabel()}</span></div></div>`;
+  },
+};
+
+function plural(n, one, few, many) {
+  const m10 = n % 10, m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+  return many;
+}
+
+/* ================= stamping + wiring ================= */
+const host = document.getElementById('variants-host');
+['base', 'a', 'b', 'c'].forEach(v => {
+  const wrap = document.createElement('div');
+  wrap.className = 'variant' + (v === 'base' ? ' active' : '');
+  wrap.id = 'variant-' + v;
+  wrap.appendChild(document.getElementById('phone-tpl').content.cloneNode(true));
+  host.appendChild(wrap);
+  const phone = wrap.querySelector('.phone');
+  phone.dataset.variant = v;
+  phone.querySelectorAll('.tab.live').forEach(t =>
+    t.addEventListener('click', () => { kind = t.dataset.kind; renderAll(); }));
+  phone.querySelector('.sheet-scrim').addEventListener('click', () => closeSheet(phone));
+  phone.querySelector('.done').addEventListener('click', () => commitSheet(phone));
+  phone.querySelector('.del').addEventListener('click', () => deleteFromSheet(phone));
+});
+
+function renderAll() {
+  document.querySelectorAll('.phone').forEach(phone => {
+    phone.querySelectorAll('.tab.live').forEach(t =>
+      t.classList.toggle('active', t.dataset.kind === kind));
+    phone.querySelector('.listbody').innerHTML = RENDER[phone.dataset.variant](data[kind]);
+  });
+}
+
+function showVariant(id, tab) {
+  document.querySelectorAll('.variant').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.variant-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('variant-' + id).classList.add('active');
+  tab.classList.add('active');
+  document.getElementById('caption').innerHTML = CAPTIONS[id];
+}
+document.getElementById('caption').innerHTML = CAPTIONS.base;
+
+/* ================= edit sheet ================= */
+function openSheet(el, index) {
+  const phone = el.closest('.phone');
+  const it = data[kind][index];
+  phone.dataset.editing = index;
+  phone.querySelector('.sheet-title').textContent = kind === 'products' ? 'Товар' : 'Услуга';
+  phone.querySelector('.f-name').value = it.name;
+  phone.querySelector('.f-price').value = it.price ? it.price.toLocaleString('ru-RU') : '';
+  phone.querySelector('.f-desc').value = it.desc;
+  phone.classList.add('sheet-open');
+}
+function closeSheet(phone) { phone.classList.remove('sheet-open'); }
+function commitSheet(phone) {
+  const i = +phone.dataset.editing;
+  const it = data[kind][i];
+  if (!it) return closeSheet(phone);
+  it.name  = phone.querySelector('.f-name').value.trim() || 'Без названия';
+  it.price = parseInt(phone.querySelector('.f-price').value.replace(/\D/g, ''), 10) || 0;
+  it.desc  = phone.querySelector('.f-desc').value.trim();
+  closeSheet(phone);
+  setTimeout(renderAll, 120);
+}
+function deleteFromSheet(phone) {
+  data[kind].splice(+phone.dataset.editing, 1);
+  closeSheet(phone);
+  setTimeout(renderAll, 120);
+}
+
+/* ================= add / tools ================= */
+function addItem(el) {
+  const phone = el.closest('.phone');
+  const it = { name: kind === 'products' ? 'Новый товар' : 'Новая услуга', price: 0, desc: '' };
+  data[kind].push(it);
+  renderAll();
+  if (phone) openSheet(phone.querySelector('.listbody'), data[kind].length - 1);
+}
+function clearList() { data[kind] = []; renderAll(); }
+function resetData() { data = JSON.parse(JSON.stringify(DEFAULT_DATA)); renderAll(); }
+
+renderAll();
+</script>
+</body>
+</html>
