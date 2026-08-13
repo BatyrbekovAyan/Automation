@@ -272,6 +272,23 @@ namespace Automation.BotSettingsUI
             }
 
             float effectiveLift = Mathf.Max(0f, heldKeyboardHeight - liftReduction);
+
+            // Never lift the sheet's header off the top of the screen. The lift
+            // is driven purely by keyboard height, so on a short canvas (16:9
+            // phones report ~1920 reference units, where the restyled sheet's
+            // 1149 plus a ~840-unit keyboard overflows) the title and the first
+            // label would slide out of reach. Clamping to the free space above
+            // the sheet spends the overflow on the sheet's BOTTOM, which the
+            // keyboard covers anyway, instead of on the header being read.
+            // Canvas-derived rather than a constant: the canvas height varies
+            // with aspect ratio, and taller phones never hit this at all.
+            var canvasRt = canvas != null ? canvas.rootCanvas.transform as RectTransform : null;
+            if (canvasRt != null)
+            {
+                float freeSpace = canvasRt.rect.height - sheetRoot.rect.height;
+                effectiveLift = Mathf.Min(effectiveLift, Mathf.Max(0f, freeSpace));
+            }
+
             float target = baselineY + effectiveLift;
 
             // Only reissue the tween when the target has meaningfully shifted.

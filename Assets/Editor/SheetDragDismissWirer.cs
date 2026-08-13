@@ -24,9 +24,14 @@ public static class SheetDragDismissWirer
     // each sheet's content (grabber area + title / grabber area + row gap).
     private const float BotSwitcherZoneHeight = 172f;
     private const float AttachZoneHeight = 96f;
-    // ItemEditSheet: grabber strip (60, pre-existing padding above the title)
-    // + title block (100); the Fields container starts at 190.
-    private const float ItemEditZoneHeight = 160f;
+    // ItemEditSheet: grabber strip (24 pad + 12 pill + 36 gap) + title block
+    // (60); the Fields container starts at 168, so 156 leaves 12 units of
+    // clearance above the first field label.
+    //
+    // NOTE: re-running this wirer re-creates the Grabber from scratch with a
+    // hardcoded colour and no ThemedColor binding — run
+    // Tools/BotSettings/Restyle Item Edit Sheet afterwards to restore it.
+    private const float ItemEditZoneHeight = 156f;
 
     // Grabber pill added to the edit sheets — same metrics as the bot
     // switcher's and attach sheet's pills.
