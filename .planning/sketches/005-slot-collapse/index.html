@@ -152,16 +152,17 @@
   .phone[data-slot="kb"] .kb, .phone[data-slot="sg"] .sg { opacity:1; pointer-events:auto; transform:none; }
   .phone[data-slot="peek"] .pk { opacity:1; pointer-events:auto; transform:none; }
 
-  /* ---- E: the ✦/⌨ switch pair at the field's end — each key owns ONE tenant, the active one is lit ---- */
-  .comp-key2 { width:27px; height:27px; border-radius:50%; flex:0 0 auto; cursor:pointer;
-               display:flex; align-items:center; justify-content:center; color: var(--ink-3);
-               transition: background .15s ease, color .15s ease; }
-  .comp-key2:hover { background: color-mix(in srgb, var(--ink) 7%, transparent); }
+  /* ---- E: ONE morphing key at the field's end — it always shows the DESTINATION
+         (panel up → ⌨ «к клавиатуре»; otherwise → ✦ «к подсказкам»), like WhatsApp's emoji key ---- */
   .phone[data-frame="e"] .comp-input { padding-right:6px; }
-  .phone[data-frame="e"][data-slot="sg"] .ck-sg, .phone[data-frame="e"][data-slot="sgx"] .ck-sg,
-  .phone[data-frame="e"][data-slot="kb"] .ck-kb {
-    color: var(--positive-ink); background: color-mix(in srgb, var(--positive-ink) 13%, transparent); }
-  .phone.auto .comp-key2 { display:none; }
+  .phone[data-frame="e"] .comp-key .ic-kb { display:none; }
+  .phone[data-frame="e"] .comp-key { background: color-mix(in srgb, var(--positive-ink) 13%, transparent); }
+  .phone[data-frame="e"][data-slot="sg"] .comp-key .ic-sp,
+  .phone[data-frame="e"][data-slot="sgx"] .comp-key .ic-sp { display:none; }
+  .phone[data-frame="e"][data-slot="sg"] .comp-key .ic-kb,
+  .phone[data-frame="e"][data-slot="sgx"] .comp-key .ic-kb { display:block; }
+  .phone[data-frame="e"][data-slot="sg"] .comp-key,
+  .phone[data-frame="e"][data-slot="sgx"] .comp-key { background:transparent; }
 
   /* ---- E: expanded detent + draggable handle on the panel's top edge ---- */
   .sg.layer { height:100%; }                       /* the panel follows the slot, so the handle can resize it live */
@@ -323,7 +324,7 @@ const CAPTIONS = {
   b:`<b>B · Шеврон в шапке панели.</b> Явная кнопка ˅ в шапке справа (рядом с ↻): тап — слот схлопывается целиком, composer внизу. Тап по треду закрывает только клавиатуру — к панели, а не в ноль (сама панель от тапа по треду НЕ прячется — только ˅). Вернуть панель — ✦ в конце поля, появляется, когда панель спрятана. <b>Смотрите на:</b> читается ли ˅ как «спрятать панель», и не далеко ли тянуться к шапке слота ради частого жеста.`,
   c:`<b>C · Клавиша-хамелеон в поле.</b> Одна клавиша в конце поля живёт ВСЕГДА, но меняет смысл: панель открыта → ˅ (спрятать всё, composer вниз); панель спрятана — в том числе пока печатаете — → ✦ (поднять панель). Тап по треду закрывает только клавиатуру. Один орган управления на оба направления, в одном и том же месте. <b>Смотрите на:</b> не смущает ли смена глифа ✦⇄˅ и хватает ли цели 27px для самого частого жеста в чате.`,
   d:`<b>D · Свернуть в полоску.</b> Панель не исчезает совсем: ˅ в шапке схлопывает её в полоску 26px «✦ ПРЕДЛОЖЕНИЯ · 4» над самым низом; тап по полоске раскрывает обратно. В composer'е — ни одной иконки вообще: поле всегда чистое, все органы — на самой панели. Плата: composer не ложится на самый низ, под ним всегда 26px. <b>Смотрите на:</b> честная ли это цена за постоянную видимость подсказок и очевидный путь назад.`,
-  e:`<b>E · Синтез: тап + ручка + пара ✦/⌨ (раунд 3).</b> Тап по треду только ПОДНИМАЕТ панель; повторный тап ничего не прячет. Когда composer ВНИЗУ, тап по нему поднимает ПАНЕЛЬ — поле не фокусируется, клавиатура не открывается; тап по полю при открытой панели — уже клавиатура. В конце поля — два переключателя: ✦ (панель) и ⌨ (клавиатура), активный подсвечен; из любого состояния один тап ведёт куда нужно. Под composer'ом — РУЧКА с тремя фиксациями: вниз — свёрнуто (composer на низу), середина — стандарт, вверх — все карточки без скролла. <b>Смотрите на:</b> не тесно ли справа от текста два глифа + отправка, и читается ли подсветка активного как «вы здесь».`,
+  e:`<b>E · Синтез: тап + ручка + одна клавиша-хамелеон (раунд 4).</b> Тап по треду только ПОДНИМАЕТ панель; повторный тап ничего не прячет. Когда composer ВНИЗУ, тап по нему поднимает ПАНЕЛЬ — поле не фокусируется, клавиатура не открывается; тап по полю при открытой панели — уже клавиатура. В конце поля — ОДНА клавиша, показывающая, КУДА она ведёт (как кнопка эмодзи в WhatsApp): панель открыта → ⌨ (тап = клавиатура), в остальных состояниях → ✦ с зелёным тинтом (тап = подсказки). Под composer'ом — РУЧКА с тремя фиксациями: вниз — свёрнуто (composer на низу), середина — стандарт, вверх — все карточки без скролла. <b>Смотрите на:</b> не сбивает ли смена глифа ✦⇄⌨ в одной точке, и верна ли грамматика «глиф = пункт назначения» (альтернатива — «глиф = где вы сейчас»).`,
 };
 
 /* ================= svg ================= */
@@ -415,8 +416,9 @@ const peek = () => `
 /* ================= frames ================= */
 function frame(id){
   const key = id==='d' ? '' : id==='e' ? `
-    <span class="comp-key2 ck-sg" title="Подсказки" onclick="event.stopPropagation();pairTap(this,'sg')">${svg.spark('currentColor',15)}</span>
-    <span class="comp-key2 ck-kb" title="Клавиатура" onclick="event.stopPropagation();pairTap(this,'kb')">${svg.kbd('currentColor',17)}</span>` : `
+    <span class="comp-key" title="Подсказки / клавиатура" onclick="event.stopPropagation();keyTap(this)">
+      <span class="ic-sp">${svg.spark('var(--positive-ink)',16)}</span><span class="ic-kb">${svg.kbd('var(--ink-3)',17)}</span>
+    </span>` : `
     <span class="comp-key" onclick="event.stopPropagation();keyTap(this)">
       <span class="ic-sp">${svg.spark('var(--positive-ink)',17)}</span><span class="ic-dn">${svg.chevDn('var(--positive-ink)',17)}</span>
     </span>`;
@@ -536,12 +538,6 @@ function focusInput(el){
   setSlot(ph, 'kb');
 }
 
-/* E: the ✦/⌨ pair — each key summons its own tenant; ✦ keeps an expanded panel expanded */
-function pairTap(el, mode){
-  const ph = el.closest('.phone');
-  if (mode === 'sg' && (ph.dataset.slot === 'sg' || ph.dataset.slot === 'sgx')) return;
-  setSlot(ph, mode);
-}
 
 /* tap on the thread: blur first; in A it also steps the panel down (kb → sg → none);
    in E it only ever RAISES — keyboard → panel, collapsed → panel, open panel stays put */
@@ -554,10 +550,12 @@ function chatTap(el){
   else if (ph.dataset.frame === 'e' && s === 'none') setSlot(ph, 'sg');
 }
 
-/* composer key: A/B — pure entry (✦); C — chameleon (✦ raises, ˅ collapses) */
+/* composer key: A/B — pure entry (✦); C — chameleon (✦ raises, ˅ collapses);
+   E — one key showing the DESTINATION: panel up → keyboard, otherwise → panel */
 function keyTap(el){
-  const ph = el.closest('.phone');
-  if (ph.dataset.frame === 'c' && ph.dataset.slot === 'sg') setSlot(ph, 'none');
+  const ph = el.closest('.phone'), s = ph.dataset.slot;
+  if (ph.dataset.frame === 'c' && s === 'sg') setSlot(ph, 'none');
+  else if (ph.dataset.frame === 'e') setSlot(ph, (s === 'sg' || s === 'sgx') ? 'kb' : 'sg');
   else setSlot(ph, 'sg');
 }
 
