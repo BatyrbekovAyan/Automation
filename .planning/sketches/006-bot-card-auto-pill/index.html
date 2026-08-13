@@ -11,7 +11,7 @@
   body {
     font-family: -apple-system, 'SF Pro Text', Roboto, 'Segoe UI', system-ui, sans-serif;
     background: var(--page-bg); color: var(--page-ink);
-    padding: 148px 16px 40px; display:flex; flex-direction:column; align-items:center;
+    padding: 186px 16px 40px; display:flex; flex-direction:column; align-items:center;
     transition: background .2s;
   }
   #variant-nav {
@@ -75,6 +75,16 @@
            white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .bdesc { font-size:11px; color:var(--ink-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .bdesc.connecting { color: var(--mode-semi-track); }
+
+  /* C2: subline = business type + channel icons */
+  .bsub { display:flex; align-items:center; gap:4.7px; font-size:11px; color:var(--ink-3); min-width:0; }
+  .bsub .btype { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .bsub .bsep { color:var(--ink-3); flex:0 0 auto; }
+  .chicon { width:12.7px; height:12.7px; flex:0 0 auto; display:block; }
+  .chicon.wa { fill: var(--wa-green); }
+  .chicon.tg { fill: #2AABEE; }        /* ChannelAccent.TelegramBlue */
+  .chicon.dis { fill: var(--ink-3); opacity:.55; }
+  .blink { animation: pulse 1.1s ease-in-out infinite; }
   .chev  { flex:0 0 auto; color:var(--ink-3); display:flex; }
 
   /* status pill («Активен» / «Подключение» / «Неактивен») */
@@ -166,19 +176,21 @@
 <div id="variant-nav">
   <div class="nav-row">
     <span class="nav-title">Sketch 006 · Карточка бота: капсула «Авто»</span>
-    <button class="variant-tab active" onclick="showVariant('base', this)">Сегодня (baseline)</button>
+    <button class="variant-tab" onclick="showVariant('base', this)">Сегодня (baseline)</button>
     <button class="variant-tab" onclick="showVariant('a', this)">A: Пилюля из шапки</button>
     <button class="variant-tab" onclick="showVariant('b', this)">B: Сегмент Авто | Пауза</button>
-    <button class="variant-tab" onclick="showVariant('c', this)">C: Компакт без футера</button>
+    <button class="variant-tab" onclick="showVariant('c', this)">C: Компакт (р1)</button>
+    <button class="variant-tab active" onclick="showVariant('c2', this)">C2: Компакт + значки каналов ★ направление</button>
   </div>
   <div id="model-line"><b>Семантика:</b> капсула = тот же авто-режим, что кнопка «Авто» в шапке чатов. Выкл → вкл — диалог подтверждения (как в шапке); вкл → выкл — мгновенно. Состояния ботов общие между вкладками — переключите и сравните.</div>
   <div id="caption"></div>
 </div>
 
-<div class="variant active" id="variant-base"></div>
+<div class="variant" id="variant-base"></div>
 <div class="variant" id="variant-a"></div>
 <div class="variant" id="variant-b"></div>
 <div class="variant" id="variant-c"></div>
+<div class="variant active" id="variant-c2"></div>
 
 <div id="sketch-tools">
   <span>Тема</span>
@@ -190,17 +202,22 @@
 
 <script>
 /* ---------- shared state ---------- */
+/* wa/tg (для C2): 'on' = подключён и включён (цветной значок), 'off' = подключён,
+   но выключен тумблером канала в настройках бота (серый), 'none' = не подключён
+   (значка нет), 'connecting' = идёт подключение (моргает слово). */
 const bots = [
-  { id:1, name:'Цветы Астана',    desc:'Цветы · WhatsApp',            emoji:'🌸', tint:'linear-gradient(135deg,#E8A2B8,#C96A8B)', auto:true,  conn:'ok' },
-  { id:2, name:'Автозапчасти KZ', desc:'Автозапчасти · WhatsApp',     emoji:'⚙️', tint:'linear-gradient(135deg,#8FB8E8,#5E86C0)', auto:false, conn:'ok' },
-  { id:3, name:'Ремонт телефонов',desc:'Ремонт техники · Telegram',   emoji:'📱', tint:'linear-gradient(135deg,#A8E6C3,#5FBF8A)', auto:true,  conn:'connecting' },
+  { id:1, name:'Цветы Астана',    type:'Цветы',          desc:'Цветы · WhatsApp',          emoji:'🌸', tint:'linear-gradient(135deg,#E8A2B8,#C96A8B)', auto:true,  conn:'ok',         wa:'on',         tg:'on'   },
+  { id:2, name:'Автозапчасти KZ', type:'Автозапчасти',   desc:'Автозапчасти · WhatsApp',   emoji:'⚙️', tint:'linear-gradient(135deg,#8FB8E8,#5E86C0)', auto:false, conn:'ok',         wa:'on',         tg:'off'  },
+  { id:3, name:'Ремонт телефонов',type:'Ремонт техники', desc:'Ремонт техники · Telegram', emoji:'📱', tint:'linear-gradient(135deg,#A8E6C3,#5FBF8A)', auto:true,  conn:'connecting', wa:'none',       tg:'connecting' },
+  { id:4, name:'Школа английского',type:'Обучение',      desc:'Обучение · WhatsApp',       emoji:'🎓', tint:'linear-gradient(135deg,#F2CE8F,#DBA04E)', auto:true,  conn:'ok',         wa:'on',         tg:'none' },
 ];
 
 const captions = {
   base: '<b>Как сейчас:</b> iOS-свитч (150×84) + подпись «Бот работает / Бот на паузе» + статус-пилюля в строке. Одно состояние — три сигнала: выключите свитч у первого бота и посчитайте, сколько элементов поменялось. Переключение мгновенное в обе стороны.',
   a: '<b>Минимальный ход:</b> свитч заменён точной пилюлей из шапки чатов (76h: точка + «Авто»; вкл = PositiveBg/PositiveInk, выкл = кольцо Border + полая точка). Подпись и статус-пилюля не тронуты. Один и тот же контрол теперь везде — но обратите внимание: у паузы карточка всё ещё дублирует сигнал красной пилюлей «Неактивен».',
   b: '<b>Футер = сегмент «Авто | Пауза»</b> — язык утопленной лунки переключателя каналов из той же шапки. Контрол сам себя называет, отдельная подпись не нужна; оба состояния видны и «куда нажать, чтобы выключить» очевидно. Самая большая цель касания из всех вариантов.',
-  c: '<b>Радикально:</b> футер убран, карточка 360 → 232 ед. Капсула «Авто» встала в строку, а статус-пилюля растворилась — связь показывает точка на аватаре (зелёная = подключён, синяя мигает = подключение), авто-режим показывает капсула. Один сигнал на одно понятие, список в полтора раза плотнее.',
+  c: '<b>Радикально (раунд 1):</b> футер убран, карточка 360 → 232 ед. Капсула «Авто» встала в строку, а статус-пилюля растворилась — связь показывает точка на аватаре (зелёная = подключён, синяя мигает = подключение), авто-режим показывает капсула. Один сигнал на одно понятие, список в полтора раза плотнее. <b>→ выбран как направление, уточнён в C2.</b>',
+  c2: '<b>Синтез C по правкам (раунд 2):</b> точка на аватаре убрана — при подключении моргает само слово «Подключение…» (Ремонт телефонов). Под именем — тип бизнеса + значки каналов: <b>цветной</b> = канал подключён и включён (Цветы: оба); <b>серый</b> = подключён, но выключен тумблером в настройках бота (Автозапчасти: Telegram); <b>нет значка</b> = канал не подключён (Школа: только WhatsApp). Капсула и диалог — без изменений.',
 };
 
 let lastPunch = null;   // {variant, id} — the control to punch after re-render
@@ -270,6 +287,34 @@ function cardC(b) {
   return `<div class="bcard">${rowTop(b, { avatarDot:true, connInDesc:true, trailing:pill })}</div>`;
 }
 
+/* ---------- C2: no avatar dot, business type + channel icons ---------- */
+const WA_PATH = 'M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z';
+const TG_PATH = 'M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z';
+
+function channelIcon(kind, state) {
+  if (state === 'none' || state === 'connecting') return '';
+  const path = kind === 'wa' ? WA_PATH : TG_PATH;
+  const cls = state === 'off' ? 'chicon dis' : `chicon ${kind}`;
+  return `<svg class="${cls}" viewBox="0 0 24 24"><path d="${path}"/></svg>`;
+}
+
+function cardC2(b) {
+  const connecting = b.wa === 'connecting' || b.tg === 'connecting';
+  let sub;
+  if (connecting) {
+    sub = `<span class="bsub"><span class="blink" style="color:var(--mode-semi-track)">Подключение…</span></span>`;
+  } else {
+    const icons = channelIcon('wa', b.wa) + channelIcon('tg', b.tg);
+    sub = `<span class="bsub"><span class="btype">${b.type}</span>${icons ? `<span class="bsep">·</span>${icons}` : ''}</span>`;
+  }
+  const pill = `<div class="apill ${b.auto ? 'on' : ''}${punchCls('c2', b.id)}" onclick="attempt('c2', ${b.id})"><span class="dot"></span>Авто</div>`;
+  return `<div class="bcard"><div class="brow">
+      <div class="bava" style="background:${b.tint}">${b.emoji}</div>
+      <div class="binfo"><span class="bname">${b.name}</span>${sub}</div>
+      ${pill}<span class="chev">${svgChev}</span>
+    </div></div>`;
+}
+
 /* ---------- phone renderer ---------- */
 function phone(variant, renderCard) {
   return `<div class="phone" data-variant="${variant}">
@@ -295,7 +340,7 @@ function phone(variant, renderCard) {
   </div>`;
 }
 
-const renderers = { base: cardBase, a: cardA, b: cardB, c: cardC };
+const renderers = { base: cardBase, a: cardA, b: cardB, c: cardC, c2: cardC2 };
 
 function renderAll() {
   for (const v of Object.keys(renderers)) {
@@ -342,7 +387,7 @@ function showVariant(v, tabEl) {
 }
 
 renderAll();
-document.getElementById('caption').innerHTML = captions.base;
+document.getElementById('caption').innerHTML = captions.c2;
 </script>
 </body>
 </html>
