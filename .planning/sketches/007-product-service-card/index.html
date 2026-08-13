@@ -162,6 +162,75 @@
   .c-add .plusring { width:34px; height:34px; border-radius:50%; background: var(--accent-soft);
                      display:flex; align-items:center; justify-content:center; }
 
+  /* ============ price-lists section (round 2, on top of B) ============ */
+  .fgroup { background: var(--surface); border-radius: 13px; box-shadow: var(--shadow-sm);
+            overflow:hidden; margin-bottom: 16px; }
+  .frow { display:flex; align-items:center; gap: 10px; padding: 10px 12px; position:relative; }
+  .frow + .frow::before, .frow + .fadd::before, .fadd:first-child::before {
+    content:''; position:absolute; left:59px; right:0; top:0; height:1px; background: var(--hairline); }
+  .fadd:first-child::before { display:none; }
+  .fbadge { width:37px; height:37px; border-radius:9px; background: var(--accent-soft); color: var(--accent-text);
+            font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
+  .ftexts { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2px; }
+  .fname { font-size:13.5px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .fmeta { font-size:11px; color:var(--ink-3); }
+  .fmeta.up { color: var(--accent-text); }
+  .fx { width:34px; height:34px; flex:0 0 auto; display:flex; align-items:center; justify-content:center;
+        color: var(--ink-3); cursor:pointer; border-radius:50%; transition: background .15s ease; }
+  .fx:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+  .fdots { width:34px; flex:0 0 auto; display:flex; gap:3px; align-items:center; justify-content:center; }
+  .fdots i { width:4px; height:4px; border-radius:50%; background: var(--accent-text);
+             animation: fdot 1s ease-in-out infinite; }
+  .fdots i:nth-child(2) { animation-delay:.16s; } .fdots i:nth-child(3) { animation-delay:.32s; }
+  @keyframes fdot { 0%,100%{opacity:.25} 40%{opacity:1} }
+  .fadd { display:flex; align-items:center; justify-content:center; gap:6px; padding: 12px;
+          color: var(--accent-text); font-size:13px; font-weight:600; position:relative; }
+
+  /* chips shelf (B3) */
+  .fchips { display:flex; flex-wrap:wrap; gap:7px; margin-bottom: 16px; }
+  .fchip { display:inline-flex; align-items:center; gap:6px; height:30px; padding: 0 8px 0 10px;
+           border-radius: 15px; background: var(--surface); box-shadow: var(--shadow-sm);
+           font-size:11.5px; color: var(--ink); max-width:100%; }
+  .fchip .ext { font-size:9px; font-weight:800; color: var(--accent-text); letter-spacing:.02em; }
+  .fchip .nm { max-width: 138px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .fchip .cx { color: var(--ink-3); display:flex; cursor:pointer; padding: 2px; }
+  .fchip .fdots { width:auto; }
+  .fchip.addchip { padding: 0 12px; background: transparent; box-shadow:none;
+                   border: 1.5px dashed var(--border); color: var(--accent-text);
+                   font-weight:600; cursor:pointer; }
+
+  /* upload source sheet («Файл / Фото из галереи / Отмена») */
+  .src-scrim { position:absolute; inset:0; background: rgba(0,0,0,.45); opacity:0;
+               pointer-events:none; transition: opacity .22s ease; z-index: 50; }
+  .srcsheet { position:absolute; left:0; right:0; bottom:0; z-index:51;
+              background: var(--surface); border-radius: 18px 18px 0 0;
+              padding: 10px 16px 18px; transform: translateY(105%); transition: transform .25s ease;
+              box-shadow: var(--shadow-up); }
+  .phone.src-open .srcsheet { transform: translateY(0); }
+  .phone.src-open .src-scrim { opacity:1; pointer-events:auto; }
+  .srcsheet .handle { width:36px; height:4px; border-radius:2px; background: var(--border); margin: 0 auto 12px; }
+  .srcsheet h2 { font-size:15.5px; font-weight:700; color:var(--ink); margin: 2px 0 13px; text-align:center; }
+  .srcsheet .opt { width:100%; height:46px; border-radius:12px; border:none; background: var(--bg);
+                   color: var(--ink); font-size:14.5px; font-weight:600; font-family:inherit;
+                   cursor:pointer; margin-bottom:8px; }
+  .srcsheet .opt:active { transform: scale(.99); }
+  .srcsheet .srccancel { background:transparent; color: var(--ink-3); height:40px; margin-bottom:0; }
+
+  /* delete-file confirm popup */
+  .cpop-scrim { position:absolute; inset:0; background: rgba(0,0,0,.45); z-index:60;
+                display:none; align-items:center; justify-content:center; padding: 0 30px; }
+  .phone.cpop-open .cpop-scrim { display:flex; }
+  .cpop { background: var(--surface); border-radius: 16px; padding: 18px 16px 14px; width:100%;
+          box-shadow: var(--shadow-md); }
+  .cpop h4 { font-size:15px; font-weight:700; color:var(--ink); margin-bottom:7px; }
+  .cpop p { font-size:12.5px; line-height:1.45; color:var(--ink-2); margin-bottom:15px; }
+  .cpop .btns { display:flex; gap:8px; }
+  .cpop .btns button { flex:1; height:40px; border-radius:11px; border:none; font-size:13.5px;
+                       font-weight:600; font-family:inherit; cursor:pointer; }
+  .cpop .pcancel { background: var(--bg); color: var(--ink); }
+  .cpop .pconfirm { background: color-mix(in srgb, var(--destructive) 15%, var(--surface));
+                    color: var(--destructive); }
+
   /* ============ edit sheet mock (shared) ============ */
   .sheet-scrim { position:absolute; inset:0; background: rgba(0,0,0,.45); opacity:0;
                  pointer-events:none; transition: opacity .22s ease; z-index: 40; }
@@ -209,9 +278,11 @@
 <div id="variant-nav">
   <div class="nav-row">
     <span class="nav-title">Sketch 007 · Карточка товара/услуги</span>
-    <button class="variant-tab active" onclick="showVariant('base', this)">Baseline: Сегодня</button>
+    <button class="variant-tab" onclick="showVariant('base', this)">Baseline: Сегодня</button>
     <button class="variant-tab" onclick="showVariant('a', this)">A: Реестр</button>
-    <button class="variant-tab" onclick="showVariant('b', this)">B: Ценник</button>
+    <button class="variant-tab" onclick="showVariant('b', this)">B: Ценник ★</button>
+    <button class="variant-tab active" onclick="showVariant('b2', this)">B2: + прайсы (секция)</button>
+    <button class="variant-tab" onclick="showVariant('b3', this)">B3: + прайсы (чипы)</button>
     <button class="variant-tab" onclick="showVariant('c', this)">C: Витрина</button>
   </div>
   <div id="caption"></div>
@@ -251,6 +322,26 @@
       <button class="done">Готово</button>
       <button class="del">Удалить</button>
     </div>
+
+    <div class="src-scrim" onclick="closeSrcSheet(this.closest('.phone'))"></div>
+    <div class="srcsheet">
+      <div class="handle"></div>
+      <h2>Загрузить прайс-лист</h2>
+      <button class="opt" onclick="pickSource(this, 'file')">Файл</button>
+      <button class="opt" onclick="pickSource(this, 'photo')">Фото из галереи</button>
+      <button class="opt srccancel" onclick="closeSrcSheet(this.closest('.phone'))">Отмена</button>
+    </div>
+
+    <div class="cpop-scrim">
+      <div class="cpop">
+        <h4>Удалить прайс-лист?</h4>
+        <p></p>
+        <div class="btns">
+          <button class="pcancel" onclick="cancelDeleteFile(this)">Отмена</button>
+          <button class="pconfirm" onclick="confirmDeleteFile(this)">Удалить</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -281,7 +372,18 @@ const DEFAULT_DATA = {
     { name: 'Развал-схождение 3D',      price: 15000, desc: '' },
   ],
 };
+const DEFAULT_FILES = {
+  products: [
+    { name: 'Прайс август.pdf',    ext: 'PDF', size: '310 КБ', date: '12 авг', st: 'done' },
+    { name: 'Остатки склад.xlsx',  ext: 'XLS', size: '88 КБ',  date: '3 авг',  st: 'done' },
+    { name: 'Фото ценника.jpg',    ext: 'JPG', size: '1,4 МБ', date: '28 июл', st: 'done' },
+  ],
+  services: [
+    { name: 'Услуги и цены.pdf',   ext: 'PDF', size: '120 КБ', date: '5 авг',  st: 'done' },
+  ],
+};
 let data = JSON.parse(JSON.stringify(DEFAULT_DATA));
+let files = JSON.parse(JSON.stringify(DEFAULT_FILES));
 let kind = 'products';                       // products | services — shared by all variants
 
 const CAPTIONS = {
@@ -289,6 +391,8 @@ const CAPTIONS = {
   a: '<b>А «Реестр».</b> Муляж-иконка удалена совсем. Одна сгруппированная карточка, строки через hairline — плотный спокойный список «как Настройки/Wallet». Цена — табличные цифры справа, самый тихий и самый ёмкий вариант: ~8 позиций на экран.',
   b: '<b>B «Ценник».</b> Отдельные карточки остаются, но квадрат-заглушку заменяет цветная монограмма (детерминированный цвет от названия), а цена становится пилюлей-ценником. Имя и описание могут занимать 2 строки. «Тёплый каталог».',
   c: '<b>C «Витрина».</b> Сетка 2 колонки, как мини-маркетплейс: цветная зона с монограммой сверху, название, крупная цена. Описание в карточке не показывается (только в редакторе). Заодно отвечает на вопрос «нужны ли товарам фото» — зона под них уже есть.',
+  b2: '<b>B2 «Ценник + прайсы (секция)».</b> Раунд 2 на выбранном B. Прайс-листы наверху, до товаров — как сегодня: та же анатомия строки (бейдж-расширение, имя, размер · дата, ✕), но собрано в одну группу; «Загрузить прайс-лист» — строка внутри неё. Смысловой цветовой код: документы = акцент, товары = цветные монограммы. Всё живое: загрузка проигрывается точками, ✕ спрашивает подтверждение. У услуг свои прайсы — переключите вкладку.',
+  b3: '<b>B3 «Ценник + прайсы (чипы)».</b> Те же данные, но прайсы сжаты в полку чипов — товары начинаются заметно выше. Плата: размер · дата скрыты, длинные имена режутся, ✕ мельче. Честно для 1–3 файлов; при 5+ лучше секция B2.',
 };
 
 /* ================= monogram palette ================= */
@@ -361,17 +465,21 @@ const RENDER = {
 
   b(items) {
     if (!items.length) return emptyHtml();
-    const rows = items.map((it, i) => `
-      <div class="b-card pressable" onclick="openSheet(this, ${i})">
-        <div class="mono" style="${monoStyle(it.name)}">${esc(it.name[0].toUpperCase())}</div>
-        <div class="b-info">
-          <div class="b-name">${esc(it.name)}</div>
-          ${it.desc ? `<div class="b-desc">${esc(it.desc)}</div>` : ''}
-        </div>
-        <div class="b-pill price-num">${fmt(it.price)}</div>
-      </div>`).join('');
-    return `<div class="b-list">${rows}
-      <div class="b-add pressable" onclick="addItem(this)">${PLUS}<span>${addLabel()}</span></div></div>`;
+    return bList(items);
+  },
+
+  /* round 2: chosen B + the price-lists block on top (as on today's tab) */
+  b2(items) {
+    const goods = items.length
+      ? `<div class="seccount">${kind === 'products' ? 'Товары' : 'Услуги'}</div>` + bList(items)
+      : emptyHtml();
+    return filesGroup() + goods;
+  },
+  b3(items) {
+    const goods = items.length
+      ? `<div class="seccount">${kind === 'products' ? 'Товары' : 'Услуги'}</div>` + bList(items)
+      : emptyHtml();
+    return filesChips() + goods;
   },
 
   c(items) {
@@ -390,6 +498,54 @@ const RENDER = {
   },
 };
 
+const XSVG = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+
+function bList(items) {
+  const rows = items.map((it, i) => `
+    <div class="b-card pressable" onclick="openSheet(this, ${i})">
+      <div class="mono" style="${monoStyle(it.name)}">${esc(it.name[0].toUpperCase())}</div>
+      <div class="b-info">
+        <div class="b-name">${esc(it.name)}</div>
+        ${it.desc ? `<div class="b-desc">${esc(it.desc)}</div>` : ''}
+      </div>
+      <div class="b-pill price-num">${fmt(it.price)}</div>
+    </div>`).join('');
+  return `<div class="b-list">${rows}
+    <div class="b-add pressable" onclick="addItem(this)">${PLUS}<span>${addLabel()}</span></div></div>`;
+}
+
+/* price-lists as a grouped section (B2) — today's row anatomy in B language */
+function filesGroup() {
+  const rows = files[kind].map((f, i) => `
+    <div class="frow">
+      <div class="fbadge">${esc(f.ext)}</div>
+      <div class="ftexts">
+        <div class="fname">${esc(f.name)}</div>
+        <div class="fmeta${f.st === 'uploading' ? ' up' : ''}">${
+          f.st === 'uploading' ? 'Загрузка…' : `${f.size} · ${f.date}`}</div>
+      </div>
+      ${f.st === 'uploading'
+        ? '<div class="fdots"><i></i><i></i><i></i></div>'
+        : `<div class="fx" onclick="askDeleteFile(this, ${i})">${XSVG}</div>`}
+    </div>`).join('');
+  return `<div class="seccount">Прайс-листы</div>
+    <div class="fgroup">${rows}
+      <div class="fadd pressable" onclick="openSrcSheet(this)">${PLUS}<span>Загрузить прайс-лист</span></div>
+    </div>`;
+}
+
+/* price-lists as a chips shelf (B3) */
+function filesChips() {
+  const chips = files[kind].map((f, i) => f.st === 'uploading'
+    ? `<span class="fchip"><span class="fdots"><i></i><i></i><i></i></span><span class="nm">${esc(f.name)}</span></span>`
+    : `<span class="fchip"><span class="ext">${esc(f.ext)}</span><span class="nm">${esc(f.name)}</span><span class="cx" onclick="askDeleteFile(this, ${i})">${XSVG}</span></span>`
+  ).join('');
+  return `<div class="seccount">Прайс-листы</div>
+    <div class="fchips">${chips}
+      <span class="fchip addchip pressable" onclick="openSrcSheet(this)">${PLUS}<span>Загрузить</span></span>
+    </div>`;
+}
+
 function plural(n, one, few, many) {
   const m10 = n % 10, m100 = n % 100;
   if (m10 === 1 && m100 !== 11) return one;
@@ -399,9 +555,9 @@ function plural(n, one, few, many) {
 
 /* ================= stamping + wiring ================= */
 const host = document.getElementById('variants-host');
-['base', 'a', 'b', 'c'].forEach(v => {
+['base', 'a', 'b', 'b2', 'b3', 'c'].forEach(v => {
   const wrap = document.createElement('div');
-  wrap.className = 'variant' + (v === 'base' ? ' active' : '');
+  wrap.className = 'variant' + (v === 'b2' ? ' active' : '');
   wrap.id = 'variant-' + v;
   wrap.appendChild(document.getElementById('phone-tpl').content.cloneNode(true));
   host.appendChild(wrap);
@@ -429,7 +585,7 @@ function showVariant(id, tab) {
   tab.classList.add('active');
   document.getElementById('caption').innerHTML = CAPTIONS[id];
 }
-document.getElementById('caption').innerHTML = CAPTIONS.base;
+document.getElementById('caption').innerHTML = CAPTIONS.b2;
 
 /* ================= edit sheet ================= */
 function openSheet(el, index) {
@@ -468,7 +624,46 @@ function addItem(el) {
   if (phone) openSheet(phone.querySelector('.listbody'), data[kind].length - 1);
 }
 function clearList() { data[kind] = []; renderAll(); }
-function resetData() { data = JSON.parse(JSON.stringify(DEFAULT_DATA)); renderAll(); }
+function resetData() {
+  data = JSON.parse(JSON.stringify(DEFAULT_DATA));
+  files = JSON.parse(JSON.stringify(DEFAULT_FILES));
+  renderAll();
+}
+
+/* ================= price-list upload / delete flow ================= */
+const UPLOAD_SAMPLES = {
+  file:  [{ name: 'Новый прайс.pdf',    ext: 'PDF', size: '275 КБ' },
+          { name: 'Опт сентябрь.xlsx',  ext: 'XLS', size: '64 КБ' }],
+  photo: [{ name: 'Фото прайса.jpg',    ext: 'JPG', size: '1,1 МБ' }],
+};
+let uploadSeq = 0;
+
+function openSrcSheet(el) { el.closest('.phone').classList.add('src-open'); }
+function closeSrcSheet(phone) { phone.classList.remove('src-open'); }
+function pickSource(btn, src) {
+  const phone = btn.closest('.phone');
+  closeSrcSheet(phone);
+  const sample = UPLOAD_SAMPLES[src][uploadSeq++ % UPLOAD_SAMPLES[src].length];
+  const entry = { ...sample, date: '13 авг', st: 'uploading' };
+  files[kind].push(entry);
+  renderAll();
+  setTimeout(() => { entry.st = 'done'; renderAll(); }, 2400);
+}
+
+function askDeleteFile(el, i) {
+  const phone = el.closest('.phone');
+  phone.dataset.delfile = i;
+  phone.querySelector('.cpop p').textContent =
+    `Бот перестанет использовать «${files[kind][i].name}» в ответах. Это действие необратимо.`;
+  phone.classList.add('cpop-open');
+}
+function cancelDeleteFile(btn) { btn.closest('.phone').classList.remove('cpop-open'); }
+function confirmDeleteFile(btn) {
+  const phone = btn.closest('.phone');
+  files[kind].splice(+phone.dataset.delfile, 1);
+  phone.classList.remove('cpop-open');
+  renderAll();
+}
 
 renderAll();
 </script>
