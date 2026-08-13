@@ -48,8 +48,11 @@ ONLY via the handle. Slot states: `panel` · `keyboard` · `expanded` · `collap
   keyboard + focus); while collapsed or keyboard → ✦ in `PositiveInk` on a 13% tint circle
   (tap = panel). Hidden in «Авто».
 - **Pick** still slides the slot away (locked flow 2026-08-11: pick opens NO keyboard).
-- **Incoming message auto-raise** = OPEN QUESTION (always / only-if-collapsed / never); the
-  sketch's «＋ Входящее» demo raises when the owner is not typing.
+- **Incoming message auto-raise — DECIDED 2026-08-13: only-if-collapsed.** A new client
+  message raises the panel ONLY when the slot is collapsed. Keyboard up ⇒ nothing moves
+  (no steal; no parking needed — in this model dismissing the keyboard lands on the panel
+  anyway). Panel already up ⇒ state unchanged, only the content refreshes (existing
+  debounce/refresh flow).
 
 **Sizes (sketch px → ×3 reference units):** handle strip 14 → 42 hit-height; grabber bar
 36×4 r2 → 108×12 r6 (`Border`, hover `InkTertiary`); key circle 27 → 81, glyphs ✦16/⌨17 →
