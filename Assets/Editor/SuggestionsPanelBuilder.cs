@@ -574,7 +574,9 @@ public static class SuggestionsPanelBuilder
         OverlayOver(go, area);
         var vlg = go.AddComponent<VerticalLayoutGroup>();
         vlg.childAlignment = TextAnchor.MiddleCenter; vlg.spacing = 24f;
-        vlg.childForceExpandWidth = true; vlg.childForceExpandHeight = false;
+        // childForceExpandWidth must stay FALSE: force-expand overrides the retry pill's
+        // LayoutElement width and stretches «Обновить» full-bleed across the slot.
+        vlg.childForceExpandWidth = false; vlg.childForceExpandHeight = false;
         vlg.childControlWidth = true; vlg.childControlHeight = true;
         TextMeshProUGUI head = Text("Heading", go.transform, "Нет предложений", StateSize, Color.black,
             FontStyles.Bold, TextAlignmentOptions.Center);
@@ -594,7 +596,9 @@ public static class SuggestionsPanelBuilder
         OverlayOver(go, area);
         var vlg = go.AddComponent<VerticalLayoutGroup>();
         vlg.childAlignment = TextAnchor.MiddleCenter; vlg.spacing = 24f;
-        vlg.childForceExpandWidth = true; vlg.childForceExpandHeight = false;
+        // childForceExpandWidth must stay FALSE: force-expand overrides the retry pill's
+        // LayoutElement width and stretches «Обновить» full-bleed across the slot.
+        vlg.childForceExpandWidth = false; vlg.childForceExpandHeight = false;
         vlg.childControlWidth = true; vlg.childControlHeight = true;
         TextMeshProUGUI head = Text("Heading", go.transform, "Не удалось загрузить", StateSize, Color.black,
             FontStyles.Bold, TextAlignmentOptions.Center);
