@@ -152,6 +152,18 @@
   .phone[data-slot="kb"] .kb, .phone[data-slot="sg"] .sg { opacity:1; pointer-events:auto; transform:none; }
   .phone[data-slot="peek"] .pk { opacity:1; pointer-events:auto; transform:none; }
 
+  /* ---- E: expanded detent + draggable handle on the panel's top edge ---- */
+  .sg.layer { height:100%; }                       /* the panel follows the slot, so the handle can resize it live */
+  .phone[data-slot="sgx"] .sg { opacity:1; pointer-events:auto; transform:none; }
+  .phone[data-slot="sgx"] .fade { display:none; }  /* nothing is cut when everything fits */
+  .phone.dragging .slot { transition:none; }
+  .grabrow { height:14px; flex:0 0 auto; display:flex; align-items:center; justify-content:center;
+             cursor:grab; touch-action:none; }
+  .grabrow:active { cursor:grabbing; }
+  .grabrow i { width:36px; height:4px; border-radius:2px; background: var(--border); pointer-events:none;
+               transition: background .15s ease; }
+  .grabrow:hover i { background: var(--ink-3); }
+
   /* ---- peek strip (variant D's collapsed form) ---- */
   .pk { height:26px; flex-direction:row; align-items:center; gap:5px; padding: 0 12px; cursor:pointer; }
   .pk-title { font-size:9px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color: var(--ink-3); }
@@ -246,10 +258,11 @@
 <div id="variant-nav">
   <div class="nav-row">
     <span class="nav-title">Спустить всё вниз</span>
-    <button class="variant-tab active" data-v="a" onclick="showVariant('a',this)">A · Тап по переписке</button>
+    <button class="variant-tab" data-v="a" onclick="showVariant('a',this)">A · Тап по переписке</button>
     <button class="variant-tab" data-v="b" onclick="showVariant('b',this)">B · Шеврон в шапке</button>
     <button class="variant-tab" data-v="c" onclick="showVariant('c',this)">C · Клавиша-хамелеон</button>
     <button class="variant-tab" data-v="d" onclick="showVariant('d',this)">D · Свернуть в полоску</button>
+    <button class="variant-tab active" data-v="e" onclick="showVariant('e',this)">E · Синтез: тап + ручка</button>
   </div>
   <div id="model-line"><b>Модель (дано):</b> клавиатура — только пока поле в фокусе; в остальное время в слоте живёт панель. Вопрос скетча: чем спустить ВСЁ (и панель, и клавиатуру), чтобы composer лёг на низ экрана — и чем вернуть панель обратно.</div>
   <div id="caption"></div>
@@ -299,6 +312,7 @@ const CAPTIONS = {
   b:`<b>B · Шеврон в шапке панели.</b> Явная кнопка ˅ в шапке справа (рядом с ↻): тап — слот схлопывается целиком, composer внизу. Тап по треду закрывает только клавиатуру — к панели, а не в ноль (сама панель от тапа по треду НЕ прячется — только ˅). Вернуть панель — ✦ в конце поля, появляется, когда панель спрятана. <b>Смотрите на:</b> читается ли ˅ как «спрятать панель», и не далеко ли тянуться к шапке слота ради частого жеста.`,
   c:`<b>C · Клавиша-хамелеон в поле.</b> Одна клавиша в конце поля живёт ВСЕГДА, но меняет смысл: панель открыта → ˅ (спрятать всё, composer вниз); панель спрятана — в том числе пока печатаете — → ✦ (поднять панель). Тап по треду закрывает только клавиатуру. Один орган управления на оба направления, в одном и том же месте. <b>Смотрите на:</b> не смущает ли смена глифа ✦⇄˅ и хватает ли цели 27px для самого частого жеста в чате.`,
   d:`<b>D · Свернуть в полоску.</b> Панель не исчезает совсем: ˅ в шапке схлопывает её в полоску 26px «✦ ПРЕДЛОЖЕНИЯ · 4» над самым низом; тап по полоске раскрывает обратно. В composer'е — ни одной иконки вообще: поле всегда чистое, все органы — на самой панели. Плата: composer не ложится на самый низ, под ним всегда 26px. <b>Смотрите на:</b> честная ли это цена за постоянную видимость подсказок и очевидный путь назад.`,
+  e:`<b>E · Синтез: тап + ручка (по правкам владельца).</b> Тап по треду только ПОДНИМАЕТ панель: из клавиатуры и из свёрнутого — к панели; повторный тап ничего не прячет. Под composer'ом, на верху панели — РУЧКА: тяните ВВЕРХ — панель раскрывается на всю высоту карточек (все подсказки видны, скроллить не надо), тяните ВНИЗ — панель уходит совсем и composer ложится на низ. Отпустили — панель прилипает к ближайшему из трёх положений: <b>свёрнуто · стандарт · всё</b>. В поле — ни одной иконки. <b>Смотрите на:</b> хватает ли тапа по треду как пути назад из свёрнутого (или свёрнутость должна быть «липкой»), и естественны ли три фиксации ручки.`,
 };
 
 /* ================= svg ================= */
@@ -374,6 +388,11 @@ const headRow = (collapse=false) => `
 
 const panel = (collapse=false) => `<div class="sg layer" data-state="cards">${headRow(collapse)}${viewport()}</div>`;
 
+/* E: the panel wears a draggable handle on its top edge, right under the composer */
+const panelE = () => `<div class="sg layer" data-state="cards">
+  <div class="grabrow" onpointerdown="grabStart(this, event)" title="Потяните вверх или вниз"><i></i></div>
+  ${headRow(false)}${viewport()}</div>`;
+
 /* peek strip — variant D's collapsed form */
 const peek = () => `
   <div class="pk layer" onclick="slot(this,'sg')" title="Развернуть подсказки">
@@ -383,12 +402,12 @@ const peek = () => `
 
 /* ================= frames ================= */
 function frame(id){
-  const key = id==='d' ? '' : `
+  const key = (id==='d' || id==='e') ? '' : `
     <span class="comp-key" onclick="event.stopPropagation();keyTap(this)">
       <span class="ic-sp">${svg.spark('var(--positive-ink)',17)}</span><span class="ic-dn">${svg.chevDn('var(--positive-ink)',17)}</span>
     </span>`;
   return `
-  <div class="variant${id==='a'?' active':''}" id="variant-${id}">
+  <div class="variant${id==='e'?' active':''}" id="variant-${id}">
     <div class="phone" data-frame="${id}" data-slot="sg">
       <div class="statusbar"><span>14:05</span><span class="sb-icons">${svg.sb('currentColor')}</span></div>
       <div class="topbar">
@@ -413,7 +432,7 @@ function frame(id){
         <div class="comp-input" onclick="focusInput(this)"><span class="input-text">Сообщение</span>${key}</div>
         <div class="comp-send">${svg.send()}</div>
       </div>
-      <div class="slot">${keyboard()}${panel(id==='b' || id==='d')}${id==='d' ? peek() : ''}</div>
+      <div class="slot">${keyboard()}${id==='e' ? panelE() : panel(id==='b' || id==='d')}${id==='d' ? peek() : ''}</div>
       <div class="homebar"><i></i></div>
     </div>
   </div>`;
@@ -421,8 +440,8 @@ function frame(id){
 
 /* ================= build ================= */
 document.getElementById('stage').innerHTML =
-  frame('a') + frame('b') + frame('c') + frame('d');
-document.getElementById('caption').innerHTML = CAPTIONS.a;
+  frame('a') + frame('b') + frame('c') + frame('d') + frame('e');
+document.getElementById('caption').innerHTML = CAPTIONS.e;
 
 /* deep-link: ?v=a|b|c|d&theme=ink-dark&sl=kb|sg|none|peek&st=cards|load|empty|error */
 (function(){
@@ -445,23 +464,64 @@ function showVariant(id, btn){
 }
 
 /* ================= state machine ================= */
-/* the model: kb only while the field is focused; sg is the DEFAULT tenant; none = deliberately collapsed */
+/* the model: kb only while the field is focused; sg is the DEFAULT tenant; none = deliberately collapsed;
+   sgx (E only) = expanded to full card height — the handle's upper detent */
 function setSlot(ph, mode){
   if (ph.dataset.frame === 'd' && mode === 'none') mode = 'peek';     // D never fully vanishes
   if (ph.dataset.frame !== 'd' && mode === 'peek') mode = 'none';
+  if (ph.dataset.frame !== 'e' && mode === 'sgx') mode = 'sg';
+  // sgx has no CSS height rule (it is content-driven) — the inline height IS the state
+  ph.querySelector('.slot').style.height = (mode === 'sgx') ? expandedHeight(ph) + 'px' : '';
   ph.dataset.slot = mode;
   ph.querySelector('.comp-input').classList.toggle('focus', mode === 'kb');
+}
+
+/* E: full-content height — grabber + header + every card, capped so a strip of thread survives */
+function expandedHeight(ph){
+  const fix = ph.querySelector('.sg .st-cards .fix');
+  return Math.min(14 + 32 + (fix ? fix.scrollHeight : 300), 470);
+}
+
+/* E: the handle — live drag between 0 and expanded, snap to the nearest of three detents */
+function grabStart(el, ev){
+  ev.preventDefault();
+  const ph = el.closest('.phone');
+  const slotEl = ph.querySelector('.slot');
+  const exp = expandedHeight(ph);
+  const startY = ev.clientY;
+  const startH = slotEl.getBoundingClientRect().height;
+  ph.classList.add('dragging');
+  try { el.setPointerCapture(ev.pointerId); } catch(_){}
+  const move = e => {
+    slotEl.style.height = Math.max(0, Math.min(exp, startH + (startY - e.clientY))) + 'px';
+  };
+  const up = () => {
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    window.removeEventListener('pointercancel', up);
+    const h = slotEl.getBoundingClientRect().height;
+    ph.classList.remove('dragging');
+    slotEl.style.height = '';
+    const detents = [[0,'none'],[244,'sg'],[exp,'sgx']];
+    detents.sort((p,q)=>Math.abs(p[0]-h)-Math.abs(q[0]-h));
+    setSlot(ph, detents[0][1]);
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+  window.addEventListener('pointercancel', up);
 }
 const slot = (el, mode) => setSlot(el.closest('.phone'), mode);
 function focusInput(el){ setSlot(el.closest('.phone'), 'kb'); }
 
-/* tap on the thread: blur first; in A it also steps the panel down (kb → sg → none) */
+/* tap on the thread: blur first; in A it also steps the panel down (kb → sg → none);
+   in E it only ever RAISES — keyboard → panel, collapsed → panel, open panel stays put */
 function chatTap(el){
   const ph = el.closest('.phone');
   const s = ph.dataset.slot;
   if (ph.classList.contains('auto')) { if (s === 'kb') setSlot(ph, 'none'); return; }
   if (s === 'kb') setSlot(ph, 'sg');
   else if (ph.dataset.frame === 'a' && s === 'sg') setSlot(ph, 'none');
+  else if (ph.dataset.frame === 'e' && s === 'none') setSlot(ph, 'sg');
 }
 
 /* composer key: A/B — pure entry (✦); C — chameleon (✦ raises, ˅ collapses) */
@@ -515,12 +575,15 @@ function refreshFrame(el){
 function flash(el){ el.style.background = 'color-mix(in srgb, var(--ink) 16%, transparent)';
                     setTimeout(()=>el.style.background = '', 180); }
 
-/* full cycle: panel → keyboard (focus) → panel (thread tap) → collapsed (the mechanism) → panel */
+/* full cycle: panel → keyboard (focus) → panel (thread tap) → collapsed (the mechanism) → panel;
+   E adds the expanded detent before collapsing */
 function demoSwap(){
   const ph = document.querySelector('.variant.active .phone');
   if (!ph) return;
-  [['sg',0],['kb',900],['sg',1900],['none',2900],['sg',4200]]
-    .forEach(([m,d])=>setTimeout(()=>setSlot(ph,m), d));
+  const seq = ph.dataset.frame === 'e'
+    ? [['sg',0],['kb',900],['sg',1900],['sgx',2900],['none',4300],['sg',5400]]
+    : [['sg',0],['kb',900],['sg',1900],['none',2900],['sg',4200]];
+  seq.forEach(([m,d])=>setTimeout(()=>setSlot(ph,m), d));
 }
 
 /* an incoming message raises the panel with fresh cards — unless the owner is typing */
@@ -535,7 +598,7 @@ function demoIncoming(){
   msgs.appendChild(b);
   const z = ph.querySelector('.sg');
   z.dataset.state = 'load';
-  if (ph.dataset.slot !== 'kb') setSlot(ph, 'sg');
+  if (ph.dataset.slot !== 'kb' && ph.dataset.slot !== 'sgx') setSlot(ph, 'sg');
   clearTimeout(timers.get(z));
   timers.set(z, setTimeout(()=>{ z.dataset.state = 'cards'; }, 900));
 }
