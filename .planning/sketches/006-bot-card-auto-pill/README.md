@@ -2,7 +2,7 @@
 sketch: 006
 name: bot-card-auto-pill
 question: "Чем заменить iOS-свитч активации на карточке бота, чтобы он говорил на одном языке с кнопкой «Авто» в шапке чатов?"
-winner: "C → C2 (round 2, awaiting confirm)"
+winner: "C2 — locked 2026-08-13 (компакт без футера + значки каналов)"
 tags: [bots-page, bot-card, activation, auto-pill, restyle]
 ---
 
