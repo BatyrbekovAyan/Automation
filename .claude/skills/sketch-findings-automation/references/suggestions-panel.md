@@ -20,8 +20,18 @@ currently produced by `SuggestionsPanelBuilder`. Interactive reference:
 > **SWITCHING MODEL SUPERSEDED 2026-08-13 — sketch 005 winner E («тап + ручка +
 > клавиша-хамелеон»).** 003-A's both-ways ✦⇄⌨ toggle (key at the field START) is replaced by
 > a focus-driven model — see «Interaction model (005 E)» right below. The slot-tenant chassis
-> and the P cards stay. NOT implemented in Unity yet (design lock only). Sections further down
-> describe the still-valid card/skin spec + the OLD chassis for history.
+> and the P cards stay. **IMPLEMENTED 2026-08-14** (`d09aa94` seams + `201ee23` runtime +
+> `68d264a` scene; suite 1812/1812; iOS device pass pending) — the «Unity implementation notes»
+> below are now a record of what was built, not a plan. Sections further down describe the
+> still-valid card/skin spec + the OLD chassis for history.
+>
+> **Two spec values changed during implementation, both forced by the real scene:**
+> the tint circle is **64u, not 81u** (the composer pill is 74u tall and carries a `RectMask2D`
+> inset 8u vertically — 81 overflowed the pill AND would have been sheared to a flat chord every
+> time the ✦ face showed), and the Text Area insets are the exact mirror **24/120** rather than
+> the spec's 39/105, keeping the pre-005 total of 144 so the composer's auto-grow threshold does
+> not shift. The 42u handle strip grows the chrome, and since the standard detent stays equal to
+> the keyboard height, **the visible card area loses 42u** — worth a look on device.
 
 ## Interaction model — sketch 005 winner E (LOCKED 2026-08-13)
 
