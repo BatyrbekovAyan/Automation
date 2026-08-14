@@ -3,6 +3,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.Events;
 using UnityEngine.UI;
 using System.Collections;
+using System.Collections.Generic;
 
 public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
@@ -42,6 +43,15 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
 
     private float dragStartTime;
     private Vector2 dragStartPos;
+
+    // Where a NON-horizontal drag goes, resolved ONCE per gesture (at potential-drag time, while
+    // eventData still carries the press position) so a drag can never switch owners midway.
+    // Not always the thread: this strip is a full-height band over the left edge that renders
+    // above the thread, the composer AND the suggestions slot, so it wins the raycast over
+    // whatever the user actually aimed at. Policy in SwipeBackDragRouting.
+    private readonly List<RaycastResult> hitsUnderFinger = new List<RaycastResult>();
+    private GameObject verticalDragTarget;
+    private ScrollRect verticalDragScroll;   // that target's own ScrollRect, if it has one
 
     /// <summary>
     /// True whenever a slide animation is running (in, out, or swipe-back
@@ -139,8 +149,90 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
 
     public void OnInitializePotentialDrag(PointerEventData eventData)
     {
-        if (chatScrollRect != null) chatScrollRect.OnInitializePotentialDrag(eventData);
-        dragDecided = false; 
+        dragDecided = false;
+
+        verticalDragTarget = ResolveVerticalTarget(eventData);
+        verticalDragScroll = verticalDragTarget != null
+            ? verticalDragTarget.GetComponent<ScrollRect>()
+            : null;
+
+        // Stop momentum on both candidates — the real target is chosen at drag-begin, and a
+        // committed back-swipe freezes the thread whether or not it owns this gesture.
+        if (verticalDragTarget != null)
+            ExecuteEvents.Execute(verticalDragTarget, eventData, ExecuteEvents.initializePotentialDrag);
+        if (chatScrollRect != null && chatScrollRect.gameObject != verticalDragTarget)
+            chatScrollRect.OnInitializePotentialDrag(eventData);
+    }
+
+    /// <summary>
+    /// Which object a non-horizontal drag starting on this strip belongs to.
+    ///
+    /// Only the TOP-MOST hit past ourselves is consulted, and a "no drag gesture here" answer is
+    /// kept rather than searched past: uGUI's RaycastAll has no occlusion, so the thread sits in
+    /// the hit list underneath the composer's opaque background and the suggestions panel's own.
+    /// Walking on would make a vertical drag over the composer scroll a thread the finger is not
+    /// even touching. See SwipeBackDragRouting for the rule and why it exists.
+    /// </summary>
+    private GameObject ResolveVerticalTarget(PointerEventData eventData)
+    {
+        GameObject threadFallback = chatScrollRect != null ? chatScrollRect.gameObject : null;
+        if (EventSystem.current == null) return threadFallback;
+
+        hitsUnderFinger.Clear();
+        EventSystem.current.RaycastAll(eventData, hitsUnderFinger);
+
+        GameObject topForeignHit = null;
+        foreach (var hit in hitsUnderFinger)
+        {
+            if (hit.gameObject == gameObject) continue;
+            topForeignHit = hit.gameObject;
+            break;
+        }
+
+        // Walk up from what the finger is on to whoever owns drags there — a ScrollRect (thread,
+        // cards), the slot's grab handle, a sheet's drag zone, a bubble's swipe-to-reply. Null
+        // means this surface owns no drag gesture. Resolving back to ourselves would forward the
+        // gesture in a circle, so it counts as "no owner" too.
+        var handler = topForeignHit != null
+            ? ExecuteEvents.GetEventHandler<IDragHandler>(topForeignHit)
+            : null;
+        if (handler == gameObject) handler = null;
+
+        switch (SwipeBackDragRouting.Resolve(topForeignHit != null, handler != null))
+        {
+            case SwipeBackDragRouting.VerticalTarget.UnderFinger: return handler;
+            case SwipeBackDragRouting.VerticalTarget.None:        return null;
+            default:                                             return threadFallback;
+        }
+    }
+
+    private void ForwardVertical<T>(PointerEventData eventData, ExecuteEvents.EventFunction<T> handler)
+        where T : IEventSystemHandler
+    {
+        if (verticalDragTarget != null)
+            ExecuteEvents.Execute(verticalDragTarget, eventData, handler);
+    }
+
+    // A back-swipe must not leave anything free-scrolling underneath it — the thread, and
+    // whatever the gesture would otherwise have driven.
+    private void SetVerticalScrolling(bool enabled)
+    {
+        if (chatScrollRect != null) chatScrollRect.vertical = enabled;
+        if (verticalDragScroll != null && verticalDragScroll != chatScrollRect)
+            verticalDragScroll.vertical = enabled;
+    }
+
+    void OnDisable()
+    {
+        // A gesture interrupted by the chat closing never gets its OnEndDrag, so the vertical
+        // freeze applied at drag-begin would outlive it. Harmless for the thread (the next chat
+        // re-enters through the same path) but NOT for a resolved target that lives elsewhere —
+        // the suggestions panel survives this screen's teardown and would come back unscrollable.
+        SetVerticalScrolling(true);
+        verticalDragTarget = null;
+        verticalDragScroll = null;
+        dragDecided = false;
+        isHorizontalDrag = false;
     }
 
     public void OnBeginDrag(PointerEventData eventData)
@@ -178,13 +270,13 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
             IsSliding = true;
             if (snapCoroutine != null) StopCoroutine(snapCoroutine);
 
-            if (chatScrollRect != null) chatScrollRect.vertical = false;
+            SetVerticalScrolling(false);
             if (chatListPanel) chatListPanel.gameObject.SetActive(true); // Ensure background is visible
         }
         else
         {
             isHorizontalDrag = false;
-            if (chatScrollRect != null) chatScrollRect.OnBeginDrag(eventData);
+            ForwardVertical(eventData, ExecuteEvents.beginDragHandler);
         }
 
         dragDecided = true;
@@ -220,7 +312,7 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
         }
         else
         {
-            if (chatScrollRect != null) chatScrollRect.OnDrag(eventData);
+            ForwardVertical(eventData, ExecuteEvents.dragHandler);
         }
     }
 
@@ -247,12 +339,12 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
             {
                 snapCoroutine = StartCoroutine(SnapToPosition(0f, false));
             }
-            
-            if (chatScrollRect != null) chatScrollRect.vertical = true;
+
+            SetVerticalScrolling(true);
         }
         else
         {
-            if (chatScrollRect != null) chatScrollRect.OnEndDrag(eventData);
+            ForwardVertical(eventData, ExecuteEvents.endDragHandler);
         }
 
         dragDecided = false;
