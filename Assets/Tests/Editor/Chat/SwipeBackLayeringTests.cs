@@ -116,6 +116,62 @@ public class SwipeBackLayeringTests
         }
     }
 
+    // --- Band geometry -----------------------------------------------------
+
+    // The band as it shipped: anchoredX 100, width 150, pivot .5 — seated 25u short of the screen
+    // edge, which is exactly where an iOS-style edge pan starts. The strip is the only thing that
+    // can begin a back-swipe, so a finger landing on the bezel fell into a dead band.
+    private const float ShippedX = 100f, ShippedWidth = 150f, Pivot = 0.5f;
+
+    [Test]
+    public void ShippedBand_LeavesADeadStripAtTheScreenEdge()
+    {
+        Assert.AreEqual(25f, SwipeBackLayering.BandLeftEdge(ShippedX, ShippedWidth, Pivot), 0.001f);
+    }
+
+    [Test]
+    public void EdgeAlignedBand_ReachesTheScreenEdge()
+    {
+        SwipeBackLayering.EdgeAlignedBand(ShippedX, ShippedWidth, Pivot, out var x, out var width);
+
+        Assert.AreEqual(0f, SwipeBackLayering.BandLeftEdge(x, width, Pivot), 0.001f);
+        Assert.AreEqual(87.5f, x, 0.001f);
+        Assert.AreEqual(175f, width, 0.001f);
+    }
+
+    // Widening must only ever reach LEFT. Moving the right edge further in would newly shadow
+    // composer controls (the «+» button already sits under the band at x 40–94).
+    [Test]
+    public void EdgeAlignedBand_KeepsTheRightEdgeExactlyWhereItWas()
+    {
+        var before = SwipeBackLayering.BandRightEdge(ShippedX, ShippedWidth, Pivot);
+        SwipeBackLayering.EdgeAlignedBand(ShippedX, ShippedWidth, Pivot, out var x, out var width);
+
+        Assert.AreEqual(before, SwipeBackLayering.BandRightEdge(x, width, Pivot), 0.001f);
+    }
+
+    // The wirer re-runs after every suggestions-panel rebuild, so a second pass must be a no-op.
+    [Test]
+    public void EdgeAlignedBand_IsIdempotent()
+    {
+        SwipeBackLayering.EdgeAlignedBand(ShippedX, ShippedWidth, Pivot, out var x1, out var w1);
+        SwipeBackLayering.EdgeAlignedBand(x1, w1, Pivot, out var x2, out var w2);
+
+        Assert.AreEqual(x1, x2, 0.001f);
+        Assert.AreEqual(w1, w2, 0.001f);
+    }
+
+    // Pivot is read, never assumed: a band authored with a left pivot has to align just as well.
+    [Test]
+    public void EdgeAlignedBand_HonoursANonCentredPivot()
+    {
+        SwipeBackLayering.EdgeAlignedBand(anchoredX: 25f, width: 150f, pivotX: 0f,
+                                          out var x, out var width);
+
+        Assert.AreEqual(0f, SwipeBackLayering.BandLeftEdge(x, width, 0f), 0.001f);
+        Assert.AreEqual(175f, SwipeBackLayering.BandRightEdge(x, width, 0f), 0.001f);
+    }
+
     private static Transform Child(Transform parent, string name)
     {
         var go = new GameObject(name);

@@ -49,4 +49,33 @@ public static class SwipeBackLayering
     /// </summary>
     public static bool StaysBelowChrome(int stripIndex, int lowestChromeIndex) =>
         lowestChromeIndex == NotPresent || stripIndex < lowestChromeIndex;
+
+    // --- Band geometry -----------------------------------------------------
+    // The strip is left-ANCHORED (anchorMin.x == anchorMax.x == 0), so its anchoredPosition.x is
+    // the pivot's offset from the parent's left edge and sizeDelta.x is its literal width. Both
+    // edges therefore follow from (anchoredX, width, pivotX) alone.
+
+    public static float BandLeftEdge(float anchoredX, float width, float pivotX) =>
+        anchoredX - pivotX * width;
+
+    public static float BandRightEdge(float anchoredX, float width, float pivotX) =>
+        anchoredX + (1f - pivotX) * width;
+
+    /// <summary>
+    /// The band re-seated flush against the screen edge: left edge to 0, right edge exactly where
+    /// the author put it, so widening can never reach further in and shadow a control.
+    ///
+    /// It shipped seated 25u in (x ∈ [25,175]), and the strip is the ONLY thing that can start a
+    /// back-swipe — so a finger landing on the bezel, which is precisely where an iOS-style edge
+    /// pan begins, fell into a dead band and the gesture went to whatever was behind it.
+    ///
+    /// Idempotent by construction: re-running it on an already-aligned band recomputes the same
+    /// right edge and returns the same pair.
+    /// </summary>
+    public static void EdgeAlignedBand(float anchoredX, float width, float pivotX,
+                                       out float newAnchoredX, out float newWidth)
+    {
+        newWidth = BandRightEdge(anchoredX, width, pivotX);
+        newAnchoredX = pivotX * newWidth;
+    }
 }

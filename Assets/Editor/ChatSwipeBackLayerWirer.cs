@@ -24,7 +24,11 @@ using UnityEngine;
 /// controls, SwipeToClose, the sheets — are never shadowed. That invariant is asserted, not
 /// assumed: a scene whose chrome would end up under the strip is left untouched with an error.
 ///
-/// Additive and idempotent: it moves ONE object and preserves its rect verbatim. It creates
+/// It also seats the band flush against the screen edge (left edge to x = 0, right edge kept where
+/// the author put it). The strip shipped starting 25u in, which is dead space exactly where an
+/// iOS-style edge pan begins — and it is the only object that can start a back-swipe at all.
+///
+/// Additive and idempotent: it moves ONE object and changes only its horizontal band. It creates
 /// nothing, destroys nothing, and re-running it after 'Tools/UI/Build Suggestions Panel' (which
 /// re-inserts the panel at MovingArea+1) is both safe and the correct thing to do.
 ///
@@ -116,6 +120,34 @@ public static class ChatSwipeBackLayerWirer
             strip.localRotation = Quaternion.identity;
         }
 
+        // Seat the band flush against the screen edge. The strip is the ONLY thing that can start
+        // a back-swipe, and it shipped 25u short of the edge — dead space exactly where an
+        // iOS-style edge pan begins, so a finger landing on the bezel went to whatever was behind
+        // it. Only the LEFT edge moves: the right edge is preserved so widening can never reach
+        // further in and newly shadow a composer control.
+        var alignedBand = false;
+        if (Mathf.Approximately(strip.anchorMin.x, 0f) && Mathf.Approximately(strip.anchorMax.x, 0f))
+        {
+            SwipeBackLayering.EdgeAlignedBand(
+                strip.anchoredPosition.x, strip.sizeDelta.x, strip.pivot.x,
+                out var bandX, out var bandWidth);
+
+            if (bandWidth > 0f &&
+                (!Mathf.Approximately(bandX, strip.anchoredPosition.x) ||
+                 !Mathf.Approximately(bandWidth, strip.sizeDelta.x)))
+            {
+                strip.anchoredPosition = new Vector2(bandX, strip.anchoredPosition.y);
+                strip.sizeDelta = new Vector2(bandWidth, strip.sizeDelta.y);
+                alignedBand = true;
+            }
+        }
+        else
+        {
+            Debug.LogWarning("[ChatSwipeBackLayerWirer] The strip is x-STRETCHED rather than left-anchored, " +
+                             "so sizeDelta.x is an inset and not a width — edge alignment skipped. Check by " +
+                             "hand that the band still reaches x = 0.");
+        }
+
         // Recomputed after the reparent: it appends the strip last, so any index read before the
         // move describes a hierarchy that no longer exists.
         movingAreaIndex = DirectChildIndex(messagesPanel, ComposerHost(messagesPanel));
@@ -164,6 +196,9 @@ public static class ChatSwipeBackLayerWirer
                   $"SuggestionsPanel [{(panelIndex == SwipeBackLayering.NotPresent ? "absent" : panelIndex.ToString())}], " +
                   $"below the first chrome/overlay layer [{lowestChrome}]. " +
                   $"{(reparented ? "Reparented out of MovingArea." : "Already parented correctly; index re-checked.")} " +
+                  $"Band x ∈ [{SwipeBackLayering.BandLeftEdge(strip.anchoredPosition.x, strip.sizeDelta.x, strip.pivot.x):0.##}, " +
+                  $"{SwipeBackLayering.BandRightEdge(strip.anchoredPosition.x, strip.sizeDelta.x, strip.pivot.x):0.##}]" +
+                  $"{(alignedBand ? " (re-seated flush to the screen edge)." : " (already flush).")} " +
                   "Save the scene.");
     }
 
