@@ -380,6 +380,13 @@ public partial class Manager : MonoBehaviour
         // slot keys before LoadBots reads them. Idempotent on clean data.
         MigrateBotPersistence();
 
+        // One-shot, retry-safe: bots paused with the retired master switch come
+        // back as «Вместе» (suppressed but manageable). The ForceSemi pref write
+        // is synchronous, so the cards instantiated below read the safe mode;
+        // the network part (suppress → re-activate → clear key) runs in the
+        // background. See Manager.ActivationMigration.cs.
+        MigratePausedBotsActivation();
+
         yield return new WaitForEndOfFrame();
 
         for (int i = 0; i < id; i++)
@@ -3412,11 +3419,10 @@ public partial class Manager : MonoBehaviour
                 SeedReplyModeDefaultForProfile(openBot.name, openBot.GetComponent<Bot>().whatsappProfileId);   // WR-02: '*' row for a channel authed after a Вместе default
 
                 // The CreateWhatsappWorkflow webhook ACTIVATES the new workflow before it
-                // responds. Honor the master switch: if the bot is paused the channel must
-                // not start replying just because it was authed — deactivate it now.
-                if (!BotActivationPolicy.ChannelWorkflowActive(
-                        PlayerPrefs.GetInt(openBot.name, 1) == 1,
-                        PlayerPrefs.GetInt(openBot.name + "isOnWhatsapp", 1) == 1))
+                // responds. Honor the channel toggle — the only activation gate since the
+                // capsule↔ReplyMode unification (a Вместе default is enforced separately:
+                // SeedReplyModeDefaultForProfile above writes the '*' suppression row).
+                if (PlayerPrefs.GetInt(openBot.name + "isOnWhatsapp", 1) != 1)
                 {
                     StartCoroutine(SetWorkflowActiveRoutine(openBot.GetComponent<Bot>().whatsappWorkflowId, false));
                 }
@@ -3570,11 +3576,9 @@ public partial class Manager : MonoBehaviour
                 SeedReplyModeDefaultForProfile(openBot.name, openBot.GetComponent<Bot>().telegramProfileId);   // WR-02: '*' row for a channel authed after a Вместе default
 
                 // See CreateWhatsappWorkflowFromEdit: the webhook activates the new workflow
-                // before responding, so honor the master switch — a channel authed while the
-                // bot is paused must not start replying.
-                if (!BotActivationPolicy.ChannelWorkflowActive(
-                        PlayerPrefs.GetInt(openBot.name, 1) == 1,
-                        PlayerPrefs.GetInt(openBot.name + "isOnTelegram", 1) == 1))
+                // before responding — honor the channel toggle, the only activation gate
+                // since the capsule↔ReplyMode unification.
+                if (PlayerPrefs.GetInt(openBot.name + "isOnTelegram", 1) != 1)
                 {
                     StartCoroutine(SetWorkflowActiveRoutine(openBot.GetComponent<Bot>().telegramWorkflowId, false));
                 }
@@ -3602,10 +3606,14 @@ public partial class Manager : MonoBehaviour
     // Create*Workflow webhook activates the new workflow server-side before it responds
     // (node order: … → Activate Created Workflow → … → Send New Workflows Id), so a
     // channel authed while the bot is paused must be deactivated once we hold its id.
-    private IEnumerator SetWorkflowActiveRoutine(string id, bool active)
+    private IEnumerator SetWorkflowActiveRoutine(string id, bool active, System.Action<bool> done = null)
     {
         // Same sentinels the Enable/Save paths skip — no n8n workflow to (de)activate.
-        if (string.IsNullOrEmpty(id) || id.Equals("-1")) yield break;
+        if (string.IsNullOrEmpty(id) || id.Equals("-1"))
+        {
+            done?.Invoke(true);   // nothing to do IS the desired state
+            yield break;
+        }
 
         // See EnableWhatsappWorkflow: n8n's REST API 415s anything but application/json,
         // and Unity's transport stamps x-www-form-urlencoded on a bodyless POST, so pin it.
@@ -3619,6 +3627,7 @@ public partial class Manager : MonoBehaviour
 
         if (www.result != UnityWebRequest.Result.Success)
             Debug.LogError($"[{www.responseCode}] SetWorkflowActiveRoutine {www.url}: {www.error} {www.downloadHandler.text}");
+        done?.Invoke(www.result == UnityWebRequest.Result.Success);
     }
 
     private IEnumerator EnableWhatsappWorkflow(string id, bool enabled)
@@ -3806,10 +3815,9 @@ public partial class Manager : MonoBehaviour
         EditTelegramWorkflowSaved = false;
 
 
-        // The channel's workflow may only run when the bot master switch is also on —
-        // saving with the bot paused must never activate a channel. Effective state
-        // for each channel = master AND that channel's toggle (BotActivationPolicy).
-        bool masterOn = PlayerPrefs.GetInt(openBot.name, 1) == 1;
+        // Since the capsule↔ReplyMode unification the channel toggles are the ONLY
+        // workflow-activation gate: «выключить бота целиком» = both toggles off.
+        // The bots-page capsule governs reply SUPPRESSION (ReplyMode), not activation.
 
         // Freshly-created bots reach here with empty whatsappWorkflowId/telegramWorkflowId
         // because CreateWhatsappWorkflowFromStart / CreateTelegramWorkflowFromStart have
@@ -3826,8 +3834,7 @@ public partial class Manager : MonoBehaviour
         {
             if (previousWhatsappOn != openBotSettings.WhatsappToggle.isOn)
             {
-                StartCoroutine(EnableWhatsappWorkflow(whatsappWid,
-                    BotActivationPolicy.ChannelWorkflowActive(masterOn, openBotSettings.WhatsappToggle.isOn)));
+                StartCoroutine(EnableWhatsappWorkflow(whatsappWid, openBotSettings.WhatsappToggle.isOn));
             }
             else
             {
@@ -3864,8 +3871,7 @@ public partial class Manager : MonoBehaviour
         {
             if (previousTelegramOn != openBotSettings.TelegramToggle.isOn)
             {
-                StartCoroutine(EnableTelegramWorkflow(telegramWid,
-                    BotActivationPolicy.ChannelWorkflowActive(masterOn, openBotSettings.TelegramToggle.isOn)));
+                StartCoroutine(EnableTelegramWorkflow(telegramWid, openBotSettings.TelegramToggle.isOn));
             }
             else
             {

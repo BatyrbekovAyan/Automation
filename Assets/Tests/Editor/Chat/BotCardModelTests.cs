@@ -44,16 +44,9 @@ public class BotCardModelTests
         Assert.AreEqual(BotChannelIconState.Muted, BotCardModel.IconState("profile1", false));
     }
 
-    // ---- Confirm asymmetry ----------------------------------------------
-
-    [Test]
-    public void Confirm_OnlyWhenEnabling()
-    {
-        Assert.IsTrue(BotCardModel.ConfirmRequired(masterOn: false),
-            "OFF → ON starts messaging real clients — must confirm");
-        Assert.IsFalse(BotCardModel.ConfirmRequired(masterOn: true),
-            "ON → OFF is the safe direction — instant");
-    }
+    // Confirm asymmetry is AutoButtonModel's contract since the unification —
+    // the card feeds ReplyModeToggleBinder.GetMode into AutoButtonModel
+    // directly, and AutoButtonModelTests pin that matrix.
 
     // ---- Subline ---------------------------------------------------------
 

@@ -15,7 +15,7 @@ public class Bot : MonoBehaviour
     [SerializeField] public TextMeshProUGUI Status;
     [SerializeField] public Button EditButton;
 
-    [Header("Auto capsule (C2 card — wired by BotCardAutoPillBuilder)")]
+    [Header("Auto capsule (C2 card — wired by BotCardAutoPillBuilder; drives the bot's ReplyMode)")]
     [SerializeField] private Button autoPillButton;
     [SerializeField] private Image autoPillRing;
     [SerializeField] private Image autoPillFill;
@@ -90,7 +90,6 @@ public class Bot : MonoBehaviour
     public string telegramWorkflowId;
 
     private Color green = new(0, 1, 0);
-    private Color red = new(1, 0, 0);
     private Color blue = new(0, 0.6980392f, 1);
 
     // Display blue of the blinking «Подключение…» word (the retired status
@@ -119,6 +118,9 @@ public class Bot : MonoBehaviour
     private void OnEnable()
     {
         Theme.Changed += HandleThemeChanged;
+        // A mode committed elsewhere (chats header, bot-switcher chip) must
+        // repaint this card — all three controls share the bot's ReplyMode.
+        ReplyModeToggleBinder.OnReplyModeChanged += HandleReplyModeChanged;
         // Returning to the Боты tab after Bot Settings: the channel toggles or
         // the business type may have changed while this card was inactive.
         if (cardStateReady) RefreshCardState(animatePill: false);
@@ -127,6 +129,7 @@ public class Bot : MonoBehaviour
     private void OnDisable()
     {
         Theme.Changed -= HandleThemeChanged;
+        ReplyModeToggleBinder.OnReplyModeChanged -= HandleReplyModeChanged;
         KillSublineBlink();
     }
 
@@ -353,10 +356,12 @@ public class Bot : MonoBehaviour
     }
 
     /// <summary>
-    /// The master activation state (bare botName key, default ON) — the same
-    /// store the old iOS switch drove; only the control changed clothes.
+    /// The capsule's state — the bot's ReplyMode default, the SAME store the
+    /// chats-header «Авто» button drives (unified 2026-08-13). Workflow
+    /// activation is no longer this control's business: workflows stay active
+    /// per the channel toggles, and «Вместе» suppresses replies server-side.
     /// </summary>
-    private bool MasterOn => PlayerPrefs.GetInt(transform.name, 1) == 1;
+    private bool AutoOn => AutoButtonModel.IsAutoOn(ReplyModeToggleBinder.GetMode(transform.name));
 
     /// <summary>Manager gates the capsule while workflows are being created
     /// (the old switch did this via Toggle.interactable).</summary>
@@ -374,36 +379,24 @@ public class Bot : MonoBehaviour
         autoPillButton.transform.DOPunchScale(Vector3.one * -0.04f, 0.18f, 1, 0.5f);
 
         // The header pill's asymmetry: enabling confirms (the bot starts
-        // messaging real clients), pausing commits instantly.
-        if (BotCardModel.ConfirmRequired(MasterOn))
+        // messaging real clients), switching back to «Вместе» is instant.
+        // RequestEnableAuto can't be reused here — its popup lives under the
+        // inactive chats screen — so the card shows its own overlay confirm
+        // and commits through the same binder entry; the repaint (and the
+        // chats-header sync) arrives via OnReplyModeChanged.
+        if (AutoButtonModel.ConfirmRequired(ReplyModeToggleBinder.GetMode(transform.name)))
             BotActivationConfirm.Show(BotName != null ? BotName.font : null, () =>
             {
-                if (this != null) ApplyActivation(true);   // card may die before confirm
+                if (this != null)   // card may die before confirm
+                    ReplyModeToggleBinder.CommitMode(transform.name, ReplyModeToggleBinder.ReplyMode.Auto);
             });
         else
-            ApplyActivation(false);
+            ReplyModeToggleBinder.DisableAuto(transform.name);
     }
 
-    private void ApplyActivation(bool enabled)
+    private void HandleReplyModeChanged(string botId, ReplyModeToggleBinder.ReplyMode _)
     {
-        PlayerPrefs.SetInt(transform.name, enabled ? 1 : 0);
-        PlayerPrefs.Save();
-
-        Status.text = enabled ? active ? "Active" : "Connecting.." : "Not Active";
-        Status.color = enabled ? active ? green : blue : red;
-
-        RefreshCardState(animatePill: true);
-
-        // The master switch gates BOTH channels, but must not activate a channel the
-        // owner has toggled off: effective state = master AND that channel's toggle.
-        // (Off master → both false → deactivate; on master → only enabled channels run.)
-        bool whatsappOn = BotActivationPolicy.ChannelWorkflowActive(
-            enabled, PlayerPrefs.GetInt(transform.name + "isOnWhatsapp", 1) == 1);
-        bool telegramOn = BotActivationPolicy.ChannelWorkflowActive(
-            enabled, PlayerPrefs.GetInt(transform.name + "isOnTelegram", 1) == 1);
-
-        Manager.Instance.GetEnableWhatsappWorkflow(whatsappWorkflowId, whatsappOn);
-        Manager.Instance.GetEnableTelegramWorkflow(telegramWorkflowId, telegramOn);
+        if (cardStateReady && botId == transform.name) RefreshCardState(animatePill: true);
     }
 
     // Deferred one frame: Manager renames the instantiated card and writes its
@@ -414,9 +407,10 @@ public class Bot : MonoBehaviour
         yield return new WaitForEndOfFrame();
 
         cardStateReady = true;
-        bool on = MasterOn;
-        Status.text = on ? active ? "Active" : "Connecting.." : "Not Active";
-        Status.color = on ? active ? green : blue : red;
+        // The «Not Active» (red) state died with the master switch — the hidden
+        // status channel now only distinguishes connected from connecting.
+        Status.text = active ? "Active" : "Connecting..";
+        Status.color = active ? green : blue;
 
         RefreshCardState(animatePill: false);
     }
@@ -442,8 +436,9 @@ public class Bot : MonoBehaviour
         if (!cardStateReady) return;
         if (Status != null) lastObservedStatusColor = Status.color;
 
-        // The capsule is the chats-header «Авто» pill 1:1 — one painter, one look.
-        ReplyModeToggleBinder.PaintChip(MasterOn, autoPillRing, autoPillFill,
+        // The capsule is the chats-header «Авто» pill 1:1 — one painter, one
+        // look, and since the unification one STORE (the bot's ReplyMode).
+        ReplyModeToggleBinder.PaintChip(AutoOn, autoPillRing, autoPillFill,
             autoPillLabel, autoPillDotRing, autoPillDotCore, animatePill);
 
         RefreshSubline();

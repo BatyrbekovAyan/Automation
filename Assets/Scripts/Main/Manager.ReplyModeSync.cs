@@ -105,7 +105,7 @@ public partial class Manager
     // /webhook/SetReplyMode (NO auth header — every /webhook/* is open, R-02-01),
     // Content-Type: application/json (libcurl would otherwise stamp x-www-form-urlencoded
     // and n8n would 415 it), timeout 30, using-block, log-only on failure.
-    private IEnumerator SyncReplyModeRoutine(string jsonBody)
+    private IEnumerator SyncReplyModeRoutine(string jsonBody, System.Action<bool> done = null)
     {
         string url = $"{n8nBaseUrl}/webhook/SetReplyMode";
 
@@ -118,5 +118,6 @@ public partial class Manager
 
         if (request.result != UnityWebRequest.Result.Success)
             Debug.LogError($"[SetReplyMode] [{request.responseCode}] {url}: {request.error}\n{request.downloadHandler?.text}");
+        done?.Invoke(request.result == UnityWebRequest.Result.Success);
     }
 }

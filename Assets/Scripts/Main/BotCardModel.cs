@@ -15,16 +15,16 @@ public enum BotChannelIconState
 }
 
 /// <summary>
-/// Pure decision seam for the C2 bot card (sketch 006): the «Авто» capsule that
-/// replaced the iOS activation switch, the channel brand icons, and the
-/// blinking «Подключение…» subline. No MonoBehaviour so the matrix is
-/// EditMode-testable (AutoButtonModel precedent).
+/// Pure decision seam for the C2 bot card (sketch 006): the channel brand
+/// icons and the blinking «Подключение…» subline. No MonoBehaviour so the
+/// matrix is EditMode-testable (AutoButtonModel precedent).
 ///
-/// The capsule drives the SAME master-activation state the old switch did
-/// (bare botName PlayerPrefs key + n8n activate/deactivate through
-/// <see cref="BotActivationPolicy"/>) — only the clothes changed. It shares the
-/// chats-header «Авто» button's confirm asymmetry: enabling asks (the bot
-/// starts messaging real clients), disabling commits instantly.
+/// The «Авто» capsule itself needs no seam of its own since the 2026-08-13
+/// unification: it drives the bot's ReplyMode — the exact store and confirm
+/// asymmetry of the chats-header button, both pinned by
+/// <see cref="AutoButtonModel"/> / AutoButtonModelTests. The old master
+/// activation key is dead (see BotActivationMigration); workflows stay active
+/// per the channel toggles alone.
 /// </summary>
 public static class BotCardModel
 {
@@ -45,12 +45,6 @@ public static class BotCardModel
         if (!IsConnected(profileId)) return BotChannelIconState.Hidden;
         return channelEnabled ? BotChannelIconState.Colored : BotChannelIconState.Muted;
     }
-
-    /// <summary>
-    /// Confirm asymmetry (same as the chats-header pill): only ENABLING needs
-    /// the popup; pausing the bot is instant.
-    /// </summary>
-    public static bool ConfirmRequired(bool masterOn) => !masterOn;
 
     /// <summary>
     /// Subline text: while a channel is connecting the blinking word replaces
