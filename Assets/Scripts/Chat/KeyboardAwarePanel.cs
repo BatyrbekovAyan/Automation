@@ -43,6 +43,22 @@ public class KeyboardAwarePanel : MonoBehaviour
     /// The applied rise is max(keyboard, this).</summary>
     public float VirtualBottomInset { get; set; }
 
+    /// <summary>While true the applied rise follows the target with NO smoothing, and the
+    /// smoothing velocity is held at zero.
+    ///
+    /// Reason: a finger dragging the slot handle must move the composer 1:1 — SmoothDamp makes
+    /// the composer lag behind the finger. Smoothing resumes the moment the flag clears (on
+    /// release), and it must NOT inherit velocity from the drag, or the stale momentum would
+    /// overshoot the detent snap. Zeroing the velocity every immediate frame guarantees that.
+    ///
+    /// This is a transient, caller-owned flag — it deliberately does not touch the serialized
+    /// <see cref="iosSmoothTime"/> knob, so an interrupted drag can never corrupt it.
+    ///
+    /// iOS only, by construction: the Editor and Android paths go through ApplyInstant, which is
+    /// already 1:1. Set it unconditionally (no #if at the call site) — and verify drag smoothness
+    /// on a DEVICE, since the Editor looks identical with the flag on or off.</summary>
+    public bool TrackInsetImmediately { get; set; }
+
     /// <summary>The rise actually applied to the panel THIS frame, canvas px — smoothing and
     /// all. Slot tenants glue their top edge to this so they track the composer exactly.</summary>
     public float AppliedBottomInset => _panel != null ? _panel.anchoredPosition.y - _baseY : 0f;
@@ -109,6 +125,26 @@ public class KeyboardAwarePanel : MonoBehaviour
 #endif
     }
 
+    void OnDisable()
+    {
+        // Defensive: a drag interrupted by the chat screen closing never gets its release,
+        // so clear the bypass here — the next chat must open with smoothing back on.
+        TrackInsetImmediately = false;
+
+        // ...and the interrupted drag's HEIGHT must not survive the flag. _currentY is written
+        // only by ApplyIOS, so it keeps the parked drag value across the disable; clearing the
+        // flag alone would just turn the next chat's first frame into a slow slide down from
+        // that height (Expanded can be the whole card stack) instead of an instant correction —
+        // dragging the thread's top-inset compensation with it. Rest is the only correct start:
+        // whichever tenant claims the slot on the next open re-drives the rise from zero, and
+        // the anchored write guarantees the stale Y can never render if this component's Update
+        // has already run on the frame something re-enables it.
+        _velocityY = 0f;
+        _currentY  = _baseY;
+        if (_panel != null)
+            _panel.anchoredPosition = new Vector2(_panel.anchoredPosition.x, _baseY);
+    }
+
     // The one place keyboard and slot-tenant claims merge (no-dip max rule).
     private float EffectiveTarget => Mathf.Max(EffectiveAreaCanvasPx, VirtualBottomInset);
 
@@ -132,13 +168,22 @@ public class KeyboardAwarePanel : MonoBehaviour
     {
         float targetY = _baseY + offsetCanvasPx;
 
-        _currentY = Mathf.SmoothDamp(
-            _currentY, targetY,
-            ref _velocityY,
-            iosSmoothTime,
-            Mathf.Infinity,
-            Time.unscaledDeltaTime
-        );
+        if (TrackInsetImmediately)
+        {
+            // 1:1 finger tracking — no lag, and no momentum left for the snap that follows.
+            _currentY  = targetY;
+            _velocityY = 0f;
+        }
+        else
+        {
+            _currentY = Mathf.SmoothDamp(
+                _currentY, targetY,
+                ref _velocityY,
+                iosSmoothTime,
+                Mathf.Infinity,
+                Time.unscaledDeltaTime
+            );
+        }
 
         _panel.anchoredPosition = new Vector2(_panel.anchoredPosition.x, _currentY);
     }

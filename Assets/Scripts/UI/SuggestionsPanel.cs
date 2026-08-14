@@ -39,6 +39,7 @@ public class SuggestionsPanel : MonoBehaviour
     private readonly List<SuggestionCard> _cards = new();
     private float _slotCanvasPx;       // panel height — the keyboard slot's effective height
     private float _safeInsetCanvasPx;  // home-bar clearance applied inside the slot
+    private bool _fadeSuppressed;      // sticky "never show the fade" (expanded detent — nothing is cut off)
 
     /// <summary>View-level visibility. The controller owns INTENT (its own sheet-open state) —
     /// the panel can be active-but-covered while the native keyboard slides over it.</summary>
@@ -55,7 +56,19 @@ public class SuggestionsPanel : MonoBehaviour
         if (backButton != null) backButton.onClick.AddListener(() => OnBackRequested?.Invoke());
     }
 
-    void OnDisable() => StopShimmer();
+    void OnDisable()
+    {
+        StopShimmer();
+        // Defensive, mirroring KeyboardAwarePanel.OnDisable: a drag that suppressed the fade at the
+        // Expanded detent never gets its release when the chat screen closes underneath it. The
+        // latch is sticky BY DESIGN against re-renders and the controller cannot read it back, so a
+        // stranded `true` would silently kill the "more below" cue for every later round — on a
+        // whole new chat, at Standard, with cards genuinely cut off. Clearing it here can only
+        // over-show the fade (an honest cue at a capped Expanded), never strand it hidden. The
+        // visibility itself is re-derived by the next UpdateFadeVisibility — every show runs
+        // SetSlotMetrics, and every state change (skeleton / cards) recomputes too.
+        _fadeSuppressed = false;
+    }
 
     // --- Slot chassis (sketch-003 variant A) --------------------------------
 
@@ -68,18 +81,51 @@ public class SuggestionsPanel : MonoBehaviour
     /// </summary>
     public void SetSlotMetrics(float slotCanvasPx, float safeInsetCanvasPx)
     {
-        _slotCanvasPx = slotCanvasPx;
         _safeInsetCanvasPx = safeInsetCanvasPx;
+        ApplySlotHeight(slotCanvasPx);
+        if (gameObject.activeInHierarchy) StartCoroutine(UpdateFadeNextFrame());
+        else UpdateFadeVisibility();
+    }
+
+    /// <summary>
+    /// The live-drag path: same geometry as <see cref="SetSlotMetrics"/> (the stored slot height,
+    /// the rect and the content insets) but WITHOUT the fade recompute — that measures the whole
+    /// card stack via <see cref="UnityEngine.UI.LayoutUtility"/> and would run a full layout pass
+    /// on every drag frame. The fade cannot change while only the slot height moves anyway; the
+    /// caller MUST settle it when the drag releases — <see cref="SetSlotMetrics"/> at the snapped
+    /// detent (it re-measures next frame), or <see cref="SetFadeSuppressed"/> at Expanded.
+    /// The safe inset is unchanged during a drag, so it is reused from the last SetSlotMetrics.
+    /// LOCKSTEP: the caller must drive the APPLIED inset with this height, not behind it —
+    /// <see cref="FollowInset"/> assumes applied ≤ the stored slot height, and a SMOOTHED inset
+    /// lagging a shrinking slot (every downward drag) makes applied &gt; slot for the smoothing
+    /// tail, which lifts the panel's bottom edge off the screen bottom. Hold
+    /// KeyboardAwarePanel.TrackInsetImmediately for the whole gesture.
+    /// </summary>
+    public void SetSlotHeightLive(float slotCanvasPx) => ApplySlotHeight(slotCanvasPx);
+
+    /// <summary>
+    /// Height of the panel's own chrome — the drag handle strip plus the header — authored once at
+    /// build time as the card viewport's top inset. The Expanded detent is chrome + content, so the
+    /// controller must read the chrome from the SAME rect the content is measured inside
+    /// (<see cref="MeasuredContentHeight"/>), or the detent and the fade disagree about what "all
+    /// the cards fit" means.
+    /// </summary>
+    public float ChromeHeightCanvasPx => cardsViewport != null ? -cardsViewport.offsetMax.y : 0f;
+
+    // Shared core of both height paths. _slotCanvasPx MUST move with the rect: FollowInset derives
+    // both the panel's y and its open ratio from it, so a rect resized behind its back would let
+    // the panel float off the screen bottom mid-drag.
+    private void ApplySlotHeight(float slotCanvasPx)
+    {
+        _slotCanvasPx = slotCanvasPx;
         // The panel is TALLER than the slot by the safe inset. The native keyboard covers the
         // composer's baked bottom pad (KeyboardAwarePanel subtracts the safe area from the
         // rise, so the pad "slides under the keyboard"); a tenant of the same slot must cover
         // that same strip, or it shows as a dead gap between the composer pill and the panel
         // chrome (device finding 2026-08-12). The pad is 108u, the safe inset ≈94u — the pill
         // itself starts above the pad, so the overlap can never touch it.
-        if (rt != null) rt.sizeDelta = new Vector2(rt.sizeDelta.x, slotCanvasPx + safeInsetCanvasPx);
-        ApplySafeInset(safeInsetCanvasPx);
-        if (gameObject.activeInHierarchy) StartCoroutine(UpdateFadeNextFrame());
-        else UpdateFadeVisibility();
+        if (rt != null) rt.sizeDelta = new Vector2(rt.sizeDelta.x, slotCanvasPx + _safeInsetCanvasPx);
+        ApplySafeInset(_safeInsetCanvasPx);
     }
 
     // The safe pad lives on the CONTENT region, not the panel rect: viewport, the fade glued to
@@ -211,13 +257,53 @@ public class SuggestionsPanel : MonoBehaviour
         _cards.Clear();
     }
 
-    // The fade is a lie once everything is visible — show it only while content overflows.
+    /// <summary>
+    /// The measured height of the card stack — the SAME number the fade's overflow rule uses, so a
+    /// caller sizing a detent around the content can never disagree with the fade about whether
+    /// anything is cut off. Only valid AFTER a layout pass has run over freshly built cards (this
+    /// class works around that with <see cref="UpdateFadeNextFrame"/>); read it a frame late too.
+    /// </summary>
+    public float MeasuredContentHeight
+    {
+        get
+        {
+            // `as` + Unity's null operator, not a hard cast: this is public and read from a drag
+            // hot path, so a mis-wired (plain Transform) or destroyed container must read as 0
+            // rather than throw InvalidCastException / MissingReferenceException mid-gesture.
+            RectTransform content = cardsContainer as RectTransform;
+            return content == null ? 0f : UnityEngine.UI.LayoutUtility.GetPreferredHeight(content);
+        }
+    }
+
+    /// <summary>
+    /// Force the "more below" fade off regardless of overflow, and remember it — the Expanded
+    /// detent shows the whole stack, so a fade there would be a lie, and a later
+    /// <see cref="UpdateFadeVisibility"/> (a re-render, a re-measure) must not pop it back.
+    /// Suppression only vetoes the VISIBILITY decision: <see cref="ApplySafeInset"/> keeps moving
+    /// the (hidden) fade with the safe pad, so it reappears at the right Y back at Standard.
+    /// </summary>
+    public void SetFadeSuppressed(bool suppressed)
+    {
+        if (_fadeSuppressed == suppressed) return;   // repeatable per drag frame — never re-measures
+        _fadeSuppressed = suppressed;
+        UpdateFadeVisibility();
+    }
+
+    // The fade is a lie once everything is visible — show it only while content overflows (and
+    // never while suppressed). SOLE owner of the fade's active state.
     private void UpdateFadeVisibility()
     {
-        if (bottomFade == null || cardsViewport == null || cardsContainer == null) return;
-        float contentH = UnityEngine.UI.LayoutUtility.GetPreferredHeight((RectTransform)cardsContainer);
-        bool overflows = contentH > cardsViewport.rect.height + 1f;
-        if (bottomFade.activeSelf != overflows) bottomFade.SetActive(overflows);
+        if (bottomFade == null) return;
+        if (_fadeSuppressed) { SetActiveSafe(bottomFade, false); return; }
+        if (cardsViewport == null || cardsContainer == null) return;   // cannot measure — leave as authored
+        // A slot dragged to (or near) Collapsed leaves the viewport zero/negative — the chrome alone
+        // is taller than the slot — and every content height then "overflows". Nothing is on screen
+        // to be cut off, and the fade is the one child anchored ABOVE the panel's own bottom edge
+        // (by the safe pad), so at slot 0 it would still paint a Surface wash over the bottom ~100u
+        // of the screen while the panel itself sits fully below it.
+        float viewportH = cardsViewport.rect.height;
+        bool overflows = viewportH > 0f && MeasuredContentHeight > viewportH + 1f;
+        SetActiveSafe(bottomFade, overflows);
     }
 
     private IEnumerator UpdateFadeNextFrame()

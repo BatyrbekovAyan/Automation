@@ -33,6 +33,14 @@ public class ReactionBarController : MonoBehaviour
     // Inset the panels keep from the top/bottom of the overlay before they're considered off-screen.
     private const float VerticalLimitInset = 12f;
 
+    /// <summary>
+    /// Is the bar (and its full-screen scrim) up? Read by gesture owners that must stand down while
+    /// a long-press has escalated into the reaction bar — the scrim answers raycasts, but
+    /// EventSystem.RaycastAll does no occlusion culling, so "something is above me" is not
+    /// something a hit test can conclude on its own.
+    /// </summary>
+    public bool IsShowing => content != null && content.activeSelf;
+
     [Header("Overlay")]
     [SerializeField] private GameObject content;     // scrim + bar; toggled on show/hide
     [SerializeField] private Button scrimButton;     // full-panel dismiss

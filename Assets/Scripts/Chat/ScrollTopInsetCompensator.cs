@@ -29,6 +29,15 @@ public class ScrollTopInsetCompensator : MonoBehaviour
         _restTopOffset = _rt.offsetMax.y;
     }
 
+    /// <summary>
+    /// The thread viewport's height with nothing raised: the current height plus whatever rise is
+    /// trimming it right now (LateUpdate shortens the rect by exactly the applied inset, so adding
+    /// it back reconstructs rest). The suggestions panel's Expanded detent is capped against this
+    /// so a readable slice of thread always survives — computed from live geometry rather than a
+    /// constant, because the canvas height varies with the device's aspect ratio.
+    /// </summary>
+    public float RestViewportHeightCanvasPx => _rt != null ? _rt.rect.height + _lastApplied : 0f;
+
     void LateUpdate()
     {
         if (_mover == null) return;

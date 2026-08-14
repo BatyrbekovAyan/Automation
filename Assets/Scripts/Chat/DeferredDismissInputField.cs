@@ -1,3 +1,4 @@
+using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -141,6 +142,14 @@ public class DeferredDismissInputField : TMP_InputField,
     {
         liveInputs.Remove(this);
 
+        // A press vetoed a moment ago can end HERE — the veto listener raises
+        // the panel, the panel raise (or a Back / tab switch) hides this field,
+        // and the PointerUp that would have forgotten the pointer is never
+        // delivered to a disabled component. Reset so a recycled touch id can
+        // never make the next gesture's click look like the tail of this one
+        // (which would swallow it silently, with no ActivationVetoed raised).
+        vetoedPointerId = NoVetoedPointer;
+
         // Teardown with an orphan still parked: no Update will run to
         // watchdog it, so close it now.
         if (orphanedKeyboard != null)
@@ -213,12 +222,163 @@ public class DeferredDismissInputField : TMP_InputField,
         base.OnSelect(eventData);
     }
 
+    // ── activation veto (pointer routes only) ────────────────────────────
+    /// <summary>
+    /// Optional per-INSTANCE predicate consulted before a POINTER gesture is
+    /// allowed to focus this field. Returning true swallows the gesture: TMP
+    /// never selects and never activates the field (so no keyboard opens) and
+    /// <see cref="ActivationVetoed"/> is raised instead — which is what lets a
+    /// tap on a collapsed composer raise the suggestions panel rather than
+    /// start an edit.
+    ///
+    /// Default null, so every other input in the scene and in every prefab
+    /// keeps today's behaviour byte for byte; only the owner of one specific
+    /// field (the message composer) installs it.
+    ///
+    /// Consulted on the two POINTER activation routes: TMP's OnPointerDown
+    /// (which selects the field itself → OnSelect → ActivateInputField) and
+    /// TMP's direct OnPointerClick path. Deliberately NOT consulted in
+    /// OnSelect — every PROGRAMMATIC activation must keep working (the ⌨ key,
+    /// the post-Send re-focus, the reply focus), and all of them arrive there.
+    ///
+    /// OUT OF SCOPE BY DESIGN: the long-press / double-tap text-selection route
+    /// (TextSelectionRouter calls SetSelectedGameObject + ActivateInputField
+    /// itself, bypassing both pointer overrides) is NOT vetoed. Long-pressing a
+    /// collapsed composer is a request to EDIT text, so focusing there is the
+    /// correct behaviour.
+    /// </summary>
+    public Func<bool> ActivationVeto;
+
+    /// <summary>
+    /// Raised INSTEAD of activating when <see cref="ActivationVeto"/> returns
+    /// true, so the installer can turn the swallowed tap into something else.
+    /// Raised exactly ONCE per vetoed gesture: the pointer-down and the
+    /// pointer-click of the same tap share a single raise.
+    ///
+    /// "Gesture" means one finger. A genuine two-finger tap on this field is
+    /// two presses and announces twice, so keep the handler IDEMPOTENT (a raise
+    /// means "the tap wanted the panel", not "toggle").
+    ///
+    /// It is a C# event, so a subscriber that re-subscribes on every screen
+    /// open MUST `-=` before `+=`; nothing here clears the list, deliberately —
+    /// this field is disabled and re-enabled by ordinary tab navigation and
+    /// must come back with its veto still installed.
+    /// </summary>
+    public event Action ActivationVetoed;
+
+    // The pointer whose press was already vetoed and announced. One tap is
+    // delivered as PointerDown → PointerUp → PointerClick, so without this the
+    // click would announce the same tap a second time.
+    private const int NoVetoedPointer = int.MinValue;
+    private int vetoedPointerId = NoVetoedPointer;
+
+    // Route (a): TMP's own OnPointerDown calls
+    // EventSystem.SetSelectedGameObject → OnSelect → ActivateInputField, so
+    // gating OnPointerClick alone would NOT keep the keyboard shut.
+    // (The input module deselects the previously selected object before it
+    // dispatches this event — that is module behaviour we neither cause nor
+    // can suppress; the vetoed field simply never becomes the new selection.)
+    public override void OnPointerDown(PointerEventData eventData)
+    {
+        // A fresh press always starts a fresh gesture. This is what makes a
+        // left-over id harmless: a press that ends without a click (finger
+        // dragged away) can never be mistaken for a later tap that reuses the
+        // same pointer id.
+        vetoedPointerId = NoVetoedPointer;
+        if (VetoActivation(eventData)) return;
+        base.OnPointerDown(eventData);
+    }
+
     // TMP also activates directly from OnPointerClick, bypassing OnSelect —
-    // the single-focus invariant must hold on this path too.
+    // the single-focus invariant must hold on this path too. Route (b) of the
+    // veto lives here as well, and is checked BEFORE ReleaseOtherFocusedInputs
+    // so a vetoed tap leaves every other field's focus exactly as it was.
     public override void OnPointerClick(PointerEventData eventData)
     {
+        if (eventData != null && eventData.pointerId == vetoedPointerId)
+        {
+            // Same tap whose pointer-down was already vetoed and announced.
+            vetoedPointerId = NoVetoedPointer;
+            return;
+        }
+        if (!ActivationAlreadyPromised() && VetoActivation(eventData)) return;
         ReleaseOtherFocusedInputs();
         base.OnPointerClick(eventData);
+    }
+
+    public override void OnPointerUp(PointerEventData eventData)
+    {
+        ForgetVetoedPointerIfNoClickFollows(eventData);
+        base.OnPointerUp(eventData);
+    }
+
+    // MATERIALIZED FOCUS, read from the other side: activation is a PROMISE, so
+    // between TMP's OnPointerDown (which selects this field) and the LateUpdate
+    // that finally sets m_AllowInput, isFocused is still false. When the down
+    // and the click of one gesture land in the SAME dispatch pass — a very fast
+    // tap, or DragShield's synthetic down→up→click burst — vetoing on the click
+    // would announce a swallowed tap while the keyboard that same gesture
+    // already committed to is on its way up: panel AND keyboard. Being the
+    // EventSystem's current selection is that in-flight marker.
+    //
+    // Deliberately consulted on the CLICK route only. On the DOWN route a stale
+    // selection would defeat the veto outright: SilentCaretStop deactivates a
+    // field without deselecting it, so the composer can sit as
+    // currentSelectedGameObject long after its keyboard was handed away.
+    private bool ActivationAlreadyPromised() =>
+        EventSystem.current != null
+        && EventSystem.current.currentSelectedGameObject == gameObject;
+
+    // Swallows the gesture when the installed predicate says so: nothing is
+    // selected, nothing is activated, and no other field's focus is touched —
+    // the listener decides what the tap means instead.
+    private bool VetoActivation(PointerEventData eventData)
+    {
+        if (ActivationVeto == null) return false;
+        // Left button only, matching TMP's own activation gates (MayDrag on
+        // OnPointerDown, the explicit button test in OnPointerClick).
+        if (eventData != null && eventData.button != PointerEventData.InputButton.Left) return false;
+        // The veto REPLACES an activation; where TMP could not have activated
+        // anyway there is nothing to replace, so a tap on a field a CanvasGroup
+        // has locked must not silently raise the panel instead. Same gate TMP
+        // opens with (MayDrag).
+        if (!IsActive() || !IsInteractable()) return false;
+        // Already editing HERE: a tap that only moves the caret inside the
+        // field the user is typing in must never be swallowed.
+        if (isFocused) return false;
+        if (!ActivationVeto()) return false;
+
+        if (eventData != null) vetoedPointerId = eventData.pointerId;
+        Trace($"{Who()} activation vetoed");
+        ActivationVetoed?.Invoke();
+        return true;
+    }
+
+    // PointerUp is dispatched BEFORE the PointerClick of the same tap, so the
+    // vetoed pointer may only be forgotten once no click can still arrive for
+    // it — clearing unconditionally would let that click announce the same
+    // gesture a second time. The test mirrors the input module's own: a click
+    // is delivered only while the gesture is still click-eligible AND the
+    // release lands back on this field.
+    //
+    // Release is the ONLY place this may run. PointerExit is emphatically not
+    // the end of a gesture: the finger leaving this field's rect mid-press
+    // fires one, and so does the layout moving out from under a still-pressed
+    // finger — which is exactly what the panel raise this veto triggers DOES.
+    // Forgetting there and then taking the release back over the field would
+    // raise ActivationVetoed a second time for one tap. Nothing is lost by
+    // skipping exit: a gesture that ends anywhere but on this field arrives
+    // here with the handler test already false and is forgotten then, and a
+    // gesture that never reaches a release at all (this field hidden mid-press)
+    // is covered by OnDisable and by the reset at the top of the next press.
+    private void ForgetVetoedPointerIfNoClickFollows(PointerEventData eventData)
+    {
+        if (eventData == null || eventData.pointerId != vetoedPointerId) return;
+
+        bool clickCanStillFollow = eventData.eligibleForClick
+            && ExecuteEvents.GetEventHandler<IPointerClickHandler>(
+                   eventData.pointerCurrentRaycast.gameObject) == gameObject;
+        if (!clickCanStillFollow) vetoedPointerId = NoVetoedPointer;
     }
 
     private void Update()

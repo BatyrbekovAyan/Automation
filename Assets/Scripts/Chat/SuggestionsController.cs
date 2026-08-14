@@ -30,19 +30,54 @@ public class SuggestionsController : MonoBehaviour
     private long _requestSeq;          // monotonic; newest wins (A6)
     private bool _semiAutoOn;
 
-    // Keyboard-slot tenancy (sketch-003 variant A). _sheetOpen is the INTENT — the panel view
-    // can be active-but-covered while the native keyboard slides over it. _yieldingToKeyboard
-    // bridges the handoff where the panel has conceded the slot but the held inset must not
-    // drop until the keyboard actually arrives (SuggestionSlotSwap.ShouldReleaseHold — the
-    // no-dip rule). _pendingShow parks an auto-show that found the keyboard owning the slot
-    // (an auto-show never steals the slot from a typing owner) until the keyboard leaves.
-    private bool _sheetOpen;
+    // Keyboard-slot tenancy. Chassis = sketch-003 A (the panel is a tenant of the keyboard's slot);
+    // interaction model = sketch-005 E. _slotState is the INTENT — the panel view can be
+    // active-but-covered while the native keyboard slides over it — and it is the ONLY place that
+    // can tell «the owner collapsed the slot» (Collapsed) apart from «there is no panel here»
+    // («Авто», no chat), a distinction the old _sheetOpen bool could not express and which rules
+    // 3/4/5/9 all key off. Every intent goes through SuggestionSlotStateMachine.Resolve.
+    // _yieldingToKeyboard bridges the handoff where the panel has conceded the slot but the held
+    // inset must not drop until the keyboard actually arrives (SuggestionSlotSwap.ShouldReleaseHold
+    // — the no-dip rule). _pendingShow parks a show that found the «+» attach sheet owning the slot.
+    private SuggestionSlotState _slotState = SuggestionSlotState.Collapsed;
     private bool _yieldingToKeyboard;
     private float _yieldStartedAt;
     private bool _kbWasVisible;
     private bool _pendingShow;
     private float _slotCanvasPx;
     private Tweener _insetTween;       // slot open/close inset animation (handoffs never tween — they hold)
+
+    // The panel holds the slot in both of its up states; the difference is only how tall it is.
+    private bool PanelOwnsSlot =>
+        _slotState == SuggestionSlotState.Panel || _slotState == SuggestionSlotState.Expanded;
+
+    // --- Drag handle (model E rule 6) ---
+    // The handle reports a PROPOSED height; this controller owns the inset, the detent snap and the
+    // smoothing bypass. _draggingSlot suppresses every automatic tenancy decision for the length of
+    // the gesture — the swap watcher must not reinterpret a finger-driven inset as a keyboard claim.
+    [SerializeField] private SuggestionSlotDragHandle _dragHandle;
+    private bool _draggingSlot;
+    private ScrollTopInsetCompensator _threadInset;   // live rest geometry for the Expanded cap
+    // Captured ONCE per gesture: the handle polls the ceiling every drag frame, and a ceiling that
+    // shrank mid-drag (cards re-rendering under the finger) would yank the slot down with it.
+    private float _dragCeilingCanvasPx;
+
+    // Last measured live keyboard height. The return handoff (the keyboard leaves, the panel takes
+    // the slot back) fires on the frame the keyboard is ALREADY gone, so there is nothing left to
+    // read — without this the inset would have to tween up from 0 and the composer would dip a full
+    // slot height first, the exact no-dip violation the opposite direction is careful to avoid.
+    private float _lastKeyboardCanvasPx;
+
+    // --- Thread tap (model E rule 5) ---
+    // The Canvas, not its scaleFactor: CanvasScaler writes the real factor from its own OnEnable, so
+    // a value latched in Awake is the serialised default of 1 and every tap would be measured at a
+    // third of its true length on a 3x device.
+    private Canvas _rootCanvas;
+    private bool _threadPressActive;
+    private Vector2 _threadPressPos;
+    private bool _threadPressEligible;
+    private readonly List<RaycastResult> _tapHits = new List<RaycastResult>();   // reused; no GC per press
+    private PointerEventData _tapEventData;                                      // ditto — built once
 
     // BATCH-03 debounce: HandleLive pokes the gate; a single self-gating loop fires ONE coalesced
     // request when the ~2.5s window settles. The window is cancelled + _pendingIncomingText cleared at
@@ -88,7 +123,39 @@ public class SuggestionsController : MonoBehaviour
             _panel.OnBackRequested += HandleBack;
         }
         if (_slotKey != null) _slotKey.Tapped += HandleSlotKeyTapped;
+
+        // Model E rule 6: the handle owns pointer math only — grab height, ceiling, snapping and
+        // the inset all live here.
+        if (_dragHandle != null)
+        {
+            _dragHandle.HeightProvider = () => _keyboardMover != null ? _keyboardMover.AppliedBottomInset : 0f;
+            _dragHandle.MaxHeightProvider = () => _dragCeilingCanvasPx;
+            _dragHandle.Grabbed += HandleDragGrabbed;
+            _dragHandle.Dragged += HandleDragMoved;
+            _dragHandle.Released += HandleDragReleased;
+        }
+
+        // Model E rule 4: a tap on the composer while the slot is COLLAPSED raises the panel
+        // instead of focusing the field. The veto is installed on THIS field only — every other
+        // input in the project keeps stock TMP behaviour.
+        var composer = _bottomPanel != null ? _bottomPanel.inputField as DeferredDismissInputField : null;
+        if (composer != null)
+        {
+            composer.ActivationVeto = ShouldVetoComposerActivation;
+            composer.ActivationVetoed += HandleComposerActivationVetoed;
+        }
+
+        _threadInset = _keyboardMover != null
+            ? _keyboardMover.GetComponentInChildren<ScrollTopInsetCompensator>(true)
+            : null;
+
+        var canvas = GetComponentInParent<Canvas>();
+        _rootCanvas = canvas != null ? canvas.rootCanvas : null;
     }
+
+    /// <summary>Screen px → canvas units, read live (see <see cref="_rootCanvas"/>).</summary>
+    private float CanvasScale =>
+        _rootCanvas != null && _rootCanvas.scaleFactor > 0f ? _rootCanvas.scaleFactor : 1f;
 
     void OnDestroy()
     {
@@ -105,6 +172,20 @@ public class SuggestionsController : MonoBehaviour
             _panel.OnBackRequested -= HandleBack;
         }
         if (_slotKey != null) _slotKey.Tapped -= HandleSlotKeyTapped;
+        if (_dragHandle != null)
+        {
+            _dragHandle.Grabbed -= HandleDragGrabbed;
+            _dragHandle.Dragged -= HandleDragMoved;
+            _dragHandle.Released -= HandleDragReleased;
+            _dragHandle.HeightProvider = null;
+            _dragHandle.MaxHeightProvider = null;
+        }
+        var composer = _bottomPanel != null ? _bottomPanel.inputField as DeferredDismissInputField : null;
+        if (composer != null)
+        {
+            composer.ActivationVeto = null;                       // never outlive this controller
+            composer.ActivationVetoed -= HandleComposerActivationVetoed;
+        }
     }
 
     void OnEnable()
@@ -124,9 +205,13 @@ public class SuggestionsController : MonoBehaviour
         // Chat screen closing mid-tenancy: drop the slot claim so the MovingArea settles back to
         // rest for the next chat, and reset the swap state with it.
         if (_keyboardMover != null) _keyboardMover.VirtualBottomInset = 0f;
-        _sheetOpen = false;
+        _slotState = SuggestionSlotState.Collapsed;
         _yieldingToKeyboard = false;
         _pendingShow = false;
+        _draggingSlot = false;
+        _threadPressActive = false;      // a press in flight when the chat closed must not
+        _threadPressEligible = false;    // resolve into a tap on the next screen
+        if (_keyboardMover != null) _keyboardMover.TrackInsetImmediately = false;   // a drag cut short by the chat closing
         if (_panel != null) _panel.Deactivate();
         if (ChatManager.Instance != null) ChatManager.Instance.OnLiveMessagesReceived -= HandleLive;
     }
@@ -407,7 +492,9 @@ public class SuggestionsController : MonoBehaviour
             // fresh set.) The next incoming re-shows it at the debounce fire.
             _answeredIdle = true;
             StartFreshRound();   // the question was answered — its refinement rounds are over
-            SetSheetOpen(false);
+            // Model E: the answered run lands on COLLAPSED specifically — that is the one state
+            // rule 9's auto-raise fires from, so the next incoming message brings the panel back.
+            ApplySlotInput(SuggestionSlotInput.AnsweredRun);
         }
         // UNSCALED wall clock, matching DebounceLoop's WaitForSecondsRealtime tick and the
         // ChatManager poll idiom: Time.time is maximumDeltaTime-capped (so a frame hitch or an
@@ -500,7 +587,10 @@ public class SuggestionsController : MonoBehaviour
                 // fire — arriving together with the skeleton, never flashing the stale pre-send
                 // set for the window's 2.5s (flow decision 2026-08-11). Never steals the slot
                 // from an open keyboard — ShowPanel parks the show until the keyboard leaves.
-                if (!_sheetOpen) ShowPanel(claimSlotFromKeyboard: false);
+                // Model E rule 9: an incoming message auto-raises the panel ONLY from Collapsed.
+                // While the owner is typing nothing moves, and an already-open panel just gets the
+                // fresh set rendered into it by the IssueRequest below.
+                ApplySlotInput(SuggestionSlotInput.IncomingMessage);
                 StartFreshRound();   // a new client message is a NEW question — round 1 again
                 // NOTE: _pendingIncomingText deliberately survives the fire — it mirrors the
                 // UN-REPLIED trailing run, and a burst that straddles the window fires twice; the
@@ -522,31 +612,44 @@ public class SuggestionsController : MonoBehaviour
     // SuggestionSlotSwap), so the composer and thread never move during a handoff.
 
     /// <summary>
-    /// Open the slot for the panel. Auto-shows (chat open, toggle-on, debounce fire) pass
-    /// false and PARK the show while the keyboard owns the slot — stealing it mid-typing is
-    /// never acceptable; the parked show lands when the keyboard leaves. The explicit ✦ tap
-    /// passes true: it dismisses the keyboard and takes the slot at the keyboard's own height.
+    /// Open the slot for the panel at a detent. Only the «+» attach sheet still PARKS a show
+    /// (it is a third tenant the model never mentions and it must not be stolen from); the
+    /// keyboard needs no parking any more, because model E returns the slot to the panel on
+    /// every blur (KeyboardDismissed in <see cref="Update"/>) — so a show that arrives while the
+    /// owner is typing simply does not happen, rather than queueing behind them.
+    /// <paramref name="claimSlotFromKeyboard"/> is the explicit ask (the ⌨/✦ key): it dismisses
+    /// the keyboard and takes the slot at the keyboard's own height, never moving the composer.
     /// </summary>
-    private void ShowPanel(bool claimSlotFromKeyboard)
+    private void ShowPanel(bool claimSlotFromKeyboard, SlotDetent detent = SlotDetent.Standard)
     {
         if (_panel == null) return;
         bool kbVisible = _keyboardMover != null && _keyboardMover.NativeKeyboardVisible;
         if ((kbVisible || AttachOpen) && !claimSlotFromKeyboard)
         {
-            _pendingShow = true;   // never steal the slot from a typing owner or an open «+» sheet
+            // Never steal the slot from a typing owner or an open «+» sheet. The park lands from
+            // Update the moment the other tenant leaves. (Rule 2's automatic return goes through
+            // the same branch, so an auto-raise arriving mid-typing simply waits its turn.)
+            _pendingShow = true;
             return;
         }
-        // Explicit ✦ while the attach sheet is up: the sheet hands the slot over, like the keyboard.
+        // Explicit ask while the attach sheet is up: the sheet hands the slot over, like the keyboard.
         if (AttachOpen) _bottomPanel.AttachSheet.Close();
 
         float kbCanvas = _keyboardMover != null ? _keyboardMover.EffectiveAreaCanvasPx : 0f;
-        _slotCanvasPx = SuggestionSlotSwap.SlotForOpen(kbVisible, kbCanvas, SuggestionSlotHeight.Remembered);
+        float standard = SuggestionSlotSwap.SlotForOpen(kbVisible, kbCanvas, SuggestionSlotHeight.Remembered);
+        // Over a LIVE keyboard the slot MUST equal that keyboard's height or the composer moves
+        // mid-swap (SuggestionSlotSwap's invariant), so a handoff is always Standard — Expanded is
+        // only ever reached by dragging the handle, which needs the panel to already own the slot.
+        _slotCanvasPx = kbVisible ? standard : SuggestionSlotDetents.HeightFor(detent, standard, ExpandedDetent(standard));
         _panel.SetSlotMetrics(_slotCanvasPx, _keyboardMover != null ? _keyboardMover.SafeBottomCanvasPx : 0f);
         _panel.ShowInSlot();
-        _sheetOpen = true;
+        _slotState = kbVisible || detent != SlotDetent.Expanded
+            ? SuggestionSlotState.Panel
+            : SuggestionSlotState.Expanded;
         _yieldingToKeyboard = false;
         _pendingShow = false;
-        if (_slotKey != null) _slotKey.SetSlotOpen(true);
+        _panel.SetFadeSuppressed(_slotState == SuggestionSlotState.Expanded);
+        ApplyKeyStyle();
 
         _insetTween?.Kill();
         if (_keyboardMover == null) return;
@@ -567,11 +670,17 @@ public class SuggestionsController : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Drop the slot to nothing. Model E calls this state Collapsed and it is a real tenant
+    /// state, not merely "no panel": an incoming message may auto-raise from it (rule 9) and a
+    /// tap anywhere brings the panel back — which is exactly why every caller that used to mean
+    /// "the panel is gone" now records Collapsed rather than a bare hidden flag.
+    /// </summary>
     private void HidePanel()
     {
-        _sheetOpen = false;
+        _slotState = SuggestionSlotState.Collapsed;
         _pendingShow = false;
-        if (_slotKey != null) _slotKey.SetSlotOpen(false);
+        ApplyKeyStyle();
         if (_yieldingToKeyboard) return;   // the keyboard is mid-takeover — the yield watcher finishes the handoff
         _insetTween?.Kill();
         if (_keyboardMover != null && _keyboardMover.VirtualBottomInset > 0.5f)
@@ -586,12 +695,187 @@ public class SuggestionsController : MonoBehaviour
         else if (_panel != null) _panel.Deactivate();
     }
 
+    // --- Detents (model E rule 6) -------------------------------------------
+
+    /// <summary>
+    /// The third detent's height: the panel's own chrome plus its measured card stack, capped so a
+    /// readable slice of thread survives. Both measurements come from the panel itself so the
+    /// detent and the bottom fade can never disagree about "everything fits"; the cap is read from
+    /// the thread's live rest geometry rather than a constant, because canvas height varies with
+    /// the device aspect ratio.
+    /// </summary>
+    private float ExpandedDetent(float standardCanvasPx)
+    {
+        if (_panel == null) return standardCanvasPx;
+        float threadRest = _threadInset != null ? _threadInset.RestViewportHeightCanvasPx : 0f;
+        return SuggestionSlotDetents.ExpandedHeight(
+            _panel.ChromeHeightCanvasPx, _panel.MeasuredContentHeight, standardCanvasPx, threadRest);
+    }
+
+    private float StandardDetent()
+    {
+        bool kbVisible = _keyboardMover != null && _keyboardMover.NativeKeyboardVisible;
+        float kbCanvas = _keyboardMover != null ? _keyboardMover.EffectiveAreaCanvasPx : 0f;
+        return SuggestionSlotSwap.SlotForOpen(kbVisible, kbCanvas, SuggestionSlotHeight.Remembered);
+    }
+
+    // --- Drag handle --------------------------------------------------------
+
+    private void HandleDragGrabbed()
+    {
+        if (_keyboardMover == null || _panel == null) return;
+        _draggingSlot = true;
+        _insetTween?.Kill();                       // a tween and a finger must never write the inset together
+        _dragCeilingCanvasPx = ExpandedDetent(StandardDetent());
+        // 1:1 finger tracking: SmoothDamp would leave the panel trailing the drag, and a smoothed
+        // inset lagging a SHRINKING slot breaks FollowInset's applied ≤ slot assumption.
+        _keyboardMover.TrackInsetImmediately = true;
+        _panel.SetFadeSuppressed(false);           // the fade is settled again on release
+    }
+
+    private void HandleDragMoved(float proposedCanvasPx)
+    {
+        if (!_draggingSlot || _keyboardMover == null || _panel == null) return;
+        // Lockstep, both every frame: the panel's stored slot height and the applied inset.
+        _panel.SetSlotHeightLive(proposedCanvasPx);
+        _keyboardMover.VirtualBottomInset = proposedCanvasPx;
+        if (!_panel.IsShown && proposedCanvasPx > 0.5f) _panel.ShowInSlot();
+    }
+
+    private void HandleDragReleased(float finalCanvasPx)
+    {
+        if (!_draggingSlot) return;
+        _draggingSlot = false;
+        if (_keyboardMover != null) _keyboardMover.TrackInsetImmediately = false;
+
+        float standard = StandardDetent();
+        float expanded = _dragCeilingCanvasPx;
+        SlotDetent snapped = SuggestionSlotDetents.Snap(finalCanvasPx, standard, expanded);
+        _slotState = SuggestionSlotStateMachine.AfterDrag(snapped);
+        ApplyKeyStyle();
+
+        if (snapped == SlotDetent.Collapsed) { HidePanel(); return; }
+
+        float target = SuggestionSlotDetents.HeightFor(snapped, standard, expanded);
+        _slotCanvasPx = target;
+        // Re-settle through the full metrics path so the fade re-measures at the new height.
+        if (_panel != null)
+        {
+            _panel.SetSlotMetrics(target, _keyboardMover != null ? _keyboardMover.SafeBottomCanvasPx : 0f);
+            _panel.SetFadeSuppressed(snapped == SlotDetent.Expanded);
+        }
+        if (_keyboardMover == null) return;
+        _insetTween?.Kill();
+        _insetTween = DOTween.To(
+                () => _keyboardMover.VirtualBottomInset,
+                v => _keyboardMover.VirtualBottomInset = v,
+                target, 0.18f)
+            .SetEase(Ease.OutCubic);
+    }
+
+    // --- Composer activation veto (model E rule 4) --------------------------
+
+    /// <summary>
+    /// The two-step entry: while the slot is COLLAPSED in «Вместе», a tap on the composer raises
+    /// the panel instead of focusing the field — focusing there would open the keyboard underneath
+    /// a panel still on its way up. Every other situation focuses normally, including all of «Авто».
+    /// </summary>
+    private bool ShouldVetoComposerActivation() =>
+        _semiAutoOn && _slotState == SuggestionSlotState.Collapsed && !_draggingSlot;
+
+    private void HandleComposerActivationVetoed() => ApplySlotInput(SuggestionSlotInput.FieldTap);
+
+    // --- One place that turns an intent into slot motion --------------------
+
+    /// <summary>
+    /// Route an intent through the pure transition table and apply whatever it decided. This is
+    /// the ONLY way the slot changes tenant outside the swap watcher, so the rules «a tap never
+    /// hides an open panel» and «only a drag collapses» hold by construction rather than by every
+    /// call site remembering them.
+    /// </summary>
+    private void ApplySlotInput(SuggestionSlotInput input)
+    {
+        // The finger owns the slot for the length of a gesture. DebounceLoop and HandleLive fire from
+        // outside Update (the chat poll), and either would start a DOTween on the very inset
+        // HandleDragMoved is writing this frame — the tween-vs-finger collision the drag path is
+        // otherwise careful to avoid. The release re-settles everything anyway. «Авто» still wins,
+        // because it must be able to tear the whole surface down mid-drag.
+        if (_draggingSlot && input != SuggestionSlotInput.ReplyModeOff) return;
+
+        // Resolve against the LIVE tenant, not the remembered one. _slotState can legitimately
+        // disagree with reality: the answered-run collapse fires on the outgoing echo while
+        // MessagesBottomPanel.KeepKeyboardOpenRoutine is still holding the keyboard up, which would
+        // leave a Collapsed state sitting over a live keyboard — and the very next incoming message
+        // would then read rule 9's «raise from Collapsed» and tear the keyboard away mid-word.
+        bool kbUp = _keyboardMover != null && _keyboardMover.NativeKeyboardVisible;
+        SuggestionSlotState current = kbUp ? SuggestionSlotState.Keyboard : _slotState;
+
+        SlotTransition t = SuggestionSlotStateMachine.Resolve(current, input, _semiAutoOn);
+        bool blurHandledByShow = false;
+
+        // Only a deliberate user ask may take the slot from a typing owner; everything automatic
+        // parks and lands when the keyboard leaves.
+        bool explicitAsk = input == SuggestionSlotInput.FieldTap
+                           || input == SuggestionSlotInput.ThreadTap
+                           || input == SuggestionSlotInput.KeyTap;
+
+        if (t.State != current)
+        {
+            switch (t.State)
+            {
+                case SuggestionSlotState.Panel:
+                    // Claiming FROM a live keyboard is only allowed for an explicit ask, and then
+                    // ShowPanel holds the inset at the keyboard's own height and dismisses it
+                    // itself, so the composer cannot move mid-handoff. It owns the blur too —
+                    // dismissing here as well would fire the dismissal pair twice for one gesture.
+                    blurHandledByShow = kbUp && explicitAsk;
+                    ShowPanel(claimSlotFromKeyboard: blurHandledByShow);
+                    break;
+                case SuggestionSlotState.Expanded:
+                    ShowPanel(claimSlotFromKeyboard: false, detent: SlotDetent.Expanded);
+                    break;
+                case SuggestionSlotState.Collapsed:
+                    HidePanel();
+                    break;
+                case SuggestionSlotState.Keyboard:
+                    // Deliberately NO state write here. The keyboard has not risen yet — it rises
+                    // because of the FocusField below — and the swap watcher recognises the claim
+                    // as `kbVisible && PanelOwnsSlot`. Flipping the state now would make that test
+                    // false forever, so the no-dip hold would never start and the inset would never
+                    // be released: the panel would sit active behind the keyboard for the whole
+                    // typing session. The watcher owns this transition (see Update).
+                    break;
+            }
+        }
+
+        if (t.BlurField && !blurHandledByShow) DismissComposerKeyboard();
+        if (t.FocusField) FocusComposer();
+    }
+
+    private void FocusComposer()
+    {
+        var field = _bottomPanel != null ? _bottomPanel.inputField : null;
+        if (field == null) return;
+        if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(field.gameObject);
+        field.ActivateInputField();
+#if UNITY_EDITOR
+        if (_keyboardMover != null) _keyboardMover.SetSimulatedKeyboard(true);
+#endif
+    }
+
+    /// <summary>Repaint the composer key from the current tenant — one call site for the whole grammar.</summary>
+    private void ApplyKeyStyle()
+    {
+        if (_slotKey != null) _slotKey.Apply(ComposerSlotKeyModel.For(_slotState, _semiAutoOn));
+    }
+
     // The swap watcher. Runs every frame the chat screen is up: measures the live keyboard for
     // the next slot open, detects the keyboard claiming the slot (⌨ key or a direct composer
     // tap — both just activate the field; the rise is detected here), completes or reinstates
     // a yield, and lands a parked auto-show once the keyboard leaves.
     void Update()
     {
+        if (_semiAutoOn) PumpThreadTap();   // model E rule 5; «Авто» has no panel to raise
         if (_keyboardMover == null) return;
 
 #if UNITY_EDITOR
@@ -605,20 +889,40 @@ public class SuggestionsController : MonoBehaviour
         float kbCanvas = _keyboardMover.EffectiveAreaCanvasPx;
 
         if (kbVisible && SuggestionSlotHeight.IsValid(kbCanvas))
+        {
             SuggestionSlotHeight.Remember(kbCanvas);   // measure while it's up — the next slot open matches exactly
+            _lastKeyboardCanvasPx = kbCanvas;          // ...and keep it for the return handoff's hold
+        }
 
-        bool keyboardClaimsSlot = kbVisible && _sheetOpen && !_yieldingToKeyboard
+        // A finger owns the slot for the length of a drag: the watcher must not read a
+        // finger-driven inset as a tenant change, and the release re-settles everything anyway.
+        if (_draggingSlot) { _kbWasVisible = kbVisible; return; }
+
+        bool keyboardClaimsSlot = kbVisible && PanelOwnsSlot && !_yieldingToKeyboard
                                   && (!_kbWasVisible || ComposerFocused);
         if (keyboardClaimsSlot)
         {
             // The keyboard is rising into the slot: the sheet yields, but the held inset must
             // NOT drop until the keyboard is actually there (no-dip). The panel stays active
             // underneath — the native keyboard renders above everything and covers it.
-            _sheetOpen = false;
+            // Yielding FROM Expanded: retarget the hold down to the standard detent first.
+            // ShouldReleaseHold passes when the keyboard covers 95% of the HELD height, and an
+            // expanded slot is taller than any keyboard — the fraction could never be reached, so
+            // every such handoff would sit frozen for the full 0.7s timeout with a strip of panel
+            // wedged above the keyboard, then drop the difference in one step.
+            if (_slotState == SuggestionSlotState.Expanded && _keyboardMover.VirtualBottomInset > kbCanvas)
+            {
+                _slotCanvasPx = SuggestionSlotSwap.SlotForOpen(true, kbCanvas, SuggestionSlotHeight.Remembered);
+                _keyboardMover.VirtualBottomInset = _slotCanvasPx;
+                if (_panel != null)
+                    _panel.SetSlotMetrics(_slotCanvasPx, _keyboardMover.SafeBottomCanvasPx);
+            }
+            _slotState = SuggestionSlotState.Keyboard;
             _yieldingToKeyboard = true;
             _yieldStartedAt = Time.realtimeSinceStartup;
             _insetTween?.Kill();
-            if (_slotKey != null) _slotKey.SetSlotOpen(false);
+            if (_panel != null) _panel.SetFadeSuppressed(false);   // Expanded is over; the fade rules again
+            ApplyKeyStyle();
         }
 
         if (_yieldingToKeyboard)
@@ -628,8 +932,8 @@ public class SuggestionsController : MonoBehaviour
                 // The keyboard bounced away before taking the slot — the panel is still in
                 // place and holding the inset: reinstate it instead of dropping the slot.
                 _yieldingToKeyboard = false;
-                _sheetOpen = true;
-                if (_slotKey != null) _slotKey.SetSlotOpen(true);
+                _slotState = SuggestionSlotState.Panel;
+                ApplyKeyStyle();
             }
             else if (SuggestionSlotSwap.ShouldReleaseHold(
                          kbVisible, kbCanvas, _keyboardMover.VirtualBottomInset,
@@ -645,17 +949,41 @@ public class SuggestionsController : MonoBehaviour
         // over the panel must swap exactly like the keyboard — panel slides away, sheet rises.
         // The show is parked and lands again when the sheet closes.
         bool attachOpen = AttachOpen;
-        if (attachOpen && _sheetOpen)
+        if (attachOpen && (PanelOwnsSlot || _slotState == SuggestionSlotState.Keyboard))
         {
-            HidePanel();
+            // The sheet must park the show from EITHER tenant. Parking only from the panel left the
+            // keyboard→sheet path with nothing to restore: the sheet's own opening blurs the field,
+            // so the keyboard-left signal is consumed while the sheet still owns the slot, and
+            // closing the sheet would then leave the slot with no tenant at all.
+            if (PanelOwnsSlot) HidePanel();
             _pendingShow = true;   // after HidePanel — it clears the flag
         }
 
         // A parked auto-show lands the moment nothing else owns the slot.
-        if (_pendingShow && _semiAutoOn && !_sheetOpen && !_yieldingToKeyboard && !kbVisible && !attachOpen)
+        if (_pendingShow && _semiAutoOn && !PanelOwnsSlot && !_yieldingToKeyboard && !kbVisible && !attachOpen)
         {
             _pendingShow = false;
             ShowPanel(claimSlotFromKeyboard: false);
+        }
+
+        // Model E rule 2: the panel is the slot's DEFAULT tenant, so it comes back whenever the
+        // keyboard leaves — however it left (thread tap, Send, the ⌨ key, the OS). Today's build
+        // simply deactivated the panel here and nothing brought it back. Never against a deliberate
+        // collapse: Collapsed is not Keyboard, so the transition table declines it by itself.
+        // LEVEL-triggered, not edge-triggered: an edge is a single frame, and any guard that
+        // rejects that one frame (the «+» sheet opening, a yield still finishing) would consume it
+        // for good and strand the slot with no tenant. Resolve only ever moves Keyboard→Panel here,
+        // so re-asserting it every frame is idempotent.
+        if (!kbVisible && !_yieldingToKeyboard && !attachOpen
+            && _slotState == SuggestionSlotState.Keyboard)
+        {
+            // Hold BEFORE handing over. This fires on the frame the keyboard is already gone, so
+            // the applied rise has just collapsed to 0: letting ShowPanel tween up from there drops
+            // the composer a full slot height and flies it back — the one handoff that would dip.
+            float hold = _lastKeyboardCanvasPx > 0f ? _lastKeyboardCanvasPx : StandardDetent();
+            _insetTween?.Kill();
+            _keyboardMover.VirtualBottomInset = hold;
+            ApplySlotInput(SuggestionSlotInput.KeyboardDismissed);
         }
 
         _kbWasVisible = kbVisible;
@@ -695,17 +1023,11 @@ public class SuggestionsController : MonoBehaviour
     private void HandleSlotKeyTapped()
     {
         if (!_semiAutoOn) return;
-        if (_sheetOpen)
-        {
-            var field = _bottomPanel != null ? _bottomPanel.inputField : null;
-            if (field == null) return;
-            if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(field.gameObject);
-            field.ActivateInputField();
-#if UNITY_EDITOR
-            if (_keyboardMover != null) _keyboardMover.SetSimulatedKeyboard(true);
-#endif
-        }
-        else SetSheetOpen(true);
+        bool wasIdleAndOpening = _answeredIdle && !PanelOwnsSlot;
+        ApplySlotInput(SuggestionSlotInput.KeyTap);
+        // Re-opening after an answered run: the rendered cards are the stale pre-send set —
+        // regenerate for "what's next" instead of showing them (flow decision 2026-08-11).
+        if (wasIdleAndOpening && PanelOwnsSlot) IssueRequest(steerTowardText: null, lastIncomingText: null);
     }
 
     // --- Manual refresh (INT-03) ---
@@ -737,5 +1059,93 @@ public class SuggestionsController : MonoBehaviour
         else HidePanel();
     }
 
-    public void ToggleSheet() => SetSheetOpen(!_sheetOpen);
+    public void ToggleSheet() => SetSheetOpen(!PanelOwnsSlot);
+
+    // --- Thread tap (model E rule 5) ----------------------------------------
+    // Nothing on the messages thread listened for taps before: the keyboard dismissal was a side
+    // effect of EventSystem deselection. Model E gives the tap a meaning — it RAISES the panel
+    // (from the keyboard, blurring first; from Collapsed) and never hides an open one. Run as a
+    // press/release pump rather than an IPointerClickHandler on the Scroll, because the gesture
+    // has to be rejected when a bubble long-press, a swipe-to-reply, a fling-stop or a plain
+    // scroll already owns it — none of which a click handler can see.
+    private void PumpThreadTap()
+    {
+        var pointer = UnityEngine.InputSystem.Pointer.current;
+        if (pointer == null) return;
+
+        if (pointer.press.wasPressedThisFrame)
+        {
+            _threadPressActive = true;
+            _threadPressPos = pointer.position.ReadValue();
+            // WHERE the press landed can only be known while the finger is down — the raycast needs
+            // a live pointer position. WHETHER it was a fling-stop is read at RELEASE instead:
+            // ScrollClickBlocker latches IsBlocking inside its own Update on this very frame, and
+            // nothing orders the two components, so reading it now is a coin flip. No new press can
+            // occur between this press and its release, so by release time the verdict is settled.
+            _threadPressEligible = PressLandedOnThread(_threadPressPos);
+            return;
+        }
+
+        if (!pointer.press.wasReleasedThisFrame || !_threadPressActive) return;
+        _threadPressActive = false;
+        if (!_threadPressEligible) return;
+
+        Vector2 release = pointer.position.ReadValue();
+        float scale = CanvasScale;
+        if (!SuggestionSlotGestures.IsThreadTap(
+                _threadPressPos.x / scale, _threadPressPos.y / scale,
+                release.x / scale, release.y / scale,
+                pressWasInsideThread: true,
+                scrollWasFlinging: ScrollClickBlocker.IsBlocking,
+                otherGestureOwnedIt: ReactionBarShowing))
+            return;
+
+        ApplySlotInput(SuggestionSlotInput.ThreadTap);
+    }
+
+    // A long-press that opened the reaction bar ends with a pointer-up like any tap; the bar's own
+    // scrim is what tells us the gesture became something else. Checked at RELEASE because the bar
+    // opens DURING the press.
+    private static bool ReactionBarShowing =>
+        ReactionBarController.Instance != null && ReactionBarController.Instance.IsShowing;
+
+    /// <summary>
+    /// Was the press inside the messages thread? Walks ALL raycast hits rather than taking the top
+    /// one: the left-edge SwipeBack strip and other transparent overlays sit above the thread, so a
+    /// top-hit test would reject every tap in that band.
+    /// <para>
+    /// Deliberately does NOT reject a press merely because a bubble gesture component is under it.
+    /// MessageBubbleLongPress and SwipeToReply live on every Bubble, which is most of the thread's
+    /// area — rejecting on their presence would leave rule 5 alive only in the gaps between
+    /// messages. A plain tap on a bubble IS a thread tap; the gestures those components actually
+    /// fire (a long-press opening the reaction bar, a swipe) are rejected at release instead, by
+    /// the movement tolerance and the reaction-bar check.
+    /// </para>
+    /// </summary>
+    private bool PressLandedOnThread(Vector2 screenPos)
+    {
+        if (EventSystem.current == null || _threadInset == null) return false;
+        // A modal above the thread still lets the thread's own graphics answer a raycast —
+        // RaycastAll does no occlusion culling — so overlays have to be rejected by name.
+        if (ReactionBarShowing) return false;
+        if (PhotoViewer.Instance != null && PhotoViewer.Instance.panel != null
+            && PhotoViewer.Instance.panel.activeSelf) return false;
+
+        _tapEventData ??= new PointerEventData(EventSystem.current);
+        _tapEventData.position = screenPos;
+        _tapHits.Clear();
+        EventSystem.current.RaycastAll(_tapEventData, _tapHits);
+
+        bool sawThread = false;
+        for (int i = 0; i < _tapHits.Count; i++)
+        {
+            Transform hit = _tapHits[i].gameObject.transform;
+            // The panel and the composer are the slot's own surfaces — a tap there is never a
+            // "raise the panel" request, and the cheap checks go first.
+            if (hit.GetComponentInParent<SuggestionsPanel>() != null) return false;
+            if (hit.GetComponentInParent<MessagesBottomPanel>() != null) return false;
+            if (hit.GetComponentInParent<ScrollTopInsetCompensator>() == _threadInset) sawThread = true;
+        }
+        return sawThread;
+    }
 }
