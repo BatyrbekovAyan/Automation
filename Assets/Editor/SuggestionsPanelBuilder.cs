@@ -14,8 +14,10 @@ using UnityEngine.UI;
 /// raises the MovingArea by the slot height (KeyboardAwarePanel.VirtualBottomInset) the same
 /// way the keyboard does. Cards keep the LOCKED sketch-002 winner "P" design (bordered
 /// full-text cards, legend pills on the top border, tint-only recommended card, header
-/// «‹ ✦ ПРЕДЛОЖЕНИЯ ↻») — only the chassis changed. Also builds the ✦⇄⌨ ComposerSlotKey
-/// INSIDE the composer input field and retires the old mic-slot sheet toggle.
+/// «‹ ✦ ПРЕДЛОЖЕНИЯ ↻») — only the chassis changed. Since sketch-005 (winner E) the panel also
+/// carries the 42u DragHandle strip on its top edge (the only gesture that may collapse the slot),
+/// and the ✦⇄⌨ ComposerSlotKey sits at the input field's END with a soft PositiveInk tint circle
+/// behind its ✦ face. Retires the old mic-slot sheet toggle.
 /// All static chrome binds theme tokens via ThemedColor; per-card dynamic colors are resolved
 /// from Theme in SuggestionCard.Setup. Build-time only; no networking.
 ///
@@ -35,7 +37,15 @@ public static class SuggestionsPanelBuilder
     // only the pre-first-measurement stand-in so the scene shows sane geometry.
     private static readonly float AuthoredSlotHeight = SuggestionSlotHeight.FallbackCanvasPx;
     private const float HeaderTop = 18f, HeaderH = 84f;
-    private const float ChromeHeight = HeaderTop + HeaderH;   // header only — the grabber died with the sheet chassis
+    // Grab strip on the panel's top edge (sketch-005 E) — the ONLY gesture that may collapse the slot.
+    private const float HandleH = 42f;
+    private const float GrabberW = 108f, GrabberH = 12f;
+    // Strip + header. ChromeHeight IS the card viewport's top offset, and
+    // SuggestionsPanel.ChromeHeightCanvasPx reads that offset back (-cardsViewport.offsetMax.y) to
+    // compute the Expanded detent — so the strip must be counted here or the detent is stale.
+    // Consequence to accept: the standard detent height does NOT grow, so the visible card area
+    // LOSES the strip's 42u (one card less of headroom before the list starts scrolling).
+    private const float ChromeHeight = HandleH + HeaderTop + HeaderH;
     private const float HairlineH = 2f;
     private const float HeaderSparkSize = 33f, HeaderTitleSize = 28f;
     private const float RefreshHit = 120f, RefreshIconSize = 44f;
@@ -52,12 +62,35 @@ public static class SuggestionsPanelBuilder
     private const float SkeletonHeight = 144f;
     private const float StateSize = 39f, RetryFont = 36f, RetryRadius = 36f;
 
-    // Composer slot key (✦⇄⌨ inside the input field, sketch-003 A).
-    private const float SlotKeyHit = 96f;          // raycast target (overflows the 74u field — no mask clips it)
-    private const float SlotKeyGlyph = 52f;
-    private const float SlotKeyCenterX = 60f;      // from the field's left edge
-    private const float TextAreaLeftInset = 120f;  // text starts right of the key (was 24)
-    private const float TextAreaRightInset = 24f;
+    // Composer slot key (✦⇄⌨ inside the input field — sketch-005 E moved it to the field's END).
+    // NOMINAL hit target. It overflows the 74u field by 11u top and bottom, but the composer pill
+    // (the field's PARENT «Input») carries a RectMask2D padded 8u top / 8u bottom, and a RectMask2D
+    // filters RAYCASTS as well as pixels (Graphic.Raycast walks ancestors for ICanvasRaycastFilter).
+    // The tappable band is therefore the middle 58u of the field, ~94u wide — do NOT read this 96 as
+    // a 96u touch target, and do not shrink it to the 81u circle either: the horizontal reach is real
+    // (nothing masks it sideways) and it is what makes the key comfortable to hit.
+    private const float SlotKeyHit = 96f;
+    // Soft PositiveInk disc behind the ✦ face. The sketch's 81u (27px x3) assumed a taller field than
+    // this project's 74u composer pill: at 81 the disc is TALLER than the pill it sits in, so it
+    // pokes 3.5u out top and bottom and — because the pill carries a RectMask2D inset 8u vertically —
+    // the visible band is only 58u, which would have sheared a flat chord off the disc every time the
+    // ✦ face showed. 64 keeps it fully inside the pill with 5u of air above and below, and still
+    // leaves 8u of ring around the 48u sparkle.
+    private const float SlotKeyCircle = 64f;
+    private const float SlotKeySpark = 48f;        // ✦ glyph
+    private const float SlotKeyKeyboard = 51f;     // ⌨ glyph — optically heavier stroke, sized up to match
+    // From the field's RIGHT edge (applied negative) — 60 puts 19.5u between the circle and the field
+    // edge, the sketch's 18u. NOTE the field rect is currently 834u wide inside an 820u pill, so it
+    // hangs 14u past the VISIBLE pill and the on-screen gap comes out ~5.5u. That is scene state, not
+    // a builder constant: fix it by matching the InputField's width to its parent, never by padding
+    // this number, or the key drifts again the day the rect is corrected.
+    private const float SlotKeyCenterX = 60f;
+    // Text-area insets are the exact MIRROR of the pre-005 pair: the wide inset follows the key to
+    // the right, the bare one takes the left. The TOTAL must stay 144 — ExpandableInput measures the
+    // auto-grow threshold at the FIELD width (ExpandableInput.GetAccurateTextHeight), so any other
+    // total shifts the character count at which the composer grows to a second line.
+    private const float TextAreaLeftInset = 24f;
+    private const float TextAreaRightInset = 120f; // text stops left of the key (was 24)
 
     // Reply-mode switch (built only if absent — legacy geometry, untouched by the redesign).
     private static readonly Color SwitchTrackAuto = Hex("#2FB344");
@@ -118,7 +151,7 @@ public static class SuggestionsPanelBuilder
         EditorUtility.SetDirty(host);
         EditorSceneManager.MarkSceneDirty(host.scene);
         Debug.Log("SuggestionsPanelBuilder: built SuggestionsPanel as a keyboard-slot tenant (sketch-003 A) " +
-                  "+ ComposerSlotKey; mic-slot toggle retired.");
+                  "+ 42u DragHandle strip + end-of-field ComposerSlotKey (sketch-005 E); mic-slot toggle retired.");
     }
 
     // === Panel ==============================================================
@@ -152,6 +185,8 @@ public static class SuggestionsPanelBuilder
         hrt.anchorMin = new Vector2(0, 1); hrt.anchorMax = new Vector2(1, 1); hrt.pivot = new Vector2(0.5f, 1);
         hrt.sizeDelta = new Vector2(0, HairlineH);
         hrt.anchoredPosition = Vector2.zero;
+
+        BuildDragHandle(panelGo.transform);
 
         Button refreshButton = null;
         Button backButton = null;
@@ -199,13 +234,67 @@ public static class SuggestionsPanelBuilder
         panelGo.SetActive(false);
     }
 
+    // The 42u grab strip across the panel's top edge, directly under the composer (sketch-005 E).
+    // SuggestionSlotDragHandle resolves pointer events by walking UP from the raycast target, so the
+    // strip MUST carry its own raycast-target Graphic — a transparent Image sized to the band. With
+    // no graphic of its own the component is never reached and the handle is simply dead.
+    //
+    // Where it lands on screen: the panel is taller than the slot by the safe inset and its top edge
+    // therefore sits INSIDE the composer's baked 108u bottom pad (SuggestionsPanel.ApplySlotHeight),
+    // so the whole 42u strip lives in that pad, below the input pill — the grabber reads as hanging
+    // straight off the composer. The panel is drawn (and raycast) after the MovingArea, so the strip
+    // wins the pointer there; it steals no composer control, because every one of them sits above
+    // the pad.
+    private static void BuildDragHandle(Transform panel)
+    {
+        GameObject strip = ImageGo("DragHandle", panel, new Color(0, 0, 0, 0));
+        strip.GetComponent<Image>().raycastTarget = true;   // load-bearing — see above, do not turn off
+        var rt = (RectTransform)strip.transform;
+        rt.anchorMin = new Vector2(0, 1); rt.anchorMax = new Vector2(1, 1); rt.pivot = new Vector2(0.5f, 1);
+        rt.sizeDelta = new Vector2(0, HandleH);
+        rt.anchoredPosition = Vector2.zero;
+
+        // Visible grabber: centred in the band, purely decorative (the strip owns the gesture).
+        GameObject grabber = ImageGo("Grabber", strip.transform, Color.white);
+        Themed(grabber, ThemeRole.Border);
+        grabber.GetComponent<Image>().raycastTarget = false;
+        var grt = (RectTransform)grabber.transform;
+        Center(grt);
+        grt.sizeDelta = new Vector2(GrabberW, GrabberH);
+        AddRounded(grabber, GrabberH / 2f);
+
+        strip.AddComponent<SuggestionSlotDragHandle>();
+
+        // Sibling order is load-bearing, in two directions:
+        //
+        // • DragHandle vs Header — the strip is built FIRST so the header is the LATER sibling. Do
+        //   the arithmetic before trusting the usual "they overlap" story: the header's Back/Refresh
+        //   hit targets are 120u tall and the HLG (childControlHeight) gives them their preferred
+        //   height inside the 84u row, so they overflow it by 18u each way — reaching y = -60 + 18 =
+        //   -42, which is EXACTLY this strip's bottom edge. Today they abut it and never intersect,
+        //   so the order is free. It is pinned anyway because the margin is zero: one taller hit
+        //   target, a smaller HeaderTop or a shorter header and the bands cross. uGUI awards the
+        //   raycast to the LATER sibling, so with the header later those buttons keep their hit area
+        //   while the handle still owns the middle of the strip — exactly where the grabber invites
+        //   the finger. Reversed, a full-width invisible strip would sit over ‹ and ↻ the moment the
+        //   two bands touch at all.
+        //
+        // • DragHandle vs TopHairline — the hairline stays the EARLIER sibling (built above, at the
+        //   panel's very top edge, 2u tall, raycastTarget false). It cannot draw through the grabber:
+        //   the grabber is centred in the band, ~21u below the top edge, and the strip's own Image is
+        //   fully transparent, so drawing the hairline underneath changes nothing visually and keeps
+        //   the tray divider reading as the panel's boundary rather than as part of the handle.
+    }
+
     private static void BuildHeader(Transform panel, Sprite sparkle, ref Button refreshButton, ref Button backButton)
     {
         GameObject header = Rect("Header", panel);
         var rt = (RectTransform)header.transform;
         rt.anchorMin = new Vector2(0, 1); rt.anchorMax = new Vector2(1, 1); rt.pivot = new Vector2(0.5f, 1);
         rt.sizeDelta = new Vector2(0, HeaderH);
-        rt.anchoredPosition = new Vector2(0, -HeaderTop);
+        // Pushed down past the grab strip. Growing ChromeHeight alone shrinks the viewport but leaves
+        // the header drawing UNDER the grabber — a purely visual failure no test can see.
+        rt.anchoredPosition = new Vector2(0, -(HandleH + HeaderTop));
         var hlg = header.AddComponent<HorizontalLayoutGroup>();
         hlg.padding = new RectOffset((int)LegendInsetX, (int)ContentSidePad, 0, 0);
         hlg.spacing = 12;
@@ -335,12 +424,12 @@ public static class SuggestionsPanelBuilder
         return go;
     }
 
-    // === Composer slot key (sketch-003 A) ===================================
+    // === Composer slot key (sketch-005 E) ===================================
 
-    // The ✦⇄⌨ key INSIDE the composer input field's left end, like WhatsApp/Telegram in-field
-    // icons: a 96u invisible hit circle with a 52u glyph, pinned to the field's bottom-left so
-    // multi-line growth keeps it on the entry line. The field's Text Area is inset to start
-    // right of it. Idempotent: rebuilds the key, sets the inset absolutely.
+    // The ✦⇄⌨ key INSIDE the composer input field's RIGHT end, like WhatsApp/Telegram in-field
+    // icons: a 96u invisible hit circle carrying an 81u tint disc and the destination glyph, pinned
+    // to the field's bottom-right so multi-line growth keeps it on the entry line. The field's Text
+    // Area is inset to stop left of it. Idempotent: rebuilds the key, sets the insets absolutely.
     private static void BuildComposerKey(Transform movingArea, Sprite sparkle, Sprite keyboard)
     {
         Transform field = FindChildRecursive(movingArea, "InputField");
@@ -355,19 +444,53 @@ public static class SuggestionsPanelBuilder
 
         GameObject keyGo = ImageGo(SlotKeyName, field, new Color(0, 0, 0, 0));   // invisible hit target
         var rt = (RectTransform)keyGo.transform;
-        rt.anchorMin = new Vector2(0, 0); rt.anchorMax = new Vector2(0, 0); rt.pivot = new Vector2(0.5f, 0.5f);
+        // Anchored to the field's RIGHT edge (x from the right, hence negative). The y anchors MUST
+        // stay 0: the field is top-anchored with pivot (0.5,1) and grows DOWNWARD as text wraps
+        // (ExpandableInput writes sizeDelta.y), so only a bottom anchor keeps the glyph on the entry
+        // line instead of riding up with the growing box.
+        rt.anchorMin = new Vector2(1, 0); rt.anchorMax = new Vector2(1, 0); rt.pivot = new Vector2(0.5f, 0.5f);
         rt.sizeDelta = new Vector2(SlotKeyHit, SlotKeyHit);
-        rt.anchoredPosition = new Vector2(SlotKeyCenterX, 37f);   // centered on the field's one-line height (74/2)
+        rt.anchoredPosition = new Vector2(-SlotKeyCenterX, 37f);   // centered on the field's one-line height (74/2)
+
+        // Soft PositiveInk disc that promotes the ✦ face. Built FIRST and pinned as the first sibling
+        // so it renders BEHIND both glyphs. The 13% alpha is authored here, in the Image's colour,
+        // BEFORE Themed() runs: Themed copies the graphic's CURRENT alpha and stamps
+        // preserveAlpha = true, so authoring it afterwards would be repainted to full opacity. The
+        // circle therefore has exactly ONE colour owner (this binding) — ComposerSlotKey only ever
+        // SetActive()s it. Built ACTIVE because ✦ is the authored default face and the model pairs the
+        // circle with it; ComposerSlotKey.Apply corrects it on the first paint either way.
+        Color tint = Theme.Color(ThemeRole.PositiveInk);
+        tint.a = ComposerSlotKeyModel.TintCircleAlpha;
+        GameObject tintCircle = ImageGo("TintCircle", keyGo.transform, tint);
+        Image tintImg = tintCircle.GetComponent<Image>();
+        tintImg.raycastTarget = false;   // the key root Image is the only hit target
+        // maskable OFF, deliberately. The composer pill (the field's parent «Input») carries a
+        // RectMask2D padded 8u top / 8u bottom, so every maskable graphic under the field is clipped
+        // to the middle 58u of its 74u height. The glyphs (48/51) fit inside that band; an 81u disc
+        // does not — masked, it renders as a lozenge with a ~57u-wide flat chord across its top AND
+        // bottom, every single time the ✦ face is shown. The circle size is locked by sketch-005 E,
+        // so the disc opts out of the pill's mask instead of being cut to fit.
+        // The cost — and the reason the GLYPHS keep their masking: the pill is also a ScrollRect
+        // whose content is the field, so past ~5 lines of draft a manual scroll-up can push the key
+        // out of the pill, and an unmasked circle would paint outside it while its glyph is correctly
+        // clipped. Rare and self-correcting (typing re-pins the scroll to the bottom) against a
+        // defect that is otherwise permanent.
+        tintImg.maskable = false;
+        var trt = (RectTransform)tintCircle.transform;
+        trt.sizeDelta = new Vector2(SlotKeyCircle, SlotKeyCircle); Center(trt);
+        AddRounded(tintCircle, SlotKeyCircle / 2f);
+        Themed(tintCircle, ThemeRole.PositiveInk);   // alpha-on-PositiveInk — never a new ThemeRole
+        tintCircle.transform.SetAsFirstSibling();
 
         Image sparkGlyph = ImageGo("SparkGlyph", keyGo.transform, Color.white).GetComponent<Image>();
         sparkGlyph.sprite = sparkle; sparkGlyph.preserveAspect = true; sparkGlyph.raycastTarget = false;
         Themed(sparkGlyph.gameObject, ThemeRole.PositiveInk);   // the suggestions identity, same as the header ✦
-        var srt = (RectTransform)sparkGlyph.transform; srt.sizeDelta = new Vector2(SlotKeyGlyph, SlotKeyGlyph); Center(srt);
+        var srt = (RectTransform)sparkGlyph.transform; srt.sizeDelta = new Vector2(SlotKeySpark, SlotKeySpark); Center(srt);
 
         Image kbGlyph = ImageGo("KeyboardGlyph", keyGo.transform, Color.white).GetComponent<Image>();
         kbGlyph.sprite = keyboard; kbGlyph.preserveAspect = true; kbGlyph.raycastTarget = false;
-        Themed(kbGlyph.gameObject, ThemeRole.InkSecondary);
-        var krt = (RectTransform)kbGlyph.transform; krt.sizeDelta = new Vector2(SlotKeyGlyph, SlotKeyGlyph); Center(krt);
+        Themed(kbGlyph.gameObject, ThemeRole.InkTertiary);   // the quiet return trip — no tint circle behind it
+        var krt = (RectTransform)kbGlyph.transform; krt.sizeDelta = new Vector2(SlotKeyKeyboard, SlotKeyKeyboard); Center(krt);
         kbGlyph.gameObject.SetActive(false);   // ✦ is the default face (slot closed)
 
         Rect("A11y:Подсказки", keyGo.transform);
@@ -379,9 +502,13 @@ public static class SuggestionsPanelBuilder
         so.FindProperty("button").objectReferenceValue = button;
         so.FindProperty("sparkleGlyph").objectReferenceValue = sparkGlyph.gameObject;
         so.FindProperty("keyboardGlyph").objectReferenceValue = kbGlyph.gameObject;
+        // FindProperty returns null for a field the compiled class does not have; guard so a build
+        // against a pre-005 ComposerSlotKey degrades to "no tint circle" instead of throwing.
+        SerializedProperty tintProp = so.FindProperty("tintCircle");
+        if (tintProp != null) tintProp.objectReferenceValue = tintCircle;
         so.ApplyModifiedPropertiesWithoutUndo();
 
-        // Text starts right of the key. Absolute offsets — idempotent across re-runs.
+        // Text stops left of the key. Absolute offsets — idempotent across re-runs.
         Transform textArea = field.Find("Text Area");
         if (textArea != null)
         {
@@ -389,7 +516,7 @@ public static class SuggestionsPanelBuilder
             taRt.offsetMin = new Vector2(TextAreaLeftInset, taRt.offsetMin.y);
             taRt.offsetMax = new Vector2(-TextAreaRightInset, taRt.offsetMax.y);
         }
-        else Debug.LogWarning("SuggestionsPanelBuilder: InputField has no 'Text Area' child — left inset not applied.");
+        else Debug.LogWarning("SuggestionsPanelBuilder: InputField has no 'Text Area' child — text insets not applied.");
 
         // The key must win the raycast over the field's own graphic and the DragShield.
         keyGo.transform.SetAsLastSibling();
