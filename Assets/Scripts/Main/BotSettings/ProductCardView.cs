@@ -41,10 +41,19 @@ namespace Automation.BotSettingsUI
             get => priceLabel != null ? priceLabel.text : string.Empty;
             set
             {
+                // Hardening for a device-only symptom (2026-08-17): after
+                // committing a price from the edit sheet the tag rendered at a
+                // stale width until bot settings were re-opened. EditMode could
+                // not reproduce it in either ordering, so the mechanism is
+                // suspected, not proven — the suspect being that a freshly
+                // added item has no price, so the text lands on an INACTIVE tag
+                // and LayoutRebuilder.MarkLayoutForRebuild returns early for it.
+                // Switching the tag on BEFORE the write costs nothing and puts
+                // every write on a live object.
+                bool hasPrice = !string.IsNullOrWhiteSpace(value);
+                if (pricePill != null) pricePill.SetActive(hasPrice);
                 if (priceLabel != null) priceLabel.text = value ?? string.Empty;
-                // A freshly added item has no price yet; an empty tag would
-                // render as a stray ₸ in a 60-unit stub. Mirrors Description.
-                if (pricePill != null) pricePill.SetActive(!string.IsNullOrWhiteSpace(value));
+                if (hasPrice) RequestRelayout();
             }
         }
         public string Description
@@ -57,6 +66,16 @@ namespace Automation.BotSettingsUI
                 descLabel.text = text;
                 descLabel.gameObject.SetActive(!string.IsNullOrWhiteSpace(text));
             }
+        }
+
+        // The price tag sizes itself from its own text, so a new price must
+        // re-run the row's layout. TMP marks it on its own when the write lands
+        // on a live object; this is the belt to that braces, and it is a queued
+        // mark rather than an immediate rebuild, so it costs nothing per write.
+        private void RequestRelayout()
+        {
+            if (isActiveAndEnabled)
+                LayoutRebuilder.MarkLayoutForRebuild((RectTransform)transform);
         }
 
         private void Awake()

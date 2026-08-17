@@ -12740,7 +12740,7 @@ MonoBehaviour:
   scrimBehindFinger: {fileID: 2454379623712298803}
   slideDuration: 0.25
   scrimAlpha: 0.5
-  liftReduction: 140
+  liftReduction: 168
   keyboardFollowDuration: 0.1
   firstLiftDuration: 0.35
   firstLiftStartDelay: 0.06
@@ -16099,7 +16099,7 @@ MonoBehaviour:
   scrimBehindFinger: {fileID: 2626025863259832277}
   slideDuration: 0.3
   scrimAlpha: 0.5
-  liftReduction: 0
+  liftReduction: 168
   keyboardFollowDuration: 0.4
   firstLiftDuration: 0.4
   firstLiftStartDelay: 0.06

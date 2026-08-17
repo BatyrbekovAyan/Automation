@@ -126,6 +126,84 @@ public class ItemCardB2LayoutTests
             "The text column overlaps the price tag.");
     }
 
+    // Reproduces the exact sequence the edit sheet commits in: a just-added
+    // item has an empty price, so the tag is INACTIVE while its text is
+    // written, and only then switched on. Reported on device 2026-08-17: the
+    // tag comes out stretched and only settles after leaving and re-opening
+    // bot settings.
+    [Test]
+    public void PriceCommittedOntoAHiddenTag_StillFitsItsContent()
+    {
+        var view = View;
+        view.Name = "Новый товар";
+        view.Price = string.Empty;
+        Relayout();
+        Assert.IsFalse(Pill.gameObject.activeSelf, "precondition: the tag starts hidden");
+
+        view.Price = "100000";
+        Relayout();
+
+        var price = card.transform.Find("Pill/Price").GetComponent<TextMeshProUGUI>();
+        var currency = card.transform.Find("Pill/Currency").GetComponent<TextMeshProUGUI>();
+        var inner = Pill.GetComponent<HorizontalLayoutGroup>();
+        if (price.preferredWidth <= 0f)
+            Assert.Inconclusive("TMP reported a zero preferred width in batch mode.");
+
+        float expected = inner.padding.left + inner.padding.right + inner.spacing
+                         + price.preferredWidth + currency.preferredWidth;
+        Assert.AreEqual(expected, Pill.rect.width, 1f,
+            "The tag did not re-measure after being switched on with a fresh price.");
+    }
+
+    // Drains only the layouts that were actually MARKED dirty, instead of
+    // rebuilding unconditionally like the tests above.
+    //
+    // HONEST LIMITATION: this is NOT a regression guard for the stale-width
+    // symptom reported on device 2026-08-17. It was written to be one, and a
+    // negative control disproved it — reverting the card view to the original
+    // write-then-activate order left this test green, so EditMode reaches the
+    // correct width by either path and cannot see the defect. What it does
+    // still assert is that the automatic path produces content-fitted geometry
+    // at all. The symptom itself is Play-Mode-only and has to be checked there.
+    [Test]
+    public void PriceCommit_MarksTheRowForRebuildByItself()
+    {
+        var view = View;
+        view.Name = "Новый товар";
+        view.Price = string.Empty;
+        LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)card.transform);
+
+        view.Price = "100000";
+        Canvas.ForceUpdateCanvases();   // no explicit rebuild — only what was queued
+
+        var price = card.transform.Find("Pill/Price").GetComponent<TextMeshProUGUI>();
+        var currency = card.transform.Find("Pill/Currency").GetComponent<TextMeshProUGUI>();
+        var inner = Pill.GetComponent<HorizontalLayoutGroup>();
+        if (price.preferredWidth <= 0f)
+            Assert.Inconclusive("TMP reported a zero preferred width in batch mode.");
+
+        float expected = inner.padding.left + inner.padding.right + inner.spacing
+                         + price.preferredWidth + currency.preferredWidth;
+        Assert.AreEqual(expected, Pill.rect.width, 1f,
+            "Writing a price did not queue a layout rebuild — the tag keeps a stale width " +
+            "until something else re-lays the tab out.");
+    }
+
+    [Test]
+    public void PriceChangedInPlace_ReMeasuresTheTag()
+    {
+        var view = View;
+        view.Price = "5000";
+        Relayout();
+        float before = Pill.rect.width;
+
+        view.Price = "100000";
+        Relayout();
+
+        if (before <= 0f) Assert.Inconclusive("TMP reported a zero preferred width in batch mode.");
+        Assert.Greater(Pill.rect.width, before, "The tag kept the previous price's width.");
+    }
+
     [Test]
     public void EmptyPrice_HidesTheTagEntirely()
     {

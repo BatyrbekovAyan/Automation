@@ -71,6 +71,15 @@ public static class ItemEditSheetRestyleBuilder
     private const float DeleteHeight = 114f;        // 38px
     private const float DeleteFontSize = 40f;
 
+    // How much of the keyboard's height the sheet declines to lift by.
+    // Derived, not tuned: «Готово» spans y 192..330, so a reduction of 192
+    // would put its bottom edge exactly on the keyboard; 168 leaves a 24-unit
+    // margin above it. «Удалить» (y 54..168) therefore ends up entirely behind
+    // the keyboard while typing — deliberate. A destructive action sitting
+    // directly above the keyboard's top row is an accidental-tap hazard, and
+    // while the user is typing the only action that matters is «Готово».
+    private const float LiftReduction = 168f;
+
     // Authored colours. They are only the value the graphic carries on disk —
     // ThemedColor / FieldWellFocusBorder repaint from the palette at runtime.
     private static readonly Color DarkHairline = new Color32(0x24, 0x2C, 0x38, 0xFF);
@@ -153,6 +162,11 @@ public static class ItemEditSheetRestyleBuilder
         RestyleField(descField, "ОПИСАНИЕ", groupHeight: 213f, wellHeight: 162f, priceSuffix: false);
 
         RestyleButtons(doneButton, deleteButton);
+
+        // Unified deliberately: the two sheets shipped with 0 and 140, neither
+        // derived from anything. The value now follows from where «Готово» sits.
+        so.FindProperty("liftReduction").floatValue = LiftReduction;
+        so.ApplyModifiedPropertiesWithoutUndo();
     }
 
     private static void RestyleChassis(RectTransform sheetRoot, bool isProduct)
