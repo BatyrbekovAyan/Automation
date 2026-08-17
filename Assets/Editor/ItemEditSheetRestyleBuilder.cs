@@ -53,7 +53,9 @@ public static class ItemEditSheetRestyleBuilder
     private const float LabelSideInset = 6f;
     private const float LabelCharacterSpacing = 4f; // TMP: x fontSize x 0.01 = .04em
 
-    private const float WellRadius = 15f;           // doubled by the shader -> 30u (10px)
+    // Nobi's radius field is 1:1 with the visual radius: Refresh sends
+    // radius*2 and the shader halves it again (SDFUtils.cginc CalcAlpha:35).
+    private const float WellRadius = 30f;           // 10px
     private const float WellRingWidth = 3f;         // 1px
     private const float WellPadX = 36f;             // 12px
     private const float WellPadY = 30f;             // 10px
@@ -63,7 +65,7 @@ public static class ItemEditSheetRestyleBuilder
 
     private const float DoneY = 192f;
     private const float DoneHeight = 138f;          // 46px
-    private const float DoneRadius = 18f;           // doubled -> 36u (12px)
+    private const float DoneRadius = 36f;           // 12px
     private const float DoneFontSize = 45f;
     private const float DeleteY = 54f;
     private const float DeleteHeight = 114f;        // 38px
@@ -85,16 +87,15 @@ public static class ItemEditSheetRestyleBuilder
     private static Type cachedRoundedType;
     private static Type cachedIndependentRoundedType;
 
+    // Reports through the Console rather than EditorUtility.DisplayDialog: a
+    // modal blocks the Editor when the entry is driven over the mcp-unity
+    // bridge, and the Console is already open next to the menu.
     [MenuItem("Tools/BotSettings/Restyle Item Edit Sheet")]
     public static void Restyle()
     {
         int sheets = Run();
-        EditorUtility.DisplayDialog(
-            "Item Edit Sheet restyled",
-            $"{sheets} sheet(s) updated in BotSettings.prefab.\n\n" +
-            "Open Main.unity and enter Play mode to smoke-test: open a product " +
-            "and a service card, focus each field, delete an item.",
-            "OK");
+        Debug.Log($"[ItemEditSheetRestyleBuilder] {sheets} sheet(s) updated in BotSettings.prefab. " +
+                  "Smoke-test in Play mode: open a product and a service card, focus each field, delete an item.");
     }
 
     /// <summary>Batch entry: Tools/run-editor-builder.sh ItemEditSheetRestyleBuilder.BuildHeadless</summary>
@@ -307,7 +308,7 @@ public static class ItemEditSheetRestyleBuilder
         var fillImage = fill.GetComponent<Image>() ?? fill.gameObject.AddComponent<Image>();
         fillImage.color = DarkBackground;
         fillImage.raycastTarget = false;
-        SetCornerRadius(fill.gameObject, WellRadius - WellRingWidth * 0.5f);
+        SetCornerRadius(fill.gameObject, WellRadius - WellRingWidth);
         BindTheme(fill.gameObject, ThemeRole.Background);
 
         // The ring owns its colour itself — see FieldWellFocusBorder's summary.

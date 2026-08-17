@@ -20,18 +20,32 @@ namespace Automation.BotSettingsUI
         [SerializeField] private TextMeshProUGUI descLabel;
         [SerializeField] private Image thumb;
         [SerializeField] private Button rootButton;
+        [SerializeField] private ItemCardMonogram monogram;
+        [SerializeField] private GameObject pricePill;
 
         public event Action<ServiceCardView> OnEditRequested;
 
         public string Name
         {
             get => nameLabel != null ? nameLabel.text : string.Empty;
-            set { if (nameLabel != null) nameLabel.text = value ?? string.Empty; }
+            set
+            {
+                if (nameLabel != null) nameLabel.text = value ?? string.Empty;
+                // The single entry point for every write path — load, add, and
+                // the edit sheet's commit all land here.
+                if (monogram != null) monogram.Bind(value ?? string.Empty);
+            }
         }
         public string Price
         {
             get => priceLabel != null ? priceLabel.text : string.Empty;
-            set { if (priceLabel != null) priceLabel.text = value ?? string.Empty; }
+            set
+            {
+                if (priceLabel != null) priceLabel.text = value ?? string.Empty;
+                // A freshly added item has no price yet; an empty tag would
+                // render as a stray ₸ in a 60-unit stub. Mirrors Description.
+                if (pricePill != null) pricePill.SetActive(!string.IsNullOrWhiteSpace(value));
+            }
         }
         public string Description
         {

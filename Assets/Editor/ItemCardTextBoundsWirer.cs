@@ -19,6 +19,13 @@ using UnityEngine.UI;
 /// group drive the width and to truncate the single-line title instead of
 /// wrapping it into a second line the 60-unit box cannot show.
 ///
+/// SUPERSEDED IN PART by ItemCardB2RestyleBuilder: the card is now a
+/// three-cell row where the price is a self-sizing tag rather than a fixed
+/// 224-unit lane, so the collision cannot recur by construction. This wirer
+/// stays because both flags it sets are still part of the B2 card and it is
+/// the smallest way to re-assert them; run the B2 builder for the layout
+/// itself, not this one.
+///
 /// ADDITIVE AND IDEMPOTENT: it flips flags on existing components only. Do NOT
 /// "fix" this by re-running Tools/Rebuild Bot Settings Prefabs — that builder
 /// has long diverged from these prefabs (it authors 78-unit cards against the

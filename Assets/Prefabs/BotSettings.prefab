@@ -1978,7 +1978,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: adb30198aa32dd140b5750692dd48104, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithRoundedCorners
-  radius: 15
+  radius: 30
   image: {fileID: 643151668792424606}
 --- !u!114 &3629011312142094034
 MonoBehaviour:
@@ -3121,7 +3121,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: adb30198aa32dd140b5750692dd48104, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithRoundedCorners
-  radius: 13.5
+  radius: 27
   image: {fileID: 1125506306438616806}
 --- !u!114 &3089032621564627478
 MonoBehaviour:
@@ -4140,7 +4140,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: adb30198aa32dd140b5750692dd48104, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithRoundedCorners
-  radius: 15
+  radius: 30
   image: {fileID: 2262487114086687099}
 --- !u!114 &3254065304865291520
 MonoBehaviour:
@@ -5805,7 +5805,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: adb30198aa32dd140b5750692dd48104, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithRoundedCorners
-  radius: 15
+  radius: 30
   image: {fileID: 3518341205683032423}
 --- !u!114 &3790775565772006871
 MonoBehaviour:
@@ -6705,7 +6705,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: adb30198aa32dd140b5750692dd48104, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithRoundedCorners
-  radius: 13.5
+  radius: 27
   image: {fileID: 503096007837946312}
 --- !u!114 &6370912893959326225
 MonoBehaviour:
@@ -8031,7 +8031,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: adb30198aa32dd140b5750692dd48104, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithRoundedCorners
-  radius: 13.5
+  radius: 27
   image: {fileID: 5291958905045603780}
 --- !u!114 &2381166397703545001
 MonoBehaviour:
@@ -10937,7 +10937,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: adb30198aa32dd140b5750692dd48104, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithRoundedCorners
-  radius: 13.5
+  radius: 27
   image: {fileID: 424569908084828994}
 --- !u!114 &7935563988393218714
 MonoBehaviour:
@@ -11514,7 +11514,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: adb30198aa32dd140b5750692dd48104, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithRoundedCorners
-  radius: 13.5
+  radius: 27
   image: {fileID: 1715894138404420490}
 --- !u!114 &815321385857448432
 MonoBehaviour:
@@ -18967,7 +18967,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: adb30198aa32dd140b5750692dd48104, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithRoundedCorners
-  radius: 15
+  radius: 30
   image: {fileID: 4039837948012471961}
 --- !u!114 &7778821749054002979
 MonoBehaviour:
@@ -27050,7 +27050,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: adb30198aa32dd140b5750692dd48104, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithRoundedCorners
-  radius: 18
+  radius: 36
   image: {fileID: 2787831595614036059}
 --- !u!114 &1488819078703198270
 MonoBehaviour:
@@ -34738,7 +34738,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: adb30198aa32dd140b5750692dd48104, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithRoundedCorners
-  radius: 18
+  radius: 36
   image: {fileID: 5994220474146305710}
 --- !u!114 &314481641416293219
 MonoBehaviour:
@@ -37099,7 +37099,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: adb30198aa32dd140b5750692dd48104, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithRoundedCorners
-  radius: 15
+  radius: 30
   image: {fileID: 6146104381078961810}
 --- !u!114 &7743939579099949463
 MonoBehaviour:
@@ -41288,7 +41288,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: adb30198aa32dd140b5750692dd48104, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithRoundedCorners
-  radius: 15
+  radius: 30
   image: {fileID: 7858015781036733514}
 --- !u!114 &1093345886381806593
 MonoBehaviour:
@@ -43556,7 +43556,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: adb30198aa32dd140b5750692dd48104, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Nobi.UiRoundedCorners::Nobi.UiRoundedCorners.ImageWithRoundedCorners
-  radius: 13.5
+  radius: 27
   image: {fileID: 8126329822709244153}
 --- !u!114 &6061692940734365519
 MonoBehaviour:

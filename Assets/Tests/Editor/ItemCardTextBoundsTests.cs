@@ -59,25 +59,10 @@ public class ItemCardTextBoundsTests
         }
     }
 
-    // The column reserves exactly the price lane on its right. If that reserve
-    // is ever dropped the collision returns even with childControlWidth on.
-    [Test]
-    public void CardTitleColumn_StopsAtThePriceLane()
-    {
-        foreach (var path in CardPrefabPaths)
-        {
-            var card = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-            var column = (RectTransform)card.transform.Find("Info/NameDesc");
-            var price = (RectTransform)card.transform.Find("Info/Price");
-            Assert.IsNotNull(price, $"{path}: no Price label.");
-
-            // Column: right edge inset from the parent's right by -offsetMax.x.
-            // Price: right-anchored, so its left edge sits at -anchoredPosition.x + width.
-            float columnRightInset = -column.offsetMax.x;
-            float priceLeftInset = -price.anchoredPosition.x + price.sizeDelta.x;
-            Assert.GreaterOrEqual(columnRightInset, priceLeftInset,
-                $"{path}: the text column reaches into the price lane " +
-                $"(column stops {columnRightInset} from the right, price starts at {priceLeftInset}).");
-        }
-    }
+    // The old CardTitleColumn_StopsAtThePriceLane lived here. It measured the
+    // title column against a FIXED 224-unit price lane, which the B2 card no
+    // longer has — the price is a layout cell that sizes to its own digits. The
+    // invariant it protected did not go away with it: it is re-armed, in both a
+    // static and a behavioural form, by ItemCardB2Tests.TextColumn_IsTheOnlyFlexibleCell
+    // and ItemCardB2LayoutTests.LongName_NeverReachesThePriceTag.
 }
