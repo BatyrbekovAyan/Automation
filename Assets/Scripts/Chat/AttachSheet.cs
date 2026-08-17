@@ -30,14 +30,27 @@ public class AttachSheet : MonoBehaviour
     /// <summary>True while the sheet is up — the suggestions slot yields to it (slot exclusivity).</summary>
     public bool IsOpen => _isOpen;
 
-    private RectTransform _rt;
-    private bool          _isOpen;
-    private Tween         _slideTween;
-    private Tween         _fadeTween;
+    // The sheet shares the screen's bottom region with the native keyboard and the suggestions
+    // panel, and opening it collapses whichever of those held that region. Below this much
+    // remaining rise the composer is visually home and the sheet may start up; the timeout is a
+    // safety net, not a schedule — if something holds the region open, «+» must still respond.
+    private const float ComposerSettledCanvasPx  = 8f;
+    private const float MaxComposerSettleSeconds = 0.6f;
+
+    private RectTransform     _rt;
+    private bool              _isOpen;
+    private Tween             _slideTween;
+    private Tween             _fadeTween;
+    private KeyboardAwarePanel _composerMover;   // owns the composer's rise; read-only from here
+    private Coroutine         _pendingRise;
 
     void Awake()
     {
         _rt = GetComponent<RectTransform>();
+        // Found through the field rather than serialized: the mover lives on MovingArea, which is
+        // the composer's ancestor but not this sheet's, and adding a scene reference would mean
+        // re-running a builder over a hand-tuned scene for a value that is already reachable.
+        _composerMover = inputField != null ? inputField.GetComponentInParent<KeyboardAwarePanel>() : null;
 
         OnPicked += pick =>
             Debug.Log($"[AttachSheet] OnPicked: kind={pick.Kind} file={pick.FileName} " +
@@ -59,6 +72,7 @@ public class AttachSheet : MonoBehaviour
         if (documentButton != null) documentButton.onClick.RemoveListener(OnDocumentTapped);
         if (backdropButton != null) backdropButton.onClick.RemoveListener(Close);
 
+        StopPendingRise();
         _slideTween?.Kill();
         _fadeTween?.Kill();
         if (backdrop != null) backdrop.SetActive(false);
@@ -105,16 +119,39 @@ public class AttachSheet : MonoBehaviour
 
         gameObject.SetActive(true);
         if (backdrop != null) backdrop.SetActive(true);
+        // The backdrop dims IMMEDIATELY, deliberately ahead of the sheet: it is what acknowledges
+        // the tap, so «+» stays responsive while the composer is still on its way down.
         FadeBackdrop(1f, openDuration);
 
-        // Sheet slides up from below the canvas. Width is held by the
-        // pre-existing anchors (built by AttachSheetBuilder).
+        // Sheet parks below the canvas. Width is held by the pre-existing anchors (built by
+        // AttachSheetBuilder).
         _rt.sizeDelta        = new Vector2(_rt.sizeDelta.x, sheetHeightCanvasPx);
         _rt.anchoredPosition = new Vector2(0f, -sheetHeightCanvasPx);
 
         _slideTween?.Kill();
-        // SetTarget links the lambda tween to the RectTransform so
-        // SheetDragDismiss's DOTween.IsTweening guard can see it.
+        StopPendingRise();
+        _pendingRise = StartCoroutine(RiseWhenComposerHasSettled());
+    }
+
+    /// <summary>
+    /// Start the sheet up only once the composer has finished coming DOWN. Opening the sheet
+    /// evicts whoever held the bottom region — the keyboard (dismissed above) or the suggestions
+    /// panel (SuggestionsController polls <see cref="IsOpen"/> and collapses its slot) — and both
+    /// take a beat to drain. Riding up THROUGH a composer that is still falling reads as two
+    /// surfaces fighting over the same space, which is what this sequencing removes.
+    /// With nothing raised the wait falls through in the same frame, so the ordinary open is
+    /// unchanged.
+    /// </summary>
+    private IEnumerator RiseWhenComposerHasSettled()
+    {
+        float deadline = Time.unscaledTime + MaxComposerSettleSeconds;
+        while (ComposerStillRaised && Time.unscaledTime < deadline)
+            yield return null;
+
+        _pendingRise = null;
+        _slideTween?.Kill();
+        // SetTarget links the lambda tween to the RectTransform so SheetDragDismiss's
+        // DOTween.IsTweening guard can see it.
         _slideTween = DOTween.To(
                 () => _rt.anchoredPosition.y,
                 v  => _rt.anchoredPosition = new Vector2(0f, v),
@@ -124,6 +161,18 @@ public class AttachSheet : MonoBehaviour
             .SetTarget(_rt);
     }
 
+    // An unwired mover reads as «nothing is raised», so the sheet opens exactly as it did before
+    // this sequencing existed rather than stalling for the timeout.
+    private bool ComposerStillRaised =>
+        _composerMover != null && _composerMover.AppliedBottomInset > ComposerSettledCanvasPx;
+
+    private void StopPendingRise()
+    {
+        if (_pendingRise == null) return;
+        StopCoroutine(_pendingRise);
+        _pendingRise = null;
+    }
+
     public void Close()
     {
         if (!_isOpen) return;
@@ -131,6 +180,9 @@ public class AttachSheet : MonoBehaviour
 
         FadeBackdrop(0f, closeDuration);
 
+        // A close can land while the rise is still waiting for the composer (a second «+» tap, the
+        // ✦ key, a backdrop tap). Drop the wait or the sheet would slide up after being closed.
+        StopPendingRise();
         _slideTween?.Kill();
         float startY = _rt.anchoredPosition.y;
         _slideTween = DOTween.To(
