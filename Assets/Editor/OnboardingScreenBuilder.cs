@@ -63,7 +63,7 @@ public static class OnboardingScreenBuilder
 
     private const string WhatsappIconPath = "Assets/Images/Icons/WhatsApp Glowing.png";
     private const string TelegramIconPath = "Assets/Images/Icons/Telegram.png";
-    private const string CheckIconPath = "Assets/Images/Icons/[CITYPNG.COM]HD Green Check True Tick Mark Icon Sign PNG - 3000x3000.png";
+    private const string CheckIconPath = "Assets/Images/Icons/Tick Green.png";
 
     private static TMP_FontAsset _regular, _semibold, _bold;
     private static Sprite _whatsapp, _telegram, _check;

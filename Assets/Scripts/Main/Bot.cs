@@ -99,11 +99,11 @@ public class Bot : MonoBehaviour
     private Tween sublineBlink;
     private Color lastObservedStatusColor = new(-1f, -1f, -1f);
     private bool cardStateReady;
+    private Coroutine initRoutine;
 
 
     private void Awake ()
     {
-        StartCoroutine(InitCardState());
         ApplyBusinessIcon();
 
         if (autoPillButton != null)
@@ -121,9 +121,15 @@ public class Bot : MonoBehaviour
         // A mode committed elsewhere (chats header, bot-switcher chip) must
         // repaint this card — all three controls share the bot's ReplyMode.
         ReplyModeToggleBinder.OnReplyModeChanged += HandleReplyModeChanged;
+
         // Returning to the Боты tab after Bot Settings: the channel toggles or
         // the business type may have changed while this card was inactive.
         if (cardStateReady) RefreshCardState(animatePill: false);
+        // Init lives HERE, not in Awake: it yields a frame, and Unity kills a
+        // coroutine when its GameObject deactivates. A card deactivated inside
+        // that first frame (tab switch, settings slide-in) would otherwise stay
+        // cardStateReady == false forever — unpainted for the whole session.
+        else if (initRoutine == null) initRoutine = StartCoroutine(InitCardState());
     }
 
     private void OnDisable()
@@ -131,6 +137,11 @@ public class Bot : MonoBehaviour
         Theme.Changed -= HandleThemeChanged;
         ReplyModeToggleBinder.OnReplyModeChanged -= HandleReplyModeChanged;
         KillSublineBlink();
+        KillPillTweens();
+
+        // Unity already stopped the pending init coroutine — drop the stale
+        // handle so the next OnEnable can start a fresh one.
+        if (!cardStateReady) initRoutine = null;
     }
 
 
@@ -406,6 +417,7 @@ public class Bot : MonoBehaviour
     {
         yield return new WaitForEndOfFrame();
 
+        initRoutine = null;
         cardStateReady = true;
         // The «Not Active» (red) state died with the master switch — the hidden
         // status channel now only distinguishes connected from connecting.
@@ -438,10 +450,23 @@ public class Bot : MonoBehaviour
 
         // The capsule is the chats-header «Авто» pill 1:1 — one painter, one
         // look, and since the unification one STORE (the bot's ReplyMode).
+        // Kill first, exactly like ReplyModeToggleBinder.SetVisualMode: an
+        // in-flight DOColor from a previous animated paint would otherwise keep
+        // writing its OLD target over these colours until the tween ends.
+        KillPillTweens();
         ReplyModeToggleBinder.PaintChip(AutoOn, autoPillRing, autoPillFill,
             autoPillLabel, autoPillDotRing, autoPillDotCore, animatePill);
 
         RefreshSubline();
+    }
+
+    private void KillPillTweens()
+    {
+        if (autoPillRing != null) autoPillRing.DOKill();
+        if (autoPillFill != null) autoPillFill.DOKill();
+        if (autoPillLabel != null) autoPillLabel.DOKill();
+        if (autoPillDotRing != null) autoPillDotRing.DOKill();
+        if (autoPillDotCore != null) autoPillDotCore.DOKill();
     }
 
     private void RefreshSubline()
@@ -564,5 +589,6 @@ public class Bot : MonoBehaviour
     {
         if (autoPillButton != null) autoPillButton.onClick.RemoveListener(OnAutoPillTapped);
         KillSublineBlink();
+        KillPillTweens();
     }
 }

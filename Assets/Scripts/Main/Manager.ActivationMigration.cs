@@ -25,7 +25,10 @@ public partial class Manager
 
             var plan = BotActivationMigration.Plan(
                 PlayerPrefs.GetInt(botKey, 1),
-                PlayerPrefs.GetInt(botKey + "ReplyMode", (int)AutoButtonModel.DefaultMode),
+                // Through the binder, not a hand-rolled key read: it owns the
+                // "ReplyMode" suffix and the semi default, and a drift between the
+                // two would silently disarm the ForceSemi safety pin below.
+                (int)ReplyModeToggleBinder.GetMode(botKey),
                 PlayerPrefs.GetInt(botKey + "isOnWhatsapp", 1) == 1,
                 PlayerPrefs.GetInt(botKey + "isOnTelegram", 1) == 1,
                 PlayerPrefs.GetString(botKey + "WhatsappProfileId", Bot.UnauthedProfileSentinel),

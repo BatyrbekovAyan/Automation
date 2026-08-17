@@ -68,7 +68,7 @@ public static class OnboardingAuthBlocksBuilder
     private const string BoldGuid = "1cd715823fef34be4a3d3f3c5572594c";
 
     private const string LockIconPath = "Assets/Images/Icons/Lock.png";
-    private const string CheckIconPath = "Assets/Images/Icons/[CITYPNG.COM]HD Green Check True Tick Mark Icon Sign PNG - 3000x3000.png";
+    private const string CheckIconPath = "Assets/Images/Icons/Tick Green.png";
 
     // Verbatim copy deck (owner-approved — do not paraphrase).
     private const string TrustTitleText = "Это безопасно";

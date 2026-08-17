@@ -59,7 +59,7 @@ public static class FirstStepsCardBuilder
     private const string BoldGuid = "1cd715823fef34be4a3d3f3c5572594c";
 
     private const string ChevronRightPath = "Assets/Images/Chat/chevron-right.png";
-    private const string CheckIconPath = "Assets/Images/Icons/[CITYPNG.COM]HD Green Check True Tick Mark Icon Sign PNG - 3000x3000.png";
+    private const string CheckIconPath = "Assets/Images/Icons/Tick Green.png";
 
     // Copy deck (spec §Screen specs — owner-approved). Row 1's channel label is filled
     // at runtime by FirstStepsCard; the builder seeds the WhatsApp default.

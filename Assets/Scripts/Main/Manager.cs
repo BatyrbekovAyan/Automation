@@ -748,9 +748,6 @@ public partial class Manager : MonoBehaviour
         openBotSettings.SyncHeaderTitle();
         var openBotComp = openBot.GetComponent<Bot>();
         if (openBotComp.BotName != null) openBotComp.BotName.text = newName;
-        // C2 card: the subline shows the business TYPE (+ channel icons), not the
-        // description — let the card re-derive it from the just-saved prefs.
-        openBotComp.RefreshCardSubline();
 
         {
             var dd = openBotSettings.BusinessTypeDropdown;
@@ -780,6 +777,13 @@ public partial class Manager : MonoBehaviour
             PlayerPrefs.SetInt(openBot.name + "isOnWhatsapp", openBotSettings.WhatsappToggle.isOn ? 1 : 0);
         if (openBotSettings.TelegramToggle != null)
             PlayerPrefs.SetInt(openBot.name + "isOnTelegram", openBotSettings.TelegramToggle.isOn ? 1 : 0);
+
+        // C2 card: the subline shows the business TYPE + the channel icons, so it
+        // must be re-derived AFTER both the BusinessType write above and the two
+        // channel toggles just persisted — reading them earlier repaints the card
+        // from pre-save values (invisible today only because BotsPage is inactive
+        // while settings are open and Bot.OnEnable refreshes again on return).
+        openBotComp.RefreshCardSubline();
 
         PlayerPrefs.SetString(openBot.name + "WhatsappNumber", openBotSettings.WhatsappNumberField.Value);
         PlayerPrefs.SetString(openBot.name + "TelegramNumber", openBotSettings.TelegramNumberField.Value);
@@ -3310,21 +3314,50 @@ public partial class Manager : MonoBehaviour
         form.AddField("ServicesList", "");
         
         using UnityWebRequest www = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateWhatsappWorkflow", form);
+        // Without a timeout a connected-but-silent n8n parks this coroutine forever:
+        // neither branch below runs, so the card's controls stay disabled and the
+        // LoadingPanel never lifts. 30s matches every other request in this file.
+        www.timeout = 30;
         yield return www.SendWebRequest();
-        
+
+        // The user can reach the card while the sibling channel's request is still in
+        // flight (the branches below drop the shared LoadingPanel), and deleting the
+        // bot destroys this GameObject — so never dereference it unguarded.
+        var startedBot = bot != null ? bot.GetComponent<Bot>() : null;
+        if (startedBot == null)
+        {
+            LoadingPanel.SetActive(false);
+            yield break;
+        }
+
         if (www.result != UnityWebRequest.Result.Success)
         {
+            // The card SURVIVES this failure (DeleteWhatsappProfile only resets the
+            // local id to the unauthed sentinel), so hand its controls back — the
+            // creation path disabled both, and only the success branch below used
+            // to re-enable them, stranding a bot that could be neither opened nor
+            // switched between «Авто»/«Вместе» until the app was relaunched.
+            startedBot.EditButton.interactable = true;
+            startedBot.SetActivationInteractable(true);
+
+            // …and forget the profile we are about to delete: the card would keep
+            // painting a connected WhatsApp glyph off a dangling id, and a capsule
+            // tap would write '*' suppression rows keyed to a profile that no
+            // longer exists (AuthedProfileIds only rejects null/empty/"-1").
+            startedBot.whatsappProfileId = Bot.UnauthedProfileSentinel;
+            startedBot.RefreshCardSubline();
+
             StartCoroutine(DeleteWhatsappProfile(whatsappProfileId, true));
         }
         else
         {
-            bot.GetComponent<Bot>().active = true;
+            startedBot.active = true;
             PlayerPrefs.SetInt(bot.name + "Active", 1);
-            bot.GetComponent<Bot>().Status.GetComponent<TextMeshProUGUI>().text = "Active";
-            bot.GetComponent<Bot>().Status.GetComponent<TextMeshProUGUI>().color = new(0, 1, 0);
+            startedBot.Status.text = "Active";
+            startedBot.Status.color = new(0, 1, 0);
 
-            bot.GetComponent<Bot>().EditButton.interactable = true;
-            bot.GetComponent<Bot>().SetActivationInteractable(true);
+            startedBot.EditButton.interactable = true;
+            startedBot.SetActivationInteractable(true);
 
 
             string response = www.downloadHandler.text;
@@ -3464,24 +3497,45 @@ public partial class Manager : MonoBehaviour
         form.AddField("ServicesList", "");
         
         using UnityWebRequest www = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateTelegramWorkflow", form);
+        // See the WhatsApp twin: no timeout means a silent n8n parks this coroutine
+        // forever and neither branch below ever runs.
+        www.timeout = 30;
         yield return www.SendWebRequest();
-        
+
+        // The card may have been deleted while the sibling channel was still in
+        // flight — never dereference it unguarded.
+        var startedBot = bot != null ? bot.GetComponent<Bot>() : null;
+        if (startedBot == null)
+        {
+            LoadingPanel.SetActive(false);
+            yield break;
+        }
+
         // NOTE: this check was left inverted (debug flip, correct line commented
         // beside it) — on success it deleted the just-authorized profile and on
         // failure marked the bot active. Restored to mirror the WhatsApp twin.
         if (www.result != UnityWebRequest.Result.Success)
         {
+            // Mirror of the WhatsApp twin: the card survives, so give its Edit
+            // button and «Авто» capsule back instead of stranding them disabled,
+            // and drop the id of the profile being deleted so neither the subline
+            // icons nor a capsule tap can act on it.
+            startedBot.EditButton.interactable = true;
+            startedBot.SetActivationInteractable(true);
+            startedBot.telegramProfileId = Bot.UnauthedProfileSentinel;
+            startedBot.RefreshCardSubline();
+
             StartCoroutine(DeleteTelegramProfile(telegramProfileId, true));
         }
         else
         {
-            bot.GetComponent<Bot>().active = true;
+            startedBot.active = true;
             PlayerPrefs.SetInt(bot.name + "Active", 1);
-            bot.GetComponent<Bot>().Status.GetComponent<TextMeshProUGUI>().text = "Active";
-            bot.GetComponent<Bot>().Status.GetComponent<TextMeshProUGUI>().color = new(0, 1, 0);
+            startedBot.Status.text = "Active";
+            startedBot.Status.color = new(0, 1, 0);
 
-            bot.GetComponent<Bot>().EditButton.interactable = true;
-            bot.GetComponent<Bot>().SetActivationInteractable(true);
+            startedBot.EditButton.interactable = true;
+            startedBot.SetActivationInteractable(true);
 
 
             string response = www.downloadHandler.text;
@@ -3818,6 +3872,30 @@ public partial class Manager : MonoBehaviour
         // Since the capsule↔ReplyMode unification the channel toggles are the ONLY
         // workflow-activation gate: «выключить бота целиком» = both toggles off.
         // The bots-page capsule governs reply SUPPRESSION (ReplyMode), not activation.
+        //
+        // Which makes the ordering below load-bearing: the server reads ABSENCE of a
+        // '*' row as «reply», so activating a channel while a Вместе bot has no row
+        // (its seed write failed, or n8n was unreachable when the mode was set) would
+        // let the bot answer real clients while every UI surface says «Вместе».
+        //
+        // BLOCKING on purpose. The fire-and-forget SyncReplyMode loses this race by
+        // construction — SetReplyMode responds only after its Postgres upsert, while
+        // /workflows/{id}/activate is a single in-process n8n call — so dispatching
+        // both in the same frame would activate first and guarantee nothing. Waiting
+        // for the 200 is what actually proves the row exists (Respond sits after
+        // Upsert Reply Mode). An Auto bot needs no row at all: absence means «reply».
+        bool replySuppressionReady = true;
+        if (ReplyModeToggleBinder.GetMode(openBot.name) == ReplyModeToggleBinder.ReplyMode.Semi)
+        {
+            string[] suppressProfileIds = AuthedProfileIds(openBot.GetComponent<Bot>());
+            if (suppressProfileIds.Length > 0)
+            {
+                replySuppressionReady = false;
+                yield return SyncReplyModeRoutine(
+                    BuildReplyModePayload(suppressProfileIds, "*", true),
+                    ok => replySuppressionReady = ok);
+            }
+        }
 
         // Freshly-created bots reach here with empty whatsappWorkflowId/telegramWorkflowId
         // because CreateWhatsappWorkflowFromStart / CreateTelegramWorkflowFromStart have
@@ -3832,9 +3910,23 @@ public partial class Manager : MonoBehaviour
         }
         else
         {
-            if (previousWhatsappOn != openBotSettings.WhatsappToggle.isOn)
+            bool whatsappTurningOn = openBotSettings.WhatsappToggle.isOn;
+            if (previousWhatsappOn != whatsappTurningOn)
             {
-                StartCoroutine(EnableWhatsappWorkflow(whatsappWid, openBotSettings.WhatsappToggle.isOn));
+                // Waking a channel we could not silence first is the one move that
+                // can make a «Вместе» bot answer a real client — refuse it and fail
+                // the save loudly. Turning a channel OFF is always safe.
+                if (whatsappTurningOn && !replySuppressionReady)
+                {
+                    Debug.LogError("[SaveWorkflows] WhatsApp activation skipped — the '*' " +
+                                   "suppression row did not land, so the bot would auto-reply.");
+                    _saveHadError = true;
+                    EnableWhatsappWorkflowSaved = true;   // settle the gate, never hang the pill
+                }
+                else
+                {
+                    StartCoroutine(EnableWhatsappWorkflow(whatsappWid, whatsappTurningOn));
+                }
             }
             else
             {
@@ -3869,9 +3961,21 @@ public partial class Manager : MonoBehaviour
         }
         else
         {
-            if (previousTelegramOn != openBotSettings.TelegramToggle.isOn)
+            bool telegramTurningOn = openBotSettings.TelegramToggle.isOn;
+            if (previousTelegramOn != telegramTurningOn)
             {
-                StartCoroutine(EnableTelegramWorkflow(telegramWid, openBotSettings.TelegramToggle.isOn));
+                // Mirror of the WhatsApp gate above.
+                if (telegramTurningOn && !replySuppressionReady)
+                {
+                    Debug.LogError("[SaveWorkflows] Telegram activation skipped — the '*' " +
+                                   "suppression row did not land, so the bot would auto-reply.");
+                    _saveHadError = true;
+                    EnableTelegramWorkflowSaved = true;   // settle the gate, never hang the pill
+                }
+                else
+                {
+                    StartCoroutine(EnableTelegramWorkflow(telegramWid, telegramTurningOn));
+                }
             }
             else
             {

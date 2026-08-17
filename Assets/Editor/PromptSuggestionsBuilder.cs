@@ -21,7 +21,7 @@ public static class PromptSuggestionsBuilder
     private const string PrefabPath = "Assets/Prefabs/BotSettings.prefab";
     private const string PlusSpritePath = "Assets/Images/New/plus.png";
     private const string TickSpritePath =
-        "Assets/Images/Icons/[CITYPNG.COM]HD Green Check True Tick Mark Icon Sign PNG - 3000x3000.png";
+        "Assets/Images/Icons/Tick Green.png";
     private const string HeaderGoName = "SuggestionsHeader";
     private const string CloudGoName = "SuggestionsCloud";
     private const string MoreGoName = "SuggestionsMoreButton";
