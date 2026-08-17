@@ -135,13 +135,15 @@ public class SuggestionsController : MonoBehaviour
             _dragHandle.Released += HandleDragReleased;
         }
 
-        // Rule 4 REVISED by the owner 2026-08-14: a tap on the composer focuses the field and
-        // opens the keyboard from EVERY state, Collapsed included — the two-step entry (first tap
-        // raises the panel without focus) is gone, and with it the activation veto that
-        // implemented it. The panel-raise affordances from Collapsed are the thread tap, the ✦
-        // key, and rule 9's auto-raise. A keyboard session that STARTED from Collapsed also ends
-        // there (_slotState never leaves Collapsed, so the rule-2 return stays quiet): the slot
-        // returns to whatever tenant held it before the keyboard.
+        // Model E rule 4: a tap on the composer while the slot is COLLAPSED raises the panel
+        // instead of focusing the field. The veto is installed on THIS field only — every other
+        // input in the project keeps stock TMP behaviour.
+        var composer = _bottomPanel != null ? _bottomPanel.inputField as DeferredDismissInputField : null;
+        if (composer != null)
+        {
+            composer.ActivationVeto = ShouldVetoComposerActivation;
+            composer.ActivationVetoed += HandleComposerActivationVetoed;
+        }
 
         _threadInset = _keyboardMover != null
             ? _keyboardMover.GetComponentInChildren<ScrollTopInsetCompensator>(true)
@@ -177,6 +179,12 @@ public class SuggestionsController : MonoBehaviour
             _dragHandle.Released -= HandleDragReleased;
             _dragHandle.HeightProvider = null;
             _dragHandle.MaxHeightProvider = null;
+        }
+        var composer = _bottomPanel != null ? _bottomPanel.inputField as DeferredDismissInputField : null;
+        if (composer != null)
+        {
+            composer.ActivationVeto = null;                       // never outlive this controller
+            composer.ActivationVetoed -= HandleComposerActivationVetoed;
         }
     }
 
@@ -764,6 +772,18 @@ public class SuggestionsController : MonoBehaviour
                 target, 0.18f)
             .SetEase(Ease.OutCubic);
     }
+
+    // --- Composer activation veto (model E rule 4) --------------------------
+
+    /// <summary>
+    /// The two-step entry: while the slot is COLLAPSED in «Вместе», a tap on the composer raises
+    /// the panel instead of focusing the field — focusing there would open the keyboard underneath
+    /// a panel still on its way up. Every other situation focuses normally, including all of «Авто».
+    /// </summary>
+    private bool ShouldVetoComposerActivation() =>
+        _semiAutoOn && _slotState == SuggestionSlotState.Collapsed && !_draggingSlot;
+
+    private void HandleComposerActivationVetoed() => ApplySlotInput(SuggestionSlotInput.FieldTap);
 
     // --- One place that turns an intent into slot motion --------------------
 

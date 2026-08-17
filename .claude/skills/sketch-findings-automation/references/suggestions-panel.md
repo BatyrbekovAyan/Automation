@@ -43,15 +43,9 @@ DEFAULT tenant; `collapsed` (slot height 0, composer flush to the screen bottom)
 ONLY via the handle. Slot states: `panel` · `keyboard` · `expanded` · `collapsed`.
 
 **Transitions:**
-- **Tap the input field — REVISED by the owner 2026-08-14**: normal focus → keyboard from
-  EVERY state, Collapsed included; identical in «Вместе» and «Авто». The original two-step
-  entry (first tap on the lowered composer raised the panel without focusing) is DROPPED, and
-  with it the whole `DeferredDismissInputField` activation-veto seam (removed, file reverted).
-  The panel-raise affordances from Collapsed are the thread tap, the ✦ key, and rule 9's
-  auto-raise. A keyboard session that STARTED from Collapsed also ENDS there — the slot
-  returns to whatever tenant held it before the keyboard (`_slotState` stays Collapsed, so
-  the rule-2 return trigger stays quiet); a session started from panel/expanded returns to
-  the panel as before.
+- **Tap the input field**: panel/expanded → keyboard (normal focus). From COLLAPSED the same
+  tap raises the PANEL instead — the field is NOT focused, no keyboard (two-step entry,
+  «панель прежде клавиатуры»). In «Авто» mode the field always focuses normally.
 - **Tap the thread**: only RAISES — keyboard → panel (blur), collapsed → panel; an open panel
   never hides from thread taps (repeat taps are no-ops). Scroll gestures are not taps.
 - **The handle** — grabber strip on the panel's top edge, directly under the composer: free
@@ -86,23 +80,29 @@ header + cards content height, cap ≈ leave ≥ ~360u of thread visible (sketch
 that same geometry is what «Авто», a bot switch and the attach-sheet swap produce — so the shipped
 `_sheetOpen` bool cannot express «the owner collapsed it». Model E needs an explicit 4-state field
 (Collapsed | Panel | Expanded | Keyboard), because rules 3/4/5/9 all key off «collapsed» specifically.
-Collapsed does NOT keep the handle on screen (the panel leaves with the slot) — that is intended: the ways
-back are the thread tap, the ✦ key and the incoming auto-raise (the composer tap opens the KEYBOARD since
-the 2026-08-14 revision). Collapsed does not persist across a chat or bot switch; every chat opens with the
-panel as the default tenant.
+Collapsed does NOT keep the handle on screen (the panel leaves with the slot) — that is intended: the three
+ways back are the thread tap, the composer tap and the ✦ key. Collapsed does not persist across a chat or
+bot switch; every chat opens with the panel as the default tenant.
 
 **Unity implementation notes (delta over the shipped 003-A build):**
 - `ComposerSlotKey` already does destination-glyph morphing — MOVE it to the field END
   (Text Area RIGHT inset 24→120 instead of the left one) and add the state styling: tint
   circle only under ✦; ⌨ neutral.
-- ~~«Raise without focus» activation veto~~ **REMOVED 2026-08-14** with the owner's rule-4
-  revision (field tap = keyboard from every state); `DeferredDismissInputField` reverted to its
-  pre-005 form. Historical note kept because the analysis stays true if a field-tap gate is ever
-  wanted again: gating `OnPointerClick` alone is provably insufficient — TMP reaches activation
-  by THREE routes (`OnPointerDown` → `SetSelectedGameObject` → `OnSelect`; the overridden
-  `OnPointerClick`; and `TextSelectionRouter`'s long-press path), gating `OnSelect` is FORBIDDEN
-  (it would break the ⌨ key, the post-Send re-focus and the reply focus), and `DragShield` does
-  not cover the field's full width, so any such gate must live on the field itself.
+- «Raise without focus»: a tap on the collapsed composer's field must NOT activate the TMP
+  input. **CORRECTED 2026-08-13 — gating `OnPointerClick` alone is provably insufficient**: TMP
+  reaches activation by THREE routes — its own `OnPointerDown` calls
+  `EventSystem.SetSelectedGameObject` (TMP_InputField.cs:1982) → `OnSelect` → activate; the
+  overridden `OnPointerClick` (DeferredDismissInputField.cs:218); and `TextSelectionRouter`'s
+  long-press/double-tap path, which calls `SetSelectedGameObject` + `ActivateInputField`
+  directly (TextSelectionRouter.cs:255-256). The veto must therefore be a pointer-scoped
+  predicate consulted from an overridden `OnPointerDown` AND `OnPointerClick`, default-null so
+  the other ~12 scene fields are untouched, installed by the controller on the composer field
+  only, false whenever `!semiAutoOn` or the field is already focused. Do NOT gate `OnSelect` —
+  that would break the ⌨ key (SuggestionsController.cs:702), the post-Send re-focus
+  (MessagesBottomPanel.cs:138) and the reply focus (:164), all of which must keep working.
+  Note also `DragShield` does not cover the field's full width (x∈[24,790] of 834), so a tap at
+  either edge reaches TMP directly — the veto must live on the field, not on the shield.
+  Respect the single-focus and materialized-focus invariants throughout.
 - Thread-tap raise rides the existing keyboard-dismiss path; must not fire on ScrollRect
   drags (tap ≠ drag).
 - The handle drives `VirtualBottomInset` LIVE during drag (bypass SmoothDamp while

@@ -57,11 +57,10 @@ public enum SuggestionSlotInput
 /// the suggestions panel — not the keyboard — is its DEFAULT one: the native keyboard exists only
 /// while the composer field is focused, and no TAP ever collapses the slot — Collapsed is reached by
 /// a downward drag of the handle (see <see cref="AfterDrag"/>) or by the two events that end the
-/// suggestions surface itself, AnsweredRun and ReplyModeOff. This seam protects the rule a
-/// controller keeps breaking by hand: a tap NEVER hides an open panel — raising is the only thing
-/// taps do. A FieldTap focuses the field (and so summons the keyboard) from EVERY state, Collapsed
-/// included: the owner revised the original two-step entry away on 2026-08-14, so the panel-raise
-/// affordances from Collapsed are the thread tap, the ✦ key and the incoming-message auto-raise.
+/// suggestions surface itself, AnsweredRun and ReplyModeOff. This seam protects the two rules a
+/// controller keeps breaking by hand: a tap NEVER hides an open panel, and the first tap on the field
+/// raises the panel WITHOUT focusing it (focusing there would open the keyboard underneath a panel
+/// that is still rising — the dip the whole model exists to avoid).
 /// Pure: no MonoBehaviour, no input types, no clock — the controller feeds state + intent and
 /// applies the returned flags.
 /// </summary>
@@ -103,10 +102,11 @@ public static class SuggestionSlotStateMachine
         switch (input)
         {
             case SuggestionSlotInput.FieldTap:
-                // Owner revision 2026-08-14: tapping the field means «I want to type» from every
-                // state, Collapsed included — the keyboard opens directly. (The original two-step
-                // entry raised the panel first; it was dropped.)
-                return ToFocused(SuggestionSlotState.Keyboard);
+                // Two-step entry: from Collapsed the tap only RAISES the panel — focusing here would
+                // open the keyboard under a panel still on its way up.
+                return state == SuggestionSlotState.Collapsed
+                    ? To(SuggestionSlotState.Panel)
+                    : ToFocused(SuggestionSlotState.Keyboard);
 
             case SuggestionSlotInput.ThreadTap:
                 // An open panel NEVER hides from a thread tap; over a keyboard the tap is a dismiss.
