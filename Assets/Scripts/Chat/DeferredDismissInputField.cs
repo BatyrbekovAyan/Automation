@@ -143,11 +143,12 @@ public class DeferredDismissInputField : TMP_InputField,
         liveInputs.Remove(this);
 
         // A press vetoed a moment ago can end HERE — the veto listener raises
-        // the panel, the panel raise (or a Back / tab switch) hides this field,
-        // and the PointerUp that would have forgotten the pointer is never
-        // delivered to a disabled component. Reset so a recycled touch id can
-        // never make the next gesture's click look like the tail of this one
-        // (which would swallow it silently, with no ActivationVetoed raised).
+        // the panel, and that raise (or a Back / tab switch) hides this field
+        // before its click is ever delivered. This is one of the three places
+        // the vetoed pointer is cleared (with the top of the next press and the
+        // click that consumes it): reset so a recycled touch id can never make
+        // the next gesture's click look like the tail of this one, which would
+        // swallow it silently with no ActivationVetoed raised.
         vetoedPointerId = NoVetoedPointer;
 
         // Teardown with an orphan still parked: no Update will run to
@@ -306,12 +307,6 @@ public class DeferredDismissInputField : TMP_InputField,
         base.OnPointerClick(eventData);
     }
 
-    public override void OnPointerUp(PointerEventData eventData)
-    {
-        ForgetVetoedPointerIfNoClickFollows(eventData);
-        base.OnPointerUp(eventData);
-    }
-
     // MATERIALIZED FOCUS, read from the other side: activation is a PROMISE, so
     // between TMP's OnPointerDown (which selects this field) and the LateUpdate
     // that finally sets m_AllowInput, isFocused is still false. When the down
@@ -354,32 +349,27 @@ public class DeferredDismissInputField : TMP_InputField,
         return true;
     }
 
-    // PointerUp is dispatched BEFORE the PointerClick of the same tap, so the
-    // vetoed pointer may only be forgotten once no click can still arrive for
-    // it — clearing unconditionally would let that click announce the same
-    // gesture a second time. The test mirrors the input module's own: a click
-    // is delivered only while the gesture is still click-eligible AND the
-    // release lands back on this field.
+    // NOTE (2026-08-14, device-reported): there is deliberately NO "forget the
+    // vetoed pointer on release" step. An earlier version cleared the id on
+    // PointerUp unless a click could still reach THIS field, testing
+    // ExecuteEvents.GetEventHandler<IPointerClickHandler>(raycast) == gameObject.
+    // That test is wrong for the composer, whose middle is covered by DragShield:
+    // the shield implements IPointerClickHandler on purpose (to absorb the
+    // generic dispatch) and re-sends the tap to us as a synthetic
+    // down → up → click burst carrying ITS OWN raycast. The handler walk
+    // therefore resolved to the shield, the id was dropped between our down and
+    // our click — and by the time the click arrived the veto predicate had
+    // already flipped false, because the pointer-down veto had just raised the
+    // panel. The click then fell through to base and activated the field: ONE
+    // tap that both raised the panel and opened the keyboard, i.e. exactly the
+    // dip the two-step entry exists to prevent, and only in the middle of the
+    // field (the bare edges, which reach us directly, behaved correctly).
     //
-    // Release is the ONLY place this may run. PointerExit is emphatically not
-    // the end of a gesture: the finger leaving this field's rect mid-press
-    // fires one, and so does the layout moving out from under a still-pressed
-    // finger — which is exactly what the panel raise this veto triggers DOES.
-    // Forgetting there and then taking the release back over the field would
-    // raise ActivationVetoed a second time for one tap. Nothing is lost by
-    // skipping exit: a gesture that ends anywhere but on this field arrives
-    // here with the handler test already false and is forgotten then, and a
-    // gesture that never reaches a release at all (this field hidden mid-press)
-    // is covered by OnDisable and by the reset at the top of the next press.
-    private void ForgetVetoedPointerIfNoClickFollows(PointerEventData eventData)
-    {
-        if (eventData == null || eventData.pointerId != vetoedPointerId) return;
-
-        bool clickCanStillFollow = eventData.eligibleForClick
-            && ExecuteEvents.GetEventHandler<IPointerClickHandler>(
-                   eventData.pointerCurrentRaycast.gameObject) == gameObject;
-        if (!clickCanStillFollow) vetoedPointerId = NoVetoedPointer;
-    }
+    // A left-over id is harmless by construction: OnPointerDown clears it at the
+    // top of every fresh press, OnPointerClick clears it when it consumes the
+    // matching click, and OnDisable clears it for a gesture that never ends.
+    // Keeping it until one of those three is what makes the veto survive an
+    // intermediary that rewrites the event's raycast.
 
     private void Update()
     {
