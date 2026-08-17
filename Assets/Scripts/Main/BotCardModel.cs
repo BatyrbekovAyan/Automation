@@ -23,8 +23,7 @@ public enum BotChannelIconState
 /// unification: it drives the bot's ReplyMode — the exact store and confirm
 /// asymmetry of the chats-header button, both pinned by
 /// <see cref="AutoButtonModel"/> / AutoButtonModelTests. The old master
-/// activation key is dead (see BotActivationMigration); workflows stay active
-/// per the channel toggles alone.
+/// activation key is dead; workflows stay active per the channel toggles alone.
 /// </summary>
 public static class BotCardModel
 {

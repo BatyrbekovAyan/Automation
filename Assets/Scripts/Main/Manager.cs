@@ -380,13 +380,6 @@ public partial class Manager : MonoBehaviour
         // slot keys before LoadBots reads them. Idempotent on clean data.
         MigrateBotPersistence();
 
-        // One-shot, retry-safe: bots paused with the retired master switch come
-        // back as «Вместе» (suppressed but manageable). The ForceSemi pref write
-        // is synchronous, so the cards instantiated below read the safe mode;
-        // the network part (suppress → re-activate → clear key) runs in the
-        // background. See Manager.ActivationMigration.cs.
-        MigratePausedBotsActivation();
-
         yield return new WaitForEndOfFrame();
 
         for (int i = 0; i < id; i++)
@@ -3656,18 +3649,14 @@ public partial class Manager : MonoBehaviour
 
     // Pure n8n activate/deactivate with NO save-pill side effects — deliberately
     // does not touch the four *Saved gate flags or LoadingPanel. Used to reconcile a
-    // workflow's active state to the master+channel gate outside the save flow: the
+    // workflow's active state to the channel toggle outside the save flow: the
     // Create*Workflow webhook activates the new workflow server-side before it responds
     // (node order: … → Activate Created Workflow → … → Send New Workflows Id), so a
-    // channel authed while the bot is paused must be deactivated once we hold its id.
-    private IEnumerator SetWorkflowActiveRoutine(string id, bool active, System.Action<bool> done = null)
+    // channel authed while its toggle is off must be deactivated once we hold its id.
+    private IEnumerator SetWorkflowActiveRoutine(string id, bool active)
     {
         // Same sentinels the Enable/Save paths skip — no n8n workflow to (de)activate.
-        if (string.IsNullOrEmpty(id) || id.Equals("-1"))
-        {
-            done?.Invoke(true);   // nothing to do IS the desired state
-            yield break;
-        }
+        if (string.IsNullOrEmpty(id) || id.Equals("-1")) yield break;
 
         // See EnableWhatsappWorkflow: n8n's REST API 415s anything but application/json,
         // and Unity's transport stamps x-www-form-urlencoded on a bodyless POST, so pin it.
@@ -3681,7 +3670,6 @@ public partial class Manager : MonoBehaviour
 
         if (www.result != UnityWebRequest.Result.Success)
             Debug.LogError($"[{www.responseCode}] SetWorkflowActiveRoutine {www.url}: {www.error} {www.downloadHandler.text}");
-        done?.Invoke(www.result == UnityWebRequest.Result.Success);
     }
 
     private IEnumerator EnableWhatsappWorkflow(string id, bool enabled)
