@@ -267,9 +267,9 @@ public class DeferredDismissInputField : TMP_InputField,
     /// </summary>
     public event Action ActivationVetoed;
 
-    // The pointer whose press was already vetoed and announced. One tap is
-    // delivered as PointerDown → PointerUp → PointerClick, so without this the
-    // click would announce the same tap a second time.
+    // The gesture whose press was swallowed. SWALLOWING happens on the press —
+    // TMP must not select — but the ANNOUNCE waits for the click that completes
+    // the same gesture, so this id is what carries the decision between them.
     private const int NoVetoedPointer = int.MinValue;
     private int vetoedPointerId = NoVetoedPointer;
 
@@ -281,6 +281,15 @@ public class DeferredDismissInputField : TMP_InputField,
     // can suppress; the vetoed field simply never becomes the new selection.)
     public override void OnPointerDown(PointerEventData eventData)
     {
+        // The SAME still-live gesture arriving a second time. Real, not defensive:
+        // in one ~24u band the composer sits under BOTH intermediaries, and
+        // ClickPassthrough (deliverPressToAllBehind) hands the press to this field
+        // AND to DragShield, which then replays it as its own synthetic burst.
+        // Re-deciding here would ask the predicate a question the first press has
+        // already changed the answer to. The mark identifies the GESTURE, not one
+        // dispatch of it.
+        if (eventData != null && eventData.pointerId == vetoedPointerId) return;
+
         // A fresh press always starts a fresh gesture. This is what makes a
         // left-over id harmless: a press that ends without a click (finger
         // dragged away) can never be mistaken for a later tap that reuses the
@@ -294,17 +303,42 @@ public class DeferredDismissInputField : TMP_InputField,
     // the single-focus invariant must hold on this path too. Route (b) of the
     // veto lives here as well, and is checked BEFORE ReleaseOtherFocusedInputs
     // so a vetoed tap leaves every other field's focus exactly as it was.
+    //
+    // This is also where a swallowed gesture is ANNOUNCED, deliberately not on the
+    // press (2026-08-14, device-reported). Announcing on the press raised the panel
+    // while the finger was still down, and that raise is destructive to its own
+    // gesture: it flips the veto predicate false for any second dispatch of the same
+    // press, and it slides the composer out from under the finger so the release is
+    // re-raycast somewhere else — leaving DragShield's held-pointer state stranded
+    // and the next tap on the field's middle dead. Waiting for the click also makes
+    // a press that turns into a drag produce no raise at all, which is what
+    // DragShield's own middle route already did.
     public override void OnPointerClick(PointerEventData eventData)
     {
         if (eventData != null && eventData.pointerId == vetoedPointerId)
         {
-            // Same tap whose pointer-down was already vetoed and announced.
             vetoedPointerId = NoVetoedPointer;
+            AnnounceVeto();                 // the swallowed press completed as a tap
             return;
         }
-        if (!ActivationAlreadyPromised() && VetoActivation(eventData)) return;
+        if (!ActivationAlreadyPromised() && VetoActivation(eventData))
+        {
+            // No press of ours preceded this click (nothing observed can produce
+            // that today — the module resolves a click from the same handler walk
+            // as its press — but a silent swallow would be a dead tap, so announce
+            // rather than trust the invariant).
+            vetoedPointerId = NoVetoedPointer;
+            AnnounceVeto();
+            return;
+        }
         ReleaseOtherFocusedInputs();
         base.OnPointerClick(eventData);
+    }
+
+    private void AnnounceVeto()
+    {
+        Trace($"{Who()} activation vetoed");
+        ActivationVetoed?.Invoke();
     }
 
     // MATERIALIZED FOCUS, read from the other side: activation is a PROMISE, so
@@ -343,9 +377,8 @@ public class DeferredDismissInputField : TMP_InputField,
         if (isFocused) return false;
         if (!ActivationVeto()) return false;
 
+        // Marks only — the announce belongs to the click (see OnPointerClick).
         if (eventData != null) vetoedPointerId = eventData.pointerId;
-        Trace($"{Who()} activation vetoed");
-        ActivationVetoed?.Invoke();
         return true;
     }
 
@@ -357,19 +390,19 @@ public class DeferredDismissInputField : TMP_InputField,
     // the shield implements IPointerClickHandler on purpose (to absorb the
     // generic dispatch) and re-sends the tap to us as a synthetic
     // down → up → click burst carrying ITS OWN raycast. The handler walk
-    // therefore resolved to the shield, the id was dropped between our down and
-    // our click — and by the time the click arrived the veto predicate had
-    // already flipped false, because the pointer-down veto had just raised the
-    // panel. The click then fell through to base and activated the field: ONE
-    // tap that both raised the panel and opened the keyboard, i.e. exactly the
-    // dip the two-step entry exists to prevent, and only in the middle of the
-    // field (the bare edges, which reach us directly, behaved correctly).
+    // therefore resolved to the shield and the id was dropped between our down
+    // and our click. Back when the veto also ANNOUNCED on the press, that alone
+    // was fatal: the raise had already flipped the predicate false, so the click
+    // fell through to base and activated the field — ONE tap that both raised the
+    // panel and opened the keyboard, and only in the middle of the field (the bare
+    // edges, which reach us directly, behaved correctly). Moving the announce to
+    // the click removed the flip; dropping this hook removed the lost mark. Both
+    // are needed: the mark is how one gesture's two dispatches stay one gesture.
     //
     // A left-over id is harmless by construction: OnPointerDown clears it at the
-    // top of every fresh press, OnPointerClick clears it when it consumes the
-    // matching click, and OnDisable clears it for a gesture that never ends.
-    // Keeping it until one of those three is what makes the veto survive an
-    // intermediary that rewrites the event's raycast.
+    // top of every fresh press (unless that press IS the marked gesture arriving
+    // twice), OnPointerClick clears it when it consumes the matching click, and
+    // OnDisable clears it for a gesture that never ends.
 
     private void Update()
     {
