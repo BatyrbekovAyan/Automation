@@ -233,6 +233,20 @@ public class SwipeToBack : MonoBehaviour, IInitializePotentialDragHandler, IBegi
         verticalDragScroll = null;
         dragDecided = false;
         isHorizontalDrag = false;
+
+        // Same interruption, wider blast radius. OnBeginDrag raises IsSliding the instant a
+        // back-swipe is recognised and only SnapToPosition's tail lowers it, so a gesture that
+        // never reaches OnEndDrag strands the app-wide gate: image decode, the live poll, the
+        // sync park loop, long-press and the row swipes all stay paused until some later slide
+        // happens to run to completion.
+        //
+        // Unconditional is correct. This fires when our subtree is deactivated, which also stops
+        // SnapToPosition, so there is never a live slide left to gate. The slide-OUT tail is the
+        // one path that disables us mid-coroutine (it deactivates chatPanelToSlide, our parent,
+        // from inside SnapToPosition) — harmless, because the body has no yield left after that
+        // point, so its own IsSliding = false still runs a few lines later and nothing in between
+        // reads the gate.
+        IsSliding = false;
     }
 
     public void OnBeginDrag(PointerEventData eventData)

@@ -1,6 +1,7 @@
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 /// <summary>
@@ -17,9 +18,39 @@ using UnityEngine.UI;
 /// The raycast walk itself is not testable in EditMode (an unrendered canvas leaves Graphic.depth
 /// at -1, so GraphicRaycaster returns no hits at all — see the Bot Settings routing note), which
 /// is precisely why the decision was extracted into <see cref="SwipeBackDragRouting"/>.
+///
+/// The last two tests guard the other half of the strip's contract: every piece of state a
+/// back-swipe raises at drag-begin has to come back down on disable, because a gesture the chat
+/// closing interrupts never reaches OnEndDrag.
 /// </summary>
 public class SwipeBackDragRoutingTests
 {
+    /// <summary>
+    /// IsSliding is static and its setter is private, so a test that leaves it raised would
+    /// silently change what every later test sees.
+    /// </summary>
+    [TearDown]
+    public void ReleaseStaticState()
+    {
+        typeof(SwipeToBack)
+            .GetProperty("IsSliding", BindingFlags.Static | BindingFlags.Public)
+            ?.GetSetMethod(nonPublic: true)
+            ?.Invoke(null, new object[] { false });
+        SwipeToBack.Instance = null;   // Awake stamps it; ours is destroyed by then
+    }
+
+    /// <summary>
+    /// SwipeToBack is not [ExecuteAlways], so Unity runs none of its lifecycle callbacks in
+    /// EditMode — they have to be called by hand (same idiom as InputFieldHideCaretTests).
+    /// </summary>
+    private static void InvokeLifecycle(SwipeToBack target, string method)
+    {
+        var callback = typeof(SwipeToBack).GetMethod(
+            method, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.IsNotNull(callback, $"SwipeToBack.{method} is gone — the state it released can now leak.");
+        callback.Invoke(target, null);
+    }
+
     [Test]
     public void NoHitsAtAll_FallsBackToTheThread()
     {
@@ -82,6 +113,60 @@ public class SwipeBackDragRoutingTests
         finally
         {
             Object.DestroyImmediate(root);
+        }
+    }
+
+    /// <summary>
+    /// The same interruption, the other piece of state it strands. <c>SwipeToBack.IsSliding</c> is
+    /// raised the instant a back-swipe is recognised in OnBeginDrag and lowered only by the tail of
+    /// SnapToPosition — so a gesture that never reaches OnEndDrag leaves it true with no animation
+    /// running and nothing scheduled to clear it.
+    ///
+    /// It is not local state: it is the app-wide "a slide is animating, stay off the main thread"
+    /// gate. Image decode (MessageItemView.AcquireDecodeSlot), the live poll
+    /// (ChatManager.LivePoll), the message sync's park loop, long-press, swipe-to-reply and
+    /// swipe-to-delete all pause on it. Stranded true, the app stops decoding images and stops
+    /// polling until some later slide happens to run to completion.
+    /// </summary>
+    [Test]
+    public void InterruptedBackSwipe_DoesNotLeaveTheSlideGateRaised()
+    {
+        var canvas = new GameObject("Canvas", typeof(RectTransform), typeof(Canvas));
+        var panel = new GameObject("MessagesPanel", typeof(RectTransform));
+        var scroll = new GameObject("Scroll").AddComponent<ScrollRect>();
+        var strip = new GameObject("SwipeBack", typeof(RectTransform));
+        try
+        {
+            ((RectTransform)canvas.transform).sizeDelta = new Vector2(1080f, 1920f);
+            strip.transform.SetParent(canvas.transform, false);
+
+            var swipe = strip.AddComponent<SwipeToBack>();
+            swipe.chatPanelToSlide = (RectTransform)panel.transform;
+            swipe.chatScrollRect = scroll;
+            InvokeLifecycle(swipe, "Awake");   // resolves the canvas OnBeginDrag measures against
+
+            // A recognised back-swipe: mostly horizontal, rightwards, out of the left edge.
+            swipe.OnBeginDrag(new PointerEventData(EventSystem.current)
+            {
+                pressPosition = new Vector2(30f, 900f),
+                position = new Vector2(150f, 910f),
+            });
+            Assert.IsTrue(SwipeToBack.IsSliding,
+                "OnBeginDrag no longer raises the slide gate — this test would pass on nothing.");
+
+            // ...and the chat closes under the finger. No OnEndDrag, so no SnapToPosition either.
+            InvokeLifecycle(swipe, "OnDisable");
+
+            Assert.IsFalse(SwipeToBack.IsSliding,
+                "OnDisable must lower the slide gate, or an interrupted swipe pauses image decode "
+                + "and the live poll app-wide until the next slide completes.");
+        }
+        finally
+        {
+            Object.DestroyImmediate(strip);
+            Object.DestroyImmediate(scroll.gameObject);
+            Object.DestroyImmediate(panel);
+            Object.DestroyImmediate(canvas);
         }
     }
 }
