@@ -2,9 +2,10 @@ using NUnit.Framework;
 
 // EditMode coverage for SuggestionSlotStateMachine — the whole slot transition table of the
 // sketch-005 winner E model. Pins the rules that are invisible in the controller and expensive
-// to rediscover on device: the two-step field entry (first tap raises the panel, does NOT focus),
-// "a tap never hides an open panel", a pick that keeps the panel up, the single auto-raise
-// (IncomingMessage from Collapsed only), and the fact that Panel/Expanded cannot survive «Авто».
+// to rediscover on device: FieldTap focuses from EVERY state (owner revision 2026-08-14 — the
+// original two-step entry was dropped), "a tap never hides an open panel", a pick that keeps the
+// panel up, the single auto-raise (IncomingMessage from Collapsed only), and the fact that
+// Panel/Expanded cannot survive «Авто».
 // Two of the pins are CROSS-SEAM correlations rather than rows: the KeyTap destination must match
 // the glyph ComposerSlotKeyModel shows, and AfterDrag's state must match the height
 // SuggestionSlotDetents gives the same detent. Either half can be inverted on its own and still
@@ -25,14 +26,27 @@ public class SuggestionSlotStateMachineTests
     // --- «Вместе»: FieldTap -------------------------------------------------
 
     [Test]
-    public void FieldTap_FromCollapsed_RaisesThePanelWithoutFocusing()
+    public void FieldTap_FromCollapsed_OpensTheKeyboardDirectly()
     {
-        // THE anti-dip rule: focusing here would open the keyboard underneath a panel still rising.
+        // Owner revision 2026-08-14: tapping the field means «I want to type» from every state —
+        // the original two-step entry (first tap raises the panel, no focus) was dropped. The
+        // panel-raise affordances from Collapsed are ThreadTap, KeyTap and IncomingMessage.
         SlotTransition t = SuggestionSlotStateMachine.Resolve(
             SuggestionSlotState.Collapsed, SuggestionSlotInput.FieldTap, SemiAuto);
-        Assert.AreEqual(SuggestionSlotState.Panel, t.State);
-        Assert.IsFalse(t.FocusField, "the first tap raises the panel only — it must never focus");
-        AssertTransition(t, SuggestionSlotState.Panel);
+        AssertTransition(t, SuggestionSlotState.Keyboard, focus: true);
+    }
+
+    [Test]
+    public void FieldTap_BehavesIdenticallyInBothReplyModes()
+    {
+        // The revision makes FieldTap the one input with NO mode asymmetry — pin that, so a future
+        // «improvement» that re-splits the modes fails loudly here.
+        foreach (SuggestionSlotState state in AllStates)
+        {
+            SlotTransition semi = SuggestionSlotStateMachine.Resolve(state, SuggestionSlotInput.FieldTap, SemiAuto);
+            Assert.AreEqual(SuggestionSlotState.Keyboard, semi.State, $"«Вместе» from {state}");
+            Assert.IsTrue(semi.FocusField, $"«Вместе» from {state} must focus");
+        }
     }
 
     [Test]
@@ -217,7 +231,7 @@ public class SuggestionSlotStateMachineTests
     [TestCase(SuggestionSlotState.Keyboard)]
     public void Auto_FieldTap_FocusesNormallyFromEveryState(SuggestionSlotState state)
     {
-        // The two-step entry belongs to the panel, which does not exist here — never withhold focus.
+        // Same as «Вместе» since the 2026-08-14 revision — a field tap always means «type».
         SlotTransition t = SuggestionSlotStateMachine.Resolve(state, SuggestionSlotInput.FieldTap, Auto);
         Assert.IsTrue(t.FocusField, $"«Авто» must focus the field directly (from {state})");
         AssertTransition(t, SuggestionSlotState.Keyboard, focus: true);
