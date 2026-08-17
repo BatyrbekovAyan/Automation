@@ -231,6 +231,32 @@ public class ItemEditSheetRestyleTests
         }
     }
 
+    // The keyboard lift is DERIVED from where «Готово» sits: liftReduction is
+    // how much of the keyboard's height the sheet declines to rise by, so
+    // «Готово» clears the keyboard by (DoneY − liftReduction) and «Удалить»,
+    // which ends exactly at liftReduction, stays fully behind it. Move the
+    // buttons and this pairing has to be re-derived, or the keyboard eats
+    // «Готово» again (device report 2026-08-17).
+    [Test]
+    public void KeyboardLift_LeavesDoneClearAndDeleteBehindTheKeyboard()
+    {
+        foreach (var sheet in LoadSheets())
+        {
+            float liftReduction = new SerializedObject(sheet).FindProperty("liftReduction").floatValue;
+            var done = (RectTransform)Ref<Button>(sheet, "doneButton").transform;
+            var delete = (RectTransform)Ref<Button>(sheet, "deleteButton").transform;
+
+            float deleteTop = delete.anchoredPosition.y + delete.sizeDelta.y;
+            Assert.GreaterOrEqual(liftReduction, deleteTop,
+                $"{sheet.name}: «Удалить» would poke out from behind the keyboard — " +
+                "a destructive action next to the keyboard's top row is an accidental-tap hazard.");
+
+            float doneClearance = done.anchoredPosition.y - liftReduction;
+            Assert.Greater(doneClearance, 0f,
+                $"{sheet.name}: the keyboard covers «Готово» (clearance {doneClearance}).");
+        }
+    }
+
     [Test]
     public void Title_NamesTheItemBeingEdited()
     {

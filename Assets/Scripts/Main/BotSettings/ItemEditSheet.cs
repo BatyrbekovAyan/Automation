@@ -345,15 +345,26 @@ namespace Automation.BotSettingsUI
             float heightPx = EstimateKeyboardHeightPixels();
             if (heightPx <= 0f) return 0f;
 
-            // Subtract the bottom safe-area inset (iPhone home bar / Android
-            // gesture inset). The canvas is inset to the safe area, so we
-            // only need to lift by the portion of the keyboard that covers
-            // new canvas space. Mirrors Chat/KeyboardAwarePanel.
-            float safeBottomPx = Screen.safeArea.y;
-            float adjustedPx = Mathf.Max(0f, heightPx - safeBottomPx);
+            // This scene's canvas is ScreenSpaceOverlay, so its rect IS the
+            // full screen: canvas y=0 sits at the physical screen bottom — the
+            // same origin TouchScreenKeyboard.area.height is measured from.
+            // Subtracting the bottom safe-area inset there under-lifts by the
+            // home-bar height, which is what left «Готово» half covered on
+            // device (2026-08-17). KeyboardLiftMath states the rule and its
+            // callers are meant to pass 0 for overlay canvases; this one was
+            // subtracting unconditionally, and liftReduction 0 used to mask it.
+            var rootCanvas = canvas != null ? canvas.rootCanvas : null;
+            bool isOverlay = rootCanvas != null && rootCanvas.renderMode == RenderMode.ScreenSpaceOverlay;
+            float safeBottomPx = isOverlay ? 0f : Screen.safeArea.y;
+            var canvasRect = rootCanvas != null ? rootCanvas.transform as RectTransform : null;
 
-            float scale = (canvas != null && canvas.scaleFactor > 0f) ? canvas.scaleFactor : 1f;
-            return adjustedPx / scale;
+            return KeyboardLiftMath.ScreenPxToCanvas(
+                heightPx,
+                safeBottomPx,
+                isOverlay,
+                rootCanvas != null ? rootCanvas.scaleFactor : 1f,
+                canvasRect != null ? canvasRect.rect.height : 0f,
+                Screen.height);
         }
 
         private static float EstimateKeyboardHeightPixels()
