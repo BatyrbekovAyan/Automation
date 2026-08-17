@@ -76,6 +76,17 @@ public class AttachSheet : MonoBehaviour
         _slideTween?.Kill();
         _fadeTween?.Kill();
         if (backdrop != null) backdrop.SetActive(false);
+
+        // End the open the way Close()'s completion would have. This teardown is reached by
+        // ANCESTOR deactivation (a back-swipe kills MessagesPanel), so this component's own
+        // activeSelf stays true and it returns with the next chat — but the close tween that
+        // normally resets all of this has just been killed above. Leaving _isOpen true then
+        // strands the whole bottom region: SuggestionsController reads IsOpen as «the sheet owns
+        // the slot», so its show parks forever and the suggestions panel never appears again for
+        // the rest of the session. Invisible, too — the sheet is parked off-screen, so there is
+        // nothing to dismiss.
+        _isOpen = false;
+        if (_rt != null) _rt.anchoredPosition = new Vector2(0f, -sheetHeightCanvasPx);
     }
 
     public void Toggle()
@@ -116,6 +127,14 @@ public class AttachSheet : MonoBehaviour
             inputField.DeactivateInputField();
             inputField.ReleaseSelection();
         }
+#if UNITY_EDITOR
+        // Editor parity. On device the OS keyboard's own retreat is what drops the rise, but in the
+        // Editor the height comes from KeyboardAwarePanel's SIMULATED flag, and the only other
+        // place that clears it is SuggestionsController's dismissal pair — which this path does not
+        // go through. Without this the rise never drains in the Editor and every «+» waits out the
+        // full settle budget before opening.
+        if (_composerMover != null) _composerMover.SetSimulatedKeyboard(false);
+#endif
 
         gameObject.SetActive(true);
         if (backdrop != null) backdrop.SetActive(true);
@@ -149,7 +168,11 @@ public class AttachSheet : MonoBehaviour
             yield return null;
 
         _pendingRise = null;
-        _slideTween?.Kill();
+        // Kill by TARGET, not just the tracked handle. While the rise waits there is no tween on
+        // the rect, so SheetDragDismiss's at-rest guard (DOTween.IsTweening) lets the user grab the
+        // parked sheet; its snap-back is its own DOAnchorPosY on the same RectTransform, which
+        // _slideTween does not reference and could therefore write the same y concurrently.
+        DOTween.Kill(_rt);
         // SetTarget links the lambda tween to the RectTransform so SheetDragDismiss's
         // DOTween.IsTweening guard can see it.
         _slideTween = DOTween.To(

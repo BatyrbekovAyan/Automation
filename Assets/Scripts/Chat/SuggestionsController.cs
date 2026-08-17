@@ -742,6 +742,18 @@ public class SuggestionsController : MonoBehaviour
         if (!_panel.IsShown && proposedCanvasPx > 0.5f) _panel.ShowInSlot();
     }
 
+    /// <summary>
+    /// Abandon a drag without snapping to a detent — used when a modal takes the region out from
+    /// under the finger. Deliberately does NOT touch the slot state or the inset: the caller's own
+    /// eviction owns both, and a snap here would fight it. Releases the smoothing bypass, which is
+    /// otherwise only cleared on a release that will now never be honoured.
+    /// </summary>
+    private void CancelSlotDrag()
+    {
+        _draggingSlot = false;
+        if (_keyboardMover != null) _keyboardMover.TrackInsetImmediately = false;
+    }
+
     private void HandleDragReleased(float finalCanvasPx)
     {
         if (!_draggingSlot) return;
@@ -896,7 +908,16 @@ public class SuggestionsController : MonoBehaviour
 
         // A finger owns the slot for the length of a drag: the watcher must not read a
         // finger-driven inset as a tenant change, and the release re-settles everything anyway.
-        if (_draggingSlot) { _kbWasVisible = kbVisible; return; }
+        // The «+» sheet is the one exception. It is a MODAL that evicts whoever holds the region
+        // and then waits for the composer to come down before it rises, and HandleDragMoved is the
+        // only writer of the inset that AttachOpen does not gate — so a finger still on the handle
+        // would both suppress this eviction and drive the rise back up, starving that wait until
+        // its timeout. The sheet outranks the drag: cancel the gesture and let the eviction run.
+        if (_draggingSlot)
+        {
+            if (!AttachOpen) { _kbWasVisible = kbVisible; return; }
+            CancelSlotDrag();
+        }
 
         bool keyboardClaimsSlot = kbVisible && PanelOwnsSlot && !_yieldingToKeyboard
                                   && (!_kbWasVisible || ComposerFocused);
