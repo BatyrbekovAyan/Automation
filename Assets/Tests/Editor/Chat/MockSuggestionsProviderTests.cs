@@ -3,10 +3,12 @@ using NUnit.Framework;
 
 public class MockSuggestionsProviderTests
 {
-    // The locked RU intent-label set (D-14 / UI-SPEC Copywriting Contract).
+    // Fresh-set topic titles + steered-set variation titles (drill redesign 2026-08-18:
+    // labels are free-form display titles; the closed taxonomy moved to item.move).
     private static readonly HashSet<string> Labels = new HashSet<string>
     {
-        "Приветствие", "Цена", "Наличие", "Запись", "Вежливый отказ"
+        "Приветствие", "Цена", "Наличие", "Запись",                       // fresh (explore) topics
+        "Со следующим шагом", "С вопросом", "Коротко", "Вежливый отказ"   // steered (drill) variations
     };
 
     private MockSuggestionsProvider _provider;
@@ -36,12 +38,15 @@ public class MockSuggestionsProviderTests
     }
 
     [Test]
-    public void EveryItem_HasIntentLabelFromTheRussianSet()
+    public void EveryItem_HasATitleFromTheRussianSet_AndAValidMove()
     {
-        foreach (var item in _provider.BuildResult(Req()).items)
+        var all = new List<SuggestionItem>();
+        all.AddRange(_provider.BuildResult(Req()).items);
+        all.AddRange(_provider.BuildResult(Req(steer: "любой выбранный текст")).items);
+        foreach (var item in all)
         {
-            Assert.IsFalse(string.IsNullOrEmpty(item.intentLabel));
-            Assert.IsTrue(Labels.Contains(item.intentLabel), $"Unexpected intent label: {item.intentLabel}");
+            Assert.IsTrue(Labels.Contains(item.intentLabel), $"Unexpected title: {item.intentLabel}");
+            Assert.IsTrue(SuggestionMoves.IsMove(item.move), $"Invalid move: {item.move}");
         }
     }
 

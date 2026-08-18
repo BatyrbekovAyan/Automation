@@ -18,7 +18,7 @@ using UnityEngine;
 /// </summary>
 public class MockSuggestionsProvider : ISuggestionsProvider
 {
-    // RU intent labels (D-14; UI-SPEC Copywriting Contract) — live in the mock, not UI chrome.
+    // RU display titles (drill redesign 2026-08-18: fresh topics; steered variations are inline below).
     private const string LabelGreeting = "Приветствие";
     private const string LabelPrice    = "Цена";
     private const string LabelStock    = "Наличие";
@@ -90,25 +90,24 @@ public class MockSuggestionsProvider : ISuggestionsProvider
     // item[3] is the deliberately long reply (>120 chars) for the PANEL-06 truncation demo.
     private static List<SuggestionItem> BuildFreshSet() => new List<SuggestionItem>
     {
-        Item("Здравствуйте! Спасибо за обращение. Чем могу помочь?", LabelGreeting),
-        Item("Стоимость зависит от объёма заказа. Подскажите, что именно вас интересует?", LabelPrice),
-        Item("Да, товар есть в наличии. Могу оформить для вас прямо сейчас.", LabelStock),
+        Item("Здравствуйте! Спасибо за обращение. Чем могу помочь?", LabelGreeting, "Ответ"),
+        Item("Стоимость зависит от объёма заказа. Подскажите, что именно вас интересует?", LabelPrice, "Уточнить"),
+        Item("Да, товар есть в наличии. Могу оформить для вас прямо сейчас.", LabelStock, "Ответ"),
         Item("Конечно, давайте подберём удобное для вас время. У нас есть свободные слоты на этой неделе " +
              "в первой половине дня и ближе к вечеру — подскажите, какой день вам подходит, и я сразу " +
-             "забронирую запись на ваше имя.", LabelBooking),
+             "забронирую запись на ваше имя.", LabelBooking, "К заказу"),
     };
 
-    // Steered re-cluster (INT-04/D-01): a DIFFERENT ordered set biased toward the pick, so
-    // items[0] differs from the fresh lead. Phase-2 replaces this deterministic transform with
-    // the live "steer toward" field (N8N-03).
+    // Steered DRILL round (2026-08-18): variation titles, moves may repeat — mirrors the live
+    // contract so the editor demo exercises the same shapes the server now emits.
     private static List<SuggestionItem> BuildSteeredSet(string steerTowardText) => new List<SuggestionItem>
     {
-        Item("Отлично, тогда уточню детали по вашему запросу и сразу всё подготовлю.", LabelBooking),
-        Item("Могу предложить пару вариантов под ваш бюджет — какой ориентир по цене вам комфортен?", LabelPrice),
-        Item("Уже проверяю наличие на складе, буквально минуту.", LabelStock),
-        Item("К сожалению, сейчас это направление мы не обслуживаем, но буду рад помочь с другими вопросами.", LabelDecline),
+        Item("Отлично, тогда уточню детали по вашему запросу и сразу всё подготовлю.", "Со следующим шагом", "К заказу"),
+        Item("Могу предложить пару вариантов под ваш бюджет — какой ориентир по цене вам комфортен?", "С вопросом", "Уточнить"),
+        Item("Уже проверяю наличие на складе, буквально минуту.", "Коротко", "Отложить"),
+        Item("К сожалению, сейчас это направление мы не обслуживаем, но буду рад помочь с другими вопросами.", LabelDecline, "Отказ"),
     };
 
-    private static SuggestionItem Item(string text, string intentLabel)
-        => new SuggestionItem { text = text, intentLabel = intentLabel };
+    private static SuggestionItem Item(string text, string intentLabel, string move)
+        => new SuggestionItem { text = text, intentLabel = intentLabel, move = move };
 }
