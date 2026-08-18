@@ -32,9 +32,17 @@ public static class SuggestionsHeaderTitleWirer
         prop.objectReferenceValue = title;
         so.ApplyModifiedPropertiesWithoutUndo();
 
-        EditorSceneManager.MarkSceneDirty(panel.gameObject.scene);
-        EditorSceneManager.SaveOpenScenes();
-        Debug.Log($"[HeaderTitleWirer] headerTitle -> {Path(title.transform)} (scene saved)");
+        // Save ONLY the panel's own scene: SaveOpenScenes() would also persist any other scene
+        // left open additively (or a stray test-runner scene), silently committing edits this
+        // tool never made. Same scoping every other builder/wirer here uses.
+        var scene = panel.gameObject.scene;
+        EditorSceneManager.MarkSceneDirty(scene);
+        if (!EditorSceneManager.SaveScene(scene))
+        {
+            Debug.LogError($"[HeaderTitleWirer] {scene.path} save FAILED — headerTitle is assigned in memory only.");
+            return;
+        }
+        Debug.Log($"[HeaderTitleWirer] headerTitle -> {Path(title.transform)} ({scene.name} saved)");
     }
 
     private static TextMeshProUGUI FindHeaderTitle(SuggestionsPanel panel)
