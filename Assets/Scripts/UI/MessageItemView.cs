@@ -4644,7 +4644,22 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
         // is orphaned (the new URL hashes differently) and the fresh bytes
         // overwrite the stale render.
         bool showSenderName = senderNameText != null && senderNameText.gameObject.activeSelf;
-        Bind(currentVm, currentShowTail, true, showSenderName);
+
+        // This event also carries the async QUOTE resolution (ChatManager.ApplyResolvedQuote), which
+        // swaps the "Message" placeholder for a real sender row + snippet — so the bubble CHANGES
+        // HEIGHT here, unlike a plain media-URL refresh. Skipping the rebuild left the row at its old
+        // height and uGUI never caught up on its own: a dirty raised DURING a layout pass is swallowed
+        // by CanvasUpdateRegistry's dedup (the layout root is already queued, and the queue is cleared
+        // when the pass ends), so nothing schedules the follow-up. A short row lets the bubble overflow
+        // into the list's 10px inter-row spacing (bubbles read as glued); a tall one drops the tail —
+        // ignoreLayout, anchored to the ROW's bottom edge — below the bubble's corner.
+        // ForceRebuildRoutine's deferred parent mark runs a frame later, outside any layout pass, so
+        // it is the one request that survives. Inactive bubbles can't run coroutines (the chat screen
+        // deactivates on back-swipe while resolves are still landing), so they mark instead — mirrors
+        // the guard in SetDeliveryStatus.
+        bool canRebuild = isActiveAndEnabled;
+        Bind(currentVm, currentShowTail, !canRebuild, showSenderName);
+        if (!canRebuild && rectTransform != null) LayoutRebuilder.MarkLayoutForRebuild(rectTransform);
         FinalizeCustomVisuals();
     }
 
