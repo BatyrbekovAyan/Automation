@@ -352,10 +352,11 @@ public class SuggestionsController : MonoBehaviour
         // F9 capture-at-issue: the tail this request answers. Verified again at store time —
         // either drift direction degrades to a cache miss, never to stale cards.
         string tailKey = CurrentTailKey();
-        _provider.Request(req, result => OnResult(seq, chatId, tailKey, result));
+        bool freshSet = steerTowardText == null;   // only round-1 sets are cache-worthy
+        _provider.Request(req, result => OnResult(seq, chatId, tailKey, freshSet, result));
     }
 
-    private void OnResult(long seq, string capturedChatId, string capturedTailKey, SuggestionResult result)
+    private void OnResult(long seq, string capturedChatId, string capturedTailKey, bool freshSet, SuggestionResult result)
     {
         if (!_semiAutoOn) return;                              // user opted out mid-flight → never render
         string currentChatId = ChatManager.Instance != null ? ChatManager.Instance.CurrentChatId : null;
@@ -365,10 +366,11 @@ public class SuggestionsController : MonoBehaviour
         // Rounds: only an Ok set becomes the restorable "current round" — an error/empty render
         // leaves _currentRendered on the last good set, so a pick-after-retry still pushes it.
         if (result != null && result.status == SuggestionStatus.Ok) _currentRendered = result;
-        // F9 verify-at-store: cache only when the tail is STILL the one this request answered —
-        // a message that landed mid-flight makes this set already-stale, so let it render (the
-        // corrective fire is coming) but never persist it. Store ignores non-Ok results itself.
-        if (capturedTailKey != null && capturedTailKey == CurrentTailKey())
+        // F9 verify-at-store, narrowed by the drill flow (2026-08-18): only FRESH sets are
+        // cached — a re-opened chat must render a round-1 set under the default header, never
+        // a mid-drill set whose steer/back context is gone. Tail drift still degrades to a
+        // cache miss, never to stale cards.
+        if (freshSet && capturedTailKey != null && capturedTailKey == CurrentTailKey())
             _cache.Store(capturedChatId, capturedTailKey, result);
     }
 
@@ -378,16 +380,28 @@ public class SuggestionsController : MonoBehaviour
     {
         if (_bottomPanel != null && _bottomPanel.inputField != null)
             StartCoroutine(WriteComposerRoutine(_bottomPanel.inputField, replyText));
-        // Rounds flow: record the round being left so ‹ can restore it locally, remember the
-        // new direction for refresh re-rolls, and count the pick for preference learning.
+        // Rounds flow: record the round being left (cards + steer + header) so ‹ restores it
+        // locally, remember the new direction for refresh re-rolls, retitle the header to the
+        // picked card's title (drill flow 2026-08-18), and count the pick's MOVE.
+        SuggestionItem picked = FindRenderedItem(replyText);
         _rounds.Push(_currentRendered, _currentSteer, _currentHeader);
         _currentSteer = replyText;
-        RecordPick(replyText);
+        if (picked != null) _currentHeader = picked.intentLabel;
+        if (_panel != null) _panel.SetHeaderTitle(_currentHeader);
+        RecordPick(picked);
         UpdateBackUi();
-        IssueRequest(steerTowardText: replyText, lastIncomingText: null);   // next round steers toward the pick (INT-04/D-01)
+        IssueRequest(steerTowardText: replyText, lastIncomingText: null);   // next round drills into the pick (INT-04/D-01)
         // NEVER auto-send — only the existing composer Send button delivers a message (D-03).
-        // The sheet stays open on a pick so a re-clustered variant is one tap to swap in;
-        // it hides on the OUTGOING echo instead (flow decision 2026-08-11).
+        // The sheet stays open on a pick; it hides on the OUTGOING echo (flow decision 2026-08-11).
+    }
+
+    // The tap event carries only the text; texts within one set are distinct by generation.
+    private SuggestionItem FindRenderedItem(string replyText)
+    {
+        if (_currentRendered?.items == null) return null;
+        foreach (var item in _currentRendered.items)
+            if (item != null && item.text == replyText) return item;
+        return null;
     }
 
     // ‹ pressed: restore the previous round's cards INSTANTLY — no LLM call, no skeleton.
@@ -402,26 +416,37 @@ public class SuggestionsController : MonoBehaviour
         _currentSteer = previousSteer;
         _currentHeader = previousHeader;
         _currentRendered = previous;
-        if (_panel != null) _panel.Render(previous);
+        if (_panel != null)
+        {
+            _panel.Render(previous);
+            _panel.SetHeaderTitle(previousHeader);
+        }
         UpdateBackUi();
     }
 
-    // Preference learning v1 (2026-08-11): count which MOVE the owner picks, per bot. The tap
-    // carries only the text, so the label is resolved from the set on screen; texts within one
-    // set are distinct by generation. Read back by N8nSuggestionsProvider.BuildPickStats.
-    private void RecordPick(string replyText)
+    // Preference learning v1 under the drill redesign: count the picked card's internal MOVE
+    // (server field since 2026-08-18); a legacy server without `move` still counts when the
+    // display label IS one of the 6 moves (the pre-redesign contract). Free-form titles never
+    // mint PlayerPrefs keys — the counter namespace must stay the closed taxonomy.
+    private void RecordPick(SuggestionItem picked)
     {
-        if (_currentRendered?.items == null || ChatManager.Instance == null) return;
+        if (ChatManager.Instance == null) return;
         string botName = ChatManager.Instance.CurrentBotId;
-        if (string.IsNullOrEmpty(botName)) return;
-        foreach (var item in _currentRendered.items)
-        {
-            if (item == null || item.text != replyText) continue;
-            string key = botName + "SuggestPick" + item.intentLabel;
-            PlayerPrefs.SetInt(key, PlayerPrefs.GetInt(key, 0) + 1);
-            PlayerPrefs.Save();   // mobile apps get killed — flush (bot-persistence)
-            return;
-        }
+        string move = ResolvePickStatsMove(picked);
+        if (string.IsNullOrEmpty(botName) || move == null) return;
+        string key = botName + "SuggestPick" + move;
+        PlayerPrefs.SetInt(key, PlayerPrefs.GetInt(key, 0) + 1);
+        PlayerPrefs.Save();   // mobile apps get killed — flush (bot-persistence)
+    }
+
+    /// <summary>Pure pick-stats resolution: the item's move when valid, else its label if
+    /// that label IS a move (legacy server), else null (record nothing). EditMode-tested.</summary>
+    public static string ResolvePickStatsMove(SuggestionItem picked)
+    {
+        if (picked == null) return null;
+        if (SuggestionMoves.IsMove(picked.move)) return picked.move;
+        if (SuggestionMoves.IsMove(picked.intentLabel)) return picked.intentLabel;
+        return null;
     }
 
     // A fresh round 1: new incoming, chat/bot switch, explicit toggle-on, answered run.
@@ -429,7 +454,8 @@ public class SuggestionsController : MonoBehaviour
     {
         _rounds.Clear();
         _currentSteer = null;
-        _currentRendered = null;
+        _currentHeader = null;
+        if (_panel != null) _panel.SetHeaderTitle(null);   // back to the default «ПРЕДЛОЖЕНИЯ»
         UpdateBackUi();
     }
 

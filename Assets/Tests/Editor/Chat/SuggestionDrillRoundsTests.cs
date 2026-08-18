@@ -45,4 +45,28 @@ public class SuggestionDrillRoundsTests
         Assert.AreEqual(26, composed.Length);
         StringAssert.EndsWith("…", composed);
     }
+
+    // --- ResolvePickStatsMove (preference learning under free-form titles) ---
+
+    [Test]
+    public void ResolvePickStats_PrefersTheMoveField()
+    {
+        var picked = new SuggestionItem { text = "т", intentLabel = "Коротко", move = "Ответ" };
+        Assert.AreEqual("Ответ", SuggestionsController.ResolvePickStatsMove(picked));
+    }
+
+    [Test]
+    public void ResolvePickStats_LegacyServer_FallsBackToAnEnumLabel()
+    {
+        var picked = new SuggestionItem { text = "т", intentLabel = "К заказу", move = null };
+        Assert.AreEqual("К заказу", SuggestionsController.ResolvePickStatsMove(picked));
+    }
+
+    [Test]
+    public void ResolvePickStats_FreeFormTitleWithoutMove_RecordsNothing()
+    {
+        var picked = new SuggestionItem { text = "т", intentLabel = "Со скидкой", move = "" };
+        Assert.IsNull(SuggestionsController.ResolvePickStatsMove(picked));
+        Assert.IsNull(SuggestionsController.ResolvePickStatsMove(null));
+    }
 }
