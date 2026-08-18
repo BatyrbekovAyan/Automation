@@ -17,6 +17,8 @@ failure modes (docs/design/suggestions-audit-2026-08.md): fabricated contacts/ho
 (B/B2/J/J2), false-negative availability (A/K), media over-confidence (D), steer echo
 (H), language mirroring + greeting spam (G), filler-card padding (F), non-business
 abstain (N).
+Drill redesign (2026-08-18): H2 drills within a steer, F expects 4 trivial variants,
+STRUCT gates move∈enum + distinct short titles.
 
 This workflow only calls OpenAI and returns JSON — probing it never messages anyone.
 """
@@ -29,6 +31,8 @@ import urllib.request
 
 BASE = os.environ.get("N8N_BASE_URL", "http://localhost:5678").rstrip("/")
 URL = BASE + "/webhook/SuggestReplies"
+
+MOVES = ("Ответ", "Уточнить", "Вариант", "К заказу", "Отложить", "Отказ")
 
 KNOW = ("About Business:\nЦветочный магазин в Астане, букеты и композиции на заказ.\n\n"
         "Контакты:\nТелефон: +7 777 123 45 67\nЧасы работы: 10:00–20:00\nАдрес: ул. Абая 1, Астана")
@@ -88,7 +92,7 @@ PROBES = [
     # hard rule is: no price before марка/модель/год is known.
     ("P_autoparts_intake", base("auto_parts", "АвтоЗапчасти KZ", AUTO_CAT,
         [m("client", "колодки передние сколько стоят?")]), [
-        ("card1_clarifies", lambda c: c[0]["label"] == "Уточнить"),
+        ("card1_clarifies", lambda c: c[0].get("move") == "Уточнить"),
         ("card1_asks_car", lambda c: re.search(r"марк|модел|год|vin", c[0]["text"].lower()) is not None),
         ("no_price_before_car_known", lambda c: "18500" not in c[0]["text"]),
     ]),
@@ -100,12 +104,19 @@ PROBES = [
     ]),
     ("D_photo_no_text", base("kaspi_seller", "TechStore KZ", KASPI_CAT,
         [m("client", "[фото] такой есть в наличии?")]), [
-        ("card1_clarifies", lambda c: c[0]["label"] == "Уточнить"),
+        ("card1_clarifies", lambda c: c[0].get("move") == "Уточнить"),
         ("no_yes_claim_about_photo", lambda c: not re.search(r"^да, ", c[0]["text"].lower())),
     ]),
     ("H_steer_recluster", base("flowers", "Цветы Астана", FLOWER_CAT,
         [m("client", "нужен букет жене на годовщину, что посоветуете?")], steer=STEER), [
         ("card1_not_verbatim_echo", lambda c: c[0]["text"].strip() != STEER),
+    ]),
+    ("H2_drill_within_direction", base("flowers", "Цветы Астана", FLOWER_CAT,
+        [m("client", "нужен букет жене на годовщину, что посоветуете?")], steer=STEER), [
+        ("four_cards", lambda c: len(c) == 4),
+        ("titles_not_move_names", lambda c: not any(x["label"] in MOVES for x in c)),
+        ("stays_on_the_roses_offer", lambda c: sum(
+            1 for x in c if re.search(r"роз|букет|годовщин|доставк", x["text"].lower())) >= 3),
     ]),
     ("G_kazakh_mirror", base("flowers", "Цветы Астана", FLOWER_CAT,
         [m("client", "сәлеметсіз бе, 25 раушан гүлінен жасалған букет қанша тұрады?")]), [
@@ -120,11 +131,12 @@ PROBES = [
          m("client", "уже 15:30!!! где мой заказ??? я вам два раза писала!!")]), [
         ("no_upsell_to_angry", lambda c: not re.search(r"могу предложить|как вам такая идея", c[0]["text"].lower())),
     ]),
-    ("F_trivial_thanks_small_set", base("education", "SmartKids", "• Английский, группа (мес) — 20000 тг",
+    ("F_trivial_thanks_variants", base("education", "SmartKids", "• Английский, группа (мес) — 20000 тг",
         [m("client", "сколько стоит английский для ребенка?"),
          m("business", "Группа — 20000 тг/мес."),
          m("client", "спасибо")]), [
-        ("at_most_two_cards", lambda c: len(c) <= 2),
+        ("four_variant_cards", lambda c: len(c) == 4),
+        ("distinct_titles", lambda c: len({x["label"].lower() for x in c}) == len(c)),
     ]),
 ]
 
@@ -157,9 +169,19 @@ def main():
         cards = body.get("suggestions") or []
         print(f"\n### {name} ({time.time() - t0:.1f}s)" + ("" if cards else f"  ERR:{body.get('error')} abstain:{body.get('abstain')}"))
         for c in cards:
-            print(f"  [{c.get('label', '?')}] {c.get('text', '')}")
+            print(f"  [{c.get('label', '?')}/{c.get('move', '?')}] {c.get('text', '')}")
         if not 1 <= len(cards) <= 4 or body.get("abstain"):
             print("  !! STRUCT-FAIL: expected 1-4 cards without abstain")
+            struct_fails += 1
+            continue
+        bad_move = [c for c in cards if c.get("move") not in MOVES]
+        if bad_move:
+            print(f"  !! STRUCT-FAIL: move outside the enum: {[c.get('move') for c in bad_move]}")
+            struct_fails += 1
+            continue
+        titles = [str(c.get("label", "")).strip() for c in cards]
+        if any(not t or len(t) > 24 for t in titles) or len({t.lower() for t in titles}) != len(titles):
+            print(f"  !! STRUCT-FAIL: labels must be non-empty, <=24 chars, distinct: {titles}")
             struct_fails += 1
             continue
         for label, fn in checks:
@@ -180,7 +202,7 @@ def main():
         cards = body.get("suggestions") or []
         print(f"\n### {name} ({time.time() - t0:.1f}s) abstain:{body.get('abstain')} cards:{len(cards)}")
         for c in cards:
-            print(f"  [{c.get('label', '?')}] {c.get('text', '')}")
+            print(f"  [{c.get('label', '?')}/{c.get('move', '?')}] {c.get('text', '')}")
         ok = body.get("abstain") is True and len(cards) == 0 and not body.get("error")
         print(f"  {'OK  ' if ok else 'WARN'} abstain_envelope")
         warns += 0 if ok else 1
