@@ -69,4 +69,14 @@ public class SuggestionDrillRoundsTests
         Assert.IsNull(SuggestionsController.ResolvePickStatsMove(picked));
         Assert.IsNull(SuggestionsController.ResolvePickStatsMove(null));
     }
+
+    [Test]
+    public void ComposeHeaderTitle_ExactCapPassesIntact_OneOverSlices()
+    {
+        string atCap = new string('ы', 26);
+        Assert.AreEqual(atCap.ToUpperInvariant(), SuggestionsPanel.ComposeHeaderTitle(atCap));
+        string overCap = SuggestionsPanel.ComposeHeaderTitle(new string('ы', 27));
+        Assert.AreEqual(26, overCap.Length);
+        StringAssert.EndsWith("…", overCap);
+    }
 }

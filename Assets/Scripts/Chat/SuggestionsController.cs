@@ -68,6 +68,14 @@ public class SuggestionsController : MonoBehaviour
     // slot height first, the exact no-dip violation the opposite direction is careful to avoid.
     private float _lastKeyboardCanvasPx;
 
+    // --- Chat-open choreography (SuggestionSlotOpenTiming) ---
+    // The instant the chat-open animation settled, or -1 while it is still in flight. Written ONLY
+    // by Update, which does not run while the chat screen is closed — and that is precisely the
+    // point: RestoreForActiveChat claims the slot on the row tap, ~600ms before the screen exists,
+    // and a claim applied on the slide's first frame makes the panel rise diagonally alongside the
+    // incoming chat. The claim parks until this clock says the chat has finished opening.
+    private float _chatOpenSettledAt = -1f;
+
     // --- Thread tap (model E rule 5) ---
     // The Canvas, not its scaleFactor: CanvasScaler writes the real factor from its own OnEnable, so
     // a value latched in Awake is the serialised default of 1 and every tap would be measured at a
@@ -209,6 +217,7 @@ public class SuggestionsController : MonoBehaviour
         _slotState = SuggestionSlotState.Collapsed;
         _yieldingToKeyboard = false;
         _pendingShow = false;
+        _chatOpenSettledAt = -1f;        // the next chat opens with the clock unset — never pre-settled
         _draggingSlot = false;
         _threadPressActive = false;      // a press in flight when the chat closed must not
         _threadPressEligible = false;    // resolve into a tap on the next screen
@@ -249,6 +258,11 @@ public class SuggestionsController : MonoBehaviour
         _pendingIncomingText = null;
         _answeredIdle = false;   // per-chat latch — never carries into another chat's open
         _pendingShow = false;    // a parked auto-show must not leak into another chat's open
+        // A chat open has just STARTED (ChatManager sets Prep on the line after this event), so the
+        // settle clock restarts here rather than relying on OnDisable having run: a re-open that
+        // never closed the screen would otherwise still be carrying the previous chat's settled
+        // stamp and would let the show through mid-slide — the exact diagonal this gate removes.
+        _chatOpenSettledAt = -1f;
         StartFreshRound();       // rounds are per-question, never per-app — a chat open starts at round 1
         _semiAutoOn = SemiAutoStore.IsOn(ChatManager.Instance.CurrentBotId, ChatManager.Instance.CurrentChatId);
         if (_toggle != null) _toggle.SetLit(_semiAutoOn);     // default OFF → other chats stay manual (SEMI-03)
@@ -277,6 +291,10 @@ public class SuggestionsController : MonoBehaviour
         string tailKey = CurrentTailKey();
         if (tailKey == null || !_cache.TryGet(cm.CurrentChatId, tailKey, out var cached)) return false;
         _panel.Render(cached);
+        // The cached set must be pickable with full context: a tap resolves the item for the
+        // header retitle + pickStats, and pushes THIS set for ‹. Safe: StartFreshRound just
+        // nulled the previous chat's set, and the cache stores only fresh (round-1) sets.
+        _currentRendered = cached;
         return true;
     }
 
@@ -641,6 +659,37 @@ public class SuggestionsController : MonoBehaviour
     // SuggestionSlotSwap), so the composer and thread never move during a handoff.
 
     /// <summary>
+    /// True once the chat-open animation has finished and the settle beat has passed — see
+    /// <see cref="SuggestionSlotOpenTiming"/> for why the slot must wait for it. No ChatManager
+    /// (EditMode / a bare scene) means there is no chat choreography to wait on.
+    /// </summary>
+    private bool SlotOpenAllowed
+    {
+        get
+        {
+            if (ChatManager.Instance == null) return true;
+            float sinceSettled = _chatOpenSettledAt >= 0f
+                ? Time.realtimeSinceStartup - _chatOpenSettledAt
+                : -1f;
+            return SuggestionSlotOpenTiming.MayTakeSlot(
+                ChatManager.Instance.Phase, SwipeToBack.IsSliding, sinceSettled);
+        }
+    }
+
+    /// <summary>
+    /// Runs the chat-open clock <see cref="SlotOpenAllowed"/> reads. Level-triggered on purpose:
+    /// the settle instant is stamped on the first settled frame and cleared by ANY later unsettled
+    /// one (a re-open, a back-swipe), so a stale stamp can never let a claim through mid-animation.
+    /// </summary>
+    private void TrackChatOpenSettle()
+    {
+        bool settled = ChatManager.Instance == null
+            || SuggestionSlotOpenTiming.ChatOpenSettled(ChatManager.Instance.Phase, SwipeToBack.IsSliding);
+        if (!settled) _chatOpenSettledAt = -1f;
+        else if (_chatOpenSettledAt < 0f) _chatOpenSettledAt = Time.realtimeSinceStartup;
+    }
+
+    /// <summary>
     /// Open the slot for the panel at a detent. Only the «+» attach sheet still PARKS a show
     /// (it is a third tenant the model never mentions and it must not be stolen from); the
     /// keyboard needs no parking any more, because model E returns the slot to the panel on
@@ -652,6 +701,19 @@ public class SuggestionsController : MonoBehaviour
     private void ShowPanel(bool claimSlotFromKeyboard, SlotDetent detent = SlotDetent.Standard)
     {
         if (_panel == null) return;
+
+        // The chat-open animation owns the screen until it is done. This park is NOT conditional on
+        // claimSlotFromKeyboard the way the tenant parks below are: there is no other tenant to ask
+        // the slot from here — the screen itself is still arriving — so an explicit ask waits too.
+        // ApplyKeyStyle repaints the ✦ face while parked: the slot really is Collapsed until the
+        // show lands, and a tap during the wait would indeed be "raise the panel".
+        if (!SlotOpenAllowed)
+        {
+            _pendingShow = true;
+            ApplyKeyStyle();
+            return;
+        }
+
         bool kbVisible = _keyboardMover != null && _keyboardMover.NativeKeyboardVisible;
         if ((kbVisible || AttachOpen) && !claimSlotFromKeyboard)
         {
@@ -916,6 +978,9 @@ public class SuggestionsController : MonoBehaviour
     // a yield, and lands a parked auto-show once the keyboard leaves.
     void Update()
     {
+        // Before every early return below — the clock must keep running through a drag or a
+        // mis-wired keyboardMover, or a parked chat-open show would never become eligible.
+        TrackChatOpenSettle();
         if (_semiAutoOn) PumpThreadTap();   // model E rule 5; «Авто» has no panel to raise
         if (_keyboardMover == null) return;
 
@@ -1009,8 +1074,10 @@ public class SuggestionsController : MonoBehaviour
             _pendingShow = true;   // after HidePanel — it clears the flag
         }
 
-        // A parked auto-show lands the moment nothing else owns the slot.
-        if (_pendingShow && _semiAutoOn && !PanelOwnsSlot && !_yieldingToKeyboard && !kbVisible && !attachOpen)
+        // A parked auto-show lands the moment nothing else owns the slot — and, for the chat-open
+        // park, not before the chat has finished arriving (ShowPanel would just re-park otherwise).
+        if (_pendingShow && _semiAutoOn && !PanelOwnsSlot && !_yieldingToKeyboard && !kbVisible
+            && !attachOpen && SlotOpenAllowed)
         {
             _pendingShow = false;
             ShowPanel(claimSlotFromKeyboard: false);
