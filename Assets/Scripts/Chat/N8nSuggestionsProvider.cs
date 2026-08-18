@@ -160,17 +160,14 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
         return n.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture) + ", " + day;
     }
 
-    // The closed move taxonomy — MUST mirror the server enum (Validate node) verbatim.
-    private static readonly string[] MoveLabels =
-        { "Ответ", "Уточнить", "Вариант", "К заказу", "Отложить", "Отказ" };
-
     // Preference learning v1 (2026-08-11): per-bot pick counters, written by
-    // SuggestionsController.RecordPick under {botName}SuggestPick{label}. Emitted as a
-    // compact "label:count" ranking hint; empty string when the owner has never picked.
+    // SuggestionsController.RecordPick under {botName}SuggestPick{move}. Emitted as a
+    // compact "move:count" ranking hint; empty string when the owner has never picked.
+    // Counts the closed move taxonomy (SuggestionMoves) — free-form titles never mint keys.
     private static string BuildPickStats(string botName)
     {
         var sb = new StringBuilder();
-        foreach (string label in MoveLabels)
+        foreach (string label in SuggestionMoves.All)
         {
             int count = PlayerPrefs.GetInt(botName + "SuggestPick" + label, 0);
             if (count <= 0) continue;
@@ -314,7 +311,7 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
         var items = r.suggestions
             .Where(s => s != null && !string.IsNullOrEmpty(s.text) && !string.IsNullOrEmpty(s.label))
             .Take(4)   // enforce the wire contract's upper bound client-side (trust boundary)
-            .Select(s => new SuggestionItem { text = s.text, intentLabel = s.label })   // {text,label} -> {text,intentLabel}
+            .Select(s => new SuggestionItem { text = s.text, intentLabel = s.label, move = s.move })   // {text,label,move} -> item
             .ToList();
 
         return items.Count == 0

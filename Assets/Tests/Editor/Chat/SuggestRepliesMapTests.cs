@@ -138,4 +138,27 @@ public class SuggestRepliesMapTests
         Assert.AreEqual("Уточнить", r.items[0].intentLabel);
         Assert.AreEqual(2L, r.requestSeq);
     }
+
+    // --- v1.3 drill redesign: the internal move field rides the mapper ---
+
+    [Test]
+    public void MapResponse_CarriesTheMoveField()
+    {
+        string json = "{\"v\":1,\"requestSeq\":7,\"error\":\"\",\"abstain\":false," +
+            "\"suggestions\":[{\"text\":\"Букет 25 роз — 25000 тг\",\"label\":\"Цена\",\"move\":\"Ответ\"}]}";
+        var r = N8nSuggestionsProvider.MapResponse(json, 7);
+        Assert.AreEqual(SuggestionStatus.Ok, r.status);
+        Assert.AreEqual("Ответ", r.items[0].move);
+        Assert.AreEqual("Цена", r.items[0].intentLabel);
+    }
+
+    [Test]
+    public void MapResponse_ToleratesALegacyServerWithoutMove()
+    {
+        string json = "{\"v\":1,\"requestSeq\":7,\"error\":\"\",\"abstain\":false," +
+            "\"suggestions\":[{\"text\":\"Здравствуйте!\",\"label\":\"Ответ\"}]}";
+        var r = N8nSuggestionsProvider.MapResponse(json, 7);
+        Assert.AreEqual(SuggestionStatus.Ok, r.status);
+        Assert.IsNull(r.items[0].move);
+    }
 }

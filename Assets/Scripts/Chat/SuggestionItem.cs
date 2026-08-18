@@ -7,4 +7,5 @@ public class SuggestionItem
 {
     public string text;
     public string intentLabel;
+    public string move;   // internal 6-enum move (v1.3); null from a legacy server — never displayed
 }

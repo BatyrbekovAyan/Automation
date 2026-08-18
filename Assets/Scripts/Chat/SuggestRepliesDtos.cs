@@ -57,12 +57,15 @@ public class SuggestRepliesRequestDto
     public string pickStats;         // per-bot pick counters "Ответ:12,К заказу:8" (preference learning v1, 2026-08-11); "" when none
 }
 
-/// <summary>One suggestion in the response envelope: server sends {text,label}.</summary>
+/// <summary>One suggestion in the response envelope: server sends {text,label,move}.
+/// <c>move</c> is v1.3-additive (drill redesign 2026-08-18) — the internal 6-enum move;
+/// a legacy server omits it, so null must be tolerated end-to-end.</summary>
 [System.Serializable]
 public class SuggestReplyDto
 {
     public string text;
     public string label;
+    public string move;   // v1.3 additive — internal move taxonomy; null/"" from a legacy server
 }
 
 /// <summary>
