@@ -142,10 +142,9 @@ public class AttachSheet : MonoBehaviour
         // the tap, so «+» stays responsive while the composer is still on its way down.
         FadeBackdrop(1f, openDuration);
 
-        // Sheet parks below the canvas. Width is held by the pre-existing anchors (built by
-        // AttachSheetBuilder).
-        _rt.sizeDelta        = new Vector2(_rt.sizeDelta.x, sheetHeightCanvasPx);
-        _rt.anchoredPosition = new Vector2(0f, -sheetHeightCanvasPx);
+        // Width is held by the pre-existing anchors (built by AttachSheetBuilder).
+        _rt.sizeDelta = new Vector2(_rt.sizeDelta.x, sheetHeightCanvasPx);
+        ParkBelowScreen();
 
         _slideTween?.Kill();
         StopPendingRise();
@@ -165,7 +164,15 @@ public class AttachSheet : MonoBehaviour
     {
         float deadline = Time.unscaledTime + MaxComposerSettleSeconds;
         while (ComposerStillRaised && Time.unscaledTime < deadline)
+        {
+            // Re-park EVERY frame, not once. This sheet is a CHILD of MovingArea, so it rides the
+            // composer's rise: a park measured only against the sheet's own height hides it below
+            // the screen only while MovingArea is at rest. With the composer up, that same park sits
+            // `rise` units too high and exactly that much of the sheet shows — behind the
+            // translucent iOS keyboard, or peeking under a suggestions panel on its way down.
+            ParkBelowScreen();
             yield return null;
+        }
 
         _pendingRise = null;
         // Kill by TARGET, not just the tracked handle. While the rise waits there is no tween on
@@ -182,6 +189,16 @@ public class AttachSheet : MonoBehaviour
                 openDuration)
             .SetEase(Ease.OutCubic)
             .SetTarget(_rt);
+    }
+
+    // Park clear of the screen bottom, compensating for however far the parent has been raised.
+    // The sheet's local origin travels with MovingArea, so the offset is its own height PLUS the
+    // current rise; at rest that is the plain -sheetHeightCanvasPx it has always been.
+    private void ParkBelowScreen()
+    {
+        if (_rt == null) return;
+        float rise = _composerMover != null ? Mathf.Max(0f, _composerMover.AppliedBottomInset) : 0f;
+        _rt.anchoredPosition = new Vector2(0f, -(sheetHeightCanvasPx + rise));
     }
 
     // An unwired mover reads as «nothing is raised», so the sheet opens exactly as it did before
