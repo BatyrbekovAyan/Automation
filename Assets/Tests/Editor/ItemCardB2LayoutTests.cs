@@ -31,9 +31,18 @@ public class ItemCardB2LayoutTests
         var hostRect = (RectTransform)host.transform;
         hostRect.sizeDelta = new Vector2(CardWidth, 1920f);
 
+        // The real list lives under the Product tab's Viewport, which carries a
+        // stencil Mask (BotSettings.prefab). That matters: Mask is an
+        // IMaterialModifier and renders a COPY of the graphic's material, so a
+        // test hosted on a bare canvas cannot see anything the copy gets wrong.
+        var viewport = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(Mask));
+        var viewportRect = (RectTransform)viewport.transform;
+        viewportRect.SetParent(host.transform, false);
+        viewportRect.sizeDelta = new Vector2(CardWidth, 1920f);
+
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(ProductPrefabPath);
         Assert.IsNotNull(prefab, "Product.prefab not found");
-        card = Object.Instantiate(prefab, host.transform);
+        card = Object.Instantiate(prefab, viewport.transform);
 
         var cardRect = (RectTransform)card.transform;
         cardRect.anchorMin = new Vector2(0f, 1f);
@@ -235,5 +244,35 @@ public class ItemCardB2LayoutTests
 
         view.Name = "Колодки Bosch";
         Assert.AreEqual(first, background.color, "The colour is not stable for the same name.");
+    }
+
+    // Diagnostic for the third report on this node: after a price change the
+    // tag's WIDTH is right but its corner rounding is drawn for the old width.
+    // Nobi's shader takes the rect size as a material vector, refreshed from
+    // OnRectTransformDimensionsChange — so a stale vector means that refresh
+    // never ran for the new size.
+    [Test]
+    public void PriceTag_RoundedCornersFollowTheNewWidth()
+    {
+        var view = View;
+        view.Price = "5000";
+        Relayout();
+
+        view.Price = "1 200 000";
+        Relayout();
+
+        var image = Pill.GetComponent<Image>();
+        Assert.IsNotNull(image.material, "the tag has no instance material — rounding is not applied at all");
+
+        // materialForRendering, NOT material: under a Mask the base material is
+        // updated but the stencil COPY is what reaches the screen, and it only
+        // picks the new size up when the graphic's material is marked dirty.
+        var rendered = image.materialForRendering;
+        var props = rendered.GetVector("_WidthHeightRadius");
+        if (props == Vector4.zero)
+            Assert.Inconclusive("the rounded-corner material was never initialised in this context");
+
+        Assert.AreEqual(Pill.rect.width, props.x, 1f,
+            $"the corner shader still has width {props.x} while the tag is {Pill.rect.width} wide");
     }
 }

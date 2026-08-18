@@ -93,6 +93,10 @@ public class ItemCardB2Tests
                 "the tag at one size and the content-fitting breaks.");
             Assert.AreEqual(72f, element.preferredHeight, 0.5f, $"{path}: tag height drifted.");
 
+            Assert.IsNotNull(pill.GetComponent<RoundedCornerMaskSync>(),
+                $"{path}: the tag resizes under a stencil Mask, so its corner material must be " +
+                "re-pushed on resize or the rounding keeps rendering the previous width.");
+
             var inner = pill.GetComponent<HorizontalLayoutGroup>();
             Assert.IsNotNull(inner, $"{path}: the tag has no group to publish its preferred width.");
             Assert.IsTrue(inner.childControlWidth, $"{path}: the tag must measure its own text.");

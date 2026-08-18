@@ -246,6 +246,11 @@ public static class ItemCardB2RestyleBuilder
         BindTheme(pill.gameObject, ThemeRole.AccentSoft);
         SetCornerRadius(pill.gameObject, PillRadius);
 
+        // The tag is the only part of the card that resizes at runtime, and it
+        // renders under the Product tab's stencil Mask — so its corner shader
+        // needs the material re-pushed after every resize. See the component.
+        GetOrAdd<RoundedCornerMaskSync>(pill.gameObject);
+
         var layout = GetOrAdd<HorizontalLayoutGroup>(pill.gameObject);
         layout.padding = new RectOffset((int)PillPadX, (int)PillPadX, 0, 0);
         layout.spacing = PillSpacing;
