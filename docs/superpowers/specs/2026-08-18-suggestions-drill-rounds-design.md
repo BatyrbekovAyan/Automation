@@ -223,3 +223,25 @@ payload; `SuggestionCache` class; prod instance (dormant).
   temperature stays 0.4.
 - Round-1 explore over-eagerly drilling (model miscounts directions) → probe matrix
   keeps a multi-direction case asserting ≥2 distinct topics.
+
+## Amendment (2026-08-18, during execution)
+
+Two deviations from the section «Validate + Validate 2 (identical twins — edit both,
+keep ===)», both shipped and review-verified:
+
+1. **The twins are now deliberately asymmetric** (commit 94e772d). Probing found
+   J2-class requests (drill variants converging on one natural title — «Завтра» for a
+   closed-now hours question) burned the single retry on the strict distinct-title rule
+   and returned `generation_failed` ~50% of the time. Validate (pre-retry) stays strict
+   so the retry still pushes for 4 distinct titles; Validate 2 (post-retry) now dedupes
+   casefolded title collisions keep-first and slices to 4 — a title collision must never
+   cost the owner the whole round. Moves stay enum-hard in both. 6× targeted soak: 0
+   errors; 32k-case simulation: the lenient path never diverges on sets the strict path
+   accepted.
+2. **ЗАГОЛОВКИ gained an axis-title clause** (Task-9 tune + 94e772d): titles for
+   convergent cards name the DIFFERENCE («Коротко», «Подробнее», «Теплее»,
+   «Официально»), not the shared theme, and must not literally equal a move name.
+
+Also corrected during execution (commit 4892ba7): the plan's `StartFreshRound` block
+had dropped the pre-existing `_currentRendered = null;` — restored (a pick on a
+cache-restored set must not push the previous chat's round).
