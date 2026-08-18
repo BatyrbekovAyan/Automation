@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using DG.Tweening;
+using TMPro;
 
 /// <summary>
 /// The suggestions panel view — since sketch-003 (variant A) a KEYBOARD-SLOT tenant: it sits at
@@ -31,6 +32,7 @@ public class SuggestionsPanel : MonoBehaviour
     [SerializeField] private CanvasGroup canvasGroup;      // kept at 1 — the slot swap is positional, not a fade
     [SerializeField] private RectTransform cardsViewport;  // fixed scroll region (chrome = -offsetMax.y)
     [SerializeField] private GameObject bottomFade;        // "more below" wash — hidden when nothing overflows
+    [SerializeField] private TextMeshProUGUI headerTitle;  // «ПРЕДЛОЖЕНИЯ» overline; drill rounds retitle it (wired by Tools/Suggestions/Wire Header Title)
 
     public event Action<string> OnCardTapped;
     public event Action OnRefreshRequested;
@@ -244,6 +246,30 @@ public class SuggestionsPanel : MonoBehaviour
     {
         if (backButton != null && backButton.gameObject.activeSelf != visible)
             backButton.gameObject.SetActive(visible);
+    }
+
+    /// <summary>The header overline's rest text — round 1 and every fresh round.</summary>
+    public const string DefaultHeaderTitle = "ПРЕДЛОЖЕНИЯ";
+
+    // Validate clamps titles to 24 server-side; the slice only guards a rogue payload.
+    private const int HeaderTitleMaxChars = 26;
+
+    /// <summary>Round header (drill flow 2026-08-18): null/empty restores the default
+    /// overline; a drill round shows the picked card's title. Uppercased HERE because the
+    /// scene TMP carries no uppercase FontStyle — the composed string IS the display string.</summary>
+    public void SetHeaderTitle(string title)
+    {
+        if (headerTitle != null) headerTitle.text = ComposeHeaderTitle(title);
+    }
+
+    /// <summary>Pure composition seam for <see cref="SetHeaderTitle"/> — EditMode-tested.</summary>
+    public static string ComposeHeaderTitle(string title)
+    {
+        if (string.IsNullOrWhiteSpace(title)) return DefaultHeaderTitle;
+        string value = title.Trim().ToUpperInvariant();
+        return value.Length <= HeaderTitleMaxChars
+            ? value
+            : value.Substring(0, HeaderTitleMaxChars - 1) + "…";
     }
 
     public void Clear()

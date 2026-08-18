@@ -21,4 +21,28 @@ public class SuggestionDrillRoundsTests
         Assert.IsFalse(SuggestionMoves.IsMove("Цена"));      // free-form title, not a move
         Assert.IsFalse(SuggestionMoves.IsMove("ответ"));     // case-sensitive: server enum is exact
     }
+
+    // --- ComposeHeaderTitle (panel header, pure) ---
+
+    [Test]
+    public void ComposeHeaderTitle_NullOrBlank_IsTheDefaultOverline()
+    {
+        Assert.AreEqual(SuggestionsPanel.DefaultHeaderTitle, SuggestionsPanel.ComposeHeaderTitle(null));
+        Assert.AreEqual(SuggestionsPanel.DefaultHeaderTitle, SuggestionsPanel.ComposeHeaderTitle("   "));
+    }
+
+    [Test]
+    public void ComposeHeaderTitle_UppercasesCyrillicAndTrims()
+    {
+        Assert.AreEqual("ЦЕНА", SuggestionsPanel.ComposeHeaderTitle(" Цена "));
+        Assert.AreEqual("СО СКИДКОЙ", SuggestionsPanel.ComposeHeaderTitle("Со скидкой"));
+    }
+
+    [Test]
+    public void ComposeHeaderTitle_SlicesARoguePayload()
+    {
+        string composed = SuggestionsPanel.ComposeHeaderTitle(new string('ы', 40));
+        Assert.AreEqual(26, composed.Length);
+        StringAssert.EndsWith("…", composed);
+    }
 }
