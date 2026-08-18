@@ -454,6 +454,7 @@ public class SuggestionsController : MonoBehaviour
     {
         _rounds.Clear();
         _currentSteer = null;
+        _currentRendered = null;   // a pick on a cache-restored set must not push the PREVIOUS chat's round
         _currentHeader = null;
         if (_panel != null) _panel.SetHeaderTitle(null);   // back to the default «ПРЕДЛОЖЕНИЯ»
         UpdateBackUi();
