@@ -1,43 +1,84 @@
+using Nobi.UiRoundedCorners;
 using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Re-pushes a rounded-corner graphic's material after its rect changes, for
-/// graphics that live under a stencil <see cref="Mask"/>.
+/// Keeps a rounded-corner graphic's corners correct while it resizes UNDER a
+/// stencil <see cref="Mask"/>.
 ///
-/// Nobi's ImageWithRoundedCorners feeds the rect size to the shader through a
-/// material vector and refreshes it from OnRectTransformDimensionsChange — but
-/// it writes to the graphic's BASE material. A stencil Mask is an
-/// IMaterialModifier, so what actually reaches the screen is StencilMaterial's
-/// COPY of that material, taken when the graphic last rebuilt its material. A
-/// plain resize never marks the material dirty, so the copy goes on rendering
-/// the previous size.
+/// Nobi's ImageWithRoundedCorners builds no geometry — it feeds the rect size to
+/// the shader through the `_WidthHeightRadius` material vector, refreshed from
+/// OnRectTransformDimensionsChange onto the graphic's BASE material. Under a
+/// Mask, MaskableGraphic swaps in StencilMaterial.Add(baseMaterial, …), and that
+/// call is a CACHE keyed by base-material identity: it returns the copy it made
+/// once with `new Material(baseMat)` and never re-takes it. So the base keeps
+/// receiving the new size while the screen keeps drawing the old one. Measured
+/// on the price tag: base 263.59, rendered copy 181.65.
 ///
-/// Symptom that led here (device, 2026-08-18): editing an existing product's
-/// price resized the price tag correctly but left its corners drawn for the old
-/// width, and only re-opening bot settings — which re-enables the graphic and
-/// rebuilds the copy — put it right. The Product tab's Viewport carries a Mask,
-/// and the tag is the one element in the card whose width changes at runtime.
+/// Marking the material dirty is not enough on its own — the rebuild goes back
+/// through StencilMaterial.Add and hits the same cached copy. Only disabling the
+/// graphic ever refreshed it (OnDisable → Remove → refcount 0 → entry
+/// destroyed), which is the workaround seen on device: switch tabs and back.
 ///
-/// NOT reproduced in EditMode: materialForRendering recomputes the modifier
-/// chain on every access, so a test cannot observe the stale copy that the
-/// CanvasRenderer is holding. The mechanism is read off uGUI's own behaviour
-/// rather than off a red test — the guard below is structural.
+/// So this component joins the modifier chain itself. materialForRendering runs
+/// every IMaterialModifier on the GameObject in component order, and the
+/// MaskableGraphic's own modifier — the one producing the stencil copy — sits
+/// before this one, so the material arriving here IS the copy that will be
+/// handed to the CanvasRenderer. Stamping the current size on it there means it
+/// is refreshed on every material rebuild, and the resize itself requests one.
+///
+/// Each graphic owns its own base material (Nobi news one up per component), so
+/// each has its own cache entry: writing here cannot leak into another card.
+///
+/// Symptom that led here (device 2026-08-18): editing an existing product's
+/// price resized the price tag correctly but drew its corners for the previous
+/// width until the tab was switched away and back.
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(Graphic))]
-public class RoundedCornerMaskSync : MonoBehaviour
+public class RoundedCornerMaskSync : MonoBehaviour, IMaterialModifier
 {
+    private static readonly int WidthHeightRadius = Shader.PropertyToID("_WidthHeightRadius");
+
     private Graphic graphic;
+    private ImageWithRoundedCorners corners;
 
-    private void Awake() => graphic = GetComponent<Graphic>();
+    public Material GetModifiedMaterial(Material baseMaterial)
+    {
+        Resolve();
+        if (corners == null || baseMaterial == null || !baseMaterial.HasProperty(WidthHeightRadius))
+            return baseMaterial;
 
-    private void OnRectTransformDimensionsChange()
+        // Same expression ImageWithRoundedCorners.Refresh uses, including the
+        // doubling the shader halves again — recomputed rather than read back,
+        // because the order of the two components' callbacks is undefined.
+        var rect = ((RectTransform)transform).rect;
+        baseMaterial.SetVector(
+            WidthHeightRadius, new Vector4(rect.width, rect.height, corners.radius * 2f, 0f));
+        return baseMaterial;
+    }
+
+    private void Awake() => Resolve();
+
+    private void OnEnable()
+    {
+        Resolve();
+        RequestMaterialRebuild();
+    }
+
+    // A resize alone never marks the material dirty, so nothing would re-enter
+    // the modifier chain above.
+    private void OnRectTransformDimensionsChange() => RequestMaterialRebuild();
+
+    private void Resolve()
     {
         if (graphic == null) graphic = GetComponent<Graphic>();
+        if (corners == null) corners = GetComponent<ImageWithRoundedCorners>();
+    }
 
-        // Queued, not immediate: the rebuild lands in the same canvas update
-        // that produced the resize, so the corners never render a stale frame.
+    private void RequestMaterialRebuild()
+    {
+        Resolve();
         if (graphic != null && graphic.isActiveAndEnabled) graphic.SetMaterialDirty();
     }
 }

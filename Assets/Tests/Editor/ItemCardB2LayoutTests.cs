@@ -257,6 +257,11 @@ public class ItemCardB2LayoutTests
         var view = View;
         view.Price = "5000";
         Relayout();
+        // Load-bearing: the stencil copy is taken on the graphic's FIRST
+        // material rebuild. Without a canvas update HERE the copy would be made
+        // after both prices were applied, from a base that is already correct —
+        // which is why an earlier version of this test could not fail.
+        Canvas.ForceUpdateCanvases();
 
         view.Price = "1 200 000";
         Relayout();
@@ -264,15 +269,23 @@ public class ItemCardB2LayoutTests
         var image = Pill.GetComponent<Image>();
         Assert.IsNotNull(image.material, "the tag has no instance material — rounding is not applied at all");
 
-        // materialForRendering, NOT material: under a Mask the base material is
-        // updated but the stencil COPY is what reaches the screen, and it only
-        // picks the new size up when the graphic's material is marked dirty.
+        // Assert on materialForRendering: that is literally the argument
+        // Graphic.UpdateMaterial hands to canvasRenderer.SetMaterial, so it is
+        // what the screen gets. The renderer's own slot cannot be read here —
+        // Graphic.Rebuild bails out on canvasRenderer.cull, which is always true
+        // for a canvas that never renders in an EditMode test.
+        //
+        // image.material would pass either way: Nobi keeps the BASE correct.
+        // The whole defect lives in the stencil copy that sits between them.
         var rendered = image.materialForRendering;
+        Assert.IsNotNull(rendered, "the tag has no material to render with");
+
         var props = rendered.GetVector("_WidthHeightRadius");
         if (props == Vector4.zero)
             Assert.Inconclusive("the rounded-corner material was never initialised in this context");
 
         Assert.AreEqual(Pill.rect.width, props.x, 1f,
-            $"the corner shader still has width {props.x} while the tag is {Pill.rect.width} wide");
+            $"the corner shader still has width {props.x} while the tag is {Pill.rect.width} wide — " +
+            $"the stencil copy went stale (base material reads {image.material.GetVector("_WidthHeightRadius").x})");
     }
 }
