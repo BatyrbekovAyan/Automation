@@ -105,6 +105,7 @@ public class SuggestionsController : MonoBehaviour
     // set, i.e. what Push records when a pick moves forward.
     private readonly SuggestionRoundStack _rounds = new SuggestionRoundStack();
     private string _currentSteer;
+    private string _currentHeader;   // display title of the round ON SCREEN (null = default «ПРЕДЛОЖЕНИЯ»)
     private SuggestionResult _currentRendered;
 
     void Awake()
@@ -379,7 +380,7 @@ public class SuggestionsController : MonoBehaviour
             StartCoroutine(WriteComposerRoutine(_bottomPanel.inputField, replyText));
         // Rounds flow: record the round being left so ‹ can restore it locally, remember the
         // new direction for refresh re-rolls, and count the pick for preference learning.
-        _rounds.Push(_currentRendered, _currentSteer);
+        _rounds.Push(_currentRendered, _currentSteer, _currentHeader);
         _currentSteer = replyText;
         RecordPick(replyText);
         UpdateBackUi();
@@ -396,9 +397,10 @@ public class SuggestionsController : MonoBehaviour
     private void HandleBack()
     {
         if (!_semiAutoOn) return;
-        if (!_rounds.TryPop(out SuggestionResult previous, out string previousSteer)) return;
+        if (!_rounds.TryPop(out SuggestionResult previous, out string previousSteer, out string previousHeader)) return;
         _requestSeq++;
         _currentSteer = previousSteer;
+        _currentHeader = previousHeader;
         _currentRendered = previous;
         if (_panel != null) _panel.Render(previous);
         UpdateBackUi();

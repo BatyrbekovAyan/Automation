@@ -14,28 +14,31 @@ public sealed class SuggestionRoundStack
     /// overflow drops the OLDEST round, so back still walks the recent path.</summary>
     public const int MaxDepth = 8;
 
-    private readonly List<(SuggestionResult result, string steer)> _rounds = new();
+    private readonly List<(SuggestionResult result, string steer, string header)> _rounds = new();
 
     public int Count => _rounds.Count;
     public bool CanGoBack => _rounds.Count > 0;
 
-    /// <summary>Record the round being left. A null <paramref name="result"/> is a no-op —
-    /// a pick that lands while nothing is rendered has no round to return to.</summary>
-    public void Push(SuggestionResult result, string steer)
+    /// <summary>Record the round being left: its cards, the steer that PRODUCED it, and the
+    /// display header it was shown under (null = the default «ПРЕДЛОЖЕНИЯ» overline). A null
+    /// <paramref name="result"/> is a no-op — a pick that lands while nothing is rendered
+    /// has no round to return to.</summary>
+    public void Push(SuggestionResult result, string steer, string header)
     {
         if (result == null) return;
         if (_rounds.Count == MaxDepth) _rounds.RemoveAt(0);
-        _rounds.Add((result, steer));
+        _rounds.Add((result, steer, header));
     }
 
-    /// <summary>LIFO restore of the most recent round and the steer that PRODUCED it
-    /// (null = it was a fresh set), so a subsequent refresh re-rolls the right direction.</summary>
-    public bool TryPop(out SuggestionResult result, out string steer)
+    /// <summary>LIFO restore of the most recent round, the steer that produced it (null =
+    /// fresh set — a refresh after back re-rolls the right direction) and its header.</summary>
+    public bool TryPop(out SuggestionResult result, out string steer, out string header)
     {
         result = null;
         steer = null;
+        header = null;
         if (_rounds.Count == 0) return false;
-        (result, steer) = _rounds[_rounds.Count - 1];
+        (result, steer, header) = _rounds[_rounds.Count - 1];
         _rounds.RemoveAt(_rounds.Count - 1);
         return true;
     }
