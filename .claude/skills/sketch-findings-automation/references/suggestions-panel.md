@@ -53,6 +53,22 @@ ONLY via the handle. Slot states: `panel` · `keyboard` · `expanded` · `collap
   standard (keyboard height) / expanded (chrome + full card content, capped so a strip of
   thread stays visible). The bottom fade hides in expanded (nothing is cut). Grabbing during
   an animation catches the panel where it currently is.
+- **The thread pull-down — ADDED 2026-08-19 (owner request), amends this model.** Dragging the
+  message thread downward past the COMPOSER'S TOP EDGE takes the slot with the finger (iOS
+  `keyboardDismissMode = .interactive`). The engage line is a POSITION test, which is what makes it
+  continuous: at the crossing instant the finger is that edge, so the slot starts at exactly the
+  height already on screen. Its ceiling is the height it engaged at — it may shrink the slot and put
+  it back, never grow it, so expanding stays the handle's. On release it uses the same detent snap
+  as the handle plus a velocity rule (a genuine flick beats the half-way rule; a travel minimum
+  stops an ordinary fast scroll that merely grazed the line from counting). **Over a LIVE keyboard
+  it is a ONE-SHOT dismissal** — Unity cannot drag the native keyboard — and it lands on
+  **collapsed**, NOT on the panel: this is the one place the «keyboard leaves ⇒ panel takes the
+  slot» rule is deliberately overridden (`SuggestionSlotInput.PullDownDismiss`). Works in «Авто»
+  too, where only the keyboard tenant exists.
+
+  Consequently the line above — «`collapsed` … is reachable ONLY via the handle» — now reads
+  «only via the handle or the thread pull-down». The velocity rule was added to the handle at the
+  same time so the two entries feel identical.
 - **The key** — ONE morphing key at the field END, destination-glyph grammar (WhatsApp
   emoji-key): while panel/expanded is up → ⌨ in neutral `InkTertiary`, no tint (tap =
   keyboard + focus); while collapsed or keyboard → ✦ in `PositiveInk` on a 13% tint circle
