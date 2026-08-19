@@ -15,7 +15,20 @@ public class SnappyFlickScrollRect : ScrollRect
 
     private float dragStartTime;
     private Vector2 dragStartPosition;
-    private float preDragVelocityY; 
+    private float preDragVelocityY;
+
+    /// <summary>
+    /// The thread's drag stream, re-broadcast for gesture layers that must see EVERY drag this
+    /// list receives — including the ones forwarded by a TYPED call rather than through
+    /// ExecuteEvents: SwipeToReply on every bubble (`_scroll.OnDrag(e)`), DragShield, and
+    /// SwipeToBack's left-band routing, which resolves to that same SwipeToReply. A component of
+    /// its own on this GameObject would see only the drags that start in the gaps BETWEEN bubbles
+    /// — dead over most of the thread. ScrollRect's own callbacks are the one point they converge.
+    /// This class stays a plain scroll and knows nothing about its listeners.
+    /// </summary>
+    public event System.Action<PointerEventData> DragBegan;
+    public event System.Action<PointerEventData> DragMoved;
+    public event System.Action<PointerEventData> DragEnded;
 
     // THE FIX: Intercept the touch BEFORE Unity zeros out the velocity!
     public override void OnInitializePotentialDrag(PointerEventData eventData)
@@ -29,9 +42,16 @@ public class SnappyFlickScrollRect : ScrollRect
     public override void OnBeginDrag(PointerEventData eventData)
     {
         base.OnBeginDrag(eventData);
-        
+
         dragStartTime = Time.unscaledTime;
-        dragStartPosition = content.anchoredPosition; 
+        dragStartPosition = content.anchoredPosition;
+        DragBegan?.Invoke(eventData);
+    }
+
+    public override void OnDrag(PointerEventData eventData)
+    {
+        base.OnDrag(eventData);
+        DragMoved?.Invoke(eventData);
     }
 
     public override void OnEndDrag(PointerEventData eventData)
@@ -59,5 +79,7 @@ public class SnappyFlickScrollRect : ScrollRect
 
             this.velocity = new Vector2(0f, finalVelocityY);
         }
+
+        DragEnded?.Invoke(eventData);
     }
 }
