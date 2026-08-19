@@ -32,6 +32,21 @@ public static class SuggestionSlotDetents
     public const float MinThreadVisibleCanvasPx = 360f;
 
     /// <summary>
+    /// Finger speed at which a release counts as a flick rather than a placement (canvas units per
+    /// second). A device-tuning knob — it lives here so both drag entries read the same number.
+    /// </summary>
+    public const float FlickVelocityCanvasPxPerSec = 2200f;
+
+    /// <summary>
+    /// How far the SLOT must actually have moved before a fast release is allowed to count as a
+    /// flick. Load-bearing, not a nicety: the pull-down's engage line is the composer's top edge —
+    /// roughly the lower 40% of the screen — so ordinary "scroll back through history" gestures
+    /// routinely cross it at speed. Without this minimum every one of them would read as a flick
+    /// and collapse the panel the owner was reading.
+    /// </summary>
+    public const float MinFlickTravelCanvasPx = 60f;
+
+    /// <summary>
     /// Height of the third detent: the panel's natural size (chrome = handle strip + header, plus
     /// the measured card stack), never shorter than standard and never so tall that less than
     /// MinThreadVisibleCanvasPx of thread survives. The cap itself never drops below standard —
@@ -93,6 +108,49 @@ public static class SuggestionSlotDetents
 
         return SlotDetent.Standard;
     }
+
+    /// <summary>
+    /// Where a released drag settles once speed is taken into account: a genuine flick wins over
+    /// the half-way rule, everything else falls through to <see cref="Snap"/> unchanged.
+    /// <para>
+    /// <paramref name="velocityCanvasPxPerSec"/> is on Unity's POSITIVE-IS-UP pointer axis, so a
+    /// flick DOWN is negative. <paramref name="travelCanvasPx"/> is how far the SLOT moved since
+    /// the grab (a distance — the sign is ignored), not how far the finger moved.
+    /// <paramref name="ceilingCanvasPx"/> is the GESTURE's own ceiling and is what makes the two
+    /// entries differ on a flick up: the handle's ceiling is the expanded detent, so it may expand;
+    /// the pull-down's ceiling is the height it engaged at, so it restores and stops there — that
+    /// gesture is a dismissal and must never grow a panel past where the owner found it.
+    /// </para>
+    /// </summary>
+    public static SlotDetent SnapWithFlick(
+        float draggedCanvasPx, float standardCanvasPx, float expandedCanvasPx,
+        float velocityCanvasPxPerSec, float travelCanvasPx, float ceilingCanvasPx)
+    {
+        if (!IsFlick(velocityCanvasPxPerSec, travelCanvasPx))
+            return Snap(draggedCanvasPx, standardCanvasPx, expandedCanvasPx);
+
+        return velocityCanvasPxPerSec < 0f
+            ? SlotDetent.Collapsed
+            : TallestUnderCeiling(standardCanvasPx, expandedCanvasPx, ceilingCanvasPx);
+    }
+
+    /// <summary>Both gates must pass. A non-finite reading of either is a broken frame and is never
+    /// a flick — the position rule is always the safe fallback.</summary>
+    private static bool IsFlick(float velocityCanvasPxPerSec, float travelCanvasPx)
+        => float.IsFinite(velocityCanvasPxPerSec) && float.IsFinite(travelCanvasPx)
+           && Mathf.Abs(velocityCanvasPxPerSec) >= FlickVelocityCanvasPxPerSec
+           && Mathf.Abs(travelCanvasPx) >= MinFlickTravelCanvasPx;
+
+    /// <summary>The tallest detent a gesture with this ceiling is allowed to land on. The 1u slack
+    /// matches <see cref="HasExpandedDetent"/>'s epsilon, so a ceiling that IS the expanded detent
+    /// still qualifies after float arithmetic.</summary>
+    private static SlotDetent TallestUnderCeiling(
+        float standardCanvasPx, float expandedCanvasPx, float ceilingCanvasPx)
+        => HasExpandedDetent(standardCanvasPx, expandedCanvasPx)
+           && float.IsFinite(ceilingCanvasPx)
+           && expandedCanvasPx <= ceilingCanvasPx + 1f
+            ? SlotDetent.Expanded
+            : SlotDetent.Standard;
 
     /// <summary>The slot height a detent means; asking for Expanded where no third detent exists yields standard, and an unknown detent never silently collapses.</summary>
     public static float HeightFor(SlotDetent detent, float standardCanvasPx, float expandedCanvasPx)

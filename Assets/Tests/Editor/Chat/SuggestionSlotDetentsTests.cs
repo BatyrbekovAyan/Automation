@@ -214,4 +214,104 @@ public class SuggestionSlotDetentsTests
     public void ExpandedHeight_NegativeStandard_ClampsToZero()
         // A caller bug either way, but the answer is never a negative slot height.
         => Assert.AreEqual(0f, SuggestionSlotDetents.ExpandedHeight(Chrome, 900f, -50f, ThreadRest));
+
+    // --- SnapWithFlick: velocity beats position, but only for a real flick ---
+    // The travel minimum is the load-bearing half. The pull-down's engage line sits at the
+    // composer's top edge — roughly the lower 40% of the screen — so ordinary "scroll back through
+    // history" gestures routinely graze it at speed. Without the minimum, every one of them would
+    // report a flick and kill the panel.
+
+    private const float FastDown = -SuggestionSlotDetents.FlickVelocityCanvasPxPerSec - 1f;
+    private const float FastUp = SuggestionSlotDetents.FlickVelocityCanvasPxPerSec + 1f;
+    private const float BigTravel = SuggestionSlotDetents.MinFlickTravelCanvasPx + 1f;
+    private const float TinyTravel = SuggestionSlotDetents.MinFlickTravelCanvasPx - 1f;
+
+    [Test]
+    public void SnapWithFlick_FastDown_CollapsesEvenAboveHalf()
+        => Assert.AreEqual(SlotDetent.Collapsed, SuggestionSlotDetents.SnapWithFlick(
+            Standard - 1f, Standard, Expanded, FastDown, BigTravel, Expanded));
+
+    [Test]
+    public void SnapWithFlick_FastDown_BelowTravelMinimum_FallsBackToSnap()
+        => Assert.AreEqual(
+            SuggestionSlotDetents.Snap(Standard - 1f, Standard, Expanded),
+            SuggestionSlotDetents.SnapWithFlick(
+                Standard - 1f, Standard, Expanded, FastDown, TinyTravel, Expanded));
+
+    [Test]
+    public void SnapWithFlick_SlowDown_FallsBackToSnap()
+        => Assert.AreEqual(
+            SuggestionSlotDetents.Snap(Standard - 1f, Standard, Expanded),
+            SuggestionSlotDetents.SnapWithFlick(
+                Standard - 1f, Standard, Expanded, -10f, BigTravel, Expanded));
+
+    // The handle's ceiling IS the expanded detent, so a flick up there may expand.
+    [Test]
+    public void SnapWithFlick_FastUp_HandleCeiling_Expands()
+        => Assert.AreEqual(SlotDetent.Expanded, SuggestionSlotDetents.SnapWithFlick(
+            10f, Standard, Expanded, FastUp, BigTravel, Expanded));
+
+    // The pull-down's ceiling is the height it engaged at, so a flick up there RESTORES and stops.
+    // This is what keeps "pull down a little, change your mind" from expanding a panel the owner
+    // never dragged above standard.
+    [Test]
+    public void SnapWithFlick_FastUp_PullDownCeiling_StopsAtStandard()
+        => Assert.AreEqual(SlotDetent.Standard, SuggestionSlotDetents.SnapWithFlick(
+            10f, Standard, Expanded, FastUp, BigTravel, Standard));
+
+    [Test]
+    public void SnapWithFlick_FastUp_NoThirdDetent_StopsAtStandard()
+        => Assert.AreEqual(SlotDetent.Standard, SuggestionSlotDetents.SnapWithFlick(
+            10f, Standard, WithinEpsilon, FastUp, BigTravel, WithinEpsilon));
+
+    [Test]
+    public void SnapWithFlick_ExactlyAtVelocityThreshold_CountsAsFlick()
+        => Assert.AreEqual(SlotDetent.Collapsed, SuggestionSlotDetents.SnapWithFlick(
+            Standard, Standard, Expanded,
+            -SuggestionSlotDetents.FlickVelocityCanvasPxPerSec,
+            SuggestionSlotDetents.MinFlickTravelCanvasPx, Expanded));
+
+    [Test]
+    public void SnapWithFlick_ZeroVelocity_IsNeverAFlick()
+        => Assert.AreEqual(
+            SuggestionSlotDetents.Snap(Standard, Standard, Expanded),
+            SuggestionSlotDetents.SnapWithFlick(Standard, Standard, Expanded, 0f, BigTravel, Expanded));
+
+    // Travel is a DISTANCE: a gesture that grew the slot by a lot and flicked down still collapses.
+    [Test]
+    public void SnapWithFlick_NegativeTravel_IsMeasuredAsDistance()
+        => Assert.AreEqual(SlotDetent.Collapsed, SuggestionSlotDetents.SnapWithFlick(
+            Standard, Standard, Expanded, FastDown, -BigTravel, Expanded));
+
+    [Test]
+    public void SnapWithFlick_NonFiniteVelocity_FallsBackToSnap()
+        => Assert.AreEqual(
+            SuggestionSlotDetents.Snap(Standard, Standard, Expanded),
+            SuggestionSlotDetents.SnapWithFlick(
+                Standard, Standard, Expanded, float.NaN, BigTravel, Expanded));
+
+    [Test]
+    public void SnapWithFlick_NonFiniteTravel_FallsBackToSnap()
+        => Assert.AreEqual(
+            SuggestionSlotDetents.Snap(Standard, Standard, Expanded),
+            SuggestionSlotDetents.SnapWithFlick(
+                Standard, Standard, Expanded, FastDown, float.NaN, Expanded));
+
+    // A ceiling read that came back broken must never be treated as "tall enough to expand".
+    [Test]
+    public void SnapWithFlick_FastUp_NonFiniteCeiling_StopsAtStandard()
+        => Assert.AreEqual(SlotDetent.Standard, SuggestionSlotDetents.SnapWithFlick(
+            10f, Standard, Expanded, FastUp, BigTravel, float.NaN));
+
+    // With no flick the seam must be byte-identical to the rule the handle shipped with, across
+    // the whole range — otherwise this task silently re-tunes the existing gesture.
+    [Test]
+    public void SnapWithFlick_WithoutAFlick_MatchesSnapEverywhere()
+    {
+        for (float h = 0f; h <= Expanded + 200f; h += 25f)
+            Assert.AreEqual(
+                SuggestionSlotDetents.Snap(h, Standard, Expanded),
+                SuggestionSlotDetents.SnapWithFlick(h, Standard, Expanded, 0f, BigTravel, Expanded),
+                $"drift at height {h}");
+    }
 }
