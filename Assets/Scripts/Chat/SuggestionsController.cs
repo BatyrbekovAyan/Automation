@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -615,7 +616,25 @@ public class SuggestionsController : MonoBehaviour
         }
     }
 
-    /// <summary>Pure fold of ONE live batch over the pending burst (BATCH-03), in arrival order.
+    /// <summary>Pure fold of ONE live batch over the pending burst (BATCH-03), in CONVERSATION
+    /// order — the batch is sorted here, it is NOT assumed to arrive sorted.
+    ///
+    /// <para>That sort is the fix for a real defect, not defensive noise. ChatManager builds the
+    /// live batch in raw Wappi response order, which is NEWEST-FIRST (ChatManager.cs:836 copies
+    /// the brand-new rows unsorted; <see cref="MessageOrder.ResponseTimes"/> documents the
+    /// direction), and hands that list to every subscriber. MessageListView sorts its own copy
+    /// ascending before using it (MessageListView.cs:481) — this fold did not, and it is
+    /// last-wins, so the direction decides the outcome. A batch of [newer incoming, older
+    /// outgoing] — the owner answered from the phone's WhatsApp app and the client then wrote
+    /// again, all of it landing at once when the chat is opened — folded to Cancel + SawOutgoing:
+    /// the in-flight chat-open request was superseded, _answeredIdle latched, the slot collapsed
+    /// on AnsweredRun, and nothing re-armed, so the panel offered nothing at all. Chronological
+    /// order yields the opposite and correct answer, Arm. The mirror case armed for a run the
+    /// owner had already answered, and multi-fragment bursts reached lastIncomingText backwards.</para>
+    ///
+    /// <para>The sort is STABLE (LINQ OrderBy) and runs on a copy: a batch whose elements share
+    /// order keys — every message in the EditMode fixtures does — keeps its given order, so the
+    /// rules below are still expressed exactly as the tests state them.</para>
     ///
     /// Incoming fragments accumulate (see <see cref="AppendBurst"/>). An OUTGOING echo — the owner or
     /// the bot replied — is the run BOUNDARY: it drops the pending burst and disarms, because
@@ -629,11 +648,16 @@ public class SuggestionsController : MonoBehaviour
     public static LiveBatchFold FoldLiveBatch(string pending, IReadOnlyList<MessageViewModel> batch)
     {
         if (batch == null) return new LiveBatchFold(pending, false, false, false);
+        // Conversation order, on a copy — see the ordering note above. Stable, so equal-key
+        // fixtures fold exactly as written. Not a hot path: once per live batch, not per frame.
+        // Nulls are dropped BEFORE the sort, not skipped inside it: MessageOrder.Compare
+        // dereferences both arguments, so a null element would throw in the comparer.
+        var ordered = batch.Where(m => m != null).OrderBy(m => m, MessageOrder.AscendingComparer).ToList();
         bool arm = false;
         bool sawOutgoing = false;
-        for (int i = 0; i < batch.Count; i++)
+        for (int i = 0; i < ordered.Count; i++)
         {
-            var m = batch[i];
+            var m = ordered[i];
             if (m == null) continue;
             if (m.isIncoming)
             {
@@ -815,23 +839,53 @@ public class SuggestionsController : MonoBehaviour
     /// tap anywhere brings the panel back — which is exactly why every caller that used to mean
     /// "the panel is gone" now records Collapsed rather than a bare hidden flag.
     /// </summary>
-    private void HidePanel()
+    private void HidePanel(float durationSeconds = SlotSettleMotion.DefaultSeconds,
+                          Ease ease = Ease.InCubic, bool carryMomentum = false)
     {
         _slotState = SuggestionSlotState.Collapsed;
         _pendingShow = false;
         ApplyKeyStyle();
         if (_yieldingToKeyboard) return;   // the keyboard is mid-takeover — the yield watcher finishes the handoff
-        _insetTween?.Kill();
         if (_keyboardMover != null && _keyboardMover.VirtualBottomInset > 0.5f)
         {
-            _insetTween = DOTween.To(
-                    () => _keyboardMover.VirtualBottomInset,
-                    v => _keyboardMover.VirtualBottomInset = v,
-                    0f, 0.20f)
-                .SetEase(Ease.InCubic)
-                .OnComplete(() => { if (_panel != null) _panel.Deactivate(); });
+            TweenInsetTo(0f, durationSeconds, ease, carryMomentum,
+                () => { if (_panel != null) _panel.Deactivate(); });
         }
-        else if (_panel != null) _panel.Deactivate();
+        else
+        {
+            _insetTween?.Kill();
+            if (_panel != null) _panel.Deactivate();
+        }
+    }
+
+    /// <summary>
+    /// The one place an inset animation is started, so the two rules that make a release feel
+    /// continuous cannot be applied to one path and forgotten on another.
+    /// <para>
+    /// <paramref name="carryMomentum"/> keeps <c>TrackInsetImmediately</c> HELD for the length of the
+    /// tween. Without it the tween is not what the owner sees: KeyboardAwarePanel resumes SmoothDamp
+    /// the moment the flag drops, so the tween's output is smoothed AGAIN, and — because the flag
+    /// pins the smoothing velocity at zero while it is set — that second filter restarts from a dead
+    /// stop. Two curves in series, the second beginning at zero speed, is what read as the panel
+    /// pausing mid-descent to decide whether to keep going. The flag is released on OnKill rather
+    /// than OnComplete so an interrupted tween (a new gesture, the «+» sheet) cannot strand it, and
+    /// by then the inset is already at the target, so the resuming SmoothDamp has nothing to catch.
+    /// </para>
+    /// </summary>
+    private void TweenInsetTo(float target, float durationSeconds, Ease ease, bool carryMomentum,
+                              TweenCallback onComplete)
+    {
+        if (_keyboardMover == null) return;
+        _insetTween?.Kill();
+        if (carryMomentum) _keyboardMover.TrackInsetImmediately = true;
+
+        _insetTween = DOTween.To(
+                () => _keyboardMover.VirtualBottomInset,
+                v => _keyboardMover.VirtualBottomInset = v,
+                target, durationSeconds)
+            .SetEase(ease)
+            .OnKill(() => { if (_keyboardMover != null) _keyboardMover.TrackInsetImmediately = false; });
+        if (onComplete != null) _insetTween.OnComplete(onComplete);
     }
 
     // --- Detents (model E rule 6) -------------------------------------------
@@ -997,7 +1051,18 @@ public class SuggestionsController : MonoBehaviour
         _slotState = SuggestionSlotStateMachine.AfterDrag(snapped);
         ApplyKeyStyle();
 
-        if (snapped == SlotDetent.Collapsed) { HidePanel(); return; }
+        // Carry the finger's speed into the settle. `from` is where the panel VISUALLY is (the
+        // applied rise), not the proposed height, so the distance is the one actually left to cover.
+        float from = _keyboardMover != null ? _keyboardMover.AppliedBottomInset : finalCanvasPx;
+        float releaseSpeed = Mathf.Abs(velocityCanvasPxPerSec);
+
+        if (snapped == SlotDetent.Collapsed)
+        {
+            // Ease.OutCubic, not the InCubic a self-initiated hide uses: this motion is already
+            // moving and must keep going, not start over.
+            HidePanel(SlotSettleMotion.Duration(from, releaseSpeed), Ease.OutCubic, carryMomentum: true);
+            return;
+        }
 
         float target = SuggestionSlotDetents.HeightFor(snapped, standard, expanded);
         _slotCanvasPx = target;
@@ -1007,13 +1072,8 @@ public class SuggestionsController : MonoBehaviour
             _panel.SetSlotMetrics(target, _keyboardMover != null ? _keyboardMover.SafeBottomCanvasPx : 0f);
             _panel.SetFadeSuppressed(snapped == SlotDetent.Expanded);
         }
-        if (_keyboardMover == null) return;
-        _insetTween?.Kill();
-        _insetTween = DOTween.To(
-                () => _keyboardMover.VirtualBottomInset,
-                v => _keyboardMover.VirtualBottomInset = v,
-                target, 0.18f)
-            .SetEase(Ease.OutCubic);
+        TweenInsetTo(target, SlotSettleMotion.Duration(Mathf.Abs(target - from), releaseSpeed),
+            Ease.OutCubic, carryMomentum: true, onComplete: null);
     }
 
     // --- Composer activation veto (model E rule 4) --------------------------
