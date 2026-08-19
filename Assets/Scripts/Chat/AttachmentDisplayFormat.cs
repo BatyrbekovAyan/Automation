@@ -8,10 +8,12 @@ public static class AttachmentDisplayFormat
 
     public static string HumanReadableBytes(long bytes)
     {
-        if (bytes < KB) return "<1 KB";
-        if (bytes < MB) return $"{bytes / KB} KB";
-        if (bytes < GB) return string.Format(CultureInfo.InvariantCulture, "{0:0.0} MB", (double)bytes / MB);
-        return string.Format(CultureInfo.InvariantCulture, "{0:0.0} GB", (double)bytes / GB);
+        // RU units — the app ships Russian-only. InvariantCulture stays on the
+        // NUMBER so the decimal separator can never follow the device locale.
+        if (bytes < KB) return "<1 КБ";
+        if (bytes < MB) return $"{bytes / KB} КБ";
+        if (bytes < GB) return string.Format(CultureInfo.InvariantCulture, "{0:0.0} МБ", (double)bytes / MB);
+        return string.Format(CultureInfo.InvariantCulture, "{0:0.0} ГБ", (double)bytes / GB);
     }
 
     public static string ShortMime(string mime)

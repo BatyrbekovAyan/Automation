@@ -24,11 +24,11 @@ public class WhatsAppSyncGateTests
 
     [Test] public void FormatCountdown_Buckets()
     {
-        Assert.AreEqual("Finishing up…",          WhatsAppSyncGate.FormatCountdown(0L));
-        Assert.AreEqual("Less than a minute left", WhatsAppSyncGate.FormatCountdown(30_000L));
-        Assert.AreEqual("Less than a minute left", WhatsAppSyncGate.FormatCountdown(60_000L));
-        Assert.AreEqual("About 2 min left",        WhatsAppSyncGate.FormatCountdown(90_000L));
-        Assert.AreEqual("About 5 min left",        WhatsAppSyncGate.FormatCountdown(300_000L));
+        Assert.AreEqual("Завершаем…",             WhatsAppSyncGate.FormatCountdown(0L));
+        Assert.AreEqual("Осталось меньше минуты", WhatsAppSyncGate.FormatCountdown(30_000L));
+        Assert.AreEqual("Осталось меньше минуты", WhatsAppSyncGate.FormatCountdown(60_000L));
+        Assert.AreEqual("Осталось около 2 мин",   WhatsAppSyncGate.FormatCountdown(90_000L));
+        Assert.AreEqual("Осталось около 5 мин",   WhatsAppSyncGate.FormatCountdown(300_000L));
     }
 }
 

@@ -26,10 +26,10 @@ public static class WhatsAppSyncGate
     /// <summary>Human-friendly countdown label for the syncing screen.</summary>
     public static string FormatCountdown(long remainingMs)
     {
-        if (remainingMs <= 0L) return "Finishing up…";
+        if (remainingMs <= 0L) return "Завершаем…";
         int totalSeconds = (int)((remainingMs + 999L) / 1000L); // round up to whole seconds
-        if (totalSeconds <= 60) return "Less than a minute left";
+        if (totalSeconds <= 60) return "Осталось меньше минуты";
         int minutes = (totalSeconds + 59) / 60;                 // round up to whole minutes
-        return $"About {minutes} min left";
+        return $"Осталось около {minutes} мин";
     }
 }

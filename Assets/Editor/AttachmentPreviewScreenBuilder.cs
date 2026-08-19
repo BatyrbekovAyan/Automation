@@ -173,7 +173,7 @@ public static class AttachmentPreviewScreenBuilder
         var titleRt = (RectTransform)titleGo.transform;
         Stretch(titleRt);
         var titleTmp = titleGo.GetComponent<TextMeshProUGUI>();
-        titleTmp.text          = "Preview";
+        titleTmp.text          = "Просмотр";
         titleTmp.fontSize      = TitleFontSize;
         titleTmp.color         = White;
         titleTmp.alignment     = TextAlignmentOptions.Center;
@@ -604,7 +604,7 @@ public static class AttachmentPreviewScreenBuilder
         docNameRt.anchoredPosition = new Vector2(
             0f, stackTop - PageHeight - DocNameGap - DocNameHeight * 0.5f);
         var docName = docNameGo.GetComponent<TextMeshProUGUI>();
-        docName.text               = "filename.pdf";
+        docName.text               = "файл.pdf";
         docName.fontSize           = DocNameFontSize;
         docName.fontStyle          = FontStyles.Bold;
         docName.color              = White;
@@ -623,7 +623,7 @@ public static class AttachmentPreviewScreenBuilder
         docMetaRt.anchoredPosition = new Vector2(
             0f, stackTop - PageHeight - DocNameGap - DocNameHeight - DocMetaGap - DocMetaHeight * 0.5f);
         var docMeta = docMetaGo.GetComponent<TextMeshProUGUI>();
-        docMeta.text          = "PDF · 0 KB";
+        docMeta.text          = "PDF · 0 КБ";
         docMeta.fontSize      = DocSizeFontSize;
         docMeta.color         = SubtleText;
         docMeta.alignment     = TextAlignmentOptions.Center;

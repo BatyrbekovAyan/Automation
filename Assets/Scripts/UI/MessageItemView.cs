@@ -289,7 +289,7 @@ public class MessageItemView : MonoBehaviour
         // text — it isn't blanked, so it never lands here.)
         bool quoteUnavailable = string.IsNullOrEmpty(vm.quotedText);
 
-        bool quotedIsOwn = vm.quotedSenderName == "You";
+        bool quotedIsOwn = ReplyParser.IsOwnSenderLabel(vm.quotedSenderName);
         Color accent = quotedIsOwn ? new Color32(0x1F, 0xA8, 0x55, 0xFF) : GetSenderColor(vm.quotedSenderName);
         if (quotedAccentBar != null) quotedAccentBar.color = accent;
 
@@ -1833,13 +1833,13 @@ if (vm.type == MessageType.Image || vm.type == MessageType.Video)
 
         string typeText = type switch
         {
-            MessageType.Image => "Image",
-            MessageType.Video => "Video",
-            MessageType.Sticker => "Sticker",
-            MessageType.Audio => "Audio",
-            MessageType.Voice => "Voice Note",
-            MessageType.Document => "Document", 
-            _ => "Media"
+            MessageType.Image => "Фото",
+            MessageType.Video => "Видео",
+            MessageType.Sticker => "Стикер",
+            MessageType.Audio => "Аудио",
+            MessageType.Voice => "Голосовое",
+            MessageType.Document => "Документ", 
+            _ => "Медиа"
         };
 
         downloadButtonText.text = typeText;
@@ -2833,7 +2833,7 @@ IEnumerator SmartMediaRoutine(MessageViewModel vm, float bubbleRatio, bool isMan
                 originalBtnColor = btnImg.color;
                 btnImg.color = Color.clear;
             }
-            if (downloadButtonText) downloadButtonText.text = "Downloading...";
+            if (downloadButtonText) downloadButtonText.text = "Загрузка…";
 
             using (UnityWebRequest www = new UnityWebRequest(vm.mediaUrl, UnityWebRequest.kHttpVerbGET))
             {
@@ -4352,14 +4352,15 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
         if (documentNameText) documentNameText.text = UnicodeEmojiConverter.ConvertRealEmojisToSprites(decodedName, MissingEmojiMode.Hide);
         
         string ext = System.IO.Path.GetExtension(decodedName).Replace(".", "").ToUpper();
-        if (string.IsNullOrEmpty(ext)) ext = "FILE";
+        if (string.IsNullOrEmpty(ext)) ext = "ФАЙЛ";
         
         string infoStr = ext;
         
         if (vm.fileSize > 0)
         {
             if (vm.pageCount > 0)
-                infoStr = $"{vm.pageCount} pages • {FormatBytes(vm.fileSize)} • {ext}";
+                infoStr = $"{vm.pageCount} {RuPlural.Pick(vm.pageCount, "страница", "страницы", "страниц")}"
+                        + $" • {FormatBytes(vm.fileSize)} • {ext}";
             else
                 infoStr = $"{FormatBytes(vm.fileSize)} • {ext}";
         }
@@ -4398,7 +4399,7 @@ private string SplitLongWord(string text, TextMeshProUGUI textComp, float maxWid
 
     private string FormatBytes(long bytes)
     {
-        string[] sizes = { "B", "KB", "MB", "GB" };
+        string[] sizes = { "Б", "КБ", "МБ", "ГБ" };
         double len = bytes;
         int order = 0;
 

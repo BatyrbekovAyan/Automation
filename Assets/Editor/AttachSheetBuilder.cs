@@ -180,9 +180,9 @@ public static class AttachSheetBuilder
         hl.childForceExpandHeight = true;
         hl.spacing                = 0;
 
-        var cameraTile   = BuildTile(row.transform, "CameraOpt",   "Camera",   CameraTint,   cameraSprite);
-        var galleryTile  = BuildTile(row.transform, "GalleryOpt",  "Gallery",  GalleryTint,  gallerySprite);
-        var documentTile = BuildTile(row.transform, "DocumentOpt", "Document", DocumentTint, documentSprite);
+        var cameraTile   = BuildTile(row.transform, "CameraOpt",   "Камера",   CameraTint,   cameraSprite);
+        var galleryTile  = BuildTile(row.transform, "GalleryOpt",  "Галерея",  GalleryTint,  gallerySprite);
+        var documentTile = BuildTile(row.transform, "DocumentOpt", "Документ", DocumentTint, documentSprite);
 
         // ── Wire AttachSheet ──────────────────────────────────────
         var attachSheet = sheetGo.GetComponent<AttachSheet>();

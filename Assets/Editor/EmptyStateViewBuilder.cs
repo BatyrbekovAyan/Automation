@@ -98,9 +98,9 @@ public static class EmptyStateViewBuilder
         iconImage.preserveAspect = true;
 
         // Title (H1) + Body.
-        var titleText = CreateText(hero.transform, "Title", "Create your first bot", 52f, FontStyles.Bold, TitleColor, 820f, 70f);
+        var titleText = CreateText(hero.transform, "Title", "Создайте первого бота", 52f, FontStyles.Bold, TitleColor, 820f, 70f);
         var bodyText = CreateText(hero.transform, "Body",
-            "An AI assistant that answers your customers on WhatsApp, day and night.",
+            "ИИ-ассистент, который отвечает вашим клиентам в WhatsApp круглосуточно.",
             40f, FontStyles.Normal, BodyColor, 820f, 150f);
         bodyText.enableWordWrapping = true;
 
@@ -116,7 +116,7 @@ public static class EmptyStateViewBuilder
         btn.GetComponent<Image>().color = Brand;
         AddRoundedCorners(btn, 66f);                   // half of 132 -> pill
 
-        var btnLabel = CreateText(btn.transform, "Label", "Create a bot", 42f, FontStyles.Bold, Color.white);
+        var btnLabel = CreateText(btn.transform, "Label", "Создать бота", 42f, FontStyles.Bold, Color.white);
         StretchFull(btnLabel.rectTransform);
 
         // EmptyStateView + serialized wiring.

@@ -2215,7 +2215,7 @@ public partial class Manager : MonoBehaviour
         WhatsappQRCodeImage.texture = null;
 
         WhatsappQRStatusText.SetActive(false);
-        WhatsappQRStatusText.GetComponent<TextMeshProUGUI>().text = "Server Unavailable.\nTry Again Later";
+        WhatsappQRStatusText.GetComponent<TextMeshProUGUI>().text = "Сервер недоступен.\nПопробуйте позже";
     }
 
     public void OpenWhatsappCodePanel()
@@ -2600,7 +2600,7 @@ public partial class Manager : MonoBehaviour
         TelegramQRCodeImage.texture = null;
 
         TelegramQRStatusText.SetActive(false);
-        TelegramQRStatusText.GetComponent<TextMeshProUGUI>().text = "Server Unavailable.\nTry Again Later";
+        TelegramQRStatusText.GetComponent<TextMeshProUGUI>().text = "Сервер недоступен.\nПопробуйте позже";
     }
 
     // The auth/qr response was detail:"2fa" (a cloud password is set), so the QR path

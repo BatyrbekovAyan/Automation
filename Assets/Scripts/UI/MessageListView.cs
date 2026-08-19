@@ -691,21 +691,22 @@ IEnumerator SlideUpRevealRoutine(float startNorm)
 
         if (difference.Days == 0) 
         {
-            return "Today";
+            return "Сегодня";
         }
         else if (difference.Days == 1) 
         {
-            return "Yesterday";
+            return "Вчера";
         }
         else if (difference.Days >= 2 && difference.Days < 7) 
         {
-            // "dddd" returns the full localized name of the day (e.g., "Monday", "Tuesday")
-            return messageDate.ToString("dddd"); 
+            // Spelled out in RuDateFormat, not ToString("dddd") — that follows the
+            // DEVICE locale and would print English days inside the Russian UI.
+            return RuDateFormat.Weekday(messageDate.DayOfWeek);
         }
         else 
         {
             // Older than a week
-            return messageDate.ToString("dd MMM yyyy"); // e.g., "24 Feb 2026"
+            return RuDateFormat.DayMonthYear(messageDate); // e.g. "24 фев 2026"
         }
     }
 

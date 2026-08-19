@@ -184,8 +184,9 @@ public class ChatViewModel
         TimeSpan diff = now - dt.Date;
 
         if (diff.Days == 0) return dt.ToString("HH:mm");
-        if (diff.Days == 1) return "Yesterday";
-        if (diff.Days < 7) return dt.ToString("dddd");
+        if (diff.Days == 1) return "Вчера";
+        // RuDateFormat, not ToString("dddd"): that reads the DEVICE locale.
+        if (diff.Days < 7) return RuDateFormat.Weekday(dt.DayOfWeek);
         return dt.ToString("dd.MM.yy");
     }
 

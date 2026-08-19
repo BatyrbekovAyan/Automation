@@ -241,7 +241,7 @@ public class AttachmentPreviewScreen : MonoBehaviour
         string label = string.IsNullOrEmpty(ext)
             ? AttachmentDisplayFormat.ShortMime(pick.MimeType)
             : ext.TrimStart('.').ToUpperInvariant();
-        return string.IsNullOrEmpty(label) || label.Length > MaxChipLabelLength ? "FILE" : label;
+        return string.IsNullOrEmpty(label) || label.Length > MaxChipLabelLength ? "ФАЙЛ" : label;
     }
 
     private static Color ChipColorFor(string typeLabel)
@@ -328,7 +328,7 @@ public class AttachmentPreviewScreen : MonoBehaviour
         if (_currentPick.Kind == AttachmentKind.GalleryVideo &&
             _currentPick.FileSizeBytes > MaxVideoPickBytes)
         {
-            ShowSizeError("This video is too large to process.");
+            ShowSizeError("Это видео слишком большое для отправки.");
             if (sendButton != null) sendButton.interactable = true;   // let the user go Back and re-pick
             return;                                                   // do NOT stage, do NOT close
         }

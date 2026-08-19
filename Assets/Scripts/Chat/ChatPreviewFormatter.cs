@@ -45,7 +45,7 @@ public static class ChatPreviewFormatter
 
         // When Wappi sends the body as the bare type keyword (e.g. "image" for
         // an image with no caption) or leaves it empty, substitute the
-        // WhatsApp-style English label so the row reads "📷 Photo" rather
+        // Russian label so the row reads "📷 Фото" rather
         // than "📷 image". Real captions and chat text are preserved as-is.
         //
         // UnicodeEmojiConverter prepends a zero-width space (U+200B) to its
@@ -64,13 +64,13 @@ public static class ChatPreviewFormatter
         }
 
         // In group rows, prefix the sender ("You" for own, else the pushname) so the row
-        // reads "Aliya: 📷 Photo" / "✓✓ You: Hello". 1:1 rows get no prefix. Skip the prefix
+        // reads "Aliya: 📷 Фото" / "✓✓ Вы: Привет". 1:1 rows get no prefix. Skip the prefix
         // when there's nothing to show (empty body, no media, no tick) so we never emit a
         // dangling "Name: " — that case returns "" exactly like the 1:1 path.
         string senderPrefix = null;
         if (isGroup && !(tick == null && emoji == null && string.IsNullOrEmpty(text)))
         {
-            string who = isMine ? "You" : senderName;
+            string who = isMine ? "Вы" : senderName;
             if (!string.IsNullOrEmpty(who)) senderPrefix = who + ": ";
         }
 
@@ -88,7 +88,7 @@ public static class ChatPreviewFormatter
     private const int ReactionSnippetMax = 24;
 
     /// <summary>
-    /// WhatsApp-style reaction preview: "You reacted ❤️ to “msg”" / "Reacted ❤️".
+    /// WhatsApp-style reaction preview: «Вы отреагировали ❤️ на «msg»» / «Отреагировал(-а) ❤️».
     /// The emoji arrives already (possibly) sprite-converted with a leading U+200B;
     /// an empty/whitespace emoji means the reaction was removed.
     /// </summary>
@@ -99,13 +99,13 @@ public static class ChatPreviewFormatter
         string emoji = (emojiRaw ?? string.Empty).Trim('​', ' ', '\t', '\n', '\r');
         // Wappi reports a removed reaction as type "reaction_remove" with the literal
         // "reaction_remove" as the body; treat that (and an empty emoji) as removed.
-        if (isRemoval || emoji.Length == 0) return "Reaction removed";
+        if (isRemoval || emoji.Length == 0) return "Реакция убрана";
 
         var sb = new System.Text.StringBuilder(64);
-        // In groups, attribute the reactor by name ("Aliya reacted ❤️"); 1:1 stays "Reacted".
-        if (isMine) sb.Append("You reacted ");
-        else if (isGroup && !string.IsNullOrEmpty(senderName)) { sb.Append(senderName); sb.Append(" reacted "); }
-        else sb.Append("Reacted ");
+        // In groups, attribute the reactor by name ("Aliya отреагировал(-а) ❤️"); 1:1 stays "Отреагировал(-а)".
+        if (isMine) sb.Append("Вы отреагировали ");
+        else if (isGroup && !string.IsNullOrEmpty(senderName)) { sb.Append(senderName); sb.Append(" отреагировал(-а) "); }
+        else sb.Append("Отреагировал(-а) ");
         sb.Append(emoji);
 
         string clause = ReactionTargetClause(targetText, targetType);
@@ -113,17 +113,17 @@ public static class ChatPreviewFormatter
         return sb.ToString();
     }
 
-    // " to 📷 Photo" for a media target (unquoted label), " to “snippet”" for text,
+    // " на 📷 Фото" for a media target (unquoted label), " на «snippet»" for text,
     // or null when the target is unknown (Phase 1 bulk-fetched reactions).
     private static string ReactionTargetClause(string targetText, string targetType)
     {
         var (emoji, label) = GetMediaInfo(targetType);
         if (label != null)
-            return emoji != null ? $" to {emoji} {label}" : $" to {label}";
+            return emoji != null ? $" на {emoji} {label}" : $" на {label}";
 
         string snippet = Snippet(targetText);
         if (string.IsNullOrEmpty(snippet)) return null;
-        return $" to “{snippet}”"; // “ ”
+        return $" на «{snippet}»";
     }
 
     private static string Snippet(string text)
@@ -191,16 +191,16 @@ public static class ChatPreviewFormatter
             case "chat":
             case "text":     return (null, null);
             case "image":
-            case "photo":    return ("📷", "Photo");
-            case "video":    return ("📹", "Video");
+            case "photo":    return ("📷", "Фото");
+            case "video":    return ("📹", "Видео");
             case "voice":
-            case "ptt":      return ("🎤", "Voice");
-            case "audio":    return ("🎵", "Audio");
-            case "document": return ("📄", "Document");
-            case "location": return ("📍", "Location");
-            case "sticker":  return (null, "Sticker"); // EmojiOne lacks a clean sticker glyph.
+            case "ptt":      return ("🎤", "Голосовое");
+            case "audio":    return ("🎵", "Аудио");
+            case "document": return ("📄", "Документ");
+            case "location": return ("📍", "Геолокация");
+            case "sticker":  return (null, "Стикер"); // EmojiOne lacks a clean sticker glyph.
             case "vcard":
-            case "contact":  return ("👤", "Contact");
+            case "contact":  return ("👤", "Контакт");
             case "reaction": return (null, null); // Wappi pre-formats the full sentence.
             default:
                 if (LoggedUnknownTypes.Add(type))

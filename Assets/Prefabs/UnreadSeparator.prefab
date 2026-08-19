@@ -320,7 +320,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 0 unread messages
+  m_text: "0 \u041d\u0415\u041f\u0420\u041e\u0427\u0418\u0422\u0410\u041d\u041d\u042b\u0425 \u0421\u041e\u041e\u0411\u0429\u0415\u041d\u0418\u0419"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: a2b0b38b6764047da9250bcff1b0f432, type: 2}
   m_sharedMaterial: {fileID: 8843604280675880768, guid: a2b0b38b6764047da9250bcff1b0f432, type: 2}

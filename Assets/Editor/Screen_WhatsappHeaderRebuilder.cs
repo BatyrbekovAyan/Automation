@@ -90,7 +90,7 @@ public static class Screen_WhatsappHeaderRebuilder
         GameObject nameGO = new GameObject("BotName", typeof(RectTransform), typeof(TextMeshProUGUI), typeof(TMPMaxWidthLayoutElement));
         nameGO.transform.SetParent(root.transform, false);
         var nameText = nameGO.GetComponent<TextMeshProUGUI>();
-        nameText.text = "Bot";
+        nameText.text = "Бот";
         nameText.fontSize = 18;
         nameText.fontStyle = FontStyles.Bold;
         nameText.color = new Color(0.1f, 0.1f, 0.1f);

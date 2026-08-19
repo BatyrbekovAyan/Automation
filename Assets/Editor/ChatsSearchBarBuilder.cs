@@ -212,7 +212,7 @@ public static class ChatsSearchBarBuilder
         placeholderRt.offsetMin = Vector2.zero;
         placeholderRt.offsetMax = Vector2.zero;
         var placeholderTmp = placeholder.GetComponent<TextMeshProUGUI>();
-        placeholderTmp.text = "Search";
+        placeholderTmp.text = "Поиск";
         placeholderTmp.fontSize = 30;
         placeholderTmp.color = HexColor("#8E8E93");
         placeholderTmp.alignment = TextAlignmentOptions.MidlineLeft;

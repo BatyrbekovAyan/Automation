@@ -81,14 +81,14 @@ public class ReplyParserTests
     public void OwnMessage_SenderLabelIsYou()
     {
         var cached = new MessageViewModel { messageId = "Q5", senderName = "Me", text = "hi", type = MessageType.Chat, isIncoming = false };
-        Assert.AreEqual("You", ReplyParser.Resolve(Reply("Q5"), id => cached, StubParse).senderName);
+        Assert.AreEqual("Вы", ReplyParser.Resolve(Reply("Q5"), id => cached, StubParse).senderName);
     }
 
     [Test]
     public void MediaNoCaption_SnippetIsTypeLabel()
     {
-        Assert.AreEqual("Photo", ReplyParser.SnippetFor(MessageType.Image, null));
-        Assert.AreEqual("Voice message", ReplyParser.SnippetFor(MessageType.Voice, ""));
+        Assert.AreEqual("Фото", ReplyParser.SnippetFor(MessageType.Image, null));
+        Assert.AreEqual("Голосовое сообщение", ReplyParser.SnippetFor(MessageType.Voice, ""));
         Assert.AreEqual("hello", ReplyParser.SnippetFor(MessageType.Image, "hello"));
     }
 
@@ -171,7 +171,7 @@ public class ReplyParserTests
         var target = new MessageViewModel { messageId = "Q1", senderName = "Me", text = "mine", type = MessageType.Chat, isIncoming = false };
         var reply  = new MessageViewModel { messageId = "M1", quotedMessageId = "Q1", quotedType = MessageType.Unknown };
         ReplyParser.BackfillFromCache(new[] { reply, target });
-        Assert.AreEqual("You", reply.quotedSenderName);
+        Assert.AreEqual("Вы", reply.quotedSenderName);
     }
 
     // Wappi sometimes returns a reply_message snapshot whose body equals the replying message's
@@ -279,7 +279,7 @@ public class ReplyParserTests
     public void FromFetchedMessage_FromMe_SenderIsYou()
     {
         var msg = new JObject { ["id"] = "Q", ["type"] = "chat", ["fromMe"] = true, ["body"] = "mine" };
-        Assert.AreEqual("You", ReplyParser.FromFetchedMessage(msg, StubParse).senderName);
+        Assert.AreEqual("Вы", ReplyParser.FromFetchedMessage(msg, StubParse).senderName);
     }
 
     [Test]
@@ -304,7 +304,7 @@ public class ReplyParserTests
     {
         var snap = new JObject { ["id"] = "Q6", ["type"] = "chat", ["body"] = "hi", ["fromMe"] = true };
         var raw = new RawMessage { type = "chat", isReply = true, replyMessage = snap };
-        Assert.AreEqual("You", ReplyParser.Resolve(raw, _ => null, StubParse).senderName);
+        Assert.AreEqual("Вы", ReplyParser.Resolve(raw, _ => null, StubParse).senderName);
     }
 
     [Test]
@@ -345,5 +345,16 @@ public class ReplyParserTests
         Assert.AreEqual("TG1", preview.messageId);
         Assert.AreEqual("Sender", preview.senderName);   // from contact_name (incoming default)
         Assert.AreEqual("original text", preview.text);  // NOT blanked — echo guard did not fire
+    }
+
+    [Test]
+    public void IsOwnSenderLabel_AcceptsCurrentAndLegacy()
+    {
+        Assert.IsTrue(ReplyParser.IsOwnSenderLabel("Вы"), "current RU label");
+        // Installs that predate the RU translation still hold "You" in ChatHistoryCache;
+        // MessageItemView colours the quoted card off this, so old cards must keep the accent.
+        Assert.IsTrue(ReplyParser.IsOwnSenderLabel("You"), "legacy pre-RU label");
+        Assert.IsFalse(ReplyParser.IsOwnSenderLabel("Aliya"));
+        Assert.IsFalse(ReplyParser.IsOwnSenderLabel(null));
     }
 }

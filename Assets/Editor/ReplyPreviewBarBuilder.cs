@@ -196,7 +196,7 @@ public static class ReplyPreviewBarBuilder
         var senderGo = new GameObject("Sender", typeof(RectTransform), typeof(TextMeshProUGUI), typeof(LayoutElement));
         senderGo.transform.SetParent(textColGo.transform, false);
         var senderTmp = senderGo.GetComponent<TextMeshProUGUI>();
-        senderTmp.text      = "Sender";
+        senderTmp.text      = "Отправитель";
         if (inputFont != null) senderTmp.font = inputFont;
         senderTmp.fontSize  = SenderFontSize;
         senderTmp.fontStyle = FontStyles.Bold;
@@ -214,7 +214,7 @@ public static class ReplyPreviewBarBuilder
         var snippetGo = new GameObject("Snippet", typeof(RectTransform), typeof(TextMeshProUGUI), typeof(LayoutElement));
         snippetGo.transform.SetParent(textColGo.transform, false);
         var snippetTmp = snippetGo.GetComponent<TextMeshProUGUI>();
-        snippetTmp.text      = "Quoted message";
+        snippetTmp.text      = "Цитируемое сообщение";
         if (inputFont != null) snippetTmp.font = inputFont;
         snippetTmp.fontSize  = SnippetFontSize;
         snippetTmp.fontStyle = FontStyles.Normal;

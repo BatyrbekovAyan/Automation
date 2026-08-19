@@ -4,24 +4,24 @@ public class AttachmentDisplayFormatTests
 {
     // ── HumanReadableBytes ────────────────────────────────────────
 
-    [TestCase(512L,         "<1 KB")]
-    [TestCase(1023L,        "<1 KB")]
-    [TestCase(1024L,        "1 KB")]
-    [TestCase(1500L,        "1 KB")]
-    [TestCase(10240L,       "10 KB")]
-    [TestCase(1048576L,     "1.0 MB")]
-    [TestCase(1500000L,     "1.4 MB")]
-    [TestCase(15728640L,    "15.0 MB")]
-    [TestCase(1073741824L,  "1.0 GB")]
-    [TestCase(1610612736L,  "1.5 GB")]
+    [TestCase(512L,         "<1 КБ")]
+    [TestCase(1023L,        "<1 КБ")]
+    [TestCase(1024L,        "1 КБ")]
+    [TestCase(1500L,        "1 КБ")]
+    [TestCase(10240L,       "10 КБ")]
+    [TestCase(1048576L,     "1.0 МБ")]
+    [TestCase(1500000L,     "1.4 МБ")]
+    [TestCase(15728640L,    "15.0 МБ")]
+    [TestCase(1073741824L,  "1.0 ГБ")]
+    [TestCase(1610612736L,  "1.5 ГБ")]
     public void HumanReadableBytes_Returns_Expected(long bytes, string expected)
     {
         Assert.AreEqual(expected, AttachmentDisplayFormat.HumanReadableBytes(bytes));
     }
 
-    [TestCase(0L,           "<1 KB")]
-    [TestCase(-1L,          "<1 KB")]
-    [TestCase(long.MinValue, "<1 KB")]
+    [TestCase(0L,           "<1 КБ")]
+    [TestCase(-1L,          "<1 КБ")]
+    [TestCase(long.MinValue, "<1 КБ")]
     public void HumanReadableBytes_NegativeOrZero_ReturnsLessThanOneKb(long bytes, string expected)
     {
         Assert.AreEqual(expected, AttachmentDisplayFormat.HumanReadableBytes(bytes));

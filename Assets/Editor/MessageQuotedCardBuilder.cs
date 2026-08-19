@@ -252,7 +252,7 @@ public static class MessageQuotedCardBuilder
         go.transform.SetParent(parent, false);
 
         var tmp = go.GetComponent<TextMeshProUGUI>();
-        tmp.text = "Sender";
+        tmp.text = "Отправитель";
         if (font != null) tmp.font = font;
         tmp.fontSize = SenderFontSize;
         tmp.fontStyle = FontStyles.Bold;
@@ -280,7 +280,7 @@ public static class MessageQuotedCardBuilder
         go.transform.SetParent(parent, false);
 
         var tmp = go.GetComponent<TextMeshProUGUI>();
-        tmp.text = "Quoted message";
+        tmp.text = "Цитируемое сообщение";
         if (font != null) tmp.font = font;
         tmp.fontSize = SnippetFontSize;
         tmp.fontStyle = FontStyles.Normal;

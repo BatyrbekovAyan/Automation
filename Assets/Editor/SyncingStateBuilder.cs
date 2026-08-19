@@ -94,9 +94,9 @@ public static class SyncingStateBuilder
         var spinnerRT = spinnerGO.GetComponent<RectTransform>();
 
         // Title (H1) + Body.
-        var titleText = CreateText(hero.transform, "Title", "Setting things up", 52f, FontStyles.Bold, TitleColor, 820f, 70f);
+        var titleText = CreateText(hero.transform, "Title", "Готовим всё к работе", 52f, FontStyles.Bold, TitleColor, 820f, 70f);
         var bodyText = CreateText(hero.transform, "Body",
-            "We're importing your chats and messages from WhatsApp.",
+            "Импортируем ваши чаты и сообщения из WhatsApp.",
             40f, FontStyles.Normal, BodyColor, 820f, 110f);
         bodyText.enableWordWrapping = true;
 
@@ -119,11 +119,11 @@ public static class SyncingStateBuilder
         fillImage.fillAmount = 0f;
 
         // Countdown.
-        var countdownText = CreateText(hero.transform, "Countdown", "About 5 min left", 36f, FontStyles.Bold, BrandReadable, 760f, 48f);
+        var countdownText = CreateText(hero.transform, "Countdown", "Осталось около 5 мин", 36f, FontStyles.Bold, BrandReadable, 760f, 48f);
 
         // Footnote — reassurance pinned in the lower zone.
         var footnoteText = CreateText(root.transform, "Footnote",
-            "You can keep using the app. Chats appear here when ready.",
+            "Можно пользоваться приложением — чаты появятся здесь, когда будут готовы.",
             30f, FontStyles.Normal, FootnoteColor);
         footnoteText.enableWordWrapping = true;
         var footRT = footnoteText.rectTransform;

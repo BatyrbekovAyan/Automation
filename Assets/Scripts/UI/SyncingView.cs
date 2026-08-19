@@ -147,8 +147,8 @@ public class SyncingView : MonoBehaviour
 
     /// <summary>
     /// Countdown label per channel: WhatsApp delegates to WhatsAppSyncGate byte-identically
-    /// (its English buckets are pinned by WhatsAppSyncGateTests); Telegram mirrors the same
-    /// rounding buckets in Russian. Pure + static so EditMode tests pin both contracts.
+    /// (its buckets are pinned by WhatsAppSyncTests); Telegram mirrors the same
+    /// rounding buckets. Both channels are Russian — the app ships RU-only.
     /// </summary>
     public static string FormatCountdownFor(ChatChannel channel, long remainingMs)
     {
@@ -175,10 +175,10 @@ public class SyncingView : MonoBehaviour
             return;
         }
 
-        // WhatsApp copy — byte-identical to the original cover.
-        if (titleLabel != null) titleLabel.text = "Setting things up";
-        if (bodyLabel != null) bodyLabel.text = "We're importing your chats and messages from WhatsApp.";
-        if (footnoteLabel != null) footnoteLabel.text = "You can keep using the app. Chats appear here when ready.";
+        // WhatsApp copy — RU, mirrors the Telegram branch word for word.
+        if (titleLabel != null) titleLabel.text = "Готовим всё к работе";
+        if (bodyLabel != null) bodyLabel.text = "Импортируем ваши чаты и сообщения из WhatsApp.";
+        if (footnoteLabel != null) footnoteLabel.text = "Можно пользоваться приложением — чаты появятся здесь, когда будут готовы.";
     }
 
     // Capture each green element's OWN authored scene color once, so WhatsApp reverts

@@ -289,11 +289,11 @@ public static class ReactionBarBuilder
         TMP_FontAsset messageFont = FindMessageFont();
 
         // Build the three rows.
-        var replyBtn   = BuildMenuRow(cardGo.transform, "RowReply",   "Reply",   "reply",   messageFont);
+        var replyBtn   = BuildMenuRow(cardGo.transform, "RowReply",   "Ответить",   "reply",   messageFont);
         BuildDivider(cardGo.transform);
-        var copyBtn    = BuildMenuRow(cardGo.transform, "RowCopy",    "Copy",    "copy",    messageFont);
+        var copyBtn    = BuildMenuRow(cardGo.transform, "RowCopy",    "Копировать",    "copy",    messageFont);
         BuildDivider(cardGo.transform);
-        var forwardBtn = BuildMenuRow(cardGo.transform, "RowForward", "Forward", "forward", messageFont);
+        var forwardBtn = BuildMenuRow(cardGo.transform, "RowForward", "Переслать", "forward", messageFont);
 
         return (cardRt, replyBtn, copyBtn, forwardBtn);
     }
@@ -550,7 +550,7 @@ public static class ReactionBarBuilder
         titleRt.sizeDelta = new Vector2(0f, 56f);
         titleRt.anchoredPosition = new Vector2(0f, -56f);
         var title = titleGo.GetComponent<TextMeshProUGUI>();
-        title.text = "React";
+        title.text = "Реакция";
         title.fontSize = 44f;
         title.alignment = TextAlignmentOptions.Center;
         title.color = new Color32(0x11, 0x1B, 0x21, 0xFF);

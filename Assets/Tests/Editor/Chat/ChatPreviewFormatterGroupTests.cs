@@ -13,42 +13,42 @@ public class ChatPreviewFormatterGroupTests
     public void Group_IncomingMedia_PrefixesSenderBeforeLabel()
     {
         string s = ChatPreviewFormatter.Format("", "image", null, false, null, null, "Aliya", true);
-        Assert.AreEqual("Aliya: 📷 Photo", s);
+        Assert.AreEqual("Aliya: 📷 Фото", s);
     }
 
     [Test]
     public void Group_OwnMessage_UsesYouPrefix()
     {
         string s = ChatPreviewFormatter.Format("Hello", "chat", null, true, null, null, "Ayan", true);
-        Assert.AreEqual("You: Hello", s);
+        Assert.AreEqual("Вы: Hello", s);
     }
 
     [Test]
     public void Group_OwnMessage_TickPrecedesYouPrefix()
     {
         string s = ChatPreviewFormatter.Format("Hello", "chat", "read", true, null, null, "Ayan", true);
-        Assert.AreEqual("<sprite name=\"tick_double_blue\"> You: Hello", s);
+        Assert.AreEqual("<sprite name=\"tick_double_blue\"> Вы: Hello", s);
     }
 
     [Test]
     public void Group_IncomingReaction_AttributesReactor()
     {
         string s = ChatPreviewFormatter.Format("❤️", "reaction", null, false, "Hi", "chat", "Aliya", true);
-        Assert.AreEqual("Aliya reacted ❤️ to “Hi”", s);
+        Assert.AreEqual("Aliya отреагировал(-а) ❤️ на «Hi»", s);
     }
 
     [Test]
     public void Group_OwnReaction_UsesYou()
     {
         string s = ChatPreviewFormatter.Format("❤️", "reaction", "read", true, "Hi", "chat", "Ayan", true);
-        Assert.AreEqual("You reacted ❤️ to “Hi”", s);
+        Assert.AreEqual("Вы отреагировали ❤️ на «Hi»", s);
     }
 
     [Test]
     public void Group_ReactionRemoved_NoName()
     {
         string s = ChatPreviewFormatter.Format("reaction_remove", "reaction_remove", null, false, null, null, "Aliya", true);
-        Assert.AreEqual("Reaction removed", s);
+        Assert.AreEqual("Реакция убрана", s);
     }
 
     [Test]
@@ -62,16 +62,16 @@ public class ChatPreviewFormatterGroupTests
     public void Group_MissingSenderName_ReactionFallsBackToReacted()
     {
         string s = ChatPreviewFormatter.Format("❤️", "reaction", null, false, "Hi", "chat", null, true);
-        Assert.AreEqual("Reacted ❤️ to “Hi”", s);
+        Assert.AreEqual("Отреагировал(-а) ❤️ на «Hi»", s);
     }
 
     [Test]
     public void NonGroup_SenderNameIgnored()
     {
-        // 1:1 rows: a senderName must not add a prefix, and reactions stay "Reacted".
+        // 1:1 rows: a senderName must not add a prefix, and reactions stay «Отреагировал(-а)».
         Assert.AreEqual("Hello",
             ChatPreviewFormatter.Format("Hello", "chat", null, false, null, null, "Aliya", false));
-        Assert.AreEqual("Reacted ❤️",
+        Assert.AreEqual("Отреагировал(-а) ❤️",
             ChatPreviewFormatter.Format("❤️", "reaction", null, false, null, null, "Aliya", false));
     }
 
@@ -79,28 +79,28 @@ public class ChatPreviewFormatterGroupTests
     public void Group_OwnMedia_TickThenYouThenLabel()
     {
         string s = ChatPreviewFormatter.Format("", "image", "read", true, null, null, "Ayan", true);
-        Assert.AreEqual("<sprite name=\"tick_double_blue\"> You: 📷 Photo", s);
+        Assert.AreEqual("<sprite name=\"tick_double_blue\"> Вы: 📷 Фото", s);
     }
 
     [Test]
     public void Group_IncomingReaction_MediaTarget_UnquotedLabel()
     {
         string s = ChatPreviewFormatter.Format("❤️", "reaction", null, false, "", "image", "Aliya", true);
-        Assert.AreEqual("Aliya reacted ❤️ to 📷 Photo", s);
+        Assert.AreEqual("Aliya отреагировал(-а) ❤️ на 📷 Фото", s);
     }
 
     [Test]
     public void Group_IncomingSticker_PrefixThenLabel()
     {
         string s = ChatPreviewFormatter.Format("", "sticker", null, false, null, null, "Aliya", true);
-        Assert.AreEqual("Aliya: Sticker", s);
+        Assert.AreEqual("Aliya: Стикер", s);
     }
 
     [Test]
     public void Group_IncomingVoice_PrefixThenEmojiLabel()
     {
         string s = ChatPreviewFormatter.Format("", "voice", null, false, null, null, "Aliya", true);
-        Assert.AreEqual("Aliya: 🎤 Voice", s);
+        Assert.AreEqual("Aliya: 🎤 Голосовое", s);
     }
 
     [Test]

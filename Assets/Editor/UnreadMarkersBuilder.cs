@@ -197,7 +197,7 @@ public static class UnreadMarkersBuilder
         labelRt.offsetMin = Vector2.zero;
         labelRt.offsetMax = Vector2.zero;
         var label = labelGo.GetComponent<TextMeshProUGUI>();
-        label.text = "0 UNREAD MESSAGES";
+        label.text = "0 НЕПРОЧИТАННЫХ СООБЩЕНИЙ";
         label.fontSize = 32f;
         label.fontStyle = FontStyles.Bold | FontStyles.UpperCase;
         label.characterSpacing = 6f; // ~+0.6 tracking

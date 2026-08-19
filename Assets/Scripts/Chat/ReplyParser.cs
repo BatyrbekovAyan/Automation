@@ -141,9 +141,22 @@ public static class ReplyParser
         return FromSnapshot(id, message, parseType, ownBody: null);
     }
 
-    /// "You" for own messages, else the real sender name (never null).
+    /// Sender label for an own message. A CONSTANT, not a literal at each call site:
+    /// MessageItemView colours the quoted card by comparing against it, so a hand-typed
+    /// copy would silently lose the "own message" accent the day the wording changes.
+    public const string OwnSenderLabel = "Вы";
+
+    /// The pre-RU label, still sitting in ChatHistoryCache on installs that predate the
+    /// translation. Recognised on read so old quoted cards keep their accent; never written.
+    private const string LegacyOwnSenderLabel = "You";
+
+    /// «Вы» for own messages, else the real sender name (never null).
     public static string SenderLabel(bool isIncoming, string senderName)
-        => isIncoming ? (senderName ?? string.Empty) : "You";
+        => isIncoming ? (senderName ?? string.Empty) : OwnSenderLabel;
+
+    /// True when a stored quoted-sender name denotes the account owner.
+    public static bool IsOwnSenderLabel(string label) =>
+        label == OwnSenderLabel || label == LegacyOwnSenderLabel;
 
     /// Longest snippet we keep. The quoted card is a single line; this is a data-side guard so
     /// TMP never measures a multi-thousand-pixel string (the visual one-line ellipsis is enforced
@@ -158,12 +171,12 @@ public static class ReplyParser
         if (!string.IsNullOrEmpty(text)) return SanitizeSnippet(text);
         switch (type)
         {
-            case MessageType.Image:    return "Photo";
-            case MessageType.Video:    return "Video";
-            case MessageType.Voice:    return "Voice message";
-            case MessageType.Audio:    return "Audio";
-            case MessageType.Sticker:  return "Sticker";
-            case MessageType.Document: return "Document";
+            case MessageType.Image:    return "Фото";
+            case MessageType.Video:    return "Видео";
+            case MessageType.Voice:    return "Голосовое сообщение";
+            case MessageType.Audio:    return "Аудио";
+            case MessageType.Sticker:  return "Стикер";
+            case MessageType.Document: return "Документ";
             default:                   return string.Empty;
         }
     }
