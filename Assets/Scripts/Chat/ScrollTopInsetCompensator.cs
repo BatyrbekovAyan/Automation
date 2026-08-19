@@ -57,7 +57,9 @@ public class ScrollTopInsetCompensator : MonoBehaviour
         // deliberately holding it OUTSIDE the legal range (elastic overscroll). See
         // ScrollTopInsetMath.ShouldClampContent — this only became reachable once the slot inset
         // started moving during a gesture.
-        if (!ScrollTopInsetMath.ShouldClampContent(_snappy != null && _snappy.IsDragging)) return;
+        if (!ScrollTopInsetMath.ShouldClampContent(
+                scrollIsDragging: _snappy != null && _snappy.IsDragging,
+                scrollIsSettling: _snappy != null && _snappy.IsSettling)) return;
         RectTransform viewport = _scroll.viewport != null ? _scroll.viewport : _rt;
         Vector2 pos = _scroll.content.anchoredPosition;
         float clamped = ScrollTopInsetMath.ClampContentY(pos.y, _scroll.content.rect.height, viewport.rect.height);

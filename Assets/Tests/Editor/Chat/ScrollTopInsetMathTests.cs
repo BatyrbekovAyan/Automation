@@ -46,18 +46,34 @@ public class ScrollTopInsetMathTests
         => Assert.AreEqual(-510f, ScrollTopInsetMath.ClampContentY(-510f, 2000f, 1490f));
 
     // --- ShouldClampContent -------------------------------------------------
-    // The clamp exists for a viewport that resized while NOBODY was touching it (keyboard or panel
-    // opening/closing). Once the thread pull-down started moving the slot inset DURING a gesture,
-    // running it under the finger began tearing away ScrollRect's elastic overscroll — which is by
-    // definition outside the range the clamp enforces. Device symptom, short thread at the top: the
-    // stretch collapsed and the messages snapped upward the instant the pull-down engaged, then
-    // stretched again once the slot bottomed out and the inset stopped changing.
+    // The clamp exists for a viewport that resized while NOBODY was touching the scroll (keyboard
+    // or panel opening/closing). Once the thread pull-down started moving the slot inset DURING a
+    // gesture, running it under the finger began tearing away ScrollRect's elastic overscroll —
+    // which is by definition outside the range the clamp enforces. Device symptom, short thread at
+    // the top: the stretch collapsed and the messages snapped upward the instant the pull-down
+    // engaged, then stretched again once the slot bottomed out and the inset stopped changing.
+    // BOTH conditions must be quiet, and the settling half is the one that is easy to drop: the
+    // drag flag clears on pointer-up, one frame BEFORE the elastic ease begins, so a drag-only
+    // guard still pops on release. An `||` slipped in for the `&&` would pass every
+    // single-condition case and fail only this table.
 
     [Test]
     public void ShouldClampContent_WhileAFingerOwnsTheScroll_IsFalse()
-        => Assert.IsFalse(ScrollTopInsetMath.ShouldClampContent(scrollIsDragging: true));
+        => Assert.IsFalse(ScrollTopInsetMath.ShouldClampContent(
+            scrollIsDragging: true, scrollIsSettling: false));
 
     [Test]
-    public void ShouldClampContent_WhenNobodyIsDragging_IsTrue()
-        => Assert.IsTrue(ScrollTopInsetMath.ShouldClampContent(scrollIsDragging: false));
+    public void ShouldClampContent_WhileTheScrollIsStillEasingItself_IsFalse()
+        => Assert.IsFalse(ScrollTopInsetMath.ShouldClampContent(
+            scrollIsDragging: false, scrollIsSettling: true));
+
+    [Test]
+    public void ShouldClampContent_DraggingAndSettlingAtOnce_IsFalse()
+        => Assert.IsFalse(ScrollTopInsetMath.ShouldClampContent(
+            scrollIsDragging: true, scrollIsSettling: true));
+
+    [Test]
+    public void ShouldClampContent_OnlyWhenBothAreQuiet_IsTrue()
+        => Assert.IsTrue(ScrollTopInsetMath.ShouldClampContent(
+            scrollIsDragging: false, scrollIsSettling: false));
 }
