@@ -12,7 +12,9 @@
 
 ## Global Constraints
 
-- **Zero scene edits.** `Assets/Scenes/Main.unity` must not be opened, saved, or dirtied by any task. No new `[SerializeField]`, no builder, no wirer. The project has a recorded history of parallel sessions clobbering the scene.
+- **Zero scene edits.** No task may save `Assets/Scenes/Main.unity`, and no task may ever STAGE it. No new `[SerializeField]`, no builder, no wirer. The project has a recorded history of parallel sessions clobbering the scene.
+- **The working tree is shared and already dirty with other people's work** (`Main.unity`, `CLAUDE.md`, `.gitignore`, `Tools/render_business_icons.js`, images, `Tools/icon-lab/`, `Assets/Editor/NavIconSetBuilder.cs`). NEVER `git add -A` / `git add .` / `git commit -a`. Stage ONLY the exact paths a task names, plus their Unity-generated `.meta` siblings.
+- **Before committing a SHARED hand-edited file** (`CLAUDE.md` is the one here), run `git diff --cached <file>` and confirm every staged hunk is yours. This repo has had a parallel session's uncommitted paragraph swept into a commit twice; both times the file was `CLAUDE.md` or a controller someone else was mid-edit on.
 - **All lengths are CANVAS reference units** in the safe-adjusted space (the space `KeyboardAwarePanel.VirtualBottomInset` works in), never screen pixels. Screen px appear only where a pointer position enters the system, and are divided by the canvas scale factor immediately.
 - **Pointer Y is POSITIVE-IS-UP** (Unity input events, origin bottom-left). A downward flick therefore reports a NEGATIVE velocity. Do not negate anywhere.
 - **New `.cs` files are silently excluded from compilation** until Unity imports them. After creating a file, confirm its `.meta` sibling exists before trusting any test result.
@@ -24,23 +26,25 @@
 
 The Unity Editor currently has this project open (`Temp/UnityLockfile` present), so use the **bridge**:
 
-```bash
-mkdir -p Temp/claude && : > Temp/claude/run-tests.trigger
-```
+The Unity Editor has this project open (verified: lockfile + a live `-projectpath` process), so tests
+run through the **Unity Editor MCP**, which works without focusing the Unity window. The headless
+runner `Tools/run-tests-headless.sh` REFUSES while the Editor holds the project lock, and the
+`Temp/claude/run-tests.trigger` bridge only ticks while Unity has focus — neither is the path here.
 
-Then click the Unity window once (the bridge polls only while Unity has focus) and read the result:
+Per task:
 
-```bash
-cat Temp/claude/test-summary.json
-```
+1. `mcp__mcp-unity__execute_menu_item` with `{ "menuPath": "Assets/Refresh" }` — imports and compiles.
+   **A brand-new `.cs` file is silently excluded from compilation until this runs**, and its `.meta`
+   sibling does not exist before it either.
+2. `mcp__mcp-unity__run_tests` with `{ "testMode": "EditMode", "testFilter": "<ExactTestClassName>",
+   "returnOnlyFailures": false }`.
+3. `mcp__mcp-unity__get_console_logs` with `{ "logType": "error", "limit": 20, "includeStackTrace":
+   false }` when a run looks wrong — a compile error explains most surprises.
 
-Gate on `"total"` being the full suite count (~1812+) and `"failed": 0`. A `total` of 0 is a FALSE GREEN, not a pass. The bridge runs `AssetDatabase.Refresh` before executing, which is what imports brand-new `.cs` files.
+**The filter must be the EXACT class name.** A substring filter matches nothing and returns a 0/0
+run, which reads as green and is not. Treat any total of 0 as a failed run.
 
-If the Editor is closed instead, use the headless runner (it refuses to run while the Editor holds the lock):
-
-```bash
-Tools/run-tests-headless.sh
-```
+Do not call `recompile_scripts` while a test run is in flight.
 
 ## File Structure
 
@@ -177,11 +181,15 @@ public class DragVelocitySamplerTests
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Drop the trigger, focus Unity, read the summary:
+Import and compile through the Unity Editor MCP (the Editor is open; these calls work WITHOUT
+focusing the window), then read the compile errors:
 
-```bash
-mkdir -p Temp/claude && : > Temp/claude/run-tests.trigger
-```
+1. `mcp__mcp-unity__execute_menu_item` with `{ "menuPath": "Assets/Refresh" }`
+2. `mcp__mcp-unity__get_console_logs` with `{ "logType": "error", "limit": 20, "includeStackTrace": false }`
+
+Expected: a compile error naming `DragVelocitySampler`. That is the correct RED — the symbol does not exist yet.
+Do NOT call `run_tests` at this step: the test assembly does not compile, so it has nothing to fail
+with and would report a misleading 0.
 
 Expected: the run reports a COMPILE error (`DragVelocitySampler` could not be found). That is the correct failure — the class does not exist yet.
 
@@ -268,21 +276,18 @@ public sealed class DragVelocitySampler
 ls Assets/Scripts/Chat/DragVelocitySampler.cs.meta
 ```
 
-Expected: the path prints. If it does not exist, Unity has not imported the file and any test result is stale — focus the Unity window and wait for the import spinner, then re-check.
+Expected: the path prints. If it does not, Unity has not imported the file yet and ANY test result is
+stale — run `mcp__mcp-unity__execute_menu_item` with `{ "menuPath": "Assets/Refresh" }` and re-check.
 
 - [ ] **Step 5: Run the tests to verify they pass**
 
-```bash
-mkdir -p Temp/claude && : > Temp/claude/run-tests.trigger
-```
+1. `mcp__mcp-unity__execute_menu_item` with `{ "menuPath": "Assets/Refresh" }`
+2. `mcp__mcp-unity__run_tests` with `{ "testMode": "EditMode", "testFilter": "DragVelocitySamplerTests", "returnOnlyFailures": false }`
 
-Focus Unity, then:
+Expected: the class's 9 tests pass, 0 failed. **A total of 0 is a FALSE GREEN, not a pass** — it means the filter
+matched nothing (the filter must be the EXACT class name, no substring). Fix the filter and re-run;
+never record a 0-total run as green.
 
-```bash
-cat Temp/claude/test-summary.json
-```
-
-Expected: `"failed": 0` and `"total"` at the full suite count (the 9 new tests included). A `total` of 0 is a false green — re-run.
 
 - [ ] **Step 6: Commit**
 
@@ -411,9 +416,15 @@ Append to `Assets/Tests/Editor/Chat/SuggestionSlotDetentsTests.cs`, immediately 
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-```bash
-mkdir -p Temp/claude && : > Temp/claude/run-tests.trigger
-```
+Import and compile through the Unity Editor MCP (the Editor is open; these calls work WITHOUT
+focusing the window), then read the compile errors:
+
+1. `mcp__mcp-unity__execute_menu_item` with `{ "menuPath": "Assets/Refresh" }`
+2. `mcp__mcp-unity__get_console_logs` with `{ "logType": "error", "limit": 20, "includeStackTrace": false }`
+
+Expected: a compile error naming `SnapWithFlick`. That is the correct RED — the symbol does not exist yet.
+Do NOT call `run_tests` at this step: the test assembly does not compile, so it has nothing to fail
+with and would report a misleading 0.
 
 Expected: compile error — `SnapWithFlick` does not exist.
 
@@ -487,11 +498,13 @@ And add these methods directly after the existing `Snap` method:
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-```bash
-mkdir -p Temp/claude && : > Temp/claude/run-tests.trigger
-```
+1. `mcp__mcp-unity__execute_menu_item` with `{ "menuPath": "Assets/Refresh" }`
+2. `mcp__mcp-unity__run_tests` with `{ "testMode": "EditMode", "testFilter": "SuggestionSlotDetentsTests", "returnOnlyFailures": false }`
 
-Focus Unity, then `cat Temp/claude/test-summary.json`. Expected: `"failed": 0`, full `total`.
+Expected: every test in the class passes, including the 13 added here, 0 failed. **A total of 0 is a FALSE GREEN, not a pass** — it means the filter
+matched nothing (the filter must be the EXACT class name, no substring). Fix the filter and re-run;
+never record a 0-total run as green.
+
 
 - [ ] **Step 5: Commit**
 
@@ -622,9 +635,15 @@ public class SuggestionSlotPullDownTests
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-```bash
-mkdir -p Temp/claude && : > Temp/claude/run-tests.trigger
-```
+Import and compile through the Unity Editor MCP (the Editor is open; these calls work WITHOUT
+focusing the window), then read the compile errors:
+
+1. `mcp__mcp-unity__execute_menu_item` with `{ "menuPath": "Assets/Refresh" }`
+2. `mcp__mcp-unity__get_console_logs` with `{ "logType": "error", "limit": 20, "includeStackTrace": false }`
+
+Expected: a compile error naming `SuggestionSlotPullDown`. That is the correct RED — the symbol does not exist yet.
+Do NOT call `run_tests` at this step: the test assembly does not compile, so it has nothing to fail
+with and would report a misleading 0.
 
 Expected: compile error — `SuggestionSlotPullDown` does not exist.
 
@@ -693,15 +712,18 @@ public static class SuggestionSlotPullDown
 ls Assets/Scripts/Chat/SuggestionSlotPullDown.cs.meta
 ```
 
-Expected: the path prints.
+Expected: the path prints. If it does not, run `Assets/Refresh` through the Editor MCP and re-check —
+an unimported file is not compiled, so any test result taken before it appears is stale.
 
 - [ ] **Step 5: Run the tests to verify they pass**
 
-```bash
-mkdir -p Temp/claude && : > Temp/claude/run-tests.trigger
-```
+1. `mcp__mcp-unity__execute_menu_item` with `{ "menuPath": "Assets/Refresh" }`
+2. `mcp__mcp-unity__run_tests` with `{ "testMode": "EditMode", "testFilter": "SuggestionSlotPullDownTests", "returnOnlyFailures": false }`
 
-Focus Unity, then `cat Temp/claude/test-summary.json`. Expected: `"failed": 0`, full `total`.
+Expected: the class's 13 tests pass, 0 failed. **A total of 0 is a FALSE GREEN, not a pass** — it means the filter
+matched nothing (the filter must be the EXACT class name, no substring). Fix the filter and re-run;
+never record a 0-total run as green.
+
 
 - [ ] **Step 6: Commit**
 
@@ -795,9 +817,15 @@ Append to `Assets/Tests/Editor/Chat/SuggestionSlotStateMachineTests.cs`, immedia
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-```bash
-mkdir -p Temp/claude && : > Temp/claude/run-tests.trigger
-```
+Import and compile through the Unity Editor MCP (the Editor is open; these calls work WITHOUT
+focusing the window), then read the compile errors:
+
+1. `mcp__mcp-unity__execute_menu_item` with `{ "menuPath": "Assets/Refresh" }`
+2. `mcp__mcp-unity__get_console_logs` with `{ "logType": "error", "limit": 20, "includeStackTrace": false }`
+
+Expected: a compile error naming `SuggestionSlotInput.PullDownDismiss`. That is the correct RED — the symbol does not exist yet.
+Do NOT call `run_tests` at this step: the test assembly does not compile, so it has nothing to fail
+with and would report a misleading 0.
 
 Expected: compile error — `SuggestionSlotInput.PullDownDismiss` does not exist.
 
@@ -841,11 +869,13 @@ In `ResolveAuto`, add the same case directly after its `KeyboardDismissed` case:
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-```bash
-mkdir -p Temp/claude && : > Temp/claude/run-tests.trigger
-```
+1. `mcp__mcp-unity__execute_menu_item` with `{ "menuPath": "Assets/Refresh" }`
+2. `mcp__mcp-unity__run_tests` with `{ "testMode": "EditMode", "testFilter": "SuggestionSlotStateMachineTests", "returnOnlyFailures": false }`
 
-Focus Unity, then `cat Temp/claude/test-summary.json`. Expected: `"failed": 0`, full `total`.
+Expected: every test in the class passes, including the 4 added here, 0 failed. **A total of 0 is a FALSE GREEN, not a pass** — it means the filter
+matched nothing (the filter must be the EXACT class name, no substring). Fix the filter and re-run;
+never record a 0-total run as green.
+
 
 - [ ] **Step 5: Commit**
 
@@ -1129,9 +1159,15 @@ public class SlotPullDownRecognizerTests
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-```bash
-mkdir -p Temp/claude && : > Temp/claude/run-tests.trigger
-```
+Import and compile through the Unity Editor MCP (the Editor is open; these calls work WITHOUT
+focusing the window), then read the compile errors:
+
+1. `mcp__mcp-unity__execute_menu_item` with `{ "menuPath": "Assets/Refresh" }`
+2. `mcp__mcp-unity__get_console_logs` with `{ "logType": "error", "limit": 20, "includeStackTrace": false }`
+
+Expected: a compile error naming `SlotPullDownRecognizer`. That is the correct RED — the symbol does not exist yet.
+Do NOT call `run_tests` at this step: the test assembly does not compile, so it has nothing to fail
+with and would report a misleading 0.
 
 Expected: compile error — `SlotPullDownRecognizer` does not exist.
 
@@ -1381,15 +1417,18 @@ public sealed class SlotPullDownRecognizer
 ls Assets/Scripts/Chat/SlotPullDownRecognizer.cs.meta
 ```
 
-Expected: the path prints.
+Expected: the path prints. If it does not, run `Assets/Refresh` through the Editor MCP and re-check —
+an unimported file is not compiled, so any test result taken before it appears is stale.
 
 - [ ] **Step 6: Run the tests to verify they pass**
 
-```bash
-mkdir -p Temp/claude && : > Temp/claude/run-tests.trigger
-```
+1. `mcp__mcp-unity__execute_menu_item` with `{ "menuPath": "Assets/Refresh" }`
+2. `mcp__mcp-unity__run_tests` with `{ "testMode": "EditMode", "testFilter": "SlotPullDownRecognizerTests", "returnOnlyFailures": false }`
 
-Focus Unity, then `cat Temp/claude/test-summary.json`. Expected: `"failed": 0`, full `total`.
+Expected: the class's 14 tests pass, 0 failed. **A total of 0 is a FALSE GREEN, not a pass** — it means the filter
+matched nothing (the filter must be the EXACT class name, no substring). Fix the filter and re-run;
+never record a 0-total run as green.
+
 
 - [ ] **Step 7: Commit**
 
@@ -1543,11 +1582,16 @@ Leave the rest of the method exactly as it is.
 
 - [ ] **Step 4: Run the tests to verify nothing regressed**
 
-```bash
-mkdir -p Temp/claude && : > Temp/claude/run-tests.trigger
-```
+1. `mcp__mcp-unity__execute_menu_item` with `{ "menuPath": "Assets/Refresh" }`
+2. `mcp__mcp-unity__run_tests` with `{ "testMode": "EditMode", "returnOnlyFailures": true }` — the WHOLE
+   suite, unfiltered: this task changes an EXISTING gesture, and a class filter cannot prove the
+   absence of regressions elsewhere.
 
-Focus Unity, then `cat Temp/claude/test-summary.json`. Expected: `"failed": 0` and the SAME `total` as after Task 5 — this task adds no tests, it must not remove any either. A compile error here means the `Released` signature change missed a subscriber.
+Expected: 0 failed, total in the 1900+ range (a 0 total is a false green). Note: a full-suite run
+swaps the Editor's active scene — expected and harmless here, but do NOT save any scene afterwards.
+
+The total must be the SAME as after Task 5 — this task adds no tests and must not remove any.
+A compile error here means the `Released` signature change missed a subscriber.
 
 - [ ] **Step 5: Commit**
 
@@ -1708,19 +1752,28 @@ with:
 
 - [ ] **Step 6: Run the tests to verify nothing regressed**
 
-```bash
-mkdir -p Temp/claude && : > Temp/claude/run-tests.trigger
-```
+1. `mcp__mcp-unity__execute_menu_item` with `{ "menuPath": "Assets/Refresh" }`
+2. `mcp__mcp-unity__run_tests` with `{ "testMode": "EditMode", "returnOnlyFailures": true }` — the WHOLE
+   suite, unfiltered: this task changes an EXISTING gesture, and a class filter cannot prove the
+   absence of regressions elsewhere.
 
-Focus Unity, then `cat Temp/claude/test-summary.json`. Expected: `"failed": 0` and the same `total` as after Task 6.
+Expected: 0 failed, total in the 1900+ range (a 0 total is a false green). Note: a full-suite run
+swaps the Editor's active scene — expected and harmless here, but do NOT save any scene afterwards.
+
+The total must be the same as after Task 6.
 
 - [ ] **Step 7: Verify the scene was not touched**
 
+`Assets/Scenes/Main.unity` was ALREADY modified in the working tree by another session before this
+plan began, so its status line is expected and is NOT this task's doing. What must hold is that the
+scene is not STAGED and its modification time did not move during the task:
+
 ```bash
-git status --short Assets/Scenes/Main.unity
+git diff --cached --name-only | grep -c 'Main.unity'
 ```
 
-Expected: NO output. Any output means the scene was dirtied — revert it with `git checkout -- Assets/Scenes/Main.unity` before committing.
+Expected: `0`. If it is anything else, unstage it (`git restore --staged Assets/Scenes/Main.unity`)
+before committing — do NOT `git checkout` the scene, that would destroy the other session's work.
 
 - [ ] **Step 8: Commit**
 
@@ -1775,10 +1828,13 @@ In `CLAUDE.md`, find the paragraph beginning «**Suggestions-slot interaction mo
 - [ ] **Step 3: Verify no code changed**
 
 ```bash
-git status --short -- 'Assets/**'
+git diff --cached --name-only
 ```
 
-Expected: no output from this task's changes (any pre-existing unrelated modifications in the working tree stay untouched — do not stage them).
+Expected: exactly `CLAUDE.md` and
+`.claude/skills/sketch-findings-automation/references/suggestions-panel.md` — nothing under
+`Assets/`. `CLAUDE.md` also carries another session's uncommitted paragraph, so run
+`git diff --cached CLAUDE.md` and confirm every staged hunk is the one this task wrote.
 
 - [ ] **Step 4: Commit**
 
