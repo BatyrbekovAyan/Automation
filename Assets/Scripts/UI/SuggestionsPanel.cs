@@ -128,6 +128,7 @@ public class SuggestionsPanel : MonoBehaviour
         // itself starts above the pad, so the overlap can never touch it.
         if (rt != null) rt.sizeDelta = new Vector2(rt.sizeDelta.x, slotCanvasPx + _safeInsetCanvasPx);
         ApplySafeInset(_safeInsetCanvasPx);
+        PositionStates();
     }
 
     // The safe pad lives on the CONTENT region, not the panel rect: viewport, the fade glued to
@@ -141,15 +142,88 @@ public class SuggestionsPanel : MonoBehaviour
             var fadeRt = (RectTransform)bottomFade.transform;
             fadeRt.anchoredPosition = new Vector2(fadeRt.anchoredPosition.x, safePx);
         }
-        ApplyStateInset(emptyState, safePx);
-        ApplyStateInset(errorState, safePx);
     }
 
-    private static void ApplyStateInset(GameObject state, float safePx)
+    // --- Empty / error block chassis (device fix 2026-08-19) ----------------
+    // The builder stretches these overlays across the card area, which made the block SHRINK with
+    // the slot rather than slide out of it: the VerticalLayoutGroup has childControlHeight, so as
+    // its rect fell below the content it lerped the children from preferred toward MIN — and the two
+    // labels are plain TMP with a min of 0, so their rects collapsed while the glyphs kept drawing
+    // and «Нет предложений» printed on top of «Напишите ответ вручную». The «Обновить» pill held its
+    // size because it is the only child with a LayoutElement.minHeight.
+    //
+    // The runtime owns the chassis instead. The block keeps its NATURAL height — a ContentSizeFitter
+    // reads it off the same VerticalLayoutGroup that lays it out, so nothing has to be measured by
+    // hand or kept in sync with the text — and only its POSITION follows the slot
+    // (SuggestionStateLayout.TopOffset). Conversion is idempotent, so a builder re-run cannot undo
+    // it for longer than the next slot change.
+
+    private void EnsureStateChassis(GameObject state)
     {
         if (state == null) return;
         var stateRt = (RectTransform)state.transform;
-        stateRt.offsetMin = new Vector2(stateRt.offsetMin.x, safePx);
+
+        // Already converted — bail before touching the transform. PositionStates runs on every drag
+        // frame, and re-writing anchors there would dirty the layout 60 times a second for nothing.
+        if (stateRt.anchorMin.y == 1f && stateRt.anchorMax.y == 1f && stateRt.pivot.y == 1f
+            && state.GetComponent<ContentSizeFitter>() != null) return;
+
+        // Top-anchored, top-pivoted: anchoredPosition.y then places the block's TOP edge below the
+        // panel's top, which is the one edge that must never be crossed. Horizontal anchors are left
+        // alone, so the block keeps stretching to the panel's width.
+        stateRt.anchorMin = new Vector2(stateRt.anchorMin.x, 1f);
+        stateRt.anchorMax = new Vector2(stateRt.anchorMax.x, 1f);
+        stateRt.pivot = new Vector2(stateRt.pivot.x, 1f);
+
+        var fitter = state.GetComponent<ContentSizeFitter>();
+        if (fitter == null) fitter = state.AddComponent<ContentSizeFitter>();
+        // Vertical only: the width is anchored, and a horizontal fit would fight it.
+        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+    }
+
+    private void PositionStates()
+    {
+        // The card area is the panel minus its chrome; the safe pad sits BELOW the area, so it is
+        // already out of this height (panel = slot + safe, area = panel - chrome - safe).
+        float areaHeight = Mathf.Max(0f, _slotCanvasPx - ChromeHeightCanvasPx);
+        PositionState(emptyState, areaHeight);
+        PositionState(errorState, areaHeight);
+    }
+
+    private void PositionState(GameObject state, float areaHeight)
+    {
+        if (state == null) return;
+        EnsureStateChassis(state);
+        var stateRt = (RectTransform)state.transform;
+        float top = SuggestionStateLayout.TopOffset(areaHeight, stateRt.rect.height);
+        stateRt.anchoredPosition = new Vector2(
+            stateRt.anchoredPosition.x, -(ChromeHeightCanvasPx + top));
+    }
+
+    // The activation path only. A state switched on this frame has not had its ContentSizeFitter
+    // run, so its rect still holds the builder's stretched height — placing it against that reads as
+    // a one-frame jump exactly when the block appears. Settling the layout first costs a rebuild on
+    // a state change (never on a drag frame, where PositionStates alone is called and the height is
+    // already correct and unchanging).
+    private void RebuildAndPositionState(GameObject state)
+    {
+        if (state != null && state.activeInHierarchy)
+        {
+            EnsureStateChassis(state);
+            LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)state.transform);
+        }
+        PositionStates();
+        // ...and a belt for the first show of all, where the PANEL's own width may not be settled
+        // yet, so even a forced rebuild measures the text against nothing. Same trick, same reason
+        // as UpdateFadeNextFrame.
+        if (gameObject.activeInHierarchy) StartCoroutine(PositionStatesNextFrame());
+    }
+
+    private IEnumerator PositionStatesNextFrame()
+    {
+        yield return null;
+        PositionStates();
     }
 
     /// <summary>Occupy the slot. Position comes from <see cref="FollowInset"/> — activate first,
@@ -230,6 +304,7 @@ public class SuggestionsPanel : MonoBehaviour
         Clear();
         SetActiveSafe(errorState, false);
         SetActiveSafe(emptyState, true);
+        RebuildAndPositionState(emptyState);
     }
 
     private void RenderError()
@@ -237,6 +312,7 @@ public class SuggestionsPanel : MonoBehaviour
         Clear();
         SetActiveSafe(emptyState, false);
         SetActiveSafe(errorState, true);
+        RebuildAndPositionState(errorState);
     }
 
     private void HandleCardTapped(string text) => OnCardTapped?.Invoke(text);
