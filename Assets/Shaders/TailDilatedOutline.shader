@@ -43,6 +43,7 @@ Shader "UI/TailDilatedOutline" {
             CGPROGRAM
             #include "UnityCG.cginc"
             #include "UnityUI.cginc"
+            #pragma target 3.0
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_local _ UNITY_UI_CLIP_RECT
@@ -90,10 +91,19 @@ Shader "UI/TailDilatedOutline" {
                 float2( 0.7071, -0.7071), float2(-0.7071, -0.7071)
             };
 
+            // Branchless, and sampled at an EXPLICIT mip level — both halves matter.
+            // This runs nine times per pixel from the dilation loop below, and the old
+            // `if (out of bounds) return 0;` guard put an implicit-derivative tex2D inside
+            // divergent control flow, where the mip level it picks is undefined. Desktop
+            // compilers flatten that branch, so the Editor rendered a clean tail; the mobile
+            // compilers keep it, the LOD collapsed toward the smallest mip of the tail sprite
+            // (mean alpha ~0.24) and the whole quad came out as a uniform 24%-opacity box —
+            // the grey square seen around every tail on device.
             float SampleArtAlpha(float2 artUV) {
-                if (artUV.x < 0.0 || artUV.x > 1.0 || artUV.y < 0.0 || artUV.y > 1.0) return 0.0;
-                float2 suv = lerp(_OuterUV.xy, _OuterUV.zw, artUV);
-                return tex2D(_MainTex, suv).a;
+                float2 suv = lerp(_OuterUV.xy, _OuterUV.zw, saturate(artUV));
+                float a = tex2Dlod(_MainTex, float4(suv, 0, 0)).a;
+                float2 inBounds = step(float2(0.0, 0.0), artUV) * step(artUV, float2(1.0, 1.0));
+                return a * inBounds.x * inBounds.y;
             }
 
             fixed4 frag (v2f i) : SV_Target {
