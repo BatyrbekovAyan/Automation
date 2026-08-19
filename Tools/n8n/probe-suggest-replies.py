@@ -117,6 +117,7 @@ PROBES = [
         ("titles_not_move_names", lambda c: not any(x["label"] in MOVES for x in c)),
         ("stays_on_the_roses_offer", lambda c: sum(
             1 for x in c if re.search(r"роз|букет|годовщин|доставк", x["text"].lower())) >= 3),
+        ("no_return_to_breadth", lambda c: not any(re.search(r"какой повод|какой бюджет", x["text"].lower()) for x in c)),
     ]),
     ("G_kazakh_mirror", base("flowers", "Цветы Астана", FLOWER_CAT,
         [m("client", "сәлеметсіз бе, 25 раушан гүлінен жасалған букет қанша тұрады?")]), [
@@ -137,6 +138,14 @@ PROBES = [
          m("client", "спасибо")]), [
         ("four_variant_cards", lambda c: len(c) == 4),
         ("distinct_titles", lambda c: len({x["label"].lower() for x in c}) == len(c)),
+        ("not_echoing_spasibo", lambda c: not any(x["text"].strip().lower().startswith("спасибо") for x in c)),
+        ("no_sales_pitch_on_thanks", lambda c: not any(re.search(r"\d[\d\s]*тг|скидк|акци|ассортимент", x["text"].lower()) for x in c)),
+    ]),
+    ("R_explore_direction_diversity", base("flowers", "Цветы Астана", FLOWER_CAT,
+        [m("client", "хочу букет на день рождения мамы, что посоветуете и сколько будет стоить?")],
+        know=KNOW), [
+        ("moves_are_diverse", lambda c: len({x.get("move") for x in c}) >= 3),
+        ("texts_not_near_identical", lambda c: len({x["text"][:40].lower() for x in c}) == len(c)),
     ]),
 ]
 
@@ -145,6 +154,10 @@ PROBES = [
 ABSTAIN_PROBES = [
     ("N_personal_abstain", base("flowers", "Цветы Астана", FLOWER_CAT,
         [m("client", "братан ну что, идём сегодня на футбол вечером? все наши собираются")])),
+    ("N2_banter_abstain", base("flowers", "Цветы Астана", FLOWER_CAT,
+        [m("client", "ахахах ну ты дал, красавчик 😂")])),
+    ("N3_wrong_recipient_abstain", base("kaspi_seller", "TechStore KZ", KASPI_CAT,
+        [m("client", "ой, извините, это сообщение не вам")])),
 ]
 
 
