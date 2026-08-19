@@ -3,8 +3,9 @@ public enum SuggestionSlotState
 {
     /// <summary>
     /// Slot height 0, composer flush to the screen bottom. No TAP ever reaches it — only a downward
-    /// drag of the handle, or the two events that end the suggestions surface itself (AnsweredRun,
-    /// ReplyModeOff).
+    /// drag of the handle, a thread pull-down (over the panel it settles through AfterDrag like the
+    /// handle, over a live keyboard through PullDownDismiss), or the two events that end the
+    /// suggestions surface itself (AnsweredRun, ReplyModeOff).
     /// </summary>
     Collapsed,
 
@@ -65,8 +66,9 @@ public enum SuggestionSlotInput
 /// The slot's transition table (sketch-005 winner E). The bottom slot holds exactly one tenant and
 /// the suggestions panel — not the keyboard — is its DEFAULT one: the native keyboard exists only
 /// while the composer field is focused, and no TAP ever collapses the slot — Collapsed is reached by
-/// a downward drag of the handle (see <see cref="AfterDrag"/>) or by the two events that end the
-/// suggestions surface itself, AnsweredRun and ReplyModeOff. This seam protects the two rules a
+/// a downward drag of the handle (see <see cref="AfterDrag"/>), a thread pull-down (over the panel
+/// it settles through AfterDrag like the handle, over a live keyboard through PullDownDismiss), or
+/// by the two events that end the suggestions surface itself, AnsweredRun and ReplyModeOff. This seam protects the two rules a
 /// controller keeps breaking by hand: a tap NEVER hides an open panel, and the first tap on the field
 /// raises the panel WITHOUT focusing it (focusing there would open the keyboard underneath a panel
 /// that is still rising — the dip the whole model exists to avoid).

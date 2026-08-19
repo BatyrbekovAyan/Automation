@@ -3,7 +3,7 @@ using UnityEngine;
 /// <summary>The three heights the suggestions slot is allowed to rest at (sketch-005 model E).</summary>
 public enum SlotDetent
 {
-    /// <summary>Slot height 0, composer flush to the screen bottom — reachable ONLY by dragging the handle down, never by a tap.</summary>
+    /// <summary>Slot height 0, composer flush to the screen bottom — reachable by dragging the handle down or by pulling the message thread down past the composer, never by a tap.</summary>
     Collapsed,
 
     /// <summary>The slot's default height: the measured keyboard height, so a panel ⇄ keyboard swap never moves the composer.</summary>

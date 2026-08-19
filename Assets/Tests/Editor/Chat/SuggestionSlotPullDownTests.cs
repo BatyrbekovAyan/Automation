@@ -98,4 +98,67 @@ public class SuggestionSlotPullDownTests
     public void HeightFromPull_EngagedAtZero_StaysAtZero()
         => Assert.AreEqual(0f, SuggestionSlotPullDown.HeightFromPull(
             0f, ComposerTop - 100f, ComposerTop), 0.0001f);
+
+    // --- Eligible ------------------------------------------------------------
+    // The first assertion is the one that matters: over a LIVE keyboard the gesture must be
+    // eligible even though the panel owns nothing. The recognizer asks this BEFORE it checks who
+    // holds the slot, so narrowing the rule to "the panel owns it" would silently delete the whole
+    // one-shot keyboard dismissal on device while the suite stayed green.
+
+    private static bool AllClear(
+        bool keyboardVisible = false, bool panelOwnsSlot = true, bool alreadyDragging = false,
+        bool attachSheetOpen = false, bool reactionBarShowing = false, bool photoViewerOpen = false,
+        bool backSwipeSliding = false, bool chatOpenSettled = true)
+        => SuggestionSlotPullDown.Eligible(
+            keyboardVisible, panelOwnsSlot, alreadyDragging,
+            attachSheetOpen, reactionBarShowing, photoViewerOpen,
+            backSwipeSliding, chatOpenSettled);
+
+    [Test]
+    public void Eligible_OverALiveKeyboard_EvenWithNoPanel()
+        => Assert.IsTrue(AllClear(keyboardVisible: true, panelOwnsSlot: false));
+
+    [Test]
+    public void Eligible_WithThePanelUp_AndNoKeyboard()
+        => Assert.IsTrue(AllClear(keyboardVisible: false, panelOwnsSlot: true));
+
+    [Test]
+    public void Eligible_WithNeitherTenant_IsFalse()
+        => Assert.IsFalse(AllClear(keyboardVisible: false, panelOwnsSlot: false));
+
+    [Test]
+    public void Eligible_WhileAlreadyDragging_IsFalse()
+        => Assert.IsFalse(AllClear(alreadyDragging: true));
+
+    [Test]
+    public void Eligible_WithTheAttachSheetOpen_IsFalse()
+        => Assert.IsFalse(AllClear(attachSheetOpen: true));
+
+    [Test]
+    public void Eligible_WithTheReactionBarShowing_IsFalse()
+        => Assert.IsFalse(AllClear(reactionBarShowing: true));
+
+    [Test]
+    public void Eligible_WithThePhotoViewerOpen_IsFalse()
+        => Assert.IsFalse(AllClear(photoViewerOpen: true));
+
+    [Test]
+    public void Eligible_DuringABackSwipe_IsFalse()
+        => Assert.IsFalse(AllClear(backSwipeSliding: true));
+
+    [Test]
+    public void Eligible_BeforeTheChatHasSettled_IsFalse()
+        => Assert.IsFalse(AllClear(chatOpenSettled: false));
+
+    // Every veto must hold over a live keyboard too — the branch that has no panel to fall back on.
+    [Test]
+    public void Eligible_OverAKeyboard_StillRespectsEveryVeto()
+    {
+        Assert.IsFalse(AllClear(keyboardVisible: true, panelOwnsSlot: false, alreadyDragging: true));
+        Assert.IsFalse(AllClear(keyboardVisible: true, panelOwnsSlot: false, attachSheetOpen: true));
+        Assert.IsFalse(AllClear(keyboardVisible: true, panelOwnsSlot: false, reactionBarShowing: true));
+        Assert.IsFalse(AllClear(keyboardVisible: true, panelOwnsSlot: false, photoViewerOpen: true));
+        Assert.IsFalse(AllClear(keyboardVisible: true, panelOwnsSlot: false, backSwipeSliding: true));
+        Assert.IsFalse(AllClear(keyboardVisible: true, panelOwnsSlot: false, chatOpenSettled: false));
+    }
 }

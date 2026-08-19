@@ -97,6 +97,12 @@ public class SuggestionsController : MonoBehaviour
     private bool _threadPressActive;
     private Vector2 _threadPressPos;
     private bool _threadPressEligible;
+    // A press the pull-down claimed is NOT a thread tap, however close its endpoints end up.
+    // IsThreadTap measures press->release endpoints only, so an ordinary drag down past the
+    // composer and back re-reads as a tap at release — and from Collapsed a thread tap RAISES the
+    // panel, undoing the very dismissal the pull-down just performed. Ownership, not geometry, is
+    // what separates them.
+    private bool _pressClaimedByPullDown;
     private readonly List<RaycastResult> _tapHits = new List<RaycastResult>();   // reused; no GC per press
     private PointerEventData _tapEventData;                                      // ditto — built once
 
@@ -262,6 +268,7 @@ public class SuggestionsController : MonoBehaviour
         _pullDown.Reset();               // a pull-down cut short by the chat closing
         _threadPressActive = false;      // a press in flight when the chat closed must not
         _threadPressEligible = false;    // resolve into a tap on the next screen
+        _pressClaimedByPullDown = false;
         if (_keyboardMover != null) _keyboardMover.TrackInsetImmediately = false;   // a drag cut short by the chat closing
         if (_panel != null) _panel.Deactivate();
         if (ChatManager.Instance != null) ChatManager.Instance.OnLiveMessagesReceived -= HandleLive;
@@ -860,7 +867,11 @@ public class SuggestionsController : MonoBehaviour
     /// gesture may shrink the slot and put it back, never grow it. Dragging the finger back up past
     /// the composer must restore the panel and stop — expanding stays the handle's job.
     /// </summary>
-    private void HandlePullDownGrabbed() => BeginSlotDrag(ceilingIsEngageHeight: true);
+    private void HandlePullDownGrabbed()
+    {
+        _pressClaimedByPullDown = true;
+        BeginSlotDrag(ceilingIsEngageHeight: true);
+    }
 
     private void BeginSlotDrag(bool ceilingIsEngageHeight)
     {
@@ -927,12 +938,16 @@ public class SuggestionsController : MonoBehaviour
     {
         get
         {
-            if (_keyboardMover == null || _draggingSlot) return false;
-            bool kbUp = _keyboardMover.NativeKeyboardVisible;
-            if (!kbUp && !PanelOwnsSlot) return false;   // already collapsed — nothing to pull down
-            if (AttachOpen || ReactionBarShowing || PhotoViewerOpen) return false;
-            if (SwipeToBack.IsSliding) return false;
-            return SlotOpenAllowed;
+            if (_keyboardMover == null) return false;
+            return SuggestionSlotPullDown.Eligible(
+                keyboardVisible: _keyboardMover.NativeKeyboardVisible,
+                panelOwnsSlot: PanelOwnsSlot,
+                alreadyDragging: _draggingSlot,
+                attachSheetOpen: AttachOpen,
+                reactionBarShowing: ReactionBarShowing,
+                photoViewerOpen: PhotoViewerOpen,
+                backSwipeSliding: SwipeToBack.IsSliding,
+                chatOpenSettled: SlotOpenAllowed);
         }
     }
 
@@ -948,12 +963,17 @@ public class SuggestionsController : MonoBehaviour
     /// input with it still true would leave the yield live, and the next frame's «the keyboard
     /// bounced away before taking the slot» branch in <see cref="Update"/> would put the panel back
     /// up, producing exactly the outcome this method exists to prevent. Clearing it lets HidePanel
-    /// run in full. The composer still cannot dip, because the applied rise is
-    /// max(keyboard, slot) and the live keyboard holds it up until its own animation finishes.
+    /// run in full. On iOS <c>TouchScreenKeyboard.visible</c> flips false the instant the dismissal
+    /// STARTS, not when it finishes, so <c>KeyboardAwarePanel.EffectiveAreaCanvasPx</c> drops to 0
+    /// immediately — the live keyboard does NOT hold the composer up. What actually paces the
+    /// composer down is <see cref="HidePanel"/>'s own 0.20s inset tween together with
+    /// <c>KeyboardAwarePanel</c>'s 0.12s SmoothDamp, so that pacing needs a device check against the
+    /// native ~250ms hide to confirm it neither outruns nor lags the real keyboard.
     /// </para>
     /// </summary>
     private void HandleKeyboardPullDown()
     {
+        _pressClaimedByPullDown = true;
         _yieldingToKeyboard = false;
         ApplySlotInput(SuggestionSlotInput.PullDownDismiss);
     }
@@ -1313,6 +1333,7 @@ public class SuggestionsController : MonoBehaviour
         if (pointer.press.wasPressedThisFrame)
         {
             _threadPressActive = true;
+            _pressClaimedByPullDown = false;
             _threadPressPos = pointer.position.ReadValue();
             // WHERE the press landed can only be known while the finger is down — the raycast needs
             // a live pointer position. WHETHER it was a fling-stop is read at RELEASE instead:
@@ -1334,7 +1355,7 @@ public class SuggestionsController : MonoBehaviour
                 release.x / scale, release.y / scale,
                 pressWasInsideThread: true,
                 scrollWasFlinging: ScrollClickBlocker.IsBlocking,
-                otherGestureOwnedIt: ReactionBarShowing))
+                otherGestureOwnedIt: ReactionBarShowing || _pressClaimedByPullDown))
             return;
 
         ApplySlotInput(SuggestionSlotInput.ThreadTap);

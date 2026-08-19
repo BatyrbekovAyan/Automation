@@ -49,4 +49,25 @@ public static class SuggestionSlotPullDown
         float heightAtEngageCanvasPx, float fingerCanvasY, float engageFingerCanvasY)
         => SuggestionSlotGestures.HeightFromDrag(
             heightAtEngageCanvasPx, fingerCanvasY - engageFingerCanvasY, heightAtEngageCanvasPx);
+
+    /// <summary>
+    /// Whether a pull-down may engage at all. This is a pure rule for one specific reason: the
+    /// disjunction on the first line is the keyboard branch's life support. The recognizer asks
+    /// this BEFORE it looks at who owns the slot, so narrowing it to <paramref name="panelOwnsSlot"/>
+    /// alone would make the one-shot keyboard dismissal unreachable on device while every EditMode
+    /// test stayed green — a composed-output failure this project has already paid for once.
+    /// Every other argument is a region that already belongs to someone else.
+    /// </summary>
+    public static bool Eligible(
+        bool keyboardVisible, bool panelOwnsSlot, bool alreadyDragging,
+        bool attachSheetOpen, bool reactionBarShowing, bool photoViewerOpen,
+        bool backSwipeSliding, bool chatOpenSettled)
+    {
+        // Neither tenant holds the slot: it is already collapsed and there is nothing to pull down.
+        if (!keyboardVisible && !panelOwnsSlot) return false;
+        if (alreadyDragging) return false;
+        if (attachSheetOpen || reactionBarShowing || photoViewerOpen) return false;
+        if (backSwipeSliding) return false;
+        return chatOpenSettled;
+    }
 }
