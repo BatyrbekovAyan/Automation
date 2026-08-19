@@ -45,8 +45,6 @@ public class TabData
     [Tooltip("Icon sprite shown when this tab is ACTIVE (filled / coloured variant).")]
     public Sprite activeIcon;
     
-    [Tooltip("Color of the Label text when this tab is ACTIVE (filled / coloured variant).")]
-    public Color activeLabelColor;
 }
 
 /// <summary>
@@ -56,7 +54,7 @@ public class TabData
 ///   1. Attach this script to the BottomNavPanel GameObject.
 ///   2. Populate the <see cref="tabs"/> list in the Inspector
 ///      (one entry per tab, in left-to-right display order).
-///   3. Assign <see cref="activeColor"/> and <see cref="inactiveColor"/>.
+///   3. Colours come from NavTabPalette — nothing to assign per tab.
 ///   4. Set <see cref="defaultTabIndex"/> to the tab that should
 ///      be selected when the scene first loads.
 /// </summary>
@@ -89,15 +87,10 @@ public class BottomTabManager : MonoBehaviour
     [Tooltip("Add one TabData entry per tab, ordered left to right.")]
     [SerializeField] private List<TabData> tabs = new();
 
-    // [Header("Colour Scheme")]
-    // [Tooltip("Colour applied to the icon and label of the ACTIVE tab.")]
-    // [SerializeField] private Color activeColor = new Color(0.07f, 0.53f, 0.45f); // WhatsApp teal
-    
-    // Theme-routed: ApplyTabState re-stamps this on every tab switch, so a
-    // serialized literal would keep the inactive labels light-mode grey on the
-    // dark nav bar. The ACTIVE colour stays per-tab (it carries channel/brand
-    // identity), only the muted rest follows the theme.
-    private static Color inactiveColor => Theme.Color(ThemeRole.InkTertiary);
+    // Colours are theme-routed through NavTabPalette and re-stamped on every
+    // tab switch and on Theme.Changed, so a serialized literal would strand the
+    // bar in the other mode's palette. See NavTabPalette for why the active
+    // state is one brand accent rather than the old per-tab colour.
 
     [Header("Startup")]
     [Tooltip("Zero-based index of the tab selected when the scene loads.")]
@@ -153,6 +146,22 @@ public class BottomTabManager : MonoBehaviour
     {
         // Select the default tab once all other Start() calls have run
         SwitchTab(defaultTabIndex);
+    }
+
+    private void OnEnable() => Theme.Changed += RepaintTabs;
+
+    private void OnDisable() => Theme.Changed -= RepaintTabs;
+
+    /// <summary>
+    /// Re-stamps every tab's colours after a light/dark switch. The bar paints
+    /// its icons and labels itself — they carry no ThemedColor bindings, on
+    /// purpose, since two owners would fight over the active tab — so without
+    /// this the bar would keep the previous mode's palette until the next tap.
+    /// </summary>
+    private void RepaintTabs()
+    {
+        for (int i = 0; i < tabs.Count; i++)
+            ApplyTabColours(tabs[i], i == _activeTabIndex);
     }
 
     // ------------------------------------------------------------------ //
@@ -245,12 +254,28 @@ public class BottomTabManager : MonoBehaviour
     /// <param name="isActive">Whether to apply the active state.</param>
     private void ApplyTabState(TabData tab, bool isActive)
     {
-        Color targetColor = isActive ? tab.activeLabelColor : inactiveColor;
+        ApplyTabColours(tab, isActive);
+
+        // --- Screen panel ---
+        if (tab.screenPanel != null)
+            tab.screenPanel.SetActive(isActive);
+    }
+
+    /// <summary>
+    /// Paints one tab's icon and label. Split out of <see cref="ApplyTabState"/>
+    /// so a theme switch can repaint without re-asserting panel visibility.
+    /// </summary>
+    private static void ApplyTabColours(TabData tab, bool isActive)
+    {
+        Color targetColor = NavTabPalette.ColorFor(isActive);
 
         // --- Icon ---
         if (tab.iconImage != null)
         {
-            // tab.iconImage.color = targetColor;
+            // The glyphs are white-on-transparent, so this tint is the only
+            // thing making them visible: untinted, they disappear against the
+            // light theme's white bar.
+            tab.iconImage.color = targetColor;
 
             // Swap sprite only when distinct sprites have been provided
             if (isActive && tab.activeIcon != null)
@@ -262,10 +287,6 @@ public class BottomTabManager : MonoBehaviour
         // --- Label ---
         if (tab.labelText != null)
             tab.labelText.color = targetColor;
-
-        // --- Screen panel ---
-        if (tab.screenPanel != null)
-            tab.screenPanel.SetActive(isActive);
     }
 
     /// <summary>

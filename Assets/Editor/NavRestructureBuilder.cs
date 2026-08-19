@@ -21,7 +21,7 @@ using UnityEngine.UI;
 ///   (c) Bots empty state   — a centered hero + title + body + CTA under the
 ///       BotsPage host, shown when zero bots exist.
 ///
-/// The tab-2 rewire (tabName/screenPanel/activeLabelColor + label text) is done
+/// The tab-2 rewire (tabName/screenPanel + label text) is done
 /// here via SerializedObject rather than by hand in the Inspector. Runtime button
 /// listeners that target singletons (CloseAddBotForm, StartNewBot) are wired in
 /// Manager.Start against three serialized fields this builder stamps.
@@ -417,7 +417,10 @@ public static class NavRestructureBuilder
     {
         newTab.FindPropertyRelative("tabName").stringValue = "Сводка";
         newTab.FindPropertyRelative("screenPanel").objectReferenceValue = dashboard;
-        newTab.FindPropertyRelative("activeLabelColor").colorValue = Primary;
+        // No colour is stamped here any more: tab colours moved to NavTabPalette,
+        // which resolves them from the theme for every tab alike. The old
+        // per-tab activeLabelColor field is gone, and FindPropertyRelative on it
+        // would return null and throw.
 
         // Update the scene TMP label text on the tab.
         var labelTmp = newTab.FindPropertyRelative("labelText").objectReferenceValue as TextMeshProUGUI;
