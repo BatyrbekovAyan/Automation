@@ -17,6 +17,7 @@ public class ScrollTopInsetCompensator : MonoBehaviour
 {
     private RectTransform _rt;
     private ScrollRect _scroll;
+    private SnappyFlickScrollRect _snappy;   // the same component, typed for its drag flag
     private KeyboardAwarePanel _mover;
     private float _restTopOffset;
     private float _lastApplied;
@@ -25,6 +26,7 @@ public class ScrollTopInsetCompensator : MonoBehaviour
     {
         _rt = (RectTransform)transform;
         _scroll = GetComponent<ScrollRect>();
+        _snappy = _scroll as SnappyFlickScrollRect;
         _mover = GetComponentInParent<KeyboardAwarePanel>();
         _restTopOffset = _rt.offsetMax.y;
     }
@@ -51,6 +53,11 @@ public class ScrollTopInsetCompensator : MonoBehaviour
     private void ClampContentIntoRange()
     {
         if (_scroll == null || _scroll.content == null) return;
+        // The finger outranks the clamp: mid-drag the ScrollRect owns the content position and is
+        // deliberately holding it OUTSIDE the legal range (elastic overscroll). See
+        // ScrollTopInsetMath.ShouldClampContent — this only became reachable once the slot inset
+        // started moving during a gesture.
+        if (!ScrollTopInsetMath.ShouldClampContent(_snappy != null && _snappy.IsDragging)) return;
         RectTransform viewport = _scroll.viewport != null ? _scroll.viewport : _rt;
         Vector2 pos = _scroll.content.anchoredPosition;
         float clamped = ScrollTopInsetMath.ClampContentY(pos.y, _scroll.content.rect.height, viewport.rect.height);

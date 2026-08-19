@@ -39,13 +39,31 @@ public class SnappyFlickScrollRect : ScrollRect
         base.OnInitializePotentialDrag(eventData);
     }
 
+    /// <summary>
+    /// True between OnBeginDrag and OnEndDrag — the window in which this ScrollRect owns
+    /// content.anchoredPosition, ELASTIC OVERSCROLL included. Anything else that writes that
+    /// position must stand down while this is set, or it fights the rubber band under the finger
+    /// (see ScrollTopInsetMath.ShouldClampContent for the device symptom that forced this).
+    /// </summary>
+    public bool IsDragging { get; private set; }
+
     public override void OnBeginDrag(PointerEventData eventData)
     {
         base.OnBeginDrag(eventData);
 
+        IsDragging = true;
         dragStartTime = Time.unscaledTime;
         dragStartPosition = content.anchoredPosition;
         DragBegan?.Invoke(eventData);
+    }
+
+    // A drag can be lost without an OnEndDrag (the chat screen closing mid-gesture). Clearing the
+    // flag here keeps a stranded `true` from suppressing the content clamp for the rest of the
+    // session — it would fail silently, as an inset change that never corrects the scroll.
+    protected override void OnDisable()
+    {
+        IsDragging = false;
+        base.OnDisable();
     }
 
     public override void OnDrag(PointerEventData eventData)
@@ -57,6 +75,8 @@ public class SnappyFlickScrollRect : ScrollRect
     public override void OnEndDrag(PointerEventData eventData)
     {
         base.OnEndDrag(eventData);
+
+        IsDragging = false;
 
         float dragDuration = Time.unscaledTime - dragStartTime;
 

@@ -27,6 +27,29 @@ public static class ScrollTopInsetMath
     /// grows back (keyboard/panel closing) while the user sits at the very top would leave
     /// the thread parked past its own end without this.
     /// </summary>
+    /// <summary>
+    /// Whether the compensator may clamp the content after a viewport resize. It may not while a
+    /// finger owns the scroll: during a drag the ScrollRect itself owns content.anchoredPosition and
+    /// deliberately allows ELASTIC OVERSCROLL, which is by definition outside the very range
+    /// <see cref="ClampContentY"/> enforces — so clamping there does not correct the position, it
+    /// tears the rubber band away under the finger.
+    /// <para>
+    /// This was invisible until the slot inset started moving DURING a gesture (the thread
+    /// pull-down, 2026-08-19). Device symptom, short thread scrolled to the top: the stretch
+    /// collapses and the messages snap upward the instant the pull-down engages, then stretch again
+    /// the moment the slot bottoms out and the inset stops changing. The window is exactly "the
+    /// inset is moving", because that is the only time the compensator runs at all.
+    /// </para>
+    /// <para>
+    /// Skipping is safe in both directions. A pull-down only ever GROWS the reachable range (its
+    /// ceiling is the height it engaged at, so it can never push the inset past where it already
+    /// was), and on release ScrollRect's own elasticity settles the content against the new
+    /// viewport. The clamp still runs for every non-drag resize — the keyboard or the panel opening
+    /// and closing — which is the case it was written for.
+    /// </para>
+    /// </summary>
+    public static bool ShouldClampContent(bool scrollIsDragging) => !scrollIsDragging;
+
     public static float ClampContentY(float contentY, float contentHeight, float viewportHeight)
     {
         var maxDown = Math.Max(0f, contentHeight - viewportHeight);
