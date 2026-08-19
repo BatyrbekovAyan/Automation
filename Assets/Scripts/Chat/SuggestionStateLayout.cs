@@ -27,14 +27,23 @@ public static class SuggestionStateLayout
 {
     /// <summary>
     /// Distance from the card area's TOP edge down to the block's top edge, canvas units.
-    /// Never negative: that is the whole point — the block may leave through the bottom, never
-    /// through the top. Any non-finite input is a geometry read that has not settled yet (a rect
-    /// measured before its first layout pass) and yields 0, which pins the block to the area's top —
-    /// the safe end, since it can only ever be too low, never over the header.
+    /// Never negative: that is half the point — the block may leave through the bottom, never
+    /// through the top.
+    /// <para>
+    /// The other half is what counts as a MEASUREMENT. A block height that is zero or negative is
+    /// not a short block, it is a rect whose ContentSizeFitter has not run yet — and a negative one
+    /// is the normal state for exactly one frame, because converting the overlay off stretch anchors
+    /// leaves the old inset sum (a negative number) sitting in sizeDelta.y until the fitter
+    /// overwrites it. Centring against that pushes the block BELOW the area's middle, which shipped
+    /// as "on first chat open the empty state sits almost at the bottom" (device 2026-08-20).
+    /// So an unmeasured block pins to the top: wrong for one frame at the safe end, where the
+    /// caller's next placement corrects it, instead of wrong at the end nobody expects.
+    /// </para>
     /// </summary>
     public static float TopOffset(float areaHeightCanvasPx, float blockHeightCanvasPx)
     {
         if (!float.IsFinite(areaHeightCanvasPx) || !float.IsFinite(blockHeightCanvasPx)) return 0f;
+        if (blockHeightCanvasPx <= 0f) return 0f;   // not measured yet — never "centre on nothing"
         return Mathf.Max(0f, (areaHeightCanvasPx - blockHeightCanvasPx) * 0.5f);
     }
 }

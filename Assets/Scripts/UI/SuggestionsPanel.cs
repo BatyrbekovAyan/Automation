@@ -42,6 +42,7 @@ public class SuggestionsPanel : MonoBehaviour
     private float _slotCanvasPx;       // panel height — the keyboard slot's effective height
     private float _safeInsetCanvasPx;  // home-bar clearance applied inside the slot
     private bool _fadeSuppressed;      // sticky "never show the fade" (expanded detent — nothing is cut off)
+    private float _placedBlockHeight = float.NaN;   // block height the empty/error placement was computed against
 
     /// <summary>View-level visibility. The controller owns INTENT (its own sheet-open state) —
     /// the panel can be active-but-covered while the native keyboard slides over it.</summary>
@@ -180,11 +181,46 @@ public class SuggestionsPanel : MonoBehaviour
         stateRt.anchorMax = new Vector2(stateRt.anchorMax.x, 1f);
         stateRt.pivot = new Vector2(stateRt.pivot.x, 1f);
 
+        // Setting anchors does NOT recompute sizeDelta — and on a stretched rect sizeDelta.y held the
+        // inset SUM, a negative number. The moment the Y anchors collapse to a line that number
+        // becomes the height, so the block is negative-tall until the fitter overwrites it. Zero it
+        // here so no consumer can ever read the leftover.
+        stateRt.sizeDelta = new Vector2(stateRt.sizeDelta.x, 0f);
+
         var fitter = state.GetComponent<ContentSizeFitter>();
         if (fitter == null) fitter = state.AddComponent<ContentSizeFitter>();
         // Vertical only: the width is anchored, and a horizontal fit would fight it.
         fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
         fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+    }
+
+    /// <summary>
+    /// Re-place the block the frame its natural height first becomes known. WHICH frame that is
+    /// cannot be ordered from here: it depends on when the state was switched on, whether this panel
+    /// was active at the time, and whether the canvas had ever been laid out — the forced rebuild on
+    /// the show path covers the common case and misses the first chat open, where the panel's own
+    /// width is not settled yet. Keying on the measured HEIGHT instead of on a frame count closes
+    /// all of them. It cannot reintroduce the drift that settled-only positioning exists to prevent:
+    /// a collapse changes the AREA, never the block, so this fires once and then never again.
+    /// </summary>
+    void LateUpdate()
+    {
+        GameObject active = ActiveStateBlock;
+        if (active == null) return;
+        float measured = ((RectTransform)active.transform).rect.height;
+        if (Mathf.Approximately(measured, _placedBlockHeight)) return;
+        _placedBlockHeight = measured;
+        PositionStates();
+    }
+
+    private GameObject ActiveStateBlock
+    {
+        get
+        {
+            if (emptyState != null && emptyState.activeInHierarchy) return emptyState;
+            if (errorState != null && errorState.activeInHierarchy) return errorState;
+            return null;
+        }
     }
 
     private void PositionStates()

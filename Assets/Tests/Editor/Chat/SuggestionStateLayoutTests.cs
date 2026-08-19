@@ -43,8 +43,17 @@ public class SuggestionStateLayoutTests
         Assert.AreEqual(0f, SuggestionStateLayout.TopOffset(float.PositiveInfinity, Block), 0.001f);
     }
 
-    // A block measured as zero (state never laid out) must not push itself half an area down.
+    // An UNMEASURED block pins to the top. This test previously asserted the opposite — that a zero
+    // height still centres — which is how "on first chat open the empty state sits almost at the
+    // bottom" shipped: converting the overlay off stretch anchors leaves the old inset sum, a
+    // NEGATIVE number, in sizeDelta.y until the ContentSizeFitter overwrites it, and centring
+    // against a negative height pushes the block past the area's middle. Zero and negative are not
+    // heights, they are "the fitter has not run".
     [Test]
-    public void TopOffset_UnmeasuredBlock_StillCentresOnTheArea()
-        => Assert.AreEqual(300f, SuggestionStateLayout.TopOffset(600f, 0f), 0.001f);
+    public void TopOffset_UnmeasuredBlock_PinsToTheTop()
+        => Assert.AreEqual(0f, SuggestionStateLayout.TopOffset(600f, 0f), 0.001f);
+
+    [Test]
+    public void TopOffset_NegativeBlockHeight_PinsToTheTop()
+        => Assert.AreEqual(0f, SuggestionStateLayout.TopOffset(600f, -202f), 0.001f);
 }
