@@ -172,6 +172,42 @@ public class SlotPullDownRecognizerTests
         Assert.AreEqual(1, _releasedHeights.Count);
     }
 
+    // The DOWN edge of the same rule — the hole the test above does not cover. Without the guard in
+    // PointerDown, this second press clears IsEngaged, Released never fires for finger 0, and the
+    // controller is left holding a 1:1 tracking latch nothing will ever release.
+    [Test]
+    public void ASecondPointerPressing_CannotHijackAnEngagedGesture()
+    {
+        _r.PointerDown(0);
+        _r.PointerMoved(0, ComposerTopScreen - 300f, 0.02f);
+        Assert.IsTrue(_r.IsEngaged);
+
+        _r.PointerDown(1);
+
+        Assert.IsTrue(_r.IsEngaged, "the first finger still owns the gesture");
+
+        _r.PointerMoved(0, ComposerTopScreen - 600f, 0.04f);
+        Assert.AreEqual(2, _dragged.Count, "the owner must still drive the slot");
+
+        _r.PointerUp(0, ComposerTopScreen - 600f, 0.06f);
+        Assert.AreEqual(1, _releasedHeights.Count, "Released must still fire for the owner");
+    }
+
+    // ...and the guard must not latch: once the owner lets go, the next finger is free to engage.
+    [Test]
+    public void AfterTheOwnerReleases_ANewPointerCanEngage()
+    {
+        _r.PointerDown(0);
+        _r.PointerMoved(0, ComposerTopScreen - 300f, 0.02f);
+        _r.PointerUp(0, ComposerTopScreen - 300f, 0.04f);
+
+        _r.PointerDown(1);
+        _r.PointerMoved(1, ComposerTopScreen - 300f, 0.06f);
+
+        Assert.IsTrue(_r.IsEngaged, "a press after the previous gesture ended must still engage");
+        Assert.AreEqual(2, _grabs);
+    }
+
     // --- Keyboard branch -----------------------------------------------------
 
     [Test]

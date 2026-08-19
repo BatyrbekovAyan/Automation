@@ -119,6 +119,14 @@ public sealed class SlotPullDownRecognizer
 
     public void PointerDown(int pointerId)
     {
+        // The first pointer owns the gesture until it releases — the same rule
+        // SuggestionSlotDragHandle.OnBeginDrag enforces with its own IsDragging guard. uGUI puts no
+        // pointer filter on ScrollRect.OnBeginDrag and SwipeToReply forwards per bubble, so a second
+        // finger landing anywhere on the thread arrives here too; without this, it would clear
+        // IsEngaged mid-drag and Released would never fire for the finger that is actually dragging,
+        // stranding the slot between detents with the controller's 1:1 tracking latch still held.
+        if (_tracking && pointerId != _pointerId) return;
+
         _tracking = true;
         IsEngaged = false;
         _pointerId = pointerId;
