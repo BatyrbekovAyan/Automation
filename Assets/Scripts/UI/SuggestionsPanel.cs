@@ -85,6 +85,7 @@ public class SuggestionsPanel : MonoBehaviour
     {
         _safeInsetCanvasPx = safeInsetCanvasPx;
         ApplySlotHeight(slotCanvasPx);
+        PositionStates();
         if (gameObject.activeInHierarchy) StartCoroutine(UpdateFadeNextFrame());
         else UpdateFadeVisibility();
     }
@@ -97,6 +98,11 @@ public class SuggestionsPanel : MonoBehaviour
     /// caller MUST settle it when the drag releases — <see cref="SetSlotMetrics"/> at the snapped
     /// detent (it re-measures next frame), or <see cref="SetFadeSuppressed"/> at Expanded.
     /// The safe inset is unchanged during a drag, so it is reused from the last SetSlotMetrics.
+    /// The empty/error block is deliberately NOT re-placed here either. Its offset below the chrome
+    /// is a function of the area's height, so recomputing it per frame would slide the block toward
+    /// the header as the slot shrank — the panel would not descend as one piece. Holding the last
+    /// settled offset makes the chrome and the block travel rigidly, which is what a collapse should
+    /// look like; the caller settles it on release through <see cref="SetSlotMetrics"/>.
     /// LOCKSTEP: the caller must drive the APPLIED inset with this height, not behind it —
     /// <see cref="FollowInset"/> assumes applied ≤ the stored slot height, and a SMOOTHED inset
     /// lagging a shrinking slot (every downward drag) makes applied &gt; slot for the smoothing
@@ -128,7 +134,6 @@ public class SuggestionsPanel : MonoBehaviour
         // itself starts above the pad, so the overlap can never touch it.
         if (rt != null) rt.sizeDelta = new Vector2(rt.sizeDelta.x, slotCanvasPx + _safeInsetCanvasPx);
         ApplySafeInset(_safeInsetCanvasPx);
-        PositionStates();
     }
 
     // The safe pad lives on the CONTENT region, not the panel rect: viewport, the fade glued to
