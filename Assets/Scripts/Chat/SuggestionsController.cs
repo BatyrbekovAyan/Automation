@@ -69,6 +69,12 @@ public class SuggestionsController : MonoBehaviour
     // finger's, so a fast release that barely moved the panel is not a flick.
     private float _slotHeightAtGrabCanvasPx;
 
+    // The SECOND entry into the same gesture (owner request 2026-08-19): drag the thread down past
+    // the composer and the slot follows the finger, iOS-style. Resolved off the thread this
+    // controller already finds, so nothing is serialized and the scene is untouched.
+    private readonly SlotPullDownRecognizer _pullDown = new SlotPullDownRecognizer();
+    private readonly Vector3[] _composerCorners = new Vector3[4];   // reused; no GC on the drag path
+
     // Last measured live keyboard height. The return handoff (the keyboard leaves, the panel takes
     // the slot back) fires on the frame the keyboard is ALREADY gone, so there is nothing left to
     // read — without this the inset would have to tween up from 0 and the composer would dip a full
@@ -167,6 +173,23 @@ public class SuggestionsController : MonoBehaviour
 
         var canvas = GetComponentInParent<Canvas>();
         _rootCanvas = canvas != null ? canvas.rootCanvas : null;
+
+        var threadScroll = _threadInset != null
+            ? _threadInset.GetComponent<SnappyFlickScrollRect>()
+            : null;
+        if (threadScroll != null)
+        {
+            _pullDown.HeightProvider = () => _keyboardMover != null ? _keyboardMover.AppliedBottomInset : 0f;
+            _pullDown.ComposerTopScreenYProvider = ComposerTopScreenY;
+            _pullDown.CanvasScaleProvider = () => CanvasScale;
+            _pullDown.EligibleProvider = () => PullDownEligible;
+            _pullDown.KeyboardVisibleProvider = () => _keyboardMover != null && _keyboardMover.NativeKeyboardVisible;
+            _pullDown.Grabbed += HandlePullDownGrabbed;
+            _pullDown.Dragged += HandleDragMoved;          // the handle's own tracking path, verbatim
+            _pullDown.Released += HandleDragReleased;      // ...and its snap
+            _pullDown.KeyboardPullDown += HandleKeyboardPullDown;
+            _pullDown.Attach(threadScroll);
+        }
     }
 
     /// <summary>Screen px → canvas units, read live (see <see cref="_rootCanvas"/>).</summary>
@@ -202,6 +225,16 @@ public class SuggestionsController : MonoBehaviour
             composer.ActivationVeto = null;                       // never outlive this controller
             composer.ActivationVetoed -= HandleComposerActivationVetoed;
         }
+        _pullDown.Grabbed -= HandlePullDownGrabbed;
+        _pullDown.Dragged -= HandleDragMoved;
+        _pullDown.Released -= HandleDragReleased;
+        _pullDown.KeyboardPullDown -= HandleKeyboardPullDown;
+        _pullDown.HeightProvider = null;                   // never outlive this controller
+        _pullDown.ComposerTopScreenYProvider = null;
+        _pullDown.CanvasScaleProvider = null;
+        _pullDown.EligibleProvider = null;
+        _pullDown.KeyboardVisibleProvider = null;
+        _pullDown.Detach();
     }
 
     void OnEnable()
@@ -226,6 +259,7 @@ public class SuggestionsController : MonoBehaviour
         _pendingShow = false;
         _chatOpenSettledAt = -1f;        // the next chat opens with the clock unset — never pre-settled
         _draggingSlot = false;
+        _pullDown.Reset();               // a pull-down cut short by the chat closing
         _threadPressActive = false;      // a press in flight when the chat closed must not
         _threadPressEligible = false;    // resolve into a tap on the next screen
         if (_keyboardMover != null) _keyboardMover.TrackInsetImmediately = false;   // a drag cut short by the chat closing
@@ -863,7 +897,52 @@ public class SuggestionsController : MonoBehaviour
     {
         _draggingSlot = false;
         if (_keyboardMover != null) _keyboardMover.TrackInsetImmediately = false;
+        _pullDown.Reset();               // the «+» sheet outranks the gesture; abandon without snapping
     }
+
+    /// <summary>
+    /// The engage line in SCREEN pixels: the composer's top edge, read live because it rides the
+    /// slot inset. Corner 1 is the rect's TOP-LEFT (GetWorldCorners returns BL, TL, TR, BR). A
+    /// missing composer yields NaN, which SuggestionSlotPullDown.ShouldEngage rejects — a broken
+    /// reading must never become an engage line at the bottom of the world.
+    /// </summary>
+    private float ComposerTopScreenY()
+    {
+        var rt = _bottomPanel != null ? _bottomPanel.transform as RectTransform : null;
+        if (rt == null) return float.NaN;
+        rt.GetWorldCorners(_composerCorners);
+        Camera cam = _rootCanvas != null && _rootCanvas.renderMode != RenderMode.ScreenSpaceOverlay
+            ? _rootCanvas.worldCamera
+            : null;
+        return RectTransformUtility.WorldToScreenPoint(cam, _composerCorners[1]).y;
+    }
+
+    /// <summary>
+    /// May a pull-down engage this frame? Every veto is a region that already belongs to someone
+    /// else, plus the one case where there is nothing to dismiss. Deliberately NOT gated on
+    /// <c>_semiAutoOn</c> (unlike PumpThreadTap): «Авто» has no panel, but the native keyboard still
+    /// owns the slot there and dismissing it by scrolling is exactly the gesture being added.
+    /// </summary>
+    private bool PullDownEligible
+    {
+        get
+        {
+            if (_keyboardMover == null || _draggingSlot) return false;
+            bool kbUp = _keyboardMover.NativeKeyboardVisible;
+            if (!kbUp && !PanelOwnsSlot) return false;   // already collapsed — nothing to pull down
+            if (AttachOpen || ReactionBarShowing || PhotoViewerOpen) return false;
+            if (SwipeToBack.IsSliding) return false;
+            return SlotOpenAllowed;
+        }
+    }
+
+    /// <summary>
+    /// The pull-down reached the composer while the native keyboard owned the slot. Collapse
+    /// outright — deliberately NOT the KeyboardDismissed path, which hands the slot back to the
+    /// panel: the owner has just pushed the whole slot off the screen, and a panel springing up in
+    /// the keyboard's place is the opposite of what the gesture asked for.
+    /// </summary>
+    private void HandleKeyboardPullDown() => ApplySlotInput(SuggestionSlotInput.PullDownDismiss);
 
     private void HandleDragReleased(float finalCanvasPx, float velocityCanvasPxPerSec)
     {
@@ -877,8 +956,10 @@ public class SuggestionsController : MonoBehaviour
         // flick may land, which is what keeps the pull-down from expanding a panel the owner never
         // dragged above standard.
         SlotDetent snapped = SuggestionSlotDetents.SnapWithFlick(
-            finalCanvasPx, standard, expanded, velocityCanvasPxPerSec,
-            finalCanvasPx - _slotHeightAtGrabCanvasPx, _dragCeilingCanvasPx);
+            finalCanvasPx, standard, expanded,
+            velocityCanvasPxPerSec: velocityCanvasPxPerSec,
+            travelCanvasPx: finalCanvasPx - _slotHeightAtGrabCanvasPx,
+            ceilingCanvasPx: _dragCeilingCanvasPx);
         _slotState = SuggestionSlotStateMachine.AfterDrag(snapped);
         ApplyKeyStyle();
 
@@ -1245,6 +1326,12 @@ public class SuggestionsController : MonoBehaviour
         ApplySlotInput(SuggestionSlotInput.ThreadTap);
     }
 
+    // A modal above the thread still answers a raycast (RaycastAll does no occlusion culling), so
+    // overlays are rejected by name — shared by the thread tap and the pull-down.
+    private static bool PhotoViewerOpen =>
+        PhotoViewer.Instance != null && PhotoViewer.Instance.panel != null
+        && PhotoViewer.Instance.panel.activeSelf;
+
     // A long-press that opened the reaction bar ends with a pointer-up like any tap; the bar's own
     // scrim is what tells us the gesture became something else. Checked at RELEASE because the bar
     // opens DURING the press.
@@ -1270,8 +1357,7 @@ public class SuggestionsController : MonoBehaviour
         // A modal above the thread still lets the thread's own graphics answer a raycast —
         // RaycastAll does no occlusion culling — so overlays have to be rejected by name.
         if (ReactionBarShowing) return false;
-        if (PhotoViewer.Instance != null && PhotoViewer.Instance.panel != null
-            && PhotoViewer.Instance.panel.activeSelf) return false;
+        if (PhotoViewerOpen) return false;
 
         _tapEventData ??= new PointerEventData(EventSystem.current);
         _tapEventData.position = screenPos;
