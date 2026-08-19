@@ -361,4 +361,69 @@ public class SuggestionSlotStateMachineTests
         Assert.AreEqual(blur, actual.BlurField, "BlurField");
         Assert.AreEqual(refreshOnly, actual.ContentRefreshOnly, "ContentRefreshOnly");
     }
+
+    // --- PullDownDismiss (owner request 2026-08-19) --------------------------
+    // The thread pull-down over a LIVE keyboard. It is deliberately NOT KeyboardDismissed: that
+    // input hands the slot back to the panel (the panel is the slot's default tenant), and here the
+    // owner has just pushed the whole slot off the screen — a panel springing up in the keyboard's
+    // place is the opposite of what the gesture asked for. Over the PANEL the pull-down is
+    // interactive and resolves through AfterDrag instead, which is why every non-keyboard state is
+    // inert here rather than collapsing.
+
+    [Test]
+    public void PullDownDismiss_OverTheKeyboard_CollapsesAndBlurs_SemiAuto()
+    {
+        SlotTransition t = SuggestionSlotStateMachine.Resolve(
+            SuggestionSlotState.Keyboard, SuggestionSlotInput.PullDownDismiss, SemiAuto);
+        Assert.AreEqual(SuggestionSlotState.Collapsed, t.State);
+        Assert.IsTrue(t.BlurField);
+        Assert.IsFalse(t.FocusField);
+        Assert.IsFalse(t.ContentRefreshOnly);
+    }
+
+    [Test]
+    public void PullDownDismiss_OverTheKeyboard_CollapsesAndBlurs_Auto()
+    {
+        SlotTransition t = SuggestionSlotStateMachine.Resolve(
+            SuggestionSlotState.Keyboard, SuggestionSlotInput.PullDownDismiss, Auto);
+        Assert.AreEqual(SuggestionSlotState.Collapsed, t.State);
+        Assert.IsTrue(t.BlurField);
+        Assert.IsFalse(t.FocusField);
+    }
+
+    // Contrast pin: the SAME state under the OTHER input must still raise the panel. If someone
+    // "simplifies" PullDownDismiss into KeyboardDismissed, this pair stops disagreeing and the
+    // gesture silently reverts.
+    [Test]
+    public void PullDownDismiss_DiffersFromKeyboardDismissed_InSemiAuto()
+    {
+        SlotTransition pull = SuggestionSlotStateMachine.Resolve(
+            SuggestionSlotState.Keyboard, SuggestionSlotInput.PullDownDismiss, SemiAuto);
+        SlotTransition dismissed = SuggestionSlotStateMachine.Resolve(
+            SuggestionSlotState.Keyboard, SuggestionSlotInput.KeyboardDismissed, SemiAuto);
+        Assert.AreEqual(SuggestionSlotState.Collapsed, pull.State);
+        Assert.AreEqual(SuggestionSlotState.Panel, dismissed.State);
+    }
+
+    [Test]
+    public void PullDownDismiss_WithoutAKeyboard_IsInert()
+    {
+        foreach (SuggestionSlotState state in AllStates)
+        {
+            if (state == SuggestionSlotState.Keyboard) continue;
+
+            SlotTransition semi = SuggestionSlotStateMachine.Resolve(
+                state, SuggestionSlotInput.PullDownDismiss, SemiAuto);
+            Assert.AreEqual(state, semi.State, $"semi-auto moved from {state}");
+            Assert.IsFalse(semi.BlurField, $"semi-auto blurred from {state}");
+            Assert.IsFalse(semi.FocusField, $"semi-auto focused from {state}");
+
+            // In «Авто» Panel/Expanded are normalised away, so every non-keyboard state reads as
+            // Collapsed and stays there.
+            SlotTransition auto = SuggestionSlotStateMachine.Resolve(
+                state, SuggestionSlotInput.PullDownDismiss, Auto);
+            Assert.AreEqual(SuggestionSlotState.Collapsed, auto.State, $"auto moved from {state}");
+            Assert.IsFalse(auto.BlurField, $"auto blurred from {state}");
+        }
+    }
 }

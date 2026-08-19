@@ -45,6 +45,15 @@ public enum SuggestionSlotInput
     /// <summary>The native keyboard went away (platform callback or our own blur).</summary>
     KeyboardDismissed,
 
+    /// <summary>
+    /// The owner dragged the message thread down past the composer while the native KEYBOARD owned
+    /// the slot (the pull-down gesture, 2026-08-19). Deliberately distinct from
+    /// <see cref="KeyboardDismissed"/>: that one hands the slot back to the panel, and here the
+    /// owner has just pushed the whole slot off the screen. Over the PANEL the pull-down is
+    /// interactive and resolves through <see cref="SuggestionSlotStateMachine.AfterDrag"/> instead.
+    /// </summary>
+    PullDownDismiss,
+
     /// <summary>The chat switched into «Вместе» — the suggestions surface becomes available.</summary>
     ReplyModeOn,
 
@@ -139,6 +148,14 @@ public static class SuggestionSlotStateMachine
                 // The panel is the slot's default tenant, so any blur hands the slot back to it.
                 return To(state == SuggestionSlotState.Keyboard ? SuggestionSlotState.Panel : state);
 
+            case SuggestionSlotInput.PullDownDismiss:
+                // Only the keyboard branch reaches here: dismissing it must land on Collapsed, NOT
+                // hand the slot to the panel. Every other state is inert — the panel's own
+                // pull-down is a live drag and settles through AfterDrag.
+                return state == SuggestionSlotState.Keyboard
+                    ? ToBlurred(SuggestionSlotState.Collapsed)
+                    : To(state);
+
             case SuggestionSlotInput.ReplyModeOn:
                 return To(SuggestionSlotState.Panel);
 
@@ -170,6 +187,13 @@ public static class SuggestionSlotStateMachine
 
             case SuggestionSlotInput.KeyboardDismissed:
                 return To(state == SuggestionSlotState.Keyboard ? SuggestionSlotState.Collapsed : state);
+
+            case SuggestionSlotInput.PullDownDismiss:
+                // «Авто» has no panel, so this is simply the keyboard leaving for good — the same
+                // destination ThreadTap already produces here.
+                return state == SuggestionSlotState.Keyboard
+                    ? ToBlurred(SuggestionSlotState.Collapsed)
+                    : To(state);
 
             case SuggestionSlotInput.ReplyModeOn:
                 return To(SuggestionSlotState.Panel);   // leaving «Авто» hands the slot to the panel
