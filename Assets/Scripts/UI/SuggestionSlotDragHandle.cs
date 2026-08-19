@@ -41,7 +41,10 @@ public class SuggestionSlotDragHandle : MonoBehaviour, IBeginDragHandler, IDragH
 
     public event Action Grabbed;
     public event Action<float> Dragged;   // proposed slot height, canvas units
-    public event Action<float> Released;  // final proposed height, canvas units; the CONTROLLER snaps
+    /// <summary>Final proposed height + the finger's release velocity (canvas units per second, on
+    /// Unity's POSITIVE-IS-UP axis, so a flick DOWN is negative). The CONTROLLER snaps —
+    /// SuggestionSlotDetents.SnapWithFlick lets a genuine flick beat the half-way rule.</summary>
+    public event Action<float, float> Released;
 
     public bool IsDragging { get; private set; }
 
@@ -50,6 +53,9 @@ public class SuggestionSlotDragHandle : MonoBehaviour, IBeginDragHandler, IDragH
     private float _grabPointerScreenY;
     private float _grabHeightCanvasPx;
     private float _lastProposedCanvasPx;
+    // Shared with the thread pull-down so the two entries into this gesture feel identical: a fast
+    // release collapses (or expands) regardless of where the finger stopped.
+    private readonly DragVelocitySampler _velocity = new DragVelocitySampler();
 
     void Awake() => CacheCanvas();
 
@@ -69,7 +75,7 @@ public class SuggestionSlotDragHandle : MonoBehaviour, IBeginDragHandler, IDragH
         // handler that disables us again cannot make Released fire twice.
         if (!IsDragging) return;
         IsDragging = false;
-        Released?.Invoke(_lastProposedCanvasPx);
+        Released?.Invoke(_lastProposedCanvasPx, 0f);
     }
 
     public void OnBeginDrag(PointerEventData eventData)
@@ -92,6 +98,8 @@ public class SuggestionSlotDragHandle : MonoBehaviour, IBeginDragHandler, IDragH
         _lastProposedCanvasPx = _grabHeightCanvasPx;
         _grabPointerScreenY = eventData.position.y;
         _activePointerId = eventData.pointerId;
+        _velocity.Reset();
+        _velocity.Sample(eventData.position.y / CanvasScale, Time.unscaledTime);
 
         // State BEFORE the event. A Grabbed handler that deactivates the panel (or closes the
         // chat) runs our OnDisable synchronously: with the flag still false that release path
@@ -106,6 +114,7 @@ public class SuggestionSlotDragHandle : MonoBehaviour, IBeginDragHandler, IDragH
     {
         if (!IsDragging || eventData.pointerId != _activePointerId) return;
 
+        _velocity.Sample(eventData.position.y / CanvasScale, Time.unscaledTime);
         _lastProposedCanvasPx = ProposedHeight(eventData);
         Dragged?.Invoke(_lastProposedCanvasPx);
     }
@@ -114,9 +123,10 @@ public class SuggestionSlotDragHandle : MonoBehaviour, IBeginDragHandler, IDragH
     {
         if (!IsDragging || eventData.pointerId != _activePointerId) return;
 
+        _velocity.Sample(eventData.position.y / CanvasScale, Time.unscaledTime);
         _lastProposedCanvasPx = ProposedHeight(eventData);
         IsDragging = false;                            // cleared first — Released must fire once
-        Released?.Invoke(_lastProposedCanvasPx);
+        Released?.Invoke(_lastProposedCanvasPx, _velocity.VelocityCanvasPxPerSec);
     }
 
     /// <summary>

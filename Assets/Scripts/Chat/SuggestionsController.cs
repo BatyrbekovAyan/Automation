@@ -61,6 +61,13 @@ public class SuggestionsController : MonoBehaviour
     // Captured ONCE per gesture: the handle polls the ceiling every drag frame, and a ceiling that
     // shrank mid-drag (cards re-rendering under the finger) would yank the slot down with it.
     private float _dragCeilingCanvasPx;
+    // The REAL expanded detent, captured at grab beside the ceiling. The two differ for the thread
+    // pull-down, whose ceiling is the height it engaged at — Snap still needs the real detent so a
+    // gesture that started at Expanded can settle back on it.
+    private float _dragExpandedCanvasPx;
+    // Where the slot was when the gesture began: the flick rule measures the SLOT's travel, not the
+    // finger's, so a fast release that barely moved the panel is not a flick.
+    private float _slotHeightAtGrabCanvasPx;
 
     // Last measured live keyboard height. The return handoff (the keyboard leaves, the panel takes
     // the slot back) fires on the frame the keyboard is ALREADY gone, so there is nothing left to
@@ -812,12 +819,25 @@ public class SuggestionsController : MonoBehaviour
 
     // --- Drag handle --------------------------------------------------------
 
-    private void HandleDragGrabbed()
+    private void HandleDragGrabbed() => BeginSlotDrag(ceilingIsEngageHeight: false);
+
+    /// <summary>
+    /// The thread pull-down's ceiling is the height it engaged at, not the Expanded detent: that
+    /// gesture may shrink the slot and put it back, never grow it. Dragging the finger back up past
+    /// the composer must restore the panel and stop — expanding stays the handle's job.
+    /// </summary>
+    private void HandlePullDownGrabbed() => BeginSlotDrag(ceilingIsEngageHeight: true);
+
+    private void BeginSlotDrag(bool ceilingIsEngageHeight)
     {
         if (_keyboardMover == null || _panel == null) return;
         _draggingSlot = true;
         _insetTween?.Kill();                       // a tween and a finger must never write the inset together
-        _dragCeilingCanvasPx = ExpandedDetent(StandardDetent());
+        _slotHeightAtGrabCanvasPx = _keyboardMover.AppliedBottomInset;
+        _dragExpandedCanvasPx = ExpandedDetent(StandardDetent());
+        _dragCeilingCanvasPx = ceilingIsEngageHeight
+            ? _slotHeightAtGrabCanvasPx
+            : _dragExpandedCanvasPx;
         // 1:1 finger tracking: SmoothDamp would leave the panel trailing the drag, and a smoothed
         // inset lagging a SHRINKING slot breaks FollowInset's applied ≤ slot assumption.
         _keyboardMover.TrackInsetImmediately = true;
@@ -845,15 +865,20 @@ public class SuggestionsController : MonoBehaviour
         if (_keyboardMover != null) _keyboardMover.TrackInsetImmediately = false;
     }
 
-    private void HandleDragReleased(float finalCanvasPx)
+    private void HandleDragReleased(float finalCanvasPx, float velocityCanvasPxPerSec)
     {
         if (!_draggingSlot) return;
         _draggingSlot = false;
         if (_keyboardMover != null) _keyboardMover.TrackInsetImmediately = false;
 
         float standard = StandardDetent();
-        float expanded = _dragCeilingCanvasPx;
-        SlotDetent snapped = SuggestionSlotDetents.Snap(finalCanvasPx, standard, expanded);
+        float expanded = _dragExpandedCanvasPx;
+        // A genuine flick beats the half-way rule; the gesture's own ceiling decides how far UP a
+        // flick may land, which is what keeps the pull-down from expanding a panel the owner never
+        // dragged above standard.
+        SlotDetent snapped = SuggestionSlotDetents.SnapWithFlick(
+            finalCanvasPx, standard, expanded, velocityCanvasPxPerSec,
+            finalCanvasPx - _slotHeightAtGrabCanvasPx, _dragCeilingCanvasPx);
         _slotState = SuggestionSlotStateMachine.AfterDrag(snapped);
         ApplyKeyStyle();
 
