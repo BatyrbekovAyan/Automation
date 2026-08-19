@@ -941,8 +941,22 @@ public class SuggestionsController : MonoBehaviour
     /// outright — deliberately NOT the KeyboardDismissed path, which hands the slot back to the
     /// panel: the owner has just pushed the whole slot off the screen, and a panel springing up in
     /// the keyboard's place is the opposite of what the gesture asked for.
+    /// <para>
+    /// The yield latch is cleared FIRST, and that ordering is load-bearing. During a panel→keyboard
+    /// handoff the controller holds the inset and parks in <c>_yieldingToKeyboard</c> (the no-dip
+    /// rule), and <see cref="HidePanel"/> early-returns while that latch is set — so routing the
+    /// input with it still true would leave the yield live, and the next frame's «the keyboard
+    /// bounced away before taking the slot» branch in <see cref="Update"/> would put the panel back
+    /// up, producing exactly the outcome this method exists to prevent. Clearing it lets HidePanel
+    /// run in full. The composer still cannot dip, because the applied rise is
+    /// max(keyboard, slot) and the live keyboard holds it up until its own animation finishes.
+    /// </para>
     /// </summary>
-    private void HandleKeyboardPullDown() => ApplySlotInput(SuggestionSlotInput.PullDownDismiss);
+    private void HandleKeyboardPullDown()
+    {
+        _yieldingToKeyboard = false;
+        ApplySlotInput(SuggestionSlotInput.PullDownDismiss);
+    }
 
     private void HandleDragReleased(float finalCanvasPx, float velocityCanvasPxPerSec)
     {
