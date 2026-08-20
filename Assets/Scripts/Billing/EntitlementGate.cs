@@ -13,6 +13,7 @@ public static class EntitlementGate
     internal static void ResetSeamsForTests()
     {
         PurchasedTierSource = () => PlanTier.None;
+        OnPaywallRequested = null;   // a leaked subscriber from one test would fire in every test after it
     }
 
     // With nothing purchased and a trial that never started this yields Trial
@@ -31,6 +32,16 @@ public static class EntitlementGate
 
     public static bool CanConnectChannel(int connectedChannels) =>
         EntitlementPolicy.CanConnectChannel(CurrentTier, connectedChannels);
+
+    // Pre-flight, multi-slot variant of CanConnectChannel: "is there room for `demand` MORE
+    // channels, all at once, before any of them starts pairing?" A single wizard submission
+    // can demand 2 slots at once (platform «Оба») — checking one slot at a time let a first
+    // leg pass, walk the user through a full pairing, and only then discover the second leg
+    // doesn't fit (see Manager.CreateBotFromForm). demand<=0 is always allowed (nothing to
+    // reserve); otherwise connectedNow + demand must not exceed the tier's MaxChannels, which
+    // reduces to the existing single-slot check against connectedNow + demand - 1.
+    public static bool CanConnectChannels(int connectedNow, int demand) =>
+        demand <= 0 || EntitlementPolicy.CanConnectChannel(CurrentTier, connectedNow + demand - 1);
 
     // Pure seam: sum of true flags across (whatsapp, telegram) occupancy pairs.
     // Test-pinned so the counting rule can never silently drift from CanConnectChannel.

@@ -80,4 +80,24 @@ public class EntitlementGateTests
     // not None — otherwise the first-bot wizard couldn't open on a brand-new install.
     [Test] public void Fresh_install_grace_yields_trial_tier()
         => Assert.AreEqual(PlanTier.Trial, EntitlementGate.CurrentTier);
+
+    // Trial-grace default (seams from [SetUp]): MaxChannels=3. Pins the pre-flight
+    // multi-slot check Manager.CreateBotFromForm uses ahead of any pairing.
+    [TestCase(2, 1, true)]   // третий канал влезает
+    [TestCase(2, 2, false)]  // «Оба» при двух занятых — отказ ДО пейринга
+    [TestCase(0, 2, true)]
+    [TestCase(3, 0, true)]   // нулевой спрос всегда ок
+    public void Demand_math(int connected, int demand, bool ok)
+        => Assert.AreEqual(ok, EntitlementGate.CanConnectChannels(connected, demand));
+
+    [Test] public void ResetSeamsForTests_clears_paywall_subscribers()
+    {
+        bool called = false;
+        EntitlementGate.OnPaywallRequested += _ => called = true;
+
+        EntitlementGate.ResetSeamsForTests();
+        EntitlementGate.RequestPaywall(PaywallTrigger.Browse);
+
+        Assert.IsFalse(called, "a subscriber surviving ResetSeamsForTests would leak into other tests");
+    }
 }

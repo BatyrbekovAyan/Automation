@@ -1486,19 +1486,34 @@ public partial class Manager : MonoBehaviour
         bool useWhatsapp = selectedPlatform == 1 || selectedPlatform == 3;
         bool useTelegram = selectedPlatform == 2 || selectedPlatform == 3;
 
+        // Pre-flight gate — checked ONCE here, before ANY profile creation/pairing begins,
+        // covering both legs at once. This bot has no Bot component yet (Step 3 instantiates
+        // it), so BotsPage's gate (checked once, at wizard entry) and BotSettings.Auth's gate
+        // (operates on an already-instantiated Manager.openBot) never see this wizard's own
+        // fresh-profile creation below — it needs its own check.
+        //
+        // Deliberately NOT per-leg: a per-leg check let platform «Оба» pass Step 1 (room for
+        // one more channel), walk the user through a full WhatsApp pairing (QR/code, the
+        // remote wait), and only then discover Step 2 doesn't fit — CancelBotCreation would
+        // then silently delete the just-authorized profile the user just spent real effort
+        // on. Checking total demand up front means a block costs nothing: no QR shown, no
+        // pairing started. whatsappProfileId/telegramProfileId are still "-1" here (just
+        // reset above), so CancelBotCreation's delete-profile branches are both skipped —
+        // this call is a pure UI/coroutine reset, no network calls.
+        int channelDemand = (useWhatsapp ? 1 : 0) + (useTelegram ? 1 : 0);
+        int existingBotsForGate = BotsParent != null ? BotsParent.transform.childCount : 0;
+        bool botOk = EntitlementGate.CanCreateBot(existingBotsForGate);
+        bool channelsOk = EntitlementGate.CanConnectChannels(EntitlementGate.ConnectedChannelCount(), channelDemand);
+        if (!botOk || !channelsOk)
+        {
+            EntitlementGate.RequestPaywall(!botOk ? PaywallTrigger.BotLimit : PaywallTrigger.ChannelLimit);
+            CancelBotCreation();
+            yield break;
+        }
+
         // Step 1: Create WhatsApp profile and authenticate
         if (useWhatsapp)
         {
-            // This bot has no Bot component yet (Step 3 instantiates it), so it isn't
-            // covered by BotSettings.Auth's gate — this IS the fresh-profile entry for
-            // a brand-new bot's first channel, and consuming it needs its own check.
-            if (!EntitlementGate.CanConnectChannel(EntitlementGate.ConnectedChannelCount()))
-            {
-                EntitlementGate.RequestPaywall(PaywallTrigger.ChannelLimit);
-                CancelBotCreation();
-                yield break;
-            }
-
             yield return StartCoroutine(CreateWhatsappProfile(formBotName, true));
             if (!isCreatingBot) yield break;
 
@@ -1521,16 +1536,6 @@ public partial class Manager : MonoBehaviour
         // Step 2: Create Telegram profile and authenticate
         if (useTelegram)
         {
-            // +1: this run's own WhatsApp leg (if selected) already claimed a slot that
-            // ConnectedChannelCount() can't see yet — the new bot has no Bot component
-            // until Step 3, so its just-created profile isn't under BotsParent to count.
-            if (!EntitlementGate.CanConnectChannel(EntitlementGate.ConnectedChannelCount() + (useWhatsapp ? 1 : 0)))
-            {
-                EntitlementGate.RequestPaywall(PaywallTrigger.ChannelLimit);
-                CancelBotCreation();
-                yield break;
-            }
-
             yield return StartCoroutine(CreateTelegramProfile(formBotName, true));
             if (!isCreatingBot) yield break;
 
