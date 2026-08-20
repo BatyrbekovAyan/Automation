@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "url": "https://bagkz.app.n8n.cloud/api/v1/workflows/4VN3gsFaC2HUYmcc",
+        "url": "http://localhost:5678/api/v1/workflows/4VN3gsFaC2HUYmcc",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {}
@@ -11,14 +11,14 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -272,
+        828,
         672
       ],
       "id": "8074b2ad-4336-445e-926b-04e947636cc5",
       "name": "Get Sample Workflow",
       "credentials": {
         "n8nApi": {
-          "id": "X1k4igOAG65Fb3oz",
+          "id": "hG8UUsDx8EHS1xbB",
           "name": "n8n account"
         },
         "httpBearerAuth": {
@@ -26,7 +26,7 @@
           "name": "Bearer Auth account"
         },
         "httpHeaderAuth": {
-          "id": "RV7m661NMLPXEcvm",
+          "id": "nAmEcPrSbxIVDPFd",
           "name": "n8nAPIKey"
         }
       }
@@ -34,7 +34,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://bagkz.app.n8n.cloud/api/v1/workflows",
+        "url": "http://localhost:5678/api/v1/workflows",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
@@ -45,14 +45,14 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        128,
+        1228,
         672
       ],
       "id": "8d6a78cb-776b-4e79-8e00-4fc6720a4ffa",
       "name": "Create Workflow",
       "credentials": {
         "n8nApi": {
-          "id": "X1k4igOAG65Fb3oz",
+          "id": "hG8UUsDx8EHS1xbB",
           "name": "n8n account"
         },
         "httpBearerAuth": {
@@ -60,7 +60,7 @@
           "name": "Bearer Auth account"
         },
         "httpHeaderAuth": {
-          "id": "RV7m661NMLPXEcvm",
+          "id": "nAmEcPrSbxIVDPFd",
           "name": "n8nAPIKey"
         }
       }
@@ -103,7 +103,7 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        -64,
+        1036,
         672
       ],
       "id": "c3249084-a534-4c8b-bc04-2345c75ba1f0",
@@ -119,7 +119,7 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        -528,
+        -752,
         672
       ],
       "id": "8f1ef0d5-16f1-44ab-b9fb-df2e978b78e2",
@@ -143,7 +143,7 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        416,
+        1516,
         672
       ],
       "id": "e47d3754-dbc6-435e-ac9b-67a9c16031b5",
@@ -152,7 +152,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://bagkz.app.n8n.cloud/api/v1/workflows/{{ $json.id }}/activate",
+        "url": "=http://localhost:5678/api/v1/workflows/{{ $json.id }}/activate",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {}
@@ -160,14 +160,14 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        592,
+        1692,
         672
       ],
       "id": "04555395-1ac0-4851-91cf-e2a32b4d656a",
       "name": "Activate Created Workflow",
       "credentials": {
         "n8nApi": {
-          "id": "X1k4igOAG65Fb3oz",
+          "id": "hG8UUsDx8EHS1xbB",
           "name": "n8n account"
         },
         "httpBearerAuth": {
@@ -175,7 +175,7 @@
           "name": "Bearer Auth account"
         },
         "httpHeaderAuth": {
-          "id": "RV7m661NMLPXEcvm",
+          "id": "nAmEcPrSbxIVDPFd",
           "name": "n8nAPIKey"
         }
       }
@@ -195,7 +195,7 @@
             },
             {
               "name": "url",
-              "value": "=https://bagkz.app.n8n.cloud/webhook/{{ $('Unity Webhook').item.json.body.TelegramProfileId }}"
+              "value": "=https://units-entry-roster-foreign.trycloudflare.com/webhook/{{ $('Unity Webhook').item.json.body.TelegramProfileId }}"
             }
           ]
         },
@@ -204,14 +204,14 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        864,
+        1964,
         672
       ],
       "id": "863b3680-68f6-4069-8cdb-9789f0588a7a",
       "name": "Set Wappi Webhook",
       "credentials": {
         "httpHeaderAuth": {
-          "id": "EuhhqAaV56DpoqAN",
+          "id": "ZowntFGvApDJ7UzQ",
           "name": "WappiAuthToken"
         }
       }
@@ -239,14 +239,14 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1040,
+        2140,
         672
       ],
       "id": "14a13077-9d38-4eaf-8593-4f4dd7158909",
       "name": "Set Wappi Webhook Types",
       "credentials": {
         "httpHeaderAuth": {
-          "id": "EuhhqAaV56DpoqAN",
+          "id": "ZowntFGvApDJ7UzQ",
           "name": "WappiAuthToken"
         }
       }
@@ -268,36 +268,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        1296,
+        2396,
         672
       ],
       "id": "5b372561-59de-415a-9aba-3b4b61f7281a",
       "name": "Send New Workflows Id"
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "UPDATE documents\nSET metadata = jsonb_set(metadata, '{botTgId}', to_jsonb($1::text))\nWHERE $2 <> '-1' AND $2 <> ''\n  AND metadata->>'botWaId' = $2\n  AND metadata->>'botTgId' = '-1';",
-        "options": {
-          "queryReplacement": "={{ $('Get Created Workflow Id').item.json.id }},{{ $('Unity Webhook').first().json.body.WhatsappWorkflowId }}"
-        }
-      },
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.6,
-      "position": [
-        1168,
-        856
-      ],
-      "id": "a5b6c7d8-0401-4e5f-9a01-000000000401",
-      "name": "Restamp RAG Chunks",
-      "alwaysOutputData": true,
-      "onError": "continueRegularOutput",
-      "credentials": {
-        "postgres": {
-          "id": "vvRrFiEXzLVqKjOx",
-          "name": "Postgres"
-        }
-      }
     },
     {
       "parameters": {
@@ -306,11 +281,217 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -400,
-        496
+        -496,
+        672
       ],
-      "id": "e6c1ae6f-7039-42e5-8ab8-4705646346c8",
+      "id": "eb741ddf-84d4-476f-ad5d-577a23f60f63",
       "name": "Vertical Prompt"
+    },
+    {
+      "id": "23959da4-2543-4951-9ced-ecfe2e5d19bd",
+      "name": "Restamp RAG Chunks",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2268,
+        856
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE documents\nSET metadata = jsonb_set(metadata, '{botTgId}', to_jsonb($1::text))\nWHERE $2 <> '-1' AND $2 <> ''\n  AND metadata->>'botWaId' = $2\n  AND metadata->>'botTgId' = '-1';",
+        "options": {
+          "queryReplacement": "={{ $('Get Created Workflow Id').item.json.id }},{{ $('Unity Webhook').first().json.body.WhatsappWorkflowId }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "e0e1d117-6777-426e-afa4-46227e28a46d",
+      "name": "If Has AppUserID?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -272,
+        672
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d654e360-acaf-469a-9298-29bb8db6450f",
+              "leftValue": "={{ $('Unity Webhook').first().json.body.AppUserID }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "d9b71ba1-910c-4c5e-b5be-8e937fde82b9",
+      "name": "Ensure Subscriber",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -112,
+        672
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into subscribers (app_user_id, plan, status, trial_started_at)\nvalues ($1, 'trial', 'trialing', now())\non conflict (app_user_id) do nothing;",
+        "options": {
+          "queryReplacement": "={{ [ $('Unity Webhook').first().json.body.AppUserID ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      }
+    },
+    {
+      "id": "3a50d42b-1ed5-4b56-81ac-6abd78d8a7e5",
+      "name": "Count Channels",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        48,
+        672
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select\n  (select count(*) from bot_profiles where app_user_id=$1 and deleted_at is null) as c,\n  s.plan, s.status\nfrom subscribers s\nwhere s.app_user_id=$1;",
+        "options": {
+          "queryReplacement": "={{ [ $('Unity Webhook').first().json.body.AppUserID ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      }
+    },
+    {
+      "id": "c4a653b8-3b8f-43aa-9abe-34976f5052bc",
+      "name": "Compute Slot Limit",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        672
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const row = $input.first().json;\nconst LIMITS = { trial: 3, start: 1, business: 3, network: 5, none: 0 };\nconst plan = row.plan || 'none';\nconst status = row.status || 'none';\nconst limit = status === 'expired' ? 0 : (LIMITS[plan] ?? 0);\nconst c = Number(row.c) || 0;\nreturn [{ json: { c, plan, status, limit, overLimit: c >= limit } }];"
+      }
+    },
+    {
+      "id": "1bf1f008-62aa-47c2-a12b-bc567b2f748b",
+      "name": "If Slot Limit",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        368,
+        672
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "4a209b2b-1c76-49b8-af77-1caafa75e5ec",
+              "leftValue": "={{ $json.overLimit }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "79ca5966-d434-460b-a8a2-cf05205024e1",
+      "name": "Respond Channel Limit",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        368,
+        868
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c38a61af-e298-4ed5-9ce8-1d3522352d60",
+              "name": "success",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "534bcac8-b5f0-4bf1-a95c-d504440bfc41",
+              "name": "error",
+              "value": "channel_limit",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "f5149f6b-3564-49f8-994b-2ed5e9eb0999",
+      "name": "Register Profile",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        528,
+        672
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into bot_profiles (profile_id, app_user_id, channel)\nvalues ($1, $2, $3)\non conflict (profile_id) do update set deleted_at = null;",
+        "options": {
+          "queryReplacement": "={{ [ $('Unity Webhook').first().json.body.TelegramProfileId, $('Unity Webhook').first().json.body.AppUserID, 'telegram' ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      }
     }
   ],
   "connections": {
@@ -417,6 +598,86 @@
       "main": [
         [
           {
+            "node": "If Has AppUserID?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Has AppUserID?": {
+      "main": [
+        [
+          {
+            "node": "Ensure Subscriber",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Sample Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ensure Subscriber": {
+      "main": [
+        [
+          {
+            "node": "Count Channels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Count Channels": {
+      "main": [
+        [
+          {
+            "node": "Compute Slot Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Slot Limit": {
+      "main": [
+        [
+          {
+            "node": "If Slot Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Slot Limit": {
+      "main": [
+        [
+          {
+            "node": "Respond Channel Limit",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Register Profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Register Profile": {
+      "main": [
+        [
+          {
             "node": "Get Sample Workflow",
             "type": "main",
             "index": 0
@@ -426,12 +687,17 @@
     }
   },
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
   },
   "staticData": null,
   "pinData": {},
   "triggerCount": 1,
-  "meta": null,
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  },
   "id": "Uz6HBBUpAiUqVysB",
-  "active": false
+  "active": true
 }

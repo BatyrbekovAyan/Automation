@@ -3330,7 +3330,8 @@ public partial class Manager : MonoBehaviour
         form.AddField("Prompt", "");
         form.AddField("ProductsList", "");
         form.AddField("ServicesList", "");
-        
+        form.AddField("AppUserID", BillingIdentity.AppUserId);
+
         using UnityWebRequest www = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateWhatsappWorkflow", form);
         // Without a timeout a connected-but-silent n8n parks this coroutine forever:
         // neither branch below runs, so the card's controls stay disabled and the
@@ -3452,6 +3453,7 @@ public partial class Manager : MonoBehaviour
         form.AddField("Prompt", openBotSettings.PromptField.Value);
         form.AddField("ProductsList", "Products:\n" + productsList);
         form.AddField("ServicesList", "Services:\n" + servicesList);
+        form.AddField("AppUserID", BillingIdentity.AppUserId);
 
         using UnityWebRequest www = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateWhatsappWorkflow", form);
         yield return www.SendWebRequest();
@@ -3513,7 +3515,8 @@ public partial class Manager : MonoBehaviour
         form.AddField("Prompt", "");
         form.AddField("ProductsList", "");
         form.AddField("ServicesList", "");
-        
+        form.AddField("AppUserID", BillingIdentity.AppUserId);
+
         using UnityWebRequest www = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateTelegramWorkflow", form);
         // See the WhatsApp twin: no timeout means a silent n8n parks this coroutine
         // forever and neither branch below ever runs.
@@ -3630,6 +3633,7 @@ public partial class Manager : MonoBehaviour
         form.AddField("Prompt", openBotSettings.PromptField.Value);
         form.AddField("ProductsList", "Products:\n" + productsList);
         form.AddField("ServicesList", "Services:\n" + servicesList);
+        form.AddField("AppUserID", BillingIdentity.AppUserId);
 
         using UnityWebRequest www = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateTelegramWorkflow", form);
         yield return www.SendWebRequest();
