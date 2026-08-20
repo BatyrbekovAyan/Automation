@@ -1,20 +1,28 @@
 #!/usr/bin/env python3
-"""Smoke probes for the RevenueCat_Events webhook mirror (Task 7, extended in Task 8-9).
+"""Smoke probes for the RevenueCat Events webhook mirror (Task 7, extended in Task 8-9).
 
 Fires realistic RevenueCat webhook envelopes at the local dev n8n instance and checks
 the HTTP contract: an unauthenticated request must be rejected, and every recognized
 event type must return 200 -- INCLUDING CANCELLATION, whose Map Event Code node
-deliberately returns zero items (n8n skips all downstream nodes for that run; see
-RevenueCat_Events' Webhook node, responseMode "onReceived" -- the ack is sent the
-instant the webhook fires, decoupled from whatever Map Event/Upsert Subscriber do
-afterwards, which is what makes a zero-item run still answer 200 rather than 500).
+deliberately returns zero items for that case. RevenueCat Events acks AFTER the write,
+not on receipt: Webhook uses responseMode "responseNode", Map Event has
+alwaysOutputData=true (so CANCELLATION's `return []` still emits one synthetic empty
+item instead of killing the run), and an `If Has Payload?` gate on `app_user_id` routes
+a real item to Upsert Subscriber -> Respond 200 (Postgres has onError:
+continueErrorOutput -> Respond Error 500, so a genuine write failure surfaces as a
+non-2xx and RevenueCat retries) while the empty/no-op item goes straight to its own
+Respond 200. This is what makes CANCELLATION 200 without ever touching Postgres, and
+what makes a broken Upsert Subscriber query show up as a real failure here rather than
+being silently swallowed.
 
 This script only checks HTTP status codes. It does NOT read back the database --
 Postgres lives behind n8n's own credential, unreachable from a plain script, so DB-
-state verification (plan/status/topup_balance after the series) is a separate step:
-a one-off Manual Trigger -> Postgres SELECT workflow, run and archived manually (see
-Tools/n8n/README.md's Import/export section for the same one-off pattern used by the
-2026-08-21 billing schema migration).
+state verification (plan/status/topup_balance after the series) is done separately:
+a throwaway Manual-Trigger-then-Postgres-SELECT workflow, built and executed by hand
+through the n8n-mcp tools, read once, then archived -- there is no committed script or
+README section for this today, it's a one-off procedure repeated per verification pass.
+DB-state assertions become probe-native in Task 11 via /webhook/GetUsage -- once that
+read endpoint exists, this script should call it instead of requiring a manual read.
 
 Usage:
     RC_WEBHOOK_SECRET=<minted-secret> python3 Tools/n8n/probe-billing.py
@@ -66,8 +74,10 @@ def post_event(event_body, with_auth=True):
 
 
 # Each probe: (label, event_body, with_auth, expected_codes (set), settle_seconds)
-# settle_seconds gives the onReceived-mode background write a moment to land before
-# the NEXT probe fires (probes b-e mutate the same row in sequence and must not race).
+# responseNode mode means the HTTP response IS the confirmation the write already
+# committed (or failed) -- there's no post-response background race anymore. The small
+# settle_seconds gap is just a courteous buffer between sequential mutations of the same
+# row (probes b-e), not a correctness requirement.
 PROBES = [
     ("a_no_auth", {"type": "INITIAL_PURCHASE", "app_user_id": "probe_noauth_check"}, False, {401, 403}, 0),
     ("b_initial_purchase", {

@@ -5,7 +5,7 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
 
 ## Layout
 
-- `workflows/` — **committed source of truth**: the 13 workflows the app actually depends on.
+- `workflows/` — **committed source of truth**: the 14 workflows the app actually depends on.
   Each JSON has its original n8n `id` injected at the top level so it round-trips on import
   (including `SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json`, whose id was assigned on first deploy 2026-07-22).
 - `supabase/` — the RAG store's DB contract: `schema.sql` (documents table +
@@ -54,7 +54,7 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
 - `reference/` — **gitignored**: downloaded community/marketplace templates + n8n onboarding
   samples, kept only to mine for ideas. Not part of the app, never imported.
 
-## The 13 canonical workflows
+## The 14 canonical workflows
 
 | id | name | role |
 |----|------|------|
@@ -71,6 +71,7 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
 | `2islisFH7jjLoPQM` | Delete Orphan Profiles | **Scheduled, hourly** (no webhook) — server-side TTL sweep deleting Wappi profiles that stay unauthorized ≥ 24h; see below |
 | `SCLcpn6DMDG3Z4VN` | Set Reply Mode | App webhook `SetReplyMode` — shared always-active; body `{ profileIds:[...], chatId:"*"\|"<id>", suppressed:bool }`; validates (malformed → `bad_request` before any DB write), fans out one item per surviving profileId, upserts each into `reply_mode_flags` (on conflict do update). The semi-auto «Авто/Вместе» suppression write path (SUP-02); the bot templates' gate reads the same table. Deployed by `build-set-reply-mode.py` (Postgres cred bound by explicit id `vvRrFiEXzLVqKjOx` — dev's single Postgres cred as of 2026-07-22); id `SCLcpn6DMDG3Z4VN` assigned + activated on first deploy 2026-07-22, filename finalized to `SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json` in 09-04 |
 | `9PTyYcelRQI7bGDb` | Suggest Replies | App webhook `SuggestReplies` — body = frozen v1 request (`{ v, requestSeq, chatId, botWaId, businessTypeId, catalog, steerTowardText, messages… }`); known-invalid requests (v mismatch / missing `chatId` / empty `messages`) short-circuit straight to `generation_failed` — zero LLM spend on the unauthenticated webhook; optional channel-branched tenant-scoped RAG pre-retrieval (one single-key filter per channel: `botWaId` WA / `botTgId` TG, topK 5, skipped on `""`/`"-1"`) → one gpt-4o-mini call (strict json_schema, closed 6-label enum) → Code validation (exactly 4 distinct enum-labeled moves, ≤300 clamp, markdown-strip, one retry then `generation_failed`) → returns `{ v:1, requestSeq, suggestions:[{text,label}×4] }` for the semi-auto «Вместе» reply panel. Deployed from the committed canonical JSON by `build-suggest-replies.py` (dev id here; prod bagkz replication pending). Adversarially verified on dev 2026-07-10 (6-case matrix — grounding / missing-data / steer / injection / trivial / sentinel — plus format-hijack + malformed→`generation_failed`, **zero fixes needed**); dev RAG grounding is **catalog-only** until Supabase `documents` are seeded — RAG-with-data deferred to prod replication |
+| `ZGYr6srzS3rSSXHp` | RevenueCat Events | App webhook `RevenueCatEvent` (`Tools/n8n/workflows/ZGYr6srzS3rSSXHp-RevenueCat_Events.json`) — mirrors RevenueCat subscription events into `subscribers` (billing schema, Task 6). Auth is n8n's **native** `httpHeaderAuth` credential (`RevenueCat Webhook`, header `Authorization`) bound on the Webhook node — no in-workflow secret compare, so the exported JSON carries no secret, only a `{id,name}` credential reference. Chain: Webhook (`responseMode: responseNode`) → `Map Event` (Code, verbatim event→row mapping; `alwaysOutputData: true` so `CANCELLATION`'s deliberate `return []` still emits one empty item instead of killing the run downstream) → `If Has Payload?` (non-empty `app_user_id`) → **TRUE**: `Upsert Subscriber` (Postgres upsert; `onError: continueErrorOutput` routes a failed write to `Respond Error` / HTTP 500) → `Respond 200`; **FALSE**: `Respond No-Op` (200). Net effect: a real event only acks 200 **after** the Postgres write commits — a genuine DB failure surfaces as a non-2xx so RevenueCat retries — while `CANCELLATION` (which intentionally writes nothing) still gets a clean 200 off the FALSE branch. Gotcha worth keeping for any future Postgres node here: `queryReplacement` must be **one** `={{ [...] }}` array expression, never comma-joined `{{ }}` fragments — the comma-joined form stringifies a JS `null` to the literal text `"null"`, which Postgres then rejects outright for a `timestamptz` column. Probed by `Tools/n8n/probe-billing.py` (`RC_WEBHOOK_SECRET` env; 401/403 no-auth + 200×4 real events, extendable in Task 8-9); permanent DB read-back is deliberately deferred to Task 11 (`GetUsage`), not a bespoke debug webhook here |
 
 > ⚠️ `4wYitz5ek30SVNlT` and `4VN3gsFaC2HUYmcc` are referenced by **literal id** inside the
 > two Create handlers. Never change their ids, or bot creation 404s on the clone step.

@@ -1,5 +1,5 @@
 {
-  "name": "RevenueCat_Events",
+  "name": "RevenueCat Events",
   "nodes": [
     {
       "id": "7b2c9e2c-efbd-4f82-9c21-d2cd9ad0ea9f",
@@ -14,10 +14,8 @@
         "httpMethod": "POST",
         "path": "RevenueCatEvent",
         "authentication": "headerAuth",
-        "responseMode": "onReceived",
-        "options": {
-          "responseData": "={{ { \"success\": true } }}"
-        }
+        "responseMode": "responseNode",
+        "options": {}
       },
       "webhookId": "2957e9cb-646a-439d-a51e-35ab8e0bbd18",
       "credentials": {
@@ -40,7 +38,8 @@
         "mode": "runOnceForAllItems",
         "language": "javaScript",
         "jsCode": "const e = $json.body.event ?? $json.body;\nconst type = e.type;                       // INITIAL_PURCHASE | RENEWAL | ...\nconst appUserId = e.app_user_id;\nconst ent = (e.entitlement_ids && e.entitlement_ids[0]) || '';\nconst planByEnt = { tier_start: 'start', tier_business: 'business', tier_network: 'network' };\nconst out = { app_user_id: appUserId, topup_delta: 0 };\n\nif (type === 'NON_RENEWING_PURCHASE' && e.product_id === 'topup.dialogs.500') {\n  out.topup_delta = 500;                   // план/статус не трогаем\n} else if (['INITIAL_PURCHASE','RENEWAL','UNCANCELLATION','PRODUCT_CHANGE'].includes(type)) {\n  out.plan = planByEnt[ent] ?? 'none';\n  out.status = 'active';\n  out.period_end = e.expiration_at_ms ? new Date(e.expiration_at_ms).toISOString() : null;\n} else if (type === 'EXPIRATION') {\n  out.status = 'expired';\n} else if (type === 'CANCELLATION') {\n  return [];                               // автопродление выключили — доступ до period_end, ничего не меняем\n}\nreturn [{ json: out }];"
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "id": "4e4aaa68-bdd6-4355-8113-71a836506cf5",
@@ -48,8 +47,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        440,
-        0
+        660,
+        140
       ],
       "parameters": {
         "resource": "database",
@@ -63,6 +62,87 @@
         "postgres": {
           "id": "vvRrFiEXzLVqKjOx",
           "name": "Postgres"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "cadb8c6d-e1b8-4727-aebe-e0fe0efdd97b",
+      "name": "If Has Payload?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c9c1a001-0001-4000-8000-0000000000a1",
+              "leftValue": "={{ $json.app_user_id }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "56d5932c-fafa-4561-bd47-d7c453c3c5f9",
+      "name": "Respond 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        880,
+        140
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true } }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "09c981a0-541a-493d-a5de-b593eec48cb2",
+      "name": "Respond No-Op",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        660,
+        -140
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"noop\": true } }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "0ae23eee-7b26-493f-a990-9ef31f4d3d94",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        880,
+        320
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"error\": \"upsert_failed\" } }}",
+        "options": {
+          "responseCode": 500
         }
       }
     }
@@ -83,7 +163,43 @@
       "main": [
         [
           {
+            "node": "If Has Payload?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Has Payload?": {
+      "main": [
+        [
+          {
             "node": "Upsert Subscriber",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond No-Op",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Subscriber": {
+      "main": [
+        [
+          {
+            "node": "Respond 200",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Error",
             "type": "main",
             "index": 0
           }
