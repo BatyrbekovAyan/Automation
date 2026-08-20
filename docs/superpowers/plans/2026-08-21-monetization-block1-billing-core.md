@@ -533,11 +533,17 @@ queryReplacement: `{{$json.app_user_id}},{{$json.plan ?? null}},{{$json.status ?
 - Modify: `Assets/Scripts/Main/Manager.cs` — обе Create*/Edit* формы получают поле `AppUserID` (значение из Task 10 `BillingService.AppUserId`; до неё — `SystemInfo.deviceUniqueIdentifier` за seam `BillingIdentity.AppUserId`)
 - Create: `Assets/Scripts/Billing/BillingIdentity.cs` (+ тест на стабильность/непустоту через seam)
 
-**Вставка в оба Create*-workflow (после парсинга формы, до создания клона):**
-1. `Postgres: Ensure Subscriber` — `insert into subscribers (app_user_id, plan, status, trial_started_at) values ($1,'trial','trialing', now()) on conflict (app_user_id) do nothing;`
-2. `Postgres: Count Channels` — `select count(*) c from bot_profiles where app_user_id=$1 and deleted_at is null;` + `select plan,status from subscribers where app_user_id=$1`.
-3. `If Slot Limit` — лимит по plan (`Code`-мапа `{trial:3,start:1,business:3,network:5,none:0}`; status `expired`→0): `c >= limit` → `Respond {success:false, error:"channel_limit"}` (клиент показывает гейт-шит Task 14).
-4. `Postgres: Register Profile` — `insert into bot_profiles (profile_id, app_user_id, channel) values ($1,$2,$3) on conflict (profile_id) do update set deleted_at = null;`
+**Вставка в оба Create*-workflow (ревизия после opus-ревью), после парсинга формы, до клона шаблона:**
+0. **Канонические JSONы НИКОГДА не абсорбируют dev-значения** (инвариант fix-orchestrator-settings.py / apply-dev-config.py / README / d594f17): экспорт с dev вносит ТОЛЬКО новые ноды+связи; URL bagkz, cred-ids, active:false, settings/meta остаются базовыми. Гейт: verify-telegram-parity.py получает ассерты «bagkz в 3 API-нодах, ни localhost, ни trycloudflare в канонике».
+1. `If Has AppUserID?` — форма без AppUserID (старый клиент) → мимо всего блока (graceful skip).
+2. `Postgres: Ensure Subscriber` — upsert trial/trialing on conflict do nothing; **onError: continueRegularOutput** (fail-open, прецедент Restamp RAG Chunks: сбой БД не валит создание бота).
+3. `Postgres: Count Channels` — row-safe: `select coalesce(cnt.c,0) c, s.plan, s.status from (select $1 id) x left join subscribers s on s.app_user_id=x.id left join lateral (select count(*) c from bot_profiles bp where bp.app_user_id=x.id and bp.deleted_at is null and not (bp.channel=$2 and bp.bot_key is not distinct from nullif($3,''))) cnt on true;` — считая, ИСКЛЮЧАЕТ живые строки того же (user, channel, bot_key): смена номера того же бота не жрёт второй слот. **onError: continueRegularOutput + alwaysOutputData**.
+4. `Code: Compute Slot Limit` — map {trial:3,start:1,business:3,network:5,none:0}, status expired→0; **при error/отсутствии plan → overLimit=false, dbError=true (fail-open)**.
+5. `If Slot Limit` → Respond `{success:false,error:"channel_limit"}` (терминальный, по respond-конвенции воркфлоу); профиль Wappi НЕ удаляется (принятый остаток, добирается свипом Task 12).
+6. `Postgres: Retire Same Bot Slot` — `update bot_profiles set deleted_at=now() where app_user_id=$1 and channel=$2 and bot_key is not distinct from nullif($3,'') and deleted_at is null;` (замена профиля бота освобождает старую строку) → `Register Profile` — insert (profile_id, app_user_id, channel, bot_key) on conflict (profile_id) do update set deleted_at=null. **onError: continueRegularOutput** на обоих.
+7. Схема: миграция `Tools/n8n/sql/2026-08-21-bot-key.sql` — `alter table bot_profiles add column if not exists bot_key text;`
+8. Клиент: 4 Create*-формы шлют AppUserID; обе FromEdit-формы дополнительно `BotKey = Manager.openBot.name` (стабильное имя-слот Bot0/Bot1...); FromStart — BotKey нового бота, если имя уже существует в момент отправки, иначе "" (пустой ключ никогда ничего не заменяет и не исключает). **FromStart-обработчики успеха обязаны проверять тело на "error" и НЕ красить бота в Active при отказе** (контракт «200 без id» появился впервые).
+9. Release-хвосты вне этой задачи: удаление бота/логаут освобождают слот через liveness-reconcile свипа **Task 12 (требование добавлено)** — реестровые строки, чей профиль отсутствует в Wappi profile/all/get, получают deleted_at.
 
 - [ ] Step 1: клиент — `BillingIdentity` + поле формы (`form.AddField("AppUserID", BillingIdentity.AppUserId)`) в 4 местах (`CreateWhatsappWorkflowFromStart/FromEdit`, Telegram-пара). Step 2: n8n-вставки на dev. Step 3: probe (расширить `probe-billing.py`: дважды создать «профиль» одному user при plan=start → второй ответ `channel_limit`). Step 4: экспорт + commit `feat(n8n): profile registry, trial upsert, channel-slot backstop`.
 
@@ -614,6 +620,8 @@ where bp.deleted_at is null
   );
 ```
 → Loop: `HTTP: profile/delete` (base `api|tapi` по channel, header Authorization; те же вызовы, что в Delete Orphan Profiles) → `Postgres: mark` `update bot_profiles set deleted_at = now() where profile_id = $1;` → `Postgres: demote` `update subscribers set status='expired' where app_user_id=$1 and status='trialing';`
+
+**Liveness reconcile (требование из ревью Task 8):** отдельная ветка свипа сверяет живые bot_profiles с Wappi `profile/all/get` (оба базовых пути) и ставит `deleted_at=now()` строкам, чьих профилей в Wappi больше нет (удаление бота, логаут, смена номера старыми клиентами) — release-путь реестра.
 
 **Инварианты (как у orphan-sweep):** никогда не трогает профили владельцев со `status='active'`; идемпотентен; первый запуск — с выключенной веткой delete (dry-run, только лог кандидатов) и ручной проверкой списка.
 
