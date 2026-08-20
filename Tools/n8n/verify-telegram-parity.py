@@ -185,6 +185,31 @@ def check_restamp_orchestrator(f, jsonb_key, opposite_field):
     print(f"OK  {f}")
 
 
+def check_canonical_export_invariant(f):
+    """Task 8 fix-round regression guard: the canonical export must NEVER absorb
+    dev-only values (localhost/tunnel URLs, dev-instance credential ids) — the
+    standing invariant documented in Tools/n8n/fix-orchestrator-settings.py's
+    docstring and Tools/n8n/apply-dev-config.py (dev is DERIVED from canonical by
+    rewriting bagkz -> localhost + remapping credential ids, never the reverse) and
+    established in commit d594f17. A raw dev re-export corrupted these two files with
+    localhost/tunnel URLs and dev credential ids once (Task 8's first pass, caught in
+    review) — this assert exists so that mistake can't ship silently again.
+    """
+    wf = load(f)
+    ns = wf["nodes"]
+    text = json.dumps(wf)
+
+    assert "localhost:5678" not in text, f"{f}: canonical export contains a dev localhost URL"
+    assert "trycloudflare" not in text, f"{f}: canonical export contains a dev tunnel URL"
+
+    for name in ("Get Sample Workflow", "Create Workflow", "Activate Created Workflow"):
+        url = node(ns, name)["parameters"].get("url", "")
+        assert "bagkz.app.n8n.cloud" in url, \
+            f"{f}: {name}'s url is not the canonical bagkz host: {url!r}"
+
+    print(f"OK  {f} (canonical-export invariant)")
+
+
 def check_suggest_replies():
     f = SUGGEST
     wf = load(f)
@@ -263,6 +288,8 @@ def main():
         check_telegram_bot()
         check_restamp_orchestrator(CREATE_TG, "{botTgId}", "WhatsappWorkflowId")
         check_restamp_orchestrator(CREATE_WA, "{botWaId}", "TelegramWorkflowId")
+        check_canonical_export_invariant(CREATE_WA)
+        check_canonical_export_invariant(CREATE_TG)
         check_suggest_replies()
     except AssertionError as e:
         print(f"PARITY FAIL: {e}")

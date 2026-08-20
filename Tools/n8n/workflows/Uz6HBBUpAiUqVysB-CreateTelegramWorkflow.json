@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "url": "http://localhost:5678/api/v1/workflows/4VN3gsFaC2HUYmcc",
+        "url": "https://bagkz.app.n8n.cloud/api/v1/workflows/4VN3gsFaC2HUYmcc",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {}
@@ -11,14 +11,14 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        828,
+        988,
         672
       ],
       "id": "8074b2ad-4336-445e-926b-04e947636cc5",
       "name": "Get Sample Workflow",
       "credentials": {
         "n8nApi": {
-          "id": "hG8UUsDx8EHS1xbB",
+          "id": "X1k4igOAG65Fb3oz",
           "name": "n8n account"
         },
         "httpBearerAuth": {
@@ -26,7 +26,7 @@
           "name": "Bearer Auth account"
         },
         "httpHeaderAuth": {
-          "id": "nAmEcPrSbxIVDPFd",
+          "id": "RV7m661NMLPXEcvm",
           "name": "n8nAPIKey"
         }
       }
@@ -34,7 +34,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:5678/api/v1/workflows",
+        "url": "https://bagkz.app.n8n.cloud/api/v1/workflows",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
@@ -45,14 +45,14 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1228,
+        1388,
         672
       ],
       "id": "8d6a78cb-776b-4e79-8e00-4fc6720a4ffa",
       "name": "Create Workflow",
       "credentials": {
         "n8nApi": {
-          "id": "hG8UUsDx8EHS1xbB",
+          "id": "X1k4igOAG65Fb3oz",
           "name": "n8n account"
         },
         "httpBearerAuth": {
@@ -60,7 +60,7 @@
           "name": "Bearer Auth account"
         },
         "httpHeaderAuth": {
-          "id": "nAmEcPrSbxIVDPFd",
+          "id": "RV7m661NMLPXEcvm",
           "name": "n8nAPIKey"
         }
       }
@@ -103,7 +103,7 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        1036,
+        1196,
         672
       ],
       "id": "c3249084-a534-4c8b-bc04-2345c75ba1f0",
@@ -143,7 +143,7 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        1516,
+        1676,
         672
       ],
       "id": "e47d3754-dbc6-435e-ac9b-67a9c16031b5",
@@ -152,7 +152,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=http://localhost:5678/api/v1/workflows/{{ $json.id }}/activate",
+        "url": "=https://bagkz.app.n8n.cloud/api/v1/workflows/{{ $json.id }}/activate",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {}
@@ -160,14 +160,14 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1692,
+        1852,
         672
       ],
       "id": "04555395-1ac0-4851-91cf-e2a32b4d656a",
       "name": "Activate Created Workflow",
       "credentials": {
         "n8nApi": {
-          "id": "hG8UUsDx8EHS1xbB",
+          "id": "X1k4igOAG65Fb3oz",
           "name": "n8n account"
         },
         "httpBearerAuth": {
@@ -175,7 +175,7 @@
           "name": "Bearer Auth account"
         },
         "httpHeaderAuth": {
-          "id": "nAmEcPrSbxIVDPFd",
+          "id": "RV7m661NMLPXEcvm",
           "name": "n8nAPIKey"
         }
       }
@@ -195,7 +195,7 @@
             },
             {
               "name": "url",
-              "value": "=https://units-entry-roster-foreign.trycloudflare.com/webhook/{{ $('Unity Webhook').item.json.body.TelegramProfileId }}"
+              "value": "=https://bagkz.app.n8n.cloud/webhook/{{ $('Unity Webhook').item.json.body.TelegramProfileId }}"
             }
           ]
         },
@@ -204,14 +204,14 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1964,
+        2124,
         672
       ],
       "id": "863b3680-68f6-4069-8cdb-9789f0588a7a",
       "name": "Set Wappi Webhook",
       "credentials": {
         "httpHeaderAuth": {
-          "id": "ZowntFGvApDJ7UzQ",
+          "id": "EuhhqAaV56DpoqAN",
           "name": "WappiAuthToken"
         }
       }
@@ -239,14 +239,14 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2140,
+        2300,
         672
       ],
       "id": "14a13077-9d38-4eaf-8593-4f4dd7158909",
       "name": "Set Wappi Webhook Types",
       "credentials": {
         "httpHeaderAuth": {
-          "id": "ZowntFGvApDJ7UzQ",
+          "id": "EuhhqAaV56DpoqAN",
           "name": "WappiAuthToken"
         }
       }
@@ -268,11 +268,36 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        2396,
+        2556,
         672
       ],
       "id": "5b372561-59de-415a-9aba-3b4b61f7281a",
       "name": "Send New Workflows Id"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE documents\nSET metadata = jsonb_set(metadata, '{botTgId}', to_jsonb($1::text))\nWHERE $2 <> '-1' AND $2 <> ''\n  AND metadata->>'botWaId' = $2\n  AND metadata->>'botTgId' = '-1';",
+        "options": {
+          "queryReplacement": "={{ $('Get Created Workflow Id').item.json.id }},{{ $('Unity Webhook').first().json.body.WhatsappWorkflowId }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2428,
+        856
+      ],
+      "id": "a5b6c7d8-0401-4e5f-9a01-000000000401",
+      "name": "Restamp RAG Chunks",
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      }
     },
     {
       "parameters": {
@@ -284,33 +309,8 @@
         -496,
         672
       ],
-      "id": "eb741ddf-84d4-476f-ad5d-577a23f60f63",
+      "id": "e6c1ae6f-7039-42e5-8ab8-4705646346c8",
       "name": "Vertical Prompt"
-    },
-    {
-      "id": "23959da4-2543-4951-9ced-ecfe2e5d19bd",
-      "name": "Restamp RAG Chunks",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.6,
-      "position": [
-        2268,
-        856
-      ],
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "UPDATE documents\nSET metadata = jsonb_set(metadata, '{botTgId}', to_jsonb($1::text))\nWHERE $2 <> '-1' AND $2 <> ''\n  AND metadata->>'botWaId' = $2\n  AND metadata->>'botTgId' = '-1';",
-        "options": {
-          "queryReplacement": "={{ $('Get Created Workflow Id').item.json.id }},{{ $('Unity Webhook').first().json.body.WhatsappWorkflowId }}"
-        }
-      },
-      "credentials": {
-        "postgres": {
-          "id": "vvRrFiEXzLVqKjOx",
-          "name": "Postgres"
-        }
-      },
-      "onError": "continueRegularOutput",
-      "alwaysOutputData": true
     },
     {
       "id": "e0e1d117-6777-426e-afa4-46227e28a46d",
@@ -367,7 +367,8 @@
           "id": "vvRrFiEXzLVqKjOx",
           "name": "Postgres"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "id": "3a50d42b-1ed5-4b56-81ac-6abd78d8a7e5",
@@ -380,9 +381,9 @@
       ],
       "parameters": {
         "operation": "executeQuery",
-        "query": "select\n  (select count(*) from bot_profiles where app_user_id=$1 and deleted_at is null) as c,\n  s.plan, s.status\nfrom subscribers s\nwhere s.app_user_id=$1;",
+        "query": "select coalesce(cnt.c,0) c, s.plan, s.status\nfrom (select $1 id) x\nleft join subscribers s on s.app_user_id = x.id\nleft join lateral (\n  select count(*) c\n  from bot_profiles bp\n  where bp.app_user_id = x.id\n    and bp.deleted_at is null\n    and not (\n      bp.channel = $2\n      and bp.bot_key is not distinct from nullif($3,'')\n      and nullif($3,'') is not null\n    )\n) cnt on true;",
         "options": {
-          "queryReplacement": "={{ [ $('Unity Webhook').first().json.body.AppUserID ] }}"
+          "queryReplacement": "={{ [ $('Unity Webhook').first().json.body.AppUserID, 'telegram', $('Unity Webhook').first().json.body.BotKey ] }}"
         }
       },
       "credentials": {
@@ -390,7 +391,9 @@
           "id": "vvRrFiEXzLVqKjOx",
           "name": "Postgres"
         }
-      }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
     },
     {
       "id": "c4a653b8-3b8f-43aa-9abe-34976f5052bc",
@@ -404,7 +407,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const row = $input.first().json;\nconst LIMITS = { trial: 3, start: 1, business: 3, network: 5, none: 0 };\nconst plan = row.plan || 'none';\nconst status = row.status || 'none';\nconst limit = status === 'expired' ? 0 : (LIMITS[plan] ?? 0);\nconst c = Number(row.c) || 0;\nreturn [{ json: { c, plan, status, limit, overLimit: c >= limit } }];"
+        "jsCode": "const row = $input.first().json;\nif (row.error || !row.plan) {\n  return [{ json: { c: row.c ?? 0, plan: row.plan ?? null, status: row.status ?? null, limit: null, overLimit: false, dbError: true } }];\n}\nconst LIMITS = { trial: 3, start: 1, business: 3, network: 5, none: 0 };\nconst plan = row.plan;\nconst status = row.status || 'none';\nconst limit = status === 'expired' ? 0 : (LIMITS[plan] ?? 0);\nconst c = Number(row.c) || 0;\nreturn [{ json: { c, plan, status, limit, overLimit: c >= limit, dbError: false } }];"
       }
     },
     {
@@ -476,14 +479,14 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        528,
+        688,
         672
       ],
       "parameters": {
         "operation": "executeQuery",
-        "query": "insert into bot_profiles (profile_id, app_user_id, channel)\nvalues ($1, $2, $3)\non conflict (profile_id) do update set deleted_at = null;",
+        "query": "insert into bot_profiles (profile_id, app_user_id, channel, bot_key)\nvalues ($1, $2, $3, nullif($4,''))\non conflict (profile_id) do update set deleted_at = null, bot_key = nullif($4,'');",
         "options": {
-          "queryReplacement": "={{ [ $('Unity Webhook').first().json.body.TelegramProfileId, $('Unity Webhook').first().json.body.AppUserID, 'telegram' ] }}"
+          "queryReplacement": "={{ [ $('Unity Webhook').first().json.body.TelegramProfileId, $('Unity Webhook').first().json.body.AppUserID, 'telegram', $('Unity Webhook').first().json.body.BotKey ] }}"
         }
       },
       "credentials": {
@@ -491,7 +494,32 @@
           "id": "vvRrFiEXzLVqKjOx",
           "name": "Postgres"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "46373d59-fb68-4a27-a527-158e656f6ee8",
+      "name": "Retire Same Bot Slot",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        528,
+        672
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update bot_profiles\nset deleted_at = now()\nwhere app_user_id = $1\n  and channel = $2\n  and bot_key is not distinct from nullif($3,'')\n  and nullif($3,'') is not null\n  and deleted_at is null;",
+        "options": {
+          "queryReplacement": "={{ [ $('Unity Webhook').first().json.body.AppUserID, 'telegram', $('Unity Webhook').first().json.body.BotKey ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -667,7 +695,7 @@
         ],
         [
           {
-            "node": "Register Profile",
+            "node": "Retire Same Bot Slot",
             "type": "main",
             "index": 0
           }
@@ -684,20 +712,26 @@
           }
         ]
       ]
+    },
+    "Retire Same Bot Slot": {
+      "main": [
+        [
+          {
+            "node": "Register Profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
-    "executionOrder": "v1",
-    "binaryMode": "separate",
-    "availableInMCP": true
+    "executionOrder": "v1"
   },
   "staticData": null,
   "pinData": {},
   "triggerCount": 1,
-  "meta": {
-    "aiBuilderAssisted": true,
-    "builderVariant": "mcp"
-  },
+  "meta": {},
   "id": "Uz6HBBUpAiUqVysB",
-  "active": true
+  "active": false
 }

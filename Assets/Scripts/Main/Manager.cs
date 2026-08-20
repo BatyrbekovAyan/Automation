@@ -3331,6 +3331,11 @@ public partial class Manager : MonoBehaviour
         form.AddField("ProductsList", "");
         form.AddField("ServicesList", "");
         form.AddField("AppUserID", BillingIdentity.AppUserId);
+        // BotKey = this bot's stable slot name (already assigned by the time this
+        // coroutine runs — Manager.cs sets newBot.name before starting it). Lets the
+        // server-side slot backstop retire the SAME bot's old channel row on a
+        // re-register (e.g. change-number) instead of counting it as a second slot.
+        form.AddField("BotKey", bot != null ? bot.name : "");
 
         using UnityWebRequest www = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateWhatsappWorkflow", form);
         // Without a timeout a connected-but-silent n8n parks this coroutine forever:
@@ -3349,8 +3354,17 @@ public partial class Manager : MonoBehaviour
             yield break;
         }
 
-        if (www.result != UnityWebRequest.Result.Success)
+        // A channel_limit rejection is a real HTTP 200 with no "id" (the billing
+        // slot backstop's contract — see Task 8) — so success can no longer be judged
+        // from www.result alone; the body must be inspected too.
+        string response = www.result == UnityWebRequest.Result.Success ? www.downloadHandler.text : null;
+        bool serverRejected = response != null && response.Contains("\"error\"");
+
+        if (www.result != UnityWebRequest.Result.Success || serverRejected)
         {
+            if (serverRejected)
+                Debug.LogWarning($"CreateWhatsappWorkflow rejected: {response}");
+
             // The card SURVIVES this failure (DeleteWhatsappProfile only resets the
             // local id to the unauthed sentinel), so hand its controls back — the
             // creation path disabled both, and only the success branch below used
@@ -3378,12 +3392,9 @@ public partial class Manager : MonoBehaviour
             startedBot.EditButton.interactable = true;
             startedBot.SetActivationInteractable(true);
 
-
-            string response = www.downloadHandler.text;
-            
             if (response.Contains("\"id\":"))
             {
-            
+
                 bot.GetComponent<Bot>().whatsappWorkflowId = ExtractWorkflowId(response);
                 PlayerPrefs.SetString(bot.name + "WhatsappWorkflowId", bot.GetComponent<Bot>().whatsappWorkflowId);
                 PlayerPrefs.SetString(bot.name + "WhatsappProfileId", bot.GetComponent<Bot>().whatsappProfileId);
@@ -3454,6 +3465,9 @@ public partial class Manager : MonoBehaviour
         form.AddField("ProductsList", "Products:\n" + productsList);
         form.AddField("ServicesList", "Services:\n" + servicesList);
         form.AddField("AppUserID", BillingIdentity.AppUserId);
+        // BotKey = this (existing) bot's stable slot name — lets a re-auth/change-number
+        // save on the SAME bot retire its own old channel row server-side.
+        form.AddField("BotKey", openBot != null ? openBot.name : "");
 
         using UnityWebRequest www = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateWhatsappWorkflow", form);
         yield return www.SendWebRequest();
@@ -3516,6 +3530,8 @@ public partial class Manager : MonoBehaviour
         form.AddField("ProductsList", "");
         form.AddField("ServicesList", "");
         form.AddField("AppUserID", BillingIdentity.AppUserId);
+        // See the WhatsApp twin: BotKey = this bot's already-assigned stable slot name.
+        form.AddField("BotKey", bot != null ? bot.name : "");
 
         using UnityWebRequest www = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateTelegramWorkflow", form);
         // See the WhatsApp twin: no timeout means a silent n8n parks this coroutine
@@ -3535,8 +3551,16 @@ public partial class Manager : MonoBehaviour
         // NOTE: this check was left inverted (debug flip, correct line commented
         // beside it) — on success it deleted the just-authorized profile and on
         // failure marked the bot active. Restored to mirror the WhatsApp twin.
-        if (www.result != UnityWebRequest.Result.Success)
+        // Also see the WhatsApp twin: a channel_limit rejection is a real HTTP 200
+        // with no "id" (Task 8 billing backstop), so the body must be inspected too.
+        string response = www.result == UnityWebRequest.Result.Success ? www.downloadHandler.text : null;
+        bool serverRejected = response != null && response.Contains("\"error\"");
+
+        if (www.result != UnityWebRequest.Result.Success || serverRejected)
         {
+            if (serverRejected)
+                Debug.LogWarning($"CreateTelegramWorkflow rejected: {response}");
+
             // Mirror of the WhatsApp twin: the card survives, so give its Edit
             // button and «Авто» capsule back instead of stranding them disabled,
             // and drop the id of the profile being deleted so neither the subline
@@ -3558,12 +3582,9 @@ public partial class Manager : MonoBehaviour
             startedBot.EditButton.interactable = true;
             startedBot.SetActivationInteractable(true);
 
-
-            string response = www.downloadHandler.text;
-            
             if (response.Contains("\"id\":"))
             {
-            
+
                 bot.GetComponent<Bot>().telegramWorkflowId = ExtractWorkflowId(response);
                 PlayerPrefs.SetString(bot.name + "TelegramWorkflowId", bot.GetComponent<Bot>().telegramWorkflowId);
                 PlayerPrefs.SetString(bot.name + "TelegramProfileId", bot.GetComponent<Bot>().telegramProfileId);
@@ -3634,6 +3655,8 @@ public partial class Manager : MonoBehaviour
         form.AddField("ProductsList", "Products:\n" + productsList);
         form.AddField("ServicesList", "Services:\n" + servicesList);
         form.AddField("AppUserID", BillingIdentity.AppUserId);
+        // See the WhatsApp twin: BotKey = this (existing) bot's stable slot name.
+        form.AddField("BotKey", openBot != null ? openBot.name : "");
 
         using UnityWebRequest www = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateTelegramWorkflow", form);
         yield return www.SendWebRequest();

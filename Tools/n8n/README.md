@@ -131,6 +131,17 @@ n8n import:workflow --separate --input=Tools/n8n/workflows/
 n8n export:workflow --backup --output=/tmp/n8n-export
 ```
 
+**Editing an already-active workflow via the n8n-mcp `update_workflow` tool (Task 8 gotcha):**
+`update_workflow` mutates the workflow's *draft* only — a live webhook keeps serving
+whatever was last **published**, even though `get_workflow_details`/a raw `GET` on the
+edited workflow immediately shows the new nodes/connections as present. The two ids to
+compare are `versionId` (the draft you just wrote) and `activeVersionId` (what the live
+webhook actually runs); if they differ, the edit is invisible to real traffic. Call
+`publish_workflow` right after any `update_workflow` against an active orchestrator, and
+re-check `versionId == activeVersionId` before probing — skipping this silently ran the
+OLD (pre-edit) chain against two Task 8 fix-round probe calls and left two stray cloned
+workflows behind (found via `search_workflows` and cleaned up by hand).
+
 ## Known follow-ups before this is production-/dev-ready
 
 1. **Credentials are not in these files** (referenced by id only). The local server has none yet —
