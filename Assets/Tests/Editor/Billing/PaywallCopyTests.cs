@@ -5,6 +5,7 @@ public class PaywallCopyTests
     [TestCase(9900, "9 900 ₸")]
     [TestCase(199000, "199 000 ₸")]
     [TestCase(500, "500 ₸")]
+    [TestCase(-199000, "-199 000 ₸")]
     public void Kzt_groups_thousands_with_nbsp(int v, string s) => Assert.AreEqual(s, PaywallCopy.Kzt(v));
 
     [TestCase(1, "1 диалог")]
@@ -15,4 +16,6 @@ public class PaywallCopyTests
 
     [Test] public void Trial_cta_is_five_days() => StringAssert.Contains("5 дней", PaywallCopy.TrialCta());
     [Test] public void Year_line_carries_12_for_10() => StringAssert.Contains("12 месяцев по цене 10", PaywallCopy.YearLine(PlanCatalog.Get(PlanTier.Start)));
+    [Test] public void PerMonth_appends_suffix() => Assert.AreEqual("9 900 ₸/мес", PaywallCopy.PerMonth(9900));
+    [Test] public void TrialPill_formats_days() => Assert.AreEqual("Пробный · 3 дн.", PaywallCopy.TrialPill(3));
 }
