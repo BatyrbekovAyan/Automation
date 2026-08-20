@@ -185,15 +185,50 @@ def check_restamp_orchestrator(f, jsonb_key, opposite_field):
     print(f"OK  {f}")
 
 
+# Cloud-shaped canonical credential ids, pinned exactly (review round 2 — the URL-only
+# check in round 1 let a copy carrying dev credential ids + active:true +
+# settings.binaryMode slip through cleanly, since none of those dimensions is a dev URL
+# string). Values confirmed against the committed canonical files, both identical.
+CANON_N8N_API_CRED = "X1k4igOAG65Fb3oz"      # n8nApi ("n8n account")
+CANON_N8N_APIKEY_CRED = "RV7m661NMLPXEcvm"   # httpHeaderAuth ("n8nAPIKey") on the 3 API nodes
+CANON_N8N_BEARER_CRED = "nfU8CbYjPssGjEZA"   # httpBearerAuth ("Bearer Auth account")
+CANON_WAPPI_CRED = "EuhhqAaV56DpoqAN"        # httpHeaderAuth ("WappiAuthToken")
+# CANON_POSTGRES_CRED reuses PG_EXECUTEQUERY_CRED (vvRrFiEXzLVqKjOx), already defined above —
+# single source of truth rather than a second literal that could drift from it.
+
+API_NODE_NAMES = ("Get Sample Workflow", "Create Workflow", "Activate Created Workflow")
+WAPPI_NODE_NAMES = ("Set Wappi Webhook", "Set Wappi Webhook Types")
+POSTGRES_NODE_NAMES = (
+    "Restamp RAG Chunks", "Ensure Subscriber", "Count Channels",
+    "Retire Same Bot Slot", "Register Profile",
+)
+
+
 def check_canonical_export_invariant(f):
-    """Task 8 fix-round regression guard: the canonical export must NEVER absorb
-    dev-only values (localhost/tunnel URLs, dev-instance credential ids) — the
-    standing invariant documented in Tools/n8n/fix-orchestrator-settings.py's
-    docstring and Tools/n8n/apply-dev-config.py (dev is DERIVED from canonical by
-    rewriting bagkz -> localhost + remapping credential ids, never the reverse) and
-    established in commit d594f17. A raw dev re-export corrupted these two files with
-    localhost/tunnel URLs and dev credential ids once (Task 8's first pass, caught in
-    review) — this assert exists so that mistake can't ship silently again.
+    """Task 8 fix-round regression guard (hardened in review round 2): the canonical
+    export must NEVER absorb dev-only values — the standing invariant documented in
+    Tools/n8n/fix-orchestrator-settings.py's docstring and Tools/n8n/apply-dev-config.py
+    (dev is DERIVED from canonical by rewriting bagkz -> localhost + remapping
+    credential ids, never the reverse) and established in commit d594f17. A raw dev
+    re-export corrupted these two files once (Task 8's first pass, caught in review).
+
+    Round 1 only checked for the ABSENCE of dev strings (localhost/trycloudflare) and
+    the PRESENCE of "bagkz.app.n8n.cloud" as a substring of 3 node urls. A reviewer's
+    negative test showed a copy carrying dev CREDENTIAL ids + active:true +
+    settings.binaryMode still passed cleanly — none of those dimensions is a "dev URL
+    string", so the round-1 asserts never looked at them. This version pins every
+    dimension of that same regression, per file:
+      - every credential id on every node that has one (the 3 n8n-API httpRequest
+        nodes, the 2 Wappi httpRequest nodes, the 5 Postgres nodes) to its EXACT
+        canonical value — not "looks like a URL", not "isn't a known dev id";
+      - `active is False` (identity, not just falsy);
+      - `settings == {"executionOrder": "v1"}` by exact dict equality, which rules out
+        ANY stray key (binaryMode, availableInMCP, or one not yet seen) rather than
+        naming binaryMode specifically;
+      - a POSITIVE assert that Set Wappi Webhook's callback-url query parameter starts
+        with the canonical bagkz webhook host — checking only for the ABSENCE of
+        "trycloudflare" would still pass an ngrok-style (or any other non-bagkz)
+        tunnel host, since that literal string never appears in one.
     """
     wf = load(f)
     ns = wf["nodes"]
@@ -202,10 +237,43 @@ def check_canonical_export_invariant(f):
     assert "localhost:5678" not in text, f"{f}: canonical export contains a dev localhost URL"
     assert "trycloudflare" not in text, f"{f}: canonical export contains a dev tunnel URL"
 
-    for name in ("Get Sample Workflow", "Create Workflow", "Activate Created Workflow"):
-        url = node(ns, name)["parameters"].get("url", "")
+    for name in API_NODE_NAMES:
+        n = node(ns, name)
+        url = n["parameters"].get("url", "")
         assert "bagkz.app.n8n.cloud" in url, \
             f"{f}: {name}'s url is not the canonical bagkz host: {url!r}"
+        creds = n.get("credentials") or {}
+        assert creds.get("n8nApi", {}).get("id") == CANON_N8N_API_CRED, \
+            f"{f}: {name}'s n8nApi credential id is not canonical: {creds.get('n8nApi')}"
+        assert creds.get("httpHeaderAuth", {}).get("id") == CANON_N8N_APIKEY_CRED, \
+            f"{f}: {name}'s httpHeaderAuth (n8nAPIKey) credential id is not canonical: {creds.get('httpHeaderAuth')}"
+        assert creds.get("httpBearerAuth", {}).get("id") == CANON_N8N_BEARER_CRED, \
+            f"{f}: {name}'s httpBearerAuth credential id is not canonical: {creds.get('httpBearerAuth')}"
+
+    for name in WAPPI_NODE_NAMES:
+        creds = node(ns, name).get("credentials") or {}
+        assert creds.get("httpHeaderAuth", {}).get("id") == CANON_WAPPI_CRED, \
+            f"{f}: {name}'s WappiAuthToken credential id is not canonical: {creds.get('httpHeaderAuth')}"
+
+    for name in POSTGRES_NODE_NAMES:
+        creds = node(ns, name).get("credentials") or {}
+        assert creds.get("postgres", {}).get("id") == PG_EXECUTEQUERY_CRED, \
+            f"{f}: {name}'s postgres credential id is not canonical: {creds.get('postgres')}"
+
+    assert wf["active"] is False, f"{f}: active is not False: {wf['active']!r}"
+    assert wf["settings"] == {"executionOrder": "v1"}, \
+        f"{f}: settings is not the clean canonical dict (binaryMode/availableInMCP stowaway?): {wf['settings']!r}"
+
+    # Positive assert (not just "no trycloudflare") — an ngrok-style dev tunnel host
+    # would pass a purely-negative trycloudflare check.
+    swh = node(ns, "Set Wappi Webhook")
+    url_param = next(
+        (p["value"] for p in swh["parameters"]["queryParameters"]["parameters"] if p["name"] == "url"),
+        None,
+    )
+    assert url_param is not None, f"{f}: Set Wappi Webhook has no 'url' query parameter"
+    assert url_param.lstrip("=").startswith("https://bagkz.app.n8n.cloud/webhook/"), \
+        f"{f}: Set Wappi Webhook's callback url is not the canonical bagkz webhook host: {url_param!r}"
 
     print(f"OK  {f} (canonical-export invariant)")
 
