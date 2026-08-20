@@ -75,6 +75,13 @@ public class BotsPage : MonoBehaviour
     /// </summary>
     public void StartNewBot()
     {
+        int existingBots = botsParent != null ? botsParent.childCount : 0;
+        if (!EntitlementGate.CanCreateBot(existingBots))
+        {
+            EntitlementGate.RequestPaywall(PaywallTrigger.BotLimit);
+            return;
+        }
+
         var tabs = BottomTabManager.Instance;   // IN-08
         if (tabs != null && tabs.ActiveTabIndex != BottomTabManager.BotsTabIndex)
             tabs.SwitchTab(BottomTabManager.BotsTabIndex);

@@ -80,6 +80,16 @@ public partial class BotSettings
 
         if (bot.whatsappProfileId.Equals("-1"))
         {
+            // Fresh path: a new Wappi profile is about to be provisioned, consuming a
+            // channel slot. Re-auth of an EXISTING profile (the branch below) reuses
+            // its slot and is deliberately NOT gated.
+            if (!EntitlementGate.CanConnectChannel(EntitlementGate.ConnectedChannelCount()))
+            {
+                EntitlementGate.RequestPaywall(PaywallTrigger.ChannelLimit);
+                SetChannelRowQuiet(whatsappRow, false);
+                yield break;
+            }
+
             // Fresh auth path: provision a new Wappi profile for this bot, then
             // show Manager's shared auth page using the newly assigned id.
             Manager.Instance.GetCreateWhatsappProfile(BotNameField.Value);
@@ -275,6 +285,15 @@ public partial class BotSettings
 
         if (bot.telegramProfileId.Equals("-1"))
         {
+            // Fresh path — see the WhatsApp twin above (re-auth of an existing profile
+            // reuses its slot and is deliberately NOT gated).
+            if (!EntitlementGate.CanConnectChannel(EntitlementGate.ConnectedChannelCount()))
+            {
+                EntitlementGate.RequestPaywall(PaywallTrigger.ChannelLimit);
+                SetChannelRowQuiet(telegramRow, false);
+                yield break;
+            }
+
             Manager.Instance.GetCreateTelegramProfile(BotNameField.Value);
 
             float elapsed = 0f;
