@@ -30,6 +30,7 @@ public static class TrialLedger
         if (!HasStarted) return PlanCatalog.TrialDays;
         var start = DateTime.Parse(Load(Key), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
         var elapsedDays = (int)Math.Floor((UtcNow() - start).TotalDays);
+        if (elapsedDays < 0) elapsedDays = 0;   // откат часов не удлиняет триал; настоящий enforcement — серверный свип (Task 12)
         return Math.Max(0, PlanCatalog.TrialDays - elapsedDays);
     }
 

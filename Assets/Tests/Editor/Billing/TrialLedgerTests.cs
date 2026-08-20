@@ -37,4 +37,12 @@ public class TrialLedgerTests
         Assert.AreEqual(0, TrialLedger.DaysLeft());
         Assert.IsTrue(TrialLedger.IsExpired);
     }
+
+    [Test] public void Clock_rollback_does_not_extend_past_five_days()
+    {
+        TrialLedger.StartIfNeeded();
+        _now = _now.AddDays(-100);
+        Assert.AreEqual(5, TrialLedger.DaysLeft());
+        Assert.IsFalse(TrialLedger.IsExpired);
+    }
 }
