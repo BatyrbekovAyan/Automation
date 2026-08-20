@@ -483,7 +483,7 @@ create index if not exists dialog_counts_month on dialog_counts (app_user_id, d)
 - Create (dev n8n → экспорт): `Tools/n8n/workflows/<id>-RevenueCat_Events.json`
 - Create: `Tools/n8n/probe-billing.py` (расширяется в Task 8–9)
 
-**Workflow (nodes):** `Webhook` (POST `/webhook/RevenueCatEvent`) → `If Auth` (`headers.authorization == секрет`; иначе respond 401) → `Code: Map Event` → `Postgres: Upsert Subscriber` → `Respond 200`.
+**Workflow (nodes, синхронизировано с реализацией):** `Webhook` (POST `/webhook/RevenueCatEvent`, auth = НАТИВНЫЙ httpHeaderAuth-кредензал «RevenueCat Webhook» — секрет живёт в n8n, НЕ в экспортируемом JSON; неверный header n8n отбивает сам) → `Code: Map Event` (**alwaysOutputData=true** — CANCELLATION возвращает [], нода эмитит пустой item) → `If Has Payload?` (item несёт app_user_id → Postgres-ветка; пустой → сразу `Respond 200`) → `Postgres: Upsert Subscriber` → `Respond 200`. **responseMode = responseNode, НЕ onReceived**: ack уходит ПОСЛЕ записи, сбой Postgres возвращает 5xx и RevenueCat ретраит (глобальный onReceived молча терял бы billing-события — ревью-находка). Проба читает секрет из env `RC_WEBHOOK_SECRET`; DB-state-ассерты пробы появятся в Task 11 через GetUsage (постоянный read-back путь уже в плане — отдельный debug-вебхук не строим).
 
 - [ ] **Step 1: Map Event (Code node, полный текст)**
 
