@@ -238,7 +238,7 @@ public static class TrialLedger
 
 **Interfaces:**
 - Consumes: `PlanCatalog`, `TrialLedger`.
-- Produces: `EntitlementPolicy.EffectiveTier(PlanTier purchased, bool trialStarted, bool trialExpired)` → purchased≠None ? purchased : (started && !expired ? Trial : None); `CanCreateBot(PlanTier, int existingBots)`, `CanConnectChannel(PlanTier, int connectedChannels)`; `enum QuotaState { Ok, Warn, Over }`; `QuotaMath.State(used, quota, topupBalance)`, `QuotaMath.Remaining(used, quota, topupBalance)`, `QuotaMath.Percent(used, quota)`.
+- Produces: `EntitlementPolicy.EffectiveTier(PlanTier purchased, bool trialStarted, bool trialExpired)` → purchased≠None ? purchased : (`None` ТОЛЬКО когда триал стартовал И истёк; НЕ стартовавший триал = `Trial` — pre-auth grace: часы триала запускает первая успешная авторизация (Task 15), а мастер первого бота должен открываться на свежей установке); `CanCreateBot(PlanTier, int existingBots)`, `CanConnectChannel(PlanTier, int connectedChannels)`; `enum QuotaState { Ok, Warn, Over }`; `QuotaMath.State(used, quota, topupBalance)`, `QuotaMath.Remaining(used, quota, topupBalance)`, `QuotaMath.Percent(used, quota)`.
 
 - [ ] **Step 1: failing tests**
 
@@ -256,8 +256,8 @@ public class EntitlementPolicyTests
     [Test] public void Expired_trial_without_purchase_is_none()
         => Assert.AreEqual(PlanTier.None, EntitlementPolicy.EffectiveTier(PlanTier.None, true, true));
 
-    [Test] public void Not_started_trial_is_none()
-        => Assert.AreEqual(PlanTier.None, EntitlementPolicy.EffectiveTier(PlanTier.None, false, false));
+    [Test] public void Not_started_trial_is_trial_grace()   // мастер первого бота должен открываться до первой авторизации
+        => Assert.AreEqual(PlanTier.Trial, EntitlementPolicy.EffectiveTier(PlanTier.None, false, false));
 
     [TestCase(PlanTier.Start, 0, true)]
     [TestCase(PlanTier.Start, 1, false)]
@@ -299,7 +299,9 @@ public static class EntitlementPolicy
     public static PlanTier EffectiveTier(PlanTier purchased, bool trialStarted, bool trialExpired)
     {
         if (purchased != PlanTier.None) return purchased;
-        return trialStarted && !trialExpired ? PlanTier.Trial : PlanTier.None;
+        // Не стартовавший триал = Trial (pre-auth grace): часы запускает первая авторизация,
+        // а мастер первого бота обязан открываться на свежей установке.
+        return trialStarted && trialExpired ? PlanTier.None : PlanTier.Trial;
     }
 
     public static bool CanCreateBot(PlanTier tier, int existingBots)
