@@ -475,6 +475,7 @@ create index if not exists dialog_counts_month on dialog_counts (app_user_id, d)
 
 - [ ] **Step 2: применить** через Supabase SQL Editor (dashboard) — Supabase MCP тут read-only; альтернатива: одноразовый n8n workflow c Postgres-нодой (Session pooler 5432, НЕ 6543). Проверка: `select count(*) from subscribers;` → 0.
 - [ ] **Step 3: commit** `feat(n8n): billing schema — subscribers, bot_profiles, dialog_counts`
+- [ ] **Step 4 (ревью-находка): RLS-закалка** — `Tools/n8n/sql/2026-08-21-billing-rls.sql` по ТОЧНОМУ паттерну существующих миграций (`Tools/n8n/supabase/2026-07-02-harden-rag-store.sql`, `2026-07-19-reply-mode-flags.sql`): `alter table ... enable row level security` (deny-all, без policy) + `revoke all ... from anon, authenticated` на все три таблицы. Смысл: RLS гейтит НЕ n8n (Postgres-кред = owner, обходит RLS), а автогенерируемый PostgREST API Supabase, который по умолчанию даёт anon/authenticated CRUD на каждую новую public-таблицу — проект уже наступал на это (см. комментарий harden-rag-store). Применить тем же одноразовым workflow-путём, верифицировать `pg_tables.rowsecurity=true` × 3 + отсутствие грантов anon/authenticated в `information_schema.role_table_grants`, заархивировать, закоммитить один файл.
 
 ### Task 7: n8n RevenueCat_Events — зеркало подписок
 
