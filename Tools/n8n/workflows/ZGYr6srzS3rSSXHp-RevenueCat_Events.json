@@ -1,0 +1,107 @@
+{
+  "name": "RevenueCat_Events",
+  "nodes": [
+    {
+      "id": "7b2c9e2c-efbd-4f82-9c21-d2cd9ad0ea9f",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "RevenueCatEvent",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "options": {
+          "responseData": "={{ { \"success\": true } }}"
+        }
+      },
+      "webhookId": "2957e9cb-646a-439d-a51e-35ab8e0bbd18",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "zqEakONO3UZyeqBq",
+          "name": "RevenueCat Webhook"
+        }
+      }
+    },
+    {
+      "id": "ea4bc75b-d329-449c-a13d-8f3f8a8c1e8f",
+      "name": "Map Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const e = $json.body.event ?? $json.body;\nconst type = e.type;                       // INITIAL_PURCHASE | RENEWAL | ...\nconst appUserId = e.app_user_id;\nconst ent = (e.entitlement_ids && e.entitlement_ids[0]) || '';\nconst planByEnt = { tier_start: 'start', tier_business: 'business', tier_network: 'network' };\nconst out = { app_user_id: appUserId, topup_delta: 0 };\n\nif (type === 'NON_RENEWING_PURCHASE' && e.product_id === 'topup.dialogs.500') {\n  out.topup_delta = 500;                   // план/статус не трогаем\n} else if (['INITIAL_PURCHASE','RENEWAL','UNCANCELLATION','PRODUCT_CHANGE'].includes(type)) {\n  out.plan = planByEnt[ent] ?? 'none';\n  out.status = 'active';\n  out.period_end = e.expiration_at_ms ? new Date(e.expiration_at_ms).toISOString() : null;\n} else if (type === 'EXPIRATION') {\n  out.status = 'expired';\n} else if (type === 'CANCELLATION') {\n  return [];                               // автопродление выключили — доступ до period_end, ничего не меняем\n}\nreturn [{ json: out }];"
+      }
+    },
+    {
+      "id": "4e4aaa68-bdd6-4355-8113-71a836506cf5",
+      "name": "Upsert Subscriber",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "insert into subscribers (app_user_id, plan, status, current_period_end, topup_balance, updated_at)\nvalues ($1, coalesce($2,'trial'), coalesce($3,'trialing'), $4, greatest($5,0), now())\non conflict (app_user_id) do update set\n  plan = coalesce($2, subscribers.plan),\n  status = coalesce($3, subscribers.status),\n  current_period_end = coalesce($4, subscribers.current_period_end),\n  topup_balance = subscribers.topup_balance + $5,\n  updated_at = now();",
+        "options": {
+          "queryReplacement": "={{ [$json.app_user_id, ($json.plan ?? null), ($json.status ?? null), ($json.period_end ?? null), $json.topup_delta] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Map Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map Event": {
+      "main": [
+        [
+          {
+            "node": "Upsert Subscriber",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "staticData": null,
+  "pinData": {},
+  "triggerCount": 1,
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  },
+  "id": "ZGYr6srzS3rSSXHp",
+  "active": true
+}
