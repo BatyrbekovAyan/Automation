@@ -554,29 +554,7 @@ queryReplacement: `{{$json.app_user_id}},{{$json.plan ?? null}},{{$json.status ?
 
 **Правило (из спеки):** диалог = (app_user_id, chat_id, дата Asia/Almaty). НОВЫЙ диалог сверх `quota+topup` → бот НЕ шлёт автоответ (ведёт себя как «Вместе»); диалог, начатый в пределах квоты, договаривает сутки. Порядок узлов: после `Suppressed?` (false-ветка = разрешено отвечать) вставить `Postgres: Count Dialog` → `If Over Quota` → true → END (без отправки); false → дальше по существующей цепочке.
 
-- [ ] **Step 1: Count Dialog (Postgres node, один запрос)**
-
-```sql
-with me as (
-  select bp.app_user_id, s.plan, s.status, s.topup_balance
-  from bot_profiles bp join subscribers s using (app_user_id)
-  where bp.profile_id = $1
-), ins as (
-  insert into dialog_counts (app_user_id, chat_id, d)
-  select app_user_id, $2, (now() at time zone 'Asia/Almaty')::date from me
-  on conflict do nothing
-  returning 1
-)
-select
-  me.plan, me.status, me.topup_balance,
-  exists(select 1 from ins) as is_new,
-  (select count(*) from dialog_counts dc, me
-     where dc.app_user_id = me.app_user_id
-       and date_trunc('month', dc.d) = date_trunc('month', (now() at time zone 'Asia/Almaty')::date)) as used
-from me;
-```
-queryReplacement: `{{profileId из контекста workflow}},{{chatId сообщения}}` (profileId в клонах уже зашит — взять из того же выражения, которым его читает существующий `HTTP Request`-отправитель).
-
+- [ ] **Step 1: Count Dialog — FINAL semantics (sync with d9c5c5b; full SQL in task-9-report.md and the shipped templates):** conditional-insert CTE: `existing` (client+day today, independent of quota — continuation ALWAYS replies), insert only when `not exists(existing) AND status not in ('expired','grace') AND used < q` (suppressed new dialog does NOT consume quota; expired/grace block NEW only, via explicit clause not arithmetic sentinel), `allowed = existing OR inserted`, `q`/`used` surfaced for explainability. Fail-open: onError=continueRegularOutput + alwaysOutputData; `Quota Decision` MUST carry the payload — `{...$('Latest+Combine').first().json, allowed, quotaUsed, plan, status, failOpen}` + explicit `pairedItem`; `$input.first()?.json ?? {}` guards the fail-closed throw. Spliced AFTER Is Latest? (debounce dedup first) and after Suppressed?-allow; blocked branch dead-ends in Suppressed? style. Gate: metering asserts on CONNECTIONS + payload-continuity assert, negative-tested against the broken variant.
 - [ ] **Step 2: If Over Quota** — `Code`-мапа квот `{trial:150,start:300,business:1000,network:3000,none:0}` (status `expired|grace` → 0); условие: `is_new && used > quota + topup_balance` → true-ветка в END.
 - [ ] **Step 3: probe** — сценарий: подписчик start (300), нагенерить 300 строк dialog_counts SQL-ом, послать сообщение НОВОГО chat_id → бот молчит; послать в СТАРЫЙ chat_id этого дня → бот отвечает. Прогнать для обоих каналов.
 - [ ] **Step 4:** ВАЖНО — клоны существующих ботов не обновятся сами (правило «old clones keep old behavior»): для тестовых ботов владельца пересоздать/прогнать Edit. Экспорт + commit `feat(n8n): per-day dialog metering with quota enforcement`.
@@ -654,6 +632,7 @@ where bp.deleted_at is null
 
 - [ ] `TrialLedger.StartIfNeeded()` в момент первой успешной авторизации канала (существующий success-обработчик в Manager/BotSettings.Auth — та же точка, где сегодня включается success-оверлей).
 - [ ] На старте приложения: `if (EntitlementGate.CurrentTier == PlanTier.None && TrialLedger.IsExpired)` → paywall (TrialExpired, вариант «чек ценности»).
+- [ ] **WA metering exit criteria (Task 9 review — WhatsApp template had no live run; fix is byte-identical to TG):** under-quota WA message reaches `AI Agent` (NOT «Ask to Send Text»); over-quota new chat produces no send.
 - [ ] **E2E чеклист (device, сторы в sandbox):** свежая установка → мастер → авторизация WhatsApp → триал стартовал (пилюля «5 дн.») → бот отвечает → счётчик растёт → sandbox-покупка Старт (месяц) → entitlement активен, пилюля исчезла, гейты = 1/1/300 → попытка второго канала → гейт-шит → sandbox-апгрейд Бизнес → канал подключается → restore на переустановке → топ-ап +500 отражается в Get_Usage. Серверно: строки в subscribers/bot_profiles/dialog_counts корректны; sweep в dry-run не видит активного подписчика.
 - [ ] Commit `feat(billing): trial start wiring + e2e pass` + отметить в спеке §10.2 фактические стор-цены.
 
