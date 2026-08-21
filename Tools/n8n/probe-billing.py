@@ -372,12 +372,20 @@ def dialog_metering_query(profile_id, chat_id):
   select
     case me.plan when 'trial' then 150 when 'start' then 300 when 'business' then 1000 when 'network' then 3000 else 0 end
     + case when me.status in ('active','trialing') then me.topup_balance else 0 end
-    - case when me.status in ('expired','grace') then 100000000 else 0 end as q
+    as q
   from me
-), ins as (
+)
+-- Two accepted concurrency edges, both benign: (1) a genuine same-chat race can't
+-- reach here twice -- the upstream debounce gate (Is Latest?) already collapses
+-- concurrent fragments for one chat down to a single survivor before Count Dialog
+-- ever runs; (2) two DIFFERENT new chat_ids for the same app_user_id racing the same
+-- usage_now snapshot can both insert, overshooting the quota by at most one dialog --
+-- accepted, and it favours the customer rather than the business.
+, ins as (
   insert into dialog_counts (app_user_id, chat_id, d)
   select me.app_user_id, {cid}, t.d from me, today t
   where not exists (select 1 from existing)
+    and me.status not in ('expired','grace')
     and (select used from usage_now) < (select q from quota)
   on conflict (app_user_id, chat_id, d) do nothing
   returning 1
@@ -385,6 +393,7 @@ def dialog_metering_query(profile_id, chat_id):
 select
   (exists(select 1 from existing) or exists(select 1 from ins)) as allowed,
   (select used from usage_now) as used,
+  (select q from quota) as q,
   me.plan as plan, me.status as status
 from me;"""
 

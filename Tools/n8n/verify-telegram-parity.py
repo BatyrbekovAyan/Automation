@@ -350,6 +350,30 @@ def check_dialog_metering(f):
     assert "where not exists" in q and "used from usage_now" in q, \
         f"{f}: Count Dialog insert does not look conditional on quota/existing: {q}"
 
+    # (vii) PAYLOAD CONTINUITY (fix round, 2026-08-21) -- Count Dialog is a Postgres
+    # executeQuery node: its output is JUST the SQL result columns, not a merge with
+    # its input, so by the time Quota Decision runs, the incoming message's
+    # .body.messages[0]/combinedText/abort are already gone. If Quota Decision's own
+    # return value doesn't put them back, Input type (immediately downstream, reading
+    # bare $json.body.messages[0].type) fails every Switch rule and falls to the
+    # "please send text messages" branch for EVERY allowed (and fail-open!) message --
+    # this is exactly the bug a live pinned execution caught (2026-08-21): the original
+    # shipped Quota Decision returned a bare {allowed,used,plan,status} object, so
+    # Input type's Switch silently mis-routed on every non-blocked message. Quota
+    # Decision must therefore (a) rebuild its item from the upstream enriched payload --
+    # $('Latest+Combine'), not bare $input or $('Webhook'), because Latest+Combine is
+    # what computed combinedText/abort in the first place -- and (b) carry an EXPLICIT
+    # pairedItem, matching Latest+Combine's own established rule that every node below
+    # the debounce splice needs an unbroken paired-item chain for $('Webhook').item to
+    # keep resolving in Mark Read/Typing/Chat Memory/the send HTTP Request.
+    qd = node(ns, "Quota Decision")
+    jscode = qd["parameters"]["jsCode"]
+    assert "Latest+Combine" in jscode, \
+        f"{f}: Quota Decision does not reference Latest+Combine -- it will drop the " \
+        f"incoming message payload and misroute every allowed/fail-open reply"
+    assert "pairedItem" in jscode, \
+        f"{f}: Quota Decision does not set an explicit pairedItem"
+
     print(f"OK  {f} (dialog-metering wiring)")
 
 
