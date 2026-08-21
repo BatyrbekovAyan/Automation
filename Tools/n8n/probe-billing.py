@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Smoke probes for the RevenueCat Events webhook mirror (Task 7), extended in Task 8
 with the channel-slot registration/backstop probe for CreateWhatsappWorkflow /
-CreateTelegramWorkflow, and in Task 11 with a real value-asserting probe against the
-new /webhook/GetUsage read endpoint.
+CreateTelegramWorkflow, in Task 11 with a real value-asserting probe against the
+new /webhook/GetUsage read endpoint, and in Task 12 with fixture SQL for the scheduled
+Profile Lifecycle Sweep (no webhook -- verified entirely through n8n-mcp, see Part 5).
 
 ## Part 1 -- RevenueCat Events (Task 7)
 
@@ -66,6 +67,55 @@ asserts the trial-default shape, 200 not 500) and a seeded probe_user_11 (needs 
 precondition seeded via `usage_seed_sql()` through a one-off n8n-mcp workflow first --
 asserts an EXACT value set: plan/quota/used/topupBalance/channelsConnected/
 botsRegistered/periodEnd).
+
+## Part 5 -- Profile Lifecycle Sweep (Task 12, opt-in)
+
+Run with `--sweep` (prints fixture SQL only; see that section below). This workflow has
+NO webhook at all -- it is a bare Schedule Trigger ("Every 6 Hours") with two branches:
+Branch A deletes Wappi profiles for trial (created_at < now() - 4d17h) / churned+grace
+(current_period_end < now() - 3d) owners before Wappi's day-6 retroactive-charge
+boundary; Branch B reconciles alive `bot_profiles` rows against Wappi's own
+`profile/all/get` truth (both api/tapi bases) and releases (`deleted_at`) any row whose
+profile no longer exists there. Unlike Parts 1/4, there is no HTTP entry point this
+script can fire at all -- verification for this task was done ENTIRELY through
+n8n-mcp's `execute_workflow`(manual mode)/`get_execution` against the real workflow
+`fXYpCXPKw92EzRz8`, using a one-off Manual-Trigger->Postgres harness (same pattern as
+Parts 1-4) to seed/read/clean up fixtures. `sweep_seed_sql()` and `sweep_cleanup_sql()`
+below are the EXACT SQL used for that pass (6 fixtures, all confirmed correct in
+task-12-report.md): (a) trialing owner, profile older than the 4d17h threshold -- a
+Branch-A candidate; a real Wappi 400 "Profile not found" on the delete attempt (fake
+id) correctly left `deleted_at` NULL (invariant: delete-fail -> no mark) UNTIL Branch B's
+liveness reconcile independently retired it on a later pass, since the same fake id is
+also absent from Wappi's list -- a deliberate, confirmed self-healing overlap between
+the two branches, not a bug; (b) trialing younger than the threshold -- absent from
+Branch A's candidates entirely (still gets swept by Branch B's liveness check once
+its channel's Wappi fetch succeeds, same reasoning as (a), since ANY fake/never-real
+profile_id is by construction absent from Wappi's real list regardless of age -- age
+only gates Branch A); (c) ACTIVE owner with an ancient profile -- absent from BOTH
+branches (the #1 invariant is applied uniformly: Branch B's own registry read also
+excludes `status='active'`, a deliberate scope decision beyond the literal brief, see
+the report); (d) expired owner past the 3-day grace -- a Branch-A candidate
+(reason=churn_grace), same fake-id fail-safe as (a); a same-shape sibling fixture
+(expired but INSIDE the 3-day grace) is also seeded and confirmed absent from
+candidates; (e) liveness -- alive registry row (fresh created_at, so NOT a Branch-A
+candidate at all) with a profile_id absent from Wappi's real list -- confirmed retired
+with reason=liveness by Branch B alone, cleanly isolated from Branch A by construction;
+(f) is NOT a data fixture -- it is exercised by temporarily pointing "List WA Profiles"
+at a broken path via n8n-mcp's `update_workflow` (`setNodeParameter` on `/url`), which
+confirmed EVERY whatsapp-channel registry row got `action:"skip_invalid_fetch"` (zero
+retirements for that base that run) while the telegram base's own (independent, still
+healthy) fetch was unaffected, then restored the URL. A REAL throwaway Wappi profile
+(`profile/add` -> `profile/delete`, same shape as Manager.cs, called directly with the
+plain `wappiAuthToken` string already in `secrets.json` -- no n8n detour needed) proved
+the full success path end-to-end: real delete (confirmed gone from a fresh
+`profile/all/get` too) -> `bot_profiles.deleted_at` set -> `subscribers.status` demoted
+to `expired`. OPERATIONAL NOTE for any future real-profile test: an unauthorized
+"connecting" Wappi profile auto-expires/vanishes from Wappi's own side within roughly
+10 minutes (observed directly -- a first throwaway profile was already gone by the time
+a delete was attempted ~10 min later, itself a clean natural demonstration of what
+Branch B exists for) -- seed the fixture row and fire the sweep within a minute or two
+of calling `profile/add`, or the "successful delete" assertion will spuriously look like
+a "not found" case instead.
 """
 import argparse
 import json
@@ -650,6 +700,116 @@ def run_usage_probe():
     return 0 if ok_all else 1
 
 
+# ---------------------------------------------------------------------------------
+# Part 5: Profile Lifecycle Sweep (Task 12) -- fixture SQL only, no HTTP probe exists
+# ---------------------------------------------------------------------------------
+#
+# Workflow fXYpCXPKw92EzRz8 ("Profile Lifecycle Sweep", Schedule Trigger "Every 6
+# Hours", ACTIVE). Branch A: Candidates (Postgres, trialing older than 4d17h OR
+# expired/grace more than 3d past current_period_end) -> Trial/Churn Dry Run? ->
+# [dry run] Log Would Delete / [live] HTTP Delete Profile (POST {api|tapi}/profile/
+# delete, WappiAuthToken cred, onError:continueRegularOutput) -> Delete Succeeded?
+# ($json.status == 'done') -> [true] Mark Deleted -> Demote Trialing -> Stamp Deleted /
+# [false] Stamp Delete Failed (deleted_at stays NULL -- retried next run). Branch B:
+# List WA/TG Profiles (GET {api|tapi}/profile/all/get, onError:continueRegularOutput +
+# retryOnFail) -> Alive Registry (Postgres, alive bot_profiles LEFT JOINed to
+# subscribers, excluding status='active') -> Compute Liveness Diff (Code -- validates
+# each base independently: no `.error`, status=='done', profiles is an array after
+# coalescing Wappi's documented `profiles: null` empty-namespace shape to `[]`; a row
+# whose channel's base failed validation gets action='skip_invalid_fetch' and is NEVER
+# touched, a row present in the live set gets 'keep', otherwise 'retire'/reason=
+# 'liveness') -> Is Retire Candidate? -> Liveness Dry Run? -> [live] Mark Liveness
+# Deleted (Postgres, deleted_at=now(), no Wappi call -- the row's absence from the
+# list IS the evidence).
+#
+# Sweep Config (Set node) carries the single `dryRun` boolean gating BOTH branches'
+# destructive step; it is FALSE on the committed/live workflow (dry-run-first was
+# verified by hand, see task-12-report.md, before flipping it).
+#
+# There is no webhook anywhere in this workflow -- a plain HTTP script has literally
+# nothing to call. All verification for Task 12 went through n8n-mcp's
+# `execute_workflow` (executionMode:"manual", which runs the CURRENT draft, so no
+# publish/unpublish churn was needed while iterating) + `get_execution` (includeData,
+# scoped via `nodeNames`) against the real workflow, using the same one-off
+# Manual-Trigger->Postgres harness pattern as Parts 1-4 to seed/read/clean up fixture
+# rows (Postgres lives behind n8n's own credential, unreachable from this plain
+# script -- identical constraint to every earlier part). The functions below are that
+# exact SQL, kept here so a future re-verification pass does not need to hand-retype
+# it from the report.
+SWEEP_WORKFLOW_ID = "fXYpCXPKw92EzRz8"
+SWEEP_PROBE_PREFIX = "probe12_"
+
+
+def sweep_seed_sql():
+    """Seeds 6 fixture (app_user_id, bot_profiles row) pairs covering every rule
+    branch except (f) (which is a workflow-URL mutation, not a data fixture -- see
+    the Part 5 module docstring) and the real-Wappi-profile case (which needs a live
+    `profile/add` call first; see the docstring's operational note about the ~10min
+    auto-expiry window). Uses now()-relative intervals deliberately (unlike
+    usage_seed_sql's fixed calendar dates) since this rule is entirely about AGE
+    relative to the moment the sweep runs, not a calendar-month boundary."""
+    return """insert into subscribers (app_user_id, plan, status, current_period_end, topup_balance, updated_at) values
+  ('probe12_trial_old', 'trial', 'trialing', null, 0, now()),
+  ('probe12_trial_young', 'trial', 'trialing', null, 0, now()),
+  ('probe12_active_ancient', 'business', 'active', now() + interval '20 days', 0, now()),
+  ('probe12_churn_expired', 'start', 'expired', now() - interval '10 days', 0, now()),
+  ('probe12_churn_grace_ok', 'start', 'expired', now() - interval '1 day', 0, now()),
+  ('probe12_liveness', 'trial', 'trialing', null, 0, now())
+on conflict (app_user_id) do update set
+  plan = excluded.plan, status = excluded.status, current_period_end = excluded.current_period_end,
+  topup_balance = excluded.topup_balance, updated_at = now();
+
+insert into bot_profiles (profile_id, app_user_id, channel, created_at, deleted_at) values
+  ('probe12_fake_wa_old', 'probe12_trial_old', 'whatsapp', now() - interval '6 days', null),
+  ('probe12_fake_wa_young', 'probe12_trial_young', 'whatsapp', now() - interval '2 days', null),
+  ('probe12_fake_wa_activeancient', 'probe12_active_ancient', 'whatsapp', now() - interval '30 days', null),
+  ('probe12_fake_wa_churn', 'probe12_churn_expired', 'whatsapp', now() - interval '1 day', null),
+  ('probe12_fake_wa_grace_ok', 'probe12_churn_grace_ok', 'whatsapp', now() - interval '1 day', null),
+  ('probe12_fake_wa_liveness', 'probe12_liveness', 'whatsapp', now(), null)
+on conflict (profile_id) do update set
+  app_user_id = excluded.app_user_id, channel = excluded.channel, created_at = excluded.created_at, deleted_at = excluded.deleted_at;"""
+
+
+def sweep_candidates_readback_sql():
+    """Exact read-back used to confirm outcomes -- paste into the same one-off
+    workflow after firing the sweep (via n8n-mcp execute_workflow, manual mode)."""
+    return ("select bp.app_user_id, bp.profile_id, bp.deleted_at, s.status "
+            "from bot_profiles bp join subscribers s using (app_user_id) "
+            "where bp.app_user_id like 'probe12_%' order by bp.app_user_id;")
+
+
+def sweep_cleanup_sql():
+    """Deletes everything sweep_seed_sql() created (plus any real Wappi-profile
+    fixture row added by hand under a probe12_ app_user_id) -- paste into the same
+    one-off workflow once verification is done. Safe regardless of what the sweep
+    already did to deleted_at (plain DELETE, not conditional on it)."""
+    return """delete from dialog_counts where app_user_id like 'probe12_%';
+delete from bot_profiles where app_user_id like 'probe12_%';
+delete from subscribers where app_user_id like 'probe12_%';"""
+
+
+def run_sweep_fixture_helper():
+    """Not a network probe -- see the Part 5 module docstring for why. Prints the
+    seed/read-back/cleanup SQL plus the exact procedure, for pasting into a one-off
+    n8n-mcp Manual-Trigger->Postgres workflow (or re-running by hand against the
+    Profile Lifecycle Sweep workflow itself)."""
+    print(f"=== Profile Lifecycle Sweep ({SWEEP_WORKFLOW_ID}) -- fixture SQL, no HTTP probe exists ===\n")
+    print("This workflow has no webhook. Verification procedure (see task-12-report.md for the")
+    print("actual transcript, and the Part 5 module docstring for full context):\n")
+    print("1. Seed fixtures via a one-off n8n-mcp Manual-Trigger->Postgres workflow:\n")
+    print(sweep_seed_sql())
+    print(f"\n2. Fire the sweep: n8n-mcp execute_workflow(workflowId={SWEEP_WORKFLOW_ID!r}, "
+          "executionMode='manual')")
+    print("   then get_execution(includeData=true) scoped to the relevant nodeNames -- see the")
+    print("   report for the exact node names per branch and the expected per-fixture outcome.\n")
+    print("3. Read back the outcome:\n")
+    print(sweep_candidates_readback_sql())
+    print(f"\n4. Clean up (this repo's convention -- no probe rows left in a shared dev DB):\n")
+    print(sweep_cleanup_sql())
+    print(f"\nNote: {SWEEP_PROBE_PREFIX}* rows are the ONLY ones touched -- safe to run against a live DB.")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument(
@@ -677,6 +837,15 @@ def main():
              "Part 4 section first -- scenario 2 needs probe_user_11 seeded via "
              "usage_seed_sql() through a one-off n8n-mcp workflow first, and is "
              "SKIPPED (not failed) if that precondition isn't live.")
+    ap.add_argument(
+        "--sweep", action="store_true",
+        help="Print the Task 12 Profile Lifecycle Sweep fixture SQL (seed/read-back/"
+             "cleanup) instead of the default RevenueCat Events probes. This workflow "
+             "has NO webhook at all -- there is nothing for a plain script to fire; "
+             "read the module docstring's Part 5 section first. Verification is done "
+             "via n8n-mcp execute_workflow/get_execution against the real workflow, "
+             "using the printed SQL through a one-off Manual-Trigger->Postgres "
+             "harness -- same pattern as every other Part here.")
     args = ap.parse_args()
 
     if args.channel_slot_backstop:
@@ -687,6 +856,9 @@ def main():
 
     if args.usage:
         sys.exit(run_usage_probe())
+
+    if args.sweep:
+        sys.exit(run_sweep_fixture_helper())
 
     if not SECRET:
         print("FAIL: RC_WEBHOOK_SECRET is not set -- refusing to run (probes b-e need it "

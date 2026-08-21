@@ -1,0 +1,801 @@
+{
+  "name": "Profile Lifecycle Sweep",
+  "nodes": [
+    {
+      "id": "e2ce6bff-489b-4814-a6ba-c511acabd869",
+      "name": "Every 6 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -900,
+        200
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "3281cd90-d758-491d-b861-b65eeb2f0a39",
+      "name": "Sweep Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -680,
+        200
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cfg-dry-run",
+              "name": "dryRun",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "af53d4cc-0c91-48bb-a28a-a5857d04d391",
+      "name": "Candidates",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -460,
+        -80
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select bp.profile_id, bp.channel, bp.app_user_id, s.status,\n  case when s.status = 'trialing' then 'trial_expiry' else 'churn_grace' end as reason\nfrom bot_profiles bp\njoin subscribers s using (app_user_id)\nwhere bp.deleted_at is null\n  and (\n    (s.status = 'trialing' and bp.created_at < now() - interval '4 days 17 hours')\n    or (s.status in ('expired','grace') and coalesce(s.current_period_end, now() - interval '99 days') < now() - interval '3 days')\n  );",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      }
+    },
+    {
+      "id": "eeb67d0d-c2a2-434d-9238-809121dc95fb",
+      "name": "Trial/Churn Dry Run?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -260,
+        -80
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-dryrun-a",
+              "leftValue": "={{ $('Sweep Config').first().json.dryRun }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "4bb6f6be-50ec-4b3a-a77c-9e2aac70c0e5",
+      "name": "Log Would Delete",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -260,
+        80
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "lwd-1",
+              "name": "dryRun",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "lwd-2",
+              "name": "action",
+              "value": "would_delete",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "d7e14ab5-3f16-44a6-8394-81a665a33d83",
+      "name": "HTTP Delete Profile",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -40,
+        -80
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($json.channel === 'telegram' ? 'https://wappi.pro/tapi' : 'https://wappi.pro/api') + '/profile/delete?profile_id=' + $json.profile_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ZowntFGvApDJ7UzQ",
+          "name": "WappiAuthToken"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "c3cf8924-87f9-416c-8cf5-9a81e48c3fff",
+      "name": "Delete Succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        160,
+        -80
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-delete-ok",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "done",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c8cc82b7-5425-4434-91d9-c061fe5da9a9",
+      "name": "Mark Deleted",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        360,
+        -160
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update bot_profiles set deleted_at = now() where profile_id = $1;",
+        "options": {
+          "queryReplacement": "={{ [ $('Candidates').item.json.profile_id ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "660601b2-4e3f-48cc-8ec8-a3b89e2ba499",
+      "name": "Demote Trialing",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        560,
+        -160
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update subscribers set status = 'expired' where app_user_id = $1 and status = 'trialing';",
+        "options": {
+          "queryReplacement": "={{ [ $('Candidates').item.json.app_user_id ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "1264b9f4-dced-48c7-824b-1a9c6c49685c",
+      "name": "Stamp Deleted",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        760,
+        -160
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "sd-1",
+              "name": "profileId",
+              "value": "={{ $('Candidates').item.json.profile_id }}",
+              "type": "string"
+            },
+            {
+              "id": "sd-2",
+              "name": "channel",
+              "value": "={{ $('Candidates').item.json.channel }}",
+              "type": "string"
+            },
+            {
+              "id": "sd-3",
+              "name": "appUserId",
+              "value": "={{ $('Candidates').item.json.app_user_id }}",
+              "type": "string"
+            },
+            {
+              "id": "sd-4",
+              "name": "reason",
+              "value": "={{ $('Candidates').item.json.reason }}",
+              "type": "string"
+            },
+            {
+              "id": "sd-5",
+              "name": "deleted",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "aa96754f-f01f-4d82-b14b-3d2776269395",
+      "name": "Stamp Delete Failed",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        360,
+        40
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "sdf-1",
+              "name": "profileId",
+              "value": "={{ $('Candidates').item.json.profile_id }}",
+              "type": "string"
+            },
+            {
+              "id": "sdf-2",
+              "name": "channel",
+              "value": "={{ $('Candidates').item.json.channel }}",
+              "type": "string"
+            },
+            {
+              "id": "sdf-3",
+              "name": "appUserId",
+              "value": "={{ $('Candidates').item.json.app_user_id }}",
+              "type": "string"
+            },
+            {
+              "id": "sdf-4",
+              "name": "reason",
+              "value": "={{ $('Candidates').item.json.reason }}",
+              "type": "string"
+            },
+            {
+              "id": "sdf-5",
+              "name": "deleted",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "sdf-6",
+              "name": "wappiResponse",
+              "value": "={{ JSON.stringify($json) }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "3d2b4a62-aa2b-4e9f-af62-d3ec2f5e1624",
+      "name": "List WA Profiles",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -460,
+        320
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://wappi.pro/api/profile/all/get",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ZowntFGvApDJ7UzQ",
+          "name": "WappiAuthToken"
+        }
+      },
+      "disabled": false,
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "5d35f1ec-4fa7-4493-9242-a4eacc5314cc",
+      "name": "List TG Profiles",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -260,
+        320
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://wappi.pro/tapi/profile/all/get",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ZowntFGvApDJ7UzQ",
+          "name": "WappiAuthToken"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "executeOnce": true
+    },
+    {
+      "id": "e6e9306e-4f7d-4791-b1d6-f9b6babed03b",
+      "name": "Alive Registry",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -40,
+        320
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select bp.profile_id, bp.channel, bp.app_user_id\nfrom bot_profiles bp\nleft join subscribers s on s.app_user_id = bp.app_user_id\nwhere bp.deleted_at is null\n  and coalesce(s.status, 'none') <> 'active';",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      }
+    },
+    {
+      "id": "8d83ea55-a7a1-4362-b6cd-d41766f3c9ea",
+      "name": "Compute Liveness Diff",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        320
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "function validateBase(resp) {\n  if (!resp || resp.error) return { ok: false, reason: 'fetch_error: ' + JSON.stringify(resp && resp.error) };\n  if (resp.status !== 'done') return { ok: false, reason: 'bad_status: ' + JSON.stringify(resp && resp.status) };\n  const profiles = (resp.profiles === null || resp.profiles === undefined) ? [] : resp.profiles;\n  if (!Array.isArray(profiles)) return { ok: false, reason: 'profiles_not_array' };\n  return { ok: true, profiles: profiles };\n}\n\nconst waResp = $('List WA Profiles').first().json;\nconst tgResp = $('List TG Profiles').first().json;\nconst waCheck = validateBase(waResp);\nconst tgCheck = validateBase(tgResp);\n\nconst liveSets = {};\nif (waCheck.ok) { liveSets.whatsapp = new Set(waCheck.profiles.map(function (p) { return String(p.profile_id || '').trim(); })); }\nif (tgCheck.ok) { liveSets.telegram = new Set(tgCheck.profiles.map(function (p) { return String(p.profile_id || '').trim(); })); }\n\nconst baseValid = { whatsapp: waCheck.ok, telegram: tgCheck.ok };\nconst baseSkipReason = { whatsapp: waCheck.ok ? null : waCheck.reason, telegram: tgCheck.ok ? null : tgCheck.reason };\n\nconst rows = $input.all().map(function (i) { return i.json; });\nreturn rows.map(function (row) {\n  const channel = row.channel;\n  let action, reason;\n  if (!baseValid[channel]) {\n    action = 'skip_invalid_fetch';\n    reason = baseSkipReason[channel];\n  } else if (liveSets[channel] && liveSets[channel].has(String(row.profile_id || '').trim())) {\n    action = 'keep';\n    reason = null;\n  } else {\n    action = 'retire';\n    reason = 'liveness';\n  }\n  return { json: Object.assign({}, row, { action: action, reason: reason, baseValid: baseValid[channel] }) };\n});"
+      }
+    },
+    {
+      "id": "5fac9a75-86b0-4be0-b232-0fa7a8eebbe8",
+      "name": "Is Retire Candidate?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        360,
+        320
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-retire",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "retire",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "58c85168-613f-4e51-add8-21c99660e013",
+      "name": "Liveness Dry Run?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        560,
+        320
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-dryrun-b",
+              "leftValue": "={{ $('Sweep Config').first().json.dryRun }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "1b9300cf-736a-418f-94c9-1eb444d14a2e",
+      "name": "Log Would Retire",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        560,
+        460
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "lwr-1",
+              "name": "dryRun",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "5b178f9a-7872-4026-8391-20f50b5389fa",
+      "name": "Mark Liveness Deleted",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        760,
+        320
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update bot_profiles set deleted_at = now() where profile_id = $1;",
+        "options": {
+          "queryReplacement": "={{ [ $json.profile_id ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "6fcab9c8-5bf8-4735-be88-3ce161ec5fc0",
+      "name": "Stamp Retired",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        960,
+        320
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "sr-5",
+              "name": "retired",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "86215b7b-a446-478b-af9b-d2f61461f7da",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -900,
+        -320
+      ],
+      "parameters": {
+        "content": "## Profile Lifecycle Sweep — Task 12 (billing)\n\nEvery 6h. Branch A (top row): trial profiles older than 4d17h (before Wappi's day-6 retro-charge boundary) and churned/grace subscribers 3d past period_end get their Wappi profile deleted, then bot_profiles.deleted_at set + subscribers demoted to expired (trialing only). Branch B (bottom row): reconciles alive bot_profiles (excluding status='active' owners) against Wappi profile/all/get truth on BOTH bases (api/tapi) — a registry row whose profile_id is absent from the live list gets released (reason=liveness), UNLESS that base's own fetch failed/malformed this run (skip_invalid_fetch — never mass-retire on a bad fetch).\n\nSweep Config.dryRun gates BOTH branches' destructive step (HTTP delete / Postgres mark) — log-only when true. NEVER touches status='active' owners in either branch. Idempotent: both branches' WHERE clauses only ever select deleted_at IS NULL rows, so a marked row drops out of candidates on the next run.",
+        "color": 4,
+        "width": 1900,
+        "height": 200
+      }
+    }
+  ],
+  "connections": {
+    "Every 6 Hours": {
+      "main": [
+        [
+          {
+            "node": "Sweep Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sweep Config": {
+      "main": [
+        [
+          {
+            "node": "Candidates",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "List WA Profiles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Candidates": {
+      "main": [
+        [
+          {
+            "node": "Trial/Churn Dry Run?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trial/Churn Dry Run?": {
+      "main": [
+        [
+          {
+            "node": "Log Would Delete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Delete Profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Delete Profile": {
+      "main": [
+        [
+          {
+            "node": "Delete Succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Succeeded?": {
+      "main": [
+        [
+          {
+            "node": "Mark Deleted",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stamp Delete Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Deleted": {
+      "main": [
+        [
+          {
+            "node": "Demote Trialing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Demote Trialing": {
+      "main": [
+        [
+          {
+            "node": "Stamp Deleted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List WA Profiles": {
+      "main": [
+        [
+          {
+            "node": "List TG Profiles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List TG Profiles": {
+      "main": [
+        [
+          {
+            "node": "Alive Registry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alive Registry": {
+      "main": [
+        [
+          {
+            "node": "Compute Liveness Diff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Liveness Diff": {
+      "main": [
+        [
+          {
+            "node": "Is Retire Candidate?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Retire Candidate?": {
+      "main": [
+        [
+          {
+            "node": "Liveness Dry Run?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Liveness Dry Run?": {
+      "main": [
+        [
+          {
+            "node": "Log Would Retire",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Liveness Deleted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Liveness Deleted": {
+      "main": [
+        [
+          {
+            "node": "Stamp Retired",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "staticData": {
+    "node:Every 6 Hours": {
+      "recurrenceRules": []
+    }
+  },
+  "pinData": {},
+  "triggerCount": 1,
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  },
+  "id": "fXYpCXPKw92EzRz8",
+  "active": true
+}
