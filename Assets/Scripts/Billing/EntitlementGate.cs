@@ -20,8 +20,22 @@ public static class EntitlementGate
     // (pre-auth grace, 3 bots / 3 channels) rather than None — deliberate, so
     // current dev flows (and a brand-new install's first-bot wizard) keep working
     // until the paywall UI (Task 12/14) lands.
-    public static PlanTier CurrentTier =>
-        EntitlementPolicy.EffectiveTier(PurchasedTierSource(), TrialLedger.HasStarted, TrialLedger.IsExpired);
+    public static PlanTier CurrentTier
+    {
+        get
+        {
+            PlanTier purchased = PurchasedTierSource();
+
+            // Resolve-window grace (Task 10): while a real backend hasn't heard back from its
+            // first CustomerInfo round-trip yet, don't let a stale/expired LOCAL trial clock
+            // paywall a customer whose actual entitlement we simply haven't confirmed — dialog
+            // metering (server-side) is the real enforcement, this only affects the client gate.
+            if (!BillingService.EntitlementsKnown && purchased == PlanTier.None)
+                return PlanTier.Trial;
+
+            return EntitlementPolicy.EffectiveTier(purchased, TrialLedger.HasStarted, TrialLedger.IsExpired);
+        }
+    }
 
     public static event Action<PaywallTrigger> OnPaywallRequested;
 

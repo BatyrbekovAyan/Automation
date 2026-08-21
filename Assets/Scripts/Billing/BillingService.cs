@@ -23,11 +23,21 @@ public static class BillingService
         BackendFactory = DefaultBackendFactory;
         _backend = null;
         _initialized = false;
+        EntitlementsKnown = true;
         OnEntitlementChanged = null;   // a leaked subscriber from one test would fire in every test after it
+        EntitlementGate.PurchasedTierSource = () => PlanTier.None;   // Initialize() overwrites this — restore EntitlementGate's own default too
     }
 
     /// <summary>Fires whenever the active backend reports a new active-entitlement set (purchase, restore, push update).</summary>
     public static event Action<PlanTier> OnEntitlementChanged;
+
+    /// <summary>
+    /// False only during the brief window between a keyed real-backend Initialize() and its first
+    /// CustomerInfo round-trip landing (success OR error) — Fake/keyless backends are synchronous
+    /// by construction and are "known" immediately. EntitlementGate.CurrentTier reads this to grant
+    /// a grace window rather than paywall a paying customer before we've heard back from RevenueCat.
+    /// </summary>
+    public static bool EntitlementsKnown { get; private set; } = true;
 
     public static void Initialize()
     {
@@ -35,7 +45,13 @@ public static class BillingService
         _initialized = true;
 
         _backend = BackendFactory();
-        _backend.Initialize(ResolveApiKey(), tier => OnEntitlementChanged?.Invoke(tier));
+        EntitlementsKnown = !(_backend is RevenueCatBackend);
+
+        _backend.Initialize(ResolveApiKey(), tier =>
+        {
+            EntitlementsKnown = true;
+            OnEntitlementChanged?.Invoke(tier);
+        });
 
         EntitlementGate.PurchasedTierSource = () => PurchasedTier;
     }
@@ -81,7 +97,11 @@ public static class BillingService
 #elif UNITY_ANDROID
         return revenueCat.androidKey ?? "";
 #else
-        return "";   // desktop/Editor builds have no store to key against
+        // Non-mobile build targets only (Standalone, WebGL, ...) — no store to key against.
+        // NOT "Editor": UNITY_IOS/UNITY_ANDROID are ALSO defined when the Editor is running with
+        // that platform selected as the active build target, so this branch is never what keeps
+        // the Editor on FakeBillingBackend — DefaultBackendFactory's own #if UNITY_EDITOR does that.
+        return "";
 #endif
     }
 }

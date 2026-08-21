@@ -1,3 +1,4 @@
+using System;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -17,6 +18,7 @@ public class BillingServiceTests
         BillingService.ResetSeamsForTests();
         EntitlementGate.ResetSeamsForTests();
         BillingIdentity.ResetSeamsForTests();
+        TrialLedger.ResetSeamsForTests();   // only the tri-state tests below touch TrialLedger, but hygiene either way
     }
 
     // --- Entitlement mapping (FakeBillingBackend, no BillingService involved) ------------------
@@ -126,6 +128,62 @@ public class BillingServiceTests
         fake.SetActiveEntitlements("tier_start");
 
         Assert.IsFalse(called, "a subscriber surviving ResetSeamsForTests would leak into other tests");
+    }
+
+    // --- Entitlement resolve-window tri-state (EntitlementGate.CurrentTier grace) ---------------
+
+    [Test] public void Fake_backend_marks_entitlements_known_immediately()
+    {
+        var fake = new FakeBillingBackend();
+        BillingService.BackendFactory = () => fake;
+
+        BillingService.Initialize();
+
+        Assert.IsTrue(BillingService.EntitlementsKnown);
+    }
+
+    [Test] public void Unknown_resolve_window_grants_trial_grace_even_with_expired_local_trial()
+    {
+        // A real backend never resolves in EditMode (RevenueCat is unsupported in the Editor —
+        // Initialize() no-ops there per RevenueCatBackend), so selecting one and never hearing
+        // back IS the "mid-resolve" window this test needs — produced by the real type, not a
+        // stand-in flag.
+        BillingService.BackendFactory = () => new RevenueCatBackend();
+        BillingService.Initialize();
+        Assert.IsFalse(BillingService.EntitlementsKnown, "precondition: still unresolved");
+
+        // Mutable backing store (mirrors TrialLedgerTests.cs) — Load/Save must round-trip through
+        // the SAME variable, or StartIfNeeded()'s write is never visible to a later Load() and
+        // HasStarted/IsExpired can never become true.
+        string stored = "";
+        var now = new DateTime(2026, 8, 21, 10, 0, 0, DateTimeKind.Utc);
+        TrialLedger.Load = _ => stored;
+        TrialLedger.Save = (_, v) => stored = v;
+        TrialLedger.UtcNow = () => now;
+        TrialLedger.StartIfNeeded();
+        now = now.AddDays(10);   // well past the 5-day trial
+
+        Assert.IsTrue(TrialLedger.IsExpired, "precondition: the local trial really is expired");
+        Assert.AreEqual(PlanTier.Trial, EntitlementGate.CurrentTier);
+    }
+
+    [Test] public void Resolved_none_with_expired_trial_is_none()
+    {
+        // Default seams (FakeBillingBackend via ResetSeamsForTests) already resolve
+        // EntitlementsKnown=true synchronously — pins that the grace window does NOT swallow a
+        // genuinely-expired trial once entitlements are actually known.
+        Assert.IsTrue(BillingService.EntitlementsKnown, "precondition: nothing pending");
+
+        string stored = "";
+        var now = new DateTime(2026, 8, 21, 10, 0, 0, DateTimeKind.Utc);
+        TrialLedger.Load = _ => stored;
+        TrialLedger.Save = (_, v) => stored = v;
+        TrialLedger.UtcNow = () => now;
+        TrialLedger.StartIfNeeded();
+        now = now.AddDays(10);
+
+        Assert.IsTrue(TrialLedger.IsExpired, "precondition: the local trial really is expired");
+        Assert.AreEqual(PlanTier.None, EntitlementGate.CurrentTier);
     }
 
     // --- AppUserId fallback ----------------------------------------------------------------------

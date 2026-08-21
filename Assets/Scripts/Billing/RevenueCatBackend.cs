@@ -23,6 +23,13 @@ public class RevenueCatBackend : IBillingBackend
     private Action<PlanTier> _onEntitlementChanged;
     private string _apiKey;
 
+    // True only after Configure() has actually run (FinishConfigure, one frame after
+    // AddComponent). Purchase/RestorePurchases must refuse during that window rather than call
+    // into a Purchases component whose native wrapper hasn't been Setup() yet — _purchases itself
+    // is already non-null by then (assigned synchronously in Initialize), so a null check alone
+    // would let a call straight through.
+    private bool _configured;
+
     public string AppUserId { get; private set; } = "";
     public PlanTier PurchasedTier { get; private set; } = PlanTier.None;
 
@@ -57,7 +64,12 @@ public class RevenueCatBackend : IBillingBackend
 
     public void Purchase(string sku, Action<bool, string> done)
     {
-        if (_purchases == null) { done?.Invoke(false, "not_initialized"); return; }
+        if (!_configured) { done?.Invoke(false, "not_initialized"); return; }
+
+        // The top-up SKU is a one-time consumable, not a subscription — everything else in
+        // PlanCatalog is a sub.*.month/year SKU. Mistyping this as "subs" would make the store
+        // treat a one-time purchase as a recurring subscription.
+        string type = sku == PlanCatalog.SkuTopUp ? "inapp" : "subs";
 
         _purchases.PurchaseProduct(sku, result =>
         {
@@ -65,16 +77,27 @@ public class RevenueCatBackend : IBillingBackend
             if (result.UserCancelled) { done?.Invoke(false, "cancelled"); return; }
             if (result.CustomerInfo != null) Apply(result.CustomerInfo);
             done?.Invoke(true, null);
-        });
+        }, type: type);
     }
 
     public void RestorePurchases(Action<bool> done)
     {
-        if (_purchases == null) { done?.Invoke(false); return; }
+        if (!_configured) { done?.Invoke(false); return; }
 
         _purchases.RestorePurchases((info, error) =>
         {
-            if (error != null || info == null) { done?.Invoke(false); return; }
+            if (error != null)
+            {
+                Debug.LogWarning($"[RevenueCatBackend] RestorePurchases error: {error.Message}");
+                done?.Invoke(false);
+                return;
+            }
+            if (info == null)
+            {
+                Debug.LogWarning("[RevenueCatBackend] RestorePurchases returned no CustomerInfo and no error.");
+                done?.Invoke(false);
+                return;
+            }
             Apply(info);
             done?.Invoke(true);
         });
@@ -82,15 +105,39 @@ public class RevenueCatBackend : IBillingBackend
 
     private void FinishConfigure()
     {
-        var config = Purchases.PurchasesConfiguration.Builder.Init(_apiKey).Build();
-        _purchases.Configure(config);
-
-        AppUserId = _purchases.GetAppUserId();
-
-        _purchases.GetCustomerInfo((info, error) =>
+        try
         {
-            if (error == null && info != null) Apply(info);
-        });
+            var config = Purchases.PurchasesConfiguration.Builder.Init(_apiKey)
+                .SetStoreKitVersion(Purchases.StoreKitVersion.Default)
+                .SetEntitlementVerificationMode(Purchases.EntitlementVerificationMode.Informational)
+                .SetShouldShowInAppMessagesAutomatically(true)
+                .Build();
+            _purchases.Configure(config);
+            _configured = true;
+
+            AppUserId = _purchases.GetAppUserId();
+
+            _purchases.GetCustomerInfo((info, error) =>
+            {
+                if (error != null)
+                {
+                    Debug.LogWarning($"[RevenueCatBackend] GetCustomerInfo error: {error.Message}");
+                    _onEntitlementChanged?.Invoke(PurchasedTier);   // resolve window closes even on error
+                    return;
+                }
+                if (info == null)
+                {
+                    Debug.LogWarning("[RevenueCatBackend] GetCustomerInfo returned no CustomerInfo and no error.");
+                    _onEntitlementChanged?.Invoke(PurchasedTier);
+                    return;
+                }
+                Apply(info);
+            });
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[RevenueCatBackend] FinishConfigure threw — billing stays uninitialized: {e}");
+        }
     }
 
     // MAX active-entitlement tier by enum order, mirroring FakeBillingBackend.SetActiveEntitlements
@@ -98,6 +145,11 @@ public class RevenueCatBackend : IBillingBackend
     // depending on the test double would be backwards).
     private void Apply(Purchases.CustomerInfo info)
     {
+        // Re-capture on every resolution, not just the first: an empty/failed read right after
+        // Configure() shouldn't be a life sentence for the whole session — a later successful
+        // round-trip (poll or push) gets another chance to pick up the real id.
+        if (_purchases != null) AppUserId = _purchases.GetAppUserId();
+
         PlanTier max = PlanTier.None;
         foreach (var entitlementId in info.Entitlements.Active.Keys)
         {

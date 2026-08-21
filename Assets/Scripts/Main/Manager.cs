@@ -264,18 +264,32 @@ public partial class Manager : MonoBehaviour
         // and let it populate the cache before any user-driven request or the next-frame
         // chat sync fires. iOS/Editor/desktop read the file directly in the same frame.
         // See Secrets.cs.
-        StartCoroutine(Secrets.Preload());
+        StartCoroutine(PreloadSecretsThenInitBilling());
+    }
+
+    // BillingService.Initialize() reads Secrets.Data.revenueCat, so it must run AFTER Preload
+    // actually completes — chained as a continuation (yield return, not a parallel
+    // StartCoroutine) so it never races Android's async APK read (Preload is synchronous inline
+    // on Editor/iOS/desktop but a real yield on Android). try/catch: an uncaught throw here must
+    // not brick the rest of Start() behind LoadingPanel — billing degrades to
+    // FakeBillingBackend/None-tier rather than the app getting stuck on the loading cover.
+    private IEnumerator PreloadSecretsThenInitBilling()
+    {
+        yield return Secrets.Preload();
+
+        try
+        {
+            BillingService.Initialize();
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[Manager] BillingService.Initialize() threw — continuing without billing: {e}");
+        }
     }
 
     public void Start()
     {
         Application.targetFrameRate = 60;
-
-        // Reads Secrets.Data.revenueCat (populated synchronously by Awake()'s Secrets.Preload() on
-        // Editor/iOS/desktop) and selects a backend — degrades to FakeBillingBackend when no key
-        // exists yet (Task 0) rather than throwing. Early: EntitlementGate.CurrentTier reads through
-        // BillingService.PurchasedTier from here on, and the wizard/paywall gates need it live.
-        BillingService.Initialize();
 
         PopulateBusinessTypes();
 
