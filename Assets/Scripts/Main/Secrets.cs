@@ -12,6 +12,13 @@ public class GreenApiSecrets
 }
 
 [System.Serializable]
+public class RevenueCatSecrets
+{
+    public string iosKey;
+    public string androidKey;
+}
+
+[System.Serializable]
 public class SecretsData
 {
     public string wappiAuthToken;
@@ -22,6 +29,10 @@ public class SecretsData
     public string supportChatId;
     public GreenApiSecrets greenApi;
     public GreenApiSecrets greenApiAvatar;
+    // Store keys don't exist yet (Task 0, owner-side RevenueCat/store dashboard setup) — both
+    // fields are legitimately empty until then. BillingService.Initialize() reads these and
+    // degrades to FakeBillingBackend when empty rather than throwing.
+    public RevenueCatSecrets revenueCat;
 }
 
 public static class Secrets
@@ -129,14 +140,16 @@ public static class Secrets
     {
         _data = JsonUtility.FromJson<SecretsData>(json) ?? EmptyData();
 
-        // Guard nested objects so the Green API getters never NPE on a partial file.
+        // Guard nested objects so the Green API / RevenueCat getters never NPE on a partial file.
         _data.greenApi ??= new GreenApiSecrets();
         _data.greenApiAvatar ??= new GreenApiSecrets();
+        _data.revenueCat ??= new RevenueCatSecrets();
     }
 
     private static SecretsData EmptyData() => new SecretsData
     {
         greenApi = new GreenApiSecrets(),
-        greenApiAvatar = new GreenApiSecrets()
+        greenApiAvatar = new GreenApiSecrets(),
+        revenueCat = new RevenueCatSecrets()
     };
 }

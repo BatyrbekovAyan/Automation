@@ -271,6 +271,12 @@ public partial class Manager : MonoBehaviour
     {
         Application.targetFrameRate = 60;
 
+        // Reads Secrets.Data.revenueCat (populated synchronously by Awake()'s Secrets.Preload() on
+        // Editor/iOS/desktop) and selects a backend — degrades to FakeBillingBackend when no key
+        // exists yet (Task 0) rather than throwing. Early: EntitlementGate.CurrentTier reads through
+        // BillingService.PurchasedTier from here on, and the wizard/paywall gates need it live.
+        BillingService.Initialize();
+
         PopulateBusinessTypes();
 
         id = PlayerPrefs.GetInt("ids", 0);

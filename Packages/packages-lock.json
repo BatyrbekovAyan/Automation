@@ -25,6 +25,13 @@
       "dependencies": {},
       "hash": "33135342e868201eb0d4cef821ecab90caca373e"
     },
+    "com.revenuecat.purchases-unity": {
+      "version": "https://github.com/RevenueCat/purchases-unity.git?path=RevenueCat#9.5.3",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "9a2f7d4fe8d7fa0976264dcc636ffe5b1633b83d"
+    },
     "com.unity.2d.animation": {
       "version": "13.0.4",
       "depth": 1,
