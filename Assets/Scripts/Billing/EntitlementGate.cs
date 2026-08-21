@@ -6,13 +6,18 @@ public enum PaywallTrigger { BotLimit, ChannelLimit, TrialExpired, Browse }
 
 public static class EntitlementGate
 {
+    // Single source of truth for the "nothing purchased" default, so BillingService's own
+    // ResetSeamsForTests can restore EntitlementGate.PurchasedTierSource by referencing THIS
+    // instead of hand-copying the lambda (which would silently drift if this default ever changes).
+    internal static readonly Func<PlanTier> DefaultPurchasedTierSource = () => PlanTier.None;
+
     // Task 10 (BillingService) rewires this once real purchases exist; until then
     // nothing is purchased, so CurrentTier falls back to the trial/none split below.
-    internal static Func<PlanTier> PurchasedTierSource = () => PlanTier.None;
+    internal static Func<PlanTier> PurchasedTierSource = DefaultPurchasedTierSource;
 
     internal static void ResetSeamsForTests()
     {
-        PurchasedTierSource = () => PlanTier.None;
+        PurchasedTierSource = DefaultPurchasedTierSource;
         OnPaywallRequested = null;   // a leaked subscriber from one test would fire in every test after it
     }
 

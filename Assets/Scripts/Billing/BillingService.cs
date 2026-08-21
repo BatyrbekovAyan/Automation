@@ -18,26 +18,35 @@ public static class BillingService
     private static IBillingBackend _backend;
     private static bool _initialized;
 
+    // Backing state for EntitlementsKnown below — deliberately private/gated behind _initialized so
+    // reading EntitlementsKnown before Initialize() has ever run can never read "known" by accident
+    // (the property is what enforces that; see EntitlementsKnown's own doc).
+    private static bool _known = true;
+
     internal static void ResetSeamsForTests()
     {
         BackendFactory = DefaultBackendFactory;
         _backend = null;
         _initialized = false;
-        EntitlementsKnown = true;
+        _known = true;
         OnEntitlementChanged = null;   // a leaked subscriber from one test would fire in every test after it
-        EntitlementGate.PurchasedTierSource = () => PlanTier.None;   // Initialize() overwrites this — restore EntitlementGate's own default too
+        EntitlementGate.PurchasedTierSource = EntitlementGate.DefaultPurchasedTierSource;   // Initialize() overwrites this
     }
 
     /// <summary>Fires whenever the active backend reports a new active-entitlement set (purchase, restore, push update).</summary>
     public static event Action<PlanTier> OnEntitlementChanged;
 
     /// <summary>
-    /// False only during the brief window between a keyed real-backend Initialize() and its first
-    /// CustomerInfo round-trip landing (success OR error) — Fake/keyless backends are synchronous
-    /// by construction and are "known" immediately. EntitlementGate.CurrentTier reads this to grant
-    /// a grace window rather than paywall a paying customer before we've heard back from RevenueCat.
+    /// False before Initialize() has ever run, AND during the brief window between a keyed
+    /// real-backend Initialize() and its first CustomerInfo round-trip landing (success OR error).
+    /// Fake/keyless backends are synchronous by construction and are "known" the instant Initialize()
+    /// selects them. EntitlementGate.CurrentTier reads this to grant a grace window rather than
+    /// paywall a paying customer before we've heard back from RevenueCat OR before Initialize() has
+    /// even run — the pre-init window is now multi-frame on Android (Initialize is chained after
+    /// Secrets.Preload's async APK read), so code that reads CurrentTier very early (e.g.
+    /// BotsPage.OnEnable on a fresh scene load) must see "unknown", not a false "resolved to None".
     /// </summary>
-    public static bool EntitlementsKnown { get; private set; } = true;
+    public static bool EntitlementsKnown => _initialized && _known;
 
     public static void Initialize()
     {
@@ -45,11 +54,11 @@ public static class BillingService
         _initialized = true;
 
         _backend = BackendFactory();
-        EntitlementsKnown = !(_backend is RevenueCatBackend);
+        _known = !(_backend is RevenueCatBackend);
 
         _backend.Initialize(ResolveApiKey(), tier =>
         {
-            EntitlementsKnown = true;
+            _known = true;
             OnEntitlementChanged?.Invoke(tier);
         });
 

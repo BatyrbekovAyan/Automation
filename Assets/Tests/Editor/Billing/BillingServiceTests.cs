@@ -169,9 +169,12 @@ public class BillingServiceTests
 
     [Test] public void Resolved_none_with_expired_trial_is_none()
     {
-        // Default seams (FakeBillingBackend via ResetSeamsForTests) already resolve
-        // EntitlementsKnown=true synchronously — pins that the grace window does NOT swallow a
-        // genuinely-expired trial once entitlements are actually known.
+        // EntitlementsKnown is now false until Initialize() actually runs (not a bare-reset
+        // default), so this test's "nothing pending" precondition comes from a REAL Initialize()
+        // call — the default Editor selection (FakeBillingBackend) resolves EntitlementsKnown=true
+        // synchronously inside it. Pins that the grace window does NOT swallow a genuinely-expired
+        // trial once entitlements are actually known.
+        BillingService.Initialize();
         Assert.IsTrue(BillingService.EntitlementsKnown, "precondition: nothing pending");
 
         string stored = "";

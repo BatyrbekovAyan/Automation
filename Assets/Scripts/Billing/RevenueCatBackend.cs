@@ -137,6 +137,17 @@ public class RevenueCatBackend : IBillingBackend
         catch (Exception e)
         {
             Debug.LogError($"[RevenueCatBackend] FinishConfigure threw — billing stays uninitialized: {e}");
+
+            // Deliberately asymmetric vs. the GetCustomerInfo error/null branches above (which DO
+            // fire _onEntitlementChanged to close BillingService's resolve window): those mean "the
+            // SDK is healthy, this one network round-trip failed" — a common, recoverable case, and
+            // the SDK will keep retrying on its own. A throw HERE means Configure() itself — the
+            // SDK's own entry point — is broken on this device, so we know NOTHING trustworthy about
+            // this user's entitlement. Leaving BillingService.EntitlementsKnown permanently false is
+            // fail-open-as-grace: on a device with a broken SDK integration it can only ever
+            // OVER-grant a stuck client-side Trial gate, never lock out a real subscriber — and
+            // server-side dialog metering (Task 9) is the actual enforcement boundary regardless of
+            // what this client-side gate believes.
         }
     }
 
@@ -145,10 +156,11 @@ public class RevenueCatBackend : IBillingBackend
     // depending on the test double would be backwards).
     private void Apply(Purchases.CustomerInfo info)
     {
-        // Re-capture on every resolution, not just the first: an empty/failed read right after
-        // Configure() shouldn't be a life sentence for the whole session — a later successful
-        // round-trip (poll or push) gets another chance to pick up the real id.
-        if (_purchases != null) AppUserId = _purchases.GetAppUserId();
+        // Re-capture on every resolution, not just the first — but only when non-empty: a
+        // transient empty read (e.g. mid-flight before the native side has one to give) must not
+        // roll back a previously-good id to BillingService's device-id fallback.
+        var freshAppUserId = _purchases?.GetAppUserId();
+        if (!string.IsNullOrEmpty(freshAppUserId)) AppUserId = freshAppUserId;
 
         PlanTier max = PlanTier.None;
         foreach (var entitlementId in info.Entitlements.Active.Keys)
