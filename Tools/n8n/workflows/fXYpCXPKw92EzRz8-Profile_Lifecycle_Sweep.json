@@ -603,10 +603,10 @@
         -320
       ],
       "parameters": {
-        "content": "## Profile Lifecycle Sweep — Task 12 (billing)\n\nEvery 6h. Branch A (top row): trial profiles older than 4d17h (before Wappi's day-6 retro-charge boundary) and churned/grace subscribers 3d past period_end get their Wappi profile deleted, then bot_profiles.deleted_at set + subscribers demoted to expired (trialing only). Branch B (bottom row): reconciles alive bot_profiles (excluding status='active' owners) against Wappi profile/all/get truth on BOTH bases (api/tapi) — a registry row whose profile_id is absent from the live list gets released (reason=liveness), UNLESS that base's own fetch failed/malformed this run (skip_invalid_fetch — never mass-retire on a bad fetch).\n\nSweep Config.dryRun gates BOTH branches' destructive step (HTTP delete / Postgres mark) — log-only when true. NEVER touches status='active' owners in either branch. Idempotent: both branches' WHERE clauses only ever select deleted_at IS NULL rows, so a marked row drops out of candidates on the next run.",
+        "content": "## Profile Lifecycle Sweep — Task 12 (billing)\n\n**⚠ Sweep Config.dryRun = true UNTIL Task 15 launch — DO NOT flip to false while owner-recreated real bots sit in the registry as trial/trialing. Flipping this live before launch would delete their real Wappi profiles.**\n\nEvery 6h. Branch A (top row): Candidates (trial older than 4d17h before Wappi's day-6 retro-charge boundary, OR churned/grace subscribers >3d past period_end) → Trial/Churn Dry Run? → Capture Delete Fields (last safe .item snapshot of profile_id/channel/app_user_id/reason — nothing upstream of it ever collapses) → HTTP Delete Profile → Delete Succeeded? → Mark Deleted (sets deleted_at + deleted_reason, RETURNING so N≥2 successful deletes in one run — e.g. one owner's WhatsApp+Telegram both expiring together — never collapse into one ambiguous item) → Mark Succeeded? → Demote Trialing (only ever demotes trialing, no-op for churn) → Stamp Deleted / Stamp Mark Failed.\n\nBranch B (bottom row, liveness reconcile): List WA/TG Profiles → Alive Registry (excludes status='active' AND anything created <1h ago — the age guard closes a fetch-snapshot race against a just-registered profile) → Compute Liveness Diff (validates each base independently: a fetch error → skip_invalid_fetch; a well-formed but EMPTY live list while the registry holds alive rows for that channel → ALSO skip_invalid_fetch/empty_list_floor — never mass-retire on a suspicious-looking empty response) → Is Retire Candidate? → Liveness Dry Run? → Mark Liveness Deleted (deleted_reason='liveness', no Wappi call — absence from the list IS the evidence).\n\nNEVER touches status='active' owners in either branch. Idempotent: both branches' WHERE clauses only ever select deleted_at IS NULL rows, so a marked row drops out of candidates on the next run. deleted_reason (bot_profiles column) is the durable audit trail — outlives execution-log retention.",
         "color": 4,
         "width": 1900,
-        "height": 200
+        "height": 460
       }
     },
     {
@@ -735,7 +735,8 @@
             }
           ]
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
