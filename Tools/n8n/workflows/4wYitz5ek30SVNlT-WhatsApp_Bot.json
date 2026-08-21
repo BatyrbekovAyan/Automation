@@ -913,6 +913,78 @@
         -2736,
         316
       ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "with me as (\n  select bp.app_user_id, s.plan, s.status, s.topup_balance\n  from bot_profiles bp join subscribers s using (app_user_id)\n  where bp.profile_id = $1 and bp.deleted_at is null\n), today as (\n  select (now() at time zone 'Asia/Almaty')::date d\n), usage_now as (\n  select count(*) used from dialog_counts dc, me\n  where dc.app_user_id = me.app_user_id\n    and date_trunc('month', dc.d) = date_trunc('month', (select d from today))\n), existing as (\n  select 1 from dialog_counts dc, me, today t\n  where dc.app_user_id = me.app_user_id and dc.chat_id = $2 and dc.d = t.d\n), quota as (\n  select\n    case me.plan when 'trial' then 150 when 'start' then 300 when 'business' then 1000 when 'network' then 3000 else 0 end\n    + case when me.status in ('active','trialing') then me.topup_balance else 0 end\n    - case when me.status in ('expired','grace') then 100000000 else 0 end as q\n  from me\n), ins as (\n  insert into dialog_counts (app_user_id, chat_id, d)\n  select me.app_user_id, $2, t.d from me, today t\n  where not exists (select 1 from existing)\n    and (select used from usage_now) < (select q from quota)\n  on conflict (app_user_id, chat_id, d) do nothing\n  returning 1\n)\nselect\n  (exists(select 1 from existing) or exists(select 1 from ins)) as allowed,\n  (select used from usage_now) as used,\n  me.plan as plan, me.status as status\nfrom me;",
+        "options": {
+          "queryReplacement": "={{ [ $('Webhook').item.json.body.messages[0].profile_id, $('Webhook').item.json.body.messages[0].chatId ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -3568,
+        32
+      ],
+      "id": "3459eb00-0fc8-4bb1-9791-da01bdaa7b9c",
+      "name": "Count Dialog",
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first().json;\nif (row.error || row.allowed === undefined) {\n  return [{ json: { allowed: true, used: row.used ?? null, plan: row.plan ?? null, status: row.status ?? null, failOpen: true } }];\n}\nreturn [{ json: { allowed: row.allowed === true, used: row.used, plan: row.plan, status: row.status, failOpen: false } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3408,
+        32
+      ],
+      "id": "cb158095-4b16-4a2a-b006-ebc6dd335ded",
+      "name": "Quota Decision"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b3d3c017-db47-4c2c-b482-b437d7c9b3cf",
+              "leftValue": "={{ $json.allowed }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -3248,
+        32
+      ],
+      "id": "96b3afa0-b276-4544-bb02-7eced137a852",
+      "name": "If Quota Allows"
     }
   ],
   "connections": {
@@ -1265,11 +1337,45 @@
         [],
         [
           {
-            "node": "Input type",
+            "node": "Count Dialog",
             "type": "main",
             "index": 0
           }
         ]
+      ]
+    },
+    "Count Dialog": {
+      "main": [
+        [
+          {
+            "node": "Quota Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Quota Decision": {
+      "main": [
+        [
+          {
+            "node": "If Quota Allows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Quota Allows": {
+      "main": [
+        [
+          {
+            "node": "Input type",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
       ]
     }
   },

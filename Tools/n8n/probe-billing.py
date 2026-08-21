@@ -46,6 +46,14 @@ event.app_user_id, event.entitlement_ids, event.product_id, event.expiration_at_
 
 Run with `--channel-slot-backstop` (see that section below for the full contract, the
 precondition it needs, and why it is NOT part of the default run).
+
+## Part 3 -- dialog metering / quota enforcement (Task 9, opt-in)
+
+Run with `--dialog-metering` (see that section below). Provides `dialog_metering_query`,
+a reusable helper returning the exact shipped Count Dialog SQL with profile_id/chat_id
+substituted as literals, for pasting into a one-off Manual-Trigger -> Postgres
+verification workflow -- and a real-webhook CONNECTIVITY smoke test only (the quota
+decision itself cannot be asserted over plain HTTP; see that section for why).
 """
 import argparse
 import json
@@ -288,6 +296,179 @@ def run_channel_slot_backstop_probe():
     return 0 if ok_all else 1
 
 
+# ---------------------------------------------------------------------------------
+# Part 3: dialog metering / quota enforcement (Task 9) -- WhatsApp_Bot / Telegram_Bot
+# ---------------------------------------------------------------------------------
+#
+# Rule: a dialog = (app_user_id, chat_id, date Asia/Almaty). Spliced into BOTH bot
+# templates right after Is Latest?'s not-aborted branch (so a debounced duplicate
+# fragment never double-counts) and before Input type/AI Agent (so a quota-blocked
+# NEW dialog never triggers an auto-reply): Count Dialog (Postgres, the CTE below,
+# onError:continueRegularOutput + alwaysOutputData:true so a DB outage or an
+# unregistered profile fails OPEN) -> Quota Decision (Code, parses allowed/used/plan/
+# status, fail-open on row.error or a missing `allowed` key) -> If Quota Allows
+# ([email protected] Input type; [email protected] dead end, same idiom as Suppressed?/Is Latest?).
+#
+# TWO EMPIRICAL FINDINGS (2026-08-21) rule out a plain-HTTP end-to-end probe here,
+# unlike Parts 1/2:
+#   1. Fetch Recent (pre-existing debounce machinery, upstream of this splice) calls
+#      Wappi's REAL messages/get with the incoming profile_id, has no onError
+#      override, and a profile_id Wappi has never authorized gets a real HTTP 400
+#      {"detail":"profile_id error"} back (confirmed via a direct curl against
+#      wappi.pro) -- the execution aborts right there, before Count Dialog ever runs.
+#      A synthetic/fake profile_id can therefore never reach this task's new nodes via
+#      a real webhook fire, by construction of the pre-existing debounce gate.
+#   2. Both bot templates' Webhook trigger responds IMMEDIATELY (confirmed via each
+#      workflow's own triggerInfo: "Webhook is configured to respond immediately with
+#      the message 'Workflow got started.'") -- the HTTP response is identical
+#      regardless of what happens downstream, so even a real-profile fire couldn't
+#      show the quota decision in the HTTP response.
+#
+# The quota decision was instead verified two other ways for Task 9 (full transcript
+# in task-9-report.md, not reproduced as script code here since both require access
+# this plain script does not have -- the same constraint Part 1's docstring already
+# notes for Postgres/DB-state checks):
+#   (a) the EXACT shipped SQL (dialog_metering_query below) run against real seeded
+#       Postgres data via a one-off Manual-Trigger -> Postgres workflow -- 3 scenarios
+#       (new+over quota / continuation / new+under quota) plus a 4th (unregistered
+#       profile), all matching the required allowed/used/row-count outcomes;
+#   (b) the real node WIRING proven via n8n-mcp's test_workflow pinned-execution
+#       against the live Telegram Bot template (Count Dialog pinned to each of
+#       blocked/allowed/fail-open; get_execution's node-path confirms execution stops
+#       at If Quota Allows when blocked and reaches Input type otherwise).
+#
+# What THIS script provides instead: dialog_metering_query() as a reusable helper (so
+# a future re-verification doesn't need to hand-copy the CTE out of the workflow
+# JSON), and --dialog-metering as a real-webhook CONNECTIVITY smoke test ONLY --
+# it proves the endpoint is reachable and accepts the payload shape, nothing about
+# the quota decision.
+DIALOG_METERING_WA_ID = "4wYitz5ek30SVNlT"
+DIALOG_METERING_TG_ID = "4VN3gsFaC2HUYmcc"
+
+
+def dialog_metering_query(profile_id, chat_id):
+    """Return the exact shipped Count Dialog SQL with profile_id/chat_id substituted
+    as SQL literals -- paste into a one-off Manual-Trigger -> Postgres workflow (via
+    n8n-mcp or the n8n UI) to check allowed/used/plan/status for that pair. Returns
+    text only; this script has no Postgres credential to run it directly (see the
+    Part 3 docstring above)."""
+    def lit(s):
+        return "'" + s.replace("'", "''") + "'"
+    pid, cid = lit(profile_id), lit(chat_id)
+    return f"""with me as (
+  select bp.app_user_id, s.plan, s.status, s.topup_balance
+  from bot_profiles bp join subscribers s using (app_user_id)
+  where bp.profile_id = {pid} and bp.deleted_at is null
+), today as (
+  select (now() at time zone 'Asia/Almaty')::date d
+), usage_now as (
+  select count(*) used from dialog_counts dc, me
+  where dc.app_user_id = me.app_user_id
+    and date_trunc('month', dc.d) = date_trunc('month', (select d from today))
+), existing as (
+  select 1 from dialog_counts dc, me, today t
+  where dc.app_user_id = me.app_user_id and dc.chat_id = {cid} and dc.d = t.d
+), quota as (
+  select
+    case me.plan when 'trial' then 150 when 'start' then 300 when 'business' then 1000 when 'network' then 3000 else 0 end
+    + case when me.status in ('active','trialing') then me.topup_balance else 0 end
+    - case when me.status in ('expired','grace') then 100000000 else 0 end as q
+  from me
+), ins as (
+  insert into dialog_counts (app_user_id, chat_id, d)
+  select me.app_user_id, {cid}, t.d from me, today t
+  where not exists (select 1 from existing)
+    and (select used from usage_now) < (select q from quota)
+  on conflict (app_user_id, chat_id, d) do nothing
+  returning 1
+)
+select
+  (exists(select 1 from existing) or exists(select 1 from ins)) as allowed,
+  (select used from usage_now) as used,
+  me.plan as plan, me.status as status
+from me;"""
+
+
+def _n8n_api_key():
+    """Read the same n8nAPIKey the app itself uses -- never hardcoded."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    secrets_path = os.path.join(here, "..", "..", "Assets", "StreamingAssets", "secrets.json")
+    with open(secrets_path) as fh:
+        return json.load(fh)["n8nAPIKey"]
+
+
+def _set_workflow_active(workflow_id, active, api_key):
+    """Raw REST activate/deactivate (both bot templates lack availableInMCP, so the
+    n8n-mcp tools refuse them -- see task-9-report.md). Returns True on success."""
+    verb = "activate" if active else "deactivate"
+    req = urllib.request.Request(
+        f"{BASE}/api/v1/workflows/{workflow_id}/{verb}", method="POST",
+        headers={"X-N8N-API-KEY": api_key, "Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return resp.status in (200, 201)
+    except urllib.error.HTTPError:
+        return False
+
+
+def _fire_bot_template_webhook(webhook_path, profile_id, chat_id, timeout=15):
+    body = json.dumps({
+        "messages": [{
+            "id": f"probe_conn_{uuid.uuid4().hex[:10]}",
+            "type": "chat",
+            "body": "connectivity probe",
+            "from": chat_id,
+            "chatId": chat_id,
+            "profile_id": profile_id,
+        }]
+    }).encode()
+    req = urllib.request.Request(f"{BASE}/webhook/{webhook_path}", data=body, method="POST")
+    req.add_header("Content-Type", "application/json")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.status, resp.read().decode(errors="replace")
+    except urllib.error.HTTPError as e:
+        return e.code, e.read().decode(errors="replace")
+    except urllib.error.URLError as e:
+        return None, str(e.reason)
+
+
+def run_dialog_metering_connectivity_probe():
+    """Transport-level smoke test only -- see the Part 3 docstring for why the quota
+    decision itself cannot be asserted this way. Activates each template in turn
+    (never both at once -- they share the identical literal webhook path
+    "0091024b-7b46", so simultaneous activation would collide), fires one synthetic
+    message, and restores the PRIOR active state in a finally block regardless of
+    outcome (both templates are inactive by project convention outside active
+    testing -- see feedback_bot_activation_policy.md)."""
+    api_key = _n8n_api_key()
+    ok_all = True
+    for label, wid in (("WhatsApp Bot", DIALOG_METERING_WA_ID), ("Telegram Bot", DIALOG_METERING_TG_ID)):
+        print(f"=== {label} ({wid}) connectivity smoke test ===")
+        activated = _set_workflow_active(wid, True, api_key)
+        if not activated:
+            print(f"[FAIL] could not activate {label} -- skipping fire, leaving deactivated")
+            ok_all = False
+            continue
+        try:
+            status, body = _fire_bot_template_webhook(
+                "0091024b-7b46", f"probe_conn_fake_{uuid.uuid4().hex[:8]}", "probe_conn_chat"
+            )
+            reached = status is not None
+            print(f"[{'OK' if reached else 'FAIL'}] {label}: HTTP {status} -- {body[:150]}")
+            ok_all = ok_all and reached
+        finally:
+            restored = _set_workflow_active(wid, False, api_key)
+            print(f"    restored active=false: {restored}")
+            ok_all = ok_all and restored
+        print()
+    print("This only proves the webhook is reachable and accepts the payload shape --")
+    print("it does NOT assert the quota decision (see the Part 3 module docstring).")
+    print("Quota-decision verification transcript: task-9-report.md.")
+    return 0 if ok_all else 1
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument(
@@ -299,10 +480,21 @@ def main():
              "docstring's Part 2 section first -- real side effects (creates+activates "
              "real n8n workflows) and needs both probe_user_8/probe_user_9 preconditions "
              "seeded first.")
+    ap.add_argument(
+        "--dialog-metering", action="store_true",
+        help="Run the Task 9 dialog-metering CONNECTIVITY smoke test (activates each "
+             "bot template in turn, fires one synthetic webhook call, restores prior "
+             "active state) instead of the default RevenueCat Events probes. Read the "
+             "module docstring's Part 3 section first -- this does NOT assert the "
+             "quota decision itself (see why); use dialog_metering_query() for a "
+             "real DB-level re-check via a one-off n8n-mcp workflow.")
     args = ap.parse_args()
 
     if args.channel_slot_backstop:
         sys.exit(run_channel_slot_backstop_probe())
+
+    if args.dialog_metering:
+        sys.exit(run_dialog_metering_connectivity_probe())
 
     if not SECRET:
         print("FAIL: RC_WEBHOOK_SECRET is not set -- refusing to run (probes b-e need it "

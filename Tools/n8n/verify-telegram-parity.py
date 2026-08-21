@@ -30,6 +30,7 @@ DEFAULT_WF = os.path.join(HERE, "workflows")
 WF = DEFAULT_WF
 
 TG_BOT = "4VN3gsFaC2HUYmcc-Telegram_Bot.json"
+WA_BOT = "4wYitz5ek30SVNlT-WhatsApp_Bot.json"
 CREATE_TG = "Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json"
 CREATE_WA = "XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json"
 SUGGEST = "9PTyYcelRQI7bGDb-Suggest_Replies.json"
@@ -45,7 +46,8 @@ PG_MEMORY_CRED = "1H5xlpFSESU4w6JH"
 # index positions the orchestrator patches are asserted separately via nodes[0]/nodes[5]).
 # History: Phase 4 parity baseline = 24 nodes; Phase 9 suppression gate +2 (Read Reply
 # Mode, Suppressed?); Phase 10 debounce splice +4 (Debounce Wait, Fetch Recent,
-# Latest+Combine, Is Latest?). A future splice must extend this set deliberately.
+# Latest+Combine, Is Latest?); billing Task 9 dialog-metering splice +3 (Count Dialog,
+# Quota Decision, If Quota Allows). A future splice must extend this set deliberately.
 TG_BOT_NODE_NAMES = {
     "Webhook", "HTTP Request", "Transcribe Audio", "Text", "Audio", "AI Agent",
     "Input type", "Mark Read", "Typing", "Reading Pause", "Typing Pause",
@@ -54,6 +56,7 @@ TG_BOT_NODE_NAMES = {
     "Read Reply Mode", "Suppressed?",
     "OpenAI", "Supabase Vector Store", "Retrieve Answer", "OpenAI Embedding",
     "Debounce Wait", "Fetch Recent", "Latest+Combine", "Is Latest?",
+    "Count Dialog", "Quota Decision", "If Quota Allows",
 }
 
 
@@ -278,6 +281,78 @@ def check_canonical_export_invariant(f):
     print(f"OK  {f} (canonical-export invariant)")
 
 
+DIALOG_METERING_NODES = ("Count Dialog", "Quota Decision", "If Quota Allows")
+
+
+def check_dialog_metering(f):
+    """Billing Task 9: per-day dialog metering + quota enforcement, spliced after
+    Is Latest?'s not-aborted (debounce-settled) branch -- so a debounced duplicate
+    fragment can never double-count -- and before the reply-generation chain
+    (Input type -> ... -> AI Agent) -- so a quota-blocked NEW dialog never triggers an
+    auto-reply. Shared by both bot templates: this file has always been scoped to
+    Telegram-PARITY structural asserts (check_telegram_bot() is where TG's own node-set
+    is pinned; WhatsApp_Bot never got a mirror check_whatsapp_bot() since WA was the
+    already-trusted original TG was built to match), but the billing gate itself ships
+    identically to both, so this one function verifies the shape on whichever template
+    filename it's given rather than duplicating a second full node-set pin for WA.
+    """
+    wf = load(f)
+    ns = wf["nodes"]
+    conns = wf["connections"]
+
+    for name in DIALOG_METERING_NODES:
+        node(ns, name)  # raises AssertionError if missing
+
+    # (i) Is Latest?'s NOT-aborted branch (index 1) now feeds Count Dialog, not Input
+    # type directly -- debounced duplicates are filtered by Is Latest? BEFORE metering
+    # ever runs, so a resend of the same fragment can't count twice.
+    is_latest_false = conns["Is Latest?"]["main"][1]
+    assert is_latest_false == [{"node": "Count Dialog", "type": "main", "index": 0}], \
+        f"{f}: Is Latest?'s not-aborted branch does not feed Count Dialog: {is_latest_false}"
+
+    # (ii) Count Dialog -> Quota Decision -> If Quota Allows, linear.
+    assert conns["Count Dialog"]["main"][0] == [{"node": "Quota Decision", "type": "main", "index": 0}], \
+        f"{f}: Count Dialog does not feed Quota Decision: {conns['Count Dialog']}"
+    assert conns["Quota Decision"]["main"][0] == [{"node": "If Quota Allows", "type": "main", "index": 0}], \
+        f"{f}: Quota Decision does not feed If Quota Allows: {conns['Quota Decision']}"
+
+    # (iii) If Quota Allows: TRUE (allowed) -> Input type (the reply-generation chain);
+    # FALSE (blocked) -> nothing, matching Suppressed?/Is Latest?'s own dead-end idiom
+    # for "do not auto-reply."
+    iqa = conns["If Quota Allows"]["main"]
+    assert iqa[0] == [{"node": "Input type", "type": "main", "index": 0}], \
+        f"{f}: If Quota Allows true-branch does not feed Input type: {iqa[0]}"
+    assert iqa[1] == [], f"{f}: If Quota Allows false-branch is not a dead end: {iqa[1]}"
+
+    # (iv) Count Dialog is fail-open: a Supabase outage or an unregistered profile (0
+    # rows from the `me` CTE) must never silence the bot -- mirrors Restamp RAG
+    # Chunks/Count Channels' established onError+alwaysOutputData contract (Tasks 8/9).
+    cd = node(ns, "Count Dialog")
+    assert cd["type"] == "n8n-nodes-base.postgres", f"{f}: Count Dialog is not a postgres node"
+    assert cd.get("onError") == "continueRegularOutput", f"{f}: Count Dialog onError not continueRegularOutput"
+    assert cd.get("alwaysOutputData") is True, f"{f}: Count Dialog alwaysOutputData not true"
+    cred = cd["credentials"]["postgres"]["id"]
+    assert cred == PG_EXECUTEQUERY_CRED, \
+        f"{f}: Count Dialog postgres credential is not the shared executeQuery cred: {cred}"
+
+    # (v) queryReplacement is the array-form ={{ [...] }} expression (Task 7's null-
+    # stringification lesson: a comma-joined multi-fragment form turns a null/undefined
+    # element into the literal text "null" once interpolated into the surrounding SQL).
+    qr = cd["parameters"]["options"]["queryReplacement"]
+    assert qr.startswith("={{ [") and qr.rstrip().endswith("] }}"), \
+        f"{f}: Count Dialog queryReplacement is not the single array-literal form: {qr!r}"
+
+    # (vi) the insert is conditional on being allowed -- a suppressed NEW dialog must
+    # never consume quota (insert-then-suppress would silently burn a slot on every
+    # rejected message instead of leaving it unconsumed).
+    q = cd["parameters"]["query"]
+    assert "insert into dialog_counts" in q, f"{f}: Count Dialog query does not insert into dialog_counts"
+    assert "where not exists" in q and "used from usage_now" in q, \
+        f"{f}: Count Dialog insert does not look conditional on quota/existing: {q}"
+
+    print(f"OK  {f} (dialog-metering wiring)")
+
+
 def check_suggest_replies():
     f = SUGGEST
     wf = load(f)
@@ -358,6 +433,8 @@ def main():
         check_restamp_orchestrator(CREATE_WA, "{botWaId}", "TelegramWorkflowId")
         check_canonical_export_invariant(CREATE_WA)
         check_canonical_export_invariant(CREATE_TG)
+        check_dialog_metering(TG_BOT)
+        check_dialog_metering(WA_BOT)
         check_suggest_replies()
     except AssertionError as e:
         print(f"PARITY FAIL: {e}")
