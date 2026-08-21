@@ -703,7 +703,7 @@
         "model": {
           "__rl": true,
           "mode": "list",
-          "value": "gpt-4o-mini"
+          "value": "gpt-5.4-mini"
         },
         "options": {
           "frequencyPenalty": 0.2,
