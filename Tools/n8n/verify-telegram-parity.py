@@ -377,6 +377,26 @@ def check_dialog_metering(f):
     print(f"OK  {f} (dialog-metering wiring)")
 
 
+def check_model_id(f):
+    """Billing Task 13: both bot templates' AI Agent must run on the pinned mini-class
+    model (gpt-5.4-mini, live-verified against the real OpenAI model catalog + real API
+    calls tagging back gpt-5.4-mini-2026-03-17 -- see task-13-report.md). This asserts
+    the OpenAI [lmChatOpenAi] node's model id directly, closing the gap the dialog-
+    metering/canonical-export asserts don't cover: a future accidental reversion to an
+    older model (or a stray edit landing on the wrong alias) would otherwise slip
+    through this gate silently.
+    """
+    wf = load(f)
+    ns = wf["nodes"]
+    openai_nodes = [n for n in ns if n.get("type") == "@n8n/n8n-nodes-langchain.lmChatOpenAi"]
+    assert len(openai_nodes) == 1, \
+        f"{f}: expected exactly 1 lmChatOpenAi node, found {len(openai_nodes)}"
+    model_value = openai_nodes[0]["parameters"]["model"]["value"]
+    assert model_value == "gpt-5.4-mini", \
+        f"{f}: OpenAI node model id is {model_value!r}, expected 'gpt-5.4-mini'"
+    print(f"OK  {f} (model id pinned)")
+
+
 def check_suggest_replies():
     f = SUGGEST
     wf = load(f)
@@ -459,6 +479,8 @@ def main():
         check_canonical_export_invariant(CREATE_TG)
         check_dialog_metering(TG_BOT)
         check_dialog_metering(WA_BOT)
+        check_model_id(TG_BOT)
+        check_model_id(WA_BOT)
         check_suggest_replies()
     except AssertionError as e:
         print(f"PARITY FAIL: {e}")
