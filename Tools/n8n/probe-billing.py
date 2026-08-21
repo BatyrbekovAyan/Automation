@@ -68,21 +68,22 @@ precondition seeded via `usage_seed_sql()` through a one-off n8n-mcp workflow fi
 asserts an EXACT value set: plan/quota/used/topupBalance/channelsConnected/
 botsRegistered/periodEnd).
 
-## Part 5 -- Profile Lifecycle Sweep (Task 12, opt-in)
+## Part 5 -- Profile Lifecycle Sweep (Task 12, opt-in; fix round same day)
 
 Run with `--sweep` (prints fixture SQL only; see that section below). This workflow has
 NO webhook at all -- it is a bare Schedule Trigger ("Every 6 Hours") with two branches:
 Branch A deletes Wappi profiles for trial (created_at < now() - 4d17h) / churned+grace
 (current_period_end < now() - 3d) owners before Wappi's day-6 retroactive-charge
-boundary; Branch B reconciles alive `bot_profiles` rows against Wappi's own
-`profile/all/get` truth (both api/tapi bases) and releases (`deleted_at`) any row whose
-profile no longer exists there. Unlike Parts 1/4, there is no HTTP entry point this
-script can fire at all -- verification for this task was done ENTIRELY through
-n8n-mcp's `execute_workflow`(manual mode)/`get_execution` against the real workflow
+boundary; Branch B reconciles alive `bot_profiles` rows (now additionally gated
+`created_at < now() - 1h`, see the C2 fix below) against Wappi's own `profile/all/get`
+truth (both api/tapi bases) and releases (`deleted_at`) any row whose profile no
+longer exists there. Unlike Parts 1/4, there is no HTTP entry point this script can
+fire at all -- verification for this task was done ENTIRELY through n8n-mcp's
+`execute_workflow`(manual mode)/`get_execution` against the real workflow
 `fXYpCXPKw92EzRz8`, using a one-off Manual-Trigger->Postgres harness (same pattern as
 Parts 1-4) to seed/read/clean up fixtures. `sweep_seed_sql()` and `sweep_cleanup_sql()`
-below are the EXACT SQL used for that pass (6 fixtures, all confirmed correct in
-task-12-report.md): (a) trialing owner, profile older than the 4d17h threshold -- a
+below are the EXACT SQL used for the original pass (6 fixtures, all confirmed correct
+in task-12-report.md): (a) trialing owner, profile older than the 4d17h threshold -- a
 Branch-A candidate; a real Wappi 400 "Profile not found" on the delete attempt (fake
 id) correctly left `deleted_at` NULL (invariant: delete-fail -> no mark) UNTIL Branch B's
 liveness reconcile independently retired it on a later pass, since the same fake id is
@@ -97,25 +98,80 @@ excludes `status='active'`, a deliberate scope decision beyond the literal brief
 the report); (d) expired owner past the 3-day grace -- a Branch-A candidate
 (reason=churn_grace), same fake-id fail-safe as (a); a same-shape sibling fixture
 (expired but INSIDE the 3-day grace) is also seeded and confirmed absent from
-candidates; (e) liveness -- alive registry row (fresh created_at, so NOT a Branch-A
-candidate at all) with a profile_id absent from Wappi's real list -- confirmed retired
-with reason=liveness by Branch B alone, cleanly isolated from Branch A by construction;
-(f) is NOT a data fixture -- it is exercised by temporarily pointing "List WA Profiles"
-at a broken path via n8n-mcp's `update_workflow` (`setNodeParameter` on `/url`), which
-confirmed EVERY whatsapp-channel registry row got `action:"skip_invalid_fetch"` (zero
-retirements for that base that run) while the telegram base's own (independent, still
-healthy) fetch was unaffected, then restored the URL. A REAL throwaway Wappi profile
-(`profile/add` -> `profile/delete`, same shape as Manager.cs, called directly with the
-plain `wappiAuthToken` string already in `secrets.json` -- no n8n detour needed) proved
-the full success path end-to-end: real delete (confirmed gone from a fresh
-`profile/all/get` too) -> `bot_profiles.deleted_at` set -> `subscribers.status` demoted
-to `expired`. OPERATIONAL NOTE for any future real-profile test: an unauthorized
-"connecting" Wappi profile auto-expires/vanishes from Wappi's own side within roughly
-10 minutes (observed directly -- a first throwaway profile was already gone by the time
-a delete was attempted ~10 min later, itself a clean natural demonstration of what
-Branch B exists for) -- seed the fixture row and fire the sweep within a minute or two
-of calling `profile/add`, or the "successful delete" assertion will spuriously look like
-a "not found" case instead.
+candidates; (e) liveness -- alive registry row (created_at 2h old -- see the age-guard
+note below for why this is no longer `now()`) with a profile_id absent from Wappi's
+real list -- confirmed retired with reason=liveness by Branch B alone, cleanly isolated
+from Branch A by construction; (f) is NOT a data fixture -- it is exercised by
+temporarily pointing "List WA Profiles" at a broken path via n8n-mcp's
+`update_workflow` (`setNodeParameter` on `/url`), which confirmed EVERY
+whatsapp-channel registry row got `action:"skip_invalid_fetch"` (zero retirements for
+that base that run) while the telegram base's own (independent, still healthy) fetch
+was unaffected, then restored the URL.
+
+**Fix round (opus review, same day): 2 Critical + 3 Important, all applied and
+re-verified with REAL Wappi profiles -- see `sweep_multi_delete_seed_sql()` and
+`sweep_empty_floor_seed_sql()` below for the exact new fixture SQL, full transcript
+in the "Fix round" section of task-12-report.md.**
+
+**C1 (multi-delete crash, FIXED):** a Postgres UPDATE with no `RETURNING` clause,
+given N>=2 successful input items, collapses to a SINGLE output item whose
+`pairedItem` is an ARRAY covering all N -- this is the exact same footgun Stamp
+Retired hit in the original pass (see the Concerns section of task-12-report.md),
+just unapplied to Branch A's own Mark Deleted -> Demote Trialing -> Stamp Deleted
+chain. The NORMAL case (one user, WhatsApp + Telegram both expiring the same run) is
+N=2, not an edge case -- and the original code threw a `NodeOperationError` in Stamp
+Deleted trying to resolve an ambiguous `.item` back-reference, crashing the WHOLE
+execution and skipping Branch B entirely (confirmed: this is what actually happened
+to the FIRST throwaway profile in the original pass -- struck the "~10min Wappi
+auto-expiry" explanation below, see that note). Fixed by (1) a new `Capture Delete
+Fields` Set node (the last point where a `.item` back-reference to `Candidates` is
+still 100% safe -- nothing upstream of it ever collapses) and (2) adding `RETURNING`
+to BOTH `Mark Deleted` and `Demote Trialing`, which EMPIRICALLY restores clean 1:1
+per-item output (verified directly: 2 real throwaway profiles for the SAME
+app_user_id both deleted in one run, `Mark Deleted` emitted 2 separate correctly-paired
+items, zero crash). `deleted_reason` (see the minors fix below) is echoed back through
+each `RETURNING` clause as a real or literal-cast column, so every node downstream of
+a Postgres write reads plain `$json.*` -- zero `.item` back-references survive on the
+success path. New `Mark Succeeded?` If node (I3) gates `Demote Trialing` on
+`!$json.error` from `Mark Deleted`, wired to a new `Stamp Mark Failed` terminal node
+on the false branch.
+
+**C2 (liveness over-eager, FIXED):** two guards added to Branch B. Guard 1 (age
+floor): `Alive Registry`'s WHERE clause now also requires `created_at < now() -
+interval '1 hour'` -- closes a fetch-snapshot race against a profile registered
+moments ago (propagation lag on Wappi's own side). Guard 2 (empty-list floor): in
+`Compute Liveness Diff`, a base whose live list comes back a well-formed but EMPTY
+array, while the registry holds >=1 alive row for that channel, is now treated
+identically to an invalid fetch (`action:"skip_invalid_fetch"`,
+`reason:"empty_list_floor: ..."`) rather than confidently retiring every row for that
+channel -- this was the fail-DANGEROUS polarity flip vs. the orphan sweep's own
+"never delete on ambiguity" philosophy that a genuinely-empty-but-wrong response
+would have hit. Both guards verified in one execution: a profile registered 10
+minutes ago never appeared in `Alive Registry` at all (guard 1); a fake telegram-
+channel registry row (this dev account's own TG list is always empty, a real
+`{"profiles":null,"status":"done"}`) got floored to `skip_invalid_fetch` instead of
+retired (guard 2).
+
+**I1 (corrected claim, was WRONG):** the original report claimed an unauthorized
+Wappi "connecting" profile auto-expires within ~10 minutes, based on a first
+throwaway profile being gone by the time a delete was attempted. Struck per review --
+it contradicts the orphan sweep's own 24h-TTL design premise (which assumes
+unauthorized profiles persist far longer than minutes), and a re-examination of the
+actual execution data does not support it either: the FIRST live-mode execution
+(pre-onError-fix) shows only ONE item (index 0, a different fake profile) ever
+reached "HTTP Delete Profile" before the whole node/execution failed -- the real
+throwaway profile (a later item in the same batch) was very likely never even
+attempted by that run, so its own disappearance sometime in that ~10-minute window is
+NOT explained by anything this script observed. Honest state: the mechanism is
+UNRESOLVED, not auto-expiry, not confirmed-otherwise -- the two later real-profile
+fixture tests (C1's 2-candidate check above) sidestepped the question entirely by
+seeding and firing the sweep within seconds of `profile/add`, which is now the
+documented safe practice for any future real-profile test with this workflow.
+
+**Minor (durable audit, applied):** `bot_profiles.deleted_reason` (migration
+`Tools/n8n/sql/2026-08-21-deleted-reason.sql`) persists `trial_expiry`/`churn_grace`/
+`liveness` past execution-log retention/pruning -- set by both `Mark Deleted` and
+`Mark Liveness Deleted`, confirmed in the C1 re-verification read-back.
 """
 import argparse
 import json
@@ -744,10 +800,15 @@ def sweep_seed_sql():
     """Seeds 6 fixture (app_user_id, bot_profiles row) pairs covering every rule
     branch except (f) (which is a workflow-URL mutation, not a data fixture -- see
     the Part 5 module docstring) and the real-Wappi-profile case (which needs a live
-    `profile/add` call first; see the docstring's operational note about the ~10min
-    auto-expiry window). Uses now()-relative intervals deliberately (unlike
-    usage_seed_sql's fixed calendar dates) since this rule is entirely about AGE
-    relative to the moment the sweep runs, not a calendar-month boundary."""
+    `profile/add` call first -- fire the sweep within SECONDS of that call, not
+    minutes; see the Part 5 docstring's I1 note, the original ~10min-auto-expiry
+    explanation was struck as unsupported). Uses now()-relative intervals
+    deliberately (unlike usage_seed_sql's fixed calendar dates) since this rule is
+    entirely about AGE relative to the moment the sweep runs, not a calendar-month
+    boundary. Fixture (e)'s created_at is 2 HOURS ago, not `now()` -- it must clear
+    the C2 age-guard floor (created_at < now() - 1h) on Alive Registry while staying
+    far under Branch A's 4d17h threshold, or it would be invisible to Branch B too
+    and the isolation-from-Branch-A test would prove nothing."""
     return """insert into subscribers (app_user_id, plan, status, current_period_end, topup_balance, updated_at) values
   ('probe12_trial_old', 'trial', 'trialing', null, 0, now()),
   ('probe12_trial_young', 'trial', 'trialing', null, 0, now()),
@@ -765,9 +826,60 @@ insert into bot_profiles (profile_id, app_user_id, channel, created_at, deleted_
   ('probe12_fake_wa_activeancient', 'probe12_active_ancient', 'whatsapp', now() - interval '30 days', null),
   ('probe12_fake_wa_churn', 'probe12_churn_expired', 'whatsapp', now() - interval '1 day', null),
   ('probe12_fake_wa_grace_ok', 'probe12_churn_grace_ok', 'whatsapp', now() - interval '1 day', null),
-  ('probe12_fake_wa_liveness', 'probe12_liveness', 'whatsapp', now(), null)
+  ('probe12_fake_wa_liveness', 'probe12_liveness', 'whatsapp', now() - interval '2 hours', null)
 on conflict (profile_id) do update set
   app_user_id = excluded.app_user_id, channel = excluded.channel, created_at = excluded.created_at, deleted_at = excluded.deleted_at;"""
+
+
+def sweep_multi_delete_seed_sql(profile_id_a, profile_id_b, app_user_id="probe12fix_multi"):
+    """Fix-round C1 fixture: ONE trialing app_user_id with TWO alive bot_profiles
+    rows, both past the 4d17h threshold -- the normal "WhatsApp + Telegram both
+    expiring the same run" case (N=2 successful deletes reaching Mark Deleted in one
+    execution), which the original Mark Deleted/Demote Trialing/Stamp Deleted chain
+    could not survive (see the C1 note in the Part 5 docstring). Pass two REAL
+    throwaway Wappi profile_ids (created via profile/add, same channel is fine --
+    the bug is channel-independent) for a genuine end-to-end proof; fake ids only
+    exercise the fail-safe path (both would 400 and never reach Mark Deleted at
+    all), not the bug this fixture targets."""
+    return f"""insert into subscribers (app_user_id, plan, status, current_period_end, topup_balance, updated_at) values
+  ({app_user_id!r}, 'trial', 'trialing', null, 0, now())
+on conflict (app_user_id) do update set plan=excluded.plan, status=excluded.status, current_period_end=excluded.current_period_end, updated_at=now();
+
+insert into bot_profiles (profile_id, app_user_id, channel, created_at, deleted_at) values
+  ({profile_id_a!r}, {app_user_id!r}, 'whatsapp', now() - interval '6 days', null),
+  ({profile_id_b!r}, {app_user_id!r}, 'whatsapp', now() - interval '6 days', null)
+on conflict (profile_id) do update set app_user_id=excluded.app_user_id, channel=excluded.channel, created_at=excluded.created_at, deleted_at=excluded.deleted_at;"""
+
+
+def sweep_multi_delete_cleanup_sql(app_user_id="probe12fix_multi"):
+    return f"""delete from bot_profiles where app_user_id = {app_user_id!r};
+delete from subscribers where app_user_id = {app_user_id!r};"""
+
+
+def sweep_empty_floor_seed_sql():
+    """Fix-round C2 fixture (guard 2, the empty-list floor) + a companion guard-1
+    (age floor) check, both provable in ONE run on this dev account without any
+    mocking: this account's OWN Telegram profile list is always a real, healthy
+    `{{"profiles":null,"status":"done"}}` (zero Telegram profiles registered) --
+    seeding a fake telegram-channel registry row (2h old, clears the age floor)
+    means its live set is genuinely empty while the registry holds >=1 row for that
+    channel, which must floor to skip_invalid_fetch, NOT retire. The second row
+    (10 minutes old) proves guard 1 on its own: it must be invisible to Alive
+    Registry entirely, regardless of channel or Wappi truth."""
+    return """insert into subscribers (app_user_id, plan, status, current_period_end, topup_balance, updated_at) values
+  ('probe12fix_g', 'trial', 'trialing', null, 0, now()),
+  ('probe12fix_ageguard', 'trial', 'trialing', null, 0, now())
+on conflict (app_user_id) do update set plan=excluded.plan, status=excluded.status, updated_at=now();
+
+insert into bot_profiles (profile_id, app_user_id, channel, created_at, deleted_at) values
+  ('probe12fix_g_tg_fake', 'probe12fix_g', 'telegram', now() - interval '2 hours', null),
+  ('probe12fix_ageguard_wa_fake', 'probe12fix_ageguard', 'whatsapp', now() - interval '10 minutes', null)
+on conflict (profile_id) do update set app_user_id=excluded.app_user_id, channel=excluded.channel, created_at=excluded.created_at, deleted_at=excluded.deleted_at;"""
+
+
+def sweep_empty_floor_cleanup_sql():
+    return """delete from bot_profiles where app_user_id in ('probe12fix_g', 'probe12fix_ageguard');
+delete from subscribers where app_user_id in ('probe12fix_g', 'probe12fix_ageguard');"""
 
 
 def sweep_candidates_readback_sql():
@@ -792,14 +904,17 @@ def run_sweep_fixture_helper():
     """Not a network probe -- see the Part 5 module docstring for why. Prints the
     seed/read-back/cleanup SQL plus the exact procedure, for pasting into a one-off
     n8n-mcp Manual-Trigger->Postgres workflow (or re-running by hand against the
-    Profile Lifecycle Sweep workflow itself)."""
+    Profile Lifecycle Sweep workflow itself). Covers the original a-f set AND the
+    fix-round additions (C1's 2-candidate multi-delete, C2's empty-list-floor)."""
     print(f"=== Profile Lifecycle Sweep ({SWEEP_WORKFLOW_ID}) -- fixture SQL, no HTTP probe exists ===\n")
     print("This workflow has no webhook. Verification procedure (see task-12-report.md for the")
     print("actual transcript, and the Part 5 module docstring for full context):\n")
     print("1. Seed fixtures via a one-off n8n-mcp Manual-Trigger->Postgres workflow:\n")
     print(sweep_seed_sql())
     print(f"\n2. Fire the sweep: n8n-mcp execute_workflow(workflowId={SWEEP_WORKFLOW_ID!r}, "
-          "executionMode='manual')")
+          "executionMode='manual') -- Sweep Config.dryRun must be false in the DRAFT for this")
+    print("   (manual mode tests the current draft, not the published/active version -- restore")
+    print("   dryRun=true and publish_workflow when done, do not leave a live draft mismatch).")
     print("   then get_execution(includeData=true) scoped to the relevant nodeNames -- see the")
     print("   report for the exact node names per branch and the expected per-fixture outcome.\n")
     print("3. Read back the outcome:\n")
@@ -807,6 +922,15 @@ def run_sweep_fixture_helper():
     print(f"\n4. Clean up (this repo's convention -- no probe rows left in a shared dev DB):\n")
     print(sweep_cleanup_sql())
     print(f"\nNote: {SWEEP_PROBE_PREFIX}* rows are the ONLY ones touched -- safe to run against a live DB.")
+    print("\n--- Fix-round additions (run separately, see docstrings for exact fixture reasoning) ---\n")
+    print("C1 multi-delete (needs 2 REAL throwaway Wappi profile_ids from profile/add first):")
+    print(sweep_multi_delete_seed_sql("<real_profile_id_a>", "<real_profile_id_b>"))
+    print()
+    print(sweep_multi_delete_cleanup_sql())
+    print("\nC2 empty-list floor + age guard (no preconditions beyond a live dev n8n):")
+    print(sweep_empty_floor_seed_sql())
+    print()
+    print(sweep_empty_floor_cleanup_sql())
     return 0
 
 
