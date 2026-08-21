@@ -1,0 +1,149 @@
+{
+  "name": "Get Usage",
+  "nodes": [
+    {
+      "id": "0d2e33b4-4aca-4af1-b274-b116743e96e5",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "GetUsage",
+        "authentication": "none",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "96d4806d-76ba-419e-a92d-9b9610e6493b"
+    },
+    {
+      "id": "8529c5ad-9cda-403f-93a5-f011525d2d51",
+      "name": "Read Usage",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        300,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "with x as (\n  select $1::text as id\n), sub as (\n  select s.plan, s.status, s.current_period_end, s.topup_balance\n  from x left join subscribers s on s.app_user_id = x.id\n), today as (\n  select (now() at time zone 'Asia/Almaty')::date d\n), usage_now as (\n  select count(*) used\n  from dialog_counts dc, x, today t\n  where dc.app_user_id = x.id\n    and date_trunc('month', dc.d) = date_trunc('month', t.d)\n), bots as (\n  select\n    count(*) filter (where bp.deleted_at is null) as channels_connected,\n    count(distinct bp.bot_key) filter (where bp.deleted_at is null and bp.bot_key is not null)\n      + count(*) filter (where bp.deleted_at is null and bp.bot_key is null) as bots_registered\n  from bot_profiles bp, x\n  where bp.app_user_id = x.id\n)\nselect\n  coalesce(sub.plan, 'trial') as plan,\n  coalesce(sub.status, 'trialing') as status,\n  sub.current_period_end as period_end,\n  coalesce(sub.topup_balance, 0) as topup_balance,\n  usage_now.used as used,\n  bots.channels_connected as channels_connected,\n  bots.bots_registered as bots_registered\nfrom sub, usage_now, bots;",
+        "options": {
+          "queryReplacement": "={{ [ $('Webhook').item.json.body.appUserId ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "6d037b85-b934-46ac-9210-30c0cc9b33b0",
+      "name": "Shape Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        580,
+        -140
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const row = $input.first().json;\nconst QUOTA = { trial: 150, start: 300, business: 1000, network: 3000, none: 0 };\nconst plan = row.plan || 'trial';\nreturn [{\n  json: {\n    success: true,\n    plan,\n    status: row.status || 'trialing',\n    quota: QUOTA[plan] ?? 0,\n    used: Number(row.used) || 0,\n    topupBalance: Number(row.topup_balance) || 0,\n    botsRegistered: Number(row.bots_registered) || 0,\n    channelsConnected: Number(row.channels_connected) || 0,\n    periodEnd: row.period_end ?? null,\n  },\n}];"
+      }
+    },
+    {
+      "id": "24967eec-f55f-4c5c-8627-783b2434e76d",
+      "name": "Respond 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        860,
+        -140
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "dd93ca22-a0da-4874-999a-911bf234d30f",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        580,
+        200
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"error\": \"usage_read_failed\" } }}",
+        "options": {
+          "responseCode": 500
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Read Usage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Usage": {
+      "main": [
+        [
+          {
+            "node": "Shape Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shape Response": {
+      "main": [
+        [
+          {
+            "node": "Respond 200",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "staticData": null,
+  "pinData": null,
+  "triggerCount": 1,
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  },
+  "id": "jtbssfzXbOxwTK4k",
+  "active": true
+}

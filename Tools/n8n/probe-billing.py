@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Smoke probes for the RevenueCat Events webhook mirror (Task 7), extended in Task 8
 with the channel-slot registration/backstop probe for CreateWhatsappWorkflow /
-CreateTelegramWorkflow.
+CreateTelegramWorkflow, and in Task 11 with a real value-asserting probe against the
+new /webhook/GetUsage read endpoint.
 
 ## Part 1 -- RevenueCat Events (Task 7)
 
@@ -54,6 +55,17 @@ a reusable helper returning the exact shipped Count Dialog SQL with profile_id/c
 substituted as literals, for pasting into a one-off Manual-Trigger -> Postgres
 verification workflow -- and a real-webhook CONNECTIVITY smoke test only (the quota
 decision itself cannot be asserted over plain HTTP; see that section for why).
+
+## Part 4 -- GetUsage read endpoint (Task 11, opt-in)
+
+Run with `--usage` (see that section below). Unlike Parts 1-3, this one gets REAL
+exact-value assertions over plain HTTP -- GetUsage is a pure unauthenticated read, so
+there's no Postgres credential or n8n-mcp access needed to check the numbers it
+returns. Two scenarios: an unknown appUserId (needs no precondition, always passes --
+asserts the trial-default shape, 200 not 500) and a seeded probe_user_11 (needs a
+precondition seeded via `usage_seed_sql()` through a one-off n8n-mcp workflow first --
+asserts an EXACT value set: plan/quota/used/topupBalance/channelsConnected/
+botsRegistered/periodEnd).
 """
 import argparse
 import json
@@ -478,6 +490,166 @@ def run_dialog_metering_connectivity_probe():
     return 0 if ok_all else 1
 
 
+# ---------------------------------------------------------------------------------
+# Part 4: GetUsage read endpoint (Task 11)
+# ---------------------------------------------------------------------------------
+#
+# GetUsage: Webhook (responseNode, authentication:none -- the appUserId IS the
+# secret, same v1 posture as every other webhook in this app) -> Postgres "Read
+# Usage" (row-safe: a fixed one-row CTE left-joined to subscribers/dialog_counts/
+# bot_profiles, so an unregistered appUserId still gets exactly one output row with
+# defaults instead of zero rows; onError:continueRegularOutput via
+# continueErrorOutput -> Respond Error 500) -> Code "Shape Response" (maps plan to
+# quota via the same {trial:150,start:300,business:1000,network:3000,none:0} map as
+# Tasks 8/9) -> Respond 200 JSON.
+#
+# Unlike Parts 1-3, this endpoint's response IS the thing being verified -- no
+# Postgres credential or n8n-mcp access needed, so the assertions below are REAL
+# exact-value checks, not connectivity-only smoke tests (Task 7's report flagged
+# this gap explicitly: "DB-state assertions become probe-native in Task 11").
+#
+# Scenario 1 (UNKNOWN_USER, always runs, no precondition): a random appUserId that
+# has never been seen. Asserts the row-safe default shape -- 200 (not 500), plan
+# 'trial', status 'trialing', quota 150, used 0, topupBalance 0, botsRegistered 0,
+# channelsConnected 0, periodEnd null.
+#
+# Scenario 2 (USAGE_PROBE_USER = "probe_user_11", needs a precondition, SKIPPED --
+# reported, not failed -- if the live plan isn't 'business' yet): asserts an EXACT
+# value set. PRECONDITION (same constraint as Parts 1/2 -- Postgres lives behind
+# n8n's own credential, unreachable from this plain script): seed via a one-off
+# Manual-Trigger -> Postgres workflow through the n8n-mcp tools, running
+# usage_seed_sql() verbatim. It creates, for app_user_id="probe_user_11":
+#   - subscribers: plan='business', status='active', topup_balance=500
+#   - bot_profiles: 2 ALIVE rows sharing bot_key='Bot0' (channel='whatsapp' and
+#     channel='telegram') + 1 DEAD row (deleted_at set, bot_key='BotDead') -- proves
+#     botsRegistered counts DISTINCT bot_key among alive rows (1, not 2) while
+#     channelsConnected counts alive ROWS (2, not 1)
+#   - dialog_counts: 7 rows dated in the CURRENT month + 2 rows dated in the
+#     PREVIOUS month -- proves `used` excludes last month (7, not 9)
+# Expected response: plan=business, status=active, quota=1000, used=7,
+# topupBalance=500, botsRegistered=1, channelsConnected=2, periodEnd non-null.
+# Clean up with usage_cleanup_sql() (also via a one-off n8n-mcp workflow) once done
+# -- this repo's convention is to not leave probe rows lying around in a shared dev
+# database (see Task 8/9 reports).
+#
+# The broken-query negative test (temporarily point Read Usage's query at a
+# nonexistent column, confirm HTTP 500, restore, confirm HTTP 200 again with
+# unchanged values) is NOT scriptable here either -- same class of gap as Part 3's
+# quota-decision check, it needs n8n-mcp write access (update_workflow +
+# publish_workflow) this plain script does not have. Done by hand via n8n-mcp for
+# this task; full transcript in task-11-report.md.
+USAGE_URL = BASE + "/webhook/GetUsage"
+USAGE_PROBE_USER = "probe_user_11"
+
+EXPECTED_UNKNOWN_USER_USAGE = {
+    "success": True, "plan": "trial", "status": "trialing", "quota": 150, "used": 0,
+    "topupBalance": 0, "botsRegistered": 0, "channelsConnected": 0, "periodEnd": None,
+}
+EXPECTED_USAGE_PROBE_USER = {
+    "success": True, "plan": "business", "status": "active", "quota": 1000, "used": 7,
+    "topupBalance": 500, "botsRegistered": 1, "channelsConnected": 2,
+}   # periodEnd asserted non-null separately (it's a real timestamp, not a fixed literal)
+
+
+def usage_seed_sql():
+    """Exact SQL used to seed the USAGE_PROBE_USER precondition (scenario 2) --
+    paste into a one-off Manual-Trigger -> Postgres workflow via n8n-mcp. Uses
+    fixed calendar-date literals (2026-08/2026-07) rather than now()-relative math
+    so the this-month/last-month split can't drift across a midnight boundary at
+    the moment it runs; safe as long as this is run before 2026-09-01."""
+    return """insert into subscribers (app_user_id, plan, status, topup_balance, current_period_end, updated_at)
+values ('probe_user_11', 'business', 'active', 500, now() + interval '30 days', now())
+on conflict (app_user_id) do update set
+  plan = excluded.plan, status = excluded.status, topup_balance = excluded.topup_balance,
+  current_period_end = excluded.current_period_end, updated_at = now();
+
+insert into bot_profiles (profile_id, app_user_id, channel, bot_key, deleted_at)
+values
+  ('probe11_wa_profile', 'probe_user_11', 'whatsapp', 'Bot0', null),
+  ('probe11_tg_profile', 'probe_user_11', 'telegram', 'Bot0', null),
+  ('probe11_dead_profile', 'probe_user_11', 'whatsapp', 'BotDead', now())
+on conflict (profile_id) do update set
+  app_user_id = excluded.app_user_id, channel = excluded.channel, bot_key = excluded.bot_key, deleted_at = excluded.deleted_at;
+
+insert into dialog_counts (app_user_id, chat_id, d)
+values
+  ('probe_user_11', 'probe11_chat_1', '2026-08-01'),
+  ('probe_user_11', 'probe11_chat_2', '2026-08-03'),
+  ('probe_user_11', 'probe11_chat_3', '2026-08-06'),
+  ('probe_user_11', 'probe11_chat_4', '2026-08-09'),
+  ('probe_user_11', 'probe11_chat_5', '2026-08-12'),
+  ('probe_user_11', 'probe11_chat_6', '2026-08-15'),
+  ('probe_user_11', 'probe11_chat_7', '2026-08-18'),
+  ('probe_user_11', 'probe11_chat_8', '2026-07-05'),
+  ('probe_user_11', 'probe11_chat_9', '2026-07-20')
+on conflict (app_user_id, chat_id, d) do nothing;"""
+
+
+def usage_cleanup_sql():
+    """Deletes everything usage_seed_sql() created -- paste into the same one-off
+    workflow once verification is done."""
+    return """delete from dialog_counts where app_user_id = 'probe_user_11';
+delete from bot_profiles where app_user_id = 'probe_user_11';
+delete from subscribers where app_user_id = 'probe_user_11';"""
+
+
+def fetch_usage(app_user_id, timeout=15):
+    """POST {"appUserId": ...} to GetUsage. Returns (status, parsed_json_or_None)."""
+    body = json.dumps({"appUserId": app_user_id}).encode()
+    req = urllib.request.Request(USAGE_URL, data=body, method="POST")
+    req.add_header("Content-Type", "application/json")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            status, raw = resp.status, resp.read().decode()
+    except urllib.error.HTTPError as e:
+        status, raw = e.code, e.read().decode()
+    except urllib.error.URLError as e:
+        return None, str(e.reason)
+    try:
+        return status, json.loads(raw)
+    except json.JSONDecodeError:
+        return status, raw
+
+
+def run_usage_probe():
+    ok_all = True
+
+    print(f"=== Scenario 1: unknown appUserId -- always-on default-shape assert against {USAGE_URL} ===")
+    unknown_id = f"probe_conn_unknown_{uuid.uuid4().hex[:10]}"
+    status, body = fetch_usage(unknown_id)
+    print(f"HTTP {status} -- {body}")
+    if status == 200 and isinstance(body, dict):
+        mismatches = {k: (v, body.get(k)) for k, v in EXPECTED_UNKNOWN_USER_USAGE.items() if body.get(k) != v}
+        scenario1_ok = not mismatches
+    else:
+        mismatches = {"<http>": (200, status)}
+        scenario1_ok = False
+    print(f"[{'OK' if scenario1_ok else 'FAIL'}] unknown-user default shape matches exactly: {scenario1_ok}"
+          + (f" -- mismatches: {mismatches}" if mismatches else ""))
+    ok_all = ok_all and scenario1_ok
+
+    print(f"\n=== Scenario 2: seeded {USAGE_PROBE_USER!r} -- exact-value assert ===")
+    status, body = fetch_usage(USAGE_PROBE_USER)
+    print(f"HTTP {status} -- {body}")
+    if status == 200 and isinstance(body, dict) and body.get("plan") == EXPECTED_USAGE_PROBE_USER["plan"]:
+        mismatches = {k: (v, body.get(k)) for k, v in EXPECTED_USAGE_PROBE_USER.items() if body.get(k) != v}
+        if not body.get("periodEnd"):
+            mismatches["periodEnd"] = ("<non-null>", body.get("periodEnd"))
+        scenario2_ok = not mismatches
+        print(f"[{'OK' if scenario2_ok else 'FAIL'}] exact value set matches: {scenario2_ok}"
+              + (f" -- mismatches: {mismatches}" if mismatches else ""))
+        ok_all = ok_all and scenario2_ok
+    else:
+        print(f"[SKIP] {USAGE_PROBE_USER!r} does not currently show plan={EXPECTED_USAGE_PROBE_USER['plan']!r} "
+              f"(HTTP {status}, plan={body.get('plan') if isinstance(body, dict) else '?'!r}) -- "
+              f"seed the precondition first via usage_seed_sql() through a one-off n8n-mcp workflow, "
+              f"see the Part 4 module docstring. NOT counted as a failure.")
+
+    print("\nThe broken-query negative test (bad column -> 500, restore -> 200) needs n8n-mcp write")
+    print("access this script does not have -- done by hand; transcript in task-11-report.md.")
+    return 0 if ok_all else 1
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument(
@@ -497,6 +669,14 @@ def main():
              "module docstring's Part 3 section first -- this does NOT assert the "
              "quota decision itself (see why); use dialog_metering_query() for a "
              "real DB-level re-check via a one-off n8n-mcp workflow.")
+    ap.add_argument(
+        "--usage", action="store_true",
+        help="Run the Task 11 GetUsage EXACT-VALUE probe (2 scenarios: unknown "
+             "appUserId default shape, seeded probe_user_11 exact values) instead of "
+             "the default RevenueCat Events probes. Read the module docstring's "
+             "Part 4 section first -- scenario 2 needs probe_user_11 seeded via "
+             "usage_seed_sql() through a one-off n8n-mcp workflow first, and is "
+             "SKIPPED (not failed) if that precondition isn't live.")
     args = ap.parse_args()
 
     if args.channel_slot_backstop:
@@ -504,6 +684,9 @@ def main():
 
     if args.dialog_metering:
         sys.exit(run_dialog_metering_connectivity_probe())
+
+    if args.usage:
+        sys.exit(run_usage_probe())
 
     if not SECRET:
         print("FAIL: RC_WEBHOOK_SECRET is not set -- refusing to run (probes b-e need it "

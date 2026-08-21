@@ -31,6 +31,12 @@ public class BotsPage : MonoBehaviour
         // there are zero bots, auto-opens the Add-Bot overlay.
         // IN-06: no isActiveAndEnabled guard — it is always true inside OnEnable.
         Invoke(nameof(RefreshEmptyState), 0f);
+
+        // Task 11 usage-snapshot fetch trigger #2 (boot is #1, in
+        // Manager.PreloadSecretsThenInitBilling): the Bots tab becoming visible. Best-effort —
+        // UsageClient.FetchRoutine() already swallows its own errors (non-200/garbage keeps the
+        // cache, logs a warning), so no try/catch needed here.
+        StartCoroutine(UsageClient.FetchRoutine());
     }
 
     void OnDisable()

@@ -285,6 +285,21 @@ public partial class Manager : MonoBehaviour
         {
             Debug.LogError($"[Manager] BillingService.Initialize() threw — continuing without billing: {e}");
         }
+
+        // Boot-time usage snapshot fetch (Task 11) — best-effort, one shot. Must never brick
+        // boot behind LoadingPanel, so the StartCoroutine call itself (which runs
+        // UsageClient.FetchRoutine()'s body synchronously up to its first yield) is guarded
+        // the same way Initialize() is above. The other trigger is BotsPage.OnEnable (fires
+        // whenever the Bots tab becomes visible); a screen-open-time fetch for the usage UI
+        // itself lands with Task 14c.
+        try
+        {
+            StartCoroutine(UsageClient.FetchRoutine());
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[Manager] UsageClient.FetchRoutine() threw — continuing without a usage snapshot: {e}");
+        }
     }
 
     public void Start()
