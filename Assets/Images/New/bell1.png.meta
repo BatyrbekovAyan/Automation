@@ -1,15 +1,15 @@
 fileFormatVersion: 2
-guid: 84cb5ef8f390447ca9cac55a202a1fa8
+guid: 8c84648c00cdd458ca275be55a501964
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -6698567728355539575
-    second: plus copy 4_0
+      213: 2700514458052006739
+    second: bell1_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
     mipMapMode: 0
-    enableMipMap: 0
+    enableMipMap: 1
     sRGBTexture: 1
     linearTexture: 0
     fadeOut: 0
@@ -126,13 +126,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: plus copy 4_0
+      name: bell1_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 512
-        height: 512
+        width: 415
+        height: 490
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -141,8 +141,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 985097f3428e903a0800000000000000
-      internalID: -6698567728355539575
+      spriteID: 3531ff677972a7520800000000000000
+      internalID: 2700514458052006739
       vertices: []
       indices: 
       edges: []
@@ -161,7 +161,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      plus copy 4_0: -6698567728355539575
+      bell1_0: 2700514458052006739
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

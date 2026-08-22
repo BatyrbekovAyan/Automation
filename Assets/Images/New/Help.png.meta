@@ -1,15 +1,15 @@
 fileFormatVersion: 2
-guid: 8e0555d09ae014a64a9964bed5c054bf
+guid: 278cf047cb3fa4ea0aecb9b35f3cbd26
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 1409830513793316728
-    second: question_0
+      213: -5584967292902616453
+    second: Help 1_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
     mipMapMode: 0
-    enableMipMap: 0
+    enableMipMap: 1
     sRGBTexture: 1
     linearTexture: 0
     fadeOut: 0
@@ -126,7 +126,7 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: question_0
+      name: Help 1_0
       rect:
         serializedVersion: 2
         x: 0
@@ -141,8 +141,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 8773828f169b09310800000000000000
-      internalID: 1409830513793316728
+      spriteID: b725d5866d53e72b0800000000000000
+      internalID: -5584967292902616453
       vertices: []
       indices: 
       edges: []
@@ -161,7 +161,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      question_0: 1409830513793316728
+      Help 1_0: -5584967292902616453
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
