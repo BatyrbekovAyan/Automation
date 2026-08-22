@@ -176,6 +176,14 @@ public class PaywallController : MonoBehaviour
     {
         EnsureInit();
 
+        bool wasActive = gameObject.activeSelf;
+        bool wasSettledOpen = wasActive && !_closing;
+
+        // Kill() defaults to complete:false, so a mid-flight exit tween's OnComplete — which
+        // would SetActive(false) — can never land on the screen we are re-opening.
+        _activeSlide?.Kill();
+        _closing = false;
+
         _receiptVariant = trigger == PaywallTrigger.TrialExpired;
         _notice = "";
         _purchased = BillingService.PurchasedTier;
@@ -183,15 +191,19 @@ public class PaywallController : MonoBehaviour
         _selected = _purchased != PlanTier.None ? _purchased : PaywallRows.Recommended;
         _period = PaywallPeriod.Month;
 
-        bool wasOpen = IsOpen && !_closing;
-        _closing = false;
-        gameObject.SetActive(true);   // OnEnable renders
-        if (wasOpen) Render();        // re-request while already open: refresh in place
+        gameObject.SetActive(true);   // a fresh activation renders through OnEnable…
+        // …but OnEnable never fires when the object was ALREADY active — including the 0.25s
+        // window in which the exit tween has not yet deactivated us. Every state field above
+        // was just reassigned, so without this a TrialExpired request landing on a
+        // just-dismissed Browse paywall would slide back in wearing the Browse header and no
+        // receipt.
+        if (wasActive) Render();
 
         if (scroll != null) scroll.verticalNormalizedPosition = 1f;
 
-        _activeSlide?.Kill();
-        if (wasOpen) return;          // don't restart the slide on a re-request
+        // A re-request while genuinely settled on screen refreshes in place; a re-request
+        // mid-close falls through and slides back in from wherever the exit tween left us.
+        if (wasSettledOpen) return;
         _rt.anchoredPosition = new Vector2(CanvasWidth(), _rt.anchoredPosition.y);
         _activeSlide = _rt.DOAnchorPosX(0f, SlideInDuration).SetEase(Ease.OutCubic);
     }
@@ -270,6 +282,7 @@ public class PaywallController : MonoBehaviour
                 return;
             }
             Debug.LogWarning($"[PaywallController] Purchase of {sku} failed: {reason}");
+            // TODO(14b): move to PaywallRows/PaywallCopy once the owner signs off the wording.
             _notice = reason == "user_cancelled" ? "" : "Не удалось оформить подписку. Попробуйте ещё раз.";
             Render();
         });
@@ -289,6 +302,7 @@ public class PaywallController : MonoBehaviour
                 Close();
                 return;
             }
+            // TODO(14b): move to PaywallRows/PaywallCopy once the owner signs off the wording.
             _notice = ok ? "Активных покупок не найдено" : "Не удалось восстановить покупки";
             Render();
         });
@@ -363,6 +377,7 @@ public class PaywallController : MonoBehaviour
 
     // ── Value receipt ────────────────────────────────────────────────────────
 
+    // TODO(14b): move to PaywallRows/PaywallCopy — user-facing RU copy belongs in the pinned seam.
     private static readonly string[] ReceiptLabels =
     {
         "Диалогов обработано",

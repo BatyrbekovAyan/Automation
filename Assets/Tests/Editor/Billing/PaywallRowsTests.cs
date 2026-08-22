@@ -134,6 +134,8 @@ public class PaywallRowsTests
     [TestCase(PlanTier.Start, PaywallPeriod.Month, "sub.start.month")]
     [TestCase(PlanTier.Start, PaywallPeriod.Year, "sub.start.year")]
     [TestCase(PlanTier.Business, PaywallPeriod.Month, "sub.business.month")]
+    [TestCase(PlanTier.Business, PaywallPeriod.Year, "sub.business.year")]
+    [TestCase(PlanTier.Network, PaywallPeriod.Month, "sub.network.month")]
     [TestCase(PlanTier.Network, PaywallPeriod.Year, "sub.network.year")]
     public void Sku_for_selection(PlanTier tier, PaywallPeriod period, string sku)
         => Assert.AreEqual(sku, PaywallRows.Sku(tier, period));

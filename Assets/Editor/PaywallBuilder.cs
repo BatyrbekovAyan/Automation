@@ -33,9 +33,13 @@ public static class PaywallBuilder
     private const float CardPadding = 48f;
     private const float CardGap = 40f;
     private const float RingWidth = 6f;
-    private const float ToggleHeight = 96f;
+    // 132 = the house touch-target floor (44dp x 3). The 6u track padding makes each
+    // segment 120 tall, still at/above the floor. The «12 за 10» ribbon stays 48.
+    private const float ToggleHeight = 132f;
     private const float CtaHeight = 132f;
-    private const float BottomBarHeight = 420f;
+    // Cta 132 + FinePrint 40 + Restore 120 + 2x20 spacing + 32 top + 96 bottom (home-bar
+    // safe area) = 460. Re-derive this if any of those change, or the bar clips its own rows.
+    private const float BottomBarHeight = 460f;
     private const float SwipeStripWidth = 150f;
 
     // Fonts by GUID (the default font's weight table is empty — always assign explicitly).
@@ -415,7 +419,7 @@ public static class PaywallBuilder
         SetFixedSize(crossCheck, 36f, 36f);
         AddIconImage(crossCheck, _tick, ThemeRole.PositiveInk);
         var crossLabelGo = NewChild(crossRow, "Label", out _);
-        var crossLabel = AddText(crossLabelGo, PaywallRows.CrossBotLine, 34f, _regular, ThemeRole.InkSecondary);
+        var crossLabel = AddText(crossLabelGo, PaywallRows.CrossBotLine, 36f, _regular, ThemeRole.InkSecondary);
         crossLabel.alignment = TextAlignmentOptions.MidlineLeft;
         var crossLe = crossLabelGo.AddComponent<LayoutElement>();
         crossLe.minWidth = 0f;
@@ -503,6 +507,12 @@ public static class PaywallBuilder
         AddRounded(ctaGo, CardRadius);
         cta = ctaGo.AddComponent<Button>();
         cta.targetGraphic = ctaBg;
+        // DELIBERATE exception to this screen's Transition.None house default: these two are the
+        // only ACTIONS here (everything else is selection, which shows its own state), and both
+        // go non-interactable while a purchase/restore is in flight — ColorTint is what makes
+        // that dim visible. It works because each one's targetGraphic is a VISIBLE graphic: the
+        // CTA's opaque fill here, and the label (not the alpha-0 hit area) on Restore below.
+        cta.transition = Selectable.Transition.ColorTint;
         var ctaLabelGo = NewChild(ctaGo, "Label", out var ctaLabelRt);
         StretchFill(ctaLabelRt);
         ctaLabel = AddText(ctaLabelGo, PaywallCopy.TrialCta(), 44f, _semibold, ThemeRole.AccentOnFill);
@@ -514,17 +524,21 @@ public static class PaywallBuilder
         finePrint.alignment = TextAlignmentOptions.Center;
 
         var restoreGo = NewChild(bar, "Restore", out _);
-        SetPreferredHeight(restoreGo, 80f);
+        SetPreferredHeight(restoreGo, 120f);   // house touch-target floor (44dp x 3)
         var restoreHit = restoreGo.AddComponent<Image>();
         restoreHit.color = new Color(0f, 0f, 0f, 0f);
         restoreHit.raycastTarget = true;
         restore = restoreGo.AddComponent<Button>();
-        restore.targetGraphic = restoreHit;
-        restore.transition = Selectable.Transition.None;
         var restoreLabelGo = NewChild(restoreGo, "Label", out var restoreLabelRt);
         StretchFill(restoreLabelRt);
         restoreLabel = AddText(restoreLabelGo, PaywallRows.RestoreLabel, 36f, _semibold, ThemeRole.AccentText);
         restoreLabel.alignment = TextAlignmentOptions.Center;
+        // targetGraphic is the LABEL, not the alpha-0 hit area: ColorTint multiplies into the
+        // target's colour, so tinting a fully transparent graphic would produce no feedback at
+        // all. The hit Image stays the raycast surface (full-row tap target); the label carries
+        // the press + disabled look. Same reasoning as the CTA above.
+        restore.targetGraphic = restoreLabel;
+        restore.transition = Selectable.Transition.ColorTint;
 
         return bar;
     }
