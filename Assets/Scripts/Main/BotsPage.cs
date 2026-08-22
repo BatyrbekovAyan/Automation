@@ -46,7 +46,8 @@ public class BotsPage : MonoBehaviour
 
     public void RefreshEmptyState()
     {
-        bool hasBots = botsParent != null && botsParent.childCount > 0;
+        int liveBots = botsParent != null ? botsParent.childCount : 0;
+        bool hasBots = liveBots > 0;
         if (emptyState != null) emptyState.SetActive(!hasBots);
 
         // D1 authority + return-to-Bots refresh: the checklist mirrors the live bot count.
@@ -72,10 +73,14 @@ public class BotsPage : MonoBehaviour
             {
                 onboardingScreen.SetActive(true);   // carousel instead of the auto-open
             }
-            else
+            else if (BotsPageRows.ShouldAutoOpenWizard(EntitlementGate.CurrentTier, liveBots))
             {
                 StartNewBot();                       // existing auto-open (idempotent, unchanged)
             }
+            // Nothing else: at PlanTier.None the auto-open would refuse, and a refusal raises the
+            // limit sheet — so merely ARRIVING here (tab switch, wizard back-out) would throw a
+            // modal every time. The empty state above is already showing; its CTA is a real tap,
+            // and THAT still refuses into the sheet. Owner default: no modal on auto-open.
         }
     }
 

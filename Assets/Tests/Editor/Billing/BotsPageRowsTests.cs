@@ -247,6 +247,52 @@ public class BotsPageRowsTests
         Assert.AreEqual("Добавить бота", BotsPageRows.AddBotTitle);
     }
 
+    // ── Auto-open gate (Task 14d) ────────────────────────────────────────────
+
+    [TestCase(PlanTier.Trial)]
+    [TestCase(PlanTier.Start)]
+    [TestCase(PlanTier.Business)]
+    [TestCase(PlanTier.Network)]
+    public void A_plan_with_room_still_auto_opens_the_wizard_at_zero_bots(PlanTier tier)
+    {
+        // The zero-bots happy path, unchanged: every tier with MaxBots > 0 keeps opening the
+        // first-bot wizard on arrival.
+        Assert.IsTrue(BotsPageRows.ShouldAutoOpenWizard(tier, 0));
+    }
+
+    [Test]
+    public void No_subscription_never_auto_opens_a_wizard_it_would_refuse()
+    {
+        // PlanTier.None allows 0 bots, so the auto-open would refuse — and a refusal now raises
+        // the limit sheet, which would mean a modal on every arrival at «Боты». The empty state
+        // keeps the screen; its CTA is the tap that earns the sheet.
+        Assert.IsFalse(BotsPageRows.ShouldAutoOpenWizard(PlanTier.None, 0));
+    }
+
+    [TestCase(PlanTier.Trial, 1)]
+    [TestCase(PlanTier.Business, 2)]
+    [TestCase(PlanTier.Network, 5)]
+    [TestCase(PlanTier.None, 3)]
+    public void A_page_that_already_has_bots_never_auto_opens(PlanTier tier, int liveBots)
+    {
+        // Belt and braces: the call site only reaches this inside !hasBots, but the rule reads
+        // «no bots AND room», not «room».
+        Assert.IsFalse(BotsPageRows.ShouldAutoOpenWizard(tier, liveBots));
+    }
+
+    [TestCase(PlanTier.None)]
+    [TestCase(PlanTier.Trial)]
+    [TestCase(PlanTier.Start)]
+    [TestCase(PlanTier.Business)]
+    [TestCase(PlanTier.Network)]
+    public void The_auto_open_gate_agrees_with_the_bot_gate_at_zero_bots(PlanTier tier)
+    {
+        // The auto-open must never disagree with what StartNewBot would do — that disagreement
+        // IS the unwanted modal (auto-open true, gate false).
+        Assert.AreEqual(EntitlementPolicy.CanCreateBot(tier, 0),
+                        BotsPageRows.ShouldAutoOpenWizard(tier, 0));
+    }
+
     // The UsageClient in-flight guard moved to UsageClientTests when Task 14d gave it a
     // staleness arm — it was never about this screen's rows.
 }

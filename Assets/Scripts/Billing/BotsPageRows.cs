@@ -133,6 +133,24 @@ public static class BotsPageRows
     // ── «+ бот» card ─────────────────────────────────────────────────────────
 
     /// <summary>
+    /// Whether the zero-bot chokepoint (<c>BotsPage.RefreshEmptyState</c>) may AUTO-open the
+    /// add-bot wizard — i.e. only when there is nothing on the page yet AND the plan has a slot
+    /// to open it for.
+    ///
+    /// The second half is the whole point: at <see cref="PlanTier.None"/> (trial spent, nothing
+    /// bought) the auto-open would refuse, and a refusal now raises the limit sheet — so simply
+    /// ARRIVING on «Боты» would throw a modal, on every tab switch and every wizard back-out.
+    /// A modal nobody asked for is not feedback. The empty state still renders with its CTA, and
+    /// a user TAP on that CTA still refuses and still gets the sheet, which is where the sheet
+    /// belongs: answering an action, not an arrival.
+    ///
+    /// Every tier with room (Trial 3, Старт 1, Бизнес 3, Сеть 5) keeps auto-opening exactly as
+    /// before.
+    /// </summary>
+    public static bool ShouldAutoOpenWizard(PlanTier effectiveTier, int liveBots)
+        => liveBots == 0 && EntitlementPolicy.RemainingBots(effectiveTier, liveBots) > 0;
+
+    /// <summary>
     /// «Ещё 2 бота в тарифе», or <see cref="BotLimitSubtext"/> once the plan is full.
     ///
     /// The count comes from <see cref="EntitlementPolicy.RemainingBots"/> — the same

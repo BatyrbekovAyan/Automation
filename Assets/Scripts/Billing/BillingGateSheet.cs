@@ -53,7 +53,11 @@ public static class BillingGateSheet
     private const float TitleSize = 44f;          // H3
 
     private const float BodyTop = 156f;
-    /// <summary>Three lines at 38 (~144) — the longest live body is two, so a reword has room.</summary>
+    /// <summary>
+    /// Three lines at 38 (~144) — the longest live body is two, so a reword has one line of
+    /// headroom. Past that it overflows toward the CTA rather than clipping (unmasked sheet,
+    /// same reason the title carries Ellipsis): re-derive SheetHeight if the copy grows.
+    /// </summary>
     private const float BodyHeight = 160f;
     private const float BodySize = 38f;           // Body2
 
@@ -87,6 +91,11 @@ public static class BillingGateSheet
     private static bool hiding;
     private static Action pending;
 
+    // What the labels are actually WEARING. The sheet is built once and lives for the whole
+    // session, so a first Show that caught the paywall before PaywallBuilder had stamped its
+    // labels (or before Screen_Paywall awoke) would otherwise bake TMP's fallback in forever.
+    private static TMP_FontAsset stampedTitleFont, stampedBodyFont;
+
     /// <summary>
     /// Statics survive a domain-reload-free play-mode enter, so clear the ones that would
     /// otherwise point at last session's objects/tweens. The GameObject reference is
@@ -101,6 +110,8 @@ public static class BillingGateSheet
         fade = null;
         hiding = false;
         pending = null;
+        stampedTitleFont = null;
+        stampedBodyFont = null;
     }
 
     // ── Show / hide ──────────────────────────────────────────────────────────
@@ -119,6 +130,7 @@ public static class BillingGateSheet
     {
         EnsureBuilt(titleFont, bodyFont);
         if (panel == null) return;
+        ApplyFonts(titleFont, bodyFont);
 
         pending = onSeePlans;
 
@@ -170,6 +182,16 @@ public static class BillingGateSheet
             return;
         }
 
+        // Already leaving. The panel stays ACTIVE for the whole 0.2s exit and the scrim keeps
+        // raycasting (a CanvasGroup alpha fade does not stop hit-testing), so a second tap in
+        // that window re-enters here — and the Kill() below, being complete:false, would drop
+        // the first call's OnComplete and with it the pending action. That is «tapped
+        // «Посмотреть тарифы», paywall never opened, tap silently swallowed». Returning
+        // instead lets the first exit finish and fire what it promised.
+        // Safe against every re-entry shape: Show() clears `hiding` before it re-travels, and
+        // OnPrimary() takes `pending` before calling in, so nothing can be lost by refusing.
+        if (hiding) return;
+
         hiding = true;
         slide?.Kill();
         fade?.Kill();
@@ -184,6 +206,28 @@ public static class BillingGateSheet
                 after?.Invoke();
             });
         fade = scrimGroup.DOFade(0f, ScrimFadeSeconds).SetLink(panel);
+    }
+
+    /// <summary>
+    /// Re-stamps the labels whenever the caller offers a font the sheet is not already
+    /// wearing — which is how a null-font first build heals on the next Show. A no-op on every
+    /// ordinary call (same assets, reference-equal).
+    /// </summary>
+    private static void ApplyFonts(TMP_FontAsset titleFont, TMP_FontAsset bodyFont)
+    {
+        if (titleFont != null && stampedTitleFont != titleFont)
+        {
+            stampedTitleFont = titleFont;
+            if (titleTmp != null) titleTmp.font = titleFont;
+            if (primaryLabel != null) primaryLabel.font = titleFont;
+        }
+
+        if (bodyFont != null && stampedBodyFont != bodyFont)
+        {
+            stampedBodyFont = bodyFont;
+            if (bodyTmp != null) bodyTmp.font = bodyFont;
+            if (secondaryLabel != null) secondaryLabel.font = bodyFont;
+        }
     }
 
     // ── Paint ────────────────────────────────────────────────────────────────
@@ -235,6 +279,9 @@ public static class BillingGateSheet
 
         BuildScrim();
         BuildSheet(titleFont, bodyFont);
+
+        stampedTitleFont = titleFont;
+        stampedBodyFont = bodyFont;
 
         // Hidden state is authored, not tweened into: the very first Show travels from here.
         sheetRect.anchoredPosition = new Vector2(0f, -SheetHeight);
@@ -289,6 +336,11 @@ public static class BillingGateSheet
         grabRounded.Refresh();
 
         titleTmp = BuildTmp(go.transform, "Title", TitleSize, titleFont);
+        // The sheet is a fixed 780 with no mask of its own, so an over-long title would neither
+        // grow the sheet nor be clipped by it — it would simply draw past the rounded edges and
+        // over the body. Both live titles fit one line at 44 in the 936-unit column; anything
+        // longer truncates visibly, which is the failure that gets noticed and fixed.
+        titleTmp.overflowMode = TextOverflowModes.Ellipsis;
         SetTopStretch((RectTransform)titleTmp.transform, TitleTop, TitleHeight, SideInset);
 
         bodyTmp = BuildTmp(go.transform, "Body", BodySize, bodyFont);
