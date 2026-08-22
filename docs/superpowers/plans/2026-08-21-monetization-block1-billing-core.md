@@ -649,6 +649,17 @@ where bp.deleted_at is null
 **Files:**
 - Modify: `Assets/Scripts/Main/Manager.cs` (auth-success точка), `PaywallController.cs`
 
+**Разделение Task 15 (2026-08-22, контроллер):** ключи/продукты сторов (Task 0) блокируют только sandbox-покупку. Поэтому:
+
+**15a — кодовая связка (сейчас, без ключей):**
+- `TrialLedger.StartIfNeeded()` в момент ПЕРВОЙ успешной авторизации канала (WhatsApp или Telegram — та же точка, где сегодня включается success-оверлей; и в мастере, и в настройках). Ре-верификация: пилюля триала на «Ботах» наконец рендерится без ручного PlayerPrefs.
+- На старте приложения: `CurrentTier == None && TrialLedger.IsExpired` → `RequestPaywall(TrialExpired)` (вариант «чек ценности»); один раз за запуск, после инициализации биллинга (в той же Preload-цепочке).
+- **Годовой период (решение (а))**: RevenueCat-маппер сохраняет `product_id` в `subscribers` (миграция: колонка `product_id text`), GetUsage отдаёт `interval: "month"|"year"|null` (по суффиксу SKU `.month`/`.year`), `UsageSnapshot` получает поле, `SubscriptionPageRows.StatusLine` показывает годовую цену/«в год» при `year`. Probe-ассерт на оба интервала.
+- Хелпер `Tools/n8n/set-revenuecat-webhook-url.md` (или в README): как пере-указать URL вебхука в RevenueCat после ротации туннеля; текущий туннель фиксируется в отчёте.
+- Правило пробы/гейтов прежнее: value-level ассерты, каноника без dev-значений, publish после update.
+
+**15b — запуск на устройстве (после Task 0):** sandbox-покупка Старт/апгрейд Бизнес/restore/топ-ап на iPhone; включение `dryRun=false` у свипа (ПЕРЕД этим: контракт пагинации `profile/all/get` или пропорциональный кап retire); WA-метеринг live-ассерты (под квотой → AI Agent; сверх → нет отправки); RevenueCat webhook URL на актуальный туннель; фактические стор-цены в спеку §10.2; ре-проверка пилюли триала на устройстве; Android: EDM4U/зависимости RevenueCat при первой Android-сборке.
+
 - [ ] `TrialLedger.StartIfNeeded()` в момент первой успешной авторизации канала (существующий success-обработчик в Manager/BotSettings.Auth — та же точка, где сегодня включается success-оверлей).
 - [ ] На старте приложения: `if (EntitlementGate.CurrentTier == PlanTier.None && TrialLedger.IsExpired)` → paywall (TrialExpired, вариант «чек ценности»).
 - [ ] **WA metering exit criteria (Task 9 review — WhatsApp template had no live run; fix is byte-identical to TG):** under-quota WA message reaches `AI Agent` (NOT «Ask to Send Text»); over-quota new chat produces no send.
