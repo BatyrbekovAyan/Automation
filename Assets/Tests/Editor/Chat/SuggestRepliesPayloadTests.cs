@@ -37,6 +37,41 @@ public class SuggestRepliesPayloadTests
             businessTypeId, businessName, ownerPrompt, catalog, msgs,
             businessKnowledge, now, pickStats));
 
+    // --- window direction (the composed VALUE gate, 2026-08-20) --------------
+    // Every other test here hand-feeds an already-ascending list, so they pin the builder's
+    // contract and not its PRODUCER. This one starts from the shape ChatManager actually holds —
+    // _activeChatCache, NEWEST-FIRST — runs it through the real window seam, and asserts on the
+    // emitted JSON. It fails on the pre-fix accessor, which took the oldest 24 and reversed them.
+    [Test]
+    public void Messages_FromNewestFirstCache_EndOnTheNewestMessage()
+    {
+        // 30 newest-first, so the 24-message ceiling actually has to drop something.
+        var cache = new List<MessageViewModel>();
+        for (int i = 30; i >= 1; i--)
+            cache.Add(new MessageViewModel
+            {
+                text = "m" + i, timestamp = i, messageId = "id" + i,
+                type = MessageType.Chat, isIncoming = i == 30,
+            });
+
+        var window = RecentMessageWindow.TakeNewest(cache, 24);
+        var messages = (JArray)Build(Req(), window)["messages"];
+
+        Assert.AreEqual(24, messages.Count);
+        // The element the server's backward run-walk reads first.
+        Assert.AreEqual("m30", (string)messages[messages.Count - 1]["text"],
+            "the newest message must be LAST — the server walks back from the array's end");
+        Assert.AreEqual("client", (string)messages[messages.Count - 1]["role"],
+            "an unanswered client message must present as the trailing run, or the model abstains");
+        Assert.AreEqual("m7", (string)messages[0]["text"], "the window starts 24 back from the newest");
+        Assert.IsFalse(messages.Any(m => (string)m["text"] == "m1"),
+            "the oldest end must be dropped — it used to be ALL the payload carried");
+
+        var timestamps = messages.Select(m => (long)m["ts"]).ToList();
+        CollectionAssert.AreEqual(timestamps.OrderBy(t => t).ToList(), timestamps,
+            "wire order must be non-decreasing in time");
+    }
+
     // --- version + request passthrough ---------------------------------------
 
     [Test]

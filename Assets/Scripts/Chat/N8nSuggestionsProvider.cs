@@ -236,7 +236,7 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
         return JsonConvert.SerializeObject(dto);
     }
 
-    // Take the LAST 12, preserve oldest->newest, map role + media placeholder + clamp each text.
+    // Take the last MaxMessages (24), preserve oldest->newest, map role + media placeholder + clamp each text.
     private static List<WireMessage> ToWireMessages(List<MessageViewModel> src)
     {
         var wire = new List<WireMessage>();

@@ -45,6 +45,11 @@ public class SuggestionsController : MonoBehaviour
     private float _yieldStartedAt;
     private bool _kbWasVisible;
     private bool _pendingShow;
+    // The chat-open REQUEST, parked beside the parked show (2026-08-20): set by
+    // RestoreForActiveChat (which runs before any history exists), landed by Update at
+    // SlotOpenAllowed via SuggestionOpenRequestPolicy, cleared at the same four lifecycle
+    // sites as the debounce window plus by ANY direct IssueRequest (which supersedes it).
+    private bool _pendingOpenRequest;
     private float _slotCanvasPx;
     private Tweener _insetTween;       // slot open/close inset animation (handoffs never tween — they hold)
 
@@ -264,6 +269,7 @@ public class SuggestionsController : MonoBehaviour
         _slotState = SuggestionSlotState.Collapsed;
         _yieldingToKeyboard = false;
         _pendingShow = false;
+        _pendingOpenRequest = false;     // a parked open request must not fire into the next chat
         _chatOpenSettledAt = -1f;        // the next chat opens with the clock unset — never pre-settled
         _draggingSlot = false;
         _pullDown.Reset();               // a pull-down cut short by the chat closing
@@ -290,6 +296,7 @@ public class SuggestionsController : MonoBehaviour
         _debounce.Cancel();                                  // bot switch: drop a window pending from the previous bot's chat (BATCH-03)
         _pendingIncomingText = null;
         _answeredIdle = false;
+        _pendingOpenRequest = false;                         // a parked open request dies with its chat
         StartFreshRound();
         _cache.Clear();                                      // chat ids recur across bots — entries must not outlive the bot (F9)
         if (_toggle != null) _toggle.SetLit(false);
@@ -307,6 +314,7 @@ public class SuggestionsController : MonoBehaviour
         _pendingIncomingText = null;
         _answeredIdle = false;   // per-chat latch — never carries into another chat's open
         _pendingShow = false;    // a parked auto-show must not leak into another chat's open
+        _pendingOpenRequest = false;   // ...nor a parked open request (re-set below if «Вместе» is on)
         // A chat open has just STARTED (ChatManager sets Prep on the line after this event), so the
         // settle clock restarts here rather than relying on OnDisable having run: a re-open that
         // never closed the screen would otherwise still be carrying the previous chat's settled
@@ -325,14 +333,37 @@ public class SuggestionsController : MonoBehaviour
         if (_semiAutoOn)
         {
             ShowPanel(claimSlotFromKeyboard: false);
-            // F9: an unmoved history tail renders the cached set instantly — no skeleton, no
-            // paid call. Any drift (new message, owner reply, first visit) = miss = fresh request.
-            if (!TryRenderCached()) IssueRequest(null, null);
+            // The open REQUEST parks too (2026-08-20), landing in Update beside the parked show.
+            // This event fires synchronously on the row tap, BEFORE OpenChatRoutine has loaded any
+            // history: _activeChatCache is null right now (SelectChat nulls it lines above the
+            // invoke), so a request issued here was assembled from nothing — or, after the drain,
+            // from the stale disk snapshot — and answered the previous conversational turn. It
+            // also made TryRenderCached structurally dead (no cache ⇒ no tail key ⇒ no hit), so
+            // every open paid the LLM call F9 exists to skip. At settle the history is loaded and
+            // the open's sync has had its chance to arm the debounce; SuggestionOpenRequestPolicy
+            // picks between the three outcomes there. The skeleton goes up NOW so the previous
+            // chat's cards can never show through the wait (ShowSkeleton is inactive-safe: no
+            // coroutines, and Destroy/SetActive work on an inactive panel).
+            if (_panel != null) _panel.ShowSkeleton();
+            _pendingOpenRequest = true;
         }
         else HidePanel();
     }
 
+    // Side-effect-free probe for the policy decision: does the F9 cache hold a set for the open
+    // chat's CURRENT tail? (TryRenderCached below is the acting half — probe + render.)
+    private bool HasCachedForOpenChat()
+    {
+        var cm = ChatManager.Instance;
+        if (cm == null) return false;
+        string tailKey = CurrentTailKey();
+        return tailKey != null && _cache.TryGet(cm.CurrentChatId, tailKey, out _);
+    }
+
     // Renders the cached set for the open chat when its tail key still matches. False = issue.
+    // Called at chat-open SETTLE, never inside OnChatSelected: there _activeChatCache is still
+    // null (SelectChat nulls it before the invoke), so the tail key is structurally null and the
+    // read path was dead — every open paid the LLM call this cache exists to skip (F9).
     private bool TryRenderCached()
     {
         var cm = ChatManager.Instance;
@@ -379,6 +410,7 @@ public class SuggestionsController : MonoBehaviour
             _debounce.Cancel();                                // toggle-OFF: a stale window must not survive to fire after a later toggle-ON (BATCH-03)
             _pendingIncomingText = null;
             _pendingShow = false;
+            _pendingOpenRequest = false;                       // toggle-OFF also kills a parked open request
             HidePanel();                                       // D-11: off = hide; composer untouched
         }
     }
@@ -405,6 +437,7 @@ public class SuggestionsController : MonoBehaviour
     {
         if (ChatManager.Instance == null || _provider == null) return;
         _answeredIdle = false;                                 // a fresh set is on its way — stale latch off
+        _pendingOpenRequest = false;                           // any direct request supersedes the parked open one
         long seq = ++_requestSeq;                              // newest wins (also supersedes any in-flight)
         string chatId = ChatManager.Instance.CurrentChatId;
         if (string.IsNullOrEmpty(chatId)) return;             // no open chat → nothing to scope a request to (WR-02)
@@ -1281,6 +1314,25 @@ public class SuggestionsController : MonoBehaviour
         {
             _pendingShow = false;
             ShowPanel(claimSlotFromKeyboard: false);
+        }
+
+        // The parked chat-open REQUEST lands here (2026-08-20) — after the show above so a cached
+        // render lands into an active panel, but deliberately NOT behind the show's kb/attach
+        // guards: those decide slot TENANCY, and the data may load behind a keyboard the owner
+        // opened during the slide. By settle the history is loaded (OpenChatRoutine assigns
+        // _activeChatCache synchronously, long before Populate) and PopulateBubbles has drained
+        // the open sync's staged brand-new messages through HandleLive — which is exactly the
+        // signal the policy reads: an armed window means the coalesced fire owns this open.
+        // Priority is pinned by SuggestionOpenRequestPolicyTests; do not inline-reorder it.
+        if (_pendingOpenRequest && _semiAutoOn && SlotOpenAllowed)
+        {
+            _pendingOpenRequest = false;
+            switch (SuggestionOpenRequestPolicy.Resolve(_debounce.IsArmed, HasCachedForOpenChat()))
+            {
+                case OpenChatRequestAction.WaitForDebounce: break;   // the fire renders (≤2.5s, with lastIncomingText)
+                case OpenChatRequestAction.RenderCached: TryRenderCached(); break;   // F9 hit — no paid call
+                default: IssueRequest(steerTowardText: null, lastIncomingText: null); break;
+            }
         }
 
         // Model E rule 2: the panel is the slot's DEFAULT tenant, so it comes back whenever the

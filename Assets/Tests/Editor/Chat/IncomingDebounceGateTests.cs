@@ -21,6 +21,28 @@ public class IncomingDebounceGateTests
         Assert.IsFalse(gate.ShouldFire(0f));
     }
 
+    // IsArmed is the chat-open request park's decision input (SuggestionOpenRequestPolicy): armed
+    // at settle means the open's own sync staged a coalesced fire, so no second request is issued.
+    // It must therefore be true for EXACTLY the Poke->fire/Cancel span — a Poke that leaks armed
+    // past its fire would silently swallow every later chat-open request in that chat.
+    [Test] public void IsArmed_TrueOnlyBetweenPokeAndFireOrCancel()
+    {
+        var gate = new IncomingDebounceGate();
+        Assert.IsFalse(gate.IsArmed, "a fresh gate is disarmed");
+
+        gate.Poke(0f);
+        Assert.IsTrue(gate.IsArmed, "Poke arms");
+        Assert.IsFalse(gate.ShouldFire(Window - 0.01f));
+        Assert.IsTrue(gate.IsArmed, "an unfired probe inside the window must NOT disarm");
+
+        Assert.IsTrue(gate.ShouldFire(Window));
+        Assert.IsFalse(gate.IsArmed, "the fire consumes the window");
+
+        gate.Poke(10f);
+        gate.Cancel();
+        Assert.IsFalse(gate.IsArmed, "Cancel disarms without firing");
+    }
+
     // One poke: silent until the window elapses, then fires EXACTLY once (disarms after firing).
     [Test] public void FiresOnce_AfterWindow_ThenDisarms()
     {
@@ -134,6 +156,13 @@ public class SuggestionsLiveBatchFoldTests
     private static MessageViewModel In(string text) => new MessageViewModel { isIncoming = true, text = text };
     private static MessageViewModel Out(string text) => new MessageViewModel { isIncoming = false, text = text };
 
+    // Timestamped variants. The fixtures above deliberately share order keys (all zero) so the
+    // rules read as written; these carry real keys so the DIRECTION of the batch is expressible.
+    private static MessageViewModel InAt(string text, long ts) =>
+        new MessageViewModel { isIncoming = true, text = text, timestamp = ts, messageId = "in" + ts };
+    private static MessageViewModel OutAt(string text, long ts) =>
+        new MessageViewModel { isIncoming = false, text = text, timestamp = ts, messageId = "out" + ts };
+
     // A burst of incoming fragments accumulates and arms the window.
     [Test] public void IncomingFragments_AccumulateAndArm()
     {
@@ -224,5 +253,48 @@ public class SuggestionsLiveBatchFoldTests
             SuggestionsController.FoldLiveBatch("старый", new[] { Out("ответ"), In("новый") }).SawOutgoing,
             "a re-arm (Cancel=false) must not hide the reply from the supersede signal");
         Assert.IsFalse(SuggestionsController.FoldLiveBatch("вопрос", new MessageViewModel[] { null }).SawOutgoing);
+    }
+
+    // --- Batch DIRECTION (2026-08-20 fix) ----------------------------------
+    // ChatManager builds the live batch in raw Wappi response order, which is NEWEST-FIRST, and
+    // hands that list to every subscriber (MessageListView sorts its own copy; this fold did not).
+    // The fold is last-wins, so direction decides the verdict — these pin that it sorts.
+
+    // THE BUG, in its exact shape: the owner answered from the phone's WhatsApp app and the client
+    // then wrote again; both land together when the chat is opened. Newest-first that reads
+    // [incoming, outgoing] and used to fold to Cancel — which superseded the in-flight chat-open
+    // request, latched _answeredIdle and collapsed the slot, so the panel offered nothing at all.
+    [Test] public void NewestFirstBatch_OutgoingThenIncomingInTime_Arms()
+    {
+        var fold = SuggestionsController.FoldLiveBatch(
+            null, new[] { InAt("а есть дверь?", 200), OutAt("Ответил", 100) });
+
+        Assert.AreEqual("а есть дверь?", fold.Pending, "the client's unanswered question must survive");
+        Assert.IsTrue(fold.Arm, "the run ends on the CLIENT — the window must arm");
+        Assert.IsFalse(fold.Cancel, "collapsing here is what left the panel empty on chat open");
+        Assert.IsTrue(fold.SawOutgoing, "the echo is still reported so in-flight requests supersede");
+    }
+
+    // The mirror: chronologically the owner answered LAST, so the run really is closed. Fed
+    // newest-first this reads [outgoing, incoming] and used to arm — cards for an answered run.
+    [Test] public void NewestFirstBatch_IncomingThenOutgoingInTime_Cancels()
+    {
+        var fold = SuggestionsController.FoldLiveBatch(
+            null, new[] { OutAt("Да, есть", 200), InAt("есть колодки", 100) });
+
+        Assert.IsNull(fold.Pending, "the owner's reply bounds the run");
+        Assert.IsFalse(fold.Arm);
+        Assert.IsTrue(fold.Cancel, "the run is answered — the sheet closes");
+    }
+
+    // A multi-fragment burst arriving newest-first must still compose in reading order, or
+    // lastIncomingText reaches the model backwards (and the tail-based re-delivery guard misses).
+    [Test] public void NewestFirstBurst_ComposesInChronologicalOrder()
+    {
+        var fold = SuggestionsController.FoldLiveBatch(
+            null, new[] { InAt("на камри 70", 200), InAt("есть колодки", 100) });
+
+        Assert.AreEqual("есть колодки\nна камри 70", fold.Pending);
+        Assert.IsTrue(fold.Arm);
     }
 }

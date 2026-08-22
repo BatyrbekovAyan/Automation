@@ -19,6 +19,15 @@ public sealed class IncomingDebounceGate
     /// <summary>Drop a pending window (chat close / bot switch) — never fires until re-Poked.</summary>
     public void Cancel() => _armed = false;
 
+    /// <summary>
+    /// True while a Poked window has neither fired nor been cancelled. The chat-open request
+    /// park reads this at settle time: armed means the open's own sync already delivered a
+    /// brand-new incoming (HandleLive Poked), so the coalesced fire — which carries
+    /// <c>lastIncomingText</c> — IS the open request, and issuing another would render a
+    /// stale-tail answer first and pay for a second LLM call the fire then supersedes.
+    /// </summary>
+    public bool IsArmed => _armed;
+
     /// <summary>True EXACTLY once when the window has settled; disarms so it fires only once.</summary>
     public bool ShouldFire(float now)
     {
