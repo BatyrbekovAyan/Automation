@@ -55,6 +55,11 @@ public class BotsPage : MonoBehaviour
         // card is not yet awake.
         FirstStepsCard.Instance?.RefreshFromFacts();
 
+        // Same fact, same moment: the trial pill, the dialog meter and the «+ бот» card's
+        // remaining-slot subtext all read the live bot count (Task 14c). Fire-and-forget,
+        // null-guarded no-op if the billing surface is not yet awake.
+        BotsPageBilling.Instance?.Refresh();
+
         if (!hasBots)
         {
             // Single zero-bot chokepoint (the Chats empty-state CTA also routes here

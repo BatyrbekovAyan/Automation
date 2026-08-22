@@ -363,6 +363,11 @@ public class Bot : MonoBehaviour
         // Add-Bot overlay, so it is safe on the «Удалить все данные» wipe path too.
         FirstStepsCard.Instance?.RefreshFromFacts();
 
+        // Ditto for the billing surface (Task 14c): the «+ бот» card's remaining-slot count
+        // and the meter's own zero-bot hide both read this roster. Refresh() never opens
+        // anything, so — unlike RefreshEmptyState — it is safe on the wipe path too.
+        BotsPageBilling.Instance?.Refresh();
+
         Destroy(gameObject);
     }
 

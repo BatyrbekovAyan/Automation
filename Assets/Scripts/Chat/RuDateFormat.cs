@@ -61,6 +61,28 @@ public static class RuDateFormat
         _  => "декабря",
     };
 
+    /// <summary>
+    /// Full month name in the nominative, e.g. "август" — the form a month takes as a
+    /// LABEL rather than as the tail of a date ("Диалоги ИИ · август", the «Боты» meter
+    /// strip). Sibling of <see cref="MonthGenitive"/>, hardcoded for the same reason:
+    /// ToString("MMMM") reads CultureInfo.CurrentCulture, which follows the DEVICE locale.
+    /// </summary>
+    public static string MonthNominative(int month) => month switch
+    {
+        1  => "январь",
+        2  => "февраль",
+        3  => "март",
+        4  => "апрель",
+        5  => "май",
+        6  => "июнь",
+        7  => "июль",
+        8  => "август",
+        9  => "сентябрь",
+        10 => "октябрь",
+        11 => "ноябрь",
+        _  => "декабрь",
+    };
+
     /// <summary>Day + spelled-out genitive month, no year, e.g. "26 августа".</summary>
     public static string DayMonth(DateTime date) =>
         $"{date.Day} {MonthGenitive(date.Month)}";
