@@ -162,6 +162,36 @@ When in doubt, use `updateNodeParameters` with `replace:true` and the full param
 object instead — it has no such ambiguity — and always verify via a raw `GET`, since
 both failure modes return HTTP 200 with `appliedOperations` matching what you sent.
 
+## Prompt composition (`inject-prompts.py`) and the Task 13b caching-floor gate
+
+`Tools/n8n/inject-prompts.py` composes each vertical's `PROMPTS[vid]` value as
+`<vertical_id>.md + "\n\n" + _core.md + "\n\n" + _universal.md` and injects it into the `Vertical
+Prompt` Code node of all 4 canonical Create/Edit orchestrator workflows (`--check` diffs without
+writing, exit 2 if stale; plain run writes). `_universal.md` (Task 13b, owner decision
+2026-08-22) is a behavior-neutral elaboration of `_core.md`'s existing rules, appended LAST so it
+sits in the STABLE part of the composed prefix — ahead of the genuinely per-bot, owner-editable
+fields (Additional Instructions/About Business/Products/Services) `Set Fields` appends after it —
+existing purely to push every bot's static `systemMessage` prefix past OpenAI's practical
+prompt-caching floor (see `.superpowers/sdd/task-13-report.md`: reliable caching needs roughly
+2200+ nominal tokens; a modest real bot profile does not reach that on vertical+core alone).
+
+**Since Task 13b, `inject-prompts.py` has a hard runtime dependency on `tiktoken`** (first
+third-party Python dependency in this toolset — every other script here is stdlib-only). Both
+`--check` and a real write run `assert_token_floor()` BEFORE touching any workflow file: it
+recomposes each vertical's MINIMAL-profile `systemMessage` (empty description/instructions, 0
+products/services — the shortest a real bot's prompt can ever be) and asserts every one is
+`>= TOKEN_FLOOR` (2300) tokens by `tiktoken.get_encoding("o200k_base")`. **If `tiktoken` is not
+importable, the script hard-fails with install instructions — it never silently skips the
+check**, since a missing tokenizer must never be mistaken for a passing gate. Install it into a
+venv, never globally:
+```bash
+python3 -m venv /tmp/tiktoken-venv && /tmp/tiktoken-venv/bin/pip install tiktoken
+/tmp/tiktoken-venv/bin/python3 Tools/n8n/inject-prompts.py --check
+```
+Negative-tested (Task 13b fix round): a scratch copy with `_universal.md` truncated to one
+sentence dropped all 6 verticals to 967–1009 tokens and the gate correctly refused with a
+per-vertical breakdown, confirming the assert discriminates rather than being vacuously true.
+
 ## Known follow-ups before this is production-/dev-ready
 
 1. **Credentials are not in these files** (referenced by id only). The local server has none yet —

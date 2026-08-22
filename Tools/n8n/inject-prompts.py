@@ -1,12 +1,21 @@
 #!/usr/bin/env python3
 """Inject vertical main prompts into the bot Create/Edit n8n workflows.
 
-Sources:  Tools/n8n/prompts/_core.md + <vertical_id>.md  (composed as vertical + "\n\n" + core)
+Sources:  Tools/n8n/prompts/<vertical_id>.md + _core.md + _universal.md
+          (composed as vertical + "\n\n" + core + "\n\n" + universal)
 Targets:  no args  -> the 4 canonical workflow JSONs in Tools/n8n/workflows/
           paths    -> transform those JSON files in place (e.g. live-fetched copies)
 Flags:    --check  -> don't write; exit 2 if any file would change, 0 if all up to date
 
 Idempotent. Fails loudly on unexpected workflow shape.
+
+Also enforces (unconditionally, both write and --check modes, BEFORE touching any workflow
+file) the Task 13b caching-floor gate: every vertical's MINIMAL-profile composition (empty
+Additional Instructions / About Business / Products / Services -- the worst case, since a
+bot's static systemMessage never gets shorter than this) must be >= TOKEN_FLOOR tokens by
+tiktoken o200k_base, matching the byte-for-byte Set Fields template. If tiktoken is not
+importable, this is a HARD failure with install instructions -- never a silent skip, since a
+missing tokenizer must never be mistaken for "the floor holds".
 """
 import json
 import sys
@@ -18,6 +27,31 @@ PROMPTS_DIR = ROOT / "prompts"
 WORKFLOWS_DIR = ROOT / "workflows"
 
 VERTICALS = ["auto_parts", "wholesale", "flowers", "kaspi_seller", "education", "phone_repair"]
+
+# Mirrors Assets/Data/BusinessTypes.asset's per-id `displayName` (the literal value Manager.cs
+# sends as the webhook's `BusinessType` form field -- see Manager.PopulateBusinessTypes /
+# businessTypes.TryGetById(...).displayName). Kept as a small literal rather than parsed out of
+# the Unity YAML asset: the exact label only shifts the token count by a couple of tokens either
+# way (immaterial against the >100-token margin this gate expects), so a parser here would add
+# fragility without adding real accuracy. If BusinessTypes.asset's displayName strings ever
+# change, update this dict to match -- a stale label cannot make this gate falsely PASS (any
+# plausible label is within a token or two of any other), only misreport by that same margin.
+BUSINESS_TYPE_LABELS = {
+    "auto_parts": "Автозапчасти",
+    "wholesale": "Оптовый поставщик",
+    "flowers": "Цветочный магазин",
+    "kaspi_seller": "Продавец на Kaspi",
+    "education": "Учебный центр",
+    "phone_repair": "Ремонт телефонов",
+}
+
+# Task 13b (owner decision 2026-08-22): every bot's static prefix must clear OpenAI's PRACTICAL
+# caching floor, empirically bracketed by task-13-report.md at "reliably fails <=~1326 nominal
+# tokens, reliably succeeds >=~2241" -- 2300 sits inside the confirmed-reliable zone with margin
+# for measurement noise. This is the MINIMAL profile: empty description/instructions, 0
+# products/services -- the shortest a real bot's composed systemMessage can ever be, so if this
+# floor holds for the minimal profile it holds for every less-empty bot of that vertical too.
+TOKEN_FLOOR = 2300
 
 DEFAULT_TARGETS = [
     WORKFLOWS_DIR / "XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json",
@@ -63,6 +97,49 @@ def load_prompts() -> dict:
         body = (PROMPTS_DIR / f"{vid}.md").read_text(encoding="utf-8").strip()
         prompts[vid] = body + "\n\n" + core + "\n\n" + universal
     return prompts
+
+
+def minimal_profile_template(vid: str, vertical_prompt: str) -> str:
+    """Byte-for-byte match to Set Fields' composed systemMessage with every owner-editable
+    field empty (0 products/services, blank description/instructions) -- the exact template
+    verified against a live dev workflow in the Task 13b report (systemMessage byte-identical
+    check). Do not hand-simplify the spacing: "Additional Instructions: " carries one literal
+    trailing space in the real expression PLUS two more literal spaces before the next "\n\n"."""
+    label = BUSINESS_TYPE_LABELS[vid]
+    return (f"Business Type: {label}\n\n{vertical_prompt}"
+            f"\n\nAdditional Instructions:   \n\nAbout Business: \n\nProducts:\n\n\nServices:\n")
+
+
+def assert_token_floor(prompts: dict) -> None:
+    try:
+        import tiktoken
+    except ImportError:
+        raise SystemExit(
+            "ERROR: tiktoken is not importable -- cannot verify the Task 13b caching-floor gate "
+            f"(every vertical's minimal composition must be >= {TOKEN_FLOOR} tokens). This is a "
+            "hard failure, not a skip: a missing tokenizer must never be mistaken for a passing "
+            "gate. Install it into a venv (never globally), e.g.:\n"
+            "  python3 -m venv /tmp/tiktoken-venv && /tmp/tiktoken-venv/bin/pip install tiktoken\n"
+            "then re-run this script with that venv's python3."
+        )
+    enc = tiktoken.get_encoding("o200k_base")
+    failures = []
+    counts = {}
+    for vid, vertical_prompt in prompts.items():
+        template = minimal_profile_template(vid, vertical_prompt)
+        n = len(enc.encode(template))
+        counts[vid] = n
+        if n < TOKEN_FLOOR:
+            failures.append((vid, n))
+    if failures:
+        detail = ", ".join(f"{vid}={n}" for vid, n in failures)
+        raise SystemExit(
+            f"ERROR: {len(failures)} vertical(s) fall below the Task 13b caching floor of "
+            f"{TOKEN_FLOOR} tokens (minimal profile, tiktoken o200k_base): {detail}. "
+            f"All counts: {counts}. Refusing to write/check workflows -- pad prompts/_universal.md "
+            f"(or the affected vertical) before proceeding."
+        )
+    print(f"token floor OK (>= {TOKEN_FLOOR}, o200k_base, minimal profile): {counts}")
 
 
 def build_jscode(prompts: dict) -> str:
@@ -157,6 +234,7 @@ def main() -> None:
     check = "--check" in sys.argv[1:]
     targets = [Path(a) for a in args] if args else DEFAULT_TARGETS
     prompts = load_prompts()
+    assert_token_floor(prompts)  # hard gate, before any file is read or written -- see docstring
     jscode = build_jscode(prompts)
     changed = []
     for path in targets:
