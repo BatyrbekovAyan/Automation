@@ -48,10 +48,20 @@ EDIT_NEW_HEAD = ("{{ $('Vertical Prompt').first().json.verticalPrompt ? "
 
 def load_prompts() -> dict:
     core = (PROMPTS_DIR / "_core.md").read_text(encoding="utf-8").strip()
+    # Task 13b: universal static filler appended LAST, after core -- it exists purely to push
+    # every bot's static systemMessage prefix past OpenAI's practical prompt-caching floor
+    # (see .superpowers/sdd/task-13-report.md: reliable caching needs ~2200+ nominal tokens,
+    # a modest real bot profile does not get there on vertical+core alone). Placed at the END
+    # of the vertical+core block (not before it) so the MORE STABLE content -- vertical persona
+    # + house rules + this filler, none of which the owner ever edits from BotSettings -- forms
+    # the longest possible common prefix ahead of the genuinely per-bot, owner-editable fields
+    # (Additional Instructions / About Business / Products / Services) that Set Fields appends
+    # after verticalPrompt. An edit to those fields only invalidates the tail, never this head.
+    universal = (PROMPTS_DIR / "_universal.md").read_text(encoding="utf-8").strip()
     prompts = {}
     for vid in VERTICALS:
         body = (PROMPTS_DIR / f"{vid}.md").read_text(encoding="utf-8").strip()
-        prompts[vid] = body + "\n\n" + core
+        prompts[vid] = body + "\n\n" + core + "\n\n" + universal
     return prompts
 
 
