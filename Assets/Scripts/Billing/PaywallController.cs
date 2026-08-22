@@ -90,6 +90,11 @@ public class PaywallController : MonoBehaviour
     private Canvas _rootCanvas;
     private Tween _activeSlide;
     private bool _wired;
+    // True while the exit tween is in flight. The GameObject is still active during it
+    // (SetActive(false) happens in OnComplete), so without this flag a paywall request
+    // arriving mid-close would read as "already open", kill the exit tween, and leave the
+    // screen parked wherever the tween had got to.
+    private bool _closing;
 
     private PaywallPeriod _period = PaywallPeriod.Month;
     private PlanTier _selected = PaywallRows.Recommended;
@@ -178,7 +183,8 @@ public class PaywallController : MonoBehaviour
         _selected = _purchased != PlanTier.None ? _purchased : PaywallRows.Recommended;
         _period = PaywallPeriod.Month;
 
-        bool wasOpen = IsOpen;
+        bool wasOpen = IsOpen && !_closing;
+        _closing = false;
         gameObject.SetActive(true);   // OnEnable renders
         if (wasOpen) Render();        // re-request while already open: refresh in place
 
@@ -193,17 +199,23 @@ public class PaywallController : MonoBehaviour
     public void Close()
     {
         EnsureInit();
-        if (!IsOpen) return;
+        if (!IsOpen || _closing) return;
+        _closing = true;
         _activeSlide?.Kill();
         _activeSlide = _rt.DOAnchorPosX(CanvasWidth(), SlideOutDuration)
             .SetEase(Ease.InCubic)
-            .OnComplete(() => gameObject.SetActive(false));
+            .OnComplete(() =>
+            {
+                _closing = false;
+                gameObject.SetActive(false);
+            });
     }
 
     /// <summary>The left-edge strip already slid us off screen — just stop being active.</summary>
     private void HandleSwipeDismissed()
     {
         _activeSlide?.Kill();
+        _closing = false;
         gameObject.SetActive(false);
     }
 
