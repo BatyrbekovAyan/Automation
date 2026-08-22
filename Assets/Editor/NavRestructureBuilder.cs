@@ -463,6 +463,8 @@ public static class NavRestructureBuilder
             "Screen_Dashboard",
             "Screen_New",
             "Screen_Onboarding",   // inserted after Screen_New, BEFORE auth pages
+            "Screen_Paywall",      // billing overlay: above the Add-Bot form (a limit gate fires
+                                   // while it is open), still below the auth pages (PaywallBuilder)
             "WhatsappAuth",
             "TelegramAuth",
         };
