@@ -177,7 +177,12 @@ public class PaywallController : MonoBehaviour
         EnsureInit();
 
         bool wasActive = gameObject.activeSelf;
-        bool wasSettledOpen = wasActive && !_closing;
+        // A slide of EITHER direction still running means the screen is not where it looks like
+        // it is. The exit case is covered by _closing; the ENTRY case is not — a request landing
+        // inside the 0.3s entry slide would read as "settled open", skip the (re)slide, and leave
+        // the screen parked at whatever x the killed tween had reached.
+        bool slideInFlight = _activeSlide != null && _activeSlide.IsActive() && _activeSlide.IsPlaying();
+        bool wasSettledOpen = wasActive && !_closing && !slideInFlight;
 
         // Kill() defaults to complete:false, so a mid-flight exit tween's OnComplete — which
         // would SetActive(false) — can never land on the screen we are re-opening.
@@ -282,8 +287,7 @@ public class PaywallController : MonoBehaviour
                 return;
             }
             Debug.LogWarning($"[PaywallController] Purchase of {sku} failed: {reason}");
-            // TODO(14b): move to PaywallRows/PaywallCopy once the owner signs off the wording.
-            _notice = reason == "user_cancelled" ? "" : "Не удалось оформить подписку. Попробуйте ещё раз.";
+            _notice = reason == "user_cancelled" ? "" : PaywallRows.PurchaseFailedNotice;
             Render();
         });
     }
@@ -302,8 +306,7 @@ public class PaywallController : MonoBehaviour
                 Close();
                 return;
             }
-            // TODO(14b): move to PaywallRows/PaywallCopy once the owner signs off the wording.
-            _notice = ok ? "Активных покупок не найдено" : "Не удалось восстановить покупки";
+            _notice = ok ? PaywallRows.RestoreNothingFoundNotice : PaywallRows.RestoreFailedNotice;
             Render();
         });
     }
@@ -377,15 +380,6 @@ public class PaywallController : MonoBehaviour
 
     // ── Value receipt ────────────────────────────────────────────────────────
 
-    // TODO(14b): move to PaywallRows/PaywallCopy — user-facing RU copy belongs in the pinned seam.
-    private static readonly string[] ReceiptLabels =
-    {
-        "Диалогов обработано",
-        "Заказов собрано",
-        "Ответов ночью",
-        "Средний ответ",
-    };
-
     private void RenderReceipt()
     {
         string[] values =
@@ -401,7 +395,7 @@ public class PaywallController : MonoBehaviour
             var tile = receiptTiles[i];
             if (tile == null) continue;
             if (tile.value != null) tile.value.text = values[i];
-            if (tile.label != null && i < ReceiptLabels.Length) tile.label.text = ReceiptLabels[i];
+            if (tile.label != null && i < PaywallRows.ReceiptLabels.Length) tile.label.text = PaywallRows.ReceiptLabels[i];
         }
     }
 

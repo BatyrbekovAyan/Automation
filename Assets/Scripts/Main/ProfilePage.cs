@@ -29,6 +29,7 @@ public class ProfilePage : MonoBehaviour
     // ── Settings rows ──────────────────────────────────────────────────────
     [Header("Settings Rows")]
     [SerializeField] private Button accountButton;
+    [SerializeField] private Button subscriptionButton;
     [SerializeField] private Button notificationsButton;
     [SerializeField] private Button privacyButton;
     [SerializeField] private Button supportButton;
@@ -118,6 +119,7 @@ public class ProfilePage : MonoBehaviour
 
         // Settings rows → ProfileSubPages panels (built by ProfileSubPagesBuilder)
         if (accountButton       != null) accountButton.onClick.AddListener(OnAccount);
+        if (subscriptionButton  != null) subscriptionButton.onClick.AddListener(OnSubscription);
         if (notificationsButton != null) notificationsButton.onClick.AddListener(OnNotifications);
         if (privacyButton       != null) privacyButton.onClick.AddListener(OnPrivacy);
         if (supportButton       != null) supportButton.onClick.AddListener(OnSupport);
@@ -240,6 +242,7 @@ public class ProfilePage : MonoBehaviour
     // «Удалить все данные», implemented in ProfileSubPages.Account.
 
     private void OnAccount()       => ProfileSubPages.Instance?.Open(ProfileSubPages.Page.Account);
+    private void OnSubscription()  => ProfileSubPages.Instance?.Open(ProfileSubPages.Page.Subscription);
     private void OnNotifications() => ProfileSubPages.Instance?.Open(ProfileSubPages.Page.Notifications);
     private void OnPrivacy()       => ProfileSubPages.Instance?.Open(ProfileSubPages.Page.Privacy);
     private void OnSupport()       => ProfileSubPages.Instance?.Open(ProfileSubPages.Page.Support);

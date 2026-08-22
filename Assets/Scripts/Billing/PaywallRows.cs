@@ -47,6 +47,30 @@ public static class PaywallRows
     public const string StatUnknown = "—";
 
     /// <summary>
+    /// Value-receipt tile labels, in tile order (день-5 «чек ценности»). Tiles 3 and 4 have
+    /// no source yet and render <see cref="StatUnknown"/> — see the task-14a report.
+    /// Lives here rather than in the controller because it is user-facing RU copy, and this
+    /// is the place tests can pin it (moved out of PaywallController by Task 14b).
+    /// </summary>
+    public static readonly string[] ReceiptLabels =
+    {
+        "Диалогов обработано",
+        "Заказов собрано",
+        "Ответов ночью",
+        "Средний ответ",
+    };
+
+    /// <summary>
+    /// Transient notices shown in the fine-print slot after a failed store round-trip.
+    /// WORDING IS STILL PENDING THE OWNER'S SIGN-OFF — pinned here (rather than typed at the
+    /// two call sites in PaywallController) so the eventual reword is a single edit.
+    /// A user_cancelled purchase deliberately shows NOTHING: the user already knows.
+    /// </summary>
+    public const string PurchaseFailedNotice = "Не удалось оформить подписку. Попробуйте ещё раз.";
+    public const string RestoreNothingFoundNotice = "Активных покупок не найдено";
+    public const string RestoreFailedNotice = "Не удалось восстановить покупки";
+
+    /// <summary>
     /// Spec §2 «Во всех тарифах», verbatim and in order. The launch rule («пейволл не
     /// публикуется, пока каждая строка не работает») is checked against THIS list, so it
     /// must stay the single place the promise is written down.

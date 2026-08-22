@@ -39,6 +39,32 @@ public static class RuDateFormat
         _  => "дек",
     };
 
+    /// <summary>
+    /// Full month name in the genitive used after a day number, e.g. "августа".
+    /// The long sibling of <see cref="ShortMonth"/>, for places with room to spell it out
+    /// (the «Подписка» renewal line). Same reason it is hardcoded: ToString("MMMM") reads
+    /// CultureInfo.CurrentCulture, which follows the DEVICE locale.
+    /// </summary>
+    public static string MonthGenitive(int month) => month switch
+    {
+        1  => "января",
+        2  => "февраля",
+        3  => "марта",
+        4  => "апреля",
+        5  => "мая",
+        6  => "июня",
+        7  => "июля",
+        8  => "августа",
+        9  => "сентября",
+        10 => "октября",
+        11 => "ноября",
+        _  => "декабря",
+    };
+
+    /// <summary>Day + spelled-out genitive month, no year, e.g. "26 августа".</summary>
+    public static string DayMonth(DateTime date) =>
+        $"{date.Day} {MonthGenitive(date.Month)}";
+
     /// <summary>Day-month-year label for dates older than a week, e.g. "24 фев 2026".</summary>
     public static string DayMonthYear(DateTime date) =>
         $"{date.Day} {ShortMonth(date.Month)} {date.Year}";

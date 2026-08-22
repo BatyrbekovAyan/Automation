@@ -170,4 +170,33 @@ public class PaywallRowsTests
     [Test]
     public void Receipt_title_names_the_trial_length()
         => Assert.AreEqual("Ваш бот за 5 дней", PaywallCopy.ReceiptTitle());
+
+    // ── Copy moved out of PaywallController by Task 14b ───────────────────────
+
+    [Test]
+    public void Receipt_labels_are_four_tiles_in_order()
+    {
+        Assert.AreEqual(4, PaywallRows.ReceiptLabels.Length);
+        Assert.AreEqual("Диалогов обработано", PaywallRows.ReceiptLabels[0]);
+        Assert.AreEqual("Заказов собрано", PaywallRows.ReceiptLabels[1]);
+        Assert.AreEqual("Ответов ночью", PaywallRows.ReceiptLabels[2]);
+        Assert.AreEqual("Средний ответ", PaywallRows.ReceiptLabels[3]);
+    }
+
+    [Test]
+    public void Store_failure_notices_are_pinned()
+    {
+        // Wording is still with the owner; pinning it here is what makes the reword one edit.
+        Assert.AreEqual("Не удалось оформить подписку. Попробуйте ещё раз.",
+            PaywallRows.PurchaseFailedNotice);
+        Assert.AreEqual("Активных покупок не найдено", PaywallRows.RestoreNothingFoundNotice);
+        Assert.AreEqual("Не удалось восстановить покупки", PaywallRows.RestoreFailedNotice);
+    }
+
+    [Test]
+    public void No_notice_is_blank()
+    {
+        foreach (string notice in new[] { PaywallRows.PurchaseFailedNotice, PaywallRows.RestoreNothingFoundNotice, PaywallRows.RestoreFailedNotice })
+            Assert.IsFalse(string.IsNullOrWhiteSpace(notice));
+    }
 }

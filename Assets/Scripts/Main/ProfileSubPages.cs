@@ -5,9 +5,11 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Controller for the Profile tab's sub-pages (Аккаунт / Уведомления /
+/// Controller for the Profile tab's sub-pages (Аккаунт / Подписка / Уведомления /
 /// Конфиденциальность / Поддержка / О приложении / Лицензии). Panels are
-/// built by ProfileSubPagesBuilder inside Screen_Profile; this component
+/// built by ProfileSubPagesBuilder inside Screen_Profile — except «Подписка»,
+/// whose panel is built ADDITIVELY by SubscriptionPageBuilder (Tools/Billing/
+/// Build Subscription Page); this component
 /// lives on the always-active SubPages root and slides panels in from the
 /// right, matching the app's page-transition language. Per-page logic lives
 /// in the ProfileSubPages.*.cs partials.
@@ -16,7 +18,9 @@ public partial class ProfileSubPages : MonoBehaviour
 {
     public static ProfileSubPages Instance;
 
-    public enum Page { Account = 0, Notifications = 1, Privacy = 2, Support = 3, About = 4, Licenses = 5 }
+    // Ordinals are serialised in the `pages` array's index, so new pages may only ever be
+    // APPENDED — inserting one would silently re-point every existing panel reference.
+    public enum Page { Account = 0, Notifications = 1, Privacy = 2, Support = 3, About = 4, Licenses = 5, Subscription = 6 }
 
     [Serializable]
     private struct PageRefs
@@ -27,7 +31,7 @@ public partial class ProfileSubPages : MonoBehaviour
     }
 
     [Header("Pages (indexed by the Page enum)")]
-    [SerializeField] private PageRefs[] pages = new PageRefs[6];
+    [SerializeField] private PageRefs[] pages = new PageRefs[7];
 
     [Header("Shared confirm popup")]
     [SerializeField] private GameObject confirmPopup;
@@ -78,6 +82,7 @@ public partial class ProfileSubPages : MonoBehaviour
         WireSupport();
         WireAbout();
         WireAppearance();
+        WireSubscription();
         RefreshAppearanceToggle(); // restore the persisted light/dark choice
     }
 
@@ -134,6 +139,7 @@ public partial class ProfileSubPages : MonoBehaviour
             case Page.Support: ResetFaq(); break;
             case Page.About: RefreshAbout(); break;
             case Page.Licenses: RefreshLicenses(); break;
+            case Page.Subscription: OpenSubscriptionPage(); break;
         }
     }
 
