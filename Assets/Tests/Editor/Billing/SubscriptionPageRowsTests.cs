@@ -28,7 +28,7 @@ public class SubscriptionPageRowsTests
     [Test]
     public void Active_business_shows_price_and_renewal_date()
     {
-        var line = SubscriptionPageRows.StatusLine(PlanTier.Business, true, 0, PeriodEndUtc);
+        var line = SubscriptionPageRows.StatusLine(PlanTier.Business, 0, PeriodEndUtc);
 
         Assert.AreEqual(SubscriptionState.Active, line.State);
         Assert.AreEqual("Бизнес", line.Title);
@@ -41,7 +41,7 @@ public class SubscriptionPageRowsTests
     [Test]
     public void Active_start_tier_carries_its_own_price()
     {
-        var line = SubscriptionPageRows.StatusLine(PlanTier.Start, true, 0, PeriodEndUtc);
+        var line = SubscriptionPageRows.StatusLine(PlanTier.Start, 0, PeriodEndUtc);
         Assert.AreEqual("Старт", line.Title);
         Assert.AreEqual("9\u00A0900\u00A0₸/мес · продлится 26 августа", line.Subline);
     }
@@ -51,57 +51,80 @@ public class SubscriptionPageRowsTests
     {
         foreach (string iso in new[] { null, "", "   ", "not-a-date" })
         {
-            var line = SubscriptionPageRows.StatusLine(PlanTier.Network, true, 0, iso);
+            var line = SubscriptionPageRows.StatusLine(PlanTier.Network, 0, iso);
             Assert.AreEqual("39\u00A0900\u00A0₸/мес", line.Subline, $"iso={iso ?? "null"}");
         }
     }
 
     [Test]
-    public void Renewal_date_survives_an_offset_timestamp()
+    public void An_offset_timestamp_normalises_to_utc_before_the_seam_sees_it()
     {
-        // Not every producer stamps Z; a +05:00 offset must still resolve to a real date.
-        var line = SubscriptionPageRows.StatusLine(PlanTier.Business, true, 0, "2026-09-03T10:00:00+05:00");
+        // Not every producer stamps Z. 10:00+05:00 IS 05:00Z, so with the seam set to identity
+        // this must land on 3 сентября on every machine — if ParsePeriodEnd ever stopped
+        // normalising, the day would start following the test runner's own timezone.
+        var line = SubscriptionPageRows.StatusLine(PlanTier.Business, 0, "2026-09-03T10:00:00+05:00");
         StringAssert.EndsWith("продлится 3 сентября", line.Subline);
+
+        // Same instant, other side of midnight UTC: 01:00+05:00 is the PREVIOUS day in UTC.
+        Assert.AreEqual(new DateTime(2026, 9, 2, 20, 0, 0, DateTimeKind.Utc),
+            SubscriptionPageRows.ParsePeriodEnd("2026-09-03T01:00:00+05:00"));
     }
 
     [Test]
     public void Trial_with_days_left_shows_the_countdown()
     {
-        var line = SubscriptionPageRows.StatusLine(PlanTier.None, true, 3, null);
+        var line = SubscriptionPageRows.StatusLine(PlanTier.None, 3, null);
 
         Assert.AreEqual(SubscriptionState.Trial, line.State);
         Assert.AreEqual("Пробный", line.Title);
         Assert.AreEqual("Пробный", line.PillText);
-        Assert.AreEqual(ThemeRole.Surface, line.PillBg);
+        // Hairline, NOT Surface: the pill sits on a Surface card and would vanish into it.
+        Assert.AreEqual(ThemeRole.Hairline, line.PillBg);
         Assert.AreEqual(ThemeRole.InkTertiary, line.PillInk);
         Assert.AreEqual("Пробный · осталось 3 дн.", line.Subline);
     }
 
     [Test]
-    public void Trial_that_never_started_is_still_a_trial()
+    public void A_full_clock_is_a_trial_even_before_the_first_auth()
     {
-        // Pre-auth grace (EntitlementPolicy.EffectiveTier(None,false,false) == Trial):
-        // the clock starts at first channel auth, so «not started» must not read as expired.
-        var line = SubscriptionPageRows.StatusLine(PlanTier.None, false, PlanCatalog.TrialDays, null);
+        // Pre-auth grace: TrialLedger.DaysLeft() returns the full TrialDays before the clock
+        // has ever started, so the DAY COUNT alone must carry that state — this used to pass a
+        // separate «trialStarted:false» flag, which read like it mattered while no branch ever
+        // consulted it. The flag is gone; this asserts what actually decides.
+        var line = SubscriptionPageRows.StatusLine(PlanTier.None, PlanCatalog.TrialDays, null);
         Assert.AreEqual(SubscriptionState.Trial, line.State);
         Assert.AreEqual("Пробный · осталось 5 дн.", line.Subline);
+        Assert.AreEqual(SubscriptionState.Trial, SubscriptionPageRows.State(PlanTier.None, PlanCatalog.TrialDays));
+    }
+
+    [Test]
+    public void No_pill_ever_paints_itself_the_colour_of_the_card_beneath_it()
+    {
+        foreach (var line in new[]
+                 {
+                     SubscriptionPageRows.StatusLine(PlanTier.Business, 0, PeriodEndUtc),
+                     SubscriptionPageRows.StatusLine(PlanTier.None, 3, null),
+                     SubscriptionPageRows.StatusLine(PlanTier.None, 0, null),
+                 })
+            Assert.AreNotEqual(ThemeRole.Surface, line.PillBg, $"pill «{line.PillText}» исчезнет на карточке");
     }
 
     [Test]
     public void Trial_last_day_still_counts_one()
     {
-        var line = SubscriptionPageRows.StatusLine(PlanTier.None, true, 1, null);
+        var line = SubscriptionPageRows.StatusLine(PlanTier.None, 1, null);
         Assert.AreEqual("Пробный · осталось 1 дн.", line.Subline);
     }
 
     [Test]
     public void Spent_trial_reads_as_no_subscription()
     {
-        var line = SubscriptionPageRows.StatusLine(PlanTier.None, true, 0, null);
+        var line = SubscriptionPageRows.StatusLine(PlanTier.None, 0, null);
 
         Assert.AreEqual(SubscriptionState.Expired, line.State);
         Assert.AreEqual("Без подписки", line.Title);
         Assert.AreEqual("Истекла", line.PillText);
+        Assert.AreEqual(ThemeRole.Hairline, line.PillBg);
         Assert.AreEqual(ThemeRole.InkTertiary, line.PillInk);
         Assert.AreEqual("Подписка не оформлена", line.Subline);
     }
@@ -109,14 +132,14 @@ public class SubscriptionPageRowsTests
     [Test]
     public void A_purchase_outranks_a_spent_trial_clock()
     {
-        var line = SubscriptionPageRows.StatusLine(PlanTier.Business, true, 0, PeriodEndUtc);
+        var line = SubscriptionPageRows.StatusLine(PlanTier.Business, 0, PeriodEndUtc);
         Assert.AreEqual(SubscriptionState.Active, line.State);
     }
 
     [Test]
     public void Negative_days_left_never_renders_as_a_countdown()
     {
-        var line = SubscriptionPageRows.StatusLine(PlanTier.None, true, -4, null);
+        var line = SubscriptionPageRows.StatusLine(PlanTier.None, -4, null);
         Assert.AreEqual(SubscriptionState.Expired, line.State);
     }
 
@@ -169,7 +192,7 @@ public class SubscriptionPageRowsTests
         Assert.AreEqual(0f, SubscriptionPageRows.FillFraction(0, 1000, 0), 0.0001f);
         Assert.AreEqual(0.412f, SubscriptionPageRows.FillFraction(412, 1000, 0), 0.0001f);
         Assert.AreEqual(1f, SubscriptionPageRows.FillFraction(2500, 1000, 0), 0.0001f, "перерасход не рисует полосу шире дорожки");
-        Assert.AreEqual(1f, SubscriptionPageRows.FillFraction(5, 0, 0), 0.0001f, "нулевая квота — полоса полная, не деление на ноль");
+        Assert.AreEqual(0f, SubscriptionPageRows.FillFraction(5, 0, 0), 0.0001f, "нет тарифа — полоса ПУСТАЯ, не полная (и не деление на ноль)");
         Assert.AreEqual(0f, SubscriptionPageRows.FillFraction(-3, 1000, 0), 0.0001f);
     }
 
@@ -179,6 +202,17 @@ public class SubscriptionPageRowsTests
         Assert.AreEqual(ThemeRole.AccentFill, SubscriptionPageRows.FillRole(QuotaState.Ok));
         Assert.AreEqual(ThemeRole.StatusOwnerNeeded, SubscriptionPageRows.FillRole(QuotaState.Warn));
         Assert.AreEqual(ThemeRole.Destructive, SubscriptionPageRows.FillRole(QuotaState.Over));
+    }
+
+    [Test]
+    public void Meters_are_hidden_when_there_is_no_plan_to_measure_against()
+    {
+        // PlanCatalog.Get(None) is 0/0/0 — a visible meter would read «2 из 0».
+        Assert.IsFalse(SubscriptionPageRows.MetersVisible(PlanTier.None));
+        Assert.IsTrue(SubscriptionPageRows.MetersVisible(PlanTier.Trial));
+        Assert.IsTrue(SubscriptionPageRows.MetersVisible(PlanTier.Start));
+        Assert.IsTrue(SubscriptionPageRows.MetersVisible(PlanTier.Business));
+        Assert.IsTrue(SubscriptionPageRows.MetersVisible(PlanTier.Network));
     }
 
     // ── Count rows / actions ─────────────────────────────────────────────────

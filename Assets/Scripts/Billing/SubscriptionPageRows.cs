@@ -44,6 +44,9 @@ public static class SubscriptionPageRows
     public const string PlanCaption = "ВАШ ТАРИФ";
     public const string ActionsCaption = "УПРАВЛЕНИЕ";
 
+    // The pill sits ON the plan card, which is Surface — so a Surface pill is the same RGB
+    // as its own background in BOTH themes and simply disappears. Hairline is the one
+    // neutral that steps off Surface in both (dark #242C38 on #171C24, light on white).
     public const string PillActive = "Активна";
     public const string PillTrial = "Пробный";
     public const string PillExpired = "Истекла";
@@ -87,17 +90,22 @@ public static class SubscriptionPageRows
     /// A purchase always wins; otherwise a trial with days on the clock is a trial
     /// (including the pre-auth grace, where the clock has never STARTED — see
     /// EntitlementPolicy.EffectiveTier), and everything else is spent.
+    ///
+    /// «Has the clock started» is deliberately NOT a parameter: TrialLedger.DaysLeft()
+    /// already returns the full TrialDays before the first auth, so the day count is the
+    /// only thing this decision needs — and taking the flag anyway would look like it
+    /// mattered when no branch could ever read it.
     /// </summary>
-    public static SubscriptionState State(PlanTier purchased, bool trialStarted, int trialDaysLeft)
+    public static SubscriptionState State(PlanTier purchased, int trialDaysLeft)
     {
         if (purchased != PlanTier.None) return SubscriptionState.Active;
         return trialDaysLeft > 0 ? SubscriptionState.Trial : SubscriptionState.Expired;
     }
 
-    public static SubscriptionStatusLine StatusLine(PlanTier purchased, bool trialStarted,
-        int trialDaysLeft, string periodEndIso)
+    public static SubscriptionStatusLine StatusLine(PlanTier purchased, int trialDaysLeft,
+        string periodEndIso)
     {
-        SubscriptionState state = State(purchased, trialStarted, trialDaysLeft);
+        SubscriptionState state = State(purchased, trialDaysLeft);
         switch (state)
         {
             case SubscriptionState.Active:
@@ -117,7 +125,7 @@ public static class SubscriptionPageRows
                     State = state,
                     Title = PaywallCopy.TierName(PlanTier.Trial),
                     PillText = PillTrial,
-                    PillBg = ThemeRole.Surface,
+                    PillBg = ThemeRole.Hairline,
                     PillInk = ThemeRole.InkTertiary,
                     Subline = TrialSubline(trialDaysLeft),
                 };
@@ -128,7 +136,7 @@ public static class SubscriptionPageRows
                     State = SubscriptionState.Expired,
                     Title = NoPlanTitle,
                     PillText = PillExpired,
-                    PillBg = ThemeRole.Surface,
+                    PillBg = ThemeRole.Hairline,
                     PillInk = ThemeRole.InkTertiary,
                     Subline = NoSubscriptionSubline,
                 };
@@ -161,12 +169,17 @@ public static class SubscriptionPageRows
     public static DateTime? ParsePeriodEnd(string iso)
     {
         if (string.IsNullOrWhiteSpace(iso)) return null;
+        // Normalise every wire form to UTC before the seam sees it, so the seam alone decides
+        // localisation. AdjustToUniversal converts an offset form ("+05:00") that would
+        // otherwise land in the PARSING machine's local time; AssumeUniversal covers a naked
+        // timestamp with no offset at all (a Postgres timestamptz is UTC, and "assume local"
+        // would make the rendered day follow the device). Note RoundtripKind is ILLEGAL
+        // alongside these two — DateTime.TryParse throws ArgumentException, it does not just
+        // ignore it.
         if (!DateTime.TryParse(iso, CultureInfo.InvariantCulture,
-                DateTimeStyles.RoundtripKind, out DateTime parsed))
+                DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out DateTime parsed))
             return null;
 
-        // An offset form ("+05:00") parses to Local on the parsing machine; only a genuine
-        // Z/Utc kind needs converting, which is exactly what the seam decides.
         return LocalizeUtc(parsed);
     }
 
@@ -201,11 +214,15 @@ public static class SubscriptionPageRows
     public static string CountLine(int current, int max)
         => PaywallCopy.Number(current) + " из " + PaywallCopy.Number(max);
 
-    /// <summary>0..1 bar fill. A zero quota fills the bar rather than dividing by zero.</summary>
+    /// <summary>
+    /// 0..1 bar fill. A ceiling of zero reads EMPTY, never full: «no plan» is not «quota
+    /// exhausted», and a full red bar there would invent an alarm out of a missing number
+    /// (the meters are hidden outright in that state — see <see cref="MetersVisible"/>).
+    /// </summary>
     public static float FillFraction(int used, int quota, int topup)
     {
         int ceiling = quota + topup;
-        if (ceiling <= 0) return 1f;
+        if (ceiling <= 0) return 0f;
         if (used <= 0) return 0f;
         return used >= ceiling ? 1f : used / (float)ceiling;
     }
@@ -225,6 +242,14 @@ public static class SubscriptionPageRows
             default: return ThemeRole.AccentFill;
         }
     }
+
+    /// <summary>
+    /// PlanTier.None has no allowances at all (PlanCatalog.Get(None) is 0 bots / 0 channels /
+    /// 0 dialogs), so a meter block would read «2 из 0» — a limit that is not a limit but a
+    /// missing plan. In that state the card's «Подписка не оформлена» and the actions below
+    /// carry the page instead.
+    /// </summary>
+    public static bool MetersVisible(PlanTier effectiveTier) => effectiveTier != PlanTier.None;
 
     // ── Actions ──────────────────────────────────────────────────────────────
 

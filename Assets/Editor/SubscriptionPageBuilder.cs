@@ -26,7 +26,10 @@ using UnityEngine.UI;
 ///    swipe chrome, then filled with freshly built, theme-bound content;
 ///  • touches nothing else in the scene.
 ///
-/// Idempotent: run it twice and the scene is byte-equivalent. All sizes are 1080×1920
+/// Idempotent at the level that matters: run it twice and the GameObject census is stable
+/// (same count, same paths, no duplicates) — the panel SUBTREE is torn down and rebuilt, so
+/// its fileIDs are new each run, while the list row is found-and-rewired in place.
+/// All sizes are 1080×1920
 /// canvas reference units. Save the scene after running (the headless entry saves).
 /// </summary>
 public static class SubscriptionPageBuilder
@@ -187,10 +190,10 @@ public static class SubscriptionPageBuilder
     {
         GameObject content = panel.transform.Find("ScrollView/Viewport/Content").gameObject;
 
-        MakeCaption(content, SubscriptionPageRows.PlanCaption);
+        MakeCaption(content, "Caption_Plan", SubscriptionPageRows.PlanCaption);
         BuildPlanCard(content, so);
 
-        MakeCaption(content, SubscriptionPageRows.ActionsCaption);
+        MakeCaption(content, "Caption_Actions", SubscriptionPageRows.ActionsCaption);
         BuildActionsCard(content, so);
 
         var notice = NewChild(content, "Notice", out _);
@@ -243,7 +246,7 @@ public static class SubscriptionPageBuilder
         var sublineGo = NewChild(head, "Subline", out _);
         var subline = AddText(sublineGo, "", 36f, _regular, ThemeRole.InkSecondary);
 
-        MakeDivider(card);
+        GameObject metersDivider = MakeDivider(card);
 
         // Meters.
         var meters = NewChild(card, "Meters", out _);
@@ -280,6 +283,8 @@ public static class SubscriptionPageBuilder
         so.FindProperty("subPillLabel").objectReferenceValue = pillLabel;
         so.FindProperty("subPillBgTheme").objectReferenceValue = pillBgTheme;
         so.FindProperty("subPillInkTheme").objectReferenceValue = pillInkTheme;
+        so.FindProperty("subMetersBlock").objectReferenceValue = meters;
+        so.FindProperty("subMetersDivider").objectReferenceValue = metersDivider;
         so.FindProperty("subDialogsValue").objectReferenceValue = dialogsValue;
         so.FindProperty("subQuotaFill").objectReferenceValue = fillRt;
         so.FindProperty("subQuotaFillTheme").objectReferenceValue = fillTheme;
@@ -291,7 +296,8 @@ public static class SubscriptionPageBuilder
     {
         GameObject card = MakeCard(parent, "ActionsCard");
 
-        Button change = MakeActionRow(card, "Row_ChangePlan", SubscriptionPageRows.ChangePlanRow, _cardIcon, IconBlue, out _);
+        Button change = MakeActionRow(card, "Row_ChangePlan", SubscriptionPageRows.ChangePlanRow,
+            _cardIcon, IconBlue, out _, chevron: true);   // the only row that navigates in-app
         MakeDivider(card);
         Button topUp = MakeActionRow(card, "Row_TopUp", SubscriptionPageRows.TopUpRowText(), _dialogIcon, IconGreen, out var topUpLabel);
         MakeDivider(card);
@@ -395,6 +401,19 @@ public static class SubscriptionPageBuilder
             var bg = iconBg.GetComponent<Image>();
             if (bg != null) bg.color = RowIconTeal;
 
+            // Instantiate copies the SERIALISED m_Material, so the clone points at the
+            // template's rounded-corner material — and Nobi only mints a fresh one from
+            // OnEnable, which never fires here because Screen_Profile is inactive. Two
+            // graphics on one material means the second's size overwrites the first's
+            // _WidthHeightRadius. Null it, then re-Validate: Nobi's own `material` field is
+            // NOT serialised, so it is null on the clone and Validate() creates a new one.
+            var rounded = iconBg.GetComponent<ImageWithRoundedCorners>();
+            if (rounded != null)
+            {
+                if (bg != null) bg.material = null;
+                _roundedToRefresh.Add(rounded);
+            }
+
             var glyph = iconBg.Find("Icon")?.GetComponent<Image>();
             if (glyph != null)
             {
@@ -461,15 +480,15 @@ public static class SubscriptionPageBuilder
         return card;
     }
 
-    private static void MakeCaption(GameObject parent, string text)
+    private static void MakeCaption(GameObject parent, string name, string text)
     {
-        var go = NewChild(parent, "Caption", out _);
+        var go = NewChild(parent, name, out _);
         var tmp = AddText(go, text, 30f, _semibold, ThemeRole.InkSecondary);
         tmp.characterSpacing = 6f;
         tmp.margin = new Vector4(12f, 24f, 12f, 0f);
     }
 
-    private static void MakeDivider(GameObject card)
+    private static GameObject MakeDivider(GameObject card)
     {
         var divider = NewChild(card, "Divider", out _);
         SetPreferredHeight(divider, 2f);
@@ -477,6 +496,7 @@ public static class SubscriptionPageBuilder
         img.color = Color.white;
         img.raycastTarget = false;
         Themed(divider, ThemeRole.Hairline);
+        return divider;
     }
 
     /// <summary>«Диалоги ИИ» ————— «412 из 1 000». Returns the VALUE label.</summary>
@@ -499,9 +519,15 @@ public static class SubscriptionPageBuilder
         return value;
     }
 
-    /// <summary>Tappable row: squircle icon + label + chevron. Returns its Button.</summary>
+    /// <summary>
+    /// Tappable row: squircle icon + label, plus a chevron only when the row NAVIGATES
+    /// somewhere in-app. «Купить…»/«Восстановить…» perform an action in place and
+    /// «Отменить…» leaves for the store, so a disclosure chevron on those would promise a
+    /// sub-page that does not exist (no external-link glyph exists in the project yet).
+    /// Returns its Button.
+    /// </summary>
     private static Button MakeActionRow(GameObject card, string name, string text, Sprite glyph,
-        Color iconColor, out TextMeshProUGUI label, ThemeRole? iconBgRole = null,
+        Color iconColor, out TextMeshProUGUI label, bool chevron = false, ThemeRole? iconBgRole = null,
         ThemeRole? glyphRole = null, ThemeRole labelRole = ThemeRole.InkPrimary)
     {
         // Stable node name, not the label: the top-up row's text is re-stamped from the
@@ -538,14 +564,24 @@ public static class SubscriptionPageBuilder
         labelLe.preferredWidth = 0f;
         labelLe.flexibleWidth = 1f;
 
-        var chevron = NewChild(row, "Chevron", out _);
-        SetFixedSize(chevron, 32f, 32f);
-        var chevronImg = chevron.AddComponent<Image>();
-        chevronImg.sprite = _chevronRight;
-        chevronImg.color = Color.white;
-        chevronImg.preserveAspect = true;
-        chevronImg.raycastTarget = false;
-        Themed(chevron, ThemeRole.InkSecondary);
+        if (chevron)
+        {
+            var chevronGo = NewChild(row, "Chevron", out _);
+            SetFixedSize(chevronGo, 32f, 32f);
+            var chevronImg = chevronGo.AddComponent<Image>();
+            chevronImg.sprite = _chevronRight;
+            chevronImg.color = Color.white;
+            chevronImg.preserveAspect = true;
+            chevronImg.raycastTarget = false;
+            Themed(chevronGo, ThemeRole.InkSecondary);
+        }
+
+        // ColorTint multiplies into the target's colour, so tinting the alpha-0 hit Image
+        // would produce no feedback at all — point it at the LABEL instead (14a's Restore
+        // row precedent). This is what makes the in-flight `interactable = false` visible.
+        // It writes through CanvasRenderer, so it never fights the label's ThemedColor.
+        button.targetGraphic = label;
+        button.transition = Selectable.Transition.ColorTint;
 
         return button;
     }

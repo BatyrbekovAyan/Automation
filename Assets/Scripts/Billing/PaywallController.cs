@@ -181,7 +181,9 @@ public class PaywallController : MonoBehaviour
         // it is. The exit case is covered by _closing; the ENTRY case is not — a request landing
         // inside the 0.3s entry slide would read as "settled open", skip the (re)slide, and leave
         // the screen parked at whatever x the killed tween had reached.
-        bool slideInFlight = _activeSlide != null && _activeSlide.IsActive() && _activeSlide.IsPlaying();
+        // IsActive() alone: a tween that exists but is paused/queued still means the screen is
+        // parked mid-travel, and IsPlaying() would call that "settled".
+        bool slideInFlight = _activeSlide != null && _activeSlide.IsActive();
         bool wasSettledOpen = wasActive && !_closing && !slideInFlight;
 
         // Kill() defaults to complete:false, so a mid-flight exit tween's OnComplete — which

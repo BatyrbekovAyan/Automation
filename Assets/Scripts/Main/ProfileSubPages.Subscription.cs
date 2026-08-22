@@ -34,6 +34,10 @@ public partial class ProfileSubPages
     [SerializeField] private ThemedColor subPillInkTheme;
 
     [Header("Subscription page — meters")]
+    // Hidden wholesale at PlanTier.None (see SubscriptionPageRows.MetersVisible): the divider
+    // goes with the block, or the card ends on a hairline with nothing under it.
+    [SerializeField] private GameObject subMetersBlock;
+    [SerializeField] private GameObject subMetersDivider;
     [SerializeField] private TextMeshProUGUI subDialogsValue;
     [SerializeField] private RectTransform subQuotaFill;
     [SerializeField] private ThemedColor subQuotaFillTheme;
@@ -72,6 +76,9 @@ public partial class ProfileSubPages
     {
         UsageStore.OnUsageChanged += RefreshSubscriptionPage;
         BillingService.OnEntitlementChanged += HandleEntitlementChanged;
+        // Self-heal: while the Profile tab was away, both events fired into nothing. Repaint
+        // on the way back rather than trusting whatever was last rendered.
+        RefreshSubscriptionPage();
     }
 
     private void OnDisable()
@@ -87,6 +94,9 @@ public partial class ProfileSubPages
     private void OpenSubscriptionPage()
     {
         _subNoticeText = "";
+        // A store callback that never came back (app backgrounded mid-purchase) would otherwise
+        // leave every action row disabled for the rest of the session.
+        _subBusy = false;
         RefreshSubscriptionPage();
         FetchUsage();   // paint the cache instantly, then quietly refresh (house pattern)
     }
@@ -109,7 +119,7 @@ public partial class ProfileSubPages
         UsageSnapshot usage = UsageStore.Current;
 
         SubscriptionStatusLine status = SubscriptionPageRows.StatusLine(
-            purchased, TrialLedger.HasStarted, TrialLedger.DaysLeft(), usage?.periodEnd);
+            purchased, TrialLedger.DaysLeft(), usage?.periodEnd);
 
         if (subPlanTitle != null) subPlanTitle.text = status.Title;
         if (subPlanSubline != null) subPlanSubline.text = status.Subline;
@@ -137,7 +147,14 @@ public partial class ProfileSubPages
     {
         // Limits follow the EFFECTIVE tier (a live trial has its own caps), and the
         // quota falls back to the catalog whenever the server has not spoken yet.
-        PlanSpec spec = PlanCatalog.Get(EntitlementGate.CurrentTier);
+        PlanTier tier = EntitlementGate.CurrentTier;
+        PlanSpec spec = PlanCatalog.Get(tier);
+
+        bool metersVisible = SubscriptionPageRows.MetersVisible(tier);
+        if (subMetersBlock != null) subMetersBlock.SetActive(metersVisible);
+        if (subMetersDivider != null) subMetersDivider.SetActive(metersVisible);
+        if (!metersVisible) return;   // None has no allowances to measure against
+
         int quota = usage != null && usage.quota > 0 ? usage.quota : spec.DialogQuota;
 
         SubscriptionUsageLine dialogs = usage == null

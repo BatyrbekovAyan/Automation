@@ -18,6 +18,16 @@ using UnityEngine.UI;
 /// (superseded by Аккаунт → «Удалить все данные»). All sizes in 1080×1920
 /// canvas reference units. Save the scene after running (headless entry saves
 /// automatically).
+///
+/// ⚠️ THIS BUILDER IS DESTRUCTIVE AND NO LONGER KNOWS THE WHOLE PAGE. It destroys
+/// the entire SubPages root and rebuilds SIX panels, so running it will:
+///   • DELETE «Подписка» (PanelSubscription) — built separately and additively by
+///     SubscriptionPageBuilder, which this builder has never heard of;
+///   • TRUNCATE ProfileSubPages.pages back to 6 entries, unwiring Page.Subscription;
+///   • re-write the pre-theme LIGHT literals below over the scene's hand-tuned
+///     ThemedColor bindings.
+/// If you must run it, run «Tools/Billing/Build Subscription Page» straight after to
+/// restore the seventh page, and expect to redo the theme pass by hand.
 /// </summary>
 public static class ProfileSubPagesBuilder
 {
