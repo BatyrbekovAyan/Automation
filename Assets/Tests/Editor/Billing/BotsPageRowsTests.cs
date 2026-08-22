@@ -12,11 +12,6 @@ using NUnit.Framework;
 /// </summary>
 public class BotsPageRowsTests
 {
-    // The flag lives on a static, so a PlayMode/coroutine-driven test that abandoned a
-    // fetch could otherwise leak «in flight» into every test after it.
-    [TearDown]
-    public void Reset() => UsageClient.ResetSeamsForTests();
-
     // ── Trial pill ───────────────────────────────────────────────────────────
 
     [Test]
@@ -252,12 +247,6 @@ public class BotsPageRowsTests
         Assert.AreEqual("Добавить бота", BotsPageRows.AddBotTitle);
     }
 
-    // ── UsageClient in-flight guard (Task 11 carry-over) ─────────────────────
-
-    [Test]
-    public void A_second_usage_fetch_is_refused_while_one_is_in_flight()
-    {
-        Assert.IsTrue(UsageClient.ShouldStart(inFlight: false));
-        Assert.IsFalse(UsageClient.ShouldStart(inFlight: true));
-    }
+    // The UsageClient in-flight guard moved to UsageClientTests when Task 14d gave it a
+    // staleness arm — it was never about this screen's rows.
 }

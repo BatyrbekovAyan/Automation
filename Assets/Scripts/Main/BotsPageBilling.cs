@@ -323,6 +323,15 @@ public class BotsPageBilling : MonoBehaviour
 
         if (addCardTitle != null) addCardTitle.text = BotsPageRows.AddBotTitle;
         if (addCardSubtext != null) addCardSubtext.text = BotsPageRows.AddBotSubtext(tier, bots);
+
+        // Refresh() runs on exactly the frames the list CHANGED (a bot created or deleted),
+        // and PositionAddCard seats the card off botsList.rect.height — which uGUI has not
+        // recomputed yet: ReserveListBottom's MarkLayoutForRebuild is deferred to the end of
+        // the frame, and the new/removed card's own row is queued with it. Reading the stale
+        // height parks the card at the PREVIOUS list length for one frame, which is the pop
+        // on create/delete. Forcing the rebuild here makes the position right in the same
+        // frame the fact changed; LateUpdate keeps it right afterwards.
+        if (botsList != null) LayoutRebuilder.ForceRebuildLayoutImmediate(botsList);
         PositionAddCard();
     }
 

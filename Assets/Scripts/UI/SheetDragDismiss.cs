@@ -22,6 +22,18 @@ public class SheetDragDismiss : MonoBehaviour, IBeginDragHandler, IDragHandler, 
 
     public UnityEvent onDismiss = new UnityEvent();
 
+    /// <summary>
+    /// Runtime wiring for sheets built in code rather than in the scene
+    /// (<see cref="BillingGateSheet"/>). The scene sheets keep getting these two refs
+    /// stamped by <c>SheetDragDismissWirer</c> through SerializedObject, which this does
+    /// not disturb — it only gives a non-Editor caller a way to reach the same fields.
+    /// </summary>
+    public void Bind(RectTransform sheetPanel, CanvasGroup backdrop)
+    {
+        panel = sheetPanel;
+        backdropGroup = backdrop;
+    }
+
     private bool dragging;
     private float shownY;
     private float startPointerY;

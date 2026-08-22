@@ -268,13 +268,25 @@ public class EmptyStateView : MonoBehaviour
         // include-inactive so it works even if the Bots tab was never opened this
         // session (BotsPage.Instance is set only after Screen_Bots first activates).
         BotsPage botsPage = FindFirstObjectByType<BotsPage>(FindObjectsInactive.Include);
-        if (botsPage != null) botsPage.StartNewBot();
+        if (botsPage == null)
+            Debug.LogWarning("[D12] OpenCreateBotFlow: no BotsPage in the scene — opening the wizard unchecked.");
 
-        // Defensive guarantee (D12 device re-fail — the CTA read as INERT, "nothing happens"):
-        // ensure the Add-Bot overlay actually opens even if the BotsPage path above was compromised
-        // at runtime (missing BotsPage, a SwitchTab no-op, or a swallowed exception before Open()).
-        // Open() is idempotent, so on the normal path — including every WhatsApp tap, where
-        // StartNewBot already opened it — this is a no-op (WhatsApp byte-identical).
+        // A missing BotsPage is the one D12 case the checked path below cannot cover (there is
+        // nothing to count bots with), so it still falls through to the defensive open — a
+        // broken scene is not a plan state, and a dead CTA was the measured device failure.
+        bool allowed = botsPage == null || botsPage.TryStartNewBot();
+
+        // Task 14d — the bypass is CLOSED. This used to open the overlay unconditionally, which
+        // walked straight around the plan's bot gate: Task 5 left it that way on purpose, because
+        // a refusal had no visible feedback yet and a silent dead end was the worse failure. The
+        // gate sheet (and the paywall behind it) is that feedback now, so a refusal must stay
+        // refused — otherwise this CTA is the one door in the app the limit does not close.
+        //
+        // The D12 defence it also carried (device re-fail: the CTA read as INERT because the
+        // BotsPage path was compromised at runtime — missing BotsPage, a SwitchTab no-op, a
+        // swallowed exception before Open()) survives, now scoped to the ALLOWED case. Open() is
+        // idempotent, so on the normal path this stays the no-op it always was.
+        if (!allowed) return;
         if (AddBotPanel.Instance != null && !AddBotPanel.Instance.IsOpen)
             AddBotPanel.Instance.Open();
 

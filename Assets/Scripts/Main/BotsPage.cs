@@ -84,18 +84,30 @@ public class BotsPage : MonoBehaviour
     /// form always lands on the Bots page. Idempotent (AddBotPanel.Open no-ops when
     /// already open). Public so the header + and the chats empty-state CTA share it.
     /// </summary>
-    public void StartNewBot()
+    public void StartNewBot() => TryStartNewBot();
+
+    /// <summary>
+    /// <see cref="StartNewBot"/> with its verdict: <c>false</c> means the plan's bot limit
+    /// refused, and the gate sheet / paywall is what the owner sees instead.
+    ///
+    /// Exists because a caller that follows up on the wizard (EmptyStateView preselects the
+    /// platform, and used to force the panel open defensively) must be able to tell a
+    /// REFUSAL from a failure — the void overload stays for UnityEvent wiring, which cannot
+    /// bind a bool-returning method.
+    /// </summary>
+    public bool TryStartNewBot()
     {
         int existingBots = botsParent != null ? botsParent.childCount : 0;
         if (!EntitlementGate.CanCreateBot(existingBots))
         {
             EntitlementGate.RequestPaywall(PaywallTrigger.BotLimit);
-            return;
+            return false;
         }
 
         var tabs = BottomTabManager.Instance;   // IN-08
         if (tabs != null && tabs.ActiveTabIndex != BottomTabManager.BotsTabIndex)
             tabs.SwitchTab(BottomTabManager.BotsTabIndex);
         AddBotPanel.Instance?.Open();
+        return true;
     }
 }

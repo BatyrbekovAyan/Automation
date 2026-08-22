@@ -22,6 +22,37 @@ public class EntitlementPolicyTests
     public void Bot_gate(PlanTier t, int existing, bool ok)
         => Assert.AreEqual(ok, EntitlementPolicy.CanCreateBot(t, existing));
 
+    // RemainingBots is what the «+ бот» card renders and what CanCreateBot is built on, so
+    // these cases also pin that the card and the gate can never disagree (Task 14d).
+    [TestCase(PlanTier.Start, 0, 1)]
+    [TestCase(PlanTier.Start, 1, 0)]
+    [TestCase(PlanTier.Business, 0, 3)]
+    [TestCase(PlanTier.Business, 2, 1)]
+    [TestCase(PlanTier.Network, 5, 0)]
+    [TestCase(PlanTier.Trial, 1, 2)]
+    [TestCase(PlanTier.None, 0, 0)]
+    public void Remaining_bots(PlanTier tier, int existing, int remaining)
+        => Assert.AreEqual(remaining, EntitlementPolicy.RemainingBots(tier, existing));
+
+    [TestCase(PlanTier.Start, 4)]
+    [TestCase(PlanTier.Business, 9)]
+    public void A_downgrade_never_counts_backwards(PlanTier tier, int existing)
+    {
+        // Over the allowance: the bots stay, the allowance shrank. «Ещё -3 бота» would be
+        // both wrong and unpluralisable.
+        Assert.AreEqual(0, EntitlementPolicy.RemainingBots(tier, existing));
+        Assert.IsFalse(EntitlementPolicy.CanCreateBot(tier, existing));
+    }
+
+    [TestCase(PlanTier.None, 0)]
+    [TestCase(PlanTier.Trial, 2)]
+    [TestCase(PlanTier.Trial, 3)]
+    [TestCase(PlanTier.Network, 4)]
+    [TestCase(PlanTier.Network, 5)]
+    public void The_bot_gate_is_exactly_remaining_greater_than_zero(PlanTier tier, int existing)
+        => Assert.AreEqual(EntitlementPolicy.RemainingBots(tier, existing) > 0,
+                           EntitlementPolicy.CanCreateBot(tier, existing));
+
     [TestCase(PlanTier.Network, 4, true)]
     [TestCase(PlanTier.Network, 5, false)]
     [TestCase(PlanTier.Trial, 2, true)]

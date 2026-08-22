@@ -134,12 +134,16 @@ public static class BotsPageRows
 
     /// <summary>
     /// «Ещё 2 бота в тарифе», or <see cref="BotLimitSubtext"/> once the plan is full.
-    /// Never counts backwards: a downgrade leaves the bots in place while the allowance
-    /// shrinks, so the remainder is clamped at zero.
+    ///
+    /// The count comes from <see cref="EntitlementPolicy.RemainingBots"/> — the same
+    /// expression <see cref="EntitlementPolicy.CanCreateBot"/> is built on — rather than
+    /// being re-derived here, so the card's limit STATE and the gate's refusal are one fact.
+    /// (That seam also owns the zero clamp: a downgrade leaves the bots in place while the
+    /// allowance shrinks, and the remainder must never count backwards.)
     /// </summary>
     public static string AddBotSubtext(PlanTier effectiveTier, int liveBots)
     {
-        int remaining = Math.Max(0, PlanCatalog.Get(effectiveTier).MaxBots - liveBots);
+        int remaining = EntitlementPolicy.RemainingBots(effectiveTier, liveBots);
         return remaining == 0
             ? BotLimitSubtext
             : "Ещё " + PaywallCopy.Bots(remaining) + " в тарифе";

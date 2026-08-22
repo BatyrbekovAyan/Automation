@@ -117,6 +117,18 @@ public class PaywallController : MonoBehaviour
         EntitlementGate.OnPaywallRequested += HandlePaywallRequested;
     }
 
+    /// <summary>
+    /// THE single subscriber to <see cref="EntitlementGate.OnPaywallRequested"/>, and
+    /// therefore the one place the sheet-vs-paywall decision is made (Task 14d). A second
+    /// subscriber owning the interception would make BOTH open on a limit trigger, which is
+    /// exactly the outcome the sheet exists to avoid.
+    ///
+    /// Limit triggers (<see cref="BillingGateRows.ShouldInterceptWithSheet"/>) get the
+    /// lightweight bottom sheet first; its «Посмотреть тарифы» re-enters
+    /// <see cref="Open"/> with the SAME trigger, so nothing downstream (the receipt variant,
+    /// the CTA form) can tell the difference between a direct request and a sheet-forwarded
+    /// one. Browse/TrialExpired open the paywall directly, unchanged.
+    /// </summary>
     private static void HandlePaywallRequested(PaywallTrigger trigger)
     {
         var instance = Instance;
@@ -125,8 +137,28 @@ public class PaywallController : MonoBehaviour
             Debug.LogWarning($"[PaywallController] Paywall requested ({trigger}) but Screen_Paywall is not in the scene — run Tools/Billing/Build Paywall.");
             return;
         }
+
+        // Resolved BEFORE the sheet so a missing paywall screen never leaves the owner
+        // holding a sheet whose only action leads nowhere.
+        if (BillingGateRows.ShouldInterceptWithSheet(trigger))
+        {
+            BillingGateSheet.Show(trigger, instance.SemiboldFont, instance.RegularFont,
+                                  () => Instance?.Open(trigger));
+            return;
+        }
+
         instance.Open(trigger);
     }
+
+    /// <summary>
+    /// Font assets for the runtime-built <see cref="BillingGateSheet"/>. PaywallBuilder
+    /// stamped the project's real weights onto these labels, and there is no runtime path to
+    /// AssetDatabase — TMP's own default asset ships an empty weight table, so a synthesized
+    /// bold would not match anything else on screen.
+    /// </summary>
+    internal TMP_FontAsset SemiboldFont => ctaLabel != null ? ctaLabel.font : null;
+
+    internal TMP_FontAsset RegularFont => headerSubline != null ? headerSubline.font : null;
 
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
