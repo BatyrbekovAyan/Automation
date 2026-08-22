@@ -305,10 +305,12 @@
       "Bash(kill 6405 7439)",
       "Bash(grep -iE \"nuget|^Packages$\")",
       "Bash(curl -s \"https://raw.githubusercontent.com/Unity-Technologies/UnityCsReference/master/Editor/Mono/AssemblyValidation.cs\" -o /tmp/AssemblyValidation.cs)",
-      "Bash(awk '{print $1}')"
+      "Bash(awk '{print $1}')",
+      "Bash(grep -v \"^$\")"
     ],
     "defaultMode": "acceptEdits"
   },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "mcp-unity"
   ],
@@ -316,6 +318,5 @@
     "type": "command",
     "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/gsd-statusline.js",
     "padding": 0
-  },
-  "enableAllProjectMcpServers": true
+  }
 }
