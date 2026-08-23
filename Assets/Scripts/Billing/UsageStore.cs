@@ -18,6 +18,21 @@ public class UsageSnapshot
     public int botsRegistered;
     public int channelsConnected;
     public string periodEnd;   // ISO-8601 or null (no active/known period end)
+
+    /// <summary>
+    /// Raw store SKU behind the current subscription (<c>sub.business.year</c>, …), or null.
+    /// Carried for diagnosis only — nothing branches on it client-side; the server already
+    /// reduced it to <see cref="interval"/>, so the suffix rule lives in exactly one place.
+    /// </summary>
+    public string productId;
+
+    /// <summary>
+    /// «month» / «year» / null — the billing period, derived server-side from the SKU suffix
+    /// (Get Usage's Shape Response). Null means UNKNOWN (unrecognised SKU, or a payload from
+    /// before Task 15a), never «month»: the fallback belongs to the display seam, which treats
+    /// monthly as the known default (<see cref="SubscriptionPageRows.ActiveSubline"/>).
+    /// </summary>
+    public string interval;
 }
 
 /// <summary>

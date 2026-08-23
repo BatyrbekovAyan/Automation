@@ -102,8 +102,13 @@ public static class SubscriptionPageRows
         return trialDaysLeft > 0 ? SubscriptionState.Trial : SubscriptionState.Expired;
     }
 
+    /// <param name="interval">
+    /// <see cref="UsageSnapshot.interval"/> — «month», «year», or null/anything else for
+    /// «period unknown». Optional so the 20-odd existing call sites that have no snapshot to
+    /// hand (and every test written before Task 15a) keep asserting the KNOWN DEFAULT, monthly.
+    /// </param>
     public static SubscriptionStatusLine StatusLine(PlanTier purchased, int trialDaysLeft,
-        string periodEndIso)
+        string periodEndIso, string interval = null)
     {
         SubscriptionState state = State(purchased, trialDaysLeft);
         switch (state)
@@ -116,7 +121,7 @@ public static class SubscriptionPageRows
                     PillText = PillActive,
                     PillBg = ThemeRole.PositiveBg,
                     PillInk = ThemeRole.PositiveInk,
-                    Subline = ActiveSubline(purchased, periodEndIso),
+                    Subline = ActiveSubline(purchased, periodEndIso, interval),
                 };
 
             case SubscriptionState.Trial:
@@ -143,15 +148,27 @@ public static class SubscriptionPageRows
         }
     }
 
+    /// <summary>Wire values of <see cref="UsageSnapshot.interval"/> (Get Usage, Task 15a).</summary>
+    public const string IntervalMonth = "month";
+    public const string IntervalYear = "year";
+
     /// <summary>
-    /// «19 900 ₸/мес» plus «· продлится 26 августа» when the server gave us a period end.
-    /// NOTE: the monthly price is the only one we can name — neither the GetUsage snapshot
-    /// nor BillingService carries the purchased PERIOD, so an annual subscriber is shown a
-    /// monthly figure (flagged in the task-14b report).
+    /// «19 900 ₸/мес» (or «199 000 ₸/год» on an annual subscription) plus «· продлится
+    /// 26 августа» when the server gave us a period end.
+    ///
+    /// <paramref name="interval"/> is the Get Usage snapshot's own field, derived there from
+    /// the purchased SKU's <c>.month</c>/<c>.year</c> suffix. Anything that is not exactly
+    /// <see cref="IntervalYear"/> — null, empty, an unrecognised value, or a payload from a
+    /// deployment older than Task 15a — renders the MONTHLY line: that is the known default
+    /// and the safe one, because the annual figure is ten times larger and quoting it at a
+    /// monthly subscriber would be a straight lie about what they are paying.
     /// </summary>
-    public static string ActiveSubline(PlanTier purchased, string periodEndIso)
+    public static string ActiveSubline(PlanTier purchased, string periodEndIso, string interval = null)
     {
-        string price = PaywallCopy.PerMonth(PlanCatalog.Get(purchased).PriceMonthKzt);
+        PlanSpec spec = PlanCatalog.Get(purchased);
+        string price = interval == IntervalYear
+            ? PaywallCopy.PerYear(spec.PriceYearKzt)
+            : PaywallCopy.PerMonth(spec.PriceMonthKzt);
         DateTime? end = ParsePeriodEnd(periodEndIso);
         return end.HasValue ? price + " · продлится " + RuDateFormat.DayMonth(end.Value) : price;
     }

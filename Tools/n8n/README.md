@@ -192,6 +192,39 @@ Negative-tested (Task 13b fix round): a scratch copy with `_universal.md` trunca
 sentence dropped all 6 verticals to 967–1009 tokens and the gate correctly refused with a
 per-vertical breakdown, confirming the assert discriminates rather than being vacuously true.
 
+## Re-pointing the RevenueCat webhook after a tunnel rotation
+
+`rotate-tunnel.py` fixes the four places listed in its own docstring. The RevenueCat
+webhook is a **fifth** one it does not touch, because it lives in a third-party dashboard
+with no local artifact: after every `cloudflared` restart the URL RevenueCat POSTs to is
+dead, purchases stop reaching `subscribers`, and nothing in this repo reports it.
+
+1. **Read the current tunnel URL.** `n8nBaseUrl` in `Assets/StreamingAssets/secrets.json`
+   (gitignored) is the live value — `rotate-tunnel.py` writes it there and it is what the
+   app itself uses. `python3 Tools/n8n/rotate-tunnel.py --dry-run` prints it alongside
+   everything that would change; `Tools/n8n/dev-tunnel.md` documents the manual flow, and
+   Option 1's *named* tunnel avoids this whole chore by never rotating.
+2. **Build the endpoint**: `<tunnel>/webhook/RevenueCatEvent` — the path is the `Webhook`
+   node's `path` in `Tools/n8n/workflows/ZGYr6srzS3rSSXHp-RevenueCat_Events.json` and must
+   match it exactly (no trailing slash, `/webhook/` not `/webhook-test/`, which is the
+   editor-only test URL and is live only while the canvas has "Listen for test event" armed).
+3. **Update it in RevenueCat**: dashboard → your project → **Integrations → Webhooks** →
+   the existing webhook → *Webhook URL*. Save; RevenueCat's own "Send test event" is the
+   quickest confirmation, and a `200 {"success":true}` (or `{"noop":true}` for an event
+   type the mapper deliberately ignores) means the whole chain is live.
+4. **The Authorization header is NOT rotated with the URL.** Its value lives ONLY in the
+   n8n credential named **«RevenueCat Webhook»** (`httpHeaderAuth`, header name
+   `Authorization`) and in the RevenueCat webhook's own *Authorization header* field — it
+   is deliberately absent from every file here, including this one, and from the exported
+   workflow JSON (which references the credential by id). Leave that field untouched when
+   changing the URL; if it ever has to be re-minted, read it from the n8n credential UI and
+   paste it straight into the dashboard, never into the repo.
+
+A rotation that misses this is silent in exactly one direction: the app keeps reading usage
+(GetUsage is called by the app over the same fresh tunnel), while purchases and renewals stop
+landing — so a subscriber quietly reads as `trial`/`trialing`. RevenueCat retries failed
+deliveries for a while, so re-pointing promptly usually backfills.
+
 ## Known follow-ups before this is production-/dev-ready
 
 1. **Credentials are not in these files** (referenced by id only). The local server has none yet —

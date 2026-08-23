@@ -39,6 +39,46 @@ public class SubscriptionPageRowsTests
     }
 
     [Test]
+    public void An_annual_subscriber_sees_the_year_price_and_period()
+    {
+        var line = SubscriptionPageRows.StatusLine(PlanTier.Business, 0, "2026-09-03T09:00:00Z",
+            interval: SubscriptionPageRows.IntervalYear);
+
+        Assert.AreEqual(SubscriptionState.Active, line.State);
+        Assert.AreEqual("Бизнес", line.Title);
+        Assert.AreEqual("199\u00A0000\u00A0₸/год · продлится 3 сентября", line.Subline);
+    }
+
+    [Test]
+    public void An_explicit_month_interval_is_the_unchanged_monthly_line()
+    {
+        var line = SubscriptionPageRows.StatusLine(PlanTier.Business, 0, PeriodEndUtc,
+            interval: SubscriptionPageRows.IntervalMonth);
+        Assert.AreEqual("19\u00A0900\u00A0₸/мес · продлится 26 августа", line.Subline);
+    }
+
+    [Test]
+    public void An_unknown_or_missing_interval_falls_back_to_the_month_line()
+    {
+        // Server said null (unrecognised SKU suffix), said nothing at all (pre-15a payload),
+        // or answered something we do not model — all three are «период неизвестен», and the
+        // KNOWN DEFAULT is monthly. Never guess the annual figure: it is 10× the monthly one.
+        foreach (string interval in new[] { null, "", "   ", "week", "YEARLY" })
+            Assert.AreEqual("19\u00A0900\u00A0₸/мес · продлится 26 августа",
+                SubscriptionPageRows.StatusLine(PlanTier.Business, 0, PeriodEndUtc, interval).Subline,
+                $"interval={interval ?? "null"}");
+    }
+
+    [Test]
+    public void The_year_price_is_read_from_the_catalog_for_every_tier()
+    {
+        Assert.AreEqual("99\u00A0000\u00A0₸/год",
+            SubscriptionPageRows.ActiveSubline(PlanTier.Start, null, SubscriptionPageRows.IntervalYear));
+        Assert.AreEqual("399\u00A0000\u00A0₸/год",
+            SubscriptionPageRows.ActiveSubline(PlanTier.Network, null, SubscriptionPageRows.IntervalYear));
+    }
+
+    [Test]
     public void Active_start_tier_carries_its_own_price()
     {
         var line = SubscriptionPageRows.StatusLine(PlanTier.Start, 0, PeriodEndUtc);

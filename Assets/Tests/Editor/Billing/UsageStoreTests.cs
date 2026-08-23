@@ -41,6 +41,44 @@ public class UsageStoreTests
         Assert.IsNull(snapshot.periodEnd);
     }
 
+    // Task 15a: the annual-interval fields. `interval` is derived server-side from the SKU
+    // suffix; the client only carries it (and the raw productId, for diagnosis).
+    [Test] public void Parse_carries_the_billing_interval_and_product_id()
+    {
+        var snapshot = UsageStore.Parse(
+            "{\"success\":true,\"plan\":\"business\",\"status\":\"active\",\"quota\":1000,\"used\":7," +
+            "\"topupBalance\":500,\"botsRegistered\":1,\"channelsConnected\":2," +
+            "\"periodEnd\":\"2026-09-03T10:00:00Z\",\"productId\":\"sub.business.year\",\"interval\":\"year\"}");
+
+        Assert.IsNotNull(snapshot);
+        Assert.AreEqual("year", snapshot.interval);
+        Assert.AreEqual("sub.business.year", snapshot.productId);
+    }
+
+    [Test] public void Parse_tolerates_a_payload_without_the_interval_fields()
+    {
+        // An older Get Usage deployment (or a response from before Task 15a) simply omits
+        // them — that must land as null, not throw and not lose the rest of the snapshot.
+        var snapshot = UsageStore.Parse(ValidJson);
+
+        Assert.IsNotNull(snapshot);
+        Assert.IsNull(snapshot.interval);
+        Assert.IsNull(snapshot.productId);
+        Assert.AreEqual(1000, snapshot.quota, "остальные поля не пострадали");
+    }
+
+    [Test] public void Parse_explicit_null_interval_round_trips_null()
+    {
+        var snapshot = UsageStore.Parse(
+            "{\"success\":true,\"plan\":\"start\",\"status\":\"active\",\"quota\":300,\"used\":0," +
+            "\"topupBalance\":0,\"botsRegistered\":0,\"channelsConnected\":0,\"periodEnd\":null," +
+            "\"productId\":\"legacy.grandfathered\",\"interval\":null}");
+
+        Assert.IsNotNull(snapshot);
+        Assert.IsNull(snapshot.interval);
+        Assert.AreEqual("legacy.grandfathered", snapshot.productId);
+    }
+
     [Test] public void Parse_garbage_returns_null_without_throwing()
     {
         UsageSnapshot snapshot = null;

@@ -119,7 +119,7 @@ public partial class ProfileSubPages
         UsageSnapshot usage = UsageStore.Current;
 
         SubscriptionStatusLine status = SubscriptionPageRows.StatusLine(
-            purchased, TrialLedger.DaysLeft(), usage?.periodEnd);
+            purchased, TrialLedger.DaysLeft(), usage?.periodEnd, usage?.interval);
 
         if (subPlanTitle != null) subPlanTitle.text = status.Title;
         if (subPlanSubline != null) subPlanSubline.text = status.Subline;

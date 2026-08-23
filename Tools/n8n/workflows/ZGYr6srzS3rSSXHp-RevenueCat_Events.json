@@ -37,7 +37,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const e = $json.body.event ?? $json.body;\nconst type = e.type;                       // INITIAL_PURCHASE | RENEWAL | ...\nconst appUserId = e.app_user_id;\nconst ent = (e.entitlement_ids && e.entitlement_ids[0]) || '';\nconst planByEnt = { tier_start: 'start', tier_business: 'business', tier_network: 'network' };\nconst out = { app_user_id: appUserId, topup_delta: 0 };\n\nif (type === 'NON_RENEWING_PURCHASE' && e.product_id === 'topup.dialogs.500') {\n  out.topup_delta = 500;                   // план/статус не трогаем\n} else if (['INITIAL_PURCHASE','RENEWAL','UNCANCELLATION','PRODUCT_CHANGE'].includes(type)) {\n  out.plan = planByEnt[ent] ?? 'none';\n  out.status = 'active';\n  out.period_end = e.expiration_at_ms ? new Date(e.expiration_at_ms).toISOString() : null;\n} else if (type === 'EXPIRATION') {\n  out.status = 'expired';\n} else if (type === 'CANCELLATION') {\n  return [];                               // автопродление выключили — доступ до period_end, ничего не меняем\n}\nreturn [{ json: out }];"
+        "jsCode": "const e = $json.body.event ?? $json.body;\nconst type = e.type;                       // INITIAL_PURCHASE | RENEWAL | ...\nconst appUserId = e.app_user_id;\nconst ent = (e.entitlement_ids && e.entitlement_ids[0]) || '';\nconst planByEnt = { tier_start: 'start', tier_business: 'business', tier_network: 'network' };\nconst out = { app_user_id: appUserId, topup_delta: 0 };\n\nif (type === 'NON_RENEWING_PURCHASE' && e.product_id === 'topup.dialogs.500') {\n  out.topup_delta = 500;                   // план/статус/product_id не трогаем\n} else if (['INITIAL_PURCHASE','RENEWAL','UNCANCELLATION','PRODUCT_CHANGE'].includes(type)) {\n  out.plan = planByEnt[ent] ?? 'none';\n  out.status = 'active';\n  out.period_end = e.expiration_at_ms ? new Date(e.expiration_at_ms).toISOString() : null;\n  out.product_id = e.product_id ?? null;   // .month/.year суффикс SKU -> интервал в Get Usage\n} else if (type === 'EXPIRATION') {\n  out.status = 'expired';\n} else if (type === 'CANCELLATION') {\n  return [];                               // автопродление выключили — доступ до period_end, ничего не меняем\n}\nreturn [{ json: out }];"
       },
       "alwaysOutputData": true
     },
@@ -53,9 +53,9 @@
       "parameters": {
         "resource": "database",
         "operation": "executeQuery",
-        "query": "insert into subscribers (app_user_id, plan, status, current_period_end, topup_balance, updated_at)\nvalues ($1, coalesce($2,'trial'), coalesce($3,'trialing'), $4, greatest($5,0), now())\non conflict (app_user_id) do update set\n  plan = coalesce($2, subscribers.plan),\n  status = coalesce($3, subscribers.status),\n  current_period_end = coalesce($4, subscribers.current_period_end),\n  topup_balance = subscribers.topup_balance + $5,\n  updated_at = now();",
+        "query": "insert into subscribers (app_user_id, plan, status, current_period_end, topup_balance, product_id, updated_at)\nvalues ($1, coalesce($2,'trial'), coalesce($3,'trialing'), $4, greatest($5,0), $6, now())\non conflict (app_user_id) do update set\n  plan = coalesce($2, subscribers.plan),\n  status = coalesce($3, subscribers.status),\n  current_period_end = coalesce($4, subscribers.current_period_end),\n  topup_balance = subscribers.topup_balance + $5,\n  product_id = coalesce($6, subscribers.product_id),\n  updated_at = now();",
         "options": {
-          "queryReplacement": "={{ [$json.app_user_id, ($json.plan ?? null), ($json.status ?? null), ($json.period_end ?? null), $json.topup_delta] }}"
+          "queryReplacement": "={{ [$json.app_user_id, ($json.plan ?? null), ($json.status ?? null), ($json.period_end ?? null), $json.topup_delta, ($json.product_id ?? null)] }}"
         }
       },
       "credentials": {

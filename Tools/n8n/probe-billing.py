@@ -66,7 +66,11 @@ returns. Two scenarios: an unknown appUserId (needs no precondition, always pass
 asserts the trial-default shape, 200 not 500) and a seeded probe_user_11 (needs a
 precondition seeded via `usage_seed_sql()` through a one-off n8n-mcp workflow first --
 asserts an EXACT value set: plan/quota/used/topupBalance/channelsConnected/
-botsRegistered/periodEnd).
+botsRegistered/periodEnd). Task 15a added `productId`/`interval` to all three
+expectation sets plus a third scenario (probe_user_15) proving an unrecognised SKU
+suffix yields interval null while still echoing the raw productId; the default RC run
+(Part 1) also gained a GetUsage read-back asserting the mapper PERSISTED product_id and
+that a top-up event never clobbers it.
 
 ## Part 5 -- Profile Lifecycle Sweep (Task 12, opt-in; fix round same day)
 
@@ -188,6 +192,10 @@ SECRET = os.environ.get("RC_WEBHOOK_SECRET", "")
 
 PROBE_USER = "probe_user_1"
 TOPUP_PRODUCT_ID = "topup.dialogs.500"
+# A real subscription SKU (PlanCatalog.Get(Business).SkuMonth). Task 15a: the mapper now
+# persists this into subscribers.product_id, and Get Usage derives `interval` from its
+# .month/.year suffix -- so the sequence below doubles as the annual-interval probe.
+SUBSCRIPTION_PRODUCT_ID = "sub.business.month"
 
 
 def now_plus_days_ms(days):
@@ -247,6 +255,7 @@ PROBES = [
         "app_user_id": PROBE_USER,
         "entitlement_ids": ["tier_business"],
         "expiration_at_ms": now_plus_days_ms(30),
+        "product_id": SUBSCRIPTION_PRODUCT_ID,
     }, True, {200}, 2),
     ("c_non_renewing_topup", {
         "type": "NON_RENEWING_PURCHASE",
@@ -647,14 +656,25 @@ def run_dialog_metering_connectivity_probe():
 USAGE_URL = BASE + "/webhook/GetUsage"
 USAGE_PROBE_USER = "probe_user_11"
 
+UNKNOWN_SKU_PROBE_USER = "probe_user_15"   # legacy/unrecognised product_id -> interval null
+
 EXPECTED_UNKNOWN_USER_USAGE = {
     "success": True, "plan": "trial", "status": "trialing", "quota": 150, "used": 0,
     "topupBalance": 0, "botsRegistered": 0, "channelsConnected": 0, "periodEnd": None,
+    "productId": None, "interval": None,
 }
 EXPECTED_USAGE_PROBE_USER = {
     "success": True, "plan": "business", "status": "active", "quota": 1000, "used": 7,
     "topupBalance": 500, "botsRegistered": 1, "channelsConnected": 2,
+    "productId": "sub.business.year", "interval": "year",
 }   # periodEnd asserted non-null separately (it's a real timestamp, not a fixed literal)
+# Task 15a scenario 3: a product_id whose suffix is neither .month nor .year (a legacy or
+# hand-written SKU) must yield interval null and still ECHO the raw productId -- the client
+# treats null as "period unknown" and falls back to the monthly line rather than guessing.
+EXPECTED_UNKNOWN_SKU_USAGE = {
+    "success": True, "plan": "start", "status": "active", "quota": 300,
+    "productId": "legacy.grandfathered", "interval": None,
+}
 
 
 def usage_seed_sql():
@@ -663,11 +683,17 @@ def usage_seed_sql():
     fixed calendar-date literals (2026-08/2026-07) rather than now()-relative math
     so the this-month/last-month split can't drift across a midnight boundary at
     the moment it runs; safe as long as this is run before 2026-09-01."""
-    return """insert into subscribers (app_user_id, plan, status, topup_balance, current_period_end, updated_at)
-values ('probe_user_11', 'business', 'active', 500, now() + interval '30 days', now())
+    return """insert into subscribers (app_user_id, plan, status, topup_balance, current_period_end, product_id, updated_at)
+values ('probe_user_11', 'business', 'active', 500, now() + interval '30 days', 'sub.business.year', now())
 on conflict (app_user_id) do update set
   plan = excluded.plan, status = excluded.status, topup_balance = excluded.topup_balance,
-  current_period_end = excluded.current_period_end, updated_at = now();
+  current_period_end = excluded.current_period_end, product_id = excluded.product_id, updated_at = now();
+
+insert into subscribers (app_user_id, plan, status, topup_balance, current_period_end, product_id, updated_at)
+values ('probe_user_15', 'start', 'active', 0, now() + interval '30 days', 'legacy.grandfathered', now())
+on conflict (app_user_id) do update set
+  plan = excluded.plan, status = excluded.status, topup_balance = excluded.topup_balance,
+  current_period_end = excluded.current_period_end, product_id = excluded.product_id, updated_at = now();
 
 insert into bot_profiles (profile_id, app_user_id, channel, bot_key, deleted_at)
 values
@@ -696,7 +722,7 @@ def usage_cleanup_sql():
     workflow once verification is done."""
     return """delete from dialog_counts where app_user_id = 'probe_user_11';
 delete from bot_profiles where app_user_id = 'probe_user_11';
-delete from subscribers where app_user_id = 'probe_user_11';"""
+delete from subscribers where app_user_id in ('probe_user_11', 'probe_user_15');"""
 
 
 def fetch_usage(app_user_id, timeout=15):
@@ -750,6 +776,20 @@ def run_usage_probe():
               f"(HTTP {status}, plan={body.get('plan') if isinstance(body, dict) else '?'!r}) -- "
               f"seed the precondition first via usage_seed_sql() through a one-off n8n-mcp workflow, "
               f"see the Part 4 module docstring. NOT counted as a failure.")
+
+    print(f"\n=== Scenario 3 (Task 15a): seeded {UNKNOWN_SKU_PROBE_USER!r} -- unrecognised SKU suffix ===")
+    status, body = fetch_usage(UNKNOWN_SKU_PROBE_USER)
+    print(f"HTTP {status} -- {body}")
+    if status == 200 and isinstance(body, dict) and body.get("productId") == EXPECTED_UNKNOWN_SKU_USAGE["productId"]:
+        mismatches = {k: (v, body.get(k)) for k, v in EXPECTED_UNKNOWN_SKU_USAGE.items() if body.get(k) != v}
+        scenario3_ok = not mismatches
+        print(f"[{'OK' if scenario3_ok else 'FAIL'}] unknown SKU echoes productId with interval null: {scenario3_ok}"
+              + (f" -- mismatches: {mismatches}" if mismatches else ""))
+        ok_all = ok_all and scenario3_ok
+    else:
+        print(f"[SKIP] {UNKNOWN_SKU_PROBE_USER!r} is not seeded (HTTP {status}, productId="
+              f"{body.get('productId') if isinstance(body, dict) else '?'!r}) -- seed via usage_seed_sql(). "
+              f"NOT counted as a failure.")
 
     print("\nThe broken-query negative test (bad column -> 500, restore -> 200) needs n8n-mcp write")
     print("access this script does not have -- done by hand; transcript in task-11-report.md.")
@@ -1000,8 +1040,29 @@ def main():
         if settle:
             time.sleep(settle)
 
+    # Task 15a: value-level read-back of what the mapper actually PERSISTED. The HTTP 200s
+    # above only prove the upsert did not error; GetUsage is the permanent read path (Task 7
+    # IMPORTANT#2 -- no debug webhook was built for this), so it is what asserts the column.
+    # Two facts in one read: (b) carried product_id and it landed, and (c)'s top-up did NOT
+    # overwrite it with 'topup.dialogs.500' -- the mapper only sets product_id on the
+    # subscription branch, and the upsert coalesces it against the stored value.
+    print()
+    status, usage = fetch_usage(PROBE_USER)
+    expected_readback = {"productId": SUBSCRIPTION_PRODUCT_ID, "interval": "month"}
+    if status == 200 and isinstance(usage, dict):
+        rb_mismatches = {k: (v, usage.get(k)) for k, v in expected_readback.items() if usage.get(k) != v}
+    else:
+        rb_mismatches = {"<http>": (200, status)}
+    readback_ok = not rb_mismatches
+    print(f"[{'OK' if readback_ok else 'FAIL'}] f_product_id_persisted: GetUsage({PROBE_USER}) "
+          f"-> {expected_readback} (top-up must not clobber it)"
+          + (f" -- mismatches: {rb_mismatches}" if rb_mismatches else ""))
+    print(f"    raw: {usage}")
+    if not readback_ok:
+        failures.append("f_product_id_persisted")
+
     if failures:
-        print(f"\n{len(failures)}/{len(PROBES)} probes failed: {failures}")
+        print(f"\n{len(failures)}/{len(PROBES) + 1} probes failed: {failures}")
         sys.exit(1)
 
     print("\nALL OK")
