@@ -300,6 +300,72 @@ public partial class Manager : MonoBehaviour
         {
             Debug.LogError($"[Manager] UsageClient.FetchRoutine() threw — continuing without a usage snapshot: {e}");
         }
+
+        // Trial-expiry paywall (Task 15a): the «чек ценности» variant, once per launch, and only
+        // AFTER BillingService.Initialize() — the whole decision hangs on EntitlementsKnown, which
+        // is false until Initialize() has run at all. Same try/catch discipline as the two steps
+        // above: a paywall failure must never brick boot behind LoadingPanel.
+        try
+        {
+            TryShowLaunchExpiryPaywall();
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[Manager] launch expiry paywall check threw — continuing: {e}");
+        }
+    }
+
+    // ── Launch-time trial-expiry paywall (Task 15a, Part B) ──────────────────
+    //
+    // Instance fields, not statics: a launch is one Manager, and a static would survive the
+    // Editor's domain-reload-free play-mode enter and make the second Play session think the
+    // paywall had already been shown.
+    private bool _launchExpiryPaywallShown;
+    private bool _launchExpiryAwaitingEntitlements;
+
+    /// <summary>
+    /// Evaluates <see cref="LaunchPaywallPolicy.ShouldShowExpiry"/> now if the entitlement set is
+    /// already resolved; otherwise subscribes ONCE to the first
+    /// <see cref="BillingService.OnEntitlementChanged"/> and evaluates there.
+    ///
+    /// The wait is the point: on a keyed device the first CustomerInfo round-trip is still in
+    /// flight at this moment, and <see cref="EntitlementGate.CurrentTier"/> answers Trial grace
+    /// for that whole window — evaluating once and giving up would silently skip the paywall for
+    /// every real customer whose trial had actually expired.
+    /// </summary>
+    private void TryShowLaunchExpiryPaywall()
+    {
+        if (BillingService.EntitlementsKnown)
+        {
+            EvaluateLaunchExpiryPaywall();
+            return;
+        }
+
+        if (_launchExpiryAwaitingEntitlements) return;
+        _launchExpiryAwaitingEntitlements = true;
+        BillingService.OnEntitlementChanged += OnFirstEntitlementResolved;
+    }
+
+    private void OnFirstEntitlementResolved(PlanTier _)
+    {
+        // One shot: unsubscribe before evaluating, so a purchase later in the session can never
+        // re-open this paywall (Open/Restore own that flow) even if the guard field were reset.
+        BillingService.OnEntitlementChanged -= OnFirstEntitlementResolved;
+        _launchExpiryAwaitingEntitlements = false;
+        EvaluateLaunchExpiryPaywall();
+    }
+
+    private void EvaluateLaunchExpiryPaywall()
+    {
+        if (!LaunchPaywallPolicy.ShouldShowExpiry(
+                EntitlementGate.CurrentTier,
+                BillingService.EntitlementsKnown,
+                TrialLedger.IsExpired,
+                _launchExpiryPaywallShown))
+            return;
+
+        _launchExpiryPaywallShown = true;
+        EntitlementGate.RequestPaywall(PaywallTrigger.TrialExpired);
     }
 
     public void Start()
@@ -578,6 +644,14 @@ public partial class Manager : MonoBehaviour
     private void OnApplicationQuit()
     {
         SettlePendingProfilesBeforeQuit();
+    }
+
+    private void OnDestroy()
+    {
+        // BillingService.OnEntitlementChanged is a STATIC event: a Manager destroyed while still
+        // waiting for the first CustomerInfo would otherwise leave a delegate pointing at a dead
+        // MonoBehaviour (Task 15a). Unsubscribing an unsubscribed handler is a no-op.
+        BillingService.OnEntitlementChanged -= OnFirstEntitlementResolved;
     }
 
     // Coroutines are dead on the quit path, so this blocks the main thread
@@ -2557,6 +2631,15 @@ public partial class Manager : MonoBehaviour
                 {
                     authorized = true;
 
+                    // THE trial clock starts here (spec §3, Task 15a): the first channel this
+                    // account ever gets authorized. This poller is the single confirmation point
+                    // for WhatsApp — the wizard and the Bot-Settings re-auth flow both run it
+                    // (OpenWhatsappAuthFromSettings only re-points the shared panel), and it is
+                    // reached ONLY on a server-confirmed authorized:true. Idempotent, so every
+                    // later auth is a no-op; it deliberately does NOT fire on wizard open or on
+                    // bot creation, neither of which authorizes anything.
+                    TrialLedger.StartIfNeeded();
+
                     if (WappiStatusParser.TryGetPhone(response, out string phone))
                     {
                         WhatsappNumberInput.text = phone;
@@ -3063,6 +3146,12 @@ public partial class Manager : MonoBehaviour
                 if (WappiStatusParser.TryGetAuthorized(response, out bool isAuthorized) && isAuthorized)
                 {
                     authorized = true;
+
+                    // Telegram twin of the WhatsApp clock start (Task 15a) — see
+                    // GetWhatsappProfileStatus. Every Telegram success path funnels here: QR,
+                    // phone-code (SendTelegramCode) and the 2FA cloud-password step both restart
+                    // this poller on auth_success rather than declaring success themselves.
+                    TrialLedger.StartIfNeeded();
 
                     if (WappiStatusParser.TryGetPhone(response, out string phone))
                         TelegramNumberInput.text = phone;

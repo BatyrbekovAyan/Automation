@@ -142,6 +142,14 @@ public partial class BotSettings
             {
                 if (isAuthorized)
                 {
+                    // Task 15a: the server just confirmed this bot has an authorized WhatsApp
+                    // channel, so the trial clock must be running. The FRESH auth path starts it
+                    // in Manager's poller; this branch covers the profile that was ALREADY
+                    // authorized when the row was toggled on — including an install whose
+                    // channels were connected before the ledger existed, which would otherwise
+                    // never show the countdown. Idempotent: a no-op once the clock has started.
+                    TrialLedger.StartIfNeeded();
+
                     if (WappiStatusParser.TryGetPhone(response, out string phone)
                         && WhatsappNumberField.Value != phone)
                     {
@@ -332,6 +340,10 @@ public partial class BotSettings
             {
                 if (isAuthorized)
                 {
+                    // Telegram twin of the WhatsApp branch above (Task 15a): an already-authorized
+                    // channel confirmed on toggle-on also starts the trial clock, idempotently.
+                    TrialLedger.StartIfNeeded();
+
                     if (WappiStatusParser.TryGetPhone(response, out string phone))
                     {
                         TelegramNumberField.Value = phone;
