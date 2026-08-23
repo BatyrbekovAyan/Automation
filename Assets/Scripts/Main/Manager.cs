@@ -352,7 +352,20 @@ public partial class Manager : MonoBehaviour
         // re-open this paywall (Open/Restore own that flow) even if the guard field were reset.
         BillingService.OnEntitlementChanged -= OnFirstEntitlementResolved;
         _launchExpiryAwaitingEntitlements = false;
-        EvaluateLaunchExpiryPaywall();
+
+        // Same try/catch discipline as the synchronous twin in PreloadSecretsThenInitBilling — and
+        // it matters MORE here: this runs inside BillingService.OnEntitlementChanged's multicast
+        // invoke, itself inside RevenueCat's GetCustomerInfo callback. An escaping throw (the whole
+        // paywall open — Render, DOTween, scene lookups — hangs off this call) would abort the
+        // REST of the multicast, silently starving whichever handlers happen to sit after ours.
+        try
+        {
+            EvaluateLaunchExpiryPaywall();
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[Manager] deferred launch expiry paywall check threw — continuing: {e}");
+        }
     }
 
     private void EvaluateLaunchExpiryPaywall()

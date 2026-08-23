@@ -171,12 +171,28 @@ public class PaywallController : MonoBehaviour
     private void OnEnable()
     {
         Theme.Changed += PaintPeriodLabels;
+        UsageStore.OnUsageChanged += HandleUsageChanged;
         Render();
     }
 
     private void OnDisable()
     {
         Theme.Changed -= PaintPeriodLabels;
+        UsageStore.OnUsageChanged -= HandleUsageChanged;
+    }
+
+    /// <summary>
+    /// The receipt's «Диалогов» tile reads <see cref="UsageStore.Current"/>, which is null until
+    /// the first GetUsage response lands — and at LAUNCH that fetch and the TrialExpired paywall
+    /// are started in the same tick (Manager.PreloadSecretsThenInitBilling), so the tile would
+    /// otherwise sit on «—» exactly when it is supposed to persuade. Repainting on the store's own
+    /// event is the whole fix; subscription is tied to enable/disable, so a closed paywall holds
+    /// nothing. Non-receipt variants ignore it: nothing else on this screen reads usage.
+    /// </summary>
+    private void HandleUsageChanged()
+    {
+        if (!_receiptVariant || !IsOpen) return;
+        RenderReceipt();
     }
 
     private void EnsureInit()

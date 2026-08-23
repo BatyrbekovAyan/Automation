@@ -2,7 +2,7 @@
 """Rotate the cloudflared quick-tunnel URL across the local n8n dev setup.
 
 When the trycloudflare hostname changes (every `cloudflared tunnel --url ...`
-restart), four places go stale; a missed one silently kills bot replies:
+restart), five places go stale; a missed one silently kills bot replies:
 
   1. Assets/StreamingAssets/secrets.json  -> n8nBaseUrl
   2. Live local Create handlers' "Set Wappi Webhook" callback URL
@@ -11,6 +11,10 @@ restart), four places go stale; a missed one silently kills bot replies:
      (POST wappi.pro/{api|tapi}/webhook/url/set per profile)
   4. n8n itself must be restarted with WEBHOOK_URL=<new tunnel>
      (the script can only detect + warn; restart it yourself)
+  5. RevenueCat webhook URL -- dashboard only, this script CANNOT touch it
+     (Integrations -> Webhooks -> Webhook URL = <tunnel>/webhook/RevenueCatEvent;
+     leave the Authorization header alone -- see Tools/n8n/README.md,
+     "Re-pointing the RevenueCat webhook after a tunnel rotation")
 
 Usage:
   python3 Tools/n8n/rotate-tunnel.py               # rotate + verify
