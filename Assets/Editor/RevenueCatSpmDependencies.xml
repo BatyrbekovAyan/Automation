@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Closes a verified gap in RevenueCat's own shipped dependencies file
+  (Library/PackageCache/com.revenuecat.purchases-unity@.../Plugins/Editor/RevenueCatDependencies.xml):
+  that file declares only the "PurchasesHybridCommon" Swift Package product (from
+  purchases-hybrid-common.git), which EDM4U links to the UnityFramework target. But
+  purchases-unity's own native bridge code (e.g. RCPurchasesUnityDangerousSettingsFactory.swift)
+  does `@_spi(Internal) import RevenueCat` directly — and "RevenueCat" is a DIFFERENT product,
+  from a DIFFERENT package repo (purchases-ios-spm), that purchases-hybrid-common's Package.swift
+  depends on transitively but never re-exports. Linking a product to a target in Xcode's native
+  SPM integration does not make that product's own transitive dependencies importable in a
+  DIFFERENT target — each product a target directly `import`s must be linked to THAT target
+  explicitly. Verified by reading purchases-hybrid-common's Package.swift at tag 18.23.0 (the
+  version RevenueCatDependencies.xml pins): it depends on
+  `https://github.com/RevenueCat/purchases-ios-spm` at `exact: "5.81.2"` for the "RevenueCat"
+  product — version pinned here to match exactly (SPM requires the whole graph to agree).
+
+  Without this file: "No such module 'RevenueCat'" compiling UnityFramework on Archive, even with
+  EDM4U installed and PurchasesHybridCommon correctly linked.
+-->
+<dependencies>
+    <remoteSwiftPackage url="https://github.com/RevenueCat/purchases-ios-spm" version="5.81.2">
+        <swiftPackage name="RevenueCat" />
+    </remoteSwiftPackage>
+</dependencies>

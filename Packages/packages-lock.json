@@ -18,6 +18,13 @@
       "dependencies": {},
       "hash": "34432703a177c97631a4eb1d908f086037c67969"
     },
+    "com.google.external-dependency-manager": {
+      "version": "https://github.com/googlesamples/unity-jar-resolver.git?path=upm#v1.2.188",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "32c34224fd3f34c813c97c69508d2a3930105dc7"
+    },
     "com.nobi.roundedcorners": {
       "version": "https://github.com/kirevdokimov/Unity-UI-Rounded-Corners.git",
       "depth": 0,
