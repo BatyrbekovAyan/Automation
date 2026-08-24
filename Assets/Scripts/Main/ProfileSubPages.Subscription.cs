@@ -16,8 +16,10 @@ public partial class ProfileSubPages
     // subscription itself — the only correct action is to hand the user to the place
     // that can, which is also what Apple's and Google's review guidelines expect.
     private const string AppleSubscriptionsUrl = "https://apps.apple.com/account/subscriptions";
-    private const string GoogleSubscriptionsUrl =
-        "https://play.google.com/store/account/subscriptions?package=com.SynergySoft.Automation";
+    // package= derived at runtime so a bundle-id rename can never desync this link
+    // (it did once: the id was hardcoded before the Choose Reply rename).
+    private static string GoogleSubscriptionsUrl =>
+        "https://play.google.com/store/account/subscriptions?package=" + Application.identifier;
 
     // A fill narrower than the bar's own corner radius reads as a dot rather than a
     // sliver, so any non-zero usage draws at least this much of the track.
