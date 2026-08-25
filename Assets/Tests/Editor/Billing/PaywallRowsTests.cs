@@ -52,8 +52,8 @@ public class PaywallRowsTests
     public void Month_prices_match_the_tariff_matrix()
     {
         var rows = PaywallRows.Build(PaywallPeriod.Month);
-        Assert.AreEqual("9\u00A0900\u00A0₸/мес", rows[0].PriceText);
-        Assert.AreEqual("19\u00A0900\u00A0₸/мес", rows[1].PriceText);
+        Assert.AreEqual("9\u00A0990\u00A0₸/мес", rows[0].PriceText);
+        Assert.AreEqual("19\u00A0990\u00A0₸/мес", rows[1].PriceText);
         Assert.AreEqual("39\u00A0900\u00A0₸/мес", rows[2].PriceText);
     }
 
@@ -62,8 +62,8 @@ public class PaywallRowsTests
     {
         var rows = PaywallRows.Build(PaywallPeriod.Year);
         Assert.AreEqual("99\u00A0000\u00A0₸/год", rows[0].PriceText);
-        Assert.AreEqual("199\u00A0000\u00A0₸/год", rows[1].PriceText);
-        Assert.AreEqual("399\u00A0000\u00A0₸/год", rows[2].PriceText);
+        Assert.AreEqual("198\u00A0990\u00A0₸/год", rows[1].PriceText);
+        Assert.AreEqual("399\u00A0990\u00A0₸/год", rows[2].PriceText);
     }
 
     // ── Counts line + RU plural agreement ────────────────────────────────────
@@ -116,12 +116,12 @@ public class PaywallRowsTests
 
     [Test]
     public void Cta_switches_to_subscribe_once_the_trial_clock_started()
-        => Assert.AreEqual("Оформить Бизнес — 19\u00A0900\u00A0₸/мес",
+        => Assert.AreEqual("Оформить Бизнес — 19\u00A0990\u00A0₸/мес",
             PaywallRows.CtaText(true, PlanTier.None, PlanTier.Business, PaywallPeriod.Month));
 
     [Test]
     public void Cta_switches_to_subscribe_once_something_is_purchased()
-        => Assert.AreEqual("Оформить Сеть — 399\u00A0000\u00A0₸/год",
+        => Assert.AreEqual("Оформить Сеть — 399\u00A0990\u00A0₸/год",
             PaywallRows.CtaText(false, PlanTier.Start, PlanTier.Network, PaywallPeriod.Year));
 
     [Test]

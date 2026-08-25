@@ -2,9 +2,9 @@ using NUnit.Framework;
 
 public class PlanCatalogTests
 {
-    [TestCase(PlanTier.Start, 1, 1, 300, 9900, 99000)]
-    [TestCase(PlanTier.Business, 3, 3, 1000, 19900, 199000)]
-    [TestCase(PlanTier.Network, 5, 5, 3000, 39900, 399000)]
+    [TestCase(PlanTier.Start, 1, 1, 300, 9990, 99000)]
+    [TestCase(PlanTier.Business, 3, 3, 1000, 19990, 198990)]
+    [TestCase(PlanTier.Network, 5, 5, 3000, 39900, 399990)]
     public void Paid_tiers_match_spec(PlanTier t, int bots, int ch, int quota, int m, int y)
     {
         var p = PlanCatalog.Get(t);

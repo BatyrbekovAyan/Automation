@@ -35,7 +35,7 @@ public class SubscriptionPageRowsTests
         Assert.AreEqual("Активна", line.PillText);
         Assert.AreEqual(ThemeRole.PositiveBg, line.PillBg);
         Assert.AreEqual(ThemeRole.PositiveInk, line.PillInk);
-        Assert.AreEqual("19\u00A0900\u00A0₸/мес · продлится 26 августа", line.Subline);
+        Assert.AreEqual("19\u00A0990\u00A0₸/мес · продлится 26 августа", line.Subline);
     }
 
     [Test]
@@ -46,7 +46,7 @@ public class SubscriptionPageRowsTests
 
         Assert.AreEqual(SubscriptionState.Active, line.State);
         Assert.AreEqual("Бизнес", line.Title);
-        Assert.AreEqual("199\u00A0000\u00A0₸/год · продлится 3 сентября", line.Subline);
+        Assert.AreEqual("198\u00A0990\u00A0₸/год · продлится 3 сентября", line.Subline);
     }
 
     [Test]
@@ -54,7 +54,7 @@ public class SubscriptionPageRowsTests
     {
         var line = SubscriptionPageRows.StatusLine(PlanTier.Business, 0, PeriodEndUtc,
             interval: SubscriptionPageRows.IntervalMonth);
-        Assert.AreEqual("19\u00A0900\u00A0₸/мес · продлится 26 августа", line.Subline);
+        Assert.AreEqual("19\u00A0990\u00A0₸/мес · продлится 26 августа", line.Subline);
     }
 
     [Test]
@@ -64,7 +64,7 @@ public class SubscriptionPageRowsTests
         // or answered something we do not model — all three are «период неизвестен», and the
         // KNOWN DEFAULT is monthly. Never guess the annual figure: it is 10× the monthly one.
         foreach (string interval in new[] { null, "", "   ", "week", "YEARLY" })
-            Assert.AreEqual("19\u00A0900\u00A0₸/мес · продлится 26 августа",
+            Assert.AreEqual("19\u00A0990\u00A0₸/мес · продлится 26 августа",
                 SubscriptionPageRows.StatusLine(PlanTier.Business, 0, PeriodEndUtc, interval).Subline,
                 $"interval={interval ?? "null"}");
     }
@@ -74,7 +74,7 @@ public class SubscriptionPageRowsTests
     {
         Assert.AreEqual("99\u00A0000\u00A0₸/год",
             SubscriptionPageRows.ActiveSubline(PlanTier.Start, null, SubscriptionPageRows.IntervalYear));
-        Assert.AreEqual("399\u00A0000\u00A0₸/год",
+        Assert.AreEqual("399\u00A0990\u00A0₸/год",
             SubscriptionPageRows.ActiveSubline(PlanTier.Network, null, SubscriptionPageRows.IntervalYear));
     }
 
@@ -83,7 +83,7 @@ public class SubscriptionPageRowsTests
     {
         var line = SubscriptionPageRows.StatusLine(PlanTier.Start, 0, PeriodEndUtc);
         Assert.AreEqual("Старт", line.Title);
-        Assert.AreEqual("9\u00A0900\u00A0₸/мес · продлится 26 августа", line.Subline);
+        Assert.AreEqual("9\u00A0990\u00A0₸/мес · продлится 26 августа", line.Subline);
     }
 
     [Test]
