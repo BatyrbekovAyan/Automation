@@ -176,6 +176,23 @@ documented safe practice for any future real-profile test with this workflow.
 `Tools/n8n/sql/2026-08-21-deleted-reason.sql`) persists `trial_expiry`/`churn_grace`/
 `liveness` past execution-log retention/pruning -- set by both `Mark Deleted` and
 `Mark Liveness Deleted`, confirmed in the C1 re-verification read-back.
+
+**Task 15b (proportional retire cap + dryRun flipped LIVE):** `Compute Liveness Diff`
+now also refuses to act on a base whose would-be retirements exceed
+`max(2, 50% of that base's alive registry rows)` -- `action:"skip_retire_cap"`, reason
+carrying both counts, whole base skipped for the run. This was the Task 12 review's
+binding pre-flip requirement: the empty-list floor only catches a FULLY empty list,
+and `profile/all/get` has NO documented pagination parameters and NO response envelope
+(`{profiles, status}` only -- no total/page/next/has_more; checked against the
+published WhatsApp API docs and live against both bases, where unknown query params
+are silently ignored), so a silently TRUNCATED list would look exactly like a complete
+one and retire everything past the cut. Fixture (h) below is the cap's own fixture; the
+at-cap boundary (2 of 3 -> still retires, since the test is a strict `>`) is exercised
+in the same pass. `Sweep Config.dryRun` is now `false`. See
+`.superpowers/sdd/task-15b-report.md` for the full fixture transcript, and note that
+fixtures (e)/(h) need a NON-empty live list -- this dev account now has zero Wappi
+profiles on both bases, so those runs point `List WA Profiles` at a local stub (the
+same node-URL mutation technique fixture (f) uses) while `dryRun` is still true.
 """
 import argparse
 import json
@@ -922,6 +939,62 @@ def sweep_empty_floor_cleanup_sql():
 delete from subscribers where app_user_id in ('probe12fix_g', 'probe12fix_ageguard');"""
 
 
+def sweep_retire_cap_seed_sql():
+    """Task 15b fixture (h) -- the proportional retire cap. THREE alive whatsapp rows
+    under one trialing owner, all 2 hours old so they clear the C2 age floor and stay
+    far under Branch A's 4d17h threshold (Branch A must contribute nothing here; this
+    fixture is about Branch B alone). Run it with the a-f/g fixtures already CLEANED
+    UP, or the extra alive rows raise the base's denominator and the cap stops tripping.
+
+    Preconditions this fixture cannot express in SQL, both mandatory:
+
+      1. The live list for the whatsapp base must be well-formed and NON-EMPTY, and
+         must NOT contain these three profile_ids. An EMPTY list hits the empty-list
+         floor FIRST (a deliberate ordering -- it is the more specific diagnosis), so
+         the cap would never be reached and the fixture would silently prove nothing.
+         This dev account currently has ZERO Wappi profiles on both bases, so point
+         `List WA Profiles` at a local stub returning e.g.
+         {"status":"done","profiles":[{"profile_id":"stub-unrelated-0001"}]} -- the same
+         node-URL mutation technique fixture (f) uses -- and restore it afterwards.
+      2. `Sweep Config.dryRun` must still be true while the stub URL is in place.
+
+    Expected: alive=3, would-retire=3, cap = max(2, 1.5) = 2, 3 > 2 -> every row comes
+    out `action:"skip_retire_cap"` with the counts in `reason`, `Log Would Retire`
+    receives NOTHING. Boundary companion, same three rows: list ONE of them as live ->
+    would-retire=2, 2 > 2 is false -> both absent rows retire normally (the cap test is
+    a strict `>`; exactly-at-50% is allowed)."""
+    return """insert into subscribers (app_user_id, plan, status, current_period_end, topup_balance, updated_at) values
+  ('probe15b_cap', 'trial', 'trialing', null, 0, now())
+on conflict (app_user_id) do update set plan=excluded.plan, status=excluded.status, updated_at=now();
+
+insert into bot_profiles (profile_id, app_user_id, channel, created_at, deleted_at) values
+  ('probe15b_cap_wa_1', 'probe15b_cap', 'whatsapp', now() - interval '2 hours', null),
+  ('probe15b_cap_wa_2', 'probe15b_cap', 'whatsapp', now() - interval '2 hours', null),
+  ('probe15b_cap_wa_3', 'probe15b_cap', 'whatsapp', now() - interval '2 hours', null)
+on conflict (profile_id) do update set app_user_id=excluded.app_user_id, channel=excluded.channel, created_at=excluded.created_at, deleted_at=excluded.deleted_at;"""
+
+
+def sweep_retire_cap_cleanup_sql():
+    return """delete from bot_profiles where app_user_id = 'probe15b_cap';
+delete from subscribers where app_user_id = 'probe15b_cap';"""
+
+
+def sweep_dev_owner_grant_sql(app_user_ids):
+    """DEV-OWNER GRANT (Task 15b). Exempts a dev/owner identity from BOTH sweep
+    branches -- they uniformly exclude `status='active'` -- so the owner's own test
+    bots are never deleted at the 4d17h trial boundary. NOT production data and NOT a
+    real entitlement: the client still reads its tier from RevenueCat, so this only
+    changes what the SERVER-side sweep considers eligible.
+
+    At the Task 15b flip there was nothing to grant (registry empty, Wappi empty). Run
+    this AFTER the device pass, once the real RevenueCat app_user_id is known -- read
+    it off a fresh `bot_profiles` row, or from the app's own GetUsage request."""
+    ids = ", ".join(repr(str(i)) for i in app_user_ids)
+    return (f"update subscribers set plan='network', status='active', "
+            f"current_period_end = now() + interval '365 days' "
+            f"where app_user_id in ({ids});")
+
+
 def sweep_candidates_readback_sql():
     """Exact read-back used to confirm outcomes -- paste into the same one-off
     workflow after firing the sweep (via n8n-mcp execute_workflow, manual mode)."""
@@ -971,6 +1044,13 @@ def run_sweep_fixture_helper():
     print(sweep_empty_floor_seed_sql())
     print()
     print(sweep_empty_floor_cleanup_sql())
+    print("\n--- Task 15b fixture (h): proportional retire cap (read the docstring FIRST -- it "
+          "needs a NON-empty live list and dryRun=true, or it silently proves nothing) ---\n")
+    print(sweep_retire_cap_seed_sql())
+    print()
+    print(sweep_retire_cap_cleanup_sql())
+    print("\n--- Task 15b dev-owner grant (run AFTER the device pass, with the real RC id) ---\n")
+    print(sweep_dev_owner_grant_sql(["<real_revenuecat_app_user_id>"]))
     return 0
 
 
