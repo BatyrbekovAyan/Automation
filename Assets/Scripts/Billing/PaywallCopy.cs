@@ -30,10 +30,10 @@ public static class PaywallCopy
 
     public static string PerYear(int amount) => Kzt(amount) + "/год";
 
-    public static string YearLine(PlanSpec p) => Kzt(p.PriceYearKzt) + "/год — 12 месяцев по цене 10";
+    public static string YearLine(PlanSpec p) => Kzt(p.PriceYearKzt) + "/год — выгода до 17%";
 
-    /// <summary>Short «12 за 10» badge for the Год half of the period toggle.</summary>
-    public const string YearSavingBadge = "12 за 10";
+    /// <summary>Short «до −17%» badge for the Год half of the period toggle.</summary>
+    public const string YearSavingBadge = "до \u221217%";
 
     public static string Dialogs(int n)
         => Number(n) + " " + RuPlural.Pick(n, "диалог", "диалога", "диалогов");

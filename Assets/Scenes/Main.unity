@@ -115248,7 +115248,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "12 \u0437\u0430 10"
+  m_text: "\u0434\u043E \u221217%"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: a2b0b38b6764047da9250bcff1b0f432, type: 2}
   m_sharedMaterial: {fileID: 8843604280675880768, guid: a2b0b38b6764047da9250bcff1b0f432, type: 2}
