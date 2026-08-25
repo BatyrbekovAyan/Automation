@@ -7,13 +7,19 @@
 /// install that authed a channel BEFORE that shipped therefore carries bots and Wappi
 /// profiles with no <c>TrialStartedUtc</c> at all — a trial that never starts and, because
 /// <see cref="TrialLedger.IsExpired"/> is <c>HasStarted &amp;&amp; DaysLeft() &lt;= 0</c>,
-/// never expires either. Left alone those installs would sit on an unlimited free tier
-/// forever, and the server-side sweep would never see them reach its 4d17h boundary.
-/// Owner-approved default: start the clock at the next launch instead.</para>
+/// never expires either. Left alone, those installs sit on an unlimited CLIENT-side free
+/// tier forever: nothing ever moves them off Trial, so no launch ever shows the expiry
+/// paywall and no client gate ever refuses them. Owner-approved default: start the clock
+/// at the next launch instead.</para>
+///
+/// <para>Client-side only, deliberately. The server-side Profile Lifecycle Sweep has its
+/// own independent clock — <c>bot_profiles.created_at</c> — and nothing server-side ever
+/// reads <c>TrialStartedUtc</c>, so this ledger being absent never affected the sweep and
+/// writing it now does not change what the sweep does.</para>
 ///
 /// <para>A pure seam for the same reason as <see cref="LaunchPaywallPolicy"/>: the caller
-/// lives inside Manager's boot coroutine, which EditMode cannot instantiate, so the rule
-/// is pinned by a table rather than trusted by inspection.</para>
+/// lives inside a Manager coroutine, which EditMode cannot instantiate, so the rule is
+/// pinned by a table rather than trusted by inspection.</para>
 /// </summary>
 public static class LaunchTrialBackfill
 {

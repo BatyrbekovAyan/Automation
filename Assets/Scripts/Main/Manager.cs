@@ -301,34 +301,6 @@ public partial class Manager : MonoBehaviour
             Debug.LogError($"[Manager] UsageClient.FetchRoutine() threw — continuing without a usage snapshot: {e}");
         }
 
-        // Trial backfill (Task 15b): installs that authed a channel BEFORE Task 15a's
-        // auth-time StartIfNeeded shipped carry no TrialStartedUtc at all, so their trial
-        // never starts and — since IsExpired is `HasStarted && DaysLeft() <= 0` — never
-        // expires either. Owner-approved default: start their clock at this launch.
-        //
-        // Ordering, both halves load-bearing: it must run AFTER BillingService.Initialize()
-        // (same coroutine, so the tier the paywall reads below is already resolving) and
-        // BEFORE the expiry-paywall check, so that check never sees a half-written ledger.
-        // The bot list it counts is already populated by now: LoadBots() is started in
-        // Start() and yields WaitForEndOfFrame, which resumes at the END of frame 1 and
-        // instantiates every bot synchronously, while this coroutine's own body cannot
-        // resume before frame 2 (`yield return` suspends for a frame even when the nested
-        // enumerator completes without yielding — Secrets.Preload() on iOS/Editor does).
-        // Same try/catch discipline as every step above.
-        try
-        {
-            if (LaunchTrialBackfill.ShouldBackfill(TrialLedger.HasStarted,
-                                                   EntitlementGate.ConnectedChannelCount()))
-            {
-                TrialLedger.StartIfNeeded();
-                Debug.Log("[Manager] trial backfill: pre-ledger install with a connected channel — clock started now.");
-            }
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"[Manager] trial backfill threw — continuing without starting the clock: {e}");
-        }
-
         // Trial-expiry paywall (Task 15a): the «чек ценности» variant, once per launch, and only
         // AFTER BillingService.Initialize() — the whole decision hangs on EntitlementsKnown, which
         // is false until Initialize() has run at all. Same try/catch discipline as the two steps
@@ -591,6 +563,47 @@ public partial class Manager : MonoBehaviour
                     recreatedService.Description = PlayerPrefs.GetString(recreatedBot.name + "Service" + s + "Description", "");
                 }
             }
+        }
+
+        // Trial backfill (Task 15b): installs that authed a channel BEFORE Task 15a's
+        // auth-time StartIfNeeded shipped carry no TrialStartedUtc at all, so their trial
+        // never starts and — since IsExpired is `HasStarted && DaysLeft() <= 0` — never
+        // expires either, leaving them on an unlimited client-side free tier forever.
+        // Owner-approved default: start their clock at this launch.
+        //
+        // It lives HERE, at the end of the instantiation loop, and not in
+        // PreloadSecretsThenInitBilling, for one reason: EntitlementGate.ConnectedChannelCount()
+        // counts Bot components under BotsParent, and only control flow can guarantee that the
+        // loop above has run. Deciding this from a different coroutine would make it depend on
+        // how two coroutines interleave across frames — and getting that wrong fails SILENTLY
+        // and PERMANENTLY (a zero count reads as «no channels», ShouldBackfill returns false,
+        // and the one-shot never runs again), on exactly the population that is hardest to test:
+        // an existing install with bots. A fresh install correctly does nothing either way, so
+        // the bug would be invisible to a device pass. Here the precondition is not an
+        // assumption at all.
+        //
+        // Ordering against the launch expiry paywall does not need a guard, and the reason is
+        // worth stating: IsExpired is `HasStarted && DaysLeft() <= 0`, so a NOT-STARTED ledger
+        // reads not-expired, and a just-backfilled one reads not-expired too (a full trial
+        // remains). Whichever of the two coroutines gets there first, the paywall's answer for
+        // a pre-ledger install is «don't show» — and a negative evaluation does not consume
+        // its once-per-launch guard, which is set only when the paywall actually opens.
+        //
+        // try/catch for the same reason every billing step in the boot path has one, and it
+        // matters more here: an escaping throw would abort the REST of LoadBots — the
+        // onboarding auto-flag and both orphan-profile sweeps below.
+        try
+        {
+            if (LaunchTrialBackfill.ShouldBackfill(TrialLedger.HasStarted,
+                                                   EntitlementGate.ConnectedChannelCount()))
+            {
+                TrialLedger.StartIfNeeded();
+                Debug.Log("[Manager] trial backfill: pre-ledger install with a connected channel — clock started now.");
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[Manager] trial backfill threw — continuing without starting the clock: {e}");
         }
 
         // Existing-user auto-flag: users who already have bots must never see the
