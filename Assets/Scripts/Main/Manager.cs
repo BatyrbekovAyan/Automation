@@ -301,6 +301,34 @@ public partial class Manager : MonoBehaviour
             Debug.LogError($"[Manager] UsageClient.FetchRoutine() threw — continuing without a usage snapshot: {e}");
         }
 
+        // Trial backfill (Task 15b): installs that authed a channel BEFORE Task 15a's
+        // auth-time StartIfNeeded shipped carry no TrialStartedUtc at all, so their trial
+        // never starts and — since IsExpired is `HasStarted && DaysLeft() <= 0` — never
+        // expires either. Owner-approved default: start their clock at this launch.
+        //
+        // Ordering, both halves load-bearing: it must run AFTER BillingService.Initialize()
+        // (same coroutine, so the tier the paywall reads below is already resolving) and
+        // BEFORE the expiry-paywall check, so that check never sees a half-written ledger.
+        // The bot list it counts is already populated by now: LoadBots() is started in
+        // Start() and yields WaitForEndOfFrame, which resumes at the END of frame 1 and
+        // instantiates every bot synchronously, while this coroutine's own body cannot
+        // resume before frame 2 (`yield return` suspends for a frame even when the nested
+        // enumerator completes without yielding — Secrets.Preload() on iOS/Editor does).
+        // Same try/catch discipline as every step above.
+        try
+        {
+            if (LaunchTrialBackfill.ShouldBackfill(TrialLedger.HasStarted,
+                                                   EntitlementGate.ConnectedChannelCount()))
+            {
+                TrialLedger.StartIfNeeded();
+                Debug.Log("[Manager] trial backfill: pre-ledger install with a connected channel — clock started now.");
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[Manager] trial backfill threw — continuing without starting the clock: {e}");
+        }
+
         // Trial-expiry paywall (Task 15a): the «чек ценности» variant, once per launch, and only
         // AFTER BillingService.Initialize() — the whole decision hangs on EntitlementsKnown, which
         // is false until Initialize() has run at all. Same try/catch discipline as the two steps
