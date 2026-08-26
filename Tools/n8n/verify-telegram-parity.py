@@ -35,6 +35,7 @@ WA_BOT = "4wYitz5ek30SVNlT-WhatsApp_Bot.json"
 CREATE_TG = "Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json"
 CREATE_WA = "XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json"
 SUGGEST = "9PTyYcelRQI7bGDb-Suggest_Replies.json"
+RC_EVENTS = "ZGYr6srzS3rSSXHp-RevenueCat_Events.json"
 
 # The executeQuery Postgres credential shared by Dashboard_Outcomes / Delete_File /
 # Delete_Bot_Files. The re-stamp nodes MUST use this, NOT the memoryPostgresChat cred.
@@ -629,6 +630,39 @@ def check_suggest_replies():
     print(f"OK  {f}")
 
 
+def sql_code(query):
+    """SQL with `--` comments stripped, line-wise. The RC queries carry long RU comment
+    blocks that name the very identifiers these asserts hunt for -- a raw substring test
+    would pass (or fail) on prose. No string literal in these queries contains `--`."""
+    return "\n".join(line.split("--", 1)[0] for line in query.splitlines())
+
+
+def check_rc_transfer_carry_gate():
+    """Task 17a fix round (review N-1): Transfer Subscriber's `carried` CTE must move
+    dialog_counts ONLY for destinations whose snapshot the statement itself ACCEPTED
+    (the `accepted` CTE, derived from moved's RETURNING) -- never straight off `to_ids`.
+    Ungated, a refused snapshot's used-rows land on a live trial and exhaust it instantly
+    (200 carried onto a 150 quota, reproduced live pre-fix). The probe's T3 catches this
+    only against a live instance; this assert is the committed, offline guard.
+    The ALIAS path (Consolidate Aliases) is DELIBERATELY ungated -- same human, no
+    snapshot at all -- so this check is scoped to Transfer Subscriber alone."""
+    wf = load(RC_EVENTS)
+    q = sql_code(node(wf["nodes"], "Transfer Subscriber")["parameters"]["query"])
+    assert re.search(r"\baccepted as \(", q), \
+        f"{RC_EVENTS}: Transfer Subscriber lost the `accepted` CTE -- the usage carry " \
+        f"has nothing to gate on"
+    m = re.search(r"\bcarried as \((.*?)\n\)", q, re.DOTALL)
+    assert m, f"{RC_EVENTS}: Transfer Subscriber lost the `carried` CTE"
+    carried = m.group(1)
+    assert re.search(r"\bfrom accepted\b", carried), \
+        f"{RC_EVENTS}: `carried` no longer drives off `accepted` -- usage would move even " \
+        f"when the snapshot was refused"
+    assert not re.search(r"\bto_ids\b", carried), \
+        f"{RC_EVENTS}: `carried` reads `to_ids` directly -- that is the exact pre-fix " \
+        f"defect (review N-1): a refused snapshot's dialog_counts dumped onto the destination"
+    print(f"OK  {RC_EVENTS} (usage carry gated on snapshot acceptance)")
+
+
 def main():
     global WF
     ap = argparse.ArgumentParser(
@@ -655,6 +689,7 @@ def main():
         check_model_id(TG_BOT)
         check_model_id(WA_BOT)
         check_suggest_replies()
+        check_rc_transfer_carry_gate()
     except AssertionError as e:
         print(f"PARITY FAIL: {e}")
         sys.exit(1)
