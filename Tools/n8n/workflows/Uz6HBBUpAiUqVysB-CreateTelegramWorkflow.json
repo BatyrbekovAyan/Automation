@@ -451,7 +451,7 @@
       "typeVersion": 3.4,
       "position": [
         368,
-        868
+        1048
       ],
       "parameters": {
         "assignments": {
@@ -472,6 +472,33 @@
         },
         "options": {}
       }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://wappi.pro/tapi/profile/delete?profile_id={{ $('Unity Webhook').first().json.body.TelegramProfileId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        368,
+        868
+      ],
+      "id": "0f4a8c1e-2b57-4d8a-9c31-7e6b5a49d202",
+      "name": "Delete Refused Profile",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "EuhhqAaV56DpoqAN",
+          "name": "WappiAuthToken"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
     },
     {
       "id": "f5149f6b-3564-49f8-994b-2ed5e9eb0999",
@@ -688,7 +715,7 @@
       "main": [
         [
           {
-            "node": "Respond Channel Limit",
+            "node": "Delete Refused Profile",
             "type": "main",
             "index": 0
           }
@@ -718,6 +745,17 @@
         [
           {
             "node": "Register Profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Refused Profile": {
+      "main": [
+        [
+          {
+            "node": "Respond Channel Limit",
             "type": "main",
             "index": 0
           }

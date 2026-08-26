@@ -221,7 +221,7 @@ CANON_WAPPI_CRED = "EuhhqAaV56DpoqAN"        # httpHeaderAuth ("WappiAuthToken")
 # single source of truth rather than a second literal that could drift from it.
 
 API_NODE_NAMES = ("Get Sample Workflow", "Create Workflow", "Activate Created Workflow")
-WAPPI_NODE_NAMES = ("Set Wappi Webhook", "Set Wappi Webhook Types")
+WAPPI_NODE_NAMES = ("Set Wappi Webhook", "Set Wappi Webhook Types", "Delete Refused Profile")
 POSTGRES_NODE_NAMES = (
     "Restamp RAG Chunks", "Ensure Subscriber", "Count Channels",
     "Retire Same Bot Slot", "Register Profile",
@@ -663,6 +663,93 @@ def check_rc_transfer_carry_gate():
     print(f"OK  {RC_EVENTS} (usage carry gated on snapshot acceptance)")
 
 
+REFUSED_DELETE_NODE = "Delete Refused Profile"
+
+
+def check_refused_create_deletes_profile(f, wappi_base, profile_field):
+    """Task 19 (live incident 2026-08-26 15:12): a Create refused for lack of a channel slot
+    must DELETE the profile the owner just authorized, before answering `channel_limit`.
+
+    The refusal lands AFTER Wappi pairing -- the client only calls this webhook once the
+    channel is authorized -- so a bare refusal strands a real, AUTHORIZED profile at 23₽/day
+    that NO sweep can reap: the hourly orphan sweep only deletes UNAUTHORIZED profiles, and
+    Profile Lifecycle Sweep drives off `bot_profiles`, where the refusal branch (correctly)
+    never wrote a row. On 2026-08-26 the owner's manual in-app bot delete is what cleaned it;
+    a real user would not know to do that.
+
+    Every assert below is a way that fix can silently rot:
+      - the node moved to the ALLOWED branch  => deletes the profile it just accepted;
+      - the node stopped feeding Respond Channel Limit => the webhook's `lastNode` response
+        becomes the Wappi delete's own body (the client keys on {success,error});
+      - onError/alwaysOutputData dropped      => a Wappi hiccup turns a clean refusal into an
+        n8n execution error, i.e. the client's channel_limit handling never runs;
+      - the url lost its channel base or its `.first()` binding => deletes nothing, or reads
+        an item that does not exist on this branch.
+    """
+    wf = load(f)
+    ns = wf["nodes"]
+    conns = wf["connections"]
+
+    n = node(ns, REFUSED_DELETE_NODE)
+    assert n["type"] == "n8n-nodes-base.httpRequest", \
+        f"{f}: {REFUSED_DELETE_NODE} is not an httpRequest node: {n['type']}"
+    assert n["parameters"].get("method") == "POST", \
+        f"{f}: {REFUSED_DELETE_NODE} is not a POST: {n['parameters'].get('method')}"
+
+    expected_url = ("=" + wappi_base + "/profile/delete?profile_id="
+                    "{{ $('Unity Webhook').first().json.body." + profile_field + " }}")
+    url = n["parameters"].get("url")
+    assert url == expected_url, \
+        f"{f}: {REFUSED_DELETE_NODE} url wrong (channel base / profile field / binding):\n" \
+        f"  got:      {url!r}\n  expected: {expected_url!r}"
+
+    # Best-effort, by construction: a failed delete must never change the refusal response.
+    assert n.get("onError") == "continueRegularOutput", \
+        f"{f}: {REFUSED_DELETE_NODE} onError is {n.get('onError')!r}, not continueRegularOutput " \
+        f"-- a Wappi error would abort the execution and the client would never see channel_limit"
+    assert n.get("alwaysOutputData") is True, \
+        f"{f}: {REFUSED_DELETE_NODE} alwaysOutputData not true -- an empty output would leave " \
+        f"Respond Channel Limit unexecuted, and `lastNode` would answer with nothing"
+
+    # Wiring: If Slot Limit[TRUE = over limit] -> delete -> Respond Channel Limit (terminal).
+    over_limit = [c["node"] for c in conns["If Slot Limit"]["main"][0]]
+    assert over_limit == [REFUSED_DELETE_NODE], \
+        f"{f}: If Slot Limit's over-limit branch goes to {over_limit}, expected [{REFUSED_DELETE_NODE!r}]"
+    nxt = [c["node"] for c in conns[REFUSED_DELETE_NODE]["main"][0]]
+    assert nxt == ["Respond Channel Limit"], \
+        f"{f}: {REFUSED_DELETE_NODE} -> {nxt}, expected ['Respond Channel Limit']"
+    assert "Respond Channel Limit" not in conns, \
+        f"{f}: Respond Channel Limit gained an outgoing connection (it must stay the terminal " \
+        f"`lastNode` response)"
+
+    # …and NOT on the allowed branch, in any position.
+    under_limit = [c["node"] for c in conns["If Slot Limit"]["main"][1]]
+    assert REFUSED_DELETE_NODE not in under_limit, \
+        f"{f}: {REFUSED_DELETE_NODE} sits on the ALLOWED branch -- that deletes the profile the " \
+        f"gate just accepted"
+    for src, wiring in conns.items():
+        if src in ("If Slot Limit", REFUSED_DELETE_NODE):
+            continue
+        for branch in wiring.get("main", []):
+            targets = [c["node"] for c in branch]
+            assert REFUSED_DELETE_NODE not in targets, \
+                f"{f}: {REFUSED_DELETE_NODE} is also reachable from {src!r} -- the delete must " \
+                f"hang off the refusal branch ALONE"
+
+    # The refusal body itself is untouched: the client keys on exactly these two fields, and a
+    # Set node that started merging its input would let the Wappi delete's payload ride along.
+    resp = node(ns, "Respond Channel Limit")
+    assert resp["type"] == "n8n-nodes-base.set", f"{f}: Respond Channel Limit is not a set node"
+    assigned = {a["name"]: a["value"] for a in resp["parameters"]["assignments"]["assignments"]}
+    assert assigned == {"success": False, "error": "channel_limit"}, \
+        f"{f}: refusal response changed: {assigned!r} (the client keys on success/channel_limit)"
+    assert resp["parameters"].get("includeOtherFields") is not True, \
+        f"{f}: Respond Channel Limit now merges its input -- the delete's Wappi payload would " \
+        f"leak into the refusal body"
+
+    print(f"OK  {f} (refused create deletes the stranded profile)")
+
+
 def main():
     global WF
     ap = argparse.ArgumentParser(
@@ -683,6 +770,8 @@ def main():
         check_restamp_orchestrator(CREATE_WA, "{botWaId}", "TelegramWorkflowId")
         check_canonical_export_invariant(CREATE_WA)
         check_canonical_export_invariant(CREATE_TG)
+        check_refused_create_deletes_profile(CREATE_WA, "https://wappi.pro/api", "WhatsappProfileId")
+        check_refused_create_deletes_profile(CREATE_TG, "https://wappi.pro/tapi", "TelegramProfileId")
         check_dialog_metering(TG_BOT)
         check_dialog_metering(WA_BOT)
         check_dialog_metering_shared()

@@ -2066,6 +2066,169 @@ def f_subs(*uids):
             f"from subscribers where app_user_id in ({quoted}) order by app_user_id")
 
 
+# ---------------------------------------------------------------------------------
+# Part 10: a refused Create must delete the stranded profile (Task 19)
+# ---------------------------------------------------------------------------------
+#
+# `--refused-delete`. The live incident (2026-08-26 15:12, exec 4238): the owner's RC
+# anonymous id survived a reinstall, so the SERVER knew the account was expired while the
+# CLIENT's wiped trial ledger offered a trial -- the wizard walked him through a REAL
+# WhatsApp pairing and only then did Create refuse with channel_limit (expired => 0 slots).
+# The refusal left an AUTHORIZED Wappi profile behind at ~23₽/day that no sweep can reap:
+# the hourly orphan sweep only deletes UNAUTHORIZED profiles, and Profile Lifecycle Sweep
+# drives off bot_profiles, where the refusal branch (correctly) never wrote a row.
+#
+# The fix is one node on the refusal branch -- `Delete Refused Profile`, POST
+# {api|tapi}/profile/delete?profile_id=<this request's own id>, onError:
+# continueRegularOutput -- so what this probe has to prove is exactly two things:
+#   1. the response the client keys on is UNCHANGED ({"success":false,"error":"channel_limit"});
+#   2. the delete node actually RAN on that path.
+# (2) is read from the execution log, not from the response, because the delete is
+# deliberately invisible to the caller. A probe profile id does not exist on Wappi, so the
+# call comes back HTTP 400 «Profile not found» -- that is the EXPECTED outcome here and is
+# itself the proof that the node ran and that its onError kept the refusal intact. A real
+# authorized profile is what gets genuinely deleted in production; the probe cannot create
+# one (that needs a real phone pairing) and must never touch the owner's.
+#
+# PRECONDITION (no public write path for subscriber rows -- same constraint as Parts 2/8/9):
+# seed REFUSED_DELETE_APP_USER as an EXPIRED subscriber, e.g. through the one-off SQL
+# harness (TASK16_SQL_URL) or the n8n «SQL Command Runner» workflow:
+#     delete from bot_profiles where app_user_id = 'probe_user_19';
+#     delete from subscribers   where app_user_id = 'probe_user_19';
+#     insert into subscribers (app_user_id, plan, status)
+#     values ('probe_user_19', 'business', 'expired');
+# With status='expired' Compute Slot Limit yields limit 0, so the very first channel is
+# refused and no bot_profiles row is ever written -- which is why cleanup is just the two
+# deletes above. The script runs them itself when TASK16_SQL_URL is set, and otherwise
+# prints them and asserts against whatever is already seeded.
+REFUSED_DELETE_APP_USER = "probe_user_19"
+REFUSED_DELETE_BOT_NAME = "ZZZ_PROBE_TASK19_REFUSED"
+REFUSED_DELETE_SEED_SQL = (
+    f"delete from bot_profiles where app_user_id = '{REFUSED_DELETE_APP_USER}';\n"
+    f"delete from subscribers   where app_user_id = '{REFUSED_DELETE_APP_USER}';\n"
+    f"insert into subscribers (app_user_id, plan, status) "
+    f"values ('{REFUSED_DELETE_APP_USER}', 'business', 'expired');"
+)
+REFUSED_DELETE_CLEANUP_SQL = (
+    f"delete from bot_profiles where app_user_id = '{REFUSED_DELETE_APP_USER}';\n"
+    f"delete from subscribers   where app_user_id = '{REFUSED_DELETE_APP_USER}';"
+)
+
+
+def _latest_execution_nodes(workflow_id, timeout=20):
+    """runData of the most recent execution of `workflow_id`, keyed by node name.
+
+    Returns None when the execution API is unreachable -- the caller treats that as a SKIP,
+    never as a pass (same rule as _latest_gate_reason)."""
+    time.sleep(1.0)   # the execution row is written after the response
+    url = (f"{BASE}/api/v1/executions?workflowId={workflow_id}&limit=1&includeData=true")
+    try:
+        req = urllib.request.Request(url, headers={"X-N8N-API-KEY": _n8n_api_key()})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode())
+        return data["data"][0]["data"]["resultData"]["runData"]
+    except (urllib.error.URLError, urllib.error.HTTPError, OSError,
+            ValueError, KeyError, IndexError, TypeError):
+        return None
+
+
+def _refused_delete_case(label, url, form, workflow_id, failures):
+    fake = f"probe_fake_{label}_profile_{uuid.uuid4().hex[:8]}"
+    status, body = post_multipart_form(url, form(fake))
+    print(f"[{label}] HTTP {status} -- {body[:200]}")
+
+    # 1. the client contract, byte for byte (not just "channel_limit is in there somewhere").
+    try:
+        parsed = json.loads(body)
+    except json.JSONDecodeError:
+        parsed = None
+    ok_response = status == 200 and parsed == {"success": False, "error": "channel_limit"}
+    print(f"[{'OK' if ok_response else 'FAIL'}] {label}: refusal response unchanged "
+          f"({{'success': False, 'error': 'channel_limit'}}) -- got {parsed!r}")
+    if not ok_response:
+        failures.append(f"{label}_response")
+
+    # 2. the delete ran on that same execution.
+    run = _latest_execution_nodes(workflow_id)
+    if run is None:
+        print(f"[SKIP] {label}: execution API unreachable -- cannot assert the delete node ran")
+        return fake
+
+    present = "Delete Refused Profile" in run
+    print(f"[{'OK' if present else 'FAIL'}] {label}: Delete Refused Profile on the refusal path: "
+          f"{present} (nodes: {sorted(run)})")
+    if not present:
+        failures.append(f"{label}_delete_on_path")
+        return fake
+
+    out = run["Delete Refused Profile"][0]
+    payload = {}
+    try:
+        payload = out["data"]["main"][0][0]["json"]
+    except (KeyError, IndexError, TypeError):
+        pass
+    print(f"    wappi said: {json.dumps(payload, ensure_ascii=False)[:200]}")
+    # PRESENCE IN runData IS NOT PROOF THAT THE CALL WENT OUT: a DISABLED node still shows up
+    # there, passing its input straight through (measured 2026-08-27 -- disabling the node
+    # left every other assert here green). What proves the request happened is the SHAPE of
+    # the output: a Wappi answer, i.e. either the tolerated 400 «Profile not found» that a
+    # probe id must produce, or a real {status:"done"}. A pass-through would carry
+    # Compute Slot Limit's own fields (overLimit/limit/plan) instead.
+    called = "error" in payload or payload.get("status") in ("error", "done")
+    print(f"[{'OK' if called else 'FAIL'}] {label}: the delete really called Wappi and its failure "
+          f"was tolerated, not fatal: {called}")
+    if not called:
+        failures.append(f"{label}_delete_called")
+
+    # …and the refusal node still ran AFTER it (the `lastNode` response above proves the
+    # body, this proves the ORDER -- a delete wired past Respond would answer with Wappi's
+    # payload instead).
+    responded = "Respond Channel Limit" in run
+    print(f"[{'OK' if responded else 'FAIL'}] {label}: Respond Channel Limit still ran: {responded}")
+    if not responded:
+        failures.append(f"{label}_respond_ran")
+    return fake
+
+
+def run_refused_delete_probe():
+    failures = []
+    print(f"=== Task 19: refused Create deletes the stranded profile -- "
+          f"app_user_id={REFUSED_DELETE_APP_USER!r} (expired) ===\n")
+
+    if TASK16_SQL_URL:
+        print("seeding the expired subscriber via the SQL harness…")
+        print(f"  {_harness_sql(REFUSED_DELETE_SEED_SQL)}\n")
+    else:
+        print("TASK16_SQL_URL unset -- seed this first (or run it through «SQL Command Runner»):\n")
+        print(REFUSED_DELETE_SEED_SQL + "\n")
+
+    _refused_delete_case(
+        "wa", CREATE_WA_URL,
+        lambda fake: channel_slot_form_wa(REFUSED_DELETE_APP_USER, fake, bot_key="Bot0",
+                                          name=REFUSED_DELETE_BOT_NAME),
+        "XuvOp7TxOImOAmlj", failures)
+    print()
+    time.sleep(2)
+    _refused_delete_case(
+        "tg", CREATE_TG_URL,
+        lambda fake: channel_slot_form_tg(REFUSED_DELETE_APP_USER, fake, bot_key="Bot0",
+                                          name=REFUSED_DELETE_BOT_NAME),
+        "Uz6HBBUpAiUqVysB", failures)
+
+    print("\nNo workflow clone and no bot_profiles row are created on this path (the refusal "
+          "terminates before Get Sample Workflow), so cleanup is only:")
+    if TASK16_SQL_URL:
+        print(f"  {_harness_sql(REFUSED_DELETE_CLEANUP_SQL)}")
+    else:
+        print(REFUSED_DELETE_CLEANUP_SQL)
+
+    if failures:
+        print(f"\n{len(failures)} assertion(s) FAILED: {failures}")
+        return 1
+    print("\nALL OK")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument(
@@ -2140,7 +2303,18 @@ def main():
              "trialing and OVER-QUOTA allowed (the panel is the quota fallback), "
              "suggestions never touch dialog_counts, and the daily cap refuses request "
              "101. Needs TASK16_SQL_URL to seed subscriber rows. See Part 9.")
+    ap.add_argument(
+        "--refused-delete", action="store_true",
+        help="Run the Task 19 probe: a Create refused for lack of a channel slot must DELETE "
+             "the profile the owner just authorized before answering. Fires both Create "
+             "webhooks with an EXPIRED subscriber fixture (limit 0) and asserts the refusal "
+             "body is unchanged AND that Delete Refused Profile ran on that execution — the "
+             "fake profile id makes Wappi answer 400 «Profile not found», which is the "
+             "expected, tolerated outcome. Needs probe_user_19 seeded (Part 10).")
     args = ap.parse_args()
+
+    if args.refused_delete:
+        sys.exit(run_refused_delete_probe())
 
     if args.channel_slot_backstop:
         sys.exit(run_channel_slot_backstop_probe())
