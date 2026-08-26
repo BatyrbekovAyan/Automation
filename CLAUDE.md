@@ -190,6 +190,16 @@ The app communicates with four external services via `UnityWebRequest` + corouti
   is the live example: `MessageItemView` colours the quoted card by comparing against it, so translating a
   hand-typed `"You"` at one site would silently drop the accent. `ReplyParser.IsOwnSenderLabel` also accepts
   the pre-RU `"You"` still sitting in `ChatHistoryCache` on older installs.
+  (4) **An authored UI character must exist in the static SF Pro atlases.** All four SFProText SDFs are
+  static 711-glyph atlases with NO fallbacks (TMP Settings global fallbacks are empty too), so a char
+  outside the table renders as NOTHING and TMP only logs at layout time — «до −17%» shipped as «до 17%»
+  (U+2212 minus, fixed to ASCII "-" in f4fe603) and the Support FAQ's «→» never rendered. Known-absent:
+  − (U+2212 → use "-"), № (U+2116), ✕ (U+2715 → use × U+00D7), → (U+2192 → use › U+203A), ⇒, ∈, ✦, ⌨.
+  Present and safe: - – — … « » ‹ › ' ' " " • · ₸ × NBSP. Only the LiberationSans chain (chat bubbles /
+  TMP default font) is dynamic and can draw anything in LiberationSans.ttf. `FontGlyphCoverageTests`
+  pins the whole class: every serialized label in Main.unity + Assets/Prefabs against its own font, and
+  the copy seams (billing `*Rows`/`PaywallCopy`, dashboard labels, FAQ, prompt catalog) against SF Pro —
+  extend its seam list when adding a new copy seam.
   Deliberately NOT translated: brand names (WhatsApp/Telegram/Instagram/n8n) and format acronyms (PDF/DOCX/GIF/QR);
   the hidden `Bot/Status` TMP, whose `"Active"`/`"Connecting.."` are a data channel `Bot.cs` reads (it paints the
   visible subline off `Status.color`, not the text); the dev-only n8n URL field; and every server-payload string

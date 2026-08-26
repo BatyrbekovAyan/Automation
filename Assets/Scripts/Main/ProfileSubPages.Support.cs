@@ -34,7 +34,9 @@ public partial class ProfileSubPages
         ("Что такое режим «Вместе»?",
          "Бот предлагает варианты ответа, а отправляете их вы. Удобно, пока вы ещё проверяете, как бот отвечает клиентам."),
         ("Как загрузить прайс-лист?",
-         "В настройках бота, вкладка «Промпты» → «Прайс-листы». Подойдут Excel, Word, PDF, фото и другие форматы — бот сам разберёт цены."),
+         // › (U+203A), not → (U+2192): the arrow is absent from the static SF Pro
+         // atlases and silently dropped at render — pinned by FontGlyphCoverageTests.
+         "В настройках бота, вкладка «Промпты» › «Прайс-листы». Подойдут Excel, Word, PDF, фото и другие форматы — бот сам разберёт цены."),
     };
 
     private bool _sendingSupport;

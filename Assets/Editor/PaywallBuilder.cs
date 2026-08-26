@@ -34,7 +34,7 @@ public static class PaywallBuilder
     private const float CardGap = 40f;
     private const float RingWidth = 6f;
     // 132 = the house touch-target floor (44dp x 3). The 6u track padding makes each
-    // segment 120 tall, still at/above the floor. The «до −17%» ribbon stays 48.
+    // segment 120 tall, still at/above the floor. The «до -17%» ribbon stays 48.
     private const float ToggleHeight = 132f;
     private const float CtaHeight = 132f;
     // Secondary «Оформить …» button (Task 18) — one step below the CTA's 132 and at the house
@@ -347,7 +347,7 @@ public static class PaywallBuilder
         // scene so the un-run screen doesn't read as "both segments selected".
         yearParts[1].SetActive(false);
 
-        // «до −17%» ribbon straddling the Год half's top edge. Deliberately NOT inside the
+        // «до -17%» ribbon straddling the Год half's top edge. Deliberately NOT inside the
         // segment: over the selected segment's AccentFill, PositiveInk would fail contrast.
         var badge = NewChild(toggle, "YearSavingBadge", out var badgeRt);
         IgnoreLayout(badge);

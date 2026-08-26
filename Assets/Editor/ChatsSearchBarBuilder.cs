@@ -291,7 +291,9 @@ public static class ChatsSearchBarBuilder
         hitImg.color = new Color(0, 0, 0, 0);
         hitImg.raycastTarget = true;
 
-        // "✕" glyph child — toggled via clearIcon SetActive
+        // "×" glyph child — toggled via clearIcon SetActive. × (U+00D7), not ✕
+        // (U+2715): ✕ exists in NO project font, so a label stamped with it renders
+        // blank — FontGlyphCoverageTests fails the scene the moment such a char lands.
         var x = new GameObject("X",
             typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
         x.layer = LayerMask.NameToLayer("UI");
@@ -302,7 +304,7 @@ public static class ChatsSearchBarBuilder
         xRt.offsetMin = Vector2.zero;
         xRt.offsetMax = Vector2.zero;
         var xTmp = x.GetComponent<TextMeshProUGUI>();
-        xTmp.text = "✕"; // ✕
+        xTmp.text = "×";
         xTmp.fontSize = 28;
         xTmp.color = Color.white;
         xTmp.alignment = TextAlignmentOptions.Center;
