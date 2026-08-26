@@ -194,57 +194,93 @@ fixtures (e)/(h) need a NON-empty live list -- this dev account now has zero Wap
 profiles on both bases, so those runs point `List WA Profiles` at a local stub (the
 same node-URL mutation technique fixture (f) uses) while `dryRun` is still true.
 
-## Part 6 -- RC TRANSFER handler (Task 16, opt-in)
+## Part 6 -- RC identity moves: TRANSFER + alias merge (Task 16, opt-in)
 
 Run with `--transfer`. Like Part 4 this one is a REAL exact-value probe over plain
 HTTP, and unlike every other part it needs NO seeded precondition: it builds its own
 fixtures out of ordinary RevenueCat events (so the seeding path is itself the shipped
 mapper) and reads every assertion back through GetUsage.
 
-What it covers (the device-pass gaps of 2026-08-26, see the ledger's DEVICE PASS
-block): RC/StoreKit2 auto-transferred a live subscription to a fresh anonymous
-app_user_id on reinstall. GAP-1: the top-up balance stayed stranded on the OLD id.
-GAP-2: the old identity became a zombie -- `status='active'` forever (no further event
-will ever name it), its Wappi profiles still billing 23R/day and its workflow clones
-still auto-replying, and NEITHER sweep branch can reap it because both exclude
-`status='active'` by design.
+WHAT IT COVERS -- the device-pass gaps of 2026-08-26 (see the ledger's DEVICE PASS
+block). On reinstall the subscription ended up under a fresh anonymous app_user_id.
+GAP-1: the purchased top-up stayed stranded on the OLD id. GAP-2: the old identity
+became a zombie -- `status='active'` forever (no further event would ever name it),
+its Wappi profiles still billing 23R/day and its workflow clones still auto-replying,
+and NEITHER sweep branch can reap it because both exclude `status='active'` by design.
 
-The handler: `Map Event` recognises `type === 'TRANSFER'` (RC's payload carries NO
-app_user_id/product_id/entitlement_ids -- only the `transferred_from`/`transferred_to`
-String arrays) and emits `{to_id, from_ids}`; a new `If Is Transfer?` gate routes that
-to `Transfer Subscriber`, ONE parameterized statement (= one transaction) that moves the
-snapshot + SUMS the top-up onto the destination row and, in the same statement, sets
-every source row to `status='expired'`, `topup_balance=0` and clamps its
-`current_period_end` down to `now()`. That clamp is the whole Branch-A hand-off: the
-sweep's `Candidates` query selects on `status in ('expired','grace') and
-coalesce(current_period_end, ...) < now() - interval '3 days'`, so a still-in-the-future
-paid period would have parked the zombie's profiles for up to a month. No new deletion
-machinery exists anywhere -- retirement is entirely "make the row look like churn".
+There are TWO different mechanisms behind that, and they need different handling:
 
-Scenarios (all asserted at VALUE level, all self-seeded, ids are per-run unique so a
-re-run can never read a previous run's residue):
-  1. old id: INITIAL_PURCHASE (tier_business, +30d, sub.business.month) +
-     NON_RENEWING_PURCHASE (top-up 500)  ->  business/active/500
-  2. new id: NON_RENEWING_PURCHASE (top-up 500) only  ->  trial/trialing/500. This is
-     the "destination row already exists" case, which is what makes the SUM (500+500)
-     a real assertion rather than a copy.
-  3. TRANSFER old -> new. Asserts the new id now reads business/active/quota
-     1000/topupBalance 1000/productId sub.business.month/interval month, and that the
-     old id reads status expired + topupBalance 0 with its periodEnd clamped (proved
-     relatively: the destination keeps a periodEnd ~30 days later than the source's,
-     which can only be true if the source's was pulled back from that same value).
-  4. The SAME TRANSFER fired a second time (RevenueCat retries on any non-2xx) must be
-     a no-op: the new id's values must be byte-identical, and in particular the top-up
-     must NOT be credited twice.
-  5. A TRANSFER whose arrays are empty must be a clean no-op: HTTP 200 with the
-     `Respond No-Op` body, never a 500 and never a write.
+  * **Alias merge (what a same-device reinstall actually does).** RC does NOT fire
+    TRANSFER here. It renames the identity: the event arrives under the NEW
+    `app_user_id` with the old one in BOTH `original_app_user_id` and `aliases[]`
+    (live proof on this instance -- execs 3150/3151/3153, where `transferred_from`/
+    `transferred_to` are absent entirely; RC's own docs say to "search both the
+    original_app_user_id and the aliases array"). `Map Event` computes the alias set
+    minus the current id, and `If Needs Consolidation?` routes it to
+    `Consolidate Aliases`, which moves the balance and retires the alias rows --
+    deliberately WITHOUT copying their plan/status/period, because the event riding
+    behind it already carries the authoritative ones and this path fires on EVERY
+    event forever. It sits BEFORE `Upsert Subscriber` on purpose: that node's
+    `topup_balance + $5` is not retry-idempotent, so a failure after it would let a
+    RevenueCat redelivery double-credit the event's own top-up.
+  * **TRANSFER (a cross-account move).** RC's payload carries NO app_user_id/
+    product_id/entitlement_ids -- only the `transferred_from`/`transferred_to` String
+    arrays -- so it cannot pass the `If Has Payload?` gate at all. `If Is Transfer?`
+    routes it to `Transfer Subscriber`, which additionally moves the SNAPSHOT
+    (plan/status/period/product) to every destination id, crediting the balance to the
+    first one only.
+
+Both statements are single parameterized statements (= one transaction each), both
+take their sources `for update` (this instance demonstrably delivers same-subscriber
+events concurrently, and a snapshot-read `sum(topup_balance)` double-credits in that
+race), and both retire sources by setting `status='expired'`, `topup_balance=0` and
+clamping `current_period_end` to `least(coalesce(period, now()), now())`. That clamp is
+the entire Branch-A hand-off (see Part 7), and BOTH of its coalesces matter: a future
+paid period parks the zombie's profiles for up to a month, while a NULL period makes
+the row a sweep candidate INSTANTLY -- the sweep reads
+`coalesce(current_period_end, now() - interval '99 days')`. No new deletion machinery
+exists anywhere: retirement is entirely "make the row look like ordinary churn".
+
+Cases (all VALUE-level, all self-seeded, ids per-run unique so a re-run can never read
+a previous run's residue):
+  T1  happy path: paid source + top-up, destination that ALREADY has its own top-up
+      (which is what makes the 500+500 sum a real assertion rather than a copy); then
+      a replay (must credit nothing) and an empty-array TRANSFER (must be a clean
+      no-op, never a 500).
+  T2  a RENEWAL under the new id lands BEFORE the transfer -- the older source snapshot
+      must not roll the destination's period back (asserted byte-identical to its
+      pre-transfer value) while the money still moves.
+  T3  an EXPIRED source with a LATER period vs a LIVE (trialing) destination -- the
+      liveness term must refuse the snapshot, or `Count Dialog`'s
+      `status not in ('expired','grace')` would silence a healthy fresh install.
+  T4  a top-up-only source has a NULL period: retiring it must still leave the 3-day
+      grace rather than making it instantly sweep-eligible.
+  T5  multi-id arrays: the snapshot fans out to EVERY `transferred_to` id, the balance
+      goes to the first only, every source is retired.
+  A1/A2  alias merge + replay, including a payload-carry assert (the event's own +45d
+      period must survive `Consolidate Aliases`, since a Postgres node emits only its
+      query result and drops the incoming json).
+  A3  4 concurrent deliveries of the same alias-bearing event -> credited exactly once.
 
 Cleanup: `transfer_cleanup_sql()` (printed at the end of the run) deletes the probe's
 own `probe16_*` rows -- same one-off Manual-Trigger->Postgres harness convention as
 Parts 4/5, since Postgres lives behind n8n's own credential and is unreachable from a
 plain script.
+
+## Part 7 -- Branch A hand-off trace (Task 16 fix round, opt-in)
+
+Run with `--branch-a-trace`. Proves the single claim the whole design rests on: that
+retiring a row is ENOUGH to hand its `bot_profiles` rows to Profile Lifecycle Sweep's
+Branch A, so no new deletion machinery is needed. It runs the sweep's own shipped
+`Candidates` query (read verbatim out of the canonical workflow JSON) against real
+fixtures, and includes a CONTROL row -- expired but with its period still in the future,
+i.e. what a retired row would look like WITHOUT the clamp -- which must never become a
+candidate. Prints the procedure and SQL by default; set `TASK16_SQL_URL` to a one-off
+SQL harness webhook (bind it to a credential -- never leave an unauthenticated SQL
+endpoint up) and it runs end to end.
 """
 import argparse
+import calendar
 import json
 import os
 import sys
@@ -1105,34 +1141,51 @@ def run_sweep_fixture_helper():
 
 
 # ---------------------------------------------------------------------------------
-# Part 6: RC TRANSFER handler (Task 16) -- self-seeding exact-value probe
+# Part 6: RC identity moves (Task 16) -- self-seeding exact-value probe
 # ---------------------------------------------------------------------------------
 #
 # See the Part 6 section of the module docstring for the full contract. Everything
-# below runs over plain HTTP: the RevenueCat webhook seeds, GetUsage asserts.
+# below runs over plain HTTP: the RevenueCat webhook seeds, GetUsage asserts. Ids are
+# per-run unique, so a re-run can never read a previous run's residue.
 TRANSFER_PROBE_PREFIX = "probe16_"
+GRACE_TOLERANCE_S = 900        # a clamped period_end must land within this of "now"
 
 
 def transfer_cleanup_sql():
     """Deletes every row this probe can possibly have created. Paste into the same
     one-off Manual-Trigger->Postgres harness Parts 4/5 use. The prefix is unique to
     this probe -- no other fixture, and no real RevenueCat id, can start with it."""
-    return "delete from subscribers where app_user_id like 'probe16\\_%';"
+    return ("delete from bot_profiles where profile_id like 'probe16\\_%';\n"
+            "delete from subscribers where app_user_id like 'probe16\\_%';")
 
 
-def _iso_seconds(ts):
+def _uid(kind):
+    return f"{TRANSFER_PROBE_PREFIX}{kind}_{uuid.uuid4().hex[:10]}"
+
+
+def _epoch(ts):
     """Parse the ISO-8601 timestamp GetUsage echoes back (Postgres timestamptz through
-    n8n) into epoch-ish seconds. Only ever used for a DIFFERENCE between two values
-    read from the SAME endpoint in the same run, so a same-offset naive parse is
-    sufficient and, unlike datetime.fromisoformat on Python 3.9, tolerates both a
-    trailing 'Z' and fractional seconds."""
+    n8n) into a UTC epoch. Uses calendar.timegm, NOT time.mktime -- the values are UTC
+    and this probe compares some of them against wall-clock now(), not only against
+    each other. Tolerates both a trailing 'Z' and fractional seconds (Python 3.9's
+    datetime.fromisoformat does neither)."""
     if not isinstance(ts, str) or len(ts) < 19:
         return None
     try:
-        t = time.strptime(ts[:19], "%Y-%m-%dT%H:%M:%S")
+        return calendar.timegm(time.strptime(ts[:19], "%Y-%m-%dT%H:%M:%S"))
     except ValueError:
         return None
-    return time.mktime(t)
+
+
+def _fire(label, event, failures, expect=200, settle=1.0):
+    status, resp = post_event(event)
+    ok = status == expect
+    print(f"[{'OK' if ok else 'FAIL'}] {label}: HTTP {status} -- {resp[:120]}")
+    if not ok:
+        failures.append(label)
+    if settle:
+        time.sleep(settle)
+    return resp
 
 
 def _assert_usage(label, app_user_id, expected, failures):
@@ -1152,123 +1205,255 @@ def _assert_usage(label, app_user_id, expected, failures):
     return body
 
 
+def _assert_grace(label, body, failures):
+    """A retired identity's period_end must be non-null AND ~now: non-null because the
+    sweep's Candidates query reads `coalesce(current_period_end, now() - interval '99
+    days')`, so leaving it NULL makes the row a churn candidate INSTANTLY (real Wappi
+    profiles deleted within one 6h sweep tick, zero grace); ~now because that is what
+    starts the same 3-day grace every other churned owner gets."""
+    end = _epoch((body or {}).get("periodEnd"))
+    if end is None:
+        print(f"[FAIL] {label}: periodEnd is null/unparseable ({(body or {}).get('periodEnd')!r}) "
+              f"-- a NULL period means INSTANT sweep eligibility, not grace")
+        failures.append(label)
+        return
+    drift = abs(time.time() - end)
+    ok = drift <= GRACE_TOLERANCE_S
+    print(f"[{'OK' if ok else 'FAIL'}] {label}: periodEnd clamped to ~now "
+          f"({body.get('periodEnd')}, {drift:.0f}s from now, tolerance {GRACE_TOLERANCE_S}s) "
+          f"-- 3-day churn grace starts here")
+    if not ok:
+        failures.append(label)
+
+
+# ---- seed helpers (every fixture is built out of ORDINARY RevenueCat events, so the
+# ---- seeding path is itself the shipped mapper) --------------------------------------
+
+def _seed_paid(uid, failures, days=30, product=SUBSCRIPTION_PRODUCT_ID, ent="tier_business", aliases=None):
+    ev = {"type": "INITIAL_PURCHASE", "app_user_id": uid, "entitlement_ids": [ent],
+          "expiration_at_ms": now_plus_days_ms(days), "product_id": product}
+    if aliases:
+        ev["aliases"] = aliases
+    _fire(f"seed_paid[{uid[-10:]}]", ev, failures)
+
+
+def _seed_topup(uid, failures):
+    _fire(f"seed_topup[{uid[-10:]}]",
+          {"type": "NON_RENEWING_PURCHASE", "app_user_id": uid, "product_id": TOPUP_PRODUCT_ID},
+          failures)
+
+
+def _seed_expire(uid, failures):
+    _fire(f"seed_expire[{uid[-10:]}]", {"type": "EXPIRATION", "app_user_id": uid}, failures)
+
+
+def _transfer_event(from_ids, to_ids):
+    return {"type": "TRANSFER", "transferred_from": from_ids, "transferred_to": to_ids,
+            "store": "APP_STORE", "environment": "SANDBOX"}
+
+
+def _alias_event(cur, aliases, days=45, ev_type="RENEWAL"):
+    """A real post-reinstall RevenueCat envelope: the event arrives under the NEW id and
+    names the old one in BOTH original_app_user_id and aliases[] (live shape, execs
+    3150/3151/3153 of 2026-08-26 -- transferred_from/to are absent there entirely)."""
+    return {"type": ev_type, "app_user_id": cur, "entitlement_ids": ["tier_business"],
+            "expiration_at_ms": now_plus_days_ms(days), "product_id": SUBSCRIPTION_PRODUCT_ID,
+            "original_app_user_id": aliases[0], "aliases": [cur] + aliases}
+
+
+# ---- TRANSFER path (cross-account move) ---------------------------------------------
+
+def _case_t1_happy(failures):
+    print("\n=== T1: TRANSFER happy path -- plan moves, top-ups SUM, source retired ===")
+    old, new = _uid("t1old"), _uid("t1new")
+    _seed_paid(old, failures)
+    _seed_topup(old, failures)
+    _seed_topup(new, failures)          # destination row ALREADY exists -> the sum is real
+    _assert_usage("t1_pre_old", old, {
+        "plan": "business", "status": "active", "quota": 1000, "topupBalance": 500,
+        "productId": SUBSCRIPTION_PRODUCT_ID, "interval": "month"}, failures)
+    _assert_usage("t1_pre_new", new, {
+        "plan": "trial", "status": "trialing", "quota": 150, "topupBalance": 500,
+        "periodEnd": None, "productId": None}, failures)
+
+    _fire("t1_transfer", _transfer_event([old], [new]), failures, settle=2)
+    after_new = _assert_usage("t1_post_new", new, {
+        "plan": "business", "status": "active", "quota": 1000,
+        "topupBalance": 1000,                       # 500 own + 500 moved; not 500, not 1500
+        "productId": SUBSCRIPTION_PRODUCT_ID, "interval": "month"}, failures)
+    after_old = _assert_usage("t1_post_old", old, {
+        "plan": "business", "status": "expired", "topupBalance": 0}, failures)
+    _assert_grace("t1_old_grace", after_old, failures)
+    if after_new and after_old:
+        gap = (_epoch(after_new.get("periodEnd")) or 0) - (_epoch(after_old.get("periodEnd")) or 0)
+        ok = gap / 86400.0 >= 25
+        print(f"[{'OK' if ok else 'FAIL'}] t1_period_split: destination keeps the +30d period while the "
+              f"source was pulled back to ~now -- gap {gap / 86400.0:.2f} days (>= 25; without the "
+              f"clamp both would read the SAME value, gap 0)")
+        if not ok:
+            failures.append("t1_period_split")
+
+    print("\n--- T1b: replay (RevenueCat retries any non-2xx) must change NOTHING ---")
+    _fire("t1b_replay", _transfer_event([old], [new]), failures, settle=2)
+    _assert_usage("t1b_replay_unchanged", new, {
+        "plan": "business", "status": "active", "topupBalance": 1000,
+        "productId": SUBSCRIPTION_PRODUCT_ID}, failures)
+
+    print("\n--- T1c: empty arrays must be a clean no-op, never a 500 and never a write ---")
+    resp = _fire("t1c_empty", _transfer_event([], []), failures, settle=0)
+    if '"noop"' not in resp:
+        print("[FAIL] t1c_empty: expected the Respond No-Op body")
+        failures.append("t1c_empty_body")
+
+
+def _case_t2_renewal_first(failures):
+    print("\n=== T2: a RENEWAL under the new id lands BEFORE the TRANSFER -- the older "
+          "source snapshot must NOT roll the destination back (freshness guard) ===")
+    old, new = _uid("t2old"), _uid("t2new")
+    _seed_paid(new, failures, days=60)          # destination already renewed, further out
+    _seed_paid(old, failures, days=30)
+    _seed_topup(old, failures)
+    pre_new = _assert_usage("t2_pre_new", new, {
+        "plan": "business", "status": "active", "topupBalance": 0}, failures)
+    pre_end = (pre_new or {}).get("periodEnd")
+
+    _fire("t2_transfer", _transfer_event([old], [new]), failures, settle=2)
+    _assert_usage("t2_post_new", new, {
+        "plan": "business", "status": "active", "topupBalance": 500,   # money still moves
+        "periodEnd": pre_end}, failures)                               # period NOT rolled back
+    print(f"    (destination periodEnd asserted byte-identical to its pre-transfer value: {pre_end})")
+    _assert_usage("t2_post_old", old, {"status": "expired", "topupBalance": 0}, failures)
+
+
+def _case_t3_expired_source(failures):
+    print("\n=== T3: an EXPIRED source with a LATER period must not silence a LIVE "
+          "destination (liveness term) -- money moves, status does not ===")
+    old, new = _uid("t3old"), _uid("t3new")
+    _seed_topup(new, failures)                  # destination: trial/trialing, periodEnd NULL
+    _seed_paid(old, failures, days=30)
+    _seed_topup(old, failures)
+    _seed_expire(old, failures)                 # source: expired, but period +30d
+    _assert_usage("t3_pre_old", old, {"status": "expired", "topupBalance": 500}, failures)
+
+    _fire("t3_transfer", _transfer_event([old], [new]), failures, settle=2)
+    _assert_usage("t3_post_new", new, {
+        "plan": "trial", "status": "trialing", "quota": 150,   # NOT stamped business/expired
+        "topupBalance": 1000,                                  # the balance still moves
+        "periodEnd": None, "productId": None}, failures)
+    after_old = _assert_usage("t3_post_old", old, {"status": "expired", "topupBalance": 0}, failures)
+    _assert_grace("t3_old_grace", after_old, failures)
+
+
+def _case_t4_null_period(failures):
+    print("\n=== T4: a top-up-only source has a NULL period -- retiring it must still "
+          "leave 3 days of grace, not make it a sweep candidate instantly ===")
+    old, new = _uid("t4old"), _uid("t4new")
+    _seed_topup(old, failures)                  # trial/trialing, periodEnd NULL, 500
+    _assert_usage("t4_pre_old", old, {
+        "plan": "trial", "status": "trialing", "topupBalance": 500, "periodEnd": None}, failures)
+
+    _fire("t4_transfer", _transfer_event([old], [new]), failures, settle=2)
+    _assert_usage("t4_post_new", new, {
+        "plan": "trial", "status": "trialing", "topupBalance": 500, "periodEnd": None}, failures)
+    after_old = _assert_usage("t4_post_old", old, {"status": "expired", "topupBalance": 0}, failures)
+    _assert_grace("t4_old_grace", after_old, failures)
+
+
+def _case_t5_multi(failures):
+    print("\n=== T5: multi-id arrays -- the snapshot fans out to EVERY transferred_to id, "
+          "the balance goes to the first one only, every source is retired ===")
+    a, b = _uid("t5srcA"), _uid("t5srcB")
+    x, y = _uid("t5dstX"), _uid("t5dstY")
+    _seed_paid(a, failures, days=30)
+    _seed_topup(a, failures)
+    _seed_topup(b, failures)                    # second source: top-up only, NULL period
+
+    _fire("t5_transfer", _transfer_event([a, b], [x, y]), failures, settle=2)
+    _assert_usage("t5_post_primary", x, {
+        "plan": "business", "status": "active", "quota": 1000,
+        "topupBalance": 1000,                   # 500 + 500, summed across BOTH sources
+        "productId": SUBSCRIPTION_PRODUCT_ID}, failures)
+    _assert_usage("t5_post_secondary", y, {
+        "plan": "business", "status": "active", "quota": 1000,
+        "topupBalance": 0,                      # entitlement yes, money no
+        "productId": SUBSCRIPTION_PRODUCT_ID}, failures)
+    for label, uid in (("t5_post_srcA", a), ("t5_post_srcB", b)):
+        body = _assert_usage(label, uid, {"status": "expired", "topupBalance": 0}, failures)
+        _assert_grace(label + "_grace", body, failures)
+
+
+# ---- ALIAS path (same-device reinstall -- the case RC actually produces) -------------
+
+def _case_a1_alias(failures):
+    print("\n=== A1: alias merge (the REAL reinstall shape) -- RC never fires TRANSFER "
+          "here; it renames the identity and names the old one in aliases[] ===")
+    old, new = _uid("a1old"), _uid("a1new")
+    _seed_paid(old, failures)
+    _seed_topup(old, failures)
+    _assert_usage("a1_pre_old", old, {
+        "plan": "business", "status": "active", "topupBalance": 500}, failures)
+
+    # One ordinary RENEWAL, delivered under the NEW id, carrying the old id as an alias.
+    _fire("a1_alias_event", _alias_event(new, [old]), failures, settle=2)
+    after_new = _assert_usage("a1_post_new", new, {
+        "plan": "business", "status": "active", "quota": 1000,
+        "topupBalance": 500,                    # consolidated from the alias row
+        "productId": SUBSCRIPTION_PRODUCT_ID, "interval": "month"}, failures)
+    # The event's OWN plan/status/period must survive the consolidation node -- a Postgres
+    # node emits only its query result and drops the incoming json, so this also proves the
+    # payload is carried through to Upsert Subscriber rather than silently lost.
+    end = _epoch((after_new or {}).get("periodEnd"))
+    ok = end is not None and (end - time.time()) / 86400.0 >= 40
+    print(f"[{'OK' if ok else 'FAIL'}] a1_payload_carried: the event's own +45d period reached the row "
+          f"({(after_new or {}).get('periodEnd')}) -- proves Consolidate Aliases carries the payload "
+          f"through to Upsert Subscriber")
+    if not ok:
+        failures.append("a1_payload_carried")
+    after_old = _assert_usage("a1_post_old", old, {
+        "status": "expired", "topupBalance": 0}, failures)
+    _assert_grace("a1_old_grace", after_old, failures)
+
+    print("\n--- A2: the alias set rides EVERY event forever -- a replay must credit nothing ---")
+    _fire("a2_replay", _alias_event(new, [old]), failures, settle=2)
+    _assert_usage("a2_replay_unchanged", new, {
+        "plan": "business", "status": "active", "topupBalance": 500}, failures)
+    _assert_usage("a2_old_still_retired", old, {"status": "expired", "topupBalance": 0}, failures)
+
+
+def _case_a3_concurrent(failures):
+    print("\n=== A3: concurrent burst -- this instance delivers same-subscriber events in "
+          "parallel (execs 3150/3151 overlapped), so the credit must be lock-produced ===")
+    old, new = _uid("a3old"), _uid("a3new")
+    _seed_topup(old, failures)
+    event = _alias_event(new, [old])
+    results = []
+    try:
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+            futures = [pool.submit(post_event, event) for _ in range(4)]
+            results = [f.result() for f in futures]
+    except Exception as exc:                      # noqa: BLE001 -- environment, not contract
+        print(f"[SKIP] a3_concurrent: could not run the burst ({exc}) -- NOT counted as a failure")
+        return
+    print(f"    4 concurrent deliveries -> {[r[0] for r in results]}")
+    time.sleep(3)
+    _assert_usage("a3_credited_once", new, {
+        "plan": "business", "status": "active",
+        "topupBalance": 500}, failures)           # exactly once, not 2000
+    _assert_usage("a3_old_retired", old, {"status": "expired", "topupBalance": 0}, failures)
+
+
 def run_transfer_probe():
     if not SECRET:
-        print("FAIL: RC_WEBHOOK_SECRET is not set -- the TRANSFER probe seeds through the "
-              "real RevenueCat webhook and cannot authenticate without it.")
+        print("FAIL: RC_WEBHOOK_SECRET is not set -- this probe seeds through the real "
+              "RevenueCat webhook and cannot authenticate without it.")
         return 1
 
-    tag = uuid.uuid4().hex[:10]
-    old_id = f"{TRANSFER_PROBE_PREFIX}old_{tag}"
-    new_id = f"{TRANSFER_PROBE_PREFIX}new_{tag}"
     failures = []
-    print(f"=== Task 16 TRANSFER probe -- old={old_id!r} new={new_id!r} ===\n")
-
-    print("--- 1. seed the OLD identity: a paying business subscriber with a top-up ---")
-    for label, body in (
-        ("initial_purchase", {
-            "type": "INITIAL_PURCHASE", "app_user_id": old_id,
-            "entitlement_ids": ["tier_business"],
-            "expiration_at_ms": now_plus_days_ms(30),
-            "product_id": SUBSCRIPTION_PRODUCT_ID,
-        }),
-        ("topup", {"type": "NON_RENEWING_PURCHASE", "app_user_id": old_id,
-                   "product_id": TOPUP_PRODUCT_ID}),
-    ):
-        status, resp = post_event(body)
-        ok = status == 200
-        print(f"[{'OK' if ok else 'FAIL'}] seed_old_{label}: HTTP {status} -- {resp[:120]}")
-        if not ok:
-            failures.append(f"seed_old_{label}")
-        time.sleep(1)
-
-    print("\n--- 2. seed the NEW identity: a top-up only, so the destination row ALREADY "
-          "exists (this is what makes the sum a real assertion) ---")
-    status, resp = post_event({"type": "NON_RENEWING_PURCHASE", "app_user_id": new_id,
-                               "product_id": TOPUP_PRODUCT_ID})
-    ok = status == 200
-    print(f"[{'OK' if ok else 'FAIL'}] seed_new_topup: HTTP {status} -- {resp[:120]}")
-    if not ok:
-        failures.append("seed_new_topup")
-    time.sleep(1)
-
-    print("\n--- 3. pre-transfer state (both identities, exact values) ---")
-    before_old = _assert_usage("pre_old", old_id, {
-        "success": True, "plan": "business", "status": "active", "quota": 1000,
-        "used": 0, "topupBalance": 500, "productId": SUBSCRIPTION_PRODUCT_ID,
-        "interval": "month",
-    }, failures)
-    _assert_usage("pre_new", new_id, {
-        "success": True, "plan": "trial", "status": "trialing", "quota": 150,
-        "used": 0, "topupBalance": 500, "periodEnd": None, "productId": None,
-        "interval": None,
-    }, failures)
-    if before_old and not before_old.get("periodEnd"):
-        print("[FAIL] pre_old: periodEnd is null -- the +30d seed did not land")
-        failures.append("pre_old_period_end")
-
-    print("\n--- 4. fire TRANSFER (RC's real shape: no app_user_id, only the two arrays) ---")
-    transfer_event = {
-        "type": "TRANSFER",
-        "transferred_from": [old_id],
-        "transferred_to": [new_id],
-        "store": "APP_STORE",
-        "environment": "SANDBOX",
-    }
-    status, resp = post_event(transfer_event)
-    ok = status == 200
-    print(f"[{'OK' if ok else 'FAIL'}] transfer_fired: HTTP {status} -- {resp[:160]}")
-    if not ok:
-        failures.append("transfer_fired")
-    time.sleep(2)
-
-    print("\n--- 5. GAP-1: the subscription AND the top-up landed on the new identity ---")
-    after_new = _assert_usage("post_new", new_id, {
-        "success": True, "plan": "business", "status": "active", "quota": 1000,
-        "used": 0, "topupBalance": 1000,          # 500 (its own) + 500 (moved), not 500 and not 1500
-        "productId": SUBSCRIPTION_PRODUCT_ID, "interval": "month",
-    }, failures)
-
-    print("\n--- 6. GAP-2: the old identity is neutralized (status expired kills the quota "
-          "gate; the clamped periodEnd hands its profiles to the sweep's Branch A) ---")
-    after_old = _assert_usage("post_old", old_id, {
-        "success": True, "plan": "business", "status": "expired", "topupBalance": 0,
-    }, failures)
-
-    if after_new and after_old:
-        new_end, old_end = _iso_seconds(after_new.get("periodEnd")), _iso_seconds(after_old.get("periodEnd"))
-        if new_end is None or old_end is None:
-            print(f"[FAIL] period_end_clamped: unparseable timestamps "
-                  f"(new={after_new.get('periodEnd')!r} old={after_old.get('periodEnd')!r})")
-            failures.append("period_end_clamped")
-        else:
-            gap_days = (new_end - old_end) / 86400.0
-            ok = gap_days >= 25
-            print(f"[{'OK' if ok else 'FAIL'}] period_end_clamped: the destination keeps the "
-                  f"+30d period while the source was pulled back to ~now -- gap {gap_days:.2f} days "
-                  f"(expected >= 25; without the clamp both would read the SAME value, gap 0)")
-            print(f"    new periodEnd: {after_new.get('periodEnd')}")
-            print(f"    old periodEnd: {after_old.get('periodEnd')}")
-            if not ok:
-                failures.append("period_end_clamped")
-
-    print("\n--- 7. idempotency: RevenueCat retries on any non-2xx, so a second delivery of "
-          "the SAME event must not credit the top-up twice or downgrade the destination ---")
-    status, resp = post_event(transfer_event)
-    print(f"    replay: HTTP {status} -- {resp[:120]}")
-    time.sleep(2)
-    _assert_usage("replay_new_unchanged", new_id, {
-        "success": True, "plan": "business", "status": "active", "quota": 1000,
-        "topupBalance": 1000, "productId": SUBSCRIPTION_PRODUCT_ID, "interval": "month",
-    }, failures)
-
-    print("\n--- 8. empty-array guard: a TRANSFER carrying no ids must be a clean no-op ---")
-    status, resp = post_event({"type": "TRANSFER", "transferred_from": [], "transferred_to": []})
-    ok = status == 200 and '"noop"' in resp
-    print(f"[{'OK' if ok else 'FAIL'}] transfer_empty_noop: HTTP {status} -- {resp[:160]} "
-          f"(expected 200 + the Respond No-Op body)")
-    if not ok:
-        failures.append("transfer_empty_noop")
+    print("=== Task 16 identity-move probe (TRANSFER + alias merge) ===")
+    for case in (_case_t1_happy, _case_t2_renewal_first, _case_t3_expired_source,
+                 _case_t4_null_period, _case_t5_multi, _case_a1_alias, _case_a3_concurrent):
+        case(failures)
 
     print("\n--- cleanup (run through a one-off Manual-Trigger->Postgres harness) ---")
     print(transfer_cleanup_sql())
@@ -1278,6 +1463,154 @@ def run_transfer_probe():
         return 1
     print("\nALL OK")
     return 0
+
+
+# ---------------------------------------------------------------------------------
+# Part 7: Branch A hand-off trace (Task 16 fix round) -- req-3 evidence, reproducible
+# ---------------------------------------------------------------------------------
+#
+# Proves the ONE claim the identity-move design rests on: retiring a row is enough to
+# hand its bot_profiles rows to Profile Lifecycle Sweep's Branch A, so no new deletion
+# machinery is needed. It runs the sweep's OWN shipped Candidates SQL, read verbatim
+# out of the canonical workflow JSON (never retyped), against real rows -- plus a
+# CONTROL fixture (status expired, period still in the future = what the retired row
+# would look like WITHOUT the clamp) which must never become a candidate.
+#
+# Postgres lives behind n8n's own credential, so this needs the same one-off
+# Manual-Trigger/Webhook -> Postgres harness every other Part documents. Point
+# TASK16_SQL_URL at such a harness (a webhook that runs {"sql": "..."} and returns the
+# rows; bind it to a credential -- never leave an unauthenticated SQL endpoint up) and
+# this runs end to end. Without it, the exact SQL and the expected outcome per step are
+# printed instead.
+SWEEP_CANDIDATES_WORKFLOW = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "workflows",
+    "fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json")
+TASK16_SQL_URL = os.environ.get("TASK16_SQL_URL", "")
+
+
+def sweep_candidates_sql():
+    """The shipped Candidates query, read out of the canonical sweep workflow."""
+    with open(SWEEP_CANDIDATES_WORKFLOW) as f:
+        wf = json.load(f)
+    q = next(n for n in wf["nodes"] if n["name"] == "Candidates")["parameters"]["query"]
+    return q.strip().rstrip(";")
+
+
+def _harness_sql(sql):
+    body = json.dumps({"sql": sql}).encode()
+    req = urllib.request.Request(TASK16_SQL_URL, data=body, method="POST")
+    req.add_header("Content-Type", "application/json")
+    if SECRET:
+        req.add_header("Authorization", SECRET)
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            return json.loads(r.read().decode() or "{}")
+    except urllib.error.HTTPError as e:
+        return {"error": e.read().decode()[:400]}
+
+
+def _trace_rows(sql):
+    out = _harness_sql(f"select coalesce(json_agg(t), '[]'::json) as rows from ({sql}) t;")
+    return out.get("rows", out) if isinstance(out, dict) else out
+
+
+def run_branch_a_trace():
+    tag = uuid.uuid4().hex[:8]
+    old, new = f"{TRANSFER_PROBE_PREFIX}ba_old_{tag}", f"{TRANSFER_PROBE_PREFIX}ba_new_{tag}"
+    ctl = f"{TRANSFER_PROBE_PREFIX}ctl_{tag}"
+    prof_old, prof_ctl = f"{TRANSFER_PROBE_PREFIX}ba_profile_{tag}", f"{TRANSFER_PROBE_PREFIX}ctl_profile_{tag}"
+    cand = sweep_candidates_sql()
+    scoped = f"select * from ({cand}) c where c.profile_id like 'probe16%'"
+    seed = (f"insert into bot_profiles (profile_id, app_user_id, channel, bot_key, created_at, deleted_at)\n"
+            f"values ('{prof_old}', '{old}', 'whatsapp', 'Bot0', now(), null),\n"
+            f"       ('{prof_ctl}', '{ctl}', 'whatsapp', 'Bot0', now(), null)\n"
+            f"on conflict (profile_id) do nothing returning profile_id;")
+    shift = (f"update subscribers set current_period_end = current_period_end - interval '4 days'\n"
+             f"where app_user_id in ('{old}','{ctl}') returning app_user_id, status, current_period_end;")
+
+    if not TASK16_SQL_URL:
+        print("=== Branch A hand-off trace -- procedure + SQL (set TASK16_SQL_URL to run it) ===\n")
+        print("Fixtures (all under the probe16_ prefix, all cleaned up at the end):")
+        print(f"  {old:38} the transferred-away identity  (+ profile {prof_old})")
+        print(f"  {ctl:38} CONTROL: expired but period still in the future (no clamp) (+ {prof_ctl})")
+        print("\n1. seed both identities with INITIAL_PURCHASE(+30d); EXPIRATION on the control only")
+        print("2. register one fake profile each:\n")
+        print(seed)
+        print("\n3. run the sweep's own Candidates query -- expect NEITHER (source active, control")
+        print("   expired but inside grace):\n")
+        print(scoped + ";")
+        print(f"\n4. fire an alias-merge event under {new} naming {old} (or a TRANSFER between them)")
+        print("5. run Candidates again -- expect STILL NEITHER (the clamp starts a 3-day grace,")
+        print("   it does not delete instantly)")
+        print("6. simulate 4 days of wall clock passing:\n")
+        print(shift)
+        print("\n7. run Candidates again -- expect EXACTLY the transferred-away identity's profile,")
+        print("   reason 'churn_grace', and the un-clamped CONTROL still absent")
+        print("8. clean up:\n")
+        print(transfer_cleanup_sql())
+        return 0
+
+    if not SECRET:
+        print("FAIL: RC_WEBHOOK_SECRET is not set (needed to seed through the real webhook).")
+        return 1
+
+    failures = []
+    print(f"=== Branch A hand-off trace (live, tag {tag}) ===")
+    print("\n1-2. seed identities + one fake profile each")
+    _seed_paid(old, failures)
+    _seed_paid(ctl, failures)
+    _seed_expire(ctl, failures)
+    print(f"    {_harness_sql(seed)}")
+
+    print("\n3. sweep Candidates BEFORE the move (expect none)")
+    rows = _trace_rows(scoped)
+    print(f"    {json.dumps(rows, ensure_ascii=False)}")
+    if rows:
+        failures.append("branch_a_pre_move_not_empty")
+
+    print("\n4. fire the identity move -- the ALIAS-MERGE shape, i.e. what a real reinstall")
+    print("   produces; the TRANSFER path retires its sources with the same statement")
+    _fire("branch_a_move", _alias_event(new, [old]), failures, settle=2)
+    print(f"    rows: {json.dumps(_trace_rows(f_subs(old, new, ctl)), ensure_ascii=False)}")
+
+    print("\n5. sweep Candidates right after (expect none -- 3-day grace, not instant)")
+    rows = _trace_rows(scoped)
+    print(f"    {json.dumps(rows, ensure_ascii=False)}")
+    if rows:
+        failures.append("branch_a_inside_grace_not_empty")
+
+    print("\n6. simulate 4 days passing")
+    print(f"    {_harness_sql(shift)}")
+
+    print("\n7. sweep Candidates 4 days later")
+    rows = _trace_rows(scoped)
+    print(f"    {json.dumps(rows, ensure_ascii=False)}")
+    got = {r["profile_id"] for r in rows} if isinstance(rows, list) else set()
+    reason = next((r["reason"] for r in rows if r.get("profile_id") == prof_old), None) if isinstance(rows, list) else None
+    ok_old, ok_ctl = prof_old in got, prof_ctl not in got
+    print(f"[{'OK' if ok_old else 'FAIL'}] retired identity's profile IS a Branch A candidate (reason={reason!r})")
+    print(f"[{'OK' if ok_ctl else 'FAIL'}] un-clamped CONTROL is still NOT a candidate -- the clamp is "
+          f"what makes the hand-off work")
+    if not ok_old:
+        failures.append("branch_a_candidate_missing")
+    if not ok_ctl:
+        failures.append("branch_a_control_leaked")
+
+    print("\n8. cleanup")
+    for stmt in transfer_cleanup_sql().split("\n"):
+        print(f"    {_harness_sql(stmt)}")
+
+    if failures:
+        print(f"\n{len(failures)} assertion(s) FAILED: {failures}")
+        return 1
+    print("\nTRACE OK")
+    return 0
+
+
+def f_subs(*uids):
+    quoted = ",".join(f"'{u}'" for u in uids)
+    return (f"select app_user_id, plan, status, topup_balance, current_period_end "
+            f"from subscribers where app_user_id in ({quoted}) order by app_user_id")
 
 
 def main():
@@ -1318,15 +1651,24 @@ def main():
              "harness -- same pattern as every other Part here.")
     ap.add_argument(
         "--transfer", action="store_true",
-        help="Run the Task 16 RC TRANSFER exact-value probe (8 steps: self-seeds a "
-             "paying old identity and a top-up-only new one through the real webhook, "
-             "fires TRANSFER, then asserts through GetUsage that the plan + the SUMMED "
-             "top-up landed on the new id, that the old id is expired/zeroed with a "
-             "clamped periodEnd, that a replayed delivery changes nothing, and that an "
-             "empty-array TRANSFER is a clean no-op) instead of the default RevenueCat "
-             "Events probes. Needs RC_WEBHOOK_SECRET and no seeded precondition; read "
-             "the module docstring's Part 6 section, and run the printed cleanup SQL "
-             "afterwards.")
+        help="Run the Task 16 identity-move exact-value probe instead of the default "
+             "RevenueCat Events probes: 5 TRANSFER cases (happy path incl. the summed "
+             "top-up and the clamped source period; a renewal landing BEFORE the "
+             "transfer; an expired source vs a live destination; a NULL-period source; "
+             "multi-id arrays) plus the ALIAS-MERGE cases that reinstall actually "
+             "produces (consolidation + payload carry-through, replay, concurrent "
+             "burst). Needs RC_WEBHOOK_SECRET and no seeded precondition -- every "
+             "fixture is built out of ordinary RevenueCat events. Read the module "
+             "docstring's Part 6 section, and run the printed cleanup SQL afterwards.")
+    ap.add_argument(
+        "--branch-a-trace", action="store_true",
+        help="Run (or print) the Task 16 req-3 evidence: does retiring an identity "
+             "really hand its bot_profiles rows to Profile Lifecycle Sweep's Branch A? "
+             "Executes the sweep's OWN shipped Candidates query against real fixtures, "
+             "including a control row that shows the period clamp is what makes the "
+             "hand-off work. Prints the procedure + SQL unless TASK16_SQL_URL points at "
+             "a one-off SQL harness webhook, in which case it runs end to end. See the "
+             "module docstring's Part 7 section.")
     args = ap.parse_args()
 
     if args.channel_slot_backstop:
@@ -1343,6 +1685,9 @@ def main():
 
     if args.transfer:
         sys.exit(run_transfer_probe())
+
+    if args.branch_a_trace:
+        sys.exit(run_branch_a_trace())
 
     if not SECRET:
         print("FAIL: RC_WEBHOOK_SECRET is not set -- refusing to run (probes b-e need it "
