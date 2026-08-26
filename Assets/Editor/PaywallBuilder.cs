@@ -37,9 +37,17 @@ public static class PaywallBuilder
     // segment 120 tall, still at/above the floor. The «до −17%» ribbon stays 48.
     private const float ToggleHeight = 132f;
     private const float CtaHeight = 132f;
+    // Secondary «Оформить …» button (Task 18) — one step below the CTA's 132 and at the house
+    // touch floor, same as Restore. It is present only in the trial-offer state, which is why
+    // the bar's height is fitted rather than fixed (see BuildBottomBar).
+    private const float SecondaryHeight = 120f;
+    private const float BarSpacing = 20f;
     // Cta 132 + FinePrint 40 + Restore 120 + 2x20 spacing + 32 top + 96 bottom (home-bar
     // safe area) = 460. Re-derive this if any of those change, or the bar clips its own rows.
+    // This is the RESTING height (secondary button hidden); the bar's ContentSizeFitter grows
+    // it by SecondaryHeight + BarSpacing when the button is shown.
     private const float BottomBarHeight = 460f;
+    private const float BottomBarHeightMax = BottomBarHeight + SecondaryHeight + BarSpacing;
     private const float SwipeStripWidth = 150f;
 
     // Fonts by GUID (the default font's weight table is empty — always assign explicitly).
@@ -66,6 +74,62 @@ public static class PaywallBuilder
         Selection.activeGameObject = screen;
         EditorSceneManager.MarkSceneDirty(screen.scene);
         Debug.Log("[PaywallBuilder] Build complete: Screen_Paywall rebuilt + PaywallController stamped. SAVE THE SCENE (Cmd+S).");
+    }
+
+    /// <summary>
+    /// Additive, idempotent patch that adds ONLY the secondary «Оформить …» button to the
+    /// Screen_Paywall already in the open scene (Task 18). <see cref="Build"/> destroys and
+    /// re-creates the whole screen, which is not something to run over a scene someone is
+    /// living in — this touches one node, the bar's fitter, and the content's bottom padding.
+    /// Re-running it replaces only the node it owns.
+    /// </summary>
+    [MenuItem("Tools/Billing/Add Paywall Purchase Button")]
+    public static void AddPurchaseButton()
+    {
+        LoadAssets();
+        _roundedToRefresh.Clear();
+
+        var screen = FindInactiveByName("Screen_Paywall");
+        if (screen == null)
+            throw new System.InvalidOperationException(
+                "[PaywallBuilder] Screen_Paywall not found — is Main.unity open? Run Tools/Billing/Build Paywall first.");
+
+        Transform bar = screen.transform.Find("BottomBar");
+        if (bar == null)
+            throw new System.InvalidOperationException(
+                "[PaywallBuilder] Screen_Paywall/BottomBar not found — the scene has drifted from this builder.");
+
+        DestroyAllByName(bar, "SecondaryPurchase");
+        var node = BuildSecondaryPurchase(bar.gameObject, out Button purchase, out TextMeshProUGUI purchaseLabel);
+
+        // Between the fine print and «Восстановить покупки»: the trial CTA keeps its position
+        // in the thumb zone, and the fine print stays attached to the CTA it describes.
+        Transform restore = bar.Find("Restore");
+        if (restore != null) node.transform.SetSiblingIndex(restore.GetSiblingIndex());
+        else Debug.LogWarning("[PaywallBuilder] No Restore row under BottomBar — the new button was left last.");
+
+        EnsureBarAutoHeight(bar.gameObject);
+        EnsureScrollBottomPadding(screen);
+
+        var controller = screen.GetComponent<PaywallController>();
+        if (controller == null)
+            throw new System.InvalidOperationException("[PaywallBuilder] Screen_Paywall carries no PaywallController.");
+        var so = new SerializedObject(controller);
+        StampPurchaseRefs(so, purchase, purchaseLabel);
+        so.ApplyModifiedPropertiesWithoutUndo();
+        EditorUtility.SetDirty(controller);
+
+        // Nobi needs a sized rect to bake the radius, and the screen serializes INACTIVE.
+        bool wasActive = screen.activeSelf;
+        screen.SetActive(true);
+        Canvas.ForceUpdateCanvases();
+        foreach (var rounded in _roundedToRefresh)
+            RefreshRounded(rounded);
+        screen.SetActive(wasActive);
+
+        Selection.activeGameObject = node;
+        EditorSceneManager.MarkSceneDirty(screen.scene);
+        Debug.Log("[PaywallBuilder] SecondaryPurchase added to Screen_Paywall/BottomBar + controller re-stamped. SAVE THE SCENE (Cmd+S).");
     }
 
     // Headless entry (Editor closed):
@@ -113,14 +177,15 @@ public static class PaywallBuilder
 
         // (3) Fixed chrome above the scroll.
         var bottomBar = BuildBottomBar(screen, out var ctaButton, out var ctaLabel,
-            out var finePrint, out var restoreButton, out var restoreLabel);
+            out var finePrint, out var purchaseButton, out var purchaseLabel,
+            out var restoreButton, out var restoreLabel);
         var closeButton = BuildTopBar(screen);
         var swipe = BuildSwipeStrip(screen, screenRt, scroll);
 
         // (4) Wire the controller.
         StampController(controller, scroll, headerTitle, headerSubline, closeButton, swipe,
-            monthParts, yearParts, cards, ctaButton, ctaLabel, finePrint, restoreButton,
-            restoreLabel, receipt, receiptTiles);
+            monthParts, yearParts, cards, ctaButton, ctaLabel, finePrint, purchaseButton,
+            purchaseLabel, restoreButton, restoreLabel, receipt, receiptTiles);
 
         // (5) Seat it after Screen_New/Screen_Onboarding, before the auth pages.
         SeatBeforeAuthScreens(container, screen.transform);
@@ -187,7 +252,10 @@ public static class PaywallBuilder
         SetAnchors(contentRt, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f));
         contentRt.offsetMin = Vector2.zero;
         contentRt.offsetMax = Vector2.zero;
-        AddVerticalGroup(content, new RectOffset((int)Gutter, (int)Gutter, 24, (int)(BottomBarHeight + 48f)),
+        // Bottom padding clears the bar at its TALLEST (secondary button shown), not its resting
+        // height — otherwise the last card's tail sits under the bar in exactly the state a
+        // first-run user is in. The cost in the other states is scroll slack nobody sees.
+        AddVerticalGroup(content, new RectOffset((int)Gutter, (int)Gutter, 24, (int)(BottomBarHeightMax + 48f)),
             CardGap, TextAnchor.UpperCenter, expandHeight: false);
         content.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
@@ -474,7 +542,8 @@ public static class PaywallBuilder
     // ── (3a) Bottom bar (thumb zone) ─────────────────────────────────────────
 
     private static GameObject BuildBottomBar(GameObject screen, out Button cta, out TextMeshProUGUI ctaLabel,
-        out TextMeshProUGUI finePrint, out Button restore, out TextMeshProUGUI restoreLabel)
+        out TextMeshProUGUI finePrint, out Button purchase, out TextMeshProUGUI purchaseLabel,
+        out Button restore, out TextMeshProUGUI restoreLabel)
     {
         var bar = NewChild(screen, "BottomBar", out var barRt);
         SetAnchors(barRt, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f));
@@ -495,8 +564,9 @@ public static class PaywallBuilder
         hairImg.raycastTarget = false;
         Themed(hairline, ThemeRole.Hairline);
 
-        AddVerticalGroup(bar, new RectOffset((int)Gutter, (int)Gutter, 32, 96), 20f,
+        AddVerticalGroup(bar, new RectOffset((int)Gutter, (int)Gutter, 32, 96), BarSpacing,
             TextAnchor.UpperCenter, expandHeight: false);
+        EnsureBarAutoHeight(bar);
 
         var ctaGo = NewChild(bar, "Cta", out _);
         SetPreferredHeight(ctaGo, CtaHeight);
@@ -523,6 +593,8 @@ public static class PaywallBuilder
         finePrint = AddText(fineGo, PaywallRows.FinePrint, 28f, _regular, ThemeRole.InkTertiary);
         finePrint.alignment = TextAlignmentOptions.Center;
 
+        BuildSecondaryPurchase(bar, out purchase, out purchaseLabel);
+
         var restoreGo = NewChild(bar, "Restore", out _);
         SetPreferredHeight(restoreGo, 120f);   // house touch-target floor (44dp x 3)
         var restoreHit = restoreGo.AddComponent<Image>();
@@ -541,6 +613,76 @@ public static class PaywallBuilder
         restore.transition = Selectable.Transition.ColorTint;
 
         return bar;
+    }
+
+    // ── (3a-bis) Secondary «Оформить …» button (Task 18) ─────────────────────
+
+    /// <summary>
+    /// The direct-purchase button under the trial CTA. Secondary by construction: a Surface
+    /// fill (the screen's card ground) with an AccentText label, against the CTA's solid
+    /// AccentFill — so the free trial stays the loudest thing in the thumb zone while paying
+    /// right now is one tap away. Visibility + text are owned at runtime by
+    /// <see cref="PaywallController"/> from the <c>PaywallRows.SecondaryPurchase</c> seam;
+    /// the scene seeds the state a fresh install actually opens in.
+    /// </summary>
+    private static GameObject BuildSecondaryPurchase(GameObject bar, out Button purchase,
+        out TextMeshProUGUI purchaseLabel)
+    {
+        var go = NewChild(bar, "SecondaryPurchase", out _);
+        SetPreferredHeight(go, SecondaryHeight);
+        var bg = go.AddComponent<Image>();
+        bg.color = Color.white;
+        bg.raycastTarget = true;
+        Themed(go, ThemeRole.Surface);
+        AddRounded(go, CardRadius);
+        purchase = go.AddComponent<Button>();
+        purchase.targetGraphic = bg;
+        // ColorTint for the same reason the CTA has it: this is an ACTION that goes
+        // non-interactable while a purchase is in flight, and its targetGraphic is a visible fill.
+        purchase.transition = Selectable.Transition.ColorTint;
+
+        var labelGo = NewChild(go, "Label", out var labelRt);
+        StretchFill(labelRt);
+        purchaseLabel = AddText(labelGo,
+            PaywallRows.SubscribeText(PaywallRows.Recommended, PaywallPeriod.Month),
+            40f, _semibold, ThemeRole.AccentText);
+        purchaseLabel.alignment = TextAlignmentOptions.Center;
+        purchaseLabel.textWrappingMode = TextWrappingModes.NoWrap;   // a wrapped price is never right
+        return go;
+    }
+
+    /// <summary>
+    /// The scroll content must clear the bar at its TALLEST. Idempotent, and it rewrites only
+    /// the bottom inset so any hand-tuned gutter/top padding survives.
+    /// </summary>
+    private static void EnsureScrollBottomPadding(GameObject screen)
+    {
+        Transform content = screen.transform.Find("ScrollView/Viewport/Content");
+        var vlg = content != null ? content.GetComponent<VerticalLayoutGroup>() : null;
+        if (vlg == null)
+        {
+            Debug.LogWarning("[PaywallBuilder] ScrollView/Viewport/Content has no VerticalLayoutGroup — bottom padding left as-is.");
+            return;
+        }
+
+        int wanted = (int)(BottomBarHeightMax + 48f);
+        if (vlg.padding.bottom == wanted) return;
+        vlg.padding = new RectOffset(vlg.padding.left, vlg.padding.right, vlg.padding.top, wanted);
+        EditorUtility.SetDirty(vlg);
+    }
+
+    /// <summary>
+    /// The bar sizes itself from its rows instead of carrying a fixed height, because one of
+    /// those rows comes and goes. Safe with the bottom-anchored/pivot-0 rect the builder gives
+    /// it: the fitter grows the bar UPWARD, so «Восстановить покупки» never moves and the
+    /// resting height stays exactly <see cref="BottomBarHeight"/>.
+    /// </summary>
+    private static void EnsureBarAutoHeight(GameObject bar)
+    {
+        var fitter = bar.GetComponent<ContentSizeFitter>();
+        if (fitter == null) fitter = bar.AddComponent<ContentSizeFitter>();
+        fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
     }
 
     // ── (3b) Top bar + back chevron ──────────────────────────────────────────
@@ -605,7 +747,8 @@ public static class PaywallBuilder
         TextMeshProUGUI headerTitle, TextMeshProUGUI headerSubline, Button closeButton,
         SwipeToBackPanel swipe, GameObject[] monthParts, GameObject[] yearParts,
         GameObject[][] cards, Button cta, TextMeshProUGUI ctaLabel, TextMeshProUGUI finePrint,
-        Button restore, TextMeshProUGUI restoreLabel, GameObject receipt, GameObject[] receiptTiles)
+        Button purchase, TextMeshProUGUI purchaseLabel, Button restore, TextMeshProUGUI restoreLabel,
+        GameObject receipt, GameObject[] receiptTiles)
     {
         var so = new SerializedObject(controller);
         so.FindProperty("scroll").objectReferenceValue = scroll;
@@ -639,6 +782,7 @@ public static class PaywallBuilder
         so.FindProperty("ctaButton").objectReferenceValue = cta;
         so.FindProperty("ctaLabel").objectReferenceValue = ctaLabel;
         so.FindProperty("finePrint").objectReferenceValue = finePrint;
+        StampPurchaseRefs(so, purchase, purchaseLabel);
         so.FindProperty("restoreButton").objectReferenceValue = restore;
         so.FindProperty("restoreLabel").objectReferenceValue = restoreLabel;
 
@@ -656,6 +800,25 @@ public static class PaywallBuilder
 
         so.ApplyModifiedPropertiesWithoutUndo();
         EditorUtility.SetDirty(controller);
+    }
+
+    /// <summary>
+    /// Shared by the full build and the additive patch. Fails LOUD rather than silently
+    /// leaving a visible button with no listener: a missing property here means the scripts
+    /// have not recompiled yet.
+    /// </summary>
+    private static void StampPurchaseRefs(SerializedObject so, Button purchase, TextMeshProUGUI purchaseLabel)
+    {
+        SerializedProperty buttonProp = so.FindProperty("purchaseButton");
+        SerializedProperty labelProp = so.FindProperty("purchaseLabel");
+        if (buttonProp == null || labelProp == null)
+        {
+            Debug.LogError("[PaywallBuilder] PaywallController has no purchaseButton/purchaseLabel field — "
+                         + "let the scripts recompile (Assets/Refresh) and run the builder again.");
+            return;
+        }
+        buttonProp.objectReferenceValue = purchase;
+        labelProp.objectReferenceValue = purchaseLabel;
     }
 
     // ── (5) Sibling order ────────────────────────────────────────────────────

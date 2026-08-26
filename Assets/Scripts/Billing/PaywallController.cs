@@ -72,6 +72,11 @@ public class PaywallController : MonoBehaviour
     [SerializeField] private Button ctaButton;
     [SerializeField] private TextMeshProUGUI ctaLabel;
     [SerializeField] private TextMeshProUGUI finePrint;
+    // The direct-purchase button under the CTA — shown only while the CTA offers the trial
+    // (PaywallRows.SecondaryPurchase). Its own GameObject is the visibility switch, so no
+    // separate root ref is needed.
+    [SerializeField] private Button purchaseButton;
+    [SerializeField] private TextMeshProUGUI purchaseLabel;
     [SerializeField] private Button restoreButton;
     [SerializeField] private TextMeshProUGUI restoreLabel;
 
@@ -204,6 +209,7 @@ public class PaywallController : MonoBehaviour
 
         if (closeButton != null) closeButton.onClick.AddListener(Close);
         if (ctaButton != null) ctaButton.onClick.AddListener(OnCtaClicked);
+        if (purchaseButton != null) purchaseButton.onClick.AddListener(StartPurchase);
         if (restoreButton != null) restoreButton.onClick.AddListener(OnRestoreClicked);
         if (monthButton != null) monthButton.onClick.AddListener(() => SetPeriod(PaywallPeriod.Month));
         if (yearButton != null) yearButton.onClick.AddListener(() => SetPeriod(PaywallPeriod.Year));
@@ -313,11 +319,23 @@ public class PaywallController : MonoBehaviour
         {
             // «Попробовать N дней бесплатно» buys nothing: the trial takes no card, and its
             // clock is started by the first channel authorization (spec §3), never by this
-            // button. So the honest action here is to get out of the user's way.
+            // button. So the honest action here is to get out of the user's way. Paying right
+            // now is reachable through the secondary button below it (Task 18) — which shares
+            // StartPurchase with this method's other branch, so there is exactly one buy path.
             Close();
             return;
         }
 
+        StartPurchase();
+    }
+
+    /// <summary>
+    /// THE purchase path, entered by the CTA once it is the subscribe form and by the
+    /// secondary button while the CTA still offers the trial. Both read the same
+    /// selection fields, so the button's label and what it buys cannot drift apart.
+    /// </summary>
+    private void StartPurchase()
+    {
         string sku = PaywallRows.Sku(_selected, _period);
         if (string.IsNullOrEmpty(sku))
         {
@@ -379,11 +397,12 @@ public class PaywallController : MonoBehaviour
         Manager.Instance.StartCoroutine(UsageClient.FetchRoutine());
     }
 
-    private bool IsTrialOffer => !_trialStarted && _purchased == PlanTier.None;
+    private bool IsTrialOffer => PaywallRows.IsTrialOffer(_trialStarted, _purchased);
 
     private void SetBusy(bool busy)
     {
         if (ctaButton != null) ctaButton.interactable = !busy;
+        if (purchaseButton != null) purchaseButton.interactable = !busy;
         if (restoreButton != null) restoreButton.interactable = !busy;
     }
 
@@ -427,6 +446,15 @@ public class PaywallController : MonoBehaviour
 
         if (ctaLabel != null)
             ctaLabel.text = PaywallRows.CtaText(_trialStarted, _purchased, _selected, _period);
+
+        // The secondary button follows the same selection as the CTA, so a tier/period tap
+        // repaints both here — and the seam keeps it OFF in every state where the CTA is
+        // already the subscribe form.
+        PaywallSecondaryRow secondary =
+            PaywallRows.SecondaryPurchase(_trialStarted, _purchased, _selected, _period);
+        if (purchaseButton != null) purchaseButton.gameObject.SetActive(secondary.Visible);
+        if (purchaseLabel != null && secondary.Visible) purchaseLabel.text = secondary.Text;
+
         if (finePrint != null)
             finePrint.text = string.IsNullOrEmpty(_notice) ? PaywallRows.FinePrint : _notice;
         if (restoreLabel != null)

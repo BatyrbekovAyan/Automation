@@ -1,6 +1,16 @@
 /// <summary>Which price column the paywall is showing.</summary>
 public enum PaywallPeriod { Month, Year }
 
+/// <summary>
+/// The second, secondary-styled paywall button (Task 18): the direct-purchase escape hatch
+/// shown only while the primary CTA is the free-trial offer.
+/// </summary>
+public struct PaywallSecondaryRow
+{
+    public bool Visible;
+    public string Text;             // «Оформить Бизнес — 19 990 ₸/мес», empty when hidden
+}
+
 /// <summary>One rendered tier card's worth of state — everything the view needs, nothing it doesn't.</summary>
 public struct PaywallTierRow
 {
@@ -128,16 +138,50 @@ public static class PaywallRows
     // ── CTA ──────────────────────────────────────────────────────────────────
 
     /// <summary>
+    /// The one state in which the primary CTA offers the free trial instead of naming a tier:
+    /// the trial clock has never started AND nothing is purchased. Shared by <see cref="CtaText"/>
+    /// and <see cref="SecondaryPurchase"/> so the two can never disagree about which button
+    /// carries the subscribe form.
+    /// </summary>
+    public static bool IsTrialOffer(bool trialStarted, PlanTier purchased)
+        => !trialStarted && purchased == PlanTier.None;
+
+    /// <summary>
     /// «Попробовать 5 дней бесплатно» only while the trial clock has never started AND
     /// nothing is purchased — every other state is a subscribe form naming the selected
     /// tier and its price in the selected period.
     /// </summary>
     public static string CtaText(bool trialStarted, PlanTier purchased, PlanTier selected, PaywallPeriod period)
     {
-        if (!trialStarted && purchased == PlanTier.None)
+        if (IsTrialOffer(trialStarted, purchased))
             return PaywallCopy.TrialCta();
-        return PaywallCopy.SubscribeCta(selected, PriceText(PlanCatalog.Get(selected), period));
+        return SubscribeText(selected, period);
     }
+
+    /// <summary>
+    /// The direct-purchase button UNDER the trial CTA (Task 18). It exists because the trial
+    /// offer names no tier and buys nothing — without it, a fresh install has no way to pay,
+    /// which is what the owner hit on device 2026-08-26.
+    ///
+    /// Visible ONLY in that state, deliberately: everywhere else the CTA already IS this exact
+    /// string, and a second copy of it would be a duplicate. The text is therefore the SAME
+    /// <see cref="PaywallCopy.SubscribeCta"/> form the CTA shows, so a tier/period change moves
+    /// both in lockstep. A selection with no store product (never reachable through
+    /// <see cref="Order"/>, but cheap to rule out) hides the button rather than offering a
+    /// purchase that cannot be made.
+    /// </summary>
+    public static PaywallSecondaryRow SecondaryPurchase(bool trialStarted, PlanTier purchased,
+        PlanTier selected, PaywallPeriod period)
+    {
+        if (!IsTrialOffer(trialStarted, purchased) || string.IsNullOrEmpty(Sku(selected, period)))
+            return new PaywallSecondaryRow { Visible = false, Text = "" };
+
+        return new PaywallSecondaryRow { Visible = true, Text = SubscribeText(selected, period) };
+    }
+
+    /// <summary>«Оформить &lt;тариф&gt; — &lt;цена&gt;» for the current selection.</summary>
+    public static string SubscribeText(PlanTier tier, PaywallPeriod period)
+        => PaywallCopy.SubscribeCta(tier, PriceText(PlanCatalog.Get(tier), period));
 
     /// <summary>Store product id the CTA buys for a (tier, period) selection; empty for non-purchasable tiers.</summary>
     public static string Sku(PlanTier tier, PaywallPeriod period)

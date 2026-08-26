@@ -129,6 +129,70 @@ public class PaywallRowsTests
         => Assert.AreEqual("Оформить Старт — 99\u00A0000\u00A0₸/год",
             PaywallRows.CtaText(true, PlanTier.None, PlanTier.Start, PaywallPeriod.Year));
 
+    // ── Secondary direct-purchase button (Task 18) ───────────────────────────
+
+    [Test]
+    public void Secondary_purchase_shows_while_the_cta_offers_the_trial()
+    {
+        var row = PaywallRows.SecondaryPurchase(false, PlanTier.None, PlanTier.Business, PaywallPeriod.Month);
+        Assert.IsTrue(row.Visible);
+        Assert.AreEqual("Оформить Бизнес — 19\u00A0990\u00A0₸/мес", row.Text);
+    }
+
+    [Test]
+    public void Secondary_purchase_follows_the_selected_tier_and_period()
+    {
+        var row = PaywallRows.SecondaryPurchase(false, PlanTier.None, PlanTier.Network, PaywallPeriod.Year);
+        Assert.IsTrue(row.Visible);
+        Assert.AreEqual("Оформить Сеть — 399\u00A0990\u00A0₸/год", row.Text);
+    }
+
+    [Test]
+    public void Secondary_purchase_hides_once_the_trial_clock_started()
+        => Assert.IsFalse(PaywallRows.SecondaryPurchase(true, PlanTier.None, PlanTier.Business, PaywallPeriod.Month).Visible);
+
+    [Test]
+    public void Secondary_purchase_hides_once_something_is_purchased()
+        => Assert.IsFalse(PaywallRows.SecondaryPurchase(false, PlanTier.Start, PlanTier.Business, PaywallPeriod.Month).Visible);
+
+    [Test]
+    public void Secondary_purchase_carries_no_text_while_hidden()
+        => Assert.AreEqual("", PaywallRows.SecondaryPurchase(true, PlanTier.Start, PlanTier.Network, PaywallPeriod.Year).Text);
+
+    [TestCase(PlanTier.None)]
+    [TestCase(PlanTier.Trial)]
+    public void Secondary_purchase_hides_for_a_selection_with_no_store_product(PlanTier selected)
+        => Assert.IsFalse(PaywallRows.SecondaryPurchase(false, PlanTier.None, selected, PaywallPeriod.Month).Visible);
+
+    /// <summary>
+    /// The whole point of the button: it appears exactly where the CTA stops naming a tier,
+    /// so the paywall can never show the subscribe form twice — nor zero times.
+    /// </summary>
+    [Test]
+    public void Secondary_purchase_is_visible_exactly_when_the_cta_is_the_trial_offer()
+    {
+        foreach (bool started in new[] { false, true })
+        foreach (PlanTier purchased in new[] { PlanTier.None, PlanTier.Start, PlanTier.Business, PlanTier.Network })
+        foreach (PlanTier selected in PaywallRows.Order)
+        foreach (PaywallPeriod period in new[] { PaywallPeriod.Month, PaywallPeriod.Year })
+        {
+            string cta = PaywallRows.CtaText(started, purchased, selected, period);
+            var row = PaywallRows.SecondaryPurchase(started, purchased, selected, period);
+            bool ctaIsTrial = cta == PaywallCopy.TrialCta();
+            Assert.AreEqual(ctaIsTrial, row.Visible,
+                $"started={started} purchased={purchased} selected={selected} {period}");
+            // Whichever button carries it, the subscribe form reads the same.
+            Assert.AreEqual(ctaIsTrial ? row.Text : cta, PaywallRows.SubscribeText(selected, period));
+        }
+    }
+
+    [TestCase(false, PlanTier.None, true)]
+    [TestCase(true, PlanTier.None, false)]
+    [TestCase(false, PlanTier.Start, false)]
+    [TestCase(true, PlanTier.Business, false)]
+    public void Trial_offer_state(bool started, PlanTier purchased, bool expected)
+        => Assert.AreEqual(expected, PaywallRows.IsTrialOffer(started, purchased));
+
     // ── Sku routing (what the CTA actually buys) ─────────────────────────────
 
     [TestCase(PlanTier.Start, PaywallPeriod.Month, "sub.start.month")]
