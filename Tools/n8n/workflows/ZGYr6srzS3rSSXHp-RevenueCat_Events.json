@@ -37,7 +37,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const e = $json.body.event ?? $json.body;\nconst type = e.type;                       // INITIAL_PURCHASE | RENEWAL | ...\nconst appUserId = e.app_user_id;\nconst ent = (e.entitlement_ids && e.entitlement_ids[0]) || '';\nconst planByEnt = { tier_start: 'start', tier_business: 'business', tier_network: 'network' };\nconst out = { app_user_id: appUserId, topup_delta: 0 };\n\nif (type === 'NON_RENEWING_PURCHASE' && e.product_id === 'topup.dialogs.500') {\n  out.topup_delta = 500;                   // план/статус/product_id не трогаем\n} else if (['INITIAL_PURCHASE','RENEWAL','UNCANCELLATION','PRODUCT_CHANGE'].includes(type)) {\n  out.plan = planByEnt[ent] ?? 'none';\n  out.status = 'active';\n  out.period_end = e.expiration_at_ms ? new Date(e.expiration_at_ms).toISOString() : null;\n  out.product_id = e.product_id ?? null;   // .month/.year суффикс SKU -> интервал в Get Usage\n} else if (type === 'EXPIRATION') {\n  out.status = 'expired';\n} else if (type === 'CANCELLATION') {\n  return [];                               // автопродление выключили — доступ до period_end, ничего не меняем\n}\nreturn [{ json: out }];"
+        "jsCode": "const e = $json.body.event ?? $json.body;\nconst type = e.type;                       // INITIAL_PURCHASE | RENEWAL | TRANSFER | ...\nconst appUserId = e.app_user_id;\nconst ent = (e.entitlement_ids && e.entitlement_ids[0]) || '';\nconst planByEnt = { tier_start: 'start', tier_business: 'business', tier_network: 'network' };\nconst out = { app_user_id: appUserId, topup_delta: 0 };\n\nif (type === 'TRANSFER') {\n  // TRANSFER несёт ТОЛЬКО transferred_from/transferred_to (в доках RC — String arrays,\n  // «App User ID(s)»); ни app_user_id, ни product_id, ни entitlement_ids в нём НЕТ.\n  // Всё, что переезжает (план/статус/период/SKU/топ-ап), читается из СТАРОЙ СТРОКИ в SQL.\n  const ids = (a) => (Array.isArray(a) ? a.filter((x) => typeof x === 'string' && x.length > 0) : []);\n  const from = ids(e.transferred_from);\n  const to = ids(e.transferred_to);\n  if (!from.length || !to.length) return [{ json: out }];   // пустые массивы -> no-op (Respond No-Op)\n  return [{ json: { app_user_id: '', topup_delta: 0, to_id: to[0], from_ids: JSON.stringify(from) } }];\n}\n\nif (type === 'NON_RENEWING_PURCHASE' && e.product_id === 'topup.dialogs.500') {\n  out.topup_delta = 500;                   // план/статус/product_id не трогаем\n} else if (['INITIAL_PURCHASE','RENEWAL','UNCANCELLATION','PRODUCT_CHANGE'].includes(type)) {\n  out.plan = planByEnt[ent] ?? 'none';\n  out.status = 'active';\n  out.period_end = e.expiration_at_ms ? new Date(e.expiration_at_ms).toISOString() : null;\n  // PRODUCT_CHANGE несёт СТАРЫЙ sku в product_id, новый — в new_product_id (доки RC;\n  // живое наблюдение 2026-08-26: апгрейд записал sub.start.month поверх плана business,\n  // пока следующий RENEWAL не поправил). Для остальных типов new_product_id отсутствует.\n  out.product_id = e.new_product_id ?? e.product_id ?? null;   // .month/.year суффикс SKU -> интервал в Get Usage\n} else if (type === 'EXPIRATION') {\n  out.status = 'expired';\n} else if (type === 'CANCELLATION') {\n  return [];                               // автопродление выключили — доступ до period_end, ничего не меняем\n}\nreturn [{ json: out }];"
       },
       "alwaysOutputData": true
     },
@@ -47,7 +47,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        660,
+        880,
         140
       ],
       "parameters": {
@@ -72,7 +72,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        440,
+        660,
         0
       ],
       "parameters": {
@@ -105,7 +105,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        880,
+        1100,
         140
       ],
       "parameters": {
@@ -120,7 +120,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        660,
+        880,
         -140
       ],
       "parameters": {
@@ -135,7 +135,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        880,
+        1100,
         320
       ],
       "parameters": {
@@ -145,6 +145,64 @@
           "responseCode": 500
         }
       }
+    },
+    {
+      "id": "b1f0d2a6-1601-4a16-9c16-0000000016a1",
+      "name": "If Is Transfer?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c9c1a001-0016-4000-8000-0000000016a1",
+              "leftValue": "={{ $json.to_id }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b1f0d2a6-1602-4a16-9c16-0000000016a2",
+      "name": "Transfer Subscriber",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        880,
+        -360
+      ],
+      "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "-- RC TRANSFER (Task 16): переносим подписку на НОВЫЙ RevenueCat-идентификатор и гасим\n-- СТАРЫЙ. Один statement = одна транзакция, поэтому перенос и гашение не могут примениться\n-- наполовину. $1 = transferred_to[0] (получатель), $2 = JSON-массив transferred_from.\n-- Само событие не несёт ни плана, ни SKU — всё читается из СТАРОЙ строки.\nwith src_ids as (\n  select distinct value as app_user_id from jsonb_array_elements_text($2::jsonb) as t(value)\n), src_rows as (\n  -- все существующие строки-источники, кроме самого получателя (self-transfer = no-op)\n  select s.* from subscribers s\n  where s.app_user_id in (select app_user_id from src_ids)\n    and s.app_user_id <> $1\n), src as (\n  -- снимок, который переезжает: самая «живая» строка-источник (в доках RC это «App User\n  -- ID(s)», т.е. массив — N>1 возможен через алиасы; N=1 — обычная переустановка)\n  select * from src_rows\n  order by current_period_end desc nulls last, updated_at desc nulls last\n  limit 1\n), moved as (\n  insert into subscribers (app_user_id, plan, status, current_period_end, topup_balance, product_id, updated_at)\n  select $1, src.plan, src.status, src.current_period_end,\n         coalesce((select sum(topup_balance) from src_rows), 0),\n         src.product_id, now()\n  from src\n  on conflict (app_user_id) do update set\n    -- Снимок переезжает ТОЛЬКО если источник СТРОГО свежее того, что уже лежит у получателя:\n    -- RENEWAL под новым id законно может прийти РАНЬШЕ TRANSFER (наблюдалось 2026-08-26), а\n    -- повторная доставка TRANSFER перечитает уже погашенную строку-источник — ни то, ни другое\n    -- не имеет права понизить здоровую строку. Ничья отдаётся получателю; именно это делает\n    -- повторный TRANSFER идемпотентным no-op.\n    plan = case when coalesce(subscribers.current_period_end, '-infinity'::timestamptz)\n                   < coalesce(excluded.current_period_end, '-infinity'::timestamptz)\n                then excluded.plan else subscribers.plan end,\n    status = case when coalesce(subscribers.current_period_end, '-infinity'::timestamptz)\n                     < coalesce(excluded.current_period_end, '-infinity'::timestamptz)\n                  then excluded.status else subscribers.status end,\n    product_id = case when coalesce(subscribers.current_period_end, '-infinity'::timestamptz)\n                         < coalesce(excluded.current_period_end, '-infinity'::timestamptz)\n                      then coalesce(excluded.product_id, subscribers.product_id)\n                      else subscribers.product_id end,\n    current_period_end = greatest(subscribers.current_period_end, excluded.current_period_end),\n    -- ПРИБАВЛЯЕМ, а не ПРИСВАИВАЕМ: у получателя мог быть свой топ-ап, и прибавление ложится\n    -- на заблокированное живое значение строки, а не на снимок этого statement'а\n    topup_balance = subscribers.topup_balance + excluded.topup_balance,\n    updated_at = now()\n  returning app_user_id, plan, status, topup_balance, product_id\n), retired as (\n  update subscribers s set\n    status = 'expired',   -- убивает квоту зомби: Count Dialog не считает status in (expired,grace)\n    topup_balance = 0,    -- баланс уже перенесён выше; обнуление делает перенос ровно консервативным\n    -- передаём профили старой личности Branch A свипа Profile Lifecycle Sweep, который смотрит на\n    -- (status in ('expired','grace') and current_period_end < now() - 3 days). Оплаченный период,\n    -- который ещё В БУДУЩЕМ, продержал бы зомби-профили на Wappi до месяца по 23₽/день; клэмп в now()\n    -- запускает тот же 3-дневный grace, что и любой другой churn. Значение только УМЕНЬШАЕТСЯ\n    -- (просроченная строка остаётся просроченной), а NULL остаётся NULL — в том запросе NULL и так\n    -- «сразу подходит», и least(null, now()) вернул бы now(), то есть отложил бы уборку.\n    current_period_end = case when s.current_period_end is null then null\n                              else least(s.current_period_end, now()) end,\n    updated_at = now()\n  where s.app_user_id in (select app_user_id from src_rows)\n  returning s.app_user_id\n)\nselect $1::text as to_id,\n       (select count(*) from src_rows) as source_rows,\n       (select count(*) from moved) as moved_rows,\n       (select count(*) from retired) as retired_rows,\n       (select topup_balance from moved) as to_topup_balance;",
+        "options": {
+          "queryReplacement": "={{ [$json.to_id, $json.from_ids] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "onError": "continueErrorOutput"
     }
   ],
   "connections": {
@@ -161,6 +219,24 @@
     },
     "Map Event": {
       "main": [
+        [
+          {
+            "node": "If Is Transfer?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Is Transfer?": {
+      "main": [
+        [
+          {
+            "node": "Transfer Subscriber",
+            "type": "main",
+            "index": 0
+          }
+        ],
         [
           {
             "node": "If Has Payload?",
@@ -182,6 +258,24 @@
         [
           {
             "node": "Respond No-Op",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transfer Subscriber": {
+      "main": [
+        [
+          {
+            "node": "Respond 200",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Error",
             "type": "main",
             "index": 0
           }
