@@ -55,6 +55,13 @@ public class SuggestRepliesRequestDto
     public string businessKnowledge; // ComposeBusinessKnowledge output (description + Контакты block), clamped <=1200; "" when unset
     public string now;               // device local time "yyyy-MM-dd HH:mm, <ru day>"; server sanitizes before prompt use
     public string pickStats;         // per-bot pick counters "Ответ:12,К заказу:8" (preference learning v1, 2026-08-11); "" when none
+    // --- v1.4 additive key (final-review I-3; ADD-only, same rules) ---
+    // The account this panel belongs to. Suggest_Replies is subscription-gated as of Task 17a
+    // (expired or unknown account => refused, over-quota deliberately allowed — it IS the
+    // fallback), and the gate REQUIRES this field: missing or empty is a refusal, not a legacy
+    // payload. Same identity every other billing call carries (BillingIdentity.AppUserId, i.e.
+    // RevenueCat's app_user_id), so the gate reads the same subscribers row Get Usage does.
+    public string appUserId;
 }
 
 /// <summary>One suggestion in the response envelope: server sends {text,label,move}.

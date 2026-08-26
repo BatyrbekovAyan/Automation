@@ -91,7 +91,11 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
             recentMessages: msgs,
             businessKnowledge: BuildBusinessKnowledge(botName),
             now:               LocalNowString(),
-            pickStats:         BuildPickStats(botName));
+            pickStats:         BuildPickStats(botName),
+            // The subscription gate's key (Task 17a): the SAME identity the Create/Edit workflow
+            // forms and GetUsage send. Always sent — an empty one is refused server-side, and the
+            // refusal arrives in the existing error envelope, which the panel already renders.
+            appUserId:         BillingIdentity.AppUserId);
 
         using var www = new UnityWebRequest($"{Manager.n8nBaseUrl}/webhook/SuggestReplies", "POST");
         www.uploadHandler   = new UploadHandlerRaw(Encoding.UTF8.GetBytes(json));
@@ -191,10 +195,14 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
     /// text media-mapped then clamped &lt;=500, role="client" if incoming else "business".
     /// v1.2 (audit F1/F2 + preference learning): <paramref name="businessKnowledge"/>
     /// (clamped &lt;=1200), <paramref name="now"/> and <paramref name="pickStats"/> append
-    /// after the v1.1 keys. Stripping channel+botTgId+businessKnowledge+now+pickStats yields
-    /// the frozen v1 object again — structural identity (JToken.DeepEquals + exact key set)
-    /// is what the payload tests enforce; matching byte order additionally follows from
-    /// Json.NET's declaration-order field emission.
+    /// after the v1.1 keys. v1.4 appends <paramref name="appUserId"/> — the subscription
+    /// gate's key (final-review I-3), passed through verbatim: no clamp, no default, and
+    /// never derived here, so a missing identity presents to the server as the refusal it is
+    /// rather than as somebody else's account. Stripping
+    /// channel+botTgId+businessKnowledge+now+pickStats+appUserId yields the frozen v1 object
+    /// again — structural identity (JToken.DeepEquals + exact key set) is what the payload
+    /// tests enforce; matching byte order additionally follows from Json.NET's
+    /// declaration-order field emission.
     /// </summary>
     public static string BuildPayloadJson(
         SuggestionRequest req,
@@ -210,7 +218,8 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
         List<MessageViewModel> recentMessages,
         string businessKnowledge,
         string now,
-        string pickStats)
+        string pickStats,
+        string appUserId)
     {
         bool isTelegram = channel == ChatChannel.Telegram;
         var dto = new SuggestRepliesRequestDto
@@ -232,6 +241,7 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
             businessKnowledge = Clamp(businessKnowledge, MaxKnowledgeChars),          // v1.2; Авто-parity grounding (audit F2)
             now              = now,                                                   // v1.2; server sanitizes before prompt use
             pickStats        = Clamp(pickStats, 200),                                 // v1.2; preference-learning ranking hint
+            appUserId        = appUserId,                                             // v1.4; subscription gate key — never clamped, never derived
         };
         return JsonConvert.SerializeObject(dto);
     }

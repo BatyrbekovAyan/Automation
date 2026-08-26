@@ -31,11 +31,12 @@ public class SuggestRepliesPayloadTests
         string businessName = "Магазин", string ownerPrompt = "", string catalog = "",
         ChatChannel channel = ChatChannel.WhatsApp,
         string telegramProfileId = "tgpid", string telegramWorkflowId = "wf_tg",
-        string businessKnowledge = "", string now = "", string pickStats = "")
+        string businessKnowledge = "", string now = "", string pickStats = "",
+        string appUserId = "$RCAnonymousID:abc123")
         => JObject.Parse(N8nSuggestionsProvider.BuildPayloadJson(
             req, channel, profileId, telegramProfileId, botWaId, telegramWorkflowId,
             businessTypeId, businessName, ownerPrompt, catalog, msgs,
-            businessKnowledge, now, pickStats));
+            businessKnowledge, now, pickStats, appUserId));
 
     // --- window direction (the composed VALUE gate, 2026-08-20) --------------
     // Every other test here hand-feeds an already-ascending list, so they pin the builder's
@@ -360,6 +361,7 @@ public class SuggestRepliesPayloadTests
         j.Remove("businessKnowledge");
         j.Remove("now");
         j.Remove("pickStats");
+        j.Remove("appUserId");
 
         var expectedV1 = new JObject
         {
@@ -391,5 +393,31 @@ public class SuggestRepliesPayloadTests
             .OrderBy(n => n, System.StringComparer.Ordinal).ToArray();
         Assert.AreEqual(12, residualKeys.Length);
         CollectionAssert.AreEqual(v1Keys, residualKeys);
+    }
+
+    // --- v1.4: the subscription gate's key (final-review I-3) ----------------
+
+    [Test]
+    public void AppUserId_is_passed_through_verbatim()
+    {
+        var j = Build(Req(), One(), appUserId: "$RCAnonymousID:9f3c");
+        Assert.AreEqual("$RCAnonymousID:9f3c", (string)j["appUserId"]);
+    }
+
+    [Test]
+    public void AppUserId_key_is_always_present_even_when_the_identity_is_missing()
+    {
+        // The Suggest_Replies gate REQUIRES the field (Task 17a): missing or empty is a
+        // refusal, delivered in the error envelope the panel already renders. The builder must
+        // therefore never invent, default or omit an identity — it reports exactly what it was
+        // handed, so a refusal is the truth about this device rather than a silent fallback
+        // onto some other account.
+        var blank = Build(Req(), One(), appUserId: "");
+        Assert.IsTrue(blank.ContainsKey("appUserId"));
+        Assert.AreEqual("", (string)blank["appUserId"]);
+
+        var missing = Build(Req(), One(), appUserId: null);
+        Assert.IsTrue(missing.ContainsKey("appUserId"), "null must serialise as an explicit null, not vanish");
+        Assert.AreEqual(JTokenType.Null, missing["appUserId"].Type);
     }
 }

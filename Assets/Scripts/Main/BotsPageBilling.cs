@@ -246,7 +246,7 @@ public class BotsPageBilling : MonoBehaviour
 
         ApplyFill(usage == null
             ? 0f
-            : SubscriptionPageRows.FillFraction(usage.used, quota, usage.topupBalance));
+            : SubscriptionPageRows.FillFraction(usage.used, quota));
 
         // No snapshot means no honest hint — «— из 300» already says the number is unknown.
         string hint = usage == null ? null : BotsPageRows.MeterHint(usage.used, quota, usage.topupBalance);

@@ -333,6 +333,7 @@ public class PaywallController : MonoBehaviour
             if (ok)
             {
                 _purchased = BillingService.PurchasedTier;
+                RefetchUsage();   // the new tier's quota lives server-side (M-6)
                 Close();   // the gate re-evaluates off BillingService.OnEntitlementChanged
                 return;
             }
@@ -353,12 +354,29 @@ public class PaywallController : MonoBehaviour
             if (_purchased != PlanTier.None)
             {
                 _selected = _purchased;
+                RefetchUsage();   // a restored plan changes the quota, not just the tier
                 Close();
                 return;
             }
             _notice = ok ? PaywallRows.RestoreNothingFoundNotice : PaywallRows.RestoreFailedNotice;
             Render();
         });
+    }
+
+    /// <summary>
+    /// Re-reads the usage snapshot after the plan changed, so the «Боты» strip and «Подписка»
+    /// show the new quota without the user having to leave and re-enter the tab (final-review
+    /// M-6; the «Подписка» page's own top-up and restore have always done this).
+    ///
+    /// Hosted on <see cref="Manager.Instance"/>, NEVER on this component: every caller here is
+    /// one line away from <see cref="Close"/>, which deactivates this GameObject — and Unity
+    /// kills a coroutine whose host goes inactive, so the fetch would be cut off mid-request.
+    /// Manager is the always-active host that already runs the boot fetch.
+    /// </summary>
+    private static void RefetchUsage()
+    {
+        if (Manager.Instance == null) return;
+        Manager.Instance.StartCoroutine(UsageClient.FetchRoutine());
     }
 
     private bool IsTrialOffer => !_trialStarted && _purchased == PlanTier.None;

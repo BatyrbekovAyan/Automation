@@ -203,15 +203,21 @@ public static class SubscriptionPageRows
     // ── Meters ───────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// «412 из 1 000». A purchased top-up genuinely raises the ceiling, so it extends the
-    /// denominator as well as the state — showing «1 000 из 1 000» to someone who just
-    /// bought 500 more would read as a wall that isn't there.
+    /// «412 из 1 000» — always against the BASE monthly quota (owner decision 2026-08-26: a
+    /// top-up is a RESERVE spent after the quota, not an extension of it). The denominator used
+    /// to carry <c>quota + topup</c>, which under reserve semantics would quote a ceiling the
+    /// month does not have and would slide every time a reserve dialog was spent.
+    ///
+    /// <paramref name="reserve"/> therefore only reaches the STATE — and the numerator is left
+    /// unclamped on purpose: past the quota «1 240 из 1 000» is the honest count of what the
+    /// bots actually handled this month, and the strip's hint line
+    /// (<see cref="BotsPageRows.MeterHint"/>) names where the extra came from.
     /// </summary>
-    public static SubscriptionUsageLine UsageLine(int used, int quota, int topup)
+    public static SubscriptionUsageLine UsageLine(int used, int quota, int reserve)
         => new SubscriptionUsageLine
         {
-            Text = CountLine(used, quota + topup),
-            State = QuotaMath.State(used, quota, topup),
+            Text = CountLine(used, quota),
+            State = QuotaMath.State(used, quota, reserve),
         };
 
     /// <summary>
@@ -232,16 +238,20 @@ public static class SubscriptionPageRows
         => PaywallCopy.Number(current) + " из " + PaywallCopy.Number(max);
 
     /// <summary>
-    /// 0..1 bar fill. A ceiling of zero reads EMPTY, never full: «no plan» is not «quota
-    /// exhausted», and a full red bar there would invent an alarm out of a missing number
-    /// (the meters are hidden outright in that state — see <see cref="MetersVisible"/>).
+    /// 0..1 bar fill, measured against the same BASE quota <see cref="UsageLine"/> prints — the
+    /// bar and the number under it must never describe different denominators. The reserve is
+    /// deliberately NOT a parameter: it does not lengthen this track, it is spent past its end
+    /// (which the bar shows as full and the hint line explains).
+    ///
+    /// A quota of zero reads EMPTY, never full: «no plan» is not «quota exhausted», and a full
+    /// red bar there would invent an alarm out of a missing number (the meters are hidden
+    /// outright in that state — see <see cref="MetersVisible"/>).
     /// </summary>
-    public static float FillFraction(int used, int quota, int topup)
+    public static float FillFraction(int used, int quota)
     {
-        int ceiling = quota + topup;
-        if (ceiling <= 0) return 0f;
+        if (quota <= 0) return 0f;
         if (used <= 0) return 0f;
-        return used >= ceiling ? 1f : used / (float)ceiling;
+        return used >= quota ? 1f : used / (float)quota;
     }
 
     /// <summary>
@@ -249,12 +259,18 @@ public static class SubscriptionPageRows
     /// only ever be APPENDED (ThemedColor serialises the ordinal), so the amber
     /// StatusOwnerNeeded (#E46602 dark / spec's «#F8942F-class») carries the Warn step —
     /// semantically «нужно внимание владельца», which is precisely what a near-full quota is.
+    ///
+    /// <see cref="QuotaState.Reserve"/> shares that amber deliberately: the bot is still
+    /// answering by itself, so the destructive red — which this app uses for a WALL — would be
+    /// a lie, while the blue AccentFill the default arm would hand it says «всё в порядке» over
+    /// a spent quota. The two amber states are told apart by the hint line, not by the bar.
     /// </summary>
     public static ThemeRole FillRole(QuotaState state)
     {
         switch (state)
         {
-            case QuotaState.Warn: return ThemeRole.StatusOwnerNeeded;
+            case QuotaState.Warn:
+            case QuotaState.Reserve: return ThemeRole.StatusOwnerNeeded;
             case QuotaState.Over: return ThemeRole.Destructive;
             default: return ThemeRole.AccentFill;
         }

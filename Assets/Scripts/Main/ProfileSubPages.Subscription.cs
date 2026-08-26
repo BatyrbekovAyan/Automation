@@ -168,7 +168,7 @@ public partial class ProfileSubPages
 
         float fill = usage == null
             ? 0f
-            : SubscriptionPageRows.FillFraction(usage.used, quota, usage.topupBalance);
+            : SubscriptionPageRows.FillFraction(usage.used, quota);
         ApplyQuotaFill(fill);
 
         // Bots and channels are read LOCALLY, not from the snapshot: these are exactly

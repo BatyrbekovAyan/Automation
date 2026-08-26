@@ -321,7 +321,8 @@ public class SuggestionsController : MonoBehaviour
         // stamp and would let the show through mid-slide — the exact diagonal this gate removes.
         _chatOpenSettledAt = -1f;
         StartFreshRound();       // rounds are per-question, never per-app — a chat open starts at round 1
-        _semiAutoOn = SemiAutoStore.IsOn(ChatManager.Instance.CurrentBotId, ChatManager.Instance.CurrentChatId);
+        _semiAutoOn = EffectiveSemiAuto(
+            SemiAutoStore.IsOn(ChatManager.Instance.CurrentBotId, ChatManager.Instance.CurrentChatId));
         if (_toggle != null) _toggle.SetLit(_semiAutoOn);     // default OFF → other chats stay manual (SEMI-03)
         // SUP-02 heal: re-assert only an EXPLICIT per-chat override (tri-state 1/2) — covers a lost
         // «Вместе» (true) AND a lost «back to Авто» (false) write. Inherited chats (raw 0) push
@@ -349,6 +350,22 @@ public class SuggestionsController : MonoBehaviour
         }
         else HidePanel();
     }
+
+    // The chat's EFFECTIVE reply mode: its stored choice, OR the account-level quota fallback
+    // (final-review I-1, owner decision 2026-08-26). Once the monthly quota and the whole reserve
+    // are spent the server stops auto-replying — Count Dialog's false branch simply dead-ends —
+    // so an «Авто» chat would sit in silence while the «Боты» meter promises «бот отвечает в
+    // режиме «Вместе»». The panel is what makes that promise true.
+    //
+    // Deliberately applied HERE and not in HandleToggle: this is the one place the chat's mode is
+    // RESOLVED, and resolving it is all the override does. Nothing is written — not SemiAutoStore,
+    // not ReplyModeToggleBinder, not the server's Set_Reply_Mode row (that push is driven by
+    // TryGetOverride's explicit tri-state, which this cannot reach) — because the owner's chosen
+    // mode has to come back untouched the moment the quota resets or a top-up lands. And an owner
+    // who then taps the toggle off still gets what they asked for, in this chat, for this session:
+    // an override that could not be dismissed would be a dead control, not a fallback.
+    private static bool EffectiveSemiAuto(bool storedOn)
+        => storedOn || QuotaFallbackPolicy.ShouldFallBackToSemi(UsageStore.Current);
 
     // Side-effect-free probe for the policy decision: does the F9 cache hold a set for the open
     // chat's CURRENT tail? (TryRenderCached below is the acting half — probe + render.)

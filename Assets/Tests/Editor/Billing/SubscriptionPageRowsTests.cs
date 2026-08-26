@@ -209,13 +209,21 @@ public class SubscriptionPageRowsTests
     }
 
     [Test]
-    public void A_top_up_extends_both_the_denominator_and_the_state()
+    public void The_denominator_is_always_the_base_quota_and_the_reserve_only_moves_the_state()
     {
+        // Резерв не расширяет месячную квоту (решение владельца 2026-08-26) — он тратится
+        // ПОСЛЕ неё. Раньше знаменатель был quota + topup, и он сползал на каждом
+        // израсходованном диалоге резерва.
         var line = SubscriptionPageRows.UsageLine(1000, 1000, 500);
-        Assert.AreEqual("1\u00A0000 из 1\u00A0500", line.Text);
-        Assert.AreEqual(QuotaState.Warn, line.State, "докупленные диалоги ещё не потрачены");
+        Assert.AreEqual("1\u00A0000 из 1\u00A0000", line.Text);
+        Assert.AreEqual(QuotaState.Reserve, line.State, "квота исчерпана, но резерв ещё платит");
 
-        Assert.AreEqual(QuotaState.Over, SubscriptionPageRows.UsageLine(1500, 1000, 500).State);
+        // Перерасход печатается честно — числитель не подрезается под знаменатель.
+        var spending = SubscriptionPageRows.UsageLine(1240, 1000, 260);
+        Assert.AreEqual("1\u00A0240 из 1\u00A0000", spending.Text);
+        Assert.AreEqual(QuotaState.Reserve, spending.State);
+
+        Assert.AreEqual(QuotaState.Over, SubscriptionPageRows.UsageLine(1500, 1000, 0).State);
     }
 
     [Test]
@@ -229,11 +237,20 @@ public class SubscriptionPageRowsTests
     [Test]
     public void Fill_fraction_tracks_usage_and_clamps()
     {
-        Assert.AreEqual(0f, SubscriptionPageRows.FillFraction(0, 1000, 0), 0.0001f);
-        Assert.AreEqual(0.412f, SubscriptionPageRows.FillFraction(412, 1000, 0), 0.0001f);
-        Assert.AreEqual(1f, SubscriptionPageRows.FillFraction(2500, 1000, 0), 0.0001f, "перерасход не рисует полосу шире дорожки");
-        Assert.AreEqual(0f, SubscriptionPageRows.FillFraction(5, 0, 0), 0.0001f, "нет тарифа — полоса ПУСТАЯ, не полная (и не деление на ноль)");
-        Assert.AreEqual(0f, SubscriptionPageRows.FillFraction(-3, 1000, 0), 0.0001f);
+        Assert.AreEqual(0f, SubscriptionPageRows.FillFraction(0, 1000), 0.0001f);
+        Assert.AreEqual(0.412f, SubscriptionPageRows.FillFraction(412, 1000), 0.0001f);
+        Assert.AreEqual(1f, SubscriptionPageRows.FillFraction(2500, 1000), 0.0001f, "перерасход не рисует полосу шире дорожки");
+        Assert.AreEqual(0f, SubscriptionPageRows.FillFraction(5, 0), 0.0001f, "нет тарифа — полоса ПУСТАЯ, не полная (и не деление на ноль)");
+        Assert.AreEqual(0f, SubscriptionPageRows.FillFraction(-3, 1000), 0.0001f);
+    }
+
+    [Test]
+    public void Fill_fraction_measures_the_same_denominator_the_line_prints()
+    {
+        // Полоса и число под ней не могут говорить о разных знаменателях: резерв тратится
+        // ЗА концом дорожки, а не удлиняет её.
+        Assert.AreEqual(1f, SubscriptionPageRows.FillFraction(1000, 1000), 0.0001f);
+        Assert.AreEqual(1f, SubscriptionPageRows.FillFraction(1240, 1000), 0.0001f);
     }
 
     [Test]
@@ -241,6 +258,8 @@ public class SubscriptionPageRowsTests
     {
         Assert.AreEqual(ThemeRole.AccentFill, SubscriptionPageRows.FillRole(QuotaState.Ok));
         Assert.AreEqual(ThemeRole.StatusOwnerNeeded, SubscriptionPageRows.FillRole(QuotaState.Warn));
+        Assert.AreEqual(ThemeRole.StatusOwnerNeeded, SubscriptionPageRows.FillRole(QuotaState.Reserve),
+            "резерв ещё платит: не красная стена, но и не спокойный синий");
         Assert.AreEqual(ThemeRole.Destructive, SubscriptionPageRows.FillRole(QuotaState.Over));
     }
 

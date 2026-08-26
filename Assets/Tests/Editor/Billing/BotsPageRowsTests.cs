@@ -159,18 +159,33 @@ public class BotsPageRowsTests
     }
 
     [Test]
-    public void A_top_up_raises_the_ceiling_the_hint_measures_against()
+    public void A_spent_quota_with_a_reserve_left_says_so_instead_of_claiming_the_wall()
     {
-        // Exhausting the BASE quota is already Warn even with credits in hand — that is
-        // QuotaMath's rule, shared with the «Подписка» bar, and it is honest: the plan's
-        // own allowance is gone. What is LEFT, though, counts the top-up, so the line
-        // offers a real number instead of a wall.
-        Assert.AreEqual("Осталось 500 — докупить 500 за 3\u00A0900\u00A0₸",
+        // Резерв (решение владельца 2026-08-26): квота кончилась, но топ-ап ещё платит —
+        // это НЕ «Лимит исчерпан». Строка называет остаток резерва, потому что он
+        // меняется и именно по нему владелец принимает решение.
+        Assert.AreEqual("Квота исчерпана — из резерва осталось 500 диалогов",
             BotsPageRows.MeterHint(300, 300, 500));
-        Assert.AreEqual("Осталось 40 — докупить 500 за 3\u00A0900\u00A0₸",
-            BotsPageRows.MeterHint(760, 300, 500));
-        // Over only once the credits are spent too.
-        Assert.AreEqual(BotsPageRows.OverHint, BotsPageRows.MeterHint(800, 300, 500));
+        Assert.AreEqual("Квота исчерпана — из резерва осталось 40 диалогов",
+            BotsPageRows.MeterHint(760, 300, 40));
+        // …и только когда резерв пуст — стена.
+        Assert.AreEqual(BotsPageRows.OverHint, BotsPageRows.MeterHint(800, 300, 0));
+    }
+
+    [Test]
+    public void The_reserve_hint_agrees_with_the_number_it_counts()
+    {
+        // Глагол — через RuPlural, существительное — через PaywallCopy.Dialogs (там же NBSP).
+        Assert.AreEqual("Квота исчерпана — из резерва остался 1 диалог",
+            BotsPageRows.MeterHint(300, 300, 1));
+        Assert.AreEqual("Квота исчерпана — из резерва осталось 2 диалога",
+            BotsPageRows.MeterHint(300, 300, 2));
+        Assert.AreEqual("Квота исчерпана — из резерва осталось 11 диалогов",
+            BotsPageRows.MeterHint(300, 300, 11));   // 11..14 — «много», несмотря на 1
+        Assert.AreEqual("Квота исчерпана — из резерва остался 21 диалог",
+            BotsPageRows.MeterHint(300, 300, 21));
+        Assert.AreEqual("Квота исчерпана — из резерва осталось 1\u00A0000 диалогов",
+            BotsPageRows.MeterHint(300, 300, 1000));   // NBSP-группировка разрядов
     }
 
     [Test]
@@ -178,6 +193,8 @@ public class BotsPageRowsTests
     {
         Assert.AreEqual(ThemeRole.InkSecondary, BotsPageRows.HintRole(QuotaState.Ok));
         Assert.AreEqual(ThemeRole.InkSecondary, BotsPageRows.HintRole(QuotaState.Warn));
+        Assert.AreEqual(ThemeRole.InkSecondary, BotsPageRows.HintRole(QuotaState.Reserve),
+            "резерв ещё платит — это не стена");
         Assert.AreEqual(ThemeRole.Destructive, BotsPageRows.HintRole(QuotaState.Over));
     }
 

@@ -78,7 +78,7 @@ public partial class BotSettings
     {
         var bot = Manager.openBot.GetComponent<Bot>();
 
-        if (bot.whatsappProfileId.Equals("-1"))
+        if (bot.whatsappProfileId.Equals(Bot.UnauthedProfileSentinel))
         {
             // Fresh path: a new Wappi profile is about to be provisioned, consuming a
             // channel slot. Re-auth of an EXISTING profile (the branch below) reuses
@@ -95,13 +95,13 @@ public partial class BotSettings
             Manager.Instance.GetCreateWhatsappProfile(BotNameField.Value);
 
             float elapsed = 0f;
-            while (bot.whatsappProfileId.Equals("-1") && elapsed < 10f)
+            while (bot.whatsappProfileId.Equals(Bot.UnauthedProfileSentinel) && elapsed < 10f)
             {
                 yield return new WaitForSeconds(0.25f);
                 elapsed += 0.25f;
             }
 
-            if (bot.whatsappProfileId.Equals("-1"))
+            if (bot.whatsappProfileId.Equals(Bot.UnauthedProfileSentinel))
             {
                 SetChannelRowQuiet(whatsappRow, false);
                 yield break;
@@ -236,7 +236,7 @@ public partial class BotSettings
             // `!TryGetAuthorized(...) || !isAuthorized` condition.
             if (WappiStatusParser.TryGetAuthorized(response, out bool isAuthorized))
             {
-                if (!isAuthorized && !Manager.openBot.GetComponent<Bot>().whatsappProfileId.Equals("-1"))
+                if (!isAuthorized && !Manager.openBot.GetComponent<Bot>().whatsappProfileId.Equals(Bot.UnauthedProfileSentinel))
                 {
                     WhatsappNumberField.Value = "";
                     WhatsappNumberField.gameObject.SetActive(false);
@@ -291,7 +291,7 @@ public partial class BotSettings
     {
         var bot = Manager.openBot.GetComponent<Bot>();
 
-        if (bot.telegramProfileId.Equals("-1"))
+        if (bot.telegramProfileId.Equals(Bot.UnauthedProfileSentinel))
         {
             // Fresh path — see the WhatsApp twin above (re-auth of an existing profile
             // reuses its slot and is deliberately NOT gated).
@@ -305,13 +305,13 @@ public partial class BotSettings
             Manager.Instance.GetCreateTelegramProfile(BotNameField.Value);
 
             float elapsed = 0f;
-            while (bot.telegramProfileId.Equals("-1") && elapsed < 10f)
+            while (bot.telegramProfileId.Equals(Bot.UnauthedProfileSentinel) && elapsed < 10f)
             {
                 yield return new WaitForSeconds(0.25f);
                 elapsed += 0.25f;
             }
 
-            if (bot.telegramProfileId.Equals("-1"))
+            if (bot.telegramProfileId.Equals(Bot.UnauthedProfileSentinel))
             {
                 SetChannelRowQuiet(telegramRow, false);
                 yield break;
@@ -432,7 +432,7 @@ public partial class BotSettings
             if (WappiStatusParser.TryGetAuthorized(response, out bool isAuthorized)
                 && !isAuthorized
                 && PlayerPrefs.GetInt(Manager.openBot.name + "isOnTelegram", 0) == 1
-                && !Manager.openBot.GetComponent<Bot>().telegramProfileId.Equals("-1"))
+                && !Manager.openBot.GetComponent<Bot>().telegramProfileId.Equals(Bot.UnauthedProfileSentinel))
             {
                 TelegramNumberField.Value = "";
                 TelegramNumberField.gameObject.SetActive(false);

@@ -26,6 +26,17 @@ public class PlanCatalogTests
         Assert.AreEqual(0, p.MaxBots); Assert.AreEqual(0, p.MaxChannels); Assert.AreEqual(0, p.DialogQuota);
     }
 
+    // Дрейф SKU топ-апа ловим здесь (M-4): этот литерал ДУБЛИРУЕТСЯ в n8n RC_Events
+    // (нода «Map Event» опознаёт по нему покупку резерва и начисляет 500 диалогов), а
+    // подписочные SKU уже закреплены в PaywallRowsTests.Sku_for_selection. Переименование
+    // на любой из двух сторон должно падать тестом, а не молча ломать начисление.
+    [Test] public void Top_up_sku_and_pack_match_the_store_and_the_webhook()
+    {
+        Assert.AreEqual("topup.dialogs.500", PlanCatalog.SkuTopUp);
+        Assert.AreEqual(500, PlanCatalog.TopUpDialogs);
+        Assert.AreEqual(3900, PlanCatalog.TopUpPriceKzt);
+    }
+
     [TestCase("tier_start", PlanTier.Start)]
     [TestCase("tier_business", PlanTier.Business)]
     [TestCase("tier_network", PlanTier.Network)]

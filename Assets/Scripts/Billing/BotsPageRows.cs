@@ -33,10 +33,15 @@ public static class BotsPageRows
     public const string MeterTitleStem = "Диалоги ИИ";
 
     /// <summary>
-    /// Shown once the ceiling (quota + top-up) is spent. It names the CONSEQUENCE rather
-    /// than the number, because at that point the number is the same every time and what
-    /// the owner needs to know is that the bot has not gone silent — it has fallen back
-    /// to the «Вместе» suggestions panel, which costs no metered dialog.
+    /// Shown once the ceiling — the monthly quota AND the whole reserve — is spent. It names the
+    /// CONSEQUENCE rather than the number, because at that point the number is the same every
+    /// time and what the owner needs to know is that the bot has not gone silent: it has fallen
+    /// back to the «Вместе» suggestions panel, which costs no metered dialog.
+    ///
+    /// That claim is now literally true on both sides — the server stops auto-replying
+    /// (<c>Count Dialog</c>'s dead end) and the client raises the panel in «Авто» chats too
+    /// (<see cref="QuotaFallbackPolicy"/>). Before Task 17b it was the app's one promise that
+    /// nothing kept.
     /// </summary>
     public const string OverHint = "Лимит исчерпан — бот отвечает в режиме «Вместе»";
 
@@ -91,23 +96,43 @@ public static class BotsPageRows
 
     /// <summary>
     /// The second caption line, or <c>null</c> while there is nothing worth saying.
-    /// Ok → null · Warn → «Осталось 86 — докупить 500 за 3 900 ₸» · Over → <see cref="OverHint"/>.
+    /// Ok → null · Warn → «Осталось 86 — докупить 500 за 3 900 ₸» ·
+    /// Reserve → <see cref="ReserveHint"/> · Over → <see cref="OverHint"/>.
     ///
     /// The verb agrees with the bare number («Остался 1» / «Осталось 2» / «Осталось 86»),
     /// which is why it goes through <see cref="RuPlural"/> instead of a hand-rolled ternary —
     /// 11..14 take the "many" form despite ending in 1..4.
     /// </summary>
-    public static string MeterHint(int used, int quota, int topup)
+    public static string MeterHint(int used, int quota, int reserve)
     {
-        QuotaState state = QuotaMath.State(used, quota, topup);
+        QuotaState state = QuotaMath.State(used, quota, reserve);
         if (state == QuotaState.Ok) return null;
         if (state == QuotaState.Over) return OverHint;
+        if (state == QuotaState.Reserve) return ReserveHint(reserve);
 
-        int left = QuotaMath.Remaining(used, quota, topup);
+        int left = QuotaMath.Remaining(used, quota, reserve);
         return RuPlural.Pick(left, "Остался", "Осталось", "Осталось")
              + " " + PaywallCopy.Number(left)
              + " — докупить " + PaywallCopy.Number(PlanCatalog.TopUpDialogs)
              + " за " + PaywallCopy.Kzt(PlanCatalog.TopUpPriceKzt);
+    }
+
+    /// <summary>
+    /// «Квота исчерпана — из резерва осталось 320 диалогов»: the month's allowance is gone but a
+    /// purchased reserve is still paying, so this is a heads-up, not the wall
+    /// (<see cref="OverHint"/>). The line names the number because — unlike at the wall — it is
+    /// different every time and it is exactly what the owner has to decide on.
+    ///
+    /// Both agreements are seam-owned: the verb through <see cref="RuPlural"/> («остался 1» /
+    /// «осталось 2» / «осталось 11»), the noun through <see cref="PaywallCopy.Dialogs"/>, which
+    /// also NBSP-groups the digits.
+    /// </summary>
+    public static string ReserveHint(int reserve)
+    {
+        int left = Math.Max(0, reserve);
+        return "Квота исчерпана — из резерва "
+             + RuPlural.Pick(left, "остался", "осталось", "осталось")
+             + " " + PaywallCopy.Dialogs(left);
     }
 
     /// <summary>
@@ -117,6 +142,8 @@ public static class BotsPageRows
     /// in the light theme, under the floor for a 30-unit caption. Over gets
     /// <see cref="ThemeRole.Destructive"/>, which clears it in both themes (dark 5.06:1,
     /// light 7.90:1) and is the one state where the line reports a wall rather than an offer.
+    /// Reserve falls to the secondary ink with Warn, for the same reason the bar refuses the
+    /// red: the bot is still answering by itself.
     /// </summary>
     public static ThemeRole HintRole(QuotaState state)
         => state == QuotaState.Over ? ThemeRole.Destructive : ThemeRole.InkSecondary;
