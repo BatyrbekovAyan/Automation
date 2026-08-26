@@ -691,6 +691,12 @@ def check_refused_create_deletes_profile(f, wappi_base, profile_field):
     conns = wf["connections"]
 
     n = node(ns, REFUSED_DELETE_NODE)
+    # Task 19's own trap, turned into a structural assert (review minor, 2026-08-27): a
+    # DISABLED n8n node still appears in runData passing its input through, so every other
+    # assert here (type/url/wiring) passes while the delete never fires. Presence is not proof.
+    assert not n.get("disabled"), \
+        f"{f}: {REFUSED_DELETE_NODE} is disabled -- it would pass input through in runData " \
+        f"while never calling Wappi, and the refused profile strands again"
     assert n["type"] == "n8n-nodes-base.httpRequest", \
         f"{f}: {REFUSED_DELETE_NODE} is not an httpRequest node: {n['type']}"
     assert n["parameters"].get("method") == "POST", \
