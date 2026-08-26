@@ -3,16 +3,60 @@ using NUnit.Framework;
 public class EntitlementPolicyTests
 {
     [Test] public void Purchase_beats_trial()
-        => Assert.AreEqual(PlanTier.Start, EntitlementPolicy.EffectiveTier(PlanTier.Start, true, true));
+        => Assert.AreEqual(PlanTier.Start, EntitlementPolicy.EffectiveTier(PlanTier.Start, true, true, false));
 
     [Test] public void Active_trial_when_nothing_purchased()
-        => Assert.AreEqual(PlanTier.Trial, EntitlementPolicy.EffectiveTier(PlanTier.None, true, false));
+        => Assert.AreEqual(PlanTier.Trial, EntitlementPolicy.EffectiveTier(PlanTier.None, true, false, false));
 
     [Test] public void Expired_trial_without_purchase_is_none()
-        => Assert.AreEqual(PlanTier.None, EntitlementPolicy.EffectiveTier(PlanTier.None, true, true));
+        => Assert.AreEqual(PlanTier.None, EntitlementPolicy.EffectiveTier(PlanTier.None, true, true, false));
 
     [Test] public void Not_started_trial_is_trial_grace()   // мастер первого бота должен открываться до первой авторизации
-        => Assert.AreEqual(PlanTier.Trial, EntitlementPolicy.EffectiveTier(PlanTier.None, false, false));
+        => Assert.AreEqual(PlanTier.Trial, EntitlementPolicy.EffectiveTier(PlanTier.None, false, false, false));
+
+    // ── Task 19: слово сервера против стёртого леджера ────────────────────────
+
+    /// <summary>
+    /// САМ инцидент 2026-08-26: переустановка стёрла триал-леджер, id RC выжил, сервер знает
+    /// «expired». Раньше это давало Trial — мастер открывался, владелец авторизовал WhatsApp,
+    /// и отказывал уже вебхук Create, оставив оплаченный профиль висеть на Wappi.
+    /// </summary>
+    [Test] public void Server_expired_beats_a_wiped_trial_ledger()
+        => Assert.AreEqual(PlanTier.None, EntitlementPolicy.EffectiveTier(PlanTier.None, false, false, true));
+
+    /// <summary>Покупка — по-прежнему первый и безусловный ответ: сервер её не отменяет.</summary>
+    [TestCase(PlanTier.Start)]
+    [TestCase(PlanTier.Business)]
+    [TestCase(PlanTier.Network)]
+    public void Server_expired_never_overrides_a_purchase(PlanTier purchased)
+        => Assert.AreEqual(purchased, EntitlementPolicy.EffectiveTier(purchased, false, false, true));
+
+    /// <summary>
+    /// Уже стартовавший локальный триал живёт по своим часам — сервер не может отнять
+    /// оставшиеся дни (в этом состоянии зеркало и так отдаёт «trialing»).
+    /// </summary>
+    [Test] public void Server_expired_does_not_cut_a_running_local_trial()
+        => Assert.AreEqual(PlanTier.Trial, EntitlementPolicy.EffectiveTier(PlanTier.None, true, false, true));
+
+    /// <summary>
+    /// Fail-open: неизвестный/устаревший/неудачный снимок = false, и КАЖДОЕ плечо матрицы
+    /// обязано совпасть с доTask19-поведением. Это тот самый гард, который не даёт свежей
+    /// офлайн-установке потерять мастер первого бота.
+    /// </summary>
+    [Test] public void Unknown_server_status_changes_nothing()
+    {
+        foreach (PlanTier purchased in new[] { PlanTier.None, PlanTier.Trial, PlanTier.Start,
+                                               PlanTier.Business, PlanTier.Network })
+        foreach (bool started in new[] { false, true })
+        foreach (bool expired in new[] { false, true })
+        {
+            PlanTier legacy = purchased != PlanTier.None
+                ? purchased
+                : (started && expired ? PlanTier.None : PlanTier.Trial);
+            Assert.AreEqual(legacy, EntitlementPolicy.EffectiveTier(purchased, started, expired, false),
+                $"purchased={purchased} started={started} expired={expired}");
+        }
+    }
 
     [TestCase(PlanTier.Start, 0, true)]
     [TestCase(PlanTier.Start, 1, false)]

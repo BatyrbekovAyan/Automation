@@ -50,14 +50,14 @@ public class TrialLedgerTests
     {
         // Pre-auth grace: EntitlementPolicy already grants Trial, but nothing has started
         // the clock, so the header pill stays hidden (BotsPageRows.TrialPill's own rule).
-        PlanTier before = EntitlementPolicy.EffectiveTier(PlanTier.None, TrialLedger.HasStarted, TrialLedger.IsExpired);
+        PlanTier before = EntitlementPolicy.EffectiveTier(PlanTier.None, TrialLedger.HasStarted, TrialLedger.IsExpired, false);
         Assert.AreEqual(PlanTier.Trial, before);
         Assert.IsFalse(BotsPageRows.TrialPill(before, TrialLedger.HasStarted, TrialLedger.DaysLeft()).Visible);
 
         // …exactly what a confirmed channel authorization now calls (Task 15a, Part A).
         TrialLedger.StartIfNeeded();
 
-        PlanTier after = EntitlementPolicy.EffectiveTier(PlanTier.None, TrialLedger.HasStarted, TrialLedger.IsExpired);
+        PlanTier after = EntitlementPolicy.EffectiveTier(PlanTier.None, TrialLedger.HasStarted, TrialLedger.IsExpired, false);
         var pill = BotsPageRows.TrialPill(after, TrialLedger.HasStarted, TrialLedger.DaysLeft());
         Assert.IsTrue(pill.Visible, "пилюля появляется органически, без ручной правки PlayerPrefs");
         Assert.AreEqual("Пробный · 5 дн.", pill.Text);

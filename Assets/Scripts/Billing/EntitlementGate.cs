@@ -38,13 +38,35 @@ public static class EntitlementGate
             if (!BillingService.EntitlementsKnown && purchased == PlanTier.None)
                 return PlanTier.Trial;
 
-            return EntitlementPolicy.EffectiveTier(purchased, TrialLedger.HasStarted, TrialLedger.IsExpired);
+            // Task 19: слово сервера бьёт СТЁРТЫЙ леджер (и только его — см. EffectiveTier).
+            // Читается живьём из UsageStore, поэтому неизвестный снимок = «не знаю» = как раньше.
+            return EntitlementPolicy.EffectiveTier(purchased, TrialLedger.HasStarted, TrialLedger.IsExpired,
+                                                   ServerAccountStatus.Expired);
         }
     }
 
     public static event Action<PaywallTrigger> OnPaywallRequested;
 
     public static void RequestPaywall(PaywallTrigger trigger) => OnPaywallRequested?.Invoke(trigger);
+
+    /// <summary>
+    /// Какой пейволл открывает отказ мастера создания бота (Task 19).
+    ///
+    /// Обычный отказ — это ПОТОЛОК тарифа, и его место — лёгкий лист
+    /// (<see cref="BillingGateRows.ShouldInterceptWithSheet"/> пропускает
+    /// <see cref="PaywallTrigger.BotLimit"/> именно туда). Но когда сервер говорит «expired»,
+    /// потолка нет — закончилась сама подписка, и правильная копия здесь единственная:
+    /// <see cref="PaywallTrigger.TrialExpired"/> («Итоги пробного периода» + полноэкранный
+    /// пейволл, который лист не перехватывает). Никакого нового UI: оба состояния уже
+    /// существуют, меняется только выбор между ними.
+    ///
+    /// Чистая функция, а не чтение <see cref="ServerAccountStatus.Expired"/> внутри — вызов
+    /// живёт в <c>BotsPage.TryStartNewBot</c>, который EditMode не может создать, поэтому
+    /// правило пиннится таблицей истинности (тот же приём, что и в
+    /// <see cref="LaunchPaywallPolicy"/>).
+    /// </summary>
+    public static PaywallTrigger BotRefusalTrigger(bool serverSaysExpired)
+        => serverSaysExpired ? PaywallTrigger.TrialExpired : PaywallTrigger.BotLimit;
 
     public static bool CanCreateBot(int existingBots) =>
         EntitlementPolicy.CanCreateBot(CurrentTier, existingBots);

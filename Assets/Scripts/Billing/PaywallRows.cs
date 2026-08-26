@@ -139,21 +139,29 @@ public static class PaywallRows
 
     /// <summary>
     /// The one state in which the primary CTA offers the free trial instead of naming a tier:
-    /// the trial clock has never started AND nothing is purchased. Shared by <see cref="CtaText"/>
-    /// and <see cref="SecondaryPurchase"/> so the two can never disagree about which button
+    /// the trial clock has never started, nothing is purchased AND the server has not already
+    /// told us this account is expired. Shared by <see cref="CtaText"/> and
+    /// <see cref="SecondaryPurchase"/> so the two can never disagree about which button
     /// carries the subscribe form.
+    ///
+    /// <paramref name="serverSaysExpired"/> (Task 19) is the same fact
+    /// <see cref="EntitlementGate.CurrentTier"/> now reads — an id-persisted reinstall wipes
+    /// the local trial ledger while the server still knows the subscription ended, and
+    /// offering that owner a free trial he cannot have is what walked him into the Create
+    /// webhook's refusal on 2026-08-26. Unknown snapshot ⇒ <c>false</c> ⇒ unchanged.
     /// </summary>
-    public static bool IsTrialOffer(bool trialStarted, PlanTier purchased)
-        => !trialStarted && purchased == PlanTier.None;
+    public static bool IsTrialOffer(bool trialStarted, PlanTier purchased, bool serverSaysExpired)
+        => !trialStarted && purchased == PlanTier.None && !serverSaysExpired;
 
     /// <summary>
-    /// «Попробовать 5 дней бесплатно» only while the trial clock has never started AND
-    /// nothing is purchased — every other state is a subscribe form naming the selected
-    /// tier and its price in the selected period.
+    /// «Попробовать 5 дней бесплатно» only in the <see cref="IsTrialOffer"/> state — every
+    /// other one is a subscribe form naming the selected tier and its price in the selected
+    /// period.
     /// </summary>
-    public static string CtaText(bool trialStarted, PlanTier purchased, PlanTier selected, PaywallPeriod period)
+    public static string CtaText(bool trialStarted, PlanTier purchased, bool serverSaysExpired,
+        PlanTier selected, PaywallPeriod period)
     {
-        if (IsTrialOffer(trialStarted, purchased))
+        if (IsTrialOffer(trialStarted, purchased, serverSaysExpired))
             return PaywallCopy.TrialCta();
         return SubscribeText(selected, period);
     }
@@ -171,9 +179,9 @@ public static class PaywallRows
     /// purchase that cannot be made.
     /// </summary>
     public static PaywallSecondaryRow SecondaryPurchase(bool trialStarted, PlanTier purchased,
-        PlanTier selected, PaywallPeriod period)
+        bool serverSaysExpired, PlanTier selected, PaywallPeriod period)
     {
-        if (!IsTrialOffer(trialStarted, purchased) || string.IsNullOrEmpty(Sku(selected, period)))
+        if (!IsTrialOffer(trialStarted, purchased, serverSaysExpired) || string.IsNullOrEmpty(Sku(selected, period)))
             return new PaywallSecondaryRow { Visible = false, Text = "" };
 
         return new PaywallSecondaryRow { Visible = true, Text = SubscribeText(selected, period) };

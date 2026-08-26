@@ -2,12 +2,25 @@ using System;
 
 public static class EntitlementPolicy
 {
-    public static PlanTier EffectiveTier(PlanTier purchased, bool trialStarted, bool trialExpired)
+    /// <param name="serverSaysExpired">
+    /// <see cref="ServerAccountStatus.Expired"/> — зеркало подписок ОПРЕДЕЛЁННО отдало
+    /// «expired» для этого app_user_id (Task 19). Бьёт только по одному состоянию: локальный
+    /// триал НЕ стартовал, а сервер уже знает, что аккаунт истёк — то есть переустановка стёрла
+    /// леджер, но не идентичность (живой инцидент 2026-08-26). Неизвестный/устаревший снимок —
+    /// <c>false</c>, и тогда всё поведение прежнее.
+    /// </param>
+    public static PlanTier EffectiveTier(PlanTier purchased, bool trialStarted, bool trialExpired,
+        bool serverSaysExpired)
     {
         if (purchased != PlanTier.None) return purchased;
+        // Стартовавший триал живёт по СВОИМ часам: сервер не может ни продлить его, ни отнять
+        // (в этом состоянии слово сервера ничего не добавляет — статус аккаунта и так «trialing»).
+        if (trialStarted) return trialExpired ? PlanTier.None : PlanTier.Trial;
         // Не стартовавший триал = Trial (pre-auth grace): часы запускает первая авторизация,
-        // а мастер первого бота обязан открываться на свежей установке.
-        return trialStarted && trialExpired ? PlanTier.None : PlanTier.Trial;
+        // а мастер первого бота обязан открываться на свежей установке — ЕСЛИ сервер не говорит
+        // обратного. Иначе гейт отпускает владельца в мастер, он проходит реальную авторизацию
+        // канала, и отказывает уже вебхук Create — оставив оплаченный Wappi-профиль висеть.
+        return serverSaysExpired ? PlanTier.None : PlanTier.Trial;
     }
 
     /// <summary>

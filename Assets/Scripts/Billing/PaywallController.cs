@@ -105,6 +105,7 @@ public class PaywallController : MonoBehaviour
     private PlanTier _selected = PaywallRows.Recommended;
     private PlanTier _purchased = PlanTier.None;
     private bool _trialStarted;
+    private bool _serverSaysExpired;
     private bool _receiptVariant;
     private string _notice = "";
 
@@ -192,11 +193,27 @@ public class PaywallController : MonoBehaviour
     /// are started in the same tick (Manager.PreloadSecretsThenInitBilling), so the tile would
     /// otherwise sit on «—» exactly when it is supposed to persuade. Repainting on the store's own
     /// event is the whole fix; subscription is tied to enable/disable, so a closed paywall holds
-    /// nothing. Non-receipt variants ignore it: nothing else on this screen reads usage.
+    /// nothing.
+    ///
+    /// Since Task 19 the SAME event can also flip the CTA: a snapshot that lands while the paywall
+    /// is open is exactly when «сервер говорит expired» becomes known, and a screen left offering
+    /// a trial the account cannot have is the bug this task exists to close. A full
+    /// <see cref="Render"/> (which repaints the receipt itself when that variant is up) runs only
+    /// when the fact actually changed — every other usage read still costs a tile repaint at most.
     /// </summary>
     private void HandleUsageChanged()
     {
-        if (!_receiptVariant || !IsOpen) return;
+        if (!IsOpen) return;
+
+        bool expired = ServerAccountStatus.Expired;
+        if (expired != _serverSaysExpired)
+        {
+            _serverSaysExpired = expired;
+            Render();
+            return;
+        }
+
+        if (!_receiptVariant) return;
         RenderReceipt();
     }
 
@@ -249,6 +266,7 @@ public class PaywallController : MonoBehaviour
         _notice = "";
         _purchased = BillingService.PurchasedTier;
         _trialStarted = TrialLedger.HasStarted;
+        _serverSaysExpired = ServerAccountStatus.Expired;
         _selected = _purchased != PlanTier.None ? _purchased : PaywallRows.Recommended;
         _period = PaywallPeriod.Month;
 
@@ -397,7 +415,7 @@ public class PaywallController : MonoBehaviour
         Manager.Instance.StartCoroutine(UsageClient.FetchRoutine());
     }
 
-    private bool IsTrialOffer => PaywallRows.IsTrialOffer(_trialStarted, _purchased);
+    private bool IsTrialOffer => PaywallRows.IsTrialOffer(_trialStarted, _purchased, _serverSaysExpired);
 
     private void SetBusy(bool busy)
     {
@@ -445,13 +463,13 @@ public class PaywallController : MonoBehaviour
         }
 
         if (ctaLabel != null)
-            ctaLabel.text = PaywallRows.CtaText(_trialStarted, _purchased, _selected, _period);
+            ctaLabel.text = PaywallRows.CtaText(_trialStarted, _purchased, _serverSaysExpired, _selected, _period);
 
         // The secondary button follows the same selection as the CTA, so a tier/period tap
         // repaints both here — and the seam keeps it OFF in every state where the CTA is
         // already the subscribe form.
         PaywallSecondaryRow secondary =
-            PaywallRows.SecondaryPurchase(_trialStarted, _purchased, _selected, _period);
+            PaywallRows.SecondaryPurchase(_trialStarted, _purchased, _serverSaysExpired, _selected, _period);
         if (purchaseButton != null) purchaseButton.gameObject.SetActive(secondary.Visible);
         if (purchaseLabel != null && secondary.Visible) purchaseLabel.text = secondary.Text;
 

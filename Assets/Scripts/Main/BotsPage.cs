@@ -105,7 +105,9 @@ public class BotsPage : MonoBehaviour
         int existingBots = botsParent != null ? botsParent.childCount : 0;
         if (!EntitlementGate.CanCreateBot(existingBots))
         {
-            EntitlementGate.RequestPaywall(PaywallTrigger.BotLimit);
+            // Task 19: тариф упёрся в потолок — лёгкий лист; сервер сказал «expired» — полный
+            // пейволл с «чеком ценности», потому что потолка тут нет, кончилась подписка.
+            EntitlementGate.RequestPaywall(EntitlementGate.BotRefusalTrigger(ServerAccountStatus.Expired));
             return false;
         }
 
