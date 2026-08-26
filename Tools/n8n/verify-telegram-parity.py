@@ -20,6 +20,7 @@ Exits 1 with "PARITY FAIL: <reason>" naming the first violated assert.
 import argparse
 import json
 import os
+import re
 import sys
 
 # Resolve workflow paths from this script's own location so cwd does not matter.
@@ -70,6 +71,18 @@ def node(nodes, name):
         if n.get("name") == name:
             return n
     raise AssertionError(f"node '{name}' not found")
+
+
+def sql_code(query):
+    """The query with `--` comments stripped.
+
+    These queries are heavily commented -- deliberately, they carry the reasoning -- and the
+    comments name the very tables and clauses the asserts below look for. Asserting against
+    the raw text would let a comment satisfy a check about executable SQL (and did: the
+    suggestions gate's own comment explaining that it never touches dialog_counts tripped
+    the assert that it never touches dialog_counts). Every content assert reads this.
+    """
+    return "\n".join(re.sub(r"--.*$", "", line) for line in query.split("\n"))
 
 
 def check_telegram_bot():
@@ -345,10 +358,48 @@ def check_dialog_metering(f):
     # (vi) the insert is conditional on being allowed -- a suppressed NEW dialog must
     # never consume quota (insert-then-suppress would silently burn a slot on every
     # rejected message instead of leaving it unconsumed).
-    q = cd["parameters"]["query"]
+    q = sql_code(cd["parameters"]["query"])
     assert "insert into dialog_counts" in q, f"{f}: Count Dialog query does not insert into dialog_counts"
     assert "where not exists" in q and "used from usage_now" in q, \
         f"{f}: Count Dialog insert does not look conditional on quota/existing: {q}"
+
+    # (vi-b) TOP-UP RESERVE SEMANTICS (Task 17a; owner decision 2026-08-26, spec §2).
+    # The top-up used to be ADDED to the monthly quota and never consumed, so one 3900₸
+    # purchase raised the quota by 500 every month forever. It is now a reserve: spent one
+    # dialog at a time, and only once the BASE quota is gone. Four things make that true,
+    # and each is asserted rather than described, because losing any one silently restores
+    # the old free-forever behaviour or lets the balance go negative:
+    #   1. the quota CTE is the BASE plan number ONLY -- the old `+ case when me.status in
+    #      ('active','trialing') then me.topup_balance` term must be GONE. (Get Usage
+    #      reports the same base number as `quota` and the column as `topupBalance`.)
+    #   2. the decrement is an UPDATE on subscribers, guarded `topup_balance > 0` -- the
+    #      row lock it takes is what serialises two racing new chats, and READ COMMITTED
+    #      re-evaluates that guard against the freshly committed row, so the loser is
+    #      refused instead of driving the balance to -1.
+    #   3. it fires ONLY for a new dialog (`not exists (... existing)`) that is already
+    #      over quota (`>= (select q from quota)`) -- a continuation or an under-quota
+    #      dialog must cost nothing.
+    #   4. `allowed` counts a consumed reserve unit: `on conflict do nothing` can swallow
+    #      OUR insert when a racer inserted the same key first, and that conflict PROVES
+    #      the row exists -- without this term such a race would spend a unit AND refuse.
+    assert "then me.topup_balance" not in q, \
+        f"{f}: Count Dialog still ADDS topup_balance into the quota -- the top-up is a " \
+        f"reserve since 2026-08-26, not a permanent quota bump"
+    assert "update subscribers" in q and "topup_balance = s.topup_balance - 1" in q, \
+        f"{f}: Count Dialog does not consume the top-up reserve"
+    assert "and s.topup_balance > 0" in q, \
+        f"{f}: the reserve decrement is not guarded `topup_balance > 0` under the row lock"
+    reserve = q[q.index("update subscribers"):q.index("returning s.topup_balance")]
+    assert "not exists (select 1 from existing)" in reserve \
+        and ">= (select q from quota)" in reserve, \
+        f"{f}: the reserve decrement is not scoped to a NEW, over-quota dialog: {reserve}"
+    assert "in ('active','trialing')" in reserve, \
+        f"{f}: the reserve decrement is not gated on a consuming status"
+    assert "or exists (select 1 from reserve)" in q, \
+        f"{f}: the dialog insert does not accept a reserve-funded dialog"
+    assert "exists(select 1 from reserve)) as allowed" in q, \
+        f"{f}: `allowed` does not count a consumed reserve unit -- an on-conflict race " \
+        f"would spend the unit and still refuse the reply"
 
     # (vii) PAYLOAD CONTINUITY (fix round, 2026-08-21) -- Count Dialog is a Postgres
     # executeQuery node: its output is JUST the SQL result columns, not a merge with
@@ -375,6 +426,28 @@ def check_dialog_metering(f):
         f"{f}: Quota Decision does not set an explicit pairedItem"
 
     print(f"OK  {f} (dialog-metering wiring)")
+
+
+def check_dialog_metering_shared():
+    """The two bot templates must carry the BYTE-IDENTICAL metering SQL and Code.
+
+    This is load-bearing for the WhatsApp template specifically, and worth stating plainly:
+    only the Telegram template is `availableInMCP`, so only IT can be exercised with pinned
+    n8n-mcp executions (Task 9 / Task 15b / this task all pin TG live). WhatsApp's own gate
+    cannot be reached without a real authorized Wappi profile and a real inbound message --
+    Fetch Recent hard-aborts on Wappi's 400 for a synthetic profile_id, so the chain
+    dead-ends before Count Dialog. The standard of proof for WA is therefore: the SQL and
+    Code it runs are the SAME BYTES that were proven live on TG. That argument is only worth
+    anything if something CHECKS the bytes -- otherwise a one-template edit drifts silently.
+    """
+    tg, wa = load(TG_BOT), load(WA_BOT)
+    for name, field in (("Count Dialog", "query"), ("Quota Decision", "jsCode")):
+        a = node(tg["nodes"], name)["parameters"][field]
+        b = node(wa["nodes"], name)["parameters"][field]
+        assert a == b, (f"{name}.{field} differs between the Telegram and WhatsApp "
+                        f"templates -- only TG can be pinned-tested live, so WA's proof IS "
+                        f"byte-equality with it")
+    print("OK  both bot templates share byte-identical metering SQL + Code")
 
 
 def check_model_id(f):
@@ -454,6 +527,86 @@ def check_suggest_replies():
     assert "lastClientMessage" in assemble, \
         f"{f}: Assemble fenced block missing the D10 lastClientMessage anchor"
 
+    # (vii) SUBSCRIPTION GATE + DAILY CAP (Task 17a; owner decision 2026-08-26, spec §5.3).
+    # «Вместе» suggestions are FREE (they never consume a dialog) but they are NOT free to
+    # serve: /webhook/SuggestReplies is unauthenticated and every call spends LLM tokens.
+    # Before this task an EXPIRED account -- the very population the quota enforcement
+    # routes INTO the panel -- had unlimited free generations. The gate refuses expired and
+    # unknown ids, deliberately ALLOWS over-quota (the panel IS the fallback), and caps
+    # requests per account per day.
+    for name in ("Suggestion Gate", "Gate Decision", "If Gate Allows"):
+        node(ns, name)
+
+    # (vii-a) POSITION IS THE WHOLE POINT: the gate hangs off If invalid?'s valid branch,
+    # so a refusal costs ZERO LLM and never reaches retrieval. If this edge ever points at
+    # If skipRag? again, refused traffic silently starts paying for itself.
+    assert conns["If invalid?"]["main"][1] == \
+        [{"node": "Suggestion Gate", "type": "main", "index": 0}], \
+        f"{f}: If invalid?'s valid branch does not enter the subscription gate"
+    assert conns["Suggestion Gate"]["main"][0] == \
+        [{"node": "Gate Decision", "type": "main", "index": 0}], f"{f}: gate chain broken"
+    assert conns["Gate Decision"]["main"][0] == \
+        [{"node": "If Gate Allows", "type": "main", "index": 0}], f"{f}: gate chain broken"
+    ga = conns["If Gate Allows"]["main"]
+    assert ga[0] == [{"node": "If skipRag?", "type": "main", "index": 0}], \
+        f"{f}: If Gate Allows true-branch does not resume the normal path: {ga[0]}"
+    assert ga[1] == [{"node": "Build Response", "type": "main", "index": 0}], \
+        f"{f}: If Gate Allows false-branch must go straight to Build Response (the " \
+        f"existing generation_failed envelope), reaching no LLM node: {ga[1]}"
+
+    # (vii-b) fail-open contract, identical to Count Dialog's: a Supabase outage must never
+    # kill the panel, so onError + alwaysOutputData, and the shared executeQuery credential.
+    gate = node(ns, "Suggestion Gate")
+    assert gate["type"] == "n8n-nodes-base.postgres", f"{f}: Suggestion Gate is not postgres"
+    assert gate.get("onError") == "continueRegularOutput", \
+        f"{f}: Suggestion Gate onError not continueRegularOutput"
+    assert gate.get("alwaysOutputData") is True, \
+        f"{f}: Suggestion Gate alwaysOutputData not true"
+    assert gate["credentials"]["postgres"]["id"] == PG_EXECUTEQUERY_CRED, \
+        f"{f}: Suggestion Gate uses the wrong postgres credential"
+    qr = gate["parameters"]["options"]["queryReplacement"]
+    assert qr.startswith("={{ [") and qr.rstrip().endswith("] }}"), \
+        f"{f}: Suggestion Gate queryReplacement is not the single array-literal form: {qr!r}"
+    assert re.search(r"\bappUserId\b", qr), \
+        f"{f}: Suggestion Gate is not keyed by appUserId: {qr!r}"
+
+    # (vii-c) the SQL itself: values, not node presence. Suggestions must stay free
+    # (dialog_counts is never touched), the cap must be a real per-day counter, and `grace`
+    # must be allowed alongside active/trialing -- refusing grace would cut the panel off
+    # from exactly the owners who are being asked to pay.
+    gq = sql_code(gate["parameters"]["query"])
+    assert "dialog_counts" not in gq, \
+        f"{f}: the suggestions gate touches dialog_counts -- suggestions are FREE " \
+        f"(owner decision 2026-08-26); they must never consume a dialog"
+    assert "insert into suggestion_counts" in gq and "n = suggestion_counts.n + 1" in gq, \
+        f"{f}: the gate does not increment the daily counter atomically"
+    assert "in ('active','trialing','grace')" in gq, \
+        f"{f}: the gate's entitled-status set is not exactly active/trialing/grace"
+    assert "<= 100" in gq, f"{f}: the gate carries no daily cap"
+    assert "Asia/Almaty" in gq, \
+        f"{f}: the gate's day boundary is not the Asia/Almaty one dialog_counts uses"
+
+    # (vii-d) payload continuity, the Task 9 trap again: a Postgres node emits ONLY its
+    # query result and DROPS the incoming item, so Gate Decision must rebuild from Prep or
+    # everything downstream (If skipRag?/Assemble) reads undefined.
+    gd = node(ns, "Gate Decision")["parameters"]["jsCode"]
+    assert "$('Prep')" in gd, \
+        f"{f}: Gate Decision does not rebuild the payload from Prep -- the Postgres node " \
+        f"above it drops the incoming item"
+    assert "pairedItem" in gd, f"{f}: Gate Decision does not set an explicit pairedItem"
+    assert "row.allowed === undefined" in gd, \
+        f"{f}: Gate Decision does not fail open on a DB error"
+
+    # (vii-e) the client contract is UNCHANGED: a refusal reuses the existing
+    # generation_failed envelope (the panel has no new state for this), with `reason` as an
+    # extra diagnostic key only.
+    # \b on both sides: a rename to appUserIdX would satisfy a bare substring test.
+    assert re.search(r"\bappUserId\b", prep), \
+        f"{f}: Prep does not carry appUserId -- the gate would refuse every request"
+    br = node(ns, "Build Response")["parameters"]["jsCode"]
+    assert "generation_failed" in br, f"{f}: Build Response lost the error envelope"
+    assert "j.gateReason" in br, f"{f}: Build Response does not surface the refusal reason"
+
     print(f"OK  {f}")
 
 
@@ -479,6 +632,7 @@ def main():
         check_canonical_export_invariant(CREATE_TG)
         check_dialog_metering(TG_BOT)
         check_dialog_metering(WA_BOT)
+        check_dialog_metering_shared()
         check_model_id(TG_BOT)
         check_model_id(WA_BOT)
         check_suggest_replies()

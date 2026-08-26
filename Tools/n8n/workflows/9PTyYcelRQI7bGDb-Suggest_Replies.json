@@ -20,7 +20,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const b = $json.body || {};\nlet invalid = false;\nif (b.v !== 1) invalid = true;\nif (typeof b.chatId !== 'string' || !b.chatId) invalid = true;\nif (!Array.isArray(b.messages) || b.messages.length === 0) invalid = true;\n\nlet messages = Array.isArray(b.messages) ? b.messages : [];\nmessages = messages.slice(-24).map(m => ({\n  role: (m && m.role === 'client') ? 'client' : 'business',\n  text: String((m && m.text) || '').slice(0, 500),\n  ts: (m && typeof m.ts === 'number') ? m.ts : 0\n}));\n\nconst ownerPrompt = String(b.ownerPrompt || '').slice(0, 2000);\nconst catalog = String(b.catalog || '').slice(0, 2500);\nconst businessKnowledge = String(b.businessKnowledge || '').slice(0, 1200);\n// `now` reaches the SYSTEM prompt (ВРЕМЯ rule) — whitelist-sanitize: the webhook is unauthenticated.\nconst now = String(b.now || '').replace(/[^0-9A-Za-z\\u0400-\\u04FF:,. \\-]/g, '').slice(0, 64);\nconst pickStats = String(b.pickStats || '').replace(/[^0-9\\u0400-\\u04FF:, ]/g, '').slice(0, 200);\nconst businessName = String(b.businessName || '');\nconst businessTypeId = String(b.businessTypeId || '');\nconst botWaId = (typeof b.botWaId === 'string') ? b.botWaId : ''; const channel = (b.channel === 'telegram') ? 'telegram' : 'whatsapp'; const botTgId = (typeof b.botTgId === 'string') ? b.botTgId : '';\nconst steerTowardText = (b.steerTowardText === null || b.steerTowardText === undefined)\n  ? null : String(b.steerTowardText).slice(0, 500);\nconst lastIncomingText = (b.lastIncomingText === null || b.lastIncomingText === undefined)\n  ? null : String(b.lastIncomingText);\n\n// Burst-combine (BATCH-03 gap fix): anchor RAG + lastClientMessage on the whole trailing\n// client run (consecutive client messages since the last owner/bot reply), not only the\n// final fragment — mirrors the reply path's Latest+Combine run-walk semantics.\nconst runParts = [];\nfor (let i = messages.length - 1; i >= 0; i--) {\n  const m = messages[i];\n  if (m.role !== 'client') break;\n  if (m.text && m.text.trim()) runParts.unshift(m.text.trim());\n}\n// Per-line merge: lastIncomingText now carries the client's WHOLE accumulated burst\n// (possibly multi-line) — append each line not already present in the trailing run.\nif (lastIncomingText && lastIncomingText.trim()) {\n  const seen = new Set(runParts);\n  for (const rawLine of lastIncomingText.split('\\n')) {\n    const line = rawLine.trim();\n    if (line && !seen.has(line)) { runParts.push(line); seen.add(line); }\n  }\n}\nlet queryText = runParts.join('\\n').slice(0, 500);\n\nconst wfId = (channel === 'telegram') ? botTgId : botWaId; const skipRag = (wfId === '' || wfId === '-1' || !queryText);\nconst requestSeq = (b.requestSeq === undefined || b.requestSeq === null) ? 0 : b.requestSeq;\n\nreturn [{ json: {\n  v: 1, requestSeq, invalid,\n  profileId: String(b.profileId || ''),\n  chatId: String(b.chatId || ''),\n  botWaId, botTgId, channel, businessTypeId, businessName, ownerPrompt, catalog, businessKnowledge, now, pickStats,\n  steerTowardText, lastIncomingText, messages, queryText, skipRag\n} }];"
+        "jsCode": "const b = $json.body || {};\nlet invalid = false;\nif (b.v !== 1) invalid = true;\nif (typeof b.chatId !== 'string' || !b.chatId) invalid = true;\nif (!Array.isArray(b.messages) || b.messages.length === 0) invalid = true;\n\nlet messages = Array.isArray(b.messages) ? b.messages : [];\nmessages = messages.slice(-24).map(m => ({\n  role: (m && m.role === 'client') ? 'client' : 'business',\n  text: String((m && m.text) || '').slice(0, 500),\n  ts: (m && typeof m.ts === 'number') ? m.ts : 0\n}));\n\nconst ownerPrompt = String(b.ownerPrompt || '').slice(0, 2000);\nconst catalog = String(b.catalog || '').slice(0, 2500);\nconst businessKnowledge = String(b.businessKnowledge || '').slice(0, 1200);\n// `now` reaches the SYSTEM prompt (ВРЕМЯ rule) — whitelist-sanitize: the webhook is unauthenticated.\nconst now = String(b.now || '').replace(/[^0-9A-Za-z\\u0400-\\u04FF:,. \\-]/g, '').slice(0, 64);\nconst pickStats = String(b.pickStats || '').replace(/[^0-9\\u0400-\\u04FF:, ]/g, '').slice(0, 200);\nconst businessName = String(b.businessName || '');\nconst businessTypeId = String(b.businessTypeId || '');\n// Task 17a: the RevenueCat app_user_id. Only ever a bound SQL parameter in Suggestion\n// Gate -- it never reaches a prompt -- so it needs no whitelist sanitising, just a\n// length clamp. The client ALWAYS sends it; missing/empty is refused by the gate.\nconst appUserId = String(b.appUserId || '').slice(0, 128);\nconst botWaId = (typeof b.botWaId === 'string') ? b.botWaId : ''; const channel = (b.channel === 'telegram') ? 'telegram' : 'whatsapp'; const botTgId = (typeof b.botTgId === 'string') ? b.botTgId : '';\nconst steerTowardText = (b.steerTowardText === null || b.steerTowardText === undefined)\n  ? null : String(b.steerTowardText).slice(0, 500);\nconst lastIncomingText = (b.lastIncomingText === null || b.lastIncomingText === undefined)\n  ? null : String(b.lastIncomingText);\n\n// Burst-combine (BATCH-03 gap fix): anchor RAG + lastClientMessage on the whole trailing\n// client run (consecutive client messages since the last owner/bot reply), not only the\n// final fragment — mirrors the reply path's Latest+Combine run-walk semantics.\nconst runParts = [];\nfor (let i = messages.length - 1; i >= 0; i--) {\n  const m = messages[i];\n  if (m.role !== 'client') break;\n  if (m.text && m.text.trim()) runParts.unshift(m.text.trim());\n}\n// Per-line merge: lastIncomingText now carries the client's WHOLE accumulated burst\n// (possibly multi-line) — append each line not already present in the trailing run.\nif (lastIncomingText && lastIncomingText.trim()) {\n  const seen = new Set(runParts);\n  for (const rawLine of lastIncomingText.split('\\n')) {\n    const line = rawLine.trim();\n    if (line && !seen.has(line)) { runParts.push(line); seen.add(line); }\n  }\n}\nlet queryText = runParts.join('\\n').slice(0, 500);\n\nconst wfId = (channel === 'telegram') ? botTgId : botWaId; const skipRag = (wfId === '' || wfId === '-1' || !queryText);\nconst requestSeq = (b.requestSeq === undefined || b.requestSeq === null) ? 0 : b.requestSeq;\n\nreturn [{ json: {\n  v: 1, requestSeq, invalid, appUserId,\n  profileId: String(b.profileId || ''),\n  chatId: String(b.chatId || ''),\n  botWaId, botTgId, channel, businessTypeId, businessName, ownerPrompt, catalog, businessKnowledge, now, pickStats,\n  steerTowardText, lastIncomingText, messages, queryText, skipRag\n} }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -64,6 +64,78 @@
       ],
       "id": "c1000000-0000-4000-8000-000000000308",
       "name": "If invalid?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- «Вместе» subscription gate + daily anti-abuse cap (Task 17a; owner decision 2026-08-26,\n-- spec §5.3). ONE statement does lookup, increment and verdict, so a hammering client\n-- cannot slip between a read and a write. $1 = appUserId.\n--\n-- Suggestions are FREE: this NEVER touches dialog_counts. Over-quota is deliberately\n-- ALLOWED -- the panel IS the fallback the quota gate routes people into. What is refused:\n-- an `expired` subscriber, an id with NO row at all (the id is the only secret this\n-- unauthenticated endpoint has, so unknown = no service), and anything past the daily cap.\n--\n-- The counter row is only ever created for an entitled caller, so an unknown/expired id --\n-- the shape an abuser would send -- cannot grow the table either.\nwith me as (\n  select status from subscribers where app_user_id = $1\n), today as (\n  select (now() at time zone 'Asia/Almaty')::date d   -- same day boundary as dialog_counts\n), bump as (\n  insert into suggestion_counts (app_user_id, d, n)\n  select $1, t.d, 1 from today t\n  where (select status from me) in ('active','trialing','grace')\n  on conflict (app_user_id, d) do update set n = suggestion_counts.n + 1\n  returning n\n)\nselect\n  exists(select 1 from me) as known,\n  (select status from me) as status,\n  (select n from bump) as n,\n  -- 100/day/account. `n` is the count INCLUDING this request, so request 101 is the first\n  -- refused one. NULL (no bump = not entitled) collapses to false, never NULL: in SQL\n  -- `false and NULL` is false, so Gate Decision always gets a real boolean.\n  ((select n from bump) is not null and (select n from bump) <= 100) as allowed;",
+        "options": {
+          "queryReplacement": "={{ [ $json.appUserId ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        460,
+        -220
+      ],
+      "id": "c1000000-0000-4000-8000-000000000309",
+      "name": "Suggestion Gate",
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// «Вместе» gate verdict (Task 17a). The Postgres node above emits ONLY its query\n// result and DROPS the incoming item -- the same trap Count Dialog hit in Task 9 -- so\n// this rebuilds the payload from Prep; everything downstream (If skipRag?/Assemble/\n// Build Response) reads those fields.\nconst src = $('Prep').first().json;\nconst row = $input.first()?.json ?? {};\n// FAIL OPEN on a DB error, the house posture for the bot/panel hot paths. \"No row\" is\n// NOT an error here: the gate SQL's final SELECT has no FROM clause, so it always returns\n// exactly one row -- `allowed === undefined` really does mean the query never ran.\nconst failOpen = Boolean(row.error) || row.allowed === undefined;\nconst allowed = failOpen ? true : row.allowed === true;\n// The SQL owns the VERDICT; this only labels it. Order matters: an expired account has\n// n = null (nothing was counted for it), so the cap test can never mislabel it.\nlet gateReason = null;\nif (!allowed) {\n  if (!src.appUserId) gateReason = 'missing_app_user_id';\n  else if (row.known !== true) gateReason = 'unknown_account';\n  else if (Number(row.n) > 100) gateReason = 'daily_cap';\n  else gateReason = 'subscription_' + String(row.status ?? 'unknown');\n}\nreturn [{\n  json: { ...src, gateAllowed: allowed, gateReason, gateFailOpen: failOpen,\n          suggestionsToday: row.n ?? null },\n  pairedItem: { item: 0 },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        -220
+      ],
+      "id": "c1000000-0000-4000-8000-000000000310",
+      "name": "Gate Decision"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "1a2b3c4d-0009-4000-8000-000000000009",
+              "leftValue": "={{ $json.gateAllowed }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        900,
+        -220
+      ],
+      "id": "c1000000-0000-4000-8000-000000000311",
+      "name": "If Gate Allows"
     },
     {
       "parameters": {
@@ -363,7 +435,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const j = $json;\nconst requestSeq = (j.requestSeq === undefined || j.requestSeq === null) ? 0 : j.requestSeq;\nif (j.invalid || !j.ok) {\n  return [{ json: { v: 1, requestSeq, suggestions: [], error: 'generation_failed' } }];\n}\nif (j.abstain) {\n  // Deliberate non-business abstain (owner decision 2026-08-11) — the client maps this\n  // to the quiet Empty state, NOT the error+retry state.\n  return [{ json: { v: 1, requestSeq, suggestions: [], abstain: true } }];\n}\nreturn [{ json: { v: 1, requestSeq, suggestions: j.items } }];"
+        "jsCode": "const j = $json;\nconst requestSeq = (j.requestSeq === undefined || j.requestSeq === null) ? 0 : j.requestSeq;\nif (j.invalid || !j.ok) {\n  const out = { v: 1, requestSeq, suggestions: [], error: 'generation_failed' };\n  // Task 17a: a subscription/cap refusal reuses the EXISTING error envelope the client\n  // already renders -- `reason` is an extra diagnostic key, NOT a new client contract\n  // (the panel keys off `error`, and no new panel state was added for this).\n  if (j.gateReason) out.reason = j.gateReason;\n  return [{ json: out }];\n}\nif (j.abstain) {\n  // Deliberate non-business abstain (owner decision 2026-08-11) — the client maps this\n  // to the quiet Empty state, NOT the error+retry state.\n  return [{ json: { v: 1, requestSeq, suggestions: [], abstain: true } }];\n}\nreturn [{ json: { v: 1, requestSeq, suggestions: j.items } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -424,7 +496,7 @@
         ],
         [
           {
-            "node": "If skipRag?",
+            "node": "Suggestion Gate",
             "type": "main",
             "index": 0
           }
@@ -583,6 +655,46 @@
         [
           {
             "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Suggestion Gate": {
+      "main": [
+        [
+          {
+            "node": "Gate Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate Decision": {
+      "main": [
+        [
+          {
+            "node": "If Gate Allows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Gate Allows": {
+      "main": [
+        [
+          {
+            "node": "If skipRag?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Response",
             "type": "main",
             "index": 0
           }

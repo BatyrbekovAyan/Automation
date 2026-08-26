@@ -267,6 +267,19 @@ own `probe16_*` rows -- same one-off Manual-Trigger->Postgres harness convention
 Parts 4/5, since Postgres lives behind n8n's own credential and is unreachable from a
 plain script.
 
+## Part 8 -- top-up reserve consumption (Task 17a, opt-in)
+
+Run with `--reserve`. Asserts the owner-approved reserve semantics (spec §2, 2026-08-26)
+at VALUE level, running the EXACT Count Dialog statement read out of the canonical bot
+template against real rows through the Part 7 SQL harness. Includes a genuine
+lock-contention race (two new chats, one reserve unit) that the balance must survive at 0.
+
+## Part 9 -- «Вместе» suggestions gate (Task 17a, opt-in)
+
+Run with `--suggestions`. Fires the real /webhook/SuggestReplies endpoint: expired/unknown/
+missing-id refusals (zero LLM spend -- the gate sits before retrieval), trialing and
+over-quota allowed, dialog_counts provably untouched, and the daily cap.
+
 ## Part 7 -- Branch A hand-off trace (Task 16 fix round, opt-in)
 
 Run with `--branch-a-trace`. Proves the single claim the whole design rests on: that
@@ -1156,6 +1169,7 @@ def transfer_cleanup_sql():
     one-off Manual-Trigger->Postgres harness Parts 4/5 use. The prefix is unique to
     this probe -- no other fixture, and no real RevenueCat id, can start with it."""
     return ("delete from bot_profiles where profile_id like 'probe16\\_%';\n"
+            "delete from dialog_counts where app_user_id like 'probe16\\_%';\n"
             "delete from subscribers where app_user_id like 'probe16\\_%';")
 
 
@@ -1390,14 +1404,36 @@ def _case_a1_alias(failures):
     old, new = _uid("a1old"), _uid("a1new")
     _seed_paid(old, failures)
     _seed_topup(old, failures)
+    # Task 17a (I-4): PAID USAGE must move with the money. dialog_counts is keyed by
+    # app_user_id, so before this the reinstall reset the monthly counter -- «300 из 300»
+    # became «0 из 300» on the same paid subscription, a free month per reinstall. Seeded
+    # through the SQL harness because there is no public write path for dialog rows; when
+    # TASK16_SQL_URL is not set the carry asserts are SKIPPED, not failed (same convention
+    # as --usage scenario 2).
+    carry = bool(TASK16_SQL_URL)
+    if carry:
+        _harness_sql(
+            f"insert into dialog_counts (app_user_id, chat_id, d) values "
+            f"('{old}', 'carry1', (now() at time zone 'Asia/Almaty')::date), "
+            f"('{old}', 'carry2', (now() at time zone 'Asia/Almaty')::date - 1), "
+            f"('{old}', 'carry3', (now() at time zone 'Asia/Almaty')::date), "
+            f"('{old}', 'lastmonth', (now() at time zone 'Asia/Almaty')::date "
+            f"- interval '40 days') on conflict do nothing;")
+    else:
+        print("[SKIP] a1 usage-carry asserts: TASK16_SQL_URL not set (dialog rows cannot "
+              "be seeded over plain HTTP) -- NOT counted as a failure")
     _assert_usage("a1_pre_old", old, {
-        "plan": "business", "status": "active", "topupBalance": 500}, failures)
+        "plan": "business", "status": "active", "topupBalance": 500,
+        **({"used": 3} if carry else {})}, failures)
 
     # One ordinary RENEWAL, delivered under the NEW id, carrying the old id as an alias.
     _fire("a1_alias_event", _alias_event(new, [old]), failures, settle=2)
     after_new = _assert_usage("a1_post_new", new, {
         "plan": "business", "status": "active", "quota": 1000,
         "topupBalance": 500,                    # consolidated from the alias row
+        # the month's 3 dialogs move with it; the 40-day-old row does NOT (the carry is
+        # windowed to the current month, the same window Count Dialog and Get Usage use)
+        **({"used": 3} if carry else {}),
         "productId": SUBSCRIPTION_PRODUCT_ID, "interval": "month"}, failures)
     # The event's OWN plan/status/period must survive the consolidation node -- a Postgres
     # node emits only its query result and drops the incoming json, so this also proves the
@@ -1416,7 +1452,10 @@ def _case_a1_alias(failures):
     print("\n--- A2: the alias set rides EVERY event forever -- a replay must credit nothing ---")
     _fire("a2_replay", _alias_event(new, [old]), failures, settle=2)
     _assert_usage("a2_replay_unchanged", new, {
-        "plan": "business", "status": "active", "topupBalance": 500}, failures)
+        "plan": "business", "status": "active", "topupBalance": 500,
+        # the carry is `insert ... on conflict do nothing`, so a replay finds every row
+        # already there: `used` must not grow, and no NEW row version is written
+        **({"used": 3} if carry else {})}, failures)
     _assert_usage("a2_old_still_retired", old, {"status": "expired", "topupBalance": 0}, failures)
 
 
@@ -1507,6 +1546,21 @@ def _harness_sql(sql):
             return json.loads(r.read().decode() or "{}")
     except urllib.error.HTTPError as e:
         return {"error": e.read().decode()[:400]}
+
+
+def _scalar(sql):
+    """First column of the first row of `sql`, as an int when it looks like one. Postgres
+    returns count(*) as a bigint, which the driver hands back as a STRING -- comparing that
+    to an int is the kind of silently-always-false assert this file exists to avoid."""
+    out = _harness_sql(f"select ({sql}) as v;")
+    rows = out.get("rows") if isinstance(out, dict) else None
+    if not rows:
+        return None
+    v = rows[0].get("v")
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return v
 
 
 def _trace_rows(sql):
@@ -1607,6 +1661,335 @@ def run_branch_a_trace():
     return 0
 
 
+
+# ---------------------------------------------------------------------------------
+# Part 8: top-up reserve consumption (Task 17a, opt-in)
+# ---------------------------------------------------------------------------------
+#
+# `--reserve`. Since 2026-08-26 the top-up is a RESERVE, not a permanent quota bump: it is
+# spent one dialog at a time and only once the BASE monthly quota is gone (spec §2, owner
+# decision). This part proves that at VALUE level against real Postgres rows, running the
+# EXACT SQL read out of the canonical WhatsApp/Telegram bot templates -- never a retyped
+# copy -- so the probe cannot drift from what ships.
+#
+# Why not fire the bot webhooks instead: it is impossible, and Task 9 established why. A
+# synthetic profile_id makes `Fetch Recent` hit Wappi's real 400, `Latest+Combine` sets
+# abort, and `Is Latest?` DEAD-ENDS before Count Dialog ever runs -- the gate is
+# unreachable without a real authorized profile and a real inbound message (i.e. a device
+# pass). What CAN be done from here, and is: run the shipped statement itself. That leaves
+# exactly one gap, stated honestly -- that the node's queryReplacement passes the right two
+# values -- and that half is covered by the Telegram template's pinned n8n-mcp executions
+# (TG is `availableInMCP`, WA is not) plus the parity gate's byte-equality assert between
+# the two templates.
+#
+# Needs TASK16_SQL_URL (the same one-off header-auth'd SQL harness Part 7 documents).
+# Without it the matrix and the exact SQL are printed instead of run.
+BOT_TEMPLATE_WA = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "workflows",
+    "4wYitz5ek30SVNlT-WhatsApp_Bot.json")
+RESERVE_PREFIX = "probe17a_"
+
+
+def count_dialog_sql():
+    """The shipped Count Dialog query, read out of the canonical WhatsApp bot template."""
+    with open(BOT_TEMPLATE_WA) as f:
+        wf = json.load(f)
+    return next(n for n in wf["nodes"] if n["name"] == "Count Dialog")["parameters"]["query"]
+
+
+def _lit(value):
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def reserve_seed_sql(uid, plan, status, topup, used_rows):
+    """One fixture: a registered profile whose owner is on `plan`/`status` with `topup`
+    reserve units left and `used_rows` dialogs already counted THIS month."""
+    return (
+        f"delete from dialog_counts where app_user_id = {_lit(uid)};\n"
+        f"delete from bot_profiles where app_user_id = {_lit(uid)};\n"
+        f"delete from subscribers  where app_user_id = {_lit(uid)};\n"
+        f"insert into subscribers (app_user_id, plan, status, topup_balance)\n"
+        f"  values ({_lit(uid)}, {_lit(plan)}, {_lit(status)}, {topup});\n"
+        f"insert into bot_profiles (profile_id, app_user_id, channel, bot_key)\n"
+        f"  values ({_lit(uid + '_p')}, {_lit(uid)}, 'whatsapp', 'Bot0');\n"
+        f"insert into dialog_counts (app_user_id, chat_id, d)\n"
+        f"  select {_lit(uid)}, 'seed' || g, (now() at time zone 'Asia/Almaty')::date\n"
+        f"  from generate_series(1, {used_rows}) g where {used_rows} > 0;")
+
+
+def reserve_cleanup_sql():
+    return ("delete from dialog_counts where app_user_id like 'probe17a\\_%';\n"
+            "delete from bot_profiles  where app_user_id like 'probe17a\\_%';\n"
+            "delete from subscribers   where app_user_id like 'probe17a\\_%';\n"
+            "delete from suggestion_counts where app_user_id like 'probe17a\\_%';")
+
+
+# name, plan, status, topup, used, chat, (allowed, reserve_used, topup_after, rows_delta)
+RESERVE_MATRIX = [
+    # a continuation costs nothing even when the account is over quota with a reserve
+    ("continuation", "start", "active", 5, 300, "seed1", (True, False, 5, 0)),
+    # under the BASE quota the reserve is untouched
+    ("under_quota", "start", "active", 5, 10, "fresh", (True, False, 5, 1)),
+    # ... and is not spent one dialog early either (the boundary the old `quota + topup`
+    # arithmetic used to blur)
+    ("at_quota_minus_1", "start", "active", 5, 299, "fresh", (True, False, 5, 1)),
+    # over quota WITH reserve: allowed, and exactly ONE unit is consumed
+    ("over_quota_reserve", "start", "active", 5, 300, "fresh", (True, True, 4, 1)),
+    # over quota with an EMPTY reserve: refused, nothing inserted (dead end, as before)
+    ("over_quota_empty", "start", "active", 0, 300, "fresh", (False, False, 0, 0)),
+    # status still outranks money: expired/grace consume nothing whatever the balance
+    ("expired_ignores_reserve", "start", "expired", 500, 10, "fresh", (False, False, 500, 0)),
+    ("grace_ignores_reserve", "start", "grace", 500, 400, "fresh", (False, False, 500, 0)),
+    # trialing consumes it too (trial's base quota is 150)
+    ("trialing_reserve", "trial", "trialing", 2, 150, "fresh", (True, True, 1, 1)),
+]
+
+
+def run_reserve_probe():
+    q = count_dialog_sql()
+    if not TASK16_SQL_URL:
+        print("=== top-up reserve consumption -- matrix + SQL (set TASK16_SQL_URL to run) ===\n")
+        for name, plan, status, topup, used, chat, exp in RESERVE_MATRIX:
+            print(f"  {name:24} plan={plan:8} status={status:8} topup={topup:3} used={used:3} "
+                  f"chat={chat:6} -> allowed={exp[0]} reserve_used={exp[1]} "
+                  f"topup_after={exp[2]} new_rows={exp[3]}")
+        print("\nSeed one fixture like this (per row), then run the shipped Count Dialog "
+              "query with $1 = <uid>_p and $2 = the chat id:\n")
+        print(reserve_seed_sql(RESERVE_PREFIX + "example", "start", "active", 5, 300))
+        print("\n--- the shipped statement (canonical WhatsApp_Bot.json / Count Dialog) ---\n")
+        print(q)
+        print("\n--- cleanup ---\n")
+        print(reserve_cleanup_sql())
+        return 0
+
+    failures = []
+    print("=== Task 17a top-up reserve probe (shipped Count Dialog SQL, real rows) ===")
+    for name, plan, status, topup, used, chat, (w_allowed, w_res, w_topup, w_rows) in RESERVE_MATRIX:
+        uid = RESERVE_PREFIX + name
+        _harness_sql(reserve_seed_sql(uid, plan, status, topup, used))
+        before = _scalar(f"select count(*) from dialog_counts where app_user_id = {_lit(uid)}")
+        rows = _harness_sql(q.replace("$1", _lit(uid + "_p")).replace("$2", _lit(chat)))
+        row = (rows.get("rows") or [{}])[0] if isinstance(rows, dict) else {}
+        after = _scalar(f"select count(*) from dialog_counts where app_user_id = {_lit(uid)}")
+        bal = _scalar(f"select topup_balance from subscribers where app_user_id = {_lit(uid)}")
+        got = (row.get("allowed"), row.get("reserve_used"), bal, after - before)
+        want = (w_allowed, w_res, w_topup, w_rows)
+        ok = got == want
+        print(f"[{'OK' if ok else 'FAIL'}] {name}: (allowed, reserve_used, topup_after, "
+              f"new_rows) = {got}, want {want}")
+        if not ok:
+            print(f"    raw: {row}")
+            failures.append(name)
+
+    # drain to zero and then refuse -- the reserve must not go negative and must not
+    # keep letting dialogs through once it is gone
+    uid = RESERVE_PREFIX + "drain"
+    _harness_sql(reserve_seed_sql(uid, "start", "active", 2, 300))
+    for i, (w_allowed, w_bal) in enumerate([(True, 1), (True, 0), (False, 0)]):
+        rows = _harness_sql(q.replace("$1", _lit(uid + "_p")).replace("$2", _lit(f"drain{i}")))
+        row = (rows.get("rows") or [{}])[0] if isinstance(rows, dict) else {}
+        bal = _scalar(f"select topup_balance from subscribers where app_user_id = {_lit(uid)}")
+        got, want = (row.get("allowed"), bal), (w_allowed, w_bal)
+        ok = got == want
+        print(f"[{'OK' if ok else 'FAIL'}] drain[{i}]: (allowed, topup_after) = {got}, want {want}")
+        if not ok:
+            failures.append(f"drain{i}")
+
+    # RACE: two DIFFERENT new chats, ONE reserve unit left. The subscribers-row lock the
+    # decrement takes is what decides this; without it both would insert and the balance
+    # would go to -1. A `pg_sleep` CTE is prepended (and ONLY here) so both statements are
+    # provably in flight together -- they still take their snapshots before the sleep, so
+    # both see the same pre-race usage, which is the situation the lock exists for.
+    race_q = q.replace("with me as (\n", "with delay as (select pg_sleep(2)), me as (\n", 1) \
+              .replace("where bp.profile_id = $1 and bp.deleted_at is null",
+                       "where bp.profile_id = $1 and bp.deleted_at is null "
+                       "and (select true from delay)", 1)
+    uid = RESERVE_PREFIX + "race"
+    _harness_sql(reserve_seed_sql(uid, "start", "active", 1, 300))
+    try:
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            futs = [pool.submit(_harness_sql,
+                                race_q.replace("$1", _lit(uid + "_p")).replace("$2", _lit(f"race{i}")))
+                    for i in range(2)]
+            res = [(f.result().get("rows") or [{}])[0] for f in futs]
+    except Exception as exc:                       # noqa: BLE001 -- environment, not contract
+        print(f"[SKIP] race: could not run the burst ({exc}) -- NOT counted as a failure")
+        res = None
+    if res is not None:
+        snaps = {r.get("used") for r in res}
+        allowed = sorted(bool(r.get("allowed")) for r in res)
+        bal = _scalar(f"select topup_balance from subscribers where app_user_id = {_lit(uid)}")
+        rows = _scalar(f"select count(*) from dialog_counts where app_user_id = {_lit(uid)}")
+        contended = len(snaps) == 1
+        ok = contended and allowed == [False, True] and bal == 0 and rows == 301
+        print(f"[{'OK' if ok else 'FAIL'}] race: both saw the same pre-race usage={snaps} "
+              f"(true contention={contended}), allowed={allowed}, topup_after={bal} "
+              f"(floor 0, never -1), dialog rows={rows} (300 seeded + exactly 1)")
+        if not ok:
+            failures.append("race")
+
+    print("\n--- cleanup ---")
+    for stmt in reserve_cleanup_sql().split("\n"):
+        _harness_sql(stmt)
+    print(f"    remaining probe17a rows: "
+          f"{_scalar('select count(*) from subscribers where app_user_id like %s' % _lit('probe17a%'))}")
+
+    if failures:
+        print(f"\n{len(failures)} assertion(s) FAILED: {failures}")
+        return 1
+    print("\nALL OK")
+    return 0
+
+
+# ---------------------------------------------------------------------------------
+# Part 9: «Вместе» suggestions gate (Task 17a, opt-in)
+# ---------------------------------------------------------------------------------
+#
+# `--suggestions`. Everything here runs over PLAIN HTTP against the real
+# /webhook/SuggestReplies endpoint -- no harness needed for the asserts themselves, only
+# for seeding subscriber rows (TASK16_SQL_URL) since there is no public write path for
+# them. Suggestions are FREE (owner decision 2026-08-26) but gated: expired and unknown
+# ids are refused, over-quota is deliberately ALLOWED (the panel IS the quota fallback),
+# and a per-account daily cap bounds the LLM spend an unauthenticated endpoint can incur.
+#
+# A refusal reuses the EXISTING error envelope the client already renders
+# ({error:"generation_failed"}) plus a diagnostic `reason` -- no new client contract.
+SUGGEST_URL = BASE + "/webhook/SuggestReplies"
+SUGGESTION_DAILY_CAP = 100
+
+
+def suggest(app_user_id, text="сколько стоит доставка?", timeout=90, **extra):
+    """POST a minimal valid SuggestReplies request. Returns (status, parsed_json)."""
+    body = {"v": 1, "chatId": "probe17a@c.us", "profileId": "probe17a-profile",
+            "botWaId": "", "botTgId": "", "channel": "whatsapp",
+            "messages": [{"role": "client", "text": text, "ts": int(time.time() * 1000)}]}
+    if app_user_id is not None:
+        body["appUserId"] = app_user_id
+    body.update(extra)
+    req = urllib.request.Request(SUGGEST_URL, data=json.dumps(body).encode(), method="POST")
+    req.add_header("Content-Type", "application/json")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            status, raw = r.status, r.read().decode()
+    except urllib.error.HTTPError as e:
+        status, raw = e.code, e.read().decode()
+    except urllib.error.URLError as e:
+        return None, str(e.reason)
+    try:
+        return status, json.loads(raw)
+    except json.JSONDecodeError:
+        return status, raw
+
+
+def suggestions_seed_sql(uid, status, plan="business"):
+    return (f"delete from suggestion_counts where app_user_id = {_lit(uid)};\n"
+            f"delete from subscribers where app_user_id = {_lit(uid)};\n"
+            f"insert into subscribers (app_user_id, plan, status) "
+            f"values ({_lit(uid)}, {_lit(plan)}, {_lit(status)});")
+
+
+def run_suggestions_probe():
+    if not TASK16_SQL_URL:
+        print("=== suggestions gate -- procedure + SQL (set TASK16_SQL_URL to run it) ===\n")
+        print("Seed one subscriber per status, then POST /webhook/SuggestReplies with that "
+              "appUserId and read the envelope:\n")
+        print(suggestions_seed_sql(RESERVE_PREFIX + "sg_active", "active"))
+        print(f"\n  active/trialing/grace -> suggestions (or abstain); expired -> "
+              f"{{error:'generation_failed', reason:'subscription_expired'}};\n"
+              f"  unknown id -> reason 'unknown_account'; missing appUserId -> "
+              f"'missing_app_user_id';\n"
+              f"  request {SUGGESTION_DAILY_CAP + 1} of the day -> 'daily_cap'.\n")
+        print(reserve_cleanup_sql())
+        return 0
+
+    failures = []
+    print("=== Task 17a «Вместе» suggestions gate probe ===")
+
+    def check(label, app_user_id, want_refused, want_reason=None, **extra):
+        status, body = suggest(app_user_id, **extra)
+        refused = isinstance(body, dict) and body.get("error") == "generation_failed"
+        reason = body.get("reason") if isinstance(body, dict) else None
+        ok = (status == 200 and refused == want_refused
+              and (want_reason is None or reason == want_reason))
+        print(f"[{'OK' if ok else 'FAIL'}] {label}: HTTP {status} refused={refused} "
+              f"reason={reason!r} (want refused={want_refused}"
+              + (f", reason={want_reason!r}" if want_reason else "") + ")")
+        if not ok:
+            print(f"    raw: {str(body)[:400]}")
+            failures.append(label)
+        return body
+
+    # --- refusals: zero LLM spend, and the CHEAP asserts first
+    _harness_sql(suggestions_seed_sql(RESERVE_PREFIX + "sg_expired", "expired"))
+    check("expired_refused", RESERVE_PREFIX + "sg_expired", True, "subscription_expired")
+    check("unknown_refused", RESERVE_PREFIX + "sg_neverseen", True, "unknown_account")
+    check("missing_id_refused", None, True, "missing_app_user_id")
+    check("empty_id_refused", "", True, "missing_app_user_id")
+
+    # a refused caller must not even get a counter row -- an unauthenticated endpoint must
+    # not let an unknown id grow a table
+    ghost = _scalar("select count(*) from suggestion_counts where app_user_id = "
+                    + _lit(RESERVE_PREFIX + "sg_neverseen"))
+    ok = ghost == 0
+    print(f"[{'OK' if ok else 'FAIL'}] unknown_writes_nothing: suggestion_counts rows for an "
+          f"unknown id = {ghost} (want 0)")
+    if not ok:
+        failures.append("unknown_writes_nothing")
+
+    # --- allowed: trialing, and an OVER-QUOTA account (deliberately allowed -- the panel is
+    # the fallback the quota gate routes people into). These two DO spend LLM tokens.
+    _harness_sql(suggestions_seed_sql(RESERVE_PREFIX + "sg_trialing", "trialing", "trial"))
+    check("trialing_allowed", RESERVE_PREFIX + "sg_trialing", False)
+
+    over = RESERVE_PREFIX + "sg_overquota"
+    _harness_sql(suggestions_seed_sql(over, "active"))
+    _harness_sql(f"insert into dialog_counts (app_user_id, chat_id, d) select {_lit(over)}, "
+                 f"'c' || g, (now() at time zone 'Asia/Almaty')::date from "
+                 f"generate_series(1, 1200) g on conflict do nothing;")
+    dialogs_before = _scalar(f"select count(*) from dialog_counts where app_user_id = {_lit(over)}")
+    check("over_quota_allowed", over, False)
+    dialogs_after = _scalar(f"select count(*) from dialog_counts where app_user_id = {_lit(over)}")
+    ok = dialogs_after == dialogs_before
+    print(f"[{'OK' if ok else 'FAIL'}] suggestions_are_free: dialog_counts {dialogs_before} -> "
+          f"{dialogs_after} (a suggestion must never consume a dialog)")
+    if not ok:
+        failures.append("suggestions_are_free")
+
+    # --- daily cap: jump the counter to the cap, then walk over the edge. No LLM is spent
+    # on the refused call, which is the whole point of the cap.
+    cap = RESERVE_PREFIX + "sg_cap"
+    _harness_sql(suggestions_seed_sql(cap, "active"))
+    _harness_sql(f"insert into suggestion_counts (app_user_id, d, n) values ({_lit(cap)}, "
+                 f"(now() at time zone 'Asia/Almaty')::date, {SUGGESTION_DAILY_CAP}) "
+                 f"on conflict (app_user_id, d) do update set n = {SUGGESTION_DAILY_CAP};")
+    check(f"request_{SUGGESTION_DAILY_CAP + 1}_refused", cap, True, "daily_cap")
+    n = _scalar(f"select n from suggestion_counts where app_user_id = {_lit(cap)} "
+                f"and d = (now() at time zone 'Asia/Almaty')::date")
+    ok = n == SUGGESTION_DAILY_CAP + 1
+    print(f"[{'OK' if ok else 'FAIL'}] cap_counts_the_refused_request: n = {n} "
+          f"(want {SUGGESTION_DAILY_CAP + 1} -- the counter is incremented in the same "
+          f"statement that decides, so hammering cannot slip between read and write)")
+    if not ok:
+        failures.append("cap_counts_the_refused_request")
+    # one row per (account, day): yesterday's exhaustion must not gate today
+    rows = _scalar(f"select count(*) from suggestion_counts where app_user_id = {_lit(cap)}")
+    ok = rows == 1
+    print(f"[{'OK' if ok else 'FAIL'}] cap_is_per_day: suggestion_counts rows = {rows} (want 1)")
+    if not ok:
+        failures.append("cap_is_per_day")
+
+    print("\n--- cleanup ---")
+    for stmt in reserve_cleanup_sql().split("\n"):
+        _harness_sql(stmt)
+
+    if failures:
+        print(f"\n{len(failures)} assertion(s) FAILED: {failures}")
+        return 1
+    print("\nALL OK")
+    return 0
+
+
 def f_subs(*uids):
     quoted = ",".join(f"'{u}'" for u in uids)
     return (f"select app_user_id, plan, status, topup_balance, current_period_end "
@@ -1669,6 +2052,24 @@ def main():
              "hand-off work. Prints the procedure + SQL unless TASK16_SQL_URL points at "
              "a one-off SQL harness webhook, in which case it runs end to end. See the "
              "module docstring's Part 7 section.")
+    ap.add_argument(
+        "--reserve", action="store_true",
+        help="Run the Task 17a top-up RESERVE probe: the EXACT Count Dialog SQL read out "
+             "of the canonical bot template, run against real seeded rows (continuation / "
+             "under quota / at the boundary / over quota with and without reserve / "
+             "expired+grace ignore the balance / trialing consumes it / drain to zero / a "
+             "true two-chat race that must never drive the balance below 0). Needs "
+             "TASK16_SQL_URL (Part 7's one-off SQL harness); without it the matrix and the "
+             "shipped SQL are printed. See the module docstring's Part 8 section for why "
+             "the bot webhook itself cannot be fired for this.")
+    ap.add_argument(
+        "--suggestions", action="store_true",
+        help="Run the Task 17a «Вместе» suggestions-gate probe against the real "
+             "/webhook/SuggestReplies endpoint: expired/unknown/missing-appUserId refused "
+             "with the existing generation_failed envelope + a diagnostic reason, "
+             "trialing and OVER-QUOTA allowed (the panel is the quota fallback), "
+             "suggestions never touch dialog_counts, and the daily cap refuses request "
+             "101. Needs TASK16_SQL_URL to seed subscriber rows. See Part 9.")
     args = ap.parse_args()
 
     if args.channel_slot_backstop:
@@ -1688,6 +2089,12 @@ def main():
 
     if args.branch_a_trace:
         sys.exit(run_branch_a_trace())
+
+    if args.reserve:
+        sys.exit(run_reserve_probe())
+
+    if args.suggestions:
+        sys.exit(run_suggestions_probe())
 
     if not SECRET:
         print("FAIL: RC_WEBHOOK_SECRET is not set -- refusing to run (probes b-e need it "
