@@ -32,8 +32,10 @@ public static class PaywallCopy
 
     public static string YearLine(PlanSpec p) => Kzt(p.PriceYearKzt) + "/год — выгода до 17%";
 
-    /// <summary>Short «до −17%» badge for the Год half of the period toggle.</summary>
-    public const string YearSavingBadge = "до \u221217%";
+    /// <summary>Short «до -17%» badge for the Год half of the period toggle. ASCII hyphen-minus
+    /// on purpose: U+2212 MINUS SIGN is absent from SFProText-Semibold SDF and every fallback,
+    /// so TMP silently dropped the glyph and the badge shipped as «до 17%».</summary>
+    public const string YearSavingBadge = "до -17%";
 
     public static string Dialogs(int n)
         => Number(n) + " " + RuPlural.Pick(n, "диалог", "диалога", "диалогов");

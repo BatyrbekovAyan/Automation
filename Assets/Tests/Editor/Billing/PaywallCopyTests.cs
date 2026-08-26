@@ -16,7 +16,7 @@ public class PaywallCopyTests
 
     [Test] public void Trial_cta_is_five_days() => StringAssert.Contains("5 дней", PaywallCopy.TrialCta());
     [Test] public void Year_line_carries_the_savings_claim() => StringAssert.Contains("выгода до 17%", PaywallCopy.YearLine(PlanCatalog.Get(PlanTier.Start)));
-    [Test] public void YearSavingBadge_is_pinned() => Assert.AreEqual("до \u221217%", PaywallCopy.YearSavingBadge);
+    [Test] public void YearSavingBadge_is_pinned() => Assert.AreEqual("до -17%", PaywallCopy.YearSavingBadge);
     [Test] public void PerMonth_appends_suffix() => Assert.AreEqual("9 900 ₸/мес", PaywallCopy.PerMonth(9900));
     [Test] public void TrialPill_formats_days() => Assert.AreEqual("Пробный · 3 дн.", PaywallCopy.TrialPill(3));
 }
