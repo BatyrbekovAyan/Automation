@@ -885,3 +885,36 @@ secondary-кнопка «Оформить <тариф> — <цена>» под �
 28fd92b (сцена, 12 added / 6 modified fileID в поддереве пейволла), f4fe603 (попутный фикс:
 U+2212 отсутствует в SDF-атласе → бейдж годов рендерился «до 17%»; ASCII-дефис в
 PaywallCopy.YearSavingBadge + тест + сцена). Ревью: Approve (2026-08-26).
+
+### Task 19: слово сервера бьёт стёртый триал-леджер + отказавший Create удаляет профиль (live-инцидент 2026-08-26 15:12, exec 4238)
+
+Анонимный id RevenueCat пережил ВТОРУЮ переустановку: сервер знал `business/expired`, клиент —
+стёртый `TrialLedger` («триал не начинался») → гейт отдавал `Trial`, мастер довёл владельца до
+РЕАЛЬНОЙ авторизации WhatsApp, и отказал уже вебхук Create (`channel_limit`: у expired 0 слотов).
+Итог: авторизованный Wappi-профиль повис на сервере (23₽/сутки, невидим ни для одного свипа — строки
+`bot_profiles` ветка отказа не пишет, а hourly orphan-sweep чистит только НЕавторизованные), и
+полусозданный бот в приложении. Почистил это ручной in-app «удалить бота» — реальный пользователь так
+не сделает.
+
+**R1 (клиент).** Новый чистый seam `ServerAccountStatus` (`SaysExpired(UsageSnapshot)` + живое
+`Expired` из `UsageStore.Current`, литерал статуса — общий с `QuotaFallbackPolicy.StatusExpired`).
+`EntitlementPolicy.EffectiveTier` получил 4-й вход `serverSaysExpired` — он бьёт РОВНО одно состояние
+(куплено ничего × локальный триал НЕ стартовал × сервер сказал «expired» ⇒ `None`); покупка,
+уже идущий триал и tri-state `EntitlementsKnown` — не тронуты, неизвестный/неуспешный снимок = как
+раньше (fail-open; неизвестный серверу аккаунт приходит как `trial/trialing`, так что свежая установка
+сюда не попадает). Тот же факт получил `PaywallRows.IsTrialOffer` (и через него `CtaText` +
+`SecondaryPurchase`), поэтому истёкшему аккаунту пейволл показывает рабочую форму подписки вместо
+бесплатного триала; `PaywallController` снимает факт в `Open()` и перерисовывается на `OnUsageChanged`.
+Отказ мастера маршрутизируется новой чистой `EntitlementGate.BotRefusalTrigger`: потолок тарифа →
+прежний лист `BotLimit`, «expired» → полноэкранный `TrialExpired` (нового UI не заведено). Это
+сознательно СУЖАЕТ §3-шную «переустановка сбрасывает триал» до установок, у которых реально сбросилась
+идентичность — исходный смысл спеки («триал один раз»); дыра со сброшенным id остаётся принятой.
+
+**R2 (сервер).** В обоих Create-workflow на ветке отказа появилась нода `Delete Refused Profile`
+(POST `{api|tapi}/profile/delete?profile_id=<id из этого же запроса>`, WappiAuthToken,
+`onError: continueRegularOutput` + `alwaysOutputData`): `If Slot Limit[over] → Delete Refused Profile →
+Respond Channel Limit`. Тело отказа не изменилось (клиент ключуется на `{success:false,
+error:"channel_limit"}`), а неудачное удаление ничего не ломает. Гейт паритета получил
+`check_refused_create_deletes_profile` (10 мутаций — включая перенос ноды на РАЗРЕШАЮЩУЮ ветку —
+ловятся), probe `--refused-delete` (Part 10) доказывает на живом dev: тело отказа байт-в-байт + нода
+реально сходила в Wappi (фейковый id ⇒ терпимый 400 «Profile not found»). Суита 2378/2378.
