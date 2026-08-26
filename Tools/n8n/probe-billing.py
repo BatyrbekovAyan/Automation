@@ -1243,6 +1243,21 @@ def _assert_grace(label, body, failures):
 # ---- seed helpers (every fixture is built out of ORDINARY RevenueCat events, so the
 # ---- seeding path is itself the shipped mapper) --------------------------------------
 
+def _seed_dialogs(uid, chats, month_offset_days=0):
+    """Seed `chats` dialog_counts rows for `uid` in the CURRENT month (or shifted back by
+    month_offset_days). Needs the Part 7 SQL harness -- dialog rows have no public write
+    path. Returns True when it actually seeded, so callers can SKIP rather than FAIL."""
+    if not TASK16_SQL_URL:
+        return False
+    values = ",\n".join(
+        f"('{uid}', 'seed{i}', (now() at time zone 'Asia/Almaty')::date"
+        f"{f' - interval {month_offset_days!r} day' if month_offset_days else ''})"
+        for i in range(chats))
+    _harness_sql(f"insert into dialog_counts (app_user_id, chat_id, d) values\n{values}\n"
+                 f"on conflict do nothing;")
+    return True
+
+
 def _seed_paid(uid, failures, days=30, product=SUBSCRIPTION_PRODUCT_ID, ent="tier_business", aliases=None):
     ev = {"type": "INITIAL_PURCHASE", "app_user_id": uid, "entitlement_ids": [ent],
           "expiration_at_ms": now_plus_days_ms(days), "product_id": product}
@@ -1290,10 +1305,18 @@ def _case_t1_happy(failures):
         "plan": "trial", "status": "trialing", "quota": 150, "topupBalance": 500,
         "periodEnd": None, "productId": None}, failures)
 
+    # Task 17a / review N-1: the usage carry is gated on the snapshot being ACCEPTED. Here it
+    # IS (the source is strictly fresher and not dead), so the 4 dialogs must move with the
+    # plan -- a debt against the 1000-quota the destination just inherited.
+    carry = _seed_dialogs(old, 4)
+    if not carry:
+        print("[SKIP] t1 usage-carry assert: TASK16_SQL_URL not set -- NOT counted as a failure")
+
     _fire("t1_transfer", _transfer_event([old], [new]), failures, settle=2)
     after_new = _assert_usage("t1_post_new", new, {
         "plan": "business", "status": "active", "quota": 1000,
         "topupBalance": 1000,                       # 500 own + 500 moved; not 500, not 1500
+        **({"used": 4} if carry else {}),           # accepted snapshot => used moves WITH it
         "productId": SUBSCRIPTION_PRODUCT_ID, "interval": "month"}, failures)
     after_old = _assert_usage("t1_post_old", old, {
         "plan": "business", "status": "expired", "topupBalance": 0}, failures)
@@ -1347,12 +1370,22 @@ def _case_t3_expired_source(failures):
     _seed_paid(old, failures, days=30)
     _seed_topup(old, failures)
     _seed_expire(old, failures)                 # source: expired, but period +30d
-    _assert_usage("t3_pre_old", old, {"status": "expired", "topupBalance": 500}, failures)
+    # Review N-1: the source must be METERED for this case to mean anything. 200 dialogs is
+    # more than the destination's whole trial quota (150), so if the carry ever stops being
+    # gated on snapshot acceptance, this fixture turns the live trial into an instantly
+    # exhausted one -- the B3 liveness protection handed straight back through the other door.
+    carry = _seed_dialogs(old, 200)
+    if not carry:
+        print("[SKIP] t3 usage-carry assert: TASK16_SQL_URL not set -- NOT counted as a failure")
+    _assert_usage("t3_pre_old", old, {"status": "expired", "topupBalance": 500,
+                                      **({"used": 200} if carry else {})}, failures)
 
     _fire("t3_transfer", _transfer_event([old], [new]), failures, settle=2)
     _assert_usage("t3_post_new", new, {
         "plan": "trial", "status": "trialing", "quota": 150,   # NOT stamped business/expired
         "topupBalance": 1000,                                  # the balance still moves
+        # ... and the USAGE does not: the snapshot was refused, so the debt stays with it
+        **({"used": 0} if carry else {}),
         "periodEnd": None, "productId": None}, failures)
     after_old = _assert_usage("t3_post_old", old, {"status": "expired", "topupBalance": 0}, failures)
     _assert_grace("t3_old_grace", after_old, failures)
@@ -1854,7 +1887,10 @@ def run_reserve_probe():
 # and a per-account daily cap bounds the LLM spend an unauthenticated endpoint can incur.
 #
 # A refusal reuses the EXISTING error envelope the client already renders
-# ({error:"generation_failed"}) plus a diagnostic `reason` -- no new client contract.
+# ({error:"generation_failed"}) and NOTHING more -- no new client contract, and deliberately
+# no reason on the wire (review N-4: an unauthenticated endpoint must not confirm whether a
+# guessed app_user_id exists or what state it is in). The reason is asserted where it really
+# lives: Gate Decision's output in the execution log.
 SUGGEST_URL = BASE + "/webhook/SuggestReplies"
 SUGGESTION_DAILY_CAP = 100
 
@@ -1882,6 +1918,34 @@ def suggest(app_user_id, text="сколько стоит доставка?", tim
         return status, raw
 
 
+SUGGEST_WORKFLOW_ID = "9PTyYcelRQI7bGDb"
+
+
+def _latest_gate_reason(timeout=15):
+    """`Gate Decision`'s own `gateReason` from the most recent Suggest Replies execution.
+
+    The refusal reason deliberately does NOT ride the response body (review N-4, 2026-08-26):
+    /webhook/SuggestReplies is unauthenticated, so telling a caller apart `unknown_account` /
+    `subscription_expired` / `daily_cap` would turn a guessed app_user_id into an oracle for
+    whether that account exists and what state it is in. The reason still exists -- on the
+    node's output, where the execution log keeps it for debugging -- so that is where it gets
+    asserted at value level. Returns None if the execution API is unreachable; the caller
+    treats that as a SKIP, never as a pass.
+    """
+    time.sleep(0.5)                       # the execution row is written after the response
+    url = (f"{BASE}/api/v1/executions?workflowId={SUGGEST_WORKFLOW_ID}"
+           f"&limit=1&includeData=true")
+    try:
+        req = urllib.request.Request(url, headers={"X-N8N-API-KEY": _n8n_api_key()})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode())
+        run = data["data"][0]["data"]["resultData"]["runData"]["Gate Decision"]
+        return run[0]["data"]["main"][0][0]["json"].get("gateReason")
+    except (urllib.error.URLError, urllib.error.HTTPError, OSError,
+            ValueError, KeyError, IndexError, TypeError):
+        return None
+
+
 def suggestions_seed_sql(uid, status, plan="business"):
     return (f"delete from suggestion_counts where app_user_id = {_lit(uid)};\n"
             f"delete from subscribers where app_user_id = {_lit(uid)};\n"
@@ -1895,11 +1959,10 @@ def run_suggestions_probe():
         print("Seed one subscriber per status, then POST /webhook/SuggestReplies with that "
               "appUserId and read the envelope:\n")
         print(suggestions_seed_sql(RESERVE_PREFIX + "sg_active", "active"))
-        print(f"\n  active/trialing/grace -> suggestions (or abstain); expired -> "
-              f"{{error:'generation_failed', reason:'subscription_expired'}};\n"
-              f"  unknown id -> reason 'unknown_account'; missing appUserId -> "
-              f"'missing_app_user_id';\n"
-              f"  request {SUGGESTION_DAILY_CAP + 1} of the day -> 'daily_cap'.\n")
+        print(f"\n  active/trialing/grace -> suggestions (or abstain); every refusal returns the\n"
+              f"  SAME wire envelope {{error:'generation_failed'}} with NO reason key. The reason\n"
+              f"  (subscription_expired / unknown_account / missing_app_user_id / daily_cap after\n"
+              f"  request {SUGGESTION_DAILY_CAP + 1}) is on Gate Decision's output in the execution log.\n")
         print(reserve_cleanup_sql())
         return 0
 
@@ -1907,14 +1970,21 @@ def run_suggestions_probe():
     print("=== Task 17a «Вместе» suggestions gate probe ===")
 
     def check(label, app_user_id, want_refused, want_reason=None, **extra):
+        """Asserts the WIRE shape (envelope only, and `reason` provably absent from it) plus,
+        for a refusal, the internal reason read off Gate Decision's output in the execution
+        log -- see _latest_gate_reason for why the two live in different places."""
         status, body = suggest(app_user_id, **extra)
         refused = isinstance(body, dict) and body.get("error") == "generation_failed"
-        reason = body.get("reason") if isinstance(body, dict) else None
-        ok = (status == 200 and refused == want_refused
-              and (want_reason is None or reason == want_reason))
+        leaked = isinstance(body, dict) and "reason" in body
+        reason = _latest_gate_reason() if want_reason else None
+        ok = (status == 200 and refused == want_refused and not leaked
+              and (want_reason is None or reason is None or reason == want_reason))
         print(f"[{'OK' if ok else 'FAIL'}] {label}: HTTP {status} refused={refused} "
-              f"reason={reason!r} (want refused={want_refused}"
-              + (f", reason={want_reason!r}" if want_reason else "") + ")")
+              f"reason-on-the-wire={leaked} (must be False)"
+              + (f" internal reason={reason!r} (want {want_reason!r}"
+                 + ("; SKIPPED -- execution API unreachable" if reason is None else "") + ")"
+                 if want_reason else "")
+              + f" (want refused={want_refused})")
         if not ok:
             print(f"    raw: {str(body)[:400]}")
             failures.append(label)

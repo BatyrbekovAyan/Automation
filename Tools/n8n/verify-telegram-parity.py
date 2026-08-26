@@ -85,6 +85,13 @@ def sql_code(query):
     return "\n".join(re.sub(r"--.*$", "", line) for line in query.split("\n"))
 
 
+def js_code(jscode):
+    """Same idea as sql_code, for the Code nodes: strip `//` line comments before asserting
+    on content. These node bodies carry their reasoning too, and prose that NAMES a symbol
+    would otherwise satisfy (or, for a must-NOT-appear assert, break) a check about code."""
+    return "\n".join(re.sub(r"//.*$", "", line) for line in jscode.split("\n"))
+
+
 def check_telegram_bot():
     f = TG_BOT
     wf = load(f)
@@ -390,9 +397,11 @@ def check_dialog_metering(f):
     assert "and s.topup_balance > 0" in q, \
         f"{f}: the reserve decrement is not guarded `topup_balance > 0` under the row lock"
     reserve = q[q.index("update subscribers"):q.index("returning s.topup_balance")]
-    assert "not exists (select 1 from existing)" in reserve \
-        and ">= (select q from quota)" in reserve, \
-        f"{f}: the reserve decrement is not scoped to a NEW, over-quota dialog: {reserve}"
+    missing = [c for c in ("not exists (select 1 from existing)", ">= (select q from quota)")
+               if c not in reserve]
+    assert not missing, \
+        f"{f}: the reserve decrement is not scoped to a NEW, over-quota dialog -- missing " \
+        f"{missing} from its WHERE (a continuation or an under-quota dialog would burn a unit)"
     assert "in ('active','trialing')" in reserve, \
         f"{f}: the reserve decrement is not gated on a consuming status"
     assert "or exists (select 1 from reserve)" in q, \
@@ -589,7 +598,7 @@ def check_suggest_replies():
     # (vii-d) payload continuity, the Task 9 trap again: a Postgres node emits ONLY its
     # query result and DROPS the incoming item, so Gate Decision must rebuild from Prep or
     # everything downstream (If skipRag?/Assemble) reads undefined.
-    gd = node(ns, "Gate Decision")["parameters"]["jsCode"]
+    gd = js_code(node(ns, "Gate Decision")["parameters"]["jsCode"])
     assert "$('Prep')" in gd, \
         f"{f}: Gate Decision does not rebuild the payload from Prep -- the Postgres node " \
         f"above it drops the incoming item"
@@ -603,9 +612,19 @@ def check_suggest_replies():
     # \b on both sides: a rename to appUserIdX would satisfy a bare substring test.
     assert re.search(r"\bappUserId\b", prep), \
         f"{f}: Prep does not carry appUserId -- the gate would refuse every request"
-    br = node(ns, "Build Response")["parameters"]["jsCode"]
+    br = js_code(node(ns, "Build Response")["parameters"]["jsCode"])
     assert "generation_failed" in br, f"{f}: Build Response lost the error envelope"
-    assert "j.gateReason" in br, f"{f}: Build Response does not surface the refusal reason"
+    # ... and the reason must NOT ride the wire (review N-4, 2026-08-26). This endpoint is
+    # unauthenticated, so `unknown_account` vs `subscription_expired` vs `daily_cap` would
+    # tell anyone who guessed an app_user_id whether that account exists and what state it is
+    # in. The reason lives on Gate Decision's output, where the execution log keeps it for
+    # debugging and the probe asserts it; the client never read it (SuggestRepliesResponse
+    # has no such field). An `out.reason = ...` reappearing here is the regression to catch.
+    assert "gateReason" not in br, \
+        f"{f}: Build Response puts the refusal reason on the wire -- an unauthenticated " \
+        f"endpoint must not confirm whether a guessed app_user_id exists or its state"
+    assert "gateReason" in gd, \
+        f"{f}: Gate Decision no longer records a reason -- a refusal would be undebuggable"
 
     print(f"OK  {f}")
 

@@ -234,3 +234,27 @@ deliveries for a while, so re-pointing promptly usually backfills.
 3. **`CreateWhatsappWorkflow`** has a trailing space in the `/activate ` URL — fix during the prod pass.
 4. **Edit handlers** assume target node indices (`nodes[5]` is the AI agent) and have a `Set Bussiness Type`
    node-name typo + leftover unused credential refs — clean up during the prod pass.
+5. **BILLING REPLICATION ORDER (Task 17a) — import both bot templates BEFORE any bot is created,
+   and recreate every pre-existing clone.** A bot workflow is a CLONE of
+   `4wYitz5ek30SVNlT`/`4VN3gsFaC2HUYmcc` taken at creation time, and the Edit handlers PUT the
+   clone's *own* json back — they never re-splice nodes. So a clone made before the reserve change
+   keeps the OLD `Count Dialog` forever: the top-up stays ADDED to the monthly quota and is never
+   consumed, i.e. one 3 900 ₸ purchase = +500 dialogs every month for life, silently, with nothing
+   in the app or the logs saying so. There is no migration for this and no way to detect it from
+   the outside — the only fix is recreating the bot. (Dev had zero clones when this shipped, so
+   nothing is stale there today.)
+6. **The GRACE TRIAD must be settled together** by whoever first puts a real account into
+   `status='grace'` — nothing does today, so the three halves have never met in production:
+   dialogs are refused outright (`Count Dialog`), channel slots are 0 (`Compute Slot Limit`, Task
+   17a M-2), and suggestions ARE allowed (the panel is the fallback) — **but the client only
+   flips a chat into effective-«Вместе» when it is OVER QUOTA** (17b's `QuotaFallbackPolicy`). A
+   grace account that is *under* its quota therefore gets silence with no panel: the server
+   refuses the dialog, the client sees no reason to offer suggestions. Decide the intended
+   grace UX (probably: treat grace like over-quota client-side) before grace can actually happen.
+7. **Request auth for `/webhook/SuggestReplies` at prod hardening.** The daily cap is per
+   `app_user_id`, and the endpoint is unauthenticated — so it is griefing-bounded only while
+   "the id is the secret" holds: anyone who learns a real RevenueCat app_user_id can burn that
+   account's 100 requests/day. It cannot touch money or dialogs (the gate writes only
+   `suggestion_counts`), and the refusal envelope deliberately carries no reason so the endpoint
+   is not an account-state oracle — but the real fix is authenticating the request, the same way
+   `RevenueCatEvent` already is.
