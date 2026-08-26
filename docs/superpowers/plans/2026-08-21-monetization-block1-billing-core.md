@@ -872,3 +872,16 @@ I-1 вычисляется в момент ОТКРЫТИЯ чата (исчер
 1. **Spec coverage:** §2 матрица → Task 1; §3 триал → Task 2, 8 (upsert), 12 (день-5 удаление), 15 (старт+receipt); §4 кэширование → Task 13; §5.1 → Task 7; §5.2–3 → Task 9, 11; §5.4 → Task 12; §5.5 → Task 5 (клиент) + 8 (бэкстоп); §6 → Task 10, 14a–d; SKU/консоли → Task 0. Промо (founding/рефералка) — офферы конфигурируются в RevenueCat/сторах без кода: добавлено в Task 0 чеклистом? — НЕТ: сознательно отложено до конца Блока 1 (нужен работающий биллинг раньше промо; вернуть при запуске маркетинга). Блок 2 — отдельный план.
 2. **Placeholder scan:** каждая кодовая задача несёт полный код/SQL/JS; билдерные задачи задают иерархию+метрики+паттерн-источник — это документированный процесс проекта (unity-ui-builder), не заглушка.
 3. **Type consistency:** `PlanTier/PlanSpec/QuotaState`, `EntitlementGate.RequestPaywall(PaywallTrigger)`, `BillingIdentity.AppUserId`→`BillingService.AppUserId` (Task 8→10 переключение указано), SKU-строки и entitlement-ids едины по всем задачам.
+
+### Task 18: прямой путь покупки на триал-пейволле (owner device report 2026-08-26, post-push)
+
+При неначатом триале (`!trialStarted && purchased == None`) единственная CTA пейволла — «Попробовать
+5 дней бесплатно», тап по ней ничего не покупает (Close), прямая покупка недостижима. Фикс: вторая
+secondary-кнопка «Оформить <тариф> — <цена>» под триальной CTA — видима РОВНО когда CTA = триал-оффер
+(общий факт `PaywallRows.IsTrialOffer`, пиновано матричным тестом started×purchased×selected×period),
+покупает через единый `StartPurchase()` (busy/M-6 refetch/notice — общие). Билдер
+`Tools/Billing/Add Paywall Purchase Button` (аддитивный; BottomBar растёт ВВЕРХ через CSF PreferredSize,
+«Восстановить покупки» держит экранную позицию — y сдвинут ровно на −140). Коммиты: 1244b93 (код),
+28fd92b (сцена, 12 added / 6 modified fileID в поддереве пейволла), f4fe603 (попутный фикс:
+U+2212 отсутствует в SDF-атласе → бейдж годов рендерился «до 17%»; ASCII-дефис в
+PaywallCopy.YearSavingBadge + тест + сцена). Ревью: Approve (2026-08-26).
