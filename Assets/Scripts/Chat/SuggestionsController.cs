@@ -361,9 +361,11 @@ public class SuggestionsController : MonoBehaviour
     // RESOLVED, and resolving it is all the override does. Nothing is written — not SemiAutoStore,
     // not ReplyModeToggleBinder, not the server's Set_Reply_Mode row (that push is driven by
     // TryGetOverride's explicit tri-state, which this cannot reach) — because the owner's chosen
-    // mode has to come back untouched the moment the quota resets or a top-up lands. And an owner
-    // who then taps the toggle off still gets what they asked for, in this chat, for this session:
-    // an override that could not be dismissed would be a dead control, not a fallback.
+    // mode has to come back untouched the moment the quota resets or a top-up lands. An owner who
+    // then taps the toggle off dismisses the fallback — an override that could not be dismissed
+    // would be a dead control — but that tap goes through HandleToggle's normal path, which writes
+    // a PERSISTENT per-chat override (SemiAutoStore + the server row): it survives the quota reset
+    // and detaches this chat from the bot default from then on, exactly the WR-01 semantics.
     private static bool EffectiveSemiAuto(bool storedOn)
         => storedOn || QuotaFallbackPolicy.ShouldFallBackToSemi(UsageStore.Current);
 
