@@ -50,6 +50,22 @@ public static class PaywallRows
     public const string FinePrint = "Без карты · Отмена в любой момент";
     public const string RestoreLabel = "Восстановить покупки";
 
+    /// <summary>
+    /// Auto-renew disclosure for the subscribe state (Apple Guideline 3.1.2: renewal terms
+    /// must be clear at the purchase point; price + period already sit on the tier cards).
+    /// Split per store because Guideline 2.3.10 forbids mentioning Google Play inside the
+    /// iOS binary. The trial state keeps <see cref="FinePrint"/> — that CTA buys nothing.
+    /// </summary>
+    public const string FinePrintAutoRenewIos =
+        "Продлевается автоматически · отмена в настройках App Store";
+    public const string FinePrintAutoRenewAndroid =
+        "Продлевается автоматически · отмена в настройках Google Play";
+
+    public static string FinePrintText(bool isTrialOffer, bool iosStore)
+        => isTrialOffer ? FinePrint
+         : iosStore ? FinePrintAutoRenewIos
+         : FinePrintAutoRenewAndroid;
+
     public const string PeriodMonth = "Месяц";
     public const string PeriodYear = "Год";
 

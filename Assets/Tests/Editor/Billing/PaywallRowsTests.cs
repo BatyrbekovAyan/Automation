@@ -295,4 +295,24 @@ public class PaywallRowsTests
         foreach (string notice in new[] { PaywallRows.PurchaseFailedNotice, PaywallRows.RestoreNothingFoundNotice, PaywallRows.RestoreFailedNotice })
             Assert.IsFalse(string.IsNullOrWhiteSpace(notice));
     }
+
+    // ── Fine print (store submission pack) ───────────────────────────────────
+
+    [Test]
+    public void FinePrint_trial_state_keeps_no_card_promise_on_both_stores()
+    {
+        Assert.AreEqual("Без карты · Отмена в любой момент", PaywallRows.FinePrintText(true, true));
+        Assert.AreEqual("Без карты · Отмена в любой момент", PaywallRows.FinePrintText(true, false));
+    }
+
+    [Test]
+    public void FinePrint_subscribe_state_discloses_auto_renew_per_store()
+    {
+        // 2.3.10: the iOS build must never say «Google Play», and naming the wrong store
+        // in a renewal disclosure is its own kind of wrong — so the pair is pinned whole.
+        Assert.AreEqual("Продлевается автоматически · отмена в настройках App Store",
+            PaywallRows.FinePrintText(false, true));
+        Assert.AreEqual("Продлевается автоматически · отмена в настройках Google Play",
+            PaywallRows.FinePrintText(false, false));
+    }
 }

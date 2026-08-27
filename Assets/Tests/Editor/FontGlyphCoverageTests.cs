@@ -293,7 +293,7 @@ public class FontGlyphCoverageTests
         var constTypes = new[]
         {
             typeof(PaywallCopy), typeof(PaywallRows), typeof(SubscriptionPageRows),
-            typeof(BillingGateRows), typeof(BotsPageRows),
+            typeof(BillingGateRows), typeof(BotsPageRows), typeof(LegalLinks),
         };
         foreach (var t in constTypes)
             foreach (var f in t.GetFields(BindingFlags.Public | BindingFlags.Static))
