@@ -306,7 +306,9 @@
       "Bash(grep -iE \"nuget|^Packages$\")",
       "Bash(curl -s \"https://raw.githubusercontent.com/Unity-Technologies/UnityCsReference/master/Editor/Mono/AssemblyValidation.cs\" -o /tmp/AssemblyValidation.cs)",
       "Bash(awk '{print $1}')",
-      "Bash(grep -v \"^$\")"
+      "Bash(grep -v \"^$\")",
+      "Bash(python3 -c \"import psycopg2\")",
+      "Bash(python3 Tools/n8n/verify-telegram-parity.py)"
     ],
     "defaultMode": "acceptEdits"
   },

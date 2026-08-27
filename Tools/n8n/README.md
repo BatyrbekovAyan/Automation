@@ -225,6 +225,24 @@ A rotation that misses this is silent in exactly one direction: the app keeps re
 landing — so a subscriber quietly reads as `trial`/`trialing`. RevenueCat retries failed
 deliveries for a while, so re-pointing promptly usually backfills.
 
+## Prod instance — n8n.choosereply.com (since 2026-08-27)
+
+Production n8n is SELF-HOSTED: Docker `docker.n8n.io/n8nio/n8n` (2.36.7 at migration) behind Caddy on the
+owner's ps.kz VPS (Ubuntu 24.04, 87.199.130.239; SSH alias `choosereply`, key `~/.ssh/choosereply`; compose
+project in `~/choosereply/`). The old `bagkz.app.n8n.cloud` Cloud workspace is DELETED — treat any bagkz
+mention below as historical. Migrated 2026-08-27 with ids preserved end-to-end: all 7 dev credentials
+(decrypted export → import, so workflow credential bindings survived verbatim) + the 16 canonical workflows;
+14 activated, the 2 clone templates left inactive. The two n8n-API credentials (`n8nAPIKey` httpHeaderAuth,
+`n8n account` n8nApi) hold the PROD key/baseUrl on prod. Prod API key: `Tools/n8n/.secrets/prod-api-key.txt`
+(gitignored). Canonical JSONs now carry `https://n8n.choosereply.com` (Wappi callbacks + the handlers'
+`/api/v1` clone/activate calls) and the `/activate ` trailing space is fixed — follow-ups 1–3 below are DONE
+for prod. Still open after the switch: `rotate-tunnel.py` remains dev-only (its `CLOUD_WEBHOOK_PREFIX` still
+says bagkz, and it rewrites `secrets.json` `n8nBaseUrl` to a tunnel while `n8nAPIKey` now holds the PROD
+key — adapt before the next dev-tunnel session); the pre-17a dev clone `jICKoC6QKucHcryV` («16») was
+deliberately NOT migrated (stale Count Dialog — delete + recreate that bot in the app); RevenueCat's
+dashboard webhook URL must be re-pointed by the owner to `https://n8n.choosereply.com/webhook/RevenueCatEvent`
+(Authorization header unchanged).
+
 ## Known follow-ups before this is production-/dev-ready
 
 1. **Credentials are not in these files** (referenced by id only). The local server has none yet —

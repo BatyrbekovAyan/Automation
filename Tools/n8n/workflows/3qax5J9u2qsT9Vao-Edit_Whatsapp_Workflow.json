@@ -20,7 +20,7 @@
     },
     {
       "parameters": {
-        "url": "=https://bagkz.app.n8n.cloud/api/v1/workflows/{{ $json.body.WhatsappWorkflowId }}",
+        "url": "=https://n8n.choosereply.com/api/v1/workflows/{{ $json.body.WhatsappWorkflowId }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {}
@@ -51,7 +51,7 @@
     {
       "parameters": {
         "method": "PUT",
-        "url": "=https://bagkz.app.n8n.cloud/api/v1/workflows/{{ $('Get Workflow').item.json.id }}",
+        "url": "=https://n8n.choosereply.com/api/v1/workflows/{{ $('Get Workflow').item.json.id }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,

@@ -136,7 +136,7 @@ The app communicates with four external services via `UnityWebRequest` + corouti
 - **Endpoints**: `auth/qr`, `auth/phone` (POST), `auth/code` (POST), `auth/2fa` (POST — body `{pwd_code}`; cloud-password step when `auth/code` or `auth/qr` returns `detail:"2fa"`; success = `detail` startswith `auth_success`; `Manager.SubmitTelegram2fa`, classified via `TelegramAuthResponseParser`), `get/status`, `profile/add`, `profile/delete`, `profile/logout`
 
 ### n8n (Workflow Automation)
-- **Base**: `https://bagkz.app.n8n.cloud/`
+- **Base**: `https://n8n.choosereply.com/` — self-hosted n8n (Docker behind Caddy) on the owner's ps.kz VPS (`ssh choosereply`), migrated 2026-08-27 with workflow/credential ids preserved. The old `https://bagkz.app.n8n.cloud/` Cloud workspace is DELETED — any bagkz reference elsewhere is historical
 - **Auth**: `X-N8N-API-KEY` header with `Manager.n8nAPIKey`
 - **API endpoints** (`/api/v1/workflows/`):
   - `{id}/activate`, `{id}/deactivate` — POST with an explicit `Content-Type: application/json` header (empty body is fine). Unity's libcurl transport stamps `application/x-www-form-urlencoded` onto a POST with no upload handler and n8n's REST API 415s any non-JSON content type, so "bodyless" alone is not enough. The Enable coroutines also skip the `""`/`"-1"` sentinel ids (channel never authed → no workflow → guaranteed 404)

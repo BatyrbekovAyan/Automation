@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "url": "https://bagkz.app.n8n.cloud/api/v1/workflows/4VN3gsFaC2HUYmcc",
+        "url": "https://n8n.choosereply.com/api/v1/workflows/4VN3gsFaC2HUYmcc",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {}
@@ -34,7 +34,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://bagkz.app.n8n.cloud/api/v1/workflows",
+        "url": "https://n8n.choosereply.com/api/v1/workflows",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
@@ -152,7 +152,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://bagkz.app.n8n.cloud/api/v1/workflows/{{ $json.id }}/activate",
+        "url": "=https://n8n.choosereply.com/api/v1/workflows/{{ $json.id }}/activate",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {}
@@ -195,7 +195,7 @@
             },
             {
               "name": "url",
-              "value": "=https://bagkz.app.n8n.cloud/webhook/{{ $('Unity Webhook').item.json.body.TelegramProfileId }}"
+              "value": "=https://n8n.choosereply.com/webhook/{{ $('Unity Webhook').item.json.body.TelegramProfileId }}"
             }
           ]
         },
