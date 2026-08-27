@@ -79,6 +79,13 @@ public class PaywallController : MonoBehaviour
     [SerializeField] private TextMeshProUGUI purchaseLabel;
     [SerializeField] private Button restoreButton;
     [SerializeField] private TextMeshProUGUI restoreLabel;
+    // Legal links row (store submission pack): hidden entirely until LegalLinks carries
+    // real URLs, so a build made before the domain exists never shows a dead link.
+    [SerializeField] private GameObject legalRow;
+    [SerializeField] private Button termsButton;
+    [SerializeField] private Button privacyButton;
+    [SerializeField] private TextMeshProUGUI termsLabel;
+    [SerializeField] private TextMeshProUGUI privacyLabel;
 
     [Header("Чек ценности (PaywallTrigger.TrialExpired)")]
     [SerializeField] private GameObject receiptBlock;
@@ -228,6 +235,8 @@ public class PaywallController : MonoBehaviour
         if (ctaButton != null) ctaButton.onClick.AddListener(OnCtaClicked);
         if (purchaseButton != null) purchaseButton.onClick.AddListener(StartPurchase);
         if (restoreButton != null) restoreButton.onClick.AddListener(OnRestoreClicked);
+        if (termsButton != null) termsButton.onClick.AddListener(() => OpenLegal(LegalLinks.TermsUrl));
+        if (privacyButton != null) privacyButton.onClick.AddListener(() => OpenLegal(LegalLinks.PrivacyUrl));
         if (monthButton != null) monthButton.onClick.AddListener(() => SetPeriod(PaywallPeriod.Month));
         if (yearButton != null) yearButton.onClick.AddListener(() => SetPeriod(PaywallPeriod.Year));
         if (swipeBack != null) swipeBack.OnCommitted = HandleSwipeDismissed;
@@ -379,6 +388,12 @@ public class PaywallController : MonoBehaviour
         });
     }
 
+    private static void OpenLegal(string url)
+    {
+        if (string.IsNullOrEmpty(url)) return;   // row is hidden in this state; belt-and-braces
+        Application.OpenURL(url);
+    }
+
     private void OnRestoreClicked()
     {
         SetBusy(true);
@@ -474,9 +489,15 @@ public class PaywallController : MonoBehaviour
         if (purchaseLabel != null && secondary.Visible) purchaseLabel.text = secondary.Text;
 
         if (finePrint != null)
-            finePrint.text = string.IsNullOrEmpty(_notice) ? PaywallRows.FinePrint : _notice;
+            finePrint.text = !string.IsNullOrEmpty(_notice) ? _notice
+                : PaywallRows.FinePrintText(IsTrialOffer,
+                    Application.platform == RuntimePlatform.IPhonePlayer);
         if (restoreLabel != null)
             restoreLabel.text = PaywallRows.RestoreLabel;
+
+        if (legalRow != null) legalRow.SetActive(LegalLinks.HasUrls);
+        if (termsLabel != null) termsLabel.text = LegalLinks.TermsLabel;
+        if (privacyLabel != null) privacyLabel.text = LegalLinks.PrivacyLabel;
     }
 
     /// <summary>
