@@ -41,6 +41,10 @@ public static class PaywallBuilder
     // touch floor, same as Restore. It is present only in the trial-offer state, which is why
     // the bar's height is fitted rather than fixed (see BuildBottomBar).
     private const float SecondaryHeight = 120f;
+    // Legal links row (store submission pack) — house touch floor, matching Restore above it.
+    // Inactive (and out of layout) while LegalLinks URLs are empty, so the resting bar
+    // height only grows once the links can actually lead somewhere.
+    private const float LegalRowHeight = 120f;
     private const float BarSpacing = 20f;
     // Cta 132 + FinePrint 40 + Restore 120 + 2x20 spacing + 32 top + 96 bottom (home-bar
     // safe area) = 460. Re-derive this if any of those change, or the bar clips its own rows.
@@ -130,6 +134,67 @@ public static class PaywallBuilder
         Selection.activeGameObject = node;
         EditorSceneManager.MarkSceneDirty(screen.scene);
         Debug.Log("[PaywallBuilder] SecondaryPurchase added to Screen_Paywall/BottomBar + controller re-stamped. SAVE THE SCENE (Cmd+S).");
+    }
+
+    /// <summary>
+    /// Additive, idempotent patch adding ONLY BottomBar/LegalRow («Условия использования ·
+    /// Политика конфиденциальности», Apple Guideline 3.1.2) to the Screen_Paywall already
+    /// in the open scene — same contract as <see cref="AddPurchaseButton"/>: never re-runs
+    /// the destructive full Build over the owner's hand-tuned scene. Re-run after filling
+    /// <see cref="LegalLinks"/> URLs so the scene's seeded visibility matches runtime.
+    /// </summary>
+    [MenuItem("Tools/Billing/Add Paywall Legal Row")]
+    public static void AddLegalRow()
+    {
+        LoadAssets();
+
+        var screen = FindInactiveByName("Screen_Paywall");
+        if (screen == null)
+            throw new System.InvalidOperationException(
+                "[PaywallBuilder] Screen_Paywall not found — is Main.unity open? Run Tools/Billing/Build Paywall first.");
+        Transform bar = screen.transform.Find("BottomBar");
+        if (bar == null)
+            throw new System.InvalidOperationException(
+                "[PaywallBuilder] Screen_Paywall/BottomBar not found — the scene has drifted from this builder.");
+
+        DestroyAllByName(bar, "LegalRow");
+        var row = BuildLegalRow(bar.gameObject,
+            out Button terms, out Button privacy,
+            out TextMeshProUGUI termsLabel, out TextMeshProUGUI privacyLabel);
+        row.transform.SetAsLastSibling();   // below Restore: quietest row, furthest from the CTA
+
+        EnsureBarAutoHeight(bar.gameObject);
+        EnsureScrollBottomPadding(screen);
+
+        var controller = screen.GetComponent<PaywallController>();
+        if (controller == null)
+            throw new System.InvalidOperationException("[PaywallBuilder] Screen_Paywall carries no PaywallController.");
+        var so = new SerializedObject(controller);
+        so.FindProperty("legalRow").objectReferenceValue = row;
+        so.FindProperty("termsButton").objectReferenceValue = terms;
+        so.FindProperty("privacyButton").objectReferenceValue = privacy;
+        so.FindProperty("termsLabel").objectReferenceValue = termsLabel;
+        so.FindProperty("privacyLabel").objectReferenceValue = privacyLabel;
+        so.ApplyModifiedPropertiesWithoutUndo();
+        EditorUtility.SetDirty(controller);
+
+        // Scene mirrors runtime: hidden while the URL constants are empty (an inactive row
+        // also leaves the bar's fitted resting height unchanged).
+        row.SetActive(LegalLinks.HasUrls);
+
+        Selection.activeGameObject = row;
+        EditorSceneManager.MarkSceneDirty(screen.scene);
+        Debug.Log("[PaywallBuilder] LegalRow added to Screen_Paywall/BottomBar + controller re-stamped. SAVE THE SCENE (Cmd+S).");
+    }
+
+    // Headless entry (Editor closed):
+    //   Unity -batchmode -nographics -projectPath . -executeMethod PaywallBuilder.AddLegalRowHeadless -quit
+    public static void AddLegalRowHeadless()
+    {
+        var scene = EditorSceneManager.OpenScene("Assets/Scenes/Main.unity");
+        AddLegalRow();
+        EditorSceneManager.SaveScene(scene);
+        Debug.Log("[PaywallBuilder] Headless AddLegalRow + save complete.");
     }
 
     // Headless entry (Editor closed):
@@ -651,6 +716,53 @@ public static class PaywallBuilder
         return go;
     }
 
+    // ── (3a-ter) Legal links row (store submission pack) ─────────────────────
+
+    /// <summary>
+    /// «Условия использования · Политика конфиденциальности» — the quietest thing in the
+    /// bar (InkTertiary 30 regular + underline): utility links, not actions. Each link is
+    /// ONE GameObject carrying the TMP label AND its Button — the label itself is the
+    /// layout child, the raycast surface and the targetGraphic. Deliberately NO alpha-0
+    /// hit Image container: a sprite-less Image reports preferredWidth 0, so inside this
+    /// width-controlling HorizontalLayoutGroup the link would collapse to nothing (the
+    /// house layout-contract rule). Full-row tap height comes from the group stretching
+    /// the labels to the row's 120u.
+    /// </summary>
+    private static GameObject BuildLegalRow(GameObject bar, out Button terms, out Button privacy,
+        out TextMeshProUGUI termsLabel, out TextMeshProUGUI privacyLabel)
+    {
+        var row = NewChild(bar, "LegalRow", out _);
+        SetPreferredHeight(row, LegalRowHeight);
+        AddHorizontalGroup(row, new RectOffset(0, 0, 0, 0), 20f,
+            TextAnchor.MiddleCenter, expandWidth: false, expandHeight: true);
+
+        terms = BuildLegalLink(row, "Terms", LegalLinks.TermsLabel, out termsLabel);
+
+        var dotGo = NewChild(row, "Dot", out _);
+        var dot = AddText(dotGo, LegalLinks.Separator, 30f, _regular, ThemeRole.InkTertiary);
+        dot.alignment = TextAlignmentOptions.Center;
+
+        privacy = BuildLegalLink(row, "Privacy", LegalLinks.PrivacyLabel, out privacyLabel);
+        return row;
+    }
+
+    private static Button BuildLegalLink(GameObject row, string name, string text,
+        out TextMeshProUGUI label)
+    {
+        var go = NewChild(row, name, out _);
+        label = AddText(go, text, 30f, _regular, ThemeRole.InkTertiary);
+        label.alignment = TextAlignmentOptions.Center;
+        label.fontStyle = FontStyles.Underline;
+        label.textWrappingMode = TextWrappingModes.NoWrap;   // a wrapped link reads as two
+        label.raycastTarget = true;                          // the label IS the hit surface
+        var button = go.AddComponent<Button>();
+        // targetGraphic is the label for the same reason as Restore: ColorTint into a
+        // visible graphic is what makes the press/disabled state readable.
+        button.targetGraphic = label;
+        button.transition = Selectable.Transition.ColorTint;
+        return button;
+    }
+
     /// <summary>
     /// The scroll content must clear the bar at its TALLEST. Idempotent, and it rewrites only
     /// the bottom inset so any hand-tuned gutter/top padding survives.
@@ -665,7 +777,7 @@ public static class PaywallBuilder
             return;
         }
 
-        int wanted = (int)(BottomBarHeightMax + 48f);
+        int wanted = (int)(BottomBarHeightMax + LegalRowHeight + BarSpacing + 48f);
         if (vlg.padding.bottom == wanted) return;
         vlg.padding = new RectOffset(vlg.padding.left, vlg.padding.right, vlg.padding.top, wanted);
         EditorUtility.SetDirty(vlg);
