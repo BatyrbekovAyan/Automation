@@ -8,7 +8,10 @@
 - [x] **Финальное имя приложения: «Choose Reply»** (решение владельца 2026-08-27).
   Вписано: `ProjectSettings.productName`, `ProfileSubPages.ProductName` + сцена,
   юр-документы, review notes. Осталось: использовать «Choose Reply» в store listing.
-- [ ] **Юр-страницы опубликованы на choosereply.com.** Перед выкладкой заполнить
+- [ ] **Юр-страницы опубликованы на choosereply.com.** ⚠️ На 2026-08-27 домен
+  НЕ РЕЗОЛВИТСЯ (нет DNS): сначала зарегистрировать домен и настроить
+  хостинг/DNS — без живого Privacy Policy URL Apple отклонит метаданные.
+  Перед выкладкой заполнить
   в обоих файлах жёлтое поле «[Заполнить до публикации: ИП/ТОО …]», затем залить
   `docs/legal/privacy.html` → `https://choosereply.com/privacy.html` и
   `docs/legal/terms.html` → `https://choosereply.com/terms.html` — ИМЕННО по этим

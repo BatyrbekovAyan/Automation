@@ -3,11 +3,11 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // Profile → О приложении + the Лицензии child page. Version comes live from
-// Application.version; the product name is a single constant (working title
-// per Q1 — rename here before release if the product gets a real name).
+// Application.version; the product name is a single constant (final store name
+// «Choose Reply», owner's call 2026-08-27 — matches ProjectSettings.productName).
 public partial class ProfileSubPages
 {
-    public const string ProductName = "Automation";
+    public const string ProductName = "Choose Reply";
 
     [Header("About page")]
     [SerializeField] private TextMeshProUGUI aboutVersionLabel;

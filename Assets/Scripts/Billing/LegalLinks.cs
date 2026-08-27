@@ -11,8 +11,8 @@
 /// </summary>
 public static class LegalLinks
 {
-    public const string TermsUrl = "";
-    public const string PrivacyUrl = "";
+    public const string TermsUrl = "https://choosereply.com/terms.html";
+    public const string PrivacyUrl = "https://choosereply.com/privacy.html";
 
     public const string TermsLabel = "Условия использования";
     public const string PrivacyLabel = "Политика конфиденциальности";
