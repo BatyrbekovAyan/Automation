@@ -3304,26 +3304,29 @@ public partial class Manager : MonoBehaviour
         StartCoroutine(DeleteTelegramWorkflow(telegramWorkflowId, true));
     }
 
-    // Server-side sweep of a deleted bot's price-list knowledge: the n8n
-    // DeleteBotFiles webhook removes every RAG chunk tagged with the bot's
-    // workflow ids (including legacy chunks with no fileId) plus each file's
-    // stored original in the price-lists bucket. Runs on Manager because the
-    // calling Bot destroys itself — a coroutine on the Bot would die with it.
-    public void DeleteBotFilesOnServer(string whatsappWorkflowId, string telegramWorkflowId)
+    // Server-side sweep of a deleted bot: the n8n DeleteBotFiles webhook removes
+    // every RAG chunk tagged with the bot's workflow ids (including legacy chunks
+    // with no fileId) plus each file's stored original in the price-lists bucket,
+    // and — since 2026-08-27 — retires the bot's bot_profiles rows by profile id so
+    // the channel slots free up immediately (the scheduled sweeps never reconcile
+    // status='active' owners, so without this send a paying owner's deleted bot
+    // held its slot forever). Runs on Manager because the calling Bot destroys
+    // itself — a coroutine on the Bot would die with it.
+    public void DeleteBotFilesOnServer(string whatsappWorkflowId, string telegramWorkflowId,
+                                       string whatsappProfileId, string telegramProfileId)
     {
-        bool noWhatsapp = string.IsNullOrEmpty(whatsappWorkflowId) || whatsappWorkflowId == Bot.UnauthedProfileSentinel;
-        bool noTelegram = string.IsNullOrEmpty(telegramWorkflowId) || telegramWorkflowId == Bot.UnauthedProfileSentinel;
-        if (noWhatsapp && noTelegram) return; // never-authed bot — nothing is tagged server-side
+        string body = DeleteBotFilesPayload.Compose(
+            whatsappWorkflowId, telegramWorkflowId,
+            whatsappProfileId, telegramProfileId,
+            BillingIdentity.AppUserId);
+        if (body == null) return; // never-authed bot — nothing exists server-side
 
-        StartCoroutine(DeleteBotFilesRoutine(
-            string.IsNullOrEmpty(whatsappWorkflowId) ? Bot.UnauthedProfileSentinel : whatsappWorkflowId,
-            string.IsNullOrEmpty(telegramWorkflowId) ? Bot.UnauthedProfileSentinel : telegramWorkflowId));
+        StartCoroutine(DeleteBotFilesRoutine(body));
     }
 
-    private IEnumerator DeleteBotFilesRoutine(string botWaId, string botTgId)
+    private IEnumerator DeleteBotFilesRoutine(string body)
     {
         string url = $"{n8nBaseUrl}/webhook/DeleteBotFiles";
-        string body = JsonConvert.SerializeObject(new { botWaId, botTgId });
 
         using var request = new UnityWebRequest(url, "POST");
         request.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(body));

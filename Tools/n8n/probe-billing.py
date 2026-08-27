@@ -280,6 +280,22 @@ Run with `--suggestions`. Fires the real /webhook/SuggestReplies endpoint: expir
 missing-id refusals (zero LLM spend -- the gate sits before retrieval), trialing and
 over-quota allowed, dialog_counts provably untouched, and the daily cap.
 
+## Part 11 -- app-delete slot retire (Task 20, opt-in)
+
+Run with `--app-delete-retire`. Proves the 2026-08-27 billing fix end to end: deleting a
+bot in the app (Bot.DeleteBot -> /webhook/DeleteBotFiles, now carrying waProfileId/
+tgProfileId/appUserId) must retire the bot's `bot_profiles` rows in the SAME execution
+(`deleted_reason='app_delete'`) so the channel slot frees immediately -- create ->
+refused-at-limit -> delete -> create-allowed, on a start-plan (limit 1) subscriber
+seeded `status='active'` deliberately: active owners are the class BOTH Profile
+Lifecycle Sweep branches never reconcile, so the webhook retire is the only mechanism
+that can pass this probe. Needs an n8n API key (N8N_API_KEY env, else
+.secrets/prod-api-key.txt when BASE is choosereply.com, else secrets.json) -- SQL runs
+through an EPHEMERAL webhook->Postgres harness (fix-subscriber.py pattern: random-path
+workflow created via the API and deleted in `finally`, never left up), and the
+ZZZ-named workflow clones the allowed creates produce are deleted through the same API.
+Real side effects while it runs -- same as Part 2, but self-cleaning.
+
 ## Part 7 -- Branch A hand-off trace (Task 16 fix round, opt-in)
 
 Run with `--branch-a-trace`. Proves the single claim the whole design rests on: that
@@ -299,6 +315,7 @@ import os
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
 
@@ -2229,6 +2246,309 @@ def run_refused_delete_probe():
     return 0
 
 
+# ---------------------------------------------------------------------------------
+# Part 11: app-delete slot retire (Task 20) -- Delete Bot Files
+# ---------------------------------------------------------------------------------
+#
+# The gap this covers (live incident 2026-08-27): deleting a bot in the app deleted its
+# RAG chunks, Wappi profiles, and n8n workflows -- but never its bot_profiles rows, so
+# the dead bot held its channel slot forever and the next create was refused with
+# channel_limit. The fix rides the webhook the delete path already fires: Delete Bot
+# Files gained a `Retire Bot Profiles` node (first after the webhook, so a chunks
+# failure can never block the slot release) that sets deleted_at + deleted_reason=
+# 'app_delete' on the rows named by the new waProfileId/tgProfileId body fields --
+# matched by profile_id ONLY, never app_user_id (the client identity can drift between
+# create and delete; appUserId in the body is audit-only).
+#
+# Why the fixture is status='active': Profile Lifecycle Sweep's Branch B deliberately
+# excludes active owners from its liveness reconcile (never mass-retire a paying
+# customer on Wappi-list ambiguity), and Branch A only handles trial/churn -- so for an
+# active owner the synchronous webhook retire is the ONLY slot-release mechanism, and a
+# green run here cannot be the sweep's doing no matter how the timing falls.
+#
+# Same REAL side effects as Part 2 (each ALLOWED create clones + activates a real n8n
+# workflow and aborts at Set Wappi Webhook -- expected), but this part cleans up after
+# itself: clones are found by their ZZZ name and deleted via the API, probe rows via the
+# same ephemeral SQL harness that seeds them.
+APP_DELETE_APP_USER = "probe_user_20"
+APP_DELETE_BOT_NAME = "ZZZ_PROBE_TASK20_APPDEL"
+DELETE_BOT_FILES_URL = BASE + "/webhook/DeleteBotFiles"
+PROD_API_KEY_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), ".secrets", "prod-api-key.txt")
+
+
+def _api_key_any():
+    """N8N_API_KEY env -> prod key file (when BASE is the prod host) -> secrets.json.
+    secrets.json currently holds the PROD key (post-migration), so the file order keeps
+    a localhost run from silently sending the prod key at the local API."""
+    env = os.environ.get("N8N_API_KEY", "")
+    if env:
+        return env
+    if "choosereply.com" in BASE and os.path.exists(PROD_API_KEY_PATH):
+        with open(PROD_API_KEY_PATH) as fh:
+            return fh.read().strip()
+    return _n8n_api_key()
+
+
+def _api(method, path, body=None, key=None, timeout=30):
+    """Raw n8n public-API request. Returns (status, body_text)."""
+    req = urllib.request.Request(
+        f"{BASE}/api/v1{path}", method=method, headers={"X-N8N-API-KEY": key})
+    data = json.dumps(body).encode() if body is not None else None
+    if data:
+        req.add_header("Content-Type", "application/json")
+    try:
+        with urllib.request.urlopen(req, data=data, timeout=timeout) as resp:
+            return resp.status, resp.read().decode(errors="replace")
+    except urllib.error.HTTPError as e:
+        return e.code, e.read().decode(errors="replace")
+    except urllib.error.URLError as e:
+        return None, str(e.reason)
+
+
+class EphemeralSqlHarness:
+    """A temporary webhook->Postgres workflow (random unguessable path), the
+    fix-subscriber.py pattern: Postgres is only reachable through n8n's own credential,
+    and the project rule is to NEVER leave an unauthenticated SQL endpoint up -- so this
+    exists only inside the `with` block and is deleted in __exit__ no matter what."""
+
+    def __init__(self, key):
+        self.key = key
+        self.path = uuid.uuid4().hex + uuid.uuid4().hex
+        self.workflow_id = None
+
+    def __enter__(self):
+        wf = {
+            "name": "ZZZ TEMP probe20 sql harness (auto-delete)",
+            "nodes": [
+                {"id": "w1", "name": "Hook", "type": "n8n-nodes-base.webhook",
+                 "typeVersion": 2, "position": [0, 0],
+                 "parameters": {"httpMethod": "POST", "path": self.path,
+                                "responseMode": "lastNode", "options": {}}},
+                {"id": "p1", "name": "Q", "type": "n8n-nodes-base.postgres",
+                 "typeVersion": 2.6, "position": [220, 0],
+                 "parameters": {"operation": "executeQuery",
+                                "query": "={{ $json.body.sql }}", "options": {}},
+                 "credentials": {"postgres": {"id": "vvRrFiEXzLVqKjOx",
+                                              "name": "Postgres"}}},
+            ],
+            "connections": {"Hook": {"main": [[{"node": "Q", "type": "main",
+                                                "index": 0}]]}},
+            "settings": {"executionOrder": "v1"},
+        }
+        status, body = _api("POST", "/workflows", wf, key=self.key)
+        if status not in (200, 201):
+            raise RuntimeError(f"harness create failed: HTTP {status} {body[:300]}")
+        self.workflow_id = json.loads(body)["id"]
+        status, body = _api("POST", f"/workflows/{self.workflow_id}/activate", {},
+                            key=self.key)
+        if status not in (200, 201):
+            raise RuntimeError(f"harness activate failed: HTTP {status} {body[:300]}")
+        return self
+
+    def __exit__(self, *exc):
+        if self.workflow_id:
+            status, _ = _api("DELETE", f"/workflows/{self.workflow_id}", key=self.key)
+            print(f"    [harness deleted -> HTTP {status}]")
+        return False
+
+    def sql(self, statements):
+        """Run `statements` (last one MUST be a SELECT returning >=1 row -- a zero-item
+        last node leaves the webhook with an empty response). Returns parsed JSON."""
+        payload = json.dumps({"sql": statements}).encode()
+        for attempt in range(5):   # webhook registration can lag activation by a beat
+            req = urllib.request.Request(f"{BASE}/webhook/{self.path}", data=payload,
+                                         method="POST")
+            req.add_header("Content-Type", "application/json")
+            try:
+                with urllib.request.urlopen(req, timeout=60) as resp:
+                    return json.loads(resp.read().decode() or "{}")
+            except urllib.error.HTTPError as e:
+                detail = e.read().decode(errors="replace")[:200]
+                if attempt == 4:
+                    return {"error": f"HTTP {e.code} {detail}"}
+                time.sleep(1.5)
+            except (urllib.error.URLError, ValueError) as e:
+                if attempt == 4:
+                    return {"error": str(e)}
+                time.sleep(1.5)
+
+    def rows(self, select_sql):
+        """`select_sql` wrapped in json_agg so the harness always answers exactly one
+        row -- {'rows': [...]} -- even for an empty result set."""
+        out = self.sql(
+            f"select coalesce(json_agg(t), '[]'::json) as rows from ({select_sql}) t;")
+        return out.get("rows", out) if isinstance(out, dict) else out
+
+
+def _probe20_clone_ids(key):
+    """Ids of the real workflow clones this probe's ALLOWED creates produced,
+    found by their ZZZ name (exact-match `name` filter on the public API)."""
+    status, body = _api(
+        "GET", f"/workflows?name={urllib.parse.quote(APP_DELETE_BOT_NAME)}&limit=50",
+        key=key)
+    if status != 200:
+        return []
+    try:
+        return [w["id"] for w in json.loads(body).get("data", [])]
+    except (ValueError, KeyError, TypeError):
+        return []
+
+
+def run_app_delete_retire_probe():
+    failures = []
+    try:
+        key = _api_key_any()
+    except (OSError, KeyError, ValueError) as e:
+        print(f"FAIL: no n8n API key available ({e}) -- set N8N_API_KEY.")
+        return 1
+
+    print(f"=== Task 20: app-side bot delete retires its bot_profiles rows -- "
+          f"app_user_id={APP_DELETE_APP_USER!r} (start plan, ACTIVE, limit 1) "
+          f"against {BASE} ===\n")
+
+    fake1 = f"probe_fake_wa_profile_{uuid.uuid4().hex[:8]}"
+    fake2 = f"probe_fake_wa_profile_{uuid.uuid4().hex[:8]}"
+    fake3 = f"probe_fake_wa_profile_{uuid.uuid4().hex[:8]}"
+
+    with EphemeralSqlHarness(key) as db:
+        print("1. seed the ACTIVE start-plan subscriber (both sweep branches skip "
+              "status='active' -- only the webhook retire can free its slot)")
+        out = db.sql(
+            f"delete from bot_profiles where app_user_id = '{APP_DELETE_APP_USER}';\n"
+            f"delete from subscribers where app_user_id = '{APP_DELETE_APP_USER}';\n"
+            f"insert into subscribers (app_user_id, plan, status, current_period_end)\n"
+            f"values ('{APP_DELETE_APP_USER}', 'start', 'active', "
+            f"now() + interval '30 days');\n"
+            f"select 1 as ok;")
+        print(f"    {out}")
+        if not (isinstance(out, dict) and out.get("ok") == 1):
+            print("FAIL: seed did not apply -- aborting before firing any webhook.")
+            return 1
+
+        try:
+            print(f"\n2. create #1 (register the only slot) -- fake profile {fake1}")
+            status, body = post_multipart_form(
+                CREATE_WA_URL,
+                channel_slot_form_wa(APP_DELETE_APP_USER, fake1, bot_key="Bot0",
+                                     name=APP_DELETE_BOT_NAME))
+            print(f"    HTTP {status} -- {body[:200]}")
+            allowed1 = not (status == 200 and "channel_limit" in body)
+            alive1 = db.rows(
+                f"select profile_id from bot_profiles "
+                f"where app_user_id = '{APP_DELETE_APP_USER}' and deleted_at is null")
+            registered1 = isinstance(alive1, list) and \
+                [r.get("profile_id") for r in alive1] == [fake1]
+            print(f"[{'OK' if allowed1 else 'FAIL'}] create #1 allowed (not channel_limit)")
+            print(f"[{'OK' if registered1 else 'FAIL'}] bot_profiles alive rows == "
+                  f"[{fake1}]: {alive1}")
+            if not allowed1:
+                failures.append("create1_refused")
+            if not registered1:
+                failures.append("create1_not_registered")
+
+            time.sleep(2)
+            print(f"\n3. create #2 (a DIFFERENT bot_key -- must hit the limit) -- "
+                  f"fake profile {fake2}")
+            status, body = post_multipart_form(
+                CREATE_WA_URL,
+                channel_slot_form_wa(APP_DELETE_APP_USER, fake2, bot_key="Bot1",
+                                     name=APP_DELETE_BOT_NAME))
+            print(f"    HTTP {status} -- {body[:200]}")
+            try:
+                parsed = json.loads(body)
+            except json.JSONDecodeError:
+                parsed = None
+            refused = status == 200 and parsed == {"success": False,
+                                                   "error": "channel_limit"}
+            print(f"[{'OK' if refused else 'FAIL'}] create #2 refused byte-exact "
+                  f"channel_limit: {parsed!r}")
+            if not refused:
+                failures.append("create2_not_refused")
+
+            print("\n4. fire /webhook/DeleteBotFiles exactly as Bot.DeleteBot would "
+                  "(botWaId = the clone's real workflow id)")
+            clone_ids = _probe20_clone_ids(key)
+            bot_wa_id = clone_ids[0] if clone_ids else "-1"
+            payload = json.dumps({
+                "botWaId": bot_wa_id, "botTgId": "-1",
+                "waProfileId": fake1, "tgProfileId": "-1",
+                "appUserId": APP_DELETE_APP_USER,
+            }).encode()
+            req = urllib.request.Request(DELETE_BOT_FILES_URL, data=payload,
+                                         method="POST")
+            req.add_header("Content-Type", "application/json")
+            try:
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    status, body = resp.status, resp.read().decode(errors="replace")
+            except urllib.error.HTTPError as e:
+                status, body = e.code, e.read().decode(errors="replace")
+            print(f"    HTTP {status} -- {body[:200]}")
+            try:
+                parsed = json.loads(body)
+            except json.JSONDecodeError:
+                parsed = None
+            expected = {"success": True, "deletedChunks": 0, "deletedFiles": 0,
+                        "retiredProfiles": 1}
+            delete_ok = status == 200 and parsed == expected
+            print(f"[{'OK' if delete_ok else 'FAIL'}] delete response byte-exact "
+                  f"{expected}: got {parsed!r}")
+            if not delete_ok:
+                failures.append("delete_response")
+
+            print("\n5. value-level read-back: the row is retired with "
+                  "deleted_reason='app_delete'")
+            rb = db.rows(
+                f"select deleted_at is not null as retired, deleted_reason "
+                f"from bot_profiles where profile_id = '{fake1}'")
+            retired_ok = isinstance(rb, list) and len(rb) == 1 \
+                and rb[0].get("retired") is True \
+                and rb[0].get("deleted_reason") == "app_delete"
+            print(f"[{'OK' if retired_ok else 'FAIL'}] {rb}")
+            if not retired_ok:
+                failures.append("row_not_retired")
+
+            time.sleep(1)
+            print(f"\n6. create #3 (same DIFFERENT bot_key -- the freed slot must "
+                  f"admit it) -- fake profile {fake3}")
+            status, body = post_multipart_form(
+                CREATE_WA_URL,
+                channel_slot_form_wa(APP_DELETE_APP_USER, fake3, bot_key="Bot1",
+                                     name=APP_DELETE_BOT_NAME))
+            print(f"    HTTP {status} -- {body[:200]}")
+            allowed3 = not (status == 200 and "channel_limit" in body)
+            alive3 = db.rows(
+                f"select profile_id from bot_profiles "
+                f"where app_user_id = '{APP_DELETE_APP_USER}' and deleted_at is null")
+            registered3 = isinstance(alive3, list) and \
+                [r.get("profile_id") for r in alive3] == [fake3]
+            print(f"[{'OK' if allowed3 else 'FAIL'}] create #3 allowed -- the slot "
+                  f"really freed")
+            print(f"[{'OK' if registered3 else 'FAIL'}] alive rows are exactly "
+                  f"[{fake3}]: {alive3}")
+            if not allowed3:
+                failures.append("create3_refused")
+            if not registered3:
+                failures.append("create3_rows_wrong")
+
+        finally:
+            print("\n7. cleanup: probe rows + the ZZZ workflow clones")
+            out = db.sql(
+                f"delete from bot_profiles where app_user_id = '{APP_DELETE_APP_USER}';\n"
+                f"delete from subscribers where app_user_id = '{APP_DELETE_APP_USER}';\n"
+                f"select 1 as ok;")
+            print(f"    rows: {out}")
+            for wid in _probe20_clone_ids(key):
+                status, _ = _api("DELETE", f"/workflows/{wid}", key=key)
+                print(f"    clone {wid} deleted -> HTTP {status}")
+
+    if failures:
+        print(f"\n{len(failures)} assertion(s) FAILED: {failures}")
+        return 1
+    print("\nALL OK")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument(
@@ -2311,7 +2631,20 @@ def main():
              "body is unchanged AND that Delete Refused Profile ran on that execution — the "
              "fake profile id makes Wappi answer 400 «Profile not found», which is the "
              "expected, tolerated outcome. Needs probe_user_19 seeded (Part 10).")
+    ap.add_argument(
+        "--app-delete-retire", action="store_true",
+        help="Run the Task 20 probe: deleting a bot in the app must retire its "
+             "bot_profiles rows in the same DeleteBotFiles execution and free the "
+             "channel slot immediately. Create -> refused-at-limit -> app-style delete "
+             "-> row retired with deleted_reason='app_delete' -> create allowed, on a "
+             "start-plan ACTIVE subscriber (the owner class no sweep ever reconciles). "
+             "Self-seeding and self-cleaning via an ephemeral SQL harness + the n8n "
+             "API; needs an API key (N8N_API_KEY / .secrets/prod-api-key.txt / "
+             "secrets.json). See Part 11.")
     args = ap.parse_args()
+
+    if args.app_delete_retire:
+        sys.exit(run_app_delete_retire_probe())
 
     if args.refused_delete:
         sys.exit(run_refused_delete_probe())

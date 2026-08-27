@@ -22,15 +22,40 @@
       "parameters": {
         "resource": "database",
         "operation": "executeQuery",
-        "query": "WITH matched AS (\n  SELECT id, metadata->>'fileId' AS file_id\n  FROM documents\n  WHERE (metadata->>'botWaId' = $1 AND $1 NOT IN ('-1', ''))\n     OR (metadata->>'botTgId' = $2 AND $2 NOT IN ('-1', ''))\n),\ndeleted AS (\n  DELETE FROM documents WHERE id IN (SELECT id FROM matched) RETURNING id\n)\nSELECT\n  (SELECT count(*)::int FROM deleted) AS \"deletedChunks\",\n  COALESCE((SELECT array_agg(DISTINCT file_id) FROM matched WHERE file_id IS NOT NULL AND file_id <> ''), '{}'::text[]) AS \"fileIds\";",
+        "query": "-- App-delete slot release (2026-08-27): retiring here, synchronously with the app's\n-- delete action, is the ONLY coverage for status='active' owners -- Profile Lifecycle\n-- Sweep's Branch B deliberately never touches them, and Count Channels would otherwise\n-- hold the dead bot's slot forever (live incident: bot «16», profile dec53892-d97f).\n-- Match by profile_id ONLY (the PK, sent by the app that owns it): scoping by\n-- app_user_id would MISS rows created under a different identity (RevenueCat anonymous\n-- id rotation / the pre-init deviceUniqueIdentifier fallback) -- appUserId in the body\n-- is audit-only. The final SELECT guarantees exactly one output item so the chain can\n-- never die on a zero-row update; '-1'/'' are the client's unauthed sentinels.\nwith retired as (\n  update bot_profiles\n     set deleted_at = now(), deleted_reason = 'app_delete'\n   where deleted_at is null\n     and profile_id in ($1, $2)\n     and profile_id not in ('-1', '')\n   returning profile_id\n)\nselect count(*)::int as \"retiredProfiles\" from retired;",
         "options": {
-          "queryReplacement": "={{ $json.body.botWaId }},{{ $json.body.botTgId }}"
+          "queryReplacement": "={{ [ $json.body.waProfileId || '-1', $json.body.tgProfileId || '-1' ] }}"
         }
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
         224,
+        0
+      ],
+      "id": "74e3b81d-2e06-46fd-9f65-9f84b9833939",
+      "name": "Retire Bot Profiles",
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "WITH matched AS (\n  SELECT id, metadata->>'fileId' AS file_id\n  FROM documents\n  WHERE (metadata->>'botWaId' = $1 AND $1 NOT IN ('-1', ''))\n     OR (metadata->>'botTgId' = $2 AND $2 NOT IN ('-1', ''))\n),\ndeleted AS (\n  DELETE FROM documents WHERE id IN (SELECT id FROM matched) RETURNING id\n)\nSELECT\n  (SELECT count(*)::int FROM deleted) AS \"deletedChunks\",\n  COALESCE((SELECT array_agg(DISTINCT file_id) FROM matched WHERE file_id IS NOT NULL AND file_id <> ''), '{}'::text[]) AS \"fileIds\";",
+        "options": {
+          "queryReplacement": "={{ $('Webhook').first().json.body.botWaId }},{{ $('Webhook').first().json.body.botTgId }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        448,
         0
       ],
       "id": "fb183c84-64a1-4bba-b8bb-a95992009841",
@@ -45,13 +70,13 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { \"success\": true, \"deletedChunks\": $json.deletedChunks, \"deletedFiles\": ($json.fileIds || []).length } }}",
+        "responseBody": "={{ { \"success\": true, \"deletedChunks\": $json.deletedChunks, \"deletedFiles\": ($json.fileIds || []).length, \"retiredProfiles\": $('Retire Bot Profiles').first().json.retiredProfiles ?? null } }}",
         "options": {}
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        448,
+        672,
         0
       ],
       "id": "72fb853d-e1e5-4783-a55c-e8435ef8c602",
@@ -64,7 +89,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        672,
+        896,
         0
       ],
       "id": "b370bace-f73e-4329-a140-7de8791ab0ab",
@@ -81,7 +106,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        896,
+        1120,
         0
       ],
       "id": "6bdf0c55-ce4c-4517-a3f4-1f686ae64b80",
@@ -97,6 +122,17 @@
   ],
   "connections": {
     "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Retire Bot Profiles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retire Bot Profiles": {
       "main": [
         [
           {

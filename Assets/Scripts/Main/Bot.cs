@@ -328,10 +328,12 @@ public class Bot : MonoBehaviour
             ChatManager.Instance.PurgeCacheForBot(transform.name);
         }
 
-        // Sweep the bot's price-list knowledge from Supabase BEFORE the
-        // workflow ids stop meaning anything — chunks are tagged by these ids
-        // and nothing could clean them up after the bot is gone.
-        Manager.Instance.DeleteBotFilesOnServer(whatsappWorkflowId, telegramWorkflowId);
+        // Sweep the bot's server-side trace from Supabase BEFORE the ids stop
+        // meaning anything — RAG chunks are tagged by the workflow ids, and the
+        // bot_profiles slot rows are keyed by the profile ids; nothing could
+        // clean either up after the bot is gone.
+        Manager.Instance.DeleteBotFilesOnServer(whatsappWorkflowId, telegramWorkflowId,
+                                                whatsappProfileId, telegramProfileId);
 
         Manager.Instance.DeleteProfilesAndWorkflows(whatsappProfileId, telegramProfileId, whatsappWorkflowId, telegramWorkflowId);
 
