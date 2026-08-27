@@ -5,7 +5,7 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
 
 ## Layout
 
-- `workflows/` — **committed source of truth**: the 16 workflows the app actually depends on.
+- `workflows/` — **committed source of truth**: the 17 workflows the app and the choosereply.com landing depend on.
   Each JSON has its original n8n `id` injected at the top level so it round-trips on import
   (including `SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json`, whose id was assigned on first deploy 2026-07-22).
 - `supabase/` — the RAG store's DB contract: `schema.sql` (documents table +
@@ -54,10 +54,11 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
 - `reference/` — **gitignored**: downloaded community/marketplace templates + n8n onboarding
   samples, kept only to mine for ideas. Not part of the app, never imported.
 
-## The 16 canonical workflows
+## The 17 canonical workflows
 
 | id | name | role |
 |----|------|------|
+| `hHwvfOvTCS42pXnq` | Landing Lead | Landing webhook `/webhook/LandingLead` (form-encoded POST с choosereply.com, деплой 2026-08-27, спека `docs/superpowers/specs/2026-08-27-landing-page-design.md`) — Code-валидация: honeypot `website` непустой → тихий `{success:true}` БЕЗ вставки; `phone` обязателен, 6..32 из `[0-9+()\-\s]`, иначе `bad_request` → INSERT в `landing_leads` (миграция `sql/2026-08-27-landing-leads.sql`; Postgres cred `vvRrFiEXzLVqKjOx`; `queryReplacement` — ОДНО выражение-массив, по гочте RevenueCat) → `{success:true}`; ошибка БД → `{success:false,error:"db"}` (страница показывает fallback-текст на любой `success:false`). CORS вебхук отдаёт сам (`allowedOrigins:"*"` — n8n эхо-ит Origin, преflight OPTIONS 204 проверен). Спам-риск принят: INSERT-only, honeypot, длины — пересмотреть при реальном спаме |
 | `XuvOp7TxOImOAmlj` | CreateWhatsappWorkflow | App webhook `/webhook/CreateWhatsappWorkflow` — clones the WhatsApp template per bot **Task 17a:** `Register Profile` now (a) ensures the owner's `subscribers` row in the SAME statement (a preceding `insert … on conflict do nothing` CTE) — `Ensure Subscriber` upstream is fail-open, and a profile registered without an owner row was BOTH unmetered (`Count Dialog` inner-joins `subscribers`, finds nothing, and Quota Decision fail-opens) and invisible to both Profile Lifecycle Sweep branches; and (b) refuses `profile_id` `'-1'`/empty — `'-1'` is the client's «channel not authorized» sentinel and `profile_id` is the PRIMARY KEY, so one shared row would have been re-owned by every account in turn. `Compute Slot Limit` treats `grace` like `expired` (0 slots), because `Count Dialog` already refuses dialogs at `status in ('expired','grace')` — handing out slots there would create new paid Wappi profiles for a bot that cannot answer. |
 | `Uz6HBBUpAiUqVysB` | CreateTelegramWorkflow | App webhook `/webhook/CreateTelegramWorkflow` — clones the Telegram template per bot **Task 17a:** `Register Profile` now (a) ensures the owner's `subscribers` row in the SAME statement (a preceding `insert … on conflict do nothing` CTE) — `Ensure Subscriber` upstream is fail-open, and a profile registered without an owner row was BOTH unmetered (`Count Dialog` inner-joins `subscribers`, finds nothing, and Quota Decision fail-opens) and invisible to both Profile Lifecycle Sweep branches; and (b) refuses `profile_id` `'-1'`/empty — `'-1'` is the client's «channel not authorized» sentinel and `profile_id` is the PRIMARY KEY, so one shared row would have been re-owned by every account in turn. `Compute Slot Limit` treats `grace` like `expired` (0 slots), because `Count Dialog` already refuses dialogs at `status in ('expired','grace')` — handing out slots there would create new paid Wappi profiles for a bot that cannot answer. |
 | `3qax5J9u2qsT9Vao` | Edit Whatsapp Workflow | App webhook `/webhook/EditWhatsappWorkflow` — edits a bot's system prompt |
