@@ -1,13 +1,13 @@
 # App Review Notes (вставить в App Store Connect → App Review Information → Notes)
 
-Ниже готовый EN-текст. Перед вставкой: заменить `<APP NAME>` на финальное имя,
-`<VIDEO URL>` на ссылку демо-видео (непубличный YouTube/Drive), проверить, что
-юр-ссылки уже живые. Тот же текст пригодится для ответа на вопросы Google Play.
+Ниже готовый EN-текст. Перед вставкой: заменить `<VIDEO URL>` на ссылку
+демо-видео (непубличный YouTube/Drive) и проверить, что юр-ссылки уже живые
+(https://choosereply.com/privacy.html, https://choosereply.com/terms.html). Тот же текст пригодится для ответа на вопросы Google Play.
 
 ---
 
 **What the app is.**
-<APP NAME> is a business tool for small-business owners in Kazakhstan/CIS. The
+Choose Reply is a business tool for small-business owners in Kazakhstan/CIS. The
 owner connects their OWN WhatsApp and/or Telegram account, describes their
 business (services, price lists, working details), and the app answers their
 customers' incoming messages with AI — either fully automatically ("Auto" mode)

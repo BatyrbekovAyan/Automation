@@ -5,18 +5,19 @@
 
 ## 0. Блокеры (без них подача невозможна или бессмысленна)
 
-- [ ] **Финальное имя приложения.** Сейчас три РАЗНЫХ значения:
-  `ProjectSettings.productName = "Choose Reply"` (имя под иконкой),
-  `ProfileSubPages.ProductName = "Automation"` (страница «О приложении»),
-  юр-документы = «Automation». Выбрать одно, вписать во все три места + store listing.
-- [ ] **Домен: юр-страницы опубликованы.** Залить `docs/legal/privacy.html` и
-  `docs/legal/terms.html` на домен (например `https://<домен>/privacy.html` и
-  `https://<домен>/terms.html`). В обоих файлах перед публикацией заполнить
-  жёлтое поле «[Заполнить до публикации: ИП/ТОО …]».
-- [ ] **URL вписаны в приложение:** `Assets/Scripts/Billing/LegalLinks.cs` →
-  `TermsUrl`/`PrivacyUrl` (оба сразу), затем перезапустить
-  `Tools/Billing/Add Paywall Legal Row` (пересеет видимость ряда в сцене) и убедиться,
-  что ссылки видны на пейволле и открываются.
+- [x] **Финальное имя приложения: «Choose Reply»** (решение владельца 2026-08-27).
+  Вписано: `ProjectSettings.productName`, `ProfileSubPages.ProductName` + сцена,
+  юр-документы, review notes. Осталось: использовать «Choose Reply» в store listing.
+- [ ] **Юр-страницы опубликованы на choosereply.com.** Перед выкладкой заполнить
+  в обоих файлах жёлтое поле «[Заполнить до публикации: ИП/ТОО …]», затем залить
+  `docs/legal/privacy.html` → `https://choosereply.com/privacy.html` и
+  `docs/legal/terms.html` → `https://choosereply.com/terms.html` — ИМЕННО по этим
+  путям: они вшиты в приложение (`LegalLinks`) и в notes. Проверить открытие
+  с телефона.
+- [x] **URL вписаны в приложение** (`LegalLinks.TermsUrl`/`PrivacyUrl` =
+  `https://choosereply.com/{terms,privacy}.html`), билдер перезапущен, ряд ссылок
+  на пейволле активен. Осталось: глазами убедиться на устройстве/в Editor, что обе
+  ссылки открываются (страницы должны быть уже залиты).
 - [ ] **Иконка приложения** — финальная, во всех размерах (Unity Player Settings).
 - [ ] **Скриншоты**: iPhone 6.7" и 6.5" (обязательные), Android phone. Снимать тёмную
   тему, RU. Минимум: Боты, чат с автоответом, «Вместе», Сводка, пейволл.
