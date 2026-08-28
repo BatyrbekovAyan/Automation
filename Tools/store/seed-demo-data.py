@@ -1,21 +1,30 @@
 #!/usr/bin/env python3
-"""Seed the iOS Simulator with fabricated demo data for App Store screenshots.
+"""Seed fabricated demo data for App Store screenshots — Unity Editor or iOS Simulator.
 
-Writes the app's PlayerPrefs (NSUserDefaults) and its on-disk caches so that the
-Боты / Чаты / чат-тред / Сводка screens render fully populated with NO server
-reachable. Every string here is fabricated — see docs/store/screenshot-fixtures.md
-for the content rules this dataset obeys (the bot must never confirm a booking,
-appoint a time, or state stock as fact — that is what the product actually does).
+Writes the app's PlayerPrefs and its on-disk caches so that the Боты / Чаты /
+чат-тред / Сводка screens render fully populated with NO server reachable. Every
+string is fabricated — see docs/store/screenshot-fixtures.md for the content rules
+this dataset obeys (the bot never confirms a booking, appoints a time, or states
+stock as fact — that is what the product actually does).
+
+Two targets, same dataset:
+    --target editor      (default) Unity Editor Play Mode on this Mac. This is the
+                         cheap path: the Editor renders the REAL UI with the real
+                         fonts and shaders, so no Xcode, no iOS runtime, no IL2CPP
+                         build is needed to produce genuine store screenshots.
+    --target simulator   a booted iOS Simulator with the app installed.
 
 Usage:
-    python3 Tools/store/seed-simulator.py --dry-run     # print what would be written
-    python3 Tools/store/seed-simulator.py               # seed the booted simulator
+    python3 Tools/store/seed-demo-data.py --dry-run
+    python3 Tools/store/seed-demo-data.py                    # Editor
+    python3 Tools/store/seed-demo-data.py --target simulator
 
-Preconditions: a booted simulator with the app INSTALLED, and the app NOT running
-(NSUserDefaults writes go through cfprefsd; a running app would overwrite them on quit).
+Editor preconditions: Unity must NOT be in Play Mode (Play Mode flushes its own
+PlayerPrefs on exit and would overwrite the seed). The script backs up the existing
+prefs plist first — another session's Play Mode state lives in the same file.
 
-STATUS: written 2026-08-28 from code-verified formats but NOT yet executed end-to-end —
-the machine had no iOS runtime at authoring time. Verify each screen after the first run.
+STATUS: written 2026-08-28 from code-verified formats; the Editor path is the one
+we intend to run. Verify each screen after the first run.
 """
 
 import argparse
@@ -46,6 +55,12 @@ def player_prefs(now: datetime) -> dict:
         # Without this the «Первые шаги» card reserves 700u of list padding and covers
         # the top of the bots list (FirstStepsCard).
         "OnboardingChecklistDone": 1,
+        # The onboarding carousel is raised at STARTUP (Manager.LoadBots tail) and would
+        # cover every screen we are trying to photograph.
+        "OnboardingSeen": 1,
+        "OnboardingChannelConnectedSeen": 1,
+        "OnboardingPriceListSeen": 1,
+        "FirstBotReplySeen": 1,
         # Per-chat override: this ONE chat is «Вместе» while Bot0 stays Авто.
         # SemiAutoStore.Key = "{botId}_semiAuto_{chatId}"; 2 = on, 1 = explicit off.
         "Bot0_semiAuto_77000000012@c.us": 2,
@@ -226,8 +241,45 @@ def sh(args: list[str]) -> str:
         sys.exit(f"FAILED: {' '.join(args)}\n{r.stderr.strip()}")
     return r.stdout.strip()
 
+EDITOR_DOMAIN = "unity.SynergySoft.Choose Reply"          # companyName / productName
+EDITOR_PREFS = Path.home() / "Library/Preferences" / f"{EDITOR_DOMAIN}.plist"
+EDITOR_DOCS = Path.home() / "Library/Application Support/SynergySoft/Choose Reply"
+
+def seed_editor(prefs: dict, files: dict) -> None:
+    """Unity Editor Play Mode on macOS. PlayerPrefs live in a plist under the
+    unity.<company>.<product> domain; persistentDataPath is Application Support."""
+    if EDITOR_PREFS.exists():
+        backup = EDITOR_PREFS.with_suffix(".plist.pre-seed")
+        backup.write_bytes(EDITOR_PREFS.read_bytes())
+        existing = plistlib.loads(EDITOR_PREFS.read_bytes())
+        print(f"бэкап прежних настроек: {backup.name} ({len(existing)} ключей)")
+
+    for key, value in prefs.items():
+        flag = "-int" if isinstance(value, int) else "-string"
+        sh(["defaults", "write", EDITOR_DOMAIN, key, flag, str(value)])
+    print(f"PlayerPrefs записано: {len(prefs)}  → {EDITOR_PREFS}")
+
+    write_files(EDITOR_DOCS, files)
+
+def seed_simulator(udid: str, bundle: str, prefs: dict, files: dict) -> None:
+    container = Path(sh(["xcrun", "simctl", "get_app_container", udid, bundle, "data"]))
+    print(f"контейнер: {container}")
+    for key, value in prefs.items():
+        flag = "-int" if isinstance(value, int) else "-string"
+        sh(["xcrun", "simctl", "spawn", udid, "defaults", "write", bundle, key, flag, str(value)])
+    print(f"PlayerPrefs записано: {len(prefs)}")
+    write_files(container / "Documents", files)
+
+def write_files(docs: Path, files: dict) -> None:
+    for rel, payload in files.items():
+        target = docs / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        print(f"  ✓ {rel}")
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--target", choices=["editor", "simulator"], default="editor")
     ap.add_argument("--udid", default="booted", help="simulator udid (default: booted)")
     ap.add_argument("--bundle", default=BUNDLE)
     ap.add_argument("--dry-run", action="store_true")
@@ -245,6 +297,8 @@ def main():
     }
 
     if args.dry_run:
+        dest = EDITOR_DOCS if args.target == "editor" else "<app container>/Documents"
+        print(f"цель: {args.target}   → {dest}")
         print(f"PlayerPrefs: {len(prefs)} ключей")
         for k in sorted(prefs):
             v = prefs[k]
@@ -255,23 +309,12 @@ def main():
             print(f"  {path:52} {len(body):6d} байт")
         return
 
-    container = Path(sh(["xcrun", "simctl", "get_app_container", args.udid, args.bundle, "data"]))
-    docs = container / "Documents"
-    print(f"контейнер: {container}")
+    if args.target == "editor":
+        seed_editor(prefs, files)
+    else:
+        seed_simulator(args.udid, args.bundle, prefs, files)
 
-    for key, value in prefs.items():
-        flag = "-int" if isinstance(value, int) else "-string"
-        sh(["xcrun", "simctl", "spawn", args.udid, "defaults", "write",
-            args.bundle, key, flag, str(value)])
-    print(f"PlayerPrefs записано: {len(prefs)}")
-
-    for rel, payload in files.items():
-        target = docs / rel
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-        print(f"  ✓ {rel}")
-
-    print("\nГотово. Запусти приложение и снимай.")
+    print("\nГотово. Дальше: Tools/Store/Capture Screenshots в Unity.")
     print("Порядок важен: сначала кадр списка чатов (открытие чата гасит его бейдж),")
     print("потом тред, Боты, Сводка.")
 
