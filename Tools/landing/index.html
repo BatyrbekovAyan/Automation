@@ -16,7 +16,7 @@
 <link rel="apple-touch-icon" href="/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Unbounded:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@600&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#0B0E14; --surface:#121722; --surface-2:#0E141F; --border:#1E2633; --border-2:#232D3D;
@@ -146,12 +146,14 @@
              padding:42px 38px;box-shadow:0 0 90px rgba(34,211,238,.08);text-align:center}
   .lead-card h2{margin-bottom:10px}
   .lead-card .lead{margin:0 auto 30px}
+  .lbl{display:block;text-align:left;font-size:14px;font-weight:600;color:var(--ink-2);margin:0 0 7px 3px}
   .field{width:100%;background:var(--surface-2);border:1px solid var(--border-2);border-radius:var(--r-s);
-         padding:16px 18px;font:500 16px Manrope,sans-serif;color:var(--ink);margin-bottom:14px;outline:none;transition:border-color .2s,box-shadow .2s}
-  .field::placeholder{color:#5C6675}
+         padding:16px 18px;font:500 16px Manrope,sans-serif;color:var(--ink);text-align:left;margin-bottom:16px;outline:none;transition:border-color .2s,box-shadow .2s}
+  .field::placeholder{color:#7E8798}
   .field:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(34,211,238,.16)}
-  .lead-card .btn{width:100%;padding:16px;font-size:16px}
+  .lead-card .btn{width:100%;padding:16px;font-size:16px;margin-top:4px}
   .form-err{display:block;color:#FF8A8A;font-size:14.5px;margin-top:12px}
+  .form-err[hidden]{display:none}
   .ok{padding:22px 0 6px}
   .ok .mark{width:64px;height:64px;border-radius:50%;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-size:28px;color:var(--accent)}
   .hp{position:absolute;left:-9999px;top:-9999px;height:0;overflow:hidden}
@@ -266,9 +268,9 @@
             <div><div class="t">Автомагазин «Байтерек»</div><div class="s">онлайн</div></div>
           </div>
           <div class="msg in">Здравствуйте! Есть масляный фильтр на Camry 50?</div>
-          <div class="msg out">Здравствуйте! Да, в наличии: оригинал Toyota — 8 500 ₸, аналог VIC — 3 900 ₸. Какой вам подойдёт?</div>
-          <div class="msg in">Давайте оригинал</div>
-          <div class="msg out">Отлично, оформляю ✅ Подъедете сегодня до 19:00 или нужна доставка?</div>
+          <div class="msg out">Здравствуйте! Подскажите двигатель — 2.5 или 3.5? Подберу точно по прайсу.</div>
+          <div class="msg in">2.5</div>
+          <div class="msg out">Есть в прайсе: оригинал Toyota — 8 500 ₸, аналог VIC — 3 900 ₸. Точное наличие подтвердит менеджер. Оставьте номер — передам заявку.</div>
           <div class="chat-tag">⚡ Ответил бот · режим «Авто»</div>
         </div>
       </div>
@@ -294,7 +296,7 @@
       <h2 class="rv">Под контролем — каждый ответ</h2>
       <p class="lead rv">Choose Reply создан для владельцев, которые не готовы отдать переписку с клиентами «чёрному ящику».</p>
       <div class="grid">
-        <div class="card rv"><div class="ic"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 1 1-4-6.9"/><path d="m14 9 3 3 5-6"/></svg></div><h3>Авто и Вместе</h3><p>Бот отвечает сам — или предлагает четыре готовых ответа, а вы выбираете одним касанием.</p></div>
+        <div class="card rv"><div class="ic"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 1 1-4-6.9"/><path d="m14 9 3 3 5-6"/></svg></div><h3>Авто и Вместе</h3><p>Бот отвечает сам — или предлагает готовые варианты ответа, а вы выбираете одним касанием.</p></div>
         <div class="card rv"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 4h7l9 9-7 7-9-9z"/><circle cx="8.5" cy="8.5" r="1.6"/></svg></div><h3>Знает ваши цены</h3><p>Загрузите прайс-лист фото или файлом — бот отвечает по вашим товарам, а не выдумывает.</p></div>
         <div class="card rv"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 5h10v8H8l-4 4z"/><path d="M14 9h6v7h-3l-3 3v-3"/></svg></div><h3>WhatsApp + Telegram</h3><p>Один бот на оба мессенджера. Все переписки — в одном приложении.</p></div>
         <div class="card rv"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 20V9"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg></div><h3>Сводка диалогов</h3><p>Кто оформил заказ, кто ждёт ответа, где нужен владелец — итоги без чтения переписок.</p></div>
@@ -342,14 +344,17 @@
         <form id="leadForm">
           <h2>Получите ранний доступ</h2>
           <p class="lead">Оставьте номер — напишем в WhatsApp, когда откроем доступ, и поможем настроить бота под ваш бизнес.</p>
-          <input class="field" type="text" name="name" placeholder="Как к вам обращаться" autocomplete="name">
-          <input class="field" type="tel" name="phone" placeholder="+7 ___ ___-__-__" autocomplete="tel" required minlength="6" maxlength="32">
+          <label class="lbl" for="leadName">Как к вам обращаться</label>
+          <input class="field" id="leadName" type="text" name="name" placeholder="Например, Айдос" autocomplete="name">
+          <label class="lbl" for="leadPhone">Номер телефона в WhatsApp</label>
+          <input class="field" id="leadPhone" type="tel" name="phone" placeholder="+7 ___ ___-__-__"
+                 autocomplete="tel" required minlength="6" maxlength="32" aria-describedby="leadErr">
           <div class="hp" aria-hidden="true"><input type="text" name="website" tabindex="-1" autocomplete="off"></div>
           <input type="hidden" name="source" value="landing">
           <button class="btn" type="submit" id="leadBtn">Оставить заявку</button>
-          <span class="form-err" id="leadErr" hidden>Не получилось отправить. Попробуйте ещё раз чуть позже.</span>
+          <span class="form-err" id="leadErr" role="alert" hidden>Не получилось отправить. Попробуйте ещё раз чуть позже.</span>
         </form>
-        <div class="ok" id="leadOk" hidden>
+        <div class="ok" id="leadOk" tabindex="-1" hidden>
           <div class="mark">✓</div>
           <h2>Спасибо!</h2>
           <p class="lead" style="margin-bottom:0">Мы напишем вам в WhatsApp.</p>
@@ -376,9 +381,17 @@
   document.querySelectorAll('.rv:not(.in)').forEach(el => io.observe(el));
 
   const form = document.getElementById('leadForm');
+  const BAD_PHONE = 'Проверьте номер телефона — нужно от 10 до 15 цифр.';
+  const SEND_FAILED = 'Не получилось отправить. Попробуйте ещё раз чуть позже.';
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = document.getElementById('leadBtn'), err = document.getElementById('leadErr');
+    const fail = (text) => { err.textContent = text; err.hidden = false; btn.disabled = false; btn.textContent = 'Оставить заявку'; };
+
+    const digits = (form.phone.value.match(/\d/g) || []).length;
+    if (digits < 10 || digits > 15) { fail(BAD_PHONE); form.phone.focus(); return; }
+
     err.hidden = true; btn.disabled = true; btn.textContent = 'Отправляем…';
     try {
       const r = await fetch('https://n8n.choosereply.com/webhook/LandingLead', {
@@ -386,13 +399,13 @@
         body: new URLSearchParams(new FormData(form)),
       });
       const j = await r.json();
-      if (!j.success) throw new Error('server');
+      if (!j.success) { fail(j.error === 'bad_request' ? BAD_PHONE : SEND_FAILED); return; }
       form.hidden = true;
-      document.getElementById('leadOk').hidden = false;
+      const ok = document.getElementById('leadOk');
+      ok.hidden = false;
+      ok.focus();
     } catch (_) {
-      err.hidden = false;
-      btn.disabled = false;
-      btn.textContent = 'Оставить заявку';
+      fail(SEND_FAILED);
     }
   });
 </script>

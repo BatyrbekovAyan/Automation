@@ -22,7 +22,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const j = $input.first().json;\nconst b = j.body || {};\nconst s = v => (typeof v === 'string' ? v.trim() : '');\nconst website = s(b.website);\nconst phone = s(b.phone);\nconst name = s(b.name).slice(0, 80);\nconst source = (s(b.source) || 'landing').slice(0, 40);\nconst ua = s((j.headers || {})['user-agent']).slice(0, 200);\nlet action;\nif (website) action = 'silent';\nelse if (!phone || phone.length < 6 || phone.length > 32 || !/^[0-9+()\\-\\s]+$/.test(phone)) action = 'bad';\nelse action = 'insert';\nreturn [{ json: { action, name, phone, source, ua } }];"
+        "jsCode": "const j = $input.first().json;\nconst b = j.body || {};\nconst s = v => (typeof v === 'string' ? v.trim() : '');\nconst website = s(b.website);\nconst phone = s(b.phone);\nconst name = s(b.name).slice(0, 80);\nconst source = (s(b.source) || 'landing').slice(0, 40);\nconst ua = s((j.headers || {})['user-agent']).slice(0, 200);\n// Цифры считаем отдельно от charset-проверки: '((((((' и '++++++' проходили длину и набор\n// символов, но телефоном не являются. КЗ-номер = 11 цифр, 15 — максимум по E.164.\nconst digits = (phone.match(/\\d/g) || []).length;\nlet action;\nif (website) action = 'silent';\nelse if (!phone || phone.length < 6 || phone.length > 32 ||\n         !/^[0-9+()\\-\\s]+$/.test(phone) || digits < 10 || digits > 15) action = 'bad';\nelse action = 'insert';\nreturn [{ json: { action, name, phone, source, ua } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -103,7 +103,7 @@
       "parameters": {
         "resource": "database",
         "operation": "executeQuery",
-        "query": "insert into landing_leads (name, phone, source, user_agent)\nvalues (nullif($1,''), $2, $3, nullif($4,''));",
+        "query": "-- Дешёвый предохранитель для НЕаутентифицированного эндпоинта: вставка происходит только\n-- пока за последнюю минуту записей меньше 10. Живой посетитель этого порога не достигает,\n-- а флуд не забивает таблицу, которую владелец читает глазами. Ответ остаётся {success:true}.\ninsert into landing_leads (name, phone, source, user_agent)\nselect nullif($1,''), $2, $3, nullif($4,'')\nwhere (select count(*) from landing_leads where created_at > now() - interval '1 minute') < 10;",
         "options": {
           "queryReplacement": "={{ [ $json.name, $json.phone, $json.source, $json.ua ] }}"
         }
