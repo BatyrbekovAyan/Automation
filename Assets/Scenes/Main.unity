@@ -149905,6 +149905,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1675736585}
   - component: {fileID: 1675736586}
+  - component: {fileID: 1675736587}
   m_Layer: 5
   m_Name: HeaderIcons
   m_TagString: Untagged
@@ -149959,6 +149960,20 @@ MonoBehaviour:
   m_ChildScaleWidth: 0
   m_ChildScaleHeight: 0
   m_ReverseArrangement: 0
+--- !u!114 &1675736587
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1675736584}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3245ec927659c4140ac4f8d17403cc18, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.ContentSizeFitter
+  m_HorizontalFit: 2
+  m_VerticalFit: 0
 --- !u!21 &1675916499
 Material:
   serializedVersion: 8

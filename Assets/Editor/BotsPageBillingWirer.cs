@@ -11,7 +11,9 @@ using UnityEngine.UI;
 /// Builds the «Боты» page's billing surface (Task 14c, spec §6) into Screen_Bots:
 ///
 ///  • <b>TrialPill</b> — first child of <c>NavHeader/HeaderIcons</c>, so the header's own
-///    right-aligned HorizontalLayoutGroup seats it left of the «+» button;
+///    right-aligned HorizontalLayoutGroup seats it left of the «+» button. That row is
+///    ALSO given a ContentSizeFitter here (see EnsureHeaderFitsContent) — without it the
+///    pill runs off the right edge of the screen and takes the «+» with it;
 ///  • <b>UsageStrip</b> — a Surface card between the header and the list, a sibling of
 ///    ScrollContent under BotsPage;
 ///  • <b>AddBotCard</b> — an outlined ghost row under <c>ScrollContent/Viewport</c>,
@@ -149,6 +151,7 @@ public static class BotsPageBillingWirer
         int listPadBottomBase = (int)ResolveBase(so, "listPadBottomBase",
             listLayout != null ? listLayout.padding.bottom : 0);
 
+        EnsureHeaderFitsContent(headerIcons);
         BuildPill(headerIcons, so);
         BuildStrip(page, scrollContent, scrollTopBase, so);
         BuildAddCard(viewport, botsList, listLayout, listPadBottomBase, so);
@@ -219,6 +222,38 @@ public static class BotsPageBillingWirer
         Vector2 pos = stepsRt.anchoredPosition;
         pos.y = firstStepsBaseY - block;
         stepsRt.anchoredPosition = pos;
+    }
+
+    // ── (a0) The header icon row must fit its content ────────────────────────
+
+    /// <summary>
+    /// Makes <c>HeaderIcons</c> size itself to its children, and it is LOAD-BEARING, not
+    /// tidiness: a HorizontalLayoutGroup honours <c>childAlignment</c> on the main axis
+    /// ONLY while it has surplus space. <c>SetChildrenAlongAxis</c> opens with
+    /// <c>pos = padding.left</c> and re-seats it from the alignment inside
+    /// <c>if (surplusSpace &gt; 0)</c> — so the moment the row's content is WIDER than the
+    /// row, «right-aligned» silently becomes «laid out from the left edge, overflowing to
+    /// the right».
+    ///
+    /// The row was authored 190 wide for the 80-wide «+» alone. The trial pill measures
+    /// ~270–300, so a visible pill made the content ~410 and the group started overflowing
+    /// rightwards: the pill hung off the screen's right edge with its tail clipped and the
+    /// «+» button was pushed clean off screen (device report 2026-08-28). It only ever
+    /// looked right while the pill was hidden, which is every state except an active trial.
+    ///
+    /// A ContentSizeFitter fixes it with no runtime code and no magic width: HeaderIcons is
+    /// anchored right with pivot.x 1, so <c>SetSizeWithCurrentAnchors</c> grows it LEFTWARDS
+    /// from its fixed right edge, surplus is never negative, and a reworded pill re-fits
+    /// itself. <c>BotsPageBilling.ResizePill</c> already asks for the rebuild that re-runs
+    /// it. Vertical stays Unconstrained — the row's 60 height is authored, and the pill's
+    /// 120 tap target is deliberately taller than the row it sits in.
+    /// </summary>
+    private static void EnsureHeaderFitsContent(Transform headerIcons)
+    {
+        var fitter = headerIcons.GetComponent<ContentSizeFitter>()
+                     ?? headerIcons.gameObject.AddComponent<ContentSizeFitter>();
+        fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+        fitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
     }
 
     // ── (a) Header trial pill ────────────────────────────────────────────────

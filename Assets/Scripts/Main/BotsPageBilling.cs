@@ -206,8 +206,17 @@ public class BotsPageBilling : MonoBehaviour
     /// HeaderIcons has childControlWidth OFF, so its HorizontalLayoutGroup allocates from
     /// each child's own sizeDelta and ignores LayoutElement entirely — the width has to be
     /// written onto the rect. Measuring the label (rather than pinning a constant) is what
-    /// keeps a reworded pill from clipping; the group is right-aligned, so the extra width
-    /// grows leftwards, away from the «+» button.
+    /// keeps a reworded pill from clipping.
+    ///
+    /// The extra width grows LEFTWARDS, away from the «+» button, only because HeaderIcons
+    /// carries a ContentSizeFitter (added by BotsPageBillingWirer.EnsureHeaderFitsContent)
+    /// and is anchored right with pivot.x 1. Right-alignment alone does NOT deliver that:
+    /// HorizontalOrVerticalLayoutGroup.SetChildrenAlongAxis re-seats its start position from
+    /// childAlignment only inside «if (surplusSpace > 0)», so a row narrower than its content
+    /// lays out from the LEFT edge and overflows to the RIGHT — which is exactly how a
+    /// visible trial pill pushed itself off the screen's right edge and the «+» clean off
+    /// screen (2026-08-28). Hence the MarkLayoutForRebuild below: the fitter has to re-run
+    /// on the new width, not just the group.
     /// </summary>
     private void ResizePill()
     {
