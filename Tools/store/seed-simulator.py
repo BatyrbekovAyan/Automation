@@ -1,0 +1,279 @@
+#!/usr/bin/env python3
+"""Seed the iOS Simulator with fabricated demo data for App Store screenshots.
+
+Writes the app's PlayerPrefs (NSUserDefaults) and its on-disk caches so that the
+Боты / Чаты / чат-тред / Сводка screens render fully populated with NO server
+reachable. Every string here is fabricated — see docs/store/screenshot-fixtures.md
+for the content rules this dataset obeys (the bot must never confirm a booking,
+appoint a time, or state stock as fact — that is what the product actually does).
+
+Usage:
+    python3 Tools/store/seed-simulator.py --dry-run     # print what would be written
+    python3 Tools/store/seed-simulator.py               # seed the booted simulator
+
+Preconditions: a booted simulator with the app INSTALLED, and the app NOT running
+(NSUserDefaults writes go through cfprefsd; a running app would overwrite them on quit).
+
+STATUS: written 2026-08-28 from code-verified formats but NOT yet executed end-to-end —
+the machine had no iOS runtime at authoring time. Verify each screen after the first run.
+"""
+
+import argparse
+import json
+import plistlib
+import subprocess
+import sys
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+BUNDLE = "com.synergysoft.choosereply"
+TZ = timezone(timedelta(hours=5))            # Asia/Almaty — the app's GENERIC_TIMEZONE
+WA_PROFILE = "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412"   # fabricated, non-sentinel
+TG_PROFILE = "3f1c9e02-7a84-4b16-b0d9-55ac1e2f6d31"
+
+# ---------------------------------------------------------------- PlayerPrefs
+
+def player_prefs(now: datetime) -> dict:
+    """PlayerPrefs → NSUserDefaults. int values MUST land as plist integers:
+    PlayerPrefs.GetInt on a string returns its DEFAULT, and Bot{N}Active defaulting
+    to 0 paints the card as the blinking «Подключение…» state (Bot.cs RefreshSubline)."""
+    p = {
+        "ids": 3,                                  # roster size; slots must be contiguous
+        "LastSelectedBotForChats": "Bot0",
+        # Trial must be STARTED and FRESH: absent → backfilled mid-capture; older than
+        # PlanCatalog.TrialDays (5) → EvaluateLaunchExpiryPaywall opens the paywall over Боты.
+        "TrialStartedUtc": (now - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        # Without this the «Первые шаги» card reserves 700u of list padding and covers
+        # the top of the bots list (FirstStepsCard).
+        "OnboardingChecklistDone": 1,
+        # Per-chat override: this ONE chat is «Вместе» while Bot0 stays Авто.
+        # SemiAutoStore.Key = "{botId}_semiAuto_{chatId}"; 2 = on, 1 = explicit off.
+        "Bot0_semiAuto_77000000012@c.us": 2,
+    }
+
+    bots = [
+        dict(i=0, name="Авто-Деталь KZ", btype="auto_parts", wa=1, tg=1, mode=0,
+             business="Магазин автозапчастей для японских авто в Астане. "
+                      "Подбор по VIN, Kaspi рассрочка, самовывоз со склада.",
+             prompt="Если клиент пишет ночью — прими заявку и добавь, что ответим в рабочее время.",
+             phone="+7 700 000-00-01", hours="Пн–Сб 09:00–19:00, Вс выходной",
+             address="Астана, ул. Бейбитшилик, 25", instagram="@avtodetal_demo",
+             email="zakaz@example.com",
+             products=[("Колодки передние 04465-33471", "34 900", "Оригинал Toyota. Camry 50, 2.5"),
+                       ("Колодки передние PN1512", "18 900", "Аналог Nibk. Camry 50, 2.5"),
+                       ("Фильтр масляный 04152-YZZA1", "4 900", "Оригинал Toyota. RAV4 2.0"),
+                       ("Фильтр масляный OP 570", "2 400", "Аналог Filtron. RAV4 2.0")],
+             services=[]),
+        dict(i=1, name="Букет Астана", btype="flowers", wa=1, tg=0, mode=0,
+             business="Цветочный магазин. Доставка по Астане с 9:00 до 21:00, "
+                      "оплата Kaspi или наличными.",
+             prompt="", phone="+7 700 000-00-02", hours="Ежедневно 09:00–21:00",
+             address="Астана, пр. Кабанбай батыра, 11", instagram="@buket_astana_demo", email="",
+             products=[("Букет 25 роз", "18 000", "Красные, 60 см, лента"),
+                       ("Пионовидные розы, 15 шт", "24 500", "Нежно-розовые, сезон"),
+                       ("Композиция в коробке", "15 900", "Хризантема и эустома")],
+             services=[]),
+        dict(i=2, name="Сервис 24", btype="phone_repair", wa=0, tg=1, mode=1,
+             business="Ремонт телефонов и ноутбуков. Диагностика бесплатно, гарантия 3 месяца.",
+             prompt="", phone="+7 700 000-00-03", hours="Ежедневно 10:00–20:00",
+             address="Астана, ул. Сарыарка, 4, ТЦ, 2 этаж", instagram="", email="",
+             products=[],
+             services=[("Замена экрана iPhone 12", "45 000", "Оригинальный дисплей, 1 день"),
+                       ("Замена батареи iPhone 11", "18 000", "45 минут"),
+                       ("Чистка после воды", "12 000", "Диагностика бесплатно")]),
+    ]
+
+    for b in bots:
+        k = f"Bot{b['i']}"
+        p[f"{k}Name"] = b["name"]
+        p[f"{k}Active"] = 1                        # int — the connected/live gate
+        p[f"{k}Status"] = "Active"
+        p[f"{k}BusinessType"] = b["btype"]
+        p[f"{k}Business"] = b["business"]
+        p[f"{k}Prompt"] = b["prompt"]
+        p[f"{k}Phone"] = b["phone"]
+        p[f"{k}Hours"] = b["hours"]
+        p[f"{k}Address"] = b["address"]
+        p[f"{k}Instagram"] = b["instagram"]
+        p[f"{k}Email"] = b["email"]
+        p[f"{k}isOnWhatsapp"] = b["wa"]
+        p[f"{k}isOnTelegram"] = b["tg"]
+        p[f"{k}ReplyMode"] = b["mode"]             # 0 = Авто, 1 = Вместе
+        p[f"{k}WhatsappProfileId"] = WA_PROFILE if b["wa"] else "-1"
+        p[f"{k}TelegramProfileId"] = TG_PROFILE if b["tg"] else "-1"
+        p[f"{k}WhatsappWorkflowId"] = "9PTyYcelRQI7bGDb" if b["wa"] else "-1"
+        p[f"{k}TelegramWorkflowId"] = "4VN3gsFaC2HUYmcc" if b["tg"] else "-1"
+        # Lists: count key is PLURAL+Number, item keys SINGULAR. An EMPTY name string makes
+        # MigrateBotPersistence compact the list and silently shrink it on first launch.
+        p[f"{k}ProductsNumber"] = len(b["products"])
+        for j, (name, price, desc) in enumerate(b["products"]):
+            p[f"{k}Product{j}"] = name
+            p[f"{k}Product{j}Price"] = price       # digits only — ₸ is a sibling label
+            p[f"{k}Product{j}Description"] = desc
+        p[f"{k}ServicesNumber"] = len(b["services"])
+        for j, (name, price, desc) in enumerate(b["services"]):
+            p[f"{k}Service{j}"] = name
+            p[f"{k}Service{j}Price"] = price
+            p[f"{k}Service{j}Description"] = desc
+    return p
+
+# ---------------------------------------------------------------- chat caches
+
+def at(now: datetime, day_offset: int, hh: int, mm: int) -> datetime:
+    return (now - timedelta(days=day_offset)).replace(hour=hh, minute=mm, second=0, microsecond=0)
+
+def chats_json(now: datetime) -> dict:
+    """Raw server payload shape (ChatsResponse). WhatsApp ids MUST carry '@'
+    (ChatIdFormat.IsForeignToChannel drops a bare numeric id as a bled Telegram dialog)."""
+    def row(cid, name, group, unread, preview, when, mine, sender=""):
+        d = {"id": cid, "name": name, "isGroup": group, "unread_count": unread,
+             "last_message_data": preview, "last_timestamp": when.isoformat(),
+             "last_message_type": "chat",
+             "last_message_sender": {"isMe": mine, "pushname": sender}}
+        if mine:
+            d["last_message_delivery_status"] = "read"
+        return d
+
+    return {"status": "done", "dialogs": [
+        row("77000000011@c.us", "Ерлан Сапаров", False, 0,
+            "Передаю менеджеру, он свяжется и подтвердит.", at(now, 0, 10, 9), True),
+        row("77000000012@c.us", "Айгерим Нурланова", False, 2,
+            "И сколько будет с заменой?", at(now, 0, 9, 47), False, "Айгерим Нурланова"),
+        row("77000000013@c.us", "Данияр Оспанов", False, 0,
+            "VIN скину вечером", at(now, 0, 8, 54), False, "Данияр Оспанов"),
+        row("120363000000000001@g.us", "СТО Партнёры", True, 5,
+            "нужны колодки на Camry, 5 комплектов", at(now, 1, 18, 40), False, "Тимур"),
+        row("77000000014@c.us", "Мадина Ахметова", False, 0,
+            "Точное наличие подтвердит менеджер.", at(now, 1, 18, 22), True),
+        row("77000000015@c.us", "Азамат Жумабек", False, 1,
+            "Спасибо, заеду завтра", at(now, 1, 16, 40), False, "Азамат Жумабек"),
+        row("77000000016@c.us", "Сауле Кенжебаева", False, 3,
+            "Kaspi рассрочка есть?", at(now, 1, 12, 15), False, "Сауле Кенжебаева"),
+        row("77000000017@c.us", "Нурлан Абдиров", False, 0,
+            "Записал: Prado 2018, фильтр воздушный.", at(now, 2, 11, 5), True),
+    ]}
+
+def thread(chat_id: str, sender: str, rows, now: datetime) -> dict:
+    """MessageViewModel list under {"messages":[…]} (JsonUtility). type 0 = Chat,
+    deliveryStatus 4 = Read. StripForeignMessages deletes any row whose chatId
+    differs from the file's — so chatId is stamped from one place here."""
+    out = []
+    for n, (incoming, hh, mm, text) in enumerate(rows, start=1):
+        ts = at(now, 0, hh, mm)
+        out.append({
+            "messageId": f"{'false' if incoming else 'true'}_{chat_id}_DEMO{n:04d}",
+            "chatId": chat_id, "type": 0, "text": text,
+            "isIncoming": incoming, "timestamp": int(ts.timestamp()),
+            "sequence": n, "senderName": sender if incoming else "",
+            "deliveryStatus": 0 if incoming else 4,
+        })
+    return {"messages": out}
+
+THREAD_A = [  # Ерлан — the «Авто» payoff thread
+    (True,  10, 2, "Здравствуйте! Нужны передние колодки. Есть?"),
+    (False, 10, 2, "Здравствуйте! Подскажите марку, модель и год авто — так подберу точно."),
+    (True,  10, 3, "Toyota Camry, 2015 год, 2.5"),
+    (False, 10, 4, "По Camry 2015 2.5 в прайсе есть два варианта:\n"
+                   "Колодки передние, арт. 04465-33471 — 34 900 ₸\n"
+                   "Колодки передние, арт. PN1512 — 18 900 ₸"),
+    (True,  10, 5, "А вторые точно есть в наличии?"),
+    (False, 10, 5, "Позиция в прайсе есть, точное наличие подтвердит менеджер."),
+    (True,  10, 6, "Это оригинал или аналог?"),
+    (False, 10, 6, "PN1512 в прайсе помечен как аналог Nibk. Оригинал — 04465-33471."),
+    (True,  10, 7, "Понял. Беру за 18 900, заберу сегодня после 18:00"),
+    (False, 10, 8, "Принял заявку. Напишите, пожалуйста, имя и номер телефона — передам менеджеру."),
+    (True,  10, 8, "Ерлан, +7 700 000-00-11"),
+    (False, 10, 9, "Записал: Ерлан, +7 700 000-00-11, Camry 2015 2.5, колодки PN1512. "
+                   "Передаю менеджеру, он свяжется и подтвердит."),
+]
+
+THREAD_B = [  # Айгерим — «Вместе»: last message must be INCOMING and unanswered
+    (True,  9, 41, "Здравствуйте! Масляный фильтр на RAV4 есть?"),
+    (False, 9, 42, "Здравствуйте! Подскажите год и объём двигателя — подберу точно."),
+    (True,  9, 46, "2019, 2.0 бензин"),
+    (True,  9, 47, "И сколько будет с заменой?"),
+]
+
+def dashboard_json(now: datetime) -> dict:
+    """DashboardStore.Payload. lastFetchMs is set to NOW on purpose: DashboardPage.OnEnable
+    refetches when now-lastFetchMs >= 60s, and a success response carrying an empty
+    outcomes array for these fabricated profileIds would CLEAR the seeded rows and
+    rewrite this file."""
+    now_ms = int(now.timestamp() * 1000)
+    def o(chat, outcome, summary, mins_ago):
+        t = now_ms - mins_ago * 60_000
+        return {"profileId": WA_PROFILE, "chatId": chat, "outcome": outcome,
+                "summary": summary, "outcomeAt": t, "lastMessageAt": t}
+    return {"lastFetchMs": now_ms, "outcomes": [
+        o("77000000011@c.us", "order_collected",
+          "Колодки PN1512, Camry 2015. Имя и телефон взяты, ждёт менеджера.", 12),
+        o("77000000012@c.us", "in_dialog",
+          "Спрашивает цену фильтра на RAV4 2019 и про замену.", 34),
+        o("77000000017@c.us", "order_collected",
+          "Prado 2018, фильтр воздушный — позиции нет в прайсе, заявка принята.", 2_900),
+        o("77000000016@c.us", "owner_needed",
+          "Вопрос по Kaspi рассрочке — условий нет в данных бизнеса.", 1_180),
+        o("77000000013@c.us", "client_silent", "Обещал прислать VIN, ответа пока нет.", 96),
+        o("77000000014@c.us", "question_closed", "Уточняла наличие колодок, ответ дан.", 1_120),
+        o("77000000015@c.us", "in_dialog", "Написал, что заедет завтра.", 1_030),
+    ]}
+
+# ---------------------------------------------------------------- simulator IO
+
+def sh(args: list[str]) -> str:
+    r = subprocess.run(args, capture_output=True, text=True)
+    if r.returncode != 0:
+        sys.exit(f"FAILED: {' '.join(args)}\n{r.stderr.strip()}")
+    return r.stdout.strip()
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--udid", default="booted", help="simulator udid (default: booted)")
+    ap.add_argument("--bundle", default=BUNDLE)
+    ap.add_argument("--dry-run", action="store_true")
+    args = ap.parse_args()
+
+    now = datetime.now(TZ)
+    prefs = player_prefs(now)
+    files = {
+        f"BotCache/Bot0/chats.json": chats_json(now),
+        f"BotCache/Bot0/messages/77000000011@c.us.json":
+            thread("77000000011@c.us", "Ерлан Сапаров", THREAD_A, now),
+        f"BotCache/Bot0/messages/77000000012@c.us.json":
+            thread("77000000012@c.us", "Айгерим Нурланова", THREAD_B, now),
+        "dashboard_cache.json": dashboard_json(now),
+    }
+
+    if args.dry_run:
+        print(f"PlayerPrefs: {len(prefs)} ключей")
+        for k in sorted(prefs):
+            v = prefs[k]
+            print(f"  {k:38} = {v!r} ({'int' if isinstance(v, int) else 'str'})")
+        print(f"\nФайлы: {len(files)}")
+        for path, payload in files.items():
+            body = json.dumps(payload, ensure_ascii=False)
+            print(f"  {path:52} {len(body):6d} байт")
+        return
+
+    container = Path(sh(["xcrun", "simctl", "get_app_container", args.udid, args.bundle, "data"]))
+    docs = container / "Documents"
+    print(f"контейнер: {container}")
+
+    for key, value in prefs.items():
+        flag = "-int" if isinstance(value, int) else "-string"
+        sh(["xcrun", "simctl", "spawn", args.udid, "defaults", "write",
+            args.bundle, key, flag, str(value)])
+    print(f"PlayerPrefs записано: {len(prefs)}")
+
+    for rel, payload in files.items():
+        target = docs / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        print(f"  ✓ {rel}")
+
+    print("\nГотово. Запусти приложение и снимай.")
+    print("Порядок важен: сначала кадр списка чатов (открытие чата гасит его бейдж),")
+    print("потом тред, Боты, Сводка.")
+
+if __name__ == "__main__":
+    main()
