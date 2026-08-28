@@ -47,9 +47,26 @@ public class StoreScreenshotDriver : MonoBehaviour
     private IEnumerator Start()
     {
         Directory.CreateDirectory(OutputDir);
-        Debug.Log($"[StoreCapture] старт, кадры → {OutputDir}");
+        Debug.Log($"[StoreCapture] старт, кадры → {OutputDir}  ({Screen.width}x{Screen.height}), " +
+                  $"timeScale={Time.timeScale}");
 
-        yield return new WaitForSeconds(BootSeconds);
+        // Realtime, never scaled: a scaled wait never returns while the app sits at
+        // timeScale 0, and this codebase already carries that lesson in two other places
+        // (ChatManager.LivePoll, SuggestionsController). A stalled capture looks identical
+        // to a hung Editor.
+        yield return new WaitForSecondsRealtime(BootSeconds);
+        Debug.Log("[StoreCapture] загрузка дождалась, проверяю менеджеров");
+
+        // Fail loudly rather than writing a blank PNG that looks like a successful run:
+        // in an empty scene every manager is null and the capture is just the camera's
+        // background colour.
+        if (Manager.Instance == null || BottomTabManager.Instance == null)
+        {
+            Debug.LogError("[StoreCapture] сцена без менеджеров — открыта не Main.unity. " +
+                           "Кадры не сняты, выхожу.");
+            UnityEditor.EditorApplication.isPlaying = false;
+            yield break;
+        }
 
         // 1. Chat list FIRST — opening any chat zeroes its unread badge, and offline
         //    nothing ever restores it.
@@ -101,7 +118,7 @@ public class StoreScreenshotDriver : MonoBehaviour
 
     private IEnumerator Capture(string name)
     {
-        yield return new WaitForSeconds(SettleSeconds);
+        yield return new WaitForSecondsRealtime(SettleSeconds);
 
         string path = Path.Combine(OutputDir, $"{name}.png");
         ScreenCapture.CaptureScreenshot(path);

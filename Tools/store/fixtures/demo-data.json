@@ -1,0 +1,462 @@
+{
+ "prefs": {
+  "ids": 3,
+  "LastSelectedBotForChats": "Bot0",
+  "TrialStartedUtc": "2026-08-27T16:12:04Z",
+  "OnboardingChecklistDone": 1,
+  "OnboardingSeen": 1,
+  "OnboardingChannelConnectedSeen": 1,
+  "OnboardingPriceListSeen": 1,
+  "FirstBotReplySeen": 1,
+  "Bot0_semiAuto_77000000012@c.us": 2,
+  "Bot0Name": "Авто-Деталь KZ",
+  "Bot0Active": 1,
+  "Bot0Status": "Active",
+  "Bot0BusinessType": "auto_parts",
+  "Bot0Business": "Магазин автозапчастей для японских авто в Астане. Подбор по VIN, Kaspi рассрочка, самовывоз со склада.",
+  "Bot0Prompt": "Если клиент пишет ночью — прими заявку и добавь, что ответим в рабочее время.",
+  "Bot0Phone": "+7 700 000-00-01",
+  "Bot0Hours": "Пн–Сб 09:00–19:00, Вс выходной",
+  "Bot0Address": "Астана, ул. Бейбитшилик, 25",
+  "Bot0Instagram": "@avtodetal_demo",
+  "Bot0Email": "zakaz@example.com",
+  "Bot0isOnWhatsapp": 1,
+  "Bot0isOnTelegram": 1,
+  "Bot0ReplyMode": 0,
+  "Bot0WhatsappProfileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
+  "Bot0TelegramProfileId": "3f1c9e02-7a84-4b16-b0d9-55ac1e2f6d31",
+  "Bot0WhatsappWorkflowId": "9PTyYcelRQI7bGDb",
+  "Bot0TelegramWorkflowId": "4VN3gsFaC2HUYmcc",
+  "Bot0ProductsNumber": 4,
+  "Bot0Product0": "Колодки передние 04465-33471",
+  "Bot0Product0Price": "34 900",
+  "Bot0Product0Description": "Оригинал Toyota. Camry 50, 2.5",
+  "Bot0Product1": "Колодки передние PN1512",
+  "Bot0Product1Price": "18 900",
+  "Bot0Product1Description": "Аналог Nibk. Camry 50, 2.5",
+  "Bot0Product2": "Фильтр масляный 04152-YZZA1",
+  "Bot0Product2Price": "4 900",
+  "Bot0Product2Description": "Оригинал Toyota. RAV4 2.0",
+  "Bot0Product3": "Фильтр масляный OP 570",
+  "Bot0Product3Price": "2 400",
+  "Bot0Product3Description": "Аналог Filtron. RAV4 2.0",
+  "Bot0ServicesNumber": 0,
+  "Bot1Name": "Букет Астана",
+  "Bot1Active": 1,
+  "Bot1Status": "Active",
+  "Bot1BusinessType": "flowers",
+  "Bot1Business": "Цветочный магазин. Доставка по Астане с 9:00 до 21:00, оплата Kaspi или наличными.",
+  "Bot1Prompt": "",
+  "Bot1Phone": "+7 700 000-00-02",
+  "Bot1Hours": "Ежедневно 09:00–21:00",
+  "Bot1Address": "Астана, пр. Кабанбай батыра, 11",
+  "Bot1Instagram": "@buket_astana_demo",
+  "Bot1Email": "",
+  "Bot1isOnWhatsapp": 1,
+  "Bot1isOnTelegram": 0,
+  "Bot1ReplyMode": 0,
+  "Bot1WhatsappProfileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
+  "Bot1TelegramProfileId": "-1",
+  "Bot1WhatsappWorkflowId": "9PTyYcelRQI7bGDb",
+  "Bot1TelegramWorkflowId": "-1",
+  "Bot1ProductsNumber": 3,
+  "Bot1Product0": "Букет 25 роз",
+  "Bot1Product0Price": "18 000",
+  "Bot1Product0Description": "Красные, 60 см, лента",
+  "Bot1Product1": "Пионовидные розы, 15 шт",
+  "Bot1Product1Price": "24 500",
+  "Bot1Product1Description": "Нежно-розовые, сезон",
+  "Bot1Product2": "Композиция в коробке",
+  "Bot1Product2Price": "15 900",
+  "Bot1Product2Description": "Хризантема и эустома",
+  "Bot1ServicesNumber": 0,
+  "Bot2Name": "Сервис 24",
+  "Bot2Active": 1,
+  "Bot2Status": "Active",
+  "Bot2BusinessType": "phone_repair",
+  "Bot2Business": "Ремонт телефонов и ноутбуков. Диагностика бесплатно, гарантия 3 месяца.",
+  "Bot2Prompt": "",
+  "Bot2Phone": "+7 700 000-00-03",
+  "Bot2Hours": "Ежедневно 10:00–20:00",
+  "Bot2Address": "Астана, ул. Сарыарка, 4, ТЦ, 2 этаж",
+  "Bot2Instagram": "",
+  "Bot2Email": "",
+  "Bot2isOnWhatsapp": 0,
+  "Bot2isOnTelegram": 1,
+  "Bot2ReplyMode": 1,
+  "Bot2WhatsappProfileId": "-1",
+  "Bot2TelegramProfileId": "3f1c9e02-7a84-4b16-b0d9-55ac1e2f6d31",
+  "Bot2WhatsappWorkflowId": "-1",
+  "Bot2TelegramWorkflowId": "4VN3gsFaC2HUYmcc",
+  "Bot2ProductsNumber": 0,
+  "Bot2ServicesNumber": 3,
+  "Bot2Service0": "Замена экрана iPhone 12",
+  "Bot2Service0Price": "45 000",
+  "Bot2Service0Description": "Оригинальный дисплей, 1 день",
+  "Bot2Service1": "Замена батареи iPhone 11",
+  "Bot2Service1Price": "18 000",
+  "Bot2Service1Description": "45 минут",
+  "Bot2Service2": "Чистка после воды",
+  "Bot2Service2Price": "12 000",
+  "Bot2Service2Description": "Диагностика бесплатно"
+ },
+ "files": {
+  "BotCache/Bot0/chats.json": {
+   "status": "done",
+   "dialogs": [
+    {
+     "id": "77000000011@c.us",
+     "name": "Ерлан Сапаров",
+     "isGroup": false,
+     "unread_count": 0,
+     "last_message_data": "Передаю менеджеру, он свяжется и подтвердит.",
+     "last_timestamp": "2026-08-28T10:09:00+05:00",
+     "last_message_type": "chat",
+     "last_message_sender": {
+      "isMe": true,
+      "pushname": ""
+     },
+     "last_message_delivery_status": "read"
+    },
+    {
+     "id": "77000000012@c.us",
+     "name": "Айгерим Нурланова",
+     "isGroup": false,
+     "unread_count": 2,
+     "last_message_data": "И сколько будет с заменой?",
+     "last_timestamp": "2026-08-28T09:47:00+05:00",
+     "last_message_type": "chat",
+     "last_message_sender": {
+      "isMe": false,
+      "pushname": "Айгерим Нурланова"
+     }
+    },
+    {
+     "id": "77000000013@c.us",
+     "name": "Данияр Оспанов",
+     "isGroup": false,
+     "unread_count": 0,
+     "last_message_data": "VIN скину вечером",
+     "last_timestamp": "2026-08-28T08:54:00+05:00",
+     "last_message_type": "chat",
+     "last_message_sender": {
+      "isMe": false,
+      "pushname": "Данияр Оспанов"
+     }
+    },
+    {
+     "id": "120363000000000001@g.us",
+     "name": "СТО Партнёры",
+     "isGroup": true,
+     "unread_count": 5,
+     "last_message_data": "нужны колодки на Camry, 5 комплектов",
+     "last_timestamp": "2026-08-27T18:40:00+05:00",
+     "last_message_type": "chat",
+     "last_message_sender": {
+      "isMe": false,
+      "pushname": "Тимур"
+     }
+    },
+    {
+     "id": "77000000014@c.us",
+     "name": "Мадина Ахметова",
+     "isGroup": false,
+     "unread_count": 0,
+     "last_message_data": "Точное наличие подтвердит менеджер.",
+     "last_timestamp": "2026-08-27T18:22:00+05:00",
+     "last_message_type": "chat",
+     "last_message_sender": {
+      "isMe": true,
+      "pushname": ""
+     },
+     "last_message_delivery_status": "read"
+    },
+    {
+     "id": "77000000015@c.us",
+     "name": "Азамат Жумабек",
+     "isGroup": false,
+     "unread_count": 1,
+     "last_message_data": "Спасибо, заеду завтра",
+     "last_timestamp": "2026-08-27T16:40:00+05:00",
+     "last_message_type": "chat",
+     "last_message_sender": {
+      "isMe": false,
+      "pushname": "Азамат Жумабек"
+     }
+    },
+    {
+     "id": "77000000016@c.us",
+     "name": "Сауле Кенжебаева",
+     "isGroup": false,
+     "unread_count": 3,
+     "last_message_data": "Kaspi рассрочка есть?",
+     "last_timestamp": "2026-08-27T12:15:00+05:00",
+     "last_message_type": "chat",
+     "last_message_sender": {
+      "isMe": false,
+      "pushname": "Сауле Кенжебаева"
+     }
+    },
+    {
+     "id": "77000000017@c.us",
+     "name": "Нурлан Абдиров",
+     "isGroup": false,
+     "unread_count": 0,
+     "last_message_data": "Записал: Prado 2018, фильтр воздушный.",
+     "last_timestamp": "2026-08-26T11:05:00+05:00",
+     "last_message_type": "chat",
+     "last_message_sender": {
+      "isMe": true,
+      "pushname": ""
+     },
+     "last_message_delivery_status": "read"
+    }
+   ]
+  },
+  "BotCache/Bot0/messages/77000000011@c.us.json": {
+   "messages": [
+    {
+     "messageId": "false_77000000011@c.us_DEMO0001",
+     "chatId": "77000000011@c.us",
+     "type": 0,
+     "text": "Здравствуйте! Нужны передние колодки. Есть?",
+     "isIncoming": true,
+     "timestamp": 1787893320,
+     "sequence": 1,
+     "senderName": "Ерлан Сапаров",
+     "deliveryStatus": 0
+    },
+    {
+     "messageId": "true_77000000011@c.us_DEMO0002",
+     "chatId": "77000000011@c.us",
+     "type": 0,
+     "text": "Здравствуйте! Подскажите марку, модель и год авто — так подберу точно.",
+     "isIncoming": false,
+     "timestamp": 1787893320,
+     "sequence": 2,
+     "senderName": "",
+     "deliveryStatus": 4
+    },
+    {
+     "messageId": "false_77000000011@c.us_DEMO0003",
+     "chatId": "77000000011@c.us",
+     "type": 0,
+     "text": "Toyota Camry, 2015 год, 2.5",
+     "isIncoming": true,
+     "timestamp": 1787893380,
+     "sequence": 3,
+     "senderName": "Ерлан Сапаров",
+     "deliveryStatus": 0
+    },
+    {
+     "messageId": "true_77000000011@c.us_DEMO0004",
+     "chatId": "77000000011@c.us",
+     "type": 0,
+     "text": "По Camry 2015 2.5 в прайсе есть два варианта:\nКолодки передние, арт. 04465-33471 — 34 900 ₸\nКолодки передние, арт. PN1512 — 18 900 ₸",
+     "isIncoming": false,
+     "timestamp": 1787893440,
+     "sequence": 4,
+     "senderName": "",
+     "deliveryStatus": 4
+    },
+    {
+     "messageId": "false_77000000011@c.us_DEMO0005",
+     "chatId": "77000000011@c.us",
+     "type": 0,
+     "text": "А вторые точно есть в наличии?",
+     "isIncoming": true,
+     "timestamp": 1787893500,
+     "sequence": 5,
+     "senderName": "Ерлан Сапаров",
+     "deliveryStatus": 0
+    },
+    {
+     "messageId": "true_77000000011@c.us_DEMO0006",
+     "chatId": "77000000011@c.us",
+     "type": 0,
+     "text": "Позиция в прайсе есть, точное наличие подтвердит менеджер.",
+     "isIncoming": false,
+     "timestamp": 1787893500,
+     "sequence": 6,
+     "senderName": "",
+     "deliveryStatus": 4
+    },
+    {
+     "messageId": "false_77000000011@c.us_DEMO0007",
+     "chatId": "77000000011@c.us",
+     "type": 0,
+     "text": "Это оригинал или аналог?",
+     "isIncoming": true,
+     "timestamp": 1787893560,
+     "sequence": 7,
+     "senderName": "Ерлан Сапаров",
+     "deliveryStatus": 0
+    },
+    {
+     "messageId": "true_77000000011@c.us_DEMO0008",
+     "chatId": "77000000011@c.us",
+     "type": 0,
+     "text": "PN1512 в прайсе помечен как аналог Nibk. Оригинал — 04465-33471.",
+     "isIncoming": false,
+     "timestamp": 1787893560,
+     "sequence": 8,
+     "senderName": "",
+     "deliveryStatus": 4
+    },
+    {
+     "messageId": "false_77000000011@c.us_DEMO0009",
+     "chatId": "77000000011@c.us",
+     "type": 0,
+     "text": "Понял. Беру за 18 900, заберу сегодня после 18:00",
+     "isIncoming": true,
+     "timestamp": 1787893620,
+     "sequence": 9,
+     "senderName": "Ерлан Сапаров",
+     "deliveryStatus": 0
+    },
+    {
+     "messageId": "true_77000000011@c.us_DEMO0010",
+     "chatId": "77000000011@c.us",
+     "type": 0,
+     "text": "Принял заявку. Напишите, пожалуйста, имя и номер телефона — передам менеджеру.",
+     "isIncoming": false,
+     "timestamp": 1787893680,
+     "sequence": 10,
+     "senderName": "",
+     "deliveryStatus": 4
+    },
+    {
+     "messageId": "false_77000000011@c.us_DEMO0011",
+     "chatId": "77000000011@c.us",
+     "type": 0,
+     "text": "Ерлан, +7 700 000-00-11",
+     "isIncoming": true,
+     "timestamp": 1787893680,
+     "sequence": 11,
+     "senderName": "Ерлан Сапаров",
+     "deliveryStatus": 0
+    },
+    {
+     "messageId": "true_77000000011@c.us_DEMO0012",
+     "chatId": "77000000011@c.us",
+     "type": 0,
+     "text": "Записал: Ерлан, +7 700 000-00-11, Camry 2015 2.5, колодки PN1512. Передаю менеджеру, он свяжется и подтвердит.",
+     "isIncoming": false,
+     "timestamp": 1787893740,
+     "sequence": 12,
+     "senderName": "",
+     "deliveryStatus": 4
+    }
+   ]
+  },
+  "BotCache/Bot0/messages/77000000012@c.us.json": {
+   "messages": [
+    {
+     "messageId": "false_77000000012@c.us_DEMO0001",
+     "chatId": "77000000012@c.us",
+     "type": 0,
+     "text": "Здравствуйте! Масляный фильтр на RAV4 есть?",
+     "isIncoming": true,
+     "timestamp": 1787892060,
+     "sequence": 1,
+     "senderName": "Айгерим Нурланова",
+     "deliveryStatus": 0
+    },
+    {
+     "messageId": "true_77000000012@c.us_DEMO0002",
+     "chatId": "77000000012@c.us",
+     "type": 0,
+     "text": "Здравствуйте! Подскажите год и объём двигателя — подберу точно.",
+     "isIncoming": false,
+     "timestamp": 1787892120,
+     "sequence": 2,
+     "senderName": "",
+     "deliveryStatus": 4
+    },
+    {
+     "messageId": "false_77000000012@c.us_DEMO0003",
+     "chatId": "77000000012@c.us",
+     "type": 0,
+     "text": "2019, 2.0 бензин",
+     "isIncoming": true,
+     "timestamp": 1787892360,
+     "sequence": 3,
+     "senderName": "Айгерим Нурланова",
+     "deliveryStatus": 0
+    },
+    {
+     "messageId": "false_77000000012@c.us_DEMO0004",
+     "chatId": "77000000012@c.us",
+     "type": 0,
+     "text": "И сколько будет с заменой?",
+     "isIncoming": true,
+     "timestamp": 1787892420,
+     "sequence": 4,
+     "senderName": "Айгерим Нурланова",
+     "deliveryStatus": 0
+    }
+   ]
+  },
+  "dashboard_cache.json": {
+   "lastFetchMs": 1787915524668,
+   "outcomes": [
+    {
+     "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
+     "chatId": "77000000011@c.us",
+     "outcome": "order_collected",
+     "summary": "Колодки PN1512, Camry 2015. Имя и телефон взяты, ждёт менеджера.",
+     "outcomeAt": 1787914804668,
+     "lastMessageAt": 1787914804668
+    },
+    {
+     "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
+     "chatId": "77000000012@c.us",
+     "outcome": "in_dialog",
+     "summary": "Спрашивает цену фильтра на RAV4 2019 и про замену.",
+     "outcomeAt": 1787913484668,
+     "lastMessageAt": 1787913484668
+    },
+    {
+     "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
+     "chatId": "77000000017@c.us",
+     "outcome": "order_collected",
+     "summary": "Prado 2018, фильтр воздушный — позиции нет в прайсе, заявка принята.",
+     "outcomeAt": 1787741524668,
+     "lastMessageAt": 1787741524668
+    },
+    {
+     "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
+     "chatId": "77000000016@c.us",
+     "outcome": "owner_needed",
+     "summary": "Вопрос по Kaspi рассрочке — условий нет в данных бизнеса.",
+     "outcomeAt": 1787844724668,
+     "lastMessageAt": 1787844724668
+    },
+    {
+     "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
+     "chatId": "77000000013@c.us",
+     "outcome": "client_silent",
+     "summary": "Обещал прислать VIN, ответа пока нет.",
+     "outcomeAt": 1787909764668,
+     "lastMessageAt": 1787909764668
+    },
+    {
+     "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
+     "chatId": "77000000014@c.us",
+     "outcome": "question_closed",
+     "summary": "Уточняла наличие колодок, ответ дан.",
+     "outcomeAt": 1787848324668,
+     "lastMessageAt": 1787848324668
+    },
+    {
+     "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
+     "chatId": "77000000015@c.us",
+     "outcome": "in_dialog",
+     "summary": "Написал, что заедет завтра.",
+     "outcomeAt": 1787853724668,
+     "lastMessageAt": 1787853724668
+    }
+   ]
+  }
+ }
+}

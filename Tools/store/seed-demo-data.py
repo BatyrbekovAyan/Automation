@@ -279,7 +279,13 @@ def write_files(docs: Path, files: dict) -> None:
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--target", choices=["editor", "simulator"], default="editor")
+    ap.add_argument("--target", choices=["fixture", "editor", "simulator"], default="fixture",
+                    help="fixture (default): write Tools/store/fixtures/demo-data.json for the "
+                         "in-Editor seeder — the ONLY reliable path while Unity is open, because "
+                         "a running Editor caches PlayerPrefs and flushes its own copy over any "
+                         "external `defaults write` when Play Mode exits (measured 2026-08-28: "
+                         "99 seeded keys reduced to 20). 'editor' writes the plist directly and "
+                         "is only safe with Unity CLOSED.")
     ap.add_argument("--udid", default="booted", help="simulator udid (default: booted)")
     ap.add_argument("--bundle", default=BUNDLE)
     ap.add_argument("--dry-run", action="store_true")
@@ -309,6 +315,14 @@ def main():
             print(f"  {path:52} {len(body):6d} байт")
         return
 
+    if args.target == "fixture":
+        out = Path("Tools/store/fixtures/demo-data.json")
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps({"prefs": prefs, "files": files},
+                                  ensure_ascii=False, indent=1), encoding="utf-8")
+        print(f"фикстура записана: {out}  ({len(prefs)} ключей, {len(files)} файлов)")
+        print("Применить: Tools/Store/Capture Screenshots в Unity (сеет сам перед съёмкой).")
+        return
     if args.target == "editor":
         seed_editor(prefs, files)
     else:
