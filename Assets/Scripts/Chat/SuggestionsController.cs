@@ -27,6 +27,15 @@ public class SuggestionsController : MonoBehaviour
     // constructed here since the Phase-2 swap to N8nSuggestionsProvider (it owns its own latency
     // default), so the field was dead inspector surface.
 
+    /// <summary>
+    /// Injectable provider seam (project idiom: SemiAutoStore.GetInt / ThemePrefs' Func seams).
+    /// Defaults to the live provider, so shipping behaviour is unchanged. The store-screenshot
+    /// driver swaps in a deterministic one before scene load: cards arrive ONLY from a live
+    /// SuggestReplies round-trip — there is no disk cache and no fallback — so without a seam
+    /// the app's flagship screen cannot be photographed offline at all.
+    /// </summary>
+    internal static System.Func<ISuggestionsProvider> ProviderFactory = () => new N8nSuggestionsProvider();
+
     private ISuggestionsProvider _provider;
     private long _requestSeq;          // monotonic; newest wins (A6)
     private bool _semiAutoOn;
@@ -143,7 +152,7 @@ public class SuggestionsController : MonoBehaviour
 
     void Awake()
     {
-        _provider = new N8nSuggestionsProvider();   // Phase-2 live provider (N8N-02 single-line swap); coroutine runs on ChatManager.Instance
+        _provider = ProviderFactory();   // live N8nSuggestionsProvider by default; coroutine runs on ChatManager.Instance
         if (ChatManager.Instance != null)
         {
             ChatManager.Instance.OnChatSelected += HandleChatSelected;        // fires while this may be INACTIVE (Pitfall 3)

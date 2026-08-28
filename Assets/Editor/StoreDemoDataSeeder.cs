@@ -70,8 +70,29 @@ public static class StoreDemoDataSeeder
             {
                 string full = Path.Combine(Application.persistentDataPath, pair.Key);
                 Directory.CreateDirectory(Path.GetDirectoryName(full));
+
+                JToken payload = pair.Value;
+
+                // Stamp the dashboard's fetch clock at SEED time, not at fixture-generation
+                // time. DashboardPage.OnEnable refetches once 60s have passed, and a success
+                // response carrying an empty outcomes array for these fabricated profileIds
+                // CLEARS the seeded rows and rewrites this file — which is exactly how the
+                // 2026-08-28 run photographed «Бот пока не вёл диалогов». Minutes usually pass
+                // between generating the fixture and running the capture; seconds do not.
+                if (pair.Key.EndsWith("dashboard_cache.json") && payload is JObject dash)
+                {
+                    // Deliberately in the FUTURE. The throttle is `now - lastFetchMs >= 60s`,
+                    // and stamping "now" left barely a minute — the 2026-08-28 run compiled,
+                    // booted and opened two chats first, so the gate was already open by the
+                    // time Сводка appeared and the fetch wrote 0 rows over the seed. A forward
+                    // stamp keeps the gate shut for the whole capture; it only ever suppresses
+                    // a refresh, and this cache is fixture data with no other consumer.
+                    dash["lastFetchMs"] = System.DateTimeOffset.UtcNow
+                        .AddMinutes(15).ToUnixTimeMilliseconds();
+                }
+
                 // Compact, no indentation — these files mimic server payloads and app caches.
-                File.WriteAllText(full, pair.Value.ToString(Newtonsoft.Json.Formatting.None));
+                File.WriteAllText(full, payload.ToString(Newtonsoft.Json.Formatting.None));
                 written++;
             }
         }

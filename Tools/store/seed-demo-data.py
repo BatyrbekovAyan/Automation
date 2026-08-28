@@ -209,6 +209,22 @@ THREAD_B = [  # Айгерим — «Вместе»: last message must be INCOMI
     (True,  9, 47, "И сколько будет с заменой?"),
 ]
 
+# «Вместе» cards for thread B, rendered by StoreDemoSuggestionsProvider. Authored against
+# Tools/n8n/prompts/panel/auto_parts.md — the panel speaks in the OWNER's voice (first person,
+# «уточню и напишу»), never the auto-mode assistant's «передам менеджеру». Prices are verbatim
+# Bot0Product2 / Bot0Product3. Installation is absent from the catalogue and from About Business,
+# so card 3 defers instead of inventing a price. Labels ≤18 chars, all four distinct.
+SUGGESTION_CARDS = [
+    {"label": "Цена и артикул", "move": "Ответ",
+     "text": "На RAV4 2019 2.0 подходит фильтр, арт. 04152-YZZA1 — 4 900 ₸."},
+    {"label": "Дешевле", "move": "Вариант",
+     "text": "Есть аналог подешевле — OP 570, 2 400 ₸. В прайсе он помечен как аналог Filtron."},
+    {"label": "Про замену", "move": "Отложить",
+     "text": "По замене уточню и напишу вам — не хочу называть условия наугад."},
+    {"label": "Оформить?", "move": "К заказу",
+     "text": "Если берём — напишите имя и телефон, проверю остаток на складе и наберу вас."},
+]
+
 def dashboard_json(now: datetime) -> dict:
     """DashboardStore.Payload. lastFetchMs is set to NOW on purpose: DashboardPage.OnEnable
     refetches when now-lastFetchMs >= 60s, and a success response carrying an empty
@@ -318,7 +334,8 @@ def main():
     if args.target == "fixture":
         out = Path("Tools/store/fixtures/demo-data.json")
         out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(json.dumps({"prefs": prefs, "files": files},
+        out.write_text(json.dumps({"prefs": prefs, "files": files,
+                                   "suggestions": SUGGESTION_CARDS},
                                   ensure_ascii=False, indent=1), encoding="utf-8")
         print(f"фикстура записана: {out}  ({len(prefs)} ключей, {len(files)} файлов)")
         print("Применить: Tools/Store/Capture Screenshots в Unity (сеет сам перед съёмкой).")

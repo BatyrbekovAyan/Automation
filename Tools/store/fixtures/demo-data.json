@@ -2,7 +2,7 @@
  "prefs": {
   "ids": 3,
   "LastSelectedBotForChats": "Bot0",
-  "TrialStartedUtc": "2026-08-27T16:12:04Z",
+  "TrialStartedUtc": "2026-08-27T17:09:35Z",
   "OnboardingChecklistDone": 1,
   "OnboardingSeen": 1,
   "OnboardingChannelConnectedSeen": 1,
@@ -398,65 +398,87 @@
    ]
   },
   "dashboard_cache.json": {
-   "lastFetchMs": 1787915524668,
+   "lastFetchMs": 1787918975806,
    "outcomes": [
     {
      "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
      "chatId": "77000000011@c.us",
      "outcome": "order_collected",
      "summary": "Колодки PN1512, Camry 2015. Имя и телефон взяты, ждёт менеджера.",
-     "outcomeAt": 1787914804668,
-     "lastMessageAt": 1787914804668
+     "outcomeAt": 1787918255806,
+     "lastMessageAt": 1787918255806
     },
     {
      "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
      "chatId": "77000000012@c.us",
      "outcome": "in_dialog",
      "summary": "Спрашивает цену фильтра на RAV4 2019 и про замену.",
-     "outcomeAt": 1787913484668,
-     "lastMessageAt": 1787913484668
+     "outcomeAt": 1787916935806,
+     "lastMessageAt": 1787916935806
     },
     {
      "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
      "chatId": "77000000017@c.us",
      "outcome": "order_collected",
      "summary": "Prado 2018, фильтр воздушный — позиции нет в прайсе, заявка принята.",
-     "outcomeAt": 1787741524668,
-     "lastMessageAt": 1787741524668
+     "outcomeAt": 1787744975806,
+     "lastMessageAt": 1787744975806
     },
     {
      "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
      "chatId": "77000000016@c.us",
      "outcome": "owner_needed",
      "summary": "Вопрос по Kaspi рассрочке — условий нет в данных бизнеса.",
-     "outcomeAt": 1787844724668,
-     "lastMessageAt": 1787844724668
+     "outcomeAt": 1787848175806,
+     "lastMessageAt": 1787848175806
     },
     {
      "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
      "chatId": "77000000013@c.us",
      "outcome": "client_silent",
      "summary": "Обещал прислать VIN, ответа пока нет.",
-     "outcomeAt": 1787909764668,
-     "lastMessageAt": 1787909764668
+     "outcomeAt": 1787913215806,
+     "lastMessageAt": 1787913215806
     },
     {
      "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
      "chatId": "77000000014@c.us",
      "outcome": "question_closed",
      "summary": "Уточняла наличие колодок, ответ дан.",
-     "outcomeAt": 1787848324668,
-     "lastMessageAt": 1787848324668
+     "outcomeAt": 1787851775806,
+     "lastMessageAt": 1787851775806
     },
     {
      "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
      "chatId": "77000000015@c.us",
      "outcome": "in_dialog",
      "summary": "Написал, что заедет завтра.",
-     "outcomeAt": 1787853724668,
-     "lastMessageAt": 1787853724668
+     "outcomeAt": 1787857175806,
+     "lastMessageAt": 1787857175806
     }
    ]
   }
- }
+ },
+ "suggestions": [
+  {
+   "label": "Цена и артикул",
+   "move": "Ответ",
+   "text": "На RAV4 2019 2.0 подходит фильтр, арт. 04152-YZZA1 — 4 900 ₸."
+  },
+  {
+   "label": "Дешевле",
+   "move": "Вариант",
+   "text": "Есть аналог подешевле — OP 570, 2 400 ₸. В прайсе он помечен как аналог Filtron."
+  },
+  {
+   "label": "Про замену",
+   "move": "Отложить",
+   "text": "По замене уточню и напишу вам — не хочу называть условия наугад."
+  },
+  {
+   "label": "Оформить?",
+   "move": "К заказу",
+   "text": "Если берём — напишите имя и телефон, проверю остаток на складе и наберу вас."
+  }
+ ]
 }

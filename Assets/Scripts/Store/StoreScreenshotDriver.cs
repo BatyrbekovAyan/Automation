@@ -24,20 +24,26 @@ public class StoreScreenshotDriver : MonoBehaviour
     public const string RunFlagKey = "StoreCaptureRun";
 
     private const string OutputDir = "Tools/store/screenshots";
-    private const string DemoChatId = "77000000011@c.us";   // Ерлан — the «Авто» payoff thread
+    private const string AutoChatId = "77000000011@c.us";   // Ерлан — the «Авто» payoff thread
+    private const string SemiChatId = "77000000012@c.us";   // Айгерим — seeded into «Вместе»
 
-    // Settle budgets. Bot instantiation waits a frame and then paints the card one frame
-    // later (Bot.InitCardState), the chat list lays out asynchronously, and a tab switch
-    // animates — so every capture is preceded by a real pause rather than a yield.
     private const float BootSeconds = 3.0f;
-    private const float SettleSeconds = 1.2f;
+    private const float SettleSeconds = 1.5f;
+    // Opening a chat is ~600ms of chrome alone (300ms Prep + ~290ms slide) and PopulateBubbles
+    // runs INSIDE the slide's onComplete, followed by the row-height layout chain. A 1.2s wait
+    // photographed the wallpaper with no bubbles on it (2026-08-28).
+    private const float ChatOpenSeconds = 4.0f;
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void Bootstrap()
     {
         if (PlayerPrefs.GetInt(RunFlagKey, 0) != 1) return;
         PlayerPrefs.DeleteKey(RunFlagKey);
         PlayerPrefs.Save();
+
+        // BEFORE scene load on purpose: SuggestionsController.Awake reads the factory, and the
+        // «Вместе» panel has no offline path without this swap.
+        SuggestionsController.ProviderFactory = () => new StoreDemoSuggestionsProvider();
 
         var host = new GameObject(nameof(StoreScreenshotDriver));
         DontDestroyOnLoad(host);
@@ -72,40 +78,43 @@ public class StoreScreenshotDriver : MonoBehaviour
         //    nothing ever restores it.
         yield return Capture("01-chats");
 
-        // 2. The auto-reply thread.
-        if (ChatManager.Instance != null)
+        // 2. The auto-reply thread — the «Авто» payoff.
+        ChatManager.Instance.SelectChat(AutoChatId);
+        yield return new WaitForSecondsRealtime(ChatOpenSeconds);
+        yield return Capture("02-thread-auto");
+
+        // 3. The «Вместе» panel over its own chat. This chat is seeded per-chat semi-auto, so
+        //    the panel is the slot's tenant on open and the cards come from the demo provider.
+        ChatManager.Instance.SelectChat(SemiChatId);
+        yield return new WaitForSecondsRealtime(ChatOpenSeconds);
+        yield return Capture("03-suggestions");
+
+        // 4. Every tab, by index. Named by index on purpose: the tab order is scene data, so the
+        //    driver does not assert which index is Боты vs Сводка — identify the PNGs by eye.
+        //    Each switch gets its own settle: a tab captured mid-transition photographs a
+        //    half-drawn nav bar (measured 2026-08-28).
+        // Leave the open chat before touching the tabs. The messages panel stays active over
+        // the chat list otherwise, and its black composer strip covers part of the nav bar —
+        // which is what put a black block in the corner of every tab shot on 2026-08-28.
+        if (SwipeToBack.Instance != null)
         {
-            ChatManager.Instance.SelectChat(DemoChatId);
-            yield return Capture("02-thread-auto");
-        }
-        else
-        {
-            Debug.LogWarning("[StoreCapture] ChatManager.Instance == null — тред пропущен");
+            SwipeToBack.Instance.SlideOutToChatList(instant: true);
+            yield return new WaitForSecondsRealtime(1.5f);
         }
 
-        // 3. Every tab, by index. Named by index on purpose: the tab order is scene data,
-        //    so the driver does not assert which index is Боты vs Сводка — identify the
-        //    PNGs by eye and rename, rather than baking a wrong constant in here.
-        var bar = BottomTabManager.Instance;
-        if (bar != null)
+        foreach (int index in new[] { 1, 2, 3, 0 })
         {
-            foreach (int index in new[] { 0, 1, 2, 3 })
-            {
-                bar.SwitchTab(index);
-                yield return Capture($"03-tab{index}");
-            }
-        }
-        else
-        {
-            Debug.LogWarning("[StoreCapture] BottomTabManager.Instance == null — вкладки пропущены");
+            BottomTabManager.Instance.SwitchTab(index);
+            yield return new WaitForSecondsRealtime(2.0f);
+            yield return Capture($"04-tab{index}");
         }
 
-        // 4. Paywall.
+        // 5. Paywall.
         var paywall = PaywallController.Instance;
         if (paywall != null)
         {
             paywall.Open(PaywallTrigger.Browse);
-            yield return Capture("04-paywall");
+            yield return Capture("05-paywall");
         }
         else
         {
