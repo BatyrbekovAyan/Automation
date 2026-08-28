@@ -8,15 +8,15 @@
 - [x] **Финальное имя приложения: «Choose Reply»** (решение владельца 2026-08-27).
   Вписано: `ProjectSettings.productName`, `ProfileSubPages.ProductName` + сцена,
   юр-документы, review notes. Осталось: использовать «Choose Reply» в store listing.
-- [ ] **Юр-страницы опубликованы на choosereply.com.** ⚠️ На 2026-08-27 домен
-  НЕ РЕЗОЛВИТСЯ (нет DNS): сначала зарегистрировать домен и настроить
-  хостинг/DNS — без живого Privacy Policy URL Apple отклонит метаданные.
-  Перед выкладкой заполнить
-  в обоих файлах жёлтое поле «[Заполнить до публикации: ИП/ТОО …]», затем залить
-  `docs/legal/privacy.html` → `https://choosereply.com/privacy.html` и
-  `docs/legal/terms.html` → `https://choosereply.com/terms.html` — ИМЕННО по этим
-  путям: они вшиты в приложение (`LegalLinks`) и в notes. Проверить открытие
-  с телефона.
+- [x] **Юр-страницы опубликованы на choosereply.com** (2026-08-28). Домен живёт на
+  собственном VPS (Caddy, авто-HTTPS): `https://choosereply.com/privacy.html` и
+  `/terms.html` отдают 200 — ИМЕННО по этим путям, они вшиты в приложение
+  (`LegalLinks`) и в review notes. Реквизиты оператора заполнены в обоих файлах:
+  ТОО «Synergy Expert Group», БИН 180940030158, руководитель Батырбеков Аян,
+  г. Астана, проспект Бауыржана Момышулы, 7-87. Источник — `docs/legal/*.html`;
+  копии для деплоя лежат в `Tools/landing/` и должны быть байт-в-байт теми же
+  (после правки юр-текста копировать заново и перезаливать scp на VPS).
+  Осталось: проверить открытие ссылок с телефона.
 - [x] **URL вписаны в приложение** (`LegalLinks.TermsUrl`/`PrivacyUrl` =
   `https://choosereply.com/{terms,privacy}.html`), билдер перезапущен, ряд ссылок
   на пейволле активен. Осталось: глазами убедиться на устройстве/в Editor, что обе
