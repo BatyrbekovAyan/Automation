@@ -68,5 +68,12 @@ public partial class ProfileSubPages
 
         FinishClose(Page.Account);
         ProfilePage.Instance?.NavigateToWhatsAppTab();
+
+        // 4. The wipe restores a TRUE first-run state (bots gone, OnboardingSeen cleared by
+        //    DeleteAll above), so the welcome carousel comes back now — not on the next
+        //    launch, and not only if the owner walks to the Bots tab. This is the sanctioned
+        //    first-run reset, and it lands on the Chats tab (line above), which is exactly
+        //    where the boot gate would have been unreachable. Same single gate as boot.
+        BotsPage.Instance?.TryShowFirstRunCarousel();
     }
 }

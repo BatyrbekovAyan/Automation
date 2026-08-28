@@ -15,13 +15,38 @@ public class BotsPage : MonoBehaviour
     [Tooltip("Screen_Onboarding root (first-run welcome carousel). Stamped by OnboardingScreenBuilder.")]
     [SerializeField] private GameObject onboardingScreen;
 
-    public static BotsPage Instance;
+    private static BotsPage _instance;
+
+    /// <summary>
+    /// Resolves even while Screen_Bots is INACTIVE (analog: <see cref="AddBotPanel.Instance"/>,
+    /// which resolves the same way and for the same reason).
+    ///
+    /// It used to be a plain field assigned in <see cref="Start"/>, i.e. null until the Bots
+    /// tab was opened at least once — and the app launches on the Chats tab. Every caller
+    /// that can fire before that (<see cref="OnboardingScreen.OnCreateBotTapped"/>'s
+    /// «Создать бота», the Chats empty-state CTA — which already had to hand-roll this very
+    /// lookup after the CTA read as inert on device) silently no-opped through the
+    /// <c>?.</c>. The lookup runs at most once per instance and is cached, so it never
+    /// lands on a tap path twice.
+    /// </summary>
+    public static BotsPage Instance =>
+        _instance != null ? _instance
+            : _instance = Object.FindFirstObjectByType<BotsPage>(FindObjectsInactive.Include);
 
     void Start()
     {
-        Instance = this;
+        _instance = this;
         if (NewBotButton != null)
             NewBotButton.onClick.AddListener(StartNewBot);
+    }
+
+    void OnDestroy()
+    {
+        // Clear the handle so a destroyed page can't be reached through it: C#'s ?. bypasses
+        // UnityEngine.Object's null-equality overload, so a stale static would throw
+        // MissingReferenceException where the lazy lookup simply re-resolves.
+        // (Unreachable in this single-scene app — defensive, mirrors BottomTabManager.)
+        if (_instance == this) _instance = null;
     }
 
     void OnEnable()
@@ -65,15 +90,13 @@ public class BotsPage : MonoBehaviour
         {
             // Single zero-bot chokepoint (the Chats empty-state CTA also routes here
             // via SwitchTab(Bots)→RefreshEmptyState): show the first-run carousel on a
-            // true first launch, otherwise fall back to the existing auto-open. The
-            // null-guard keeps a not-yet-built scene on the existing behaviour so a
-            // brand-new user is never trapped on a dead end.
-            bool seen = PlayerPrefs.GetInt(OnboardingKeys.Seen, 0) == 1;
-            if (onboardingScreen != null && OnboardingGate.ShouldShowCarousel(hasBots, seen))
-            {
-                onboardingScreen.SetActive(true);   // carousel instead of the auto-open
-            }
-            else if (BotsPageRows.ShouldAutoOpenWizard(EntitlementGate.CurrentTier, liveBots))
+            // true first launch, otherwise fall back to the existing auto-open. The gate
+            // itself lives in TryShowFirstRunCarousel because boot and «Удалить все данные»
+            // ask the same question from outside this screen.
+            bool carouselOwnsScreen = TryShowFirstRunCarousel();
+
+            if (!carouselOwnsScreen
+                && BotsPageRows.ShouldAutoOpenWizard(EntitlementGate.CurrentTier, liveBots))
             {
                 StartNewBot();                       // existing auto-open (idempotent, unchanged)
             }
@@ -82,6 +105,37 @@ public class BotsPage : MonoBehaviour
             // modal every time. The empty state above is already showing; its CTA is a real tap,
             // and THAT still refuses into the sheet. Owner default: no modal on auto-open.
         }
+    }
+
+    /// <summary>
+    /// Raises the first-run welcome carousel when this is a true first run (no bots AND
+    /// <see cref="OnboardingKeys.Seen"/> unset). Returns whether it took the screen.
+    ///
+    /// The SINGLE evaluation of <see cref="OnboardingGate.ShouldShowCarousel"/>, so the
+    /// three moments that can be a first run — app boot (Manager.LoadBots, once the live
+    /// bot count is truthful), this zero-bot chokepoint, and «Удалить все данные» — all
+    /// ask it the same way.
+    ///
+    /// Deliberately callable while Screen_Bots is INACTIVE, which is the whole point: the
+    /// app launches on the Chats tab (BottomTabManager.defaultTabIndex = 0) with this
+    /// screen inactive, so a gate that only ran from OnEnable never fired on a fresh
+    /// install until the owner happened to open the Bots tab. Screen_Onboarding is a
+    /// SIBLING full-screen takeover with an opaque raycast-blocking background drawn over
+    /// the nav bar, so it needs nothing from this screen in order to own the display.
+    ///
+    /// The null-guard keeps a not-yet-built scene on the existing auto-open behaviour, so
+    /// a brand-new user is never trapped on a dead end.
+    /// </summary>
+    public bool TryShowFirstRunCarousel()
+    {
+        if (onboardingScreen == null) return false;
+
+        bool hasBots = botsParent != null && botsParent.childCount > 0;
+        bool seen = PlayerPrefs.GetInt(OnboardingKeys.Seen, 0) == 1;
+        if (!OnboardingGate.ShouldShowCarousel(hasBots, seen)) return false;
+
+        onboardingScreen.SetActive(true);   // idempotent — already-active screen no-ops
+        return true;
     }
 
     /// <summary>

@@ -622,6 +622,21 @@ public partial class Manager : MonoBehaviour
             PlayerPrefs.Save();
         }
 
+        // First-run carousel, raised at BOOT — the other half of the same fact the auto-flag
+        // above just used. It has to happen here and not from the Bots page alone: the app
+        // launches on the Chats tab (BottomTabManager.defaultTabIndex = 0) with Screen_Bots
+        // INACTIVE, so a gate that only ran from BotsPage.OnEnable stayed unevaluated on a
+        // fresh install until the owner happened to open the Bots tab — the reported bug
+        // (onboarding must own the screen before anything can be chosen). «Удалить все
+        // данные» has the same shape and ends on the Chats tab too; it calls the same entry.
+        //
+        // This is also the EARLIEST truthful moment: BotsParent is populated by the loop
+        // above, and deciding any earlier would read an empty parent and show the carousel
+        // to an existing user (the very case the auto-flag exists to protect). Screen_Bots
+        // stays inactive behind it — BotsPage.Instance resolves include-inactive precisely
+        // so the carousel's «Создать бота» still reaches the wizard.
+        global::BotsPage.Instance?.TryShowFirstRunCarousel();
+
         // Sweep profiles orphaned by an app death mid-wizard/mid-re-auth that
         // the quit-time settle (OnApplicationQuit) couldn't reach — on mobile
         // most kills run no code at all, so this launch-time pass stays the
