@@ -40,6 +40,14 @@ TZ = timezone(timedelta(hours=5))            # Asia/Almaty — the app's GENERIC
 WA_PROFILE = "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412"   # fabricated, non-sentinel
 TG_PROFILE = "3f1c9e02-7a84-4b16-b0d9-55ac1e2f6d31"
 
+# The one number a reader actually studies: it is spoken twice inside the auto-reply thread,
+# which is the screenshot that has to look real. The chat-list rows keep the obviously
+# non-routable +7 700 000-00-NN block — nobody reads those, and it keeps the blast radius
+# small. RESIDUAL RISK, owner's call: this is a well-formed KZ mobile, so it could belong to
+# a real subscriber. Replace it with a number the owner controls before final submission.
+CLIENT_PHONE = "+7 705 318-24-90"
+SHOP_PHONE = "+7 707 245-18-60"
+
 # ---------------------------------------------------------------- PlayerPrefs
 
 def player_prefs(now: datetime) -> dict:
@@ -70,8 +78,11 @@ def player_prefs(now: datetime) -> dict:
         dict(i=0, name="Авто-Деталь KZ", btype="auto_parts", wa=1, tg=1, mode=0,
              business="Магазин автозапчастей для японских авто в Астане. "
                       "Подбор по VIN, Kaspi рассрочка, самовывоз со склада.",
-             prompt="Если клиент пишет ночью — прими заявку и добавь, что ответим в рабочее время.",
-             phone="+7 700 000-00-01", hours="Пн–Сб 09:00–19:00, Вс выходной",
+             prompt="Если клиент пишет ночью — прими заявку и добавь, что ответим в рабочее время.\n"
+                    "Всегда уточняй марку, модель и год авто до того, как назвать цену.\n"
+                    "Если позиции нет в прайсе — не отказывай, прими заявку на подбор.\n"
+                    "Про доставку по городу отвечай: 1 500 ₸, в день заказа.",
+             phone=SHOP_PHONE, hours="Пн–Сб 09:00–19:00, Вс выходной",
              address="Астана, ул. Бейбитшилик, 25", instagram="@avtodetal_demo",
              email="zakaz@example.com",
              products=[("Колодки передние 04465-33471", "34 900", "Оригинал Toyota. Camry 50, 2.5"),
@@ -130,6 +141,22 @@ def player_prefs(now: datetime) -> dict:
             p[f"{k}Service{j}"] = name
             p[f"{k}Service{j}Price"] = price
             p[f"{k}Service{j}Description"] = desc
+
+    # Uploaded price lists for the primary bot (UploadedFilesStore): count key is
+    # "<bot><Type>FilesNumber", items "<bot><Type>File<i>" + Name/Size/Date, and Size/Date
+    # are STRINGS in PlayerPrefs even though they parse as longs. contentType "product"
+    # → the «Продукты» tab, which is the screen that shows the price-list section.
+    day_ms = 24 * 60 * 60 * 1000
+    now_ms = int(now.timestamp() * 1000)
+    for j, (fid, fname, size, days_ago) in enumerate([
+        ("3f8a1c22-9d41-4c07-b6e5-2a7f0d51e934", "Прайс август 2026.xlsx", 48210, 2),
+        ("7c1e4b90-56af-4d13-9e28-c4b6a3f70d15", "Колодки и фильтры.pdf", 315744, 9),
+    ]):
+        p[f"Bot0ProductFile{j}"] = fid
+        p[f"Bot0ProductFile{j}Name"] = fname
+        p[f"Bot0ProductFile{j}Size"] = str(size)
+        p[f"Bot0ProductFile{j}Date"] = str(now_ms - days_ago * day_ms)
+    p["Bot0ProductFilesNumber"] = 2
     return p
 
 # ---------------------------------------------------------------- chat caches
@@ -197,8 +224,8 @@ THREAD_A = [  # Ерлан — the «Авто» payoff thread
     (False, 10, 6, "PN1512 в прайсе помечен как аналог Nibk. Оригинал — 04465-33471."),
     (True,  10, 7, "Понял. Беру за 18 900, заберу сегодня после 18:00"),
     (False, 10, 8, "Принял заявку. Напишите, пожалуйста, имя и номер телефона — передам менеджеру."),
-    (True,  10, 8, "Ерлан, +7 700 000-00-11"),
-    (False, 10, 9, "Записал: Ерлан, +7 700 000-00-11, Camry 2015 2.5, колодки PN1512. "
+    (True,  10, 8, f"Ерлан, {CLIENT_PHONE}"),
+    (False, 10, 9, f"Записал: Ерлан, {CLIENT_PHONE}, Camry 2015 2.5, колодки PN1512. "
                    "Передаю менеджеру, он свяжется и подтвердит."),
 ]
 

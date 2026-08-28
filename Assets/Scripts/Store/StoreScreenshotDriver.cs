@@ -53,6 +53,14 @@ public class StoreScreenshotDriver : MonoBehaviour
     private IEnumerator Start()
     {
         Directory.CreateDirectory(OutputDir);
+
+        // Keep the player loop (and therefore rendering) running while Unity sits in the
+        // background. Without this the run stalls the moment the Editor loses focus: the
+        // capture waits on a frame that is never drawn, and the whole thing silently hangs
+        // until someone clicks the window — which is exactly what made earlier runs look
+        // like they had frozen (2026-08-28).
+        Application.runInBackground = true;
+
         Debug.Log($"[StoreCapture] старт, кадры → {OutputDir}  ({Screen.width}x{Screen.height}), " +
                   $"timeScale={Time.timeScale}");
 
@@ -106,20 +114,68 @@ public class StoreScreenshotDriver : MonoBehaviour
         {
             BottomTabManager.Instance.SwitchTab(index);
             yield return new WaitForSecondsRealtime(2.0f);
+
+            // Сводка on «7 дней»: the seeded outcomes span three days, so the default
+            // «Сегодня» window shows a nearly empty board (1/0/1/1/0) and undersells the
+            // screen. No singleton here — an Editor-only find is fine.
+            if (index == 1)
+            {
+                var dash = FindFirstObjectByType<DashboardPage>();
+                if (dash != null)
+                {
+                    dash.SetPeriod(DashboardPeriod.Week);
+                    yield return new WaitForSecondsRealtime(1.0f);
+                }
+                else Debug.LogWarning("[StoreCapture] DashboardPage не найден — период не сменён");
+            }
+
             yield return Capture($"04-tab{index}");
         }
 
-        // 5. Paywall.
+        // 5. Paywall BEFORE the settings screen: bot settings is a full-screen panel and the
+        //    paywall never appeared once it was open (2026-08-28 run ended one shot short).
         var paywall = PaywallController.Instance;
         if (paywall != null)
         {
             paywall.Open(PaywallTrigger.Browse);
+            yield return new WaitForSecondsRealtime(1.5f);
             yield return Capture("05-paywall");
+            paywall.Close();
+            yield return new WaitForSecondsRealtime(1.5f);
         }
         else
         {
             Debug.LogWarning("[StoreCapture] PaywallController.Instance == null — пейволл пропущен");
         }
+
+        // 6. Bot settings: the price-list screen and the prompt screen. Opened through the
+        //    card's own entry point so the paired settings clone is the one the app wired.
+        var bot = BotsPage.Instance != null
+            ? System.Array.Find(BotsPage.Instance.GetComponentsInChildren<Bot>(true),
+                                b => b.name == "Bot0")
+            : null;
+        if (bot != null)
+        {
+            BottomTabManager.Instance.SwitchTab(BottomTabManager.BotsTabIndex);
+            yield return new WaitForSecondsRealtime(1.0f);
+
+            bot.OpenSettingsAtProductTab();
+            yield return new WaitForSecondsRealtime(2.5f);
+            yield return Capture("06-settings-products");
+
+            if (Manager.openBotSettings != null)
+            {
+                Manager.openBotSettings.OpenPromptTab();
+                yield return new WaitForSecondsRealtime(2.0f);
+                yield return Capture("07-settings-prompt");
+            }
+            else Debug.LogWarning("[StoreCapture] Manager.openBotSettings == null — вкладка промпта пропущена");
+        }
+        else
+        {
+            Debug.LogWarning("[StoreCapture] карточка Bot0 не найдена — настройки пропущены");
+        }
+
 
         Debug.Log("[StoreCapture] готово — выходим из Play Mode");
         UnityEditor.EditorApplication.isPlaying = false;
@@ -132,11 +188,11 @@ public class StoreScreenshotDriver : MonoBehaviour
         string path = Path.Combine(OutputDir, $"{name}.png");
         ScreenCapture.CaptureScreenshot(path);
 
-        // CaptureScreenshot lands at end of frame and the file appears a frame or two
-        // later; capturing again before it flushes silently drops the previous shot.
-        yield return new WaitForEndOfFrame();
-        yield return null;
-        yield return null;
+        // CaptureScreenshot lands at end of frame and the file appears a frame or two later;
+        // capturing again before it flushes silently drops the previous shot. Plain frame
+        // yields rather than WaitForEndOfFrame — the latter never resumes in an unfocused
+        // Editor, which hung the run for 15 minutes with no error (2026-08-28).
+        for (int frame = 0; frame < 4; frame++) yield return null;
 
         Debug.Log($"[StoreCapture] {name}.png  ({Screen.width}x{Screen.height})");
     }

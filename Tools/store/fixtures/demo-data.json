@@ -2,7 +2,7 @@
  "prefs": {
   "ids": 3,
   "LastSelectedBotForChats": "Bot0",
-  "TrialStartedUtc": "2026-08-27T17:09:35Z",
+  "TrialStartedUtc": "2026-08-27T18:25:20Z",
   "OnboardingChecklistDone": 1,
   "OnboardingSeen": 1,
   "OnboardingChannelConnectedSeen": 1,
@@ -14,8 +14,8 @@
   "Bot0Status": "Active",
   "Bot0BusinessType": "auto_parts",
   "Bot0Business": "Магазин автозапчастей для японских авто в Астане. Подбор по VIN, Kaspi рассрочка, самовывоз со склада.",
-  "Bot0Prompt": "Если клиент пишет ночью — прими заявку и добавь, что ответим в рабочее время.",
-  "Bot0Phone": "+7 700 000-00-01",
+  "Bot0Prompt": "Если клиент пишет ночью — прими заявку и добавь, что ответим в рабочее время.\nВсегда уточняй марку, модель и год авто до того, как назвать цену.\nЕсли позиции нет в прайсе — не отказывай, прими заявку на подбор.\nПро доставку по городу отвечай: 1 500 ₸, в день заказа.",
+  "Bot0Phone": "+7 707 245-18-60",
   "Bot0Hours": "Пн–Сб 09:00–19:00, Вс выходной",
   "Bot0Address": "Астана, ул. Бейбитшилик, 25",
   "Bot0Instagram": "@avtodetal_demo",
@@ -98,7 +98,16 @@
   "Bot2Service1Description": "45 минут",
   "Bot2Service2": "Чистка после воды",
   "Bot2Service2Price": "12 000",
-  "Bot2Service2Description": "Диагностика бесплатно"
+  "Bot2Service2Description": "Диагностика бесплатно",
+  "Bot0ProductFile0": "3f8a1c22-9d41-4c07-b6e5-2a7f0d51e934",
+  "Bot0ProductFile0Name": "Прайс август 2026.xlsx",
+  "Bot0ProductFile0Size": "48210",
+  "Bot0ProductFile0Date": "1787750720459",
+  "Bot0ProductFile1": "7c1e4b90-56af-4d13-9e28-c4b6a3f70d15",
+  "Bot0ProductFile1Name": "Колодки и фильтры.pdf",
+  "Bot0ProductFile1Size": "315744",
+  "Bot0ProductFile1Date": "1787145920459",
+  "Bot0ProductFilesNumber": 2
  },
  "files": {
   "BotCache/Bot0/chats.json": {
@@ -329,7 +338,7 @@
      "messageId": "false_77000000011@c.us_DEMO0011",
      "chatId": "77000000011@c.us",
      "type": 0,
-     "text": "Ерлан, +7 700 000-00-11",
+     "text": "Ерлан, +7 705 318-24-90",
      "isIncoming": true,
      "timestamp": 1787893680,
      "sequence": 11,
@@ -340,7 +349,7 @@
      "messageId": "true_77000000011@c.us_DEMO0012",
      "chatId": "77000000011@c.us",
      "type": 0,
-     "text": "Записал: Ерлан, +7 700 000-00-11, Camry 2015 2.5, колодки PN1512. Передаю менеджеру, он свяжется и подтвердит.",
+     "text": "Записал: Ерлан, +7 705 318-24-90, Camry 2015 2.5, колодки PN1512. Передаю менеджеру, он свяжется и подтвердит.",
      "isIncoming": false,
      "timestamp": 1787893740,
      "sequence": 12,
@@ -398,63 +407,63 @@
    ]
   },
   "dashboard_cache.json": {
-   "lastFetchMs": 1787918975806,
+   "lastFetchMs": 1787923520459,
    "outcomes": [
     {
      "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
      "chatId": "77000000011@c.us",
      "outcome": "order_collected",
      "summary": "Колодки PN1512, Camry 2015. Имя и телефон взяты, ждёт менеджера.",
-     "outcomeAt": 1787918255806,
-     "lastMessageAt": 1787918255806
+     "outcomeAt": 1787922800459,
+     "lastMessageAt": 1787922800459
     },
     {
      "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
      "chatId": "77000000012@c.us",
      "outcome": "in_dialog",
      "summary": "Спрашивает цену фильтра на RAV4 2019 и про замену.",
-     "outcomeAt": 1787916935806,
-     "lastMessageAt": 1787916935806
+     "outcomeAt": 1787921480459,
+     "lastMessageAt": 1787921480459
     },
     {
      "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
      "chatId": "77000000017@c.us",
      "outcome": "order_collected",
      "summary": "Prado 2018, фильтр воздушный — позиции нет в прайсе, заявка принята.",
-     "outcomeAt": 1787744975806,
-     "lastMessageAt": 1787744975806
+     "outcomeAt": 1787749520459,
+     "lastMessageAt": 1787749520459
     },
     {
      "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
      "chatId": "77000000016@c.us",
      "outcome": "owner_needed",
      "summary": "Вопрос по Kaspi рассрочке — условий нет в данных бизнеса.",
-     "outcomeAt": 1787848175806,
-     "lastMessageAt": 1787848175806
+     "outcomeAt": 1787852720459,
+     "lastMessageAt": 1787852720459
     },
     {
      "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
      "chatId": "77000000013@c.us",
      "outcome": "client_silent",
      "summary": "Обещал прислать VIN, ответа пока нет.",
-     "outcomeAt": 1787913215806,
-     "lastMessageAt": 1787913215806
+     "outcomeAt": 1787917760459,
+     "lastMessageAt": 1787917760459
     },
     {
      "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
      "chatId": "77000000014@c.us",
      "outcome": "question_closed",
      "summary": "Уточняла наличие колодок, ответ дан.",
-     "outcomeAt": 1787851775806,
-     "lastMessageAt": 1787851775806
+     "outcomeAt": 1787856320459,
+     "lastMessageAt": 1787856320459
     },
     {
      "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
      "chatId": "77000000015@c.us",
      "outcome": "in_dialog",
      "summary": "Написал, что заедет завтра.",
-     "outcomeAt": 1787857175806,
-     "lastMessageAt": 1787857175806
+     "outcomeAt": 1787861720459,
+     "lastMessageAt": 1787861720459
     }
    ]
   }
