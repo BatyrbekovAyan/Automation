@@ -61,12 +61,23 @@ public static class OnboardingScreenBuilder
     private const string SemiboldGuid = "a2b0b38b6764047da9250bcff1b0f432";
     private const string BoldGuid = "1cd715823fef34be4a3d3f3c5572594c";
 
-    private const string WhatsappIconPath = "Assets/Images/Icons/WhatsApp Glowing.png";
-    private const string TelegramIconPath = "Assets/Images/Icons/Telegram.png";
+    // Neutral in-house channel glyph (store audit 2026-08-31 §03): the hero cards used
+    // the official WhatsApp (glow-modified!) and Telegram marks as decorative key art —
+    // exactly the placement Apple 5.2.1 / Meta brand guidelines forbid. Channel identity
+    // now comes from the card's NAME text + the channel-tinted glyph on the tinted
+    // square; small nominative marks remain only where they identify a connected
+    // channel (bot cards, wizard picker). Do not point these back at official logos.
+    private const string ChannelGlyphPath = "Assets/Images/Nav/nav_chats_filled.png";
     private const string CheckIconPath = "Assets/Images/Icons/Tick Green.png";
 
+    // Channel-accent glyph tints over the pale squares (white-on-pale is invisible):
+    // deep green mirrors OnboardingAuthBlocksBuilder.LockTint; blue single-sources
+    // the ChannelAccent.TelegramBlue hue.
+    private static readonly Color WaGlyphTint = Hex("#1F8A46");
+    private static readonly Color TgGlyphTint = Hex("#2AABEE");
+
     private static TMP_FontAsset _regular, _semibold, _bold;
-    private static Sprite _whatsapp, _telegram, _check;
+    private static Sprite _channelGlyph, _check;
     private static readonly List<Component> _roundedToRefresh = new List<Component>();
 
     // ── Entry points ─────────────────────────────────────────────────────────
@@ -424,16 +435,16 @@ public static class OnboardingScreenBuilder
         heroRt.sizeDelta = new Vector2(690f, 372f);
         SetPreferredSize(hero, 690f, 372f);
 
-        BuildChannelCard(hero, "WhatsappCard", 0f, _whatsapp, WaIconBg,
+        BuildChannelCard(hero, "WhatsappCard", 0f, _channelGlyph, WaIconBg, WaGlyphTint,
             "WhatsApp", "Клиенты пишут на ваш номер");
-        BuildChannelCard(hero, "TelegramCard", -186f, _telegram, TgIconBg,
+        BuildChannelCard(hero, "TelegramCard", -186f, _channelGlyph, TgIconBg, TgGlyphTint,
             "Telegram", "Ваш личный аккаунт Telegram");
 
         return hero;
     }
 
     private static void BuildChannelCard(GameObject hero, string name, float topOffset,
-        Sprite icon, Color iconBg, string title, string desc)
+        Sprite icon, Color iconBg, Color iconTint, string title, string desc)
     {
         var fill = MakeBorderedCard(hero, name, 690f, 170f, Card, CardBorder,
             new Vector2(0.5f, 1f), new Vector2(0f, topOffset));
@@ -447,7 +458,7 @@ public static class OnboardingScreenBuilder
         AddRounded(iconSquare, 24f);
         var logoGo = NewChild(iconSquare, "Logo", out var logoRt);
         StretchFill(logoRt, 20f);
-        AddIconImage(logoGo, icon, Color.white);
+        AddIconImage(logoGo, icon, iconTint);
 
         var titleGo = NewChild(fill, "Title", out var titleRt);
         SetAnchors(titleRt, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f));
@@ -550,7 +561,7 @@ public static class OnboardingScreenBuilder
     // ── Asset loading / import settings ─────────────────────────────────────
 
     private static void EnsureIconImportSettings() =>
-        EnsureIconImportSettings(new[] { WhatsappIconPath, TelegramIconPath, CheckIconPath });
+        EnsureIconImportSettings(new[] { ChannelGlyphPath, CheckIconPath });
 
     private static void EnsureIconImportSettings(IEnumerable<string> paths)
     {
@@ -584,8 +595,7 @@ public static class OnboardingScreenBuilder
         _semibold = LoadFont(SemiboldGuid);
         _bold = LoadFont(BoldGuid);
 
-        _whatsapp = LoadSprite(WhatsappIconPath);
-        _telegram = LoadSprite(TelegramIconPath);
+        _channelGlyph = LoadSprite(ChannelGlyphPath);
         _check = LoadSprite(CheckIconPath);
     }
 

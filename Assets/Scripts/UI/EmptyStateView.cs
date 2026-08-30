@@ -7,9 +7,13 @@ public class EmptyStateView : MonoBehaviour
 {
     [Header("UI references")]
     [SerializeField] private Image iconImage;
-    // The Telegram logo shown (UNTINTED) in place of the placeholder icon on the Telegram
-    // channel. Stamped into the scene by EmptyStateTelegramIconBuilder; a runtime script
-    // can't resolve an asset sprite (no Resources.Load), so it must be a serialized ref.
+    // Deliberately NULL since 2026-08-31 (store audit §03): this used to swap in the
+    // official Telegram roundel as hero art on the Telegram channel — a decorative
+    // third-party-mark placement (Apple 5.2.1 / brand guidelines). With the ref null
+    // the authored neutral glyph stays and the Telegram branch below forces it white
+    // on the Telegram-blue disc, so channel identity survives without the mark. The
+    // field is kept for scene-binding stability; do not re-stamp a logo into it
+    // (the old EmptyStateTelegramIconBuilder that did was deleted).
     [SerializeField] private Sprite telegramIcon;
     [SerializeField] private TextMeshProUGUI titleLabel;
     [SerializeField] private TextMeshProUGUI bodyLabel;
