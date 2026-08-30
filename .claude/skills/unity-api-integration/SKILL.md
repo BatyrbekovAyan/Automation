@@ -82,7 +82,7 @@ private IEnumerator PostSomething(SomeRequest data, System.Action<SomeResponse> 
 5. **Async pattern**: Coroutines with `System.Action<T>` callbacks — NEVER async/await
 6. **Models**: Serializable response classes in `Assets/Scripts/Chat/`
 7. **Base URLs**: Match the base paths already used in `Manager.cs` (they're inlined per call via string interpolation, not extracted constants — see the table below)
-8. **Headers**: Wappi = `Authorization`, n8n = `X-N8N-API-KEY`, Green API = token in URL path
+8. **Headers**: Wappi = `Authorization`; n8n = NO auth header — client calls are webhooks only (URL-is-the-secret; the admin `X-N8N-API-KEY` never ships in the client since 2026-08-31)
 
 ## Response Model Template
 ```csharp
@@ -110,12 +110,11 @@ public class SomeData
 |---------|------|------|
 | Wappi WhatsApp | `https://wappi.pro/api/sync/` (profile mgmt under `https://wappi.pro/api/`) | `Authorization` header |
 | Wappi Telegram | `https://wappi.pro/tapi/sync/` (profile mgmt under `https://wappi.pro/tapi/`) | `Authorization` header |
-| n8n | `https://bagkz.app.n8n.cloud/` (`/api/v1/workflows/…`, `/webhook/…`) | `X-N8N-API-KEY` header |
-| Green API | `https://7103.api.greenapi.com/` (avatars), `https://4100.api.green-api.com/` (auth) | instance id + token in URL path: `/waInstance{id}/{method}/{token}` |
+| n8n | `Manager.n8nBaseUrl` (prod `https://n8n.choosereply.com`) — `/webhook/…` ONLY | none — auth-free webhooks; workflow activate/deactivate/delete go through `/webhook/SetWorkflowState` (`Manager.NewWorkflowStateRequest`), never `/api/v1/` |
 
 **Video send must be MP4/H.264.** `…/video/send` (see `WappiMediaRequestFactory`) only delivers MP4/H.264 — raw iPhone `.mov`/HEVC fails silently. Run the picked file through `Assets/Scripts/Chat/VideoConverter.cs` before upload.
 
-**Never hardcode secrets.** All tokens come from the `Secrets` class. (There is a legacy hardcoded Telegram bot token in `Manager.cs` — do not copy that pattern; it's a known issue, not the convention.)
+**Never hardcode secrets — and never add a server-side credential to the client.** The only tokens in `Secrets` are the wappi token and the RevenueCat public SDK keys; StreamingAssets ship verbatim inside the APK/IPA, so anything else (n8n admin key, Telegram bot token, Green API — all removed 2026-08-31) belongs behind an n8n webhook instead.
 
 ## Checklist
 - [ ] Token loaded from Secrets class

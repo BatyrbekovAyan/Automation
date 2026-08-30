@@ -1,0 +1,280 @@
+{
+  "name": "Set Workflow State",
+  "nodes": [
+    {
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "ce954378-5bc5-4fe0-8f39-7ce6406ce868",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "SetWorkflowState",
+        "authentication": "none",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "6f7c5476-451f-43b4-b1dc-9cb46691b5a5"
+    },
+    {
+      "name": "Validate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Canonical infra ids are off-limits: this webhook may only touch the bot\n// workflows the app itself creates (fresh ids from the two templates).\nconst PROTECTED = new Set([\n  '2htWSV5IHO8E2CgB',\n  '2islisFH7jjLoPQM',\n  '3qax5J9u2qsT9Vao',\n  '4VN3gsFaC2HUYmcc',\n  '4wYitz5ek30SVNlT',\n  '9PTyYcelRQI7bGDb',\n  'KoTuIlk4LMrlvnWI',\n  'SCLcpn6DMDG3Z4VN',\n  'TwWPW3gIyjZS3foR',\n  'Uz6HBBUpAiUqVysB',\n  'XuvOp7TxOImOAmlj',\n  'ZGYr6srzS3rSSXHp',\n  'ZTqpumOpL1rNDOp6',\n  'fXYpCXPKw92EzRz8',\n  'hHwvfOvTCS42pXnq',\n  'jtbssfzXbOxwTK4k',\n  'lmjYsdNcQA2IE5rl',\n  'olmqWMfcFpCEcpiE'\n]);\nPROTECTED.add($workflow.id);\nconst body = $input.first().json.body || {};\nconst id = typeof body.workflowId === 'string' ? body.workflowId.trim() : '';\nconst action = typeof body.action === 'string' ? body.action.trim() : '';\nconst ACTIONS = ['activate', 'deactivate', 'delete'];\nif (!/^[A-Za-z0-9]{8,36}$/.test(id) || !ACTIONS.includes(action))\n  return [{ json: { ok: false, error: 'bad_request' } }];\nif (PROTECTED.has(id))\n  return [{ json: { ok: false, error: 'protected_workflow' } }];\nreturn [{ json: { ok: true, id, action } }];"
+      },
+      "id": "6b58d609-b7b5-4a4f-bdd6-1c805360ebe9"
+    },
+    {
+      "name": "Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6ad81df9-6ea8-499b-9f9b-2676448d8e6e"
+    },
+    {
+      "name": "Delete?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        -80
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "delete",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4a5f2422-f0ef-4afe-8b9e-54188f8234e0"
+    },
+    {
+      "name": "Delete Workflow",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        -140
+      ],
+      "parameters": {
+        "method": "DELETE",
+        "url": "=http://localhost:5678/api/v1/workflows/{{ $json.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__HDR_CRED__",
+          "name": "n8n Admin API"
+        }
+      },
+      "id": "72400534-5d42-4efc-9f6c-6ec209fdc3d9"
+    },
+    {
+      "name": "Toggle Workflow",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        -20
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=http://localhost:5678/api/v1/workflows/{{ $json.id }}/{{ $json.action }}",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__HDR_CRED__",
+          "name": "n8n Admin API"
+        }
+      },
+      "id": "04d60dce-93bb-4de8-9658-8dc0eeb3ad14"
+    },
+    {
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1000,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true } }}",
+        "options": {}
+      },
+      "id": "6dc9c03a-80a2-475f-b631-c130e1cada0d"
+    },
+    {
+      "name": "Respond Rejected",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1000,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"error\": $json.error } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "4bfbf6fa-2d62-405f-a84f-3a495959feee"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate": {
+      "main": [
+        [
+          {
+            "node": "Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid?": {
+      "main": [
+        [
+          {
+            "node": "Delete?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete?": {
+      "main": [
+        [
+          {
+            "node": "Delete Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Toggle Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Workflow": {
+      "main": [
+        [
+          {
+            "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Toggle Workflow": {
+      "main": [
+        [
+          {
+            "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": null,
+  "triggerCount": 1,
+  "meta": null,
+  "id": "0DP79STI3pafXO9B",
+  "active": true
+}

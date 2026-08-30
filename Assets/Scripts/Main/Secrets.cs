@@ -4,34 +4,26 @@ using UnityEngine;
 using UnityEngine.Networking;
 
 [System.Serializable]
-public class GreenApiSecrets
-{
-    public string apiUrl;
-    public string idInstance;
-    public string apiTokenInstance;
-}
-
-[System.Serializable]
 public class RevenueCatSecrets
 {
     public string iosKey;
     public string androidKey;
 }
 
+// Deliberately minimal since 2026-08-31 (store-submission blocker): StreamingAssets
+// ship VERBATIM inside the APK/IPA, so every key here is extractable by anyone who
+// unzips the public binary. The n8n admin API key, Telegram support-bot token, and
+// dead Green API tokens were removed from the client entirely — their operations now
+// go through auth-free n8n webhooks (SetWorkflowState / SupportMessage, deployed by
+// Tools/n8n/build-client-webhooks.py). Do not add a server-side credential back here.
 [System.Serializable]
 public class SecretsData
 {
     public string wappiAuthToken;
-    public string n8nAPIKey;
     public string n8nBaseUrl;
-    public string telegramBotToken;
-    // Telegram chat that receives in-app support-form messages (Profile → Поддержка).
-    public string supportChatId;
-    public GreenApiSecrets greenApi;
-    public GreenApiSecrets greenApiAvatar;
-    // Store keys don't exist yet (Task 0, owner-side RevenueCat/store dashboard setup) — both
-    // fields are legitimately empty until then. BillingService.Initialize() reads these and
-    // degrades to FakeBillingBackend when empty rather than throwing.
+    // RevenueCat public SDK keys are DESIGNED to be embedded in the binary — the
+    // one class of key that legitimately ships. BillingService.Initialize() reads
+    // these and degrades to FakeBillingBackend when the platform key is empty.
     public RevenueCatSecrets revenueCat;
 }
 
@@ -140,16 +132,12 @@ public static class Secrets
     {
         _data = JsonUtility.FromJson<SecretsData>(json) ?? EmptyData();
 
-        // Guard nested objects so the Green API / RevenueCat getters never NPE on a partial file.
-        _data.greenApi ??= new GreenApiSecrets();
-        _data.greenApiAvatar ??= new GreenApiSecrets();
+        // Guard the nested object so the RevenueCat getters never NPE on a partial file.
         _data.revenueCat ??= new RevenueCatSecrets();
     }
 
     private static SecretsData EmptyData() => new SecretsData
     {
-        greenApi = new GreenApiSecrets(),
-        greenApiAvatar = new GreenApiSecrets(),
         revenueCat = new RevenueCatSecrets()
     };
 }

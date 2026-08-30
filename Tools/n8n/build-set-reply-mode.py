@@ -76,7 +76,16 @@ def api_key():
     if k:
         return k
     with open(SECRETS) as f:
-        return json.load(f)["n8nAPIKey"]
+        k = json.load(f).get("n8nAPIKey")
+    if k:
+        return k
+    # n8nAPIKey left secrets.json 2026-08-31 (it shipped inside the app binary);
+    # dev tools now fall back to the gitignored prod key file.
+    prod = os.path.join(HERE, ".secrets", "prod-api-key.txt")
+    if os.path.exists(prod):
+        with open(prod) as f:
+            return f.read().strip()
+    sys.exit("no n8n API key: set N8N_API_KEY or provide Tools/n8n/.secrets/prod-api-key.txt")
 
 
 def resolve_cred(cred_type):

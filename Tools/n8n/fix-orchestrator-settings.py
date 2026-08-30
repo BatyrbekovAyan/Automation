@@ -157,7 +157,14 @@ def run_canonical():
 
 # --- live mode (owner-run) ---------------------------------------------------
 def api_key():
-    return os.environ.get("N8N_API_KEY") or json.loads(SECRETS_PATH.read_text())["n8nAPIKey"]
+    # n8nAPIKey left secrets.json 2026-08-31 (it shipped inside the app binary).
+    key = os.environ.get("N8N_API_KEY") or json.loads(SECRETS_PATH.read_text()).get("n8nAPIKey")
+    if key:
+        return key
+    prod = Path(__file__).parent / ".secrets" / "prod-api-key.txt"
+    if prod.exists():
+        return prod.read_text().strip()
+    sys.exit("no n8n API key: set N8N_API_KEY or provide Tools/n8n/.secrets/prod-api-key.txt")
 
 
 def http(method, url, key, body=None, timeout=30):

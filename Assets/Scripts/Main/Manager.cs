@@ -191,9 +191,6 @@ public partial class Manager : MonoBehaviour
     private bool _telegram2faMode;
 
     public static string wappiAuthToken => Secrets.Data.wappiAuthToken;
-    public static string n8nAPIKey => Secrets.Data.n8nAPIKey;
-    public static string telegramBotToken => Secrets.Data.telegramBotToken;
-    public static string supportChatId => Secrets.Data.supportChatId;
     public const string DevN8nBaseUrlKey = "DevN8nBaseUrl";
 
     public static string n8nBaseUrl =>
@@ -229,10 +226,6 @@ public partial class Manager : MonoBehaviour
         public string id;
     }
 
-    private string apiUrl => Secrets.Data.greenApi.apiUrl;
-    private string idInstance => Secrets.Data.greenApi.idInstance;
-    private string apiTokenInstance => Secrets.Data.greenApi.apiTokenInstance;
-
     public static GameObject BotSettingsParentStatic;
     public static Manager Instance;
 
@@ -250,8 +243,6 @@ public partial class Manager : MonoBehaviour
     private string docx;
     private string video;
 
-    // private GreenApiAvatarFetcher greenApiAvatarFetcher;
-    // public GameObject GreenApi;
     // public Image profileImage;
     #endregion
 
@@ -3895,7 +3886,25 @@ public partial class Manager : MonoBehaviour
         LoadingPanel.SetActive(false);
     }
 
-    // Pure n8n activate/deactivate with NO save-pill side effects — deliberately
+    // All workflow activate/deactivate/delete calls go through the auth-free
+    // SetWorkflowState webhook (2026-08-31): the client used to POST n8n's REST API
+    // directly with the instance-admin X-N8N-API-KEY, which shipped in plaintext
+    // inside the APK/IPA — anyone unzipping the binary got workflow-CRUD (= code
+    // execution) on the whole server. The webhook validates the id, refuses the
+    // canonical infra workflows, and performs the operation server-side.
+    private static UnityWebRequest NewWorkflowStateRequest(string workflowId, string action)
+    {
+        var www = new UnityWebRequest($"{n8nBaseUrl}{WorkflowStateRequest.Path}", "POST");
+        byte[] body = System.Text.Encoding.UTF8.GetBytes(
+            WorkflowStateRequest.ComposeBody(workflowId, action));
+        www.uploadHandler = new UploadHandlerRaw(body);
+        www.downloadHandler = new DownloadHandlerBuffer();
+        www.SetRequestHeader("Content-Type", "application/json");
+        www.timeout = 30;
+        return www;
+    }
+
+    // Pure activate/deactivate with NO save-pill side effects — deliberately
     // does not touch the four *Saved gate flags or LoadingPanel. Used to reconcile a
     // workflow's active state to the channel toggle outside the save flow: the
     // Create*Workflow webhook activates the new workflow server-side before it responds
@@ -3906,13 +3915,7 @@ public partial class Manager : MonoBehaviour
         // Same sentinels the Enable/Save paths skip — no n8n workflow to (de)activate.
         if (string.IsNullOrEmpty(id) || id.Equals("-1")) yield break;
 
-        // See EnableWhatsappWorkflow: n8n's REST API 415s anything but application/json,
-        // and Unity's transport stamps x-www-form-urlencoded on a bodyless POST, so pin it.
-        using UnityWebRequest www = new UnityWebRequest($"{n8nBaseUrl}/api/v1/workflows/{id}/" + (active ? "activate" : "deactivate"), "POST");
-        www.downloadHandler = new DownloadHandlerBuffer();
-        www.timeout = 30;
-        www.SetRequestHeader("X-N8N-API-KEY", n8nAPIKey);
-        www.SetRequestHeader("Content-Type", "application/json");
+        using UnityWebRequest www = NewWorkflowStateRequest(id, WorkflowStateRequest.ToggleAction(active));
 
         yield return www.SendWebRequest();
 
@@ -3935,17 +3938,7 @@ public partial class Manager : MonoBehaviour
 
         LoadingPanel.SetActive(true);
 
-        // n8n's REST API only accepts application/json here and 415s anything else.
-        // A body-less POST is NOT enough: Unity's libcurl transport stamps
-        // Content-Type: application/x-www-form-urlencoded onto a POST with no upload
-        // handler, so the JSON content type must be pinned explicitly. An empty body
-        // with application/json is accepted (verified against n8n 2.27.4).
-        using UnityWebRequest www = new UnityWebRequest($"{n8nBaseUrl}/api/v1/workflows/{id}/" + (enabled ? "activate" : "deactivate"), "POST");
-        www.downloadHandler = new DownloadHandlerBuffer();
-        www.timeout = 30;
-
-        www.SetRequestHeader("X-N8N-API-KEY", n8nAPIKey);
-        www.SetRequestHeader("Content-Type", "application/json");
+        using UnityWebRequest www = NewWorkflowStateRequest(id, WorkflowStateRequest.ToggleAction(enabled));
 
         yield return www.SendWebRequest();
 
@@ -3979,14 +3972,7 @@ public partial class Manager : MonoBehaviour
 
         LoadingPanel.SetActive(true);
 
-        // See EnableWhatsappWorkflow: Content-Type must be pinned to application/json
-        // or Unity's transport substitutes x-www-form-urlencoded and n8n replies 415.
-        using UnityWebRequest www = new UnityWebRequest($"{n8nBaseUrl}/api/v1/workflows/{id}/" + (enabled ? "activate" : "deactivate"), "POST");
-        www.downloadHandler = new DownloadHandlerBuffer();
-        www.timeout = 30;
-
-        www.SetRequestHeader("X-N8N-API-KEY", n8nAPIKey);
-        www.SetRequestHeader("Content-Type", "application/json");
+        using UnityWebRequest www = NewWorkflowStateRequest(id, WorkflowStateRequest.ToggleAction(enabled));
 
         yield return www.SendWebRequest();
 
@@ -4005,9 +3991,10 @@ public partial class Manager : MonoBehaviour
 
     private IEnumerator DeleteWhatsappWorkflow(string whatsappWorkflowId, bool deletingBot)
     {
-        using UnityWebRequest whatsappRequest = UnityWebRequest.Delete($"{n8nBaseUrl}/api/v1/workflows/{whatsappWorkflowId}");
+        // Sentinel ids ("" / "-1") have no n8n workflow — same skip as the Enable paths.
+        if (string.IsNullOrEmpty(whatsappWorkflowId) || whatsappWorkflowId.Equals("-1")) yield break;
 
-        whatsappRequest.SetRequestHeader("X-N8N-API-KEY", n8nAPIKey);
+        using UnityWebRequest whatsappRequest = NewWorkflowStateRequest(whatsappWorkflowId, WorkflowStateRequest.Delete);
 
         yield return whatsappRequest.SendWebRequest();
 
@@ -4023,9 +4010,10 @@ public partial class Manager : MonoBehaviour
 
     private IEnumerator DeleteTelegramWorkflow(string telegramWorkflowId, bool deletingBot)
     {
-        using UnityWebRequest telegramRequest = UnityWebRequest.Delete($"{n8nBaseUrl}/api/v1/workflows/{telegramWorkflowId}");
+        // Sentinel ids ("" / "-1") have no n8n workflow — same skip as the Enable paths.
+        if (string.IsNullOrEmpty(telegramWorkflowId) || telegramWorkflowId.Equals("-1")) yield break;
 
-        telegramRequest.SetRequestHeader("X-N8N-API-KEY", n8nAPIKey);
+        using UnityWebRequest telegramRequest = NewWorkflowStateRequest(telegramWorkflowId, WorkflowStateRequest.Delete);
 
         yield return telegramRequest.SendWebRequest();
 
@@ -4174,8 +4162,6 @@ public partial class Manager : MonoBehaviour
 
             using UnityWebRequest editWhatsappRequest = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/EditWhatsappWorkflow", form);
 
-            editWhatsappRequest.SetRequestHeader("X-N8N-API-KEY", n8nAPIKey);
-
             yield return editWhatsappRequest.SendWebRequest();
 
             // Mark done either way: a failed Edit must not leave EditWhatsappWorkflowSaved
@@ -4223,8 +4209,6 @@ public partial class Manager : MonoBehaviour
             // the user to press Save twice before the button dimmed.
 
             using UnityWebRequest editTelegramRequest = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/EditTelegramWorkflow", form);
-
-            editTelegramRequest.SetRequestHeader("X-N8N-API-KEY", n8nAPIKey);
 
             yield return editTelegramRequest.SendWebRequest();
 
@@ -4301,33 +4285,30 @@ public partial class Manager : MonoBehaviour
 
     //////////////////////////////////////////////////////////SEND TO TELEGRAM REQUESTS//////////////////////////////////////////////////////////
 
-    // Delivers a support-form message to the owner's Telegram chat (both ids
-    // live in secrets.json). Public so ProfileSubPages.Support can start it;
-    // callback reports success so the sheet can close or keep the draft.
+    // Delivers a support-form message to the owner's Telegram chat through the
+    // SupportMessage n8n webhook — the bot token and chat id live only on the
+    // server since 2026-08-31 (they used to ship in secrets.json inside the
+    // binary). Public so ProfileSubPages.Support can start it; callback reports
+    // success so the sheet can close or keep the draft.
     public IEnumerator SendToTelegram(string message, System.Action<bool> callback = null)
     {
-        if (string.IsNullOrEmpty(message) || string.IsNullOrEmpty(telegramBotToken) || string.IsNullOrEmpty(supportChatId))
+        if (string.IsNullOrEmpty(message))
         {
-            if (string.IsNullOrEmpty(telegramBotToken))
-                Debug.LogError("[SendToTelegram] telegramBotToken missing from secrets.json");
-            if (string.IsNullOrEmpty(supportChatId))
-                Debug.LogError("[SendToTelegram] supportChatId missing from secrets.json");
             callback?.Invoke(false);
             yield break;
         }
 
-        string url = $"https://api.telegram.org/bot{telegramBotToken}/sendMessage";
-        WWWForm form = new();
-        form.AddField("chat_id", supportChatId);
-        form.AddField("text", message);
-
-        using UnityWebRequest www = UnityWebRequest.Post(url, form);
+        using UnityWebRequest www = new UnityWebRequest($"{n8nBaseUrl}{SupportRelayRequest.Path}", "POST");
+        byte[] body = System.Text.Encoding.UTF8.GetBytes(SupportRelayRequest.ComposeBody(message));
+        www.uploadHandler = new UploadHandlerRaw(body);
+        www.downloadHandler = new DownloadHandlerBuffer();
+        www.SetRequestHeader("Content-Type", "application/json");
         www.timeout = 30;
         yield return www.SendWebRequest();
 
         bool ok = www.result == UnityWebRequest.Result.Success;
         if (!ok)
-            Debug.LogError($"[SendToTelegram] [{www.responseCode}] {www.error}"); // never log the URL — it embeds the bot token
+            Debug.LogError($"[SendToTelegram] [{www.responseCode}] {www.url}: {www.error}");
         callback?.Invoke(ok);
     }
 

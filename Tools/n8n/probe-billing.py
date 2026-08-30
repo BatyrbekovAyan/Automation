@@ -659,11 +659,25 @@ from me;"""
 
 
 def _n8n_api_key():
-    """Read the same n8nAPIKey the app itself uses -- never hardcoded."""
+    """N8N_API_KEY env -> legacy secrets.json key -> gitignored prod key file.
+
+    n8nAPIKey left secrets.json 2026-08-31 (it shipped inside the app binary),
+    so the file fallback is the normal path now."""
+    key = os.environ.get("N8N_API_KEY", "")
+    if key:
+        return key
     here = os.path.dirname(os.path.abspath(__file__))
     secrets_path = os.path.join(here, "..", "..", "Assets", "StreamingAssets", "secrets.json")
-    with open(secrets_path) as fh:
-        return json.load(fh)["n8nAPIKey"]
+    if os.path.exists(secrets_path):
+        with open(secrets_path) as fh:
+            key = json.load(fh).get("n8nAPIKey", "")
+        if key:
+            return key
+    prod = os.path.join(here, ".secrets", "prod-api-key.txt")
+    if os.path.exists(prod):
+        with open(prod) as fh:
+            return fh.read().strip()
+    raise RuntimeError("no n8n API key: set N8N_API_KEY or provide Tools/n8n/.secrets/prod-api-key.txt")
 
 
 def _set_workflow_active(workflow_id, active, api_key):
