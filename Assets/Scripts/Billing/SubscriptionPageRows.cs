@@ -61,7 +61,18 @@ public static class SubscriptionPageRows
     public const string ChangePlanRow = "Изменить тариф";
     public const string RestoreRow = "Восстановить покупки";
     public const string CancelRow = "Отменить подписку";
-    public const string CancelCaption = "Управление подпиской — в настройках App Store / Google Play";
+
+    // Apple 2.3.10: the iOS binary must never mention Google Play (the caption is
+    // visible in exactly the state a reviewer reaches after a sandbox purchase).
+    // CancelCaption is the STORE-NEUTRAL scene seed the builder bakes; runtime
+    // always overwrites it per store via CancelCaptionText — the same split
+    // PaywallRows.FinePrintText already has.
+    public const string CancelCaption = "Управление подпиской — в настройках магазина приложений";
+    public const string CancelCaptionIos = "Управление подпиской — в настройках App Store";
+    public const string CancelCaptionAndroid = "Управление подпиской — в настройках Google Play";
+
+    public static string CancelCaptionText(bool iosStore)
+        => iosStore ? CancelCaptionIos : CancelCaptionAndroid;
 
     /// <summary>
     /// Wording still pending the owner's sign-off (same status as the paywall's

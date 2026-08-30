@@ -140,7 +140,17 @@ public partial class ProfileSubPages
 
         bool cancellable = SubscriptionPageRows.CancelVisible(purchased);
         if (subCancelCard != null) subCancelCard.SetActive(cancellable);
-        if (subCancelCaption != null) subCancelCaption.SetActive(cancellable);
+        if (subCancelCaption != null)
+        {
+            // 2.3.10: the scene seed is store-neutral; the per-store wording is
+            // stamped here so the iOS binary never displays «Google Play» (mirrors
+            // PaywallController's FinePrintText platform branch).
+            var captionTmp = subCancelCaption.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (captionTmp != null)
+                captionTmp.text = SubscriptionPageRows.CancelCaptionText(
+                    Application.platform == RuntimePlatform.IPhonePlayer);
+            subCancelCaption.SetActive(cancellable);
+        }
 
         SetSubscriptionBusy(_subBusy);
     }

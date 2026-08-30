@@ -70,12 +70,18 @@ public static class OnboardingAuthBlocksBuilder
     private const string LockIconPath = "Assets/Images/Icons/Lock.png";
     private const string CheckIconPath = "Assets/Images/Icons/Tick Green.png";
 
-    // Verbatim copy deck (owner-approved — do not paraphrase).
-    private const string TrustTitleText = "Это безопасно";
-    private const string TrustBodyWhatsapp =
-        "Работает через официальные «Связанные устройства» WhatsApp. Переписка остаётся у вас, отключить бота можно в любой момент.";
-    private const string TrustBodyTelegram =
-        "Официальный вход Telegram: код приходит в само приложение. Переписка остаётся у вас, отключить бота можно в любой момент.";
+    // Verbatim copy deck. Reworded 2026-08-31 (store-submission audit §02, Apple
+    // 2.3.1 / Play Deceptive Behavior): the original deck claimed «официальные»
+    // linked-devices and «Переписка остаётся у вас» under an «Это безопасно»
+    // header — overclaiming officialness/data locality that the app's own review
+    // notes contradict (transport is a server-side gateway; messages are processed
+    // server-side). Keep this deck honest: no «официальный», no data-locality
+    // claims. Internal so StoreClaimsFixWirer restamps the SAME strings in-scene.
+    internal const string TrustTitleText = "Как это работает";
+    internal const string TrustBodyWhatsapp =
+        "Подключение через «Связанные устройства» WhatsApp — как WhatsApp Web. Вы видите каждый диалог и можете отключить бота в любой момент.";
+    internal const string TrustBodyTelegram =
+        "Вход по коду, который приходит в само приложение Telegram. Вы видите каждый диалог и можете отключить бота в любой момент.";
     private const string SuccessTitleText = "Бот подключён!";
     private const string SuccessBodyText =
         "Осталось научить бота вашим ценам — загрузите прайс-лист, и он будет отвечать по вашим товарам";

@@ -307,8 +307,16 @@ public class SubscriptionPageRowsTests
         Assert.AreEqual("Изменить тариф", SubscriptionPageRows.ChangePlanRow);
         Assert.AreEqual("Восстановить покупки", SubscriptionPageRows.RestoreRow);
         Assert.AreEqual("Отменить подписку", SubscriptionPageRows.CancelRow);
-        Assert.AreEqual("Управление подпиской — в настройках App Store / Google Play",
+        // 2.3.10: the SEED must stay store-neutral (it ships baked in the scene of
+        // BOTH platforms' binaries); the store names live only in the per-store
+        // variants stamped at runtime.
+        Assert.AreEqual("Управление подпиской — в настройках магазина приложений",
             SubscriptionPageRows.CancelCaption);
+        Assert.AreEqual("Управление подпиской — в настройках App Store",
+            SubscriptionPageRows.CancelCaptionText(iosStore: true));
+        Assert.AreEqual("Управление подпиской — в настройках Google Play",
+            SubscriptionPageRows.CancelCaptionText(iosStore: false));
+        StringAssert.DoesNotContain("Google Play", SubscriptionPageRows.CancelCaptionText(iosStore: true));
         Assert.AreEqual("Диалоги ИИ", SubscriptionPageRows.DialogsTitle);
         Assert.AreEqual("Боты", SubscriptionPageRows.BotsTitle);
         Assert.AreEqual("Каналы", SubscriptionPageRows.ChannelsTitle);
