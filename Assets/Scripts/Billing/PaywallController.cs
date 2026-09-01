@@ -181,12 +181,23 @@ public class PaywallController : MonoBehaviour
         EnsureInit();
     }
 
+    private bool _navBarWasActive;
+
     private void OnEnable()
     {
         Theme.Changed += PaintPeriodLabels;
         UsageStore.OnUsageChanged += HandleUsageChanged;
         BillingService.OnPricesChanged += HandlePricesChanged;
         BillingService.FetchLocalizedPrices();
+
+        // The nav bar draws ABOVE ScreenContainer, so it stayed visible over this
+        // full-screen overlay while its taps only switched the screens BENEATH it —
+        // dead-looking buttons (owner check 2026-09-01). Hide it for the paywall's
+        // lifetime; restore only what we hid, so another surface's own hide survives.
+        var navBar = BottomTabManager.Instance;
+        _navBarWasActive = navBar != null && navBar.gameObject.activeSelf;
+        if (_navBarWasActive) navBar.gameObject.SetActive(false);
+
         Render();
     }
 
@@ -195,6 +206,10 @@ public class PaywallController : MonoBehaviour
         Theme.Changed -= PaintPeriodLabels;
         UsageStore.OnUsageChanged -= HandleUsageChanged;
         BillingService.OnPricesChanged -= HandlePricesChanged;
+
+        if (_navBarWasActive && BottomTabManager.Instance != null)
+            BottomTabManager.Instance.gameObject.SetActive(true);
+        _navBarWasActive = false;
     }
 
     /// <summary>

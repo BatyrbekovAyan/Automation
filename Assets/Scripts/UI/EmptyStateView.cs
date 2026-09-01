@@ -135,11 +135,44 @@ public class EmptyStateView : MonoBehaviour
             {
                 Hide();
             }
+
+            _reassertRoutine = StartCoroutine(ReassertAfterChannelRestore());
         }
+    }
+
+    private Coroutine _reassertRoutine;
+
+    /// <summary>
+    /// Tab re-entry race (device 2026-09-01): ChatManager restores the bot's persisted
+    /// channel WITHOUT firing OnActiveChannelChanged (BotState's restore is deliberately
+    /// silent), and the OnEmptyState/catch-up above can land BEFORE that restore — the
+    /// card then paints the PREVIOUS channel's accent (green hero on an empty Telegram)
+    /// and nothing repaints until a manual channel switch. One frame later the channel
+    /// is settled, so re-derive exactly the way HandleActiveChannelChanged does; the
+    /// steady state is a repeat Configure with identical inputs (idempotent).
+    /// </summary>
+    private System.Collections.IEnumerator ReassertAfterChannelRestore()
+    {
+        yield return null;
+        _reassertRoutine = null;
+        if (!_lastReason.HasValue) yield break;
+
+        EmptyStateReason? reason = ChatManager.Instance != null
+            ? ChatManager.Instance.ComputeCurrentEmptyState()
+            : _lastReason;
+        if (!reason.HasValue) { Hide(); yield break; }
+        _lastReason = reason;
+        ConfigureForReason(reason.Value);
+        Show();
     }
 
     private void OnDisable()
     {
+        if (_reassertRoutine != null)
+        {
+            StopCoroutine(_reassertRoutine);
+            _reassertRoutine = null;
+        }
         if (ChatManager.Instance != null)
         {
             ChatManager.Instance.OnEmptyState -= HandleEmptyState;
