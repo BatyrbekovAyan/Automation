@@ -118,8 +118,9 @@ public static class ThemeAssetsBuilder
         t.bubbleIncoming = Hex("#252A31");
         // Store audit 2026-09-01: #005C4B was byte-exact WhatsApp dark outgoing — the
         // single most WhatsApp-identified pixel in the thread. Deep indigo from the
-        // accent hue (#3E61C6 family); inkPrimary keeps ~10:1 on it. Do not revert.
-        t.bubbleOutgoing = Hex("#2C3A61");
+        // accent hue (#3E61C6 family); inkPrimary keeps ~9:1 on it. Do not revert to
+        // green. (#2C3A61 first cut read muddy on device — lifted/saturated a step.)
+        t.bubbleOutgoing = Hex("#33477E");
         // Multiplies the baked #E5DAC6 strokes down to ≈#1C242E — the same subtle
         // paper-vs-ink ΔL the light wallpaper has, no dark art regen needed.
         t.chatWallpaperInk = Hex("#1F2A3B");

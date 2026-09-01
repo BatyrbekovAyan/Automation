@@ -235,10 +235,45 @@ public class PaywallController : MonoBehaviour
         RenderReceipt();
     }
 
+    private RectTransform _bottomBarRt;
+    private VerticalLayoutGroup _contentGroup;
+    private float _appliedBarClearance = -1f;
+
+    private void LateUpdate() => SyncContentBottomPadding();
+
+    /// <summary>
+    /// The scroll content's bottom padding used to be a CONSTANT sized for the bar's
+    /// tallest state («scroll slack nobody sees», PaywallBuilder.BuildScrollColumn) —
+    /// but the bar height now varies twice at runtime (secondary purchase button, legal
+    /// row), and after the 2026-09-01 feature-list trim the slack surfaced as a visible
+    /// dead zone under the «Во всех тарифах» card (owner check). Follow the bar's
+    /// ACTUAL fitted height instead; +48 keeps the authored breathing room. LateUpdate,
+    /// because the bar's own ContentSizeFitter settles a frame after Render toggles its
+    /// rows — the cached-clearance guard makes the steady-state cost one float compare.
+    /// </summary>
+    private void SyncContentBottomPadding()
+    {
+        if (_contentGroup == null || _bottomBarRt == null) return;
+        float clearance = Mathf.Ceil(_bottomBarRt.rect.height) + 48f;
+        if (Mathf.Approximately(clearance, _appliedBarClearance)) return;
+        _appliedBarClearance = clearance;
+        _contentGroup.padding.bottom = (int)clearance;
+        LayoutRebuilder.MarkLayoutForRebuild(scroll.content);
+    }
+
     private void EnsureInit()
     {
         if (_rt == null) _rt = GetComponent<RectTransform>();
         if (_rootCanvas == null) _rootCanvas = GetComponentInParent<Canvas>(true);
+        if (_contentGroup == null && scroll != null && scroll.content != null)
+            _contentGroup = scroll.content.GetComponent<VerticalLayoutGroup>();
+        if (_bottomBarRt == null && ctaButton != null)
+            for (Transform bar = ctaButton.transform.parent; bar != null; bar = bar.parent)
+                if (bar.GetComponent<ContentSizeFitter>() != null)
+                {
+                    _bottomBarRt = (RectTransform)bar;
+                    break;
+                }
         if (_wired) return;
         _wired = true;
 

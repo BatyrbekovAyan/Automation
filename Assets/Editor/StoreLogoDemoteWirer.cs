@@ -51,6 +51,11 @@ public static class StoreLogoDemoteWirer
     private static readonly Color WaCardTint = Hex("#1F8A46");   // OnboardingAuthBlocksBuilder.LockTint
     private static readonly Color TgCardTint = Hex("#2AABEE");   // ChannelAccent.TelegramBlue
 
+    // The nav glyph inks nearly its full canvas, unlike the old logo art whose padding
+    // made it read smaller — at the authored 260×260 it looked gigantic in the disc
+    // (owner check 2026-09-01). 150 ≈ the About page's robot-in-disc proportion.
+    private const float EmptyStateIconSize = 150f;
+
     [MenuItem("Tools/Store Compliance/Demote Official Channel Logos")]
     public static void Run()
     {
@@ -101,6 +106,7 @@ public static class StoreLogoDemoteWirer
 
         iconImage.sprite = glyph;
         iconImage.color = EmptyStateTint;
+        iconImage.rectTransform.sizeDelta = new Vector2(EmptyStateIconSize, EmptyStateIconSize);
         EditorUtility.SetDirty(iconImage);
 
         so.FindProperty("telegramIcon").objectReferenceValue = null;

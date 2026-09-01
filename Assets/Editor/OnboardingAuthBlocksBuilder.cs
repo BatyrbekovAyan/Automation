@@ -86,8 +86,10 @@ public static class OnboardingAuthBlocksBuilder
         "Подключение через «Связанные устройства» WhatsApp — как WhatsApp Web. Подключая аккаунт, вы соглашаетесь на обработку входящих сообщений ИИ-сервисом для подготовки ответов. Отключить бота можно в любой момент.";
     internal const string TrustBodyTelegram =
         "Вход по коду, который приходит в само приложение Telegram. Подключая аккаунт, вы соглашаетесь на обработку входящих сообщений ИИ-сервисом для подготовки ответов. Отключить бота можно в любой момент.";
-    internal const float TrustCardHeight = 356f;
-    internal const float TrustBodyHeight = 216f;
+    // 404/264: the 356/216 first cut clipped the 5th line on device-check 2026-09-01 —
+    // TMP's SF Pro line height at 34pt runs ~48px with the 4pt lineSpacing, not ~43.
+    internal const float TrustCardHeight = 404f;
+    internal const float TrustBodyHeight = 264f;
     private const string SuccessTitleText = "Бот подключён!";
     private const string SuccessBodyText =
         "Осталось научить бота вашим ценам — загрузите прайс-лист, и он будет отвечать по вашим товарам";

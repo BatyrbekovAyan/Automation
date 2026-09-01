@@ -317,9 +317,11 @@ public static class PaywallBuilder
         SetAnchors(contentRt, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f));
         contentRt.offsetMin = Vector2.zero;
         contentRt.offsetMax = Vector2.zero;
-        // Bottom padding clears the bar at its TALLEST (secondary button shown), not its resting
-        // height — otherwise the last card's tail sits under the bar in exactly the state a
-        // first-run user is in. The cost in the other states is scroll slack nobody sees.
+        // Bottom padding here is only the SEED: since 2026-09-01 the runtime owns it —
+        // PaywallController.SyncContentBottomPadding follows the bar's actual fitted
+        // height (+48) every frame the paywall is open, because the bar varies twice
+        // (secondary button, legal row) and a constant sized for the tallest state left
+        // a visible dead zone under the last card in every other state.
         AddVerticalGroup(content, new RectOffset((int)Gutter, (int)Gutter, 24, (int)(BottomBarHeightMax + 48f)),
             CardGap, TextAnchor.UpperCenter, expandHeight: false);
         content.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
