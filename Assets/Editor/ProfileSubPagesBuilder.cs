@@ -573,14 +573,29 @@ public static class ProfileSubPagesBuilder
 
         MakeCaption(parts.content.gameObject, "Документы");
         var docsCard = MakeCard(parts.content.gameObject, "DocsCard");
+        // Store audit 2026-09-01 (Apple 5.1.1(i) / Play User Data): the legal pages must
+        // be reachable in-app outside the paywall — rows open LegalLinks URLs at runtime.
+        var privacyRow = MakeActionRow(docsCard, PsIcon("PS_Doc"), IconBlueGray, "Политика конфиденциальности",
+            out _, out _);
+        MakeDivider(docsCard);
+        var termsRow = MakeActionRow(docsCard, PsIcon("PS_Doc"), IconBlueGray, "Условия использования",
+            out _, out _);
+        MakeDivider(docsCard);
         var licensesRow = MakeActionRow(docsCard, PsIcon("PS_Doc"), IconBlueGray, "Лицензии открытого ПО",
             out _, out _);
 
+        // Non-affiliation disclaimer (Apple 5.2.1 / Play Impersonation — the first thing a
+        // human reviewer looks for when the channel-glyph question comes up) + operator ©
+        // (the legal entity, matching choosereply.com/terms — not the old SynergySoft label).
         MakeFinePrint(parts.content.gameObject,
-            "© 2026 SynergySoft\nСделано для бизнеса в Казахстане и СНГ", center: true);
+            "Choose Reply не связан с WhatsApp (Meta Platforms) и Telegram и не одобрен ими.\n" +
+            "WhatsApp и Telegram — товарные знаки их владельцев.\n\n" +
+            "© 2026 ТОО «Synergy Expert Group»\nСделано для бизнеса в Казахстане и СНГ", center: true);
 
         so.FindProperty("aboutVersionLabel").objectReferenceValue = versionTmp;
         so.FindProperty("licensesButton").objectReferenceValue = licensesRow;
+        so.FindProperty("privacyPolicyButton").objectReferenceValue = privacyRow;
+        so.FindProperty("termsOfUseButton").objectReferenceValue = termsRow;
     }
 
     private static void BuildLicensesContent(PanelParts parts, SerializedObject so)

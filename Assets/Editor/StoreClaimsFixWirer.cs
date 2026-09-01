@@ -68,11 +68,31 @@ public static class StoreClaimsFixWirer
             throw new System.InvalidOperationException(
                 $"[StoreClaimsFixWirer] Manager.{panelField} is not assigned.");
 
-        var fill = panel.transform.Find("TrustBlock/Fill");
+        var block = panel.transform.Find("TrustBlock");
+        var fill = block != null ? block.Find("Fill") : null;
         if (fill == null)
             throw new System.InvalidOperationException(
                 $"[StoreClaimsFixWirer] TrustBlock/Fill not found under {panelField} — " +
                 "run Tools/Onboarding/Build Auth Blocks first.");
+
+        // The 5.1.2(i) consent sentence made the deck 5 lines — grow the card to the
+        // builder's geometry so the last line is not clipped (both sources move together).
+        var blockRt = (RectTransform)block;
+        blockRt.sizeDelta = new Vector2(blockRt.sizeDelta.x, OnboardingAuthBlocksBuilder.TrustCardHeight);
+        var layout = block.GetComponent<UnityEngine.UI.LayoutElement>();
+        if (layout != null)
+        {
+            layout.minHeight = OnboardingAuthBlocksBuilder.TrustCardHeight;
+            layout.preferredHeight = OnboardingAuthBlocksBuilder.TrustCardHeight;
+            EditorUtility.SetDirty(layout);
+        }
+        var bodyRt = fill.Find("Body") as RectTransform;
+        if (bodyRt != null)
+        {
+            bodyRt.sizeDelta = new Vector2(bodyRt.sizeDelta.x, OnboardingAuthBlocksBuilder.TrustBodyHeight);
+            EditorUtility.SetDirty(bodyRt);
+        }
+        EditorUtility.SetDirty(blockRt);
 
         SetLabel(fill.Find("Title"), OnboardingAuthBlocksBuilder.TrustTitleText, panelField + " Title");
         SetLabel(fill.Find("Body"), bodyText, panelField + " Body");

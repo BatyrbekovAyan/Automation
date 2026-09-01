@@ -35,13 +35,25 @@
 
 - [ ] Создать App Record: bundle id `com.synergysoft.choosereply`, имя, RU primary locale.
 - [ ] **Privacy Policy URL** (обязательное поле) — URL из блокеров.
-- [ ] **App Privacy (labels)** — готовые ответы под факты приложения:
-  - Data collected: **User Content** (Messages, Photos/Docs — прайс-листы) —
-    App Functionality, **not linked to identity**, **no tracking**.
-  - **Purchases** (история покупок через RevenueCat, анонимный ID) — App Functionality,
-    not linked, no tracking.
-  - **Identifiers**: нет (RevenueCat ID анонимный, не связан с личностью).
-  - Tracking: **No**. Третьесторонней рекламы/аналитики нет.
+- [ ] **App Privacy (labels)** — ПЕРЕПИСАНО 2026-09-01 под правду кода (аудит 2026-08-30:
+  старые ответы «Identifiers: нет» / «not linked» опровергались трафиком — приложение
+  шлёт RevenueCat appUserID/IDFV-фолбэк на свой сервер ВМЕСТЕ с текстами сообщений,
+  и сервер джойнит их; Google/Apple карают за расхождение декларации с трафиком):
+  - **User Content**: Messages (тексты чатов клиентов; идут через Wappi → наш n8n →
+    OpenAI как процессоры), Photos or Videos (прайс-фото), Other User Content
+    (файлы прайс-листов), **Audio Data** (голосовые клиентов — транскрибируются
+    сервисом) — purpose App Functionality, **LINKED to identity** (связаны с
+    идентификатором установки на сервере), no tracking.
+  - **Contact Info**: Phone Number (номер владельца при подключении; номера клиентов
+    как chat id), Email Address + Physical Address (контакты бизнеса, введённые
+    владельцем и отправляемые в workflow) — App Functionality, linked, no tracking.
+  - **Identifiers**: **User ID** (RevenueCat appUserID) + **Device ID**
+    (SystemInfo.deviceUniqueIdentifier как фолбэк до резолва RC) — App Functionality,
+    linked, no tracking.
+  - **Purchases**: Purchase History (RevenueCat) — App Functionality, linked, no tracking.
+  - Tracking: **No** (кросс-приложенческого/рекламного трекинга нет — это правда).
+  - После первого Xcode-архива: Product → Generate Privacy Report и сверить лейблы
+    с агрегированными манифестами SDK.
 - [ ] **Подписки**: subscription group + 7 SKU заведены Блоком 1 — сверить цены
   (месяц 9 990 / 19 990 / 39 900 ₸; год 99 000 / 198 990 / 399 990 ₸; топ-ап 3 900 ₸),
   добавить RU-локализацию названий SKU, приложить юр-URL к группе (Terms).
@@ -69,9 +81,22 @@
   после 13.11.2023) **не применяется** — можно идти сразу в production-трек.
   Internal testing перед продакшеном — по желанию, не обязателен.
 - [ ] Создать приложение: `com.synergysoft.choosereply`, RU listing.
-- [ ] **Data Safety** — те же ответы, что labels Apple: собираются «Messages»
-  и «Files/Docs» (функциональность, шифрование в транзите, можно запросить удаление),
-  «Purchase history»; No ads, no tracking, данные не продаются.
+- [ ] **Data Safety** — зеркалить ПЕРЕПИСАННЫЕ labels Apple (см. §1, 2026-09-01):
+  собираются Messages, Photos and videos, Files and docs, **Voice or sound
+  recordings**, **Phone number**, Email + Address (введённые владельцем),
+  **Device or other IDs** (RevenueCat ID + device-id фолбэк), Purchase history —
+  всё purpose «App functionality», шифрование в транзите. Wappi/n8n/OpenAI/Supabase —
+  процессоры по нашим инструкциям ⇒ «Data shared» = **No** (политика §5 это
+  фиксирует). «Можно запросить удаление» = **Yes** честно ЧЕРЕЗ: «Удалить все
+  данные» в приложении (локальное + RAG/оригиналы/bot_profiles) + запрос на
+  synergyexpertgroup@gmail.com (политика обещает 30-дневный SLA). ⚠️ Серверная
+  память диалогов (`n8n_chat_histories`/`conversation_outcomes`) при удалении бота
+  пока НЕ чистится — расширить DeleteBotFiles ДО заполнения формы (задача ниже,
+  правка формы позже = ре-ревью). No ads, no tracking, данные не продаются.
+- [ ] **Серверная задача до заполнения Data Safety**: расширить n8n `DeleteBotFiles`
+  (или добавить соседний вебхук), чтобы при удалении бота чистились строки
+  `n8n_chat_histories` и `conversation_outcomes` по profile/session id — иначе
+  ответ «можно запросить удаление» опирается только на почтовый канал.
 - [ ] Privacy Policy URL — тот же.
 - [ ] IARC-опросник (получить рейтинг).
 - [ ] Подписки: создать 3×(месяц/год) + топ-ап продукты с теми же ценами

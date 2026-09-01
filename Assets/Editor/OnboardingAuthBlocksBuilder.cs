@@ -78,10 +78,16 @@ public static class OnboardingAuthBlocksBuilder
     // server-side). Keep this deck honest: no «официальный», no data-locality
     // claims. Internal so StoreClaimsFixWirer restamps the SAME strings in-scene.
     internal const string TrustTitleText = "Как это работает";
+    // The «Подключая аккаунт, вы соглашаетесь…» sentence is the Apple 5.1.2(i) surface:
+    // routing customers' messages to a third-party AI needs disclosure AT the point the
+    // user connects the channel, not only in the privacy policy. Card geometry sized for
+    // this 5-line deck — TrustCardHeight/TrustBodyHeight below move with the copy.
     internal const string TrustBodyWhatsapp =
-        "Подключение через «Связанные устройства» WhatsApp — как WhatsApp Web. Вы видите каждый диалог и можете отключить бота в любой момент.";
+        "Подключение через «Связанные устройства» WhatsApp — как WhatsApp Web. Подключая аккаунт, вы соглашаетесь на обработку входящих сообщений ИИ-сервисом для подготовки ответов. Отключить бота можно в любой момент.";
     internal const string TrustBodyTelegram =
-        "Вход по коду, который приходит в само приложение Telegram. Вы видите каждый диалог и можете отключить бота в любой момент.";
+        "Вход по коду, который приходит в само приложение Telegram. Подключая аккаунт, вы соглашаетесь на обработку входящих сообщений ИИ-сервисом для подготовки ответов. Отключить бота можно в любой момент.";
+    internal const float TrustCardHeight = 356f;
+    internal const float TrustBodyHeight = 216f;
     private const string SuccessTitleText = "Бот подключён!";
     private const string SuccessBodyText =
         "Осталось научить бота вашим ценам — загрузите прайс-лист, и он будет отвечать по вашим товарам";
@@ -183,7 +189,7 @@ public static class OnboardingAuthBlocksBuilder
     // intact (Pitfall 2).
     private static void BuildTrustCard(GameObject codePanel, string bodyText)
     {
-        const float cardHeight = 300f;
+        float cardHeight = TrustCardHeight;
 
         DestroyAllByName(codePanel.transform, "TrustBlock");
 
@@ -232,7 +238,7 @@ public static class OnboardingAuthBlocksBuilder
         var bodyGo = NewChild(fill, "Body", out var bodyRt);
         SetAnchors(bodyRt, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f));
         bodyRt.anchoredPosition = new Vector2(160f, -120f);
-        bodyRt.sizeDelta = new Vector2(770f, 160f);
+        bodyRt.sizeDelta = new Vector2(770f, TrustBodyHeight);
         var bodyTmp = AddText(bodyGo, bodyText, 34f, _regular, Muted);
         bodyTmp.alignment = TextAlignmentOptions.TopLeft;
         bodyTmp.lineSpacing = 4f;

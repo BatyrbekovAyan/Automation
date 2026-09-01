@@ -202,7 +202,12 @@ public partial class Manager : MonoBehaviour
     {
         if (!string.IsNullOrWhiteSpace(overrideUrl)) return overrideUrl.Trim().TrimEnd('/');
         if (!string.IsNullOrWhiteSpace(configured)) return configured.Trim().TrimEnd('/');
-        return "https://bagkz.app.n8n.cloud";
+        // Last-resort fallback (secrets.json unreadable — a real, coded-for path on
+        // Android). Must be a domain WE control: it used to be the DELETED
+        // bagkz.app.n8n.cloud workspace, i.e. the app would silently POST business
+        // data and chat content to a re-registrable third-party subdomain
+        // (store audit 2026-08-30 §04).
+        return "https://n8n.choosereply.com";
     }
 
     // Robustly extract the workflow "id" from an n8n create response. Tolerates the

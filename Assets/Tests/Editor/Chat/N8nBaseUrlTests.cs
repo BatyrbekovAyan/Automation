@@ -2,7 +2,9 @@ using NUnit.Framework;
 
 public class N8nBaseUrlTests
 {
-    private const string CloudDefault = "https://bagkz.app.n8n.cloud";
+    // The last-resort fallback must be a domain WE control (the old bagkz n8n Cloud
+    // workspace is deleted and re-registrable) - store audit 2026-08-30.
+    private const string CloudDefault = "https://n8n.choosereply.com";
 
     [Test]
     public void EmptyConfig_FallsBackToCloud()
