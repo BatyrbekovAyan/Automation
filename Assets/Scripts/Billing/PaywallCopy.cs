@@ -30,6 +30,15 @@ public static class PaywallCopy
 
     public static string PerYear(int amount) => Kzt(amount) + "/год";
 
+    /// <summary>
+    /// Store-supplied localized price + RU period suffix («9 990,00 ₸/мес», «$24.99/год»).
+    /// The price string arrives fully formatted from StoreKit/Play Billing — never re-group
+    /// or re-symbol it; it must match the store's own confirmation sheet (Apple 3.1.2).
+    /// </summary>
+    public static string PerMonthLocalized(string storePrice) => storePrice + "/мес";
+
+    public static string PerYearLocalized(string storePrice) => storePrice + "/год";
+
     public static string YearLine(PlanSpec p) => Kzt(p.PriceYearKzt) + "/год — выгода до 17%";
 
     /// <summary>Short «до -17%» badge for the Год half of the period toggle. ASCII hyphen-minus

@@ -288,6 +288,10 @@ public class SubscriptionPageRowsTests
     public void Top_up_row_names_the_pack_and_its_price()
     {
         Assert.AreEqual("Купить 500 диалогов — 3\u00A0900\u00A0₸", SubscriptionPageRows.TopUpRowText());
+        // Store-localized top-up price wins when the fetch has landed (Apple 3.1.2);
+        // an empty store string keeps the KZT fallback.
+        Assert.AreEqual("Купить 500 диалогов — $9.99", SubscriptionPageRows.TopUpRowText("$9.99"));
+        Assert.AreEqual("Купить 500 диалогов — 3\u00A0900\u00A0₸", SubscriptionPageRows.TopUpRowText(""));
     }
 
     [Test]

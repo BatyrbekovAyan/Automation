@@ -28,4 +28,14 @@ public interface IBillingBackend
 
     /// <summary>Restore previously-bought entitlements for the current store account. <paramref name="done"/> fires with success.</summary>
     void RestorePurchases(Action<bool> done);
+
+    /// <summary>
+    /// Fetch the store's localized price strings for every sellable product
+    /// (<see cref="PlanCatalog.AllSkus"/>): product id → fully-formatted price
+    /// («9 990,00 ₸», «$24.99»). <paramref name="done"/> fires with null/empty when the
+    /// store is unreachable or the backend is not configured — callers then keep the
+    /// <see cref="PlanCatalog"/> KZT fallback (Apple 3.1.2: displayed price must match
+    /// what the store actually bills).
+    /// </summary>
+    void FetchPrices(Action<System.Collections.Generic.Dictionary<string, string>> done);
 }

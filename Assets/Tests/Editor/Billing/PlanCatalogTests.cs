@@ -43,4 +43,15 @@ public class PlanCatalogTests
     [TestCase("garbage", PlanTier.None)]
     public void Entitlement_ids_map(string id, PlanTier expected)
         => Assert.AreEqual(expected, PlanCatalog.FromEntitlementId(id));
+
+    /// <summary>The localized-price fetch asks the store for EXACTLY the sellable set.</summary>
+    [Test]
+    public void All_skus_cover_six_subscriptions_and_the_topup()
+        => CollectionAssert.AreEqual(new[]
+        {
+            "sub.start.month", "sub.start.year",
+            "sub.business.month", "sub.business.year",
+            "sub.network.month", "sub.network.year",
+            "topup.dialogs.500",
+        }, PlanCatalog.AllSkus());
 }

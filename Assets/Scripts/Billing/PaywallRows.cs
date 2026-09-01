@@ -97,9 +97,17 @@ public static class PaywallRows
     public const string RestoreFailedNotice = "Не удалось восстановить покупки";
 
     /// <summary>
-    /// Spec §2 «Во всех тарифах», verbatim and in order. The launch rule («пейволл не
-    /// публикуется, пока каждая строка не работает») is checked against THIS list, so it
-    /// must stay the single place the promise is written down.
+    /// Spec §2 «Во всех тарифах» — TRIMMED 2026-08-31 to what the shipped binary actually
+    /// does (store audit §05, Apple 2.1/3.1.2: review notes invite a sandbox purchase and
+    /// the reviewer can falsify advertised features in-app — «Сводка за всё время» had no
+    /// such period, экспорта/алертов/отчёта/расписания не существовало). Removed until
+    /// their Block-2 client pieces land (restore them in that update — updates get
+    /// re-reviewed anyway): «Сводка за всё время + экспорт», «Алерты: „клиент готов
+    /// купить", „канал отключился"», «Недельный отчёт в Telegram», «Расписание работы
+    /// бота». The launch rule («пейволл не публикуется, пока каждая строка не работает»)
+    /// is checked against THIS list, so it must stay the single place the promise is
+    /// written down. After editing, re-run Tools/Store Compliance/Trim Paywall Feature
+    /// List — the scene rows are BAKED by PaywallBuilder and do not re-render at runtime.
     /// </summary>
     public static readonly string[] AllPlansFeatures =
     {
@@ -107,40 +115,57 @@ public static class PaywallRows
         "Понимает голосовые сообщения",
         "Прайс-листы без лимита — файлы и фото",
         "Режимы «Авто» и «Вместе»",
-        "Сводка за всё время + экспорт",
-        "Алерты: «клиент готов купить», «канал отключился»",
-        "Недельный отчёт в Telegram",
-        "Расписание работы бота · докупка диалогов",
+        "Сводка: итоги диалогов и заказы",
+        "Докупка диалогов в любой момент",
     };
 
     // ── Rows ─────────────────────────────────────────────────────────────────
 
-    public static PaywallTierRow[] Build(PaywallPeriod period)
+    public static PaywallTierRow[] Build(PaywallPeriod period,
+        System.Collections.Generic.IReadOnlyDictionary<string, string> localizedPrices = null)
     {
         var rows = new PaywallTierRow[Order.Length];
         for (int i = 0; i < Order.Length; i++)
-            rows[i] = Build(Order[i], period);
+            rows[i] = Build(Order[i], period, localizedPrices);
         return rows;
     }
 
-    public static PaywallTierRow Build(PlanTier tier, PaywallPeriod period)
+    public static PaywallTierRow Build(PlanTier tier, PaywallPeriod period,
+        System.Collections.Generic.IReadOnlyDictionary<string, string> localizedPrices = null)
     {
         PlanSpec spec = PlanCatalog.Get(tier);
         return new PaywallTierRow
         {
             Tier = tier,
             Title = PaywallCopy.TierName(tier),
-            PriceText = PriceText(spec, period),
+            PriceText = PriceText(spec, period, localizedPrices),
             CountsLine = CountsLine(spec),
             ShowCrossBotLine = HasCrossBotSummary(tier),
             IsHighlighted = tier == Recommended,
         };
     }
 
-    public static string PriceText(PlanSpec spec, PaywallPeriod period)
-        => period == PaywallPeriod.Year
+    /// <summary>
+    /// Apple 3.1.2: prefer the STORE's localized price string for the exact product the
+    /// CTA buys — hardcoded ₸ under a differently-currencied StoreKit sheet is the classic
+    /// «misleading pricing» rejection (the reviewer's sandbox account is rarely on the KZ
+    /// storefront). The <see cref="PlanCatalog"/> literals stay as the offline/pre-fetch
+    /// fallback; they match the confirmed KZT store config (spec §10.2).
+    /// </summary>
+    public static string PriceText(PlanSpec spec, PaywallPeriod period,
+        System.Collections.Generic.IReadOnlyDictionary<string, string> localizedPrices = null)
+    {
+        string sku = period == PaywallPeriod.Year ? spec.SkuYear : spec.SkuMonth;
+        if (localizedPrices != null && !string.IsNullOrEmpty(sku)
+            && localizedPrices.TryGetValue(sku, out string storePrice) && !string.IsNullOrEmpty(storePrice))
+            return period == PaywallPeriod.Year
+                ? PaywallCopy.PerYearLocalized(storePrice)
+                : PaywallCopy.PerMonthLocalized(storePrice);
+
+        return period == PaywallPeriod.Year
             ? PaywallCopy.PerYear(spec.PriceYearKzt)
             : PaywallCopy.PerMonth(spec.PriceMonthKzt);
+    }
 
     public static string CountsLine(PlanSpec spec)
         => PaywallCopy.Bots(spec.MaxBots)
@@ -175,11 +200,12 @@ public static class PaywallRows
     /// period.
     /// </summary>
     public static string CtaText(bool trialStarted, PlanTier purchased, bool serverSaysExpired,
-        PlanTier selected, PaywallPeriod period)
+        PlanTier selected, PaywallPeriod period,
+        System.Collections.Generic.IReadOnlyDictionary<string, string> localizedPrices = null)
     {
         if (IsTrialOffer(trialStarted, purchased, serverSaysExpired))
             return PaywallCopy.TrialCta();
-        return SubscribeText(selected, period);
+        return SubscribeText(selected, period, localizedPrices);
     }
 
     /// <summary>
@@ -195,17 +221,19 @@ public static class PaywallRows
     /// purchase that cannot be made.
     /// </summary>
     public static PaywallSecondaryRow SecondaryPurchase(bool trialStarted, PlanTier purchased,
-        bool serverSaysExpired, PlanTier selected, PaywallPeriod period)
+        bool serverSaysExpired, PlanTier selected, PaywallPeriod period,
+        System.Collections.Generic.IReadOnlyDictionary<string, string> localizedPrices = null)
     {
         if (!IsTrialOffer(trialStarted, purchased, serverSaysExpired) || string.IsNullOrEmpty(Sku(selected, period)))
             return new PaywallSecondaryRow { Visible = false, Text = "" };
 
-        return new PaywallSecondaryRow { Visible = true, Text = SubscribeText(selected, period) };
+        return new PaywallSecondaryRow { Visible = true, Text = SubscribeText(selected, period, localizedPrices) };
     }
 
     /// <summary>«Оформить &lt;тариф&gt; — &lt;цена&gt;» for the current selection.</summary>
-    public static string SubscribeText(PlanTier tier, PaywallPeriod period)
-        => PaywallCopy.SubscribeCta(tier, PriceText(PlanCatalog.Get(tier), period));
+    public static string SubscribeText(PlanTier tier, PaywallPeriod period,
+        System.Collections.Generic.IReadOnlyDictionary<string, string> localizedPrices = null)
+        => PaywallCopy.SubscribeCta(tier, PriceText(PlanCatalog.Get(tier), period, localizedPrices));
 
     /// <summary>Store product id the CTA buys for a (tier, period) selection; empty for non-purchasable tiers.</summary>
     public static string Sku(PlanTier tier, PaywallPeriod period)

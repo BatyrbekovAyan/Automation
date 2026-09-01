@@ -297,10 +297,16 @@ public static class SubscriptionPageRows
 
     // ── Actions ──────────────────────────────────────────────────────────────
 
-    /// <summary>«Купить 500 диалогов — 3 900 ₸».</summary>
-    public static string TopUpRowText()
+    /// <summary>
+    /// «Купить 500 диалогов — 3 900 ₸». Prefers the STORE's localized price for the
+    /// top-up product when the fetch has landed (Apple 3.1.2 — same rule as the paywall
+    /// tier cards); the PlanCatalog literal stays the offline fallback.
+    /// </summary>
+    public static string TopUpRowText(string localizedTopUpPrice = null)
         => "Купить " + PaywallCopy.Dialogs(PlanCatalog.TopUpDialogs)
-         + " — " + PaywallCopy.Kzt(PlanCatalog.TopUpPriceKzt);
+         + " — " + (string.IsNullOrEmpty(localizedTopUpPrice)
+                        ? PaywallCopy.Kzt(PlanCatalog.TopUpPriceKzt)
+                        : localizedTopUpPrice);
 
     /// <summary>
     /// The store's cancel deep-link only makes sense once something was actually bought —

@@ -55,4 +55,15 @@ public class FakeBillingBackend : IBillingBackend
         RestoreCalled = true;
         done?.Invoke(RestoreSucceeds);
     }
+
+    // Test-controlled localized price map; null (the default) = store prices unavailable,
+    // which is also the honest Editor behavior — the paywall then renders the KZT fallback.
+    public System.Collections.Generic.Dictionary<string, string> LocalizedPrices;
+    public bool FetchPricesCalled { get; private set; }
+
+    public void FetchPrices(Action<System.Collections.Generic.Dictionary<string, string>> done)
+    {
+        FetchPricesCalled = true;
+        done?.Invoke(LocalizedPrices);
+    }
 }

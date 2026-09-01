@@ -131,7 +131,17 @@ public partial class ProfileSubPages
 
         RenderMeters(usage);
 
-        if (subTopUpLabel != null) subTopUpLabel.text = SubscriptionPageRows.TopUpRowText();
+        if (subTopUpLabel != null)
+        {
+            // Prefer the store's localized top-up price (Apple 3.1.2, same rule as the
+            // paywall); kick the fetch so a page opened before any paywall still gets
+            // them — the next refresh then renders the store string.
+            BillingService.FetchLocalizedPrices();
+            string localizedTopUp = null;
+            var storePrices = BillingService.LocalizedPrices;
+            if (storePrices != null) storePrices.TryGetValue(PlanCatalog.SkuTopUp, out localizedTopUp);
+            subTopUpLabel.text = SubscriptionPageRows.TopUpRowText(localizedTopUp);
+        }
         if (subNotice != null)
         {
             subNotice.text = _subNoticeText;

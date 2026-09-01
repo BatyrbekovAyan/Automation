@@ -185,6 +185,8 @@ public class PaywallController : MonoBehaviour
     {
         Theme.Changed += PaintPeriodLabels;
         UsageStore.OnUsageChanged += HandleUsageChanged;
+        BillingService.OnPricesChanged += HandlePricesChanged;
+        BillingService.FetchLocalizedPrices();
         Render();
     }
 
@@ -192,7 +194,16 @@ public class PaywallController : MonoBehaviour
     {
         Theme.Changed -= PaintPeriodLabels;
         UsageStore.OnUsageChanged -= HandleUsageChanged;
+        BillingService.OnPricesChanged -= HandlePricesChanged;
     }
+
+    /// <summary>
+    /// Store-localized prices land async (a GetProducts round-trip started in OnEnable) —
+    /// repaint so the tier cards/CTA flip from the KZT fallback to the store's own
+    /// strings while the screen is up. Subscription is enable-scoped, so a closed
+    /// paywall holds nothing.
+    /// </summary>
+    private void HandlePricesChanged() => Render();
 
     /// <summary>
     /// The receipt's «Диалогов» tile reads <see cref="UsageStore.Current"/>, which is null until
@@ -460,7 +471,8 @@ public class PaywallController : MonoBehaviour
         if (yearFill != null) yearFill.SetActive(_period == PaywallPeriod.Year);
         PaintPeriodLabels();
 
-        var rows = PaywallRows.Build(_period);
+        var localizedPrices = BillingService.LocalizedPrices;
+        var rows = PaywallRows.Build(_period, localizedPrices);
         for (int i = 0; i < tierCards.Length; i++)
         {
             var card = tierCards[i];
@@ -478,13 +490,13 @@ public class PaywallController : MonoBehaviour
         }
 
         if (ctaLabel != null)
-            ctaLabel.text = PaywallRows.CtaText(_trialStarted, _purchased, _serverSaysExpired, _selected, _period);
+            ctaLabel.text = PaywallRows.CtaText(_trialStarted, _purchased, _serverSaysExpired, _selected, _period, localizedPrices);
 
         // The secondary button follows the same selection as the CTA, so a tier/period tap
         // repaints both here — and the seam keeps it OFF in every state where the CTA is
         // already the subscribe form.
         PaywallSecondaryRow secondary =
-            PaywallRows.SecondaryPurchase(_trialStarted, _purchased, _serverSaysExpired, _selected, _period);
+            PaywallRows.SecondaryPurchase(_trialStarted, _purchased, _serverSaysExpired, _selected, _period, localizedPrices);
         if (purchaseButton != null) purchaseButton.gameObject.SetActive(secondary.Visible);
         if (purchaseLabel != null && secondary.Visible) purchaseLabel.text = secondary.Text;
 

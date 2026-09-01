@@ -103,6 +103,33 @@ public class RevenueCatBackend : IBillingBackend
         });
     }
 
+    public void FetchPrices(Action<System.Collections.Generic.Dictionary<string, string>> done)
+    {
+        if (!_configured) { done?.Invoke(null); return; }
+
+        // One call covers iOS fully — StoreKit ignores the subs/inapp type filter, so the
+        // consumable top-up rides along with the six subscriptions. Android's Play Billing
+        // DOES split by type and would miss the top-up here; add a second "inapp" call when
+        // the Android track ships (deferred with the rest of Android, owner 2026-08-31).
+        _purchases.GetProducts(PlanCatalog.AllSkus(), (products, error) =>
+        {
+            if (error != null)
+            {
+                Debug.LogWarning($"[RevenueCatBackend] GetProducts error: {error.Message}");
+                done?.Invoke(null);
+                return;
+            }
+            if (products == null || products.Count == 0) { done?.Invoke(null); return; }
+
+            var prices = new System.Collections.Generic.Dictionary<string, string>(products.Count);
+            foreach (var product in products)
+                if (product != null && !string.IsNullOrEmpty(product.Identifier)
+                    && !string.IsNullOrEmpty(product.PriceString))
+                    prices[product.Identifier] = product.PriceString;
+            done?.Invoke(prices);
+        });
+    }
+
     private void FinishConfigure()
     {
         try

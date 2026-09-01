@@ -239,14 +239,73 @@ public class PaywallRowsTests
     // ── Feature checklist («Во всех тарифах») ────────────────────────────────
 
     [Test]
-    public void All_plans_block_lists_eight_features()
-        => Assert.AreEqual(8, PaywallRows.AllPlansFeatures.Length);
+    public void All_plans_block_lists_six_features()
+        => Assert.AreEqual(6, PaywallRows.AllPlansFeatures.Length);
 
     [Test]
     public void All_plans_block_has_no_blank_lines()
     {
         foreach (var f in PaywallRows.AllPlansFeatures)
             Assert.IsFalse(string.IsNullOrWhiteSpace(f));
+    }
+
+    /// <summary>
+    /// Store audit 2026-08-31 §05 (Apple 2.1/3.1.2): the four Block-2 promises the
+    /// binary can't keep must stay off the paywall until their client pieces ship.
+    /// Restore them ONLY in the Block-2 update, then delete this guard.
+    /// </summary>
+    [Test]
+    public void All_plans_block_promises_only_shipped_features()
+    {
+        foreach (var f in PaywallRows.AllPlansFeatures)
+        {
+            StringAssert.DoesNotContain("экспорт", f);
+            StringAssert.DoesNotContain("Алерты", f);
+            StringAssert.DoesNotContain("отчёт", f);
+            StringAssert.DoesNotContain("Расписание", f);
+            StringAssert.DoesNotContain("всё время", f);
+        }
+    }
+
+    // ── Localized store prices (Apple 3.1.2) ─────────────────────────────────
+
+    [Test]
+    public void Price_prefers_store_localized_string()
+    {
+        var prices = new System.Collections.Generic.Dictionary<string, string>
+        {
+            { "sub.business.month", "19 990,00 ₸" },
+            { "sub.business.year", "$419.99" },
+        };
+        var spec = PlanCatalog.Get(PlanTier.Business);
+
+        Assert.AreEqual("19 990,00 ₸/мес", PaywallRows.PriceText(spec, PaywallPeriod.Month, prices));
+        Assert.AreEqual("$419.99/год", PaywallRows.PriceText(spec, PaywallPeriod.Year, prices));
+    }
+
+    [Test]
+    public void Price_falls_back_to_catalog_when_store_price_missing()
+    {
+        var spec = PlanCatalog.Get(PlanTier.Start);
+        string fallback = PaywallCopy.PerMonth(spec.PriceMonthKzt);
+
+        Assert.AreEqual(fallback, PaywallRows.PriceText(spec, PaywallPeriod.Month));
+        Assert.AreEqual(fallback, PaywallRows.PriceText(spec, PaywallPeriod.Month, null));
+        Assert.AreEqual(fallback, PaywallRows.PriceText(spec, PaywallPeriod.Month,
+            new System.Collections.Generic.Dictionary<string, string>()));
+        // A present-but-empty store string must not blank the card either.
+        Assert.AreEqual(fallback, PaywallRows.PriceText(spec, PaywallPeriod.Month,
+            new System.Collections.Generic.Dictionary<string, string> { { "sub.start.month", "" } }));
+    }
+
+    [Test]
+    public void Subscribe_cta_carries_the_localized_price()
+    {
+        var prices = new System.Collections.Generic.Dictionary<string, string> { { "sub.start.month", "$24.99" } };
+        Assert.AreEqual("Оформить Старт — $24.99/мес",
+            PaywallRows.SubscribeText(PlanTier.Start, PaywallPeriod.Month, prices));
+        Assert.AreEqual("Оформить Старт — $24.99/мес",
+            PaywallRows.SecondaryPurchase(false, PlanTier.None, false, PlanTier.Start, PaywallPeriod.Month, prices).Text);
     }
 
     // ── Value receipt ────────────────────────────────────────────────────────

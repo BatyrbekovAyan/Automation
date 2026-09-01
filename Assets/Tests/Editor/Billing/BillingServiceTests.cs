@@ -291,4 +291,50 @@ public class BillingServiceTests
         Assert.DoesNotThrow(() => BillingService.RestorePurchases(success => ok = success));
         Assert.IsFalse(ok);
     }
+
+    // --- Localized store prices (Apple 3.1.2) -------------------------------------------------
+
+    [Test] public void FetchLocalizedPrices_publishes_map_and_fires_event()
+    {
+        var fake = new FakeBillingBackend
+        {
+            LocalizedPrices = new System.Collections.Generic.Dictionary<string, string>
+                { { "sub.start.month", "$24.99" } },
+        };
+        BillingService.BackendFactory = () => fake;
+        BillingService.Initialize();
+
+        int fired = 0;
+        BillingService.OnPricesChanged += () => fired++;
+        BillingService.FetchLocalizedPrices();
+
+        Assert.AreEqual(1, fired);
+        Assert.AreEqual("$24.99", BillingService.LocalizedPrices["sub.start.month"]);
+
+        // Idempotent once landed — store prices don't change mid-session.
+        BillingService.FetchLocalizedPrices();
+        Assert.AreEqual(1, fired);
+    }
+
+    [Test] public void FetchLocalizedPrices_with_no_store_prices_keeps_null_fallback()
+    {
+        var fake = new FakeBillingBackend();   // LocalizedPrices stays null = store unreachable
+        BillingService.BackendFactory = () => fake;
+        BillingService.Initialize();
+
+        int fired = 0;
+        BillingService.OnPricesChanged += () => fired++;
+        BillingService.FetchLocalizedPrices();
+
+        Assert.IsTrue(fake.FetchPricesCalled);
+        Assert.AreEqual(0, fired);
+        Assert.IsNull(BillingService.LocalizedPrices);   // paywall renders the KZT literals
+
+        // A later retry is allowed to try again (the first fetch landed empty, not in-flight).
+        BillingService.FetchLocalizedPrices();
+        Assert.IsNull(BillingService.LocalizedPrices);
+    }
+
+    [Test] public void FetchLocalizedPrices_before_initialize_is_a_safe_noop()
+        => Assert.DoesNotThrow(BillingService.FetchLocalizedPrices);
 }

@@ -30,6 +30,9 @@ public static class BillingService
         _initialized = false;
         _known = true;
         OnEntitlementChanged = null;   // a leaked subscriber from one test would fire in every test after it
+        OnPricesChanged = null;
+        LocalizedPrices = null;
+        _priceFetchInFlight = false;
         EntitlementGate.PurchasedTierSource = EntitlementGate.DefaultPurchasedTierSource;   // Initialize() overwrites this
     }
 
@@ -86,6 +89,35 @@ public static class BillingService
     {
         if (_backend == null) { done?.Invoke(false); return; }
         _backend.RestorePurchases(done);
+    }
+
+    /// <summary>
+    /// Store-localized price strings by product id (Apple 3.1.2 — the paywall prefers
+    /// these over the PlanCatalog KZT literals); null until a fetch has landed.
+    /// </summary>
+    public static System.Collections.Generic.IReadOnlyDictionary<string, string> LocalizedPrices
+    { get; private set; }
+
+    /// <summary>Fires once <see cref="LocalizedPrices"/> becomes available.</summary>
+    public static event Action OnPricesChanged;
+
+    private static bool _priceFetchInFlight;
+
+    /// <summary>
+    /// Kick off (at most one concurrent) localized-price fetch. Idempotent once prices
+    /// have landed — store prices don't change mid-session. Safe pre-Initialize (no-op).
+    /// </summary>
+    public static void FetchLocalizedPrices()
+    {
+        if (_backend == null || _priceFetchInFlight || LocalizedPrices != null) return;
+        _priceFetchInFlight = true;
+        _backend.FetchPrices(prices =>
+        {
+            _priceFetchInFlight = false;
+            if (prices == null || prices.Count == 0) return;   // keep the KZT fallback
+            LocalizedPrices = prices;
+            OnPricesChanged?.Invoke();
+        });
     }
 
     private static IBillingBackend DefaultBackendFactory()

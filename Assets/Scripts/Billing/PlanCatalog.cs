@@ -28,6 +28,22 @@ public static class PlanCatalog
         }
     }
 
+    /// <summary>
+    /// Every store product id the app sells (6 subscriptions + the consumable top-up) —
+    /// the exact set the localized-price fetch asks the store for.
+    /// </summary>
+    public static string[] AllSkus()
+    {
+        PlanSpec start = Get(PlanTier.Start), business = Get(PlanTier.Business), network = Get(PlanTier.Network);
+        return new[]
+        {
+            start.SkuMonth, start.SkuYear,
+            business.SkuMonth, business.SkuYear,
+            network.SkuMonth, network.SkuYear,
+            SkuTopUp,
+        };
+    }
+
     public static PlanTier FromEntitlementId(string id)
     {
         switch (id)
