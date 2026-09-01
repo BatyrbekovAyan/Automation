@@ -27,8 +27,17 @@ public static class ChatTicksSpriteAssetBuilder
     private const string SpriteAssetPath = "Assets/Resources/Sprite Assets/ChatTicks.asset";
     private const string AtlasPath = "Assets/Resources/Sprite Assets/ChatTicks_Atlas.png";
 
+    // ⚠️ STALE BUILDER — do NOT re-run as-is (2026-09-01). The LIVE ChatTicks.asset was
+    // re-authored after this generator ran: a 2780×2056 sheet with FIVE glyphs
+    // (tick_sent/double/double_blue + the later tick_pending clock and tick_failed
+    // refresh, which this builder does not draw) — a re-run would clobber them back to
+    // the original 3 and break the Pending/Failed delivery states. The read-tick was
+    // recolored IN the live atlas to the app accent (#4E74D9; the old value was a
+    // WhatsApp-identified blue — store audit §03). The const below is updated so any
+    // future regeneration at least agrees on the hue, but extend this builder to all
+    // five glyphs before ever running it again.
     private static readonly Color32 Gray = new Color32(0x99, 0x99, 0x99, 0xFF);
-    private static readonly Color32 Blue = new Color32(0x34, 0xB7, 0xF1, 0xFF);
+    private static readonly Color32 Blue = new Color32(0x4E, 0x74, 0xD9, 0xFF);
 
     [MenuItem("Tools/Chat List/Generate Tick Sprites")]
     public static void Build()

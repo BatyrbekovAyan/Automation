@@ -52,7 +52,8 @@ public class ThemeAsset : ScriptableObject
     [Header("Chat thread")]
     public Color chatWallpaper  = Hex("#F3F1EB"); // scene truth (paper + thread bars)
     public Color bubbleIncoming = Hex("#FFFFFF");
-    public Color bubbleOutgoing = Hex("#D8FDD4"); // the app's real outgoing bubble
+    public Color bubbleOutgoing = Hex("#DCE7FB"); // indigo-family since 2026-09-01 (the old
+                                                  // #D8FDD4 was WhatsApp's pale green — audit §03)
     // The doodle texture ships with its ink BAKED IN (#E5DAC6 strokes), so the
     // ink role works by TINT: white passes the art through unchanged in light,
     // and the dark value multiplies the strokes down to a subtle dark hatch.

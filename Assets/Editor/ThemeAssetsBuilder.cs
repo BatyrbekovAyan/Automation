@@ -75,7 +75,10 @@ public static class ThemeAssetsBuilder
         t.positiveInk = Hex("#0A6B3E");
         t.chatWallpaper = Hex("#F3F1EB");     // scene truth: paper + thread bars
         t.bubbleIncoming = Hex("#FFFFFF");
-        t.bubbleOutgoing = Hex("#D8FDD4");
+        // Store audit 2026-09-01 (Apple 4.1 / Play Impersonation risk reduction): the old
+        // #D8FDD4 was WhatsApp's pale-green outgoing bubble — shifted into the app's own
+        // indigo family (accent #243A7A). Do not drift this back toward green.
+        t.bubbleOutgoing = Hex("#DCE7FB");
         t.chatWallpaperInk = Hex("#FFFFFF");  // baked doodle art passes through
         t.bubbleBorder = Hex("#D9D4CA");      // MessageItemView's light border
         t.sendButton = Hex("#1FAA61");        // today's send-circle green
@@ -113,7 +116,10 @@ public static class ThemeAssetsBuilder
         t.positiveInk = Hex("#57DE95");
         t.chatWallpaper = Hex("#090B0E");
         t.bubbleIncoming = Hex("#252A31");
-        t.bubbleOutgoing = Hex("#005C4B");
+        // Store audit 2026-09-01: #005C4B was byte-exact WhatsApp dark outgoing — the
+        // single most WhatsApp-identified pixel in the thread. Deep indigo from the
+        // accent hue (#3E61C6 family); inkPrimary keeps ~10:1 on it. Do not revert.
+        t.bubbleOutgoing = Hex("#2C3A61");
         // Multiplies the baked #E5DAC6 strokes down to ≈#1C242E — the same subtle
         // paper-vs-ink ΔL the light wallpaper has, no dark art regen needed.
         t.chatWallpaperInk = Hex("#1F2A3B");
