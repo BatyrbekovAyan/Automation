@@ -70,7 +70,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { \"success\": true, \"deletedChunks\": $json.deletedChunks, \"deletedFiles\": ($json.fileIds || []).length, \"retiredProfiles\": $('Retire Bot Profiles').first().json.retiredProfiles ?? null } }}",
+        "responseBody": "={{ { \"success\": true, \"deletedChunks\": $('Delete Bot Chunks').first().json.deletedChunks, \"deletedFiles\": ($('Delete Bot Chunks').first().json.fileIds || []).length, \"retiredProfiles\": $('Retire Bot Profiles').first().json.retiredProfiles ?? null, \"deletedMemoryRows\": $json.deletedMemoryRows ?? null, \"deletedOutcomes\": $json.deletedOutcomes ?? null, \"deletedReplyFlags\": $json.deletedReplyFlags ?? null } }}",
         "options": {}
       },
       "type": "n8n-nodes-base.respondToWebhook",
@@ -118,6 +118,31 @@
         }
       },
       "onError": "continueRegularOutput"
+    },
+    {
+      "id": "9848b3aea3b2483e",
+      "name": "Delete Chat Memory",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        668,
+        0
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "-- Privacy deletion (2026-09-01, store audit / Data Safety «можно запросить удаление»):\n-- a deleted bot's server-side conversation memory goes with it. Chat transcripts key\n-- off session_id = '<profileId>:<chatId>' (both bot templates' Chat Memory nodes),\n-- conversation_outcomes and reply_mode_flags carry profile_id directly. Sentinels\n-- '-1'/'' (channel never authed) are excluded like Delete Bot Chunks guards its ids;\n-- 'null'/'undefined' cover a missing body field stringified by queryReplacement.\n-- dialog_counts stay UNTOUCHED on purpose: they are the owner's billing usage records\n-- (Task 17a moves them with the money on transfer), not chat content.\nWITH ids AS (\n  SELECT unnest(ARRAY[$1, $2]) AS profile_id\n), valid AS (\n  SELECT profile_id FROM ids\n  WHERE profile_id IS NOT NULL AND profile_id NOT IN ('-1', '', 'null', 'undefined')\n), hist AS (\n  DELETE FROM public.n8n_chat_histories h\n  WHERE split_part(h.session_id, ':', 1) IN (SELECT profile_id FROM valid)\n  RETURNING 1\n), outcomes AS (\n  DELETE FROM public.conversation_outcomes c\n  WHERE c.profile_id IN (SELECT profile_id FROM valid)\n  RETURNING 1\n), flags AS (\n  DELETE FROM public.reply_mode_flags f\n  WHERE f.profile_id IN (SELECT profile_id FROM valid)\n  RETURNING 1\n)\nSELECT (SELECT count(*)::int FROM hist)     AS \"deletedMemoryRows\",\n       (SELECT count(*)::int FROM outcomes) AS \"deletedOutcomes\",\n       (SELECT count(*)::int FROM flags)    AS \"deletedReplyFlags\";",
+        "options": {
+          "queryReplacement": "={{ $('Webhook').first().json.body.waProfileId || '-1' }},{{ $('Webhook').first().json.body.tgProfileId || '-1' }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      }
     }
   ],
   "connections": {
@@ -147,7 +172,7 @@
       "main": [
         [
           {
-            "node": "Respond",
+            "node": "Delete Chat Memory",
             "type": "main",
             "index": 0
           }
@@ -170,6 +195,17 @@
         [
           {
             "node": "Delete Stored Original",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Chat Memory": {
+      "main": [
+        [
+          {
+            "node": "Respond",
             "type": "main",
             "index": 0
           }
