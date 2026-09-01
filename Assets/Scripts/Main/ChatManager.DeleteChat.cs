@@ -70,9 +70,11 @@ public partial class ChatManager
         www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
         www.timeout = 30;
 
-        // TEMP diagnostic: log the exact outgoing request so we can compare it byte-for-byte
-        // against Wappi's docs / a Postman call when chat/delete returns "deleteChat error".
-        Debug.Log($"[Wappi] chat/delete → POST {url}  chatId='{chatId}'  body={body}");
+        // Diagnostic for "deleteChat error" investigations. Debug builds only: the line
+        // carries the customer's phone number (chatId) and a reviewer can read the
+        // device console (store audit 2026-08-30, 5.1.1 data-minimization).
+        if (Debug.isDebugBuild)
+            Debug.Log($"[Wappi] chat/delete → POST {url}  chatId='{chatId}'  body={body}");
 
         yield return www.SendWebRequest();
 

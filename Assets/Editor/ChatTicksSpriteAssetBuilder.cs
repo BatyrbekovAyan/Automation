@@ -35,7 +35,10 @@ public static class ChatTicksSpriteAssetBuilder
     // recolored IN the live atlas to the app accent (#4E74D9; the old value was a
     // WhatsApp-identified blue — store audit §03). The const below is updated so any
     // future regeneration at least agrees on the hue, but extend this builder to all
-    // five glyphs before ever running it again.
+    // five glyphs before ever running it again. Also: BuildSpriteAsset inherits its
+    // material from EmojiOne.asset, which was DELETED 2026-09-01 (unreferenced TMP
+    // sample; the project default sprite asset is Resources/Sprite Assets/texture-0) —
+    // point it at texture-0.asset when reviving.
     private static readonly Color32 Gray = new Color32(0x99, 0x99, 0x99, 0xFF);
     private static readonly Color32 Blue = new Color32(0x4E, 0x74, 0xD9, 0xFF);
 

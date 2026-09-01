@@ -317,8 +317,10 @@ public static class ProfileSubPagesBuilder
         infoVlg.childControlWidth = true;
         infoVlg.childControlHeight = true;
         info.AddComponent<LayoutElement>().flexibleWidth = 1f;
-        var nameTmp = AddText(NewChild(info, "NameText", out _), "Иван Петров", 50f, _bold, Ink);
-        var emailTmp = AddText(NewChild(info, "EmailText", out _), "ivan.petrov@email.com", 36f, _regular, Muted);
+        // Seed mirrors ProfilePage.DefaultName/DefaultEmail — neutral since 2026-09-01
+        // (the fictional «Иван Петров» read as demo residue to a reviewer).
+        var nameTmp = AddText(NewChild(info, "NameText", out _), ProfilePage.DefaultName, 50f, _bold, Ink);
+        var emailTmp = AddText(NewChild(info, "EmailText", out _), ProfilePage.DefaultEmail, 36f, _regular, Muted);
 
         var editBtnGo = NewChild(card, "EditButton", out _);
         SetPreferredSize(editBtnGo, 110f, 110f);

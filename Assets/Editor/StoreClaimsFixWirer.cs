@@ -57,8 +57,36 @@ public static class StoreClaimsFixWirer
         RestampTrustCard(managerSo, "TelegramCodePanel", OnboardingAuthBlocksBuilder.TrustBodyTelegram);
 
         RestampCancelCaption();
+        RestampProfileSeed();
 
-        Debug.Log("[StoreClaimsFixWirer] Trust cards (WA+TG) + subscription caption restamped.");
+        Debug.Log("[StoreClaimsFixWirer] Trust cards (WA+TG) + subscription caption + profile seed restamped.");
+    }
+
+    // C) Profile card seed: the baked «Иван Петров» / ivan.petrov@email.com read as demo
+    //    residue to a reviewer (audit §07). Runtime seeds PlayerPrefs from
+    //    ProfilePage.DefaultName/DefaultEmail on first run and overwrites these labels,
+    //    so this only keeps the scene truthful — the constants are the source.
+    private static void RestampProfileSeed()
+    {
+        var profilePage = Object.FindFirstObjectByType<ProfilePage>(FindObjectsInactive.Include);
+        if (profilePage == null)
+            throw new System.InvalidOperationException(
+                "[StoreClaimsFixWirer] ProfilePage not found — is Main.unity open?");
+
+        var so = new SerializedObject(profilePage);
+        SetLabel((so.FindProperty("nameText").objectReferenceValue as TextMeshProUGUI)?.transform,
+            ProfilePage.DefaultName, "ProfilePage.nameText");
+        SetLabel((so.FindProperty("emailText").objectReferenceValue as TextMeshProUGUI)?.transform,
+            ProfilePage.DefaultEmail, "ProfilePage.emailText");
+
+        // The profile screen carries a SECOND NameText/EmailText pair (the card
+        // ProfileSubPagesBuilder bakes, not bound to ProfilePage) that still held the
+        // fictional seed — stamp every label by those names under the screen root.
+        foreach (var tmp in profilePage.GetComponentsInChildren<TextMeshProUGUI>(true))
+        {
+            if (tmp.name == "NameText") SetLabel(tmp.transform, ProfilePage.DefaultName, "NameText");
+            else if (tmp.name == "EmailText") SetLabel(tmp.transform, ProfilePage.DefaultEmail, "EmailText");
+        }
     }
 
     private static void RestampTrustCard(SerializedObject managerSo, string panelField, string bodyText)

@@ -1740,7 +1740,8 @@ if (msg.messageType == MessageType.Video)
             string emoji = obj["reaction"]?.ToString();
             if (string.IsNullOrEmpty(emoji)) continue;
             string userId = obj["user_id"]?.ToString();
-            Debug.Log($"[TG reaction echo] '{emoji}' [{CodePointHex(emoji)}] user_id={userId} ownId={ownUserId ?? "(null)"}");
+            if (Debug.isDebugBuild)   // user ids are PII — keep them out of release consoles
+                Debug.Log($"[TG reaction echo] '{emoji}' [{CodePointHex(emoji)}] user_id={userId} ownId={ownUserId ?? "(null)"}");
         }
     }
 

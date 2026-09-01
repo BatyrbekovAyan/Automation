@@ -4,15 +4,17 @@ using UnityEngine;
 
 /// <summary>
 /// Registers the ChatTicks TMP_SpriteAsset as a fallback on the project's
-/// default sprite asset (EmojiOne) at runtime startup. Without this, bare
+/// default sprite asset (TMP_Settings.defaultSpriteAsset — the Twemoji atlas
+/// Resources/Sprite Assets/texture-0; the stock EmojiOne sample was deleted
+/// 2026-09-01 as unreferenced) at runtime startup. Without this, bare
 /// `<sprite name="tick_sent">` / `tick_double` / `tick_double_blue` tags
 /// emitted by ChatPreviewFormatter cannot be resolved — TMP's name-lookup
 /// searches the current sprite asset → its fallbacks → the default sprite
 /// asset → its fallbacks, and ChatTicks is not otherwise reachable from
-/// EmojiOne (the project default).
+/// the default.
 ///
-/// Why runtime registration vs. modifying EmojiOne.asset on disk: keeping
-/// EmojiOne.asset unmodified preserves the TextMesh Pro vendor folder as
+/// Why runtime registration vs. modifying the default asset on disk: keeping
+/// the vendor asset unmodified preserves the TextMesh Pro folder as
 /// reset-safe (TMP package updates won't conflict) and avoids tracking a
 /// modified vendor asset in git for a single fallback entry.
 ///

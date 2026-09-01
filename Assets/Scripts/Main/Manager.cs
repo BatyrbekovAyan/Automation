@@ -2343,7 +2343,7 @@ public partial class Manager : MonoBehaviour
         yield return new WaitForSeconds(3f);
         if (!WhatsappQRPanel.activeSelf) yield break;
 
-        string lastError = "Server Unavailable.\nTry Again Later";
+        string lastError = "Сервер недоступен.\nПопробуйте позже";
 
         for (int attempt = 0; attempt < 5; attempt++)
         {
@@ -2384,7 +2384,7 @@ public partial class Manager : MonoBehaviour
                 }
                 else if (www.result == UnityWebRequest.Result.ConnectionError)
                 {
-                    lastError = "Check internet connection.";
+                    lastError = "Проверьте подключение к интернету.";
                 }
                 else if (www.result == UnityWebRequest.Result.ProtocolError && www.downloadHandler != null)
                 {
@@ -2475,7 +2475,7 @@ public partial class Manager : MonoBehaviour
 
             if (whatsappProfileId.Equals("-1"))
             {
-                yield return StartCoroutine(FlashWhatsappCodeError("Server Unavailable", originalWaBtnText));
+                yield return StartCoroutine(FlashWhatsappCodeError("Сервер недоступен", originalWaBtnText));
                 yield break;
             }
         }
@@ -2488,10 +2488,10 @@ public partial class Manager : MonoBehaviour
 
         if (www.result != UnityWebRequest.Result.Success)
         {
-            string errorMsg = "Server Unavailable";
+            string errorMsg = "Сервер недоступен";
             if (www.result == UnityWebRequest.Result.ConnectionError)
             {
-                errorMsg = "Check internet connection";
+                errorMsg = "Проверьте подключение к интернету";
             }
             else if (www.result == UnityWebRequest.Result.ProtocolError && www.downloadHandler != null)
             {
@@ -2729,7 +2729,7 @@ public partial class Manager : MonoBehaviour
         yield return new WaitForSeconds(3f);
         if (!TelegramQRPanel.activeSelf) yield break;
 
-        string lastError = "Server Unavailable.\nTry Again Later";
+        string lastError = "Сервер недоступен.\nПопробуйте позже";
 
         for (int attempt = 0; attempt < 5; attempt++)
         {
@@ -2777,7 +2777,7 @@ public partial class Manager : MonoBehaviour
                 }
                 else if (www.result == UnityWebRequest.Result.ConnectionError)
                 {
-                    lastError = "Check internet connection.";
+                    lastError = "Проверьте подключение к интернету.";
                 }
                 else if (www.result == UnityWebRequest.Result.ProtocolError && www.downloadHandler != null)
                 {
@@ -2888,10 +2888,10 @@ public partial class Manager : MonoBehaviour
 
         if (www.result != UnityWebRequest.Result.Success)
         {
-            string errorMsg = "Server Unavailable";
+            string errorMsg = "Сервер недоступен";
             if (www.result == UnityWebRequest.Result.ConnectionError)
             {
-                errorMsg = "Check internet connection";
+                errorMsg = "Проверьте подключение к интернету";
             }
             else if (www.result == UnityWebRequest.Result.ProtocolError && www.downloadHandler != null)
             {
@@ -2989,10 +2989,10 @@ public partial class Manager : MonoBehaviour
 
         if (www.result != UnityWebRequest.Result.Success)
         {
-            string errorMsg = "Server Unavailable";
+            string errorMsg = "Сервер недоступен";
             if (www.result == UnityWebRequest.Result.ConnectionError)
             {
-                errorMsg = "Check internet connection";
+                errorMsg = "Проверьте подключение к интернету";
             }
             else if (www.result == UnityWebRequest.Result.ProtocolError && www.downloadHandler != null)
             {

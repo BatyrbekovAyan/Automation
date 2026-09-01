@@ -16,8 +16,12 @@ public class ProfilePage : MonoBehaviour
     public const string KeyName  = "ProfileName";
     public const string KeyEmail = "ProfileEmail";
 
-    public const string DefaultName  = "Иван Петров";
-    public const string DefaultEmail = "ivan.petrov@email.com";
+    // Neutral first-run seed (store audit 2026-08-30 §07): the old fictional
+    // «Иван Петров» / ivan.petrov@email.com read to a reviewer as demo residue or
+    // as an account system the review notes say does not exist. Empty e-mail =
+    // the row simply stays blank until the owner fills the card.
+    public const string DefaultName  = "Владелец";
+    public const string DefaultEmail = "";
 
     // ── Profile card ───────────────────────────────────────────────────────
     [Header("Profile Card")]
