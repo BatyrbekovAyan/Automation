@@ -1,0 +1,6 @@
+{
+    "AutomatedSetup": true,
+    "PhotoLibraryUsageDescription": "Доступ к фото нужен, чтобы прикрепить изображение или прайс-лист к сообщению.",
+    "PhotoLibraryAdditionsUsageDescription": "",
+    "DontAskLimitedPhotosPermissionAutomaticallyOnIos14": true
+}

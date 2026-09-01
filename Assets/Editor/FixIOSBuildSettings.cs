@@ -27,6 +27,17 @@ public static class FixIOSBuildSettings
         pbx.SetBuildProperty(mainTarget, "CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]", "");
 
         pbx.WriteToFile(pbxPath);
+
+        // Export compliance (store audit 2026-09-01): the app is HTTPS-only —
+        // UnityWebRequest rides the OS-provided TLS, which is "standard encryption"
+        // and exempt. Answering in the plist keeps every TestFlight / App Store upload
+        // from stalling on the manual export-compliance questionnaire. Revisit only if
+        // a plugin ever bundles its own crypto (OpenSSL/mbedTLS class).
+        string plistPath = Path.Combine(path, "Info.plist");
+        var plist = new PlistDocument();
+        plist.ReadFromString(File.ReadAllText(plistPath));
+        plist.root.SetBoolean("ITSAppUsesNonExemptEncryption", false);
+        File.WriteAllText(plistPath, plist.WriteToString());
     }
 }
 #endif
