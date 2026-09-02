@@ -94,6 +94,15 @@ public class PaywallController : MonoBehaviour
     private static PaywallController _instance;
 
     /// <summary>Resolves even while Screen_Paywall is inactive (Awake hasn't run yet).</summary>
+    /// <summary>
+    /// Which store's cancellation wording the fine print carries. Injectable seam (project
+    /// idiom: SemiAutoStore / ThemePrefs / SuggestionsController.ProviderFactory); the default
+    /// is the platform check that shipped, so player behaviour is unchanged. The Editor is
+    /// never IPhonePlayer, so an Editor-rendered App Store screenshot would otherwise read
+    /// «отмена в настройках Google Play» — exactly what Guideline 2.3.10 forbids on iOS.
+    /// </summary>
+    internal static System.Func<bool> IsIosStore = () => Application.platform == RuntimePlatform.IPhonePlayer;
+
     public static PaywallController Instance =>
         _instance != null ? _instance
             : _instance = UnityEngine.Object.FindFirstObjectByType<PaywallController>(FindObjectsInactive.Include);
@@ -552,8 +561,7 @@ public class PaywallController : MonoBehaviour
 
         if (finePrint != null)
             finePrint.text = !string.IsNullOrEmpty(_notice) ? _notice
-                : PaywallRows.FinePrintText(IsTrialOffer,
-                    Application.platform == RuntimePlatform.IPhonePlayer);
+                : PaywallRows.FinePrintText(IsTrialOffer, IsIosStore());
         if (restoreLabel != null)
             restoreLabel.text = PaywallRows.RestoreLabel;
 

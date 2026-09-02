@@ -44,6 +44,9 @@ public class StoreScreenshotDriver : MonoBehaviour
         // BEFORE scene load on purpose: SuggestionsController.Awake reads the factory, and the
         // «Вместе» panel has no offline path without this swap.
         SuggestionsController.ProviderFactory = () => new StoreDemoSuggestionsProvider();
+        // These are App Store shots rendered by the Editor, whose platform is never IPhonePlayer:
+        // without this the paywall's fine print names Google Play (Guideline 2.3.10 on iOS).
+        PaywallController.IsIosStore = () => true;
 
         var host = new GameObject(nameof(StoreScreenshotDriver));
         DontDestroyOnLoad(host);
@@ -81,6 +84,18 @@ public class StoreScreenshotDriver : MonoBehaviour
             UnityEditor.EditorApplication.isPlaying = false;
             yield break;
         }
+
+        // Force the chats tab onto Bot0. ChatManager ([DefaultExecutionOrder(-100)]) resolves
+        // its active bot after `yield return null`, while Manager.LoadBots instantiates the
+        // bots after WaitForEndOfFrame. On a device end-of-frame-0 always precedes frame-1
+        // Update, so the order holds; in an Editor that is not rendering (driven from the
+        // background over MCP) WaitForEndOfFrame lags, ChatManager sees an empty BotsParent,
+        // fires NoBotsExist and never re-resolves — the 2026-09-02 run photographed «Создайте
+        // первого бота» and a thread whose header still read the scene placeholder «Aimgul».
+        // SetActiveBot early-returns when Bot0 is already current, so this is a no-op on a
+        // healthy boot.
+        ChatManager.Instance.SetActiveBot("Bot0");
+        yield return new WaitForSecondsRealtime(2.0f);
 
         // 1. Chat list FIRST — opening any chat zeroes its unread badge, and offline
         //    nothing ever restores it.

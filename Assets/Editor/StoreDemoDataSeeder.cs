@@ -63,6 +63,23 @@ public static class StoreDemoDataSeeder
             PlayerPrefs.Save();
         }
 
+        // Trial clock stamped at SEED time, never taken from the fixture. The fixture bakes
+        // "now - 1 day" at generation time, and five days later that reads as an expired trial:
+        // EvaluateLaunchExpiryPaywall then opens «Ваш бот за 5 дней» over every screen and
+        // eight of ten captures photographed the paywall (2026-09-02). Same class of trap as
+        // the dashboard's lastFetchMs below.
+        // The profile card persists whatever name was last saved; the Editor's prefs carried
+        // «Иван Петров» / ivan.petrov@email.com from an older session, which is exactly the
+        // demo residue the store audit replaced with the neutral «Владелец» default. Pin the
+        // app's own defaults rather than deleting the keys, so the result does not depend on
+        // ProfilePage's fallback semantics.
+        PlayerPrefs.SetString(ProfilePage.KeyName, ProfilePage.DefaultName);
+        PlayerPrefs.SetString(ProfilePage.KeyEmail, ProfilePage.DefaultEmail);
+
+        PlayerPrefs.SetString("TrialStartedUtc",
+            System.DateTime.UtcNow.AddDays(-1).ToString("yyyy-MM-ddTHH:mm:ssZ"));
+        PlayerPrefs.Save();
+
         int written = 0;
         if (root["files"] is JObject files)
         {

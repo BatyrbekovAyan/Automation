@@ -125,6 +125,12 @@ def player_prefs(now: datetime) -> dict:
         p[f"{k}isOnWhatsapp"] = b["wa"]
         p[f"{k}isOnTelegram"] = b["tg"]
         p[f"{k}ReplyMode"] = b["mode"]             # 0 = Авто, 1 = Вместе
+        # Persisted channel the chats tab shows for this bot (ChatManager.Channel.cs,
+        # "<bot>ActiveChatChannel", 0 = WhatsApp / 1 = Telegram). Left unseeded, whatever a
+        # previous Play Mode session persisted wins: on 2026-09-02 it was Telegram, so the
+        # list loaded the empty Bot0/telegram/ cache and photographed a blank screen while
+        # the seeded WhatsApp chats.json sat untouched beside it.
+        p[f"{k}ActiveChatChannel"] = 0 if b["wa"] else 1
         p[f"{k}WhatsappProfileId"] = WA_PROFILE if b["wa"] else "-1"
         p[f"{k}TelegramProfileId"] = TG_PROFILE if b["tg"] else "-1"
         p[f"{k}WhatsappWorkflowId"] = "9PTyYcelRQI7bGDb" if b["wa"] else "-1"
