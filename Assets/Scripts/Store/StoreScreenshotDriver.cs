@@ -144,6 +144,23 @@ public class StoreScreenshotDriver : MonoBehaviour
                 else Debug.LogWarning("[StoreCapture] DashboardPage не найден — период не сменён");
             }
 
+            // Боты: the «Диалоги ИИ» strip reads UsageStore, which only a live GetUsage fills, and
+            // the Editor's anonymous app user has no usage — it rendered «0 из 150», which reads
+            // as "nobody uses this" in a store shot. Let the real fetch land first (BotsPage.OnEnable
+            // starts it and it would overwrite a snapshot applied too early), then apply a
+            // plausible one through the store's own seam; the strip re-renders on OnUsageChanged.
+            if (index == BottomTabManager.BotsTabIndex)
+            {
+                yield return new WaitForSecondsRealtime(2.0f);
+                UsageStore.Apply(new UsageSnapshot
+                {
+                    success = true, plan = "trial", status = "trialing",
+                    quota = PlanCatalog.TrialDialogCap, used = 64,
+                    botsRegistered = 3, channelsConnected = 4,
+                });
+                yield return new WaitForSecondsRealtime(0.5f);
+            }
+
             yield return Capture($"04-tab{index}");
         }
 

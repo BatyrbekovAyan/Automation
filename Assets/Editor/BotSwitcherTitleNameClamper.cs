@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Surgical patcher for ONLY the BotName TMP inside the WhatsApp header's
+/// Surgical patcher for ONLY the BotName TMP inside the chats header's
 /// BotSwitcherTitle. Switches the row to a dynamic-width slot capped at a
 /// max so short bot names render tight against the avatar and chevron, and
 /// long ones ellipsize at maxWidth. Does not touch the avatar, chevron,
@@ -14,17 +14,26 @@ using UnityEngine.UI;
 /// tweaks. Drops the older static LayoutElement (preferredWidth=160) if a
 /// previous version of this menu installed one, so the dynamic component
 /// isn't out-voted on layoutPriority.
+///
+/// This is the ONLY owner of the name's width cap: neither
+/// ChatsTopBarRestyleBuilder nor ReplyModeToggleBuilder writes it, so the
+/// scene kept a 240u cap from an earlier, smaller header long after the
+/// identity block moved into a 640u LeftZone — «Авто-Деталь KZ» rendered as
+/// «Авто-Дет» with half the row empty (store screenshot review, 2026-09-02).
 /// </summary>
 public static class BotSwitcherTitleNameClamper
 {
-    private const string ScreenName = "Screen_Whatsapp";
+    // The chats screen was renamed when Telegram joined; the old "Screen_Whatsapp" no longer exists.
+    private const string ScreenName = "Screen_Messanger";
     private const string TitleName = "BotSwitcherTitle";
     private const string NameChild = "BotName";
 
-    // Cap chosen so avatar(24) + spacing(8) + name(<=160) + spacing(8) +
-    // chevron(16) + padding(16) tops out at 232px, fitting inside the title
-    // shell's 240px and leaving visible margin against the "Chats" tile.
-    private const float NameMaxWidth = 160f;
+    // Derived from the live two-tier header (chats-topbar-spec.md, «Bot identity»):
+    // LeftZone is 640u wide, the title sits at x=40 inside it, and the row spends
+    // padding(8+8) + avatar(88) + spacing(16+16) + chevron(32) = 168u on chrome —
+    // 640 - 40 - 168 = 432u remain for the name; 420 keeps a 12u margin. RightZone
+    // (the «Авто» capsule) starts at x=740, so the block can never reach it.
+    private const float NameMaxWidth = 420f;
 
     [MenuItem("Tools/Bot Switcher/Clamp Title Name Width")]
     public static void Clamp()

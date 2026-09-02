@@ -85,10 +85,14 @@ def player_prefs(now: datetime) -> dict:
              phone=SHOP_PHONE, hours="Пн–Сб 09:00–19:00, Вс выходной",
              address="Астана, ул. Бейбитшилик, 25", instagram="@avtodetal_demo",
              email="zakaz@example.com",
-             products=[("Колодки передние 04465-33471", "34 900", "Оригинал Toyota. Camry 50, 2.5"),
-                       ("Колодки передние PN1512", "18 900", "Аналог Nibk. Camry 50, 2.5"),
-                       ("Фильтр масляный 04152-YZZA1", "4 900", "Оригинал Toyota. RAV4 2.0"),
-                       ("Фильтр масляный OP 570", "2 400", "Аналог Filtron. RAV4 2.0")],
+             # Names stay under the card's ~18-glyph column so nothing truncates; the артикул
+             # moves into the description (still part of the catalogue row the bot quotes).
+             # Distinct names on purpose — the monogram hue is hashed from the name, and two
+             # identical names would paint two identical tiles.
+             products=[("Колодки Toyota", "34 900", "Оригинал · 04465-33471"),
+                       ("Колодки Nibk", "18 900", "Аналог · PN1512"),
+                       ("Фильтр Toyota", "4 900", "Оригинал · 04152-YZZA1"),
+                       ("Фильтр Filtron", "2 400", "Аналог · OP 570")],
              services=[]),
         dict(i=1, name="Букет Астана", btype="flowers", wa=1, tg=0, mode=0,
              business="Цветочный магазин. Доставка по Астане с 9:00 до 21:00, "
@@ -199,7 +203,30 @@ def chats_json(now: datetime) -> dict:
             "Kaspi рассрочка есть?", at(now, 1, 12, 15), False, "Сауле Кенжебаева"),
         row("77000000017@c.us", "Нурлан Абдиров", False, 0,
             "Записал: Prado 2018, фильтр воздушный.", at(now, 2, 11, 5), True),
+    ] + [
+        # Older rows: below the fold on the chat-list shot, but Сводка resolves its titles
+        # and avatars from this list, so every dashboard outcome needs a chat here.
+        row(cid, name, False, 0, preview, at(now, days, hh, mm), mine, "" if mine else name)
+        for cid, name, preview, days, hh, mm, mine in EXTRA_CHATS
     ]}
+
+EXTRA_CHATS = [
+    ("77000000018@c.us", "Бауыржан Сейтказы", "Записал: Camry 40, рулевые наконечники.", 2, 17, 20, True),
+    ("77000000019@c.us", "Динара Мукашева", "Спасибо, буду ждать звонка", 2, 15, 5, False),
+    ("77000000020@c.us", "Арман Тулегенов", "Есть амортизаторы на RAV4 2019?", 3, 11, 42, False),
+    ("77000000021@c.us", "Жанар Сулейменова", "Позиция в прайсе есть, точное наличие подтвердит менеджер.", 3, 10, 15, True),
+    ("77000000022@c.us", "Ерасыл Бекмуратов", "Ок, тогда позже напишу", 4, 19, 30, False),
+    ("77000000023@c.us", "Гульнара Досанова", "По гарантии уточнит менеджер — передаю.", 4, 14, 50, True),
+    ("77000000024@c.us", "Нурсултан Кайыров", "Принял заявку: Prado 150, стойки стабилизатора.", 5, 12, 10, True),
+    ("77000000025@c.us", "Асель Жаксыбекова", "Хорошо, спасибо!", 5, 9, 35, False),
+    ("77000000026@c.us", "Ринат Ахмедов", "А доставка до Косшы есть?", 6, 18, 5, False),
+    ("77000000027@c.us", "Айдана Серикова", "Записал: Corolla 2014, свечи, 4 шт.", 6, 13, 40, True),
+    ("77000000028@c.us", "Тимур Есимов", "Прислал VIN, жду подбор", 6, 11, 20, False),
+    ("77000000029@c.us", "Камила Оразбаева", "Понятно, подумаю", 8, 16, 0, False),
+    ("77000000030@c.us", "Бекзат Нуртаев", "Записал: Camry 70, масло 5W-30, 4 л.", 9, 10, 25, True),
+    ("77000000031@c.us", "Алия Жумагулова", "Спасибо, всё получила", 10, 15, 45, False),
+    ("77000000032@c.us", "Даулет Исаев", "Записал: Hilux 2018, ремень ГРМ.", 11, 12, 0, True),
+]
 
 def thread(chat_id: str, sender: str, rows, now: datetime) -> dict:
     """MessageViewModel list under {"messages":[…]} (JsonUtility). type 0 = Chat,
@@ -280,6 +307,25 @@ def dashboard_json(now: datetime) -> dict:
         o("77000000013@c.us", "client_silent", "Обещал прислать VIN, ответа пока нет.", 96),
         o("77000000014@c.us", "question_closed", "Уточняла наличие колодок, ответ дан.", 1_120),
         o("77000000015@c.us", "in_dialog", "Написал, что заедет завтра.", 1_030),
+        # Rest of the 7-day window — the default period showed 1/0/1/1/0 and undersold the
+        # board (2026-09-02). Current window: 5 заявок / 3 / 4 / 3 / 3 = 18 dialogs …
+        o("77000000018@c.us", "order_collected", "Рулевые наконечники на Camry 40 — заявка принята.", 2 * 1440 + 400),
+        o("77000000019@c.us", "client_silent", "Ждёт звонка менеджера, ответа нет.", 2 * 1440 + 540),
+        o("77000000020@c.us", "in_dialog", "Спрашивает амортизаторы на RAV4 2019.", 3 * 1440 + 740),
+        o("77000000021@c.us", "question_closed", "Уточнила наличие, ответ дан.", 3 * 1440 + 830),
+        o("77000000022@c.us", "client_silent", "Обещал написать позже.", 4 * 1440 + 270),
+        o("77000000023@c.us", "owner_needed", "Вопрос по гарантии — условий нет в данных бизнеса.", 4 * 1440 + 550),
+        o("77000000024@c.us", "order_collected", "Стойки стабилизатора, Prado 150. Контакты взяты.", 5 * 1440 + 710),
+        o("77000000025@c.us", "question_closed", "Поблагодарила, вопрос закрыт.", 5 * 1440 + 865),
+        o("77000000026@c.us", "owner_needed", "Доставка до Косшы — зоны нет в данных бизнеса.", 6 * 1440 + 355),
+        o("77000000027@c.us", "order_collected", "Свечи на Corolla 2014, 4 шт. — заявка принята.", 6 * 1440 + 620),
+        o("77000000028@c.us", "in_dialog", "Прислал VIN, ждёт подбор.", 6 * 1440 + 760),
+        # … and the previous window (8–14 days), so «к пред.» has something to compare with:
+        # 2 заявки there → «+3 к пред.».
+        o("77000000029@c.us", "client_silent", "Взяла паузу, ответа нет.", 8 * 1440 + 480),
+        o("77000000030@c.us", "order_collected", "Масло 5W-30 4 л, Camry 70 — заявка принята.", 9 * 1440 + 815),
+        o("77000000031@c.us", "question_closed", "Получила заказ, вопрос закрыт.", 10 * 1440 + 495),
+        o("77000000032@c.us", "order_collected", "Ремень ГРМ, Hilux 2018 — заявка принята.", 11 * 1440 + 720),
     ]}
 
 # ---------------------------------------------------------------- simulator IO

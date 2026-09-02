@@ -55,7 +55,14 @@ public class BotSwitcherTitleBinder : MonoBehaviour
             : null;
 
         if (nameLabel != null)
+        {
+            // The scene shipped at Truncate although every builder that authors this label
+            // (BotSwitcherTitleNameClamper, Screen_WhatsappHeaderRebuilder) writes Ellipsis, so
+            // «Авто-Деталь KZ» was cut to «Авто-Дет» and read as a typo (store screenshot
+            // review, 2026-09-02). Asserted on every bind so scene/builder drift cannot recur.
+            nameLabel.overflowMode = TextOverflowModes.Ellipsis;
             nameLabel.text = bot != null ? PlayerPrefs.GetString(botId + "Name", botId) : "Bot";
+        }
 
         ApplyAvatar(bot);
     }

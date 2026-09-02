@@ -2,7 +2,7 @@
  "prefs": {
   "ids": 3,
   "LastSelectedBotForChats": "Bot0",
-  "TrialStartedUtc": "2026-09-01T13:16:26Z",
+  "TrialStartedUtc": "2026-09-01T14:22:42Z",
   "OnboardingChecklistDone": 1,
   "OnboardingSeen": 1,
   "OnboardingChannelConnectedSeen": 1,
@@ -29,18 +29,18 @@
   "Bot0WhatsappWorkflowId": "9PTyYcelRQI7bGDb",
   "Bot0TelegramWorkflowId": "4VN3gsFaC2HUYmcc",
   "Bot0ProductsNumber": 4,
-  "Bot0Product0": "Колодки передние 04465-33471",
+  "Bot0Product0": "Колодки Toyota",
   "Bot0Product0Price": "34 900",
-  "Bot0Product0Description": "Оригинал Toyota. Camry 50, 2.5",
-  "Bot0Product1": "Колодки передние PN1512",
+  "Bot0Product0Description": "Оригинал · 04465-33471",
+  "Bot0Product1": "Колодки Nibk",
   "Bot0Product1Price": "18 900",
-  "Bot0Product1Description": "Аналог Nibk. Camry 50, 2.5",
-  "Bot0Product2": "Фильтр масляный 04152-YZZA1",
+  "Bot0Product1Description": "Аналог · PN1512",
+  "Bot0Product2": "Фильтр Toyota",
   "Bot0Product2Price": "4 900",
-  "Bot0Product2Description": "Оригинал Toyota. RAV4 2.0",
-  "Bot0Product3": "Фильтр масляный OP 570",
+  "Bot0Product2Description": "Оригинал · 04152-YZZA1",
+  "Bot0Product3": "Фильтр Filtron",
   "Bot0Product3Price": "2 400",
-  "Bot0Product3Description": "Аналог Filtron. RAV4 2.0",
+  "Bot0Product3Description": "Аналог · OP 570",
   "Bot0ServicesNumber": 0,
   "Bot1Name": "Букет Астана",
   "Bot1Active": 1,
@@ -105,11 +105,11 @@
   "Bot0ProductFile0": "3f8a1c22-9d41-4c07-b6e5-2a7f0d51e934",
   "Bot0ProductFile0Name": "Прайс август 2026.xlsx",
   "Bot0ProductFile0Size": "48210",
-  "Bot0ProductFile0Date": "1788164186802",
+  "Bot0ProductFile0Date": "1788168162399",
   "Bot0ProductFile1": "7c1e4b90-56af-4d13-9e28-c4b6a3f70d15",
   "Bot0ProductFile1Name": "Колодки и фильтры.pdf",
   "Bot0ProductFile1Size": "315744",
-  "Bot0ProductFile1Date": "1787559386802",
+  "Bot0ProductFile1Date": "1787563362399",
   "Bot0ProductFilesNumber": 2
  },
  "files": {
@@ -216,6 +216,208 @@
      "unread_count": 0,
      "last_message_data": "Записал: Prado 2018, фильтр воздушный.",
      "last_timestamp": "2026-08-31T11:05:00+05:00",
+     "last_message_type": "chat",
+     "last_message_sender": {
+      "isMe": true,
+      "pushname": ""
+     },
+     "last_message_delivery_status": "read"
+    },
+    {
+     "id": "77000000018@c.us",
+     "name": "Бауыржан Сейтказы",
+     "isGroup": false,
+     "unread_count": 0,
+     "last_message_data": "Записал: Camry 40, рулевые наконечники.",
+     "last_timestamp": "2026-08-31T17:20:00+05:00",
+     "last_message_type": "chat",
+     "last_message_sender": {
+      "isMe": true,
+      "pushname": ""
+     },
+     "last_message_delivery_status": "read"
+    },
+    {
+     "id": "77000000019@c.us",
+     "name": "Динара Мукашева",
+     "isGroup": false,
+     "unread_count": 0,
+     "last_message_data": "Спасибо, буду ждать звонка",
+     "last_timestamp": "2026-08-31T15:05:00+05:00",
+     "last_message_type": "chat",
+     "last_message_sender": {
+      "isMe": false,
+      "pushname": "Динара Мукашева"
+     }
+    },
+    {
+     "id": "77000000020@c.us",
+     "name": "Арман Тулегенов",
+     "isGroup": false,
+     "unread_count": 0,
+     "last_message_data": "Есть амортизаторы на RAV4 2019?",
+     "last_timestamp": "2026-08-30T11:42:00+05:00",
+     "last_message_type": "chat",
+     "last_message_sender": {
+      "isMe": false,
+      "pushname": "Арман Тулегенов"
+     }
+    },
+    {
+     "id": "77000000021@c.us",
+     "name": "Жанар Сулейменова",
+     "isGroup": false,
+     "unread_count": 0,
+     "last_message_data": "Позиция в прайсе есть, точное наличие подтвердит менеджер.",
+     "last_timestamp": "2026-08-30T10:15:00+05:00",
+     "last_message_type": "chat",
+     "last_message_sender": {
+      "isMe": true,
+      "pushname": ""
+     },
+     "last_message_delivery_status": "read"
+    },
+    {
+     "id": "77000000022@c.us",
+     "name": "Ерасыл Бекмуратов",
+     "isGroup": false,
+     "unread_count": 0,
+     "last_message_data": "Ок, тогда позже напишу",
+     "last_timestamp": "2026-08-29T19:30:00+05:00",
+     "last_message_type": "chat",
+     "last_message_sender": {
+      "isMe": false,
+      "pushname": "Ерасыл Бекмуратов"
+     }
+    },
+    {
+     "id": "77000000023@c.us",
+     "name": "Гульнара Досанова",
+     "isGroup": false,
+     "unread_count": 0,
+     "last_message_data": "По гарантии уточнит менеджер — передаю.",
+     "last_timestamp": "2026-08-29T14:50:00+05:00",
+     "last_message_type": "chat",
+     "last_message_sender": {
+      "isMe": true,
+      "pushname": ""
+     },
+     "last_message_delivery_status": "read"
+    },
+    {
+     "id": "77000000024@c.us",
+     "name": "Нурсултан Кайыров",
+     "isGroup": false,
+     "unread_count": 0,
+     "last_message_data": "Принял заявку: Prado 150, стойки стабилизатора.",
+     "last_timestamp": "2026-08-28T12:10:00+05:00",
+     "last_message_type": "chat",
+     "last_message_sender": {
+      "isMe": true,
+      "pushname": ""
+     },
+     "last_message_delivery_status": "read"
+    },
+    {
+     "id": "77000000025@c.us",
+     "name": "Асель Жаксыбекова",
+     "isGroup": false,
+     "unread_count": 0,
+     "last_message_data": "Хорошо, спасибо!",
+     "last_timestamp": "2026-08-28T09:35:00+05:00",
+     "last_message_type": "chat",
+     "last_message_sender": {
+      "isMe": false,
+      "pushname": "Асель Жаксыбекова"
+     }
+    },
+    {
+     "id": "77000000026@c.us",
+     "name": "Ринат Ахмедов",
+     "isGroup": false,
+     "unread_count": 0,
+     "last_message_data": "А доставка до Косшы есть?",
+     "last_timestamp": "2026-08-27T18:05:00+05:00",
+     "last_message_type": "chat",
+     "last_message_sender": {
+      "isMe": false,
+      "pushname": "Ринат Ахмедов"
+     }
+    },
+    {
+     "id": "77000000027@c.us",
+     "name": "Айдана Серикова",
+     "isGroup": false,
+     "unread_count": 0,
+     "last_message_data": "Записал: Corolla 2014, свечи, 4 шт.",
+     "last_timestamp": "2026-08-27T13:40:00+05:00",
+     "last_message_type": "chat",
+     "last_message_sender": {
+      "isMe": true,
+      "pushname": ""
+     },
+     "last_message_delivery_status": "read"
+    },
+    {
+     "id": "77000000028@c.us",
+     "name": "Тимур Есимов",
+     "isGroup": false,
+     "unread_count": 0,
+     "last_message_data": "Прислал VIN, жду подбор",
+     "last_timestamp": "2026-08-27T11:20:00+05:00",
+     "last_message_type": "chat",
+     "last_message_sender": {
+      "isMe": false,
+      "pushname": "Тимур Есимов"
+     }
+    },
+    {
+     "id": "77000000029@c.us",
+     "name": "Камила Оразбаева",
+     "isGroup": false,
+     "unread_count": 0,
+     "last_message_data": "Понятно, подумаю",
+     "last_timestamp": "2026-08-25T16:00:00+05:00",
+     "last_message_type": "chat",
+     "last_message_sender": {
+      "isMe": false,
+      "pushname": "Камила Оразбаева"
+     }
+    },
+    {
+     "id": "77000000030@c.us",
+     "name": "Бекзат Нуртаев",
+     "isGroup": false,
+     "unread_count": 0,
+     "last_message_data": "Записал: Camry 70, масло 5W-30, 4 л.",
+     "last_timestamp": "2026-08-24T10:25:00+05:00",
+     "last_message_type": "chat",
+     "last_message_sender": {
+      "isMe": true,
+      "pushname": ""
+     },
+     "last_message_delivery_status": "read"
+    },
+    {
+     "id": "77000000031@c.us",
+     "name": "Алия Жумагулова",
+     "isGroup": false,
+     "unread_count": 0,
+     "last_message_data": "Спасибо, всё получила",
+     "last_timestamp": "2026-08-23T15:45:00+05:00",
+     "last_message_type": "chat",
+     "last_message_sender": {
+      "isMe": false,
+      "pushname": "Алия Жумагулова"
+     }
+    },
+    {
+     "id": "77000000032@c.us",
+     "name": "Даулет Исаев",
+     "isGroup": false,
+     "unread_count": 0,
+     "last_message_data": "Записал: Hilux 2018, ремень ГРМ.",
+     "last_timestamp": "2026-08-22T12:00:00+05:00",
      "last_message_type": "chat",
      "last_message_sender": {
       "isMe": true,
@@ -410,63 +612,183 @@
    ]
   },
   "dashboard_cache.json": {
-   "lastFetchMs": 1788336986802,
+   "lastFetchMs": 1788340962399,
    "outcomes": [
     {
      "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
      "chatId": "77000000011@c.us",
      "outcome": "order_collected",
      "summary": "Колодки PN1512, Camry 2015. Имя и телефон взяты, ждёт менеджера.",
-     "outcomeAt": 1788336266802,
-     "lastMessageAt": 1788336266802
+     "outcomeAt": 1788340242399,
+     "lastMessageAt": 1788340242399
     },
     {
      "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
      "chatId": "77000000012@c.us",
      "outcome": "in_dialog",
      "summary": "Спрашивает цену фильтра на RAV4 2019 и про замену.",
-     "outcomeAt": 1788334946802,
-     "lastMessageAt": 1788334946802
+     "outcomeAt": 1788338922399,
+     "lastMessageAt": 1788338922399
     },
     {
      "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
      "chatId": "77000000017@c.us",
      "outcome": "order_collected",
      "summary": "Prado 2018, фильтр воздушный — позиции нет в прайсе, заявка принята.",
-     "outcomeAt": 1788162986802,
-     "lastMessageAt": 1788162986802
+     "outcomeAt": 1788166962399,
+     "lastMessageAt": 1788166962399
     },
     {
      "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
      "chatId": "77000000016@c.us",
      "outcome": "owner_needed",
      "summary": "Вопрос по Kaspi рассрочке — условий нет в данных бизнеса.",
-     "outcomeAt": 1788266186802,
-     "lastMessageAt": 1788266186802
+     "outcomeAt": 1788270162399,
+     "lastMessageAt": 1788270162399
     },
     {
      "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
      "chatId": "77000000013@c.us",
      "outcome": "client_silent",
      "summary": "Обещал прислать VIN, ответа пока нет.",
-     "outcomeAt": 1788331226802,
-     "lastMessageAt": 1788331226802
+     "outcomeAt": 1788335202399,
+     "lastMessageAt": 1788335202399
     },
     {
      "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
      "chatId": "77000000014@c.us",
      "outcome": "question_closed",
      "summary": "Уточняла наличие колодок, ответ дан.",
-     "outcomeAt": 1788269786802,
-     "lastMessageAt": 1788269786802
+     "outcomeAt": 1788273762399,
+     "lastMessageAt": 1788273762399
     },
     {
      "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
      "chatId": "77000000015@c.us",
      "outcome": "in_dialog",
      "summary": "Написал, что заедет завтра.",
-     "outcomeAt": 1788275186802,
-     "lastMessageAt": 1788275186802
+     "outcomeAt": 1788279162399,
+     "lastMessageAt": 1788279162399
+    },
+    {
+     "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
+     "chatId": "77000000018@c.us",
+     "outcome": "order_collected",
+     "summary": "Рулевые наконечники на Camry 40 — заявка принята.",
+     "outcomeAt": 1788144162399,
+     "lastMessageAt": 1788144162399
+    },
+    {
+     "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
+     "chatId": "77000000019@c.us",
+     "outcome": "client_silent",
+     "summary": "Ждёт звонка менеджера, ответа нет.",
+     "outcomeAt": 1788135762399,
+     "lastMessageAt": 1788135762399
+    },
+    {
+     "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
+     "chatId": "77000000020@c.us",
+     "outcome": "in_dialog",
+     "summary": "Спрашивает амортизаторы на RAV4 2019.",
+     "outcomeAt": 1788037362399,
+     "lastMessageAt": 1788037362399
+    },
+    {
+     "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
+     "chatId": "77000000021@c.us",
+     "outcome": "question_closed",
+     "summary": "Уточнила наличие, ответ дан.",
+     "outcomeAt": 1788031962399,
+     "lastMessageAt": 1788031962399
+    },
+    {
+     "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
+     "chatId": "77000000022@c.us",
+     "outcome": "client_silent",
+     "summary": "Обещал написать позже.",
+     "outcomeAt": 1787979162399,
+     "lastMessageAt": 1787979162399
+    },
+    {
+     "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
+     "chatId": "77000000023@c.us",
+     "outcome": "owner_needed",
+     "summary": "Вопрос по гарантии — условий нет в данных бизнеса.",
+     "outcomeAt": 1787962362399,
+     "lastMessageAt": 1787962362399
+    },
+    {
+     "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
+     "chatId": "77000000024@c.us",
+     "outcome": "order_collected",
+     "summary": "Стойки стабилизатора, Prado 150. Контакты взяты.",
+     "outcomeAt": 1787866362399,
+     "lastMessageAt": 1787866362399
+    },
+    {
+     "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
+     "chatId": "77000000025@c.us",
+     "outcome": "question_closed",
+     "summary": "Поблагодарила, вопрос закрыт.",
+     "outcomeAt": 1787857062399,
+     "lastMessageAt": 1787857062399
+    },
+    {
+     "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
+     "chatId": "77000000026@c.us",
+     "outcome": "owner_needed",
+     "summary": "Доставка до Косшы — зоны нет в данных бизнеса.",
+     "outcomeAt": 1787801262399,
+     "lastMessageAt": 1787801262399
+    },
+    {
+     "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
+     "chatId": "77000000027@c.us",
+     "outcome": "order_collected",
+     "summary": "Свечи на Corolla 2014, 4 шт. — заявка принята.",
+     "outcomeAt": 1787785362399,
+     "lastMessageAt": 1787785362399
+    },
+    {
+     "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
+     "chatId": "77000000028@c.us",
+     "outcome": "in_dialog",
+     "summary": "Прислал VIN, ждёт подбор.",
+     "outcomeAt": 1787776962399,
+     "lastMessageAt": 1787776962399
+    },
+    {
+     "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
+     "chatId": "77000000029@c.us",
+     "outcome": "client_silent",
+     "summary": "Взяла паузу, ответа нет.",
+     "outcomeAt": 1787620962399,
+     "lastMessageAt": 1787620962399
+    },
+    {
+     "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
+     "chatId": "77000000030@c.us",
+     "outcome": "order_collected",
+     "summary": "Масло 5W-30 4 л, Camry 70 — заявка принята.",
+     "outcomeAt": 1787514462399,
+     "lastMessageAt": 1787514462399
+    },
+    {
+     "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
+     "chatId": "77000000031@c.us",
+     "outcome": "question_closed",
+     "summary": "Получила заказ, вопрос закрыт.",
+     "outcomeAt": 1787447262399,
+     "lastMessageAt": 1787447262399
+    },
+    {
+     "profileId": "b7a44f5d-1c2e-4f80-9a31-0d5e7c9a4412",
+     "chatId": "77000000032@c.us",
+     "outcome": "order_collected",
+     "summary": "Ремень ГРМ, Hilux 2018 — заявка принята.",
+     "outcomeAt": 1787347362399,
+     "lastMessageAt": 1787347362399
     }
    ]
   }
