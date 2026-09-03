@@ -33,6 +33,10 @@ FRAMES = [
     ("04-tab2",              "04-bots",       "Бот под каждый бизнес",             "Включайте «Авто» одним тапом"),
     ("06-settings-products", "05-pricelist",  "Загрузите прайс — бот знает цены",  "PDF, Excel, фото — разберёт сам"),
     ("04-tab1",              "06-dashboard",  "Сводка за неделю",                  "Сколько заявок собрал бот и где нужны вы"),
+    # Prices on this frame are PlanCatalog's fallback text (the Editor has no StoreKit); they equal
+    # the ASC-confirmed grid (monetization spec, 2026-08-25). The «от 9 990 ₸» below is Start/month —
+    # keep it in step with PlanCatalog if the grid ever moves.
+    ("05-paywall",           "07-plans",      "Все функции в каждом тарифе",       "Платите только за масштаб — от 9 990 ₸ в месяц"),
 ]
 
 CANVAS = (1320, 2868)                 # iPhone 6.9" portrait

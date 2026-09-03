@@ -45,7 +45,7 @@ TG_PROFILE = "3f1c9e02-7a84-4b16-b0d9-55ac1e2f6d31"
 # non-routable +7 700 000-00-NN block — nobody reads those, and it keeps the blast radius
 # small. RESIDUAL RISK, owner's call: this is a well-formed KZ mobile, so it could belong to
 # a real subscriber. Replace it with a number the owner controls before final submission.
-CLIENT_PHONE = "+7 705 318-24-90"
+CLIENT_PHONE = "+7 702 699-88-44"   # номер владельца (его решение 2026-09-03), не вымышленный
 SHOP_PHONE = "+7 707 245-18-60"
 
 # ---------------------------------------------------------------- PlayerPrefs
