@@ -80,3 +80,4 @@ Tools/n8n/.secrets/
 
 # Store screenshot captures — regenerate with Tools/Store/Capture Screenshots
 Tools/store/screenshots/
+Tools/store/listing/
