@@ -17,7 +17,20 @@ using UnityEngine.UI;
 /// Авто on the right — with a white thumb that covers the active one. Also sets
 /// the bar background to true white and hides the competing centre "Title".
 ///
-/// Safe to re-run: destroys and rebuilds the toggle + popup each time.
+/// SUPERSEDED — DO NOT REVIVE (see CLAUDE.md's list of builders never to re-run).
+/// The sliding knob was replaced by the «Авто» pill in the 2026-08 top-bar
+/// restyle, and ChatsTopBarRestyleBuilder now owns the popup: it lifts it out of
+/// ChatsPanel to the SCREEN ROOT (so the per-chat SemiAutoToggle's confirm can
+/// render above MessagesPanel at all), restyles it to the palette tokens, and
+/// rewires the reworked binder. This builder still DESTROYS AND REBUILDS both
+/// objects on every run (DestroyExisting below), so a run would undo that lift,
+/// the theme bindings and the copy in one go.
+///
+/// It is inert today only by accident: ScreenName is "Screen_Whatsapp", which no
+/// longer exists in Main.unity, so Build() logs an error and returns. Correcting
+/// that one constant is exactly the innocuous-looking edit that would arm it —
+/// don't. Nothing here is needed any more; the file is kept only because its
+/// geometry literals are the last written record of the popup's authored rects.
 /// </summary>
 public static class ReplyModeToggleBuilder
 {
@@ -274,6 +287,12 @@ public static class ReplyModeToggleBuilder
         card.transform.SetParent(popup.transform, false);
         var crt = (RectTransform)card.transform;
         crt.anchorMin = crt.anchorMax = crt.pivot = new Vector2(0.5f, 0.5f);
+        // These four rects (card 720x440, Title -52/64, Body -118/130) are the
+        // AUTHORED BASELINE that ConfirmCardFitter reads off the live card and
+        // solves from. They are a floor, not a fit: the card is grown at runtime
+        // by however much the current copy overflows. So if a title or body ever
+        // overlaps again, do NOT enlarge these numbers — that only raises the
+        // fixed minimum and the next longer string overlaps just the same.
         crt.sizeDelta = new Vector2(720f, 440f);
         crt.anchoredPosition = Vector2.zero;
         card.GetComponent<Image>().color = Color.white;

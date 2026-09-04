@@ -314,6 +314,11 @@ public class FontGlyphCoverageTests
         yield return ("PaywallCopy.TrialCta", PaywallCopy.TrialCta());
         yield return ("PaywallCopy.TrialPill", PaywallCopy.TrialPill(3));
         yield return ("PaywallCopy.ReceiptTitle", PaywallCopy.ReceiptTitle());
+
+        // The delete-chat body wraps a chat title the app does not control; only the
+        // authored half is pinned here, so the placeholder stands in for the name.
+        yield return ("ChatDeleteConfirm.BodyText(null)", ChatDeleteConfirm.BodyText(null));
+        yield return ("ChatDeleteConfirm.BodyText(name)", ChatDeleteConfirm.BodyText("Клиенты"));
         foreach (PlanTier tier in Enum.GetValues(typeof(PlanTier)))
         {
             yield return ($"PaywallCopy.TierName({tier})", PaywallCopy.TierName(tier));
@@ -359,6 +364,29 @@ public class FontGlyphCoverageTests
         {
             yield return ($"ProfileSubPages.Faq[{i}].question", faq[i].question);
             yield return ($"ProfileSubPages.Faq[{i}].answer", faq[i].answer);
+        }
+
+        // The «Авто» confirm popups. Their copy is private consts written into the
+        // shared card at runtime, so the SCENE only ever holds the short header
+        // title — the long per-chat one has never been glyph-checked by the
+        // serialized-label sweep above. That matters here more than elsewhere:
+        // this copy is the most likely in the app to be reworded (the per-chat
+        // title wraps to two lines, so shortening it is a standing option), and a
+        // «−» or a «№» typed into it renders as NOTHING on device.
+        foreach (var t in new[]
+                 {
+                     typeof(SemiAutoToggle), typeof(ReplyModeToggleBinder), typeof(BotActivationConfirm),
+                 })
+        {
+            var consts = t.GetFields(BindingFlags.NonPublic | BindingFlags.Static)
+                          .Where(f => f.IsLiteral && f.FieldType == typeof(string))
+                          .ToArray();
+            Assert.IsNotEmpty(consts,
+                $"{t.Name} has no private string consts left — its confirm copy moved. " +
+                "Update FontGlyphCoverageTests so the popup copy stays glyph-checked.");
+
+            foreach (var f in consts)
+                yield return ($"{t.Name}.{f.Name}", (string)f.GetValue(null));
         }
     }
 

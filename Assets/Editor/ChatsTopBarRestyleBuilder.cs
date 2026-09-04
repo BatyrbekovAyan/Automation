@@ -296,6 +296,13 @@ public static class ChatsTopBarRestyleBuilder
             EnsureThemed(card.gameObject, ThemeRole.Surface);
         }
 
+        // Copy seeded here is only the editor-time preview: ReplyModeToggleBinder
+        // .ShowConfirm rewrites both strings per caller, and the per-chat variant
+        // is long enough to wrap. Do NOT enlarge the card or the Title box to
+        // make that fit — the card is grown at runtime by ConfirmCardFitter from
+        // whatever geometry this scene authors, so a hand-enlarged box would just
+        // become the new (still fixed) minimum and the next longer string would
+        // overlap again exactly as it did on 2026-09-04.
         StyleTmp(popup.Find("Content/Title"), "Включить авто-режим?", LInkPrimary, ThemeRole.InkPrimary);
         StyleTmp(popup.Find("Content/Body"),
             "Бот будет отвечать клиентам сам. Выключить можно в любой момент — этой же кнопкой.",

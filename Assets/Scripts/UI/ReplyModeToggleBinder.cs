@@ -59,6 +59,7 @@ public class ReplyModeToggleBinder : MonoBehaviour
     private ReplyMode currentMode = AutoButtonModel.DefaultMode;
     private Action pendingConfirm;   // armed by ShowConfirm, fired by the popup's confirm button
     private bool popupWired;
+    private ConfirmCardFitter.Baseline confirmBaseline;   // authored card geometry, captured once
 
     /// <summary>Reads a bot's persisted reply mode (unset ⇒ semi-auto, the silent default).</summary>
     public static ReplyMode GetMode(string botName) =>
@@ -99,6 +100,13 @@ public class ReplyModeToggleBinder : MonoBehaviour
     /// Show the shared confirm popup with caller-supplied copy; <paramref name="onConfirm"/>
     /// runs only when the user confirms. Returns false when no popup is wired —
     /// callers then commit directly. Also serves SemiAutoToggle's per-chat gate.
+    ///
+    /// The card is fitted to the copy AFTER PopupUI.Show, never before: the
+    /// popup is inactive between shows, and TMP cannot measure text on a
+    /// GameObject that has never been active (see ConfirmCardFitter). Show
+    /// activates it, so the fit lands in the same frame and long before the
+    /// first render — which is what lets the per-chat title wrap to two lines
+    /// and push the body down instead of drawing over it.
     /// </summary>
     public static bool ShowConfirm(string title, string body, Action onConfirm)
     {
@@ -108,7 +116,21 @@ public class ReplyModeToggleBinder : MonoBehaviour
         if (instance.confirmTitle != null) instance.confirmTitle.text = title;
         if (instance.confirmBody != null) instance.confirmBody.text = body;
         PopupUI.Show(instance.confirmPopup);
+        instance.FitConfirmCard();
         return true;
+    }
+
+    /// <summary>
+    /// Resize the confirm card to whatever copy it is currently showing. The
+    /// baseline was snapshotted in WirePopupButtons, so every solve starts from
+    /// the geometry the scene authored rather than from the previous result.
+    /// </summary>
+    private void FitConfirmCard()
+    {
+        if (confirmPopup == null || confirmTitle == null || confirmBody == null) return;
+
+        var card = PopupUI.FindCard(confirmPopup.transform) as RectTransform;
+        ConfirmCardFitter.Fit(card, confirmTitle, confirmBody, ref confirmBaseline);
     }
 
     /// <summary>
@@ -189,6 +211,13 @@ public class ReplyModeToggleBinder : MonoBehaviour
         if (popupWired) return;
         if (confirmButton != null) PopupUI.WireFingerUp(confirmButton, OnConfirm);
         if (cancelButton != null) PopupUI.WireFingerUp(cancelButton, OnCancel);
+
+        // Snapshot the card as the scene authored it, while it is guaranteed
+        // untouched — every later fit solves from these values.
+        if (confirmPopup != null && confirmTitle != null && confirmBody != null)
+            ConfirmCardFitter.Capture(PopupUI.FindCard(confirmPopup.transform) as RectTransform,
+                confirmTitle, confirmBody, ref confirmBaseline);
+
         popupWired = true;
     }
 

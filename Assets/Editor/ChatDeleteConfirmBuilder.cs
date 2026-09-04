@@ -29,9 +29,17 @@ public static class ChatDeleteConfirmBuilder
         var title = NewText("Title", card, "Удалить чат?", 44, FontStyles.Bold, TextAlignmentOptions.Center);
         Anchor((RectTransform)title.transform, new Vector2(0.5f, 1f), new Vector2(760, 70), new Vector2(0, -60));
 
+        // Height 86, NOT the 140 this builder originally wrote. The body is
+        // Middle-aligned inside its box and the buttons own the card's bottom
+        // 180u, so a 140u box starting at -150 ended 10u BELOW the buttons' top
+        // edge — authored overlap, which a four-line body made visible and which
+        // ConfirmCardFitter's grow-by-overflow rule would have preserved rather
+        // than fixed. 86 fits two 39.36u lines with slack and leaves 44u of
+        // clearance, matching ReplyModeConfirmPopup; three or more lines grow the
+        // box and the card together. See ConfirmCardLayout.
         var body = NewText("Body", card, "", 32, FontStyles.Normal, TextAlignmentOptions.Center);
         body.color = new Color(0.4f, 0.4f, 0.4f, 1f);
-        Anchor((RectTransform)body.transform, new Vector2(0.5f, 1f), new Vector2(760, 140), new Vector2(0, -150));
+        Anchor((RectTransform)body.transform, new Vector2(0.5f, 1f), new Vector2(760, 86), new Vector2(0, -150));
 
         var cancel = NewButton("CancelButton", card, "Отмена", new Color(0.93f, 0.93f, 0.93f), Color.black);
         Anchor((RectTransform)cancel.transform, new Vector2(0.5f, 0f), new Vector2(360, 110), new Vector2(-195, 70));

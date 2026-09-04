@@ -154,9 +154,15 @@ public static class PopupUI
     /// <summary>
     /// Default card lookup: "Content" → "Card" → first child. Returns null
     /// if the panel has no children.
+    ///
+    /// Public so callers that need the card itself — e.g. resizing it to fit
+    /// wrapped copy via <see cref="ConfirmCardFitter"/> — resolve it by the
+    /// same rule Show/Hide animate, instead of each keeping its own guess.
     /// </summary>
-    private static Transform FindCard(Transform panelT)
+    public static Transform FindCard(Transform panelT)
     {
+        if (panelT == null) return null;
+
         var card = panelT.Find("Content");
         if (card == null) card = panelT.Find("Card");
         if (card == null && panelT.childCount > 0) card = panelT.GetChild(0);

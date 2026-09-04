@@ -34,6 +34,7 @@ public static class BotActivationConfirm
     private static TextMeshProUGUI titleTmp, bodyTmp, cancelLabel, confirmLabel;
     private static Image cancelImage, confirmImage;
     private static Action pending;
+    private static ConfirmCardFitter.Baseline baseline;   // authored card geometry, captured once
 
     /// <summary>Show the confirm; <paramref name="onConfirm"/> runs only on «Включить».</summary>
     public static void Show(TMP_FontAsset font, Action onConfirm)
@@ -42,6 +43,22 @@ public static class BotActivationConfirm
         pending = onConfirm;
         Paint();
         PopupUI.Show(panel);
+        Fit();
+    }
+
+    /// <summary>
+    /// Grow the card if the copy no longer fits its authored boxes — the same
+    /// treatment the chats popup gets, applied here so the two twins cannot
+    /// drift. A no-op for today's copy (the title is one line and the body
+    /// three, both inside their boxes); it exists so a longer string can never
+    /// reproduce the chats popup's 2026-09-04 overlap on this screen.
+    /// Runs after PopupUI.Show, which is what makes the panel active and the
+    /// TMP measurement valid — see ConfirmCardFitter.
+    /// </summary>
+    private static void Fit()
+    {
+        if (cardImage == null) return;
+        ConfirmCardFitter.Fit((RectTransform)cardImage.transform, titleTmp, bodyTmp, ref baseline);
     }
 
     private static void EnsureBuilt(TMP_FontAsset font)
@@ -81,6 +98,11 @@ public static class BotActivationConfirm
         PopupUI.AbsorbEvents(cardImage);
 
         titleTmp = BuildTmp(card.transform, "Title", TitleText, 44f, FontStyles.Bold, font);
+        // Wrapping ON so a longer title breaks onto a second line — which Fit()
+        // then makes room for — instead of running off the card's edge. Today's
+        // title measures ~554u inside a 624u column, so it still renders as the
+        // same single line it always did.
+        titleTmp.textWrappingMode = TextWrappingModes.Normal;
         SetTopStretch((RectTransform)titleTmp.transform, top: 56f, height: 60f, sideInset: 48f);
 
         bodyTmp = BuildTmp(card.transform, "Body", BodyText, 32f, FontStyles.Normal, font);
@@ -91,6 +113,9 @@ public static class BotActivationConfirm
             font, anchoredX: -170f, OnCancel);
         (confirmImage, confirmLabel) = BuildButton(card.transform, "ConfirmButton", "Включить",
             font, anchoredX: 170f, OnConfirm);
+
+        // Snapshot the geometry just authored above — Fit() solves from it.
+        ConfirmCardFitter.Capture(cardRt, titleTmp, bodyTmp, ref baseline);
     }
 
     private static (Image, TextMeshProUGUI) BuildButton(Transform card, string name, string label,
