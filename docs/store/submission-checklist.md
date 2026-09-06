@@ -126,8 +126,15 @@
      Build 1 (из Player Settings), Product → Archive → Distribute → App Store Connect → Upload.
   3. После обработки билда: письма ITMS-9105x (privacy manifest) — если пришли, добавить
      декларации и перезалить; вопрос export compliance задаваться не должен (plist-ключ).
-  4. TestFlight на телефоне: онбординг → визард до QR/кода (в идеале через US-VPN — QR-экран
-     единственное, что ревьюер трогает с сетью); Профиль → Подписка → Изменить тариф:
+  4. TestFlight на телефоне: онбординг → визард до QR/кода через VPN с выходом в США
+     (QR-экран — единственное, что ревьюер трогает с сетью). ФАКТ 2026-09-06: wappi.pro
+     доступен из США/ЕС/Ирана/KZ одинаково (check-host.net us1/us2/us3/de1/nl1/uk1/ir1/kz1:
+     TLS ок, Let's Encrypt, nginx без WAF/CDN, тот же 404 на GET к API —
+     https://check-host.net/check-report/4a434456k35, корень 4a434467kb31,
+     choosereply.com 4a434473k67b). «Unable to complete SSL connection» на бесплатном VPN —
+     это VPN подменяет/ломает TLS, не гео-блок: проверять ТОЛЬКО через VPN без перехвата
+     (ProtonVPN free, сервер US; сначала Safari → https://wappi.pro без предупреждения о
+     сертификате, затем QR-экран); Профиль → Подписка → Изменить тариф:
      цены из StoreKit (не ₸-фолбэк), **sandbox-покупка + «Восстановить покупки»**, обе
      юр-ссылки открываются; «О приложении» — 3 ряда документов; «Удалить все данные».
   5. Xcode: Product → Generate Privacy Report по архиву — сверить с labels.
