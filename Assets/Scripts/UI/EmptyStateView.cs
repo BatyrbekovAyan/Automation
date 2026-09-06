@@ -122,21 +122,70 @@ public class EmptyStateView : MonoBehaviour
             ChatManager.Instance.OnActiveBotChanged += HandleActiveBotChanged;
             ChatManager.Instance.OnChatAdded += HandleChatAdded;
             ChatManager.Instance.OnActiveChannelChanged += HandleActiveChannelChanged;
+        }
 
-            // Catch up to the current state. The initial OnEmptyState event may have
-            // fired before this view's GameObject was activated (Screen_Whatsapp is
-            // inactive at scene load), in which case our subscription missed it.
-            EmptyStateReason? reason = ChatManager.Instance.ComputeCurrentEmptyState();
-            if (reason.HasValue)
-            {
-                HandleEmptyState(reason.Value);
-            }
-            else if (ChatManager.Instance.Chats != null && ChatManager.Instance.Chats.Count > 0)
-            {
-                Hide();
-            }
+        // Catch up to the current state. The initial OnEmptyState event may have fired before
+        // this view's GameObject was activated (Screen_Whatsapp is inactive at scene load), and
+        // EVERY later event that would have corrected the card — bot created, channel authorised
+        // from settings, chats loaded — fires while the chats tab is inactive and this view is
+        // unsubscribed, so a re-entry is the only place those are ever seen.
+        //
+        // Deliberately OUTSIDE the manager guard (SyncingView.OnEnable's shape, pinned for the
+        // sibling cover by SyncingViewLifecycleTests.Enable_NoChatManager_HidesStrandedCover):
+        // with no gate reachable at all, a card left on screen by the previous enable must still
+        // come down. 2026-09-04 device bug: this used to hide only `if (Chats.Count > 0)`, so a
+        // resolver verdict of "no empty card" over an EMPTY list did nothing — and the card is a
+        // CanvasGroup whose alpha survives the GameObject deactivation, so the stale card stayed
+        // up, opaque and full-stretch over the chat list, with its CTA listeners already stripped
+        // by OnDisable. Fresh install: create the first bot, come back to «Чаты», and
+        // «Создайте первого бота» was still sitting there (the list is empty for the whole 300s
+        // post-creation sync window, and stays empty forever on an account with no chats) until a
+        // WhatsApp→Telegram→WhatsApp round trip happened to re-derive it.
+        RederiveFromResolver();
 
+        if (ChatManager.Instance != null)
             _reassertRoutine = StartCoroutine(ReassertAfterChannelRestore());
+    }
+
+    /// <summary>
+    /// True while the card is actually on screen. DERIVED from the CanvasGroup rather than
+    /// mirrored in a bool: alpha is the only visibility fact (Show/Hide are its only writers,
+    /// and nothing outside this class touches this CanvasGroup), and a mirror field is exactly
+    /// the kind of state that drifted here — `_lastReason` was the de-facto visibility flag
+    /// until OnDisable started nulling it without lowering the alpha.
+    /// </summary>
+    private bool CardVisible => canvasGroup != null && canvasGroup.alpha > 0f;
+
+    /// <summary>
+    /// The single re-derive funnel, shared by the OnEnable catch-up, the frame-1 reassert and
+    /// the channel switch. Those three sites each carried their OWN guard before, and the
+    /// divergence between them IS the 2026-09-04 bug — so they now ask one question
+    /// (ComputeCurrentEmptyState, the authority) and obey one pure rule (EmptyStateCardPolicy).
+    /// No manager reachable counts as "no reason": there is nothing to authorise keeping a card
+    /// up, and a stranded one must come down.
+    /// </summary>
+    private void RederiveFromResolver()
+    {
+        EmptyStateReason? reason = ChatManager.Instance != null
+            ? ChatManager.Instance.ComputeCurrentEmptyState()
+            : null;
+
+        switch (EmptyStateCardPolicy.Decide(reason, CardVisible))
+        {
+            case EmptyStateCardAction.Show:
+                // Straight to Configure, never via HandleEmptyState: its EmptyStateReasonPolicy
+                // coercion is the identity on the resolver's own output (Effective only promotes
+                // a reason that DISAGREES with the resolver), and its _lastReason equality guard
+                // would skip the re-theme/re-wire a channel switch needs. That coercion stays
+                // where it belongs — on the event path, where the raw reason can disagree.
+                _lastReason = reason;
+                ConfigureForReason(reason.Value);
+                Show();
+                break;
+
+            case EmptyStateCardAction.Hide:
+                Hide();
+                break;
         }
     }
 
@@ -148,22 +197,20 @@ public class EmptyStateView : MonoBehaviour
     /// silent), and the OnEmptyState/catch-up above can land BEFORE that restore — the
     /// card then paints the PREVIOUS channel's accent (green hero on an empty Telegram)
     /// and nothing repaints until a manual channel switch. One frame later the channel
-    /// is settled, so re-derive exactly the way HandleActiveChannelChanged does; the
-    /// steady state is a repeat Configure with identical inputs (idempotent).
+    /// is settled, so re-derive; the steady state is a repeat Configure with identical
+    /// inputs (idempotent).
+    ///
+    /// The re-derive is UNCONDITIONAL (2026-09-04): it used to bail on a null _lastReason,
+    /// which skipped precisely the case the catch-up above now repairs — and it must also see
+    /// the INVERSE race, where a catch-up that read the pre-restore channel hides a card the
+    /// settled channel actually needs. The resolver is authoritative in both directions, so
+    /// one frame later we simply ask it again.
     /// </summary>
     private System.Collections.IEnumerator ReassertAfterChannelRestore()
     {
         yield return null;
         _reassertRoutine = null;
-        if (!_lastReason.HasValue) yield break;
-
-        EmptyStateReason? reason = ChatManager.Instance != null
-            ? ChatManager.Instance.ComputeCurrentEmptyState()
-            : _lastReason;
-        if (!reason.HasValue) { Hide(); yield break; }
-        _lastReason = reason;
-        ConfigureForReason(reason.Value);
-        Show();
+        RederiveFromResolver();
     }
 
     private void OnDisable()
@@ -181,10 +228,18 @@ public class EmptyStateView : MonoBehaviour
             ChatManager.Instance.OnActiveChannelChanged -= HandleActiveChannelChanged;
         }
         if (primaryButton != null) primaryButton.onClick.RemoveAllListeners();
+        // Take the card OFF SCREEN as well as forgetting it (2026-09-04). The listeners were
+        // just stripped, so anything left visible past this point is a dead card — and its
+        // alpha survives the deactivation, so "left visible" is the default, not an edge case.
+        // Killing it here removes the stale state at the source; the OnEnable catch-up runs
+        // synchronously inside SetActive(true) and re-raises a still-valid card in the same
+        // frame, so there is no flicker.
+        Hide();
         // Reset so the next OnEnable re-runs ConfigureForReason and RE-WIRES the button.
         // Without this, the _lastReason guard skips re-config on re-entry (same reason),
         // leaving the just-cleared button with no click listener — so it works once then
-        // goes dead on the second visit.
+        // goes dead on the second visit. Kept explicit rather than leaning on Hide(): Hide
+        // early-returns when the CanvasGroup is missing, and this promise must not depend on it.
         _lastReason = null;
     }
 
@@ -238,17 +293,7 @@ public class EmptyStateView : MonoBehaviour
     // empty card (syncing / has chats), HIDE; otherwise re-theme, RE-WIRE, and Show for the reason now in
     // view. WhatsApp is unaffected — a WhatsApp reason re-derives to the identical green card + identical
     // handler (byte-identical outcome).
-    private void HandleActiveChannelChanged(ChatChannel _)
-    {
-        if (!_lastReason.HasValue) return;              // nothing was showing → nothing to re-derive
-        EmptyStateReason? reason = ChatManager.Instance != null
-            ? ChatManager.Instance.ComputeCurrentEmptyState()
-            : _lastReason;                              // manager gone: fall back to the prior reason
-        if (!reason.HasValue) { Hide(); return; }       // new channel is syncing / has chats — no card
-        _lastReason = reason;
-        ConfigureForReason(reason.Value);
-        Show();
-    }
+    private void HandleActiveChannelChanged(ChatChannel _) => RederiveFromResolver();
 
     private void ConfigureForReason(EmptyStateReason reason)
     {

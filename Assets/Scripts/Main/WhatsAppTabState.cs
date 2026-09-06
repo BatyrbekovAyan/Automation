@@ -40,6 +40,42 @@ public static class EmptyStateReasonPolicy
             : raw;
 }
 
+/// <summary>What the empty-state card must do after a re-derive from the authoritative resolver.</summary>
+public enum EmptyStateCardAction
+{
+    None, // nothing on screen and nothing to raise — leave the card alone
+    Show, // (re)configure for the resolved reason and raise the card
+    Hide, // the resolver says there is no empty-card state — take whatever is showing off screen
+}
+
+/// <summary>
+/// Pure re-derive rule for the empty-state card (2026-09-04 stale-card fix). The card is a
+/// CanvasGroup whose alpha SURVIVES its GameObject being deactivated, while every event that
+/// would correct it (bot created, channel authorised, chats loaded) fires while the chats
+/// screen is inactive and the view is unsubscribed. So on every re-derive the ONE authority is
+/// <see cref="ChatManager.ComputeCurrentEmptyState"/>: a reason means show that card, and null
+/// (Syncing / Ready — "not an empty-card state") means hide whatever is on screen, no matter
+/// how many chats are loaded. The chat count is deliberately NOT an input: keying the hide on
+/// it left a just-created bot (empty list inside its 300s sync window, or an account with
+/// genuinely zero chats) showing the stale «Создайте первого бота» card — opaque, full-stretch
+/// and swallowing taps over the chat list — until a WhatsApp→Telegram→WhatsApp round trip
+/// happened to re-derive it. Same invariant SyncingView.OnEnable already carries for the
+/// sibling cover under the same parent (pinned by SyncingViewLifecycleTests).
+///
+/// Show is returned even when that reason is already the one showing: the re-derive sites are
+/// also the channel-switch sites, where the card keeps its reason but must re-theme (the
+/// Telegram accent) and re-wire its CTA. Suppressing duplicate work is the EVENT path's job
+/// (EmptyStateView.HandleEmptyState's _lastReason guard), never this one's.
+/// </summary>
+public static class EmptyStateCardPolicy
+{
+    public static EmptyStateCardAction Decide(EmptyStateReason? resolved, bool cardVisible)
+    {
+        if (resolved.HasValue) return EmptyStateCardAction.Show;
+        return cardVisible ? EmptyStateCardAction.Hide : EmptyStateCardAction.None;
+    }
+}
+
 /// <summary>The four mutually-exclusive states of the WhatsApp tab content area.</summary>
 public enum WhatsAppTabState
 {

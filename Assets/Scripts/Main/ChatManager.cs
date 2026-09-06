@@ -171,7 +171,7 @@ public partial class ChatManager : MonoBehaviour
     /// second; increments preserve send order across rapid sends. The first
     /// sync echo replaces it with the server's within-second sequence.
     /// </summary>
-    private int _nextLocalSendSequence = 1000;
+    private int _nextLocalSendSequence = OutgoingSendCache.LocalSendSequenceFloor;
 
     /// <summary>
     /// The MessageViewModel list currently powering the open chat's bubbles.
@@ -921,19 +921,10 @@ public partial class ChatManager : MonoBehaviour
     private bool ReconcileGhostSend(string ghostTempId, RawMessage raw, NormalizedMessage norm,
                                     int serverSequence, List<MessageViewModel> cachedList, string chatId)
     {
-        bool found = false;
-        for (int j = 0; j < cachedList.Count; j++)
-        {
-            if (cachedList[j].messageId == ghostTempId)
-            {
-                cachedList[j].messageId      = raw.id;
-                cachedList[j].deliveryStatus = norm.deliveryStatus;
-                cachedList[j].timestamp      = norm.time;
-                cachedList[j].sequence       = serverSequence;
-                found = true;
-                break;
-            }
-        }
+        // Through the same seam the ack path uses, so the echo race is exercised by the seam's
+        // tests rather than by a private copy of the swap loop (review, 2026-09-05).
+        bool found = OutgoingSendCache.AdoptServerId(cachedList, ghostTempId, raw.id, norm.deliveryStatus,
+                                                      norm.time, serverSequence);
 
         Outbox.RemoveAt(GetCacheRoot(), chatId, ghostTempId);
         seenMessageIds.Remove(ghostTempId);
@@ -1065,6 +1056,13 @@ public partial class ChatManager : MonoBehaviour
                 // preview from its target BEFORE saving, so the persisted cache carries resolved
                 // quotes and the very first render shows them (not just a re-entry).
                 ReplyParser.BackfillFromCache(newMessages);
+
+                // A send fired while this first page was in flight had no live list to land in
+                // (LiveCacheFor fell back to disk), so its optimistic row lives ONLY in the file
+                // this callback is about to overwrite. Carry it into the list that becomes
+                // _activeChatCache, or the echo-reconcile searches a list the bubble is not in
+                // and the duplicate returns in this one window (review, 2026-09-05).
+                OutgoingSendCache.MergeOptimisticRows(newMessages, ChatHistoryCache.LoadHistory(GetCacheRoot(), chatId));
 
                 if (newMessages.Count > 0)
                     ChatHistoryCache.SaveHistory(GetCacheRoot(), chatId, newMessages);
@@ -2252,9 +2250,13 @@ IEnumerator SendTextMessageRoutine(string chatId, string text)
     var chatVm = GetChat(chatId);
     if (chatVm != null) chatVm.UpdateLastMessage(text, now);
 
-    List<MessageViewModel> cachedList = ChatHistoryCache.LoadHistory(sendCacheRoot, chatId);
-    cachedList.Add(instantMessage);
-    ChatHistoryCache.SaveHistory(sendCacheRoot, chatId, cachedList);
+    // Through LiveCacheFor, NOT a detached LoadHistory: this must land in the same list the
+    // live poll hands to SyncLatestMessages, or the server's echo of this very message finds
+    // no optimistic bubble to reconcile onto and renders as a duplicate. Ordered insert —
+    // _activeChatCache is newest-first and a just-sent message is the newest.
+    List<MessageViewModel> cachedList = LiveCacheFor(chatId, sendCacheRoot);
+    OutgoingSendCache.Insert(cachedList, instantMessage);
+    PersistSendCache(sendCacheRoot, chatId, cachedList);
 
     Outbox.Add(new OutboxStore.OutboxEntry
     {
@@ -2344,22 +2346,19 @@ private IEnumerator PostTextMessageRoutine(
         seenMessageIds.Remove(tempId);
         seenMessageIds.Add(response.message_id);
 
-        // Update cached optimistic message so a chat reopen picks up the
-        // real id and Sent status instead of a stranded tempId / Pending.
-        List<MessageViewModel> cachedList = ChatHistoryCache.LoadHistory(sendCacheRoot, chatId);
-        for (int i = 0; i < cachedList.Count; i++)
-        {
-            if (cachedList[i].messageId == tempId)
-            {
-                cachedList[i].messageId = response.message_id;
-                cachedList[i].deliveryStatus = DeliveryStatus.Sent;
-                break;
-            }
-        }
-        ChatHistoryCache.SaveHistory(sendCacheRoot, chatId, cachedList);
+        // Update the cached optimistic message so a chat reopen picks up the real id and Sent
+        // status instead of a stranded tempId / Pending — and so the live poll's echo matches
+        // it by id on the already-cached branch and upgrades the tick to ✓✓ in place.
+        List<MessageViewModel> cachedList = LiveCacheFor(chatId, sendCacheRoot);
+        bool adopted = OutgoingSendCache.AdoptServerId(cachedList, tempId, response.message_id, DeliveryStatus.Sent);
+        PersistSendCache(sendCacheRoot, chatId, cachedList);
 
         Outbox.RemoveAt(sendCacheRoot, chatId, tempId);
-        OnMessageStatusChanged?.Invoke(tempId, response.message_id, DeliveryStatus.Sent);
+        // A false adopt here means the poll's echo already reconciled the bubble (it is the
+        // newest entry and never evicted in-session) and may have left it at ✓✓ — announce the
+        // fresher of the two, never a hard-coded Sent that would step it back for a poll interval.
+        OnMessageStatusChanged?.Invoke(tempId, response.message_id,
+            OutgoingSendCache.StatusToAnnounce(cachedList, adopted, response.message_id, DeliveryStatus.Sent));
     }
     else
     {

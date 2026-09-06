@@ -16,7 +16,9 @@ using UnityEngine;
 /// </summary>
 public class SyncingViewLifecycleTests
 {
-    private const string DefaultBotSyncKey = "_defaultWhatsappSyncUntil";
+    // Derived from the production suffix (see EmptyStateViewLifecycleTests): a rename must not
+    // silently turn the mid-window cases into their Ready twins.
+    private static readonly string DefaultBotSyncKey = "_default" + ChatManager.SyncUntilSuffixFor(ChatChannel.WhatsApp);
 
     private GameObject viewGo;
     private GameObject managerGo;

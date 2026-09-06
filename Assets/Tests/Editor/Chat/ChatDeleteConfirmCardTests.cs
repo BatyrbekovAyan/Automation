@@ -1,7 +1,9 @@
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 using TMPro;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.TestTools;
 
 /// <summary>
 /// Exercises ConfirmCardFitter against a REAL DeleteChatConfirmPanel card — built
@@ -22,8 +24,11 @@ using UnityEngine;
 ///     not control, so it is the only one that genuinely runs long. The line
 ///     counts below come from real chat names, not from invented copy.
 ///
-/// ClearanceHolds_AtEveryLineCount is the test that fails if the 140 ever comes
-/// back, with or without the fitter.
+/// This file builds its OWN 86u box, so it cannot see Main.unity: the guard that
+/// fails if the scene's 140 ever comes back (a builder re-run, a hand edit) is
+/// ConfirmCardScenePremiseTests.BodyBox_ClearsTheButtons, which reads the scene's
+/// numbers. ClearanceHolds_AtEveryLineCount pins the arithmetic on the corrected
+/// box; Ask_ShowsThenFits_TheRealComponent pins that the component actually fits.
 /// </summary>
 public class ChatDeleteConfirmCardTests
 {
@@ -65,8 +70,38 @@ public class ChatDeleteConfirmCardTests
     [TearDown]
     public void TearDown()
     {
+        // Ask_ShowsThenFits_TheRealComponent goes through PopupUI.Show, which creates DOTween
+        // tweens on the card; kill them before the objects go, so no tween outlives its target.
+        DG.Tweening.DOTween.KillAll();
         if (_canvasGo != null) Object.DestroyImmediate(_canvasGo);
         _baseline = default;
+    }
+
+    // --- the component's own wiring ---------------------------------------
+
+    /// <summary>
+    /// Drives the REAL ChatDeleteConfirm on the inactive panel: Awake is deferred until
+    /// PopupUI.Show activates it (so the baseline is captured from the authored card, as
+    /// in the scene), and Ask must show first and fit second. Swap those two lines, or
+    /// drop the Fit, and the card stays 460 here — the silent regression every other test
+    /// in this file is blind to, because they call the fitter themselves.
+    /// </summary>
+    [Test]
+    public void Ask_ShowsThenFits_TheRealComponent()
+    {
+        Build(BodyText(OneLineName));   // inactive panel with Content/Title/Body
+        var confirm = _popup.AddComponent<ChatDeleteConfirm>();   // Awake waits for the first SetActive
+        var so = new SerializedObject(confirm);
+        so.FindProperty("panel").objectReferenceValue = _popup;
+        so.FindProperty("bodyText").objectReferenceValue = _body;
+        so.ApplyModifiedPropertiesWithoutUndo();
+
+        confirm.Ask("77010000000@c.us", FourLineName);
+
+        Assert.IsTrue(_popup.activeSelf, "Ask must show the panel");
+        Assert.AreEqual(158f, _body.rectTransform.sizeDelta.y, 0.001f, "four 39.36u lines, ceiled");
+        Assert.AreEqual(532f, _card.sizeDelta.y, 0.001f,
+            "the card grew by the body's overflow — the fit ran AFTER the show, on an active text");
     }
 
     // --- the authored card, before anything is fitted ---------------------
@@ -181,13 +216,14 @@ public class ChatDeleteConfirmCardTests
     }
 
     /// <summary>
-    /// The regression guard. Every line count must leave the buttons the same 44u
-    /// below the body box that the scene authored — which is only true because the
-    /// card is centre-pivoted and the buttons hang off its bottom edge.
-    ///
-    /// Run this against the pre-fix scene (Body height 140) and it fails at every
-    /// case with a clearance of -10, fitted or not. That is the point: it fails on
-    /// the geometry, not on the growth.
+    /// The regression guard for the ARITHMETIC. Every line count must leave the
+    /// buttons the same 44u below the body box that the scene authored — which is
+    /// only true because the card is centre-pivoted and the buttons hang off its
+    /// bottom edge. Feed it the pre-fix 140u box (BodyHeight above) and it fails at
+    /// every case with a clearance of -10, fitted or not: it fails on the geometry,
+    /// not on the growth. The SCENE's own number is guarded elsewhere — this file
+    /// builds its box from a constant, so a Main.unity revert to 140 is caught by
+    /// ConfirmCardScenePremiseTests.BodyBox_ClearsTheButtons, not here.
     /// </summary>
     [TestCase(OneLineName)]
     [TestCase(TwoLineName)]
@@ -319,6 +355,9 @@ public class ChatDeleteConfirmCardTests
     public void FittingBeforeTheShow_LeavesTheCardAlone()
     {
         Build(BodyText(FourLineName));   // deliberately NOT shown
+        // The fitter must SAY it could not measure: a never-active TMP reports a small positive
+        // height, not 0, so without the isActiveAndEnabled precondition the failure is silent.
+        LogAssert.Expect(LogType.Warning, new Regex("ConfirmCardFitter"));
 
         Fit();
 

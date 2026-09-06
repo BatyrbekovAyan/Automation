@@ -31,9 +31,12 @@ public partial class ChatManager
         if (!chatLookup.TryGetValue(chatId, out var vm)) return;
 
         int index = Chats.IndexOf(vm);
+        string cacheRoot = GetCacheRoot();
 
         RemoveChatLocally(chatId);
-        ChatHistoryCache.DeleteHistory(GetCacheRoot(), chatId);
+        ChatHistoryCache.DeleteHistory(cacheRoot, chatId);
+        // A send ack still in flight for this chat must not write its history back (PersistSendCache).
+        MarkChatDeletedForSends(cacheRoot, chatId);
 
         StartCoroutine(DeleteChatRoutine(chatId, vm, index));
     }
@@ -104,6 +107,7 @@ public partial class ChatManager
 
     private void RollbackDelete(string chatId, ChatViewModel vm, int index)
     {
+        UnmarkChatDeletedForSends(GetCacheRoot(), chatId);
         if (vm == null) return;
         if (chatLookup.ContainsKey(chatId)) return; // already restored / never gone
 

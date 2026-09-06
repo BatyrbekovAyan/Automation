@@ -60,3 +60,42 @@ public class EmptyStateReasonPolicyTests
         => Assert.AreEqual(EmptyStateReason.BotHasNoWhatsApp,
             EmptyStateReasonPolicy.Effective(EmptyStateReason.BotHasNoWhatsApp, null));
 }
+
+// 2026-09-04 stale-card fix: the pure re-derive rule behind EmptyStateView's OnEnable catch-up,
+// its frame-1 reassert and its channel switch — three sites that each carried their own guard,
+// and whose divergence was the bug. The card's visibility is a CanvasGroup alpha that survives
+// the GameObject being deactivated, so a re-derive must be able to take DOWN a card it has no
+// memory of raising, and must decide that from the resolver alone — never from the chat count.
+public class EmptyStateCardPolicyTests
+{
+    // The bug: resolver says "no empty card" (Syncing / Ready) while a stale card is on screen.
+    // This used to be reachable only when the chat list was non-empty, so a just-created bot kept
+    // «Создайте первого бота» over the list for the whole 300s sync window — and forever on an
+    // account with no chats.
+    [Test] public void HidesVisibleCard_WhenResolverSaysNoEmptyState()
+        => Assert.AreEqual(EmptyStateCardAction.Hide,
+            EmptyStateCardPolicy.Decide(null, cardVisible: true));
+
+    [Test] public void DoesNothing_WhenNoCardShowingAndNoEmptyState()
+        => Assert.AreEqual(EmptyStateCardAction.None,
+            EmptyStateCardPolicy.Decide(null, cardVisible: false));
+
+    [Test] public void ShowsCard_WhenResolverGivesAReasonAndNothingIsShowing()
+        => Assert.AreEqual(EmptyStateCardAction.Show,
+            EmptyStateCardPolicy.Decide(EmptyStateReason.NoBotsExist, cardVisible: false));
+
+    // Show, NOT None, when the same reason is already up: the re-derive sites are also the
+    // channel-switch sites, where the reason survives but the card must re-theme (Telegram accent)
+    // and re-wire its CTA. Deduping duplicate work belongs to the event path's _lastReason guard.
+    [Test] public void ReshowsCard_WhenTheSameReasonIsAlreadyOnScreen()
+        => Assert.AreEqual(EmptyStateCardAction.Show,
+            EmptyStateCardPolicy.Decide(EmptyStateReason.BotHasNoTelegram, cardVisible: true));
+
+    [Test] public void ShowsConnectCard_ForEitherChannel()
+    {
+        Assert.AreEqual(EmptyStateCardAction.Show,
+            EmptyStateCardPolicy.Decide(EmptyStateReason.BotHasNoWhatsApp, cardVisible: false));
+        Assert.AreEqual(EmptyStateCardAction.Show,
+            EmptyStateCardPolicy.Decide(EmptyStateReason.BotHasNoTelegram, cardVisible: false));
+    }
+}

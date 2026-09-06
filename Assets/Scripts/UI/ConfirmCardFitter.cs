@@ -146,6 +146,13 @@ public static class ConfirmCardFitter
     {
         if (tmp == null || string.IsNullOrEmpty(tmp.text)) return 0f;
 
+        // A text whose GameObject is not active has never initialised, and TMP then reports a
+        // small positive number (≈ one tenth of the real height) rather than 0 — enough to pass
+        // IsMeasured and leave the card silently un-fitted (review, 2026-09-05). The state is
+        // exactly "Fit ran before PopupUI.Show", so refuse it and say so.
+        if (!tmp.isActiveAndEnabled)
+            return WarnUnmeasured(tmp, "its GameObject is not active — fit after PopupUI.Show");
+
         float width = tmp.rectTransform.rect.width;
         if (width <= 1f) return WarnUnmeasured(tmp, "its rect has no width yet");
 

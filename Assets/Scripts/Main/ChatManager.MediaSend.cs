@@ -177,9 +177,9 @@ public partial class ChatManager
         }
 
         // ---- persist (parity with SendTextMessageRoutine) ----
-        List<MessageViewModel> cachedList = ChatHistoryCache.LoadHistory(sendCacheRoot, currentChatId);
-        cachedList.Add(vm);
-        ChatHistoryCache.SaveHistory(sendCacheRoot, currentChatId, cachedList);
+        List<MessageViewModel> cachedList = LiveCacheFor(currentChatId, sendCacheRoot);
+        OutgoingSendCache.Insert(cachedList, vm);
+        PersistSendCache(sendCacheRoot, currentChatId, cachedList);
 
         var chatVm = GetChat(currentChatId);
         if (chatVm != null) chatVm.UpdateLastMessage(LastMessagePreview(pick, caption), now);
@@ -372,24 +372,18 @@ public partial class ChatManager
                 seenMessageIds.Remove(entry.tempId);
                 seenMessageIds.Add(resp.message_id);
 
-                List<MessageViewModel> cached = ChatHistoryCache.LoadHistory(sendCacheRoot, entry.chatId);
-                for (int i = 0; i < cached.Count; i++)
-                {
-                    if (cached[i].messageId == entry.tempId)
-                    {
-                        cached[i].messageId      = resp.message_id;
-                        cached[i].deliveryStatus = DeliveryStatus.Sent;
-                        break;
-                    }
-                }
-                ChatHistoryCache.SaveHistory(sendCacheRoot, entry.chatId, cached);
+                List<MessageViewModel> cached = LiveCacheFor(entry.chatId, sendCacheRoot);
+                bool adopted = OutgoingSendCache.AdoptServerId(cached, entry.tempId, resp.message_id, DeliveryStatus.Sent);
+                PersistSendCache(sendCacheRoot, entry.chatId, cached);
 
                 Outbox.RemoveAt(sendCacheRoot, entry.chatId, entry.tempId);
                 if (convertedTemp != null)
                 {
                     try { System.IO.File.Delete(convertedTemp); } catch { /* best-effort cleanup */ }
                 }
-                OnMessageStatusChanged?.Invoke(entry.tempId, resp.message_id, DeliveryStatus.Sent);
+                // Same rule as the text ack: never step an echo-reconciled ✓✓ back to ✓.
+                OnMessageStatusChanged?.Invoke(entry.tempId, resp.message_id,
+                    OutgoingSendCache.StatusToAnnounce(cached, adopted, resp.message_id, DeliveryStatus.Sent));
             }
             else
             {
@@ -425,9 +419,9 @@ public partial class ChatManager
         string chatId = outboxEntry != null ? outboxEntry.chatId : currentChatId;
 
         // Remove from cache, outbox, and the seen-set so the message is gone everywhere.
-        List<MessageViewModel> cached = ChatHistoryCache.LoadHistory(cacheRoot, chatId);
+        List<MessageViewModel> cached = LiveCacheFor(chatId, cacheRoot);
         cached.RemoveAll(m => m.messageId == tempId);
-        ChatHistoryCache.SaveHistory(cacheRoot, chatId, cached);
+        PersistSendCache(cacheRoot, chatId, cached);
         Outbox.RemoveAt(cacheRoot, chatId, tempId);
         seenMessageIds.Remove(tempId);
 

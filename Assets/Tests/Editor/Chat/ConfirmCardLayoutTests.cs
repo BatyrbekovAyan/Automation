@@ -219,15 +219,75 @@ public class ConfirmCardLayoutTests
     [Test]
     public void BotsPageTwin_TodaysCopy_ChangesNothing()
     {
-        // BotActivationConfirm: card 720x440, title top 56 / height 60 at 44pt,
-        // body top 136 / height 140 at 32pt. One 44pt line is 52.51u; the body
-        // wraps to three 38.19u lines.
-        var g = ConfirmCardLayout.Solve(440f, 60f, 52.51f, -136f, 140f, 114.56f);
+        // BotActivationConfirm's authored geometry, read from the class itself: one 44pt
+        // title line is 52.51u; the body wraps to three 38.19u lines.
+        var g = ConfirmCardLayout.Solve(BotActivationConfirm.CardHeight,
+            BotActivationConfirm.TitleHeight, 52.51f,
+            -BotActivationConfirm.BodyTop, BotActivationConfirm.BodyHeight, 114.56f);
 
-        Assert.AreEqual(60f, g.TitleHeight, 0.001f);
-        Assert.AreEqual(-136f, g.BodyY, 0.001f);
-        Assert.AreEqual(140f, g.BodyHeight, 0.001f);
-        Assert.AreEqual(440f, g.CardHeight, 0.001f);
+        Assert.AreEqual(BotActivationConfirm.TitleHeight, g.TitleHeight, 0.001f);
+        Assert.AreEqual(-BotActivationConfirm.BodyTop, g.BodyY, 0.001f);
+        Assert.AreEqual(BotActivationConfirm.BodyHeight, g.BodyHeight, 0.001f);
+        Assert.AreEqual(BotActivationConfirm.CardHeight, g.CardHeight, 0.001f);
+    }
+
+    /// <summary>
+    /// The precondition every fitted card must satisfy BEFORE the fit is wired (the delete
+    /// card's lesson): grow-by-overflow preserves the authored gap, so a box that already
+    /// reaches the buttons stays overlapped at every size. Computed from the twin's own
+    /// constants, so moving a box in BotActivationConfirm moves this arithmetic with it.
+    /// </summary>
+    [Test]
+    public void BotsPageTwin_AuthoredBodyBox_ClearsTheButtons()
+    {
+        float bodyBottom = BotActivationConfirm.BodyTop + BotActivationConfirm.BodyHeight;
+        float buttonTop = BotActivationConfirm.CardHeight
+                          - (BotActivationConfirm.ButtonY + BotActivationConfirm.ButtonHeight);
+
+        Assert.Greater(buttonTop - bodyBottom, 0f,
+            "the twin's body box reaches its buttons — the fit would faithfully preserve that overlap");
+        Assert.AreEqual(24f, buttonTop - bodyBottom, 0.001f, "the clearance the twin was authored with");
+    }
+
+    // --- the delete card: the one body the app does not control ------------
+
+    // Main.unity DeleteChatConfirmPanel: card 460, no title term (fixed copy), body 86 at -150;
+    // a 32pt SF Pro line is 39.36u.
+    private const float DeleteCardHeight = 460f, DeleteBodyY = -150f, DeleteBodyHeight = 86f, DeleteBodyLine = 39.36f;
+
+    [Test]
+    public void DeleteCard_LongestRealisticName_ClearsTheTopEdge_OnEveryPortraitAspect()
+    {
+        const float centreOffset = 104f;
+        // WhatsApp caps a group subject at 100 characters and Telegram a title at 128, which
+        // wrap to at most five lines in the 760u column.
+        var g = ConfirmCardLayout.Solve(DeleteCardHeight, 0f, 0f, DeleteBodyY, DeleteBodyHeight, 5 * DeleteBodyLine);
+        float topEdge = centreOffset + g.CardHeight / 2f;
+
+        foreach (float ratio in new[] { 2340f / 1080f, 1920f / 1080f, 1440f / 1080f })
+            Assert.Less(topEdge, 1080f * ratio / 2f, $"a {g.CardHeight}u delete card runs off the top at {ratio:F2}:1");
+    }
+
+    /// <summary>
+    /// Where the delete card WOULD run off the shortest canvas (4:3) if a title ever carried
+    /// newlines or a pathological pushname: documents the cliff rather than clamping it, since
+    /// no real name gets within a factor of four of it.
+    /// </summary>
+    [Test]
+    public void DeleteCard_TopEdgeCliff_IsFarBeyondAnyRealName()
+    {
+        const float centreOffset = 104f;
+        const float halfCanvas4x3 = 1080f * (1440f / 1080f) / 2f;
+
+        int lines = 0;
+        while (true)
+        {
+            var g = ConfirmCardLayout.Solve(DeleteCardHeight, 0f, 0f, DeleteBodyY, DeleteBodyHeight, (lines + 1) * DeleteBodyLine);
+            if (centreOffset + g.CardHeight / 2f >= halfCanvas4x3) break;
+            lines++;
+        }
+
+        Assert.GreaterOrEqual(lines, 20, $"the delete card clips the 4:3 top edge at {lines + 1} body lines");
     }
 
     // ---------------------------------------------------------------------

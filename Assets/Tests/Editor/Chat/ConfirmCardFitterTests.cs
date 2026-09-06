@@ -4,6 +4,7 @@ using NUnit.Framework;
 using TMPro;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.TestTools;
 
 /// <summary>
 /// Exercises ConfirmCardFitter against a REAL card built to Main.unity's numbers
@@ -19,7 +20,10 @@ using UnityEngine;
 ///   • The measurement is valid on the ACTIVATION frame. The popup is inactive
 ///     between shows, so the fit runs on a GameObject that has just been
 ///     switched on and has had no layout pass — the tests reproduce exactly that
-///     sequence (build inactive, set text, SetActive, fit).
+///     sequence: the panel is deactivated BEFORE its texts are created (so TMP
+///     has genuinely never initialised, the scene's real state), then set text,
+///     SetActive, fit. Build-active-then-deactivate would pre-initialise TMP and
+///     make the ordering rule unfalsifiable (review, 2026-09-05).
 ///   • A wrapped title ends up above the body rather than inside it.
 ///
 /// If a Unity/TMP upgrade changes line-height or preferred-height accounting,
@@ -64,6 +68,11 @@ public class ConfirmCardFitterTests
     public void TitleWrapsToTwoLines_AtThePopupsRealWidth()
     {
         Build(LongTitle, ChatBody);
+
+        Assert.AreEqual(640f, _title.rectTransform.rect.width, 0.5f,
+            "A stretch-anchored text derives its width from the card, so it is valid BEFORE activation " +
+            "and without a layout pass — the property the activation-frame measurement relies on");
+
         Show();
 
         Assert.AreEqual(640f, _title.rectTransform.rect.width, 0.5f,
@@ -199,6 +208,28 @@ public class ConfirmCardFitterTests
         Assert.AreEqual(-BodyTop, _body.rectTransform.anchoredPosition.y, 0.001f);
     }
 
+    /// <summary>
+    /// The ordering rule stated as a failing case, for THIS popup's stretch-inset
+    /// shape: fitted before the show, the never-active texts cannot be measured,
+    /// the card stays exactly as authored — and the fitter says so, once per text.
+    /// Remove the isActiveAndEnabled precondition in ConfirmCardFitter and the
+    /// warning expectation fails, because an uninitialised TMP measures a small
+    /// positive number rather than 0 and the failure turns silent.
+    /// </summary>
+    [Test]
+    public void FittingBeforeTheShow_LeavesTheCardAlone_AndWarns()
+    {
+        Build(LongTitle, ChatBody);   // deliberately NOT shown
+        LogAssert.Expect(LogType.Warning, new Regex("ConfirmCardFitter"));   // title
+        LogAssert.Expect(LogType.Warning, new Regex("ConfirmCardFitter"));   // body
+
+        Fit();
+
+        Assert.AreEqual(CardHeight, _card.sizeDelta.y, 0.001f,
+            "This is why ReplyModeToggleBinder.ShowConfirm calls PopupUI.Show BEFORE FitConfirmCard");
+        Assert.AreEqual(-BodyTop, _body.rectTransform.anchoredPosition.y, 0.001f);
+    }
+
     // --- the baseline is the authored card, and only ever that ------------
 
     [Test]
@@ -257,10 +288,13 @@ public class ConfirmCardFitterTests
         string path = Path.Combine(Application.dataPath, "Scripts/Main/BotActivationConfirm.cs");
         Assert.IsTrue(File.Exists(path), $"BotActivationConfirm.cs moved — update this guard. Looked in {path}");
 
-        string source = File.ReadAllText(path);
+        // Comments stripped first: a commented-out line must not satisfy the guard.
+        string source = Regex.Replace(File.ReadAllText(path), @"//[^\n]*|/\*.*?\*/", "", RegexOptions.Singleline);
 
         Assert.IsTrue(
-            Regex.IsMatch(source, @"titleTmp\.(enableWordWrapping\s*=\s*true|textWrappingMode\s*=\s*TextWrappingModes\.Normal)"),
+            Regex.IsMatch(source,
+                @"^\s*titleTmp\.(enableWordWrapping\s*=\s*true|textWrappingMode\s*=\s*TextWrappingModes\.Normal)",
+                RegexOptions.Multiline),
             "BotActivationConfirm's title no longer enables wrapping. BuildTmp disables it for every text " +
             "it creates, so without that line the title can never wrap, ConfirmCardFitter.Fit becomes a " +
             "permanent no-op there, and a long title runs off the side of the card instead.");
@@ -288,6 +322,12 @@ public class ConfirmCardFitterTests
         popupRt.anchorMax = Vector2.one;
         popupRt.sizeDelta = Vector2.zero;
 
+        // Deactivated BEFORE its children exist: the scene saves the popup inactive, so its
+        // texts have never run OnEnable or parsed their text — the state the ordering rule is
+        // about. Building active and switching off afterwards pre-initialises TMP and makes
+        // FittingBeforeTheShow_LeavesTheCardAlone_AndWarns pass for the wrong reason.
+        _popup.SetActive(false);
+
         var cardGo = new GameObject("Content", typeof(RectTransform));
         cardGo.transform.SetParent(_popup.transform, false);
         _card = (RectTransform)cardGo.transform;
@@ -298,10 +338,6 @@ public class ConfirmCardFitterTests
             TextAlignmentOptions.Top, TitleTop, TitleHeight);
         _body = NewText("Body", font, body, 34f, FontStyles.Normal,
             TextAlignmentOptions.Center, BodyTop, BodyHeight);
-
-        // The popup lives inactive in the scene between shows; the fit has to
-        // survive being handed a card that has never laid out.
-        _popup.SetActive(false);
     }
 
     private TextMeshProUGUI NewText(string name, TMP_FontAsset font, string text, float size,

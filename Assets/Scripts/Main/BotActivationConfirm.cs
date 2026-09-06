@@ -25,8 +25,14 @@ public static class BotActivationConfirm
     private const string BodyText =
         "Бот будет отвечать клиентам сам. Выключить можно в любой момент — этой же кнопкой.";
 
-    private const float CardWidth = 720f;
-    private const float CardHeight = 440f;
+    // Authored card geometry. Public so ConfirmCardLayoutTests computes this twin's
+    // clearance above the buttons from the same numbers BuildCard writes, instead of
+    // typing them a second time — a box moved here must move the test's arithmetic too.
+    public const float CardWidth = 720f;
+    public const float CardHeight = 440f;
+    public const float TitleTop = 56f, TitleHeight = 60f, TitleSideInset = 48f;
+    public const float BodyTop = 136f, BodyHeight = 140f, BodySideInset = 56f;
+    public const float ButtonY = 44f, ButtonHeight = 96f, ButtonWidth = 300f;
     private const int OverlaySortingOrder = 3;   // above screens, below SelectionOverlay (4)
 
     private static GameObject panel;
@@ -103,11 +109,11 @@ public static class BotActivationConfirm
         // title measures ~554u inside a 624u column, so it still renders as the
         // same single line it always did.
         titleTmp.textWrappingMode = TextWrappingModes.Normal;
-        SetTopStretch((RectTransform)titleTmp.transform, top: 56f, height: 60f, sideInset: 48f);
+        SetTopStretch((RectTransform)titleTmp.transform, top: TitleTop, height: TitleHeight, sideInset: TitleSideInset);
 
         bodyTmp = BuildTmp(card.transform, "Body", BodyText, 32f, FontStyles.Normal, font);
         bodyTmp.enableWordWrapping = true;
-        SetTopStretch((RectTransform)bodyTmp.transform, top: 136f, height: 140f, sideInset: 56f);
+        SetTopStretch((RectTransform)bodyTmp.transform, top: BodyTop, height: BodyHeight, sideInset: BodySideInset);
 
         (cancelImage, cancelLabel) = BuildButton(card.transform, "CancelButton", "Отмена",
             font, anchoredX: -170f, OnCancel);
@@ -125,8 +131,8 @@ public static class BotActivationConfirm
         var rt = (RectTransform)go.transform;
         rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0f);
         rt.pivot = new Vector2(0.5f, 0f);
-        rt.anchoredPosition = new Vector2(anchoredX, 44f);
-        rt.sizeDelta = new Vector2(300f, 96f);
+        rt.anchoredPosition = new Vector2(anchoredX, ButtonY);
+        rt.sizeDelta = new Vector2(ButtonWidth, ButtonHeight);
         AddRounded(go, 48f);
 
         var button = go.GetComponent<Button>();
@@ -164,6 +170,15 @@ public static class BotActivationConfirm
     {
         PopupUI.Hide(panel);
         pending = null;
+    }
+
+    /// <summary>True while the confirm is on screen (Back router).</summary>
+    public static bool IsShowing => panel != null && panel.activeSelf;
+
+    /// <summary>The system Back — identical to «Отмена».</summary>
+    public static void Cancel()
+    {
+        if (IsShowing) OnCancel();
     }
 
     // ---- build helpers ---------------------------------------------------
