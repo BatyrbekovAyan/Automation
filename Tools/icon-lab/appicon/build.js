@@ -7,7 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 const { Resvg } = require('@resvg/resvg-js');
-const { concepts } = require(process.env.SET === 'v1' ? './concepts' : process.env.SET === 'v2' ? './concepts_choice' : process.env.SET === 'v3' ? './concepts_round3' : process.env.SET === 'v4' ? './concepts_round4' : process.env.SET === 'v5' ? './concepts_round5' : process.env.SET === 'v6' ? './concepts_round6' : './concepts_round7');
+const { concepts } = require(process.env.SET === 'v1' ? './concepts' : process.env.SET === 'v2' ? './concepts_choice' : process.env.SET === 'v3' ? './concepts_round3' : process.env.SET === 'v4' ? './concepts_round4' : process.env.SET === 'v5' ? './concepts_round5' : process.env.SET === 'v6' ? './concepts_round6' : process.env.SET === 'v7' ? './concepts_round7' : './concepts_round8');
 
 const OUT = path.join(__dirname, 'out');
 const dirs = ['svg', 'png'].map((d) => path.join(OUT, d));
@@ -17,13 +17,13 @@ dirs.forEach((d) => fs.mkdirSync(d, { recursive: true }));
 // accent    = the single accent element
 // onAccent  = ink that sits on top of accent
 const palettes = [
-  { id: 'night',    ru: 'Ночной',        bg: ['#1E2947', '#0A0E18'], mark: '#FFFFFF', accent: '#22D3EE', accentHi: '#67E8F9', onAccent: '#062B33' },
-  { id: 'ink',      ru: 'Чернильный',    bg: ['#182036', '#0A0D16'], mark: '#FFFFFF', accent: '#5981D6', accentHi: '#8FAEEF', onAccent: '#0B1B3A' },
-  { id: 'indigo',   ru: 'Индиго',        bg: ['#5271E4', '#22357A'], mark: '#FFFFFF', accent: '#8FE9F9', accentHi: '#C4F4FD', onAccent: '#0B2D57' },
-  { id: 'cyan',     ru: 'Циан',          bg: ['#34DDF2', '#0B93B8'], mark: '#FFFFFF', accent: '#06333D', accentHi: '#0B4D5C', onAccent: '#EAFCFF' },
-  { id: 'light',    ru: 'Светлый',       bg: ['#FFFFFF', '#E4EAF4'], mark: '#16233E', accent: '#2C6BF0', accentHi: '#5B93FF', onAccent: '#FFFFFF' },
-  { id: 'graphite', ru: 'Графит',        bg: ['#252C39', '#10141B'], mark: '#FFFFFF', accent: '#22D3EE', accentHi: '#67E8F9', onAccent: '#062B33' },
-  { id: 'green',    ru: 'Мессенджерский',bg: ['#123A24', '#06140D'], mark: '#FFFFFF', accent: '#25D366', accentHi: '#6EE7A0', onAccent: '#05301A' },
+  { id: 'night',    ru: 'Ночной',        bg: ['#1E2947', '#0A0E18'], mark: '#FFFFFF', accent: '#22D3EE', accentHi: '#67E8F9', onAccent: '#062B33', deep: '#0D2638' },
+  { id: 'ink',      ru: 'Чернильный',    bg: ['#182036', '#0A0D16'], mark: '#FFFFFF', accent: '#5981D6', accentHi: '#8FAEEF', onAccent: '#0B1B3A', deep: '#13214A' },
+  { id: 'indigo',   ru: 'Индиго',        bg: ['#5271E4', '#22357A'], mark: '#FFFFFF', accent: '#8FE9F9', accentHi: '#C4F4FD', onAccent: '#0B2D57', deep: '#1A2B66' },
+  { id: 'cyan',     ru: 'Циан',          bg: ['#34DDF2', '#0B93B8'], mark: '#FFFFFF', accent: '#06333D', accentHi: '#0B4D5C', onAccent: '#EAFCFF', deep: '#083744' },
+  { id: 'light',    ru: 'Светлый',       bg: ['#FFFFFF', '#E4EAF4'], mark: '#16233E', accent: '#2C6BF0', accentHi: '#5B93FF', onAccent: '#FFFFFF', deep: '#1B2A4D' },
+  { id: 'graphite', ru: 'Графит',        bg: ['#252C39', '#10141B'], mark: '#FFFFFF', accent: '#22D3EE', accentHi: '#67E8F9', onAccent: '#062B33', deep: '#1D2532' },
+  { id: 'green',    ru: 'Мессенджерский',bg: ['#123A24', '#06140D'], mark: '#FFFFFF', accent: '#25D366', accentHi: '#6EE7A0', onAccent: '#05301A', deep: '#0B2A1A' },
 ];
 
 const P = Object.fromEntries(palettes.map((p) => [p.id, p]));
