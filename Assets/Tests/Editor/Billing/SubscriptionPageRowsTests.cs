@@ -274,6 +274,38 @@ public class SubscriptionPageRowsTests
         Assert.IsTrue(SubscriptionPageRows.MetersVisible(PlanTier.Network));
     }
 
+    // ── ReserveLine ──────────────────────────────────────────────────────────
+
+    [Test]
+    public void A_purchased_reserve_is_named_under_the_meter_while_it_is_unspent()
+    {
+        // Sandbox pass 2026-09-06: four top-ups had landed server-side (topupBalance 2000) and
+        // the page still read «0 из 1 000» — the reserve was invisible until the quota ran out,
+        // because the denominator is the BASE quota by design (2026-08-26). This line is where
+        // the paid reserve becomes visible without touching that denominator.
+        Assert.AreEqual("Резерв: 2\u00A0000 диалогов — спишутся после квоты",
+            SubscriptionPageRows.ReserveLine(2000));
+        Assert.AreEqual("Резерв: 500 диалогов — спишутся после квоты",
+            SubscriptionPageRows.ReserveLine(PlanCatalog.TopUpDialogs));
+    }
+
+    [Test]
+    public void An_empty_reserve_yields_no_line_so_the_label_hides()
+    {
+        Assert.IsNull(SubscriptionPageRows.ReserveLine(0));
+        Assert.IsNull(SubscriptionPageRows.ReserveLine(-5),
+            "a negative wire value is «nothing to show», never «-5 диалогов»");
+    }
+
+    [Test]
+    public void The_reserve_line_agrees_noun_and_verb_with_the_count()
+    {
+        Assert.AreEqual("Резерв: 1 диалог — спишется после квоты", SubscriptionPageRows.ReserveLine(1));
+        Assert.AreEqual("Резерв: 2 диалога — спишутся после квоты", SubscriptionPageRows.ReserveLine(2));
+        Assert.AreEqual("Резерв: 11 диалогов — спишутся после квоты", SubscriptionPageRows.ReserveLine(11));
+        Assert.AreEqual("Резерв: 21 диалог — спишется после квоты", SubscriptionPageRows.ReserveLine(21));
+    }
+
     // ── Count rows / actions ─────────────────────────────────────────────────
 
     [Test]

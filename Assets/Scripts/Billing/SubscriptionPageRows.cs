@@ -295,6 +295,30 @@ public static class SubscriptionPageRows
     /// </summary>
     public static bool MetersVisible(PlanTier effectiveTier) => effectiveTier != PlanTier.None;
 
+    /// <summary>
+    /// «Резерв: 2 000 диалогов — спишутся после квоты», or <c>null</c> while there is no
+    /// reserve — the caller HIDES the label on null rather than printing an empty line.
+    ///
+    /// This is the one place a purchased top-up is visible before the quota runs out. The
+    /// meter above keeps the BASE quota as its denominator (owner decision 2026-08-26: a
+    /// top-up is a reserve spent after the quota, not an extension of it), so without this
+    /// line four paid top-ups read as «0 из 1 000» with nothing to show for them — which is
+    /// exactly what the 2026-09-06 sandbox pass found. The clause names WHEN the reserve is
+    /// spent so the base denominator stops looking like a lost purchase.
+    ///
+    /// Both agreements are seam-owned (RU-only-UI rule): the noun through
+    /// <see cref="PaywallCopy.Dialogs"/> (which also NBSP-groups the digits), the verb through
+    /// <see cref="RuPlural"/> («1 диалог — спишется» / «2 диалога — спишутся» / «11 диалогов —
+    /// спишутся»). A negative wire value is «nothing to show», never «-5 диалогов».
+    /// </summary>
+    public static string ReserveLine(int reserve)
+    {
+        if (reserve <= 0) return null;
+        return "Резерв: " + PaywallCopy.Dialogs(reserve)
+             + " — " + RuPlural.Pick(reserve, "спишется", "спишутся", "спишутся")
+             + " после квоты";
+    }
+
     // ── Actions ──────────────────────────────────────────────────────────────
 
     /// <summary>

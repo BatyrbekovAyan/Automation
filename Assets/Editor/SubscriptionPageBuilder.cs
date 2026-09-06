@@ -38,6 +38,7 @@ public static class SubscriptionPageBuilder
     private const string ScenePath = "Assets/Scenes/Main.unity";
     private const string PanelName = "PanelSubscription";
     private const string RowName = "ПодпискаRow";
+    private const string ReserveLineName = "ReserveLine";
     private const string SectionPath = "ScrollView/Viewport/Content/Section1";
 
     private const float CardRadius = 40f;
@@ -92,6 +93,71 @@ public static class SubscriptionPageBuilder
         BuildInternal();
         EditorSceneManager.SaveScene(scene);
         Debug.Log("[SubscriptionPageBuilder] Headless build + save complete.");
+    }
+
+    /// <summary>
+    /// Additive, idempotent patch that adds ONLY the reserve line under the dialogs bar of an
+    /// already-built page (the PaywallBuilder.AddLegalRow idiom). The full Build tears the
+    /// whole PanelSubscription subtree down and rebuilds it — the wrong tool for one label on
+    /// a page the owner may have hand-tuned since. Resolves the Meters block and the bar
+    /// through ProfileSubPages' own serialized refs, never by name; destroys a previous
+    /// ReserveLine first, so re-running repairs rather than duplicates; stamps
+    /// <c>subReserveLine</c>. The full Build produces the same line, so a rebuild keeps it.
+    /// </summary>
+    [MenuItem("Tools/Billing/Add Subscription Reserve Line")]
+    public static void AddReserveLine()
+    {
+        LoadAssets();
+        ProfileSubPages subPages = FindSubPages();
+        var so = new SerializedObject(subPages);
+
+        SerializedProperty reserveProp = so.FindProperty("subReserveLine");
+        if (reserveProp == null)
+            throw new System.InvalidOperationException("[SubscriptionPageBuilder] ProfileSubPages.subReserveLine missing — compile first.");
+
+        var meters = so.FindProperty("subMetersBlock").objectReferenceValue as GameObject;
+        var fill = so.FindProperty("subQuotaFill").objectReferenceValue as RectTransform;
+        Transform bar = fill != null ? fill.parent : null;
+        if (meters == null || bar == null || bar.parent != meters.transform)
+            throw new System.InvalidOperationException(
+                "[SubscriptionPageBuilder] subMetersBlock/subQuotaFill do not describe a built page — run Tools/Billing/Build Subscription Page first.");
+
+        for (int i = meters.transform.childCount - 1; i >= 0; i--)
+            if (meters.transform.GetChild(i).name == ReserveLineName)
+                Object.DestroyImmediate(meters.transform.GetChild(i).gameObject);
+
+        TextMeshProUGUI line = MakeReserveLine(meters);
+        // Directly under the bar: the line belongs to the dialogs meter, not to «Боты» below it.
+        line.transform.SetSiblingIndex(bar.GetSiblingIndex() + 1);
+
+        reserveProp.objectReferenceValue = line;
+        so.ApplyModifiedPropertiesWithoutUndo();
+
+        EditorSceneManager.MarkSceneDirty(subPages.gameObject.scene);
+        Debug.Log("[SubscriptionPageBuilder] ReserveLine added under PlanCard/Meters/Bar + subReserveLine stamped. SAVE THE SCENE (Cmd+S).");
+    }
+
+    // Headless entry (Editor closed):
+    //   Unity -batchmode -nographics -projectPath . \
+    //         -executeMethod SubscriptionPageBuilder.AddReserveLineHeadless -quit
+    public static void AddReserveLineHeadless()
+    {
+        var scene = EditorSceneManager.OpenScene(ScenePath);
+        AddReserveLine();
+        EditorSceneManager.SaveScene(scene);
+        Debug.Log("[SubscriptionPageBuilder] Headless AddReserveLine + save complete.");
+    }
+
+    private static ProfileSubPages FindSubPages()
+    {
+        var profilePage = Object.FindFirstObjectByType<ProfilePage>(FindObjectsInactive.Include);
+        if (profilePage == null)
+            throw new System.InvalidOperationException("[SubscriptionPageBuilder] ProfilePage not found — is Main.unity open?");
+
+        var subPages = profilePage.GetComponentInChildren<ProfileSubPages>(true);
+        if (subPages == null)
+            throw new System.InvalidOperationException("[SubscriptionPageBuilder] ProfileSubPages root not found — run Tools/Profile Sub-Pages/Build first.");
+        return subPages;
     }
 
     // ── Main build ───────────────────────────────────────────────────────────
@@ -275,6 +341,8 @@ public static class SubscriptionPageBuilder
         fillTheme.Configure(ThemeRole.AccentFill, fillImg);
         AddRounded(fill, BarHeight / 2f);
 
+        TextMeshProUGUI reserveLine = MakeReserveLine(meters);
+
         var botsValue = MakeMeterRow(meters, SubscriptionPageRows.BotsTitle, out _);
         var channelsValue = MakeMeterRow(meters, SubscriptionPageRows.ChannelsTitle, out _);
 
@@ -288,6 +356,7 @@ public static class SubscriptionPageBuilder
         so.FindProperty("subDialogsValue").objectReferenceValue = dialogsValue;
         so.FindProperty("subQuotaFill").objectReferenceValue = fillRt;
         so.FindProperty("subQuotaFillTheme").objectReferenceValue = fillTheme;
+        so.FindProperty("subReserveLine").objectReferenceValue = reserveLine;
         so.FindProperty("subBotsValue").objectReferenceValue = botsValue;
         so.FindProperty("subChannelsValue").objectReferenceValue = channelsValue;
     }
@@ -517,6 +586,25 @@ public static class SubscriptionPageBuilder
         value.textWrappingMode = TextWrappingModes.NoWrap;
         valueGo.AddComponent<LayoutElement>().flexibleWidth = 0f;
         return value;
+    }
+
+    /// <summary>
+    /// «Резерв: 500 диалогов — спишутся после квоты» directly under the dialogs bar, in
+    /// CancelCaption's type and ink (30u regular, InkTertiary). Seeded with the top-up pack
+    /// size so the Editor shows a real line, but INACTIVE like Notice: the runtime is the only
+    /// owner of its visibility (ProfileSubPages.RenderMeters shows it exactly while
+    /// UsageSnapshot.topupBalance is positive), so a device can never render a stale «500»
+    /// before the first GetUsage read lands. Meters' VerticalLayoutGroup controls the
+    /// height, so a long count simply wraps and grows the card.
+    /// </summary>
+    private static TextMeshProUGUI MakeReserveLine(GameObject meters)
+    {
+        var go = NewChild(meters, ReserveLineName, out _);
+        var tmp = AddText(go, SubscriptionPageRows.ReserveLine(PlanCatalog.TopUpDialogs), 30f, _regular,
+            ThemeRole.InkTertiary);
+        tmp.alignment = TextAlignmentOptions.MidlineLeft;
+        go.SetActive(false);
+        return tmp;
     }
 
     /// <summary>

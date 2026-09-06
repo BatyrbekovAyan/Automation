@@ -43,6 +43,10 @@ public partial class ProfileSubPages
     [SerializeField] private TextMeshProUGUI subDialogsValue;
     [SerializeField] private RectTransform subQuotaFill;
     [SerializeField] private ThemedColor subQuotaFillTheme;
+    // The paid top-up reserve, named under the dialogs bar while it is unspent. The bar's
+    // denominator never includes it (owner decision 2026-08-26), so this label is the only
+    // place a top-up shows before the quota runs out — hidden whenever there is nothing to say.
+    [SerializeField] private TextMeshProUGUI subReserveLine;
     [SerializeField] private TextMeshProUGUI subBotsValue;
     [SerializeField] private TextMeshProUGUI subChannelsValue;
 
@@ -190,6 +194,16 @@ public partial class ProfileSubPages
             ? 0f
             : SubscriptionPageRows.FillFraction(usage.used, quota);
         ApplyQuotaFill(fill);
+
+        // Null = nothing to say = label hidden. No snapshot yet is also nothing to say: a
+        // «Резерв: 0» would be a statement about a number we do not have (same rule as the
+        // dash in UnknownUsageLine).
+        string reserve = usage == null ? null : SubscriptionPageRows.ReserveLine(usage.topupBalance);
+        if (subReserveLine != null)
+        {
+            subReserveLine.text = reserve ?? "";
+            subReserveLine.gameObject.SetActive(!string.IsNullOrEmpty(reserve));
+        }
 
         // Bots and channels are read LOCALLY, not from the snapshot: these are exactly
         // the numbers EntitlementGate enforces against, so reading them anywhere else

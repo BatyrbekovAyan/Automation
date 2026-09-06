@@ -345,6 +345,8 @@ public class FontGlyphCoverageTests
         yield return ("SubscriptionPageRows.TrialSubline", SubscriptionPageRows.TrialSubline(3));
         yield return ("SubscriptionPageRows.CountLine", SubscriptionPageRows.CountLine(412, 1000));
         yield return ("SubscriptionPageRows.TopUpRowText", SubscriptionPageRows.TopUpRowText());
+        yield return ("SubscriptionPageRows.ReserveLine", SubscriptionPageRows.ReserveLine(2000));
+        yield return ("SubscriptionPageRows.ReserveLine(1)", SubscriptionPageRows.ReserveLine(1));
 
         foreach (OutcomeStatus s in Enum.GetValues(typeof(OutcomeStatus)))
             yield return ($"DashboardStatusInfo.Label({s})", DashboardStatusInfo.Label(s));
