@@ -1,6 +1,6 @@
 # Чеклист подачи в App Store / Google Play
 
-Статус на 2026-08-27. Порядок: сначала «Блокеры», дальше можно параллельно.
+Статус на 2026-09-06. Порядок: сначала «Блокеры», дальше можно параллельно.
 Подача ≠ релиз: релизим вручную (manual release) только после Блока 2 (правило запуска Блока 1 §7).
 
 ## 0. Блокеры (без них подача невозможна или бессмысленна)
@@ -21,7 +21,9 @@
   `https://choosereply.com/{terms,privacy}.html`), билдер перезапущен, ряд ссылок
   на пейволле активен. Осталось: глазами убедиться на устройстве/в Editor, что обе
   ссылки открываются (страницы должны быть уже залиты).
-- [ ] **Иконка приложения** — финальная, во всех размерах (Unity Player Settings).
+- [x] **Иконка приложения** — финал (три полосы, «ink») стоит в `Assets/Images/Icon.png`
+  (1024×1024, c3f2e06). Per-platform слоты iOS пустые ОСОЗНАННО: Unity генерит все
+  размеры из дефолтной иконки, включая 1024 для ASC.
 - [x] **Скриншоты ГОТОВЫ (2026-09-03)** — витринные кадры с рамкой телефона и подписями,
   в двух размерах: `Tools/store/listing/ios-6.9/` (1320×2868 — то, что ASC просит для
   iPhone) и `ios-6.5/` (1284×2778, fallback). Пайплайн из двух команд, повторять после
@@ -52,14 +54,30 @@
   iPhone-only (2026-09-01, `Tools/Store Compliance/Apply iOS Store Settings`).
   Демо-данные вымышленные, кроме номера клиента: `+7 702 699-88-44` — номер владельца
   (его решение 2026-09-03).
-- [ ] **Демо-видео записано** (сценарий: `demo-video-script.md`), залито на
-  непубличный YouTube/Drive — ссылка пойдёт в review notes.
+- [x] **Демо-видео записано и выложено (2026-09-05)** — режим A (iOS Simulator,
+  итоги и ловушки в `demo-video-plan.md`), v4 одобрен владельцем. Непубличная ссылка
+  `https://choosereply.com/review/923843a986255cba/ChooseReply-demo-2026-09.mp4`
+  (отдаёт 200, проверено 2026-09-06) уже вписана в `app-review-notes.md`.
+- [x] **Политика перезалита на VPS (владелец, 2026-09-06; live == repo проверено).** Было:
+  живая страница отставала от репо (нет трёх пунктов §3 — идентификатор установки,
+  статистика подсказок, обращения в поддержку), а App Privacy labels «User ID / Device
+  ID» опираются именно на них. `scp Tools/landing/privacy.html choosereply:~/choosereply/site/privacy.html`,
+  затем `curl -s https://choosereply.com/privacy.html | cmp - Tools/landing/privacy.html`.
 
 ## 1. App Store Connect (после активации Apple Developer, оплачен 2026-08-22)
 
-- [ ] Создать App Record: bundle id `com.synergysoft.choosereply`, имя, RU primary locale.
-- [ ] **Privacy Policy URL** (обязательное поле) — URL из блокеров.
-- [ ] **App Privacy (labels)** — ПЕРЕПИСАНО 2026-09-01 под правду кода (аудит 2026-08-30:
+- [x] App Record создан (владелец, 2026-09-03): bundle id `com.synergysoft.choosereply`,
+  имя «Choose Reply», RU primary locale; сторфронты KZ + KG/UZ/TJ/AZ/AM/GE/MD; Paid Apps
+  Agreement / банк / налоговая форма заполнены.
+- [x] **Листинг (страница версии 1.0)** заполнен владельцем 2026-09-06 — текст для копирования блоками:
+  `app-store-listing.md` (subtitle / promo / description с EULA-строкой и нейтральным
+  дисклеймером / keywords / URL / copyright). Скриншоты 6.9″ — 7 файлов из
+  `Tools/store/listing/ios-6.9/` в порядке таблицы выше.
+- [ ] **Privacy Policy URL** (App Information, обязательное поле) —
+  `https://choosereply.com/privacy.html`; там же License Agreement = стандартная EULA
+  Apple (своя ссылка на Условия уже в описании), Content Rights = стороннего контента нет.
+- [x] **App Privacy (labels)** — заполнены владельцем 2026-09-03 по матрице ниже.
+  Матрица ПЕРЕПИСАНА 2026-09-01 под правду кода (аудит 2026-08-30:
   старые ответы «Identifiers: нет» / «not linked» опровергались трафиком — приложение
   шлёт RevenueCat appUserID/IDFV-фолбэк на свой сервер ВМЕСТЕ с текстами сообщений,
   и сервер джойнит их; Google/Apple карают за расхождение декларации с трафиком):
@@ -78,19 +96,41 @@
   - Tracking: **No** (кросс-приложенческого/рекламного трекинга нет — это правда).
   - После первого Xcode-архива: Product → Generate Privacy Report и сверить лейблы
     с агрегированными манифестами SDK.
-- [ ] **Подписки**: subscription group + 7 SKU заведены Блоком 1 — сверить цены
+- [x] **Подписки** (владелец, 2026-09-03: цены сверены, RU-локализация названий и
+  описаний, скриншоты для ревью приняты, RevenueCat — entitlement ids/продукты/вебхук на
+  месте). Было: subscription group + 7 SKU заведены Блоком 1 — сверить цены
   (месяц 9 990 / 19 990 / 39 900 ₸; год 99 000 / 198 990 / 399 990 ₸; топ-ап 3 900 ₸),
   добавить RU-локализацию названий SKU, приложить юр-URL к группе (Terms).
-- [ ] Каждому SKU — скриншот для ревью (пейволл с этим тарифом).
-- [ ] **Review Notes**: вставить текст из `app-review-notes.md` + ссылку на демо-видео.
-  Demo account НЕ отмечать (объяснение в notes, почему логин невозможен).
+- [x] Каждому SKU — скриншот для ревью (с РЕЛИЗНОЙ сборки, оригиналы ≥640×920 без
+  мессенджер-сжатия; приняты 2026-09-03).
+- [ ] На странице версии 1.0 в блоке «In-App Purchases and Subscriptions» ОТМЕТИТЬ все
+  7 SKU — первая подача SKU идёт только вместе с версией; иначе они останутся
+  «Ready to Submit» и пейволл в ревью покажет ₸-фолбэк без покупки.
+- [ ] **Review Notes**: вставить текст из `app-review-notes.md` (ссылка на демо-видео уже
+  внутри). «Sign-in required» НЕ отмечать (объяснение в notes, почему логин невозможен);
+  контакт для ревью — имя/телефон/e-mail владельца.
 - [x] Export compliance: только HTTPS → «standard encryption», exempt. Автоматизировано
   2026-09-01: `FixIOSBuildSettings` пишет `ITSAppUsesNonExemptEncryption=false` в
   Info.plist каждой сборки — ASC не будет задавать вопрос на каждую загрузку.
 - [ ] **Release: Manually release this version** (подача ≠ релиз до Блока 2).
+- [ ] Ротация ключей, бывавших в старых сборках (n8n admin key → `.secrets/prod-api-key.txt`
+  + credential «n8n Admin API»; BotFather revoke → credential «Support Bot»; Green API
+  revoke) — по желанию: обязательна только если сборка до 2026-08-31 покидала ваш Mac.
 - [ ] После активации аккаунта — подать заявку в **Apple Small Business Program**
   (15% вместо 30%; спека Блока 1 §10.3). Учесть: применится со СЛЕДУЮЩЕГО месяца
   после одобрения.
+- [ ] **Сборка и TestFlight-прогон (до сабмита):**
+  1. Unity: платформа iOS, `iPhoneSdkVersion` = Device (988 — проверено 2026-09-06 после
+     симуляторных сборок), **Development Build ВЫКЛ**, Append в `Builds/Built - iOS Automation`.
+  2. Xcode 26.6 (стоит, `xcode-select` → Xcode.app): Team/подпись автоматическая, Version 1.0
+     Build 1 (из Player Settings), Product → Archive → Distribute → App Store Connect → Upload.
+  3. После обработки билда: письма ITMS-9105x (privacy manifest) — если пришли, добавить
+     декларации и перезалить; вопрос export compliance задаваться не должен (plist-ключ).
+  4. TestFlight на телефоне: онбординг → визард до QR/кода (в идеале через US-VPN — QR-экран
+     единственное, что ревьюер трогает с сетью); Профиль → Подписка → Изменить тариф:
+     цены из StoreKit (не ₸-фолбэк), **sandbox-покупка + «Восстановить покупки»**, обе
+     юр-ссылки открываются; «О приложении» — 3 ряда документов; «Удалить все данные».
+  5. Xcode: Product → Generate Privacy Report по архиву — сверить с labels.
 - [ ] При первом Xcode-экспорте: убедиться, что в архиве есть `PrivacyInfo.xcprivacy`
   (Unity 6 генерирует свой; RevenueCat несёт свой; плагины yasirkula — проверить
   версии; недостающие required-reason API Apple подсветит письмом ITMS-91053 —
