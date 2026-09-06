@@ -1,6 +1,6 @@
 {
     "AutomatedSetup": true,
     "PhotoLibraryUsageDescription": "Доступ к фото нужен, чтобы прикрепить изображение или прайс-лист к сообщению.",
-    "PhotoLibraryAdditionsUsageDescription": "",
+    "PhotoLibraryAdditionsUsageDescription": "Нужно, чтобы сохранять фото из чата в галерею, если вы выберете «Сохранить изображение».",
     "DontAskLimitedPhotosPermissionAutomaticallyOnIos14": true
 }

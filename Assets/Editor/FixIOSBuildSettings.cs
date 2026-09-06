@@ -1,7 +1,9 @@
 #if UNITY_IOS
 using UnityEditor;
+using UnityEditor.Build;
 using UnityEditor.Callbacks;
 using UnityEditor.iOS.Xcode;
+using UnityEngine;
 using System.IO;
 
 public static class FixIOSBuildSettings
@@ -52,7 +54,57 @@ public static class FixIOSBuildSettings
         var plist = new PlistDocument();
         plist.ReadFromString(File.ReadAllText(plistPath));
         plist.root.SetBoolean("ITSAppUsesNonExemptEncryption", false);
+        EnforcePurposeStrings(plist.root);
         File.WriteAllText(plistPath, plist.WriteToString());
+    }
+
+    /// <summary>
+    /// Stamps the four purpose strings from <see cref="StoreIosSettingsApplier"/> — the single
+    /// source of truth — over whatever the build put there. This runs at callbackOrder 1000,
+    /// after NativeGallery (1), NativeShare / NativeCamera (default) and NativeFilePicker (99),
+    /// because two things put English template prompts into the 2026-09-06 upload: the three
+    /// yasirkula post-processors each write their own defaults (NativeShare's single string
+    /// lands on BOTH photo keys), and an Append build MERGES the previous Info.plist, so a key
+    /// written once (an August microphone default) outlived its emptied source. Each key is
+    /// REQUIRED by a live code path, so an empty constant fails the build instead of shipping
+    /// a prompt-less access that iOS answers by terminating the app.
+    /// </summary>
+    static void EnforcePurposeStrings(PlistElementDict root)
+    {
+        WarnOnPlayerSettingsDrift("camera", PlayerSettings.iOS.cameraUsageDescription, StoreIosSettingsApplier.CameraPurposeRu);
+        WarnOnPlayerSettingsDrift("microphone", PlayerSettings.iOS.microphoneUsageDescription, StoreIosSettingsApplier.MicrophonePurposeRu);
+
+        StampRequired(root, "NSCameraUsageDescription", StoreIosSettingsApplier.CameraPurposeRu,
+            "NativeCamera.TakePicture (AttachSheet)");
+        StampRequired(root, "NSMicrophoneUsageDescription", StoreIosSettingsApplier.MicrophonePurposeRu,
+            "AVAudioSessionCategoryPlayAndRecord in EnableIOSAudio.m (voice message at the ear)");
+        StampRequired(root, "NSPhotoLibraryUsageDescription", StoreIosSettingsApplier.PhotoLibraryPurposeRu,
+            "NativeGallery pickers");
+        StampRequired(root, "NSPhotoLibraryAddUsageDescription", StoreIosSettingsApplier.PhotoLibraryAddPurposeRu,
+            "the share sheet's Save Image action (NativeShare in MessageItemView)");
+    }
+
+    static void StampRequired(PlistElementDict root, string key, string value, string neededBy)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            throw new BuildFailedException(
+                $"[FixIOSBuildSettings] {key} is empty but {neededBy} needs it — iOS terminates the app on " +
+                "the first access without a purpose string. Fill the constant in StoreIosSettingsApplier.");
+
+        string previous = root.values.TryGetValue(key, out PlistElement element)
+            ? (element as PlistElementString)?.value
+            : null;
+        root.SetString(key, value);
+        if (previous != value)
+            Debug.Log($"[FixIOSBuildSettings] {key}: '{previous ?? "<absent>"}' -> stamped from StoreIosSettingsApplier.");
+    }
+
+    static void WarnOnPlayerSettingsDrift(string what, string playerSettingsValue, string constant)
+    {
+        if (playerSettingsValue != constant)
+            Debug.LogWarning($"[FixIOSBuildSettings] Player Settings {what} usage description differs from " +
+                             "StoreIosSettingsApplier — the constant was stamped; run Tools/Store Compliance/" +
+                             "Apply iOS Store Settings so the Editor UI stops lying.");
     }
 
     /// <summary>

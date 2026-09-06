@@ -120,8 +120,15 @@
   (15% вместо 30%; спека Блока 1 §10.3). Учесть: применится со СЛЕДУЮЩЕГО месяца
   после одобрения.
 - [ ] **Сборка и TestFlight-прогон (до сабмита):**
-  1. Unity: платформа iOS, `iPhoneSdkVersion` = Device (988 — проверено 2026-09-06 после
-     симуляторных сборок), **Development Build ВЫКЛ**, Append в `Builds/Built - iOS Automation`.
+  1. Unity: `Tools/Store Compliance/Apply iOS Store Settings` (строки назначения → Player
+     Settings + json трёх плагинов) и `Tools/Store Compliance/Bump iOS Build Number` (каждая
+     загрузка в ASC — новый номер; число из Xcode Unity перезапишет). Платформа iOS,
+     `iPhoneSdkVersion` = Device (988 — проверено 2026-09-06 после симуляторных сборок),
+     **Development Build ВЫКЛ**, Append в `Builds/Built - iOS Automation`. После экспорта
+     проверить 4 строки в `Info.plist` (все на русском, микрофон НЕ пустой — см. CLAUDE.md):
+     `plutil -p "Builds/Built - iOS Automation/Info.plist" | grep UsageDescription`.
+     ФАКТ 2026-09-06: билд 1 ушёл в ASC с английскими строками микрофона/фото (NativeShare без
+     файла настроек + Append-слияние старого plist) — заменяется билдом 2 ДО сабмита.
   2. Xcode 26.6 (стоит, `xcode-select` → Xcode.app): Team/подпись автоматическая, Version 1.0
      Build 1 (из Player Settings), Product → Archive → Distribute → App Store Connect → Upload.
   3. После обработки билда: письма ITMS-9105x (privacy manifest) — если пришли, добавить
