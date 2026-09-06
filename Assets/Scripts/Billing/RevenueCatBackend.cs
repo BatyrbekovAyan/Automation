@@ -30,6 +30,10 @@ public class RevenueCatBackend : IBillingBackend
     // would let a call straight through.
     private bool _configured;
 
+    // Bare product id of the subscription behind the highest active entitlement, kept so a plan
+    // change on Google Play is issued as a REPLACEMENT (see PurchaseParamsPolicy.Resolve).
+    private string _activeSubscriptionProductId;
+
     public string AppUserId { get; private set; } = "";
     public PlanTier PurchasedTier { get; private set; } = PlanTier.None;
 
@@ -64,20 +68,28 @@ public class RevenueCatBackend : IBillingBackend
 
     public void Purchase(string sku, Action<bool, string> done)
     {
-        if (!_configured) { done?.Invoke(false, "not_initialized"); return; }
+        if (!_configured) { done?.Invoke(false, BillingFailure.NotInitialized); return; }
 
-        // The top-up SKU is a one-time consumable, not a subscription — everything else in
-        // PlanCatalog is a sub.*.month/year SKU. Mistyping this as "subs" would make the store
-        // treat a one-time purchase as a recurring subscription.
-        string type = sku == PlanCatalog.SkuTopUp ? "inapp" : "subs";
+        // Type (subs / inapp for the one-time top-up) and — on Google Play only — the owned
+        // subscription this purchase replaces, both decided by the pure, test-pinned policy.
+        PurchaseParams p = PurchaseParamsPolicy.Resolve(_activeSubscriptionProductId, sku,
+            Application.platform == RuntimePlatform.Android);
 
-        _purchases.PurchaseProduct(sku, result =>
+        Purchases.MakePurchaseFunc callback = result =>
         {
-            if (result.Error != null) { done?.Invoke(false, result.Error.Message); return; }
-            if (result.UserCancelled) { done?.Invoke(false, "cancelled"); return; }
+            // Cancel BEFORE error: the Android wrapper reports a dismissed Play sheet as both,
+            // and the paywall must stay silent on a deliberate cancel.
+            if (result.UserCancelled) { done?.Invoke(false, BillingFailure.UserCancelled); return; }
+            if (result.Error != null) { done?.Invoke(false, PurchaseParamsPolicy.FailureReason(false, result.Error.Message)); return; }
             if (result.CustomerInfo != null) Apply(result.CustomerInfo);
             done?.Invoke(true, null);
-        }, type: type);
+        };
+
+        if (p.Replace)
+            _purchases.PurchaseProduct(sku, callback, type: p.Type, oldSku: p.OldSku,
+                prorationMode: Purchases.ProrationMode.ImmediateWithTimeProration);
+        else
+            _purchases.PurchaseProduct(sku, callback, type: p.Type);
     }
 
     public void RestorePurchases(Action<bool> done)
@@ -107,27 +119,47 @@ public class RevenueCatBackend : IBillingBackend
     {
         if (!_configured) { done?.Invoke(null); return; }
 
+        var prices = new System.Collections.Generic.Dictionary<string, string>(PlanCatalog.AllSkus().Length);
+#if UNITY_ANDROID
+        // Google Play Billing answers a product query per TYPE: a «subs» query never returns the
+        // consumable top-up and an «inapp» query never returns a subscription, so the seven
+        // sellable SKUs take two round-trips here. Each leg is best-effort — a failed leg logs
+        // and the other leg's prices still reach the paywall; the KZT fallback covers the rest.
+        GetProductsInto(PlanCatalog.SubscriptionSkus(), "subs", prices, () =>
+            GetProductsInto(new[] { PlanCatalog.SkuTopUp }, "inapp", prices, () =>
+                done?.Invoke(prices.Count > 0 ? prices : null)));
+#else
         // One call covers iOS fully — StoreKit ignores the subs/inapp type filter, so the
-        // consumable top-up rides along with the six subscriptions. Android's Play Billing
-        // DOES split by type and would miss the top-up here; add a second "inapp" call when
-        // the Android track ships (deferred with the rest of Android, owner 2026-08-31).
-        _purchases.GetProducts(PlanCatalog.AllSkus(), (products, error) =>
+        // consumable top-up rides along with the six subscriptions.
+        GetProductsInto(PlanCatalog.AllSkus(), "subs", prices, () =>
+            done?.Invoke(prices.Count > 0 ? prices : null));
+#endif
+    }
+
+    /// <summary>
+    /// One store product query; every product that came back with an identifier and a
+    /// formatted price lands in <paramref name="into"/>, then <paramref name="next"/> runs —
+    /// on error too, so a chained leg still executes and the caller always completes.
+    /// </summary>
+    private void GetProductsInto(string[] skus, string type,
+                                 System.Collections.Generic.Dictionary<string, string> into, Action next)
+    {
+        _purchases.GetProducts(skus, (products, error) =>
         {
             if (error != null)
-            {
-                Debug.LogWarning($"[RevenueCatBackend] GetProducts error: {error.Message}");
-                done?.Invoke(null);
-                return;
-            }
-            if (products == null || products.Count == 0) { done?.Invoke(null); return; }
-
-            var prices = new System.Collections.Generic.Dictionary<string, string>(products.Count);
-            foreach (var product in products)
-                if (product != null && !string.IsNullOrEmpty(product.Identifier)
-                    && !string.IsNullOrEmpty(product.PriceString))
-                    prices[product.Identifier] = product.PriceString;
-            done?.Invoke(prices);
-        });
+                Debug.LogWarning($"[RevenueCatBackend] GetProducts({type}) error: {error.Message}");
+            else if (products != null)
+                foreach (var product in products)
+                {
+                    if (product == null || string.IsNullOrEmpty(product.Identifier)
+                        || string.IsNullOrEmpty(product.PriceString)) continue;
+                    // Play ids carry «:basePlanId»; the paywall keys by the bare id. First hit
+                    // wins so a product with several base plans cannot overwrite itself.
+                    string key = StoreProductKey.Normalize(product.Identifier);
+                    if (!into.ContainsKey(key)) into[key] = product.PriceString;
+                }
+            next();
+        }, type: type);
     }
 
     private void FinishConfigure()
@@ -190,11 +222,17 @@ public class RevenueCatBackend : IBillingBackend
         if (!string.IsNullOrEmpty(freshAppUserId)) AppUserId = freshAppUserId;
 
         PlanTier max = PlanTier.None;
-        foreach (var entitlementId in info.Entitlements.Active.Keys)
+        string activeProduct = null;
+        foreach (var kv in info.Entitlements.Active)
         {
-            var tier = PlanCatalog.FromEntitlementId(entitlementId);
-            if (tier > max) max = tier;
+            var tier = PlanCatalog.FromEntitlementId(kv.Key);
+            if (tier > max)
+            {
+                max = tier;
+                activeProduct = kv.Value != null ? kv.Value.ProductIdentifier : null;
+            }
         }
+        _activeSubscriptionProductId = StoreProductKey.Normalize(activeProduct);
         PurchasedTier = max;
         _onEntitlementChanged?.Invoke(PurchasedTier);
     }

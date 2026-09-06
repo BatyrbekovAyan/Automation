@@ -81,7 +81,7 @@ public static class BillingService
 
     public static void Purchase(string sku, Action<bool, string> done)
     {
-        if (_backend == null) { done?.Invoke(false, "not_initialized"); return; }
+        if (_backend == null) { done?.Invoke(false, BillingFailure.NotInitialized); return; }
         _backend.Purchase(sku, done);
     }
 
@@ -120,13 +120,29 @@ public static class BillingService
         });
     }
 
+    /// <summary>Which backend <see cref="DefaultBackendFactory"/> selects; pinned by BillingServiceTests.</summary>
+    internal enum BackendKind { Fake, RevenueCat }
+
+    /// <summary>
+    /// The selection rule, pure: the fake is an EDITOR convenience only. A device build gets the
+    /// real backend even when this platform's key is missing — RevenueCatBackend then stays
+    /// uninitialised, so purchases refuse with «not_initialized», restore reports false and the
+    /// paywall keeps the KZT fallback. Until 2026-09-05 a keyless device build fell back to
+    /// FakeBillingBackend, whose Purchase() SUCCEEDS synchronously: on Android, where
+    /// secrets.json carried no androidKey, every plan «sold» for free, the client believed it
+    /// held a purchased tier and the server (which never saw a purchase) kept metering dialogs
+    /// against the trial quota. The key's presence deliberately does NOT enter the decision;
+    /// StoreBillingKeyGuard fails a release build whose platform key is empty instead.
+    /// </summary>
+    internal static BackendKind SelectBackendKind(bool isEditor, bool keyPresent) =>
+        isEditor ? BackendKind.Fake : BackendKind.RevenueCat;
+
     private static IBillingBackend DefaultBackendFactory()
     {
-#if UNITY_EDITOR
-        return new FakeBillingBackend();
-#else
-        return string.IsNullOrEmpty(ResolveApiKey()) ? (IBillingBackend)new FakeBillingBackend() : new RevenueCatBackend();
-#endif
+        bool keyPresent = !string.IsNullOrEmpty(ResolveApiKey());
+        return SelectBackendKind(Application.isEditor, keyPresent) == BackendKind.Fake
+            ? (IBillingBackend)new FakeBillingBackend()
+            : new RevenueCatBackend();
     }
 
     private static string ResolveApiKey()

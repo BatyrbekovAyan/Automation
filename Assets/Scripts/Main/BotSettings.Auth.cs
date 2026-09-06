@@ -571,7 +571,13 @@ public partial class BotSettings
         xls = NativeFilePicker.ConvertExtensionToFileType("xls");
         xlsx = NativeFilePicker.ConvertExtensionToFileType("xlsx");
         xlsm = NativeFilePicker.ConvertExtensionToFileType("xlsm");
-        docx = "org.openxmlformats.wordprocessingml.document";
+#if UNITY_IOS
+        docx = "org.openxmlformats.wordprocessingml.document";   // the UTI, as before
+#else
+        // Android's SAF picker takes MIME types; the iOS UTI used to reach it verbatim and greyed
+        // out every .docx (2026-09-06). MimeTypeMap resolves docx to the OOXML MIME.
+        docx = NativeFilePicker.ConvertExtensionToFileType("docx");
+#endif
         doc = NativeFilePicker.ConvertExtensionToFileType("doc"); // application/msword / com.microsoft.word.doc
         html = NativeFilePicker.ConvertExtensionToFileType("html"); // text/html / public.html also cover .htm
         jpg = NativeFilePicker.ConvertExtensionToFileType("jpg"); // also covers .jpeg
@@ -582,13 +588,8 @@ public partial class BotSettings
 
     private void PickMediaFile(string contentType)
     {
-#if UNITY_ANDROID
-				// Use MIMEs on Android
-            string[] fileTypes = new string[] { pdf, txt, rtf, xml, csv, tsv, xls, xlsx, xlsm, docx, doc, html, jpg, png, webp, heic };
-#else
-        // Use UTIs on iOS
+        // MIME types on Android, UTIs on iOS — each field was already resolved per platform above.
         string[] fileTypes = new string[] { pdf, txt, rtf, xml, csv, tsv, xls, xlsx, xlsm, docx, doc, html, jpg, png, webp, heic };
-#endif
         // Older Androids have no MIME registered for tsv/xlsm — drop nulls so
         // the picker intent doesn't choke on them.
         fileTypes = System.Array.FindAll(fileTypes, type => !string.IsNullOrEmpty(type));

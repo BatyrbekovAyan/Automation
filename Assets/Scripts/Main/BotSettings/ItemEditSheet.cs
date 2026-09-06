@@ -610,6 +610,9 @@ namespace Automation.BotSettingsUI
         /// (they begin on the sheet's own DragZone, not the scrim), so
         /// SheetDragDismiss wires onDismiss directly to this.
         /// </summary>
+        /// <summary>True while the sheet is up (Back router).</summary>
+        public bool IsShown => isShown;
+
         public void Dismiss()
         {
             if (isNewlyAdded)

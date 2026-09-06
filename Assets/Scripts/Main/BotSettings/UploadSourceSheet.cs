@@ -87,6 +87,9 @@ namespace Automation.BotSettingsUI
                 });
         }
 
+        /// <summary>True while the sheet is up or arriving (Back router).</summary>
+        public bool IsShown => mode == SheetMode.Shown || mode == SheetMode.Showing;
+
         public void Hide()
         {
             if (mode == SheetMode.Hidden || mode == SheetMode.Hiding) return;

@@ -1,7 +1,8 @@
 # App Review Notes (вставить в App Store Connect → App Review Information → Notes)
 
-Ниже готовый EN-текст. Перед вставкой: заменить `<VIDEO URL>` на ссылку
-демо-видео (непубличный YouTube/Drive) и проверить, что юр-ссылки уже живые
+Ниже готовый EN-текст. Ссылка на демо-видео уже вписана (непубличный путь на
+choosereply.com, файл `~/choosereply/site/review/…` на VPS; исходник и монтаж —
+`~/Projects/Builds/demo-tools/`). Перед вставкой проверить, что юр-ссылки живые
 (https://choosereply.com/privacy.html, https://choosereply.com/terms.html). Тот же текст пригодится для ответа на вопросы Google Play.
 
 ВАЖНО (аудит 2026-08-30, не откатывать): в notes НЕТ ни номера гайдлайна 5.2.2,
@@ -27,9 +28,10 @@ linking a REAL WhatsApp account by scanning a QR code (or entering a pairing
 code) from the WhatsApp mobile app on a live phone number, and then having a
 real customer send messages to that number. This cannot be reproduced with test
 credentials. We recorded a full demo video showing the entire flow end-to-end
-on a real device and number:
+with a real WhatsApp number (recorded in the iOS Simulator; the linked
+WhatsApp account and the customer messages are real):
 
-**Demo video: <VIDEO URL>**
+**Demo video: https://choosereply.com/review/923843a986255cba/ChooseReply-demo-2026-09.mp4**
 
 **What you CAN test directly in the review build without any account:**
 1. First-run onboarding.
@@ -61,6 +63,12 @@ unsolicited messages, and is designed for replying to inbound customer messages
 of the user's own business. Messaging is handled by a server-side gateway
 operated by us; AI replies are generated server-side. Data handling is described
 in the privacy policy linked on the paywall and in the App Store metadata.
+
+**Google Play — «App access» (вставить в Policy → App content → App access → инструкции).**
+Тот же смысл, но без слов Apple/StoreKit/App Store; готовый EN-блок лежит в
+`docs/store/play-console.md` §3.1 (логина нет; нужен реальный аккаунт мессенджера;
+демо-видео; покупки — только Google Play Billing, тестовые аккаунты через
+License testing).
 
 **Subscription disclosure locations.**
 Price and period are shown on each tier card; the auto-renewal notice is shown

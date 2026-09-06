@@ -1324,6 +1324,22 @@ public partial class Manager : MonoBehaviour
         done?.Invoke();
     }
 
+    /// <summary>True while either auth page (QR / code) is on screen (Back router).</summary>
+    public bool IsAuthPageOpen =>
+        (WhatsappAuth != null && WhatsappAuth.activeInHierarchy)
+        || (TelegramAuth != null && TelegramAuth.activeInHierarchy);
+
+    /// <summary>
+    /// The system Back on an auth page — what its chevron does: the wizard cancels bot creation
+    /// (and deletes the pending Wappi profiles), the settings flow returns to Bot Settings.
+    /// </summary>
+    public void TryBackFromAuth()
+    {
+        if (!IsAuthPageOpen) return;
+        if (isCreatingBot) CancelBotCreation();
+        else OnSettingsAuthBackPressed();
+    }
+
     private void OnSettingsAuthBackPressed()
     {
         // IN-04: mirror CancelBotCreation and stop the QR loop too. OpenWhatsappQRPanel's

@@ -240,7 +240,7 @@ public partial class ProfileSubPages
             {
                 // A cancelled purchase needs no message — the user just did it.
                 Debug.LogWarning($"[Subscription] Top-up failed: {reason}");
-                _subNoticeText = reason == "user_cancelled" ? "" : SubscriptionPageRows.TopUpFailedNotice;
+                _subNoticeText = reason == BillingFailure.UserCancelled ? "" : SubscriptionPageRows.TopUpFailedNotice;
             }
             RefreshSubscriptionPage();
         });

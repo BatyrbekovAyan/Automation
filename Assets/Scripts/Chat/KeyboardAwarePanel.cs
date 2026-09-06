@@ -193,9 +193,27 @@ public class KeyboardAwarePanel : MonoBehaviour
     float GetAndroidLiveHeight()
     {
 #if UNITY_ANDROID
-        return TouchScreenKeyboard.visible ? (Screen.height - TouchScreenKeyboard.area.y) : 0f;
+        // The JNI visible-frame measurement — the reader every later Android keyboard site in
+        // this project (KeyboardInset / ItemEditSheet / KeyboardScrollFix) settled on after
+        // rejecting TouchScreenKeyboard.area, which can report a ZERO rect while .visible is
+        // already true: Screen.height − 0 was then a full-screen lift. Returns 0 when down.
+        return KeyboardInset.OccludedScreenPixels();
 #else
         return 0f;
+#endif
+    }
+
+    /// <summary>
+    /// The bottom strip that slides under the keyboard, in screen pixels: the OS home-bar inset
+    /// on iOS; on Android (immersive, safeArea.y == 0) the same strip is the baked home-bar zone
+    /// the panel still carries, so it is that zone converted to pixels.
+    /// </summary>
+    float BottomSlackScreenPx()
+    {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        return KeyboardLiftMath.BakedHomeBarCanvasPx * (_canvas != null ? _canvas.scaleFactor : 1f);
+#else
+        return Screen.safeArea.y;
 #endif
     }
 
@@ -217,7 +235,7 @@ public class KeyboardAwarePanel : MonoBehaviour
         // Subtract the bottom safe area (home bar / gesture inset) so the panel
         // only rises by the amount that covers NEW screen space.
         // The safe-zone gap slides under the keyboard instead of floating above it.
-        float safeBottom = Screen.safeArea.y;           // px — 0 on devices with no home bar
+        float safeBottom = BottomSlackScreenPx();       // px — 0 on devices with no home bar
         return RawToCanvas(Mathf.Max(0f, screenPixels - safeBottom));
     }
 

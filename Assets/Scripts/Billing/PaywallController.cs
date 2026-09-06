@@ -453,7 +453,7 @@ public class PaywallController : MonoBehaviour
                 return;
             }
             Debug.LogWarning($"[PaywallController] Purchase of {sku} failed: {reason}");
-            _notice = reason == "user_cancelled" ? "" : PaywallRows.PurchaseFailedNotice;
+            _notice = reason == BillingFailure.UserCancelled ? "" : PaywallRows.PurchaseFailedNotice;
             Render();
         });
     }

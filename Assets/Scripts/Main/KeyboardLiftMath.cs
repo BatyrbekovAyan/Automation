@@ -10,6 +10,18 @@ using System;
 public static class KeyboardLiftMath
 {
     /// <summary>
+    /// The home-indicator zone baked into the chat composer's 204u bottom panel
+    /// (24 + 88 + 92, AttachmentPreviewScreenBuilder): the empty strip under the
+    /// input that iOS reports as Screen.safeArea.y and that slides UNDER the
+    /// keyboard when the panel rises. Android runs immersive, where safeArea.y is
+    /// 0 at the bottom, yet the panel carries the same baked strip — so the
+    /// Android readers subtract this many canvas units instead, or the composer
+    /// floats a full home-bar above the IME. Static safe zones are baked in this
+    /// project on purpose (see project notes); this is that decision in a number.
+    /// </summary>
+    public const float BakedHomeBarCanvasPx = 92f;
+
+    /// <summary>
     /// Converts an occluded screen height (device pixels) into canvas units.
     ///
     /// safeAreaBottomPx is a parameter rather than a baked-in

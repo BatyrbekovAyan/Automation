@@ -100,6 +100,9 @@ namespace Automation.BotSettingsUI
             RefreshApplyButton();
         }
 
+        /// <summary>True while the sheet is up (Back router).</summary>
+        public bool IsVisible => visible;
+
         public void Hide()
         {
             if (!visible) return;

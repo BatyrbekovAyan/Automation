@@ -104,8 +104,24 @@
   требование обязательного closed test (введено для личных аккаунтов, созданных
   после 13.11.2023) **не применяется** — можно идти сразу в production-трек.
   Internal testing перед продакшеном — по желанию, не обязателен.
-- [ ] Создать приложение: `com.synergysoft.choosereply`, RU listing.
-- [ ] **Data Safety** — зеркалить ПЕРЕПИСАННЫЕ labels Apple (см. §1, 2026-09-01):
+- [x] **Android-трек в репозитории ЗАКРЫТ 2026-09-06** — всё, что не требует консолей:
+  Player Settings под Play (targetSdk 36, категория productivity, AAB, адаптивная
+  иконка), манифест с одной launcher-activity, биллинг на Play (subs/inapp, замена
+  подписки при смене тарифа, ключи цен, отмена без ошибки), страж релизной сборки
+  без ключа/зависимости RevenueCat, точка сборки .aab, системная кнопка «Назад»,
+  клавиатура Android через JNI-замер, .docx в пикере, Play-графика (7 скриншотов
+  9:16 + feature graphic + иконка 512), тексты листинга, ответы на все формы —
+  **см. `docs/store/play-console.md`** (там же порядок подачи и device-чек).
+- [ ] **Владелец до сборки** (play-console.md §1): `revenueCat.androidKey` в secrets.json;
+  upload-keystore (`keytool`, вне репо); Android Resolver → Force Resolve и коммит
+  `mainTemplate.gradle` + `AndroidResolverDependencies.xml`; сборка
+  `Tools/Store/Build Android App Bundle` (release, keystore из env); проверки артефакта
+  (16 KB `zipalign -c -P 16`, `aapt2 dump permissions` без READ_MEDIA_*/AD_ID).
+- [ ] Создать приложение: `com.synergysoft.choosereply`, RU listing — тексты и графика
+  готовы (play-console.md §2).
+- [ ] **Data Safety** — точная матрица в play-console.md §4 (дополнено: App interactions =
+  pickStats, метаданные поддержки, device-id фолбэк — политика §3 дополнена 2026-09-06,
+  копию `Tools/landing/privacy.html` ПЕРЕЗАЛИТЬ на VPS). Исходная сверка с Apple (2026-09-01):
   собираются Messages, Photos and videos, Files and docs, **Voice or sound
   recordings**, **Phone number**, Email + Address (введённые владельцем),
   **Device or other IDs** (RevenueCat ID + device-id фолбэк), Purchase history —
@@ -122,10 +138,11 @@
   проде). «Удалить все данные» = локальное + RAG/оригиналы + bot_profiles +
   память диалогов; ответ «можно запросить удаление» честен без оговорок.
 - [ ] Privacy Policy URL — тот же.
-- [ ] IARC-опросник (получить рейтинг).
-- [ ] Подписки: создать 3×(месяц/год) + топ-ап продукты с теми же ценами
-  (SKU-идентификаторы — как в RevenueCat-конфиге Блока 1; сверить по
-  дашборду RevenueCat → Products).
+- [ ] App content: Ads No, App access (EN-текст в play-console.md §3.1 + демо-видео),
+  IARC-опросник (ответы в §3), Target audience 18+, Advertising ID No.
+- [ ] Подписки: 6 продуктов `sub.*.month/year` (по ОДНОМУ base plan каждый, помечен
+  Backwards compatible) + `topup.dialogs.500`; RevenueCat Google app + service-account
+  JSON + RTDN; License testing — play-console.md §5.
 - [ ] App signing by Google Play — включить (дефолт).
 - [ ] Staged rollout / managed publishing — включить managed publishing
   (аналог manual release).

@@ -44,6 +44,23 @@ public static class PlanCatalog
         };
     }
 
+    /// <summary>
+    /// The six subscription product ids — <see cref="AllSkus"/> minus the consumable top-up.
+    /// Google Play Billing answers a product query per TYPE («subs» never returns a one-time
+    /// product, «inapp» never returns a subscription), so the Android price fetch asks for
+    /// these under «subs» and for <see cref="SkuTopUp"/> under «inapp». StoreKit ignores the
+    /// type filter, which is why iOS still asks for <see cref="AllSkus"/> in one call.
+    /// </summary>
+    public static string[] SubscriptionSkus()
+    {
+        string[] all = AllSkus();
+        var subs = new string[all.Length - 1];
+        int n = 0;
+        foreach (string sku in all)
+            if (sku != SkuTopUp) subs[n++] = sku;
+        return subs;
+    }
+
     public static PlanTier FromEntitlementId(string id)
     {
         switch (id)

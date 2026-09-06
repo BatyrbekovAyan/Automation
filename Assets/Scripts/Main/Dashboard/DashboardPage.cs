@@ -317,6 +317,12 @@ public class DashboardPage : MonoBehaviour
         listPanel.DOAnchorPosX(0f, 0.3f).SetEase(DG.Tweening.Ease.OutCubic);
     }
 
+    /// <summary>True while the drill-down list is up (Back router).</summary>
+    public bool IsStatusListOpen => listPanel != null && listPanel.gameObject.activeSelf;
+
+    /// <summary>The system Back — identical to the drill-down's own chevron.</summary>
+    public void RequestCloseStatusList() => CloseStatusList();
+
     private void CloseStatusList()
     {
         if (listPanel == null) return;

@@ -232,6 +232,29 @@ public partial class BotSettings : MonoBehaviour
             backButton.onClick.AddListener(OnBackPressed);
     }
 
+    /// <summary>The system Back — identical to the chevron (Back router).</summary>
+    public void RequestBack() => OnBackPressed();
+
+    /// <summary>Whether one of the settings screen's bottom sheets is up (Back router).</summary>
+    public bool HasOpenSheet =>
+        (productEditSheet != null && productEditSheet.IsShown)
+        || (serviceEditSheet != null && serviceEditSheet.IsShown)
+        || (promptSuggestionsSheet != null && promptSuggestionsSheet.IsVisible)
+        || (uploadSourceSheet != null && uploadSourceSheet.IsShown);
+
+    /// <summary>
+    /// Closes the open bottom sheet the way its scrim tap would (the item sheets DISMISS, which
+    /// also discards a never-committed new card). Returns false when none was open.
+    /// </summary>
+    public bool TryCloseTopSheet()
+    {
+        if (productEditSheet != null && productEditSheet.IsShown) { productEditSheet.Dismiss(); return true; }
+        if (serviceEditSheet != null && serviceEditSheet.IsShown) { serviceEditSheet.Dismiss(); return true; }
+        if (promptSuggestionsSheet != null && promptSuggestionsSheet.IsVisible) { promptSuggestionsSheet.Hide(); return true; }
+        if (uploadSourceSheet != null && uploadSourceSheet.IsShown) { uploadSourceSheet.Hide(); return true; }
+        return false;
+    }
+
     private void OnBackPressed()
     {
         // If already animating (either slide-in or slide-out in progress), ignore

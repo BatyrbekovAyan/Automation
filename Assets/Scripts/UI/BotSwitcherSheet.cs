@@ -97,6 +97,9 @@ public class BotSwitcherSheet : MonoBehaviour
         }
     }
 
+    /// <summary>True while the sheet is on screen (Back router).</summary>
+    public bool IsOpen => gameObject.activeSelf;
+
     public void Close()
     {
         if (isAnimating) return;

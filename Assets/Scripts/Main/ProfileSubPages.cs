@@ -101,6 +101,31 @@ public partial class ProfileSubPages : MonoBehaviour
         _activeSlide = panel.DOAnchorPosX(0f, SlideInDuration).SetEase(Ease.OutCubic);
     }
 
+    /// <summary>True while one of the slide-in pages is up (Back router).</summary>
+    public bool HasOpenPage
+    {
+        get
+        {
+            for (int i = 0; i < pages.Length; i++)
+                if (pages[i].panel != null && pages[i].panel.gameObject.activeSelf) return true;
+            return false;
+        }
+    }
+
+    /// <summary>Closes the slide-in page that is up, if any (Back router). Returns false when none is.</summary>
+    public bool TryCloseOpenPage()
+    {
+        for (int i = 0; i < pages.Length; i++)
+        {
+            if (pages[i].panel != null && pages[i].panel.gameObject.activeSelf)
+            {
+                Close((Page)i);
+                return true;
+            }
+        }
+        return false;
+    }
+
     public void Close(Page page)
     {
         var panel = PanelFor(page);

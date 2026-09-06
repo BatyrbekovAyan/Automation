@@ -348,6 +348,12 @@ public class AttachmentPreviewScreen : MonoBehaviour
         Close();
     }
 
+    /// <summary>True while the preview is on screen (Back router).</summary>
+    public bool IsOpen => root != null && root.activeSelf;
+
+    /// <summary>The system Back — identical to the chevron.</summary>
+    public void RequestBack() => OnBackTapped();
+
     private void OnBackTapped()
     {
         PunchButton(backButton);

@@ -81,3 +81,7 @@ Tools/n8n/.secrets/
 # Store screenshot captures — regenerate with Tools/Store/Capture Screenshots
 Tools/store/screenshots/
 Tools/store/listing/
+
+# Android upload key — a credential; Player Settings only stores its PATH (StoreAndroidBuild reads it from env)
+*.keystore
+*.jks

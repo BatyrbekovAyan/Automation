@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
@@ -24,6 +25,42 @@ using UnityEngine.UI;
 /// </summary>
 public static class PopupUI
 {
+    // Popups currently shown through Show and not yet asked to Hide, newest last. Lets the
+    // Android Back router close the top one without every owner exposing its own cancel
+    // (BackNavigation / AndroidBackRouter, 2026-09-06). A panel destroyed while open is pruned
+    // on the next read.
+    private static readonly List<GameObject> _open = new List<GameObject>();
+
+    /// <summary>True while at least one popup shown through <see cref="Show"/> is still up.</summary>
+    public static bool HasOpenPopup
+    {
+        get
+        {
+            Prune();
+            return _open.Count > 0;
+        }
+    }
+
+    /// <summary>
+    /// Hides the most recently shown popup, exactly as its scrim tap / «Отмена» would through
+    /// <see cref="Hide"/>. Owners that keep a pending action (ChatDeleteConfirm, the reply-mode
+    /// confirm) clear it on their next Ask/Show, so a generic hide is safe. Returns false when
+    /// nothing is open.
+    /// </summary>
+    public static bool TryCloseTop()
+    {
+        Prune();
+        if (_open.Count == 0) return false;
+        Hide(_open[_open.Count - 1]);
+        return true;
+    }
+
+    private static void Prune()
+    {
+        for (int i = _open.Count - 1; i >= 0; i--)
+            if (_open[i] == null || !_open[i].activeSelf) _open.RemoveAt(i);
+    }
+
     public const float DefaultBackdropAlpha = 0.5f;
     public const float OpenDuration  = 0.22f;
     public const float CloseDuration = 0.16f;
@@ -52,6 +89,8 @@ public static class PopupUI
         // backdrop stays full-screen while only the card pops.
         panelT.localScale = Vector3.one;
         panel.SetActive(true);
+        _open.Remove(panel);
+        _open.Add(panel);
 
         if (backdrop != null)
         {
@@ -81,6 +120,9 @@ public static class PopupUI
     public static void Hide(GameObject panel)
     {
         if (panel == null) return;
+        // Off the stack at once, not in OnComplete: a second Back during the 0.16s exit must
+        // reach the surface underneath, not re-target a popup that is already leaving.
+        _open.Remove(panel);
         var panelT = panel.transform;
         var backdrop = panel.GetComponent<Image>();
         var card = FindCard(panelT);

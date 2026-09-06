@@ -159,6 +159,9 @@ public static class BillingGateSheet
         fade = scrimGroup.DOFade(1f, ScrimFadeSeconds).SetLink(panel);
     }
 
+    /// <summary>True while the sheet is up and not already leaving (Back router).</summary>
+    public static bool IsOpen => panel != null && panel.activeSelf && !hiding;
+
     /// <summary>Dismiss without acting — scrim tap, «Позже», or a completed drag-dismiss.</summary>
     public static void Dismiss()
     {

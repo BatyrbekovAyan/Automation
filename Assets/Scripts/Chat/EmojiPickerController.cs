@@ -77,6 +77,9 @@ public class EmojiPickerController : MonoBehaviour
         }
     }
 
+    /// <summary>True while the picker sheet is on screen (Back router).</summary>
+    public bool IsShowing => content != null && content.activeSelf;
+
     public void Hide()
     {
         _target = null;

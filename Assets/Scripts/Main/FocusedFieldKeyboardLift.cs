@@ -179,8 +179,9 @@ public class FocusedFieldKeyboardLift : MonoBehaviour
             _editorSimulated, editorTarget, EditorKbSpeed * Time.unscaledDeltaTime);
         return ConvertToCanvasSpace(_editorSimulated);
 #elif UNITY_ANDROID
-        float live = TouchScreenKeyboard.visible ? (Screen.height - TouchScreenKeyboard.area.y) : 0f;
-        return ConvertToCanvasSpace(live);
+        // Same reader as KeyboardAwarePanel: the JNI visible-frame measurement, never
+        // TouchScreenKeyboard.area (a zero rect while .visible is true = a full-screen lift).
+        return ConvertToCanvasSpace(KeyboardInset.OccludedScreenPixels());
 #elif UNITY_IOS
         float target = TouchScreenKeyboard.visible ? TouchScreenKeyboard.area.height : 0f;
         return ConvertToCanvasSpace(target);
@@ -195,7 +196,12 @@ public class FocusedFieldKeyboardLift : MonoBehaviour
     {
         if (screenPixels <= 0f) return 0f;
 
+#if UNITY_ANDROID && !UNITY_EDITOR
+        // Immersive Android reports no bottom inset; the sheets still carry the baked home-bar zone.
+        float safeBottom = KeyboardLiftMath.BakedHomeBarCanvasPx * _canvas.scaleFactor;
+#else
         float safeBottom = Screen.safeArea.y;
+#endif
         float adjusted = Mathf.Max(0f, screenPixels - safeBottom);
 
         if (_canvas.renderMode == RenderMode.ScreenSpaceOverlay)
