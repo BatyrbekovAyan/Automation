@@ -37,6 +37,13 @@
    Play App Signing (дефолт для новых приложений) хранит ключ подписи у Google; upload-ключ
    при утере меняется через поддержку Play. В Player Settings хранится только ПУТЬ —
    пароли передаются сборке через окружение (п. 4).
+   **Сделано 2026-09-07:** `~/Keys/choosereply-upload.jks`, alias `upload`, SHA1-отпечаток
+   `EC:F1:BD:36:60:C8:CB:35:F2:80:9B:17:00:99:1D:A0:23:26:65:49` (по нему
+   `keytool -printcert -jarfile …aab` сверяет подпись бандла). Две ловушки: системный
+   `/usr/bin/keytool` на macOS — заглушка без Java («Unable to locate a Java Runtime»),
+   рабочий — `…/PlaybackEngines/AndroidPlayer/OpenJDK/bin/keytool`; пароль PKCS12 обязан быть
+   ASCII («Password is not ASCII» = кириллица/раскладка, файл НЕ создаётся), а пароль ключа
+   в PKCS12 всегда равен паролю хранилища.
 3. **Android Resolver (EDM4U).** В редакторе: Assets → External Dependency Manager →
    Android Resolver → **Force Resolve**. Должно появиться в `Assets/Plugins/Android/mainTemplate.gradle`
    между `// Android Resolver Dependencies Start … End`:
@@ -45,9 +52,16 @@
    `PurchasesWrapper.java` не компилируется, а если резолв сработает молча не до конца —
    RevenueCat падает в `Configure` и приложение живёт в вечном «пробном» режиме
    (страж сборки это теперь ловит).
+   **Сделано 2026-09-07 (cfd0231).** На Unity 6 Force Resolve падает с «could not enable
+   Jetifier … without Custom Gradle Properties Template»: включить Player → Android →
+   Publishing Settings → **Custom Gradle Properties Template** (и Custom Gradle Settings
+   Template), повторить Force Resolve. В коммит идут ещё `gradleTemplate.properties`,
+   `settingsTemplate.gradle` (+ .meta), `ProjectSettings/GvhProjectSettings.xml` и два
+   флага шаблонов в ProjectSettings.asset.
 4. **Сборка .aab** (release, без Development Build — иначе водяной знак):
    ```bash
-   export CR_UPLOAD_KEYSTORE=~/Keys/choosereply-upload.jks CR_UPLOAD_KEYSTORE_PASS='…' CR_UPLOAD_KEY_ALIAS=upload CR_UPLOAD_KEY_PASS='…'
+   # zsh: пароль вводится скрыто и не попадает в историю; для PKCS12 пароль ключа = пароль хранилища
+   read -s "CR_UPLOAD_KEYSTORE_PASS?Пароль хранилища: " && export CR_UPLOAD_KEYSTORE_PASS CR_UPLOAD_KEY_PASS="$CR_UPLOAD_KEYSTORE_PASS" CR_UPLOAD_KEYSTORE=/Users/ayan/Keys/choosereply-upload.jks CR_UPLOAD_KEY_ALIAS=upload
    /Applications/Unity/Hub/Editor/6000.3.9f1/Unity.app/Contents/MacOS/Unity -batchmode -nographics -projectPath . -buildTarget Android -executeMethod StoreAndroidBuild.BuildAab -logFile Tools/test-output/android-build.log
    ```
    Редактор при этом должен быть закрыт (project lock). Результат:
@@ -56,6 +70,14 @@
    Unity — запускать Hub/Unity из терминала с `export`).
    Переключение build target на Android переимпортирует текстуры (десятки минут на этом
    Mac); обратно на iOS — быстро (артефакты кэшируются).
+   **Сделано 2026-09-08: билд 1 = `ChooseReply-1.0-1.aab` (154 МБ).** Холодная IL2CPP-сборка
+   на этом Mac — больше часа, повтор по кэшу Bee — 5–6 минут. Сборка записывает в
+   ProjectSettings.asset путь к keystore (`{dedicated}: Keys/…`), alias и флаг кастомного
+   keystore — закоммитить, паролей там нет. Остановка: Ctrl+C в ТОЙ ЖЕ вкладке, затем
+   `pgrep -fl StoreAndroidBuild.BuildAab`; если жив — `pkill -TERM -f StoreAndroidBuild.BuildAab`
+   (Ctrl+C в чужой вкладке сборку не трогает, а убитый Unity оставляет сироту `bee_backend`,
+   который продолжает компилировать). Прерванная сборка оставляет
+   `Assets/Resources/PerformanceTestRun*.json` — в коммит не брать, полная сборка их убирает.
 5. **Проверки артефакта** (владелец, один раз):
    - `bundletool build-apks --bundle=….aab --output=….apks --mode=universal`, распаковать
      `universal.apk` и `zipalign -c -P 16 -v 4 universal.apk` (16 KB) — ожидаем «Verification successful».
@@ -64,6 +86,12 @@
      добавить в манифест `<uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove"/>`.
    - В `unityLibrary/src/main/AndroidManifest.xml` экспортированного проекта — ровно одна
      activity с категорией LAUNCHER.
+   **Билд 1 (2026-09-08) прошёл все три** (universal.apk через `bundletool build-apks
+   --mode=universal --aapt2=…`, оба из поставки Unity: `…/AndroidPlayer/Tools/bundletool-all-1.17.2.jar`,
+   `…/AndroidPlayer/SDK/build-tools/36.0.0/`), плюс: подпись .aab = upload-ключ,
+   `native-code arm64-v8a/armeabi-v7a`, targetSdk 36, versionCode 1, одна launchable-activity
+   `UnityPlayerGameActivity`. Разрешения: WAKE_LOCK, MODIFY_AUDIO_SETTINGS, INTERNET, VIBRATE,
+   ACCESS_NETWORK_STATE, BILLING и пара legacy `WRITE/READ_EXTERNAL_STORAGE` (§7).
 6. **Bump перед каждой загрузкой:** `AndroidBundleVersionCode` (Player Settings →
    Other → Version Code) — Play требует монотонный рост; `bundleVersion` = маркетинговая версия.
 
@@ -289,6 +317,10 @@ Monetization setup → RTDN). Продукты импортировать и п�
 - Открытие документа из чата: QuickLook только на iOS; на Android — системный share.
 - «Купить» для уже купленного тарифа: Play вернёт ITEM_ALREADY_OWNED (на iOS StoreKit
   скажет «уже подписан»); косметика пейволла — отдельная задача.
+- `WRITE_EXTERNAL_STORAGE` (+ implied `READ_EXTERNAL_STORAGE`) без `maxSdkVersion` приходят
+  из AAR-манифестов NativeGallery/NativeFilePicker/NativeCamera. На Android 10+ запись — no-op,
+  на 13+ чтение ничего не даёт, декларации в Play Console не требуют; косметика —
+  `tools:node="remove"`/`maxSdkVersion` в нашем манифесте, отдельной сборкой.
 
 ## 8. Порядок подачи
 

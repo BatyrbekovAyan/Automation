@@ -177,7 +177,9 @@
   клавиатура Android через JNI-замер, .docx в пикере, Play-графика (7 скриншотов
   9:16 + feature graphic + иконка 512), тексты листинга, ответы на все формы —
   **см. `docs/store/play-console.md`** (там же порядок подачи и device-чек).
-- [ ] **Владелец до сборки** (play-console.md §1): `revenueCat.androidKey` в secrets.json;
+- [x] **Владелец до сборки — ЗАКРЫТО 2026-09-08** (play-console.md §1; билд 1
+  `~/Projects/Builds/Android/ChooseReply-1.0-1.aab`, подпись upload-ключом, все проверки
+  артефакта зелёные, рядом `…-universal-debugsigned.apk` для adb-установки): `revenueCat.androidKey` в secrets.json;
   upload-keystore (`keytool`, вне репо); Android Resolver → Force Resolve и коммит
   `mainTemplate.gradle` + `AndroidResolverDependencies.xml`; сборка
   `Tools/Store/Build Android App Bundle` (release, keystore из env); проверки артефакта
