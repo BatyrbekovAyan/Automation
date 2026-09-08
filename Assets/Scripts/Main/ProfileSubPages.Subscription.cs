@@ -1,3 +1,4 @@
+using System.Collections;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -63,6 +64,15 @@ public partial class ProfileSubPages
     private string _subNoticeText = "";
     private bool _subBusy;
 
+    // Post-top-up settle (TopUpSettlePolicy): the store's purchase callback lands BEFORE
+    // RevenueCat's webhook has credited the reserve — on prod 2026-09-06 the credit (exec 1546)
+    // and the app's read (1547) shared the same second and the read lost, so the page showed
+    // «Диалоги начислены» over the old number until it was reopened. The balance is therefore
+    // re-read on the policy's schedule until it has grown by what was bought.
+    private Coroutine _topUpSettle;
+    private int? _topUpBaseline;
+    private int _topUpPacksPending;
+
     // ── Wiring ─────────────────────────────────────────────────────────────
 
     private void WireSubscription()
@@ -91,6 +101,10 @@ public partial class ProfileSubPages
     {
         UsageStore.OnUsageChanged -= RefreshSubscriptionPage;
         BillingService.OnEntitlementChanged -= HandleEntitlementChanged;
+        // Unity stops this component's coroutines on disable; drop the latch with them, or the
+        // next purchase would only bump a counter for a settle that no longer runs.
+        _topUpSettle = null;
+        _topUpPacksPending = 0;
     }
 
     private void HandleEntitlementChanged(PlanTier _) => RefreshSubscriptionPage();
@@ -248,7 +262,7 @@ public partial class ProfileSubPages
             if (ok)
             {
                 _subNoticeText = SubscriptionPageRows.TopUpDoneNotice;
-                FetchUsage();   // the new balance lives server-side; re-read it
+                BeginTopUpSettle();   // the new balance lives server-side and lands AFTER this callback
             }
             else
             {
@@ -258,6 +272,46 @@ public partial class ProfileSubPages
             }
             RefreshSubscriptionPage();
         });
+    }
+
+    private void BeginTopUpSettle()
+    {
+        if (_topUpSettle != null)
+        {
+            _topUpPacksPending++;   // bought again while the first pack is still landing: raise the bar
+            return;
+        }
+        if (!isActiveAndEnabled) return;   // nothing can host the reads; OnEnable repaints on the way back
+
+        _topUpBaseline = UsageStore.Current?.topupBalance;
+        _topUpPacksPending = 1;
+        _topUpSettle = StartCoroutine(TopUpSettleRoutine());
+    }
+
+    /// <summary>
+    /// Reads GetUsage on <see cref="TopUpSettlePolicy"/>'s schedule until the reserve has grown by
+    /// the packs bought, then stops; the schedule is finite so a purchase the server never credits
+    /// costs a handful of reads, not a session of polling. Every applied snapshot repaints the page
+    /// through UsageStore.OnUsageChanged, so the reserve line moves the moment the webhook lands.
+    /// </summary>
+    private IEnumerator TopUpSettleRoutine()
+    {
+        for (int read = 0; ; read++)
+        {
+            float? delay = TopUpSettlePolicy.DelayBeforeRead(read);
+            if (!delay.HasValue) break;
+            if (delay.Value > 0f) yield return new WaitForSecondsRealtime(delay.Value);
+
+            // Nested, so it runs the same client every other read uses. A read refused because
+            // another one is in flight returns at once, and that other read's snapshot is judged.
+            yield return UsageClient.FetchRoutine();
+
+            UsageSnapshot now = UsageStore.Current;
+            if (now != null && TopUpSettlePolicy.Settled(_topUpBaseline, _topUpPacksPending, now.topupBalance))
+                break;
+        }
+        _topUpSettle = null;
+        _topUpPacksPending = 0;
     }
 
     private void OnRestoreClicked()
