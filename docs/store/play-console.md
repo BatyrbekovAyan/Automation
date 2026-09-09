@@ -99,6 +99,8 @@
    - `unzip -l ….aab | grep BUNDLE-METADATA/com.android.tools.build.debugsymbols` — по `.so.sym` на
      каждую ABI (`libunity`, `libil2cpp`, …): символы едут внутри бандла, отдельный `symbols.zip`
      в Play Console не грузить (с билда 2; в билде 1 их нет).
+   **Билд 2 `ChooseReply-1.0-2.aab` (2026-09-09, versionCode 2, 236 МБ с символами в бандле) прошёл те же
+   проверки** — это первая сборка с фиксами device-пасса §6; билд 1 в Play дальше не использовать.
    **Билд 1 (2026-09-08) прошёл все три** (universal.apk через `bundletool build-apks
    --mode=universal --aapt2=…`, оба из поставки Unity: `…/AndroidPlayer/Tools/bundletool-all-1.17.2.jar`,
    `…/AndroidPlayer/SDK/build-tools/36.0.0/`), плюс: подпись .aab = upload-ключ,
