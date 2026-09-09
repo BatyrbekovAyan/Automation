@@ -269,15 +269,23 @@ Supabase, n8n, RevenueCat, Google — обработчики по нашим и�
 **Play Console → Monetize → Products.** Шесть подписок и один товар — идентификаторы
 ПОБУКВЕННО как в `PlanCatalog` (приложение покупает по голому product id):
 
-| Product ID | Тип | Период | Цена (KZT, как в ASC) |
-|---|---|---|---|
-| `sub.start.month` | Subscription, один base plan (auto-renewing, 1 month) | месяц | 9 990 |
-| `sub.start.year` | Subscription, один base plan (1 year) | год | как в PlanCatalog |
-| `sub.business.month` | Subscription | месяц | 19 990 |
-| `sub.business.year` | Subscription | год | как в PlanCatalog |
-| `sub.network.month` | Subscription | месяц | 39 900 |
-| `sub.network.year` | Subscription | год | как в PlanCatalog |
-| `topup.dialogs.500` | In-app product (one-time) | — | 3 900 |
+| Product ID | Тип | Период | Цель (KZT, как в ASC) | **Факт Play (2026-09-09)** |
+|---|---|---|---|---|
+| `sub.start.month` | Subscription, один base plan `monthly` (auto-renewing, 1 month) | месяц | 9 990 | 9 990 |
+| `sub.start.year` | Subscription, один base plan `yearly` (1 year) | год | 99 000 | **98 990** |
+| `sub.business.month` | Subscription | месяц | 19 990 | 19 990 |
+| `sub.business.year` | Subscription | год | 198 990 | 198 990 |
+| `sub.network.month` | Subscription | месяц | 39 900 | **39 990** |
+| `sub.network.year` | Subscription | год | 399 990 | 399 990 |
+| `topup.dialogs.500` | One-time product, purchase option `standard` (Buy) | — | 3 900 | **3 890** |
+
+**Все семь созданы и активны 2026-09-09.** Ловушки формы: Play принимает цену БЕЗ налога, добавляет
+16 % НДС Казахстана и округляет по своей сетке для тенге (окончание …990, для мелких сумм …90), поэтому
+вводились базовые 8 600 / 85 340 / 17 230 / 171 540 / 34 390 / 344 810 / 3 360 «на все страны» через
+Set prices с конвертацией от KZT; 99 000 / 39 900 / 3 900 на сетке недостижимы — принято ±90 ₸.
+Цену нужно задать во ВСЕХ странах (иначе Save не проходит), список стран продажи задаётся релизом, не
+товаром. Backwards compatible для единственного base plan / purchase option Play ставит сам (метка в
+строке плана, меню ⋮). В приложении показывается цена магазина, литералы `PlanCatalog` — только фолбэк.
 
 Ловушка Play: у одной подписки может быть несколько base plan. Приложение и RevenueCat
 работают с ГОЛЫМИ product id, поэтому у каждой подписки ровно **один** base plan, и он
