@@ -392,3 +392,25 @@ tap` по координатам 720×1280 (вкладки y=1213, x=90/270/450/
 3. Internal testing → загрузить .aab → установить на своём устройстве → §6.
 4. Production → загрузить тот же .aab → **managed publishing** ON → отправить на ревью.
 5. После одобрения — релиз кнопкой (как в `submission-checklist.md` §3).
+
+**Состояние 2026-09-09, вечер — ОТПРАВЛЕНО НА РЕВЬЮ.** Сделано за день: п. 2 полностью (листинг
+с шестью кадрами, все анкеты App content incl. Sign in details / Data safety / Advertising ID,
+семь товаров §5 с фактическими ценами Play, License testing с Gmail владельца); п. 3 — билды 1 и 2
+через Internal testing, device-пасс §6, фиксы закоммичены (`1b6a230`), билд 2 = `2 (1.0)`;
+RevenueCat: JSON сервисного аккаунта (Google Cloud проект `choosereply-play-508114`, аккаунт
+`revenuecat@…`, роль Pub/Sub Admin; права в Play — View app info + View financial data + Manage
+orders) — все три проверки credentials ЗЕЛЁНЫЕ в тот же вечер; RTDN подключён (топик
+`projects/choosereply-play-508114/topics/Play-Store-Notifications`, в Play выбран режим
+«Subscriptions, voided purchases, and all one-time products» — иначе топ-ап без уведомлений;
+тестовое уведомление дошло); семь товаров импортированы, `topup.dialogs.500` = Consumable, шесть
+подписок привязаны к `tier_start/business/network`; п. 4 — Production из библиотеки (`2 (1.0)`),
+восемь стран как в ASC, managed publishing ON, **Send for review нажат**.
+**Осталось:** (а) тест покупок на телефоне по чек-листу из этой сессии — цены Play на пейволле,
+покупка Старт, докупка 500 диалогов (сверить начисление по вебхуку RevenueCatEvent в n8n), смена
+тарифа Старт → Бизнес = ОДНА активная подписка в RevenueCat → Customers, отмена листа без красного
+уведомления, «Восстановить покупки»; после теста отменить тестовые подписки в Play Store;
+(б) после одобрения Google — кнопка **Publish** в Publishing overview, только после (а).
+Ловушки консоли, за которые заплачено: Sign in details — поле инструкций 500 символов (текст §3.1
+сокращён), галочка «full access» честна, потому что платные тарифы отличаются только квотами;
+Content rating — категория «All Other App Types»; AI asset declaration в листинге — «Don't label»;
+«Connect to Google» в RevenueCat оживает только после перезагрузки страницы с сохранённым JSON.
