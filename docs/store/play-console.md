@@ -10,7 +10,7 @@
 
 | Что | Где | Как воспроизвести |
 |---|---|---|
-| Player Settings под Play: targetSdk **36** (требование Play для новых приложений с 31.08.2026), minSdk 25, категория приложения **productivity** (было «game» — дефолт Unity 6.3), App Bundle ON, адаптивная иконка | `Assets/Editor/StoreAndroidSettingsApplier.cs` | `Tools/Store Compliance/Apply Android Store Settings` (или headless `-executeMethod StoreAndroidSettingsApplier.ApplyHeadless`) |
+| Player Settings под Play: targetSdk **36** (требование Play для новых приложений с 31.08.2026), minSdk 25, категория приложения **productivity** (было «game» — дефолт Unity 6.3), App Bundle ON, адаптивная иконка, debug-символы **Symbol Table внутри .aab** (с билда 2; билд 1 ушёл с `debugSymbolLevel 'none'`) | `Assets/Editor/StoreAndroidSettingsApplier.cs` | `Tools/Store Compliance/Apply Android Store Settings` (или headless `-executeMethod StoreAndroidSettingsApplier.ApplyHeadless`) |
 | Адаптивная иконка Android: фон + передний план из ТОГО ЖЕ векторного концепта U9, что и мастер `Icon.png` (знак ×0.63 в 72dp-окне маски, градиент растянут на видимое окно) | `Assets/Images/Icon_android_{bg,fg}.png` (432), превью под масками `Tools/icon-lab/appicon/out/android/adaptive_preview.png` | `node Tools/icon-lab/appicon/android.js` |
 | Манифест: одна launcher-activity (`UnityPlayerGameActivity`, entry = GameActivity), `android:exported="true"`, дубль `WAKE_LOCK` убран | `Assets/Plugins/Android/AndroidManifest.xml` | — |
 | Биллинг на Play: цены запрашиваются двумя запросами (`subs` + `inapp` — Play Billing делит по типу), ключи цен нормализуются (`sub.start.month:monthly` → `sub.start.month`), **смена тарифа — ЗАМЕНА подписки** (`oldSku` + ImmediateWithTimeProration; без этого Play оформлял бы ВТОРУЮ подписку рядом с первой), отмена листа покупки больше не показывается как ошибка | `Assets/Scripts/Billing/StorePurchaseRules.cs`, `RevenueCatBackend.cs`, `PlanCatalog.SubscriptionSkus` | тесты `AndroidBillingPathTests` |
@@ -78,6 +78,16 @@
    (Ctrl+C в чужой вкладке сборку не трогает, а убитый Unity оставляет сироту `bee_backend`,
    который продолжает компилировать). Прерванная сборка оставляет
    `Assets/Resources/PerformanceTestRun*.json` — в коммит не брать, полная сборка их убирает.
+   **Символы (2026-09-08, с билда 2):** applier закрепляет отладочные символы = **Symbol Table** (не Full —
+   DWARF на десятки МБ на ABI читает только локальный отладчик) в формате **IncludeInBundle**
+   (`UserBuildSettings.DebugSymbols`; живёт в per-machine `Library/EditorUserBuildSettings.asset` — потому
+   applier, а не галочка в инспекторе), так что `.so.sym` для `libunity`/`libil2cpp` едут ВНУТРИ .aab
+   (`BUNDLE-METADATA/com.android.tools.build.debugsymbols/`) и Play символицирует нативные краши в
+   Android vitals без отдельной загрузки `symbols.zip`; предупреждение консоли «no debug symbols»
+   относится только к билду 1 (`debugSymbolLevel 'none'`); проверено 2026-09-09 — сгенерированный
+   `unityLibrary/build.gradle` несёт `debugSymbolLevel 'symbol_table'`, а `.aab` из редактора — 14 `.so.sym`
+   в `BUNDLE-METADATA` (81 МБ сжатых, .aab тяжелее на ~88 МБ при пороге 800 МБ `androidSymbolsSizeThreshold`;
+   на размер скачивания не влияет — Play вырезает метаданные из APK).
 5. **Проверки артефакта** (владелец, один раз):
    - `bundletool build-apks --bundle=….aab --output=….apks --mode=universal`, распаковать
      `universal.apk` и `zipalign -c -P 16 -v 4 universal.apk` (16 KB) — ожидаем «Verification successful».
@@ -86,6 +96,9 @@
      добавить в манифест `<uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove"/>`.
    - В `unityLibrary/src/main/AndroidManifest.xml` экспортированного проекта — ровно одна
      activity с категорией LAUNCHER.
+   - `unzip -l ….aab | grep BUNDLE-METADATA/com.android.tools.build.debugsymbols` — по `.so.sym` на
+     каждую ABI (`libunity`, `libil2cpp`, …): символы едут внутри бандла, отдельный `symbols.zip`
+     в Play Console не грузить (с билда 2; в билде 1 их нет).
    **Билд 1 (2026-09-08) прошёл все три** (universal.apk через `bundletool build-apks
    --mode=universal --aapt2=…`, оба из поставки Unity: `…/AndroidPlayer/Tools/bundletool-all-1.17.2.jar`,
    `…/AndroidPlayer/SDK/build-tools/36.0.0/`), плюс: подпись .aab = upload-ключ,
