@@ -400,7 +400,7 @@ namespace Automation.BotSettingsUI
                 using var visibleRect = new AndroidJavaObject("android.graphics.Rect");
                 decorView.Call("getWindowVisibleDisplayFrame", visibleRect);
 
-                int visibleBottom = visibleRect.Call<int>("bottom");
+                int visibleBottom = visibleRect.Get<int>("bottom");
                 int rootHeight = rootView.Call<int>("getHeight");
                 int height = rootHeight - visibleBottom;
 

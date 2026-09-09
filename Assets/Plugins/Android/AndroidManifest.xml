@@ -19,6 +19,13 @@
             </intent-filter>
             <meta-data android:name="unityplayer.UnityActivity" android:value="true" />
             <meta-data android:name="android.app.lib_name" android:value="game" />
+            <!-- Unity asks for every dangerous permission in the manifest at first launch — on
+                 Android ≤ 12 that is a «доступ к фото, мультимедиа и файлам» dialog before the
+                 onboarding even appears (seen 2026-09-09 on Android 8). The legacy storage
+                 permissions come from NativeGallery / NativeFilePicker, and both request them
+                 themselves at pick time (RequestPermissionAsync), so the startup prompt is pure
+                 noise. -->
+            <meta-data android:name="unityplayer.SkipPermissionsDialog" android:value="true" />
         </activity>
     </application>
 </manifest>

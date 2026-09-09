@@ -90,8 +90,18 @@ public class FocusedFieldKeyboardLift : MonoBehaviour
 
     private void HandleFieldSelected(string _) => _lastActiveTime = Time.unscaledTime;
 
+#if CR_DIAGNOSTICS
+    private bool _diagUpdateLogged;
+    private float _diagLastRaw = -1f;
+#endif
+
     private void OnEnable()
     {
+#if CR_DIAGNOSTICS
+        _diagUpdateLogged = false;
+        _diagLastRaw = -1f;
+        Debug.Log($"[FocusedFieldKeyboardLift] OnEnable on '{name}': panel={(panel != null)} canvasRect={(_canvasRect != null)}");
+#endif
         // Self-sync: the host may hand us the panel at any settled position.
         if (panel != null) _currentY = panel.anchoredPosition.y;
         _velocityY = 0f;
@@ -106,6 +116,13 @@ public class FocusedFieldKeyboardLift : MonoBehaviour
 
     private void Update()
     {
+#if CR_DIAGNOSTICS
+        if (!_diagUpdateLogged)
+        {
+            _diagUpdateLogged = true;
+            Debug.Log($"[FocusedFieldKeyboardLift] Update running on '{name}': panel={(panel != null)} canvasRect={(_canvasRect != null)} enabled={enabled}");
+        }
+#endif
         if (panel == null || _canvasRect == null) return;
 
         // Two independent "the keyboard should be up" signals, EITHER of which
@@ -116,6 +133,13 @@ public class FocusedFieldKeyboardLift : MonoBehaviour
         // overwritten by a zero reading), the panel holds a constant target
         // throughout and cannot dip regardless of how long the blip lasts.
         float rawKeyboard = KeyboardCanvasHeight();
+#if CR_DIAGNOSTICS
+        if (!Mathf.Approximately(rawKeyboard, _diagLastRaw))
+        {
+            _diagLastRaw = rawKeyboard;
+            Debug.Log($"[FocusedFieldKeyboardLift] raw={rawKeyboard:F1} focused={AnyFieldFocused()} tskVisible={TouchScreenKeyboard.visible} lift={ComputeLift(rawKeyboard):F1}");
+        }
+#endif
         if (rawKeyboard > 0f)
         {
             _heldKeyboardCanvas = rawKeyboard;

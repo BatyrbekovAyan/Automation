@@ -150,6 +150,9 @@ public partial class ProfileSubPages
             .OnComplete(() =>
             {
                 if (supportSheetKeyboard != null) supportSheetKeyboard.enabled = true;
+#if CR_DIAGNOSTICS
+                Debug.Log($"[Support] slide complete; lift ref={(supportSheetKeyboard != null)} enabled={(supportSheetKeyboard != null && supportSheetKeyboard.enabled)}");
+#endif
             });
 
         RefreshSendInteractable();

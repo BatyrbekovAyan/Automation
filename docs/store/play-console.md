@@ -176,7 +176,7 @@ Choose Reply — независимое приложение, не связан�
 |---|---|---|
 | Значок приложения | `Tools/store/listing/play/icon-512.png` | 512×512 PNG, Play накладывает свою маску |
 | Feature graphic (обязателен) | `Tools/store/listing/play/feature-graphic.png` | 1024×500, без альфы |
-| Скриншоты телефона (2–8) | `Tools/store/listing/play-phone/01-vmeste … 07-plans.png` | 1080×1920 (9:16), порядок как для ASC |
+| Скриншоты телефона (2–8) | `Tools/store/listing/play-phone/01-vmeste … 06-dashboard.png` — **шесть, без `07-plans`** | 1080×1920 (9:16), порядок как для ASC. `07-plans` на Play НЕ грузить (решение 2026-09-08): кадр снят с iOS-ветки пейволла, под кнопкой «отмена в настройках App Store», плюс цены в ₸, которые Play локализует сам; вернуть можно только перехватом из Android-сборки |
 | Планшетные скриншоты | не загружать (приложение телефонное; без них Play лишь не продвигает на планшетах) | — |
 
 Перегенерация после любого изменения UI: `Tools/Store/Capture Screenshots` (редактор,
@@ -316,6 +316,39 @@ Monetization setup → RTDN). Продукты импортировать и п�
 - Тёмная клавиатура следует системной теме (на Android — из настроек ОС, это ожидаемо).
 - Слой выделения текста (долгое нажатие, пины, меню) — проверен только на iOS.
 
+**Device-пасс 2026-09-09, Galaxy J5 Prime (SM-G570F, Android 8.0, 720×1280, Mali-T720, ARMv7),
+билд 1 через Internal testing.** Прошло: иконка, онбординг, вкладки, мастер до QR, все
+сценарии «Назад» (6–10), пикер фото, пейволл (ссылки, переключатель, подпись про Google Play),
+«Удалить все данные». Упало и ПОЧИНЕНО в репо (билд 2 обязателен):
+- **Клавиатура (п. 11–13): композер под IME, лист товара и вкладка Бизнес не реагируют.**
+  Корень: все три JNI-измерителя читали `android.graphics.Rect.bottom` как МЕТОД
+  (`Call<int>` вместо `Get<int>`) → `NoSuchMethodError` → пустой `catch` → 0 на КАЖДОМ
+  Android-устройстве с самого начала; композер приподнимался только на fallback панели
+  подсказок (780u). Починено, страж `AndroidRectJniGuardTests`. На устройстве после фикса:
+  `occluded=582 root=1280 visible=[0..698]`, лист поддержки лёг ровно на клавиатуру.
+  `TouchScreenKeyboard.area` на GameActivity — нулевой rect при `visible=true` (подтверждено
+  логом), а окно IME в `dumpsys window` ВЫШЕ видимой клавиатуры (Samsung: 936 px окно vs
+  582 видимых) — верить только visible-frame. Экраны с ботом перепроверить на билде 2.
+- **Квадратики за мелкими буквами.** Атласы SF Pro были сгенерированы AutoSize 224 pt с
+  padding 5 (SDF-spread 2,2 % em): шейдер TMP гасит фон глифа только при spread ≥ 1 px, порог
+  ≈ 45 px em — на 1080-wide это самый мелкий текст, на 720p (scale 0,667) почти весь.
+  Перегенерировано в месте `Tools/Fonts/Regenerate SF Pro Atlases (112pt, pad 12)`, стражи
+  `FontAtlasPaddingPremiseTests` + `FontGlyphCoverageTests`.
+- **Диалог «доступ к фото, мультимедиа и файлам» при первом запуске** (Android ≤ 12): Unity
+  сам запрашивает dangerous-permissions манифеста на старте. Убран
+  `unityplayer.SkipPermissionsDialog` в activity (пикеры запрашивают сами в момент выбора).
+Не блокеры, см. §7: холодный старт ~2,5 мин на этом устройстве; пустая полоса сверху (п. 4);
+белая клавиатура на тёмной теме — Samsung Keypad берёт свою тему. Не проверено: .docx (п. 17),
+слой выделения (п. 15 «ок» по словам владельца).
+
+**Как воспроизводить и снимать цифры без рук владельца:** `Tools/Store/Build Android Debug
+APK (dev, adb)` (`DevAndroidBuild`: РЕЛИЗНЫЙ конфиг + define `CR_DIAGNOSTICS`, debug-keystore;
+Development Build не брать — меняет флаги IL2CPP и обнуляет кэш Bee) → `adb uninstall`
+Play-версии (другая подпись) → `adb install -r` → `am start` → ждать в `logcat -s Unity`
+маркер `[KeyboardInset] diagnostics build alive` (на J5 Prime ~2,5 мин) → `adb shell input
+tap` по координатам 720×1280 (вкладки y=1213, x=90/270/450/630) → `adb exec-out screencap`.
+Диагностические логи компилируются только под `CR_DIAGNOSTICS`.
+
 ## 7. Известные Android-пробелы (не блокеры подачи)
 
 - **Immersive fullscreen + baked-инсеты под iPhone.** Статус-бар скрыт, верхние ~150u
@@ -330,8 +363,14 @@ Monetization setup → RTDN). Продукты импортировать и п�
 - Открытие документа из чата: QuickLook только на iOS; на Android — системный share.
 - «Купить» для уже купленного тарифа: Play вернёт ITEM_ALREADY_OWNED (на iOS StoreKit
   скажет «уже подписан»); косметика пейволла — отдельная задача.
+- **Холодный старт 125–145 с чёрного экрана на J5 Prime** (2026-09-09; от `APP_CMD_INIT_WINDOW`
+  до первого лога сцены; RES 575 МБ на устройстве с 1,8 ГБ). Отчёт сборки: текстуры 265 МБ
+  несжатых — 4 атласа SF Pro по ~20 МБ, 33 эмодзи-атласа по ~4 МБ (`Resources/Sprite Assets`,
+  все грузятся в `EmojiPatchService.Awake`), доодл 12 МБ, `ChatTicks` 12 МБ. Кандидат №1 на
+  v1.0.1: ленивые эмодзи-атласы / меньше начертаний; на флагманах не воспроизводится.
 - `WRITE_EXTERNAL_STORAGE` (+ implied `READ_EXTERNAL_STORAGE`) без `maxSdkVersion` приходят
-  из AAR-манифестов NativeGallery/NativeFilePicker/NativeCamera. На Android 10+ запись — no-op,
+  из AAR-манифестов NativeGallery/NativeFilePicker/NativeCamera. Стартовый запрос Unity по ним
+  отключён `unityplayer.SkipPermissionsDialog` (2026-09-09). На Android 10+ запись — no-op,
   на 13+ чтение ничего не даёт, декларации в Play Console не требуют; косметика —
   `tools:node="remove"`/`maxSdkVersion` в нашем манифесте, отдельной сборкой.
 

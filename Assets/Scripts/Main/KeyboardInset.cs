@@ -16,10 +16,12 @@ using UnityEngine;
 /// screen looks like. Editor coverage lives in KeyboardLiftMath's unit tests;
 /// the real gate is a device pass.
 ///
-/// NOTE: KeyboardAwarePanel (chat), FocusedFieldKeyboardLift (sheets) and
-/// ItemEditSheet each carry their own equivalent reader, tuned and verified on
-/// device. They are deliberately left alone — consolidating them would change
-/// behaviour on screens that cannot be re-verified right now.
+/// NOTE: ItemEditSheet and KeyboardScrollFix carry their own copies of the same
+/// JNI reader. None of the three had ever worked on a device until 2026-09-09:
+/// Rect.top/bottom were read as methods and the bare catch returned 0 (see
+/// MeasureAndroid). Keep the three in step; AndroidRectJniGuardTests pins them.
+/// Verified on a Galaxy J5 Prime (Android 8): occluded=582 of 1280 px with the
+/// Samsung keyboard up, and TouchScreenKeyboard.area was a zero rect the whole time.
 /// </summary>
 public static class KeyboardInset
 {
@@ -53,17 +55,97 @@ public static class KeyboardInset
             using var visibleRect = new AndroidJavaObject("android.graphics.Rect");
             decorView.Call("getWindowVisibleDisplayFrame", visibleRect);
 
-            int visibleBottom = visibleRect.Call<int>("bottom");
+            // Rect.top/bottom are FIELDS, so this is Get<>, never Call<> — Call<int>("bottom")
+            // throws NoSuchMethodError, the catch below swallowed it, and every Android keyboard
+            // reader in the project returned 0 on every device until the 2026-09-09 pass
+            // (composer under the IME, sheets and forms not lifting at all). AndroidRectJniGuardTests
+            // pins the accessor.
+            int visibleBottom = visibleRect.Get<int>("bottom");
             int rootHeight = rootView.Call<int>("getHeight");
             int height = rootHeight - visibleBottom;
 
             // Noise floor: small deltas are status-bar/gesture-inset jitter.
-            return height > 100 ? height : 0f;
+            float result = height > 100 ? height : 0f;
+#if CR_DIAGNOSTICS
+            LogIfChanged(result, rootHeight, visibleRect, decorView);
+#endif
+            return result;
         }
         catch
+#if CR_DIAGNOSTICS
+        (System.Exception e)
+        {
+            if (!_exceptionLogged)
+            {
+                _exceptionLogged = true;
+                Debug.Log("[KeyboardInset] EXCEPTION in MeasureAndroid: " + e);
+            }
+            return 0f;
+        }
+#else
         {
             return 0f;
         }
+#endif
     }
+
+#if CR_DIAGNOSTICS
+    // ── Diagnostics build only (2026-09-09 Android keyboard pass; DevAndroidBuild sets CR_DIAGNOSTICS) ──
+    // Logs once per CHANGE of the measured value, beside the numbers the fix
+    // decision needs: the visible-frame delta this reader trusts, the IME and
+    // navigation-bar insets the platform reports through WindowInsets (API 30+),
+    // and Unity's own TouchScreenKeyboard view. Compiled out of every store build.
+    private static float _lastLogged = -1f;
+    private static bool _exceptionLogged;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    private static void AnnounceDiagnostics()
+    {
+        string activity = "?";
+        try
+        {
+            using var unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
+            using var current = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity");
+            activity = current == null ? "NULL" : current.Call<string>("toString");
+        }
+        catch (System.Exception e) { activity = "err:" + e.GetType().Name + " " + e.Message; }
+        Debug.Log($"[KeyboardInset] diagnostics build alive; UnityPlayer.currentActivity={activity} " +
+                  $"screen={Screen.width}x{Screen.height} dpi={Screen.dpi} safeArea={Screen.safeArea}");
+    }
+
+    private static void LogIfChanged(float result, int rootHeight, AndroidJavaObject visibleRect,
+                                     AndroidJavaObject decorView)
+    {
+        if (Mathf.Approximately(result, _lastLogged)) return;
+        _lastLogged = result;
+
+        int visibleTop = visibleRect.Get<int>("top");
+        int visibleBottom = visibleRect.Get<int>("bottom");
+        string ime = "n/a", nav = "n/a";
+        try
+        {
+            using var insets = decorView.Call<AndroidJavaObject>("getRootWindowInsets");   // API 23+
+            if (insets != null)
+            {
+                using var typeClass = new AndroidJavaClass("android.view.WindowInsets$Type"); // API 30+
+                int imeType = typeClass.CallStatic<int>("ime");
+                int navType = typeClass.CallStatic<int>("navigationBars");
+                using var imeInsets = insets.Call<AndroidJavaObject>("getInsets", imeType);
+                using var navInsets = insets.Call<AndroidJavaObject>("getInsets", navType);
+                bool imeVisible = insets.Call<bool>("isVisible", imeType);
+                ime = imeInsets.Get<int>("bottom") + (imeVisible ? " visible" : " hidden");
+                nav = navInsets.Get<int>("bottom").ToString();
+            }
+        }
+        catch (System.Exception e)
+        {
+            ime = "err:" + e.GetType().Name;
+        }
+
+        Debug.Log($"[KeyboardInset] occluded={result} root={rootHeight} visible=[{visibleTop}..{visibleBottom}] " +
+                  $"imeInsetBottom={ime} navInsetBottom={nav} screen={Screen.width}x{Screen.height} " +
+                  $"safeArea={Screen.safeArea} tskVisible={TouchScreenKeyboard.visible} tskArea={TouchScreenKeyboard.area}");
+    }
+#endif // CR_DIAGNOSTICS
 #endif
 }
