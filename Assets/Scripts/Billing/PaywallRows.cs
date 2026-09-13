@@ -2,13 +2,15 @@
 public enum PaywallPeriod { Month, Year }
 
 /// <summary>
-/// The second, secondary-styled paywall button (Task 18): the direct-purchase escape hatch
-/// shown only while the primary CTA is the free-trial offer.
+/// The second, secondary-styled paywall button. Since 2026-09-13 it carries the free-trial
+/// offer («Попробовать 5 дней бесплатно») and shows only while that offer exists — the
+/// primary CTA is the purchase in every state. (Task 18 built it the other way round: the
+/// purchase under a trial CTA; App Review 2026-09-10 is why the roles swapped.)
 /// </summary>
 public struct PaywallSecondaryRow
 {
     public bool Visible;
-    public string Text;             // «Оформить Бизнес — 19 990 ₸/мес», empty when hidden
+    public string Text;             // «Попробовать 5 дней бесплатно», empty when hidden
 }
 
 /// <summary>One rendered tier card's worth of state — everything the view needs, nothing it doesn't.</summary>
@@ -47,24 +49,23 @@ public static class PaywallRows
     public const string PopularBadge = "Популярный";
     public const string CrossBotLine = "Сводка по всем ботам";
     public const string AllPlansOverline = "ВО ВСЕХ ТАРИФАХ";
-    public const string FinePrint = "Без карты · Отмена в любой момент";
     public const string RestoreLabel = "Восстановить покупки";
 
     /// <summary>
-    /// Auto-renew disclosure for the subscribe state (Apple Guideline 3.1.2: renewal terms
-    /// must be clear at the purchase point; price + period already sit on the tier cards).
-    /// Split per store because Guideline 2.3.10 forbids mentioning Google Play inside the
-    /// iOS binary. The trial state keeps <see cref="FinePrint"/> — that CTA buys nothing.
+    /// Auto-renew disclosure under the CTA (Apple Guideline 3.1.2: renewal terms must be
+    /// clear at the purchase point; price + period already sit on the tier cards). Split per
+    /// store because Guideline 2.3.10 forbids mentioning Google Play inside the iOS binary.
+    /// Since 2026-09-13 the CTA is a purchase in EVERY state (see <see cref="CtaText"/>), so
+    /// this is the fine print in every state — the old trial-state «Без карты · Отмена в
+    /// любой момент» described a CTA that no longer exists.
     /// </summary>
     public const string FinePrintAutoRenewIos =
         "Продлевается автоматически · отмена в настройках App Store";
     public const string FinePrintAutoRenewAndroid =
         "Продлевается автоматически · отмена в настройках Google Play";
 
-    public static string FinePrintText(bool isTrialOffer, bool iosStore)
-        => isTrialOffer ? FinePrint
-         : iosStore ? FinePrintAutoRenewIos
-         : FinePrintAutoRenewAndroid;
+    public static string FinePrintText(bool iosStore)
+        => iosStore ? FinePrintAutoRenewIos : FinePrintAutoRenewAndroid;
 
     public const string PeriodMonth = "Месяц";
     public const string PeriodYear = "Год";
@@ -179,11 +180,10 @@ public static class PaywallRows
     // ── CTA ──────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// The one state in which the primary CTA offers the free trial instead of naming a tier:
-    /// the trial clock has never started, nothing is purchased AND the server has not already
-    /// told us this account is expired. Shared by <see cref="CtaText"/> and
-    /// <see cref="SecondaryPurchase"/> so the two can never disagree about which button
-    /// carries the subscribe form.
+    /// The state in which the free trial is on offer: the trial clock has never started,
+    /// nothing is purchased AND the server has not already told us this account is expired.
+    /// It decides ONLY whether the secondary <see cref="TrialRow"/> shows — never what the
+    /// CTA says (see <see cref="CtaText"/>).
     ///
     /// <paramref name="serverSaysExpired"/> (Task 19) is the same fact
     /// <see cref="EntitlementGate.CurrentTier"/> now reads — an id-persisted reinstall wipes
@@ -195,39 +195,34 @@ public static class PaywallRows
         => !trialStarted && purchased == PlanTier.None && !serverSaysExpired;
 
     /// <summary>
-    /// «Попробовать 5 дней бесплатно» only in the <see cref="IsTrialOffer"/> state — every
-    /// other one is a subscribe form naming the selected tier and its price in the selected
-    /// period.
+    /// The primary CTA is the subscribe form — «Оформить &lt;тариф&gt; — &lt;цена&gt;» for the
+    /// selected tier and period — in EVERY state (App Review rejection 2026-09-10, Guideline
+    /// 2.1(b) «the app failed to complete the in-app purchase»).
+    ///
+    /// Until 2026-09-13 the CTA read «Попробовать 5 дней бесплатно» while the trial had not
+    /// started and merely CLOSED the paywall; the purchase sat on a secondary button under it.
+    /// A reviewer's sandbox account owns no subscription, so that was precisely the state App
+    /// Review opened the paywall in: the server trace of the review session shows three
+    /// paywall visits and not one StoreKit purchase. The trial offer now lives on the
+    /// secondary row (<see cref="TrialRow"/>), where a button that buys nothing belongs.
     /// </summary>
-    public static string CtaText(bool trialStarted, PlanTier purchased, bool serverSaysExpired,
-        PlanTier selected, PaywallPeriod period,
+    public static string CtaText(PlanTier selected, PaywallPeriod period,
         System.Collections.Generic.IReadOnlyDictionary<string, string> localizedPrices = null)
-    {
-        if (IsTrialOffer(trialStarted, purchased, serverSaysExpired))
-            return PaywallCopy.TrialCta();
-        return SubscribeText(selected, period, localizedPrices);
-    }
+        => SubscribeText(selected, period, localizedPrices);
 
     /// <summary>
-    /// The direct-purchase button UNDER the trial CTA (Task 18). It exists because the trial
-    /// offer names no tier and buys nothing — without it, a fresh install has no way to pay,
-    /// which is what the owner hit on device 2026-08-26.
-    ///
-    /// Visible ONLY in that state, deliberately: everywhere else the CTA already IS this exact
-    /// string, and a second copy of it would be a duplicate. The text is therefore the SAME
-    /// <see cref="PaywallCopy.SubscribeCta"/> form the CTA shows, so a tier/period change moves
-    /// both in lockstep. A selection with no store product (never reachable through
-    /// <see cref="Order"/>, but cheap to rule out) hides the button rather than offering a
-    /// purchase that cannot be made.
+    /// The secondary row under the CTA: «Попробовать 5 дней бесплатно», visible exactly in the
+    /// <see cref="IsTrialOffer"/> state. It names no tier and buys nothing — the trial takes no
+    /// card and its clock starts on the first channel authorization (spec §3) — so tapping it
+    /// just closes the paywall, which is what the old primary CTA did. Hidden with empty text
+    /// everywhere else: there is no trial to offer a subscriber or an expired account.
     /// </summary>
-    public static PaywallSecondaryRow SecondaryPurchase(bool trialStarted, PlanTier purchased,
-        bool serverSaysExpired, PlanTier selected, PaywallPeriod period,
-        System.Collections.Generic.IReadOnlyDictionary<string, string> localizedPrices = null)
+    public static PaywallSecondaryRow TrialRow(bool trialStarted, PlanTier purchased, bool serverSaysExpired)
     {
-        if (!IsTrialOffer(trialStarted, purchased, serverSaysExpired) || string.IsNullOrEmpty(Sku(selected, period)))
+        if (!IsTrialOffer(trialStarted, purchased, serverSaysExpired))
             return new PaywallSecondaryRow { Visible = false, Text = "" };
 
-        return new PaywallSecondaryRow { Visible = true, Text = SubscribeText(selected, period, localizedPrices) };
+        return new PaywallSecondaryRow { Visible = true, Text = PaywallCopy.TrialCta() };
     }
 
     /// <summary>«Оформить &lt;тариф&gt; — &lt;цена&gt;» for the current selection.</summary>

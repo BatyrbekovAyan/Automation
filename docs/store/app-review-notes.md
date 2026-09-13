@@ -42,7 +42,12 @@ WhatsApp account and the customer messages are real):
    Use and Privacy Policy links at the bottom, and "Restore purchases"
    («Восстановить покупки»). (If a trial is already running, the trial pill in
    the header of the Bots tab opens the same paywall.)
-4. Sandbox purchase and restore of any subscription tier work with a sandbox
+4. To purchase: select a tier card, then tap the large primary button
+   «Оформить <тариф> — <цена>» ("Subscribe to <tier> — <price>") at the bottom.
+   It opens the standard StoreKit purchase sheet for the selected tier in the
+   selected period. The consumable top-up is on the same «Подписка» page:
+   «Купить 500 диалогов» ("Buy 500 dialogs").
+5. Sandbox purchase and restore of any subscription tier work with a sandbox
    Apple ID as usual (products: 3 tiers × monthly/yearly + one consumable
    dialog top-up).
 
@@ -50,8 +55,10 @@ WhatsApp account and the customer messages are real):
 The 5-day trial is app-level functionality: it starts when the user first
 connects a messenger channel, requires no payment method, and no payment is
 requested outside of standard auto-renewable In-App Purchases. All payments go
-exclusively through StoreKit. The trial button on the paywall
-(«Попробовать 5 дней бесплатно») does not initiate any purchase.
+exclusively through StoreKit. On a fresh install the paywall shows a secondary
+row «Попробовать 5 дней бесплатно» ("Try 5 days free") UNDER the purchase
+button; it does not initiate any purchase — it simply closes the paywall. The
+purchase is always the primary button above it (item 4).
 
 **About messenger connectivity.**
 The app connects only accounts that belong to the user themselves — the user

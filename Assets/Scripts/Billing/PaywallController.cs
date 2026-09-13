@@ -72,11 +72,17 @@ public class PaywallController : MonoBehaviour
     [SerializeField] private Button ctaButton;
     [SerializeField] private TextMeshProUGUI ctaLabel;
     [SerializeField] private TextMeshProUGUI finePrint;
-    // The direct-purchase button under the CTA — shown only while the CTA offers the trial
-    // (PaywallRows.SecondaryPurchase). Its own GameObject is the visibility switch, so no
-    // separate root ref is needed.
-    [SerializeField] private Button purchaseButton;
-    [SerializeField] private TextMeshProUGUI purchaseLabel;
+    // The secondary row under the CTA: «Попробовать 5 дней бесплатно», shown only while the
+    // trial is on offer (PaywallRows.TrialRow); tapping it just closes the paywall. Its own
+    // GameObject is the visibility switch, so no separate root ref is needed.
+    // FormerlySerializedAs: until 2026-09-13 this same scene node (BottomBar/SecondaryPurchase)
+    // was the direct-PURCHASE button under a trial CTA — the roles swapped after App Review
+    // 2026-09-10 (see PaywallRows.CtaText). The node keeps its historical name in Main.unity;
+    // only the field names and the listeners changed, so the scene refs survive untouched.
+    [UnityEngine.Serialization.FormerlySerializedAs("purchaseButton")]
+    [SerializeField] private Button trialButton;
+    [UnityEngine.Serialization.FormerlySerializedAs("purchaseLabel")]
+    [SerializeField] private TextMeshProUGUI trialLabel;
     [SerializeField] private Button restoreButton;
     [SerializeField] private TextMeshProUGUI restoreLabel;
     // Legal links row (store submission pack): hidden entirely until LegalLinks carries
@@ -302,8 +308,10 @@ public class PaywallController : MonoBehaviour
         _wired = true;
 
         if (closeButton != null) closeButton.onClick.AddListener(Close);
-        if (ctaButton != null) ctaButton.onClick.AddListener(OnCtaClicked);
-        if (purchaseButton != null) purchaseButton.onClick.AddListener(StartPurchase);
+        // The CTA buys, unconditionally (PaywallCtaWiringTests). It used to route through a
+        // trial branch that CLOSED the paywall on a fresh install — App Review 2026-09-10.
+        if (ctaButton != null) ctaButton.onClick.AddListener(StartPurchase);
+        if (trialButton != null) trialButton.onClick.AddListener(OnTrialClicked);
         if (restoreButton != null) restoreButton.onClick.AddListener(OnRestoreClicked);
         if (termsButton != null) termsButton.onClick.AddListener(() => OpenLegal(LegalLinks.TermsUrl));
         if (privacyButton != null) privacyButton.onClick.AddListener(() => OpenLegal(LegalLinks.PrivacyUrl));
@@ -410,26 +418,24 @@ public class PaywallController : MonoBehaviour
         Render();
     }
 
-    private void OnCtaClicked()
+    /// <summary>
+    /// «Попробовать N дней бесплатно» buys nothing: the trial takes no card, and its clock is
+    /// started by the first channel authorization (spec §3), never by this button. So the
+    /// honest action is to get out of the user's way. This is exactly what the primary CTA
+    /// did until 2026-09-13 — and why App Review, whose sandbox account owns no subscription,
+    /// tapped the big button three times and never reached a StoreKit sheet (Guideline
+    /// 2.1(b), «the app failed to complete the in-app purchase»). The purchase is the primary
+    /// CTA now; this row is the one that only closes.
+    /// </summary>
+    private void OnTrialClicked()
     {
-        if (IsTrialOffer)
-        {
-            // «Попробовать N дней бесплатно» buys nothing: the trial takes no card, and its
-            // clock is started by the first channel authorization (spec §3), never by this
-            // button. So the honest action here is to get out of the user's way. Paying right
-            // now is reachable through the secondary button below it (Task 18) — which shares
-            // StartPurchase with this method's other branch, so there is exactly one buy path.
-            Close();
-            return;
-        }
-
-        StartPurchase();
+        Close();
     }
 
     /// <summary>
-    /// THE purchase path, entered by the CTA once it is the subscribe form and by the
-    /// secondary button while the CTA still offers the trial. Both read the same
-    /// selection fields, so the button's label and what it buys cannot drift apart.
+    /// THE purchase path, entered by the primary CTA in every state. It reads the same
+    /// selection fields the label is rendered from, so the button's text and what it buys
+    /// cannot drift apart.
     /// </summary>
     private void StartPurchase()
     {
@@ -500,12 +506,10 @@ public class PaywallController : MonoBehaviour
         Manager.Instance.StartCoroutine(UsageClient.FetchRoutine());
     }
 
-    private bool IsTrialOffer => PaywallRows.IsTrialOffer(_trialStarted, _purchased, _serverSaysExpired);
-
     private void SetBusy(bool busy)
     {
         if (ctaButton != null) ctaButton.interactable = !busy;
-        if (purchaseButton != null) purchaseButton.interactable = !busy;
+        if (trialButton != null) trialButton.interactable = !busy;
         if (restoreButton != null) restoreButton.interactable = !busy;
     }
 
@@ -548,20 +552,20 @@ public class PaywallController : MonoBehaviour
             if (card.ring != null) card.ring.SetActive(row.Tier == _selected);
         }
 
+        // The CTA is the subscribe form for the current selection in every state; a tier or
+        // period tap repaints it here, so its label and what StartPurchase buys never drift.
         if (ctaLabel != null)
-            ctaLabel.text = PaywallRows.CtaText(_trialStarted, _purchased, _serverSaysExpired, _selected, _period, localizedPrices);
+            ctaLabel.text = PaywallRows.CtaText(_selected, _period, localizedPrices);
 
-        // The secondary button follows the same selection as the CTA, so a tier/period tap
-        // repaints both here — and the seam keeps it OFF in every state where the CTA is
-        // already the subscribe form.
-        PaywallSecondaryRow secondary =
-            PaywallRows.SecondaryPurchase(_trialStarted, _purchased, _serverSaysExpired, _selected, _period, localizedPrices);
-        if (purchaseButton != null) purchaseButton.gameObject.SetActive(secondary.Visible);
-        if (purchaseLabel != null && secondary.Visible) purchaseLabel.text = secondary.Text;
+        // The trial row shows only while the trial is on offer (never started, nothing
+        // bought, server not saying expired) — the seam keeps it OFF everywhere else.
+        PaywallSecondaryRow trial = PaywallRows.TrialRow(_trialStarted, _purchased, _serverSaysExpired);
+        if (trialButton != null) trialButton.gameObject.SetActive(trial.Visible);
+        if (trialLabel != null && trial.Visible) trialLabel.text = trial.Text;
 
         if (finePrint != null)
             finePrint.text = !string.IsNullOrEmpty(_notice) ? _notice
-                : PaywallRows.FinePrintText(IsTrialOffer, IsIosStore());
+                : PaywallRows.FinePrintText(IsIosStore());
         if (restoreLabel != null)
             restoreLabel.text = PaywallRows.RestoreLabel;
 

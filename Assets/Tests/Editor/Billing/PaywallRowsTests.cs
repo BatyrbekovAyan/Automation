@@ -102,88 +102,87 @@ public class PaywallRowsTests
     public void Dialogs_group_thousands_with_nbsp()
         => Assert.AreEqual("1\u00A0000 диалогов", PaywallCopy.Dialogs(1000));
 
-    // ── CTA ──────────────────────────────────────────────────────────────────
+    // ── CTA: the subscribe form in EVERY state (App Review 2026-09-10, Guideline 2.1(b)) ──
+    //
+    // The primary button used to read «Попробовать 5 дней бесплатно» on a fresh install and
+    // close the paywall without buying; the purchase sat on a secondary button below it. The
+    // reviewer's sandbox account has no subscriptions, so that is the state App Review opens
+    // the paywall in — the server trace shows three paywall visits and not one StoreKit
+    // purchase, and the rejection reads «the app failed to complete the in-app purchase».
+    // Now the CTA is the purchase everywhere and the trial line is the secondary row.
 
     [Test]
-    public void Cta_offers_the_free_trial_while_nothing_started_and_nothing_bought()
-        => Assert.AreEqual(PaywallCopy.TrialCta(),
-            PaywallRows.CtaText(false, PlanTier.None, false, PlanTier.Business, PaywallPeriod.Month));
-
-    [Test]
-    public void Cta_offers_the_free_trial_verbatim()
-        => Assert.AreEqual("Попробовать 5 дней бесплатно",
-            PaywallRows.CtaText(false, PlanTier.None, false, PlanTier.Business, PaywallPeriod.Month));
-
-    [Test]
-    public void Cta_switches_to_subscribe_once_the_trial_clock_started()
+    public void Cta_is_the_subscribe_form_for_the_selection()
         => Assert.AreEqual("Оформить Бизнес — 19\u00A0990\u00A0₸/мес",
-            PaywallRows.CtaText(true, PlanTier.None, false, PlanTier.Business, PaywallPeriod.Month));
-
-    [Test]
-    public void Cta_switches_to_subscribe_once_something_is_purchased()
-        => Assert.AreEqual("Оформить Сеть — 399\u00A0990\u00A0₸/год",
-            PaywallRows.CtaText(false, PlanTier.Start, false, PlanTier.Network, PaywallPeriod.Year));
+            PaywallRows.CtaText(PlanTier.Business, PaywallPeriod.Month));
 
     [Test]
     public void Cta_follows_the_selected_tier_and_period()
         => Assert.AreEqual("Оформить Старт — 99\u00A0000\u00A0₸/год",
-            PaywallRows.CtaText(true, PlanTier.None, false, PlanTier.Start, PaywallPeriod.Year));
-
-    // ── Secondary direct-purchase button (Task 18) ───────────────────────────
+            PaywallRows.CtaText(PlanTier.Start, PaywallPeriod.Year));
 
     [Test]
-    public void Secondary_purchase_shows_while_the_cta_offers_the_trial()
+    public void Cta_carries_the_localized_price()
     {
-        var row = PaywallRows.SecondaryPurchase(false, PlanTier.None, false, PlanTier.Business, PaywallPeriod.Month);
-        Assert.IsTrue(row.Visible);
-        Assert.AreEqual("Оформить Бизнес — 19\u00A0990\u00A0₸/мес", row.Text);
+        var prices = new System.Collections.Generic.Dictionary<string, string> { { "sub.network.year", "$699.99" } };
+        Assert.AreEqual("Оформить Сеть — $699.99/год",
+            PaywallRows.CtaText(PlanTier.Network, PaywallPeriod.Year, prices));
     }
-
-    [Test]
-    public void Secondary_purchase_follows_the_selected_tier_and_period()
-    {
-        var row = PaywallRows.SecondaryPurchase(false, PlanTier.None, false, PlanTier.Network, PaywallPeriod.Year);
-        Assert.IsTrue(row.Visible);
-        Assert.AreEqual("Оформить Сеть — 399\u00A0990\u00A0₸/год", row.Text);
-    }
-
-    [Test]
-    public void Secondary_purchase_hides_once_the_trial_clock_started()
-        => Assert.IsFalse(PaywallRows.SecondaryPurchase(true, PlanTier.None, false, PlanTier.Business, PaywallPeriod.Month).Visible);
-
-    [Test]
-    public void Secondary_purchase_hides_once_something_is_purchased()
-        => Assert.IsFalse(PaywallRows.SecondaryPurchase(false, PlanTier.Start, false, PlanTier.Business, PaywallPeriod.Month).Visible);
-
-    [Test]
-    public void Secondary_purchase_carries_no_text_while_hidden()
-        => Assert.AreEqual("", PaywallRows.SecondaryPurchase(true, PlanTier.Start, false, PlanTier.Network, PaywallPeriod.Year).Text);
-
-    [TestCase(PlanTier.None)]
-    [TestCase(PlanTier.Trial)]
-    public void Secondary_purchase_hides_for_a_selection_with_no_store_product(PlanTier selected)
-        => Assert.IsFalse(PaywallRows.SecondaryPurchase(false, PlanTier.None, false, selected, PaywallPeriod.Month).Visible);
 
     /// <summary>
-    /// The whole point of the button: it appears exactly where the CTA stops naming a tier,
-    /// so the paywall can never show the subscribe form twice — nor zero times.
+    /// The trap App Review walked into, pinned from the other side: no selection and no
+    /// account state may ever turn the primary button into the free-trial line again.
     /// </summary>
     [Test]
-    public void Secondary_purchase_is_visible_exactly_when_the_cta_is_the_trial_offer()
+    public void Cta_never_reads_as_the_trial_offer()
+    {
+        foreach (PlanTier selected in PaywallRows.Order)
+        foreach (PaywallPeriod period in new[] { PaywallPeriod.Month, PaywallPeriod.Year })
+        {
+            string cta = PaywallRows.CtaText(selected, period);
+            Assert.AreEqual(PaywallRows.SubscribeText(selected, period), cta, $"{selected} {period}");
+            Assert.AreNotEqual(PaywallCopy.TrialCta(), cta, $"{selected} {period}");
+        }
+    }
+
+    // ── Secondary trial row (was the direct-purchase button, Task 18) ────────
+
+    [Test]
+    public void Trial_row_shows_while_nothing_started_and_nothing_bought()
+    {
+        var row = PaywallRows.TrialRow(false, PlanTier.None, false);
+        Assert.IsTrue(row.Visible);
+        Assert.AreEqual(PaywallCopy.TrialCta(), row.Text);
+    }
+
+    [Test]
+    public void Trial_row_reads_the_free_trial_verbatim()
+        => Assert.AreEqual("Попробовать 5 дней бесплатно", PaywallRows.TrialRow(false, PlanTier.None, false).Text);
+
+    [Test]
+    public void Trial_row_hides_once_the_trial_clock_started()
+        => Assert.IsFalse(PaywallRows.TrialRow(true, PlanTier.None, false).Visible);
+
+    [Test]
+    public void Trial_row_hides_once_something_is_purchased()
+        => Assert.IsFalse(PaywallRows.TrialRow(false, PlanTier.Start, false).Visible);
+
+    [Test]
+    public void Trial_row_carries_no_text_while_hidden()
+        => Assert.AreEqual("", PaywallRows.TrialRow(true, PlanTier.Start, false).Text);
+
+    /// <summary>The row is the trial offer and nothing else: visible exactly in that state.</summary>
+    [Test]
+    public void Trial_row_is_visible_exactly_in_the_trial_offer_state()
     {
         foreach (bool started in new[] { false, true })
         foreach (PlanTier purchased in new[] { PlanTier.None, PlanTier.Start, PlanTier.Business, PlanTier.Network })
         foreach (bool serverExpired in new[] { false, true })
-        foreach (PlanTier selected in PaywallRows.Order)
-        foreach (PaywallPeriod period in new[] { PaywallPeriod.Month, PaywallPeriod.Year })
         {
-            string cta = PaywallRows.CtaText(started, purchased, serverExpired, selected, period);
-            var row = PaywallRows.SecondaryPurchase(started, purchased, serverExpired, selected, period);
-            bool ctaIsTrial = cta == PaywallCopy.TrialCta();
-            Assert.AreEqual(ctaIsTrial, row.Visible,
-                $"started={started} purchased={purchased} serverExpired={serverExpired} selected={selected} {period}");
-            // Whichever button carries it, the subscribe form reads the same.
-            Assert.AreEqual(ctaIsTrial ? row.Text : cta, PaywallRows.SubscribeText(selected, period));
+            var row = PaywallRows.TrialRow(started, purchased, serverExpired);
+            Assert.AreEqual(PaywallRows.IsTrialOffer(started, purchased, serverExpired), row.Visible,
+                $"started={started} purchased={purchased} serverExpired={serverExpired}");
+            Assert.AreEqual(row.Visible ? PaywallCopy.TrialCta() : "", row.Text);
         }
     }
 
@@ -205,20 +204,10 @@ public class PaywallRowsTests
     public void Server_expired_kills_the_trial_offer()
         => Assert.IsFalse(PaywallRows.IsTrialOffer(false, PlanTier.None, true));
 
-    /// <summary>
-    /// И CTA обязан стать рабочей кнопкой покупки — иначе у истёкшего аккаунта на пейволле
-    /// вообще нет платного пути (это и был баг Task 18, только в другом состоянии).
-    /// </summary>
+    /// <summary>И строка триала при этом прячется — предлагать нечего.</summary>
     [Test]
-    public void Server_expired_turns_the_cta_into_the_subscribe_form()
-        => Assert.AreEqual("Оформить Бизнес — 19\u00A0990\u00A0₸/мес",
-            PaywallRows.CtaText(false, PlanTier.None, true, PlanTier.Business, PaywallPeriod.Month));
-
-    /// <summary>Вторая кнопка при этом прячется: дублировать форму подписки нечем и незачем.</summary>
-    [Test]
-    public void Server_expired_hides_the_secondary_button()
-        => Assert.IsFalse(
-            PaywallRows.SecondaryPurchase(false, PlanTier.None, true, PlanTier.Business, PaywallPeriod.Month).Visible);
+    public void Server_expired_hides_the_trial_row()
+        => Assert.IsFalse(PaywallRows.TrialRow(false, PlanTier.None, true).Visible);
 
     /// <summary>Неизвестный статус (снимка ещё нет) ничего не меняет — fail-open.</summary>
     [Test]
@@ -305,7 +294,7 @@ public class PaywallRowsTests
         Assert.AreEqual("Оформить Старт — $24.99/мес",
             PaywallRows.SubscribeText(PlanTier.Start, PaywallPeriod.Month, prices));
         Assert.AreEqual("Оформить Старт — $24.99/мес",
-            PaywallRows.SecondaryPurchase(false, PlanTier.None, false, PlanTier.Start, PaywallPeriod.Month, prices).Text);
+            PaywallRows.CtaText(PlanTier.Start, PaywallPeriod.Month, prices));
     }
 
     // ── Value receipt ────────────────────────────────────────────────────────
@@ -357,21 +346,26 @@ public class PaywallRowsTests
 
     // ── Fine print (store submission pack) ───────────────────────────────────
 
+    /// <summary>
+    /// The CTA is a purchase in every state now, so the auto-renew disclosure (Apple 3.1.2)
+    /// sits under it in every state — the old trial-state «Без карты» line would have
+    /// described a button that no longer exists.
+    /// </summary>
     [Test]
-    public void FinePrint_trial_state_keeps_no_card_promise_on_both_stores()
-    {
-        Assert.AreEqual("Без карты · Отмена в любой момент", PaywallRows.FinePrintText(true, true));
-        Assert.AreEqual("Без карты · Отмена в любой момент", PaywallRows.FinePrintText(true, false));
-    }
-
-    [Test]
-    public void FinePrint_subscribe_state_discloses_auto_renew_per_store()
+    public void FinePrint_discloses_auto_renew_per_store()
     {
         // 2.3.10: the iOS build must never say «Google Play», and naming the wrong store
         // in a renewal disclosure is its own kind of wrong — so the pair is pinned whole.
         Assert.AreEqual("Продлевается автоматически · отмена в настройках App Store",
-            PaywallRows.FinePrintText(false, true));
+            PaywallRows.FinePrintText(true));
         Assert.AreEqual("Продлевается автоматически · отмена в настройках Google Play",
-            PaywallRows.FinePrintText(false, false));
+            PaywallRows.FinePrintText(false));
+    }
+
+    [Test]
+    public void FinePrint_never_promises_no_card()
+    {
+        StringAssert.DoesNotContain("Без карты", PaywallRows.FinePrintText(true));
+        StringAssert.DoesNotContain("Без карты", PaywallRows.FinePrintText(false));
     }
 }

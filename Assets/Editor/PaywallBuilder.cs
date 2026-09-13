@@ -106,7 +106,7 @@ public static class PaywallBuilder
         DestroyAllByName(bar, "SecondaryPurchase");
         var node = BuildSecondaryPurchase(bar.gameObject, out Button purchase, out TextMeshProUGUI purchaseLabel);
 
-        // Between the fine print and «Восстановить покупки»: the trial CTA keeps its position
+        // Between the fine print and «Восстановить покупки»: the purchase CTA keeps its position
         // in the thumb zone, and the fine print stays attached to the CTA it describes.
         Transform restore = bar.Find("Restore");
         if (restore != null) node.transform.SetSiblingIndex(restore.GetSiblingIndex());
@@ -652,12 +652,17 @@ public static class PaywallBuilder
         cta.transition = Selectable.Transition.ColorTint;
         var ctaLabelGo = NewChild(ctaGo, "Label", out var ctaLabelRt);
         StretchFill(ctaLabelRt);
-        ctaLabel = AddText(ctaLabelGo, PaywallCopy.TrialCta(), 44f, _semibold, ThemeRole.AccentOnFill);
+        // Seed = the state a fresh install opens in. Since 2026-09-13 the CTA is the purchase in
+        // every state (App Review 2026-09-10); the trial offer is the secondary row below.
+        ctaLabel = AddText(ctaLabelGo, PaywallRows.CtaText(PaywallRows.Recommended, PaywallPeriod.Month),
+            44f, _semibold, ThemeRole.AccentOnFill);
         ctaLabel.alignment = TextAlignmentOptions.Center;
 
         var fineGo = NewChild(bar, "FinePrint", out _);
         SetPreferredHeight(fineGo, 40f);
-        finePrint = AddText(fineGo, PaywallRows.FinePrint, 28f, _regular, ThemeRole.InkTertiary);
+        // iOS wording as the scene seed: safe in both binaries (2.3.10 forbids «Google Play» on
+        // iOS, not the other way round); the runtime stamps the per-store line before first paint.
+        finePrint = AddText(fineGo, PaywallRows.FinePrintText(true), 28f, _regular, ThemeRole.InkTertiary);
         finePrint.alignment = TextAlignmentOptions.Center;
 
         BuildSecondaryPurchase(bar, out purchase, out purchaseLabel);
@@ -682,15 +687,17 @@ public static class PaywallBuilder
         return bar;
     }
 
-    // ── (3a-bis) Secondary «Оформить …» button (Task 18) ─────────────────────
+    // ── (3a-bis) Secondary trial row (was the «Оформить …» button, Task 18) ─────
 
     /// <summary>
-    /// The direct-purchase button under the trial CTA. Secondary by construction: a Surface
-    /// fill (the screen's card ground) with an AccentText label, against the CTA's solid
-    /// AccentFill — so the free trial stays the loudest thing in the thumb zone while paying
-    /// right now is one tap away. Visibility + text are owned at runtime by
-    /// <see cref="PaywallController"/> from the <c>PaywallRows.SecondaryPurchase</c> seam;
-    /// the scene seeds the state a fresh install actually opens in.
+    /// The secondary row under the CTA — «Попробовать 5 дней бесплатно» since 2026-09-13.
+    /// Secondary by construction: a Surface fill (the screen's card ground) with an AccentText
+    /// label, against the CTA's solid AccentFill — so the PURCHASE is the loudest thing in the
+    /// thumb zone (App Review 2026-09-10 tapped the big button and got a closed paywall) while
+    /// the free trial stays one tap away. Visibility + text are owned at runtime by
+    /// <see cref="PaywallController"/> from the <c>PaywallRows.TrialRow</c> seam; the scene
+    /// seeds the state a fresh install actually opens in. The node keeps its historical name
+    /// «SecondaryPurchase» so the idempotent patch below and the live scene keep resolving.
     /// </summary>
     private static GameObject BuildSecondaryPurchase(GameObject bar, out Button purchase,
         out TextMeshProUGUI purchaseLabel)
@@ -710,9 +717,7 @@ public static class PaywallBuilder
 
         var labelGo = NewChild(go, "Label", out var labelRt);
         StretchFill(labelRt);
-        purchaseLabel = AddText(labelGo,
-            PaywallRows.SubscribeText(PaywallRows.Recommended, PaywallPeriod.Month),
-            40f, _semibold, ThemeRole.AccentText);
+        purchaseLabel = AddText(labelGo, PaywallCopy.TrialCta(), 40f, _semibold, ThemeRole.AccentText);
         purchaseLabel.alignment = TextAlignmentOptions.Center;
         purchaseLabel.textWrappingMode = TextWrappingModes.NoWrap;   // a wrapped price is never right
         return go;
@@ -923,11 +928,13 @@ public static class PaywallBuilder
     /// </summary>
     private static void StampPurchaseRefs(SerializedObject so, Button purchase, TextMeshProUGUI purchaseLabel)
     {
-        SerializedProperty buttonProp = so.FindProperty("purchaseButton");
-        SerializedProperty labelProp = so.FindProperty("purchaseLabel");
+        // Field names on PaywallController since 2026-09-13 (FormerlySerializedAs keeps the
+        // scene's old «purchaseButton»/«purchaseLabel» refs loading; new stamps use the new names).
+        SerializedProperty buttonProp = so.FindProperty("trialButton");
+        SerializedProperty labelProp = so.FindProperty("trialLabel");
         if (buttonProp == null || labelProp == null)
         {
-            Debug.LogError("[PaywallBuilder] PaywallController has no purchaseButton/purchaseLabel field — "
+            Debug.LogError("[PaywallBuilder] PaywallController has no trialButton/trialLabel field — "
                          + "let the scripts recompile (Assets/Refresh) and run the builder again.");
             return;
         }
