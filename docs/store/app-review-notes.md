@@ -45,8 +45,11 @@ WhatsApp account and the customer messages are real):
 4. To purchase: select a tier card, then tap the large primary button
    «Оформить <тариф> — <цена>» ("Subscribe to <tier> — <price>") at the bottom.
    It opens the standard StoreKit purchase sheet for the selected tier in the
-   selected period. The consumable top-up is on the same «Подписка» page:
-   «Купить 500 диалогов» ("Buy 500 dialogs").
+   selected period (build 1.0 (4)+: the purchase is presented through the
+   StoreKit 1 flow, which also works when the iPhone app runs on iPad in
+   compatibility mode; if the store shows no sheet within 12 seconds the
+   button is re-enabled with an error message). The consumable top-up is on
+   the same «Подписка» page: «Купить 500 диалогов» ("Buy 500 dialogs").
 5. Sandbox purchase and restore of any subscription tier work with a sandbox
    Apple ID as usual (products: 3 tiers × monthly/yearly + one consumable
    dialog top-up).

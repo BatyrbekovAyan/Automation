@@ -251,12 +251,51 @@ public partial class ProfileSubPages
 
     // ── Actions ────────────────────────────────────────────────────────────
 
+    // ── Store-call watchdog — same rule as PaywallController's (App Review 2026-09-15): a store
+    // call that shows no system UI within PurchaseWatchdogPolicy.SheetGraceSeconds is released
+    // with a notice instead of leaving the page busy forever. This root never deactivates, so the
+    // coroutine survives the whole call.
+    private bool _storeSheetSeen;
+    private Coroutine _storeWatchdog;
+
+    private void OnApplicationFocus(bool hasFocus)
+    {
+        if (!hasFocus) _storeSheetSeen = true;
+    }
+
+    private void StartStoreWatchdog(string notice)
+    {
+        StopStoreWatchdog();
+        _storeSheetSeen = false;
+        _storeWatchdog = StartCoroutine(StoreWatchdogRoutine(notice));
+    }
+
+    private void StopStoreWatchdog()
+    {
+        if (_storeWatchdog != null) StopCoroutine(_storeWatchdog);
+        _storeWatchdog = null;
+    }
+
+    private IEnumerator StoreWatchdogRoutine(string notice)
+    {
+        float started = Time.realtimeSinceStartup;
+        while (!PurchaseWatchdogPolicy.ShouldGiveUp(false, _storeSheetSeen, Time.realtimeSinceStartup - started))
+            yield return new WaitForSecondsRealtime(0.5f);
+        _storeWatchdog = null;
+        Debug.LogWarning($"[Subscription] store call showed no UI within {PurchaseWatchdogPolicy.SheetGraceSeconds}s — releasing ({PurchaseWatchdogPolicy.HungReason})");
+        SetSubscriptionBusy(false);
+        _subNoticeText = notice;
+        RefreshSubscriptionPage();
+    }
+
     private void OnTopUpClicked()
     {
         SetSubscriptionBusy(true);
+        StartStoreWatchdog(SubscriptionPageRows.TopUpFailedNotice);
         BillingService.Purchase(PlanCatalog.SkuTopUp, (ok, reason) =>
         {
             if (this == null) return;
+            StopStoreWatchdog();
             SetSubscriptionBusy(false);
 
             if (ok)
@@ -317,9 +356,11 @@ public partial class ProfileSubPages
     private void OnRestoreClicked()
     {
         SetSubscriptionBusy(true);
+        StartStoreWatchdog(PaywallRows.RestoreFailedNotice);
         BillingService.RestorePurchases(ok =>
         {
             if (this == null) return;
+            StopStoreWatchdog();
             SetSubscriptionBusy(false);
 
             bool found = BillingService.PurchasedTier != PlanTier.None;

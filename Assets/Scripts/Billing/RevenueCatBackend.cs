@@ -167,7 +167,20 @@ public class RevenueCatBackend : IBillingBackend
         try
         {
             var config = Purchases.PurchasesConfiguration.Builder.Init(_apiKey)
-                .SetStoreKitVersion(Purchases.StoreKitVersion.Default)
+                // StoreKit 1 ON PURPOSE (2026-09-16, App Review rejection №2 — iPad Air 11-inch (M3),
+                // iPadOS 26.6, «the in-app purchases were not responsive»). Reproduced on the iPad Air
+                // (M4) simulator, iOS 26.5, in the iPhone-compatibility window: with StoreKit 2 the
+                // CTA tap reaches storekitd («StoreKit/Purchase_SK2», TransactionQuery) and then NOTHING
+                // — no payment sheet, no sandbox sign-in, no error, and the purchase callback never
+                // arrives, so the paywall's busy latch holds forever. Same build, same simulator,
+                // StoreKit 1: «StoreKit/Purchase_SK1» → «Adding payment» → sandbox authentication UI
+                // within a second. SK1 presents the payment sheet through the StoreKit daemon, SK2
+                // has to resolve a presentation scene/window in the app — the path that hangs for a
+                // Unity app in compatibility mode on iPadOS 26. purchases-ios 5.86+ exposes
+                // confirmInScene for exactly this, but purchases-unity (9.10.1) does not surface it.
+                // Pinned by RevenueCatStoreKitVersionTests — flip back to Default only with an iPad
+                // compat-mode purchase verified end to end.
+                .SetStoreKitVersion(Purchases.StoreKitVersion.StoreKit1)
                 .SetEntitlementVerificationMode(Purchases.EntitlementVerificationMode.Informational)
                 .SetShouldShowInAppMessagesAutomatically(true)
                 .Build();

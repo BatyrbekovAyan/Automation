@@ -1,0 +1,175 @@
+{
+  "identifier": "A6EF4CED",
+  "nonRenewingSubscriptions": [],
+  "products": [
+    {
+      "displayPrice": "6.99",
+      "familyShareable": false,
+      "internalID": "E501EAA4",
+      "localizations": [
+        {
+          "description": "500 диалогов",
+          "displayName": "500 диалогов",
+          "locale": "ru_RU"
+        }
+      ],
+      "productID": "topup.dialogs.500",
+      "referenceName": "500 диалогов",
+      "type": "Consumable"
+    }
+  ],
+  "settings": {
+    "_applicationInternalID": "6804794838",
+    "_developerTeamID": "7RDC86CA77",
+    "_failTransactionsEnabled": false,
+    "_lastSynced": null,
+    "_locale": "en_US",
+    "_storefront": "USA",
+    "_storeKitErrors": []
+  },
+  "subscriptionGroups": [
+    {
+      "id": "6ECA9605",
+      "localizations": [],
+      "name": "Тарифы",
+      "subscriptions": [
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "17.99",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "D9E59A55",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "Старт (месяц)",
+              "displayName": "Старт (месяц)",
+              "locale": "ru_RU"
+            }
+          ],
+          "productID": "sub.start.month",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Старт (месяц)",
+          "subscriptionGroupID": "6ECA9605",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "179.99",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "6C54E7F3",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "Старт (год)",
+              "displayName": "Старт (год)",
+              "locale": "ru_RU"
+            }
+          ],
+          "productID": "sub.start.year",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "Старт (год)",
+          "subscriptionGroupID": "6ECA9605",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "34.99",
+          "familyShareable": false,
+          "groupNumber": 2,
+          "internalID": "2F9664D1",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "Бизнес (месяц)",
+              "displayName": "Бизнес (месяц)",
+              "locale": "ru_RU"
+            }
+          ],
+          "productID": "sub.business.month",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Бизнес (месяц)",
+          "subscriptionGroupID": "6ECA9605",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "349.99",
+          "familyShareable": false,
+          "groupNumber": 2,
+          "internalID": "C7A7BA1A",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "Бизнес (год)",
+              "displayName": "Бизнес (год)",
+              "locale": "ru_RU"
+            }
+          ],
+          "productID": "sub.business.year",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "Бизнес (год)",
+          "subscriptionGroupID": "6ECA9605",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "69.99",
+          "familyShareable": false,
+          "groupNumber": 3,
+          "internalID": "A793306D",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "Сеть (месяц)",
+              "displayName": "Сеть (месяц)",
+              "locale": "ru_RU"
+            }
+          ],
+          "productID": "sub.network.month",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Сеть (месяц)",
+          "subscriptionGroupID": "6ECA9605",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "699.99",
+          "familyShareable": false,
+          "groupNumber": 3,
+          "internalID": "ABC57E3B",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "Сеть (год)",
+              "displayName": "Сеть (год)",
+              "locale": "ru_RU"
+            }
+          ],
+          "productID": "sub.network.year",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "Сеть (год)",
+          "subscriptionGroupID": "6ECA9605",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        }
+      ]
+    }
+  ],
+  "version": {
+    "major": 3,
+    "minor": 0
+  }
+}

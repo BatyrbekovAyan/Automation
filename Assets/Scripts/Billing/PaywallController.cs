@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using DG.Tweening;
 using TMPro;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -437,6 +438,45 @@ public class PaywallController : MonoBehaviour
     /// selection fields the label is rendered from, so the button's text and what it buys
     /// cannot drift apart.
     /// </summary>
+    // ── Store-call watchdog (App Review 2026-09-15, «in-app purchases were not responsive») ──
+    //
+    // A StoreKit call that never calls back would leave SetBusy(true) on forever — a dead
+    // paywall. The watchdog releases it with a visible notice once PurchaseWatchdogPolicy says
+    // the call showed no system UI in time. «System UI appeared» = the app lost focus (every
+    // StoreKit sheet resigns the app's active state); after that the call is never timed out.
+    private bool _storeSheetSeen;
+    private Coroutine _storeWatchdog;
+
+    private void OnApplicationFocus(bool hasFocus)
+    {
+        if (!hasFocus) _storeSheetSeen = true;
+    }
+
+    private void StartStoreWatchdog(string notice)
+    {
+        StopStoreWatchdog();
+        _storeSheetSeen = false;
+        _storeWatchdog = StartCoroutine(StoreWatchdogRoutine(notice));
+    }
+
+    private void StopStoreWatchdog()
+    {
+        if (_storeWatchdog != null) StopCoroutine(_storeWatchdog);
+        _storeWatchdog = null;
+    }
+
+    private IEnumerator StoreWatchdogRoutine(string notice)
+    {
+        float started = Time.realtimeSinceStartup;
+        while (!PurchaseWatchdogPolicy.ShouldGiveUp(false, _storeSheetSeen, Time.realtimeSinceStartup - started))
+            yield return new WaitForSecondsRealtime(0.5f);
+        _storeWatchdog = null;
+        Debug.LogWarning($"[PaywallController] store call showed no UI within {PurchaseWatchdogPolicy.SheetGraceSeconds}s — releasing ({PurchaseWatchdogPolicy.HungReason})");
+        SetBusy(false);
+        _notice = notice;
+        Render();
+    }
+
     private void StartPurchase()
     {
         string sku = PaywallRows.Sku(_selected, _period);
@@ -447,9 +487,11 @@ public class PaywallController : MonoBehaviour
         }
 
         SetBusy(true);
+        StartStoreWatchdog(PaywallRows.PurchaseFailedNotice);
         BillingService.Purchase(sku, (ok, reason) =>
         {
             if (this == null) return;
+            StopStoreWatchdog();
             SetBusy(false);
             if (ok)
             {
@@ -473,9 +515,11 @@ public class PaywallController : MonoBehaviour
     private void OnRestoreClicked()
     {
         SetBusy(true);
+        StartStoreWatchdog(PaywallRows.RestoreFailedNotice);
         BillingService.RestorePurchases(ok =>
         {
             if (this == null) return;
+            StopStoreWatchdog();
             SetBusy(false);
             _purchased = BillingService.PurchasedTier;
             if (_purchased != PlanTier.None)

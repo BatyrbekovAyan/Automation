@@ -269,6 +269,49 @@
   реального тарифа («0 из 150» под Бизнес); даунгрейд Apple применяет на продлении,
   приложение не пишет «с <дата> тариф сменится»; строка резерва докупки есть только с билда 3.
 
+## Ревью №2 — отказ 2.1(b) «purchases were not responsive», ТОЛЬКО iPad (2026-09-15 → 2026-09-16)
+
+- Ресабмит билдом 1.0 (3) 2026-09-14; 15.09 — Guideline 2.1(b): «the in-app purchases were not
+  responsive» — устройство ТОЛЬКО iPad Air 11-inch (M3), iPadOS 26.6 (iPhone из первого отказа
+  в списке нет — фикс ревью №1 сработал). Вложений нет; у владельца iPad нет.
+- ВОСПРОИЗВЕДЕНО 2026-09-16 на симуляторе iPad Air 11-inch (M4), iOS 26.5 (тулчейн:
+  `DemoSimulatorBuild` → `Tools/store/sim-ipad-run.sh`; sandbox работает без StoreKit-конфига).
+  Приложение iPhone-only, на iPad идёт в режиме совместимости. Тап «Оформить»: RevenueCat пишет
+  `Purchase_SK2`, StoreKit 2 делает `TransactionQuery` — и ТИШИНА: ни листа покупки, ни колбэка,
+  ни ошибки; кнопка остаётся «занята» навсегда (`SetBusy(true)` ждёт колбэк). Это в точности
+  «not responsive» ревьюера. Прод-трейс n8n за сессию ревью (GetUsage/RevenueCat Events,
+  `Tools/n8n/review-trace.py`) — визиты пейволла есть, событий магазина ноль, как в ревью №1.
+- Тот же симулятор, тот же билд, только `SetStoreKitVersion(StoreKit1)`: `Purchase_SK1` →
+  «Adding payment for sub.business.month» → sandbox-аутентификация → лист «Sign in to Apple
+  Account» через ~1 с, приложение получает `applicationWillResignActive`. StoreKit 1
+  показывает через storekitd, StoreKit 2 в compat-окне на iPadOS 26 — нет (purchases-ios
+  5.81.2 внутри Unity SDK 9.5.3 зовёт `product.purchase(options:)` без сцены; `confirmIn:`
+  появился в 5.86 и в Unity SDK не вынесен).
+- ФИКС (код, 2026-09-16): (1) `RevenueCatBackend.FinishConfigure` →
+  `Purchases.StoreKitVersion.StoreKit1` (страж `RevenueCatStoreKitVersionTests`; обратно на
+  Default — только с проверенной покупкой на iPad в compat-режиме); (2) сторожевой таймер
+  `PurchaseWatchdogPolicy` (12 с) во ВСЕХ четырёх точках вызова магазина — пейволл покупка/
+  восстановление, «Подписка» докупка/восстановление: если магазин за 12 с не показал
+  системный UI (приложение не теряло фокус) и не ответил, кнопки отпускаются и печатается
+  «Не удалось…»; появившийся лист (потеря фокуса) таймер отменяет навсегда, поздний успех
+  всё равно применяется (страж `PurchaseWatchdogWiringTests`).
+- Что НЕ причина (проверено): продукты/цены (в первом отказе покупки на iPhone прошли бы тем же
+  кодом; US sandbox-тестер покупает E2E 13.09), договоры (Active), «покупка прошла в фоне»
+  (событий нет), тайминг SDK (RC-id за 5 с).
+- РЕСАБМИТ (план, билд 1.0 (4)): bump `Tools/Store Compliance/Bump iOS Build Number` → Unity
+  Build (Append) → Xcode Archive → upload → TestFlight на iPhone: покупка Старт, апгрейд,
+  докупка 500, восстановление — путь StoreKit 1 обязан работать так же (на iPhone SK1 и SK2
+  ведут себя одинаково, отличие только в compat-режиме iPad). Затем ответ в тред + билд 4 →
+  Update Review → Resubmit. Черновик ответа (EN):
+  «Thank you for the details. We reproduced the issue on an iPad simulator running the app in
+  iPhone-compatibility mode: the StoreKit 2 purchase sheet never appeared there, so the
+  Subscribe button stayed in its loading state. Build 1.0 (4) switches purchases to the
+  StoreKit 1 flow (verified on the same iPad simulator: the App Store sign-in/purchase sheet
+  appears within a second) and adds a 12-second watchdog that re-enables the buttons with an
+  error message if the store shows no UI. Purchases, upgrades, the dialog top-up and Restore
+  Purchases were re-verified on iPhone with a sandbox account. The purchase path is unchanged:
+  Profile → Подписка → select a tier → «Оформить».»
+
 ## Известные риски первого ревью (готовые ответы — в app-review-notes.md)
 
 1. **Автоматизация WhatsApp неофициальным путём** (Guideline 5.2.2). Митигция:
