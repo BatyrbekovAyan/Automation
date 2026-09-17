@@ -37,7 +37,7 @@
           "parameters": [
             {
               "name": "body",
-              "value": "={{ $json.text }}"
+              "value": "={{ $('Final Check').first().json.text }}"
             },
             {
               "name": "=recipient",
@@ -45,7 +45,16 @@
             }
           ]
         },
-        "options": {}
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -60,7 +69,9 @@
           "id": "EuhhqAaV56DpoqAN",
           "name": "WappiAuthToken"
         }
-      }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -145,7 +156,9 @@
         448,
         304
       ],
-      "typeVersion": 1.8
+      "typeVersion": 1.8,
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -295,7 +308,9 @@
             }
           ]
         },
-        "options": {}
+        "options": {
+          "timeout": 15000
+        }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -310,7 +325,9 @@
           "id": "EuhhqAaV56DpoqAN",
           "name": "WappiAuthToken"
         }
-      }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -336,7 +353,9 @@
             }
           ]
         },
-        "options": {}
+        "options": {
+          "timeout": 15000
+        }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -351,7 +370,9 @@
           "id": "EuhhqAaV56DpoqAN",
           "name": "WappiAuthToken"
         }
-      }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -540,7 +561,7 @@
     },
     {
       "parameters": {
-        "jsCode": "function countWords(str) { \n  const matches = str.match(/\\p{L}[\\p{L}\\p{N}_']*/gu);\n  return matches ? matches.length : 0; \n} \nreturn [{ \n    json: { wordCount: countWords($('AI Agent').first().json.output) } \n  }];"
+        "jsCode": "function countWords(str) { \n  const matches = str.match(/\\p{L}[\\p{L}\\p{N}_']*/gu);\n  return matches ? matches.length : 0; \n} \nreturn [{ \n    json: { wordCount: Math.min(countWords($('AI Agent').first().json.output), 20) }   // typing pause ≤ 12 s (stage 3 delay budget) \n  }];"
       },
       "id": "fe8f6c28-87d7-414c-bbee-4c97dbaaa54d",
       "name": "Count Output Words",
@@ -553,7 +574,7 @@
     },
     {
       "parameters": {
-        "jsCode": "function countWords(str) { \n  const matches = str.match(/\\p{L}[\\p{L}\\p{N}_']*/gu);\n  return matches ? matches.length : 0; \n} \nreturn [{ \n    json: { wordCount: countWords($('Webhook').first().json.body.messages[0].body) } \n  }];"
+        "jsCode": "function countWords(str) { \n  const matches = str.match(/\\p{L}[\\p{L}\\p{N}_']*/gu);\n  return matches ? matches.length : 0; \n} \nreturn [{ \n    json: { wordCount: Math.min(countWords($('Webhook').first().json.body.messages[0].body), 12) }   // reading pause ≤ 8 s (stage 3 delay budget) \n  }];"
       },
       "id": "4cdeb640-d409-441d-81e5-a1aabeb10c4e",
       "name": "Count Input Words",
@@ -588,7 +609,7 @@
     },
     {
       "parameters": {
-        "amount": "={{ ($('Webhook').item.json.body.messages[0].media_info?.duration ?? $('Webhook').item.json.body.messages[0].length_seconds ?? 0) + 2 }}"
+        "amount": "={{ Math.min(Number($('Webhook').item.json.body.messages[0].media_info?.duration ?? $('Webhook').item.json.body.messages[0].length_seconds ?? 0) || 0, 10) + 2 }}"
       },
       "id": "565d5ef8-9c95-437d-b193-3b50bb7659c3",
       "name": "Listening Pause",
@@ -892,7 +913,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const wh = $('Webhook').first().json;\nconst triggeringId = wh.body.messages[0].id;\nconst triggeringChatId = wh.body.messages[0].chatId;\n\n// Wappi/tapi CROSS concurrent same-endpoint responses (project-confirmed; the Unity client\n// defends with CrossChatResponseGuard). Two chats bursting at once now issue messages/get\n// concurrently from n8n too, so drop any row naming a FOREIGN chat before it can drive the\n// is-latest decision or leak another chat's text into the combine. Conservative, mirroring\n// CrossChatResponseGuard: a row with no chatId is KEPT (never discard on missing data), so a\n// non-crossed fetch filters to itself and behavior is unchanged. A fully crossed payload\n// filters to empty -> newestIncoming undefined -> abort (the pre-existing id-mismatch\n// outcome: this fragment dead-ends; never a second reply).\nconst fetchedAll = ($json.messages || []).slice();\nconst isForeign = (m) => m && m.chatId && triggeringChatId && m.chatId !== triggeringChatId;\nconst fetched = fetchedAll.filter(m => !isForeign(m));\nconst foreignFetched = fetchedAll.length - fetched.length;\n\nfetched.sort((a, b) => (b.time || 0) - (a.time || 0));\n\nconst isText = (m) => m && (m.type === 'chat' || m.type === 'text');\nconst incoming = fetched.filter(m => m && m.fromMe === false);\nconst newestIncoming = incoming[0];\n\nlet abort = false;\nlet combinedText = null;\n\nif (!newestIncoming || newestIncoming.id !== triggeringId) {\n  abort = true;\n} else if (isText(newestIncoming)) {\n  const parts = [];\n  for (const m of fetched) {\n    if (m.fromMe === true) break;\n    if (!isText(m)) break;\n    parts.push(typeof m.body === 'string' ? m.body : '');\n  }\n  parts.reverse();\n  // '' would beat the Text node's `?? $json.body.messages[0].body` fallback (?? is nullish-only)\n  // and hand the agent an EMPTY prompt whenever the loop breaks on iteration 1 — e.g. a humanizer\n  // reply to an earlier fragment lands inside this fragment's window. Stay nullish when empty.\n  combinedText = parts.length > 0 ? parts.join('\\n') : null;\n}\n\n// foreignFetched rides along purely as an observability flag: runData shows > 0 exactly when a\n// crossed messages/get response reached this node.\n// pairedItem is EXPLICIT (same idiom as the orchestrators' Vertical Prompt node): every node\n// below the splice back-references the trigger with an .item lookup on the Webhook node, which\n// needs an unbroken paired-item chain. Without it Mark Read / Typing / Chat Memory / send all\n// depend on n8n's implicit auto-pairing surviving Wait -> HTTP -> Code -> If, and a break kills\n// every reply with \"paired item data unavailable\".\nreturn [{ json: { ...wh, abort, combinedText, foreignFetched }, pairedItem: { item: 0 } }];"
+        "jsCode": "const wh = $('Webhook').first().json;\nconst triggeringId = wh.body.messages[0].id;\nconst triggeringChatId = wh.body.messages[0].chatId;\n\n// Wappi/tapi CROSS concurrent same-endpoint responses (project-confirmed; the Unity client\n// defends with CrossChatResponseGuard). Two chats bursting at once now issue messages/get\n// concurrently from n8n too, so drop any row naming a FOREIGN chat before it can drive the\n// is-latest decision or leak another chat's text into the combine. Conservative, mirroring\n// CrossChatResponseGuard: a row with no chatId is KEPT (never discard on missing data), so a\n// non-crossed fetch filters to itself and behavior is unchanged. A fully crossed payload\n// filters to empty -> newestIncoming undefined -> abort (the pre-existing id-mismatch\n// outcome: this fragment dead-ends; never a second reply).\nconst fetchedAll = ($json.messages || []).slice();\nconst isForeign = (m) => m && m.chatId && triggeringChatId && m.chatId !== triggeringChatId;\nconst fetched = fetchedAll.filter(m => !isForeign(m));\nconst foreignFetched = fetchedAll.length - fetched.length;\n\n// Stable newest-first order: time desc, then Wappi's own order (newest first) breaks equal timestamps —\n// two rows in the same second no longer shuffle on every fetch (stage 3).\nfetched.forEach((m, i) => { if (m) m.__i = i; });\nfetched.sort((a, b) => ((b.time || 0) - (a.time || 0)) || ((a.__i || 0) - (b.__i || 0)));\n\nconst isText = (m) => m && (m.type === 'chat' || m.type === 'text');\nconst incoming = fetched.filter(m => m && m.fromMe === false);\nconst newestIncoming = incoming[0];\n// A3 (stage 3): an OWNER row newer than the trigger means the owner already answered (from the phone or\n// the app) — an auto-reply on top of it is exactly the double reply the audit reproduced. Abort.\nconst trigIdx = fetched.findIndex(m => m && m.id === triggeringId);\nconst ownerReplied = trigIdx >= 0 && fetched.slice(0, trigIdx).some(m => m && m.fromMe === true);\n\nlet abort = false;\nlet combinedText = null;\n\nif (!newestIncoming || newestIncoming.id !== triggeringId || ownerReplied) {\n  abort = true;\n} else if (isText(newestIncoming)) {\n  const parts = [];\n  for (const m of fetched) {\n    if (m.fromMe === true) break;\n    if (!isText(m)) break;\n    parts.push(typeof m.body === 'string' ? m.body : '');\n  }\n  parts.reverse();\n  // '' would beat the Text node's `?? $json.body.messages[0].body` fallback (?? is nullish-only)\n  // and hand the agent an EMPTY prompt whenever the loop breaks on iteration 1 — e.g. a humanizer\n  // reply to an earlier fragment lands inside this fragment's window. Stay nullish when empty.\n  combinedText = parts.length > 0 ? parts.join('\\n') : null;\n}\n\n// foreignFetched rides along purely as an observability flag: runData shows > 0 exactly when a\n// crossed messages/get response reached this node.\n// pairedItem is EXPLICIT (same idiom as the orchestrators' Vertical Prompt node): every node\n// below the splice back-references the trigger with an .item lookup on the Webhook node, which\n// needs an unbroken paired-item chain. Without it Mark Read / Typing / Chat Memory / send all\n// depend on n8n's implicit auto-pairing surviving Wait -> HTTP -> Code -> If, and a break kills\n// every reply with \"paired item data unavailable\".\nreturn [{ json: { ...wh, abort, combinedText, foreignFetched }, pairedItem: { item: 0 } }];"
       },
       "id": "649a2ca5-5262-5713-b662-a97f950d57ee",
       "name": "Latest+Combine",
@@ -1011,7 +1032,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// OUTCOME STAMP (audit stage 0.5, Tools/n8n/apply-outcome-stamps.py). One structured row per\n// execution end, no dialog text: the label is derived from WHICH branch reached this node.\nconst byPrev = { 'If': 'filtered', 'Suppressed?': 'suppressed', 'Is Latest?': 'superseded',\n                 'If Quota Allows': 'quota_denied', 'HTTP Request': 'sent' };\nconst prev = $prevNode.name;\nlet wh = {};\ntry { wh = $('Webhook').first().json || {}; } catch (e) { wh = {}; }\nconst m = (wh.body && Array.isArray(wh.body.messages) && wh.body.messages[0]) || {};\nconst resp = $input.first() ? ($input.first().json || {}) : {};\nconst outcome = byPrev[prev] || ('other:' + prev);\nreturn [{ json: {\n  outcome,\n  correlationId: $execution.id,\n  stage: prev,\n  messageId: m.id ?? null,\n  profileId: m.profile_id ?? null,\n  chatId: m.chatId ?? null,\n  channel: 'telegram',\n  transportMessageId: (prev === 'HTTP Request' && resp && resp.message_id) ? resp.message_id : null,\n  transportStatus: (prev === 'HTTP Request' && resp) ? (resp.status ?? null) : null,\n  stampedAt: new Date().toISOString(),\n}, pairedItem: { item: 0 } }];\n"
+        "jsCode": "// OUTCOME STAMP (audit stage 0.5, Tools/n8n/apply-outcome-stamps.py). One structured row per\n// execution end, no dialog text: the label is derived from WHICH branch reached this node.\nconst byPrev = { 'If': 'filtered', 'Suppressed?': 'suppressed', 'Is Latest?': 'superseded',\n                 'If Quota Allows': 'quota_denied', 'HTTP Request': 'sent', 'Claimed?': 'duplicate' };\nconst prev = $prevNode.name;\nlet wh = {};\ntry { wh = $('Webhook').first().json || {}; } catch (e) { wh = {}; }\nconst m = (wh.body && Array.isArray(wh.body.messages) && wh.body.messages[0]) || {};\nconst resp = $input.first() ? ($input.first().json || {}) : {};\n// Stage 3: the record rows (Record Send / Record Cancel) carry the event's final state explicitly.\nconst outcome = (typeof resp.outcome === 'string' && resp.outcome) ? resp.outcome : (byPrev[prev] || ('other:' + prev));\nreturn [{ json: {\n  outcome,\n  correlationId: $execution.id,\n  stage: prev,\n  messageId: m.id ?? null,\n  profileId: m.profile_id ?? null,\n  chatId: m.chatId ?? null,\n  channel: 'telegram',\n  transportMessageId: resp.transport_message_id ?? ((prev === 'HTTP Request' && resp && resp.message_id) ? resp.message_id : null),\n  transportStatus: (prev === 'HTTP Request' && resp) ? (resp.status ?? null) : null,\n  stampedAt: new Date().toISOString(),\n}, pairedItem: { item: 0 } }];\n"
       },
       "id": "0c0b0e0a-5ba1-4a7e-9f0e-0000000000ff",
       "name": "Outcome",
@@ -1021,6 +1042,434 @@
         2928,
         1136
       ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- A4: the atomic right to process THIS event. A re-delivered event finds its row and is refused\n-- (claimed=false → duplicate); a claim left behind by a crashed run (>10 min, no send started) may be\n-- re-claimed. Each claim bumps the chat's incoming generation — the final check compares against it.\n-- history_watermark lets a cancelled generation's AI rows be dropped from memory (A3.7).\nwith ev as (\n  insert into reply_events (profile_id, chat_id, message_id, execution_id, state)\n  values ($1, $2, $3, $4, 'claimed')\n  on conflict (profile_id, chat_id, message_id) do update\n    set state = 'claimed', execution_id = excluded.execution_id, updated_at = now()\n    where reply_events.state in ('claimed', 'generated') and reply_events.updated_at < now() - interval '10 minutes'\n  returning message_id\n), st as (\n  insert into chat_reply_state (profile_id, chat_id, incoming_generation)\n  select $1, $2, 1 where exists (select 1 from ev)\n  on conflict (profile_id, chat_id) do update set incoming_generation = chat_reply_state.incoming_generation + 1\n  returning incoming_generation\n)\nselect exists(select 1 from ev) as claimed,\n       coalesce((select incoming_generation from st), (select incoming_generation from chat_reply_state where profile_id = $1 and chat_id = $2), 0)::bigint as generation,\n       coalesce((select max(id) from n8n_chat_histories where session_id = $1 || ':' || $2), 0)::bigint as history_watermark;",
+        "options": {
+          "queryReplacement": "={{ [ $('Webhook').first().json.body.messages[0].profile_id, $('Webhook').first().json.body.messages[0].from, $('Webhook').first().json.body.messages[0].id, $execution.id ] }}"
+        }
+      },
+      "id": "e4b8356e-06a6-5ff9-ae70-eee227573725",
+      "name": "Claim Event",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -3360,
+        520
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f386f027-44db-5113-b8af-129a6f225e56",
+              "leftValue": "={{ $json.claimed }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "96abfa6a-4d6e-50d8-a8cf-d0b614e380fd",
+      "name": "Claimed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -3152,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// CANCEL LABEL: one place that names why a reply did not go out, from whichever gate refused it.\nconst j = $input.first().json || {};\nconst prev = $prevNode.name;\nlet outcome;\nif (prev === 'Is Latest?') outcome = 'superseded';\nelse if (prev === 'If Quota Allows') outcome = 'quota_denied';\nelse if (prev === 'Generated?') outcome = 'generation_failed';\nelse if (prev === 'Final OK?') outcome = j.outcome || 'cancelled_fetch';\nelse if (prev === 'Send Allowed?') outcome = j.suppressed === true ? 'cancelled_mode' : (j.lock_busy === true ? 'cancelled_busy' : 'superseded');\nelse outcome = 'cancelled_fetch';\nlet watermark = 0;\ntry { watermark = Number($('Claim Event').first().json.history_watermark) || 0; } catch (e) { watermark = 0; }\n// Only a run that reached the generator can have written AI memory rows to drop.\nconst generated = prev === 'Final OK?' || prev === 'Send Allowed?';\nreturn [{ json: { outcome, historyWatermark: watermark, dropAiHistory: generated }, pairedItem: { item: 0 } }];\n"
+      },
+      "id": "81da6c17-e568-5179-8844-0f48cca0d0ef",
+      "name": "Cancel Label",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2500,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- A3.7: a refused / cancelled reply is recorded as such, the lease (if this run held it) is released, and\n-- the AI rows a cancelled GENERATION already wrote to memory are dropped — the customer never saw them,\n-- so the bot must not remember having said them.\nwith ev as (\n  update reply_events set state = $4, updated_at = now()\n  where profile_id = $1 and chat_id = $2 and message_id = $3 returning 1\n), hist as (\n  delete from n8n_chat_histories\n  where $6::boolean and session_id = $1 || ':' || $2 and id > $5::bigint and message->>'type' = 'ai' returning 1\n), rel as (\n  update chat_reply_state set lock_token = null, lock_expires_at = null\n  where profile_id = $1 and chat_id = $2 and lock_token = $7 returning 1\n)\nselect $4::text as outcome, (select count(*) from hist)::int as dropped_ai_rows, exists(select 1 from ev) as recorded;",
+        "options": {
+          "queryReplacement": "={{ [ $('Webhook').first().json.body.messages[0].profile_id, $('Webhook').first().json.body.messages[0].from, $('Webhook').first().json.body.messages[0].id, $json.outcome, $json.historyWatermark, $json.dropAiHistory, $execution.id ] }}"
+        }
+      },
+      "id": "b9998258-aa28-5c3a-91dd-80a414168dc8",
+      "name": "Record Cancel",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -2300,
+        620
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "68452d72-aed2-53e7-95ed-41e875db8090",
+              "leftValue": "={{ typeof $json.output === 'string' && $json.output.trim().length > 0 && !$json.error }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4e67f489-602c-5d3e-99e8-9f0bdf338f5f",
+      "name": "Generated?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2080,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://wappi.pro/tapi/sync/messages/get",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "profile_id",
+              "value": "={{ $('Webhook').first().json.body.messages[0].profile_id }}"
+            },
+            {
+              "name": "chat_id",
+              "value": "={{ $('Webhook').first().json.body.messages[0].chatId }}"
+            },
+            {
+              "name": "limit",
+              "value": "15"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "802655dc-ae1b-5024-8d58-049b8a7de664",
+      "name": "Final Fetch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -64,
+        -160
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "EuhhqAaV56DpoqAN",
+          "name": "WappiAuthToken"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// FINAL CHECK (A3, stage 3): re-read the chat RIGHT BEFORE sending. Same rules as Latest+Combine, on a\n// fresh snapshot: a client message newer than the trigger → this text is stale (superseded — the newer\n// event's own run answers); an owner message newer than the trigger → the owner took over (cancelled).\n// A snapshot that does not even contain the trigger (crossed/short fetch) is never sent on.\nconst wh = $('Webhook').first().json;\nconst trig = wh.body.messages[0];\nlet claim = {};\ntry { claim = $('Claim Event').first().json || {}; } catch (e) { claim = {}; }\nlet text = '';\ntry { text = String($('Retrieve Answer').first().json.text || ''); } catch (e) {\n  try { text = String($('Ask to Send Text').first().json.text || ''); } catch (e2) { text = ''; }\n}\nconst fetchedAll = ($json.messages || []).slice();\nconst fetched = fetchedAll.filter(m => !(m && m.chatId && trig.chatId && m.chatId !== trig.chatId));\nfetched.forEach((m, i) => { if (m) m.__i = i; });\nfetched.sort((a, b) => ((b.time || 0) - (a.time || 0)) || ((a.__i || 0) - (b.__i || 0)));   // newest first, Wappi order breaks ties\nconst trigIdx = fetched.findIndex(m => m && m.id === trig.id);\nlet ok = true, outcome = null;\nif (!text.trim()) { ok = false; outcome = 'generation_failed'; }\nelse if (trigIdx < 0) { ok = false; outcome = 'cancelled_fetch'; }\nelse if (fetched.slice(0, trigIdx).some(m => m && m.fromMe === false)) { ok = false; outcome = 'superseded'; }\nelse if (fetched.slice(0, trigIdx).some(m => m && m.fromMe === true)) { ok = false; outcome = 'cancelled_owner'; }\nreturn [{ json: { ok, outcome, text, generation: Number(claim.generation) || 0, historyWatermark: Number(claim.history_watermark) || 0,\n                  sendStartedAt: Math.floor(Date.now() / 1000) }, pairedItem: { item: 0 } }];\n"
+      },
+      "id": "d7b9c9f7-8716-5893-9fd7-f1b6edb93b43",
+      "name": "Final Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        128,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "4fbee58f-4c2e-536d-afca-f1ec9e43ac93",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c7f485c3-2488-5486-a073-ca27dfe073d1",
+      "name": "Final OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        320,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- A3/A4: the last word before the transport call, in ONE statement: the CURRENT mode (a «Вместе» flip\n-- during generation cancels), the incoming generation captured at claim time (a newer claimed event\n-- supersedes), and a 90-s per-chat lease (two runs of the same chat cannot send at once; other chats are\n-- untouched). Only a run that holds the lease marks its event send_pending. Nothing here spans the LLM or\n-- the transport call — the lease is what covers the send itself.\nwith mode as (\n  select coalesce((select suppressed from reply_mode_flags\n                   where profile_id = $1 and chat_id in ($2, '*')\n                   order by (chat_id = '*') limit 1), false) as suppressed\n), cur as (\n  select incoming_generation, lock_token, lock_expires_at from chat_reply_state where profile_id = $1 and chat_id = $2\n), lease as (\n  update chat_reply_state c set lock_token = $5, lock_expires_at = now() + interval '90 seconds'\n  where c.profile_id = $1 and c.chat_id = $2\n    and (c.lock_token is null or c.lock_expires_at < now() or c.lock_token = $5)\n    and c.incoming_generation = $4::bigint\n    and not (select suppressed from mode)\n  returning 1\n), ev as (\n  update reply_events set state = 'send_pending', updated_at = now()\n  where profile_id = $1 and chat_id = $2 and message_id = $3 and exists (select 1 from lease)\n  returning 1\n)\nselect exists(select 1 from lease) as allowed,\n       (select suppressed from mode) as suppressed,\n       (select incoming_generation from cur)::bigint as generation_now,\n       (select lock_token from cur) is not null and (select lock_expires_at from cur) > now() and (select lock_token from cur) <> $5 as lock_busy;",
+        "options": {
+          "queryReplacement": "={{ [ $('Webhook').first().json.body.messages[0].profile_id, $('Webhook').first().json.body.messages[0].from, $('Webhook').first().json.body.messages[0].id, $json.generation, $execution.id ] }}"
+        }
+      },
+      "id": "d8c69d79-277a-5d9b-90d8-1f4196f0419d",
+      "name": "Acquire Send Lease",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        512,
+        -160
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "1b6dceb6-a348-5895-a6f1-8c9e2a1c1fc8",
+              "leftValue": "={{ $json.allowed }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9e2e0a67-7989-5db4-98ca-66cc96b57c2e",
+      "name": "Send Allowed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        704,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// SETTLE SEND (A7): classify the transport call — never assume delivery from a missing answer.\nconst r = $input.first().json || {};\nconst body = (r.body && typeof r.body === 'object') ? r.body : {};\nconst status = Number(r.statusCode) || 0;\nlet state, transportMessageId = '', error = '';\nif (!status && r.error) { state = 'send_unknown'; error = String(r.error.message || r.error).slice(0, 300); }\nelse if (status === 200 && (body.status === 'done' || body.message_id)) { state = 'sent'; transportMessageId = String(body.message_id || ''); }\nelse if (status >= 400 || body.status === 'error') { state = 'send_failed'; error = ('http ' + status + ' ' + JSON.stringify(body)).slice(0, 300); }\nelse { state = 'send_unknown'; error = ('unexpected ' + JSON.stringify(r)).slice(0, 300); }\nconst fc = $('Final Check').first().json;\nreturn [{ json: { state, unknown: state === 'send_unknown', transportMessageId, error, text: fc.text, sendStartedAt: fc.sendStartedAt }, pairedItem: { item: 0 } }];\n"
+      },
+      "id": "c06d9e2f-4503-5686-a7ea-7931d0116959",
+      "name": "Settle Send",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1088,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9d8da44c-f740-57ae-a5b7-9e71e16e5db2",
+              "leftValue": "={{ $json.unknown }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "bf80decf-743c-5277-b499-587bb9cd3fa2",
+      "name": "Send Unknown?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1280,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 3
+      },
+      "id": "20d467af-d6ce-5259-a5e6-c99ef0a2ea03",
+      "name": "Wait Reconcile",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1472,
+        420
+      ],
+      "webhookId": "0c4d080a-8c4b-5e37-865d-8832ea973152"
+    },
+    {
+      "parameters": {
+        "url": "https://wappi.pro/tapi/sync/messages/get",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "profile_id",
+              "value": "={{ $('Webhook').first().json.body.messages[0].profile_id }}"
+            },
+            {
+              "name": "chat_id",
+              "value": "={{ $('Webhook').first().json.body.messages[0].chatId }}"
+            },
+            {
+              "name": "limit",
+              "value": "15"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "c19176a8-9ac3-5ec8-a867-ce626824e9c9",
+      "name": "Reconcile Fetch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1664,
+        420
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "EuhhqAaV56DpoqAN",
+          "name": "WappiAuthToken"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// RECONCILE (A7): the transport may have accepted the message although its answer was lost. Look for\n// OUR text as an outgoing row after the send started; found ⇒ sent (adopt its id), else the state stays\n// send_unknown for the owner to see. Never resend here.\nconst s = $('Settle Send').first().json;\nconst rows = ($json.messages || []).filter(m => m && m.fromMe === true && typeof m.body === 'string');\nconst hit = rows.find(m => m.body.trim() === String(s.text).trim() && (m.time || 0) >= (Number(s.sendStartedAt) - 5));\nreturn [{ json: { state: hit ? 'sent' : 'send_unknown', transportMessageId: hit ? String(hit.id || '') : '',\n                  error: hit ? '' : s.error, reconciled: !!hit }, pairedItem: { item: 0 } }];\n"
+      },
+      "id": "e0477045-6925-527d-a4da-bccdcc26e0a6",
+      "name": "Reconcile Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1856,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- A7: the event's final transport state and the lease release. send_unknown stays send_unknown —\n-- an operator-visible uncertainty, never a silent retry.\nwith ev as (\n  update reply_events set state = $4, transport_message_id = nullif($5, ''), error = nullif($6, ''), updated_at = now()\n  where profile_id = $1 and chat_id = $2 and message_id = $3 returning 1\n), rel as (\n  update chat_reply_state set lock_token = null, lock_expires_at = null,\n    last_sent_at = case when $4 = 'sent' then now() else last_sent_at end,\n    last_sent_message_id = case when $4 = 'sent' then nullif($5, '') else last_sent_message_id end\n  where profile_id = $1 and chat_id = $2 and lock_token = $7 returning 1\n)\nselect $4::text as outcome, nullif($5, '')::text as transport_message_id, exists(select 1 from ev) as recorded, exists(select 1 from rel) as released;",
+        "options": {
+          "queryReplacement": "={{ [ $('Webhook').first().json.body.messages[0].profile_id, $('Webhook').first().json.body.messages[0].from, $('Webhook').first().json.body.messages[0].id, $json.state, $json.transportMessageId, $json.error, $execution.id ] }}"
+        }
+      },
+      "id": "df16769a-616a-5a3b-a0f0-e4b34294a8c9",
+      "name": "Record Send",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2048,
+        288
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -1072,7 +1521,7 @@
       "main": [
         [
           {
-            "node": "Pause Before Reading",
+            "node": "Generated?",
             "type": "main",
             "index": 0
           }
@@ -1177,7 +1626,7 @@
       "main": [
         [
           {
-            "node": "HTTP Request",
+            "node": "Final Fetch",
             "type": "main",
             "index": 0
           }
@@ -1297,7 +1746,7 @@
         ],
         [
           {
-            "node": "Debounce Wait",
+            "node": "Claim Event",
             "type": "main",
             "index": 0
           }
@@ -1330,7 +1779,7 @@
       "main": [
         [
           {
-            "node": "HTTP Request",
+            "node": "Final Fetch",
             "type": "main",
             "index": 0
           }
@@ -1385,7 +1834,7 @@
       "main": [
         [
           {
-            "node": "Outcome",
+            "node": "Cancel Label",
             "type": "main",
             "index": 0
           }
@@ -1432,7 +1881,7 @@
         ],
         [
           {
-            "node": "Outcome",
+            "node": "Cancel Label",
             "type": "main",
             "index": 0
           }
@@ -1440,6 +1889,217 @@
       ]
     },
     "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Settle Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim Event": {
+      "main": [
+        [
+          {
+            "node": "Claimed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claimed?": {
+      "main": [
+        [
+          {
+            "node": "Debounce Wait",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancel Label": {
+      "main": [
+        [
+          {
+            "node": "Record Cancel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Cancel": {
+      "main": [
+        [
+          {
+            "node": "Outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generated?": {
+      "main": [
+        [
+          {
+            "node": "Pause Before Reading",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Cancel Label",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Final Fetch": {
+      "main": [
+        [
+          {
+            "node": "Final Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Final Check": {
+      "main": [
+        [
+          {
+            "node": "Final OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Final OK?": {
+      "main": [
+        [
+          {
+            "node": "Acquire Send Lease",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Cancel Label",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Acquire Send Lease": {
+      "main": [
+        [
+          {
+            "node": "Send Allowed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Allowed?": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Cancel Label",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Settle Send": {
+      "main": [
+        [
+          {
+            "node": "Send Unknown?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Unknown?": {
+      "main": [
+        [
+          {
+            "node": "Wait Reconcile",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Reconcile": {
+      "main": [
+        [
+          {
+            "node": "Reconcile Fetch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reconcile Fetch": {
+      "main": [
+        [
+          {
+            "node": "Reconcile Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reconcile Check": {
+      "main": [
+        [
+          {
+            "node": "Record Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Send": {
       "main": [
         [
           {

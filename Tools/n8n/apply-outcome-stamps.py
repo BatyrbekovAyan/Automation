@@ -9,8 +9,8 @@ node, `Outcome`, onto every terminal branch, so each execution ends with a singl
     { outcome, correlationId: $execution.id, stage: <previous node>, messageId, profileId, chatId,
       channel, transportMessageId (send response id when sent), stampedAt }
 
-outcome ∈ filtered | suppressed | superseded | quota_denied | sent   (stage 0.5)
-          send_failed | send_unknown | generation_failed              (added by stage 3, same node)
+outcome ∈ filtered | suppressed | duplicate | superseded | quota_denied | generation_failed | cancelled_owner |
+          cancelled_mode | cancelled_busy | cancelled_fetch | sent | send_failed | send_unknown  (stage 0.5 + stage 3)
 
 Branches stamped: If[false] (from != chatId), Suppressed?[true], Is Latest?[false] (older fragment
 of a burst), If Quota Allows[false], HTTP Request[main] (the Wappi send returned). Nothing on the
@@ -31,19 +31,22 @@ NODE = "Outcome"
 
 # (source node, output index) -> outcome label. These are exactly the dead-end branches the
 # verifiers pin (verify-message-batching / verify-telegram-parity) plus the send's own output.
-TERMINALS = [("If", 1, "filtered"), ("Suppressed?", 0, "suppressed"), ("Is Latest?", 0, "superseded"),
-             ("If Quota Allows", 1, "quota_denied"), ("HTTP Request", 0, "sent")]
+# Stage 3 moved the winner/refusal/send terminals behind Record Send / Record Cancel / Claimed?; the stamp
+# now sits after those (apply-reply-pipeline-v2.py wires them) — this list is the stage-0 shape kept for
+# templates that predate the pipeline migration.
+TERMINALS = [("If", 1, "filtered"), ("Suppressed?", 0, "suppressed")]
 
 JS_TEMPLATE = r"""// OUTCOME STAMP (audit stage 0.5, Tools/n8n/apply-outcome-stamps.py). One structured row per
 // execution end, no dialog text: the label is derived from WHICH branch reached this node.
 const byPrev = { 'If': 'filtered', 'Suppressed?': 'suppressed', 'Is Latest?': 'superseded',
-                 'If Quota Allows': 'quota_denied', 'HTTP Request': 'sent' };
+                 'If Quota Allows': 'quota_denied', 'HTTP Request': 'sent', 'Claimed?': 'duplicate' };
 const prev = $prevNode.name;
 let wh = {};
 try { wh = $('Webhook').first().json || {}; } catch (e) { wh = {}; }
 const m = (wh.body && Array.isArray(wh.body.messages) && wh.body.messages[0]) || {};
 const resp = $input.first() ? ($input.first().json || {}) : {};
-const outcome = byPrev[prev] || ('other:' + prev);
+// Stage 3: the record rows (Record Send / Record Cancel) carry the event's final state explicitly.
+const outcome = (typeof resp.outcome === 'string' && resp.outcome) ? resp.outcome : (byPrev[prev] || ('other:' + prev));
 return [{ json: {
   outcome,
   correlationId: $execution.id,
@@ -52,7 +55,7 @@ return [{ json: {
   profileId: m.profile_id ?? null,
   chatId: m.chatId ?? null,
   channel: '__CHANNEL__',
-  transportMessageId: (prev === 'HTTP Request' && resp && resp.message_id) ? resp.message_id : null,
+  transportMessageId: resp.transport_message_id ?? ((prev === 'HTTP Request' && resp && resp.message_id) ? resp.message_id : null),
   transportStatus: (prev === 'HTTP Request' && resp) ? (resp.status ?? null) : null,
   stampedAt: new Date().toISOString(),
 }, pairedItem: { item: 0 } }];

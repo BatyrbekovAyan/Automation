@@ -6,11 +6,11 @@
 ## 0. Что меняется
 | Слой | Изменение | Артефакт |
 |---|---|---|
-| Postgres (Supabase, cred `Postgres`) | + `installs`, + `uploaded_files`, + колонки `bot_profiles.owner_id/workflow_id/claimed_at/claim_*` (аддитивно, идемпотентно); **A2:** + `reply_mode_flags.version` | `Tools/n8n/sql/2026-09-17-auth-installs.sql`, `Tools/n8n/sql/2026-09-17-reply-mode-version.sql` |
+| Postgres (Supabase, cred `Postgres`) | + `installs`, + `uploaded_files`, + колонки `bot_profiles.owner_id/workflow_id/claimed_at/claim_*` (аддитивно, идемпотентно); **A2:** + `reply_mode_flags.version`; **A3/A4/A7:** + `reply_events` (журнал событий/состояний ответа), + `chat_reply_state` (поколение входящих + 90-с lease на чат), RLS default-deny | `Tools/n8n/sql/2026-09-17-auth-installs.sql`, `Tools/n8n/sql/2026-09-17-reply-mode-version.sql`, `Tools/n8n/sql/2026-09-17-reply-events.sql` |
 | n8n env (docker-compose) | `NODE_FUNCTION_ALLOW_BUILTIN=crypto`, `N8N_BLOCK_ENV_ACCESS_IN_NODE=false`, `CR_AUTH_SECRET=<64 hex>`, `CR_AUTH_COMPAT_UNTIL=<ISO, см. §3>`, (опц.) `CR_AUTH_SECRET_PREV`, `N8N_PAYLOAD_SIZE_MAX=32` | §1 |
 | n8n workflows (новые) | `crAuthSession001` Auth Session (`/webhook/AuthSession`), `crWappiProxy0001` Wappi Proxy (`/webhook/WappiProxy`) | `Tools/n8n/workflows/crAuth*.json` |
 | n8n workflows (обновлённые, 12) | Auth Gate → Authorized? → 401/403 перед первым узлом; Create WA/TG + `Bind Workflow Id`; Upload File + `Register Upload`; Delete File owner-scoped; Set Workflow State защищает новые id; **A2:** Set Reply Mode v2 (версионный атомарный upsert, отчёт per profile, 400/500), Create WA/TG + `Seed Reply Mode` до активации | `Tools/n8n/apply-auth-gate.py`, `Tools/n8n/apply-reply-mode-v2.py` (идемпотентно) |
-| шаблоны ботов + клоны «13»/«15» | `If` требует `profile_id == path вебхука`; узел `Outcome` (этап 0.5) | обновление клонов — этап 7 |
+| шаблоны ботов + клоны «13»/«15» | `If` требует `profile_id == path вебхука`; узел `Outcome` (этап 0.5); **этап 3:** `Claim Event`/`Claimed?` (однократная обработка события), `Generated?`, `Final Fetch`/`Final Check`/`Final OK?` (финальная проверка контекста перед отправкой), `Acquire Send Lease`/`Send Allowed?` (режим + поколение + lease одним запросом), send с `fullResponse/neverError/30 с`, `Settle Send` → `sent | send_failed | send_unknown`, `Wait Reconcile`/`Reconcile Fetch`/`Reconcile Check` (эхо ⇒ sent, иначе send_unknown — БЕЗ повторной отправки), `Record Send`/`Cancel Label`/`Record Cancel` (журнал + удаление AI-строк памяти отменённой генерации), Mark Read/Typing/AI Agent fail-open, паузы ≤ 8/12/12 с | `Tools/n8n/apply-reply-pipeline-v2.py` (идемпотентно); клоны — этап 7 |
 | клиент | сессия установки (AuthClient), все вызовы с `Authorization: Bearer`, Wappi только через прокси, `wappiAuthToken` удалён из `secrets.json`, claim наследуемых ботов | коммиты 5448f98d, далее |
 
 ## 1. Env на VPS (owner, ~5 минут, не в git)
@@ -30,15 +30,17 @@ docker compose up -d n8n && docker compose logs --tail 20 n8n
 
 ## 2. Порядок развёртывания (этап 7)
 1. **Бэкап** — ночной `~/backups/n8n-<date>.tar.gz` уже есть; перед деплоем снять свежий: `~/choosereply/backup.sh`.
-2. **SQL** — `2026-09-17-auth-installs.sql` и `2026-09-17-reply-mode-version.sql` через cred `Postgres` (одноразовый n8n-harness, как `apply-landing-leads.py`).
-   Post-check: `select relrowsecurity from pg_class where oid='public.installs'::regclass` = true.
+2. **SQL** — `2026-09-17-auth-installs.sql`, `2026-09-17-reply-mode-version.sql` и `2026-09-17-reply-events.sql` через cred `Postgres` (одноразовый n8n-harness, как `apply-landing-leads.py`).
+   Post-check: `select relrowsecurity from pg_class where oid in ('public.installs'::regclass, 'public.reply_events'::regclass, 'public.chat_reply_state'::regclass)` = true×3.
+   Стоимость на проде: каждый Postgres-узел ≈ 1,9 с (pooler) — путь ответа этапа 3 добавляет 3 узла на отправку (Claim, Lease, Record) и 2 на отказ; суммарная задержка ответа ≤ ~40 с при клампах пауз (8/12/12 с).
 3. **Env** — §1, рестарт n8n.
 4. **Новые workflows** — импорт `crAuthSession001`, `crWappiProxy0001` с ребиндингом credential-id по имени
    (Postgres → `vvRrFiEXzLVqKjOx`, WappiAuthToken → `ZowntFGvApDJ7UzQ`), активация; smoke: bootstrap → refresh →
    `WappiProxy status` на СВОЁМ профиле (read-only).
 5. **Гейтированные 12 workflows** — `--update` по id (как `build-client-webhooks.py --update`), `activeVersion == versionId`
    проверить чтением. Compat-окно открыто ⇒ старые клиенты продолжают работать (legacy mode, лог `crAuth.mode`).
-6. **Шаблоны ботов** (`4wYitz…`, `4VN3…`) — `--update`; клоны «13»/«15» — управляемое обновление по имени узлов (этап 7.5).
+6. **Шаблоны ботов** (`4wYitz…`, `4VN3…`) — `--update` (этапы 0.5 + 1 + 3 вместе: один шаблон = один `--update`); клоны «13»/«15» — управляемое обновление по имени узлов (этап 7.5). До обновления клонов старые клоны продолжают работать по прежней схеме (без журнала `reply_events`) — таблицы аддитивны.
+   Post-check шаблонов: `python3 Tools/n8n/verify-reply-pipeline.py` на экспортах с прода; smoke на тестовом владельце — одно входящее ⇒ одна строка `reply_events.state='sent'` с `transport_message_id`.
 7. **Клиент** — релиз iOS/Android с A1; **до отправки** прогнать `Tools/store/inspect-artifact.sh <aab|ipa>` — артефакт
    без `wappiAuthToken`.
 8. **Canary** — тестовый владелец: свежая установка → создание бота через прокси → чат → удаление; существующий бот
@@ -59,6 +61,7 @@ docker compose up -d n8n && docker compose logs --tail 20 n8n
 - SQL аддитивна: таблицы/колонки остаются, ничего не ломают старым workflows.
 - Клиент: предыдущий билд продолжает работать в compat-окне (прямой Wappi + legacy-вебхуки).
 - Откат не открывает неавторизованный доступ дольше, чем он был до A1, и не дублирует отправки (транспорт не менялся).
+- Этап 3: откат шаблонов = предыдущая версия workflow; строки `reply_events`/`chat_reply_state` остаются (аддитивно, ничего не читает их кроме новых узлов). Просроченный lease (90 с) не блокирует после отката, потому что старый шаблон его не читает.
 
 ## 5. Остаточные риски / owner-действия
 - **Самосообщение** (`message/send` на собственный номер) для claim-кода — не подтверждено документацией Wappi; при

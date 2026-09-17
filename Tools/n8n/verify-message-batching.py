@@ -167,8 +167,19 @@ def check_bot(f, base):
     #     pre-billing direct edge Is Latest? -> Input type and failed on every run; the contract is
     #     the gated path, not "any path" — every hop is pinned by name so a UI round-trip that drops
     #     the gate (winner straight to Input type) reads as a FAIL again.
-    assert_that(conns["Suppressed?"]["main"][1][0]["node"] == "Debounce Wait",
-                f"{f}: Suppressed? main[1] does not route to Debounce Wait (debounce not after the gate)")
+    # Stage 3 (A4): the reply branch first CLAIMS the event (Claim Event -> Claimed?), and only a
+    # first-time claim enters the debounce; a re-delivered event is refused before any side effect.
+    assert_that(conns["Suppressed?"]["main"][1] == [{"node": "Claim Event", "type": "main", "index": 0}],
+                f"{f}: Suppressed? main[1] must route to Claim Event (stage 3): {conns['Suppressed?']['main'][1]}")
+    assert_that(conns["Claim Event"]["main"][0] == [{"node": "Claimed?", "type": "main", "index": 0}],
+                f"{f}: Claim Event must chain to Claimed?")
+    assert_that(conns["Claimed?"]["main"][0] == [{"node": "Debounce Wait", "type": "main", "index": 0}],
+                f"{f}: Claimed? main[0] (first claim) does not route to Debounce Wait (debounce not after the claim)")
+    assert_that(conns["Claimed?"]["main"][1] == [OUTCOME_EDGE],
+                f"{f}: Claimed? main[1] (duplicate) must end ONLY at the Outcome stamp: {conns['Claimed?']['main'][1]}")
+    ce = node(ns, "Claim Event")
+    assert_that(ce["type"] == "n8n-nodes-base.postgres" and "on conflict (profile_id, chat_id, message_id)" in ce["parameters"]["query"],
+                f"{f}: Claim Event is not the reply_events upsert")
     assert_that(conns["Suppressed?"]["main"][0] == [OUTCOME_EDGE],
                 f"{f}: Suppressed? main[0] (suppressed) must end ONLY at the Outcome stamp: {conns['Suppressed?']['main'][0]}")
     assert_that(conns["Debounce Wait"]["main"][0][0]["node"] == "Fetch Recent",
@@ -180,8 +191,8 @@ def check_bot(f, base):
     assert_that(conns["Is Latest?"]["main"][1] == [{"node": "Count Dialog", "type": "main", "index": 0}],
                 f"{f}: Is Latest? main[1] (winner) does not proceed to the billing gate (Count Dialog): "
                 f"{conns['Is Latest?']['main'][1]}")
-    assert_that(conns["Is Latest?"]["main"][0] == [OUTCOME_EDGE],
-                f"{f}: Is Latest? main[0] (aborted fragment) must end ONLY at the Outcome stamp: {conns['Is Latest?']['main'][0]}")
+    assert_that(conns["Is Latest?"]["main"][0] == [{"node": "Cancel Label", "type": "main", "index": 0}],
+                f"{f}: Is Latest? main[0] (aborted fragment) must be recorded via Cancel Label (stage 3): {conns['Is Latest?']['main'][0]}")
     assert_that(conns["Count Dialog"]["main"][0] == [{"node": "Quota Decision", "type": "main", "index": 0}],
                 f"{f}: Count Dialog does not chain to Quota Decision: {conns['Count Dialog']['main'][0]}")
     assert_that(conns["Quota Decision"]["main"][0] == [{"node": "If Quota Allows", "type": "main", "index": 0}],
@@ -189,8 +200,11 @@ def check_bot(f, base):
     assert_that(conns["If Quota Allows"]["main"][0] == [{"node": "Input type", "type": "main", "index": 0}],
                 f"{f}: If Quota Allows main[0] (allowed) does not proceed to Input type: "
                 f"{conns['If Quota Allows']['main'][0]}")
-    assert_that(conns["If Quota Allows"]["main"][1] == [OUTCOME_EDGE],
-                f"{f}: If Quota Allows main[1] (quota refused) must end ONLY at the Outcome stamp: {conns['If Quota Allows']['main'][1]}")
+    assert_that(conns["If Quota Allows"]["main"][1] == [{"node": "Cancel Label", "type": "main", "index": 0}],
+                f"{f}: If Quota Allows main[1] (quota refused) must be recorded via Cancel Label (stage 3): {conns['If Quota Allows']['main'][1]}")
+    assert_that(conns["Cancel Label"]["main"][0] == [{"node": "Record Cancel", "type": "main", "index": 0}]
+                and conns["Record Cancel"]["main"][0] == [OUTCOME_EDGE],
+                f"{f}: Cancel Label -> Record Cancel -> Outcome chain broken")
     # The winner must reach Input type ONLY through the gate: no direct edge may bypass it.
     direct = [c for outs in conns["Is Latest?"]["main"] for c in outs if c["node"] == "Input type"]
     assert_that(direct == [],
@@ -211,8 +225,38 @@ def check_bot(f, base):
     assert_that("$execution.id" in ojs and "$prevNode.name" in ojs,
                 f"{f}: Outcome stamp must carry the execution id as correlationId and derive the label from $prevNode")
     assert_that(conns["If"]["main"][1] == [OUTCOME_EDGE], f"{f}: If main[1] (foreign/group filtered) must end at Outcome: {conns['If']['main'][1]}")
-    assert_that(conns["HTTP Request"]["main"][0] == [OUTCOME_EDGE],
-                f"{f}: the send (HTTP Request) must be followed ONLY by the Outcome stamp: {conns['HTTP Request']['main'][0]}")
+    # Stage 3 (A3/A7): the send is preceded by Final Fetch -> Final Check -> Final OK? -> Acquire Send
+    # Lease -> Send Allowed? and followed by Settle Send -> [reconcile] -> Record Send -> Outcome.
+    for src, dst in (("Retrieve Answer", "Final Fetch"), ("Ask to Send Text", "Final Fetch"), ("Final Fetch", "Final Check"),
+                     ("Final Check", "Final OK?"), ("Acquire Send Lease", "Send Allowed?"), ("HTTP Request", "Settle Send"),
+                     ("Settle Send", "Send Unknown?"), ("Wait Reconcile", "Reconcile Fetch"), ("Reconcile Fetch", "Reconcile Check"),
+                     ("Reconcile Check", "Record Send"), ("Record Send", "Outcome"), ("AI Agent", "Generated?")):
+        assert_that(conns[src]["main"][0] == [{"node": dst, "type": "main", "index": 0}],
+                    f"{f}: {src} must chain ONLY to {dst}: {conns[src]['main'][0]}")
+    assert_that(conns["Final OK?"]["main"] == [[{"node": "Acquire Send Lease", "type": "main", "index": 0}], [{"node": "Cancel Label", "type": "main", "index": 0}]],
+                f"{f}: Final OK? branches wrong: {conns['Final OK?']['main']}")
+    assert_that(conns["Send Allowed?"]["main"] == [[{"node": "HTTP Request", "type": "main", "index": 0}], [{"node": "Cancel Label", "type": "main", "index": 0}]],
+                f"{f}: Send Allowed? branches wrong: {conns['Send Allowed?']['main']}")
+    assert_that(conns["Send Unknown?"]["main"] == [[{"node": "Wait Reconcile", "type": "main", "index": 0}],
+                                                    [{"node": "Record Send", "type": "main", "index": 0}]],
+                f"{f}: Send Unknown? branches wrong: {conns['Send Unknown?']['main']}")
+    assert_that(conns["Generated?"]["main"] == [[{"node": "Pause Before Reading", "type": "main", "index": 0}], [{"node": "Cancel Label", "type": "main", "index": 0}]],
+                f"{f}: Generated? branches wrong: {conns['Generated?']['main']}")
+    send = node(ns, "HTTP Request")
+    body = [p for p in send["parameters"]["bodyParameters"]["parameters"] if p["name"] == "body"][0]["value"]
+    assert_that(body == "={{ $('Final Check').first().json.text }}", f"{f}: the send body must be the text the Final Check re-emitted: {body}")
+    assert_that(send.get("onError") == "continueRegularOutput" and send["parameters"]["options"]["response"]["response"].get("neverError") is True
+                and send["parameters"]["options"]["response"]["response"].get("fullResponse") is True,
+                f"{f}: the send must never throw and must expose the full response (Settle Send classifies it)")
+    lease = node(ns, "Acquire Send Lease")["parameters"]["query"]
+    for frag in ("from reply_mode_flags", "incoming_generation = $4::bigint", "lock_expires_at = now() + interval", "state = 'send_pending'"):
+        assert_that(frag in lease, f"{f}: Acquire Send Lease lacks {frag!r} (mode re-read / generation / lease / event state must be ONE statement)")
+    for name in ("Mark Read", "Typing"):
+        assert_that(node(ns, name).get("onError") == "continueRegularOutput", f"{f}: {name} must fail open (decorative action)")
+    assert_that(node(ns, "AI Agent").get("onError") == "continueRegularOutput", f"{f}: AI Agent must not abort the run (Generated? records generation_failed)")
+    for name, cap in (("Count Input Words", "12"), ("Count Output Words", "20")):
+        assert_that(f"Math.min(" in node(ns, name)["parameters"]["jsCode"] and cap in node(ns, name)["parameters"]["jsCode"],
+                    f"{f}: {name} pause is not clamped (delay budget)")
     assert_that("Outcome" not in conns or conns["Outcome"].get("main", [[]])[0] == [],
                 f"{f}: Outcome must be terminal (it feeds {conns.get('Outcome')})")
 

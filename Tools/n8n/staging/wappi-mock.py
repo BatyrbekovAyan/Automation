@@ -22,7 +22,7 @@ Control routes (never exist on the real transport):
     POST /__mock/messages  {profile_id, chat_id, messages:[...]}     replace a chat's history
     POST /__mock/incoming  {profile_id, chat_id, message:{...}}      append one incoming row (returns it)
     GET  /__mock/calls?since=<n>&path=<substr>                        recorded calls
-    POST /__mock/fault     {match:<path substr>, mode:"status"|"timeout"|"accept_then_drop",
+    POST /__mock/fault     {match:<path substr>, mode:"status"|"timeout"|"accept_then_drop"|"drop",
                             status:500, times:1, delay:35}
     POST /__mock/profile   {profile_id, authorized, phone, authorized_at}   status fields for get/status
     GET  /__mock/state
@@ -124,6 +124,13 @@ class Handler(BaseHTTPRequestHandler):
         fault = _take_fault(path)
         entry = {"ts": time.time(), "method": method, "path": path, "query": query, "body": body,
                  "auth": bool(self.headers.get("Authorization")), "fault": fault and fault["mode"]}
+        if fault and fault["mode"] == "drop":
+            # the connection dies BEFORE the transport processes anything: nothing is sent, no echo
+            # will ever appear — the honest final state for the caller is send_unknown.
+            entry["dropped"] = True
+            entry["status"] = None
+            _record(entry)
+            return self._drop()
         # Route on the tail after the channel prefix.
         channel = "telegram" if path.startswith("/tapi/") else "whatsapp"
         tail = path

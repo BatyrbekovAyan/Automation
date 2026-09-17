@@ -68,6 +68,11 @@ TG_BOT_NODE_NAMES = {
     "Debounce Wait", "Fetch Recent", "Latest+Combine", "Is Latest?",
     "Count Dialog", "Quota Decision", "If Quota Allows",
     "Outcome",   # audit stage 0.5 terminal outcome stamp (apply-outcome-stamps.py)
+    # audit stage 3 (apply-reply-pipeline-v2.py): claim, generation guard, final check + lease + settle,
+    # reconcile, records — +16
+    "Claim Event", "Claimed?", "Generated?", "Final Fetch", "Final Check", "Final OK?", "Acquire Send Lease",
+    "Send Allowed?", "Settle Send", "Send Unknown?", "Wait Reconcile", "Reconcile Fetch", "Reconcile Check",
+    "Record Send", "Cancel Label", "Record Cancel",
 }
 
 
@@ -365,8 +370,8 @@ def check_dialog_metering(f):
     iqa = conns["If Quota Allows"]["main"]
     assert iqa[0] == [{"node": "Input type", "type": "main", "index": 0}], \
         f"{f}: If Quota Allows true-branch does not feed Input type: {iqa[0]}"
-    assert iqa[1] == [{"node": "Outcome", "type": "main", "index": 0}], \
-        f"{f}: If Quota Allows false-branch must end only at the Outcome stamp: {iqa[1]}"
+    assert iqa[1] == [{"node": "Cancel Label", "type": "main", "index": 0}], \
+        f"{f}: If Quota Allows false-branch must be recorded via Cancel Label (stage 3): {iqa[1]}"
 
     # (iv) Count Dialog is fail-open: a Supabase outage or an unregistered profile (0
     # rows from the `me` CTE) must never silence the bot -- mirrors Restamp RAG

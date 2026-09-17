@@ -8,13 +8,16 @@
 
 - **Дата:** 2026-09-17 · **Ветка/коммит:** `main` @ `95221844` (исходный HEAD; работа идёт на `main`
   scoped-коммитами — единый рабочий каталог, без worktree; перед каждым коммитом `git rev-parse HEAD`).
-- **Текущий этап:** 2 (A2) — код ЗАВЕРШЁН и staging_verified 2026-09-17; НЕ развёрнут (пакет в
-  `docs/audits/a1-deploy-runbook.md`, дополнен A2). Следующий: этап 3 (A3/A4/A7).
-- **Коммиты:** этап 1 — d44fc037, 5448f98d, e3aec245, 616e6461; этап 2 — b892b83d (сервер), клиент — см. git log.
+- **Текущий этап:** 3 (A3/A4/A7) — код ЗАВЕРШЁН и staging_verified 2026-09-17 (WA и TG); НЕ развёрнут (пакет в
+  `docs/audits/a1-deploy-runbook.md`, дополнен этапом 3). Следующий: этап 4 (A5/A6 — история, handoff, уведомления).
+- **Коммиты:** этап 1 — d44fc037, 5448f98d, e3aec245, 616e6461; этап 2 — b892b83d, 230392e8, f456e1b9; этап 3 — см. git log
+  (`feat(reply-pipeline)`).
 - **Как продолжить:** `Tools/n8n/staging/pg.sh start` → `python3 Tools/n8n/staging/wappi-mock.py &` →
-  `python3 Tools/n8n/staging/bootstrap.py --restart` → `python3 Tools/n8n/staging/e2e.py`; чистый харнесс —
-  `node Tools/n8n/repro/run-code-node.mjs`; четыре verify-скрипта; Unity — `Tools/run-tests-headless.sh`.
-  Ожидаемое состояние ДО этапов 2–5: repro 13 pass / 4 fail, e2e 7 pass / 3 fail (все fail = дефекты аудита).
+  `python3 Tools/n8n/staging/bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001` → `python3 Tools/n8n/staging/e2e.py`
+  → `python3 Tools/n8n/staging/e2e-reply.py` (этап 3, ~15 мин); чистый харнесс — `node Tools/n8n/repro/run-code-node.mjs`;
+  verify-скрипты: batching, parity, rag, panel-prompts, auth-gate, reply-mode, reply-pipeline; Unity — `Tools/run-tests-headless.sh`.
+  Ожидаемое состояние ПОСЛЕ этапа 3: repro 15 pass / 2 fail (S4 subject, no-identity — цели этапа 5), e2e.py 11/11,
+  e2e-reply.py 28/28. Мок надо перезапускать после правок `wappi-mock.py` (процесс держит старый код).
 
 ## Baseline (этап 0.1) — зафиксировано 2026-09-17
 
@@ -119,3 +122,24 @@ bad_request (staging); два быстрых переключения с обр�
 частичный сбой одного канала — единая транзакция/один запрос на оба профиля (staging both-channels) + 403 всего запроса при
 чужом профиле (A1); первое входящее во время создания — посев до активации (staging create). Интерфейс не утверждает
 серверное состояние без подтверждения (dim/subline). Не проверено на устройстве.
+
+## Этап 3 (A3/A4/A7) — состояние
+
+| Пункт | Статус | Изменения | Доказательства | Ограничения |
+|---|---|---|---|---|
+| 3.1 атомарная регистрация события | staging_verified | `sql/2026-09-17-reply-events.sql`: `reply_events (profile, chat, message_id, state, execution_id, transport_message_id, error)` + `chat_reply_state (incoming_generation, lock_token, lock_expires_at, last_sent_*)`, RLS default-deny; узел `Claim Event` (один upsert: повторная доставка → `claimed=false` → `duplicate` ДО debounce/LLM/typing; устаревший claim >10 мин в claimed/generated переиспользуется; каждый claim поднимает поколение чата и фиксирует watermark памяти) | e2e-reply `dup_parallel_once`, `dup_sequential_once` (второй прогон не выполняет ни Debounce, ни AI Agent, ни Mark Read/Typing/send), `restart_stale_claim_reclaims` (11-мин claim → ответ отправлен; 1-мин claim → duplicate) — WA и TG | состояние `generated` зарезервировано (не пишется — лишний DB-узел ≈1,9 с на проде); событие, умершее между lease и Record, остаётся `send_pending` (Wappi не доставляет повторно; lease истекает за 90 с) |
+| 3.2 порядок в рамках чата | staging_verified | lease 90 с на (profile, chat) в `Acquire Send Lease`; другой чат не блокируется; просроченный lease не блокирует; `cancelled_busy` при живом чужом lease | `two_chats_parallel_independent` (2 чата → 2 отправки), `expired_lock_does_not_block` (lock снят после отправки), `live_lock_blocks_send` (0 отправок, ledger cancelled_busy) | — |
+| 3.3 проверка режима/поколения/владельца перед отправкой | staging_verified | `Final Fetch` → `Final Check` (новее клиент → superseded; новее владелец → cancelled_owner; снимок без триггера → cancelled_fetch; стабильная сортировка time+порядок Wappi); `Latest+Combine` — то же правило владельца внутри debounce; `Acquire Send Lease` ОДНИМ запросом перечитывает текущий режим (`cancelled_mode`) и поколение (`superseded`) | repro `combine_human_reply_after_trigger_aborts` (WA+TG) теперь PASS; e2e.py `bot_human_reply_during_debounce_aborts`, `bot_newer_incoming_supersedes`; e2e-reply `newer_incoming_during_llm_supersedes`, `owner_reply_before_send_cancels`, `auto_off_mid_flight_cancels` — 0 отправок, ledger-состояние, AI-строк памяти 0 | окно между `Acquire Send Lease` и самим send (~2 с на проде) — единственное, где новое входящее уже не отменяет; его ответ придёт следующим |
+| 3.4 короткие транзакции | staging_verified | ни один DB-запрос не охватывает LLM или транспорт: Claim / Lease / Record — по одному statement; lease покрывает только send | структура: `verify-reply-pipeline.py` (SQL-контракты, отсутствие send в Code-узлах) | — |
+| 3.5 состояния sent / send_failed / send_unknown | staging_verified | send: `fullResponse` + `neverError` + 30 с + `onError: continue`; `Settle Send` классифицирует; `Record Send` пишет состояние и `transport_message_id`, снимает lease; `Outcome` читает записанное состояние | `send_500_is_send_failed` (ровно 1 попытка, error `http 500 …`), `accept_then_drop_reconciles_sent`, `send_timeout_reconciles_from_echo`, `dropped_without_echo_stays_send_unknown` (состояние остаётся send_unknown в ledger и в Outcome) | видимость send_unknown для владельца в приложении — этап 4/7 (статус последнего исхода); сейчас — ledger + `baseline-metrics.py` |
+| 3.6 идемпотентность транспорта / сверка | staging_verified | у Wappi нет ключа идемпотентности (документация 2026-09-17) ⇒ сверка: `Wait Reconcile` 3 с → `Reconcile Fetch` → `Reconcile Check` (наш текст как исходящее эхо после начала send ⇒ sent с id эха; иначе send_unknown). Повторной отправки нет нигде в цепочке | `accept_then_drop_reconciles_sent` (1 вызов send, reconciled=true), `send_timeout_reconciles_from_echo` (Settle=send_unknown → Outcome sent), `dropped_without_echo…` (reconciled=false) | сверка по тексту+времени, не по id: одинаковый текст, отправленный владельцем в те же 5 с, дал бы ложное «sent» (маловероятно, отмечено) |
+| 3.7 Mark Read / Typing не блокируют | staging_verified | `Mark Read`, `Typing`: `onError: continueRegularOutput`, `alwaysOutputData`, timeout 15 с; `AI Agent` fail-open → `Generated?` → `generation_failed` | `typing_failure_still_sends` (typing 500 → ответ отправлен) — WA и TG | сбой самого LLM не воспроизводился на staging (OpenAI не мокается) — ветка проверена структурно |
+| 3.8 бюджет задержки | locally_verified | клампы: чтение ≤ 8 с (12 слов), печать ≤ 12 с (20 слов), прослушивание ≤ 12 с; итог на проде ≈ 8 (debounce) + 5×1,9 (DB) + LLM + ≤ 21 (паузы) ≈ 30–45 с | `verify-message-batching.py` (клампы), выборочно по длительностям staging-прогона (12–35 с при DB ≈ 0) | 1,9 с/узел Postgres на проде (Supabase pooler) — сам по себе риск; вынесено в runbook §2 |
+| 3.9 отменённая генерация не в истории | staging_verified | `Record Cancel` удаляет AI-строки `n8n_chat_histories` выше watermark для отменённой генерации (`dropAiHistory` только с `Final OK?`/`Send Allowed?`); `Cancel Label` именует каждую причину | сценарии 3.3: `ai_memory_rows == 0` после superseded / cancelled_owner / cancelled_mode | человеческие строки (входящее клиента) остаются — правильно: следующий ответ должен их видеть |
+
+**Приёмка этапа 3** (по инструкции): последовательные и параллельные дубли ✓; перезапуск после захвата события ✓ (stale-claim);
+два клиента одновременно ✓; новый вход во время LLM и перед отправкой ✓; ручной ответ ✓ (в debounce и перед отправкой);
+выключение авто ✓; сбой typing ✓; истёкшая блокировка ✓; Wappi принял сообщение, ответ потерян ✓ (accept_then_drop, timeout);
+нет повторных отправок ✓ (в каждом сценарии считаются вызовы `message/send` мока); неопределённый результат не скрывается ✓
+(`dropped_without_echo_stays_send_unknown`). WA и TG — одинаковые сценарии, e2e-reply 28/28. Клиент не менялся (Unity 2640/2640
+от этапа 2 остаётся в силе). Прод не менялся.

@@ -42,6 +42,14 @@ BOT_OUTCOME_BY_LAST_NODE = {
     "Quota Decision": "error",
     "If Quota Allows": "quota_denied",
     "HTTP Request": "sent",         # Wappi message/send returned (transport accepted)
+    # Stage 3 (apply-reply-pipeline-v2.py): every run ends at the Outcome stamp, which now carries the
+    # recorded ledger state (duplicate | superseded | cancelled_owner | cancelled_mode | cancelled_busy |
+    # cancelled_fetch | generation_failed | sent | send_failed | send_unknown); these are the fallbacks
+    # for a run that died inside the new stretch.
+    "Claim Event": "error", "Claimed?": "duplicate", "Generated?": "generation_failed",
+    "Final Fetch": "error", "Final Check": "error", "Final OK?": "error", "Acquire Send Lease": "error",
+    "Send Allowed?": "error", "Settle Send": "error", "Send Unknown?": "error", "Wait Reconcile": "in_progress",
+    "Reconcile Fetch": "error", "Reconcile Check": "error", "Record Send": "error", "Cancel Label": "error", "Record Cancel": "error",
 }
 SUGGEST_OUTCOME_BY_LAST_NODE = {"Respond": "responded"}
 
