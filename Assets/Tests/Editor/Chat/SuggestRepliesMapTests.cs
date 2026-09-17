@@ -161,4 +161,40 @@ public class SuggestRepliesMapTests
         Assert.AreEqual(SuggestionStatus.Ok, r.status);
         Assert.IsNull(r.items[0].move);
     }
+
+    // --- S8 (audit stage 5): failures are told apart, never shown raw ------------------------
+
+    [Test]
+    public void ErrorKinds_FromServer_AreClassified()
+    {
+        Assert.AreEqual(SuggestionErrorKind.Subscription, N8nSuggestionsProvider.MapResponse("{\"v\":1,\"suggestions\":[],\"error\":\"subscription\"}", 1).errorKind);
+        Assert.AreEqual(SuggestionErrorKind.DailyCap, N8nSuggestionsProvider.MapResponse("{\"v\":1,\"suggestions\":[],\"error\":\"daily_cap\"}", 1).errorKind);
+        Assert.AreEqual(SuggestionErrorKind.Generation, N8nSuggestionsProvider.MapResponse("{\"v\":1,\"suggestions\":[],\"error\":\"something n8n-ish: node Retrieve RAG failed\"}", 1).errorKind, "an unknown server string never reaches the UI");
+        Assert.AreEqual(SuggestionErrorKind.Generation, N8nSuggestionsProvider.MapResponse("not json", 1).errorKind);
+        Assert.IsNull(N8nSuggestionsProvider.MapResponse("{\"v\":1,\"suggestions\":[],\"abstain\":true}", 1).errorKind, "abstain is not an error");
+    }
+
+    [Test]
+    public void ErrorKinds_FromTransport_AreClassified()
+    {
+        Assert.AreEqual(SuggestionErrorKind.Unauthorized, SuggestionErrorKind.FromTransport(401, "HTTP/1.1 401 Unauthorized"));
+        Assert.AreEqual(SuggestionErrorKind.Unauthorized, SuggestionErrorKind.FromTransport(403, "HTTP/1.1 403 Forbidden"));
+        Assert.AreEqual(SuggestionErrorKind.Timeout, SuggestionErrorKind.FromTransport(0, "Request timeout"));
+        Assert.AreEqual(SuggestionErrorKind.Timeout, SuggestionErrorKind.FromTransport(504, "HTTP/1.1 504 Gateway Timeout"));
+        Assert.AreEqual(SuggestionErrorKind.Network, SuggestionErrorKind.FromTransport(0, "Cannot resolve destination host"));
+        Assert.AreEqual(SuggestionErrorKind.Network, SuggestionErrorKind.FromTransport(500, "HTTP/1.1 500 Internal Server Error"));
+    }
+
+    [Test]
+    public void ErrorCopy_NamesEachKind_InRussian_WithoutInternals()
+    {
+        foreach (string kind in new[] { SuggestionErrorKind.Network, SuggestionErrorKind.Timeout, SuggestionErrorKind.Unauthorized, SuggestionErrorKind.Subscription, SuggestionErrorKind.DailyCap, SuggestionErrorKind.UnknownAccount, SuggestionErrorKind.Generation, "garbage", null })
+        {
+            string t = SuggestionErrorCopy.Text(kind);
+            Assert.IsFalse(string.IsNullOrEmpty(t));
+            Assert.IsFalse(t.Contains("n8n") || t.Contains("node") || t.Contains("HTTP"), t);
+        }
+        Assert.AreEqual(SuggestionErrorCopy.DailyCapText, SuggestionErrorCopy.Text(SuggestionErrorKind.DailyCap));
+        Assert.AreEqual(SuggestionErrorCopy.Default, SuggestionErrorCopy.Text(SuggestionErrorKind.Generation));
+    }
 }

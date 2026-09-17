@@ -76,6 +76,9 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
   SQL `sql/2026-09-17-history-handoff.sql`, staging suite `staging/e2e-handoff.py`): the one history
   (`chat_history_events`) with explicit sources, the `create_handoff` tool → `crHandoffReq0001`, the
   self-message notifier `crHandoffNtfy001`, the app webhook `crHandoffsApi001` — see CLAUDE.md «A5/A6».
+  Stage 5 (`apply-suggest-v2.py`, SQL `sql/2026-09-17-suggestion-request-keys.sql`, staging suite
+  `staging/e2e-suggest.py`, repro scenarios `prep_*` in `repro/scenarios.json`): Suggest Replies knowledge
+  budget / subject recovery / exact match / server time / idempotent count / error kinds — see CLAUDE.md «S1/S3–S8».
   `$execution.id` as correlationId). `verify-message-batching.py` / `verify-telegram-parity.py` pin the
   stamp's wiring and the winner → billing-gate → Input type path (their pre-2026-09 expectations were
   stale and failed every run).

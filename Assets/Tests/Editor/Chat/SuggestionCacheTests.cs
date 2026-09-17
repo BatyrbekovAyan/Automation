@@ -132,3 +132,47 @@ public class SuggestionCacheTests
         Assert.IsFalse(cache.TryGet("c2", "t2", out _));
     }
 }
+
+/// <summary>S6 (audit stage 5): the cache knows about scope, knowledge version and time.</summary>
+public class SuggestionCacheScopeTests
+{
+    private static SuggestionResult Ok() => new SuggestionResult { status = SuggestionStatus.Ok, requestSeq = 1,
+        items = new System.Collections.Generic.List<SuggestionItem> { new SuggestionItem { text = "ответ", intentLabel = "Ответ" } } };
+
+    [Test]
+    public void KnowledgeVersionChange_Misses_SameVersionHits()
+    {
+        var cache = new SuggestionCache();
+        cache.SetKnowledgeVersion("v1");
+        cache.Store("c1", "t1", Ok());
+        Assert.IsTrue(cache.TryGet("c1", "t1", out _));
+        cache.SetKnowledgeVersion("v2");
+        Assert.IsFalse(cache.TryGet("c1", "t1", out _), "a price/contact/prompt edit must not serve the old set");
+        cache.SetKnowledgeVersion("v1");
+        Assert.IsTrue(cache.TryGet("c1", "t1", out _), "the version is a key, not an invalidation counter");
+    }
+
+    [Test]
+    public void ChannelOrProfileSwitch_Misses_SwitchingBackHits()
+    {
+        var cache = new SuggestionCache();
+        cache.SetScope("Bot0", "whatsapp", "wa1");
+        cache.Store("77@c.us", "t1", Ok());
+        cache.SetScope("Bot0", "telegram", "tg1");
+        Assert.IsFalse(cache.TryGet("77@c.us", "t1", out _), "a chat id is not unique across channels/profiles");
+        cache.SetScope("Bot0", "whatsapp", "wa1");
+        Assert.IsTrue(cache.TryGet("77@c.us", "t1", out _), "the useful re-open hit survives a round trip");
+    }
+
+    [Test]
+    public void Ttl_Expires_TimeSensitiveAnswers()
+    {
+        long now = 1_000_000;
+        var cache = new SuggestionCache { NowMs = () => now, TtlMs = 10 * 60 * 1000 };
+        cache.Store("c1", "t1", Ok());
+        now += 9 * 60 * 1000;
+        Assert.IsTrue(cache.TryGet("c1", "t1", out _));
+        now += 2 * 60 * 1000;
+        Assert.IsFalse(cache.TryGet("c1", "t1", out _), "«сейчас открыты» must not outlive the hour");
+    }
+}

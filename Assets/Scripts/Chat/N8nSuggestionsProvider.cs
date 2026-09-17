@@ -30,6 +30,7 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
     private const int MaxPromptChars    = 2000;
     private const int MaxCatalogChars   = 2500;
     private const int MaxKnowledgeChars = 1200;
+    public const int RequestTimeoutSeconds = 22;   // S3: > the server's 20 s executionTimeout
 
     // --- ISuggestionsProvider ------------------------------------------------
 
@@ -95,17 +96,22 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
             // The subscription gate's key (Task 17a): the SAME identity the Create/Edit workflow
             // forms and GetUsage send. Always sent — an empty one is refused server-side, and the
             // refusal arrives in the existing error envelope, which the panel already renders.
-            appUserId:         BillingIdentity.AppUserId);
+            appUserId:         BillingIdentity.AppUserId,
+            // S1/S6/S7 (stage 5): the one knowledge contract (descriptions, contacts as fields, zone, version)
+            // and the idempotent request key the daily counter dedupes on (a timeout retry is not a second request).
+            knowledge:         BuildKnowledge(botName),
+            requestKey:        RequestKey(req, msgs));
 
         UnityWebRequest www = null;
-        // 15 s: server p95 ≈ 4s; 30s was a very long skeleton before the error state (audit F17c)
-        yield return AuthorizedRequest.Send(() => AuthorizedRequest.JsonPost($"{Manager.n8nBaseUrl}/webhook/SuggestReplies", json, 15), r => www = r);
+        // S3 (stage 5): ONE deadline. The server stops the run at 20 s (workflow executionTimeout) and
+        // answers with a timeout error; the client waits 22 s so the server's answer always wins the race.
+        yield return AuthorizedRequest.Send(() => AuthorizedRequest.JsonPost($"{Manager.n8nBaseUrl}/webhook/SuggestReplies", json, RequestTimeoutSeconds), r => www = r);
         using var wwwScope = www;
 
         if (www.result != UnityWebRequest.Result.Success)
         {
             Debug.LogWarning($"[Suggest] fetch failed [{www.responseCode}] {www.error}");
-            cb?.Invoke(Error(req));
+            cb?.Invoke(Error(req, SuggestionErrorKind.FromTransport(www.responseCode, www.error)));
             yield break;
         }
 
@@ -151,6 +157,53 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
             PlayerPrefs.GetString(botName + global::BotSettings.ContactKeys[2], ""),
             PlayerPrefs.GetString(botName + global::BotSettings.ContactKeys[3], ""),
             PlayerPrefs.GetString(botName + global::BotSettings.ContactKeys[4], ""));
+    }
+
+    // S1 (stage 5): the knowledge contract, read from the same keys the settings screen writes
+    // (bot-persistence key catalog: Product{i}/Service{i} + Price + Description, the contact keys,
+    // {bot}Business, {bot}TimeZone).
+    private static SuggestionKnowledgeDto BuildKnowledge(string botName)
+    {
+        var items = new List<SuggestionKnowledgeItem>();
+        AppendKnowledgeItems(items, botName, "Product", "product", PlayerPrefs.GetInt(botName + "ProductsNumber", 0));
+        AppendKnowledgeItems(items, botName, "Service", "service", PlayerPrefs.GetInt(botName + "ServicesNumber", 0));
+        var contacts = new SuggestionKnowledgeContacts
+        {
+            phone     = PlayerPrefs.GetString(botName + global::BotSettings.ContactKeys[0], ""),
+            hours     = PlayerPrefs.GetString(botName + global::BotSettings.ContactKeys[1], ""),
+            address   = PlayerPrefs.GetString(botName + global::BotSettings.ContactKeys[2], ""),
+            instagram = PlayerPrefs.GetString(botName + global::BotSettings.ContactKeys[3], ""),
+            email     = PlayerPrefs.GetString(botName + global::BotSettings.ContactKeys[4], ""),
+        };
+        int documents = 0;
+        try { documents = UploadedFilesStore.Load(botName, "product").Count + UploadedFilesStore.Load(botName, "service").Count; } catch (Exception) { documents = 0; }   // the store's two sections
+        return SuggestionKnowledge.Compose(items, contacts, PlayerPrefs.GetString(botName + "Business", ""), BusinessTimeZone.ForBot(botName), documents);
+    }
+
+    private static void AppendKnowledgeItems(List<SuggestionKnowledgeItem> items, string botName, string singular, string kind, int count)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            string name = PlayerPrefs.GetString(botName + singular + i, "");
+            if (string.IsNullOrEmpty(name)) continue;
+            items.Add(new SuggestionKnowledgeItem
+            {
+                kind = kind, name = name,
+                price = PlayerPrefs.GetString(botName + singular + i + "Price", ""),
+                description = PlayerPrefs.GetString(botName + singular + i + "Description", ""),
+            });
+        }
+    }
+
+    /// <summary>The knowledge version the cache keys on (S6): the same hash the payload carries, plus the owner prompt.</summary>
+    public static string KnowledgeVersionFor(string botName)
+        => SuggestionKnowledge.Version(BuildKnowledge(botName), PlayerPrefs.GetString(botName + "Prompt", ""));
+
+    /// <summary>S3: one key per (chat, tail message, direction) — a retry after a timeout is the SAME request to the daily counter.</summary>
+    public static string RequestKey(SuggestionRequest req, List<MessageViewModel> msgs)
+    {
+        string tail = (msgs != null && msgs.Count > 0) ? SuggestionCache.TailKey(msgs[msgs.Count - 1]) : "";
+        return SuggestionKnowledge.Fnv1a64((req?.chatId ?? "") + "|" + tail + "|" + (req?.steerTowardText ?? "") + "|" + (req?.lastIncomingText ?? ""));
     }
 
     // Device-local timestamp for the ВРЕМЯ grounding rule ("вы сейчас работаете?" — audit F1):
@@ -217,7 +270,9 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
         string businessKnowledge,
         string now,
         string pickStats,
-        string appUserId)
+        string appUserId,
+        SuggestionKnowledgeDto knowledge = null,
+        string requestKey = null)
     {
         bool isTelegram = channel == ChatChannel.Telegram;
         var dto = new SuggestRepliesRequestDto
@@ -231,8 +286,8 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
             businessName     = businessName,
             ownerPrompt      = Clamp(ownerPrompt, MaxPromptChars),
             catalog          = Clamp(catalog, MaxCatalogChars),
-            steerTowardText  = req?.steerTowardText,
-            lastIncomingText = req?.lastIncomingText,
+            steerTowardText  = req?.steerTowardText == null ? null : TmpTextToPlain.Convert(req.steerTowardText),    // S5: never interface markup; null stays null (wire contract)
+            lastIncomingText = req?.lastIncomingText == null ? null : TmpTextToPlain.Convert(req.lastIncomingText),
             messages         = ToWireMessages(recentMessages),
             botTgId          = telegramWorkflowId,                                    // v1.1; ""/"-1" => server skips TG RAG
             channel          = isTelegram ? "telegram" : "whatsapp",                 // v1.1; lowercase, enum-derived only
@@ -240,6 +295,8 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
             now              = now,                                                   // v1.2; server sanitizes before prompt use
             pickStats        = Clamp(pickStats, 200),                                 // v1.2; preference-learning ranking hint
             appUserId        = appUserId,                                             // v1.4; subscription gate key — never clamped, never derived
+            knowledge        = knowledge,                                             // v1.5 (stage 5); null from a legacy caller → server uses the text fields
+            requestKey       = requestKey,                                            // v1.5 (stage 5); idempotent daily count
         };
         return JsonConvert.SerializeObject(dto);
     }
@@ -258,7 +315,7 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
             wire.Add(new WireMessage
             {
                 role = m.isIncoming ? "client" : "business",
-                text = Clamp(MediaText(m.type, m.text), MaxTextChars),
+                text = Clamp(TmpTextToPlain.Convert(MediaText(m.type, m.text)), MaxTextChars),   // S5: sprites → emoji, layout tags gone
                 ts   = m.timestamp,
             });
         }
@@ -310,8 +367,10 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
         SuggestRepliesResponse r = null;
         try { r = JsonConvert.DeserializeObject<SuggestRepliesResponse>(json); } catch { }
 
-        if (r == null || !string.IsNullOrEmpty(r.error) || r.suggestions == null)
-            return new SuggestionResult { items = null, requestSeq = requestSeq, status = SuggestionStatus.Error };
+        if (r == null || r.suggestions == null)
+            return new SuggestionResult { items = null, requestSeq = requestSeq, status = SuggestionStatus.Error, errorKind = SuggestionErrorKind.Generation };
+        if (!string.IsNullOrEmpty(r.error))
+            return new SuggestionResult { items = null, requestSeq = requestSeq, status = SuggestionStatus.Error, errorKind = SuggestionErrorKind.FromServer(r.error) };
 
         if (r.abstain && r.suggestions.Count == 0)
             return new SuggestionResult { items = null, requestSeq = requestSeq, status = SuggestionStatus.Empty };
@@ -323,7 +382,7 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
             .ToList();
 
         return items.Count == 0
-            ? new SuggestionResult { items = null, requestSeq = requestSeq, status = SuggestionStatus.Error }
+            ? new SuggestionResult { items = null, requestSeq = requestSeq, status = SuggestionStatus.Error, errorKind = SuggestionErrorKind.Generation }
             : new SuggestionResult { items = items, requestSeq = requestSeq, status = SuggestionStatus.Ok };   // lenient 1–4
     }
 
@@ -332,6 +391,6 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
     private static SuggestionResult Empty(SuggestionRequest req)
         => new SuggestionResult { items = null, requestSeq = req != null ? req.requestSeq : 0L, status = SuggestionStatus.Empty };
 
-    private static SuggestionResult Error(SuggestionRequest req)
-        => new SuggestionResult { items = null, requestSeq = req != null ? req.requestSeq : 0L, status = SuggestionStatus.Error };
+    private static SuggestionResult Error(SuggestionRequest req, string kind = SuggestionErrorKind.Network)
+        => new SuggestionResult { items = null, requestSeq = req != null ? req.requestSeq : 0L, status = SuggestionStatus.Error, errorKind = kind };
 }

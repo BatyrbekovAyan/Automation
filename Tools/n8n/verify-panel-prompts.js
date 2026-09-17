@@ -65,6 +65,8 @@ function runAssemble(businessTypeId) {
   };
   const $ = (name) => {
     if (name === 'Prep') return { first: () => ({ json: p }) };
+    // stage 5: Assemble pulls the retrieval outputs by name (fail-open RAG + the exact-match lookup)
+    if (name === 'Retrieve RAG' || name === 'Retrieve RAG TG' || name === 'Exact Match') return { all: () => [] };
     throw new Error(`unexpected $(${name}) in Assemble`);
   };
   const $input = { all: () => [] };

@@ -24,6 +24,9 @@ export GENERIC_TIMEZONE=Asia/Almaty
 export TZ=Asia/Almaty
 export EXECUTIONS_DATA_PRUNE=false
 export N8N_DIAGNOSTICS_ENABLED=false
+# S3 (stage 5): a per-workflow executionTimeout only takes effect when the instance-wide timeout is enabled.
+export EXECUTIONS_TIMEOUT=120
+export EXECUTIONS_TIMEOUT_MAX=300
 export N8N_VERSION_NOTIFICATIONS_ENABLED=false
 export N8N_TEMPLATES_ENABLED=false
 export N8N_HIRING_BANNER_ENABLED=false

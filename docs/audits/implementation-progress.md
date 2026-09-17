@@ -8,18 +8,19 @@
 
 - **Дата:** 2026-09-17 · **Ветка/коммит:** `main` @ `95221844` (исходный HEAD; работа идёт на `main`
   scoped-коммитами — единый рабочий каталог, без worktree; перед каждым коммитом `git rev-parse HEAD`).
-- **Текущий этап:** 4 (A5/A6) — код ЗАВЕРШЁН и staging_verified 2026-09-17 (push = внешний блокер, runbook §2.11); НЕ развёрнут.
-  Следующий: этап 5 (S1, S3–S6 — контракт знаний и подготовка подсказок).
+- **Текущий этап:** 5 (S1, S3–S8) — код ЗАВЕРШЁН и staging_verified 2026-09-17; НЕ развёрнут. Следующий: этап 6 (промпты и измерение качества).
 - **Коммиты:** этап 1 — d44fc037, 5448f98d, e3aec245, 616e6461; этап 2 — b892b83d, 230392e8, f456e1b9; этап 3 — см. git log
   (`feat(reply-pipeline)`).
 - **Как продолжить:** `Tools/n8n/staging/pg.sh start` → `python3 Tools/n8n/staging/wappi-mock.py &` →
   `python3 Tools/n8n/staging/bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001` → `python3 Tools/n8n/staging/e2e.py`
-  → `python3 Tools/n8n/staging/e2e-reply.py` (этап 3, ~15 мин) → `python3 Tools/n8n/staging/e2e-handoff.py` (этап 4, ~8 мин);
+  → `python3 Tools/n8n/staging/e2e-reply.py` (этап 3, ~15 мин) → `python3 Tools/n8n/staging/e2e-handoff.py` (этап 4, ~8 мин)
+  → `python3 Tools/n8n/staging/e2e-suggest.py` (этап 5, ~3 мин) → `PROBE_APP_USER_ID=<fixture> N8N_BASE_URL=http://localhost:5678 python3 Tools/n8n/probe-suggest-replies.py`;
   чистый харнесс — `node Tools/n8n/repro/run-code-node.mjs`; verify-скрипты: batching, parity, rag, panel-prompts, auth-gate,
   reply-mode, reply-pipeline, history-handoff; builder-проверки `build-auth-workflows.py --check`, `build-handoff-workflows.py --check`,
   `inject-prompts.py --check` (нужен tiktoken: `~/.venvs/tiktoken/bin/python3`); Unity — `Tools/run-tests-headless.sh`.
-  Ожидаемое состояние ПОСЛЕ этапа 4: repro 15 pass / 2 fail (S4 subject, no-identity — цели этапа 5), e2e.py 11/11,
-  e2e-reply.py 28/28, e2e-handoff.py 14/14 (прогон 2: 13/14, notifier исправлен на per-item и повторён 1/1), Unity 2651/2651. Мок надо перезапускать после правок `wappi-mock.py`.
+  Ожидаемое состояние ПОСЛЕ этапа 5: repro **22/22** (S4 subject и no-identity закрыты), e2e.py 11/11, e2e-reply.py 28/28,
+  e2e-handoff.py 14/14, e2e-suggest.py 6/6, probe-suggest-replies struct_fails=0 (4 эвристических WARN, LLM), Unity 2669/2669. Мок надо перезапускать после правок `wappi-mock.py`;
+  n8n staging — после правок `n8n-staging.sh` (env) нужен `bootstrap.py --restart`.
 
 ## Baseline (этап 0.1) — зафиксировано 2026-09-17
 
@@ -163,3 +164,22 @@ bad_request (staging); два быстрых переключения с обр�
 на канале бота (проверено моком, на устройстве НЕ проверено; push — внешний блокер) → **этап частично готов** по формулировке
 инструкции; denied notification permission — push отсутствует, честный fallback = список заявок + self-message; удаление/изоляция ✓.
 e2e-handoff 14/14 (прогон 2: 13/14, notifier исправлен на per-item и повторён 1/1); Unity 2651/2651. Прод не менялся.
+
+## Этап 5 (S1, S3–S8) — состояние
+
+| Пункт | Статус | Изменения | Доказательства | Ограничения |
+|---|---|---|---|---|
+| 5.1 контракт знаний для обоих режимов | staging_verified | payload v1.5 `knowledge` (`SuggestionKnowledge.Compose`): позиции с ОПИСАНИЕМ (как в Авто), контакты полями, часовой пояс, версия-хеш, число документов; legacy-текстовые поля сохранены; сервер (`apply-suggest-v2.py` Prep) собирает блок из объекта; валюта/состав/остаток не додумываются (только то, что ввёл владелец) | `SuggestionKnowledgeTests` (4), `SuggestRepliesPayloadTests.Knowledge_RidesThePayload…`, repro `prep_budget_keeps_contacts…`, e2e-suggest `knowledge_budget_and_server_time_reach_the_prompt` (описание позиции и адрес в fencedData) | «версия знаний» = хеш содержимого (нет счётчика на сервере); описание позиции ≤ 200 символов в блоке (полное — в RAG-документах) |
+| 5.2 осмысленный бюджет вместо отрезания конца | staging_verified | Prep: описание бизнеса ≤ 1200 + «…» (`description_truncated`), позиции ≤ 3000: сначала убираются описания (`descriptions_dropped`), затем позиции (`catalog_incomplete`); контакты не режутся никогда; legacy-клиент: хвост «Контакты:» защищён; Assemble пишет модели «КАТАЛОГ СОКРАЩЁН»/«ОПИСАНИЕ БИЗНЕСА СОКРАЩЕНО» | repro `prep_budget_keeps_contacts_when_description_is_long`, `prep_legacy_text_fields_protect_contacts_tail`; e2e-suggest (флаг + правило в systemPrompt) | размер/стоимость ограничены прежними потолками (4000 RAG, 2000 промпт) |
+| 5.3 UI-текст → текст модели | locally_verified | `TmpTextToPlain.Convert`: `<sprite name=hex>` → эмодзи (ZWJ/keycap/флаги), `<space>`/`<link>`/ZWSP/BOM убраны, литеральные `<`, URL и незнакомые теги сохранены; применяется к messages, steer, lastIncoming (null остаётся null) | `TmpTextToPlainTests` (5), `SuggestRepliesPayloadTests.Messages_AndSteer_ArePlainText…` | — |
+| 5.4 предмет короткого вопроса + точное совпадение | staging_verified | Prep: короткий/уточняющий хвост (≤ 4 слов / ≤ 40 символов / follow-up-паттерн) → запрос поиска = до 2 предыдущих реплик клиента + последняя реплика бизнеса + выбранное направление + хвост; `trailingText` остаётся `lastClientMessage`; `exactTokens` (алфавитно-цифровые с цифрой, ≥ 5, не телефон) → узел `Exact Match` (ILIKE по `documents` бота, 1 раз/запрос) → блок `exactMatches` + правило «цену и артикул бери оттуда» | repro `prep_short_follow_up_keeps_subject` (аудит S4 — закрыт), `prep_exact_tokens_and_subject_for_sku`, `prep_phone_number_is_not_an_exact_token`; e2e-suggest `short_follow_up_recovers_subject_and_exact_match [llm]` (запрос несёт «Camry 2019», точная строка найдена, карточки называют 3200) | точное совпадение — подстрочное (ILIKE), не нормализует дефисы/пробелы в артикуле |
+| 5.5 общий deadline | staging_verified | клиент 22 с (`RequestTimeoutSeconds`), workflow `executionTimeout` 20 с (env `EXECUTIONS_TIMEOUT`), retrieve-узлы fail-open (`ragError` → «ПОИСК НЕДОСТУПЕН: не значит, что позиции нет»), счётчик дневного лимита идемпотентен по `requestKey` (10 мин) — повтор после таймаута не считается | e2e-suggest `execution_deadline_is_set`, `same_request_key_is_counted_once` (1/1/2); verify-parity (fail-open узлы) | таймаут самого исполнения на staging не воспроизводился (нет способа замедлить Supabase); поведение ответа при kill = HTTP-ошибка → клиентский вид `network`/`timeout` |
+| 5.6 область и актуальность кэша | locally_verified | `SuggestionCache`: ключ = (бот, канал, профиль) + версия знаний (`KnowledgeVersionFor`: позиции, цены, описания, контакты, зона, документы, промпт) + TTL 10 мин; контроллер выставляет область/версию перед каждым Store/TryGet; переключение канала и обратно сохраняет попадание | `SuggestionCacheScopeTests` (3) + прежние 10 | «изменение знаний» узнаётся по хешу при следующем открытии (события нет — и не нужно) |
+| 5.7 часовой пояс бизнеса и серверное время | staging_verified | `{bot}TimeZone` ставится при создании бота (`BusinessTimeZone.DeviceIanaId`), сервер считает `now` по СВОИМ часам в этой зоне (Intl), клиентское `now` игнорируется; старый бот без зоны → зона по умолчанию + правило-хедж «пояс не задан» | repro `prep_server_time_default_zone_is_hedged`; e2e-suggest (фиктивное «1999» с телефона не попадает в промпт, tzSource=bot) | смена зоны бизнеса — только через новую запись ключа (UI-настройки нет) |
+| 5.8 различимые ошибки vs abstain | staging_verified | `SuggestionErrorKind` (network/timeout/unauthorized/subscription/daily_cap/unknown_account/bad_request/generation_failed) + `SuggestionErrorCopy` (RU, без внутренних деталей) → заголовок состояния ошибки панели; сервер называет причину ТОЛЬКО токен-вызову (legacy — прежний непрозрачный `generation_failed`, N-4) | `SuggestRepliesMapTests` (+3), e2e-suggest `authenticated_refusals_are_named` (subscription / unknown_account / bad_request), `legacy_caller_keeps_opaque_error` | дневной лимит (101-й запрос) не прогонялся на staging |
+
+**Приёмка этапа 5:** только ручной каталог с описанием ✓ (описание в блоке ДАННЫЕ); длинное описание + контакты в конце ✓;
+«а сколько?» после точной модели ✓ (запрос + точная строка + цена в карточках, реальная модель); смена цены без новых
+сообщений ✓ (версия знаний → промах кэша, юнит); переход между каналами ✓ (область кэша, юнит); открытие после изменения
+времени ✓ (TTL, юнит; серверное время в зоне бизнеса — staging). Клиент не проверен на устройстве. e2e-suggest 6/6,
+probe-suggest-replies struct_fails=0 (4 эвристических WARN, LLM), Unity 2669/2669, repro 22/22. Прод не менялся.

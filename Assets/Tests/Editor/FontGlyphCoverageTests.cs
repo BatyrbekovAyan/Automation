@@ -297,6 +297,7 @@ public class FontGlyphCoverageTests
             typeof(ProfileClaimCopy),   // A1 legacy-profile claim sheet (2026-09-17)
             typeof(ReplyModeSyncCopy),  // A2 unconfirmed / failed reply-mode sync subline (2026-09-17)
             typeof(HandoffCopy),        // A5 «Заявка ·» marker on real-request rows of the dashboard (2026-09-17)
+            typeof(SuggestionErrorCopy),// S8 per-kind error headings of the suggestions panel (2026-09-17)
         };
         foreach (var t in constTypes)
             foreach (var f in t.GetFields(BindingFlags.Public | BindingFlags.Static))

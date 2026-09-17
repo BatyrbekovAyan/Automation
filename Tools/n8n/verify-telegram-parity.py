@@ -533,10 +533,14 @@ def check_suggest_replies():
     assert {"Retrieve RAG", "Retrieve RAG TG"} <= emb_targets, \
         f"{f}: Embeddings ai_embedding targets missing a Retrieve node: {emb_targets}"
 
-    # (ii-c) both retrieve nodes feed Assemble (a dropped main connection dead-ends the path).
+    # (ii-c) both retrieve nodes feed the exact-match hop (stage 5) which feeds Assemble on BOTH branches
+    # (a dropped main connection dead-ends the path).
+    hop = conns["Has Exact Tokens?"]["main"]
+    assert hop[0][0]["node"] == "Exact Match" and hop[1][0]["node"] == "Assemble" and conns["Exact Match"]["main"][0][0]["node"] == "Assemble", \
+        f"{f}: Has Exact Tokens? / Exact Match must both end at Assemble: {hop}"
     for retr in ("Retrieve RAG TG", "Retrieve RAG"):
         nxt = conns[retr]["main"][0][0]["node"]
-        assert nxt == "Assemble", f"{f}: {retr} -> {nxt}, expected Assemble"
+        assert nxt == "Has Exact Tokens?", f"{f}: {retr} -> {nxt}, expected Has Exact Tokens? (stage 5 exact-match hop)"
 
     # (iii) channel branch on the RAG path.
     ictg = node(ns, "If channel TG?")
@@ -651,9 +655,13 @@ def check_suggest_replies():
     # in. The reason lives on Gate Decision's output, where the execution log keeps it for
     # debugging and the probe asserts it; the client never read it (SuggestRepliesResponse
     # has no such field). An `out.reason = ...` reappearing here is the regression to catch.
-    assert "gateReason" not in br, \
-        f"{f}: Build Response puts the refusal reason on the wire -- an unauthenticated " \
-        f"endpoint must not confirm whether a guessed app_user_id exists or its state"
+    # Stage 5 (S8): the refusal KIND may ride the wire ONLY for an authenticated caller (A1 session
+    # token — the account is proven, so the N-4 oracle concern does not apply); a legacy caller keeps
+    # the opaque envelope. Both halves are asserted.
+    assert "if (authMode === 'session') {" in br and "if (j.invalid) error = 'bad_request';" in br and "else if (j.gateReason) {" in br, \
+        f"{f}: Build Response must gate EVERY named refusal (bad_request included) on an authenticated session"
+    assert "let error = 'generation_failed';" in br and "authMode = 'legacy'" in br, \
+        f"{f}: Build Response must keep the opaque generation_failed default for legacy callers"
     assert "gateReason" in gd, \
         f"{f}: Gate Decision no longer records a reason -- a refusal would be undebuggable"
 

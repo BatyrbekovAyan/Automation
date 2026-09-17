@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 /// <summary>
@@ -12,11 +13,35 @@ using System.Collections.Generic;
 /// when the request is ISSUED and the result is stored only if the tail still matches at
 /// result time — either drift direction (message landed mid-flight, or the provider's
 /// post-drain snapshot outran the capture) degrades to a cache MISS, never to stale cards.
-/// One entry per chat: the latest stored set wins.
+/// One entry per (scope, chat): the latest stored set wins.
+///
+/// S6 (audit stage 5): an entry is valid only for the SCOPE it was made in (bot + channel +
+/// profile — a chat id is not globally unique), the KNOWLEDGE VERSION it was generated from
+/// (a price / contact / prompt edit changes it, so «сколько стоит» never survives a price
+/// change), and a TTL (a «сейчас открыты» answer must not outlive the hour). All three are
+/// set by the controller; the useful re-open hit is kept when nothing changed.
 /// </summary>
 public sealed class SuggestionCache
 {
-    private readonly Dictionary<string, (string tailKey, SuggestionResult result)> _byChat = new();
+    public const long DefaultTtlMs = 10 * 60 * 1000;
+
+    /// <summary>Injectable clock (tests); defaults to UTC now.</summary>
+    public Func<long> NowMs = () => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+    public long TtlMs = DefaultTtlMs;
+
+    private static readonly char Sep = (char)31;     // unit separator: never in a bot id, channel or profile id
+    private static readonly char KeySep = (char)30;  // record separator between scope and chat id
+
+    private string _scope = "";
+    private string _knowledgeVersion = "";
+    private readonly Dictionary<string, Entry> _byKey = new();
+
+    private readonly struct Entry
+    {
+        public readonly string TailKey; public readonly string Version; public readonly long StoredAtMs; public readonly SuggestionResult Result;
+        public Entry(string tailKey, string version, long storedAtMs, SuggestionResult result)
+        { TailKey = tailKey; Version = version; StoredAtMs = storedAtMs; Result = result; }
+    }
 
     /// <summary>
     /// Identity of a chat's last message. Prefers the server message id (timestamps get
@@ -31,13 +56,22 @@ public sealed class SuggestionCache
         return $"c:{tail.timestamp}|{tail.sequence}|{(tail.isIncoming ? 1 : 0)}|{tail.text}";
     }
 
-    /// <summary>True + the stored set only when the chat's entry exists AND its tail matches.</summary>
+    /// <summary>The (bot, channel, profile) the next Store/TryGet belong to. Switching scopes does not drop entries — switching back still hits.</summary>
+    public void SetScope(string botId, string channel, string profileId)
+        => _scope = (botId ?? "") + Sep + (channel ?? "") + Sep + (profileId ?? "");
+
+    /// <summary>The knowledge version the next Store is generated from / the next TryGet must match.</summary>
+    public void SetKnowledgeVersion(string version) => _knowledgeVersion = version ?? "";
+
+    /// <summary>True + the stored set only when the entry exists for this scope AND chat, its tail, its knowledge version and its age all still match.</summary>
     public bool TryGet(string chatId, string tailKey, out SuggestionResult result)
     {
         result = null;
         if (string.IsNullOrEmpty(chatId) || string.IsNullOrEmpty(tailKey)) return false;
-        if (!_byChat.TryGetValue(chatId, out var entry) || entry.tailKey != tailKey) return false;
-        result = entry.result;
+        if (!_byKey.TryGetValue(Key(chatId), out var e) || e.TailKey != tailKey) return false;
+        if (e.Version != _knowledgeVersion) return false;
+        if (NowMs() - e.StoredAtMs > TtlMs) return false;
+        result = e.Result;
         return true;
     }
 
@@ -49,9 +83,11 @@ public sealed class SuggestionCache
     {
         if (string.IsNullOrEmpty(chatId) || string.IsNullOrEmpty(tailKey)) return;
         if (result == null || result.status != SuggestionStatus.Ok) return;
-        _byChat[chatId] = (tailKey, result);
+        _byKey[Key(chatId)] = new Entry(tailKey, _knowledgeVersion, NowMs(), result);
     }
 
     /// <summary>Drop everything — bot switch (chat ids recur across bots).</summary>
-    public void Clear() => _byChat.Clear();
+    public void Clear() => _byKey.Clear();
+
+    private string Key(string chatId) => _scope + KeySep + chatId;
 }

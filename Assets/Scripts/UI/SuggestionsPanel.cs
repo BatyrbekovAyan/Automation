@@ -319,7 +319,7 @@ public class SuggestionsPanel : MonoBehaviour
         {
             case SuggestionStatus.Ok:    RenderCards(result.items); break;
             case SuggestionStatus.Empty: RenderEmpty();             break;
-            default:                     RenderError();             break;   // SuggestionStatus.Error
+            default:                     RenderError(result.errorKind); break;   // SuggestionStatus.Error
         }
     }
 
@@ -348,11 +348,14 @@ public class SuggestionsPanel : MonoBehaviour
         RebuildAndPositionState(emptyState);
     }
 
-    private void RenderError()
+    private void RenderError(string kind = null)
     {
         Clear();
         SetActiveSafe(emptyState, false);
         SetActiveSafe(errorState, true);
+        // S8: name the failure (access / subscription / cap / timeout / generation), never an n8n detail.
+        var heading = errorState != null ? errorState.transform.Find("Heading")?.GetComponent<TextMeshProUGUI>() : null;
+        if (heading != null) heading.text = SuggestionErrorCopy.Text(kind);
         RebuildAndPositionState(errorState);
     }
 

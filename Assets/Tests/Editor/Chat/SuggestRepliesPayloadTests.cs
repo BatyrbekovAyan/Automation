@@ -362,6 +362,8 @@ public class SuggestRepliesPayloadTests
         j.Remove("now");
         j.Remove("pickStats");
         j.Remove("appUserId");
+        j.Remove("knowledge");    // v1.5 (stage 5)
+        j.Remove("requestKey");   // v1.5 (stage 5)
 
         var expectedV1 = new JObject
         {
@@ -419,5 +421,48 @@ public class SuggestRepliesPayloadTests
         var missing = Build(Req(), One(), appUserId: null);
         Assert.IsTrue(missing.ContainsKey("appUserId"), "null must serialise as an explicit null, not vanish");
         Assert.AreEqual(JTokenType.Null, missing["appUserId"].Type);
+    }
+
+    // --- v1.5 (audit stage 5): the knowledge contract, plain text, the request key --------------
+
+    [Test]
+    public void Knowledge_RidesThePayload_WithDescriptionsAndContactsAsFields()
+    {
+        var k = SuggestionKnowledge.Compose(
+            new List<SuggestionKnowledgeItem> { new SuggestionKnowledgeItem { kind = "product", name = "Роза", price = "500", description = "50 см, Эквадор" } },
+            new SuggestionKnowledgeContacts { phone = "+7 700", hours = "9–21" }, "Цветы у дома", "Asia/Almaty", 1);
+        var j = JObject.Parse(N8nSuggestionsProvider.BuildPayloadJson(Req(), ChatChannel.WhatsApp, "p", "tp", "w", "tw", "flowers", "Цветы", "", "• Роза — 500",
+            new List<MessageViewModel>(), "", "", "", "uid", knowledge: k, requestKey: "abc"));
+        Assert.AreEqual("50 см, Эквадор", (string)j["knowledge"]["items"][0]["description"], "the panel now sees what the auto path always saw");
+        Assert.AreEqual("+7 700", (string)j["knowledge"]["contacts"]["phone"], "contacts are fields, never a tail that gets cut");
+        Assert.AreEqual("Asia/Almaty", (string)j["knowledge"]["timezone"]);
+        Assert.AreEqual(k.version, (string)j["knowledge"]["version"]);
+        Assert.AreEqual("abc", (string)j["requestKey"]);
+        Assert.AreEqual("• Роза — 500", (string)j["catalog"], "the legacy text fields stay for older servers");
+    }
+
+    [Test]
+    public void Messages_AndSteer_ArePlainText_NotInterfaceMarkup()
+    {
+        string rendered = UnicodeEmojiConverter.ConvertRealEmojisToSprites("привет 😂 сколько?");
+        var msgs = new List<MessageViewModel> { new MessageViewModel { text = rendered, type = MessageType.Chat, isIncoming = true, timestamp = 5 } };
+        var req = new SuggestionRequest { chatId = "c", requestSeq = 1, steerTowardText = rendered, lastIncomingText = rendered };
+        var j = Build(req, msgs);
+        Assert.AreEqual("привет 😂 сколько?", (string)j["messages"][0]["text"]);
+        Assert.AreEqual("привет 😂 сколько?", (string)j["steerTowardText"]);
+        Assert.AreEqual("привет 😂 сколько?", (string)j["lastIncomingText"]);
+        Assert.IsFalse(N8nSuggestionsProvider.BuildPayloadJson(req, ChatChannel.WhatsApp, "p", "tp", "w", "tw", "x", "n", "", "", msgs, "", "", "", "u").Contains("<sprite"));
+    }
+
+    [Test]
+    public void RequestKey_IsStableForTheSameTail_AndMovesWithIt()
+    {
+        var req = new SuggestionRequest { chatId = "c1", requestSeq = 1 };
+        var a = new List<MessageViewModel> { new MessageViewModel { messageId = "m1", text = "x" } };
+        var b = new List<MessageViewModel> { new MessageViewModel { messageId = "m1", text = "x" } };
+        var c = new List<MessageViewModel> { new MessageViewModel { messageId = "m2", text = "x" } };
+        Assert.AreEqual(N8nSuggestionsProvider.RequestKey(req, a), N8nSuggestionsProvider.RequestKey(req, b), "a retry after a timeout is the SAME request to the daily counter");
+        Assert.AreNotEqual(N8nSuggestionsProvider.RequestKey(req, a), N8nSuggestionsProvider.RequestKey(req, c), "a new message is a new request");
+        Assert.AreNotEqual(N8nSuggestionsProvider.RequestKey(req, a), N8nSuggestionsProvider.RequestKey(new SuggestionRequest { chatId = "c1", steerTowardText = "s" }, a), "a drill is a new request");
     }
 }

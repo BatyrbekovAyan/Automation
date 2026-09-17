@@ -388,6 +388,7 @@ public class SuggestionsController : MonoBehaviour
     {
         var cm = ChatManager.Instance;
         if (cm == null) return false;
+        ScopeCache(cm);
         string tailKey = CurrentTailKey();
         return tailKey != null && _cache.TryGet(cm.CurrentChatId, tailKey, out _);
     }
@@ -400,6 +401,7 @@ public class SuggestionsController : MonoBehaviour
     {
         var cm = ChatManager.Instance;
         if (cm == null || _panel == null) return false;
+        ScopeCache(cm);
         string tailKey = CurrentTailKey();
         if (tailKey == null || !_cache.TryGet(cm.CurrentChatId, tailKey, out var cached)) return false;
         _panel.Render(cached);
@@ -408,6 +410,15 @@ public class SuggestionsController : MonoBehaviour
         // nulled the previous chat's set, and the cache stores only fresh (round-1) sets.
         _currentRendered = cached;
         return true;
+    }
+
+    // S6 (stage 5): the cache is valid for one (bot, channel, profile) and one knowledge version at a
+    // time — set both before any Store/TryGet so a channel switch or a price edit can never serve a
+    // set generated for another scope or older facts.
+    private void ScopeCache(ChatManager cm)
+    {
+        _cache.SetScope(cm.CurrentBotId, cm.ActiveChannel == ChatChannel.Telegram ? "telegram" : "whatsapp", cm.ActiveChannelProfileId());
+        _cache.SetKnowledgeVersion(string.IsNullOrEmpty(cm.CurrentBotId) ? "" : N8nSuggestionsProvider.KnowledgeVersionFor(cm.CurrentBotId));
     }
 
     // Tail identity of the OPEN chat's freshest message, or null when there is none to key on.
@@ -506,6 +517,7 @@ public class SuggestionsController : MonoBehaviour
         };
         // F9 capture-at-issue: the tail this request answers. Verified again at store time —
         // either drift direction degrades to a cache miss, never to stale cards.
+        ScopeCache(ChatManager.Instance);
         string tailKey = CurrentTailKey();
         bool freshSet = steerTowardText == null;   // only round-1 sets are cache-worthy
         _provider.Request(req, result => OnResult(seq, chatId, tailKey, freshSet, result));

@@ -1819,6 +1819,9 @@ public partial class Manager : MonoBehaviour
 
         // Step 5: Save to PlayerPrefs
         PlayerPrefs.SetString(newBot.name + "Name", formBotName);
+        // S7 (audit stage 5): the business's timezone is fixed at creation from the device that created
+        // the bot; the suggestions server computes «now» in it from ITS clock, never from a traveling phone.
+        PlayerPrefs.SetString(newBot.name + "TimeZone", BusinessTimeZone.DeviceIanaId());
         PlayerPrefs.SetInt(newBot.name + "isOn", 1);
         PlayerPrefs.SetString(newBot.name + "Status", "Connecting..");
         PlayerPrefs.SetInt(newBot.name + "Active", 0);

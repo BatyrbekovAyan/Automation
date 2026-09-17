@@ -62,6 +62,10 @@ public class SuggestRepliesRequestDto
     // payload. Same identity every other billing call carries (BillingIdentity.AppUserId, i.e.
     // RevenueCat's app_user_id), so the gate reads the same subscribers row Get Usage does.
     public string appUserId;
+    // v1.5 (audit stage 5, additive): the knowledge contract + the idempotent request key. A legacy
+    // server ignores both; a legacy client sends neither and the server falls back to the text fields.
+    public SuggestionKnowledgeDto knowledge;
+    public string requestKey;
 }
 
 /// <summary>One suggestion in the response envelope: server sends {text,label,move}.
