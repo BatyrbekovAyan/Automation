@@ -3,8 +3,10 @@
 
 Proves BOTH canonical bot templates carry the identical pre-generation debounce+combine
 stage that `apply-message-batching.py` splices onto the Phase-9 `Suppressed?` FALSE branch
-(BATCH-01/02). These are exactly the subtle fail-safe properties a UI round-trip or a bad
-edit would silently drop — a dropped body re-emit, an added `mark_all`, a broken rewire, or
+(BATCH-01/02), and that the debounce winner reaches the reply chain ONLY through the billing
+gate spliced after it (Count Dialog -> Quota Decision -> If Quota Allows, Billing Task 9).
+These are exactly the subtle fail-safe properties a UI round-trip or a bad edit would silently
+drop — a dropped body re-emit, an added `mark_all`, a broken rewire, or
 a channel-specific Code body. Run before deploying to dev n8n (owner's 10-03 step); no live
 n8n / network needed.
 
@@ -153,8 +155,14 @@ def check_bot(f, base):
     assert_that(cond["operator"].get("operation") == "true", f"{f}: Is Latest? operator is not boolean-true")
 
     # (5) Connections prove the debounce sits AFTER the Phase-9 gate and only the winner proceeds:
-    #     Suppressed? main[1] -> Debounce Wait; the 3-node chain; Is Latest? main[1] -> Input type
-    #     AND main[0] == [] (the aborted fragment dead-ends). Suppressed? main[0] stays a dead-end.
+    #     Suppressed? main[1] -> Debounce Wait; the 3-node chain; Is Latest? main[1] (winner) ->
+    #     the billing gate (Count Dialog -> Quota Decision -> If Quota Allows, Billing Task 9) ->
+    #     If Quota Allows main[0] -> Input type, AND Is Latest? main[0] == [] (the aborted fragment
+    #     dead-ends) AND If Quota Allows main[1] == [] (a quota-refused dialog never auto-replies).
+    #     Suppressed? main[0] stays a dead-end. Until 2026-09-17 this verifier still expected the
+    #     pre-billing direct edge Is Latest? -> Input type and failed on every run; the contract is
+    #     the gated path, not "any path" — every hop is pinned by name so a UI round-trip that drops
+    #     the gate (winner straight to Input type) reads as a FAIL again.
     assert_that(conns["Suppressed?"]["main"][1][0]["node"] == "Debounce Wait",
                 f"{f}: Suppressed? main[1] does not route to Debounce Wait (debounce not after the gate)")
     assert_that(conns["Suppressed?"]["main"][0] == [],
@@ -165,10 +173,24 @@ def check_bot(f, base):
                 f"{f}: Fetch Recent does not chain to Latest+Combine")
     assert_that(conns["Latest+Combine"]["main"][0][0]["node"] == "Is Latest?",
                 f"{f}: Latest+Combine does not chain to Is Latest?")
-    assert_that(conns["Is Latest?"]["main"][1][0]["node"] == "Input type",
-                f"{f}: Is Latest? main[1] (winner) does not proceed to Input type")
+    assert_that(conns["Is Latest?"]["main"][1] == [{"node": "Count Dialog", "type": "main", "index": 0}],
+                f"{f}: Is Latest? main[1] (winner) does not proceed to the billing gate (Count Dialog): "
+                f"{conns['Is Latest?']['main'][1]}")
     assert_that(conns["Is Latest?"]["main"][0] == [],
                 f"{f}: Is Latest? main[0] (aborted fragment) is not a dead-end")
+    assert_that(conns["Count Dialog"]["main"][0] == [{"node": "Quota Decision", "type": "main", "index": 0}],
+                f"{f}: Count Dialog does not chain to Quota Decision: {conns['Count Dialog']['main'][0]}")
+    assert_that(conns["Quota Decision"]["main"][0] == [{"node": "If Quota Allows", "type": "main", "index": 0}],
+                f"{f}: Quota Decision does not chain to If Quota Allows: {conns['Quota Decision']['main'][0]}")
+    assert_that(conns["If Quota Allows"]["main"][0] == [{"node": "Input type", "type": "main", "index": 0}],
+                f"{f}: If Quota Allows main[0] (allowed) does not proceed to Input type: "
+                f"{conns['If Quota Allows']['main'][0]}")
+    assert_that(conns["If Quota Allows"]["main"][1] == [],
+                f"{f}: If Quota Allows main[1] (quota refused) is not a dead-end: {conns['If Quota Allows']['main'][1]}")
+    # The winner must reach Input type ONLY through the gate: no direct edge may bypass it.
+    direct = [c for outs in conns["Is Latest?"]["main"] for c in outs if c["node"] == "Input type"]
+    assert_that(direct == [],
+                f"{f}: Is Latest? still carries a direct edge to Input type that bypasses the billing gate")
 
     # (6) The Text set node injects combinedText with the single-message fallback.
     txt = node(ns, "Text")["parameters"]["assignments"]["assignments"][0]["value"]

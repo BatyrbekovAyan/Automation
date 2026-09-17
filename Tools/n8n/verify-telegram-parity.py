@@ -30,6 +30,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_WF = os.path.join(HERE, "workflows")
 WF = DEFAULT_WF
 
+# Canonical server host. Since the 2026-08-27 migration the canonical JSONs carry the
+# self-hosted prod instance; the old n8n Cloud workspace (bagkz.app.n8n.cloud) is DELETED, so
+# its host must be ABSENT from every canonical export (a stale re-export would resurrect it).
+# The verifier pins the exact host on purpose: "any https URL" would pass an ngrok/other tunnel.
+CANON_HOST = "https://n8n.choosereply.com"
+LEGACY_DELETED_HOST = "bagkz.app.n8n.cloud"
+
 TG_BOT = "4VN3gsFaC2HUYmcc-Telegram_Bot.json"
 WA_BOT = "4wYitz5ek30SVNlT-WhatsApp_Bot.json"
 CREATE_TG = "Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json"
@@ -232,12 +239,12 @@ def check_canonical_export_invariant(f):
     """Task 8 fix-round regression guard (hardened in review round 2): the canonical
     export must NEVER absorb dev-only values — the standing invariant documented in
     Tools/n8n/fix-orchestrator-settings.py's docstring and Tools/n8n/apply-dev-config.py
-    (dev is DERIVED from canonical by rewriting bagkz -> localhost + remapping
+    (dev is DERIVED from canonical by rewriting the canonical host -> localhost + remapping
     credential ids, never the reverse) and established in commit d594f17. A raw dev
     re-export corrupted these two files once (Task 8's first pass, caught in review).
 
     Round 1 only checked for the ABSENCE of dev strings (localhost/trycloudflare) and
-    the PRESENCE of "bagkz.app.n8n.cloud" as a substring of 3 node urls. A reviewer's
+    the PRESENCE of the canonical host as a substring of 3 node urls. A reviewer's
     negative test showed a copy carrying dev CREDENTIAL ids + active:true +
     settings.binaryMode still passed cleanly — none of those dimensions is a "dev URL
     string", so the round-1 asserts never looked at them. This version pins every
@@ -250,9 +257,11 @@ def check_canonical_export_invariant(f):
         ANY stray key (binaryMode, availableInMCP, or one not yet seen) rather than
         naming binaryMode specifically;
       - a POSITIVE assert that Set Wappi Webhook's callback-url query parameter starts
-        with the canonical bagkz webhook host — checking only for the ABSENCE of
-        "trycloudflare" would still pass an ngrok-style (or any other non-bagkz)
-        tunnel host, since that literal string never appears in one.
+        with the canonical webhook host (CANON_HOST) — checking only for the ABSENCE of
+        "trycloudflare" would still pass an ngrok-style (or any other foreign) tunnel
+        host, since that literal string never appears in one;
+      - the DELETED legacy Cloud host must be absent (2026-09-17: the verifier itself had
+        gone stale on the old host after the prod migration and failed every run).
     """
     wf = load(f)
     ns = wf["nodes"]
@@ -260,12 +269,15 @@ def check_canonical_export_invariant(f):
 
     assert "localhost:5678" not in text, f"{f}: canonical export contains a dev localhost URL"
     assert "trycloudflare" not in text, f"{f}: canonical export contains a dev tunnel URL"
+    assert LEGACY_DELETED_HOST not in text, \
+        f"{f}: canonical export still carries the DELETED legacy Cloud host {LEGACY_DELETED_HOST}"
 
     for name in API_NODE_NAMES:
         n = node(ns, name)
         url = n["parameters"].get("url", "")
-        assert "bagkz.app.n8n.cloud" in url, \
-            f"{f}: {name}'s url is not the canonical bagkz host: {url!r}"
+        # n8n stores an expression-valued url with a leading "=" — strip it before the prefix test.
+        assert url.lstrip("=").startswith(CANON_HOST + "/api/v1/"), \
+            f"{f}: {name}'s url is not the canonical host's REST API ({CANON_HOST}/api/v1/): {url!r}"
         creds = n.get("credentials") or {}
         assert creds.get("n8nApi", {}).get("id") == CANON_N8N_API_CRED, \
             f"{f}: {name}'s n8nApi credential id is not canonical: {creds.get('n8nApi')}"
@@ -296,8 +308,8 @@ def check_canonical_export_invariant(f):
         None,
     )
     assert url_param is not None, f"{f}: Set Wappi Webhook has no 'url' query parameter"
-    assert url_param.lstrip("=").startswith("https://bagkz.app.n8n.cloud/webhook/"), \
-        f"{f}: Set Wappi Webhook's callback url is not the canonical bagkz webhook host: {url_param!r}"
+    assert url_param.lstrip("=").startswith(CANON_HOST + "/webhook/"), \
+        f"{f}: Set Wappi Webhook's callback url is not the canonical webhook host ({CANON_HOST}/webhook/): {url_param!r}"
 
     print(f"OK  {f} (canonical-export invariant)")
 

@@ -1,0 +1,171 @@
+{
+ "capturedAt": "2026-09-17T09:41:54.844705+00:00",
+ "base": "https://n8n.choosereply.com",
+ "workflows": [
+  {
+   "workflow": "15",
+   "workflowId": "OcR75Ug0upgdfrqN",
+   "executions": 232,
+   "window": {
+    "from": "2026-09-11T11:01:19.853Z",
+    "to": "2026-09-14T12:46:50.657Z"
+   },
+   "outcomes": {
+    "filtered": {
+     "n": 130,
+     "p50_s": 0.13,
+     "p95_s": 0.413,
+     "max_s": 0.751
+    },
+    "suppressed": {
+     "n": 102,
+     "p50_s": 1.998,
+     "p95_s": 2.633,
+     "max_s": 4.061
+    }
+   },
+   "stages": {
+    "If": {
+     "n": 232,
+     "p50_s": 0.012,
+     "p95_s": 0.02,
+     "max_s": 0.086
+    },
+    "Read Reply Mode": {
+     "n": 102,
+     "p50_s": 1.846,
+     "p95_s": 2.529,
+     "max_s": 4.003
+    },
+    "Suppressed?": {
+     "n": 102,
+     "p50_s": 0.004,
+     "p95_s": 0.006,
+     "max_s": 0.019
+    },
+    "Webhook": {
+     "n": 232,
+     "p50_s": 0.0,
+     "p95_s": 0.001,
+     "max_s": 0.002
+    }
+   }
+  },
+  {
+   "workflow": "13",
+   "workflowId": "tqGXmiT6aJu7vUIG",
+   "executions": 305,
+   "window": {
+    "from": "2026-09-10T09:23:01.398Z",
+    "to": "2026-09-14T06:42:00.922Z"
+   },
+   "outcomes": {
+    "filtered": {
+     "n": 177,
+     "p50_s": 0.053,
+     "p95_s": 0.34,
+     "max_s": 0.579
+    },
+    "suppressed": {
+     "n": 128,
+     "p50_s": 2.027,
+     "p95_s": 2.689,
+     "max_s": 3.444
+    }
+   },
+   "stages": {
+    "If": {
+     "n": 305,
+     "p50_s": 0.011,
+     "p95_s": 0.019,
+     "max_s": 0.064
+    },
+    "Read Reply Mode": {
+     "n": 128,
+     "p50_s": 1.887,
+     "p95_s": 2.531,
+     "max_s": 3.36
+    },
+    "Suppressed?": {
+     "n": 128,
+     "p50_s": 0.004,
+     "p95_s": 0.006,
+     "max_s": 0.008
+    },
+    "Webhook": {
+     "n": 305,
+     "p50_s": 0.001,
+     "p95_s": 0.002,
+     "max_s": 0.007
+    }
+   }
+  },
+  {
+   "workflow": "Suggest Replies",
+   "workflowId": "9PTyYcelRQI7bGDb",
+   "executions": 1,
+   "window": {
+    "from": "2026-09-15T11:07:09.110Z",
+    "to": "2026-09-15T11:07:09.110Z"
+   },
+   "outcomes": {
+    "generation_failed": {
+     "n": 1,
+     "p50_s": 1.962,
+     "p95_s": 1.962,
+     "max_s": 1.962
+    }
+   },
+   "stages": {
+    "Build Response": {
+     "n": 1,
+     "p50_s": 0.011,
+     "p95_s": 0.011,
+     "max_s": 0.011
+    },
+    "Gate Decision": {
+     "n": 1,
+     "p50_s": 0.017,
+     "p95_s": 0.017,
+     "max_s": 0.017
+    },
+    "If Gate Allows": {
+     "n": 1,
+     "p50_s": 0.004,
+     "p95_s": 0.004,
+     "max_s": 0.004
+    },
+    "If invalid?": {
+     "n": 1,
+     "p50_s": 0.009,
+     "p95_s": 0.009,
+     "max_s": 0.009
+    },
+    "Prep": {
+     "n": 1,
+     "p50_s": 0.023,
+     "p95_s": 0.023,
+     "max_s": 0.023
+    },
+    "Respond": {
+     "n": 1,
+     "p50_s": 0.023,
+     "p95_s": 0.023,
+     "max_s": 0.023
+    },
+    "Suggestion Gate": {
+     "n": 1,
+     "p50_s": 1.848,
+     "p95_s": 1.848,
+     "max_s": 1.848
+    },
+    "Webhook": {
+     "n": 1,
+     "p50_s": 0.001,
+     "p95_s": 0.001,
+     "max_s": 0.001
+    }
+   }
+  }
+ ]
+}

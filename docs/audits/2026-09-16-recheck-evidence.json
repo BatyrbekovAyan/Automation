@@ -1,0 +1,281 @@
+{
+  "checkedDate": "2026-09-16",
+  "timezone": "Asia/Almaty",
+  "scope": "Read-only live definitions and selected historical executions; synthetic local Code-node runs; invalid webhook probes only. No customer messages sent and no production configuration/database changes.",
+  "workflowInventory": {
+    "count": 21,
+    "canonicalCount": 19,
+    "botClones": 2,
+    "canonicalParameterAndConnectionMatches": 18,
+    "remainingDifference": "Support Message recipient chatId replaces canonical __CHAT_ID__; expected deployment substitution"
+  },
+  "versions": [
+    {
+      "name": "Set Workflow State",
+      "workflowId": "0DP79STI3pafXO9B",
+      "active": true,
+      "versionId": "f9607f56-1862-4346-8007-2fb523eef804",
+      "activeVersionId": "f9607f56-1862-4346-8007-2fb523eef804",
+      "updatedAt": "2026-08-30T11:26:09.798Z",
+      "publishedMatchesReadDefinition": true
+    },
+    {
+      "name": "Telegram Bot",
+      "workflowId": "4VN3gsFaC2HUYmcc",
+      "active": false,
+      "versionId": "2946ca7d-1aaa-4528-9e2f-5b3e0e0c3223",
+      "activeVersionId": null,
+      "updatedAt": "2026-08-27T12:35:20.557Z",
+      "publishedMatchesReadDefinition": null
+    },
+    {
+      "name": "WhatsApp Bot",
+      "workflowId": "4wYitz5ek30SVNlT",
+      "active": false,
+      "versionId": "7553c130-ee48-414b-a49c-fbc9f9169eb6",
+      "activeVersionId": null,
+      "updatedAt": "2026-08-27T12:35:20.564Z",
+      "publishedMatchesReadDefinition": null
+    },
+    {
+      "name": "Suggest Replies",
+      "workflowId": "9PTyYcelRQI7bGDb",
+      "active": true,
+      "versionId": "81eee597-2993-44f3-bc99-2f21bbd6d6f7",
+      "activeVersionId": "81eee597-2993-44f3-bc99-2f21bbd6d6f7",
+      "updatedAt": "2026-08-27T12:35:20.572Z",
+      "publishedMatchesReadDefinition": true
+    },
+    {
+      "name": "15",
+      "workflowId": "OcR75Ug0upgdfrqN",
+      "active": true,
+      "versionId": "cccb7e10-d0f9-484c-a254-b6c2d379f3df",
+      "activeVersionId": "cccb7e10-d0f9-484c-a254-b6c2d379f3df",
+      "updatedAt": "2026-09-11T10:26:05.522Z",
+      "publishedMatchesReadDefinition": true
+    },
+    {
+      "name": "Set Reply Mode",
+      "workflowId": "SCLcpn6DMDG3Z4VN",
+      "active": true,
+      "versionId": "8954f399-fdcc-44ac-a187-a6e09bb05939",
+      "activeVersionId": "8954f399-fdcc-44ac-a187-a6e09bb05939",
+      "updatedAt": "2026-08-27T12:35:20.589Z",
+      "publishedMatchesReadDefinition": true
+    },
+    {
+      "name": "13",
+      "workflowId": "tqGXmiT6aJu7vUIG",
+      "active": false,
+      "versionId": "765b76b7-bd32-4805-93ef-83715ec24726",
+      "activeVersionId": null,
+      "updatedAt": "2026-09-14T09:55:44.000Z",
+      "publishedMatchesReadDefinition": null
+    }
+  ],
+  "sourceSHA256": {
+    "Assets/Scripts/Main/Manager.ReplyModeSync.cs": "bb412af8fa4a1d7e3f5d04f0cade37ecdf387242a695345408aad184c834540a",
+    "Assets/Scripts/Chat/N8nSuggestionsProvider.cs": "43ca39874817c089981c4b860091deaf7f4d4323199779e668d00d6309969c92",
+    "Assets/Scripts/Chat/SuggestionCache.cs": "67317185df1e51fe12631ae0a66ab947ea4a0a5bbf7dc2dc66d77b25709151cb",
+    "Assets/Scripts/Chat/SuggestionsController.cs": "d3a36e2c4a52284b7d330ae0ceb25cdc2ff6144992fb4e20817eacbde02d7d17",
+    "Assets/Scripts/Main/Manager.cs": "71f4e0f3c2d87d10398f7463ca7b25ae6884f1164419da9cf76cc2ac69866a16",
+    "Tools/n8n/prompts/_core.md": "097b45381bf5f9e3499969c51d353f8379d125d4207e7ac2dbce1b07a69a9a3c",
+    "Tools/n8n/prompts/_universal.md": "2640eab22cf8261997d58f7ba9f8727cd3f2f04781d2766f1c500a6e9397326c",
+    "Tools/n8n/prompts/panel/kaspi_seller.md": "96a2532b892753714c237cb730552e7abbaaac66768b03caa55128818947966f"
+  },
+  "localReproductions": [
+    {
+      "id": "batching-WhatsApp Bot",
+      "observed": {
+        "singleProceeds": true,
+        "duplicateProceeds": true,
+        "humanReplyDoesNotAbort": true,
+        "humanReplyFallsBack": true,
+        "newerClientAborts": true,
+        "foreignAborts": true
+      }
+    },
+    {
+      "id": "batching-Telegram Bot",
+      "observed": {
+        "singleProceeds": true,
+        "duplicateProceeds": true,
+        "humanReplyDoesNotAbort": true,
+        "humanReplyFallsBack": true,
+        "newerClientAborts": true,
+        "foreignAborts": true
+      }
+    },
+    {
+      "id": "batching-15",
+      "observed": {
+        "singleProceeds": true,
+        "duplicateProceeds": true,
+        "humanReplyDoesNotAbort": true,
+        "humanReplyFallsBack": true,
+        "newerClientAborts": true,
+        "foreignAborts": true
+      }
+    },
+    {
+      "id": "batching-13",
+      "observed": {
+        "singleProceeds": true,
+        "duplicateProceeds": true,
+        "humanReplyDoesNotAbort": true,
+        "humanReplyFallsBack": true,
+        "newerClientAborts": true,
+        "foreignAborts": true
+      }
+    },
+    {
+      "id": "short-follow-up-query",
+      "observed": {
+        "queryText": "Да, сколько стоит?",
+        "fullHistoryStillPresent": true
+      }
+    },
+    {
+      "id": "validator-is-structural",
+      "observed": {
+        "acceptsSchemaValidUnverifiedClaim": true
+      }
+    },
+    {
+      "id": "workflow-state-local-validator",
+      "observed": {
+        "acceptsWithoutIdentity": true
+      }
+    }
+  ],
+  "syntheticBatchFixtures": {
+    "trigger": {
+      "id": "a",
+      "chatId": "audit",
+      "from": "audit",
+      "body": "Цена?",
+      "time": 10,
+      "fromMe": false,
+      "type": "chat or text by channel"
+    },
+    "ownerAfterTrigger": {
+      "id": "h",
+      "time": 11,
+      "fromMe": true,
+      "body": "Уже ответил"
+    },
+    "newerIncoming": {
+      "id": "b",
+      "time": 11,
+      "fromMe": false
+    },
+    "foreign": "same event but chatId=other",
+    "execution": "Unmodified Latest+Combine jsCode from each named workflow, evaluated with mocked Webhook and Fetch Recent inputs; no external nodes called"
+  },
+  "invalidLiveProbes": [
+    {
+      "endpoint": "SetWorkflowState",
+      "body": {},
+      "authentication": "none",
+      "httpStatus": 400,
+      "response": {
+        "success": false,
+        "error": "bad_request"
+      },
+      "writes": "invalid branch only"
+    },
+    {
+      "endpoint": "SetReplyMode",
+      "body": {},
+      "authentication": "none",
+      "httpStatus": 200,
+      "response": {
+        "success": false,
+        "error": "bad_request"
+      },
+      "writes": "invalid branch only"
+    }
+  ],
+  "historyRevalidated": [
+    {
+      "executionId": "1967",
+      "status": "success",
+      "cards": 4,
+      "abstain": false,
+      "abstainRulePresent": true,
+      "clientHistoryContainsTMPSprites": true
+    },
+    {
+      "executionId": "1971",
+      "status": "success",
+      "cards": 4,
+      "abstain": false,
+      "abstainRulePresent": true,
+      "clientHistoryContainsTMPSprites": true
+    },
+    {
+      "executionId": "1994",
+      "status": "success",
+      "cards": 4,
+      "abstain": false,
+      "abstainRulePresent": true,
+      "clientHistoryContainsTMPSprites": true
+    }
+  ],
+  "smokePayloadFailure": {
+    "executionId": "3069",
+    "llmExecuted": false,
+    "reason": "missing_app_user_id"
+  },
+  "unavailableHistoricalRecord": {
+    "executionId": "1809",
+    "result": "HTTP 404 on recheck",
+    "previouslyReportedSeconds": 87.876,
+    "currentClaim": "Observation reported on 2026-09-15 only; raw record cannot be revalidated now; no matched client error log"
+  },
+  "existingVerificationCommands": [
+    {
+      "command": "python3 Tools/n8n/verify_rag.py all",
+      "exit": 0
+    },
+    {
+      "command": "node Tools/n8n/verify-panel-prompts.js",
+      "exit": 0
+    },
+    {
+      "command": "python3 Tools/n8n/verify-message-batching.py",
+      "exit": 1,
+      "firstFailure": "Expects Is Latest? -> Input type directly; actual path includes billing gate",
+      "laterAssertions": "Not established past first failure"
+    },
+    {
+      "command": "python3 Tools/n8n/verify-telegram-parity.py",
+      "exit": 1,
+      "firstFailure": "Expects previous bagkz host; current configured host choosereply",
+      "laterAssertions": "Not established past first failure"
+    }
+  ],
+  "additionalFindings": [
+    {
+      "id": "A2-response-body",
+      "evidence": "SyncReplyModeRoutine checks UnityWebRequest.Result.Success only; SetReplyMode invalid branch returns HTTP 200 success:false",
+      "limit": "Does not establish that ordinary valid client requests use an empty body"
+    },
+    {
+      "id": "A2-create-window",
+      "evidence": "Both Create workflows activate clone and contain no reply_mode_flags write; client SeedReplyModeDefaultForProfile runs after create response; missing flag allows auto",
+      "limit": "Interleaving derived from code; no real customer delivery induced"
+    }
+  ],
+  "limits": [
+    "No device UI rerun",
+    "No full Unity compilation/test run",
+    "No new automatic customer-send test",
+    "No new LLM quality benchmark",
+    "No direct live SQL or provider-permission audit",
+    "Wappi secret presence verified in local StreamingAssets only; distributed APK/IPA not inspected",
+    "S6 cache risk not reproduced through UI",
+    "Three personal-chat examples are not a business-quality sample"
+  ]
+}
