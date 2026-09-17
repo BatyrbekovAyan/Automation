@@ -22,9 +22,9 @@
       "parameters": {
         "resource": "database",
         "operation": "executeQuery",
-        "query": "WITH deleted AS (\n  DELETE FROM documents\n  WHERE metadata->>'fileId' = $1 AND $1 <> ''\n  RETURNING id\n)\nSELECT count(*)::int AS \"deletedChunks\" FROM deleted;",
+        "query": "-- A1: owner-scoped delete. $1 fileId, $2 gate mode (session|legacy), $3 install id, $4 JSON array of\n-- the token's workflow ids. A session may delete a file it uploaded (uploaded_files) or, for a LEGACY\n-- file with no registry row, one whose chunks belong to its own workflows. legacy mode = old behaviour\n-- until the compat window closes. `allowed` gates the storage delete downstream.\nWITH own AS (\n  SELECT 1\n  WHERE $2 = 'legacy'\n     OR EXISTS (SELECT 1 FROM uploaded_files u WHERE u.file_id = $1 AND u.owner_id = $3)\n     OR (NOT EXISTS (SELECT 1 FROM uploaded_files u WHERE u.file_id = $1)\n         AND EXISTS (SELECT 1 FROM documents d WHERE d.metadata->>'fileId' = $1\n                     AND (d.metadata->>'botWaId' IN (SELECT jsonb_array_elements_text($4::jsonb))\n                       OR d.metadata->>'botTgId' IN (SELECT jsonb_array_elements_text($4::jsonb)))))\n), deleted AS (\n  DELETE FROM documents\n  WHERE metadata->>'fileId' = $1 AND $1 <> '' AND EXISTS (SELECT 1 FROM own)\n  RETURNING id\n), marked AS (\n  UPDATE uploaded_files SET deleted_at = now() WHERE file_id = $1 AND EXISTS (SELECT 1 FROM own)\n  RETURNING file_id\n)\nSELECT (SELECT count(*)::int FROM deleted) AS \"deletedChunks\", EXISTS (SELECT 1 FROM own) AS \"allowed\";",
         "options": {
-          "queryReplacement": "={{ $json.body.fileId }}"
+          "queryReplacement": "={{ [ $json.body.fileId, $json.crAuth.mode, ($json.crAuth.installId || ''), JSON.stringify($json.crAuth.workflows || []) ] }}"
         }
       },
       "type": "n8n-nodes-base.postgres",
@@ -60,7 +60,7 @@
     {
       "parameters": {
         "method": "DELETE",
-        "url": "=https://mnwsdbqvehrkeqwnwpqb.supabase.co/storage/v1/object/price-lists/{{ $json.body.fileId }}",
+        "url": "=https://mnwsdbqvehrkeqwnwpqb.supabase.co/storage/v1/object/price-lists/{{ $('Webhook').first().json.body.fileId }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
         "options": {}
@@ -80,6 +80,121 @@
         }
       },
       "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// crAuth GATE — generated into every client webhook by Tools/n8n/apply-auth-gate.py from\n// Tools/n8n/auth/gate.js (+ token.js). Edit the sources, re-run the migration; never the copies.\n//\n// Verifies the Bearer capability token WITHOUT a database round-trip (HMAC, see token.js), then\n// checks that every id the request names is owned by the token's install:\n//   RULE.profiles  — body fields whose value(s) must be ⊆ claims.p   (sentinels ''/'-1' pass)\n//   RULE.workflows — body fields whose value(s) must be ⊆ claims.w   (sentinels ''/'-1' pass)\n//   RULE.appUser   — body fields that must EQUAL claims.u when the token carries one\n//   RULE.legacy    — true: a request WITHOUT a token is admitted in `legacy` mode while\n//                    CR_AUTH_COMPAT_UNTIL lies in the future (old clients); false: 401\n// Output: the webhook item re-emitted with `crAuth` = { ok, mode, reason, installId, appUserId,\n// profiles, workflows, claimPending } so downstream nodes can read the verified identity.\n// CRAUTH-TOKEN-BEGIN\nconst crAuth = (() => {\n  const crypto = require('crypto');\n  const b64u = (buf) => Buffer.from(buf).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n  const unb64u = (s) => Buffer.from(String(s).replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((String(s).length + 3) % 4), 'base64');\n  const isIdList = (a) => Array.isArray(a) && a.every((x) => typeof x === 'string' && x.length > 0 && x.length <= 128);\n  function sign(payload, secret) {\n    if (!secret) throw new Error('crAuth: no signing secret');\n    const p = b64u(JSON.stringify(payload));\n    const sig = crypto.createHmac('sha256', secret).update('v1.' + p).digest();\n    return 'v1.' + p + '.' + b64u(sig);\n  }\n  function verify(token, secrets, nowSec) {\n    if (typeof token !== 'string' || !token) return { ok: false, reason: 'missing' };\n    const parts = token.split('.');\n    if (parts.length !== 3 || parts[0] !== 'v1' || !parts[1] || !parts[2]) return { ok: false, reason: 'malformed' };\n    const given = unb64u(parts[2]);\n    let good = false;\n    for (const sec of (secrets || []).filter(Boolean)) {\n      const exp = crypto.createHmac('sha256', sec).update(parts[0] + '.' + parts[1]).digest();\n      if (exp.length === given.length && crypto.timingSafeEqual(exp, given)) { good = true; break; }\n    }\n    if (!good) return { ok: false, reason: 'bad_signature' };\n    let c;\n    try { c = JSON.parse(unb64u(parts[1]).toString('utf8')); } catch (e) { return { ok: false, reason: 'malformed' }; }\n    if (!c || typeof c !== 'object' || typeof c.i !== 'string' || !c.i || !isIdList(c.p) || !isIdList(c.w)) return { ok: false, reason: 'malformed' };\n    if (typeof c.e !== 'number' || !(c.e > nowSec)) return { ok: false, reason: 'expired' };\n    if (c.c !== undefined && !isIdList(c.c)) return { ok: false, reason: 'malformed' };\n    return { ok: true, claims: { i: c.i, u: (typeof c.u === 'string' && c.u) ? c.u : null, p: c.p, w: c.w, c: c.c || [], e: c.e, n: (typeof c.n === 'number') ? c.n : 1 } };\n  }\n  function sha256Hex(s) { return crypto.createHash('sha256').update(String(s)).digest('hex'); }\n  function randomSecret(bytes) { return b64u(crypto.randomBytes(bytes || 32)); }\n  function bearer(headers) {\n    const h = headers || {};\n    const a = String(h.authorization || h.Authorization || '');\n    return a.startsWith('Bearer ') ? a.slice(7).trim() : '';\n  }\n  return { sign, verify, sha256Hex, randomSecret, bearer, b64u, unb64u };\n})();\n// CRAUTH-TOKEN-END\nconst RULE = {\"legacy\": true};\nconst wh = $input.first().json;\nconst secrets = [$env.CR_AUTH_SECRET, $env.CR_AUTH_SECRET_PREV];\nconst compatUntil = Date.parse($env.CR_AUTH_COMPAT_UNTIL || '') || 0;\nconst nowMs = Date.now();\nconst token = crAuth.bearer(wh.headers);\nlet mode = 'session', claims = null, deny = null;\nif (!token) {\n  if (RULE.legacy && compatUntil > nowMs) mode = 'legacy';\n  else deny = 'unauthorized:missing';\n} else {\n  const v = crAuth.verify(token, secrets, Math.floor(nowMs / 1000));\n  if (!v.ok) deny = 'unauthorized:' + v.reason; else claims = v.claims;\n}\nconst body = (wh.body && typeof wh.body === 'object') ? wh.body : {};\nconst isSentinel = (x) => x === undefined || x === null || x === '' || x === '-1';\nconst listOf = (v) => (Array.isArray(v) ? v : [v]);\nconst owned = (set, v) => listOf(v).every((x) => isSentinel(x) || (typeof x === 'string' && set.includes(x)));\nif (!deny && mode === 'session') {\n  for (const f of RULE.profiles || []) if (!owned(claims.p, body[f])) { deny = 'forbidden:' + f; break; }\n  if (!deny) for (const f of RULE.workflows || []) if (!owned(claims.w, body[f])) { deny = 'forbidden:' + f; break; }\n  if (!deny && claims.u) for (const f of RULE.appUser || []) {\n    const v = body[f];\n    if (!isSentinel(v) && String(v) !== claims.u) { deny = 'forbidden:' + f; break; }\n  }\n}\nreturn [{ json: { ...wh, crAuth: {\n  ok: !deny, mode, reason: deny,\n  installId: claims ? claims.i : null, appUserId: claims ? claims.u : null,\n  profiles: claims ? claims.p : [], workflows: claims ? claims.w : [], claimPending: claims ? (claims.c || []) : [],\n} }, pairedItem: { item: 0 } }];\n"
+      },
+      "id": "bc8402fe-e7cb-5c1e-8427-c81190a07099",
+      "name": "Auth Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        200,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "6659555f-e21d-527e-8d29-d0af06839002",
+              "leftValue": "={{ $json.crAuth.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "35b7b0d5-d850-5b0e-bda2-9418fecd1e6c",
+      "name": "Authorized?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        400,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"error\": \"unauthorized\", \"reason\": $json.crAuth.reason } }}",
+        "options": {
+          "responseCode": "={{ String($json.crAuth.reason || '').startsWith('forbidden') ? 403 : 401 }}"
+        }
+      },
+      "id": "655cf673-05f1-5fec-af68-5fe86d81cd16",
+      "name": "Respond 401",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        600,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e827eb2a-6875-52dc-8773-463959921fe2",
+              "leftValue": "={{ $json.allowed }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ba4c186b-94a5-5759-83a5-9d695911bfae",
+      "name": "Allowed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        444,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"error\": \"forbidden\", \"fileId\": $('Webhook').first().json.body.fileId } }}",
+        "options": {
+          "responseCode": 403
+        }
+      },
+      "id": "083cef0c-2ca2-5824-aa78-5969a11bad2c",
+      "name": "Respond Forbidden",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        664,
+        200
+      ]
     }
   ],
   "connections": {
@@ -87,12 +202,7 @@
       "main": [
         [
           {
-            "node": "Delete File Chunks",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Delete Stored Original",
+            "node": "Auth Gate",
             "type": "main",
             "index": 0
           }
@@ -103,7 +213,59 @@
       "main": [
         [
           {
+            "node": "Allowed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth Gate": {
+      "main": [
+        [
+          {
+            "node": "Authorized?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Authorized?": {
+      "main": [
+        [
+          {
+            "node": "Delete File Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond 401",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Allowed?": {
+      "main": [
+        [
+          {
             "node": "Respond",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Delete Stored Original",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Forbidden",
             "type": "main",
             "index": 0
           }

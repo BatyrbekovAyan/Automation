@@ -203,11 +203,19 @@ def check_restamp_orchestrator(f, jsonb_key, opposite_field):
     assert r.get("alwaysOutputData") is True, f"{f}: Restamp alwaysOutputData not true"
     assert r.get("onError") == "continueRegularOutput", f"{f}: Restamp onError not continueRegularOutput"
 
-    # (iv) wiring: Set Wappi Webhook Types -> Restamp RAG Chunks -> Send New Workflows Id (terminal).
+    # (iv) wiring: Set Wappi Webhook Types -> Restamp RAG Chunks -> Bind Workflow Id (A1, 2026-09-17:
+    #      binds the created clone id + owning install to the profile row) -> Send New Workflows Id (terminal).
     swwt = conns["Set Wappi Webhook Types"]["main"][0][0]["node"]
     assert swwt == "Restamp RAG Chunks", f"{f}: Set Wappi Webhook Types -> {swwt}, expected Restamp RAG Chunks"
     nxt = conns["Restamp RAG Chunks"]["main"][0][0]["node"]
-    assert nxt == "Send New Workflows Id", f"{f}: Restamp RAG Chunks -> {nxt}, expected Send New Workflows Id"
+    assert nxt == "Bind Workflow Id", f"{f}: Restamp RAG Chunks -> {nxt}, expected Bind Workflow Id"
+    bind = node(ns, "Bind Workflow Id")
+    assert bind["type"] == "n8n-nodes-base.postgres" and bind["credentials"]["postgres"]["id"] == PG_EXECUTEQUERY_CRED, \
+        f"{f}: Bind Workflow Id must be a postgres node on the executeQuery cred"
+    assert "workflow_id = excluded.workflow_id" in bind["parameters"]["query"] and "$1 <> '-1'" in bind["parameters"]["query"], \
+        f"{f}: Bind Workflow Id SQL must set workflow_id and guard the -1 sentinel"
+    nxt2 = conns["Bind Workflow Id"]["main"][0][0]["node"]
+    assert nxt2 == "Send New Workflows Id", f"{f}: Bind Workflow Id -> {nxt2}, expected Send New Workflows Id"
     assert "Send New Workflows Id" not in conns, \
         f"{f}: Send New Workflows Id has an outgoing connection (must stay the terminal/response node)"
 

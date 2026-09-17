@@ -287,6 +287,23 @@ def bot_newer(ctx):
                             extra_history_after_post=[{"id": f"n2-{ctx.run_id}", "body": "Сколько стоит?", "time": t + 1, "fromMe": False, "type": "chat"}])
 
 
+@scenario("bot_callback_profile_mismatch_filtered", "a callback naming ANOTHER profile than the registered webhook → filtered, no gate read, no send (A1 binding)")
+def bot_callback_binding(ctx):
+    wf_id = workflow_id_by_name(f"STAGING WA {WA_PROFILE}")
+    ctx.bot(WA_PROFILE)
+    since_exec = max([int(e["id"]) for e in latest_executions(wf_id, 0, 50)] or [0])
+    since_calls = mock_total()
+    chat = f"chat-{ctx.run_id}@c.us"
+    ev = wa_event("some-other-profile", chat, f"x-{ctx.run_id}", "Цена?", int(time.time()))
+    st, _ = post_event(WA_PROFILE, ev)
+    rows = wait_executions_settle(wf_id, since_exec, 1, 30)
+    d = execution(rows[-1]["id"]) if rows else {}
+    stamp = node_output(d, "Outcome") or {}
+    sends, _ = send_calls(since_calls)
+    ok = st == 200 and rows and stamp.get("outcome") == "filtered" and not ran(d, "Read Reply Mode") and len(sends) == 0
+    return ok, f"webhook={st} outcome={stamp.get('outcome')} gate_read={ran(d, 'Read Reply Mode') if rows else 'n/a'} sends={len(sends)}"
+
+
 @scenario("bot_suppressed_mode_no_send", "«Вместе» (suppressed=true) → execution ends at the gate, no send")
 def bot_suppressed(ctx):
     t = int(time.time())

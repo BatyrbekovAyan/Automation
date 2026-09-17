@@ -29,6 +29,13 @@ export N8N_TEMPLATES_ENABLED=false
 export N8N_HIRING_BANNER_ENABLED=false
 export N8N_PERSONALIZATION_ENABLED=false
 export N8N_LOG_LEVEL="${N8N_LOG_LEVEL:-info}"
+# A1 auth (see docs/superpowers/specs/2026-09-17-a1-server-identity-design.md): the same three env
+# vars prod needs in docker-compose. The secret lives in the gitignored staging secrets file.
+SECRETS_JSON="$(cd "${HOME_DIR}/.." >/dev/null 2>&1; dirname "${BASH_SOURCE[0]}")/../.secrets/staging-n8n.json"
+export NODE_FUNCTION_ALLOW_BUILTIN=crypto
+export N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+export CR_AUTH_SECRET="${CR_AUTH_SECRET:-$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('authSecret',''))" "${SECRETS_JSON}" 2>/dev/null)}"
+export CR_AUTH_COMPAT_UNTIL="${CR_AUTH_COMPAT_UNTIL:-$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('compatUntil',''))" "${SECRETS_JSON}" 2>/dev/null)}"
 case "${1:-}" in
   version) exec "${BIN}" --version ;;
   start) shift; exec "${BIN}" start "$@" ;;

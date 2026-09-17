@@ -1,0 +1,473 @@
+{
+  "id": "crWappiProxy0001",
+  "name": "Wappi Proxy",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "WappiProxy",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "2e9f3439-f728-57f8-9e74-205b5ec91aa5",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "484ea7e4-1cce-5bd2-828d-94b56f924a40"
+    },
+    {
+      "parameters": {
+        "jsCode": "// crAuth GATE — generated into every client webhook by Tools/n8n/apply-auth-gate.py from\n// Tools/n8n/auth/gate.js (+ token.js). Edit the sources, re-run the migration; never the copies.\n//\n// Verifies the Bearer capability token WITHOUT a database round-trip (HMAC, see token.js), then\n// checks that every id the request names is owned by the token's install:\n//   RULE.profiles  — body fields whose value(s) must be ⊆ claims.p   (sentinels ''/'-1' pass)\n//   RULE.workflows — body fields whose value(s) must be ⊆ claims.w   (sentinels ''/'-1' pass)\n//   RULE.appUser   — body fields that must EQUAL claims.u when the token carries one\n//   RULE.legacy    — true: a request WITHOUT a token is admitted in `legacy` mode while\n//                    CR_AUTH_COMPAT_UNTIL lies in the future (old clients); false: 401\n// Output: the webhook item re-emitted with `crAuth` = { ok, mode, reason, installId, appUserId,\n// profiles, workflows, claimPending } so downstream nodes can read the verified identity.\n// CRAUTH-TOKEN-BEGIN\nconst crAuth = (() => {\n  const crypto = require('crypto');\n  const b64u = (buf) => Buffer.from(buf).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n  const unb64u = (s) => Buffer.from(String(s).replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((String(s).length + 3) % 4), 'base64');\n  const isIdList = (a) => Array.isArray(a) && a.every((x) => typeof x === 'string' && x.length > 0 && x.length <= 128);\n  function sign(payload, secret) {\n    if (!secret) throw new Error('crAuth: no signing secret');\n    const p = b64u(JSON.stringify(payload));\n    const sig = crypto.createHmac('sha256', secret).update('v1.' + p).digest();\n    return 'v1.' + p + '.' + b64u(sig);\n  }\n  function verify(token, secrets, nowSec) {\n    if (typeof token !== 'string' || !token) return { ok: false, reason: 'missing' };\n    const parts = token.split('.');\n    if (parts.length !== 3 || parts[0] !== 'v1' || !parts[1] || !parts[2]) return { ok: false, reason: 'malformed' };\n    const given = unb64u(parts[2]);\n    let good = false;\n    for (const sec of (secrets || []).filter(Boolean)) {\n      const exp = crypto.createHmac('sha256', sec).update(parts[0] + '.' + parts[1]).digest();\n      if (exp.length === given.length && crypto.timingSafeEqual(exp, given)) { good = true; break; }\n    }\n    if (!good) return { ok: false, reason: 'bad_signature' };\n    let c;\n    try { c = JSON.parse(unb64u(parts[1]).toString('utf8')); } catch (e) { return { ok: false, reason: 'malformed' }; }\n    if (!c || typeof c !== 'object' || typeof c.i !== 'string' || !c.i || !isIdList(c.p) || !isIdList(c.w)) return { ok: false, reason: 'malformed' };\n    if (typeof c.e !== 'number' || !(c.e > nowSec)) return { ok: false, reason: 'expired' };\n    if (c.c !== undefined && !isIdList(c.c)) return { ok: false, reason: 'malformed' };\n    return { ok: true, claims: { i: c.i, u: (typeof c.u === 'string' && c.u) ? c.u : null, p: c.p, w: c.w, c: c.c || [], e: c.e, n: (typeof c.n === 'number') ? c.n : 1 } };\n  }\n  function sha256Hex(s) { return crypto.createHash('sha256').update(String(s)).digest('hex'); }\n  function randomSecret(bytes) { return b64u(crypto.randomBytes(bytes || 32)); }\n  function bearer(headers) {\n    const h = headers || {};\n    const a = String(h.authorization || h.Authorization || '');\n    return a.startsWith('Bearer ') ? a.slice(7).trim() : '';\n  }\n  return { sign, verify, sha256Hex, randomSecret, bearer, b64u, unb64u };\n})();\n// CRAUTH-TOKEN-END\nconst RULE = {\"profiles\": [], \"workflows\": [], \"appUser\": [], \"legacy\": false};\nconst wh = $input.first().json;\nconst secrets = [$env.CR_AUTH_SECRET, $env.CR_AUTH_SECRET_PREV];\nconst compatUntil = Date.parse($env.CR_AUTH_COMPAT_UNTIL || '') || 0;\nconst nowMs = Date.now();\nconst token = crAuth.bearer(wh.headers);\nlet mode = 'session', claims = null, deny = null;\nif (!token) {\n  if (RULE.legacy && compatUntil > nowMs) mode = 'legacy';\n  else deny = 'unauthorized:missing';\n} else {\n  const v = crAuth.verify(token, secrets, Math.floor(nowMs / 1000));\n  if (!v.ok) deny = 'unauthorized:' + v.reason; else claims = v.claims;\n}\nconst body = (wh.body && typeof wh.body === 'object') ? wh.body : {};\nconst isSentinel = (x) => x === undefined || x === null || x === '' || x === '-1';\nconst listOf = (v) => (Array.isArray(v) ? v : [v]);\nconst owned = (set, v) => listOf(v).every((x) => isSentinel(x) || (typeof x === 'string' && set.includes(x)));\nif (!deny && mode === 'session') {\n  for (const f of RULE.profiles || []) if (!owned(claims.p, body[f])) { deny = 'forbidden:' + f; break; }\n  if (!deny) for (const f of RULE.workflows || []) if (!owned(claims.w, body[f])) { deny = 'forbidden:' + f; break; }\n  if (!deny && claims.u) for (const f of RULE.appUser || []) {\n    const v = body[f];\n    if (!isSentinel(v) && String(v) !== claims.u) { deny = 'forbidden:' + f; break; }\n  }\n}\nreturn [{ json: { ...wh, crAuth: {\n  ok: !deny, mode, reason: deny,\n  installId: claims ? claims.i : null, appUserId: claims ? claims.u : null,\n  profiles: claims ? claims.p : [], workflows: claims ? claims.w : [], claimPending: claims ? (claims.c || []) : [],\n} }, pairedItem: { item: 0 } }];\n"
+      },
+      "id": "42949914-9232-5c74-b9d4-095f3531a92c",
+      "name": "Auth Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "25d8ec0d-02bb-54f1-b39e-e54c8bd63c48",
+              "leftValue": "={{ $json.crAuth.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1ce0ea6f-e1f2-5bb9-be3c-934fbb0aceaf",
+      "name": "Authorized?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\"success\": false, \"error\": \"unauthorized\"} }}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "id": "64253233-7ac9-5059-9e13-ce1dad2015e7",
+      "name": "Respond 401",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        660,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// WAPPI PROXY / Build Request (generated — see build-auth-workflows.py). Allow-listed operations\n// only: every op maps to ONE Wappi endpoint with validated parameters; the profile named by the\n// request must be owned by the token's install (or be a pending legacy claim for the auth ops).\nconst g = $input.first().json;\nconst claims = g.crAuth || {};\nconst b = (g.body && typeof g.body === 'object') ? g.body : {};\nconst BASE = { whatsapp: 'https://wappi.pro/api/', telegram: 'https://wappi.pro/tapi/' };\nconst ID = /^[A-Za-z0-9@._:+\\-]{1,128}$/;\nconst PHONE = /^\\d{7,15}$/;\nconst NAME = /^[\\p{L}\\p{N} _\\-.]{1,64}$/u;\nconst AUTH_OPS = new Set(['status', 'qr', 'auth.code', 'tg.auth.phone', 'tg.auth.code', 'tg.auth.2fa']);\nconst OPS = {\n  'profile.add':       { m: 'POST', path: 'profile/add', q: { name: ['name', NAME] }, noProfile: true, needsBilling: true },\n  'profile.delete':    { m: 'POST', path: 'profile/delete', q: { profile_id: 'pid' } },\n  'profile.logout':    { m: 'GET',  path: 'profile/logout', q: { profile_id: 'pid' } },\n  'status':            { m: 'GET',  path: 'sync/get/status', q: { profile_id: 'pid' } },\n  'qr':                { m: 'GET',  path: { whatsapp: 'sync/qr/get', telegram: 'sync/auth/qr' }, q: { profile_id: 'pid' } },\n  'auth.code':         { m: 'GET',  path: 'sync/auth/code', q: { profile_id: 'pid', phone: ['phone', PHONE] }, only: 'whatsapp' },\n  'tg.auth.phone':     { m: 'POST', path: 'sync/auth/phone', q: { profile_id: 'pid' }, body: { phone: ['phone', PHONE] }, only: 'telegram' },\n  'tg.auth.code':      { m: 'POST', path: 'sync/auth/code', q: { profile_id: 'pid' }, body: { auth_code: ['auth_code', /^\\d{4,8}$/] }, only: 'telegram' },\n  'tg.auth.2fa':       { m: 'POST', path: 'sync/auth/2fa', q: { profile_id: 'pid' }, body: { pwd_code: ['pwd_code', 'text', 256] }, only: 'telegram' },\n  'chats.filter':      { m: 'GET',  path: 'sync/chats/filter', q: { profile_id: 'pid' } },\n  'messages.get':      { m: 'GET',  path: 'sync/messages/get', q: { profile_id: 'pid', chat_id: ['chat_id', ID], limit: ['limit', 'int', 200, 15], offset: ['offset', 'int', 100000, 0] } },\n  'messages.id.get':   { m: 'GET',  path: 'sync/messages/id/get', q: { profile_id: 'pid', message_id: ['message_id', ID] } },\n  'media.download':    { m: 'GET',  path: 'sync/message/media/download', q: { profile_id: 'pid', message_id: ['message_id', ID] }, timeout: 60000 },\n  'message.send':      { m: 'POST', path: 'sync/message/send', q: { profile_id: 'pid' }, body: { recipient: ['recipient', ID], body: ['body', 'text', 8192], quoted_message_id: ['quoted_message_id', ID, 'opt'] } },\n  'message.reply':     { m: 'POST', path: 'sync/message/reply', q: { profile_id: 'pid' }, body: { recipient: ['recipient', ID], body: ['body', 'text', 8192], message_id: ['message_id', ID] }, only: 'telegram' },\n  'message.mark_read': { m: 'POST', path: 'sync/message/mark/read', q: { profile_id: 'pid', mark_all: ['mark_all', 'bool', 'opt'] }, body: { message_id: ['message_id', ID] } },\n  'chat.delete':       { m: 'POST', path: 'sync/chat/delete', q: { profile_id: 'pid' }, body: { recipient: ['recipient', ID] } },\n  'message.reaction':  { m: 'POST', path: 'sync/message/reaction', q: { profile_id: 'pid' }, body: { body: ['body', 'text', 64], message_id: ['message_id', ID], recipient: ['recipient', ID, 'opt'] } },\n  'media.send':        { m: 'POST', path: { img: 'sync/message/img/send', video: 'sync/message/video/send', document: 'sync/message/document/send' }, q: { profile_id: 'pid' },\n                         body: { recipient: ['recipient', ID], caption: ['caption', 'text', 1024, 'opt'], file_name: ['file_name', 'text', 255, 'opt'], b64_file: ['b64_file', 'text', 24 * 1024 * 1024] }, kind: true, timeout: 300000 },\n};\nconst deny = (status, error, detail) => [{ json: { ok: false, _status: status, error, detail: detail || null, op: String(b.op || '') }, pairedItem: { item: 0 } }];\nconst op = typeof b.op === 'string' ? b.op : '';\nconst spec = OPS[op];\nif (!spec) return deny(400, 'unknown_op');\nconst channel = (b.channel === 'telegram') ? 'telegram' : 'whatsapp';\nif (spec.only && spec.only !== channel) return deny(400, 'op_channel_mismatch');\nconst pid = typeof b.profile_id === 'string' ? b.profile_id : '';\nif (!spec.noProfile) {\n  if (!ID.test(pid)) return deny(400, 'bad_param', 'profile_id');\n  const owned = (claims.profiles || []).includes(pid);\n  const pending = AUTH_OPS.has(op) && (claims.claimPending || []).includes(pid);\n  if (!owned && !pending) return deny(403, 'forbidden', 'profile_id');\n}\nif (spec.needsBilling && !claims.appUserId) return deny(409, 'no_billing_identity');\nconst take = (dest, key, rule) => {\n  if (rule === 'pid') { dest[key] = pid; return null; }\n  const [field, kind, a, bb] = rule;\n  const opt = rule.includes('opt');\n  const v = b[field];\n  if (v === undefined || v === null || v === '') {\n    if (kind === 'int' && bb !== undefined) { dest[key] = bb; return null; }   // int rules carry a default\n    if (opt) return null;\n    return 'missing:' + field;\n  }\n  if (kind === 'int') { const n = Number.parseInt(v, 10); if (!Number.isFinite(n) || n < 0 || n > a) return 'bad:' + field; dest[key] = n; return null; }\n  if (kind === 'bool') { dest[key] = (v === true || v === 'true') ? 'true' : 'false'; return null; }\n  if (kind === 'text') { if (typeof v !== 'string' || v.length > a) return 'bad:' + field; dest[key] = v; return null; }\n  if (kind instanceof RegExp) { if (typeof v !== 'string' || !kind.test(v)) return 'bad:' + field; dest[key] = v; return null; }\n  return 'bad:' + field;\n};\nconst query = {}, body = {};\nfor (const [k, rule] of Object.entries(spec.q || {})) { const e = take(query, k, rule); if (e) return deny(400, 'bad_param', e); }\nfor (const [k, rule] of Object.entries(spec.body || {})) { const e = take(body, k, rule); if (e) return deny(400, 'bad_param', e); }\nlet path = spec.path;\nif (spec.kind) { const kind = String(b.kind || ''); if (!path[kind]) return deny(400, 'bad_param', 'kind'); path = path[kind]; }\nelse if (typeof path === 'object') path = path[channel];\nreturn [{ json: { ok: true, _status: 200, op, channel, profileId: pid, method: spec.m, url: BASE[channel] + path, query,\n  jsonBody: spec.body ? body : {}, sendBody: !!spec.body, timeout: spec.timeout || 30000 }, pairedItem: { item: 0 } }];\n"
+      },
+      "id": "ea52ee06-8726-5108-a8d3-91b2f7072f65",
+      "name": "Build Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "94026e1c-aca7-5220-afd6-0ee650719bcb",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ecee57db-3582-5c2d-a349-c6d018ee7d73",
+      "name": "Op valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: $json.error, detail: $json.detail } }}",
+        "options": {
+          "responseCode": "={{ $json._status }}"
+        }
+      },
+      "id": "8d85a24c-610e-593e-a48d-9621467bb84e",
+      "name": "Respond Rejected",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1100,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "={{ $json.method }}",
+        "url": "={{ $json.url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": "={{ $json.timeout }}",
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={{ JSON.stringify($json.query) }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.jsonBody || {}) }}"
+      },
+      "id": "8b19d4cf-2306-5852-ade4-02946ab5cb63",
+      "name": "Wappi Call",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        100
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "EuhhqAaV56DpoqAN",
+          "name": "WappiAuthToken"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "879ed12d-be59-5db9-9eb9-75e4b2c71d3c",
+              "leftValue": "={{ $('Build Request').first().json.op === 'profile.add' && Number($json.statusCode) === 200 && !!($json.body && $json.body.profile_id) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3d9630f8-0ac8-59bd-961e-510491df31b8",
+      "name": "Profile Added?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1320,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- A1: a profile created through the proxy is OWNED by the creating install from birth.\ninsert into bot_profiles (profile_id, app_user_id, channel, owner_id, claimed_at)\nvalues ($1, $2, $3, $4, now())\non conflict (profile_id) do update set owner_id = coalesce(bot_profiles.owner_id, excluded.owner_id), deleted_at = null\nreturning profile_id;",
+        "options": {
+          "queryReplacement": "={{ [ $json.body.profile_id, $('Auth Gate').first().json.crAuth.appUserId, $('Build Request').first().json.channel, $('Auth Gate').first().json.crAuth.installId ] }}"
+        }
+      },
+      "id": "861d8147-7936-5530-bb60-4a0abff0d580",
+      "name": "Bind Profile",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1540,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- A1: re-read ownership after a claim step (same shape as Verify Install's row).\nselect i.install_id, i.app_user_id, i.token_version,\n  coalesce((select array_agg(bp.profile_id) from bot_profiles bp where bp.owner_id = i.install_id and bp.deleted_at is null), '{}'::text[]) as p,\n  coalesce((select array_agg(distinct bp.workflow_id) from bot_profiles bp where bp.owner_id = i.install_id and bp.deleted_at is null and bp.workflow_id is not null), '{}'::text[]) as w,\n  coalesce((select array_agg(bp.profile_id) from bot_profiles bp where bp.claim_pending_by = i.install_id and bp.owner_id is null and bp.claim_pending_at > now() - interval '1 day'), '{}'::text[]) as c\nfrom installs i where i.install_id = $1 and i.revoked_at is null;",
+        "options": {
+          "queryReplacement": "={{ [ $('Auth Gate').first().json.crAuth.installId ] }}"
+        }
+      },
+      "id": "46b558f7-1df9-5400-904e-179288051647",
+      "name": "Reload Ownership",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1760,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// WAPPI PROXY / Compose Add Response: Wappi's profile/add body + a refreshed token that already\n// carries the new profile, so the client can use it without a second round trip (generated)\n// CRAUTH-TOKEN-BEGIN\nconst crAuth = (() => {\n  const crypto = require('crypto');\n  const b64u = (buf) => Buffer.from(buf).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n  const unb64u = (s) => Buffer.from(String(s).replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((String(s).length + 3) % 4), 'base64');\n  const isIdList = (a) => Array.isArray(a) && a.every((x) => typeof x === 'string' && x.length > 0 && x.length <= 128);\n  function sign(payload, secret) {\n    if (!secret) throw new Error('crAuth: no signing secret');\n    const p = b64u(JSON.stringify(payload));\n    const sig = crypto.createHmac('sha256', secret).update('v1.' + p).digest();\n    return 'v1.' + p + '.' + b64u(sig);\n  }\n  function verify(token, secrets, nowSec) {\n    if (typeof token !== 'string' || !token) return { ok: false, reason: 'missing' };\n    const parts = token.split('.');\n    if (parts.length !== 3 || parts[0] !== 'v1' || !parts[1] || !parts[2]) return { ok: false, reason: 'malformed' };\n    const given = unb64u(parts[2]);\n    let good = false;\n    for (const sec of (secrets || []).filter(Boolean)) {\n      const exp = crypto.createHmac('sha256', sec).update(parts[0] + '.' + parts[1]).digest();\n      if (exp.length === given.length && crypto.timingSafeEqual(exp, given)) { good = true; break; }\n    }\n    if (!good) return { ok: false, reason: 'bad_signature' };\n    let c;\n    try { c = JSON.parse(unb64u(parts[1]).toString('utf8')); } catch (e) { return { ok: false, reason: 'malformed' }; }\n    if (!c || typeof c !== 'object' || typeof c.i !== 'string' || !c.i || !isIdList(c.p) || !isIdList(c.w)) return { ok: false, reason: 'malformed' };\n    if (typeof c.e !== 'number' || !(c.e > nowSec)) return { ok: false, reason: 'expired' };\n    if (c.c !== undefined && !isIdList(c.c)) return { ok: false, reason: 'malformed' };\n    return { ok: true, claims: { i: c.i, u: (typeof c.u === 'string' && c.u) ? c.u : null, p: c.p, w: c.w, c: c.c || [], e: c.e, n: (typeof c.n === 'number') ? c.n : 1 } };\n  }\n  function sha256Hex(s) { return crypto.createHash('sha256').update(String(s)).digest('hex'); }\n  function randomSecret(bytes) { return b64u(crypto.randomBytes(bytes || 32)); }\n  function bearer(headers) {\n    const h = headers || {};\n    const a = String(h.authorization || h.Authorization || '');\n    return a.startsWith('Bearer ') ? a.slice(7).trim() : '';\n  }\n  return { sign, verify, sha256Hex, randomSecret, bearer, b64u, unb64u };\n})();\n// CRAUTH-TOKEN-END\nconst wap = $('Wappi Call').first().json || {};\nconst body = (wap.body && typeof wap.body === 'object') ? wap.body : {};\nconst row = $input.first() ? ($input.first().json || {}) : {};\nconst g = $('Auth Gate').first().json.crAuth || {};\nlet token = null, exp = null;\nif (row.install_id) {\n  exp = Math.floor(Date.now() / 1000) + 43200;\n  token = crAuth.sign({ i: row.install_id, u: row.app_user_id || null, p: row.p || [], w: row.w || [], c: row.c || [], e: exp, n: row.token_version || 1 }, $env.CR_AUTH_SECRET);\n}\nreturn [{ json: { ...body, token, expiresAt: exp, profiles: row.p || g.profiles || [], workflows: row.w || g.workflows || [], _status: Number(wap.statusCode) || 200 }, pairedItem: { item: 0 } }];\n"
+      },
+      "id": "bde22aa4-2fcb-5aab-84bd-839d383d8606",
+      "name": "Compose Add Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1980,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// WAPPI PROXY / Compose Response: pass Wappi's status + JSON body through unchanged (generated)\nconst r = $input.first().json || {};\nconst status = Number(r.statusCode) || (r.error ? 502 : 200);\nconst body = (r.body && typeof r.body === 'object' && !Array.isArray(r.body)) ? r.body : { status: 'error', detail: r.error ? String(r.error.message || r.error) : String(r.body ?? '') };\nreturn [{ json: { ...body, _status: status }, pairedItem: { item: 0 } }];\n"
+      },
+      "id": "a35c4858-0a83-576d-8f8e-ffc914bde63c",
+      "name": "Compose Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ Object.fromEntries(Object.entries($json).filter(([k]) => k !== '_status')) }}",
+        "options": {
+          "responseCode": "={{ $json._status || 200 }}"
+        }
+      },
+      "id": "7a17fabe-9ea3-5257-9e36-425a875d5b5e",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2200,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Auth Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth Gate": {
+      "main": [
+        [
+          {
+            "node": "Authorized?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Authorized?": {
+      "main": [
+        [
+          {
+            "node": "Build Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond 401",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Request": {
+      "main": [
+        [
+          {
+            "node": "Op valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Op valid?": {
+      "main": [
+        [
+          {
+            "node": "Wappi Call",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wappi Call": {
+      "main": [
+        [
+          {
+            "node": "Profile Added?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Profile Added?": {
+      "main": [
+        [
+          {
+            "node": "Bind Profile",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Compose Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bind Profile": {
+      "main": [
+        [
+          {
+            "node": "Reload Ownership",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reload Ownership": {
+      "main": [
+        [
+          {
+            "node": "Compose Add Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compose Add Response": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compose Response": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "saveManualExecutions": false
+  },
+  "staticData": null,
+  "meta": null,
+  "tags": []
+}

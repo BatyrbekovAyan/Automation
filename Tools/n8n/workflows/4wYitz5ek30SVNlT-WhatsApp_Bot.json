@@ -625,6 +625,15 @@
                 "type": "string",
                 "operation": "equals"
               }
+            },
+            {
+              "id": "c0a11bac-0000-4000-8000-0000000000a1",
+              "leftValue": "={{ String($json.webhookUrl || '').split('/').pop() }}",
+              "rightValue": "={{ $json.body.messages[0].profile_id }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
             }
           ],
           "combinator": "and"

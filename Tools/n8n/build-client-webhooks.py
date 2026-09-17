@@ -78,6 +78,8 @@ PROTECTED_IDS = [
     "hHwvfOvTCS42pXnq",  # Landing Lead
     "jtbssfzXbOxwTK4k",  # Get Usage
     "lmjYsdNcQA2IE5rl",  # Delete Bot Files
+    "crAuthSession001",  # Auth Session (A1, 2026-09-17)
+    "crWappiProxy0001",  # Wappi Proxy (A1, 2026-09-17)
 ]
 
 

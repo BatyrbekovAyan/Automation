@@ -50,7 +50,8 @@ STAGING_CONFIG = os.path.join(STATE_DIR, "config")
 ACTIVE_CANONICAL = ["0DP79STI3pafXO9B", "2htWSV5IHO8E2CgB", "2islisFH7jjLoPQM", "3qax5J9u2qsT9Vao", "9PTyYcelRQI7bGDb",
                     "KoTuIlk4LMrlvnWI", "SCLcpn6DMDG3Z4VN", "TwWPW3gIyjZS3foR", "Uz6HBBUpAiUqVysB", "XuvOp7TxOImOAmlj",
                     "ZGYr6srzS3rSSXHp", "ZTqpumOpL1rNDOp6", "fXYpCXPKw92EzRz8", "hHwvfOvTCS42pXnq", "jtbssfzXbOxwTK4k",
-                    "lmjYsdNcQA2IE5rl", "olmqWMfcFpCEcpiE"]
+                    "lmjYsdNcQA2IE5rl", "olmqWMfcFpCEcpiE",
+                    "crAuthSession001", "crWappiProxy0001"]   # A1 (stage 1): Auth Session + Wappi Proxy
 
 
 def sh(*args, check=True, quiet=False):

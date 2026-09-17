@@ -8,7 +8,7 @@
 
 - **Дата:** 2026-09-17 · **Ветка/коммит:** `main` @ `95221844` (исходный HEAD; работа идёт на `main`
   scoped-коммитами — единый рабочий каталог, без worktree; перед каждым коммитом `git rev-parse HEAD`).
-- **Текущий этап:** 0 — ЗАКРЫТ 2026-09-17 (locally_verified + staging_verified). Следующий: этап 1 (A1).
+- **Текущий этап:** 1 (A1) — СЕРВЕРНАЯ часть staging_verified 2026-09-17, клиентская in_progress.
 - **Как продолжить:** `Tools/n8n/staging/pg.sh start` → `python3 Tools/n8n/staging/wappi-mock.py &` →
   `python3 Tools/n8n/staging/bootstrap.py --restart` → `python3 Tools/n8n/staging/e2e.py`; чистый харнесс —
   `node Tools/n8n/repro/run-code-node.mjs`; четыре verify-скрипта; Unity — `Tools/run-tests-headless.sh`.
@@ -81,3 +81,21 @@
   `bot_suppressed_mode_no_send` первый раз падал из-за бага харнесса (режим сбрасывался повторным `ctx.bot`), исправлено, PASS.
 - 2026-09-17 · staging `PROBE_APP_USER_ID=<fixture> probe-suggest-replies.py` → struct_fails=0, heuristic_warns=2; `--refusal-only` → OK.
 - 2026-09-17 · после `apply-outcome-stamps.py`: batching/parity/rag/panel — все 4 зелёные (verifiers расширены на штамп).
+
+## Этап 1 (A1) — состояние
+
+Дизайн: `docs/superpowers/specs/2026-09-17-a1-server-identity-design.md`. Карта клиентских вызовов (агент, 2026-09-17):
+60 сайтов — 33 Wappi с общим токеном в 8 файлах (19 hardcoded-литералов мимо `WappiEndpoints`), 12 n8n-вебхуков без auth,
+медиа/аватары/превью — по подписанным URL без заголовка. Факты, определившие дизайн: Wappi — один токен аккаунта, у вебхуков
+нет подписи; прод n8n — Postgres-узел ≈1,9 с (Get Usage p50 1,92 с) → гейт без БД (HMAC capability-токен).
+
+| Пункт | Статус | Изменения | Доказательства | Ограничения |
+|---|---|---|---|---|
+| 1.1 карта endpoint→действие→объект→права | locally_verified | таблица вебхуков (`webhook path / auth / поля`) + карта клиента | этот журнал, спец | — |
+| 1.2 identity/сессия | staging_verified | `sql/2026-09-17-auth-installs.sql` (installs, bot_profiles.owner_id/workflow_id/claim_*, uploaded_files), `auth/token.js` (+`token.test.mjs`), `build-auth-workflows.py` → `crAuthSession001-Auth_Session.json` (bootstrap/refresh/claim.start/claim.verify/claim.status) | `e2e-auth.py`: bootstrap+refresh OK, wrong secret/unknown install → 401, malformed → 400 | env на проде: `NODE_FUNCTION_ALLOW_BUILTIN=crypto`, `N8N_BLOCK_ENV_ACCESS_IN_NODE=false`, `CR_AUTH_SECRET`, `CR_AUTH_COMPAT_UNTIL` (owner-шаг, этап 7); claim-потоки (код в самосообщении / re-auth) требуют device-проверки |
+| 1.3 владелец ↔ объекты | staging_verified | `apply-auth-gate.py`: гейт на 12 вебхуках (RULE per workflow), `Bind Workflow Id` в Create WA/TG, `Register Upload` (uploaded_files), owner-scoped `Delete File Chunks` + `Allowed?` перед удалением из bucket; `verify-auth-gate.py` | `e2e-auth.py hooks_reject_foreign_ids`: чужие ids → 403 (SetReplyMode/Dashboard/GetUsage/SetWorkflowState/DeleteBotFiles), свои → 200; compat CLOSED → без токена 401; compat open → legacy 200 | Create/Edit (`lastNode`) отказывают телом `{success:false,error:"unauthorized"}` при HTTP 200 — как их же `channel_limit`; новый клиент читает тело |
+| 1.4 Wappi через сервер | staging_verified | `crWappiProxy0001-Wappi_Proxy.json`: allow-list 19 операций, валидация параметров, `profile_id ∈ p` (auth-ops — и `∈ c`), `profile.add` привязывает профиль владельцу и возвращает обновлённый токен, `fullResponse` Wappi пробрасывается, успешные выполнения не сохраняются | `e2e-auth.py`: без/поддельный/мусорный токен → 401 и 0 вызовов транспорта; изоляция A/B по 10 операциям → 403 и 0 вызовов; свои ops → транспорт с серверным credential; unknown op/channel mismatch → 400 | медиа-байты клиент качает по подписанным URL напрямую (как сейчас); `media.send` через n8n требует `N8N_PAYLOAD_SIZE_MAX≥32` на проде |
+| 1.5 callback | staging_verified | `If` шаблонов: `profile_id == path вебхука` (оба шаблона) | `e2e.py bot_callback_profile_mismatch_filtered`: outcome=filtered, gate не читался, 0 отправок | подписи у Wappi нет (документация проверена 2026-09-17); rate-limit — Caddy без плагина (owner: xcaddy) |
+| 1.6 миграция/compat | locally_verified | `CR_AUTH_COMPAT_UNTIL` в гейте (legacy только до даты), SetWorkflowState защищает новые infra-id | compat open/closed прогоны | клиент (ниже) + план отзыва |
+| 1.7 ротация токена | planned | — | — | после окончания compat-окна: регенерация в кабинете Wappi + замена credential `WappiAuthToken` (owner) |
+| 1.8 клиент | in_progress | — | — | — |

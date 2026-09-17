@@ -162,15 +162,20 @@ def check_delete_hardening():
     assert node is not None, "Delete Stored Original node missing"
     assert node["parameters"]["method"] == "DELETE", "must DELETE the storage object"
     assert "/storage/v1/object/price-lists/" in node["parameters"]["url"] \
-        and "$json.body.fileId" in node["parameters"]["url"], \
+        and "$('Webhook').first().json.body.fileId" in node["parameters"]["url"], \
         f"Delete Stored Original url wrong: {node['parameters']['url']}"
     # Pre-bucket uploads have no stored object (404) — chunks must still delete.
     assert node.get("onError") == "continueRegularOutput", "storage 404 must not fail chunk deletion"
+    # A1 (2026-09-17): the webhook feeds ONLY the auth gate; the chunk delete decides `allowed`, and only
+    # then do the 200 + the storage delete run (the storage delete used to fan out unconditionally —
+    # an unowned fileId could evict another owner's original). verify-auth-gate.py pins the gate itself.
     hook = conns["Webhook"]["main"][0]
-    targets = {l["node"] for l in hook}
-    assert {"Delete File Chunks", "Delete Stored Original"} <= targets, \
-        f"Webhook must fan out to chunks + storage delete: {targets}"
-    assert conns["Delete File Chunks"]["main"][0][0]["node"] == "Respond", "chunk→respond chain broken"
+    assert [l["node"] for l in hook] == ["Auth Gate"], f"Webhook must feed only the auth gate: {hook}"
+    assert conns["Authorized?"]["main"][0][0]["node"] == "Delete File Chunks", "Authorized? must lead to the chunk delete"
+    assert conns["Delete File Chunks"]["main"][0][0]["node"] == "Allowed?", "chunk delete must decide `allowed` first"
+    allowed = {l["node"] for l in conns["Allowed?"]["main"][0]}
+    assert allowed == {"Respond", "Delete Stored Original"}, f"allowed branch must respond AND delete storage: {allowed}"
+    assert conns["Allowed?"]["main"][1][0]["node"] == "Respond Forbidden", "refused branch must answer 403"
 
 
 def load_named(fname):
