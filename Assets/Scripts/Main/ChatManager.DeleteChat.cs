@@ -62,16 +62,8 @@ public partial class ChatManager
         }
 
         string recipient = WappiRecipient.FromChatId(chatId);
-        string url = WappiEndpoints.Sync(ActiveChannel, $"chat/delete?profile_id={profileId}");
+        string url = $"{Manager.n8nBaseUrl}{WappiProxyRequest.Path} (chat.delete)";
         string body = JsonConvert.SerializeObject(new WappiDeleteChatRequest { recipient = recipient });
-
-        using UnityWebRequest www = new UnityWebRequest(url, "POST");
-        byte[] raw = System.Text.Encoding.UTF8.GetBytes(body);
-        www.uploadHandler = new UploadHandlerRaw(raw);
-        www.downloadHandler = new DownloadHandlerBuffer();
-        www.SetRequestHeader("Content-Type", "application/json");
-        www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
-        www.timeout = 30;
 
         // Diagnostic for "deleteChat error" investigations. Debug builds only: the line
         // carries the customer's phone number (chatId) and a reviewer can read the
@@ -79,7 +71,9 @@ public partial class ChatManager
         if (Debug.isDebugBuild)
             Debug.Log($"[Wappi] chat/delete → POST {url}  chatId='{chatId}'  body={body}");
 
-        yield return www.SendWebRequest();
+        UnityWebRequest www = null;
+        yield return WappiProxy.Send(WappiProxy.Op.ChatDelete, ActiveChannel, new { profile_id = profileId, recipient }, r => www = r);
+        using var wwwScope = www;
 
         if (www.result != UnityWebRequest.Result.Success)
         {

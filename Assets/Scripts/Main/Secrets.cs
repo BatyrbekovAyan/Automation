@@ -19,7 +19,9 @@ public class RevenueCatSecrets
 [System.Serializable]
 public class SecretsData
 {
-    public string wappiAuthToken;
+    // wappiAuthToken REMOVED 2026-09-17 (audit A1): the Wappi transport token was the last shared
+    // server credential in the binary. Every Wappi call now goes through /webhook/WappiProxy with
+    // the per-install session (AuthClient); the token lives only in the n8n credential store.
     public string n8nBaseUrl;
     // RevenueCat public SDK keys are DESIGNED to be embedded in the binary — the
     // one class of key that legitimately ships. BillingService.Initialize() reads

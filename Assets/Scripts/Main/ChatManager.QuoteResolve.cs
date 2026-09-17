@@ -114,7 +114,6 @@ public partial class ChatManager
             string qid = _quoteResolveQueue.Dequeue();
             if (string.IsNullOrEmpty(profileId)) { _quoteResolveInFlight.Remove(qid); continue; }
 
-            string url = WappiEndpoints.Sync(ActiveChannel, $"messages/id/get?profile_id={profileId}&message_id={UnityWebRequest.EscapeURL(qid)}");
 
             bool definitive = false;
             string text = "", senderName = "";
@@ -124,11 +123,10 @@ public partial class ChatManager
             // never races them on Wappi's crossing-prone sync API (see WaitForChatFetchesToDrain).
             yield return WaitForChatFetchesToDrain();
 
-            using (UnityWebRequest www = UnityWebRequest.Get(url))
+            UnityWebRequest www = null;
+            yield return WappiProxy.Send(WappiProxy.Op.MessagesIdGet, ActiveChannel, new { profile_id = profileId, message_id = qid }, r => www = r);
+            using (www)
             {
-                www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
-                www.timeout = 30;
-                yield return www.SendWebRequest();
 
                 if (www.result == UnityWebRequest.Result.Success)
                 {
@@ -158,7 +156,7 @@ public partial class ChatManager
                 }
                 else
                 {
-                    Debug.LogWarning($"[Wappi] messages/id/get failed [{www.responseCode}] {url}: {www.error}");
+                    Debug.LogWarning($"[Wappi] messages/id/get failed [{www.responseCode}] messages.id.get: {www.error}");
                 }
             }
 

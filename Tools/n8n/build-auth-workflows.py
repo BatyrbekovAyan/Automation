@@ -161,29 +161,32 @@ select i.install_id, i.app_user_id, i.token_version,
   coalesce((select array_agg(bp.profile_id) from bot_profiles bp where bp.claim_pending_by = i.install_id and bp.owner_id is null and bp.claim_pending_at > now() - interval '1 day'), '{}'::text[]) as c
 from installs i where i.install_id = $1 and i.revoked_at is null;"""
 
-CLAIM_START_SQL = """-- A1 legacy claim: register the intent. An UNOWNED profile (legacy bot, or none registered yet) gets a
--- pending claim by this install; an owned profile is untouched (the Decide node answers 403).
+CLAIM_START_SQL = """-- A1 claim: register the intent. Legacy (unowned) profiles AND profiles owned by a previous install
+-- (reinstall / new phone) are claimable — ownership is proven by control of the channel itself
+-- (code in the bot's own chat, or a fresh pairing), never by knowing an id. A still-valid code is
+-- reused (no re-send inside its 10-minute window), which also bounds unsolicited codes.
 insert into bot_profiles (profile_id, app_user_id, channel, claim_pending_by, claim_pending_at)
 values ($1, coalesce(nullif($3, ''), $2), $4, $2, now())
 on conflict (profile_id) do update set
-  claim_pending_by = case when bot_profiles.owner_id is null then excluded.claim_pending_by else bot_profiles.claim_pending_by end,
-  claim_pending_at = case when bot_profiles.owner_id is null then now() else bot_profiles.claim_pending_at end
-returning profile_id, owner_id, channel, claim_pending_by, extract(epoch from claim_pending_at)::bigint as claim_pending_epoch;"""
+  claim_pending_by = case when bot_profiles.owner_id = $2 then bot_profiles.claim_pending_by else excluded.claim_pending_by end,
+  claim_pending_at = case when bot_profiles.owner_id = $2 then bot_profiles.claim_pending_at else now() end
+returning profile_id, owner_id, channel, claim_pending_by, extract(epoch from claim_pending_at)::bigint as claim_pending_epoch,
+  (claim_code_expires_at is not null and claim_code_expires_at > now()) as code_still_valid;"""
 
 STORE_CLAIM_CODE_SQL = """update bot_profiles set claim_code_hash = $3, claim_code_expires_at = now() + interval '10 minutes'
-where profile_id = $1 and owner_id is null and claim_pending_by = $2
+where profile_id = $1 and claim_pending_by = $2 and (claim_code_expires_at is null or claim_code_expires_at <= now())
 returning profile_id;"""
 
 VERIFY_CLAIM_CODE_SQL = """-- A1 legacy claim by self-message code: binds ownership only for the install that started the claim,
 -- with an unexpired matching code, on a still-unowned profile.
 update bot_profiles set owner_id = $2, claimed_at = now(), claim_pending_by = null, claim_pending_at = null,
   claim_code_hash = null, claim_code_expires_at = null
-where profile_id = $1 and owner_id is null and claim_pending_by = $2 and claim_code_hash = $3 and claim_code_expires_at > now()
+where profile_id = $1 and (owner_id is null or owner_id <> $2) and claim_pending_by = $2 and claim_code_hash = $3 and claim_code_expires_at > now()
 returning profile_id;"""
 
 BIND_REAUTH_SQL = """-- A1 legacy claim by re-authorisation: the channel was (re)paired AFTER the claim started.
 update bot_profiles set owner_id = $2, claimed_at = now(), claim_pending_by = null, claim_pending_at = null
-where profile_id = $1 and owner_id is null and claim_pending_by = $2 and claim_pending_at < to_timestamp($3::bigint)
+where profile_id = $1 and (owner_id is null or owner_id <> $2) and claim_pending_by = $2 and claim_pending_at < to_timestamp($3::bigint)
 returning profile_id;"""
 
 CLAIM_DECIDE_JS = r"""// AUTH SESSION / Claim Decide: what the claim needs next (generated — see build-auth-workflows.py)
@@ -197,7 +200,6 @@ const out = { op: r.op, profileId: r.profileId, channel: r.channel, installId: i
   claimMethod: null, claimError: null, code: null, codeHash: null, phone: null, authorizedEpoch: null };
 if (!inst.install_id) { out.statusCode = 401; out.claimError = 'unauthorized'; }
 else if (row.error || !row.profile_id) { out.statusCode = 500; out.claimError = 'db_error'; }
-else if (row.owner_id && row.owner_id !== inst.install_id) { out.statusCode = 403; out.claimError = 'already_owned'; }
 else if (row.owner_id === inst.install_id) { out.claimMethod = 'owned'; }
 else if (st.statusCode !== 200 || typeof status.authorized !== 'boolean') { out.statusCode = 502; out.claimError = 'transport_unavailable'; }
 else if (status.authorized === true) {
@@ -207,7 +209,10 @@ else if (status.authorized === true) {
   if (r.op === 'claim.status' && out.authorizedEpoch && out.authorizedEpoch > Number(row.claim_pending_epoch || 0)) {
     out.claimMethod = 'reauth';                        // paired after the claim began -> bind
   } else if (!phone) { out.statusCode = 409; out.claimError = 'no_phone'; }
-  else {
+  else if (row.code_still_valid === true && r.op === 'claim.start') {
+    out.claimMethod = 'code';                        // a code is already on its way / valid: do not re-send
+    out.codeReused = true;
+  } else {
     out.claimMethod = 'code';
     out.phone = phone;
     out.code = String(Math.floor(100000 + Math.random() * 900000));
@@ -243,7 +248,7 @@ const token = crAuth.sign(claims, $env.CR_AUTH_SECRET);
 const out = { success: true, _status: 200, installId: row.install_id, token, expiresAt: exp, appUserId: claims.u,
   profiles: claims.p, workflows: claims.w, claimPending: claims.c };
 if (r.op === 'bootstrap') out.installSecret = r.installSecret;
-if (claimInfo) { out.claimMethod = claimInfo.claimMethod; out.claimProfileId = claimInfo.profileId; }
+if (claimInfo) { out.claimMethod = claimInfo.claimMethod; out.claimProfileId = claimInfo.profileId; out.codeReused = !!claimInfo.codeReused; }
 return [{ json: out, pairedItem: { item: 0 } }];
 """
 
@@ -275,7 +280,7 @@ def build_session():
     n.append(postgres("Verify Claim Code", VERIFY_CLAIM_CODE_SQL,
                       "={{ [ $('Route').first().json.profileId, $('Route').first().json.installId, crAuthHashOf($('Route').first().json.code) ] }}".replace(
                           "crAuthHashOf($('Route').first().json.code)", "$('Route').first().json.codeHash"), [2200, 400]))
-    n.append(if_true("Send Code?", "={{ $json.claimMethod === 'code' }}", [2200, 640]))
+    n.append(if_true("Send Code?", "={{ $json.claimMethod === 'code' && !$json.codeReused && !!$json.code }}", [2200, 640]))
     n.append(postgres("Store Claim Code", STORE_CLAIM_CODE_SQL,
                       "={{ [ $('Route').first().json.profileId, $('Route').first().json.installId, $('Claim Decide').first().json.codeHash ] }}", [2420, 560]))
     n.append(http_wappi("Send Claim Code", "POST", SEND_CODE_URL, [2640, 560], query_expr=SEND_CODE_QUERY, body_expr=SEND_CODE_BODY))
@@ -336,7 +341,7 @@ const OPS = {
   'messages.id.get':   { m: 'GET',  path: 'sync/messages/id/get', q: { profile_id: 'pid', message_id: ['message_id', ID] } },
   'media.download':    { m: 'GET',  path: 'sync/message/media/download', q: { profile_id: 'pid', message_id: ['message_id', ID] }, timeout: 60000 },
   'message.send':      { m: 'POST', path: 'sync/message/send', q: { profile_id: 'pid' }, body: { recipient: ['recipient', ID], body: ['body', 'text', 8192], quoted_message_id: ['quoted_message_id', ID, 'opt'] } },
-  'message.reply':     { m: 'POST', path: 'sync/message/reply', q: { profile_id: 'pid' }, body: { recipient: ['recipient', ID], body: ['body', 'text', 8192], message_id: ['message_id', ID] }, only: 'telegram' },
+  'message.reply':     { m: 'POST', path: 'sync/message/reply', q: { profile_id: 'pid' }, body: { recipient: ['recipient', ID, 'opt'], body: ['body', 'text', 8192], message_id: ['message_id', ID] }, only: 'telegram' },
   'message.mark_read': { m: 'POST', path: 'sync/message/mark/read', q: { profile_id: 'pid', mark_all: ['mark_all', 'bool', 'opt'] }, body: { message_id: ['message_id', ID] } },
   'chat.delete':       { m: 'POST', path: 'sync/chat/delete', q: { profile_id: 'pid' }, body: { recipient: ['recipient', ID] } },
   'message.reaction':  { m: 'POST', path: 'sync/message/reaction', q: { profile_id: 'pid' }, body: { body: ['body', 'text', 64], message_id: ['message_id', ID], recipient: ['recipient', ID, 'opt'] } },
@@ -368,7 +373,7 @@ const take = (dest, key, rule) => {
     return 'missing:' + field;
   }
   if (kind === 'int') { const n = Number.parseInt(v, 10); if (!Number.isFinite(n) || n < 0 || n > a) return 'bad:' + field; dest[key] = n; return null; }
-  if (kind === 'bool') { dest[key] = (v === true || v === 'true') ? 'true' : 'false'; return null; }
+  if (kind === 'bool') { if (v === true || v === 'true') dest[key] = 'true'; return null; }   // absent when false (byte-parity with the old queries)
   if (kind === 'text') { if (typeof v !== 'string' || v.length > a) return 'bad:' + field; dest[key] = v; return null; }
   if (kind instanceof RegExp) { if (typeof v !== 'string' || !kind.test(v)) return 'bad:' + field; dest[key] = v; return null; }
   return 'bad:' + field;

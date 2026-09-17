@@ -83,7 +83,6 @@ public partial class ChatManager
         MessageViewModel target, string sentEmoji, string priorEmoji,
         string profileId, string sendCacheRoot, long appliedTime)
     {
-        string url = WappiEndpoints.Sync(ActiveChannel, $"message/reaction?profile_id={profileId}");
         var requestData = new WappiSendReactionRequest
         {
             body       = sentEmoji,
@@ -93,17 +92,10 @@ public partial class ChatManager
                        ? ChatIdFormat.Recipient(target.chatId)
                        : null,
         };
-        string jsonPayload = JsonConvert.SerializeObject(requestData);
-
-        using UnityWebRequest www = new UnityWebRequest(url, "POST");
-        byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(jsonPayload);
-        www.uploadHandler = new UploadHandlerRaw(bodyRaw);
-        www.downloadHandler = new DownloadHandlerBuffer();
-        www.SetRequestHeader("Content-Type", "application/json");
-        www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
-        www.timeout = 30;
-
-        yield return www.SendWebRequest();
+        UnityWebRequest www = null;
+        yield return WappiProxy.Send(WappiProxy.Op.MessageReaction, ActiveChannel,
+            new { profile_id = profileId, body = requestData.body, message_id = requestData.message_id, recipient = requestData.recipient }, r => www = r);
+        using var wwwScope = www;
 
         bool ok = false;
         if (www.result == UnityWebRequest.Result.Success)

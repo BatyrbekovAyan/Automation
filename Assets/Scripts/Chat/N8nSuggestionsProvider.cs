@@ -97,12 +97,10 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
             // refusal arrives in the existing error envelope, which the panel already renders.
             appUserId:         BillingIdentity.AppUserId);
 
-        using var www = new UnityWebRequest($"{Manager.n8nBaseUrl}/webhook/SuggestReplies", "POST");
-        www.uploadHandler   = new UploadHandlerRaw(Encoding.UTF8.GetBytes(json));
-        www.downloadHandler = new DownloadHandlerBuffer();
-        www.SetRequestHeader("Content-Type", "application/json");   // REQUIRED — libcurl else stamps x-www-form-urlencoded => n8n mis-parse
-        www.timeout = 15;   // server p95 ≈ 4s; 30s was a very long skeleton before the error state (audit F17c)
-        yield return www.SendWebRequest();
+        UnityWebRequest www = null;
+        // 15 s: server p95 ≈ 4s; 30s was a very long skeleton before the error state (audit F17c)
+        yield return AuthorizedRequest.Send(() => AuthorizedRequest.JsonPost($"{Manager.n8nBaseUrl}/webhook/SuggestReplies", json, 15), r => www = r);
+        using var wwwScope = www;
 
         if (www.result != UnityWebRequest.Result.Success)
         {

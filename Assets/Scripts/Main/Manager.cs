@@ -190,7 +190,6 @@ public partial class Manager : MonoBehaviour
     // auth/2fa instead of auth/code. Reset whenever the panel is closed / number changed.
     private bool _telegram2faMode;
 
-    public static string wappiAuthToken => Secrets.Data.wappiAuthToken;
     public const string DevN8nBaseUrlKey = "DevN8nBaseUrl";
 
     public static string n8nBaseUrl =>
@@ -280,6 +279,17 @@ public partial class Manager : MonoBehaviour
         catch (Exception e)
         {
             Debug.LogError($"[Manager] BillingService.Initialize() threw — continuing without billing: {e}");
+        }
+
+        // A1 server session (bootstrap on first launch, refresh otherwise) — best effort, single-flight;
+        // every authorised request re-checks it, so a failure here only costs a later retry.
+        try
+        {
+            StartCoroutine(AuthClient.Instance.EnsureSession());
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[Manager] AuthClient.EnsureSession() threw — continuing: {e}");
         }
 
         // Boot-time usage snapshot fetch (Task 11) — best-effort, one shot. Must never brick
@@ -734,14 +744,12 @@ public partial class Manager : MonoBehaviour
 
         if (hasWhatsappOrphan)
         {
-            whatsappDelete = UnityWebRequest.Post($"https://wappi.pro/api/profile/delete?profile_id={pendingWhatsappId}", new WWWForm());
-            whatsappDelete.SetRequestHeader("Authorization", wappiAuthToken);
+            whatsappDelete = WappiProxy.NewRequest(WappiProxy.Op.ProfileDelete, ChatChannel.WhatsApp, new { profile_id = pendingWhatsappId });
             whatsappDelete.SendWebRequest();
         }
         if (hasTelegramOrphan)
         {
-            telegramDelete = UnityWebRequest.Post($"https://wappi.pro/tapi/profile/delete?profile_id={pendingTelegramId}", new WWWForm());
-            telegramDelete.SetRequestHeader("Authorization", wappiAuthToken);
+            telegramDelete = WappiProxy.NewRequest(WappiProxy.Op.ProfileDelete, ChatChannel.Telegram, new { profile_id = pendingTelegramId });
             telegramDelete.SendWebRequest();
         }
 
@@ -2365,11 +2373,10 @@ public partial class Manager : MonoBehaviour
         {
             if (!WhatsappQRPanel.activeSelf) yield break;
 
-            using (var www = UnityWebRequest.Get($"https://wappi.pro/api/sync/qr/get?profile_id={whatsappProfileId}"))
+            UnityWebRequest www = null;
+            yield return WappiProxy.Send(WappiProxy.Op.Qr, ChatChannel.WhatsApp, new { profile_id = whatsappProfileId }, r => www = r);
+            using (www)
             {
-                www.SetRequestHeader("Authorization", wappiAuthToken);
-                www.timeout = 30;
-                yield return www.SendWebRequest();
 
                 if (!WhatsappQRPanel.activeSelf) yield break;
 
@@ -2496,11 +2503,10 @@ public partial class Manager : MonoBehaviour
             }
         }
 
-        using UnityWebRequest www = UnityWebRequest.Get($"https://wappi.pro/api/sync/auth/code?profile_id={whatsappProfileId}&phone=7{WhatsappNumberInput.text}");
-
-        www.SetRequestHeader("Authorization", wappiAuthToken);
-
-        yield return www.SendWebRequest();
+        UnityWebRequest www = null;
+        yield return WappiProxy.Send(WappiProxy.Op.AuthCode, ChatChannel.WhatsApp,
+            new { profile_id = whatsappProfileId, phone = "7" + WappiProxyRequest.DigitsOnly(WhatsappNumberInput.text) }, r => www = r);
+        using var wwwScope = www;
 
         if (www.result != UnityWebRequest.Result.Success)
         {
@@ -2572,12 +2578,9 @@ public partial class Manager : MonoBehaviour
 
     private IEnumerator CheckWhatsappAuthorized(System.Action<bool> callback)
     {
-        using UnityWebRequest www = UnityWebRequest.Get($"https://wappi.pro/api/sync/get/status?profile_id={whatsappProfileId}");
-
-        www.SetRequestHeader("Authorization", wappiAuthToken);
-        www.timeout = 30;
-
-        yield return www.SendWebRequest();
+        UnityWebRequest www = null;
+        yield return WappiProxy.Send(WappiProxy.Op.Status, ChatChannel.WhatsApp, new { profile_id = whatsappProfileId }, r => www = r);
+        using var wwwScope = www;
 
         bool authorized = false;
 
@@ -2693,11 +2696,9 @@ public partial class Manager : MonoBehaviour
             // Auth screen is gone (wizard cancelled / settings back) — nothing to advance
             if (!WhatsappAuth.activeInHierarchy) yield break;
 
-            using UnityWebRequest www = UnityWebRequest.Get($"https://wappi.pro/api/sync/get/status?profile_id={whatsappProfileId}");
-
-            www.SetRequestHeader("Authorization", wappiAuthToken);
-
-            yield return www.SendWebRequest();
+            UnityWebRequest www = null;
+            yield return WappiProxy.Send(WappiProxy.Op.Status, ChatChannel.WhatsApp, new { profile_id = whatsappProfileId }, r => www = r);
+            using var wwwScope = www;
 
             if (www.result == UnityWebRequest.Result.Success)
             {
@@ -2751,11 +2752,10 @@ public partial class Manager : MonoBehaviour
         {
             if (!TelegramQRPanel.activeSelf) yield break;
 
-            using (var www = UnityWebRequest.Get($"https://wappi.pro/tapi/sync/auth/qr?profile_id={telegramProfileId}"))
+            UnityWebRequest www = null;
+            yield return WappiProxy.Send(WappiProxy.Op.Qr, ChatChannel.Telegram, new { profile_id = telegramProfileId }, r => www = r);
+            using (www)
             {
-                www.SetRequestHeader("Authorization", wappiAuthToken);
-                www.timeout = 30;
-                yield return www.SendWebRequest();
 
                 if (!TelegramQRPanel.activeSelf) yield break;
 
@@ -2891,16 +2891,10 @@ public partial class Manager : MonoBehaviour
         string originalTgBtnText = GetTelegramCodeButton.GetComponentInChildren<TextMeshProUGUI>().text;
         SetButtonText(GetTelegramCodeButton, "Sending..");
 
-        string jsonBody = "{\"phone\":\"7" + TelegramNumberInput.text + "\"}";
-
-        using UnityWebRequest www = new($"https://wappi.pro/tapi/sync/auth/phone?profile_id={telegramProfileId}", "POST");
-        byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonBody);
-        www.uploadHandler = new UploadHandlerRaw(bodyRaw);
-        www.downloadHandler = new DownloadHandlerBuffer();
-        www.SetRequestHeader("Content-Type", "application/json");
-        www.SetRequestHeader("Authorization", wappiAuthToken);
-
-        yield return www.SendWebRequest();
+        UnityWebRequest www = null;
+        yield return WappiProxy.Send(WappiProxy.Op.TgAuthPhone, ChatChannel.Telegram,
+            new { profile_id = telegramProfileId, phone = "7" + WappiProxyRequest.DigitsOnly(TelegramNumberInput.text) }, r => www = r);
+        using var wwwScope = www;
 
         if (www.result != UnityWebRequest.Result.Success)
         {
@@ -2992,16 +2986,10 @@ public partial class Manager : MonoBehaviour
         SendTelegramCodeButton.interactable = false;
         SetButtonText(SendTelegramCodeButton, "Авторизация...");
 
-        string jsonBody = "{\"auth_code\":\"" + TelegramCodeInput.text + "\"}";
-
-        using UnityWebRequest www = new($"https://wappi.pro/tapi/sync/auth/code?profile_id={telegramProfileId}", "POST");
-        byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonBody);
-        www.uploadHandler = new UploadHandlerRaw(bodyRaw);
-        www.downloadHandler = new DownloadHandlerBuffer();
-        www.SetRequestHeader("Content-Type", "application/json");
-        www.SetRequestHeader("Authorization", wappiAuthToken);
-
-        yield return www.SendWebRequest();
+        UnityWebRequest www = null;
+        yield return WappiProxy.Send(WappiProxy.Op.TgAuthCode, ChatChannel.Telegram,
+            new { profile_id = telegramProfileId, auth_code = WappiProxyRequest.DigitsOnly(TelegramCodeInput.text) }, r => www = r);
+        using var wwwScope = www;
 
         if (www.result != UnityWebRequest.Result.Success)
         {
@@ -3110,17 +3098,10 @@ public partial class Manager : MonoBehaviour
 
         // JsonConvert escapes quotes/backslashes — a cloud password is free-form text,
         // so manual concatenation would produce malformed JSON and hard-fail auth (WR-02).
-        string jsonBody = JsonConvert.SerializeObject(new { pwd_code = TelegramCodeInput.text });
-
-        using UnityWebRequest www = new($"https://wappi.pro/tapi/sync/auth/2fa?profile_id={telegramProfileId}", "POST");
-        byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonBody);
-        www.uploadHandler = new UploadHandlerRaw(bodyRaw);
-        www.downloadHandler = new DownloadHandlerBuffer();
-        www.SetRequestHeader("Content-Type", "application/json");
-        www.SetRequestHeader("Authorization", wappiAuthToken);
-        www.timeout = 30;
-
-        yield return www.SendWebRequest();
+        UnityWebRequest www = null;
+        yield return WappiProxy.Send(WappiProxy.Op.TgAuth2fa, ChatChannel.Telegram,
+            new { profile_id = telegramProfileId, pwd_code = TelegramCodeInput.text }, r => www = r);
+        using var wwwScope = www;
 
         // SECURITY: never log the password / jsonBody. Clear the field on every path.
         TelegramCodeInput.text = "";
@@ -3212,11 +3193,9 @@ public partial class Manager : MonoBehaviour
             // Auth screen is gone (wizard cancelled / settings back) — nothing to advance
             if (!TelegramAuth.activeInHierarchy) yield break;
 
-            using UnityWebRequest www = UnityWebRequest.Get($"https://wappi.pro/tapi/sync/get/status?profile_id={telegramProfileId}");
-
-            www.SetRequestHeader("Authorization", wappiAuthToken);
-
-            yield return www.SendWebRequest();
+            UnityWebRequest www = null;
+            yield return WappiProxy.Send(WappiProxy.Op.Status, ChatChannel.Telegram, new { profile_id = telegramProfileId }, r => www = r);
+            using var wwwScope = www;
 
             if (www.result == UnityWebRequest.Result.Success)
             {
@@ -3355,12 +3334,9 @@ public partial class Manager : MonoBehaviour
     {
         string url = $"{n8nBaseUrl}/webhook/DeleteBotFiles";
 
-        using var request = new UnityWebRequest(url, "POST");
-        request.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(body));
-        request.downloadHandler = new DownloadHandlerBuffer();
-        request.SetRequestHeader("Content-Type", "application/json");
-        request.timeout = 30;
-        yield return request.SendWebRequest();
+        UnityWebRequest request = null;
+        yield return AuthorizedRequest.Send(() => AuthorizedRequest.JsonPost(url, body, 30), r => request = r);
+        using var requestScope = request;
 
         if (request.result != UnityWebRequest.Result.Success)
             Debug.LogError($"[DeleteBotFiles] [{request.responseCode}] {url}: {request.error}\n{request.downloadHandler?.text}");
@@ -3373,14 +3349,9 @@ public partial class Manager : MonoBehaviour
     {
         LoadingPanel.SetActive(true);
 
-        WWWForm form = new();
-
-        using UnityWebRequest www = UnityWebRequest.Post($"https://wappi.pro/api/profile/add?name={name}", form);
-
-        www.SetRequestHeader("Authorization", wappiAuthToken);
-        www.timeout = 30;
-
-        yield return www.SendWebRequest();
+        UnityWebRequest www = null;
+        yield return WappiProxy.Send(WappiProxy.Op.ProfileAdd, ChatChannel.WhatsApp, new { name }, r => www = r);
+        using var wwwScope = www;
 
         if (www.result != UnityWebRequest.Result.Success)
         {
@@ -3419,13 +3390,9 @@ public partial class Manager : MonoBehaviour
     {
         LoadingPanel.SetActive(true);
 
-        WWWForm form = new();
-
-        using UnityWebRequest www = UnityWebRequest.Post($"https://wappi.pro/api/profile/delete?profile_id={whatsappProfileId}", form);
-
-        www.SetRequestHeader("Authorization", wappiAuthToken);
-
-        yield return www.SendWebRequest();
+        UnityWebRequest www = null;
+        yield return WappiProxy.Send(WappiProxy.Op.ProfileDelete, ChatChannel.WhatsApp, new { profile_id = whatsappProfileId }, r => www = r);
+        using var wwwScope = www;
 
         if (www.result == UnityWebRequest.Result.Success)
         {
@@ -3450,14 +3417,9 @@ public partial class Manager : MonoBehaviour
     {
         LoadingPanel.SetActive(true);
 
-        WWWForm form = new();
-
-        using UnityWebRequest www = UnityWebRequest.Post($"https://wappi.pro/tapi/profile/add?name={name}", form);
-
-        www.SetRequestHeader("Authorization", wappiAuthToken);
-        www.timeout = 30;
-
-        yield return www.SendWebRequest();
+        UnityWebRequest www = null;
+        yield return WappiProxy.Send(WappiProxy.Op.ProfileAdd, ChatChannel.Telegram, new { name }, r => www = r);
+        using var wwwScope = www;
 
         if (www.result != UnityWebRequest.Result.Success)
         {
@@ -3492,13 +3454,9 @@ public partial class Manager : MonoBehaviour
     {
         LoadingPanel.SetActive(true);
 
-        WWWForm form = new();
-
-        using UnityWebRequest www = UnityWebRequest.Post($"https://wappi.pro/tapi/profile/delete?profile_id={telegramProfileId}", form);
-
-        www.SetRequestHeader("Authorization", wappiAuthToken);
-
-        yield return www.SendWebRequest();
+        UnityWebRequest www = null;
+        yield return WappiProxy.Send(WappiProxy.Op.ProfileDelete, ChatChannel.Telegram, new { profile_id = telegramProfileId }, r => www = r);
+        using var wwwScope = www;
 
         if (www.result == UnityWebRequest.Result.Success)
         {
@@ -3545,12 +3503,14 @@ public partial class Manager : MonoBehaviour
         // re-register (e.g. change-number) instead of counting it as a second slot.
         form.AddField("BotKey", bot != null ? bot.name : "");
 
-        using UnityWebRequest www = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateWhatsappWorkflow", form);
         // Without a timeout a connected-but-silent n8n parks this coroutine forever:
         // neither branch below runs, so the card's controls stay disabled and the
         // LoadingPanel never lifts. 30s matches every other request in this file.
-        www.timeout = 30;
-        yield return www.SendWebRequest();
+        UnityWebRequest www = null;
+        yield return AuthorizedRequest.Send(
+            () => { var r = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateWhatsappWorkflow", form); r.timeout = 30; return r; },
+            r => www = r);
+        using var wwwScope = www;
 
         // The user can reach the card while the sibling channel's request is still in
         // flight (the branches below drop the shared LoadingPanel), and deleting the
@@ -3604,6 +3564,7 @@ public partial class Manager : MonoBehaviour
             {
 
                 bot.GetComponent<Bot>().whatsappWorkflowId = ExtractWorkflowId(response);
+                yield return AuthClient.Instance.ForceRefresh();   // the new clone id must enter the session token before SetWorkflowState/Edit
                 PlayerPrefs.SetString(bot.name + "WhatsappWorkflowId", bot.GetComponent<Bot>().whatsappWorkflowId);
                 PlayerPrefs.SetString(bot.name + "WhatsappProfileId", bot.GetComponent<Bot>().whatsappProfileId);
                 PendingProfileLedger.MarkWhatsappClaimed();
@@ -3677,8 +3638,11 @@ public partial class Manager : MonoBehaviour
         // save on the SAME bot retire its own old channel row server-side.
         form.AddField("BotKey", openBot != null ? openBot.name : "");
 
-        using UnityWebRequest www = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateWhatsappWorkflow", form);
-        yield return www.SendWebRequest();
+        UnityWebRequest www = null;
+        yield return AuthorizedRequest.Send(
+            () => { var r = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateWhatsappWorkflow", form); r.timeout = 30; return r; },
+            r => www = r);
+        using var wwwScope = www;
 
         bool resolved = false;
         if (www.result == UnityWebRequest.Result.Success)
@@ -3689,6 +3653,7 @@ public partial class Manager : MonoBehaviour
             {
 
                 openBot.GetComponent<Bot>().whatsappWorkflowId = ExtractWorkflowId(response);
+                yield return AuthClient.Instance.ForceRefresh();   // see the start-path twin
                 PlayerPrefs.SetString(openBot.name + "WhatsappWorkflowId", openBot.GetComponent<Bot>().whatsappWorkflowId);
                 PendingProfileLedger.MarkWhatsappClaimed();
                 SeedReplyModeDefaultForProfile(openBot.name, openBot.GetComponent<Bot>().whatsappProfileId);   // WR-02: '*' row for a channel authed after a Вместе default
@@ -3741,11 +3706,13 @@ public partial class Manager : MonoBehaviour
         // See the WhatsApp twin: BotKey = this bot's already-assigned stable slot name.
         form.AddField("BotKey", bot != null ? bot.name : "");
 
-        using UnityWebRequest www = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateTelegramWorkflow", form);
         // See the WhatsApp twin: no timeout means a silent n8n parks this coroutine
         // forever and neither branch below ever runs.
-        www.timeout = 30;
-        yield return www.SendWebRequest();
+        UnityWebRequest www = null;
+        yield return AuthorizedRequest.Send(
+            () => { var r = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateTelegramWorkflow", form); r.timeout = 30; return r; },
+            r => www = r);
+        using var wwwScope = www;
 
         // The card may have been deleted while the sibling channel was still in
         // flight — never dereference it unguarded.
@@ -3794,6 +3761,7 @@ public partial class Manager : MonoBehaviour
             {
 
                 bot.GetComponent<Bot>().telegramWorkflowId = ExtractWorkflowId(response);
+                yield return AuthClient.Instance.ForceRefresh();   // the new clone id must enter the session token before SetWorkflowState/Edit
                 PlayerPrefs.SetString(bot.name + "TelegramWorkflowId", bot.GetComponent<Bot>().telegramWorkflowId);
                 PlayerPrefs.SetString(bot.name + "TelegramProfileId", bot.GetComponent<Bot>().telegramProfileId);
                 PendingProfileLedger.MarkTelegramClaimed();
@@ -3866,8 +3834,11 @@ public partial class Manager : MonoBehaviour
         // See the WhatsApp twin: BotKey = this (existing) bot's stable slot name.
         form.AddField("BotKey", openBot != null ? openBot.name : "");
 
-        using UnityWebRequest www = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateTelegramWorkflow", form);
-        yield return www.SendWebRequest();
+        UnityWebRequest www = null;
+        yield return AuthorizedRequest.Send(
+            () => { var r = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/CreateTelegramWorkflow", form); r.timeout = 30; return r; },
+            r => www = r);
+        using var wwwScope = www;
 
         bool resolved = false;
         if (www.result == UnityWebRequest.Result.Success)
@@ -3878,6 +3849,7 @@ public partial class Manager : MonoBehaviour
             {
 
                 openBot.GetComponent<Bot>().telegramWorkflowId = ExtractWorkflowId(response);
+                yield return AuthClient.Instance.ForceRefresh();   // see the start-path twin
                 PlayerPrefs.SetString(openBot.name + "TelegramWorkflowId", openBot.GetComponent<Bot>().telegramWorkflowId);
                 PendingProfileLedger.MarkTelegramClaimed();
                 SeedReplyModeDefaultForProfile(openBot.name, openBot.GetComponent<Bot>().telegramProfileId);   // WR-02: '*' row for a channel authed after a Вместе default
@@ -3936,9 +3908,9 @@ public partial class Manager : MonoBehaviour
         // Same sentinels the Enable/Save paths skip — no n8n workflow to (de)activate.
         if (string.IsNullOrEmpty(id) || id.Equals("-1")) yield break;
 
-        using UnityWebRequest www = NewWorkflowStateRequest(id, WorkflowStateRequest.ToggleAction(active));
-
-        yield return www.SendWebRequest();
+        UnityWebRequest www = null;
+        yield return AuthorizedRequest.Send(() => NewWorkflowStateRequest(id, WorkflowStateRequest.ToggleAction(active)), r => www = r);
+        using var wwwScope = www;
 
         if (www.result != UnityWebRequest.Result.Success)
             Debug.LogError($"[{www.responseCode}] SetWorkflowActiveRoutine {www.url}: {www.error} {www.downloadHandler.text}");
@@ -3959,9 +3931,9 @@ public partial class Manager : MonoBehaviour
 
         LoadingPanel.SetActive(true);
 
-        using UnityWebRequest www = NewWorkflowStateRequest(id, WorkflowStateRequest.ToggleAction(enabled));
-
-        yield return www.SendWebRequest();
+        UnityWebRequest www = null;
+        yield return AuthorizedRequest.Send(() => NewWorkflowStateRequest(id, WorkflowStateRequest.ToggleAction(enabled)), r => www = r);
+        using var wwwScope = www;
 
         // Mark this sub-step done whether the request succeeded or not, so the
         // save pill's four-flag gate in Saved() can never hang on a failed
@@ -3993,9 +3965,9 @@ public partial class Manager : MonoBehaviour
 
         LoadingPanel.SetActive(true);
 
-        using UnityWebRequest www = NewWorkflowStateRequest(id, WorkflowStateRequest.ToggleAction(enabled));
-
-        yield return www.SendWebRequest();
+        UnityWebRequest www = null;
+        yield return AuthorizedRequest.Send(() => NewWorkflowStateRequest(id, WorkflowStateRequest.ToggleAction(enabled)), r => www = r);
+        using var wwwScope = www;
 
         // See EnableWhatsappWorkflow: always settle the gate, record failures.
         if (www.result != UnityWebRequest.Result.Success)
@@ -4015,9 +3987,9 @@ public partial class Manager : MonoBehaviour
         // Sentinel ids ("" / "-1") have no n8n workflow — same skip as the Enable paths.
         if (string.IsNullOrEmpty(whatsappWorkflowId) || whatsappWorkflowId.Equals("-1")) yield break;
 
-        using UnityWebRequest whatsappRequest = NewWorkflowStateRequest(whatsappWorkflowId, WorkflowStateRequest.Delete);
-
-        yield return whatsappRequest.SendWebRequest();
+        UnityWebRequest whatsappRequest = null;
+        yield return AuthorizedRequest.Send(() => NewWorkflowStateRequest(whatsappWorkflowId, WorkflowStateRequest.Delete), r => whatsappRequest = r);
+        using var whatsappScope = whatsappRequest;
 
         if (!deletingBot)
         {
@@ -4034,9 +4006,9 @@ public partial class Manager : MonoBehaviour
         // Sentinel ids ("" / "-1") have no n8n workflow — same skip as the Enable paths.
         if (string.IsNullOrEmpty(telegramWorkflowId) || telegramWorkflowId.Equals("-1")) yield break;
 
-        using UnityWebRequest telegramRequest = NewWorkflowStateRequest(telegramWorkflowId, WorkflowStateRequest.Delete);
-
-        yield return telegramRequest.SendWebRequest();
+        UnityWebRequest telegramRequest = null;
+        yield return AuthorizedRequest.Send(() => NewWorkflowStateRequest(telegramWorkflowId, WorkflowStateRequest.Delete), r => telegramRequest = r);
+        using var telegramScope = telegramRequest;
 
         if (!deletingBot)
         {
@@ -4181,15 +4153,23 @@ public partial class Manager : MonoBehaviour
             // isOnWhatsapp is persisted by SaveSettings, not here — see the
             // comment beside those two SetInt calls.
 
-            using UnityWebRequest editWhatsappRequest = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/EditWhatsappWorkflow", form);
-
-            yield return editWhatsappRequest.SendWebRequest();
+            UnityWebRequest editWhatsappRequest = null;
+            yield return AuthorizedRequest.Send(
+                () => { var r = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/EditWhatsappWorkflow", form); r.timeout = 60; return r; },
+                r => editWhatsappRequest = r);
+            using var editWhatsappScope = editWhatsappRequest;
 
             // Mark done either way: a failed Edit must not leave EditWhatsappWorkflowSaved
             // false forever, which would hang Saved()'s four-flag gate and strand the pill.
             if (editWhatsappRequest.result != UnityWebRequest.Result.Success)
             {
                 Debug.LogError($"[{editWhatsappRequest.responseCode}] EditWhatsappWorkflow failed: {editWhatsappRequest.error}");
+                _saveHadError = true;
+            }
+            else if (N8nResponse.IsFailureBody(editWhatsappRequest.downloadHandler?.text))
+            {
+                // lastNode-mode refusals (auth gate, A1) are HTTP 200 with {success:false} — never a save.
+                Debug.LogError($"EditWhatsappWorkflow refused: {N8nResponse.ErrorOf(editWhatsappRequest.downloadHandler?.text)}");
                 _saveHadError = true;
             }
             EditWhatsappWorkflowSaved = true;
@@ -4229,14 +4209,21 @@ public partial class Manager : MonoBehaviour
             // at this point (after the WhatsApp Edit round-trip) is what forced
             // the user to press Save twice before the button dimmed.
 
-            using UnityWebRequest editTelegramRequest = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/EditTelegramWorkflow", form);
-
-            yield return editTelegramRequest.SendWebRequest();
+            UnityWebRequest editTelegramRequest = null;
+            yield return AuthorizedRequest.Send(
+                () => { var r = UnityWebRequest.Post($"{n8nBaseUrl}/webhook/EditTelegramWorkflow", form); r.timeout = 60; return r; },
+                r => editTelegramRequest = r);
+            using var editTelegramScope = editTelegramRequest;
 
             // See EditWhatsappWorkflow above: mark done either way so the gate can settle.
             if (editTelegramRequest.result != UnityWebRequest.Result.Success)
             {
                 Debug.LogError($"[{editTelegramRequest.responseCode}] EditTelegramWorkflow failed: {editTelegramRequest.error}");
+                _saveHadError = true;
+            }
+            else if (N8nResponse.IsFailureBody(editTelegramRequest.downloadHandler?.text))
+            {
+                Debug.LogError($"EditTelegramWorkflow refused: {N8nResponse.ErrorOf(editTelegramRequest.downloadHandler?.text)}");
                 _saveHadError = true;
             }
             EditTelegramWorkflowSaved = true;
@@ -4319,13 +4306,11 @@ public partial class Manager : MonoBehaviour
             yield break;
         }
 
-        using UnityWebRequest www = new UnityWebRequest($"{n8nBaseUrl}{SupportRelayRequest.Path}", "POST");
-        byte[] body = System.Text.Encoding.UTF8.GetBytes(SupportRelayRequest.ComposeBody(message));
-        www.uploadHandler = new UploadHandlerRaw(body);
-        www.downloadHandler = new DownloadHandlerBuffer();
-        www.SetRequestHeader("Content-Type", "application/json");
-        www.timeout = 30;
-        yield return www.SendWebRequest();
+        UnityWebRequest www = null;
+        yield return AuthorizedRequest.Send(
+            () => AuthorizedRequest.JsonPost($"{n8nBaseUrl}{SupportRelayRequest.Path}", SupportRelayRequest.ComposeBody(message), 30),
+            r => www = r);
+        using var wwwScope = www;
 
         bool ok = www.result == UnityWebRequest.Result.Success;
         if (!ok)
@@ -4460,9 +4445,9 @@ public partial class Manager : MonoBehaviour
         form.AddBinaryData("data", fileData, fileName); // Added mimeType here
 
 
-        using UnityWebRequest www = UnityWebRequest.Post(uploadUrl, form);
-
-        yield return www.SendWebRequest();
+        UnityWebRequest www = null;
+        yield return AuthorizedRequest.Send(() => UnityWebRequest.Post(uploadUrl, form), r => www = r);
+        using var wwwScope = www;
 
 
         if (www.result != UnityWebRequest.Result.Success)

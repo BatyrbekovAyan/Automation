@@ -166,6 +166,7 @@ def s_isolation(ctx):
 def s_legit(ctx):
     a = ctx["A"]
     pid = a.profiles[0]
+    http("POST", f"{MOCK}/__mock/profile", {"profile_id": pid, "authorized": True, "phone": "77000000001"})   # paired
     since = mock_total()
     st1, d1 = proxy(a.token, {"op": "status", "channel": "whatsapp", "profile_id": pid})
     st2, d2 = proxy(a.token, {"op": "message.send", "channel": "whatsapp", "profile_id": pid, "recipient": "7700", "body": "e2e"})
@@ -208,18 +209,71 @@ def s_hooks(ctx):
     return ok, json.dumps(r) + f"  (token-less expected {legacy_expected}: compat {'CLOSED' if COMPAT_CLOSED else 'open'})"
 
 
+@scenario("claim_by_code_transfers_ownership", "a legacy/other-install profile: claim.start sends a code to the bot's OWN chat; claim.verify binds it to the claiming install")
+def s_claim_code(ctx):
+    a, b = ctx["A"], ctx["B"]
+    victim = b.profiles[0]                                   # owned by B (stands in for 'a previous install')
+    http("POST", f"{MOCK}/__mock/profile", {"profile_id": victim, "authorized": True, "phone": "77001112233"})
+    since = mock_total()
+    st, d = session({"op": "claim.start", "installId": a.install_id, "installSecret": a.secret, "appUserId": a.app_user_id, "profileId": victim, "channel": "whatsapp"})
+    sends, _ = mock_calls(since, "message/send")
+    if not (st == 200 and d.get("claimMethod") == "code" and len(sends) == 1):
+        return False, f"start http={st} body={d} sends={len(sends)}"
+    body_text = sends[0]["body"].get("body", "")
+    recipient = sends[0]["body"].get("recipient")
+    code = "".join(ch for ch in body_text if ch.isdigit())[-6:]
+    st2, d2 = session({"op": "claim.start", "installId": a.install_id, "installSecret": a.secret, "appUserId": a.app_user_id, "profileId": victim, "channel": "whatsapp"})
+    sends2, _ = mock_calls(since, "message/send")
+    st3, d3 = session({"op": "claim.verify", "installId": a.install_id, "installSecret": a.secret, "appUserId": a.app_user_id, "profileId": victim, "channel": "whatsapp", "code": "000000" if code != "000000" else "111111"})
+    st4, d4 = session({"op": "claim.verify", "installId": a.install_id, "installSecret": a.secret, "appUserId": a.app_user_id, "profileId": victim, "channel": "whatsapp", "code": code})
+    a.token = d4.get("token", a.token)
+    b_after = b.refresh()
+    ok = (recipient == "77001112233" and d2.get("codeReused") is True and len(sends2) == 1 and st3 == 403 and d3.get("error") == "claim_code_rejected"
+          and st4 == 200 and victim in d4.get("profiles", []) and victim not in b_after["profiles"])
+    if ok:
+        a.profiles.append(victim)
+    return ok, f"recipient_is_own_phone={recipient == '77001112233'} second_start_reuses_code={d2.get('codeReused')} wrong_code={st3} verify={st4} now_owned_by_A={victim in d4.get('profiles', [])} B_lost_it={victim not in b_after['profiles']}"
+
+
+@scenario("claim_by_reauth_binds_after_pairing", "an UNAUTHORISED legacy profile: claim.start → reauth; only a pairing AFTER the claim binds it (claim.status)")
+def s_claim_reauth(ctx):
+    a = ctx["A"]
+    legacy = f"legacy-{ctx['run_id']}"
+    a.profiles.append(legacy)                                 # cleanup scope
+    http("POST", f"{MOCK}/__mock/profile", {"profile_id": legacy, "authorized": False, "phone": None})
+    st, d = session({"op": "claim.start", "installId": a.install_id, "installSecret": a.secret, "appUserId": a.app_user_id, "profileId": legacy, "channel": "whatsapp"})
+    if not (st == 200 and d.get("claimMethod") == "reauth" and legacy in d.get("claimPending", [])):
+        return False, f"start http={st} body={d}"
+    tok = d["token"]
+    # with the c-capability the proxy admits the auth ops for this profile, nothing else
+    st_qr, _ = proxy(tok, {"op": "qr", "channel": "whatsapp", "profile_id": legacy})
+    st_chats, _ = proxy(tok, {"op": "chats.filter", "channel": "whatsapp", "profile_id": legacy})
+    # not yet paired → status keeps it pending
+    st1, d1 = session({"op": "claim.status", "installId": a.install_id, "installSecret": a.secret, "appUserId": a.app_user_id, "profileId": legacy, "channel": "whatsapp"})
+    # paired AFTER the claim began → bound
+    time.sleep(1.2)
+    import datetime as dt
+    http("POST", f"{MOCK}/__mock/profile", {"profile_id": legacy, "authorized": True, "phone": "77009998877", "authorized_at": dt.datetime.now(dt.timezone.utc).isoformat()})
+    st2, d2 = session({"op": "claim.status", "installId": a.install_id, "installSecret": a.secret, "appUserId": a.app_user_id, "profileId": legacy, "channel": "whatsapp"})
+    a.token = d2.get("token", a.token)
+    ok = st_qr == 200 and st_chats == 403 and st1 == 200 and legacy not in d1.get("profiles", []) and st2 == 200 and legacy in d2.get("profiles", [])
+    return ok, f"qr_allowed={st_qr} chats_refused={st_chats} before_pairing_owned={legacy in d1.get('profiles', [])} after_pairing_owned={legacy in d2.get('profiles', [])}"
+
+
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--only"); ap.add_argument("--compat-closed", action="store_true"); a = ap.parse_args()
     if not AUTH_SECRET:
         sys.exit("no authSecret in staging secrets — restart staging via bootstrap.py")
     run_id = uuid.uuid4().hex[:10]
-    ctx = {}
+    ctx = {"run_id": run_id}
     passed = failed = 0
     try:
         ctx["A"] = Owner("A", run_id); ctx["B"] = Owner("B", run_id)
         ctx["B"].add_profile()
         for id_, title, fn in SCENARIOS:
             if a.only and a.only not in id_:
+                continue
+            if id_ == "claim_by_reauth_binds_after_pairing" and "Owner" not in str(type(ctx.get("A"))):
                 continue
             if id_ != "proxy_profile_add_binds_owner" and not ctx["A"].profiles:
                 ctx["A"].add_profile()

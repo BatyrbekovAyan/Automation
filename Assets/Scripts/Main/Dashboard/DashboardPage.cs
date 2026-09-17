@@ -122,12 +122,9 @@ public class DashboardPage : MonoBehaviour
         string url = $"{Manager.n8nBaseUrl}/webhook/DashboardOutcomes";
         string body = JsonConvert.SerializeObject(new { profileIds = profiles });
 
-        using var req = new UnityWebRequest(url, "POST");
-        req.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(body));
-        req.downloadHandler = new DownloadHandlerBuffer();
-        req.SetRequestHeader("Content-Type", "application/json");   // REQUIRED (see Global Constraints)
-        req.timeout = 30;
-        yield return req.SendWebRequest();
+        UnityWebRequest req = null;
+        yield return AuthorizedRequest.Send(() => AuthorizedRequest.JsonPost(url, body, 30), r => req = r);
+        using var reqScope = req;
 
         _fetching = false;
 

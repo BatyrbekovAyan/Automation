@@ -86,12 +86,9 @@ public static class UsageClient
             string url = $"{Manager.n8nBaseUrl}/webhook/GetUsage";
             string body = JsonConvert.SerializeObject(new { appUserId });
 
-            using var req = new UnityWebRequest(url, "POST");
-            req.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(body));
-            req.downloadHandler = new DownloadHandlerBuffer();
-            req.SetRequestHeader("Content-Type", "application/json");   // REQUIRED (see Global Constraints)
-            req.timeout = RequestTimeoutSeconds;
-            yield return req.SendWebRequest();
+            UnityWebRequest req = null;
+            yield return AuthorizedRequest.Send(() => AuthorizedRequest.JsonPost(url, body, RequestTimeoutSeconds), r => req = r);
+            using var reqScope = req;
 
             if (req.result != UnityWebRequest.Result.Success)
             {

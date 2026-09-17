@@ -24,6 +24,7 @@ Control routes (never exist on the real transport):
     GET  /__mock/calls?since=<n>&path=<substr>                        recorded calls
     POST /__mock/fault     {match:<path substr>, mode:"status"|"timeout"|"accept_then_drop",
                             status:500, times:1, delay:35}
+    POST /__mock/profile   {profile_id, authorized, phone, authorized_at}   status fields for get/status
     GET  /__mock/state
 """
 import json
@@ -179,7 +180,9 @@ class Handler(BaseHTTPRequestHandler):
                         "profile/delete", "profile/logout"):
                 return 200, {"status": "done"}
             if tail == "get/status":
-                return 200, {"authorized": True, "profile_id": pid}
+                prof = STATE["profiles"].get(pid) or {}
+                return 200, {"authorized": prof.get("authorized", True), "profile_id": pid,
+                             "phone": prof.get("phone"), "authorized_at": prof.get("authorized_at"), "logouted_at": prof.get("logouted_at")}
             if tail == "profile/add":
                 new = _new_id("profile")
                 STATE["profiles"][new] = {"channel": channel, "authorized": False}
@@ -226,6 +229,9 @@ class Handler(BaseHTTPRequestHandler):
                      "times": int(b.get("times", 1)), "delay": float(b.get("delay", 35))}
                 STATE["faults"].append(f)
                 return self._send(200, {"ok": True, "fault": f})
+            if path == "/__mock/profile" and method == "POST":
+                STATE["profiles"].setdefault(b["profile_id"], {}).update({k: v for k, v in b.items() if k != "profile_id"})
+                return self._send(200, {"ok": True, "profile": STATE["profiles"][b["profile_id"]]})
             if path == "/__mock/state" and method == "GET":
                 return self._send(200, {"chats": {k: len(v) for k, v in STATE["messages"].items()},
                                         "calls": len(STATE["calls"]), "faults": STATE["faults"],

@@ -34,6 +34,33 @@ public static class WappiMediaRequestFactory
 
     public static string NormalizeRecipient(string chatId) => ChatIdFormat.Recipient(chatId);
 
+    /// <summary>The Wappi Proxy <c>media.send</c> kind for an attachment (img | video | document), null when unsendable.</summary>
+    public static string ProxyKind(AttachmentKind kind) => kind switch
+    {
+        AttachmentKind.Photo or AttachmentKind.GalleryImage => "img",
+        AttachmentKind.GalleryVideo                         => "video",
+        AttachmentKind.Document                             => "document",
+        _                                                   => null
+    };
+
+    /// <summary>
+    /// The proxy request arguments for a media send (A1): the same recipient/caption/file_name/b64
+    /// contract as <see cref="BuildBody"/>, plus the profile and the kind the server maps to the endpoint.
+    /// </summary>
+    public static WappiProxyMediaArgs BuildProxyArgs(AttachmentKind kind, string profileId, string chatId,
+                                                     string caption, string fileName, string b64)
+        => new WappiProxyMediaArgs
+        {
+            profile_id = profileId,
+            kind       = ProxyKind(kind),
+            recipient  = NormalizeRecipient(chatId),
+            caption    = caption ?? "",
+            b64_file   = b64,
+            file_name  = kind == AttachmentKind.Document
+                         ? (string.IsNullOrEmpty(fileName) ? "file" : fileName)
+                         : null
+        };
+
     public static string BuildBody(AttachmentKind kind, string chatId, string caption,
                                    string fileName, string b64)
     {
@@ -49,6 +76,17 @@ public static class WappiMediaRequestFactory
         return JsonConvert.SerializeObject(req,
             new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
     }
+}
+
+[Serializable]
+public class WappiProxyMediaArgs
+{
+    public string profile_id;
+    public string kind;
+    public string recipient;
+    public string caption;
+    public string file_name;
+    public string b64_file;
 }
 
 [Serializable]

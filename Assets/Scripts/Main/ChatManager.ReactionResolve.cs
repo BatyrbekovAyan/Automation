@@ -70,8 +70,6 @@ public partial class ChatManager
             string id = chatVm.LastMessageId;
             if (string.IsNullOrEmpty(profileId)) { _reactionResolveInFlight.Remove(id); continue; }
 
-            string escapedId = UnityWebRequest.EscapeURL(chatId);
-            string url = WappiEndpoints.Sync(ActiveChannel, $"messages/get?profile_id={profileId}&chat_id={escapedId}&limit={MessagesPerPage}&offset=0");
 
             bool definitive = false;
             ReactionTargetResolver.Result res = new ReactionTargetResolver.Result { text = "", type = "", senderName = "" };
@@ -81,11 +79,11 @@ public partial class ChatManager
             // another chat's messages into the open chat. Defer until the chat fetches drain.
             yield return WaitForChatFetchesToDrain();
 
-            using (UnityWebRequest www = UnityWebRequest.Get(url))
+            UnityWebRequest www = null;
+            yield return WappiProxy.Send(WappiProxy.Op.MessagesGet, ActiveChannel,
+                new { profile_id = profileId, chat_id = chatId, limit = MessagesPerPage, offset = 0 }, r => www = r);
+            using (www)
             {
-                www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
-                www.timeout = 30;
-                yield return www.SendWebRequest();
 
                 if (www.result == UnityWebRequest.Result.Success)
                 {
@@ -102,7 +100,7 @@ public partial class ChatManager
                 }
                 else
                 {
-                    Debug.LogWarning($"[Wappi] row-detail messages/get failed [{www.responseCode}] {url}: {www.error}");
+                    Debug.LogWarning($"[Wappi] row-detail messages/get failed [{www.responseCode}] messages.get: {www.error}");
                 }
             }
 

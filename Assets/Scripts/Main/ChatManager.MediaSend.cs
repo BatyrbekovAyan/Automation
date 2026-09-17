@@ -260,8 +260,8 @@ public partial class ChatManager
             var kind = (AttachmentKind)entry.attachmentKind;
             // Channel-aware endpoint: entry.channel (snapshotted at send time) picks
             // api/tapi. Legacy entries with channel==0 resolve to WhatsApp — byte-identical.
-            string url = WappiMediaRequestFactory.EndpointFor(kind, entry.profileId, (ChatChannel)entry.channel);
-            if (string.IsNullOrEmpty(url))
+            string proxyKind = WappiMediaRequestFactory.ProxyKind(kind);
+            if (string.IsNullOrEmpty(proxyKind))
             {
                 Debug.LogError($"[Wappi] no media endpoint for kind {kind}");
                 OnMessageStatusChanged?.Invoke(entry.tempId, entry.tempId, DeliveryStatus.Failed);
@@ -330,14 +330,13 @@ public partial class ChatManager
             // Encode is opaque (one Task), so the ring snaps to the encode ceiling.
             OnMediaSendProgress?.Invoke(entry.tempId, SendProgress(SendPhase.Encode, 1f));
 
-            string body = WappiMediaRequestFactory.BuildBody(kind, entry.chatId, entry.text, entry.fileName, encodeTask.Result);
+            var mediaArgs = WappiMediaRequestFactory.BuildProxyArgs(kind, entry.profileId, entry.chatId, entry.text, entry.fileName, encodeTask.Result);
 
-            using UnityWebRequest www = new UnityWebRequest(url, "POST");
-            www.uploadHandler   = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(body));
-            www.downloadHandler = new DownloadHandlerBuffer();
-            www.SetRequestHeader("Content-Type", "application/json");
-            www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
-            www.timeout = 300;   // media uploads carry multi-MB base64 bodies; 30s (text default) is too short
+            // The session must be fresh BEFORE the request exists: this site keeps the request object for
+            // progress polling + Abort, so it cannot go through AuthorizedRequest.Send's 401 retry.
+            var auth = AuthClient.Instance;
+            if (auth != null) yield return auth.EnsureSession();
+            using UnityWebRequest www = WappiProxy.NewRequest(WappiProxy.Op.MediaSend, (ChatChannel)entry.channel, mediaArgs, 300);   // multi-MB base64 bodies; 30s is too short
 
             // Non-blocking upload poll so we can surface byte-level progress and let
             // CancelMediaSend Abort() the request mid-flight.
@@ -357,7 +356,7 @@ public partial class ChatManager
 
             if (www.result != UnityWebRequest.Result.Success)
             {
-                Debug.LogError($"[Wappi] {url} failed: {www.error}\n{www.downloadHandler?.text}");
+                Debug.LogError($"[Wappi] media.send ({proxyKind}) failed: {www.error}\n{www.downloadHandler?.text}");
                 OnMessageStatusChanged?.Invoke(entry.tempId, entry.tempId, DeliveryStatus.Failed);
                 yield break;
             }

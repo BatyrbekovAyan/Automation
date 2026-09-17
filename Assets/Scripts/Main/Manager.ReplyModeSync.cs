@@ -101,20 +101,17 @@ public partial class Manager
         SyncReplyMode(new[] { profileId }, "*", true);
     }
 
-    // Copies DeleteBotFilesRoutine verbatim: POST the JSON to the unauthenticated
-    // /webhook/SetReplyMode (NO auth header — every /webhook/* is open, R-02-01),
-    // Content-Type: application/json (libcurl would otherwise stamp x-www-form-urlencoded
-    // and n8n would 415 it), timeout 30, using-block, log-only on failure.
+    // POST the JSON to /webhook/SetReplyMode through AuthorizedRequest (A1: Bearer session token,
+    // the gate checks every profileId belongs to this install), Content-Type: application/json
+    // (libcurl would otherwise stamp x-www-form-urlencoded and n8n would 415 it), timeout 30,
+    // using-block, log-only on failure.
     private IEnumerator SyncReplyModeRoutine(string jsonBody, System.Action<bool> done = null)
     {
         string url = $"{n8nBaseUrl}/webhook/SetReplyMode";
 
-        using var request = new UnityWebRequest(url, "POST");
-        request.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(jsonBody));
-        request.downloadHandler = new DownloadHandlerBuffer();
-        request.SetRequestHeader("Content-Type", "application/json");
-        request.timeout = 30;
-        yield return request.SendWebRequest();
+        UnityWebRequest request = null;
+        yield return AuthorizedRequest.Send(() => AuthorizedRequest.JsonPost(url, jsonBody, 30), r => request = r);
+        using var requestScope = request;
 
         if (request.result != UnityWebRequest.Result.Success)
             Debug.LogError($"[SetReplyMode] [{request.responseCode}] {url}: {request.error}\n{request.downloadHandler?.text}");

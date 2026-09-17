@@ -114,11 +114,9 @@ public partial class BotSettings
 
         Manager.Instance.LoadingPanel.SetActive(true);
 
-        using UnityWebRequest www = UnityWebRequest.Get($"https://wappi.pro/api/sync/get/status?profile_id={bot.whatsappProfileId}");
-
-        www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
-
-        yield return www.SendWebRequest();
+        UnityWebRequest www = null;
+        yield return WappiProxy.Send(WappiProxy.Op.Status, ChatChannel.WhatsApp, new { profile_id = bot.whatsappProfileId }, r => www = r);
+        using var wwwScope = www;
 
         if (www.result == UnityWebRequest.Result.Success)
         {
@@ -218,11 +216,9 @@ public partial class BotSettings
         // foreground action the user expects to see.
         yield return new WaitForEndOfFrame();
 
-        using UnityWebRequest www = UnityWebRequest.Get($"https://wappi.pro/api/sync/get/status?profile_id={Manager.openBot.GetComponent<Bot>().whatsappProfileId}");
-
-        www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
-
-        yield return www.SendWebRequest();
+        UnityWebRequest www = null;
+        yield return WappiProxy.Send(WappiProxy.Op.Status, ChatChannel.WhatsApp, new { profile_id = Manager.openBot.GetComponent<Bot>().whatsappProfileId }, r => www = r);
+        using var wwwScope = www;
 
         if (www.result == UnityWebRequest.Result.Success)
         {
@@ -261,11 +257,9 @@ public partial class BotSettings
     {
         Manager.Instance.LoadingPanel.SetActive(true);
 
-        using UnityWebRequest www = UnityWebRequest.Get($"https://wappi.pro/api/profile/logout?profile_id={Manager.openBot.GetComponent<Bot>().whatsappProfileId}");
-
-        www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
-
-        yield return www.SendWebRequest();
+        UnityWebRequest www = null;
+        yield return WappiProxy.Send(WappiProxy.Op.ProfileLogout, ChatChannel.WhatsApp, new { profile_id = Manager.openBot.GetComponent<Bot>().whatsappProfileId }, r => www = r);
+        using var wwwScope = www;
 
         if (www.result == UnityWebRequest.Result.Success)
         {
@@ -324,11 +318,9 @@ public partial class BotSettings
 
         Manager.Instance.LoadingPanel.SetActive(true);
 
-        using UnityWebRequest www = UnityWebRequest.Get($"https://wappi.pro/tapi/sync/get/status?profile_id={bot.telegramProfileId}");
-
-        www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
-
-        yield return www.SendWebRequest();
+        UnityWebRequest www = null;
+        yield return WappiProxy.Send(WappiProxy.Op.Status, ChatChannel.Telegram, new { profile_id = bot.telegramProfileId }, r => www = r);
+        using var wwwScope = www;
 
         if (www.result == UnityWebRequest.Result.Success)
         {
@@ -405,11 +397,9 @@ public partial class BotSettings
         // foreground action the user expects to see.
         yield return new WaitForEndOfFrame();
 
-        using UnityWebRequest www = UnityWebRequest.Get($"https://wappi.pro/tapi/sync/get/status?profile_id={Manager.openBot.GetComponent<Bot>().telegramProfileId}");
-
-        www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
-
-        yield return www.SendWebRequest();
+        UnityWebRequest www = null;
+        yield return WappiProxy.Send(WappiProxy.Op.Status, ChatChannel.Telegram, new { profile_id = Manager.openBot.GetComponent<Bot>().telegramProfileId }, r => www = r);
+        using var wwwScope = www;
 
         if (www.result == UnityWebRequest.Result.Success)
         {
@@ -451,11 +441,9 @@ public partial class BotSettings
     {
         Manager.Instance.LoadingPanel.SetActive(true);
 
-        using UnityWebRequest www = UnityWebRequest.Get($"https://wappi.pro/tapi/profile/logout?profile_id={Manager.openBot.GetComponent<Bot>().telegramProfileId}");
-
-        www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
-
-        yield return www.SendWebRequest();
+        UnityWebRequest www = null;
+        yield return WappiProxy.Send(WappiProxy.Op.ProfileLogout, ChatChannel.Telegram, new { profile_id = Manager.openBot.GetComponent<Bot>().telegramProfileId }, r => www = r);
+        using var wwwScope = www;
 
         if (www.result == UnityWebRequest.Result.Success)
         {

@@ -127,9 +127,9 @@ public class UploadCenter : MonoBehaviour
         // Everything above this line fails without creating a single chunk.
         PendingUploadLedger.Add(job.FileId, job.BotName, job.ContentType);
 
-        using UnityWebRequest www = UnityWebRequest.Post($"{Manager.n8nBaseUrl}/webhook/UploadFile", form);
-
-        yield return www.SendWebRequest();
+        UnityWebRequest www = null;
+        yield return AuthorizedRequest.Send(() => UnityWebRequest.Post($"{Manager.n8nBaseUrl}/webhook/UploadFile", form), r => www = r);
+        using var wwwScope = www;
 
         if (www.result != UnityWebRequest.Result.Success)
         {
@@ -277,12 +277,9 @@ public class UploadCenter : MonoBehaviour
         string url = $"{Manager.n8nBaseUrl}/webhook/DeleteFile";
         string body = JsonConvert.SerializeObject(new { fileId });
 
-        using var request = new UnityWebRequest(url, "POST");
-        request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(body));
-        request.downloadHandler = new DownloadHandlerBuffer();
-        request.SetRequestHeader("Content-Type", "application/json");
-        request.timeout = 30;
-        yield return request.SendWebRequest();
+        UnityWebRequest request = null;
+        yield return AuthorizedRequest.Send(() => AuthorizedRequest.JsonPost(url, body, 30), r => request = r);
+        using var requestScope = request;
 
         if (request.result != UnityWebRequest.Result.Success)
         {

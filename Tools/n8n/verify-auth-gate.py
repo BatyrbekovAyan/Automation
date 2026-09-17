@@ -118,7 +118,8 @@ def check_session():
     rt = node(wf, "Route")["parameters"]["jsCode"]
     assert "sha256Hex(out.installSecret)" in rt and "randomSecret(32)" in rt, "bootstrap must mint and hash the install secret server-side"
     vc = node(wf, "Verify Claim Code")["parameters"]["query"]
-    assert "claim_code_expires_at > now()" in vc and "claim_pending_by = $2" in vc and "owner_id is null" in vc, "claim verify must be scoped/expiring"
+    assert "claim_code_expires_at > now()" in vc and "claim_pending_by = $2" in vc and "(owner_id is null or owner_id <> $2)" in vc, \
+        "claim verify must be scoped to the claiming install, expiring, and allow a proven transfer"
     print("OK  crAuthSession001-Auth_Session.json (cap, hash compare, single round-trip refresh, TTL, claim scoping)")
 
 

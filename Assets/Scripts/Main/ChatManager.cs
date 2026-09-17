@@ -468,12 +468,9 @@ public partial class ChatManager : MonoBehaviour
                 OnEmptyState?.Invoke(NoConnectionEmptyState());
                 yield break;
             }
-            string url = WappiEndpoints.Sync(ActiveChannel, $"chats/filter?profile_id={activeProfileId}");
-
-            using UnityWebRequest www = UnityWebRequest.Get(url);
-            www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
-            www.timeout = 30;
-            yield return www.SendWebRequest();
+            UnityWebRequest www = null;
+            yield return WappiProxy.Send(WappiProxy.Op.ChatsFilter, ActiveChannel, new { profile_id = activeProfileId }, r => www = r);
+            using var wwwScope = www;
 
             if (www.result != UnityWebRequest.Result.Success) yield break;
 
@@ -600,16 +597,13 @@ public partial class ChatManager : MonoBehaviour
             Debug.LogWarning("[ChatManager] SyncLatestMessages aborted: no valid profile for active bot.");
             yield break;
         }
-        string escapedId = UnityWebRequest.EscapeURL(chatId);
         // We strictly only check offset 0 (the absolute newest messages)
-        string url = WappiEndpoints.Sync(ActiveChannel, $"messages/get?profile_id={activeProfileId}&chat_id={escapedId}&limit={MessagesPerPage}&offset=0");
-
-        using UnityWebRequest www = UnityWebRequest.Get(url);
-        www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
-        www.timeout = 30;
+        UnityWebRequest www = null;
         _chatFetchesInFlight++;
-        yield return www.SendWebRequest();
+        yield return WappiProxy.Send(WappiProxy.Op.MessagesGet, ActiveChannel,
+            new { profile_id = activeProfileId, chat_id = chatId, limit = MessagesPerPage, offset = 0 }, r => www = r);
         _chatFetchesInFlight = Mathf.Max(0, _chatFetchesInFlight - 1);
+        using var wwwScope = www;
 
         if (www.result != UnityWebRequest.Result.Success) yield break;
 
@@ -1225,15 +1219,12 @@ public partial class ChatManager : MonoBehaviour
         string activeProfileId = GetActiveProfileId();
         if (string.IsNullOrEmpty(activeProfileId)) yield break;
 
-        string escapedId = UnityWebRequest.EscapeURL(chatId);
-        string url = WappiEndpoints.Sync(ActiveChannel, $"messages/get?profile_id={activeProfileId}&chat_id={escapedId}&limit={MessagesPerPage}&offset={offset}");
-
-        using UnityWebRequest www = UnityWebRequest.Get(url);
-        www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
-        www.timeout = 30;
+        UnityWebRequest www = null;
         _chatFetchesInFlight++;
-        yield return www.SendWebRequest();
+        yield return WappiProxy.Send(WappiProxy.Op.MessagesGet, ActiveChannel,
+            new { profile_id = activeProfileId, chat_id = chatId, limit = MessagesPerPage, offset }, r => www = r);
         _chatFetchesInFlight = Mathf.Max(0, _chatFetchesInFlight - 1);
+        using var wwwScope = www;
 
         if (www.result != UnityWebRequest.Result.Success) yield break;
 
@@ -1308,15 +1299,12 @@ public partial class ChatManager : MonoBehaviour
             onComplete?.Invoke(new List<MessageViewModel>(), false);
             yield break;
         }
-        string escapedId = UnityWebRequest.EscapeURL(chatId);
-        string url = WappiEndpoints.Sync(ActiveChannel, $"messages/get?profile_id={activeProfileId}&chat_id={escapedId}&limit={MessagesPerPage}&offset={offset}");
-
-        using UnityWebRequest www = UnityWebRequest.Get(url);
-        www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
-        www.timeout = 30;
+        UnityWebRequest www = null;
         _chatFetchesInFlight++;
-        yield return www.SendWebRequest();
+        yield return WappiProxy.Send(WappiProxy.Op.MessagesGet, ActiveChannel,
+            new { profile_id = activeProfileId, chat_id = chatId, limit = MessagesPerPage, offset }, r => www = r);
         _chatFetchesInFlight = Mathf.Max(0, _chatFetchesInFlight - 1);
+        using var wwwScope = www;
 
         if (www.result != UnityWebRequest.Result.Success)
         {
@@ -2102,7 +2090,6 @@ if (msg.messageType == MessageType.Video)
             onFailure?.Invoke();
             yield break;
         }
-        string url = WappiEndpoints.Sync(ActiveChannel, $"message/media/download?profile_id={activeProfileId}&message_id={messageId}");
 
         // D11: at most TWO attempts — the original plus ONE serial-safe retry for a TRANSIENT
         // failure (network/timeout or HTTP 5xx). The retry is issued INLINE on this coroutine;
@@ -2118,11 +2105,10 @@ if (msg.messageType == MessageType.Video)
         {
             bool retryTransient = false;
 
-            using (UnityWebRequest www = UnityWebRequest.Get(url))
+            UnityWebRequest www = null;   // 30 s timeout inside the proxy request — never let recovery / tap-to-retry hang the spinner
+            yield return WappiProxy.Send(WappiProxy.Op.MediaDownload, ActiveChannel, new { profile_id = activeProfileId, message_id = messageId }, r => www = r);
+            using (www)
             {
-                www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
-                www.timeout = 30;   // never let recovery / tap-to-retry hang the spinner — re-applied on the retry too
-                yield return www.SendWebRequest();
 
                 // Capped, actionable diagnostics — NEVER a full payload, NEVER a file write
                 // (do not grow into the pre-existing response.txt dumps, IN-03).
@@ -2296,31 +2282,23 @@ private IEnumerator PostTextMessageRoutine(
     // profile_id never posts to the WhatsApp base.
     bool telegramReply = channel == ChatChannel.Telegram && !string.IsNullOrEmpty(quotedMessageId);
 
-    string url;
-    string jsonPayload;
+    string op;
+    object args;
     if (telegramReply)
     {
-        url = WappiEndpoints.Sync(channel, $"message/reply?profile_id={profileId}");
-        jsonPayload = JsonConvert.SerializeObject(
-            new WappiSendReplyRequest { body = text, message_id = quotedMessageId });
+        op = WappiProxy.Op.MessageReply;
+        args = new { profile_id = profileId, body = text, message_id = quotedMessageId };
     }
     else
     {
         string recipient = ChatIdFormat.Recipient(chatId);
-        url = WappiEndpoints.Sync(channel, $"message/send?profile_id={profileId}");
-        var requestData = new WappiSendTextRequest { body = text, recipient = recipient, quotedMessageId = quotedMessageId };
-        jsonPayload = JsonConvert.SerializeObject(requestData);
+        op = WappiProxy.Op.MessageSend;
+        args = new { profile_id = profileId, body = text, recipient, quoted_message_id = quotedMessageId };
     }
 
-    using UnityWebRequest www = new UnityWebRequest(url, "POST");
-    byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(jsonPayload);
-    www.uploadHandler = new UploadHandlerRaw(bodyRaw);
-    www.downloadHandler = new DownloadHandlerBuffer();
-    www.SetRequestHeader("Content-Type", "application/json");
-    www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
-    www.timeout = 30;
-
-    yield return www.SendWebRequest();
+    UnityWebRequest www = null;
+    yield return WappiProxy.Send(op, channel, args, r => www = r);
+    using var wwwScope = www;
 
     if (www.result != UnityWebRequest.Result.Success)
     {
@@ -2399,22 +2377,14 @@ private IEnumerator MarkChatAsRead(string chatId, string messageId)
 
     // Query shape (incl. the WhatsApp-only mark_all lever) lives in MarkReadRequest so it
     // is unit-testable; the body {message_id} is identical on both channels.
-    string url = WappiEndpoints.Sync(ActiveChannel, MarkReadRequest.Path(ActiveChannel, activeProfileId));
-    string jsonPayload = JsonConvert.SerializeObject(new { message_id = messageId });
-
-    using UnityWebRequest www = new UnityWebRequest(url, "POST");
-    byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(jsonPayload);
-    www.uploadHandler = new UploadHandlerRaw(bodyRaw);
-    www.downloadHandler = new DownloadHandlerBuffer();
-    www.SetRequestHeader("Content-Type", "application/json");
-    www.SetRequestHeader("Authorization", Manager.wappiAuthToken);
-    www.timeout = 30;
-
-    yield return www.SendWebRequest();
+    UnityWebRequest www = null;
+    yield return WappiProxy.Send(WappiProxy.Op.MessageMarkRead, ActiveChannel,
+        new { profile_id = activeProfileId, message_id = messageId, mark_all = MarkReadRequest.UsesMarkAll(ActiveChannel) }, r => www = r);
+    using var wwwScope = www;
 
     if (www.result != UnityWebRequest.Result.Success)
     {
-        Debug.LogError($"[ChatManager.MarkChatAsRead] {www.responseCode} {url}: {www.error}\n{www.downloadHandler.text}");
+        Debug.LogError($"[ChatManager.MarkChatAsRead] {www.responseCode} message.mark_read: {www.error}\n{www.downloadHandler.text}");
         yield break;
     }
 
