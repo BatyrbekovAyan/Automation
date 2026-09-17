@@ -1,0 +1,69 @@
+# A1 — пакет развёртывания (готовится этапом 1, исполняется этапом 7 по отдельному разрешению)
+
+Статус: **подготовлено, НЕ развёрнуто**. Прод (`https://n8n.choosereply.com`) не трогался; всё ниже
+проверено на изолированном staging (`Tools/n8n/staging/`), см. `docs/audits/implementation-progress.md`.
+
+## 0. Что меняется
+| Слой | Изменение | Артефакт |
+|---|---|---|
+| Postgres (Supabase, cred `Postgres`) | + `installs`, + `uploaded_files`, + колонки `bot_profiles.owner_id/workflow_id/claimed_at/claim_*` (аддитивно, идемпотентно) | `Tools/n8n/sql/2026-09-17-auth-installs.sql` |
+| n8n env (docker-compose) | `NODE_FUNCTION_ALLOW_BUILTIN=crypto`, `N8N_BLOCK_ENV_ACCESS_IN_NODE=false`, `CR_AUTH_SECRET=<64 hex>`, `CR_AUTH_COMPAT_UNTIL=<ISO, см. §3>`, (опц.) `CR_AUTH_SECRET_PREV`, `N8N_PAYLOAD_SIZE_MAX=32` | §1 |
+| n8n workflows (новые) | `crAuthSession001` Auth Session (`/webhook/AuthSession`), `crWappiProxy0001` Wappi Proxy (`/webhook/WappiProxy`) | `Tools/n8n/workflows/crAuth*.json` |
+| n8n workflows (обновлённые, 12) | Auth Gate → Authorized? → 401/403 перед первым узлом; Create WA/TG + `Bind Workflow Id`; Upload File + `Register Upload`; Delete File owner-scoped; Set Workflow State защищает новые id | `Tools/n8n/apply-auth-gate.py` (идемпотентно) |
+| шаблоны ботов + клоны «13»/«15» | `If` требует `profile_id == path вебхука`; узел `Outcome` (этап 0.5) | обновление клонов — этап 7 |
+| клиент | сессия установки (AuthClient), все вызовы с `Authorization: Bearer`, Wappi только через прокси, `wappiAuthToken` удалён из `secrets.json`, claim наследуемых ботов | коммиты 5448f98d, далее |
+
+## 1. Env на VPS (owner, ~5 минут, не в git)
+```bash
+ssh choosereply
+cd ~/choosereply && cp docker-compose.yml docker-compose.yml.bak-$(date +%F)
+# в секцию environment сервиса n8n добавить:
+#   - NODE_FUNCTION_ALLOW_BUILTIN=crypto
+#   - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+#   - CR_AUTH_SECRET=<openssl rand -hex 32>
+#   - CR_AUTH_COMPAT_UNTIL=2026-12-31T00:00:00Z     # см. §3 — дата закрытия legacy-доступа
+#   - N8N_PAYLOAD_SIZE_MAX=32                        # media.send через прокси (b64 до ~24 МБ)
+docker compose up -d n8n && docker compose logs --tail 20 n8n
+```
+Проверка: `curl -s -X POST https://n8n.choosereply.com/webhook/AuthSession -H 'Content-Type: application/json' -d '{"op":"nonsense"}'`
+→ `400 {"success":false,"error":"bad_request"}` (после шага 2). Секрет нигде в репо не появляется.
+
+## 2. Порядок развёртывания (этап 7)
+1. **Бэкап** — ночной `~/backups/n8n-<date>.tar.gz` уже есть; перед деплоем снять свежий: `~/choosereply/backup.sh`.
+2. **SQL** — `2026-09-17-auth-installs.sql` через cred `Postgres` (одноразовый n8n-harness, как `apply-landing-leads.py`).
+   Post-check: `select relrowsecurity from pg_class where oid='public.installs'::regclass` = true.
+3. **Env** — §1, рестарт n8n.
+4. **Новые workflows** — импорт `crAuthSession001`, `crWappiProxy0001` с ребиндингом credential-id по имени
+   (Postgres → `vvRrFiEXzLVqKjOx`, WappiAuthToken → `ZowntFGvApDJ7UzQ`), активация; smoke: bootstrap → refresh →
+   `WappiProxy status` на СВОЁМ профиле (read-only).
+5. **Гейтированные 12 workflows** — `--update` по id (как `build-client-webhooks.py --update`), `activeVersion == versionId`
+   проверить чтением. Compat-окно открыто ⇒ старые клиенты продолжают работать (legacy mode, лог `crAuth.mode`).
+6. **Шаблоны ботов** (`4wYitz…`, `4VN3…`) — `--update`; клоны «13»/«15» — управляемое обновление по имени узлов (этап 7.5).
+7. **Клиент** — релиз iOS/Android с A1; **до отправки** прогнать `Tools/store/inspect-artifact.sh <aab|ipa>` — артефакт
+   без `wappiAuthToken`.
+8. **Canary** — тестовый владелец: свежая установка → создание бота через прокси → чат → удаление; существующий бот
+   → claim по коду из «Избранного» (device-проверка самосообщения WA/TG — единственный непроверенный элемент).
+9. **Закрытие окна** — когда доля старых клиентов ≈ 0 (по `crAuth.mode=legacy` в логах): `CR_AUTH_COMPAT_UNTIL` в прошлое,
+   рестарт; token-less → 401 (проверено на staging).
+10. **Ротация Wappi-токена** — кабинет Wappi → новый токен → обновить credential `WappiAuthToken` на n8n (значение только
+    в n8n) → старые APK/IPA теряют прямой доступ. До этого A1 формально НЕ закрыт (инструкция §Этап 1.6–1.7).
+
+## 3. Compat-дата
+Предложение: `CR_AUTH_COMPAT_UNTIL` = дата релиза клиента + 30 дней. До неё legacy-вызовы без токена проходят
+на 12 вебхуках (как сегодня), после — 401. Прокси legacy-режима не имеет (старые клиенты ходят в Wappi напрямую
+до ротации токена).
+
+## 4. Откат
+- Workflows: вернуть предыдущие версии (`versionId` из бэкапа / `workflow_publish_history`), либо оставить гейты и
+  передвинуть `CR_AUTH_COMPAT_UNTIL` в будущее — доступ старых клиентов восстанавливается без потери данных.
+- SQL аддитивна: таблицы/колонки остаются, ничего не ломают старым workflows.
+- Клиент: предыдущий билд продолжает работать в compat-окне (прямой Wappi + legacy-вебхуки).
+- Откат не открывает неавторизованный доступ дольше, чем он был до A1, и не дублирует отправки (транспорт не менялся).
+
+## 5. Остаточные риски / owner-действия
+- **Самосообщение** (`message/send` на собственный номер) для claim-кода — не подтверждено документацией Wappi; при
+  неудаче на устройстве владелец использует путь re-auth (подключить канал заново) — реализован.
+- **Rate-limit** на вебхуках: Caddy без плагина; DB-счётчик стоит ~1,9 с — отложено; bootstrap ограничен 60/мин.
+- **PlayerPrefs** как хранилище install-секрета: per-install, отзываемо; при рутованном устройстве утекает только
+  свой install (не общий токен, как раньше).
+- **RevenueCat app_user_id** остаётся биллинговым ключом, привязка к install — по заявлению клиента (как и до A1).

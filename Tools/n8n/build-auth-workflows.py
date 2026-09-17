@@ -169,7 +169,12 @@ insert into bot_profiles (profile_id, app_user_id, channel, claim_pending_by, cl
 values ($1, coalesce(nullif($3, ''), $2), $4, $2, now())
 on conflict (profile_id) do update set
   claim_pending_by = case when bot_profiles.owner_id = $2 then bot_profiles.claim_pending_by else excluded.claim_pending_by end,
-  claim_pending_at = case when bot_profiles.owner_id = $2 then bot_profiles.claim_pending_at else now() end
+  -- the claim clock starts ONCE per claiming install: a repeated claim.* call (status polling) must not
+  -- move claim_pending_at, or a pairing done in between could never be "after the claim began"
+  claim_pending_at = case
+      when bot_profiles.owner_id = $2 then bot_profiles.claim_pending_at
+      when bot_profiles.claim_pending_by = $2 and bot_profiles.claim_pending_at is not null then bot_profiles.claim_pending_at
+      else now() end
 returning profile_id, owner_id, channel, claim_pending_by, extract(epoch from claim_pending_at)::bigint as claim_pending_epoch,
   (claim_code_expires_at is not null and claim_code_expires_at > now()) as code_still_valid;"""
 
