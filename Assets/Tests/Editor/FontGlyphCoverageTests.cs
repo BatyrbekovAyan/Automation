@@ -294,6 +294,7 @@ public class FontGlyphCoverageTests
         {
             typeof(PaywallCopy), typeof(PaywallRows), typeof(SubscriptionPageRows),
             typeof(BillingGateRows), typeof(BotsPageRows), typeof(LegalLinks),
+            typeof(ProfileClaimCopy),   // A1 legacy-profile claim sheet (2026-09-17)
         };
         foreach (var t in constTypes)
             foreach (var f in t.GetFields(BindingFlags.Public | BindingFlags.Static))

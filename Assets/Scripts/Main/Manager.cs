@@ -643,6 +643,18 @@ public partial class Manager : MonoBehaviour
         // so the carousel's «Создать бота» still reaches the wizard.
         global::BotsPage.Instance?.TryShowFirstRunCarousel();
 
+        // A1: bots connected before the server identity existed (or on another install) are not
+        // owned by this install's session yet — the proxy would refuse their chats. Claim them one
+        // at a time (code into the bot's own chat, or a fresh pairing); waits for the session itself.
+        try
+        {
+            StartCoroutine(ProfileClaimFlow.RunAtBoot(BotsRoot));
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[Manager] ProfileClaimFlow.RunAtBoot threw — continuing: {e}");
+        }
+
         // Sweep profiles orphaned by an app death mid-wizard/mid-re-auth that
         // the quit-time settle (OnApplicationQuit) couldn't reach — on mobile
         // most kills run no code at all, so this launch-time pass stays the
@@ -2727,6 +2739,9 @@ public partial class Manager : MonoBehaviour
                         WhatsappNumberInput.text = phone;
                     }
 
+                    // A1: a re-pair that completes a pending legacy claim binds the profile here.
+                    yield return ProfileClaimFlow.AfterChannelAuthorized(whatsappProfileId, ChatChannel.WhatsApp);
+
                     // Show checkmark inside QR box, then navigate
                     yield return StartCoroutine(ShowAuthSuccess(WhatsappAuth, WhatsappAuthSuccessPanel));
                     whatsappAuthCompleted = true;
@@ -3215,6 +3230,9 @@ public partial class Manager : MonoBehaviour
 
                     if (WappiStatusParser.TryGetPhone(response, out string phone))
                         TelegramNumberInput.text = phone;
+
+                    // A1: a re-pair that completes a pending legacy claim binds the profile here.
+                    yield return ProfileClaimFlow.AfterChannelAuthorized(telegramProfileId, ChatChannel.Telegram);
 
                     // Show checkmark inside QR box, then navigate
                     yield return StartCoroutine(ShowAuthSuccess(TelegramAuth, TelegramAuthSuccessPanel));
