@@ -303,6 +303,19 @@ def s_rm_reorder(ctx):
     return ok, f"first={st1}/{d1.get('allApplied')} stale={st2}/{d2.get('allApplied')} report={d2.get('applied')} row={row!r}"
 
 
+@scenario("replymode_bot_default_covers_both_channels_atomically", "SetReplyMode v2: a bot-default write for WA+TG travels as ONE request and both rows land (all-or-nothing); a stale follow-up for one of them is refused per profile")
+def s_rm_both(ctx):
+    a = ctx["A"]
+    tg = a.add_profile("telegram")
+    wa = a.profiles[0]
+    st, d = hook("SetReplyMode", a.token, {"profileIds": [wa, tg], "chatId": "*", "suppressed": True, "version": 300})
+    rows = pg(f"select count(*) from reply_mode_flags where profile_id in ('{wa}','{tg}') and chat_id = '*' and suppressed and version = 300;")
+    st2, d2 = hook("SetReplyMode", a.token, {"profileIds": [wa, tg], "chatId": "*", "suppressed": False, "version": 250})
+    ok = (st == 200 and d.get("allApplied") is True and len(d.get("applied", [])) == 2 and rows == "2"
+          and st2 == 200 and d2.get("allApplied") is False and all(r["applied"] is False and r["suppressed"] is True for r in d2.get("applied", [])))
+    return ok, f"both={st}/{d.get('allApplied')} rows={rows} stale={st2}/{d2.get('allApplied')} report={[r['applied'] for r in d2.get('applied', [])]}"
+
+
 @scenario("replymode_legacy_body_still_writes", "SetReplyMode v2: a legacy body (no version) is applied with a server-assigned version and reads success + written")
 def s_rm_legacy(ctx):
     a = ctx["A"]

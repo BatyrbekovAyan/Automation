@@ -8,9 +8,9 @@
 
 - **Дата:** 2026-09-17 · **Ветка/коммит:** `main` @ `95221844` (исходный HEAD; работа идёт на `main`
   scoped-коммитами — единый рабочий каталог, без worktree; перед каждым коммитом `git rev-parse HEAD`).
-- **Текущий этап:** 1 (A1) — код ЗАВЕРШЁН и staging_verified 2026-09-17 (сервер + клиент + claim); НЕ развёрнут
-  (пакет: `docs/audits/a1-deploy-runbook.md`). Следующий: этап 2 (A2).
-- **Коммиты этапа 1:** d44fc037 (сервер), 5448f98d (клиент), e3aec245 (claim), далее docs.
+- **Текущий этап:** 2 (A2) — код ЗАВЕРШЁН и staging_verified 2026-09-17; НЕ развёрнут (пакет в
+  `docs/audits/a1-deploy-runbook.md`, дополнен A2). Следующий: этап 3 (A3/A4/A7).
+- **Коммиты:** этап 1 — d44fc037, 5448f98d, e3aec245, 616e6461; этап 2 — b892b83d (сервер), клиент — см. git log.
 - **Как продолжить:** `Tools/n8n/staging/pg.sh start` → `python3 Tools/n8n/staging/wappi-mock.py &` →
   `python3 Tools/n8n/staging/bootstrap.py --restart` → `python3 Tools/n8n/staging/e2e.py`; чистый харнесс —
   `node Tools/n8n/repro/run-code-node.mjs`; четыре verify-скрипта; Unity — `Tools/run-tests-headless.sh`.
@@ -103,3 +103,19 @@
 | 1.8 клиент | locally_verified | `Assets/Scripts/Auth/{InstallSession,AuthClient,AuthorizedRequest,ProfileClaimCopy,ProfileClaimPolicy,ProfileClaimSheet,ProfileClaimFlow}.cs`, `Chat/WappiProxy.cs`; 33 Wappi-сайта + 12 n8n-сайтов переведены; `Secrets.wappiAuthToken` удалён; Create* → ForceRefresh; Edit* читает `{success:false}`; claim-карточка на boot + хук в WA/TG status-поллерах | headless EditMode **2625/2625**; `AuthWiringGuardTests` (source guard: 0 `wappi.pro`/`Authorization` вне helper'а, каждый прямой `SendWebRequest` в allow-list, каждый `/webhook/`-файл через AuthorizedRequest/WappiProxy) | device-пасс не проводился (Editor закрыт, устройств нет): клавиатура карточки кода, первый запуск с наследуемыми ботами, задержка bootstrap (2 Postgres-узла ≈ 4 с на проде) — в canary; `Tools/store/inspect-artifact.sh` ждёт реальный билд |
 - 2026-09-17 · A1 итог: verify_rag/panel/batching/parity/auth-gate — все зелёные; `apply-*.py --check` OK; token.test.mjs OK;
   repro 13/4 (по замыслу); staging `e2e-auth.py` **10/10**; Unity headless **2625/2625**. Прод не менялся.
+
+## Этап 2 (A2) — состояние
+
+| Пункт | Статус | Изменения | Доказательства | Ограничения |
+|---|---|---|---|---|
+| 2.1 желаемое vs подтверждённое + pending/error | locally_verified | `ReplyModeSyncQueue` (desired/confirmed с версиями), `ReplyModeSyncService` (persist, батчи, события); UI: pill в шапке чатов и per-chat чип приглушены (alpha 0,55) пока нет подтверждения, карточка бота — «Сохраняем режим…» (мигает) / «Режим не сохранён»; дизайн панели не менялся | Unity 2640/2640, `ReplyModeSyncQueueTests` (10), `ReplyModeSyncWiringTests` (4) | device-пасс не проводился |
+| 2.2 подтверждение по телу/области/версии | staging_verified | Set Reply Mode v2: `Validate` (одна item, version; legacy → серверный now), ONE-statement upsert `where version < excluded.version` с отчётом per profile, `Shape Response` (`allApplied`, db_error → 500), bad_request → **400**; клиент подтверждает только по `applied` своей версии | e2e-auth: `replymode_invalid_is_400`, `replymode_reordered_versions_keep_newest`, `replymode_bot_default_covers_both_channels_atomically`, `replymode_legacy_body_still_writes`; e2e.py `setreplymode_invalid_is_4xx` теперь PASS | — |
+| 2.3 очередь последнего состояния | locally_verified | backoff 2/5/15/60 с → 5 мин, ≤8 попыток за запуск, парковка и повтор при следующем запуске; устаревший ответ игнорируется; серверное более новое значение принимается (`OnServerNewer` → `ReconcileFromServer` / `SemiAutoStore.Set` без обратной записи); 403/400 — стоп без повторов (владение решает claim) | queue-тесты (restart-reload, reorder, backoff cap) | «сеть пропала» проверено юнит-тестами очереди и структурно, не на устройстве |
+| 2.4 приоритеты override/default/quota | locally_verified | не тронуты: `RestoreForActiveChat` по-прежнему пушит только явный override (TryGetOverride), наследуемые чаты ничего не пишут; QuotaFallbackPolicy без изменений | существующие тесты SemiAutoStore/AutoButtonModel зелёные | — |
+| 2.5 окно начальной активации | staging_verified | Create WA/TG: `Seed Reply Mode` (пишет заявленный `ReplyMode`, version-guarded) строго между `Get Created Workflow Id` и `Activate Created Workflow`; клиент шлёт `ReplyMode`/`ReplyModeVersion` во всех 4 формах (start+edit, WA+TG); legacy-клиент без поля — прежняя семантика | e2e-auth `create_seeds_reply_mode_before_activation` (строка '*' есть после create, workflow_id привязан, токен знает клон, delete OK); `verify-reply-mode.py` | посев fail-open при сбое БД (клиентская очередь дописывает); re-auth через настройки использует ту же форму |
+
+**Приёмка этапа 2:** обрыв сети/перезапуск — очередь (юнит); 200 с ошибкой — `success:false` не подтверждает + 400 на
+bad_request (staging); два быстрых переключения с обратным порядком — версии (staging reorder + юнит ignore-stale);
+частичный сбой одного канала — единая транзакция/один запрос на оба профиля (staging both-channels) + 403 всего запроса при
+чужом профиле (A1); первое входящее во время создания — посев до активации (staging create). Интерфейс не утверждает
+серверное состояние без подтверждения (dim/subline). Не проверено на устройстве.

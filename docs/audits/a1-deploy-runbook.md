@@ -6,10 +6,10 @@
 ## 0. Что меняется
 | Слой | Изменение | Артефакт |
 |---|---|---|
-| Postgres (Supabase, cred `Postgres`) | + `installs`, + `uploaded_files`, + колонки `bot_profiles.owner_id/workflow_id/claimed_at/claim_*` (аддитивно, идемпотентно) | `Tools/n8n/sql/2026-09-17-auth-installs.sql` |
+| Postgres (Supabase, cred `Postgres`) | + `installs`, + `uploaded_files`, + колонки `bot_profiles.owner_id/workflow_id/claimed_at/claim_*` (аддитивно, идемпотентно); **A2:** + `reply_mode_flags.version` | `Tools/n8n/sql/2026-09-17-auth-installs.sql`, `Tools/n8n/sql/2026-09-17-reply-mode-version.sql` |
 | n8n env (docker-compose) | `NODE_FUNCTION_ALLOW_BUILTIN=crypto`, `N8N_BLOCK_ENV_ACCESS_IN_NODE=false`, `CR_AUTH_SECRET=<64 hex>`, `CR_AUTH_COMPAT_UNTIL=<ISO, см. §3>`, (опц.) `CR_AUTH_SECRET_PREV`, `N8N_PAYLOAD_SIZE_MAX=32` | §1 |
 | n8n workflows (новые) | `crAuthSession001` Auth Session (`/webhook/AuthSession`), `crWappiProxy0001` Wappi Proxy (`/webhook/WappiProxy`) | `Tools/n8n/workflows/crAuth*.json` |
-| n8n workflows (обновлённые, 12) | Auth Gate → Authorized? → 401/403 перед первым узлом; Create WA/TG + `Bind Workflow Id`; Upload File + `Register Upload`; Delete File owner-scoped; Set Workflow State защищает новые id | `Tools/n8n/apply-auth-gate.py` (идемпотентно) |
+| n8n workflows (обновлённые, 12) | Auth Gate → Authorized? → 401/403 перед первым узлом; Create WA/TG + `Bind Workflow Id`; Upload File + `Register Upload`; Delete File owner-scoped; Set Workflow State защищает новые id; **A2:** Set Reply Mode v2 (версионный атомарный upsert, отчёт per profile, 400/500), Create WA/TG + `Seed Reply Mode` до активации | `Tools/n8n/apply-auth-gate.py`, `Tools/n8n/apply-reply-mode-v2.py` (идемпотентно) |
 | шаблоны ботов + клоны «13»/«15» | `If` требует `profile_id == path вебхука`; узел `Outcome` (этап 0.5) | обновление клонов — этап 7 |
 | клиент | сессия установки (AuthClient), все вызовы с `Authorization: Bearer`, Wappi только через прокси, `wappiAuthToken` удалён из `secrets.json`, claim наследуемых ботов | коммиты 5448f98d, далее |
 
@@ -30,7 +30,7 @@ docker compose up -d n8n && docker compose logs --tail 20 n8n
 
 ## 2. Порядок развёртывания (этап 7)
 1. **Бэкап** — ночной `~/backups/n8n-<date>.tar.gz` уже есть; перед деплоем снять свежий: `~/choosereply/backup.sh`.
-2. **SQL** — `2026-09-17-auth-installs.sql` через cred `Postgres` (одноразовый n8n-harness, как `apply-landing-leads.py`).
+2. **SQL** — `2026-09-17-auth-installs.sql` и `2026-09-17-reply-mode-version.sql` через cred `Postgres` (одноразовый n8n-harness, как `apply-landing-leads.py`).
    Post-check: `select relrowsecurity from pg_class where oid='public.installs'::regclass` = true.
 3. **Env** — §1, рестарт n8n.
 4. **Новые workflows** — импорт `crAuthSession001`, `crWappiProxy0001` с ребиндингом credential-id по имени
