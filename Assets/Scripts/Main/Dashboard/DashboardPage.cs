@@ -71,6 +71,7 @@ public class DashboardPage : MonoBehaviour
         long now = NowMs();
         if (DashboardRefreshGate.ShouldFetch(DashboardStore.LastFetchMs, now))
             StartCoroutine(FetchRoutine(0));
+        HandoffSyncService.Instance?.Refresh(force: false);   // pending requests + server pauses (gated)
         // If we just fetched (<60s) and cache is empty, the empty state is correct —
         // don't show a loading overlay with no coroutine to clear it. FetchRoutine owns
         // the first-open loading state.
@@ -378,7 +379,7 @@ public class DashboardPage : MonoBehaviour
 
         string display = ChatDisplayName(r.chatId);
         if (name) name.text = display;
-        if (summary) summary.text = r.summary;
+        if (summary) summary.text = HandoffCopy.RowSummary(r);   // a REAL request is marked, a verdict is not (A5)
         if (pill) pill.color = DashboardStatusInfo.BgColor(r.Status);
         if (pillLabel) { pillLabel.text = DashboardStatusInfo.Label(r.Status);
                          pillLabel.color = DashboardStatusInfo.FgColor(r.Status); }
@@ -416,6 +417,10 @@ public class DashboardPage : MonoBehaviour
         var map = ProfileToBot();
         if (!DashboardProfileMap.TryResolve(map, r.profileId, out var botName, out var channel)
             || ChatManager.Instance == null) return;
+
+        // A5: opening the chat from an OPEN request is the owner's real view — the server marks it
+        // «taken» (never assumed from a notification), and only a later explicit «Авто» resumes the chat.
+        if (r.HasOpenHandoff) HandoffSyncService.Instance?.Take(r.handoffId.Value, r.profileId);
 
         if (ChatManager.Instance.CurrentBotId != botName)
             ChatManager.Instance.SetActiveBot(botName);   // restores the bot's persisted channel FIRST

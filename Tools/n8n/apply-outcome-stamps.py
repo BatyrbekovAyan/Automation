@@ -34,12 +34,14 @@ NODE = "Outcome"
 # Stage 3 moved the winner/refusal/send terminals behind Record Send / Record Cancel / Claimed?; the stamp
 # now sits after those (apply-reply-pipeline-v2.py wires them) — this list is the stage-0 shape kept for
 # templates that predate the pipeline migration.
-TERMINALS = [("If", 1, "filtered"), ("Suppressed?", 0, "suppressed")]
+# Stage 4 moved the suppressed terminal behind Record Suppressed (apply-history-handoff.py wires it).
+TERMINALS = [("If", 1, "filtered")]
 
 JS_TEMPLATE = r"""// OUTCOME STAMP (audit stage 0.5, Tools/n8n/apply-outcome-stamps.py). One structured row per
 // execution end, no dialog text: the label is derived from WHICH branch reached this node.
 const byPrev = { 'If': 'filtered', 'Suppressed?': 'suppressed', 'Is Latest?': 'superseded',
-                 'If Quota Allows': 'quota_denied', 'HTTP Request': 'sent', 'Claimed?': 'duplicate' };
+                 'If Quota Allows': 'quota_denied', 'HTTP Request': 'sent', 'Claimed?': 'duplicate',
+                 'Is Outgoing?': 'ignored', 'Outgoing Bound?': 'filtered' };
 const prev = $prevNode.name;
 let wh = {};
 try { wh = $('Webhook').first().json || {}; } catch (e) { wh = {}; }

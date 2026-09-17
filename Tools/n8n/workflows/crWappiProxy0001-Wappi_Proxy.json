@@ -314,6 +314,65 @@
         2200,
         200
       ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0e92ffb6-5be8-5988-8a47-af638238d901",
+              "leftValue": "={{ ['message.send', 'message.reply', 'media.send'].includes($('Build Request').first().json.op) && Number($('Wappi Call').first().json.statusCode) === 200 && !!($('Wappi Call').first().json.body && $('Wappi Call').first().json.body.message_id) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c43977d4-968e-5072-a837-b197cf2b5644",
+      "name": "Owner Send?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2420,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- A6 (stage 4): a message the OWNER sent from the app («Вместе» pick or a typed reply) is an\n-- owner_app row in the one history and an assistant-side turn in the agent's memory (marked by\n-- source, so a cancelled generation's cleanup never touches it). Runs AFTER the response.\nwith ev as (\n  insert into chat_history_events (profile_id, chat_id, message_id, source, body, msg_type, sent_at, execution_id)\n  values ($1, $2, $3, 'owner_app', $4, $5, now(), $6)\n  on conflict (profile_id, chat_id, message_id) do update set source = 'owner_app', body = excluded.body, execution_id = excluded.execution_id\n  returning 1\n), mem as (\n  insert into n8n_chat_histories (session_id, message)\n  select $1 || ':' || $2, jsonb_build_object('type', 'ai', 'content', $4, 'additional_kwargs', jsonb_build_object('source', 'owner_app', 'message_id', $3), 'response_metadata', '{}'::jsonb)\n  where not exists (select 1 from n8n_chat_histories x where x.session_id = $1 || ':' || $2 and x.message->'additional_kwargs'->>'message_id' = $3)\n  returning 1\n)\nselect exists(select 1 from ev) as recorded, exists(select 1 from mem) as remembered;",
+        "options": {
+          "queryReplacement": "={{ (r => { const b = r.jsonBody || {}; const rec = String(b.recipient || ''); const chat = (r.channel === 'whatsapp' && rec && !rec.includes('@')) ? rec + '@c.us' : rec;\n  const text = r.op === 'media.send' ? ('[' + String(r.kind || 'file') + ']' + (b.caption ? ' ' + String(b.caption) : '')) : String(b.body || '');\n  return [ r.profileId, chat, String($('Wappi Call').first().json.body.message_id || ''), text.slice(0, 4000), r.op === 'media.send' ? String(r.kind || 'file') : 'chat', $execution.id ]; })($('Build Request').first().json) }}"
+        }
+      },
+      "id": "1ce2e0fa-7017-548d-98cc-3a55ef458fc1",
+      "name": "Record Owner Send",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2640,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -453,6 +512,28 @@
         [
           {
             "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond": {
+      "main": [
+        [
+          {
+            "node": "Owner Send?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Owner Send?": {
+      "main": [
+        [
+          {
+            "node": "Record Owner Send",
             "type": "main",
             "index": 0
           }

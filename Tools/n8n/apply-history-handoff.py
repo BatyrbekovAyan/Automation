@@ -1,0 +1,514 @@
+#!/usr/bin/env python3
+"""Idempotent migration (A5/A6, audit stage 4) — one history with explicit sources + the real handoff.
+
+Bot templates (both):
+  Webhook → *Is Incoming? →[yes] If (unchanged chain) | [no] *Is Outgoing? →[yes] *Outgoing Bound? →
+  *Record Outgoing (owner_phone rows into chat_history_events AND the agent memory; outgoing_api rows
+  only into the history) → Outcome; Suppressed?[yes] → *Record Suppressed (client row + memory human
+  row — history recording no longer depends on generation) → Outcome; Claim Event also records the
+  client row; Record Send records the ai row; Record Cancel records the human row when the agent
+  never ran (quota / generation failure); Read Reply Mode ORs the handoff pause; *Create Handoff
+  tool (→ crHandoffReq0001) wired into the AI Agent + the tool rule appended to the system prompt.
+Create WA/TG: subscribe to outgoing_message_phone + outgoing_message_api.
+Dashboard Outcomes: owner rows labelled «Владелец:» for the classifier; open handoffs are REAL
+  events (source='event') that outrank the classifier (order → order_collected, else owner_needed).
+Delete Bot Files: wipes chat_history_events / handoff_requests / reply_events / chat_reply_state.
+Set Workflow State: the three handoff workflow ids are protected.
+
+    python3 Tools/n8n/apply-history-handoff.py          # patch in place (re-runnable)
+    python3 Tools/n8n/apply-history-handoff.py --check
+"""
+import json
+import os
+import sys
+import uuid
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+WF = os.path.join(HERE, "workflows")
+PG_CRED = {"id": "vvRrFiEXzLVqKjOx", "name": "Postgres"}
+BOTS = ("4wYitz5ek30SVNlT-WhatsApp_Bot.json", "4VN3gsFaC2HUYmcc-Telegram_Bot.json")
+CREATES = ("XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json", "Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json")
+DASHBOARD = "2htWSV5IHO8E2CgB-Dashboard_Outcomes.json"
+DELETE_BOT = "lmjYsdNcQA2IE5rl-Delete_Bot_Files.json"
+SET_STATE = "0DP79STI3pafXO9B-Set_Workflow_State.json"
+HANDOFF_IDS = ("crHandoffReq0001", "crHandoffNtfy001", "crHandoffsApi001")
+M = "$('Webhook').first().json.body.messages[0]"
+# body text for the history: never a media payload (Wappi puts base64 into `body` for media)
+BODY_TEXT = "(['chat','text'].includes(String(m.type)) ? String(m.body || '').slice(0, 4000) : ('[' + String(m.type || 'media') + ']' + (m.caption ? ' ' + String(m.caption).slice(0, 1000) : '')))"
+
+MEMORY_ROW = "jsonb_build_object('type', %s, 'content', %s, 'additional_kwargs', jsonb_build_object('source', %s, 'message_id', %s), 'response_metadata', '{}'::jsonb)"
+
+CLAIM_SQL = """-- A4: the atomic right to process THIS event. A re-delivered event finds its row and is refused
+-- (claimed=false → duplicate); a claim left behind by a crashed run (>10 min, no send started) may be
+-- re-claimed. Each claim bumps the chat's incoming generation — the final check compares against it.
+-- history_watermark lets a cancelled generation's AI rows be dropped from memory (A3.7).
+-- A6: the client's message enters the ONE history right here, before any generation decision.
+with ev as (
+  insert into reply_events (profile_id, chat_id, message_id, execution_id, state)
+  values ($1, $2, $3, $4, 'claimed')
+  on conflict (profile_id, chat_id, message_id) do update
+    set state = 'claimed', execution_id = excluded.execution_id, updated_at = now()
+    where reply_events.state in ('claimed', 'generated') and reply_events.updated_at < now() - interval '10 minutes'
+  returning message_id
+), st as (
+  insert into chat_reply_state (profile_id, chat_id, incoming_generation)
+  select $1, $2, 1 where exists (select 1 from ev)
+  on conflict (profile_id, chat_id) do update set incoming_generation = chat_reply_state.incoming_generation + 1
+  returning incoming_generation
+), hist as (
+  insert into chat_history_events (profile_id, chat_id, message_id, source, body, msg_type, sent_at, execution_id)
+  values ($1, $2, $3, 'client', $5, $6, to_timestamp($7::bigint), $4)
+  on conflict (profile_id, chat_id, message_id) do nothing
+  returning 1
+)
+select exists(select 1 from ev) as claimed,
+       coalesce((select incoming_generation from st), (select incoming_generation from chat_reply_state where profile_id = $1 and chat_id = $2), 0)::bigint as generation,
+       coalesce((select max(id) from n8n_chat_histories where session_id = $1 || ':' || $2), 0)::bigint as history_watermark;"""
+CLAIM_PARAMS = "={{ (m => [ m.profile_id, m.from, m.id, $execution.id, " + BODY_TEXT + ", String(m.type || ''), Number(m.time) || Math.floor(Date.now() / 1000) ])(" + M + ") }}"
+
+RECORD_SUPPRESSED_SQL = """-- A6: «Вместе» — no generation, but the history and the agent's memory still learn what the client
+-- said, so a later return to «Авто» continues the same conversation (no double write: the memory
+-- node only writes when the agent runs, which it does not on this branch).
+with ev as (
+  insert into chat_history_events (profile_id, chat_id, message_id, source, body, msg_type, sent_at, execution_id)
+  values ($1, $2, $3, 'client', $4, $5, to_timestamp($6::bigint), $7)
+  on conflict (profile_id, chat_id, message_id) do nothing
+  returning 1
+), mem as (
+  insert into n8n_chat_histories (session_id, message)
+  select $1 || ':' || $2, __ROW__
+  where exists (select 1 from ev)
+    and not exists (select 1 from n8n_chat_histories x where x.session_id = $1 || ':' || $2 and x.message->'additional_kwargs'->>'message_id' = $3)
+  returning 1
+)
+select 'suppressed'::text as outcome, exists(select 1 from ev) as recorded, exists(select 1 from mem) as remembered;""".replace(
+    "__ROW__", MEMORY_ROW % ("'human'", "$4", "'client'", "$3"))
+RECORD_SUPPRESSED_PARAMS = "={{ (m => [ m.profile_id, m.from, m.id, " + BODY_TEXT + ", String(m.type || ''), Number(m.time) || Math.floor(Date.now() / 1000), $execution.id ])(" + M + ") }}"
+
+RECORD_OUTGOING_SQL = """-- A6: what the business side sent. outgoing_message_phone = the owner from the phone (history +
+-- memory, so the bot knows the agreement); outgoing_message_api = fallback history row only — the
+-- AI's own sends (Record Send) and the app's sends (Wappi Proxy) upgrade it to their real source, and
+-- their memory rows are written by those writers, never here. Group chats are not recorded.
+with ev as (
+  insert into chat_history_events (profile_id, chat_id, message_id, source, body, msg_type, sent_at, execution_id)
+  select $1, $2, $3, case when $7 = 'outgoing_message_phone' then 'owner_phone' else 'outgoing_api' end, $4, $5, to_timestamp($6::bigint), $8
+  where $2 not like '%@g.us'
+  on conflict (profile_id, chat_id, message_id) do nothing
+  returning source
+), mem as (
+  insert into n8n_chat_histories (session_id, message)
+  select $1 || ':' || $2, __ROW__
+  where exists (select 1 from ev where source = 'owner_phone')
+    and not exists (select 1 from n8n_chat_histories x where x.session_id = $1 || ':' || $2 and x.message->'additional_kwargs'->>'message_id' = $3)
+  returning 1
+)
+select case when exists (select 1 from ev) then 'recorded_' || (select source from ev limit 1)
+            when $2 like '%@g.us' then 'ignored_group' else 'outgoing_known' end as outcome,
+       exists(select 1 from mem) as remembered;""".replace("__ROW__", MEMORY_ROW % ("'ai'", "$4", "'owner_phone'", "$3"))
+RECORD_OUTGOING_PARAMS = "={{ (m => [ m.profile_id, String(m.chatId || m.to || ''), String(m.id || ''), " + BODY_TEXT + ", String(m.type || ''), Number(m.time) || Math.floor(Date.now() / 1000), String(m.wh_type || ''), $execution.id ])(" + M + ") }}"
+
+RECORD_SEND_SQL = """-- A7: the event's final transport state and the lease release. send_unknown stays send_unknown —
+-- an operator-visible uncertainty, never a silent retry. A6: a sent reply is an `ai` history row.
+with ev as (
+  update reply_events set state = $4, transport_message_id = nullif($5, ''), error = nullif($6, ''), updated_at = now()
+  where profile_id = $1 and chat_id = $2 and message_id = $3 returning 1
+), rel as (
+  update chat_reply_state set lock_token = null, lock_expires_at = null,
+    last_sent_at = case when $4 = 'sent' then now() else last_sent_at end,
+    last_sent_message_id = case when $4 = 'sent' then nullif($5, '') else last_sent_message_id end
+  where profile_id = $1 and chat_id = $2 and lock_token = $7 returning 1
+), hist as (
+  insert into chat_history_events (profile_id, chat_id, message_id, source, body, msg_type, sent_at, execution_id)
+  select $1, $2, $5, 'ai', $8, 'chat', now(), $7 where $4 = 'sent' and nullif($5, '') is not null
+  on conflict (profile_id, chat_id, message_id) do update set source = 'ai', body = excluded.body, execution_id = excluded.execution_id
+  returning 1
+)
+select $4::text as outcome, nullif($5, '')::text as transport_message_id, exists(select 1 from ev) as recorded, exists(select 1 from rel) as released;"""
+RECORD_SEND_PARAMS_TAIL = ", $json.state, $json.transportMessageId, $json.error, $execution.id, $('Final Check').first().json.text ] }}"
+
+RECORD_CANCEL_SQL = """-- A3.7: a refused / cancelled reply is recorded as such, the lease (if this run held it) is released, and
+-- the AI rows a cancelled GENERATION already wrote to memory are dropped — the customer never saw them,
+-- so the bot must not remember having said them. Owner rows (source-marked) are never dropped.
+-- A6: when the agent never ran (quota / generation failure), the client's message still enters memory.
+with ev as (
+  update reply_events set state = $4, updated_at = now()
+  where profile_id = $1 and chat_id = $2 and message_id = $3 returning 1
+), hist as (
+  delete from n8n_chat_histories
+  where $6::boolean and session_id = $1 || ':' || $2 and id > $5::bigint and message->>'type' = 'ai'
+    and (message->'additional_kwargs'->>'source') is null returning 1
+), rel as (
+  update chat_reply_state set lock_token = null, lock_expires_at = null
+  where profile_id = $1 and chat_id = $2 and lock_token = $7 returning 1
+), mem as (
+  insert into n8n_chat_histories (session_id, message)
+  select $1 || ':' || $2, __ROW__
+  where $8::boolean and nullif($9, '') is not null
+    and not exists (select 1 from n8n_chat_histories x where x.session_id = $1 || ':' || $2 and x.message->'additional_kwargs'->>'message_id' = $3)
+  returning 1
+)
+select $4::text as outcome, (select count(*) from hist)::int as dropped_ai_rows, exists(select 1 from ev) as recorded, exists(select 1 from mem) as remembered;""".replace(
+    "__ROW__", MEMORY_ROW % ("'human'", "$9", "'client'", "$3"))
+RECORD_CANCEL_PARAMS_TAIL = ", $json.outcome, $json.historyWatermark, $json.dropAiHistory, $execution.id, $json.recordHuman, $json.humanText ] }}"
+
+CANCEL_LABEL_JS = r"""// CANCEL LABEL: one place that names why a reply did not go out, from whichever gate refused it.
+const j = $input.first().json || {};
+const prev = $prevNode.name;
+let outcome;
+if (prev === 'Is Latest?') outcome = 'superseded';
+else if (prev === 'If Quota Allows') outcome = 'quota_denied';
+else if (prev === 'Generated?') outcome = 'generation_failed';
+else if (prev === 'Final OK?') outcome = j.outcome || 'cancelled_fetch';
+else if (prev === 'Send Allowed?') outcome = j.suppressed === true ? 'cancelled_mode' : (j.lock_busy === true ? 'cancelled_busy' : 'superseded');
+else outcome = 'cancelled_fetch';
+let watermark = 0;
+try { watermark = Number($('Claim Event').first().json.history_watermark) || 0; } catch (e) { watermark = 0; }
+// Only a run that reached the generator can have written AI memory rows to drop.
+const generated = prev === 'Final OK?' || prev === 'Send Allowed?';
+// A6: when the agent never ran, the client's message still has to reach memory (it is the memory
+// node that writes it on a normal run).
+const recordHuman = prev === 'If Quota Allows' || prev === 'Generated?';
+let humanText = '';
+if (recordHuman) {
+  try { humanText = String($('Audio').first().json.text || ''); } catch (e) { humanText = ''; }
+  if (!humanText) { try { humanText = String($('Text').first().json.text || ''); } catch (e) { humanText = ''; } }
+  if (!humanText) { try { humanText = String($('Latest+Combine').first().json.combinedText || ''); } catch (e) { humanText = ''; } }
+  if (!humanText) { try { const m = $('Webhook').first().json.body.messages[0]; humanText = ['chat', 'text'].includes(String(m.type)) ? String(m.body || '') : '[' + String(m.type || 'media') + ']'; } catch (e) { humanText = ''; } }
+}
+return [{ json: { outcome, historyWatermark: watermark, dropAiHistory: generated, recordHuman, humanText: humanText.slice(0, 4000) }, pairedItem: { item: 0 } }];
+"""
+
+READ_MODE_SQL = """select (
+  coalesce(
+    (select suppressed from reply_mode_flags
+     where profile_id = $1 and chat_id in ($2, '*')
+     order by (chat_id = '*')   -- specific chat_id sorts before the '*' default
+     limit 1),
+    false)
+  -- A5: a chat with a pending handoff is paused until the owner acts (done / explicit «Авто» for the chat)
+  or coalesce((select handoff_paused from chat_reply_state where profile_id = $1 and chat_id = $2), false)
+) as suppressed;"""
+
+TOOL_RULE = ("\n\n##create_handoff##\n"
+             "Передача владельцу — это ДЕЙСТВИЕ, не фраза. Когда клиент готов к заказу/брони, просит связаться, или вопрос надо передать человеку — "
+             "вызови инструмент create_handoff (reason: order | question | escalation; name и phone — если клиент их назвал; summary — суть одной-двумя фразами). "
+             "Ответ ok:true — только тогда говори «Передал владельцу, он свяжется». Ответ ok:false или ошибка — не обещай передачу: скажи, что не удалось передать автоматически, "
+             "и предложи контакт из данных бизнеса. Никогда не утверждай, что владелец уже увидел или в курсе.")
+
+FROM_AI = {
+    "reason": "={{ $fromAI('reason', 'Причина: order — заказ, бронь или покупка; question — вопрос, на который нет ответа в данных бизнеса; escalation — жалоба, спор, срочное', 'string', 'question') }}",
+    "name": "={{ $fromAI('name', 'Имя клиента, если он его назвал; иначе пустая строка', 'string', '') }}",
+    "phone": "={{ $fromAI('phone', 'Телефон клиента, если он его назвал; иначе пустая строка', 'string', '') }}",
+    "summary": "={{ $fromAI('summary', 'Суть заявки одной-двумя фразами: что нужно клиенту и какие детали уже известны', 'string') }}",
+}
+TOOL_INPUTS = {"profile_id": "={{ " + M + ".profile_id }}", "chat_id": "={{ " + M + ".from }}", "source_message_id": "={{ " + M + ".id }}", **FROM_AI}
+TOOL_DESCRIPTION = ("Передать заявку владельцу бизнеса: создаёт запись заявки и уведомление владельцу, ставит чат на паузу автоответов. "
+                    "Вызывай, когда клиент готов к заказу или брони, просит связаться, или вопрос нужно передать человеку. "
+                    "Возвращает {ok:true} — тогда можно сказать клиенту «Передал владельцу»; {ok:false} — передачу не обещай.")
+
+
+def nid(*parts):
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, "history-handoff:" + ":".join(parts)))
+
+
+def node(wf, name):
+    return next((n for n in wf["nodes"] if n["name"] == name), None)
+
+
+def ensure(wf, spec):
+    existing = node(wf, spec["name"])
+    if existing is None:
+        wf["nodes"].append(spec)
+        return True
+    changed = False
+    for k in ("parameters", "type", "typeVersion", "credentials", "alwaysOutputData", "onError", "retryOnFail", "maxTries", "waitBetweenTries"):
+        if k in spec and existing.get(k) != spec[k]:
+            existing[k] = spec[k]
+            changed = True
+    return changed
+
+
+def set_edges(wf, src, outputs, kind="main"):
+    want = [[{"node": t, "type": kind, "index": 0} for t in outs] for outs in outputs]
+    cur = wf["connections"].setdefault(src, {})
+    if cur.get(kind) != want:
+        cur[kind] = want
+        return True
+    return False
+
+
+def set_query(n, sql, params=None):
+    ch = False
+    if n["parameters"].get("query") != sql:
+        n["parameters"]["query"] = sql
+        ch = True
+    if params is not None and n["parameters"]["options"].get("queryReplacement") != params:
+        n["parameters"]["options"]["queryReplacement"] = params
+        ch = True
+    return ch
+
+
+def pg(name, query, params, pos, fname):
+    return {"parameters": {"operation": "executeQuery", "query": query, "options": {"queryReplacement": params}},
+            "id": nid(fname, name), "name": name, "type": "n8n-nodes-base.postgres", "typeVersion": 2.6, "position": pos,
+            "credentials": {"postgres": dict(PG_CRED)}, "alwaysOutputData": True, "onError": "continueRegularOutput"}
+
+
+def if_true(name, expr, pos, fname):
+    return {"parameters": {"conditions": {"options": {"caseSensitive": True, "leftValue": "", "typeValidation": "loose", "version": 2},
+                                          "conditions": [{"id": nid(fname, name, "cond"), "leftValue": expr, "rightValue": "",
+                                                          "operator": {"type": "boolean", "operation": "true", "singleValue": True}}],
+                                          "combinator": "and"}, "options": {}},
+            "id": nid(fname, name), "name": name, "type": "n8n-nodes-base.if", "typeVersion": 2.2, "position": pos}
+
+
+def tool_node(fname):
+    schema = [{"id": k, "displayName": k, "required": False, "defaultMatch": False, "display": True, "canBeUsedToMatch": True, "type": "string", "removed": False}
+              for k in TOOL_INPUTS]
+    return {"parameters": {"description": TOOL_DESCRIPTION, "workflowId": {"__rl": True, "value": "crHandoffReq0001", "mode": "id"},
+                           "workflowInputs": {"mappingMode": "defineBelow", "value": dict(TOOL_INPUTS), "matchingColumns": [], "schema": schema,
+                                              "attemptToConvertTypes": False, "convertFieldsToString": False}},
+            "id": nid(fname, "Create Handoff"), "name": "Create Handoff", "type": "@n8n/n8n-nodes-langchain.toolWorkflow", "typeVersion": 2.2,
+            "position": [-1900, 200]}
+
+
+def patch_bot(fname):
+    path = os.path.join(WF, fname)
+    wf = json.load(open(path, encoding="utf-8"))
+    ch = False
+    # (1) event routing before the group/binding filter
+    ch |= ensure(wf, if_true("Is Incoming?", "={{ Array.isArray($json.body && $json.body.messages) && !!$json.body.messages[0] && (!$json.body.messages[0].wh_type || $json.body.messages[0].wh_type === 'incoming_message') }}", [-4400, 400], fname))
+    ch |= ensure(wf, if_true("Is Outgoing?", "={{ Array.isArray($json.body && $json.body.messages) && !!$json.body.messages[0] && ['outgoing_message_phone', 'outgoing_message_api'].includes(String($json.body.messages[0].wh_type)) }}", [-4200, 700], fname))
+    ch |= ensure(wf, if_true("Outgoing Bound?", "={{ String($json.webhookUrl || '').split('/').pop() === String($json.body.messages[0].profile_id) }}", [-4000, 700], fname))
+    ch |= ensure(wf, pg("Record Outgoing", RECORD_OUTGOING_SQL, RECORD_OUTGOING_PARAMS, [-3800, 700], fname))
+    ch |= ensure(wf, pg("Record Suppressed", RECORD_SUPPRESSED_SQL, RECORD_SUPPRESSED_PARAMS, [-3560, 700], fname))
+    ch |= set_edges(wf, "Webhook", [["Is Incoming?"]])
+    ch |= set_edges(wf, "Is Incoming?", [["If"], ["Is Outgoing?"]])
+    ch |= set_edges(wf, "Is Outgoing?", [["Outgoing Bound?"], ["Outcome"]])
+    ch |= set_edges(wf, "Outgoing Bound?", [["Record Outgoing"], ["Outcome"]])
+    ch |= set_edges(wf, "Record Outgoing", [["Outcome"]])
+    ch |= set_edges(wf, "Suppressed?", [["Record Suppressed"], ["Claim Event"]])
+    ch |= set_edges(wf, "Record Suppressed", [["Outcome"]])
+    # (2) the one history: claim / send / cancel statements
+    ch |= set_query(node(wf, "Claim Event"), CLAIM_SQL, CLAIM_PARAMS)
+    rs = node(wf, "Record Send")
+    head = rs["parameters"]["options"]["queryReplacement"].split(", $json.state")[0]
+    ch |= set_query(rs, RECORD_SEND_SQL, head + RECORD_SEND_PARAMS_TAIL)
+    rc = node(wf, "Record Cancel")
+    head = rc["parameters"]["options"]["queryReplacement"].split(", $json.outcome")[0]
+    ch |= set_query(rc, RECORD_CANCEL_SQL, head + RECORD_CANCEL_PARAMS_TAIL)
+    cl = node(wf, "Cancel Label")
+    if cl["parameters"]["jsCode"] != CANCEL_LABEL_JS:
+        cl["parameters"]["jsCode"] = CANCEL_LABEL_JS
+        ch = True
+    # (3) handoff pause in the mode gate
+    ch |= set_query(node(wf, "Read Reply Mode"), READ_MODE_SQL)
+    # (4) the tool + the rule
+    ch |= ensure(wf, tool_node(fname))
+    ch |= set_edges(wf, "Create Handoff", [["AI Agent"]], kind="ai_tool")
+    ai = node(wf, "AI Agent")
+    sm = ai["parameters"]["options"]["systemMessage"]
+    if "##create_handoff##" not in sm:
+        ai["parameters"]["options"]["systemMessage"] = sm.rstrip() + TOOL_RULE
+        ch = True
+    if ch:
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(wf, fh, indent=2, ensure_ascii=False)
+            fh.write("\n")
+    return ch
+
+
+WEBHOOK_TYPES = "[\n  \"incoming_message\",\n  \"outgoing_message_phone\",\n  \"outgoing_message_api\"\n]"
+
+
+def patch_create(fname):
+    path = os.path.join(WF, fname)
+    wf = json.load(open(path, encoding="utf-8"))
+    n = node(wf, "Set Wappi Webhook Types")
+    if n["parameters"].get("jsonBody") == WEBHOOK_TYPES:
+        return False
+    n["parameters"]["jsonBody"] = WEBHOOK_TYPES
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(wf, fh, indent=2, ensure_ascii=False)
+        fh.write("\n")
+    return True
+
+
+TRANSCRIPT_OLD = "(CASE WHEN m.message->>'type' = 'ai' THEN 'Бот: ' ELSE 'Клиент: ' END)"
+TRANSCRIPT_NEW = "(CASE WHEN m.message->>'type' = 'ai' THEN (CASE WHEN m.message->'additional_kwargs'->>'source' LIKE 'owner%' THEN 'Владелец: ' ELSE 'Бот: ' END) ELSE 'Клиент: ' END)"
+FETCH_OUTCOMES_SQL = """-- «Сводка» reads ONE source: the classifier's verdict per session, outranked by a REAL event — an
+-- open/taken handoff (order → order_collected, question/escalation → owner_needed), marked
+-- source='event' so the app can tell a fact from a classification.
+WITH ids AS (
+  SELECT jsonb_array_elements_text(convert_from(decode($1, 'base64'), 'UTF8')::jsonb) AS profile_id
+), o AS (
+  SELECT c.* FROM public.conversation_outcomes c WHERE c.profile_id IN (SELECT profile_id FROM ids)
+), h AS (
+  SELECT DISTINCT ON (r.profile_id, r.chat_id) r.*
+  FROM public.handoff_requests r
+  WHERE r.profile_id IN (SELECT profile_id FROM ids) AND r.status <> 'done'
+  ORDER BY r.profile_id, r.chat_id, r.created_at DESC
+)
+SELECT coalesce(o.profile_id, h.profile_id) AS "profileId",
+       coalesce(o.chat_id, h.chat_id)       AS "chatId",
+       CASE WHEN h.id IS NOT NULL THEN (CASE WHEN h.reason = 'order' THEN 'order_collected' ELSE 'owner_needed' END) ELSE o.outcome END AS outcome,
+       coalesce(h.summary, o.summary)       AS summary,
+       (extract(epoch from coalesce(h.created_at, o.outcome_at)) * 1000)::bigint      AS "outcomeAt",
+       (extract(epoch from coalesce(o.last_message_at, h.created_at)) * 1000)::bigint AS "lastMessageAt",
+       CASE WHEN h.id IS NOT NULL THEN 'event' ELSE 'classifier' END AS source,
+       h.id     AS "handoffId",
+       h.status AS "handoffStatus",
+       h.reason AS "handoffReason"
+FROM o
+FULL OUTER JOIN h ON h.profile_id = o.profile_id AND h.chat_id = o.chat_id
+ORDER BY coalesce(o.last_message_at, h.created_at) DESC;"""
+
+
+def patch_dashboard():
+    path = os.path.join(WF, DASHBOARD)
+    wf = json.load(open(path, encoding="utf-8"))
+    ch = False
+    fc = node(wf, "Find Changed Sessions")
+    if TRANSCRIPT_OLD in fc["parameters"]["query"]:
+        fc["parameters"]["query"] = fc["parameters"]["query"].replace(TRANSCRIPT_OLD, TRANSCRIPT_NEW)
+        ch = True
+    fo = node(wf, "Fetch Outcomes")
+    if fo["parameters"]["query"] != FETCH_OUTCOMES_SQL:
+        fo["parameters"]["query"] = FETCH_OUTCOMES_SQL
+        ch = True
+    if ch:
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(wf, fh, indent=2, ensure_ascii=False)
+            fh.write("\n")
+    return ch
+
+
+DELETE_OLD_TAIL = """), flags AS (
+  DELETE FROM public.reply_mode_flags f
+  WHERE f.profile_id IN (SELECT profile_id FROM valid)
+  RETURNING 1
+)
+SELECT (SELECT count(*)::int FROM hist)     AS "deletedMemoryRows",
+       (SELECT count(*)::int FROM outcomes) AS "deletedOutcomes",
+       (SELECT count(*)::int FROM flags)    AS "deletedReplyFlags";"""
+DELETE_NEW_TAIL = """), flags AS (
+  DELETE FROM public.reply_mode_flags f
+  WHERE f.profile_id IN (SELECT profile_id FROM valid)
+  RETURNING 1
+), hist_events AS (   -- stage 4: the one history
+  DELETE FROM public.chat_history_events e
+  WHERE e.profile_id IN (SELECT profile_id FROM valid)
+  RETURNING 1
+), handoffs AS (      -- stage 4: the bot's requests (and their pending notices)
+  DELETE FROM public.handoff_requests r
+  WHERE r.profile_id IN (SELECT profile_id FROM valid)
+  RETURNING 1
+), events AS (        -- stage 3: the event ledger + per-chat state
+  DELETE FROM public.reply_events r
+  WHERE r.profile_id IN (SELECT profile_id FROM valid)
+  RETURNING 1
+), states AS (
+  DELETE FROM public.chat_reply_state s
+  WHERE s.profile_id IN (SELECT profile_id FROM valid)
+  RETURNING 1
+)
+SELECT (SELECT count(*)::int FROM hist)        AS "deletedMemoryRows",
+       (SELECT count(*)::int FROM outcomes)    AS "deletedOutcomes",
+       (SELECT count(*)::int FROM flags)       AS "deletedReplyFlags",
+       (SELECT count(*)::int FROM hist_events) AS "deletedHistoryEvents",
+       (SELECT count(*)::int FROM handoffs)    AS "deletedHandoffs",
+       (SELECT count(*)::int FROM events)      AS "deletedReplyEvents",
+       (SELECT count(*)::int FROM states)      AS "deletedChatStates";"""
+
+
+RESPOND_OLD_TAIL = '"deletedReplyFlags": $json.deletedReplyFlags ?? null } }}'
+RESPOND_NEW_TAIL = ('"deletedReplyFlags": $json.deletedReplyFlags ?? null, "deletedHistoryEvents": $json.deletedHistoryEvents ?? null, '
+                    '"deletedHandoffs": $json.deletedHandoffs ?? null, "deletedReplyEvents": $json.deletedReplyEvents ?? null, '
+                    '"deletedChatStates": $json.deletedChatStates ?? null } }}')
+
+
+def patch_delete_bot():
+    path = os.path.join(WF, DELETE_BOT)
+    wf = json.load(open(path, encoding="utf-8"))
+    ch = False
+    n = node(wf, "Delete Chat Memory")
+    q = n["parameters"]["query"]
+    if DELETE_OLD_TAIL in q:
+        n["parameters"]["query"] = q.replace(DELETE_OLD_TAIL, DELETE_NEW_TAIL)
+        ch = True
+    else:
+        assert DELETE_NEW_TAIL in q, "Delete Chat Memory has an unexpected shape"
+    r = node(wf, "Respond")
+    body = r["parameters"]["responseBody"]
+    if RESPOND_OLD_TAIL in body:
+        r["parameters"]["responseBody"] = body.replace(RESPOND_OLD_TAIL, RESPOND_NEW_TAIL)
+        ch = True
+    else:
+        assert RESPOND_NEW_TAIL in body, "Delete Bot Files Respond has an unexpected shape"
+    if ch:
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(wf, fh, indent=2, ensure_ascii=False)
+            fh.write("\n")
+    return ch
+
+
+def patch_set_state():
+    path = os.path.join(WF, SET_STATE)
+    wf = json.load(open(path, encoding="utf-8"))
+    ch = False
+    for n in wf["nodes"]:
+        js = n["parameters"].get("jsCode", "")
+        if "const PROTECTED = new Set([" in js and "'crHandoffReq0001'" not in js:
+            n["parameters"]["jsCode"] = js.replace("  'crWappiProxy0001'\n]);", "  'crWappiProxy0001',\n  'crHandoffReq0001',\n  'crHandoffNtfy001',\n  'crHandoffsApi001'\n]);")
+            assert "'crHandoffReq0001'" in n["parameters"]["jsCode"], "Set Workflow State protected list has an unexpected shape"
+            ch = True
+    if ch:
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(wf, fh, indent=2, ensure_ascii=False)
+            fh.write("\n")
+    return ch
+
+
+def check():
+    bad = []
+    for f in BOTS:
+        wf = json.load(open(os.path.join(WF, f), encoding="utf-8"))
+        ok = all(node(wf, n) for n in ("Is Incoming?", "Is Outgoing?", "Outgoing Bound?", "Record Outgoing", "Record Suppressed", "Create Handoff")) \
+            and node(wf, "Claim Event")["parameters"]["query"] == CLAIM_SQL and node(wf, "Record Send")["parameters"]["query"] == RECORD_SEND_SQL \
+            and node(wf, "Record Cancel")["parameters"]["query"] == RECORD_CANCEL_SQL and node(wf, "Read Reply Mode")["parameters"]["query"] == READ_MODE_SQL \
+            and "##create_handoff##" in node(wf, "AI Agent")["parameters"]["options"]["systemMessage"] \
+            and wf["connections"].get("Create Handoff", {}).get("ai_tool") == [[{"node": "AI Agent", "type": "ai_tool", "index": 0}]]
+        if not ok:
+            bad.append(f)
+    for f in CREATES:
+        wf = json.load(open(os.path.join(WF, f), encoding="utf-8"))
+        if node(wf, "Set Wappi Webhook Types")["parameters"].get("jsonBody") != WEBHOOK_TYPES:
+            bad.append(f)
+    wf = json.load(open(os.path.join(WF, DASHBOARD), encoding="utf-8"))
+    if node(wf, "Fetch Outcomes")["parameters"]["query"] != FETCH_OUTCOMES_SQL or TRANSCRIPT_NEW not in node(wf, "Find Changed Sessions")["parameters"]["query"]:
+        bad.append(DASHBOARD)
+    wf = json.load(open(os.path.join(WF, DELETE_BOT), encoding="utf-8"))
+    if DELETE_NEW_TAIL not in node(wf, "Delete Chat Memory")["parameters"]["query"] or RESPOND_NEW_TAIL not in node(wf, "Respond")["parameters"]["responseBody"]:
+        bad.append(DELETE_BOT)
+    wf = json.load(open(os.path.join(WF, SET_STATE), encoding="utf-8"))
+    if not any("'crHandoffsApi001'" in n["parameters"].get("jsCode", "") for n in wf["nodes"]):
+        bad.append(SET_STATE)
+    return bad
+
+
+def main():
+    if "--check" in sys.argv:
+        bad = check()
+        print("history/handoff:", "OK" if not bad else f"MISSING/STALE in {bad}")
+        sys.exit(2 if bad else 0)
+    for f in BOTS:
+        print(f"{'patched' if patch_bot(f) else 'up to date'}  {f}")
+    for f in CREATES:
+        print(f"{'patched' if patch_create(f) else 'up to date'}  {f}")
+    print(f"{'patched' if patch_dashboard() else 'up to date'}  {DASHBOARD}")
+    print(f"{'patched' if patch_delete_bot() else 'up to date'}  {DELETE_BOT}")
+    print(f"{'patched' if patch_set_state() else 'up to date'}  {SET_STATE}")
+
+
+if __name__ == "__main__":
+    main()

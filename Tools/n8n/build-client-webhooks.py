@@ -80,6 +80,9 @@ PROTECTED_IDS = [
     "lmjYsdNcQA2IE5rl",  # Delete Bot Files
     "crAuthSession001",  # Auth Session (A1, 2026-09-17)
     "crWappiProxy0001",  # Wappi Proxy (A1, 2026-09-17)
+    "crHandoffReq0001",  # Handoff Request — the bots' create_handoff tool target (A5, 2026-09-17)
+    "crHandoffNtfy001",  # Handoff Notifier — scheduled owner notices (A5, 2026-09-17)
+    "crHandoffsApi001",  # Handoffs — the app's pending list / take / done (A5, 2026-09-17)
 ]
 
 

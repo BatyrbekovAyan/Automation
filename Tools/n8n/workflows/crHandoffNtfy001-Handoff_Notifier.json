@@ -1,0 +1,312 @@
+{
+  "id": "crHandoffNtfy001",
+  "name": "Handoff Notifier",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 2
+            }
+          ]
+        }
+      },
+      "id": "3657996e-b073-5998-84a5-f37e44af3dc4",
+      "name": "Every 2 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- A5: claim a batch of due notices (attempt counted BEFORE the send, next try in 10 min, hard cap\n-- 6 attempts); the request row itself is never touched by a delivery failure.\nwith due as (\n  select id from handoff_requests\n  where notify_state in ('pending', 'failed') and notify_attempts < 6 and notify_next_at <= now() and status <> 'done'\n  order by created_at limit 20\n  for update skip locked\n), claimed as (\n  update handoff_requests h\n    set notify_attempts = h.notify_attempts + 1, notify_next_at = now() + interval '10 minutes', updated_at = now()\n  from due where h.id = due.id\n  returning h.id, h.profile_id, h.chat_id, h.reason, h.notify_attempts,\n    coalesce((select b.channel from bot_profiles b where b.profile_id = h.profile_id order by b.created_at desc nulls last limit 1), 'whatsapp') as channel\n)\nselect * from claimed;",
+        "options": {
+          "queryReplacement": "={{ [] }}"
+        }
+      },
+      "id": "ca221faf-2021-59df-84b2-28181c3b0cfe",
+      "name": "Due Notifications",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        220,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ ($json.channel === 'telegram' ? 'https://wappi.pro/tapi/' : 'https://wappi.pro/api/') + 'sync/get/status' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={{ JSON.stringify({ profile_id: $json.profile_id }) }}"
+      },
+      "id": "afa44861-7616-5ca6-b253-79e1bc5c51ed",
+      "name": "Owner Phone",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "EuhhqAaV56DpoqAN",
+          "name": "WappiAuthToken"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// HANDOFF NOTIFIER / Compose Notice (runs PER ITEM — one notice per due request): a self-message\n// on the bot's own channel. No client text, no client number — the owner opens the app for the details.\nconst row = $('Due Notifications').item.json;\nconst st = $json || {};\nconst body = (st.body && typeof st.body === 'object') ? st.body : st;\nconst phone = String(body.phone || '').replace(/\\D/g, '');\nconst chat = String(row.chat_id || '');\nconst tail = chat.replace(/\\D/g, '').slice(-4) || '…';\nconst what = row.reason === 'order' ? 'новый заказ' : (row.reason === 'escalation' ? 'клиент ждёт ответа' : 'вопрос клиента');\nconst text = 'Choose Reply: ' + what + ' (чат …' + tail + '). Автоответ в этом чате приостановлен — откройте приложение → Сводка → «Нужен владелец».';\nconst base = row.channel === 'telegram' ? 'https://wappi.pro/tapi/' : 'https://wappi.pro/api/';\nreturn { json: { id: row.id, skip: !phone, error: phone ? '' : 'no_phone', url: base + 'sync/message/send', profileId: row.profile_id,\n                 recipient: phone, body: text } };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "bc1de799-f4d7-5f6d-a301-51c8424c3361",
+      "name": "Compose Notice",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "6f2156b6-36af-5f50-8986-1a1479463caf",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4c754299-a84f-5e74-9677-0dad64347501",
+      "name": "Skip?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={{ JSON.stringify({ profile_id: $json.profileId }) }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ recipient: $json.recipient, body: $json.body }) }}"
+      },
+      "id": "95b88817-f543-549e-9fe5-804d7b7faee7",
+      "name": "Send Notice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "EuhhqAaV56DpoqAN",
+          "name": "WappiAuthToken"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// HANDOFF NOTIFIER / Settle Notice (runs PER ITEM): sent | failed (+ error). A failure keeps the\n// request; the next sweep retries until the attempt cap.\nconst c = $('Compose Notice').item.json;\nif (c.skip) return { json: { id: c.id, state: 'failed', error: c.error || 'no_phone' } };\nconst r = $json || {};\nconst status = Number(r.statusCode) || 0;\nconst body = (r.body && typeof r.body === 'object') ? r.body : {};\nconst ok = status === 200 && (body.status === 'done' || !!body.message_id);\nreturn { json: { id: c.id, state: ok ? 'sent' : 'failed', error: ok ? '' : ('http ' + status + ' ' + JSON.stringify(body).slice(0, 200)) } };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "275e8067-fca1-5f09-8734-449d0ccbc44f",
+      "name": "Settle Notice",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update handoff_requests\n   set notify_state = $2, notify_last_error = nullif($3, ''),\n       notified_at = case when $2 = 'sent' then now() else notified_at end,\n       updated_at = now()\n where id = $1::bigint\nreturning id, notify_state, notify_attempts;",
+        "options": {
+          "queryReplacement": "={{ [ $json.id, $json.state, $json.error ] }}"
+        }
+      },
+      "id": "dd13d0f5-0c55-5ec0-a40c-89190a83ba91",
+      "name": "Record Notify",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1540,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Every 2 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Due Notifications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Due Notifications": {
+      "main": [
+        [
+          {
+            "node": "Owner Phone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Owner Phone": {
+      "main": [
+        [
+          {
+            "node": "Compose Notice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compose Notice": {
+      "main": [
+        [
+          {
+            "node": "Skip?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip?": {
+      "main": [
+        [
+          {
+            "node": "Settle Notice",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Notice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Notice": {
+      "main": [
+        [
+          {
+            "node": "Settle Notice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Settle Notice": {
+      "main": [
+        [
+          {
+            "node": "Record Notify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "saveManualExecutions": false
+  },
+  "staticData": null,
+  "meta": null,
+  "tags": []
+}

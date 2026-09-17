@@ -63,6 +63,16 @@ with req as (
     set suppressed = excluded.suppressed, version = excluded.version, updated_at = now()
     where reply_mode_flags.version < excluded.version
   returning profile_id, suppressed, version
+), unpause as (
+  -- A5 (stage 4): the owner's explicit «Авто» for THIS chat is the sanctioned resume — it lifts the
+  -- handoff pause and closes the chat's pending requests. A bot-wide '*' write never does.
+  update chat_reply_state c set handoff_paused = false
+  from req where c.profile_id = req.profile_id and c.chat_id = req.chat_id and req.chat_id <> '*' and req.suppressed = false
+  returning 1
+), closed as (
+  update handoff_requests h set status = 'done', done_at = now(), updated_at = now()
+  from req where h.profile_id = req.profile_id and h.chat_id = req.chat_id and req.chat_id <> '*' and req.suppressed = false and h.status <> 'done'
+  returning 1
 )
 select r.profile_id as "profileId",
        (up.profile_id is not null) as applied,

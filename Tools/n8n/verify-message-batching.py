@@ -180,8 +180,22 @@ def check_bot(f, base):
     ce = node(ns, "Claim Event")
     assert_that(ce["type"] == "n8n-nodes-base.postgres" and "on conflict (profile_id, chat_id, message_id)" in ce["parameters"]["query"],
                 f"{f}: Claim Event is not the reply_events upsert")
-    assert_that(conns["Suppressed?"]["main"][0] == [OUTCOME_EDGE],
-                f"{f}: Suppressed? main[0] (suppressed) must end ONLY at the Outcome stamp: {conns['Suppressed?']['main'][0]}")
+    # Stage 4 (A6): a suppressed («Вместе») incoming is still RECORDED (history + memory) before the stamp.
+    assert_that(conns["Suppressed?"]["main"][0] == [{"node": "Record Suppressed", "type": "main", "index": 0}]
+                and conns["Record Suppressed"]["main"][0] == [OUTCOME_EDGE],
+                f"{f}: Suppressed? main[0] must be Record Suppressed → Outcome (stage 4): {conns['Suppressed?']['main'][0]}")
+    # Stage 4 (A6): event routing in front of the group/binding filter — incoming → If; outgoing (phone/api)
+    # → Outgoing Bound? → Record Outgoing → Outcome; anything else → Outcome ('ignored').
+    assert_that(conns["Webhook"]["main"][0] == [{"node": "Is Incoming?", "type": "main", "index": 0}], f"{f}: Webhook must feed Is Incoming? (stage 4)")
+    assert_that(conns["Is Incoming?"]["main"] == [[{"node": "If", "type": "main", "index": 0}], [{"node": "Is Outgoing?", "type": "main", "index": 0}]],
+                f"{f}: Is Incoming? branches wrong: {conns['Is Incoming?']['main']}")
+    assert_that(conns["Is Outgoing?"]["main"] == [[{"node": "Outgoing Bound?", "type": "main", "index": 0}], [OUTCOME_EDGE]],
+                f"{f}: Is Outgoing? branches wrong: {conns['Is Outgoing?']['main']}")
+    assert_that(conns["Outgoing Bound?"]["main"] == [[{"node": "Record Outgoing", "type": "main", "index": 0}], [OUTCOME_EDGE]]
+                and conns["Record Outgoing"]["main"][0] == [OUTCOME_EDGE],
+                f"{f}: Outgoing Bound? / Record Outgoing wiring wrong")
+    assert_that(conns.get("Create Handoff", {}).get("ai_tool") == [[{"node": "AI Agent", "type": "ai_tool", "index": 0}]],
+                f"{f}: Create Handoff tool is not wired into the AI Agent")
     assert_that(conns["Debounce Wait"]["main"][0][0]["node"] == "Fetch Recent",
                 f"{f}: Debounce Wait does not chain to Fetch Recent")
     assert_that(conns["Fetch Recent"]["main"][0][0]["node"] == "Latest+Combine",

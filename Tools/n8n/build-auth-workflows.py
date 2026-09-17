@@ -422,6 +422,27 @@ return [{ json: { ...body, token, expiresAt: exp, profiles: row.p || g.profiles 
 """
 
 
+RECORD_OWNER_SEND_SQL = """-- A6 (stage 4): a message the OWNER sent from the app («Вместе» pick or a typed reply) is an
+-- owner_app row in the one history and an assistant-side turn in the agent's memory (marked by
+-- source, so a cancelled generation's cleanup never touches it). Runs AFTER the response.
+with ev as (
+  insert into chat_history_events (profile_id, chat_id, message_id, source, body, msg_type, sent_at, execution_id)
+  values ($1, $2, $3, 'owner_app', $4, $5, now(), $6)
+  on conflict (profile_id, chat_id, message_id) do update set source = 'owner_app', body = excluded.body, execution_id = excluded.execution_id
+  returning 1
+), mem as (
+  insert into n8n_chat_histories (session_id, message)
+  select $1 || ':' || $2, jsonb_build_object('type', 'ai', 'content', $4, 'additional_kwargs', jsonb_build_object('source', 'owner_app', 'message_id', $3), 'response_metadata', '{}'::jsonb)
+  where not exists (select 1 from n8n_chat_histories x where x.session_id = $1 || ':' || $2 and x.message->'additional_kwargs'->>'message_id' = $3)
+  returning 1
+)
+select exists(select 1 from ev) as recorded, exists(select 1 from mem) as remembered;"""
+
+OWNER_SEND_PARAMS = """={{ (r => { const b = r.jsonBody || {}; const rec = String(b.recipient || ''); const chat = (r.channel === 'whatsapp' && rec && !rec.includes('@')) ? rec + '@c.us' : rec;
+  const text = r.op === 'media.send' ? ('[' + String(r.kind || 'file') + ']' + (b.caption ? ' ' + String(b.caption) : '')) : String(b.body || '');
+  return [ r.profileId, chat, String($('Wappi Call').first().json.body.message_id || ''), text.slice(0, 4000), r.op === 'media.send' ? String(r.kind || 'file') : 'chat', $execution.id ]; })($('Build Request').first().json) }}"""
+
+
 def build_proxy():
     tok = token_block()
     n, c = [], {}
@@ -450,6 +471,13 @@ def build_proxy():
     edge(c, "Profile Added?", "Bind Profile", 0); edge(c, "Profile Added?", "Compose Response", 1)
     edge(c, "Bind Profile", "Reload Ownership"); edge(c, "Reload Ownership", "Compose Add Response")
     edge(c, "Compose Add Response", "Respond"); edge(c, "Compose Response", "Respond")
+    # Stage 4 (A6): after the response is on the wire, an app send lands in the one history + memory.
+    n.append(if_true("Owner Send?", "={{ ['message.send', 'message.reply', 'media.send'].includes($('Build Request').first().json.op) && Number($('Wappi Call').first().json.statusCode) === 200 && !!($('Wappi Call').first().json.body && $('Wappi Call').first().json.body.message_id) }}", [2420, 200]))
+    rec = postgres("Record Owner Send", RECORD_OWNER_SEND_SQL, OWNER_SEND_PARAMS, [2640, 200])
+    rec["alwaysOutputData"] = True
+    rec["onError"] = "continueRegularOutput"
+    n.append(rec)
+    edge(c, "Respond", "Owner Send?"); edge(c, "Owner Send?", "Record Owner Send", 0)
     settings = {"executionOrder": "v1", "saveDataSuccessExecution": "none", "saveDataErrorExecution": "all", "saveManualExecutions": False}
     return workflow(PROXY_ID, PROXY_NAME, n, c, settings)
 

@@ -1,0 +1,200 @@
+{
+  "id": "crHandoffReq0001",
+  "name": "Handoff Request",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "profile_id",
+              "type": "string"
+            },
+            {
+              "name": "chat_id",
+              "type": "string"
+            },
+            {
+              "name": "source_message_id",
+              "type": "string"
+            },
+            {
+              "name": "reason",
+              "type": "string"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "phone",
+              "type": "string"
+            },
+            {
+              "name": "summary",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "87aaa636-3706-5dfe-9b92-41de8e31479b",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// HANDOFF REQUEST / Validate (generated — build-handoff-workflows.py). The model fills reason /\n// name / phone / summary; profile, chat and the triggering message id come from the calling run.\nconst j = $input.first().json || {};\nconst s = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');\nconst profileId = s(j.profile_id, 128), chatId = s(j.chat_id, 128), messageId = s(j.source_message_id, 128);\nif (!profileId || !chatId || !messageId) return [{ json: { ok: false, error: 'bad_request', detail: 'missing ids' } }];\nlet reason = s(j.reason, 32).toLowerCase();\nif (!['order', 'question', 'escalation'].includes(reason)) reason = 'question';\nconst phone = s(j.phone, 40).replace(/[^\\d+()\\- ]/g, '').trim();\nconst name = s(j.name, 80);\nconst summary = s(j.summary, 500);\nconst data = {};\nif (name) data.name = name;\nif (phone) data.phone = phone;\nreturn [{ json: { ok: true, profileId, chatId, messageId, reason, data: JSON.stringify(data), summary: summary || null } }];\n"
+      },
+      "id": "eea4bab1-5eb0-5a3b-b932-382451511d47",
+      "name": "Validate Handoff",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a512d888-26d8-5015-9c52-4df66b85e40b",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a6516a98-5464-5bdc-9c7a-aead6fcde141",
+      "name": "Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- A5: the request row is the fact «нужен человек». One row per triggering event: a retried tool\n-- call (same run) or a re-delivered event (same message id) lands on the same row. The chat is\n-- paused for auto-replies until the owner acts (Read Reply Mode ORs handoff_paused).\nwith up as (\n  insert into handoff_requests (profile_id, chat_id, source_message_id, reason, data, summary, created_by)\n  values ($1, $2, $3, $4, $5::jsonb, $6, 'ai')\n  on conflict (profile_id, chat_id, source_message_id) do update\n    set data = handoff_requests.data || excluded.data,\n        summary = coalesce(excluded.summary, handoff_requests.summary),\n        updated_at = now()\n  returning id, (xmax = 0) as created, status\n), pause as (\n  insert into chat_reply_state (profile_id, chat_id, handoff_paused) values ($1, $2, true)\n  on conflict (profile_id, chat_id) do update set handoff_paused = true\n  returning 1\n)\nselect id, created, status from up;",
+        "options": {
+          "queryReplacement": "={{ [ $json.profileId, $json.chatId, $json.messageId, $json.reason, $json.data, $json.summary ] }}"
+        }
+      },
+      "id": "391e362b-ac6a-5ac5-9bbc-17fff8f44e07",
+      "name": "Upsert Handoff",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        660,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// HANDOFF REQUEST / Tool Result: what the model sees. ok:true ONLY when the row is written.\nconst j = $input.first().json || {};\nif (j.ok === false) return [{ json: { ok: false, error: j.error || 'bad_request', note: 'Заявку записать не удалось — не обещай клиенту передачу.' } }];\nif (j.id === undefined || j.id === null) return [{ json: { ok: false, error: 'db_error', note: 'Заявку записать не удалось — не обещай клиенту передачу; предложи контакт из данных бизнеса.' } }];\nreturn [{ json: { ok: true, handoff_id: Number(j.id), created: j.created !== false, status: j.status || 'open',\n                  note: 'Заявка записана, владелец получит уведомление. Можно сказать клиенту, что заявка передана.' } }];\n"
+      },
+      "id": "5297f39d-3412-5584-845b-b843b7302580",
+      "name": "Tool Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Validate Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Handoff": {
+      "main": [
+        [
+          {
+            "node": "Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid?": {
+      "main": [
+        [
+          {
+            "node": "Upsert Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tool Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Handoff": {
+      "main": [
+        [
+          {
+            "node": "Tool Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "saveManualExecutions": false
+  },
+  "staticData": null,
+  "meta": null,
+  "tags": []
+}

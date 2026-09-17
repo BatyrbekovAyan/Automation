@@ -72,6 +72,10 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
   `$execution.id` as correlationId). Stage 3 (`apply-reply-pipeline-v2.py`, verifier `verify-reply-pipeline.py`,
   SQL `sql/2026-09-17-reply-events.sql`, staging suite `staging/e2e-reply.py`): Claim Event / final check /
   send lease / settle + reconcile / record nodes on both bot templates — see CLAUDE.md «A3/A4/A7».
+  Stage 4 (`apply-history-handoff.py`, `build-handoff-workflows.py`, verifier `verify-history-handoff.py`,
+  SQL `sql/2026-09-17-history-handoff.sql`, staging suite `staging/e2e-handoff.py`): the one history
+  (`chat_history_events`) with explicit sources, the `create_handoff` tool → `crHandoffReq0001`, the
+  self-message notifier `crHandoffNtfy001`, the app webhook `crHandoffsApi001` — see CLAUDE.md «A5/A6».
   `$execution.id` as correlationId). `verify-message-batching.py` / `verify-telegram-parity.py` pin the
   stamp's wiring and the winner → billing-gate → Input type path (their pre-2026-09 expectations were
   stale and failed every run).

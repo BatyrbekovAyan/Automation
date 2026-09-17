@@ -146,7 +146,7 @@
         "promptType": "define",
         "text": "={{ $json.text }}",
         "options": {
-          "systemMessage": "=You are an intelligent assistant. Your purpose is to analyze various types of input and provide helpful, accurate responses.\n\nCAPABILITIES:\n- Process and respond to text messages\n\nINPUT HANDLING:\nAnalyze the content, understand the intent, and provide a relevant response.\n\n\nRESPONSE GUIDELINES:\n- Be concise but thorough\n- No speculation\n- Maintain a professional and helpful tone\n- When uncertain, acknowledge limitations\n- Format responses for easy reading on mobile devices\n- Do not offer further assistance, ask follow-up questions, or end with phrases like 'Is there anything else?' or 'How else can I help you?' Answer the question and then stop. \n- End your response immediately after the final fact\n- Keep answers shot\n- Never think up or invent any information and facts, if you do not know the answer, just say that you dont know\n\nLIMITATIONS:\n- Mention if you're unable to process certain file formats\n\nSECURITY & PRIVACY:\n- Do not share personal information across different user interactions\n- Inform users about data privacy limitations when relevant\n\nAnalyze all inputs, Chat Memory and relevent documents from Supabase Vector Store tool carefully before responding. Your goal is to provide value through accurate information and helpful assistance.\n\n\n# RULES\nUse the **Chat Memory** to store  all input and output messages.\n\n# Tools\n##Supabase Vector Store##\nUse Supabase Vector Store tool to get relevant information and prices for products and services"
+          "systemMessage": "=You are an intelligent assistant. Your purpose is to analyze various types of input and provide helpful, accurate responses.\n\nCAPABILITIES:\n- Process and respond to text messages\n\nINPUT HANDLING:\nAnalyze the content, understand the intent, and provide a relevant response.\n\n\nRESPONSE GUIDELINES:\n- Be concise but thorough\n- No speculation\n- Maintain a professional and helpful tone\n- When uncertain, acknowledge limitations\n- Format responses for easy reading on mobile devices\n- Do not offer further assistance, ask follow-up questions, or end with phrases like 'Is there anything else?' or 'How else can I help you?' Answer the question and then stop. \n- End your response immediately after the final fact\n- Keep answers shot\n- Never think up or invent any information and facts, if you do not know the answer, just say that you dont know\n\nLIMITATIONS:\n- Mention if you're unable to process certain file formats\n\nSECURITY & PRIVACY:\n- Do not share personal information across different user interactions\n- Inform users about data privacy limitations when relevant\n\nAnalyze all inputs, Chat Memory and relevent documents from Supabase Vector Store tool carefully before responding. Your goal is to provide value through accurate information and helpful assistance.\n\n\n# RULES\nUse the **Chat Memory** to store  all input and output messages.\n\n# Tools\n##Supabase Vector Store##\nUse Supabase Vector Store tool to get relevant information and prices for products and services\n\n##create_handoff##\nПередача владельцу — это ДЕЙСТВИЕ, не фраза. Когда клиент готов к заказу/брони, просит связаться, или вопрос надо передать человеку — вызови инструмент create_handoff (reason: order | question | escalation; name и phone — если клиент их назвал; summary — суть одной-двумя фразами). Ответ ok:true — только тогда говори «Передал владельцу, он свяжется». Ответ ok:false или ошибка — не обещай передачу: скажи, что не удалось передать автоматически, и предложи контакт из данных бизнеса. Никогда не утверждай, что владелец уже увидел или в курсе."
         }
       },
       "id": "f34e5e26-17f0-4b03-a204-a9cc2dc4217d",
@@ -688,7 +688,7 @@
       "parameters": {
         "resource": "database",
         "operation": "executeQuery",
-        "query": "select coalesce(\n  (select suppressed from reply_mode_flags\n   where profile_id = $1 and chat_id in ($2, '*')\n   order by (chat_id = '*')   -- specific chat_id sorts before the '*' default\n   limit 1),\n  false\n) as suppressed;",
+        "query": "select (\n  coalesce(\n    (select suppressed from reply_mode_flags\n     where profile_id = $1 and chat_id in ($2, '*')\n     order by (chat_id = '*')   -- specific chat_id sorts before the '*' default\n     limit 1),\n    false)\n  -- A5: a chat with a pending handoff is paused until the owner acts (done / explicit «Авто» for the chat)\n  or coalesce((select handoff_paused from chat_reply_state where profile_id = $1 and chat_id = $2), false)\n) as suppressed;",
         "options": {
           "queryReplacement": "={{ $('Webhook').item.json.body.messages[0].profile_id }},{{ $('Webhook').item.json.body.messages[0].from }}"
         }
@@ -1032,7 +1032,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// OUTCOME STAMP (audit stage 0.5, Tools/n8n/apply-outcome-stamps.py). One structured row per\n// execution end, no dialog text: the label is derived from WHICH branch reached this node.\nconst byPrev = { 'If': 'filtered', 'Suppressed?': 'suppressed', 'Is Latest?': 'superseded',\n                 'If Quota Allows': 'quota_denied', 'HTTP Request': 'sent', 'Claimed?': 'duplicate' };\nconst prev = $prevNode.name;\nlet wh = {};\ntry { wh = $('Webhook').first().json || {}; } catch (e) { wh = {}; }\nconst m = (wh.body && Array.isArray(wh.body.messages) && wh.body.messages[0]) || {};\nconst resp = $input.first() ? ($input.first().json || {}) : {};\n// Stage 3: the record rows (Record Send / Record Cancel) carry the event's final state explicitly.\nconst outcome = (typeof resp.outcome === 'string' && resp.outcome) ? resp.outcome : (byPrev[prev] || ('other:' + prev));\nreturn [{ json: {\n  outcome,\n  correlationId: $execution.id,\n  stage: prev,\n  messageId: m.id ?? null,\n  profileId: m.profile_id ?? null,\n  chatId: m.chatId ?? null,\n  channel: 'telegram',\n  transportMessageId: resp.transport_message_id ?? ((prev === 'HTTP Request' && resp && resp.message_id) ? resp.message_id : null),\n  transportStatus: (prev === 'HTTP Request' && resp) ? (resp.status ?? null) : null,\n  stampedAt: new Date().toISOString(),\n}, pairedItem: { item: 0 } }];\n"
+        "jsCode": "// OUTCOME STAMP (audit stage 0.5, Tools/n8n/apply-outcome-stamps.py). One structured row per\n// execution end, no dialog text: the label is derived from WHICH branch reached this node.\nconst byPrev = { 'If': 'filtered', 'Suppressed?': 'suppressed', 'Is Latest?': 'superseded',\n                 'If Quota Allows': 'quota_denied', 'HTTP Request': 'sent', 'Claimed?': 'duplicate',\n                 'Is Outgoing?': 'ignored', 'Outgoing Bound?': 'filtered' };\nconst prev = $prevNode.name;\nlet wh = {};\ntry { wh = $('Webhook').first().json || {}; } catch (e) { wh = {}; }\nconst m = (wh.body && Array.isArray(wh.body.messages) && wh.body.messages[0]) || {};\nconst resp = $input.first() ? ($input.first().json || {}) : {};\n// Stage 3: the record rows (Record Send / Record Cancel) carry the event's final state explicitly.\nconst outcome = (typeof resp.outcome === 'string' && resp.outcome) ? resp.outcome : (byPrev[prev] || ('other:' + prev));\nreturn [{ json: {\n  outcome,\n  correlationId: $execution.id,\n  stage: prev,\n  messageId: m.id ?? null,\n  profileId: m.profile_id ?? null,\n  chatId: m.chatId ?? null,\n  channel: 'telegram',\n  transportMessageId: resp.transport_message_id ?? ((prev === 'HTTP Request' && resp && resp.message_id) ? resp.message_id : null),\n  transportStatus: (prev === 'HTTP Request' && resp) ? (resp.status ?? null) : null,\n  stampedAt: new Date().toISOString(),\n}, pairedItem: { item: 0 } }];\n"
       },
       "id": "0c0b0e0a-5ba1-4a7e-9f0e-0000000000ff",
       "name": "Outcome",
@@ -1046,9 +1046,9 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "-- A4: the atomic right to process THIS event. A re-delivered event finds its row and is refused\n-- (claimed=false → duplicate); a claim left behind by a crashed run (>10 min, no send started) may be\n-- re-claimed. Each claim bumps the chat's incoming generation — the final check compares against it.\n-- history_watermark lets a cancelled generation's AI rows be dropped from memory (A3.7).\nwith ev as (\n  insert into reply_events (profile_id, chat_id, message_id, execution_id, state)\n  values ($1, $2, $3, $4, 'claimed')\n  on conflict (profile_id, chat_id, message_id) do update\n    set state = 'claimed', execution_id = excluded.execution_id, updated_at = now()\n    where reply_events.state in ('claimed', 'generated') and reply_events.updated_at < now() - interval '10 minutes'\n  returning message_id\n), st as (\n  insert into chat_reply_state (profile_id, chat_id, incoming_generation)\n  select $1, $2, 1 where exists (select 1 from ev)\n  on conflict (profile_id, chat_id) do update set incoming_generation = chat_reply_state.incoming_generation + 1\n  returning incoming_generation\n)\nselect exists(select 1 from ev) as claimed,\n       coalesce((select incoming_generation from st), (select incoming_generation from chat_reply_state where profile_id = $1 and chat_id = $2), 0)::bigint as generation,\n       coalesce((select max(id) from n8n_chat_histories where session_id = $1 || ':' || $2), 0)::bigint as history_watermark;",
+        "query": "-- A4: the atomic right to process THIS event. A re-delivered event finds its row and is refused\n-- (claimed=false → duplicate); a claim left behind by a crashed run (>10 min, no send started) may be\n-- re-claimed. Each claim bumps the chat's incoming generation — the final check compares against it.\n-- history_watermark lets a cancelled generation's AI rows be dropped from memory (A3.7).\n-- A6: the client's message enters the ONE history right here, before any generation decision.\nwith ev as (\n  insert into reply_events (profile_id, chat_id, message_id, execution_id, state)\n  values ($1, $2, $3, $4, 'claimed')\n  on conflict (profile_id, chat_id, message_id) do update\n    set state = 'claimed', execution_id = excluded.execution_id, updated_at = now()\n    where reply_events.state in ('claimed', 'generated') and reply_events.updated_at < now() - interval '10 minutes'\n  returning message_id\n), st as (\n  insert into chat_reply_state (profile_id, chat_id, incoming_generation)\n  select $1, $2, 1 where exists (select 1 from ev)\n  on conflict (profile_id, chat_id) do update set incoming_generation = chat_reply_state.incoming_generation + 1\n  returning incoming_generation\n), hist as (\n  insert into chat_history_events (profile_id, chat_id, message_id, source, body, msg_type, sent_at, execution_id)\n  values ($1, $2, $3, 'client', $5, $6, to_timestamp($7::bigint), $4)\n  on conflict (profile_id, chat_id, message_id) do nothing\n  returning 1\n)\nselect exists(select 1 from ev) as claimed,\n       coalesce((select incoming_generation from st), (select incoming_generation from chat_reply_state where profile_id = $1 and chat_id = $2), 0)::bigint as generation,\n       coalesce((select max(id) from n8n_chat_histories where session_id = $1 || ':' || $2), 0)::bigint as history_watermark;",
         "options": {
-          "queryReplacement": "={{ [ $('Webhook').first().json.body.messages[0].profile_id, $('Webhook').first().json.body.messages[0].from, $('Webhook').first().json.body.messages[0].id, $execution.id ] }}"
+          "queryReplacement": "={{ (m => [ m.profile_id, m.from, m.id, $execution.id, (['chat','text'].includes(String(m.type)) ? String(m.body || '').slice(0, 4000) : ('[' + String(m.type || 'media') + ']' + (m.caption ? ' ' + String(m.caption).slice(0, 1000) : ''))), String(m.type || ''), Number(m.time) || Math.floor(Date.now() / 1000) ])($('Webhook').first().json.body.messages[0]) }}"
         }
       },
       "id": "e4b8356e-06a6-5ff9-ae70-eee227573725",
@@ -1104,7 +1104,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// CANCEL LABEL: one place that names why a reply did not go out, from whichever gate refused it.\nconst j = $input.first().json || {};\nconst prev = $prevNode.name;\nlet outcome;\nif (prev === 'Is Latest?') outcome = 'superseded';\nelse if (prev === 'If Quota Allows') outcome = 'quota_denied';\nelse if (prev === 'Generated?') outcome = 'generation_failed';\nelse if (prev === 'Final OK?') outcome = j.outcome || 'cancelled_fetch';\nelse if (prev === 'Send Allowed?') outcome = j.suppressed === true ? 'cancelled_mode' : (j.lock_busy === true ? 'cancelled_busy' : 'superseded');\nelse outcome = 'cancelled_fetch';\nlet watermark = 0;\ntry { watermark = Number($('Claim Event').first().json.history_watermark) || 0; } catch (e) { watermark = 0; }\n// Only a run that reached the generator can have written AI memory rows to drop.\nconst generated = prev === 'Final OK?' || prev === 'Send Allowed?';\nreturn [{ json: { outcome, historyWatermark: watermark, dropAiHistory: generated }, pairedItem: { item: 0 } }];\n"
+        "jsCode": "// CANCEL LABEL: one place that names why a reply did not go out, from whichever gate refused it.\nconst j = $input.first().json || {};\nconst prev = $prevNode.name;\nlet outcome;\nif (prev === 'Is Latest?') outcome = 'superseded';\nelse if (prev === 'If Quota Allows') outcome = 'quota_denied';\nelse if (prev === 'Generated?') outcome = 'generation_failed';\nelse if (prev === 'Final OK?') outcome = j.outcome || 'cancelled_fetch';\nelse if (prev === 'Send Allowed?') outcome = j.suppressed === true ? 'cancelled_mode' : (j.lock_busy === true ? 'cancelled_busy' : 'superseded');\nelse outcome = 'cancelled_fetch';\nlet watermark = 0;\ntry { watermark = Number($('Claim Event').first().json.history_watermark) || 0; } catch (e) { watermark = 0; }\n// Only a run that reached the generator can have written AI memory rows to drop.\nconst generated = prev === 'Final OK?' || prev === 'Send Allowed?';\n// A6: when the agent never ran, the client's message still has to reach memory (it is the memory\n// node that writes it on a normal run).\nconst recordHuman = prev === 'If Quota Allows' || prev === 'Generated?';\nlet humanText = '';\nif (recordHuman) {\n  try { humanText = String($('Audio').first().json.text || ''); } catch (e) { humanText = ''; }\n  if (!humanText) { try { humanText = String($('Text').first().json.text || ''); } catch (e) { humanText = ''; } }\n  if (!humanText) { try { humanText = String($('Latest+Combine').first().json.combinedText || ''); } catch (e) { humanText = ''; } }\n  if (!humanText) { try { const m = $('Webhook').first().json.body.messages[0]; humanText = ['chat', 'text'].includes(String(m.type)) ? String(m.body || '') : '[' + String(m.type || 'media') + ']'; } catch (e) { humanText = ''; } }\n}\nreturn [{ json: { outcome, historyWatermark: watermark, dropAiHistory: generated, recordHuman, humanText: humanText.slice(0, 4000) }, pairedItem: { item: 0 } }];\n"
       },
       "id": "81da6c17-e568-5179-8844-0f48cca0d0ef",
       "name": "Cancel Label",
@@ -1118,9 +1118,9 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "-- A3.7: a refused / cancelled reply is recorded as such, the lease (if this run held it) is released, and\n-- the AI rows a cancelled GENERATION already wrote to memory are dropped — the customer never saw them,\n-- so the bot must not remember having said them.\nwith ev as (\n  update reply_events set state = $4, updated_at = now()\n  where profile_id = $1 and chat_id = $2 and message_id = $3 returning 1\n), hist as (\n  delete from n8n_chat_histories\n  where $6::boolean and session_id = $1 || ':' || $2 and id > $5::bigint and message->>'type' = 'ai' returning 1\n), rel as (\n  update chat_reply_state set lock_token = null, lock_expires_at = null\n  where profile_id = $1 and chat_id = $2 and lock_token = $7 returning 1\n)\nselect $4::text as outcome, (select count(*) from hist)::int as dropped_ai_rows, exists(select 1 from ev) as recorded;",
+        "query": "-- A3.7: a refused / cancelled reply is recorded as such, the lease (if this run held it) is released, and\n-- the AI rows a cancelled GENERATION already wrote to memory are dropped — the customer never saw them,\n-- so the bot must not remember having said them. Owner rows (source-marked) are never dropped.\n-- A6: when the agent never ran (quota / generation failure), the client's message still enters memory.\nwith ev as (\n  update reply_events set state = $4, updated_at = now()\n  where profile_id = $1 and chat_id = $2 and message_id = $3 returning 1\n), hist as (\n  delete from n8n_chat_histories\n  where $6::boolean and session_id = $1 || ':' || $2 and id > $5::bigint and message->>'type' = 'ai'\n    and (message->'additional_kwargs'->>'source') is null returning 1\n), rel as (\n  update chat_reply_state set lock_token = null, lock_expires_at = null\n  where profile_id = $1 and chat_id = $2 and lock_token = $7 returning 1\n), mem as (\n  insert into n8n_chat_histories (session_id, message)\n  select $1 || ':' || $2, jsonb_build_object('type', 'human', 'content', $9, 'additional_kwargs', jsonb_build_object('source', 'client', 'message_id', $3), 'response_metadata', '{}'::jsonb)\n  where $8::boolean and nullif($9, '') is not null\n    and not exists (select 1 from n8n_chat_histories x where x.session_id = $1 || ':' || $2 and x.message->'additional_kwargs'->>'message_id' = $3)\n  returning 1\n)\nselect $4::text as outcome, (select count(*) from hist)::int as dropped_ai_rows, exists(select 1 from ev) as recorded, exists(select 1 from mem) as remembered;",
         "options": {
-          "queryReplacement": "={{ [ $('Webhook').first().json.body.messages[0].profile_id, $('Webhook').first().json.body.messages[0].from, $('Webhook').first().json.body.messages[0].id, $json.outcome, $json.historyWatermark, $json.dropAiHistory, $execution.id ] }}"
+          "queryReplacement": "={{ [ $('Webhook').first().json.body.messages[0].profile_id, $('Webhook').first().json.body.messages[0].from, $('Webhook').first().json.body.messages[0].id, $json.outcome, $json.historyWatermark, $json.dropAiHistory, $execution.id, $json.recordHuman, $json.humanText ] }}"
         }
       },
       "id": "b9998258-aa28-5c3a-91dd-80a414168dc8",
@@ -1449,9 +1449,9 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "-- A7: the event's final transport state and the lease release. send_unknown stays send_unknown —\n-- an operator-visible uncertainty, never a silent retry.\nwith ev as (\n  update reply_events set state = $4, transport_message_id = nullif($5, ''), error = nullif($6, ''), updated_at = now()\n  where profile_id = $1 and chat_id = $2 and message_id = $3 returning 1\n), rel as (\n  update chat_reply_state set lock_token = null, lock_expires_at = null,\n    last_sent_at = case when $4 = 'sent' then now() else last_sent_at end,\n    last_sent_message_id = case when $4 = 'sent' then nullif($5, '') else last_sent_message_id end\n  where profile_id = $1 and chat_id = $2 and lock_token = $7 returning 1\n)\nselect $4::text as outcome, nullif($5, '')::text as transport_message_id, exists(select 1 from ev) as recorded, exists(select 1 from rel) as released;",
+        "query": "-- A7: the event's final transport state and the lease release. send_unknown stays send_unknown —\n-- an operator-visible uncertainty, never a silent retry. A6: a sent reply is an `ai` history row.\nwith ev as (\n  update reply_events set state = $4, transport_message_id = nullif($5, ''), error = nullif($6, ''), updated_at = now()\n  where profile_id = $1 and chat_id = $2 and message_id = $3 returning 1\n), rel as (\n  update chat_reply_state set lock_token = null, lock_expires_at = null,\n    last_sent_at = case when $4 = 'sent' then now() else last_sent_at end,\n    last_sent_message_id = case when $4 = 'sent' then nullif($5, '') else last_sent_message_id end\n  where profile_id = $1 and chat_id = $2 and lock_token = $7 returning 1\n), hist as (\n  insert into chat_history_events (profile_id, chat_id, message_id, source, body, msg_type, sent_at, execution_id)\n  select $1, $2, $5, 'ai', $8, 'chat', now(), $7 where $4 = 'sent' and nullif($5, '') is not null\n  on conflict (profile_id, chat_id, message_id) do update set source = 'ai', body = excluded.body, execution_id = excluded.execution_id\n  returning 1\n)\nselect $4::text as outcome, nullif($5, '')::text as transport_message_id, exists(select 1 from ev) as recorded, exists(select 1 from rel) as released;",
         "options": {
-          "queryReplacement": "={{ [ $('Webhook').first().json.body.messages[0].profile_id, $('Webhook').first().json.body.messages[0].from, $('Webhook').first().json.body.messages[0].id, $json.state, $json.transportMessageId, $json.error, $execution.id ] }}"
+          "queryReplacement": "={{ [ $('Webhook').first().json.body.messages[0].profile_id, $('Webhook').first().json.body.messages[0].from, $('Webhook').first().json.body.messages[0].id, $json.state, $json.transportMessageId, $json.error, $execution.id, $('Final Check').first().json.text ] }}"
         }
       },
       "id": "df16769a-616a-5a3b-a0f0-e4b34294a8c9",
@@ -1470,6 +1470,263 @@
       },
       "alwaysOutputData": true,
       "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "533699cc-bd2e-52a8-a5a7-a4549a05846d",
+              "leftValue": "={{ Array.isArray($json.body && $json.body.messages) && !!$json.body.messages[0] && (!$json.body.messages[0].wh_type || $json.body.messages[0].wh_type === 'incoming_message') }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e58bdf3e-45d0-5d52-87ae-9b66237ffbee",
+      "name": "Is Incoming?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -4400,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "6e473a6c-9366-512b-b0f9-837b72b5e202",
+              "leftValue": "={{ Array.isArray($json.body && $json.body.messages) && !!$json.body.messages[0] && ['outgoing_message_phone', 'outgoing_message_api'].includes(String($json.body.messages[0].wh_type)) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c11c2dfd-77cc-5d2a-bea0-f94a4ccb16c0",
+      "name": "Is Outgoing?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -4200,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "df14737d-3194-516f-9e7f-0ebacf1ba92e",
+              "leftValue": "={{ String($json.webhookUrl || '').split('/').pop() === String($json.body.messages[0].profile_id) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e24de313-d4f5-5503-89d8-c8c3caad873b",
+      "name": "Outgoing Bound?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -4000,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- A6: what the business side sent. outgoing_message_phone = the owner from the phone (history +\n-- memory, so the bot knows the agreement); outgoing_message_api = fallback history row only — the\n-- AI's own sends (Record Send) and the app's sends (Wappi Proxy) upgrade it to their real source, and\n-- their memory rows are written by those writers, never here. Group chats are not recorded.\nwith ev as (\n  insert into chat_history_events (profile_id, chat_id, message_id, source, body, msg_type, sent_at, execution_id)\n  select $1, $2, $3, case when $7 = 'outgoing_message_phone' then 'owner_phone' else 'outgoing_api' end, $4, $5, to_timestamp($6::bigint), $8\n  where $2 not like '%@g.us'\n  on conflict (profile_id, chat_id, message_id) do nothing\n  returning source\n), mem as (\n  insert into n8n_chat_histories (session_id, message)\n  select $1 || ':' || $2, jsonb_build_object('type', 'ai', 'content', $4, 'additional_kwargs', jsonb_build_object('source', 'owner_phone', 'message_id', $3), 'response_metadata', '{}'::jsonb)\n  where exists (select 1 from ev where source = 'owner_phone')\n    and not exists (select 1 from n8n_chat_histories x where x.session_id = $1 || ':' || $2 and x.message->'additional_kwargs'->>'message_id' = $3)\n  returning 1\n)\nselect case when exists (select 1 from ev) then 'recorded_' || (select source from ev limit 1)\n            when $2 like '%@g.us' then 'ignored_group' else 'outgoing_known' end as outcome,\n       exists(select 1 from mem) as remembered;",
+        "options": {
+          "queryReplacement": "={{ (m => [ m.profile_id, String(m.chatId || m.to || ''), String(m.id || ''), (['chat','text'].includes(String(m.type)) ? String(m.body || '').slice(0, 4000) : ('[' + String(m.type || 'media') + ']' + (m.caption ? ' ' + String(m.caption).slice(0, 1000) : ''))), String(m.type || ''), Number(m.time) || Math.floor(Date.now() / 1000), String(m.wh_type || ''), $execution.id ])($('Webhook').first().json.body.messages[0]) }}"
+        }
+      },
+      "id": "279ab92b-204b-5a9c-bd9e-6d4a509eac03",
+      "name": "Record Outgoing",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -3800,
+        700
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- A6: «Вместе» — no generation, but the history and the agent's memory still learn what the client\n-- said, so a later return to «Авто» continues the same conversation (no double write: the memory\n-- node only writes when the agent runs, which it does not on this branch).\nwith ev as (\n  insert into chat_history_events (profile_id, chat_id, message_id, source, body, msg_type, sent_at, execution_id)\n  values ($1, $2, $3, 'client', $4, $5, to_timestamp($6::bigint), $7)\n  on conflict (profile_id, chat_id, message_id) do nothing\n  returning 1\n), mem as (\n  insert into n8n_chat_histories (session_id, message)\n  select $1 || ':' || $2, jsonb_build_object('type', 'human', 'content', $4, 'additional_kwargs', jsonb_build_object('source', 'client', 'message_id', $3), 'response_metadata', '{}'::jsonb)\n  where exists (select 1 from ev)\n    and not exists (select 1 from n8n_chat_histories x where x.session_id = $1 || ':' || $2 and x.message->'additional_kwargs'->>'message_id' = $3)\n  returning 1\n)\nselect 'suppressed'::text as outcome, exists(select 1 from ev) as recorded, exists(select 1 from mem) as remembered;",
+        "options": {
+          "queryReplacement": "={{ (m => [ m.profile_id, m.from, m.id, (['chat','text'].includes(String(m.type)) ? String(m.body || '').slice(0, 4000) : ('[' + String(m.type || 'media') + ']' + (m.caption ? ' ' + String(m.caption).slice(0, 1000) : ''))), String(m.type || ''), Number(m.time) || Math.floor(Date.now() / 1000), $execution.id ])($('Webhook').first().json.body.messages[0]) }}"
+        }
+      },
+      "id": "03efecfb-697e-5b97-a1f7-d4a5746dbe94",
+      "name": "Record Suppressed",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -3560,
+        700
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "description": "Передать заявку владельцу бизнеса: создаёт запись заявки и уведомление владельцу, ставит чат на паузу автоответов. Вызывай, когда клиент готов к заказу или брони, просит связаться, или вопрос нужно передать человеку. Возвращает {ok:true} — тогда можно сказать клиенту «Передал владельцу»; {ok:false} — передачу не обещай.",
+        "workflowId": {
+          "__rl": true,
+          "value": "crHandoffReq0001",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "profile_id": "={{ $('Webhook').first().json.body.messages[0].profile_id }}",
+            "chat_id": "={{ $('Webhook').first().json.body.messages[0].from }}",
+            "source_message_id": "={{ $('Webhook').first().json.body.messages[0].id }}",
+            "reason": "={{ $fromAI('reason', 'Причина: order — заказ, бронь или покупка; question — вопрос, на который нет ответа в данных бизнеса; escalation — жалоба, спор, срочное', 'string', 'question') }}",
+            "name": "={{ $fromAI('name', 'Имя клиента, если он его назвал; иначе пустая строка', 'string', '') }}",
+            "phone": "={{ $fromAI('phone', 'Телефон клиента, если он его назвал; иначе пустая строка', 'string', '') }}",
+            "summary": "={{ $fromAI('summary', 'Суть заявки одной-двумя фразами: что нужно клиенту и какие детали уже известны', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "profile_id",
+              "displayName": "profile_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "source_message_id",
+              "displayName": "source_message_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "e53ee562-972e-556a-b977-8c84de2bba10",
+      "name": "Create Handoff",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        -1900,
+        200
+      ]
     }
   ],
   "connections": {
@@ -1477,7 +1734,7 @@
       "main": [
         [
           {
-            "node": "If",
+            "node": "Is Incoming?",
             "type": "main",
             "index": 0
           }
@@ -1739,7 +1996,7 @@
       "main": [
         [
           {
-            "node": "Outcome",
+            "node": "Record Suppressed",
             "type": "main",
             "index": 0
           }
@@ -2105,6 +2362,93 @@
           {
             "node": "Outcome",
             "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Incoming?": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Outgoing?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Outgoing?": {
+      "main": [
+        [
+          {
+            "node": "Outgoing Bound?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Outgoing Bound?": {
+      "main": [
+        [
+          {
+            "node": "Record Outgoing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Outgoing": {
+      "main": [
+        [
+          {
+            "node": "Outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Suppressed": {
+      "main": [
+        [
+          {
+            "node": "Outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Handoff": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
             "index": 0
           }
         ]

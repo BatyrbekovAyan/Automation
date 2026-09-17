@@ -37,8 +37,16 @@ public class DashboardOutcome
     public string summary;
     public long outcomeAt;      // unix ms
     public long lastMessageAt;  // unix ms
+    // A5 (stage 4): a REAL handoff request outranks the classifier — source == "event" (absent /
+    // "classifier" on older servers and cached rows) and the request's handle for take/done.
+    public string source;
+    public long? handoffId;
+    public string handoffStatus;
+    public string handoffReason;
 
     [JsonIgnore] public OutcomeStatus Status => OutcomeStatusMap.FromId(outcome);
+    [JsonIgnore] public bool IsEvent => source == "event";
+    [JsonIgnore] public bool HasOpenHandoff => IsEvent && handoffId.HasValue && handoffId.Value > 0 && handoffStatus == "open";
 }
 
 [Serializable]

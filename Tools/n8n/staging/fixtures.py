@@ -77,6 +77,8 @@ def main():
             psql("delete from conversation_outcomes where profile_id = :'p0';", pid)
             psql("delete from reply_events where profile_id = :'p0';", pid)
             psql("delete from chat_reply_state where profile_id = :'p0';", pid)
+            psql("delete from chat_history_events where profile_id = :'p0';", pid)
+            psql("delete from handoff_requests where profile_id = :'p0';", pid)
         n = psql("with a as (delete from suggestion_counts where app_user_id = :'p0' returning 1), b as (delete from dialog_counts where app_user_id = :'p0' returning 1), c as (delete from bot_profiles where app_user_id = :'p0' returning 1), d as (delete from subscribers where app_user_id = :'p0' returning 1) select (select count(*) from a) + (select count(*) from b) + (select count(*) from c) + (select count(*) from d);",
                  a.app_user_id)
         print(f"deleted rows: {n}")

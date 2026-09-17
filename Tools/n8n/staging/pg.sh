@@ -91,6 +91,7 @@ cmd_migrate() {
     "${N8N_DIR}/sql/2026-09-17-auth-installs.sql"
     "${N8N_DIR}/sql/2026-09-17-reply-mode-version.sql"
     "${N8N_DIR}/sql/2026-09-17-reply-events.sql"
+    "${N8N_DIR}/sql/2026-09-17-history-handoff.sql"
   )
   for f in "${files[@]}"; do
     [ -s "$f" ] || { echo "skip (missing) $f"; continue; }

@@ -103,7 +103,8 @@ with ev as (
   where profile_id = $1 and chat_id = $2 and message_id = $3 returning 1
 ), hist as (
   delete from n8n_chat_histories
-  where $6::boolean and session_id = $1 || ':' || $2 and id > $5::bigint and message->>'type' = 'ai' returning 1
+  where $6::boolean and session_id = $1 || ':' || $2 and id > $5::bigint and message->>'type' = 'ai'
+    and (message->'additional_kwargs'->>'source') is null returning 1
 ), rel as (
   update chat_reply_state set lock_token = null, lock_expires_at = null
   where profile_id = $1 and chat_id = $2 and lock_token = $7 returning 1
@@ -217,11 +218,18 @@ def node(wf, name):
     return next((n for n in wf["nodes"] if n["name"] == name), None)
 
 
+STAGE4_OWNED = ("Claim Event", "Record Send", "Record Cancel", "Cancel Label")   # apply-history-handoff.py re-shapes these
+
+
 def ensure(wf, spec):
     existing = node(wf, spec["name"])
     if existing is None:
         wf["nodes"].append(spec)
         return True
+    if spec["name"] in STAGE4_OWNED:
+        blob = json.dumps(existing.get("parameters", {}), ensure_ascii=False)
+        if "chat_history_events" in blob or "recordHuman" in blob:
+            return False   # already re-shaped by stage 4 — stage 3 never regresses it
     changed = False
     for k in ("parameters", "type", "typeVersion", "credentials", "alwaysOutputData", "onError", "retryOnFail", "maxTries", "waitBetweenTries"):
         if k in spec and existing.get(k) != spec[k]:
@@ -395,6 +403,7 @@ def check():
         need = ("Claim Event", "Claimed?", "Generated?", "Final Fetch", "Final Check", "Final OK?", "Acquire Send Lease",
                 "Send Allowed?", "Settle Send", "Send Unknown?", "Wait Reconcile", "Reconcile Fetch", "Reconcile Check",
                 "Record Send", "Cancel Label", "Record Cancel")
+            # Claim / Record Send / Record Cancel / Cancel Label are re-shaped by apply-history-handoff.py (stage 4) — not compared here.
         if any(node(wf, n) is None for n in need) or LATEST_COMBINE_PATCH_NEW not in node(wf, "Latest+Combine")["parameters"]["jsCode"] \
                 or node(wf, "Acquire Send Lease")["parameters"]["query"] != ACQUIRE_SQL or node(wf, "Final Check")["parameters"]["jsCode"] != FINAL_CHECK_JS:
             bad.append(f)

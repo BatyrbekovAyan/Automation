@@ -73,6 +73,8 @@ TG_BOT_NODE_NAMES = {
     "Claim Event", "Claimed?", "Generated?", "Final Fetch", "Final Check", "Final OK?", "Acquire Send Lease",
     "Send Allowed?", "Settle Send", "Send Unknown?", "Wait Reconcile", "Reconcile Fetch", "Reconcile Check",
     "Record Send", "Cancel Label", "Record Cancel",
+    # audit stage 4 (apply-history-handoff.py): event routing, outgoing/suppressed recording, the handoff tool — +6
+    "Is Incoming?", "Is Outgoing?", "Outgoing Bound?", "Record Outgoing", "Record Suppressed", "Create Handoff",
 }
 
 

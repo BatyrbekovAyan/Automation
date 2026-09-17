@@ -8,16 +8,18 @@
 
 - **Дата:** 2026-09-17 · **Ветка/коммит:** `main` @ `95221844` (исходный HEAD; работа идёт на `main`
   scoped-коммитами — единый рабочий каталог, без worktree; перед каждым коммитом `git rev-parse HEAD`).
-- **Текущий этап:** 3 (A3/A4/A7) — код ЗАВЕРШЁН и staging_verified 2026-09-17 (WA и TG); НЕ развёрнут (пакет в
-  `docs/audits/a1-deploy-runbook.md`, дополнен этапом 3). Следующий: этап 4 (A5/A6 — история, handoff, уведомления).
+- **Текущий этап:** 4 (A5/A6) — код ЗАВЕРШЁН и staging_verified 2026-09-17 (push = внешний блокер, runbook §2.11); НЕ развёрнут.
+  Следующий: этап 5 (S1, S3–S6 — контракт знаний и подготовка подсказок).
 - **Коммиты:** этап 1 — d44fc037, 5448f98d, e3aec245, 616e6461; этап 2 — b892b83d, 230392e8, f456e1b9; этап 3 — см. git log
   (`feat(reply-pipeline)`).
 - **Как продолжить:** `Tools/n8n/staging/pg.sh start` → `python3 Tools/n8n/staging/wappi-mock.py &` →
   `python3 Tools/n8n/staging/bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001` → `python3 Tools/n8n/staging/e2e.py`
-  → `python3 Tools/n8n/staging/e2e-reply.py` (этап 3, ~15 мин); чистый харнесс — `node Tools/n8n/repro/run-code-node.mjs`;
-  verify-скрипты: batching, parity, rag, panel-prompts, auth-gate, reply-mode, reply-pipeline; Unity — `Tools/run-tests-headless.sh`.
-  Ожидаемое состояние ПОСЛЕ этапа 3: repro 15 pass / 2 fail (S4 subject, no-identity — цели этапа 5), e2e.py 11/11,
-  e2e-reply.py 28/28. Мок надо перезапускать после правок `wappi-mock.py` (процесс держит старый код).
+  → `python3 Tools/n8n/staging/e2e-reply.py` (этап 3, ~15 мин) → `python3 Tools/n8n/staging/e2e-handoff.py` (этап 4, ~8 мин);
+  чистый харнесс — `node Tools/n8n/repro/run-code-node.mjs`; verify-скрипты: batching, parity, rag, panel-prompts, auth-gate,
+  reply-mode, reply-pipeline, history-handoff; builder-проверки `build-auth-workflows.py --check`, `build-handoff-workflows.py --check`,
+  `inject-prompts.py --check` (нужен tiktoken: `~/.venvs/tiktoken/bin/python3`); Unity — `Tools/run-tests-headless.sh`.
+  Ожидаемое состояние ПОСЛЕ этапа 4: repro 15 pass / 2 fail (S4 subject, no-identity — цели этапа 5), e2e.py 11/11,
+  e2e-reply.py 28/28, e2e-handoff.py 14/14 (прогон 2: 13/14, notifier исправлен на per-item и повторён 1/1), Unity 2651/2651. Мок надо перезапускать после правок `wappi-mock.py`.
 
 ## Baseline (этап 0.1) — зафиксировано 2026-09-17
 
@@ -143,3 +145,21 @@ bad_request (staging); два быстрых переключения с обр�
 нет повторных отправок ✓ (в каждом сценарии считаются вызовы `message/send` мока); неопределённый результат не скрывается ✓
 (`dropped_without_echo_stays_send_unknown`). WA и TG — одинаковые сценарии, e2e-reply 28/28. Клиент не менялся (Unity 2640/2640
 от этапа 2 остаётся в силе). Прод не менялся.
+
+## Этап 4 (A5/A6) — состояние
+
+| Пункт | Статус | Изменения | Доказательства | Ограничения |
+|---|---|---|---|---|
+| 4.1 согласованная история с ролями/источниками | staging_verified | `chat_history_events` (source ∈ client/ai/owner_app/owner_phone/outgoing_api, ключ = id транспорта); писатели: `Claim Event` (клиент, до решения о генерации), `Record Suppressed` («Вместе»: клиент → история + human-строка памяти), `Record Send` (ai), `Record Outgoing` (телефон владельца → история + ai-строка памяти с меткой source), Wappi Proxy `Record Owner Send` после ответа (owner_app → история + память). Запись не зависит от разрешения генерации; outgoing не считается AI | e2e-handoff `outgoing_phone_recorded` (WA+TG: recorded_owner_phone, повтор → outgoing_known, 1 строка памяти), `outgoing_api_history_only`, `suppressed_incoming_recorded` (WA+TG), `auto_reply_records_client_and_ai_rows` (client,ai / human,ai без дублей), `proxy_send_records_owner_app_row` | форма outgoing-ивентов Wappi в документации не показана — узел построен по форме входящего (canary в runbook §2.6); существующие профили получат outgoing-типы только после прогона `webhook/types/set` (этап 7.5) |
+| 4.2 фактические callbacks WA/TG | staging_verified (моком) | Create WA/TG подписывают `incoming_message + outgoing_message_phone + outgoing_message_api`; шаблоны маршрутизируют по `wh_type` (`Is Incoming?`/`Is Outgoing?`), чужой профиль отфильтрован до записи (`Outgoing Bound?`), группы не пишутся; двойной записи нет: память клиента пишет либо memory-узел (агент запущен), либо `Record Suppressed`/`Record Cancel` (агент не запускался), дедуп по `message_id` в `additional_kwargs` | `outgoing_foreign_profile_filtered`, `verify-history-handoff.py` (writers/sources/дедуп), `verify-message-batching.py` (маршрутизация) | границы покрытия: сообщения владельца с телефона у ботов без outgoing-подписки не видны (честно: строк owner_phone нет); сверка истории по `messages/get` не добавлялась |
+| 4.3 текстовая память vs структурированное состояние заявки | staging_verified | заявка = строка `handoff_requests` (reason, data{name, phone}, summary, status, notify_*) — отдельно от памяти; агент читает известные данные из Chat Memory (правило промпта: не спрашивать телефон повторно — было) | `handoff_tool…` (data.phone из инструмента), структура SQL | «что осталось уточнить» не моделируется отдельно (summary + data) — достаточно для заявки, не для многошагового сбора |
+| 4.4 надёжный handoff | staging_verified | инструмент агента `Create Handoff` → sub-workflow `crHandoffReq0001`: upsert по уникальному ключу (profile, chat, message id триггера), пауза `handoff_paused` в чате; `Read Reply Mode` OR'ит паузу; снять паузу может только владелец: `SetReplyMode` для ЭТОГО чата suppressed=false (закрывает заявки чата) или `Handoffs done`; промпт: «Передал владельцу» только при ok:true, «увидел/в курсе» — никогда | `handoff_tool_creates_request_once_and_pauses [llm]` (заявка 1 шт., повтор события → без второй, новое входящее → suppressed, явный «Авто» → unpaused + done → ответ снова уходит), `handoffs_webhook_owner_scoped_list_take_done` | инструмент вызывает модель — детерминированность не гарантирована (сценарий отмечен [llm]); заявка, созданная во время отменённой генерации, остаётся (owner видит и закрывает) |
+| 4.5 сводка читает достоверный источник | staging_verified | `Fetch Outcomes`: FULL OUTER JOIN открытых заявок; `source=event` перекрывает классификатор (order → order_collected, иначе owner_needed), `handoffId/Status/Reason`; транскрипт классификатора помечает строки владельца «Владелец:» | `dashboard_shows_open_handoff_as_event`; клиент: `DashboardOutcome.IsEvent`, метка «Заявка ·» (`HandoffCopy.RowSummary`) | — |
+| 4.6 уведомление владельца + список ожидающих | staging_verified (мок) / **push — внешний блокер** | Notifier `crHandoffNtfy001` (каждые 2 мин): self-message на собственный канал бота, без текста клиента и его номера; попытки/бэкофф на строке заявки; приложение: `HandoffSyncService` (list на старте/раз в 3 мин/при открытии «Сводки», зеркало пауз в per-chat «Вместе» — только пауза, никогда возобновление; звук/вибрация при новой заявке), `OpenChat` из заявки → `take` (реальный просмотр) | `notifier_delivers_self_message_and_survives_failure` (500 → failed/1, заявка цела; вторая → sent/1; получатель = свой номер; тело без утечки), Unity `HandoffModelsTests` (7), `HandoffWiringTests` (4) | APNs/FCM: нет ключей, пакета и device-теста — runbook §2.11 с точными шагами; self-message на устройстве не проверен; deep-link из уведомления в чат не реализован (нет URL-схемы) |
+| 4.7 удаление/очистка | staging_verified | Delete Bot Files: + `chat_history_events`, `handoff_requests`, `reply_events`, `chat_reply_state` (по profile id); `dialog_counts` не трогаются | `delete_bot_wipes_history_and_requests` (0/0/0/0, счётчики в ответе) | — |
+
+**Приёмка этапа 4:** договорённость вручную → после явного «Авто» бот знает её ✓ (реальная модель: «Завтра в 15:00, спросить Марину»);
+заявка один раз при повторе события ✓; ошибка уведомления не теряет заявку ✓; приложение закрыто → уведомление — self-message
+на канале бота (проверено моком, на устройстве НЕ проверено; push — внешний блокер) → **этап частично готов** по формулировке
+инструкции; denied notification permission — push отсутствует, честный fallback = список заявок + self-message; удаление/изоляция ✓.
+e2e-handoff 14/14 (прогон 2: 13/14, notifier исправлен на per-item и повторён 1/1); Unity 2651/2651. Прод не менялся.

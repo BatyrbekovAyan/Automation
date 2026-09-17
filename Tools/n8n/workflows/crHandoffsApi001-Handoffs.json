@@ -1,0 +1,310 @@
+{
+  "id": "crHandoffsApi001",
+  "name": "Handoffs",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "Handoffs",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a9bf210c-f998-5ad6-a458-e57ef157c051",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "aef4bca0-1127-54f5-a918-4af22966f069"
+    },
+    {
+      "parameters": {
+        "jsCode": "// crAuth GATE — generated into every client webhook by Tools/n8n/apply-auth-gate.py from\n// Tools/n8n/auth/gate.js (+ token.js). Edit the sources, re-run the migration; never the copies.\n//\n// Verifies the Bearer capability token WITHOUT a database round-trip (HMAC, see token.js), then\n// checks that every id the request names is owned by the token's install:\n//   RULE.profiles  — body fields whose value(s) must be ⊆ claims.p   (sentinels ''/'-1' pass)\n//   RULE.workflows — body fields whose value(s) must be ⊆ claims.w   (sentinels ''/'-1' pass)\n//   RULE.appUser   — body fields that must EQUAL claims.u when the token carries one\n//   RULE.legacy    — true: a request WITHOUT a token is admitted in `legacy` mode while\n//                    CR_AUTH_COMPAT_UNTIL lies in the future (old clients); false: 401\n// Output: the webhook item re-emitted with `crAuth` = { ok, mode, reason, installId, appUserId,\n// profiles, workflows, claimPending } so downstream nodes can read the verified identity.\n// CRAUTH-TOKEN-BEGIN\nconst crAuth = (() => {\n  const crypto = require('crypto');\n  const b64u = (buf) => Buffer.from(buf).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n  const unb64u = (s) => Buffer.from(String(s).replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((String(s).length + 3) % 4), 'base64');\n  const isIdList = (a) => Array.isArray(a) && a.every((x) => typeof x === 'string' && x.length > 0 && x.length <= 128);\n  function sign(payload, secret) {\n    if (!secret) throw new Error('crAuth: no signing secret');\n    const p = b64u(JSON.stringify(payload));\n    const sig = crypto.createHmac('sha256', secret).update('v1.' + p).digest();\n    return 'v1.' + p + '.' + b64u(sig);\n  }\n  function verify(token, secrets, nowSec) {\n    if (typeof token !== 'string' || !token) return { ok: false, reason: 'missing' };\n    const parts = token.split('.');\n    if (parts.length !== 3 || parts[0] !== 'v1' || !parts[1] || !parts[2]) return { ok: false, reason: 'malformed' };\n    const given = unb64u(parts[2]);\n    let good = false;\n    for (const sec of (secrets || []).filter(Boolean)) {\n      const exp = crypto.createHmac('sha256', sec).update(parts[0] + '.' + parts[1]).digest();\n      if (exp.length === given.length && crypto.timingSafeEqual(exp, given)) { good = true; break; }\n    }\n    if (!good) return { ok: false, reason: 'bad_signature' };\n    let c;\n    try { c = JSON.parse(unb64u(parts[1]).toString('utf8')); } catch (e) { return { ok: false, reason: 'malformed' }; }\n    if (!c || typeof c !== 'object' || typeof c.i !== 'string' || !c.i || !isIdList(c.p) || !isIdList(c.w)) return { ok: false, reason: 'malformed' };\n    if (typeof c.e !== 'number' || !(c.e > nowSec)) return { ok: false, reason: 'expired' };\n    if (c.c !== undefined && !isIdList(c.c)) return { ok: false, reason: 'malformed' };\n    return { ok: true, claims: { i: c.i, u: (typeof c.u === 'string' && c.u) ? c.u : null, p: c.p, w: c.w, c: c.c || [], e: c.e, n: (typeof c.n === 'number') ? c.n : 1 } };\n  }\n  function sha256Hex(s) { return crypto.createHash('sha256').update(String(s)).digest('hex'); }\n  function randomSecret(bytes) { return b64u(crypto.randomBytes(bytes || 32)); }\n  function bearer(headers) {\n    const h = headers || {};\n    const a = String(h.authorization || h.Authorization || '');\n    return a.startsWith('Bearer ') ? a.slice(7).trim() : '';\n  }\n  return { sign, verify, sha256Hex, randomSecret, bearer, b64u, unb64u };\n})();\n// CRAUTH-TOKEN-END\nconst RULE = {\"profiles\": [\"profileIds\"], \"workflows\": [], \"appUser\": [], \"legacy\": false};\nconst wh = $input.first().json;\nconst secrets = [$env.CR_AUTH_SECRET, $env.CR_AUTH_SECRET_PREV];\nconst compatUntil = Date.parse($env.CR_AUTH_COMPAT_UNTIL || '') || 0;\nconst nowMs = Date.now();\nconst token = crAuth.bearer(wh.headers);\nlet mode = 'session', claims = null, deny = null;\nif (!token) {\n  if (RULE.legacy && compatUntil > nowMs) mode = 'legacy';\n  else deny = 'unauthorized:missing';\n} else {\n  const v = crAuth.verify(token, secrets, Math.floor(nowMs / 1000));\n  if (!v.ok) deny = 'unauthorized:' + v.reason; else claims = v.claims;\n}\nconst body = (wh.body && typeof wh.body === 'object') ? wh.body : {};\nconst isSentinel = (x) => x === undefined || x === null || x === '' || x === '-1';\nconst listOf = (v) => (Array.isArray(v) ? v : [v]);\nconst owned = (set, v) => listOf(v).every((x) => isSentinel(x) || (typeof x === 'string' && set.includes(x)));\nif (!deny && mode === 'session') {\n  for (const f of RULE.profiles || []) if (!owned(claims.p, body[f])) { deny = 'forbidden:' + f; break; }\n  if (!deny) for (const f of RULE.workflows || []) if (!owned(claims.w, body[f])) { deny = 'forbidden:' + f; break; }\n  if (!deny && claims.u) for (const f of RULE.appUser || []) {\n    const v = body[f];\n    if (!isSentinel(v) && String(v) !== claims.u) { deny = 'forbidden:' + f; break; }\n  }\n}\nreturn [{ json: { ...wh, crAuth: {\n  ok: !deny, mode, reason: deny,\n  installId: claims ? claims.i : null, appUserId: claims ? claims.u : null,\n  profiles: claims ? claims.p : [], workflows: claims ? claims.w : [], claimPending: claims ? (claims.c || []) : [],\n} }, pairedItem: { item: 0 } }];\n"
+      },
+      "id": "42949914-9232-5c74-b9d4-095f3531a92c",
+      "name": "Auth Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "25d8ec0d-02bb-54f1-b39e-e54c8bd63c48",
+              "leftValue": "={{ $json.crAuth.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1ce0ea6f-e1f2-5bb9-be3c-934fbb0aceaf",
+      "name": "Authorized?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: 'unauthorized', reason: $json.crAuth.reason } }}",
+        "options": {
+          "responseCode": "={{ String($json.crAuth.reason || '').startsWith('forbidden') ? 403 : 401 }}"
+        }
+      },
+      "id": "64253233-7ac9-5059-9e13-ce1dad2015e7",
+      "name": "Respond 401",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        660,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// HANDOFFS / Validate (generated). Owner-scoped by the gate (profileIds ⊆ token.p); defensive\n// re-intersection here so the SQL only ever sees the caller's own profiles.\nconst wh = $input.first().json || {};\nconst b = wh.body || {};\nconst owned = new Set((wh.crAuth && wh.crAuth.profiles) || []);\nconst op = typeof b.op === 'string' ? b.op : 'list';\nif (!['list', 'take', 'done'].includes(op)) return [{ json: { ok: false, error: 'bad_request', detail: 'op' } }];\nconst ids = Array.isArray(b.profileIds) ? b.profileIds.filter(x => typeof x === 'string' && x && x !== '-1' && owned.has(x)).slice(0, 20) : [];\nif (ids.length === 0) return [{ json: { ok: false, error: 'bad_request', detail: 'profileIds' } }];\nconst id = Number(b.id);\nif (op !== 'list' && !(Number.isInteger(id) && id > 0)) return [{ json: { ok: false, error: 'bad_request', detail: 'id' } }];\nreturn [{ json: { ok: true, op, profileIds: JSON.stringify(ids), id: op === 'list' ? 0 : id } }];\n"
+      },
+      "id": "f79ac55c-30cf-587f-b3a7-7dfdccfeb23d",
+      "name": "Validate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a512d888-26d8-5015-9c52-4df66b85e40b",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a6516a98-5464-5bdc-9c7a-aead6fcde141",
+      "name": "Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\"success\": false, \"error\": \"bad_request\"} }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "6d145507-f354-5bac-a890-a6d72b520908",
+      "name": "Respond 400",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1100,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- A5: the owner's pending requests (+ take/done in the same statement). `done` is the explicit\n-- owner action that also lifts the chat's pause — unless another request in that chat is still open.\nwith p as (\n  select jsonb_array_elements_text($1::jsonb) as profile_id\n), taken as (\n  update handoff_requests h set status = 'taken', taken_at = coalesce(h.taken_at, now()), updated_at = now()\n  where $2 = 'take' and h.id = $3::bigint and h.status = 'open' and h.profile_id in (select profile_id from p)\n  returning h.id\n), done as (\n  update handoff_requests h set status = 'done', done_at = now(), updated_at = now()\n  where $2 = 'done' and h.id = $3::bigint and h.status <> 'done' and h.profile_id in (select profile_id from p)\n  returning h.id, h.profile_id, h.chat_id\n), unpause as (\n  update chat_reply_state c set handoff_paused = false\n  from done d\n  where c.profile_id = d.profile_id and c.chat_id = d.chat_id\n    and not exists (select 1 from handoff_requests o\n                    where o.profile_id = d.profile_id and o.chat_id = d.chat_id and o.status <> 'done' and o.id <> d.id)\n  returning 1\n)\nselect\n  coalesce((select json_agg(json_build_object(\n      'id', h.id, 'profileId', h.profile_id, 'chatId', h.chat_id, 'reason', h.reason,\n      'status', case when $2 = 'take' and h.id = $3::bigint then 'taken' else h.status end,\n      'summary', h.summary, 'data', h.data,\n      'createdAt', (extract(epoch from h.created_at) * 1000)::bigint,\n      'notifyState', h.notify_state,\n      'paused', coalesce(c.handoff_paused, false)) order by h.created_at desc)\n    from handoff_requests h\n    left join chat_reply_state c on c.profile_id = h.profile_id and c.chat_id = h.chat_id\n    where h.profile_id in (select profile_id from p) and h.status <> 'done'\n      and not ($2 = 'done' and h.id = $3::bigint)), '[]'::json) as requests,\n  coalesce((select json_agg(json_build_object('profileId', c.profile_id, 'chatId', c.chat_id))\n    from chat_reply_state c\n    where c.profile_id in (select profile_id from p) and c.handoff_paused\n      and not exists (select 1 from done d where d.profile_id = c.profile_id and d.chat_id = c.chat_id\n                      and not exists (select 1 from handoff_requests o where o.profile_id = d.profile_id and o.chat_id = d.chat_id and o.status <> 'done' and o.id <> d.id))),\n    '[]'::json) as \"pausedChats\",\n  (select count(*) from taken) + (select count(*) from done) as changed;",
+        "options": {
+          "queryReplacement": "={{ [ $json.profileIds, $json.op, $json.id ] }}"
+        }
+      },
+      "id": "1a253817-a0c9-5ce9-9f4f-baa215561ed5",
+      "name": "Handoffs Query",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1100,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.first().json || {};\nif (r.requests === undefined) return [{ json: { success: false, error: 'db_error', _status: 500 } }];\nreturn [{ json: { success: true, requests: r.requests || [], pausedChats: r.pausedChats || [], changed: Number(r.changed) || 0, _status: 200 } }];"
+      },
+      "id": "1c9acb04-7cc4-598f-b606-9d05bf7c55dc",
+      "name": "Shape Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: $json.success, error: $json.error, requests: $json.requests, pausedChats: $json.pausedChats, changed: $json.changed } }}",
+        "options": {
+          "responseCode": "={{ $json._status }}"
+        }
+      },
+      "id": "7a17fabe-9ea3-5257-9e36-425a875d5b5e",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1540,
+        100
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Auth Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth Gate": {
+      "main": [
+        [
+          {
+            "node": "Authorized?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Authorized?": {
+      "main": [
+        [
+          {
+            "node": "Validate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond 401",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate": {
+      "main": [
+        [
+          {
+            "node": "Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid?": {
+      "main": [
+        [
+          {
+            "node": "Handoffs Query",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond 400",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handoffs Query": {
+      "main": [
+        [
+          {
+            "node": "Shape Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shape Response": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "saveManualExecutions": false
+  },
+  "staticData": null,
+  "meta": null,
+  "tags": []
+}
