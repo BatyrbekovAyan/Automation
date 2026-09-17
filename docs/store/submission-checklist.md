@@ -298,7 +298,16 @@
 - Что НЕ причина (проверено): продукты/цены (в первом отказе покупки на iPhone прошли бы тем же
   кодом; US sandbox-тестер покупает E2E 13.09), договоры (Active), «покупка прошла в фоне»
   (событий нет), тайминг SDK (RC-id за 5 с).
-- РЕСАБМИТ (план, билд 1.0 (4)): bump `Tools/Store Compliance/Bump iOS Build Number` → Unity
+- ПРОВЕРКА БИЛДА 1.0 (4) НА iPhone ПРОЙДЕНА 2026-09-17 00:25–00:34 (TestFlight, sandbox US;
+  серверный след `Tools/n8n/review-trace.py`, исполнения #3134–#3149): свежая установка → триал;
+  покупка Старт (у sandbox-аккаунта уже есть история, поэтому RevenueCat пишет PRODUCT_CHANGE/
+  RENEWAL, а не INITIAL_PURCHASE; aliases=2) → GetUsage «start/active/300»; апгрейд → Бизнес
+  «business/active/1000»; NON_RENEWING_PURCHASE topup.dialogs.500 → резерв 500 → 1000; вторая
+  свежая установка + восстановление → RENEWAL business, aliases=3, «business/active, резерв 1000».
+  Путь StoreKit 1 на iPhone работает E2E, как и SK2 до него.
+- РЕСАБМИТ СДЕЛАН 2026-09-17 ~00:50 (билд 1.0 (4)): ответ в тред (текст ниже), затем билд 4 на
+  странице версии → Update Review → Resubmit to App Review. ЖДЁМ ВЕРДИКТ.
+- РЕСАБМИТ (как планировалось, билд 1.0 (4)): bump `Tools/Store Compliance/Bump iOS Build Number` → Unity
   Build (Append) → Xcode Archive → upload → TestFlight на iPhone: покупка Старт, апгрейд,
   докупка 500, восстановление — путь StoreKit 1 обязан работать так же (на iPhone SK1 и SK2
   ведут себя одинаково, отличие только в compat-режиме iPad). Затем ответ в тред + билд 4 →
