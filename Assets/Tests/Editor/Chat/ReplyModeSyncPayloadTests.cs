@@ -17,9 +17,10 @@ public class ReplyModeSyncPayloadTests
     [Test]
     public void BuildPayload_BotDefaultRow_ChatIdStar_SuppressedTrue()
     {
-        var o = JObject.Parse(Manager.BuildReplyModePayload(new[] { "pWA", "pTG" }, "*", true));
+        var o = JObject.Parse(Manager.BuildReplyModePayload(new[] { "pWA", "pTG" }, "*", true, 1700000000123));
         Assert.AreEqual("*", (string)o["chatId"]);
         Assert.IsTrue((bool)o["suppressed"]);
+        Assert.AreEqual(1700000000123L, (long)o["version"], "A2: every write carries its desired-state version");
         var ids = (JArray)o["profileIds"];
         Assert.AreEqual(2, ids.Count);
         CollectionAssert.AreEqual(new[] { "pWA", "pTG" }, ids.Select(t => (string)t).ToArray());
@@ -28,7 +29,7 @@ public class ReplyModeSyncPayloadTests
     [Test]
     public void BuildPayload_PerChatOverride_RealChatId_SuppressedFalse()
     {
-        var o = JObject.Parse(Manager.BuildReplyModePayload(new[] { "pWA" }, "7701@c.us", false));
+        var o = JObject.Parse(Manager.BuildReplyModePayload(new[] { "pWA" }, "7701@c.us", false, 42));
         Assert.AreEqual("7701@c.us", (string)o["chatId"]);
         Assert.IsFalse((bool)o["suppressed"]);
         var ids = (JArray)o["profileIds"];

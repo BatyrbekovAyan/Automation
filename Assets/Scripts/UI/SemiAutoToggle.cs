@@ -61,6 +61,18 @@ public class SemiAutoToggle : MonoBehaviour
         transform.localScale = Vector3.one;
     }
 
+    /// <summary>
+    /// A2: dim the chip while the tapped state is not yet confirmed by the server (pending desire);
+    /// full opacity once the per-profile confirmation lands. The chip stays tappable meanwhile —
+    /// a newer tap simply supersedes the pending one.
+    /// </summary>
+    public void SetPending(bool pending)
+    {
+        var group = GetComponent<CanvasGroup>();
+        if (group == null) group = gameObject.AddComponent<CanvasGroup>();
+        group.alpha = pending ? ReplyModeToggleBinder.PendingAlpha : 1f;
+    }
+
     /// <summary>Sets the visual state. <paramref name="on"/> = semi-auto (chip unlit).</summary>
     public void SetLit(bool on)
     {

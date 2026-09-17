@@ -84,6 +84,50 @@ public class ReplyModeToggleBinder : MonoBehaviour
     /// <summary>Instant OFF — the safe direction never confirms (spec asymmetry).</summary>
     public static void DisableAuto(string botName) => CommitMode(botName, ReplyMode.Semi);
 
+    /// <summary>Opacity of a pill whose tapped state the server has not confirmed yet (A2).</summary>
+    public const float PendingAlpha = 0.55f;
+
+    /// <summary>
+    /// True while <see cref="ReconcileFromServer"/> raises <see cref="OnReplyModeChanged"/>: the
+    /// Manager's sync hook must NOT turn a value the server already holds into a new desire.
+    /// </summary>
+    public static bool ReconcilingFromServer { get; private set; }
+
+    /// <summary>
+    /// The server holds a NEWER bot-default than the local one (another device, or a reordered
+    /// write): persist + repaint every surface WITHOUT writing it back (A2).
+    /// </summary>
+    public static void ReconcileFromServer(string botName, ReplyMode mode)
+    {
+        if (string.IsNullOrEmpty(botName)) return;
+        ReconcilingFromServer = true;
+        try { CommitMode(botName, mode); }
+        finally { ReconcilingFromServer = false; }
+    }
+
+    private void HandleSyncStateChanged(string botId, string chatId)
+    {
+        if (botId != currentBotId || chatId != ReplyModeSyncQueue.BotDefaultChat) return;
+        ApplyPending();
+    }
+
+    private void HandleServerNewer(string botId, string profileId, string chatId, bool suppressed)
+    {
+        if (chatId != ReplyModeSyncQueue.BotDefaultChat) return;
+        ReconcileFromServer(botId, suppressed ? ReplyMode.Semi : ReplyMode.Auto);
+    }
+
+    /// <summary>Dim the header pill while this bot's '*' desire is unconfirmed; restore once confirmed.</summary>
+    private void ApplyPending()
+    {
+        if (toggleButton == null) return;
+        bool pending = ReplyModeSyncService.Existing != null && !string.IsNullOrEmpty(currentBotId)
+                       && ReplyModeSyncService.Existing.IsPending(currentBotId, ReplyModeSyncQueue.BotDefaultChat);
+        var group = toggleButton.GetComponent<CanvasGroup>();
+        if (group == null) group = toggleButton.gameObject.AddComponent<CanvasGroup>();
+        group.alpha = pending ? PendingAlpha : 1f;
+    }
+
     /// <summary>
     /// Route an enable request through the confirm popup (falls back to a direct
     /// commit when no popup is wired, e.g. before the builder ran).
@@ -186,6 +230,9 @@ public class ReplyModeToggleBinder : MonoBehaviour
     private void OnEnable()
     {
         Theme.Changed += RepaintForTheme;
+        ReplyModeSyncService.OnStateChanged += HandleSyncStateChanged;
+        ReplyModeSyncService.OnServerNewer += HandleServerNewer;
+        ApplyPending();
 
         if (ChatManager.Instance == null) return;
         ChatManager.Instance.OnActiveBotChanged += Refresh;
@@ -195,6 +242,8 @@ public class ReplyModeToggleBinder : MonoBehaviour
     private void OnDisable()
     {
         Theme.Changed -= RepaintForTheme;
+        ReplyModeSyncService.OnStateChanged -= HandleSyncStateChanged;
+        ReplyModeSyncService.OnServerNewer -= HandleServerNewer;
 
         if (ChatManager.Instance != null)
             ChatManager.Instance.OnActiveBotChanged -= Refresh;
@@ -224,6 +273,7 @@ public class ReplyModeToggleBinder : MonoBehaviour
     private void Refresh(string botId)
     {
         currentBotId = botId;
+        ApplyPending();   // A2: a bot with an unconfirmed '*' desire opens dimmed
         SetVisualMode(GetMode(botId), animate: false);
     }
 

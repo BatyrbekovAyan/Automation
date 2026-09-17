@@ -24,19 +24,23 @@ public partial class Manager
         public string[] profileIds;
         public string chatId;
         public bool suppressed;
+        // A2: the desired-state version (ReplyModeSyncQueue.NextVersion) — the server applies the
+        // row only when its stored version is older, so a reordered/retried write cannot regress.
+        public long version;
     }
 
     /// <summary>
     /// Serialises the SetReplyMode body. Pure + static so EditMode tests can JObject.Parse it.
     /// chatId is "*" for a bot-wide default row or the real chat id for a per-chat override.
     /// </summary>
-    public static string BuildReplyModePayload(IReadOnlyList<string> profileIds, string chatId, bool suppressed)
+    public static string BuildReplyModePayload(IReadOnlyList<string> profileIds, string chatId, bool suppressed, long version)
     {
         var payload = new ReplyModePayload
         {
             profileIds = profileIds is string[] array ? array : new List<string>(profileIds).ToArray(),
             chatId = chatId,
-            suppressed = suppressed
+            suppressed = suppressed,
+            version = version
         };
         return JsonConvert.SerializeObject(payload);
     }
@@ -57,13 +61,15 @@ public partial class Manager
         !string.IsNullOrEmpty(id) && id != Bot.UnauthedProfileSentinel;
 
     /// <summary>
-    /// Fire-and-forget write of the suppression flag for the given profiles + chat.
-    /// No-ops on an empty/absent profile list so a never-authed bot never writes junk rows.
+    /// Record the owner's choice for the given profiles + chat as a DESIRE in the persisted
+    /// last-state queue (A2): delivered with bounded retries, confirmed per profile by the server,
+    /// survives a restart. No-ops on an empty/absent profile list so a never-authed bot never
+    /// writes junk rows.
     /// </summary>
-    public void SyncReplyMode(string[] profileIds, string chatId, bool suppressed)
+    public void SyncReplyMode(string botId, string[] profileIds, string chatId, bool suppressed)
     {
         if (profileIds == null || profileIds.Length == 0) return;
-        StartCoroutine(SyncReplyModeRoutine(BuildReplyModePayload(profileIds, chatId, suppressed)));
+        ReplyModeSyncService.Instance?.Desire(botId, profileIds, chatId, suppressed);
     }
 
     // --- Bot-default flip hook (ReplyModeToggleBinder.OnReplyModeChanged) -----
@@ -81,9 +87,12 @@ public partial class Manager
     /// </summary>
     private void OnBotReplyModeChanged(string botId, ReplyModeToggleBinder.ReplyMode mode)
     {
+        // A2: a value the SERVER just told us about is not a new desire — writing it back would only
+        // mint a fresh version for a choice the server already holds (and could ping-pong).
+        if (ReplyModeToggleBinder.ReconcilingFromServer) return;
         Bot bot = FindBotByName(botId);
         if (bot == null) return;
-        SyncReplyMode(AuthedProfileIds(bot), "*", mode == ReplyModeToggleBinder.ReplyMode.Semi);
+        SyncReplyMode(botId, AuthedProfileIds(bot), "*", mode == ReplyModeToggleBinder.ReplyMode.Semi);
     }
 
     /// <summary>
@@ -98,23 +107,6 @@ public partial class Manager
     {
         if (!IsRealProfileId(profileId)) return;
         if (ReplyModeToggleBinder.GetMode(botId) != ReplyModeToggleBinder.ReplyMode.Semi) return;
-        SyncReplyMode(new[] { profileId }, "*", true);
-    }
-
-    // POST the JSON to /webhook/SetReplyMode through AuthorizedRequest (A1: Bearer session token,
-    // the gate checks every profileId belongs to this install), Content-Type: application/json
-    // (libcurl would otherwise stamp x-www-form-urlencoded and n8n would 415 it), timeout 30,
-    // using-block, log-only on failure.
-    private IEnumerator SyncReplyModeRoutine(string jsonBody, System.Action<bool> done = null)
-    {
-        string url = $"{n8nBaseUrl}/webhook/SetReplyMode";
-
-        UnityWebRequest request = null;
-        yield return AuthorizedRequest.Send(() => AuthorizedRequest.JsonPost(url, jsonBody, 30), r => request = r);
-        using var requestScope = request;
-
-        if (request.result != UnityWebRequest.Result.Success)
-            Debug.LogError($"[SetReplyMode] [{request.responseCode}] {url}: {request.error}\n{request.downloadHandler?.text}");
-        done?.Invoke(request.result == UnityWebRequest.Result.Success);
+        SyncReplyMode(botId, new[] { profileId }, "*", true);
     }
 }

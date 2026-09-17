@@ -121,6 +121,7 @@ public class Bot : MonoBehaviour
         // A mode committed elsewhere (chats header, bot-switcher chip) must
         // repaint this card — all three controls share the bot's ReplyMode.
         ReplyModeToggleBinder.OnReplyModeChanged += HandleReplyModeChanged;
+        ReplyModeSyncService.OnStateChanged += HandleReplyModeSyncState;
 
         // Returning to the Боты tab after Bot Settings: the channel toggles or
         // the business type may have changed while this card was inactive.
@@ -136,6 +137,7 @@ public class Bot : MonoBehaviour
     {
         Theme.Changed -= HandleThemeChanged;
         ReplyModeToggleBinder.OnReplyModeChanged -= HandleReplyModeChanged;
+        ReplyModeSyncService.OnStateChanged -= HandleReplyModeSyncState;
         KillSublineBlink();
         KillPillTweens();
 
@@ -417,6 +419,14 @@ public class Bot : MonoBehaviour
         if (cardStateReady && botId == transform.name) RefreshCardState(animatePill: true);
     }
 
+    // A2: the capsule's tapped state is painted at once; the subline says whether the server has
+    // confirmed it («Сохраняем режим…» blinking in the connecting blue) or gave up for this
+    // launch («Режим не сохранён», destructive ink). Confirmed = the ordinary subline.
+    private void HandleReplyModeSyncState(string botId, string _)
+    {
+        if (cardStateReady && botId == transform.name) RefreshCardState(animatePill: false);
+    }
+
     // Deferred one frame: Manager renames the instantiated card and writes its
     // PlayerPrefs after Instantiate, so an Awake-time read would see another
     // bot's defaults (the old SetSwitches used the same trick).
@@ -481,10 +491,24 @@ public class Bot : MonoBehaviour
         if (BotDesc == null) return;
 
         bool connecting = Status != null && ColorsClose(Status.color, blue);
+        var sync = ReplyModeSyncService.Existing;
+        bool syncPending = !connecting && sync != null && sync.IsPending(transform.name);
+        bool syncFailed = !connecting && !syncPending && sync != null && sync.HasFailed(transform.name);
         string typeName = connecting ? "" : BusinessTypeDisplayName();
-        BotDesc.text = BotCardModel.SublineText(connecting, typeName);
+        BotDesc.text = syncPending ? ReplyModeSyncCopy.Pending
+                     : syncFailed ? ReplyModeSyncCopy.Failed
+                     : BotCardModel.SublineText(connecting, typeName);
 
-        if (connecting)
+        if (syncPending || syncFailed)
+        {
+            var c = BotDesc.color;
+            Color ink = syncFailed ? Theme.Color(ThemeRole.Destructive) : ConnectingInk;
+            BotDesc.color = new Color(ink.r, ink.g, ink.b, c.a);
+            ApplyChannelIcon(waChannelIcon, whatsappProfileId, "isOnWhatsapp", waIconColored, waIconGray);
+            ApplyChannelIcon(tgChannelIcon, telegramProfileId, "isOnTelegram", tgIconColored, tgIconGray);
+            if (syncPending) EnsureSublineBlink(); else KillSublineBlink();
+        }
+        else if (connecting)
         {
             var c = BotDesc.color;
             BotDesc.color = new Color(ConnectingInk.r, ConnectingInk.g, ConnectingInk.b, c.a);

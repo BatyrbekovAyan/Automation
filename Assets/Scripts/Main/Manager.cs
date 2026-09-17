@@ -3515,6 +3515,9 @@ public partial class Manager : MonoBehaviour
         form.AddField("ProductsList", "");
         form.AddField("ServicesList", "");
         form.AddField("AppUserID", BillingIdentity.AppUserId);
+        // A2: the server seeds this profile's '*' reply-mode row BEFORE activating the clone, so a
+        // «Вместе» bot can never answer in the gap between activation and the client's own write.
+        AddReplyModeFields(form, bot != null ? bot.name : "");
         // BotKey = this bot's stable slot name (already assigned by the time this
         // coroutine runs — Manager.cs sets newBot.name before starting it). Lets the
         // server-side slot backstop retire the SAME bot's old channel row on a
@@ -3652,6 +3655,9 @@ public partial class Manager : MonoBehaviour
         form.AddField("ProductsList", "Products:\n" + productsList);
         form.AddField("ServicesList", "Services:\n" + servicesList);
         form.AddField("AppUserID", BillingIdentity.AppUserId);
+        // A2: the server seeds this profile's '*' reply-mode row BEFORE activating the clone, so a
+        // «Вместе» bot can never answer in the gap between activation and the client's own write.
+        AddReplyModeFields(form, openBot != null ? openBot.name : "");
         // BotKey = this (existing) bot's stable slot name — lets a re-auth/change-number
         // save on the SAME bot retire its own old channel row server-side.
         form.AddField("BotKey", openBot != null ? openBot.name : "");
@@ -3721,6 +3727,9 @@ public partial class Manager : MonoBehaviour
         form.AddField("ProductsList", "");
         form.AddField("ServicesList", "");
         form.AddField("AppUserID", BillingIdentity.AppUserId);
+        // A2: the server seeds this profile's '*' reply-mode row BEFORE activating the clone, so a
+        // «Вместе» bot can never answer in the gap between activation and the client's own write.
+        AddReplyModeFields(form, bot != null ? bot.name : "");
         // See the WhatsApp twin: BotKey = this bot's already-assigned stable slot name.
         form.AddField("BotKey", bot != null ? bot.name : "");
 
@@ -3849,6 +3858,9 @@ public partial class Manager : MonoBehaviour
         form.AddField("ProductsList", "Products:\n" + productsList);
         form.AddField("ServicesList", "Services:\n" + servicesList);
         form.AddField("AppUserID", BillingIdentity.AppUserId);
+        // A2: the server seeds this profile's '*' reply-mode row BEFORE activating the clone, so a
+        // «Вместе» bot can never answer in the gap between activation and the client's own write.
+        AddReplyModeFields(form, openBot != null ? openBot.name : "");
         // See the WhatsApp twin: BotKey = this (existing) bot's stable slot name.
         form.AddField("BotKey", openBot != null ? openBot.name : "");
 
@@ -3903,6 +3915,14 @@ public partial class Manager : MonoBehaviour
     // inside the APK/IPA — anyone unzipping the binary got workflow-CRUD (= code
     // execution) on the whole server. The webhook validates the id, refuses the
     // canonical infra workflows, and performs the operation server-side.
+    /// <summary>The bot's current reply mode + a fresh desired-state version for the Create handlers' seed.</summary>
+    private static void AddReplyModeFields(WWWForm form, string botName)
+    {
+        bool semi = string.IsNullOrEmpty(botName) || ReplyModeToggleBinder.GetMode(botName) == ReplyModeToggleBinder.ReplyMode.Semi;
+        form.AddField("ReplyMode", semi ? "semi" : "auto");
+        form.AddField("ReplyModeVersion", ReplyModeSyncQueue.NextVersion(System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), 0).ToString());
+    }
+
     private static UnityWebRequest NewWorkflowStateRequest(string workflowId, string action)
     {
         var www = new UnityWebRequest($"{n8nBaseUrl}{WorkflowStateRequest.Path}", "POST");
@@ -4126,8 +4146,9 @@ public partial class Manager : MonoBehaviour
             if (suppressProfileIds.Length > 0)
             {
                 replySuppressionReady = false;
-                yield return SyncReplyModeRoutine(
-                    BuildReplyModePayload(suppressProfileIds, "*", true),
+                // A2: the row counts only once the server CONFIRMED it for every profile (per-profile
+                // report, versioned) — never on a bare HTTP 200.
+                yield return ReplyModeSyncService.Instance.SendAndConfirm(openBot.name, suppressProfileIds, "*", true,
                     ok => replySuppressionReady = ok);
             }
         }

@@ -159,6 +159,8 @@ public class SuggestionsController : MonoBehaviour
             ChatManager.Instance.OnActiveBotChanged += HandleBotChanged;
         }
         if (_toggle != null) _toggle.OnToggled += HandleToggle;
+        ReplyModeSyncService.OnStateChanged += HandleReplyModeSyncState;
+        ReplyModeSyncService.OnServerNewer += HandleReplyModeServerNewer;
         if (_panel != null)
         {
             _panel.OnCardTapped += HandleCardTapped;
@@ -225,6 +227,8 @@ public class SuggestionsController : MonoBehaviour
             ChatManager.Instance.OnActiveBotChanged -= HandleBotChanged;
         }
         if (_toggle != null) _toggle.OnToggled -= HandleToggle;
+        ReplyModeSyncService.OnStateChanged -= HandleReplyModeSyncState;
+        ReplyModeSyncService.OnServerNewer -= HandleReplyModeServerNewer;
         if (_panel != null)
         {
             _panel.OnCardTapped -= HandleCardTapped;
@@ -456,7 +460,30 @@ public class SuggestionsController : MonoBehaviour
         if (bot == null) return;
         string profileId = cm.ActiveChannelProfileId();       // C3 accessor, wraps GetActiveProfileId()
         if (string.IsNullOrEmpty(profileId) || profileId == Bot.UnauthedProfileSentinel) return;
-        Manager.Instance.SyncReplyMode(new[] { profileId }, cm.CurrentChatId, suppressed);
+        Manager.Instance.SyncReplyMode(cm.CurrentBotId, new[] { profileId }, cm.CurrentChatId, suppressed);
+    }
+
+    // --- A2: the server's answer (confirmation, or a NEWER value from another device) ---------------
+    // A tap paints the chip immediately but dimmed (pending); the server's per-profile confirmation
+    // lifts the dim. A newer server value for THIS chat replaces the local override outright — the
+    // stale tap must never win over a choice the server already holds.
+    private void HandleReplyModeSyncState(string botId, string chatId)
+    {
+        var cm = ChatManager.Instance;
+        if (cm == null || _toggle == null || botId != cm.CurrentBotId || chatId != cm.CurrentChatId) return;
+        _toggle.SetPending(ReplyModeSyncService.Existing != null && ReplyModeSyncService.Existing.IsPending(botId, chatId));
+    }
+
+    private void HandleReplyModeServerNewer(string botId, string profileId, string chatId, bool suppressed)
+    {
+        var cm = ChatManager.Instance;
+        if (cm == null || chatId == ReplyModeSyncQueue.BotDefaultChat) return;         // '*' rows reconcile through the binder
+        SemiAutoStore.Set(botId, chatId, suppressed);                                  // the server's choice is now the override
+        if (botId != cm.CurrentBotId || chatId != cm.CurrentChatId) return;
+        _semiAutoOn = EffectiveSemiAuto(suppressed);
+        if (_toggle != null) _toggle.SetLit(_semiAutoOn);
+        if (_slotKey != null) _slotKey.SetVisible(_semiAutoOn);
+        if (_semiAutoOn) ShowPanel(claimSlotFromKeyboard: false); else HidePanel();
     }
 
     // --- Issue + guard (DATA-03 — capture seq + chat, discard superseded/chat-switched) ---
