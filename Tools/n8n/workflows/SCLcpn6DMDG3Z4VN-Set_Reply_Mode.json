@@ -20,7 +20,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const b = $json.body || {};\nconst sentinel = (id) => !id || id === \"-1\";\n// Harden against the Postgres node's queryReplacement comma-split (WR-03): a comma inside a\n// value shifts the positional $1,$2,$3 parameters. Legit Wappi ids never contain commas.\n// Length cap + slice(0, 10) bound the unauthenticated fan-out (IN-03); legit client sends <= 2.\nconst clean = (s) => typeof s === \"string\" && s.length > 0 && s.length <= 128 && !s.includes(\",\");\nlet ids = Array.isArray(b.profileIds) ? b.profileIds.filter(x => clean(x) && !sentinel(x)).slice(0, 10) : [];\nconst okChat = clean(b.chatId);\nconst okSup  = typeof b.suppressed === \"boolean\";\nif (ids.length === 0 || !okChat || !okSup) return [{ json: { invalid: true } }];\nreturn ids.map(pid => ({ json: { profileId: pid, chatId: b.chatId, suppressed: b.suppressed } }));"
+        "jsCode": "const b = $json.body || {};\nconst sentinel = (id) => !id || id === \"-1\";\n// Harden against the Postgres node's queryReplacement comma-split (WR-03): a comma inside a\n// value shifts the positional parameters. Legit Wappi ids never contain commas.\n// Length cap + slice(0, 10) bound the fan-out (IN-03); legit client sends <= 2.\nconst clean = (s) => typeof s === \"string\" && s.length > 0 && s.length <= 128 && !s.includes(\",\");\nlet ids = Array.isArray(b.profileIds) ? b.profileIds.filter(x => clean(x) && !sentinel(x)).slice(0, 10) : [];\nids = Array.from(new Set(ids));\nconst okChat = clean(b.chatId);\nconst okSup  = typeof b.suppressed === \"boolean\";\n// A2 (2026-09-17): the desired-state VERSION. The client mints a per-(profile,chat) monotonic number\n// (ms timestamp with a local monotonic guard); the upsert applies a row only when the stored version\n// is OLDER, so a delayed retry or a reordered response can never overwrite a newer desire. A legacy\n// client sends none: the server assigns \"now\", which keeps its last-arrival semantics.\nconst hasVersion = (Number.isInteger(b.version) && b.version > 0) || (typeof b.version === \"string\" && /^[1-9]\\d{0,15}$/.test(b.version));\nconst version = hasVersion ? Number(b.version) : Date.now();\nif (ids.length === 0 || !okChat || !okSup) return [{ json: { invalid: true } }];\nreturn [{ json: { invalid: false, profileIds: ids, chatId: b.chatId, suppressed: b.suppressed, version, legacy: !hasVersion } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -69,7 +69,9 @@
       "parameters": {
         "respondWith": "json",
         "responseBody": "={{ { \"success\": false, \"error\": \"bad_request\" } }}",
-        "options": {}
+        "options": {
+          "responseCode": 400
+        }
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
@@ -84,9 +86,9 @@
       "parameters": {
         "resource": "database",
         "operation": "executeQuery",
-        "query": "insert into reply_mode_flags (profile_id, chat_id, suppressed, updated_at)\nvalues ($1, $2, $3::boolean, now())\non conflict (profile_id, chat_id) do update\n  set suppressed = excluded.suppressed, updated_at = now();",
+        "query": "-- A2: ONE statement for every requested profile — all rows or none (a partial write can never read\n-- as «the whole bot switched»). A row is applied only when the stored version is OLDER than the\n-- request's; for a stale request the report carries the server's CURRENT value + version so the\n-- client adopts it instead of retrying forever. `cur` reads the pre-statement snapshot on purpose\n-- (a data-modifying CTE is invisible to the rest of the same statement), which is exactly the\n-- \"what the server holds if we were not applied\" value.\nwith req as (\n  select jsonb_array_elements_text($1::jsonb) as profile_id, $2::text as chat_id, $3::boolean as suppressed, $4::bigint as version\n), up as (\n  insert into reply_mode_flags (profile_id, chat_id, suppressed, version, updated_at)\n  select profile_id, chat_id, suppressed, version, now() from req\n  on conflict (profile_id, chat_id) do update\n    set suppressed = excluded.suppressed, version = excluded.version, updated_at = now()\n    where reply_mode_flags.version < excluded.version\n  returning profile_id, suppressed, version\n)\nselect r.profile_id as \"profileId\",\n       (up.profile_id is not null) as applied,\n       coalesce(up.suppressed, cur.suppressed) as suppressed,\n       coalesce(up.version, cur.version, 0)::bigint as version\nfrom req r\nleft join up on up.profile_id = r.profile_id\nleft join reply_mode_flags cur on cur.profile_id = r.profile_id and cur.chat_id = r.chat_id;",
         "options": {
-          "queryReplacement": "={{ $json.profileId }},{{ $json.chatId }},{{ $json.suppressed }}"
+          "queryReplacement": "={{ [ JSON.stringify($json.profileIds), $json.chatId, $json.suppressed, $json.version ] }}"
         }
       },
       "type": "n8n-nodes-base.postgres",
@@ -102,13 +104,17 @@
           "id": "vvRrFiEXzLVqKjOx",
           "name": "Postgres"
         }
-      }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { \"success\": true, \"written\": $items().length } }}",
-        "options": {}
+        "responseBody": "={{ Object.fromEntries(Object.entries($json).filter(([k]) => k !== '_status')) }}",
+        "options": {
+          "responseCode": "={{ $json._status || 200 }}"
+        }
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
@@ -182,6 +188,19 @@
         600,
         460
       ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// A2: the confirmation the client acts on. Every requested profile is reported; `allApplied` is\n// the only thing that may be read as «the switch is confirmed». A DB error never reads as success.\nconst v = $('Validate').first().json;\nconst rows = $input.all().map(i => i.json).filter(r => r && typeof r === 'object');\nif (rows.some(r => r.error)) {\n  return [{ json: { success: false, error: 'db_error', _status: 500 }, pairedItem: { item: 0 } }];\n}\nconst applied = rows.filter(r => r.profileId !== undefined).map(r => ({\n  profileId: String(r.profileId), applied: r.applied === true,\n  suppressed: r.suppressed === true, version: Number(r.version) || 0,\n}));\nconst requested = Array.isArray(v.profileIds) ? v.profileIds : [];\nconst allApplied = requested.length > 0 && applied.length === requested.length && applied.every(a => a.applied);\nreturn [{ json: {\n  success: true, chatId: v.chatId, requestedVersion: v.version, legacy: v.legacy === true,\n  allApplied, applied, written: applied.filter(a => a.applied).length, _status: 200,\n}, pairedItem: { item: 0 } }];"
+      },
+      "id": "9d1362e0-786e-5593-a5d0-bd8ad0e943f3",
+      "name": "Shape Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        120
+      ]
     }
   ],
   "connections": {
@@ -229,7 +248,7 @@
       "main": [
         [
           {
-            "node": "Respond",
+            "node": "Shape Response",
             "type": "main",
             "index": 0
           }
@@ -259,6 +278,17 @@
         [
           {
             "node": "Respond 401",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shape Response": {
+      "main": [
+        [
+          {
+            "node": "Respond",
             "type": "main",
             "index": 0
           }

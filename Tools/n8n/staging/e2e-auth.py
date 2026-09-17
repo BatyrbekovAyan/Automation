@@ -260,6 +260,83 @@ def s_claim_reauth(ctx):
     return ok, f"qr_allowed={st_qr} chats_refused={st_chats} before_pairing_owned={legacy in d1.get('profiles', [])} after_pairing_owned={legacy in d2.get('profiles', [])}"
 
 
+def multipart(fields):
+    boundary = "----crE2E" + uuid.uuid4().hex
+    body = b""
+    for k, v in fields.items():
+        body += (f"--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n{v}\r\n").encode("utf-8")
+    body += f"--{boundary}--\r\n".encode()
+    return body, f"multipart/form-data; boundary={boundary}"
+
+
+def hook_form(name, token, fields, timeout=120):
+    body, ctype = multipart(fields)
+    req = urllib.request.Request(f"{BASE}/webhook/{name}", data=body, method="POST",
+                                 headers={"Content-Type": ctype, **({"Authorization": f"Bearer {token}"} if token else {})})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            raw = r.read().decode()
+            return r.status, (json.loads(raw) if raw else None)
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode()
+        try:
+            return e.code, json.loads(raw)
+        except Exception:
+            return e.code, raw
+
+
+def pg(sqltext):
+    return subprocess.run([os.path.join(HERE, "pg.sh"), "psql", "-tAc", sqltext], capture_output=True, text=True).stdout.strip()
+
+
+@scenario("replymode_reordered_versions_keep_newest", "SetReplyMode v2: a later request with an OLDER version is not applied; the reply reports the server's newer value")
+def s_rm_reorder(ctx):
+    a = ctx["A"]
+    pid = a.profiles[0]
+    st1, d1 = hook("SetReplyMode", a.token, {"profileIds": [pid], "chatId": "*", "suppressed": True, "version": 200})
+    st2, d2 = hook("SetReplyMode", a.token, {"profileIds": [pid], "chatId": "*", "suppressed": False, "version": 100})
+    row = pg(f"select suppressed || '|' || version from reply_mode_flags where profile_id = '{pid}' and chat_id = '*';")
+    ok = (st1 == 200 and d1.get("success") and d1.get("allApplied") is True
+          and st2 == 200 and d2.get("success") and d2.get("allApplied") is False
+          and d2["applied"][0]["applied"] is False and d2["applied"][0]["suppressed"] is True and d2["applied"][0]["version"] == 200
+          and row == "true|200")
+    return ok, f"first={st1}/{d1.get('allApplied')} stale={st2}/{d2.get('allApplied')} report={d2.get('applied')} row={row!r}"
+
+
+@scenario("replymode_legacy_body_still_writes", "SetReplyMode v2: a legacy body (no version) is applied with a server-assigned version and reads success + written")
+def s_rm_legacy(ctx):
+    a = ctx["A"]
+    pid = a.profiles[0]
+    st, d = hook("SetReplyMode", a.token, {"profileIds": [pid], "chatId": "*", "suppressed": False})
+    row = pg(f"select suppressed from reply_mode_flags where profile_id = '{pid}' and chat_id = '*';")
+    ok = st == 200 and d.get("success") and d.get("legacy") is True and d.get("allApplied") is True and d.get("written") == 1 and row == "f"
+    return ok, f"http={st} legacy={d.get('legacy')} allApplied={d.get('allApplied')} written={d.get('written')} row={row!r}"
+
+
+@scenario("replymode_invalid_is_400", "SetReplyMode v2: a malformed body answers 400 (was 200 + success:false)")
+def s_rm_invalid(ctx):
+    a = ctx["A"]
+    st, d = hook("SetReplyMode", a.token, {"profileIds": [a.profiles[0]], "chatId": "*"})
+    return st == 400 and d.get("success") is False, f"http={st} body={d}"
+
+
+@scenario("create_seeds_reply_mode_before_activation", "CreateWhatsappWorkflow with ReplyMode=semi: the '*' row exists after create, the clone id is bound to the profile, the token learns it, and SetWorkflowState can delete it")
+def s_create_seed(ctx):
+    a = ctx["A"]
+    pid = a.add_profile()
+    fields = {"Name": f"e2e-{ctx['run_id']}", "BusinessType": "Цветы", "BusinessTypeId": "flowers", "WhatsappProfileId": pid,
+              "TelegramWorkflowId": "-1", "Business": "", "Prompt": "", "ProductsList": "", "ServicesList": "",
+              "AppUserID": a.app_user_id, "BotKey": f"Bot-e2e-{ctx['run_id']}", "ReplyMode": "semi", "ReplyModeVersion": "150"}
+    st, d = hook_form("CreateWhatsappWorkflow", a.token, fields)
+    wid = (d or {}).get("id") if isinstance(d, dict) else None
+    row = pg(f"select suppressed || '|' || version from reply_mode_flags where profile_id = '{pid}' and chat_id = '*';")
+    bound = pg(f"select workflow_id from bot_profiles where profile_id = '{pid}';")
+    d2 = a.refresh()
+    st3, d3 = hook("SetWorkflowState", a.token, {"workflowId": wid or "x", "action": "delete"}) if wid else (0, None)
+    ok = st == 200 and bool(wid) and row == "true|150" and bound == wid and wid in d2.get("workflows", []) and st3 == 200
+    return ok, f"create={st} id={wid} row={row!r} bound={bound == wid} token_has_wf={wid in d2.get('workflows', [])} delete={st3} {d3}"
+
+
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--only"); ap.add_argument("--compat-closed", action="store_true"); a = ap.parse_args()
     if not AUTH_SECRET:

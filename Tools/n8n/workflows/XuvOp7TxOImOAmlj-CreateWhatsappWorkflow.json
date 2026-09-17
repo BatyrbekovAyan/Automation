@@ -92,7 +92,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://n8n.choosereply.com/api/v1/workflows/{{ $json.id }}/activate",
+        "url": "=https://n8n.choosereply.com/api/v1/workflows/{{ $('Get Created Workflow Id').first().json.id }}/activate",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {}
@@ -654,6 +654,31 @@
       },
       "alwaysOutputData": true,
       "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- A2: the profile's initial reply mode lands BEFORE the clone is activated (the gate reads absence\n-- as «reply», so activating first opened a window in which a «Вместе» bot answered). Only a client\n-- that states its mode writes; a legacy client (no ReplyMode field) keeps the old absence semantics.\n-- Version-guarded like Set Reply Mode: a newer explicit choice already stored is never downgraded.\ninsert into reply_mode_flags (profile_id, chat_id, suppressed, version, updated_at)\nselect $1, '*', ($2 = 'semi'), $3::bigint, now()\nwhere nullif($1, '') is not null and $1 <> '-1' and $2 in ('semi', 'auto')\non conflict (profile_id, chat_id) do update\n  set suppressed = excluded.suppressed, version = excluded.version, updated_at = now()\n  where reply_mode_flags.version < excluded.version;",
+        "options": {
+          "queryReplacement": "={{ [ $('Unity Webhook').first().json.body.WhatsappProfileId, String($('Unity Webhook').first().json.body.ReplyMode || ''), String($('Unity Webhook').first().json.body.ReplyModeVersion || '0') ] }}"
+        }
+      },
+      "id": "50fb9d3c-8da5-5405-859a-67172aa31730",
+      "name": "Seed Reply Mode",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2244,
+        204
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -694,7 +719,7 @@
       "main": [
         [
           {
-            "node": "Activate Created Workflow",
+            "node": "Seed Reply Mode",
             "type": "main",
             "index": 0
           }
@@ -903,6 +928,17 @@
         [
           {
             "node": "Send New Workflows Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Seed Reply Mode": {
+      "main": [
+        [
+          {
+            "node": "Activate Created Workflow",
             "type": "main",
             "index": 0
           }
