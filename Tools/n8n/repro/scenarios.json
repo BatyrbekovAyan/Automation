@@ -1,0 +1,120 @@
+[
+  {
+    "id": "combine_single_proceeds",
+    "title": "single incoming text: the winner proceeds with its own text",
+    "workflows": ["4wYitz5ek30SVNlT-WhatsApp_Bot.json", "4VN3gsFaC2HUYmcc-Telegram_Bot.json"],
+    "node": "Latest+Combine",
+    "ctx": {
+      "nodes": {"Webhook": [{"json": {"body": {"messages": [{"id": "a", "chatId": "audit", "from": "audit", "profile_id": "p1", "body": "Цена?", "time": 10, "fromMe": false, "type": "chat"}]}}}]},
+      "input": [{"json": {"messages": [{"id": "a", "chatId": "audit", "from": "audit", "body": "Цена?", "time": 10, "fromMe": false, "type": "chat"}]}}]
+    },
+    "expect": {"abort": false, "combinedText": "Цена?"}
+  },
+  {
+    "id": "combine_burst_joins_oldest_first",
+    "title": "a burst of client fragments is joined oldest->newest and only the newest fragment's run proceeds",
+    "workflows": ["4wYitz5ek30SVNlT-WhatsApp_Bot.json", "4VN3gsFaC2HUYmcc-Telegram_Bot.json"],
+    "node": "Latest+Combine",
+    "ctx": {
+      "nodes": {"Webhook": [{"json": {"body": {"messages": [{"id": "b", "chatId": "audit", "from": "audit", "profile_id": "p1", "body": "Сколько?", "time": 11, "fromMe": false, "type": "chat"}]}}}]},
+      "input": [{"json": {"messages": [{"id": "a", "chatId": "audit", "body": "Цена?", "time": 10, "fromMe": false, "type": "chat"}, {"id": "b", "chatId": "audit", "body": "Сколько?", "time": 11, "fromMe": false, "type": "chat"}]}}]
+    },
+    "expect": {"abort": false, "combinedText": "Цена?\nСколько?"}
+  },
+  {
+    "id": "combine_newer_incoming_aborts",
+    "title": "a newer client message already visible in the fetch supersedes the trigger (abort)",
+    "workflows": ["4wYitz5ek30SVNlT-WhatsApp_Bot.json", "4VN3gsFaC2HUYmcc-Telegram_Bot.json"],
+    "node": "Latest+Combine",
+    "ctx": {
+      "nodes": {"Webhook": [{"json": {"body": {"messages": [{"id": "a", "chatId": "audit", "from": "audit", "profile_id": "p1", "body": "Цена?", "time": 10, "fromMe": false, "type": "chat"}]}}}]},
+      "input": [{"json": {"messages": [{"id": "a", "chatId": "audit", "body": "Цена?", "time": 10, "fromMe": false, "type": "chat"}, {"id": "b", "chatId": "audit", "body": "Ещё вопрос", "time": 11, "fromMe": false, "type": "chat"}]}}]
+    },
+    "expect": {"abort": true}
+  },
+  {
+    "id": "combine_foreign_chat_aborts",
+    "title": "a fully crossed fetch (rows of another chat only) never drives a reply (abort)",
+    "workflows": ["4wYitz5ek30SVNlT-WhatsApp_Bot.json", "4VN3gsFaC2HUYmcc-Telegram_Bot.json"],
+    "node": "Latest+Combine",
+    "ctx": {
+      "nodes": {"Webhook": [{"json": {"body": {"messages": [{"id": "a", "chatId": "audit", "from": "audit", "profile_id": "p1", "body": "Цена?", "time": 10, "fromMe": false, "type": "chat"}]}}}]},
+      "input": [{"json": {"messages": [{"id": "a", "chatId": "other", "body": "Цена?", "time": 10, "fromMe": false, "type": "chat"}]}}]
+    },
+    "expect": {"abort": true, "foreignFetched": 1}
+  },
+  {
+    "id": "combine_human_reply_after_trigger_aborts",
+    "title": "the owner answered AFTER the trigger (fromMe row newer than the client message): the auto-reply must abort",
+    "defect": "A3 — reproduced 2026-09-16: abort=false, combinedText=null, Text falls back to the webhook body",
+    "workflows": ["4wYitz5ek30SVNlT-WhatsApp_Bot.json", "4VN3gsFaC2HUYmcc-Telegram_Bot.json"],
+    "node": "Latest+Combine",
+    "ctx": {
+      "nodes": {"Webhook": [{"json": {"body": {"messages": [{"id": "a", "chatId": "audit", "from": "audit", "profile_id": "p1", "body": "Цена?", "time": 10, "fromMe": false, "type": "chat"}]}}}]},
+      "input": [{"json": {"messages": [{"id": "a", "chatId": "audit", "body": "Цена?", "time": 10, "fromMe": false, "type": "chat"}, {"id": "h", "chatId": "audit", "body": "Уже ответил", "time": 11, "fromMe": true, "type": "chat"}]}}]
+    },
+    "expect": {"abort": true}
+  },
+  {
+    "id": "combine_owner_reply_before_trigger_is_not_intervention",
+    "title": "an owner message OLDER than the trigger is ordinary history, not an intervention: proceed",
+    "workflows": ["4wYitz5ek30SVNlT-WhatsApp_Bot.json", "4VN3gsFaC2HUYmcc-Telegram_Bot.json"],
+    "node": "Latest+Combine",
+    "ctx": {
+      "nodes": {"Webhook": [{"json": {"body": {"messages": [{"id": "a", "chatId": "audit", "from": "audit", "profile_id": "p1", "body": "Цена?", "time": 10, "fromMe": false, "type": "chat"}]}}}]},
+      "input": [{"json": {"messages": [{"id": "h0", "chatId": "audit", "body": "Здравствуйте!", "time": 9, "fromMe": true, "type": "chat"}, {"id": "a", "chatId": "audit", "body": "Цена?", "time": 10, "fromMe": false, "type": "chat"}]}}]
+    },
+    "expect": {"abort": false, "combinedText": "Цена?"}
+  },
+  {
+    "id": "prep_short_follow_up_keeps_subject",
+    "title": "«Да, сколько стоит?» after «Нужен фильтр Camry 2019» — the retrieval query must still carry the subject",
+    "defect": "S4 — reproduced 2026-09-16: queryText = «Да, сколько стоит?» only",
+    "workflows": ["9PTyYcelRQI7bGDb-Suggest_Replies.json"],
+    "node": "Prep",
+    "ctx": {
+      "input": [{"json": {"body": {"v": 1, "requestSeq": 3, "profileId": "p1", "chatId": "audit@c.us", "botWaId": "wf1", "botTgId": "-1", "channel": "whatsapp", "businessTypeId": "auto_parts", "businessName": "АвтоЗапчасти", "ownerPrompt": "", "catalog": "", "businessKnowledge": "", "steerTowardText": null, "lastIncomingText": null, "appUserId": "u1",
+        "messages": [{"role": "client", "text": "Нужен фильтр Camry 2019", "ts": 1}, {"role": "business", "text": "Масляный фильтр?", "ts": 2}, {"role": "client", "text": "Да, сколько стоит?", "ts": 3}]}}}]
+    },
+    "expect": {"queryText": {"contains": ["Camry", "фильтр"]}, "skipRag": false}
+  },
+  {
+    "id": "prep_full_history_still_reaches_generator",
+    "title": "the generator keeps the whole trailing history (the audit's S4 is about the query, not the history)",
+    "workflows": ["9PTyYcelRQI7bGDb-Suggest_Replies.json"],
+    "node": "Prep",
+    "ctx": {
+      "input": [{"json": {"body": {"v": 1, "requestSeq": 3, "profileId": "p1", "chatId": "audit@c.us", "botWaId": "wf1", "botTgId": "-1", "channel": "whatsapp", "businessTypeId": "auto_parts", "businessName": "АвтоЗапчасти", "appUserId": "u1",
+        "messages": [{"role": "client", "text": "Нужен фильтр Camry 2019", "ts": 1}, {"role": "business", "text": "Масляный фильтр?", "ts": 2}, {"role": "client", "text": "Да, сколько стоит?", "ts": 3}]}}}]
+    },
+    "expect": {"messages.length": 3, "messages.0.text": "Нужен фильтр Camry 2019"}
+  },
+  {
+    "id": "prep_missing_identity_is_marked_invalid_before_the_gate",
+    "title": "a request without appUserId must be refused as invalid input (not sent to the gate as an empty id)",
+    "defect": "0.3 — today Prep passes appUserId='' through; the gate then labels it missing_app_user_id after a DB round-trip",
+    "workflows": ["9PTyYcelRQI7bGDb-Suggest_Replies.json"],
+    "node": "Prep",
+    "ctx": {
+      "input": [{"json": {"body": {"v": 1, "requestSeq": 1, "profileId": "p1", "chatId": "audit@c.us", "botWaId": "-1", "botTgId": "-1", "channel": "whatsapp", "businessTypeId": "flowers", "businessName": "Цветы",
+        "messages": [{"role": "client", "text": "сколько стоит букет?", "ts": 1}]}}}]
+    },
+    "expect": {"invalid": true}
+  },
+  {
+    "id": "setreplymode_validate_rejects_empty_body",
+    "title": "Set Reply Mode: an empty body is invalid (server contract; the HTTP status for it is asserted by the staging e2e)",
+    "workflows": ["SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json"],
+    "node": "Validate",
+    "ctx": {"input": [{"json": {"body": {}}}]},
+    "expect": {"invalid": true}
+  },
+  {
+    "id": "setreplymode_validate_fans_out_per_profile",
+    "title": "Set Reply Mode: two profile ids produce two upsert rows with the same chat/flag",
+    "workflows": ["SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json"],
+    "node": "Validate",
+    "ctx": {"input": [{"json": {"body": {"profileIds": ["wa1", "tg1"], "chatId": "*", "suppressed": true}}}]},
+    "expect": {"profileId": "wa1", "chatId": "*", "suppressed": true}
+  }
+]

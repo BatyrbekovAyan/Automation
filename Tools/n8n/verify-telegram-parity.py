@@ -56,7 +56,8 @@ PG_MEMORY_CRED = "1H5xlpFSESU4w6JH"
 # History: Phase 4 parity baseline = 24 nodes; Phase 9 suppression gate +2 (Read Reply
 # Mode, Suppressed?); Phase 10 debounce splice +4 (Debounce Wait, Fetch Recent,
 # Latest+Combine, Is Latest?); billing Task 9 dialog-metering splice +3 (Count Dialog,
-# Quota Decision, If Quota Allows). A future splice must extend this set deliberately.
+# Quota Decision, If Quota Allows); audit 2026-09 stage 0.5 +1 (Outcome, appended LAST so the
+# nodes[0]/nodes[5] orchestrator indices hold). A future splice must extend this set deliberately.
 TG_BOT_NODE_NAMES = {
     "Webhook", "HTTP Request", "Transcribe Audio", "Text", "Audio", "AI Agent",
     "Input type", "Mark Read", "Typing", "Reading Pause", "Typing Pause",
@@ -66,6 +67,7 @@ TG_BOT_NODE_NAMES = {
     "OpenAI", "Supabase Vector Store", "Retrieve Answer", "OpenAI Embedding",
     "Debounce Wait", "Fetch Recent", "Latest+Combine", "Is Latest?",
     "Count Dialog", "Quota Decision", "If Quota Allows",
+    "Outcome",   # audit stage 0.5 terminal outcome stamp (apply-outcome-stamps.py)
 }
 
 
@@ -350,12 +352,13 @@ def check_dialog_metering(f):
         f"{f}: Quota Decision does not feed If Quota Allows: {conns['Quota Decision']}"
 
     # (iii) If Quota Allows: TRUE (allowed) -> Input type (the reply-generation chain);
-    # FALSE (blocked) -> nothing, matching Suppressed?/Is Latest?'s own dead-end idiom
-    # for "do not auto-reply."
+    # FALSE (blocked) -> ONLY the Outcome stamp (stage 0.5), matching Suppressed?/Is Latest?'s
+    # idiom for "do not auto-reply" — nothing on that branch may generate or send.
     iqa = conns["If Quota Allows"]["main"]
     assert iqa[0] == [{"node": "Input type", "type": "main", "index": 0}], \
         f"{f}: If Quota Allows true-branch does not feed Input type: {iqa[0]}"
-    assert iqa[1] == [], f"{f}: If Quota Allows false-branch is not a dead end: {iqa[1]}"
+    assert iqa[1] == [{"node": "Outcome", "type": "main", "index": 0}], \
+        f"{f}: If Quota Allows false-branch must end only at the Outcome stamp: {iqa[1]}"
 
     # (iv) Count Dialog is fail-open: a Supabase outage or an unregistered profile (0
     # rows from the `me` CTE) must never silence the bot -- mirrors Restamp RAG

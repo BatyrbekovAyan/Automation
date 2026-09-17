@@ -28,6 +28,8 @@ BASE = os.environ.get("N8N_BASE_URL", "https://n8n.choosereply.com").rstrip("/")
 KEY = os.environ.get("N8N_API_KEY") or open(os.path.join(HERE, ".secrets", "prod-api-key.txt")).read().strip()
 
 # Bot-pipeline terminal node -> outcome label (see docs/audits/implementation-progress.md, stage 0.5).
+# Templates carrying the `Outcome` stamp (apply-outcome-stamps.py) report their label directly; this
+# map is the fallback for executions of clones that predate the stamp.
 BOT_OUTCOME_BY_LAST_NODE = {
     "If": "filtered",               # from != chatId (group / foreign) -> dead-end
     "Read Reply Mode": "error",     # gate read never completed
@@ -96,6 +98,13 @@ def summarise(name, wf_id, outcome_map, suggest=False):
         last = rd.get("lastNodeExecuted")
         status = d.get("status")
         outcome = outcome_map.get(last, f"other:{last}")
+        stamp = None
+        for run in rd.get("runData", {}).get("Outcome", []) or []:
+            for br in (run.get("data") or {}).get("main") or []:
+                for it in br or []:
+                    stamp = (it.get("json") or {}).get("outcome") or stamp
+        if stamp:
+            outcome = stamp
         if status not in ("success", "finished"):
             outcome = f"status:{status}"
         if suggest and last == "Respond":

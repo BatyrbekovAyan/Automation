@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+"""Explicit, run-scoped test fixtures for the STAGING database (audit stage 0.3).
+
+Every fixture carries a unique run id in its keys, and `delete` removes ONLY rows carrying that
+exact id — never a broad prefix, never another run's rows (instruction: «удаляй только по
+уникальной области данного запуска»). Runs against the staging Postgres from staging/pg.sh.
+
+    python3 Tools/n8n/staging/fixtures.py create-subscriber [--status trialing|active|grace|expired] [--plan trial|start|...]
+        -> prints the new app_user_id  (probe-<runid>)
+    python3 Tools/n8n/staging/fixtures.py register-profile --app-user-id <id> --profile-id <pid> --channel whatsapp|telegram
+    python3 Tools/n8n/staging/fixtures.py set-mode --profile-id <pid> [--chat-id '*'] --suppressed true|false
+    python3 Tools/n8n/staging/fixtures.py show --app-user-id <id>
+    python3 Tools/n8n/staging/fixtures.py delete --app-user-id <id> [--profile-id <pid> ...]
+"""
+import argparse
+import json
+import os
+import subprocess
+import sys
+import uuid
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+PG = os.path.join(HERE, "pg.sh")
+
+
+def psql(sql, *params):
+    # Parameters are passed as psql variables and interpolated with :'name' quoting (SQL-safe).
+    # The SQL goes through stdin (-f -): psql does NOT interpolate variables inside a -c string.
+    args = [PG, "psql", "-tAq"]
+    for i, p in enumerate(params):
+        args += ["-v", f"p{i}={p}"]
+    args += ["-f", "-"]
+    out = subprocess.run(args, capture_output=True, text=True, input=sql + "\n")
+    if out.returncode != 0:
+        sys.exit(f"psql failed: {out.stderr.strip()}")
+    return out.stdout.strip()
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    c = sub.add_parser("create-subscriber"); c.add_argument("--status", default="trialing"); c.add_argument("--plan", default="trial"); c.add_argument("--run-id")
+    r = sub.add_parser("register-profile"); r.add_argument("--app-user-id", required=True); r.add_argument("--profile-id", required=True); r.add_argument("--channel", default="whatsapp")
+    m = sub.add_parser("set-mode"); m.add_argument("--profile-id", required=True); m.add_argument("--chat-id", default="*"); m.add_argument("--suppressed", required=True)
+    s = sub.add_parser("show"); s.add_argument("--app-user-id", required=True)
+    d = sub.add_parser("delete"); d.add_argument("--app-user-id", required=True); d.add_argument("--profile-id", action="append", default=[])
+    a = ap.parse_args()
+
+    if a.cmd == "create-subscriber":
+        run_id = a.run_id or uuid.uuid4().hex[:12]
+        uid = f"probe-{run_id}"
+        psql("insert into subscribers (app_user_id, plan, status, trial_started_at) values (:'p0', :'p1', :'p2', now()) on conflict (app_user_id) do update set plan = excluded.plan, status = excluded.status;",
+             uid, a.plan, a.status)
+        print(uid)
+    elif a.cmd == "register-profile":
+        psql("insert into bot_profiles (profile_id, app_user_id, channel) values (:'p0', :'p1', :'p2') on conflict (profile_id) do update set app_user_id = excluded.app_user_id, deleted_at = null;",
+             a.profile_id, a.app_user_id, a.channel)
+        print("ok")
+    elif a.cmd == "set-mode":
+        sup = "true" if str(a.suppressed).lower() in ("1", "true", "yes") else "false"
+        psql("insert into reply_mode_flags (profile_id, chat_id, suppressed, updated_at) values (:'p0', :'p1', :'p2'::boolean, now()) on conflict (profile_id, chat_id) do update set suppressed = excluded.suppressed, updated_at = now();",
+             a.profile_id, a.chat_id, sup)
+        print("ok")
+    elif a.cmd == "show":
+        print(json.dumps({
+            "subscriber": psql("select row_to_json(s) from subscribers s where app_user_id = :'p0';", a.app_user_id),
+            "profiles": psql("select json_agg(row_to_json(b)) from bot_profiles b where app_user_id = :'p0';", a.app_user_id),
+            "suggestion_counts": psql("select json_agg(row_to_json(c)) from suggestion_counts c where app_user_id = :'p0';", a.app_user_id),
+            "dialog_counts": psql("select json_agg(row_to_json(c)) from dialog_counts c where app_user_id = :'p0';", a.app_user_id),
+        }, ensure_ascii=False, indent=1))
+    elif a.cmd == "delete":
+        if not a.app_user_id.startswith("probe-"):
+            sys.exit("refusing: delete is scoped to fixture identities (probe-<runid>) only")
+        for pid in a.profile_id:
+            psql("delete from reply_mode_flags where profile_id = :'p0';", pid)
+            psql("delete from n8n_chat_histories where session_id like :'p0' || ':%';", pid)
+            psql("delete from conversation_outcomes where profile_id = :'p0';", pid)
+        n = psql("with a as (delete from suggestion_counts where app_user_id = :'p0' returning 1), b as (delete from dialog_counts where app_user_id = :'p0' returning 1), c as (delete from bot_profiles where app_user_id = :'p0' returning 1), d as (delete from subscribers where app_user_id = :'p0' returning 1) select (select count(*) from a) + (select count(*) from b) + (select count(*) from c) + (select count(*) from d);",
+                 a.app_user_id)
+        print(f"deleted rows: {n}")
+
+
+if __name__ == "__main__":
+    main()

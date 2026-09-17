@@ -48,6 +48,10 @@ DEBOUNCE_AMOUNT = 8                       # ~8s in-memory Wait window
 FETCH_MAX_TRIES = 3                       # Fetch Recent hot-path retry (review WR-03)
 FETCH_WAIT_MS = 1000
 TEXT_VALUE = "={{ $json.combinedText ?? $json.body.messages[0].body }}"
+# Terminal OUTCOME stamp (audit stage 0.5, apply-outcome-stamps.py): every branch that used to be a
+# bare dead-end now ends at this single Code node, and NOTHING else may hang off those branches.
+OUTCOME_EDGE = {"node": "Outcome", "type": "main", "index": 0}
+OUTCOME_LABELS = ("filtered", "suppressed", "superseded", "quota_denied", "sent")
 
 
 def load(fname):
@@ -165,8 +169,8 @@ def check_bot(f, base):
     #     the gate (winner straight to Input type) reads as a FAIL again.
     assert_that(conns["Suppressed?"]["main"][1][0]["node"] == "Debounce Wait",
                 f"{f}: Suppressed? main[1] does not route to Debounce Wait (debounce not after the gate)")
-    assert_that(conns["Suppressed?"]["main"][0] == [],
-                f"{f}: Suppressed? main[0] (suppressed) is no longer a dead-end")
+    assert_that(conns["Suppressed?"]["main"][0] == [OUTCOME_EDGE],
+                f"{f}: Suppressed? main[0] (suppressed) must end ONLY at the Outcome stamp: {conns['Suppressed?']['main'][0]}")
     assert_that(conns["Debounce Wait"]["main"][0][0]["node"] == "Fetch Recent",
                 f"{f}: Debounce Wait does not chain to Fetch Recent")
     assert_that(conns["Fetch Recent"]["main"][0][0]["node"] == "Latest+Combine",
@@ -176,8 +180,8 @@ def check_bot(f, base):
     assert_that(conns["Is Latest?"]["main"][1] == [{"node": "Count Dialog", "type": "main", "index": 0}],
                 f"{f}: Is Latest? main[1] (winner) does not proceed to the billing gate (Count Dialog): "
                 f"{conns['Is Latest?']['main'][1]}")
-    assert_that(conns["Is Latest?"]["main"][0] == [],
-                f"{f}: Is Latest? main[0] (aborted fragment) is not a dead-end")
+    assert_that(conns["Is Latest?"]["main"][0] == [OUTCOME_EDGE],
+                f"{f}: Is Latest? main[0] (aborted fragment) must end ONLY at the Outcome stamp: {conns['Is Latest?']['main'][0]}")
     assert_that(conns["Count Dialog"]["main"][0] == [{"node": "Quota Decision", "type": "main", "index": 0}],
                 f"{f}: Count Dialog does not chain to Quota Decision: {conns['Count Dialog']['main'][0]}")
     assert_that(conns["Quota Decision"]["main"][0] == [{"node": "If Quota Allows", "type": "main", "index": 0}],
@@ -185,8 +189,8 @@ def check_bot(f, base):
     assert_that(conns["If Quota Allows"]["main"][0] == [{"node": "Input type", "type": "main", "index": 0}],
                 f"{f}: If Quota Allows main[0] (allowed) does not proceed to Input type: "
                 f"{conns['If Quota Allows']['main'][0]}")
-    assert_that(conns["If Quota Allows"]["main"][1] == [],
-                f"{f}: If Quota Allows main[1] (quota refused) is not a dead-end: {conns['If Quota Allows']['main'][1]}")
+    assert_that(conns["If Quota Allows"]["main"][1] == [OUTCOME_EDGE],
+                f"{f}: If Quota Allows main[1] (quota refused) must end ONLY at the Outcome stamp: {conns['If Quota Allows']['main'][1]}")
     # The winner must reach Input type ONLY through the gate: no direct edge may bypass it.
     direct = [c for outs in conns["Is Latest?"]["main"] for c in outs if c["node"] == "Input type"]
     assert_that(direct == [],
@@ -195,6 +199,22 @@ def check_bot(f, base):
     # (6) The Text set node injects combinedText with the single-message fallback.
     txt = node(ns, "Text")["parameters"]["assignments"]["assignments"][0]["value"]
     assert_that(txt == TEXT_VALUE, f"{f}: Text value wrong: {txt}")
+
+    # (8) Outcome stamp (stage 0.5): one Code node, reached from exactly the five terminal branches,
+    #     labelling each by the branch that reached it; the send's own output is stamped too, so
+    #     «sent» means "the transport call returned", never "the LLM produced text".
+    oc = node(ns, "Outcome")
+    assert_that(oc["type"] == "n8n-nodes-base.code", f"{f}: Outcome is not a code node")
+    ojs = oc["parameters"]["jsCode"]
+    for label in OUTCOME_LABELS:
+        assert_that(f"'{label}'" in ojs, f"{f}: Outcome stamp lacks the label {label!r}")
+    assert_that("$execution.id" in ojs and "$prevNode.name" in ojs,
+                f"{f}: Outcome stamp must carry the execution id as correlationId and derive the label from $prevNode")
+    assert_that(conns["If"]["main"][1] == [OUTCOME_EDGE], f"{f}: If main[1] (foreign/group filtered) must end at Outcome: {conns['If']['main'][1]}")
+    assert_that(conns["HTTP Request"]["main"][0] == [OUTCOME_EDGE],
+                f"{f}: the send (HTTP Request) must be followed ONLY by the Outcome stamp: {conns['HTTP Request']['main'][0]}")
+    assert_that("Outcome" not in conns or conns["Outcome"].get("main", [[]])[0] == [],
+                f"{f}: Outcome must be terminal (it feeds {conns.get('Outcome')})")
 
     print(f"OK  {f}")
     return wf
@@ -215,6 +235,11 @@ def check_cross_template(wa, tg):
                 f"Telegram Fetch Recent url wrong: {fr_tg.get('url')}")
     fr_wa["url"] = fr_tg["url"] = ""   # blank the sole allowed difference, then require equality
     assert_that(fr_wa == fr_tg, "Fetch Recent differs between templates beyond the channel base url")
+
+    # (7b) Outcome stamp jsCode differs ONLY by the channel constant.
+    o_wa = node(wa["nodes"], "Outcome")["parameters"]["jsCode"].replace("'whatsapp'", "'__CH__'")
+    o_tg = node(tg["nodes"], "Outcome")["parameters"]["jsCode"].replace("'telegram'", "'__CH__'")
+    assert_that(o_wa == o_tg, "Outcome stamp jsCode differs between templates beyond the channel constant")
 
     print("OK  cross-template identity")
 

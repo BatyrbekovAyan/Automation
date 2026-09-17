@@ -21,6 +21,14 @@ Drill redesign (2026-08-18): H2 drills within a steer, F expects 4 trivial varia
 STRUCT gates move∈enum + distinct short titles.
 
 This workflow only calls OpenAI and returns JSON — probing it never messages anyone.
+
+Identity (2026-09-17, audit stage 0.3): the endpoint is gated on a SUBSCRIBER (Task 17a), so the
+quality probes need an authorised test identity — pass it as PROBE_APP_USER_ID (on staging:
+`python3 Tools/n8n/staging/fixtures.py create-subscriber`, delete it after the run by that exact
+id). Without it every card probe would be refused with `generation_failed` before the model runs
+(exactly what execution 3069 of the first smoke run showed) — so the probe REFUSES to start
+instead of reporting model quality on refusals. The `IDENTITY_no_app_user_id_refused` probe is
+the explicit negative: no identity ⇒ the refusal envelope, never an LLM answer.
 """
 import json
 import os
@@ -43,12 +51,20 @@ AUTO_CAT = ("• Колодки тормозные передние, арт. 044
             "• Фильтр масляный, арт. 90915-YZZE1 — 3200 тг")
 
 
-def base(vertical, name, catalog, msgs, know="", now="", last=None, steer=None):
-    return {"v": 1, "requestSeq": 1, "profileId": "probe", "chatId": "probe@c.us",
-            "botWaId": "-1", "botTgId": "-1", "channel": "whatsapp",
-            "businessTypeId": vertical, "businessName": name, "ownerPrompt": "",
-            "catalog": catalog, "steerTowardText": steer, "lastIncomingText": last,
-            "messages": msgs, "businessKnowledge": know, "now": now}
+APP_USER_ID = os.environ.get("PROBE_APP_USER_ID", "").strip()
+REFUSAL_ONLY = "--refusal-only" in sys.argv
+
+
+def base(vertical, name, catalog, msgs, know="", now="", last=None, steer=None, app_user_id=None):
+    payload = {"v": 1, "requestSeq": 1, "profileId": "probe", "chatId": "probe@c.us",
+               "botWaId": "-1", "botTgId": "-1", "channel": "whatsapp",
+               "businessTypeId": vertical, "businessName": name, "ownerPrompt": "",
+               "catalog": catalog, "steerTowardText": steer, "lastIncomingText": last,
+               "messages": msgs, "businessKnowledge": know, "now": now}
+    uid = APP_USER_ID if app_user_id is None else app_user_id
+    if uid:
+        payload["appUserId"] = uid
+    return payload
 
 
 def m(role, text):
@@ -149,6 +165,14 @@ PROBES = [
     ]),
 ]
 
+# No identity ⇒ the refusal envelope (suggestions:[], error:"generation_failed", NO abstain flag) and
+# NO model call. The gate reason (missing_app_user_id) deliberately does not ride the wire, so the
+# wire-level check is the envelope; on staging the e2e harness additionally reads the execution.
+IDENTITY_PROBES = [
+    ("IDENTITY_no_app_user_id_refused", base("flowers", "Цветы Астана", FLOWER_CAT,
+        [m("client", "сколько стоит букет из 25 роз?")], app_user_id="")),
+]
+
 # Non-business messages must return the deliberate abstain envelope (empty suggestions,
 # abstain=true, no error) — the client renders the quiet «Нет предложений» state.
 ABSTAIN_PROBES = [
@@ -171,6 +195,26 @@ def post(payload):
 def main():
     struct_fails = 0
     warns = 0
+    for name, payload in IDENTITY_PROBES:
+        t0 = time.time()
+        try:
+            body = post(payload)
+        except Exception as e:
+            print(f"\n### {name} REQUEST-ERROR {e}")
+            struct_fails += 1
+            continue
+        cards = body.get("suggestions") or []
+        ok = body.get("error") == "generation_failed" and len(cards) == 0 and not body.get("abstain")
+        print(f"\n### {name} ({time.time() - t0:.1f}s) error:{body.get('error')} abstain:{body.get('abstain')} cards:{len(cards)}")
+        print(f"  {'OK  ' if ok else '!! STRUCT-FAIL:'} refusal_envelope_without_identity")
+        struct_fails += 0 if ok else 1
+    if REFUSAL_ONLY:
+        print(f"\nprobes done (refusal only): struct_fails={struct_fails}")
+        sys.exit(1 if struct_fails else 0)
+    if not APP_USER_ID:
+        print("\nREFUSED: PROBE_APP_USER_ID is not set — the quality probes would all be gate refusals, "
+              "not model output. Create a staging fixture identity first (staging/fixtures.py).")
+        sys.exit(2)
     for name, payload, checks in PROBES:
         t0 = time.time()
         try:

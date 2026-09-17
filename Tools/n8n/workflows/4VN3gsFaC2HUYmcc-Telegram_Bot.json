@@ -999,6 +999,19 @@
         },
         "options": {}
       }
+    },
+    {
+      "parameters": {
+        "jsCode": "// OUTCOME STAMP (audit stage 0.5, Tools/n8n/apply-outcome-stamps.py). One structured row per\n// execution end, no dialog text: the label is derived from WHICH branch reached this node.\nconst byPrev = { 'If': 'filtered', 'Suppressed?': 'suppressed', 'Is Latest?': 'superseded',\n                 'If Quota Allows': 'quota_denied', 'HTTP Request': 'sent' };\nconst prev = $prevNode.name;\nlet wh = {};\ntry { wh = $('Webhook').first().json || {}; } catch (e) { wh = {}; }\nconst m = (wh.body && Array.isArray(wh.body.messages) && wh.body.messages[0]) || {};\nconst resp = $input.first() ? ($input.first().json || {}) : {};\nconst outcome = byPrev[prev] || ('other:' + prev);\nreturn [{ json: {\n  outcome,\n  correlationId: $execution.id,\n  stage: prev,\n  messageId: m.id ?? null,\n  profileId: m.profile_id ?? null,\n  chatId: m.chatId ?? null,\n  channel: 'telegram',\n  transportMessageId: (prev === 'HTTP Request' && resp && resp.message_id) ? resp.message_id : null,\n  transportStatus: (prev === 'HTTP Request' && resp) ? (resp.status ?? null) : null,\n  stampedAt: new Date().toISOString(),\n}, pairedItem: { item: 0 } }];\n"
+      },
+      "id": "0c0b0e0a-5ba1-4a7e-9f0e-0000000000ff",
+      "name": "Outcome",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2928,
+        1136
+      ]
     }
   ],
   "connections": {
@@ -1243,6 +1256,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Outcome",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -1259,7 +1279,13 @@
     },
     "Suppressed?": {
       "main": [
-        [],
+        [
+          {
+            "node": "Outcome",
+            "type": "main",
+            "index": 0
+          }
+        ],
         [
           {
             "node": "Debounce Wait",
@@ -1348,7 +1374,13 @@
     },
     "Is Latest?": {
       "main": [
-        [],
+        [
+          {
+            "node": "Outcome",
+            "type": "main",
+            "index": 0
+          }
+        ],
         [
           {
             "node": "Count Dialog",
@@ -1389,7 +1421,24 @@
             "index": 0
           }
         ],
-        []
+        [
+          {
+            "node": "Outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },

@@ -60,6 +60,18 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
   replying" outage.
 - `reference/` — **gitignored**: downloaded community/marketplace templates + n8n onboarding
   samples, kept only to mine for ideas. Not part of the app, never imported.
+- **Audit remediation toolset (2026-09-17, `docs/audits/implementation-progress.md`):**
+  `staging/` — the isolated STAGING stand (private n8n home `~/.n8n-staging`, private Postgres 16 from
+  the `pgserver` wheel on :5433, the **Wappi mock** on 127.0.0.1:8765, `derive-staging.py` which
+  rewrites every external host and REFUSES a set that could reach prod or a real chat, `bootstrap.py`,
+  run-scoped `fixtures.py`, `e2e.py` scenarios); `repro/run-code-node.mjs` — offline harness that runs the
+  unmodified jsCode of the decision Code nodes against `repro/scenarios.json` (audit-defect scenarios are
+  RED until their stage lands); `baseline-metrics.py` — read-only outcome/latency metrics of retained
+  executions, no dialog text; `apply-outcome-stamps.py` — idempotent migration adding the terminal
+  `Outcome` Code node to both bot templates (filtered/suppressed/superseded/quota_denied/sent, with
+  `$execution.id` as correlationId). `verify-message-batching.py` / `verify-telegram-parity.py` pin the
+  stamp's wiring and the winner → billing-gate → Input type path (their pre-2026-09 expectations were
+  stale and failed every run).
 
 ## The 19 canonical workflows
 
