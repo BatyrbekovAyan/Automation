@@ -33,8 +33,8 @@ def psql(sql):
     return out.stdout.strip()
 
 
-def event(profile_id, chat, mid, body, t, from_me=False):
-    return {"messages": [{"id": mid, "chatId": chat, "from": chat, "profile_id": profile_id, "body": body, "type": "chat",
+def event(profile_id, chat, mid, body, t, from_me=False, mtype="chat"):
+    return {"messages": [{"id": mid, "chatId": chat, "from": chat, "profile_id": profile_id, "body": body, "type": mtype,
                           "time": t, "fromMe": from_me, "senderName": "client"}]}
 
 
@@ -76,8 +76,8 @@ class Bot:
     def incoming(self, row):
         mock("POST", "/__mock/incoming", {"profile_id": self.pid, "chat_id": self.chat, "message": dict(row, chatId=self.chat)})
 
-    def post(self, mid, body, t, times=1, parallel=True):
-        ev = event(self.pid, self.chat, mid, body, t)
+    def post(self, mid, body, t, times=1, parallel=True, mtype="chat"):
+        ev = event(self.pid, self.chat, mid, body, t, mtype=mtype)
         results = []
         if parallel:
             ts = [threading.Thread(target=lambda: results.append(post(self.pid, ev))) for _ in range(times)]
@@ -305,6 +305,20 @@ def dropped_no_echo(ctx, ch):
     rc = node_output(ex[0]["data"], "Reconcile Check") if ex else None
     ok = len(b.all_send_calls()) == 1 and ex and ex[0]["outcome"] == "send_unknown" and led.startswith("send_unknown|-|") and rc and rc.get("reconciled") is False
     return ok, f"send_calls={len(b.all_send_calls())} outcome={ex[0]['outcome'] if ex else None} ledger={led} reconciled={rc and rc.get('reconciled')}"
+
+
+@for_channels("media_message_gets_the_ru_ask_for_text", "a photo/document/sticker never reaches the model: the canned ask is Russian (+ Kazakh line), sent once, through the same send chain (stage 6, 2026-09-22)")
+def media_ask(ctx, ch):
+    b = Bot(ctx, ch, "media")
+    t = int(time.time())
+    mid = f"media-{ctx.run_id}"
+    b.history([{"id": mid, "body": "https://mock/photo.jpg", "time": t, "fromMe": False, "type": "image"}])
+    b.post(mid, "https://mock/photo.jpg", t, mtype="image")
+    rows = b.settle(1)
+    sends = b.sends()
+    body = (sends[0].get("body") or {}).get("body", "") if sends else ""
+    ok = len(rows) == 1 and len(sends) == 1 and body.startswith("Напишите, пожалуйста, текстом") and "Мәтінмен" in body and "Please send" not in body
+    return ok, {"executions": [(r["id"], r["status"], r["outcome"], r["last"]) for r in rows], "sends": len(sends), "body": body[:80]}
 
 
 def main():

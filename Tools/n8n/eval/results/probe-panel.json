@@ -1,0 +1,64 @@
+{
+ "summary": {
+  "label": "probe-panel",
+  "prompts_ref": "worktree",
+  "scenario_version": "v1.1 (2026-09-22: absent-item check names the item; harness h2)",
+  "harness": "h2 (2026-09-22: derived totals, echoed client numbers, negation-aware claims, no_price_for)",
+  "model": "gpt-5.4-mini",
+  "max_tokens": 200,
+  "scenarios": 1,
+  "runs": 2,
+  "pass_all": 0,
+  "flaky": 1,
+  "fail": 0,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 0,
+  "completion_tokens": 0,
+  "cost_usd_estimate": 0.0,
+  "seconds": 7,
+  "by_check": {
+   "cards": "2/2",
+   "cards_no_invented_installment_terms": "1/2"
+  }
+ },
+ "results": [
+  {
+   "id": "pn_installment_kaspi",
+   "vertical": "kaspi_seller",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "installment",
+    "key"
+   ],
+   "repeats": 2,
+   "pass_rate": 0.5,
+   "runs": [
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_invented_installment_terms": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Оформление рассрочки доступно на странице товара в Kaspi. Процент и условия можно узнать там. Вот ссылка на наушники: https://kaspi.kz/shop/techstore.\", \"label\": \"Условия рассрочки\", \"move\": \"Уточнить\"}, {\"text\": \"Рассрочка на наушники JBL Tune 510BT возможна, но точные условия и проценты указаны на странице товара в Kaspi. Перейдите по ссылке: https://kaspi.kz/shop/techstore.\", \"label\": \"Процент рассрочки\", \"move\": \"Уточнить\"}, {\"text\": \"Для оформления рассрочки на наушники JBL Tune 510BT перейдите на страницу товара в Kaspi, там указаны все условия и проценты.\", \"label\": \"Ссылка на товар\", \"move\": \"К заказу\"}, {\"text\": \"К сожалению, я не могу предоставить информацию о проценте рассрочки. Пожалуйста, проверьте на странице товара в Kaspi.\", \"label\": \"Процент не указан\", \"move\": \"Отказ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_invented_installment_terms": false
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Условия рассрочки можно узнать на странице товара на Kaspi. Перейдите по ссылке: https://kaspi.kz/shop/techstore и выберите наушники JBL Tune 510BT.\", \"label\": \"Условия рассрочки\", \"move\": \"Уточнить\"}, {\"text\": \"Да, наушники JBL Tune 510BT можно оформить в рассрочку на 12 месяцев. Процент и другие условия можно найти на странице товара на Kaspi.\", \"label\": \"Рассрочка доступна\", \"move\": \"Ответ\"}, {\"text\": \"Если хотите, могу помочь с оформлением заказа на наушники JBL Tune 510BT. Перейдите на страницу товара на Kaspi для оформления.\", \"label\": \"Оформить заказ\", \"move\": \"К заказу\"}, {\"text\": \"Уточню информацию и напишу через 15 минут.\", \"label\": \"Пауза на 15 мин\", \"move\": \"Отложить\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null
+    }
+   ]
+  }
+ ]
+}

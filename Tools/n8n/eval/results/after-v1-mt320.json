@@ -1,0 +1,61 @@
+{
+ "summary": {
+  "label": "after-v1-mt320",
+  "prompts_ref": "worktree",
+  "scenario_version": "v1 (2026-09-17, audit stage 6)",
+  "model": "gpt-5.4-mini",
+  "max_tokens": 320,
+  "scenarios": 1,
+  "runs": 1,
+  "pass_all": 1,
+  "flaky": 0,
+  "fail": 0,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 7101,
+  "completion_tokens": 194,
+  "cost_usd_estimate": 0.0012,
+  "seconds": 4,
+  "by_check": {
+   "no_markdown": "1/1",
+   "numbers_grounded": "1/1"
+  }
+ },
+ "results": [
+  {
+   "id": "gen_long_answer_budget",
+   "vertical": "education",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "long",
+    "budget"
+   ],
+   "repeats": 1,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "numbers_grounded": true,
+      "no_markdown": true
+     },
+     "text": "У нас есть такие курсы:\n\nАнглийский для детей, группа\n40000 тг/мес\n3 раза в неделю по 60 минут\n\nПодготовка к ЕНТ\n55000 тг/мес\nматематика и физика\n\nТакже в прайсе есть:\nIELTS индивидуально\n12000 тг/занятие\n\nАдрес: пр. Республики 10\nЧасы работы: 9:00–20:00\n\nПробный урок бесплатный.\n\nПо расписанию, преподавателям и рассрочке точные детали уточнит администратор. Если хотите, я могу передать заявку на пробный урок — напишите имя и возраст ученика.",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "прайс-лист курсы цены расписание преподаватели адрес рассрочка пробный урок учебный центр английский ЕНТ"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7101,
+      "completion_tokens": 194
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": []
+    }
+   ]
+  }
+ ]
+}

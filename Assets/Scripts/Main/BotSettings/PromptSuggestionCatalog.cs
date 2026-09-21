@@ -32,7 +32,7 @@ namespace Automation.BotSettingsUI
             Core("tone_client_language", "Отвечай на том языке, на котором написал клиент", "На языке клиента", Tone),
             Core("tone_no_pressure", "Не дави на клиента и не торопи с покупкой", "Не дави на клиента", Tone),
 
-            Core("fmt_end_question", "Заканчивай сообщение вопросом", "Заканчивай вопросом", Format, featured: true),
+            Core("fmt_end_question", "Заканчивай вопросом, если для заявки нужен следующий шаг", "Вопрос по делу", Format, featured: true),
             Core("fmt_price_list", "Цены и позиции выводи списком, по одной в строке", "Цены списком", Format),
             Core("fmt_no_markdown", "Не используй markdown-разметку и заголовки", "Без разметки", Format),
             Core("fmt_limit_length", "Не пиши сообщения длиннее 400 символов", "Не длиннее 400 знаков", Format),
@@ -55,7 +55,7 @@ namespace Automation.BotSettingsUI
             Core("ord_ask_city", "Уточняй город и способ доставки", "Уточняй город", Order, featured: true),
             Core("ord_delivery_terms", "Называй сроки доставки при оформлении", "Называй сроки", Order),
             Core("ord_payment_methods", "Расскажи о способах оплаты, если спросят", "Способы оплаты", Order),
-            Core("ord_after_hours", "Если пишут в нерабочее время — предупреди, когда ответим", "Про нерабочее время", Order),
+            Core("ord_after_hours", "Вне рабочих часов из контактов говори, что ответим в рабочее время", "Про нерабочее время", Order),
         };
 
         private static readonly PromptSuggestion[] VerticalEntries =
@@ -80,7 +80,7 @@ namespace Automation.BotSettingsUI
 
             Vertical("ks_ask_model", "kaspi_seller", "Уточняй точную модель и цвет товара", "Уточняй модель и цвет", Sales),
             Vertical("ks_warranty", "kaspi_seller", "Отвечай на вопросы о гарантии и возврате", "Гарантия и возврат", Sales),
-            Vertical("ks_kaspi_red", "kaspi_seller", "Расскажи про рассрочку Kaspi Red, если спросят про оплату", "Про Kaspi Red", Order),
+            Vertical("ks_kaspi_red", "kaspi_seller", "Про рассрочку Kaspi отвечай по условиям из описания бизнеса", "Рассрочка по данным", Order),
             Vertical("ks_delivery_or_pickup", "kaspi_seller", "Уточняй, доставка или самовывоз", "Доставка или самовывоз", Order),
             Vertical("ks_no_offsite_pay", "kaspi_seller", "Не проси оплату вне Kaspi", "Оплата только в Kaspi", Limits),
 
@@ -88,7 +88,7 @@ namespace Automation.BotSettingsUI
             Vertical("ed_trial_lesson", "education", "Предлагай записаться на пробное занятие", "Пробное занятие", Sales),
             Vertical("ed_ask_age", "education", "Уточняй возраст ученика", "Уточняй возраст", Sales),
             Vertical("ed_schedule", "education", "Называй расписание и длительность курса", "Расписание курса", Format),
-            Vertical("ed_installment", "education", "Расскажи про рассрочку оплаты, если спросят", "Про рассрочку", Order),
+            Vertical("ed_installment", "education", "Про рассрочку оплаты отвечай по условиям из описания бизнеса", "Рассрочка по данным", Order),
 
             Vertical("pr_ask_model", "phone_repair", "Уточняй модель телефона и что именно сломалось", "Модель и поломка", Sales),
             Vertical("pr_estimate", "phone_repair", "Называй срок ремонта и предварительную цену", "Срок и цена", Format),

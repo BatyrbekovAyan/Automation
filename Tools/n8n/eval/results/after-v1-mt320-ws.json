@@ -1,0 +1,77 @@
+{
+ "summary": {
+  "label": "after-v1-mt320-ws",
+  "prompts_ref": "worktree",
+  "scenario_version": "v1 (2026-09-17, audit stage 6)",
+  "model": "gpt-5.4-mini",
+  "max_tokens": 320,
+  "scenarios": 1,
+  "runs": 1,
+  "pass_all": 0,
+  "flaky": 0,
+  "fail": 1,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 7390,
+  "completion_tokens": 234,
+  "cost_usd_estimate": 0.0012,
+  "seconds": 5,
+  "by_check": {
+   "marks_unknown_item": "1/1",
+   "no_markdown": "1/1",
+   "no_total_confirmation": "1/1",
+   "numbers_grounded": "0/1"
+  }
+ },
+ "results": [
+  {
+   "id": "ws_list_of_items",
+   "vertical": "wholesale",
+   "mode": "auto",
+   "lang": "ru",
+   "tags": [
+    "catalog",
+    "long"
+   ],
+   "repeats": 1,
+   "pass_rate": 0.0,
+   "runs": [
+    {
+     "verdicts": {
+      "numbers_grounded": false,
+      "no_markdown": true,
+      "marks_unknown_item": true,
+      "no_total_confirmation": true
+     },
+     "text": "По прайсу есть:\nСредство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — в прайсе не найден, цену уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\n\nПо отбеливателю и точному общему итогу с ним уточнит менеджер",
+     "tool_calls": [
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Средство для посуды 5 л цена, коробка 4 шт"
+       }
+      },
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Стиральный порошок 10 кг цена, мешок"
+       }
+      },
+      {
+       "name": "supabase_vector_store",
+       "args": {
+        "input": "Отбеливатель 1 л цена"
+       }
+      }
+     ],
+     "usage": {
+      "prompt_tokens": 7390,
+      "completion_tokens": 234
+     },
+     "finish_reason": "stop",
+     "error": null,
+     "dropped_params": []
+    }
+   ]
+  }
+ ]
+}

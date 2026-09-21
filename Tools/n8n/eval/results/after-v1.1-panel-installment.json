@@ -1,0 +1,76 @@
+{
+ "summary": {
+  "label": "after-v1.1-panel-installment",
+  "prompts_ref": "worktree",
+  "scenario_version": "v1.1 (2026-09-22: absent-item check names the item; harness h2)",
+  "harness": "h2 (2026-09-22: derived totals, echoed client numbers, negation-aware claims, no_price_for)",
+  "model": "gpt-5.4-mini",
+  "max_tokens": 200,
+  "scenarios": 1,
+  "runs": 3,
+  "pass_all": 1,
+  "flaky": 0,
+  "fail": 0,
+  "finish_reason_length_runs": 0,
+  "prompt_tokens": 0,
+  "completion_tokens": 0,
+  "cost_usd_estimate": 0.0,
+  "seconds": 10,
+  "by_check": {
+   "cards": "3/3",
+   "cards_no_invented_installment_terms": "3/3"
+  }
+ },
+ "results": [
+  {
+   "id": "pn_installment_kaspi",
+   "vertical": "kaspi_seller",
+   "mode": "panel",
+   "lang": "ru",
+   "tags": [
+    "installment",
+    "key"
+   ],
+   "repeats": 3,
+   "pass_rate": 1.0,
+   "runs": [
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_invented_installment_terms": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Оформление рассрочки возможно на странице товара. Процент и условия будут указаны там. Вот ссылка на наушники: https://kaspi.kz/shop/techstore.\", \"label\": \"Ссылка на товар\", \"move\": \"Уточнить\"}, {\"text\": \"К сожалению, я не могу точно сказать условия рассрочки. Рекомендую проверить информацию на странице товара по ссылке: https://kaspi.kz/shop/techstore.\", \"label\": \"Условия рассрочки\", \"move\": \"Отложить\"}, {\"text\": \"Да, наушники JBL Tune 510BT можно оформить в рассрочку на 12 месяцев. Процент зависит от условий Kaspi. Все детали на странице товара: https://kaspi.kz/shop/techstore.\", \"label\": \"Рассрочка на 12 мес\", \"move\": \"Ответ\"}, {\"text\": \"Оформление рассрочки возможно только через Kaspi. Уточните, пожалуйста, условия на странице товара: https://kaspi.kz/shop/techstore.\", \"label\": \"Только через Kaspi\", \"move\": \"Отказ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_invented_installment_terms": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Оформление рассрочки доступно на странице товара на Kaspi. Там вы сможете увидеть условия, включая срок и процент. Вот ссылка: https://kaspi.kz/shop/techstore\", \"label\": \"Условия рассрочки\", \"move\": \"Уточнить\"}, {\"text\": \"К сожалению, я не могу предоставить информацию о процентах и условиях рассрочки. Пожалуйста, посмотрите на странице товара в Kaspi: https://kaspi.kz/shop/techstore\", \"label\": \"Проценты и сроки\", \"move\": \"Отложить\"}, {\"text\": \"Наушники JBL Tune 510BT можно оформить в рассрочку на 12 месяцев. Процент и условия можно узнать на странице товара в Kaspi: https://kaspi.kz/shop/techstore\", \"label\": \"Наушники в рассрочку\", \"move\": \"Ответ\"}, {\"text\": \"Чтобы узнать о рассрочке и проценте, рекомендую зайти на страницу товара в Kaspi. Там вся информация будет доступна: https://kaspi.kz/shop/techstore\", \"label\": \"Ссылка на товар\", \"move\": \"Вариант\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null
+    },
+    {
+     "verdicts": {
+      "cards": true,
+      "cards_no_invented_installment_terms": true
+     },
+     "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Оформление рассрочки возможно на странице товара на Kaspi. Процент и условия также указаны там. Вот ссылка: https://kaspi.kz/shop/techstore\", \"label\": \"Условия рассрочки\", \"move\": \"Уточнить\"}, {\"text\": \"Наушники JBL Tune 510BT можно оформить в рассрочку на 12 месяцев. Процент и другие условия можно узнать на странице товара в Kaspi: https://kaspi.kz/shop/techstore\", \"label\": \"Рассрочка на 12 мес\", \"move\": \"Ответ\"}, {\"text\": \"Если вам нужна помощь с оформлением рассрочки, дайте знать! Могу подсказать, как это сделать на Kaspi.\", \"label\": \"Помощь с рассрочкой\", \"move\": \"Вариант\"}, {\"text\": \"Пожалуйста, проверьте информацию о рассрочке на странице товара в Kaspi. Если будут вопросы, обращайтесь!\", \"label\": \"Проверка информации\", \"move\": \"Отказ\"}]}",
+     "tool_calls": null,
+     "usage": null,
+     "finish_reason": null,
+     "error": null,
+     "dropped_params": null
+    }
+   ]
+  }
+ ]
+}
