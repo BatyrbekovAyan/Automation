@@ -406,6 +406,7 @@ public partial class BotSettings : MonoBehaviour
         SyncHeaderTitle();
         BindUploadCenter(); // uploads run outside this screen — re-attach to their progress
         RefreshUploadedFiles();
+        EnsureTestRow();    // stage 7: the «Проверить бота» row is runtime-added, never authored into the prefab
     }
     
     // Mirrors the bot's current name onto the header. Called on enable, after

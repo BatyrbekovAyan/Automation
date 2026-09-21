@@ -29,6 +29,18 @@ public class HandoffPausedChat
     public string chatId;
 }
 
+/// <summary>Stage 7.3: one row of the reply ledger (`reply_events`) — the last outcomes the owner can see.</summary>
+[Serializable]
+public class ReplyOutcomeRow
+{
+    public string profileId;
+    public string chatTail;      // last 4 digits of the chat id — never the client's text
+    public string state;         // reply_events.state
+    public long at;              // unix ms
+    public string executionId;   // correlation id for support
+    public string transportMessageId;
+}
+
 [Serializable]
 public class HandoffsResponse
 {
@@ -36,6 +48,7 @@ public class HandoffsResponse
     public string error;
     public List<HandoffRequest> requests = new();
     public List<HandoffPausedChat> pausedChats = new();
+    public List<ReplyOutcomeRow> recent = new();
     public int changed;
 
     public static HandoffsResponse Parse(string json)
@@ -47,6 +60,7 @@ public class HandoffsResponse
             if (r == null) return null;
             r.requests ??= new List<HandoffRequest>();
             r.pausedChats ??= new List<HandoffPausedChat>();
+            r.recent ??= new List<ReplyOutcomeRow>();
             return r;
         }
         catch (Exception) { return null; }
@@ -101,4 +115,47 @@ public static class HandoffCopy
         string s = r.summary ?? "";
         return r.IsEvent ? RequestMarker + s : s;
     }
+}
+
+/// <summary>
+/// Stage 7.3: the ledger state as the owner reads it — the mode, the limit, an error and an unconfirmed send are
+/// different things and are named as such; technical codes stay out of the label (the correlation id is shown apart).
+/// </summary>
+public static class ReplyOutcomeCopy
+{
+    public const string Sent = "Отправлено";
+    public const string Suppressed = "Не отправлено: режим «Вместе»";
+    public const string QuotaDenied = "Не отправлено: лимит диалогов";
+    public const string SendFailed = "Ошибка отправки";
+    public const string SendUnknown = "Отправка не подтверждена";
+    public const string Superseded = "Заменено новым сообщением";
+    public const string CancelledOwner = "Отменено: ответил владелец";
+    public const string CancelledMode = "Отменено: режим изменён";
+    public const string Duplicate = "Повтор события";
+    public const string GenerationFailed = "Ошибка генерации ответа";
+    public const string Pending = "В обработке";
+    public const string Cancelled = "Отменено";
+
+    public static string Label(string state)
+    {
+        switch (state)
+        {
+            case "sent": return Sent;
+            case "suppressed": return Suppressed;
+            case "quota_denied": return QuotaDenied;
+            case "send_failed": return SendFailed;
+            case "send_unknown": return SendUnknown;
+            case "superseded": return Superseded;
+            case "cancelled_owner": return CancelledOwner;
+            case "cancelled_mode": return CancelledMode;
+            case "duplicate": return Duplicate;
+            case "generation_failed": return GenerationFailed;
+            case "claimed": case "generated": case "send_pending": return Pending;
+            default: return Cancelled;
+        }
+    }
+
+    /// <summary>Whether the owner should look at this outcome (something did not go out as intended).</summary>
+    public static bool NeedsAttention(string state)
+        => state == "send_failed" || state == "send_unknown" || state == "generation_failed" || state == "quota_denied";
 }

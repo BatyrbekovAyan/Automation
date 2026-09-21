@@ -1,0 +1,286 @@
+{
+ "base": "https://n8n.choosereply.com",
+ "canonical": [
+  {
+   "id": "0DP79STI3pafXO9B",
+   "file": "0DP79STI3pafXO9B-Set_Workflow_State.json",
+   "present": true,
+   "active": true,
+   "names_match": false,
+   "graph_hash_live": "97dbe2e7f0c1",
+   "graph_hash_canonical": "50810a81b0a3",
+   "params_match": false,
+   "published_is_stored": true,
+   "status": "DIFF",
+   "note": "admin-API credential id is instance-bound"
+  },
+  {
+   "id": "2htWSV5IHO8E2CgB",
+   "file": "2htWSV5IHO8E2CgB-Dashboard_Outcomes.json",
+   "present": true,
+   "active": true,
+   "names_match": false,
+   "graph_hash_live": "cf3a6c42b0f2",
+   "graph_hash_canonical": "52895fb0784e",
+   "params_match": false,
+   "published_is_stored": true,
+   "status": "DIFF"
+  },
+  {
+   "id": "2islisFH7jjLoPQM",
+   "file": "2islisFH7jjLoPQM-Delete_Orphan_Profiles.json",
+   "present": true,
+   "active": true,
+   "names_match": true,
+   "graph_hash_live": "1d3a78cef848",
+   "graph_hash_canonical": "1d3a78cef848",
+   "params_match": true,
+   "published_is_stored": true,
+   "status": "OK"
+  },
+  {
+   "id": "3qax5J9u2qsT9Vao",
+   "file": "3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json",
+   "present": true,
+   "active": true,
+   "names_match": false,
+   "graph_hash_live": "47ad2392b888",
+   "graph_hash_canonical": "e77a7d3fa3b7",
+   "params_match": false,
+   "published_is_stored": true,
+   "status": "DIFF"
+  },
+  {
+   "id": "4VN3gsFaC2HUYmcc",
+   "file": "4VN3gsFaC2HUYmcc-Telegram_Bot.json",
+   "present": true,
+   "active": false,
+   "names_match": false,
+   "graph_hash_live": "0d46033e821d",
+   "graph_hash_canonical": "0203a8a22ebc",
+   "params_match": false,
+   "published_is_stored": null,
+   "status": "DIFF"
+  },
+  {
+   "id": "4wYitz5ek30SVNlT",
+   "file": "4wYitz5ek30SVNlT-WhatsApp_Bot.json",
+   "present": true,
+   "active": false,
+   "names_match": false,
+   "graph_hash_live": "27c0db3f68f8",
+   "graph_hash_canonical": "4fab3de05777",
+   "params_match": false,
+   "published_is_stored": null,
+   "status": "DIFF"
+  },
+  {
+   "id": "9PTyYcelRQI7bGDb",
+   "file": "9PTyYcelRQI7bGDb-Suggest_Replies.json",
+   "present": true,
+   "active": true,
+   "names_match": false,
+   "graph_hash_live": "4d7372a2346c",
+   "graph_hash_canonical": "c39a00d8310f",
+   "params_match": false,
+   "published_is_stored": true,
+   "status": "DIFF"
+  },
+  {
+   "id": "KoTuIlk4LMrlvnWI",
+   "file": "KoTuIlk4LMrlvnWI-Upload_File.json",
+   "present": true,
+   "active": true,
+   "names_match": false,
+   "graph_hash_live": "2148623f6898",
+   "graph_hash_canonical": "385ac4d8ed81",
+   "params_match": false,
+   "published_is_stored": true,
+   "status": "DIFF"
+  },
+  {
+   "id": "SCLcpn6DMDG3Z4VN",
+   "file": "SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json",
+   "present": true,
+   "active": true,
+   "names_match": false,
+   "graph_hash_live": "e7d7f3bf9368",
+   "graph_hash_canonical": "0c21cee2da00",
+   "params_match": false,
+   "published_is_stored": true,
+   "status": "DIFF"
+  },
+  {
+   "id": "TwWPW3gIyjZS3foR",
+   "file": "TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json",
+   "present": true,
+   "active": true,
+   "names_match": false,
+   "graph_hash_live": "23a8cae017a9",
+   "graph_hash_canonical": "3c7abc5acf3d",
+   "params_match": false,
+   "published_is_stored": true,
+   "status": "DIFF"
+  },
+  {
+   "id": "Uz6HBBUpAiUqVysB",
+   "file": "Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json",
+   "present": true,
+   "active": true,
+   "names_match": false,
+   "graph_hash_live": "4c4625b4e036",
+   "graph_hash_canonical": "e2a96cd0b340",
+   "params_match": false,
+   "published_is_stored": true,
+   "status": "DIFF"
+  },
+  {
+   "id": "XuvOp7TxOImOAmlj",
+   "file": "XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json",
+   "present": true,
+   "active": true,
+   "names_match": false,
+   "graph_hash_live": "61b3dedbf658",
+   "graph_hash_canonical": "7d11a77bdae7",
+   "params_match": false,
+   "published_is_stored": true,
+   "status": "DIFF"
+  },
+  {
+   "id": "ZGYr6srzS3rSSXHp",
+   "file": "ZGYr6srzS3rSSXHp-RevenueCat_Events.json",
+   "present": true,
+   "active": true,
+   "names_match": true,
+   "graph_hash_live": "8f75d54476ac",
+   "graph_hash_canonical": "8f75d54476ac",
+   "params_match": true,
+   "published_is_stored": true,
+   "status": "OK"
+  },
+  {
+   "id": "ZTqpumOpL1rNDOp6",
+   "file": "ZTqpumOpL1rNDOp6-Delete_File.json",
+   "present": true,
+   "active": true,
+   "names_match": false,
+   "graph_hash_live": "bb4077af271a",
+   "graph_hash_canonical": "1b0061a6d1f4",
+   "params_match": false,
+   "published_is_stored": true,
+   "status": "DIFF"
+  },
+  {
+   "id": "crAuthSession001",
+   "file": "crAuthSession001-Auth_Session.json",
+   "present": false,
+   "status": "MISSING"
+  },
+  {
+   "id": "crHandoffNtfy001",
+   "file": "crHandoffNtfy001-Handoff_Notifier.json",
+   "present": false,
+   "status": "MISSING"
+  },
+  {
+   "id": "crHandoffReq0001",
+   "file": "crHandoffReq0001-Handoff_Request.json",
+   "present": false,
+   "status": "MISSING"
+  },
+  {
+   "id": "crHandoffsApi001",
+   "file": "crHandoffsApi001-Handoffs.json",
+   "present": false,
+   "status": "MISSING"
+  },
+  {
+   "id": "crWappiProxy0001",
+   "file": "crWappiProxy0001-Wappi_Proxy.json",
+   "present": false,
+   "status": "MISSING"
+  },
+  {
+   "id": "fXYpCXPKw92EzRz8",
+   "file": "fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json",
+   "present": true,
+   "active": true,
+   "names_match": true,
+   "graph_hash_live": "a5a0748e4b61",
+   "graph_hash_canonical": "a5a0748e4b61",
+   "params_match": true,
+   "published_is_stored": true,
+   "status": "OK"
+  },
+  {
+   "id": "hHwvfOvTCS42pXnq",
+   "file": "hHwvfOvTCS42pXnq-Landing_Lead.json",
+   "present": true,
+   "active": true,
+   "names_match": true,
+   "graph_hash_live": "0da433ac39f5",
+   "graph_hash_canonical": "0da433ac39f5",
+   "params_match": true,
+   "published_is_stored": true,
+   "status": "OK"
+  },
+  {
+   "id": "jtbssfzXbOxwTK4k",
+   "file": "jtbssfzXbOxwTK4k-Get_Usage.json",
+   "present": true,
+   "active": true,
+   "names_match": false,
+   "graph_hash_live": "12df126e5d8c",
+   "graph_hash_canonical": "83d6f3b37ace",
+   "params_match": false,
+   "published_is_stored": true,
+   "status": "DIFF"
+  },
+  {
+   "id": "lmjYsdNcQA2IE5rl",
+   "file": "lmjYsdNcQA2IE5rl-Delete_Bot_Files.json",
+   "present": true,
+   "active": true,
+   "names_match": false,
+   "graph_hash_live": "f3d609966b01",
+   "graph_hash_canonical": "c1a6bc6f41fd",
+   "params_match": false,
+   "published_is_stored": true,
+   "status": "DIFF"
+  },
+  {
+   "id": "olmqWMfcFpCEcpiE",
+   "file": "olmqWMfcFpCEcpiE-Support_Message.json",
+   "present": true,
+   "active": true,
+   "names_match": false,
+   "graph_hash_live": "c899aae51690",
+   "graph_hash_canonical": "f48fb5228bf1",
+   "params_match": false,
+   "published_is_stored": true,
+   "status": "DIFF",
+   "note": "recipient chat id replaces __CHAT_ID__"
+  }
+ ],
+ "clones": [
+  {
+   "id": "OcR75Ug0upgdfrqN",
+   "name": "15",
+   "channel": "whatsapp",
+   "active": true,
+   "stamp": null,
+   "at_canonical": false,
+   "nodes": 33
+  },
+  {
+   "id": "tqGXmiT6aJu7vUIG",
+   "name": "13",
+   "channel": "whatsapp",
+   "active": false,
+   "stamp": null,
+   "at_canonical": false,
+   "nodes": 33
+  }
+ ],
+ "unknown": []
+}

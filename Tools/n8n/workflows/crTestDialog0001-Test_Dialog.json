@@ -1,0 +1,800 @@
+{
+  "id": "crTestDialog0001",
+  "name": "Test Dialog",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "TestDialog",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "85efc47f-935d-5de2-8fff-53de947fa744",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "aeff05af-f3d1-52e6-a280-ad8386d542b1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// crAuth GATE — generated into every client webhook by Tools/n8n/apply-auth-gate.py from\n// Tools/n8n/auth/gate.js (+ token.js). Edit the sources, re-run the migration; never the copies.\n//\n// Verifies the Bearer capability token WITHOUT a database round-trip (HMAC, see token.js), then\n// checks that every id the request names is owned by the token's install:\n//   RULE.profiles  — body fields whose value(s) must be ⊆ claims.p   (sentinels ''/'-1' pass)\n//   RULE.workflows — body fields whose value(s) must be ⊆ claims.w   (sentinels ''/'-1' pass)\n//   RULE.appUser   — body fields that must EQUAL claims.u when the token carries one\n//   RULE.legacy    — true: a request WITHOUT a token is admitted in `legacy` mode while\n//                    CR_AUTH_COMPAT_UNTIL lies in the future (old clients); false: 401\n// Output: the webhook item re-emitted with `crAuth` = { ok, mode, reason, installId, appUserId,\n// profiles, workflows, claimPending } so downstream nodes can read the verified identity.\n// CRAUTH-TOKEN-BEGIN\nconst crAuth = (() => {\n  const crypto = require('crypto');\n  const b64u = (buf) => Buffer.from(buf).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n  const unb64u = (s) => Buffer.from(String(s).replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((String(s).length + 3) % 4), 'base64');\n  const isIdList = (a) => Array.isArray(a) && a.every((x) => typeof x === 'string' && x.length > 0 && x.length <= 128);\n  function sign(payload, secret) {\n    if (!secret) throw new Error('crAuth: no signing secret');\n    const p = b64u(JSON.stringify(payload));\n    const sig = crypto.createHmac('sha256', secret).update('v1.' + p).digest();\n    return 'v1.' + p + '.' + b64u(sig);\n  }\n  function verify(token, secrets, nowSec) {\n    if (typeof token !== 'string' || !token) return { ok: false, reason: 'missing' };\n    const parts = token.split('.');\n    if (parts.length !== 3 || parts[0] !== 'v1' || !parts[1] || !parts[2]) return { ok: false, reason: 'malformed' };\n    const given = unb64u(parts[2]);\n    let good = false;\n    for (const sec of (secrets || []).filter(Boolean)) {\n      const exp = crypto.createHmac('sha256', sec).update(parts[0] + '.' + parts[1]).digest();\n      if (exp.length === given.length && crypto.timingSafeEqual(exp, given)) { good = true; break; }\n    }\n    if (!good) return { ok: false, reason: 'bad_signature' };\n    let c;\n    try { c = JSON.parse(unb64u(parts[1]).toString('utf8')); } catch (e) { return { ok: false, reason: 'malformed' }; }\n    if (!c || typeof c !== 'object' || typeof c.i !== 'string' || !c.i || !isIdList(c.p) || !isIdList(c.w)) return { ok: false, reason: 'malformed' };\n    if (typeof c.e !== 'number' || !(c.e > nowSec)) return { ok: false, reason: 'expired' };\n    if (c.c !== undefined && !isIdList(c.c)) return { ok: false, reason: 'malformed' };\n    return { ok: true, claims: { i: c.i, u: (typeof c.u === 'string' && c.u) ? c.u : null, p: c.p, w: c.w, c: c.c || [], e: c.e, n: (typeof c.n === 'number') ? c.n : 1 } };\n  }\n  function sha256Hex(s) { return crypto.createHash('sha256').update(String(s)).digest('hex'); }\n  function randomSecret(bytes) { return b64u(crypto.randomBytes(bytes || 32)); }\n  function bearer(headers) {\n    const h = headers || {};\n    const a = String(h.authorization || h.Authorization || '');\n    return a.startsWith('Bearer ') ? a.slice(7).trim() : '';\n  }\n  return { sign, verify, sha256Hex, randomSecret, bearer, b64u, unb64u };\n})();\n// CRAUTH-TOKEN-END\nconst RULE = {\"profiles\": [\"profileId\"], \"workflows\": [\"workflowId\"], \"appUser\": [], \"legacy\": false};\nconst wh = $input.first().json;\nconst secrets = [$env.CR_AUTH_SECRET, $env.CR_AUTH_SECRET_PREV];\nconst compatUntil = Date.parse($env.CR_AUTH_COMPAT_UNTIL || '') || 0;\nconst nowMs = Date.now();\nconst token = crAuth.bearer(wh.headers);\nlet mode = 'session', claims = null, deny = null;\nif (!token) {\n  if (RULE.legacy && compatUntil > nowMs) mode = 'legacy';\n  else deny = 'unauthorized:missing';\n} else {\n  const v = crAuth.verify(token, secrets, Math.floor(nowMs / 1000));\n  if (!v.ok) deny = 'unauthorized:' + v.reason; else claims = v.claims;\n}\nconst body = (wh.body && typeof wh.body === 'object') ? wh.body : {};\nconst isSentinel = (x) => x === undefined || x === null || x === '' || x === '-1';\nconst listOf = (v) => (Array.isArray(v) ? v : [v]);\nconst owned = (set, v) => listOf(v).every((x) => isSentinel(x) || (typeof x === 'string' && set.includes(x)));\nif (!deny && mode === 'session') {\n  for (const f of RULE.profiles || []) if (!owned(claims.p, body[f])) { deny = 'forbidden:' + f; break; }\n  if (!deny) for (const f of RULE.workflows || []) if (!owned(claims.w, body[f])) { deny = 'forbidden:' + f; break; }\n  if (!deny && claims.u) for (const f of RULE.appUser || []) {\n    const v = body[f];\n    if (!isSentinel(v) && String(v) !== claims.u) { deny = 'forbidden:' + f; break; }\n  }\n}\nreturn [{ json: { ...wh, crAuth: {\n  ok: !deny, mode, reason: deny,\n  installId: claims ? claims.i : null, appUserId: claims ? claims.u : null,\n  profiles: claims ? claims.p : [], workflows: claims ? claims.w : [], claimPending: claims ? (claims.c || []) : [],\n} }, pairedItem: { item: 0 } }];\n"
+      },
+      "id": "42949914-9232-5c74-b9d4-095f3531a92c",
+      "name": "Auth Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "25d8ec0d-02bb-54f1-b39e-e54c8bd63c48",
+              "leftValue": "={{ $json.crAuth.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1ce0ea6f-e1f2-5bb9-be3c-934fbb0aceaf",
+      "name": "Authorized?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: 'unauthorized', reason: $json.crAuth.reason } }}",
+        "options": {
+          "responseCode": "={{ String($json.crAuth.reason || '').startsWith('forbidden') ? 403 : 401 }}"
+        }
+      },
+      "id": "64253233-7ac9-5059-9e13-ce1dad2015e7",
+      "name": "Respond 401",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        660,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// TEST DIALOG / Validate (generated — build-test-dialog.py). Owner-scoped by the gate; defensive re-check.\nconst wh = $input.first().json || {};\nconst b = wh.body || {};\nconst owned = wh.crAuth || {};\nconst s = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');\nconst profileId = s(b.profileId, 128), workflowId = s(b.workflowId, 64), text = s(b.text, 2000);\nconst channel = b.channel === 'telegram' ? 'telegram' : 'whatsapp';\nif (!profileId || !workflowId || !text) return [{ json: { ok: false, error: 'bad_request' } }];\nif (!(owned.profiles || []).includes(profileId) || !(owned.workflows || []).includes(workflowId)) return [{ json: { ok: false, error: 'forbidden' } }];\nconst history = (Array.isArray(b.history) ? b.history : []).slice(-10)\n  .map(m => ({ role: (m && m.role === 'business') ? 'business' : 'client', text: s(m && m.text, 500) })).filter(m => m.text);\nreturn [{ json: { ok: true, profileId, workflowId, channel, text, history, runId: String($execution.id),\n                  filterKey: channel === 'telegram' ? 'botTgId' : 'botWaId' } }];\n"
+      },
+      "id": "f79ac55c-30cf-587f-b3a7-7dfdccfeb23d",
+      "name": "Validate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a512d888-26d8-5015-9c52-4df66b85e40b",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a6516a98-5464-5bdc-9c7a-aead6fcde141",
+      "name": "Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: $json.error || 'bad_request' } }}",
+        "options": {
+          "responseCode": "={{ $json.error === 'forbidden' ? 403 : 400 }}"
+        }
+      },
+      "id": "6d145507-f354-5bac-a890-a6d72b520908",
+      "name": "Respond 400",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1100,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=http://localhost:5678/api/v1/workflows/{{ $json.workflowId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "7da499f6-b807-5632-bde5-8f0de0502863",
+      "name": "Read Bot Workflow",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        100
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__HDR_CRED__",
+          "name": "n8n Admin API"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// TEST DIALOG / Compose: the bot's REAL system message (the AI Agent node of its own workflow) + what\n// knowledge it carries. Nothing is re-composed from client data — a test that lies about the prompt is worthless.\nconst v = $('Validate').first().json;\nconst r = $input.first().json || {};\nconst wf = (r.body && typeof r.body === 'object') ? r.body : r;\nconst nodes = Array.isArray(wf.nodes) ? wf.nodes : [];\nconst agent = nodes.find(n => n.name === 'AI Agent') || nodes[5];\nconst sm = agent && agent.parameters && agent.parameters.options ? String(agent.parameters.options.systemMessage || '') : '';\nif (!sm) return [{ json: { ok: false, error: 'bot_prompt_unavailable', detail: 'http ' + (r.statusCode || 0) } }];\n// the transcript the model sees: the owner's synthetic history + the test message (no memory node — the bot's memory is untouched)\nconst lines = v.history.map(m => (m.role === 'client' ? 'Клиент: ' : 'Бизнес: ') + m.text);\nconst text = lines.length ? lines.join('\\n') + '\\nКлиент: ' + v.text : v.text;\nreturn [{ json: { ok: true, systemMessage: sm, text, sources: {\n  catalog: /Product1:|Service1:/.test(sm), contacts: /Контакты:/.test(sm), businessText: /About Business:\\s*\\S/.test(sm.replace(/About Business:\\s*\\n\\s*Контакты:/, '')) } } }];\n"
+      },
+      "id": "57d1d3a7-169e-5da0-8f56-350e09ce0be2",
+      "name": "Compose",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "07721932-a708-57ff-9bc1-43172867e53c",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7305cd82-401e-51fc-9dc7-bf5d70d463ab",
+      "name": "Prompt OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1540,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: $json.error || 'bot_prompt_unavailable', detail: $json.detail } }}",
+        "options": {
+          "responseCode": 502
+        }
+      },
+      "id": "aee238ed-9bb5-51b1-81e7-831c97e2c3a1",
+      "name": "Respond Unavailable",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1760,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "load",
+        "tableName": {
+          "__rl": true,
+          "value": "documents",
+          "mode": "list",
+          "cachedResultName": "documents"
+        },
+        "options": {
+          "queryName": "match_documents",
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "={{ $('Validate').first().json.filterKey }}",
+                "value": "={{ $('Validate').first().json.workflowId }}"
+              }
+            ]
+          }
+        },
+        "prompt": "={{ $('Validate').first().json.text }}",
+        "topK": 5,
+        "includeDocumentMetadata": true
+      },
+      "id": "eb6ffcb5-22a7-5783-a5a5-0d8409680164",
+      "name": "Probe Documents",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        1760,
+        100
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "ifCYb9DhUxoCq3pu",
+          "name": "Supabase"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "model": "text-embedding-3-small"
+      },
+      "id": "b0a0ed32-d4c2-5925-9453-e0dafdb9f830",
+      "name": "OpenAI Embedding",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1760,
+        300
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "XVjhR1xlWrIgJjKz",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// TEST DIALOG / Sources: the price-list fragments this question could draw on (same table, same per-bot scope\n// as the bot's own retrieval tool), listed for the owner — never sent to the client.\nconst docs = [];\nfor (const it of $input.all()) {\n  const j = it && it.json;\n  if (!j || j.error) continue;\n  const d = j.document || j;\n  const content = d && (d.pageContent || d.content);\n  if (content) docs.push({ snippet: String(content).slice(0, 160), fileId: (d.metadata || {}).fileId || null });\n}\nconst c = $('Compose').first().json;\nreturn [{ json: { text: c.text, systemMessage: c.systemMessage, sources: { ...c.sources, documents: docs } } }];\n"
+      },
+      "id": "1b71454a-6188-5fbc-ac23-69c306bf6f8a",
+      "name": "Sources",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1980,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.text }}",
+        "options": {
+          "systemMessage": "={{ $json.systemMessage }}"
+        }
+      },
+      "id": "e8b8cf47-d894-56c5-aa5d-9963c4a46c82",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.8,
+      "position": [
+        2200,
+        100
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5.4-mini"
+        },
+        "options": {
+          "frequencyPenalty": 0.2,
+          "maxTokens": 200,
+          "responseFormat": "text",
+          "temperature": 0.2,
+          "maxRetries": 2
+        }
+      },
+      "id": "cebdb19a-552c-5f00-bc67-74c85dda1ab9",
+      "name": "OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        2200,
+        320
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "XVjhR1xlWrIgJjKz",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "tableName": {
+          "__rl": true,
+          "value": "documents",
+          "mode": "list",
+          "cachedResultName": "documents"
+        },
+        "options": {
+          "queryName": "match_documents",
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "={{ $('Validate').first().json.filterKey }}",
+                "value": "={{ $('Validate').first().json.workflowId }}"
+              }
+            ]
+          }
+        },
+        "toolDescription": "Retrieve product details, prices, services, and any uploaded catalog or document content for this business. Use whenever the customer asks about products, pricing, availability, or specifics that may be in uploaded documents.",
+        "topK": 10,
+        "useReranker": false
+      },
+      "id": "442993b7-03ad-5b93-9644-ce36c1fbe992",
+      "name": "Supabase Vector Store",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        2380,
+        420
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "ifCYb9DhUxoCq3pu",
+          "name": "Supabase"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "text-embedding-3-small"
+      },
+      "id": "6a6c8e4e-f87a-5dcf-bb7d-247d35ac5d1b",
+      "name": "OpenAI Embedding Tool",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        2380,
+        600
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "XVjhR1xlWrIgJjKz",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Передать заявку владельцу бизнеса: создаёт запись заявки и уведомление владельцу, ставит чат на паузу автоответов. Вызывай, когда клиент готов к заказу или брони, просит связаться, или вопрос нужно передать человеку. Возвращает {ok:true} — тогда можно сказать клиенту «Передал владельцу»; {ok:false} — передачу не обещай.",
+        "workflowId": {
+          "__rl": true,
+          "value": "crHandoffDry0001",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "={{ $('Validate').first().json.runId }}",
+            "reason": "={{ $fromAI('reason', 'Причина: order — заказ, бронь или покупка; question — вопрос, на который нет ответа в данных бизнеса; escalation — жалоба, спор, срочное', 'string', 'question') }}",
+            "name": "={{ $fromAI('name', 'Имя клиента, если он его назвал; иначе пустая строка', 'string', '') }}",
+            "phone": "={{ $fromAI('phone', 'Телефон клиента, если он его назвал; иначе пустая строка', 'string', '') }}",
+            "summary": "={{ $fromAI('summary', 'Суть заявки одной-двумя фразами: что нужно клиенту и какие детали уже известны', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "run_id",
+              "displayName": "run_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "aeb12cdb-bda5-559c-89ce-55ef4f8057ce",
+      "name": "Create Handoff",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1540,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- the dry tool's ledger for THIS run (+ the daily sweep of old rows)\nwith sweep as (delete from test_dialog_actions where created_at < now() - interval '1 day' returning 1)\nselect coalesce(json_agg(json_build_object('action', a.action, 'args', a.args) order by a.id), '[]'::json) as actions\nfrom test_dialog_actions a where a.run_id = $1;",
+        "options": {
+          "queryReplacement": "={{ [ $('Validate').first().json.runId ] }}"
+        }
+      },
+      "id": "4bd8489b-5b09-561e-a40d-383be2f6d1b1",
+      "name": "Read Actions",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2420,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// TEST DIALOG / Build Response: the reply, the sources it could use, the action it would have taken, the\n// correlation id — and an honest error when the model or the prompt read failed.\nconst v = $('Validate').first().json;\nlet reply = '';\ntry { reply = String($('AI Agent').first().json.output || ''); } catch (e) { reply = ''; }\nlet sources = {};\ntry { sources = $('Sources').first().json.sources || {}; } catch (e) { sources = {}; }\nlet actions = [];\ntry { actions = $input.first().json.actions || []; } catch (e) { actions = []; }\nconst handoff = actions.find(a => a.action === 'create_handoff');\nif (!reply.trim()) return [{ json: { success: false, error: 'generation_failed', correlationId: v.runId, _status: 200 } }];\nreturn [{ json: { success: true, reply, sources, wouldHandoff: handoff ? (handoff.args || {}) : null,\n                  wouldSend: true, sent: false, quotaCounted: false, correlationId: v.runId, _status: 200 } }];\n"
+      },
+      "id": "69e93fd2-1587-56f0-9dec-c3c1bf6a87c4",
+      "name": "Build Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ Object.fromEntries(Object.entries($json).filter(([k]) => k !== '_status')) }}",
+        "options": {
+          "responseCode": "={{ $json._status || 200 }}"
+        }
+      },
+      "id": "7a17fabe-9ea3-5257-9e36-425a875d5b5e",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2860,
+        100
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Auth Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth Gate": {
+      "main": [
+        [
+          {
+            "node": "Authorized?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Authorized?": {
+      "main": [
+        [
+          {
+            "node": "Validate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond 401",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate": {
+      "main": [
+        [
+          {
+            "node": "Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid?": {
+      "main": [
+        [
+          {
+            "node": "Read Bot Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond 400",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Bot Workflow": {
+      "main": [
+        [
+          {
+            "node": "Compose",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compose": {
+      "main": [
+        [
+          {
+            "node": "Prompt OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompt OK?": {
+      "main": [
+        [
+          {
+            "node": "Probe Documents",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Unavailable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Probe Documents": {
+      "main": [
+        [
+          {
+            "node": "Sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sources": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Read Actions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Actions": {
+      "main": [
+        [
+          {
+            "node": "Build Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Response": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Embedding": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Probe Documents",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Embedding Tool": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Vector Store": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Handoff": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "saveManualExecutions": false,
+    "executionTimeout": 60
+  },
+  "staticData": null,
+  "meta": null,
+  "tags": []
+}

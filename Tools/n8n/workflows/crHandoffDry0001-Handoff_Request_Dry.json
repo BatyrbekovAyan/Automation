@@ -1,0 +1,116 @@
+{
+  "id": "crHandoffDry0001",
+  "name": "Handoff Request (dry)",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "run_id",
+              "type": "string"
+            },
+            {
+              "name": "reason",
+              "type": "string"
+            },
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "phone",
+              "type": "string"
+            },
+            {
+              "name": "summary",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "a7c4e84c-2bff-5252-ade0-f526156801fa",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into test_dialog_actions (run_id, action, args)\nvalues ($1, 'create_handoff', jsonb_build_object('reason', $2, 'name', $3, 'phone', $4, 'summary', $5))\nreturning id;",
+        "options": {
+          "queryReplacement": "={{ [ String($json.run_id || ''), String($json.reason || 'question'), String($json.name || ''), String($json.phone || ''), String($json.summary || '') ] }}"
+        }
+      },
+      "id": "6e5621fd-503b-57c0-8e8e-10828f707a48",
+      "name": "Record Intent",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        220,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// HANDOFF (DRY) / Tool Result: identical to the real tool's success so the model behaves exactly as in\n// production — the request row does NOT exist and nobody was notified (the Test Dialog says so to the owner).\nreturn [{ json: { ok: true, handoff_id: 0, created: true, status: 'open', note: 'Заявка записана, владелец получит уведомление. Можно сказать клиенту, что заявка передана.' } }];\n"
+      },
+      "id": "5297f39d-3412-5584-845b-b843b7302580",
+      "name": "Tool Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Record Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Intent": {
+      "main": [
+        [
+          {
+            "node": "Tool Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "saveManualExecutions": false
+  },
+  "staticData": null,
+  "meta": null,
+  "tags": []
+}

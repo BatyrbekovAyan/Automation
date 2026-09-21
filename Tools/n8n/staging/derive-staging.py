@@ -100,8 +100,14 @@ def main():
             os.remove(os.path.join(OUT, stale))
     missing = set()
     manifest = {"n8nHome": HOME, "n8nBase": LOCAL_HOST, "wappiMock": MOCK, "files": [], "bots": []}
-    for f in sorted(x for x in os.listdir(SRC) if x.endswith(".json")):
-        wf = json.loads(derive_file(open(os.path.join(SRC, f), encoding="utf-8").read()))
+    # Canonical workflows + the STAGING-ONLY ones (Tools/n8n/staging/workflows/, e.g. the stage-6 eval
+    # runner) — the latter never reach prod because every deploy tool reads Tools/n8n/workflows/ only.
+    STAGING_ONLY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "workflows")
+    sources = [(SRC, f) for f in sorted(x for x in os.listdir(SRC) if x.endswith(".json"))]
+    if os.path.isdir(STAGING_ONLY):
+        sources += [(STAGING_ONLY, f) for f in sorted(x for x in os.listdir(STAGING_ONLY) if x.endswith(".json"))]
+    for src_dir, f in sources:
+        wf = json.loads(derive_file(open(os.path.join(src_dir, f), encoding="utf-8").read()))
         for node in wf.get("nodes", []):
             remap(node, creds, missing)
         wf["active"] = False

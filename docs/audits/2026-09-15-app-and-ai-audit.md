@@ -308,3 +308,29 @@ Debounce выбирает последнее сообщение, но не фи�
 - [Критерий первого ответа](/Users/ayan/Projects/Automation/Assets/Scripts/Main/Onboarding/OnboardingFirstReplyLatch.cs:19)
 
 Рабочие выполнения для внутренней перепроверки: 1809 — задержка поиска; 1967, 1971, 1994 — примеры уместности карточек. Сырые ответы API прочитаны для аудита и не помещены в репозиторий.
+
+---
+
+## Статус устранения (дополнено 2026-09-22; исходные находки выше не изменялись)
+
+Работа велась по инструкции `2026-09-16-claude-code-remediation-prompt.md`, этапы 0–7. Полная матрица «находка →
+где исправлено → тест → ограничения» — `2026-09-22-remediation-matrix.md`; журнал доказательств по этапам —
+`implementation-progress.md`; пакет развёртывания — `release-package.md`. **Прод не менялся**: всё проверено на изолированном
+staging (n8n 2.27.4 + приватный Postgres + мок Wappi) и юнит-тестами Unity (2679/2679 на 2026-09-22).
+
+| Находка | Состояние | Ключевое доказательство |
+|---|---|---|
+| A1 | исправлено в коде и на staging; не развёрнуто; закрывается ротацией Wappi-токена после релиза | e2e-auth (bootstrap/refresh/403 чужой профиль/claim), `AuthWiringGuardTests`, артефакт без токена (`inspect-artifact.sh`) |
+| A2 | исправлено; не развёрнуто | версионный upsert `SetReplyMode` + очередь с подтверждением (`ReplyModeSyncQueueTests`, e2e-auth `rm_*`) |
+| A3 | исправлено; не развёрнуто | `Final Check` перед отправкой: `superseded`/`cancelled_owner`; e2e-reply `newer_during_llm`, `owner_before_send` |
+| A4 | исправлено; не развёрнуто | `Claim Event` + lease; e2e-reply `dup_parallel`/`dup_sequential`/`restart_reclaim` (WA+TG), 28/28 |
+| A5 | исправлено (заявка = действие инструмента, пауза чата, self-message, список в приложении); push — внешний блокер | e2e-handoff 14/14; промпт «Передал…» только после `ok:true` (eval `claims_handoff_only_if_ok`) |
+| A6 | исправлено (единая история с источниками, ответы владельца в памяти и сводке); форма outgoing-событий Wappi — canary на проде | e2e-handoff `outgoing_phone_recorded`, `proxy_send_records_owner_app_row`, `dashboard_shows_open_handoff_as_event` |
+| A7 | исправлено (fail-open декоративных узлов, честные `sent/send_failed/send_unknown`, без слепого повтора) | e2e-reply `typing_fail`, `accept_drop`, `dropped_without_echo_stays_send_unknown` |
+| S1, S3–S7 | исправлено; не развёрнуто | e2e-suggest 6/6, repro 22/22, `SuggestionKnowledgeTests`, `SuggestionCacheScopeTests`, `TmpTextToPlainTests` |
+| S2 | измерено, правила панели не менялись (locked) | eval: личное поздравление/эмоция — карточки вместо abstain (0/3, 1/3) — известный промах суждения модели |
+| Промпты (раздел 3) | переписаны по приоритету/данным/инструменту; измерено до/после на одном наборе | eval v1.1/h2: 54/6/3 против 52/3/8 (63 сценария, 111 прогонов); + русский ответ на медиа вместо английского |
+| Раздел 5 (проверки и наблюдаемость) | добавлены: ledger `reply_events` с именованными состояниями, `Outcome`-штампы, «Проверка бота» с источниками и dry-handoff, «Последние ответы» в приложении, read-back развёрнутого (`verify-deployed.py`), обновление клонов со штампом | e2e-test-dialog 4 сценария, e2e-clone-update, `TestDialogClientTests`, `BotReadinessTests` |
+
+Что осталось вне кода: развёртывание по пакету (разрешение владельца), device-pass экранов этапа 7 и self-message заявки,
+push-ключи, закрытие compat-окна, ротация Wappi-токена.

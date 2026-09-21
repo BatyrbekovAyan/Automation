@@ -52,7 +52,9 @@ ACTIVE_CANONICAL = ["0DP79STI3pafXO9B", "2htWSV5IHO8E2CgB", "2islisFH7jjLoPQM", 
                     "ZGYr6srzS3rSSXHp", "ZTqpumOpL1rNDOp6", "fXYpCXPKw92EzRz8", "hHwvfOvTCS42pXnq", "jtbssfzXbOxwTK4k",
                     "lmjYsdNcQA2IE5rl", "olmqWMfcFpCEcpiE",
                     "crAuthSession001", "crWappiProxy0001",   # A1 (stage 1): Auth Session + Wappi Proxy
-                    "crHandoffReq0001", "crHandoffNtfy001", "crHandoffsApi001"]   # A5 (stage 4): handoff tool target, notifier, app webhook
+                    "crHandoffReq0001", "crHandoffNtfy001", "crHandoffsApi001",   # A5 (stage 4): handoff tool target, notifier, app webhook
+                    "crTestDialog0001", "crHandoffDry0001",   # stage 7.1: the safe test dialog + its dry handoff target
+                    "stgEvalRunner001"]   # STAGING-ONLY (stage 6): completions proxy for the eval runner
 
 
 def sh(*args, check=True, quiet=False):

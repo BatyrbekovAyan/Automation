@@ -192,12 +192,13 @@ const wh = $input.first().json || {};
 const b = wh.body || {};
 const owned = new Set((wh.crAuth && wh.crAuth.profiles) || []);
 const op = typeof b.op === 'string' ? b.op : 'list';
-if (!['list', 'take', 'done'].includes(op)) return [{ json: { ok: false, error: 'bad_request', detail: 'op' } }];
+if (!['list', 'take', 'done', 'status'].includes(op)) return [{ json: { ok: false, error: 'bad_request', detail: 'op' } }];
 const ids = Array.isArray(b.profileIds) ? b.profileIds.filter(x => typeof x === 'string' && x && x !== '-1' && owned.has(x)).slice(0, 20) : [];
 if (ids.length === 0) return [{ json: { ok: false, error: 'bad_request', detail: 'profileIds' } }];
 const id = Number(b.id);
-if (op !== 'list' && !(Number.isInteger(id) && id > 0)) return [{ json: { ok: false, error: 'bad_request', detail: 'id' } }];
-return [{ json: { ok: true, op, profileIds: JSON.stringify(ids), id: op === 'list' ? 0 : id } }];
+const readOnly = op === 'list' || op === 'status';
+if (!readOnly && !(Number.isInteger(id) && id > 0)) return [{ json: { ok: false, error: 'bad_request', detail: 'id' } }];
+return [{ json: { ok: true, op, profileIds: JSON.stringify(ids), id: readOnly ? 0 : id } }];
 """
 
 HANDOFFS_SQL = """-- A5: the owner's pending requests (+ take/done in the same statement). `done` is the explicit
@@ -238,6 +239,14 @@ select
       and not exists (select 1 from done d where d.profile_id = c.profile_id and d.chat_id = c.chat_id
                       and not exists (select 1 from handoff_requests o where o.profile_id = d.profile_id and o.chat_id = d.chat_id and o.status <> 'done' and o.id <> d.id))),
     '[]'::json) as "pausedChats",
+  -- stage 7.3: the last reply outcomes per profile (the ledger, not a guess) — state + correlation id; the
+  -- chat is masked to its last 4 digits, the client's text never rides along.
+  coalesce((select json_agg(json_build_object(
+      'profileId', e.profile_id, 'chatTail', right(regexp_replace(e.chat_id, '\D', '', 'g'), 4), 'state', e.state,
+      'at', (extract(epoch from e.updated_at) * 1000)::bigint, 'executionId', e.execution_id,
+      'transportMessageId', e.transport_message_id) order by e.updated_at desc)
+    from (select * from reply_events r where r.profile_id in (select profile_id from p) order by r.updated_at desc limit 12) e
+    where $2 = 'status'), '[]'::json) as recent,
   (select count(*) from taken) + (select count(*) from done) as changed;"""
 
 
@@ -257,8 +266,8 @@ def build_api():
     n.append(q)
     n.append(auth.code("Shape Response", r"""const r = $input.first().json || {};
 if (r.requests === undefined) return [{ json: { success: false, error: 'db_error', _status: 500 } }];
-return [{ json: { success: true, requests: r.requests || [], pausedChats: r.pausedChats || [], changed: Number(r.changed) || 0, _status: 200 } }];""", [1320, 100]))
-    n.append(auth.respond("Respond", [1540, 100], body="={{ { success: $json.success, error: $json.error, requests: $json.requests, pausedChats: $json.pausedChats, changed: $json.changed } }}",
+return [{ json: { success: true, requests: r.requests || [], pausedChats: r.pausedChats || [], recent: r.recent || [], changed: Number(r.changed) || 0, _status: 200 } }];""", [1320, 100]))
+    n.append(auth.respond("Respond", [1540, 100], body="={{ { success: $json.success, error: $json.error, requests: $json.requests, pausedChats: $json.pausedChats, recent: $json.recent, changed: $json.changed } }}",
                           code_expr="={{ $json._status }}"))
     auth.edge(c, "Webhook", "Auth Gate"); auth.edge(c, "Auth Gate", "Authorized?")
     auth.edge(c, "Authorized?", "Validate", 0); auth.edge(c, "Authorized?", "Respond 401", 1)

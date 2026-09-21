@@ -40,12 +40,15 @@ public class HandoffSyncService : MonoBehaviour
     public static event Action Changed;
 
     private readonly List<HandoffRequest> _pending = new();
+    private readonly List<ReplyOutcomeRow> _recent = new();
     private readonly HashSet<long> _knownOpen = new();
     private long _lastFetchMs;
     private bool _fetching;
     private bool _everFetched;
 
     public IReadOnlyList<HandoffRequest> Pending => _pending;
+    /// <summary>Stage 7.3: the last reply outcomes (ledger rows) for the owner's profiles; filled by <see cref="RefreshStatus"/>.</summary>
+    public IReadOnlyList<ReplyOutcomeRow> Recent => _recent;
     public int OpenCount { get { int n = 0; foreach (var r in _pending) if (r.IsOpen) n++; return n; } }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -79,8 +82,11 @@ public class HandoffSyncService : MonoBehaviour
     {
         if (_fetching) return;
         if (!force && !DashboardRefreshGate.ShouldFetch(_lastFetchMs, NowMs(), GateSeconds * 1000L)) return;
-        StartCoroutine(FetchRoutine());
+        StartCoroutine(FetchRoutine("list"));
     }
+
+    /// <summary>Stage 7.3: fetch the pending list AND the last reply outcomes (op status) — not gated; a screen asks for it explicitly.</summary>
+    public void RefreshStatus() { if (!_fetching) StartCoroutine(FetchRoutine("status")); }
 
     /// <summary>The owner opened the chat from the request: the server may now say «taken» (a real view, never assumed).</summary>
     public void Take(long id, string profileId) => StartCoroutine(MutateRoutine("take", id, profileId));
@@ -104,7 +110,7 @@ public class HandoffSyncService : MonoBehaviour
         return list;
     }
 
-    private IEnumerator FetchRoutine()
+    private IEnumerator FetchRoutine(string op)
     {
         _fetching = true;
         try
@@ -113,7 +119,7 @@ public class HandoffSyncService : MonoBehaviour
             var profiles = DashboardProfileMap.AuthedProfiles(descriptors);
             if (profiles.Count == 0) yield break;
             string url = $"{Manager.n8nBaseUrl}/webhook/Handoffs";
-            string body = JsonConvert.SerializeObject(new { op = "list", profileIds = profiles });
+            string body = JsonConvert.SerializeObject(new { op, profileIds = profiles });
             UnityWebRequest req = null;
             yield return AuthorizedRequest.Send(() => AuthorizedRequest.JsonPost(url, body, RequestTimeoutSeconds), r => req = r);
             using var scope = req;
@@ -142,6 +148,7 @@ public class HandoffSyncService : MonoBehaviour
         }
         _pending.Clear();
         _pending.AddRange(parsed.requests);
+        if (parsed.recent != null && parsed.recent.Count > 0) { _recent.Clear(); _recent.AddRange(parsed.recent); }
         _knownOpen.Clear();
         _knownOpen.UnionWith(open);
         _everFetched = true;

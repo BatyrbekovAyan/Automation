@@ -79,6 +79,9 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
   Stage 5 (`apply-suggest-v2.py`, SQL `sql/2026-09-17-suggestion-request-keys.sql`, staging suite
   `staging/e2e-suggest.py`, repro scenarios `prep_*` in `repro/scenarios.json`): Suggest Replies knowledge
   budget / subject recovery / exact match / server time / idempotent count / error kinds — see CLAUDE.md «S1/S3–S8».
+  Stage 6 (`eval/scenarios.v1.json` + `eval/run-eval.py`, staging-only proxy `staging/workflows/stgEvalRunner001`
+  from `eval/build-eval-runner.py`): the versioned synthetic eval set and the before/after runner (composed bot prompt
+  + simulated tools; panel via the real webhook) — see CLAUDE.md «Prompt priority + the eval set».
   `$execution.id` as correlationId). `verify-message-batching.py` / `verify-telegram-parity.py` pin the
   stamp's wiring and the winner → billing-gate → Input type path (their pre-2026-09 expectations were
   stale and failed every run).
@@ -287,7 +290,8 @@ dashboard webhook URL must be re-pointed by the owner to `https://n8n.chooserepl
 4. **Edit handlers** assume target node indices (`nodes[5]` is the AI agent) and have a `Set Bussiness Type`
    node-name typo + leftover unused credential refs — clean up during the prod pass.
 5. **BILLING REPLICATION ORDER (Task 17a) — import both bot templates BEFORE any bot is created,
-   and recreate every pre-existing clone.** A bot workflow is a CLONE of
+   and recreate every pre-existing clone** *(superseded 2026-09-22 by `update-clones.py`, which updates a clone IN PLACE —
+   see «Stage 7 tools» below; the paragraph is kept for the history of WHY clones drift).* A bot workflow is a CLONE of
    `4wYitz5ek30SVNlT`/`4VN3gsFaC2HUYmcc` taken at creation time, and the Edit handlers PUT the
    clone's *own* json back — they never re-splice nodes. So a clone made before the reserve change
    keeps the OLD `Count Dialog` forever: the top-up stays ADDED to the monthly quota and is never
@@ -310,3 +314,28 @@ dashboard webhook URL must be re-pointed by the owner to `https://n8n.chooserepl
    `suggestion_counts`), and the refusal envelope deliberately carries no reason so the endpoint
    is not an account-state oracle — but the real fix is authenticating the request, the same way
    `RevenueCatEvent` already is.
+
+## Stage 7 tools (audit remediation, 2026-09-22) — owner readiness + managed deployment
+
+All READ-ONLY against prod unless the flag says otherwise; every mutating path was exercised on staging (`staging/`).
+
+- `update-clones.py` — managed update of existing bot clones (a Create-made workflow = template graph + 4 identity fields:
+  name, Webhook path/webhookId, AI Agent systemMessage, settings, plus credential ids per TYPE). Dry-run by default (node diff +
+  preserved identity + the pre-update `versionId` as the rollback pointer); `--apply --yes [--only <id>]` PUTs, re-publishes an
+  active clone, and READS BACK (node set == canonical, path/prompt kept, `crTemplateVersion` stamp in a sticky note because
+  `meta` is read-only on PUT, `activeVersionId == versionId`). Idempotent by stamp. Acceptance: `staging/e2e-clone-update.py`
+  (an old 33-node clone → 57 nodes, replies once, ledger `sent`).
+- `verify-deployed.py [--base …] [--json out]` — read-back of an instance vs the canonical exports: per canonical workflow
+  OK/DIFF/MISSING (graph hash with identity blanked), `published_is_stored`, clone stamps, unknown workflows. Prod snapshot of
+  2026-09-22: `docs/audits/2026-09-22-prod-readback.json` (20 DIFF, 5 MISSING, clones «13»/«15» behind — the deploy scope).
+- `build-test-dialog.py` → `crTestDialog0001-Test_Dialog.json` + `crHandoffDry0001-Handoff_Request_Dry.json`: `/webhook/TestDialog`
+  answers the owner's test message with the bot's REAL prompt (read through the admin API from the bot's own workflow, never a
+  copy), same model/params/tools, NO memory node, NO send, NO dialog count, NO ledger row; the handoff tool is the DRY twin, which
+  records the intended action in `test_dialog_actions` (SQL `sql/2026-09-22-test-dialog.sql`) and the response reports it as
+  `wouldHandoff`. Gate rule: profiles[profileId] + workflows[workflowId] of the calling install. Protected in Set Workflow State.
+  Verifier: `verify-history-handoff.py` (`verify_test_dialog`). Staging: `staging/e2e-test-dialog.py` (4 scenarios).
+- Handoffs `op: "status"` (`build-handoff-workflows.py`) — the last 12 `reply_events` rows for the owner's profiles (state, time,
+  execution id, chat masked to its last 4 digits — never the client's text); the app's `ReplyOutcomeCopy` names each state.
+- `eval/run-eval.py` (stage 6, harness h2) — before/after prompt measurement through the STAGING-ONLY completions proxy
+  `stgEvalRunner001`; compare only runs of one scenario version + one harness version. Results in `eval/results/`.
+

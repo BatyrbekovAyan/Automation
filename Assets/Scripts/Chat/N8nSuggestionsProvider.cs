@@ -162,7 +162,7 @@ public class N8nSuggestionsProvider : ISuggestionsProvider
     // S1 (stage 5): the knowledge contract, read from the same keys the settings screen writes
     // (bot-persistence key catalog: Product{i}/Service{i} + Price + Description, the contact keys,
     // {bot}Business, {bot}TimeZone).
-    private static SuggestionKnowledgeDto BuildKnowledge(string botName)
+    internal static SuggestionKnowledgeDto BuildKnowledge(string botName)
     {
         var items = new List<SuggestionKnowledgeItem>();
         AppendKnowledgeItems(items, botName, "Product", "product", PlayerPrefs.GetInt(botName + "ProductsNumber", 0));

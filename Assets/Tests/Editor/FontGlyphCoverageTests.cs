@@ -298,6 +298,8 @@ public class FontGlyphCoverageTests
             typeof(ReplyModeSyncCopy),  // A2 unconfirmed / failed reply-mode sync subline (2026-09-17)
             typeof(HandoffCopy),        // A5 «Заявка ·» marker on real-request rows of the dashboard (2026-09-17)
             typeof(SuggestionErrorCopy),// S8 per-kind error headings of the suggestions panel (2026-09-17)
+            typeof(ReplyOutcomeCopy),   // stage 7.3 ledger-state labels (2026-09-22)
+            typeof(BotReadinessCopy),   // stage 7.1/7.2 test-dialog + readiness copy (2026-09-22)
         };
         foreach (var t in constTypes)
             foreach (var f in t.GetFields(BindingFlags.Public | BindingFlags.Static))

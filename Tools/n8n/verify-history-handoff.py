@@ -110,6 +110,24 @@ def verify_handoff_workflows():
     print("OK  handoff workflows (request / notifier / app webhook)")
 
 
+def verify_test_dialog():
+    td = load("crTestDialog0001-Test_Dialog.json")
+    names = {n["name"] for n in td["nodes"]}
+    types = {n["type"] for n in td["nodes"]}
+    check("Chat Memory" not in names and not any("memory" in t.lower() for t in types), "test dialog must not touch the bot's memory")
+    check("Count Dialog" not in names and "HTTP Request" not in names and not any("message/send" in json.dumps(n["parameters"]) for n in td["nodes"]), "test dialog must never send or count a dialog")
+    tool = node(td, "Create Handoff")
+    check(tool["parameters"]["workflowId"]["value"] == "crHandoffDry0001", "test dialog's handoff tool must target the DRY sub-workflow")
+    check("$('Validate').first().json.runId" in tool["parameters"]["workflowInputs"]["value"]["run_id"], "dry tool must carry the run id from the run, not the model")
+    g = node(td, "Auth Gate")["parameters"]["jsCode"]
+    check('"profiles": ["profileId"]' in g and '"workflows": ["workflowId"]' in g and '"legacy": false' in g, "test dialog keeps the owner check (profile + workflow, token-only)")
+    check("api/v1/workflows/{{ $json.workflowId }}" in node(td, "Read Bot Workflow")["parameters"]["url"], "the prompt is read from the bot's own workflow")
+    dry = load("crHandoffDry0001-Handoff_Request_Dry.json")
+    check("test_dialog_actions" in node(dry, "Record Intent")["parameters"]["query"] and not any("handoff_requests" in json.dumps(n["parameters"]) for n in dry["nodes"]),
+          "the dry tool records intent only — never a real request")
+    print("OK  test dialog (no memory, no send, no quota, dry handoff, owner check)")
+
+
 def verify_integrations():
     for f in ("XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json", "Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json"):
         jb = node(load(f), "Set Wappi Webhook Types")["parameters"]["jsonBody"]
@@ -126,8 +144,8 @@ def verify_integrations():
     for k in ("deletedHistoryEvents", "deletedHandoffs", "deletedReplyEvents", "deletedChatStates"):
         check(k in rb, f"Delete Bot Files response must report {k}")
     st = load("0DP79STI3pafXO9B-Set_Workflow_State.json")
-    check(any(all(i in n["parameters"].get("jsCode", "") for i in ("'crHandoffReq0001'", "'crHandoffNtfy001'", "'crHandoffsApi001'")) for n in st["nodes"]),
-          "Set Workflow State must protect the handoff workflow ids")
+    check(any(all(i in n["parameters"].get("jsCode", "") for i in ("'crHandoffReq0001'", "'crHandoffNtfy001'", "'crHandoffsApi001'", "'crTestDialog0001'", "'crHandoffDry0001'")) for n in st["nodes"]),
+          "Set Workflow State must protect the handoff + test-dialog workflow ids")
     px = load("crWappiProxy0001-Wappi_Proxy.json")
     check(px["connections"]["Respond"]["main"][0] == [{"node": "Owner Send?", "type": "main", "index": 0}], "proxy: the recorder must run AFTER the response")
     q = node(px, "Record Owner Send")["parameters"]["query"]
@@ -139,6 +157,7 @@ def main():
     for f in BOTS:
         verify_bot(f)
     verify_handoff_workflows()
+    verify_test_dialog()
     verify_integrations()
     print("ALL HISTORY/HANDOFF ASSERTS PASSED")
 
