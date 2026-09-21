@@ -71,12 +71,12 @@ def main():
         d = get(f"/executions/{e['id']}", includeData="true")
         uid = leaf(d, "Webhook", "body.appUserId")
         body = {k: leaf(d, "Respond 200", k) for k in ("plan", "status", "quota", "topupBalance")}
-        print(f'  {e["startedAt"][11:23]}  #{e["id"]}  {uid}  -> {body}')
+        print(f'  {e["startedAt"][5:19]}  #{e["id"]}  {uid}  -> {body}')
     print(f"=== RevenueCat_Events {lo.isoformat()} .. {hi.isoformat()} ===")
     for e in list_execs(WF_RC_EVENTS, lo, hi):
         d = get(f"/executions/{e['id']}", includeData="true")
         ev = leaf(d, "Webhook", "body.event") or {}
-        print(f'  {e["startedAt"][11:23]}  #{e["id"]}  {ev.get("type")}  {ev.get("product_id")}  '
+        print(f'  {e["startedAt"][5:19]}  #{e["id"]}  {ev.get("type")}  {ev.get("product_id")}  '
               f'env={ev.get("environment")}  cc={ev.get("country_code")}  user={ev.get("app_user_id")}  '
               f'aliases={len(ev.get("aliases") or [])}')
 
