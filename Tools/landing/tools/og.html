@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Choose Reply — OG</title>
+<style>
+@font-face{font-family:Onest;font-style:normal;font-weight:400 700;src:url(../src/assets/fonts/onest-cyr.woff2) format("woff2");unicode-range:U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116}
+@font-face{font-family:Onest;font-style:normal;font-weight:400 700;src:url(../src/assets/fonts/onest-lat.woff2) format("woff2");unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
+@font-face{font-family:"CR Serif Italic";font-style:italic;font-weight:400;src:url(../src/assets/fonts/serif-italic.woff2) format("woff2")}
+
+:root{
+  --bg:#0A0D16; --bg-2:#182036; --ink:#ECF0F6; --ink-2:#9AA6B8;
+  --accent:#5981D6; --accent-fill:#3E61C6; --accent-hi:#8FAEEF;
+  --wa:#25D366; --tg:#2AABEE;
+  --line:rgba(154,166,184,.16);
+  --f-sans:Onest,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-serif:"CR Serif Italic",Georgia,serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1200px;height:630px;overflow:hidden;background:var(--bg)}
+body{font-family:var(--f-sans);-webkit-font-smoothing:antialiased}
+
+.card{position:relative;width:1200px;height:630px;overflow:hidden;
+  background:linear-gradient(135deg,var(--bg) 0%,var(--bg-2) 100%);}
+
+/* cinematic bloom, opposite corners for balance */
+.glow-a{position:absolute;width:920px;height:920px;left:-300px;top:-260px;border-radius:50%;
+  background:radial-gradient(closest-side,rgba(89,129,214,.34),rgba(62,97,198,.10) 55%,rgba(62,97,198,0));}
+.glow-b{position:absolute;width:640px;height:640px;right:-220px;bottom:-280px;border-radius:50%;
+  background:radial-gradient(closest-side,rgba(143,174,239,.2),rgba(143,174,239,0));}
+.grain{position:absolute;inset:0;pointer-events:none;
+  background-image:radial-gradient(rgba(236,240,246,.05) 1px,transparent 1.4px);background-size:26px 26px;
+  -webkit-mask-image:radial-gradient(64% 64% at 38% 42%,#000,transparent 72%);}
+.vignette{position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(180deg,rgba(10,13,22,0) 66%,rgba(10,13,22,.5) 100%);}
+
+.content{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;gap:68px;
+  padding:0 80px;height:546px;}
+
+.mark-wrap{flex:0 0 auto;filter:drop-shadow(0 0 50px rgba(89,129,214,.55)) drop-shadow(0 0 100px rgba(62,97,198,.34));}
+.mark{width:214px;height:214px;display:block}
+.mark .m-side{fill:var(--accent);fill-opacity:.3}
+.mark .m-mid{fill:var(--accent)}
+
+.headline{color:var(--ink)}
+.ln{font-size:72px;line-height:1.14;letter-spacing:-.03em;font-weight:600;white-space:nowrap}
+.ln em{font-family:var(--f-serif);font-style:italic;font-weight:400;color:var(--accent-hi);letter-spacing:0}
+
+.footer{position:relative;z-index:1;height:84px;border-top:1px solid var(--line);
+  display:flex;align-items:center;padding:0 80px;
+  color:var(--ink-2);font-size:19px;letter-spacing:-.005em;}
+.footer b{font-weight:600;color:var(--ink)}
+.footer .wa{color:var(--wa);font-weight:600}
+.footer .tg{color:var(--tg);font-weight:600}
+.footer .dot{margin:0 12px;color:var(--ink-2)}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="glow-a"></div>
+  <div class="glow-b"></div>
+  <div class="grain"></div>
+  <div class="content">
+    <div class="mark-wrap">
+      <svg class="mark" viewBox="0 0 1024 1024" aria-hidden="true">
+        <rect x="110" y="208" width="804" height="142" rx="71" class="m-side"/>
+        <rect x="110" y="420" width="804" height="184" rx="92" class="m-mid"/>
+        <rect x="110" y="674" width="804" height="142" rx="71" class="m-side"/>
+      </svg>
+    </div>
+    <div class="headline">
+      <p class="ln">Ответ — за ботом.</p>
+      <p class="ln">Выбор — <em>за вами</em>.</p>
+    </div>
+  </div>
+  <div class="vignette"></div>
+  <div class="footer">
+    <b>choosereply.com</b><span class="dot">·</span><span class="wa">WhatsApp</span>&nbsp;и&nbsp;<span class="tg">Telegram</span>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,20 @@
+#!/bin/bash
+# Fake rsync: choosereply:<path> → the fake VPS home, then the LOCAL /usr/bin/rsync (never a remote).
+# The root pass (the one with --exclude /assets/) can be made to die half-way (SIM_RSYNC_ROOT_FAIL=1:
+# index.html lands, then the link drops) or to hang (SIM_RSYNC_ROOT_SLOW=<s>, marker .rsync-root — the
+# test Ctrl-Cs it there).
+out=(); root=0
+for a in "$@"; do
+  [[ $a == choosereply:* ]] && a="$SIM_V/${a#choosereply:}"
+  [[ $a == /assets/ ]] && root=1
+  out+=("$a")
+done
+for a in "${out[@]}"; do [[ $a == *choosereply:* ]] && { echo "fake rsync: unmapped $a" >&2; exit 97; }; done
+echo "rsync: ${out[*]}" >> "$SIM_V/log"
+n=${#out[@]}
+if [[ $root == 1 && -n ${SIM_RSYNC_ROOT_SLOW:-} ]]; then touch "$SIM_V/.rsync-root"; sleep "$SIM_RSYNC_ROOT_SLOW"; fi
+if [[ $root == 1 && -n ${SIM_RSYNC_ROOT_FAIL:-} ]]; then
+  cp "${out[$((n-2))]}index.html" "${out[$((n-1))]}index.html"
+  echo "fake rsync: connection unexpectedly closed" >&2; exit 12
+fi
+exec /usr/bin/rsync "${out[@]}"

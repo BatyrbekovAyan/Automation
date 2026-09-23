@@ -1,0 +1,37 @@
+#!/bin/bash
+# Fake `docker compose exec -T caddy …`: the container's /etc/caddy/Caddyfile, /srv/site and /tmp are the
+# fake VPS's choosereply/Caddyfile, choosereply/site and ctmp/. `caddy validate` = the file exists, parses
+# (caddy-block.py show) and has no INVALID; `caddy reload` copies the config to running-config (what the
+# fake Caddy "runs") and can fail on its N-th call (SIM_FAIL_RELOAD_N).
+[[ "${1:-} ${2:-} ${3:-} ${4:-}" == "compose exec -T caddy" ]] || { echo "fake docker: unexpected $*" >&2; exit 97; }
+shift 4
+map() {
+  case "$1" in
+    /etc/caddy/Caddyfile) printf '%s' "$SIM_V/choosereply/Caddyfile" ;;
+    /srv/site/*) printf '%s' "$SIM_V/choosereply/site/${1#/srv/site/}" ;;
+    /tmp/*) printf '%s' "$SIM_V/ctmp/${1#/tmp/}" ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+echo "docker: $*" >> "$SIM_V/log"
+case "${1:-}" in
+  caddy)
+    cfg=$(map "${@: -1}")
+    if [[ $2 == validate ]]; then
+      [[ -f $cfg ]] || { echo "caddy: open $cfg: no such file" >&2; exit 1; }
+      if grep -q INVALID "$cfg"; then echo "caddy: adapting config: INVALID" >&2; exit 1; fi
+      python3 "$SIM_BLOCK" show "$cfg" > /dev/null || exit 1
+      exit 0
+    elif [[ $2 == reload ]]; then
+      n=$(cat "$SIM_V/.reloads" 2>/dev/null || echo 0); n=$((n + 1)); echo "$n" > "$SIM_V/.reloads"
+      if [[ -n ${SIM_FAIL_RELOAD_N:-} && $n == "$SIM_FAIL_RELOAD_N" ]]; then echo "caddy: reload failed" >&2; exit 1; fi
+      cp "$cfg" "$SIM_V/running-config"; touch "$SIM_V/.after-install"; exit 0
+    fi
+    echo "fake caddy: unexpected $2" >&2; exit 97 ;;
+  sha256sum) shift; for f in "$@"; do shasum -a 256 "$(map "$f")" | sed "s|  .*|  $f|"; done ;;
+  sh)
+    [[ ${2:-} == -c && ${3:-} == "cat > "* ]] || { echo "fake docker sh: unexpected $*" >&2; exit 97; }
+    cat > "$(map "${3#cat > }")" ;;
+  rm) [[ ${2:-} == -f ]] && rm -f "$(map "$3")" ;;
+  *) echo "fake docker: unexpected command $1" >&2; exit 97 ;;
+esac

@@ -1,0 +1,3 @@
+#!/bin/bash
+# The VPS (Linux) has sha256sum; this Mac may not — same output format.
+exec shasum -a 256 "$@"

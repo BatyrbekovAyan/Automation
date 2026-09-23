@@ -1,0 +1,224 @@
+/* ── Первый экран + «Сигнал» ──────────────────────────────────────────────────
+   Один слой частиц (position:fixed) живёт от начала страницы до конца .stage и
+   держит три формы: знак → два пузыря → WhatsApp/Telegram. Текст первого экрана
+   рендерится сразу и никогда не зависит от JS: частицы проявляются поверх него.
+   Геометрия сцены: --s (единица формы в px), --cx/--cy (центр) — у знака; --ss/--cys — у форм шагов
+   (пузыри, каналы) и их оверлеев: на коротком телефоне знак меньше ради первого экрана, а переписка
+   остаётся того размера, при котором её текст помещается в пузыри (stepScale в stage.js, повторное
+   ревью 2, N-5). JS уточняет их измеренными значениями; значения ниже — рабочий запас без JS.
+
+   Три состояния секции, между ними переключают ТОЛЬКО классы на .stage:
+     нет .gl-init         — частиц нет (low / нет WebGL / поле погашено):
+                            знак статичный, «Сигнал» — обычная переписка в потоке;
+     .gl-init             — поле создано: оверлеи уже лежат на форме из частиц, но
+                            ещё невидимы и БЕЗ переходов — иначе первый кадр GL
+                            показал бы всю переписку поверх первого экрана и только
+                            потом погасил её (ревью r2, I1);
+     .gl-init + .gl-on    — идёт первый кадр и дальше: переходы включены, знак ушёл;
+     .gl-init + .gl-solid — тихий откат: поле погашено (shutDown), знак вернулся, а collapse
+                            (снимает gl-init, раскладка отката ровно одна) приходит, только
+                            пока шаги целиком ниже окна (stage.js, финальное ревью I-6) — иначе
+                            сдвиг раскладки под читателем. Может длиться до конца визита, поэтому
+                            резерв высоты шагов не пустует: переписка ложится в него сама, в
+                            плотном скине (повторное ревью, N-2; правила ниже, у GL-раскладки).
+   Классы секции с префиксом sg- — чтобы не столкнуться с .step/.bub/.glow других секций. */
+.stage{
+  /* единица формы на телефоне: до 20 % высоты, на коротком экране — плавно к 14 % (360×660: условия
+     пробного не уходят под сгиб, линза владельца); та же формула — phoneScale() в stage.js */
+  --s:min(calc((100vw - 40px) / 1.92), clamp(14vh, calc(48.3vh - 226.3px), 20vh));
+  --s:min(calc((100vw - 40px) / 1.92), clamp(14svh, calc(48.3svh - 226.3px), 20svh));
+  --cx:50vw;
+  --cy:calc(84px + var(--s) * .68);
+  /* единица шагов: не меньше 13px / .077 (≈169px), пока позволяет ширина — stepScale() в stage.js */
+  --ss:max(var(--s), min(calc((100vw - 40px) / 1.92), 168.8px));
+  --cys:calc(84px + var(--ss) * .68);
+  --textw:620px;
+  /* колонка первого экрана: JS уточняет --textw измеренным зазором до знака */
+  --heroc:min(640px, var(--textw));
+  position:relative;
+  background:
+    radial-gradient(74% 42vh at 50% 6vh, rgba(30,42,68,.85), rgba(10,13,22,0) 70%),
+    radial-gradient(120% 60vh at 50% 0, rgba(19,33,74,.5), rgba(10,13,22,0) 72%);
+}
+@media (min-width:900px){
+  .stage{
+    --s:min(20vw, 35vh, 320px);
+    --s:min(20vw, 35svh, 320px);
+    /* знак правее (было 72vw): освобождает колонку под заголовок, при этом правое поле
+       остаётся ≥40px — предел ниже считает от габарита знака (ревью r2, I3) */
+    --cx:min(75vw, calc(100vw - 1.05 * var(--s) - 40px));
+    --cy:52vh; --cy:52svh;
+    --ss:var(--s); --cys:var(--cy);
+    --heroc:min(700px, var(--textw));
+    background:
+      radial-gradient(38vw 46vh at 72% 46vh, rgba(30,42,68,.8), rgba(10,13,22,0) 70%),
+      radial-gradient(90vw 70vh at 74% 0, rgba(19,33,74,.45), rgba(10,13,22,0) 74%);
+  }
+}
+/* визуально скрытый заголовок секции (локальная утилита; общей в 01-base.css пока нет) */
+
+/* ── слой частиц ───────────────────────────────────────────────────────────── */
+.stage-vis{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;opacity:0;transition:opacity .7s var(--ease-out)}
+/* при gl-solid слой остаётся (свечение — часть фона), гаснет только сам canvas */
+.stage.gl-on .stage-vis,.stage.gl-solid .stage-vis{opacity:1}
+.stage.stage-out .stage-vis{opacity:0}
+.q-low .stage-vis{display:none}
+.stage-gl{position:absolute;inset:0;width:100%;height:100%}
+.stage.gl-solid .stage-gl{opacity:0;transition:opacity .6s var(--ease-out)}
+/* нижняя виньетка пришита к НИЗУ ЭКРАНА, а не к концу .stage: стык со следующей секцией
+   гасит не она, а сам canvas — stage.js уводит его прозрачность в 0 на последнем полуэкране
+   секции (иначе знаки WA/TG висят ещё целый экран уже под следующей секцией). */
+.stage-vis::after{content:"";position:absolute;left:0;right:0;bottom:0;height:20vh;background:linear-gradient(180deg,rgba(10,13,22,0),rgba(10,13,22,.75) 62%,var(--bg))}
+.sg-glow{position:absolute;left:var(--cx);top:var(--cy);translate:-50% -50%;border-radius:50%}
+.sg-glow-far{width:78vmax;height:78vmax;left:14%;top:10%;background:radial-gradient(closest-side,rgba(19,33,74,.5),rgba(19,33,74,0))}
+.sg-glow-a{width:calc(var(--s) * 4.4);height:calc(var(--s) * 3.1);background:radial-gradient(closest-side,rgba(62,97,198,.28),rgba(19,33,74,.2) 52%,rgba(10,13,22,0))}
+.sg-glow-b{width:calc(var(--s) * 2.5);height:calc(var(--s) * 1.35);background:radial-gradient(closest-side,rgba(143,174,239,.14),rgba(143,174,239,0));animation:stage-breathe 7s ease-in-out infinite alternate}
+@keyframes stage-breathe{from{transform:scale(.92);opacity:.65}to{transform:scale(1.1);opacity:1}}
+/* циклов нет там, где кадры дороги: low и погашенное поле */
+.q-low .sg-glow-b,.stage.gl-solid .sg-glow-b,.q-low .hero-scroll i::after,.stage.gl-solid .hero-scroll i::after{animation:none}
+/* читатель ушёл со сцены: слой невидим (opacity 0), но бесконечная анимация внутри него пересчитывала
+   стили 61 раз в секунду до конца визита — 17 % каждой секунды при 6× CPU (линза перф-инженера, I-3).
+   .stage-out ставит IntersectionObserver в stage.js. */
+.stage.stage-out .sg-glow-b,.stage.stage-out .hero-scroll i::after{animation-play-state:paused}
+
+/* статичный знак: виден без JS, на низком уровне качества и до первого кадра GL */
+.stage-mark{position:absolute;left:var(--cx);top:var(--cy);width:calc(var(--s) * 2);height:auto;translate:-50% -50%;
+  filter:drop-shadow(0 0 calc(var(--s) * .16) rgba(89,129,214,.45));transition:opacity .6s var(--ease-out)}
+/* SVG-знак держится, пока частицы не легли на него, и гаснет ПОД блик-проходом поля (sweep стартует
+   на 1.15 с от первого кадра, последние частицы садятся к ~1.65 с — field.js). Гаснуть на первом кадре
+   GL было нельзя: 1.1–1.8 с на месте знака висела пустая дымка — «знак → ничего → знак» (линза АД).
+   Оба часа — время (переход CSS и uTime), поэтому стык одинаков и на настоящем GPU. */
+.stage.gl-on .stage-mark{opacity:0;transition:opacity .5s var(--ease-out) 1.1s}
+
+/* ── первый экран ──────────────────────────────────────────────────────────── */
+.hero{position:relative;z-index:1;display:flex;min-height:100vh;min-height:100svh;align-items:flex-start;
+  padding:calc(var(--cy) + var(--s) * .72 + clamp(20px,3.4vh,36px)) 0 clamp(40px,6vh,72px)}
+.hero>.wrap,.sg-step>.wrap{width:100%}
+.hero-in{max-width:var(--heroc)}
+.hero h1{font-size:clamp(34px,9.7vw,46px)}
+.hero h1 em{font-size:1.06em;line-height:.9}
+.hero-lead{margin-top:clamp(14px,2vh,24px);max-width:min(560px, var(--textw))}
+.hero-cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:clamp(18px,3vh,36px);max-width:min(560px, var(--textw))}
+.hero-cta .btn{flex:1 1 auto}
+.btn-ar{transition:transform .5s var(--ease-out)}
+.btn:hover .btn-ar{transform:translateX(3px)}
+.hero-micro{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:clamp(14px,2.2vh,28px);list-style:none;font-size:14px;color:var(--ink-2)}
+.hero-micro li{display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.hero-micro svg{color:var(--accent-hi);flex:none}
+.hero-price{display:inline-flex;align-items:center;gap:6px;min-height:24px;color:var(--ink);text-decoration:underline;text-decoration-color:rgba(143,174,239,.45);text-underline-offset:4px}
+.hero-price:hover{text-decoration-color:var(--accent-hi)}
+.hero-price svg{transition:transform .4s var(--ease-out)}
+.hero-price:hover svg{transform:translateX(2px)}
+.hero-stores{display:flex;flex-wrap:wrap;gap:8px;margin-top:clamp(12px,1.8vh,20px)}
+.sg-store{display:inline-flex;align-items:center;height:32px;padding:0 12px;border-radius:999px;
+  box-shadow:inset 0 0 0 1px var(--line);background:rgba(255,255,255,.02);
+  font-size:12.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
+.hero-scroll{position:absolute;left:50%;bottom:24px;translate:-50% 0;display:none;flex-direction:column;align-items:center;gap:8px;
+  font-size:11px;font-weight:600;letter-spacing:.24em;text-transform:uppercase;color:var(--ink-2);transition:opacity .5s}
+.hero-scroll i{position:relative;width:1px;height:40px;background:linear-gradient(var(--line-2),transparent);overflow:hidden}
+.hero-scroll i::after{content:"";position:absolute;left:0;top:-40%;width:1px;height:40%;background:var(--accent-hi);animation:stage-drip 2.2s var(--ease-out) infinite}
+@keyframes stage-drip{to{transform:translateY(350%)}}
+.stage.stage-scrolled .hero-scroll{opacity:0}
+@media (min-width:600px){.hero-scroll{display:flex}}
+@media (min-width:900px){
+  .hero{align-items:center;padding:calc(68px + clamp(24px,5vh,56px)) 0 clamp(48px,8vh,96px)}
+  /* Ramp выше, чем у h2 в 01-base.css (clamp(32px,5vw,64px)): заголовок страницы обязан
+     быть крупнее заголовков её секций на ВСЕЙ полосе 900–1920 (ревью r2, I3). Второй
+     предел — ширина колонки: самая длинная авторская строка занимает 8.67em, поэтому
+     кегль выше --heroc/8.8 сломал бы вёрстку H1 на две строки, заданную <br>. */
+  .hero h1{font-size:min(clamp(46px,5.4vw,72px), calc(var(--heroc) / 8.8))}
+}
+
+/* ── «Сигнал»: два шага, между ними форма перетекает ───────────────────────── */
+.sg-step{position:relative;z-index:1;display:flex;min-height:100vh;min-height:100svh;align-items:center;
+  padding:calc(var(--cys) + var(--ss) * .78 + 20px) 0 clamp(40px,7vh,80px)}
+.sg-h{margin:16px 0 0;font-size:var(--h2-scene);line-height:1.05;letter-spacing:-.03em;font-weight:600}
+.sg-h em{font-family:var(--f-serif);font-style:italic;font-weight:400;color:var(--accent-hi);letter-spacing:0;font-size:1.06em}
+.sg-step .lead{margin-top:20px}
+@media (min-width:900px){
+  .sg-step{align-items:center;padding:clamp(80px,12vh,140px) 0}
+  .sg-in{max-width:min(560px, var(--textw))}
+}
+
+/* ── оверлей: настоящий текст внутри формы из частиц ───────────────────────── */
+.sg-vis{font-size:15.5px;line-height:1.45}
+.sg-o{position:relative}
+.sg-bub{display:flex;flex-direction:column;border-radius:var(--r-s);padding:.6em .85em}
+.sg-bub time{display:inline-flex;align-items:center;gap:.3em;align-self:flex-end;margin-top:.25em;
+  font-size:max(12px,.72em);font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.sg-bub-out time{color:var(--accent-hi)}
+/* микро-подписи: ink-3 разрешён только от 14px, поэтому здесь ink-2 с нижним пределом 12px */
+.sg-lbl{display:flex;align-items:center;gap:.55em;font-size:max(12px,.76em);font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2)}
+.sg-lbl-out{color:var(--accent-hi);justify-content:flex-end}
+.sg-dot{width:.55em;height:.55em;border-radius:50%;background:var(--wa);box-shadow:0 0 .8em var(--wa);flex:none}
+.sg-badge{display:grid;place-items:center;border-radius:50%;color:var(--ink)}
+.sg-badge svg{width:54%;height:54%}
+.sg-badge-wa{background:var(--wa)}
+.sg-badge-tg{background:var(--tg)}
+.sg-fold{fill:var(--bg)}
+.sg-cap{font-size:max(12px,.76em);font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2)}
+/* артикул не рвётся на дефисе («04152-» / «YZZA1», ревью r3) — U+2011 нет в subsets Onest */
+.sg-nw{white-space:nowrap}
+
+/* ── откат: частиц нет — «Сигнал» живёт обычной перепиской в потоке страницы ──
+   Одно условие :not(.gl-init) покрывает все случаи: без JS, low, reduced motion,
+   отсутствие WebGL и погашенное поле после collapse (он снимает и gl-init, и gl-on).
+   Плотный скин пузырей — одно правило и для тихого отката (gl-init + gl-solid): формы из
+   частиц под текстом там уже нет, а копия правил под gl-solid однажды разошлась бы. */
+.stage:not(.gl-init) .sg-bub{max-width:88%}
+.stage:not(.gl-init) .sg-bub,.stage.gl-solid .sg-bub{box-shadow:inset 0 0 0 1px var(--line)}
+.stage:not(.gl-init) .sg-bub-in,.stage.gl-solid .sg-bub-in{background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.01)),var(--surface)}
+.stage:not(.gl-init) .sg-bub-out,.stage.gl-solid .sg-bub-out{background:var(--accent-soft);box-shadow:inset 0 0 0 1px rgba(89,129,214,.4)}
+.stage:not(.gl-init) .sg-bub-out{align-self:flex-end}
+.stage:not(.gl-init) .sg-vis{display:flex;flex-direction:column;gap:8px;margin-top:clamp(24px,4vh,44px);max-width:min(520px, var(--textw))}
+.stage:not(.gl-init) .sg-lbl-out{align-self:flex-end}
+.stage:not(.gl-init) .sg-vis-ch{flex-direction:row;align-items:center;gap:16px}
+.stage:not(.gl-init) .sg-badge{width:48px;height:48px}
+.stage:not(.gl-init) .sg-cap{margin-right:12px}
+/* формы из частиц нет — шаги не резервируют под неё высоту (раньше это знали только
+   .q-low и .gl-solid, и без JS над каждым шагом оставалась пустая полоса ~330px, ревью r3) */
+.stage:not(.gl-init) .sg-step{min-height:0;padding:clamp(64px,10vh,120px) 0}
+
+/* в GL-режиме оверлей ложится на форму из частиц: только текст, без подложки.
+   Прячем прозрачностью, а не visibility — текст остаётся в дереве доступности.
+   Раскладка приходит с .gl-init и БЕЗ transition: класс ставится за кадр до первого
+   кадра GL, и переход из потока в position:fixed обязан быть мгновенным — иначе
+   переписка целиком вспыхивает поверх первого экрана (ревью r2, I1).
+   Кегль — строго доля единицы шагов, БЕЗ нижнего предела: пузыри рисуются под этот кегль, и пол 13px
+   при единице 90px выталкивал текст из них на 25–57px (N-5). Мелким кегль не становится: единица шагов
+   сама не опускается ниже 13px/.077, пока позволяет ширина (12.8px на 360px). */
+.stage.gl-init .sg-vis{position:fixed;inset:0;z-index:2;pointer-events:none;
+  font-size:min(calc(var(--ss) * .077), 21px);line-height:1.34;
+  text-shadow:0 1px 12px rgba(10,13,22,.92),0 0 3px rgba(10,13,22,.8);
+  opacity:0;transition:none}
+.stage.gl-init .sg-o{position:absolute;left:calc(var(--cx) + var(--x) * var(--ss));top:calc(var(--cys) - var(--y) * var(--ss));
+  width:calc(var(--w,1) * var(--ss));height:calc(var(--h,.2) * var(--ss));margin:0;
+  opacity:0;transform:translateY(.6em);transition:none}
+.stage.gl-init .sg-lbl,.stage.gl-init .sg-cap{height:auto}
+.stage.gl-init .sg-bub{justify-content:center;padding:.62em .92em;border-radius:calc(var(--ss) * .12)}
+.stage.gl-init .sg-cap{text-align:center}
+/* знаки каналов рисуют частицы — html-кружки нужны только в откате */
+.stage.gl-init .sg-badge{opacity:0}
+/* поле рисует — с этого момента оверлеи проявляются переходами. Уходит оверлей
+   быстрее, чем приходит: на телефоне его гасит подъезжающий снизу текст шага (stage.js,
+   overlayOn), и за .25s текст не успевает до него доехать. */
+.stage.gl-on .sg-vis{transition:opacity .25s var(--ease-out)}
+.stage.gl-on .sg-vis.on{opacity:1;transition-duration:.45s}
+.stage.gl-on .sg-o{transition:opacity .5s var(--ease-out),transform .9s var(--ease-out)}
+.stage.gl-on .sg-vis.on .sg-o:not(.sg-badge){opacity:1;transform:none;transition-delay:var(--dl,0s)}
+/* тихий откат (gl-init + gl-solid): формы нет, резерв высоты шагов остаётся — и переписка ложится
+   в него. Слой уже не fixed, а absolute внутри своего шага (.sg-step — position:relative) на тех же
+   --cx/--cys/--ss: в покое шага (его якорь — верх шага, stage.js) ровно там, где её держала форма, и
+   дальше уезжает вместе с шагом, поэтому на его текст не наезжает (текст начинается ниже формы —
+   padding-top шага). Раскладка потока не меняется, CLS 0. Кадр переключения прячет слой (opacity 0
+   в начале анимации: перенос не виден, и Chrome не засчитывает сдвиг прозрачного), проявляется он
+   после того, как погас canvas (.6 с). Знаки каналов — html-кружки: частиц, что рисовали их, нет. */
+.stage.gl-init.gl-solid .sg-vis{position:absolute;text-shadow:none;animation:sg-rest 1.3s var(--ease-out) both}
+.stage.gl-init.gl-solid .sg-o{opacity:1;transform:none}
+@keyframes sg-rest{0%,54%{opacity:0}to{opacity:1}}
+
+/* при reduced motion stage.js выходит до создания поля: gl-init/gl-on не появляются,
+   и «Сигнал» остаётся обычной перепиской в потоке — гасим только фоновые циклы */
+@media (prefers-reduced-motion:reduce){
+  .sg-glow-b,.hero-scroll i::after{animation:none}
+}

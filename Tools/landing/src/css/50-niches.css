@@ -1,0 +1,56 @@
+/* 50-niches — marquee ribbon + spotlight niche cards */
+
+.niches{overflow:hidden}
+.niches .sec-head{display:flex;flex-direction:column;max-width:640px}
+.niches .sec-head h2{margin-top:16px}
+.niches .sec-head .lead{margin-top:20px}
+
+.nch-body{display:flex;flex-direction:column;gap:56px;margin-top:56px}
+/* .wrap здесь — flex-элемент колонки с margin:auto: без явной ширины он сжимается по содержимому
+   (сетке или ряду карточек, до 1180px) и уезжает под обрез секции вместо того, чтобы занять окно */
+.nch-body>.wrap{width:100%}
+
+/* ---------- marquee ribbon ---------- */
+.marquee{position:relative;overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)}
+.marquee-track{display:flex;width:max-content;animation:mq-scroll 44s linear infinite;animation-play-state:paused}
+.marquee.running .marquee-track{animation-play-state:running}
+.q-low .marquee-track{animation-play-state:paused!important}
+@keyframes mq-scroll{to{transform:translateX(-50%)}}
+.marquee-group{display:flex;align-items:center;flex:none}
+.marquee-item{display:inline-block;padding:0 .45em;font-size:clamp(22px,3.6vw,40px);font-weight:600;letter-spacing:-.02em;line-height:1.15;color:var(--ink-2);white-space:nowrap}
+.marquee-item--tail{color:var(--ink-3);font-weight:500}
+.marquee-dot{display:inline-block;color:var(--accent-hi);font-size:clamp(15px,2vw,20px);opacity:.85}
+
+@media (prefers-reduced-motion:reduce){.marquee-track{animation:none}}
+
+/* ---------- niche cards ---------- */
+.nch-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+@media (max-width:900px){.nch-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.nch-grid{grid-template-columns:1fr}}
+/* Телефон: шесть одинаковых карточек столбиком тянулись на 2,8 экрана сразу после ленты с теми же
+   названиями (линза арт-директора). Здесь — горизонтальный ряд со снапом, следующая карточка
+   выглядывает справа: вся секция помещается примерно в экран. Ряд идёт под поля .wrap до края окна. */
+@media (max-width:767px){
+  /* карточки ряда видны сразу: IntersectionObserver не видит карточку, обрезанную краем ряда, и
+     выглядывающая следующая (подсказка «листайте») оставалась бы прозрачной */
+  .js .nch-card[data-reveal]{opacity:1;transform:none;transition:none}
+  .nch-grid{display:flex;gap:12px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;
+    scroll-padding-inline:var(--gutter);margin:0 calc(-1 * var(--gutter));padding:4px var(--gutter) 14px;scrollbar-width:none}
+  .nch-grid::-webkit-scrollbar{display:none}
+  .nch-card{flex:0 0 min(82vw,340px);scroll-snap-align:start}
+}
+
+.nch-card{position:relative;padding:28px 26px 26px;border-radius:var(--r);background-color:var(--surface);background-image:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.01));box-shadow:inset 0 0 0 1px var(--line),inset 0 1px 0 rgba(255,255,255,.05);isolation:isolate;overflow:hidden}
+@media (hover:hover){
+  .nch-card{--mx:50%;--my:0%;transition:transform .45s var(--ease-out),box-shadow .45s var(--ease-out)}
+  .nch-card::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;z-index:2;background:radial-gradient(320px circle at var(--mx) var(--my),rgba(143,174,239,.6),transparent 60%);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:0;transition:opacity .35s}
+  .nch-card::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(360px circle at var(--mx) var(--my),rgba(89,129,214,.14),transparent 55%);opacity:0;transition:opacity .35s}
+  .nch-card:hover{transform:translateY(-4px)}
+  .nch-card:hover::before,.nch-card:hover::after{opacity:1}
+}
+.nch-icon{display:grid;place-items:center;width:44px;height:44px;border-radius:var(--r-s);background:var(--accent-soft);flex:none}
+.nch-icon svg{width:22px;height:22px;fill:none;stroke:var(--accent-hi);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.nch-card h3{margin-top:20px}
+.nch-q{display:inline-block;margin-top:14px;padding:10px 14px;border-radius:16px 16px 16px 5px;background:rgba(154,166,184,.1);box-shadow:inset 0 0 0 1px var(--line);font-size:14.5px;line-height:1.4;color:var(--ink)}
+.nch-desc{margin-top:14px;font-size:15px;line-height:1.55;color:var(--ink-2)}
+.nch-more{margin-top:28px;text-align:center;color:var(--ink-3);font-size:15px}

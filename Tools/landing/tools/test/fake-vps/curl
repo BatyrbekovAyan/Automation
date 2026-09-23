@@ -1,0 +1,17 @@
+#!/bin/bash
+# Fake curl — NEVER the network. Answers like Caddy's file_server over the fake VPS's site/ (a file 200,
+# a directory without an index 404 — v1 has no browse), n8n /healthz 200. SIM_CURL_FAIL=<url>=<code>:
+# that URL answers <code> once the new config is live (marker .after-install, set by the fake reload).
+url="${@: -1}"; method=GET
+for a in "$@"; do [[ $a == -I ]] && method=HEAD; done
+case "$url" in
+  https://n8n.choosereply.com/healthz) code=200 ;;
+  https://choosereply.com/*)
+    p=${url#https://choosereply.com/}; p=$(printf '%b' "${p//%/\\x}")   # percent-decode
+    [[ -z $p ]] && p=index.html
+    if [[ -f "$SIM_V/choosereply/site/$p" ]]; then code=200; else code=404; fi ;;
+  *) echo "fake curl: refused $url" >&2; exit 97 ;;
+esac
+if [[ -n ${SIM_CURL_FAIL:-} && $url == "${SIM_CURL_FAIL%=*}" && -f $SIM_V/.after-install ]]; then code=${SIM_CURL_FAIL##*=}; fi
+echo "curl: $method $url -> $code" >> "$SIM_V/log"
+printf '%s' "$code"

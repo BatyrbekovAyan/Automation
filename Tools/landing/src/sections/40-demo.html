@@ -1,0 +1,120 @@
+<section class="demo sec" id="demo" data-module="demo" aria-labelledby="demo-h">
+  <div class="demo-bg" aria-hidden="true"></div>
+  <svg width="0" height="0" class="dm-defs" aria-hidden="true" focusable="false">
+    <symbol id="dm-spark" viewBox="0 0 16 16"><path d="M8 0c.55 4.3 3.7 7.45 8 8-4.3.55-7.45 3.7-8 8-.55-4.3-3.7-7.45-8-8C4.3 7.45 7.45 4.3 8 0z"/></symbol>
+  </svg>
+  <div class="wrap">
+    <header class="demo-head">
+      <p class="eyebrow" data-reveal>Интерактивное демо</p>
+      <h2 id="demo-h" data-split>Попробуйте <em>сами</em>.</h2>
+      <p class="lead" data-reveal>Это демо на&nbsp;примерах: нажмите на&nbsp;любой вариант ответа&nbsp;— или&nbsp;переключите «Авто», и&nbsp;бот ответит сам.</p>
+    </header>
+
+    <div class="demo-stage">
+      <!-- Inbox = niche tabs. Desktop: a chat list beside the window; mobile: a segmented row above it. -->
+      <div class="dm-inbox" data-reveal>
+        <p class="dm-rail-h" aria-hidden="true"><span>Входящие</span><small>4 примера</small></p>
+        <div class="dm-tabs" role="tablist" aria-label="Примеры по нишам">
+          <button class="dm-tab" type="button" role="tab" id="demo-tab-parts" aria-controls="demo-win" aria-selected="true" tabindex="0" data-i="0" data-ch="wa" aria-label="Автозапчасти — Айгерим, WhatsApp">
+            <span class="dm-tab-ava" aria-hidden="true">А</span>
+            <span class="dm-tab-tx"><span class="dm-tab-n"><span class="dm-l">Автозапчасти</span><span class="dm-s">Запчасти</span></span><span class="dm-tab-sub"><i></i><span>Айгерим · WhatsApp</span></span></span>
+            <span class="dm-tab-st" aria-hidden="true"></span>
+            <span class="dm-tab-prog" aria-hidden="true"><i></i></span>
+          </button>
+          <button class="dm-tab" type="button" role="tab" id="demo-tab-flowers" aria-controls="demo-win" aria-selected="false" tabindex="-1" data-i="1" data-ch="tg" aria-label="Цветы — Дана, Telegram">
+            <span class="dm-tab-ava" aria-hidden="true">Д</span>
+            <span class="dm-tab-tx"><span class="dm-tab-n"><span class="dm-l">Цветы</span><span class="dm-s">Цветы</span></span><span class="dm-tab-sub"><i></i><span>Дана · Telegram</span></span></span>
+            <span class="dm-tab-st" aria-hidden="true"></span>
+            <span class="dm-tab-prog" aria-hidden="true"><i></i></span>
+          </button>
+          <button class="dm-tab" type="button" role="tab" id="demo-tab-kaspi" aria-controls="demo-win" aria-selected="false" tabindex="-1" data-i="2" data-ch="wa" aria-label="Kaspi-продавец — Руслан, WhatsApp">
+            <span class="dm-tab-ava" aria-hidden="true">Р</span>
+            <span class="dm-tab-tx"><span class="dm-tab-n"><span class="dm-l">Kaspi-продавец</span><span class="dm-s">Kaspi</span></span><span class="dm-tab-sub"><i></i><span>Руслан · WhatsApp</span></span></span>
+            <span class="dm-tab-st" aria-hidden="true"></span>
+            <span class="dm-tab-prog" aria-hidden="true"><i></i></span>
+          </button>
+          <button class="dm-tab" type="button" role="tab" id="demo-tab-repair" aria-controls="demo-win" aria-selected="false" tabindex="-1" data-i="3" data-ch="tg" aria-label="Ремонт телефонов — Тимур, Telegram">
+            <span class="dm-tab-ava" aria-hidden="true">Т</span>
+            <span class="dm-tab-tx"><span class="dm-tab-n"><span class="dm-l">Ремонт телефонов</span><span class="dm-s">Ремонт</span></span><span class="dm-tab-sub"><i></i><span>Тимур · Telegram</span></span></span>
+            <span class="dm-tab-st" aria-hidden="true"></span>
+            <span class="dm-tab-prog" aria-hidden="true"><i></i></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- The chat window. Static content below = a readable finished dialog for no-JS; demo.js replaces it. -->
+      <div class="dm-win" id="demo-win" role="tabpanel" aria-labelledby="demo-tab-parts" data-ch="wa" data-mode="with" data-reveal>
+        <div class="dm-head">
+          <span class="dm-ava" aria-hidden="true">А</span>
+          <div class="dm-who">
+            <b class="dm-name">Айгерим</b>
+            <small><i class="dm-dot" aria-hidden="true"></i><span class="dm-ch">WhatsApp</span><span class="dm-st">в&nbsp;сети</span></small>
+          </div>
+          <button class="dm-mode" type="button" role="switch" aria-checked="false" aria-label="Режим «Авто»: бот отвечает сам">
+            <span class="dm-thumb" aria-hidden="true"></span><span aria-hidden="true">Вместе</span><span aria-hidden="true">Авто</span>
+          </button>
+        </div>
+        <div class="dm-thread" tabindex="-1" role="region" aria-label="Переписка">
+          <div class="dm-shift">
+            <div class="dm-list" role="log" aria-live="polite" aria-relevant="additions">
+              <span class="dm-chip" aria-hidden="true">Сегодня</span>
+              <div class="dm-msg in"><span class="sr">Айгерим: </span><span class="dm-tx">Здравствуйте! Масляный фильтр на&nbsp;RAV4 2019, 2.0 бензин есть?</span><span class="dm-meta">09:41</span></div>
+              <div class="dm-msg out t1s t2 read"><span class="sr">Вы: </span><span class="dm-tx">Есть оригинал 04152-YZZA1&nbsp;— 4&nbsp;900&nbsp;₸. Подходит на&nbsp;ваш RAV4 2019, 2.0.</span><span class="dm-meta">09:42<svg class="dm-tk" viewBox="0 0 20 12" aria-hidden="true"><path class="t1" d="M1.5 6.5l3.2 3.2L11 3"/><path class="t2" d="M8.2 9.1l.6.6L15.5 3"/></svg></span></div>
+              <div class="dm-msg in"><span class="sr">Айгерим: </span><span class="dm-tx">Отлично, беру. Заеду после обеда</span><span class="dm-meta">09:44</span></div>
+              <p class="dm-ochip" data-st="order"><i aria-hidden="true"></i>Сводка: заявка собрана</p>
+            </div>
+          </div>
+        </div>
+        <div class="dm-tray">
+          <div class="dm-comp" aria-hidden="true">
+            <span class="dm-c-plus"><svg viewBox="0 0 20 20"><path d="M10 4v12M4 10h12"/></svg></span>
+            <span class="dm-c-field">
+              <span class="dm-c-ph">Сообщение</span>
+              <span class="dm-c-ok"><svg class="dm-tk" viewBox="0 0 20 12"><path class="t1" d="M1.5 6.5l3.2 3.2L11 3"/><path class="t2" d="M8.2 9.1l.6.6L15.5 3"/></svg>Ушло с&nbsp;вашего номера</span>
+              <span class="dm-c-auto"><i></i>Бот отвечает сам · 24/7</span>
+            </span>
+            <span class="dm-c-send"><svg viewBox="0 0 20 20"><path d="M4 10h11M11 5l5 5-5 5"/></svg></span>
+          </div>
+          <div class="dm-sug">
+            <div class="dm-sug-h">
+              <span class="dm-sug-t"><svg aria-hidden="true"><use href="#dm-spark"/></svg>Предложения</span>
+              <span class="dm-hint">Нажмите на&nbsp;вариант</span>
+            </div>
+            <div class="dm-pl" aria-hidden="true"><div class="dm-pl-bars"><i></i><i></i><i></i></div><p class="dm-pl-t"></p></div>
+            <div class="dm-cards" role="group" aria-label="Варианты ответа"></div>
+          </div>
+        </div>
+        <div class="dm-fly" aria-hidden="true"></div>
+        <div class="dm-ghost" aria-hidden="true">
+          <svg class="dm-g-arrow" viewBox="0 0 24 24"><path d="M5 2.5l14.5 8-6.4 1.7L9.8 18.8z"/></svg>
+          <span class="dm-g-tip"></span><span class="dm-g-ring"></span>
+        </div>
+        <span class="dm-flash" aria-hidden="true"></span>
+      </div>
+
+      <!-- Annotations: what the bot read, which mode is on, what the Сводка recorded. -->
+      <div class="dm-side" data-reveal>
+        <div class="dm-note dm-src" data-state="hit">
+          <p class="dm-note-h">Источник ответа</p>
+          <div class="dm-src-row">
+            <span class="dm-src-kind" aria-hidden="true">XLSX</span>
+            <span class="dm-src-tx"><b class="dm-src-title">Прайс_запчасти.xlsx</b><small class="dm-src-st"><i aria-hidden="true"></i><span class="dm-src-lines"><span class="dm-src-line">нашёл в&nbsp;прайсе: масляный фильтр, RAV4 2019, 2.0</span></span></small></span>
+          </div>
+        </div>
+        <div class="dm-note dm-cap">
+          <p class="dm-note-h">Режим</p>
+          <p class="dm-cap-t"><span class="on" data-m="with"><b>«Вместе»</b>: бот предлагает до&nbsp;4 вариантов&nbsp;— отправляете вы, одним касанием.</span><span data-m="auto"><b>«Авто»</b>: бот отвечает сам, с&nbsp;вашего номера, круглосуточно.</span></p>
+        </div>
+        <div class="dm-note dm-sv">
+          <p class="dm-note-h">Сводка <small>итоги диалогов</small></p>
+          <ul class="dm-sv-list">
+            <li class="dm-sv-row" data-st="order"><i aria-hidden="true"></i><b>Айгерим</b><span>Заявка собрана</span></li>
+          </ul>
+        </div>
+        <button class="dm-play" type="button" aria-pressed="true" hidden>
+          <span class="dm-play-i" aria-hidden="true"></span><span class="dm-play-t">Автопоказ</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</section>

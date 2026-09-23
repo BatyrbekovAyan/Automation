@@ -1,0 +1,80 @@
+/* Тарифы. Токены только из 01-base.css (var(--…)). Карточка «Бизнес» акцентная и первая на mobile. */
+.pricing{background:radial-gradient(60% 34% at 50% 8%,rgba(62,97,198,.14),transparent 70%)}
+.pricing [data-reveal]{transition-delay:var(--d,0s)}
+
+.pr-head{display:flex;align-items:flex-end;justify-content:space-between;gap:28px;flex-wrap:wrap}
+.pr-head-txt{max-width:620px}
+.pr-head-txt .eyebrow{margin-bottom:16px}
+.pr-head-txt h2{margin-bottom:20px}
+.pr-trial{display:flex;align-items:center;gap:12px;padding:14px 22px;border-radius:999px;
+  background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.01)),var(--surface);
+  border:1px solid var(--line);box-shadow:inset 0 1px 0 rgba(255,255,255,.05);max-width:360px;flex:none}
+.pr-trial-ic{color:var(--accent-hi);flex:none}
+.pr-trial p{margin:0;color:var(--ink-2);font-size:14.5px;line-height:1.4}
+
+.pr-toggle-row{display:flex;justify-content:center;margin:52px 0 0}
+.pr-seg{position:relative;display:inline-flex;padding:4px;border-radius:999px;background:rgba(236,240,246,.04);box-shadow:inset 0 0 0 1px var(--line-2)}
+/* выбранное — заливка акцентом, как у всех выбранных состояний страницы (тумблер демо, «Популярный», вкладки) */
+.pr-seg-th{position:absolute;z-index:0;top:4px;bottom:4px;left:4px;width:calc(50% - 4px);border-radius:999px;background:var(--accent-fill);
+  box-shadow:0 8px 22px -10px rgba(62,97,198,.8),inset 0 1px 0 rgba(255,255,255,.16);
+  transition:transform .5s var(--ease-out),width .5s var(--ease-out)}
+.pr-seg button{position:relative;z-index:1;height:44px;padding:0 22px;border:0;background:none;border-radius:999px;
+  cursor:pointer;font:600 14.5px/1 var(--f-sans);color:var(--ink-2);display:inline-flex;align-items:center;gap:8px;
+  transition:color .4s;min-height:44px}
+.pr-seg button[aria-checked="true"]{color:var(--ink)}
+.pr-seg-tag{font-size:11px;font-weight:600;letter-spacing:.02em;padding:3px 9px;border-radius:999px;
+  background:rgba(58,147,76,.18);color:var(--st-order);color:color-mix(in srgb,var(--st-order) 55%,white);
+  transition:background .4s,color .4s;white-space:nowrap}
+.pr-seg button[aria-checked="true"] .pr-seg-tag{background:rgba(255,255,255,.16);color:var(--ink)}
+
+.pr-plans{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;margin-top:44px;align-items:stretch}
+.pr-card{position:relative;display:flex;flex-direction:column;border-radius:var(--r);padding:30px 26px 28px;
+  background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.01)),var(--surface);
+  border:1px solid var(--line);box-shadow:inset 0 1px 0 rgba(255,255,255,.05);
+  transform:perspective(900px)}
+/* the tilt follows a mouse only: promote the cards there, not on every phone (3 permanent layers) */
+@media (hover:hover) and (pointer:fine){.pr-card{will-change:transform}}
+@media (hover:hover){.pr-card:hover{border-color:rgba(143,174,239,.35)}}
+.pr-pop{border-color:rgba(143,174,239,.45);
+  background:linear-gradient(180deg,rgba(137,168,239,.1),rgba(255,255,255,.012)),var(--surface);
+  box-shadow:0 26px 64px -32px rgba(62,97,198,.6),inset 0 1px 0 rgba(255,255,255,.08)}
+@media (hover:hover){.pr-pop:hover{border-color:rgba(143,174,239,.65)}}
+.pr-badge{position:absolute;top:0;left:28px;translate:0 -50%;z-index:2;padding:6px 14px;border-radius:999px;
+  background:var(--accent-fill);color:#fff;font-size:12px;font-weight:600;letter-spacing:.02em;
+  box-shadow:0 10px 24px -10px rgba(62,97,198,.8)}
+
+.pr-card-head{margin-bottom:2px}
+.pr-name{font-size:19px;font-weight:600;letter-spacing:-.01em}
+.pr-for{margin-top:6px;color:var(--ink-2);font-size:14.5px}
+
+.pr-amt{display:flex;flex-wrap:wrap;align-items:flex-end;gap:6px 8px;margin:28px 0 4px}
+.pr-amt-num{display:inline-block;overflow:hidden;flex:none}
+.pr-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+/* в покое цифры стоят влево, вровень с заголовком и галочками; ширину под итог pricing.js
+   резервирует только на время докрутки (раньше бокс под «198 990» сдвигал месячную цену вправо) */
+.pr-amt-digits{display:inline-block;text-align:left;
+  font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;font-weight:300;
+  font-size:clamp(34px,3.6vw,44px);letter-spacing:-.02em;line-height:1;color:var(--ink);white-space:nowrap}
+.pr-amt-cur{padding-bottom:.26em;color:var(--ink-2);font-size:19px;flex:none}
+.pr-amt-per{padding-bottom:.32em;color:var(--ink-3);font-size:14.5px;flex:none;white-space:nowrap}
+.pr-amt-sub{min-height:1.4em;margin-bottom:6px;color:var(--ink-3);font-size:14px}
+
+.pr-feats{list-style:none;display:grid;gap:12px;margin:20px 0 26px;padding-top:22px;border-top:1px solid var(--line)}
+.pr-feats li{display:flex;align-items:center;gap:10px;color:var(--ink-2);font-size:14.5px}
+.pr-feats svg{flex:none;color:var(--accent-hi)}
+
+.pr-card-in{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
+.pr-cta{width:100%;margin-top:auto}
+
+.pr-note{max-width:640px;margin:32px auto 0;color:var(--ink-3);font-size:14px;line-height:1.6;text-align:center}
+
+@media (max-width:899px){
+  .pr-head{flex-direction:column;align-items:flex-start;gap:20px}
+  .pr-plans{grid-template-columns:1fr;gap:16px}
+  .pr-pop{order:-1}
+  .pr-badge{left:50%;translate:-50% -50%}
+}
+@media (max-width:420px){
+  .pr-card{padding:26px 20px 24px}
+  .pr-amt-digits{font-size:clamp(30px,9vw,36px)}
+}

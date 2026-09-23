@@ -1,0 +1,11 @@
+#!/bin/bash
+# Fake ssh for deploy-go.test.mjs — NEVER the real ssh, no network. Only host "choosereply"; the remote
+# command runs HERE, with HOME = the fake VPS ($SIM_V), and its /tmp/cr-deploy-… dir mapped under it.
+# SIM_SSH_DROP=<substring>: a command containing it dies like a dropped connection (exit 255).
+[[ ${1:-} == choosereply ]] || { echo "fake ssh: refused host ${1:-}" >&2; exit 97; }
+shift
+cmd="$*"
+cmd="${cmd//\/tmp\/cr-deploy-/$SIM_V/rtmp/cr-deploy-}"
+echo "ssh: $cmd" >> "$SIM_V/log"
+if [[ -n ${SIM_SSH_DROP:-} && $cmd == *"$SIM_SSH_DROP"* ]]; then echo "fake ssh: connection closed" >&2; exit 255; fi
+cd "$SIM_V" && HOME="$SIM_V" exec /bin/bash -c "$cmd"

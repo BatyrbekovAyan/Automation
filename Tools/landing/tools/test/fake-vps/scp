@@ -1,0 +1,8 @@
+#!/bin/bash
+# Fake scp: the last argument must be choosereply:/tmp/cr-deploy-…/ — copied into the fake VPS.
+args=(); for a in "$@"; do [[ $a == -q ]] || args+=("$a"); done
+n=${#args[@]}; dest="${args[$((n-1))]}"
+[[ $dest == choosereply:/tmp/cr-deploy-* ]] || { echo "fake scp: refused destination $dest" >&2; exit 97; }
+dest="${dest#choosereply:}"; dest="${dest/\/tmp\/cr-deploy-/$SIM_V/rtmp/cr-deploy-}"
+echo "scp: ${args[*]}" >> "$SIM_V/log"
+cp "${args[@]:0:$((n-1))}" "$dest"

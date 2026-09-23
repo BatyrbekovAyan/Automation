@@ -1,0 +1,265 @@
+/* 30-story — «Как это работает»: четыре главы и один телефон.
+   По умолчанию (без JS, .q-low, reduced motion) — обычный столбик глав, у каждой свой
+   экран: всё читается сразу. Кино-режим включает story.js классом .is-live — экраны
+   переезжают в общий корпус, сцена закрепляется (sticky), главы сменяются по прокрутке. */
+
+.story{
+  --ratio:2.1639;                                   /* 1558 / 720 — пропорция реальных скриншотов */
+  --scr-w:min(250px,58vw);
+  --scr-h:calc(var(--scr-w) * var(--ratio));
+  --bez:calc(var(--scr-w) * .035);
+  --dev-w:calc(var(--scr-w) + var(--bez) * 2);
+  --dev-h:calc(var(--scr-h) + var(--bez) * 2);
+  --r-ph:calc(var(--dev-w) * .152);                 /* радиус корпуса ~ у настоящего телефона */
+  --ph-off:0px;                                     /* сдвиг корпуса от центра сцены (desktop) */
+  --chip-w:24ch;                                    /* ширина самого длинного чипа главы, см. блок чипов */
+}
+.story .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+
+/* ---------- корпус (общий для обоих режимов) ---------- */
+.phone-screen{position:relative;width:var(--dev-w);padding:var(--bez);border-radius:var(--r-ph);
+  background:linear-gradient(145deg,rgba(255,255,255,.42),rgba(255,255,255,.07) 12%,rgba(0,0,0,.55) 30%,rgba(0,0,0,.6) 70%,rgba(255,255,255,.12) 88%,rgba(255,255,255,.34)),var(--surface);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),0 40px 80px -34px rgba(0,0,0,.9),0 4px 18px -8px rgba(0,0,0,.6)}
+.phone-screen img{width:100%;height:auto;border-radius:calc(var(--r-ph) - var(--bez));background:var(--surface-2)}
+
+/* ---------- статичная раскладка ---------- */
+.story-atmo,.story-device,.story-hud{display:none}
+.story-chapters{display:grid;gap:clamp(76px,11vw,132px)}
+.chapter{display:grid;gap:28px;justify-items:start}
+/* splitWords делает из каждого слова отдельный inline-block, и финальная «.» — тоже слово:
+   в узкой полосе ширин (напр. 373–383px, это iPhone 375) она уезжала на свою строку.
+   text-wrap:pretty уводит вниз предыдущее слово вместе с точкой; где не поддерживается,
+   от висячей точки страхует ширина колонки (см. кино-режим ниже). */
+.chapter-copy h2{margin-top:16px;text-wrap:pretty}
+.chapter-copy .lead{margin-top:20px}
+.chips{display:flex;flex-wrap:wrap;gap:10px;list-style:none}
+.phone-screen{justify-self:center}
+@media (min-width:900px){
+  .story{--scr-w:280px}
+  .chapter{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"copy phone" "chips phone";
+    column-gap:clamp(40px,6vw,96px);row-gap:28px;align-items:center}
+  .chapter-copy{grid-area:copy;align-self:end}
+  .chips{grid-area:chips;align-self:start}
+  .phone-screen{grid-area:phone}
+  .chapter:nth-child(even){grid-template-areas:"phone copy" "phone chips";grid-template-columns:auto minmax(0,1fr)}
+}
+
+/* ---------- чипы ---------- */
+.chip{display:inline-flex;align-items:center;gap:9px;white-space:nowrap;padding:9px 15px;border-radius:999px;
+  font-size:14px;font-weight:500;line-height:1.2;color:var(--ink);
+  background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.012)),rgba(23,28,36,.92);
+  border:1px solid var(--line);box-shadow:inset 0 1px 0 rgba(255,255,255,.055),0 14px 30px -18px rgba(0,0,0,.9)}
+.chip-dot{width:8px;height:8px;border-radius:50%;background:currentColor;color:var(--accent-hi);box-shadow:0 0 12px -1px currentColor;flex:none}
+.chip-dot[data-c=wa]{color:var(--wa)}
+.chip-dot[data-c=tg]{color:var(--tg)}
+.chip-dot[data-c=order]{color:var(--st-order)}
+.chip-dot[data-c=owner]{color:var(--st-owner)}
+.chip-dot[data-c=dialog]{color:var(--st-dialog)}
+.chip-dot[data-c=silent]{color:var(--st-silent)}
+.chip-dot[data-c=closed]{color:var(--st-closed)}
+.chip-ico{width:12px;height:12px;fill:var(--accent-hi);flex:none}
+.chip-file{padding-left:9px;gap:10px}
+.chip-ext{display:grid;place-items:center;min-width:38px;height:24px;padding:0 6px;border-radius:8px;
+  font:700 10px/1 var(--f-sans);letter-spacing:.06em;color:var(--bg);flex:none}  /* тёмный на цветном: 5.0–5.9:1 */
+.chip-ext[data-ext=xlsx]{background:var(--st-order)}
+.chip-ext[data-ext=pdf]{background:var(--st-owner)}
+.chip-ext[data-ext=jpg]{background:var(--st-dialog)}
+
+/* =====================================================================
+   КИНО-РЕЖИМ
+   ===================================================================== */
+/* Закрепление — CSS, не pin ScrollTrigger-а: секция выше сцены на длину таймлайна (--pin-k экранов,
+   ставит story.js), сцена стоит sticky. Переключение relative ⇄ fixed у pin Chrome писал как
+   layout-shift ≈ 1.0 на входе и выходе, sticky не сдвигает раскладку вовсе (линза перф-инженера).
+   Предки сцены — только overflow-x:clip (body), он не создаёт контейнер прокрутки: sticky работает. */
+.story.is-live{padding:0;height:calc(var(--vh) * (1 + var(--pin-k, 0)))}
+.is-live .story-stage{position:sticky;top:0;height:var(--vh);overflow-x:clip;overflow-y:visible;isolation:isolate}
+.is-live .story-atmo,.is-live .story-device,.is-live .story-hud{display:block}
+.is-live .story-chapters{position:absolute;inset:0}
+.is-live .chapter{position:absolute;inset:0;display:block;pointer-events:none;z-index:4}
+.is-live .w>span{transition:none}                   /* словами двигает GSAP, не CSS-переход */
+.js .is-live [data-reveal].in{transition:none}      /* эйбрау и lead тоже ведёт скраб: .9s-переход тянулся за ним */
+
+/* геометрия сцены: сперва экран, из него — корпус.
+   Высота окна берётся через --vh, а не из 100svh напрямую: у Chrome ≤107 / Safari ≤15.3 нет
+   единицы svh, а внутри custom property неизвестная единица НЕ отбрасывается при разборе —
+   она падает уже при подстановке, и вся сцена (все дети .story-stage абсолютные) схлопнулась бы
+   в height:0. Поэтому пара vh/svh задаётся через @supports, а не двумя объявлениями подряд,
+   как в 10-stage.css: там 100vh;100svh стоит у обычного свойства height, где приём работает. */
+.story.is-live{
+  --vh:100vh;
+  --hdr:68px;
+  --ph-bot:20px;                                    /* воздух под корпусом */
+  --copy-top:calc(var(--hdr) + 22px);               /* верх текста главы */
+  --copy-gap:18px;                                  /* воздух между текстом и корпусом */
+  --copy-rise:18px;                                 /* story.js: на въезде lead приезжает снизу */
+  --copy-h:236px;                                   /* до первого замера — заведомо с запасом */
+  --scr-k:.9686;                                    /* scr-h / dev-h = 1 / (1 + 2·.035 / 2.1639) */
+  /* Место под корпус — это ВСЁ, что осталось под текстом главы, а не «100svh минус константа».
+     Высота текста зависит от ШИРИНЫ окна (сколько строк займёт lead), поэтому любая константа
+     резерва ошибается сразу в двух измерениях: на 360×780 (бюджетный Android, iPhone SE) текст
+     главы 02 налезал на верх корпуса. --copy-h ставит story.js по факту, на refresh, --copy-rise —
+     из своей же константы въезда: в кадрах въезда lead стоит ровно на столько ниже. */
+  --scr-h:max(160px,min(
+    calc((var(--vh) - var(--ph-bot) - var(--copy-top) - var(--copy-h) - var(--copy-rise) - var(--copy-gap)) * var(--scr-k)),
+    calc((100vw - 128px) * var(--ratio))));       /* 160px — пол: текст выше окна не делает корпус отрицательным */
+  --scr-w:calc(var(--scr-h) / var(--ratio));
+  --ph-cx:50%;
+  --ph-top:calc(var(--vh) - var(--dev-h) - var(--ph-bot));
+}
+@supports (height:1svh){.story.is-live{--vh:100svh}}
+/* невысокий экран: текст ужимается — резерв считается по факту, значит каждый сэкономленный
+   на тексте пиксель достаётся корпусу, а не пропадает в константе */
+@media (max-width:899px) and (max-height:780px){
+  .is-live .chapter-copy h2{font-size:28px}
+  .is-live .chapter-copy .lead{font-size:15px;line-height:1.5;margin-top:14px}
+}
+@media (min-width:900px){
+  .story.is-live{
+    --scr-h:min(calc(var(--vh) - 210px),640px);
+    --scr-w:calc(var(--scr-h) / var(--ratio));
+    --ph-off:min(16vw,200px);
+    --ph-cx:calc(50% + var(--ph-off));
+    --ph-top:calc(var(--hdr) + (var(--vh) - var(--hdr) - var(--dev-h)) / 2);
+  }
+}
+
+/* ---------- свет ---------- */
+.is-live .story-atmo{position:absolute;inset:0;z-index:1;pointer-events:none}
+/* no permanent will-change on the light, the glare, the screens or the chips (Task 12, T6 r4 Minor 6):
+   GSAP promotes an element for the length of its tween (force3D:auto) and drops it after, so a
+   dozen full-time layers under the pin only cost compositing on every frame of the scroll. The
+   glows move only under a mouse — promoted there. The device itself is 3D and stays a layer. */
+.sa-glow{position:absolute;display:block;border-radius:50%}
+@media (hover:hover) and (pointer:fine) and (min-width:900px){.sa-glow{will-change:transform}}
+.sa-g0{left:var(--ph-cx);top:calc(var(--ph-top) + var(--dev-h) * .42);width:calc(var(--dev-w) * 3.1);height:calc(var(--dev-w) * 3.1);
+  margin:calc(var(--dev-w) * -1.55) 0 0 calc(var(--dev-w) * -1.55);
+  background:radial-gradient(closest-side,rgba(89,129,214,.44),rgba(62,97,198,.13) 52%,rgba(62,97,198,0))}
+.sa-g1{left:0;top:0;width:min(120vw,1100px);height:min(120vw,1100px);margin:-42% 0 0 -34%;
+  background:radial-gradient(closest-side,rgba(19,33,74,.85),rgba(19,33,74,.22) 55%,rgba(19,33,74,0))}
+.sa-g4{left:var(--ph-cx);top:calc(var(--ph-top) + var(--dev-h) * .96);width:calc(var(--dev-w) * 1.5);height:calc(var(--dev-w) * .5);
+  margin:calc(var(--dev-w) * -.25) 0 0 calc(var(--dev-w) * -.75);border-radius:50%;
+  background:radial-gradient(closest-side,rgba(143,174,239,.4),rgba(143,174,239,0))}
+
+/* ---------- корпус ---------- */
+.is-live .story-device{position:absolute;z-index:2;left:var(--ph-cx);top:var(--ph-top);
+  width:var(--dev-w);height:var(--dev-h);margin-left:calc(var(--dev-w) / -2);
+  border-radius:var(--r-ph);transform-style:preserve-3d;will-change:transform;
+  background:linear-gradient(145deg,rgba(255,255,255,.5),rgba(255,255,255,.08) 11%,rgba(0,0,0,.62) 29%,rgba(0,0,0,.66) 71%,rgba(255,255,255,.14) 89%,rgba(255,255,255,.4)),var(--surface);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),inset 0 0 0 2px rgba(0,0,0,.85),
+    0 70px 120px -46px rgba(0,0,0,.95),0 10px 40px -16px rgba(0,0,0,.7)}
+.dev-back{position:absolute;inset:0;border-radius:inherit;transform:translateZ(-10px);
+  background:linear-gradient(150deg,rgba(255,255,255,.3),rgba(255,255,255,.04) 28%,rgba(0,0,0,.5) 62%,rgba(255,255,255,.22))}
+/* пошаговый режим (story.js, регулятор кадров; финальное ревью, I-5): корпус без 3D-контекста и без задней
+   плоскости — на телефоне наклона нет вовсе, на desktop пропадает только кромка толщины */
+.story[data-mode=steps] .story-device{transform-style:flat}
+.story[data-mode=steps] .dev-back{display:none}
+.dev-key{position:absolute;width:3px;border-radius:2px;background:linear-gradient(90deg,rgba(0,0,0,.6),rgba(255,255,255,.42))}
+.k1{left:-3px;top:17%;height:4.4%}.k2{left:-3px;top:25%;height:8.6%}.k3{left:-3px;top:36%;height:8.6%}
+.k4{right:-3px;top:28%;height:12.4%;background:linear-gradient(270deg,rgba(0,0,0,.6),rgba(255,255,255,.42))}
+.dev-front{position:absolute;z-index:3;left:var(--bez);top:var(--bez);width:var(--scr-w);height:var(--scr-h);overflow:hidden;pointer-events:none;
+  border-radius:calc(var(--r-ph) - var(--bez));
+  background:linear-gradient(152deg,rgba(255,255,255,.1) 0%,rgba(255,255,255,.02) 24%,rgba(255,255,255,0) 44%)}
+.dev-glare{position:absolute;top:-8%;bottom:-8%;left:0;width:100%;transform:translateX(-130%);
+  background:linear-gradient(104deg,rgba(255,255,255,0) 22%,rgba(255,255,255,.13) 44%,rgba(255,255,255,.035) 53%,rgba(255,255,255,0) 68%)}
+.dev-island{position:absolute;left:50%;top:1.9%;width:30%;height:3%;margin-left:-15%;border-radius:999px;background:rgba(0,0,0,.94)}
+.dev-home{position:absolute;left:50%;bottom:1.1%;width:32%;height:.55%;margin-left:-16%;border-radius:999px;background:rgba(255,255,255,.5)}
+/* геометрия экрана задаётся явно: авто-ширина по insets в этой сцене схлопывалась в 0 */
+.is-live .story-device .phone-screen{position:absolute;z-index:2;left:var(--bez);top:var(--bez);
+  width:var(--scr-w);height:var(--scr-h);padding:0;
+  border-radius:calc(var(--r-ph) - var(--bez));background:none;box-shadow:none;overflow:hidden}
+.is-live .story-device .phone-screen img{position:absolute;inset:0;width:100%;height:100%;border-radius:0;
+  object-fit:cover;object-position:50% 0}
+.tap-ring,.tap-dot{display:none}
+/* проценты выверены по самому скриншоту: первая карточка предложений */
+.is-live .tap-ring{display:block;position:absolute;z-index:3;left:1.9%;right:1.9%;top:73.1%;height:6.9%;border-radius:7px;opacity:0;
+  box-shadow:0 0 0 2px rgba(236,240,246,.85),0 0 26px 2px rgba(89,129,214,.65)}
+.is-live .tap-dot{display:block;position:absolute;z-index:4;left:60%;top:76.5%;width:11%;aspect-ratio:1;margin:-5.5% 0 0 -5.5%;
+  border-radius:50%;background:rgba(236,240,246,.16);box-shadow:0 0 0 2px rgba(236,240,246,.6);opacity:0}
+
+/* ---------- текст главы ---------- */
+.is-live .chapter-copy{position:absolute;left:var(--gutter);right:var(--gutter);top:var(--copy-top)}   /* тот же верх, от которого считается резерв над корпусом */
+.is-live .chapter-copy .lead{margin-top:16px}
+@media (min-width:900px){
+  /* Колонка — ровно место до корпуса минус 48px воздуха, а не доля ширины: на 44 % от .wrap
+     (519px) заголовок «Знает ваш прайс.» на 64px требовал 520px и ронял точку на свою строку,
+     а на 900px до корпуса оставалось 8px. Потолок кегля в сцене — 56px: столько влезает
+     в самую узкую колонку (900px) с запасом. */
+  .is-live .chapter-copy{left:var(--gutter);right:auto;top:50%;
+    width:min(560px,calc(50vw + var(--ph-off) - var(--dev-w) / 2 - max(0px,(100vw - var(--wrap)) / 2) - var(--gutter) - 48px))}
+  .is-live .chapter-copy h2{font-size:var(--h2-scene)}
+  .is-live .chapter-copy .lead{margin-top:20px;font-size:17.5px}
+}
+@media (min-width:900px) and (max-width:1099px){
+  .is-live .chip{font-size:13px;padding:8px 13px;gap:8px}
+}
+
+/* ---------- чипы вокруг телефона ----------
+   Чип висит на краю корпуса, но обязан остаться в окне. Поэтому --chip-in (насколько он заходит
+   на корпус) не подбирается по брейкпоинтам, а выводится из места: правый край чипа (на мобильном
+   у нечётных — левый, сцена симметрична) не ближе --gutter к краю окна, то есть
+     chip-in ≥ --ph-off + --dev-w/2 + --chip-w + --gutter + --stag − 50vw,
+   зажатое между 8 % и 78 % ширины корпуса. --chip-w — самый длинный чип главы в ch: единица
+   привязана к шрифту чипа, поэтому переживает и смену кегля по брейкпоинтам, и подмену шрифта.
+   max-width — жёсткая страховка на случай, что и максимального захода мало (≤330px): чип
+   переносит строку, а не уезжает под обрез .story-stage{overflow:clip}. */
+.is-live .chips{position:absolute;left:var(--ph-cx);top:var(--ph-top);width:var(--dev-w);height:var(--dev-h);
+  margin-left:calc(var(--dev-w) / -2);display:block;gap:0;
+  --t1:26%;--t2:44%;--t3:62%;--t4:74%;--t5:86%}
+.is-live .chips[data-step="1"]{--chip-w:17ch}
+.is-live .chips[data-step="2"]{--chip-w:18ch;--t1:24%;--t2:44%}
+.is-live .chips[data-step="3"]{--chip-w:24ch}
+.is-live .chips[data-step="4"]{--chip-w:19ch;--t1:30%;--t2:44%;--t3:58%;--t4:72%;--t5:86%}
+@media (max-width:899px){ .is-live .chip{font-size:13px;padding:8px 13px;gap:8px} }   /* поверх экрана — чем компактнее, тем лучше */
+.is-live .chip{position:absolute;--stag:0px;
+  /* width:max-content обязателен вместе с white-space:normal: у абсолютного элемента с одним
+     только left ширина «по содержимому» считается от МЕСТА В КОНТЕЙНЕРЕ (dev-w − left), и чип
+     схлопывался в 90px на две строки. С max-content перенос включается ровно тогда, когда
+     упирается max-width. */
+  width:max-content;white-space:normal;
+  --chip-in:clamp(calc(var(--dev-w) * .08),
+    calc(var(--ph-off) + var(--dev-w) / 2 + var(--chip-w) + var(--gutter) + var(--stag) - 50vw),
+    calc(var(--dev-w) * .78));
+  max-width:calc(50vw - var(--ph-off) - var(--dev-w) / 2 + var(--chip-in) - var(--stag) - var(--gutter))}
+.is-live .chips li:nth-child(odd){right:calc(100% - var(--chip-in))}
+.is-live .chips li:nth-child(even){left:calc(100% - var(--chip-in))}
+.is-live .chips li:nth-child(1){top:var(--t1)}
+.is-live .chips li:nth-child(2){top:var(--t2)}
+.is-live .chips li:nth-child(3){top:var(--t3)}
+.is-live .chips li:nth-child(4){top:var(--t4)}
+.is-live .chips li:nth-child(5){top:var(--t5)}
+/* Телефон/планшет (< 900 px): чипы только касаются рамки корпуса (12 px), а не лежат на экране —
+   раньше они заходили на него на 80–140 px и закрывали те самые строки скриншота, которые должны
+   подтверждать («…мабек» вместо «Асхат Жумабек»). Места снаружи корпуса мало, поэтому чип компактнее,
+   переносит текст на две строки, у файлов виден только цветной тип (подпись — для чтения с экрана),
+   а чипы «Сводки» не показываются: сам экран уже показывает все пять статусов (линза арт-директора). */
+@media (max-width:899px){
+  .is-live .chip{--chip-in:12px;max-width:calc(50vw - var(--dev-w) / 2 + var(--chip-in) - 8px);
+    font-size:12px;line-height:1.25;padding:7px 11px;gap:6px;border-radius:var(--r-s)}
+  .is-live .chip-file{padding:6px}
+  .is-live .chip-file>span:not(.sr){position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+  .is-live .chips[data-step="4"]{display:none}
+}
+@media (min-width:900px){
+  /* на широком экране чипы собираются справа от корпуса: экран приложения не закрыт */
+  .is-live .chips{--t1:14%;--t2:31%;--t3:48%;--t4:65%;--t5:82%}
+  .is-live .chips[data-step="2"]{--t1:24%;--t2:44%}
+  .is-live .chips[data-step="4"]{--t1:10%;--t2:27%;--t3:44%;--t4:61%;--t5:78%}
+  .is-live .chips li:nth-child(odd),.is-live .chips li:nth-child(even){right:auto;left:calc(100% - var(--chip-in))}
+  .is-live .chips li:nth-child(even){--stag:34px;margin-left:var(--stag)}
+}
+
+/* ---------- индикатор глав ---------- */
+.is-live .story-hud{position:absolute;z-index:5;list-style:none;pointer-events:none;
+  left:var(--gutter);right:var(--gutter);top:calc(var(--hdr) + 8px);display:flex;gap:6px}
+.story-hud li{flex:1;display:flex;flex-direction:column;gap:8px}
+.story-hud span{display:none;font:600 11px/1 var(--f-sans);letter-spacing:.16em;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.story-hud i{display:block;height:2px;border-radius:2px;background:rgba(143,174,239,.22);overflow:hidden}
+.story-hud b{display:block;height:100%;border-radius:2px;background:var(--accent-hi);transform:scaleX(0);transform-origin:0 50%}
+@media (min-width:900px){
+  /* привязан к колонке глав (.wrap), а не к краю окна: на широком экране полоса иначе висела одна в углу */
+  .is-live .story-hud{left:max(var(--gutter), calc((100vw - var(--wrap)) / 2 + var(--gutter)));right:auto;top:auto;bottom:40px;gap:16px}
+  .story-hud li{flex:none}
+  .story-hud span{display:block}
+  .story-hud i{width:56px}
+}

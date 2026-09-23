@@ -1,0 +1,64 @@
+/* 80 · Вопросы — <details> accordion, works without JS. The marker is CSS («+» → «−»),
+   the open/close is animated through ::details-content where the browser supports it
+   (height is interpolated only with interpolate-size; elsewhere it opens instantly). */
+.faq{interpolate-size:allow-keywords}
+.faq-grid{display:grid;gap:40px}
+.faq-head h2{margin-top:16px}
+.faq-head .lead{margin-top:20px;max-width:440px}
+@media (min-width:960px){
+  .faq-grid{grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:72px;align-items:start}
+  .faq-head{position:sticky;top:124px}
+}
+
+.faq-list{border-top:1px solid var(--line)}
+.qa{position:relative;border-bottom:1px solid var(--line)}
+/* the light line that draws itself under the open item */
+.qa::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;pointer-events:none;
+  background:linear-gradient(90deg,var(--accent-hi),rgba(89,129,214,.35) 45%,rgba(89,129,214,0));
+  transform:scaleX(0);transform-origin:0 50%;transition:transform .9s var(--ease-out)}
+.qa[open]::after{transform:none}
+
+.qa summary{display:grid;grid-template-columns:28px minmax(0,1fr) 40px;align-items:center;gap:16px;
+  min-height:72px;padding:20px 0;cursor:pointer;list-style:none;-webkit-tap-highlight-color:transparent}
+.qa summary::-webkit-details-marker{display:none}
+.qa summary::marker{content:""}
+.qa summary:focus-visible{outline-offset:6px}
+.qa-n{font-size:13px;font-weight:600;letter-spacing:.06em;font-variant-numeric:tabular-nums;color:var(--ink-3);transition:color .35s}
+.qa-q{font-size:clamp(18px,1.8vw,21px);font-weight:600;line-height:1.32;letter-spacing:-.015em;color:var(--ink);
+  transition:transform .45s var(--ease-out)}
+.qa-i{position:relative;width:40px;height:40px;border-radius:50%;justify-self:end;
+  box-shadow:inset 0 0 0 1px var(--line-2);transition:background-color .35s,box-shadow .35s}
+.qa-i::before,.qa-i::after{content:"";position:absolute;left:50%;top:50%;width:14px;height:1.5px;margin:-.75px 0 0 -7px;
+  border-radius:2px;background:var(--ink);transition:transform .55s var(--ease-out)}
+.qa-i::after{transform:rotate(90deg)}
+.qa[open] .qa-n{color:var(--accent-hi)}
+.qa[open] .qa-i{background-color:var(--accent-fill);box-shadow:inset 0 0 0 1px rgba(143,174,239,.45),0 8px 24px -10px rgba(62,97,198,.9)}
+.qa[open] .qa-i::before{transform:rotate(180deg)}
+.qa[open] .qa-i::after{transform:rotate(180deg)}
+@media (hover:hover){
+  .qa summary:hover .qa-q{transform:translateX(4px)}
+  .qa summary:hover .qa-n{color:var(--accent-hi)}
+  .qa:not([open]) summary:hover .qa-i{box-shadow:inset 0 0 0 1px rgba(143,174,239,.5)}
+}
+
+.qa-a{padding:0 56px 28px 44px}
+.qa-a p{max-width:60ch;font-size:16.5px;line-height:1.65;color:var(--ink-2)}
+.qa-a a{color:var(--accent-hi);text-decoration:underline;text-decoration-color:rgba(143,174,239,.4);text-underline-offset:3px;transition:text-decoration-color .25s}
+.qa-a a:hover{text-decoration-color:var(--accent-hi)}
+.qa[open] .qa-a p{animation:qaIn .7s var(--ease-out) both}
+@keyframes qaIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+
+@supports selector(::details-content){
+  .qa::details-content{block-size:0;overflow-y:clip;
+    transition:block-size .55s var(--ease-out),content-visibility .55s allow-discrete}
+  .qa[open]::details-content{block-size:auto}
+  .q-low .qa::details-content{transition:none}
+}
+.q-low .qa[open] .qa-a p{animation:none}
+
+@media (max-width:600px){
+  .qa summary{grid-template-columns:22px minmax(0,1fr) 36px;gap:12px;min-height:64px;padding:18px 0}
+  .qa-i{width:36px;height:36px}
+  .qa-a{padding:0 0 24px 34px}
+  .qa-a p{font-size:16px}
+}
