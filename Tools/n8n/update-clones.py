@@ -248,6 +248,10 @@ def main():
     summary = {"clones": 0, "up_to_date": 0, "would_update": 0, "updated": 0, "failed": 0}
     for w in clones:
         st, full = call(base, "GET", f"/workflows/{w['id']}")
+        if st == 200 and full.get("isArchived"):
+            summary["archived"] = summary.get("archived", 0) + 1
+            print(f"- {w['id']} '{w.get('name')}' archived — skipped (n8n refuses PUT on an archived workflow; the owner retired this bot)")
+            continue
         if st != 200 or not is_clone(full, canonical_ids):
             continue
         summary["clones"] += 1

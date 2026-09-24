@@ -8,7 +8,7 @@
 
 - **Дата:** 2026-09-17 · **Ветка/коммит:** `main` @ `95221844` (исходный HEAD; работа идёт на `main`
   scoped-коммитами — единый рабочий каталог, без worktree; перед каждым коммитом `git rev-parse HEAD`).
-- **Текущий этап:** 7 (готовность владельца и пакет развёртывания) — код ЗАВЕРШЁН, staging_verified 2026-09-22; НЕ развёрнут (7.7 — нет разрешения владельца). Итоговые документы: `docs/audits/2026-09-22-remediation-matrix.md`, `docs/audits/release-package.md`, статус-раздел в `2026-09-15-app-and-ai-audit.md`. Следующий шаг — ВЛАДЕЛЕЦ: прочитать пакет, дать явное «go» на конкретные шаги; device-pass экранов этапа 7.
+- **Текущий этап:** РАЗВЁРНУТО НА ПРОД 2026-09-24 (7.7 выполнен по явному «go» владельца; раздел «Развёртывание 2026-09-24» ниже). Осталось владельцу: новый билд клиента (TestFlight / внутренний трек Play, в стор — после вердикта по текущему ревью), device-pass экранов этапа 7 и self-message заявки на новом боте, ротация Wappi-токена ПОСЛЕ выхода клиента, закрытие compat-окна (`CR_AUTH_COMPAT_UNTIL=2026-12-31`), push-ключи. Итоговые документы: `docs/audits/2026-09-22-remediation-matrix.md`, `docs/audits/release-package.md`, статус-раздел в `2026-09-15-app-and-ai-audit.md`.
 - **Коммиты:** этап 1 — d44fc037, 5448f98d, e3aec245, 616e6461; этап 2 — b892b83d, 230392e8, f456e1b9; этап 3 — см. git log
   (`feat(reply-pipeline)`).
 - **Как продолжить:** `Tools/n8n/staging/pg.sh start` → `python3 Tools/n8n/staging/wappi-mock.py &` →
@@ -233,3 +233,23 @@ probe-suggest-replies struct_fails=0 (4 эвристических WARN, LLM), U
 e2e-test-dialog 4/4, e2e-clone-update 1/1; регрессия после обновления staging-ботов до канона: e2e-reply 30/30 (28 прежних + 2 медиа),
 e2e-handoff 12/14 в полном прогоне — оба провала (`notifier_delivers_self_message…`, `handoffs_webhook_owner_scoped…`) проходят 2/2 при
 изолированном повторе (взаимное влияние сценариев на общих staging-профилях, как и в прогоне этапа 4; регрессии шаблона нет); Unity 2679/2679. Итоговые документы: матрица `2026-09-22-remediation-matrix.md`, статус-раздел в аудите.
+
+## Развёртывание 2026-09-24 (прод, по явному разрешению владельца)
+
+Порядок — как в `release-package.md`; каждый шаг с проверкой. Прод: n8n 2.36.7, SQLite, **Code-узлы в task runners** (`N8N_RUNNERS_ENABLED=true` — на staging runners не было).
+
+| Шаг | Результат | Доказательство |
+|---|---|---|
+| Бэкап + снимок «до» | `~/backups/n8n-2026-09-24.tar.gz` (свежий, 06:58 UTC); `2026-09-24-prod-before.json` (20 DIFF, 7 MISSING, клоны «13»/«15» BEHIND) | файлы |
+| SQL (6 миграций) | все 200 через `.secrets/sql-oneoff.py`; RLS=true на 8 таблицах; колонки `bot_profiles.owner_id/workflow_id/claimed_at`, `reply_mode_flags.version`, `chat_reply_state.handoff_paused/incoming_generation` | пост-чек одной строкой |
+| Env + рестарт | 7 переменных вставлены в `docker-compose.yml` (секрет 64 hex сгенерирован на VPS, нигде не печатался; `CR_AUTH_COMPAT_UNTIL=2026-12-31T00:00:00Z`), `docker compose config` valid, контейнер пересоздан, healthz 200 | env в контейнере (имена; длина секрета) |
+| Canary runners | самоудаляющийся Webhook→Code: `require('crypto')` HMAC ok, `$env.CR_AUTH_SECRET` len 64, `$env.CR_AUTH_COMPAT_UNTIL` виден — под task runners | `{"hmacLen":64,"secretLen":64,"until":"2026-12-31T00:00:00Z"}` |
+| 7 новых workflows | `docker exec … n8n import:workflow --separate` (id сохранены), `publish:workflow` для 2 sub-workflows, API activate для 5 триггерных; read-back active=True, activeVersionId==versionId у всех | API GET |
+| Smoke гейтов | AuthSession nonsense → 400; WappiProxy/Handoffs/TestDialog без токена → 401; плохой токен → 401; bootstrap → refresh → с токеном: unknown_op 400 (токен проверен), чужой профиль → 403 `forbidden:profileId`; пробный install удалён | вывод smoke |
+| 15 обновлённых workflows | `build-client-webhooks.py --update` (Set Workflow State с защищённым списком новых id, Support Message) + `deploy-canonical.py --apply --yes` (13: Dashboard Outcomes, Edit WA/TG, шаблоны WA/TG, Suggest Replies, Upload File, Set Reply Mode, Create WA/TG, Delete File, Get Usage, Delete Bot Files) — read-back ok у каждого, точки отката (versionId до) в выводе | `2026-09-24-prod-after.json`: 26/26 OK, unknown 0, 24 активных опубликованы (2 шаблона неактивны по определению) |
+| Compat для старых клиентов | без токена: GetUsage 200, SetWorkflowState protected → 400 `protected_workflow`, SuggestReplies → legacy-непрозрачный `generation_failed`, SupportMessage пустой → 400 — ни одного 401; повторено после контрольного рестарта | вывод smoke |
+| Клоны | **обновлять нечего**: «13» архивирован в n8n (14.09, вручную владельцем; PUT на архивный n8n запрещает — `update-clones.py` теперь пропускает archived), «15» удалён ВРУЧНУЮ в редакторе n8n во время деплоя (аудит-лог: deactivate 12:41:37 → archive 12:41:42 → delete 12:41:45 Алматы под учёткой владельца; мои API-удаления касаются только временных `ZZZ TEMP` workflows и дают только событие `deleted`). Оба профиля списаны lifecycle-sweep'ом 14.09 (`trial_expiry`/`churn_grace`) | аудит-лог n8n, `bot_profiles` |
+| Типы вебхуков у существующих профилей | нечего применять — живых ботов на проде нет; новые боты получают три типа при создании | — |
+| Контрольный рестарт | после `publish:workflow` (подсказка CLI) — healthz через 12 с, активные workflows подняты at init; Notifier активен (успешные прогоны не сохраняются по настройке `saveDataSuccessExecution: none`, ошибок нет) | docker logs, API |
+
+**Не проверено на проде (нужен живой бот с нового клиента):** ответ бота по новой цепочке (claim → final check → lease → ledger), Test Dialog, handoff-инструмент, self-message, русский ответ на медиа. **Не сделано:** ротация Wappi-токена (только после выхода клиента), закрытие compat-окна, push.
