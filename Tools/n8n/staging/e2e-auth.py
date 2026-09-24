@@ -350,6 +350,29 @@ def s_create_seed(ctx):
     return ok, f"create={st} id={wid} row={row!r} bound={bound == wid} token_has_wf={wid in d2.get('workflows', [])} delete={st3} {d3}"
 
 
+@scenario("create_slot_count_excludes_own_profile_and_retires_refused", "2026-09-24 hotfix: on a 1-channel plan the FIRST channel is accepted (the A1-registered row of the profile being created is not counted) and a refused second profile is deleted at Wappi AND retired in bot_profiles")
+def s_create_slots(ctx):
+    c = Owner("C", ctx["run_id"])
+    pg(f"update subscribers set plan = 'start', status = 'active' where app_user_id = '{c.app_user_id}';")
+    pid1 = c.add_profile()
+    base_fields = {"Name": f"e2e-slot-{ctx['run_id']}", "BusinessType": "Цветы", "BusinessTypeId": "flowers", "TelegramWorkflowId": "-1",
+                   "Business": "", "Prompt": "", "ProductsList": "", "ServicesList": "", "AppUserID": c.app_user_id, "ReplyMode": "semi", "ReplyModeVersion": "150"}
+    st1, d1 = hook_form("CreateWhatsappWorkflow", c.token, {**base_fields, "WhatsappProfileId": pid1, "BotKey": f"Bot-slot1-{ctx['run_id']}"})
+    wid1 = (d1 or {}).get("id") if isinstance(d1, dict) else None
+    c.refresh()
+    pid2 = c.add_profile()
+    total_before = mock_total()
+    st2, d2 = hook_form("CreateWhatsappWorkflow", c.token, {**base_fields, "WhatsappProfileId": pid2, "BotKey": f"Bot-slot2-{ctx['run_id']}"})
+    refused = isinstance(d2, dict) and d2.get("success") is False and d2.get("error") == "channel_limit"
+    deletes = [x for x in mock_calls(total_before, "profile/delete")[0] if pid2 in json.dumps(x)]
+    row2 = pg(f"select coalesce(deleted_reason, '-') || '|' || (deleted_at is not null) from bot_profiles where profile_id = '{pid2}';")
+    row1 = pg(f"select (deleted_at is null) || '|' || coalesce(workflow_id, '-') from bot_profiles where profile_id = '{pid1}';")
+    if wid1:
+        hook("SetWorkflowState", c.token, {"workflowId": wid1, "action": "delete"})
+    ok = st1 == 200 and bool(wid1) and st2 == 200 and refused and len(deletes) == 1 and row2 == "channel_limit|true" and row1 == f"true|{wid1}"
+    return ok, f"first={st1} id={wid1} second={st2} refused={refused} wappi_deletes={len(deletes)} row2={row2!r} row1_alive_bound={row1 == f'true|{wid1}'}"
+
+
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--only"); ap.add_argument("--compat-closed", action="store_true"); a = ap.parse_args()
     if not AUTH_SECRET:

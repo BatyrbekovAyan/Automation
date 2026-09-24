@@ -381,9 +381,9 @@
       ],
       "parameters": {
         "operation": "executeQuery",
-        "query": "select coalesce(cnt.c,0) c, s.plan, s.status\nfrom (select $1 id) x\nleft join subscribers s on s.app_user_id = x.id\nleft join lateral (\n  select count(*) c\n  from bot_profiles bp\n  where bp.app_user_id = x.id\n    and bp.deleted_at is null\n    and not (\n      bp.channel = $2\n      and bp.bot_key is not distinct from nullif($3,'')\n      and nullif($3,'') is not null\n    )\n) cnt on true;",
+        "query": "select coalesce(cnt.c,0) c, s.plan, s.status\nfrom (select $1 id) x\nleft join subscribers s on s.app_user_id = x.id\nleft join lateral (\n  select count(*) c\n  from bot_profiles bp\n  where bp.app_user_id = x.id\n    and bp.deleted_at is null\n    and bp.profile_id is distinct from nullif($4,'')\n    and not (\n      bp.channel = $2\n      and bp.bot_key is not distinct from nullif($3,'')\n      and nullif($3,'') is not null\n    )\n) cnt on true;",
         "options": {
-          "queryReplacement": "={{ [ $('Unity Webhook').first().json.body.AppUserID, 'whatsapp', $('Unity Webhook').first().json.body.BotKey ] }}"
+          "queryReplacement": "={{ [ $('Unity Webhook').first().json.body.AppUserID, 'whatsapp', $('Unity Webhook').first().json.body.BotKey, $('Unity Webhook').first().json.body.WhatsappProfileId ] }}"
         }
       },
       "credentials": {
@@ -679,6 +679,30 @@
       },
       "alwaysOutputData": true,
       "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- 2026-09-24: a profile refused for the channel limit was already deleted at Wappi (node above); retire its\n-- A1-registered row too, or it keeps counting as an occupied channel on the next attempt.\nupdate bot_profiles\nset deleted_at = now(), deleted_reason = 'channel_limit'\nwhere profile_id = nullif($1,'') and deleted_at is null and workflow_id is null;",
+        "options": {
+          "queryReplacement": "={{ [ $('Unity Webhook').first().json.body.WhatsappProfileId ] }}"
+        }
+      },
+      "id": "retire-refused-whatsapp",
+      "name": "Retire Refused Profile",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        896,
+        180
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -887,7 +911,7 @@
       "main": [
         [
           {
-            "node": "Respond Channel Limit",
+            "node": "Retire Refused Profile",
             "type": "main",
             "index": 0
           }
@@ -939,6 +963,17 @@
         [
           {
             "node": "Activate Created Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retire Refused Profile": {
+      "main": [
+        [
+          {
+            "node": "Respond Channel Limit",
             "type": "main",
             "index": 0
           }
