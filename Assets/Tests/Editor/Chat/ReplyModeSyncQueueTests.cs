@@ -121,6 +121,87 @@ public class ReplyModeSyncQueueTests
         Assert.IsFalse(ReplyModeSyncQueue.AnyPending(m, "Bot1"));
     }
 
+    // ---- R4 (2026-09-27): the chat-open heal REPEATS a decision, it never makes a new one ----------------------
+    // A fresh version on every chat open made the server read a mere open as the owner's new «Авто» and close a
+    // handoff the owner had not even seen. The heal (Reassert) now re-sends only what the queue still owes, with the
+    // ORIGINAL version, and probes an unrecorded «Авто» with the floor version (applies only where the server has no
+    // row, never resolves a request).
+
+    [Test]
+    public void Reassert_SameValueConfirmed_SendsNothing_AndKeepsTheOriginalVersion()
+    {
+        var m = M();
+        long v = ReplyModeSyncQueue.Desire(m, "Bot0", new[] { "wa" }, "c1", false, 1000);        // the owner's «Авто», a day ago
+        var e = ReplyModeSyncQueue.Find(m, "wa", "c1");
+        ReplyModeSyncQueue.OnResponse(e, v, applied: true, serverSuppressed: false, serverVersion: v);
+        ReplyModeSyncQueue.Reassert(m, "Bot0", "wa", "c1", false, 86_401_000);                       // chat opened after a new handoff
+        Assert.AreEqual(v, e.desiredVersion, "a chat open must not mint a new decision");
+        Assert.AreEqual(ReplyModeSyncQueue.StateConfirmed, e.state);
+        Assert.AreEqual(0, ReplyModeSyncQueue.Due(m, 86_401_000).Count, "nothing is owed: nothing is sent");
+    }
+
+    [Test]
+    public void Reassert_PendingSameValue_DoesNotMintANewVersion()
+    {
+        var m = M();
+        long v = ReplyModeSyncQueue.Desire(m, "Bot0", new[] { "wa" }, "c1", false, 1000);
+        ReplyModeSyncQueue.Reassert(m, "Bot0", "wa", "c1", false, 50_000);
+        var e = ReplyModeSyncQueue.Find(m, "wa", "c1");
+        Assert.AreEqual(v, e.desiredVersion, "the queued decision keeps its version");
+        Assert.IsTrue(e.IsPending);
+    }
+
+    [Test]
+    public void Reassert_FailedSameValue_RequeuesTheOriginalVersion()
+    {
+        var m = M();
+        long v = ReplyModeSyncQueue.Desire(m, "Bot0", new[] { "wa" }, "c1", false, 1000);
+        var e = ReplyModeSyncQueue.Find(m, "wa", "c1");
+        for (int i = 0; i < ReplyModeSyncQueue.MaxAttemptsPerLaunch; i++) ReplyModeSyncQueue.OnSendFailed(e, 1000);
+        Assert.IsTrue(e.IsFailed);
+        ReplyModeSyncQueue.Reassert(m, "Bot0", "wa", "c1", false, 90_000);
+        Assert.IsTrue(e.IsPending && e.attempts == 0 && e.nextAttemptAtMs == 90_000, "a parked decision is retried");
+        Assert.AreEqual(v, e.desiredVersion, "...with the version it was decided at");
+    }
+
+    [Test]
+    public void Reassert_AutoWithoutAnEntry_UsesTheFloorVersion()
+    {
+        var m = M();
+        ReplyModeSyncQueue.Reassert(m, "Bot0", "wa", "c1", false, 90_000);
+        var e = ReplyModeSyncQueue.Find(m, "wa", "c1");
+        Assert.IsNotNull(e);
+        Assert.IsFalse(e.desiredSuppressed);
+        Assert.AreEqual(ReplyModeSyncQueue.FloorVersion, e.desiredVersion, "an unrecorded «Авто» is probed with the floor version, never «now»");
+        Assert.IsTrue(e.IsPending && e.botId == "Bot0");
+        // the server answers with its stored (newer) row: adopted, and a later real tap still mints above it
+        ReplyModeSyncQueue.OnResponse(e, ReplyModeSyncQueue.FloorVersion, applied: false, serverSuppressed: true, serverVersion: 5000);
+        Assert.IsTrue(e.desiredSuppressed && e.confirmedVersion == 5000);
+        Assert.Greater(ReplyModeSyncQueue.Desire(m, "Bot0", new[] { "wa" }, "c1", false, 100), 5000);
+    }
+
+    [Test]
+    public void Reassert_SemiDiffering_MintsAFreshVersion()
+    {
+        var m = M();
+        long v = ReplyModeSyncQueue.Desire(m, "Bot0", new[] { "wa" }, "c1", false, 1000);
+        var e = ReplyModeSyncQueue.Find(m, "wa", "c1");
+        ReplyModeSyncQueue.OnResponse(e, v, true, false, v);
+        ReplyModeSyncQueue.Reassert(m, "Bot0", "wa", "c1", true, 90_000);          // e.g. the handoff mirror paused the chat
+        Assert.IsTrue(e.desiredSuppressed && e.IsPending);
+        Assert.Greater(e.desiredVersion, v, "«Вместе» resolves nothing on the server, so it may be a fresh decision");
+    }
+
+    [Test]
+    public void Reassert_AutoOverAPendingSemi_LeavesTheQueuedDecisionAlone()
+    {
+        var m = M();
+        long v = ReplyModeSyncQueue.Desire(m, "Bot0", new[] { "wa" }, "c1", true, 1000);
+        ReplyModeSyncQueue.Reassert(m, "Bot0", "wa", "c1", false, 90_000);
+        var e = ReplyModeSyncQueue.Find(m, "wa", "c1");
+        Assert.IsTrue(e.desiredSuppressed && e.desiredVersion == v && e.IsPending, "an undelivered decision is on its way; its answer reconciles");
+    }
+
     [Test]
     public void Deserialize_ToleratesGarbage_AndEmpty()
     {

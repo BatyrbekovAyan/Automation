@@ -73,6 +73,19 @@ public class ReplyModeSyncService : MonoBehaviour
     }
 
     /// <summary>
+    /// The chat-open heal (R4): re-deliver what the queue still owes for this chat WITHOUT making a new decision —
+    /// see <see cref="ReplyModeSyncQueue.Reassert"/>. Only the owner's tap goes through <see cref="Desire"/>.
+    /// </summary>
+    public void Reassert(string botId, string profileId, string chatId, bool suppressed)
+    {
+        if (string.IsNullOrEmpty(profileId) || string.IsNullOrEmpty(chatId)) return;
+        ReplyModeSyncQueue.Reassert(_model, botId, profileId, chatId, suppressed, NowMs());
+        Persist();
+        OnStateChanged?.Invoke(botId, chatId);
+        Kick();
+    }
+
+    /// <summary>
     /// Desire + wait until every one of these entries is confirmed or gives up (the SaveWorkflows
     /// gate: a «Вместе» bot's suppression row must be CONFIRMED before its workflow activates).
     /// </summary>

@@ -1,0 +1,40 @@
+R4 client — EditMode (headless, filter 'ReplyModeSync'), 2026-09-28.
+Red state: ReplyModeSyncQueue.Reassert is a stub that does what today's chat-open heal does (Desire → a NEW version);
+SuggestionsController.RestoreForActiveChat still calls PushReplyModeForActiveChat (SyncReplyMode → Desire).
+
+  result=Failed(Child)  total=27  passed=21  failed=6  skipped=0  inconclusive=0
+  Failing / inconclusive tests:
+
+PASS ReplyModeSyncPayloadTests.AuthedProfileIds_BothChannels_KeepsBoth
+PASS ReplyModeSyncPayloadTests.AuthedProfileIds_SkipsBlankWhatsapp
+PASS ReplyModeSyncPayloadTests.AuthedProfileIds_SkipsTelegramSentinel
+PASS ReplyModeSyncPayloadTests.BuildPayload_BotDefaultRow_ChatIdStar_SuppressedTrue
+PASS ReplyModeSyncPayloadTests.BuildPayload_PerChatOverride_RealChatId_SuppressedFalse
+PASS ReplyModeSyncQueueTests.AnyPending_ScopesByBotAndOptionalChat
+PASS ReplyModeSyncQueueTests.Backoff_IsBounded_AndParksAfterMaxAttempts_ThenRetriesNextLaunch
+PASS ReplyModeSyncQueueTests.Batches_GroupBySameChatValueAndVersion
+PASS ReplyModeSyncQueueTests.Deserialize_ToleratesGarbage_AndEmpty
+PASS ReplyModeSyncQueueTests.Desire_CreatesPendingEntries_WithOneSharedVersion_AndSupersedesOlderDesires
+PASS ReplyModeSyncQueueTests.NextVersion_IsStrictlyIncreasing_EvenWhenTheClockStallsOrStepsBack
+PASS ReplyModeSyncQueueTests.OnResponse_Applied_ConfirmsTheDesire
+PASS ReplyModeSyncQueueTests.OnResponse_ForAnOlderRequest_IsIgnored_TheNewerDesireStaysPending
+PASS ReplyModeSyncQueueTests.OnResponse_NotApplied_AdoptsTheServersNewerValue
+FAIL ReplyModeSyncQueueTests.Reassert_AutoOverAPendingSemi_LeavesTheQueuedDecisionAlone
+      - an undelivered decision is on its way; its answer reconciles   Expected: True   But was:  False
+FAIL ReplyModeSyncQueueTests.Reassert_AutoWithoutAnEntry_UsesTheFloorVersion
+      - an unrecorded «Авто» is probed with the floor version, never «now»   Expected: 1   But was:  90000
+FAIL ReplyModeSyncQueueTests.Reassert_FailedSameValue_RequeuesTheOriginalVersion
+      - ...with the version it was decided at   Expected: 1000   But was:  90000
+FAIL ReplyModeSyncQueueTests.Reassert_PendingSameValue_DoesNotMintANewVersion
+      - the queued decision keeps its version   Expected: 1000   But was:  50000
+FAIL ReplyModeSyncQueueTests.Reassert_SameValueConfirmed_SendsNothing_AndKeepsTheOriginalVersion
+      - a chat open must not mint a new decision   Expected: 1000   But was:  86401000
+PASS ReplyModeSyncQueueTests.Reassert_SemiDiffering_MintsAFreshVersion
+PASS ReplyModeSyncQueueTests.Rejected_StopsRetrying_ButSurvivesForTheNextLaunch
+PASS ReplyModeSyncQueueTests.Response_ParsesTheV2Envelope_AndRejectsGarbage
+FAIL ReplyModeSyncWiringTests.ChatOpenHeal_RepeatsTheDecision_NeverMintsANewOne
+      - the heal must re-assert, not re-decide   Expected: True   But was:  False
+PASS ReplyModeSyncWiringTests.CreateForms_CarryTheInitialReplyMode_ForTheServerSeed
+PASS ReplyModeSyncWiringTests.EveryWriteSite_GoesThroughTheQueue
+PASS ReplyModeSyncWiringTests.SaveWorkflows_WaitsForTheServersConfirmation_BeforeActivating
+PASS ReplyModeSyncWiringTests.Service_ConfirmsOnlyOnThePerProfileReport

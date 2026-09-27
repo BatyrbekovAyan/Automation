@@ -340,9 +340,11 @@ public class SuggestionsController : MonoBehaviour
         // SUP-02 heal: re-assert only an EXPLICIT per-chat override (tri-state 1/2) — covers a lost
         // «Вместе» (true) AND a lost «back to Авто» (false) write. Inherited chats (raw 0) push
         // NOTHING: they rely on the '*' bot-default row alone; writing the collapsed boolean here
-        // would turn a mere chat-open into a sticky per-chat server row (WR-01).
+        // would turn a mere chat-open into a sticky per-chat server row (WR-01). R4: the heal
+        // REPEATS the decision (original version), it never makes a new one — the server reads an
+        // applied chat «Авто» as the owner's resume and would close a handoff the owner never saw.
         if (SemiAutoStore.TryGetOverride(ChatManager.Instance.CurrentBotId, ChatManager.Instance.CurrentChatId, out bool overrideOn))
-            PushReplyModeForActiveChat(overrideOn);
+            ReassertReplyModeForActiveChat(overrideOn);
         if (_slotKey != null) _slotKey.SetVisible(_semiAutoOn);
         if (_semiAutoOn)
         {
@@ -465,13 +467,26 @@ public class SuggestionsController : MonoBehaviour
     // NEVER from HandleLive — the 3s open-chat LivePoll would storm the server (Pitfall 3).
     private void PushReplyModeForActiveChat(bool suppressed)
     {
-        var cm = ChatManager.Instance;
-        if (cm == null || Manager.Instance == null) return;
-        Bot bot = Manager.Instance.FindBotByName(cm.CurrentBotId);
-        if (bot == null) return;
-        string profileId = cm.ActiveChannelProfileId();       // C3 accessor, wraps GetActiveProfileId()
-        if (string.IsNullOrEmpty(profileId) || profileId == Bot.UnauthedProfileSentinel) return;
+        if (!TryGetActiveChatProfile(out var cm, out string profileId)) return;
         Manager.Instance.SyncReplyMode(cm.CurrentBotId, new[] { profileId }, cm.CurrentChatId, suppressed);
+    }
+
+    // The chat-open heal (R4): same target as the tap, but the queue repeats the chat's recorded decision
+    // (original version, or the floor version for an unrecorded «Авто») instead of recording a new one.
+    private void ReassertReplyModeForActiveChat(bool suppressed)
+    {
+        if (!TryGetActiveChatProfile(out var cm, out string profileId)) return;
+        Manager.Instance.ReassertReplyMode(cm.CurrentBotId, profileId, cm.CurrentChatId, suppressed);
+    }
+
+    private static bool TryGetActiveChatProfile(out ChatManager cm, out string profileId)
+    {
+        cm = ChatManager.Instance;
+        profileId = null;
+        if (cm == null || Manager.Instance == null) return false;
+        if (Manager.Instance.FindBotByName(cm.CurrentBotId) == null) return false;
+        profileId = cm.ActiveChannelProfileId();                // C3 accessor, wraps GetActiveProfileId()
+        return !string.IsNullOrEmpty(profileId) && profileId != Bot.UnauthedProfileSentinel;
     }
 
     // --- A2: the server's answer (confirmation, or a NEWER value from another device) ---------------

@@ -52,6 +52,25 @@ public class ReplyModeSyncWiringTests
     }
 
     [Test]
+    public void ChatOpenHeal_RepeatsTheDecision_NeverMintsANewOne()
+    {
+        // R4 (2026-09-27): a chat open is not the owner's decision. Re-sending the chat's explicit «Авто» through
+        // Desire minted a NEW version, which the server correctly applied as a fresh resume — closing a handoff the
+        // owner had not seen. The heal must go through Reassert (original version / floor version), and only the
+        // owner's tap (HandleToggle) may record a new desire.
+        string sc = Src("Scripts/Chat/SuggestionsController.cs");
+        string restore = MethodBody(sc, "private void RestoreForActiveChat");
+        Assert.IsTrue(restore.Contains("ReassertReplyModeForActiveChat(overrideOn)"), "the heal must re-assert, not re-decide");
+        Assert.IsFalse(restore.Contains("PushReplyModeForActiveChat(") || restore.Contains("SyncReplyMode(") || restore.Contains(".Desire("),
+            "a chat open must never record a new desire");
+        Assert.IsTrue(MethodBody(sc, "private void ReassertReplyModeForActiveChat").Contains("Manager.Instance.ReassertReplyMode(cm.CurrentBotId"));
+        Assert.IsTrue(MethodBody(sc, "private void HandleToggle").Contains("PushReplyModeForActiveChat(desiredOn)"), "the owner's tap is the one new decision");
+        string sync = Src("Scripts/Main/Manager.ReplyModeSync.cs");
+        Assert.IsTrue(MethodBody(sync, "public void ReassertReplyMode").Contains("ReplyModeSyncService.Instance?.Reassert("));
+        Assert.IsTrue(MethodBody(Src("Scripts/Chat/ReplyModeSyncService.cs"), "public void Reassert").Contains("ReplyModeSyncQueue.Reassert(_model"));
+    }
+
+    [Test]
     public void CreateForms_CarryTheInitialReplyMode_ForTheServerSeed()
     {
         string m = Src("Scripts/Main/Manager.cs");

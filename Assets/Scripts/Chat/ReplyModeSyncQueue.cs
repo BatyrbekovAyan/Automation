@@ -96,6 +96,54 @@ public static class ReplyModeSyncQueue
         return version;
     }
 
+    /// <summary>
+    /// The version a heal uses for an «Авто» the queue has no record of: it applies only where the server holds no
+    /// row for the chat (or a pre-A2 version-0 row), never beats a stored decision, and — being older than every
+    /// handoff request — never resolves one on the server (R4).
+    /// </summary>
+    public const long FloorVersion = 1;
+
+    /// <summary>
+    /// R4 (2026-09-27): the chat-open heal REPEATS a decision, it never makes a new one. Every version the server
+    /// applies to a chat-scoped «Авто» resolves that chat's handoff requests up to that version, so a heal that
+    /// minted «now» turned a mere chat open into the owner's resume and closed a request the owner had not seen.
+    /// Same value already queued → re-sent with its ORIGINAL version (a parked one is re-armed), or nothing when it
+    /// is confirmed. «Вместе» resolves nothing server-side, so a differing one is an ordinary desire. An «Авто» with
+    /// no record is probed with <see cref="FloorVersion"/>; an undelivered differing decision is left to its answer.
+    /// </summary>
+    public static void Reassert(Model m, string botId, string profileId, string chatId, bool suppressed, long nowMs)
+    {
+        var e = Find(m, profileId, chatId);
+        if (e != null && e.desiredSuppressed == suppressed)
+        {
+            e.botId = botId;
+            if (e.IsFailed) Arm(e, nowMs);
+            return;
+        }
+        if (suppressed)
+        {
+            Desire(m, botId, new[] { profileId }, chatId, true, nowMs);
+            return;
+        }
+        if (e != null && e.IsPending) return;
+        if (e == null)
+        {
+            e = new Entry { profileId = profileId, chatId = chatId };
+            m.entries.Add(e);
+        }
+        e.botId = botId;
+        e.desiredSuppressed = false;
+        e.desiredVersion = FloorVersion;
+        Arm(e, nowMs);
+    }
+
+    private static void Arm(Entry e, long nowMs)
+    {
+        e.attempts = 0;
+        e.nextAttemptAtMs = nowMs;
+        e.state = StatePending;
+    }
+
     public static List<Entry> Due(Model m, long nowMs)
     {
         var due = new List<Entry>();

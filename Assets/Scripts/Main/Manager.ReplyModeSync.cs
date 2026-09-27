@@ -72,6 +72,17 @@ public partial class Manager
         ReplyModeSyncService.Instance?.Desire(botId, profileIds, chatId, suppressed);
     }
 
+    /// <summary>
+    /// The chat-open heal (R4): re-assert a chat's EXPLICIT override without minting a new decision. The server
+    /// reads every applied chat-scoped «Авто» as the owner's resume (it closes the chat's handoff requests up to
+    /// that version), so a chat open must repeat the original version, never «now».
+    /// </summary>
+    public void ReassertReplyMode(string botId, string profileId, string chatId, bool suppressed)
+    {
+        if (!IsRealProfileId(profileId)) return;
+        ReplyModeSyncService.Instance?.Reassert(botId, profileId, chatId, suppressed);
+    }
+
     // --- Bot-default flip hook (ReplyModeToggleBinder.OnReplyModeChanged) -----
 
     // Manager declares its OWN OnEnable/OnDisable here (the primary file has none — C4) to
