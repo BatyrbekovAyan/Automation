@@ -95,10 +95,16 @@ def verify(fname):
     js = node(wf, "Settle Send")["parameters"]["jsCode"]
     for frag in ("state = 'sent'", "state = 'send_failed'", "state = 'send_unknown'", "body.status === 'done' || body.message_id"):
         check(frag in js, f"{f}: Settle Send lacks {frag!r}")
-    # (7) Reconcile: adopts an echo of OUR text after the send started; never resends.
+    # (7) Reconcile: adopts an echo of OUR text after the send started; never resends. R10: foreign chatId rows
+    #     dropped, the trigger must be in the window, the echo newer than it, exactly one distinct candidate.
     js = node(wf, "Reconcile Check")["parameters"]["jsCode"]
-    for frag in ("fromMe === true", "m.body.trim() === String(s.text).trim()", "sendStartedAt", "'send_unknown'"):
+    for frag in ("fromMe === true", "m.body.trim() === String(s.text).trim()", "sendStartedAt", "'send_unknown'",
+                 "m.chatId && trig.chatId && m.chatId !== trig.chatId", "fetched.findIndex(m => m.id === trig.id)",
+                 "trigIdx < 0 ? [] : fetched.slice(0, trigIdx)", "cands.length === 1 ? cands[0] : null", "m.from_where !== 'phone'"):
         check(frag in js, f"{f}: Reconcile Check lacks {frag!r}")
+    # negative (R10): the first same-text outgoing row anywhere in the response is not proof of OUR delivery
+    check("rows.find(m => m.body.trim() === String(s.text).trim()" not in js,
+          f"{f}: Reconcile Check adopts the first same-text row of any chat (R10: a crossed row becomes a false «sent»)")
     check("message/send" not in js and "$http" not in js, f"{f}: Reconcile Check must never resend")
     wait = node(wf, "Wait Reconcile")
     check(wait["type"] == "n8n-nodes-base.wait" and wait["parameters"].get("amount") == 3 and wait.get("webhookId"),

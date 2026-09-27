@@ -1,0 +1,59 @@
+# R10 before — Tools/n8n/tests/test_reply_reconcile.py on HEAD 8bcf7206 (Reconcile Check adopts the first same-text outgoing row of the response); the real Reconcile Check body of both templates + Settle Send → Reconcile Check → Record Send on staging-PG temp tables
+PASS R10 [WA] our echo newer than the trigger → sent with the echo's id
+FAIL R10 [WA] the same text in ANOTHER chat (a crossed row inside our window) → send_unknown
+      - got state=sent id='FOREIGN' error=''
+FAIL R10 [WA] a fully crossed window of the neighbour chat (its own trigger-less rows, same template text) → send_unknown
+      - got state=sent id='FOREIGN' error=''
+FAIL R10 [WA] a crossed window WITHOUT chatId fields (no trigger in it) → send_unknown
+      - got state=sent id='FOREIGN' error=''
+FAIL R10 [WA] two DIFFERENT outgoing rows with our text → ambiguous → send_unknown
+      - got state=sent id='ECHO1' error=''
+PASS R10 [WA] the SAME echo row listed twice (one id) → still one candidate → sent
+FAIL R10 [WA] the same text OLDER than the trigger yet inside the send window (trigger stamped late) → send_unknown
+      - got state=sent id='OLD' error=''
+PASS R10 [WA] our echo in rows that carry no chatId (the trigger is there) → sent
+FAIL R10 [WA] a foreign row listed first, then our own echo → sent with OUR id
+      - got state=sent id='FOREIGN' error=''
+FAIL R10 [WA] the owner typed the SAME text by hand and our echo is there too → ambiguous → send_unknown
+      - got state=sent id='MANUAL' error=''
+FAIL R10 [WA] only a row the transport marks as sent FROM THE PHONE (tapi from_where) with our text → send_unknown
+      - got state=sent id='MANUAL' error=''
+PASS R10 [WA] our echo in the same second as the trigger, listed above it (Wappi order breaks the tie) → sent
+FAIL R10 [WA] our echo in the same second as the trigger but listed BELOW it → not newer → send_unknown
+      - got state=sent id='ECHO' error=''
+PASS R10 [WA] no echo at all → send_unknown
+PASS R10 [WA] the reconcile fetch failed → send_unknown
+FAIL R10 [WA] end to end: a crossed window after a lost send leaves the ledger send_unknown, no ai history row
+      - outcome=sent ledger={'TRIG': 'sent'}
+      - history=[('TRIG', 'client'), ('FOREIGN', 'ai')]
+      - last_sent_message_id=[{'last_sent_message_id': 'FOREIGN'}]
+PASS R10 [TG] our echo newer than the trigger → sent with the echo's id
+FAIL R10 [TG] the same text in ANOTHER chat (a crossed row inside our window) → send_unknown
+      - got state=sent id='FOREIGN' error=''
+FAIL R10 [TG] a fully crossed window of the neighbour chat (its own trigger-less rows, same template text) → send_unknown
+      - got state=sent id='FOREIGN' error=''
+FAIL R10 [TG] a crossed window WITHOUT chatId fields (no trigger in it) → send_unknown
+      - got state=sent id='FOREIGN' error=''
+FAIL R10 [TG] two DIFFERENT outgoing rows with our text → ambiguous → send_unknown
+      - got state=sent id='ECHO1' error=''
+PASS R10 [TG] the SAME echo row listed twice (one id) → still one candidate → sent
+FAIL R10 [TG] the same text OLDER than the trigger yet inside the send window (trigger stamped late) → send_unknown
+      - got state=sent id='OLD' error=''
+PASS R10 [TG] our echo in rows that carry no chatId (the trigger is there) → sent
+FAIL R10 [TG] a foreign row listed first, then our own echo → sent with OUR id
+      - got state=sent id='FOREIGN' error=''
+FAIL R10 [TG] the owner typed the SAME text by hand and our echo is there too → ambiguous → send_unknown
+      - got state=sent id='MANUAL' error=''
+FAIL R10 [TG] only a row the transport marks as sent FROM THE PHONE (tapi from_where) with our text → send_unknown
+      - got state=sent id='MANUAL' error=''
+PASS R10 [TG] our echo in the same second as the trigger, listed above it (Wappi order breaks the tie) → sent
+FAIL R10 [TG] our echo in the same second as the trigger but listed BELOW it → not newer → send_unknown
+      - got state=sent id='ECHO' error=''
+PASS R10 [TG] no echo at all → send_unknown
+PASS R10 [TG] the reconcile fetch failed → send_unknown
+FAIL R10 [TG] end to end: a crossed window after a lost send leaves the ledger send_unknown, no ai history row
+      - outcome=sent ledger={'TRIG': 'sent'}
+      - history=[('TRIG', 'client'), ('FOREIGN', 'ai')]
+      - last_sent_message_id=[{'last_sent_message_id': 'FOREIGN'}]
+
+12 pass, 20 fail

@@ -156,11 +156,29 @@ return [{ json: { state, unknown: state === 'send_unknown', transportMessageId, 
 RECONCILE_JS = r"""// RECONCILE (A7): the transport may have accepted the message although its answer was lost. Look for
 // OUR text as an outgoing row after the send started; found ⇒ sent (adopt its id), else the state stays
 // send_unknown for the owner to see. Never resend here.
+// R10: Final Check's rules, stricter — here a false «sent» hides a lost reply. Rows naming a FOREIGN chat are
+// dropped (Wappi/tapi cross concurrent responses); the window must hold the TRIGGER (a crossed window without
+// chatId fields fails here); the echo must be newer than the trigger in the window's order (time desc, Wappi
+// order on ties); a row the transport marks as sent from the phone (tapi from_where) is the owner's, not ours;
+// and EXACTLY ONE distinct row may match — none or several (the owner typed the same text) stay send_unknown.
 const s = $('Settle Send').first().json;
-const rows = ($json.messages || []).filter(m => m && m.fromMe === true && typeof m.body === 'string');
-const hit = rows.find(m => m.body.trim() === String(s.text).trim() && (m.time || 0) >= (Number(s.sendStartedAt) - 5));
+const trig = $('Webhook').first().json.body.messages[0];
+const fetchedAll = ($json.messages || []).filter(m => m && typeof m === 'object');
+const fetched = fetchedAll.filter(m => !(m.chatId && trig.chatId && m.chatId !== trig.chatId));
+fetched.forEach((m, i) => { m.__i = i; });
+fetched.sort((a, b) => ((b.time || 0) - (a.time || 0)) || ((a.__i || 0) - (b.__i || 0)));
+const trigIdx = fetched.findIndex(m => m.id === trig.id);
+const ours = m => m.fromMe === true && typeof m.body === 'string' && m.from_where !== 'phone'
+  && m.body.trim() === String(s.text).trim() && (m.time || 0) >= (Number(s.sendStartedAt) - 5);
+const cands = [];
+for (const m of (trigIdx < 0 ? [] : fetched.slice(0, trigIdx))) {
+  if (ours(m) && !cands.some(x => String(x.id) === String(m.id))) cands.push(m);
+}
+const hit = cands.length === 1 ? cands[0] : null;
+const why = trigIdx < 0 ? 'reconcile: window without the trigger' : (cands.length > 1 ? 'reconcile: ambiguous echo (' + cands.length + ' rows)' : '');
 return [{ json: { state: hit ? 'sent' : 'send_unknown', transportMessageId: hit ? String(hit.id || '') : '',
-                  error: hit ? '' : s.error, reconciled: !!hit }, pairedItem: { item: 0 } }];
+                  error: hit ? '' : [s.error, why].filter(Boolean).join(' | ').slice(0, 300), reconciled: !!hit,
+                  foreignFetched: fetchedAll.length - fetched.length }, pairedItem: { item: 0 } }];
 """
 
 CANCEL_LABEL_JS = r"""// CANCEL LABEL: one place that names why a reply did not go out, from whichever gate refused it.
@@ -408,7 +426,8 @@ def check():
                 "Record Send", "Cancel Label", "Record Cancel")
             # Claim / Record Send / Record Cancel / Cancel Label are re-shaped by apply-history-handoff.py (stage 4) — not compared here.
         if any(node(wf, n) is None for n in need) or LATEST_COMBINE_PATCH_NEW not in node(wf, "Latest+Combine")["parameters"]["jsCode"] \
-                or node(wf, "Acquire Send Lease")["parameters"]["query"] != ACQUIRE_SQL or node(wf, "Final Check")["parameters"]["jsCode"] != FINAL_CHECK_JS:
+                or node(wf, "Acquire Send Lease")["parameters"]["query"] != ACQUIRE_SQL or node(wf, "Final Check")["parameters"]["jsCode"] != FINAL_CHECK_JS \
+                or node(wf, "Reconcile Check")["parameters"]["jsCode"] != RECONCILE_JS:
             bad.append(f)
     return bad
 
