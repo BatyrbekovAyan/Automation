@@ -11,9 +11,13 @@ over, plus the clone's credential ids per credential TYPE (prod and staging bind
 Files, mode rows, history, billing and the workflow id are untouched — they live in the database
 and are keyed by profile/workflow id, both preserved.
 
-Idempotent: every updated clone carries a `Template Version` sticky note (n8n's `meta` is read-only on
-PUT) holding `crTemplateVersion: <hash>` — a content hash of the canonical graph with the identity fields
-blanked; a clone already at that stamp is skipped. Re-running after a successful apply changes nothing.
+Idempotent by GRAPH (review D1, 2026-09-27): a clone is up to date when its stored graph AND the graph n8n
+publishes (`activeVersion`) both hash to the template's `graph_stamp` — node name/type/version/parameters plus
+the non-default behaviour keys (disabled/onError/alwaysOutputData/…) and the connections, with the identity
+fields blanked. Such a clone is skipped whether or not it carries a sticky (a fresh Create-made bot has none).
+Every updated clone still gets a `Template Version` sticky note (n8n's `meta` is read-only on PUT) holding
+`crTemplateVersion: <graph_stamp>`, but that is a label only: a sticky over an edited graph is reported
+(«sticky claims X but the graph is Y») and updated. Re-running after a successful apply changes nothing.
 
     python3 Tools/n8n/update-clones.py                                   # dry-run on the default base (prod, READ-ONLY)
     python3 Tools/n8n/update-clones.py --base http://localhost:5678 --apply --yes          # staging
@@ -147,21 +151,82 @@ def is_clone(wf, canonical_ids):
     return node(wf, "Webhook") is not None and node(wf, "AI Agent") is not None and node(wf, "Chat Memory") is not None and channel_of(wf) is not None
 
 
-def template_stamp(tpl):
-    """Content hash of the canonical graph with the identity fields blanked — the version a clone carries."""
-    t = copy.deepcopy(tpl)
-    t["nodes"] = real_nodes(t)
-    for n in t["nodes"]:
-        n.pop("id", None)
-        n.pop("position", None)
-        if n["name"] == "Webhook":
-            n["parameters"]["path"] = ""
-            n.pop("webhookId", None)
-        if n["name"] == "AI Agent":
-            n["parameters"].setdefault("options", {})["systemMessage"] = ""
-        n.pop("credentials", None)
-    blob = json.dumps({"nodes": sorted(t["nodes"], key=lambda n: n["name"]), "connections": t["connections"]}, sort_keys=True, ensure_ascii=False)
+# Node keys that change what a node DOES. n8n omits them at their defaults, so only a NON-default value is part of
+# the graph: a node disabled by hand in the editor, or one that lost its onError, is a different graph.
+BEHAVIOUR_KEYS = {"disabled": False, "onError": "stopWorkflow", "alwaysOutputData": False, "executeOnce": False,
+                  "retryOnFail": False, "maxTries": 3, "waitBetweenTries": 1000, "continueOnFail": False}
+
+
+def node_signature(n):
+    """What a node IS for every graph comparison (this tool, verify-deployed.py, deploy-canonical.py): name, type,
+    version, parameters and the non-default behaviour keys. Never node ids, positions, credentials (bound per
+    instance) or webhookIds (n8n mints them on create)."""
+    m = {"name": n.get("name"), "type": n.get("type"), "typeVersion": n.get("typeVersion"),
+         "parameters": copy.deepcopy(n.get("parameters") or {})}
+    for k, default in BEHAVIOUR_KEYS.items():
+        if k in n and n[k] != default:
+            m[k] = n[k]
+    return m
+
+
+def graph_stamp(wf):
+    """Content hash of a workflow's REAL graph with the per-bot identity blanked (Webhook path, AI Agent
+    systemMessage). The SAME function hashes the template and a live clone — draft or published version — so
+    `graph_stamp(clone) == graph_stamp(template)` is the proof a clone runs the canonical graph. A clone made by
+    Create WA/TG carries no sticky and is still at canonical; a sticky over an edited graph is not."""
+    nodes = []
+    for n in real_nodes(wf):
+        m = node_signature(n)
+        if m["name"] == "Webhook":
+            m["parameters"]["path"] = ""
+        if m["name"] == "AI Agent":
+            m["parameters"].setdefault("options", {})["systemMessage"] = ""
+        nodes.append(m)
+    blob = json.dumps({"nodes": sorted(nodes, key=lambda x: x["name"]), "connections": wf.get("connections") or {}},
+                      sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(blob.encode()).hexdigest()[:12]
+
+
+def template_stamp(tpl):
+    """The version value the `Template Version` sticky carries = the template's graph_stamp. The sticky is only a
+    label for humans: every up-to-date decision compares graphs (clone_state)."""
+    return graph_stamp(tpl)
+
+
+def published_graph(full):
+    """The graph n8n SERVES for an active workflow — the public API's `activeVersion` (n8n 2.x). None when the
+    workflow is not active or the response carries no published version (then callers fall back to ids)."""
+    av = full.get("activeVersion")
+    if full.get("active") and isinstance(av, dict) and av.get("nodes") is not None:
+        return {"nodes": av.get("nodes") or [], "connections": av.get("connections") or {}}
+    return None
+
+
+def published_matches(full, same_graph):
+    """Does the SERVED graph satisfy `same_graph(graph) -> bool`? None when nothing is served (inactive) or the
+    instance reports neither activeVersion nor version ids; with ids only, published == stored is required."""
+    if not full.get("active"):
+        return None
+    pub = published_graph(full)
+    if pub is not None:
+        return bool(same_graph(pub))
+    av, vid = full.get("activeVersionId"), full.get("versionId")
+    if av and vid:
+        return av == vid and bool(same_graph(full))
+    return None
+
+
+def clone_state(full, tpl_stamp):
+    """One clone judged by its graphs: the stored (draft) graph and the published one against the template; what
+    the sticky merely CLAIMS is reported beside it, never trusted."""
+    graph = graph_stamp(full)
+    claimed = stamp_of(full)
+    pub = published_graph(full)
+    published_ok = published_matches(full, lambda g: graph_stamp(g) == tpl_stamp)
+    return {"graph_stamp": graph, "published_stamp": graph_stamp(pub) if pub is not None else None, "stamp": claimed,
+            "stamp_consistent": claimed is None or claimed == graph, "at_canonical": graph == tpl_stamp,
+            "published_at_canonical": published_ok is not False,
+            "up_to_date": graph == tpl_stamp and published_ok is not False, "archived": bool(full.get("isArchived"))}
 
 
 def credentials_by_type(wf):
@@ -201,8 +266,7 @@ def node_diff(clone, target):
     removed = sorted(set(cn) - set(tn))
     changed = []
     for name in sorted(set(cn) & set(tn)):
-        a, b = cn[name], tn[name]
-        if a.get("type") != b.get("type") or a.get("typeVersion") != b.get("typeVersion") or a.get("parameters") != b.get("parameters"):
+        if node_signature(cn[name]) != node_signature(tn[name]):   # the same per-node definition graph_stamp hashes
             changed.append(name)
     conn_changed = clone.get("connections") != target["connections"]
     return added, removed, changed, conn_changed
@@ -257,10 +321,16 @@ def main():
         summary["clones"] += 1
         ch = channel_of(full)
         stamp = stamps[ch]
-        if stamp_of(full) == stamp:
+        cs = clone_state(full, stamp)
+        if cs["up_to_date"]:   # by GRAPH (stored + published), never by the sticky alone
             summary["up_to_date"] += 1
-            print(f"= {full['id']} {full['name']!r} [{ch}] up to date ({stamp})")
+            note = "" if cs["stamp"] in (None, stamp) else f"; sticky claims {cs['stamp']}"
+            print(f"= {full['id']} {full['name']!r} [{ch}] up to date ({stamp}, graph-verified{note})")
             continue
+        if not cs["stamp_consistent"]:
+            print(f"! {full['id']} {full['name']!r} sticky claims {cs['stamp']} but the graph is {cs['graph_stamp']} (template {stamp})")
+        if cs["at_canonical"] and not cs["published_at_canonical"]:
+            print(f"! {full['id']} {full['name']!r} stored graph is canonical but the PUBLISHED one is {cs['published_stamp']} — the apply re-publishes it")
         target = build_target(full, tpls[ch])
         added, removed, changed, conn = node_diff(full, target)
         print(f"~ {full['id']} {full['name']!r} [{ch}] active={full.get('active')} → +{len(added)} -{len(removed)} ~{len(changed)} conn={'changed' if conn else 'same'}")

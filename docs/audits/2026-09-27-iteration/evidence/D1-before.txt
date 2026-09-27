@@ -1,0 +1,68 @@
+$ python3 Tools/n8n/tests/test_verify_deployed.py   # HEAD dbbeb0b1: verify-deployed.py + update-clones.py as committed (before the D1 fix)
+PASS D1 control: healthy canonical set, no clones -> exit 0
+FAIL D1 prod 2026-09-25 (production-readback.json): fresh «23» without sticky is AT-CANONICAL, archived «13» listed apart -> exit 0
+      - exit 2: {'canonical_not_ok': [], 'clones': [('23', False, None), ('13', False, None)], 'archived': []}
+      - «23» must be at canonical by its graph: {'id': 'dt6hHFUVrW07unTj', 'name': '23', 'channel': 'whatsapp', 'active': True, 'stamp': None, 'at_canonical': False, 'nodes': 56}
+      - archived clones must be reported separately: {'canonical_not_ok': [], 'clones': [('23', False, None), ('13', False, None)], 'archived': []}
+FAIL D1 fresh TG clone (re-ided nodes, instance credential ids) + edited WA bot + inactive (channels off) clone -> exit 0
+      - exit 2: {'canonical_not_ok': [], 'clones': [('tg', False, None), ('ed', False, None), ('off', False, None)], 'archived': []}
+      - tgFresh000000001 must be at canonical: {'id': 'tgFresh000000001', 'name': 'tg', 'channel': 'telegram', 'active': True, 'stamp': None, 'at_canonical': False, 'nodes': 56}
+      - waEdited00000001 must be at canonical: {'id': 'waEdited00000001', 'name': 'ed', 'channel': 'whatsapp', 'active': True, 'stamp': None, 'at_canonical': False, 'nodes': 56}
+      - waOff00000000001 must be at canonical: {'id': 'waOff00000000001', 'name': 'off', 'channel': 'whatsapp', 'active': False, 'stamp': None, 'at_canonical': False, 'nodes': 56}
+FAIL D1 draft moved in the editor (positions only) while the published graph is canonical -> OK, exit 0
+      - exit 2: {'id': 'SCLcpn6DMDG3Z4VN', 'file': 'SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json', 'present': True, 'active': True, 'names_match': True, 'graph_hash_live': '0c21cee2da00', 'graph_hash_canonical': '0c21cee2da00', 'params_match': True, 'published_is_stored': False, 'status': 'DIFF'}
+FAIL D1 staging base: derived set, Support Message left unbound ON PURPOSE, a staging bot clone -> exit 0; inactive webhook still -> 2
+      - exit 2: {'canonical_not_ok': [], 'clones': [('Staging WA', False, None)], 'archived': []}
+      - exit 2: {'id': 'crWappiProxy0001', 'file': 'crWappiProxy0001-Wappi_Proxy.json', 'present': True, 'active': False, 'names_match': True, 'graph_hash_live': '9481b37883ba', 'graph_hash_canonical': '9481b37883ba', 'params_match': True, 'published_is_stored': None, 'status': 'OK'}
+FAIL D1 NEG forged correct sticky on a drifted clone graph -> BEHIND, «sticky claims … graph is …», exit 2
+      - exit 0: {'canonical_not_ok': [], 'clones': [('drift', True, '5a8d64886018')], 'archived': []}
+      - the drifted clone must not pass on its sticky: {'id': 'cloneDrift000001', 'name': 'drift', 'channel': 'whatsapp', 'active': True, 'stamp': '5a8d64886018', 'at_canonical': True, 'nodes': 56}
+      - the report must say the sticky claims one version while the graph is another:
+=True
+  OK      fXYpCXPKw92EzRz8 fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json  active=True names=True params=True published=True
+  OK      hHwvfOvTCS42pXnq hHwvfOvTCS42pXnq-Landing_Lead.json  active=True names=True params=True published=True
+  OK      jtbssfzXbOxwTK4k jtbssfzXbOxwTK4k-Get_Usage.json  active=True names=True params=True published=True
+  OK      lmjYsdNcQA2IE5rl lmjYsdNcQA2IE5rl-Delete_Bot_Files.json  active=True names=True params=True published=True
+  OK      olmqWMfcFpCEcpiE olmqWMfcFpCEcpiE-Support_
+FAIL D1 NEG inactive required webhook (Wappi Proxy imported, never activated) -> DIFF, exit 2
+      - exit 0: {'id': 'crWappiProxy0001', 'file': 'crWappiProxy0001-Wappi_Proxy.json', 'present': True, 'active': False, 'names_match': True, 'graph_hash_live': 'dbca199e75c3', 'graph_hash_canonical': 'dbca199e75c3', 'params_match': True, 'published_is_stored': None, 'status': 'OK'}
+FAIL D1 NEG a clone template switched on (templates must stay inactive) -> DIFF, exit 2
+      - exit 0: {'id': '4wYitz5ek30SVNlT', 'file': '4wYitz5ek30SVNlT-WhatsApp_Bot.json', 'present': True, 'active': True, 'names_match': True, 'graph_hash_live': 'aeaaba90cddc', 'graph_hash_canonical': 'aeaaba90cddc', 'params_match': True, 'published_is_stored': True, 'status': 'OK'}
+FAIL D1 NEG clone: canonical draft, but the PUBLISHED graph is the drifted one -> not at canonical, exit 2
+      - exit 0: {'id': 'cloneUnpub000001', 'name': 'unpub', 'channel': 'whatsapp', 'active': True, 'stamp': '5a8d64886018', 'at_canonical': True, 'nodes': 56}
+PASS D1 NEG canonical workflow: canonical draft, published graph has the Auth Gate bypassed -> DIFF, exit 2
+FAIL D1 NEG Support Message: chat id bound AND an extra edit (Validate clamp removed) -> DIFF, exit 2
+      - exit 0: {'id': 'olmqWMfcFpCEcpiE', 'file': 'olmqWMfcFpCEcpiE-Support_Message.json', 'present': True, 'active': True, 'names_match': True, 'graph_hash_live': '49828945cfe9', 'graph_hash_canonical': 'f48fb5228bf1', 'params_match': False, 'published_is_stored': True, 'status': 'OK', 'note': 'recipient chat id replaces __CHAT_ID__'}
+FAIL D1 NEG Support Message: connections rewired (Webhook -> Send, no gate/validation) hidden behind SUBSTITUTED -> DIFF, exit 2
+      - exit 0: {'id': 'olmqWMfcFpCEcpiE', 'file': 'olmqWMfcFpCEcpiE-Support_Message.json', 'present': True, 'active': True, 'names_match': True, 'graph_hash_live': '67548dba6c44', 'graph_hash_canonical': 'f48fb5228bf1', 'params_match': False, 'published_is_stored': True, 'status': 'OK', 'note': 'recipient chat id replaces __CHAT_ID__'}
+FAIL D1 NEG Support Message deployed with the placeholder chat id (substitution not applied) -> DIFF, exit 2
+      - exit 0: {'id': 'olmqWMfcFpCEcpiE', 'file': 'olmqWMfcFpCEcpiE-Support_Message.json', 'present': True, 'active': True, 'names_match': True, 'graph_hash_live': 'f48fb5228bf1', 'graph_hash_canonical': 'f48fb5228bf1', 'params_match': True, 'published_is_stored': True, 'status': 'OK'}
+FAIL D1 NEG Set Workflow State: Auth Gate bypassed (Webhook -> Validate) -> DIFF, exit 2
+      - exit 0: {'id': '0DP79STI3pafXO9B', 'file': '0DP79STI3pafXO9B-Set_Workflow_State.json', 'present': True, 'active': True, 'names_match': True, 'graph_hash_live': '8ff777fcad23', 'graph_hash_canonical': '5d0380a24937', 'params_match': False, 'published_is_stored': True, 'status': 'OK', 'note': 'admin-API credential id is instance-bound'}
+FAIL D1 NEG Set Workflow State: PROTECTED list lost the stage-7 ids -> DIFF, exit 2
+      - exit 0: {'id': '0DP79STI3pafXO9B', 'file': '0DP79STI3pafXO9B-Set_Workflow_State.json', 'present': True, 'active': True, 'names_match': True, 'graph_hash_live': '6b0a456e695b', 'graph_hash_canonical': '5d0380a24937', 'params_match': False, 'published_is_stored': True, 'status': 'OK', 'note': 'admin-API credential id is instance-bound'}
+FAIL D1 NEG a node disabled by hand (Wappi Proxy Auth Gate) -> DIFF, exit 2
+      - exit 0: {'id': 'crWappiProxy0001', 'file': 'crWappiProxy0001-Wappi_Proxy.json', 'present': True, 'active': True, 'names_match': True, 'graph_hash_live': 'dbca199e75c3', 'graph_hash_canonical': 'dbca199e75c3', 'params_match': True, 'published_is_stored': True, 'status': 'OK'}
+FAIL D1 NEG Test Dialog imported with its credential placeholder unbound -> DIFF, exit 2
+      - exit 0: {'id': 'crTestDialog0001', 'file': 'crTestDialog0001-Test_Dialog.json', 'present': True, 'active': True, 'names_match': True, 'graph_hash_live': '035077151271', 'graph_hash_canonical': '035077151271', 'params_match': True, 'published_is_stored': True, 'status': 'OK'}
+FAIL D1 NEG an ARCHIVED canonical workflow is not a running one -> DIFF, exit 2
+      - exit 0: {'id': 'crWappiProxy0001', 'file': 'crWappiProxy0001-Wappi_Proxy.json', 'present': True, 'active': True, 'names_match': True, 'graph_hash_live': 'dbca199e75c3', 'graph_hash_canonical': 'dbca199e75c3', 'params_match': True, 'published_is_stored': True, 'status': 'OK'}
+PASS D1 NEG the archive exemption is not blanket: a LIVE clone on the old graph still fails -> exit 2
+FAIL D1 update-clones: fresh «23» (no sticky, canonical graph) is up to date — no needless PUT + re-activate of a live bot
+      - {'clones': 1, 'up_to_date': 0, 'would_update': 1, 'updated': 0, 'failed': 0}
+FAIL D1 update-clones: forged sticky over a drifted graph is planned for update (drift is repairable)
+      - {'clones': 1, 'up_to_date': 1, 'would_update': 0, 'updated': 0, 'failed': 0}
+      - the dry-run must name the lying sticky:
+base https://prod.fake.invalid · mode dry-run · template stamps {'whatsapp': '5a8d64886018', 'telegram': 'fc945ae016cc'}
+= cloneDrift000001 'd' [whatsapp] up to date (5a8d64886018)
+{"clones": 1, "up_to_date": 1, "would_update": 0, "updated": 0, "failed": 0}
+
+FAIL D1 update-clones: canonical draft + stale PUBLISHED graph is planned for update (the apply re-publishes)
+      - {'clones': 1, 'up_to_date': 1, 'would_update': 0, 'updated': 0, 'failed': 0}
+PASS D1 update-clones: a clone rebuilt by build_target is up to date by its GRAPH (no endless would_update)
+FAIL D1 deploy-canonical (shares graph_hash): healthy set is up to date; a hand-disabled node is planned for re-deploy
+      - {'considered': 24, 'missing': 0, 'up_to_date': 24, 'would_update': 0, 'updated': 0, 'failed': 0}
+PASS D1 update-clones: archived clones are skipped, never counted as clones
+
+5 pass, 20 fail
+exit=1
