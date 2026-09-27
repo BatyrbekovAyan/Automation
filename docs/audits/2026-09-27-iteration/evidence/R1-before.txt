@@ -1,0 +1,36 @@
+# R1 before — the final Tools/n8n/tests/test_claim.py run against the canonical JSON at HEAD c7216f99 (git show HEAD:… into a temp dir; real SQL on staging PG session temp tables with a real clock, real Claim Decide/Build Request JS, If conditions by n8n's expression engine)
+FAIL R1 S1: the owner re-pairs its own profile while a stranger holds a pending claim -> the stranger gets nothing
+      - owner changed to inst-A ({'op': 'claim.status', 'profileId': 'P1', 'channel': 'whatsapp', 'installId': 'inst-A', 'statusCode': 200, 'claimMethod': 'reauth', 'claimError': None, 'code': None, 'codeHash': None, 'phone': None, 'authorizedEpoch': 1790516498})
+      - stranger's token owns P1: {'install_id': 'inst-A', 'app_user_id': None, 'token_version': 1, 'p': ['P1'], 'w': [], 'c': []}
+      - bind ran: [{'profile_id': 'P1'}]
+PASS R1 S2: a legacy profile re-paired BY the claimant through the proxy binds to the claimant (legit recovery)
+FAIL R1 S3: a stranger takes over the pending claim while the claimant pairs -> nobody is bound
+      - owner=inst-A A={'op': 'claim.status', 'profileId': 'P3', 'channel': 'whatsapp', 'installId': 'inst-A', 'statusCode': 200, 'claimMethod': 'reauth', 'claimError': None, 'code': None, 'codeHash': None, 'phone': None, 'authorizedEpoch': 1790516509} bound=[{'profile_id': 'P3'}]
+FAIL R1 S4: a claim older than a day records no pairing and its old pairing never binds; a renewed claim needs a NEW pairing
+      - an expired claim must not record a pairing
+      - an expired claim's pairing bound: {'op': 'claim.status', 'profileId': 'P4', 'channel': 'whatsapp', 'installId': 'inst-L', 'statusCode': 200, 'claimMethod': 'reauth', 'claimError': None, 'code': None, 'codeHash': None, 'phone': None, 'authorizedEpoch': 1790516516} [{'profile_id': 'P4'}]
+      - the renewed claim must carry a fresh clock: None
+FAIL R1 S5: a stale claim capability (the claim was taken over) cannot start a pairing through the proxy
+      - stale capability reached the transport: wappi
+FAIL R1 S7: claim.status never mints or sends a code (no unsolicited codes / phishing aid)
+      - claim.status sent codes ['917283', '631453', '292804'] / minted 374449
+PASS R1 S8: transfer by code on reinstall — wrong / expired / replayed codes change nothing, the right code transfers
+FAIL R1 S9: two concurrent claims — only the proof (the code from the bot's own chat) binds; the racing claimant without it changes nothing
+      - the racing claimant moved the owner: inst-A
+FAIL R1 S10: an unauthenticated claim.* call never reaches Claim Start (no pending claim / row written before the refusal)
+      - Claim Start must be reachable only from Install Verified? (true): [('Claim Op?', 0)]
+
+2 pass, 7 fail
+
+# R1 before (staging e2e, n8n 2.36.7 running the pre-R1 Auth Session + Wappi Proxy)
+PASS  claim_by_code_transfers_ownership (0.5s) — a legacy/other-install profile: claim.start sends a code to the bot's OWN chat; claim.verify binds it to the claiming install
+      recipient_is_own_phone=True second_start_reuses_code=True wrong_code=403 verify=200 now_owned_by_A=True B_lost_it=True
+PASS  claim_by_reauth_binds_after_pairing (1.7s) — an UNAUTHORISED legacy profile: claim.start → reauth; only a pairing AFTER the claim binds it (claim.status)
+      qr_allowed=200 chats_refused=403 before_pairing_owned=False after_pairing_owned=True
+FAIL  claim_reauth_owned_profile_not_transferred (2.3s) — R1: a stranger's pending claim on an OWNED profile + the owner's own later re-pairing → the stranger gets nothing, claim.status sends no code, the owner keeps the profile
+      stranger start=200/code owner_qr=200 stranger status=200 got_it=True codes_sent_by_status=0 owner_keeps=False (codes in chat total 1)
+FAIL  claim_stale_capability_cannot_pair (1.0s) — R1: once another install takes over a pending claim, the first claimant's token capability no longer starts a pairing (403 claim_not_pending, no transport call)
+      L start=200 takeover=200 L qr=200 {'status': 'done', 'qr': 'MOCK'} transport_calls=1
+FAIL  claim_unauthenticated_writes_nothing (1.0s) — R1: a claim.* call with a wrong secret is refused (401) before Claim Start — no row inserted, a pending claim untouched
+      wrong-secret=401/install_revoked ghost=401 rows_for_new_id=1 pending_unchanged=False
+2 pass, 3 fail

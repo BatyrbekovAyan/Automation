@@ -86,7 +86,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// WAPPI PROXY / Build Request (generated — see build-auth-workflows.py). Allow-listed operations\n// only: every op maps to ONE Wappi endpoint with validated parameters; the profile named by the\n// request must be owned by the token's install (or be a pending legacy claim for the auth ops).\nconst g = $input.first().json;\nconst claims = g.crAuth || {};\nconst b = (g.body && typeof g.body === 'object') ? g.body : {};\nconst BASE = { whatsapp: 'https://wappi.pro/api/', telegram: 'https://wappi.pro/tapi/' };\nconst ID = /^[A-Za-z0-9@._:+\\-]{1,128}$/;\nconst PHONE = /^\\d{7,15}$/;\nconst NAME = /^[\\p{L}\\p{N} _\\-.]{1,64}$/u;\nconst AUTH_OPS = new Set(['status', 'qr', 'auth.code', 'tg.auth.phone', 'tg.auth.code', 'tg.auth.2fa']);\nconst OPS = {\n  'profile.add':       { m: 'POST', path: 'profile/add', q: { name: ['name', NAME] }, noProfile: true, needsBilling: true },\n  'profile.delete':    { m: 'POST', path: 'profile/delete', q: { profile_id: 'pid' } },\n  'profile.logout':    { m: 'GET',  path: 'profile/logout', q: { profile_id: 'pid' } },\n  'status':            { m: 'GET',  path: 'sync/get/status', q: { profile_id: 'pid' } },\n  'qr':                { m: 'GET',  path: { whatsapp: 'sync/qr/get', telegram: 'sync/auth/qr' }, q: { profile_id: 'pid' } },\n  'auth.code':         { m: 'GET',  path: 'sync/auth/code', q: { profile_id: 'pid', phone: ['phone', PHONE] }, only: 'whatsapp' },\n  'tg.auth.phone':     { m: 'POST', path: 'sync/auth/phone', q: { profile_id: 'pid' }, body: { phone: ['phone', PHONE] }, only: 'telegram' },\n  'tg.auth.code':      { m: 'POST', path: 'sync/auth/code', q: { profile_id: 'pid' }, body: { auth_code: ['auth_code', /^\\d{4,8}$/] }, only: 'telegram' },\n  'tg.auth.2fa':       { m: 'POST', path: 'sync/auth/2fa', q: { profile_id: 'pid' }, body: { pwd_code: ['pwd_code', 'text', 256] }, only: 'telegram' },\n  'chats.filter':      { m: 'GET',  path: 'sync/chats/filter', q: { profile_id: 'pid' } },\n  'messages.get':      { m: 'GET',  path: 'sync/messages/get', q: { profile_id: 'pid', chat_id: ['chat_id', ID], limit: ['limit', 'int', 200, 15], offset: ['offset', 'int', 100000, 0] } },\n  'messages.id.get':   { m: 'GET',  path: 'sync/messages/id/get', q: { profile_id: 'pid', message_id: ['message_id', ID] } },\n  'media.download':    { m: 'GET',  path: 'sync/message/media/download', q: { profile_id: 'pid', message_id: ['message_id', ID] }, timeout: 60000 },\n  'message.send':      { m: 'POST', path: 'sync/message/send', q: { profile_id: 'pid' }, body: { recipient: ['recipient', ID], body: ['body', 'text', 8192], quoted_message_id: ['quoted_message_id', ID, 'opt'] } },\n  'message.reply':     { m: 'POST', path: 'sync/message/reply', q: { profile_id: 'pid' }, body: { recipient: ['recipient', ID, 'opt'], body: ['body', 'text', 8192], message_id: ['message_id', ID] }, only: 'telegram' },\n  'message.mark_read': { m: 'POST', path: 'sync/message/mark/read', q: { profile_id: 'pid', mark_all: ['mark_all', 'bool', 'opt'] }, body: { message_id: ['message_id', ID] } },\n  'chat.delete':       { m: 'POST', path: 'sync/chat/delete', q: { profile_id: 'pid' }, body: { recipient: ['recipient', ID] } },\n  'message.reaction':  { m: 'POST', path: 'sync/message/reaction', q: { profile_id: 'pid' }, body: { body: ['body', 'text', 64], message_id: ['message_id', ID], recipient: ['recipient', ID, 'opt'] } },\n  'media.send':        { m: 'POST', path: { img: 'sync/message/img/send', video: 'sync/message/video/send', document: 'sync/message/document/send' }, q: { profile_id: 'pid' },\n                         body: { recipient: ['recipient', ID], caption: ['caption', 'text', 1024, 'opt'], file_name: ['file_name', 'text', 255, 'opt'], b64_file: ['b64_file', 'text', 24 * 1024 * 1024] }, kind: true, timeout: 300000 },\n};\nconst deny = (status, error, detail) => [{ json: { ok: false, _status: status, error, detail: detail || null, op: String(b.op || '') }, pairedItem: { item: 0 } }];\nconst op = typeof b.op === 'string' ? b.op : '';\nconst spec = OPS[op];\nif (!spec) return deny(400, 'unknown_op');\nconst channel = (b.channel === 'telegram') ? 'telegram' : 'whatsapp';\nif (spec.only && spec.only !== channel) return deny(400, 'op_channel_mismatch');\nconst pid = typeof b.profile_id === 'string' ? b.profile_id : '';\nif (!spec.noProfile) {\n  if (!ID.test(pid)) return deny(400, 'bad_param', 'profile_id');\n  const owned = (claims.profiles || []).includes(pid);\n  const pending = AUTH_OPS.has(op) && (claims.claimPending || []).includes(pid);\n  if (!owned && !pending) return deny(403, 'forbidden', 'profile_id');\n}\nif (spec.needsBilling && !claims.appUserId) return deny(409, 'no_billing_identity');\nconst take = (dest, key, rule) => {\n  if (rule === 'pid') { dest[key] = pid; return null; }\n  const [field, kind, a, bb] = rule;\n  const opt = rule.includes('opt');\n  const v = b[field];\n  if (v === undefined || v === null || v === '') {\n    if (kind === 'int' && bb !== undefined) { dest[key] = bb; return null; }   // int rules carry a default\n    if (opt) return null;\n    return 'missing:' + field;\n  }\n  if (kind === 'int') { const n = Number.parseInt(v, 10); if (!Number.isFinite(n) || n < 0 || n > a) return 'bad:' + field; dest[key] = n; return null; }\n  if (kind === 'bool') { if (v === true || v === 'true') dest[key] = 'true'; return null; }   // absent when false (byte-parity with the old queries)\n  if (kind === 'text') { if (typeof v !== 'string' || v.length > a) return 'bad:' + field; dest[key] = v; return null; }\n  if (kind instanceof RegExp) { if (typeof v !== 'string' || !kind.test(v)) return 'bad:' + field; dest[key] = v; return null; }\n  return 'bad:' + field;\n};\nconst query = {}, body = {};\nfor (const [k, rule] of Object.entries(spec.q || {})) { const e = take(query, k, rule); if (e) return deny(400, 'bad_param', e); }\nfor (const [k, rule] of Object.entries(spec.body || {})) { const e = take(body, k, rule); if (e) return deny(400, 'bad_param', e); }\nlet path = spec.path;\nif (spec.kind) { const kind = String(b.kind || ''); if (!path[kind]) return deny(400, 'bad_param', 'kind'); path = path[kind]; }\nelse if (typeof path === 'object') path = path[channel];\nreturn [{ json: { ok: true, _status: 200, op, channel, profileId: pid, method: spec.m, url: BASE[channel] + path, query,\n  jsonBody: spec.body ? body : {}, sendBody: !!spec.body, timeout: spec.timeout || 30000 }, pairedItem: { item: 0 } }];\n"
+        "jsCode": "// WAPPI PROXY / Build Request (generated — see build-auth-workflows.py). Allow-listed operations\n// only: every op maps to ONE Wappi endpoint with validated parameters; the profile named by the\n// request must be owned by the token's install (or be a pending legacy claim for the auth ops).\nconst g = $input.first().json;\nconst claims = g.crAuth || {};\nconst b = (g.body && typeof g.body === 'object') ? g.body : {};\nconst BASE = { whatsapp: 'https://wappi.pro/api/', telegram: 'https://wappi.pro/tapi/' };\nconst ID = /^[A-Za-z0-9@._:+\\-]{1,128}$/;\nconst PHONE = /^\\d{7,15}$/;\nconst NAME = /^[\\p{L}\\p{N} _\\-.]{1,64}$/u;\nconst AUTH_OPS = new Set(['status', 'qr', 'auth.code', 'tg.auth.phone', 'tg.auth.code', 'tg.auth.2fa']);\n// R1: the ops that START or advance a pairing. On a claim-pending (not owned) profile they run only after\n// Record Claim Pairing has written, in the database, that THIS install started the pairing — the proof\n// Bind Reauthed Profile requires (a `c` in a 12-hour token is not: the claim may have been taken over since).\nconst PAIR_OPS = new Set(['qr', 'auth.code', 'tg.auth.phone', 'tg.auth.code', 'tg.auth.2fa']);\nconst OPS = {\n  'profile.add':       { m: 'POST', path: 'profile/add', q: { name: ['name', NAME] }, noProfile: true, needsBilling: true },\n  'profile.delete':    { m: 'POST', path: 'profile/delete', q: { profile_id: 'pid' } },\n  'profile.logout':    { m: 'GET',  path: 'profile/logout', q: { profile_id: 'pid' } },\n  'status':            { m: 'GET',  path: 'sync/get/status', q: { profile_id: 'pid' } },\n  'qr':                { m: 'GET',  path: { whatsapp: 'sync/qr/get', telegram: 'sync/auth/qr' }, q: { profile_id: 'pid' } },\n  'auth.code':         { m: 'GET',  path: 'sync/auth/code', q: { profile_id: 'pid', phone: ['phone', PHONE] }, only: 'whatsapp' },\n  'tg.auth.phone':     { m: 'POST', path: 'sync/auth/phone', q: { profile_id: 'pid' }, body: { phone: ['phone', PHONE] }, only: 'telegram' },\n  'tg.auth.code':      { m: 'POST', path: 'sync/auth/code', q: { profile_id: 'pid' }, body: { auth_code: ['auth_code', /^\\d{4,8}$/] }, only: 'telegram' },\n  'tg.auth.2fa':       { m: 'POST', path: 'sync/auth/2fa', q: { profile_id: 'pid' }, body: { pwd_code: ['pwd_code', 'text', 256] }, only: 'telegram' },\n  'chats.filter':      { m: 'GET',  path: 'sync/chats/filter', q: { profile_id: 'pid' } },\n  'messages.get':      { m: 'GET',  path: 'sync/messages/get', q: { profile_id: 'pid', chat_id: ['chat_id', ID], limit: ['limit', 'int', 200, 15], offset: ['offset', 'int', 100000, 0] } },\n  'messages.id.get':   { m: 'GET',  path: 'sync/messages/id/get', q: { profile_id: 'pid', message_id: ['message_id', ID] } },\n  'media.download':    { m: 'GET',  path: 'sync/message/media/download', q: { profile_id: 'pid', message_id: ['message_id', ID] }, timeout: 60000 },\n  'message.send':      { m: 'POST', path: 'sync/message/send', q: { profile_id: 'pid' }, body: { recipient: ['recipient', ID], body: ['body', 'text', 8192], quoted_message_id: ['quoted_message_id', ID, 'opt'] } },\n  'message.reply':     { m: 'POST', path: 'sync/message/reply', q: { profile_id: 'pid' }, body: { recipient: ['recipient', ID, 'opt'], body: ['body', 'text', 8192], message_id: ['message_id', ID] }, only: 'telegram' },\n  'message.mark_read': { m: 'POST', path: 'sync/message/mark/read', q: { profile_id: 'pid', mark_all: ['mark_all', 'bool', 'opt'] }, body: { message_id: ['message_id', ID] } },\n  'chat.delete':       { m: 'POST', path: 'sync/chat/delete', q: { profile_id: 'pid' }, body: { recipient: ['recipient', ID] } },\n  'message.reaction':  { m: 'POST', path: 'sync/message/reaction', q: { profile_id: 'pid' }, body: { body: ['body', 'text', 64], message_id: ['message_id', ID], recipient: ['recipient', ID, 'opt'] } },\n  'media.send':        { m: 'POST', path: { img: 'sync/message/img/send', video: 'sync/message/video/send', document: 'sync/message/document/send' }, q: { profile_id: 'pid' },\n                         body: { recipient: ['recipient', ID], caption: ['caption', 'text', 1024, 'opt'], file_name: ['file_name', 'text', 255, 'opt'], b64_file: ['b64_file', 'text', 24 * 1024 * 1024] }, kind: true, timeout: 300000 },\n};\nconst deny = (status, error, detail) => [{ json: { ok: false, _status: status, error, detail: detail || null, op: String(b.op || '') }, pairedItem: { item: 0 } }];\nconst op = typeof b.op === 'string' ? b.op : '';\nconst spec = OPS[op];\nif (!spec) return deny(400, 'unknown_op');\nconst channel = (b.channel === 'telegram') ? 'telegram' : 'whatsapp';\nif (spec.only && spec.only !== channel) return deny(400, 'op_channel_mismatch');\nconst pid = typeof b.profile_id === 'string' ? b.profile_id : '';\nlet claimPairing = false;\nif (!spec.noProfile) {\n  if (!ID.test(pid)) return deny(400, 'bad_param', 'profile_id');\n  const owned = (claims.profiles || []).includes(pid);\n  const pending = AUTH_OPS.has(op) && (claims.claimPending || []).includes(pid);\n  if (!owned && !pending) return deny(403, 'forbidden', 'profile_id');\n  claimPairing = !owned && PAIR_OPS.has(op);\n}\nif (spec.needsBilling && !claims.appUserId) return deny(409, 'no_billing_identity');\nconst take = (dest, key, rule) => {\n  if (rule === 'pid') { dest[key] = pid; return null; }\n  const [field, kind, a, bb] = rule;\n  const opt = rule.includes('opt');\n  const v = b[field];\n  if (v === undefined || v === null || v === '') {\n    if (kind === 'int' && bb !== undefined) { dest[key] = bb; return null; }   // int rules carry a default\n    if (opt) return null;\n    return 'missing:' + field;\n  }\n  if (kind === 'int') { const n = Number.parseInt(v, 10); if (!Number.isFinite(n) || n < 0 || n > a) return 'bad:' + field; dest[key] = n; return null; }\n  if (kind === 'bool') { if (v === true || v === 'true') dest[key] = 'true'; return null; }   // absent when false (byte-parity with the old queries)\n  if (kind === 'text') { if (typeof v !== 'string' || v.length > a) return 'bad:' + field; dest[key] = v; return null; }\n  if (kind instanceof RegExp) { if (typeof v !== 'string' || !kind.test(v)) return 'bad:' + field; dest[key] = v; return null; }\n  return 'bad:' + field;\n};\nconst query = {}, body = {};\nfor (const [k, rule] of Object.entries(spec.q || {})) { const e = take(query, k, rule); if (e) return deny(400, 'bad_param', e); }\nfor (const [k, rule] of Object.entries(spec.body || {})) { const e = take(body, k, rule); if (e) return deny(400, 'bad_param', e); }\nlet path = spec.path;\nif (spec.kind) { const kind = String(b.kind || ''); if (!path[kind]) return deny(400, 'bad_param', 'kind'); path = path[kind]; }\nelse if (typeof path === 'object') path = path[channel];\nreturn [{ json: { ok: true, _status: 200, op, channel, profileId: pid, method: spec.m, url: BASE[channel] + path, query,\n  jsonBody: spec.body ? body : {}, sendBody: !!spec.body, timeout: spec.timeout || 30000, claimPairing }, pairedItem: { item: 0 } }];\n"
       },
       "id": "ea52ee06-8726-5108-a8d3-91b2f7072f65",
       "name": "Build Request",
@@ -150,12 +150,12 @@
     },
     {
       "parameters": {
-        "method": "={{ $json.method }}",
-        "url": "={{ $json.url }}",
+        "method": "={{ $('Build Request').first().json.method }}",
+        "url": "={{ $('Build Request').first().json.url }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {
-          "timeout": "={{ $json.timeout }}",
+          "timeout": "={{ $('Build Request').first().json.timeout }}",
           "response": {
             "response": {
               "fullResponse": true,
@@ -166,10 +166,10 @@
         },
         "sendQuery": true,
         "specifyQuery": "json",
-        "jsonQuery": "={{ JSON.stringify($json.query) }}",
+        "jsonQuery": "={{ JSON.stringify($('Build Request').first().json.query) }}",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify($json.jsonBody || {}) }}"
+        "jsonBody": "={{ JSON.stringify($('Build Request').first().json.jsonBody || {}) }}"
       },
       "id": "8b19d4cf-2306-5852-ade4-02946ab5cb63",
       "name": "Wappi Call",
@@ -187,6 +187,116 @@
       },
       "alwaysOutputData": true,
       "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "524949ce-a65d-5bc9-8005-617b15182397",
+              "leftValue": "={{ $json.claimPairing === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "db457327-1710-51b4-a6c3-5fb19bfd6ec7",
+      "name": "Claim Pairing?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        990,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- R1: the claimant starts a pairing of a profile it is claiming. Recorded ONLY while this install holds the\n-- fresh (one day) claim on a still OWNER-LESS profile — a claim taken over by another install, expired or bound\n-- records nothing and the proxy refuses (claim_not_pending). The anchor stays put for 30 minutes of repeated\n-- pairing calls (QR refreshes, code -> 2FA), so a scan completing between two polls still counts as after it.\nupdate bot_profiles set claim_pair_by = $2,\n  claim_pair_at = case when claim_pair_by = $2 and claim_pair_at >= claim_pending_at and claim_pair_at > now() - interval '30 minutes'\n                       then claim_pair_at else now() end\nwhere profile_id = $1 and owner_id is null and deleted_at is null\n  and claim_pending_by = $2 and claim_pending_at > now() - interval '1 day'\nreturning profile_id;",
+        "options": {
+          "queryReplacement": "={{ [ $json.profileId, $('Auth Gate').first().json.crAuth.installId ] }}"
+        }
+      },
+      "id": "1ac20522-98ba-58a7-8930-33a0f1eb9593",
+      "name": "Record Claim Pairing",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        990,
+        -200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "dfc4b592-8fd2-536f-ba42-144f3d1ad7ee",
+              "leftValue": "={{ !!$json.profile_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "bc9f972e-b42a-5d25-8d00-2885ed569bd3",
+      "name": "Pairing Recorded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1100,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: $json.error ? 'db_unavailable' : 'claim_not_pending' } }}",
+        "options": {
+          "responseCode": "={{ $json.error ? 503 : 403 }}"
+        }
+      },
+      "id": "c03eff47-7c87-5e01-b1a9-6dfb77301c91",
+      "name": "Respond Claim Not Pending",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1320,
+        -400
+      ]
     },
     {
       "parameters": {
@@ -431,7 +541,7 @@
       "main": [
         [
           {
-            "node": "Wappi Call",
+            "node": "Claim Pairing?",
             "type": "main",
             "index": 0
           }
@@ -439,6 +549,53 @@
         [
           {
             "node": "Respond Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim Pairing?": {
+      "main": [
+        [
+          {
+            "node": "Record Claim Pairing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wappi Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Claim Pairing": {
+      "main": [
+        [
+          {
+            "node": "Pairing Recorded?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pairing Recorded?": {
+      "main": [
+        [
+          {
+            "node": "Wappi Call",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Claim Not Pending",
             "type": "main",
             "index": 0
           }

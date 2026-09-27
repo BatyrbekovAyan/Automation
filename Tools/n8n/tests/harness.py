@@ -113,6 +113,82 @@ def sql_json(body, setup=''):
     return json.loads(out[-1]) if out else None
 
 
+class PgSession:
+    """ONE psql session for a multi-step scenario whose steps interleave SQL and Code-node JS (a claim round trip).
+    Deliberately NOT one transaction: now() is frozen inside a transaction, and the scenarios test time order
+    (a pairing after a claim, a claim older than a day), so every statement autocommits with a real now().
+    Isolation is by SESSION TEMP TABLES first on the search_path (dropped by `discard temp` on close) — the
+    setup must create, as temp, EVERY table the scenario's SQL touches. Use as a context manager. `q(sql)`
+    returns the statement's rows as a list of dicts (wrapped in json_agg); `x(sql)` runs as is."""
+
+    def __init__(self, setup=''):
+        self.p = subprocess.Popen([str(PG), 'psql', '-X', '-q', '-t', '-A', '-P', 'pager=off'], stdin=subprocess.PIPE,
+                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+        self.n = 0
+        self.x('set search_path = pg_temp, public;\n' + setup)
+
+    def _run(self, sql):
+        self.n += 1
+        mark = f'__HARNESS_END_{self.n}__'
+        self.p.stdin.write(sql + '\n\\echo ' + mark + '\n')
+        self.p.stdin.flush()
+        out = []
+        while True:
+            line = self.p.stdout.readline()
+            if not line:
+                raise RuntimeError('psql died: ' + ''.join(out)[-2000:])
+            if line.strip() == mark:
+                break
+            out.append(line)
+        txt = ''.join(out).strip()
+        if 'ERROR' in txt:
+            raise RuntimeError(txt[-2000:])
+        return txt
+
+    def q(self, sql):
+        body = sql.strip().rstrip(';')
+        txt = self._run(f"with __r as ({body}) select coalesce(json_agg(__r), '[]'::json) from __r;")
+        return json.loads(txt) if txt else []
+
+    def x(self, sql):
+        return self._run(sql)
+
+    def close(self):
+        try:
+            self._run('discard temp;')
+        finally:
+            self.p.stdin.close()
+            self.p.wait()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        self.close()
+
+
+_EXPR = r"""const fs=require('fs'); const v=JSON.parse(fs.readFileSync(0,'utf8'));
+const N = process.env.N8N_MODULES || require('path').join(require('os').homedir(), '.n8n-staging/app/node_modules');
+const {evaluateExpression,setErrorHandler}=require(N + '/n8n-workflow/dist/cjs/expression-evaluator-proxy.js');
+setErrorHandler(e=>{throw e;});
+const named=v.named||{};
+const $=(n)=>{ if(!(n in named)) throw new TypeError('node not executed: '+n); const x=named[n]; const items=Array.isArray(x)?x.map(j=>({json:j})):[{json:x}];
+  return {first:()=>items[0], all:()=>items, item:items[0], last:()=>items[items.length-1]}; };
+let out; try { out = evaluateExpression(v.expr.replace(/^=/, ''), {$json: v.json, $, String, Array, RegExp, Math, Number, JSON, Boolean, Object, Date}); }
+catch (e) { if (e instanceof TypeError) out = null; else throw e; }
+process.stdout.write(JSON.stringify(out === undefined ? null : out));"""
+
+
+def expr(expression, json_=None, named=None):
+    """Evaluate an n8n parameter expression ('={{ … }}') with n8n's OWN engine (@n8n/tournament via n8n-workflow,
+    staging install = prod version); a TypeError renders as null like n8n's legacy engine."""
+    r = subprocess.run(['node', '-e', _EXPR], input=json.dumps({'expr': expression, 'json': json_ or {}, 'named': named or {}}),
+                       text=True, capture_output=True)
+    if r.returncode != 0:
+        raise RuntimeError('expression failed: ' + r.stderr.strip()[-1500:])
+    return json.loads(r.stdout)
+
+
 class Case:
     """Tiny collector: `with Case('R3 binary survives gate') as c: c.check(cond, detail)`."""
     results = []

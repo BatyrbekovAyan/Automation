@@ -165,17 +165,19 @@ from installs i where i.install_id = $1 and i.revoked_at is null;"""
 
 CLAIM_START_SQL = """-- A1 claim: register the intent. Legacy (unowned) profiles AND profiles owned by a previous install
 -- (reinstall / new phone) are claimable — ownership is proven by control of the channel itself
--- (code in the bot's own chat, or a fresh pairing), never by knowing an id. A still-valid code is
--- reused (no re-send inside its 10-minute window), which also bounds unsolicited codes.
+-- (code in the bot's own chat for any profile; for an OWNER-LESS profile also a fresh pairing the claimant
+-- itself started through the proxy — R1), never by knowing an id. A still-valid code is reused (no re-send
+-- inside its 10-minute window), which also bounds unsolicited codes. A claim lives one day.
 insert into bot_profiles (profile_id, app_user_id, channel, claim_pending_by, claim_pending_at)
 values ($1, coalesce(nullif($3, ''), $2), $4, $2, now())
 on conflict (profile_id) do update set
   claim_pending_by = case when bot_profiles.owner_id = $2 then bot_profiles.claim_pending_by else excluded.claim_pending_by end,
   -- the claim clock starts ONCE per claiming install: a repeated claim.* call (status polling) must not
-  -- move claim_pending_at, or a pairing done in between could never be "after the claim began"
+  -- move claim_pending_at, or a pairing done in between could never be "after the claim began". A claim
+  -- older than a day has expired (R1) — a new claim.start starts a new one instead of locking the install out.
   claim_pending_at = case
       when bot_profiles.owner_id = $2 then bot_profiles.claim_pending_at
-      when bot_profiles.claim_pending_by = $2 and bot_profiles.claim_pending_at is not null then bot_profiles.claim_pending_at
+      when bot_profiles.claim_pending_by = $2 and bot_profiles.claim_pending_at > now() - interval '1 day' then bot_profiles.claim_pending_at
       else now() end
 returning profile_id, owner_id, channel, claim_pending_by, extract(epoch from claim_pending_at)::bigint as claim_pending_epoch,
   (claim_code_expires_at is not null and claim_code_expires_at > now()) as code_still_valid;"""
@@ -191,9 +193,17 @@ update bot_profiles set owner_id = $2, claimed_at = now(), claim_pending_by = nu
 where profile_id = $1 and (owner_id is null or owner_id <> $2) and claim_pending_by = $2 and claim_code_hash = $3 and claim_code_expires_at > now()
 returning profile_id;"""
 
-BIND_REAUTH_SQL = """-- A1 legacy claim by re-authorisation: the channel was (re)paired AFTER the claim started.
-update bot_profiles set owner_id = $2, claimed_at = now(), claim_pending_by = null, claim_pending_at = null
-where profile_id = $1 and (owner_id is null or owner_id <> $2) and claim_pending_by = $2 and claim_pending_at < to_timestamp($3::bigint)
+BIND_REAUTH_SQL = """-- A1 legacy claim by re-authorisation. R1 (2026-09-27): a later authorized_at alone proves nothing — the
+-- OWNER re-pairing its own profile moves it too. Binds ONLY an OWNER-LESS profile, ONLY for the install whose
+-- still-fresh (one day) claim it is, and ONLY for a pairing THAT install started through the Wappi Proxy
+-- (Record Claim Pairing: claim_pair_by/at) and that completed after it began, within 30 minutes. An owned profile
+-- moves to another install only by the code sent into the bot's own chat (Verify Claim Code).
+update bot_profiles set owner_id = $2, claimed_at = now(), claim_pending_by = null, claim_pending_at = null,
+  claim_pair_by = null, claim_pair_at = null
+where profile_id = $1 and owner_id is null and deleted_at is null
+  and claim_pending_by = $2 and claim_pending_at > now() - interval '1 day'
+  and claim_pair_by = $2 and claim_pair_at >= claim_pending_at
+  and to_timestamp($3::bigint) > claim_pair_at and to_timestamp($3::bigint) <= claim_pair_at + interval '30 minutes'
 returning profile_id;"""
 
 CLAIM_DECIDE_JS = r"""// AUTH SESSION / Claim Decide: what the claim needs next (generated — see build-auth-workflows.py)
@@ -216,8 +226,11 @@ else if (status.authorized === true) {
   const phone = String(status.phone || '').replace(/\D/g, '');
   const ts = Date.parse(status.authorized_at || '') || 0;
   out.authorizedEpoch = ts ? Math.floor(ts / 1000) : null;
-  if (r.op === 'claim.status' && out.authorizedEpoch && out.authorizedEpoch > Number(row.claim_pending_epoch || 0)) {
-    out.claimMethod = 'reauth';                        // paired after the claim began -> bind
+  if (r.op === 'claim.status') {
+    // R1: claim.status NEVER mints or sends a code (a stranger polling it spammed the owner's chat with codes)
+    // and asks for a reauth bind only on an OWNER-LESS profile paired after the claim began; the bind itself
+    // also requires the pairing to have been started by THIS install through the proxy (Bind Reauthed Profile).
+    out.claimMethod = (!row.owner_id && out.authorizedEpoch && out.authorizedEpoch > Number(row.claim_pending_epoch || 0)) ? 'reauth' : 'pending';
   } else if (!phone) { out.statusCode = 409; out.claimError = 'no_phone'; }
   else if (row.code_still_valid === true && r.op === 'claim.start') {
     out.claimMethod = 'code';                        // a code is already on its way / valid: do not re-send
@@ -245,9 +258,6 @@ try { const v = $('Verify Claim Code').first(); if (v && v.json) claimVerify = v
 if (claimInfo && claimInfo.claimError) {
   return [{ json: { success: false, error: claimInfo.claimError, _status: claimInfo.statusCode || 400 }, pairedItem: { item: 0 } }];
 }
-if (r.op === 'claim.verify' && (!claimVerify || !claimVerify.profile_id)) {
-  return [{ json: { success: false, error: 'claim_code_rejected', _status: 403 }, pairedItem: { item: 0 } }];
-}
 if (row.error || !row.install_id) {
   if (r.op === 'bootstrap') {
     const status = row.error ? 500 : 429;
@@ -259,6 +269,9 @@ if (row.error || !row.install_id) {
   // an empty row) and answers 503: the client keeps its credentials and retries later.
   const revoked = !row.error && row.verdict === 'checked';
   return [{ json: { success: false, error: revoked ? 'install_revoked' : 'db_unavailable', _status: revoked ? 401 : 503 }, pairedItem: { item: 0 } }];
+}
+if (r.op === 'claim.verify' && (!claimVerify || !claimVerify.profile_id)) {
+  return [{ json: { success: false, error: 'claim_code_rejected', _status: 403 }, pairedItem: { item: 0 } }];
 }
 const exp = r.nowSec + __TTL__;
 const claims = { i: row.install_id, u: row.app_user_id || null, p: row.p || [], w: row.w || [], c: row.c || [], e: exp, n: row.token_version || 1 };
@@ -290,6 +303,9 @@ def build_session():
     n.append(postgres("Verify Install", VERIFY_INSTALL_SQL,
                       "={{ [ $json.installId, $json.secretHash, $json.appUserId ] }}", [880, 320]))
     n.append(if_true("Claim Op?", "={{ String($('Route').first().json.op).startsWith('claim.') }}", [1100, 320]))
+    # R1: nothing of a claim is written for an install that did not prove its secret (Claim Start used to run
+    # first and let an unauthenticated call overwrite claim_pending_by / insert rows before the 401).
+    n.append(if_true("Install Verified?", "={{ !!$json.install_id && !$json.error }}", [1210, 520]))
     n.append(postgres("Claim Start", CLAIM_START_SQL,
                       "={{ [ $('Route').first().json.profileId, $('Route').first().json.installId, ($input.first().json.app_user_id || ''), $('Route').first().json.channel ] }}", [1320, 520]))
     n.append(http_wappi("Claim Status", "GET", CLAIM_STATUS_URL, [1540, 520], query_expr=CLAIM_STATUS_QUERY))
@@ -298,7 +314,7 @@ def build_session():
     n.append(postgres("Verify Claim Code", VERIFY_CLAIM_CODE_SQL,
                       "={{ [ $('Route').first().json.profileId, $('Route').first().json.installId, crAuthHashOf($('Route').first().json.code) ] }}".replace(
                           "crAuthHashOf($('Route').first().json.code)", "$('Route').first().json.codeHash"), [2200, 400]))
-    n.append(if_true("Send Code?", "={{ $json.claimMethod === 'code' && !$json.codeReused && !!$json.code }}", [2200, 640]))
+    n.append(if_true("Send Code?", "={{ $json.op === 'claim.start' && $json.claimMethod === 'code' && !$json.codeReused && !!$json.code }}", [2200, 640]))
     n.append(postgres("Store Claim Code", STORE_CLAIM_CODE_SQL,
                       "={{ [ $('Route').first().json.profileId, $('Route').first().json.installId, $('Claim Decide').first().json.codeHash ] }}", [2420, 560]))
     n.append(http_wappi("Send Claim Code", "POST", SEND_CODE_URL, [2640, 560], query_expr=SEND_CODE_QUERY, body_expr=SEND_CODE_BODY))
@@ -318,7 +334,8 @@ def build_session():
     edge(c, "Bootstrap?", "Create Install", 0); edge(c, "Bootstrap?", "Verify Install", 1)
     edge(c, "Create Install", "Issue Token")
     edge(c, "Verify Install", "Claim Op?")
-    edge(c, "Claim Op?", "Claim Start", 0); edge(c, "Claim Op?", "Issue Token", 1)
+    edge(c, "Claim Op?", "Install Verified?", 0); edge(c, "Claim Op?", "Issue Token", 1)
+    edge(c, "Install Verified?", "Claim Start", 0); edge(c, "Install Verified?", "Issue Token", 1)
     edge(c, "Claim Start", "Claim Status"); edge(c, "Claim Status", "Claim Decide"); edge(c, "Claim Decide", "Claim Verify?")
     edge(c, "Claim Verify?", "Verify Claim Code", 0); edge(c, "Claim Verify?", "Send Code?", 1)
     edge(c, "Verify Claim Code", "Reload Ownership")
@@ -344,6 +361,10 @@ const ID = /^[A-Za-z0-9@._:+\-]{1,128}$/;
 const PHONE = /^\d{7,15}$/;
 const NAME = /^[\p{L}\p{N} _\-.]{1,64}$/u;
 const AUTH_OPS = new Set(['status', 'qr', 'auth.code', 'tg.auth.phone', 'tg.auth.code', 'tg.auth.2fa']);
+// R1: the ops that START or advance a pairing. On a claim-pending (not owned) profile they run only after
+// Record Claim Pairing has written, in the database, that THIS install started the pairing — the proof
+// Bind Reauthed Profile requires (a `c` in a 12-hour token is not: the claim may have been taken over since).
+const PAIR_OPS = new Set(['qr', 'auth.code', 'tg.auth.phone', 'tg.auth.code', 'tg.auth.2fa']);
 const OPS = {
   'profile.add':       { m: 'POST', path: 'profile/add', q: { name: ['name', NAME] }, noProfile: true, needsBilling: true },
   'profile.delete':    { m: 'POST', path: 'profile/delete', q: { profile_id: 'pid' } },
@@ -373,11 +394,13 @@ if (!spec) return deny(400, 'unknown_op');
 const channel = (b.channel === 'telegram') ? 'telegram' : 'whatsapp';
 if (spec.only && spec.only !== channel) return deny(400, 'op_channel_mismatch');
 const pid = typeof b.profile_id === 'string' ? b.profile_id : '';
+let claimPairing = false;
 if (!spec.noProfile) {
   if (!ID.test(pid)) return deny(400, 'bad_param', 'profile_id');
   const owned = (claims.profiles || []).includes(pid);
   const pending = AUTH_OPS.has(op) && (claims.claimPending || []).includes(pid);
   if (!owned && !pending) return deny(403, 'forbidden', 'profile_id');
+  claimPairing = !owned && PAIR_OPS.has(op);
 }
 if (spec.needsBilling && !claims.appUserId) return deny(409, 'no_billing_identity');
 const take = (dest, key, rule) => {
@@ -403,8 +426,19 @@ let path = spec.path;
 if (spec.kind) { const kind = String(b.kind || ''); if (!path[kind]) return deny(400, 'bad_param', 'kind'); path = path[kind]; }
 else if (typeof path === 'object') path = path[channel];
 return [{ json: { ok: true, _status: 200, op, channel, profileId: pid, method: spec.m, url: BASE[channel] + path, query,
-  jsonBody: spec.body ? body : {}, sendBody: !!spec.body, timeout: spec.timeout || 30000 }, pairedItem: { item: 0 } }];
+  jsonBody: spec.body ? body : {}, sendBody: !!spec.body, timeout: spec.timeout || 30000, claimPairing }, pairedItem: { item: 0 } }];
 """
+
+RECORD_CLAIM_PAIRING_SQL = """-- R1: the claimant starts a pairing of a profile it is claiming. Recorded ONLY while this install holds the
+-- fresh (one day) claim on a still OWNER-LESS profile — a claim taken over by another install, expired or bound
+-- records nothing and the proxy refuses (claim_not_pending). The anchor stays put for 30 minutes of repeated
+-- pairing calls (QR refreshes, code -> 2FA), so a scan completing between two polls still counts as after it.
+update bot_profiles set claim_pair_by = $2,
+  claim_pair_at = case when claim_pair_by = $2 and claim_pair_at >= claim_pending_at and claim_pair_at > now() - interval '30 minutes'
+                       then claim_pair_at else now() end
+where profile_id = $1 and owner_id is null and deleted_at is null
+  and claim_pending_by = $2 and claim_pending_at > now() - interval '1 day'
+returning profile_id;"""
 
 COMPOSE_RESPONSE_JS = r"""// WAPPI PROXY / Compose Response: pass Wappi's status + JSON body through unchanged (generated)
 const r = $input.first().json || {};
@@ -466,9 +500,17 @@ def build_proxy():
     n.append(code("Build Request", BUILD_REQUEST_JS, [660, 200]))
     n.append(if_true("Op valid?", "={{ $json.ok }}", [880, 200]))
     n.append(respond("Respond Rejected", [1100, 420], body="={{ { success: false, error: $json.error, detail: $json.detail } }}", code_expr="={{ $json._status }}"))
-    n.append(http_wappi("Wappi Call", "={{ $json.method }}", "={{ $json.url }}", [1100, 100],
-                        query_expr="={{ JSON.stringify($json.query) }}", body_expr="={{ JSON.stringify($json.jsonBody || {}) }}",
-                        timeout="={{ $json.timeout }}"))   # sendBody stays a literal true: an expression-valued boolean sent NO body (staging 2026-09-17)
+    # Wappi Call reads its request from Build Request (not $json): on a claim pairing it runs after Record Claim Pairing.
+    n.append(http_wappi("Wappi Call", "={{ $('Build Request').first().json.method }}", "={{ $('Build Request').first().json.url }}", [1100, 100],
+                        query_expr="={{ JSON.stringify($('Build Request').first().json.query) }}",
+                        body_expr="={{ JSON.stringify($('Build Request').first().json.jsonBody || {}) }}",
+                        timeout="={{ $('Build Request').first().json.timeout }}"))   # sendBody stays a literal true: an expression-valued boolean sent NO body (staging 2026-09-17)
+    n.append(if_true("Claim Pairing?", "={{ $json.claimPairing === true }}", [990, 0]))
+    n.append(postgres("Record Claim Pairing", RECORD_CLAIM_PAIRING_SQL,
+                      "={{ [ $json.profileId, $('Auth Gate').first().json.crAuth.installId ] }}", [990, -200]))
+    n.append(if_true("Pairing Recorded?", "={{ !!$json.profile_id }}", [1100, -200]))
+    n.append(respond("Respond Claim Not Pending", [1320, -400], body="={{ { success: false, error: $json.error ? 'db_unavailable' : 'claim_not_pending' } }}",
+                     code_expr="={{ $json.error ? 503 : 403 }}"))
     n.append(if_true("Profile Added?", "={{ $('Build Request').first().json.op === 'profile.add' && Number($json.statusCode) === 200 && !!($json.body && $json.body.profile_id) }}", [1320, 100]))
     n.append(postgres("Bind Profile", BIND_PROFILE_SQL,
                       "={{ [ $json.body.profile_id, $('Auth Gate').first().json.crAuth.appUserId, $('Build Request').first().json.channel, $('Auth Gate').first().json.crAuth.installId ] }}", [1540, 0]))
@@ -479,7 +521,10 @@ def build_proxy():
     edge(c, "Webhook", "Auth Gate"); edge(c, "Auth Gate", "Authorized?")
     edge(c, "Authorized?", "Build Request", 0); edge(c, "Authorized?", "Respond 401", 1)
     edge(c, "Build Request", "Op valid?")
-    edge(c, "Op valid?", "Wappi Call", 0); edge(c, "Op valid?", "Respond Rejected", 1)
+    edge(c, "Op valid?", "Claim Pairing?", 0); edge(c, "Op valid?", "Respond Rejected", 1)
+    edge(c, "Claim Pairing?", "Record Claim Pairing", 0); edge(c, "Claim Pairing?", "Wappi Call", 1)
+    edge(c, "Record Claim Pairing", "Pairing Recorded?")
+    edge(c, "Pairing Recorded?", "Wappi Call", 0); edge(c, "Pairing Recorded?", "Respond Claim Not Pending", 1)
     edge(c, "Wappi Call", "Profile Added?")
     edge(c, "Profile Added?", "Bind Profile", 0); edge(c, "Profile Added?", "Compose Response", 1)
     edge(c, "Bind Profile", "Reload Ownership"); edge(c, "Reload Ownership", "Compose Add Response")

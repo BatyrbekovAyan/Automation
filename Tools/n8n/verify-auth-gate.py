@@ -96,7 +96,19 @@ def check_proxy():
     assert "if (!spec) return deny(400, 'unknown_op')" in br, "proxy must refuse unknown ops"
     assert "needsBilling" in br and "no_billing_identity" in br, "profile.add must require a billing identity"
     call = node(wf, "Wappi Call")
-    assert call["parameters"]["url"] == "={{ $json.url }}" and call["parameters"]["method"] == "={{ $json.method }}", "Wappi Call not driven by Build Request"
+    assert call["parameters"]["url"] == "={{ $('Build Request').first().json.url }}" and call["parameters"]["method"] == "={{ $('Build Request').first().json.method }}", "Wappi Call not driven by Build Request"
+    # R1: a pairing op on a claim-pending (not owned) profile reaches the transport only after Record Claim Pairing
+    # wrote, in the DB, that THIS install started it (the proof Bind Reauthed Profile requires).
+    assert "const PAIR_OPS = new Set(['qr', 'auth.code', 'tg.auth.phone', 'tg.auth.code', 'tg.auth.2fa'])" in br and "claimPairing = !owned && PAIR_OPS.has(op)" in br, \
+        "Build Request must flag pairing ops on a claim-pending profile"
+    assert edges(wf, "Op valid?", 0) == [{"node": "Claim Pairing?", "type": "main", "index": 0}], "Op valid? must route through Claim Pairing?"
+    assert edges(wf, "Claim Pairing?", 0) == [{"node": "Record Claim Pairing", "type": "main", "index": 0}] and edges(wf, "Claim Pairing?", 1) == [{"node": "Wappi Call", "type": "main", "index": 0}]
+    assert edges(wf, "Record Claim Pairing") == [{"node": "Pairing Recorded?", "type": "main", "index": 0}]
+    assert edges(wf, "Pairing Recorded?", 0) == [{"node": "Wappi Call", "type": "main", "index": 0}] and edges(wf, "Pairing Recorded?", 1) == [{"node": "Respond Claim Not Pending", "type": "main", "index": 0}]
+    rq = node(wf, "Record Claim Pairing")["parameters"]["query"]
+    assert "owner_id is null" in rq and "claim_pending_by = $2" in rq and "claim_pending_at > now() - interval '1 day'" in rq, "Record Claim Pairing must require this install's fresh claim on an owner-less profile"
+    into_call = sorted(src for src, outs in wf["connections"].items() for out in outs.get("main", []) for c in out if c["node"] == "Wappi Call")
+    assert into_call == ["Claim Pairing?", "Pairing Recorded?"], f"Wappi Call must be reachable only past the pairing check: {into_call}"
     assert call["parameters"]["options"]["response"]["response"]["fullResponse"] is True, "Wappi Call must return fullResponse"
     assert call["credentials"]["httpHeaderAuth"]["name"] == "WappiAuthToken", "Wappi Call must use the server-side Wappi credential"
     assert wf["settings"].get("saveDataSuccessExecution") == "none", "proxy must not store successful executions"
@@ -117,6 +129,14 @@ def check_session():
     assert "crAuth.sign(" in it and "$env.CR_AUTH_SECRET" in it and "12 * 3600" in it.replace("43200", "12 * 3600"), "token must be signed with the env secret and carry a 12 h TTL"
     rt = node(wf, "Route")["parameters"]["jsCode"]
     assert "sha256Hex(out.installSecret)" in rt and "randomSecret(32)" in rt, "bootstrap must mint and hash the install secret server-side"
+    br_ = node(wf, "Bind Reauthed Profile")["parameters"]["query"]
+    for frag in ("owner_id is null", "claim_pending_by = $2", "claim_pending_at > now() - interval '1 day'", "claim_pair_by = $2",
+                 "claim_pair_at >= claim_pending_at", "to_timestamp($3::bigint) > claim_pair_at"):
+        assert frag in br_, f"R1: a reauth bind must require {frag!r}"
+    cs_in = sorted(src for src, outs in wf["connections"].items() for out in outs.get("main", []) for c in out if c["node"] == "Claim Start")
+    assert cs_in == ["Install Verified?"] and edges(wf, "Install Verified?", 0) == [{"node": "Claim Start", "type": "main", "index": 0}], \
+        f"R1: Claim Start must run only for a verified install: {cs_in}"
+    assert node(wf, "Send Code?")["parameters"]["conditions"]["conditions"][0]["leftValue"].startswith("={{ $json.op === 'claim.start' &&"), "R1: only claim.start may send a code"
     vc = node(wf, "Verify Claim Code")["parameters"]["query"]
     assert "claim_code_expires_at > now()" in vc and "claim_pending_by = $2" in vc and "(owner_id is null or owner_id <> $2)" in vc, \
         "claim verify must be scoped to the claiming install, expiring, and allow a proven transfer"

@@ -266,6 +266,69 @@ def s_claim_reauth(ctx):
     return ok, f"qr_allowed={st_qr} chats_refused={st_chats} before_pairing_owned={legacy in d1.get('profiles', [])} after_pairing_owned={legacy in d2.get('profiles', [])}"
 
 
+def claim_call(owner, op, pid, code=None):
+    body = {"op": op, "installId": owner.install_id, "installSecret": owner.secret, "appUserId": owner.app_user_id, "profileId": pid, "channel": "whatsapp"}
+    if code is not None:
+        body["code"] = code
+    return session(body)
+
+
+@scenario("claim_reauth_owned_profile_not_transferred", "R1: a stranger's pending claim on an OWNED profile + the owner's own later re-pairing → the stranger gets nothing, claim.status sends no code, the owner keeps the profile")
+def s_claim_owned(ctx):
+    import datetime as dt
+    o, x = fresh_owner(ctx, "r1o"), fresh_owner(ctx, "r1x")
+    pid = o.profiles[0]
+    old = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=1)).isoformat()
+    http("POST", f"{MOCK}/__mock/profile", {"profile_id": pid, "authorized": True, "phone": "77001230001", "authorized_at": old})
+    since = mock_total()
+    st1, d1 = claim_call(x, "claim.start", pid)                                   # a code lands in the OWNER's chat (legit transfer path)
+    time.sleep(1.2)
+    st_qr, _ = proxy(o.token, {"op": "qr", "channel": "whatsapp", "profile_id": pid})   # the owner re-pairs its own profile
+    http("POST", f"{MOCK}/__mock/profile", {"profile_id": pid, "authorized": True, "phone": "77001230001",
+                                            "authorized_at": dt.datetime.now(dt.timezone.utc).isoformat()})
+    before_status = mock_total()
+    st2, d2 = claim_call(x, "claim.status", pid)
+    status_sends = [c for c in mock_calls(before_status, "message/send")[0]]
+    d_o = o.refresh()
+    ok = (st1 == 200 and d1.get("claimMethod") == "code" and st_qr == 200 and pid not in (d2 or {}).get("profiles", [])
+          and len(status_sends) == 0 and pid in d_o.get("profiles", []))
+    return ok, (f"stranger start={st1}/{d1.get('claimMethod')} owner_qr={st_qr} stranger status={st2} got_it={pid in (d2 or {}).get('profiles', [])} "
+                f"codes_sent_by_status={len(status_sends)} owner_keeps={pid in d_o.get('profiles', [])} (codes in chat total {len(mock_calls(since, 'message/send')[0])})")
+
+
+@scenario("claim_stale_capability_cannot_pair", "R1: once another install takes over a pending claim, the first claimant's token capability no longer starts a pairing (403 claim_not_pending, no transport call)")
+def s_claim_stale(ctx):
+    l, x = fresh_owner(ctx, "r1l"), fresh_owner(ctx, "r1s")
+    legacy = f"legacy2-{ctx['run_id']}"
+    l.profiles.append(legacy)
+    http("POST", f"{MOCK}/__mock/profile", {"profile_id": legacy, "authorized": False, "phone": None})
+    st1, d1 = claim_call(l, "claim.start", legacy)
+    tok = (d1 or {}).get("token")
+    st2, d2 = claim_call(x, "claim.start", legacy)                                  # takeover
+    since = mock_total()
+    st3, d3 = proxy(tok, {"op": "qr", "channel": "whatsapp", "profile_id": legacy})
+    calls = mock_calls(since, "")[0]
+    ok = st1 == 200 and legacy in (d1 or {}).get("claimPending", []) and st2 == 200 and st3 == 403 and (d3 or {}).get("error") == "claim_not_pending" and not calls
+    return ok, f"L start={st1} takeover={st2} L qr={st3} {d3} transport_calls={len(calls)}"
+
+
+@scenario("claim_unauthenticated_writes_nothing", "R1: a claim.* call with a wrong secret is refused (401) before Claim Start — no row inserted, a pending claim untouched")
+def s_claim_unauth(ctx):
+    l = fresh_owner(ctx, "r1u")
+    fresh_pid, legacy = f"ghost-{ctx['run_id']}", f"legacy3-{ctx['run_id']}"
+    l.profiles += [fresh_pid, legacy]
+    http("POST", f"{MOCK}/__mock/profile", {"profile_id": legacy, "authorized": False, "phone": None})
+    claim_call(l, "claim.start", legacy)
+    before = pg(f"select claim_pending_by || '|' || claim_pending_at from bot_profiles where profile_id = '{legacy}';")
+    bad = {"op": "claim.start", "installId": l.install_id, "installSecret": "wrong", "appUserId": l.app_user_id, "channel": "whatsapp"}
+    st1, d1 = session({**bad, "profileId": fresh_pid})
+    st2, d2 = session({**bad, "installId": "ghost-install", "profileId": legacy})
+    rows = pg(f"select count(*) from bot_profiles where profile_id = '{fresh_pid}';")
+    after = pg(f"select claim_pending_by || '|' || claim_pending_at from bot_profiles where profile_id = '{legacy}';")
+    ok = st1 == 401 and st2 == 401 and rows == "0" and before and before == after
+    return ok, f"wrong-secret={st1}/{(d1 or {}).get('error')} ghost={st2} rows_for_new_id={rows} pending_unchanged={before == after}"
+
+
 def multipart(fields):
     boundary = "----crE2E" + uuid.uuid4().hex
     body = b""

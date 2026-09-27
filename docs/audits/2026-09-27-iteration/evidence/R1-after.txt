@@ -1,0 +1,33 @@
+# R1 after — python3 Tools/n8n/tests/test_claim.py
+PASS R1 S1: the owner re-pairs its own profile while a stranger holds a pending claim -> the stranger gets nothing
+PASS R1 S2: a legacy profile re-paired BY the claimant through the proxy binds to the claimant (legit recovery)
+PASS R1 S3: a stranger takes over the pending claim while the claimant pairs -> nobody is bound
+PASS R1 S4: a claim older than a day records no pairing and its old pairing never binds; a renewed claim needs a NEW pairing
+PASS R1 S5: a stale claim capability (the claim was taken over) cannot start a pairing through the proxy
+PASS R1 S7: claim.status never mints or sends a code (no unsolicited codes / phishing aid)
+PASS R1 S8: transfer by code on reinstall — wrong / expired / replayed codes change nothing, the right code transfers
+PASS R1 S9: two concurrent claims — only the proof (the code from the bot's own chat) binds; the racing claimant without it changes nothing
+PASS R1 S10: an unauthenticated claim.* call never reaches Claim Start (no pending claim / row written before the refusal)
+
+9 pass, 0 fail
+
+# generator idempotent: python3 Tools/n8n/build-auth-workflows.py --check (after two runs)
+auth workflows: up to date
+
+# migration applied to staging: Tools/n8n/staging/pg.sh migrate (sql/2026-09-27-claim-pairing.sql)
+claim_pair_at,claim_pair_by
+
+# staging e2e after re-import (n8n 2.36.7 + task runners): claim scenarios (full e2e-auth 21/21 in the same session)
+PASS  claim_by_code_transfers_ownership (0.5s) — a legacy/other-install profile: claim.start sends a code to the bot's OWN chat; claim.verify binds it to the claiming install
+      recipient_is_own_phone=True second_start_reuses_code=True wrong_code=403 verify=200 now_owned_by_A=True B_lost_it=True
+PASS  claim_by_reauth_binds_after_pairing (1.8s) — an UNAUTHORISED legacy profile: claim.start → reauth; only a pairing AFTER the claim binds it (claim.status)
+      qr_allowed=200 chats_refused=403 before_pairing_owned=False after_pairing_owned=True
+PASS  claim_reauth_owned_profile_not_transferred (2.3s) — R1: a stranger's pending claim on an OWNED profile + the owner's own later re-pairing → the stranger gets nothing, claim.status sends no code, the owner keeps the profile
+      stranger start=200/code owner_qr=200 stranger status=200 got_it=False codes_sent_by_status=0 owner_keeps=True (codes in chat total 1)
+PASS  claim_stale_capability_cannot_pair (1.0s) — R1: once another install takes over a pending claim, the first claimant's token capability no longer starts a pairing (403 claim_not_pending, no transport call)
+      L start=200 takeover=200 L qr=403 {'success': False, 'error': 'claim_not_pending'} transport_calls=0
+PASS  claim_unauthenticated_writes_nothing (1.0s) — R1: a claim.* call with a wrong secret is refused (401) before Claim Start — no row inserted, a pending claim untouched
+      wrong-secret=401/install_revoked ghost=401 rows_for_new_id=0 pending_unchanged=True
+21 pass, 0 fail
+
+# proxy hot path regression: e2e-test-dialog 4/4; e2e-handoff 12/2 — the same two scenarios fail at baseline (evidence/baseline-e2e-handoff.txt, suite isolation, pass alone), proxy_send_records_owner_app_row passes
