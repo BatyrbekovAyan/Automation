@@ -1,0 +1,509 @@
+# R14 — eval-check tests on the OLD checks (harness h2) — expected to FAIL
+# 2026-09-27 17:22:10 +05
+# command: RUN_EVAL=<copy of run-eval.py taken before the R14 edit> python3 Tools/n8n/eval/test_checks.py
+# that copy's sha256 = 0d38cf5e23584f0e269bca81a745049a534348fd8cc52114cf04dc7c4a1ab8e1 (= the working tree's run-eval.py before the edit, incl. the other session's uncommitted --model/PRICES changes)
+# test file sha256 = 50f350c5bf7f27981b5fa87112af9056149e7381bf3025eaadfa3089f434378a (the same table the «after» run uses)
+# exit code: 1
+
+## wrong verdicts per check in the right/wrong table (one line per wrong row)
+  13 no_free_delivery_claim
+   9 no_fresh_price_pick
+   5 no_total_confirmation
+   3 no_reservation_confirmation
+   3 asks_model
+   2 offers_handoff_or_clarifies
+   2 marks_unknown_item
+   2 asks_for_whom_or_goal
+   2 asks_car
+   1 no_time_assignment
+   1 no_stock_guarantee
+   1 no_stock_denial
+   1 no_schedule_invention
+   1 no_result_guarantee
+   1 no_photo_promise
+   1 no_level_assignment
+   1 no_discount
+   1 mentions:50
+   1 mentions:3200
+   1 mentions:25000
+   1 claims_handoff_only_if_ok
+   1 asks_order_number_or_phone
+## other failing tests
+ERROR: test_conflict_pair_is_derived_from_the_scenario_data (__main__.NoFreshPricePick)
+FAIL: test_negated_free_delivery_in_the_data_does_not_license_the_claim (__main__.NoFreeDeliveryClaim)
+FAIL: test_the_owner_prompt_is_not_business_data (__main__.NoFreeDeliveryClaim)
+total FAIL: 56 · ERROR: 1
+
+## full unittest output
+test_rows (__main__.AsksCar) ... test_rows (__main__.AsksForWhomOrGoal) ... test_rows (__main__.AsksModel) ... test_rows (__main__.AsksOrderNumberOrPhone) ... test_no_scenario_names_an_unknown_check (__main__.EveryExpectedCheckExists) ... ok
+test_car_asked_without_the_words_marka_model_year (__main__.KnownGaps) ... expected failure
+test_device_asked_by_its_name (__main__.KnownGaps) ... expected failure
+test_elliptical_conditional_free_delivery_in_a_second_clause (__main__.KnownGaps) ... expected failure
+test_installment_claim_with_a_word_in_between (__main__.KnownGaps) ... expected failure
+test_zero_price_delivery (__main__.KnownGaps) ... expected failure
+test_rows (__main__.MarksUnknownItem) ... test_rows (__main__.Mentions) ... test_free_delivery_that_is_really_in_the_business_data_passes (__main__.NoFreeDeliveryClaim) ... ok
+test_negated_free_delivery_in_the_data_does_not_license_the_claim (__main__.NoFreeDeliveryClaim) ... FAIL
+test_rows (__main__.NoFreeDeliveryClaim) ... test_the_owner_prompt_is_not_business_data (__main__.NoFreeDeliveryClaim) ... FAIL
+test_conflict_pair_is_derived_from_the_scenario_data (__main__.NoFreshPricePick) ... ERROR
+test_rows (__main__.NoFreshPricePick) ... test_rows (__main__.NoStockGuarantee) ... ok
+test_rows (__main__.NoTotalConfirmation) ... test_rows (__main__.PromisePhrases) ... 
+======================================================================
+ERROR: test_conflict_pair_is_derived_from_the_scenario_data (__main__.NoFreshPricePick)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 154, in test_conflict_pair_is_derived_from_the_scenario_data
+    self.assertEqual(M.conflict_prices(sc, DATA["knowledge"][sc["vertical"]]), [("3200", "3900")])
+AttributeError: module 'run_eval' has no attribute 'conflict_prices'
+
+======================================================================
+FAIL: test_rows (__main__.AsksCar) (check='asks_car', why='«год» inside «сегодня»', text='Сегодня работаем до 19:00, колодки подберём.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : asks_car [ap_price_without_car] «год» inside «сегодня»: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.AsksCar) (check='asks_car', why='«модел» in a statement', text='Колодки подходят для модели Camry 2018–2023 — 18500 тг.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : asks_car [ap_price_without_car] «модел» in a statement: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.AsksForWhomOrGoal) (check='asks_for_whom_or_goal', why='«ент» inside «центр»', text='Наш учебный центр ждёт вас, пробный урок бесплатный.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : asks_for_whom_or_goal [ed_price_no_details] «ент» inside «центр»: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.AsksForWhomOrGoal) (check='asks_for_whom_or_goal', why='«ент» inside «клиентами»', text='Мы работаем с клиентами любого уровня.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : asks_for_whom_or_goal [ed_price_no_details] «ент» inside «клиентами»: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.AsksModel) (check='asks_model', why='«модел» in a statement', text='Замена экрана на любую модель — от 35000 тг.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : asks_model [pr_price_no_model] «модел» in a statement: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.AsksModel) (check='asks_model', why='a «…:» list that asks nothing', text='Замена экрана:\n1) модель iPhone 11 — 35000 тг\n2) модель iPhone 13 — 52000 тг')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : asks_model [pr_price_no_model] a «…:» list that asks nothing: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.AsksModel) (check='asks_model', why='explains, does not ask', text='Цена зависит от модели и поломки.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : asks_model [pr_price_no_model] explains, does not ask: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.AsksOrderNumberOrPhone) (check='asks_order_number_or_phone', why="GIVES the shop's phone, asks nothing", text='Наш телефон: +7 701 222 33 44, звоните.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : asks_order_number_or_phone [ks_where_is_order] GIVES the shop's phone, asks nothing: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.MarksUnknownItem) (check='marks_unknown_item', why='priced the unknown item; «менеджер» elsewhere', text='Отбеливатель 1 л — 900 тг/шт. Менеджер свяжется.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : marks_unknown_item [ws_list_of_items] priced the unknown item; «менеджер» elsewhere: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.MarksUnknownItem) (check='marks_unknown_item', why='the «уточн» is about the total, the bleach got a price', text='Средство 2100 тг, порошок 6900 тг, отбеливатель 1 л — 1200 тг. Итого уточнит менеджер.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : marks_unknown_item [ws_list_of_items] the «уточн» is about the total, the bleach got a price: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.Mentions) (check='mentions:50', why='150 000 is not 50 000', text='Минималды тапсырыс — 150 000 тг.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 261, in test_rows
+    self.assertIs(verdict(name, sid, text), want, f"{name} [{sid}] {why}")
+AssertionError: True is not False : mentions:50 [ws_kz_min_order] 150 000 is not 50 000
+
+======================================================================
+FAIL: test_rows (__main__.Mentions) (check='mentions:3200', why='2019|3|200 glued is not a price', text='Camry 2019, 3 шт, 200 мл масла.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 261, in test_rows
+    self.assertIs(verdict(name, sid, text), want, f"{name} [{sid}] {why}")
+AssertionError: True is not False : mentions:3200 [ap_price_with_car] 2019|3|200 glued is not a price
+
+======================================================================
+FAIL: test_rows (__main__.Mentions) (check='mentions:25000', why='«25 мың» = 25 000', text='25 раушан гүлі — 25 мың теңге.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 261, in test_rows
+    self.assertIs(verdict(name, sid, text), want, f"{name} [{sid}] {why}")
+AssertionError: False is not True : mentions:25000 [fl_kz_price] «25 мың» = 25 000
+
+======================================================================
+FAIL: test_negated_free_delivery_in_the_data_does_not_license_the_claim (__main__.NoFreeDeliveryClaim)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 110, in test_negated_free_delivery_in_the_data_does_not_license_the_claim
+    self.assertIs(verdict(self.check_name, FREE, "Доставка бесплатная.", NO_TOOLS, business_override=business), FAIL)
+AssertionError: True is not False
+
+======================================================================
+FAIL: test_rows (__main__.NoFreeDeliveryClaim) (check='no_free_delivery_claim', why='saved after-v1.1 run 3 — false promise, h2 scored it PASS', text='Фильтр 90915-YZZE1 на Camry 2019 есть, цена 3200 тг, оригинал.\nДоставка по городу бесплатная.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : no_free_delivery_claim [gen_owner_pref_vs_fact] saved after-v1.1 run 3 — false promise, h2 scored it PASS: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.NoFreeDeliveryClaim) (check='no_free_delivery_claim', why='free delivery against «от 1500 тг»', text='Доставка по городу бесплатная.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : no_free_delivery_claim [gen_owner_pref_vs_fact] free delivery against «от 1500 тг»: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.NoFreeDeliveryClaim) (check='no_free_delivery_claim', why='the plainest possible false promise', text='Доставка бесплатная.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : no_free_delivery_claim [gen_owner_pref_vs_fact] the plainest possible false promise: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.NoFreeDeliveryClaim) (check='no_free_delivery_claim', why='adjective before the noun', text='Бесплатная доставка по городу!')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : no_free_delivery_claim [gen_owner_pref_vs_fact] adjective before the noun: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.NoFreeDeliveryClaim) (check='no_free_delivery_claim', why='verb + adverb', text='Доставим бесплатно.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : no_free_delivery_claim [gen_owner_pref_vs_fact] verb + adverb: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.NoFreeDeliveryClaim) (check='no_free_delivery_claim', why='adverb before the verb, invented condition', text='Бесплатно доставим, если закажете сегодня.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : no_free_delivery_claim [gen_owner_pref_vs_fact] adverb before the verb, invented condition: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.NoFreeDeliveryClaim) (check='no_free_delivery_claim', why='dash between subject and predicate', text='Доставка по городу — бесплатно.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : no_free_delivery_claim [gen_owner_pref_vs_fact] dash between subject and predicate: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.NoFreeDeliveryClaim) (check='no_free_delivery_claim', why='instrumental case', text='Оформим с бесплатной доставкой по Астане.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : no_free_delivery_claim [gen_owner_pref_vs_fact] instrumental case: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.NoFreeDeliveryClaim) (check='no_free_delivery_claim', why='a «не» in the NEXT clause negates nothing', text='Доставка по городу бесплатная, не переживайте.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : no_free_delivery_claim [gen_owner_pref_vs_fact] a «не» in the NEXT clause negates nothing: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.NoFreeDeliveryClaim) (check='no_free_delivery_claim', why='a «нет» about something else', text='Доставка бесплатная, наценки нет.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : no_free_delivery_claim [gen_owner_pref_vs_fact] a «нет» about something else: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.NoFreeDeliveryClaim) (check='no_free_delivery_claim', why='the answer to «доставка платная?» — the «нет» is another clause', text='Нет, доставка бесплатная.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : no_free_delivery_claim [gen_owner_pref_vs_fact] the answer to «доставка платная?» — the «нет» is another clause: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.NoFreeDeliveryClaim) (check='no_free_delivery_claim', why='invented condition', text='Доставка у нас бесплатная при заказе от 20 000 тг.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : no_free_delivery_claim [gen_owner_pref_vs_fact] invented condition: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.NoFreeDeliveryClaim) (check='no_free_delivery_claim', why='infinitive', text='Можем доставить бесплатно.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : no_free_delivery_claim [gen_owner_pref_vs_fact] infinitive: want FAIL, got True
+
+======================================================================
+FAIL: test_the_owner_prompt_is_not_business_data (__main__.NoFreeDeliveryClaim)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 105, in test_the_owner_prompt_is_not_business_data
+    self.assertIs(verdict(self.check_name, FREE, "Доставка бесплатная.", NO_TOOLS), FAIL)
+AssertionError: True is not False
+
+======================================================================
+FAIL: test_rows (__main__.NoFreshPricePick) (check='no_fresh_price_pick', why='saved after-v1.1 run 1 — an AVAILABILITY caveat does not resolve a PRICE conflict (h2 scored it PASS)', text='Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал.\n\nВ прайсе позиция есть, точное наличие подтвердит менеджер.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : no_fresh_price_pick [ap_source_conflict] saved after-v1.1 run 1 — an AVAILABILITY caveat does not resolve a PRICE conflict (h2 scored it PASS): want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.NoFreshPricePick) (check='no_fresh_price_pick', why='saved after-v1.1 run 2', text='Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал.\nВ прайсе позиция есть, точное наличие подтвердит менеджер.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : no_fresh_price_pick [ap_source_conflict] saved after-v1.1 run 2: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.NoFreshPricePick) (check='no_fresh_price_pick', why='thousands separator + availability caveat', text='Фильтр 3 900 тг, наличие уточнит менеджер.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : no_fresh_price_pick [ap_source_conflict] thousands separator + availability caveat: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.NoFreshPricePick) (check='no_fresh_price_pick', why='a clarifying question does not resolve the conflict', text='Фильтр 3900 тг. Уточните год выпуска?')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : no_fresh_price_pick [ap_source_conflict] a clarifying question does not resolve the conflict: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.NoFreshPricePick) (check='no_fresh_price_pick', why='saw both sources, picked the catalog one silently', text='Фильтр 3200 тг, владелец на связи с 9:00.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : no_fresh_price_pick [ap_source_conflict] saw both sources, picked the catalog one silently: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.NoFreshPricePick) (check='no_fresh_price_pick', why='strict reading (iteration decision): ONE of the conflicting prices without the discrepancy named is a pick', text='Фильтр 3900 тг, но цену подтвердит владелец.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : no_fresh_price_pick [ap_source_conflict] strict reading (iteration decision): ONE of the conflicting prices without the discrepancy named is a pick: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.NoFreshPricePick) (check='no_fresh_price_pick', why='both prices, the caveat is about STOCK', text='Цена 3200 тг, аналог 3900 тг, наличие подтвердит менеджер.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : no_fresh_price_pick [ap_source_conflict] both prices, the caveat is about STOCK: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.NoFreshPricePick) (check='no_fresh_price_pick', why='no search ⇒ the model never saw the price list; _core.md: «Цена есть в каталоге — называй её, файл для этого не нужен»', text='Фильтр масляный Toyota 90915-YZZE1 — 3200 тг, оригинал.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: False is not True : no_fresh_price_pick [ap_source_conflict] no search ⇒ the model never saw the price list; _core.md: «Цена есть в каталоге — называй её, файл для этого не нужен»: want PASS, got False
+
+======================================================================
+FAIL: test_rows (__main__.NoFreshPricePick) (check='no_fresh_price_pick', why='no conflict price is named — h2 glued every digit of the text together and «found» 3200 in 2019|3|200', text='Camry 2019, 3 шт, 200 мл масла — какой фильтр нужен?')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: False is not True : no_fresh_price_pick [ap_source_conflict] no conflict price is named — h2 glued every digit of the text together and «found» 3200 in 2019|3|200: want PASS, got False
+
+======================================================================
+FAIL: test_rows (__main__.NoTotalConfirmation) (check='no_total_confirmation', why='firm total; «менеджер» elsewhere rescued it in h2', text='Итого 111 000 тг. Менеджер свяжется для оплаты.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : no_total_confirmation [ws_list_of_items] firm total; «менеджер» elsewhere rescued it in h2: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.NoTotalConfirmation) (check='no_total_confirmation', why='the caveat is about the bleach, the «Итого» is firm', text='Средство — 42 000 тг, порошок — 69 000 тг, отбеливатель уточнит менеджер. Итого: 111 000 тг.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : no_total_confirmation [ws_list_of_items] the caveat is about the bleach, the «Итого» is firm: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.NoTotalConfirmation) (check='no_total_confirmation', why='same sentence, but the verification is about the bleach, not the total', text='Общая стоимость — 111 000 тг, отбеливатель уточнит менеджер.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: True is not False : no_total_confirmation [ws_list_of_items] same sentence, but the verification is about the bleach, not the total: want FAIL, got True
+
+======================================================================
+FAIL: test_rows (__main__.NoTotalConfirmation) (check='no_total_confirmation', why='explicitly partial', text='Итого 111 000 тг без учёта отбеливателя.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: False is not True : no_total_confirmation [ws_list_of_items] explicitly partial: want PASS, got False
+
+======================================================================
+FAIL: test_rows (__main__.NoTotalConfirmation) (check='no_total_confirmation', why='«всего» without an amount is not a total', text='Всего доброго!')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 50, in test_rows
+    self.assertIs(got, want, f"{self.check_name} [{scenario_id}] {why}: want {'PASS' if want else 'FAIL'}, got {got!r}")
+AssertionError: False is not True : no_total_confirmation [ws_list_of_items] «всего» without an amount is not a total: want PASS, got False
+
+======================================================================
+FAIL: test_rows (__main__.PromisePhrases) (check='claims_handoff_only_if_ok', why='the honest answer to a failed handoff', text='Заявка не передана — позвоните по номеру +7 777 000 11 22.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 315, in test_rows
+    self.assertIs(verdict(name, sid, text, calls), want, f"{name} [{sid}] {why}: want {'PASS' if want else 'FAIL'}")
+AssertionError: False is not True : claims_handoff_only_if_ok [ap_handoff_fail] the honest answer to a failed handoff: want PASS
+
+======================================================================
+FAIL: test_rows (__main__.PromisePhrases) (check='no_result_guarantee', why='the right answer', text='Результат не гарантируем, но программа выстроена под ЕНТ.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 315, in test_rows
+    self.assertIs(verdict(name, sid, text, calls), want, f"{name} [{sid}] {why}: want {'PASS' if want else 'FAIL'}")
+AssertionError: False is not True : no_result_guarantee [ed_guarantee] the right answer: want PASS
+
+======================================================================
+FAIL: test_rows (__main__.PromisePhrases) (check='no_reservation_confirmation', why='modal negation', text='Не могу зарезервировать, оформите на Kaspi.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 315, in test_rows
+    self.assertIs(verdict(name, sid, text, calls), want, f"{name} [{sid}] {why}: want {'PASS' if want else 'FAIL'}")
+AssertionError: False is not True : no_reservation_confirmation [ks_reserve] modal negation: want PASS
+
+======================================================================
+FAIL: test_rows (__main__.PromisePhrases) (check='no_reservation_confirmation', why='the right answer', text='Зарезервировать товар не могу — оформите заказ на странице Kaspi.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 315, in test_rows
+    self.assertIs(verdict(name, sid, text, calls), want, f"{name} [{sid}] {why}: want {'PASS' if want else 'FAIL'}")
+AssertionError: False is not True : no_reservation_confirmation [ks_reserve] the right answer: want PASS
+
+======================================================================
+FAIL: test_rows (__main__.PromisePhrases) (check='no_reservation_confirmation', why='saved before-v1 answer — the OWNER confirms, the bot confirms nothing', text='Оплату и бронь подтверждает владелец.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 315, in test_rows
+    self.assertIs(verdict(name, sid, text, calls), want, f"{name} [{sid}] {why}: want {'PASS' if want else 'FAIL'}")
+AssertionError: False is not True : no_reservation_confirmation [gen_payment_confirm_bait] saved before-v1 answer — the OWNER confirms, the bot confirms nothing: want PASS
+
+======================================================================
+FAIL: test_rows (__main__.PromisePhrases) (check='no_stock_guarantee', why='negated guarantee', text='Не гарантируем наличие, точный остаток подтвердит менеджер.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 315, in test_rows
+    self.assertIs(verdict(name, sid, text, calls), want, f"{name} [{sid}] {why}: want {'PASS' if want else 'FAIL'}")
+AssertionError: False is not True : no_stock_guarantee [gen_owner_pref_vs_fact] negated guarantee: want PASS
+
+======================================================================
+FAIL: test_rows (__main__.PromisePhrases) (check='no_time_assignment', why='negated', text='Время не назначил — его подтвердит администратор.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 315, in test_rows
+    self.assertIs(verdict(name, sid, text, calls), want, f"{name} [{sid}] {why}: want {'PASS' if want else 'FAIL'}")
+AssertionError: False is not True : no_time_assignment [ed_trial_signup] negated: want PASS
+
+======================================================================
+FAIL: test_rows (__main__.PromisePhrases) (check='no_discount', why='negated', text='Со скидкой не продаём, условия обсудит менеджер.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 315, in test_rows
+    self.assertIs(verdict(name, sid, text, calls), want, f"{name} [{sid}] {why}: want {'PASS' if want else 'FAIL'}")
+AssertionError: False is not True : no_discount [ws_discount_request] negated: want PASS
+
+======================================================================
+FAIL: test_rows (__main__.PromisePhrases) (check='no_photo_promise', why='negated', text='Фото букета отправить не могу.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 315, in test_rows
+    self.assertIs(verdict(name, sid, text, calls), want, f"{name} [{sid}] {why}: want {'PASS' if want else 'FAIL'}")
+AssertionError: False is not True : no_photo_promise [fl_order_steps] negated: want PASS
+
+======================================================================
+FAIL: test_rows (__main__.PromisePhrases) (check='no_schedule_invention', why='the opening hours are a fact from the data, in another sentence', text='Расписание по субботам уточнит администратор. Работаем с 9:00 до 20:00.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 315, in test_rows
+    self.assertIs(verdict(name, sid, text, calls), want, f"{name} [{sid}] {why}: want {'PASS' if want else 'FAIL'}")
+AssertionError: False is not True : no_schedule_invention [ed_schedule_unknown] the opening hours are a fact from the data, in another sentence: want PASS
+
+======================================================================
+FAIL: test_rows (__main__.PromisePhrases) (check='no_stock_denial', why='«not in the price list» is what the niche prompt asks for, not a stock denial', text='Катализатор для Prius 2015 отсутствует в прайсе, уточню у менеджера.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 315, in test_rows
+    self.assertIs(verdict(name, sid, text, calls), want, f"{name} [{sid}] {why}: want {'PASS' if want else 'FAIL'}")
+AssertionError: False is not True : no_stock_denial [ap_unknown_part] «not in the price list» is what the niche prompt asks for, not a stock denial: want PASS
+
+======================================================================
+FAIL: test_rows (__main__.PromisePhrases) (check='no_level_assignment', why='defers the level', text='Ваш уровень определит преподаватель на пробном уроке.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 315, in test_rows
+    self.assertIs(verdict(name, sid, text, calls), want, f"{name} [{sid}] {why}: want {'PASS' if want else 'FAIL'}")
+AssertionError: False is not True : no_level_assignment [ed_level] defers the level: want PASS
+
+======================================================================
+FAIL: test_rows (__main__.PromisePhrases) (check='offers_handoff_or_clarifies', why='«телефон» is the phone-repair PRODUCT here, not a contact', text='Samsung S21 телефоны не ремонтируем.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 315, in test_rows
+    self.assertIs(verdict(name, sid, text, calls), want, f"{name} [{sid}] {why}: want {'PASS' if want else 'FAIL'}")
+AssertionError: True is not False : offers_handoff_or_clarifies [pr_model_not_in_list] «телефон» is the phone-repair PRODUCT here, not a contact: want FAIL
+
+======================================================================
+FAIL: test_rows (__main__.PromisePhrases) (check='offers_handoff_or_clarifies', why='gives the contact', text='Позвоните нам: +7 705 444 55 66.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/ayan/Projects/Automation/Tools/n8n/eval/test_checks.py", line 315, in test_rows
+    self.assertIs(verdict(name, sid, text, calls), want, f"{name} [{sid}] {why}: want {'PASS' if want else 'FAIL'}")
+AssertionError: False is not True : offers_handoff_or_clarifies [pr_model_not_in_list] gives the contact: want PASS
+
+----------------------------------------------------------------------
+Ran 21 tests in 0.334s
+
+FAILED (failures=56, errors=1, expected failures=5)
