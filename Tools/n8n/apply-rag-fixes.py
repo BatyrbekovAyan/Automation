@@ -106,7 +106,8 @@ def fix_upload(wf):
     # Rewire the two edges the deletions broke:
     #   Extract from PDF -> Merge(0)     (was: -> Normalize PDF -> Merge)
     #   Source Text      -> Supabase(0)  (was: -> Split into Chunks -> Supabase)
-    conns["Extract from PDF"] = {"main": [[{"node": "Merge", "type": "main", "index": 0}]]}
+    # (only output 0: output 1 is the unreadable-PDF error route, R3 2026-09-27, apply-auth-gate.py)
+    conns.setdefault("Extract from PDF", {"main": [[]]}).setdefault("main", [[]])[0] = [{"node": "Merge", "type": "main", "index": 0}]
     conns["Source Text"] = {"main": [[{"node": "Supabase Vector Store", "type": "main", "index": 0}]]}
 
     # Add the recursive splitter node (idempotent) near the Data Loader.
@@ -157,10 +158,10 @@ def fix_upload(wf):
     })
     # The chain's tail fed Merge input 1 (the sync/context item). Rewire that edge
     # straight from the id-extraction path so combineByPosition still gets both inputs.
-    # Since R3 (2026-09-27, apply-auth-gate.py) that path's fan-out hangs off the TRUE branch of
-    # "Upload Fields Valid?" — an edge straight from Extract Telegram Workflow Id would bypass the check.
+    # Since R3 (2026-09-27, apply-auth-gate.py) that path's fan-out hangs off "Upload Item" — the end of the
+    # field check + registry chain; an edge from anywhere earlier would bypass the checks.
     conns = wf["connections"]
-    carrier = "Upload Fields Valid?" if find(wf["nodes"], name="Upload Fields Valid?") else "Extract Telegram Workflow Id"
+    carrier = next((c for c in ("Upload Item", "Upload Fields Valid?") if find(wf["nodes"], name=c)), "Extract Telegram Workflow Id")
     ext_tg = conns.setdefault(carrier, {}).setdefault("main", [[]])
     links = ext_tg[0]
     if not any(l.get("node") == "Merge" for l in links):

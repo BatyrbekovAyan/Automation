@@ -7,7 +7,9 @@
 //                    getBinaryDataBuffer (the node that hard-fails when a binary part is missing);
 //   * If / Switch / Set / Merge -> evaluated from their parameters (expressions as JS; a TypeError reads as
 //                    null like n8n's expression engine).
-// Side-effect nodes are NOT executed, only recorded: Postgres (evaluated queryReplacement), HTTP Request
+// Node settings honoured: onError continueErrorOutput (a failure goes to the extra error output) / continueRegularOutput.
+// Side-effect nodes are NOT executed, only recorded: Postgres (evaluated queryReplacement; its output row comes from
+// the scenario's `pg` map — the SQL itself is exercised by the Python test on the staging Postgres), HTTP Request
 // (evaluated URL + whether it got the file), LangChain nodes (the json they would receive), respondToWebhook
 // (the first response wins, like the webhook's single reply).
 // Modules: N8N_MODULES or ~/.n8n-staging/app/node_modules (the staging install = prod version 2.36.7).
@@ -24,6 +26,7 @@ const { normalizeItems } = require(N + '/n8n-core/dist/execution-engine/node-exe
 const bh = require(N + '/n8n-core/dist/execution-engine/node-execution-context/utils/binary-helper-functions.js');
 const { validateRunCodeAllItems } = require(N + '/n8n-nodes-base/dist/nodes/Code/result-validation.js');
 const moveTo = require(N + '/n8n-nodes-base/dist/nodes/Files/ExtractFromFile/actions/moveTo.operation.js');
+const pdfOp = require(N + '/n8n-nodes-base/dist/nodes/Files/ExtractFromFile/actions/pdf.operation.js');
 const crAuth = require(path.join(__dirname, '..', 'auth', 'token.js'));
 
 const SECRET = 'synthetic-upload-secret';
@@ -81,9 +84,9 @@ async function runScenario(wf, sc) {
   const trace = [];
   const events = { sideEffects: [] };
   const mergeInputs = {};
-  const $ = (name) => {
-    const items = out[name];
-    if (!items) throw new TypeError(`node ${name} has not run`);
+  const $ = (name) => {                                 // like n8n: $('Node') reads the node's output 0
+    if (!out[name]) throw new TypeError(`node ${name} has not run`);
+    const items = out[name][0] || [];
     return { first: () => items[0], item: items[0], all: () => items, last: () => items[items.length - 1] };
   };
   const env = { CR_AUTH_SECRET: SECRET, CR_AUTH_COMPAT_UNTIL: sc.compatOpen ? '2999-01-01T00:00:00Z' : '2000-01-01T00:00:00Z' };
@@ -93,6 +96,7 @@ async function runScenario(wf, sc) {
     trace.push(name);
     const ctx = (it) => ({ json: it.json, binary: it.binary, $ });
     let outputs;
+    try {
     switch (n.type) {
       case 'n8n-nodes-base.webhook':
         outputs = [items];
@@ -119,7 +123,7 @@ async function runScenario(wf, sc) {
         break;
       case 'n8n-nodes-base.extractFromFile': {
         const p = n.parameters;
-        if (p.operation !== 'text') { events[name] = 'not executed (non-text op)'; return; }
+        if (p.operation !== 'text' && p.operation !== 'pdf') { events[name] = 'not executed (op ' + p.operation + ')'; return; }
         const inputData = { main: [items] };
         const self = {
           getWorkflowSettings: () => ({ binaryMode: undefined }),
@@ -130,10 +134,13 @@ async function runScenario(wf, sc) {
             getBinaryDataBuffer: (i, prop) => bh.getBinaryDataBuffer(inputData, i, prop, 0),
             detectBinaryEncoding: (buf) => bh.detectBinaryEncoding(buf),
           },
-          continueOnFail: () => false,
+          continueOnFail: () => n.onError === 'continueErrorOutput' || n.onError === 'continueRegularOutput',
           getNode: () => n,
         };
-        outputs = [await moveTo.execute.call(self, items, 'text')];
+        outputs = [p.operation === 'pdf' ? await pdfOp.execute.call(self, items) : await moveTo.execute.call(self, items, 'text')];
+        if (n.onError === 'continueErrorOutput') {       // n8n core: items the node flagged with json.error -> error output
+          outputs = [outputs[0].filter((it) => !('error' in it.json)), outputs[0].filter((it) => 'error' in it.json)];
+        }
         break;
       }
       case 'n8n-nodes-base.switch': {
@@ -150,18 +157,15 @@ async function runScenario(wf, sc) {
         outputs = res;
         break;
       }
-      case 'n8n-nodes-base.merge': {
-        mergeInputs[name] = mergeInputs[name] || {};
-        mergeInputs[name][inputIndex] = items;
+      case 'n8n-nodes-base.merge': {                      // called only once every input has arrived (see deliver)
         const m = mergeInputs[name];
-        if (!(m[0] && m[1])) return;                      // v1 order: waits for the other input
         outputs = [m[0].map((a, i) => ({ json: { ...(m[1][i] || {}).json, ...a.json }, binary: { ...((m[1][i] || {}).binary || {}), ...(a.binary || {}) } }))];
         break;
       }
       case 'n8n-nodes-base.postgres':
         events.sideEffects.push(name);
         events[name] = { params: evalExpr(n.parameters.options.queryReplacement, ctx(items[0])), query: n.parameters.query };
-        outputs = [[{ json: {} }]];
+        outputs = [[{ json: (sc.pg || {})[name] || {} }]];
         break;
       case 'n8n-nodes-base.respondToWebhook':
         if (!events.response) {
@@ -180,12 +184,41 @@ async function runScenario(wf, sc) {
         events[name] = { reached: true, json: items[0].json };
         return;
     }
-    out[name] = outputs.flat();
-    const conns = (wf.connections[name] || {}).main || [];
-    for (let o = 0; o < conns.length; o++) {
-      if (!outputs[o] || !outputs[o].length) continue;
-      for (const c of conns[o] || []) await exec(c.node, outputs[o], c.index || 0);
+    } catch (e) {
+      if (n.onError === 'continueErrorOutput') outputs = [[], items.map((it) => ({ json: { error: e.message } }))];
+      else if (n.onError === 'continueRegularOutput') outputs = [items.map((it) => ({ json: { error: e.message } }))];
+      else throw e;
     }
+    out[name] = outputs;
+    // n8n executionOrder v1 (n8n-core workflow-execute.js): the children of ALL outputs are pooled, sorted by canvas
+    // position (top first, then left) and pushed to the FRONT of the stack — so each child's subtree runs to the end
+    // before the next sibling starts. A multi-input child (Merge) parks its data at once and runs the moment its
+    // last input arrives. The connection order in the JSON decides NOTHING.
+    const kids = [];
+    ((wf.connections[name] || {}).main || []).forEach((list, o) => {
+      if (outputs[o] && outputs[o].length) for (const c of list || []) kids.push({ c, items: outputs[o] });
+    });
+    if ((wf.settings || {}).executionOrder === 'v1') {
+      kids.sort((a, b) => byName[a.c.node].position[1] - byName[b.c.node].position[1] || byName[a.c.node].position[0] - byName[b.c.node].position[0]);
+    }
+    for (const k of kids) if (inputCount(k.c.node) > 1) park(k.c.node, k.c.index || 0, k.items);
+    for (const k of kids) await deliver(k.c.node, k.items, k.c.index || 0, true);
+  }
+  const inputCount = (node) => {
+    let n = 0;
+    for (const outs of Object.values(wf.connections)) for (const list of (outs.main || [])) for (const c of list || []) if (c.node === node) n = Math.max(n, (c.index || 0) + 1);
+    return n;
+  };
+  const merged = new Set();
+  function park(node, index, items) { (mergeInputs[node] = mergeInputs[node] || {})[index] = items; }
+  async function deliver(node, items, index, parked) {
+    const need = inputCount(node);
+    if (need <= 1) return exec(node, items, index);
+    if (!parked) park(node, index, items);
+    const m = mergeInputs[node] || {};
+    if (merged.has(node) || [...Array(need).keys()].some((i) => !m[i])) return;   // waits for the other input
+    merged.add(node);
+    return exec(node, m[0], 0);
   }
   const now = Math.floor(Date.now() / 1000);
   const headers = { 'content-type': 'multipart/form-data; boundary=x' };
@@ -194,16 +227,18 @@ async function runScenario(wf, sc) {
   const item = {
     json: { headers, params: {}, query: {}, body: {}, webhookUrl: 'http://localhost/webhook/UploadFile', executionMode: 'production' },
     binary: { whatsappWorkflowId: bin(f.whatsappWorkflowId), telegramWorkflowId: bin(f.telegramWorkflowId), contentType: bin(f.contentType),
-      fileId: bin(f.fileId), data: bin(sc.file.text, sc.file.name, sc.file.ext, sc.file.mime) },
+      fileId: bin(f.fileId), data: sc.file.b64 !== undefined
+        ? { data: sc.file.b64, mimeType: sc.file.mime, fileName: sc.file.name, fileExtension: sc.file.ext }
+        : bin(sc.file.text, sc.file.name, sc.file.ext, sc.file.mime) },
   };
   let error = null;
   try { await exec('Webhook', [item], 0); } catch (e) { error = { node: trace[trace.length - 1], message: e.message }; }
-  const gate = out['Auth Gate'] ? out['Auth Gate'][0] : null;
+  const gate = out['Auth Gate'] ? out['Auth Gate'][0][0] : null;
   return {
     gate: gate ? { ok: gate.json.crAuth.ok, mode: gate.json.crAuth.mode, reason: gate.json.crAuth.reason, binaryKeys: Object.keys(gate.binary || {}) } : null,
     error,
     response: events.response || null,
-    extractedText: out['Extract from TXT'] ? out['Extract from TXT'][0].json.text : null,
+    extractedText: out['Extract from TXT'] ? out['Extract from TXT'][0][0].json.text : null,
     vectorStoreInput: events['Supabase Vector Store'] ? events['Supabase Vector Store'].json : null,
     registerUpload: events['Register Upload'] || null,
     storeOriginal: events['Store Original File'] || null,

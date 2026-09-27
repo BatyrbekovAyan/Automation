@@ -149,6 +149,15 @@ public class UploadCenter : MonoBehaviour
             yield break;
         }
 
+        // n8n answers 200 with an EMPTY body when the workflow fails before its Respond node — only the
+        // workflow's own success body (echoing this fileId) means the file was ingested. Retry mints a new id.
+        if (!UploadFailureText.IsAcceptedResponse(www.downloadHandler?.text, job.FileId))
+        {
+            Debug.LogError($"[UploadFile] '{job.FileName}': HTTP {www.responseCode} without the success body — not ingested: {www.downloadHandler?.text}");
+            Jobs.MarkFailed(job, UploadFailureText.TapToRetry, canRetry: true);
+            yield break;
+        }
+
         // The bot can be deleted (or the row dismissed) while these bytes are on
         // the wire. Delisting the job does NOT stop this coroutine — it lives on
         // UploadCenter — so without this check the writes below would re-create

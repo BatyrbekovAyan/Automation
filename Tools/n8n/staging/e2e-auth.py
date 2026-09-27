@@ -81,14 +81,14 @@ OWNERS = []   # every Owner this process creates — the suite cleans up ALL of 
 
 class Owner:
     def __init__(self, tag, run_id):
-        OWNERS.append(self)
         self.tag = tag
         self.app_user_id = f"probe-{run_id}-{tag}"
+        self.profiles = []
+        OWNERS.append(self)                      # registered before anything can fail, so cleanup always sees it
         fixture("create-subscriber", "--run-id", f"{run_id}-{tag}")
         st, d = session({"op": "bootstrap", "platform": "test", "appVersion": "e2e", "appUserId": self.app_user_id})
         assert st == 200 and d.get("success"), f"bootstrap {tag}: {st} {d}"
         self.install_id, self.secret, self.token = d["installId"], d["installSecret"], d["token"]
-        self.profiles = []
 
     def refresh(self):
         st, d = session({"op": "refresh", "installId": self.install_id, "installSecret": self.secret, "appUserId": self.app_user_id})
@@ -319,6 +319,21 @@ def upload(token, fields, text, name="price.txt", timeout=120):
             return e.code, raw
 
 
+def raw_upload(token, body, ctype, timeout=120):
+    req = urllib.request.Request(f"{BASE}/webhook/UploadFile", data=body, method="POST",
+                                 headers={"Content-Type": ctype, **({"Authorization": f"Bearer {token}"} if token else {})})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            raw = r.read().decode()
+            return r.status, (json.loads(raw) if raw else None)
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode()
+        try:
+            return e.code, json.loads(raw)
+        except Exception:
+            return e.code, raw
+
+
 def pg(sqltext):
     return subprocess.run([os.path.join(HERE, "pg.sh"), "psql", "-tAc", sqltext], capture_output=True, text=True).stdout.strip()
 
@@ -433,6 +448,17 @@ def s_refresh_outage(ctx):
     return ok, f"outage={st} {d} after={st2} same_install={(d2 or {}).get('installId') == a.install_id} profiles_kept={a.profiles[0] in (d2 or {}).get('profiles', [])}"
 
 
+def wait_ready(timeout=90):
+    """bootstrap.py reports «ready» while n8n is still registering the production webhooks: wait until
+    AuthSession answers a malformed body with its own 400 instead of n8n's 404 «not registered»."""
+    deadline = time.time() + timeout
+    while True:
+        st, _ = session({})
+        if st != 404 or time.time() > deadline:
+            return st
+        time.sleep(2)
+
+
 def sweep_stale_mock_profiles():
     """The Wappi mock mints profile ids from a counter that restarts with the mock (profile-000001, …), so rows a
     PREVIOUS mock lifetime left in staging collide with the ids this run is about to get: Bind Profile keeps the old
@@ -445,35 +471,46 @@ def sweep_stale_mock_profiles():
     print("   pre-run:", fixture("sweep-mock-profiles", *[x for p in live for x in ("--live", p)]))
 
 
-@scenario("upload_price_list_multipart", "R3: a real .txt price list sent the way WWWForm sends it passes the gate with its file, reaches extraction (a staging `documents` row with the text + the bot's ids) and is registered with the decoded values; a foreign workflow id or a non-GUID fileId is 403 before any write")
+@scenario("upload_price_list_multipart", "R3: a real .txt price list sent the way WWWForm sends it passes the gate with its file, is registered FIRST, reaches extraction (a staging `documents` row with the text + the bot's ids); a foreign workflow id, a non-GUID fileId or another install's fileId is 403 before any write; an unreadable PDF is 422, an empty file writes nothing, an own repeat keeps one registry row")
 def s_upload(ctx):
     u = fresh_owner(ctx, "up")
+    v = fresh_owner(ctx, "upv")                                              # another install
     wf_own = ("wfup" + ctx["run_id"])[:16]
     pid = u.profiles[0]
     pg(f"update bot_profiles set workflow_id = '{wf_own}' where profile_id = '{pid}' and owner_id = '{u.install_id}';")   # as Bind Workflow Id would after Create
     d0 = u.refresh()
     if wf_own not in d0.get("workflows", []):
         return False, f"fixture: token lacks the bot's workflow id: {d0.get('workflows')}"
-    ids = [str(uuid.uuid4()) for _ in range(4)]
+    ids = [str(uuid.uuid4()) for _ in range(7)]
+    pg(f"insert into uploaded_files (file_id, owner_id, bot_wa_id) values ('{ids[4]}', '{v.install_id}', 'wfOtherOwner001');")
     text = f"Прайс e2e {ctx['run_id']}\nТовар А — 1000 ₸\nТовар Б — 2500 ₸\n"
     base = {"telegramWorkflowId": "-1", "contentType": "products"}
+    own = {**base, "whatsappWorkflowId": wf_own}
     try:
-        st1, d1 = upload(u.token, {**base, "whatsappWorkflowId": wf_own, "fileId": ids[0]}, text)
+        st1, d1 = upload(u.token, {**own, "fileId": ids[0]}, text)
         st2, d2 = upload(u.token, {**base, "whatsappWorkflowId": "wfNotMine000001", "fileId": ids[1]}, text)
-        st3, d3 = upload(u.token, {**base, "whatsappWorkflowId": wf_own, "fileId": "../other-bucket/" + ids[2]}, text)
-        st4, d4 = upload(None, {**base, "whatsappWorkflowId": wf_own, "fileId": ids[3]}, text)   # legacy (compat open) / 401 (closed)
-        reg = pg(f"select coalesce(owner_id, '-') || '|' || coalesce(bot_wa_id, '-') || '|' || coalesce(bot_tg_id, '-') || '|' || content_type || '|' || file_name from uploaded_files where file_id = '{ids[0]}';")
-        doc = pg(f"select (content like '%Товар Б — 2500 ₸%') || '|' || (metadata->>'botWaId') || '|' || (metadata->>'botTgId') || '|' || (metadata->>'fileId') from documents where metadata->>'fileId' = '{ids[0]}';")
-        refused = pg(f"select (select count(*) from uploaded_files where file_id in ('{ids[1]}', '{ids[2]}')) + (select count(*) from documents where metadata->>'fileId' in ('{ids[1]}', '{ids[2]}'));")
+        st3, d3 = upload(u.token, {**own, "fileId": "../other-bucket/" + ids[2]}, text)
+        st4, d4 = upload(None, {**own, "fileId": ids[3]}, text)   # legacy (compat open) / 401 (closed)
+        st5, d5 = upload(u.token, {**own, "fileId": ids[4]}, text)                               # another install's fileId
+        body, ctype = wwwform({**own, "fileId": ids[5]}, "data", "price.pdf", b"%PDF-1.4 garbage, not a pdf", "application/pdf")
+        st6, d6 = raw_upload(u.token, body, ctype)
+        st7, d7 = upload(u.token, {**own, "fileId": ids[6]}, "")                                 # empty file
+        st8, d8 = upload(u.token, {**own, "fileId": ids[0]}, text)                               # own repeat
+        reg = pg(f"select coalesce(owner_id, '-') || '|' || coalesce(bot_wa_id, '-') || '|' || coalesce(bot_tg_id, '-') || '|' || content_type || '|' || file_name || '|' || (select count(*) from uploaded_files where file_id = '{ids[0]}') from uploaded_files where file_id = '{ids[0]}';")
+        doc = pg(f"select bool_and(content like '%Товар Б — 2500 ₸%') || '|' || max(metadata->>'botWaId') || '|' || max(metadata->>'botTgId') || '|' || max(metadata->>'fileId') from documents where metadata->>'fileId' = '{ids[0]}';")
+        refused = pg(f"select (select count(*) from uploaded_files where file_id in ('{ids[1]}', '{ids[2]}')) + (select count(*) from documents where metadata->>'fileId' in ('{ids[1]}', '{ids[2]}', '{ids[4]}', '{ids[5]}', '{ids[6]}'));")
+        foreign_row = pg(f"select owner_id || '|' || bot_wa_id from uploaded_files where file_id = '{ids[4]}';")
         legacy_reg = pg(f"select coalesce(owner_id, '-') from uploaded_files where file_id = '{ids[3]}';")
     finally:
         pg(f"delete from documents where metadata->>'fileId' in ({', '.join(repr(i) for i in ids)}); delete from uploaded_files where file_id in ({', '.join(repr(i) for i in ids)});")
     legacy_ok = (st4 == 401 and legacy_reg == "") if COMPAT_CLOSED else (st4 == 200 and legacy_reg == "-")
     ok = (st1 == 200 and (d1 or {}).get("success") is True and (d1 or {}).get("fileId") == ids[0]
-          and reg == f"{u.install_id}|{wf_own}|-|products|price.txt" and doc == f"true|{wf_own}|-1|{ids[0]}"
-          and st2 == 403 and st3 == 403 and refused == "0" and legacy_ok)
-    return ok, (f"own={st1} {d1} registry={reg!r} extracted_doc={doc!r} foreign_wf={st2} pathlike_fileid={st3} refused_rows={refused} "
-                f"legacy={st4} legacy_registry={legacy_reg!r}")
+          and reg == f"{u.install_id}|{wf_own}|-|products|price.txt|1" and doc.startswith(f"true|{wf_own}|-1|{ids[0]}")
+          and st2 == 403 and st3 == 403 and st5 == 403 and refused == "0" and foreign_row == f"{v.install_id}|wfOtherOwner001"
+          and st6 == 422 and (d6 or {}).get("error") == "unreadable_file" and st7 != 200 and st8 == 200 and legacy_ok)
+    return ok, (f"own={st1} {d1} registry={reg!r} extracted_doc={doc!r} foreign_wf={st2} pathlike_fileid={st3} foreign_fileid={st5} "
+                f"refused_rows={refused} foreign_row_kept={foreign_row == f'{v.install_id}|wfOtherOwner001'} corrupt_pdf={st6} {d6} "
+                f"empty_file={st7} own_repeat={st8} legacy={st4} legacy_registry={legacy_reg!r}")
 
 
 def main():
@@ -483,6 +520,7 @@ def main():
     run_id = uuid.uuid4().hex[:10]
     ctx = {"run_id": run_id}
     passed = failed = 0
+    wait_ready()
     sweep_stale_mock_profiles()
     try:
         ctx["A"] = Owner("A", run_id); ctx["B"] = Owner("B", run_id)

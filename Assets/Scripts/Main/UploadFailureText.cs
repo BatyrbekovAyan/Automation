@@ -42,6 +42,31 @@ public static class UploadFailureText
     {
         if (responseCode == 422 && responseBody != null && responseBody.Contains("no_price_data"))
             return NoPriceDataOnPhoto;
+        // The workflow could not read the file (a broken PDF) — the same bytes fail the same way.
+        if (responseCode == 422 && responseBody != null && responseBody.Contains("unreadable_file"))
+            return Unreadable;
         return null;
+    }
+
+    /// <summary>
+    /// A 2xx counts as an upload only with the workflow's own success body naming THIS fileId. When the Upload
+    /// File workflow fails before its Respond node, n8n answers 200 with an EMPTY body (R3, 2026-09-27) — treating
+    /// that as success recorded a file nothing had ingested.
+    /// </summary>
+    public static bool IsAcceptedResponse(string responseBody, string fileId)
+    {
+        if (string.IsNullOrEmpty(responseBody)) return false;
+        try
+        {
+            var jo = Newtonsoft.Json.Linq.JObject.Parse(responseBody);
+            var ok = jo["success"];
+            if (ok == null || ok.Type != Newtonsoft.Json.Linq.JTokenType.Boolean || !(bool)ok) return false;
+            string echoed = jo.Value<string>("fileId");
+            return string.IsNullOrEmpty(fileId) || echoed == fileId;
+        }
+        catch
+        {
+            return false;
+        }
     }
 }

@@ -102,11 +102,12 @@ def check_upload_no_put_chain():
         assert d not in wf["connections"], f"{UPLOAD}: connection for {d} not pruned"
     ext_tg = wf["connections"]["Extract Telegram Workflow Id"]["main"][0]
     if any(l["node"] == "Upload Fields Valid?" for l in ext_tg):
-        # R3 (2026-09-27): the decoded multipart ids are validated first; the fan-out is the check's
-        # TRUE branch, and nothing may leave Extract Telegram Workflow Id around it.
+        # R3 (2026-09-27): the decoded multipart ids are validated and the upload registered first; the fan-out
+        # hangs off "Upload Item" (the end of that chain), and nothing may leave Extract Telegram Workflow Id
+        # around it (the chain itself is pinned by verify-auth-gate.py).
         assert [l["node"] for l in ext_tg] == ["Upload Fields Valid?"], \
             f"Extract Telegram Workflow Id must feed ONLY Upload Fields Valid?: {ext_tg}"
-        ext_tg = wf["connections"]["Upload Fields Valid?"]["main"][0]
+        ext_tg = wf["connections"]["Upload Item"]["main"][0]
     targets = {(l["node"], l.get("index", 0)) for l in ext_tg}
     assert ("Switch", 0) in targets and ("Merge", 1) in targets, \
         f"the id-extraction path must feed Switch and Merge(1): {targets}"

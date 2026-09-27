@@ -136,24 +136,33 @@ def check_bots():
 def check_files(mig):
     up = load("KoTuIlk4LMrlvnWI-Upload_File.json")
     reg = node(up, "Register Upload")
-    assert "insert into uploaded_files" in reg["parameters"]["query"]
-    # R3 (2026-09-27): the multipart ids are binary parts the gate cannot see — they are validated right after
-    # decoding (ownership in session mode, GUID fileId), BEFORE the registry write and the ingest fan-out.
-    assert edges(up, "Extract Telegram Workflow Id") == [{"node": "Upload Fields Valid?", "type": "main", "index": 0}], \
+    assert reg["parameters"]["query"] == mig.REGISTER_UPLOAD_SQL and "as allowed" in reg["parameters"]["query"], "Register Upload must return the owner verdict `allowed`"
+    assert reg["parameters"]["options"]["queryReplacement"] == mig.REGISTER_UPLOAD_PARAMS, "Register Upload must read the decoded values from the nodes that decoded them"
+    # R3 (2026-09-27): the multipart ids are binary parts the gate cannot see — validated right after decoding
+    # (ownership in session mode, GUID fileId), then the upload is registered IN SEQUENCE (n8n v1 runs siblings by
+    # canvas position: a sibling registry ran LAST, after the response) and only an `allowed` verdict reaches the ingest.
+    E = lambda n: {"node": n, "type": "main", "index": 0}
+    assert edges(up, "Extract Telegram Workflow Id") == [E("Upload Fields Valid?")], \
         f"the decoded multipart fields must pass Upload Fields Valid? before anything else: {edges(up, 'Extract Telegram Workflow Id')}"
     cond = node(up, "Upload Fields Valid?")["parameters"]["conditions"]["conditions"]
     assert len(cond) == 1 and cond[0]["leftValue"] == mig.UPLOAD_FIELDS_VALID and cond[0]["operator"]["operation"] == "true", "Upload Fields Valid? condition is stale"
-    true_branch = edges(up, "Upload Fields Valid?", 0)
-    assert true_branch and true_branch[0] == {"node": "Register Upload", "type": "main", "index": 0}, "Register Upload must be the FIRST branch (runs before the ingest chain)"
-    assert {c["node"] for c in true_branch} >= {"Switch", "Merge"}, f"the ingest fan-out must hang off the check's true branch: {true_branch}"
-    assert edges(up, "Upload Fields Valid?", 1) == [{"node": "Respond Upload Forbidden", "type": "main", "index": 0}], "a refused upload must end at Respond Upload Forbidden"
+    assert edges(up, "Upload Fields Valid?", 0) == [E("Register Upload")], f"the check's true branch must go ONLY to Register Upload: {edges(up, 'Upload Fields Valid?', 0)}"
+    assert edges(up, "Upload Fields Valid?", 1) == [E("Respond Upload Forbidden")], "a refused upload must end at Respond Upload Forbidden"
     assert node(up, "Respond Upload Forbidden")["parameters"]["options"].get("responseCode") == 403
-    assert reg["parameters"]["options"]["queryReplacement"] == mig.REGISTER_UPLOAD_PARAMS, "Register Upload must read the decoded values from the nodes that decoded them"
+    assert edges(up, "Register Upload") == [E("Upload Registered?")], "the registry verdict must gate the ingest"
+    rc = node(up, "Upload Registered?")["parameters"]["conditions"]["conditions"]
+    assert len(rc) == 1 and rc[0]["leftValue"] == mig.UPLOAD_REGISTERED, "Upload Registered? must test allowed === true"
+    assert edges(up, "Upload Registered?", 0) == [E("Upload Item")] and edges(up, "Upload Registered?", 1) == [E("Respond Upload Refused")]
+    assert node(up, "Upload Item")["parameters"]["jsCode"] == mig.UPLOAD_ITEM_JS
+    assert {c["node"] for c in edges(up, "Upload Item")} >= {"Switch", "Merge"}, f"the ingest fan-out must hang off Upload Item: {edges(up, 'Upload Item')}"
+    pdf = node(up, "Extract from PDF")
+    assert pdf.get("onError") == "continueErrorOutput" and edges(up, "Extract from PDF", 1) == [E("Respond Unreadable File")], \
+        "an unreadable PDF must answer 422, not the empty 200 n8n sends when a responseNode workflow fails"
     for src, outs in up["connections"].items():
         for out in outs.get("main", []):
             for c in out:
-                if c["node"] in ("Register Upload", "Switch", "Store Original File") and src not in ("Upload Fields Valid?", "Switch"):
-                    raise AssertionError(f"{src} -> {c['node']} bypasses Upload Fields Valid?")
+                if c["node"] in ("Switch", "Merge", "Store Original File", "Register Upload") and src not in ("Upload Item", "Switch", "Upload Fields Valid?", "Extract from PDF", "Extract from TXT", "Image Text"):
+                    raise AssertionError(f"{src} -> {c['node']} bypasses the field check / registry chain")
     df = load("ZTqpumOpL1rNDOp6-Delete_File.json")
     q = node(df, "Delete File Chunks")["parameters"]["query"]
     assert "uploaded_files" in q and 'AS "allowed"' in q and "EXISTS (SELECT 1 FROM own)" in q, "Delete File Chunks must be owner-scoped and report allowed"

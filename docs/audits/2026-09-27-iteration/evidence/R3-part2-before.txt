@@ -1,0 +1,62 @@
+# R3 part 2 before — python3 Tools/n8n/tests/test_upload.py @ 0dd53d04 (driver now follows n8n executionOrder v1 exactly as n8n-core does; the order it prints is the one staging execution 4401 recorded: Register Upload runs LAST, after the ingest + the response)
+PASS R3 legacy_own: the file survives the gate and reaches extraction + the vector-store insert
+FAIL R3 legacy_own: Register Upload receives the decoded values and the real SQL stores the row
+      - Register Upload must be the first side effect: ['Store Original File', 'Supabase Vector Store', 'Register Upload']
+      - the registry verdict must come BEFORE the ingest (sequential, not a sibling branch): ['Webhook', 'Auth Gate', 'Authorized?', 'Get File Name', 'Set File Id', 'Extract File Id', 'Extract Content Type', 'Extract Whatsapp Workflow Id', 'Extract Telegram Workflow Id', 'Upload Fields Valid?', 'Switch', 'Store Original File', 'Extract from TXT', 'Merge', 'Clean Text', 'Source Text', 'Supabase Vector Store', 'Register Upload']
+PASS R3 session_own_wa: the file survives the gate and reaches extraction + the vector-store insert
+FAIL R3 session_own_wa: Register Upload receives the decoded values and the real SQL stores the row
+      - Register Upload must be the first side effect: ['Store Original File', 'Supabase Vector Store', 'Register Upload']
+      - the registry verdict must come BEFORE the ingest (sequential, not a sibling branch): ['Webhook', 'Auth Gate', 'Authorized?', 'Get File Name', 'Set File Id', 'Extract File Id', 'Extract Content Type', 'Extract Whatsapp Workflow Id', 'Extract Telegram Workflow Id', 'Upload Fields Valid?', 'Switch', 'Store Original File', 'Extract from TXT', 'Merge', 'Clean Text', 'Source Text', 'Supabase Vector Store', 'Register Upload']
+PASS R3 session_own_both: the file survives the gate and reaches extraction + the vector-store insert
+FAIL R3 session_own_both: Register Upload receives the decoded values and the real SQL stores the row
+      - Register Upload must be the first side effect: ['Store Original File', 'Supabase Vector Store', 'Register Upload']
+      - the registry verdict must come BEFORE the ingest (sequential, not a sibling branch): ['Webhook', 'Auth Gate', 'Authorized?', 'Get File Name', 'Set File Id', 'Extract File Id', 'Extract Content Type', 'Extract Whatsapp Workflow Id', 'Extract Telegram Workflow Id', 'Upload Fields Valid?', 'Switch', 'Store Original File', 'Extract from TXT', 'Merge', 'Clean Text', 'Source Text', 'Supabase Vector Store', 'Register Upload']
+PASS R3 session_foreign_wa: a WhatsApp workflow id the token does not own is refused with 403 before ANY write
+PASS R3 session_foreign_tg: a Telegram workflow id the token does not own is refused with 403 before ANY write
+PASS R3 session_pathlike_fileid: a fileId that is not a GUID (it is spliced into the service-role storage URL) is refused with 403 before ANY write
+PASS R3 legacy_pathlike_fileid: a non-GUID fileId in legacy mode too is refused with 403 before ANY write
+FAIL R3 session_foreign_fileid: a fileId the registry says belongs to another install -> 403, nothing but the registry check ran
+      - None ['Store Original File', 'Supabase Vector Store', 'Register Upload']
+FAIL R3 session_registry_fault: a registry DB fault -> 503 db_unavailable, no ingest
+      - None ['Store Original File', 'Supabase Vector Store', 'Register Upload']
+PASS R3 session_valid_pdf: a real PDF is extracted and reaches the vector-store insert
+FAIL R3 session_corrupt_pdf: an unreadable PDF answers 422 unreadable_file — never a 200 the app records as uploaded
+      - {'node': 'Extract from PDF', 'message': 'Invalid PDF structure.'} None
+FAIL R3 Register Upload SQL: a new fileId is registered to the caller (session) / to nobody (legacy) and allowed
+      - EXCEPTION RuntimeError: psql failed: ERROR:  syntax error at or near "insert"
+LINE 5: insert into uploaded_files (file_id, owner_id, bot_wa_id, bo...
+        ^
+FAIL R3 Register Upload SQL: another install's fileId is refused and its row is not changed
+      - EXCEPTION RuntimeError: psql failed: ERROR:  syntax error at or near "insert"
+LINE 5: insert into uploaded_files (file_id, owner_id, bot_wa_id, bo...
+        ^
+FAIL R3 Register Upload SQL: a repeat of the caller's own fileId and an owner-less legacy row are allowed (the legacy row is adopted)
+      - EXCEPTION RuntimeError: psql failed: ERROR:  syntax error at or near "insert"
+LINE 5: insert into uploaded_files (file_id, owner_id, bot_wa_id, bo...
+        ^
+PASS R3 compat window closed: a token-less upload is 401 and nothing runs
+FAIL R3 negative: verify-auth-gate.py rejects the pre-R3 wiring (no field check) and the binary-dropping gate
+      - registry as a sibling of the ingest: verifier passed a broken Upload File: ped delete)
+OK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (workflow id + owner bound to the profile)
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (workflow id + owner bound to the profile)
+OK  Set Workflow State (protected list carries Auth Session + Wappi Proxy)
+ALL AUTH GATE ASSERTS PASSED
+
+PASS R3 negative: verify_rag.py rejects an ingest edge that bypasses Upload Fields Valid?
+PASS R3 staging isolation: the derived staging copies can no longer write to the real Supabase project
+PASS R3 gate contract: every generated Auth Gate re-emits the input binary (no webhook can lose a file)
+
+12 pass, 10 fail
+
+# R3 part 2 before (staging e2e, n8n 2.36.7 running the R3 part-1 Upload File)
+FAIL  upload_price_list_multipart (2.7s) — R3: a real .txt price list sent the way WWWForm sends it passes the gate with its file, is registered FIRST, reaches extraction (a staging `documents` row with the text + the bot's ids); a foreign workflow id, a non-GUID fileId or another install's fileId is 403 before any write; an unreadable PDF is 422, an empty file writes nothing, an own repeat keeps one registry row
+      own=200 {'success': True, 'fileId': 'c17fa8ae-8a35-46cf-983c-148ff4546f20'} registry='339a7d80-3954-42d5-a590-4a53fc4b24de|wfupa07a91d7fb|-|products|price.txt|1' extracted_doc='true|wfupa07a91d7fb|-1|c17fa8ae-8a35-46cf-983c-148ff4546f20' foreign_wf=403 pathlike_fileid=403 foreign_fileid=200 refused_rows=1 foreign_row_kept=True corrupt_pdf=200 None empty_file=500 own_repeat=200 legacy=200 legacy_registry='-'
+0 pass, 1 fail
+
+# R3 part 2 before (client) — Tools/run-tests-headless.sh 'UploadFailureTextTests' (source guard added first)
+================ EditMode test results (headless) ================
+  result=Failed(Child)  total=10  passed=9  failed=1  skipped=0  inconclusive=0
+  Failing / inconclusive tests:
+    - UploadFailureTextTests.UploadCenter_RecordsAnUploadOnlyAfterTheSuccessBodyCheck
+=================================================================
+NOT GREEN ❌  (unity exit=2).

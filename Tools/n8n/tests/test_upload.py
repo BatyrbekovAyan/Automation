@@ -8,6 +8,7 @@ text/plain part, which n8n files under item.binary, and the body is empty. Then 
 with the evaluated parameters against a temp `uploaded_files` in the staging Postgres (BEGIN … ROLLBACK).
 Also: every generated Auth Gate (all gated webhooks, the proxy, Handoffs, Test Dialog) keeps an input's binary.
 """
+import base64
 import json
 import subprocess
 import sys
@@ -30,10 +31,30 @@ def drive(mode, files, payload):
     return json.loads(r.stdout)
 
 
-def scenario(claims, wa, tg, file_id, compat_open=False):
-    return {'compatOpen': compat_open, 'claims': claims,
+REGISTERED = {'Register Upload': {'allowed': True}}          # the registry's verdict row (SQL tested below)
+
+
+def scenario(claims, wa, tg, file_id, compat_open=False, pg=REGISTERED, file=None):
+    return {'compatOpen': compat_open, 'claims': claims, 'pg': pg,
             'fields': {'whatsappWorkflowId': wa, 'telegramWorkflowId': tg, 'contentType': 'products', 'fileId': file_id},
-            'file': {'text': FILE_TEXT, 'name': 'price.txt', 'ext': 'txt', 'mime': 'text/plain'}}
+            'file': file or {'text': FILE_TEXT, 'name': 'price.txt', 'ext': 'txt', 'mime': 'text/plain'}}
+
+
+def tiny_pdf(text):
+    """A minimal valid one-page PDF carrying `text` (ASCII), with a correct xref — for the PDF branch."""
+    objs = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+            '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 144] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
+            None, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>']
+    stream = f'BT /F1 18 Tf 20 100 Td ({text}) Tj ET'
+    objs[3] = f'<< /Length {len(stream)} >>\nstream\n{stream}\nendstream'
+    out, offs = '%PDF-1.4\n', []
+    for i, o in enumerate(objs, 1):
+        offs.append(len(out.encode('latin-1')))
+        out += f'{i} 0 obj\n{o}\nendobj\n'
+    xref = len(out.encode('latin-1'))
+    out += f'xref\n0 {len(objs) + 1}\n0000000000 65535 f \n' + ''.join(f'{x:010d} 00000 n \n' for x in offs)
+    out += f'trailer\n<< /Size {len(objs) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n'
+    return base64.b64encode(out.encode('latin-1')).decode()
 
 
 SCENARIOS = {
@@ -45,6 +66,10 @@ SCENARIOS = {
     'session_pathlike_fileid': scenario(CLAIMS, OWN_WA, '-1', '../other-bucket/x'),
     'legacy_pathlike_fileid': scenario(None, OWN_WA, '-1', '../other-bucket/x', compat_open=True),
     'session_compat_closed_no_token': scenario(None, OWN_WA, '-1', GUID),
+    'session_foreign_fileid': scenario(CLAIMS, OWN_WA, '-1', GUID, pg={'Register Upload': {'allowed': False}}),
+    'session_registry_fault': scenario(CLAIMS, OWN_WA, '-1', GUID, pg={'Register Upload': {'message': 'Connection terminated', 'error': {'message': 'Connection terminated'}}}),
+    'session_valid_pdf': scenario(CLAIMS, OWN_WA, '-1', GUID, file={'b64': tiny_pdf('Rose 1000 KZT'), 'name': 'price.pdf', 'ext': 'pdf', 'mime': 'application/pdf'}),
+    'session_corrupt_pdf': scenario(CLAIMS, OWN_WA, '-1', GUID, file={'b64': base64.b64encode(b'%PDF-garbage, not a pdf').decode(), 'name': 'price.pdf', 'ext': 'pdf', 'mime': 'application/pdf'}),
 }
 R = drive('chain', [UPLOAD], SCENARIOS)
 REGISTER_SQL = next(n for n in json.loads(UPLOAD.read_text(encoding='utf-8'))['nodes'] if n['name'] == 'Register Upload')['parameters']['query']
@@ -74,8 +99,9 @@ def own_upload(key, owner, wa, tg):
             row = registered_row(p)
             c.check(row == {'file_id': GUID, 'owner_id': owner or None, 'bot_wa_id': None if wa in ('', '-1') else wa,
                             'bot_tg_id': None if tg in ('', '-1') else tg, 'content_type': 'products', 'file_name': 'price.txt'}, f"row {row}")
-        c.check('Register Upload' in r['sideEffects'] and r['sideEffects'].index('Register Upload') == 0,
-                f"Register Upload must be the first side effect: {r['sideEffects']}")
+        c.check(r['sideEffects'][:1] == ['Register Upload'], f"Register Upload must be the first side effect: {r['sideEffects']}")
+        c.check(r['trace'].index('Register Upload') < r['trace'].index('Switch'),
+                f"the registry verdict must come BEFORE the ingest (sequential, not a sibling branch): {r['trace']}")
 
 
 own_upload('legacy_own', '', OWN_WA, '-1')
@@ -91,6 +117,57 @@ for key, why in (('session_foreign_wa', 'a WhatsApp workflow id the token does n
         c.check(r['error'] is None, f"chain failed instead of refusing: {r['error']}")
         c.check((r['response'] or {}).get('code') == 403, f"response {r['response']}")
         c.check(r['sideEffects'] == [], f"side effects ran: {r['sideEffects']}")
+
+with Case('R3 session_foreign_fileid: a fileId the registry says belongs to another install -> 403, nothing but the registry check ran') as c:
+    r = R['session_foreign_fileid']
+    c.check((r['response'] or {}).get('code') == 403 and r['sideEffects'] == ['Register Upload'], f"{r['response']} {r['sideEffects']}")
+
+with Case('R3 session_registry_fault: a registry DB fault -> 503 db_unavailable, no ingest') as c:
+    r = R['session_registry_fault']
+    c.check((r['response'] or {}).get('code') == 503 and (r['response'] or {}).get('body', {}).get('error') == 'db_unavailable'
+            and r['sideEffects'] == ['Register Upload'], f"{r['response']} {r['sideEffects']}")
+
+with Case('R3 session_valid_pdf: a real PDF is extracted and reaches the vector-store insert') as c:
+    r = R['session_valid_pdf']
+    c.check(r['error'] is None and 'Rose 1000 KZT' in str((r['vectorStoreInput'] or {}).get('content', '')), f"{r['error']} {r['vectorStoreInput']}")
+
+with Case('R3 session_corrupt_pdf: an unreadable PDF answers 422 unreadable_file — never a 200 the app records as uploaded') as c:
+    r = R['session_corrupt_pdf']
+    c.check(r['error'] is None and (r['response'] or {}).get('code') == 422
+            and (r['response'] or {}).get('body', {}).get('error') == 'unreadable_file', f"{r['error']} {r['response']}")
+    c.check('Supabase Vector Store' not in r['sideEffects'], f"nothing may be ingested: {r['sideEffects']}")
+
+# ---- the registry SQL decides: the caller's own / a new fileId -> allowed; another install's -> refused, row untouched ----
+REG_SETUP = TEMP_TABLE + """
+insert into uploaded_files (file_id, owner_id, bot_wa_id) values
+  ('11111111-1111-4111-8111-111111111111', 'inst-B', 'wfB'),
+  ('22222222-2222-4222-8222-222222222222', null, 'wfL'),
+  ('33333333-3333-4333-8333-333333333333', 'inst-A', 'wfOwnWA00000001');"""
+
+
+def reg(file_id, owner):
+    return sql_json(f"create temp table r as {bind(REGISTER_SQL.rstrip().rstrip(';'), [file_id, owner, OWN_WA, '-1', 'products', 'price.txt'])};\n"
+                    "select json_build_object('allowed', (select allowed from r), 'rows', (select json_agg(json_build_object('f', file_id, 'o', owner_id, 'wa', bot_wa_id) order by file_id) from uploaded_files));",
+                    REG_SETUP)
+
+
+with Case('R3 Register Upload SQL: a new fileId is registered to the caller (session) / to nobody (legacy) and allowed') as c:
+    a, b = reg(GUID, 'inst-A'), reg(GUID, '')
+    c.check(a['allowed'] is True and {'f': GUID, 'o': 'inst-A', 'wa': OWN_WA} in a['rows'], f"session {a}")
+    c.check(b['allowed'] is True and {'f': GUID, 'o': None, 'wa': OWN_WA} in b['rows'], f"legacy {b}")
+
+with Case('R3 Register Upload SQL: another install\'s fileId is refused and its row is not changed') as c:
+    a = reg('11111111-1111-4111-8111-111111111111', 'inst-A')
+    b = reg('11111111-1111-4111-8111-111111111111', '')
+    row = {'f': '11111111-1111-4111-8111-111111111111', 'o': 'inst-B', 'wa': 'wfB'}
+    c.check(a['allowed'] is False and row in a['rows'], f"session {a}")
+    c.check(b['allowed'] is False and row in b['rows'], f"legacy caller {b}")
+
+with Case('R3 Register Upload SQL: a repeat of the caller\'s own fileId and an owner-less legacy row are allowed (the legacy row is adopted)') as c:
+    a = reg('33333333-3333-4333-8333-333333333333', 'inst-A')
+    b = reg('22222222-2222-4222-8222-222222222222', 'inst-A')
+    c.check(a['allowed'] is True and len([x for x in a['rows'] if x['f'].startswith('3333')]) == 1, f"repeat {a}")
+    c.check(b['allowed'] is True and {'f': '22222222-2222-4222-8222-222222222222', 'o': 'inst-A', 'wa': 'wfL'} in b['rows'], f"legacy row {b}")
 
 with Case('R3 compat window closed: a token-less upload is 401 and nothing runs') as c:
     r = R['session_compat_closed_no_token']
@@ -119,13 +196,19 @@ def bypass(w):   # the pre-R3 wiring: registry + ingest straight off the last ex
                                                                   {'node': 'Merge', 'type': 'main', 'index': 1}]]}
 
 
+def sibling_registry(w):   # R3 part 1 wiring: the registry as a SIBLING of the ingest (n8n v1 runs it last)
+    w['connections']['Upload Fields Valid?']['main'][0] = [{'node': 'Register Upload', 'type': 'main', 'index': 0},
+                                                          {'node': 'Switch', 'type': 'main', 'index': 0},
+                                                          {'node': 'Merge', 'type': 'main', 'index': 1}]
+
+
 def old_gate(w):  # the pre-R3 gate that re-emitted json only
     g = next(n for n in w['nodes'] if n['name'] == 'Auth Gate')
     g['parameters']['jsCode'] = g['parameters']['jsCode'].replace('...(inItem.binary ? { binary: inItem.binary } : {}), ', '')
 
 
 with Case('R3 negative: verify-auth-gate.py rejects the pre-R3 wiring (no field check) and the binary-dropping gate') as c:
-    for label, m in (('bypass', bypass), ('old gate', old_gate)):
+    for label, m in (('bypass', bypass), ('old gate', old_gate), ('registry as a sibling of the ingest', sibling_registry)):
         d = mutated_copy(m)
         r = subprocess.run([sys.executable, str(N8N / 'verify-auth-gate.py'), '--dir', str(d)], capture_output=True, text=True)
         c.check(r.returncode != 0 and 'AUTH GATE FAIL' in r.stdout, f"{label}: verifier passed a broken Upload File: {r.stdout[-300:]}")

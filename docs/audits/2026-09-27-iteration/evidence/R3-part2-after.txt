@@ -1,0 +1,49 @@
+# R3 part 2 after — python3 Tools/n8n/tests/test_upload.py (driver follows n8n executionOrder v1)
+PASS R3 legacy_own: the file survives the gate and reaches extraction + the vector-store insert
+PASS R3 legacy_own: Register Upload receives the decoded values and the real SQL stores the row
+PASS R3 session_own_wa: the file survives the gate and reaches extraction + the vector-store insert
+PASS R3 session_own_wa: Register Upload receives the decoded values and the real SQL stores the row
+PASS R3 session_own_both: the file survives the gate and reaches extraction + the vector-store insert
+PASS R3 session_own_both: Register Upload receives the decoded values and the real SQL stores the row
+PASS R3 session_foreign_wa: a WhatsApp workflow id the token does not own is refused with 403 before ANY write
+PASS R3 session_foreign_tg: a Telegram workflow id the token does not own is refused with 403 before ANY write
+PASS R3 session_pathlike_fileid: a fileId that is not a GUID (it is spliced into the service-role storage URL) is refused with 403 before ANY write
+PASS R3 legacy_pathlike_fileid: a non-GUID fileId in legacy mode too is refused with 403 before ANY write
+PASS R3 session_foreign_fileid: a fileId the registry says belongs to another install -> 403, nothing but the registry check ran
+PASS R3 session_registry_fault: a registry DB fault -> 503 db_unavailable, no ingest
+PASS R3 session_valid_pdf: a real PDF is extracted and reaches the vector-store insert
+PASS R3 session_corrupt_pdf: an unreadable PDF answers 422 unreadable_file — never a 200 the app records as uploaded
+PASS R3 Register Upload SQL: a new fileId is registered to the caller (session) / to nobody (legacy) and allowed
+PASS R3 Register Upload SQL: another install's fileId is refused and its row is not changed
+PASS R3 Register Upload SQL: a repeat of the caller's own fileId and an owner-less legacy row are allowed (the legacy row is adopted)
+PASS R3 compat window closed: a token-less upload is 401 and nothing runs
+PASS R3 negative: verify-auth-gate.py rejects the pre-R3 wiring (no field check) and the binary-dropping gate
+PASS R3 negative: verify_rag.py rejects an ingest edge that bypasses Upload Fields Valid?
+PASS R3 staging isolation: the derived staging copies can no longer write to the real Supabase project
+PASS R3 gate contract: every generated Auth Gate re-emits the input binary (no webhook can lose a file)
+
+22 pass, 0 fail
+
+# generator idempotent: python3 Tools/n8n/apply-auth-gate.py --check (after two runs)
+auth gate: OK
+
+# staging e2e (n8n 2.36.7 + task runners): upload_price_list_multipart (full e2e-auth 18/18 in the same session)
+PASS  upload_price_list_multipart (7.3s) — R3: a real .txt price list sent the way WWWForm sends it passes the gate with its file, is registered FIRST, reaches extraction (a staging `documents` row with the text + the bot's ids); a foreign workflow id, a non-GUID fileId or another install's fileId is 403 before any write; an unreadable PDF is 422, an empty file writes nothing, an own repeat keeps one registry row
+      own=200 {'success': True, 'fileId': 'a99f5787-a2f7-497a-9ba6-8fbf6f559fb1'} registry='7f0dc46c-4971-40e7-977a-39f2e163b161|wfup04f4b6cec9|-|products|price.txt|1' extracted_doc='true|wfup04f4b6cec9|-1|a99f5787-a2f7-497a-9ba6-8fbf6f559fb1' foreign_wf=403 pathlike_fileid=403 foreign_fileid=403 refused_rows=0 foreign_row_kept=True corrupt_pdf=422 {'success': False, 'error': 'unreadable_file'} empty_file=500 own_repeat=200 legacy=200 legacy_registry='-'
+18 pass, 0 fail
+
+# real execution order on staging (runData keys of the Upload File executions of that run, from Extract Telegram Workflow Id on)
+4524 success ['Extract Telegram Workflow Id', 'Upload Fields Valid?', 'Register Upload', 'Upload Registered?', 'Upload Item', 'Switch', 'Store Original File', 'Extract from TXT', 'Merge', 'Clean Text', 'Source Text', 'Supabase Vector Store', 'Return File Id']
+4525 success ['Extract Telegram Workflow Id', 'Upload Fields Valid?', 'Respond Upload Forbidden']
+4526 success ['Extract Telegram Workflow Id', 'Upload Fields Valid?', 'Respond Upload Forbidden']
+4527 success ['Extract Telegram Workflow Id', 'Upload Fields Valid?', 'Register Upload', 'Upload Registered?', 'Upload Item', 'Switch', 'Store Original File', 'Extract from TXT', 'Merge', 'Clean Text', 'Source Text', 'Supabase Vector Store', 'Return File Id']
+4528 success ['Extract Telegram Workflow Id', 'Upload Fields Valid?', 'Register Upload', 'Upload Registered?', 'Respond Upload Refused']
+4529 success ['Extract Telegram Workflow Id', 'Upload Fields Valid?', 'Register Upload', 'Upload Registered?', 'Upload Item', 'Switch', 'Store Original File', 'Extract from PDF', 'Respond Unreadable File', 'Merge']
+4530 success ['Extract Telegram Workflow Id', 'Upload Fields Valid?', 'Register Upload', 'Upload Registered?', 'Upload Item', 'Switch', 'Store Original File', 'Extract from TXT', 'Merge', 'Clean Text', 'Source Text', 'Supabase Vector Store', 'Return File Id']
+
+# client — Tools/run-tests-headless.sh 'Upload|Auth|Claim|Install|Session'
+================ EditMode test results (headless) ================
+  result=Passed  total=212  passed=212  failed=0  skipped=0  inconclusive=0
+=================================================================
+GREEN ✅  all 212 tests passed.
+exit=0
