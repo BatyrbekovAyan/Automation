@@ -13,6 +13,15 @@ Create WhatsApp/Telegram workflow:
   * `Seed Reply Mode` between `Get Created Workflow Id` and `Activate Created Workflow`: the profile's
     initial '*' row lands BEFORE the clone can auto-reply (the gate reads absence as «reply»). Only
     a client that states `ReplyMode` (semi|auto) writes; a legacy client keeps the old semantics.
+  * R8 (2026-09-27): activation is gated on a POSITIVE marker. The seed statement answers one row
+    `seeded = true` whenever it completed (retried up to 3× on failure); `Seed Saved?` lets the clone
+    go live only on that marker — or when the create is not «Вместе» (auto / legacy: absence IS their
+    mode, a seed failure must not refuse them). Otherwise `Delete Unseeded Workflow` removes the clone
+    (never activated, no Wappi webhook, not bound) and `Respond Reply Mode Not Saved` answers
+    {success:false, error:"reply_mode_not_saved"} — the client's existing failure contract (no "id").
+    Why a marker and not continueErrorOutput: an error thrown outside the query runner passes the INPUT
+    item on output 0 (n8n-core), and an empty result becomes {} under alwaysOutputData — both would
+    still reach Activate. Behaviour pinned by tests/test_create_seed.py.
 
     python3 Tools/n8n/apply-reply-mode-v2.py            # patch in place (re-runnable)
     python3 Tools/n8n/apply-reply-mode-v2.py --check
@@ -122,12 +131,24 @@ SEED_SQL = """-- A2: the profile's initial reply mode lands BEFORE the clone is 
 -- as «reply», so activating first opened a window in which a «Вместе» bot answered). Only a client
 -- that states its mode writes; a legacy client (no ReplyMode field) keeps the old absence semantics.
 -- Version-guarded like Set Reply Mode: a newer explicit choice already stored is never downgraded.
-insert into reply_mode_flags (profile_id, chat_id, suppressed, version, updated_at)
-select $1, '*', ($2 = 'semi'), $3::bigint, now()
-where nullif($1, '') is not null and $1 <> '-1' and $2 in ('semi', 'auto')
-on conflict (profile_id, chat_id) do update
-  set suppressed = excluded.suppressed, version = excluded.version, updated_at = now()
-  where reply_mode_flags.version < excluded.version;"""
+-- R8: the statement ALWAYS answers one row `seeded = true` once it completed (a legacy body or a stale
+-- version write nothing and still count as saved) — `Seed Saved?` activates the clone only on it.
+with seed as (
+  insert into reply_mode_flags (profile_id, chat_id, suppressed, version, updated_at)
+  select $1, '*', ($2 = 'semi'), $3::bigint, now()
+  where nullif($1, '') is not null and $1 <> '-1' and $2 in ('semi', 'auto')
+  on conflict (profile_id, chat_id) do update
+    set suppressed = excluded.suppressed, version = excluded.version, updated_at = now()
+    where reply_mode_flags.version < excluded.version
+  returning 1
+)
+select true as seeded, (select count(*) from seed)::int as written;"""
+
+SEED_FLAGS = {"alwaysOutputData": True, "onError": "continueRegularOutput",
+              "retryOnFail": True, "maxTries": 3, "waitBetweenTries": 1000}
+SEED_GATE_EXPR = "={{ $json.seeded === true || String($('Unity Webhook').first().json.body.ReplyMode || '') !== 'semi' }}"
+DELETE_URL = "=https://n8n.choosereply.com/api/v1/workflows/{{ $('Get Created Workflow Id').first().json.id }}"
+NOT_SAVED_ERROR = "reply_mode_not_saved"
 
 
 def nid(*parts):
@@ -195,6 +216,51 @@ def patch_set_reply_mode():
     return changed
 
 
+def seed_gate_nodes(fname, seed, act):
+    """R8: the marker gate and the fail-closed branch, fully specified (ids are uuid5 → stable across runs)."""
+    x, y = seed["position"]
+    gate = {"parameters": {"conditions": {"options": {"caseSensitive": True, "leftValue": "", "typeValidation": "loose", "version": 2},
+                                          "conditions": [{"id": nid(fname, "seed-gate", "cond"), "leftValue": SEED_GATE_EXPR, "rightValue": "",
+                                                          "operator": {"type": "boolean", "operation": "true", "singleValue": True}}],
+                                          "combinator": "and"}, "options": {}},
+            "id": nid(fname, "seed-gate"), "name": "Seed Saved?", "type": "n8n-nodes-base.if", "typeVersion": 2.2,
+            "position": [x + 176, y]}
+    delete = {"parameters": {"method": "DELETE", "url": DELETE_URL, "authentication": "genericCredentialType",
+                             "genericAuthType": "httpHeaderAuth", "options": {"timeout": 30000}},
+              "id": nid(fname, "seed-delete"), "name": "Delete Unseeded Workflow", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2,
+              "position": [x + 352, y + 180], "credentials": json.loads(json.dumps(act["credentials"])),
+              "alwaysOutputData": True, "onError": "continueRegularOutput"}
+    respond = {"parameters": {"assignments": {"assignments": [
+                   {"id": nid(fname, "seed-respond", "success"), "name": "success", "value": False, "type": "boolean"},
+                   {"id": nid(fname, "seed-respond", "error"), "name": "error", "value": NOT_SAVED_ERROR, "type": "string"}]},
+                   "options": {}},
+               "id": nid(fname, "seed-respond"), "name": "Respond Reply Mode Not Saved", "type": "n8n-nodes-base.set", "typeVersion": 3.4,
+               "position": [x + 528, y + 180]}
+    return gate, delete, respond
+
+
+def ensure_node(wf, spec):
+    """Create the node, or bring an existing one to the spec (its canvas position is left alone)."""
+    cur = node(wf, spec["name"])
+    if cur is None:
+        wf["nodes"].append(spec)
+        return True
+    changed = False
+    for k, v in spec.items():
+        if k != "position" and cur.get(k) != v:
+            cur[k] = v
+            changed = True
+    return changed
+
+
+def set_edges(wf, src, outputs):
+    want = {"main": [[{"node": dst, "type": "main", "index": 0}] for dst in outputs]}
+    if wf["connections"].get(src) != want:
+        wf["connections"][src] = want
+        return True
+    return False
+
+
 def patch_create(fname, profile_field):
     path = os.path.join(WF, fname)
     wf = json.load(open(path, encoding="utf-8"))
@@ -204,24 +270,29 @@ def patch_create(fname, profile_field):
     params = "={{ [ $('Unity Webhook').first().json.body." + profile_field + ", String($('Unity Webhook').first().json.body.ReplyMode || ''), String($('Unity Webhook').first().json.body.ReplyModeVersion || '0') ] }}"
     seed = node(wf, "Seed Reply Mode")
     if seed is None:
-        wf["nodes"].append({"parameters": {"operation": "executeQuery", "query": SEED_SQL, "options": {"queryReplacement": params}},
-                            "id": nid(fname, "seed"), "name": "Seed Reply Mode", "type": "n8n-nodes-base.postgres", "typeVersion": 2.6,
-                            "position": [gci["position"][0] + 200, gci["position"][1] + 220],
-                            "credentials": {"postgres": dict(PG_CRED)}, "alwaysOutputData": True, "onError": "continueRegularOutput"})
+        seed = {"parameters": {"operation": "executeQuery", "query": SEED_SQL, "options": {"queryReplacement": params}},
+                "id": nid(fname, "seed"), "name": "Seed Reply Mode", "type": "n8n-nodes-base.postgres", "typeVersion": 2.6,
+                "position": [gci["position"][0] + 200, gci["position"][1] + 220],
+                "credentials": {"postgres": dict(PG_CRED)}}
+        wf["nodes"].append(seed)
         changed = True
     else:
         changed = set_param(seed, "query", SEED_SQL, changed)
         if seed["parameters"].get("options", {}).get("queryReplacement") != params:
             seed["parameters"]["options"] = {"queryReplacement": params}
             changed = True
+    for k, v in SEED_FLAGS.items():
+        if seed.get(k) != v:
+            seed[k] = v
+            changed = True
     want_url = "=https://n8n.choosereply.com/api/v1/workflows/{{ $('Get Created Workflow Id').first().json.id }}/activate"
     changed = set_param(act, "url", want_url, changed)
-    if edges(wf, "Get Created Workflow Id")[0] != [{"node": "Seed Reply Mode", "type": "main", "index": 0}]:
-        wf["connections"]["Get Created Workflow Id"] = {"main": [[{"node": "Seed Reply Mode", "type": "main", "index": 0}]]}
-        changed = True
-    if edges(wf, "Seed Reply Mode")[0] != [{"node": "Activate Created Workflow", "type": "main", "index": 0}]:
-        wf["connections"]["Seed Reply Mode"] = {"main": [[{"node": "Activate Created Workflow", "type": "main", "index": 0}]]}
-        changed = True
+    for spec in seed_gate_nodes(fname, seed, act):
+        changed = ensure_node(wf, spec) or changed
+    changed = set_edges(wf, "Get Created Workflow Id", ["Seed Reply Mode"]) or changed
+    changed = set_edges(wf, "Seed Reply Mode", ["Seed Saved?"]) or changed
+    changed = set_edges(wf, "Seed Saved?", ["Activate Created Workflow", "Delete Unseeded Workflow"]) or changed
+    changed = set_edges(wf, "Delete Unseeded Workflow", ["Respond Reply Mode Not Saved"]) or changed
     if changed:
         with open(path, "w", encoding="utf-8") as fh:
             json.dump(wf, fh, indent=2, ensure_ascii=False)
@@ -238,7 +309,14 @@ def check():
     for f, field in CREATES.items():
         wf = json.load(open(os.path.join(WF, f), encoding="utf-8"))
         s = node(wf, "Seed Reply Mode")
-        if s is None or s["parameters"]["query"] != SEED_SQL or edges(wf, "Seed Reply Mode")[0][0]["node"] != "Activate Created Workflow":
+        gate = node(wf, "Seed Saved?")
+        topology = {src: [[c["node"] for c in out] for out in wf["connections"].get(src, {}).get("main", [])]
+                    for src in ("Seed Reply Mode", "Seed Saved?", "Delete Unseeded Workflow")}
+        if s is None or s["parameters"]["query"] != SEED_SQL or any(s.get(k) != v for k, v in SEED_FLAGS.items()) \
+                or gate is None or gate["parameters"]["conditions"]["conditions"][0]["leftValue"] != SEED_GATE_EXPR \
+                or topology != {"Seed Reply Mode": [["Seed Saved?"]],
+                                "Seed Saved?": [["Activate Created Workflow"], ["Delete Unseeded Workflow"]],
+                                "Delete Unseeded Workflow": [["Respond Reply Mode Not Saved"]]}:
             bad.append(f)
     return bad
 

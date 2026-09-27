@@ -561,6 +561,58 @@ def s_create_empty_billing(ctx):
     return ok, f"wa={st1} {d1} tg={st2} {d2} clones_bound={bound}"
 
 
+def clones_for(pid):
+    """(id, active) of every staging workflow whose webhook path is this profile (the clone's first node)."""
+    found, cursor = [], None
+    while True:
+        st, d = http("GET", f"{BASE}/api/v1/workflows?limit=250" + (f"&cursor={cursor}" if cursor else ""),
+                     headers={"X-N8N-API-KEY": SEC.get("apiKey", "")})
+        for w in (d or {}).get("data", []):
+            if not w.get("isArchived") and any(n.get("type") == "n8n-nodes-base.webhook" and (n.get("parameters") or {}).get("path") == pid
+                                               for n in w.get("nodes", [])):
+                found.append((w["id"], w.get("active")))
+        cursor = (d or {}).get("nextCursor")
+        if st != 200 or not cursor:
+            return found
+
+
+@scenario("create_seed_failure_keeps_clone_inactive", "R8: a «Вместе» create whose reply-mode seed fails (a real Postgres failure on staging, scoped to this profile) answers reply_mode_not_saved, leaves NO clone (not active, not bound, no Wappi webhook); the retry once the DB is back creates exactly ONE live clone with the '*' row — WhatsApp and Telegram")
+def s_create_seed_failure(ctx):
+    res = {}
+    for ch, form, field in (("wa", "CreateWhatsappWorkflow", "WhatsappProfileId"), ("tg", "CreateTelegramWorkflow", "TelegramProfileId")):
+        o = Owner(f"r8{ch}", ctx["run_id"])
+        pid = o.add_profile("whatsapp" if ch == "wa" else "telegram")
+        base = {"Name": f"e2e-r8-{ctx['run_id']}", "BusinessType": "Цветы", "BusinessTypeId": "flowers", "Business": "", "Prompt": "",
+                "ProductsList": "", "ServicesList": "", "AppUserID": o.app_user_id, "BotKey": f"Bot-r8{ch}-{ctx['run_id']}",
+                "ReplyMode": "semi", field: pid, ("TelegramWorkflowId" if ch == "wa" else "WhatsappWorkflowId"): "-1"}
+        con = f"r8_{ctx['run_id']}_{ch}"
+        pg(f"alter table reply_mode_flags add constraint {con} check (profile_id <> '{pid}') not valid;")   # staging only, this profile only
+        try:
+            since = mock_total()
+            st1, d1 = hook_form(form, o.token, {**base, "ReplyModeVersion": "150"})
+            hooks1 = [c for c in mock_calls(since, "webhook/url/set")[0] if pid in json.dumps(c)]
+            bound1 = pg(f"select coalesce(workflow_id, '-') from bot_profiles where profile_id = '{pid}';")
+            clones1 = clones_for(pid)
+        finally:
+            pg(f"alter table reply_mode_flags drop constraint if exists {con};")
+        o.refresh()
+        st2, d2 = hook_form(form, o.token, {**base, "ReplyModeVersion": "151"})
+        wid = (d2 or {}).get("id") if isinstance(d2, dict) else None
+        clones2 = clones_for(pid)
+        row = pg(f"select suppressed || '|' || version from reply_mode_flags where profile_id = '{pid}' and chat_id = '*';")
+        o.refresh()
+        st3 = hook("SetWorkflowState", o.token, {"workflowId": wid, "action": "delete"})[0] if wid else 0
+        for left, _ in clones_for(pid):          # a regressed graph leaves the failed create's clone behind: staging API cleanup
+            http("DELETE", f"{BASE}/api/v1/workflows/{left}", headers={"X-N8N-API-KEY": SEC.get("apiKey", "")})
+        res[ch] = {"failed_create": (st1, d1), "wappi_webhook_calls": len(hooks1), "bound": bound1, "clones_after_failure": clones1,
+                   "retry": (st2, wid), "clones_after_retry": clones2, "row": row, "cleanup_delete": st3}
+    ok = all(r["failed_create"] == (200, {"success": False, "error": "reply_mode_not_saved"}) and r["wappi_webhook_calls"] == 0
+             and r["bound"] in ("", "-") and r["clones_after_failure"] == [] and r["retry"][0] == 200 and r["retry"][1]
+             and r["clones_after_retry"] == [(r["retry"][1], True)] and r["row"] == "true|151" and r["cleanup_delete"] == 200
+             for r in res.values())
+    return ok, json.dumps(res, ensure_ascii=False)
+
+
 def sweep_stale_mock_profiles():
     """The Wappi mock mints profile ids from a counter that restarts with the mock (profile-000001, …), so rows a
     PREVIOUS mock lifetime left in staging collide with the ids this run is about to get: Bind Profile keeps the old

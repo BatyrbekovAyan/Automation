@@ -1,0 +1,12 @@
+PASS R8 [WA] A1: the seed statement answers seeded=true for a new «Вместе» row and writes it
+PASS R8 [WA] A2: a legacy body (no ReplyMode) and a stale version complete with seeded=true and write nothing new
+PASS R8 [WA] A3: a failing write yields no marker (the statement errors)
+PASS R8 [WA] B: every seed failure keeps a «Вместе» clone inactive, deleted and answered reply_mode_not_saved; ok/transient/auto/legacy go live
+PASS R8 [WA] C: the checks reject the naive continueErrorOutput variant (a thrown error still activates there)
+PASS R8 [TG] A1: the seed statement answers seeded=true for a new «Вместе» row and writes it
+PASS R8 [TG] A2: a legacy body (no ReplyMode) and a stale version complete with seeded=true and write nothing new
+PASS R8 [TG] A3: a failing write yields no marker (the statement errors)
+PASS R8 [TG] B: every seed failure keeps a «Вместе» clone inactive, deleted and answered reply_mode_not_saved; ok/transient/auto/legacy go live
+PASS R8 [TG] C: the checks reject the naive continueErrorOutput variant (a thrown error still activates there)
+
+10 pass, 0 fail

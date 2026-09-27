@@ -658,7 +658,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "-- A2: the profile's initial reply mode lands BEFORE the clone is activated (the gate reads absence\n-- as «reply», so activating first opened a window in which a «Вместе» bot answered). Only a client\n-- that states its mode writes; a legacy client (no ReplyMode field) keeps the old absence semantics.\n-- Version-guarded like Set Reply Mode: a newer explicit choice already stored is never downgraded.\ninsert into reply_mode_flags (profile_id, chat_id, suppressed, version, updated_at)\nselect $1, '*', ($2 = 'semi'), $3::bigint, now()\nwhere nullif($1, '') is not null and $1 <> '-1' and $2 in ('semi', 'auto')\non conflict (profile_id, chat_id) do update\n  set suppressed = excluded.suppressed, version = excluded.version, updated_at = now()\n  where reply_mode_flags.version < excluded.version;",
+        "query": "-- A2: the profile's initial reply mode lands BEFORE the clone is activated (the gate reads absence\n-- as «reply», so activating first opened a window in which a «Вместе» bot answered). Only a client\n-- that states its mode writes; a legacy client (no ReplyMode field) keeps the old absence semantics.\n-- Version-guarded like Set Reply Mode: a newer explicit choice already stored is never downgraded.\n-- R8: the statement ALWAYS answers one row `seeded = true` once it completed (a legacy body or a stale\n-- version write nothing and still count as saved) — `Seed Saved?` activates the clone only on it.\nwith seed as (\n  insert into reply_mode_flags (profile_id, chat_id, suppressed, version, updated_at)\n  select $1, '*', ($2 = 'semi'), $3::bigint, now()\n  where nullif($1, '') is not null and $1 <> '-1' and $2 in ('semi', 'auto')\n  on conflict (profile_id, chat_id) do update\n    set suppressed = excluded.suppressed, version = excluded.version, updated_at = now()\n    where reply_mode_flags.version < excluded.version\n  returning 1\n)\nselect true as seeded, (select count(*) from seed)::int as written;",
         "options": {
           "queryReplacement": "={{ [ $('Unity Webhook').first().json.body.WhatsappProfileId, String($('Unity Webhook').first().json.body.ReplyMode || ''), String($('Unity Webhook').first().json.body.ReplyModeVersion || '0') ] }}"
         }
@@ -678,7 +678,10 @@
         }
       },
       "alwaysOutputData": true,
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
     },
     {
       "parameters": {
@@ -703,6 +706,104 @@
         }
       },
       "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9d710238-6423-5e6b-97c3-cf61232c44c7",
+              "leftValue": "={{ $json.seeded === true || String($('Unity Webhook').first().json.body.ReplyMode || '') !== 'semi' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d4e158b5-82f3-589e-9721-e6e58f7665b6",
+      "name": "Seed Saved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2420,
+        204
+      ]
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://n8n.choosereply.com/api/v1/workflows/{{ $('Get Created Workflow Id').first().json.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "ee71d913-893d-5b74-8b10-68f753f98145",
+      "name": "Delete Unseeded Workflow",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2596,
+        384
+      ],
+      "credentials": {
+        "n8nApi": {
+          "id": "X1k4igOAG65Fb3oz",
+          "name": "n8n account"
+        },
+        "httpBearerAuth": {
+          "id": "nfU8CbYjPssGjEZA",
+          "name": "Bearer Auth account"
+        },
+        "httpHeaderAuth": {
+          "id": "RV7m661NMLPXEcvm",
+          "name": "n8nAPIKey"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bd7646fe-a80e-5b5e-899f-661d863559a1",
+              "name": "success",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "4ea62cc3-4e03-5009-8978-3d6aac978c86",
+              "name": "error",
+              "value": "reply_mode_not_saved",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2389db08-19bb-58da-9cc1-844ddab227b3",
+      "name": "Respond Reply Mode Not Saved",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2772,
+        384
+      ]
     }
   ],
   "connections": {
@@ -962,7 +1063,7 @@
       "main": [
         [
           {
-            "node": "Activate Created Workflow",
+            "node": "Seed Saved?",
             "type": "main",
             "index": 0
           }
@@ -974,6 +1075,35 @@
         [
           {
             "node": "Respond Channel Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Seed Saved?": {
+      "main": [
+        [
+          {
+            "node": "Activate Created Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Delete Unseeded Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Unseeded Workflow": {
+      "main": [
+        [
+          {
+            "node": "Respond Reply Mode Not Saved",
             "type": "main",
             "index": 0
           }

@@ -1,0 +1,9 @@
+   pre-run: swept 0 stale mock profile(s) (live mock knows 12)
+FAIL  create_seed_failure_keeps_clone_inactive (4.1s) — R8: a «Вместе» create whose reply-mode seed fails (a real Postgres failure on staging, scoped to this profile) answers reply_mode_not_saved, leaves NO clone (not active, not bound, no Wappi webhook); the retry once the DB is back creates exactly ONE live clone with the '*' row — WhatsApp and Telegram
+      {"wa": {"failed_create": [200, {"id": "KZA9s0Fv6k9UD1LE"}], "wappi_webhook_calls": 1, "bound": "KZA9s0Fv6k9UD1LE", "clones_after_failure": [["KZA9s0Fv6k9UD1LE", true]], "retry": [500, null], "clones_after_retry": [["KZA9s0Fv6k9UD1LE", true], ["kPJex4qnTRgjJ1bI", false]], "row": "true|151", "cleanup_delete": 0}, "tg": {"failed_create": [200, {"id": "vrzoJzECrsCwROi2"}], "wappi_webhook_calls": 1, "bound": "vrzoJzECrsCwROi2", "clones_after_failure": [["vrzoJzECrsCwROi2", true]], "retry": [500, null], "clones_after_retry": [["FaihoLFsDfsJhmP1", false], ["vrzoJzECrsCwROi2", true]], "row": "true|151", "cleanup_delete": 0}}
+   cleanup A: deleted rows: 3
+   cleanup B: deleted rows: 3
+   cleanup r8wa: deleted rows: 3
+   cleanup r8tg: deleted rows: 3
+
+0 pass, 1 fail

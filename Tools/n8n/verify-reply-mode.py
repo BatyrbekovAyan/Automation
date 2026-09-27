@@ -8,7 +8,9 @@ Pins:
     success; malformed body → HTTP 400; the response code is driven by the shaped `_status`.
   * Create WhatsApp/Telegram: `Seed Reply Mode` sits strictly BETWEEN `Get Created Workflow Id` and
     `Activate Created Workflow` (initial mode before any auto-reply is possible), writes only when the
-    client states `ReplyMode`, and is version-guarded; Activate resolves the id by node name.
+    client states `ReplyMode`, and is version-guarded; Activate resolves the id by node name. R8: the
+    activation is gated by `Seed Saved?` on the statement's positive `seeded` marker; the false branch
+    deletes the clone and answers reply_mode_not_saved (behaviour: tests/test_create_seed.py).
   * Bot templates: Read Reply Mode's coalesce(absence → false) is UNCHANGED (locked semantics).
 
     python3 Tools/n8n/verify-reply-mode.py [--dir DIR]
@@ -97,10 +99,29 @@ def check_create(f, field):
     assert "$1 <> '-1'" in q, f"{f}: seed must skip the unauthed sentinel"
     assert field in seed["parameters"]["options"]["queryReplacement"] and "ReplyMode" in seed["parameters"]["options"]["queryReplacement"]
     assert edge(wf, "Get Created Workflow Id") == [{"node": "Seed Reply Mode", "type": "main", "index": 0}], f"{f}: seed must follow Get Created Workflow Id"
-    assert edge(wf, "Seed Reply Mode") == [{"node": "Activate Created Workflow", "type": "main", "index": 0}], f"{f}: activation must come AFTER the seed"
+    # R8 (2026-09-27): activation only on the statement's POSITIVE marker. The seed continues on error (so a failure
+    # can be answered), which is exactly why nothing may connect it straight to Activate: a Postgres error item, an
+    # error thrown outside the query runner (the INPUT item passes on) and an empty result ({}) all flow on output 0.
+    assert "select true as seeded" in q and "returning 1" in q, f"{f}: the seed must answer a positive `seeded` marker once it completed (R8)"
+    assert seed.get("retryOnFail") is True and seed.get("maxTries", 0) >= 2, f"{f}: a transient seed failure must be retried (R8)"
+    assert edge(wf, "Seed Reply Mode") == [{"node": "Seed Saved?", "type": "main", "index": 0}], \
+        f"{f}: the seed must feed the marker gate, never Activate directly (R8)"
+    gate = node(wf, "Seed Saved?")["parameters"]["conditions"]
+    lv = gate["conditions"][0]["leftValue"]
+    assert len(gate["conditions"]) == 1 and gate["conditions"][0]["operator"]["operation"] == "true" \
+        and "$json.seeded === true" in lv and "!== 'semi'" in lv, f"{f}: Seed Saved? must pass only on the marker (or a non-«Вместе» create): {lv!r}"
+    assert edge(wf, "Seed Saved?", 0) == [{"node": "Activate Created Workflow", "type": "main", "index": 0}], f"{f}: activation must come AFTER the saved marker"
+    assert edge(wf, "Seed Saved?", 1) == [{"node": "Delete Unseeded Workflow", "type": "main", "index": 0}], f"{f}: an unseeded clone must be deleted (R8)"
+    dele = node(wf, "Delete Unseeded Workflow")
+    assert dele["parameters"]["method"] == "DELETE" and dele["parameters"]["url"].endswith("/api/v1/workflows/{{ $('Get Created Workflow Id').first().json.id }}"), \
+        f"{f}: Delete Unseeded Workflow must DELETE the created clone by id"
+    assert edge(wf, "Delete Unseeded Workflow") == [{"node": "Respond Reply Mode Not Saved", "type": "main", "index": 0}]
+    assert not wf["connections"].get("Respond Reply Mode Not Saved", {}).get("main", [[]])[0], f"{f}: the refusal must be the LAST node (responseMode lastNode)"
+    body = {a["name"]: a["value"] for a in node(wf, "Respond Reply Mode Not Saved")["parameters"]["assignments"]["assignments"]}
+    assert body == {"success": False, "error": "reply_mode_not_saved"}, f"{f}: refusal body must carry no id: {body}"
     act = node(wf, "Activate Created Workflow")["parameters"]["url"]
     assert "$('Get Created Workflow Id').first().json.id" in act, f"{f}: Activate must resolve the id by node name (the seed node drops the item)"
-    print(f"OK  {f} (initial reply mode seeded before activation)")
+    print(f"OK  {f} (initial reply mode seeded before activation; activation only on the saved marker)")
 
 
 def check_gate_read():

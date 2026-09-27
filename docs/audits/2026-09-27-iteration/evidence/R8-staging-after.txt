@@ -1,0 +1,46 @@
+   pre-run: swept 0 stale mock profile(s) (live mock knows 16)
+PASS  create_seeds_reply_mode_before_activation (3.1s) — CreateWhatsappWorkflow with ReplyMode=semi: the '*' row exists after create, the clone id is bound to the profile, the token learns it, and SetWorkflowState can delete it
+      create=200 id=58yymoeObU6Db4zQ row='true|150' bound=True token_has_wf=True delete=200 {'success': True}
+PASS  create_slot_count_excludes_own_profile_and_retires_refused (1.5s) — 2026-09-24 hotfix: on a 1-channel plan the FIRST channel is accepted (the A1-registered row of the profile being created is not counted) and a refused second profile is deleted at Wappi AND retired in bot_profiles
+      first=200 id=gdbREiWgCyp0TM1z second=200 refused=True wappi_deletes=1 row2='channel_limit|true' row1_alive_bound=True
+PASS  create_rejects_empty_appuserid_in_session (0.7s) — R2: CreateWhatsappWorkflow/CreateTelegramWorkflow with an EMPTY AppUserID in session mode are refused before any write (the empty id skipped Count Channels and let the quota fail open)
+      wa=200 {'success': False, 'error': 'unauthorized', 'reason': 'forbidden:AppUserID'} tg=200 {'success': False, 'error': 'unauthorized', 'reason': 'forbidden:AppUserID'} clones_bound=0
+PASS  create_seed_failure_keeps_clone_inactive (8.1s) — R8: a «Вместе» create whose reply-mode seed fails (a real Postgres failure on staging, scoped to this profile) answers reply_mode_not_saved, leaves NO clone (not active, not bound, no Wappi webhook); the retry once the DB is back creates exactly ONE live clone with the '*' row — WhatsApp and Telegram
+      {"wa": {"failed_create": [200, {"success": false, "error": "reply_mode_not_saved"}], "wappi_webhook_calls": 0, "bound": "-", "clones_after_failure": [], "retry": [200, "FSvkl8nEwkypI6dX"], "clones_after_retry": [["FSvkl8nEwkypI6dX", true]], "row": "true|151", "cleanup_delete": 200}, "tg": {"failed_create": [200, {"success": false, "error": "reply_mode_not_saved"}], "wappi_webhook_calls": 0, "bound": "-", "clones_after_failure": [], "retry": [200, "66zhdAgdEOYem69f"], "clones_after_retry": [["66zhdAgdEOYem69f", true]], "row": "true|151", "cleanup_delete": 200}}
+   cleanup A: deleted rows: 3
+   cleanup B: deleted rows: 3
+   cleanup cs: deleted rows: 3
+   cleanup C: deleted rows: 4
+   cleanup r2e: deleted rows: 4
+   cleanup r8wa: deleted rows: 3
+   cleanup r8tg: deleted rows: 3
+
+4 pass, 0 fail
+--- full e2e-auth after re-import ---
+PASS  session_bootstrap_and_refresh (0.2s) — bootstrap mints an install; refresh with the secret returns a token; a wrong secret is 401
+PASS  session_bad_request_is_400 (0.1s) — a malformed AuthSession body answers 400, never a token
+PASS  proxy_requires_token (0.2s) — WappiProxy without / with a forged / with an expired token → 401 and NO transport call
+PASS  proxy_profile_add_binds_owner (0.7s) — profile.add creates the Wappi profile, binds it to the install and returns a token carrying it
+PASS  proxy_owner_isolation (0.7s) — owner B cannot read/act on owner A's profile through ANY proxy op (403, no transport call)
+PASS  proxy_legit_ops_pass_through (0.4s) — the owner's own ops reach the transport with the server credential and get Wappi's body back
+PASS  proxy_unknown_op_rejected (0.2s) — an op outside the allow-list is refused without a transport call
+PASS  hooks_reject_foreign_ids (0.7s) — gated webhooks refuse owner B's ids on owner A's token (and refuse no token) before any side effect
+PASS  claim_by_code_transfers_ownership (0.7s) — a legacy/other-install profile: claim.start sends a code to the bot's OWN chat; claim.verify binds it to the claiming install
+PASS  claim_by_reauth_binds_after_pairing (1.8s) — an UNAUTHORISED legacy profile: claim.start → reauth; only a pairing AFTER the claim binds it (claim.status)
+PASS  claim_reauth_owned_profile_not_transferred (2.4s) — R1: a stranger's pending claim on an OWNED profile + the owner's own later re-pairing → the stranger gets nothing, claim.status sends no code, the owner keeps the profile
+PASS  claim_stale_capability_cannot_pair (1.1s) — R1: once another install takes over a pending claim, the first claimant's token capability no longer starts a pairing (403 claim_not_pending, no transport call)
+PASS  claim_unauthenticated_writes_nothing (1.0s) — R1: a claim.* call with a wrong secret is refused (401) before Claim Start — no row inserted, a pending claim untouched
+PASS  replymode_reordered_versions_keep_newest (0.6s) — SetReplyMode v2: a later request with an OLDER version is not applied; the reply reports the server's newer value
+PASS  replymode_bot_default_covers_both_channels_atomically (0.7s) — SetReplyMode v2: a bot-default write for WA+TG travels as ONE request and both rows land (all-or-nothing); a stale follow-up for one of them is refused per profile
+PASS  replymode_legacy_body_still_writes (0.2s) — SetReplyMode v2: a legacy body (no version) is applied with a server-assigned version and reads success + written
+PASS  replymode_invalid_is_400 (0.0s) — SetReplyMode v2: a malformed body answers 400 (was 200 + success:false)
+PASS  create_seeds_reply_mode_before_activation (1.2s) — CreateWhatsappWorkflow with ReplyMode=semi: the '*' row exists after create, the clone id is bound to the profile, the token learns it, and SetWorkflowState can delete it
+PASS  create_slot_count_excludes_own_profile_and_retires_refused (1.5s) — 2026-09-24 hotfix: on a 1-channel plan the FIRST channel is accepted (the A1-registered row of the profile being created is not counted) and a refused second profile is deleted at Wappi AND retired in bot_profiles
+PASS  refresh_db_outage_keeps_install (0.4s) — R11: a refresh while the database fails answers 503 db_unavailable (never the 401 that makes the client discard its install); the SAME credentials refresh fine once it is back
+PASS  billing_id_first_bind (1.2s) — R2: a second install naming a billing id another install holds (with a live bot) gets NO billing identity + billingConflict — its GetUsage/Create/profile.add on that id are refused; the id follows only once the holder is revoked
+PASS  create_rejects_empty_appuserid_in_session (0.7s) — R2: CreateWhatsappWorkflow/CreateTelegramWorkflow with an EMPTY AppUserID in session mode are refused before any write (the empty id skipped Count Channels and let the quota fail open)
+PASS  create_seed_failure_keeps_clone_inactive (8.1s) — R8: a «Вместе» create whose reply-mode seed fails (a real Postgres failure on staging, scoped to this profile) answers reply_mode_not_saved, leaves NO clone (not active, not bound, no Wappi webhook); the retry once the DB is back creates exactly ONE live clone with the '*' row — WhatsApp and Telegram
+PASS  upload_price_list_multipart (3.9s) — R3: a real .txt price list sent the way WWWForm sends it passes the gate with its file, is registered FIRST, reaches extraction (a staging `documents` row with the text + the bot's ids); a foreign workflow id, a non-GUID fileId or another install's fileId is 403 before any write; an unreadable PDF is 422, an empty file writes nothing, an own repeat keeps one registry row
+24 pass, 0 fail
+
+[exited with code 0]

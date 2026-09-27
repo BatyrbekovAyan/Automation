@@ -1,0 +1,38 @@
+FAIL R8 [WA] A1: the seed statement answers seeded=true for a new «Вместе» row and writes it
+      - rows=[]
+FAIL R8 [WA] A2: a legacy body (no ReplyMode) and a stale version complete with seeded=true and write nothing new
+      - legacy rows=[] row=None
+      - stale rows=[] row=(False, 200)
+PASS R8 [WA] A3: a failing write yields no marker (the statement errors)
+FAIL R8 [WA] B: every seed failure keeps a «Вместе» clone inactive, deleted and answered reply_mode_not_saved; ok/transient/auto/legacy go live
+      - semi:query_error: a failed seed still went live (activate=True wappi_webhook=True bound=True)
+      - semi:query_error: answered {'id': 'WFr8new'} instead of {'success': False, 'error': 'reply_mode_not_saved'}
+      - semi:query_error: the unseeded clone was not deleted: []
+      - semi:thrown: a failed seed still went live (activate=True wappi_webhook=True bound=True)
+      - semi:thrown: answered {'id': 'WFr8new'} instead of {'success': False, 'error': 'reply_mode_not_saved'}
+      - semi:thrown: the unseeded clone was not deleted: []
+      - semi:empty: a failed seed still went live (activate=True wappi_webhook=True bound=True)
+      - semi:empty: answered {'id': 'WFr8new'} instead of {'success': False, 'error': 'reply_mode_not_saved'}
+      - semi:empty: the unseeded clone was not deleted: []
+      - semi:transient: a transient seed failure was not retried (calls=1)
+PASS R8 [WA] C: the checks reject the naive continueErrorOutput variant (a thrown error still activates there)
+FAIL R8 [TG] A1: the seed statement answers seeded=true for a new «Вместе» row and writes it
+      - rows=[]
+FAIL R8 [TG] A2: a legacy body (no ReplyMode) and a stale version complete with seeded=true and write nothing new
+      - legacy rows=[] row=None
+      - stale rows=[] row=(False, 200)
+PASS R8 [TG] A3: a failing write yields no marker (the statement errors)
+FAIL R8 [TG] B: every seed failure keeps a «Вместе» clone inactive, deleted and answered reply_mode_not_saved; ok/transient/auto/legacy go live
+      - semi:query_error: a failed seed still went live (activate=True wappi_webhook=True bound=True)
+      - semi:query_error: answered {'id': 'WFr8new'} instead of {'success': False, 'error': 'reply_mode_not_saved'}
+      - semi:query_error: the unseeded clone was not deleted: []
+      - semi:thrown: a failed seed still went live (activate=True wappi_webhook=True bound=True)
+      - semi:thrown: answered {'id': 'WFr8new'} instead of {'success': False, 'error': 'reply_mode_not_saved'}
+      - semi:thrown: the unseeded clone was not deleted: []
+      - semi:empty: a failed seed still went live (activate=True wappi_webhook=True bound=True)
+      - semi:empty: answered {'id': 'WFr8new'} instead of {'success': False, 'error': 'reply_mode_not_saved'}
+      - semi:empty: the unseeded clone was not deleted: []
+      - semi:transient: a transient seed failure was not retried (calls=1)
+PASS R8 [TG] C: the checks reject the naive continueErrorOutput variant (a thrown error still activates there)
+
+4 pass, 6 fail
