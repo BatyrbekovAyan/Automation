@@ -76,6 +76,18 @@ public static class SessionRefreshPolicy
     /// <summary>Refresh this far before expiry so a request never straddles the deadline (12 h tokens, 2 h lead).</summary>
     public const long LeadSeconds = 2 * 3600;
 
+    /// <summary>The server's positive verdict that this install is gone (wrong secret / unknown / revoked).</summary>
+    public const string InstallRevokedError = "install_revoked";
+
+    /// <summary>
+    /// R11 (2026-09-27): the install credentials are discarded ONLY on the server's explicit verdict — a refresh
+    /// answered 401 with <see cref="InstallRevokedError"/>. A bare 401, a 5xx (503 <c>db_unavailable</c> is what a
+    /// database fault answers), a network error or a bootstrap failure keep them: the secret cannot be recovered
+    /// once wiped, and every bot would then have to be claimed back one by one.
+    /// </summary>
+    public static bool ShouldDiscardInstall(string op, long httpStatus, string error)
+        => op == "refresh" && httpStatus == 401 && error == InstallRevokedError;
+
     /// <summary>No install credentials on this device yet → bootstrap (never refresh).</summary>
     public static bool NeedsBootstrap(string installId, string installSecret)
         => string.IsNullOrEmpty(installId) || string.IsNullOrEmpty(installSecret);

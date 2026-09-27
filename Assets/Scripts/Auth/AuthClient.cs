@@ -110,11 +110,12 @@ public class AuthClient : MonoBehaviour
                 using var www = NewJsonPost($"{Manager.n8nBaseUrl}{Path}", body.ToString(Formatting.None));
                 yield return www.SendWebRequest();
 
-                if (www.responseCode == 401 && op == "refresh")
+                if (SessionRefreshPolicy.ShouldDiscardInstall(op, www.responseCode, N8nResponse.ErrorOf(www.downloadHandler?.text)))
                 {
-                    // The server no longer knows this install (revoked / wiped): the only way back is a new
-                    // install. Its bots are then unowned until the owner claims them — never silently re-bound.
-                    Debug.LogWarning("[AuthClient] refresh refused (401) — install revoked or unknown; bootstrapping a new install");
+                    // The server's explicit verdict: it no longer knows this install (revoked / wiped). The only
+                    // way back is a new install; its bots stay unowned until the owner claims them — never silently
+                    // re-bound. Any other failure (a bare 401, 503 db_unavailable, network) keeps the credentials (R11).
+                    Debug.LogWarning("[AuthClient] refresh refused (401 install_revoked) — bootstrapping a new install");
                     ClearInstall();
                     op = "bootstrap";
                     continue;

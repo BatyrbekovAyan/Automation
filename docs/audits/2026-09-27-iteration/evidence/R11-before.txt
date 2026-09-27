@@ -1,0 +1,53 @@
+# R11 before (server) — python3 Tools/n8n/tests/test_auth_refresh.py @ 67029106
+FAIL R11 refresh + the Postgres node's error item -> 503 db_unavailable, never 401
+      - got {'success': False, 'error': 'unauthorized', '_status': 401}
+FAIL R11 refresh + the Route item passed through when the node failed before its handler -> 503 db_unavailable, never 401
+      - got {'success': False, 'error': 'unauthorized', '_status': 401}
+FAIL R11 refresh + an empty row (no verdict at all) -> 503 db_unavailable, never 401
+      - got {'success': False, 'error': 'unauthorized', '_status': 401}
+FAIL R11 refresh + a POSITIVE verdict (checked, no install) -> 401 install_revoked
+      - got {'success': False, 'error': 'unauthorized', '_status': 401}
+FAIL R11 refresh + a verdict row carrying an error is still a fault (503)
+      - got {'success': False, 'error': 'unauthorized', '_status': 401}
+PASS R11 refresh + the install row -> 200 and a token
+PASS R11 bootstrap keeps its own codes: DB error -> 500, no row (the cap) -> 429
+FAIL R11 claim.* with a failed install lookup -> 503 db_unavailable (Claim Decide), a positive verdict -> 401
+      - db fault: {'op': 'claim.status', 'profileId': 'p-1', 'channel': 'whatsapp', 'statusCode': 401, 'claimMethod': None, 'claimError': 'unauthorized', 'code': None, 'codeHash': None, 'phone': None, 'authorizedEpoch': None}
+      - revoked: {'op': 'claim.status', 'profileId': 'p-1', 'channel': 'whatsapp', 'installId': None, 'statusCode': 401, 'claimMethod': None, 'claimError': 'unauthorized', 'code': None, 'codeHash': None, 'phone': None, 'authorizedEpoch': None}
+FAIL R11 Verify Install SQL: a wrong secret -> exactly one row, verdict checked, install_id NULL
+      - rows []
+FAIL R11 Verify Install SQL: a revoked install -> exactly one row, verdict checked, install_id NULL
+      - rows []
+FAIL R11 Verify Install SQL: an unknown install -> exactly one row, verdict checked, install_id NULL
+      - rows []
+FAIL R11 Verify Install SQL: the valid install -> one row with its ownership (and last_seen touched)
+      - rows [{'install_id': 'inst-ok', 'app_user_id': None, 'token_version': 1, 'p': ['wa-1'], 'w': [], 'c': []}]
+
+2 pass, 10 fail
+# R11 before (staging e2e, n8n 2.36.7 running the PRE-fix canonical Auth Session)
+   pre-run: swept 0 stale mock profile(s) (live mock knows 10)
+FAIL  session_bootstrap_and_refresh (0.4s) — bootstrap mints an install; refresh with the secret returns a token; a wrong secret is 401
+      refresh ok=True wrong-secret=401/unauthorized unknown-install=401/unauthorized
+   cleanup A: deleted rows: 2
+   cleanup B: deleted rows: 2
+
+0 pass, 1 fail
+   pre-run: swept 0 stale mock profile(s) (live mock knows 12)
+FAIL  refresh_db_outage_keeps_install (0.7s) — R11: a refresh while the database fails answers 503 db_unavailable (never the 401 that makes the client discard its install); the SAME credentials refresh fine once it is back
+      outage=401 {'success': False, 'error': 'unauthorized'} after=200 same_install=True profiles_kept=True
+   cleanup A: deleted rows: 2
+   cleanup B: deleted rows: 2
+
+0 pass, 1 fail
+
+# R11 before (client) — Tools/run-tests-headless.sh 'AuthWiringGuardTests' (source guard added first; the pure policy seam does not exist yet)
+================ EditMode test results (headless) ================
+  result=Failed(Child)  total=8  passed=7  failed=1  skipped=0  inconclusive=0
+  Failing / inconclusive tests:
+    - AuthWiringGuardTests.TheInstallIsClearedOnlyOnAnExplicitRevokedVerdict
+=================================================================
+NOT GREEN ❌  (unity exit=2).
+exit=1
+            <message><![CDATA[  a bare 401 on refresh must not decide the wipe — ask SessionRefreshPolicy.ShouldDiscardInstall
+]]></message>
+            <stack-trace><![CDATA[at AuthWiringGuardTests.TheInstallIsClearedOnlyOnAnExplicitRevokedVerdict () [0x00015] in /Users/ayan/Projects/Automation/Assets/Tests/Editor/Auth/AuthWiringGuardTests.cs:120

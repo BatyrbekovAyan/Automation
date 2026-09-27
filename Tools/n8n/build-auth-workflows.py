@@ -142,17 +142,19 @@ returning install_id, app_user_id, token_version, '{}'::text[] as p, '{}'::text[
 
 VERIFY_INSTALL_SQL = """-- A1: refresh = prove the install secret (hash compare), touch last_seen, adopt the client's current
 -- billing id, and load everything this install owns in ONE round trip (each Postgres node costs
--- ~1.9 s on prod). Revoked installs get no row -> 401.
+-- ~1.9 s on prod). ALWAYS exactly one row carrying verdict = 'checked' (R11, 2026-09-27): install_id is
+-- NULL when the secret is wrong or the install is unknown/revoked -> 401 install_revoked. A row WITHOUT
+-- the verdict (node error, input passed through, nothing) is a fault -> 503, never a reason to wipe.
 with v as (
   update installs set last_seen_at = now(), app_user_id = coalesce(nullif($3, ''), app_user_id)
   where install_id = $1 and secret_hash = $2 and revoked_at is null
   returning install_id, app_user_id, token_version
 )
-select v.install_id, v.app_user_id, v.token_version,
+select 'checked'::text as verdict, v.install_id, v.app_user_id, v.token_version,
   coalesce((select array_agg(bp.profile_id) from bot_profiles bp where bp.owner_id = v.install_id and bp.deleted_at is null), '{}'::text[]) as p,
   coalesce((select array_agg(distinct bp.workflow_id) from bot_profiles bp where bp.owner_id = v.install_id and bp.deleted_at is null and bp.workflow_id is not null), '{}'::text[]) as w,
   coalesce((select array_agg(bp.profile_id) from bot_profiles bp where bp.claim_pending_by = v.install_id and bp.owner_id is null and bp.claim_pending_at > now() - interval '1 day'), '{}'::text[]) as c
-from v;"""
+from (select 1) as one left join v on true;"""
 
 RELOAD_OWNERSHIP_SQL = """-- A1: re-read ownership after a claim step (same shape as Verify Install's row).
 select i.install_id, i.app_user_id, i.token_version,
@@ -203,7 +205,10 @@ const st = $input.first().json || {};                 // fullResponse of Wappi g
 const status = (st.body && typeof st.body === 'object') ? st.body : {};
 const out = { op: r.op, profileId: r.profileId, channel: r.channel, installId: inst.install_id, statusCode: 200,
   claimMethod: null, claimError: null, code: null, codeHash: null, phone: null, authorizedEpoch: null };
-if (!inst.install_id) { out.statusCode = 401; out.claimError = 'unauthorized'; }
+if (!inst.install_id) {                                // R11: 401 only on the DB's positive verdict, else a fault
+  const revoked = !inst.error && inst.verdict === 'checked';
+  out.statusCode = revoked ? 401 : 503; out.claimError = revoked ? 'install_revoked' : 'db_unavailable';
+}
 else if (row.error || !row.profile_id) { out.statusCode = 500; out.claimError = 'db_error'; }
 else if (row.owner_id === inst.install_id) { out.claimMethod = 'owned'; }
 else if (st.statusCode !== 200 || typeof status.authorized !== 'boolean') { out.statusCode = 502; out.claimError = 'transport_unavailable'; }
@@ -244,8 +249,16 @@ if (r.op === 'claim.verify' && (!claimVerify || !claimVerify.profile_id)) {
   return [{ json: { success: false, error: 'claim_code_rejected', _status: 403 }, pairedItem: { item: 0 } }];
 }
 if (row.error || !row.install_id) {
-  const status = r.op === 'bootstrap' ? (row.error ? 500 : 429) : 401;
-  return [{ json: { success: false, error: status === 401 ? 'unauthorized' : (status === 429 ? 'rate_limited' : 'db_error'), _status: status }, pairedItem: { item: 0 } }];
+  if (r.op === 'bootstrap') {
+    const status = row.error ? 500 : 429;
+    return [{ json: { success: false, error: status === 429 ? 'rate_limited' : 'db_error', _status: status }, pairedItem: { item: 0 } }];
+  }
+  // R11: the client DISCARDS its install on a 401 — so 401 only on the database's positive verdict (Verify
+  // Install's 'checked' row without an install: wrong secret / unknown / revoked). Every other shape is a
+  // transient fault (the node's error item, the Route item passed through when it failed before its handler,
+  // an empty row) and answers 503: the client keeps its credentials and retries later.
+  const revoked = !row.error && row.verdict === 'checked';
+  return [{ json: { success: false, error: revoked ? 'install_revoked' : 'db_unavailable', _status: revoked ? 401 : 503 }, pairedItem: { item: 0 } }];
 }
 const exp = r.nowSec + __TTL__;
 const claims = { i: row.install_id, u: row.app_user_id || null, p: row.p || [], w: row.w || [], c: row.c || [], e: exp, n: row.token_version || 1 };

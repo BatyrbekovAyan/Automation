@@ -1,0 +1,33 @@
+# R11 after (server) — python3 Tools/n8n/tests/test_auth_refresh.py
+PASS R11 refresh + the Postgres node's error item -> 503 db_unavailable, never 401
+PASS R11 refresh + the Route item passed through when the node failed before its handler -> 503 db_unavailable, never 401
+PASS R11 refresh + an empty row (no verdict at all) -> 503 db_unavailable, never 401
+PASS R11 refresh + a POSITIVE verdict (checked, no install) -> 401 install_revoked
+PASS R11 refresh + a verdict row carrying an error is still a fault (503)
+PASS R11 refresh + the install row -> 200 and a token
+PASS R11 bootstrap keeps its own codes: DB error -> 500, no row (the cap) -> 429
+PASS R11 claim.* with a failed install lookup -> 503 db_unavailable (Claim Decide), a positive verdict -> 401
+PASS R11 Verify Install SQL: a wrong secret -> exactly one row, verdict checked, install_id NULL
+PASS R11 Verify Install SQL: a revoked install -> exactly one row, verdict checked, install_id NULL
+PASS R11 Verify Install SQL: an unknown install -> exactly one row, verdict checked, install_id NULL
+PASS R11 Verify Install SQL: the valid install -> one row with its ownership (and last_seen touched)
+
+12 pass, 0 fail
+
+# generator idempotent: python3 Tools/n8n/build-auth-workflows.py --check (after two runs)
+auth workflows: up to date
+
+# staging e2e after re-import (n8n 2.36.7 + task runners): session_bootstrap_and_refresh + refresh_db_outage_keeps_install (full suite 18/18 in the same session)
+PASS  session_bootstrap_and_refresh (0.5s) — bootstrap mints an install; refresh with the secret returns a token; a wrong secret is 401
+      refresh ok=True wrong-secret=401/install_revoked unknown-install=401/install_revoked
+--
+PASS  refresh_db_outage_keeps_install (1.7s) — R11: a refresh while the database fails answers 503 db_unavailable (never the 401 that makes the client discard its install); the SAME credentials refresh fine once it is back
+      outage=503 {'success': False, 'error': 'db_unavailable'} after=200 same_install=True profiles_kept=True
+18 pass, 0 fail
+
+# R11 after (client) — Tools/run-tests-headless.sh 'Auth|Claim|Install|Session'
+================ EditMode test results (headless) ================
+  result=Passed  total=103  passed=103  failed=0  skipped=0  inconclusive=0
+=================================================================
+GREEN ✅  all 103 tests passed.
+exit=0

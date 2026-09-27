@@ -108,6 +108,25 @@ public class AuthWiringGuardTests
         }
     }
 
+    /// <summary>
+    /// R11 (2026-09-27): a refresh answered with a transient server fault (a DB outage became a bare 401) wiped the
+    /// install — the secret is unrecoverable and every bot then had to be claimed back one by one. The credentials may
+    /// be cleared ONLY on the server's explicit revoked/unknown verdict, decided by the pure policy.
+    /// </summary>
+    [Test]
+    public void TheInstallIsClearedOnlyOnAnExplicitRevokedVerdict()
+    {
+        string client = Code(Path.Combine(Scripts, "Auth/AuthClient.cs"));
+        Assert.IsFalse(Regex.IsMatch(client, @"responseCode\s*==\s*401\s*&&\s*op\s*==\s*""refresh"""),
+            "a bare 401 on refresh must not decide the wipe — ask SessionRefreshPolicy.ShouldDiscardInstall");
+        var calls = Regex.Matches(client, @"ClearInstall\(\);");
+        Assert.AreEqual(1, calls.Count, "ClearInstall() must have exactly one call site");
+        int at = calls[0].Index;
+        int guard = client.LastIndexOf("SessionRefreshPolicy.ShouldDiscardInstall(", at, System.StringComparison.Ordinal);
+        Assert.IsTrue(guard >= 0 && at - guard < 400 && client.Substring(guard, at - guard).Contains("N8nResponse.ErrorOf("),
+            "ClearInstall() must sit directly under `if (SessionRefreshPolicy.ShouldDiscardInstall(op, status, N8nResponse.ErrorOf(body)))`");
+    }
+
     [Test]
     public void SecretsShipOnlyTheRevenueCatPublicKeysAndTheBaseUrl()
     {

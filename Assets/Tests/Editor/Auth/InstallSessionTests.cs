@@ -63,6 +63,19 @@ public class InstallSessionTests
 
     // ---- refresh policy ----
 
+    [TestCase("refresh", 401L, "install_revoked", true)]
+    [TestCase("refresh", 401L, "unauthorized", false)]      // pre-R11 server wording: a bare 401 decides nothing
+    [TestCase("refresh", 401L, null, false)]                // no parsable body (proxy page, empty)
+    [TestCase("refresh", 503L, "db_unavailable", false)]    // the database is down: keep the install
+    [TestCase("refresh", 500L, "db_error", false)]
+    [TestCase("refresh", 0L, null, false)]                  // network error / timeout
+    [TestCase("refresh", 403L, "install_revoked", false)]   // only the 401 carries the verdict
+    [TestCase("bootstrap", 401L, "install_revoked", false)] // nothing to discard before an install exists
+    public void ShouldDiscardInstall_OnlyOnTheServersExplicitRevokedVerdict(string op, long status, string error, bool expected)
+    {
+        Assert.AreEqual(expected, SessionRefreshPolicy.ShouldDiscardInstall(op, status, error));
+    }
+
     [Test]
     public void NeedsBootstrap_WhenEitherCredentialIsMissing()
     {

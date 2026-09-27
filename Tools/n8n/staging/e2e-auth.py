@@ -119,8 +119,10 @@ def s_bootstrap(ctx):
     d = a.refresh()
     st, bad = session({"op": "refresh", "installId": a.install_id, "installSecret": "nope", "appUserId": a.app_user_id})
     st2, bad2 = session({"op": "refresh", "installId": "not-an-install", "installSecret": a.secret})
-    ok = d["installId"] == a.install_id and d["appUserId"] == a.app_user_id and st == 401 and st2 == 401
-    return ok, f"refresh ok={d.get('success')} wrong-secret={st} unknown-install={st2}"
+    # R11: 401 carries the POSITIVE verdict the client keys its wipe on — nothing else may
+    ok = (d["installId"] == a.install_id and d["appUserId"] == a.app_user_id and st == 401 and st2 == 401
+          and (bad or {}).get("error") == "install_revoked" and (bad2 or {}).get("error") == "install_revoked")
+    return ok, f"refresh ok={d.get('success')} wrong-secret={st}/{(bad or {}).get('error')} unknown-install={st2}/{(bad2 or {}).get('error')}"
 
 
 @scenario("session_bad_request_is_400", "a malformed AuthSession body answers 400, never a token")
@@ -411,6 +413,24 @@ def s_create_slots(ctx):
         hook("SetWorkflowState", c.token, {"workflowId": wid1, "action": "delete"})
     ok = st1 == 200 and bool(wid1) and st2 == 200 and refused and len(deletes) == 1 and row2 == "channel_limit|true" and row1 == f"true|{wid1}"
     return ok, f"first={st1} id={wid1} second={st2} refused={refused} wappi_deletes={len(deletes)} row2={row2!r} row1_alive_bound={row1 == f'true|{wid1}'}"
+
+
+@scenario("refresh_db_outage_keeps_install", "R11: a refresh while the database fails answers 503 db_unavailable (never the 401 that makes the client discard its install); the SAME credentials refresh fine once it is back")
+def s_refresh_outage(ctx):
+    a = ctx["A"]
+    creds = {"op": "refresh", "installId": a.install_id, "installSecret": a.secret, "appUserId": a.app_user_id}
+    renamed = False
+    try:
+        pg("alter table installs rename to installs__r11_outage;")          # a real Postgres-node failure on n8n 2.36
+        renamed = pg("select to_regclass('public.installs__r11_outage') is not null;") == "t"
+        st, d = session(creds) if renamed else (0, None)
+    finally:
+        if renamed:
+            pg("alter table installs__r11_outage rename to installs;")
+    st2, d2 = session(creds)
+    ok = (renamed and st == 503 and (d or {}).get("error") == "db_unavailable" and not (d or {}).get("token")
+          and st2 == 200 and (d2 or {}).get("installId") == a.install_id and a.profiles[0] in (d2 or {}).get("profiles", []))
+    return ok, f"outage={st} {d} after={st2} same_install={(d2 or {}).get('installId') == a.install_id} profiles_kept={a.profiles[0] in (d2 or {}).get('profiles', [])}"
 
 
 def sweep_stale_mock_profiles():
