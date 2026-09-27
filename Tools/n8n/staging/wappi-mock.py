@@ -23,7 +23,9 @@ Control routes (never exist on the real transport):
     POST /__mock/incoming  {profile_id, chat_id, message:{...}}      append one incoming row (returns it)
     GET  /__mock/calls?since=<n>&path=<substr>                        recorded calls
     POST /__mock/fault     {match:<path substr>, mode:"status"|"timeout"|"accept_then_drop"|"drop",
-                            status:500, times:1, delay:35}
+                            status:500, times:1, delay:35, profile_id:<optional>}
+                           profile_id scopes the fault to calls FOR that profile (query/body profile_id), so a
+                           schedule sweeping every profile (the handoff notifier) cannot hand it to another row
     POST /__mock/profile   {profile_id, authorized, phone, authorized_at}   status fields for get/status
     GET  /__mock/state
 """
@@ -64,9 +66,11 @@ def _record(entry):
             fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
-def _take_fault(path):
+def _take_fault(path, profile_id=""):
     with LOCK:
         for f in STATE["faults"]:
+            if f.get("profile_id") and f["profile_id"] != profile_id:
+                continue
             if f["match"] in path and f.get("times", 1) > 0:
                 f["times"] -= 1
                 return dict(f)
@@ -121,7 +125,7 @@ class Handler(BaseHTTPRequestHandler):
         body = self._read_body() if method == "POST" else {}
         if path.startswith("/__mock/"):
             return self._control(method, path, query, body)
-        fault = _take_fault(path)
+        fault = _take_fault(path, query.get("profile_id") or (body.get("profile_id") if isinstance(body, dict) else "") or "")
         entry = {"ts": time.time(), "method": method, "path": path, "query": query, "body": body,
                  "auth": bool(self.headers.get("Authorization")), "fault": fault and fault["mode"]}
         if fault and fault["mode"] == "drop":
@@ -233,7 +237,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, {"total": len(STATE["calls"]), "calls": rows})
             if path == "/__mock/fault" and method == "POST":
                 f = {"match": b["match"], "mode": b.get("mode", "status"), "status": int(b.get("status", 500)),
-                     "times": int(b.get("times", 1)), "delay": float(b.get("delay", 35))}
+                     "times": int(b.get("times", 1)), "delay": float(b.get("delay", 35)),
+                     "profile_id": b.get("profile_id") or ""}
                 STATE["faults"].append(f)
                 return self._send(200, {"ok": True, "fault": f})
             if path == "/__mock/profile" and method == "POST":

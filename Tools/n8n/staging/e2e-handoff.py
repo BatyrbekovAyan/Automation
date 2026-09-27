@@ -110,6 +110,22 @@ def owner_for(ctx, bot):
     return o
 
 
+class Dedicated:
+    """A profile of this run ALONE, for a scenario whose assertions span the WHOLE profile (the Handoffs list's
+    pausedChats) or whose fault a schedule could hand to another profile's row (the notifier sweeps every due
+    request). Every other scenario shares the imported staging bot profile, and the [llm] ones leave real state
+    there: the baseline run's agent called create_handoff AGAIN on «Спасибо!» (exec 3753) — an open request with a
+    pending notice + that chat paused — which the notifier served first (consuming the injected 500) and which
+    showed up in pausedChats. No bot workflow is needed here: both scenarios only touch rows and the webhooks.
+    Registered through the run's fixture identity, so ctx.cleanup() deletes it with the rest."""
+
+    def __init__(self, ctx, tag, channel="whatsapp", suffix="@c.us"):
+        self.channel = channel
+        self.pid = f"stg{tag}{ctx.run_id[:8]}"
+        self.chat = f"7701{int(time.time()) % 100000:05d}{suffix}"
+        ctx.bot(self.pid, channel)
+
+
 SCENARIOS = []
 
 
@@ -254,12 +270,13 @@ def handoff_tool(ctx):
 
 @scenario("notifier_delivers_self_message_and_survives_failure", "A5 acceptance: the owner notice is a self-message on the bot's channel (no client text); a failed delivery keeps the request and is retried")
 def notifier(ctx):
-    b = Bot(ctx, "wa", "nt")
+    b = Dedicated(ctx, "nt")            # the sweep serves every profile's due rows: the fault and the count are THIS profile's
     mock("POST", "/__mock/profile", {"profile_id": b.pid, "authorized": True, "phone": "77010009999"})
     chat2 = b.chat.replace("@c.us", "") + "1@c.us"
     psql(f"insert into handoff_requests (profile_id, chat_id, source_message_id, reason, summary, data) values ('{b.pid}', '{b.chat}', 'nt1-{ctx.run_id}', 'order', 'Секретный заказ клиента', '{{\"phone\": \"87011234567\"}}');")
     psql(f"insert into handoff_requests (profile_id, chat_id, source_message_id, reason, summary) values ('{b.pid}', '{chat2}', 'nt2-{ctx.run_id}', 'question', 'Вопрос');")
-    mock("POST", "/__mock/fault", {"match": "message/send", "mode": "status", "status": 500})   # consumed by the FIRST send of the sweep
+    # consumed by the FIRST send of the sweep FOR THIS PROFILE (rows are served oldest first → nt1)
+    mock("POST", "/__mock/fault", {"match": "message/send", "mode": "status", "status": 500, "profile_id": b.pid})
     since = mock_total()
     deadline = time.time() + 170
     states = ""
@@ -269,10 +286,13 @@ def notifier(ctx):
             break
         time.sleep(5)
     st, d = mock("GET", f"/__mock/calls?since={since}&path=message/send")
-    calls = d["calls"]
+    everything = d["calls"]
+    calls = [c for c in everything if (c.get("query") or {}).get("profile_id") == b.pid]
     bodies = [c["body"].get("body", "") for c in calls]
     to_self = all(c["body"].get("recipient") == "77010009999" for c in calls)
-    no_leak = all("Секретный" not in x and "87011234567" not in x and b.chat.replace("@c.us", "") not in x for x in bodies)
+    # the leak check reads EVERY notice the sweep sent in this window, not only this profile's
+    no_leak = all("Секретный" not in x and "87011234567" not in x and b.chat.replace("@c.us", "") not in x
+                  for x in (c["body"].get("body", "") for c in everything))
     intact = psql(f"select count(*) from handoff_requests where profile_id = '{b.pid}' and status = 'open' and source_message_id like 'nt%-{ctx.run_id}';") == "2"
     ok = states == "failed/1,sent/1" and len(calls) == 2 and to_self and no_leak and all(x.startswith("Choose Reply:") for x in bodies) and intact
     return ok, f"states={states} send_calls={len(calls)} to_self={to_self} no_leak={no_leak} requests_intact={intact} body={bodies[-1][:80] if bodies else None!r}"
@@ -280,7 +300,7 @@ def notifier(ctx):
 
 @scenario("handoffs_webhook_owner_scoped_list_take_done", "A5: the app's list/take/done are token-only and owner-scoped; done lifts the chat's pause")
 def api(ctx):
-    b = Bot(ctx, "wa", "hw")
+    b = Dedicated(ctx, "hw")            # pausedChats is profile-wide: only this scenario's chat may be paused on it
     owner = owner_for(ctx, b)
     psql(f"insert into handoff_requests (profile_id, chat_id, source_message_id, reason, summary) values ('{b.pid}', '{b.chat}', 'hw-{ctx.run_id}', 'question', 'Есть ли доставка?');")
     psql(f"insert into chat_reply_state (profile_id, chat_id, handoff_paused) values ('{b.pid}', '{b.chat}', true) on conflict (profile_id, chat_id) do update set handoff_paused = true;")
@@ -391,6 +411,12 @@ def main():
             print(f"      {detail}", flush=True)
     finally:
         ctx.cleanup()
+        for o in e2e_auth.OWNERS:           # every install/subscriber owner_for() and the scenarios minted
+            try:
+                fixture(*(["delete", "--app-user-id", o.app_user_id] + [x for p in o.profiles for x in ("--profile-id", p)]))
+            except Exception as e:
+                print(f"   cleanup {o.tag} failed:", e)
+        print(f"   cleanup: {len(e2e_auth.OWNERS)} owner fixture(s)")
     print(f"\n{passed} pass, {failed} fail")
     sys.exit(1 if failed else 0)
 

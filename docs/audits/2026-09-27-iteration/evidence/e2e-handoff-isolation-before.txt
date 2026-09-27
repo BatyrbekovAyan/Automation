@@ -1,0 +1,11 @@
+# e2e-handoff ISOLATION before — HEAD's e2e-handoff.py (1a863383), over the state the baseline run's exec 3753 left on the shared profile stgwa001 (the agent's 2nd create_handoff on «Спасибо!» in handoff_tool_creates_request_once_and_pauses: an open request with a pending notice + that chat paused again), planted by scratchpad/iso/plant.sh right before each scenario
+FAIL  notifier_delivers_self_message_and_survives_failure (32s) — A5 acceptance: the owner notice is a self-message on the bot's channel (no client text); a failed delivery keeps the request and is retried
+      states=sent/1,sent/1 send_calls=3 to_self=True no_leak=True requests_intact=True body='Choose Reply: вопрос клиента (чат …5891). Автоответ в этом чате приостановлен — '
+   cleanup: deleted rows: 2
+
+0 pass, 1 fail
+FAIL  handoffs_webhook_owner_scoped_list_take_done (3s) — A5: the app's list/take/done are token-only and owner-scoped; done lifts the chat's pause
+      {"notoken": 401, "foreign": 403, "list": [200, 1, "open", false], "take": [200, ["taken"]], "done": [200, [], "f", "done"]}
+   cleanup: deleted rows: 2
+
+0 pass, 1 fail
