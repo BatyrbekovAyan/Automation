@@ -1,0 +1,23 @@
+PASS R4 [WA] A: a delayed OLDER «Авто» (v100 after v200) changes nothing — pause and the request stay
+PASS R4 [WA] A2: a stale «Авто» newer than the request but older than the server's «Вместе» closes nothing
+PASS R4 [WA] B: a replay of the SAME applied version after a NEW handoff keeps the new request open and paused
+PASS R4 [WA] C: an «Авто» decided BEFORE the request (queued offline, delivered after it) leaves the request open
+PASS R4 [WA] D: the owner's NEW explicit «Авто» resumes the chat (closes the request, lifts the pause)
+PASS R4 [WA] E: a legit «Авто» resolves the older request but a request created AFTER the tap keeps the chat paused
+PASS R4 [WA] F: a bot-wide '*' «Авто» never lifts a chat's pause nor closes its request
+PASS R4 [WA] G: a heal that repeats the ORIGINAL decision version on chat open closes nothing newer
+PASS R4 [WA] H: the client's floor-version «Авто» (no row on the server) writes the row but resolves no request
+PASS R4 [WA] I: a 16-digit version (Validate's maximum) neither overflows nor fails
+PASS R4 [TG] A: a delayed OLDER «Авто» (v100 after v200) changes nothing — pause and the request stay
+PASS R4 [TG] A2: a stale «Авто» newer than the request but older than the server's «Вместе» closes nothing
+PASS R4 [TG] B: a replay of the SAME applied version after a NEW handoff keeps the new request open and paused
+PASS R4 [TG] C: an «Авто» decided BEFORE the request (queued offline, delivered after it) leaves the request open
+PASS R4 [TG] D: the owner's NEW explicit «Авто» resumes the chat (closes the request, lifts the pause)
+PASS R4 [TG] E: a legit «Авто» resolves the older request but a request created AFTER the tap keeps the chat paused
+PASS R4 [TG] F: a bot-wide '*' «Авто» never lifts a chat's pause nor closes its request
+PASS R4 [TG] G: a heal that repeats the ORIGINAL decision version on chat open closes nothing newer
+PASS R4 [TG] H: the client's floor-version «Авто» (no row on the server) writes the row but resolves no request
+PASS R4 [TG] I: a 16-digit version (Validate's maximum) neither overflows nor fails
+PASS R4 verifier: the structural tripwire rejects the pre-R4 side effects and accepts the canonical SQL
+
+21 pass, 0 fail

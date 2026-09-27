@@ -54,6 +54,7 @@ def check_set_reply_mode():
     assert "where reply_mode_flags.version < excluded.version" in q, f"{f}: upsert must be version-guarded (older desire never overwrites newer)"
     assert 'as "profileId"' in q and "as applied" in q and "returning profile_id, suppressed, version" in q, f"{f}: upsert must report per-profile applied/suppressed/version"
     assert up.get("alwaysOutputData") is True and up.get("onError") == "continueRegularOutput", f"{f}: upsert must surface a DB error as an item (never a swallowed 500)"
+    check_resume_side_effects(q, f)
     sh = node(wf, "Shape Response")["parameters"]["jsCode"]
     assert "error: 'db_error', _status: 500" in sh and "allApplied" in sh, f"{f}: Shape Response must fail closed on db error and compute allApplied"
     assert node(wf, "Respond Error")["parameters"]["options"].get("responseCode") == 400, f"{f}: malformed body must answer 400"
@@ -63,6 +64,28 @@ def check_set_reply_mode():
     assert edge(wf, "If invalid?", 0) == [{"node": "Respond Error", "type": "main", "index": 0}]
     assert edge(wf, "If invalid?", 1) == [{"node": "Upsert Reply Mode", "type": "main", "index": 0}]
     print(f"OK  {f} (versioned atomic upsert, per-profile report, 400/500 codes)")
+
+
+def check_resume_side_effects(q, f="Set Reply Mode"):
+    """R4 (2026-09-27): a chat-scoped «Авто» resolves handoffs only when it is APPLIED, and only requests created no
+    later than the command's version. Every side-effect UPDATE must read the applied rows (`resumed`, built from
+    `up`), never the raw request `req` — a stale or replayed version is not applied and must change nothing.
+    The behaviour itself is pinned by tests/test_reply_mode.py (real SQL); this is the cheap structural tripwire."""
+    assert re.search(r"resumed as \(\s*select up\.profile_id, r\.chat_id, up\.version\s+from up join req r on r\.profile_id = up\.profile_id\s+"
+                     r"where r\.chat_id <> '\*' and up\.suppressed = false", q), \
+        f"{f}: the resume set must be the APPLIED chat-scoped «Авто» rows (from up), never '*' and never the raw request"
+    for table in ("handoff_requests", "chat_reply_state"):
+        m = re.search(r"update " + table + r"\b(.*?)returning", q, re.S)
+        assert m, f"{f}: side-effect update on {table} missing"
+        body = m.group(1)
+        assert "from resumed r" in body and not re.search(r"\bfrom req\b", body), \
+            f"{f}: the {table} side effect must key off the applied rows (from resumed), not the request (R4)"
+    closed = re.search(r"update handoff_requests\b(.*?)returning", q, re.S).group(1)
+    assert "(extract(epoch from h.created_at) * 1000)::bigint <= r.version" in closed, \
+        f"{f}: an applied «Авто» may close only requests created no later than its version (R4)"
+    unpause = re.search(r"update chat_reply_state\b(.*?)returning", q, re.S).group(1)
+    assert "(extract(epoch from o.created_at) * 1000)::bigint > r.version" in unpause and "not exists" in unpause, \
+        f"{f}: a request created after the decision must keep the chat paused (R4)"
 
 
 def check_create(f, field):

@@ -1,0 +1,7 @@
+FAIL  stale_or_replayed_auto_keeps_newer_handoff[wa] (5s) — R4: through the real SetReplyMode webhook, a replay of the owner's applied «Авто» and an older «Авто» leave a NEWER request open and the chat paused; a new explicit «Авто» resumes it
+      {"first": [200, [true]], "replay": [200, [false]], "after_replay": ["f", "233:done:question:pending:-"], "older": [200, [false]], "after_older": ["f", "233:done:question:pending:-"], "new": [200, [true]], "after_new": ["f", "233:done:question:pending:-"]}
+FAIL  stale_or_replayed_auto_keeps_newer_handoff[tg] (2s) — R4: through the real SetReplyMode webhook, a replay of the owner's applied «Авто» and an older «Авто» leave a NEWER request open and the chat paused; a new explicit «Авто» resumes it
+      {"first": [200, [true]], "replay": [200, [false]], "after_replay": ["f", "234:done:question:pending:-"], "older": [200, [false]], "after_older": ["f", "234:done:question:pending:-"], "new": [200, [true]], "after_new": ["f", "234:done:question:pending:-"]}
+   cleanup: deleted rows: 3
+
+0 pass, 2 fail

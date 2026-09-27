@@ -63,15 +63,31 @@ with req as (
     set suppressed = excluded.suppressed, version = excluded.version, updated_at = now()
     where reply_mode_flags.version < excluded.version
   returning profile_id, suppressed, version
-), unpause as (
-  -- A5 (stage 4): the owner's explicit «Авто» for THIS chat is the sanctioned resume — it lifts the
-  -- handoff pause and closes the chat's pending requests. A bot-wide '*' write never does.
-  update chat_reply_state c set handoff_paused = false
-  from req where c.profile_id = req.profile_id and c.chat_id = req.chat_id and req.chat_id <> '*' and req.suppressed = false
-  returning 1
+), resumed as (
+  -- A5 (stage 4) + R4 (2026-09-27): the owner's explicit «Авто» for THIS chat is the sanctioned resume —
+  -- but only when it is APPLIED. A stale (older) or replayed (same) version is not applied and has NO
+  -- side effect, so a late retry can never resolve a handoff the owner has not seen. A bot-wide '*'
+  -- write never resumes a chat.
+  select up.profile_id, r.chat_id, up.version
+  from up join req r on r.profile_id = up.profile_id
+  where r.chat_id <> '*' and up.suppressed = false
 ), closed as (
+  -- ...and it resolves only what existed when the owner decided: requests created no later than the
+  -- command's version (the client's ms clock). A request created after the decision stays open.
   update handoff_requests h set status = 'done', done_at = now(), updated_at = now()
-  from req where h.profile_id = req.profile_id and h.chat_id = req.chat_id and req.chat_id <> '*' and req.suppressed = false and h.status <> 'done'
+  from resumed r
+  where h.profile_id = r.profile_id and h.chat_id = r.chat_id and h.status <> 'done'
+    and (extract(epoch from h.created_at) * 1000)::bigint <= r.version
+  returning 1
+), unpause as (
+  -- `closed` is invisible here (one snapshot), so «still open after this statement» is spelled out: a
+  -- not-done request created after the decision keeps the chat paused (the Handoffs `done` rule).
+  update chat_reply_state c set handoff_paused = false
+  from resumed r
+  where c.profile_id = r.profile_id and c.chat_id = r.chat_id and c.handoff_paused
+    and not exists (select 1 from handoff_requests o
+                    where o.profile_id = r.profile_id and o.chat_id = r.chat_id and o.status <> 'done'
+                      and (extract(epoch from o.created_at) * 1000)::bigint > r.version)
   returning 1
 )
 select r.profile_id as "profileId",

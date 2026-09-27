@@ -1,0 +1,36 @@
+FAIL R4 [WA] A: a delayed OLDER «Авто» (v100 after v200) changes nothing — pause and the request stay
+      - stale «Авто» had side effects: paused=False {'A1': 'done'}
+FAIL R4 [WA] A2: a stale «Авто» newer than the request but older than the server's «Вместе» closes nothing
+      - paused=False {'A2': 'done'}
+FAIL R4 [WA] B: a replay of the SAME applied version after a NEW handoff keeps the new request open and paused
+      - the replay resolved a newer request: paused=False {'B1': 'done'}
+FAIL R4 [WA] C: an «Авто» decided BEFORE the request (queued offline, delivered after it) leaves the request open
+      - a decision older than the request resolved it: paused=False {'C1': 'done'}
+PASS R4 [WA] D: the owner's NEW explicit «Авто» resumes the chat (closes the request, lifts the pause)
+FAIL R4 [WA] E: a legit «Авто» resolves the older request but a request created AFTER the tap keeps the chat paused
+      - {'profileId': 'wa-prof-r4', 'applied': True, 'suppressed': False, 'version': 1790520520934} paused=False {'E1': 'done', 'E2': 'done'}
+PASS R4 [WA] F: a bot-wide '*' «Авто» never lifts a chat's pause nor closes its request
+FAIL R4 [WA] G: a heal that repeats the ORIGINAL decision version on chat open closes nothing newer
+      - {'profileId': 'wa-prof-r4', 'applied': False, 'suppressed': False, 'version': 1790434180934} paused=False {'G1': 'done'}
+FAIL R4 [WA] H: the client's floor-version «Авто» (no row on the server) writes the row but resolves no request
+      - {'profileId': 'wa-prof-r4', 'applied': True, 'suppressed': False, 'version': 1} paused=False {'H1': 'done'}
+PASS R4 [WA] I: a 16-digit version (Validate's maximum) neither overflows nor fails
+FAIL R4 [TG] A: a delayed OLDER «Авто» (v100 after v200) changes nothing — pause and the request stay
+      - stale «Авто» had side effects: paused=False {'A1': 'done'}
+FAIL R4 [TG] A2: a stale «Авто» newer than the request but older than the server's «Вместе» closes nothing
+      - paused=False {'A2': 'done'}
+FAIL R4 [TG] B: a replay of the SAME applied version after a NEW handoff keeps the new request open and paused
+      - the replay resolved a newer request: paused=False {'B1': 'done'}
+FAIL R4 [TG] C: an «Авто» decided BEFORE the request (queued offline, delivered after it) leaves the request open
+      - a decision older than the request resolved it: paused=False {'C1': 'done'}
+PASS R4 [TG] D: the owner's NEW explicit «Авто» resumes the chat (closes the request, lifts the pause)
+FAIL R4 [TG] E: a legit «Авто» resolves the older request but a request created AFTER the tap keeps the chat paused
+      - {'profileId': 'tg-prof-r4', 'applied': True, 'suppressed': False, 'version': 1790520528226} paused=False {'E1': 'done', 'E2': 'done'}
+PASS R4 [TG] F: a bot-wide '*' «Авто» never lifts a chat's pause nor closes its request
+FAIL R4 [TG] G: a heal that repeats the ORIGINAL decision version on chat open closes nothing newer
+      - {'profileId': 'tg-prof-r4', 'applied': False, 'suppressed': False, 'version': 1790434188226} paused=False {'G1': 'done'}
+FAIL R4 [TG] H: the client's floor-version «Авто» (no row on the server) writes the row but resolves no request
+      - {'profileId': 'tg-prof-r4', 'applied': True, 'suppressed': False, 'version': 1} paused=False {'H1': 'done'}
+PASS R4 [TG] I: a 16-digit version (Validate's maximum) neither overflows nor fails
+
+6 pass, 14 fail

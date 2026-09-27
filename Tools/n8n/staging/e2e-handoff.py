@@ -302,7 +302,31 @@ def api(ctx):
     return ok, json.dumps(r, ensure_ascii=False)
 
 
-@scenario("dashboard_shows_open_handoff_as_event", "A5/A6: «Сводка» reports an open request as a REAL event (source=event) that outranks the classifier")
+@for_channels("stale_or_replayed_auto_keeps_newer_handoff", "R4: through the real SetReplyMode webhook, a replay of the owner's applied «Авто» and an older «Авто» leave a NEWER request open and the chat paused; a new explicit «Авто» resumes it")
+def stale_auto(ctx, ch):
+    b = Bot(ctx, ch, "r4")
+    owner = owner_for(ctx, b)
+    now = int(time.time() * 1000)
+    body = lambda v: {"profileIds": [b.pid], "chatId": b.chat, "suppressed": False, "version": v}
+    r = {"first": e2e_auth.hook("SetReplyMode", owner.token, body(now - 600_000))}          # the owner resumed this chat 10 min ago
+    # the client asks for a human again: the request + pause exactly as Upsert Handoff writes them
+    psql(f"insert into handoff_requests (profile_id, chat_id, source_message_id, reason, summary) values ('{b.pid}', '{b.chat}', 'r4-{ctx.run_id}', 'question', 'Нужен менеджер');")
+    psql(f"insert into chat_reply_state (profile_id, chat_id, handoff_paused) values ('{b.pid}', '{b.chat}', true) on conflict (profile_id, chat_id) do update set handoff_paused = true;")
+    r["replay"] = e2e_auth.hook("SetReplyMode", owner.token, body(now - 600_000))          # the queue re-sends the same version
+    r["after_replay"] = (paused(b.pid, b.chat), handoffs(b.pid, b.chat))
+    r["older"] = e2e_auth.hook("SetReplyMode", owner.token, body(now - 1_200_000))         # a delayed older request
+    r["after_older"] = (paused(b.pid, b.chat), handoffs(b.pid, b.chat))
+    r["new"] = e2e_auth.hook("SetReplyMode", owner.token, body(int(time.time() * 1000) + 1000))   # the owner's new explicit «Авто»
+    r["after_new"] = (paused(b.pid, b.chat), handoffs(b.pid, b.chat))
+    applied = lambda x: [a.get("applied") for a in ((x[1] or {}).get("applied") or [])]
+    ok = r["first"][0] == 200 and applied(r["first"]) == [True] \
+        and r["replay"][0] == 200 and applied(r["replay"]) == [False] and r["after_replay"][0] == "t" and ":open:" in r["after_replay"][1] \
+        and r["older"][0] == 200 and applied(r["older"]) == [False] and r["after_older"][0] == "t" and ":open:" in r["after_older"][1] \
+        and r["new"][0] == 200 and applied(r["new"]) == [True] and r["after_new"][0] == "f" and ":done:" in r["after_new"][1]
+    return ok, json.dumps({k: (v if k.startswith("after") else (v[0], applied(v))) for k, v in r.items()}, ensure_ascii=False)
+
+
+@scenario("dashboard_shows_open_handoff_as_event","A5/A6: «Сводка» reports an open request as a REAL event (source=event) that outranks the classifier")
 def dashboard(ctx):
     b = Bot(ctx, "wa", "db")
     owner = owner_for(ctx, b)
