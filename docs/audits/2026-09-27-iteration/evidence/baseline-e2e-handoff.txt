@@ -1,0 +1,31 @@
+PASS  outgoing_phone_recorded[wa] (7s) — A6: a message the owner sent from the PHONE lands in the one history (owner_phone) and in the agent's memory once, even when re-delivered
+      first=('recorded_owner_phone', 'owner_phone:Да, завтра в 15:00 ждём вас', 'ai/owner_phone:Да, завтра в 15:00 ждём вас') redelivery=outgoing_known memory_rows=1
+PASS  outgoing_phone_recorded[tg] (7s) — A6: a message the owner sent from the PHONE lands in the one history (owner_phone) and in the agent's memory once, even when re-delivered
+      first=('recorded_owner_phone', 'owner_phone:Да, завтра в 15:00 ждём вас', 'ai/owner_phone:Да, завтра в 15:00 ждём вас') redelivery=outgoing_known memory_rows=1
+PASS  outgoing_api_history_only (5s) — A6: an API-sent message (unknown writer) is a history row only — never a memory row (the AI's / the app's own writers own memory)
+      outcome=recorded_outgoing_api history=outgoing_api:Текст через API memory_rows=0
+PASS  outgoing_foreign_profile_filtered (7s) — A1/A6: an outgoing event naming ANOTHER profile is filtered before any write
+      outcome=filtered history=''
+PASS  suppressed_incoming_recorded[wa] (11s) — A6: in «Вместе» the client's message is still recorded (history + memory human row), once, with no generation
+      outcomes=['suppressed', 'suppressed'] history=client:Можно завтра к 15? memory=human/client:Можно завтра к 15? sends=0
+PASS  suppressed_incoming_recorded[tg] (8s) — A6: in «Вместе» the client's message is still recorded (history + memory human row), once, with no generation
+      outcomes=['suppressed', 'suppressed'] history=client:Можно завтра к 15? memory=human/client:Можно завтра к 15? sends=0
+PASS  auto_reply_records_client_and_ai_rows (30s) — A6: a normal auto-reply leaves exactly client + ai history rows and the memory node's own human + ai rows (no doubles)
+      outcome=sent history_sources=client,ai memory=human/agent,ai/agent sends=1
+PASS  bot_knows_owner_agreement_after_auto_resumes [llm] (35s) — A6 acceptance: owner agreed by phone during «Вместе»; after the explicit return to «Авто» the bot answers with that agreement
+      outcome=sent reply='Завтра в 15:00, спросите Марину.' memory=human/client:Здравствуйте, можно к вам завтра подъеха | ai/owner_phone:Да, конечно. Завтра в 15:00 вас ждём, сп | human/agent:Напомните, во сколько мне подойти и кого | ai/agent:Завтра в 15:00, спросите Марину.
+PASS  handoff_tool_creates_request_once_and_pauses [llm] (63s) — A5 acceptance: the agent CREATES the request through the tool (once, even on re-delivery), the chat is paused, and only the owner's explicit «Авто» resumes it
+      request=26:open:order:pending:87011234567 reply='Передал владельцу, он свяжется.' paused=t once=True paused_incoming=suppressed setmode=200 unpaused=True closed=26:done:order:pending:87011234567 resumed=sent
+FAIL  notifier_delivers_self_message_and_survives_failure (72s) — A5 acceptance: the owner notice is a self-message on the bot's channel (no client text); a failed delivery keeps the request and is retried
+      states=sent/1,sent/1 send_calls=3 to_self=True no_leak=True requests_intact=True body='Choose Reply: вопрос клиента (чат …5511). Автоответ в этом чате приостановлен — '
+FAIL  handoffs_webhook_owner_scoped_list_take_done (7s) — A5: the app's list/take/done are token-only and owner-scoped; done lifts the chat's pause
+      {"notoken": 401, "foreign": 403, "list": [200, 1, "open", false], "take": [200, ["taken"]], "done": [200, [], "f", "done"]}
+PASS  dashboard_shows_open_handoff_as_event (5s) — A5/A6: «Сводка» reports an open request as a REAL event (source=event) that outranks the classifier
+      http=200 row={'profileId': 'stgwa001', 'chatId': '770111630@c.us', 'outcome': 'order_collected', 'summary': 'Заказ: 25 роз', 'outcomeAt': 1790511633194, 'lastMessageAt': 1790511633194, 'source': 'event', 'handoffId': 31, 'handoffStatus': 'open', 'handoffReason': 'order'}
+PASS  proxy_send_records_owner_app_row (9s) — A6: a message the owner sends from the APP (proxy) lands as owner_app in history and as a marked memory row, after the response
+      http=200 body={'status': 'done', 'message_id': 'sent-000001', 'time': 1790511638} history=owner_app:Спасибо, ждём вас memory=ai/owner_app:Спасибо, ждём вас
+PASS  delete_bot_wipes_history_and_requests (4s) — stage 4.7: deleting the bot wipes its history, requests, event ledger and chat state (billing counters untouched)
+      http=200 left=0/0/0/0 resp_counts={'deletedChunks': 0, 'deletedFiles': 0, 'deletedMemoryRows': 14, 'deletedOutcomes': 5, 'deletedReplyFlags': 2, 'deletedHistoryEvents': 16, 'deletedHandoffs': 7, 'deletedReplyEvents': 5, 'deletedChatStates': 5}
+   cleanup: deleted rows: 6
+
+12 pass, 2 fail

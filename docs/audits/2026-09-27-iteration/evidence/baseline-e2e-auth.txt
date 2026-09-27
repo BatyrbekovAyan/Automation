@@ -1,0 +1,37 @@
+PASS  session_bootstrap_and_refresh (0.3s) — bootstrap mints an install; refresh with the secret returns a token; a wrong secret is 401
+      refresh ok=True wrong-secret=401 unknown-install=401
+PASS  session_bad_request_is_400 (0.1s) — a malformed AuthSession body answers 400, never a token
+      400 {'success': False, 'error': 'bad_request'} / 400
+PASS  proxy_requires_token (0.2s) — WappiProxy without / with a forged / with an expired token → 401 and NO transport call
+      none=401 forged=401 garbage=401 transport_calls=0
+PASS  proxy_profile_add_binds_owner (0.7s) — profile.add creates the Wappi profile, binds it to the install and returns a token carrying it
+      profile=profile-000007 token_profiles=['profile-000006', 'profile-000007'] owner_bound=True
+PASS  proxy_owner_isolation (0.7s) — owner B cannot read/act on owner A's profile through ANY proxy op (403, no transport call)
+      {'chats.filter': 403, 'messages.get': 403, 'message.send': 403, 'profile.delete': 403, 'profile.logout': 403, 'status': 403, 'qr': 403, 'media.download': 403, 'chat.delete': 403, 'message.mark_read': 403} transport_calls=0
+PASS  proxy_legit_ops_pass_through (0.3s) — the owner's own ops reach the transport with the server credential and get Wappi's body back
+      status=200 send=200 get=200 bad_param=400 calls=3 all_authed=True
+PASS  proxy_unknown_op_rejected (0.2s) — an op outside the allow-list is refused without a transport call
+      unknown=400 channel_mismatch=400 calls=0
+PASS  hooks_reject_foreign_ids (0.7s) — gated webhooks refuse owner B's ids on owner A's token (and refuse no token) before any side effect
+      {"setreplymode_foreign": 403, "setreplymode_own": 200, "setreplymode_notoken": 200, "dashboard_foreign": 403, "getusage_foreign": 403, "getusage_own": 200, "setworkflowstate_foreign": 403, "deletebotfiles_foreign": 403, "support_notoken": 200}  (token-less expected 200: compat open)
+PASS  claim_by_code_transfers_ownership (0.5s) — a legacy/other-install profile: claim.start sends a code to the bot's OWN chat; claim.verify binds it to the claiming install
+      recipient_is_own_phone=True second_start_reuses_code=True wrong_code=403 verify=200 now_owned_by_A=True B_lost_it=True
+PASS  claim_by_reauth_binds_after_pairing (1.7s) — an UNAUTHORISED legacy profile: claim.start → reauth; only a pairing AFTER the claim binds it (claim.status)
+      qr_allowed=200 chats_refused=403 before_pairing_owned=False after_pairing_owned=True
+FAIL  replymode_reordered_versions_keep_newest (0.3s) — SetReplyMode v2: a later request with an OLDER version is not applied; the reply reports the server's newer value
+      first=200/False stale=200/False report=[{'profileId': 'profile-000006', 'applied': False, 'suppressed': True, 'version': 1790510450970}] row='true|1790510450970'
+FAIL  replymode_bot_default_covers_both_channels_atomically (0.2s) — SetReplyMode v2: a bot-default write for WA+TG travels as ONE request and both rows land (all-or-nothing); a stale follow-up for one of them is refused per profile
+      both=403/None rows=0 stale=403/None report=[]
+PASS  replymode_legacy_body_still_writes (0.2s) — SetReplyMode v2: a legacy body (no version) is applied with a server-assigned version and reads success + written
+      http=200 legacy=True allApplied=True written=1 row='f'
+PASS  replymode_invalid_is_400 (0.0s) — SetReplyMode v2: a malformed body answers 400 (was 200 + success:false)
+      http=400 body={'success': False, 'error': 'bad_request'}
+FAIL  create_seeds_reply_mode_before_activation (0.5s) — CreateWhatsappWorkflow with ReplyMode=semi: the '*' row exists after create, the clone id is bound to the profile, the token learns it, and SetWorkflowState can delete it
+      create=200 id=None row='' bound=False token_has_wf=False delete=0 None
+PASS  create_slot_count_excludes_own_profile_and_retires_refused (1.7s) — 2026-09-24 hotfix: on a 1-channel plan the FIRST channel is accepted (the A1-registered row of the profile being created is not counted) and a refused second profile is deleted at Wappi AND retired in bot_profiles
+      first=200 id=5tT3hdX5QcnZzSgQ second=200 refused=True wappi_deletes=1 row2='channel_limit|true' row1_alive_bound=True
+   cleanup failed: 'str' object has no attribute 'app_user_id'
+   cleanup: deleted rows: 4
+   cleanup: deleted rows: 2
+
+13 pass, 3 fail

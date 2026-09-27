@@ -1,0 +1,4 @@
+PASS  notifier_delivers_self_message_and_survives_failure (35s) — A5 acceptance: the owner notice is a self-message on the bot's channel (no client text); a failed delivery keeps the request and is retried
+1 pass, 0 fail
+PASS  handoffs_webhook_owner_scoped_list_take_done (6s) — A5: the app's list/take/done are token-only and owner-scoped; done lifts the chat's pause
+1 pass, 0 fail

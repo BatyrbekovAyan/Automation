@@ -1,0 +1,751 @@
+{
+  "scope": "last up to 100 retained executions of bot 23; no dialog contents",
+  "count": 67,
+  "outcome_counts": {
+    "filtered": 49,
+    "suppressed": 7,
+    "recorded_owner_phone": 4,
+    "recorded_outgoing_api": 1,
+    "outgoing_known": 3,
+    "sent": 3
+  },
+  "executions": [
+    {
+      "id": "4682",
+      "status": "success",
+      "startedAt": "2026-09-25T07:15:58.318Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4681",
+      "status": "success",
+      "startedAt": "2026-09-25T07:14:43.932Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4680",
+      "status": "success",
+      "startedAt": "2026-09-25T07:14:27.990Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4678",
+      "status": "success",
+      "startedAt": "2026-09-25T07:14:09.379Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4677",
+      "status": "success",
+      "startedAt": "2026-09-25T07:13:49.186Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4676",
+      "status": "success",
+      "startedAt": "2026-09-25T07:13:32.066Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4675",
+      "status": "success",
+      "startedAt": "2026-09-25T07:12:32.283Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4674",
+      "status": "success",
+      "startedAt": "2026-09-25T07:12:20.730Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4672",
+      "status": "success",
+      "startedAt": "2026-09-25T07:10:39.280Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4671",
+      "status": "success",
+      "startedAt": "2026-09-25T07:10:26.089Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4652",
+      "status": "success",
+      "startedAt": "2026-09-25T06:40:07.142Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4650",
+      "status": "success",
+      "startedAt": "2026-09-25T06:36:26.474Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4638",
+      "status": "success",
+      "startedAt": "2026-09-25T06:15:16.602Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4637",
+      "status": "success",
+      "startedAt": "2026-09-25T06:15:03.850Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4635",
+      "status": "success",
+      "startedAt": "2026-09-25T06:12:24.866Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4633",
+      "status": "success",
+      "startedAt": "2026-09-25T06:12:11.546Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4629",
+      "status": "success",
+      "startedAt": "2026-09-25T06:05:40.041Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4628",
+      "status": "success",
+      "startedAt": "2026-09-25T06:05:13.508Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4627",
+      "status": "success",
+      "startedAt": "2026-09-25T06:05:09.684Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4626",
+      "status": "success",
+      "startedAt": "2026-09-25T06:05:02.111Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4624",
+      "status": "success",
+      "startedAt": "2026-09-25T06:04:11.593Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4622",
+      "status": "success",
+      "startedAt": "2026-09-25T06:01:53.181Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4621",
+      "status": "success",
+      "startedAt": "2026-09-25T06:01:45.725Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4620",
+      "status": "success",
+      "startedAt": "2026-09-25T06:01:26.716Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4619",
+      "status": "success",
+      "startedAt": "2026-09-25T06:01:25.596Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4618",
+      "status": "success",
+      "startedAt": "2026-09-25T06:01:22.901Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4617",
+      "status": "success",
+      "startedAt": "2026-09-25T06:01:21.029Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4616",
+      "status": "success",
+      "startedAt": "2026-09-25T06:01:19.591Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4615",
+      "status": "success",
+      "startedAt": "2026-09-25T06:01:18.692Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4614",
+      "status": "success",
+      "startedAt": "2026-09-25T06:01:12.537Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4613",
+      "status": "success",
+      "startedAt": "2026-09-25T06:00:41.739Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4609",
+      "status": "success",
+      "startedAt": "2026-09-25T05:58:06.003Z",
+      "outcomes": [
+        "suppressed"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4608",
+      "status": "success",
+      "startedAt": "2026-09-25T05:57:55.098Z",
+      "outcomes": [
+        "suppressed"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4605",
+      "status": "success",
+      "startedAt": "2026-09-25T05:52:32.136Z",
+      "outcomes": [
+        "recorded_owner_phone"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4603",
+      "status": "success",
+      "startedAt": "2026-09-25T05:51:55.396Z",
+      "outcomes": [
+        "recorded_owner_phone"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4570",
+      "status": "success",
+      "startedAt": "2026-09-25T04:48:42.469Z",
+      "outcomes": [
+        "suppressed"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4568",
+      "status": "success",
+      "startedAt": "2026-09-25T04:48:04.623Z",
+      "outcomes": [
+        "suppressed"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4150",
+      "status": "success",
+      "startedAt": "2026-09-24T15:42:22.107Z",
+      "outcomes": [
+        "suppressed"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4145",
+      "status": "success",
+      "startedAt": "2026-09-24T15:35:12.763Z",
+      "outcomes": [
+        "recorded_owner_phone"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4038",
+      "status": "success",
+      "startedAt": "2026-09-24T13:22:37.041Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4034",
+      "status": "success",
+      "startedAt": "2026-09-24T13:16:40.457Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4006",
+      "status": "success",
+      "startedAt": "2026-09-24T12:36:27.459Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4004",
+      "status": "success",
+      "startedAt": "2026-09-24T12:35:35.344Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "4002",
+      "status": "success",
+      "startedAt": "2026-09-24T12:32:50.740Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "3983",
+      "status": "success",
+      "startedAt": "2026-09-24T12:01:52.825Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "3982",
+      "status": "success",
+      "startedAt": "2026-09-24T12:00:32.799Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "3981",
+      "status": "success",
+      "startedAt": "2026-09-24T12:00:31.225Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "3978",
+      "status": "success",
+      "startedAt": "2026-09-24T11:59:51.248Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "3977",
+      "status": "success",
+      "startedAt": "2026-09-24T11:58:57.542Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "3976",
+      "status": "success",
+      "startedAt": "2026-09-24T11:58:28.533Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "3973",
+      "status": "success",
+      "startedAt": "2026-09-24T11:54:35.182Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "3970",
+      "status": "success",
+      "startedAt": "2026-09-24T11:54:26.635Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "3969",
+      "status": "success",
+      "startedAt": "2026-09-24T11:54:20.249Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "3921",
+      "status": "success",
+      "startedAt": "2026-09-24T11:52:15.952Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "3920",
+      "status": "success",
+      "startedAt": "2026-09-24T11:52:14.425Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "3919",
+      "status": "success",
+      "startedAt": "2026-09-24T11:52:13.890Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "3918",
+      "status": "success",
+      "startedAt": "2026-09-24T11:52:11.860Z",
+      "outcomes": [
+        "filtered"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "3856",
+      "status": "success",
+      "startedAt": "2026-09-24T10:48:21.221Z",
+      "outcomes": [
+        "recorded_outgoing_api"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "3839",
+      "status": "success",
+      "startedAt": "2026-09-24T10:47:39.360Z",
+      "outcomes": [
+        "outgoing_known"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "3825",
+      "status": "success",
+      "startedAt": "2026-09-24T10:47:03.327Z",
+      "outcomes": [
+        "sent"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": true,
+      "handoff_tool_ran": true
+    },
+    {
+      "id": "3822",
+      "status": "success",
+      "startedAt": "2026-09-24T10:44:41.758Z",
+      "outcomes": [
+        "recorded_owner_phone"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "3815",
+      "status": "success",
+      "startedAt": "2026-09-24T10:42:39.141Z",
+      "outcomes": [
+        "outgoing_known"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "3812",
+      "status": "success",
+      "startedAt": "2026-09-24T10:42:28.137Z",
+      "outcomes": [
+        "sent"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": true,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "3804",
+      "status": "success",
+      "startedAt": "2026-09-24T10:39:12.243Z",
+      "outcomes": [
+        "outgoing_known"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "3793",
+      "status": "success",
+      "startedAt": "2026-09-24T10:38:24.788Z",
+      "outcomes": [
+        "sent"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": true,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "3758",
+      "status": "success",
+      "startedAt": "2026-09-24T10:21:23.700Z",
+      "outcomes": [
+        "suppressed"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    },
+    {
+      "id": "3682",
+      "status": "success",
+      "startedAt": "2026-09-24T10:02:33.158Z",
+      "outcomes": [
+        "suppressed"
+      ],
+      "lastNode": "Outcome",
+      "sent_node_ran": false,
+      "handoff_tool_ran": false
+    }
+  ]
+}

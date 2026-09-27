@@ -1,0 +1,6 @@
+PASS  replymode_reordered_versions_keep_newest (0.5s) — SetReplyMode v2: a later request with an OLDER version is not applied; the reply reports the server's 
+1 pass, 0 fail
+PASS  replymode_bot_default_covers_both_channels_atomically (0.6s) — SetReplyMode v2: a bot-default write for WA+TG travels as ONE request and both rows land 
+1 pass, 0 fail
+PASS  create_seeds_reply_mode_before_activation (2.2s) — CreateWhatsappWorkflow with ReplyMode=semi: the '*' row exists after create, the clone id is bound to
+1 pass, 0 fail

@@ -1,0 +1,63 @@
+PASS  dup_parallel_once[wa] (28s) — A4: the same event delivered twice IN PARALLEL → one send, one 'duplicate' stamp, ledger = sent
+      sends=1 outcomes=['duplicate', 'sent'] ledger=sent|sent-000001|-
+PASS  dup_parallel_once[tg] (29s) — A4: the same event delivered twice IN PARALLEL → one send, one 'duplicate' stamp, ledger = sent
+      sends=1 outcomes=['duplicate', 'sent'] ledger=sent|sent-000001|-
+PASS  dup_sequential_once[wa] (29s) — A4: the same event re-delivered 1 s later (first run still in flight) → one send, second refused before any side effect
+      sends=1 outcomes=['sent', 'duplicate'] dup_side_effects=False ledger=sent|sent-000001|-
+PASS  dup_sequential_once[tg] (29s) — A4: the same event re-delivered 1 s later (first run still in flight) → one send, second refused before any side effect
+      sends=1 outcomes=['sent', 'duplicate'] dup_side_effects=False ledger=sent|sent-000001|-
+PASS  restart_stale_claim_reclaims[wa] (30s) — A4: a claim older than 10 min (n8n died mid-flight) is re-claimed on re-delivery and replied; a 1-min-old claim is a duplicate
+      stale: sends=1 outcome=sent ledger=sent|sent-000001|-; recent: outcome=duplicate total_sends=1
+PASS  restart_stale_claim_reclaims[tg] (32s) — A4: a claim older than 10 min (n8n died mid-flight) is re-claimed on re-delivery and replied; a 1-min-old claim is a duplicate
+      stale: sends=1 outcome=sent ledger=sent|sent-000001|-; recent: outcome=duplicate total_sends=1
+PASS  two_chats_parallel_independent[wa] (28s) — A4: two DIFFERENT chats at the same moment → two sends (the lease is per chat, never per bot)
+      sends=2 recipients=['chat-c1-6ee34b80ed25@c.us', 'chat-c2-6ee34b80ed25@c.us'] outcomes=['sent', 'sent']
+PASS  two_chats_parallel_independent[tg] (28s) — A4: two DIFFERENT chats at the same moment → two sends (the lease is per chat, never per bot)
+      sends=2 recipients=['chat-c1-6ee34b80ed25', 'chat-c2-6ee34b80ed25'] outcomes=['sent', 'sent']
+PASS  newer_incoming_during_llm_supersedes[wa] (28s) — A3: a NEWER client message while the answer is being generated → the stale text is cancelled before the send, its AI memory dropped
+      sends=0 outcome=superseded ledger=superseded|-|- ai_memory_rows=0 last=Outcome
+PASS  newer_incoming_during_llm_supersedes[tg] (28s) — A3: a NEWER client message while the answer is being generated → the stale text is cancelled before the send, its AI memory dropped
+      sends=0 outcome=superseded ledger=superseded|-|- ai_memory_rows=0 last=Outcome
+PASS  owner_reply_before_send_cancels[wa] (28s) — A3: the OWNER answers while the bot is composing → no auto-send, cancelled_owner, memory dropped
+      sends=0 outcome=cancelled_owner ledger=cancelled_owner|-|- ai_memory_rows=0 last=Outcome
+PASS  owner_reply_before_send_cancels[tg] (28s) — A3: the OWNER answers while the bot is composing → no auto-send, cancelled_owner, memory dropped
+      sends=0 outcome=cancelled_owner ledger=cancelled_owner|-|- ai_memory_rows=0 last=Outcome
+PASS  auto_off_mid_flight_cancels[wa] (28s) — A3: «Вместе» switched on while the answer is being generated → the lease re-reads the mode, no send, cancelled_mode
+      sends=0 outcome=cancelled_mode ledger=cancelled_mode|-|- ai_memory_rows=0 last=Outcome
+PASS  auto_off_mid_flight_cancels[tg] (28s) — A3: «Вместе» switched on while the answer is being generated → the lease re-reads the mode, no send, cancelled_mode
+      sends=0 outcome=cancelled_mode ledger=cancelled_mode|-|- ai_memory_rows=0 last=Outcome
+PASS  typing_failure_still_sends[wa] (29s) — A7: the typing indicator fails (HTTP 500) → the reply is still sent
+      sends=1 outcome=sent typing_statuses=[500]
+PASS  typing_failure_still_sends[tg] (27s) — A7: the typing indicator fails (HTTP 500) → the reply is still sent
+      sends=1 outcome=sent typing_statuses=[500]
+PASS  expired_lock_does_not_block[wa] (29s) — A4: a lease left behind by a dead run (expired) does not block the next reply; the lock is released after the send
+      sends=1 outcome=sent chat_state(gen|lock)=1|-
+PASS  expired_lock_does_not_block[tg] (29s) — A4: a lease left behind by a dead run (expired) does not block the next reply; the lock is released after the send
+      sends=1 outcome=sent chat_state(gen|lock)=1|-
+PASS  live_lock_blocks_send[wa] (28s) — A4: a LIVE lease held by another run of the same chat → this run does not send (cancelled_busy), nothing is resent later
+      sends=0 outcome=cancelled_busy ledger=cancelled_busy|-|-
+PASS  live_lock_blocks_send[tg] (28s) — A4: a LIVE lease held by another run of the same chat → this run does not send (cancelled_busy), nothing is resent later
+      sends=0 outcome=cancelled_busy ledger=cancelled_busy|-|-
+PASS  accept_then_drop_reconciles_sent[wa] (33s) — A7: the transport accepts the message but the HTTP answer is lost → reconciled as sent from the echo, NO resend
+      send_calls=1 outcome=sent ledger=sent|sent-000001|- reconciled=True
+PASS  accept_then_drop_reconciles_sent[tg] (33s) — A7: the transport accepts the message but the HTTP answer is lost → reconciled as sent from the echo, NO resend
+      send_calls=1 outcome=sent ledger=sent|sent-000001|- reconciled=True
+PASS  send_500_is_send_failed[wa] (30s) — A7: the transport answers HTTP 500 → send_failed recorded with the error, exactly one attempt
+      send_calls=1 outcome=send_failed ledger=send_failed|-|http 500 {"status":"error","detail":"injected"}
+PASS  send_500_is_send_failed[tg] (30s) — A7: the transport answers HTTP 500 → send_failed recorded with the error, exactly one attempt
+      send_calls=1 outcome=send_failed ledger=send_failed|-|http 500 {"status":"error","detail":"injected"}
+PASS  send_timeout_reconciles_from_echo[wa] (66s) — A7: the transport answers after our 30-s timeout (message really went out) → send_unknown → echo found → sent, no resend
+      send_calls=1 settle=send_unknown outcome=sent ledger=sent|sent-000001|-
+PASS  send_timeout_reconciles_from_echo[tg] (65s) — A7: the transport answers after our 30-s timeout (message really went out) → send_unknown → echo found → sent, no resend
+      send_calls=1 settle=send_unknown outcome=sent ledger=sent|sent-000001|-
+PASS  dropped_without_echo_stays_send_unknown[wa] (32s) — A7: the connection dies before the transport processed anything → no echo → the state STAYS send_unknown (visible in the ledger), no resend
+      send_calls=1 outcome=send_unknown ledger=send_unknown|-|socket hang up reconciled=False
+PASS  dropped_without_echo_stays_send_unknown[tg] (33s) — A7: the connection dies before the transport processed anything → no echo → the state STAYS send_unknown (visible in the ledger), no resend
+      send_calls=1 outcome=send_unknown ledger=send_unknown|-|socket hang up reconciled=False
+PASS  media_message_gets_the_ru_ask_for_text[wa] (12s) — a photo/document/sticker never reaches the model: the canned ask is Russian (+ Kazakh line), sent once, through the same send chain (stage 6, 2026-09-22)
+      {'executions': [('3728', 'success', 'sent', 'Outcome')], 'sends': 1, 'body': 'Напишите, пожалуйста, текстом, что вас интересует — фото, файлы и стикеры я не в'}
+PASS  media_message_gets_the_ru_ask_for_text[tg] (11s) — a photo/document/sticker never reaches the model: the canned ask is Russian (+ Kazakh line), sent once, through the same send chain (stage 6, 2026-09-22)
+      {'executions': [('3729', 'success', 'sent', 'Outcome')], 'sends': 1, 'body': 'Напишите, пожалуйста, текстом, что вас интересует — фото, файлы и стикеры я не в'}
+   cleanup: deleted rows: 35
+
+30 pass, 0 fail

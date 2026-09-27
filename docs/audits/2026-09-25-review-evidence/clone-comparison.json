@@ -1,0 +1,17 @@
+{
+  "id": "dt6hHFUVrW07unTj",
+  "name": "23",
+  "active": true,
+  "published_is_stored": true,
+  "template_node_count": 56,
+  "clone_node_count": 56,
+  "connections_equal": true,
+  "parameter_differences": {
+    "Webhook": [
+      "path"
+    ],
+    "AI Agent": [
+      "options"
+    ]
+  }
+}

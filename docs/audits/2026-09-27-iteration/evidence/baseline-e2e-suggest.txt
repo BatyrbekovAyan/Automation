@@ -1,0 +1,14 @@
+PASS  knowledge_budget_and_server_time_reach_the_prompt (6s) — S1/S2/S7: the composed prompt carries the item DESCRIPTION, the contacts after a long description, the server clock in the bot's zone — and never the phone's clock
+      http=200 tz=bot now='2026-09-27 17:20, воскресенье' flags=['description_truncated'] desc_in_fenced=True addr_in_fenced=True phone_clock_leaked=False
+PASS  short_follow_up_recovers_subject_and_exact_match [llm] (7s) — S4: «а сколько стоит?» after the exact model — the retrieval query carries the subject, the article is matched EXACTLY in the price list, the cards quote that price
+      http=200 query='[клиент] Нужен масляный фильтр 90915-YZZE1 на Camry 2019\n[бизнес] Есть, оригинал' tokens=['90915-YZZE1'] exact_row=True cards=['Цена масляного фильтра 90915-YZZE1 для Camry 2019 ', 'Если вас интересует покупка, могу уточнить детали ', 'Если хотите, могу предложить альтернативные вариан', 'Пока уточню информацию по наличию, напишу через 15']
+PASS  same_request_key_is_counted_once (11s) — S3: a retry with the SAME request key (timeout / re-open) does not increment the daily counter; a new key does
+      counts after 1st/retry/new = 3/3/4 (retry must not add, a new key adds 1), keys=2
+PASS  authenticated_refusals_are_named (4s) — S8: an expired subscription and an unknown account answer with their KIND for a token-bearing caller; a bad body answers bad_request
+      expired=subscription unknown=unknown_account bad=bad_request
+PASS  legacy_caller_keeps_opaque_error (0s) — S8/N-4: a token-less legacy call (compat window) still gets only generation_failed — no account oracle
+      http=200 error=generation_failed
+PASS  execution_deadline_is_set (0s) — S3: the workflow carries a 20-s server deadline shorter than the client's 22 s
+      executionTimeout=20 (client waits 22 s)
+
+6 pass, 0 fail

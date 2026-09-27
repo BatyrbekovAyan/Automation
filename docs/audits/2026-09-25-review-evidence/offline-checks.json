@@ -1,0 +1,103 @@
+[
+  {
+    "command": [
+      "node",
+      "Tools/n8n/auth/token.test.mjs"
+    ],
+    "exit": 0,
+    "stdout": "token.js: all assertions passed\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "node",
+      "Tools/n8n/repro/run-code-node.mjs"
+    ],
+    "exit": 0,
+    "stdout": "PASS  combine_single_proceeds [4wYitz5ek30SVNlT-WhatsApp_Bot.json] — single incoming text: the winner proceeds with its own text\nPASS  combine_single_proceeds [4VN3gsFaC2HUYmcc-Telegram_Bot.json] — single incoming text: the winner proceeds with its own text\nPASS  combine_burst_joins_oldest_first [4wYitz5ek30SVNlT-WhatsApp_Bot.json] — a burst of client fragments is joined oldest->newest and only the newest fragment's run proceeds\nPASS  combine_burst_joins_oldest_first [4VN3gsFaC2HUYmcc-Telegram_Bot.json] — a burst of client fragments is joined oldest->newest and only the newest fragment's run proceeds\nPASS  combine_newer_incoming_aborts [4wYitz5ek30SVNlT-WhatsApp_Bot.json] — a newer client message already visible in the fetch supersedes the trigger (abort)\nPASS  combine_newer_incoming_aborts [4VN3gsFaC2HUYmcc-Telegram_Bot.json] — a newer client message already visible in the fetch supersedes the trigger (abort)\nPASS  combine_foreign_chat_aborts [4wYitz5ek30SVNlT-WhatsApp_Bot.json] — a fully crossed fetch (rows of another chat only) never drives a reply (abort)\nPASS  combine_foreign_chat_aborts [4VN3gsFaC2HUYmcc-Telegram_Bot.json] — a fully crossed fetch (rows of another chat only) never drives a reply (abort)\nPASS  combine_human_reply_after_trigger_aborts [4wYitz5ek30SVNlT-WhatsApp_Bot.json] — the owner answered AFTER the trigger (fromMe row newer than the client message): the auto-reply must abort\nPASS  combine_human_reply_after_trigger_aborts [4VN3gsFaC2HUYmcc-Telegram_Bot.json] — the owner answered AFTER the trigger (fromMe row newer than the client message): the auto-reply must abort\nPASS  combine_owner_reply_before_trigger_is_not_intervention [4wYitz5ek30SVNlT-WhatsApp_Bot.json] — an owner message OLDER than the trigger is ordinary history, not an intervention: proceed\nPASS  combine_owner_reply_before_trigger_is_not_intervention [4VN3gsFaC2HUYmcc-Telegram_Bot.json] — an owner message OLDER than the trigger is ordinary history, not an intervention: proceed\nPASS  prep_short_follow_up_keeps_subject [9PTyYcelRQI7bGDb-Suggest_Replies.json] — «Да, сколько стоит?» after «Нужен фильтр Camry 2019» — the retrieval query must still carry the subject\nPASS  prep_full_history_still_reaches_generator [9PTyYcelRQI7bGDb-Suggest_Replies.json] — the generator keeps the whole trailing history (the audit's S4 is about the query, not the history)\nPASS  prep_missing_identity_is_marked_invalid_before_the_gate [9PTyYcelRQI7bGDb-Suggest_Replies.json] — a request without appUserId must be refused as invalid input (not sent to the gate as an empty id)\nPASS  setreplymode_validate_rejects_empty_body [SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json] — Set Reply Mode: an empty body is invalid (server contract; the HTTP status for it is asserted by the staging e2e)\nPASS  setreplymode_validate_keeps_both_profiles_in_one_versioned_row [SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json] — Set Reply Mode v2: two profile ids stay in ONE validated row (single atomic upsert), with a version\nPASS  prep_budget_keeps_contacts_when_description_is_long [9PTyYcelRQI7bGDb-Suggest_Replies.json] — S1/S2 (stage 5): a long business description is trimmed, the contacts block at its END survives, and the cut is flagged\nPASS  prep_legacy_text_fields_protect_contacts_tail [9PTyYcelRQI7bGDb-Suggest_Replies.json] — S2 (stage 5): a legacy client's businessKnowledge is trimmed in the DESCRIPTION, never in the contacts tail\nPASS  prep_server_time_default_zone_is_hedged [9PTyYcelRQI7bGDb-Suggest_Replies.json] — S7 (stage 5): no bot timezone → the server's clock in the default zone and an explicit hedge flag; the phone's `now` is ignored\nPASS  prep_exact_tokens_and_subject_for_sku [9PTyYcelRQI7bGDb-Suggest_Replies.json] — S4 (stage 5): an article code in a short follow-up is an exact token, and the retrieval query carries the previous turn's subject\nPASS  prep_phone_number_is_not_an_exact_token [9PTyYcelRQI7bGDb-Suggest_Replies.json] — S4 (stage 5): a phone number never becomes an exact-match token\n\n22 pass, 0 fail, 0 error (assert mode)\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "Tools/n8n/verify-auth-gate.py"
+    ],
+    "exit": 0,
+    "stdout": "OK  0DP79STI3pafXO9B-Set_Workflow_State.json (gate + rule {'workflows': ['workflowId'], 'legacy': True})\nOK  SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json (gate + rule {'profiles': ['profileIds'], 'legacy': True})\nOK  9PTyYcelRQI7bGDb-Suggest_Replies.json (gate + rule {'profiles': ['profileId'], 'workflows': ['botWaId', 'botTgId'], 'appUser': ['appUserId'], 'legacy': True})\nOK  2htWSV5IHO8E2CgB-Dashboard_Outcomes.json (gate + rule {'profiles': ['profileIds'], 'legacy': True})\nOK  jtbssfzXbOxwTK4k-Get_Usage.json (gate + rule {'appUser': ['appUserId'], 'legacy': True})\nOK  KoTuIlk4LMrlvnWI-Upload_File.json (gate + rule {'workflows': ['whatsappWorkflowId', 'telegramWorkflowId'], 'binaryFields': ['whatsappWorkflowId', 'telegramWorkflowId', 'fileId'], 'legacy': True})\nOK  ZTqpumOpL1rNDOp6-Delete_File.json (gate + rule {'legacy': True})\nOK  lmjYsdNcQA2IE5rl-Delete_Bot_Files.json (gate + rule {'profiles': ['waProfileId', 'tgProfileId'], 'workflows': ['botWaId', 'botTgId'], 'appUser': ['appUserId'], 'legacy': True})\nOK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (gate + rule {'profiles': ['WhatsappProfileId'], 'workflows': ['TelegramWorkflowId'], 'appUser': ['AppUserID'], 'legacy': True})\nOK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (gate + rule {'profiles': ['TelegramProfileId'], 'workflows': ['WhatsappWorkflowId'], 'appUser': ['AppUserID'], 'legacy': True})\nOK  3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json (gate + rule {'workflows': ['WhatsappWorkflowId', 'TelegramWorkflowId'], 'legacy': True})\nOK  TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json (gate + rule {'workflows': ['WhatsappWorkflowId', 'TelegramWorkflowId'], 'legacy': True})\nOK  olmqWMfcFpCEcpiE-Support_Message.json (gate + rule {'legacy': True})\nOK  crWappiProxy0001-Wappi_Proxy.json (allow-list, ownership, no legacy, no stored executions)\nOK  crAuthSession001-Auth_Session.json (cap, hash compare, single round-trip refresh, TTL, claim scoping)\nOK  4wYitz5ek30SVNlT-WhatsApp_Bot.json (callback bound to the registered profile)\nOK  4VN3gsFaC2HUYmcc-Telegram_Bot.json (callback bound to the registered profile)\nOK  Upload File / Delete File (ownership registry + owner-scoped delete)\nOK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (workflow id + owner bound to the profile)\nOK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (workflow id + owner bound to the profile)\nOK  Set Workflow State (protected list carries Auth Session + Wappi Proxy)\nALL AUTH GATE ASSERTS PASSED\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "Tools/n8n/verify-reply-mode.py"
+    ],
+    "exit": 0,
+    "stdout": "OK  SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json (versioned atomic upsert, per-profile report, 400/500 codes)\nOK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (initial reply mode seeded before activation)\nOK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (initial reply mode seeded before activation)\nOK  bot templates (gate read unchanged: absence → reply)\nALL REPLY MODE ASSERTS PASSED\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "Tools/n8n/verify-reply-pipeline.py"
+    ],
+    "exit": 0,
+    "stdout": "OK  4wYitz5ek30SVNlT-WhatsApp_Bot.json\nOK  4VN3gsFaC2HUYmcc-Telegram_Bot.json\nOK  cross-template identity of the stage-3 nodes\nALL REPLY PIPELINE ASSERTS PASSED\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "Tools/n8n/verify-history-handoff.py"
+    ],
+    "exit": 0,
+    "stdout": "OK  4wYitz5ek30SVNlT-WhatsApp_Bot.json\nOK  4VN3gsFaC2HUYmcc-Telegram_Bot.json\nOK  handoff workflows (request / notifier / app webhook)\nOK  test dialog (no memory, no send, no quota, dry handoff, owner check)\nOK  integrations (Create types / Dashboard / Delete / Set State / proxy)\nALL HISTORY/HANDOFF ASSERTS PASSED\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "Tools/n8n/verify-message-batching.py"
+    ],
+    "exit": 0,
+    "stdout": "OK  4wYitz5ek30SVNlT-WhatsApp_Bot.json\nOK  4VN3gsFaC2HUYmcc-Telegram_Bot.json\nOK  cross-template identity\nALL BATCHING ASSERTS PASSED\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "Tools/n8n/verify-telegram-parity.py"
+    ],
+    "exit": 1,
+    "stdout": "OK  4VN3gsFaC2HUYmcc-Telegram_Bot.json\nOK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json\nOK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json\nOK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (canonical-export invariant)\nOK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (canonical-export invariant)\nPARITY FAIL: XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Delete Refused Profile -> ['Retire Refused Profile'], expected ['Respond Channel Limit']\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "Tools/n8n/verify_rag.py",
+      "all"
+    ],
+    "exit": 0,
+    "stdout": "VERIFY OK: all\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "node",
+      "Tools/n8n/verify-panel-prompts.js"
+    ],
+    "exit": 0,
+    "stdout": "sentinel table\n  OK    auto_parts: sentinel unique\n  OK    wholesale: sentinel unique\n  OK    flowers: sentinel unique\n  OK    kaspi_seller: sentinel unique\n  OK    education: sentinel unique\n  OK    phone_repair: sentinel unique\n  OK    auto_parts: sentinel present in panel/auto_parts.md\n  OK    wholesale: sentinel present in panel/wholesale.md\n  OK    flowers: sentinel present in panel/flowers.md\n  OK    kaspi_seller: sentinel present in panel/kaspi_seller.md\n  OK    education: sentinel present in panel/education.md\n  OK    phone_repair: sentinel present in panel/phone_repair.md\n\ncomposed systemPrompt (per vertical)\n  OK    auto_parts: contains sentinel\n  OK    auto_parts: contains subordinating НИША header\n  OK    auto_parts: НИША precedes ДОП. ИНСТРУКЦИИ\n  OK    wholesale: contains sentinel\n  OK    wholesale: contains subordinating НИША header\n  OK    wholesale: НИША precedes ДОП. ИНСТРУКЦИИ\n  OK    flowers: contains sentinel\n  OK    flowers: contains subordinating НИША header\n  OK    flowers: НИША precedes ДОП. ИНСТРУКЦИИ\n  OK    kaspi_seller: contains sentinel\n  OK    kaspi_seller: contains subordinating НИША header\n  OK    kaspi_seller: НИША precedes ДОП. ИНСТРУКЦИИ\n  OK    education: contains sentinel\n  OK    education: contains subordinating НИША header\n  OK    education: НИША precedes ДОП. ИНСТРУКЦИИ\n  OK    phone_repair: contains sentinel\n  OK    phone_repair: contains subordinating НИША header\n  OK    phone_repair: НИША precedes ДОП. ИНСТРУКЦИИ\n\ncomposed systemPrompt (empty + legacy id)\n  OK    (empty): no НИША block\n  OK    (empty): no vertical sentinel leaks\n  OK    (empty): base rules still present\n  OK    car_service: no НИША block\n  OK    car_service: no vertical sentinel leaks\n  OK    car_service: base rules still present\n\nPASS\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "python3",
+      "Tools/n8n/apply-slot-count-fix.py",
+      "--check"
+    ],
+    "exit": 0,
+    "stdout": "OK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json\nOK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json\n",
+    "stderr": ""
+  }
+]

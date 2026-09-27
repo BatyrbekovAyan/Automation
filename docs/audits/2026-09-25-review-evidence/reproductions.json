@@ -1,0 +1,218 @@
+{
+  "scope": "synthetic Code nodes + local PostgreSQL temporary tables",
+  "billing_self_declared_accepted_compat_closed": true,
+  "upload_binary_survives_gate": false,
+  "refresh_db_error_response": {
+    "success": false,
+    "error": "unauthorized",
+    "_status": 401
+  },
+  "unrelated_pairing_claim_method": "reauth",
+  "description": {
+    "length": 263,
+    "condition_preserved": false,
+    "flags": []
+  },
+  "selected_item": {
+    "preserved": false,
+    "flags": [
+      "descriptions_dropped",
+      "catalog_incomplete"
+    ]
+  },
+  "retrieval_query": {
+    "length": 900,
+    "latest_preserved": false,
+    "steer_preserved": false,
+    "exactTokens": [
+      "OLD54321"
+    ]
+  },
+  "test_dialog_selected_prompt": "DRAFT PRICE 999",
+  "sql_exit": 0,
+  "sql_output": "    ?column?    \n----------------\n CLAIM TRANSFER\n(1 row)\n\n  profile_id   \n---------------\n review-victim\n(1 row)\n\n    owner_id     \n-----------------\n review-attacker\n(1 row)\n\n   ?column?   \n--------------\n STALE RESUME\n(1 row)\n\n profileId | applied | suppressed | version \n-----------+---------+------------+---------\n review    | f       | f          |     200\n(1 row)\n\n handoff_paused \n----------------\n f\n(1 row)\n\n status \n--------\n done\n(1 row)\n\n             ?column?             \n----------------------------------\n CANCEL DELETES NEWER SENT MEMORY\n(1 row)\n\n claimed | generation | history_watermark \n---------+------------+-------------------\n t       |          1 |                 0\n(1 row)\n\n claimed | generation | history_watermark \n---------+------------+-------------------\n t       |          2 |                 1\n(1 row)\n\n outcome | transport_message_id | recorded | released \n---------+----------------------+----------+----------\n sent    | transport-id         | t        | f\n(1 row)\n\n  outcome   | dropped_ai_rows | recorded | remembered \n------------+-----------------+----------+------------\n superseded |               2 | t        | f\n(1 row)\n\n memory_rows_left \n------------------\n                0\n(1 row)\n\n           ?column?            \n-------------------------------\n FAILED SEND REMAINS IN MEMORY\n(1 row)\n\n claimed | generation | history_watermark \n---------+------------+-------------------\n t       |          1 |                 0\n(1 row)\n\n   outcome   | transport_message_id | recorded | released \n-------------+----------------------+----------+----------\n send_failed |                      | t        | f\n(1 row)\n\n assistant_memory_rows \n-----------------------\n                     1\n(1 row)\n\n            ?column?            \n--------------------------------\n OLDER EVENT INVALIDATES LATEST\n(1 row)\n\n claimed | generation | history_watermark \n---------+------------+-------------------\n t       |          1 |                 0\n(1 row)\n\n claimed | generation | history_watermark \n---------+------------+-------------------\n t       |          2 |                 0\n(1 row)\n\n allowed | suppressed | generation_now | lock_busy \n---------+------------+----------------+-----------\n f       | f          |              2 | f\n(1 row)\n\n          ?column?          \n----------------------------\n CRASHED SEND STAYS PENDING\n(1 row)\n\n claimed | generation | history_watermark \n---------+------------+-------------------\n f       |          0 |                 0\n(1 row)\n\n    state     \n--------------\n send_pending\n(1 row)\n\n",
+  "wa_tg": {
+    "wa": {
+      "latest_aborts": false,
+      "older_aborts": true,
+      "foreign_echo": {
+        "state": "sent",
+        "transportMessageId": "foreign",
+        "error": "",
+        "reconciled": true
+      }
+    },
+    "tg": {
+      "latest_aborts": false,
+      "older_aborts": true,
+      "foreign_echo": {
+        "state": "sent",
+        "transportMessageId": "foreign",
+        "error": "",
+        "reconciled": true
+      }
+    }
+  },
+  "eval_saved_examples": [
+    {
+      "id": "ap_source_conflict",
+      "vertical": "auto_parts",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "conflict",
+        "key"
+      ],
+      "repeats": 3,
+      "pass_rate": 0.6666666666666666,
+      "runs": [
+        {
+          "verdicts": {
+            "no_fresh_price_pick": true,
+            "no_markdown": true
+          },
+          "text": "Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал.\n\nВ прайсе позиция есть, точное наличие подтвердит менеджер.",
+          "tool_calls": [
+            {
+              "name": "supabase_vector_store",
+              "args": {
+                "input": "Toyota Camry 2019 масляный фильтр 90915-YZZE1 цена наличие"
+              }
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 7647,
+            "completion_tokens": 80
+          },
+          "finish_reason": "stop",
+          "error": null,
+          "dropped_params": []
+        },
+        {
+          "verdicts": {
+            "no_fresh_price_pick": true,
+            "no_markdown": true
+          },
+          "text": "Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал.\nВ прайсе позиция есть, точное наличие подтвердит менеджер.",
+          "tool_calls": [
+            {
+              "name": "supabase_vector_store",
+              "args": {
+                "input": "Toyota Camry 2019 фильтр масляный 90915-YZZE1 цена наличие"
+              }
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 7647,
+            "completion_tokens": 80
+          },
+          "finish_reason": "stop",
+          "error": null,
+          "dropped_params": []
+        },
+        {
+          "verdicts": {
+            "no_fresh_price_pick": false,
+            "no_markdown": true
+          },
+          "text": "Фильтр масляный 90915-YZZE1 — 3900 тг.\nОригинал.",
+          "tool_calls": [
+            {
+              "name": "supabase_vector_store",
+              "args": {
+                "input": "Toyota Camry 2019 фильтр масляный 90915-YZZE1 цена наличие"
+              }
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 7647,
+            "completion_tokens": 65
+          },
+          "finish_reason": "stop",
+          "error": null,
+          "dropped_params": []
+        }
+      ]
+    },
+    {
+      "id": "gen_owner_pref_vs_fact",
+      "vertical": "auto_parts",
+      "mode": "auto",
+      "lang": "ru",
+      "tags": [
+        "priority",
+        "key"
+      ],
+      "repeats": 3,
+      "pass_rate": 1.0,
+      "runs": [
+        {
+          "verdicts": {
+            "no_free_delivery_claim": true,
+            "no_stock_guarantee": true
+          },
+          "text": "Фильтр 90915-YZZE1 для Camry 2019 есть в прайсе, цена 3200 тг, оригинал.\n\nДоставка по городу от 1500 тг.\nТочное наличие на складе подтвердит менеджер.",
+          "tool_calls": [
+            {
+              "name": "supabase_vector_store",
+              "args": {
+                "input": "Toyota Camry 2019 фильтр 90915-YZZE1 наличие цена доставка"
+              }
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 7734,
+            "completion_tokens": 94
+          },
+          "finish_reason": "stop",
+          "error": null,
+          "dropped_params": []
+        },
+        {
+          "verdicts": {
+            "no_free_delivery_claim": true,
+            "no_stock_guarantee": true
+          },
+          "text": "Фильтр 90915-YZZE1 для Camry 2019 есть в прайсе, цена 3200 тг, оригинал.\n\nДоставка по городу от 1500 тг.\nТочное наличие на складе подтвердит менеджер.",
+          "tool_calls": [
+            {
+              "name": "supabase_vector_store",
+              "args": {
+                "input": "Toyota Camry 2019 фильтр 90915-YZZE1 наличие цена доставка"
+              }
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 7734,
+            "completion_tokens": 94
+          },
+          "finish_reason": "stop",
+          "error": null,
+          "dropped_params": []
+        },
+        {
+          "verdicts": {
+            "no_free_delivery_claim": true,
+            "no_stock_guarantee": true
+          },
+          "text": "Фильтр 90915-YZZE1 на Camry 2019 есть, цена 3200 тг, оригинал.\nДоставка по городу бесплатная.",
+          "tool_calls": [
+            {
+              "name": "supabase_vector_store",
+              "args": {
+                "input": "Toyota Camry 2019 фильтр 90915-YZZE1 наличие цена доставка платная"
+              }
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 7736,
+            "completion_tokens": 77
+          },
+          "finish_reason": "stop",
+          "error": null,
+          "dropped_params": []
+        }
+      ]
+    }
+  ]
+}

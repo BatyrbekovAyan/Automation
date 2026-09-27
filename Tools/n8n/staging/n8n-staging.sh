@@ -13,6 +13,9 @@ HOME_DIR="${N8N_STAGING_HOME:-$HOME/.n8n-staging}"
 PORT="${N8N_STAGING_PORT:-5678}"
 BIN="${HOME_DIR}/app/node_modules/.bin/n8n"
 [ -x "${BIN}" ] || BIN="$(command -v n8n)"   # fallback: the global dev install (older version)
+# Prod parity (2026-09-27): n8n 2.36.x refuses Node < 24 at start and isolated-vm does not build on Node 25 — a private Node 24 LTS
+# Node lives at ${HOME_DIR}/node when installed — staging only, the system Node is untouched.
+[ -x "${HOME_DIR}/node/bin/node" ] && export PATH="${HOME_DIR}/node/bin:${PATH}"
 mkdir -p "${HOME_DIR}"
 export N8N_USER_FOLDER="${HOME_DIR}"
 export N8N_PORT="${PORT}"
@@ -32,6 +35,9 @@ export N8N_TEMPLATES_ENABLED=false
 export N8N_HIRING_BANNER_ENABLED=false
 export N8N_PERSONALIZATION_ENABLED=false
 export N8N_LOG_LEVEL="${N8N_LOG_LEVEL:-info}"
+# Prod parity: prod runs Code nodes in TASK RUNNERS (docker-compose N8N_RUNNERS_ENABLED=true). Staging must too, or a
+# require()/$env difference between the two execution modes stays invisible until prod.
+export N8N_RUNNERS_ENABLED="${N8N_RUNNERS_ENABLED:-true}"
 # A1 auth (see docs/superpowers/specs/2026-09-17-a1-server-identity-design.md): the same three env
 # vars prod needs in docker-compose. The secret lives in the gitignored staging secrets file.
 SECRETS_JSON="$(cd "${HOME_DIR}/.." >/dev/null 2>&1; dirname "${BASH_SOURCE[0]}")/../.secrets/staging-n8n.json"

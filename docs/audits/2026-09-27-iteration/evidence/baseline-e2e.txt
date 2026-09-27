@@ -1,0 +1,25 @@
+PASS  sr_no_identity_refused (2.2s) — SuggestReplies without appUserId → refusal envelope, LLM never runs
+      http=200 body={'v': 1, 'requestSeq': 1, 'suggestions': [], 'error': 'generation_failed'} llm_ran=False gate=None
+PASS  sr_unknown_identity_refused (0.2s) — SuggestReplies with an unknown appUserId → refusal, LLM never runs
+      http=200 body={'v': 1, 'requestSeq': 1, 'suggestions': [], 'error': 'generation_failed'} gate=unknown_account
+PASS  sr_identity_gets_cards (3.9s) — SuggestReplies with a fixture subscriber → 1–4 cards (real LLM call)
+      http=200 cards=4 error=None first=Букет из 25 роз стоит 25000 тг. Если вас интересует что-то е
+PASS  setreplymode_invalid_is_4xx (0.1s) — SetReplyMode with an invalid body must answer a 4xx, not 200 + success:false
+      http=400 body={'success': False, 'error': 'bad_request'}
+PASS  setreplymode_valid_writes_row (0.2s) — SetReplyMode with a valid body → success:true, written:1, row present
+      http=200 body={'success': True, 'chatId': '*', 'requestedVersion': 1790510354616, 'legacy': True, 'allApplied': True, 'applied': [{'profileId': 'stg-srm-485fa4d60b75', 'applied': True, 'suppressed': True, 'version': 1790510354616}], 'written': 1} row='t'
+PASS  bot_single_incoming_sends_once (33.5s) — one incoming text → exactly one send on the mock transport
+      sends=1 (expected 1); executions=[('3610', ('Outcome', 'success'))]; webhook=[200]
+PASS  bot_duplicate_delivery_sends_once (31.4s) — the SAME event delivered twice → still exactly one send
+      sends=1 (expected 1); executions=[('3611', ('Outcome', 'success')), ('3612', ('Outcome', 'success'))]; webhook=[200, 200]
+PASS  bot_human_reply_during_debounce_aborts (10.4s) — the owner answers inside the debounce window → no auto-send
+      sends=0 (expected 0); executions=[('3614', ('Outcome', 'success'))]; webhook=[200]
+PASS  bot_newer_incoming_supersedes (10.4s) — a newer client message inside the window → the old fragment does not send by itself
+      sends=0 (expected 0); executions=[('3616', ('Outcome', 'success'))]; webhook=[200]
+PASS  bot_callback_profile_mismatch_filtered (2.6s) — a callback naming ANOTHER profile than the registered webhook → filtered, no gate read, no send (A1 binding)
+      webhook=200 outcome=filtered gate_read=False sends=0
+PASS  bot_suppressed_mode_no_send (2.8s) — «Вместе» (suppressed=true) → execution ends at the gate, no send
+      sends=0 (expected 0); executions=[('3618', ('Outcome', 'success'))]; webhook=[200]
+   cleanup: deleted rows: 4
+
+11 pass, 0 fail

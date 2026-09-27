@@ -1,0 +1,15 @@
+{
+  "status": "completed",
+  "source": "headless",
+  "overall": "Passed",
+  "total": 472,
+  "passed": 472,
+  "failed": 0,
+  "skipped": 0,
+  "inconclusive": 0,
+  "green": true,
+  "unityExit": 0,
+  "filter": "Auth|ReplyMode|Handoff|Suggestion|SuggestReplies|TmpTextToPlain|BotReadiness|TestDialog|FontGlyphCoverage",
+  "run_date": "2026-09-24",
+  "code_ref": "94374500 (relevant code unchanged through 328630d0)"
+}
