@@ -39,15 +39,24 @@ def node(wf, name):
 def verify(fname):
     wf = json.load(open(os.path.join(WF, fname), encoding="utf-8"))
     f = fname
-    # (1) Claim: atomic upsert, refuses a live duplicate, re-claims only a stale claim, bumps the generation.
+    # (1) Claim: atomic upsert, refuses a live duplicate, re-claims only a stale claim; the generation counts
+    #     NEWER MESSAGES (R6): it bumps only on a strictly newer Wappi time ($8) or an unknown one.
     q = node(wf, "Claim Event")["parameters"]["query"]
     for frag in ("insert into reply_events", "on conflict (profile_id, chat_id, message_id) do update",
                  "reply_events.state in ('claimed', 'generated')", "interval '10 minutes'",
-                 "incoming_generation = chat_reply_state.incoming_generation + 1", "as history_watermark"):
+                 "nullif($8::bigint, 0)", "excluded.newest_message_time > chat_reply_state.newest_message_time",
+                 "excluded.newest_message_time is null or chat_reply_state.newest_message_time is null",
+                 "newest_message_time = greatest(chat_reply_state.newest_message_time, excluded.newest_message_time)",
+                 "as history_watermark"):
         check(frag in q, f"{f}: Claim Event lacks {frag!r}")
+    # negative (R6): an unconditional bump counts claim ARRIVALS — a late older message then cancels the only reply
+    check("incoming_generation = chat_reply_state.incoming_generation + 1" not in q,
+          f"{f}: Claim Event bumps the generation on every claim (R6: a late older message refuses the newer reply)")
     params = node(wf, "Claim Event")["parameters"]["options"]["queryReplacement"]
     check("$execution.id" in params and ".profile_id" in params and ".from" in params and ".id" in params,
           f"{f}: Claim Event params must be (profile, chat=from, message id, execution id): {params}")
+    check(params.rstrip().endswith("Number(m.time) || 0 ])($('Webhook').first().json.body.messages[0]) }}"),
+          f"{f}: Claim Event $8 must be the message's own time (0 = unknown), never the server clock: {params}")
     # (2) Lease: mode re-read + generation match + lease + event state in ONE statement; lock scoped per chat.
     q = node(wf, "Acquire Send Lease")["parameters"]["query"]
     for frag in ("from reply_mode_flags", "chat_id in ($2, '*')", "order by (chat_id = '*')", "c.incoming_generation = $4::bigint",

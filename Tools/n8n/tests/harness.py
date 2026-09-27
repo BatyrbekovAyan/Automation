@@ -48,24 +48,25 @@ const dollar = name => { const x = named[name];
   if (x === undefined && v.strict) throw new Error('node not executed: '+name);
   return {first:()=>items[0], all:()=>items, last:()=>items[items.length-1], item: items[0], isExecuted: x !== undefined}; };
 const items = Array.isArray(v.items) ? v.items : [v.item];
-const fn=new Function('$input','$','$env','require','Buffer','$json','$execution','$binary', v.js);
+const fn=new Function('$input','$','$env','require','Buffer','$json','$execution','$binary','$prevNode', v.js);
 let result = fn({first:()=>items[0], all:()=>items, last:()=>items[items.length-1], item: items[0]}, dollar, env, require, Buffer,
-  (items[0]||{}).json, {id: v.executionId || 'synthetic-exec'}, (items[0]||{}).binary);
+  (items[0]||{}).json, {id: v.executionId || 'synthetic-exec'}, (items[0]||{}).binary, {name: v.prevNode || ''});
 Promise.resolve(result).then(r => process.stdout.write(JSON.stringify(r)));'''
 
 
-def run_js(js, item=None, named=None, env=None, items=None, strict=False, execution_id='synthetic-exec'):
-    """Execute a Code-node body. `item` = {'json':…, 'binary':…}; `named` = {'Node Name': json or [json, …]}."""
+def run_js(js, item=None, named=None, env=None, items=None, strict=False, execution_id='synthetic-exec', prev_node=''):
+    """Execute a Code-node body. `item` = {'json':…, 'binary':…}; `named` = {'Node Name': json or [json, …]};
+    `prev_node` = the name `$prevNode.name` reports (the branch that reached the node)."""
     payload = {'js': js, 'item': item or {'json': {}}, 'items': items, 'named': named or {}, 'env': env or {},
-               'strict': strict, 'executionId': execution_id}
+               'strict': strict, 'executionId': execution_id, 'prevNode': prev_node}
     r = subprocess.run(['node', '-e', _DRIVER], input=json.dumps(payload), text=True, capture_output=True)
     if r.returncode != 0:
         raise RuntimeError('node failed: ' + r.stderr.strip()[-2000:])
     return json.loads(r.stdout)
 
 
-def code(w, name, item=None, named=None, env=None, items=None, strict=False):
-    return run_js(node(w, name)['parameters']['jsCode'], item, named, env, items, strict)
+def code(w, name, item=None, named=None, env=None, items=None, strict=False, execution_id='synthetic-exec', prev_node=''):
+    return run_js(node(w, name)['parameters']['jsCode'], item, named, env, items, strict, execution_id, prev_node)
 
 
 def module(filename):
@@ -188,15 +189,17 @@ setErrorHandler(e=>{throw e;});
 const named=v.named||{};
 const $=(n)=>{ if(!(n in named)) throw new TypeError('node not executed: '+n); const x=named[n]; const items=Array.isArray(x)?x.map(j=>({json:j})):[{json:x}];
   return {first:()=>items[0], all:()=>items, item:items[0], last:()=>items[items.length-1]}; };
-let out; try { out = evaluateExpression(v.expr.replace(/^=/, ''), {$json: v.json, $, String, Array, RegExp, Math, Number, JSON, Boolean, Object, Date}); }
+let out; try { out = evaluateExpression(v.expr.replace(/^=/, ''), {$json: v.json, $, $execution: {id: v.executionId}, String, Array, RegExp, Math, Number, JSON, Boolean, Object, Date}); }
 catch (e) { if (e instanceof TypeError) out = null; else throw e; }
 process.stdout.write(JSON.stringify(out === undefined ? null : out));"""
 
 
-def expr(expression, json_=None, named=None):
+def expr(expression, json_=None, named=None, execution_id='synthetic-exec'):
     """Evaluate an n8n parameter expression ('={{ … }}') with n8n's OWN engine (@n8n/tournament via n8n-workflow,
-    staging install = prod version); a TypeError renders as null like n8n's legacy engine."""
-    r = subprocess.run(['node', '-e', _EXPR], input=json.dumps({'expr': expression, 'json': json_ or {}, 'named': named or {}}),
+    staging install = prod version); a TypeError renders as null like n8n's legacy engine. `$execution.id` is
+    `execution_id` (the ledger statements key their lease on it)."""
+    r = subprocess.run(['node', '-e', _EXPR], input=json.dumps({'expr': expression, 'json': json_ or {}, 'named': named or {},
+                                                                 'executionId': execution_id}),
                        text=True, capture_output=True)
     if r.returncode != 0:
         raise RuntimeError('expression failed: ' + r.stderr.strip()[-1500:])

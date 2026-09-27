@@ -40,7 +40,11 @@ MEMORY_ROW = "jsonb_build_object('type', %s, 'content', %s, 'additional_kwargs',
 
 CLAIM_SQL = """-- A4: the atomic right to process THIS event. A re-delivered event finds its row and is refused
 -- (claimed=false → duplicate); a claim left behind by a crashed run (>10 min, no send started) may be
--- re-claimed. Each claim bumps the chat's incoming generation — the final check compares against it.
+-- re-claimed. The chat's incoming generation — what the lease compares against — counts NEWER MESSAGES,
+-- not claim arrivals (R6): it bumps only when this event's Wappi time ($8, 0 = unknown) is strictly newer
+-- than the newest the chat has seen, or when either time is unknown (the old always-bump rule). A late,
+-- OLDER message therefore never refuses the newer message's reply (Latest+Combine already stops the older
+-- run); at an equal time Wappi's order — seen by Latest+Combine / Final Check, not here — picks the winner.
 -- history_watermark lets a cancelled generation's AI rows be dropped from memory (A3.7).
 -- A6: the client's message enters the ONE history right here, before any generation decision.
 with ev as (
@@ -51,9 +55,13 @@ with ev as (
     where reply_events.state in ('claimed', 'generated') and reply_events.updated_at < now() - interval '10 minutes'
   returning message_id
 ), st as (
-  insert into chat_reply_state (profile_id, chat_id, incoming_generation)
-  select $1, $2, 1 where exists (select 1 from ev)
-  on conflict (profile_id, chat_id) do update set incoming_generation = chat_reply_state.incoming_generation + 1
+  insert into chat_reply_state (profile_id, chat_id, incoming_generation, newest_message_time)
+  select $1, $2, 1, nullif($8::bigint, 0) where exists (select 1 from ev)
+  on conflict (profile_id, chat_id) do update
+    set incoming_generation = chat_reply_state.incoming_generation
+          + case when excluded.newest_message_time is null or chat_reply_state.newest_message_time is null
+                      or excluded.newest_message_time > chat_reply_state.newest_message_time then 1 else 0 end,
+        newest_message_time = greatest(chat_reply_state.newest_message_time, excluded.newest_message_time)
   returning incoming_generation
 ), hist as (
   insert into chat_history_events (profile_id, chat_id, message_id, source, body, msg_type, sent_at, execution_id)
@@ -64,7 +72,9 @@ with ev as (
 select exists(select 1 from ev) as claimed,
        coalesce((select incoming_generation from st), (select incoming_generation from chat_reply_state where profile_id = $1 and chat_id = $2), 0)::bigint as generation,
        coalesce((select max(id) from n8n_chat_histories where session_id = $1 || ':' || $2), 0)::bigint as history_watermark;"""
-CLAIM_PARAMS = "={{ (m => [ m.profile_id, m.from, m.id, $execution.id, " + BODY_TEXT + ", String(m.type || ''), Number(m.time) || Math.floor(Date.now() / 1000) ])(" + M + ") }}"
+# $7 = the history row's sent_at (server clock when the webhook has no time); $8 = the message's OWN Wappi time for the
+# generation rule, 0 when unknown — never the server clock, which would compare n8n time against Wappi time (R6).
+CLAIM_PARAMS = "={{ (m => [ m.profile_id, m.from, m.id, $execution.id, " + BODY_TEXT + ", String(m.type || ''), Number(m.time) || Math.floor(Date.now() / 1000), Number(m.time) || 0 ])(" + M + ") }}"
 
 RECORD_SUPPRESSED_SQL = """-- A6: «Вместе» — no generation, but the history and the agent's memory still learn what the client
 -- said, so a later return to «Авто» continues the same conversation (no double write: the memory

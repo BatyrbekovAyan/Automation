@@ -33,6 +33,9 @@ BOTS = {"4wYitz5ek30SVNlT-WhatsApp_Bot.json": "https://wappi.pro/api/sync/",
 LEASE_SECONDS = 90
 TRIG = "$('Webhook').first().json.body.messages[0]"
 
+# SUPERSEDED COPIES: CLAIM_SQL / RECORD_SEND_SQL / RECORD_CANCEL_SQL / CANCEL_LABEL_JS below only seed a template that
+# does not have the nodes yet. Once stage 4 re-shaped them (STAGE4_OWNED, ensure() skips them), the source of truth
+# is apply-history-handoff.py — fix Claim / Record Send / Record Cancel / Cancel Label THERE (R6/R7, 2026-09-27).
 CLAIM_SQL = """-- A4: the atomic right to process THIS event. A re-delivered event finds its row and is refused
 -- (claimed=false → duplicate); a claim left behind by a crashed run (>10 min, no send started) may be
 -- re-claimed. Each claim bumps the chat's incoming generation — the final check compares against it.

@@ -29,7 +29,7 @@ create table if not exists reply_events (
 create index if not exists reply_events_chat_idx on reply_events (profile_id, chat_id, received_at desc);
 
 -- chat_reply_state: per-chat counters + a short send LEASE. incoming_generation bumps on every claimed
--- event, so a reply that started for generation N is refused at send time once a newer incoming has
+-- event (since R6, 2026-09-27: only on a strictly NEWER message — see 2026-09-27-reply-order.sql), so a reply that started for generation N is refused at send time once a newer incoming has
 -- been claimed (N+1) — the "final check" that A3 lacked. The lease (90 s) serialises the send of ONE
 -- chat only; different chats never block each other.
 create table if not exists chat_reply_state (

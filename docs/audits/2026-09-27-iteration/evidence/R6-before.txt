@@ -1,0 +1,49 @@
+# R6 before — Tools/n8n/tests/test_reply_order.py on HEAD 5daf39ce (Claim Event bumps incoming_generation on every claim); the real WA/TG chain Claim → Latest+Combine → Final Check → Acquire Send Lease → Record Send / Cancel Label → Record Cancel on staging-PG temp tables
+PASS R6 [WA] in order: A(100) claimed, then B(101) → exactly one reply, by B, answering A and B
+FAIL R6 [WA] REORDERED: B(101) claimed first, then the late A(100) → exactly one reply, by B (was zero)
+      - sent=[] outcomes={'A': 'superseded', 'B': 'superseded'} claims={'B': 1, 'A': 2}
+      - the reply must answer A+B: []
+FAIL R6 [WA] EQUAL timestamps, claims A→B, Wappi lists A first → exactly one reply
+      - sent=[] (Latest+Combine picks A) outcomes={'A': 'superseded', 'B': 'superseded'}
+PASS R6 [WA] EQUAL timestamps, claims A→B, Wappi lists B first → exactly one reply
+PASS R6 [WA] EQUAL timestamps, claims B→A, Wappi lists A first → exactly one reply
+FAIL R6 [WA] EQUAL timestamps, claims B→A, Wappi lists B first → exactly one reply
+      - sent=[] (Latest+Combine picks B) outcomes={'A': 'superseded', 'B': 'superseded'}
+FAIL R6 [WA] duplicates: B, A, B again, A again (re-deliveries) → one reply by B, the repeats are duplicates
+      - outcomes=['superseded', 'superseded', 'duplicate', 'duplicate']
+FAIL R6 [WA] three messages claimed C→A→B (times A<B<C) → exactly one reply, by C, answering all three
+      - outcomes={'A': 'superseded', 'B': 'superseded', 'C': 'superseded'}
+      - []
+FAIL R6 [WA] two independent chats: chat 1 reordered B→A, chat 2 one message claimed between them → one reply each
+      - outcomes b/d/a=['superseded', 'sent', 'superseded']
+PASS R6 [WA] guard kept: a strictly NEWER message claimed after A's Final Fetch refuses A's lease; its own run answers
+FAIL R6 [WA] accepted residual (pinned): a SAME-second message claimed after A's Final Fetch does not refuse A's lease
+      - A lease={'allowed': False, 'suppressed': False, 'generation_now': 2, 'lock_busy': False}
+PASS R6 [WA] a webhook WITHOUT a time keeps the old rule: its claim always bumps the generation
+FAIL R6 [WA] a chat row written before the fix (no newest time) → reordered B→A still gives one reply by B
+      - b/a=['superseded', 'superseded']
+PASS R6 [TG] in order: A(100) claimed, then B(101) → exactly one reply, by B, answering A and B
+FAIL R6 [TG] REORDERED: B(101) claimed first, then the late A(100) → exactly one reply, by B (was zero)
+      - sent=[] outcomes={'A': 'superseded', 'B': 'superseded'} claims={'B': 1, 'A': 2}
+      - the reply must answer A+B: []
+FAIL R6 [TG] EQUAL timestamps, claims A→B, Wappi lists A first → exactly one reply
+      - sent=[] (Latest+Combine picks A) outcomes={'A': 'superseded', 'B': 'superseded'}
+PASS R6 [TG] EQUAL timestamps, claims A→B, Wappi lists B first → exactly one reply
+PASS R6 [TG] EQUAL timestamps, claims B→A, Wappi lists A first → exactly one reply
+FAIL R6 [TG] EQUAL timestamps, claims B→A, Wappi lists B first → exactly one reply
+      - sent=[] (Latest+Combine picks B) outcomes={'A': 'superseded', 'B': 'superseded'}
+FAIL R6 [TG] duplicates: B, A, B again, A again (re-deliveries) → one reply by B, the repeats are duplicates
+      - outcomes=['superseded', 'superseded', 'duplicate', 'duplicate']
+FAIL R6 [TG] three messages claimed C→A→B (times A<B<C) → exactly one reply, by C, answering all three
+      - outcomes={'A': 'superseded', 'B': 'superseded', 'C': 'superseded'}
+      - []
+FAIL R6 [TG] two independent chats: chat 1 reordered B→A, chat 2 one message claimed between them → one reply each
+      - outcomes b/d/a=['superseded', 'sent', 'superseded']
+PASS R6 [TG] guard kept: a strictly NEWER message claimed after A's Final Fetch refuses A's lease; its own run answers
+FAIL R6 [TG] accepted residual (pinned): a SAME-second message claimed after A's Final Fetch does not refuse A's lease
+      - A lease={'allowed': False, 'suppressed': False, 'generation_now': 2, 'lock_busy': False}
+PASS R6 [TG] a webhook WITHOUT a time keeps the old rule: its claim always bumps the generation
+FAIL R6 [TG] a chat row written before the fix (no newest time) → reordered B→A still gives one reply by B
+      - b/a=['superseded', 'superseded']
+
+10 pass, 16 fail
