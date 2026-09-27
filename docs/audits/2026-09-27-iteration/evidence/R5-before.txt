@@ -1,0 +1,54 @@
+R5 — EditMode (headless, filter 'ReplyModeSync'), 2026-09-28, BEFORE the fix.
+Red state: the pure seams exist as stubs that do exactly what today's code does — ApplyBatchResult = the
+current SendBatch branches (no version guard), ForgetBot/ForgetAll = nothing (today no deletion path clears
+the queue), PendingScopes = nothing announced, ReplyModeSendGate.CanSend = always (no gate). The service
+has no boot hook; Manager opens no gate; Bot.DeleteBot / RunWipe do not touch the queue.
+
+  result=Failed(Child)  total=37  passed=28  failed=9  skipped=0  inconclusive=0
+
+PASS ReplyModeSyncPayloadTests.AuthedProfileIds_BothChannels_KeepsBoth
+PASS ReplyModeSyncPayloadTests.AuthedProfileIds_SkipsBlankWhatsapp
+PASS ReplyModeSyncPayloadTests.AuthedProfileIds_SkipsTelegramSentinel
+PASS ReplyModeSyncPayloadTests.BuildPayload_BotDefaultRow_ChatIdStar_SuppressedTrue
+PASS ReplyModeSyncPayloadTests.BuildPayload_PerChatOverride_RealChatId_SuppressedFalse
+PASS ReplyModeSyncQueueTests.AnyPending_ScopesByBotAndOptionalChat
+PASS ReplyModeSyncQueueTests.Backoff_IsBounded_AndParksAfterMaxAttempts_ThenRetriesNextLaunch
+PASS ReplyModeSyncQueueTests.Batches_GroupBySameChatValueAndVersion
+PASS ReplyModeSyncQueueTests.BatchResult_AnsweredConfirmsOrAdopts_PerProfile_AndAMissingRowIsTransient
+PASS ReplyModeSyncQueueTests.BatchResult_RejectedAndTransient_ApplyToTheSentVersion
+PASS ReplyModeSyncQueueTests.Deserialize_ToleratesGarbage_AndEmpty
+PASS ReplyModeSyncQueueTests.Desire_CreatesPendingEntries_WithOneSharedVersion_AndSupersedesOlderDesires
+FAIL ReplyModeSyncQueueTests.ForgetBot_DropsOnlyThatBotsEntries
+      - a deleted bot's desires must never be sent again   Expected: 1   But was:  3
+PASS ReplyModeSyncQueueTests.NextVersion_IsStrictlyIncreasing_EvenWhenTheClockStallsOrStepsBack
+PASS ReplyModeSyncQueueTests.OnResponse_Applied_ConfirmsTheDesire
+PASS ReplyModeSyncQueueTests.OnResponse_ForAnOlderRequest_IsIgnored_TheNewerDesireStaysPending
+PASS ReplyModeSyncQueueTests.OnResponse_NotApplied_AdoptsTheServersNewerValue
+FAIL ReplyModeSyncQueueTests.PendingScopes_NamesEveryUnconfirmedBotChat_OnceEach
+      - the boot announcement repaints each surface that shows a still-unconfirmed choice, once   Expected: equivalent to < (Bot0, *), (Bot0, c1) >   But was:  <empty>
+PASS ReplyModeSyncQueueTests.Reassert_AutoOverAPendingSemi_LeavesTheQueuedDecisionAlone
+PASS ReplyModeSyncQueueTests.Reassert_AutoWithoutAnEntry_UsesTheFloorVersion
+PASS ReplyModeSyncQueueTests.Reassert_FailedSameValue_RequeuesTheOriginalVersion
+PASS ReplyModeSyncQueueTests.Reassert_PendingSameValue_DoesNotMintANewVersion
+PASS ReplyModeSyncQueueTests.Reassert_SameValueConfirmed_SendsNothing_AndKeepsTheOriginalVersion
+PASS ReplyModeSyncQueueTests.Reassert_SemiDiffering_MintsAFreshVersion
+PASS ReplyModeSyncQueueTests.Rejected_StopsRetrying_ButSurvivesForTheNextLaunch
+PASS ReplyModeSyncQueueTests.Response_ParsesTheV2Envelope_AndRejectsGarbage
+FAIL ReplyModeSyncQueueTests.SendGate_ClosedUntilOpened_OrUntilTheSafetyTimeout
+      - before billing + session exist nothing is sent   Expected: False   But was:  True
+FAIL ReplyModeSyncQueueTests.StaleRefusal_DoesNotSettleANewerDesire
+      - a refusal of v1 must not park the unsent v2   Expected: True   But was:  False
+FAIL ReplyModeSyncQueueTests.StaleTransientFailure_DoesNotBackOffANewerDesire
+      - the newer desire has not been tried yet   Expected: 0   But was:  1
+PASS ReplyModeSyncWiringTests.ChatOpenHeal_RepeatsTheDecision_NeverMintsANewOne
+PASS ReplyModeSyncWiringTests.CreateForms_CarryTheInitialReplyMode_ForTheServerSeed
+FAIL ReplyModeSyncWiringTests.DeletedBots_LeaveNothingInTheQueue
+      - a deleted bot's queued desires must be dropped before its server rows are wiped (a resumed send would recreate them)   Expected: True   But was:  False
+PASS ReplyModeSyncWiringTests.EveryWriteSite_GoesThroughTheQueue
+FAIL ReplyModeSyncWiringTests.FirstSend_WaitsForBillingInitAndSession
+      - the send gate opens only after billing is initialised   Expected: True   But was:  False
+PASS ReplyModeSyncWiringTests.SaveWorkflows_WaitsForTheServersConfirmation_BeforeActivating
+FAIL ReplyModeSyncWiringTests.Service_BootsItself_OnEveryLaunch_AndAnnouncesTheLoadedQueue
+      - ReplyModeSyncService must boot itself (RuntimeInitializeOnLoadMethod), like HandoffSyncService   Expected: not null   But was:  null
+FAIL ReplyModeSyncWiringTests.Service_ConfirmsOnlyOnThePerProfileReport
+      - definitive refusals stop retrying   Expected: True   But was:  False

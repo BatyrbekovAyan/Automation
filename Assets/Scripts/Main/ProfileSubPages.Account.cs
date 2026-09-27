@@ -56,7 +56,10 @@ public partial class ProfileSubPages
         }
 
         // 2. Prefs: DeleteAll is the only complete option — per-chat SemiAuto
-        //    keys and historical orphans cannot be enumerated.
+        //    keys and historical orphans cannot be enumerated. The reply-mode queue
+        //    lives in memory too and re-persists itself on its next write: empty it
+        //    first, or a new Bot0 would inherit the old bots' pending choices (R5).
+        ReplyModeSyncService.Existing?.ForgetAll();
         PlayerPrefs.DeleteAll();
         PlayerPrefs.Save();
 

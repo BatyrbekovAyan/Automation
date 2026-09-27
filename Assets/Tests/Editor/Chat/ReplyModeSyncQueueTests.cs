@@ -202,6 +202,102 @@ public class ReplyModeSyncQueueTests
         Assert.IsTrue(e.desiredSuppressed && e.desiredVersion == v && e.IsPending, "an undelivered decision is on its way; its answer reconciles");
     }
 
+    // ---- R5 (2026-09-27): cold-start resume — stale answers, deleted bots, the boot announcement, the send gate ----
+
+    private static ReplyModeSyncResponse.Row Row(string pid, bool applied, bool suppressed, long version)
+        => new ReplyModeSyncResponse.Row { ProfileId = pid, Applied = applied, Suppressed = suppressed, Version = version };
+
+    [Test]
+    public void StaleRefusal_DoesNotSettleANewerDesire()
+    {
+        var m = M();
+        long v1 = ReplyModeSyncQueue.Desire(m, "Bot0", new[] { "wa" }, "c1", false, 1000);
+        var batch = ReplyModeSyncQueue.Batches(ReplyModeSyncQueue.Due(m, 1000))[0];      // v1 is in flight
+        long v2 = ReplyModeSyncQueue.Desire(m, "Bot0", new[] { "wa" }, "c1", true, 2000);   // the owner taps again meanwhile
+        ReplyModeSyncQueue.ApplyBatchResult(batch, v1, ReplyModeSyncQueue.BatchStatus.Rejected, null, 3000);
+        var e = ReplyModeSyncQueue.Find(m, "wa", "c1");
+        Assert.IsTrue(e.IsPending && e.desiredVersion == v2 && e.desiredSuppressed, "a refusal of v1 must not park the unsent v2");
+        Assert.AreEqual(1, ReplyModeSyncQueue.Due(m, 3000).Count, "v2 is still due");
+    }
+
+    [Test]
+    public void StaleTransientFailure_DoesNotBackOffANewerDesire()
+    {
+        var m = M();
+        long v1 = ReplyModeSyncQueue.Desire(m, "Bot0", new[] { "wa" }, "c1", false, 1000);
+        var batch = ReplyModeSyncQueue.Batches(ReplyModeSyncQueue.Due(m, 1000))[0];
+        ReplyModeSyncQueue.Desire(m, "Bot0", new[] { "wa" }, "c1", true, 2000);
+        ReplyModeSyncQueue.ApplyBatchResult(batch, v1, ReplyModeSyncQueue.BatchStatus.Transient, null, 3000);
+        var e = ReplyModeSyncQueue.Find(m, "wa", "c1");
+        Assert.AreEqual(0, e.attempts, "the newer desire has not been tried yet");
+        Assert.AreEqual(1, ReplyModeSyncQueue.Due(m, 3000).Count, "...and is due now, not after a backoff");
+    }
+
+    [Test]
+    public void BatchResult_AnsweredConfirmsOrAdopts_PerProfile_AndAMissingRowIsTransient()
+    {
+        var m = M();
+        long v = ReplyModeSyncQueue.Desire(m, "Bot0", new[] { "wa", "tg", "x" }, "*", true, 1000);
+        var batch = ReplyModeSyncQueue.Batches(ReplyModeSyncQueue.Due(m, 1000))[0];
+        var adopted = ReplyModeSyncQueue.ApplyBatchResult(batch, v, ReplyModeSyncQueue.BatchStatus.Answered,
+            new[] { Row("wa", true, true, v), Row("tg", false, false, v + 9) }, 2000);
+        Assert.AreEqual(ReplyModeSyncQueue.StateConfirmed, ReplyModeSyncQueue.Find(m, "wa", "*").state);
+        Assert.AreEqual(1, adopted.Count);
+        Assert.AreEqual("tg", adopted[0].profileId, "the server's newer value is adopted and reported");
+        var x = ReplyModeSyncQueue.Find(m, "x", "*");
+        Assert.IsTrue(x.IsPending && x.attempts == 1, "a profile the server did not report is retried");
+    }
+
+    [Test]
+    public void BatchResult_RejectedAndTransient_ApplyToTheSentVersion()
+    {
+        var m = M();
+        long v = ReplyModeSyncQueue.Desire(m, "Bot0", new[] { "wa" }, "c1", false, 1000);
+        var batch = ReplyModeSyncQueue.Batches(ReplyModeSyncQueue.Due(m, 1000))[0];
+        ReplyModeSyncQueue.ApplyBatchResult(batch, v, ReplyModeSyncQueue.BatchStatus.Transient, null, 1000);
+        Assert.AreEqual(1, ReplyModeSyncQueue.Find(m, "wa", "c1").attempts);
+        ReplyModeSyncQueue.ApplyBatchResult(batch, v, ReplyModeSyncQueue.BatchStatus.Rejected, null, 1000);
+        Assert.IsTrue(ReplyModeSyncQueue.Find(m, "wa", "c1").IsFailed);
+    }
+
+    [Test]
+    public void ForgetBot_DropsOnlyThatBotsEntries()
+    {
+        var m = M();
+        ReplyModeSyncQueue.Desire(m, "Bot0", new[] { "wa0" }, "*", true, 1000);
+        ReplyModeSyncQueue.Desire(m, "Bot0", new[] { "wa0" }, "c1", false, 1000);
+        ReplyModeSyncQueue.Desire(m, "Bot1", new[] { "wa1" }, "*", true, 1000);
+        ReplyModeSyncQueue.ForgetBot(m, "Bot0");
+        Assert.AreEqual(1, m.entries.Count, "a deleted bot's desires must never be sent again");
+        Assert.AreEqual("Bot1", m.entries[0].botId);
+        ReplyModeSyncQueue.ForgetAll(m);
+        Assert.AreEqual(0, m.entries.Count, "the full wipe leaves nothing for a new Bot0 to inherit");
+    }
+
+    [Test]
+    public void PendingScopes_NamesEveryUnconfirmedBotChat_OnceEach()
+    {
+        var m = M();
+        long v = ReplyModeSyncQueue.Desire(m, "Bot0", new[] { "wa", "tg" }, "*", true, 1000);
+        ReplyModeSyncQueue.Desire(m, "Bot0", new[] { "wa" }, "c1", false, 1000);
+        ReplyModeSyncQueue.Desire(m, "Bot1", new[] { "wb" }, "*", false, 1000);
+        var confirmed = ReplyModeSyncQueue.Find(m, "wb", "*");
+        ReplyModeSyncQueue.OnResponse(confirmed, confirmed.desiredVersion, true, false, confirmed.desiredVersion);
+        var reloaded = ReplyModeSyncQueue.Deserialize(ReplyModeSyncQueue.Serialize(m), 5000);
+        var scopes = ReplyModeSyncQueue.PendingScopes(reloaded);
+        CollectionAssert.AreEquivalent(new[] { ("Bot0", "*"), ("Bot0", "c1") }, scopes,
+            "the boot announcement repaints each surface that shows a still-unconfirmed choice, once");
+    }
+
+    [Test]
+    public void SendGate_ClosedUntilOpened_OrUntilTheSafetyTimeout()
+    {
+        Assert.IsFalse(ReplyModeSendGate.CanSend(false, 0f), "before billing + session exist nothing is sent");
+        Assert.IsFalse(ReplyModeSendGate.CanSend(false, ReplyModeSendGate.SafetySeconds - 0.1f));
+        Assert.IsTrue(ReplyModeSendGate.CanSend(true, 0.5f), "opened by the boot sequence");
+        Assert.IsTrue(ReplyModeSendGate.CanSend(false, ReplyModeSendGate.SafetySeconds), "a boot that never opens it cannot strand the queue");
+    }
+
     [Test]
     public void Deserialize_ToleratesGarbage_AndEmpty()
     {

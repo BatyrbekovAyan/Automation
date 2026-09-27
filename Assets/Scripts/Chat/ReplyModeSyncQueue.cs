@@ -21,7 +21,7 @@ public static class ReplyModeSyncQueue
 {
     public const string StatePending = "pending";
     public const string StateConfirmed = "confirmed";
-    public const string StateFailed = "failed";        // attempts exhausted THIS launch; retried on the next one
+    public const string StateFailed = "failed";        // attempts exhausted / refused THIS launch; retried on the next one (the service resumes the queue at boot)
 
     public const int MaxAttemptsPerLaunch = 8;
     public const string BotDefaultChat = "*";
@@ -211,6 +211,54 @@ public static class ReplyModeSyncQueue
         return Outcome.AdoptedServer;
     }
 
+    /// <summary>How the server answered one batch: a success envelope, a definitive refusal (400/403), or anything else.</summary>
+    public enum BatchStatus { Answered, Rejected, Transient }
+
+    /// <summary>
+    /// Apply one batch's answer to its entries (R5, 2026-09-27). Only an entry still desiring the version that was
+    /// SENT is touched: a desire the owner made while the request was in flight is newer, has not been tried, and must
+    /// stay due — a stale 400/403 used to park it as failed, a stale transient failure delayed it by a backoff.
+    /// Answered: per-profile confirmation / adoption (a profile the server did not report is retried like a transient
+    /// failure). Returns the entries whose NEWER server value was adopted, for the caller to announce.
+    /// </summary>
+    public static List<Entry> ApplyBatchResult(List<Entry> batch, long sentVersion, BatchStatus status,
+                                               IReadOnlyList<ReplyModeSyncResponse.Row> rows, long nowMs)
+    {
+        var adopted = new List<Entry>();
+        foreach (var e in batch)
+        {
+            if (e.desiredVersion != sentVersion) continue;
+            if (status == BatchStatus.Rejected) { OnRejected(e); continue; }
+            var row = status == BatchStatus.Answered ? FindRow(rows, e.profileId) : null;
+            if (row == null) { OnSendFailed(e, nowMs); continue; }
+            if (OnResponse(e, sentVersion, row.Applied, row.Suppressed, row.Version) == Outcome.AdoptedServer) adopted.Add(e);
+        }
+        return adopted;
+    }
+
+    private static ReplyModeSyncResponse.Row FindRow(IReadOnlyList<ReplyModeSyncResponse.Row> rows, string profileId)
+    {
+        if (rows == null) return null;
+        foreach (var r in rows)
+            if (r.ProfileId == profileId) return r;
+        return null;
+    }
+
+    /// <summary>A deleted bot's desires must never be sent again (a resumed send would recreate wiped server rows).</summary>
+    public static void ForgetBot(Model m, string botId) => m.entries.RemoveAll(e => e.botId == botId);
+
+    /// <summary>The full local wipe: nothing may survive for a later bot that reuses a slot name.</summary>
+    public static void ForgetAll(Model m) => m.entries.Clear();
+
+    /// <summary>Each (bot, chat) with an unconfirmed choice, once — what a freshly loaded queue announces to the UI.</summary>
+    public static List<(string botId, string chatId)> PendingScopes(Model m)
+    {
+        var scopes = new List<(string botId, string chatId)>();
+        foreach (var e in m.entries)
+            if (e.IsPending && !scopes.Contains((e.botId, e.chatId))) scopes.Add((e.botId, e.chatId));
+        return scopes;
+    }
+
     /// <summary>Groups due entries that can travel in one request (same chat, value and version).</summary>
     public static List<List<Entry>> Batches(List<Entry> due)
     {
@@ -308,4 +356,17 @@ public static class ReplyModeSyncCopy
 {
     public const string Pending = "Сохраняем режим…";
     public const string Failed = "Режим не сохранён";
+}
+
+/// <summary>
+/// R5 (2026-09-27): the queue resumes on every cold start, but its first send waits until the boot sequence has
+/// initialised billing and finished the auth session op (Manager opens the gate) — otherwise the request would go
+/// out on the device-id fallback identity. A boot that never opens it (an exception, a hung session op) cannot strand
+/// the queue: the gate opens by itself after <see cref="SafetySeconds"/>. Once open it stays open for the launch.
+/// </summary>
+public static class ReplyModeSendGate
+{
+    public const float SafetySeconds = 20f;
+
+    public static bool CanSend(bool opened, float secondsSinceBoot) => opened || secondsSinceBoot >= SafetySeconds;
 }

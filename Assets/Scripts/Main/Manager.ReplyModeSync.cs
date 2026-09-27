@@ -83,6 +83,18 @@ public partial class Manager
         ReplyModeSyncService.Instance?.Reassert(botId, profileId, chatId, suppressed);
     }
 
+    /// <summary>
+    /// R5 (2026-09-27): the boot session op, then the reply-mode send gate. ReplyModeSyncService resumes its
+    /// persisted queue on every launch, but a send before BillingService.Initialize and the session would go out on
+    /// the device-id fallback identity; the gate opens here, after both (the service opens it itself after
+    /// <see cref="ReplyModeSendGate.SafetySeconds"/> if this never runs to the end).
+    /// </summary>
+    private IEnumerator EnsureSessionThenOpenReplyModeSendGate()
+    {
+        yield return AuthClient.Instance.EnsureSession();
+        ReplyModeSyncService.OpenSendGate();
+    }
+
     // --- Bot-default flip hook (ReplyModeToggleBinder.OnReplyModeChanged) -----
 
     // Manager declares its OWN OnEnable/OnDisable here (the primary file has none — C4) to

@@ -330,6 +330,11 @@ public class Bot : MonoBehaviour
             ChatManager.Instance.PurgeCacheForBot(transform.name);
         }
 
+        // R5: the reply-mode queue resumes on every launch — a deleted bot's undelivered
+        // choices must go first, or a resumed send would recreate the reply_mode_flags
+        // rows the server-side wipe below removes.
+        ReplyModeSyncService.Existing?.ForgetBot(transform.name);
+
         // Sweep the bot's server-side trace from Supabase BEFORE the ids stop
         // meaning anything — RAG chunks are tagged by the workflow ids, and the
         // bot_profiles slot rows are keyed by the profile ids; nothing could

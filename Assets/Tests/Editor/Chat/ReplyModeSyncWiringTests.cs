@@ -1,4 +1,6 @@
 using System.IO;
+using System.Linq;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEngine;
@@ -82,10 +84,61 @@ public class ReplyModeSyncWiringTests
     [Test]
     public void Service_ConfirmsOnlyOnThePerProfileReport()
     {
+        // R5 (2026-09-27): the answer branches moved into the pure ReplyModeSyncQueue.ApplyBatchResult (behaviour in
+        // ReplyModeSyncQueueTests); this guard pins that SendBatch still classifies the answer the same way and that
+        // the pure function confirms per profile by the SENT version and never touches a superseded desire.
         string svc = MethodBody(Src("Scripts/Chat/ReplyModeSyncService.cs"), "IEnumerator SendBatch");
         Assert.IsTrue(svc.Contains("ReplyModeSyncResponse.TryParse(") && svc.Contains("res.Success"), "a 200 without a success:true envelope must not confirm");
-        Assert.IsTrue(svc.Contains("ReplyModeSyncQueue.OnResponse(e, sentVersion, row.Applied, row.Suppressed, row.Version)"), "confirmation is per profile, by the sent version");
-        Assert.IsTrue(svc.Contains("www.responseCode == 400 || www.responseCode == 403") && svc.Contains("OnRejected("), "definitive refusals stop retrying");
-        Assert.IsTrue(svc.Contains("OnSendFailed(e, now)"), "transient failures back off and retry");
+        Assert.IsTrue(svc.Contains("www.responseCode == 400 || www.responseCode == 403") && svc.Contains("ReplyModeSyncQueue.BatchStatus.Rejected"), "definitive refusals stop retrying");
+        Assert.IsTrue(svc.Contains("ReplyModeSyncQueue.BatchStatus.Transient"), "transient failures back off and retry");
+        Assert.IsTrue(svc.Contains("ReplyModeSyncQueue.ApplyBatchResult(batch, sentVersion, "), "every answer goes through the pure, version-guarded seam");
+        string pure = MethodBody(Src("Scripts/Chat/ReplyModeSyncQueue.cs"), "public static List<Entry> ApplyBatchResult");
+        Assert.IsTrue(pure.Contains("OnResponse(e, sentVersion, row.Applied, row.Suppressed, row.Version)"), "confirmation is per profile, by the sent version");
+        Assert.IsTrue(pure.Contains("if (e.desiredVersion != sentVersion) continue;"), "a stale answer must not settle a newer desire");
+    }
+
+    [Test]
+    public void Service_BootsItself_OnEveryLaunch_AndAnnouncesTheLoadedQueue()
+    {
+        // R5: the persisted queue used to be read only when something happened to create the service (a tap, a
+        // chat-open heal, a Save) — a cold start with an undelivered choice sent nothing and painted it confirmed.
+        var boot = typeof(ReplyModeSyncService).GetMethods(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)
+            .FirstOrDefault(m => m.GetCustomAttribute<RuntimeInitializeOnLoadMethodAttribute>() != null);
+        Assert.IsNotNull(boot, "ReplyModeSyncService must boot itself (RuntimeInitializeOnLoadMethod), like HandoffSyncService");
+        Assert.AreEqual(RuntimeInitializeLoadType.AfterSceneLoad, boot.GetCustomAttribute<RuntimeInitializeOnLoadMethodAttribute>().loadType);
+        string src = Src("Scripts/Chat/ReplyModeSyncService.cs");
+        Assert.IsTrue(MethodBody(src, "private static void " + boot.Name).Contains("Instance"), "the boot must create the service (Awake loads the queue)");
+        string awake = MethodBody(src, "private void Awake");
+        Assert.IsTrue(awake.Contains("ReplyModeSyncQueue.Deserialize(") && awake.Contains("ReplyModeSyncQueue.PendingScopes(_model)") && awake.Contains("OnStateChanged?.Invoke("),
+            "surfaces that painted before the service existed must be told which choices are still pending");
+    }
+
+    [Test]
+    public void FirstSend_WaitsForBillingInitAndSession()
+    {
+        // R5: a boot-time send before BillingService.Initialize + the session would go out on the device-id fallback.
+        string boot = MethodBody(Src("Scripts/Main/Manager.cs"), "private IEnumerator PreloadSecretsThenInitBilling");
+        int init = boot.IndexOf("BillingService.Initialize()", System.StringComparison.Ordinal);
+        int gate = boot.IndexOf("EnsureSessionThenOpenReplyModeSendGate()", System.StringComparison.Ordinal);
+        Assert.IsTrue(init >= 0 && gate > init, "the send gate opens only after billing is initialised");
+        string opener = MethodBody(Src("Scripts/Main/Manager.ReplyModeSync.cs"), "private IEnumerator EnsureSessionThenOpenReplyModeSendGate");
+        int session = opener.IndexOf("yield return AuthClient.Instance.EnsureSession()", System.StringComparison.Ordinal);
+        int open = opener.IndexOf("ReplyModeSyncService.OpenSendGate()", System.StringComparison.Ordinal);
+        Assert.IsTrue(session >= 0 && open > session, "...and after the auth session op has finished");
+        string loop = MethodBody(Src("Scripts/Chat/ReplyModeSyncService.cs"), "private IEnumerator Loop");
+        int wait = loop.IndexOf("ReplyModeSendGate.CanSend(", System.StringComparison.Ordinal);
+        int send = loop.IndexOf("SendBatch(", System.StringComparison.Ordinal);
+        Assert.IsTrue(wait >= 0 && send > wait, "the loop waits at the gate before its first send");
+    }
+
+    [Test]
+    public void DeletedBots_LeaveNothingInTheQueue()
+    {
+        string del = MethodBody(Src("Scripts/Main/Bot.cs"), "public void DeleteBot");
+        int forget = del.IndexOf("ReplyModeSyncService.Existing?.ForgetBot(transform.name)", System.StringComparison.Ordinal);
+        int server = del.IndexOf("DeleteBotFilesOnServer(", System.StringComparison.Ordinal);
+        Assert.IsTrue(forget >= 0 && forget < server, "a deleted bot's queued desires must be dropped before its server rows are wiped (a resumed send would recreate them)");
+        string wipe = MethodBody(Src("Scripts/Main/ProfileSubPages.Account.cs"), "private void RunWipe");
+        Assert.IsTrue(wipe.Contains("ReplyModeSyncService.Existing?.ForgetAll()"), "the full wipe must empty the in-memory queue too (it re-persists itself)");
     }
 }

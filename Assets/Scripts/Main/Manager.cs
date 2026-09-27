@@ -282,10 +282,11 @@ public partial class Manager : MonoBehaviour
         }
 
         // A1 server session (bootstrap on first launch, refresh otherwise) — best effort, single-flight;
-        // every authorised request re-checks it, so a failure here only costs a later retry.
+        // every authorised request re-checks it, so a failure here only costs a later retry. Its end also
+        // opens the reply-mode send gate (R5): the resumed queue sends nothing before billing + session.
         try
         {
-            StartCoroutine(AuthClient.Instance.EnsureSession());
+            StartCoroutine(EnsureSessionThenOpenReplyModeSendGate());
         }
         catch (Exception e)
         {
