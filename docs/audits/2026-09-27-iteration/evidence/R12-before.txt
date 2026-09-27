@@ -1,0 +1,87 @@
+# R12 before-fix — python3 Tools/n8n/tests/test_suggest_catalog.py против канона Suggest Replies на HEAD f8afbb32 (git show HEAD:… во временной подмене; генератор затем вернул канон байт-в-байт)
+# PASS «variants too large» на HEAD — регрессионный пин (HEAD выбрасывает все описания, но варианты не склеивает); PASS «server limits» — проверка констант ИСПРАВЛЕННОГО генератора.
+
+FAIL [WA] reviewer A: a 263-char description keeps its closing condition, no false truncation flag
+      - catalog='• Ремонт ZX98765 — 15000 — Диагностика. Диагностика. Диагностика. Диагностика. Диагностика. Диагностика. Диагностика. Диагностика. Диагностика. Диагностика. Диагностика. Диагностика. Диагностика. Диагностика. Диагностика. Диагн'
+FAIL [WA] an overflowing catalog: the ASKED repair keeps its whole description, the others are cut visibly
+      - flags=[]
+      - no visible ellipsis although descriptions were shortened
+      - 'Замена аккумулятора iPhone 11': shortened without «…»: 'ервиса и наличия запчасти на складе. Опл'
+      - 'Замена экрана Samsung A52': shortened without «…»: 'ервиса и наличия запчасти на складе. Опл'
+      - 'Замена стекла камеры iPhone 12': shortened without «…»: 'ервиса и наличия запчасти на складе. Опл'
+      - 'Чистка после попадания воды': shortened without «…»: 'ервиса и наличия запчасти на складе. Опл'
+      - 'Замена динамика Redmi Note 10': shortened without «…»: 'ервиса и наличия запчасти на складе. Опл'
+      - 'Прошивка Android': shortened without «…»: 'ервиса и наличия запчасти на складе. Опл'
+      - 'Замена задней крышки iPhone 14': shortened without «…»: 'ервиса и наличия запчасти на складе. Опл'
+      - 'Ремонт кнопки питания': shortened without «…»: 'ервиса и наличия запчасти на складе. Опл'
+      - 'Замена шлейфа Samsung S21': shortened without «…»: 'ервиса и наличия запчасти на складе. Опл'
+      - 'Замена микрофона Xiaomi': shortened without «…»: 'ервиса и наличия запчасти на складе. Опл'
+      - 'Восстановление после падения': shortened without «…»: 'ервиса и наличия запчасти на складе. Опл'
+      - a description was shortened but knowledgeFlags=[]
+FAIL [WA] reviewer B: the asked LAST item of a 32-item catalog survives (article code in the question)
+      - catalog tail='XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX — 1000\n• Товар 24 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX — 1000'
+FAIL [WA] the asked last bouquet of 32 is found by NAME words (no code) and keeps «Доставка … отдельно»
+      - asked line='• Букет «Нежность» — 18000'
+FAIL [WA] a short follow-up «а сколько?» keeps the item named in the previous turn whole
+      - asked line='• Букет «Нежность» — 18000'
+FAIL [WA] same-name variants: all three «Нежность» sizes stay, each with its own price and conditions
+      - variant 12000 line='• Букет «Нежность» — 12000'
+      - variant 18000 line='• Букет «Нежность» — 18000'
+      - variant 26000 line='• Букет «Нежность» — 26000'
+PASS [WA] same-name variants too large to keep whole: none dropped or merged, each cut is marked
+FAIL [TG] reviewer A: a 263-char description keeps its closing condition, no false truncation flag
+      - catalog='• Ремонт ZX98765 — 15000 — Диагностика. Диагностика. Диагностика. Диагностика. Диагностика. Диагностика. Диагностика. Диагностика. Диагностика. Диагностика. Диагностика. Диагностика. Диагностика. Диагностика. Диагностика. Диагн'
+FAIL [TG] an overflowing catalog: the ASKED repair keeps its whole description, the others are cut visibly
+      - flags=[]
+      - no visible ellipsis although descriptions were shortened
+      - 'Замена аккумулятора iPhone 11': shortened without «…»: 'ервиса и наличия запчасти на складе. Опл'
+      - 'Замена экрана Samsung A52': shortened without «…»: 'ервиса и наличия запчасти на складе. Опл'
+      - 'Замена стекла камеры iPhone 12': shortened without «…»: 'ервиса и наличия запчасти на складе. Опл'
+      - 'Чистка после попадания воды': shortened without «…»: 'ервиса и наличия запчасти на складе. Опл'
+      - 'Замена динамика Redmi Note 10': shortened without «…»: 'ервиса и наличия запчасти на складе. Опл'
+      - 'Прошивка Android': shortened without «…»: 'ервиса и наличия запчасти на складе. Опл'
+      - 'Замена задней крышки iPhone 14': shortened without «…»: 'ервиса и наличия запчасти на складе. Опл'
+      - 'Ремонт кнопки питания': shortened without «…»: 'ервиса и наличия запчасти на складе. Опл'
+      - 'Замена шлейфа Samsung S21': shortened without «…»: 'ервиса и наличия запчасти на складе. Опл'
+      - 'Замена микрофона Xiaomi': shortened without «…»: 'ервиса и наличия запчасти на складе. Опл'
+      - 'Восстановление после падения': shortened without «…»: 'ервиса и наличия запчасти на складе. Опл'
+      - a description was shortened but knowledgeFlags=[]
+FAIL [TG] reviewer B: the asked LAST item of a 32-item catalog survives (article code in the question)
+      - catalog tail='XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX — 1000\n• Товар 24 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX — 1000'
+FAIL [TG] the asked last bouquet of 32 is found by NAME words (no code) and keeps «Доставка … отдельно»
+      - asked line='• Букет «Нежность» — 18000'
+FAIL [TG] a short follow-up «а сколько?» keeps the item named in the previous turn whole
+      - asked line='• Букет «Нежность» — 18000'
+FAIL [TG] same-name variants: all three «Нежность» sizes stay, each with its own price and conditions
+      - variant 12000 line='• Букет «Нежность» — 12000'
+      - variant 18000 line='• Букет «Нежность» — 18000'
+      - variant 26000 line='• Букет «Нежность» — 26000'
+PASS [TG] same-name variants too large to keep whole: none dropped or merged, each cut is marked
+FAIL [WA] small catalog: every fact the Auto prompt carries reaches the panel verbatim, no flags
+      - panel lacks a fact the Auto prompt has: 'Оригинальный дисплей, работа около 2 часов, гарантия 6 месяц'
+FAIL [WA] a description the CLIENT clamped at 600 is not presented as complete
+      - the clamped description reads as complete: 'воды: чистка в ультразвуке, замена окислившихся компонентов,'
+      - flags=[]
+FAIL [WA] a legacy client catalog clamped at its 2500 limit is flagged incomplete and marked
+      - flags=[]
+      - tail='8 — 4880 тг\n• Чехол модель 89 '
+FAIL [WA] the shortening reaches the model as a rule (Assemble)
+      - no catalog rule in the prompt
+      - the rule does not explain the «…» marker: ''
+FAIL [TG] small catalog: every fact the Auto prompt carries reaches the panel verbatim, no flags
+      - panel lacks a fact the Auto prompt has: 'Оригинальный дисплей, работа около 2 часов, гарантия 6 месяц'
+FAIL [TG] a description the CLIENT clamped at 600 is not presented as complete
+      - the clamped description reads as complete: 'воды: чистка в ультразвуке, замена окислившихся компонентов,'
+      - flags=[]
+FAIL [TG] a legacy client catalog clamped at its 2500 limit is flagged incomplete and marked
+      - flags=[]
+      - tail='8 — 4880 тг\n• Чехол модель 89 '
+FAIL [TG] the shortening reaches the model as a rule (Assemble)
+      - no catalog rule in the prompt
+      - the rule does not explain the «…» marker: ''
+PASS server limits mirror the client clamps (SuggestionKnowledge 600, N8nSuggestionsProvider catalog 2500)
+FAIL fuzz (seeded, 200 catalogs): ≤ 3000 chars, the asked item keeps its closing condition, every cut is marked
+      - the asked item lost its condition in 168/200
+      - 42/200 catalogs cut a description without «…» + flag
+
+3 pass, 21 fail
