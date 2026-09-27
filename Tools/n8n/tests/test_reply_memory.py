@@ -151,4 +151,40 @@ for ch, T in TEMPLATES.items():
                 c.check(ai_rows(pg, ch) == [OLD_TEXT] and len(memory(pg, ch)) == 2, f'memory={memory(pg, ch)}')
                 c.check(h == [('E', 'client'), ('sent-E', 'ai')], f'history={h}')
 
+    # R7 part 2 (found by the staging e2e run): pg-promise substitutes $N EVERYWHERE in the query text, SQL comments
+    # included — a `$8` inside a `--` comment inlined a MULTI-LINE reply there, its second line escaped the comment
+    # and the statement died with a syntax error, leaving the ledger at send_pending. Real replies are multi-line.
+    MULTI = 'Здравствуйте!\nБукет из 25 роз — 25 000 ₸.\nМәтінмен жазыңызшы.'
+
+    with Case(f'R7 [{ch}] a MULTI-LINE reply goes through Record Send (sent → ledger sent, one ai history row)') as c:
+        with PgSession(SETUP) as pg:
+            m = msg(ch, 'ML', 100, 'Сколько стоит букет?')
+            r = Run(T, pg, m, 'exec-ML')
+            r.claim(); r.latest([m]); r.generate(MULTI); r.final([m]); r.lease(); r.send_ok('sent-ML')
+            h = [(x['message_id'], x['source'], x['body']) for x in history(pg, ch)]
+            c.check(r.outcome == 'sent' and ('sent-ML', 'ai', MULTI) in h, f'outcome={r.outcome} history={h}')
+
+    with Case(f'R7 [{ch}] a MULTI-LINE reply refused by the transport (send_failed) leaves memory; the ledger says send_failed') as c:
+        with PgSession(SETUP) as pg:
+            m = msg(ch, 'MF', 100, 'Сколько стоит букет?')
+            r = Run(T, pg, m, 'exec-MF')
+            r.claim(); r.latest([m]); r.generate(MULTI); r.final([m]); r.lease()
+            r.send({'statusCode': 500, 'body': {'status': 'error'}})
+            c.check(r.outcome == 'send_failed' and ai_rows(pg, ch) == [], f'outcome={r.outcome} ai={ai_rows(pg, ch)}')
+
+    with Case(f'R7 [{ch}] a MULTI-LINE draft of a cancelled run is removed; the newer reply stays') as c:
+        with PgSession(SETUP) as pg:
+            mo, mn, o, n = pair(pg)
+            o.claim(); o.latest([mo]); o.generate(MULTI)
+            n.claim(); n.latest([mn, mo]); n.generate(NEW_TEXT); n.final([mn, mo]); n.lease(); n.send_ok()
+            o.final([mn, mo])
+            c.check(o.outcome == 'superseded' and ai_rows(pg, ch) == [NEW_TEXT], f'o={o.outcome} ai={ai_rows(pg, ch)}')
+
+    with Case(f'R7 [{ch}] the media branch\'s MULTI-LINE canned ask goes through Record Send') as c:
+        with PgSession(SETUP) as pg:
+            mp = msg(ch, 'MP', 100, 'https://mock/photo.jpg', mtype='image')
+            r = Run(T, pg, mp, 'exec-MP')
+            r.claim(); r.latest([mp]); r.ask_for_text(MULTI); r.final([mp]); r.lease(); r.send_ok('sent-MP')
+            c.check(r.outcome == 'sent', f'outcome={r.outcome}')
+
 report()

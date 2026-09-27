@@ -38,10 +38,15 @@ BODY_TEXT = "(['chat','text'].includes(String(m.type)) ? String(m.body || '').sl
 
 MEMORY_ROW = "jsonb_build_object('type', %s, 'content', %s, 'additional_kwargs', jsonb_build_object('source', %s, 'message_id', %s), 'response_metadata', '{}'::jsonb)"
 
+# NEVER write a positional placeholder (dollar sign + digit) inside a SQL `--` comment of these statements: n8n's Postgres node
+# formats the query with pg-promise, which substitutes the placeholder THERE TOO — a multi-line reply text inlined into a
+# comment line escapes it and the statement dies with a syntax error, leaving the ledger at send_pending (R7 part 2,
+# 2026-09-27, found by the staging e2e run). verify-reply-pipeline.py enforces it for every Postgres node of the templates.
+
 CLAIM_SQL = """-- A4: the atomic right to process THIS event. A re-delivered event finds its row and is refused
 -- (claimed=false → duplicate); a claim left behind by a crashed run (>10 min, no send started) may be
 -- re-claimed. The chat's incoming generation — what the lease compares against — counts NEWER MESSAGES,
--- not claim arrivals (R6): it bumps only when this event's Wappi time ($8, 0 = unknown) is strictly newer
+-- not claim arrivals (R6): it bumps only when this event's own Wappi time (0 = unknown) is strictly newer
 -- than the newest the chat has seen, or when either time is unknown (the old always-bump rule). A late,
 -- OLDER message therefore never refuses the newer message's reply (Latest+Combine already stops the older
 -- run); at an equal time Wappi's order — seen by Latest+Combine / Final Check, not here — picks the winner.
@@ -120,8 +125,8 @@ RECORD_OUTGOING_PARAMS = "={{ (m => [ m.profile_id, String(m.chatId || m.to || '
 RECORD_SEND_SQL = """-- A7: the event's final transport state and the lease release. send_unknown stays send_unknown —
 -- an operator-visible uncertainty, never a silent retry. A6: a sent reply is an `ai` history row.
 -- R7: a reply the transport REFUSED (send_failed) never reached the client, so its own memory row goes — the
--- first unmarked ai row above this run's watermark ($9) whose content is exactly its text ($8; the memory node
--- saves the agent's output verbatim). send_unknown KEEPS it: for Wappi «unknown» usually means «delivered, the
+-- first unmarked ai row above this run's watermark whose content is exactly its text (the memory node saves
+-- the agent's output verbatim). send_unknown KEEPS it: for Wappi «unknown» usually means «delivered, the
 -- answer got lost» (iteration decision 2026-09-27). Nothing else in memory is ever touched here.
 with ev as (
   update reply_events set state = $4, transport_message_id = nullif($5, ''), error = nullif($6, ''), updated_at = now()
@@ -152,7 +157,7 @@ RECORD_SEND_PARAMS_TAIL = (", $json.state, $json.transportMessageId, $json.error
 RECORD_CANCEL_SQL = """-- A3.7: a refused / cancelled reply is recorded as such, the lease (if this run held it) is released, and
 -- the AI row a cancelled GENERATION already wrote to memory is dropped — the customer never saw it, so the
 -- bot must not remember having said it. R7: ONLY this run's own row — the first unmarked ai row above its
--- watermark whose content is exactly its text ($10) — never a NEWER run's reply written (or sent) meanwhile.
+-- watermark whose content is exactly its text — never a NEWER run's reply written (or sent) meanwhile.
 -- Owner rows (source-marked) and human rows are never dropped.
 -- A6: when the agent never ran (quota / generation failure), the client's message still enters memory.
 with ev as (

@@ -8,6 +8,7 @@ and byte-identity of every new node across WhatsApp and Telegram (only the trans
 """
 import json
 import os
+import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -136,6 +137,15 @@ def verify(fname):
               f"{f}: {name} must be a retried messages/get")
         qp = {p["name"]: p["value"] for p in n["parameters"]["queryParameters"]["parameters"]}
         check(".chatId }}" in qp["chat_id"] and ".profile_id }}" in qp["profile_id"], f"{f}: {name} must fetch the trigger's chat")
+    # (13) pg-promise substitutes $N inside SQL comments too: a multi-line value inlined into a `--` line escapes the
+    #      comment and kills the statement (R7 part 2) — no placeholder may appear in a comment of any Postgres node.
+    for n in wf["nodes"]:
+        q = n.get("parameters", {}).get("query")
+        if n.get("type") == "n8n-nodes-base.postgres" and isinstance(q, str):
+            for line in q.split("\n"):
+                if "--" in line:
+                    check(not re.search(r"\$\d", line[line.index("--"):]),
+                          f"{f}: {n['name']} has a $N placeholder inside an SQL comment (pg-promise fills it there): {line.strip()[:120]}")
     print("OK ", f)
     return wf
 

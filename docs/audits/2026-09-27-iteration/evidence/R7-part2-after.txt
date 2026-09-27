@@ -1,0 +1,64 @@
+# R7 part 2 after — no $N inside SQL comments (apply-history-handoff.py), the same test_reply_memory.py
+PASS R7 [WA] old draft → new reply SENT → old cancelled: the new reply stays in memory (review scenario)
+PASS R7 [WA] new reply WRITTEN but not yet sent when the old run cancels → it survives, then goes out
+PASS R7 [WA] the newer message arrives during the OLD run's LLM call (claimed before its draft) → only the new reply stays
+PASS R7 [WA] the old run is refused at the LEASE (Send Allowed?) after the new reply went out → only its own draft goes
+PASS R7 [WA] two runs produced the SAME text: exactly one ai row survives (one per reply the client saw)
+PASS R7 [WA] the owner already answered (cancelled_owner): the draft goes, the owner's marked row — same text — stays
+PASS R7 [WA] send_failed: the reply the client never got leaves memory; the client's own row stays
+PASS R7 [WA] send_failed of the NEWER run after an older reply was sent: only the failed text leaves
+PASS R7 [WA] send_unknown (no echo found) KEEPS the reply in memory (decision: «unknown» usually means delivered)
+PASS R7 [WA] a media message (Ask to Send Text, the agent never ran) cancelled after a newer reply → nothing removed
+PASS R7 [WA] the transport echo of a sent reply (after Record Send) adds no second row
+PASS R7 [WA] the transport echo of a sent reply (before Record Send) adds no second row
+PASS R7 [WA] a MULTI-LINE reply goes through Record Send (sent → ledger sent, one ai history row)
+PASS R7 [WA] a MULTI-LINE reply refused by the transport (send_failed) leaves memory; the ledger says send_failed
+PASS R7 [WA] a MULTI-LINE draft of a cancelled run is removed; the newer reply stays
+PASS R7 [WA] the media branch's MULTI-LINE canned ask goes through Record Send
+PASS R7 [TG] old draft → new reply SENT → old cancelled: the new reply stays in memory (review scenario)
+PASS R7 [TG] new reply WRITTEN but not yet sent when the old run cancels → it survives, then goes out
+PASS R7 [TG] the newer message arrives during the OLD run's LLM call (claimed before its draft) → only the new reply stays
+PASS R7 [TG] the old run is refused at the LEASE (Send Allowed?) after the new reply went out → only its own draft goes
+PASS R7 [TG] two runs produced the SAME text: exactly one ai row survives (one per reply the client saw)
+PASS R7 [TG] the owner already answered (cancelled_owner): the draft goes, the owner's marked row — same text — stays
+PASS R7 [TG] send_failed: the reply the client never got leaves memory; the client's own row stays
+PASS R7 [TG] send_failed of the NEWER run after an older reply was sent: only the failed text leaves
+PASS R7 [TG] send_unknown (no echo found) KEEPS the reply in memory (decision: «unknown» usually means delivered)
+PASS R7 [TG] a media message (Ask to Send Text, the agent never ran) cancelled after a newer reply → nothing removed
+PASS R7 [TG] the transport echo of a sent reply (after Record Send) adds no second row
+PASS R7 [TG] the transport echo of a sent reply (before Record Send) adds no second row
+PASS R7 [TG] a MULTI-LINE reply goes through Record Send (sent → ledger sent, one ai history row)
+PASS R7 [TG] a MULTI-LINE reply refused by the transport (send_failed) leaves memory; the ledger says send_failed
+PASS R7 [TG] a MULTI-LINE draft of a cancelled run is removed; the newer reply stays
+PASS R7 [TG] the media branch's MULTI-LINE canned ask goes through Record Send
+
+32 pass, 0 fail
+
+# related checks:
+history/handoff: OK
+reply pipeline v2: OK
+handoff workflows: OK
+ALL REPLY PIPELINE ASSERTS PASSED
+ALL HISTORY/HANDOFF ASSERTS PASSED
+ALL BATCHING ASSERTS PASSED
+ALL PARITY ASSERTS PASSED
+SELF-TEST PASSED: 33/33 cases
+# generator idempotency: apply-reply-pipeline-v2.py → apply-history-handoff.py → byte-identical templates
+REPLY PIPELINE FAIL: 4wYitz5ek30SVNlT-WhatsApp_Bot.json: Claim Event has a $N placeholder inside an SQL comment (pg-promise fills it there): -- not claim arrivals (R6): it bumps only when this event's Wappi time ($8, 0 = unknown) is strictly newer
+# negative: the rule rejects HEAD 9b30affd 4wYitz5ek30SVNlT-WhatsApp_Bot.json (exit 1 )
+REPLY PIPELINE FAIL: 4VN3gsFaC2HUYmcc-Telegram_Bot.json: Claim Event has a $N placeholder inside an SQL comment (pg-promise fills it there): -- not claim arrivals (R6): it bumps only when this event's Wappi time ($8, 0 = unknown) is strictly newer
+# negative: the rule rejects HEAD 9b30affd 4VN3gsFaC2HUYmcc-Telegram_Bot.json (exit 1 )
+# python3 Tools/n8n/tests/run_all.py:
+OK   test_auth_refresh.py: 12 pass, 0 fail
+OK   test_billing_identity.py: 14 pass, 0 fail
+OK   test_claim.py: 9 pass, 0 fail
+OK   test_create_seed.py: 10 pass, 0 fail
+OK   test_harness_selfcheck.py: 2 pass, 0 fail
+OK   test_reply_lost_send.py: 5 pass, 0 fail
+OK   test_reply_memory.py: 32 pass, 0 fail
+OK   test_reply_mode.py: 21 pass, 0 fail
+OK   test_reply_order.py: 26 pass, 0 fail
+OK   test_reply_reconcile.py: 32 pass, 0 fail
+OK   test_upload.py: 22 pass, 0 fail
+OK   test_verify_deployed.py: 26 pass, 0 fail
+OK   test_verify_parity.py: 36 pass, 0 fail
