@@ -1,0 +1,53 @@
+# R15 after — generator fixed (build-test-dialog.py), python3 Tools/n8n/tests/test_test_dialog.py
+PASS R15 [WA] A: an ACTIVE bot is tested by its PUBLISHED prompt (draft 999 vs published 3200 → 3200)
+PASS R15 [WA] B: an INACTIVE bot is tested by its draft (what activation publishes) and says so — not an error
+PASS R15 [WA] C: an active bot in sync (draft == published) keeps working, labelled published
+PASS R15 [WA] D: an active bot whose published version is NOT in the response fails closed (never the draft)
+PASS R15 [WA] E: the published version has no «AI Agent» node → honest error, not the draft
+PASS R15 [WA] F: no «AI Agent» by name → no prompt taken from whatever node sits at index 5
+PASS R15 [WA] G: a failed read (404) stays an honest bot_prompt_unavailable
+PASS R15 [WA] H: the owner is told which version answered — promptVersion reaches the response; nothing sent/counted
+PASS R15 [TG] A: an ACTIVE bot is tested by its PUBLISHED prompt (draft 999 vs published 3200 → 3200)
+PASS R15 [TG] B: an INACTIVE bot is tested by its draft (what activation publishes) and says so — not an error
+PASS R15 [TG] C: an active bot in sync (draft == published) keeps working, labelled published
+PASS R15 [TG] D: an active bot whose published version is NOT in the response fails closed (never the draft)
+PASS R15 [TG] E: the published version has no «AI Agent» node → honest error, not the draft
+PASS R15 [TG] F: no «AI Agent» by name → no prompt taken from whatever node sits at index 5
+PASS R15 [TG] G: a failed read (404) stays an honest bot_prompt_unavailable
+PASS R15 [TG] H: the owner is told which version answered — promptVersion reaches the response; nothing sent/counted
+PASS R15 I: an unreadable published version answers 502 bot_prompt_unavailable through the existing branch
+
+17 pass, 0 fail
+exit=0
+
+# related checks
+$ python3 Tools/n8n/build-test-dialog.py --check  (second run of the generator produced a byte-identical JSON — idempotent)
+test dialog: OK
+$ python3 Tools/n8n/verify-history-handoff.py
+OK  test dialog (no memory, no send, no quota, dry handoff, owner check)
+OK  integrations (Create types / Dashboard / Delete / Set State / proxy)
+ALL HISTORY/HANDOFF ASSERTS PASSED
+$ negative: the new verify_test_dialog R15 guard against the PRE-FIX Compose (git show 8c98626b:…Test_Dialog.json) → rejects (False)
+pre-fix passes R15 guard? False
+$ python3 Tools/n8n/tests/run_all.py
+OK   test_auth_refresh.py: 12 pass, 0 fail
+OK   test_billing_identity.py: 14 pass, 0 fail
+OK   test_claim.py: 9 pass, 0 fail
+OK   test_create_seed.py: 10 pass, 0 fail
+OK   test_harness_selfcheck.py: 2 pass, 0 fail
+OK   test_reply_lost_send.py: 5 pass, 0 fail
+OK   test_reply_memory.py: 32 pass, 0 fail
+OK   test_reply_mode.py: 21 pass, 0 fail
+OK   test_reply_order.py: 26 pass, 0 fail
+OK   test_reply_reconcile.py: 32 pass, 0 fail
+OK   test_suggest_catalog.py: 24 pass, 0 fail
+OK   test_suggest_query.py: 17 pass, 0 fail
+OK   test_test_dialog.py: 17 pass, 0 fail
+OK   test_upload.py: 22 pass, 0 fail
+OK   test_verify_deployed.py: 26 pass, 0 fail
+OK   test_verify_parity.py: 36 pass, 0 fail
+$ python3 Tools/n8n/verify-deployed.py --base http://localhost:5678 (after bootstrap + the R15 staging scenarios restored the WA bot)
+exit=0
+base http://localhost:5678: canonical 26 (diff 0), clones 2 (behind template 0), archived clones 0 (not counted), other 2
+  clone   stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True nodes=56 graph=c32213d7663d published=c32213d7663d sticky=None AT-CANONICAL
+  clone   stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True nodes=56 graph=e30a125d94ab published=e30a125d94ab sticky=None AT-CANONICAL

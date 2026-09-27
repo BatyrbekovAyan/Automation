@@ -1,0 +1,40 @@
+# R15 before — HEAD 8c98626b, python3 Tools/n8n/tests/test_test_dialog.py (canonical Test Dialog as generated before the fix)
+FAIL R15 [WA] A: an ACTIVE bot is tested by its PUBLISHED prompt (draft 999 vs published 3200 → 3200)
+      - tested the wrong version: …'Ты бот цветочного магазина. Цена букета из 25 роз: DRAFT PRICE 999 тенге.'
+      - the response must name the tested (published) version and that a draft differs: None
+FAIL R15 [WA] B: an INACTIVE bot is tested by its draft (what activation publishes) and says so — not an error
+      - the response must say the draft was tested: None
+FAIL R15 [WA] C: an active bot in sync (draft == published) keeps working, labelled published
+      - None
+FAIL R15 [WA] D: an active bot whose published version is NOT in the response fails closed (never the draft)
+      - a published version that cannot be read must not be replaced by the draft: ok=True sm=…'букета из 25 роз: DRAFT PRICE 999 тенге.' err=None
+FAIL R15 [WA] E: the published version has no «AI Agent» node → honest error, not the draft
+      - True None 'букета из 25 роз: DRAFT PRICE 999 тенге.'
+FAIL R15 [WA] F: no «AI Agent» by name → no prompt taken from whatever node sits at index 5
+      - nodes[5] must not stand in for the agent: ok=True sm=…'букета из 25 роз: DRAFT PRICE 999 тенге.'
+PASS R15 [WA] G: a failed read (404) stays an honest bot_prompt_unavailable
+FAIL R15 [WA] H: the owner is told which version answered — promptVersion reaches the response; nothing sent/counted
+      - Sources must hand the tested prompt to the agent
+      - the response must carry the tested version: None
+FAIL R15 [TG] A: an ACTIVE bot is tested by its PUBLISHED prompt (draft 999 vs published 3200 → 3200)
+      - tested the wrong version: …'Ты бот цветочного магазина. Цена букета из 25 роз: DRAFT PRICE 999 тенге.'
+      - the response must name the tested (published) version and that a draft differs: None
+FAIL R15 [TG] B: an INACTIVE bot is tested by its draft (what activation publishes) and says so — not an error
+      - the response must say the draft was tested: None
+FAIL R15 [TG] C: an active bot in sync (draft == published) keeps working, labelled published
+      - None
+FAIL R15 [TG] D: an active bot whose published version is NOT in the response fails closed (never the draft)
+      - a published version that cannot be read must not be replaced by the draft: ok=True sm=…'букета из 25 роз: DRAFT PRICE 999 тенге.' err=None
+FAIL R15 [TG] E: the published version has no «AI Agent» node → honest error, not the draft
+      - True None 'букета из 25 роз: DRAFT PRICE 999 тенге.'
+FAIL R15 [TG] F: no «AI Agent» by name → no prompt taken from whatever node sits at index 5
+      - nodes[5] must not stand in for the agent: ok=True sm=…'букета из 25 роз: DRAFT PRICE 999 тенге.'
+PASS R15 [TG] G: a failed read (404) stays an honest bot_prompt_unavailable
+FAIL R15 [TG] H: the owner is told which version answered — promptVersion reaches the response; nothing sent/counted
+      - Sources must hand the tested prompt to the agent
+      - the response must carry the tested version: None
+FAIL R15 I: an unreadable published version answers 502 bot_prompt_unavailable through the existing branch
+      - Prompt OK? must route it to the error branch
+
+2 pass, 15 fail
+exit=1

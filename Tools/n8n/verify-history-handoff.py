@@ -132,6 +132,10 @@ def verify_test_dialog():
     g = node(td, "Auth Gate")["parameters"]["jsCode"]
     check('"profiles": ["profileId"]' in g and '"workflows": ["workflowId"]' in g and '"legacy": false' in g, "test dialog keeps the owner check (profile + workflow, token-only)")
     check("api/v1/workflows/{{ $json.workflowId }}" in node(td, "Read Bot Workflow")["parameters"]["url"], "the prompt is read from the bot's own workflow")
+    cj = node(td, "Compose")["parameters"]["jsCode"]
+    check("wf.activeVersion" in cj and "activeVersionId" in cj and "nodes[5]" not in cj and "published_version_unreadable" in cj,
+          "R15: an active bot is tested by its PUBLISHED version (activeVersion), fail-closed, no nodes[5] fallback — behaviour in tests/test_test_dialog.py")
+    check("promptVersion" in node(td, "Build Response")["parameters"]["jsCode"], "R15: the response names the tested version (promptVersion)")
     dry = load("crHandoffDry0001-Handoff_Request_Dry.json")
     check("test_dialog_actions" in node(dry, "Record Intent")["parameters"]["query"] and not any("handoff_requests" in json.dumps(n["parameters"]) for n in dry["nodes"]),
           "the dry tool records intent only — never a real request")

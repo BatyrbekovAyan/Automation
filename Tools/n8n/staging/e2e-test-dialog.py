@@ -5,10 +5,12 @@ the Test Dialog workflow (reads the bot's REAL prompt through the admin API), th
 Handoffs `status` op, the private Postgres and the Wappi MOCK.
     python3 Tools/n8n/staging/e2e-test-dialog.py
     python3 Tools/n8n/staging/e2e-test-dialog.py --only forbidden
-Two scenarios drive the REAL model and are tagged [llm] (the reply's shape is the model's; the SIDE-EFFECT
-asserts — no send, no memory, no dialog count, no ledger row, no real handoff — are deterministic).
+Scenarios tagged [llm] drive the REAL model (the reply's shape is the model's; the SIDE-EFFECT asserts — no send, no
+memory, no dialog count, no ledger row, no real handoff — and the tested-version asserts are deterministic).
+R15 (2026-09-27): two scenarios edit the staging WA bot's prompt into draft ≠ published / inactive and restore it.
 """
 import argparse
+import copy
 import importlib.util
 import os
 import subprocess
@@ -17,7 +19,7 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from e2e import Ctx, fixture, http, mock, mock_total, workflow_id_by_name, BASE, WA_PROFILE  # noqa: E402
+from e2e import Ctx, fixture, http, mock, mock_total, workflow_id_by_name, BASE, KEY, WA_PROFILE  # noqa: E402
 
 _spec = importlib.util.spec_from_file_location("e2e_auth", os.path.join(HERE, "e2e-auth.py"))
 e2e_auth = importlib.util.module_from_spec(_spec)
@@ -65,6 +67,74 @@ class Target:
         if history is not None:
             body["history"] = history
         return http("POST", f"{BASE}/webhook/TestDialog", body, headers={"Authorization": f"Bearer {tok}"} if tok else {}, timeout=90)
+
+
+def rest(method, path, body=None):
+    return http(method, f"{BASE}/api/v1{path}", body, headers={"X-N8N-API-KEY": KEY})
+
+
+def agent_prompt(nodes):
+    a = next((n for n in nodes or [] if n.get("name") == "AI Agent"), None)
+    return (((a or {}).get("parameters") or {}).get("options") or {}).get("systemMessage", "")
+
+
+def with_prompt(nodes, text):
+    out = copy.deepcopy(nodes)
+    next(n for n in out if n["name"] == "AI Agent")["parameters"]["options"]["systemMessage"] = text
+    return out
+
+
+class BotVersions:
+    """R15: edits the staging WA bot's AI Agent prompt as a PUBLISHED version and/or an unpublished DRAFT (PUT with
+    ?publishIfActive=false — what a Save-without-Publish in the n8n editor or an n8n-mcp update leaves behind), and puts
+    the original graph back, published and active, on exit."""
+
+    def __init__(self, wf_id):
+        self.id = wf_id
+        st, full = rest("GET", f"/workflows/{wf_id}")
+        if st != 200:
+            raise RuntimeError(f"GET workflow {st}")
+        self.orig = {"name": full["name"], "nodes": full["nodes"], "connections": full["connections"], "settings": full.get("settings") or {}}
+        self.was_active = bool(full.get("active"))
+        self.base_prompt = agent_prompt(full["nodes"])
+
+    def put(self, prompt, publish):
+        body = dict(self.orig, nodes=with_prompt(self.orig["nodes"], prompt))
+        st, r = rest("PUT", f"/workflows/{self.id}" + ("" if publish else "?publishIfActive=false"), body)
+        if st != 200:
+            raise RuntimeError(f"PUT {st}: {str(r)[:200]}")
+        return self.read()
+
+    def read(self):
+        return rest("GET", f"/workflows/{self.id}")[1]
+
+    def set_active(self, on):
+        st, r = rest("POST", f"/workflows/{self.id}/{'activate' if on else 'deactivate'}")
+        if st != 200:
+            raise RuntimeError(f"{'activate' if on else 'deactivate'} {st}: {str(r)[:200]}")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        st, _ = rest("PUT", f"/workflows/{self.id}", self.orig)
+        full = self.read()
+        if self.was_active and not full.get("active"):
+            self.set_active(True)
+            full = self.read()
+        elif self.was_active and full.get("activeVersionId") != full.get("versionId"):
+            self.set_active(False)
+            self.set_active(True)
+            full = self.read()
+        restored = st == 200 and agent_prompt(full["nodes"]) == self.base_prompt and bool(full.get("active")) == self.was_active \
+            and (not self.was_active or (full.get("activeVersionId") == full.get("versionId") and agent_prompt((full.get("activeVersion") or {}).get("nodes")) == self.base_prompt))
+        print(f"   restore: {'OK' if restored else 'FAILED'} (active={full.get('active')}, versionId==activeVersionId: {full.get('activeVersionId') == full.get('versionId')})", flush=True)
+        if not restored and exc[0] is None:
+            raise RuntimeError("the staging WA bot was NOT restored to its original published prompt")
+        return False
+
+
+PRICE_RULE = "\n\nФАКТ ДЛЯ ТЕСТА: букет из 25 роз стоит ровно {price} тенге. На вопрос о цене этого букета называй именно эту цену числом."
 
 
 SCENARIOS = []
@@ -121,6 +191,52 @@ def s_dry(ctx):
     return ok, {"status": st, "wouldHandoff": (d.get("wouldHandoff") if isinstance(d, dict) else None), "recorded_actions": recorded,
                 "handoff_requests_unchanged": before["handoffs"] == after["handoffs"], "side_effects_unchanged": before == after,
                 "reply": (d.get("reply") if isinstance(d, dict) else str(d))[:120]}
+
+
+@scenario("test_dialog_active_bot_tests_published_not_draft [llm]", "R15: an active bot with an unpublished draft (999) is tested by the PUBLISHED prompt (3200) and the response names that version")
+def s_published(ctx):
+    t = Target(ctx, "tp")
+    with BotVersions(t.wf_id) as bv:
+        pub = bv.put(bv.base_prompt + PRICE_RULE.format(price=3200), publish=True)
+        if pub.get("activeVersionId") != pub.get("versionId"):
+            bv.set_active(False)
+            bv.set_active(True)
+            pub = bv.read()
+        wf = bv.put(bv.base_prompt + PRICE_RULE.format(price=999), publish=False)
+        premise = bool(wf.get("active")) and wf.get("activeVersionId") and wf.get("versionId") != wf.get("activeVersionId") \
+            and "999" in agent_prompt(wf["nodes"]) and "3200" in agent_prompt((wf.get("activeVersion") or {}).get("nodes"))
+        if not premise:
+            return False, {"premise": "could not create draft != published on staging", "active": wf.get("active"),
+                           "versionId": wf.get("versionId"), "activeVersionId": wf.get("activeVersionId")}
+        before = t.snapshot()
+        st, d = t.test("Здравствуйте! Сколько стоит букет из 25 роз? Ответьте одной фразой с ценой.")
+        time.sleep(2)
+        after = t.snapshot()
+    reply = (d.get("reply") if isinstance(d, dict) else str(d)) or ""
+    pv = d.get("promptVersion") if isinstance(d, dict) else None
+    ok = st == 200 and isinstance(d, dict) and d.get("success") is True \
+        and pv == {"source": "published", "versionId": wf["activeVersionId"], "draftPending": True} \
+        and "3200" in reply.replace(" ", "").replace(" ", "") and "999" not in reply and before == after
+    return ok, {"status": st, "reply": reply[:160], "promptVersion": pv, "published": wf["activeVersionId"], "draft": wf["versionId"],
+                "side_effects_unchanged": before == after}
+
+
+@scenario("test_dialog_inactive_bot_tests_draft_and_says_so [llm]", "R15: an inactive bot is tested by its draft — the version activation publishes — and the response says source=draft (not an error)")
+def s_inactive(ctx):
+    t = Target(ctx, "ti")
+    with BotVersions(t.wf_id) as bv:
+        bv.put(bv.base_prompt + PRICE_RULE.format(price=999), publish=True)
+        bv.set_active(False)
+        wf = bv.read()
+        premise = not wf.get("active") and not wf.get("activeVersionId") and "999" in agent_prompt(wf["nodes"])
+        if not premise:
+            return False, {"premise": "could not deactivate the staging bot", "active": wf.get("active"), "activeVersionId": wf.get("activeVersionId")}
+        st, d = t.test("Здравствуйте! Сколько стоит букет из 25 роз? Ответьте одной фразой с ценой.")
+    reply = (d.get("reply") if isinstance(d, dict) else str(d)) or ""
+    pv = d.get("promptVersion") if isinstance(d, dict) else None
+    ok = st == 200 and isinstance(d, dict) and d.get("success") is True \
+        and pv == {"source": "draft", "versionId": wf["versionId"], "draftPending": False} and "999" in reply
+    return ok, {"status": st, "reply": reply[:160], "promptVersion": pv, "draft": wf["versionId"]}
 
 
 @scenario("handoffs_status_lists_last_outcomes_owner_scoped", "7.3: op status returns the ledger's last states for the owner's profiles (chat tail only), 403 for a foreign install")

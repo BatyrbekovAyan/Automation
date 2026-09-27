@@ -5,6 +5,10 @@ retrieval tool, but nothing leaves: no send, no memory write, no dialog quota, a
 a DRY twin that only records «would have created a request». The response names the sources the
 question could draw on (catalog / contacts / uploaded documents) and the action the bot would have
 taken, plus the correlation id. Owner verification is the same A1 gate (profileId ∈ p, workflowId ∈ w).
+Which prompt (R15, 2026-09-27): an ACTIVE bot is tested by its PUBLISHED version (`activeVersion`, what clients get — never
+the editor's unpublished draft), an INACTIVE bot by its draft (what activation publishes); the response names it as
+`promptVersion {source: published|draft, versionId, draftPending}`, and an unreadable published version or a missing
+«AI Agent» node is an honest `bot_prompt_unavailable`. Pinned by tests/test_test_dialog.py.
 
 Generated (edit here, re-run; ids fixed):
   crTestDialog0001-Test_Dialog.json        /webhook/TestDialog  {profileId, workflowId, channel, text, history?}
@@ -55,17 +59,31 @@ return [{ json: { ok: true, profileId, workflowId, channel, text, history, runId
 
 COMPOSE_JS = r"""// TEST DIALOG / Compose: the bot's REAL system message (the AI Agent node of its own workflow) + what
 // knowledge it carries. Nothing is re-composed from client data — a test that lies about the prompt is worthless.
+// WHICH version (R15): n8n 2.x returns the saved DRAFT as `nodes`/`versionId` and the PUBLISHED graph a live webhook runs
+// as `activeVersion`/`activeVersionId`. An active bot is tested by its published version (what clients get); an inactive
+// one (deactivation clears activeVersion) by its draft — exactly what activation publishes — and the response says so.
+// An active bot whose published version is not readable fails closed: never a silent fallback to the draft.
 const v = $('Validate').first().json;
 const r = $input.first().json || {};
 const wf = (r.body && typeof r.body === 'object') ? r.body : r;
-const nodes = Array.isArray(wf.nodes) ? wf.nodes : [];
-const agent = nodes.find(n => n.name === 'AI Agent') || nodes[5];
+const draftId = (typeof wf.versionId === 'string' && wf.versionId) || null;
+const activeId = (typeof wf.activeVersionId === 'string' && wf.activeVersionId) || null;
+const av = wf.activeVersion;
+const published = (av && typeof av === 'object' && Array.isArray(av.nodes) && (!av.versionId || av.versionId === activeId)) ? av.nodes : null;
+let nodes;
+if (!activeId) nodes = Array.isArray(wf.nodes) ? wf.nodes : [];
+else if (published) nodes = published;
+else if (activeId === draftId && Array.isArray(wf.nodes)) nodes = wf.nodes;
+else return [{ json: { ok: false, error: 'bot_prompt_unavailable', detail: 'published_version_unreadable' } }];
+const promptVersion = { source: activeId ? 'published' : 'draft', versionId: activeId || draftId,
+                        draftPending: !!(activeId && draftId && draftId !== activeId) };
+const agent = nodes.find(n => n && n.name === 'AI Agent');
 const sm = agent && agent.parameters && agent.parameters.options ? String(agent.parameters.options.systemMessage || '') : '';
-if (!sm) return [{ json: { ok: false, error: 'bot_prompt_unavailable', detail: 'http ' + (r.statusCode || 0) } }];
+if (!sm) return [{ json: { ok: false, error: 'bot_prompt_unavailable', detail: r.statusCode && r.statusCode !== 200 ? 'http ' + r.statusCode : 'agent_prompt_missing', promptVersion } }];
 // the transcript the model sees: the owner's synthetic history + the test message (no memory node — the bot's memory is untouched)
 const lines = v.history.map(m => (m.role === 'client' ? 'Клиент: ' : 'Бизнес: ') + m.text);
 const text = lines.length ? lines.join('\n') + '\nКлиент: ' + v.text : v.text;
-return [{ json: { ok: true, systemMessage: sm, text, sources: {
+return [{ json: { ok: true, systemMessage: sm, text, promptVersion, sources: {
   catalog: /Product1:|Service1:/.test(sm), contacts: /Контакты:/.test(sm), businessText: /About Business:\s*\S/.test(sm.replace(/About Business:\s*\n\s*Контакты:/, '')) } } }];
 """
 
@@ -98,9 +116,11 @@ try { sources = $('Sources').first().json.sources || {}; } catch (e) { sources =
 let actions = [];
 try { actions = $input.first().json.actions || []; } catch (e) { actions = []; }
 const handoff = actions.find(a => a.action === 'create_handoff');
-if (!reply.trim()) return [{ json: { success: false, error: 'generation_failed', correlationId: v.runId, _status: 200 } }];
+let promptVersion = null;   // which version of the bot answered (R15): {source: published|draft, versionId, draftPending}
+try { promptVersion = $('Compose').first().json.promptVersion || null; } catch (e) { promptVersion = null; }
+if (!reply.trim()) return [{ json: { success: false, error: 'generation_failed', correlationId: v.runId, promptVersion, _status: 200 } }];
 return [{ json: { success: true, reply, sources, wouldHandoff: handoff ? (handoff.args || {}) : null,
-                  wouldSend: true, sent: false, quotaCounted: false, correlationId: v.runId, _status: 200 } }];
+                  wouldSend: true, sent: false, quotaCounted: false, correlationId: v.runId, promptVersion, _status: 200 } }];
 """
 
 DRY_TOOL_INPUTS = {"run_id": "={{ $('Validate').first().json.runId }}", **hh.FROM_AI}

@@ -1,0 +1,15 @@
+# R15 staging BEFORE — staging n8n 2.36.7 with the PRE-FIX Test Dialog (canon of 8c98626b); python3 Tools/n8n/staging/e2e-test-dialog.py --only R15-scenarios
+   restore: OK (active=True, versionId==activeVersionId: True)
+FAIL  test_dialog_active_bot_tests_published_not_draft [llm] (14s) — R15: an active bot with an unpublished draft (999) is tested by the PUBLISHED prompt (3200) and the response names that version
+      {'status': 200, 'reply': 'Букет из 25 роз стоит 999 тенге.', 'promptVersion': None, 'published': '3a026b9d-e5ce-4ead-8a42-55a75967e4e0', 'draft': '4118258c-dea6-4697-a32e-57d134244009', 'side_effects_unchanged': True}
+   cleanup: deleted rows: 2
+
+0 pass, 1 fail
+exit=1
+   restore: OK (active=True, versionId==activeVersionId: True)
+FAIL  test_dialog_inactive_bot_tests_draft_and_says_so [llm] (7s) — R15: an inactive bot is tested by its draft — the version activation publishes — and the response says source=draft (not an error)
+      {'status': 200, 'reply': 'Букет из 25 роз стоит 999 тенге.', 'promptVersion': None, 'draft': 'b850aabc-405e-43b6-b911-d3429a0ffcc5'}
+   cleanup: deleted rows: 2
+
+0 pass, 1 fail
+exit=1

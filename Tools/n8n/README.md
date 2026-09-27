@@ -333,7 +333,12 @@ All READ-ONLY against prod unless the flag says otherwise; every mutating path w
   copy), same model/params/tools, NO memory node, NO send, NO dialog count, NO ledger row; the handoff tool is the DRY twin, which
   records the intended action in `test_dialog_actions` (SQL `sql/2026-09-22-test-dialog.sql`) and the response reports it as
   `wouldHandoff`. Gate rule: profiles[profileId] + workflows[workflowId] of the calling install. Protected in Set Workflow State.
-  Verifier: `verify-history-handoff.py` (`verify_test_dialog`). Staging: `staging/e2e-test-dialog.py` (4 scenarios).
+  Which version (R15, 2026-09-27): an ACTIVE bot is tested by its PUBLISHED graph (`activeVersion` — what clients get, never an
+  editor draft saved without Publish), an INACTIVE bot by its draft (what activation publishes); the response carries
+  `promptVersion {source: published|draft, versionId, draftPending}`; an unreadable published version or a missing «AI Agent»
+  node is `bot_prompt_unavailable` (no `nodes[5]` fallback). Behaviour: `tests/test_test_dialog.py`.
+  Verifier: `verify-history-handoff.py` (`verify_test_dialog`). Staging: `staging/e2e-test-dialog.py` (6 scenarios; two of them
+  edit the staging WA bot into draft ≠ published / inactive and restore it).
 - Handoffs `op: "status"` (`build-handoff-workflows.py`) — the last 12 `reply_events` rows for the owner's profiles (state, time,
   execution id, chat masked to its last 4 digits — never the client's text); the app's `ReplyOutcomeCopy` names each state.
 - `eval/run-eval.py` (stage 6, harness h2) — before/after prompt measurement through the STAGING-ONLY completions proxy
