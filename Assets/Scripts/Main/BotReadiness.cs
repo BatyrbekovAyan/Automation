@@ -59,6 +59,13 @@ public static class BotReadinessCopy
     public const string ErrorUnavailable = "Промпт бота недоступен: сохраните настройки бота и повторите";
     public const string Correlation = "ID";
 
+    // R15: which version of the bot answered — the ID line names it (the server's promptVersion)
+    public const string VersionPublished = "версия";
+    public const string VersionDraft = "канал выключен, проверены текущие настройки";
+    public const string VersionDraftPending = "есть неопубликованные изменения";
+    public const string VersionSeparator = " · ";
+    public const int VersionIdChars = 8;
+
     public const string ErrorNetwork = "Нет связи: проверьте интернет и повторите";
     public const string ErrorForbidden = "Этот бот не привязан к этой установке";
     public const string ErrorUnauthorized = "Сессия не подтверждена: перезапустите приложение";
@@ -78,6 +85,24 @@ public static class BotReadinessCopy
         _ => ErrorGeneric,
     };
 
+    /// <summary>R15: the tested version for the ID line — «версия 1a2b3c4d» for a live bot (plus the pending-draft note),
+    /// the inactive-channel note for a draft; empty when the server did not say.</summary>
+    public static string VersionNote(string source, string versionId, bool draftPending)
+    {
+        if (string.IsNullOrEmpty(versionId)) return "";
+        string shortId = versionId.Length > VersionIdChars ? versionId.Substring(0, VersionIdChars) : versionId;
+        if (source == TestDialogPromptVersion.SourceDraft) return $"{VersionDraft} {shortId}";
+        return draftPending ? $"{VersionPublished} {shortId}, {VersionDraftPending}" : $"{VersionPublished} {shortId}";
+    }
+
+    /// <summary>The correlation line: «ID: 1546 · версия 1a2b3c4d»; either half may be absent.</summary>
+    public static string CorrelationLine(string correlationId, string versionNote)
+    {
+        string id = string.IsNullOrEmpty(correlationId) ? "" : $"{Correlation}: {correlationId}";
+        if (string.IsNullOrEmpty(versionNote)) return id;
+        return id.Length == 0 ? versionNote : id + VersionSeparator + versionNote;
+    }
+
     public static string Sources(bool catalog, bool contacts, int documents)
     {
         var parts = new System.Collections.Generic.List<string>();
@@ -85,6 +110,58 @@ public static class BotReadinessCopy
         if (contacts) parts.Add(SourceContacts);
         if (documents > 0) parts.Add(SourceDocuments + " (" + documents + ")");
         return SourcesTitle + ": " + (parts.Count == 0 ? SourceNone : string.Join(", ", parts));
+    }
+}
+
+/// <summary>
+/// R16: the identity of ONE test call, captured when it is sent. Its result belongs to this bot, this
+/// profile/workflow and this screen — never to whatever the sheet shows by the time the answer lands.
+/// </summary>
+public readonly struct BotTestTicket
+{
+    public readonly int Seq;
+    public readonly string BotName;
+    public readonly string ProfileId;
+    public readonly string WorkflowId;
+
+    public BotTestTicket(int seq, string botName, string profileId, string workflowId)
+    { Seq = seq; BotName = botName; ProfileId = profileId; WorkflowId = workflowId; }
+}
+
+/// <summary>What one returned test result may change (R16).</summary>
+public readonly struct BotTestOutcome
+{
+    public readonly bool ApplyToScreen;   // the sheet still shows the request's screen: reply, history and busy may change
+    public readonly int? Verdict;         // 1 passed / 0 failed, written under the TICKET's bot; null = no verdict
+
+    public BotTestOutcome(bool applyToScreen, int? verdict) { ApplyToScreen = applyToScreen; Verdict = verdict; }
+}
+
+/// <summary>R16, pure: who a late test answer may touch. The sheet is one shared static surface reused for every bot.</summary>
+public static class BotTestResultPolicy
+{
+    /// <summary>Only the bot's own outcome is a verdict: a reply passes, a failed generation or an unreadable prompt
+    /// fails; no connection, no session or anything else says nothing about the bot.</summary>
+    public static int? VerdictOf(TestDialogResult result)
+    {
+        if (result == null) return null;
+        if (result.IsOk) return 1;
+        bool botSide = result.ErrorKind == TestDialogResult.KindGenerationFailed || result.ErrorKind == TestDialogResult.KindPromptUnavailable;
+        return botSide ? 0 : (int?)null;
+    }
+
+    /// <param name="currentSeq">the sheet's sequence now — bumped by every Show and every send</param>
+    /// <param name="botAlive">the ticket's Bot still exists (Unity-null once deleted)</param>
+    /// <param name="currentTarget">the ticket's bot's target NOW (null when no channel is connected)</param>
+    /// <param name="lastRecordedSeq">the newest ticket whose verdict was already written for this bot (0 = none)</param>
+    public static BotTestOutcome Decide(BotTestTicket ticket, int currentSeq, bool botAlive, BotTestTarget currentTarget, int lastRecordedSeq, TestDialogResult result)
+    {
+        int? verdict = VerdictOf(result);
+        bool sameTarget = botAlive && currentTarget != null
+            && currentTarget.ProfileId == ticket.ProfileId && currentTarget.WorkflowId == ticket.WorkflowId;
+        bool newest = ticket.Seq > lastRecordedSeq;
+        bool writable = verdict.HasValue && sameTarget && newest && !string.IsNullOrEmpty(ticket.BotName);
+        return new BotTestOutcome(ticket.Seq == currentSeq, writable ? verdict : null);
     }
 }
 

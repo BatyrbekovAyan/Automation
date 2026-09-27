@@ -13,6 +13,9 @@ using UnityEngine.UI;
 /// <c>/webhook/TestDialog</c> (nothing is sent to a client, no quota is spent, the handoff the model would
 /// create is reported as data), and lists the bot's last reply outcomes from the ledger with a named
 /// reason each (<see cref="ReplyOutcomeCopy"/>).
+/// R16: every call carries a <see cref="BotTestTicket"/> (sequence, bot, profile, workflow) captured at send — a late
+/// answer never touches another screen's reply, history or busy latch, and «тест пройден» is written only under the
+/// ticket's own bot (<see cref="BotTestResultPolicy"/>). The ID line names the tested version (R15 promptVersion).
 /// </summary>
 public static class BotTestSheet
 {
@@ -47,6 +50,12 @@ public static class BotTestSheet
     private static bool busy;
     private static bool eventsBound;
 
+    // R16: the sheet is ONE static surface reused for every bot, and a test call outlives the screen that sent it
+    // (the coroutine runs on the always-active host). Every Show and every send bumps the sequence; a result whose
+    // ticket is not the current one belongs to a screen that is gone.
+    private static int screenSeq;
+    private static readonly Dictionary<string, int> recordedSeq = new();   // newest ticket whose verdict was written, per bot
+
     public static bool IsShowing => panel != null && panel.activeSelf;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -54,12 +63,15 @@ public static class BotTestSheet
     {
         panel = null; host = null; busy = false; eventsBound = false;
         history = new List<TestDialogTurn>();
+        screenSeq = 0;
+        recordedSeq.Clear();
     }
 
     public static void Show(string name, Bot openBot, TMP_FontAsset titleFont, TMP_FontAsset bodyFont)
     {
         if (string.IsNullOrEmpty(name) || openBot == null) return;
         EnsureBuilt(titleFont, bodyFont);
+        screenSeq++;                       // anything still in flight now belongs to a screen that is gone
         botName = name;
         bot = openBot;
         history = new List<TestDialogTurn>();
@@ -138,11 +150,30 @@ public static class BotTestSheet
             profileId = target.ProfileId, workflowId = target.WorkflowId, channel = target.Channel,
             text = text, history = new List<TestDialogTurn>(history),
         };
-        host.StartCoroutine(TestDialogClient.Send(request, result => OnResult(text, result)));
+        var ticket = new BotTestTicket(++screenSeq, botName, target.ProfileId, target.WorkflowId);
+        var ticketBot = bot;
+        Action<TestDialogResult> done = result => OnResult(ticket, ticketBot, text, result);
+        if (TransportOverride != null) TransportOverride(request, done);
+        else host.StartCoroutine(TestDialogClient.Send(request, done));
     }
 
-    private static void OnResult(string clientText, TestDialogResult result)
+    /// <summary>EditMode seam: when set, a test call is handed to it instead of the network, so a test can park the
+    /// request and answer it later (a controlled response delay). Always null in the app.</summary>
+    internal static Action<TestDialogRequest, Action<TestDialogResult>> TransportOverride;
+
+    private static void OnResult(BotTestTicket ticket, Bot ticketBot, string clientText, TestDialogResult result)
     {
+        bool alive = ticketBot != null;   // Unity-null once the bot was deleted
+        var targetNow = alive ? BotTestTarget.Resolve(ticketBot.whatsappProfileId, ticketBot.whatsappWorkflowId, ticketBot.telegramProfileId, ticketBot.telegramWorkflowId) : null;
+        recordedSeq.TryGetValue(ticket.BotName ?? "", out int lastSeq);
+        var outcome = BotTestResultPolicy.Decide(ticket, screenSeq, alive, targetNow, lastSeq, result);
+        RecordVerdict(ticket, outcome);
+        if (!outcome.ApplyToScreen)
+        {
+            // A stale answer: the screen, its history and its busy latch belong to a newer request.
+            if (outcome.Verdict.HasValue && IsShowing && ticket.BotName == botName) RefreshReadiness();
+            return;
+        }
         busy = false;
         if (panel == null) return;
         SetSendEnabled(readiness.ChannelConnected);
@@ -153,19 +184,24 @@ public static class BotTestSheet
             history = TestDialogClient.AppendTurn(history, clientText, response.reply);
             field.text = "";
             metaTmp.text = SourcesLine(response.sources) + "\n" + (response.wouldHandoff != null ? BotReadinessCopy.ActionHandoff : BotReadinessCopy.ActionReply);
-            correlationTmp.text = CorrelationLine(response.correlationId);
-            PlayerPrefs.SetInt(botName + LastTestKeySuffix, 1);
-            PlayerPrefs.Save();
         }
         else
         {
             replyTmp.text = BotReadinessCopy.ErrorFor(result.ErrorKind);
-            correlationTmp.text = CorrelationLine(result.Response != null ? result.Response.correlationId : null);
-            bool botSideFailure = result.ErrorKind == TestDialogResult.KindGenerationFailed || result.ErrorKind == TestDialogResult.KindPromptUnavailable;
-            if (botSideFailure) { PlayerPrefs.SetInt(botName + LastTestKeySuffix, 0); PlayerPrefs.Save(); }
         }
+        correlationTmp.text = CorrelationLine(result.Response);
         RefreshReadiness();
         HandoffSyncService.Existing?.RefreshStatus();
+    }
+
+    /// <summary>R16: «тест пройден/не пройден» is written ONLY under the ticket's own bot, only for a bot-side outcome,
+    /// never for a deleted or re-targeted bot, and never over a newer test's verdict (<see cref="BotTestResultPolicy"/>).</summary>
+    private static void RecordVerdict(BotTestTicket ticket, BotTestOutcome outcome)
+    {
+        if (!outcome.Verdict.HasValue) return;
+        recordedSeq[ticket.BotName] = ticket.Seq;
+        PlayerPrefs.SetInt(ticket.BotName + LastTestKeySuffix, outcome.Verdict.Value);
+        PlayerPrefs.Save();
     }
 
     private static string SourcesLine(TestDialogSources sources)
@@ -174,7 +210,13 @@ public static class BotTestSheet
         return BotReadinessCopy.Sources(sources.catalog, sources.contacts, sources.documents != null ? sources.documents.Count : 0);
     }
 
-    private static string CorrelationLine(string id) => string.IsNullOrEmpty(id) ? "" : BotReadinessCopy.Correlation + ": " + id;
+    private static string CorrelationLine(TestDialogResponse response)
+    {
+        if (response == null) return "";
+        var version = response.promptVersion;
+        string note = version != null ? BotReadinessCopy.VersionNote(version.source, version.versionId, version.draftPending) : "";
+        return BotReadinessCopy.CorrelationLine(response.correlationId, note);
+    }
 
     // ---- last outcomes ---------------------------------------------------------------------
 

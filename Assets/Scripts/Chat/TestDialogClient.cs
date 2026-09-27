@@ -48,6 +48,19 @@ public class TestDialogHandoff
     public string summary;
 }
 
+/// <summary>R15: which version of the bot's workflow answered — the PUBLISHED one for an active bot, the draft (what
+/// activation publishes) for an inactive one.</summary>
+[Serializable]
+public class TestDialogPromptVersion
+{
+    public const string SourcePublished = "published";
+    public const string SourceDraft = "draft";
+
+    public string source;
+    public string versionId;
+    public bool draftPending;
+}
+
 /// <summary>
 /// Stage 7.1: the server's answer to a test message — the bot's REAL prompt answered it, nothing was sent
 /// to anyone (<c>sent</c> is always false, <c>quotaCounted</c> always false) and the handoff the model
@@ -65,6 +78,7 @@ public class TestDialogResponse
     public bool sent;
     public bool quotaCounted;
     public string correlationId;
+    public TestDialogPromptVersion promptVersion;
 
     public static TestDialogResponse Parse(string json)
     {

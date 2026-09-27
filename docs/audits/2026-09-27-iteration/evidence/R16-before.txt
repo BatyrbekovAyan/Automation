@@ -1,0 +1,47 @@
+# R16 before — HEAD 15c0a881 + ONLY the test seam BotTestSheet.TransportOverride (behaviour unchanged: the callback still captures only the text; OnResult writes the SCREEN's botName)
+# Tools/run-tests-headless.sh 'BotTestSheetLateResultTests' — the REAL sheet, requests parked and answered later (controlled delay)
+
+================ EditMode test results (headless) ================
+  result=Failed(Child)  total=7  passed=2  failed=5  skipped=0  inconclusive=0
+  Failing / inconclusive tests:
+    - BotTestSheetLateResultTests.DeletedOrRetargetedBot_GetsNoVerdictFromALateAnswer
+    - BotTestSheetLateResultTests.LateBotSideFailureOfBotA_DoesNotFailBotB
+    - BotTestSheetLateResultTests.LateReplyOfBotA_AfterSwitchingToBotB_CountsForAOnly
+    - BotTestSheetLateResultTests.SameBotReopened_OldAnswerStaysOutOfTheNewConversation_AndNeverOverwritesANewerVerdict
+    - BotTestSheetLateResultTests.StaleAnswer_DoesNotReleaseTheCurrentRequestsBusyLatch
+=================================================================
+NOT GREEN ❌  (unity exit=2).
+exit=1
+
+# assertion messages (Tools/test-output/results.xml)
+FAILED  BotTestSheetLateResultTests.DeletedOrRetargetedBot_GetsNoVerdictFromALateAnswer
+        message: a deleted bot gets no verdict (no orphan key)
+                   Expected: -1
+                   But was:  1
+        at: at BotTestSheetLateResultTests.DeletedOrRetargetedBot_GetsNoVerdictFromALateAnswer () [0x0005b] in /Users/ayan/Projects/Automation/Assets/Tests/Editor/Chat/BotTestSheetLateResultTests.cs:184
+FAILED  BotTestSheetLateResultTests.LateBotSideFailureOfBotA_DoesNotFailBotB
+        message: B passed its own test — A's failure must not fail it
+                   Expected: 1
+                   But was:  0
+        at: at BotTestSheetLateResultTests.LateBotSideFailureOfBotA_DoesNotFailBotB () [0x00061] in /Users/ayan/Projects/Automation/Assets/Tests/Editor/Chat/BotTestSheetLateResultTests.cs:122
+FAILED  BotTestSheetLateResultTests.LateReplyOfBotA_AfterSwitchingToBotB_CountsForAOnly
+        message: A's answer must never appear on B's screen
+                   Expected string length 0 but was 18. Strings differ at index 0.
+                   Expected: <string.Empty>
+                   But was:  "Букет A стоит 3200"
+                   -----------^
+        at: at BotTestSheetLateResultTests.LateReplyOfBotA_AfterSwitchingToBotB_CountsForAOnly () [0x00071] in /Users/ayan/Projects/Automation/Assets/Tests/Editor/Chat/BotTestSheetLateResultTests.cs:97
+PASSED  BotTestSheetLateResultTests.NormalPath_ReplyHistoryAndPass_Unchanged
+FAILED  BotTestSheetLateResultTests.SameBotReopened_OldAnswerStaysOutOfTheNewConversation_AndNeverOverwritesANewerVerdict
+        message: an OLDER answer must not overwrite the newer test's verdict
+                   Expected: 0
+                   But was:  1
+        at: at BotTestSheetLateResultTests.SameBotReopened_OldAnswerStaysOutOfTheNewConversation_AndNeverOverwritesANewerVerdict () [0x000b3] in /Users/ayan/Projects/Automation/Assets/Tests/Editor/Chat/BotTestSheetLateResultTests.cs:166
+FAILED  BotTestSheetLateResultTests.StaleAnswer_DoesNotReleaseTheCurrentRequestsBusyLatch
+        message: B is still waiting for ITS answer
+                   Expected string length 11 but was 7. Strings differ at index 0.
+                   Expected: "Бот думает…"
+                   But was:  "Ответ A"
+                   -----------^
+        at: at BotTestSheetLateResultTests.StaleAnswer_DoesNotReleaseTheCurrentRequestsBusyLatch () [0x0007b] in /Users/ayan/Projects/Automation/Assets/Tests/Editor/Chat/BotTestSheetLateResultTests.cs:141
+PASSED  BotTestSheetLateResultTests.TransportOrAuthFailure_IsNoVerdict

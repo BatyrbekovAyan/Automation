@@ -269,6 +269,7 @@ public class Bot : MonoBehaviour
             PlayerPrefs.DeleteKey(transform.name + "WhatsappSyncUntil");
             PlayerPrefs.DeleteKey(transform.name + "TelegramSyncUntil");
             PlayerPrefs.DeleteKey(transform.name + "ReplyMode");
+            PlayerPrefs.DeleteKey(transform.name + BotTestSheet.LastTestKeySuffix);   // R16: the «Проверка бота» verdict
 
             if (PlayerPrefs.GetInt(transform.name + "ProductsNumber", 0) > 0)
             {

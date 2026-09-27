@@ -353,6 +353,11 @@ public class FontGlyphCoverageTests
         yield return ("SubscriptionPageRows.TopUpRowText", SubscriptionPageRows.TopUpRowText());
         yield return ("SubscriptionPageRows.ReserveLine", SubscriptionPageRows.ReserveLine(2000));
         yield return ("SubscriptionPageRows.ReserveLine(1)", SubscriptionPageRows.ReserveLine(1));
+        // R15: the test sheet's ID line names the tested version of the bot
+        yield return ("BotReadinessCopy.CorrelationLine(published)", BotReadinessCopy.CorrelationLine("1546",
+            BotReadinessCopy.VersionNote(TestDialogPromptVersion.SourcePublished, "a4ad53ce-e6c3", true)));
+        yield return ("BotReadinessCopy.CorrelationLine(draft)", BotReadinessCopy.CorrelationLine("1546",
+            BotReadinessCopy.VersionNote(TestDialogPromptVersion.SourceDraft, "b2c1ff9e-5ee0", false)));
 
         foreach (OutcomeStatus s in Enum.GetValues(typeof(OutcomeStatus)))
             yield return ($"DashboardStatusInfo.Label({s})", DashboardStatusInfo.Label(s));

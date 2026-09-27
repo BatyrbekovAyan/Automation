@@ -1,0 +1,47 @@
+# R16 after — fix applied (BotTestSheet ticket + BotTestResultPolicy + Bot.DeleteBot key cleanup + promptVersion on the ID line)
+# FULL EditMode suite headless: Tools/run-tests-headless.sh (no filter)
+
+================ EditMode test results (headless) ================
+  result=Passed  total=2729  passed=2729  failed=0  skipped=0  inconclusive=0
+=================================================================
+GREEN ✅  all 2729 tests passed.
+exit=0
+
+# the R16-related fixtures in that run (Tools/test-output/results.xml)
+PASSED  BotReadinessTests.Copy_LinesAndSources
+PASSED  BotReadinessTests.OutcomeLabels_DistinguishModeLimitErrorAndUnknown
+PASSED  BotReadinessTests.Readiness_NeedsAllFourFacts
+PASSED  BotTestSheetLateResultTests.DeletedOrRetargetedBot_GetsNoVerdictFromALateAnswer
+PASSED  BotTestSheetLateResultTests.LateBotSideFailureOfBotA_DoesNotFailBotB
+PASSED  BotTestSheetLateResultTests.LateReplyOfBotA_AfterSwitchingToBotB_CountsForAOnly
+PASSED  BotTestSheetLateResultTests.NormalPath_ReplyHistoryAndPass_Unchanged
+PASSED  BotTestSheetLateResultTests.SameBotReopened_OldAnswerStaysOutOfTheNewConversation_AndNeverOverwritesANewerVerdict
+PASSED  BotTestSheetLateResultTests.StaleAnswer_DoesNotReleaseTheCurrentRequestsBusyLatch
+PASSED  BotTestSheetLateResultTests.TransportOrAuthFailure_IsNoVerdict
+PASSED  FontGlyphCoverageTests.Authored_copy_seams_use_only_chars_the_sfpro_atlases_can_draw
+PASSED  FontGlyphCoverageTests.Serialized_labels_use_only_chars_their_font_can_draw
+PASSED  TestDialogClientTests.AppendTurn_KeepsTheLastTenTurnsNewestLast
+PASSED  TestDialogClientTests.ClassifyFailure_NamesEveryReason
+PASSED  TestDialogClientTests.Parse_HandoffEnvelope_ReportsTheActionAsData
+PASSED  TestDialogClientTests.Parse_SuccessEnvelope_IsOkAndNeverSent
+PASSED  TestDialogClientTests.Policy_NoVerdict_ForADeletedOrRetargetedBot_OrOverANewerVerdict
+PASSED  TestDialogClientTests.Policy_StaleTicket_KeepsItsOwnVerdict_ButNeverTheScreen
+PASSED  TestDialogClientTests.Policy_VerdictOnlyFromTheBotItself
+PASSED  TestDialogClientTests.PromptVersion_ParsesAndNamesTheTestedVersion
+PASSED  TestDialogClientTests.Target_PrefersTheConnectedChannel_NoneWhenNeither
+PASSED  TestDialogClientTests.Wiring_ResultBelongsToTheTicketNotToTheScreen
+PASSED  TestDialogClientTests.Wiring_SheetArmsBusyBeforeTheCall_AndPassesOnlyOnARealReply
+PASSED  TestDialogClientTests.Wiring_TransportOnlyThroughAuthorizedRequest
+
+BotReadinessTests: 3/3 passed
+BotTestSheetLateResultTests: 7/7 passed
+FontGlyphCoverageTests: 2/2 passed
+TestDialogClientTests: 12/12 passed
+
+# note: an intermediate filtered run failed 1/24 — DeletedOrRetargetedBot saw 0 instead of -1: the sheet calls PlayerPrefs.Save(),
+#       the test's TearDown deleted keys WITHOUT Save, so a verdict saved by the previous Editor process came back on load.
+#       Fixed in the TEST (keys cleared + saved in SetUp and TearDown); product code unchanged by that fix.
+
+# negative: the new source guard (Wiring_ResultBelongsToTheTicketNotToTheScreen) emulated on the pre-fix sheet
+pre-fix (HEAD 15c0a881) source guard: FAIL — no ticket, callback carries only the text, no policy, writes under the SCREEN's botName, Show does not retire in-flight calls
+fixed source guard: PASS
