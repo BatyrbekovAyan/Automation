@@ -14,14 +14,26 @@ script). Point it at a prod re-export so the SAME structural asserts gate a prod
 catching a UI round-trip strip (dropped ai_embedding wiring, stripped top-level id, dropped
 mark_all guard, etc.). Absent --dir, behavior is byte-identical to before.
 
+Every check runs even when an earlier one fails (one red check must not hide the rest).
 Exits 0 and prints "ALL PARITY ASSERTS PASSED" when every assert holds.
-Exits 1 with "PARITY FAIL: <reason>" naming the first violated assert.
+Exits 1 with one "PARITY FAIL: <reason>" line per failed check, then a "PARITY FAILED: n of m" summary.
+
+  python3 Tools/n8n/verify-telegram-parity.py --self-test   # [--dir DIR]
+
+--self-test copies the workflow directory to a temp dir, proves the unmodified copy passes every check, then
+applies one bypass of the channel-limit refusal at a time to Create WA and to Create TG (Delete -> Respond with
+the retire skipped, the retire continuing into workflow creation, its WHERE without `workflow_id is null`, …)
+and requires each to fail a check naming that file. Exit 0 only when every case holds.
 """
 import argparse
+import contextlib
+import io
 import json
 import os
 import re
+import shutil
 import sys
+import tempfile
 
 # Resolve workflow paths from this script's own location so cwd does not matter.
 # WF defaults to the committed workflows/ dir; main() reassigns it from --dir so the same
@@ -249,6 +261,7 @@ WAPPI_NODE_NAMES = ("Set Wappi Webhook", "Set Wappi Webhook Types", "Delete Refu
 POSTGRES_NODE_NAMES = (
     "Restamp RAG Chunks", "Ensure Subscriber", "Count Channels",
     "Retire Same Bot Slot", "Register Profile",
+    "Retire Refused Profile",   # 2026-09-24 slot-count hotfix (apply-slot-count-fix.py)
 )
 
 
@@ -702,36 +715,124 @@ def check_rc_transfer_carry_gate():
 
 
 REFUSED_DELETE_NODE = "Delete Refused Profile"
+REFUSED_RETIRE_NODE = "Retire Refused Profile"
+REFUSAL_RESPONSE_NODE = "Respond Channel Limit"
+# The over-limit branch, in order (Task 19 + the 2026-09-24 slot-count hotfix, apply-slot-count-fix.py). Nothing
+# else may be reachable from If Slot Limit[TRUE], and none of it from the allowed branch.
+REFUSAL_CHAIN = (REFUSED_DELETE_NODE, REFUSED_RETIRE_NODE, REFUSAL_RESPONSE_NODE)
+
+
+def _main_targets(conns, src):
+    """Every main output of `src` as a list of target names ([] when it has no outgoing connection)."""
+    return [[c["node"] for c in branch] for branch in (conns.get(src) or {}).get("main", [])]
+
+
+def _reachable(conns, start_nodes):
+    seen, stack = set(), list(start_nodes)
+    while stack:
+        n = stack.pop()
+        if n in seen:
+            continue
+        seen.add(n)
+        for branch in _main_targets(conns, n):
+            stack.extend(branch)
+    return seen
+
+
+def _pg_statements(query):
+    """The statements of `query` with comments, string literals, quoted identifiers and dollar-quoted bodies
+    blanked — a Python mirror of n8n's own stripStringsAndComments + splitStatements
+    (n8n-nodes-base 2.36, nodes/Postgres/v2/helpers/utils.js)."""
+    out, i, n = [], 0, len(query)
+    while i < n:
+        c, nxt = query[i], query[i + 1] if i + 1 < n else ""
+        if c == "/" and nxt == "*":
+            end = query.find("*/", i + 2)
+            i = n if end == -1 else end + 2
+            out.append(" ")
+        elif c == "-" and nxt == "-":
+            end = query.find("\n", i + 2)
+            i = n if end == -1 else end
+            out.append(" ")
+        elif c in ("'", '"'):
+            j = i + 1
+            while j < n:
+                if query[j] == c and j + 1 < n and query[j + 1] == c:
+                    j += 2
+                    continue
+                if query[j] == c:
+                    break
+                j += 1
+            i = j + 1
+            out.append(c + c)
+        elif c == "$" and re.match(r"\$[A-Za-z_][A-Za-z0-9_]*\$|\$\$", query[i:]):
+            tag = re.match(r"\$[A-Za-z_][A-Za-z0-9_]*\$|\$\$", query[i:]).group(0)
+            end = query.find(tag, i + len(tag))
+            i = n if end == -1 else end + len(tag)
+            out.append(" ")
+        else:
+            out.append(c)
+            i += 1
+    return [s.strip() for s in "".join(out).split(";") if s.strip()]
+
+
+def _top_level_command(statement):
+    """SELECT/INSERT/UPDATE/DELETE/MERGE outside any parentheses (n8n's findTopLevelCommand):
+    `with x as (update …) select …` is a SELECT; `with x as (…) update …` is an UPDATE."""
+    depth = 0
+    for tok in re.finditer(r"[()]|[A-Za-z_][A-Za-z0-9_]*", statement):
+        t = tok.group(0)
+        if t == "(":
+            depth += 1
+        elif t == ")":
+            depth = max(0, depth - 1)
+        elif depth == 0 and t.upper() in ("SELECT", "INSERT", "UPDATE", "DELETE", "MERGE"):
+            return t.upper()
+    return None
+
+
+def _emits_on_zero_rows(pg_node):
+    """Does this executeQuery node hand the next node an item when its statement touches NO row? n8n: always with
+    alwaysOutputData; below typeVersion 2.3 always ({success:true}); from 2.3 only when not every statement is a
+    top-level SELECT (utils.js configureQueryRunner / isSelectQuery). A refusal whose retire matched nothing (the
+    common case: no A1 row for the profile) must still reach Respond Channel Limit."""
+    if pg_node.get("alwaysOutputData") is True:
+        return True
+    if float(pg_node.get("typeVersion") or 0) < 2.3:
+        return True
+    stmts = _pg_statements(pg_node["parameters"].get("query", ""))
+    return bool(stmts) and not all(_top_level_command(s) == "SELECT" for s in stmts)
 
 
 def check_refused_create_deletes_profile(f, wappi_base, profile_field):
-    """Task 19 (live incident 2026-08-26 15:12): a Create refused for lack of a channel slot
-    must DELETE the profile the owner just authorized, before answering `channel_limit`.
+    """Task 19 (live incident 2026-08-26 15:12) + the slot-count hotfix (2026-09-24, apply-slot-count-fix.py).
 
-    The refusal lands AFTER Wappi pairing -- the client only calls this webhook once the
-    channel is authorized -- so a bare refusal strands a real, AUTHORIZED profile at 23₽/day
-    that NO sweep can reap: the hourly orphan sweep only deletes UNAUTHORIZED profiles, and
-    Profile Lifecycle Sweep drives off `bot_profiles`, where the refusal branch (correctly)
-    never wrote a row. On 2026-08-26 the owner's manual in-app bot delete is what cleaned it;
-    a real user would not know to do that.
+    A Create refused for lack of a channel slot must (1) DELETE the profile the owner just authorized at Wappi,
+    (2) RETIRE its bot_profiles row (the proxy's Bind Profile writes it at profile CREATION since A1), then
+    (3) answer `channel_limit` — and must never continue into workflow creation. Chain:
+    If Slot Limit[TRUE] -> Delete Refused Profile -> Retire Refused Profile -> Respond Channel Limit (terminal).
 
-    Every assert below is a way that fix can silently rot:
-      - the node moved to the ALLOWED branch  => deletes the profile it just accepted;
-      - the node stopped feeding Respond Channel Limit => the webhook's `lastNode` response
-        becomes the Wappi delete's own body (the client keys on {success,error});
-      - onError/alwaysOutputData dropped      => a Wappi hiccup turns a clean refusal into an
-        n8n execution error, i.e. the client's channel_limit handling never runs;
-      - the url lost its channel base or its `.first()` binding => deletes nothing, or reads
-        an item that does not exist on this branch.
+    Why each half: without (1) a real, AUTHORIZED profile strands at 23₽/day (the orphan sweep only reaps
+    UNAUTHORIZED ones); without (2) the refused row keeps counting as an occupied channel — the owner's `c` grew
+    1 -> 2 -> 3 on 2026-09-24 and a legit channel is refused even after a slot frees up. Every assert below is a way
+    the chain can rot into a leak or a LIMIT BYPASS: the over-limit branch (or anything after it) reaching workflow
+    creation; the retire hanging off the ALLOWED branch; the retire's WHERE widened past the refused, unbound row
+    (owner-keyed, or without `workflow_id is null`, it frees a LIVE bot's slot whenever the Wappi delete failed);
+    the retire disabled, fail-closed, or emitting no item (then `lastNode` answers with nothing).
     """
     wf = load(f)
     ns = wf["nodes"]
     conns = wf["connections"]
 
-    n = node(ns, REFUSED_DELETE_NODE)
-    # Task 19's own trap, turned into a structural assert (review minor, 2026-08-27): a
-    # DISABLED n8n node still appears in runData passing its input through, so every other
-    # assert here (type/url/wiring) passes while the delete never fires. Presence is not proof.
+    def need(name):   # node() with the FILE in the message: a missing retire must say which Create lost it
+        found = [x for x in ns if x.get("name") == name]
+        assert found, f"{f}: node '{name}' not found -- the refusal chain {' -> '.join(REFUSAL_CHAIN)} is incomplete"
+        return found[0]
+
+    # --- (1) Delete Refused Profile (Task 19 contract, unchanged) --------------------------------------------
+    n = need(REFUSED_DELETE_NODE)
+    # Task 19's own trap, turned into a structural assert (review minor, 2026-08-27): a DISABLED n8n node still
+    # appears in runData passing its input through, so every other assert here passes while the delete never fires.
     assert not n.get("disabled"), \
         f"{f}: {REFUSED_DELETE_NODE} is disabled -- it would pass input through in runData " \
         f"while never calling Wappi, and the refused profile strands again"
@@ -739,63 +840,271 @@ def check_refused_create_deletes_profile(f, wappi_base, profile_field):
         f"{f}: {REFUSED_DELETE_NODE} is not an httpRequest node: {n['type']}"
     assert n["parameters"].get("method") == "POST", \
         f"{f}: {REFUSED_DELETE_NODE} is not a POST: {n['parameters'].get('method')}"
-
     expected_url = ("=" + wappi_base + "/profile/delete?profile_id="
                     "{{ $('Unity Webhook').first().json.body." + profile_field + " }}")
     url = n["parameters"].get("url")
     assert url == expected_url, \
         f"{f}: {REFUSED_DELETE_NODE} url wrong (channel base / profile field / binding):\n" \
         f"  got:      {url!r}\n  expected: {expected_url!r}"
-
     # Best-effort, by construction: a failed delete must never change the refusal response.
     assert n.get("onError") == "continueRegularOutput", \
         f"{f}: {REFUSED_DELETE_NODE} onError is {n.get('onError')!r}, not continueRegularOutput " \
         f"-- a Wappi error would abort the execution and the client would never see channel_limit"
     assert n.get("alwaysOutputData") is True, \
-        f"{f}: {REFUSED_DELETE_NODE} alwaysOutputData not true -- an empty output would leave " \
-        f"Respond Channel Limit unexecuted, and `lastNode` would answer with nothing"
+        f"{f}: {REFUSED_DELETE_NODE} alwaysOutputData not true -- an empty output would leave the rest of " \
+        f"the refusal chain unexecuted, and `lastNode` would answer with nothing"
 
-    # Wiring: If Slot Limit[TRUE = over limit] -> delete -> Respond Channel Limit (terminal).
-    over_limit = [c["node"] for c in conns["If Slot Limit"]["main"][0]]
-    assert over_limit == [REFUSED_DELETE_NODE], \
-        f"{f}: If Slot Limit's over-limit branch goes to {over_limit}, expected [{REFUSED_DELETE_NODE!r}]"
-    nxt = [c["node"] for c in conns[REFUSED_DELETE_NODE]["main"][0]]
-    assert nxt == ["Respond Channel Limit"], \
-        f"{f}: {REFUSED_DELETE_NODE} -> {nxt}, expected ['Respond Channel Limit']"
-    assert "Respond Channel Limit" not in conns, \
-        f"{f}: Respond Channel Limit gained an outgoing connection (it must stay the terminal " \
-        f"`lastNode` response)"
+    # --- (2) Retire Refused Profile: best-effort, always emits, scoped to the refused UNBOUND row ----------------
+    r = need(REFUSED_RETIRE_NODE)
+    assert not r.get("disabled"), \
+        f"{f}: {REFUSED_RETIRE_NODE} is disabled -- the refused profile's row keeps counting as a channel"
+    assert r["type"] == "n8n-nodes-base.postgres", f"{f}: {REFUSED_RETIRE_NODE} is not a postgres node: {r['type']}"
+    assert r["parameters"].get("operation") == "executeQuery", \
+        f"{f}: {REFUSED_RETIRE_NODE} is not executeQuery: {r['parameters'].get('operation')!r}"
+    assert r.get("onError") == "continueRegularOutput", \
+        f"{f}: {REFUSED_RETIRE_NODE} onError is {r.get('onError')!r}, not continueRegularOutput -- a Postgres " \
+        f"error would abort the execution (or fork an error output) and the client would never see channel_limit"
+    assert _emits_on_zero_rows(r), \
+        f"{f}: {REFUSED_RETIRE_NODE} can emit NO item on a zero-row result (typeVersion {r.get('typeVersion')}, " \
+        f"alwaysOutputData {r.get('alwaysOutputData')!r}, top-level SELECT) -- {REFUSAL_RESPONSE_NODE} would not run"
+    stmts = _pg_statements(r["parameters"].get("query", ""))
+    assert len(stmts) == 1, f"{f}: {REFUSED_RETIRE_NODE} must be ONE statement, got {len(stmts)}"
+    q = re.sub(r"\s+", " ", stmts[0].lower()).strip()
+    raw = re.sub(r"\s+", " ", sql_code(r["parameters"]["query"]).lower()).strip().rstrip(";").strip()
+    assert q.startswith("update bot_profiles set ") and " where " in raw, \
+        f"{f}: {REFUSED_RETIRE_NODE} is no longer `update bot_profiles set … where …`: {raw!r}"
+    set_part, where = raw.split(" where ", 1)
+    for must in ("profile_id = nullif($1,'')", "deleted_at is null", "workflow_id is null"):
+        assert must in where, \
+            f"{f}: {REFUSED_RETIRE_NODE} WHERE lost `{must}` -- it could retire a row other than the refused, " \
+            f"unbound one (a LIVE bot's slot freed = limit bypass): {where!r}"
+    for banned in (" or ", "app_user_id", "owner_id", "select", " in ("):
+        assert banned not in where, \
+            f"{f}: {REFUSED_RETIRE_NODE} WHERE is widened past the refused profile ({banned.strip()!r}): {where!r}"
+    assert "deleted_reason = 'channel_limit'" in set_part and "deleted_at = now()" in set_part, \
+        f"{f}: {REFUSED_RETIRE_NODE} must set deleted_at = now(), deleted_reason = 'channel_limit': {set_part!r}"
+    want_qr = "={{ [ $('Unity Webhook').first().json.body." + profile_field + " ] }}"
+    got_qr = (r["parameters"].get("options") or {}).get("queryReplacement")
+    assert got_qr == want_qr, \
+        f"{f}: {REFUSED_RETIRE_NODE} queryReplacement wrong (channel field / binding):\n" \
+        f"  got:      {got_qr!r}\n  expected: {want_qr!r}"
 
-    # …and NOT on the allowed branch, in any position.
-    under_limit = [c["node"] for c in conns["If Slot Limit"]["main"][1]]
-    assert REFUSED_DELETE_NODE not in under_limit, \
-        f"{f}: {REFUSED_DELETE_NODE} sits on the ALLOWED branch -- that deletes the profile the " \
+    # --- (3) Wiring: the exact chain, one output each, a terminal response, nothing else reachable ---------------
+    slot = _main_targets(conns, "If Slot Limit")
+    assert len(slot) == 2, f"{f}: If Slot Limit has {len(slot)} outputs, expected 2 (over limit / allowed)"
+    assert slot[0] == [REFUSED_DELETE_NODE], \
+        f"{f}: If Slot Limit's over-limit branch goes to {slot[0]}, expected [{REFUSED_DELETE_NODE!r}]"
+    for src, dst in zip(REFUSAL_CHAIN, REFUSAL_CHAIN[1:]):
+        got = _main_targets(conns, src)
+        assert got == [[dst]], f"{f}: {src} -> {got}, expected [[{dst!r}]] (one output, one target)"
+    assert _main_targets(conns, REFUSAL_RESPONSE_NODE) in ([], [[]]), \
+        f"{f}: {REFUSAL_RESPONSE_NODE} gained an outgoing connection (it must stay the terminal `lastNode` response)"
+    reach = _reachable(conns, slot[0])
+    assert reach == set(REFUSAL_CHAIN), \
+        f"{f}: the over-limit branch reaches {sorted(reach - set(REFUSAL_CHAIN))} beyond the refusal chain -- a " \
+        f"refused create would continue into workflow creation (limit bypass)"
+    leak = _reachable(conns, slot[1]) & set(REFUSAL_CHAIN)
+    assert not leak, \
+        f"{f}: {sorted(leak)} reachable from the ALLOWED branch -- the delete/retire would hit the profile the " \
         f"gate just accepted"
-    for src, wiring in conns.items():
-        if src in ("If Slot Limit", REFUSED_DELETE_NODE):
-            continue
-        for branch in wiring.get("main", []):
-            targets = [c["node"] for c in branch]
-            assert REFUSED_DELETE_NODE not in targets, \
-                f"{f}: {REFUSED_DELETE_NODE} is also reachable from {src!r} -- the delete must " \
-                f"hang off the refusal branch ALONE"
+    parents = {REFUSED_DELETE_NODE: "If Slot Limit", REFUSED_RETIRE_NODE: REFUSED_DELETE_NODE,
+               REFUSAL_RESPONSE_NODE: REFUSED_RETIRE_NODE}
+    for src in conns:
+        for branch in _main_targets(conns, src):
+            for tgt in branch:
+                if tgt in parents:
+                    assert src == parents[tgt], \
+                        f"{f}: {tgt} is also fed by {src!r} -- the refusal chain must hang off If Slot Limit ALONE"
 
-    # The refusal body itself is untouched: the client keys on exactly these two fields, and a
-    # Set node that started merging its input would let the Wappi delete's payload ride along.
-    resp = node(ns, "Respond Channel Limit")
-    assert resp["type"] == "n8n-nodes-base.set", f"{f}: Respond Channel Limit is not a set node"
+    # --- (4) The refusal body itself: the client keys on exactly these two fields ------------------------------
+    resp = need(REFUSAL_RESPONSE_NODE)
+    assert resp["type"] == "n8n-nodes-base.set", f"{f}: {REFUSAL_RESPONSE_NODE} is not a set node"
+    assert not resp.get("disabled"), f"{f}: {REFUSAL_RESPONSE_NODE} is disabled"
     assigned = {a["name"]: a["value"] for a in resp["parameters"]["assignments"]["assignments"]}
     assert assigned == {"success": False, "error": "channel_limit"}, \
         f"{f}: refusal response changed: {assigned!r} (the client keys on success/channel_limit)"
     assert resp["parameters"].get("includeOtherFields") is not True, \
-        f"{f}: Respond Channel Limit now merges its input -- the delete's Wappi payload would " \
-        f"leak into the refusal body"
+        f"{f}: {REFUSAL_RESPONSE_NODE} now merges its input -- the delete/retire payload would leak into the " \
+        f"refusal body"
 
-    print(f"OK  {f} (refused create deletes the stranded profile)")
+    print(f"OK  {f} (refused create deletes the profile, retires its row, answers channel_limit)")
+
+
+def checks():
+    """Every check, in order. main() runs ALL of them — one red check must never hide the ones after it."""
+    return [
+        ("telegram bot template", check_telegram_bot),
+        ("restamp TG", lambda: check_restamp_orchestrator(CREATE_TG, "{botTgId}", "WhatsappWorkflowId")),
+        ("restamp WA", lambda: check_restamp_orchestrator(CREATE_WA, "{botWaId}", "TelegramWorkflowId")),
+        ("canonical export WA", lambda: check_canonical_export_invariant(CREATE_WA)),
+        ("canonical export TG", lambda: check_canonical_export_invariant(CREATE_TG)),
+        ("refusal chain WA", lambda: check_refused_create_deletes_profile(CREATE_WA, "https://wappi.pro/api", "WhatsappProfileId")),
+        ("refusal chain TG", lambda: check_refused_create_deletes_profile(CREATE_TG, "https://wappi.pro/tapi", "TelegramProfileId")),
+        ("dialog metering TG", lambda: check_dialog_metering(TG_BOT)),
+        ("dialog metering WA", lambda: check_dialog_metering(WA_BOT)),
+        ("dialog metering shared", check_dialog_metering_shared),
+        ("model id TG", lambda: check_model_id(TG_BOT)),
+        ("model id WA", lambda: check_model_id(WA_BOT)),
+        ("suggest replies", check_suggest_replies),
+        ("revenuecat transfer", check_rc_transfer_carry_gate),
+    ]
+
+
+def run_checks(wf_dir, quiet=False):
+    """Run every check against `wf_dir`; return [(label, message)] for the ones that failed."""
+    global WF
+    saved, WF = WF, wf_dir
+    failures = []
+    try:
+        for label, fn in checks():
+            try:
+                if quiet:
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        fn()
+                else:
+                    fn()
+            except AssertionError as e:
+                failures.append((label, str(e)))
+            except Exception as e:   # a mutated/partial export: report it and keep going
+                failures.append((label, f"unexpected structural error: {type(e).__name__}: {e}"))
+    finally:
+        WF = saved
+    return failures
+
+
+# --- --self-test: prove on mutated COPIES that a bypass of the channel-limit refusal is still detected ------------
+def _link(*targets):
+    return {"main": [[{"node": t, "type": "main", "index": 0} for t in targets]]}
+
+
+def _nd(wf, name):
+    return next(n for n in wf["nodes"] if n["name"] == name)
+
+
+def _m_old_wiring(wf, own, other):            # the pre-hotfix chain: no retire, Delete -> Respond directly
+    wf["nodes"] = [n for n in wf["nodes"] if n["name"] != REFUSED_RETIRE_NODE]
+    wf["connections"].pop(REFUSED_RETIRE_NODE, None)
+    wf["connections"][REFUSED_DELETE_NODE] = _link(REFUSAL_RESPONSE_NODE)
+
+
+def _m_delete_to_respond(wf, own, other):     # retire still present but bypassed
+    wf["connections"][REFUSED_DELETE_NODE] = _link(REFUSAL_RESPONSE_NODE)
+    wf["connections"].pop(REFUSED_RETIRE_NODE, None)
+
+
+def _m_retire_into_creation(wf, own, other):  # the refusal continues into workflow creation
+    wf["connections"][REFUSED_RETIRE_NODE] = _link("Retire Same Bot Slot")
+
+
+def _m_fanout_into_creation(wf, own, other):
+    wf["connections"][REFUSED_DELETE_NODE] = _link(REFUSED_RETIRE_NODE, "Retire Same Bot Slot")
+
+
+def _m_over_limit_to_creation(wf, own, other):
+    wf["connections"]["If Slot Limit"]["main"][0] = [{"node": "Retire Same Bot Slot", "type": "main", "index": 0}]
+
+
+def _m_retire_disabled(wf, own, other):
+    _nd(wf, REFUSED_RETIRE_NODE)["disabled"] = True
+
+
+def _m_retire_fail_closed(wf, own, other):
+    _nd(wf, REFUSED_RETIRE_NODE).pop("onError", None)
+
+
+def _m_retire_error_output_to_creation(wf, own, other):
+    _nd(wf, REFUSED_RETIRE_NODE)["onError"] = "continueErrorOutput"
+    wf["connections"][REFUSED_RETIRE_NODE]["main"].append([{"node": "Retire Same Bot Slot", "type": "main", "index": 0}])
+
+
+def _m_where_without_workflow_guard(wf, own, other):
+    p = _nd(wf, REFUSED_RETIRE_NODE)["parameters"]
+    p["query"] = p["query"].replace(" and workflow_id is null", "")
+
+
+def _m_where_by_owner(wf, own, other):
+    _nd(wf, REFUSED_RETIRE_NODE)["parameters"]["query"] = (
+        "update bot_profiles\nset deleted_at = now(), deleted_reason = 'channel_limit'\nwhere app_user_id = "
+        "(select app_user_id from bot_profiles where profile_id = nullif($1,'')) and deleted_at is null and workflow_id is null;")
+
+
+def _m_retire_on_allowed_branch(wf, own, other):
+    wf["connections"]["Register Profile"]["main"][0].append({"node": REFUSED_RETIRE_NODE, "type": "main", "index": 0})
+
+
+def _m_retire_cte_select(wf, own, other):     # a top-level SELECT: zero rows -> no item -> no response
+    _nd(wf, REFUSED_RETIRE_NODE)["parameters"]["query"] = (
+        "with r as (update bot_profiles set deleted_at = now(), deleted_reason = 'channel_limit' where profile_id = "
+        "nullif($1,'') and deleted_at is null and workflow_id is null returning 1) select * from r;")
+
+
+def _m_retire_other_channel_field(wf, own, other):
+    _nd(wf, REFUSED_RETIRE_NODE)["parameters"]["options"]["queryReplacement"] = \
+        "={{ [ $('Unity Webhook').first().json.body." + other + " ] }}"
+
+
+def _m_retire_dev_credential(wf, own, other):
+    _nd(wf, REFUSED_RETIRE_NODE)["credentials"]["postgres"]["id"] = "devPgCred000001"
+
+
+def _m_respond_not_terminal(wf, own, other):
+    wf["connections"][REFUSAL_RESPONSE_NODE] = _link("Get Sample Workflow")
+
+
+def _m_respond_merges_input(wf, own, other):
+    _nd(wf, REFUSAL_RESPONSE_NODE)["parameters"]["includeOtherFields"] = True
+
+
+SELF_TEST_MUTATIONS = [_m_old_wiring, _m_delete_to_respond, _m_retire_into_creation, _m_fanout_into_creation,
+                       _m_over_limit_to_creation, _m_retire_disabled, _m_retire_fail_closed,
+                       _m_retire_error_output_to_creation, _m_where_without_workflow_guard, _m_where_by_owner,
+                       _m_retire_on_allowed_branch, _m_retire_cte_select, _m_retire_other_channel_field,
+                       _m_retire_dev_credential, _m_respond_not_terminal, _m_respond_merges_input]
+
+
+def self_test(src_dir):
+    """Control: the unmodified copy passes EVERY check (a verifier red on everything detects nothing). Then each
+    mutation, applied to ONE Create workflow at a time (WA and TG), must fail a check that names that file."""
+    tmp = tempfile.mkdtemp(prefix="parity-selftest-")
+    bad = 0
+    try:
+        for x in os.listdir(src_dir):
+            if x.endswith(".json"):
+                shutil.copy(os.path.join(src_dir, x), tmp)
+        control = run_checks(tmp, quiet=True)
+        if control:
+            bad += 1
+            print("SELF-TEST FAIL control: the unmodified set does not pass -- " + "; ".join(f"[{l}] {m}" for l, m in control)[:600])
+        else:
+            print("ok   control: the unmodified set passes every check")
+        channels = {CREATE_WA: ("WhatsappProfileId", "TelegramProfileId"), CREATE_TG: ("TelegramProfileId", "WhatsappProfileId")}
+        for fn in SELF_TEST_MUTATIONS:
+            for fname, (own, other) in channels.items():
+                path = os.path.join(tmp, fname)
+                pristine = open(path, encoding="utf-8").read()
+                wf = json.loads(pristine)
+                fn(wf, own, other)
+                with open(path, "w", encoding="utf-8") as fh:
+                    json.dump(wf, fh, ensure_ascii=False)
+                try:
+                    hits = [(l, m) for l, m in run_checks(tmp, quiet=True) if fname in m]
+                finally:
+                    with open(path, "w", encoding="utf-8") as fh:
+                        fh.write(pristine)
+                tag = f"{fn.__name__[3:]} [{'WA' if fname == CREATE_WA else 'TG'}]"
+                if hits:
+                    print(f"ok   {tag}: caught by [{hits[0][0]}] {hits[0][1].splitlines()[0][:150]}")
+                else:
+                    bad += 1
+                    print(f"SELF-TEST FAIL {tag}: NOT detected -- the refusal bypass would pass this verifier")
+    finally:
+        shutil.rmtree(tmp)
+    total = 1 + 2 * len(SELF_TEST_MUTATIONS)
+    print(f"SELF-TEST {'PASSED' if not bad else 'FAILED'}: {total - bad}/{total} cases")
+    return bad == 0
 
 
 def main():
-    global WF
     ap = argparse.ArgumentParser(
         description="Structural-assert verifier for the Telegram-parity workflow edits."
     )
@@ -806,28 +1115,16 @@ def main():
              "script). Point at a prod re-export dir to run the parity asserts as a "
              "post-import go/no-go.",
     )
+    ap.add_argument("--self-test", action="store_true",
+                    help="prove on mutated temp copies of --dir that a bypass of the channel-limit refusal is detected")
     args = ap.parse_args()
-    WF = args.dir
-    try:
-        check_telegram_bot()
-        check_restamp_orchestrator(CREATE_TG, "{botTgId}", "WhatsappWorkflowId")
-        check_restamp_orchestrator(CREATE_WA, "{botWaId}", "TelegramWorkflowId")
-        check_canonical_export_invariant(CREATE_WA)
-        check_canonical_export_invariant(CREATE_TG)
-        check_refused_create_deletes_profile(CREATE_WA, "https://wappi.pro/api", "WhatsappProfileId")
-        check_refused_create_deletes_profile(CREATE_TG, "https://wappi.pro/tapi", "TelegramProfileId")
-        check_dialog_metering(TG_BOT)
-        check_dialog_metering(WA_BOT)
-        check_dialog_metering_shared()
-        check_model_id(TG_BOT)
-        check_model_id(WA_BOT)
-        check_suggest_replies()
-        check_rc_transfer_carry_gate()
-    except AssertionError as e:
-        print(f"PARITY FAIL: {e}")
-        sys.exit(1)
-    except (OSError, KeyError, IndexError, json.JSONDecodeError) as e:
-        print(f"PARITY FAIL: unexpected structural error: {e}")
+    if args.self_test:
+        sys.exit(0 if self_test(args.dir) else 1)
+    failures = run_checks(args.dir)
+    for label, msg in failures:
+        print(f"PARITY FAIL: [{label}] {msg}")
+    if failures:
+        print(f"PARITY FAILED: {len(failures)} of {len(checks())} checks ({', '.join(l for l, _ in failures)})")
         sys.exit(1)
     print("ALL PARITY ASSERTS PASSED")
 

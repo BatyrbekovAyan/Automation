@@ -1,0 +1,121 @@
+$ python3 Tools/n8n/tests/test_verify_parity.py   # HEAD dbbeb0b1: verify-telegram-parity.py as committed (before the D2 fix)
+$ python3 Tools/n8n/verify-telegram-parity.py (the verifier itself on the canonical set):
+OK  4VN3gsFaC2HUYmcc-Telegram_Bot.json
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json
+OK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json
+OK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (canonical-export invariant)
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (canonical-export invariant)
+PARITY FAIL: XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Delete Refused Profile -> ['Retire Refused Profile'], expected ['Respond Channel Limit']
+exit=1
+
+FAIL D2 the canonical set passes: exit 0, «ALL PARITY ASSERTS PASSED»
+      - exit 1:
+OK  4VN3gsFaC2HUYmcc-Telegram_Bot.json
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json
+OK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json
+OK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (canonical-export invariant)
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (canonical-export invariant)
+PARITY FAIL: XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Delete Refused Profile -> ['Retire Refused Profile'], expected ['Respond Channel Limit']
+
+FAIL D2 one red check does not hide the rest: an early (Telegram bot) AND a late (Suggest Replies) defect are both reported
+      - the LATE defect must be reported too:
+PARITY FAIL: 4VN3gsFaC2HUYmcc-Telegram_Bot.json: Mark Read still has mark_all query param
+
+FAIL D2 --self-test (the verifier proves on mutated copies that it still catches a refusal bypass) exits 0
+      - exit 2:
+usage: verify-telegram-parity.py [-h] [--dir DIR]
+verify-telegram-parity.py: error: unrecognized arguments: --self-test
+
+FAIL D2 a ROLLBACK of the hotfix (Create WA/TG from 94374500^, no Retire) is detected, exit 1
+      - exit 0:
+z6HBBUpAiUqVysB-CreateTelegramWorkflow.json
+OK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json
+OK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (canonical-export invariant)
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (canonical-export invariant)
+OK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (refused create deletes the stranded profile)
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (refused create deletes the stranded profile)
+OK  4VN3gsFaC2HUYmcc-Telegram_Bot.json (dialog-metering wiring)
+OK  4wYitz5ek30SVNlT-WhatsApp_Bot.json (dialog-metering wiring)
+OK  both bot templates sh
+FAIL D2 NEG old_wiring [WA] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+      - exit 1; failures: ["PARITY FAIL: Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: Delete Refused Profile -> ['Retire Refused Profile'], expected ['Respond Channel Limit']"]
+FAIL D2 NEG old_wiring [TG] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+      - exit 1; failures: ["PARITY FAIL: XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Delete Refused Profile -> ['Retire Refused Profile'], expected ['Respond Channel Limit']"]
+FAIL D2 NEG retire_bypassed [WA] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+      - exit 1; failures: ["PARITY FAIL: Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: Delete Refused Profile -> ['Retire Refused Profile'], expected ['Respond Channel Limit']"]
+FAIL D2 NEG retire_bypassed [TG] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+      - exit 1; failures: ["PARITY FAIL: XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Delete Refused Profile -> ['Retire Refused Profile'], expected ['Respond Channel Limit']"]
+FAIL D2 NEG retire_into_creation [WA] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+FAIL D2 NEG retire_into_creation [TG] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+      - exit 1; failures: ["PARITY FAIL: XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Delete Refused Profile -> ['Retire Refused Profile'], expected ['Respond Channel Limit']"]
+FAIL D2 NEG fanout_into_creation [WA] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+FAIL D2 NEG fanout_into_creation [TG] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+      - exit 1; failures: ["PARITY FAIL: XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Delete Refused Profile -> ['Retire Refused Profile'], expected ['Respond Channel Limit']"]
+FAIL D2 NEG over_limit_to_creation [WA] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+FAIL D2 NEG over_limit_to_creation [TG] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+      - exit 1; failures: ["PARITY FAIL: XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Delete Refused Profile -> ['Retire Refused Profile'], expected ['Respond Channel Limit']"]
+FAIL D2 NEG retire_disabled [WA] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+FAIL D2 NEG retire_disabled [TG] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+      - exit 1; failures: ["PARITY FAIL: XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Delete Refused Profile -> ['Retire Refused Profile'], expected ['Respond Channel Limit']"]
+FAIL D2 NEG retire_no_on_error [WA] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+FAIL D2 NEG retire_no_on_error [TG] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+      - exit 1; failures: ["PARITY FAIL: XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Delete Refused Profile -> ['Retire Refused Profile'], expected ['Respond Channel Limit']"]
+FAIL D2 NEG retire_error_output_to_creation [WA] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+FAIL D2 NEG retire_error_output_to_creation [TG] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+      - exit 1; failures: ["PARITY FAIL: XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Delete Refused Profile -> ['Retire Refused Profile'], expected ['Respond Channel Limit']"]
+FAIL D2 NEG where_without_workflow_guard [WA] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+FAIL D2 NEG where_without_workflow_guard [TG] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+      - exit 1; failures: ["PARITY FAIL: XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Delete Refused Profile -> ['Retire Refused Profile'], expected ['Respond Channel Limit']"]
+FAIL D2 NEG where_by_owner [WA] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+FAIL D2 NEG where_by_owner [TG] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+      - exit 1; failures: ["PARITY FAIL: XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Delete Refused Profile -> ['Retire Refused Profile'], expected ['Respond Channel Limit']"]
+FAIL D2 NEG retire_on_allowed_branch [WA] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+FAIL D2 NEG retire_on_allowed_branch [TG] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+      - exit 1; failures: ["PARITY FAIL: XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Delete Refused Profile -> ['Retire Refused Profile'], expected ['Respond Channel Limit']"]
+FAIL D2 NEG retire_cte_select [WA] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+FAIL D2 NEG retire_cte_select [TG] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+      - exit 1; failures: ["PARITY FAIL: XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Delete Refused Profile -> ['Retire Refused Profile'], expected ['Respond Channel Limit']"]
+FAIL D2 NEG retire_other_channel_field [WA] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+FAIL D2 NEG retire_other_channel_field [TG] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+      - exit 1; failures: ["PARITY FAIL: XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Delete Refused Profile -> ['Retire Refused Profile'], expected ['Respond Channel Limit']"]
+FAIL D2 NEG respond_not_terminal [WA] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+FAIL D2 NEG respond_not_terminal [TG] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+      - exit 1; failures: ["PARITY FAIL: XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Delete Refused Profile -> ['Retire Refused Profile'], expected ['Respond Channel Limit']"]
+FAIL D2 NEG respond_merges_input [WA] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+FAIL D2 NEG respond_merges_input [TG] is detected while the canonical control passes
+      - control (canonical) exit 1 — a verifier red on everything detects nothing
+      - exit 1; failures: ["PARITY FAIL: XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: Delete Refused Profile -> ['Retire Refused Profile'], expected ['Respond Channel Limit']"]
+PASS D2 SQL: the canonical retire frees the refused profile's slot; the pre-hotfix chain (no retire) leaves a ghost
+PASS D2 SQL: `workflow_id is null` is what keeps a refusal from freeing a LIVE bot's slot
+
+2 pass, 34 fail
+exit=1
