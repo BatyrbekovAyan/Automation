@@ -76,8 +76,12 @@ def fixture(*args):
     return out.stdout.strip()
 
 
+OWNERS = []   # every Owner this process creates — the suite cleans up ALL of them (not just ctx["A"]/["B"])
+
+
 class Owner:
     def __init__(self, tag, run_id):
+        OWNERS.append(self)
         self.tag = tag
         self.app_user_id = f"probe-{run_id}-{tag}"
         fixture("create-subscriber", "--run-id", f"{run_id}-{tag}")
@@ -289,9 +293,17 @@ def pg(sqltext):
     return subprocess.run([os.path.join(HERE, "pg.sh"), "psql", "-tAc", sqltext], capture_output=True, text=True).stdout.strip()
 
 
+def fresh_owner(ctx, tag):
+    """A new install + subscriber + WhatsApp profile for a scenario whose assertions depend on server state that
+    earlier scenarios on the shared owner A change (reply-mode versions, channel counts). Cleaned up with the rest."""
+    o = Owner(tag, ctx["run_id"])
+    o.add_profile()
+    return o
+
+
 @scenario("replymode_reordered_versions_keep_newest", "SetReplyMode v2: a later request with an OLDER version is not applied; the reply reports the server's newer value")
 def s_rm_reorder(ctx):
-    a = ctx["A"]
+    a = fresh_owner(ctx, "rmv")        # A's profile already carries a server-versioned row from hooks_reject_foreign_ids
     pid = a.profiles[0]
     st1, d1 = hook("SetReplyMode", a.token, {"profileIds": [pid], "chatId": "*", "suppressed": True, "version": 200})
     st2, d2 = hook("SetReplyMode", a.token, {"profileIds": [pid], "chatId": "*", "suppressed": False, "version": 100})
@@ -305,7 +317,7 @@ def s_rm_reorder(ctx):
 
 @scenario("replymode_bot_default_covers_both_channels_atomically", "SetReplyMode v2: a bot-default write for WA+TG travels as ONE request and both rows land (all-or-nothing); a stale follow-up for one of them is refused per profile")
 def s_rm_both(ctx):
-    a = ctx["A"]
+    a = fresh_owner(ctx, "rmb")        # both rows must start absent: no earlier scenario may have versioned them
     tg = a.add_profile("telegram")
     wa = a.profiles[0]
     st, d = hook("SetReplyMode", a.token, {"profileIds": [wa, tg], "chatId": "*", "suppressed": True, "version": 300})
@@ -335,8 +347,8 @@ def s_rm_invalid(ctx):
 
 @scenario("create_seeds_reply_mode_before_activation", "CreateWhatsappWorkflow with ReplyMode=semi: the '*' row exists after create, the clone id is bound to the profile, the token learns it, and SetWorkflowState can delete it")
 def s_create_seed(ctx):
-    a = ctx["A"]
-    pid = a.add_profile()
+    a = fresh_owner(ctx, "cs")         # A has collected claimed/extra channels by now: its plan's channel limit would refuse
+    pid = a.profiles[0]
     fields = {"Name": f"e2e-{ctx['run_id']}", "BusinessType": "Цветы", "BusinessTypeId": "flowers", "WhatsappProfileId": pid,
               "TelegramWorkflowId": "-1", "Business": "", "Prompt": "", "ProductsList": "", "ServicesList": "",
               "AppUserID": a.app_user_id, "BotKey": f"Bot-e2e-{ctx['run_id']}", "ReplyMode": "semi", "ReplyModeVersion": "150"}
@@ -373,6 +385,18 @@ def s_create_slots(ctx):
     return ok, f"first={st1} id={wid1} second={st2} refused={refused} wappi_deletes={len(deletes)} row2={row2!r} row1_alive_bound={row1 == f'true|{wid1}'}"
 
 
+def sweep_stale_mock_profiles():
+    """The Wappi mock mints profile ids from a counter that restarts with the mock (profile-000001, …), so rows a
+    PREVIOUS mock lifetime left in staging collide with the ids this run is about to get: Bind Profile keeps the old
+    owner (owner_id = coalesce(existing, new)) and old reply-mode versions outrank this run's. Before any fixture is
+    created, drop the rows of mock-minted ids the LIVE mock does not know (fixtures.py sweep-mock-profiles)."""
+    st, state = http("GET", f"{MOCK}/__mock/state")
+    live = sorted((state or {}).get("profiles", {}).keys()) if st == 200 else None
+    if live is None:
+        raise SystemExit(f"Wappi mock not reachable at {MOCK} ({st})")
+    print("   pre-run:", fixture("sweep-mock-profiles", *[x for p in live for x in ("--live", p)]))
+
+
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--only"); ap.add_argument("--compat-closed", action="store_true"); a = ap.parse_args()
     if not AUTH_SECRET:
@@ -380,6 +404,7 @@ def main():
     run_id = uuid.uuid4().hex[:10]
     ctx = {"run_id": run_id}
     passed = failed = 0
+    sweep_stale_mock_profiles()
     try:
         ctx["A"] = Owner("A", run_id); ctx["B"] = Owner("B", run_id)
         ctx["B"].add_profile()
@@ -398,11 +423,11 @@ def main():
             passed += ok; failed += (not ok)
             print(f"{'PASS' if ok else 'FAIL'}  {id_} ({time.time() - t0:.1f}s) — {title}\n      {detail}")
     finally:
-        for o in ctx.values():
+        for o in OWNERS:
             try:
-                print("   cleanup:", fixture(*(["delete", "--app-user-id", o.app_user_id] + [x for p in o.profiles for x in ("--profile-id", p)])))
+                print(f"   cleanup {o.tag}:", fixture(*(["delete", "--app-user-id", o.app_user_id] + [x for p in o.profiles for x in ("--profile-id", p)])))
             except Exception as e:
-                print("   cleanup failed:", e)
+                print(f"   cleanup {o.tag} failed:", e)
     print(f"\n{passed} pass, {failed} fail")
     sys.exit(1 if failed else 0)
 

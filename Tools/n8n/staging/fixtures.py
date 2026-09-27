@@ -11,6 +11,13 @@ exact id — never a broad prefix, never another run's rows (instruction: «уд
     python3 Tools/n8n/staging/fixtures.py set-mode --profile-id <pid> [--chat-id '*'] --suppressed true|false
     python3 Tools/n8n/staging/fixtures.py show --app-user-id <id>
     python3 Tools/n8n/staging/fixtures.py delete --app-user-id <id> [--profile-id <pid> ...]
+    python3 Tools/n8n/staging/fixtures.py sweep-mock-profiles [--live <pid> ...]
+
+`sweep-mock-profiles` is the one delete that is not keyed by a run id, and it is scoped just as narrowly: the
+Wappi MOCK mints profile ids `profile-NNNNNN` from a counter that restarts with the mock, so rows of such ids
+that the LIVE mock does not know (--live = the mock's current /__mock/state profiles) are leftovers of an
+earlier mock lifetime — and the very ids the next profile/add will hand out again. Only that id shape, only
+ids absent from --live, only the per-profile tables `delete` already clears plus bot_profiles.
 """
 import argparse
 import json
@@ -44,6 +51,7 @@ def main():
     m = sub.add_parser("set-mode"); m.add_argument("--profile-id", required=True); m.add_argument("--chat-id", default="*"); m.add_argument("--suppressed", required=True)
     s = sub.add_parser("show"); s.add_argument("--app-user-id", required=True)
     d = sub.add_parser("delete"); d.add_argument("--app-user-id", required=True); d.add_argument("--profile-id", action="append", default=[])
+    w = sub.add_parser("sweep-mock-profiles"); w.add_argument("--live", action="append", default=[])
     a = ap.parse_args()
 
     if a.cmd == "create-subscriber":
@@ -68,6 +76,16 @@ def main():
             "suggestion_counts": psql("select json_agg(row_to_json(c)) from suggestion_counts c where app_user_id = :'p0';", a.app_user_id),
             "dialog_counts": psql("select json_agg(row_to_json(c)) from dialog_counts c where app_user_id = :'p0';", a.app_user_id),
         }, ensure_ascii=False, indent=1))
+    elif a.cmd == "sweep-mock-profiles":
+        live = json.dumps(sorted(set(a.live)))
+        stale = "(select profile_id from bot_profiles where profile_id ~ '^profile-[0-9]{6}$' and not (profile_id = any (select jsonb_array_elements_text(:'p0'::jsonb))))"
+        pids = [x for x in psql(f"select string_agg(profile_id, ',') from {stale} s;", live).split(",") if x]
+        for tbl, col in (("reply_mode_flags", "profile_id"), ("conversation_outcomes", "profile_id"), ("reply_events", "profile_id"),
+                         ("chat_reply_state", "profile_id"), ("chat_history_events", "profile_id"), ("handoff_requests", "profile_id")):
+            psql(f"delete from {tbl} where {col} ~ '^profile-[0-9]{{6}}$' and not ({col} = any (select jsonb_array_elements_text(:'p0'::jsonb)));", live)
+        psql("delete from n8n_chat_histories where session_id ~ '^profile-[0-9]{6}:' and not (split_part(session_id, ':', 1) = any (select jsonb_array_elements_text(:'p0'::jsonb)));", live)
+        psql("delete from bot_profiles where profile_id ~ '^profile-[0-9]{6}$' and not (profile_id = any (select jsonb_array_elements_text(:'p0'::jsonb)));", live)
+        print(f"swept {len(pids)} stale mock profile(s) (live mock knows {len(a.live)})")
     elif a.cmd == "delete":
         if not a.app_user_id.startswith("probe-"):
             sys.exit("refusing: delete is scoped to fixture identities (probe-<runid>) only")
