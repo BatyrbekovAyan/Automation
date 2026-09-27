@@ -65,13 +65,26 @@ def verify(fname):
         check(frag in q, f"{f}: Acquire Send Lease lacks {frag!r}")
     # (3) Record Send: final state + lease release only by the holder; unknown never retried here.
     q = node(wf, "Record Send")["parameters"]["query"]
-    for frag in ("set state = $4", "transport_message_id = nullif($5, '')", "lock_token = $7", "$4::text as outcome"):
+    for frag in ("set state = $4", "transport_message_id = nullif($5, '')", "lock_token = $7", "$4::text as outcome",
+                 # R7: send_failed drops ITS OWN memory row only (first unmarked ai row above its watermark with its text)
+                 "where $4 = 'send_failed'", "id = (select min(id) from n8n_chat_histories", "id > $9::bigint",
+                 "message->>'content' = $8", "(message->'additional_kwargs'->>'source') is null"):
         check(frag in q, f"{f}: Record Send lacks {frag!r}")
     check("message/send" not in q, f"{f}: Record Send must not touch the transport")
+    check("'send_unknown'" not in q, f"{f}: Record Send must keep a send_unknown reply in memory (iteration decision R7)")
+    check(node(wf, "Record Send")["parameters"]["options"]["queryReplacement"].rstrip().endswith(
+        "$('Final Check').first().json.text, $('Final Check').first().json.historyWatermark ] }}"),
+        f"{f}: Record Send $8/$9 must be the Final Check text and watermark")
     # (4) Record Cancel: state + drop the AI memory rows a cancelled generation wrote + release the lease.
     q = node(wf, "Record Cancel")["parameters"]["query"]
-    for frag in ("delete from n8n_chat_histories", "message->>'type' = 'ai'", "id > $5::bigint", "$6::boolean", "lock_token = $7"):
+    for frag in ("delete from n8n_chat_histories", "message->>'type' = 'ai'", "id > $5::bigint", "$6::boolean", "lock_token = $7",
+                 "where id = (select min(id) from n8n_chat_histories", "message->>'content' = $10"):
         check(frag in q, f"{f}: Record Cancel lacks {frag!r}")
+    # negative (R7): a delete of EVERY unmarked ai row above the watermark also removes a newer run's reply
+    check("delete from n8n_chat_histories\n  where $6::boolean" not in q,
+          f"{f}: Record Cancel deletes every ai row above the watermark (R7: a newer run's sent reply is lost from memory)")
+    check(node(wf, "Record Cancel")["parameters"]["options"]["queryReplacement"].rstrip().endswith("$json.humanText, $json.aiText ] }}"),
+          f"{f}: Record Cancel $10 must be the Cancel Label's aiText")
     # (5) Final Check rules (newer client → superseded, owner → cancelled_owner, trigger missing → cancelled_fetch).
     js = node(wf, "Final Check")["parameters"]["jsCode"]
     for frag in ("outcome = 'superseded'", "outcome = 'cancelled_owner'", "outcome = 'cancelled_fetch'", "outcome = 'generation_failed'",
@@ -93,7 +106,8 @@ def verify(fname):
     # (8) Cancel Label names every refusal; only a generated run drops AI memory.
     js = node(wf, "Cancel Label")["parameters"]["jsCode"]
     for frag in ("prev === 'Is Latest?'", "prev === 'If Quota Allows'", "prev === 'Generated?'", "prev === 'Final OK?'", "prev === 'Send Allowed?'",
-                 "'cancelled_mode'", "'cancelled_busy'", "dropAiHistory: generated"):
+                 "'cancelled_mode'", "'cancelled_busy'", "dropAiHistory: generated && aiText !== null",
+                 "$('AI Agent').first().json.output", "aiText: aiText || ''"):
         check(frag in js, f"{f}: Cancel Label lacks {frag!r}")
     # (9) Outcome reads the recorded state first; every ledger state has a label.
     js = node(wf, "Outcome")["parameters"]["jsCode"]

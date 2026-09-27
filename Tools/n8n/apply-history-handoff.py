@@ -119,6 +119,10 @@ RECORD_OUTGOING_PARAMS = "={{ (m => [ m.profile_id, String(m.chatId || m.to || '
 
 RECORD_SEND_SQL = """-- A7: the event's final transport state and the lease release. send_unknown stays send_unknown —
 -- an operator-visible uncertainty, never a silent retry. A6: a sent reply is an `ai` history row.
+-- R7: a reply the transport REFUSED (send_failed) never reached the client, so its own memory row goes — the
+-- first unmarked ai row above this run's watermark ($9) whose content is exactly its text ($8; the memory node
+-- saves the agent's output verbatim). send_unknown KEEPS it: for Wappi «unknown» usually means «delivered, the
+-- answer got lost» (iteration decision 2026-09-27). Nothing else in memory is ever touched here.
 with ev as (
   update reply_events set state = $4, transport_message_id = nullif($5, ''), error = nullif($6, ''), updated_at = now()
   where profile_id = $1 and chat_id = $2 and message_id = $3 returning 1
@@ -132,21 +136,34 @@ with ev as (
   select $1, $2, $5, 'ai', $8, 'chat', now(), $7 where $4 = 'sent' and nullif($5, '') is not null
   on conflict (profile_id, chat_id, message_id) do update set source = 'ai', body = excluded.body, execution_id = excluded.execution_id
   returning 1
+), mem as (
+  delete from n8n_chat_histories
+  where $4 = 'send_failed'
+    and id = (select min(id) from n8n_chat_histories
+              where session_id = $1 || ':' || $2 and id > $9::bigint and message->>'type' = 'ai'
+                and (message->'additional_kwargs'->>'source') is null and message->>'content' = $8)
+  returning 1
 )
-select $4::text as outcome, nullif($5, '')::text as transport_message_id, exists(select 1 from ev) as recorded, exists(select 1 from rel) as released;"""
-RECORD_SEND_PARAMS_TAIL = ", $json.state, $json.transportMessageId, $json.error, $execution.id, $('Final Check').first().json.text ] }}"
+select $4::text as outcome, nullif($5, '')::text as transport_message_id, exists(select 1 from ev) as recorded, exists(select 1 from rel) as released,
+       (select count(*) from mem)::int as dropped_ai_rows;"""
+RECORD_SEND_PARAMS_TAIL = (", $json.state, $json.transportMessageId, $json.error, $execution.id, $('Final Check').first().json.text, "
+                           "$('Final Check').first().json.historyWatermark ] }}")
 
 RECORD_CANCEL_SQL = """-- A3.7: a refused / cancelled reply is recorded as such, the lease (if this run held it) is released, and
--- the AI rows a cancelled GENERATION already wrote to memory are dropped — the customer never saw them,
--- so the bot must not remember having said them. Owner rows (source-marked) are never dropped.
+-- the AI row a cancelled GENERATION already wrote to memory is dropped — the customer never saw it, so the
+-- bot must not remember having said it. R7: ONLY this run's own row — the first unmarked ai row above its
+-- watermark whose content is exactly its text ($10) — never a NEWER run's reply written (or sent) meanwhile.
+-- Owner rows (source-marked) and human rows are never dropped.
 -- A6: when the agent never ran (quota / generation failure), the client's message still enters memory.
 with ev as (
   update reply_events set state = $4, updated_at = now()
   where profile_id = $1 and chat_id = $2 and message_id = $3 returning 1
 ), hist as (
   delete from n8n_chat_histories
-  where $6::boolean and session_id = $1 || ':' || $2 and id > $5::bigint and message->>'type' = 'ai'
-    and (message->'additional_kwargs'->>'source') is null returning 1
+  where id = (select min(id) from n8n_chat_histories
+              where $6::boolean and session_id = $1 || ':' || $2 and id > $5::bigint and message->>'type' = 'ai'
+                and (message->'additional_kwargs'->>'source') is null and message->>'content' = $10)
+  returning 1
 ), rel as (
   update chat_reply_state set lock_token = null, lock_expires_at = null
   where profile_id = $1 and chat_id = $2 and lock_token = $7 returning 1
@@ -159,7 +176,7 @@ with ev as (
 )
 select $4::text as outcome, (select count(*) from hist)::int as dropped_ai_rows, exists(select 1 from ev) as recorded, exists(select 1 from mem) as remembered;""".replace(
     "__ROW__", MEMORY_ROW % ("'human'", "$9", "'client'", "$3"))
-RECORD_CANCEL_PARAMS_TAIL = ", $json.outcome, $json.historyWatermark, $json.dropAiHistory, $execution.id, $json.recordHuman, $json.humanText ] }}"
+RECORD_CANCEL_PARAMS_TAIL = ", $json.outcome, $json.historyWatermark, $json.dropAiHistory, $execution.id, $json.recordHuman, $json.humanText, $json.aiText ] }}"
 
 CANCEL_LABEL_JS = r"""// CANCEL LABEL: one place that names why a reply did not go out, from whichever gate refused it.
 const j = $input.first().json || {};
@@ -173,8 +190,15 @@ else if (prev === 'Send Allowed?') outcome = j.suppressed === true ? 'cancelled_
 else outcome = 'cancelled_fetch';
 let watermark = 0;
 try { watermark = Number($('Claim Event').first().json.history_watermark) || 0; } catch (e) { watermark = 0; }
-// Only a run that reached the generator can have written AI memory rows to drop.
+// Only a run that reached the generator can have written AI memory rows to drop — and it drops ONLY ITS OWN
+// row (R7): Record Cancel matches the ai row by this run's exact answer text (the memory node saves the agent's
+// output verbatim). The media branch (Ask to Send Text) reaches the same gates without running the agent — there
+// $('AI Agent') throws, aiText stays null and nothing is dropped.
 const generated = prev === 'Final OK?' || prev === 'Send Allowed?';
+let aiText = null;
+if (generated) {
+  try { const o = $('AI Agent').first().json.output; aiText = (typeof o === 'string' && o.trim()) ? o : null; } catch (e) { aiText = null; }
+}
 // A6: when the agent never ran, the client's message still has to reach memory (it is the memory
 // node that writes it on a normal run).
 const recordHuman = prev === 'If Quota Allows' || prev === 'Generated?';
@@ -185,7 +209,8 @@ if (recordHuman) {
   if (!humanText) { try { humanText = String($('Latest+Combine').first().json.combinedText || ''); } catch (e) { humanText = ''; } }
   if (!humanText) { try { const m = $('Webhook').first().json.body.messages[0]; humanText = ['chat', 'text'].includes(String(m.type)) ? String(m.body || '') : '[' + String(m.type || 'media') + ']'; } catch (e) { humanText = ''; } }
 }
-return [{ json: { outcome, historyWatermark: watermark, dropAiHistory: generated, recordHuman, humanText: humanText.slice(0, 4000) }, pairedItem: { item: 0 } }];
+return [{ json: { outcome, historyWatermark: watermark, dropAiHistory: generated && aiText !== null, aiText: aiText || '', recordHuman,
+                  humanText: humanText.slice(0, 4000) }, pairedItem: { item: 0 } }];
 """
 
 READ_MODE_SQL = """select (

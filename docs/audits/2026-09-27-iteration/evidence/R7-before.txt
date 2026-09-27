@@ -1,0 +1,43 @@
+# R7 before — Tools/n8n/tests/test_reply_memory.py on HEAD 35e12951 (Record Cancel deletes every unmarked ai row above the watermark; Record Send keeps a send_failed reply); the real WA/TG chain on staging-PG temp tables
+FAIL R7 [WA] old draft → new reply SENT → old cancelled: the new reply stays in memory (review scenario)
+      - ai rows=[] (dropped=2)
+FAIL R7 [WA] new reply WRITTEN but not yet sent when the old run cancels → it survives, then goes out
+      - ai rows=[]
+FAIL R7 [WA] the newer message arrives during the OLD run's LLM call (claimed before its draft) → only the new reply stays
+      - ai rows=[] — the unsent draft must go, the sent reply must stay
+FAIL R7 [WA] the old run is refused at the LEASE (Send Allowed?) after the new reply went out → only its own draft goes
+      - o=superseded ai rows=[]
+FAIL R7 [WA] two runs produced the SAME text: exactly one ai row survives (one per reply the client saw)
+      - ai rows=[]
+PASS R7 [WA] the owner already answered (cancelled_owner): the draft goes, the owner's marked row — same text — stays
+FAIL R7 [WA] send_failed: the reply the client never got leaves memory; the client's own row stays
+      - outcome=send_failed memory=[{'id': 630, 'type': 'human', 'content': 'Сколько стоит букет?', 'source': None}, {'id': 631, 'type': 'ai', 'content': 'Букет из 25 роз стоит 25 000 ₸.', 'source': None}]
+FAIL R7 [WA] send_failed of the NEWER run after an older reply was sent: only the failed text leaves
+      - o=sent n=send_failed ai=['Букет из 25 роз стоит 25 000 ₸.', 'Букет из 25 роз стоит 25 000 ₸, доставка по городу бесплатно.']
+PASS R7 [WA] send_unknown (no echo found) KEEPS the reply in memory (decision: «unknown» usually means delivered)
+FAIL R7 [WA] a media message (Ask to Send Text, the agent never ran) cancelled after a newer reply → nothing removed
+      - p=superseded ai=[]
+PASS R7 [WA] the transport echo of a sent reply (after Record Send) adds no second row
+PASS R7 [WA] the transport echo of a sent reply (before Record Send) adds no second row
+FAIL R7 [TG] old draft → new reply SENT → old cancelled: the new reply stays in memory (review scenario)
+      - ai rows=[] (dropped=2)
+FAIL R7 [TG] new reply WRITTEN but not yet sent when the old run cancels → it survives, then goes out
+      - ai rows=[]
+FAIL R7 [TG] the newer message arrives during the OLD run's LLM call (claimed before its draft) → only the new reply stays
+      - ai rows=[] — the unsent draft must go, the sent reply must stay
+FAIL R7 [TG] the old run is refused at the LEASE (Send Allowed?) after the new reply went out → only its own draft goes
+      - o=superseded ai rows=[]
+FAIL R7 [TG] two runs produced the SAME text: exactly one ai row survives (one per reply the client saw)
+      - ai rows=[]
+PASS R7 [TG] the owner already answered (cancelled_owner): the draft goes, the owner's marked row — same text — stays
+FAIL R7 [TG] send_failed: the reply the client never got leaves memory; the client's own row stays
+      - outcome=send_failed memory=[{'id': 667, 'type': 'human', 'content': 'Сколько стоит букет?', 'source': None}, {'id': 668, 'type': 'ai', 'content': 'Букет из 25 роз стоит 25 000 ₸.', 'source': None}]
+FAIL R7 [TG] send_failed of the NEWER run after an older reply was sent: only the failed text leaves
+      - o=sent n=send_failed ai=['Букет из 25 роз стоит 25 000 ₸.', 'Букет из 25 роз стоит 25 000 ₸, доставка по городу бесплатно.']
+PASS R7 [TG] send_unknown (no echo found) KEEPS the reply in memory (decision: «unknown» usually means delivered)
+FAIL R7 [TG] a media message (Ask to Send Text, the agent never ran) cancelled after a newer reply → nothing removed
+      - p=superseded ai=[]
+PASS R7 [TG] the transport echo of a sent reply (after Record Send) adds no second row
+PASS R7 [TG] the transport echo of a sent reply (before Record Send) adds no second row
+
+8 pass, 16 fail
