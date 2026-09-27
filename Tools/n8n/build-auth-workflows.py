@@ -133,27 +133,65 @@ if (out.invalid) { out.statusCode = 400; out.error = 'bad_request'; }
 return [{ json: out, pairedItem: { item: 0 } }];
 """
 
+# R2 (2026-09-27): only a RevenueCat anonymous id ($RCAnonymousID: + 32 lowercase hex) is a bindable billing id
+# (a device-id fallback never is). Written without `$` / regex so no placeholder syntax can ever collide with it.
+RC_ID_OF_3 = ("(case when length(coalesce($3, '')) = 47 and left($3, 15) = chr(36) || 'RCAnonymousID:' "
+              "and translate(substr($3, 16), '0123456789abcdef', '') = '' then $3 end)")
+# The requested id is granted when it is free, already this install's, or its holder is revoked / owns no live bot
+# (a lost install secret: claim the bots by code first, then the billing id follows). ON CONFLICT DO UPDATE ... WHERE
+# never raises in a race (a unique index would, and a refresh error used to become a 401 — R11).
+BILLING_BIND_CTES = """req as (
+  select """ + RC_ID_OF_3 + """ as id
+), bind as (
+  insert into billing_bindings (app_user_id, install_id)
+  select req.id, __HOLDER__ from req__FROM__ where req.id is not null
+  on conflict (app_user_id) do update set install_id = excluded.install_id,
+      bound_at = case when billing_bindings.install_id = excluded.install_id then billing_bindings.bound_at else now() end
+  where billing_bindings.install_id = excluded.install_id
+     or not exists (select 1 from installs h where h.install_id = billing_bindings.install_id and h.revoked_at is null)
+     or not exists (select 1 from bot_profiles bp where bp.owner_id = billing_bindings.install_id and bp.deleted_at is null)
+  returning app_user_id
+), strip as (
+  update installs set app_user_id = null where app_user_id = (select app_user_id from bind) and install_id <> $1
+  returning 1
+)"""
+
 CREATE_INSTALL_SQL = """-- A1: mint an install (the client keeps installId + installSecret; only the hash is stored).
 -- Bootstrap is unauthenticated, so it is capped: at most 60 new installs per minute instance-wide.
-insert into installs (install_id, secret_hash, app_user_id, platform, app_version)
-select $1, $2, nullif($3, ''), nullif($4, ''), nullif($5, '')
-where (select count(*) from installs where created_at > now() - interval '1 minute') < 60
-returning install_id, app_user_id, token_version, '{}'::text[] as p, '{}'::text[] as w, '{}'::text[] as c;"""
+-- R2 (2026-09-27): the billing id ($3) is NOT trusted for being named — it is bound to this install only when
+-- billing_bindings grants it (see BILLING_BIND_CTES); otherwise app_user_id stays NULL and billing_conflict says why.
+with ok as (
+  select 1 as go where (select count(*) from installs where created_at > now() - interval '1 minute') < 60
+), """ + BILLING_BIND_CTES.replace("__HOLDER__", "$1").replace("__FROM__", ", ok") + """, ins as (
+  insert into installs (install_id, secret_hash, app_user_id, platform, app_version)
+  select $1, $2, (select app_user_id from bind), nullif($4, ''), nullif($5, '') from ok
+  returning install_id, app_user_id, token_version
+)
+select ins.install_id, ins.app_user_id, ins.token_version, '{}'::text[] as p, '{}'::text[] as w, '{}'::text[] as c,
+  ((select id from req) is not null and ins.app_user_id is null) as billing_conflict
+from ins;"""
 
 VERIFY_INSTALL_SQL = """-- A1: refresh = prove the install secret (hash compare), touch last_seen, adopt the client's current
 -- billing id, and load everything this install owns in ONE round trip (each Postgres node costs
 -- ~1.9 s on prod). ALWAYS exactly one row carrying verdict = 'checked' (R11, 2026-09-27): install_id is
 -- NULL when the secret is wrong or the install is unknown/revoked -> 401 install_revoked. A row WITHOUT
 -- the verdict (node error, input passed through, nothing) is a fault -> 503, never a reason to wipe.
-with v as (
-  update installs set last_seen_at = now(), app_user_id = coalesce(nullif($3, ''), app_user_id)
-  where install_id = $1 and secret_hash = $2 and revoked_at is null
-  returning install_id, app_user_id, token_version
+-- R2: the billing id is adopted only when billing_bindings grants it; a refused one keeps the install's own
+-- still-bound id (or none) and reports billing_conflict.
+with me as (
+  select install_id from installs where install_id = $1 and secret_hash = $2 and revoked_at is null
+), """ + BILLING_BIND_CTES.replace("__HOLDER__", "me.install_id").replace("__FROM__", ", me") + """, v as (
+  update installs i set last_seen_at = now(),
+    app_user_id = coalesce((select app_user_id from bind),
+                           (select b.app_user_id from billing_bindings b where b.app_user_id = i.app_user_id and b.install_id = i.install_id))
+  where i.install_id = $1 and i.secret_hash = $2 and i.revoked_at is null
+  returning i.install_id, i.app_user_id, i.token_version
 )
 select 'checked'::text as verdict, v.install_id, v.app_user_id, v.token_version,
   coalesce((select array_agg(bp.profile_id) from bot_profiles bp where bp.owner_id = v.install_id and bp.deleted_at is null), '{}'::text[]) as p,
   coalesce((select array_agg(distinct bp.workflow_id) from bot_profiles bp where bp.owner_id = v.install_id and bp.deleted_at is null and bp.workflow_id is not null), '{}'::text[]) as w,
-  coalesce((select array_agg(bp.profile_id) from bot_profiles bp where bp.claim_pending_by = v.install_id and bp.owner_id is null and bp.claim_pending_at > now() - interval '1 day'), '{}'::text[]) as c
+  coalesce((select array_agg(bp.profile_id) from bot_profiles bp where bp.claim_pending_by = v.install_id and bp.owner_id is null and bp.claim_pending_at > now() - interval '1 day'), '{}'::text[]) as c,
+  ((select id from req) is not null and v.install_id is not null and v.app_user_id is distinct from (select id from req)) as billing_conflict
 from (select 1) as one left join v on true;"""
 
 RELOAD_OWNERSHIP_SQL = """-- A1: re-read ownership after a claim step (same shape as Verify Install's row).
@@ -276,8 +314,10 @@ if (r.op === 'claim.verify' && (!claimVerify || !claimVerify.profile_id)) {
 const exp = r.nowSec + __TTL__;
 const claims = { i: row.install_id, u: row.app_user_id || null, p: row.p || [], w: row.w || [], c: row.c || [], e: exp, n: row.token_version || 1 };
 const token = crAuth.sign(claims, $env.CR_AUTH_SECRET);
+// billingConflict (R2): the client named a RevenueCat id another install holds — the token carries NO billing
+// identity. The client must not read u = null as "identity changed, refresh again" (AuthClient keeps the id it asked for).
 const out = { success: true, _status: 200, installId: row.install_id, token, expiresAt: exp, appUserId: claims.u,
-  profiles: claims.p, workflows: claims.w, claimPending: claims.c };
+  profiles: claims.p, workflows: claims.w, claimPending: claims.c, billingConflict: !!row.billing_conflict };
 if (r.op === 'bootstrap') out.installSecret = r.installSecret;
 if (claimInfo) { out.claimMethod = claimInfo.claimMethod; out.claimProfileId = claimInfo.profileId; out.codeReused = !!claimInfo.codeReused; }
 return [{ json: out, pairedItem: { item: 0 } }];

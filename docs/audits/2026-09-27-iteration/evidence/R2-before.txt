@@ -1,0 +1,44 @@
+# R2 before (server) — python3 Tools/n8n/tests/test_billing_identity.py @ bccc085f (real Create/Verify Install SQL on staging PG session temp tables, real Issue Token + gate Code bodies, compat window CLOSED)
+FAIL R2 B1: a second install naming a billing id another install holds (with a live bot) gets NO billing identity + billingConflict
+      - second install: {'install_id': 'inst-B', 'app_user_id': '$RCAnonymousID:0123456789abcdef0123456789abcdef', 'token_version': 1, 'p': [], 'w': [], 'c': []}
+      - holders ['inst-A', 'inst-B']
+FAIL R2 B2: a refresh naming another install's billing id does not move it (the caller keeps its own / nothing)
+      - {'verdict': 'checked', 'install_id': 'inst-C', 'app_user_id': '$RCAnonymousID:0123456789abcdef0123456789abcdef', 'token_version': 1, 'p': [], 'w': [], 'c': []} holders=['inst-A', 'inst-C']
+PASS R2 B3: the holder's own repeated refresh is idempotent (no conflict)
+PASS R2 B4: a REVOKED holder releases the id — the next install that names it takes it over
+FAIL R2 B5: a holder with NO live bot releases the id (recovery: claim the bots first, the billing id follows)
+      - before claim {'install_id': 'inst-NEW', 'app_user_id': '$RCAnonymousID:0123456789abcdef0123456789abcdef', 'token_version': 1, 'p': [], 'w': [], 'c': []} after claim {'verdict': 'checked', 'install_id': 'inst-NEW', 'app_user_id': '$RCAnonymousID:0123456789abcdef0123456789abcdef', 'token_version': 1, 'p': ['wa-1'], 'w': [], 'c': []} holders=['inst-NEW', 'inst-OLD']
+FAIL R2 B6: a device-id fallback is never bound (not a RevenueCat id) — no identity, no conflict; the RC id binds later
+      - {'install_id': 'inst-D', 'app_user_id': 'A1B2C3D4-E5F6-47A8-9B0C-D1E2F3A4B5C6', 'token_version': 1, 'p': [], 'w': [], 'c': []} / {'verdict': 'checked', 'install_id': 'inst-D', 'app_user_id': '$RCAnonymousID:fedcba9876543210fedcba9876543210', 'token_version': 1, 'p': [], 'w': [], 'c': []}
+FAIL R2 B7: exactly one live install ever holds a billing id
+      - holders ['inst-A', 'inst-X0', 'inst-X1', 'inst-X2']
+FAIL R2 M1: the migration seed keeps ONE live holder per id (the most recently seen) and clears the others
+      - 2026-09-27-billing-bindings.sql: no SEED block
+FAIL R2 T1: Issue Token signs u = null and tells the client billingConflict
+      - {'success': True, '_status': 200, 'installId': 'inst-B', 'token': 'v1.eyJpIjoiaW5zdC1CIiwidSI6bnVsbCwicCI6W10sInciOltdLCJjIjpbXSwiZSI6MTc5MDU2MTA4NSwibiI6MX0.UBcOziqrazZSwu1En-kEzOw7fdBfzqczzZTzAfbwwe8', 'expiresAt': 1790561085, 'appUserId': None, 'profiles': [], 'workflows': [], 'claimPending': []} claims={'i': 'inst-B', 'u': None, 'p': [], 'w': [], 'c': [], 'e': 1790561085, 'n': 1}
+FAIL R2 G1/G2: a token WITHOUT a billing identity cannot name any billing id (GetUsage, SuggestReplies)
+      - GetUsage accepted a foreign id on u=null
+      - SuggestReplies accepted a foreign id on u=null
+PASS R2 G3/G4: a token with u = R passes its own id and refuses another
+FAIL R2 G5: Create WA/TG refuse an EMPTY AppUserID in session mode (it skipped the channel count and the quota)
+      - XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: empty AppUserID accepted
+      - Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: empty AppUserID accepted
+PASS R2 G7: Delete Bot Files is not blocked by its audit-only appUserId (a conflicted install can still delete its bot)
+
+4 pass, 9 fail
+
+# R2 before (client) — Tools/run-tests-headless.sh 'AuthWiringGuardTests' with AuthClient/InstallSession at HEAD (source guard added first)
+================ EditMode test results (headless) ================
+  result=Failed(Child)  total=9  passed=8  failed=1  skipped=0  inconclusive=0
+  Failing / inconclusive tests:
+    - AuthWiringGuardTests.EnsureSession_ComparesAgainstTheRequestedBillingId_AndRecordsIt
+=================================================================
+NOT GREEN ❌  (unity exit=2).
+
+# R2 before (staging e2e, n8n 2.36.7 running the pre-R2 Auth Session + gates)
+FAIL  billing_id_first_bind (2.5s) — R2: a second install naming a billing id another install holds (with a live bot) gets NO billing identity + billingConflict — its GetUsage/Create/profile.add on that id are refused; the id follows only once the holder is revoked
+      second: appUserId=$RCAnonymousID:e2e0e2e010e507caadc920f02ee4036b conflict=None usage_own=200 usage_second=200 profile.add_second=200 {'status': 'done', 'profile_id': 'profile-000004', 'token': 'v1.eyJpIjoiNTlhNmJkZjAtMTJkMS00NmMyLWJiMGQtNTVjMGZjNTZlOTI0IiwidSI6IiRSQ0Fub255bW91c0lEOmUyZTBlMmUwMTBlNTA3Y2FhZGM5MjBmMDJlZTQwMzZiIiwicCI6WyJwcm9maWxlLTAwMDAwNCJdLCJ3IjpbXSwiYyI6W10sImUiOjE3OTA1NjE2NjQsIm4iOjF9.rceJKZ1lWnP9QTkdQrcVIUDOFJ-mq0Gn12TbkCNCfMo', 'expiresAt': 1790561664, 'profiles': ['profile-000004'], 'workflows': []} holders=False after_revoke=True/None
+0 pass, 1 fail
+FAIL  create_rejects_empty_appuserid_in_session (2.9s) — R2: CreateWhatsappWorkflow/CreateTelegramWorkflow with an EMPTY AppUserID in session mode are refused before any write (the empty id skipped Count Channels and let the quota fail open)
+      wa=200 {'id': 'd5VnzX2csfu6AGIO'} tg=200 {'id': 'tbxkjiBAL0NpWrpT'} clones_bound=2
+0 pass, 1 fail

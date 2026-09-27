@@ -22,9 +22,14 @@ ids absent from --live, only the per-profile tables `delete` already clears plus
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import uuid
+
+# R2 (2026-09-27): only a RevenueCat anonymous id can be a session's billing identity, so session fixtures use this
+# RC-shaped id; the fixed `e2e0e2e0` hex prefix marks it as a fixture identity (the only non-probe id `delete` accepts).
+FIXTURE_RC = re.compile(r"^\$RCAnonymousID:e2e0e2e0[0-9a-f]{24}$")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PG = os.path.join(HERE, "pg.sh")
@@ -47,6 +52,7 @@ def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
     c = sub.add_parser("create-subscriber"); c.add_argument("--status", default="trialing"); c.add_argument("--plan", default="trial"); c.add_argument("--run-id")
+    c.add_argument("--app-user-id", help="an explicit fixture RevenueCat id ($RCAnonymousID:e2e0e2e0<24 hex>) instead of probe-<runid>")
     r = sub.add_parser("register-profile"); r.add_argument("--app-user-id", required=True); r.add_argument("--profile-id", required=True); r.add_argument("--channel", default="whatsapp")
     m = sub.add_parser("set-mode"); m.add_argument("--profile-id", required=True); m.add_argument("--chat-id", default="*"); m.add_argument("--suppressed", required=True)
     s = sub.add_parser("show"); s.add_argument("--app-user-id", required=True)
@@ -57,6 +63,10 @@ def main():
     if a.cmd == "create-subscriber":
         run_id = a.run_id or uuid.uuid4().hex[:12]
         uid = f"probe-{run_id}"
+        if a.app_user_id:
+            if not FIXTURE_RC.match(a.app_user_id):
+                sys.exit("refusing: an explicit --app-user-id must be a fixture RevenueCat id ($RCAnonymousID:e2e0e2e0<24 hex>)")
+            uid = a.app_user_id
         psql("insert into subscribers (app_user_id, plan, status, trial_started_at) values (:'p0', :'p1', :'p2', now()) on conflict (app_user_id) do update set plan = excluded.plan, status = excluded.status;",
              uid, a.plan, a.status)
         print(uid)
@@ -87,8 +97,8 @@ def main():
         psql("delete from bot_profiles where profile_id ~ '^profile-[0-9]{6}$' and not (profile_id = any (select jsonb_array_elements_text(:'p0'::jsonb)));", live)
         print(f"swept {len(pids)} stale mock profile(s) (live mock knows {len(a.live)})")
     elif a.cmd == "delete":
-        if not a.app_user_id.startswith("probe-"):
-            sys.exit("refusing: delete is scoped to fixture identities (probe-<runid>) only")
+        if not (a.app_user_id.startswith("probe-") or FIXTURE_RC.match(a.app_user_id)):
+            sys.exit("refusing: delete is scoped to fixture identities (probe-<runid> / $RCAnonymousID:e2e0e2e0…) only")
         for pid in a.profile_id:
             psql("delete from reply_mode_flags where profile_id = :'p0';", pid)
             psql("delete from n8n_chat_histories where session_id like :'p0' || ':%';", pid)
@@ -97,7 +107,7 @@ def main():
             psql("delete from chat_reply_state where profile_id = :'p0';", pid)
             psql("delete from chat_history_events where profile_id = :'p0';", pid)
             psql("delete from handoff_requests where profile_id = :'p0';", pid)
-        n = psql("with a as (delete from suggestion_counts where app_user_id = :'p0' returning 1), b as (delete from dialog_counts where app_user_id = :'p0' returning 1), c as (delete from bot_profiles where app_user_id = :'p0' returning 1), d as (delete from subscribers where app_user_id = :'p0' returning 1) select (select count(*) from a) + (select count(*) from b) + (select count(*) from c) + (select count(*) from d);",
+        n = psql("with a as (delete from suggestion_counts where app_user_id = :'p0' returning 1), b as (delete from dialog_counts where app_user_id = :'p0' returning 1), c as (delete from bot_profiles where app_user_id = :'p0' returning 1), d as (delete from subscribers where app_user_id = :'p0' returning 1), e as (delete from billing_bindings where app_user_id = :'p0' returning 1) select (select count(*) from a) + (select count(*) from b) + (select count(*) from c) + (select count(*) from d) + (select count(*) from e);",
                  a.app_user_id)
         print(f"deleted rows: {n}")
 

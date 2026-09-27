@@ -95,6 +95,7 @@ cmd_migrate() {
     "${N8N_DIR}/sql/2026-09-17-suggestion-request-keys.sql"
     "${N8N_DIR}/sql/2026-09-22-test-dialog.sql"
     "${N8N_DIR}/sql/2026-09-27-claim-pairing.sql"
+    "${N8N_DIR}/sql/2026-09-27-billing-bindings.sql"
   )
   for f in "${files[@]}"; do
     [ -s "$f" ] || { echo "skip (missing) $f"; continue; }

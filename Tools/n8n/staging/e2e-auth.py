@@ -76,16 +76,24 @@ def fixture(*args):
     return out.stdout.strip()
 
 
+def rc_fixture_id(run_id, tag):
+    """A fresh RevenueCat-shaped fixture id per Owner (R2 binds an id to ONE install: suites that create several
+    owners with the same tag must not collide). The e2e0e2e0 prefix marks it for fixtures.py's scoped delete."""
+    import hashlib
+    return "$RCAnonymousID:e2e0e2e0" + hashlib.sha1(f"{run_id}-{tag}-{uuid.uuid4().hex}".encode()).hexdigest()[:24]
+
+
 OWNERS = []   # every Owner this process creates — the suite cleans up ALL of them (not just ctx["A"]/["B"])
 
 
 class Owner:
-    def __init__(self, tag, run_id):
+    def __init__(self, tag, run_id, app_user_id=None):
         self.tag = tag
-        self.app_user_id = f"probe-{run_id}-{tag}"
+        # R2: a session's billing identity must be a RevenueCat anonymous id; fixtures carry the e2e0e2e0 marker
+        self.app_user_id = app_user_id or rc_fixture_id(run_id, tag)
         self.profiles = []
         OWNERS.append(self)                      # registered before anything can fail, so cleanup always sees it
-        fixture("create-subscriber", "--run-id", f"{run_id}-{tag}")
+        fixture("create-subscriber", "--run-id", f"{run_id}-{tag}", "--app-user-id", self.app_user_id)
         st, d = session({"op": "bootstrap", "platform": "test", "appVersion": "e2e", "appUserId": self.app_user_id})
         assert st == 200 and d.get("success"), f"bootstrap {tag}: {st} {d}"
         self.install_id, self.secret, self.token = d["installId"], d["installSecret"], d["token"]
@@ -520,6 +528,37 @@ def wait_ready(timeout=90):
         if st != 404 or time.time() > deadline:
             return st
         time.sleep(2)
+
+
+@scenario("billing_id_first_bind", "R2: a second install naming a billing id another install holds (with a live bot) gets NO billing identity + billingConflict — its GetUsage/Create/profile.add on that id are refused; the id follows only once the holder is revoked")
+def s_billing_bind(ctx):
+    a = fresh_owner(ctx, "r2a")                                   # holds the id and owns a live bot
+    b = Owner("r2b", ctx["run_id"], app_user_id=a.app_user_id)   # the same id named by another install
+    d_b = b.refresh()
+    usage_own = hook("GetUsage", a.token, {"appUserId": a.app_user_id})[0]
+    usage_b = hook("GetUsage", b.token, {"appUserId": a.app_user_id})[0]
+    add_b, add_body = proxy(b.token, {"op": "profile.add", "channel": "whatsapp", "name": "e2e r2b"})
+    holders = pg(f"select string_agg(install_id, ',') from installs where app_user_id = '{a.app_user_id}' and revoked_at is null;")
+    pg(f"update installs set revoked_at = now() where install_id = '{a.install_id}';")
+    d_b2 = b.refresh()
+    ok = (d_b.get("appUserId") is None and d_b.get("billingConflict") is True and usage_own == 200 and usage_b == 403
+          and add_b == 409 and holders == a.install_id and d_b2.get("appUserId") == a.app_user_id and not d_b2.get("billingConflict"))
+    return ok, (f"second: appUserId={d_b.get('appUserId')} conflict={d_b.get('billingConflict')} usage_own={usage_own} usage_second={usage_b} "
+                f"profile.add_second={add_b} {add_body} holders={holders == a.install_id} after_revoke={d_b2.get('appUserId') == a.app_user_id}/{d_b2.get('billingConflict')}")
+
+
+@scenario("create_rejects_empty_appuserid_in_session", "R2: CreateWhatsappWorkflow/CreateTelegramWorkflow with an EMPTY AppUserID in session mode are refused before any write (the empty id skipped Count Channels and let the quota fail open)")
+def s_create_empty_billing(ctx):
+    o = fresh_owner(ctx, "r2e")
+    tg = o.add_profile("telegram")
+    base = {"Name": f"e2e-r2-{ctx['run_id']}", "BusinessType": "Цветы", "BusinessTypeId": "flowers", "Business": "", "Prompt": "",
+            "ProductsList": "", "ServicesList": "", "AppUserID": "", "BotKey": f"Bot-r2-{ctx['run_id']}", "ReplyMode": "auto", "ReplyModeVersion": "1"}
+    st1, d1 = hook_form("CreateWhatsappWorkflow", o.token, {**base, "WhatsappProfileId": o.profiles[0], "TelegramWorkflowId": "-1"})
+    st2, d2 = hook_form("CreateTelegramWorkflow", o.token, {**base, "TelegramProfileId": tg, "WhatsappWorkflowId": "-1"})
+    bound = pg(f"select count(*) from bot_profiles where profile_id in ('{o.profiles[0]}', '{tg}') and workflow_id is not null;")
+    refused = lambda d: isinstance(d, dict) and d.get("success") is False and str(d.get("reason", "")).startswith("forbidden:AppUserID")
+    ok = refused(d1) and refused(d2) and bound == "0"
+    return ok, f"wa={st1} {d1} tg={st2} {d2} clones_bound={bound}"
 
 
 def sweep_stale_mock_profiles():

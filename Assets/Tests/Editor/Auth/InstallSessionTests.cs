@@ -101,10 +101,26 @@ public class InstallSessionTests
     {
         var withU = new InstallSession.TokenClaims { AppUserId = "rc-1" };
         var withoutU = new InstallSession.TokenClaims { AppUserId = null };
-        Assert.IsFalse(SessionRefreshPolicy.IdentityChanged(null, "rc-1"));
-        Assert.IsFalse(SessionRefreshPolicy.IdentityChanged(withU, ""), "client has no id yet");
-        Assert.IsFalse(SessionRefreshPolicy.IdentityChanged(withU, "rc-1"));
-        Assert.IsTrue(SessionRefreshPolicy.IdentityChanged(withU, "rc-2"), "RevenueCat id rotated");
-        Assert.IsTrue(SessionRefreshPolicy.IdentityChanged(withoutU, "rc-1"), "token minted before the billing id existed");
+        Assert.IsFalse(SessionRefreshPolicy.IdentityChanged(null, "rc-1", null));
+        Assert.IsFalse(SessionRefreshPolicy.IdentityChanged(withU, "", null), "client has no id yet");
+        Assert.IsFalse(SessionRefreshPolicy.IdentityChanged(withU, "rc-1", "rc-1"));
+        Assert.IsTrue(SessionRefreshPolicy.IdentityChanged(withU, "rc-2", "rc-1"), "RevenueCat id rotated");
+        Assert.IsTrue(SessionRefreshPolicy.IdentityChanged(withoutU, "rc-1", null), "token minted before the billing id existed");
+        Assert.IsTrue(SessionRefreshPolicy.IdentityChanged(withoutU, "rc-1", "device-id"), "bootstrap asked with the device fallback, RevenueCat came up since");
+    }
+
+    /// <summary>
+    /// R2 (2026-09-27): the server declined the billing id this install asked for (held by another install —
+    /// billingConflict — or not a RevenueCat id): the token carries u = null. Treating that as an identity change
+    /// refreshed on EVERY AuthorizedRequest (~2 s each). Only a NEW id may trigger a refresh.
+    /// </summary>
+    [Test]
+    public void IdentityChanged_ADeclinedBillingIdIsNotAChange_NoRefreshStorm()
+    {
+        var declined = new InstallSession.TokenClaims { AppUserId = null };
+        Assert.IsFalse(SessionRefreshPolicy.IdentityChanged(declined, "rc-1", "rc-1"), "billingConflict: asked for rc-1, got none");
+        var kept = new InstallSession.TokenClaims { AppUserId = "rc-own" };
+        Assert.IsFalse(SessionRefreshPolicy.IdentityChanged(kept, "rc-other", "rc-other"), "asked for another install's id, kept our own");
+        Assert.IsTrue(SessionRefreshPolicy.IdentityChanged(declined, "rc-2", "rc-1"), "a different id than the declined one is asked for once");
     }
 }

@@ -127,6 +127,21 @@ public class AuthWiringGuardTests
             "ClearInstall() must sit directly under `if (SessionRefreshPolicy.ShouldDiscardInstall(op, status, N8nResponse.ErrorOf(body)))`");
     }
 
+    /// <summary>
+    /// R2 (2026-09-27): the freshness check must compare against the billing id the last session op ASKED for —
+    /// a server-declined id (billingConflict, u = null) must not trigger a refresh on every request.
+    /// </summary>
+    [Test]
+    public void EnsureSession_ComparesAgainstTheRequestedBillingId_AndRecordsIt()
+    {
+        string client = Code(Path.Combine(Scripts, "Auth/AuthClient.cs"));
+        Assert.IsTrue(client.Contains("SessionRefreshPolicy.IdentityChanged(Claims, BillingIdentity.AppUserId, PlayerPrefs.GetString(KeyRequestedBillingId"),
+            "EnsureSession must pass the last requested billing id");
+        Assert.IsTrue(client.Contains("PlayerPrefs.SetString(KeyRequestedBillingId, requested)") && client.Contains("[\"appUserId\"] = requested"),
+            "the id recorded as requested must be the one the session op sent");
+        Assert.IsTrue(client.Contains("jo.Value<bool?>(\"billingConflict\")"), "AuthClient must read billingConflict");
+    }
+
     [Test]
     public void SecretsShipOnlyTheRevenueCatPublicKeysAndTheBaseUrl()
     {

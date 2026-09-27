@@ -97,10 +97,15 @@ public static class SessionRefreshPolicy
         => claims == null || claims.Exp - nowUnix < LeadSeconds;
 
     /// <summary>
-    /// The billing identity the token was minted for no longer matches the one the client sends
-    /// (RevenueCat initialised after bootstrap, or an alias/transfer): the gates compare the two,
-    /// so the token must be re-issued before the next billing-bound call.
+    /// The client's billing identity changed since the token was requested (RevenueCat initialised after
+    /// bootstrap, or an alias/transfer): the gates compare the body's id with the token's, so the token must be
+    /// re-issued before the next billing-bound call. R2 (2026-09-27): the server binds a billing id to ONE install —
+    /// a token may carry no billing identity (u = null) because the id it was ASKED for is held by another install
+    /// (billingConflict) or is not a RevenueCat id. That is a server verdict, not a change: once a session op has
+    /// asked for <paramref name="currentAppUserId"/> (<paramref name="lastRequestedAppUserId"/>), asking again on
+    /// every call would only repeat it (a refresh storm of ~2 s round trips). The token's expiry refresh re-asks.
     /// </summary>
-    public static bool IdentityChanged(InstallSession.TokenClaims claims, string currentAppUserId)
-        => claims != null && !string.IsNullOrEmpty(currentAppUserId) && claims.AppUserId != currentAppUserId;
+    public static bool IdentityChanged(InstallSession.TokenClaims claims, string currentAppUserId, string lastRequestedAppUserId)
+        => claims != null && !string.IsNullOrEmpty(currentAppUserId) && claims.AppUserId != currentAppUserId
+           && currentAppUserId != lastRequestedAppUserId;
 }

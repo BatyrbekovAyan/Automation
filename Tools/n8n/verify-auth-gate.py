@@ -124,8 +124,13 @@ def check_session():
     assert "interval '1 minute') < 60" in ci, "bootstrap cap missing"
     vi = node(wf, "Verify Install")["parameters"]["query"]
     assert "secret_hash = $2" in vi and "revoked_at is null" in vi, "refresh must compare the secret hash and honour revocation"
+    # R2: a named billing id becomes the token's u only through billing_bindings (one install per RevenueCat id)
+    for q, label in ((ci, "Create Install"), (vi, "Verify Install")):
+        assert "insert into billing_bindings" in q and "billing_conflict" in q and "RCAnonymousID:" in q, f"R2: {label} must bind the billing id via billing_bindings"
+        assert "coalesce(nullif($3, ''), app_user_id)" not in q and "nullif($3, '')," not in q.split("insert into installs")[-1][:120], f"R2: {label} must not adopt the named id directly"
     assert "array_agg" in vi and "bot_profiles" in vi, "refresh must load ownership in the same statement"
     it = node(wf, "Issue Token")["parameters"]["jsCode"]
+    assert "billingConflict: !!row.billing_conflict" in it, "R2: the client must learn billingConflict"
     assert "crAuth.sign(" in it and "$env.CR_AUTH_SECRET" in it and "12 * 3600" in it.replace("43200", "12 * 3600"), "token must be signed with the env secret and carry a 12 h TTL"
     rt = node(wf, "Route")["parameters"]["jsCode"]
     assert "sha256Hex(out.installSecret)" in rt and "randomSecret(32)" in rt, "bootstrap must mint and hash the install secret server-side"

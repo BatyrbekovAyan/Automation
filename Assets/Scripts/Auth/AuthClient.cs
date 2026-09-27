@@ -21,6 +21,8 @@ public class AuthClient : MonoBehaviour
     public const string KeyInstallId = "CrAuth.InstallId";
     public const string KeyInstallSecret = "CrAuth.InstallSecret";
     public const string KeyToken = "CrAuth.Token";
+    /// <summary>The billing id the last successful bootstrap/refresh ASKED for (R2: the server may decline it).</summary>
+    public const string KeyRequestedBillingId = "CrAuth.RequestedBillingId";
     public const string Path = "/webhook/AuthSession";
     public const int RequestTimeoutSeconds = 30;
 
@@ -45,6 +47,12 @@ public class AuthClient : MonoBehaviour
     public bool HasInstall => !SessionRefreshPolicy.NeedsBootstrap(InstallId, PlayerPrefs.GetString(KeyInstallSecret, ""));
     /// <summary>Last session op failed (network / server) — callers may retry later; nothing is wiped.</summary>
     public string LastError { get; private set; }
+    /// <summary>
+    /// R2: the server declined the billing id this install asked for because another install holds it — the token
+    /// carries no billing identity, so billing-bound calls (usage, suggestions, a new bot) are refused until it is
+    /// released (the holder revoked or without live bots). Not an identity change: no refresh is triggered by it.
+    /// </summary>
+    public bool BillingConflict { get; private set; }
 
     private bool _inFlight;
 
@@ -75,7 +83,7 @@ public class AuthClient : MonoBehaviour
         long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         bool fresh = HasInstall && !string.IsNullOrEmpty(Token)
                      && !SessionRefreshPolicy.ShouldRefresh(now, Claims)
-                     && !SessionRefreshPolicy.IdentityChanged(Claims, BillingIdentity.AppUserId);
+                     && !SessionRefreshPolicy.IdentityChanged(Claims, BillingIdentity.AppUserId, PlayerPrefs.GetString(KeyRequestedBillingId, ""));
         if (fresh) yield break;
         yield return RunSessionOp();
     }
@@ -95,10 +103,11 @@ public class AuthClient : MonoBehaviour
             string op = HasInstall ? "refresh" : "bootstrap";
             for (int attempt = 0; attempt < 2; attempt++)
             {
+                string requested = BillingIdentity.AppUserId ?? "";
                 var body = new JObject
                 {
                     ["op"] = op,
-                    ["appUserId"] = BillingIdentity.AppUserId ?? "",
+                    ["appUserId"] = requested,
                     ["platform"] = Application.platform.ToString(),
                     ["appVersion"] = Application.version,
                 };
@@ -131,6 +140,12 @@ public class AuthClient : MonoBehaviour
                     LastError = "bad session response";
                     Debug.LogWarning($"[AuthClient] {op}: unexpected response body");
                 }
+                else
+                {
+                    PlayerPrefs.SetString(KeyRequestedBillingId, requested);   // asked for; a declined id is not re-asked each call
+                    PlayerPrefs.Save();
+                    if (BillingConflict) Debug.LogWarning("[AuthClient] the billing id is held by another install — no billing identity on this token (billingConflict)");
+                }
                 yield break;
             }
         }
@@ -153,6 +168,7 @@ public class AuthClient : MonoBehaviour
             PlayerPrefs.SetString(KeyInstallSecret, secret);
         }
         AdoptToken(jo.Value<string>("token"));
+        BillingConflict = jo.Value<bool?>("billingConflict") == true;
         LastError = null;
         return true;
     }
@@ -162,6 +178,7 @@ public class AuthClient : MonoBehaviour
         PlayerPrefs.DeleteKey(KeyInstallId);
         PlayerPrefs.DeleteKey(KeyInstallSecret);
         PlayerPrefs.DeleteKey(KeyToken);
+        PlayerPrefs.DeleteKey(KeyRequestedBillingId);
         PlayerPrefs.Save();
         Token = "";
         Claims = null;

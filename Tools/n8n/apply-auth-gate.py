@@ -35,9 +35,13 @@ GATED = {
     # decodes them (patch_upload -> "Upload Fields Valid?"); the gate only has to carry the binary through (R3).
     "KoTuIlk4LMrlvnWI-Upload_File.json":            {"rule": {"workflows": ["whatsappWorkflowId", "telegramWorkflowId"], "legacy": True}},
     "ZTqpumOpL1rNDOp6-Delete_File.json":            {"rule": {"legacy": True}},
-    "lmjYsdNcQA2IE5rl-Delete_Bot_Files.json":       {"rule": {"profiles": ["waProfileId", "tgProfileId"], "workflows": ["botWaId", "botTgId"], "appUser": ["appUserId"], "legacy": True}},
-    "XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json": {"webhook": "Unity Webhook", "rule": {"profiles": ["WhatsappProfileId"], "workflows": ["TelegramWorkflowId"], "appUser": ["AppUserID"], "legacy": True}},
-    "Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json": {"webhook": "Unity Webhook", "rule": {"profiles": ["TelegramProfileId"], "workflows": ["WhatsappWorkflowId"], "appUser": ["AppUserID"], "legacy": True}},
+    # R2: DeleteBotFiles' appUserId is audit-only (the retire goes by profile id) — as a gated field it would lock a
+    # billing-conflicted install (u = null) out of deleting its own bot.
+    "lmjYsdNcQA2IE5rl-Delete_Bot_Files.json":       {"rule": {"profiles": ["waProfileId", "tgProfileId"], "workflows": ["botWaId", "botTgId"], "legacy": True}},
+    # R2: in session mode Create must name the token's own billing id — an empty AppUserID used to skip Ensure
+    # Subscriber / Count Channels / Register Profile and let the dialog quota fail open.
+    "XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json": {"webhook": "Unity Webhook", "rule": {"profiles": ["WhatsappProfileId"], "workflows": ["TelegramWorkflowId"], "appUser": ["AppUserID"], "appUserRequired": ["AppUserID"], "legacy": True}},
+    "Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json": {"webhook": "Unity Webhook", "rule": {"profiles": ["TelegramProfileId"], "workflows": ["WhatsappWorkflowId"], "appUser": ["AppUserID"], "appUserRequired": ["AppUserID"], "legacy": True}},
     "3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json": {"webhook": "Unity Webhook", "rule": {"workflows": ["WhatsappWorkflowId", "TelegramWorkflowId"], "legacy": True}},
     "TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json": {"webhook": "Unity Webhook", "rule": {"workflows": ["WhatsappWorkflowId", "TelegramWorkflowId"], "legacy": True}},
     "olmqWMfcFpCEcpiE-Support_Message.json":        {"rule": {"legacy": True}},

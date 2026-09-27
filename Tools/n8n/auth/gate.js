@@ -5,7 +5,10 @@
 // checks that every id the request names is owned by the token's install:
 //   RULE.profiles  — body fields whose value(s) must be ⊆ claims.p   (sentinels ''/'-1' pass)
 //   RULE.workflows — body fields whose value(s) must be ⊆ claims.w   (sentinels ''/'-1' pass)
-//   RULE.appUser   — body fields that must EQUAL claims.u when the token carries one
+//   RULE.appUser   — body fields that must EQUAL claims.u; a token WITHOUT a billing identity (u = null: the
+//                    id is held by another install or was not bindable) can name none (R2, 2026-09-27)
+//   RULE.appUserRequired — appUser fields that may not be empty/sentinel in session mode (Create WA/TG: an
+//                    empty AppUserID skipped the channel count and let the dialog quota fail open)
 //   RULE.legacy    — true: a request WITHOUT a token is admitted in `legacy` mode while
 //                    CR_AUTH_COMPAT_UNTIL lies in the future (old clients); false: 401
 // Output: the webhook item re-emitted — json AND binary: a Code node drops whatever it does not return,
@@ -36,9 +39,13 @@ const owned = (set, v) => listOf(v).every((x) => isSentinel(x) || (typeof x === 
 if (!deny && mode === 'session') {
   for (const f of RULE.profiles || []) if (!owned(claims.p, body[f])) { deny = 'forbidden:' + f; break; }
   if (!deny) for (const f of RULE.workflows || []) if (!owned(claims.w, body[f])) { deny = 'forbidden:' + f; break; }
-  if (!deny && claims.u) for (const f of RULE.appUser || []) {
+  if (!deny) for (const f of RULE.appUser || []) {
     const v = body[f];
-    if (!isSentinel(v) && String(v) !== claims.u) { deny = 'forbidden:' + f; break; }
+    if (isSentinel(v)) {
+      if ((RULE.appUserRequired || []).includes(f)) { deny = 'forbidden:' + f; break; }
+      continue;
+    }
+    if (!claims.u || String(v) !== claims.u) { deny = 'forbidden:' + f; break; }
   }
 }
 return [{ json: { ...wh, crAuth: {

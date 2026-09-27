@@ -58,6 +58,7 @@ with Case('R11 claim.* with a failed install lookup -> 503 db_unavailable (Claim
 # ---- the SQL must deliver the verdict: ONE row for every outcome, install_id NULL when the install is not valid ----
 SETUP = """create temp table installs (like public.installs including all);
 create temp table bot_profiles (like public.bot_profiles including all);
+create temp table billing_bindings (app_user_id text primary key, install_id text not null, bound_at timestamptz not null default now());
 insert into installs (install_id, secret_hash, app_user_id) values ('inst-ok', 'h-ok', null), ('inst-rev', 'h-rev', null);
 update installs set revoked_at = now() where install_id = 'inst-rev';
 insert into bot_profiles (profile_id, app_user_id, channel, owner_id) values ('wa-1', 'rc-1', 'whatsapp', 'inst-ok');"""

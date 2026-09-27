@@ -1,0 +1,47 @@
+# R2 after (server) — python3 Tools/n8n/tests/test_billing_identity.py (compat window CLOSED)
+PASS R2 B1: a second install naming a billing id another install holds (with a live bot) gets NO billing identity + billingConflict
+PASS R2 B2: a refresh naming another install's billing id does not move it (the caller keeps its own / nothing)
+PASS R2 B3: the holder's own repeated refresh is idempotent (no conflict)
+PASS R2 B4: a REVOKED holder releases the id — the next install that names it takes it over
+PASS R2 B5: a holder with NO live bot releases the id (recovery: claim the bots first, the billing id follows)
+PASS R2 B6: a device-id fallback is never bound (not a RevenueCat id) — no identity, no conflict; the RC id binds later
+PASS R2 B7: exactly one live install ever holds a billing id
+PASS R2 M1: the migration seed keeps ONE live holder per id (the most recently seen) and clears the others
+PASS R2 T1: Issue Token signs u = null and tells the client billingConflict
+PASS R2 G1/G2: a token WITHOUT a billing identity cannot name any billing id (GetUsage, SuggestReplies)
+PASS R2 G3/G4: a token with u = R passes its own id and refuses another
+PASS R2 G5: Create WA/TG refuse an EMPTY AppUserID in session mode (it skipped the channel count and the quota)
+PASS R2 G7: Delete Bot Files is not blocked by its audit-only appUserId (a conflicted install can still delete its bot)
+PASS R2 negative: verify-auth-gate.py rejects an Auth Session that adopts the named billing id directly
+
+14 pass, 0 fail
+
+# generators idempotent (second run = no diff)
+auth gate: OK
+auth workflows: up to date
+handoff workflows: OK
+test dialog: OK
+
+# migration applied to staging (pg.sh migrate): sql/2026-09-27-billing-bindings.sql
+t
+
+# staging e2e, compat window CLOSED (CR_AUTH_COMPAT_UNTIL=2000-01-01 at staging start): python3 Tools/n8n/staging/e2e-auth.py --compat-closed
+PASS  hooks_reject_foreign_ids (0.9s) — gated webhooks refuse owner B's ids on owner A's token (and refuse no token) before any side effect
+      {"setreplymode_foreign": 403, "setreplymode_own": 200, "setreplymode_notoken": 401, "dashboard_foreign": 403, "getusage_foreign": 403, "getusage_own": 200, "setworkflowstate_foreign": 403, "deletebotfiles_foreign": 403, "support_notoken": 401}  (token-less expected 401: compat CLOSED)
+--
+PASS  billing_id_first_bind (1.4s) — R2: a second install naming a billing id another install holds (with a live bot) gets NO billing identity + billingConflict — its GetUsage/Create/profile.add on that id are refused; the id follows only once the holder is revoked
+      second: appUserId=None conflict=True usage_own=200 usage_second=403 profile.add_second=409 {'success': False, 'error': 'no_billing_identity', 'detail': None} holders=True after_revoke=True/False
+PASS  create_rejects_empty_appuserid_in_session (1.2s) — R2: CreateWhatsappWorkflow/CreateTelegramWorkflow with an EMPTY AppUserID in session mode are refused before any write (the empty id skipped Count Channels and let the quota fail open)
+      wa=200 {'success': False, 'error': 'unauthorized', 'reason': 'forbidden:AppUserID'} tg=200 {'success': False, 'error': 'unauthorized', 'reason': 'forbidden:AppUserID'} clones_bound=0
+23 pass, 0 fail
+
+# staging e2e, compat open (normal): e2e-auth
+23 pass, 0 fail
+# e2e-test-dialog 4/4, e2e-suggest 6/6 (after the fixture ids became unique per owner), e2e-handoff 12/2 (the same two scenarios fail at baseline: evidence/baseline-e2e-handoff.txt)
+
+# client — Tools/run-tests-headless.sh 'Auth|Claim|Install|Session|Billing|Upload|Usage'
+================ EditMode test results (headless) ================
+  result=Passed  total=320  passed=320  failed=0  skipped=0  inconclusive=0
+=================================================================
+GREEN ✅  all 320 tests passed.
+exit=0

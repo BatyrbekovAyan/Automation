@@ -130,8 +130,11 @@ class PgSession:
     def _run(self, sql):
         self.n += 1
         mark = f'__HARNESS_END_{self.n}__'
-        self.p.stdin.write(sql + '\n\\echo ' + mark + '\n')
-        self.p.stdin.flush()
+        try:
+            self.p.stdin.write(sql + '\n\\echo ' + mark + '\n')
+            self.p.stdin.flush()
+        except BrokenPipeError:
+            raise RuntimeError('psql had already exited (an earlier statement failed): ' + self.p.stdout.read()[-2000:])
         out = []
         while True:
             line = self.p.stdout.readline()
@@ -147,7 +150,14 @@ class PgSession:
 
     def q(self, sql):
         body = sql.strip().rstrip(';')
-        txt = self._run(f"with __r as ({body}) select coalesce(json_agg(__r), '[]'::json) from __r;")
+        first = re.sub(r'^(\s*--[^\n]*\n)*\s*', '', body).split(None, 1)[0].lower() if body else ''
+        if first in ('with', 'select'):
+            # a WITH that holds a data-modifying CTE must stay top level: materialise it instead of nesting it
+            self.n += 1
+            t = f'__harness_q{self.n}'
+            txt = self._run(f"create temp table {t} as {body};\nselect coalesce(json_agg({t}), '[]'::json) from {t};\ndrop table {t};")
+        else:
+            txt = self._run(f"with __r as ({body}) select coalesce(json_agg(__r), '[]'::json) from __r;")
         return json.loads(txt) if txt else []
 
     def x(self, sql):
@@ -155,9 +165,13 @@ class PgSession:
 
     def close(self):
         try:
-            self._run('discard temp;')
+            if self.p.poll() is None:
+                self._run('discard temp;')
         finally:
-            self.p.stdin.close()
+            try:
+                self.p.stdin.close()
+            except BrokenPipeError:
+                pass
             self.p.wait()
 
     def __enter__(self):
