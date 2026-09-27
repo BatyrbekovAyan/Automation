@@ -252,9 +252,17 @@ with Case('D1 draft moved in the editor (positions only) while the published gra
     code, out, rep = verify(inst)
     c.check(code == 0 and canon_row(rep, SET_REPLY)['status'] == 'OK', f'exit {code}: {canon_row(rep, SET_REPLY)}')
 
+def staged(d, w):
+    """A canonical workflow exactly as derive-staging.py deploys it to staging: hosts derived AND (R3, 2026-09-27)
+    the Supabase writers neutralised."""
+    x = json.loads(d.derive_file(json.dumps(w, ensure_ascii=False)))
+    d.isolate_supabase_writers(x)
+    return x
+
+
 with Case('D1 staging base: derived set, Support Message left unbound ON PURPOSE, a staging bot clone -> exit 0; inactive webhook still -> 2') as c:
     d = derive_module()
-    inst = {wid: deployed(json.loads(d.derive_file(json.dumps(w, ensure_ascii=False))), active=wid not in TEMPLATE_IDS.values())
+    inst = {wid: deployed(staged(d, w), active=wid not in TEMPLATE_IDS.values())
             for wid, w in CANON.items()}
     bot = create_style_clone('whatsapp', 'stgwa1234567890a', 'Staging WA', 'stgwa001')
     inst[bot['id']] = deployed(json.loads(d.derive_file(json.dumps(bot, ensure_ascii=False))), active=True)
@@ -263,6 +271,14 @@ with Case('D1 staging base: derived set, Support Message left unbound ON PURPOSE
     inst[PROXY] = deployed(inst[PROXY], active=False)
     code, out, rep = verify(inst, base='http://localhost:5678')
     c.check(code == 2 and canon_row(rep, PROXY)['status'] != 'OK', f'exit {code}: {canon_row(rep, PROXY)}')
+
+with Case('R3 NEG staging base: an Upload File copy that still WRITES to the real Supabase (writers not neutralised) -> DIFF, exit 2') as c:
+    d = derive_module()
+    inst = {wid: deployed(staged(d, w), active=wid not in TEMPLATE_IDS.values()) for wid, w in CANON.items()}
+    upload_id = 'KoTuIlk4LMrlvnWI'
+    inst[upload_id] = deployed(json.loads(d.derive_file(json.dumps(CANON[upload_id], ensure_ascii=False))), active=True)
+    code, out, rep = verify(inst, base='http://localhost:5678')
+    c.check(code == 2 and canon_row(rep, upload_id)['status'] != 'OK', f'exit {code}: {canon_row(rep, upload_id)}')
 
 # ---------------------------------------------------------------------------------------------- negative cases
 with Case('D1 NEG forged correct sticky on a drifted clone graph -> BEHIND, «sticky claims … graph is …», exit 2') as c:

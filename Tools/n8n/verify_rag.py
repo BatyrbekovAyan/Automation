@@ -101,9 +101,15 @@ def check_upload_no_put_chain():
     for d in PUT_CHAIN:
         assert d not in wf["connections"], f"{UPLOAD}: connection for {d} not pruned"
     ext_tg = wf["connections"]["Extract Telegram Workflow Id"]["main"][0]
+    if any(l["node"] == "Upload Fields Valid?" for l in ext_tg):
+        # R3 (2026-09-27): the decoded multipart ids are validated first; the fan-out is the check's
+        # TRUE branch, and nothing may leave Extract Telegram Workflow Id around it.
+        assert [l["node"] for l in ext_tg] == ["Upload Fields Valid?"], \
+            f"Extract Telegram Workflow Id must feed ONLY Upload Fields Valid?: {ext_tg}"
+        ext_tg = wf["connections"]["Upload Fields Valid?"]["main"][0]
     targets = {(l["node"], l.get("index", 0)) for l in ext_tg}
     assert ("Switch", 0) in targets and ("Merge", 1) in targets, \
-        f"Extract Telegram Workflow Id must feed Switch and Merge(1): {targets}"
+        f"the id-extraction path must feed Switch and Merge(1): {targets}"
 
 
 def check_upload_response():

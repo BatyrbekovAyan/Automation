@@ -10,8 +10,8 @@ Pins, per canonical JSON:
     executions of successful calls not stored;
   * Auth Session: bootstrap cap, secret hash compare, single-round-trip refresh, token TTL;
   * bot templates: the callback binding condition (profile_id == webhook path);
-  * Upload File registers uploads BEFORE the ingest chain; Delete File deletes chunks and storage
-    only when `allowed`;
+  * Upload File validates the decoded multipart ids (session ownership, GUID fileId) and only then registers
+    the upload BEFORE the ingest chain; Delete File deletes chunks and storage only when `allowed`;
   * the Set Workflow State protected list carries the two new infra ids.
 
     python3 Tools/n8n/verify-auth-gate.py            # committed workflows/
@@ -133,11 +133,27 @@ def check_bots():
         print(f"OK  {f} (callback bound to the registered profile)")
 
 
-def check_files():
+def check_files(mig):
     up = load("KoTuIlk4LMrlvnWI-Upload_File.json")
     reg = node(up, "Register Upload")
     assert "insert into uploaded_files" in reg["parameters"]["query"]
-    assert edges(up, "Extract Telegram Workflow Id")[0] == {"node": "Register Upload", "type": "main", "index": 0}, "Register Upload must be the FIRST branch (runs before the ingest chain)"
+    # R3 (2026-09-27): the multipart ids are binary parts the gate cannot see — they are validated right after
+    # decoding (ownership in session mode, GUID fileId), BEFORE the registry write and the ingest fan-out.
+    assert edges(up, "Extract Telegram Workflow Id") == [{"node": "Upload Fields Valid?", "type": "main", "index": 0}], \
+        f"the decoded multipart fields must pass Upload Fields Valid? before anything else: {edges(up, 'Extract Telegram Workflow Id')}"
+    cond = node(up, "Upload Fields Valid?")["parameters"]["conditions"]["conditions"]
+    assert len(cond) == 1 and cond[0]["leftValue"] == mig.UPLOAD_FIELDS_VALID and cond[0]["operator"]["operation"] == "true", "Upload Fields Valid? condition is stale"
+    true_branch = edges(up, "Upload Fields Valid?", 0)
+    assert true_branch and true_branch[0] == {"node": "Register Upload", "type": "main", "index": 0}, "Register Upload must be the FIRST branch (runs before the ingest chain)"
+    assert {c["node"] for c in true_branch} >= {"Switch", "Merge"}, f"the ingest fan-out must hang off the check's true branch: {true_branch}"
+    assert edges(up, "Upload Fields Valid?", 1) == [{"node": "Respond Upload Forbidden", "type": "main", "index": 0}], "a refused upload must end at Respond Upload Forbidden"
+    assert node(up, "Respond Upload Forbidden")["parameters"]["options"].get("responseCode") == 403
+    assert reg["parameters"]["options"]["queryReplacement"] == mig.REGISTER_UPLOAD_PARAMS, "Register Upload must read the decoded values from the nodes that decoded them"
+    for src, outs in up["connections"].items():
+        for out in outs.get("main", []):
+            for c in out:
+                if c["node"] in ("Register Upload", "Switch", "Store Original File") and src not in ("Upload Fields Valid?", "Switch"):
+                    raise AssertionError(f"{src} -> {c['node']} bypasses Upload Fields Valid?")
     df = load("ZTqpumOpL1rNDOp6-Delete_File.json")
     q = node(df, "Delete File Chunks")["parameters"]["query"]
     assert "uploaded_files" in q and 'AS "allowed"' in q and "EXISTS (SELECT 1 FROM own)" in q, "Delete File Chunks must be owner-scoped and report allowed"
@@ -171,7 +187,7 @@ def main():
     WF = ap.parse_args().dir
     mig = load_migration()
     try:
-        check_gated(mig); check_proxy(); check_session(); check_bots(); check_files(); check_create(); check_protected()
+        check_gated(mig); check_proxy(); check_session(); check_bots(); check_files(mig); check_create(); check_protected()
     except AssertionError as e:
         print(f"AUTH GATE FAIL: {e}")
         sys.exit(1)

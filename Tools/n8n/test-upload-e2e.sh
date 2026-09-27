@@ -15,8 +15,11 @@ set -uo pipefail
 
 BASE="${1:-http://localhost:5678}"
 STAMP="$(date +%s)"
-FILE_ID_1="e2e-${STAMP}-lower"
-FILE_ID_2="e2e-${STAMP}-upper"
+# fileIds are GUIDs like the app's Guid.NewGuid(): since R3 (2026-09-27) Upload File refuses anything else
+# with 403 (the id is spliced into the storage URL).
+guid() { uuidgen | tr 'A-Z' 'a-z'; }
+FILE_ID_1="$(guid)"
+FILE_ID_2="$(guid)"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 FAILS=0
@@ -52,7 +55,7 @@ code="$(upload "$FILE_ID_2" "$TMP_DIR/price.txt" "PRICE.TXT" "text/plain")"
 check "TXT upload" 200 "$code" '"success":true'
 
 echo "== 3. unsupported .foo → explicit 415 =="
-code="$(upload "e2e-${STAMP}-foo" "$TMP_DIR/price.foo" "price.foo" "application/octet-stream")"
+code="$(upload "$(guid)" "$TMP_DIR/price.foo" "price.foo" "application/octet-stream")"
 check "foo upload" 415 "$code" '"success":false'
 
 delete_file() { # $1=fileId

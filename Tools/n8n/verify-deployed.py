@@ -136,7 +136,8 @@ def main():
     ap.add_argument("--json")
     a = ap.parse_args()
     base = a.base.rstrip("/")
-    # On staging the deployed copies are DERIVED (hosts → mock/localhost): compare against the same derivation.
+    # On staging the deployed copies are DERIVED (hosts → mock/localhost, Supabase writers neutralised): compare
+    # against the same derivation.
     staging = "localhost" in base or "127.0.0.1" in base
     derive = None
     if staging:
@@ -148,6 +149,8 @@ def main():
         if f.endswith(".json"):
             text = open(os.path.join(WF, f), encoding="utf-8").read()
             wf = json.loads(derive.derive_file(text) if derive else text)
+            if derive:
+                derive.isolate_supabase_writers(wf)   # staging copies never write to the real Supabase (R3, derive-staging.py)
             canon[wf["id"]] = (f, wf)
     live = {w["id"]: w for w in uc.list_workflows(base)}
     report = {"base": base, "canonical": [], "clones": [], "archived": [], "unknown": []}

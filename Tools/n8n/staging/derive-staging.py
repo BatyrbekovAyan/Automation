@@ -12,6 +12,9 @@ could reach production or a real customer:
     binding is remapped to the credential named "Postgres Staging" and the run ABORTS if that
     credential does not exist (a staging set bound to the shared prod DB is the failure mode
     this guard exists for).
+  * nothing writes to the real Supabase project the staging `Supabase` credential points at: the vector-store
+    INSERT becomes an insert into the staging `documents` stub, Storage uploads/deletes become NoOps
+    (isolate_supabase_writers) and the run ABORTS if any writer is left (retrieval stays: read-only)
   * --bot wa:<profileId>[:<name>] / --bot tg:<profileId>[:<name>] additionally emits a STAGING
     BOT CLONE the way the Create handlers do (template + webhook path = profile id + name),
     with a deterministic id so re-runs upsert instead of multiplying workflows.
@@ -76,6 +79,72 @@ def staging_bot_id(channel, profile_id):
     return ("stg" + channel + h)[:16]
 
 
+SUPABASE_STORAGE = ".supabase.co/storage/"
+STAGING_DOCS_SQL = """-- STAGING ONLY (derive-staging.py): stands in for the Supabase Vector Store INSERT so an upload lands in the
+-- staging `documents` stub (staging/sql/2026-09-17-documents-stub.sql) instead of the real project; one row per
+-- upload (no splitting / embedding — nothing here calls OpenAI either).
+insert into documents (content, metadata) values ($1, $2::jsonb) returning id;"""
+
+
+def _expr_body(v):
+    """'={{ X }}' -> '(X)'; a literal -> its JSON literal (for composing one staging expression)."""
+    if isinstance(v, str) and v.startswith("={{") and v.rstrip().endswith("}}"):
+        return "(" + v.strip()[3:-2].strip() + ")"
+    return json.dumps(v, ensure_ascii=False)
+
+
+def isolate_supabase_writers(wf):
+    """The staging instance carries the dev account's `Supabase` credential (service role on a REAL project), and
+    Upload File / Delete File / Delete Bot Files WRITE through it (vector-store insert, storage upload/delete). A
+    staging run must never write test data there (remediation rule), so the writers are replaced here — staging
+    copies only, the canonical files are untouched:
+      * Supabase Vector Store in INSERT mode -> a Postgres insert into the staging `documents` stub carrying the
+        same metadata the Data Loader would stamp; its LangChain sub-nodes (embeddings, loader, splitter) go;
+      * every non-GET HTTP call to Supabase Storage -> a NoOp of the same name (connections stay valid).
+    Retrieval (load / retrieve-as-tool) stays: read-only, filtered by test bot ids no chunk carries (README)."""
+    nodes, conns = wf.get("nodes", []), wf.get("connections", {})
+    by_name = {n["name"]: n for n in nodes}
+    replaced = []
+    for n in list(nodes):
+        p = n.get("parameters") or {}
+        if n["type"] == "n8n-nodes-base.httpRequest" and SUPABASE_STORAGE in str(p.get("url", "")) and str(p.get("method", "GET")).upper() != "GET":
+            nodes[nodes.index(n)] = {"parameters": {}, "id": n["id"], "name": n["name"], "type": "n8n-nodes-base.noOp", "typeVersion": 1,
+                                     "position": n["position"], "notes": "STAGING: Supabase Storage write neutralised by derive-staging.py"}
+            replaced.append(n["name"])
+        elif n["type"] == "@n8n/n8n-nodes-langchain.vectorStoreSupabase" and p.get("mode") == "insert":
+            subs, frontier = set(), {n["name"]}
+            while frontier:                                   # every LangChain sub-node feeding this insert, transitively
+                nxt = set()
+                for src, outs in conns.items():
+                    for kind, lists in outs.items():
+                        if kind != "main" and any(c["node"] in frontier for out in lists for c in out) and src not in subs:
+                            nxt.add(src)
+                subs |= nxt
+                frontier = nxt
+            meta = {}
+            for s_name in subs:
+                for mv in (((by_name[s_name].get("parameters") or {}).get("options") or {}).get("metadata") or {}).get("metadataValues", []):
+                    meta[mv["name"]] = mv["value"]
+            meta_js = "{ " + ", ".join(f"{json.dumps(k)}: {_expr_body(v)}" for k, v in meta.items()) + " }"
+            nodes[nodes.index(n)] = {"parameters": {"operation": "executeQuery", "query": STAGING_DOCS_SQL,
+                                                    "options": {"queryReplacement": "={{ [ String($json.content || ''), JSON.stringify(" + meta_js + ") ] }}"}},
+                                     "id": n["id"], "name": n["name"], "type": "n8n-nodes-base.postgres", "typeVersion": 2.6,
+                                     "position": n["position"], "credentials": {"postgres": {"id": "vvRrFiEXzLVqKjOx", "name": "Postgres"}},
+                                     "notes": "STAGING: Supabase vector-store insert redirected to the staging documents stub by derive-staging.py"}
+            wf["nodes"] = nodes = [x for x in nodes if x["name"] not in subs]
+            for s_name in subs:
+                conns.pop(s_name, None)
+            replaced.append(n["name"] + f" (+{len(subs)} sub-nodes)")
+    return replaced
+
+
+def supabase_writers_left(wf):
+    return [n["name"] for n in wf.get("nodes", [])
+            if (n["type"] == "@n8n/n8n-nodes-langchain.vectorStoreSupabase" and (n.get("parameters") or {}).get("mode") in ("insert", "update"))
+            or (n["type"] == "n8n-nodes-base.httpRequest" and SUPABASE_STORAGE in str((n.get("parameters") or {}).get("url", ""))
+                and str((n.get("parameters") or {}).get("method", "GET")).upper() != "GET")]
+
+
 def derive_file(text):
     text = text.replace(CANON_HOST + "/api/v1", LOCAL_HOST + "/api/v1")
     text = text.replace(CANON_HOST + "/webhook/", LOCAL_HOST + "/webhook/")
@@ -108,6 +177,9 @@ def main():
         sources += [(STAGING_ONLY, f) for f in sorted(x for x in os.listdir(STAGING_ONLY) if x.endswith(".json"))]
     for src_dir, f in sources:
         wf = json.loads(derive_file(open(os.path.join(src_dir, f), encoding="utf-8").read()))
+        isolated_writers = isolate_supabase_writers(wf)
+        if isolated_writers:
+            print(f"staging isolation: {f}: {isolated_writers}")
         for node in wf.get("nodes", []):
             remap(node, creds, missing)
         wf["active"] = False
@@ -115,6 +187,8 @@ def main():
         for forbidden in (CANON_HOST, WAPPI, "wappi.pro"):
             if forbidden in text:
                 sys.exit(f"REFUSED: {f} still references {forbidden} after derivation")
+        if supabase_writers_left(wf):
+            sys.exit(f"REFUSED: {f} would still WRITE to the real Supabase project: {supabase_writers_left(wf)}")
         with open(os.path.join(OUT, f), "w", encoding="utf-8") as fh:
             json.dump(wf, fh, indent=2, ensure_ascii=False)
         manifest["files"].append(f)

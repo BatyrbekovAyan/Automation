@@ -289,6 +289,34 @@ def hook_form(name, token, fields, timeout=120):
             return e.code, raw
 
 
+def wwwform(fields, file_field, file_name, file_bytes, file_mime):
+    """multipart exactly as Unity's WWWForm builds it: every AddField part carries `Content-Type: text/plain`, so
+    n8n files it under item.binary (not body) — the shape Upload File's Extract readers depend on."""
+    boundary = "----crWWW" + uuid.uuid4().hex
+    body = b""
+    for k, v in fields.items():
+        body += (f"--{boundary}\r\nContent-Type: text/plain; charset=\"utf-8\"\r\nContent-disposition: form-data; name=\"{k}\"\r\n\r\n").encode() + str(v).encode("utf-8") + b"\r\n"
+    body += (f"--{boundary}\r\nContent-Type: {file_mime}\r\nContent-disposition: form-data; name=\"{file_field}\"; filename=\"{file_name}\"\r\n\r\n").encode() + file_bytes + b"\r\n"
+    body += f"--{boundary}--\r\n".encode()
+    return body, f"multipart/form-data; boundary={boundary}"
+
+
+def upload(token, fields, text, name="price.txt", timeout=120):
+    body, ctype = wwwform(fields, "data", name, text.encode("utf-8"), "text/plain")
+    req = urllib.request.Request(f"{BASE}/webhook/UploadFile", data=body, method="POST",
+                                 headers={"Content-Type": ctype, **({"Authorization": f"Bearer {token}"} if token else {})})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            raw = r.read().decode()
+            return r.status, (json.loads(raw) if raw else None)
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode()
+        try:
+            return e.code, json.loads(raw)
+        except Exception:
+            return e.code, raw
+
+
 def pg(sqltext):
     return subprocess.run([os.path.join(HERE, "pg.sh"), "psql", "-tAc", sqltext], capture_output=True, text=True).stdout.strip()
 
@@ -395,6 +423,37 @@ def sweep_stale_mock_profiles():
     if live is None:
         raise SystemExit(f"Wappi mock not reachable at {MOCK} ({st})")
     print("   pre-run:", fixture("sweep-mock-profiles", *[x for p in live for x in ("--live", p)]))
+
+
+@scenario("upload_price_list_multipart", "R3: a real .txt price list sent the way WWWForm sends it passes the gate with its file, reaches extraction (a staging `documents` row with the text + the bot's ids) and is registered with the decoded values; a foreign workflow id or a non-GUID fileId is 403 before any write")
+def s_upload(ctx):
+    u = fresh_owner(ctx, "up")
+    wf_own = ("wfup" + ctx["run_id"])[:16]
+    pid = u.profiles[0]
+    pg(f"update bot_profiles set workflow_id = '{wf_own}' where profile_id = '{pid}' and owner_id = '{u.install_id}';")   # as Bind Workflow Id would after Create
+    d0 = u.refresh()
+    if wf_own not in d0.get("workflows", []):
+        return False, f"fixture: token lacks the bot's workflow id: {d0.get('workflows')}"
+    ids = [str(uuid.uuid4()) for _ in range(4)]
+    text = f"Прайс e2e {ctx['run_id']}\nТовар А — 1000 ₸\nТовар Б — 2500 ₸\n"
+    base = {"telegramWorkflowId": "-1", "contentType": "products"}
+    try:
+        st1, d1 = upload(u.token, {**base, "whatsappWorkflowId": wf_own, "fileId": ids[0]}, text)
+        st2, d2 = upload(u.token, {**base, "whatsappWorkflowId": "wfNotMine000001", "fileId": ids[1]}, text)
+        st3, d3 = upload(u.token, {**base, "whatsappWorkflowId": wf_own, "fileId": "../other-bucket/" + ids[2]}, text)
+        st4, d4 = upload(None, {**base, "whatsappWorkflowId": wf_own, "fileId": ids[3]}, text)   # legacy (compat open) / 401 (closed)
+        reg = pg(f"select coalesce(owner_id, '-') || '|' || coalesce(bot_wa_id, '-') || '|' || coalesce(bot_tg_id, '-') || '|' || content_type || '|' || file_name from uploaded_files where file_id = '{ids[0]}';")
+        doc = pg(f"select (content like '%Товар Б — 2500 ₸%') || '|' || (metadata->>'botWaId') || '|' || (metadata->>'botTgId') || '|' || (metadata->>'fileId') from documents where metadata->>'fileId' = '{ids[0]}';")
+        refused = pg(f"select (select count(*) from uploaded_files where file_id in ('{ids[1]}', '{ids[2]}')) + (select count(*) from documents where metadata->>'fileId' in ('{ids[1]}', '{ids[2]}'));")
+        legacy_reg = pg(f"select coalesce(owner_id, '-') from uploaded_files where file_id = '{ids[3]}';")
+    finally:
+        pg(f"delete from documents where metadata->>'fileId' in ({', '.join(repr(i) for i in ids)}); delete from uploaded_files where file_id in ({', '.join(repr(i) for i in ids)});")
+    legacy_ok = (st4 == 401 and legacy_reg == "") if COMPAT_CLOSED else (st4 == 200 and legacy_reg == "-")
+    ok = (st1 == 200 and (d1 or {}).get("success") is True and (d1 or {}).get("fileId") == ids[0]
+          and reg == f"{u.install_id}|{wf_own}|-|products|price.txt" and doc == f"true|{wf_own}|-1|{ids[0]}"
+          and st2 == 403 and st3 == 403 and refused == "0" and legacy_ok)
+    return ok, (f"own={st1} {d1} registry={reg!r} extracted_doc={doc!r} foreign_wf={st2} pathlike_fileid={st3} refused_rows={refused} "
+                f"legacy={st4} legacy_registry={legacy_reg!r}")
 
 
 def main():

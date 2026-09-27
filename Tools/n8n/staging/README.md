@@ -14,7 +14,11 @@ dev-инстанс n8n (`~/.n8n`) для этого НЕ подходит: ег�
 
 Что НЕ изолировано (осознанно): OpenAI (реальный ключ dev-инстанса, копейки за прогон) и RAG-ретривер
 (реальная Supabase через API-cred, ТОЛЬКО чтение с тестовыми bot-id, которым не соответствует ни один
-chunk — фильтр по `botWaId/botTgId`). Upload File в staging не гоняем.
+chunk — фильтр по `botWaId/botTgId`). ПИСАТЬ в настоящую Supabase staging не может (R3, 2026-09-27):
+`derive-staging.py` (`isolate_supabase_writers`) заменяет в staging-копиях вставку в векторное хранилище
+Upload File на вставку в staging-таблицу `documents` (без эмбеддингов), а запись/удаление в Storage
+(Store Original File, оба Delete Stored Original) — на NoOp, и отказывает, если писатель остался.
+Поэтому загрузка прайса гоняется сквозным сценарием `e2e-auth.py upload_price_list_multipart`.
 
 ## Подъём (один раз)
 ```bash

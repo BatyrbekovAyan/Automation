@@ -8,11 +8,15 @@
 //   RULE.appUser   — body fields that must EQUAL claims.u when the token carries one
 //   RULE.legacy    — true: a request WITHOUT a token is admitted in `legacy` mode while
 //                    CR_AUTH_COMPAT_UNTIL lies in the future (old clients); false: 401
-// Output: the webhook item re-emitted with `crAuth` = { ok, mode, reason, installId, appUserId,
-// profiles, workflows, claimPending } so downstream nodes can read the verified identity.
+// Output: the webhook item re-emitted — json AND binary: a Code node drops whatever it does not return,
+// and a multipart upload's parts (Unity WWWForm files even its text fields there) live in `binary`
+// (R3, 2026-09-27) — with `crAuth` = { ok, mode, reason, installId, appUserId, profiles, workflows,
+// claimPending } so downstream nodes can read the verified identity. The gate sees `body` only, so
+// ids that arrive as multipart parts are checked by the workflow after it decodes them.
 // __CRAUTH_TOKEN__
 const RULE = __RULE__;
-const wh = $input.first().json;
+const inItem = $input.first();
+const wh = inItem.json;
 const secrets = [$env.CR_AUTH_SECRET, $env.CR_AUTH_SECRET_PREV];
 const compatUntil = Date.parse($env.CR_AUTH_COMPAT_UNTIL || '') || 0;
 const nowMs = Date.now();
@@ -41,4 +45,4 @@ return [{ json: { ...wh, crAuth: {
   ok: !deny, mode, reason: deny,
   installId: claims ? claims.i : null, appUserId: claims ? claims.u : null,
   profiles: claims ? claims.p : [], workflows: claims ? claims.w : [], claimPending: claims ? (claims.c || []) : [],
-} }, pairedItem: { item: 0 } }];
+} }, ...(inItem.binary ? { binary: inItem.binary } : {}), pairedItem: { item: 0 } }];

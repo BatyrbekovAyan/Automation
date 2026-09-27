@@ -30,7 +30,10 @@ GATED = {
     "9PTyYcelRQI7bGDb-Suggest_Replies.json":        {"rule": {"profiles": ["profileId"], "workflows": ["botWaId", "botTgId"], "appUser": ["appUserId"], "legacy": True}},
     "2htWSV5IHO8E2CgB-Dashboard_Outcomes.json":     {"rule": {"profiles": ["profileIds"], "legacy": True}},
     "jtbssfzXbOxwTK4k-Get_Usage.json":              {"rule": {"appUser": ["appUserId"], "legacy": True}},
-    "KoTuIlk4LMrlvnWI-Upload_File.json":            {"rule": {"workflows": ["whatsappWorkflowId", "telegramWorkflowId"], "binaryFields": ["whatsappWorkflowId", "telegramWorkflowId", "fileId"], "legacy": True}},
+    # Upload File is multipart: Unity's WWWForm files even its TEXT fields as binary parts, so `body` is empty
+    # and the gate's RULE cannot see them. Their ownership + the fileId shape are checked AFTER the Extract chain
+    # decodes them (patch_upload -> "Upload Fields Valid?"); the gate only has to carry the binary through (R3).
+    "KoTuIlk4LMrlvnWI-Upload_File.json":            {"rule": {"workflows": ["whatsappWorkflowId", "telegramWorkflowId"], "legacy": True}},
     "ZTqpumOpL1rNDOp6-Delete_File.json":            {"rule": {"legacy": True}},
     "lmjYsdNcQA2IE5rl-Delete_Bot_Files.json":       {"rule": {"profiles": ["waProfileId", "tgProfileId"], "workflows": ["botWaId", "botTgId"], "appUser": ["appUserId"], "legacy": True}},
     "XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json": {"webhook": "Unity Webhook", "rule": {"profiles": ["WhatsappProfileId"], "workflows": ["TelegramWorkflowId"], "appUser": ["AppUserID"], "legacy": True}},
@@ -48,6 +51,27 @@ REGISTER_UPLOAD_SQL = """-- A1: ownership registry for price-list files (the chu
 insert into uploaded_files (file_id, owner_id, bot_wa_id, bot_tg_id, content_type, file_name)
 values ($1, nullif($2, ''), nullif(nullif($3, ''), '-1'), nullif(nullif($4, ''), '-1'), $5, $6)
 on conflict (file_id) do update set owner_id = coalesce(uploaded_files.owner_id, excluded.owner_id), deleted_at = null;"""
+
+# R3: Extract From File (text, options.keepSource unset) emits ONLY its destination key in json, so at
+# "Extract Telegram Workflow Id" `$json` is {telegramWorkflowId}: every other decoded part is read from the node
+# that decoded it (a `$json.fileId` here is undefined -> SQL NULL file_id -> the insert failed silently).
+REGISTER_UPLOAD_PARAMS = ("={{ [ $('Extract File Id').first().json.fileId, ($('Auth Gate').first().json.crAuth.installId || ''), "
+                          "($('Extract Whatsapp Workflow Id').first().json.whatsappWorkflowId || ''), ($json.telegramWorkflowId || ''), "
+                          "($('Extract Content Type').first().json.contentType || ''), "
+                          "((($('Get File Name').first().binary || {}).data || {}).fileName || '') ] }}")
+
+# R3: the multipart ids the gate cannot see. fileId must be a client-minted GUID in EVERY mode (it is spliced
+# into the service-role storage URL — nothing path-like; every shipped client sends Guid.NewGuid()); in session
+# mode each workflow id must be a sentinel (''/'-1', like the gate) or one the token owns. One boolean on an
+# If node: an If passes the item through untouched, binary included, and nothing with a side effect runs
+# before it. (No regex quantifier braces: `}}` would end the n8n expression early.)
+UPLOAD_FIELDS_VALID = ("={{ ((f) => f.length === 36 && /^[0-9a-f-]+$/i.test(f) && f.split('-').map((p) => p.length).join() === '8,4,4,4,12')"
+                       "(String($('Extract File Id').first().json.fileId || '')) && "
+                       "($('Auth Gate').first().json.crAuth.mode !== 'session' || "
+                       "[$('Extract Whatsapp Workflow Id').first().json.whatsappWorkflowId, $json.telegramWorkflowId]"
+                       ".every((v) => v === undefined || v === null || v === '' || v === '-1' || "
+                       "($('Auth Gate').first().json.crAuth.workflows || []).includes(v))) }}")
+UPLOAD_FORBIDDEN_BODY = "={{ { \"success\": false, \"error\": \"forbidden\" } }}"
 
 DELETE_CHUNKS_SQL = """-- A1: owner-scoped delete. $1 fileId, $2 gate mode (session|legacy), $3 install id, $4 JSON array of
 -- the token's workflow ids. A session may delete a file it uploaded (uploaded_files) or, for a LEGACY
@@ -166,16 +190,36 @@ def gate_workflow(fname, cfg):
 
 
 def patch_upload(wf):
-    """Register every upload (side branch that runs first) — ownership for Delete File."""
+    """Validate the decoded multipart fields, then register every upload (the side branch that runs first —
+    ownership for Delete File) and only then ingest. Extract Telegram Workflow Id -> Upload Fields Valid?:
+    true -> [Register Upload, <the ingest fan-out>], false -> Respond Upload Forbidden (403)."""
+    tg = node(wf, "Extract Telegram Workflow Id")
     changed = ensure_node(wf, {"parameters": {"operation": "executeQuery", "query": REGISTER_UPLOAD_SQL,
-                                              "options": {"queryReplacement": "={{ [ $json.fileId, ($('Auth Gate').first().json.crAuth.installId || ''), $json.whatsappWorkflowId, $json.telegramWorkflowId, $json.contentType, ($json.fileName || '') ] }}"}},
+                                              "options": {"queryReplacement": REGISTER_UPLOAD_PARAMS}},
                                "id": nid("upload", "register"), "name": "Register Upload", "type": "n8n-nodes-base.postgres", "typeVersion": 2.6,
-                               "position": [node(wf, "Extract Telegram Workflow Id")["position"][0] + 200, node(wf, "Extract Telegram Workflow Id")["position"][1] - 220],
+                               "position": [tg["position"][0] + 200, tg["position"][1] - 220],
                                "credentials": {"postgres": dict(PG_CRED)}, "alwaysOutputData": True, "onError": "continueRegularOutput"})
+    changed |= ensure_node(wf, {"parameters": {"conditions": {"options": {"caseSensitive": True, "leftValue": "", "typeValidation": "loose", "version": 2},
+                                                              "conditions": [{"id": nid("upload", "fields-cond"), "leftValue": UPLOAD_FIELDS_VALID, "rightValue": "",
+                                                                              "operator": {"type": "boolean", "operation": "true", "singleValue": True}}],
+                                                              "combinator": "and"}, "options": {}},
+                                "id": nid("upload", "fields"), "name": "Upload Fields Valid?", "type": "n8n-nodes-base.if", "typeVersion": 2.2,
+                                "position": [tg["position"][0] + 100, tg["position"][1] + 220]})
+    changed |= ensure_node(wf, {"parameters": {"respondWith": "json", "responseBody": UPLOAD_FORBIDDEN_BODY, "options": {"responseCode": 403}},
+                                "id": nid("upload", "forbidden"), "name": "Respond Upload Forbidden", "type": "n8n-nodes-base.respondToWebhook", "typeVersion": 1.5,
+                                "position": [tg["position"][0] + 300, tg["position"][1] + 420]})
+    gate = [{"node": "Upload Fields Valid?", "type": "main", "index": 0}]
     outs = conn(wf, "Extract Telegram Workflow Id")[0]
-    reg = {"node": "Register Upload", "type": "main", "index": 0}
-    if not outs or outs[0] != reg:
-        outs[:] = [reg] + [c for c in outs if c["node"] != "Register Upload"]
+    if outs != gate:                                   # first run: the old fan-out moves behind the check
+        fanout = [c for c in outs if c["node"] not in ("Upload Fields Valid?", "Register Upload")]
+        wf["connections"]["Extract Telegram Workflow Id"] = {"main": [gate]}
+        changed = True
+    else:
+        fanout = [c for c in conn(wf, "Upload Fields Valid?")[0] if c["node"] != "Register Upload"]
+    want = {"main": [[{"node": "Register Upload", "type": "main", "index": 0}] + fanout,
+                     [{"node": "Respond Upload Forbidden", "type": "main", "index": 0}]]}
+    if wf["connections"].get("Upload Fields Valid?") != want:
+        wf["connections"]["Upload Fields Valid?"] = want
         changed = True
     return changed
 
@@ -266,6 +310,8 @@ def check_all():
         g = node(wf, "Auth Gate")
         if g is None or g["parameters"]["jsCode"] != gate_js(cfg["rule"]) or node(wf, "Authorized?") is None:
             bad.append(fname)
+        elif fname.startswith("KoTuIlk4LMrlvnWI") and patch_upload(json.loads(json.dumps(wf))):
+            bad.append(fname + " (upload field check / registry)")
     for fname in BOTS:
         wf = json.load(open(os.path.join(WF, fname), encoding="utf-8"))
         if not any(c.get("id") == "c0a11bac-0000-4000-8000-0000000000a1" for c in node(wf, "If")["parameters"]["conditions"]["conditions"]):

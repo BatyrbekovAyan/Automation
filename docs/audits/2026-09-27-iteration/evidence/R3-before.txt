@@ -1,0 +1,45 @@
+# R3 before — python3 Tools/n8n/tests/test_upload.py @ 30544fd1 (real n8n 2.36.7 modules from ~/.n8n-staging/app: Code result validation, Extract From File, binary helpers, tournament expressions)
+FAIL R3 legacy_own: the file survives the gate and reaches extraction + the vector-store insert
+      - chain failed: {'node': 'Extract File Id', 'message': "This operation expects the node's input data to contain a binary file 'fileId', but none was found [item 0]"} trace=['Webhook', 'Auth Gate', 'Authorized?', 'Get File Name', 'Set File Id', 'Extract File Id']
+      - gate output lost the file: {'ok': True, 'mode': 'legacy', 'reason': None, 'binaryKeys': []}
+      - Extract from TXT got None
+      - vector store input None
+      - Store Original File None
+FAIL R3 legacy_own: Register Upload receives the decoded values and the real SQL stores the row
+      - params None
+      - Register Upload must be the first side effect: []
+FAIL R3 session_own_wa: the file survives the gate and reaches extraction + the vector-store insert
+      - chain failed: {'node': 'Extract File Id', 'message': "This operation expects the node's input data to contain a binary file 'fileId', but none was found [item 0]"} trace=['Webhook', 'Auth Gate', 'Authorized?', 'Get File Name', 'Set File Id', 'Extract File Id']
+      - gate output lost the file: {'ok': True, 'mode': 'session', 'reason': None, 'binaryKeys': []}
+      - Extract from TXT got None
+      - vector store input None
+      - Store Original File None
+FAIL R3 session_own_wa: Register Upload receives the decoded values and the real SQL stores the row
+      - params None
+      - Register Upload must be the first side effect: []
+FAIL R3 session_own_both: the file survives the gate and reaches extraction + the vector-store insert
+      - chain failed: {'node': 'Extract File Id', 'message': "This operation expects the node's input data to contain a binary file 'fileId', but none was found [item 0]"} trace=['Webhook', 'Auth Gate', 'Authorized?', 'Get File Name', 'Set File Id', 'Extract File Id']
+      - gate output lost the file: {'ok': True, 'mode': 'session', 'reason': None, 'binaryKeys': []}
+      - Extract from TXT got None
+      - vector store input None
+      - Store Original File None
+FAIL R3 session_own_both: Register Upload receives the decoded values and the real SQL stores the row
+      - params None
+      - Register Upload must be the first side effect: []
+FAIL R3 session_foreign_wa: a WhatsApp workflow id the token does not own is refused with 403 before ANY write
+      - chain failed instead of refusing: {'node': 'Extract File Id', 'message': "This operation expects the node's input data to contain a binary file 'fileId', but none was found [item 0]"}
+      - response None
+FAIL R3 session_foreign_tg: a Telegram workflow id the token does not own is refused with 403 before ANY write
+      - chain failed instead of refusing: {'node': 'Extract File Id', 'message': "This operation expects the node's input data to contain a binary file 'fileId', but none was found [item 0]"}
+      - response None
+FAIL R3 session_pathlike_fileid: a fileId that is not a GUID (it is spliced into the service-role storage URL) is refused with 403 before ANY write
+      - chain failed instead of refusing: {'node': 'Extract File Id', 'message': "This operation expects the node's input data to contain a binary file 'fileId', but none was found [item 0]"}
+      - response None
+FAIL R3 legacy_pathlike_fileid: a non-GUID fileId in legacy mode too is refused with 403 before ANY write
+      - chain failed instead of refusing: {'node': 'Extract File Id', 'message': "This operation expects the node's input data to contain a binary file 'fileId', but none was found [item 0]"}
+      - response None
+PASS R3 compat window closed: a token-less upload is 401 and nothing runs
+FAIL R3 gate contract: every generated Auth Gate re-emits the input binary (no webhook can lose a file)
+      - gate drops binary in ['0DP79STI3pafXO9B-Set_Workflow_State.json', '2htWSV5IHO8E2CgB-Dashboard_Outcomes.json', '3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json', '9PTyYcelRQI7bGDb-Suggest_Replies.json', 'KoTuIlk4LMrlvnWI-Upload_File.json', 'SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json', 'TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json', 'Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json', 'XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json', 'ZTqpumOpL1rNDOp6-Delete_File.json', 'crHandoffsApi001-Handoffs.json', 'crTestDialog0001-Test_Dialog.json', 'crWappiProxy0001-Wappi_Proxy.json', 'jtbssfzXbOxwTK4k-Get_Usage.json', 
+
+1 pass, 11 fail

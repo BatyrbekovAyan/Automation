@@ -1,0 +1,38 @@
+# R3 after — python3 Tools/n8n/tests/test_upload.py (real n8n 2.36.7 modules)
+PASS R3 legacy_own: the file survives the gate and reaches extraction + the vector-store insert
+PASS R3 legacy_own: Register Upload receives the decoded values and the real SQL stores the row
+PASS R3 session_own_wa: the file survives the gate and reaches extraction + the vector-store insert
+PASS R3 session_own_wa: Register Upload receives the decoded values and the real SQL stores the row
+PASS R3 session_own_both: the file survives the gate and reaches extraction + the vector-store insert
+PASS R3 session_own_both: Register Upload receives the decoded values and the real SQL stores the row
+PASS R3 session_foreign_wa: a WhatsApp workflow id the token does not own is refused with 403 before ANY write
+PASS R3 session_foreign_tg: a Telegram workflow id the token does not own is refused with 403 before ANY write
+PASS R3 session_pathlike_fileid: a fileId that is not a GUID (it is spliced into the service-role storage URL) is refused with 403 before ANY write
+PASS R3 legacy_pathlike_fileid: a non-GUID fileId in legacy mode too is refused with 403 before ANY write
+PASS R3 compat window closed: a token-less upload is 401 and nothing runs
+PASS R3 negative: verify-auth-gate.py rejects the pre-R3 wiring (no field check) and the binary-dropping gate
+PASS R3 negative: verify_rag.py rejects an ingest edge that bypasses Upload Fields Valid?
+PASS R3 staging isolation: the derived staging copies can no longer write to the real Supabase project
+PASS R3 gate contract: every generated Auth Gate re-emits the input binary (no webhook can lose a file)
+
+15 pass, 0 fail
+
+# staging e2e (n8n 2.36.7 + task runners, Supabase writers neutralised by derive-staging): python3 Tools/n8n/staging/e2e-auth.py --only upload
+   pre-run: swept 0 stale mock profile(s) (live mock knows 0)
+PASS  upload_price_list_multipart (2.2s) — R3: a real .txt price list sent the way WWWForm sends it passes the gate with its file, reaches extraction (a staging `documents` row with the text + the bot's ids) and is registered with the decoded values; a foreign workflow id or a non-GUID fileId is 403 before any write
+      own=200 {'success': True, 'fileId': '51bc0388-b560-4fb5-b024-c30c8f7c0c1c'} registry='fe6421ff-77d3-40ca-bb17-d6d6506332df|wfup4d6d45bb98|-|products|price.txt' extracted_doc='true|wfup4d6d45bb98|-1|51bc0388-b560-4fb5-b024-c30c8f7c0c1c' foreign_wf=403 pathlike_fileid=403 refused_rows=0 legacy=200 legacy_registry='-'
+   cleanup A: deleted rows: 2
+   cleanup B: deleted rows: 2
+   cleanup up: deleted rows: 2
+
+1 pass, 0 fail
+
+# python3 Tools/n8n/verify-deployed.py --base http://localhost:5678
+base http://localhost:5678: canonical 26 (diff 0), clones 2 (behind template 0), archived clones 0 (not counted), other 2
+exit=0
+
+# generators: second run = no diff
+auth gate: OK
+auth workflows: up to date
+handoff workflows: OK
+test dialog: OK

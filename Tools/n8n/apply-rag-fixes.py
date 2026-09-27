@@ -157,8 +157,11 @@ def fix_upload(wf):
     })
     # The chain's tail fed Merge input 1 (the sync/context item). Rewire that edge
     # straight from the id-extraction path so combineByPosition still gets both inputs.
+    # Since R3 (2026-09-27, apply-auth-gate.py) that path's fan-out hangs off the TRUE branch of
+    # "Upload Fields Valid?" — an edge straight from Extract Telegram Workflow Id would bypass the check.
     conns = wf["connections"]
-    ext_tg = conns.setdefault("Extract Telegram Workflow Id", {}).setdefault("main", [[]])
+    carrier = "Upload Fields Valid?" if find(wf["nodes"], name="Upload Fields Valid?") else "Extract Telegram Workflow Id"
+    ext_tg = conns.setdefault(carrier, {}).setdefault("main", [[]])
     links = ext_tg[0]
     if not any(l.get("node") == "Merge" for l in links):
         links.append({"node": "Merge", "type": "main", "index": 1})
