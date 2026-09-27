@@ -26,6 +26,31 @@
     {
       "parameters": {
         "operation": "executeQuery",
+        "query": "-- R9 (iteration 2026-09-27): a bot reply whose run died between Acquire Send Lease and Record Send\n-- (OOM/SIGKILL, the execution timeout, a failed Record Send) would stay send_pending forever — Claim Event\n-- re-claims only claimed/generated, the 90-s lease expiry frees the chat but not the event. After 10\n-- minutes — far past any live send (lease 90 s; send ≤ 30 s + reconcile ≤ ~65 s; execution timeout ≤ 300 s) —\n-- it becomes send_unknown: the transport may or may not have taken it, so the owner sees «not confirmed».\n-- NEVER a resend: this branch has no transport node and a send_unknown is never re-claimed. The attempt's\n-- execution id and time (updated_at) are kept; a late real Record Send still overwrites the state.\nwith swept as (\n  update reply_events\n     set state = 'send_unknown',\n         error = coalesce(nullif(error, ''), 'run_lost: no send result recorded within 10 min (execution ' || coalesce(execution_id, '?') || ')')\n   where state = 'send_pending' and updated_at < now() - interval '10 minutes'\n  returning 1\n)\nselect count(*)::int as settled from swept;",
+        "options": {
+          "queryReplacement": "={{ [] }}"
+        }
+      },
+      "id": "3a480d2f-4f95-5151-9760-e20517642297",
+      "name": "Settle Lost Sends",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
         "query": "-- A5: claim a batch of due notices (attempt counted BEFORE the send, next try in 10 min, hard cap\n-- 6 attempts); the request row itself is never touched by a delivery failure.\nwith due as (\n  select id from handoff_requests\n  where notify_state in ('pending', 'failed') and notify_attempts < 6 and notify_next_at <= now() and status <> 'done'\n  order by created_at limit 20\n  for update skip locked\n), claimed as (\n  update handoff_requests h\n    set notify_attempts = h.notify_attempts + 1, notify_next_at = now() + interval '10 minutes', updated_at = now()\n  from due where h.id = due.id\n  returning h.id, h.profile_id, h.chat_id, h.reason, h.notify_attempts,\n    coalesce((select b.channel from bot_profiles b where b.profile_id = h.profile_id order by b.created_at desc nulls last limit 1), 'whatsapp') as channel\n)\nselect * from claimed;",
         "options": {
           "queryReplacement": "={{ [] }}"
@@ -217,6 +242,11 @@
     "Every 2 Minutes": {
       "main": [
         [
+          {
+            "node": "Settle Lost Sends",
+            "type": "main",
+            "index": 0
+          },
           {
             "node": "Due Notifications",
             "type": "main",

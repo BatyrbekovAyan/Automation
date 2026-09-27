@@ -1,0 +1,17 @@
+# R9 before — Tools/n8n/tests/test_reply_lost_send.py on HEAD 7cb394b9 (nothing settles send_pending); ledger rows from the real Claim Event + Acquire Send Lease of both templates, the sweep = the notifier's schedule-branch Postgres nodes that write reply_events, on staging-PG temp tables
+FAIL R9 graph: the notifier's schedule settles lost sends in a branch that reaches NO transport node and runs first
+      - expected exactly one reply_events sweep off 'Every 2 Minutes', found []
+FAIL R9 [WA] send_pending older than 10 min → send_unknown (execution id kept); a live one, a stale claim and the live lease untouched
+      - lost={'message_id': 'LOST', 'state': 'send_pending', 'execution_id': 'exec-dead', 'error': None, 'kept_time': True}
+      - the attempt must stay traceable (execution id, reason, attempt time): {'message_id': 'LOST', 'state': 'send_pending', 'execution_id': 'exec-dead', 'error': None, 'kept_time': True}
+      - first sweep=[] second sweep=[]
+FAIL R9 [WA] after the sweep: a re-delivery of the lost event is a duplicate (never a second send), a late real result still wins
+      - redelivery=duplicate ledger={'LOST': 'send_pending'}
+FAIL R9 [TG] send_pending older than 10 min → send_unknown (execution id kept); a live one, a stale claim and the live lease untouched
+      - lost={'message_id': 'LOST', 'state': 'send_pending', 'execution_id': 'exec-dead', 'error': None, 'kept_time': True}
+      - the attempt must stay traceable (execution id, reason, attempt time): {'message_id': 'LOST', 'state': 'send_pending', 'execution_id': 'exec-dead', 'error': None, 'kept_time': True}
+      - first sweep=[] second sweep=[]
+FAIL R9 [TG] after the sweep: a re-delivery of the lost event is a duplicate (never a second send), a late real result still wins
+      - redelivery=duplicate ledger={'LOST': 'send_pending'}
+
+0 pass, 5 fail

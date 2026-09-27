@@ -99,6 +99,16 @@ def verify_handoff_workflows():
           "the owner notice is built ONLY from the reason word and a masked chat tail")
     q = node(ntf, "Record Notify")["parameters"]["query"]
     check("notify_state = $2" in q and "handoff_requests" in q and "delete" not in q.lower(), "Record Notify must only update the notify state")
+    # R9: the same schedule settles lost sends (send_pending > 10 min → send_unknown), in a branch with no transport node
+    q = node(ntf, "Settle Lost Sends")["parameters"]["query"]
+    for frag in ("update reply_events", "set state = 'send_unknown'", "where state = 'send_pending'", "interval '10 minutes'", "run_lost"):
+        check(frag in q, f"Settle Lost Sends lacks {frag!r}")
+    check("message/send" not in q and "lock_token" not in q and "'claimed'" not in q, "Settle Lost Sends must not send, touch the lease or make an event re-claimable")
+    trig = ntf["connections"]["Every 2 Minutes"]["main"][0]
+    check({"node": "Settle Lost Sends", "type": "main", "index": 0} in trig, "Settle Lost Sends must run off the notifier's schedule")
+    check(not ntf["connections"].get("Settle Lost Sends"), "Settle Lost Sends must lead nowhere (never to a transport node)")
+    check(node(ntf, "Settle Lost Sends")["position"][1] < node(ntf, "Due Notifications")["position"][1],
+          "Settle Lost Sends must sit above the notice branch (executionOrder v1 order)")
     api = load("crHandoffsApi001-Handoffs.json")
     check("crAuth" in node(api, "Auth Gate")["parameters"]["jsCode"] and '"profiles": ["profileIds"]' in node(api, "Auth Gate")["parameters"]["jsCode"] and '"legacy": false' in node(api, "Auth Gate")["parameters"]["jsCode"],
           "Handoffs webhook must be token-only and profile-scoped")

@@ -9,7 +9,9 @@
   crHandoffNtfy001-Handoff_Notifier.json  schedule (every 2 min): retried delivery of the owner notice
                                           (a self-message on the bot's own channel — no APNs/FCM needed,
                                           no client text in it); attempts/backoff on the request row, a
-                                          failed delivery never loses the request.
+                                          failed delivery never loses the request. Also settles LOST SENDS
+                                          (R9): a bot reply left send_pending > 10 min (its run died between
+                                          the lease and Record Send) becomes send_unknown — never a resend.
   crHandoffsApi001-Handoffs.json          /webhook/Handoffs — the app's pending list + take/done
                                           (A1-gated, owner-scoped). `done` clears the chat's pause.
 
@@ -32,6 +34,7 @@ REQ_ID, REQ_NAME = "crHandoffReq0001", "Handoff Request"
 NTFY_ID, NTFY_NAME = "crHandoffNtfy001", "Handoff Notifier"
 API_ID, API_NAME = "crHandoffsApi001", "Handoffs"
 MAX_NOTIFY_ATTEMPTS = 6
+LOST_SEND_MINUTES = 10
 
 
 def nid(*parts):
@@ -123,6 +126,22 @@ with due as (
 )
 select * from claimed;""".replace("__MAX__", str(MAX_NOTIFY_ATTEMPTS))
 
+LOST_SEND_SQL = """-- R9 (iteration 2026-09-27): a bot reply whose run died between Acquire Send Lease and Record Send
+-- (OOM/SIGKILL, the execution timeout, a failed Record Send) would stay send_pending forever — Claim Event
+-- re-claims only claimed/generated, the 90-s lease expiry frees the chat but not the event. After __MIN__
+-- minutes — far past any live send (lease 90 s; send ≤ 30 s + reconcile ≤ ~65 s; execution timeout ≤ 300 s) —
+-- it becomes send_unknown: the transport may or may not have taken it, so the owner sees «not confirmed».
+-- NEVER a resend: this branch has no transport node and a send_unknown is never re-claimed. The attempt's
+-- execution id and time (updated_at) are kept; a late real Record Send still overwrites the state.
+with swept as (
+  update reply_events
+     set state = 'send_unknown',
+         error = coalesce(nullif(error, ''), 'run_lost: no send result recorded within __MIN__ min (execution ' || coalesce(execution_id, '?') || ')')
+   where state = 'send_pending' and updated_at < now() - interval '__MIN__ minutes'
+  returning 1
+)
+select count(*)::int as settled from swept;""".replace("__MIN__", str(LOST_SEND_MINUTES))
+
 COMPOSE_NOTICE_JS = r"""// HANDOFF NOTIFIER / Compose Notice (runs PER ITEM — one notice per due request): a self-message
 // on the bot's own channel. No client text, no client number — the owner opens the app for the details.
 const row = $('Due Notifications').item.json;
@@ -161,6 +180,9 @@ def build_notifier():
     n, c = [], {}
     n.append({"parameters": {"rule": {"interval": [{"field": "minutes", "minutesInterval": 2}]}}, "id": nid(NTFY_ID, "trigger"),
               "name": "Every 2 Minutes", "type": "n8n-nodes-base.scheduleTrigger", "typeVersion": 1.2, "position": [0, 200]})
+    # R9: its own branch off the trigger, ABOVE the notice branch (executionOrder v1 runs sibling branches top to
+    # bottom), reaching no transport node; onError continue (auth.postgres) so it can never fail the notices either.
+    n.append(auth.postgres("Settle Lost Sends", LOST_SEND_SQL, "={{ [] }}", [220, 0]))
     n.append(auth.postgres("Due Notifications", DUE_SQL, "={{ [] }}", [220, 200]))
     n.append(auth.http_wappi("Owner Phone", "GET", "={{ ($json.channel === 'telegram' ? 'https://wappi.pro/tapi/' : 'https://wappi.pro/api/') + 'sync/get/status' }}", [440, 200],
                              query_expr="={{ JSON.stringify({ profile_id: $json.profile_id }) }}", timeout=20000))
@@ -173,6 +195,7 @@ def build_notifier():
     n.append(auth.code("Settle Notice", SETTLE_NOTICE_JS, [1320, 200]))
     n[-1]["parameters"]["mode"] = "runOnceForEachItem"
     n.append(auth.postgres("Record Notify", RECORD_NOTIFY_SQL, "={{ [ $json.id, $json.state, $json.error ] }}", [1540, 200]))
+    auth.edge(c, "Every 2 Minutes", "Settle Lost Sends")
     auth.edge(c, "Every 2 Minutes", "Due Notifications")
     auth.edge(c, "Due Notifications", "Owner Phone")
     auth.edge(c, "Owner Phone", "Compose Notice")
