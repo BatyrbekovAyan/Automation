@@ -116,6 +116,54 @@ def subject_exact(ctx):
         psql(f"delete from documents where metadata->>'fileId' = 'e2e-{ctx.run_id}';")
 
 
+@scenario("asked_item_keeps_its_conditions_in_a_long_catalog", "R12: in a catalog over the 3000-char budget the ASKED bouquet reaches ДАННЫЕ with its whole description («Доставка … оплачивается отдельно»), the rest is cut with «…», and the prompt carries the rule")
+def asked_item_whole(ctx):
+    owner, pid = owner_for(ctx)
+    desc = ("Сезонные цветы в крафтовой упаковке с лентой, открытка в подарок, собираем за два часа, фото готового букета "
+            "присылаем перед отправкой, свежесть гарантируем трое суток. ")
+    items = [{"kind": "product", "name": f"Букет №{i}", "price": f"{9000 + 500 * i} тг", "description": desc + f"Код {1000 + i}."} for i in range(31)]
+    asked = "15 кустовых роз и эвкалипт в крафте. Собираем за 2 часа. Доставка по городу оплачивается отдельно."
+    items.append({"kind": "product", "name": "Букет «Нежность»", "price": "18000 тг", "description": asked})
+    st, d, ex = call(owner, payload(owner, pid, [m("client", "Здравствуйте! Сколько стоит букет Нежность?")], know=knowledge(items), bot_wa="-1", vertical="flowers"))
+    prep = node_output(ex, "Prep") or {}
+    asm = node_output(ex, "Assemble") or {}
+    fenced = asm.get("fencedData", "")
+    catalog = json.loads(fenced.split("\n", 1)[1]).get("catalog", "") if fenced else ""
+    rule = next((l for l in asm.get("systemPrompt", "").split("\n") if l.startswith("КАТАЛОГ СОКРАЩЁН")), "")
+    ok = (st == 200 and "• Букет «Нежность» — 18000 тг — " + asked in catalog and len(catalog) <= 3000 and "…" in catalog
+          and "item_description_truncated" in (prep.get("knowledgeFlags") or []) and "оборванная на «…»" in rule)
+    return ok, f"http={st} catalog_len={len(catalog)} asked_whole={asked in catalog} flags={prep.get('knowledgeFlags')} rule={rule[:60]!r}"
+
+
+@scenario("exact_match_newest_article_leads", "R13: after a reply listing an old code and prices, «а NEW12345?» puts NEW12345 first in the tokens and its price-list row first in exactMatches — three newer rows with an old price do not push it out, and a bare 15000 is not 150000")
+def exact_newest(ctx):
+    owner, pid = owner_for(ctx)
+    tag = f"e2e-{ctx.run_id}"
+    rows = ["Свеча NEW12345 Iridium Toyota — 9900 тг", "Масло 5W30 4л — 18500 тг", "Фильтр топливный — 18500 тг",
+            "Диск тормозной — 18500 тг", "Свеча AN-8201 — 18500 тг"]
+    for r in rows:
+        psql(f"insert into documents (content, metadata) values ('{r}', '{{\"botWaId\": \"{STG_WA}\", \"fileId\": \"{tag}\"}}'::jsonb);")
+    psql(f"insert into documents (content, metadata) values ('Аккумулятор 100Ah — 150000 тг', '{{\"botWaId\": \"{STG_WA}\", \"fileId\": \"{tag}\"}}'::jsonb);")
+    try:
+        msgs = [m("client", "Нужны свечи на Camry", 1), m("business", "Есть AN-8201 — 18500 тг, P83165 — 24500 тг, SP1376 — 9900 тг", 2),
+                m("client", "а NEW12345?", 3)]
+        st, d, ex = call(owner, payload(owner, pid, msgs, know=knowledge([], {}, "Запчасти для Toyota", "Asia/Almaty", 1)))
+        prep = node_output(ex, "Prep") or {}
+        asm = node_output(ex, "Assemble") or {}
+        exact = json.loads(asm["fencedData"].split("\n", 1)[1]).get("exactMatches", "") if asm.get("fencedData") else ""
+        msgs2 = [m("client", "нужен масляный фильтр NEW12345", 1), m("business", "есть, 9900 тг", 2), m("client", "а за 15000 есть получше?", 3)]
+        st2, d2, ex2 = call(owner, payload(owner, pid, msgs2, know=knowledge([], {}, "Запчасти для Toyota", "Asia/Almaty", 1)))
+        prep2 = node_output(ex2, "Prep") or {}
+        asm2 = node_output(ex2, "Assemble") or {}
+        exact2 = json.loads(asm2["fencedData"].split("\n", 1)[1]).get("exactMatches", "") if asm2.get("fencedData") else ""
+        ok = (st == 200 and (prep.get("exactTokens") or [])[:1] == ["NEW12345"] and exact.startswith("Свеча NEW12345")
+              and st2 == 200 and "NEW12345" in exact2 and "150000" not in exact2)
+        return ok, (f"http={st}/{st2} tokens={prep.get('exactTokens')} exact_head={exact[:40]!r} "
+                    f"tokens2={prep2.get('exactTokens')} exact2={exact2[:120]!r}")
+    finally:
+        psql(f"delete from documents where metadata->>'fileId' = '{tag}';")
+
+
 @scenario("same_request_key_is_counted_once", "S3: a retry with the SAME request key (timeout / re-open) does not increment the daily counter; a new key does")
 def idempotent_count(ctx):
     owner, pid = owner_for(ctx)

@@ -1,0 +1,25 @@
+# e2e AFTER — python3 Tools/n8n/staging/e2e-suggest.py, staging n8n 2.36.7 + task runners переимпортирован bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001 из канона cdc7350b
+# verify-deployed --base http://localhost:5678:
+base http://localhost:5678: canonical 26 (diff 0), clones 2 (behind template 0), archived clones 0 (not counted), other 2
+#   exit=0; оба клона AT-CANONICAL
+# staging-изоляция Supabase (bootstrap): писатели только в Upload/Delete File/Delete Bot Files, заменены derive-staging; Suggest Replies только читает
+
+PASS  knowledge_budget_and_server_time_reach_the_prompt (8s) — S1/S2/S7: the composed prompt carries the item DESCRIPTION, the contacts after a long description, the server clock in the bot's zone — and never the phone's clock
+      http=200 tz=bot now='2026-09-28 04:18, понедельник' flags=['description_truncated'] desc_in_fenced=True addr_in_fenced=True phone_clock_leaked=False
+PASS  short_follow_up_recovers_subject_and_exact_match [llm] (7s) — S4: «а сколько стоит?» after the exact model — the retrieval query carries the subject, the article is matched EXACTLY in the price list, the cards quote that price
+      http=200 query='[клиент] Нужен масляный фильтр 90915-YZZE1 на Camry 2019\n[бизнес] Есть, оригинал' tokens=['90915-YZZE1'] exact_row=True cards=['Цена масляного фильтра 90915-YZZE1 для Camry 2019 ', 'Масляный фильтр 90915-YZZE1 для Camry 2019 стоит 3', 'Цена на масляный фильтр 90915-YZZE1 для Camry 2019', 'Масляный фильтр 90915-YZZE1 стоит 3200 тг. Если у ']
+PASS  asked_item_keeps_its_conditions_in_a_long_catalog (3s) — R12: in a catalog over the 3000-char budget the ASKED bouquet reaches ДАННЫЕ with its whole description («Доставка … оплачивается отдельно»), the rest is cut with «…», and the prompt carries the rule
+      http=200 catalog_len=2970 asked_whole=True flags=['item_description_truncated'] rule='КАТАЛОГ СОКРАЩЁН: в ДАННЫЕ попала не вся информация о позици'
+PASS  exact_match_newest_article_leads (9s) — R13: after a reply listing an old code and prices, «а NEW12345?» puts NEW12345 first in the tokens and its price-list row first in exactMatches — three newer rows with an old price do not push it out, and a bare 15000 is not 150000
+      http=200/200 tokens=['NEW12345', 'AN-8201', 'P83165'] exact_head='Свеча NEW12345 Iridium Toyota — 9900 тг\n' tokens2=['15000', 'NEW12345'] exact2='Свеча NEW12345 Iridium Toyota — 9900 тг'
+PASS  same_request_key_is_counted_once (8s) — S3: a retry with the SAME request key (timeout / re-open) does not increment the daily counter; a new key does
+      counts after 1st/retry/new = 1/1/2 (retry must not add, a new key adds 1), keys=2
+PASS  authenticated_refusals_are_named (2s) — S8: an expired subscription and an unknown account answer with their KIND for a token-bearing caller; a bad body answers bad_request
+      expired=subscription unknown=unknown_account bad=bad_request
+PASS  legacy_caller_keeps_opaque_error (0s) — S8/N-4: a token-less legacy call (compat window) still gets only generation_failed — no account oracle
+      http=200 error=generation_failed
+PASS  execution_deadline_is_set (0s) — S3: the workflow carries a 20-s server deadline shorter than the client's 22 s
+      executionTimeout=20 (client waits 22 s)
+
+8 pass, 0 fail
+exit=0

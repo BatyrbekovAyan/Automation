@@ -1,0 +1,9 @@
+# e2e BEFORE — new staging scenarios (R12 asked_item_keeps_its_conditions_in_a_long_catalog, R13 exact_match_newest_article_leads) against staging running the PRE-iteration Suggest Replies (canon f8afbb32 imported by bootstrap.py; verify-deployed: Suggest Replies DIFF vs HEAD canon, the rest of the canon at cdc7350b)
+FAIL  asked_item_keeps_its_conditions_in_a_long_catalog (6s) — R12: in a catalog over the 3000-char budget the ASKED bouquet reaches ДАННЫЕ with its whole description («Доставка … оплачивается отдельно»), the rest is cut with «…», and the prompt carries the rule
+      http=200 catalog_len=730 asked_whole=False flags=['descriptions_dropped'] rule='КАТАЛОГ СОКРАЩЁН: в ДАННЫЕ попала не вся информация о позици'
+
+0 pass, 1 fail
+FAIL  exact_match_newest_article_leads (11s) — R13: after a reply listing an old code and prices, «а NEW12345?» puts NEW12345 first in the tokens and its price-list row first in exactMatches — three newer rows with an old price do not push it out, and a bare 15000 is not 150000
+      http=200/200 tokens=['AN-8201', '18500', 'P83165'] exact_head='Свеча AN-8201 — 18500 тг\n---\nДиск тормоз' tokens2=['NEW12345', '15000'] exact2='Аккумулятор 100Ah — 150000 тг\n---\nСвеча NEW12345 Iridium Toyota — 9900 тг'
+
+0 pass, 1 fail
