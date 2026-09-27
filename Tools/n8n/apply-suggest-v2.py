@@ -8,6 +8,8 @@
              «now» is computed from the SERVER clock in the business's zone (default + hedge for legacy).
              R12 (2026-09-27): the subject is computed BEFORE the catalog; the item the question is about keeps its
              whole description, every other cut ends with «…» and is flagged (incl. the client's 600 / 2500 clamps).
+             R13 (2026-09-27): the query reserves the newest client turn(s) and the direction and trims OLD context
+             first; exact tokens go newest first (codes before bare numbers); Exact Match ranks rows by token order.
   Gate     — the daily counter is idempotent per request key (a timeout retry is not a second request).
   RAG      — the vector-store nodes fail OPEN (a search error is not «позиции нет»); an `Exact Match`
              Postgres lookup runs only when SKU-like tokens exist.
@@ -37,7 +39,30 @@ const flags = [];
 const t = (v, max) => String(v === undefined || v === null ? '' : v).trim().slice(0, max);
 // --- S4: the retrieval query recovers the SUBJECT of a short follow-up; exact tokens for SKUs ---
 // (computed FIRST: R12 composes the catalog around the item the question is about)
-const trailingText = queryText;
+// R13: the latest client turn(s) and the picked direction are RESERVED; OLD context is trimmed first (the query used to
+// be cut from its END, which dropped the very question), and the tokens go newest first.
+const QUERY_BUDGET = 900, TRAIL_BUDGET = 500, STEER_BUDGET = 300, MIN_PART = 40;
+// newest-first packing: whole parts from the newest end while they fit; the first one that does not fit keeps its head
+// (never cutting a word — an article code — in half) when at least MIN_PART chars are left; older parts are dropped
+const newestFirst = (parts, max) => {
+  const kept = [];
+  let used = 0;
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const part = parts[i], sep = kept.length ? 1 : 0;
+    if (used + sep + part.length <= max) { kept.unshift(part); used += sep + part.length; continue; }
+    const room = max - used - sep;
+    if (room >= MIN_PART) {
+      let head = part.slice(0, room);
+      const k = head.search(/\s\S*$/);
+      if (/\S/.test(part[room] || '') && k > 0) head = head.slice(0, k);
+      if (head.trim()) kept.unshift(head.trimEnd());
+    }
+    break;
+  }
+  return kept;
+};
+const trailParts = newestFirst(runParts, TRAIL_BUDGET);   // a long series keeps its NEWEST messages (also lastClientMessage)
+const trailingText = trailParts.join('\n');
 const FOLLOW_UP = /^(а |и |ну |да,? |ок,? |хорошо,? )?(сколько|скок|цена|стоит|почём|почем|есть|наличи|можно|когда|где|какой|какая|какие|такой|такая|это|эта|этот|его|её|их|подойд|подход|доставк|срок)/i;
 const wordCount = trailingText.trim().split(/\s+/).filter(Boolean).length;
 const isShort = trailingText.trim().length <= 40 || wordCount <= 4 || FOLLOW_UP.test(trailingText.trim());
@@ -53,10 +78,16 @@ if (isShort) {
     else { ctx.unshift('[клиент] ' + mm.text.trim()); taken++; }
   }
 }
-if (steerTowardText && steerTowardText.trim()) ctx.push('[направление] ' + steerTowardText.trim());
-queryText = ((ctx.length ? ctx.join('\n') + '\n' : '') + trailingText).slice(0, 900);
+const steerLine = (steerTowardText && steerTowardText.trim()) ? '[направление] ' + steerTowardText.trim().slice(0, STEER_BUDGET) : '';
+const fixed = [steerLine, trailingText].filter(Boolean);
+const ctxKept = newestFirst(ctx, QUERY_BUDGET - fixed.join('\n').length - (fixed.length ? 1 : 0));
+queryText = ctxKept.concat(fixed).join('\n');
 const skuOf = (s) => (String(s || '').match(/[A-Za-z0-9][A-Za-z0-9\-\/]{4,}/g) || []).filter(x => /\d/.test(x) && !/^\d{7,}$/.test(x)).map(x => x.toUpperCase());
-const exactTokens = Array.from(new Set(skuOf(queryText))).slice(0, 3);
+// the question's own codes first (its newest message first, then the direction), the older context after; within each,
+// article codes before bare numbers — a price such as 18500 must not take a code's slot
+const codesFirst = (parts) => { const all = parts.flatMap(skuOf); return all.filter(x => !/^\d+$/.test(x)).concat(all.filter(x => /^\d+$/.test(x))); };
+const exactTokens = Array.from(new Set(codesFirst(trailParts.slice().reverse().concat(steerLine ? [steerLine] : []))
+  .concat(codesFirst(ctxKept.slice().reverse())))).slice(0, 3);
 // --- S1/S2 + R12: ONE knowledge contract, composed under a budget that never drops contacts. The item the question
 // is about keeps its WHOLE description; everything shortened ends with «…» and is flagged (Assemble turns the flags
 // into a rule) — a silent cut would present a partial condition list as complete ---
@@ -243,11 +274,25 @@ GATE_PARAMS = "={{ [ $json.appUserId, $json.requestKey || '' ] }}"
 EXACT_SQL = """-- S4 (stage 5): an article / model code must match EXACTLY, not by embedding proximity — a
 -- semantically «close» part is the wrong part. Runs once per request and only when the query
 -- carries SKU-like tokens; the same per-bot metadata scope as the vector search.
+-- R13: the tokens arrive NEWEST FIRST. A row ranks by the first token it matches and the rows are
+-- dealt round-robin (every token's newest row, then every token's next one), so the newest article
+-- leads and an older code or a price cannot take all three slots. A bare number matches that number
+-- only, never inside a longer one (15000 is not 150000).
 select content
-from documents
-where ((metadata->>'botWaId' = $1 and $1 not in ('-1', '')) or (metadata->>'botTgId' = $2 and $2 not in ('-1', '')))
-  and exists (select 1 from unnest($3::text[]) tok where content ilike '%' || tok || '%')
-order by id desc
+from (
+  select d.id, d.content, m.rank, row_number() over (partition by m.rank order by d.id desc) as turn
+  from documents d
+  cross join lateral (
+    select min(u.ord) as rank
+    from unnest($3::text[]) with ordinality as u(tok, ord)
+    where u.tok <> ''
+      and case when u.tok !~ '[^0-9]' then d.content ~ ('(?<![0-9])' || u.tok || '(?![0-9])')
+               else d.content ilike '%' || u.tok || '%' end
+  ) m
+  where ((d.metadata->>'botWaId' = $1 and $1 not in ('-1', '')) or (d.metadata->>'botTgId' = $2 and $2 not in ('-1', '')))
+    and m.rank is not null
+) r
+order by turn, rank, id desc
 limit 3;"""
 EXACT_PARAMS = "={{ (g => [ g.botWaId || '', g.botTgId || '', '{' + (g.exactTokens || []).map(x => '\"' + String(x).replace(/[\"\\\\{}]/g, '') + '\"').join(',') + '}' ])($('Gate Decision').first().json) }}"
 

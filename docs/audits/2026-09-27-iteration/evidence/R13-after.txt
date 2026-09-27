@@ -1,0 +1,65 @@
+# R13 after-fix — генератор Tools/n8n/apply-suggest-v2.py (S4 в PREP_BLOCK + EXACT_SQL), канон перегенерирован
+
+$ python3 Tools/n8n/apply-suggest-v2.py   (второй прогон — идемпотентность)
+up to date  9PTyYcelRQI7bGDb-Suggest_Replies.json
+$ python3 Tools/n8n/apply-suggest-v2.py --check
+suggest v2: OK
+
+$ python3 Tools/n8n/tests/test_suggest_query.py
+PASS [WA] reviewer: long history keeps «а сколько?» and the picked direction; the new article leads the tokens
+PASS [WA] «а сколько?» after long turns: the question stays, the old subject survives as the head of its turn
+PASS [WA] a series of client messages keeps its NEWEST message (query + lastClientMessage)
+PASS [WA] no overflow: three codes and prices of the previous reply do not evict the new article
+PASS [WA] «а сколько?» with codes only in the context: the newer turn's code comes first
+PASS [WA] SQL: the newest article's row comes first although three newer rows match an old price; no foreign bot
+PASS [WA] SQL: «а за 15000 есть получше?» keeps the article row; 15000 does not match 150000 / 115000
+PASS [WA] SQL: one article with many rows still returns three rows, newest first (unchanged)
+PASS [TG] reviewer: long history keeps «а сколько?» and the picked direction; the new article leads the tokens
+PASS [TG] «а сколько?» after long turns: the question stays, the old subject survives as the head of its turn
+PASS [TG] a series of client messages keeps its NEWEST message (query + lastClientMessage)
+PASS [TG] no overflow: three codes and prices of the previous reply do not evict the new article
+PASS [TG] «а сколько?» with codes only in the context: the newer turn's code comes first
+PASS [TG] SQL: the newest article's row comes first although three newer rows match an old price; no foreign bot
+PASS [TG] SQL: «а за 15000 есть получше?» keeps the article row; 15000 does not match 150000 / 115000
+PASS [TG] SQL: one article with many rows still returns three rows, newest first (unchanged)
+PASS fuzz (seeded, 300 chats): ≤ 900, the newest message and the direction always in the query, its code leads
+
+17 pass, 0 fail
+
+# мутации исправленного канона (каждая ловится тестом; канон затем восстановлен, --check OK):
+#   токены вопроса в прямом порядке (без reverse)               -> 14 pass, 1 fail
+#   токены контекста в прямом порядке (без reverse)             -> 15 pass, 2 fail (сценарий добавлен после первой проверки мутаций)
+#   серия клиента head-first slice(0,500), как было             -> 12 pass, 3 fail
+#   без резерва под вопрос/направление (ctxRoom = 900)          -> 12 pass, 3 fail
+#   без понижения «голых» чисел (коды не раньше цен)            -> 13 pass, 2 fail
+#   SQL: order by id desc вместо ранга по токенам               -> 13 pass, 2 fail
+#   SQL: число ищется подстрокой (ilike) вместо границ числа    -> 9 pass, 6 fail
+
+$ node Tools/n8n/verify-panel-prompts.js
+PASS
+$ python3 Tools/n8n/inject-panel-prompts.py --check
+9PTyYcelRQI7bGDb-Suggest_Replies.json: up-to-date
+$ node Tools/n8n/repro/run-code-node.mjs
+22 pass, 0 fail, 0 error (assert mode)
+$ python3 Tools/n8n/verify-telegram-parity.py
+ALL PARITY ASSERTS PASSED
+
+$ python3 Tools/n8n/tests/run_all.py
+OK   test_auth_refresh.py: 12 pass, 0 fail
+OK   test_billing_identity.py: 14 pass, 0 fail
+OK   test_claim.py: 9 pass, 0 fail
+OK   test_create_seed.py: 10 pass, 0 fail
+OK   test_harness_selfcheck.py: 2 pass, 0 fail
+OK   test_reply_lost_send.py: 5 pass, 0 fail
+OK   test_reply_memory.py: 32 pass, 0 fail
+OK   test_reply_mode.py: 21 pass, 0 fail
+OK   test_reply_order.py: 26 pass, 0 fail
+OK   test_reply_reconcile.py: 32 pass, 0 fail
+OK   test_suggest_catalog.py: 24 pass, 0 fail
+OK   test_suggest_query.py: 17 pass, 0 fail
+OK   test_upload.py: 22 pass, 0 fail
+OK   test_verify_deployed.py: 26 pass, 0 fail
+OK   test_verify_parity.py: 36 pass, 0 fail
+exit=0
+
+# eval: входы LLM всех 12 panel-сценариев идентичны до/после — см. R12-R13-eval-inputs.txt

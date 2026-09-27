@@ -1,0 +1,53 @@
+# R13 before-fix — python3 Tools/n8n/tests/test_suggest_query.py против канона Suggest Replies на HEAD d1a1ca4b (после R12; S4 и Exact Match — как до R13; git show HEAD:… во временной подмене, генератор затем вернул канон байт-в-байт)
+# PASS «one article with many rows» — регрессионный пин (одна позиция с многими строками должна по-прежнему давать 3 строки, новые первыми).
+
+FAIL [WA] reviewer: long history keeps «а сколько?» and the picked direction; the new article leads the tokens
+      - query tail='ББББББББББББББББББББББББББББББББББББББББББББББББББББББББББББ'
+      - the picked direction was pushed out of the query
+      - tokens=['OLD54321']
+FAIL [WA] «а сколько?» after long turns: the question stays, the old subject survives as the head of its turn
+      - query tail='каждому: Подробности по каждому: Подробности по каждому: Под'
+FAIL [WA] a series of client messages keeps its NEWEST message (query + lastClientMessage)
+      - trailing tail='а космические деньги. Ещё нужны колодки передние и'
+      - the newest message is not in the retrieval query
+      - tokens=[]
+      - lastIncomingText burst: tail='кие деньги. Ещё нужны колодки передние и' tokens=[]
+FAIL [WA] no overflow: three codes and prices of the previous reply do not evict the new article
+      - tokens=['AN-8201', '18500', 'P83165']
+      - a bare price outranked an article code: ['AN-8201', '18500', 'P83165']
+FAIL [WA] «а сколько?» with codes only in the context: the newer turn's code comes first
+      - tokens=['AB-11111', 'CD-22222']
+FAIL [WA] SQL: the newest article's row comes first although three newer rows match an old price; no foreign bot
+      - rows=['Свеча AN-8201 — 18500 тг', 'Диск тормозной — 18500 тг', 'Фильтр топливный — 18500 тг'] params=['wfR13wa0000001', '-1', '{"NEW12345","AN-8201","18500"}']
+FAIL [WA] SQL: «а за 15000 есть получше?» keeps the article row; 15000 does not match 150000 / 115000
+      - the article row is gone: tokens=['90915-YZZE1', '15000'] rows=['Фильтр масляный Mann W712 премиум — 15000 тг', 'Комплект ТО Land Cruiser — 115000 тг', 'Аккумулятор 100Ah — 150000 тг']
+      - a bare 15000 matched a longer number: ['Фильтр масляный Mann W712 премиум — 15000 тг', 'Комплект ТО Land Cruiser — 115000 тг', 'Аккумулятор 100Ah — 150000 тг']
+PASS [WA] SQL: one article with many rows still returns three rows, newest first (unchanged)
+FAIL [TG] reviewer: long history keeps «а сколько?» and the picked direction; the new article leads the tokens
+      - query tail='ББББББББББББББББББББББББББББББББББББББББББББББББББББББББББББ'
+      - the picked direction was pushed out of the query
+      - tokens=['OLD54321']
+FAIL [TG] «а сколько?» after long turns: the question stays, the old subject survives as the head of its turn
+      - query tail='каждому: Подробности по каждому: Подробности по каждому: Под'
+FAIL [TG] a series of client messages keeps its NEWEST message (query + lastClientMessage)
+      - trailing tail='а космические деньги. Ещё нужны колодки передние и'
+      - the newest message is not in the retrieval query
+      - tokens=[]
+      - lastIncomingText burst: tail='кие деньги. Ещё нужны колодки передние и' tokens=[]
+FAIL [TG] no overflow: three codes and prices of the previous reply do not evict the new article
+      - tokens=['AN-8201', '18500', 'P83165']
+      - a bare price outranked an article code: ['AN-8201', '18500', 'P83165']
+FAIL [TG] «а сколько?» with codes only in the context: the newer turn's code comes first
+      - tokens=['AB-11111', 'CD-22222']
+FAIL [TG] SQL: the newest article's row comes first although three newer rows match an old price; no foreign bot
+      - rows=['Свеча AN-8201 — 18500 тг', 'Диск тормозной — 18500 тг', 'Фильтр топливный — 18500 тг'] params=['-1', 'wfR13tg0000001', '{"NEW12345","AN-8201","18500"}']
+FAIL [TG] SQL: «а за 15000 есть получше?» keeps the article row; 15000 does not match 150000 / 115000
+      - the article row is gone: tokens=['90915-YZZE1', '15000'] rows=['Фильтр масляный Mann W712 премиум — 15000 тг', 'Комплект ТО Land Cruiser — 115000 тг', 'Аккумулятор 100Ah — 150000 тг']
+      - a bare 15000 matched a longer number: ['Фильтр масляный Mann W712 премиум — 15000 тг', 'Комплект ТО Land Cruiser — 115000 тг', 'Аккумулятор 100Ah — 150000 тг']
+PASS [TG] SQL: one article with many rows still returns three rows, newest first (unchanged)
+FAIL fuzz (seeded, 300 chats): ≤ 900, the newest message and the direction always in the query, its code leads
+      - the newest message lost in 111/300
+      - the direction lost in 36/300
+      - the newest code not first in 190/300
+
+2 pass, 15 fail

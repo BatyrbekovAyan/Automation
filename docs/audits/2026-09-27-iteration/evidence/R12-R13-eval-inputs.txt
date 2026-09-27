@@ -1,0 +1,46 @@
+# R12/R13 и набор eval (CLAUDE.md: правка промпта панели требует eval до/после на той же версии сценариев)
+# Проверка: входы LLM (systemPrompt + fencedData) всех panel-сценариев Tools/n8n/eval/scenarios.v1.json, собранные НАСТОЯЩИМИ
+# Prep+Assemble канона до итерации (f8afbb32) и после R12+R13 (рабочее дерево), на payload, который шлёт run-eval.py (http заглушен).
+# Итог: входы идентичны байт-в-байт → прогон eval до/после сравнивал бы одинаковые запросы; новое поведение (длинный каталог,
+# длинная история, коды в контексте) в наборе не представлено и покрыто поведенческими тестами test_suggest_catalog/test_suggest_query.
+
+panel scenarios: 12, payloads captured: 12
+systemPrompt identical: 12/12; fencedData identical: 12/12
+flags after (non-empty): []
+queryText/exactTokens changed (RAG is skipped in eval — botWaId -1): 0
+
+## скрипт проверки
+```python
+"""Do R12/R13 change what the LLM sees in ANY panel eval scenario? Runs Prep + Assemble of the canon BEFORE R12
+(f8afbb32) and AFTER (working tree) on the exact payloads run-eval.py POSTs (captured by stubbing its http)."""
+import importlib.util, json, subprocess, sys
+sys.path.insert(0, 'Tools/n8n/tests')
+from harness import run_js
+spec = importlib.util.spec_from_file_location('run_eval', 'Tools/n8n/eval/run-eval.py'); ev = importlib.util.module_from_spec(spec)
+sys.argv = ['run-eval.py']; spec.loader.exec_module(ev)
+cap = []
+ev.http = lambda method, url, body=None, timeout=120: (cap.append(body), (200, {}))[1]
+d = json.load(open('Tools/n8n/eval/scenarios.v1.json', encoding='utf-8'))
+panel = [s for s in d['scenarios'] if s.get('mode') == 'panel']
+for s in panel:
+    ev.run_panel(s, d['knowledge'][s['vertical']], 'eval-user')
+def wf_at(ref):
+    return json.loads(subprocess.run(['git', 'show', f'{ref}:Tools/n8n/workflows/9PTyYcelRQI7bGDb-Suggest_Replies.json'], capture_output=True, text=True).stdout) if ref else \
+           json.load(open('Tools/n8n/workflows/9PTyYcelRQI7bGDb-Suggest_Replies.json', encoding='utf-8'))
+def llm_inputs(w):
+    code = {n['name']: n['parameters'].get('jsCode') for n in w['nodes']}
+    js = ('const P = new Function("$json", ' + json.dumps(code['Prep']) + ');\nconst A = new Function("$", ' + json.dumps(code['Assemble']) + ');\n'
+          'return ' + json.dumps(cap, ensure_ascii=False) + '.map(b => { const p = P({body: b})[0].json; p.now = "X";'
+          ' const a = A(n => ({first: () => ({json: p}), all: () => []}))[0].json; return [a.systemPrompt, a.fencedData, p.knowledgeFlags, p.queryText, p.exactTokens]; });')
+    return run_js(js)
+before, after = llm_inputs(wf_at('f8afbb32')), llm_inputs(wf_at(None))
+print(f'panel scenarios: {len(panel)}, payloads captured: {len(cap)}')
+same_prompt = sum(b[0] == a[0] for b, a in zip(before, after)); same_fenced = sum(b[1] == a[1] for b, a in zip(before, after))
+print(f'systemPrompt identical: {same_prompt}/{len(cap)}; fencedData identical: {same_fenced}/{len(cap)}')
+print('flags after (non-empty):', [(panel[i]['id'], a[2]) for i, a in enumerate(after) if a[2]])
+print('queryText/exactTokens changed (RAG is skipped in eval — botWaId -1):', sum((b[3], b[4]) != (a[3], a[4]) for b, a in zip(before, after)))
+for i, (b, a) in enumerate(zip(before, after)):
+    if b[1] != a[1]:
+        import difflib
+        print('fenced diff', panel[i]['id'], [x for x in difflib.ndiff([b[1]], [a[1]]) if x[0] in '+-'][:1][0][:300])
+```
