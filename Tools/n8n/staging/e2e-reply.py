@@ -55,6 +55,19 @@ def ai_rows(profile_id, chat):
     return int(psql(f"select count(*) from n8n_chat_histories where session_id = '{profile_id}:{chat}' and message->>'type' = 'ai';") or 0)
 
 
+def human_rows(profile_id, chat):
+    return int(psql(f"select count(*) from n8n_chat_histories where session_id = '{profile_id}:{chat}' and message->>'type' = 'human';") or 0)
+
+
+def ask_text(ch):
+    """The canned media answer exactly as the canonical template holds it (Ask to Send Text; '=' marks the value)."""
+    import json
+    f = {"wa": "4wYitz5ek30SVNlT-WhatsApp_Bot.json", "tg": "4VN3gsFaC2HUYmcc-Telegram_Bot.json"}[ch]
+    wf = json.load(open(os.path.join(os.path.dirname(HERE), "workflows", f), encoding="utf-8"))
+    n = next(x for x in wf["nodes"] if x["name"] == "Ask to Send Text")
+    return n["parameters"]["assignments"]["assignments"][0]["value"].lstrip("=")
+
+
 class Bot:
     """One scenario's bot + chat on one channel; the run-scoped chat id keeps scenarios independent."""
 
@@ -279,8 +292,11 @@ def send_500(ctx, ch):
     b.post(mid, "Сколько стоит букет?", t)
     ex = b.settle(1)
     led = ledger(b.pid, b.chat, mid)
-    ok = len(b.all_send_calls()) == 1 and ex and ex[0]["outcome"] == "send_failed" and led.startswith("send_failed|-|http 500")
-    return ok, f"send_calls={len(b.all_send_calls())} outcome={ex[0]['outcome'] if ex else None} ledger={led}"
+    # R7: the refused reply never reached the client — the memory node's ai row goes (content = the agent's output on
+    # this very n8n runtime), the client's own row stays
+    ai, hu = ai_rows(b.pid, b.chat), human_rows(b.pid, b.chat)
+    ok = len(b.all_send_calls()) == 1 and ex and ex[0]["outcome"] == "send_failed" and led.startswith("send_failed|-|http 500") and ai == 0 and hu == 1
+    return ok, f"send_calls={len(b.all_send_calls())} outcome={ex[0]['outcome'] if ex else None} ledger={led} memory ai/human={ai}/{hu}"
 
 
 @for_channels("send_timeout_reconciles_from_echo", "A7: the transport answers after our 30-s timeout (message really went out) → send_unknown → echo found → sent, no resend")
@@ -303,8 +319,49 @@ def dropped_no_echo(ctx, ch):
     ex = b.settle(1)
     led = ledger(b.pid, b.chat, mid)
     rc = node_output(ex[0]["data"], "Reconcile Check") if ex else None
-    ok = len(b.all_send_calls()) == 1 and ex and ex[0]["outcome"] == "send_unknown" and led.startswith("send_unknown|-|") and rc and rc.get("reconciled") is False
-    return ok, f"send_calls={len(b.all_send_calls())} outcome={ex[0]['outcome'] if ex else None} ledger={led} reconciled={rc and rc.get('reconciled')}"
+    ai = ai_rows(b.pid, b.chat)            # R7 decision: send_unknown KEEPS the reply in memory (usually it was delivered)
+    ok = len(b.all_send_calls()) == 1 and ex and ex[0]["outcome"] == "send_unknown" and led.startswith("send_unknown|-|") and rc and rc.get("reconciled") is False \
+        and ai == 1
+    return ok, f"send_calls={len(b.all_send_calls())} outcome={ex[0]['outcome'] if ex else None} ledger={led} reconciled={rc and rc.get('reconciled')} ai_memory_rows={ai}"
+
+
+@for_channels("reordered_webhooks_one_reply", "R6: two client messages whose webhooks arrive in REVERSE order (the older one claimed last, inside the newer one's debounce) → exactly one reply, by the newer message's run")
+def reordered(ctx, ch):
+    b = Bot(ctx, ch, "ro")
+    t = int(time.time())
+    ma, mb = f"roA-{ctx.run_id}", f"roB-{ctx.run_id}"
+    b.history([{"id": ma, "body": "Здравствуйте", "time": t, "fromMe": False, "type": "chat"},
+               {"id": mb, "body": "Сколько стоит букет из 25 роз?", "time": t + 1, "fromMe": False, "type": "chat"}])
+    b.post(mb, "Сколько стоит букет из 25 роз?", t + 1)
+    time.sleep(1.5)            # B's run has claimed; the late, OLDER A is claimed now — before B's lease
+    b.post(ma, "Здравствуйте", t)
+    ex = b.settle(2)
+    la, lb = ledger(b.pid, b.chat, ma), ledger(b.pid, b.chat, mb)
+    ok = len(b.sends()) == 1 and lb.startswith("sent|") and la.startswith("superseded|")
+    return ok, f"sends={len(b.sends())} ledger A={la} B={lb} outcomes={[e['outcome'] for e in ex]}"
+
+
+@for_channels("crossed_reconcile_stays_send_unknown", "R10: the send's answer is lost and the reconcile fetch comes back CROSSED (the neighbour chat's window, with the same canned text) → send_unknown, never the neighbour's id")
+def crossed_reconcile(ctx, ch):
+    b = Bot(ctx, ch, "crx")
+    t = int(time.time())
+    mid = f"crx-{ctx.run_id}"
+    b.history([{"id": mid, "body": "https://mock/photo.jpg", "time": t, "fromMe": False, "type": "image"}])
+    nb = f"chat-crxn-{ctx.run_id}{CHANNELS[ch][3]}"
+    mock("POST", "/__mock/messages", {"profile_id": b.pid, "chat_id": nb, "messages": [
+        {"id": f"nbin-{ctx.run_id}", "chatId": nb, "from": nb, "body": "фото", "type": "image", "time": t, "fromMe": False},
+        {"id": f"nbout-{ctx.run_id}", "chatId": nb, "from": "me", "body": ask_text(ch), "type": "chat", "time": t + 600, "fromMe": True}]})
+    mock("POST", "/__mock/fault", {"match": "message/send", "mode": "drop"})                       # nothing reaches the client
+    mock("POST", "/__mock/fault", {"match": "messages/get", "mode": "cross", "cross_chat": nb, "after": "message/send", "times": 3})
+    b.post(mid, "https://mock/photo.jpg", t, mtype="image")
+    ex = b.settle(1)
+    led = ledger(b.pid, b.chat, mid)
+    rc = node_output(ex[0]["data"], "Reconcile Check") if ex else None
+    ai_hist = psql(f"select count(*) from chat_history_events where profile_id = '{b.pid}' and chat_id = '{b.chat}' and source = 'ai';")
+    ok = len(b.all_send_calls()) == 1 and ex and ex[0]["outcome"] == "send_unknown" and led.startswith("send_unknown|-|") \
+        and rc and rc.get("reconciled") is False and (rc.get("foreignFetched") or 0) > 0 and ai_hist == "0"
+    return ok, (f"send_calls={len(b.all_send_calls())} outcome={ex[0]['outcome'] if ex else None} ledger={led} "
+                f"reconciled={rc and rc.get('reconciled')} foreignFetched={rc and rc.get('foreignFetched')} ai_history_rows={ai_hist}")
 
 
 @for_channels("media_message_gets_the_ru_ask_for_text", "a photo/document/sticker never reaches the model: the canned ask is Russian (+ Kazakh line), sent once, through the same send chain (stage 6, 2026-09-22)")
@@ -317,8 +374,11 @@ def media_ask(ctx, ch):
     rows = b.settle(1)
     sends = b.sends()
     body = (sends[0].get("body") or {}).get("body", "") if sends else ""
-    ok = len(rows) == 1 and len(sends) == 1 and body.startswith("Напишите, пожалуйста, текстом") and "Мәтінмен" in body and "Please send" not in body
-    return ok, {"executions": [(r["id"], r["status"], r["outcome"], r["last"]) for r in rows], "sends": len(sends), "body": body[:80]}
+    # the ledger too: a multi-line text through Record Send (R7 part 2 — a $N in an SQL comment left it send_pending)
+    led = ledger(b.pid, b.chat, mid)
+    ok = len(rows) == 1 and len(sends) == 1 and body.startswith("Напишите, пожалуйста, текстом") and "Мәтінмен" in body and "Please send" not in body \
+        and led.startswith("sent|")
+    return ok, {"executions": [(r["id"], r["status"], r["outcome"], r["last"]) for r in rows], "sends": len(sends), "body": body[:80], "ledger": led}
 
 
 def main():

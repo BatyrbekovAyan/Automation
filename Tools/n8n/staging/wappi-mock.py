@@ -25,7 +25,11 @@ Control routes (never exist on the real transport):
     POST /__mock/fault     {match:<path substr>, mode:"status"|"timeout"|"accept_then_drop"|"drop",
                             status:500, times:1, delay:35, profile_id:<optional>}
                            profile_id scopes the fault to calls FOR that profile (query/body profile_id), so a
-                           schedule sweeping every profile (the handoff notifier) cannot hand it to another row
+                           schedule sweeping every profile (the handoff notifier) cannot hand it to another row.
+                           mode "cross" (messages/get): answer with the window of chat `cross_chat` of the same
+                           profile — the project-confirmed crossed-response bug; `after: <path substr>` keeps a
+                           fault dormant until such a call was recorded (e.g. cross only the RECONCILE fetch,
+                           i.e. a messages/get after message/send)
     POST /__mock/profile   {profile_id, authorized, phone, authorized_at}   status fields for get/status
     GET  /__mock/state
 """
@@ -70,6 +74,8 @@ def _take_fault(path, profile_id=""):
     with LOCK:
         for f in STATE["faults"]:
             if f.get("profile_id") and f["profile_id"] != profile_id:
+                continue
+            if f.get("after") and not any(f["after"] in c["path"] for c in STATE["calls"][f.get("armed_at", 0):]):
                 continue
             if f["match"] in path and f.get("times", 1) > 0:
                 f["times"] -= 1
@@ -142,6 +148,8 @@ class Handler(BaseHTTPRequestHandler):
             if path.startswith(pre):
                 tail = path[len(pre):]
                 break
+        if fault and fault["mode"] == "cross":
+            query = dict(query, chat_id=fault.get("cross_chat") or "")
         status, resp = self._transport(method, tail, channel, query, body)
         entry["status"] = status
         entry["resp"] = resp
@@ -238,7 +246,8 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/__mock/fault" and method == "POST":
                 f = {"match": b["match"], "mode": b.get("mode", "status"), "status": int(b.get("status", 500)),
                      "times": int(b.get("times", 1)), "delay": float(b.get("delay", 35)),
-                     "profile_id": b.get("profile_id") or ""}
+                     "profile_id": b.get("profile_id") or "", "after": b.get("after") or "",
+                     "cross_chat": b.get("cross_chat") or "", "armed_at": len(STATE["calls"])}
                 STATE["faults"].append(f)
                 return self._send(200, {"ok": True, "fault": f})
             if path == "/__mock/profile" and method == "POST":

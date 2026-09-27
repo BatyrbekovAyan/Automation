@@ -1,0 +1,35 @@
+# e2e BEFORE — the new/strengthened staging scenarios (e2e-reply: reordered_webhooks_one_reply, crossed_reconcile_stays_send_unknown, send_500_is_send_failed + memory, dropped_without_echo_stays_send_unknown + memory; e2e-handoff: lost_send_settled_by_notifier) against staging still running the PRE-fix templates (imported at 2b4f0f93)
+FAIL  reordered_webhooks_one_reply[wa] (38s) — R6: two client messages whose webhooks arrive in REVERSE order (the older one claimed last, inside the newer one's debounce) → exactly one reply, by the newer message's run
+      sends=0 ledger A=superseded|-|- B=superseded|-|- outcomes=['superseded', 'superseded']
+FAIL  reordered_webhooks_one_reply[tg] (35s) — R6: two client messages whose webhooks arrive in REVERSE order (the older one claimed last, inside the newer one's debounce) → exactly one reply, by the newer message's run
+      sends=0 ledger A=superseded|-|- B=superseded|-|- outcomes=['superseded', 'superseded']
+   cleanup: deleted rows: 5
+
+0 pass, 2 fail
+FAIL  crossed_reconcile_stays_send_unknown[wa] (16s) — R10: the send's answer is lost and the reconcile fetch comes back CROSSED (the neighbour chat's window, with the same canned text) → send_unknown, never the neighbour's id
+      send_calls=1 outcome=sent ledger=sent|nbout-10a3627cdc10|- reconciled=True foreignFetched=None ai_history_rows=1
+FAIL  crossed_reconcile_stays_send_unknown[tg] (17s) — R10: the send's answer is lost and the reconcile fetch comes back CROSSED (the neighbour chat's window, with the same canned text) → send_unknown, never the neighbour's id
+      send_calls=1 outcome=sent ledger=sent|nbout-10a3627cdc10|- reconciled=True foreignFetched=None ai_history_rows=1
+   cleanup: deleted rows: 5
+
+0 pass, 2 fail
+FAIL  send_500_is_send_failed[wa] (33s) — A7: the transport answers HTTP 500 → send_failed recorded with the error, exactly one attempt
+      send_calls=1 outcome=send_failed ledger=send_failed|-|http 500 {"status":"error","detail":"injected"} memory ai/human=1/1
+FAIL  send_500_is_send_failed[tg] (33s) — A7: the transport answers HTTP 500 → send_failed recorded with the error, exactly one attempt
+      send_calls=1 outcome=send_failed ledger=send_failed|-|http 500 {"status":"error","detail":"injected"} memory ai/human=1/1
+   cleanup: deleted rows: 5
+
+0 pass, 2 fail
+PASS  dropped_without_echo_stays_send_unknown[wa] (35s) — A7: the connection dies before the transport processed anything → no echo → the state STAYS send_unknown (visible in the ledger), no resend
+      send_calls=1 outcome=send_unknown ledger=send_unknown|-|socket hang up reconciled=False ai_memory_rows=1
+PASS  dropped_without_echo_stays_send_unknown[tg] (35s) — A7: the connection dies before the transport processed anything → no echo → the state STAYS send_unknown (visible in the ledger), no resend
+      send_calls=1 outcome=send_unknown ledger=send_unknown|-|socket hang up reconciled=False ai_memory_rows=1
+   cleanup: deleted rows: 5
+
+2 pass, 0 fail
+FAIL  lost_send_settled_by_notifier (174s) — R9: a reply left send_pending > 10 min (its run died between the lease and Record Send) becomes send_unknown on the notifier's schedule — no transport call; a live one is untouched
+      lost=send_pending|dead-run|- live=send_pending send_calls_for_profile=0
+   cleanup: deleted rows: 2
+   cleanup: 0 owner fixture(s)
+
+0 pass, 1 fail

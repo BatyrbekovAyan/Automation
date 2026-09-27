@@ -298,6 +298,28 @@ def notifier(ctx):
     return ok, f"states={states} send_calls={len(calls)} to_self={to_self} no_leak={no_leak} requests_intact={intact} body={bodies[-1][:80] if bodies else None!r}"
 
 
+@scenario("lost_send_settled_by_notifier", "R9: a reply left send_pending > 10 min (its run died between the lease and Record Send) becomes send_unknown on the notifier's schedule — no transport call; a live one is untouched")
+def lost_send(ctx):
+    b = Dedicated(ctx, "ls")
+    lost, live = f"ls-lost-{ctx.run_id}", f"ls-live-{ctx.run_id}"
+    psql(f"insert into reply_events (profile_id, chat_id, message_id, execution_id, state, updated_at) values "
+         f"('{b.pid}', '{b.chat}', '{lost}', 'dead-run', 'send_pending', now() - interval '11 minutes'), "
+         f"('{b.pid}', '{b.chat}', '{live}', 'live-run', 'send_pending', now() - interval '2 minutes');")
+    since = mock_total()
+    deadline = time.time() + 170            # the schedule fires every 2 minutes
+    row = ""
+    while time.time() < deadline:
+        row = psql(f"select state || '|' || coalesce(execution_id, '-') || '|' || coalesce(error, '-') from reply_events where profile_id = '{b.pid}' and message_id = '{lost}';")
+        if not row.startswith("send_pending"):
+            break
+        time.sleep(5)
+    live_state = psql(f"select state from reply_events where profile_id = '{b.pid}' and message_id = '{live}';")
+    st, d = mock("GET", f"/__mock/calls?since={since}&path=message/send")
+    mine = [c for c in d["calls"] if (c.get("query") or {}).get("profile_id") == b.pid]
+    ok = row.startswith("send_unknown|dead-run|run_lost") and live_state == "send_pending" and not mine
+    return ok, f"lost={row} live={live_state} send_calls_for_profile={len(mine)}"
+
+
 @scenario("handoffs_webhook_owner_scoped_list_take_done", "A5: the app's list/take/done are token-only and owner-scoped; done lifts the chat's pause")
 def api(ctx):
     b = Dedicated(ctx, "hw")            # pausedChats is profile-wide: only this scenario's chat may be paused on it
