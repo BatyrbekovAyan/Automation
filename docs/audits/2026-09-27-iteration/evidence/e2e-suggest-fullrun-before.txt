@@ -1,0 +1,18 @@
+FAIL  knowledge_budget_and_server_time_reach_the_prompt (1s) — S1/S2/S7: the composed prompt carries the item DESCRIPTION, the contacts after a long description, the server clock in the bot's zone — and never the phone's clock
+      http=403 tz=None now=None flags=None desc_in_fenced=False addr_in_fenced=False phone_clock_leaked=False
+FAIL  short_follow_up_recovers_subject_and_exact_match [llm] (1s) — S4: «а сколько стоит?» after the exact model — the retrieval query carries the subject, the article is matched EXACTLY in the price list, the cards quote that price
+      http=403 query='None' tokens=None exact_row=False cards=[]
+FAIL  asked_item_keeps_its_conditions_in_a_long_catalog (1s) — R12: in a catalog over the 3000-char budget the ASKED bouquet reaches ДАННЫЕ with its whole description («Доставка … оплачивается отдельно»), the rest is cut with «…», and the prompt carries the rule
+      http=403 catalog_len=0 asked_whole=False flags=None rule=''
+FAIL  exact_match_newest_article_leads (2s) — R13: after a reply listing an old code and prices, «а NEW12345?» puts NEW12345 first in the tokens and its price-list row first in exactMatches — three newer rows with an old price do not push it out, and a bare 15000 is not 150000
+      http=403/403 tokens=None exact_head='' tokens2=None exact2=''
+FAIL  same_request_key_is_counted_once (2s) — S3: a retry with the SAME request key (timeout / re-open) does not increment the daily counter; a new key does
+      counts after 1st/retry/new = 0/0/0 (retry must not add, a new key adds 1), keys=0
+FAIL  authenticated_refusals_are_named (2s) — S8: an expired subscription and an unknown account answer with their KIND for a token-bearing caller; a bad body answers bad_request
+      expired=unauthorized unknown=unknown_account bad=bad_request
+PASS  legacy_caller_keeps_opaque_error (0s) — S8/N-4: a token-less legacy call (compat window) still gets only generation_failed — no account oracle
+      http=200 error=generation_failed
+PASS  execution_deadline_is_set (0s) — S3: the workflow carries a 20-s server deadline shorter than the client's 22 s
+      executionTimeout=20 (client waits 22 s)
+
+2 pass, 6 fail

