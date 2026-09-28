@@ -1,0 +1,7 @@
+PASS legacy: apply-rag-fixes.py  refuses and leaves the canonical workflows untouched
+PASS legacy: apply-upload-hardening.py  refuses and leaves the canonical workflows untouched
+PASS legacy: apply-message-batching.py  refuses and leaves the canonical workflows untouched
+PASS legacy: apply-delete-history.py --deploy refuses and leaves the canonical workflows untouched
+PASS legacy: apply-delete-history.py --check refuses and leaves the canonical workflows untouched
+
+5 pass, 0 fail

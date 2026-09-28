@@ -1,0 +1,38 @@
+FAIL legacy: apply-rag-fixes.py  refuses and leaves the canonical workflows untouched
+      - rewrote ['4VN3gsFaC2HUYmcc-Telegram_Bot.json', '4wYitz5ek30SVNlT-WhatsApp_Bot.json', 'KoTuIlk4LMrlvnWI-Upload_File.json']
+      - exit 0: fixed 4wYitz5ek30SVNlT-WhatsApp_Bot.json
+  fixed 4VN3gsFaC2HUYmcc-Telegram_Bot.json
+  fixed KoTuIlk4LMrlvnWI-Upload_File.json
+done
+      - no RETIRED notice: fixed 4wYitz5ek30SVNlT-WhatsApp_Bot.json
+  fixed 4VN3gsFaC2HUYmcc-Telegram_Bot.json
+  fixed KoTuIlk4LMrlvnWI-Upload_File.json
+done
+FAIL legacy: apply-upload-hardening.py  refuses and leaves the canonical workflows untouched
+      - rewrote ['KoTuIlk4LMrlvnWI-Upload_File.json', 'ZTqpumOpL1rNDOp6-Delete_File.json']
+      - exit 0: fixed KoTuIlk4LMrlvnWI-Upload_File.json
+  fixed ZTqpumOpL1rNDOp6-Delete_File.json
+done
+      - no RETIRED notice: fixed KoTuIlk4LMrlvnWI-Upload_File.json
+  fixed ZTqpumOpL1rNDOp6-Delete_File.json
+done
+FAIL legacy: apply-message-batching.py  refuses and leaves the canonical workflows untouched
+      - rewrote ['4VN3gsFaC2HUYmcc-Telegram_Bot.json', '4wYitz5ek30SVNlT-WhatsApp_Bot.json']
+      - exit 0: spliced 4wYitz5ek30SVNlT-WhatsApp_Bot.json
+  spliced 4VN3gsFaC2HUYmcc-Telegram_Bot.json
+done
+      - no RETIRED notice: spliced 4wYitz5ek30SVNlT-WhatsApp_Bot.json
+  spliced 4VN3gsFaC2HUYmcc-Telegram_Bot.json
+done
+FAIL legacy: apply-delete-history.py --deploy refuses and leaves the canonical workflows untouched
+      - rewrote ['lmjYsdNcQA2IE5rl-Delete_Bot_Files.json']
+      - no RETIRED notice: turn self.do_open(http.client.HTTPConnection, req)
+  File "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/urllib/request.py", line 1349, in do_open
+    raise URLError(err)
+urllib.error.URLError: <urlopen error [Errno 61] Connection refused>
+FAIL legacy: apply-delete-history.py --check refuses and leaves the canonical workflows untouched
+      - exit 0: would change canonical
+      - no RETIRED notice: would change canonical
+      - would change canonical
+
+0 pass, 5 fail

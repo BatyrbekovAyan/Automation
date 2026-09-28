@@ -18,7 +18,7 @@ preserving indent=2 / ensure_ascii=False formatting. Re-runnable: no-op twice.
 
 The bucket must exist: see supabase/2026-07-02-price-list-originals-bucket.sql.
 """
-import json, os, uuid
+import json, os, sys, uuid
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 WF = os.path.join(REPO, "Tools/n8n/workflows")
@@ -119,7 +119,20 @@ def fix_delete(wf):
     return wf
 
 
+# RETIRED 2026-09-28 (review iteration 2026-09-27, legacy-generator audit): the 2026-07-02 upload/delete hardening was a ONE-SHOT migration.
+# Later generators rewrote the nodes it owns — now Upload File / Delete File (apply-auth-gate.py: Auth Gate, Upload Fields Valid?, owner-scoped Delete File) —
+# so re-running it REVERTS their fixes: a Webhook -> Delete Stored Original edge that bypasses the Auth Gate.
+# The canonical JSON in Tools/n8n/workflows/ is the state; change it through the owning generator and deploy with
+# deploy-canonical.py. Pinned by tests/test_legacy_generators.py. The functions above stay as the historical record.
+RETIRED = ("RETIRED: apply-upload-hardening.py is a one-shot migration superseded by later generators; re-running it would put back "
+           "a Webhook -> Delete Stored Original edge that bypasses the Auth Gate. See the RETIRED note above main().")
+
+
 def main():
+    sys.exit(RETIRED)
+
+
+def _one_shot_main():  # the original entry point, kept for the record — never called
     wf = load(UPLOAD); fix_upload(wf); save(UPLOAD, wf); print(f"  fixed {UPLOAD}")
     wf = load(DELETE); fix_delete(wf); save(DELETE, wf); print(f"  fixed {DELETE}")
     print("done")

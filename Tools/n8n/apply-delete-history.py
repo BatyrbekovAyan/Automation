@@ -22,8 +22,8 @@ with the money -- Task 17a -- and are not chat content). Respond gains
 deletedMemoryRows/deletedOutcomes/deletedReplyFlags.
 
 Usage:
-  python3 Tools/n8n/apply-delete-history.py --check    # diff canonical, no writes
-  python3 Tools/n8n/apply-delete-history.py --deploy   # mutate canonical + PUT to target
+  python3 Tools/n8n/apply-delete-history.py --check    # RETIRED 2026-09-28 (see the note above main())
+  python3 Tools/n8n/apply-delete-history.py --deploy   # RETIRED 2026-09-28 — deploy with deploy-canonical.py
   python3 Tools/n8n/apply-delete-history.py --probe    # E2E on target: seed fixtures ->
                                                        #   webhook -> assert counts + survivors
 Target: N8N_BASE_URL (default https://n8n.choosereply.com — prod-first, like
@@ -348,16 +348,24 @@ def probe():
     print("PROBE GREEN")
 
 
+# RETIRED 2026-09-28 (review iteration 2026-09-27, legacy-generator audit): --deploy and --check. Stage 4
+# (apply-history-handoff.py) and A1/R2 (apply-auth-gate.py) extended «Delete Chat Memory» and Respond after this
+# script was written, so mutate() would put the 2026-09-01 version back — dropping the deletes of
+# chat_history_events, handoff_requests, reply_events and chat_reply_state (a privacy regression) — and --deploy
+# PUTs that straight to prod. The canonical JSON is the state; deploy with deploy-canonical.py. --probe (a live
+# E2E of the deletion) is unaffected. Pinned by tests/test_legacy_generators.py.
+RETIRED = ("RETIRED: apply-delete-history.py --deploy/--check are superseded (they would restore the 2026-09-01 "
+           "Delete Chat Memory and drop the stage-4 privacy deletes). See the RETIRED note above main().")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true")
     ap.add_argument("--deploy", action="store_true")
     ap.add_argument("--probe", action="store_true")
     args = ap.parse_args()
-    if args.check:
-        check()
-    elif args.deploy:
-        deploy()
+    if args.check or args.deploy:
+        sys.exit(RETIRED)
     elif args.probe:
         probe()
     else:

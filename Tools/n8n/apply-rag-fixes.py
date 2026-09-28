@@ -11,7 +11,7 @@ Task 0 confirmed shapes (via n8n-mcp get_node_types on the live instance):
   - textSplitterRecursiveCharacterTextSplitter v1: `chunkSize` / `chunkOverlap` are plain numbers.
   - inbound body carries messages[0].profile_id on BOTH WhatsApp and Telegram (used for sessionKey namespace).
 """
-import json, os, uuid
+import json, os, sys, uuid
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 WF = os.path.join(REPO, "Tools/n8n/workflows")
@@ -169,7 +169,20 @@ def fix_upload(wf):
     return wf
 
 
+# RETIRED 2026-09-28 (review iteration 2026-09-27, legacy-generator audit): the 2026-07-01 RAG restore was a ONE-SHOT migration.
+# Later generators rewrote the nodes it owns — now the bot templates' memory/RAG nodes (apply-reply-pipeline-v2.py -> apply-history-handoff.py: session key = profile:chatId) and Upload File (apply-auth-gate.py: field check + registry chain, R3) —
+# so re-running it REVERTS their fixes: the WhatsApp memory key back to `from` (splits owner-phone rows from the client's).
+# The canonical JSON in Tools/n8n/workflows/ is the state; change it through the owning generator and deploy with
+# deploy-canonical.py. Pinned by tests/test_legacy_generators.py. The functions above stay as the historical record.
+RETIRED = ("RETIRED: apply-rag-fixes.py is a one-shot migration superseded by later generators; re-running it would put back "
+           "the WhatsApp memory key back to `from` (splits owner-phone rows from the client's). See the RETIRED note above main().")
+
+
 def main():
+    sys.exit(RETIRED)
+
+
+def _one_shot_main():  # the original entry point, kept for the record — never called
     for fname in BOT_IDS:
         wf = load(fname); fix_bot(wf); save(fname, wf); print(f"  fixed {fname}")
     wf = load(UPLOAD); fix_upload(wf); save(UPLOAD, wf); print(f"  fixed {UPLOAD}")

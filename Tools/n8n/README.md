@@ -120,12 +120,14 @@ prompt editing, RAG file upload/delete, and (in progress) live reply suggestions
 > **Phase 10 — message-batching / debounce splice.** Both bot templates carry a pre-generation
 > `Debounce Wait → Fetch Recent → Latest+Combine → Is Latest?` stage on the `Suppressed?` FALSE
 > branch (before `Input type`) that coalesces a burst of multi-fragment customer messages into ONE
-> combined reply — only the last fragment's execution proceeds; earlier fragments dead-end. It is
-> authored by the idempotent `apply-message-batching.py` (edits both templates in place, by node
-> name). The script OWNS those 4 nodes: every run upserts them from its own specs, preserving only
-> the stable uuid5 `id` and the node `position` — so never hand-edit them in the JSON (a re-run
-> reverts it), change the script instead. **Re-run `apply-message-batching.py` after any template
-> re-import / UI round-trip**, then run `verify-message-batching.py` to gate the splice (asserts the
+> combined reply — only the last fragment's execution proceeds; earlier fragments dead-end. It was
+> first authored by the one-shot `apply-message-batching.py`, which is **RETIRED (2026-09-28) — never
+> re-run it**: stage 3/4 (`apply-reply-pipeline-v2.py` → `apply-history-handoff.py`) now own those
+> nodes (the A3 owner rule inside Latest+Combine, the `Suppressed? → Record Suppressed` branch), and a
+> re-run would put the Phase-10 versions back. The same holds for `apply-rag-fixes.py`,
+> `apply-upload-hardening.py` and `apply-delete-history.py --deploy/--check`; all four refuse to write
+> (`tests/test_legacy_generators.py`). Change those nodes through their current generator, then run
+> `verify-message-batching.py` to gate the splice (asserts the
 > 4 nodes, the `Suppressed? → Debounce Wait` rewire, the `messages/get` fetch with no `mark_all` and
 > its hot-path `retryOnFail`, and the Code-node body re-emit + nullish empty combine + requested-chat
 > filter + explicit `pairedItem`). This edits the two existing templates — **no new canonical

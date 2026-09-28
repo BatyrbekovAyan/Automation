@@ -30,7 +30,7 @@ Corollary: never hand-edit the four managed nodes in the JSON — a re-run rever
 Live deploy + runData verification is plan 10-03 (owner gate). This script only
 edits the committed JSON; it never touches the live n8n instance.
 """
-import json, os, uuid
+import json, os, sys, uuid
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 WF = os.path.join(REPO, "Tools/n8n/workflows")
@@ -266,7 +266,20 @@ def splice(wf):
     return wf
 
 
+# RETIRED 2026-09-28 (review iteration 2026-09-27, legacy-generator audit): the Phase-10 debounce splice was a ONE-SHOT migration.
+# Later generators rewrote the nodes it owns — now Debounce/Fetch Recent/Latest+Combine/Is Latest? (apply-reply-pipeline-v2.py -> apply-history-handoff.py: A3 owner rule, Record Suppressed branch) —
+# so re-running it REVERTS their fixes: it would restore Latest+Combine without the A3 owner rule and drop the Suppressed? -> Record Suppressed edge.
+# The canonical JSON in Tools/n8n/workflows/ is the state; change it through the owning generator and deploy with
+# deploy-canonical.py. Pinned by tests/test_legacy_generators.py. The functions above stay as the historical record.
+RETIRED = ("RETIRED: apply-message-batching.py is a one-shot migration superseded by later generators; re-running it would restore "
+           "Latest+Combine without the A3 owner rule and drop the Suppressed? -> Record Suppressed edge. See the RETIRED note above main().")
+
+
 def main():
+    sys.exit(RETIRED)
+
+
+def _one_shot_main():  # the original entry point, kept for the record — never called
     for fname in BOT_IDS:
         wf = load(fname)
         splice(wf)
