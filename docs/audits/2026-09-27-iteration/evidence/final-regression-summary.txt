@@ -1,0 +1,19 @@
+Финальная регрессия HEAD 282224bc, 2026-09-28
+Unity EditMode: 2729/2729
+n8n run_all: 310/310 (17 наборов)
+verify-deployed стенд: exit 0
+--- e2e полный последовательный прогон с фиксом изоляции ---
+######## e2e.py ########
+11 pass, 0 fail
+######## e2e-suggest.py ########
+8 pass, 0 fail
+######## e2e-auth.py ########
+24 pass, 0 fail
+######## e2e-reply.py ########
+34 pass, 0 fail
+######## e2e-handoff.py ########
+17 pass, 0 fail
+######## e2e-test-dialog.py ########
+6 pass, 0 fail
+######## e2e-clone-update.py ########
+ALL_E2E_DONE

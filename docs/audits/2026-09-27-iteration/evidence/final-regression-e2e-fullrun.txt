@@ -1,0 +1,49 @@
+######## e2e.py ########
+e2e.py EXIT=0
+      sends=0 (expected 0); executions=[('8238', ('Outcome', 'success'))]; webhook=[200]
+   cleanup: deleted rows: 4
+
+11 pass, 0 fail
+
+######## e2e-suggest.py ########
+e2e-suggest.py EXIT=0
+PASS  execution_deadline_is_set (0s) — S3: the workflow carries a 20-s server deadline shorter than the client's 22 s
+      executionTimeout=20 (client waits 22 s)
+
+8 pass, 0 fail
+
+######## e2e-auth.py ########
+e2e-auth.py EXIT=0
+   cleanup up: deleted rows: 3
+   cleanup upv: deleted rows: 3
+
+24 pass, 0 fail
+
+######## e2e-reply.py ########
+e2e-reply.py EXIT=0
+      {'executions': [('8456', 'success', 'sent', 'Outcome')], 'sends': 1, 'body': 'Напишите, пожалуйста, текстом, что вас интересует — фото, файлы и стикеры я не в', 'ledger': 'sent|sent-000001|-'}
+   cleanup: deleted rows: 39
+
+34 pass, 0 fail
+
+######## e2e-handoff.py ########
+e2e-handoff.py EXIT=0
+   cleanup: deleted rows: 9
+   cleanup: 8 owner fixture(s)
+
+17 pass, 0 fail
+
+######## e2e-test-dialog.py ########
+e2e-test-dialog.py EXIT=0
+      {'status': 200, 'row': {'profileId': 'stgwa001', 'chatTail': '6543', 'state': 'send_unknown', 'at': 1790585955402, 'executionId': 'exec-04141457698b', 'transportMessageId': None}, 'recent_n': 1, 'foreign': 403, 'leaks_text': False, 'body': None}
+   cleanup: deleted rows: 2
+
+6 pass, 0 fail
+
+######## e2e-clone-update.py ########
+e2e-clone-update.py EXIT=0
+PASS clone_update_old_template_to_canonical
+      {"created": "Ek8cJbKm7q18xGFr", "old_nodes": 33, "dry_run": "{\"clones\": 1, \"up_to_date\": 0, \"would_update\": 1, \"updated\": 0, \"failed\": 0}", "apply": "{\"clones\": 1, \"up_to_date\": 0, \"would_update\": 0, \"updated\": 1, \"failed\": 0}", "rerun": "{\"clones\": 1, \"up_to_date\": 1, \"would_update\": 0, \"updated\": 0, \"failed\": 0}", "path_kept": true, "prompt_kept": true, "nodes_now": 57, "canonical_names": true, "stamped": true, "active_after": true, "webhook": 200, "outcome": "sent", "sends": 1, "ledger": "sent"}
+   cleanup: deleted rows: 3
+
+ALL_E2E_DONE
