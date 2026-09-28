@@ -19,7 +19,7 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from e2e import (Ctx, api, execution, fixture, http, latest_executions, node_output, wait_executions_settle, BASE)  # noqa: E402
+from e2e import (Ctx, api, execution, fixture, http, latest_executions, node_output, wait_executions_settle, BASE, MOCK)  # noqa: E402
 _spec = importlib.util.spec_from_file_location("e2e_auth", os.path.join(HERE, "e2e-auth.py"))
 e2e_auth = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(e2e_auth)
@@ -209,6 +209,19 @@ def deadline(ctx):
     return ok, f"executionTimeout={t} (client waits 22 s)"
 
 
+def sweep_stale_mock_profiles():
+    """Isolation, same class as e2e-auth's own pre-run (commit c5b81ba3): the Wappi mock mints profile ids from a
+    counter that restarts with the mock (profile-000001, …), and other suites in a full run reset that counter while
+    their bot_profiles rows stay. This suite's profile.add then gets an id an EARLIER row already owns, so the Auth
+    Gate correctly refuses it (403 forbidden:profileId) — a harness artifact, not a Suggest Replies defect. Before any
+    fixture, drop the rows of mock-minted ids the LIVE mock does not know (fixtures.py sweep-mock-profiles)."""
+    st, state = http("GET", f"{MOCK}/__mock/state")
+    live = sorted((state or {}).get("profiles", {}).keys()) if st == 200 else None
+    if live is None:
+        raise SystemExit(f"Wappi mock not reachable at {MOCK} ({st})")
+    print("   pre-run:", fixture("sweep-mock-profiles", *[x for p in live for x in ("--live", p)]))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only")
@@ -221,6 +234,7 @@ def main():
     st, _ = http("GET", f"{BASE}/healthz")
     if st != 200:
         sys.exit(f"staging n8n not reachable at {BASE}")
+    sweep_stale_mock_profiles()
     ctx = Ctx()
     passed = failed = 0
     try:
