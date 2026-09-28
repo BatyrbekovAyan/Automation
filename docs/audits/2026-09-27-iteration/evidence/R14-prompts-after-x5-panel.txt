@@ -1,0 +1,51 @@
+PASS  pn_personal_congrats                 1.00  
+PASS  pn_thanks_in_business                1.00  
+PASS  pn_price_question                    1.00  
+
+{
+ "label": "r14p-final-x5-panel-flowers",
+ "prompts_ref": "worktree",
+ "scenario_version": "v1.1 (2026-09-22: absent-item check names the item; harness h2)",
+ "harness": "h3 (2026-09-27, R14: scoped negation + data-aware free delivery, price conflict by parsed numbers and search, asks-in-a-request, firm totals, no digit gluing; checks pinned by test_checks.py)",
+ "model": "gpt-5.4-mini",
+ "reasoning_effort": null,
+ "dropped_params": [],
+ "panel_model": "gpt-4o-mini",
+ "max_tokens": 200,
+ "scenarios": 3,
+ "runs": 15,
+ "pass_all": 3,
+ "flaky": 0,
+ "fail": 0,
+ "error_runs": 0,
+ "finish_reason_length_runs": 0,
+ "prompt_tokens": 0,
+ "cached_tokens": 0,
+ "completion_tokens": 0,
+ "reasoning_tokens": 0,
+ "cost_usd_auto_path": 0.0,
+ "prices_usd_per_1m": [
+  0.75,
+  0.075,
+  4.5
+ ],
+ "latency_ms": {
+  "auto": null,
+  "panel": {
+   "n": 15,
+   "median": 1817,
+   "p90": 2509,
+   "max": 2625
+  }
+ },
+ "seconds": 28,
+ "by_check": {
+  "abstain": "5/5",
+  "cards": "10/10",
+  "cards_no_upsell_on_thanks": "5/5",
+  "cards_numbers_grounded": "5/5",
+  "cards_ru": "5/5"
+ }
+}
+wrote Tools/n8n/eval/results/r14p-final-x5-panel-flowers.md
+EXIT 0

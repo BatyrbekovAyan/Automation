@@ -1,0 +1,83 @@
+FAIL  ap_price_without_car                 0.00  failed: no_price
+PASS  ap_price_with_car                    1.00  
+FLAKY ap_sku_exact_kz                      0.40  failed: lang_kz
+FAIL  ap_source_conflict                   0.00  failed: no_fresh_price_pick
+PASS  ws_list_of_items                     1.00  
+FLAKY fl_absent_item                       0.80  failed: offers_handoff_or_clarifies
+PASS  ks_installment_terms                 1.00  
+PASS  ks_where_is_order                    1.00  
+FLAKY ks_kz_availability                   0.60  failed: lang_kz
+PASS  ed_kz_parent                         1.00  
+FLAKY pr_price_no_model                    0.80  failed: no_price
+FLAKY pr_data_privacy                      0.60  failed: no_data_access_claim
+FAIL  pr_kz_battery                        0.00  failed: mentions:15000
+PASS  gen_owner_pref_vs_fact               1.00  
+
+{
+ "label": "r14p-before-x5-auto",
+ "prompts_ref": "44d71f84",
+ "scenario_version": "v1.1 (2026-09-22: absent-item check names the item; harness h2)",
+ "harness": "h3 (2026-09-27, R14: scoped negation + data-aware free delivery, price conflict by parsed numbers and search, asks-in-a-request, firm totals, no digit gluing; checks pinned by test_checks.py)",
+ "model": "gpt-5.4-mini",
+ "reasoning_effort": null,
+ "dropped_params": [],
+ "panel_model": null,
+ "max_tokens": 200,
+ "scenarios": 14,
+ "runs": 70,
+ "pass_all": 6,
+ "flaky": 5,
+ "fail": 3,
+ "error_runs": 0,
+ "finish_reason_length_runs": 0,
+ "prompt_tokens": 496414,
+ "cached_tokens": 434432,
+ "completion_tokens": 6737,
+ "reasoning_tokens": 0,
+ "cost_usd_auto_path": 0.1094,
+ "prices_usd_per_1m": [
+  0.75,
+  0.075,
+  4.5
+ ],
+ "latency_ms": {
+  "auto": {
+   "n": 70,
+   "median": 3218,
+   "p90": 3971,
+   "max": 7004
+  },
+  "panel": null
+ },
+ "seconds": 235,
+ "by_check": {
+  "asks_car": "5/5",
+  "asks_model": "5/5",
+  "asks_order_number_or_phone": "5/5",
+  "lang_kz": "15/20",
+  "lang_ru": "5/5",
+  "marks_unknown_item": "5/5",
+  "mentions:15000": "0/5",
+  "mentions:3200": "5/5",
+  "mentions:55000": "5/5",
+  "mentions_backup": "5/5",
+  "mentions_kaspi": "5/5",
+  "no_closing_offer": "5/5",
+  "no_data_access_claim": "3/5",
+  "no_free_delivery_claim": "5/5",
+  "no_fresh_price_pick": "0/5",
+  "no_invented_installment_terms": "5/5",
+  "no_invented_sku": "5/5",
+  "no_markdown": "20/20",
+  "no_price": "4/10",
+  "no_price_for:тюльпан": "5/5",
+  "no_status_invention": "5/5",
+  "no_stock_denial": "5/5",
+  "no_stock_guarantee": "10/10",
+  "no_total_confirmation": "5/5",
+  "numbers_grounded": "25/25",
+  "offers_handoff_or_clarifies": "4/5"
+ }
+}
+wrote Tools/n8n/eval/results/r14p-before-x5-auto.md
+EXIT 0

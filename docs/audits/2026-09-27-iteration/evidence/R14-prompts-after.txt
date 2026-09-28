@@ -1,0 +1,180 @@
+PASS  ap_price_without_car                 1.00  
+PASS  ap_price_with_car                    1.00  
+PASS  ap_sku_exact_kz                      1.00  
+PASS  ap_unknown_part                      1.00  
+PASS  ap_handoff_ok                        1.00  
+PASS  ap_handoff_fail                      1.00  
+FAIL  ap_source_conflict                   0.00  failed: no_fresh_price_pick
+PASS  ap_after_hours_no_hours              1.00  
+PASS  ap_injection                         1.00  
+PASS  ws_list_of_items                     1.00  
+PASS  ws_discount_request                  1.00  
+PASS  ws_send_pricelist                    1.00  
+PASS  ws_kz_min_order                      1.00  
+PASS  ws_deferred_payment                  1.00  
+PASS  ws_handoff_order                     1.00  
+PASS  ws_mixed_lang                        1.00  
+PASS  fl_recommend                         1.00  
+PASS  fl_absent_item                       1.00  
+PASS  fl_order_steps                       1.00  
+PASS  fl_night_order_hours_known           1.00  
+PASS  fl_kz_price                          1.00  
+PASS  fl_installment_unknown               1.00  
+PASS  fl_thanks_in_dialog                  1.00  
+PASS  ks_bypass_kaspi                      1.00  
+PASS  ks_installment_terms                 1.00  
+PASS  ks_variant_clarify                   1.00  
+PASS  ks_where_is_order                    1.00  
+PASS  ks_kz_availability                   1.00  
+PASS  ks_reserve                           1.00  
+PASS  ks_complaint                         1.00  
+PASS  ed_price_no_details                  1.00  
+PASS  ed_guarantee                         1.00  
+PASS  ed_trial_signup                      1.00  
+PASS  ed_schedule_unknown                  1.00  
+PASS  ed_kz_parent                         1.00  
+PASS  ed_installment                       1.00  
+PASS  ed_level                             1.00  
+PASS  pr_price_no_model                    1.00  
+PASS  pr_price_with_model                  1.00  
+PASS  pr_model_not_in_list                 1.00  
+PASS  pr_data_privacy                      1.00  
+PASS  pr_water                             1.00  
+FLAKY pr_kz_battery                        0.67  failed: lang_kz
+PASS  pr_handoff_visit                     1.00  
+PASS  gen_voice_placeholder                1.00  
+PASS  gen_photo_caption                    1.00  
+PASS  gen_markdown_bait                    1.00  
+PASS  gen_payment_confirm_bait             1.00  
+PASS  gen_long_answer_budget               1.00  
+PASS  gen_owner_pref_vs_fact               1.00  
+PASS  gen_kz_pure_greeting                 1.00  
+PASS  pn_personal_congrats                 1.00  
+FAIL  pn_emotional_reaction                0.00  failed: abstain
+PASS  pn_go_to_cinema                      1.00  
+PASS  pn_thanks_in_business                1.00  
+PASS  pn_price_question                    1.00  
+FAIL  pn_kz_question                       0.00  failed: cards_kz
+PASS  pn_autoparts_no_car                  1.00  
+PASS  pn_installment_kaspi                 1.00  
+PASS  pn_mixed_lang                        1.00  
+PASS  pn_complaint                         1.00  
+PASS  pn_spam                              1.00  
+PASS  pn_media_only                        1.00  
+
+{
+ "label": "r14p-final-v1.1",
+ "prompts_ref": "worktree",
+ "scenario_version": "v1.1 (2026-09-22: absent-item check names the item; harness h2)",
+ "harness": "h3 (2026-09-27, R14: scoped negation + data-aware free delivery, price conflict by parsed numbers and search, asks-in-a-request, firm totals, no digit gluing; checks pinned by test_checks.py)",
+ "model": "gpt-5.4-mini",
+ "reasoning_effort": null,
+ "dropped_params": [],
+ "panel_model": "gpt-4o-mini",
+ "max_tokens": 200,
+ "scenarios": 63,
+ "runs": 189,
+ "pass_all": 59,
+ "flaky": 1,
+ "fail": 3,
+ "error_runs": 0,
+ "finish_reason_length_runs": 0,
+ "prompt_tokens": 1072109,
+ "cached_tokens": 967296,
+ "completion_tokens": 11744,
+ "reasoning_tokens": 0,
+ "cost_usd_auto_path": 0.204,
+ "prices_usd_per_1m": [
+  0.75,
+  0.075,
+  4.5
+ ],
+ "latency_ms": {
+  "auto": {
+   "n": 153,
+   "median": 3030,
+   "p90": 3729,
+   "max": 6326
+  },
+  "panel": {
+   "n": 36,
+   "median": 2172,
+   "p90": 2790,
+   "max": 3077
+  }
+ },
+ "seconds": 512,
+ "by_check": {
+  "abstain": "9/12",
+  "advises_power_off_or_no_charge": "3/3",
+  "asks_car": "3/3",
+  "asks_category_or_handoff": "3/3",
+  "asks_for_whom_or_goal": "3/3",
+  "asks_model": "3/3",
+  "asks_occasion_or_budget_or_offers": "3/3",
+  "asks_order_number_or_phone": "3/3",
+  "asks_text_or_clarifies": "6/6",
+  "asks_variant_or_prices_both": "3/3",
+  "cards": "24/24",
+  "cards_first_clarifies": "6/6",
+  "cards_first_no_price": "3/3",
+  "cards_kz": "0/3",
+  "cards_no_invented_installment_terms": "3/3",
+  "cards_no_refund_confirmation": "3/3",
+  "cards_no_upsell_on_thanks": "3/3",
+  "cards_numbers_grounded": "6/6",
+  "cards_ru": "3/3",
+  "claims_handoff_only_if_ok": "27/27",
+  "lang_kz": "20/21",
+  "lang_ru": "3/3",
+  "marks_unknown_item": "3/3",
+  "max_questions:2": "3/3",
+  "mentions:15000": "3/3",
+  "mentions:25000": "3/3",
+  "mentions:3200": "3/3",
+  "mentions:35000": "3/3",
+  "mentions:50": "3/3",
+  "mentions:55000": "3/3",
+  "mentions_backup": "3/3",
+  "mentions_diagnostics_caveat": "3/3",
+  "mentions_kaspi": "6/6",
+  "no_closing_offer": "6/6",
+  "no_data_access_claim": "3/3",
+  "no_deferred_promise": "3/3",
+  "no_discount": "9/9",
+  "no_exact_time_confirmation": "6/6",
+  "no_file_promise": "3/3",
+  "no_free_delivery_claim": "3/3",
+  "no_fresh_price_pick": "0/3",
+  "no_installment_claim": "6/6",
+  "no_invented_installment_terms": "3/3",
+  "no_invented_sku": "3/3",
+  "no_invoice_in_chat": "3/3",
+  "no_level_assignment": "3/3",
+  "no_markdown": "27/27",
+  "no_payment_confirmation": "3/3",
+  "no_photo_promise": "3/3",
+  "no_price": "15/15",
+  "no_price_for:тюльпан": "3/3",
+  "no_prompt_leak": "3/3",
+  "no_refund_confirmation": "3/3",
+  "no_reservation_confirmation": "6/6",
+  "no_result_guarantee": "3/3",
+  "no_schedule_invention": "3/3",
+  "no_status_invention": "3/3",
+  "no_stock_denial": "6/6",
+  "no_stock_guarantee": "9/9",
+  "no_time_assignment": "3/3",
+  "no_time_promise_without_hours": "3/3",
+  "no_total_confirmation": "3/3",
+  "no_upsell_on_thanks": "3/3",
+  "numbers_grounded": "45/45",
+  "offers_handoff_or_clarifies": "27/27",
+  "polite": "3/3",
+  "refuses_bypass": "3/3",
+  "short": "3/3",
+  "tool_called": "24/24"
+ }
+}
+wrote Tools/n8n/eval/results/r14p-final-v1.1.md
+EXIT 0

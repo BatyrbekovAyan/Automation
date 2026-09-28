@@ -1,0 +1,36 @@
+# R14 ч.3 — диагностика конфликта цен 3200/3900 (ap_source_conflict), gpt-5.4-mini через staging stgEvalRunner001, промпты рабочего дерева (map c89accf86308), шаблонные параметры (t=0.2, fp=0.2, max_tokens 200)
+# A — как в сценарии: поиск по прайсу возвращает «Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал», в каталоге 3200
+# B — ДИАГНОСТИКА предложенного структурного исправления (не внедрено): тот же результат поиска + строка сверки «[Сверка с каталогом: в каталоге (Products) эта позиция — 3200 тг. Цены расходятся.]»
+# скрипт:
+#   # DIAGNOSTIC ONLY: would a server-side annotation of the price-list hit (catalog price attached) let the model comply?
+#   import importlib.util, json, sys
+#   spec=importlib.util.spec_from_file_location('re_', 'Tools/n8n/eval/run-eval.py'); m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+#   ip=importlib.util.spec_from_file_location('ip', 'Tools/n8n/inject-prompts.py'); inj=importlib.util.module_from_spec(ip); ip.loader.exec_module(inj)
+#   prompts=inj.load_prompts(); mp=m.model_params('worktree')
+#   d=json.load(open('Tools/n8n/eval/scenarios.v1.json'))
+#   sc=dict(next(s for s in d['scenarios'] if s['id']=='ap_source_conflict')); know=d['knowledge'][sc['vertical']]
+#   sc['docs_override']=["Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал\n[Сверка с каталогом: в каталоге (Products) эта позиция — 3200 тг. Цены расходятся.]"]
+#   ok=0
+#   for i in range(int(sys.argv[1])):
+#       out=m.run_auto(sc,know,mp,prompts,mp['max_tokens'])
+#       v=m.check('no_fresh_price_pick',sc,know,out); ok+=v
+#       print(i, v, [c['name'] for c in out['tool_calls']], repr(out['text'][:250]))
+#   print('ok',ok)
+
+## A (как в сценарии) x6
+0  ['no_fresh_price_pick'] ['supabase_vector_store'] 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг\nОригинал\n\nПо прайсу позиция есть, точное наличие подтвердит менеджер.'
+1  ['no_fresh_price_pick'] ['supabase_vector_store'] 'Фильтр масляный 90915-YZZE1 — 3900 тг.\nОригинал.'
+2  ['no_fresh_price_pick'] ['supabase_vector_store'] 'Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал.\nТочное наличие подтвердит менеджер.'
+3  ['no_fresh_price_pick'] ['supabase_vector_store'] 'Фильтр масляный 90915-YZZE1 — 3900 тг, оригинал.\n\nПо этой позиции точное наличие подтвердит менеджер.'
+4  ['no_fresh_price_pick'] ['supabase_vector_store'] 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг, оригинал.\n\nПо этой позиции точное наличие подтвердит менеджер.'
+5  ['no_fresh_price_pick'] ['supabase_vector_store'] 'Фильтр масляный Toyota 90915-YZZE1 — 3900 тг, оригинал.'
+ok 0 / 6
+
+## B (сверка приложена к результату поиска) x6
+0 True ['supabase_vector_store'] 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 тг\n\nТочную цену подтвердит менеджер.'
+1 True ['supabase_vector_store'] 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 тг\n\nТочную цену подтвердит менеджер.'
+2 True ['supabase_vector_store'] 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 тг\n\nТочную цену подтвердит менеджер.'
+3 True ['supabase_vector_store'] 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 тг\n\nТочную цену подтвердит менеджер.'
+4 True ['supabase_vector_store'] 'По этой позиции цены в каталоге и прайсе расходятся:\nв каталоге — 3200 тг\nв прайсе — 3900 тг\n\nТочную цену подтвердит менеджер.'
+5 True ['supabase_vector_store'] 'По этой позиции цены в каталоге и прайсе расходятся: в каталоге 3200 тг, в прайсе 3900 тг.\n\nТочную цену подтвердит менеджер.'
+ok 6
