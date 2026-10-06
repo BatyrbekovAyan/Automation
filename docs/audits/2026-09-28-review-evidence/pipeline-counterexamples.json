@@ -1,0 +1,427 @@
+[
+  {
+    "case": "R6 same-second newer claim after final snapshot",
+    "channel": "WA",
+    "old_lease": {
+      "allowed": true,
+      "suppressed": false,
+      "generation_now": 1,
+      "lock_busy": false
+    },
+    "outcomes": {
+      "A": "sent",
+      "B": "superseded"
+    }
+  },
+  {
+    "case": "R7 unknown delivery retained as ordinary assistant statement",
+    "channel": "WA",
+    "ledger": {
+      "UNKNOWN": "send_unknown"
+    },
+    "memory": [
+      {
+        "id": 2986,
+        "type": "human",
+        "content": "Когда доставка?",
+        "source": null
+      },
+      {
+        "id": 2987,
+        "type": "ai",
+        "content": "Доставка завтра в 10:00.",
+        "source": null
+      }
+    ]
+  },
+  {
+    "case": "R7 same output reversed LLM completion deletes delivered row",
+    "channel": "WA",
+    "sent_ai_id": 2989,
+    "sent_ai_survives": false,
+    "cancel": {
+      "outcome": "superseded",
+      "dropped_ai_rows": 1,
+      "recorded": true,
+      "remembered": false
+    },
+    "before": [
+      {
+        "id": 2988,
+        "type": "human",
+        "content": "Запишите на вторник.\nЛучше на среду.",
+        "source": null
+      },
+      {
+        "id": 2989,
+        "type": "ai",
+        "content": "Запрос передан менеджеру.",
+        "source": null
+      },
+      {
+        "id": 2990,
+        "type": "ai",
+        "content": "Среда занята, уточню другой день.",
+        "source": "owner_phone"
+      },
+      {
+        "id": 2991,
+        "type": "human",
+        "content": "Запишите на вторник.",
+        "source": null
+      },
+      {
+        "id": 2992,
+        "type": "ai",
+        "content": "Запрос передан менеджеру.",
+        "source": null
+      }
+    ],
+    "after": [
+      {
+        "id": 2988,
+        "type": "human",
+        "content": "Запишите на вторник.\nЛучше на среду.",
+        "source": null
+      },
+      {
+        "id": 2990,
+        "type": "ai",
+        "content": "Среда занята, уточню другой день.",
+        "source": "owner_phone"
+      },
+      {
+        "id": 2991,
+        "type": "human",
+        "content": "Запишите на вторник.",
+        "source": null
+      },
+      {
+        "id": 2992,
+        "type": "ai",
+        "content": "Запрос передан менеджеру.",
+        "source": null
+      }
+    ]
+  },
+  {
+    "case": "R10 sole unmarked manual reply",
+    "channel": "WA",
+    "result": {
+      "state": "sent",
+      "transportMessageId": "manual-only",
+      "error": "",
+      "reconciled": true,
+      "foreignFetched": 0
+    },
+    "candidate": {
+      "id": "manual-only",
+      "chatId": "77001112233@c.us",
+      "from": "me",
+      "profile_id": "wa-prof-rc",
+      "body": "Напишите, пожалуйста, текстом.",
+      "type": "chat",
+      "fromMe": true,
+      "senderName": "owner",
+      "time": 1790000031
+    }
+  },
+  {
+    "case": "R10 explicit foreign profile same chat",
+    "channel": "WA",
+    "result": {
+      "state": "sent",
+      "transportMessageId": "foreign-prof",
+      "error": "",
+      "reconciled": true,
+      "foreignFetched": 0
+    },
+    "candidate": {
+      "id": "foreign-prof",
+      "chatId": "77001112233@c.us",
+      "from": "me",
+      "profile_id": "OTHER_PROFILE",
+      "body": "Напишите, пожалуйста, текстом.",
+      "type": "chat",
+      "fromMe": true,
+      "senderName": "owner",
+      "time": 1790000031
+    }
+  },
+  {
+    "case": "R10 outgoing_phone type marker",
+    "channel": "WA",
+    "result": {
+      "state": "sent",
+      "transportMessageId": "manual-marker",
+      "error": "",
+      "reconciled": true,
+      "foreignFetched": 0
+    },
+    "candidate": {
+      "id": "manual-marker",
+      "chatId": "77001112233@c.us",
+      "from": "me",
+      "profile_id": "wa-prof-rc",
+      "body": "Напишите, пожалуйста, текстом.",
+      "type": "chat",
+      "fromMe": true,
+      "senderName": "owner",
+      "time": 1790000031,
+      "wh_type": "outgoing_message_phone"
+    }
+  },
+  {
+    "case": "R6 same-second newer claim after final snapshot",
+    "channel": "TG",
+    "old_lease": {
+      "allowed": true,
+      "suppressed": false,
+      "generation_now": 1,
+      "lock_busy": false
+    },
+    "outcomes": {
+      "A": "sent",
+      "B": "superseded"
+    }
+  },
+  {
+    "case": "R7 unknown delivery retained as ordinary assistant statement",
+    "channel": "TG",
+    "ledger": {
+      "UNKNOWN": "send_unknown"
+    },
+    "memory": [
+      {
+        "id": 2995,
+        "type": "human",
+        "content": "Когда доставка?",
+        "source": null
+      },
+      {
+        "id": 2996,
+        "type": "ai",
+        "content": "Доставка завтра в 10:00.",
+        "source": null
+      }
+    ]
+  },
+  {
+    "case": "R7 same output reversed LLM completion deletes delivered row",
+    "channel": "TG",
+    "sent_ai_id": 2998,
+    "sent_ai_survives": false,
+    "cancel": {
+      "outcome": "superseded",
+      "dropped_ai_rows": 1,
+      "recorded": true,
+      "remembered": false
+    },
+    "before": [
+      {
+        "id": 2997,
+        "type": "human",
+        "content": "Запишите на вторник.\nЛучше на среду.",
+        "source": null
+      },
+      {
+        "id": 2998,
+        "type": "ai",
+        "content": "Запрос передан менеджеру.",
+        "source": null
+      },
+      {
+        "id": 2999,
+        "type": "ai",
+        "content": "Среда занята, уточню другой день.",
+        "source": "owner_phone"
+      },
+      {
+        "id": 3000,
+        "type": "human",
+        "content": "Запишите на вторник.",
+        "source": null
+      },
+      {
+        "id": 3001,
+        "type": "ai",
+        "content": "Запрос передан менеджеру.",
+        "source": null
+      }
+    ],
+    "after": [
+      {
+        "id": 2997,
+        "type": "human",
+        "content": "Запишите на вторник.\nЛучше на среду.",
+        "source": null
+      },
+      {
+        "id": 2999,
+        "type": "ai",
+        "content": "Среда занята, уточню другой день.",
+        "source": "owner_phone"
+      },
+      {
+        "id": 3000,
+        "type": "human",
+        "content": "Запишите на вторник.",
+        "source": null
+      },
+      {
+        "id": 3001,
+        "type": "ai",
+        "content": "Запрос передан менеджеру.",
+        "source": null
+      }
+    ]
+  },
+  {
+    "case": "R10 sole unmarked manual reply",
+    "channel": "TG",
+    "result": {
+      "state": "sent",
+      "transportMessageId": "manual-only",
+      "error": "",
+      "reconciled": true,
+      "foreignFetched": 0
+    },
+    "candidate": {
+      "id": "manual-only",
+      "chatId": "5550001112",
+      "from": "me",
+      "profile_id": "tg-prof-rc",
+      "body": "Напишите, пожалуйста, текстом.",
+      "type": "chat",
+      "fromMe": true,
+      "senderName": "owner",
+      "time": 1790000031
+    }
+  },
+  {
+    "case": "R10 explicit foreign profile same chat",
+    "channel": "TG",
+    "result": {
+      "state": "sent",
+      "transportMessageId": "foreign-prof",
+      "error": "",
+      "reconciled": true,
+      "foreignFetched": 0
+    },
+    "candidate": {
+      "id": "foreign-prof",
+      "chatId": "5550001112",
+      "from": "me",
+      "profile_id": "OTHER_PROFILE",
+      "body": "Напишите, пожалуйста, текстом.",
+      "type": "chat",
+      "fromMe": true,
+      "senderName": "owner",
+      "time": 1790000031
+    }
+  },
+  {
+    "case": "R10 outgoing_phone type marker",
+    "channel": "TG",
+    "result": {
+      "state": "sent",
+      "transportMessageId": "manual-marker",
+      "error": "",
+      "reconciled": true,
+      "foreignFetched": 0
+    },
+    "candidate": {
+      "id": "manual-marker",
+      "chatId": "5550001112",
+      "from": "me",
+      "profile_id": "tg-prof-rc",
+      "body": "Напишите, пожалуйста, текстом.",
+      "type": "chat",
+      "fromMe": true,
+      "senderName": "owner",
+      "time": 1790000031,
+      "wh_type": "outgoing_message_phone"
+    }
+  },
+  {
+    "case": "R4 phone five minutes ahead closes request created after actual decision",
+    "response": [
+      {
+        "profileId": "review-clock",
+        "applied": true,
+        "suppressed": false,
+        "version": 1790600435510
+      }
+    ],
+    "requests": [
+      {
+        "status": "done"
+      }
+    ],
+    "state": [
+      {
+        "handoff_paused": false
+      }
+    ]
+  },
+  {
+    "case": "R8 seed fail plus delete fail leaves no recoverable clone id in response",
+    "channel": "WA",
+    "graph": {
+      "cleanup_fails": {
+        "trace": [
+          "Seed Reply Mode",
+          "Seed Saved?",
+          "Delete Unseeded Workflow",
+          "Respond Reply Mode Not Saved"
+        ],
+        "effects": [
+          {
+            "node": "Delete Unseeded Workflow",
+            "method": "DELETE",
+            "url": "https://n8n.choosereply.com/api/v1/workflows/review-orphan-clone"
+          }
+        ],
+        "seedCalls": 3,
+        "response": {
+          "node": "Respond Reply Mode Not Saved",
+          "json": {
+            "success": false,
+            "error": "reply_mode_not_saved"
+          }
+        },
+        "stoppedAt": null
+      }
+    }
+  },
+  {
+    "case": "R8 seed fail plus delete fail leaves no recoverable clone id in response",
+    "channel": "TG",
+    "graph": {
+      "cleanup_fails": {
+        "trace": [
+          "Seed Reply Mode",
+          "Seed Saved?",
+          "Delete Unseeded Workflow",
+          "Respond Reply Mode Not Saved"
+        ],
+        "effects": [
+          {
+            "node": "Delete Unseeded Workflow",
+            "method": "DELETE",
+            "url": "https://n8n.choosereply.com/api/v1/workflows/review-orphan-clone"
+          }
+        ],
+        "seedCalls": 3,
+        "response": {
+          "node": "Respond Reply Mode Not Saved",
+          "json": {
+            "success": false,
+            "error": "reply_mode_not_saved"
+          }
+        },
+        "stoppedAt": null
+      }
+    }
+  }
+]

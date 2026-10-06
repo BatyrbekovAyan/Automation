@@ -1,0 +1,56 @@
+[
+  {
+    "command": "python3 Tools/n8n/verify-auth-gate.py",
+    "exit": 0,
+    "stdout": "OK  0DP79STI3pafXO9B-Set_Workflow_State.json (gate + rule {'workflows': ['workflowId'], 'legacy': True})\nOK  SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json (gate + rule {'profiles': ['profileIds'], 'legacy': True})\nOK  9PTyYcelRQI7bGDb-Suggest_Replies.json (gate + rule {'profiles': ['profileId'], 'workflows': ['botWaId', 'botTgId'], 'appUser': ['appUserId'], 'legacy': True})\nOK  2htWSV5IHO8E2CgB-Dashboard_Outcomes.json (gate + rule {'profiles': ['profileIds'], 'legacy': True})\nOK  jtbssfzXbOxwTK4k-Get_Usage.json (gate + rule {'appUser': ['appUserId'], 'legacy': True})\nOK  KoTuIlk4LMrlvnWI-Upload_File.json (gate + rule {'workflows': ['whatsappWorkflowId', 'telegramWorkflowId'], 'legacy': True})\nOK  ZTqpumOpL1rNDOp6-Delete_File.json (gate + rule {'legacy': True})\nOK  lmjYsdNcQA2IE5rl-Delete_Bot_Files.json (gate + rule {'profiles': ['waProfileId', 'tgProfileId'], 'workflows': ['botWaId', 'botTgId'], 'legacy': True})\nOK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (gate + rule {'profiles': ['WhatsappProfileId'], 'workflows': ['TelegramWorkflowId'], 'appUser': ['AppUserID'], 'appUserRequired': ['AppUserID'], 'legacy': True})\nOK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (gate + rule {'profiles': ['TelegramProfileId'], 'workflows': ['WhatsappWorkflowId'], 'appUser': ['AppUserID'], 'appUserRequired': ['AppUserID'], 'legacy': True})\nOK  3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json (gate + rule {'workflows': ['WhatsappWorkflowId', 'TelegramWorkflowId'], 'legacy': True})\nOK  TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json (gate + rule {'workflows': ['WhatsappWorkflowId', 'TelegramWorkflowId'], 'legacy': True})\nOK  olmqWMfcFpCEcpiE-Support_Message.json (gate + rule {'legacy': True})\nOK  crWappiProxy0001-Wappi_Proxy.json (allow-list, ownership, no legacy, no stored executions)\nOK  crAuthSession001-Auth_Session.json (cap, hash compare, single round-trip refresh, TTL, claim scoping)\nOK  4wYitz5ek30SVNlT-WhatsApp_Bot.json (callback bound to the registered profile)\nOK  4VN3gsFaC2HUYmcc-Telegram_Bot.json (callback bound to the registered profile)\nOK  Upload File / Delete File (ownership registry + owner-scoped delete)\nOK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (workflow id + owner bound to the profile)\nOK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (workflow id + owner bound to the profile)\nOK  Set Workflow State (protected list carries Auth Session + Wappi Proxy)\nALL AUTH GATE ASSERTS PASSED\n",
+    "stderr": ""
+  },
+  {
+    "command": "python3 Tools/n8n/verify-reply-mode.py",
+    "exit": 0,
+    "stdout": "OK  SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json (versioned atomic upsert, per-profile report, 400/500 codes)\nOK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (initial reply mode seeded before activation; activation only on the saved marker)\nOK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (initial reply mode seeded before activation; activation only on the saved marker)\nOK  bot templates (gate read unchanged: absence → reply)\nALL REPLY MODE ASSERTS PASSED\n",
+    "stderr": ""
+  },
+  {
+    "command": "python3 Tools/n8n/verify-reply-pipeline.py",
+    "exit": 0,
+    "stdout": "OK  4wYitz5ek30SVNlT-WhatsApp_Bot.json\nOK  4VN3gsFaC2HUYmcc-Telegram_Bot.json\nOK  cross-template identity of the stage-3 nodes\nALL REPLY PIPELINE ASSERTS PASSED\n",
+    "stderr": ""
+  },
+  {
+    "command": "python3 Tools/n8n/verify-history-handoff.py",
+    "exit": 0,
+    "stdout": "OK  4wYitz5ek30SVNlT-WhatsApp_Bot.json\nOK  4VN3gsFaC2HUYmcc-Telegram_Bot.json\nOK  handoff workflows (request / notifier / app webhook)\nOK  test dialog (no memory, no send, no quota, dry handoff, owner check)\nOK  integrations (Create types / Dashboard / Delete / Set State / proxy)\nALL HISTORY/HANDOFF ASSERTS PASSED\n",
+    "stderr": ""
+  },
+  {
+    "command": "python3 Tools/n8n/verify-telegram-parity.py",
+    "exit": 0,
+    "stdout": "OK  4VN3gsFaC2HUYmcc-Telegram_Bot.json\nOK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json\nOK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json\nOK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (canonical-export invariant)\nOK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (canonical-export invariant)\nOK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (refused create deletes the profile, retires its row, answers channel_limit)\nOK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (refused create deletes the profile, retires its row, answers channel_limit)\nOK  4VN3gsFaC2HUYmcc-Telegram_Bot.json (dialog-metering wiring)\nOK  4wYitz5ek30SVNlT-WhatsApp_Bot.json (dialog-metering wiring)\nOK  both bot templates share byte-identical metering SQL + Code\nOK  4VN3gsFaC2HUYmcc-Telegram_Bot.json (model id pinned)\nOK  4wYitz5ek30SVNlT-WhatsApp_Bot.json (model id pinned)\nOK  9PTyYcelRQI7bGDb-Suggest_Replies.json\nOK  ZGYr6srzS3rSSXHp-RevenueCat_Events.json (usage carry gated on snapshot acceptance)\nALL PARITY ASSERTS PASSED\n",
+    "stderr": ""
+  },
+  {
+    "command": "python3 Tools/n8n/verify_rag.py",
+    "exit": 0,
+    "stdout": "VERIFY OK: all\n",
+    "stderr": ""
+  },
+  {
+    "command": "python3 Tools/n8n/inject-prompts.py --check",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "ERROR: tiktoken is not importable -- cannot verify the Task 13b caching-floor gate (every vertical's minimal composition must be >= 2300 tokens). This is a hard failure, not a skip: a missing tokenizer must never be mistaken for a passing gate. Install it into a venv (never globally), e.g.:\n  python3 -m venv /tmp/tiktoken-venv && /tmp/tiktoken-venv/bin/pip install tiktoken\nthen re-run this script with that venv's python3.\n"
+  },
+  {
+    "command": "python3 Tools/n8n/inject-panel-prompts.py --check",
+    "exit": 0,
+    "stdout": "9PTyYcelRQI7bGDb-Suggest_Replies.json: up-to-date\n",
+    "stderr": ""
+  },
+  {
+    "command": "/Users/ayan/.venvs/tiktoken/bin/python Tools/n8n/inject-prompts.py --check",
+    "exit": 0,
+    "stdout": "token floor OK (>= 2300, o200k_base, minimal profile): {'auto_parts': 3775, 'wholesale': 3606, 'flowers': 3627, 'kaspi_seller': 3685, 'education': 3577, 'phone_repair': 3762}\nXuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json: kind=create up-to-date\nUz6HBBUpAiUqVysB-CreateTelegramWorkflow.json: kind=create up-to-date\n3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json: kind=edit up-to-date\nTwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json: kind=edit up-to-date\n",
+    "stderr": ""
+  }
+]

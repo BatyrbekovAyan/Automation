@@ -1,0 +1,122 @@
+{
+  "R1_independent_legacy_owner_reauth": {
+    "attacker_action": "request QR only; never scan/finish; no code submitted",
+    "external_status_fixture": "legacy owner independently reconnects same profile after A requested QR",
+    "pair_recorded": [
+      {
+        "profile_id": "legacy-victim"
+      }
+    ],
+    "decision": "reauth",
+    "bound": [
+      {
+        "profile_id": "legacy-victim"
+      }
+    ],
+    "attacker_profiles": [
+      "legacy-victim"
+    ],
+    "attacker_workflows": [
+      "victim-workflow"
+    ]
+  },
+  "R2_no_live_bots_binding_takeover": {
+    "victim_install": "20bcc988-7564-48fb-bcfd-43f1d87ac087",
+    "attacker_install": "545df9ba-fe4d-4025-aaa8-72f1eb2350bf",
+    "attacker_owned_profiles": [],
+    "attacker_billing_id": "$RCAnonymousID:0123456789abcdef0123456789abcdef",
+    "attacker_conflict": false,
+    "attacker_GetUsage_gate": true,
+    "victim_old_GetUsage_gate": true,
+    "attacker_profile_add_allowed": true,
+    "bindings": [
+      {
+        "app_user_id": "$RCAnonymousID:0123456789abcdef0123456789abcdef",
+        "install_id": "545df9ba-fe4d-4025-aaa8-72f1eb2350bf"
+      }
+    ],
+    "install_billing_after": [
+      {
+        "install_id": "545df9ba-fe4d-4025-aaa8-72f1eb2350bf",
+        "app_user_id": "$RCAnonymousID:0123456789abcdef0123456789abcdef"
+      },
+      {
+        "install_id": "20bcc988-7564-48fb-bcfd-43f1d87ac087",
+        "app_user_id": null
+      }
+    ],
+    "attacker_CreateWhatsappWorkflow_gate": true,
+    "victim_usage_read": {
+      "plan": "business",
+      "status": "active",
+      "period_end": null,
+      "product_id": null,
+      "topup_balance": 7,
+      "used": 0,
+      "channels_connected": 1,
+      "bots_registered": 1
+    },
+    "attacker_chat_quota_result": {
+      "allowed": true,
+      "used": 0,
+      "q": 1000,
+      "reserve_used": false,
+      "topup_after": null,
+      "plan": "business",
+      "status": "active"
+    },
+    "dialog_count_debited_to": [
+      {
+        "app_user_id": "$RCAnonymousID:0123456789abcdef0123456789abcdef",
+        "chat_id": "attacker-customer-chat"
+      }
+    ]
+  },
+  "R3_ownerless_foreign_file_takeover": {
+    "registry_verdict": {
+      "allowed": true
+    },
+    "row_after_adoption": {
+      "file_id": "22222222-2222-4222-8222-222222222222",
+      "owner_id": "auth-review-attacker",
+      "bot_wa_id": "victim-workflow"
+    },
+    "upload_error": null,
+    "storage_request": {
+      "url": "https://mnwsdbqvehrkeqwnwpqb.supabase.co/storage/v1/object/price-lists/22222222-2222-4222-8222-222222222222",
+      "gotFile": true
+    },
+    "side_effects": [
+      "Register Upload",
+      "Store Original File",
+      "Supabase Vector Store"
+    ],
+    "delete_verdict": {
+      "deletedChunks": 1,
+      "allowed": true
+    },
+    "victim_chunks_remaining": 0
+  },
+  "R11_issue_token_fault_classification": {
+    "db_error": {
+      "success": false,
+      "error": "db_unavailable",
+      "_status": 503
+    },
+    "passed_through": {
+      "success": false,
+      "error": "db_unavailable",
+      "_status": 503
+    },
+    "empty": {
+      "success": false,
+      "error": "db_unavailable",
+      "_status": 503
+    },
+    "revoked": {
+      "success": false,
+      "error": "install_revoked",
+      "_status": 401
+    }
+  }
+}

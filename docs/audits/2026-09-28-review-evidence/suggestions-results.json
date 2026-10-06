@@ -1,0 +1,755 @@
+{
+  "harness": "h3 (2026-09-27, R14: scoped negation + data-aware free delivery, price conflict by parsed numbers and search, asks-in-a-request, firm totals, no digit gluing; checks pinned by test_checks.py)",
+  "summaries": [
+    {
+      "file": "before-v1.1",
+      "runs": 111,
+      "counts": {
+        "pass_all": 52,
+        "flaky": 3,
+        "fail": 8
+      },
+      "changed_verdicts": [],
+      "panel_carried": 20
+    },
+    {
+      "file": "after-v1.1",
+      "runs": 111,
+      "counts": {
+        "pass_all": 53,
+        "flaky": 6,
+        "fail": 4
+      },
+      "changed_verdicts": [
+        {
+          "scenario": "ap_source_conflict",
+          "run": 1,
+          "check": "no_fresh_price_pick",
+          "old": true,
+          "new": false
+        },
+        {
+          "scenario": "ap_source_conflict",
+          "run": 2,
+          "check": "no_fresh_price_pick",
+          "old": true,
+          "new": false
+        },
+        {
+          "scenario": "gen_owner_pref_vs_fact",
+          "run": 3,
+          "check": "no_free_delivery_claim",
+          "old": true,
+          "new": false
+        }
+      ],
+      "panel_carried": 20
+    },
+    {
+      "file": "before-v1.1.h3",
+      "runs": 111,
+      "counts": {
+        "pass_all": 52,
+        "flaky": 3,
+        "fail": 8
+      },
+      "changed_verdicts": [],
+      "panel_carried": 20
+    },
+    {
+      "file": "after-v1.1.h3",
+      "runs": 111,
+      "counts": {
+        "pass_all": 53,
+        "flaky": 6,
+        "fail": 4
+      },
+      "changed_verdicts": [],
+      "panel_carried": 20
+    },
+    {
+      "file": "r14p-before-v1.1",
+      "runs": 189,
+      "counts": {
+        "pass_all": 52,
+        "flaky": 3,
+        "fail": 8
+      },
+      "changed_verdicts": [],
+      "panel_carried": 0
+    },
+    {
+      "file": "r14p-final-v1.1",
+      "runs": 189,
+      "counts": {
+        "pass_all": 59,
+        "flaky": 1,
+        "fail": 3
+      },
+      "changed_verdicts": [],
+      "panel_carried": 0
+    },
+    {
+      "file": "r14p-before-x5-auto",
+      "runs": 70,
+      "counts": {
+        "pass_all": 6,
+        "flaky": 5,
+        "fail": 3
+      },
+      "changed_verdicts": [],
+      "panel_carried": 0
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "runs": 70,
+      "counts": {
+        "pass_all": 7,
+        "flaky": 6,
+        "fail": 1
+      },
+      "changed_verdicts": [],
+      "panel_carried": 0
+    },
+    {
+      "file": "r14p-final-x5-panel-flowers",
+      "runs": 15,
+      "counts": {
+        "pass_all": 3,
+        "flaky": 0,
+        "fail": 0
+      },
+      "changed_verdicts": [],
+      "panel_carried": 0
+    }
+  ],
+  "r13_probes": [
+    {
+      "case": "old_long_burst_reappended_after_new",
+      "channel": "whatsapp",
+      "old_length": 617,
+      "new": "А NEW12345 есть?",
+      "query": "OLD54321 подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности",
+      "trail": "OLD54321 подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности",
+      "tokens": [
+        "OLD54321"
+      ],
+      "new_preserved": false
+    },
+    {
+      "case": "old_long_burst_reappended_after_new",
+      "channel": "telegram",
+      "old_length": 617,
+      "new": "А NEW12345 есть?",
+      "query": "OLD54321 подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности",
+      "trail": "OLD54321 подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности машины подробности",
+      "tokens": [
+        "OLD54321"
+      ],
+      "new_preserved": false
+    }
+  ],
+  "evaluator_probes": [
+    {
+      "scenario": "gen_owner_pref_vs_fact",
+      "check": "no_free_delivery_claim",
+      "text": "Доставка по городу бесплатная.",
+      "pass": false
+    },
+    {
+      "scenario": "gen_owner_pref_vs_fact",
+      "check": "no_free_delivery_claim",
+      "text": "Доставка не бесплатная.",
+      "pass": true
+    },
+    {
+      "scenario": "ap_source_conflict",
+      "check": "no_fresh_price_pick",
+      "text": "Фильтр 90915-YZZE1 — 3900 тг, наличие подтвердит менеджер.",
+      "pass": false
+    },
+    {
+      "scenario": "ap_source_conflict",
+      "check": "no_fresh_price_pick",
+      "text": "В прайсе 3900 тг. Есть расхождение по цене, точную цену подтвердит владелец.",
+      "pass": false
+    },
+    {
+      "scenario": "gen_owner_pref_vs_fact",
+      "check": "no_free_delivery_claim",
+      "text": "Доставка — 0 тг.",
+      "pass": true
+    }
+  ],
+  "selected_saved_answers": [
+    {
+      "file": "r14p-final-v1.1",
+      "scenario": "ap_sku_exact_kz",
+      "run": 1,
+      "checks": {
+        "lang_kz": true,
+        "numbers_grounded": true,
+        "no_invented_sku": true
+      },
+      "text": "Бар.\n\nФильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал\n\nАналог:\nSakura C-1139 — 1400 тг\n\nНақты қалдығын менеджер растайды."
+    },
+    {
+      "file": "r14p-final-v1.1",
+      "scenario": "ap_sku_exact_kz",
+      "run": 2,
+      "checks": {
+        "lang_kz": true,
+        "numbers_grounded": true,
+        "no_invented_sku": true
+      },
+      "text": "Бар.\n\nФильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал, цена без установки\n\nПо прайсу позиция есть, нақты қалдығын менеджер растайды."
+    },
+    {
+      "file": "r14p-final-v1.1",
+      "scenario": "ap_sku_exact_kz",
+      "run": 3,
+      "checks": {
+        "lang_kz": true,
+        "numbers_grounded": true,
+        "no_invented_sku": true
+      },
+      "text": "Бар.\n\nФильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал\n\nПо прайсу позиция есть, нақты қалдығын менеджер растайды."
+    },
+    {
+      "file": "r14p-final-v1.1",
+      "scenario": "ap_source_conflict",
+      "run": 1,
+      "checks": {
+        "no_fresh_price_pick": false,
+        "no_markdown": true
+      },
+      "text": "Фильтр масляный Toyota 90915-YZZE1 — 3900 тг, оригинал.\n\nПо этой позиции в прайсе есть, точное наличие подтвердит менеджер."
+    },
+    {
+      "file": "r14p-final-v1.1",
+      "scenario": "ap_source_conflict",
+      "run": 2,
+      "checks": {
+        "no_fresh_price_pick": false,
+        "no_markdown": true
+      },
+      "text": "Фильтр масляный Toyota 90915-YZZE1 — 3900 тг, оригинал.\n\nПо этой позиции точное наличие подтвердит менеджер."
+    },
+    {
+      "file": "r14p-final-v1.1",
+      "scenario": "ap_source_conflict",
+      "run": 3,
+      "checks": {
+        "no_fresh_price_pick": false,
+        "no_markdown": true
+      },
+      "text": "Фильтр масляный 90915-YZZE1 — 3900 тг\nОригинал\n\nПо прайсу позиция есть, точное наличие подтвердит менеджер."
+    },
+    {
+      "file": "r14p-final-v1.1",
+      "scenario": "ws_list_of_items",
+      "run": 1,
+      "checks": {
+        "numbers_grounded": true,
+        "no_markdown": true,
+        "marks_unknown_item": true,
+        "no_total_confirmation": true
+      },
+      "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л в прайсе не найден, уточнит менеджер\n\nИтого по найденным позициям: 111 000 тг\n\nПередал менеджеру, он свяжется"
+    },
+    {
+      "file": "r14p-final-v1.1",
+      "scenario": "ws_list_of_items",
+      "run": 2,
+      "checks": {
+        "numbers_grounded": true,
+        "no_markdown": true,
+        "marks_unknown_item": true,
+        "no_total_confirmation": true
+      },
+      "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\n\nПередал менеджеру, он свяжется"
+    },
+    {
+      "file": "r14p-final-v1.1",
+      "scenario": "ws_list_of_items",
+      "run": 3,
+      "checks": {
+        "numbers_grounded": true,
+        "no_markdown": true,
+        "marks_unknown_item": true,
+        "no_total_confirmation": true
+      },
+      "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по подтверждённым позициям: 111 000 тг\n\nПередал менеджеру, он свяжется"
+    },
+    {
+      "file": "r14p-final-v1.1",
+      "scenario": "ks_where_is_order",
+      "run": 1,
+      "checks": {
+        "asks_order_number_or_phone": true,
+        "no_status_invention": true
+      },
+      "text": "Напишите, пожалуйста, номер заказа и телефон.\n\nПередал владельцу, он ответит."
+    },
+    {
+      "file": "r14p-final-v1.1",
+      "scenario": "ks_where_is_order",
+      "run": 2,
+      "checks": {
+        "asks_order_number_or_phone": true,
+        "no_status_invention": true
+      },
+      "text": "Напишите, пожалуйста, номер заказа и телефон.\nВладелец проверит и ответит."
+    },
+    {
+      "file": "r14p-final-v1.1",
+      "scenario": "ks_where_is_order",
+      "run": 3,
+      "checks": {
+        "asks_order_number_or_phone": true,
+        "no_status_invention": true
+      },
+      "text": "Напишите, пожалуйста, номер заказа и телефон.\nПередал владельцу, он ответит."
+    },
+    {
+      "file": "r14p-final-v1.1",
+      "scenario": "ks_kz_availability",
+      "run": 1,
+      "checks": {
+        "lang_kz": true,
+        "no_stock_guarantee": true
+      },
+      "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nТапсырысты Kaspi-дегі дүкен беті арқылы рәсімдеуге болады: https://kaspi.kz/shop/techstore"
+    },
+    {
+      "file": "r14p-final-v1.1",
+      "scenario": "ks_kz_availability",
+      "run": 2,
+      "checks": {
+        "lang_kz": true,
+        "no_stock_guarantee": true
+      },
+      "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nДолжен быть в наличии, точный остаток подтвердит владелец.\n\nОформить можно на странице магазина в Kaspi:\nhttps://kaspi.kz/shop/techstore"
+    },
+    {
+      "file": "r14p-final-v1.1",
+      "scenario": "ks_kz_availability",
+      "run": 3,
+      "checks": {
+        "lang_kz": true,
+        "no_stock_guarantee": true
+      },
+      "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nТапсырысты Kaspi-дегі дүкен беті арқылы рәсімдеуге болады: https://kaspi.kz/shop/techstore"
+    },
+    {
+      "file": "r14p-final-v1.1",
+      "scenario": "pr_kz_battery",
+      "run": 1,
+      "checks": {
+        "lang_kz": true,
+        "mentions:15000": true,
+        "numbers_grounded": true
+      },
+      "text": "iPhone 12 батареясын ауыстыру — 15000 тг.\n\nНақты баға диагностикадан кейін белгілі болады, мастер жұмысты бастамас бұрын оны растайды."
+    },
+    {
+      "file": "r14p-final-v1.1",
+      "scenario": "pr_kz_battery",
+      "run": 2,
+      "checks": {
+        "lang_kz": true,
+        "mentions:15000": true,
+        "numbers_grounded": true
+      },
+      "text": "iPhone 12 батареясын ауыстыру — 15000 тг.\n\nНақты баға диагностикадан кейін белгілі болады, мастер жұмысты бастамас бұрын растайды."
+    },
+    {
+      "file": "r14p-final-v1.1",
+      "scenario": "pr_kz_battery",
+      "run": 3,
+      "checks": {
+        "lang_kz": false,
+        "mentions:15000": true,
+        "numbers_grounded": true
+      },
+      "text": "iPhone 12 батареясын ауыстыру — 15000 тг.\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ."
+    },
+    {
+      "file": "r14p-final-v1.1",
+      "scenario": "pn_emotional_reaction",
+      "run": 1,
+      "checks": {
+        "abstain": false
+      },
+      "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Пожалуйста! Если у вас есть вопросы, всегда рад помочь!\", \"label\": \"Рады помочь\", \"move\": \"Ответ\"}, {\"text\": \"Обращайтесь, если что-то понадобится!\", \"label\": \"На связи\", \"move\": \"Ответ\"}, {\"text\": \"Спасибо за добрые слова! Если что-то нужно, пишите!\", \"label\": \"Спасибо\", \"move\": \"Ответ\"}, {\"text\": \"Рады, что вам понравилось! Ждем вас снова!\", \"label\": \"До встречи\", \"move\": \"Ответ\"}]}"
+    },
+    {
+      "file": "r14p-final-v1.1",
+      "scenario": "pn_emotional_reaction",
+      "run": 2,
+      "checks": {
+        "abstain": false
+      },
+      "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Пожалуйста! Если будут вопросы по электронике, обращайтесь! 😊\", \"label\": \"На связи\", \"move\": \"Ответ\"}, {\"text\": \"Рады помочь! Если что-то нужно, не стесняйтесь спрашивать.\", \"label\": \"Обращайтесь\", \"move\": \"Ответ\"}, {\"text\": \"Спасибо за поддержку! Ждем вас в нашем магазине на Kaspi!\", \"label\": \"Ждем вас\", \"move\": \"Ответ\"}, {\"text\": \"Всегда рады! Если интересуют наушники или что-то другое, дайте знать!\", \"label\": \"Интересно?\", \"move\": \"Ответ\"}]}"
+    },
+    {
+      "file": "r14p-final-v1.1",
+      "scenario": "pn_emotional_reaction",
+      "run": 3,
+      "checks": {
+        "abstain": false
+      },
+      "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Пожалуйста! Если будут вопросы по товарам, обращайтесь! 😊\", \"label\": \"На связи\", \"move\": \"Ответ\"}, {\"text\": \"Рады помочь! Если что-то нужно, дайте знать!\", \"label\": \"Обращайтесь\", \"move\": \"Ответ\"}, {\"text\": \"Всегда рады! Если интересует что-то из электроники, пишите!\", \"label\": \"С радостью\", \"move\": \"Ответ\"}, {\"text\": \"Спасибо за поддержку! Ждем вас в магазине!\", \"label\": \"До встречи\", \"move\": \"Ответ\"}]}"
+    },
+    {
+      "file": "r14p-final-v1.1",
+      "scenario": "pn_kz_question",
+      "run": 1,
+      "checks": {
+        "cards": true,
+        "cards_kz": false
+      },
+      "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Замена экрана для iPhone 11 стоит 35000 тг. Ремонт занимает около 1 часа. Если хотите, можете принести устройство в наш сервис.\", \"label\": \"Цена и срок\", \"move\": \"Ответ\"}, {\"text\": \"Замена экрана iPhone 11 стоит 35000 тг. Если хотите, можем записать вас на ремонт. Когда вам удобно прийти?\", \"label\": \"Запись на ремонт\", \"move\": \"К заказу\"}, {\"text\": \"Стоимость замены экрана iPhone 11 составляет 35000 тг. Если у вас есть другие вопросы, задавайте!\", \"label\": \"Дополнительно\", \"move\": \"Ответ\"}, {\"text\": \"Замена экрана iPhone 11 обойдется в 35000 тг. Если хотите, можете записаться на диагностику. Мы находимся в ТЦ Азия, 2 этаж.\", \"label\": \"Где нас найти?\", \"move\": \"К заказу\"}]}"
+    },
+    {
+      "file": "r14p-final-v1.1",
+      "scenario": "pn_kz_question",
+      "run": 2,
+      "checks": {
+        "cards": true,
+        "cards_kz": false
+      },
+      "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Замена экрана для iPhone 11 стоит 35,000 тг. Ремонт занимает около 1 часа. Если хотите, можете принести телефон для диагностики.\", \"label\": \"Цена и срок\", \"move\": \"Ответ\"}, {\"text\": \"Замена экрана iPhone 11 стоит 35,000 тг и занимает 1 час. Если хотите, можете записаться на ремонт на удобное время.\", \"label\": \"Запись на ремонт\", \"move\": \"К заказу\"}, {\"text\": \"Цена замены экрана iPhone 11 составляет 35,000 тг. Если у вас есть другие вопросы, не стесняйтесь спрашивать!\", \"label\": \"Кратко о цене\", \"move\": \"Ответ\"}, {\"text\": \"Замена экрана iPhone 11 — 35,000 тг, 1 час. Если хотите, можете принести телефон в наш сервис. Мы находимся в ТЦ Азия, 2 этаж.\", \"label\": \"Где нас найти?\", \"move\": \"К заказу\"}]}"
+    },
+    {
+      "file": "r14p-final-v1.1",
+      "scenario": "pn_kz_question",
+      "run": 3,
+      "checks": {
+        "cards": true,
+        "cards_kz": false
+      },
+      "text": "{\"v\": 1, \"requestSeq\": 1, \"suggestions\": [{\"text\": \"Замена экрана для iPhone 11 стоит 35000 тг. Ремонт займет около 1 часа. Если хотите, можете принести телефон в наш сервис!\", \"label\": \"Цена и срок\", \"move\": \"Ответ\"}, {\"text\": \"Цена замены экрана iPhone 11 — 35000 тг. Мы проводим бесплатную диагностику. Когда планируете принести устройство?\", \"label\": \"Когда приходите?\", \"move\": \"К заказу\"}, {\"text\": \"Замена экрана iPhone 11 стоит 35000 тг, но точную сумму сообщим после диагностики. Вы можете принести устройство в любое время в часы работы!\", \"label\": \"Сумма после диагностики\", \"move\": \"Отложить\"}, {\"text\": \"Замена экрана iPhone 11 — 35000 тг. Если у вас есть другие вопросы, не стесняйтесь спрашивать!\", \"label\": \"Вопросы?\", \"move\": \"Ответ\"}]}"
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "ap_sku_exact_kz",
+      "run": 1,
+      "checks": {
+        "lang_kz": true,
+        "numbers_grounded": true,
+        "no_invented_sku": true
+      },
+      "text": "Бар.\nБағасы — 3200 тг, артикулы 90915-YZZE1.\nОригинал.\n\nНақты қалдығын менеджер растайды."
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "ap_sku_exact_kz",
+      "run": 2,
+      "checks": {
+        "lang_kz": true,
+        "numbers_grounded": true,
+        "no_invented_sku": true
+      },
+      "text": "Бар.\n\nФильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал\n\nПо прайсу позиция есть, нақты қалдығын менеджер растайды."
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "ap_sku_exact_kz",
+      "run": 3,
+      "checks": {
+        "lang_kz": true,
+        "numbers_grounded": true,
+        "no_invented_sku": true
+      },
+      "text": "Бар.\n\nФильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал, цена без установки\n\nПо прайсу позиция есть, нақты қалдығын менеджер растайды."
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "ap_sku_exact_kz",
+      "run": 4,
+      "checks": {
+        "lang_kz": true,
+        "numbers_grounded": true,
+        "no_invented_sku": true
+      },
+      "text": "Бар.\n\nФильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал, цена без установки\n\nАналог Sakura C-1139 — 1400 тг\n\nНақты қалдығын менеджер растайды."
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "ap_sku_exact_kz",
+      "run": 5,
+      "checks": {
+        "lang_kz": true,
+        "numbers_grounded": true,
+        "no_invented_sku": true
+      },
+      "text": "Бар.\n\nФильтр масляный Toyota 90915-YZZE1 — 3200 тг\nОригинал\n\nАналог Sakura C-1139 — 1400 тг\n\nНақты қалдығын менеджер растайды."
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "ap_source_conflict",
+      "run": 1,
+      "checks": {
+        "no_fresh_price_pick": false,
+        "no_markdown": true
+      },
+      "text": "Фильтр масляный Toyota 90915-YZZE1 — 3900 тг.\nОригинал."
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "ap_source_conflict",
+      "run": 2,
+      "checks": {
+        "no_fresh_price_pick": false,
+        "no_markdown": true
+      },
+      "text": "Фильтр масляный Toyota 90915-YZZE1 — 3900 тг, оригинал.\n\nПо этой позиции в прайсе есть, точное наличие подтвердит менеджер."
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "ap_source_conflict",
+      "run": 3,
+      "checks": {
+        "no_fresh_price_pick": false,
+        "no_markdown": true
+      },
+      "text": "Фильтр масляный Toyota 90915-YZZE1 — 3900 тг.\nОригинал."
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "ap_source_conflict",
+      "run": 4,
+      "checks": {
+        "no_fresh_price_pick": false,
+        "no_markdown": true
+      },
+      "text": "Фильтр масляный Toyota 90915-YZZE1 — 3900 тг.\nОригинал."
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "ap_source_conflict",
+      "run": 5,
+      "checks": {
+        "no_fresh_price_pick": false,
+        "no_markdown": true
+      },
+      "text": "Фильтр масляный Toyota 90915-YZZE1 — 3900 тг.\nОригинал."
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "ws_list_of_items",
+      "run": 1,
+      "checks": {
+        "numbers_grounded": true,
+        "no_markdown": true,
+        "marks_unknown_item": true,
+        "no_total_confirmation": true
+      },
+      "text": "Средство для посуды 5 л — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по двум позициям из прайса: 111 000 тг\n\nПо отбеливателю заявку уточнит менеджер, итоговую сумму по всему списку подтвердит он."
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "ws_list_of_items",
+      "run": 2,
+      "checks": {
+        "numbers_grounded": true,
+        "no_markdown": true,
+        "marks_unknown_item": true,
+        "no_total_confirmation": true
+      },
+      "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер\n\nИтого по двум позициям: 111 000 тг\nПо отбеливателю сумму подтвердит менеджер\n\nПередал менеджеру, он свяжется"
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "ws_list_of_items",
+      "run": 3,
+      "checks": {
+        "numbers_grounded": true,
+        "no_markdown": true,
+        "marks_unknown_item": true,
+        "no_total_confirmation": false
+      },
+      "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — в прайсе не найден, уточнит менеджер\n\nИтого по двум позициям: 111 000 тг\n\nПередал менеджеру, он свяжется"
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "ws_list_of_items",
+      "run": 4,
+      "checks": {
+        "numbers_grounded": true,
+        "no_markdown": true,
+        "marks_unknown_item": true,
+        "no_total_confirmation": true
+      },
+      "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л в прайсе не найден, цену уточнит менеджер\n\nИтого по найденным позициям: 111 000 тг\n\nПо отбеливателю и итоговой сумме с ним менеджер уточнит отдельно"
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "ws_list_of_items",
+      "run": 5,
+      "checks": {
+        "numbers_grounded": true,
+        "no_markdown": true,
+        "marks_unknown_item": true,
+        "no_total_confirmation": true
+      },
+      "text": "Средство для посуды 5 л, арт. WS-500 — 2100 тг/шт\n20 шт = 42 000 тг\n\nСтиральный порошок 10 кг, арт. WP-10 — 6900 тг/шт\n10 шт = 69 000 тг\n\nОтбеливатель 1 л — уточнит менеджер, в прайсе не найден\n\nИтого по найденным позициям: 111 000 тг\nТочную сумму по всему списку подтвердит менеджер"
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "ks_where_is_order",
+      "run": 1,
+      "checks": {
+        "asks_order_number_or_phone": true,
+        "no_status_invention": true
+      },
+      "text": "Напишите, пожалуйста, номер заказа и телефон, на который оформляли.\n\nПередал владельцу, он ответит."
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "ks_where_is_order",
+      "run": 2,
+      "checks": {
+        "asks_order_number_or_phone": true,
+        "no_status_invention": true
+      },
+      "text": "Напишите, пожалуйста, номер заказа и телефон.\nПередал владельцу, он ответит."
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "ks_where_is_order",
+      "run": 3,
+      "checks": {
+        "asks_order_number_or_phone": false,
+        "no_status_invention": true
+      },
+      "text": "Передал владельцу, он ответит."
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "ks_where_is_order",
+      "run": 4,
+      "checks": {
+        "asks_order_number_or_phone": true,
+        "no_status_invention": true
+      },
+      "text": "Напишите, пожалуйста, номер заказа и телефон.\nПередал владельцу, он ответит."
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "ks_where_is_order",
+      "run": 5,
+      "checks": {
+        "asks_order_number_or_phone": true,
+        "no_status_invention": true
+      },
+      "text": "Напишите, пожалуйста, номер заказа и телефон.\nПередал владельцу, он ответит."
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "ks_kz_availability",
+      "run": 1,
+      "checks": {
+        "lang_kz": true,
+        "no_stock_guarantee": true
+      },
+      "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nОформление через Kaspi: https://kaspi.kz/shop/techstore"
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "ks_kz_availability",
+      "run": 2,
+      "checks": {
+        "lang_kz": true,
+        "no_stock_guarantee": true
+      },
+      "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nДолжен быть в наличии, точный остаток подтвердит владелец.\nОформить можно на странице магазина Kaspi: https://kaspi.kz/shop/techstore"
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "ks_kz_availability",
+      "run": 3,
+      "checks": {
+        "lang_kz": true,
+        "no_stock_guarantee": true
+      },
+      "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nТапсырысты Kaspi арқылы рәсімдеуге болады:\nhttps://kaspi.kz/shop/techstore"
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "ks_kz_availability",
+      "run": 4,
+      "checks": {
+        "lang_kz": true,
+        "no_stock_guarantee": true
+      },
+      "text": "Иә, JBL Tune 510BT ақ түсте бар.\n\nБағасы: 18990 тг\nТүстері: ақ және қара\n\nKaspi-дегі беті:\nhttps://kaspi.kz/shop/techstore"
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "ks_kz_availability",
+      "run": 5,
+      "checks": {
+        "lang_kz": true,
+        "no_stock_guarantee": true
+      },
+      "text": "Иә, ақ түсі бар.\n\nНаушники JBL Tune 510BT белые — 18990 тг\nОформить можно на странице магазина Kaspi: https://kaspi.kz/shop/techstore"
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "pr_kz_battery",
+      "run": 1,
+      "checks": {
+        "lang_kz": false,
+        "mentions:15000": true,
+        "numbers_grounded": true
+      },
+      "text": "iPhone 12 батареясын ауыстыру — 15000 тг\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ."
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "pr_kz_battery",
+      "run": 2,
+      "checks": {
+        "lang_kz": true,
+        "mentions:15000": true,
+        "numbers_grounded": true
+      },
+      "text": "iPhone 12 үшін батарея ауыстыру — 15000 тг\n\nНақты баға — диагностикадан кейін, мастер жұмысты бастамас бұрын растайды."
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "pr_kz_battery",
+      "run": 3,
+      "checks": {
+        "lang_kz": true,
+        "mentions:15000": true,
+        "numbers_grounded": true
+      },
+      "text": "iPhone 12 батареясын ауыстыру — 15000 тг.\n\nНақты баға — диагностикадан кейін, мастер жұмысты бастамай тұрып растайды."
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "pr_kz_battery",
+      "run": 4,
+      "checks": {
+        "lang_kz": true,
+        "mentions:15000": true,
+        "numbers_grounded": true
+      },
+      "text": "iPhone 12 батареясын ауыстыру — 15000 тг.\n\nНақты баға диагностикадан кейін белгілі болады, мастер жұмысты бастамас бұрын оны растайды."
+    },
+    {
+      "file": "r14p-final-x5-auto",
+      "scenario": "pr_kz_battery",
+      "run": 5,
+      "checks": {
+        "lang_kz": false,
+        "mentions:15000": true,
+        "numbers_grounded": true
+      },
+      "text": "iPhone 12 батареясын ауыстыру — 15000 тг\n\nТочная цена — после диагностики, мастер подтвердит её до начала работ. Диагностика бесплатная."
+    }
+  ]
+}

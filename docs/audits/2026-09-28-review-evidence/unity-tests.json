@@ -1,0 +1,12 @@
+{
+  "status": "completed",
+  "source": "headless",
+  "overall": "Passed",
+  "total": 516,
+  "passed": 516,
+  "failed": 0,
+  "skipped": 0,
+  "inconclusive": 0,
+  "green": true,
+  "unityExit": 0
+}

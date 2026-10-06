@@ -1,0 +1,30 @@
+base https://n8n.choosereply.com: canonical 26 (diff 20), clones 1 (behind template 1), archived clones 1 (not counted), other 0
+  DIFF    0DP79STI3pafXO9B 0DP79STI3pafXO9B-Set_Workflow_State.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  DIFF    2htWSV5IHO8E2CgB 2htWSV5IHO8E2CgB-Dashboard_Outcomes.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  OK      2islisFH7jjLoPQM 2islisFH7jjLoPQM-Delete_Orphan_Profiles.json  active=True names=True graph=True published=True
+  DIFF    3qax5J9u2qsT9Vao 3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  DIFF    4VN3gsFaC2HUYmcc 4VN3gsFaC2HUYmcc-Telegram_Bot.json  active=False names=True graph=False published=None  (stored graph differs)
+  DIFF    4wYitz5ek30SVNlT 4wYitz5ek30SVNlT-WhatsApp_Bot.json  active=False names=True graph=False published=None  (stored graph differs)
+  DIFF    9PTyYcelRQI7bGDb 9PTyYcelRQI7bGDb-Suggest_Replies.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  DIFF    KoTuIlk4LMrlvnWI KoTuIlk4LMrlvnWI-Upload_File.json  active=True names=False graph=False published=False  (node set differs; stored graph differs; PUBLISHED graph differs)
+  DIFF    SCLcpn6DMDG3Z4VN SCLcpn6DMDG3Z4VN-Set_Reply_Mode.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  DIFF    TwWPW3gIyjZS3foR TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  DIFF    Uz6HBBUpAiUqVysB Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json  active=True names=False graph=False published=False  (node set differs; stored graph differs; PUBLISHED graph differs)
+  DIFF    XuvOp7TxOImOAmlj XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json  active=True names=False graph=False published=False  (node set differs; stored graph differs; PUBLISHED graph differs)
+  OK      ZGYr6srzS3rSSXHp ZGYr6srzS3rSSXHp-RevenueCat_Events.json  active=True names=True graph=True published=True
+  DIFF    ZTqpumOpL1rNDOp6 ZTqpumOpL1rNDOp6-Delete_File.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  DIFF    crAuthSession001 crAuthSession001-Auth_Session.json  active=True names=False graph=False published=False  (node set differs; stored graph differs; PUBLISHED graph differs)
+  OK      crHandoffDry0001 crHandoffDry0001-Handoff_Request_Dry.json  active=True names=True graph=True published=True
+  DIFF    crHandoffNtfy001 crHandoffNtfy001-Handoff_Notifier.json  active=True names=False graph=False published=False  (node set differs; stored graph differs; PUBLISHED graph differs)
+  OK      crHandoffReq0001 crHandoffReq0001-Handoff_Request.json  active=True names=True graph=True published=True
+  DIFF    crHandoffsApi001 crHandoffsApi001-Handoffs.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  DIFF    crTestDialog0001 crTestDialog0001-Test_Dialog.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  DIFF    crWappiProxy0001 crWappiProxy0001-Wappi_Proxy.json  active=True names=False graph=False published=False  (node set differs; stored graph differs; PUBLISHED graph differs)
+  OK      fXYpCXPKw92EzRz8 fXYpCXPKw92EzRz8-Profile_Lifecycle_Sweep.json  active=True names=True graph=True published=True
+  OK      hHwvfOvTCS42pXnq hHwvfOvTCS42pXnq-Landing_Lead.json  active=True names=True graph=True published=True
+  DIFF    jtbssfzXbOxwTK4k jtbssfzXbOxwTK4k-Get_Usage.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  DIFF    lmjYsdNcQA2IE5rl lmjYsdNcQA2IE5rl-Delete_Bot_Files.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  DIFF    olmqWMfcFpCEcpiE olmqWMfcFpCEcpiE-Support_Message.json  active=True names=True graph=False published=False  (stored graph differs; PUBLISHED graph differs)
+  clone   dt6hHFUVrW07unTj '23' [whatsapp] active=True nodes=56 graph=1e1d6c1b1b15 published=1e1d6c1b1b15 sticky=None BEHIND
+  archived tqGXmiT6aJu7vUIG '13' [whatsapp] graph=19b0e4675a8b — retired by the owner, not counted
+wrote docs/audits/2026-09-28-review-evidence/production-readback.json

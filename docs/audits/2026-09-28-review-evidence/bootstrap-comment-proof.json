@@ -1,0 +1,16 @@
+{
+  "route_invalid": false,
+  "newline_preserved": true,
+  "sentinel_executed_as_separate_sql": true,
+  "unauthenticated_endpoint": "AuthSession bootstrap",
+  "scope": "local TEMP tables + ROLLBACK; no live webhook invoked",
+  "published_has_new_vulnerable_comment": false,
+  "current_clone": {
+    "id": "dt6hHFUVrW07unTj",
+    "name": "23",
+    "active": true,
+    "archived": false,
+    "graph_stamp": "1e1d6c1b1b15",
+    "canonical_stamp": "18193d385338"
+  }
+}

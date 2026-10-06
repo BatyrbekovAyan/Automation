@@ -1,0 +1,4 @@
+same current request, alive same target: ApplyToScreen=True, Verdict=1
+same current request, bot deleted: ApplyToScreen=True, Verdict=null
+same current request, workflow changed: ApplyToScreen=True, Verdict=null
+new screen sequence: ApplyToScreen=False, Verdict=1

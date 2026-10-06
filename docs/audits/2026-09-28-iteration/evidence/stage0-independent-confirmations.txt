@@ -1,0 +1,15 @@
+Независимое подтверждение находок GPT 2026-09-28 (мой прогон репро GPT, temp-таблицы + rollback, без прода), 2026-09-28:
+- V2 (R1): auth-residuals R1_independent_legacy_owner_reauth — профиль без владельца привязан к A по чужому переподключению. РЕАЛЬНО.
+- V3 (R2): R2_no_live_bots_binding_takeover — B получает чужой billing ID в токене. РЕАЛЬНО.
+- V4 (R3): R3_ownerless_foreign_file_takeover — allowed:true, чужой chunk 1->0. РЕАЛЬНО.
+- R11-контроль: db_error/passed_through/empty все -> 503 db_unavailable. R11 ИСПРАВЛЕН ВЕРНО.
+- V5 (R6): pipeline same-second A=sent B=superseded (WA+TG). РЕАЛЬНО.
+- V6 (R7): send_unknown без пометки + reversed-completion удаляет отправленную строку нового прогона (WA+TG). РЕАЛЬНО.
+- V7 (R10): sole manual / foreign profile / outgoing_phone -> state=sent (WA+TG). РЕАЛЬНО.
+- R4 clock-ahead: часы +5мин закрывают заявку, созданную после решения. Остаточное — подтверждено.
+- R8 delete-fail: сбой удаления клона оставляет клон без id в ответе. Остаточное — подтверждено.
+- V10: prod-readback active dt6hHFUVrW07unTj name «23» active=True; «13» archived. Пакет «живых клонов нет» — ОШИБКА. РЕАЛЬНО.
+- V1: формат SQL-запросов (Delete File опубликован на проде + новый Create Install) — я нашёл это же в S1 прошлой сессии. РЕАЛЬНО.
+Не прогонял сам пока: V8 (R13), V9 (R14 частично, известно), V11 (R16) — проверят агенты.
+- V8 (R13): suggestions-review r13_probes old_long_burst_reappended_after_new (WA+TG): old 617-char turn → query начинается с OLD54321, tokens=["OLD54321"], new_preserved=false, NEW12345 отсутствует в query и exactTokens. РЕАЛЬНО (подтверждено мной 2026-09-28).
+- V9 (R14): пересчёт GPT совпадает с нашим (before 52/3/8, after 53/6/4 на сохранённых ответах) — частичность известна и подтверждена.

@@ -1,0 +1,74 @@
+{
+  "gate_without_token_in_open_compat": {
+    "ok": true,
+    "mode": "legacy",
+    "reason": null,
+    "installId": null,
+    "appUserId": null,
+    "profiles": [],
+    "workflows": [],
+    "claimPending": []
+  },
+  "local_postgres_result": "928\n0|t",
+  "sentinel_executed_as_separate_sql": true,
+  "published_active": true,
+  "published_query_matches_local": true,
+  "published_version": "ccdaac23-b288-4c5f-ba70-d311e9365177",
+  "live_webhook_invoked": false,
+  "method": "Installed pg-promise formats actual workflow SQL; execute only in local Postgres with TEMP tables and ROLLBACK. Sentinel is a read-only SELECT.",
+  "other_parameter_comments": [
+    {
+      "workflow": "crAuthSession001-Auth_Session.json",
+      "node": "Create Install",
+      "lines": [
+        "-- R2 (2026-09-27): the billing id ($3) is NOT trusted for being named — it is bound to this install only when"
+      ]
+    },
+    {
+      "workflow": "ZTqpumOpL1rNDOp6-Delete_File.json",
+      "node": "Delete File Chunks",
+      "lines": [
+        "-- A1: owner-scoped delete. $1 fileId, $2 gate mode (session|legacy), $3 install id, $4 JSON array of"
+      ]
+    },
+    {
+      "workflow": "ZGYr6srzS3rSSXHp-RevenueCat_Events.json",
+      "node": "Transfer Subscriber",
+      "lines": [
+        "-- ни SKU — всё читается из СТАРОЙ строки. $1 = JSON-массив transferred_to, $2 = transferred_from."
+      ]
+    },
+    {
+      "workflow": "ZGYr6srzS3rSSXHp-RevenueCat_Events.json",
+      "node": "Consolidate Aliases",
+      "lines": [
+        "-- $1 = текущий app_user_id, $2 = JSON-массив алиасов (текущий id уже исключён в Map Event),",
+        "-- $3..$7 = payload события, который эта нода ОБЯЗАНА пронести дальше: Postgres-нода отдаёт",
+        "-- И порядок: эта нода стоит ДО Upsert Subscriber. `topup_balance + $5` в апсерте НЕ идемпотентен"
+      ]
+    },
+    {
+      "workflow": "Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json",
+      "node": "Register Profile",
+      "lines": [
+        "-- $2 (AppUserID) нуждается в собственном гарде не больше, чем раньше: до этой ноды",
+        "-- в Get Sample Workflow мимо всей биллинг-цепочки. Гард на $1 ниже нужен потому, что там"
+      ]
+    },
+    {
+      "workflow": "XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json",
+      "node": "Register Profile",
+      "lines": [
+        "-- $2 (AppUserID) нуждается в собственном гарде не больше, чем раньше: до этой ноды",
+        "-- в Get Sample Workflow мимо всей биллинг-цепочки. Гард на $1 ниже нужен потому, что там"
+      ]
+    },
+    {
+      "workflow": "9PTyYcelRQI7bGDb-Suggest_Replies.json",
+      "node": "Suggestion Gate",
+      "lines": [
+        "-- cannot slip between a read and a write. $1 = appUserId, $2 = requestKey ('' from a legacy client)."
+      ]
+    }
+  ]
+}

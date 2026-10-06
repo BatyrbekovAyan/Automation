@@ -1,0 +1,29 @@
+{
+  "review_date": "2026-09-28",
+  "head_start": "a3a788ce",
+  "head_final": "841d6cb78eafe00b33a959040a3ef47731def343",
+  "intervening_changes": "5f231ed2 staging e2e-suggest fixture isolation; 282224bc and 841d6cb7 documents only. Product/canonical code unchanged during pause.",
+  "unity": {
+    "status": "completed",
+    "source": "headless",
+    "overall": "Passed",
+    "total": 516,
+    "passed": 516,
+    "failed": 0,
+    "skipped": 0,
+    "inconclusive": 0,
+    "green": true,
+    "unityExit": 0
+  },
+  "backend_suites": 17,
+  "backend_pass": 310,
+  "backend_fail": 0,
+  "production": "Read-only workflow API; no webhook invocations, changes or customer sends",
+  "local_database": "Local port5433; focused proofs use TEMP tables + ROLLBACK or session TEMP tables",
+  "limitations": [
+    "No new device pass",
+    "No release build or publication",
+    "Model quality regraded saved answers; no independent new paid generations",
+    "Current staging e2e results by implementer read; full HTTP e2e suite not independently rerun"
+  ]
+}

@@ -1,0 +1,37 @@
+[
+  {
+    "id": "701749959",
+    "name": "AutoButton",
+    "activeSelf": "1"
+  },
+  {
+    "id": "128643809",
+    "name": "RightZone",
+    "activeSelf": "1"
+  },
+  {
+    "id": "1485089546",
+    "name": "TopBar",
+    "activeSelf": "1"
+  },
+  {
+    "id": "263910444",
+    "name": "ChatsPanel",
+    "activeSelf": "1"
+  },
+  {
+    "id": "1992340357",
+    "name": "Screen_Messanger",
+    "activeSelf": "1"
+  },
+  {
+    "id": "1131169388",
+    "name": "ScreenContainer",
+    "activeSelf": "1"
+  },
+  {
+    "id": "42635009",
+    "name": "Canvas",
+    "activeSelf": "1"
+  }
+]

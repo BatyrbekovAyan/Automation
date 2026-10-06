@@ -1,0 +1,12 @@
+Filter: -testFilter "Auth|ReplyMode|Handoff|Suggest|TestDialog|BotTest|BotReadiness|UploadFailure"
+Launching headless Unity 6000.3.9f1 (this can take a few minutes on a cold start)…
+  Unity:   /Applications/Unity/Hub/Editor/6000.3.9f1/Unity.app/Contents/MacOS/Unity
+  Project: /Users/ayan/Projects/Automation
+  Results: /Users/ayan/Projects/Automation/Tools/test-output/results.xml
+  Log:     /Users/ayan/Projects/Automation/Tools/test-output/editor.log
+Unity process exited with code 0.
+
+================ EditMode test results (headless) ================
+  result=Passed  total=516  passed=516  failed=0  skipped=0  inconclusive=0
+=================================================================
+GREEN ✅  all 516 tests passed.
