@@ -2743,8 +2743,16 @@ public partial class Manager : MonoBehaviour
                         WhatsappNumberInput.text = phone;
                     }
 
-                    // A1: a re-pair that completes a pending legacy claim binds the profile here.
-                    yield return ProfileClaimFlow.AfterChannelAuthorized(whatsappProfileId, ChatChannel.WhatsApp);
+                    // A1/V2: a re-pair of a claim-pending legacy profile does NOT bind it — the owner confirms with
+                    // the code that lands in the paired account's «Избранное». Cancelled ⇒ the connection is undone
+                    // (the auth Back path): no workflow may be created for a profile this install does not own.
+                    bool claimOk = true;
+                    yield return ProfileClaimFlow.AfterChannelAuthorized(whatsappProfileId, ChatChannel.WhatsApp, BotsRoot, ok => claimOk = ok);
+                    if (!claimOk)
+                    {
+                        if (WhatsappAuthBackButton != null) WhatsappAuthBackButton.onClick.Invoke();
+                        yield break;
+                    }
 
                     // Show checkmark inside QR box, then navigate
                     yield return StartCoroutine(ShowAuthSuccess(WhatsappAuth, WhatsappAuthSuccessPanel));
@@ -3235,8 +3243,14 @@ public partial class Manager : MonoBehaviour
                     if (WappiStatusParser.TryGetPhone(response, out string phone))
                         TelegramNumberInput.text = phone;
 
-                    // A1: a re-pair that completes a pending legacy claim binds the profile here.
-                    yield return ProfileClaimFlow.AfterChannelAuthorized(telegramProfileId, ChatChannel.Telegram);
+                    // A1/V2: see the WhatsApp twin — the code, not the pairing, binds a claim-pending profile.
+                    bool claimOk = true;
+                    yield return ProfileClaimFlow.AfterChannelAuthorized(telegramProfileId, ChatChannel.Telegram, BotsRoot, ok => claimOk = ok);
+                    if (!claimOk)
+                    {
+                        if (TelegramAuthBackButton != null) TelegramAuthBackButton.onClick.Invoke();
+                        yield break;
+                    }
 
                     // Show checkmark inside QR box, then navigate
                     yield return StartCoroutine(ShowAuthSuccess(TelegramAuth, TelegramAuthSuccessPanel));

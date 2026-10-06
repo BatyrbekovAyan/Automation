@@ -15,7 +15,7 @@ public static class ProfileClaimCopy
 
     public const string BodyReauthFormat =
         "Бот «{0}» ещё не подтверждён на этом устройстве: откройте его настройки и подключите {1} заново. " +
-        "После подключения бот привяжется автоматически.";
+        "После подключения введите код, который придёт в чат «Избранное».";
 
     public const string BodyTransportDown = "Сервер недоступен. Попробуйте позже.";
 
@@ -23,8 +23,13 @@ public static class ProfileClaimCopy
     public const string Submit = "Подтвердить";
     public const string Later = "Позже";
     public const string Ok = "Понятно";
+    /// <summary>The code sheet raised right after a pairing (V2): leaving it cancels the connection.</summary>
+    public const string Cancel = "Отменить";
+    public const string Resend = "Отправить код ещё раз";
 
-    public const string ErrorWrongCode = "Код не подходит или истёк. Запросите новый, открыв приложение заново.";
+    public const string ErrorWrongCode = "Код не подходит. Проверьте его в чате «Избранное» и введите ещё раз.";
+    public const string ErrorLocked = "Слишком много попыток. Запросите новый код через 10 минут.";
+    public const string ErrorSendFailed = "Не удалось отправить код. Попробуйте ещё раз.";
     public const string ErrorGeneric = "Не удалось подтвердить. Попробуйте позже.";
 
     public const string ChannelWhatsApp = "WhatsApp";

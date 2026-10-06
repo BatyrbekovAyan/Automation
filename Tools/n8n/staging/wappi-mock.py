@@ -30,7 +30,8 @@ Control routes (never exist on the real transport):
                            profile — the project-confirmed crossed-response bug; `after: <path substr>` keeps a
                            fault dormant until such a call was recorded (e.g. cross only the RECONCILE fetch,
                            i.e. a messages/get after message/send)
-    POST /__mock/profile   {profile_id, authorized, phone, authorized_at}   status fields for get/status
+    POST /__mock/profile   {profile_id, authorized, phone, authorized_at, account_phone}   status fields for get/status
+                           (account_phone: tapi only — the authorised account, returned as account.phone)
     GET  /__mock/state
 """
 import json
@@ -200,8 +201,11 @@ class Handler(BaseHTTPRequestHandler):
                 return 200, {"status": "done"}
             if tail == "get/status":
                 prof = STATE["profiles"].get(pid) or {}
-                return 200, {"authorized": prof.get("authorized", True), "profile_id": pid,
-                             "phone": prof.get("phone"), "authorized_at": prof.get("authorized_at"), "logouted_at": prof.get("logouted_at")}
+                out = {"authorized": prof.get("authorized", True), "profile_id": pid,
+                       "phone": prof.get("phone"), "authorized_at": prof.get("authorized_at"), "logouted_at": prof.get("logouted_at")}
+                if channel == "telegram" and prof.get("account_phone"):
+                    out["account"] = {"phone": prof["account_phone"], "user_id": 1000000000}   # tapi: the authorised account
+                return 200, out
             if tail == "profile/add":
                 new = _new_id("profile")
                 STATE["profiles"][new] = {"channel": channel, "authorized": False}

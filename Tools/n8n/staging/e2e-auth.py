@@ -249,7 +249,7 @@ def s_claim_code(ctx):
     return ok, f"recipient_is_own_phone={recipient == '77001112233'} second_start_reuses_code={d2.get('codeReused')} wrong_code={st3} verify={st4} now_owned_by_A={victim in d4.get('profiles', [])} B_lost_it={victim not in b_after['profiles']}"
 
 
-@scenario("claim_by_reauth_binds_after_pairing", "an UNAUTHORISED legacy profile: claim.start → reauth; only a pairing AFTER the claim binds it (claim.status)")
+@scenario("claim_reauth_then_code_binds", "V2: an UNAUTHORISED legacy profile: claim.start → reauth; a pairing alone binds NOTHING (claim.status); claim.start then sends ONE code into the paired account's own chat and claim.verify binds it")
 def s_claim_reauth(ctx):
     a = ctx["A"]
     legacy = f"legacy-{ctx['run_id']}"
@@ -262,20 +262,83 @@ def s_claim_reauth(ctx):
     # with the c-capability the proxy admits the auth ops for this profile, nothing else
     st_qr, _ = proxy(tok, {"op": "qr", "channel": "whatsapp", "profile_id": legacy})
     st_chats, _ = proxy(tok, {"op": "chats.filter", "channel": "whatsapp", "profile_id": legacy})
-    # not yet paired → status keeps it pending
-    st1, d1 = session({"op": "claim.status", "installId": a.install_id, "installSecret": a.secret, "appUserId": a.app_user_id, "profileId": legacy, "channel": "whatsapp"})
-    # paired AFTER the claim began → bound
     time.sleep(1.2)
     import datetime as dt
     http("POST", f"{MOCK}/__mock/profile", {"profile_id": legacy, "authorized": True, "phone": "77009998877", "authorized_at": dt.datetime.now(dt.timezone.utc).isoformat()})
-    st2, d2 = session({"op": "claim.status", "installId": a.install_id, "installSecret": a.secret, "appUserId": a.app_user_id, "profileId": legacy, "channel": "whatsapp"})
-    a.token = d2.get("token", a.token)
-    ok = st_qr == 200 and st_chats == 403 and st1 == 200 and legacy not in d1.get("profiles", []) and st2 == 200 and legacy in d2.get("profiles", [])
-    return ok, f"qr_allowed={st_qr} chats_refused={st_chats} before_pairing_owned={legacy in d1.get('profiles', [])} after_pairing_owned={legacy in d2.get('profiles', [])}"
+    st1, d1 = session({"op": "claim.status", "installId": a.install_id, "installSecret": a.secret, "appUserId": a.app_user_id, "profileId": legacy, "channel": "whatsapp"})
+    since = mock_total()
+    st2, d2 = claim_call(a, "claim.start", legacy)
+    sends, _ = mock_calls(since, "message/send")
+    code = "".join(ch for ch in (sends[0]["body"].get("body", "") if sends else "") if ch.isdigit())[-6:]
+    st3, d3 = claim_call(a, "claim.verify", legacy, code)
+    a.token = (d3 or {}).get("token", a.token)
+    ok = (st_qr == 200 and st_chats == 403 and st1 == 200 and legacy not in d1.get("profiles", []) and d1.get("claimMethod") == "pending"
+          and st2 == 200 and (d2 or {}).get("claimMethod") == "code" and len(sends) == 1 and sends[0]["body"].get("recipient") == "77009998877"
+          and st3 == 200 and legacy in (d3 or {}).get("profiles", []))
+    return ok, (f"qr_allowed={st_qr} chats_refused={st_chats} pairing_alone_owned={legacy in d1.get('profiles', [])}/{d1.get('claimMethod')} "
+                f"start={st2}/{(d2 or {}).get('claimMethod')} sends={len(sends)} to={sends[0]['body'].get('recipient') if sends else None} "
+                f"verify={st3} owned={legacy in (d3 or {}).get('profiles', [])}")
 
 
-def claim_call(owner, op, pid, code=None):
-    body = {"op": op, "installId": owner.install_id, "installSecret": owner.secret, "appUserId": owner.app_user_id, "profileId": pid, "channel": "whatsapp"}
+@scenario("claim_reauth_independent_reconnect_not_transferred", "V2: the claimant requests a QR, the OWNER reconnects the owner-less profile independently → the claimant gets nothing (claim.status), its claim.start sends the code into the OWNER's chat, a wrong code is 403 and the row stays owner-less — WhatsApp and Telegram")
+def s_claim_independent(ctx):
+    import datetime as dt
+    res = {}
+    for ch, owner_phone in (("whatsapp", "77001119900"), ("telegram", "77001119911")):
+        x = fresh_owner(ctx, f"v2x{ch[:2]}")
+        legacy = f"legacy-v2-{ch[:2]}-{ctx['run_id']}"
+        x.profiles.append(legacy)
+        http("POST", f"{MOCK}/__mock/profile", {"profile_id": legacy, "authorized": False, "phone": None})
+        st0, d0 = claim_call(x, "claim.start", legacy, channel=ch)
+        st_qr, _ = proxy((d0 or {}).get("token"), {"op": "qr", "channel": ch, "profile_id": legacy})
+        time.sleep(1.2)
+        prof = {"profile_id": legacy, "authorized": True, "phone": owner_phone, "authorized_at": dt.datetime.now(dt.timezone.utc).isoformat()}
+        if ch == "telegram":
+            prof["account_phone"] = owner_phone
+        http("POST", f"{MOCK}/__mock/profile", prof)                    # the owner reconnects (legacy client / Wappi cabinet)
+        st1, d1 = claim_call(x, "claim.status", legacy, channel=ch)
+        since = mock_total()
+        st2, d2 = claim_call(x, "claim.start", legacy, channel=ch)
+        sends, _ = mock_calls(since, "message/send")
+        st3, d3 = claim_call(x, "claim.verify", legacy, "000000", channel=ch)
+        owner = pg(f"select coalesce(owner_id, '-') from bot_profiles where profile_id = '{legacy}';")
+        res[ch] = {"start": (st0, (d0 or {}).get("claimMethod")), "qr": st_qr, "status_owned": legacy in (d1 or {}).get("profiles", []),
+                   "start2": (st2, (d2 or {}).get("claimMethod")), "sends": [(c["path"], c["body"].get("recipient")) for c in sends],
+                   "wrong_code": (st3, (d3 or {}).get("error")), "owner": owner}
+    ok = all(r["start"] == (200, "reauth") and r["qr"] == 200 and r["status_owned"] is False and r["start2"] == (200, "code")
+             and len(r["sends"]) == 1 and r["sends"][0][1] == ph and ("/tapi/" in r["sends"][0][0]) == (ch == "telegram")
+             and r["wrong_code"] == (403, "claim_code_rejected") and r["owner"] == "-"
+             for (ch, r), ph in zip(res.items(), ("77001119900", "77001119911")))
+    return ok, json.dumps(res, ensure_ascii=False)
+
+
+@scenario("claim_code_send_failure_is_reported", "V2: a code the transport refuses is reported (502 code_send_failed) and cleared — the retry sends a NEW code (never «reused») and that code binds; a Telegram code goes to the authorised account (account.phone), not the top-level phone")
+def s_claim_send_failure(ctx):
+    res = {}
+    for ch, top, acct in (("whatsapp", "77002220000", None), ("telegram", "77002220009", "77002220001")):
+        x = fresh_owner(ctx, f"v2s{ch[:2]}")
+        legacy = f"legacy-v2s-{ch[:2]}-{ctx['run_id']}"
+        x.profiles.append(legacy)
+        prof = {"profile_id": legacy, "authorized": True, "phone": top}
+        if acct:
+            prof["account_phone"] = acct
+        http("POST", f"{MOCK}/__mock/profile", prof)
+        http("POST", f"{MOCK}/__mock/fault", {"match": "message/send", "mode": "status", "status": 500, "profile_id": legacy})
+        st1, d1 = claim_call(x, "claim.start", legacy, channel=ch)
+        since = mock_total()
+        st2, d2 = claim_call(x, "claim.start", legacy, channel=ch)
+        sends, _ = mock_calls(since, "message/send")
+        code = "".join(c for c in (sends[0]["body"].get("body", "") if sends else "") if c.isdigit())[-6:]
+        st3, d3 = claim_call(x, "claim.verify", legacy, code, channel=ch)
+        res[ch] = {"failed": (st1, (d1 or {}).get("error")), "retry": (st2, (d2 or {}).get("claimMethod"), (d2 or {}).get("codeReused")),
+                   "sends": [c["body"].get("recipient") for c in sends], "verify": st3, "owned": legacy in (d3 or {}).get("profiles", [])}
+    ok = all(r["failed"] == (502, "code_send_failed") and r["retry"] == (200, "code", False) and r["sends"] == [ph]
+             and r["verify"] == 200 and r["owned"] for r, ph in zip(res.values(), ("77002220000", "77002220001")))
+    return ok, json.dumps(res, ensure_ascii=False)
+
+
+def claim_call(owner, op, pid, code=None, channel="whatsapp"):
+    body = {"op": op, "installId": owner.install_id, "installSecret": owner.secret, "appUserId": owner.app_user_id, "profileId": pid, "channel": channel}
     if code is not None:
         body["code"] = code
     return session(body)
@@ -754,8 +817,6 @@ def main():
         ctx["B"].add_profile()
         for id_, title, fn in SCENARIOS:
             if a.only and a.only not in id_:
-                continue
-            if id_ == "claim_by_reauth_binds_after_pairing" and "Owner" not in str(type(ctx.get("A"))):
                 continue
             if id_ != "proxy_profile_add_binds_owner" and not ctx["A"].profiles:
                 ctx["A"].add_profile()

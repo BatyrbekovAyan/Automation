@@ -1,0 +1,99 @@
+V2 — после исправления (база HEAD b3132796 + правки группы V2)
+
+## Tools/n8n/tests/test_claim.py (настоящие узлы канона, SQL на temp-таблицах стенда)
+PASS R1 S1: the owner re-pairs its own profile while a stranger holds a pending claim -> the stranger gets nothing
+PASS V2 S2: a legacy profile re-paired by its owner is NOT bound by the pairing — it is bound by the code that then lands in its own chat
+PASS R1 S3: a stranger takes over the pending claim while the claimant pairs -> nobody is bound
+PASS V2 S4: a claim older than a day records no pairing; a renewed claim (claim.start) pairs again and binds only by code
+PASS R1 S5: a stale claim capability (the claim was taken over) cannot start a pairing through the proxy
+PASS R1 S7: claim.status never mints or sends a code (no unsolicited codes / phishing aid)
+PASS R1 S8: transfer by code on reinstall — wrong / expired / replayed codes change nothing, the right code transfers
+PASS R1 S9: two concurrent claims — only the proof (the code from the bot's own chat) binds; the racing claimant without it changes nothing
+PASS R1 S10: an unauthenticated claim.* call never reaches Claim Start (no pending claim / row written before the refusal)
+PASS V2 S11: a QR request + the OWNER's independent re-connection never hands an owner-less profile (or its workflow) to the requester
+PASS V2 S12: a code the transport did not accept is reported (code_send_failed, 502) and cleared — the retry sends a NEW one, never "reuses" a lost one
+PASS V2 S13: five wrong answers kill the code — the right one is then refused (claim_code_locked) and no new code is sent until its window ends
+PASS V2 S14: structure — no reauth bind, only Verify Claim Code writes owner_id, claim.verify never calls Wappi, a send is judged
+PASS V2 S15: another install's claim.status / claim.verify never take over a pending claim, nor burn its attempts
+PASS V2 S16: Telegram — the code goes to the AUTHORISED account (account.phone), never to a number named in auth/phone
+PASS V2 negative: verify-auth-gate.py rejects an Auth Session that binds on a pairing again, or lets claim.verify call Wappi
+
+16 pass, 0 fail
+
+## Генератор: второй прогон без диффа
+auth workflows: up to date
+
+## verify-auth-gate.py
+ALL AUTH GATE ASSERTS PASSED
+
+## verify-sql-comments.py
+OK  72 Postgres node(s) in 27 workflow file(s): no placeholder outside code, no {{ }}, no modifier, no leading =
+
+## Unity EditMode ДО (исходники HEAD + новые тесты): Tools/run-tests-headless.sh 'ProfileClaim'
+================ EditMode test results (headless) ================
+  result=Failed(Child)  total=9  passed=6  failed=3  skipped=0  inconclusive=0
+  Failing / inconclusive tests:
+    - ProfileClaimPolicyTests.NextUnowned_DoesNotSkipAClaimPendingProfile_APairingNeverBindsIt
+    - ProfileClaimWiringTests.AfterChannelAuthorized_AsksForTheCode_NeverPollsClaimStatus
+    - ProfileClaimWiringTests.AuthPollers_CreateNothing_UntilTheClaimSucceeded
+=================================================================
+NOT GREEN ❌  (unity exit=2).
+Failed  ProfileClaimPolicyTests.NextUnowned_DoesNotSkipAClaimPendingProfile_APairingNeverBindsIt
+        Expected: True
+  But was:  False
+--
+Failed  ProfileClaimWiringTests.AfterChannelAuthorized_AsksForTheCode_NeverPollsClaimStatus
+        the pairing must lead into the code step
+  Expected: True
+--
+Failed  ProfileClaimWiringTests.AuthPollers_CreateNothing_UntilTheClaimSucceeded
+        private IEnumerator GetWhatsappProfileStatus(: a cancelled claim must undo the connection
+  Expected: True
+
+## Unity EditMode ПОСЛЕ: 'ProfileClaim|FontGlyphCoverage|AuthWiringGuard'
+================ EditMode test results (headless) ================
+  result=Passed  total=22  passed=22  failed=0  skipped=0  inconclusive=0
+=================================================================
+GREEN ✅  all 22 tests passed.
+
+## Стенд: bootstrap.py переимпорт + verify-deployed.py --base http://localhost:5678 → exit 0
+
+## Стенд: e2e-auth.py --only claim (WhatsApp и Telegram)
+   pre-run: swept 0 stale mock profile(s) (live mock knows 18)
+PASS  claim_by_code_transfers_ownership (0.5s) — a legacy/other-install profile: claim.start sends a code to the bot's OWN chat; claim.verify binds it to the claiming install
+      recipient_is_own_phone=True second_start_reuses_code=True wrong_code=403 verify=200 now_owned_by_A=True B_lost_it=True
+PASS  claim_reauth_then_code_binds (1.8s) — V2: an UNAUTHORISED legacy profile: claim.start → reauth; a pairing alone binds NOTHING (claim.status); claim.start then sends ONE code into the paired account's own chat and claim.verify binds it
+      qr_allowed=200 chats_refused=403 pairing_alone_owned=False/pending start=200/code sends=1 to=77009998877 verify=200 owned=True
+PASS  claim_reauth_independent_reconnect_not_transferred (4.4s) — V2: the claimant requests a QR, the OWNER reconnects the owner-less profile independently → the claimant gets nothing (claim.status), its claim.start sends the code into the OWNER's chat, a wrong code is 403 and the row stays owner-less — WhatsApp and Telegram
+      {"whatsapp": {"start": [200, "reauth"], "qr": 200, "status_owned": false, "start2": [200, "code"], "sends": [["/api/sync/message/send", "77001119900"]], "wrong_code": [403, "claim_code_rejected"], "owner": "-"}, "telegram": {"start": [200, "reauth"], "qr": 200, "status_owned": false, "start2": [200, "code"], "sends": [["/tapi/sync/message/send", "77001119911"]], "wrong_code": [403, "claim_code_rejected"], "owner": "-"}}
+PASS  claim_code_send_failure_is_reported (1.4s) — V2: a code the transport refuses is reported (502 code_send_failed) and cleared — the retry sends a NEW code (never «reused») and that code binds; a Telegram code goes to the authorised account (account.phone), not the top-level phone
+      {"whatsapp": {"failed": [502, "code_send_failed"], "retry": [200, "code", false], "sends": ["77002220000"], "verify": 200, "owned": true}, "telegram": {"failed": [502, "code_send_failed"], "retry": [200, "code", false], "sends": ["77002220001"], "verify": 200, "owned": true}}
+PASS  claim_reauth_owned_profile_not_transferred (2.4s) — R1: a stranger's pending claim on an OWNED profile + the owner's own later re-pairing → the stranger gets nothing, claim.status sends no code, the owner keeps the profile
+      stranger start=200/code owner_qr=200 stranger status=200 got_it=False codes_sent_by_status=0 owner_keeps=True (codes in chat total 1)
+PASS  claim_stale_capability_cannot_pair (1.0s) — R1: once another install takes over a pending claim, the first claimant's token capability no longer starts a pairing (403 claim_not_pending, no transport call)
+      L start=200 takeover=200 L qr=403 {'success': False, 'error': 'claim_not_pending'} transport_calls=0
+PASS  claim_unauthenticated_writes_nothing (1.0s) — R1: a claim.* call with a wrong secret is refused (401) before Claim Start — no row inserted, a pending claim untouched
+      wrong-secret=401/install_revoked ghost=401 rows_for_new_id=0 pending_unchanged=True
+
+7 pass, 0 fail
+
+## Tools/n8n/tests/run_all.py
+OK   test_auth_refresh.py: 12 pass, 0 fail
+OK   test_billing_identity.py: 14 pass, 0 fail
+OK   test_claim.py: 16 pass, 0 fail
+OK   test_create_seed.py: 10 pass, 0 fail
+OK   test_harness_selfcheck.py: 2 pass, 0 fail
+OK   test_legacy_generators.py: 5 pass, 0 fail
+OK   test_reply_lost_send.py: 5 pass, 0 fail
+OK   test_reply_memory.py: 32 pass, 0 fail
+OK   test_reply_mode.py: 21 pass, 0 fail
+OK   test_reply_order.py: 26 pass, 0 fail
+OK   test_reply_reconcile.py: 32 pass, 0 fail
+OK   test_sql_comment_injection.py: 36 pass, 0 fail
+OK   test_suggest_catalog.py: 24 pass, 0 fail
+OK   test_suggest_query.py: 17 pass, 0 fail
+OK   test_test_dialog.py: 17 pass, 0 fail
+OK   test_upload.py: 22 pass, 0 fail
+OK   test_verify_deployed.py: 26 pass, 0 fail
+OK   test_verify_parity.py: 36 pass, 0 fail
+OK   test_verify_sql_comments.py: 53 pass, 0 fail

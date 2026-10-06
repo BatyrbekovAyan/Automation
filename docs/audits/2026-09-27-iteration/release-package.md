@@ -19,6 +19,8 @@ workflow — `deploy-canonical.py` (dry-run → `--apply --yes`, точка от
 2. `Tools/n8n/sql/2026-09-27-billing-bindings.sql` (R2) — таблица `billing_bindings` + seed.
    **Сначала read-only запрос на дубли** из шапки миграции (ожидается 0 строк; если нет — seed решит по последнему `last_seen`).
 3. `Tools/n8n/sql/2026-09-27-reply-order.sql` (R6) — колонка `chat_reply_state.newest_message_time`.
+4. `Tools/n8n/sql/2026-10-07-claim-code-attempts.sql` (итерация 2026-09-28, V2) — колонка `bot_profiles.claim_code_attempts`;
+   ДО `crAuthSession001` (на неё ссылаются Claim Start / Store / Verify / Clear Claim Code).
 
 `2026-09-17-reply-events.sql` в этой итерации изменён ТОЛЬКО в комментарии — **переприменять не нужно** (уже на проде с 24.09).
 

@@ -28,6 +28,7 @@ public static class ProfileClaimSheet
     private static TMP_InputField field;
     private static Action<string> pendingSubmit;
     private static Action pendingDismiss;
+    private static Action pendingResend;      // V2: set while the sheet offers «Отправить код ещё раз» instead of the field
     private static Type cachedRoundedType;
 
     public static bool IsShowing => panel != null && panel.activeSelf;
@@ -38,14 +39,19 @@ public static class ProfileClaimSheet
         panel = null;
         pendingSubmit = null;
         pendingDismiss = null;
+        pendingResend = null;
     }
 
+    /// <param name="dismissLabel">The secondary button of the CODE shape: «Позже» at boot (default), «Отменить» right
+    /// after a pairing (V2 — leaving that sheet cancels the connection instead of snoozing it).</param>
     public static void Show(TMP_FontAsset font, ProfileClaimPolicy.SheetMode mode, string botName, ChatChannel channel,
-                            Action<string> onSubmitCode, Action onDismiss)
+                            Action<string> onSubmitCode, Action onDismiss, string dismissLabel = null)
     {
         EnsureBuilt(font);
         pendingSubmit = onSubmitCode;
         pendingDismiss = onDismiss;
+        pendingResend = null;
+        secondaryLabel.text = string.IsNullOrEmpty(dismissLabel) ? ProfileClaimCopy.Later : dismissLabel;
         bool code = mode == ProfileClaimPolicy.SheetMode.Code;
         titleTmp.text = mode switch
         {
@@ -67,6 +73,30 @@ public static class ProfileClaimSheet
     public static void ShowError(string text)
     {
         if (errorTmp != null) errorTmp.text = text ?? "";
+    }
+
+    /// <summary>
+    /// V2: no usable code (the transport refused it, five wrong answers killed it, the pairing is not visible yet) —
+    /// hide the field and turn the primary button into «Отправить код ещё раз».
+    /// </summary>
+    public static void ShowResend(string error, Action onResend)
+    {
+        if (panel == null) return;
+        pendingResend = onResend;
+        field.gameObject.SetActive(false);
+        primaryLabel.text = ProfileClaimCopy.Resend;
+        errorTmp.text = error ?? "";
+    }
+
+    /// <summary>V2: a code is in the chat again — back to the field and «Подтвердить».</summary>
+    public static void ShowCodeEntry()
+    {
+        if (panel == null) return;
+        pendingResend = null;
+        field.gameObject.SetActive(true);
+        field.text = "";
+        primaryLabel.text = ProfileClaimCopy.Submit;
+        errorTmp.text = "";
     }
 
     public static void Hide()
@@ -197,6 +227,12 @@ public static class ProfileClaimSheet
 
     private static void OnPrimary()
     {
+        if (pendingResend != null)
+        {
+            errorTmp.text = "";
+            pendingResend.Invoke();             // the flow answers with ShowCodeEntry or ShowResend again
+            return;
+        }
         if (field != null && field.gameObject.activeSelf)
         {
             string code = WappiProxyRequest.DigitsOnly(field.text);
@@ -213,6 +249,7 @@ public static class ProfileClaimSheet
         Action d = pendingDismiss;
         pendingDismiss = null;
         pendingSubmit = null;
+        pendingResend = null;
         d?.Invoke();
     }
 

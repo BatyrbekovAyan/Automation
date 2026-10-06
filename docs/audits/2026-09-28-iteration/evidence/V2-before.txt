@@ -1,0 +1,48 @@
+V2 — поведенческий тест ДО исправления (HEAD b3132796, Tools/n8n/tests/test_claim.py, настоящие узлы канона + SQL на temp-таблицах стенда)
+Ожидаемо: S2/S4/S11–S16 падают (S11 = атака ревьюера: owner=inst-A p=['P11'] w=['wf-11']).
+
+b3132796
+PASS R1 S1: the owner re-pairs its own profile while a stranger holds a pending claim -> the stranger gets nothing
+FAIL V2 S2: a legacy profile re-paired by its owner is NOT bound by the pairing — it is bound by the code that then lands in its own chat
+      - a pairing alone must not bind: reauth bound=[{'profile_id': 'P2'}] reload={'install_id': 'inst-L', 'app_user_id': None, 'token_version': 1, 'p': ['P2'], 'w': ['wf-2'], 'c': []}
+      - claim.start after the pairing must send a code into the paired account's own chat: {'success': True, '_status': 200, 'installId': 'inst-L', 'token': 'v1.<token>', 'expiresAt': 1791363619, 'appUserId': None, 'profiles': ['P2'], 'workflows': ['wf-2'], 'claimPending': [], 'billingConflict': False, 'claimMethod': 'owned', 'claimProfileId': 'P2', 'codeReused': False} -> None
+      - the code from the own chat must bind (with its workflow): {'success': False, 'error': 'claim_code_rejected', '_status': 403} {'install_id': 'inst-L', 'app_user_id': None, 'token_version': 1, 'p': ['P2'], 'w': ['wf-2'], 'c': []}
+PASS R1 S3: a stranger takes over the pending claim while the claimant pairs -> nobody is bound
+FAIL V2 S4: a claim older than a day records no pairing; a renewed claim (claim.start) pairs again and binds only by code
+      - a pairing alone must not bind: {'op': 'claim.status', 'profileId': 'P4', 'channel': 'whatsapp', 'installId': 'inst-L', 'statusCode': 200, 'claimMethod': 'reauth', 'claimError': None, 'code': None, 'codeHash': None, 'phone': None, 'authorizedEpoch': 1791320450} [{'profile_id': 'P4'}]
+PASS R1 S5: a stale claim capability (the claim was taken over) cannot start a pairing through the proxy
+PASS R1 S7: claim.status never mints or sends a code (no unsolicited codes / phishing aid)
+PASS R1 S8: transfer by code on reinstall — wrong / expired / replayed codes change nothing, the right code transfers
+PASS R1 S9: two concurrent claims — only the proof (the code from the bot's own chat) binds; the racing claimant without it changes nothing
+PASS R1 S10: an unauthenticated claim.* call never reaches Claim Start (no pending claim / row written before the refusal)
+FAIL V2 S11: a QR request + the OWNER's independent re-connection never hands an owner-less profile (or its workflow) to the requester
+      - the requester got the profile from someone else's reconnection: owner=inst-A p=['P11'] w=['wf-11']
+      - the code must go into the paired (owner's) account, never anywhere the requester reads: None
+      - a wrong code bound: []
+      - no second code while one is valid: {'success': True, '_status': 200, 'installId': 'inst-O', 'token': 'v1.<token>', 'expiresAt': 1791363697, 'appUserId': None, 'profiles': [], 'workflows': [], 'claimPending': [], 'billingConflict': False, 'claimMethod': 'code', 'claimProfileId': 'P11', 'codeReused': False}
+      - the owner with the code must get it: {'success': False, 'error': 'claim_code_rejected', '_status': 403} {'install_id': 'inst-O', 'app_user_id': None, 'token_version': 1, 'p': [], 'w': [], 'c': []}
+      - a replayed code moved the owner
+FAIL V2 S12: a code the transport did not accept is reported (code_send_failed, 502) and cleared — the retry sends a NEW one, never "reuses" a lost one
+      - a refused send must be reported, not claimMethod code: {'success': True, '_status': 200, 'installId': 'inst-L', 'token': 'v1.<token>', 'expiresAt': 1791363701, 'appUserId': None, 'profiles': [], 'workflows': [], 'claimPending': ['P12'], 'billingConflict': False, 'claimMethod': 'code', 'claimProfileId': 'P12', 'codeReused': False}
+      - the unsent code must be cleared
+      - the retry must send a new code: {'success': True, '_status': 200, 'installId': 'inst-L', 'token': 'v1.<token>', 'expiresAt': 1791363703, 'appUserId': None, 'profiles': [], 'workflows': [], 'claimPending': ['P12'], 'billingConflict': False, 'claimMethod': 'code', 'claimProfileId': 'P12', 'codeReused': True}
+      - the delivered code binds: {'success': False, 'error': 'claim_code_rejected', '_status': 403}
+FAIL V2 S13: five wrong answers kill the code — the right one is then refused (claim_code_locked) and no new code is sent until its window ends
+      - the right code bound after five wrong ones: {'success': True, '_status': 200, 'installId': 'inst-A', 'token': 'v1.<token>', 'expiresAt': 1791363713, 'appUserId': None, 'profiles': ['P13'], 'workflows': [], 'claimPending': [], 'billingConflict': False, 'claimMethod': 'code', 'claimProfileId': 'P13', 'codeReused': False}
+      - a dead code must say so: {'success': True, '_status': 200, 'installId': 'inst-A', 'token': 'v1.<token>', 'expiresAt': 1791363713, 'appUserId': None, 'profiles': ['P13'], 'workflows': [], 'claimPending': [], 'billingConflict': False, 'claimMethod': 'code', 'claimProfileId': 'P13', 'codeReused': False}
+      - per-answer verdicts: ['claim_code_rejected', 'claim_code_rejected', 'claim_code_rejected', 'claim_code_rejected', 'claim_code_rejected']
+      - a new code inside the window: {'success': True, '_status': 200, 'installId': 'inst-A', 'token': 'v1.<token>', 'expiresAt': 1791363714, 'appUserId': None, 'profiles': ['P13'], 'workflows': [], 'claimPending': [], 'billingConflict': False, 'claimMethod': 'owned', 'claimProfileId': 'P13', 'codeReused': False}
+      - after the window a new code works: {'success': True, '_status': 200, 'installId': 'inst-A', 'token': 'v1.<token>', 'expiresAt': 1791363716, 'appUserId': None, 'profiles': ['P13'], 'workflows': [], 'claimPending': [], 'billingConflict': False, 'claimMethod': 'owned', 'claimProfileId': 'P13', 'codeReused': False} {'success': False, 'error': 'claim_code_rejected', '_status': 403}
+FAIL V2 S14: structure — no reauth bind, only Verify Claim Code writes owner_id, claim.verify never calls Wappi, a send is judged
+      - a reauth bind node still exists
+      - owner_id writers in Auth Session: ['Verify Claim Code', 'Bind Reauthed Profile']
+      - Claim Status must be reachable only from Needs Status? (true): [('Claim Start', 0)]
+      - an unsent code must be cleared
+      - claim.status still decides a reauth bind
+FAIL V2 S15: another install's claim.status / claim.verify never take over a pending claim, nor burn its attempts
+      - polling took the claim over: pending=inst-A A.c=['P15']
+FAIL V2 S16: Telegram — the code goes to the AUTHORISED account (account.phone), never to a number named in auth/phone
+      - recipient 70000000009 (top-level phone may be a number someone typed into auth/phone)
+
+7 pass, 8 fail
+python3 Tools/n8n/tests/test_claim.py  113.16s user 20.79s system 98% cpu 2:15.76 total

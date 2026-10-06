@@ -8,8 +8,13 @@ using UnityEngine;
 /// previous install) are not owned by this install's session, so the proxy refuses their chats.
 /// At boot, once the session is ready, the first such bot is claimed: the server sends a code into
 /// the bot's own chat (authorised channel) or asks for a fresh pairing (unauthorised), and the
-/// sheet guides the owner. A channel that becomes authorised while a claim is pending reports back
-/// through <see cref="AfterChannelAuthorized"/>, which is the re-auth binding step.
+/// sheet guides the owner.
+///
+/// V2 (2026-09-28): a pairing NEVER binds a profile — Wappi does not say which link session completed
+/// it, so someone else's re-connection inside the window would hand the profile over. The code in the
+/// bot's own chat is the only proof: a channel that becomes authorised while a claim is pending reports
+/// back through <see cref="AfterChannelAuthorized"/>, which asks for that code (claim.start →
+/// claim.verify) before the caller may create a workflow for the profile.
 /// </summary>
 public static class ProfileClaimFlow
 {
@@ -46,6 +51,13 @@ public static class ProfileClaimFlow
         return bot != null && bot.BotName != null ? bot.BotName.font : null;
     }
 
+    private static ProfileClaimPolicy.Candidate CandidateFor(Transform botsRoot, string profileId, ChatChannel channel)
+    {
+        foreach (var c in ConnectedProfiles(botsRoot))
+            if (c.ProfileId == profileId) return c;
+        return new ProfileClaimPolicy.Candidate { ProfileId = profileId, Channel = channel, BotName = "" };
+    }
+
     /// <summary>Boot entry: wait for the session, then claim the first unowned connected profile (one at a time).</summary>
     public static IEnumerator RunAtBoot(Transform botsRoot)
     {
@@ -76,36 +88,87 @@ public static class ProfileClaimFlow
         var auth = AuthClient.Instance;
         AuthClient.ClaimResult start = null;
         yield return auth.Claim("claim.start", c.ProfileId, c.Channel, null, r => start = r);
-        if (start == null || !start.Success)
+        bool usable = start != null && (start.Success || start.Error == "code_send_failed" || ProfileClaimPolicy.IsCodeDead(start.Error));
+        if (!usable)
         {
             Debug.LogWarning($"[ProfileClaim] claim.start for {c.ProfileId} failed: {start?.Error} (http {start?.HttpStatus})");
             finished(false);
             yield break;
         }
-        var mode = ProfileClaimPolicy.ModeFor(start.Method);
-        if (mode == ProfileClaimPolicy.SheetMode.Owned)
+        if (start.Success && ProfileClaimPolicy.ModeFor(start.Method) == ProfileClaimPolicy.SheetMode.Owned)
         {
             finished(true);                              // already ours (token was just refreshed)
             yield break;
         }
-        bool resolved = false, claimed = false;
-        if (mode == ProfileClaimPolicy.SheetMode.Reauth)
+        if (start.Success && ProfileClaimPolicy.ModeFor(start.Method) == ProfileClaimPolicy.SheetMode.Reauth)
         {
-            Snoozed.Add(c.ProfileId);                    // bound later by AfterChannelAuthorized; do not nag this session
-            ProfileClaimSheet.Show(font, mode, c.BotName, c.Channel, null, () => resolved = true);
+            bool resolved = false;
+            Snoozed.Add(c.ProfileId);                    // the owner re-pairs from the bot's settings, then enters the code there
+            ProfileClaimSheet.Show(font, ProfileClaimPolicy.SheetMode.Reauth, c.BotName, c.Channel, null, () => resolved = true);
             while (!resolved) yield return null;
             finished(false);
             yield break;
         }
-        ProfileClaimSheet.Show(font, mode, c.BotName, c.Channel,
-            code => auth.StartCoroutine(VerifyCode(c, code, ok => { claimed = ok; if (ok) resolved = true; })),
-            () => { Snoozed.Add(c.ProfileId); resolved = true; });
+        bool claimed = false;
+        yield return RunCodeClaim(c, font, ProfileClaimCopy.Later, start, ok => claimed = ok);
+        if (!claimed) Snoozed.Add(c.ProfileId);          // «Позже»: do not nag this session
+        finished(claimed);
+    }
+
+    /// <summary>
+    /// The code sheet over a claim: a code is asked for, verified, and — when there is no usable code (not sent,
+    /// killed by wrong answers, the pairing not visible to the server yet) — re-requested with claim.start.
+    /// <paramref name="first"/> is a claim.start answer already in hand (boot) or null to send it now (after a pairing).
+    /// </summary>
+    private static IEnumerator RunCodeClaim(ProfileClaimPolicy.Candidate c, TMP_FontAsset font, string dismissLabel,
+                                            AuthClient.ClaimResult first, System.Action<bool> finished)
+    {
+        var auth = AuthClient.Instance;
+        bool resolved = false, claimed = false, busy = false;
+        System.Action resend = null;
+
+        void ApplyStart(AuthClient.ClaimResult r)
+        {
+            busy = false;
+            switch (ProfileClaimPolicy.AfterStart(r != null && r.Success, r?.Method))
+            {
+                case ProfileClaimPolicy.StartStep.Proceed: claimed = true; resolved = true; break;
+                case ProfileClaimPolicy.StartStep.EnterCode: ProfileClaimSheet.ShowCodeEntry(); break;
+                default: ProfileClaimSheet.ShowResend(ProfileClaimPolicy.ErrorCopyFor(r?.Error), resend); break;
+            }
+        }
+
+        resend = () =>
+        {
+            if (busy) return;
+            busy = true;
+            auth.StartCoroutine(auth.Claim("claim.start", c.ProfileId, c.Channel, null, ApplyStart));
+        };
+
+        ProfileClaimSheet.Show(font, ProfileClaimPolicy.SheetMode.Code, c.BotName, c.Channel,
+            code =>
+            {
+                if (busy) return;
+                busy = true;
+                auth.StartCoroutine(VerifyCode(c, code, resend, ok => { busy = false; if (ok) { claimed = true; resolved = true; } }));
+            },
+            () => resolved = true,
+            dismissLabel);
+        if (first == null)
+        {
+            busy = true;
+            yield return auth.Claim("claim.start", c.ProfileId, c.Channel, null, ApplyStart);
+        }
+        else
+        {
+            ApplyStart(first);
+        }
         while (!resolved) yield return null;
         if (claimed) ProfileClaimSheet.Hide();
         finished(claimed);
     }
 
-    private static IEnumerator VerifyCode(ProfileClaimPolicy.Candidate c, string code, System.Action<bool> done)
+    private static IEnumerator VerifyCode(ProfileClaimPolicy.Candidate c, string code, System.Action resend, System.Action<bool> done)
     {
         AuthClient.ClaimResult verify = null;
         yield return AuthClient.Instance.Claim("claim.verify", c.ProfileId, c.Channel, code, r => verify = r);
@@ -114,18 +177,29 @@ public static class ProfileClaimFlow
             done(true);
             yield break;
         }
-        ProfileClaimSheet.ShowError(verify != null && verify.Error == "claim_code_rejected" ? ProfileClaimCopy.ErrorWrongCode : ProfileClaimCopy.ErrorGeneric);
+        string error = verify?.Error;
+        if (ProfileClaimPolicy.IsCodeDead(error)) ProfileClaimSheet.ShowResend(ProfileClaimPolicy.ErrorCopyFor(error), resend);
+        else ProfileClaimSheet.ShowError(ProfileClaimPolicy.ErrorCopyFor(error));
         done(false);
     }
 
-    /// <summary>A channel just reported authorized: if a claim is pending for it, bind it (claim.status re-issues the token).</summary>
-    public static IEnumerator AfterChannelAuthorized(string profileId, ChatChannel channel)
+    /// <summary>
+    /// A channel just reported authorized. A claim-pending profile is NOT bound by that pairing (V2): claim.start
+    /// sends a code into the paired account's own chat and only claim.verify binds it. <paramref name="done"/>(true)
+    /// = the caller may go on (the profile is this install's, or needed no claim); (false) = the owner cancelled —
+    /// the caller must not create a workflow for a profile this install does not own (Create's gate would refuse it).
+    /// </summary>
+    public static IEnumerator AfterChannelAuthorized(string profileId, ChatChannel channel, Transform botsRoot, System.Action<bool> done)
     {
         var auth = AuthClient.Existing;
-        if (auth == null || !ProfileClaimPolicy.ShouldReportAuthorization(profileId, auth.Claims)) yield break;
-        AuthClient.ClaimResult res = null;
-        yield return auth.Claim("claim.status", profileId, channel, null, r => res = r);
-        if (res == null || !res.Success)
-            Debug.LogWarning($"[ProfileClaim] claim.status for {profileId} did not bind: {res?.Error} (http {res?.HttpStatus})");
+        if (auth == null || !ProfileClaimPolicy.ShouldReportAuthorization(profileId, auth.Claims))
+        {
+            done?.Invoke(true);
+            yield break;
+        }
+        bool claimed = false;
+        yield return RunCodeClaim(CandidateFor(botsRoot, profileId, channel), FontFrom(botsRoot), ProfileClaimCopy.Cancel, null, ok => claimed = ok);
+        if (!claimed) Debug.LogWarning($"[ProfileClaim] {profileId}: the code step after the pairing was cancelled — the profile stays unclaimed");
+        done?.Invoke(claimed);
     }
 }

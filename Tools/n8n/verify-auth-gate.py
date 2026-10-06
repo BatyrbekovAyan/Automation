@@ -98,7 +98,8 @@ def check_proxy():
     call = node(wf, "Wappi Call")
     assert call["parameters"]["url"] == "={{ $('Build Request').first().json.url }}" and call["parameters"]["method"] == "={{ $('Build Request').first().json.method }}", "Wappi Call not driven by Build Request"
     # R1: a pairing op on a claim-pending (not owned) profile reaches the transport only after Record Claim Pairing
-    # wrote, in the DB, that THIS install started it (the proof Bind Reauthed Profile requires).
+    # confirmed, in the DB, that THIS install still holds the fresh claim (V2: an audit + stale-capability refusal,
+    # never a proof for a bind).
     assert "const PAIR_OPS = new Set(['qr', 'auth.code', 'tg.auth.phone', 'tg.auth.code', 'tg.auth.2fa'])" in br and "claimPairing = !owned && PAIR_OPS.has(op)" in br, \
         "Build Request must flag pairing ops on a claim-pending profile"
     assert edges(wf, "Op valid?", 0) == [{"node": "Claim Pairing?", "type": "main", "index": 0}], "Op valid? must route through Claim Pairing?"
@@ -134,10 +135,28 @@ def check_session():
     assert "crAuth.sign(" in it and "$env.CR_AUTH_SECRET" in it and "12 * 3600" in it.replace("43200", "12 * 3600"), "token must be signed with the env secret and carry a 12 h TTL"
     rt = node(wf, "Route")["parameters"]["jsCode"]
     assert "sha256Hex(out.installSecret)" in rt and "randomSecret(32)" in rt, "bootstrap must mint and hash the install secret server-side"
-    br_ = node(wf, "Bind Reauthed Profile")["parameters"]["query"]
-    for frag in ("owner_id is null", "claim_pending_by = $2", "claim_pending_at > now() - interval '1 day'", "claim_pair_by = $2",
-                 "claim_pair_at >= claim_pending_at", "to_timestamp($3::bigint) > claim_pair_at"):
-        assert frag in br_, f"R1: a reauth bind must require {frag!r}"
+    # V2 (2026-09-28): a pairing never binds (Wappi does not say which link session completed it). No reauth bind may
+    # exist; the ONLY Auth Session statement that writes owner_id is Verify Claim Code, and that code is guarded.
+    names = {n["name"] for n in wf["nodes"]}
+    assert not names & {"Bind Reauth?", "Bind Reauthed Profile"}, "V2: a reauth (pairing-time) bind must not exist"
+    writers = sorted(n["name"] for n in wf["nodes"] if n["type"] == "n8n-nodes-base.postgres"
+                     and re.search(r"(?:\bset|,)\s+owner_id\s*=", n["parameters"].get("query", ""), re.I))
+    assert writers == ["Verify Claim Code"], f"V2: only Verify Claim Code may write owner_id: {writers}"
+    assert "'reauth' : 'pending'" not in node(wf, "Claim Decide")["parameters"]["jsCode"], "V2: claim.status must not decide a reauth bind"
+    vcq = node(wf, "Verify Claim Code")["parameters"]["query"]
+    assert "claim_code_attempts" in vcq and "claim_code_attempts < 5" in vcq and ">= 5 then null" in vcq, "V2: Verify Claim Code must count wrong answers and kill the code on the fifth"
+    assert "when $5 = 'claim.start' then excluded.claim_pending_by" in node(wf, "Claim Start")["parameters"]["query"], \
+        "V2: only claim.start may take a pending claim"
+    assert edges(wf, "Claim Start") == [{"node": "Needs Status?", "type": "main", "index": 0}], "V2: Claim Start must feed Needs Status?"
+    ns = node(wf, "Needs Status?")["parameters"]["conditions"]["conditions"][0]["leftValue"]
+    assert ns == "={{ $('Route').first().json.op !== 'claim.verify' }}", "V2: claim.verify must not call Wappi"
+    into_status = sorted(src for src, outs in wf["connections"].items() for i, out in enumerate(outs.get("main", [])) for c in out if c["node"] == "Claim Status")
+    assert into_status == ["Needs Status?"] and edges(wf, "Needs Status?", 0) == [{"node": "Claim Status", "type": "main", "index": 0}], \
+        f"V2: Claim Status must be reachable only from Needs Status? true: {into_status}"
+    assert edges(wf, "Send Code?", 1) == [{"node": "Reload Ownership", "type": "main", "index": 0}], "V2: Send Code? false must reload ownership (no bind)"
+    assert edges(wf, "Send Claim Code") == [{"node": "Code Sent?", "type": "main", "index": 0}] and \
+        edges(wf, "Code Sent?", 1) == [{"node": "Clear Claim Code", "type": "main", "index": 0}], "V2: an unsent code must be judged and cleared"
+    assert "code_send_failed" in node(wf, "Issue Token")["parameters"]["jsCode"], "V2: the client must learn that the code was not sent"
     cs_in = sorted(src for src, outs in wf["connections"].items() for out in outs.get("main", []) for c in out if c["node"] == "Claim Start")
     assert cs_in == ["Install Verified?"] and edges(wf, "Install Verified?", 0) == [{"node": "Claim Start", "type": "main", "index": 0}], \
         f"R1: Claim Start must run only for a verified install: {cs_in}"

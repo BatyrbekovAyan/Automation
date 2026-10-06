@@ -239,9 +239,9 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "-- A1 claim: register the intent. Legacy (unowned) profiles AND profiles owned by a previous install\n-- (reinstall / new phone) are claimable — ownership is proven by control of the channel itself\n-- (code in the bot's own chat for any profile; for an OWNER-LESS profile also a fresh pairing the claimant\n-- itself started through the proxy — R1), never by knowing an id. A still-valid code is reused (no re-send\n-- inside its 10-minute window), which also bounds unsolicited codes. A claim lives one day.\ninsert into bot_profiles (profile_id, app_user_id, channel, claim_pending_by, claim_pending_at)\nvalues ($1, coalesce(nullif($3, ''), $2), $4, $2, now())\non conflict (profile_id) do update set\n  claim_pending_by = case when bot_profiles.owner_id = $2 then bot_profiles.claim_pending_by else excluded.claim_pending_by end,\n  -- the claim clock starts ONCE per claiming install: a repeated claim.* call (status polling) must not\n  -- move claim_pending_at, or a pairing done in between could never be \"after the claim began\". A claim\n  -- older than a day has expired (R1) — a new claim.start starts a new one instead of locking the install out.\n  claim_pending_at = case\n      when bot_profiles.owner_id = $2 then bot_profiles.claim_pending_at\n      when bot_profiles.claim_pending_by = $2 and bot_profiles.claim_pending_at > now() - interval '1 day' then bot_profiles.claim_pending_at\n      else now() end\nreturning profile_id, owner_id, channel, claim_pending_by, extract(epoch from claim_pending_at)::bigint as claim_pending_epoch,\n  (claim_code_expires_at is not null and claim_code_expires_at > now()) as code_still_valid;",
+        "query": "-- A1 claim: register the intent. Legacy (unowned) profiles AND profiles owned by a previous install\n-- (reinstall / new phone) are claimable — ownership is proven ONLY by the code sent into the bot's own chat\n-- (V2, 2026-09-28: a pairing is a precondition that gives the claimant that chat, never a proof — Wappi does not\n-- say which link session completed it). A still-valid code is reused (no re-send inside its 10-minute window),\n-- which also bounds unsolicited codes. A claim lives one day.\n-- V2: ONLY claim.start (the fifth parameter is the op) takes the pending claim or starts its clock; claim.status\n-- and claim.verify polling leave both as they are, so another install's poll can never take a claim over.\ninsert into bot_profiles (profile_id, app_user_id, channel, claim_pending_by, claim_pending_at)\nvalues ($1, coalesce(nullif($3, ''), $2), $4, $2, now())\non conflict (profile_id) do update set\n  claim_pending_by = case\n      when bot_profiles.owner_id = $2 then bot_profiles.claim_pending_by\n      when $5 = 'claim.start' then excluded.claim_pending_by\n      else bot_profiles.claim_pending_by end,\n  -- the claim clock starts ONCE per claiming install: a repeated claim.start must not move it. A claim older\n  -- than a day has expired (R1) — a new claim.start starts a new one instead of locking the install out.\n  claim_pending_at = case\n      when bot_profiles.owner_id = $2 then bot_profiles.claim_pending_at\n      when $5 <> 'claim.start' then bot_profiles.claim_pending_at\n      when bot_profiles.claim_pending_by = $2 and bot_profiles.claim_pending_at > now() - interval '1 day' then bot_profiles.claim_pending_at\n      else now() end\nreturning profile_id, owner_id, channel, claim_pending_by, extract(epoch from claim_pending_at)::bigint as claim_pending_epoch,\n  (claim_code_hash is not null and claim_code_expires_at is not null and claim_code_expires_at > now()) as code_still_valid,\n  (claim_code_hash is null and claim_code_expires_at is not null and claim_code_expires_at > now()) as code_locked;",
         "options": {
-          "queryReplacement": "={{ [ $('Route').first().json.profileId, $('Route').first().json.installId, ($input.first().json.app_user_id || ''), $('Route').first().json.channel ] }}"
+          "queryReplacement": "={{ [ $('Route').first().json.profileId, $('Route').first().json.installId, ($input.first().json.app_user_id || ''), $('Route').first().json.channel, $('Route').first().json.op ] }}"
         }
       },
       "id": "a271f901-c845-5a0b-a431-34d702216275",
@@ -260,6 +260,40 @@
       },
       "alwaysOutputData": true,
       "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "06c94ec2-9d13-5948-8e4d-50d24c34376a",
+              "leftValue": "={{ $('Route').first().json.op !== 'claim.verify' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3e69b175-4588-5a8a-9672-3bd1fe4881c4",
+      "name": "Needs Status?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1430,
+        520
+      ]
     },
     {
       "parameters": {
@@ -287,7 +321,7 @@
       "typeVersion": 4.2,
       "position": [
         1540,
-        520
+        420
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -300,7 +334,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// AUTH SESSION / Claim Decide: what the claim needs next (generated — see build-auth-workflows.py)\n// CRAUTH-TOKEN-BEGIN\nconst crAuth = (() => {\n  const crypto = require('crypto');\n  const b64u = (buf) => Buffer.from(buf).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n  const unb64u = (s) => Buffer.from(String(s).replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((String(s).length + 3) % 4), 'base64');\n  const isIdList = (a) => Array.isArray(a) && a.every((x) => typeof x === 'string' && x.length > 0 && x.length <= 128);\n  function sign(payload, secret) {\n    if (!secret) throw new Error('crAuth: no signing secret');\n    const p = b64u(JSON.stringify(payload));\n    const sig = crypto.createHmac('sha256', secret).update('v1.' + p).digest();\n    return 'v1.' + p + '.' + b64u(sig);\n  }\n  function verify(token, secrets, nowSec) {\n    if (typeof token !== 'string' || !token) return { ok: false, reason: 'missing' };\n    const parts = token.split('.');\n    if (parts.length !== 3 || parts[0] !== 'v1' || !parts[1] || !parts[2]) return { ok: false, reason: 'malformed' };\n    const given = unb64u(parts[2]);\n    let good = false;\n    for (const sec of (secrets || []).filter(Boolean)) {\n      const exp = crypto.createHmac('sha256', sec).update(parts[0] + '.' + parts[1]).digest();\n      if (exp.length === given.length && crypto.timingSafeEqual(exp, given)) { good = true; break; }\n    }\n    if (!good) return { ok: false, reason: 'bad_signature' };\n    let c;\n    try { c = JSON.parse(unb64u(parts[1]).toString('utf8')); } catch (e) { return { ok: false, reason: 'malformed' }; }\n    if (!c || typeof c !== 'object' || typeof c.i !== 'string' || !c.i || !isIdList(c.p) || !isIdList(c.w)) return { ok: false, reason: 'malformed' };\n    if (typeof c.e !== 'number' || !(c.e > nowSec)) return { ok: false, reason: 'expired' };\n    if (c.c !== undefined && !isIdList(c.c)) return { ok: false, reason: 'malformed' };\n    return { ok: true, claims: { i: c.i, u: (typeof c.u === 'string' && c.u) ? c.u : null, p: c.p, w: c.w, c: c.c || [], e: c.e, n: (typeof c.n === 'number') ? c.n : 1 } };\n  }\n  function sha256Hex(s) { return crypto.createHash('sha256').update(String(s)).digest('hex'); }\n  function randomSecret(bytes) { return b64u(crypto.randomBytes(bytes || 32)); }\n  function bearer(headers) {\n    const h = headers || {};\n    const a = String(h.authorization || h.Authorization || '');\n    return a.startsWith('Bearer ') ? a.slice(7).trim() : '';\n  }\n  return { sign, verify, sha256Hex, randomSecret, bearer, b64u, unb64u };\n})();\n// CRAUTH-TOKEN-END\nconst r = $('Route').first().json;\nconst inst = $('Verify Install').first().json || {};\nconst row = $('Claim Start').first().json || {};\nconst st = $input.first().json || {};                 // fullResponse of Wappi get/status\nconst status = (st.body && typeof st.body === 'object') ? st.body : {};\nconst out = { op: r.op, profileId: r.profileId, channel: r.channel, installId: inst.install_id, statusCode: 200,\n  claimMethod: null, claimError: null, code: null, codeHash: null, phone: null, authorizedEpoch: null };\nif (!inst.install_id) {                                // R11: 401 only on the DB's positive verdict, else a fault\n  const revoked = !inst.error && inst.verdict === 'checked';\n  out.statusCode = revoked ? 401 : 503; out.claimError = revoked ? 'install_revoked' : 'db_unavailable';\n}\nelse if (row.error || !row.profile_id) { out.statusCode = 500; out.claimError = 'db_error'; }\nelse if (row.owner_id === inst.install_id) { out.claimMethod = 'owned'; }\nelse if (st.statusCode !== 200 || typeof status.authorized !== 'boolean') { out.statusCode = 502; out.claimError = 'transport_unavailable'; }\nelse if (status.authorized === true) {\n  const phone = String(status.phone || '').replace(/\\D/g, '');\n  const ts = Date.parse(status.authorized_at || '') || 0;\n  out.authorizedEpoch = ts ? Math.floor(ts / 1000) : null;\n  if (r.op === 'claim.status') {\n    // R1: claim.status NEVER mints or sends a code (a stranger polling it spammed the owner's chat with codes)\n    // and asks for a reauth bind only on an OWNER-LESS profile paired after the claim began; the bind itself\n    // also requires the pairing to have been started by THIS install through the proxy (Bind Reauthed Profile).\n    out.claimMethod = (!row.owner_id && out.authorizedEpoch && out.authorizedEpoch > Number(row.claim_pending_epoch || 0)) ? 'reauth' : 'pending';\n  } else if (!phone) { out.statusCode = 409; out.claimError = 'no_phone'; }\n  else if (row.code_still_valid === true && r.op === 'claim.start') {\n    out.claimMethod = 'code';                        // a code is already on its way / valid: do not re-send\n    out.codeReused = true;\n  } else {\n    out.claimMethod = 'code';\n    out.phone = phone;\n    out.code = String(Math.floor(100000 + Math.random() * 900000));\n    out.codeHash = crAuth.sha256Hex(out.code);\n  }\n} else {\n  out.claimMethod = 'reauth';                          // not authorised: the client re-pairs via the proxy (c-capability)\n}\nreturn [{ json: out, pairedItem: { item: 0 } }];\n"
+        "jsCode": "// AUTH SESSION / Claim Decide: what the claim needs next (generated — see build-auth-workflows.py)\n// CRAUTH-TOKEN-BEGIN\nconst crAuth = (() => {\n  const crypto = require('crypto');\n  const b64u = (buf) => Buffer.from(buf).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n  const unb64u = (s) => Buffer.from(String(s).replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((String(s).length + 3) % 4), 'base64');\n  const isIdList = (a) => Array.isArray(a) && a.every((x) => typeof x === 'string' && x.length > 0 && x.length <= 128);\n  function sign(payload, secret) {\n    if (!secret) throw new Error('crAuth: no signing secret');\n    const p = b64u(JSON.stringify(payload));\n    const sig = crypto.createHmac('sha256', secret).update('v1.' + p).digest();\n    return 'v1.' + p + '.' + b64u(sig);\n  }\n  function verify(token, secrets, nowSec) {\n    if (typeof token !== 'string' || !token) return { ok: false, reason: 'missing' };\n    const parts = token.split('.');\n    if (parts.length !== 3 || parts[0] !== 'v1' || !parts[1] || !parts[2]) return { ok: false, reason: 'malformed' };\n    const given = unb64u(parts[2]);\n    let good = false;\n    for (const sec of (secrets || []).filter(Boolean)) {\n      const exp = crypto.createHmac('sha256', sec).update(parts[0] + '.' + parts[1]).digest();\n      if (exp.length === given.length && crypto.timingSafeEqual(exp, given)) { good = true; break; }\n    }\n    if (!good) return { ok: false, reason: 'bad_signature' };\n    let c;\n    try { c = JSON.parse(unb64u(parts[1]).toString('utf8')); } catch (e) { return { ok: false, reason: 'malformed' }; }\n    if (!c || typeof c !== 'object' || typeof c.i !== 'string' || !c.i || !isIdList(c.p) || !isIdList(c.w)) return { ok: false, reason: 'malformed' };\n    if (typeof c.e !== 'number' || !(c.e > nowSec)) return { ok: false, reason: 'expired' };\n    if (c.c !== undefined && !isIdList(c.c)) return { ok: false, reason: 'malformed' };\n    return { ok: true, claims: { i: c.i, u: (typeof c.u === 'string' && c.u) ? c.u : null, p: c.p, w: c.w, c: c.c || [], e: c.e, n: (typeof c.n === 'number') ? c.n : 1 } };\n  }\n  function sha256Hex(s) { return crypto.createHash('sha256').update(String(s)).digest('hex'); }\n  function randomSecret(bytes) { return b64u(crypto.randomBytes(bytes || 32)); }\n  function bearer(headers) {\n    const h = headers || {};\n    const a = String(h.authorization || h.Authorization || '');\n    return a.startsWith('Bearer ') ? a.slice(7).trim() : '';\n  }\n  return { sign, verify, sha256Hex, randomSecret, bearer, b64u, unb64u };\n})();\n// CRAUTH-TOKEN-END\nconst r = $('Route').first().json;\nconst inst = $('Verify Install').first().json || {};\nconst row = $('Claim Start').first().json || {};\n// V2: claim.verify never calls Wappi (the code is the proof; a status call per guess only amplified a brute force),\n// so on that op the input is Claim Start's row, not a get/status response.\nconst isVerify = r.op === 'claim.verify';\nconst st = isVerify ? {} : ($input.first().json || {});   // fullResponse of Wappi get/status\nconst status = (st.body && typeof st.body === 'object') ? st.body : {};\nconst out = { op: r.op, profileId: r.profileId, channel: r.channel, installId: inst.install_id, statusCode: 200,\n  claimMethod: null, claimError: null, code: null, codeHash: null, phone: null, authorizedEpoch: null };\nif (!inst.install_id) {                                // R11: 401 only on the DB's positive verdict, else a fault\n  const revoked = !inst.error && inst.verdict === 'checked';\n  out.statusCode = revoked ? 401 : 503; out.claimError = revoked ? 'install_revoked' : 'db_unavailable';\n}\nelse if (row.error || !row.profile_id) { out.statusCode = 500; out.claimError = 'db_error'; }\nelse if (row.owner_id === inst.install_id) { out.claimMethod = 'owned'; }\nelse if (isVerify) { out.claimMethod = 'code'; }       // Verify Claim Code decides (scoped, counted, expiring)\nelse if (st.statusCode !== 200 || typeof status.authorized !== 'boolean') { out.statusCode = 502; out.claimError = 'transport_unavailable'; }\nelse if (status.authorized === true) {\n  // V2: on Telegram the code goes to the AUTHORISED account (account.phone — its own «Избранное»); the top-level phone\n  // may be a number someone named in auth/phone. WhatsApp's get/status carries only the top-level phone.\n  const acct = (r.channel === 'telegram' && status.account && typeof status.account === 'object') ? status.account.phone : null;\n  const phone = String(acct || status.phone || '').replace(/\\D/g, '');\n  const ts = Date.parse(status.authorized_at || '') || 0;\n  out.authorizedEpoch = ts ? Math.floor(ts / 1000) : null;   // informational only (V2: a pairing proves nothing)\n  if (r.op === 'claim.status') {\n    // R1: claim.status NEVER mints or sends a code (a stranger polling it spammed the owner's chat with codes).\n    // V2: and it never binds either — an authorised profile is claimed only by claim.start + the code in its own chat.\n    out.claimMethod = 'pending';\n  } else if (!phone) { out.statusCode = 409; out.claimError = 'no_phone'; }\n  else if (row.code_locked === true && r.op === 'claim.start') {\n    out.statusCode = 429; out.claimError = 'claim_code_locked';   // V2: too many wrong answers — no new code inside its window\n  }\n  else if (row.code_still_valid === true && r.op === 'claim.start') {\n    out.claimMethod = 'code';                        // a code is already on its way / valid: do not re-send\n    out.codeReused = true;\n  } else {\n    out.claimMethod = 'code';\n    out.phone = phone;\n    out.code = String(Math.floor(100000 + Math.random() * 900000));\n    out.codeHash = crAuth.sha256Hex(out.code);\n  }\n} else {\n  out.claimMethod = 'reauth';                          // not authorised: the client re-pairs via the proxy (c-capability)\n}\nreturn [{ json: out, pairedItem: { item: 0 } }];\n"
       },
       "id": "3e57baaa-fe96-534c-86de-9785458ce989",
       "name": "Claim Decide",
@@ -348,7 +382,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "-- A1 legacy claim by self-message code: binds ownership only for the install that started the claim,\n-- with an unexpired matching code, on a still-unowned profile.\nupdate bot_profiles set owner_id = $2, claimed_at = now(), claim_pending_by = null, claim_pending_at = null,\n  claim_code_hash = null, claim_code_expires_at = null\nwhere profile_id = $1 and (owner_id is null or owner_id <> $2) and claim_pending_by = $2 and claim_code_hash = $3 and claim_code_expires_at > now()\nreturning profile_id;",
+        "query": "-- A1 claim by self-message code: binds ownership only for the install that started the claim, with an\n-- unexpired matching code. V2 (2026-09-28): the code is the ONLY proof for every profile, so it is guarded — a wrong\n-- answer from the pending install counts, and the fifth kills the code (hash cleared, the expiry kept: no new code\n-- until its window ends). Exactly one row: profile_id when bound, attempts after a miss, code_dead when an earlier\n-- statement had already killed it (the final select reads the snapshot from before this statement's own updates).\nwith hit as (\n  update bot_profiles set owner_id = $2, claimed_at = now(), claim_pending_by = null, claim_pending_at = null,\n    claim_code_hash = null, claim_code_expires_at = null, claim_code_attempts = 0\n  where profile_id = $1 and (owner_id is null or owner_id <> $2) and claim_pending_by = $2\n    and claim_code_hash = $3 and claim_code_expires_at > now() and claim_code_attempts < 5\n  returning profile_id\n), miss as (\n  update bot_profiles set claim_code_attempts = claim_code_attempts + 1,\n    claim_code_hash = case when claim_code_attempts + 1 >= 5 then null else claim_code_hash end\n  where profile_id = $1 and not exists (select 1 from hit) and claim_pending_by = $2\n    and claim_code_hash is not null and claim_code_expires_at > now()\n  returning claim_code_attempts\n)\nselect (select profile_id from hit) as profile_id, (select claim_code_attempts from miss) as attempts,\n  exists (select 1 from bot_profiles d where d.profile_id = $1 and d.claim_code_hash is null\n          and d.claim_code_expires_at is not null and d.claim_code_expires_at > now()) as code_dead;",
         "options": {
           "queryReplacement": "={{ [ $('Route').first().json.profileId, $('Route').first().json.installId, $('Route').first().json.codeHash ] }}"
         }
@@ -407,7 +441,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "update bot_profiles set claim_code_hash = $3, claim_code_expires_at = now() + interval '10 minutes'\nwhere profile_id = $1 and claim_pending_by = $2 and (claim_code_expires_at is null or claim_code_expires_at <= now())\nreturning profile_id;",
+        "query": "update bot_profiles set claim_code_hash = $3, claim_code_expires_at = now() + interval '10 minutes', claim_code_attempts = 0\nwhere profile_id = $1 and claim_pending_by = $2 and (claim_code_expires_at is null or claim_code_expires_at <= now())\nreturning profile_id;",
         "options": {
           "queryReplacement": "={{ [ $('Route').first().json.profileId, $('Route').first().json.installId, $('Claim Decide').first().json.codeHash ] }}"
         }
@@ -428,6 +462,40 @@
       },
       "alwaysOutputData": true,
       "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "137e7367-e290-5a15-ad96-ddd7136dc151",
+              "leftValue": "={{ !!$json.profile_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4a2dcf72-570f-5570-95a8-9f21880303c1",
+      "name": "Code Stored?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2530,
+        560
+      ]
     },
     {
       "parameters": {
@@ -480,8 +548,8 @@
           },
           "conditions": [
             {
-              "id": "11ccead4-c480-5c44-b518-d440977adc05",
-              "leftValue": "={{ $('Claim Decide').first().json.op === 'claim.status' && $('Claim Decide').first().json.claimMethod === 'reauth' && !!$('Claim Decide').first().json.authorizedEpoch }}",
+              "id": "bc7ac73c-5e97-5f58-b932-a75a90c3b29c",
+              "leftValue": "={{ Number($json.statusCode) === 200 && !!$json.body && ($json.body.status === 'done' || !!$json.body.message_id) }}",
               "rightValue": "",
               "operator": {
                 "type": "boolean",
@@ -494,30 +562,30 @@
         },
         "options": {}
       },
-      "id": "85419b27-9463-5dea-8d98-f2b3b60ed43c",
-      "name": "Bind Reauth?",
+      "id": "805e12b3-2fdf-5d83-8090-1bed25cfbfbd",
+      "name": "Code Sent?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        2420,
-        760
+        2750,
+        560
       ]
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "-- A1 legacy claim by re-authorisation. R1 (2026-09-27): a later authorized_at alone proves nothing — the\n-- OWNER re-pairing its own profile moves it too. Binds ONLY an OWNER-LESS profile, ONLY for the install whose\n-- still-fresh (one day) claim it is, and ONLY for a pairing THAT install started through the Wappi Proxy\n-- (Record Claim Pairing: claim_pair_by/at) and that completed after it began, within 30 minutes. An owned profile\n-- moves to another install only by the code sent into the bot's own chat (Verify Claim Code).\nupdate bot_profiles set owner_id = $2, claimed_at = now(), claim_pending_by = null, claim_pending_at = null,\n  claim_pair_by = null, claim_pair_at = null\nwhere profile_id = $1 and owner_id is null and deleted_at is null\n  and claim_pending_by = $2 and claim_pending_at > now() - interval '1 day'\n  and claim_pair_by = $2 and claim_pair_at >= claim_pending_at\n  and to_timestamp($3::bigint) > claim_pair_at and to_timestamp($3::bigint) <= claim_pair_at + interval '30 minutes'\nreturning profile_id;",
+        "query": "update bot_profiles set claim_code_hash = null, claim_code_expires_at = null, claim_code_attempts = 0\nwhere profile_id = $1 and claim_code_hash = $2\nreturning profile_id;",
         "options": {
-          "queryReplacement": "={{ [ $('Route').first().json.profileId, $('Route').first().json.installId, $('Claim Decide').first().json.authorizedEpoch ] }}"
+          "queryReplacement": "={{ [ $('Route').first().json.profileId, $('Claim Decide').first().json.codeHash ] }}"
         }
       },
-      "id": "3b77903f-b59f-5ba8-97a7-5992b0ae69f9",
-      "name": "Bind Reauthed Profile",
+      "id": "50391e7b-9d0c-5313-bff7-e9b6d2c24be3",
+      "name": "Clear Claim Code",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        2640,
-        760
+        2860,
+        700
       ],
       "credentials": {
         "postgres": {
@@ -541,7 +609,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        2860,
+        2970,
         520
       ],
       "credentials": {
@@ -555,14 +623,14 @@
     },
     {
       "parameters": {
-        "jsCode": "// AUTH SESSION / Issue Token (generated — see build-auth-workflows.py)\n// CRAUTH-TOKEN-BEGIN\nconst crAuth = (() => {\n  const crypto = require('crypto');\n  const b64u = (buf) => Buffer.from(buf).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n  const unb64u = (s) => Buffer.from(String(s).replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((String(s).length + 3) % 4), 'base64');\n  const isIdList = (a) => Array.isArray(a) && a.every((x) => typeof x === 'string' && x.length > 0 && x.length <= 128);\n  function sign(payload, secret) {\n    if (!secret) throw new Error('crAuth: no signing secret');\n    const p = b64u(JSON.stringify(payload));\n    const sig = crypto.createHmac('sha256', secret).update('v1.' + p).digest();\n    return 'v1.' + p + '.' + b64u(sig);\n  }\n  function verify(token, secrets, nowSec) {\n    if (typeof token !== 'string' || !token) return { ok: false, reason: 'missing' };\n    const parts = token.split('.');\n    if (parts.length !== 3 || parts[0] !== 'v1' || !parts[1] || !parts[2]) return { ok: false, reason: 'malformed' };\n    const given = unb64u(parts[2]);\n    let good = false;\n    for (const sec of (secrets || []).filter(Boolean)) {\n      const exp = crypto.createHmac('sha256', sec).update(parts[0] + '.' + parts[1]).digest();\n      if (exp.length === given.length && crypto.timingSafeEqual(exp, given)) { good = true; break; }\n    }\n    if (!good) return { ok: false, reason: 'bad_signature' };\n    let c;\n    try { c = JSON.parse(unb64u(parts[1]).toString('utf8')); } catch (e) { return { ok: false, reason: 'malformed' }; }\n    if (!c || typeof c !== 'object' || typeof c.i !== 'string' || !c.i || !isIdList(c.p) || !isIdList(c.w)) return { ok: false, reason: 'malformed' };\n    if (typeof c.e !== 'number' || !(c.e > nowSec)) return { ok: false, reason: 'expired' };\n    if (c.c !== undefined && !isIdList(c.c)) return { ok: false, reason: 'malformed' };\n    return { ok: true, claims: { i: c.i, u: (typeof c.u === 'string' && c.u) ? c.u : null, p: c.p, w: c.w, c: c.c || [], e: c.e, n: (typeof c.n === 'number') ? c.n : 1 } };\n  }\n  function sha256Hex(s) { return crypto.createHash('sha256').update(String(s)).digest('hex'); }\n  function randomSecret(bytes) { return b64u(crypto.randomBytes(bytes || 32)); }\n  function bearer(headers) {\n    const h = headers || {};\n    const a = String(h.authorization || h.Authorization || '');\n    return a.startsWith('Bearer ') ? a.slice(7).trim() : '';\n  }\n  return { sign, verify, sha256Hex, randomSecret, bearer, b64u, unb64u };\n})();\n// CRAUTH-TOKEN-END\nconst r = $('Route').first().json;\nconst row = $input.first() ? ($input.first().json || {}) : {};\nlet claimInfo = null;\ntry { const d = $('Claim Decide').first(); if (d && d.json && d.json.op) claimInfo = d.json; } catch (e) { claimInfo = null; }\nlet claimVerify = null;\ntry { const v = $('Verify Claim Code').first(); if (v && v.json) claimVerify = v.json; } catch (e) { claimVerify = null; }\nif (claimInfo && claimInfo.claimError) {\n  return [{ json: { success: false, error: claimInfo.claimError, _status: claimInfo.statusCode || 400 }, pairedItem: { item: 0 } }];\n}\nif (row.error || !row.install_id) {\n  if (r.op === 'bootstrap') {\n    const status = row.error ? 500 : 429;\n    return [{ json: { success: false, error: status === 429 ? 'rate_limited' : 'db_error', _status: status }, pairedItem: { item: 0 } }];\n  }\n  // R11: the client DISCARDS its install on a 401 — so 401 only on the database's positive verdict (Verify\n  // Install's 'checked' row without an install: wrong secret / unknown / revoked). Every other shape is a\n  // transient fault (the node's error item, the Route item passed through when it failed before its handler,\n  // an empty row) and answers 503: the client keeps its credentials and retries later.\n  const revoked = !row.error && row.verdict === 'checked';\n  return [{ json: { success: false, error: revoked ? 'install_revoked' : 'db_unavailable', _status: revoked ? 401 : 503 }, pairedItem: { item: 0 } }];\n}\nif (r.op === 'claim.verify' && (!claimVerify || !claimVerify.profile_id)) {\n  return [{ json: { success: false, error: 'claim_code_rejected', _status: 403 }, pairedItem: { item: 0 } }];\n}\nconst exp = r.nowSec + 43200;\nconst claims = { i: row.install_id, u: row.app_user_id || null, p: row.p || [], w: row.w || [], c: row.c || [], e: exp, n: row.token_version || 1 };\nconst token = crAuth.sign(claims, $env.CR_AUTH_SECRET);\n// billingConflict (R2): the client named a RevenueCat id another install holds — the token carries NO billing\n// identity. The client must not read u = null as \"identity changed, refresh again\" (AuthClient keeps the id it asked for).\nconst out = { success: true, _status: 200, installId: row.install_id, token, expiresAt: exp, appUserId: claims.u,\n  profiles: claims.p, workflows: claims.w, claimPending: claims.c, billingConflict: !!row.billing_conflict };\nif (r.op === 'bootstrap') out.installSecret = r.installSecret;\nif (claimInfo) { out.claimMethod = claimInfo.claimMethod; out.claimProfileId = claimInfo.profileId; out.codeReused = !!claimInfo.codeReused; }\nreturn [{ json: out, pairedItem: { item: 0 } }];\n"
+        "jsCode": "// AUTH SESSION / Issue Token (generated — see build-auth-workflows.py)\n// CRAUTH-TOKEN-BEGIN\nconst crAuth = (() => {\n  const crypto = require('crypto');\n  const b64u = (buf) => Buffer.from(buf).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n  const unb64u = (s) => Buffer.from(String(s).replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((String(s).length + 3) % 4), 'base64');\n  const isIdList = (a) => Array.isArray(a) && a.every((x) => typeof x === 'string' && x.length > 0 && x.length <= 128);\n  function sign(payload, secret) {\n    if (!secret) throw new Error('crAuth: no signing secret');\n    const p = b64u(JSON.stringify(payload));\n    const sig = crypto.createHmac('sha256', secret).update('v1.' + p).digest();\n    return 'v1.' + p + '.' + b64u(sig);\n  }\n  function verify(token, secrets, nowSec) {\n    if (typeof token !== 'string' || !token) return { ok: false, reason: 'missing' };\n    const parts = token.split('.');\n    if (parts.length !== 3 || parts[0] !== 'v1' || !parts[1] || !parts[2]) return { ok: false, reason: 'malformed' };\n    const given = unb64u(parts[2]);\n    let good = false;\n    for (const sec of (secrets || []).filter(Boolean)) {\n      const exp = crypto.createHmac('sha256', sec).update(parts[0] + '.' + parts[1]).digest();\n      if (exp.length === given.length && crypto.timingSafeEqual(exp, given)) { good = true; break; }\n    }\n    if (!good) return { ok: false, reason: 'bad_signature' };\n    let c;\n    try { c = JSON.parse(unb64u(parts[1]).toString('utf8')); } catch (e) { return { ok: false, reason: 'malformed' }; }\n    if (!c || typeof c !== 'object' || typeof c.i !== 'string' || !c.i || !isIdList(c.p) || !isIdList(c.w)) return { ok: false, reason: 'malformed' };\n    if (typeof c.e !== 'number' || !(c.e > nowSec)) return { ok: false, reason: 'expired' };\n    if (c.c !== undefined && !isIdList(c.c)) return { ok: false, reason: 'malformed' };\n    return { ok: true, claims: { i: c.i, u: (typeof c.u === 'string' && c.u) ? c.u : null, p: c.p, w: c.w, c: c.c || [], e: c.e, n: (typeof c.n === 'number') ? c.n : 1 } };\n  }\n  function sha256Hex(s) { return crypto.createHash('sha256').update(String(s)).digest('hex'); }\n  function randomSecret(bytes) { return b64u(crypto.randomBytes(bytes || 32)); }\n  function bearer(headers) {\n    const h = headers || {};\n    const a = String(h.authorization || h.Authorization || '');\n    return a.startsWith('Bearer ') ? a.slice(7).trim() : '';\n  }\n  return { sign, verify, sha256Hex, randomSecret, bearer, b64u, unb64u };\n})();\n// CRAUTH-TOKEN-END\nconst r = $('Route').first().json;\nconst row = $input.first() ? ($input.first().json || {}) : {};\nlet claimInfo = null;\ntry { const d = $('Claim Decide').first(); if (d && d.json && d.json.op) claimInfo = d.json; } catch (e) { claimInfo = null; }\nlet claimVerify = null;\ntry { const v = $('Verify Claim Code').first(); if (v && v.json) claimVerify = v.json; } catch (e) { claimVerify = null; }\nif (claimInfo && claimInfo.claimError) {\n  return [{ json: { success: false, error: claimInfo.claimError, _status: claimInfo.statusCode || 400 }, pairedItem: { item: 0 } }];\n}\nif (row.error || !row.install_id) {\n  if (r.op === 'bootstrap') {\n    const status = row.error ? 500 : 429;\n    return [{ json: { success: false, error: status === 429 ? 'rate_limited' : 'db_error', _status: status }, pairedItem: { item: 0 } }];\n  }\n  // R11: the client DISCARDS its install on a 401 — so 401 only on the database's positive verdict (Verify\n  // Install's 'checked' row without an install: wrong secret / unknown / revoked). Every other shape is a\n  // transient fault (the node's error item, the Route item passed through when it failed before its handler,\n  // an empty row) and answers 503: the client keeps its credentials and retries later.\n  const revoked = !row.error && row.verdict === 'checked';\n  return [{ json: { success: false, error: revoked ? 'install_revoked' : 'db_unavailable', _status: revoked ? 401 : 503 }, pairedItem: { item: 0 } }];\n}\nif (r.op === 'claim.verify' && (!claimVerify || !claimVerify.profile_id)) {\n  // V2: the fifth wrong answer killed the code — say so (the client offers a new one after its window), else 403.\n  const locked = !!claimVerify && (Number(claimVerify.attempts) >= 5 || claimVerify.code_dead === true);\n  return [{ json: { success: false, error: locked ? 'claim_code_locked' : 'claim_code_rejected', _status: locked ? 429 : 403 }, pairedItem: { item: 0 } }];\n}\n// V2: a freshly minted code counts as sent only when it was stored AND the transport accepted it — otherwise nobody\n// holds it (Clear Claim Code removed it), and «we sent you a code» would send the owner to wait for nothing.\nif (claimInfo && claimInfo.op === 'claim.start' && claimInfo.claimMethod === 'code' && !claimInfo.codeReused && claimInfo.code) {\n  let stored = null, send = null;\n  try { stored = $('Store Claim Code').first().json; } catch (e) { stored = null; }\n  try { send = $('Send Claim Code').first().json; } catch (e) { send = null; }\n  const body = (send && send.body && typeof send.body === 'object') ? send.body : {};\n  const sent = !!(stored && stored.profile_id) && !!send && Number(send.statusCode) === 200 && (body.status === 'done' || !!body.message_id);\n  if (!sent) return [{ json: { success: false, error: 'code_send_failed', _status: 502 }, pairedItem: { item: 0 } }];\n}\nconst exp = r.nowSec + 43200;\nconst claims = { i: row.install_id, u: row.app_user_id || null, p: row.p || [], w: row.w || [], c: row.c || [], e: exp, n: row.token_version || 1 };\nconst token = crAuth.sign(claims, $env.CR_AUTH_SECRET);\n// billingConflict (R2): the client named a RevenueCat id another install holds — the token carries NO billing\n// identity. The client must not read u = null as \"identity changed, refresh again\" (AuthClient keeps the id it asked for).\nconst out = { success: true, _status: 200, installId: row.install_id, token, expiresAt: exp, appUserId: claims.u,\n  profiles: claims.p, workflows: claims.w, claimPending: claims.c, billingConflict: !!row.billing_conflict };\nif (r.op === 'bootstrap') out.installSecret = r.installSecret;\nif (claimInfo) { out.claimMethod = claimInfo.claimMethod; out.claimProfileId = claimInfo.profileId; out.codeReused = !!claimInfo.codeReused; }\nreturn [{ json: out, pairedItem: { item: 0 } }];\n"
       },
       "id": "dedd4c3d-1ed9-5dd3-ac85-5ca1cf441ed1",
       "name": "Issue Token",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3080,
+        3190,
         320
       ]
     },
@@ -579,7 +647,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        3300,
+        3410,
         320
       ]
     }
@@ -705,7 +773,25 @@
       "main": [
         [
           {
+            "node": "Needs Status?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs Status?": {
+      "main": [
+        [
+          {
             "node": "Claim Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Claim Decide",
             "type": "main",
             "index": 0
           }
@@ -774,7 +860,7 @@
         ],
         [
           {
-            "node": "Bind Reauth?",
+            "node": "Reload Ownership",
             "type": "main",
             "index": 0
           }
@@ -785,29 +871,18 @@
       "main": [
         [
           {
+            "node": "Code Stored?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code Stored?": {
+      "main": [
+        [
+          {
             "node": "Send Claim Code",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Send Claim Code": {
-      "main": [
-        [
-          {
-            "node": "Reload Ownership",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Bind Reauth?": {
-      "main": [
-        [
-          {
-            "node": "Bind Reauthed Profile",
             "type": "main",
             "index": 0
           }
@@ -821,7 +896,36 @@
         ]
       ]
     },
-    "Bind Reauthed Profile": {
+    "Send Claim Code": {
+      "main": [
+        [
+          {
+            "node": "Code Sent?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code Sent?": {
+      "main": [
+        [
+          {
+            "node": "Reload Ownership",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clear Claim Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Claim Code": {
       "main": [
         [
           {

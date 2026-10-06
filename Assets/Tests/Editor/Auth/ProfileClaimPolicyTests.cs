@@ -19,12 +19,47 @@ public class ProfileClaimPolicyTests
     }
 
     [Test]
-    public void NextUnowned_SkipsOwnedPendingSnoozedAndUnauthed()
+    public void NextUnowned_SkipsOwnedSnoozedAndUnauthed()
     {
-        var connected = new[] { C("-1"), C("owned"), C("pending", ChatChannel.Telegram), C("snoozed"), C("legacy") };
-        var next = ProfileClaimPolicy.NextUnowned(connected, Claims(new[] { "owned" }, new[] { "pending" }), new HashSet<string> { "snoozed" });
+        var connected = new[] { C("-1"), C("owned"), C("snoozed"), C("legacy") };
+        var next = ProfileClaimPolicy.NextUnowned(connected, Claims(new[] { "owned" }), new HashSet<string> { "snoozed" });
         Assert.IsTrue(next.HasValue);
         Assert.AreEqual("legacy", next.Value.ProfileId);
+    }
+
+    [Test]
+    public void NextUnowned_DoesNotSkipAClaimPendingProfile_APairingNeverBindsIt()
+    {
+        // V2 (2026-09-28): a pending claim used to be skipped because the re-pairing bound it on claim.status. A pairing
+        // proves nothing now (Wappi does not say which link session completed it), so an authorised pending profile must
+        // get the code step at the next launch — else it would stay unowned forever.
+        var connected = new[] { C("owned"), C("pending", ChatChannel.Telegram) };
+        var next = ProfileClaimPolicy.NextUnowned(connected, Claims(new[] { "owned" }, new[] { "pending" }), new HashSet<string>());
+        Assert.IsTrue(next.HasValue);
+        Assert.AreEqual("pending", next.Value.ProfileId);
+    }
+
+    [Test]
+    public void AfterStart_OnlyACodeOrOwnershipMovesOn_EverythingElseOffersAResend()
+    {
+        Assert.AreEqual(ProfileClaimPolicy.StartStep.Proceed, ProfileClaimPolicy.AfterStart(true, "owned"));
+        Assert.AreEqual(ProfileClaimPolicy.StartStep.EnterCode, ProfileClaimPolicy.AfterStart(true, "code"));
+        Assert.AreEqual(ProfileClaimPolicy.StartStep.Resend, ProfileClaimPolicy.AfterStart(true, "reauth"), "the pairing is not visible to the server yet");
+        Assert.AreEqual(ProfileClaimPolicy.StartStep.Resend, ProfileClaimPolicy.AfterStart(true, "pending"));
+        Assert.AreEqual(ProfileClaimPolicy.StartStep.Resend, ProfileClaimPolicy.AfterStart(false, null), "code_send_failed / locked / no network");
+        Assert.AreEqual(ProfileClaimPolicy.StartStep.Resend, ProfileClaimPolicy.AfterStart(false, "code"), "a failed call never asks for a code");
+    }
+
+    [Test]
+    public void ErrorCopy_NamesEachServerRefusal_InRussian_NeverTheServerText()
+    {
+        Assert.AreEqual(ProfileClaimCopy.ErrorWrongCode, ProfileClaimPolicy.ErrorCopyFor("claim_code_rejected"));
+        Assert.AreEqual(ProfileClaimCopy.ErrorLocked, ProfileClaimPolicy.ErrorCopyFor("claim_code_locked"));
+        Assert.AreEqual(ProfileClaimCopy.ErrorSendFailed, ProfileClaimPolicy.ErrorCopyFor("code_send_failed"));
+        Assert.AreEqual(ProfileClaimCopy.ErrorGeneric, ProfileClaimPolicy.ErrorCopyFor("transport_unavailable"));
+        Assert.AreEqual(ProfileClaimCopy.ErrorGeneric, ProfileClaimPolicy.ErrorCopyFor(null));
+        Assert.IsTrue(ProfileClaimPolicy.IsCodeDead("claim_code_locked"));
+        Assert.IsFalse(ProfileClaimPolicy.IsCodeDead("claim_code_rejected"), "a wrong answer with attempts left keeps the field");
     }
 
     [Test]
@@ -58,5 +93,7 @@ public class ProfileClaimPolicyTests
         StringAssert.Contains("«Мой бот»", ProfileClaimCopy.BodyCode("Мой бот", ChatChannel.Telegram));
         StringAssert.Contains("Telegram", ProfileClaimCopy.BodyCode("Мой бот", ChatChannel.Telegram));
         StringAssert.Contains("WhatsApp", ProfileClaimCopy.BodyReauth("X", ChatChannel.WhatsApp));
+        StringAssert.DoesNotContain("автоматически", ProfileClaimCopy.BodyReauthFormat, "V2: a re-pairing no longer binds by itself");
+        StringAssert.Contains("код", ProfileClaimCopy.BodyReauthFormat);
     }
 }
