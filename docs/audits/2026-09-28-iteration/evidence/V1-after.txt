@@ -1,0 +1,231 @@
+V1 — после исправления. База HEAD 87d850c5 + рабочее дерево группы V1, 2026-10-06T20:39:03Z
+Только локально: pg-promise 11.9.1 из ~/.n8n-staging (= прод n8n 2.36.7), staging Postgres (pg.sh, temp-таблицы + ROLLBACK), staging n8n 2.36.7 + task runners, Wappi-мок. Прод и сеть не трогались.
+
+Что исправлено: в 7 Postgres-узлах (Delete File Chunks, Create Install, Suggestion Gate, Register Profile WA + TG, Transfer Subscriber, Consolidate Aliases) SQL-комментарии больше не называют параметры через «$+цифра». Источник: константы генераторов apply-auth-gate.py / build-auth-workflows.py / apply-suggest-v2.py (канон перегенерирован), Register Profile и RevenueCat Events — канон (генератора нет). Исполняемый SQL не менялся (доказательство ниже). Общий страж verify-sql-comments.py, pre-deploy отказ в deploy-canonical.py, e2e-auth sql_comment_values_run_nothing.
+
+$ python3 Tools/n8n/tests/test_sql_comment_injection.py
+PASS positive control: a placeholder in a line comment lets the value out — tokenizer AND execution catch it
+PASS positive control: a placeholder in a line comment, CR lets the value out — tokenizer AND execution catch it
+PASS positive control: a placeholder in a block comment lets the value out — tokenizer AND execution catch it
+PASS positive control: a placeholder in a string literal lets the value out — tokenizer AND execution catch it
+PASS positive control: the same placeholder in CODE keeps every payload a literal
+PASS Delete_File / Delete File Chunks: pinned node still runs its own parameters in code
+PASS Delete_File / Delete File Chunks: no injected value reaches code, in any parameter position (real pg-promise)
+PASS Delete_File / Delete File Chunks: executed with a newline value in each TEXT parameter, no extra statement runs
+PASS Delete_File / Delete File Chunks: the legitimate call gives the pinned rows
+PASS Delete_File / Delete File Chunks: a multi-line (pretty-printed) JSON parameter gives the same rows as the compact one
+PASS Auth_Session / Create Install: pinned node still runs its own parameters in code
+PASS Auth_Session / Create Install: no injected value reaches code, in any parameter position (real pg-promise)
+PASS Auth_Session / Create Install: executed with a newline value in each TEXT parameter, no extra statement runs
+PASS Auth_Session / Create Install: the legitimate call gives the pinned rows
+PASS Suggest_Replies / Suggestion Gate: pinned node still runs its own parameters in code
+PASS Suggest_Replies / Suggestion Gate: no injected value reaches code, in any parameter position (real pg-promise)
+PASS Suggest_Replies / Suggestion Gate: executed with a newline value in each TEXT parameter, no extra statement runs
+PASS Suggest_Replies / Suggestion Gate: the legitimate call gives the pinned rows
+PASS CreateWhatsappWorkflow / Register Profile: pinned node still runs its own parameters in code
+PASS CreateWhatsappWorkflow / Register Profile: no injected value reaches code, in any parameter position (real pg-promise)
+PASS CreateWhatsappWorkflow / Register Profile: executed with a newline value in each TEXT parameter, no extra statement runs
+PASS CreateWhatsappWorkflow / Register Profile: the legitimate call gives the pinned rows
+PASS CreateTelegramWorkflow / Register Profile: pinned node still runs its own parameters in code
+PASS CreateTelegramWorkflow / Register Profile: no injected value reaches code, in any parameter position (real pg-promise)
+PASS CreateTelegramWorkflow / Register Profile: executed with a newline value in each TEXT parameter, no extra statement runs
+PASS CreateTelegramWorkflow / Register Profile: the legitimate call gives the pinned rows
+PASS RevenueCat_Events / Transfer Subscriber: pinned node still runs its own parameters in code
+PASS RevenueCat_Events / Transfer Subscriber: no injected value reaches code, in any parameter position (real pg-promise)
+PASS RevenueCat_Events / Transfer Subscriber: the legitimate call gives the pinned rows
+PASS RevenueCat_Events / Transfer Subscriber: a multi-line (pretty-printed) JSON parameter gives the same rows as the compact one
+PASS RevenueCat_Events / Consolidate Aliases: pinned node still runs its own parameters in code
+PASS RevenueCat_Events / Consolidate Aliases: no injected value reaches code, in any parameter position (real pg-promise)
+PASS RevenueCat_Events / Consolidate Aliases: executed with a newline value in each TEXT parameter, no extra statement runs
+PASS RevenueCat_Events / Consolidate Aliases: the legitimate call gives the pinned rows
+PASS RevenueCat_Events / Consolidate Aliases: a multi-line (pretty-printed) JSON parameter gives the same rows as the compact one
+PASS corpus: in EVERY Postgres node of every canonical workflow, no payload in any position reaches code
+
+36 pass, 0 fail
+exit=0
+
+$ python3 Tools/n8n/tests/test_verify_sql_comments.py
+PASS guard flags: placeholder in a line comment
+PASS guard flags: placeholder in a line comment ended by CR
+PASS guard flags: placeholder in backticks inside a comment
+PASS guard flags: placeholder in a range inside a comment
+PASS guard flags: placeholder in a block comment
+PASS guard flags: placeholder in a NESTED block comment (Postgres nests)
+PASS guard flags: $0 in a comment (stricter than pg-promise on purpose)
+PASS guard flags: placeholder in a string literal
+PASS guard flags: placeholder in an E-string
+PASS guard flags: placeholder in a $$ body
+PASS guard flags: placeholder in a $tag$ body
+PASS guard flags: placeholder in a quoted identifier
+PASS guard flags: {{ in code
+PASS guard flags: {{ inside a comment
+PASS guard flags: leading = (the whole query is an expression)
+PASS guard flags: raw modifier
+PASS guard flags: caret modifier (= raw)
+PASS guard flags: hash modifier (= raw), the mistaken «#1» fix
+PASS guard flags: tilde modifier (= SQL name)
+PASS guard flags: name modifier
+PASS guard flags: alias modifier
+PASS guard flags: json modifier
+PASS guard flags: csv modifier
+PASS guard flags: list modifier
+PASS guard flags: value modifier
+PASS guard flags: value modifier in code
+PASS guard flags: unterminated block comment
+PASS guard flags: unterminated string
+PASS guard flags: unterminated dollar quote
+PASS guard passes: parameters in code with casts
+PASS guard passes: a comment naming the parameter in words
+PASS guard passes: -- inside a string literal is not a comment
+PASS guard passes: doubled quote inside a literal
+PASS guard passes: E-string with an escaped quote, then a placeholder in code
+PASS guard passes: -- inside a dollar-quoted body is not a comment
+PASS guard passes: dollar sign without a digit in literals and comments
+PASS guard passes: $ inside an identifier is not a dollar quote
+PASS guard passes: /* */ without placeholders
+PASS guard passes: double-colon cast is not the :json modifier
+PASS guard passes: trailing comment after code
+PASS guard passes: Cyrillic prose like the real comments
+PASS guard passes: minus before a placeholder (pg-promise wraps a negative number in parentheses)
+PASS guard passes: a line comment running to the end of the query
+PASS guard: a non-string executeQuery query is a finding, not a skip
+PASS guard: memory nodes without a query are not counted; other Postgres operations are not executeQuery
+PASS guard: the line numbers point at the offending line
+PASS corpus: every Postgres node of the canonical and staging-only workflows is clean (72+ nodes read)
+PASS CLI: default run exits 0 and reports the node count
+PASS CLI: a workflow with a placeholder in a comment exits 1 and names file, node, line and token
+PASS CLI: a clean workflow exits 0; one with no Postgres node at all exits 1 (nothing was checked)
+PASS pre-deploy: deploy-canonical refuses a canonical workflow whose SQL fails the guard, before any request
+PASS pre-deploy: a clean canonical workflow passes the guard and goes on to the instance (here: a dead port)
+PASS the older template-local check (verify-reply-pipeline.py (13)) still passes alongside the generic one
+
+53 pass, 0 fail
+exit=0
+
+$ python3 Tools/n8n/verify-sql-comments.py   # канон + staging/workflows
+OK  72 Postgres node(s) in 27 workflow file(s): no placeholder outside code, no {{ }}, no modifier, no leading =
+exit=0
+$ python3 Tools/n8n/verify-sql-comments.py Tools/n8n/workflows-staging   # производные staging-копии (gitignored)
+OK  89 Postgres node(s) in 30 workflow file(s): no placeholder outside code, no {{ }}, no modifier, no leading =
+exit=0
+
+$ доказательство «изменился только текст комментариев» (HEAD vs рабочее дерево; поток токенов SQL, комментарии = пробел, литералы дословно)
+9PTyYcelRQI7bGDb-Suggest_Replies.json :: Suggestion Gate: executable SQL identical = True; comment placeholders before 2, after 0
+Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json :: Register Profile: executable SQL identical = True; comment placeholders before 2, after 0
+XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json :: Register Profile: executable SQL identical = True; comment placeholders before 2, after 0
+ZGYr6srzS3rSSXHp-RevenueCat_Events.json :: Transfer Subscriber: executable SQL identical = True; comment placeholders before 2, after 0
+ZGYr6srzS3rSSXHp-RevenueCat_Events.json :: Consolidate Aliases: executable SQL identical = True; comment placeholders before 5, after 0
+ZTqpumOpL1rNDOp6-Delete_File.json :: Delete File Chunks: executable SQL identical = True; comment placeholders before 4, after 0
+crAuthSession001-Auth_Session.json :: Create Install: executable SQL identical = True; comment placeholders before 1, after 0
+7 node(s) changed, only comment text; every other field of the 6 workflow(s) identical
+exit=0
+
+$ генераторы: повторный прогон без диффа + --check
+git diff трёх сгенерированных файлов (Suggest Replies, Delete File, Auth Session) после повторного прогона генераторов == после первого: да (нет изменений)
+apply-auth-gate --check exit=0
+apply-history-handoff --check exit=0
+apply-outcome-stamps --check exit=0
+apply-reply-mode-v2 --check exit=0
+apply-reply-pipeline-v2 --check exit=0
+apply-slot-count-fix --check exit=0
+apply-suggest-v2 --check exit=0
+build-auth-workflows --check exit=0
+build-handoff-workflows --check exit=0
+build-test-dialog --check exit=0
+inject-panel-prompts --check exit=0
+inject-prompts --check (venv с tiktoken) exit=0
+
+$ структурные верификаторы
+verify-auth-gate exit=0 :: ALL AUTH GATE ASSERTS PASSED
+verify-telegram-parity exit=0 :: ALL PARITY ASSERTS PASSED
+verify-reply-pipeline exit=0 :: ALL REPLY PIPELINE ASSERTS PASSED
+verify-history-handoff exit=0 :: ALL HISTORY/HANDOFF ASSERTS PASSED
+verify-reply-mode exit=0 :: ALL REPLY MODE ASSERTS PASSED
+verify-message-batching exit=0 :: ALL BATCHING ASSERTS PASSED
+
+$ python3 Tools/n8n/tests/run_all.py
+OK   test_auth_refresh.py: 12 pass, 0 fail
+OK   test_billing_identity.py: 14 pass, 0 fail
+OK   test_claim.py: 9 pass, 0 fail
+OK   test_create_seed.py: 10 pass, 0 fail
+OK   test_harness_selfcheck.py: 2 pass, 0 fail
+OK   test_legacy_generators.py: 5 pass, 0 fail
+OK   test_reply_lost_send.py: 5 pass, 0 fail
+OK   test_reply_memory.py: 32 pass, 0 fail
+OK   test_reply_mode.py: 21 pass, 0 fail
+OK   test_reply_order.py: 26 pass, 0 fail
+OK   test_reply_reconcile.py: 32 pass, 0 fail
+OK   test_sql_comment_injection.py: 36 pass, 0 fail
+OK   test_suggest_catalog.py: 24 pass, 0 fail
+OK   test_suggest_query.py: 17 pass, 0 fail
+OK   test_test_dialog.py: 17 pass, 0 fail
+OK   test_upload.py: 22 pass, 0 fail
+OK   test_verify_deployed.py: 26 pass, 0 fail
+OK   test_verify_parity.py: 36 pass, 0 fail
+OK   test_verify_sql_comments.py: 53 pass, 0 fail
+exit=0
+
+=== STAGING (канон рабочего дерева переимпортирован bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001) ===
+$ python3 Tools/n8n/staging/e2e-auth.py --only sql_comment_values
+   pre-run: swept 0 stale mock profile(s) (live mock knows 38)
+PASS  sql_comment_values_run_nothing (4.4s) — V1: a value whose newline would end an SQL comment stays a literal on the real n8n Postgres node — Delete File (session token and token-less), Suggest Replies, AuthSession bootstrap, Create WhatsApp and Create Telegram each run their statement WITH the value (row proof) and no extra statement (no marker table)
+      {"delete_session": {"http": 200, "deletedChunks": 1, "marker": false}, "delete_tokenless": {"http": 200, "deletedChunks": 1, "marker": false}, "suggest_tokenless": {"http": 200, "body": {"v": 1, "requestSeq": 1, "suggestions": [], "error": "generation_failed"}, "count_after": "101", "marker": false}, "bootstrap": {"http": 200, "install": true, "app_user_id": "-", "marker": false}, "create_wa_tokenless": {"http": 200, "id": "5AquRLDmzTuLPVXw", "bot_key_written": true, "marker": false}, "create_tg_tokenless": {"http": 200, "id": "iUoD2ZJPrKatss9h", "bot_key_written": true, "marker": false}}
+   cleanup A: deleted rows: 3
+   cleanup B: deleted rows: 3
+   cleanup v1: deleted rows: 4
+
+1 pass, 0 fail
+exit=0
+(маркерные таблицы: select count(*) from pg_tables where tablename like 'crv1_%' -> 0)
+
+$ python3 Tools/n8n/staging/e2e-auth.py   # полный набор, последовательно
+PASS  session_bootstrap_and_refresh (0.3s) — bootstrap mints an install; refresh with the secret returns a token; a wrong secret is 401
+PASS  session_bad_request_is_400 (0.2s) — a malformed AuthSession body answers 400, never a token
+PASS  proxy_requires_token (0.2s) — WappiProxy without / with a forged / with an expired token → 401 and NO transport call
+PASS  proxy_profile_add_binds_owner (0.8s) — profile.add creates the Wappi profile, binds it to the install and returns a token carrying it
+PASS  proxy_owner_isolation (0.9s) — owner B cannot read/act on owner A's profile through ANY proxy op (403, no transport call)
+PASS  proxy_legit_ops_pass_through (0.4s) — the owner's own ops reach the transport with the server credential and get Wappi's body back
+PASS  proxy_unknown_op_rejected (0.2s) — an op outside the allow-list is refused without a transport call
+PASS  hooks_reject_foreign_ids (0.9s) — gated webhooks refuse owner B's ids on owner A's token (and refuse no token) before any side effect
+PASS  claim_by_code_transfers_ownership (0.6s) — a legacy/other-install profile: claim.start sends a code to the bot's OWN chat; claim.verify binds it to the claiming install
+PASS  claim_by_reauth_binds_after_pairing (1.8s) — an UNAUTHORISED legacy profile: claim.start → reauth; only a pairing AFTER the claim binds it (claim.status)
+PASS  claim_reauth_owned_profile_not_transferred (2.4s) — R1: a stranger's pending claim on an OWNED profile + the owner's own later re-pairing → the stranger gets nothing, claim.status sends no code, the owner keeps the profile
+PASS  claim_stale_capability_cannot_pair (1.2s) — R1: once another install takes over a pending claim, the first claimant's token capability no longer starts a pairing (403 claim_not_pending, no transport call)
+PASS  claim_unauthenticated_writes_nothing (1.1s) — R1: a claim.* call with a wrong secret is refused (401) before Claim Start — no row inserted, a pending claim untouched
+PASS  replymode_reordered_versions_keep_newest (0.7s) — SetReplyMode v2: a later request with an OLDER version is not applied; the reply reports the server's newer value
+PASS  replymode_bot_default_covers_both_channels_atomically (0.8s) — SetReplyMode v2: a bot-default write for WA+TG travels as ONE request and both rows land (all-or-nothing); a stale follow-up for one of them is refused per profile
+PASS  replymode_legacy_body_still_writes (0.2s) — SetReplyMode v2: a legacy body (no version) is applied with a server-assigned version and reads success + written
+PASS  replymode_invalid_is_400 (0.1s) — SetReplyMode v2: a malformed body answers 400 (was 200 + success:false)
+PASS  create_seeds_reply_mode_before_activation (1.5s) — CreateWhatsappWorkflow with ReplyMode=semi: the '*' row exists after create, the clone id is bound to the profile, the token learns it, and SetWorkflowState can delete it
+PASS  create_slot_count_excludes_own_profile_and_retires_refused (1.7s) — 2026-09-24 hotfix: on a 1-channel plan the FIRST channel is accepted (the A1-registered row of the profile being created is not counted) and a refused second profile is deleted at Wappi AND retired in bot_profiles
+PASS  refresh_db_outage_keeps_install (0.5s) — R11: a refresh while the database fails answers 503 db_unavailable (never the 401 that makes the client discard its install); the SAME credentials refresh fine once it is back
+PASS  billing_id_first_bind (1.3s) — R2: a second install naming a billing id another install holds (with a live bot) gets NO billing identity + billingConflict — its GetUsage/Create/profile.add on that id are refused; the id follows only once the holder is revoked
+PASS  create_rejects_empty_appuserid_in_session (0.8s) — R2: CreateWhatsappWorkflow/CreateTelegramWorkflow with an EMPTY AppUserID in session mode are refused before any write (the empty id skipped Count Channels and let the quota fail open)
+PASS  create_seed_failure_keeps_clone_inactive (9.0s) — R8: a «Вместе» create whose reply-mode seed fails (a real Postgres failure on staging, scoped to this profile) answers reply_mode_not_saved, leaves NO clone (not active, not bound, no Wappi webhook); the retry once the DB is back creates exactly ONE live clone with the '*' row — WhatsApp and Telegram
+PASS  sql_comment_values_run_nothing (5.2s) — V1: a value whose newline would end an SQL comment stays a literal on the real n8n Postgres node — Delete File (session token and token-less), Suggest Replies, AuthSession bootstrap, Create WhatsApp and Create Telegram each run their statement WITH the value (row proof) and no extra statement (no marker table)
+PASS  upload_price_list_multipart (6.8s) — R3: a real .txt price list sent the way WWWForm sends it passes the gate with its file, is registered FIRST, reaches extraction (a staging `documents` row with the text + the bot's ids); a foreign workflow id, a non-GUID fileId or another install's fileId is 403 before any write; an unreadable PDF is 422, an empty file writes nothing, an own repeat keeps one registry row
+25 pass, 0 fail
+
+$ python3 Tools/n8n/verify-deployed.py --base http://localhost:5678
+base http://localhost:5678: canonical 26 (diff 0), clones 2 (behind template 0), archived clones 0 (not counted), other 2
+exit=0
+
+=== Для выкладки (прод не трогался; решение о выкладке — владельца) ===
+- Клиентская сборка не нужна; миграций нет. Исполняемый SQL и параметры не изменились — legacy-клиент ничего не замечает.
+- Перевыложить (на проде несут уязвимый комментарий): ZTqpumOpL1rNDOp6 Delete File, 9PTyYcelRQI7bGDb Suggest Replies,
+  XuvOp7TxOImOAmlj CreateWhatsappWorkflow, Uz6HBBUpAiUqVysB CreateTelegramWorkflow (клиентски достижимы),
+  ZGYr6srzS3rSSXHp RevenueCat Events (только держатель RC-секрета, чистится ради стража).
+  crAuthSession001 Auth Session на проде ещё нет — выложится уже исправленным.
+- Delete File уязвим НЕ только в окне совместимости: правило гейта {"legacy": true} без полей пропускает любой токен,
+  а токен выдаёт неаутентифицированный bootstrap (staging до фикса: delete_session — маркер создан с токеном bootstrap).
+  Закрытие окна совместимости эту дыру не закрыло бы — нужен именно этот фикс.
+- В post-check пакета выкладки (release-package §6) добавить строку рядом с verify-*.py:
+    python3 Tools/n8n/verify-sql-comments.py
+  (deploy-canonical.py теперь сам отказывает в выкладке workflow, чей Postgres-узел не проходит страж, до первого запроса.)
+- Клоны ботов и шаблоны 4wYitz…/4VN3… не затронуты (в шаблонах плейсхолдеры вычищены ещё R7 ч.2).
+
+=== Остаточные ограничения ===
+- Страж проверяет текст запроса; запрос, собранный во время выполнения из выражения ({{ … }} / ведущий «=»), он
+  запрещает целиком, а не анализирует. Code-узлы, которые сами строят SQL, вне его области (таких в каноне нет).
+- Тест исполнения использует psql (по-операторно внутри BEGIN … ROLLBACK), а n8n — db.multi одним simple-query;
+  поэтому главный ассерт — статический (настоящий pg-promise + токенайзер), исполнение — подтверждение.

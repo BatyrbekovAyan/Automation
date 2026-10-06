@@ -230,9 +230,12 @@ PREP_RETURN_NEW = """return [{ json: {
   knowledgeFlags: flags, contactsText, documentsCount, knowledgeVersion, tz, tzSource, exactTokens, requestKey
 } }];"""
 
+# V1 (2026-09-28): an SQL comment never names a parameter as `$` + digit — pg-promise fills `$N` inside comments too
+# (verify-sql-comments.py guards every Postgres node).
 GATE_SQL = """-- «Вместе» subscription gate + daily anti-abuse cap (Task 17a; owner decision 2026-08-26,
 -- spec §5.3). ONE statement does lookup, increment and verdict, so a hammering client
--- cannot slip between a read and a write. $1 = appUserId, $2 = requestKey ('' from a legacy client).
+-- cannot slip between a read and a write. Parameters, in order: appUserId, requestKey ('' from a legacy
+-- client).
 --
 -- Suggestions are FREE: this NEVER touches dialog_counts. Over-quota is deliberately
 -- ALLOWED -- the panel IS the fallback the quota gate routes people into. What is refused:

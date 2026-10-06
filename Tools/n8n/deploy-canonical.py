@@ -7,7 +7,8 @@ and a READ-BACK after every PUT (graph hash == canonical, activeVersionId == ver
 Scope: workflows that already exist on the instance (DIFF in verify-deployed.py). New workflows are
 imported with `n8n import:workflow` (ids must be preserved) — not here. The two placeholder workflows
 (Set Workflow State `__HDR_CRED__`, Support Message `__TG_CRED__`/`__CHAT_ID__`) are deployed by
-build-client-webhooks.py --update and are SKIPPED here unless --include-placeholders.
+build-client-webhooks.py --update and are SKIPPED here unless --include-placeholders. A workflow whose Postgres SQL
+fails verify-sql-comments.py (V1: a parameter that could leave its literal) is refused before the first request.
     python3 Tools/n8n/deploy-canonical.py                       # dry-run on prod: what differs, what would be PUT
     python3 Tools/n8n/deploy-canonical.py --only <id> --apply --yes
     python3 Tools/n8n/deploy-canonical.py --apply --yes         # every DIFF canonical workflow, in file order
@@ -27,6 +28,9 @@ _spec.loader.exec_module(uc)
 _vspec = importlib.util.spec_from_file_location("vd", os.path.join(HERE, "verify-deployed.py"))
 vd = importlib.util.module_from_spec(_vspec)
 _vspec.loader.exec_module(vd)
+_gspec = importlib.util.spec_from_file_location("sql_guard", os.path.join(HERE, "verify-sql-comments.py"))
+sql_guard = importlib.util.module_from_spec(_gspec)
+_gspec.loader.exec_module(sql_guard)
 
 PLACEHOLDER_IDS = {"0DP79STI3pafXO9B", "olmqWMfcFpCEcpiE"}   # build-client-webhooks.py --update owns these
 
@@ -37,6 +41,18 @@ def canonical_files():
         wf = json.load(open(path, encoding="utf-8"))
         wid = wf.get("id") or os.path.basename(path).split("-", 1)[0]
         out[wid] = (path, wf)
+    return out
+
+
+def sql_guard_findings(files, only):
+    """V1 (2026-09-28): Postgres-node SQL that would let a parameter leave its literal (verify-sql-comments.py) is never
+    deployed — checked for every workflow this run may PUT, BEFORE the first request to the instance."""
+    out = []
+    for wid, (path, wf) in files.items():
+        if only and wid not in only:
+            continue
+        found, _ = sql_guard.check_workflow(wf)
+        out += [(os.path.basename(path), *f) for f in found]
     return out
 
 
@@ -58,6 +74,11 @@ def main():
         sys.exit("--apply needs --yes")
     base = a.base.rstrip("/")
     files = canonical_files()
+    refused = sql_guard_findings(files, a.only)
+    if refused:
+        for f, node, rule, line, token, excerpt in refused:
+            print(f"SQL GUARD: {f} :: {node} :: line {line} :: {rule} {token}: {excerpt}")
+        sys.exit("refusing to deploy: a Postgres node fails verify-sql-comments.py (V1) — fix its generator / the canon first")
     summary = {"considered": 0, "missing": 0, "up_to_date": 0, "would_update": 0, "updated": 0, "failed": 0}
     for wid, (path, canon) in files.items():
         if a.only and wid not in a.only:

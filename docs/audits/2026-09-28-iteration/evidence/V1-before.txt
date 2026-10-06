@@ -1,0 +1,235 @@
+V1 — до исправления (тест сначала). HEAD 87d850c5, 2026-10-06T20:07:43Z
+Локально: pg-promise 11.9.1 из ~/.n8n-staging (= прод n8n 2.36.7), staging Postgres через pg.sh, temp-таблицы + ROLLBACK. Прод и сеть не трогались.
+
+$ python3 Tools/n8n/tests/test_sql_comment_injection.py
+PASS positive control: a placeholder in a line comment lets the value out — tokenizer AND execution catch it
+PASS positive control: a placeholder in a line comment, CR lets the value out — tokenizer AND execution catch it
+PASS positive control: a placeholder in a block comment lets the value out — tokenizer AND execution catch it
+PASS positive control: a placeholder in a string literal lets the value out — tokenizer AND execution catch it
+PASS positive control: the same placeholder in CODE keeps every payload a literal
+PASS Delete_File / Delete File Chunks: pinned node still runs its own parameters in code
+FAIL Delete_File / Delete File Chunks: no injected value reaches code, in any parameter position (real pg-promise)
+      - $1 newline: the value escapes into code
+      - $1 carriage-return: the value escapes into code
+      - $2 newline: the value escapes into code
+      - $2 carriage-return: the value escapes into code
+      - $3 newline: the value escapes into code
+      - $3 carriage-return: the value escapes into code
+      - $4 newline: the value escapes into code
+      - $4 carriage-return: the value escapes into code
+FAIL Delete_File / Delete File Chunks: executed with a newline value in each TEXT parameter, no extra statement runs
+      - $1: the injected statement RAN
+      - $2: the injected statement RAN
+      - $3: the injected statement RAN
+PASS Delete_File / Delete File Chunks: the legitimate call gives the pinned rows
+FAIL Delete_File / Delete File Chunks: a multi-line (pretty-printed) JSON parameter gives the same rows as the compact one
+      - the multi-line value broke the statement: psql failed: ERROR:  syntax error at or near ""wfOwnWA00000001""
+LINE 1: "wfOwnWA00000001"
+        ^
+PASS Auth_Session / Create Install: pinned node still runs its own parameters in code
+FAIL Auth_Session / Create Install: no injected value reaches code, in any parameter position (real pg-promise)
+      - $3 newline: the value escapes into code
+      - $3 carriage-return: the value escapes into code
+FAIL Auth_Session / Create Install: executed with a newline value in each TEXT parameter, no extra statement runs
+      - $3: the injected statement RAN
+PASS Auth_Session / Create Install: the legitimate call gives the pinned rows
+PASS Suggest_Replies / Suggestion Gate: pinned node still runs its own parameters in code
+FAIL Suggest_Replies / Suggestion Gate: no injected value reaches code, in any parameter position (real pg-promise)
+      - $1 newline: the value escapes into code
+      - $1 carriage-return: the value escapes into code
+      - $2 newline: the value escapes into code
+      - $2 carriage-return: the value escapes into code
+FAIL Suggest_Replies / Suggestion Gate: executed with a newline value in each TEXT parameter, no extra statement runs
+      - $1: the injected statement RAN
+      - $2: the injected statement RAN
+PASS Suggest_Replies / Suggestion Gate: the legitimate call gives the pinned rows
+PASS CreateWhatsappWorkflow / Register Profile: pinned node still runs its own parameters in code
+FAIL CreateWhatsappWorkflow / Register Profile: no injected value reaches code, in any parameter position (real pg-promise)
+      - $1 newline: the value escapes into code
+      - $1 carriage-return: the value escapes into code
+      - $2 newline: the value escapes into code
+      - $2 carriage-return: the value escapes into code
+FAIL CreateWhatsappWorkflow / Register Profile: executed with a newline value in each TEXT parameter, no extra statement runs
+      - $1: the injected statement RAN
+      - $2: the injected statement RAN
+PASS CreateWhatsappWorkflow / Register Profile: the legitimate call gives the pinned rows
+PASS CreateTelegramWorkflow / Register Profile: pinned node still runs its own parameters in code
+FAIL CreateTelegramWorkflow / Register Profile: no injected value reaches code, in any parameter position (real pg-promise)
+      - $1 newline: the value escapes into code
+      - $1 carriage-return: the value escapes into code
+      - $2 newline: the value escapes into code
+      - $2 carriage-return: the value escapes into code
+FAIL CreateTelegramWorkflow / Register Profile: executed with a newline value in each TEXT parameter, no extra statement runs
+      - $1: the injected statement RAN
+      - $2: the injected statement RAN
+PASS CreateTelegramWorkflow / Register Profile: the legitimate call gives the pinned rows
+PASS RevenueCat_Events / Transfer Subscriber: pinned node still runs its own parameters in code
+FAIL RevenueCat_Events / Transfer Subscriber: no injected value reaches code, in any parameter position (real pg-promise)
+      - $1 newline: the value escapes into code
+      - $1 carriage-return: the value escapes into code
+      - $2 newline: the value escapes into code
+      - $2 carriage-return: the value escapes into code
+PASS RevenueCat_Events / Transfer Subscriber: the legitimate call gives the pinned rows
+FAIL RevenueCat_Events / Transfer Subscriber: a multi-line (pretty-printed) JSON parameter gives the same rows as the compact one
+      - the multi-line value broke the statement: psql failed: ERROR:  syntax error at or near ""new-id""
+LINE 1: "new-id"
+        ^
+PASS RevenueCat_Events / Consolidate Aliases: pinned node still runs its own parameters in code
+FAIL RevenueCat_Events / Consolidate Aliases: no injected value reaches code, in any parameter position (real pg-promise)
+      - $1 newline: the value escapes into code
+      - $1 carriage-return: the value escapes into code
+      - $2 newline: the value escapes into code
+      - $2 carriage-return: the value escapes into code
+      - $3 newline: the value escapes into code
+      - $3 carriage-return: the value escapes into code
+      - $5 newline: the value escapes into code
+      - $5 carriage-return: the value escapes into code
+      - $7 newline: the value escapes into code
+      - $7 carriage-return: the value escapes into code
+FAIL RevenueCat_Events / Consolidate Aliases: executed with a newline value in each TEXT parameter, no extra statement runs
+      - $1: the injected statement RAN
+      - $3: the injected statement RAN
+      - $7: the injected statement RAN
+PASS RevenueCat_Events / Consolidate Aliases: the legitimate call gives the pinned rows
+FAIL RevenueCat_Events / Consolidate Aliases: a multi-line (pretty-printed) JSON parameter gives the same rows as the compact one
+      - the multi-line value broke the statement: psql failed: ERROR:  syntax error at or near ""alias-id""
+LINE 1: "alias-id"
+        ^
+FAIL corpus: in EVERY Postgres node of every canonical workflow, no payload in any position reaches code
+      - 9PTyYcelRQI7bGDb-Suggest_Replies.json / Suggestion Gate $1 newline: the value escapes into code
+      - 9PTyYcelRQI7bGDb-Suggest_Replies.json / Suggestion Gate $1 carriage-return: the value escapes into code
+      - 9PTyYcelRQI7bGDb-Suggest_Replies.json / Suggestion Gate $2 newline: the value escapes into code
+      - 9PTyYcelRQI7bGDb-Suggest_Replies.json / Suggestion Gate $2 carriage-return: the value escapes into code
+      - Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json / Register Profile $1 newline: the value escapes into code
+      - Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json / Register Profile $1 carriage-return: the value escapes into code
+      - Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json / Register Profile $2 newline: the value escapes into code
+      - Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json / Register Profile $2 carriage-return: the value escapes into code
+      - XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json / Register Profile $1 newline: the value escapes into code
+      - XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json / Register Profile $1 carriage-return: the value escapes into code
+      - XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json / Register Profile $2 newline: the value escapes into code
+      - XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json / Register Profile $2 carriage-return: the value escapes into code
+      - ZGYr6srzS3rSSXHp-RevenueCat_Events.json / Transfer Subscriber $1 newline: the value escapes into code
+      - ZGYr6srzS3rSSXHp-RevenueCat_Events.json / Transfer Subscriber $1 carriage-return: the value escapes into code
+      - ZGYr6srzS3rSSXHp-RevenueCat_Events.json / Transfer Subscriber $2 newline: the value escapes into code
+      - ZGYr6srzS3rSSXHp-RevenueCat_Events.json / Transfer Subscriber $2 carriage-return: the value escapes into code
+      - ZGYr6srzS3rSSXHp-RevenueCat_Events.json / Consolidate Aliases $1 newline: the value escapes into code
+      - ZGYr6srzS3rSSXHp-RevenueCat_Events.json / Consolidate Aliases $1 carriage-return: the value escapes into code
+      - ZGYr6srzS3rSSXHp-RevenueCat_Events.json / Consolidate Aliases $2 newline: the value escapes into code
+      - ZGYr6srzS3rSSXHp-RevenueCat_Events.json / Consolidate Aliases $2 carriage-return: the value escapes into code
+      - ZGYr6srzS3rSSXHp-RevenueCat_Events.json / Consolidate Aliases $3 newline: the value escapes into code
+      - ZGYr6srzS3rSSXHp-RevenueCat_Events.json / Consolidate Aliases $3 carriage-return: the value escapes into code
+      - ZGYr6srzS3rSSXHp-RevenueCat_Events.json / Consolidate Aliases $5 newline: the value escapes into code
+      - ZGYr6srzS3rSSXHp-RevenueCat_Events.json / Consolidate Aliases $5 carriage-return: the value escapes into code
+      - ZGYr6srzS3rSSXHp-RevenueCat_Events.json / Consolidate Aliases $7 newline: the value escapes into code
+      - ZGYr6srzS3rSSXHp-RevenueCat_Events.json / Consolidate Aliases $7 carriage-return: the value escapes into code
+      - ZTqpumOpL1rNDOp6-Delete_File.json / Delete File Chunks $1 newline: the value escapes into code
+      - ZTqpumOpL1rNDOp6-Delete_File.json / Delete File Chunks $1 carriage-return: the value escapes into code
+      - ZTqpumOpL1rNDOp6-Delete_File.json / Delete File Chunks $2 newline: the value escapes into code
+      - ZTqpumOpL1rNDOp6-Delete_File.json / Delete File Chunks $2 carriage-return: the value escapes into code
+      - ZTqpumOpL1rNDOp6-Delete_File.json / Delete File Chunks $3 newline: the value escapes into code
+      - ZTqpumOpL1rNDOp6-Delete_File.json / Delete File Chunks $3 carriage-return: the value escapes into code
+      - ZTqpumOpL1rNDOp6-Delete_File.json / Delete File Chunks $4 newline: the value escapes into code
+      - ZTqpumOpL1rNDOp6-Delete_File.json / Delete File Chunks $4 carriage-return: the value escapes into code
+      - crAuthSession001-Auth_Session.json / Create Install $3 newline: the value escapes into code
+      - crAuthSession001-Auth_Session.json / Create Install $3 carriage-return: the value escapes into code
+
+19 pass, 17 fail
+exit=1
+
+$ python3 Tools/n8n/tests/test_verify_sql_comments.py
+PASS guard flags: placeholder in a line comment
+PASS guard flags: placeholder in a line comment ended by CR
+PASS guard flags: placeholder in backticks inside a comment
+PASS guard flags: placeholder in a range inside a comment
+PASS guard flags: placeholder in a block comment
+PASS guard flags: placeholder in a NESTED block comment (Postgres nests)
+PASS guard flags: $0 in a comment (stricter than pg-promise on purpose)
+PASS guard flags: placeholder in a string literal
+PASS guard flags: placeholder in an E-string
+PASS guard flags: placeholder in a $$ body
+PASS guard flags: placeholder in a $tag$ body
+PASS guard flags: placeholder in a quoted identifier
+PASS guard flags: {{ in code
+PASS guard flags: {{ inside a comment
+PASS guard flags: leading = (the whole query is an expression)
+PASS guard flags: raw modifier
+PASS guard flags: caret modifier (= raw)
+PASS guard flags: hash modifier (= raw), the mistaken «#1» fix
+PASS guard flags: tilde modifier (= SQL name)
+PASS guard flags: name modifier
+PASS guard flags: alias modifier
+PASS guard flags: json modifier
+PASS guard flags: csv modifier
+PASS guard flags: list modifier
+PASS guard flags: value modifier
+PASS guard flags: value modifier in code
+PASS guard flags: unterminated block comment
+PASS guard flags: unterminated string
+PASS guard flags: unterminated dollar quote
+PASS guard passes: parameters in code with casts
+PASS guard passes: a comment naming the parameter in words
+PASS guard passes: -- inside a string literal is not a comment
+PASS guard passes: doubled quote inside a literal
+PASS guard passes: E-string with an escaped quote, then a placeholder in code
+PASS guard passes: -- inside a dollar-quoted body is not a comment
+PASS guard passes: dollar sign without a digit in literals and comments
+PASS guard passes: $ inside an identifier is not a dollar quote
+PASS guard passes: /* */ without placeholders
+PASS guard passes: double-colon cast is not the :json modifier
+PASS guard passes: trailing comment after code
+PASS guard passes: Cyrillic prose like the real comments
+PASS guard passes: minus before a placeholder (pg-promise wraps a negative number in parentheses)
+PASS guard passes: a line comment running to the end of the query
+PASS guard: a non-string executeQuery query is a finding, not a skip
+PASS guard: memory nodes without a query are not counted; other Postgres operations are not executeQuery
+PASS guard: the line numbers point at the offending line
+FAIL corpus: every Postgres node of the canonical and staging-only workflows is clean (72+ nodes read)
+      - workflows/9PTyYcelRQI7bGDb-Suggest_Replies.json :: Suggestion Gate :: placeholder-in-comment :: 3 :: $1 :: -- cannot slip between a read and a write. $1 = appUserId, $2 = requestKey ('' from a legacy client).
+workflows/9PTyYcelRQI7bGDb-Suggest_Replies.json :: Suggestion Gate :: placeholder-in-comment :: 3 :: $2 :: -- cannot slip between a read and a write. $1 = appUserId, $2 = requestKey ('' from a legacy client).
+workflows/Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json :: Register Profile :: placeholder-in-comment :: 7 :: $2 :: -- $2 (AppUserID) нуждается в собственном гарде не больше, чем рань
+FAIL CLI: default run exits 0 and reports the node count
+      - .$7 = payload события, который эта нода ОБЯЗАНА пронести дальше: Postgres-нода отдаёт
+SQL GUARD FAIL: workflows/ZGYr6srzS3rSSXHp-RevenueCat_Events.json :: Consolidate Aliases :: line 12 :: placeholder-in-comment $5: -- И порядок: эта нода стоит ДО Upsert Subscriber. `topup_balance + $5` в апсерте НЕ идемпотентен
+SQL GUARD FAIL: workflows/ZTqpumOpL1rNDOp6-Delete_File.json :: Delete File Chunks :: line 1 :: placeholder-in-comment $1: -- A1: owner-scoped delete. $1 fileId, $2 gate mode (session|legacy), $3 install id, $4 JSON array of
+SQL GUARD FAIL: workflows/ZTqpumOpL1rNDOp6-Delete_File.json ::
+PASS CLI: a workflow with a placeholder in a comment exits 1 and names file, node, line and token
+PASS CLI: a clean workflow exits 0; one with no Postgres node at all exits 1 (nothing was checked)
+PASS the older template-local check (verify-reply-pipeline.py (13)) still passes alongside the generic one
+
+49 pass, 2 fail
+exit=1
+
+$ python3 Tools/n8n/verify-sql-comments.py
+SQL GUARD FAIL: workflows/9PTyYcelRQI7bGDb-Suggest_Replies.json :: Suggestion Gate :: line 3 :: placeholder-in-comment $1: -- cannot slip between a read and a write. $1 = appUserId, $2 = requestKey ('' from a legacy client).
+SQL GUARD FAIL: workflows/9PTyYcelRQI7bGDb-Suggest_Replies.json :: Suggestion Gate :: line 3 :: placeholder-in-comment $2: -- cannot slip between a read and a write. $1 = appUserId, $2 = requestKey ('' from a legacy client).
+SQL GUARD FAIL: workflows/Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json :: Register Profile :: line 7 :: placeholder-in-comment $2: -- $2 (AppUserID) нуждается в собственном гарде не больше, чем раньше: до этой ноды
+SQL GUARD FAIL: workflows/Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json :: Register Profile :: line 9 :: placeholder-in-comment $1: -- в Get Sample Workflow мимо всей биллинг-цепочки. Гард на $1 ниже нужен потому, что там
+SQL GUARD FAIL: workflows/XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json :: Register Profile :: line 7 :: placeholder-in-comment $2: -- $2 (AppUserID) нуждается в собственном гарде не больше, чем раньше: до этой ноды
+SQL GUARD FAIL: workflows/XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json :: Register Profile :: line 9 :: placeholder-in-comment $1: -- в Get Sample Workflow мимо всей биллинг-цепочки. Гард на $1 ниже нужен потому, что там
+SQL GUARD FAIL: workflows/ZGYr6srzS3rSSXHp-RevenueCat_Events.json :: Transfer Subscriber :: line 3 :: placeholder-in-comment $1: -- ни SKU — всё читается из СТАРОЙ строки. $1 = JSON-массив transferred_to, $2 = transferred_from.
+SQL GUARD FAIL: workflows/ZGYr6srzS3rSSXHp-RevenueCat_Events.json :: Transfer Subscriber :: line 3 :: placeholder-in-comment $2: -- ни SKU — всё читается из СТАРОЙ строки. $1 = JSON-массив transferred_to, $2 = transferred_from.
+SQL GUARD FAIL: workflows/ZGYr6srzS3rSSXHp-RevenueCat_Events.json :: Consolidate Aliases :: line 4 :: placeholder-in-comment $1: -- $1 = текущий app_user_id, $2 = JSON-массив алиасов (текущий id уже исключён в Map Event),
+SQL GUARD FAIL: workflows/ZGYr6srzS3rSSXHp-RevenueCat_Events.json :: Consolidate Aliases :: line 4 :: placeholder-in-comment $2: -- $1 = текущий app_user_id, $2 = JSON-массив алиасов (текущий id уже исключён в Map Event),
+SQL GUARD FAIL: workflows/ZGYr6srzS3rSSXHp-RevenueCat_Events.json :: Consolidate Aliases :: line 5 :: placeholder-in-comment $3: -- $3..$7 = payload события, который эта нода ОБЯЗАНА пронести дальше: Postgres-нода отдаёт
+SQL GUARD FAIL: workflows/ZGYr6srzS3rSSXHp-RevenueCat_Events.json :: Consolidate Aliases :: line 5 :: placeholder-in-comment $7: -- $3..$7 = payload события, который эта нода ОБЯЗАНА пронести дальше: Postgres-нода отдаёт
+SQL GUARD FAIL: workflows/ZGYr6srzS3rSSXHp-RevenueCat_Events.json :: Consolidate Aliases :: line 12 :: placeholder-in-comment $5: -- И порядок: эта нода стоит ДО Upsert Subscriber. `topup_balance + $5` в апсерте НЕ идемпотентен
+SQL GUARD FAIL: workflows/ZTqpumOpL1rNDOp6-Delete_File.json :: Delete File Chunks :: line 1 :: placeholder-in-comment $1: -- A1: owner-scoped delete. $1 fileId, $2 gate mode (session|legacy), $3 install id, $4 JSON array of
+SQL GUARD FAIL: workflows/ZTqpumOpL1rNDOp6-Delete_File.json :: Delete File Chunks :: line 1 :: placeholder-in-comment $2: -- A1: owner-scoped delete. $1 fileId, $2 gate mode (session|legacy), $3 install id, $4 JSON array of
+SQL GUARD FAIL: workflows/ZTqpumOpL1rNDOp6-Delete_File.json :: Delete File Chunks :: line 1 :: placeholder-in-comment $3: -- A1: owner-scoped delete. $1 fileId, $2 gate mode (session|legacy), $3 install id, $4 JSON array of
+SQL GUARD FAIL: workflows/ZTqpumOpL1rNDOp6-Delete_File.json :: Delete File Chunks :: line 1 :: placeholder-in-comment $4: -- A1: owner-scoped delete. $1 fileId, $2 gate mode (session|legacy), $3 install id, $4 JSON array of
+SQL GUARD FAIL: workflows/crAuthSession001-Auth_Session.json :: Create Install :: line 3 :: placeholder-in-comment $3: -- R2 (2026-09-27): the billing id ($3) is NOT trusted for being named — it is bound to this install only when
+18 finding(s) in 72 Postgres node(s) of 27 workflow file(s)
+exit=1
+
+=== STAGING (n8n 2.36.7 + task runners, staging Postgres, Wappi-мок; канон = HEAD 87d850c5, переимпорт bootstrap.py; окно совместимости открыто) ===
+$ python3 Tools/n8n/staging/e2e-auth.py --only sql_comment_values
+   pre-run: swept 0 stale mock profile(s) (live mock knows 4)
+FAIL  sql_comment_values_run_nothing (4.2s) — V1: a value whose newline would end an SQL comment stays a literal on the real n8n Postgres node — Delete File (session token and token-less), Suggest Replies, AuthSession bootstrap, Create WhatsApp and Create Telegram each run their statement WITH the value (row proof) and no extra statement (no marker table)
+      {"delete_session": {"http": 200, "deletedChunks": 1, "marker": true}, "delete_tokenless": {"http": 200, "deletedChunks": 1, "marker": true}, "suggest_tokenless": {"http": 200, "body": {"v": 1, "requestSeq": 1, "suggestions": [], "error": "generation_failed"}, "count_after": "101", "marker": true}, "bootstrap": {"http": 200, "install": true, "app_user_id": "-", "marker": true}, "create_wa_tokenless": {"http": 200, "id": "DHwSUJEiX3zUPtfr", "bot_key_written": true, "marker": true}, "create_tg_tokenless": {"http": 200, "id": "h14k14lgWC1Bv9q4", "bot_key_written": true, "marker": true}}
+   cleanup A: deleted rows: 3
+   cleanup B: deleted rows: 3
+   cleanup v1: deleted rows: 4
+
+0 pass, 1 fail
+exit=1
+(маркерные таблицы public.crv1_* удалены в finally сценария; проверка: select count(*) from pg_tables where tablename like 'crv1_%' -> 0)

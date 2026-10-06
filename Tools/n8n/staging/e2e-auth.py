@@ -613,6 +613,79 @@ def s_create_seed_failure(ctx):
     return ok, json.dumps(res, ensure_ascii=False)
 
 
+@scenario("sql_comment_values_run_nothing", "V1: a value whose newline would end an SQL comment stays a literal on the real n8n Postgres node — Delete File (session token and token-less), Suggest Replies, AuthSession bootstrap, Create WhatsApp and Create Telegram each run their statement WITH the value (row proof) and no extra statement (no marker table)")
+def s_sql_comment_values(ctx):
+    run, res, markers = ctx["run_id"], {}, []
+
+    def payload(tag):
+        m = f"crv1_{run}_{tag}"
+        markers.append(m)
+        return m, f"v1-{run}-{tag}\n; create table public.{m}(x int); --"
+
+    def made(m):
+        return pg(f"select to_regclass('public.{m}') is not null;") == "t"
+
+    legacy = lambda st, reached: (st == 401) if COMPAT_CLOSED else reached   # token-less calls exist only in the compat window
+    installs = []
+    try:
+        o = fresh_owner(ctx, "v1")
+        tg = o.add_profile("telegram")
+        # Delete File, session token: the value names A's registered file with one chunk → that chunk goes, nothing else runs
+        m, v = payload("delsession")
+        pg(f"insert into uploaded_files (file_id, owner_id) values ('{v}', '{o.install_id}'); "
+           f"insert into documents (content, metadata) values ('v1', jsonb_build_object('fileId', '{v}'));")
+        st, d = hook("DeleteFile", o.token, {"fileId": v})
+        res["delete_session"] = {"http": st, "deletedChunks": (d or {}).get("deletedChunks"), "marker": made(m)}
+        ok = st == 200 and (d or {}).get("deletedChunks") == 1 and not made(m)
+        # Delete File without a token (legacy file: chunk, no registry row)
+        m, v = payload("dellegacy")
+        pg(f"insert into documents (content, metadata) values ('v1', jsonb_build_object('fileId', '{v}'));")
+        st, d = hook("DeleteFile", None, {"fileId": v})
+        res["delete_tokenless"] = {"http": st, "deletedChunks": (d or {}).get("deletedChunks"), "marker": made(m)}
+        ok &= legacy(st, st == 200 and (d or {}).get("deletedChunks") == 1) and not made(m)
+        # Suggest Replies (token-less): an entitled id at the daily cap — the gate counts the value (100 → 101) and refuses
+        # before any LLM call
+        m, v = payload("suggest")
+        pg(f"insert into subscribers (app_user_id, plan, status) values ('{v}', 'business', 'active'); "
+           f"insert into suggestion_counts (app_user_id, d, n) values ('{v}', (now() at time zone 'Asia/Almaty')::date, 100);")
+        st, d = hook("SuggestReplies", None, {"v": 1, "requestSeq": 1, "chatId": "77010001234@c.us", "channel": "whatsapp",
+                                             "messages": [{"role": "client", "text": "цена?", "ts": 1754800000}], "appUserId": v})
+        n = pg(f"select n from suggestion_counts where app_user_id = '{v}';")
+        res["suggest_tokenless"] = {"http": st, "body": d, "count_after": n, "marker": made(m)}
+        ok &= legacy(st, st == 200 and n == "101") and not made(m)
+        # AuthSession bootstrap (unauthenticated by design): the value is the billing id — the install is minted, unbound
+        m, v = payload("bootstrap")
+        st, d = session({"op": "bootstrap", "platform": "test", "appVersion": "e2e", "appUserId": v})
+        if (d or {}).get("installId"):
+            installs.append(d["installId"])
+        row = pg(f"select coalesce(app_user_id, '-') from installs where install_id = '{(d or {}).get('installId', '')}';")
+        res["bootstrap"] = {"http": st, "install": bool((d or {}).get("installId")), "app_user_id": row, "marker": made(m)}
+        ok &= st == 200 and row == "-" and not made(m)
+        # Create WhatsApp / Telegram (token-less): AppUserID carries the value through Ensure Subscriber → Register Profile;
+        # Register Profile ran iff the profile now carries this call's BotKey
+        for ch, form, field, pid in (("wa", "CreateWhatsappWorkflow", "WhatsappProfileId", o.profiles[0]),
+                                     ("tg", "CreateTelegramWorkflow", "TelegramProfileId", tg)):
+            m, v = payload(f"create{ch}")
+            key = f"Bot-v1{ch}-{run}"
+            st, d = hook_form(form, None, {"Name": f"e2e-v1-{run}", "BusinessType": "Цветы", "BusinessTypeId": "flowers",
+                                           "Business": "", "Prompt": "", "ProductsList": "", "ServicesList": "", "AppUserID": v,
+                                           "BotKey": key, field: pid,
+                                           ("TelegramWorkflowId" if ch == "wa" else "WhatsappWorkflowId"): "-1"})
+            got_key = pg(f"select coalesce(bot_key, '-') from bot_profiles where profile_id = '{pid}';")
+            res[f"create_{ch}_tokenless"] = {"http": st, "id": (d or {}).get("id") if isinstance(d, dict) else None,
+                                             "bot_key_written": got_key == key, "marker": made(m)}
+            ok &= legacy(st, st == 200 and got_key == key) and not made(m)
+            for left, _ in clones_for(pid):     # the legacy create published a clone: staging API cleanup
+                http("DELETE", f"{BASE}/api/v1/workflows/{left}", headers={"X-N8N-API-KEY": SEC.get("apiKey", "")})
+    finally:
+        pg(f"delete from documents where metadata->>'fileId' like 'v1-{run}-%'; delete from uploaded_files where file_id like 'v1-{run}-%'; "
+           f"delete from suggestion_counts where app_user_id like 'v1-{run}-%'; delete from suggestion_request_keys where app_user_id like 'v1-{run}-%'; "
+           f"delete from subscribers where app_user_id like 'v1-{run}-%';"
+           + "".join(f" delete from installs where install_id = '{i}';" for i in installs)
+           + "".join(f" drop table if exists public.{m};" for m in markers))
+    return ok, json.dumps(res, ensure_ascii=False)
+
+
 def sweep_stale_mock_profiles():
     """The Wappi mock mints profile ids from a counter that restarts with the mock (profile-000001, …), so rows a
     PREVIOUS mock lifetime left in staging collide with the ids this run is about to get: Bind Profile keeps the old

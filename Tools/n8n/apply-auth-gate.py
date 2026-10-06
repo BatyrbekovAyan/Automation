@@ -94,8 +94,10 @@ UPLOAD_REFUSED_BODY = "={{ { \"success\": false, \"error\": $json.allowed === fa
 UPLOAD_REFUSED_CODE = "={{ $json.allowed === false ? 403 : 503 }}"
 UNREADABLE_BODY = "={{ { \"success\": false, \"error\": \"unreadable_file\" } }}"
 
-DELETE_CHUNKS_SQL = """-- A1: owner-scoped delete. $1 fileId, $2 gate mode (session|legacy), $3 install id, $4 JSON array of
--- the token's workflow ids. A session may delete a file it uploaded (uploaded_files) or, for a LEGACY
+# V1 (2026-09-28): an SQL comment never names a parameter as `$` + digit — the Postgres node formats the query with
+# pg-promise, which fills `$N` inside comments too, and a newline in the value ends the comment (verify-sql-comments.py).
+DELETE_CHUNKS_SQL = """-- A1: owner-scoped delete. Parameters, in order: fileId, gate mode (session|legacy), install id, JSON
+-- array of the token's workflow ids. A session may delete a file it uploaded (uploaded_files) or, for a LEGACY
 -- file with no registry row, one whose chunks belong to its own workflows. legacy mode = old behaviour
 -- until the compat window closes. `allowed` gates the storage delete downstream.
 WITH own AS (

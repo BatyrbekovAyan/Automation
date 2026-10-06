@@ -156,9 +156,11 @@ BILLING_BIND_CTES = """req as (
   returning 1
 )"""
 
+# V1 (2026-09-28): an SQL comment never names a parameter as `$` + digit — pg-promise fills `$N` inside comments too,
+# and bootstrap is unauthenticated (verify-sql-comments.py guards every Postgres node).
 CREATE_INSTALL_SQL = """-- A1: mint an install (the client keeps installId + installSecret; only the hash is stored).
 -- Bootstrap is unauthenticated, so it is capped: at most 60 new installs per minute instance-wide.
--- R2 (2026-09-27): the billing id ($3) is NOT trusted for being named — it is bound to this install only when
+-- R2 (2026-09-27): the billing id (third parameter) is NOT trusted for being named — it is bound to this install only when
 -- billing_bindings grants it (see BILLING_BIND_CTES); otherwise app_user_id stays NULL and billing_conflict says why.
 with ok as (
   select 1 as go where (select count(*) from installs where created_at > now() - interval '1 minute') < 60
