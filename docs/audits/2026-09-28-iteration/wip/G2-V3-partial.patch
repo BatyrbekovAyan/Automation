@@ -1,0 +1,690 @@
+diff --git a/Assets/Scripts/Auth/AuthClient.cs b/Assets/Scripts/Auth/AuthClient.cs
+index dad02e68..0ce9a36a 100644
+--- a/Assets/Scripts/Auth/AuthClient.cs
++++ b/Assets/Scripts/Auth/AuthClient.cs
+@@ -50,11 +50,13 @@ public class AuthClient : MonoBehaviour
+     /// <summary>
+     /// R2: the server declined the billing id this install asked for because another install holds it — the token
+     /// carries no billing identity, so billing-bound calls (usage, suggestions, a new bot) are refused until it is
+-    /// released (the holder revoked or without live bots). Not an identity change: no refresh is triggered by it.
++    /// released. V3 (2026-09-28): ONLY a revoke of the holder releases it (support), never «the holder has no live
++    /// bot». Not an identity change; a return to the app retries it once (<see cref="OnApplicationFocus"/>).
+     /// </summary>
+     public bool BillingConflict { get; private set; }
+ 
+     private bool _inFlight;
++    private long _lastBillingRetrySec;
+ 
+     private void Awake()
+     {
+@@ -63,6 +65,39 @@ public class AuthClient : MonoBehaviour
+         Claims = InstallSession.TryParse(Token, out var c) ? c : null;
+     }
+ 
++    /// <summary>
++    /// V3: back in the app with a declined billing id (billingConflict) — ask again once: the holding install may have
++    /// been revoked by support since, and the id then follows on this refresh instead of the planned one ~10 h later.
++    /// </summary>
++    private void OnApplicationFocus(bool hasFocus)
++    {
++        long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
++        if (!SessionRefreshPolicy.ShouldRetryBillingOnResume(hasFocus, HasInstall, _inFlight, Claims, BillingIdentity.AppUserId, now, _lastBillingRetrySec)) return;
++        _lastBillingRetrySec = now;
++        StartCoroutine(ForceRefresh());
++    }
++
++    /// <summary>
++    /// V3 (owner decision 2026-10-06): «Удалить все данные» wipes bots, history and settings but KEEPS this install's
++    /// server identity — the RevenueCat id survives a PlayerPrefs wipe in the SDK's own storage, and a second install
++    /// naming it would be refused (billing ids bind to one install). Restores the credentials synchronously, before any
++    /// code can read CrAuth.* again and bootstrap a second install.
++    /// </summary>
++    public static void PreserveAcrossWipe(Action wipe)
++    {
++        string id = PlayerPrefs.GetString(KeyInstallId, ""), secret = PlayerPrefs.GetString(KeyInstallSecret, "");
++        string token = PlayerPrefs.GetString(KeyToken, ""), requested = PlayerPrefs.GetString(KeyRequestedBillingId, "");
++        wipe?.Invoke();
++        if (!SessionRefreshPolicy.NeedsBootstrap(id, secret))
++        {
++            PlayerPrefs.SetString(KeyInstallId, id);
++            PlayerPrefs.SetString(KeyInstallSecret, secret);
++            if (!string.IsNullOrEmpty(token)) PlayerPrefs.SetString(KeyToken, token);
++            PlayerPrefs.SetString(KeyRequestedBillingId, requested);
++        }
++        PlayerPrefs.Save();
++    }
++
+     public bool Owns(string profileId)
+         => Claims != null && !string.IsNullOrEmpty(profileId) && Array.IndexOf(Claims.Profiles, profileId) >= 0;
+ 
+@@ -101,7 +136,8 @@ public class AuthClient : MonoBehaviour
+         try
+         {
+             string op = HasInstall ? "refresh" : "bootstrap";
+-            for (int attempt = 0; attempt < 2; attempt++)
++            // ≤ 3 round trips: a refused refresh → bootstrap → the bootstrap's own refresh (V3)
++            for (int attempt = 0; attempt < 3; attempt++)
+             {
+                 string requested = BillingIdentity.AppUserId ?? "";
+                 var body = new JObject
+@@ -142,8 +178,14 @@ public class AuthClient : MonoBehaviour
+                 }
+                 else
+                 {
+-                    PlayerPrefs.SetString(KeyRequestedBillingId, requested);   // asked for; a declined id is not re-asked each call
++                    // asked for; a declined id is not re-asked each call. A bootstrap records none (V3: it binds nothing).
++                    PlayerPrefs.SetString(KeyRequestedBillingId, SessionRefreshPolicy.RequestedIdToRecord(op, requested));
+                     PlayerPrefs.Save();
++                    if (SessionRefreshPolicy.RefreshAfterBootstrap(op, requested))
++                    {
++                        op = "refresh";                 // V3: the billing id is bound only once the new install proves its secret
++                        continue;
++                    }
+                     if (BillingConflict) Debug.LogWarning("[AuthClient] the billing id is held by another install — no billing identity on this token (billingConflict)");
+                 }
+                 yield break;
+diff --git a/Assets/Scripts/Auth/InstallSession.cs b/Assets/Scripts/Auth/InstallSession.cs
+index 8928adc9..97917652 100644
+--- a/Assets/Scripts/Auth/InstallSession.cs
++++ b/Assets/Scripts/Auth/InstallSession.cs
+@@ -108,4 +108,46 @@ public static class SessionRefreshPolicy
+     public static bool IdentityChanged(InstallSession.TokenClaims claims, string currentAppUserId, string lastRequestedAppUserId)
+         => claims != null && !string.IsNullOrEmpty(currentAppUserId) && claims.AppUserId != currentAppUserId
+            && currentAppUserId != lastRequestedAppUserId;
++
++    /// <summary>
++    /// V3 (2026-09-28): the server binds a billing id ONLY on a refresh — an install that has proven its secret.
++    /// Bootstrap is unauthenticated, so it binds nothing (an orphaned bootstrap whose answer was lost can never hold
++    /// anyone's id). A bootstrap that named an id is therefore followed by a refresh in the same session op.
++    /// </summary>
++    public static bool RefreshAfterBootstrap(string op, string requestedAppUserId)
++        => op == "bootstrap" && !string.IsNullOrEmpty(requestedAppUserId);
++
++    /// <summary>
++    /// What to record as «asked for» after a successful session op: a bootstrap asked for nothing the server could
++    /// grant (V3), so it records none — the next <see cref="IdentityChanged"/> check then asks with a refresh.
++    /// </summary>
++    public static string RequestedIdToRecord(string op, string requestedAppUserId)
++        => op == "bootstrap" ? "" : (requestedAppUserId ?? "");
++
++    /// <summary>Only a RevenueCat anonymous id is bindable (the server's rule — a device-id fallback never is).</summary>
++    public static bool IsBindableBillingId(string appUserId)
++    {
++        const string prefix = "$RCAnonymousID:";
++        if (appUserId == null || appUserId.Length != prefix.Length + 32 || !appUserId.StartsWith(prefix, StringComparison.Ordinal)) return false;
++        for (int i = prefix.Length; i < appUserId.Length; i++)
++        {
++            char ch = appUserId[i];
++            if (!((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f'))) return false;
++        }
++        return true;
++    }
++
++    /// <summary>Minimum gap between two resume-time retries of a declined billing id.</summary>
++    public const long BillingRetryGapSeconds = 60;
++
++    /// <summary>
++    /// V3: the token carries no (or another) billing identity for this device's RevenueCat id — billingConflict, or a
++    /// bootstrap whose follow-up refresh did not happen. The only cure on the server is a revoke of the holding install
++    /// (support), after which a refresh takes the id over; without a retry on resume the client would wait for the
++    /// planned refresh (~10 h). At most once a minute, never while a session op is in flight.
++    /// </summary>
++    public static bool ShouldRetryBillingOnResume(bool hasFocus, bool hasInstall, bool inFlight, InstallSession.TokenClaims claims,
++                                                  string currentAppUserId, long nowSec, long lastAttemptSec)
++        => hasFocus && hasInstall && !inFlight && claims != null && IsBindableBillingId(currentAppUserId)
++           && claims.AppUserId != currentAppUserId && nowSec - lastAttemptSec >= BillingRetryGapSeconds;
+ }
+diff --git a/Assets/Scripts/Main/ProfileSubPages.Account.cs b/Assets/Scripts/Main/ProfileSubPages.Account.cs
+index f35cb2e1..ec493fad 100644
+--- a/Assets/Scripts/Main/ProfileSubPages.Account.cs
++++ b/Assets/Scripts/Main/ProfileSubPages.Account.cs
+@@ -60,12 +60,22 @@ public partial class ProfileSubPages
+         //    lives in memory too and re-persists itself on its next write: empty it
+         //    first, or a new Bot0 would inherit the old bots' pending choices (R5).
+         ReplyModeSyncService.Existing?.ForgetAll();
+-        PlayerPrefs.DeleteAll();
+-        PlayerPrefs.Save();
++        // V3 (owner decision 2026-10-06): the install's server identity SURVIVES the wipe — the RevenueCat id lives in
++        // the SDK's own storage and comes back on the next refresh; a fresh install naming it would be refused (one
++        // install per billing id) and the subscription would be stuck in billingConflict until support revokes.
++        AuthClient.PreserveAcrossWipe(() =>
++        {
++            PlayerPrefs.DeleteAll();
++            PlayerPrefs.Save();
++        });
+ 
+         // 3. Disk: cache tree, response dumps, stickers, link previews.
+         LocalDataWipe.DeleteDiskData(Application.persistentDataPath);
+ 
++        // The token still lists the retired bots for up to 12 h: re-read ownership now (same install, nothing owned).
++        var auth = AuthClient.Existing;
++        if (auth != null) auth.StartCoroutine(auth.ForceRefresh());
++
+         RefreshAccountCard();
+         ProfilePage.Instance?.RefreshProfileCard();
+ 
+diff --git a/Assets/Tests/Editor/Auth/AuthWiringGuardTests.cs b/Assets/Tests/Editor/Auth/AuthWiringGuardTests.cs
+index 7982498d..2b4e56bc 100644
+--- a/Assets/Tests/Editor/Auth/AuthWiringGuardTests.cs
++++ b/Assets/Tests/Editor/Auth/AuthWiringGuardTests.cs
+@@ -137,11 +137,58 @@ public class AuthWiringGuardTests
+         string client = Code(Path.Combine(Scripts, "Auth/AuthClient.cs"));
+         Assert.IsTrue(client.Contains("SessionRefreshPolicy.IdentityChanged(Claims, BillingIdentity.AppUserId, PlayerPrefs.GetString(KeyRequestedBillingId"),
+             "EnsureSession must pass the last requested billing id");
+-        Assert.IsTrue(client.Contains("PlayerPrefs.SetString(KeyRequestedBillingId, requested)") && client.Contains("[\"appUserId\"] = requested"),
+-            "the id recorded as requested must be the one the session op sent");
++        Assert.IsTrue(client.Contains("PlayerPrefs.SetString(KeyRequestedBillingId, SessionRefreshPolicy.RequestedIdToRecord(op, requested))")
++                      && client.Contains("[\"appUserId\"] = requested"),
++            "the id recorded as requested must be the one the session op sent (none for a bootstrap — V3: it binds nothing)");
+         Assert.IsTrue(client.Contains("jo.Value<bool?>(\"billingConflict\")"), "AuthClient must read billingConflict");
+     }
+ 
++    /// <summary>
++    /// V3 (2026-09-28): the server binds a billing id only on a refresh. A bootstrap that named one must refresh in the
++    /// same op — otherwise the first billing-bound call after a fresh install would go out with no billing identity.
++    /// </summary>
++    [Test]
++    public void ABootstrapIsFollowedByItsOwnRefresh_AndADeclinedIdIsRetriedOnResume()
++    {
++        string client = Code(Path.Combine(Scripts, "Auth/AuthClient.cs"));
++        int record = client.IndexOf("SessionRefreshPolicy.RequestedIdToRecord(op, requested)", System.StringComparison.Ordinal);
++        int follow = client.IndexOf("if (SessionRefreshPolicy.RefreshAfterBootstrap(op, requested))", System.StringComparison.Ordinal);
++        Assert.IsTrue(record >= 0 && follow > record, "the bootstrap's follow-up refresh must be decided right after recording the request");
++        Assert.IsTrue(Regex.IsMatch(client, @"if \(SessionRefreshPolicy\.RefreshAfterBootstrap\(op, requested\)\)\s*\{\s*op = ""refresh"";\s*continue;"),
++            "the follow-up must re-enter the loop as a refresh");
++        Assert.IsTrue(Regex.IsMatch(client, @"for \(int attempt = 0; attempt < 3; attempt\+\+\)"), "room for refused-refresh → bootstrap → refresh");
++        Assert.IsTrue(client.Contains("void OnApplicationFocus(bool hasFocus)")
++                      && client.Contains("SessionRefreshPolicy.ShouldRetryBillingOnResume(hasFocus, HasInstall, _inFlight, Claims, BillingIdentity.AppUserId"),
++            "a declined billing id must be retried on return to the app (support revoke → the id follows without a 10 h wait)");
++    }
++
++    /// <summary>
++    /// V3 (owner decision 2026-10-06): «Удалить все данные» keeps the install's server identity — DeleteAll may only run
++    /// inside AuthClient.PreserveAcrossWipe, which restores the credentials synchronously, and ownership is re-read after.
++    /// </summary>
++    [Test]
++    public void TheFullWipe_KeepsTheInstall_AndRereadsOwnership()
++    {
++        string account = Code(Path.Combine(Scripts, "Main/ProfileSubPages.Account.cs"));
++        int start = account.IndexOf("private void RunWipe()", System.StringComparison.Ordinal);
++        Assert.GreaterOrEqual(start, 0, "RunWipe not found");
++        string body = account.Substring(start);
++        int preserve = body.IndexOf("AuthClient.PreserveAcrossWipe(", System.StringComparison.Ordinal);
++        int delete = body.IndexOf("PlayerPrefs.DeleteAll()", System.StringComparison.Ordinal);
++        int refresh = body.IndexOf("ForceRefresh()", System.StringComparison.Ordinal);
++        Assert.IsTrue(preserve >= 0 && delete > preserve, "PlayerPrefs.DeleteAll() must run inside AuthClient.PreserveAcrossWipe(...)");
++        Assert.AreEqual(1, Regex.Matches(account, @"PlayerPrefs\.DeleteAll\(\)").Count, "exactly one DeleteAll in the account page");
++        Assert.IsTrue(refresh > delete, "ownership must be re-read after the wipe (the token still lists the retired bots)");
++        string client = Code(Path.Combine(Scripts, "Auth/AuthClient.cs"));
++        int p = client.IndexOf("public static void PreserveAcrossWipe(", System.StringComparison.Ordinal);
++        Assert.GreaterOrEqual(p, 0);
++        string pw = client.Substring(p, client.IndexOf("public bool Owns(", p, System.StringComparison.Ordinal) - p);
++        int wipe = pw.IndexOf("wipe?.Invoke()", System.StringComparison.Ordinal);
++        Assert.IsTrue(wipe > pw.IndexOf("PlayerPrefs.GetString(KeyInstallSecret", System.StringComparison.Ordinal)
++                      && pw.IndexOf("PlayerPrefs.SetString(KeyInstallSecret, secret)", System.StringComparison.Ordinal) > wipe,
++            "the credentials are read before and written back after the wipe");
++    }
++
+     [Test]
+     public void SecretsShipOnlyTheRevenueCatPublicKeysAndTheBaseUrl()
+     {
+diff --git a/Assets/Tests/Editor/Auth/InstallSessionTests.cs b/Assets/Tests/Editor/Auth/InstallSessionTests.cs
+index c8912ee6..261a80b0 100644
+--- a/Assets/Tests/Editor/Auth/InstallSessionTests.cs
++++ b/Assets/Tests/Editor/Auth/InstallSessionTests.cs
+@@ -123,4 +123,52 @@ public class InstallSessionTests
+         Assert.IsFalse(SessionRefreshPolicy.IdentityChanged(kept, "rc-other", "rc-other"), "asked for another install's id, kept our own");
+         Assert.IsTrue(SessionRefreshPolicy.IdentityChanged(declined, "rc-2", "rc-1"), "a different id than the declined one is asked for once");
+     }
++
++    private const string Rc = "$RCAnonymousID:0123456789abcdef0123456789abcdef";
++
++    /// <summary>
++    /// V3 (2026-09-28): the server binds a billing id only on a refresh (an install that proved its secret); the
++    /// unauthenticated bootstrap binds nothing, so an orphaned bootstrap can never hold anyone's id. A bootstrap that
++    /// named an id therefore refreshes in the same op and records NO requested id (a failed follow-up refresh is then
++    /// retried by IdentityChanged on the next call).
++    /// </summary>
++    [Test]
++    public void Bootstrap_BindsNothing_TheIdIsAskedForByTheFollowUpRefresh()
++    {
++        Assert.IsTrue(SessionRefreshPolicy.RefreshAfterBootstrap("bootstrap", Rc));
++        Assert.IsFalse(SessionRefreshPolicy.RefreshAfterBootstrap("bootstrap", ""), "nothing to bind");
++        Assert.IsFalse(SessionRefreshPolicy.RefreshAfterBootstrap("refresh", Rc), "a refresh is the bind itself");
++        Assert.AreEqual("", SessionRefreshPolicy.RequestedIdToRecord("bootstrap", Rc));
++        Assert.AreEqual(Rc, SessionRefreshPolicy.RequestedIdToRecord("refresh", Rc));
++        var boot = new InstallSession.TokenClaims { AppUserId = null };
++        Assert.IsTrue(SessionRefreshPolicy.IdentityChanged(boot, Rc, SessionRefreshPolicy.RequestedIdToRecord("bootstrap", Rc)),
++            "after a bootstrap whose refresh failed, the next call must ask again");
++    }
++
++    [Test]
++    public void IsBindableBillingId_OnlyTheRevenueCatAnonymousFormat()
++    {
++        Assert.IsTrue(SessionRefreshPolicy.IsBindableBillingId(Rc));
++        Assert.IsFalse(SessionRefreshPolicy.IsBindableBillingId("A1B2C3D4-E5F6-47A8-9B0C-D1E2F3A4B5C6"), "device-id fallback");
++        Assert.IsFalse(SessionRefreshPolicy.IsBindableBillingId("$RCAnonymousID:0123456789ABCDEF0123456789abcdef"), "upper-case hex");
++        Assert.IsFalse(SessionRefreshPolicy.IsBindableBillingId(Rc + "0"));
++        Assert.IsFalse(SessionRefreshPolicy.IsBindableBillingId(null));
++    }
++
++    /// <summary>V3: a declined id is retried once on return to the app (support may have revoked the holder), never in a storm.</summary>
++    [Test]
++    public void ShouldRetryBillingOnResume_OnlyForADeclinedRevenueCatId_AtMostOnceAMinute()
++    {
++        var declined = new InstallSession.TokenClaims { AppUserId = null };
++        var granted = new InstallSession.TokenClaims { AppUserId = Rc };
++        Assert.IsTrue(SessionRefreshPolicy.ShouldRetryBillingOnResume(true, true, false, declined, Rc, 1000, 0));
++        Assert.IsFalse(SessionRefreshPolicy.ShouldRetryBillingOnResume(true, true, false, granted, Rc, 1000, 0), "the token already carries it");
++        Assert.IsFalse(SessionRefreshPolicy.ShouldRetryBillingOnResume(false, true, false, declined, Rc, 1000, 0), "focus lost");
++        Assert.IsFalse(SessionRefreshPolicy.ShouldRetryBillingOnResume(true, false, false, declined, Rc, 1000, 0), "no install yet");
++        Assert.IsFalse(SessionRefreshPolicy.ShouldRetryBillingOnResume(true, true, true, declined, Rc, 1000, 0), "a session op in flight");
++        Assert.IsFalse(SessionRefreshPolicy.ShouldRetryBillingOnResume(true, true, false, null, Rc, 1000, 0), "no token");
++        Assert.IsFalse(SessionRefreshPolicy.ShouldRetryBillingOnResume(true, true, false, declined, "device-id", 1000, 0), "a device id never binds");
++        Assert.IsFalse(SessionRefreshPolicy.ShouldRetryBillingOnResume(true, true, false, declined, Rc, 1059, 1000), "inside the gap");
++        Assert.IsTrue(SessionRefreshPolicy.ShouldRetryBillingOnResume(true, true, false, declined, Rc, 1060, 1000));
++    }
+ }
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 7046cdaa..c4d36c18 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -120,7 +120,7 @@ wappi.pro API
+ The app communicates with three external services via `UnityWebRequest` + coroutines (`IEnumerator` + `yield return SendWebRequest()`): Wappi (WhatsApp/Telegram transport, `Authorization` header), the self-hosted n8n (auth-free webhooks only), and RevenueCat via its SDK. The client carries NO server-side credentials except the wappi token (per-install proxy planned) — see the n8n section.
+ 
+ ### A1 identity + transport (2026-09-17, audit remediation stage 1 — DEPLOYED to prod 2026-09-24, see the deploy note at the end of this section; runbook `docs/audits/a1-deploy-runbook.md`)
+-The client holds NO Wappi credential any more. Every Wappi call is an allow-listed op sent to `/webhook/WappiProxy` and every n8n webhook carries `Authorization: Bearer <capability token>`; the server validates parameters, checks that every id belongs to the calling INSTALL, and forwards with its own `WappiAuthToken` credential. Pieces: `Assets/Scripts/Auth/` (`InstallSession` pure token model + refresh policy, `AuthClient` lazy always-active host: bootstrap/refresh single-flight, PlayerPrefs `CrAuth.*`, `AuthorizedRequest.Send(make, done)` = the ONE place the header is stamped + retry-once on 401, `ProfileClaim*` = legacy-profile claim), `Chat/WappiProxy` (`WappiProxy.Send(op, channel, args, done)` — Wappi's status+body pass through unchanged, so call sites keep their parsing). Server: `Tools/n8n/auth/{token,gate}.js` (HMAC-SHA256 `v1.` tokens, 12 h, claims `{i,u,p,w,c,e,n}`; verified in Code nodes WITHOUT a DB read because each Postgres node costs ≈1.9 s on prod), `build-auth-workflows.py` → `crAuthSession001` (bootstrap/refresh/claim.*) + `crWappiProxy0001`, `apply-auth-gate.py` (Auth Gate → Authorized? → 401/403 on all 12 client webhooks, `Bind Workflow Id`, `Register Upload`, owner-scoped Delete File, bot callback bound to the webhook path), `verify-auth-gate.py`, SQL `sql/2026-09-17-auth-installs.sql`. Server env: `NODE_FUNCTION_ALLOW_BUILTIN=crypto`, `N8N_BLOCK_ENV_ACCESS_IN_NODE=false`, `CR_AUTH_SECRET`, `CR_AUTH_COMPAT_UNTIL` (token-less LEGACY calls admitted only until that date). Rules: (1) a new client request site MUST go through `AuthorizedRequest.Send`/`WappiProxy.Send` — `AuthWiringGuardTests` fails on a direct `SendWebRequest` outside its allow-list or any `wappi.pro`/`Authorization` literal in transport code; (2) a new client webhook MUST be added to `GATED` in `apply-auth-gate.py` (with its ownership RULE) and to `PROTECTED_IDS`/the Validate list of Set Workflow State if it is infra; (3) a new Wappi operation MUST be added to the proxy's `OPS` allow-list (validated params, `profile_id ∈ p`), never a pass-through URL; (4) ownership = `bot_profiles.owner_id` (install) — RevenueCat `app_user_id` stays a billing key, never identity proof, and naming it grants nothing: it becomes the token's `u` only through `billing_bindings` (R2, 2026-09-27: one install per `$RCAnonymousID:` id — a device-id fallback is never bound; taken over only from a revoked holder or one without live bots; otherwise `u = null` + `billingConflict`, the gates refuse every billing-id field on `u = null`, Create WA/TG require a non-empty `AppUserID`, and the client never re-asks a declined id: `IdentityChanged` compares with `CrAuth.RequestedBillingId`); legacy/reinstalled profiles are claimed by PROOF, never assigned by a presented id — and since V2 (2026-09-28) the ONLY proof for ANY profile, owner-less ones included, is the code sent into the bot's own chat (`claim.start` → `claim.verify`). A pairing is a precondition that gives the claimant that chat, never a proof: Wappi does not say which link session completed a pairing, so the old time-window bind (`Bind Reauthed Profile`) handed an owner-less profile and its workflow to whoever had requested a QR when the OWNER reconnected independently — it is deleted, `claim.status` only ever answers `pending`/`reauth`/`owned`, and `Record Claim Pairing` (`claim_pair_by/at`) stays as an audit + stale-capability refusal. The code is guarded (`tests/test_claim.py` S11–S16, migration `sql/2026-10-07-claim-code-attempts.sql`): it counts as sent only when it was stored AND the transport accepted it (`Code Sent?` → else `Clear Claim Code` + `502 code_send_failed`, so a lost code is never «reused»); the pending install's fifth wrong answer kills it (`claim_code_locked`, 429, no new code until its 10-minute window ends); `claim.verify` never calls Wappi (`Needs Status?`); only `claim.start` takes a pending claim or starts its clock (status/verify polling never take one over); on Telegram the code goes to `account.phone` (the authorised account), never the top-level phone a claimant may have named in `auth/phone`. Client: after a pairing of a claim-pending profile `ProfileClaimFlow.AfterChannelAuthorized` raises the code sheet («Отменить», never «Позже») and the auth poller creates nothing unless it succeeded (`ProfileClaimWiringTests`); `NextUnowned` no longer skips pending claims. `claim.status` never sends a code and nothing of a claim is written before the install is verified (R1, 2026-09-27). (5) a refresh may answer 401 ONLY on Verify Install's positive verdict (`install_revoked`); any DB fault is 503 and `SessionRefreshPolicy.ShouldDiscardInstall` is the client's only wipe condition (R11). Isolated staging for all of this: `Tools/n8n/staging/` (private n8n home + Postgres from the `pgserver` wheel + Wappi MOCK on 127.0.0.1:8765; `bootstrap.py`, `e2e.py`, `e2e-auth.py`, run-scoped `fixtures.py`) — prod is read-only until the owner's explicit release go-ahead. **Deployed 2026-09-24 (owner's go, stages 0–7 in one pass; journal `docs/audits/implementation-progress.md`, snapshots `docs/audits/2026-09-24-prod-{before,after}.json`):** six SQL migrations through the `.secrets/sql-oneoff.py` harness, the seven env vars on the VPS (`CR_AUTH_COMPAT_UNTIL=2026-12-31T00:00:00Z`; the secret exists only in `~/choosereply/docker-compose.yml`), the 7 new workflows via `docker exec … n8n import:workflow` (ids preserved; sub-workflows `publish:workflow`, trigger workflows activated through the API), the 15 differing canonical workflows via `Tools/n8n/deploy-canonical.py` + `build-client-webhooks.py --update`, read-back all OK. Two facts to carry: prod runs Code nodes in TASK RUNNERS (`N8N_RUNNERS_ENABLED=true`, staging did not) — `require('crypto')` and `$env` were proven there with a self-deleting canary before anything was activated; and there are NO live bot clones on prod any more — «13» is archived (n8n refuses PUT on an archived workflow; `update-clones.py` now skips those) and «15» was deleted by hand in the n8n editor during the deploy (audit log: deactivate → archive → delete at 12:41 Almaty; both profiles had been retired by the lifecycle sweep on 2026-09-14), so the webhook-types step had nothing to apply and the real-bot canary (Test Dialog, handoff, media reply) is still pending a new bot from the new client. **Hotfix the same day, found on the owner's first bot:** the proxy's `Bind Profile` registers the `bot_profiles` row at profile CREATION, and `Count Channels` in Create WA/TG counted it as an occupied channel (an off-by-one for every plan) while a refused profile kept a live row (`c` grew 1→2→3) — `apply-slot-count-fix.py` excludes the profile being created (`$4`) and adds `Retire Refused Profile` (`deleted_reason='channel_limit'`); pinned by e2e-auth `create_slot_count_excludes_own_profile_and_retires_refused`. The visible symptom («profile deleted right after auth») also needs an EXPIRED subscriber (limit 0) — an expired RevenueCat sandbox account is exactly what the owner's test id had.
++The client holds NO Wappi credential any more. Every Wappi call is an allow-listed op sent to `/webhook/WappiProxy` and every n8n webhook carries `Authorization: Bearer <capability token>`; the server validates parameters, checks that every id belongs to the calling INSTALL, and forwards with its own `WappiAuthToken` credential. Pieces: `Assets/Scripts/Auth/` (`InstallSession` pure token model + refresh policy, `AuthClient` lazy always-active host: bootstrap/refresh single-flight, PlayerPrefs `CrAuth.*`, `AuthorizedRequest.Send(make, done)` = the ONE place the header is stamped + retry-once on 401, `ProfileClaim*` = legacy-profile claim), `Chat/WappiProxy` (`WappiProxy.Send(op, channel, args, done)` — Wappi's status+body pass through unchanged, so call sites keep their parsing). Server: `Tools/n8n/auth/{token,gate}.js` (HMAC-SHA256 `v1.` tokens, 12 h, claims `{i,u,p,w,c,e,n}`; verified in Code nodes WITHOUT a DB read because each Postgres node costs ≈1.9 s on prod), `build-auth-workflows.py` → `crAuthSession001` (bootstrap/refresh/claim.*) + `crWappiProxy0001`, `apply-auth-gate.py` (Auth Gate → Authorized? → 401/403 on all 12 client webhooks, `Bind Workflow Id`, `Register Upload`, owner-scoped Delete File, bot callback bound to the webhook path), `verify-auth-gate.py`, SQL `sql/2026-09-17-auth-installs.sql`. Server env: `NODE_FUNCTION_ALLOW_BUILTIN=crypto`, `N8N_BLOCK_ENV_ACCESS_IN_NODE=false`, `CR_AUTH_SECRET`, `CR_AUTH_COMPAT_UNTIL` (token-less LEGACY calls admitted only until that date). Rules: (1) a new client request site MUST go through `AuthorizedRequest.Send`/`WappiProxy.Send` — `AuthWiringGuardTests` fails on a direct `SendWebRequest` outside its allow-list or any `wappi.pro`/`Authorization` literal in transport code; (2) a new client webhook MUST be added to `GATED` in `apply-auth-gate.py` (with its ownership RULE) and to `PROTECTED_IDS`/the Validate list of Set Workflow State if it is infra; (3) a new Wappi operation MUST be added to the proxy's `OPS` allow-list (validated params, `profile_id ∈ p`), never a pass-through URL; (4) ownership = `bot_profiles.owner_id` (install) — RevenueCat `app_user_id` stays a billing key, never identity proof, and naming it grants nothing: it becomes the token's `u` only through `billing_bindings` (R2, 2026-09-27: one install per `$RCAnonymousID:` id — a device-id fallback is never bound; bound ONLY by a refresh — an install that proved its secret; the unauthenticated bootstrap binds nothing, so an orphaned bootstrap whose answer was lost never holds an id, and the client refreshes right after a bootstrap in the same session op (`SessionRefreshPolicy.RefreshAfterBootstrap`); taken over ONLY from a holder the server revoked — V3, 2026-09-28: «the holder owns no live bot» is NOT a release any more (a paying owner before the first bot, or right after deleting it, lost the id to anyone who named it, and two bot-less installs ping-ponged it on every refresh); otherwise `u = null` + `billingConflict`, the gates refuse every billing-id field on `u = null`, Create WA/TG require a non-empty `AppUserID`, and the client never re-asks a declined id on every call (`IdentityChanged` compares with `CrAuth.RequestedBillingId`) but retries it once on return to the app (`AuthClient.OnApplicationFocus`, ≤1/min — support may have revoked the dead holder). «Удалить все данные» KEEPS the install (owner decision 2026-10-06: `AuthClient.PreserveAcrossWipe` around `PlayerPrefs.DeleteAll`, then `ForceRefresh`); a lost secret without a wipe is a support revoke (`a1-deploy-runbook.md` §5); pinned by `tests/test_billing_identity.py` B5/B8–B11 + `InstallSessionTests`/`AuthWiringGuardTests`); legacy/reinstalled profiles are claimed by PROOF, never assigned by a presented id — and since V2 (2026-09-28) the ONLY proof for ANY profile, owner-less ones included, is the code sent into the bot's own chat (`claim.start` → `claim.verify`). A pairing is a precondition that gives the claimant that chat, never a proof: Wappi does not say which link session completed a pairing, so the old time-window bind (`Bind Reauthed Profile`) handed an owner-less profile and its workflow to whoever had requested a QR when the OWNER reconnected independently — it is deleted, `claim.status` only ever answers `pending`/`reauth`/`owned`, and `Record Claim Pairing` (`claim_pair_by/at`) stays as an audit + stale-capability refusal. The code is guarded (`tests/test_claim.py` S11–S16, migration `sql/2026-10-07-claim-code-attempts.sql`): it counts as sent only when it was stored AND the transport accepted it (`Code Sent?` → else `Clear Claim Code` + `502 code_send_failed`, so a lost code is never «reused»); the pending install's fifth wrong answer kills it (`claim_code_locked`, 429, no new code until its 10-minute window ends); `claim.verify` never calls Wappi (`Needs Status?`); only `claim.start` takes a pending claim or starts its clock (status/verify polling never take one over); on Telegram the code goes to `account.phone` (the authorised account), never the top-level phone a claimant may have named in `auth/phone`. Client: after a pairing of a claim-pending profile `ProfileClaimFlow.AfterChannelAuthorized` raises the code sheet («Отменить», never «Позже») and the auth poller creates nothing unless it succeeded (`ProfileClaimWiringTests`); `NextUnowned` no longer skips pending claims. `claim.status` never sends a code and nothing of a claim is written before the install is verified (R1, 2026-09-27). (5) a refresh may answer 401 ONLY on Verify Install's positive verdict (`install_revoked`); any DB fault is 503 and `SessionRefreshPolicy.ShouldDiscardInstall` is the client's only wipe condition (R11). Isolated staging for all of this: `Tools/n8n/staging/` (private n8n home + Postgres from the `pgserver` wheel + Wappi MOCK on 127.0.0.1:8765; `bootstrap.py`, `e2e.py`, `e2e-auth.py`, run-scoped `fixtures.py`) — prod is read-only until the owner's explicit release go-ahead. **Deployed 2026-09-24 (owner's go, stages 0–7 in one pass; journal `docs/audits/implementation-progress.md`, snapshots `docs/audits/2026-09-24-prod-{before,after}.json`):** six SQL migrations through the `.secrets/sql-oneoff.py` harness, the seven env vars on the VPS (`CR_AUTH_COMPAT_UNTIL=2026-12-31T00:00:00Z`; the secret exists only in `~/choosereply/docker-compose.yml`), the 7 new workflows via `docker exec … n8n import:workflow` (ids preserved; sub-workflows `publish:workflow`, trigger workflows activated through the API), the 15 differing canonical workflows via `Tools/n8n/deploy-canonical.py` + `build-client-webhooks.py --update`, read-back all OK. Two facts to carry: prod runs Code nodes in TASK RUNNERS (`N8N_RUNNERS_ENABLED=true`, staging did not) — `require('crypto')` and `$env` were proven there with a self-deleting canary before anything was activated; and there are NO live bot clones on prod any more — «13» is archived (n8n refuses PUT on an archived workflow; `update-clones.py` now skips those) and «15» was deleted by hand in the n8n editor during the deploy (audit log: deactivate → archive → delete at 12:41 Almaty; both profiles had been retired by the lifecycle sweep on 2026-09-14), so the webhook-types step had nothing to apply and the real-bot canary (Test Dialog, handoff, media reply) is still pending a new bot from the new client. **Hotfix the same day, found on the owner's first bot:** the proxy's `Bind Profile` registers the `bot_profiles` row at profile CREATION, and `Count Channels` in Create WA/TG counted it as an occupied channel (an off-by-one for every plan) while a refused profile kept a live row (`c` grew 1→2→3) — `apply-slot-count-fix.py` excludes the profile being created (`$4`) and adds `Retire Refused Profile` (`deleted_reason='channel_limit'`); pinned by e2e-auth `create_slot_count_excludes_own_profile_and_retires_refused`. The visible symptom («profile deleted right after auth») also needs an EXPIRED subscriber (limit 0) — an expired RevenueCat sandbox account is exactly what the owner's test id had.
+ 
+ **A2 confirmable reply mode (2026-09-17, stage 2 — deployed to prod 2026-09-24):** a tap is a DESIRE, painted immediately but dimmed (`ReplyModeToggleBinder.PendingAlpha`, `SemiAutoToggle.SetPending`, bot-card subline «Сохраняем режим…»/«Режим не сохранён» via `ReplyModeSyncCopy`); it becomes CONFIRMED only when `/webhook/SetReplyMode` reports `applied:true` for that profile at the version the client sent (`ReplyModeSyncQueue` + `ReplyModeSyncService`, persisted in PlayerPrefs `CrReplyMode.Queue`, bounded backoff, restart-safe, 400/403 stop retrying). **R5 (2026-09-27):** the service BOOTS ITSELF (`RuntimeInitializeOnLoadMethod(AfterSceneLoad)`; it used to exist only once a tap/heal/Save created it, so a cold start with an undelivered choice sent nothing and every surface painted it as confirmed), announces the loaded unconfirmed (bot, chat) scopes through `OnStateChanged` at once, and holds its first send behind `ReplyModeSendGate` — opened by `Manager.EnsureSessionThenOpenReplyModeSendGate` after `BillingService.Initialize` + the boot `EnsureSession`, or by itself after 20 s. Answers go through the pure, version-guarded `ReplyModeSyncQueue.ApplyBatchResult` (a stale 400/403/5xx for v1 never parks the unsent v2); `Bot.DeleteBot` calls `ForgetBot` before the server wipe and the full wipe calls `ForgetAll` before `PlayerPrefs.DeleteAll` (the in-memory queue re-persists itself). A cold-start resend REPEATS the queued version (R4 — a new one would read as the owner's resume). Pinned by `ReplyModeSyncQueueTests` (R5 block) + `ReplyModeSyncWiringTests` (boot, gate order, deletion). Every write carries a `version` (`ReplyModeSyncQueue.NextVersion` = max(nowMs, last+1)); the server (`apply-reply-mode-v2.py`) upserts ALL requested profiles in one statement guarded by `where reply_mode_flags.version < excluded.version` and answers per profile — a stale/reordered write never regresses, and a NEWER server value is adopted through `OnServerNewer` → `ReplyModeToggleBinder.ReconcileFromServer` (which raises `OnReplyModeChanged` with `ReconcilingFromServer` set so Manager does not write it back). `Manager.SyncReplyMode(botId, …)` is the only write entry; `SaveWorkflows` yields on `ReplyModeSyncService.SendAndConfirm`, never on a bare 200. The Create handlers seed the profile's `'*'` row from the form's `ReplyMode`/`ReplyModeVersion` BEFORE `Activate Created Workflow` (a legacy client without the field keeps the absence-→-reply semantics, which stays LOCKED in `Read Reply Mode`). **R8 (2026-09-27):** a «Вместе» clone goes live ONLY on the seed statement's positive marker (`select true as seeded` after the version-guarded insert; `Seed Saved?`, retryOnFail ×3) — never on «the node continued»: an error thrown outside the query runner passes the INPUT item on and an empty result becomes `{}`, so `continueErrorOutput` would still activate. On a failed seed `Delete Unseeded Workflow` removes the clone (never activated, no Wappi webhook, not bound) and the webhook answers `{success:false, error:"reply_mode_not_saved"}` (the client's existing «no id» failure path); «Авто»/legacy creates are not gated (absence is their mode). Pinned by `tests/test_create_seed.py` + e2e-auth `create_seed_failure_keeps_clone_inactive`. Guards: `verify-reply-mode.py`, `ReplyModeSyncWiringTests`.
+ 
+diff --git a/Tools/n8n/build-auth-workflows.py b/Tools/n8n/build-auth-workflows.py
+index 7d259fdb..1aedaba5 100644
+--- a/Tools/n8n/build-auth-workflows.py
++++ b/Tools/n8n/build-auth-workflows.py
+@@ -137,9 +137,13 @@ return [{ json: out, pairedItem: { item: 0 } }];
+ # (a device-id fallback never is). Written without `$` / regex so no placeholder syntax can ever collide with it.
+ RC_ID_OF_3 = ("(case when length(coalesce($3, '')) = 47 and left($3, 15) = chr(36) || 'RCAnonymousID:' "
+               "and translate(substr($3, 16), '0123456789abcdef', '') = '' then $3 end)")
+-# The requested id is granted when it is free, already this install's, or its holder is revoked / owns no live bot
+-# (a lost install secret: claim the bots by code first, then the billing id follows). ON CONFLICT DO UPDATE ... WHERE
+-# never raises in a race (a unique index would, and a refresh error used to become a 401 — R11).
++# The requested id is granted when it is free, already this install's, or its holder was REVOKED by the server — the
++# only transfer backed by an act of the server rather than by knowing the id. V3 (2026-09-28): «the holder owns no live
++# bot» is NOT a release any more — a paying owner before the first bot (or right after deleting it) lost the id to
++# anyone who named it, and two bot-less installs ping-ponged it on every refresh. A lost install secret is a support
++# case (revoke the dead install, the id then follows); «Удалить все данные» keeps the install. Used by Verify Install
++# ONLY (a refresh proves the secret); bootstrap binds nothing. ON CONFLICT DO UPDATE ... WHERE never raises in a race
++# (a unique index would, and a refresh error used to become a 401 — R11).
+ BILLING_BIND_CTES = """req as (
+   select """ + RC_ID_OF_3 + """ as id
+ ), bind as (
+@@ -149,7 +153,6 @@ BILLING_BIND_CTES = """req as (
+       bound_at = case when billing_bindings.install_id = excluded.install_id then billing_bindings.bound_at else now() end
+   where billing_bindings.install_id = excluded.install_id
+      or not exists (select 1 from installs h where h.install_id = billing_bindings.install_id and h.revoked_at is null)
+-     or not exists (select 1 from bot_profiles bp where bp.owner_id = billing_bindings.install_id and bp.deleted_at is null)
+   returning app_user_id
+ ), strip as (
+   update installs set app_user_id = null where app_user_id = (select app_user_id from bind) and install_id <> $1
+@@ -160,17 +163,18 @@ BILLING_BIND_CTES = """req as (
+ # and bootstrap is unauthenticated (verify-sql-comments.py guards every Postgres node).
+ CREATE_INSTALL_SQL = """-- A1: mint an install (the client keeps installId + installSecret; only the hash is stored).
+ -- Bootstrap is unauthenticated, so it is capped: at most 60 new installs per minute instance-wide.
+--- R2 (2026-09-27): the billing id (third parameter) is NOT trusted for being named — it is bound to this install only when
+--- billing_bindings grants it (see BILLING_BIND_CTES); otherwise app_user_id stays NULL and billing_conflict says why.
++-- V3 (2026-09-28): bootstrap binds NO billing id (the third parameter is deliberately unused) — it is bound only by a
++-- refresh, which proves the install secret (Verify Install). An orphaned bootstrap whose answer was lost therefore
++-- never holds anyone's id; the client refreshes right after a bootstrap in the same session op.
+ with ok as (
+   select 1 as go where (select count(*) from installs where created_at > now() - interval '1 minute') < 60
+-), """ + BILLING_BIND_CTES.replace("__HOLDER__", "$1").replace("__FROM__", ", ok") + """, ins as (
++), ins as (
+   insert into installs (install_id, secret_hash, app_user_id, platform, app_version)
+-  select $1, $2, (select app_user_id from bind), nullif($4, ''), nullif($5, '') from ok
++  select $1, $2, null::text, nullif($4, ''), nullif($5, '') from ok
+   returning install_id, app_user_id, token_version
+ )
+ select ins.install_id, ins.app_user_id, ins.token_version, '{}'::text[] as p, '{}'::text[] as w, '{}'::text[] as c,
+-  ((select id from req) is not null and ins.app_user_id is null) as billing_conflict
++  false as billing_conflict
+ from ins;"""
+ 
+ VERIFY_INSTALL_SQL = """-- A1: refresh = prove the install secret (hash compare), touch last_seen, adopt the client's current
+@@ -178,8 +182,8 @@ VERIFY_INSTALL_SQL = """-- A1: refresh = prove the install secret (hash compare)
+ -- ~1.9 s on prod). ALWAYS exactly one row carrying verdict = 'checked' (R11, 2026-09-27): install_id is
+ -- NULL when the secret is wrong or the install is unknown/revoked -> 401 install_revoked. A row WITHOUT
+ -- the verdict (node error, input passed through, nothing) is a fault -> 503, never a reason to wipe.
+--- R2: the billing id is adopted only when billing_bindings grants it; a refused one keeps the install's own
+--- still-bound id (or none) and reports billing_conflict.
++-- R2/V3: the billing id is adopted only when billing_bindings grants it (free, already ours, or its holder revoked);
++-- a refused one keeps the install's own still-bound id (or none) and reports billing_conflict.
+ with me as (
+   select install_id from installs where install_id = $1 and secret_hash = $2 and revoked_at is null
+ ), """ + BILLING_BIND_CTES.replace("__HOLDER__", "me.install_id").replace("__FROM__", ", me") + """, v as (
+diff --git a/Tools/n8n/staging/e2e-auth.py b/Tools/n8n/staging/e2e-auth.py
+index c320f325..e073cfbb 100755
+--- a/Tools/n8n/staging/e2e-auth.py
++++ b/Tools/n8n/staging/e2e-auth.py
+@@ -97,6 +97,9 @@ class Owner:
+         st, d = session({"op": "bootstrap", "platform": "test", "appVersion": "e2e", "appUserId": self.app_user_id})
+         assert st == 200 and d.get("success"), f"bootstrap {tag}: {st} {d}"
+         self.install_id, self.secret, self.token = d["installId"], d["installSecret"], d["token"]
++        self.boot_app_user_id = d.get("appUserId")
++        # V3: the unauthenticated bootstrap binds no billing id; the client refreshes right after it (same session op)
++        self.refresh()
+ 
+     def refresh(self):
+         st, d = session({"op": "refresh", "installId": self.install_id, "installSecret": self.secret, "appUserId": self.app_user_id})
+@@ -593,7 +596,7 @@ def wait_ready(timeout=90):
+         time.sleep(2)
+ 
+ 
+-@scenario("billing_id_first_bind", "R2: a second install naming a billing id another install holds (with a live bot) gets NO billing identity + billingConflict — its GetUsage/Create/profile.add on that id are refused; the id follows only once the holder is revoked")
++@scenario("billing_id_first_bind", "R2/V3: a second install naming a billing id another install holds — WITH a live bot or WITHOUT one (a paying owner before the first bot) — gets NO billing identity + billingConflict on bootstrap AND refresh; its GetUsage/profile.add on that id are refused; the bootstrap itself binds nothing; the id follows only once the holder is revoked")
+ def s_billing_bind(ctx):
+     a = fresh_owner(ctx, "r2a")                                   # holds the id and owns a live bot
+     b = Owner("r2b", ctx["run_id"], app_user_id=a.app_user_id)   # the same id named by another install
+@@ -604,10 +607,28 @@ def s_billing_bind(ctx):
+     holders = pg(f"select string_agg(install_id, ',') from installs where app_user_id = '{a.app_user_id}' and revoked_at is null;")
+     pg(f"update installs set revoked_at = now() where install_id = '{a.install_id}';")
+     d_b2 = b.refresh()
+-    ok = (d_b.get("appUserId") is None and d_b.get("billingConflict") is True and usage_own == 200 and usage_b == 403
+-          and add_b == 409 and holders == a.install_id and d_b2.get("appUserId") == a.app_user_id and not d_b2.get("billingConflict"))
+-    return ok, (f"second: appUserId={d_b.get('appUserId')} conflict={d_b.get('billingConflict')} usage_own={usage_own} usage_second={usage_b} "
+-                f"profile.add_second={add_b} {add_body} holders={holders == a.install_id} after_revoke={d_b2.get('appUserId') == a.app_user_id}/{d_b2.get('billingConflict')}")
++    with_bot = (d_b.get("appUserId") is None and d_b.get("billingConflict") is True and usage_own == 200 and usage_b == 403
++                and add_b == 409 and holders == a.install_id and d_b2.get("appUserId") == a.app_user_id and not d_b2.get("billingConflict"))
++    # V3: the holder owns NO bot (paid, before its first bot) — still keeps the id; the bootstrap binds nothing
++    c = Owner("v3c", ctx["run_id"])                               # bootstrap + refresh: holds its id, no profile
++    pg(f"update subscribers set plan = 'business', status = 'active' where app_user_id = '{c.app_user_id}';")
++    x = Owner("v3x", ctx["run_id"], app_user_id=c.app_user_id)
++    d_x = x.refresh()
++    usage_x = hook("GetUsage", x.token, {"appUserId": c.app_user_id})[0]
++    add_x, _ = proxy(x.token, {"op": "profile.add", "channel": "whatsapp", "name": "e2e v3x"})
++    d_c = c.refresh()
++    usage_c = hook("GetUsage", c.token, {"appUserId": c.app_user_id})[0]
++    holders_c = pg(f"select string_agg(install_id, ',') from installs where app_user_id = '{c.app_user_id}' and revoked_at is null;")
++    pg(f"update installs set revoked_at = now() where install_id = '{c.install_id}';")
++    d_x2 = x.refresh()
++    no_bot = (c.boot_app_user_id is None and x.boot_app_user_id is None and d_x.get("appUserId") is None and d_x.get("billingConflict") is True
++              and usage_x == 403 and add_x == 409 and d_c.get("appUserId") == c.app_user_id and not d_c.get("billingConflict")
++              and usage_c == 200 and holders_c == c.install_id and d_x2.get("appUserId") == c.app_user_id and not d_x2.get("billingConflict"))
++    return with_bot and no_bot, (f"WITH bot: second appUserId={d_b.get('appUserId')} conflict={d_b.get('billingConflict')} usage_own={usage_own} usage_second={usage_b} "
++                                 f"profile.add_second={add_b} {add_body} holders={holders == a.install_id} after_revoke={d_b2.get('appUserId') == a.app_user_id}/{d_b2.get('billingConflict')} | "
++                                 f"NO bot (V3): bootstrap_binds={c.boot_app_user_id}/{x.boot_app_user_id} second={d_x.get('appUserId')}/{d_x.get('billingConflict')} "
++                                 f"usage_second={usage_x} profile.add_second={add_x} holder_refresh={d_c.get('appUserId') == c.app_user_id}/{d_c.get('billingConflict')} "
++                                 f"usage_holder={usage_c} holders={holders_c == c.install_id} after_revoke={d_x2.get('appUserId') == c.app_user_id}/{d_x2.get('billingConflict')}")
+ 
+ 
+ @scenario("create_rejects_empty_appuserid_in_session", "R2: CreateWhatsappWorkflow/CreateTelegramWorkflow with an EMPTY AppUserID in session mode are refused before any write (the empty id skipped Count Channels and let the quota fail open)")
+diff --git a/Tools/n8n/tests/test_billing_identity.py b/Tools/n8n/tests/test_billing_identity.py
+index 4483375d..69857136 100644
+--- a/Tools/n8n/tests/test_billing_identity.py
++++ b/Tools/n8n/tests/test_billing_identity.py
+@@ -1,12 +1,16 @@
+ #!/usr/bin/env python3
+-"""R2 (iteration 2026-09-27): naming a RevenueCat billing id no longer grants its plan, quota or channel slots.
++"""R2 (iteration 2026-09-27) + V3 (iteration 2026-09-28): naming a RevenueCat billing id never grants its plan, quota or
++channel slots.
+ 
+ A billing id (only the RevenueCat anonymous format `$RCAnonymousID:` + 32 hex — a device-id fallback is never bound)
+ belongs to ONE install (billing_bindings). Another install that names it gets NO billing identity in its token
+-(u = null) and a `billingConflict` flag — unless the holder is revoked or owns no live bot (recovery after a lost
+-install secret: claim the bots by code first, then the billing id follows). The gates then refuse any billing-id
+-field that is not the token's own (u = null refuses them all), and Create WA/TG refuse an empty AppUserID in
+-session mode (it skipped the channel count and let the quota fail open).
++(u = null) and a `billingConflict` flag. V3: the id moves ONLY from a holder the server itself revoked — never because
++the holder «has no live bot» (a paying owner before the first bot, or right after deleting it, lost the id to anyone
++who named it, and the two installs then ping-ponged it on every refresh). And it is bound ONLY on a refresh (an install
++that proved its secret): the unauthenticated bootstrap binds nothing, so an orphaned bootstrap whose answer was lost can
++never hold anyone's id (the case the «no live bot» exception used to cover). The client refreshes right after a
++bootstrap; «Удалить все данные» keeps the install (owner decision 2026-10-06). The gates then refuse any billing-id field
++that is not the token's own (u = null refuses them all), and Create WA/TG refuse an empty AppUserID in session mode.
+ 
+ Real SQL of Create Install / Verify Install (+ the migration's seed) on staging-Postgres session temp tables with a
+ real clock; real Issue Token and gate Code bodies from the canonical JSONs; the legacy compat window CLOSED
+@@ -16,7 +20,7 @@ import re
+ import time
+ from pathlib import Path
+ 
+-from harness import N8N, Case, PgSession, bind, code, node, report, run_js, wf
++from harness import N8N, Case, PgSession, bind, code, module, node, report, run_js, wf
+ 
+ W = wf('crAuthSession001-Auth_Session.json')
+ Q = lambda name: node(W, name)['parameters']['query']
+@@ -38,6 +42,25 @@ def refresh(pg, install, app_user_id):
+     return pg.q(bind(Q('Verify Install'), [install, 'h-' + install, app_user_id]))[0]
+ 
+ 
++def join(pg, install, app_user_id):
++    """What the client does on a fresh install (V3): bootstrap, then refresh in the same session op — the refresh is
++    where the billing id is bound. Returns the refresh row (the token the client ends up with)."""
++    boot(pg, install, app_user_id)
++    return refresh(pg, install, app_user_id)
++
++
++def usage_gate_for(row):
++    """Issue Token on a Verify Install row → the real Auth Gate of Get Usage with that token naming R."""
++    issued = code(W, 'Issue Token', {'json': row}, named={'Route': {'op': 'refresh', 'installId': row.get('install_id'), 'nowSec': int(time.time()), 'installSecret': ''}})[0]['json']
++    g = code(wf('jtbssfzXbOxwTK4k-Get_Usage.json'), 'Auth Gate', {'json': {'headers': {'authorization': 'Bearer ' + issued.get('token', '')}, 'body': {'appUserId': R}}})[0]['json']['crAuth']
++    return 'ok' if g['ok'] else g['reason']
++
++
++def paid(pg, app_user_id):
++    pg.x("create temp table if not exists subscribers (app_user_id text primary key, plan text, status text);")
++    pg.x(f"insert into subscribers (app_user_id, plan, status) values ('{app_user_id}', 'business', 'active') on conflict do nothing;")
++
++
+ def holders(pg, app_user_id):
+     return [r['install_id'] for r in pg.q(f"select install_id from installs where app_user_id = '{app_user_id}' and revoked_at is null order by install_id")]
+ 
+@@ -48,42 +71,83 @@ def own_bot(pg, install, pid):
+ 
+ with Case('R2 B1: a second install naming a billing id another install holds (with a live bot) gets NO billing identity + billingConflict') as c:
+     with PgSession(SETUP) as pg:
+-        a = boot(pg, 'inst-A', R)
++        a = join(pg, 'inst-A', R)
+         own_bot(pg, 'inst-A', 'wa-A')
+-        b = boot(pg, 'inst-B', R)
++        b = join(pg, 'inst-B', R)
+         c.check(a.get('app_user_id') == R, f'first install must hold it: {a}')
+         c.check(b.get('install_id') == 'inst-B' and b.get('app_user_id') is None and b.get('billing_conflict') is True, f'second install: {b}')
+         c.check(holders(pg, R) == ['inst-A'], f'holders {holders(pg, R)}')
+ 
+ with Case('R2 B2: a refresh naming another install\'s billing id does not move it (the caller keeps its own / nothing)') as c:
+     with PgSession(SETUP) as pg:
+-        boot(pg, 'inst-A', R); own_bot(pg, 'inst-A', 'wa-A')
+-        boot(pg, 'inst-C', R2)
++        join(pg, 'inst-A', R); own_bot(pg, 'inst-A', 'wa-A')
++        join(pg, 'inst-C', R2)
+         r = refresh(pg, 'inst-C', R)
+         c.check(r.get('app_user_id') == R2 and r.get('billing_conflict') is True and holders(pg, R) == ['inst-A'], f'{r} holders={holders(pg, R)}')
+ 
+ with Case('R2 B3: the holder\'s own repeated refresh is idempotent (no conflict)') as c:
+     with PgSession(SETUP) as pg:
+-        boot(pg, 'inst-A', R); own_bot(pg, 'inst-A', 'wa-A')
++        join(pg, 'inst-A', R); own_bot(pg, 'inst-A', 'wa-A')
+         r1, r2 = refresh(pg, 'inst-A', R), refresh(pg, 'inst-A', R)
+         c.check(r1.get('app_user_id') == R and r2.get('app_user_id') == R and not r2.get('billing_conflict'), f'{r1} / {r2}')
+ 
+ with Case('R2 B4: a REVOKED holder releases the id — the next install that names it takes it over') as c:
+     with PgSession(SETUP) as pg:
+-        boot(pg, 'inst-A', R); own_bot(pg, 'inst-A', 'wa-A')
+-        boot(pg, 'inst-B', R)
++        join(pg, 'inst-A', R); own_bot(pg, 'inst-A', 'wa-A')
++        join(pg, 'inst-B', R)
+         pg.x("update installs set revoked_at = now() where install_id = 'inst-A';")
+         r = refresh(pg, 'inst-B', R)
+         c.check(r.get('app_user_id') == R and not r.get('billing_conflict'), f'{r}')
+ 
+-with Case('R2 B5: a holder with NO live bot releases the id (recovery: claim the bots first, the billing id follows)') as c:
++with Case('V3 B5: a live holder WITHOUT a live bot (a paying owner before the first bot) keeps its id — another install naming it gets nothing, on bootstrap AND refresh, and cannot pass Get Usage') as c:
++    with PgSession(SETUP) as pg:
++        paid(pg, R)
++        v = join(pg, 'inst-V', R)                                   # the paying owner, no bot yet
++        x_boot = boot(pg, 'inst-X', R)
++        x_ref = refresh(pg, 'inst-X', R)
++        victim_row = pg.q("select app_user_id from installs where install_id = 'inst-V'")[0]['app_user_id']
++        v2 = refresh(pg, 'inst-V', R)
++        c.check(v.get('app_user_id') == R, f'the owner must hold its id: {v}')
++        c.check(x_boot.get('app_user_id') is None and x_ref.get('app_user_id') is None and x_ref.get('billing_conflict') is True,
++                f'the second install got the id: boot={x_boot} refresh={x_ref}')
++        c.check(victim_row == R and v2.get('app_user_id') == R and not v2.get('billing_conflict') and holders(pg, R) == ['inst-V'],
++                f'the owner lost it: row={victim_row} refresh={v2} holders={holders(pg, R)}')
++        c.check(usage_gate_for(x_ref) != 'ok', 'the second install passes Get Usage with the owner\'s id')
++        c.check(usage_gate_for(v2) == 'ok', 'the owner must pass its own Get Usage')
++
++with Case('V3 B8: the holder deleted its ONLY bot (deleted_at set, as Delete Bot Files does) — the id still does not move') as c:
++    with PgSession(SETUP) as pg:
++        join(pg, 'inst-V', R); own_bot(pg, 'inst-V', 'wa-V')
++        pg.x("update bot_profiles set deleted_at = now(), deleted_reason = 'app_delete' where profile_id = 'wa-V';")
++        x = join(pg, 'inst-X', R)
++        c.check(x.get('app_user_id') is None and x.get('billing_conflict') is True and holders(pg, R) == ['inst-V'], f'{x} holders={holders(pg, R)}')
++
++with Case('V3 B9: «Удалить все данные» keeps the install — all its profiles retired, the same install refreshes with the same id: same u, no conflict, nothing owned') as c:
+     with PgSession(SETUP) as pg:
+-        boot(pg, 'inst-OLD', R); own_bot(pg, 'inst-OLD', 'wa-1')
+-        n1 = boot(pg, 'inst-NEW', R)
+-        pg.x("update bot_profiles set owner_id = 'inst-NEW' where profile_id = 'wa-1';")      # claimed by code
+-        n2 = refresh(pg, 'inst-NEW', R)
+-        c.check(n1.get('app_user_id') is None and n2.get('app_user_id') == R and holders(pg, R) == ['inst-NEW'],
+-                f'before claim {n1} after claim {n2} holders={holders(pg, R)}')
++        join(pg, 'inst-V', R); own_bot(pg, 'inst-V', 'wa-V'); own_bot(pg, 'inst-V', 'tg-V')
++        pg.x("update bot_profiles set deleted_at = now(), deleted_reason = 'app_delete' where owner_id = 'inst-V';")
++        r = refresh(pg, 'inst-V', R)
++        c.check(r.get('app_user_id') == R and not r.get('billing_conflict') and r.get('p') == [], f'{r}')
++
++with Case('V3 B10: no ping-pong — after a conflict, repeated refreshes of the holder and of the other install never move the holder') as c:
++    with PgSession(SETUP) as pg:
++        join(pg, 'inst-V', R)
++        boot(pg, 'inst-X', R)                                       # the other install exists (bootstrap) and names the id
++        seen = []
++        for _ in range(3):
++            seen.append(refresh(pg, 'inst-X', R).get('app_user_id'))
++            seen.append(refresh(pg, 'inst-V', R).get('app_user_id'))
++        c.check(seen == [None, R] * 3 and holders(pg, R) == ['inst-V'], f'alternating refreshes: {seen} holders={holders(pg, R)}')
++
++with Case('V3 B11: the unauthenticated bootstrap binds NOTHING — an orphaned bootstrap (answer lost) never holds the id, the real install\'s refresh binds it') as c:
++    with PgSession(SETUP) as pg:
++        orphan = boot(pg, 'inst-ORPHAN', R)                         # the client never saw this answer
++        bound = pg.q(f"select count(*) as n from billing_bindings where app_user_id = '{R}'")[0]['n']
++        c.check(orphan.get('app_user_id') is None and not orphan.get('billing_conflict') and bound == 0,
++                f'a bootstrap bound the id: {orphan} bindings={bound}')
++        mine = join(pg, 'inst-MINE', R)
++        c.check(mine.get('app_user_id') == R and not mine.get('billing_conflict') and holders(pg, R) == ['inst-MINE'],
++                f'the real install must get its id on its first refresh: {mine} holders={holders(pg, R)}')
+ 
+ with Case('R2 B6: a device-id fallback is never bound (not a RevenueCat id) — no identity, no conflict; the RC id binds later') as c:
+     with PgSession(SETUP) as pg:
+@@ -93,7 +157,7 @@ with Case('R2 B6: a device-id fallback is never bound (not a RevenueCat id) —
+ 
+ with Case('R2 B7: exactly one live install ever holds a billing id') as c:
+     with PgSession(SETUP) as pg:
+-        boot(pg, 'inst-A', R); own_bot(pg, 'inst-A', 'wa-A')
++        join(pg, 'inst-A', R)                                       # V3: no live bot needed to keep it
+         for i in range(3):
+             boot(pg, f'inst-X{i}', R)
+             refresh(pg, f'inst-X{i}', R)
+@@ -184,4 +248,33 @@ with Case('R2 negative: verify-auth-gate.py rejects an Auth Session that adopts
+     finally:
+         shutil.rmtree(d, ignore_errors=True)
+ 
++with Case('V3 negative: verify-auth-gate.py rejects a bootstrap that binds, and a bind that moves the id from a holder without live bots') as c:
++    import json as _json
++    import shutil
++    import subprocess
++    import sys
++    import tempfile
++    gen = module('build-auth-workflows.py')
++    old_cond = "     or not exists (select 1 from bot_profiles bp where bp.owner_id = billing_bindings.install_id and bp.deleted_at is null)\n"
++    for label, field, make in (
++        ('bootstrap binds', 'Create Install', lambda q: q.replace("select $1, $2, null::text,", "select $1, $2, $3,")
++                                                       if "null::text" in q else q + "\n-- insert into billing_bindings"),
++        ('no-live-bot takeover', 'Verify Install', lambda q: q.replace("  returning app_user_id\n), strip", old_cond + "  returning app_user_id\n), strip", 1)),
++    ):
++        d = Path(tempfile.mkdtemp(prefix='v3-neg-'))
++        try:
++            for p in (N8N / 'workflows').glob('*.json'):
++                shutil.copy(p, d / p.name)
++            f = d / 'crAuthSession001-Auth_Session.json'
++            w = _json.loads(f.read_text(encoding='utf-8'))
++            n = next(x for x in w['nodes'] if x['name'] == field)
++            before = n['parameters']['query']
++            n['parameters']['query'] = make(before)
++            c.check(n['parameters']['query'] != before, f'{label}: the mutation did not apply')
++            f.write_text(_json.dumps(w, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
++            r = subprocess.run([sys.executable, str(N8N / 'verify-auth-gate.py'), '--dir', str(d)], capture_output=True, text=True)
++            c.check(r.returncode != 0 and 'V3' in r.stdout, f'{label}: verifier passed: {r.stdout[-300:]}')
++        finally:
++            shutil.rmtree(d, ignore_errors=True)
++
+ report()
+diff --git a/Tools/n8n/verify-auth-gate.py b/Tools/n8n/verify-auth-gate.py
+index 4a91e45c..94e178d6 100755
+--- a/Tools/n8n/verify-auth-gate.py
++++ b/Tools/n8n/verify-auth-gate.py
+@@ -127,8 +127,14 @@ def check_session():
+     assert "secret_hash = $2" in vi and "revoked_at is null" in vi, "refresh must compare the secret hash and honour revocation"
+     # R2: a named billing id becomes the token's u only through billing_bindings (one install per RevenueCat id)
+     for q, label in ((ci, "Create Install"), (vi, "Verify Install")):
+-        assert "insert into billing_bindings" in q and "billing_conflict" in q and "RCAnonymousID:" in q, f"R2: {label} must bind the billing id via billing_bindings"
++        assert "billing_conflict" in q, f"R2: {label} must report billing_conflict"
+         assert "coalesce(nullif($3, ''), app_user_id)" not in q and "nullif($3, '')," not in q.split("insert into installs")[-1][:120], f"R2: {label} must not adopt the named id directly"
++    assert "insert into billing_bindings" in vi and "RCAnonymousID:" in vi, "R2: Verify Install must bind the billing id via billing_bindings"
++    # V3 (2026-09-28): only a refresh (the secret proven) binds; the unauthenticated bootstrap binds nothing, and the id
++    # moves only from a REVOKED holder — never from one that merely owns no live bot.
++    assert "insert into billing_bindings" not in ci and "select $1, $2, null::text," in ci, "V3: bootstrap (Create Install) must bind no billing id"
++    assert "bot_profiles bp where bp.owner_id = billing_bindings.install_id" not in vi, "V3: a holder without live bots must keep its billing id"
++    assert "h.revoked_at is null" in vi, "V3: a revoked holder must release its billing id"
+     assert "array_agg" in vi and "bot_profiles" in vi, "refresh must load ownership in the same statement"
+     it = node(wf, "Issue Token")["parameters"]["jsCode"]
+     assert "billingConflict: !!row.billing_conflict" in it, "R2: the client must learn billingConflict"
+diff --git a/Tools/n8n/workflows/crAuthSession001-Auth_Session.json b/Tools/n8n/workflows/crAuthSession001-Auth_Session.json
+index b0760962..784b1da8 100644
+--- a/Tools/n8n/workflows/crAuthSession001-Auth_Session.json
++++ b/Tools/n8n/workflows/crAuthSession001-Auth_Session.json
+@@ -121,7 +121,7 @@
+     {
+       "parameters": {
+         "operation": "executeQuery",
+-        "query": "-- A1: mint an install (the client keeps installId + installSecret; only the hash is stored).\n-- Bootstrap is unauthenticated, so it is capped: at most 60 new installs per minute instance-wide.\n-- R2 (2026-09-27): the billing id (third parameter) is NOT trusted for being named — it is bound to this install only when\n-- billing_bindings grants it (see BILLING_BIND_CTES); otherwise app_user_id stays NULL and billing_conflict says why.\nwith ok as (\n  select 1 as go where (select count(*) from installs where created_at > now() - interval '1 minute') < 60\n), req as (\n  select (case when length(coalesce($3, '')) = 47 and left($3, 15) = chr(36) || 'RCAnonymousID:' and translate(substr($3, 16), '0123456789abcdef', '') = '' then $3 end) as id\n), bind as (\n  insert into billing_bindings (app_user_id, install_id)\n  select req.id, $1 from req, ok where req.id is not null\n  on conflict (app_user_id) do update set install_id = excluded.install_id,\n      bound_at = case when billing_bindings.install_id = excluded.install_id then billing_bindings.bound_at else now() end\n  where billing_bindings.install_id = excluded.install_id\n     or not exists (select 1 from installs h where h.install_id = billing_bindings.install_id and h.revoked_at is null)\n     or not exists (select 1 from bot_profiles bp where bp.owner_id = billing_bindings.install_id and bp.deleted_at is null)\n  returning app_user_id\n), strip as (\n  update installs set app_user_id = null where app_user_id = (select app_user_id from bind) and install_id <> $1\n  returning 1\n), ins as (\n  insert into installs (install_id, secret_hash, app_user_id, platform, app_version)\n  select $1, $2, (select app_user_id from bind), nullif($4, ''), nullif($5, '') from ok\n  returning install_id, app_user_id, token_version\n)\nselect ins.install_id, ins.app_user_id, ins.token_version, '{}'::text[] as p, '{}'::text[] as w, '{}'::text[] as c,\n  ((select id from req) is not null and ins.app_user_id is null) as billing_conflict\nfrom ins;",
++        "query": "-- A1: mint an install (the client keeps installId + installSecret; only the hash is stored).\n-- Bootstrap is unauthenticated, so it is capped: at most 60 new installs per minute instance-wide.\n-- V3 (2026-09-28): bootstrap binds NO billing id (the third parameter is deliberately unused) — it is bound only by a\n-- refresh, which proves the install secret (Verify Install). An orphaned bootstrap whose answer was lost therefore\n-- never holds anyone's id; the client refreshes right after a bootstrap in the same session op.\nwith ok as (\n  select 1 as go where (select count(*) from installs where created_at > now() - interval '1 minute') < 60\n), ins as (\n  insert into installs (install_id, secret_hash, app_user_id, platform, app_version)\n  select $1, $2, null::text, nullif($4, ''), nullif($5, '') from ok\n  returning install_id, app_user_id, token_version\n)\nselect ins.install_id, ins.app_user_id, ins.token_version, '{}'::text[] as p, '{}'::text[] as w, '{}'::text[] as c,\n  false as billing_conflict\nfrom ins;",
+         "options": {
+           "queryReplacement": "={{ [ $json.installId, $json.secretHash, $json.appUserId, $json.platform, $json.appVersion ] }}"
+         }
+@@ -146,7 +146,7 @@
+     {
+       "parameters": {
+         "operation": "executeQuery",
+-        "query": "-- A1: refresh = prove the install secret (hash compare), touch last_seen, adopt the client's current\n-- billing id, and load everything this install owns in ONE round trip (each Postgres node costs\n-- ~1.9 s on prod). ALWAYS exactly one row carrying verdict = 'checked' (R11, 2026-09-27): install_id is\n-- NULL when the secret is wrong or the install is unknown/revoked -> 401 install_revoked. A row WITHOUT\n-- the verdict (node error, input passed through, nothing) is a fault -> 503, never a reason to wipe.\n-- R2: the billing id is adopted only when billing_bindings grants it; a refused one keeps the install's own\n-- still-bound id (or none) and reports billing_conflict.\nwith me as (\n  select install_id from installs where install_id = $1 and secret_hash = $2 and revoked_at is null\n), req as (\n  select (case when length(coalesce($3, '')) = 47 and left($3, 15) = chr(36) || 'RCAnonymousID:' and translate(substr($3, 16), '0123456789abcdef', '') = '' then $3 end) as id\n), bind as (\n  insert into billing_bindings (app_user_id, install_id)\n  select req.id, me.install_id from req, me where req.id is not null\n  on conflict (app_user_id) do update set install_id = excluded.install_id,\n      bound_at = case when billing_bindings.install_id = excluded.install_id then billing_bindings.bound_at else now() end\n  where billing_bindings.install_id = excluded.install_id\n     or not exists (select 1 from installs h where h.install_id = billing_bindings.install_id and h.revoked_at is null)\n     or not exists (select 1 from bot_profiles bp where bp.owner_id = billing_bindings.install_id and bp.deleted_at is null)\n  returning app_user_id\n), strip as (\n  update installs set app_user_id = null where app_user_id = (select app_user_id from bind) and install_id <> $1\n  returning 1\n), v as (\n  update installs i set last_seen_at = now(),\n    app_user_id = coalesce((select app_user_id from bind),\n                           (select b.app_user_id from billing_bindings b where b.app_user_id = i.app_user_id and b.install_id = i.install_id))\n  where i.install_id = $1 and i.secret_hash = $2 and i.revoked_at is null\n  returning i.install_id, i.app_user_id, i.token_version\n)\nselect 'checked'::text as verdict, v.install_id, v.app_user_id, v.token_version,\n  coalesce((select array_agg(bp.profile_id) from bot_profiles bp where bp.owner_id = v.install_id and bp.deleted_at is null), '{}'::text[]) as p,\n  coalesce((select array_agg(distinct bp.workflow_id) from bot_profiles bp where bp.owner_id = v.install_id and bp.deleted_at is null and bp.workflow_id is not null), '{}'::text[]) as w,\n  coalesce((select array_agg(bp.profile_id) from bot_profiles bp where bp.claim_pending_by = v.install_id and bp.owner_id is null and bp.claim_pending_at > now() - interval '1 day'), '{}'::text[]) as c,\n  ((select id from req) is not null and v.install_id is not null and v.app_user_id is distinct from (select id from req)) as billing_conflict\nfrom (select 1) as one left join v on true;",
++        "query": "-- A1: refresh = prove the install secret (hash compare), touch last_seen, adopt the client's current\n-- billing id, and load everything this install owns in ONE round trip (each Postgres node costs\n-- ~1.9 s on prod). ALWAYS exactly one row carrying verdict = 'checked' (R11, 2026-09-27): install_id is\n-- NULL when the secret is wrong or the install is unknown/revoked -> 401 install_revoked. A row WITHOUT\n-- the verdict (node error, input passed through, nothing) is a fault -> 503, never a reason to wipe.\n-- R2/V3: the billing id is adopted only when billing_bindings grants it (free, already ours, or its holder revoked);\n-- a refused one keeps the install's own still-bound id (or none) and reports billing_conflict.\nwith me as (\n  select install_id from installs where install_id = $1 and secret_hash = $2 and revoked_at is null\n), req as (\n  select (case when length(coalesce($3, '')) = 47 and left($3, 15) = chr(36) || 'RCAnonymousID:' and translate(substr($3, 16), '0123456789abcdef', '') = '' then $3 end) as id\n), bind as (\n  insert into billing_bindings (app_user_id, install_id)\n  select req.id, me.install_id from req, me where req.id is not null\n  on conflict (app_user_id) do update set install_id = excluded.install_id,\n      bound_at = case when billing_bindings.install_id = excluded.install_id then billing_bindings.bound_at else now() end\n  where billing_bindings.install_id = excluded.install_id\n     or not exists (select 1 from installs h where h.install_id = billing_bindings.install_id and h.revoked_at is null)\n  returning app_user_id\n), strip as (\n  update installs set app_user_id = null where app_user_id = (select app_user_id from bind) and install_id <> $1\n  returning 1\n), v as (\n  update installs i set last_seen_at = now(),\n    app_user_id = coalesce((select app_user_id from bind),\n                           (select b.app_user_id from billing_bindings b where b.app_user_id = i.app_user_id and b.install_id = i.install_id))\n  where i.install_id = $1 and i.secret_hash = $2 and i.revoked_at is null\n  returning i.install_id, i.app_user_id, i.token_version\n)\nselect 'checked'::text as verdict, v.install_id, v.app_user_id, v.token_version,\n  coalesce((select array_agg(bp.profile_id) from bot_profiles bp where bp.owner_id = v.install_id and bp.deleted_at is null), '{}'::text[]) as p,\n  coalesce((select array_agg(distinct bp.workflow_id) from bot_profiles bp where bp.owner_id = v.install_id and bp.deleted_at is null and bp.workflow_id is not null), '{}'::text[]) as w,\n  coalesce((select array_agg(bp.profile_id) from bot_profiles bp where bp.claim_pending_by = v.install_id and bp.owner_id is null and bp.claim_pending_at > now() - interval '1 day'), '{}'::text[]) as c,\n  ((select id from req) is not null and v.install_id is not null and v.app_user_id is distinct from (select id from req)) as billing_conflict\nfrom (select 1) as one left join v on true;",
+         "options": {
+           "queryReplacement": "={{ [ $json.installId, $json.secretHash, $json.appUserId ] }}"
+         }
+diff --git a/docs/audits/a1-deploy-runbook.md b/docs/audits/a1-deploy-runbook.md
+index 586f4147..39ce582f 100644
+--- a/docs/audits/a1-deploy-runbook.md
++++ b/docs/audits/a1-deploy-runbook.md
+@@ -76,9 +76,18 @@ docker compose up -d n8n && docker compose logs --tail 20 n8n
+ - Этап 3: откат шаблонов = предыдущая версия workflow; строки `reply_events`/`chat_reply_state` остаются (аддитивно, ничего не читает их кроме новых узлов). Просроченный lease (90 с) не блокирует после отката, потому что старый шаблон его не читает.
+ 
+ ## 5. Остаточные риски / owner-действия
+-- **Самосообщение** (`message/send` на собственный номер) для claim-кода — не подтверждено документацией Wappi; при
+-  неудаче на устройстве владелец использует путь re-auth (подключить канал заново) — реализован.
++- **Самосообщение** (`message/send` на собственный номер) для claim-кода — не подтверждено документацией Wappi. С V2
++  (итерация 2026-09-28) это ЕДИНСТВЕННЫЙ путь привязки наследуемого профиля: переподключение канала больше не привязывает
++  (Wappi не сообщает, чья link-сессия завершила спаривание). Неотправленный код сервер честно отвечает `502 code_send_failed`;
++  если на канале self-message не доходит (Telegram — на `account.phone`), восстановление legacy-профиля этого канала =
++  пересоздать бота. Device-проверка доставки кода (WA «Сообщения себе», TG «Избранное») — до релиза клиента.
+ - **Rate-limit** на вебхуках: Caddy без плагина; DB-счётчик стоит ~1,9 с — отложено; bootstrap ограничен 60/мин.
+ - **PlayerPrefs** как хранилище install-секрета: per-install, отзываемо; при рутованном устройстве утекает только
+   свой install (не общий токен, как раньше).
+-- **RevenueCat app_user_id** остаётся биллинговым ключом, привязка к install — по заявлению клиента (как и до A1).
++- **RevenueCat app_user_id** остаётся биллинговым ключом. Привязка к install (V3, итерация 2026-09-28): только refresh
++  (секрет доказан; bootstrap ничего не привязывает), один install на id, переход — ТОЛЬКО от отозванного держателя.
++- **Потеря секрета установки без «Удалить все данные»** (порча PlayerPrefs, ручная очистка; «Удалить все данные» установку
++  сохраняет): новая установка получает `billingConflict` (без плана/квоты/слотов), пока поддержка не отзовёт мёртвую:
++  убедиться по `bot_profiles`/`installs.last_seen_at`, что держатель действительно мёртв, затем через `sql-oneoff.py`
++  `update installs set revoked_at = now() where install_id = '<мёртвая установка>';` — id перейдёт на следующем refresh новой
++  (клиент повторяет его при возврате в приложение). Ботов новая установка забирает кодом из чата бота (claim).

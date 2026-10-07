@@ -1,0 +1,35 @@
+V3 — поведенческий тест ДО исправления (HEAD 0fced8b4, Tools/n8n/tests/test_billing_identity.py: настоящие SQL Create/Verify Install, Issue Token и Auth Gate Get Usage из канона, temp-таблицы стенда, compat закрыт)
+Ожидаемо падают: B5 (платящий без бота теряет id — второй install проходит Get Usage), B8 (окно после удаления единственного бота), B10 (пинг-понг), B11 (неаутентифицированный bootstrap привязывает id), B7, негатив верификатора.
+
+PASS R2 B1: a second install naming a billing id another install holds (with a live bot) gets NO billing identity + billingConflict
+PASS R2 B2: a refresh naming another install's billing id does not move it (the caller keeps its own / nothing)
+PASS R2 B3: the holder's own repeated refresh is idempotent (no conflict)
+PASS R2 B4: a REVOKED holder releases the id — the next install that names it takes it over
+FAIL V3 B5: a live holder WITHOUT a live bot (a paying owner before the first bot) keeps its id — another install naming it gets nothing, on bootstrap AND refresh, and cannot pass Get Usage
+      - the second install got the id: boot={'install_id': 'inst-X', 'app_user_id': '$RCAnonymousID:0123456789abcdef0123456789abcdef', 'token_version': 1, 'p': [], 'w': [], 'c': [], 'billing_conflict': False} refresh={'verdict': 'checked', 'install_id': 'inst-X', 'app_user_id': '$RCAnonymousID:0123456789abcdef0123456789abcdef', 'token_version': 1, 'p': [], 'w': [], 'c': [], 'billing_conflict': False}
+      - the owner lost it: row=None refresh={'verdict': 'checked', 'install_id': 'inst-V', 'app_user_id': '$RCAnonymousID:0123456789abcdef0123456789abcdef', 'token_version': 1, 'p': [], 'w': [], 'c': [], 'billing_conflict': False} holders=['inst-V']
+      - the second install passes Get Usage with the owner's id
+FAIL V3 B8: the holder deleted its ONLY bot (deleted_at set, as Delete Bot Files does) — the id still does not move
+      - {'verdict': 'checked', 'install_id': 'inst-X', 'app_user_id': '$RCAnonymousID:0123456789abcdef0123456789abcdef', 'token_version': 1, 'p': [], 'w': [], 'c': [], 'billing_conflict': False} holders=['inst-X']
+PASS V3 B9: «Удалить все данные» keeps the install — all its profiles retired, the same install refreshes with the same id: same u, no conflict, nothing owned
+FAIL V3 B10: no ping-pong — after a conflict, repeated refreshes of the holder and of the other install never move the holder
+      - alternating refreshes: ['$RCAnonymousID:0123456789abcdef0123456789abcdef', '$RCAnonymousID:0123456789abcdef0123456789abcdef', '$RCAnonymousID:0123456789abcdef0123456789abcdef', '$RCAnonymousID:0123456789abcdef0123456789abcdef', '$RCAnonymousID:0123456789abcdef0123456789abcdef', '$RCAnonymousID:0123456789abcdef0123456789abcdef'] holders=['inst-V']
+FAIL V3 B11: the unauthenticated bootstrap binds NOTHING — an orphaned bootstrap (answer lost) never holds the id, the real install's refresh binds it
+      - a bootstrap bound the id: {'install_id': 'inst-ORPHAN', 'app_user_id': '$RCAnonymousID:0123456789abcdef0123456789abcdef', 'token_version': 1, 'p': [], 'w': [], 'c': [], 'billing_conflict': False} bindings=1
+PASS R2 B6: a device-id fallback is never bound (not a RevenueCat id) — no identity, no conflict; the RC id binds later
+FAIL R2 B7: exactly one live install ever holds a billing id
+      - holders ['inst-X2']
+PASS R2 M1: the migration seed keeps ONE live holder per id (the most recently seen) and clears the others
+PASS R2 T1: Issue Token signs u = null and tells the client billingConflict
+PASS R2 G1/G2: a token WITHOUT a billing identity cannot name any billing id (GetUsage, SuggestReplies)
+PASS R2 G3/G4: a token with u = R passes its own id and refuses another
+PASS R2 G5: Create WA/TG refuse an EMPTY AppUserID in session mode (it skipped the channel count and the quota)
+PASS R2 G7: Delete Bot Files is not blocked by its audit-only appUserId (a conflicted install can still delete its bot)
+PASS R2 negative: verify-auth-gate.py rejects an Auth Session that adopts the named billing id directly
+FAIL V3 negative: verify-auth-gate.py rejects a bootstrap that binds, and a bind that moves the id from a holder without live bots
+      - bootstrap binds: verifier passed: ped delete)
+
+      - no-live-bot takeover: verifier passed: ped delete)
+
+
+13 pass, 6 fail
