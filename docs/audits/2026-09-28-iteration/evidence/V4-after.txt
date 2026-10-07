@@ -1,0 +1,128 @@
+V4 — AFTER the fix (base HEAD cf7456a6 + V4 working tree), 2026-10-07T18:08Z
+
+== python3 Tools/n8n/tests/test_upload.py
+PASS R3 legacy_own: the file survives the gate and reaches extraction + the vector-store insert
+PASS R3 legacy_own: Register Upload receives the decoded values and the real SQL stores the row
+PASS R3 session_own_wa: the file survives the gate and reaches extraction + the vector-store insert
+PASS R3 session_own_wa: Register Upload receives the decoded values and the real SQL stores the row
+PASS R3 session_own_both: the file survives the gate and reaches extraction + the vector-store insert
+PASS R3 session_own_both: Register Upload receives the decoded values and the real SQL stores the row
+PASS R3 session_foreign_wa: a WhatsApp workflow id the token does not own is refused with 403 before ANY write
+PASS R3 session_foreign_tg: a Telegram workflow id the token does not own is refused with 403 before ANY write
+PASS R3 session_pathlike_fileid: a fileId that is not a GUID (it is spliced into the service-role storage URL) is refused with 403 before ANY write
+PASS R3 legacy_pathlike_fileid: a non-GUID fileId in legacy mode too is refused with 403 before ANY write
+PASS R3 session_foreign_fileid: a fileId the registry says belongs to another install -> 403, nothing but the registry check ran
+PASS R3 session_registry_fault: a registry DB fault -> 503 db_unavailable, no ingest
+PASS R3 session_valid_pdf: a real PDF is extracted and reaches the vector-store insert
+PASS R3 session_corrupt_pdf: an unreadable PDF answers 422 unreadable_file — never a 200 the app records as uploaded
+PASS R3 Register Upload SQL: a new fileId is registered to the caller (session) / to nobody (legacy) and allowed
+PASS R3 Register Upload SQL: another install's fileId is refused and its row is not changed
+PASS R3 Register Upload SQL: a repeat of the caller's own fileId is allowed and keeps one row
+PASS V4 Register Upload SQL: an owner-less legacy row of a workflow the caller does not own is NOT adopted; a legacy call still re-uses it
+PASS V4 [wa] an owner-less row of ANOTHER bot's file: session Register refuses (owner stays NULL), session Delete refuses, the chunk survives
+PASS V4 [wa] a fileId with NO registry row but another bot's chunks: Register refuses and creates no row, Delete refuses
+PASS V4 [wa] the caller's OWN compat-window file (owner-less row, own workflow) is deletable from the session client
+PASS V4 [wa] an owner-less row whose every known id is the caller's is adopted (proof) and stays the caller's
+PASS V4 [wa] ALL, not SOME: one foreign id among the caller's (a token-less call wrote a chunk) blocks adoption AND delete
+PASS V4 [wa] an unregistered file whose chunks are all the caller's (pre-A1 own file) is deletable, never re-registered
+PASS V4 [wa] the caller's own row is decided by the registry FIRST: a stale id (channel re-created after the upload) changes nothing
+PASS V4 [wa] a bot-less install (empty token workflows, sentinel fields) gets nothing from another bot's owner-less file
+PASS V4 [wa] a file registered to ANOTHER install is never the caller's, even when its chunks carry the caller's ids
+PASS V4 [tg] an owner-less row of ANOTHER bot's file: session Register refuses (owner stays NULL), session Delete refuses, the chunk survives
+PASS V4 [tg] a fileId with NO registry row but another bot's chunks: Register refuses and creates no row, Delete refuses
+PASS V4 [tg] the caller's OWN compat-window file (owner-less row, own workflow) is deletable from the session client
+PASS V4 [tg] an owner-less row whose every known id is the caller's is adopted (proof) and stays the caller's
+PASS V4 [tg] ALL, not SOME: one foreign id among the caller's (a token-less call wrote a chunk) blocks adoption AND delete
+PASS V4 [tg] an unregistered file whose chunks are all the caller's (pre-A1 own file) is deletable, never re-registered
+PASS V4 [tg] the caller's own row is decided by the registry FIRST: a stale id (channel re-created after the upload) changes nothing
+PASS V4 [tg] a bot-less install (empty token workflows, sentinel fields) gets nothing from another bot's owner-less file
+PASS V4 [tg] a file registered to ANOTHER install is never the caller's, even when its chunks carry the caller's ids
+PASS V4 no evidence at all is no proof: an owner-less row without ids and sentinel-only chunks are neither adopted nor deleted by a session
+PASS V4 a brand-new fileId (no row, no chunk) is still registered to the caller, and the caller may delete it
+PASS V4 legacy (token-less, compat window) is unchanged: re-uses an owner-less foreign row without an owner, deletes any fileId
+PASS R3 compat window closed: a token-less upload is 401 and nothing runs
+PASS R3 negative: verify-auth-gate.py rejects the pre-R3 wiring (no field check) and the binary-dropping gate
+PASS V4 negative: verify-auth-gate.py rejects the pre-V4 Delete File query and a Register Upload that reads the token workflows from $json
+PASS R3 negative: verify_rag.py rejects an ingest edge that bypasses Upload Fields Valid?
+PASS R3 staging isolation: the derived staging copies can no longer write to the real Supabase project
+PASS R3 gate contract: every generated Auth Gate re-emits the input binary (no webhook can lose a file)
+
+45 pass, 0 fail
+exit 0
+
+== python3 Tools/n8n/apply-auth-gate.py (second run) / --check
+up to date  KoTuIlk4LMrlvnWI-Upload_File.json
+up to date  ZTqpumOpL1rNDOp6-Delete_File.json
+auth gate: OK
+
+== python3 Tools/n8n/verify-auth-gate.py
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (workflow id + owner bound to the profile)
+OK  Set Workflow State (protected list carries Auth Session + Wappi Proxy)
+ALL AUTH GATE ASSERTS PASSED
+
+== python3 Tools/n8n/verify-sql-comments.py
+OK  76 Postgres node(s) in 28 workflow file(s): no placeholder outside code, no {{ }}, no modifier, no leading =
+== python3 Tools/n8n/verify_rag.py
+VERIFY OK: all
+
+== python3 Tools/n8n/tests/run_all.py (exit 0, 22 min)
+OK   test_auth_refresh.py: 12 pass, 0 fail
+OK   test_billing_identity.py: 14 pass, 0 fail
+OK   test_claim.py: 16 pass, 0 fail
+OK   test_create_seed.py: 52 pass, 0 fail
+OK   test_harness_selfcheck.py: 2 pass, 0 fail
+OK   test_legacy_generators.py: 5 pass, 0 fail
+OK   test_price_search.py: 24 pass, 0 fail
+OK   test_reply_lost_send.py: 5 pass, 0 fail
+OK   test_reply_memory.py: 44 pass, 0 fail
+OK   test_reply_mode.py: 43 pass, 0 fail
+OK   test_reply_order.py: 44 pass, 0 fail
+OK   test_reply_reconcile.py: 66 pass, 0 fail
+OK   test_sql_comment_injection.py: 36 pass, 0 fail
+OK   test_suggest_catalog.py: 24 pass, 0 fail
+OK   test_suggest_lang.py: 11 pass, 0 fail
+OK   test_suggest_query.py: 37 pass, 0 fail
+OK   test_test_dialog.py: 17 pass, 0 fail
+OK   test_upload.py: 45 pass, 0 fail
+OK   test_verify_deployed.py: 48 pass, 0 fail
+OK   test_verify_parity.py: 38 pass, 0 fail
+OK   test_verify_sql_comments.py: 53 pass, 0 fail
+
+== staging re-import (bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001) + verify-deployed.py --base http://localhost:5678
+base http://localhost:5678: canonical 27 (diff 0), clones 2 (behind template 0, of them prompt head behind 0; custom prompts 2, not counted), archived clones 0 (not counted), other 2
+
+== staging e2e-auth.py (full, compat window open)
+PASS  session_bootstrap_and_refresh (0.2s) — bootstrap mints an install; refresh with the secret returns a t
+PASS  session_bad_request_is_400 (0.1s) — a malformed AuthSession body answers 400, never a token
+PASS  proxy_requires_token (0.2s) — WappiProxy without / with a forged / with an expired token → 401 and N
+PASS  proxy_profile_add_binds_owner (0.7s) — profile.add creates the Wappi profile, binds it to the install 
+PASS  proxy_owner_isolation (0.8s) — owner B cannot read/act on owner A's profile through ANY proxy op (403,
+PASS  proxy_legit_ops_pass_through (0.4s) — the owner's own ops reach the transport with the server credenti
+PASS  proxy_unknown_op_rejected (0.2s) — an op outside the allow-list is refused without a transport call
+PASS  hooks_reject_foreign_ids (0.7s) — gated webhooks refuse owner B's ids on owner A's token (and refuse n
+PASS  claim_by_code_transfers_ownership (0.6s) — a legacy/other-install profile: claim.start sends a code to
+PASS  claim_reauth_then_code_binds (1.8s) — V2: an UNAUTHORISED legacy profile: claim.start → reauth; a pa
+PASS  claim_reauth_independent_reconnect_not_transferred (4.4s) — V2: the claimant requests a QR, the OWNER 
+PASS  claim_code_send_failure_is_reported (1.4s) — V2: a code the transport refuses is reported (502 code_se
+PASS  claim_reauth_owned_profile_not_transferred (2.3s) — R1: a stranger's pending claim on an OWNED profile
+PASS  claim_stale_capability_cannot_pair (1.0s) — R1: once another install takes over a pending claim, the f
+PASS  claim_unauthenticated_writes_nothing (1.0s) — R1: a claim.* call with a wrong secret is refused (401) 
+PASS  replymode_reordered_versions_keep_newest (0.7s) — SetReplyMode v2: a later request with an OLDER versi
+PASS  replymode_bot_default_covers_both_channels_atomically (0.7s) — SetReplyMode v2: a bot-default write fo
+PASS  replymode_legacy_body_still_writes (0.2s) — SetReplyMode v2: a legacy body (no version) is applied wit
+PASS  replymode_invalid_is_400 (0.0s) — SetReplyMode v2: a malformed body answers 400 (was 200 + success:fal
+PASS  create_seeds_reply_mode_before_activation (3.2s) — CreateWhatsappWorkflow with ReplyMode=semi: the '*'
+PASS  create_slot_count_excludes_own_profile_and_retires_refused (1.6s) — 2026-09-24 hotfix: on a 1-channel 
+PASS  refresh_db_outage_keeps_install (0.4s) — R11: a refresh while the database fails answers 503 db_unavai
+PASS  billing_id_first_bind (1.2s) — R2: a second install naming a billing id another install holds (with a 
+PASS  create_rejects_empty_appuserid_in_session (0.8s) — R2: CreateWhatsappWorkflow/CreateTelegramWorkflow w
+PASS  create_seed_failure_keeps_clone_inactive (8.4s) — R8 + R8-deletefail: a «Вместе» create whose 
+PASS  sql_comment_values_run_nothing (4.2s) — V1: a value whose newline would end an SQL comment stays a lit
+PASS  upload_price_list_multipart (3.4s) — R3: a real .txt price list sent the way WWWForm sends it passes t
+27 pass, 0 fail
+
+upload_price_list_multipart detail:
+      own=200 {'success': True, 'fileId': 'e8c42c24-6bee-4918-98df-bf7b61e0d185'} registry='68c277dc-e6a8-4380-a1e7-9a38eda104ca|wfupf9ad0a1b37|-|products|price.txt|1' extracted_doc='true|wfupf9ad0a1b37|-1|e8c42c24-6bee-4918-98df-bf7b61e0d185' foreign_wf=403 pathlike_fileid=403 foreign_fileid=403 refused_rows=0 foreign_row_kept=True corrupt_pdf=422 {'success': False, 'error': 'unreadable_file'} empty_file=500 own_repeat=200 legacy=200 legacy_registry='-' | V4 owner-less foreign: upload=403 delete=403 {'success': False, 'error': 'forbidden', 'fileId': '3babbe2e-89b2-41f3-b131-c00be931a101'} owner|chunks|live='-|1|true'; unregistered foreign tg: upload=403 delete=403 rows|chunks='0|1'; own compat delete=200 {'success': True, 'fileId': 'c13e94ca-cd67-4497-96f9-efd986f4be2f', 'deletedChunks': 1}; own upload delete=200 {'success': True, 'fileId': 'e8c42c24-6bee-4918-98df-bf7b61e0d185', 'deletedChunks': 2}; own chunks left|rows marked='0|2'
+
+== staging e2e-auth.py --compat-closed --only upload_price_list_multipart (server restarted with CR_AUTH_COMPAT_UNTIL=2000-01-01): PASS 1/1 (legacy=401, V4 steps identical: upload=403 delete=403 owner|chunks|live='-|1|true'; tg upload=403 delete=403 '0|1'; own compat delete=200 deletedChunks=1; own upload delete=200)
+   (same run: sql_comment_values_run_nothing --compat-closed FAILS on Create WA/TG token-less = HTTP 200 + unauthorized body, lastNode workflow; Delete File parts pass — pre-existing, outside V4)

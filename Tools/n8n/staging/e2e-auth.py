@@ -794,7 +794,7 @@ def sweep_stale_mock_profiles():
     print("   pre-run:", fixture("sweep-mock-profiles", *[x for p in live for x in ("--live", p)]))
 
 
-@scenario("upload_price_list_multipart", "R3: a real .txt price list sent the way WWWForm sends it passes the gate with its file, is registered FIRST, reaches extraction (a staging `documents` row with the text + the bot's ids); a foreign workflow id, a non-GUID fileId or another install's fileId is 403 before any write; an unreadable PDF is 422, an empty file writes nothing, an own repeat keeps one registry row")
+@scenario("upload_price_list_multipart", "R3: a real .txt price list sent the way WWWForm sends it passes the gate with its file, is registered FIRST, reaches extraction (a staging `documents` row with the text + the bot's ids); a foreign workflow id, a non-GUID fileId or another install's fileId is 403 before any write; an unreadable PDF is 422, an empty file writes nothing, an own repeat keeps one registry row. V4: another bot's owner-less file (WhatsApp) and another bot's unregistered chunks (Telegram) are neither taken nor deleted by a session (403, row and chunk untouched); the caller's own compat-window file and its own upload are deleted (200)")
 def s_upload(ctx):
     u = fresh_owner(ctx, "up")
     v = fresh_owner(ctx, "upv")                                              # another install
@@ -804,8 +804,15 @@ def s_upload(ctx):
     d0 = u.refresh()
     if wf_own not in d0.get("workflows", []):
         return False, f"fixture: token lacks the bot's workflow id: {d0.get('workflows')}"
-    ids = [str(uuid.uuid4()) for _ in range(7)]
+    ids = [str(uuid.uuid4()) for _ in range(10)]
     pg(f"insert into uploaded_files (file_id, owner_id, bot_wa_id) values ('{ids[4]}', '{v.install_id}', 'wfOtherOwner001');")
+    # V4 fixtures: [7] another bot's owner-less (compat-window) WhatsApp file; [8] the caller's OWN compat-window file on
+    # its Telegram column; [9] another bot's pre-A1 Telegram chunks with no registry row at all
+    pg(f"insert into uploaded_files (file_id, owner_id, bot_wa_id) values ('{ids[7]}', null, 'wfVictimWA00001'); "
+       f"insert into documents (content, metadata) values ('victim', jsonb_build_object('fileId', '{ids[7]}', 'botWaId', 'wfVictimWA00001', 'botTgId', '-1')); "
+       f"insert into uploaded_files (file_id, owner_id, bot_tg_id) values ('{ids[8]}', null, '{wf_own}'); "
+       f"insert into documents (content, metadata) values ('own compat', jsonb_build_object('fileId', '{ids[8]}', 'botWaId', '-1', 'botTgId', '{wf_own}')); "
+       f"insert into documents (content, metadata) values ('victim tg', jsonb_build_object('fileId', '{ids[9]}', 'botWaId', '-1', 'botTgId', 'wfVictimTG00001'));")
     text = f"Прайс e2e {ctx['run_id']}\nТовар А — 1000 ₸\nТовар Б — 2500 ₸\n"
     base = {"telegramWorkflowId": "-1", "contentType": "products"}
     own = {**base, "whatsappWorkflowId": wf_own}
@@ -824,16 +831,38 @@ def s_upload(ctx):
         refused = pg(f"select (select count(*) from uploaded_files where file_id in ('{ids[1]}', '{ids[2]}')) + (select count(*) from documents where metadata->>'fileId' in ('{ids[1]}', '{ids[2]}', '{ids[4]}', '{ids[5]}', '{ids[6]}'));")
         foreign_row = pg(f"select owner_id || '|' || bot_wa_id from uploaded_files where file_id = '{ids[4]}';")
         legacy_reg = pg(f"select coalesce(owner_id, '-') from uploaded_files where file_id = '{ids[3]}';")
+        # V4: knowing a fileId gives nothing — another bot's owner-less file is not adopted and not deletable, an
+        # unregistered fileId with another bot's chunks is not registered; the caller's own compat file and its own
+        # upload are deletable (Delete File through the real gate + Postgres node for the first time in e2e)
+        st9, _ = upload(u.token, {**own, "fileId": ids[7]}, text)
+        st10, d10 = hook("DeleteFile", u.token, {"fileId": ids[7]})
+        victim = pg(f"select coalesce((select owner_id from uploaded_files where file_id = '{ids[7]}'), '-') || '|' || "
+                    f"(select count(*) from documents where metadata->>'fileId' = '{ids[7]}') || '|' || "
+                    f"(select (deleted_at is null)::text from uploaded_files where file_id = '{ids[7]}');")
+        st11, _ = upload(u.token, {**base, "whatsappWorkflowId": "-1", "telegramWorkflowId": wf_own, "fileId": ids[9]}, text)
+        st12, d12 = hook("DeleteFile", u.token, {"fileId": ids[9]})
+        victim_tg = pg(f"select (select count(*) from uploaded_files where file_id = '{ids[9]}') || '|' || "
+                       f"(select count(*) from documents where metadata->>'fileId' = '{ids[9]}');")
+        st13, d13 = hook("DeleteFile", u.token, {"fileId": ids[8]})
+        st14, d14 = hook("DeleteFile", u.token, {"fileId": ids[0]})
+        own_left = pg(f"select (select count(*) from documents where metadata->>'fileId' in ('{ids[0]}', '{ids[8]}')) || '|' || "
+                      f"(select count(*) from uploaded_files where file_id in ('{ids[0]}', '{ids[8]}') and deleted_at is not null);")
     finally:
         pg(f"delete from documents where metadata->>'fileId' in ({', '.join(repr(i) for i in ids)}); delete from uploaded_files where file_id in ({', '.join(repr(i) for i in ids)});")
     legacy_ok = (st4 == 401 and legacy_reg == "") if COMPAT_CLOSED else (st4 == 200 and legacy_reg == "-")
     ok = (st1 == 200 and (d1 or {}).get("success") is True and (d1 or {}).get("fileId") == ids[0]
           and reg == f"{u.install_id}|{wf_own}|-|products|price.txt|1" and doc.startswith(f"true|{wf_own}|-1|{ids[0]}")
           and st2 == 403 and st3 == 403 and st5 == 403 and refused == "0" and foreign_row == f"{v.install_id}|wfOtherOwner001"
-          and st6 == 422 and (d6 or {}).get("error") == "unreadable_file" and st7 != 200 and st8 == 200 and legacy_ok)
+          and st6 == 422 and (d6 or {}).get("error") == "unreadable_file" and st7 != 200 and st8 == 200 and legacy_ok
+          and st9 == 403 and st10 == 403 and (d10 or {}).get("error") == "forbidden" and victim == "-|1|true"
+          and st11 == 403 and st12 == 403 and victim_tg == "0|1"
+          and st13 == 200 and (d13 or {}).get("deletedChunks") == 1
+          and st14 == 200 and ((d14 or {}).get("deletedChunks") or 0) >= 1 and own_left == "0|2")
     return ok, (f"own={st1} {d1} registry={reg!r} extracted_doc={doc!r} foreign_wf={st2} pathlike_fileid={st3} foreign_fileid={st5} "
                 f"refused_rows={refused} foreign_row_kept={foreign_row == f'{v.install_id}|wfOtherOwner001'} corrupt_pdf={st6} {d6} "
-                f"empty_file={st7} own_repeat={st8} legacy={st4} legacy_registry={legacy_reg!r}")
+                f"empty_file={st7} own_repeat={st8} legacy={st4} legacy_registry={legacy_reg!r} | V4 owner-less foreign: upload={st9} "
+                f"delete={st10} {d10} owner|chunks|live={victim!r}; unregistered foreign tg: upload={st11} delete={st12} rows|chunks={victim_tg!r}; "
+                f"own compat delete={st13} {d13}; own upload delete={st14} {d14}; own chunks left|rows marked={own_left!r}")
 
 
 def main():

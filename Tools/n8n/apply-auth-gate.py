@@ -48,28 +48,61 @@ GATED = {
 }
 BOTS = ["4wYitz5ek30SVNlT-WhatsApp_Bot.json", "4VN3gsFaC2HUYmcc-Telegram_Bot.json"]
 
+# V4 (iteration 2026-09-28): ONE predicate of PROVEN ownership for a file that is NOT registered to the caller,
+# generated into BOTH Register Upload and Delete File Chunks so the two can never drift (verify-auth-gate.py pins the
+# fragment in both). The evidence is every workflow id the file is known under — its registry row's bot_wa_id /
+# bot_tg_id and the botWaId / botTgId of its chunks — minus the sentinels; `proof` = at least one id is known AND
+# every one of them is among the token's workflows. ALL, not SOME: in the compat window a token-less call can add a
+# chunk of its own workflow to any fileId, and a legacy Create re-stamps Telegram-only chunks with its clone. The
+# placeholders are the caller's (fileId, JSON array of the token's workflow ids); the text has no `$` + digit in it.
+def file_evidence(file_param, workflows_param):
+    return f"""file_known AS (
+  SELECT k.wf FROM (
+    SELECT u.bot_wa_id AS wf FROM uploaded_files u WHERE u.file_id = {file_param}
+    UNION ALL SELECT u.bot_tg_id FROM uploaded_files u WHERE u.file_id = {file_param}
+    UNION ALL SELECT d.metadata->>'botWaId' FROM documents d WHERE d.metadata->>'fileId' = {file_param}
+    UNION ALL SELECT d.metadata->>'botTgId' FROM documents d WHERE d.metadata->>'fileId' = {file_param}
+  ) k WHERE k.wf IS NOT NULL AND k.wf NOT IN ('', '-1')
+), file_proof AS (
+  SELECT count(*) > 0
+     AND count(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM jsonb_array_elements_text({workflows_param}::jsonb) t(w)
+                                            WHERE t.w = file_known.wf)) = 0 AS proof
+  FROM file_known
+)"""
+
+
 REGISTER_UPLOAD_SQL = """-- A1: ownership registry for price-list files (the chunks carry only botWaId/botTgId, the stored
--- original nothing). owner_id is NULL for legacy-mode uploads; Delete File then falls back to the
--- chunk metadata. R3 (2026-09-27): runs IN SEQUENCE before the ingest and DECIDES it — a fileId already
--- registered to another install (for a token-less legacy call: to any install) is refused before anything
--- is written; a new fileId is registered to the caller; the caller's own row (a repeat) and an owner-less
--- legacy row (adopted) are re-used. `allowed` = the row belongs to the caller now.
-with reg as (
+-- original nothing). owner_id is NULL for legacy-mode uploads. R3 (2026-09-27): runs IN SEQUENCE before the ingest
+-- and DECIDES it — `allowed` = the row belongs to the caller now. V4 (2026-09-28): the registry row decides FIRST
+-- (the conflict clause below): the caller's own row is re-used, another install's row is refused, an owner-less row
+-- is adopted by a session only with proof (file_proof — every workflow id the file is known under is the token's).
+-- A fileId with NO row is registered to a session caller only when it has no chunk at all (a new upload; a fileId
+-- with chunks but no row is somebody's pre-A1 file). A token-less legacy call keeps the A1 behaviour: any fileId
+-- without an owned row is (re)registered with no owner. Parameters, in order: fileId, install id (empty for legacy),
+-- WhatsApp workflow id, Telegram workflow id, content type, file name, JSON array of the token's workflow ids.
+with """ + file_evidence("$1", "$7") + """, reg as (
   insert into uploaded_files (file_id, owner_id, bot_wa_id, bot_tg_id, content_type, file_name)
-  values ($1, nullif($2, ''), nullif(nullif($3, ''), '-1'), nullif(nullif($4, ''), '-1'), $5, $6)
+  select $1, nullif($2, ''), nullif(nullif($3, ''), '-1'), nullif(nullif($4, ''), '-1'), $5, $6
+  where nullif($2, '') is null
+     or exists (select 1 from uploaded_files u where u.file_id = $1)
+     or not exists (select 1 from documents d where d.metadata->>'fileId' = $1)
   on conflict (file_id) do update set owner_id = coalesce(uploaded_files.owner_id, excluded.owner_id), deleted_at = null
-    where uploaded_files.owner_id is null or uploaded_files.owner_id = excluded.owner_id
+    where uploaded_files.owner_id = excluded.owner_id
+       or (uploaded_files.owner_id is null and (excluded.owner_id is null or (select proof from file_proof)))
   returning file_id
 )
 select exists (select 1 from reg) as allowed;"""
 
 # R3: Extract From File (text, options.keepSource unset) emits ONLY its destination key in json, so at
 # "Extract Telegram Workflow Id" `$json` is {telegramWorkflowId}: every other decoded part is read from the node
-# that decoded it (a `$json.fileId` here is undefined -> SQL NULL file_id -> the insert failed silently).
+# that decoded it (a `$json.fileId` here is undefined -> SQL NULL file_id -> the insert failed silently). V4: the
+# token's workflows come from Auth Gate for the same reason — via `$json` they would be '[]' and every proven
+# adoption would be refused silently (test_upload.py pins the evaluated 7th value).
 REGISTER_UPLOAD_PARAMS = ("={{ [ $('Extract File Id').first().json.fileId, ($('Auth Gate').first().json.crAuth.installId || ''), "
                           "($('Extract Whatsapp Workflow Id').first().json.whatsappWorkflowId || ''), ($json.telegramWorkflowId || ''), "
                           "($('Extract Content Type').first().json.contentType || ''), "
-                          "((($('Get File Name').first().binary || {}).data || {}).fileName || '') ] }}")
+                          "((($('Get File Name').first().binary || {}).data || {}).fileName || ''), "
+                          "JSON.stringify($('Auth Gate').first().json.crAuth.workflows || []) ] }}")
 
 # R3: the multipart ids the gate cannot see. fileId must be a client-minted GUID in EVERY mode (it is spliced
 # into the service-role storage URL — nothing path-like; every shipped client sends Guid.NewGuid()); in session
@@ -97,17 +130,16 @@ UNREADABLE_BODY = "={{ { \"success\": false, \"error\": \"unreadable_file\" } }}
 # V1 (2026-09-28): an SQL comment never names a parameter as `$` + digit — the Postgres node formats the query with
 # pg-promise, which fills `$N` inside comments too, and a newline in the value ends the comment (verify-sql-comments.py).
 DELETE_CHUNKS_SQL = """-- A1: owner-scoped delete. Parameters, in order: fileId, gate mode (session|legacy), install id, JSON
--- array of the token's workflow ids. A session may delete a file it uploaded (uploaded_files) or, for a LEGACY
--- file with no registry row, one whose chunks belong to its own workflows. legacy mode = old behaviour
--- until the compat window closes. `allowed` gates the storage delete downstream.
-WITH own AS (
+-- array of the token's workflow ids. A session may delete a file registered to its install; V4 (2026-09-28): a file
+-- registered to NO install (an owner-less compat-window row, or a pre-A1 file without a row) only with proof
+-- (file_proof — every workflow id the file is known under is the token's); a file registered to another install
+-- never. legacy mode = old behaviour until the compat window closes. `allowed` gates the storage delete downstream.
+WITH """ + file_evidence("$1", "$4") + """, own AS (
   SELECT 1
   WHERE $2 = 'legacy'
      OR EXISTS (SELECT 1 FROM uploaded_files u WHERE u.file_id = $1 AND u.owner_id = $3)
-     OR (NOT EXISTS (SELECT 1 FROM uploaded_files u WHERE u.file_id = $1)
-         AND EXISTS (SELECT 1 FROM documents d WHERE d.metadata->>'fileId' = $1
-                     AND (d.metadata->>'botWaId' IN (SELECT jsonb_array_elements_text($4::jsonb))
-                       OR d.metadata->>'botTgId' IN (SELECT jsonb_array_elements_text($4::jsonb)))))
+     OR (NOT EXISTS (SELECT 1 FROM uploaded_files u WHERE u.file_id = $1 AND u.owner_id IS NOT NULL)
+         AND (SELECT proof FROM file_proof))
 ), deleted AS (
   DELETE FROM documents
   WHERE metadata->>'fileId' = $1 AND $1 <> '' AND EXISTS (SELECT 1 FROM own)
@@ -374,6 +406,8 @@ def check_all():
             bad.append(fname)
         elif fname.startswith("KoTuIlk4LMrlvnWI") and patch_upload(json.loads(json.dumps(wf))):
             bad.append(fname + " (upload field check / registry)")
+        elif fname.startswith("ZTqpumOpL1rNDOp6") and patch_delete_file(json.loads(json.dumps(wf))):
+            bad.append(fname + " (owner-scoped delete)")
     for fname in BOTS:
         wf = json.load(open(os.path.join(WF, fname), encoding="utf-8"))
         if not any(c.get("id") == "c0a11bac-0000-4000-8000-0000000000a1" for c in node(wf, "If")["parameters"]["conditions"]["conditions"]):

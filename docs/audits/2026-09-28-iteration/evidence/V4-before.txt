@@ -1,0 +1,99 @@
+V4 — behavioural test BEFORE the fix (HEAD cf7456a6, canonical Register Upload / Delete File Chunks SQL on temp tables in staging Postgres)
+Command: python3 Tools/n8n/tests/test_upload.py   (exit 1)
+Date: 2026-10-07T17:27Z
+
+PASS R3 legacy_own: the file survives the gate and reaches extraction + the vector-store insert
+FAIL R3 legacy_own: Register Upload receives the decoded values and the real SQL stores the row
+      - params ['3f2b8c1e-9d4a-4b6f-8e21-5a7c0d9e1f42', '', 'wfOwnWA00000001', '-1', 'products', 'price.txt']
+PASS R3 session_own_wa: the file survives the gate and reaches extraction + the vector-store insert
+FAIL R3 session_own_wa: Register Upload receives the decoded values and the real SQL stores the row
+      - params ['3f2b8c1e-9d4a-4b6f-8e21-5a7c0d9e1f42', 'inst-A', 'wfOwnWA00000001', '-1', 'products', 'price.txt']
+PASS R3 session_own_both: the file survives the gate and reaches extraction + the vector-store insert
+FAIL R3 session_own_both: Register Upload receives the decoded values and the real SQL stores the row
+      - params ['3f2b8c1e-9d4a-4b6f-8e21-5a7c0d9e1f42', 'inst-A', 'wfOwnWA00000001', 'wfOwnTG00000001', 'products', 'price.txt']
+PASS R3 session_foreign_wa: a WhatsApp workflow id the token does not own is refused with 403 before ANY write
+PASS R3 session_foreign_tg: a Telegram workflow id the token does not own is refused with 403 before ANY write
+PASS R3 session_pathlike_fileid: a fileId that is not a GUID (it is spliced into the service-role storage URL) is refused with 403 before ANY write
+PASS R3 legacy_pathlike_fileid: a non-GUID fileId in legacy mode too is refused with 403 before ANY write
+PASS R3 session_foreign_fileid: a fileId the registry says belongs to another install -> 403, nothing but the registry check ran
+PASS R3 session_registry_fault: a registry DB fault -> 503 db_unavailable, no ingest
+PASS R3 session_valid_pdf: a real PDF is extracted and reaches the vector-store insert
+PASS R3 session_corrupt_pdf: an unreadable PDF answers 422 unreadable_file — never a 200 the app records as uploaded
+PASS R3 Register Upload SQL: a new fileId is registered to the caller (session) / to nobody (legacy) and allowed
+PASS R3 Register Upload SQL: another install's fileId is refused and its row is not changed
+PASS R3 Register Upload SQL: a repeat of the caller's own fileId is allowed and keeps one row
+FAIL V4 Register Upload SQL: an owner-less legacy row of a workflow the caller does not own is NOT adopted; a legacy call still re-uses it
+      - session {'allowed': True, 'rows': [{'f': '11111111-1111-4111-8111-111111111111', 'o': 'inst-B', 'wa': 'wfB'}, {'f': '22222222-2222-4222-8222-222222222222', 'o': 'inst-A', 'wa': 'wfL'}, {'f': '33333333-3333-4333-8333-333333333333', 'o': 'inst-A', 'wa': 'wfOwnWA00000001'}]}
+FAIL V4 [wa] an owner-less row of ANOTHER bot's file: session Register refuses (owner stays NULL), session Delete refuses, the chunk survives
+      - register adopted a foreign file: {'steps': [{'allowed': True}, {'deletedChunks': 1, 'allowed': True}], 'rows': {'44444444-4444-4444-8444-444444444444': {'o': 'inst-A', 'wa': 'wfVictimWA00001', 'tg': None, 'deleted': True}}, 'chunks': {}}
+      - owner written: {'44444444-4444-4444-8444-444444444444': {'o': 'inst-A', 'wa': 'wfVictimWA00001', 'tg': None, 'deleted': True}}
+      - delete: {'deletedChunks': 1, 'allowed': True}
+      - victim's file touched: {'steps': [{'allowed': True}, {'deletedChunks': 1, 'allowed': True}], 'rows': {'44444444-4444-4444-8444-444444444444': {'o': 'inst-A', 'wa': 'wfVictimWA00001', 'tg': None, 'deleted': True}}, 'chunks': {}}
+FAIL V4 [wa] a fileId with NO registry row but another bot's chunks: Register refuses and creates no row, Delete refuses
+      - register: {'steps': [{'allowed': True}, {'deletedChunks': 1, 'allowed': True}], 'rows': {'44444444-4444-4444-8444-444444444444': {'o': 'inst-A', 'wa': 'wfOwnWA00000001', 'tg': None, 'deleted': True}}, 'chunks': {}}
+      - delete: {'steps': [{'allowed': True}, {'deletedChunks': 1, 'allowed': True}], 'rows': {'44444444-4444-4444-8444-444444444444': {'o': 'inst-A', 'wa': 'wfOwnWA00000001', 'tg': None, 'deleted': True}}, 'chunks': {}}
+FAIL V4 [wa] the caller's OWN compat-window file (owner-less row, own workflow) is deletable from the session client
+      - delete: [{'deletedChunks': 0, 'allowed': False}]
+      - state: {'steps': [{'deletedChunks': 0, 'allowed': False}], 'rows': {'44444444-4444-4444-8444-444444444444': {'o': None, 'wa': 'wfOwnWA00000001', 'tg': None, 'deleted': False}}, 'chunks': {'44444444-4444-4444-8444-444444444444': 1}}
+PASS V4 [wa] an owner-less row whose every known id is the caller's is adopted (proof) and stays the caller's
+FAIL V4 [wa] ALL, not SOME: one foreign id among the caller's (a token-less call wrote a chunk) blocks adoption AND delete
+      - adoption: {'steps': [{'allowed': True}, {'deletedChunks': 2, 'allowed': True}], 'rows': {'44444444-4444-4444-8444-444444444444': {'o': 'inst-A', 'wa': 'wfOwnWA00000001', 'tg': None, 'deleted': True}}, 'chunks': {}}
+      - delete: {'steps': [{'allowed': True}, {'deletedChunks': 2, 'allowed': True}], 'rows': {'44444444-4444-4444-8444-444444444444': {'o': 'inst-A', 'wa': 'wfOwnWA00000001', 'tg': None, 'deleted': True}}, 'chunks': {}}
+      - unregistered, mixed chunks: [{'deletedChunks': 2, 'allowed': True}]
+FAIL V4 [wa] an unregistered file whose chunks are all the caller's (pre-A1 own file) is deletable, never re-registered
+      - register of a fileId with chunks: {'steps': [{'allowed': True}, {'deletedChunks': 2, 'allowed': True}], 'rows': {'44444444-4444-4444-8444-444444444444': {'o': 'inst-A', 'wa': 'wfOwnWA00000001', 'tg': None, 'deleted': True}}, 'chunks': {}}
+PASS V4 [wa] the caller's own row is decided by the registry FIRST: a stale id (channel re-created after the upload) changes nothing
+FAIL V4 [wa] a bot-less install (empty token workflows, sentinel fields) gets nothing from another bot's owner-less file
+      - register: {'steps': [{'allowed': True}, {'deletedChunks': 1, 'allowed': True}], 'rows': {'44444444-4444-4444-8444-444444444444': {'o': 'inst-A', 'wa': 'wfVictimWA00001', 'tg': None, 'deleted': True}}, 'chunks': {}}
+      - delete: {'steps': [{'allowed': True}, {'deletedChunks': 1, 'allowed': True}], 'rows': {'44444444-4444-4444-8444-444444444444': {'o': 'inst-A', 'wa': 'wfVictimWA00001', 'tg': None, 'deleted': True}}, 'chunks': {}}
+PASS V4 [wa] a file registered to ANOTHER install is never the caller's, even when its chunks carry the caller's ids
+FAIL V4 [tg] an owner-less row of ANOTHER bot's file: session Register refuses (owner stays NULL), session Delete refuses, the chunk survives
+      - register adopted a foreign file: {'steps': [{'allowed': True}, {'deletedChunks': 1, 'allowed': True}], 'rows': {'44444444-4444-4444-8444-444444444444': {'o': 'inst-A', 'wa': None, 'tg': 'wfVictimWA00001', 'deleted': True}}, 'chunks': {}}
+      - owner written: {'44444444-4444-4444-8444-444444444444': {'o': 'inst-A', 'wa': None, 'tg': 'wfVictimWA00001', 'deleted': True}}
+      - delete: {'deletedChunks': 1, 'allowed': True}
+      - victim's file touched: {'steps': [{'allowed': True}, {'deletedChunks': 1, 'allowed': True}], 'rows': {'44444444-4444-4444-8444-444444444444': {'o': 'inst-A', 'wa': None, 'tg': 'wfVictimWA00001', 'deleted': True}}, 'chunks': {}}
+FAIL V4 [tg] a fileId with NO registry row but another bot's chunks: Register refuses and creates no row, Delete refuses
+      - register: {'steps': [{'allowed': True}, {'deletedChunks': 1, 'allowed': True}], 'rows': {'44444444-4444-4444-8444-444444444444': {'o': 'inst-A', 'wa': 'wfOwnWA00000001', 'tg': None, 'deleted': True}}, 'chunks': {}}
+      - delete: {'steps': [{'allowed': True}, {'deletedChunks': 1, 'allowed': True}], 'rows': {'44444444-4444-4444-8444-444444444444': {'o': 'inst-A', 'wa': 'wfOwnWA00000001', 'tg': None, 'deleted': True}}, 'chunks': {}}
+FAIL V4 [tg] the caller's OWN compat-window file (owner-less row, own workflow) is deletable from the session client
+      - delete: [{'deletedChunks': 0, 'allowed': False}]
+      - state: {'steps': [{'deletedChunks': 0, 'allowed': False}], 'rows': {'44444444-4444-4444-8444-444444444444': {'o': None, 'wa': None, 'tg': 'wfOwnTG00000001', 'deleted': False}}, 'chunks': {'44444444-4444-4444-8444-444444444444': 1}}
+PASS V4 [tg] an owner-less row whose every known id is the caller's is adopted (proof) and stays the caller's
+FAIL V4 [tg] ALL, not SOME: one foreign id among the caller's (a token-less call wrote a chunk) blocks adoption AND delete
+      - adoption: {'steps': [{'allowed': True}, {'deletedChunks': 2, 'allowed': True}], 'rows': {'44444444-4444-4444-8444-444444444444': {'o': 'inst-A', 'wa': None, 'tg': 'wfOwnTG00000001', 'deleted': True}}, 'chunks': {}}
+      - delete: {'steps': [{'allowed': True}, {'deletedChunks': 2, 'allowed': True}], 'rows': {'44444444-4444-4444-8444-444444444444': {'o': 'inst-A', 'wa': None, 'tg': 'wfOwnTG00000001', 'deleted': True}}, 'chunks': {}}
+      - unregistered, mixed chunks: [{'deletedChunks': 2, 'allowed': True}]
+FAIL V4 [tg] an unregistered file whose chunks are all the caller's (pre-A1 own file) is deletable, never re-registered
+      - register of a fileId with chunks: {'steps': [{'allowed': True}, {'deletedChunks': 2, 'allowed': True}], 'rows': {'44444444-4444-4444-8444-444444444444': {'o': 'inst-A', 'wa': None, 'tg': 'wfOwnTG00000001', 'deleted': True}}, 'chunks': {}}
+PASS V4 [tg] the caller's own row is decided by the registry FIRST: a stale id (channel re-created after the upload) changes nothing
+FAIL V4 [tg] a bot-less install (empty token workflows, sentinel fields) gets nothing from another bot's owner-less file
+      - register: {'steps': [{'allowed': True}, {'deletedChunks': 1, 'allowed': True}], 'rows': {'44444444-4444-4444-8444-444444444444': {'o': 'inst-A', 'wa': None, 'tg': 'wfVictimWA00001', 'deleted': True}}, 'chunks': {}}
+      - delete: {'steps': [{'allowed': True}, {'deletedChunks': 1, 'allowed': True}], 'rows': {'44444444-4444-4444-8444-444444444444': {'o': 'inst-A', 'wa': None, 'tg': 'wfVictimWA00001', 'deleted': True}}, 'chunks': {}}
+PASS V4 [tg] a file registered to ANOTHER install is never the caller's, even when its chunks carry the caller's ids
+FAIL V4 no evidence at all is no proof: an owner-less row without ids and sentinel-only chunks are neither adopted nor deleted by a session
+      - register: {'steps': [{'allowed': True}, {'deletedChunks': 1, 'allowed': True}], 'rows': {'44444444-4444-4444-8444-444444444444': {'o': 'inst-A', 'wa': None, 'tg': None, 'deleted': True}}, 'chunks': {}}
+      - delete: {'steps': [{'allowed': True}, {'deletedChunks': 1, 'allowed': True}], 'rows': {'44444444-4444-4444-8444-444444444444': {'o': 'inst-A', 'wa': None, 'tg': None, 'deleted': True}}, 'chunks': {}}
+      - register of a sentinel-only unregistered file: {'steps': [{'allowed': True}, {'deletedChunks': 1, 'allowed': True}], 'rows': {'44444444-4444-4444-8444-444444444444': {'o': 'inst-A', 'wa': None, 'tg': None, 'deleted': True}}, 'chunks': {}}
+      - delete: {'steps': [{'allowed': True}, {'deletedChunks': 1, 'allowed': True}], 'rows': {'44444444-4444-4444-8444-444444444444': {'o': 'inst-A', 'wa': None, 'tg': None, 'deleted': True}}, 'chunks': {}}
+PASS V4 a brand-new fileId (no row, no chunk) is still registered to the caller, and the caller may delete it
+PASS V4 legacy (token-less, compat window) is unchanged: re-uses an owner-less foreign row without an owner, deletes any fileId
+PASS R3 compat window closed: a token-less upload is 401 and nothing runs
+PASS R3 negative: verify-auth-gate.py rejects the pre-R3 wiring (no field check) and the binary-dropping gate
+FAIL V4 negative: verify-auth-gate.py rejects the pre-V4 Delete File query and a Register Upload that reads the token workflows from $json
+      - pre-V4 delete query: verifier passed it: ped delete)
+OK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (workflow id + owner bound to the profile)
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (workflow id + owner bound to the profile)
+OK  Set Workflow State (protected list carries Auth Session + Wappi Proxy)
+ALL AUTH GATE ASSERTS PASSED
+
+      - register 7th value via $json: verifier passed it: ped delete)
+OK  XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json (workflow id + owner bound to the profile)
+OK  Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json (workflow id + owner bound to the profile)
+OK  Set Workflow State (protected list carries Auth Session + Wappi Proxy)
+ALL AUTH GATE ASSERTS PASSED
+
+PASS R3 negative: verify_rag.py rejects an ingest edge that bypasses Upload Fields Valid?
+PASS R3 staging isolation: the derived staging copies can no longer write to the real Supabase project
+PASS R3 gate contract: every generated Auth Gate re-emits the input binary (no webhook can lose a file)
+
+27 pass, 18 fail

@@ -11,7 +11,8 @@ Pins, per canonical JSON:
   * Auth Session: bootstrap cap, secret hash compare, single-round-trip refresh, token TTL;
   * bot templates: the callback binding condition (profile_id == webhook path);
   * Upload File validates the decoded multipart ids (session ownership, GUID fileId) and only then registers
-    the upload BEFORE the ingest chain; Delete File deletes chunks and storage only when `allowed`;
+    the upload BEFORE the ingest chain; Delete File deletes chunks and storage only when `allowed`; both decide a
+    file not registered to the caller by the ONE generated proof predicate (V4: every known workflow id is the token's);
   * the Set Workflow State protected list carries the two new infra ids.
 
     python3 Tools/n8n/verify-auth-gate.py            # committed workflows/
@@ -208,8 +209,19 @@ def check_files(mig):
                 if c["node"] in ("Switch", "Merge", "Store Original File", "Register Upload") and src not in ("Upload Item", "Switch", "Upload Fields Valid?", "Extract from PDF", "Extract from TXT", "Image Text"):
                     raise AssertionError(f"{src} -> {c['node']} bypasses the field check / registry chain")
     df = load("ZTqpumOpL1rNDOp6-Delete_File.json")
-    q = node(df, "Delete File Chunks")["parameters"]["query"]
+    dc = node(df, "Delete File Chunks")
+    q = dc["parameters"]["query"]
     assert "uploaded_files" in q and 'AS "allowed"' in q and "EXISTS (SELECT 1 FROM own)" in q, "Delete File Chunks must be owner-scoped and report allowed"
+    # V4 (2026-09-28): a file NOT registered to the caller is taken (Register Upload) or deleted (Delete File) only on
+    # PROOF — every workflow id it is known under is the token's. ONE generated predicate in both queries (substrings
+    # alone passed the pre-V4 delete, whose fallback trusted SOME own chunk); the whole queries equal the generator's.
+    assert q == mig.DELETE_CHUNKS_SQL and dc["parameters"]["options"].get("queryReplacement") == mig.DELETE_CHUNKS_PARAMS, \
+        "Delete File Chunks is stale against apply-auth-gate.py (re-run it)"
+    assert mig.file_evidence("$1", "$4") in q and "(SELECT proof FROM file_proof)" in q, "Delete File Chunks must decide an unregistered file by file_proof"
+    rq = reg["parameters"]["query"]
+    assert mig.file_evidence("$1", "$7") in rq and "(select proof from file_proof)" in rq, "Register Upload must adopt an owner-less row only by file_proof"
+    assert reg["parameters"]["options"]["queryReplacement"].rstrip(" }]").endswith("JSON.stringify($('Auth Gate').first().json.crAuth.workflows || [])"), \
+        "Register Upload's 7th value must be the token's workflows read from Auth Gate ($json there is the last extract's output)"
     assert edges(df, "Authorized?", 0) == [{"node": "Delete File Chunks", "type": "main", "index": 0}], "storage delete must not run in parallel with the chunk delete"
     assert edges(df, "Delete File Chunks") == [{"node": "Allowed?", "type": "main", "index": 0}]
     assert {c["node"] for c in edges(df, "Allowed?", 0)} == {"Respond", "Delete Stored Original"} and edges(df, "Allowed?", 1) == [{"node": "Respond Forbidden", "type": "main", "index": 0}]
