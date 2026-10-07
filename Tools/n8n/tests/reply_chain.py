@@ -77,7 +77,7 @@ class Run:
         return out
 
     # --- the AI Agent (synthetic output) + the Chat Memory node's own two rows --------------------
-    def generate(self, text=None, write_memory=True):
+    def generate(self, text=None, write_memory=True, stamp=True):
         human = self.combined if self.combined is not None else self.m.get('body', '')
         self.ai_text = text if text is not None else 'Ответ на: ' + str(human).replace('\n', ' / ')
         self.named['AI Agent'] = {'output': self.ai_text}
@@ -89,7 +89,16 @@ class Run:
                 self.pg.x("insert into n8n_chat_histories (session_id, message) values ("
                           f"{_lit(sid)}, jsonb_build_object('type', {_lit(typ)}, 'content', {_lit(content)}, "
                           "'additional_kwargs', '{}'::jsonb, 'response_metadata', '{}'::jsonb));")
+        if stamp:                       # stamp=False: the Stamp Draft node failed (continue on error) or runs later
+            self.stamp()
         return self.ai_text
+
+    # --- Generated? → Stamp Draft (V6): the agent's memory row is tied to this execution ---------------------
+    def stamp(self):
+        if has_node(self.w, 'Stamp Draft'):
+            self.stamp_row = _sql(self.w, self.pg, 'Stamp Draft', {'output': self.ai_text}, self.named, self.exec_id)
+            self.named['Stamp Draft'] = self.stamp_row
+        return getattr(self, 'stamp_row', None)
 
     def ask_for_text(self, text):
         """The media branch: Ask to Send Text instead of the agent (no memory rows)."""
@@ -176,5 +185,7 @@ def ledger(pg, ch):
 
 def memory(pg, ch):
     pid, c = CHATS[ch]
-    return pg.q(f"select id, message->>'type' as type, message->>'content' as content, message->'additional_kwargs'->>'source' as source "
+    return pg.q(f"select id, message->>'type' as type, message->>'content' as content, message->'additional_kwargs'->>'source' as source, "
+                "message->'additional_kwargs'->>'execution_id' as execution_id, message->'additional_kwargs'->>'event_id' as event_id, "
+                "message->'additional_kwargs'->>'delivery' as delivery, message->'additional_kwargs'->>'transport_message_id' as transport_message_id "
                 f"from n8n_chat_histories where session_id = {_lit(pid + ':' + c)} order by id")

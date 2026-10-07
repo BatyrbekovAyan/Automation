@@ -1,0 +1,174 @@
+# V6 — AFTER (apply-history-handoff.py: Stamp Draft + Record Send/Record Cancel by execution id; stage 3 → stage 4 regenerated, second run: no diff; --check OK)
+# 2026-10-07T09:52:59Z  python3 Tools/n8n/tests/test_reply_memory.py
+
+PASS R7 [WA] old draft → new reply SENT → old cancelled: the new reply stays in memory (review scenario)
+PASS R7 [WA] new reply WRITTEN but not yet sent when the old run cancels → it survives, then goes out
+PASS R7 [WA] the newer message arrives during the OLD run's LLM call (claimed before its draft) → only the new reply stays
+PASS R7 [WA] the old run is refused at the LEASE (Send Allowed?) after the new reply went out → only its own draft goes
+PASS R7 [WA] two runs produced the SAME text: exactly one ai row survives (one per reply the client saw)
+PASS R7 [WA] the owner already answered (cancelled_owner): the draft goes, the owner's marked row — same text — stays
+PASS R7 [WA] send_failed: the reply the client never got leaves memory; the client's own row stays
+PASS R7 [WA] send_failed of the NEWER run after an older reply was sent: only the failed text leaves
+PASS R7 [WA] send_unknown (no echo found) KEEPS the reply in memory (decision: «unknown» usually means delivered)
+PASS R7 [WA] a media message (Ask to Send Text, the agent never ran) cancelled after a newer reply → nothing removed
+PASS R7 [WA] the transport echo of a sent reply (after Record Send) adds no second row
+PASS R7 [WA] the transport echo of a sent reply (before Record Send) adds no second row
+PASS R7 [WA] a MULTI-LINE reply goes through Record Send (sent → ledger sent, one ai history row)
+PASS R7 [WA] a MULTI-LINE reply refused by the transport (send_failed) leaves memory; the ledger says send_failed
+PASS R7 [WA] a MULTI-LINE draft of a cancelled run is removed; the newer reply stays
+PASS R7 [WA] the media branch's MULTI-LINE canned ask goes through Record Send
+PASS V6 [WA] reversed completion with the SAME text: the newer run's SENT row survives (its id, delivery sent); the old run drops only its own draft
+PASS V6 [WA] the row says what happened: draft after the agent, sent + transport id after a send, unknown after send_unknown
+PASS V6 [WA] Record Send(send_failed) removes ONLY its execution's row while another run's identical SENT row sits lower above its watermark
+PASS V6 [WA] a run whose stamp did not happen drops NOTHING on cancel — no text fallback
+PASS V6 [WA] residual (pinned): two same-text rows stamped in REVERSE order (within one PG round trip) → one row survives, sent by N, but it sits after the owner row written between them
+PASS V6 [WA] residual (pinned): an UNSTAMPED same-text neighbour row above the watermark takes this run's stamp; no row is removed and exactly one is marked sent
+PASS R7 [TG] old draft → new reply SENT → old cancelled: the new reply stays in memory (review scenario)
+PASS R7 [TG] new reply WRITTEN but not yet sent when the old run cancels → it survives, then goes out
+PASS R7 [TG] the newer message arrives during the OLD run's LLM call (claimed before its draft) → only the new reply stays
+PASS R7 [TG] the old run is refused at the LEASE (Send Allowed?) after the new reply went out → only its own draft goes
+PASS R7 [TG] two runs produced the SAME text: exactly one ai row survives (one per reply the client saw)
+PASS R7 [TG] the owner already answered (cancelled_owner): the draft goes, the owner's marked row — same text — stays
+PASS R7 [TG] send_failed: the reply the client never got leaves memory; the client's own row stays
+PASS R7 [TG] send_failed of the NEWER run after an older reply was sent: only the failed text leaves
+PASS R7 [TG] send_unknown (no echo found) KEEPS the reply in memory (decision: «unknown» usually means delivered)
+PASS R7 [TG] a media message (Ask to Send Text, the agent never ran) cancelled after a newer reply → nothing removed
+PASS R7 [TG] the transport echo of a sent reply (after Record Send) adds no second row
+PASS R7 [TG] the transport echo of a sent reply (before Record Send) adds no second row
+PASS R7 [TG] a MULTI-LINE reply goes through Record Send (sent → ledger sent, one ai history row)
+PASS R7 [TG] a MULTI-LINE reply refused by the transport (send_failed) leaves memory; the ledger says send_failed
+PASS R7 [TG] a MULTI-LINE draft of a cancelled run is removed; the newer reply stays
+PASS R7 [TG] the media branch's MULTI-LINE canned ask goes through Record Send
+PASS V6 [TG] reversed completion with the SAME text: the newer run's SENT row survives (its id, delivery sent); the old run drops only its own draft
+PASS V6 [TG] the row says what happened: draft after the agent, sent + transport id after a send, unknown after send_unknown
+PASS V6 [TG] Record Send(send_failed) removes ONLY its execution's row while another run's identical SENT row sits lower above its watermark
+PASS V6 [TG] a run whose stamp did not happen drops NOTHING on cancel — no text fallback
+PASS V6 [TG] residual (pinned): two same-text rows stamped in REVERSE order (within one PG round trip) → one row survives, sent by N, but it sits after the owner row written between them
+PASS V6 [TG] residual (pinned): an UNSTAMPED same-text neighbour row above the watermark takes this run's stamp; no row is removed and exactly one is marked sent
+
+44 pass, 0 fail
+
+# --- generators: stage 3 → stage 4 twice; the second run leaves both templates byte-identical (cmp) ---
+reply pipeline v2: OK
+history/handoff: OK
+
+# --- structural verifiers (verify-reply-pipeline also rejects the pre-V6 templates: Record Send lacks the execution-id delete) ---
+ALL REPLY PIPELINE ASSERTS PASSED
+ALL HISTORY/HANDOFF ASSERTS PASSED
+ALL BATCHING ASSERTS PASSED
+ALL PARITY ASSERTS PASSED
+SELF-TEST PASSED: 33/33 cases
+OK  74 Postgres node(s) in 27 workflow file(s): no placeholder outside code, no {{ }}, no modifier, no leading =
+
+# --- staging re-import → verify-deployed --base http://localhost:5678 ---
+base http://localhost:5678: canonical 26 (diff 0), clones 2 (behind template 0), archived clones 0 (not counted), other 2
+  clone   stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True nodes=60 graph=f18b511bf17a published=f18b511bf17a sticky=None AT-CANONICAL
+  clone   stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True nodes=60 graph=8c719dda232a published=8c719dda232a sticky=None AT-CANONICAL
+
+# --- staging e2e-reply (real Chat Memory node + real agent): V6 delivery marks + memory-touching scenarios ---
+PASS  accept_then_drop_reconciles_sent[wa] (42s) — A7: the transport accepts the message but the HTTP answer is lost → reconciled as sent from the echo, NO resend
+      send_calls=1 outcome=sent ledger=sent|sent-000001|- reconciled=True ai_marks=[('true', 'sent', 'sent-000001')]
+PASS  accept_then_drop_reconciles_sent[tg] (34s) — A7: the transport accepts the message but the HTTP answer is lost → reconciled as sent from the echo, NO resend
+      send_calls=1 outcome=sent ledger=sent|sent-000001|- reconciled=True ai_marks=[('true', 'sent', 'sent-000001')]
+PASS  dropped_without_echo_stays_send_unknown[wa] (33s) — A7: the connection dies before the transport processed anything → no echo → the state STAYS send_unknown (visible in the ledger), no resend
+      send_calls=1 outcome=send_unknown ledger=send_unknown|-|socket hang up reconciled=False ai_memory_rows=1 ai_marks=[('true', 'unknown', '-')]
+PASS  dropped_without_echo_stays_send_unknown[tg] (34s) — A7: the connection dies before the transport processed anything → no echo → the state STAYS send_unknown (visible in the ledger), no resend
+      send_calls=1 outcome=send_unknown ledger=send_unknown|-|socket hang up reconciled=False ai_memory_rows=1 ai_marks=[('true', 'unknown', '-')]
+PASS  typing_failure_still_sends[wa] (30s) — A7: the typing indicator fails (HTTP 500) → the reply is still sent
+      sends=1 outcome=sent typing_statuses=[500] ai_marks=[('true', 'sent', 'sent-000001')]
+PASS  typing_failure_still_sends[tg] (30s) — A7: the typing indicator fails (HTTP 500) → the reply is still sent
+      sends=1 outcome=sent typing_statuses=[500] ai_marks=[('true', 'sent', 'sent-000001')]
+PASS  newer_incoming_during_llm_supersedes[wa] (29s) — A3: a NEWER client message while the answer is being generated → the stale text is cancelled before the send, its AI memory dropped
+      sends=0 outcome=superseded ledger=superseded|-|- ai_memory_rows=0 last=Outcome
+PASS  newer_incoming_during_llm_supersedes[tg] (29s) — A3: a NEWER client message while the answer is being generated → the stale text is cancelled before the send, its AI memory dropped
+      sends=0 outcome=superseded ledger=superseded|-|- ai_memory_rows=0 last=Outcome
+PASS  owner_reply_before_send_cancels[wa] (31s) — A3: the OWNER answers while the bot is composing → no auto-send, cancelled_owner, memory dropped
+      sends=0 outcome=cancelled_owner ledger=cancelled_owner|-|- ai_memory_rows=0 last=Outcome
+PASS  owner_reply_before_send_cancels[tg] (31s) — A3: the OWNER answers while the bot is composing → no auto-send, cancelled_owner, memory dropped
+      sends=0 outcome=cancelled_owner ledger=cancelled_owner|-|- ai_memory_rows=0 last=Outcome
+PASS  send_500_is_send_failed[wa] (31s) — A7: the transport answers HTTP 500 → send_failed recorded with the error, exactly one attempt
+      send_calls=1 outcome=send_failed ledger=send_failed|-|http 500 {"status":"error","detail":"injected"} memory ai/human=0/1
+PASS  send_500_is_send_failed[tg] (34s) — A7: the transport answers HTTP 500 → send_failed recorded with the error, exactly one attempt
+      send_calls=1 outcome=send_failed ledger=send_failed|-|http 500 {"status":"error","detail":"injected"} memory ai/human=0/1
+PASS  same_second_peer_after_final_fetch[wa] (53s) — V5: a SAME-second message claimed after A's Final Fetch → A's lease refuses, A re-reads once; Wappi lists B first → exactly one reply, by B; A's draft leaves memory
+      {'sends': 1, 'ledger_A': 'superseded|-|-', 'ledger_B': 'sent|sent-000001|-', 'A_final_checks': 2, 'A_rechecked': True, 'outcomes': ['superseded', 'sent'], 'ai_memory_rows': 1}
+PASS  same_second_peer_after_final_fetch[tg] (51s) — V5: a SAME-second message claimed after A's Final Fetch → A's lease refuses, A re-reads once; Wappi lists B first → exactly one reply, by B; A's draft leaves memory
+      {'sends': 1, 'ledger_A': 'superseded|-|-', 'ledger_B': 'sent|sent-000001|-', 'A_final_checks': 2, 'A_rechecked': True, 'outcomes': ['superseded', 'sent'], 'ai_memory_rows': 1}
+PASS  same_second_peer_wappi_lists_older[wa] (41s) — V5: the same race, but the re-read lists A first → exactly one reply, by A after its re-read (the send after the loop reaches the right chat and profile)
+      {'sends': 1, 'ledger_A': 'sent|sent-000001|-', 'ledger_B': 'superseded|-|-', 'A_final_checks': 2, 'A_rechecked': True, 'outcomes': ['sent', 'superseded'], 'recipient': 'chat-ssq-363f2e0dd368@c.us', 'profile_id': 'stgwa001'}
+PASS  same_second_peer_wappi_lists_older[tg] (40s) — V5: the same race, but the re-read lists A first → exactly one reply, by A after its re-read (the send after the loop reaches the right chat and profile)
+      {'sends': 1, 'ledger_A': 'sent|sent-000001|-', 'ledger_B': 'superseded|-|-', 'A_final_checks': 2, 'A_rechecked': True, 'outcomes': ['sent', 'superseded'], 'recipient': 'chat-ssq-363f2e0dd368', 'profile_id': 'stgtg001'}
+PASS  media_message_gets_the_ru_ask_for_text[wa] (12s) — a photo/document/sticker never reaches the model: the canned ask is Russian (+ Kazakh line), sent once, through the same send chain (stage 6, 2026-09-22)
+      {'executions': [('10096', 'success', 'sent', 'Outcome')], 'sends': 1, 'body': 'Напишите, пожалуйста, текстом, что вас интересует — фото, файлы и стикеры я не в', 'ledger': 'sent|sent-000001|-'}
+PASS  media_message_gets_the_ru_ask_for_text[tg] (12s) — a photo/document/sticker never reaches the model: the canned ask is Russian (+ Kazakh line), sent once, through the same send chain (stage 6, 2026-09-22)
+      {'executions': [('10097', 'success', 'sent', 'Outcome')], 'sends': 1, 'body': 'Напишите, пожалуйста, текстом, что вас интересует — фото, файлы и стикеры я не в', 'ledger': 'sent|sent-000001|-'}
+PASS  send_timeout_reconciles_from_echo[wa] (63s) — A7: the transport answers after our 30-s timeout (message really went out) → send_unknown → echo found → sent, no resend
+      send_calls=1 settle=send_unknown outcome=sent ledger=sent|sent-000001|-
+PASS  send_timeout_reconciles_from_echo[tg] (63s) — A7: the transport answers after our 30-s timeout (message really went out) → send_unknown → echo found → sent, no resend
+      send_calls=1 settle=send_unknown outcome=sent ledger=sent|sent-000001|-
+
+# --- staging e2e-handoff (agent memory with owner rows) ---
+PASS  outgoing_phone_recorded[wa] (9s) — A6: a message the owner sent from the PHONE lands in the one history (owner_phone) and in the agent's memory once, even when re-delivered
+      first=('recorded_owner_phone', 'owner_phone:Да, завтра в 15:00 ждём вас', 'ai/owner_phone:Да, завтра в 15:00 ждём вас') redelivery=outgoing_known memory_rows=1
+PASS  outgoing_phone_recorded[tg] (9s) — A6: a message the owner sent from the PHONE lands in the one history (owner_phone) and in the agent's memory once, even when re-delivered
+      first=('recorded_owner_phone', 'owner_phone:Да, завтра в 15:00 ждём вас', 'ai/owner_phone:Да, завтра в 15:00 ждём вас') redelivery=outgoing_known memory_rows=1
+PASS  outgoing_api_history_only (7s) — A6: an API-sent message (unknown writer) is a history row only — never a memory row (the AI's / the app's own writers own memory)
+      outcome=recorded_outgoing_api history=outgoing_api:Текст через API memory_rows=0
+PASS  outgoing_foreign_profile_filtered (6s) — A1/A6: an outgoing event naming ANOTHER profile is filtered before any write
+      outcome=filtered history=''
+PASS  suppressed_incoming_recorded[wa] (6s) — A6: in «Вместе» the client's message is still recorded (history + memory human row), once, with no generation
+      outcomes=['suppressed', 'suppressed'] history=client:Можно завтра к 15? memory=human/client:Можно завтра к 15? sends=0
+PASS  suppressed_incoming_recorded[tg] (5s) — A6: in «Вместе» the client's message is still recorded (history + memory human row), once, with no generation
+      outcomes=['suppressed', 'suppressed'] history=client:Можно завтра к 15? memory=human/client:Можно завтра к 15? sends=0
+PASS  auto_reply_records_client_and_ai_rows (33s) — A6: a normal auto-reply leaves exactly client + ai history rows and the memory node's own human + ai rows (no doubles)
+      outcome=sent history_sources=client,ai memory=human/agent,ai/agent sends=1
+FAIL  bot_knows_owner_agreement_after_auto_resumes [llm] (36s) — A6 acceptance: owner agreed by phone during «Вместе»; after the explicit return to «Авто» the bot answers with that agreement
+      outcome=sent reply='Передал владельцу, он свяжется.' memory=human/client:Здравствуйте, можно к вам завтра подъеха | ai/owner_phone:Да, конечно. Завтра в 15:00 вас ждём, с
+PASS  handoff_tool_creates_request_once_and_pauses [llm] (62s) — A5 acceptance: the agent CREATES the request through the tool (once, even on re-delivery), the chat is paused, and only the owner's explicit «Авто» resumes it
+      request=1290:open:order:pending:87011234567 reply='Передал владельцу, он свяжется.' paused=t once=True paused_incoming=suppressed setmode=200 unpaused=True closed=1290:done:order:pending:87011234567 resumed=sent
+PASS  notifier_delivers_self_message_and_survives_failure (70s) — A5 acceptance: the owner notice is a self-message on the bot's channel (no client text); a failed delivery keeps the request and is retried
+      states=failed/1,sent/1 send_calls=2 to_self=True no_leak=True requests_intact=True body='Choose Reply: вопрос клиента (чат …0731). Автоответ в этом чате приостановлен — '
+PASS  lost_send_settled_by_notifier (116s) — R9: a reply left send_pending > 10 min (its run died between the lease and Record Send) becomes send_unknown on the notifier's schedule — no transport call; a live one is untouched
+      lost=send_unknown|dead-run|run_lost: no send result recorded within 10 min (execution dead-run) live=send_pending send_calls_for_profile=0
+PASS  handoffs_webhook_owner_scoped_list_take_done (3s) — A5: the app's list/take/done are token-only and owner-scoped; done lifts the chat's pause
+      {"notoken": 401, "foreign": 403, "list": [200, 1, "open", true], "take": [200, ["taken"]], "done": [200, [], "f", "done"]}
+PASS  stale_or_replayed_auto_keeps_newer_handoff[wa] (4s) — R4: through the real SetReplyMode webhook, a replay of the owner's applied «Авто» and an older «Авто» leave a NEWER request open and the chat paused; a new explicit «Авто» resumes 
+      {"first": [200, [true]], "replay": [200, [false]], "after_replay": ["t", "1295:open:question:pending:-"], "older": [200, [false]], "after_older": ["t", "1295:open:question:pending:-"], "new": [200, [true]], "after_new": ["f", "1295:done:question:pending:
+PASS  stale_or_replayed_auto_keeps_newer_handoff[tg] (5s) — R4: through the real SetReplyMode webhook, a replay of the owner's applied «Авто» and an older «Авто» leave a NEWER request open and the chat paused; a new explicit «Авто» resumes 
+      {"first": [200, [true]], "replay": [200, [false]], "after_replay": ["t", "1296:open:question:pending:-"], "older": [200, [false]], "after_older": ["t", "1296:open:question:pending:-"], "new": [200, [true]], "after_new": ["f", "1296:done:question:pending:
+PASS  fast_clock_queued_auto_keeps_newer_handoff[wa] (4s) — R4-clock: through the real SetReplyMode webhook, an «Авто» decided 4 min BEFORE a request on a phone 5 min fast (queued, delivered after it) leaves the request open and the chat paused; an imm
+      {"queued": [200, [true]], "after_queued": ["t", "1297:open:question:pending:-"], "immediate": [200, [true]], "after_immediate": ["f", "1297:done:question:pending:-"]}
+PASS  fast_clock_queued_auto_keeps_newer_handoff[tg] (5s) — R4-clock: through the real SetReplyMode webhook, an «Авто» decided 4 min BEFORE a request on a phone 5 min fast (queued, delivered after it) leaves the request open and the chat paused; an imm
+      {"queued": [200, [true]], "after_queued": ["t", "1298:open:question:pending:-"], "immediate": [200, [true]], "after_immediate": ["f", "1298:done:question:pending:-"]}
+PASS  dashboard_shows_open_handoff_as_event (6s) — A5/A6: «Сводка» reports an open request as a REAL event (source=event) that outranks the classifier
+      http=200 row={'profileId': 'stgwa001', 'chatId': '770169280@c.us', 'outcome': 'order_collected', 'summary': 'Заказ: 25 роз', 'outcomeAt': 1791369284439, 'lastMessageAt': 1791369284439, 'source': 'event', 'handoffId': 1299, 'handoffStatus': 'open'
+PASS  proxy_send_records_owner_app_row (11s) — A6: a message the owner sends from the APP (proxy) lands as owner_app in history and as a marked memory row, after the response
+      http=200 body={'status': 'done', 'message_id': 'sent-000001', 'time': 1791369291} history=owner_app:Спасибо, ждём вас memory=ai/owner_app:Спасибо, ждём вас
+PASS  delete_bot_wipes_history_and_requests (6s) — stage 4.7: deleting the bot wipes its history, requests, event ledger and chat state (billing counters untouched)
+      http=200 left=0/0/0/0 resp_counts={'deletedChunks': 0, 'deletedFiles': 0, 'deletedMemoryRows': 14, 'deletedOutcomes': 5, 'deletedReplyFlags': 4, 'deletedHistoryEvents': 16, 'deletedHandoffs': 7, 'deletedReplyEvents': 5, 'deletedChatStates': 6}
+18 pass, 1 fail
+# the one FAIL is the LLM-judged [llm] scenario (the model called create_handoff instead of quoting the owner's agreement;
+# the memory it read — client row + owner_phone row — carries no V6 mark). It failed the same way on 2026-09-27 (pre-V6).
+# Re-run alone twice now: PASS, then FAIL again — model nondeterminism, outside V6; noted in the report.
+
+# --- python3 Tools/n8n/tests/run_all.py ---
+OK   test_auth_refresh.py: 12 pass, 0 fail
+OK   test_billing_identity.py: 14 pass, 0 fail
+OK   test_claim.py: 16 pass, 0 fail
+OK   test_create_seed.py: 52 pass, 0 fail
+OK   test_harness_selfcheck.py: 2 pass, 0 fail
+OK   test_legacy_generators.py: 5 pass, 0 fail
+OK   test_reply_lost_send.py: 5 pass, 0 fail
+OK   test_reply_memory.py: 44 pass, 0 fail
+OK   test_reply_mode.py: 43 pass, 0 fail
+OK   test_reply_order.py: 44 pass, 0 fail
+OK   test_reply_reconcile.py: 32 pass, 0 fail
+OK   test_sql_comment_injection.py: 36 pass, 0 fail
+OK   test_suggest_catalog.py: 24 pass, 0 fail
+OK   test_suggest_query.py: 17 pass, 0 fail
+OK   test_test_dialog.py: 17 pass, 0 fail
+OK   test_upload.py: 22 pass, 0 fail
+OK   test_verify_deployed.py: 26 pass, 0 fail
+OK   test_verify_parity.py: 36 pass, 0 fail
+OK   test_verify_sql_comments.py: 53 pass, 0 fail
+exit=0

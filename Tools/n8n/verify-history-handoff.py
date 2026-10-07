@@ -55,6 +55,8 @@ def verify_bot(f):
     check("'ai'" in q and "do update set source = 'ai'" in q and "$4 = 'sent'" in q, f"{f}: Record Send must record the sent reply as an ai row (upgrading a webhook-first row)")
     q = node(wf, "Record Cancel")["parameters"]["query"]
     check("(message->'additional_kwargs'->>'source') is null" in q, f"{f}: Record Cancel must never drop owner rows")
+    check("(message->'additional_kwargs'->>'source') is null" in node(wf, "Stamp Draft")["parameters"]["query"],
+          f"{f}: Stamp Draft must never mark owner/client rows (V6)")
     check("$8::boolean and nullif($9, '') is not null" in q and NO_DOUBLE in q, f"{f}: Record Cancel must record the human row when the agent never ran, without doubles")
     js = node(wf, "Cancel Label")["parameters"]["jsCode"]
     check("recordHuman = prev === 'If Quota Allows' || prev === 'Generated?'" in js, f"{f}: Cancel Label must flag the human row only for no-agent paths")

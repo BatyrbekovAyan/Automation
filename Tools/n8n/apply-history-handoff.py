@@ -7,7 +7,9 @@ Bot templates (both):
   only into the history) → Outcome; Suppressed?[yes] → *Record Suppressed (client row + memory human
   row — history recording no longer depends on generation) → Outcome; Claim Event also records the
   client row; Record Send records the ai row; Record Cancel records the human row when the agent
-  never ran (quota / generation failure); Read Reply Mode ORs the handoff pause; *Create Handoff
+  never ran (quota / generation failure); V6: Generated?[yes] → *Stamp Draft (ties the agent's memory
+  row to THIS execution) → Pause Before Reading, and Record Send / Record Cancel act only on the row
+  carrying their execution id; Read Reply Mode ORs the handoff pause; *Create Handoff
   tool (→ crHandoffReq0001) wired into the AI Agent + the tool rule appended to the system prompt.
 Create WA/TG: subscribe to outgoing_message_phone + outgoing_message_api.
 Dashboard Outcomes: owner rows labelled «Владелец:» for the classifier; open handoffs are REAL
@@ -124,10 +126,11 @@ RECORD_OUTGOING_PARAMS = "={{ (m => [ m.profile_id, String(m.chatId || m.to || '
 
 RECORD_SEND_SQL = """-- A7: the event's final transport state and the lease release. send_unknown stays send_unknown —
 -- an operator-visible uncertainty, never a silent retry. A6: a sent reply is an `ai` history row.
--- R7: a reply the transport REFUSED (send_failed) never reached the client, so its own memory row goes — the
--- first unmarked ai row above this run's watermark whose content is exactly its text (the memory node saves
--- the agent's output verbatim). send_unknown KEEPS it: for Wappi «unknown» usually means «delivered, the
--- answer got lost» (iteration decision 2026-09-27). Nothing else in memory is ever touched here.
+-- R7/V6: a reply the transport REFUSED (send_failed) never reached the client, so its memory row goes; sent and
+-- send_unknown KEEP it and say so in the row — delivery sent (with the transport id) or unknown: for Wappi
+-- «unknown» usually means «delivered, the answer got lost» (iteration decision 2026-09-27). Only the row Stamp
+-- Draft tied to THIS execution, never a row chosen by its text: another run's identical reply is not ours (V6,
+-- 2026-09-28). A run whose stamp did not happen touches nothing in memory. Nothing else is ever touched here.
 with ev as (
   update reply_events set state = $4, transport_message_id = nullif($5, ''), error = nullif($6, ''), updated_at = now()
   where profile_id = $1 and chat_id = $2 and message_id = $3 returning 1
@@ -143,31 +146,38 @@ with ev as (
   returning 1
 ), mem as (
   delete from n8n_chat_histories
-  where $4 = 'send_failed'
-    and id = (select min(id) from n8n_chat_histories
-              where session_id = $1 || ':' || $2 and id > $9::bigint and message->>'type' = 'ai'
-                and (message->'additional_kwargs'->>'source') is null and message->>'content' = $8)
+  where (message->'additional_kwargs'->>'execution_id') = $7
+    and $4 = 'send_failed' and session_id = $1 || ':' || $2 and id > $9::bigint and message->>'type' = 'ai'
+    and (message->'additional_kwargs'->>'source') is null
+  returning 1
+), mark as (
+  update n8n_chat_histories
+  set message = jsonb_set(message, '{additional_kwargs}', (message->'additional_kwargs')
+        || jsonb_build_object('delivery', case when $4 = 'sent' then 'sent' else 'unknown' end, 'transport_message_id', nullif($5, '')))
+  where (message->'additional_kwargs'->>'execution_id') = $7
+    and $4 <> 'send_failed' and session_id = $1 || ':' || $2 and id > $9::bigint and message->>'type' = 'ai'
+    and (message->'additional_kwargs'->>'source') is null and jsonb_typeof(message->'additional_kwargs') = 'object'
   returning 1
 )
 select $4::text as outcome, nullif($5, '')::text as transport_message_id, exists(select 1 from ev) as recorded, exists(select 1 from rel) as released,
-       (select count(*) from mem)::int as dropped_ai_rows;"""
+       (select count(*) from mem)::int as dropped_ai_rows, (select count(*) from mark)::int as marked_ai_rows;"""
 RECORD_SEND_PARAMS_TAIL = (", $json.state, $json.transportMessageId, $json.error, $execution.id, $('Final Check').first().json.text, "
                            "$('Final Check').first().json.historyWatermark ] }}")
 
 RECORD_CANCEL_SQL = """-- A3.7: a refused / cancelled reply is recorded as such, the lease (if this run held it) is released, and
 -- the AI row a cancelled GENERATION already wrote to memory is dropped — the customer never saw it, so the
--- bot must not remember having said it. R7: ONLY this run's own row — the first unmarked ai row above its
--- watermark whose content is exactly its text — never a NEWER run's reply written (or sent) meanwhile.
--- Owner rows (source-marked) and human rows are never dropped.
+-- bot must not remember having said it. R7/V6: ONLY this run's own row — the one Stamp Draft tied to this
+-- execution — never a NEWER run's reply written (or sent) meanwhile, even one with the very same text. No text
+-- fallback: a run whose stamp did not happen drops nothing. Owner rows (source-marked) and human rows stay.
 -- A6: when the agent never ran (quota / generation failure), the client's message still enters memory.
 with ev as (
   update reply_events set state = $4, updated_at = now()
   where profile_id = $1 and chat_id = $2 and message_id = $3 returning 1
 ), hist as (
   delete from n8n_chat_histories
-  where id = (select min(id) from n8n_chat_histories
-              where $6::boolean and session_id = $1 || ':' || $2 and id > $5::bigint and message->>'type' = 'ai'
-                and (message->'additional_kwargs'->>'source') is null and message->>'content' = $10)
+  where (message->'additional_kwargs'->>'execution_id') = $7
+    and $6::boolean and session_id = $1 || ':' || $2 and id > $5::bigint and message->>'type' = 'ai'
+    and (message->'additional_kwargs'->>'source') is null
   returning 1
 ), rel as (
   update chat_reply_state set lock_token = null, lock_expires_at = null
@@ -183,6 +193,32 @@ select $4::text as outcome, (select count(*) from hist)::int as dropped_ai_rows,
     "__ROW__", MEMORY_ROW % ("'human'", "$9", "'client'", "$3"))
 RECORD_CANCEL_PARAMS_TAIL = ", $json.outcome, $json.historyWatermark, $json.dropAiHistory, $execution.id, $json.recordHuman, $json.humanText, $json.aiText ] }}"
 
+# V6 (iteration 2026-09-28): the Chat Memory node writes the agent's turn inside the AI Agent with no mark of the run
+# that wrote it, and the run used to find «its» row only at the very end (Record Send / Record Cancel, 15–33 s later)
+# by text — a NEWER run of the chat with the same text was then deleted or confirmed in its place. Stamp Draft ties
+# the row to this execution right after the agent; everything later acts on that id only.
+STAMP_DRAFT_SQL = """-- V6: tie the agent's memory row to THIS execution, right after the agent wrote it — the first ai row above
+-- the run's watermark that no writer marked (source) and no run stamped yet, whose content is exactly the agent's
+-- output. delivery starts as draft; Record Send turns it into sent or unknown (a refused one is removed). Rows
+-- below the watermark, owner rows and rows another run stamped are never touched. Returns the stamped row id
+-- (null = no stamp: the later records then touch nothing in memory).
+with draft as (
+  update n8n_chat_histories
+  set message = jsonb_set(message, '{additional_kwargs}',
+        (case when jsonb_typeof(message->'additional_kwargs') = 'object' then message->'additional_kwargs' else '{}'::jsonb end)
+        || jsonb_build_object('execution_id', $4::text, 'event_id', $3::text, 'delivery', 'draft'))
+  where id = (select min(id) from n8n_chat_histories
+              where session_id = $1 || ':' || $2 and id > $5::bigint and message->>'type' = 'ai'
+                and (message->'additional_kwargs'->>'source') is null
+                and (message->'additional_kwargs'->>'execution_id') is null
+                and message->>'content' = $6)
+  returning id
+)
+select (select id from draft) as draft_row_id;"""
+STAMP_DRAFT_PARAMS = ("={{ (m => [ m.profile_id, m.from, m.id, $execution.id, Number($('Claim Event').first().json.history_watermark) || 0, "
+                      "String($('AI Agent').first().json.output || '') ])(" + M + ") }}")
+
+
 CANCEL_LABEL_JS = r"""// CANCEL LABEL: one place that names why a reply did not go out, from whichever gate refused it.
 const j = $input.first().json || {};
 const prev = $prevNode.name;
@@ -195,10 +231,10 @@ else if (prev === 'Send Allowed?') outcome = j.suppressed === true ? 'cancelled_
 else outcome = 'cancelled_fetch';
 let watermark = 0;
 try { watermark = Number($('Claim Event').first().json.history_watermark) || 0; } catch (e) { watermark = 0; }
-// Only a run that reached the generator can have written AI memory rows to drop — and it drops ONLY ITS OWN
-// row (R7): Record Cancel matches the ai row by this run's exact answer text (the memory node saves the agent's
-// output verbatim). The media branch (Ask to Send Text) reaches the same gates without running the agent — there
-// $('AI Agent') throws, aiText stays null and nothing is dropped.
+// Only a run that reached the generator can have written an AI memory row to drop — and it drops ONLY ITS OWN
+// row (R7/V6): Record Cancel deletes the row Stamp Draft tied to this execution id; aiText is the gate (no agent
+// output, nothing to drop). The media branch (Ask to Send Text) reaches the same gates without running the agent —
+// there $('AI Agent') throws, aiText stays null and nothing is dropped.
 const generated = prev === 'Final OK?' || prev === 'Send Allowed?';
 let aiText = null;
 if (generated) {
@@ -331,6 +367,11 @@ def patch_bot(fname):
     ch |= set_edges(wf, "Record Suppressed", [["Outcome"]])
     # (2) the one history: claim / send / cancel statements
     ch |= set_query(node(wf, "Claim Event"), CLAIM_SQL, CLAIM_PARAMS)
+    # V6: the agent's memory row is tied to this execution right after the agent (appended node; overrides stage 3's
+    # Generated? → Pause Before Reading edge, stage 3 → stage 4 order)
+    ch |= ensure(wf, pg("Stamp Draft", STAMP_DRAFT_SQL, STAMP_DRAFT_PARAMS, [-2000, -360], fname))
+    ch |= set_edges(wf, "Generated?", [["Stamp Draft"], ["Cancel Label"]])
+    ch |= set_edges(wf, "Stamp Draft", [["Pause Before Reading"]])
     rs = node(wf, "Record Send")
     head = rs["parameters"]["options"]["queryReplacement"].split(", $json.state")[0]
     ch |= set_query(rs, RECORD_SEND_SQL, head + RECORD_SEND_PARAMS_TAIL)
@@ -513,7 +554,10 @@ def check():
     bad = []
     for f in BOTS:
         wf = json.load(open(os.path.join(WF, f), encoding="utf-8"))
-        ok = all(node(wf, n) for n in ("Is Incoming?", "Is Outgoing?", "Outgoing Bound?", "Record Outgoing", "Record Suppressed", "Create Handoff")) \
+        ok = all(node(wf, n) for n in ("Is Incoming?", "Is Outgoing?", "Outgoing Bound?", "Record Outgoing", "Record Suppressed", "Create Handoff", "Stamp Draft")) \
+            and node(wf, "Stamp Draft")["parameters"]["query"] == STAMP_DRAFT_SQL \
+            and node(wf, "Stamp Draft")["parameters"]["options"]["queryReplacement"] == STAMP_DRAFT_PARAMS \
+            and wf["connections"].get("Generated?", {}).get("main", [[]])[0] == [{"node": "Stamp Draft", "type": "main", "index": 0}] \
             and node(wf, "Claim Event")["parameters"]["query"] == CLAIM_SQL and node(wf, "Record Send")["parameters"]["query"] == RECORD_SEND_SQL \
             and node(wf, "Record Cancel")["parameters"]["query"] == RECORD_CANCEL_SQL and node(wf, "Read Reply Mode")["parameters"]["query"] == READ_MODE_SQL \
             and "##create_handoff##" in node(wf, "AI Agent")["parameters"]["options"]["systemMessage"] \

@@ -14,6 +14,10 @@ Contract (decision of the iteration README, R7):
   * rows with additional_kwargs.source (owner_phone / owner_app / client) are never touched; human rows stay;
   * a run whose agent never ran (the media branch) removes nothing;
   * the transport's echo of a sent reply (outgoing_message_api → Record Outgoing) never adds a second row.
+V6 (iteration 2026-09-28): «its own» is decided by the EXECUTION, never by the text — Stamp Draft (right after the
+agent) marks the row with execution_id / event_id / delivery=draft; Record Cancel and Record Send(send_failed)
+delete only that row, sent / send_unknown mark it delivery=sent (+ transport id) / unknown, and a run without a
+stamp touches nothing. Two residuals are pinned as documented (crossed stamps, an unstamped same-text neighbour).
 
 The REAL chain of BOTH templates (reply_chain.Run): Claim Event, Latest+Combine, Final Check, Acquire Send Lease,
 Settle Send, Record Send, Cancel Label ($prevNode = the refusing gate), Record Cancel, Record Outgoing — on session
@@ -22,7 +26,7 @@ temp tables of the staging Postgres. Memory rows are written in the memory node'
     python3 Tools/n8n/tests/test_reply_memory.py
 """
 from harness import Case, PgSession, report
-from reply_chain import SETUP, TEMPLATES, Run, history, memory, msg, record_outgoing
+from reply_chain import CHATS, SETUP, TEMPLATES, Run, _sql, history, memory, msg, record_outgoing
 
 OLD_TEXT = 'Букет из 25 роз стоит 25 000 ₸.'
 NEW_TEXT = 'Букет из 25 роз стоит 25 000 ₸, доставка по городу бесплатно.'
@@ -186,5 +190,104 @@ for ch, T in TEMPLATES.items():
             r = Run(T, pg, mp, 'exec-MP')
             r.claim(); r.latest([mp]); r.ask_for_text(MULTI); r.final([mp]); r.lease(); r.send_ok('sent-MP')
             c.check(r.outcome == 'sent', f'outcome={r.outcome}')
+
+    # V6 (iteration 2026-09-28): R7's selector «the first unmarked ai row above the watermark with this text» did not
+    # tie the row to the run — another run of the chat that produced the SAME text (template phrases do) lost its
+    # sent reply to this run's cancel, while this run's own draft stayed; and send_unknown kept a row nobody could tell
+    # from a confirmed one. Contract: Stamp Draft (right after the agent) ties the row to the execution; Record Cancel /
+    # Record Send(send_failed) delete ONLY that row; sent / send_unknown mark it (delivery sent + transport id /
+    # unknown); a run without a stamp touches nothing. Two documented residuals are pinned below, not called closed.
+    def marks(pg):
+        return [(r['content'], r['execution_id'], r['event_id'], r['delivery'], r['transport_message_id'])
+                for r in memory(pg, ch) if r['type'] == 'ai' and r['source'] is None]
+
+    with Case(f'V6 [{ch}] reversed completion with the SAME text: the newer run\'s SENT row survives (its id, delivery sent); the old run drops only its own draft') as c:
+        with PgSession(SETUP) as pg:
+            mo, mn, o, n = pair(pg)
+            o.claim(); o.latest([mo])
+            n.claim(); n.latest([mn, mo]); n.generate(NEW_TEXT); n.final([mn, mo]); n.lease(); n.send_ok('new-sent')
+            sent_id = [r['id'] for r in memory(pg, ch) if r['type'] == 'ai'][0]
+            record_outgoing(T, pg, ch, 'own-1', 'Да, доставка бесплатно.', 135, wh_type='outgoing_message_phone')
+            o.generate(NEW_TEXT)                                        # the OLD run's agent returns last, same text
+            o.final([mn, mo])
+            mem = memory(pg, ch)
+            row = next((r for r in mem if r['id'] == sent_id), None)
+            c.check(n.outcome == 'sent' and o.outcome == 'superseded', f'n={n.outcome} o={o.outcome}')
+            c.check(row is not None and row['execution_id'] == 'exec-N' and row['delivery'] == 'sent' and row['transport_message_id'] == 'new-sent',
+                    f'the sent row must survive, stamped: {row} memory={[(r["id"], r["type"], r["source"], r["execution_id"]) for r in mem]}')
+            c.check(o.cancel and o.cancel.get('dropped_ai_rows') == 1, f'o.cancel={o.cancel}')
+            order = [(r['type'], r['source'], r['content']) for r in mem]
+            c.check(order == [('human', None, n.combined), ('ai', None, NEW_TEXT), ('ai', 'owner_phone', 'Да, доставка бесплатно.'),
+                              ('human', None, o.combined)], f'memory order={order}')
+
+    with Case(f'V6 [{ch}] the row says what happened: draft after the agent, sent + transport id after a send, unknown after send_unknown') as c:
+        with PgSession(SETUP) as pg:
+            m = msg(ch, 'D', 100, 'Сколько стоит букет?')
+            r = Run(T, pg, m, 'exec-D')
+            r.claim(); r.latest([m]); r.generate(OLD_TEXT)
+            d1 = marks(pg)
+            r.final([m]); r.lease(); r.send_ok('sent-D')
+            d2 = marks(pg)
+            c.check(d1 == [(OLD_TEXT, 'exec-D', 'D', 'draft', None)], f'after the agent: {d1} stamp={getattr(r, "stamp_row", None)}')
+            c.check(d2 == [(OLD_TEXT, 'exec-D', 'D', 'sent', 'sent-D')] and r.record.get('marked_ai_rows') == 1, f'after the send: {d2} record={r.record}')
+        with PgSession(SETUP) as pg:
+            m = msg(ch, 'U', 100, 'Сколько стоит букет?')
+            r = Run(T, pg, m, 'exec-U')
+            r.claim(); r.latest([m]); r.generate(OLD_TEXT); r.final([m]); r.lease()
+            r.send({'error': {'message': 'socket hang up'}}, reconcile_snapshot=[m])
+            c.check(r.outcome == 'send_unknown' and marks(pg) == [(OLD_TEXT, 'exec-U', 'U', 'unknown', None)],
+                    f'send_unknown keeps the row and says so: outcome={r.outcome} marks={marks(pg)}')
+
+    with Case(f'V6 [{ch}] Record Send(send_failed) removes ONLY its execution\'s row while another run\'s identical SENT row sits lower above its watermark') as c:
+        # the chain cannot bring two runs of one chat to the transport side by side (that is V5's class), so the
+        # failing run's Record Send is driven with the node's own statement and parameters, as the node would run it
+        with PgSession(SETUP) as pg:
+            mo, mn, o, n = pair(pg)
+            n.claim()                                                   # N's watermark sits below everything below
+            o.claim(); o.latest([mo]); o.generate(NEW_TEXT); o.final([mo]); o.lease(); o.send_ok('sent-O')
+            echo = msg(ch, 'sent-O', 110, NEW_TEXT, from_me=True)
+            n.latest([mn, echo, mo]); n.generate(NEW_TEXT)
+            n.named['Final Check'] = {'text': NEW_TEXT, 'historyWatermark': int(n.claim_row.get('history_watermark') or 0)}
+            rec = _sql(T, pg, 'Record Send', {'state': 'send_failed', 'transportMessageId': '', 'error': 'http 500'}, n.named, 'exec-N')
+            c.check(rec.get('dropped_ai_rows') == 1, f'record={rec}')
+            c.check(marks(pg) == [(NEW_TEXT, 'exec-O', 'O', 'sent', 'sent-O')], f'the other run\'s sent reply must stay: {marks(pg)}')
+
+    with Case(f'V6 [{ch}] a run whose stamp did not happen drops NOTHING on cancel — no text fallback') as c:
+        with PgSession(SETUP) as pg:
+            mo, mn, o, n = pair(pg)
+            o.claim(); o.latest([mo]); o.generate(OLD_TEXT, stamp=False)      # Stamp Draft failed (DB hiccup, continue)
+            n.claim(); n.latest([mn, mo]); n.generate(NEW_TEXT); n.final([mn, mo]); n.lease(); n.send_ok()
+            o.final([mn, mo])
+            c.check(o.outcome == 'superseded' and o.cancel and o.cancel.get('dropped_ai_rows') == 0 and ai_rows(pg, ch) == [OLD_TEXT, NEW_TEXT],
+                    f'o={o.outcome} cancel={o.cancel} ai={ai_rows(pg, ch)}')
+
+    with Case(f'V6 [{ch}] residual (pinned): two same-text rows stamped in REVERSE order (within one PG round trip) → one row survives, '
+              f'sent by N, but it sits after the owner row written between them') as c:
+        with PgSession(SETUP) as pg:
+            mo, mn, o, n = pair(pg)
+            o.claim(); o.latest([mo])
+            n.claim(); n.latest([mn, mo]); n.generate(NEW_TEXT, stamp=False)       # W_N
+            record_outgoing(T, pg, ch, 'own-1', 'Минутку.', 120, wh_type='outgoing_message_phone')
+            o.generate(NEW_TEXT, stamp=False)                                       # W_O
+            o.stamp(); n.stamp()                                                    # the stamps cross
+            n.final([mn, mo]); n.lease(); n.send_ok('new-sent')
+            o.final([mn, mo])
+            types = [(r['type'], r['source']) for r in memory(pg, ch)]
+            c.check(marks(pg) == [(NEW_TEXT, 'exec-N', 'N', 'sent', 'new-sent')], f'exactly one row, the sent one: {marks(pg)}')
+            c.check(types == [('human', None), ('ai', 'owner_phone'), ('human', None), ('ai', None)], f'documented shift: {types}')
+
+    with Case(f'V6 [{ch}] residual (pinned): an UNSTAMPED same-text neighbour row above the watermark takes this run\'s stamp; '
+              f'no row is removed and exactly one is marked sent') as c:
+        with PgSession(SETUP) as pg:
+            m = msg(ch, 'M', 100, 'Сколько стоит букет?')
+            r = Run(T, pg, m, 'exec-M')
+            r.claim(); r.latest([m])
+            P_, C_ = CHATS[ch]
+            pg.x("insert into n8n_chat_histories (session_id, message) values ("
+                 f"'{P_}:{C_}', jsonb_build_object('type', 'ai', 'content', '{NEW_TEXT}', 'additional_kwargs', '{{}}'::jsonb, 'response_metadata', '{{}}'::jsonb));")
+            r.generate(NEW_TEXT); r.final([m]); r.lease(); r.send_ok('sent-M')
+            mk = marks(pg)
+            c.check(len(mk) == 2 and mk[0][1:] == ('exec-M', 'M', 'sent', 'sent-M') and mk[1][1:] == (None, None, None, None),
+                    f'the neighbour row carries the stamp, the own row stays a phantom: {mk}')
 
 report()

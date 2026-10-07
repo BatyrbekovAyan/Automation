@@ -55,6 +55,14 @@ def ai_rows(profile_id, chat):
     return int(psql(f"select count(*) from n8n_chat_histories where session_id = '{profile_id}:{chat}' and message->>'type' = 'ai';") or 0)
 
 
+def ai_marks(profile_id, chat):
+    """V6: the unmarked (bot) ai rows' stamps — execution id present?, delivery, transport id — in id order."""
+    out = psql(f"select coalesce(string_agg((message->'additional_kwargs' ? 'execution_id')::text || ',' || coalesce(message->'additional_kwargs'->>'delivery', '-') "
+               f"|| ',' || coalesce(message->'additional_kwargs'->>'transport_message_id', '-'), ';' order by id), '') from n8n_chat_histories "
+               f"where session_id = '{profile_id}:{chat}' and message->>'type' = 'ai' and (message->'additional_kwargs'->>'source') is null;")
+    return [tuple(x.split(',')) for x in out.split(';') if x]
+
+
 def human_rows(profile_id, chat):
     return int(psql(f"select count(*) from n8n_chat_histories where session_id = '{profile_id}:{chat}' and message->>'type' = 'human';") or 0)
 
@@ -244,8 +252,10 @@ def typing_fail(ctx, ch):
     b.post(mid, "Сколько стоит букет?", t)
     ex = b.settle(1)
     typing_calls = [c for c in (mock("GET", f"/__mock/calls?since={b.since_calls}&path=typing")[1] or {}).get("calls", [])]
-    ok = len(b.sends()) == 1 and ex and ex[0]["outcome"] == "sent" and any(c.get("status") == 500 for c in typing_calls)
-    return ok, f"sends={len(b.sends())} outcome={ex[0]['outcome'] if ex else None} typing_statuses={[c.get('status') for c in typing_calls]}"
+    marks = ai_marks(b.pid, b.chat)        # V6: the real memory node's row, stamped right after the agent, marked sent
+    ok = len(b.sends()) == 1 and ex and ex[0]["outcome"] == "sent" and any(c.get("status") == 500 for c in typing_calls) \
+        and len(marks) == 1 and marks[0][:2] == ("true", "sent")
+    return ok, f"sends={len(b.sends())} outcome={ex[0]['outcome'] if ex else None} typing_statuses={[c.get('status') for c in typing_calls]} ai_marks={marks}"
 
 
 @for_channels("expired_lock_does_not_block", "A4: a lease left behind by a dead run (expired) does not block the next reply; the lock is released after the send")
@@ -281,8 +291,10 @@ def accept_drop(ctx, ch):
     led = ledger(b.pid, b.chat, mid)
     calls = b.all_send_calls()
     rc = node_output(ex[0]["data"], "Reconcile Check") if ex else None
-    ok = len(calls) == 1 and ex and ex[0]["outcome"] == "sent" and led.startswith("sent|") and rc and rc.get("reconciled") is True
-    return ok, f"send_calls={len(calls)} outcome={ex[0]['outcome'] if ex else None} ledger={led} reconciled={rc and rc.get('reconciled')}"
+    marks = ai_marks(b.pid, b.chat)          # V6: the reply's memory row is stamped and marked delivered with the echo's id
+    ok = len(calls) == 1 and ex and ex[0]["outcome"] == "sent" and led.startswith("sent|") and rc and rc.get("reconciled") is True \
+        and marks == [("true", "sent", led.split("|")[1])]
+    return ok, f"send_calls={len(calls)} outcome={ex[0]['outcome'] if ex else None} ledger={led} reconciled={rc and rc.get('reconciled')} ai_marks={marks}"
 
 
 @for_channels("send_500_is_send_failed", "A7: the transport answers HTTP 500 → send_failed recorded with the error, exactly one attempt")
@@ -320,9 +332,10 @@ def dropped_no_echo(ctx, ch):
     led = ledger(b.pid, b.chat, mid)
     rc = node_output(ex[0]["data"], "Reconcile Check") if ex else None
     ai = ai_rows(b.pid, b.chat)            # R7 decision: send_unknown KEEPS the reply in memory (usually it was delivered)
+    marks = ai_marks(b.pid, b.chat)        # V6: … and the row SAYS so — stamped by this run, delivery unknown
     ok = len(b.all_send_calls()) == 1 and ex and ex[0]["outcome"] == "send_unknown" and led.startswith("send_unknown|-|") and rc and rc.get("reconciled") is False \
-        and ai == 1
-    return ok, f"send_calls={len(b.all_send_calls())} outcome={ex[0]['outcome'] if ex else None} ledger={led} reconciled={rc and rc.get('reconciled')} ai_memory_rows={ai}"
+        and ai == 1 and marks == [("true", "unknown", "-")]
+    return ok, f"send_calls={len(b.all_send_calls())} outcome={ex[0]['outcome'] if ex else None} ledger={led} reconciled={rc and rc.get('reconciled')} ai_memory_rows={ai} ai_marks={marks}"
 
 
 @for_channels("reordered_webhooks_one_reply", "R6: two client messages whose webhooks arrive in REVERSE order (the older one claimed last, inside the newer one's debounce) → exactly one reply, by the newer message's run")

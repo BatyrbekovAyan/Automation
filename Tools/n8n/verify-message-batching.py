@@ -258,8 +258,11 @@ def check_bot(f, base):
     assert_that(conns["Send Unknown?"]["main"] == [[{"node": "Wait Reconcile", "type": "main", "index": 0}],
                                                     [{"node": "Record Send", "type": "main", "index": 0}]],
                 f"{f}: Send Unknown? branches wrong: {conns['Send Unknown?']['main']}")
-    assert_that(conns["Generated?"]["main"] == [[{"node": "Pause Before Reading", "type": "main", "index": 0}], [{"node": "Cancel Label", "type": "main", "index": 0}]],
+    # V6: Generated?[yes] → Stamp Draft (ties the agent's memory row to the execution) → Pause Before Reading
+    assert_that(conns["Generated?"]["main"] == [[{"node": "Stamp Draft", "type": "main", "index": 0}], [{"node": "Cancel Label", "type": "main", "index": 0}]],
                 f"{f}: Generated? branches wrong: {conns['Generated?']['main']}")
+    assert_that(conns["Stamp Draft"]["main"] == [[{"node": "Pause Before Reading", "type": "main", "index": 0}]],
+                f"{f}: Stamp Draft must chain ONLY to Pause Before Reading: {conns['Stamp Draft']['main']}")
     send = node(ns, "HTTP Request")
     body = [p for p in send["parameters"]["bodyParameters"]["parameters"] if p["name"] == "body"][0]["value"]
     assert_that(body == "={{ $('Final Check').first().json.text }}", f"{f}: the send body must be the text the Final Check re-emitted: {body}")

@@ -1,0 +1,82 @@
+# V6 — BEFORE (HEAD 7d2c5b4c, canonical bot templates unchanged; new tests + harness applied)
+# 2026-10-07T09:48:30Z  python3 Tools/n8n/tests/test_reply_memory.py
+
+PASS R7 [WA] old draft → new reply SENT → old cancelled: the new reply stays in memory (review scenario)
+PASS R7 [WA] new reply WRITTEN but not yet sent when the old run cancels → it survives, then goes out
+PASS R7 [WA] the newer message arrives during the OLD run's LLM call (claimed before its draft) → only the new reply stays
+PASS R7 [WA] the old run is refused at the LEASE (Send Allowed?) after the new reply went out → only its own draft goes
+PASS R7 [WA] two runs produced the SAME text: exactly one ai row survives (one per reply the client saw)
+PASS R7 [WA] the owner already answered (cancelled_owner): the draft goes, the owner's marked row — same text — stays
+PASS R7 [WA] send_failed: the reply the client never got leaves memory; the client's own row stays
+PASS R7 [WA] send_failed of the NEWER run after an older reply was sent: only the failed text leaves
+PASS R7 [WA] send_unknown (no echo found) KEEPS the reply in memory (decision: «unknown» usually means delivered)
+PASS R7 [WA] a media message (Ask to Send Text, the agent never ran) cancelled after a newer reply → nothing removed
+PASS R7 [WA] the transport echo of a sent reply (after Record Send) adds no second row
+PASS R7 [WA] the transport echo of a sent reply (before Record Send) adds no second row
+PASS R7 [WA] a MULTI-LINE reply goes through Record Send (sent → ledger sent, one ai history row)
+PASS R7 [WA] a MULTI-LINE reply refused by the transport (send_failed) leaves memory; the ledger says send_failed
+PASS R7 [WA] a MULTI-LINE draft of a cancelled run is removed; the newer reply stays
+PASS R7 [WA] the media branch's MULTI-LINE canned ask goes through Record Send
+FAIL V6 [WA] reversed completion with the SAME text: the newer run's SENT row survives (its id, delivery sent); the old run drops only its own draft
+      - the sent row must survive, stamped: None memory=[(7380, 'human', None, None), (7382, 'ai', 'owner_phone', None), (7383, 'human', None, None), (7384, 'ai', None, None)]
+      - memory order=[('human', None, 'Сколько стоит букет?\nА с доставкой?'), ('ai', 'owner_phone', 'Да, доставка бесплатно.'), ('human', None, 'Сколько стоит букет?'), ('ai', None, 'Букет из 25 роз стоит 25 000 ₸, доставка по городу бесплатно.')]
+FAIL V6 [WA] the row says what happened: draft after the agent, sent + transport id after a send, unknown after send_unknown
+      - after the agent: [('Букет из 25 роз стоит 25 000 ₸.', None, None, None, None)] stamp=None
+      - after the send: [('Букет из 25 роз стоит 25 000 ₸.', None, None, None, None)] record={'outcome': 'sent', 'transport_message_id': 'sent-D', 'recorded': True, 'released': True, 'dropped_ai_rows': 0}
+      - send_unknown keeps the row and says so: outcome=send_unknown marks=[('Букет из 25 роз стоит 25 000 ₸.', None, None, None, None)]
+FAIL V6 [WA] Record Send(send_failed) removes ONLY its execution's row while another run's identical SENT row sits lower above its watermark
+      - the other run's sent reply must stay: [('Букет из 25 роз стоит 25 000 ₸, доставка по городу бесплатно.', None, None, None, None)]
+FAIL V6 [WA] a run whose stamp did not happen drops NOTHING on cancel — no text fallback
+      - o=superseded cancel={'outcome': 'superseded', 'dropped_ai_rows': 1, 'recorded': True, 'remembered': False} ai=['Букет из 25 роз стоит 25 000 ₸, доставка по городу бесплатно.']
+FAIL V6 [WA] residual (pinned): two same-text rows stamped in REVERSE order (within one PG round trip) → one row survives, sent by N, but it sits after the owner row written between them
+      - exactly one row, the sent one: [('Букет из 25 роз стоит 25 000 ₸, доставка по городу бесплатно.', None, None, None, None)]
+FAIL V6 [WA] residual (pinned): an UNSTAMPED same-text neighbour row above the watermark takes this run's stamp; no row is removed and exactly one is marked sent
+      - the neighbour row carries the stamp, the own row stays a phantom: [('Букет из 25 роз стоит 25 000 ₸, доставка по городу бесплатно.', None, None, None, None), ('Букет из 25 роз стоит 25 000 ₸, доставка по городу бесплатно.', None, None, None, None)]
+PASS R7 [TG] old draft → new reply SENT → old cancelled: the new reply stays in memory (review scenario)
+PASS R7 [TG] new reply WRITTEN but not yet sent when the old run cancels → it survives, then goes out
+PASS R7 [TG] the newer message arrives during the OLD run's LLM call (claimed before its draft) → only the new reply stays
+PASS R7 [TG] the old run is refused at the LEASE (Send Allowed?) after the new reply went out → only its own draft goes
+PASS R7 [TG] two runs produced the SAME text: exactly one ai row survives (one per reply the client saw)
+PASS R7 [TG] the owner already answered (cancelled_owner): the draft goes, the owner's marked row — same text — stays
+PASS R7 [TG] send_failed: the reply the client never got leaves memory; the client's own row stays
+PASS R7 [TG] send_failed of the NEWER run after an older reply was sent: only the failed text leaves
+PASS R7 [TG] send_unknown (no echo found) KEEPS the reply in memory (decision: «unknown» usually means delivered)
+PASS R7 [TG] a media message (Ask to Send Text, the agent never ran) cancelled after a newer reply → nothing removed
+PASS R7 [TG] the transport echo of a sent reply (after Record Send) adds no second row
+PASS R7 [TG] the transport echo of a sent reply (before Record Send) adds no second row
+PASS R7 [TG] a MULTI-LINE reply goes through Record Send (sent → ledger sent, one ai history row)
+PASS R7 [TG] a MULTI-LINE reply refused by the transport (send_failed) leaves memory; the ledger says send_failed
+PASS R7 [TG] a MULTI-LINE draft of a cancelled run is removed; the newer reply stays
+PASS R7 [TG] the media branch's MULTI-LINE canned ask goes through Record Send
+FAIL V6 [TG] reversed completion with the SAME text: the newer run's SENT row survives (its id, delivery sent); the old run drops only its own draft
+      - the sent row must survive, stamped: None memory=[(7456, 'human', None, None), (7458, 'ai', 'owner_phone', None), (7459, 'human', None, None), (7460, 'ai', None, None)]
+      - memory order=[('human', None, 'Сколько стоит букет?\nА с доставкой?'), ('ai', 'owner_phone', 'Да, доставка бесплатно.'), ('human', None, 'Сколько стоит букет?'), ('ai', None, 'Букет из 25 роз стоит 25 000 ₸, доставка по городу бесплатно.')]
+FAIL V6 [TG] the row says what happened: draft after the agent, sent + transport id after a send, unknown after send_unknown
+      - after the agent: [('Букет из 25 роз стоит 25 000 ₸.', None, None, None, None)] stamp=None
+      - after the send: [('Букет из 25 роз стоит 25 000 ₸.', None, None, None, None)] record={'outcome': 'sent', 'transport_message_id': 'sent-D', 'recorded': True, 'released': True, 'dropped_ai_rows': 0}
+      - send_unknown keeps the row and says so: outcome=send_unknown marks=[('Букет из 25 роз стоит 25 000 ₸.', None, None, None, None)]
+FAIL V6 [TG] Record Send(send_failed) removes ONLY its execution's row while another run's identical SENT row sits lower above its watermark
+      - the other run's sent reply must stay: [('Букет из 25 роз стоит 25 000 ₸, доставка по городу бесплатно.', None, None, None, None)]
+FAIL V6 [TG] a run whose stamp did not happen drops NOTHING on cancel — no text fallback
+      - o=superseded cancel={'outcome': 'superseded', 'dropped_ai_rows': 1, 'recorded': True, 'remembered': False} ai=['Букет из 25 роз стоит 25 000 ₸, доставка по городу бесплатно.']
+FAIL V6 [TG] residual (pinned): two same-text rows stamped in REVERSE order (within one PG round trip) → one row survives, sent by N, but it sits after the owner row written between them
+      - exactly one row, the sent one: [('Букет из 25 роз стоит 25 000 ₸, доставка по городу бесплатно.', None, None, None, None)]
+FAIL V6 [TG] residual (pinned): an UNSTAMPED same-text neighbour row above the watermark takes this run's stamp; no row is removed and exactly one is marked sent
+      - the neighbour row carries the stamp, the own row stays a phantom: [('Букет из 25 роз стоит 25 000 ₸, доставка по городу бесплатно.', None, None, None, None), ('Букет из 25 роз стоит 25 000 ₸, доставка по городу бесплатно.', None, None, None, None)]
+
+32 pass, 12 fail
+
+# --- staging (n8n 2.36.7 + task runners, Wappi mock, the REAL Chat Memory node), STAGING WA/TG clones at HEAD canon (pre-V6) ---
+# python3 Tools/n8n/staging/e2e-reply.py --only accept_then_drop | dropped_without_echo | typing_failure (new V6 delivery checks)
+FAIL  accept_then_drop_reconciles_sent[wa] (38s) — A7: the transport accepts the message but the HTTP answer is lost → reconciled as sent from the echo, NO resend
+      send_calls=1 outcome=sent ledger=sent|sent-000001|- reconciled=True ai_marks=[('false', '-', '-')]
+FAIL  accept_then_drop_reconciles_sent[tg] (33s) — A7: the transport accepts the message but the HTTP answer is lost → reconciled as sent from the echo, NO resend
+      send_calls=1 outcome=sent ledger=sent|sent-000001|- reconciled=True ai_marks=[('false', '-', '-')]
+FAIL  dropped_without_echo_stays_send_unknown[wa] (34s) — A7: the connection dies before the transport processed anything → no echo → the state STAYS send_unknown (visible in the ledger), no resend
+      send_calls=1 outcome=send_unknown ledger=send_unknown|-|socket hang up reconciled=False ai_memory_rows=1 ai_marks=[('false', '-', '-')]
+FAIL  dropped_without_echo_stays_send_unknown[tg] (31s) — A7: the connection dies before the transport processed anything → no echo → the state STAYS send_unknown (visible in the ledger), no resend
+      send_calls=1 outcome=send_unknown ledger=send_unknown|-|socket hang up reconciled=False ai_memory_rows=1 ai_marks=[('false', '-', '-')]
+FAIL  typing_failure_still_sends[wa] (29s) — A7: the typing indicator fails (HTTP 500) → the reply is still sent
+      sends=1 outcome=sent typing_statuses=[500] ai_marks=[('false', '-', '-')]
+FAIL  typing_failure_still_sends[tg] (29s) — A7: the typing indicator fails (HTTP 500) → the reply is still sent
+      sends=1 outcome=sent typing_statuses=[500] ai_marks=[('false', '-', '-')]

@@ -89,6 +89,8 @@ TG_BOT_NODE_NAMES = {
     "Is Incoming?", "Is Outgoing?", "Outgoing Bound?", "Record Outgoing", "Record Suppressed", "Create Handoff",
     # iteration 2026-09-28 V5 (apply-reply-pipeline-v2.py): the lease's one re-read of a same-second peer — +3
     "Peer Recheck?", "Wait Peer Recheck", "Recheck Fetch",
+    # iteration 2026-09-28 V6 (apply-history-handoff.py): the agent's memory row tied to the execution — +1
+    "Stamp Draft",
 }
 
 

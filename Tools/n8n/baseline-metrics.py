@@ -50,8 +50,8 @@ BOT_OUTCOME_BY_LAST_NODE = {
     "Final Fetch": "error", "Final Check": "error", "Final OK?": "error", "Acquire Send Lease": "error",
     "Send Allowed?": "error", "Settle Send": "error", "Send Unknown?": "error", "Wait Reconcile": "in_progress",
     "Reconcile Fetch": "error", "Reconcile Check": "error", "Record Send": "error", "Cancel Label": "error", "Record Cancel": "error",
-    # iteration 2026-09-28: V5's one re-read of a same-second peer
-    "Peer Recheck?": "error", "Wait Peer Recheck": "in_progress", "Recheck Fetch": "error",
+    # iteration 2026-09-28: V5's one re-read of a same-second peer, V6's memory-row stamp
+    "Peer Recheck?": "error", "Wait Peer Recheck": "in_progress", "Recheck Fetch": "error", "Stamp Draft": "error",
 }
 SUGGEST_OUTCOME_BY_LAST_NODE = {"Respond": "responded"}
 

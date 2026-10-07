@@ -16,7 +16,7 @@ WF = os.path.join(HERE, "workflows")
 BOTS = ("4wYitz5ek30SVNlT-WhatsApp_Bot.json", "4VN3gsFaC2HUYmcc-Telegram_Bot.json")
 NEW = ("Claim Event", "Claimed?", "Generated?", "Final Fetch", "Final Check", "Final OK?", "Acquire Send Lease",
        "Send Allowed?", "Settle Send", "Send Unknown?", "Wait Reconcile", "Reconcile Fetch", "Reconcile Check",
-       "Record Send", "Cancel Label", "Record Cancel", "Peer Recheck?", "Wait Peer Recheck", "Recheck Fetch")
+       "Record Send", "Cancel Label", "Record Cancel", "Peer Recheck?", "Wait Peer Recheck", "Recheck Fetch", "Stamp Draft")
 STATES = ("claimed", "generated", "send_pending", "sent", "send_failed", "send_unknown", "superseded", "cancelled_owner",
           "cancelled_mode", "cancelled_busy", "cancelled_fetch", "generation_failed", "quota_denied", "suppressed")
 
@@ -106,23 +106,52 @@ def verify(fname):
     # (3) Record Send: final state + lease release only by the holder; unknown never retried here.
     q = node(wf, "Record Send")["parameters"]["query"]
     for frag in ("set state = $4", "transport_message_id = nullif($5, '')", "lock_token = $7", "$4::text as outcome",
-                 # R7: send_failed drops ITS OWN memory row only (first unmarked ai row above its watermark with its text)
-                 "where $4 = 'send_failed'", "id = (select min(id) from n8n_chat_histories", "id > $9::bigint",
-                 "message->>'content' = $8", "(message->'additional_kwargs'->>'source') is null"):
+                 # R7/V6: send_failed drops ITS OWN memory row only — the row Stamp Draft tied to this execution
+                 "where (message->'additional_kwargs'->>'execution_id') = $7\n    and $4 = 'send_failed'", "id > $9::bigint",
+                 "(message->'additional_kwargs'->>'source') is null",
+                 # V6: sent / send_unknown keep the row and mark it — delivery sent (+ transport id) or unknown
+                 "and $4 <> 'send_failed'", "case when $4 = 'sent' then 'sent' else 'unknown' end", "'transport_message_id', nullif($5, '')",
+                 "jsonb_typeof(message->'additional_kwargs') = 'object'", "as marked_ai_rows"):
         check(frag in q, f"{f}: Record Send lacks {frag!r}")
     check("message/send" not in q, f"{f}: Record Send must not touch the transport")
     check("'send_unknown'" not in q, f"{f}: Record Send must keep a send_unknown reply in memory (iteration decision R7)")
+    # negative (V6): a row chosen by its TEXT may be another run's identical reply — never select memory rows by content
+    check("min(id)" not in q and "message->>'content' = $" not in q,
+          f"{f}: Record Send selects a memory row by text/min(id) (V6: another run's identical sent reply is deleted or confirmed)")
     check(node(wf, "Record Send")["parameters"]["options"]["queryReplacement"].rstrip().endswith(
         "$('Final Check').first().json.text, $('Final Check').first().json.historyWatermark ] }}"),
         f"{f}: Record Send $8/$9 must be the Final Check text and watermark")
     # (4) Record Cancel: state + drop the AI memory rows a cancelled generation wrote + release the lease.
     q = node(wf, "Record Cancel")["parameters"]["query"]
     for frag in ("delete from n8n_chat_histories", "message->>'type' = 'ai'", "id > $5::bigint", "$6::boolean", "lock_token = $7",
-                 "where id = (select min(id) from n8n_chat_histories", "message->>'content' = $10"):
+                 # V6: only the row Stamp Draft tied to THIS execution
+                 "where (message->'additional_kwargs'->>'execution_id') = $7\n    and $6::boolean"):
         check(frag in q, f"{f}: Record Cancel lacks {frag!r}")
     # negative (R7): a delete of EVERY unmarked ai row above the watermark also removes a newer run's reply
     check("delete from n8n_chat_histories\n  where $6::boolean" not in q,
           f"{f}: Record Cancel deletes every ai row above the watermark (R7: a newer run's sent reply is lost from memory)")
+    # negative (V6): by text (or min(id) over text) it deletes another run's identical — possibly SENT — reply
+    check("min(id)" not in q and "message->>'content' = $" not in q,
+          f"{f}: Record Cancel selects the memory row by text/min(id) (V6: a newer run's same-text sent reply is deleted)")
+    # V6: Stamp Draft ties the agent's memory row to this execution right after the agent, never a marked/stamped row
+    sd = node(wf, "Stamp Draft")
+    q = sd["parameters"]["query"]
+    for frag in ("update n8n_chat_histories", "'execution_id', $4::text", "'event_id', $3::text", "'delivery', 'draft'",
+                 "jsonb_typeof(message->'additional_kwargs') = 'object'", "id > $5::bigint", "message->>'type' = 'ai'",
+                 "(message->'additional_kwargs'->>'source') is null", "(message->'additional_kwargs'->>'execution_id') is null",
+                 "message->>'content' = $6", "as draft_row_id"):
+        check(frag in q, f"{f}: Stamp Draft lacks {frag!r}")
+    check("delete" not in q.lower(), f"{f}: Stamp Draft must only mark, never delete")
+    sp = sd["parameters"]["options"]["queryReplacement"]
+    check("$execution.id" in sp and "$('Claim Event').first().json.history_watermark" in sp
+          and sp.rstrip().endswith("String($('AI Agent').first().json.output || '') ])($('Webhook').first().json.body.messages[0]) }}"),
+          f"{f}: Stamp Draft params must be (profile, chat, event id, execution id, the claim's watermark, the agent's output): {sp}")
+    check(sd.get("onError") == "continueRegularOutput" and sd.get("alwaysOutputData") is True,
+          f"{f}: Stamp Draft must never stop the reply (a failed stamp only means nothing is deleted later)")
+    E = lambda t: {"node": t, "type": "main", "index": 0}
+    check(wf["connections"]["Generated?"]["main"] == [[E("Stamp Draft")], [E("Cancel Label")]]
+          and wf["connections"]["Stamp Draft"]["main"] == [[E("Pause Before Reading")]],
+          f"{f}: Stamp Draft must sit right after the agent: Generated?[yes] → Stamp Draft → Pause Before Reading")
     check(node(wf, "Record Cancel")["parameters"]["options"]["queryReplacement"].rstrip().endswith("$json.humanText, $json.aiText ] }}"),
           f"{f}: Record Cancel $10 must be the Cancel Label's aiText")
     # (5) Final Check rules (newer client → superseded, owner → cancelled_owner, trigger missing → cancelled_fetch).
