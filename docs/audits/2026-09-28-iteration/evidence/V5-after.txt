@@ -1,0 +1,119 @@
+# V5 — AFTER (apply-reply-pipeline-v2.py → apply-history-handoff.py regenerated both bot templates; second run: no diff; --check OK)
+# 2026-10-07T09:17:56Z  python3 Tools/n8n/tests/test_reply_order.py
+
+PASS R6 [WA] in order: A(100) claimed, then B(101) → exactly one reply, by B, answering A and B
+PASS R6 [WA] REORDERED: B(101) claimed first, then the late A(100) → exactly one reply, by B (was zero)
+PASS R6 [WA] EQUAL timestamps, claims A→B, Wappi lists A first → exactly one reply
+PASS R6 [WA] EQUAL timestamps, claims A→B, Wappi lists B first → exactly one reply
+PASS R6 [WA] EQUAL timestamps, claims B→A, Wappi lists A first → exactly one reply
+PASS R6 [WA] EQUAL timestamps, claims B→A, Wappi lists B first → exactly one reply
+PASS R6 [WA] duplicates: B, A, B again, A again (re-deliveries) → one reply by B, the repeats are duplicates
+PASS R6 [WA] three messages claimed C→A→B (times A<B<C) → exactly one reply, by C, answering all three
+PASS R6 [WA] two independent chats: chat 1 reordered B→A, chat 2 one message claimed between them → one reply each
+PASS R6 [WA] guard kept: a strictly NEWER message claimed after A's Final Fetch refuses A's lease; its own run answers
+PASS V5 [WA] a same-second message claimed after A's Final Fetch → A re-reads; Wappi lists S first → S answers A+S, A superseded
+PASS V5 [WA] the same race, but the re-read lists A first (Wappi: A is the newer) → exactly one reply, by A; S superseded
+PASS V5 [WA] the re-read still lacks S while S's run is alive → A refused (no second re-read), S answers both
+PASS V5 [WA] S registered but Wappi never lists it (its run already stopped) → A answers after the re-read (one reply, as before)
+PASS V5 [WA] an album of 16 photos in one second, the 16th claimed late: a full 15-row page proves nothing → P01 answers
+PASS V5 [WA] a 15-row page that reaches past the trigger's second IS complete: the rule applies
+PASS V5 [WA] guards: a late OLDER message, a peer whose run already stopped, another chat's same-second message → A sends at once
+PASS V5 [WA] a strictly NEWER message stays the generation's job (no re-read); a trigger without a time keeps the rule off
+PASS V5 [WA] «Вместе» or another run's live lease next to an unseen peer → cancelled_mode / cancelled_busy, never a re-read
+PASS V5 [WA] the media branch (no agent run) re-reads the same way and its refusal drops nothing
+PASS R6 [WA] a webhook WITHOUT a time keeps the old rule: its claim always bumps the generation
+PASS R6 [WA] a chat row written before the fix (no newest time) → reordered B→A still gives one reply by B
+PASS R6 [TG] in order: A(100) claimed, then B(101) → exactly one reply, by B, answering A and B
+PASS R6 [TG] REORDERED: B(101) claimed first, then the late A(100) → exactly one reply, by B (was zero)
+PASS R6 [TG] EQUAL timestamps, claims A→B, Wappi lists A first → exactly one reply
+PASS R6 [TG] EQUAL timestamps, claims A→B, Wappi lists B first → exactly one reply
+PASS R6 [TG] EQUAL timestamps, claims B→A, Wappi lists A first → exactly one reply
+PASS R6 [TG] EQUAL timestamps, claims B→A, Wappi lists B first → exactly one reply
+PASS R6 [TG] duplicates: B, A, B again, A again (re-deliveries) → one reply by B, the repeats are duplicates
+PASS R6 [TG] three messages claimed C→A→B (times A<B<C) → exactly one reply, by C, answering all three
+PASS R6 [TG] two independent chats: chat 1 reordered B→A, chat 2 one message claimed between them → one reply each
+PASS R6 [TG] guard kept: a strictly NEWER message claimed after A's Final Fetch refuses A's lease; its own run answers
+PASS V5 [TG] a same-second message claimed after A's Final Fetch → A re-reads; Wappi lists S first → S answers A+S, A superseded
+PASS V5 [TG] the same race, but the re-read lists A first (Wappi: A is the newer) → exactly one reply, by A; S superseded
+PASS V5 [TG] the re-read still lacks S while S's run is alive → A refused (no second re-read), S answers both
+PASS V5 [TG] S registered but Wappi never lists it (its run already stopped) → A answers after the re-read (one reply, as before)
+PASS V5 [TG] an album of 16 photos in one second, the 16th claimed late: a full 15-row page proves nothing → P01 answers
+PASS V5 [TG] a 15-row page that reaches past the trigger's second IS complete: the rule applies
+PASS V5 [TG] guards: a late OLDER message, a peer whose run already stopped, another chat's same-second message → A sends at once
+PASS V5 [TG] a strictly NEWER message stays the generation's job (no re-read); a trigger without a time keeps the rule off
+PASS V5 [TG] «Вместе» or another run's live lease next to an unseen peer → cancelled_mode / cancelled_busy, never a re-read
+PASS V5 [TG] the media branch (no agent run) re-reads the same way and its refusal drops nothing
+PASS R6 [TG] a webhook WITHOUT a time keeps the old rule: its claim always bumps the generation
+PASS R6 [TG] a chat row written before the fix (no newest time) → reordered B→A still gives one reply by B
+
+44 pass, 0 fail
+
+# --- generators: stage 3 → stage 4 twice; the second run leaves both templates byte-identical (cmp) ---
+reply pipeline v2: OK
+history/handoff: OK
+
+# --- structural verifiers ---
+ALL REPLY PIPELINE ASSERTS PASSED
+ALL BATCHING ASSERTS PASSED
+ALL PARITY ASSERTS PASSED
+SELF-TEST PASSED: 33/33 cases
+ALL HISTORY/HANDOFF ASSERTS PASSED
+OK  72 Postgres node(s) in 27 workflow file(s): no placeholder outside code, no {{ }}, no modifier, no leading =
+
+# --- staging re-import (bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001) → verify-deployed --base http://localhost:5678 ---
+base http://localhost:5678: canonical 26 (diff 0), clones 2 (behind template 0), archived clones 0 (not counted), other 2
+  clone   stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True nodes=59 graph=719de739895e published=719de739895e sticky=None AT-CANONICAL
+  clone   stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True nodes=59 graph=2b53bba1560d published=2b53bba1560d sticky=None AT-CANONICAL
+
+# python3 Tools/n8n/staging/e2e-reply.py --only same_second
+PASS  same_second_peer_after_final_fetch[wa] (60s) — V5: a SAME-second message claimed after A's Final Fetch → A's lease refuses, A re-reads once; Wappi lists B first → exactly one reply, by B; A's draft leaves memory
+      {'sends': 1, 'ledger_A': 'superseded|-|-', 'ledger_B': 'sent|sent-000001|-', 'A_final_checks': 2, 'A_rechecked': True, 'outcomes': ['superseded', 'sent'], 'ai_memory_rows': 1}
+PASS  same_second_peer_after_final_fetch[tg] (53s) — V5: a SAME-second message claimed after A's Final Fetch → A's lease refuses, A re-reads once; Wappi lists B first → exactly one reply, by B; A's draft leaves memory
+      {'sends': 1, 'ledger_A': 'superseded|-|-', 'ledger_B': 'sent|sent-000001|-', 'A_final_checks': 2, 'A_rechecked': True, 'outcomes': ['superseded', 'sent'], 'ai_memory_rows': 1}
+PASS  same_second_peer_wappi_lists_older[wa] (41s) — V5: the same race, but the re-read lists A first → exactly one reply, by A after its re-read (the send after the loop reaches the right chat and profile)
+      {'sends': 1, 'ledger_A': 'sent|sent-000001|-', 'ledger_B': 'superseded|-|-', 'A_final_checks': 2, 'A_rechecked': True, 'outcomes': ['sent', 'superseded'], 'recipient': 'chat-ssq-258503e59141@c.us', 'profile_id': 'stgwa001'}
+PASS  same_second_peer_wappi_lists_older[tg] (40s) — V5: the same race, but the re-read lists A first → exactly one reply, by A after its re-read (the send after the loop reaches the right chat and profile)
+      {'sends': 1, 'ledger_A': 'sent|sent-000001|-', 'ledger_B': 'superseded|-|-', 'A_final_checks': 2, 'A_rechecked': True, 'outcomes': ['sent', 'superseded'], 'recipient': 'chat-ssq-258503e59141', 'profile_id': 'stgtg001'}
+   cleanup: deleted rows: 7
+
+4 pass, 0 fail
+
+# --- related staging scenarios (lease / supersede / owner / mode / lock / duplicates / media) ---
+PASS  reordered_webhooks_one_reply[wa] (31s) — R6: two client messages whose webhooks arrive in REVERSE order (the older one claimed last, inside the newer one's debounce) → exactly one reply, by the newer message's run
+PASS  reordered_webhooks_one_reply[tg] (31s) — R6: two client messages whose webhooks arrive in REVERSE order (the older one claimed last, inside the newer one's debounce) → exactly one reply, by the newer message's run
+PASS  newer_incoming_during_llm_supersedes[wa] (30s) — A3: a NEWER client message while the answer is being generated → the stale text is cancelled before the send, its AI memory dropped
+PASS  newer_incoming_during_llm_supersedes[tg] (32s) — A3: a NEWER client message while the answer is being generated → the stale text is cancelled before the send, its AI memory dropped
+PASS  owner_reply_before_send_cancels[wa] (29s) — A3: the OWNER answers while the bot is composing → no auto-send, cancelled_owner, memory dropped
+PASS  owner_reply_before_send_cancels[tg] (31s) — A3: the OWNER answers while the bot is composing → no auto-send, cancelled_owner, memory dropped
+PASS  auto_off_mid_flight_cancels[wa] (30s) — A3: «Вместе» switched on while the answer is being generated → the lease re-reads the mode, no send, cancelled_mode
+PASS  auto_off_mid_flight_cancels[tg] (32s) — A3: «Вместе» switched on while the answer is being generated → the lease re-reads the mode, no send, cancelled_mode
+PASS  live_lock_blocks_send[wa] (29s) — A4: a LIVE lease held by another run of the same chat → this run does not send (cancelled_busy), nothing is resent later
+PASS  live_lock_blocks_send[tg] (29s) — A4: a LIVE lease held by another run of the same chat → this run does not send (cancelled_busy), nothing is resent later
+PASS  expired_lock_does_not_block[wa] (29s) — A4: a lease left behind by a dead run (expired) does not block the next reply; the lock is released after the send
+PASS  expired_lock_does_not_block[tg] (31s) — A4: a lease left behind by a dead run (expired) does not block the next reply; the lock is released after the send
+PASS  dup_parallel_once[wa] (31s) — A4: the same event delivered twice IN PARALLEL → one send, one 'duplicate' stamp, ledger = sent
+PASS  dup_parallel_once[tg] (30s) — A4: the same event delivered twice IN PARALLEL → one send, one 'duplicate' stamp, ledger = sent
+PASS  media_message_gets_the_ru_ask_for_text[wa] (13s) — a photo/document/sticker never reaches the model: the canned ask is Russian (+ Kazakh line), sent once, through the same send chain (stage 6, 2026-09-22)
+PASS  media_message_gets_the_ru_ask_for_text[tg] (12s) — a photo/document/sticker never reaches the model: the canned ask is Russian (+ Kazakh line), sent once, through the same send chain (stage 6, 2026-09-22)
+
+# --- python3 Tools/n8n/tests/run_all.py ---
+OK   test_auth_refresh.py: 12 pass, 0 fail
+OK   test_billing_identity.py: 14 pass, 0 fail
+OK   test_claim.py: 16 pass, 0 fail
+OK   test_create_seed.py: 52 pass, 0 fail
+OK   test_harness_selfcheck.py: 2 pass, 0 fail
+OK   test_legacy_generators.py: 5 pass, 0 fail
+OK   test_reply_lost_send.py: 5 pass, 0 fail
+OK   test_reply_memory.py: 32 pass, 0 fail
+OK   test_reply_mode.py: 43 pass, 0 fail
+OK   test_reply_order.py: 44 pass, 0 fail
+OK   test_reply_reconcile.py: 32 pass, 0 fail
+OK   test_sql_comment_injection.py: 36 pass, 0 fail
+OK   test_suggest_catalog.py: 24 pass, 0 fail
+OK   test_suggest_query.py: 17 pass, 0 fail
+OK   test_test_dialog.py: 17 pass, 0 fail
+OK   test_upload.py: 22 pass, 0 fail
+OK   test_verify_deployed.py: 26 pass, 0 fail
+OK   test_verify_parity.py: 36 pass, 0 fail
+OK   test_verify_sql_comments.py: 53 pass, 0 fail
+exit=0

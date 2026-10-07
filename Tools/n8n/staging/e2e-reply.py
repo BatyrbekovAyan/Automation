@@ -364,6 +364,65 @@ def crossed_reconcile(ctx, ch):
                 f"reconciled={rc and rc.get('reconciled')} foreignFetched={rc and rc.get('foreignFetched')} ai_history_rows={ai_hist}")
 
 
+def _same_second_peer(ctx, ch, tag, wappi_lists_peer_first):
+    """V5: A's Final Fetch is answered with [A] alone (the mock computes the window BEFORE its injected 6-s delay);
+    during that delay a SAME-second message B enters the chat and its webhook is claimed — after A's snapshot, before
+    A's lease. The lease must refuse, re-read once, and let Wappi's order on a snapshot holding BOTH pick the one
+    reply."""
+    b = Bot(ctx, ch, tag)
+    t = int(time.time())
+    ma, mb = f"{tag}A-{ctx.run_id}", f"{tag}B-{ctx.run_id}"
+    ra = {"id": ma, "body": "Здравствуйте", "time": t, "fromMe": False, "type": "chat"}
+    rb = {"id": mb, "body": "Сколько стоит букет из 25 роз?", "time": t, "fromMe": False, "type": "chat"}
+    b.history([ra])
+    mock("POST", "/__mock/fault", {"match": "messages/get", "mode": "timeout", "delay": 6, "times": 1, "after": "typing/start", "profile_id": b.pid})
+    b.post(ma, ra["body"], t)
+    deadline, armed = time.time() + 150, False
+    while time.time() < deadline and not armed:          # A's Final Fetch is now inside the injected delay
+        st, d = mock("GET", f"/__mock/calls?since={b.since_calls}&path=messages/get")
+        armed = any(c.get("fault") == "timeout" for c in (d or {}).get("calls", []))
+        time.sleep(0.3)
+    if not armed:
+        return False, "A's Final Fetch never reached the injected delay"
+    b.history([rb, ra] if wappi_lists_peer_first else [ra, rb])
+    b.post(mb, rb["body"], t)
+    ex = b.settle(2, wait_s=240)
+    la, lb = ledger(b.pid, b.chat, ma), ledger(b.pid, b.chat, mb)
+    run_a = next((e for e in ex if (node_output(e["data"], "Outcome") or {}).get("messageId") == ma), None)
+    rd = ((run_a or {}).get("data") or {}).get("data", {}).get("resultData", {}).get("runData", {}) if run_a else {}
+    sends = b.sends()
+    detail = {"sends": len(sends), "ledger_A": la, "ledger_B": lb, "A_final_checks": len(rd.get("Final Check") or []),
+              "A_rechecked": "Recheck Fetch" in rd, "outcomes": [e["outcome"] for e in ex]}
+    return sends, la, lb, rd, detail, b
+
+
+@for_channels("same_second_peer_after_final_fetch", "V5: a SAME-second message claimed after A's Final Fetch → A's lease refuses, A re-reads once; Wappi lists B first → exactly one reply, by B; A's draft leaves memory")
+def same_second_peer(ctx, ch):
+    r = _same_second_peer(ctx, ch, "ssp", True)
+    if len(r) == 2:
+        return r
+    sends, la, lb, rd, detail, b = r
+    detail["ai_memory_rows"] = ai_rows(b.pid, b.chat)
+    ok = len(sends) == 1 and la.startswith("superseded|") and lb.startswith("sent|") and detail["A_rechecked"] \
+        and detail["A_final_checks"] == 2 and detail["ai_memory_rows"] == 1
+    return ok, detail
+
+
+@for_channels("same_second_peer_wappi_lists_older", "V5: the same race, but the re-read lists A first → exactly one reply, by A after its re-read (the send after the loop reaches the right chat and profile)")
+def same_second_peer_a_first(ctx, ch):
+    r = _same_second_peer(ctx, ch, "ssq", False)
+    if len(r) == 2:
+        return r
+    sends, la, lb, rd, detail, b = r
+    call = sends[0] if sends else {}
+    body = call.get("body") or {}
+    detail["recipient"] = body.get("recipient") or body.get("=recipient")
+    detail["profile_id"] = (call.get("query") or {}).get("profile_id")
+    ok = len(sends) == 1 and la.startswith("sent|") and lb.startswith("superseded|") and detail["A_rechecked"] \
+        and detail["recipient"] == b.chat and detail["profile_id"] == b.pid
+    return ok, detail
+
+
 @for_channels("media_message_gets_the_ru_ask_for_text", "a photo/document/sticker never reaches the model: the canned ask is Russian (+ Kazakh line), sent once, through the same send chain (stage 6, 2026-09-22)")
 def media_ask(ctx, ch):
     b = Bot(ctx, ch, "media")

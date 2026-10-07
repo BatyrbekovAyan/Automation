@@ -16,7 +16,7 @@ WF = os.path.join(HERE, "workflows")
 BOTS = ("4wYitz5ek30SVNlT-WhatsApp_Bot.json", "4VN3gsFaC2HUYmcc-Telegram_Bot.json")
 NEW = ("Claim Event", "Claimed?", "Generated?", "Final Fetch", "Final Check", "Final OK?", "Acquire Send Lease",
        "Send Allowed?", "Settle Send", "Send Unknown?", "Wait Reconcile", "Reconcile Fetch", "Reconcile Check",
-       "Record Send", "Cancel Label", "Record Cancel")
+       "Record Send", "Cancel Label", "Record Cancel", "Peer Recheck?", "Wait Peer Recheck", "Recheck Fetch")
 STATES = ("claimed", "generated", "send_pending", "sent", "send_failed", "send_unknown", "superseded", "cancelled_owner",
           "cancelled_mode", "cancelled_busy", "cancelled_fetch", "generation_failed", "quota_denied", "suppressed")
 
@@ -62,8 +62,47 @@ def verify(fname):
     q = node(wf, "Acquire Send Lease")["parameters"]["query"]
     for frag in ("from reply_mode_flags", "chat_id in ($2, '*')", "order by (chat_id = '*')", "c.incoming_generation = $4::bigint",
                  "c.lock_token is null or c.lock_expires_at < now() or c.lock_token = $5", "interval '90 seconds'",
-                 "not (select suppressed from mode)", "state = 'send_pending'", "as allowed", "as lock_busy"):
+                 "not (select suppressed from mode)", "state = 'send_pending'", "as allowed", "as lock_busy",
+                 # V5: a claimed SAME-second client message missing from the decided-on snapshot refuses the lease (only
+                 # on a complete snapshot, only while its run may still answer) and asks for ONE re-read
+                 "from reply_events r", "h.source = 'client'", "h.sent_at = to_timestamp($7::bigint)", "$7::bigint > 0",
+                 "jsonb_array_elements_text($6::jsonb)", "r.message_id <> $3", "$9::boolean",
+                 "r.state in ('claimed', 'generated', 'send_pending', 'sent', 'send_unknown')",
+                 "and not (select unseen from peer)", "as peer_unseen", "not $8::boolean", "as recheck"):
         check(frag in q, f"{f}: Acquire Send Lease lacks {frag!r}")
+    # negative (V5): the same second, never a range — a strictly newer message is the generation's job, and a '>='
+    # against a server clock (a webhook without a time) would refuse on unrelated rows
+    check("h.sent_at >=" not in q and "h.sent_at <=" not in q, f"{f}: Acquire Send Lease must match the trigger's own second only")
+    lp = node(wf, "Acquire Send Lease")["parameters"]["options"]["queryReplacement"]
+    check(lp.rstrip().endswith("JSON.stringify($json.seenIds || []), Number($('Webhook').first().json.body.messages[0].time) || 0, "
+                               "$json.recheck === true, $json.seenComplete === true ] }}"),
+          f"{f}: Acquire Send Lease $6..$9 must be (seen ids, the trigger's own time or 0, second pass, complete) — never undefined: {lp}")
+    # V5 coupling: the peer rule reads the client row Claim Event writes in the same statement, timed by the
+    # message's own Wappi time — if Claim stops writing it that way the rule silently switches off
+    cq = node(wf, "Claim Event")["parameters"]["query"]
+    check("values ($1, $2, $3, 'client', $5, $6, to_timestamp($7::bigint), $4)" in cq,
+          f"{f}: Claim Event must write the client history row with sent_at = to_timestamp(the message time) (V5 peer rule)")
+    check("excluded.newest_message_time >= chat_reply_state.newest_message_time" not in cq,
+          f"{f}: Claim Event must keep the STRICT newer rule (V5/R6: '>=' loses both replies at an equal second)")
+    pr = node(wf, "Peer Recheck?")
+    check(pr["type"] == "n8n-nodes-base.if" and pr["parameters"]["conditions"]["conditions"][0]["leftValue"] == "={{ $json.recheck === true }}",
+          f"{f}: Peer Recheck? must branch on the lease's recheck flag")
+    cn = wf["connections"]
+    E = lambda t: {"node": t, "type": "main", "index": 0}
+    check(cn["Acquire Send Lease"]["main"] == [[E("Peer Recheck?")]], f"{f}: Acquire Send Lease must lead ONLY to Peer Recheck?")
+    check(cn["Peer Recheck?"]["main"] == [[E("Wait Peer Recheck")], [E("Send Allowed?")]], f"{f}: Peer Recheck? branches wrong")
+    check(cn["Wait Peer Recheck"]["main"] == [[E("Recheck Fetch")]] and cn["Recheck Fetch"]["main"] == [[E("Final Check")]],
+          f"{f}: the re-read must go Wait Peer Recheck → Recheck Fetch → Final Check")
+    wpr, dw = node(wf, "Wait Peer Recheck"), node(wf, "Debounce Wait")
+    check(wpr["type"] == "n8n-nodes-base.wait" and wpr.get("webhookId")
+          and isinstance(wpr["parameters"].get("amount"), int) and wpr["parameters"]["amount"] >= dw["parameters"]["amount"] + 4,
+          f"{f}: Wait Peer Recheck must outlast the peer's debounce + fetch + one PG node (≥ Debounce Wait + 4 s) and carry a webhookId")
+    rf = node(wf, "Recheck Fetch")
+    qp = {p["name"]: p["value"] for p in rf["parameters"]["queryParameters"]["parameters"]}
+    check(rf["parameters"]["url"].endswith("messages/get") and ".chatId }}" in qp["chat_id"] and ".profile_id }}" in qp["profile_id"],
+          f"{f}: Recheck Fetch must re-read the trigger's chat")
+    check(rf["parameters"]["options"].get("timeout", 0) <= 10000 and not rf.get("retryOnFail") and rf.get("onError") == "continueRegularOutput",
+          f"{f}: Recheck Fetch must be short (≤ 10 s) without retries and fail into the Final Check (cancelled_fetch)")
     # (3) Record Send: final state + lease release only by the holder; unknown never retried here.
     q = node(wf, "Record Send")["parameters"]["query"]
     for frag in ("set state = $4", "transport_message_id = nullif($5, '')", "lock_token = $7", "$4::text as outcome",
@@ -89,7 +128,10 @@ def verify(fname):
     # (5) Final Check rules (newer client → superseded, owner → cancelled_owner, trigger missing → cancelled_fetch).
     js = node(wf, "Final Check")["parameters"]["jsCode"]
     for frag in ("outcome = 'superseded'", "outcome = 'cancelled_owner'", "outcome = 'cancelled_fetch'", "outcome = 'generation_failed'",
-                 "fromMe === false", "fromMe === true", "$('Ask to Send Text')", "$('Retrieve Answer')", "(a.__i || 0) - (b.__i || 0)"):
+                 "fromMe === false", "fromMe === true", "$('Ask to Send Text')", "$('Retrieve Answer')", "(a.__i || 0) - (b.__i || 0)",
+                 # V5: what the snapshot saw, whether it was complete for the trigger's second, and the second pass
+                 "const seenIds = fetched.", "fetchedAll.length < 15", "Number(m.time || 0) < Number(trig.time || 0)",
+                 "$('Acquire Send Lease').first().json.peer_unseen === true", "seenIds, seenComplete, recheck"):
         check(frag in js, f"{f}: Final Check lacks {frag!r}")
     check("message/send" not in js, f"{f}: Final Check must not send")
     # (6) Settle: three states, no assumption of delivery on a missing answer.

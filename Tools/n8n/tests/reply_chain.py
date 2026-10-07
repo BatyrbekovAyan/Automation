@@ -12,7 +12,7 @@ synthetic parts are the transport (a snapshot a test hands in as `messages/get`,
         a = Run(TEMPLATES['WA'], pg, msg('A', 100), 'exec-A')
         a.claim(); a.latest(snapshot); a.generate('…'); a.final(snapshot); a.lease(); a.send_ok()
 """
-from harness import code, expr, bind, node, wf
+from harness import code, expr, bind, has_node, node, wf
 
 TEMPLATES = {'WA': wf('4wYitz5ek30SVNlT-WhatsApp_Bot.json'), 'TG': wf('4VN3gsFaC2HUYmcc-Telegram_Bot.json')}
 CHATS = {'WA': ('wa-prof-rc', '77001112233@c.us'), 'TG': ('tg-prof-rc', '5550001112')}
@@ -95,26 +95,35 @@ class Run:
         """The media branch: Ask to Send Text instead of the agent (no memory rows)."""
         self.named['Ask to Send Text'] = {'text': text}
 
-    # --- Final Fetch → Final Check → Final OK? ---------------------------------------------------
+    # --- Final Fetch (or, after the lease asked for it, Recheck Fetch) → Final Check → Final OK? -------------
     def final(self, snapshot):
         out = code(self.w, 'Final Check', {'json': {'status': 'done', 'messages': [dict(x) for x in snapshot]}}, self.named,
                    strict=not self.agent_ran)[0]['json']
         self.named['Final Check'] = out
         self.text = out.get('text')
+        self.recheck_pending = False
         if not _cond(self.w, 'Final OK?', out):
             self._cancel('Final OK?', out)
         return out
 
-    # --- Acquire Send Lease → Send Allowed? -----------------------------------------------------
+    # --- Acquire Send Lease → [Peer Recheck? → Wait Peer Recheck → Recheck Fetch → Final Check] → Send Allowed? ---
     def lease(self):
         row = _sql(self.w, self.pg, 'Acquire Send Lease', self.named['Final Check'], self.named, self.exec_id)
         self.lease_row = row
+        self.leases = getattr(self, 'leases', 0) + 1
+        self.named['Acquire Send Lease'] = row          # Final Check's second pass reads it ($('Acquire Send Lease'))
+        # V5: the lease asks for ONE re-read of the chat — the test hands the fresh snapshot to final() and calls
+        # lease() again (a template without the node never asks)
+        if has_node(self.w, 'Peer Recheck?') and _cond(self.w, 'Peer Recheck?', row):
+            self.recheck_pending = True
+            return row
         if not _cond(self.w, 'Send Allowed?', row):
             self._cancel('Send Allowed?', row)
         return row
 
     # --- HTTP Request → Settle Send → [Send Unknown? → Reconcile] → Record Send ------------------------
     def send(self, http_response, reconcile_snapshot=None):
+        assert not getattr(self, 'recheck_pending', False), 'the lease asked for a re-read (Peer Recheck?): call final() + lease() again'
         st = code(self.w, 'Settle Send', {'json': http_response}, self.named)[0]['json']
         self.named['Settle Send'] = st
         final = st

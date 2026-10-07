@@ -1222,7 +1222,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// FINAL CHECK (A3, stage 3): re-read the chat RIGHT BEFORE sending. Same rules as Latest+Combine, on a\n// fresh snapshot: a client message newer than the trigger → this text is stale (superseded — the newer\n// event's own run answers); an owner message newer than the trigger → the owner took over (cancelled).\n// A snapshot that does not even contain the trigger (crossed/short fetch) is never sent on.\nconst wh = $('Webhook').first().json;\nconst trig = wh.body.messages[0];\nlet claim = {};\ntry { claim = $('Claim Event').first().json || {}; } catch (e) { claim = {}; }\nlet text = '';\ntry { text = String($('Retrieve Answer').first().json.text || ''); } catch (e) {\n  try { text = String($('Ask to Send Text').first().json.text || ''); } catch (e2) { text = ''; }\n}\nconst fetchedAll = ($json.messages || []).slice();\nconst fetched = fetchedAll.filter(m => !(m && m.chatId && trig.chatId && m.chatId !== trig.chatId));\nfetched.forEach((m, i) => { if (m) m.__i = i; });\nfetched.sort((a, b) => ((b.time || 0) - (a.time || 0)) || ((a.__i || 0) - (b.__i || 0)));   // newest first, Wappi order breaks ties\nconst trigIdx = fetched.findIndex(m => m && m.id === trig.id);\nlet ok = true, outcome = null;\nif (!text.trim()) { ok = false; outcome = 'generation_failed'; }\nelse if (trigIdx < 0) { ok = false; outcome = 'cancelled_fetch'; }\nelse if (fetched.slice(0, trigIdx).some(m => m && m.fromMe === false)) { ok = false; outcome = 'superseded'; }\nelse if (fetched.slice(0, trigIdx).some(m => m && m.fromMe === true)) { ok = false; outcome = 'cancelled_owner'; }\nreturn [{ json: { ok, outcome, text, generation: Number(claim.generation) || 0, historyWatermark: Number(claim.history_watermark) || 0,\n                  sendStartedAt: Math.floor(Date.now() / 1000) }, pairedItem: { item: 0 } }];\n"
+        "jsCode": "// FINAL CHECK (A3, stage 3): re-read the chat RIGHT BEFORE sending. Same rules as Latest+Combine, on a\n// fresh snapshot: a client message newer than the trigger → this text is stale (superseded — the newer\n// event's own run answers); an owner message newer than the trigger → the owner took over (cancelled).\n// A snapshot that does not even contain the trigger (crossed/short fetch) is never sent on.\nconst wh = $('Webhook').first().json;\nconst trig = wh.body.messages[0];\nlet claim = {};\ntry { claim = $('Claim Event').first().json || {}; } catch (e) { claim = {}; }\nlet text = '';\ntry { text = String($('Retrieve Answer').first().json.text || ''); } catch (e) {\n  try { text = String($('Ask to Send Text').first().json.text || ''); } catch (e2) { text = ''; }\n}\nconst fetchedAll = ($json.messages || []).slice();\nconst fetched = fetchedAll.filter(m => !(m && m.chatId && trig.chatId && m.chatId !== trig.chatId));\nfetched.forEach((m, i) => { if (m) m.__i = i; });\nfetched.sort((a, b) => ((b.time || 0) - (a.time || 0)) || ((a.__i || 0) - (b.__i || 0)));   // newest first, Wappi order breaks ties\nconst trigIdx = fetched.findIndex(m => m && m.id === trig.id);\nlet ok = true, outcome = null;\nif (!text.trim()) { ok = false; outcome = 'generation_failed'; }\nelse if (trigIdx < 0) { ok = false; outcome = 'cancelled_fetch'; }\nelse if (fetched.slice(0, trigIdx).some(m => m && m.fromMe === false)) { ok = false; outcome = 'superseded'; }\nelse if (fetched.slice(0, trigIdx).some(m => m && m.fromMe === true)) { ok = false; outcome = 'cancelled_owner'; }\n// V5 (iteration 2026-09-28): what this snapshot SAW, for the lease's same-second peer rule. The rule needs a\n// snapshot COMPLETE for the trigger's second: messages/get returns at most 15 rows, so a full page whose every\n// row is at or after that second (an album of more photos than fit) proves nothing about a row it lacks.\nconst seenIds = fetched.filter(m => m && m.id !== undefined && m.id !== null).map(m => String(m.id));\nconst seenComplete = fetchedAll.length < 15 || fetched.some(m => m && Number(m.time || 0) > 0 && Number(m.time || 0) < Number(trig.time || 0));\n// The pass AFTER the lease asked for its one re-read (on the first pass the lease has not run: the reference throws).\nlet recheck = false;\ntry { recheck = $('Acquire Send Lease').first().json.peer_unseen === true; } catch (e) { recheck = false; }\nreturn [{ json: { ok, outcome, text, generation: Number(claim.generation) || 0, historyWatermark: Number(claim.history_watermark) || 0,\n                  sendStartedAt: Math.floor(Date.now() / 1000), seenIds, seenComplete, recheck }, pairedItem: { item: 0 } }];\n"
       },
       "id": "d7b9c9f7-8716-5893-9fd7-f1b6edb93b43",
       "name": "Final Check",
@@ -1270,9 +1270,9 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "-- A3/A4: the last word before the transport call, in ONE statement: the CURRENT mode (a «Вместе» flip\n-- during generation cancels), the incoming generation captured at claim time (a newer claimed event\n-- supersedes), and a 90-s per-chat lease (two runs of the same chat cannot send at once; other chats are\n-- untouched). Only a run that holds the lease marks its event send_pending. Nothing here spans the LLM or\n-- the transport call — the lease is what covers the send itself.\nwith mode as (\n  select coalesce((select suppressed from reply_mode_flags\n                   where profile_id = $1 and chat_id in ($2, '*')\n                   order by (chat_id = '*') limit 1), false) as suppressed\n), cur as (\n  select incoming_generation, lock_token, lock_expires_at from chat_reply_state where profile_id = $1 and chat_id = $2\n), lease as (\n  update chat_reply_state c set lock_token = $5, lock_expires_at = now() + interval '90 seconds'\n  where c.profile_id = $1 and c.chat_id = $2\n    and (c.lock_token is null or c.lock_expires_at < now() or c.lock_token = $5)\n    and c.incoming_generation = $4::bigint\n    and not (select suppressed from mode)\n  returning 1\n), ev as (\n  update reply_events set state = 'send_pending', updated_at = now()\n  where profile_id = $1 and chat_id = $2 and message_id = $3 and exists (select 1 from lease)\n  returning 1\n)\nselect exists(select 1 from lease) as allowed,\n       (select suppressed from mode) as suppressed,\n       (select incoming_generation from cur)::bigint as generation_now,\n       (select lock_token from cur) is not null and (select lock_expires_at from cur) > now() and (select lock_token from cur) <> $5 as lock_busy;",
+        "query": "-- A3/A4: the last word before the transport call, in ONE statement: the CURRENT mode (a «Вместе» flip\n-- during generation cancels), the incoming generation captured at claim time (a newer claimed event\n-- supersedes), and a 90-s per-chat lease (two runs of the same chat cannot send at once; other chats are\n-- untouched). Only a run that holds the lease marks its event send_pending. Nothing here spans the LLM or\n-- the transport call — the lease is what covers the send itself.\n-- V5: a client message of the trigger's OWN second, claimed by its own run but absent from the snapshot the\n-- Final Check decided on, is seen by neither freshness signal (the generation counts strictly newer seconds,\n-- the snapshot's order only orders the rows it holds). It refuses the lease (peer_unseen) — only when that\n-- snapshot was complete for the second (a full page of one second proves nothing), never for a strictly newer\n-- or older second, never for a peer whose run already ended without a reply. On the first pass the run re-reads\n-- the chat once (recheck); on the second the refusal stands. No lock is taken while that happens.\nwith mode as (\n  select coalesce((select suppressed from reply_mode_flags\n                   where profile_id = $1 and chat_id in ($2, '*')\n                   order by (chat_id = '*') limit 1), false) as suppressed\n), cur as (\n  select incoming_generation, lock_token, lock_expires_at from chat_reply_state where profile_id = $1 and chat_id = $2\n), peer as (\n  select exists (\n    select 1 from reply_events r\n    join chat_history_events h on h.profile_id = r.profile_id and h.chat_id = r.chat_id\n                              and h.message_id = r.message_id and h.source = 'client'\n    where r.profile_id = $1 and r.chat_id = $2 and r.message_id <> $3\n      and r.state in ('claimed', 'generated', 'send_pending', 'sent', 'send_unknown')\n      and $9::boolean and $7::bigint > 0 and h.sent_at = to_timestamp($7::bigint)\n      and not exists (select 1 from jsonb_array_elements_text($6::jsonb) s(id) where s.id = r.message_id)\n  ) as unseen\n), lease as (\n  update chat_reply_state c set lock_token = $5, lock_expires_at = now() + interval '90 seconds'\n  where c.profile_id = $1 and c.chat_id = $2\n    and (c.lock_token is null or c.lock_expires_at < now() or c.lock_token = $5)\n    and c.incoming_generation = $4::bigint\n    and not (select suppressed from mode)\n    and not (select unseen from peer)\n  returning 1\n), ev as (\n  update reply_events set state = 'send_pending', updated_at = now()\n  where profile_id = $1 and chat_id = $2 and message_id = $3 and exists (select 1 from lease)\n  returning 1\n)\nselect exists(select 1 from lease) as allowed,\n       (select suppressed from mode) as suppressed,\n       (select incoming_generation from cur)::bigint as generation_now,\n       (select lock_token from cur) is not null and (select lock_expires_at from cur) > now() and (select lock_token from cur) <> $5 as lock_busy,\n       (select unseen from peer) as peer_unseen,\n       (select unseen from peer) and not $8::boolean and not (select suppressed from mode)\n         and coalesce((select incoming_generation from cur) = $4::bigint, false)\n         and not coalesce((select lock_token from cur) is not null and (select lock_expires_at from cur) > now()\n                          and (select lock_token from cur) <> $5, false) as recheck;",
         "options": {
-          "queryReplacement": "={{ [ $('Webhook').first().json.body.messages[0].profile_id, $('Webhook').first().json.body.messages[0].from, $('Webhook').first().json.body.messages[0].id, $json.generation, $execution.id ] }}"
+          "queryReplacement": "={{ [ $('Webhook').first().json.body.messages[0].profile_id, $('Webhook').first().json.body.messages[0].from, $('Webhook').first().json.body.messages[0].id, $json.generation, $execution.id, JSON.stringify($json.seenIds || []), Number($('Webhook').first().json.body.messages[0].time) || 0, $json.recheck === true, $json.seenComplete === true ] }}"
         }
       },
       "id": "d8c69d79-277a-5d9b-90d8-1f4196f0419d",
@@ -1727,6 +1727,98 @@
         -1900,
         200
       ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d367a197-3fb8-5915-add9-2dff882b69f6",
+              "leftValue": "={{ $json.recheck === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4160acc9-5cae-521b-bc24-e3fd73837832",
+      "name": "Peer Recheck?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        704,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 12
+      },
+      "id": "db6ab00a-075d-5754-93c6-0b4b85fde433",
+      "name": "Wait Peer Recheck",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        -400
+      ],
+      "webhookId": "7e1c7e19-7482-5887-b2d2-ad8372913d3f"
+    },
+    {
+      "parameters": {
+        "url": "https://wappi.pro/tapi/sync/messages/get",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "profile_id",
+              "value": "={{ $('Webhook').first().json.body.messages[0].profile_id }}"
+            },
+            {
+              "name": "chat_id",
+              "value": "={{ $('Webhook').first().json.body.messages[0].chatId }}"
+            },
+            {
+              "name": "limit",
+              "value": "15"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "94e8eea1-5256-5b64-a340-e548241562bf",
+      "name": "Recheck Fetch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1088,
+        -400
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "EuhhqAaV56DpoqAN",
+          "name": "WappiAuthToken"
+        }
+      },
+      "retryOnFail": false,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -2269,7 +2361,7 @@
       "main": [
         [
           {
-            "node": "Send Allowed?",
+            "node": "Peer Recheck?",
             "type": "main",
             "index": 0
           }
@@ -2449,6 +2541,46 @@
           {
             "node": "AI Agent",
             "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Peer Recheck?": {
+      "main": [
+        [
+          {
+            "node": "Wait Peer Recheck",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Allowed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Peer Recheck": {
+      "main": [
+        [
+          {
+            "node": "Recheck Fetch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recheck Fetch": {
+      "main": [
+        [
+          {
+            "node": "Final Check",
+            "type": "main",
             "index": 0
           }
         ]

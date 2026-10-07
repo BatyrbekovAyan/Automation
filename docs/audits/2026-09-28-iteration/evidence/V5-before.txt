@@ -1,0 +1,103 @@
+# V5 — BEFORE (HEAD b97ce442, canonical bot templates unchanged; new tests + harness applied)
+# 2026-10-07T09:12:51Z  python3 Tools/n8n/tests/test_reply_order.py
+
+PASS R6 [WA] in order: A(100) claimed, then B(101) → exactly one reply, by B, answering A and B
+PASS R6 [WA] REORDERED: B(101) claimed first, then the late A(100) → exactly one reply, by B (was zero)
+PASS R6 [WA] EQUAL timestamps, claims A→B, Wappi lists A first → exactly one reply
+PASS R6 [WA] EQUAL timestamps, claims A→B, Wappi lists B first → exactly one reply
+PASS R6 [WA] EQUAL timestamps, claims B→A, Wappi lists A first → exactly one reply
+PASS R6 [WA] EQUAL timestamps, claims B→A, Wappi lists B first → exactly one reply
+PASS R6 [WA] duplicates: B, A, B again, A again (re-deliveries) → one reply by B, the repeats are duplicates
+PASS R6 [WA] three messages claimed C→A→B (times A<B<C) → exactly one reply, by C, answering all three
+PASS R6 [WA] two independent chats: chat 1 reordered B→A, chat 2 one message claimed between them → one reply each
+PASS R6 [WA] guard kept: a strictly NEWER message claimed after A's Final Fetch refuses A's lease; its own run answers
+FAIL V5 [WA] a same-second message claimed after A's Final Fetch → A re-reads; Wappi lists S first → S answers A+S, A superseded
+      - A's lease must refuse and ask for one re-read: lease={'allowed': True, 'suppressed': False, 'generation_now': 1, 'lock_busy': False} outcome=None
+      - A must stop as superseded: None lease={'allowed': True, 'suppressed': False, 'generation_now': 1, 'lock_busy': False}
+      - S must answer A+S: outcome=cancelled_busy text='Ответ на: Здравствуйте / Сколько стоит букет из 25 роз?'
+      - ledger={'A': 'send_pending', 'S': 'cancelled_busy'}
+      - A's draft must leave memory: None
+FAIL V5 [WA] the same race, but the re-read lists A first (Wappi: A is the newer) → exactly one reply, by A; S superseded
+      - A must re-read first: lease={'allowed': True, 'suppressed': False, 'generation_now': 1, 'lock_busy': False}
+      - a=sent s=superseded leases=1 ledger={'A': 'sent', 'S': 'superseded'}
+FAIL V5 [WA] the re-read still lacks S while S's run is alive → A refused (no second re-read), S answers both
+      - A must be refused without a second re-read: a=None lease={'allowed': True, 'suppressed': False, 'generation_now': 1, 'lock_busy': False}
+      - s=cancelled_busy text='Ответ на: Здравствуйте / Сколько стоит букет из 25 роз?'
+PASS V5 [WA] S registered but Wappi never lists it (its run already stopped) → A answers after the re-read (one reply, as before)
+PASS V5 [WA] an album of 16 photos in one second, the 16th claimed late: a full 15-row page proves nothing → P01 answers
+FAIL V5 [WA] a 15-row page that reaches past the trigger's second IS complete: the rule applies
+      - complete=None lease={'allowed': True, 'suppressed': False, 'generation_now': 1, 'lock_busy': False}
+FAIL V5 [WA] guards: a late OLDER message, a peer whose run already stopped, another chat's same-second message → A sends at once
+      - older O(99): lease={'allowed': True, 'suppressed': False, 'generation_now': 1, 'lock_busy': False}
+      - stopped peer: lease={'allowed': True, 'suppressed': False, 'generation_now': 1, 'lock_busy': False}
+      - other chat: lease={'allowed': True, 'suppressed': False, 'generation_now': 1, 'lock_busy': False}
+FAIL V5 [WA] a strictly NEWER message stays the generation's job (no re-read); a trigger without a time keeps the rule off
+      - newer: lease={'allowed': False, 'suppressed': False, 'generation_now': 2, 'lock_busy': False} outcome=superseded
+      - no time: lease={'allowed': False, 'suppressed': False, 'generation_now': 2, 'lock_busy': False}
+FAIL V5 [WA] «Вместе» or another run's live lease next to an unseen peer → cancelled_mode / cancelled_busy, never a re-read
+      - mode: outcome=cancelled_mode lease={'allowed': False, 'suppressed': True, 'generation_now': 1, 'lock_busy': False}
+      - busy: outcome=cancelled_busy lease={'allowed': False, 'suppressed': False, 'generation_now': 1, 'lock_busy': True}
+FAIL V5 [WA] the media branch (no agent run) re-reads the same way and its refusal drops nothing
+      - media: lease={'allowed': True, 'suppressed': False, 'generation_now': 1, 'lock_busy': False}
+      - a=None cancel=None
+      - s=cancelled_busy
+PASS R6 [WA] a webhook WITHOUT a time keeps the old rule: its claim always bumps the generation
+PASS R6 [WA] a chat row written before the fix (no newest time) → reordered B→A still gives one reply by B
+PASS R6 [TG] in order: A(100) claimed, then B(101) → exactly one reply, by B, answering A and B
+PASS R6 [TG] REORDERED: B(101) claimed first, then the late A(100) → exactly one reply, by B (was zero)
+PASS R6 [TG] EQUAL timestamps, claims A→B, Wappi lists A first → exactly one reply
+PASS R6 [TG] EQUAL timestamps, claims A→B, Wappi lists B first → exactly one reply
+PASS R6 [TG] EQUAL timestamps, claims B→A, Wappi lists A first → exactly one reply
+PASS R6 [TG] EQUAL timestamps, claims B→A, Wappi lists B first → exactly one reply
+PASS R6 [TG] duplicates: B, A, B again, A again (re-deliveries) → one reply by B, the repeats are duplicates
+PASS R6 [TG] three messages claimed C→A→B (times A<B<C) → exactly one reply, by C, answering all three
+PASS R6 [TG] two independent chats: chat 1 reordered B→A, chat 2 one message claimed between them → one reply each
+PASS R6 [TG] guard kept: a strictly NEWER message claimed after A's Final Fetch refuses A's lease; its own run answers
+FAIL V5 [TG] a same-second message claimed after A's Final Fetch → A re-reads; Wappi lists S first → S answers A+S, A superseded
+      - A's lease must refuse and ask for one re-read: lease={'allowed': True, 'suppressed': False, 'generation_now': 1, 'lock_busy': False} outcome=None
+      - A must stop as superseded: None lease={'allowed': True, 'suppressed': False, 'generation_now': 1, 'lock_busy': False}
+      - S must answer A+S: outcome=cancelled_busy text='Ответ на: Здравствуйте / Сколько стоит букет из 25 роз?'
+      - ledger={'A': 'send_pending', 'S': 'cancelled_busy'}
+      - A's draft must leave memory: None
+FAIL V5 [TG] the same race, but the re-read lists A first (Wappi: A is the newer) → exactly one reply, by A; S superseded
+      - A must re-read first: lease={'allowed': True, 'suppressed': False, 'generation_now': 1, 'lock_busy': False}
+      - a=sent s=superseded leases=1 ledger={'A': 'sent', 'S': 'superseded'}
+FAIL V5 [TG] the re-read still lacks S while S's run is alive → A refused (no second re-read), S answers both
+      - A must be refused without a second re-read: a=None lease={'allowed': True, 'suppressed': False, 'generation_now': 1, 'lock_busy': False}
+      - s=cancelled_busy text='Ответ на: Здравствуйте / Сколько стоит букет из 25 роз?'
+PASS V5 [TG] S registered but Wappi never lists it (its run already stopped) → A answers after the re-read (one reply, as before)
+PASS V5 [TG] an album of 16 photos in one second, the 16th claimed late: a full 15-row page proves nothing → P01 answers
+FAIL V5 [TG] a 15-row page that reaches past the trigger's second IS complete: the rule applies
+      - complete=None lease={'allowed': True, 'suppressed': False, 'generation_now': 1, 'lock_busy': False}
+FAIL V5 [TG] guards: a late OLDER message, a peer whose run already stopped, another chat's same-second message → A sends at once
+      - older O(99): lease={'allowed': True, 'suppressed': False, 'generation_now': 1, 'lock_busy': False}
+      - stopped peer: lease={'allowed': True, 'suppressed': False, 'generation_now': 1, 'lock_busy': False}
+      - other chat: lease={'allowed': True, 'suppressed': False, 'generation_now': 1, 'lock_busy': False}
+FAIL V5 [TG] a strictly NEWER message stays the generation's job (no re-read); a trigger without a time keeps the rule off
+      - newer: lease={'allowed': False, 'suppressed': False, 'generation_now': 2, 'lock_busy': False} outcome=superseded
+      - no time: lease={'allowed': False, 'suppressed': False, 'generation_now': 2, 'lock_busy': False}
+FAIL V5 [TG] «Вместе» or another run's live lease next to an unseen peer → cancelled_mode / cancelled_busy, never a re-read
+      - mode: outcome=cancelled_mode lease={'allowed': False, 'suppressed': True, 'generation_now': 1, 'lock_busy': False}
+      - busy: outcome=cancelled_busy lease={'allowed': False, 'suppressed': False, 'generation_now': 1, 'lock_busy': True}
+FAIL V5 [TG] the media branch (no agent run) re-reads the same way and its refusal drops nothing
+      - media: lease={'allowed': True, 'suppressed': False, 'generation_now': 1, 'lock_busy': False}
+      - a=None cancel=None
+      - s=cancelled_busy
+PASS R6 [TG] a webhook WITHOUT a time keeps the old rule: its claim always bumps the generation
+PASS R6 [TG] a chat row written before the fix (no newest time) → reordered B→A still gives one reply by B
+
+28 pass, 16 fail
+
+# --- staging (n8n 2.36.7 + task runners, Wappi mock), STAGING WA/TG clones at HEAD canon (verify-deployed: BEHIND the patched canon) ---
+# python3 Tools/n8n/staging/e2e-reply.py --only same_second
+FAIL  same_second_peer_after_final_fetch[wa] (32s) — V5: a SAME-second message claimed after A's Final Fetch → A's lease refuses, A re-reads once; Wappi lists B first → exactly one reply, by B; A's draft leaves memory
+      {'sends': 1, 'ledger_A': 'sent|sent-000001|-', 'ledger_B': 'superseded|-|-', 'A_final_checks': 1, 'A_rechecked': False, 'outcomes': ['sent', 'superseded'], 'ai_memory_rows': 1}
+FAIL  same_second_peer_after_final_fetch[tg] (31s) — V5: a SAME-second message claimed after A's Final Fetch → A's lease refuses, A re-reads once; Wappi lists B first → exactly one reply, by B; A's draft leaves memory
+      {'sends': 1, 'ledger_A': 'sent|sent-000001|-', 'ledger_B': 'superseded|-|-', 'A_final_checks': 1, 'A_rechecked': False, 'outcomes': ['sent', 'superseded'], 'ai_memory_rows': 1}
+FAIL  same_second_peer_wappi_lists_older[wa] (33s) — V5: the same race, but the re-read lists A first → exactly one reply, by A after its re-read (the send after the loop reaches the right chat and profile)
+      {'sends': 1, 'ledger_A': 'sent|sent-000001|-', 'ledger_B': 'superseded|-|-', 'A_final_checks': 1, 'A_rechecked': False, 'outcomes': ['sent', 'superseded'], 'recipient': 'chat-ssq-54b8563f16ef@c.us', 'profile_id': 'stgwa001'}
+FAIL  same_second_peer_wappi_lists_older[tg] (29s) — V5: the same race, but the re-read lists A first → exactly one reply, by A after its re-read (the send after the loop reaches the right chat and profile)
+      {'sends': 1, 'ledger_A': 'sent|sent-000001|-', 'ledger_B': 'superseded|-|-', 'A_final_checks': 1, 'A_rechecked': False, 'outcomes': ['sent', 'superseded'], 'recipient': 'chat-ssq-54b8563f16ef', 'profile_id': 'stgtg001'}
+   cleanup: deleted rows: 7
+
+0 pass, 4 fail

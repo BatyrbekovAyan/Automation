@@ -240,15 +240,19 @@ def check_bot(f, base):
                 f"{f}: Outcome stamp must carry the execution id as correlationId and derive the label from $prevNode")
     assert_that(conns["If"]["main"][1] == [OUTCOME_EDGE], f"{f}: If main[1] (foreign/group filtered) must end at Outcome: {conns['If']['main'][1]}")
     # Stage 3 (A3/A7): the send is preceded by Final Fetch -> Final Check -> Final OK? -> Acquire Send
-    # Lease -> Send Allowed? and followed by Settle Send -> [reconcile] -> Record Send -> Outcome.
+    # Lease -> Peer Recheck? -> Send Allowed? and followed by Settle Send -> [reconcile] -> Record Send -> Outcome.
     for src, dst in (("Retrieve Answer", "Final Fetch"), ("Ask to Send Text", "Final Fetch"), ("Final Fetch", "Final Check"),
-                     ("Final Check", "Final OK?"), ("Acquire Send Lease", "Send Allowed?"), ("HTTP Request", "Settle Send"),
+                     ("Final Check", "Final OK?"), ("Acquire Send Lease", "Peer Recheck?"), ("Wait Peer Recheck", "Recheck Fetch"),
+                     ("Recheck Fetch", "Final Check"), ("HTTP Request", "Settle Send"),
                      ("Settle Send", "Send Unknown?"), ("Wait Reconcile", "Reconcile Fetch"), ("Reconcile Fetch", "Reconcile Check"),
                      ("Reconcile Check", "Record Send"), ("Record Send", "Outcome"), ("AI Agent", "Generated?")):
         assert_that(conns[src]["main"][0] == [{"node": dst, "type": "main", "index": 0}],
                     f"{f}: {src} must chain ONLY to {dst}: {conns[src]['main'][0]}")
     assert_that(conns["Final OK?"]["main"] == [[{"node": "Acquire Send Lease", "type": "main", "index": 0}], [{"node": "Cancel Label", "type": "main", "index": 0}]],
                 f"{f}: Final OK? branches wrong: {conns['Final OK?']['main']}")
+    # V5: the lease's one re-read (Peer Recheck? true) loops back through Wait Peer Recheck → Recheck Fetch → Final Check
+    assert_that(conns["Peer Recheck?"]["main"] == [[{"node": "Wait Peer Recheck", "type": "main", "index": 0}], [{"node": "Send Allowed?", "type": "main", "index": 0}]],
+                f"{f}: Peer Recheck? branches wrong: {conns['Peer Recheck?']['main']}")
     assert_that(conns["Send Allowed?"]["main"] == [[{"node": "HTTP Request", "type": "main", "index": 0}], [{"node": "Cancel Label", "type": "main", "index": 0}]],
                 f"{f}: Send Allowed? branches wrong: {conns['Send Allowed?']['main']}")
     assert_that(conns["Send Unknown?"]["main"] == [[{"node": "Wait Reconcile", "type": "main", "index": 0}],

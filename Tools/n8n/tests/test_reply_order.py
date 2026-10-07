@@ -33,6 +33,13 @@ def walk(run, snapshot):
     run.lease()
     if run.done:
         return run
+    if getattr(run, 'recheck_pending', False):        # V5: the lease asked for ONE re-read — the chat is unchanged here
+        run.final(snapshot)
+        if run.done:
+            return run
+        run.lease()
+        if run.done:
+            return run
     run.send_ok()
     return run
 
@@ -125,16 +132,164 @@ for ch, T in TEMPLATES.items():
             walk(rn, [mn, ma])
             c.check(rn.outcome == 'sent', f'N must answer: {rn.outcome}')
 
-    with Case(f'R6 [{ch}] accepted residual (pinned): a SAME-second message claimed after A\'s Final Fetch does not refuse A\'s lease') as c:
-        # strict '>' is deliberate: at an equal time only Wappi's order (seen by Latest+Combine / Final Check, never by
-        # the claim) knows which one is newer; bumping on '>=' re-creates the zero-reply case for equal timestamps.
+    # V5 (iteration 2026-09-28) — what used to be pinned here as an «accepted residual»: a SAME-second message S,
+    # claimed by its own run after A's Final Fetch, was seen by neither freshness signal (the generation counts
+    # strictly newer seconds; the snapshot's order only orders rows it holds) and A's lease sent a reply that never
+    # saw S — whose own run then stopped on A's echo (a newer fromMe row): S unanswered. Strict '>' in the claim
+    # stays (on '>=' equal timestamps lose BOTH replies); the LEASE now refuses a registered same-second peer
+    # missing from the snapshot it decides on and asks for ONE re-read; who wins is again Wappi's order, on a
+    # snapshot that holds both. The waits in the template (Wait Peer Recheck ≥ debounce + fetch + one PG node) put
+    # the peer's own Latest+Combine verdict before the second lease: those orders are what these cases replay.
+    def peer_setup(pg, peer_t=100, peer_chat=None, peer_type='chat', peer_body='Сколько стоит букет из 25 роз?'):
+        ma = msg(ch, 'A', 100, 'Здравствуйте')
+        ms_ = msg(ch, 'S', peer_t, peer_body, chat=peer_chat, mtype=peer_type)
+        return ma, ms_, Run(T, pg, ma, 'e-a'), Run(T, pg, ms_, 'e-s')
+
+    with Case(f'V5 [{ch}] a same-second message claimed after A\'s Final Fetch → A re-reads; Wappi lists S first → S answers A+S, A superseded') as c:
         with PgSession(SETUP) as pg:
-            ma, ms_ = msg(ch, 'A', 100), msg(ch, 'S', 100)
-            ra, rs = Run(T, pg, ma, 'e-a'), Run(T, pg, ms_, 'e-s')
+            ma, ms_, ra, rs = peer_setup(pg)
+            ra.claim(); ra.latest([ma]); ra.generate(); ra.final([ma])          # A's final snapshot does not hold S
+            rs.claim()                                                           # S arrives now (same second)
+            ra.lease()
+            c.check(ra.lease_row.get('allowed') is False and ra.lease_row.get('peer_unseen') is True and ra.lease_row.get('recheck') is True
+                    and getattr(ra, 'recheck_pending', False) and not ra.done,
+                    f'A\'s lease must refuse and ask for one re-read: lease={ra.lease_row} outcome={ra.outcome}')
+            rs.latest([ms_, ma])                                                  # S's own run passes its Latest+Combine
+            if getattr(ra, 'recheck_pending', False):
+                ra.final([ms_, ma])                                               # the re-read holds S above A
+            c.check(ra.outcome == 'superseded', f'A must stop as superseded: {ra.outcome} lease={ra.lease_row}')
+            if not rs.done:
+                rs.generate(); rs.final([ms_, ma]); rs.lease()
+                if not rs.done:
+                    rs.send_ok()
+            c.check(rs.outcome == 'sent' and rs.text and 'Здравствуйте' in rs.text and 'букет' in rs.text,
+                    f'S must answer A+S: outcome={rs.outcome} text={rs.text!r}')
+            c.check(ledger(pg, ch) == {'A': 'superseded', 'S': 'sent'}, f'ledger={ledger(pg, ch)}')
+            c.check(ra.cancel and ra.cancel.get('dropped_ai_rows') == 1, f'A\'s draft must leave memory: {ra.cancel}')
+
+    with Case(f'V5 [{ch}] the same race, but the re-read lists A first (Wappi: A is the newer) → exactly one reply, by A; S superseded') as c:
+        with PgSession(SETUP) as pg:
+            ma, ms_, ra, rs = peer_setup(pg)
             ra.claim(); ra.latest([ma]); ra.generate(); ra.final([ma])
             rs.claim()
             ra.lease()
-            c.check(ra.lease_row.get('allowed') is True, f'A lease={ra.lease_row}')
+            c.check(getattr(ra, 'recheck_pending', False), f'A must re-read first: lease={ra.lease_row}')
+            rs.latest([ma, ms_])                                                  # S's run stops: A is listed above it
+            if getattr(ra, 'recheck_pending', False):
+                ra.final([ma, ms_]); ra.lease()
+            if not ra.done:
+                ra.send_ok()
+            c.check(ra.outcome == 'sent' and rs.outcome == 'superseded' and getattr(ra, 'leases', 0) == 2,
+                    f'a={ra.outcome} s={rs.outcome} leases={getattr(ra, "leases", 0)} ledger={ledger(pg, ch)}')
+
+    with Case(f'V5 [{ch}] the re-read still lacks S while S\'s run is alive → A refused (no second re-read), S answers both') as c:
+        with PgSession(SETUP) as pg:
+            ma, ms_, ra, rs = peer_setup(pg)
+            ra.claim(); ra.latest([ma]); ra.generate(); ra.final([ma])
+            rs.claim()
+            ra.lease()
+            rs.latest([ms_, ma])                                                  # S's own fetch holds S
+            if getattr(ra, 'recheck_pending', False):
+                ra.final([ma]); ra.lease()                                         # A's re-read lags behind S
+            c.check(ra.outcome == 'superseded' and ra.lease_row.get('recheck') is False and not getattr(ra, 'recheck_pending', False),
+                    f'A must be refused without a second re-read: a={ra.outcome} lease={ra.lease_row}')
+            walk(rs, [ms_, ma])
+            c.check(rs.outcome == 'sent' and 'Здравствуйте' in (rs.text or ''), f's={rs.outcome} text={rs.text!r}')
+
+    with Case(f'V5 [{ch}] S registered but Wappi never lists it (its run already stopped) → A answers after the re-read (one reply, as before)') as c:
+        with PgSession(SETUP) as pg:
+            ma, ms_, ra, rs = peer_setup(pg)
+            ra.claim(); ra.latest([ma]); ra.generate(); ra.final([ma])
+            rs.claim()
+            ra.lease()
+            rs.latest([ma])                                                       # S's own fetch lacks S → it stops
+            if getattr(ra, 'recheck_pending', False):
+                ra.final([ma]); ra.lease()
+            if not ra.done:
+                ra.send_ok()
+            c.check(ra.outcome == 'sent' and rs.outcome == 'superseded', f'a={ra.outcome} s={rs.outcome} lease={ra.lease_row}')
+
+    with Case(f'V5 [{ch}] an album of 16 photos in one second, the 16th claimed late: a full 15-row page proves nothing → P01 answers') as c:
+        with PgSession(SETUP) as pg:
+            ps = [msg(ch, 'P%02d' % i, 100, 'https://mock/photo%d.jpg' % i, mtype='image') for i in range(1, 17)]
+            runs = [Run(T, pg, m, 'e-p%02d' % i) for i, m in enumerate(ps, 1)]
+            page = ps[:15]                                                        # messages/get: limit 15, P16 not in it
+            for r in runs[:15]:
+                r.claim()
+            first = runs[0]
+            first.latest(page); first.ask_for_text('Напишите, пожалуйста, текстом.'); first.final(page)
+            runs[15].claim()                                                      # the tail registers late
+            first.lease()
+            c.check(first.lease_row.get('allowed') is True and first.lease_row.get('peer_unseen') is not True,
+                    f'an incomplete page must not refuse: lease={first.lease_row} complete={first.named["Final Check"].get("seenComplete")}')
+            if not first.done and not getattr(first, 'recheck_pending', False):
+                first.send_ok()
+            c.check(first.outcome == 'sent', f'P01={first.outcome}')
+
+    with Case(f'V5 [{ch}] a 15-row page that reaches past the trigger\'s second IS complete: the rule applies') as c:
+        with PgSession(SETUP) as pg:
+            ma, ms_, ra, rs = peer_setup(pg)
+            older = [msg(ch, 'O%02d' % i, 50 + i, 'раньше %d' % i) for i in range(14)]
+            page = [ma] + older[::-1]                                             # 15 rows, the oldest well before 100
+            ra.claim(); ra.latest(page); ra.generate(); ra.final(page)
+            rs.claim()
+            ra.lease()
+            c.check(ra.named['Final Check'].get('seenComplete') is True and ra.lease_row.get('peer_unseen') is True,
+                    f'complete={ra.named["Final Check"].get("seenComplete")} lease={ra.lease_row}')
+
+    with Case(f'V5 [{ch}] guards: a late OLDER message, a peer whose run already stopped, another chat\'s same-second message → A sends at once') as c:
+        for label, kw, peer_first in (('older O(99)', dict(peer_t=99), False), ('stopped peer', {}, True),
+                                      ('other chat', dict(peer_chat=(C.replace('3', '4') if ch == 'WA' else C + '9')), False)):
+            with PgSession(SETUP) as pg:
+                ma, ms_, ra, rs = peer_setup(pg, **kw)
+                ra.claim(); ra.latest([ma]); ra.generate(); ra.final([ma])
+                rs.claim()
+                if peer_first:
+                    rs.latest([ma])                                               # S's run stops before A's lease
+                ra.lease()
+                c.check(ra.lease_row.get('allowed') is True and ra.lease_row.get('peer_unseen') is False and ra.lease_row.get('recheck') is False,
+                        f'{label}: lease={ra.lease_row}')
+
+    with Case(f'V5 [{ch}] a strictly NEWER message stays the generation\'s job (no re-read); a trigger without a time keeps the rule off') as c:
+        with PgSession(SETUP) as pg:
+            ma, mn, ra, rn = peer_setup(pg, peer_t=101)
+            ra.claim(); ra.latest([ma]); ra.generate(); ra.final([ma])
+            rn.claim(); ra.lease()
+            c.check(ra.lease_row.get('allowed') is False and ra.lease_row.get('recheck') is False and ra.outcome == 'superseded',
+                    f'newer: lease={ra.lease_row} outcome={ra.outcome}')
+        with PgSession(SETUP) as pg:
+            ma, mx = msg(ch, 'A', None, 'Здравствуйте'), msg(ch, 'X', None, 'Ещё вопрос')
+            ra, rx = Run(T, pg, ma, 'e-a'), Run(T, pg, mx, 'e-x')
+            ra.claim(); ra.latest([ma]); ra.generate(); ra.final([ma])
+            rx.claim(); ra.lease()
+            c.check(ra.lease_row.get('peer_unseen') is False and ra.lease_row.get('recheck') is False, f'no time: lease={ra.lease_row}')
+
+    with Case(f'V5 [{ch}] «Вместе» or another run\'s live lease next to an unseen peer → cancelled_mode / cancelled_busy, never a re-read') as c:
+        for label, prep, want in (("mode", lambda pg: pg.x(f"insert into reply_mode_flags (profile_id, chat_id, suppressed, version) values ('{P}', '{C}', true, 1);"), 'cancelled_mode'),
+                                  ("busy", lambda pg: pg.x(f"update chat_reply_state set lock_token = 'other-run', lock_expires_at = now() + interval '5 minutes' where profile_id = '{P}' and chat_id = '{C}';"), 'cancelled_busy')):
+            with PgSession(SETUP) as pg:
+                ma, ms_, ra, rs = peer_setup(pg)
+                ra.claim(); ra.latest([ma]); ra.generate(); ra.final([ma])
+                rs.claim()
+                prep(pg)
+                ra.lease()
+                c.check(ra.outcome == want and ra.lease_row.get('recheck') is False, f'{label}: outcome={ra.outcome} lease={ra.lease_row}')
+
+    with Case(f'V5 [{ch}] the media branch (no agent run) re-reads the same way and its refusal drops nothing') as c:
+        with PgSession(SETUP) as pg:
+            ma = msg(ch, 'A', 100, 'https://mock/photo.jpg', mtype='image')
+            ms_ = msg(ch, 'S', 100, 'Сколько стоит букет из 25 роз?')
+            ra, rs = Run(T, pg, ma, 'e-a'), Run(T, pg, ms_, 'e-s')
+            ra.claim(); ra.latest([ma]); ra.ask_for_text('Напишите, пожалуйста, текстом.'); ra.final([ma])
+            rs.claim()
+            ra.lease()
+            c.check(getattr(ra, 'recheck_pending', False), f'media: lease={ra.lease_row}')
+            rs.latest([ms_, ma])
+            if getattr(ra, 'recheck_pending', False):
+                ra.final([ms_, ma])
+            c.check(ra.outcome == 'superseded' and ra.cancel and ra.cancel.get('dropped_ai_rows') == 0, f'a={ra.outcome} cancel={ra.cancel}')
+            walk(rs, [ms_, ma])
+            c.check(rs.outcome == 'sent', f's={rs.outcome}')
 
     with Case(f'R6 [{ch}] a webhook WITHOUT a time keeps the old rule: its claim always bumps the generation') as c:
         with PgSession(SETUP) as pg:

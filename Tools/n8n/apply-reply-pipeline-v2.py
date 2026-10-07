@@ -9,7 +9,9 @@ Chain after this migration (the pre-existing nodes keep their names; new ones ar
   → *Generated? → Pause Before Reading → Mark Read (fail-open) → … → Typing (fail-open) → … → Retrieve Answer
   → *Final Fetch → *Final Check (newer client msg → superseded; owner replied → cancelled_owner; trigger
   missing from the fetch → cancelled_fetch) → *Final OK? → *Acquire Send Lease (ONE statement: current mode,
-  incoming generation, 90-s per-chat lease, event → send_pending) → *Send Allowed? → HTTP Request (send,
+  incoming generation, 90-s per-chat lease, event → send_pending; V5: a claimed SAME-second message missing from
+  the snapshot refuses it) → *Peer Recheck? →[once] *Wait Peer Recheck → *Recheck Fetch → Final Check (again)
+  | → *Send Allowed? → HTTP Request (send,
   fullResponse, never throws) → *Settle Send (sent | send_failed | send_unknown) → [*Send Unknown? → *Wait
   Reconcile → *Reconcile Fetch → *Reconcile Check (echo found ⇒ sent, else stays send_unknown, NEVER a
   blind resend)] → *Record Send → Outcome.  Every refusal/cancel → *Cancel Label → *Record Cancel (event
@@ -19,12 +21,20 @@ Pauses are clamped (reading ≤ 8 s, typing ≤ 12 s, listening ≤ 12 s).
     python3 Tools/n8n/apply-reply-pipeline-v2.py            # patch workflows/ in place (re-runnable)
     python3 Tools/n8n/apply-reply-pipeline-v2.py --check
 """
+import importlib.util
 import json
 import os
 import sys
 import uuid
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def _module(filename):
+    spec = importlib.util.spec_from_file_location(filename.replace("-", "_").replace(".py", ""), os.path.join(HERE, filename))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
 WF = os.path.join(HERE, "workflows")
 PG_CRED = {"id": "vvRrFiEXzLVqKjOx", "name": "Postgres"}
 WAPPI_CRED = {"id": "EuhhqAaV56DpoqAN", "name": "WappiAuthToken"}
@@ -32,6 +42,17 @@ BOTS = {"4wYitz5ek30SVNlT-WhatsApp_Bot.json": "https://wappi.pro/api/sync/",
         "4VN3gsFaC2HUYmcc-Telegram_Bot.json": "https://wappi.pro/tapi/sync/"}
 LEASE_SECONDS = 90
 TRIG = "$('Webhook').first().json.body.messages[0]"
+FETCH_LIMIT = 15        # rows messages/get returns (Fetch Recent / Final Fetch / Reconcile Fetch / Recheck Fetch)
+# V5 (iteration 2026-09-28): the re-read the lease asks for when a same-second peer is missing from the snapshot.
+# The wait outlasts the PEER's own path to its Latest+Combine verdict — debounce (the batching generator's constant)
+# + Fetch Recent + one Postgres node (≈1.9 s on prod) — so by the second lease the peer's ledger state already says
+# whether it will answer (alive ⇒ A refuses) or stopped without a reply (A sends). The re-read is ONE short fetch
+# without retries (an error ⇒ cancelled_fetch): the execution timeout (120 s on prod) must survive a slow Wappi.
+DEBOUNCE_SECONDS = _module("apply-message-batching.py").DEBOUNCE_SECONDS
+FETCH_RECENT_BUDGET_SECONDS = 2
+PG_NODE_BUDGET_SECONDS = 2
+PEER_RECHECK_SECONDS = DEBOUNCE_SECONDS + FETCH_RECENT_BUDGET_SECONDS + PG_NODE_BUDGET_SECONDS
+RECHECK_FETCH_TIMEOUT_MS = 10000
 
 # SUPERSEDED COPIES: CLAIM_SQL / RECORD_SEND_SQL / RECORD_CANCEL_SQL / CANCEL_LABEL_JS below only seed a template that
 # does not have the nodes yet. Once stage 4 re-shaped them (STAGE4_OWNED, ensure() skips them), the source of truth
@@ -62,18 +83,35 @@ ACQUIRE_SQL = """-- A3/A4: the last word before the transport call, in ONE state
 -- supersedes), and a 90-s per-chat lease (two runs of the same chat cannot send at once; other chats are
 -- untouched). Only a run that holds the lease marks its event send_pending. Nothing here spans the LLM or
 -- the transport call — the lease is what covers the send itself.
+-- V5: a client message of the trigger's OWN second, claimed by its own run but absent from the snapshot the
+-- Final Check decided on, is seen by neither freshness signal (the generation counts strictly newer seconds,
+-- the snapshot's order only orders the rows it holds). It refuses the lease (peer_unseen) — only when that
+-- snapshot was complete for the second (a full page of one second proves nothing), never for a strictly newer
+-- or older second, never for a peer whose run already ended without a reply. On the first pass the run re-reads
+-- the chat once (recheck); on the second the refusal stands. No lock is taken while that happens.
 with mode as (
   select coalesce((select suppressed from reply_mode_flags
                    where profile_id = $1 and chat_id in ($2, '*')
                    order by (chat_id = '*') limit 1), false) as suppressed
 ), cur as (
   select incoming_generation, lock_token, lock_expires_at from chat_reply_state where profile_id = $1 and chat_id = $2
+), peer as (
+  select exists (
+    select 1 from reply_events r
+    join chat_history_events h on h.profile_id = r.profile_id and h.chat_id = r.chat_id
+                              and h.message_id = r.message_id and h.source = 'client'
+    where r.profile_id = $1 and r.chat_id = $2 and r.message_id <> $3
+      and r.state in ('claimed', 'generated', 'send_pending', 'sent', 'send_unknown')
+      and $9::boolean and $7::bigint > 0 and h.sent_at = to_timestamp($7::bigint)
+      and not exists (select 1 from jsonb_array_elements_text($6::jsonb) s(id) where s.id = r.message_id)
+  ) as unseen
 ), lease as (
   update chat_reply_state c set lock_token = $5, lock_expires_at = now() + interval '__LEASE__ seconds'
   where c.profile_id = $1 and c.chat_id = $2
     and (c.lock_token is null or c.lock_expires_at < now() or c.lock_token = $5)
     and c.incoming_generation = $4::bigint
     and not (select suppressed from mode)
+    and not (select unseen from peer)
   returning 1
 ), ev as (
   update reply_events set state = 'send_pending', updated_at = now()
@@ -83,7 +121,17 @@ with mode as (
 select exists(select 1 from lease) as allowed,
        (select suppressed from mode) as suppressed,
        (select incoming_generation from cur)::bigint as generation_now,
-       (select lock_token from cur) is not null and (select lock_expires_at from cur) > now() and (select lock_token from cur) <> $5 as lock_busy;""".replace("__LEASE__", str(LEASE_SECONDS))
+       (select lock_token from cur) is not null and (select lock_expires_at from cur) > now() and (select lock_token from cur) <> $5 as lock_busy,
+       (select unseen from peer) as peer_unseen,
+       (select unseen from peer) and not $8::boolean and not (select suppressed from mode)
+         and coalesce((select incoming_generation from cur) = $4::bigint, false)
+         and not coalesce((select lock_token from cur) is not null and (select lock_expires_at from cur) > now()
+                          and (select lock_token from cur) <> $5, false) as recheck;""".replace("__LEASE__", str(LEASE_SECONDS))
+# $6 = the ids the Final Check saw, $7 = the trigger's own Wappi time (0 = unknown → the rule is off), $8 = this is
+# the pass after the one re-read, $9 = that snapshot was complete for the trigger's second. Every element always
+# has a value: n8n drops an undefined one and shifts every later placeholder.
+ACQUIRE_PARAMS_TAIL = (", $json.generation, $execution.id, JSON.stringify($json.seenIds || []), Number(" + TRIG + ".time) || 0, "
+                       "$json.recheck === true, $json.seenComplete === true ] }}")
 
 RECORD_SEND_SQL = """-- A7: the event's final transport state and the lease release. send_unknown stays send_unknown —
 -- an operator-visible uncertainty, never a silent retry.
@@ -136,9 +184,17 @@ if (!text.trim()) { ok = false; outcome = 'generation_failed'; }
 else if (trigIdx < 0) { ok = false; outcome = 'cancelled_fetch'; }
 else if (fetched.slice(0, trigIdx).some(m => m && m.fromMe === false)) { ok = false; outcome = 'superseded'; }
 else if (fetched.slice(0, trigIdx).some(m => m && m.fromMe === true)) { ok = false; outcome = 'cancelled_owner'; }
+// V5 (iteration 2026-09-28): what this snapshot SAW, for the lease's same-second peer rule. The rule needs a
+// snapshot COMPLETE for the trigger's second: messages/get returns at most __LIMIT__ rows, so a full page whose every
+// row is at or after that second (an album of more photos than fit) proves nothing about a row it lacks.
+const seenIds = fetched.filter(m => m && m.id !== undefined && m.id !== null).map(m => String(m.id));
+const seenComplete = fetchedAll.length < __LIMIT__ || fetched.some(m => m && Number(m.time || 0) > 0 && Number(m.time || 0) < Number(trig.time || 0));
+// The pass AFTER the lease asked for its one re-read (on the first pass the lease has not run: the reference throws).
+let recheck = false;
+try { recheck = $('Acquire Send Lease').first().json.peer_unseen === true; } catch (e) { recheck = false; }
 return [{ json: { ok, outcome, text, generation: Number(claim.generation) || 0, historyWatermark: Number(claim.history_watermark) || 0,
-                  sendStartedAt: Math.floor(Date.now() / 1000) }, pairedItem: { item: 0 } }];
-"""
+                  sendStartedAt: Math.floor(Date.now() / 1000), seenIds, seenComplete, recheck }, pairedItem: { item: 0 } }];
+""".replace("__LIMIT__", str(FETCH_LIMIT))
 
 SETTLE_JS = r"""// SETTLE SEND (A7): classify the transport call — never assume delivery from a missing answer.
 const r = $input.first().json || {};
@@ -291,11 +347,20 @@ def fetch(name, base, pos, fname):
                            "sendQuery": True, "queryParameters": {"parameters": [
                                {"name": "profile_id", "value": "={{ " + TRIG + ".profile_id }}"},
                                {"name": "chat_id", "value": "={{ " + TRIG + ".chatId }}"},
-                               {"name": "limit", "value": "15"}]},
+                               {"name": "limit", "value": str(FETCH_LIMIT)}]},
                            "options": {"timeout": 20000}},
             "id": nid(fname, name), "name": name, "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": pos,
             "credentials": {"httpHeaderAuth": dict(WAPPI_CRED)}, "retryOnFail": True, "maxTries": 3, "waitBetweenTries": 1000,
             "alwaysOutputData": True, "onError": "continueRegularOutput"}
+
+
+def recheck_fetch(name, base, pos, fname):
+    """V5: the lease's one re-read — the same messages/get, short and without retries (an error ⇒ cancelled_fetch)."""
+    n = fetch(name, base, pos, fname)
+    n["parameters"]["options"] = {"timeout": RECHECK_FETCH_TIMEOUT_MS}
+    n["retryOnFail"] = False
+    del n["maxTries"], n["waitBetweenTries"]
+    return n
 
 
 def patch(fname, base):
@@ -372,7 +437,7 @@ def patch(fname, base):
     ch |= ensure(wf, fetch("Final Fetch", base, [-64, -160], fname))
     ch |= ensure(wf, code("Final Check", FINAL_CHECK_JS, [128, -160], fname))
     ch |= ensure(wf, if_true("Final OK?", "={{ $json.ok }}", [320, -160], fname))
-    ch |= ensure(wf, pg("Acquire Send Lease", ACQUIRE_SQL, key + ", $json.generation, $execution.id ] }}", [512, -160], fname))
+    ch |= ensure(wf, pg("Acquire Send Lease", ACQUIRE_SQL, key + ACQUIRE_PARAMS_TAIL, [512, -160], fname))
     ch |= ensure(wf, if_true("Send Allowed?", "={{ $json.allowed }}", [704, -160], fname))
     send = node(wf, "HTTP Request")
     bp = send["parameters"]["bodyParameters"]["parameters"]
@@ -400,7 +465,15 @@ def patch(fname, base):
     ch |= set_edges(wf, "Final Fetch", [["Final Check"]])
     ch |= set_edges(wf, "Final Check", [["Final OK?"]])
     ch |= set_edges(wf, "Final OK?", [["Acquire Send Lease"], ["Cancel Label"]])
-    ch |= set_edges(wf, "Acquire Send Lease", [["Send Allowed?"]])
+    # V5: the lease's one re-read loops back into the Final Check (appended nodes: nodes[0]/[5] stay Webhook/AI Agent)
+    ch |= ensure(wf, if_true("Peer Recheck?", "={{ $json.recheck === true }}", [704, -400], fname))
+    ch |= ensure(wf, {"parameters": {"amount": PEER_RECHECK_SECONDS}, "id": nid(fname, "Wait Peer Recheck"), "name": "Wait Peer Recheck",
+                      "type": "n8n-nodes-base.wait", "typeVersion": 1.1, "position": [896, -400], "webhookId": nid(fname, "Wait Peer Recheck", "wh")})
+    ch |= ensure(wf, recheck_fetch("Recheck Fetch", base, [1088, -400], fname))
+    ch |= set_edges(wf, "Acquire Send Lease", [["Peer Recheck?"]])
+    ch |= set_edges(wf, "Peer Recheck?", [["Wait Peer Recheck"], ["Send Allowed?"]])
+    ch |= set_edges(wf, "Wait Peer Recheck", [["Recheck Fetch"]])
+    ch |= set_edges(wf, "Recheck Fetch", [["Final Check"]])
     ch |= set_edges(wf, "Send Allowed?", [["HTTP Request"], ["Cancel Label"]])
     ch |= set_edges(wf, "HTTP Request", [["Settle Send"]])
     ch |= set_edges(wf, "Settle Send", [["Send Unknown?"]])
@@ -423,10 +496,12 @@ def check():
         wf = json.load(open(os.path.join(WF, f), encoding="utf-8"))
         need = ("Claim Event", "Claimed?", "Generated?", "Final Fetch", "Final Check", "Final OK?", "Acquire Send Lease",
                 "Send Allowed?", "Settle Send", "Send Unknown?", "Wait Reconcile", "Reconcile Fetch", "Reconcile Check",
-                "Record Send", "Cancel Label", "Record Cancel")
+                "Record Send", "Cancel Label", "Record Cancel", "Peer Recheck?", "Wait Peer Recheck", "Recheck Fetch")
             # Claim / Record Send / Record Cancel / Cancel Label are re-shaped by apply-history-handoff.py (stage 4) — not compared here.
         if any(node(wf, n) is None for n in need) or LATEST_COMBINE_PATCH_NEW not in node(wf, "Latest+Combine")["parameters"]["jsCode"] \
                 or node(wf, "Acquire Send Lease")["parameters"]["query"] != ACQUIRE_SQL or node(wf, "Final Check")["parameters"]["jsCode"] != FINAL_CHECK_JS \
+                or not node(wf, "Acquire Send Lease")["parameters"]["options"]["queryReplacement"].endswith(ACQUIRE_PARAMS_TAIL) \
+                or node(wf, "Wait Peer Recheck")["parameters"].get("amount") != PEER_RECHECK_SECONDS \
                 or node(wf, "Reconcile Check")["parameters"]["jsCode"] != RECONCILE_JS:
             bad.append(f)
     return bad

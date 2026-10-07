@@ -87,6 +87,8 @@ TG_BOT_NODE_NAMES = {
     "Record Send", "Cancel Label", "Record Cancel",
     # audit stage 4 (apply-history-handoff.py): event routing, outgoing/suppressed recording, the handoff tool — +6
     "Is Incoming?", "Is Outgoing?", "Outgoing Bound?", "Record Outgoing", "Record Suppressed", "Create Handoff",
+    # iteration 2026-09-28 V5 (apply-reply-pipeline-v2.py): the lease's one re-read of a same-second peer — +3
+    "Peer Recheck?", "Wait Peer Recheck", "Recheck Fetch",
 }
 
 
