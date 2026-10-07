@@ -244,7 +244,7 @@ def check_bot(f, base):
     for src, dst in (("Retrieve Answer", "Final Fetch"), ("Ask to Send Text", "Final Fetch"), ("Final Fetch", "Final Check"),
                      ("Final Check", "Final OK?"), ("Acquire Send Lease", "Peer Recheck?"), ("Wait Peer Recheck", "Recheck Fetch"),
                      ("Recheck Fetch", "Final Check"), ("HTTP Request", "Settle Send"),
-                     ("Settle Send", "Send Unknown?"), ("Wait Reconcile", "Reconcile Fetch"), ("Reconcile Fetch", "Reconcile Check"),
+                     ("Settle Send", "Send Unknown?"), ("Wait Reconcile", "Reconcile Fetch"), ("Reconcile Fetch", "Owner Row?"), ("Owner Row?", "Reconcile Check"),
                      ("Reconcile Check", "Record Send"), ("Record Send", "Outcome"), ("AI Agent", "Generated?")):
         assert_that(conns[src]["main"][0] == [{"node": dst, "type": "main", "index": 0}],
                     f"{f}: {src} must chain ONLY to {dst}: {conns[src]['main'][0]}")

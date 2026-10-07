@@ -436,6 +436,43 @@ def same_second_peer_a_first(ctx, ch):
     return ok, detail
 
 
+def _lost_send_with_echo(ctx, ch, tag, echo, pre_sql=None):
+    """V7: the transport accepts the canned media ask but the answer is lost; the echo row the mock appends carries `echo`."""
+    b = Bot(ctx, ch, tag)
+    t = int(time.time())
+    mid = f"{tag}-{ctx.run_id}"
+    b.history([{"id": mid, "body": "https://mock/photo.jpg", "time": t, "fromMe": False, "type": "image"}])
+    if pre_sql:
+        psql(pre_sql(b))
+    mock("POST", "/__mock/fault", {"match": "message/send", "mode": "accept_then_drop", "echo": echo})
+    b.post(mid, "https://mock/photo.jpg", t, mtype="image")
+    ex = b.settle(1)
+    rc = node_output(ex[0]["data"], "Reconcile Check") if ex else None
+    return b, mid, ex, rc, ledger(b.pid, b.chat, mid)
+
+
+@for_channels("unmarked_echo_stays_send_unknown", "V7: the answer is lost and the only row with our text carries NO API mark (no from_where, no task id — isFromAPI alone proves nothing) → send_unknown, never adopted")
+def unmarked_echo(ctx, ch):
+    b, mid, ex, rc, led = _lost_send_with_echo(ctx, ch, "unm", {"from_where": "", "task_id": "", "isFromAPI": True})
+    ok = len(b.all_send_calls()) == 1 and ex and ex[0]["outcome"] == "send_unknown" and led.startswith("send_unknown|-|") \
+        and rc and rc.get("reconciled") is False and "unattributed" in (rc.get("error") or "")
+    return ok, f"send_calls={len(b.all_send_calls())} outcome={ex[0]['outcome'] if ex else None} ledger={led} reconcile_error={rc and rc.get('error')}"
+
+
+@for_channels("owner_app_same_text_stays_send_unknown", "V7: the answer is lost and the only same-text row is the OWNER's app send (owner_app in the one history, API-marked like ours) → send_unknown; the owner row keeps its source, last_sent stays empty")
+def owner_app_same_text(ctx, ch):
+    own = f"oapown-{ctx.run_id}"
+    b, mid, ex, rc, led = _lost_send_with_echo(
+        ctx, ch, "oap", {"id": own},
+        pre_sql=lambda b: (f"insert into chat_history_events (profile_id, chat_id, message_id, source, body, msg_type, sent_at, execution_id) "
+                           f"values ('{b.pid}', '{b.chat}', '{own}', 'owner_app', 'owner text', 'chat', now(), 'proxy-run');"))
+    src = psql(f"select source from chat_history_events where profile_id = '{b.pid}' and chat_id = '{b.chat}' and message_id = '{own}';")
+    last = psql(f"select coalesce(last_sent_message_id, '-') from chat_reply_state where profile_id = '{b.pid}' and chat_id = '{b.chat}';")
+    ok = len(b.all_send_calls()) == 1 and ex and ex[0]["outcome"] == "send_unknown" and led.startswith("send_unknown|-|") \
+        and src == "owner_app" and last == "-" and rc and "owner_app" in (rc.get("error") or "")
+    return ok, f"outcome={ex[0]['outcome'] if ex else None} ledger={led} owner_row_source={src} last_sent={last} reconcile_error={rc and rc.get('error')}"
+
+
 @for_channels("media_message_gets_the_ru_ask_for_text", "a photo/document/sticker never reaches the model: the canned ask is Russian (+ Kazakh line), sent once, through the same send chain (stage 6, 2026-09-22)")
 def media_ask(ctx, ch):
     b = Bot(ctx, ch, "media")

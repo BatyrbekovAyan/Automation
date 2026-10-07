@@ -91,6 +91,8 @@ TG_BOT_NODE_NAMES = {
     "Peer Recheck?", "Wait Peer Recheck", "Recheck Fetch",
     # iteration 2026-09-28 V6 (apply-history-handoff.py): the agent's memory row tied to the execution — +1
     "Stamp Draft",
+    # iteration 2026-09-28 V7 (apply-reply-pipeline-v2.py): the one history's verdict on the reconcile window — +1
+    "Owner Row?",
 }
 
 

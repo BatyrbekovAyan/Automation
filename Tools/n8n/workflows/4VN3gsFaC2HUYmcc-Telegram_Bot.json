@@ -1435,7 +1435,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// RECONCILE (A7): the transport may have accepted the message although its answer was lost. Look for\n// OUR text as an outgoing row after the send started; found ⇒ sent (adopt its id), else the state stays\n// send_unknown for the owner to see. Never resend here.\n// R10: Final Check's rules, stricter — here a false «sent» hides a lost reply. Rows naming a FOREIGN chat are\n// dropped (Wappi/tapi cross concurrent responses); the window must hold the TRIGGER (a crossed window without\n// chatId fields fails here); the echo must be newer than the trigger in the window's order (time desc, Wappi\n// order on ties); a row the transport marks as sent from the phone (tapi from_where) is the owner's, not ours;\n// and EXACTLY ONE distinct row may match — none or several (the owner typed the same text) stay send_unknown.\nconst s = $('Settle Send').first().json;\nconst trig = $('Webhook').first().json.body.messages[0];\nconst fetchedAll = ($json.messages || []).filter(m => m && typeof m === 'object');\nconst fetched = fetchedAll.filter(m => !(m.chatId && trig.chatId && m.chatId !== trig.chatId));\nfetched.forEach((m, i) => { m.__i = i; });\nfetched.sort((a, b) => ((b.time || 0) - (a.time || 0)) || ((a.__i || 0) - (b.__i || 0)));\nconst trigIdx = fetched.findIndex(m => m.id === trig.id);\nconst ours = m => m.fromMe === true && typeof m.body === 'string' && m.from_where !== 'phone'\n  && m.body.trim() === String(s.text).trim() && (m.time || 0) >= (Number(s.sendStartedAt) - 5);\nconst cands = [];\nfor (const m of (trigIdx < 0 ? [] : fetched.slice(0, trigIdx))) {\n  if (ours(m) && !cands.some(x => String(x.id) === String(m.id))) cands.push(m);\n}\nconst hit = cands.length === 1 ? cands[0] : null;\nconst why = trigIdx < 0 ? 'reconcile: window without the trigger' : (cands.length > 1 ? 'reconcile: ambiguous echo (' + cands.length + ' rows)' : '');\nreturn [{ json: { state: hit ? 'sent' : 'send_unknown', transportMessageId: hit ? String(hit.id || '') : '',\n                  error: hit ? '' : [s.error, why].filter(Boolean).join(' | ').slice(0, 300), reconciled: !!hit,\n                  foreignFetched: fetchedAll.length - fetched.length }, pairedItem: { item: 0 } }];\n"
+        "jsCode": "// RECONCILE (A7): the transport may have accepted the message although its answer was lost. Look for\n// OUR text as an outgoing row after the send started; found ⇒ sent (adopt its id), else the state stays\n// send_unknown for the owner to see. Never resend here.\n// R10: Final Check's rules, stricter — here a false «sent» hides a lost reply. Rows naming a FOREIGN chat are\n// dropped (Wappi/tapi cross concurrent responses); the window must hold the TRIGGER (a crossed window without\n// chatId fields fails here); the echo must be newer than the trigger in the window's order (time desc, Wappi\n// order on ties); a row the transport marks as sent from the phone (tapi from_where) is the owner's, not ours;\n// and EXACTLY ONE distinct row may match — none or several (the owner typed the same text) stay send_unknown.\n// V7 (iteration 2026-09-28): the single candidate needs POSITIVE attribution — the absence of a phone mark proves\n// nothing. A response whose uuid names ANOTHER profile is a foreign window; a row naming another profile is\n// dropped; the webhook phone type counts as the phone. The candidate is ours when the transport marks it as an API\n// send (from_where 'api', the outgoing_message_api type, or a task id — never the isFromAPI flag, which tapi sets\n// on phone rows too) or the one history recorded it from the transport's outgoing_message_api webhook (Owner Row?\n// — this node's input). A row the history already gives to the OWNER (owner_app: the app's own send carries the\n// same api mark; owner_phone) or to another reply (ai) is never ours. Absent facts give no verdict.\nconst s = $('Settle Send').first().json;\nconst trig = $('Webhook').first().json.body.messages[0];\nlet fetch = {};\ntry { fetch = $('Reconcile Fetch').first().json || {}; } catch (e) { fetch = {}; }\nlet sources = {};\ntry { const x = $json.sources; sources = (x && typeof x === 'object' && !Array.isArray(x)) ? x : {}; } catch (e) { sources = {}; }\nconst norm = v => (v === undefined || v === null) ? '' : String(v).trim().toLowerCase();\nconst pid = norm(trig.profile_id);\nconst scope = norm(fetch.uuid);\nconst foreignScope = pid !== '' && scope !== '' && scope !== pid;\nconst fetchedAll = (Array.isArray(fetch.messages) ? fetch.messages : []).filter(m => m && typeof m === 'object');\nconst fetched = foreignScope ? [] : fetchedAll.filter(m => !(m.chatId && trig.chatId && m.chatId !== trig.chatId)\n                                                     && !(pid && m.profile_id && norm(m.profile_id) !== pid));\nfetched.forEach((m, i) => { m.__i = i; });\nfetched.sort((a, b) => ((b.time || 0) - (a.time || 0)) || ((a.__i || 0) - (b.__i || 0)));\nconst trigIdx = fetched.findIndex(m => m.id === trig.id);\nconst ours = m => m.fromMe === true && typeof m.body === 'string' && m.from_where !== 'phone' && m.wh_type !== 'outgoing_message_phone'\n  && m.body.trim() === String(s.text).trim() && (m.time || 0) >= (Number(s.sendStartedAt) - 5);\nconst viaApi = m => m.from_where === 'api' || m.wh_type === 'outgoing_message_api' || (typeof m.task_id === 'string' && m.task_id.trim() !== '');\nconst cands = [];\nfor (const m of (trigIdx < 0 ? [] : fetched.slice(0, trigIdx))) {\n  if (ours(m) && !cands.some(x => String(x.id) === String(m.id))) cands.push(m);\n}\nconst one = cands.length === 1 ? cands[0] : null;\nconst known = one ? String(sources[String(one.id)] || '') : '';\nconst hit = one && (known === 'outgoing_api' || (known === '' && viaApi(one))) ? one : null;\nconst why = foreignScope ? 'reconcile: window of another profile'\n  : trigIdx < 0 ? 'reconcile: window without the trigger'\n  : cands.length > 1 ? 'reconcile: ambiguous echo (' + cands.length + ' rows)'\n  : (one && !hit && known) ? 'reconcile: row ' + String(one.id) + ' is recorded as ' + known\n  : (one && !hit) ? 'reconcile: unattributed outgoing row ' + String(one.id) + ' (no api mark)' : '';\nreturn [{ json: { state: hit ? 'sent' : 'send_unknown', transportMessageId: hit ? String(hit.id || '') : '',\n                  error: hit ? '' : [s.error, why].filter(Boolean).join(' | ').slice(0, 300), reconciled: !!hit,\n                  foreignFetched: fetchedAll.length - fetched.length, candidateId: one ? String(one.id || '') : '',\n                  candidateSource: known }, pairedItem: { item: 0 } }];\n"
       },
       "id": "e0477045-6925-527d-a4da-bccdcc26e0a6",
       "name": "Reconcile Check",
@@ -1835,6 +1835,31 @@
       "position": [
         -2000,
         -360
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vvRrFiEXzLVqKjOx",
+          "name": "Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- V7: the one history's source for every row of the reconcile window. owner_app (the app's own send through\n-- the proxy) and owner_phone are the owner's, never our echo; outgoing_api is the transport's own webhook for\n-- an API send, positive proof the row was sent through the API. Read-only; always exactly one row.\nselect coalesce(jsonb_object_agg(h.message_id, h.source), '{}'::jsonb) as sources\nfrom chat_history_events h\nwhere h.profile_id = $1 and h.chat_id = $2\n  and h.message_id in (select jsonb_array_elements_text($3::jsonb));",
+        "options": {
+          "queryReplacement": "={{ [ $('Webhook').first().json.body.messages[0].profile_id, $('Webhook').first().json.body.messages[0].from, JSON.stringify((Array.isArray($json.messages) ? $json.messages : []).filter(m => m && m.id !== undefined && m.id !== null).map(m => String(m.id))) ] }}"
+        }
+      },
+      "id": "79ea1959-6d30-5a5b-b5d6-7a2a30909179",
+      "name": "Owner Row?",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1760,
+        620
       ],
       "credentials": {
         "postgres": {
@@ -2455,7 +2480,7 @@
       "main": [
         [
           {
-            "node": "Reconcile Check",
+            "node": "Owner Row?",
             "type": "main",
             "index": 0
           }
@@ -2616,6 +2641,17 @@
         [
           {
             "node": "Pause Before Reading",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Owner Row?": {
+      "main": [
+        [
+          {
+            "node": "Reconcile Check",
             "type": "main",
             "index": 0
           }

@@ -13,8 +13,9 @@ Chain after this migration (the pre-existing nodes keep their names; new ones ar
   the snapshot refuses it) → *Peer Recheck? →[once] *Wait Peer Recheck → *Recheck Fetch → Final Check (again)
   | → *Send Allowed? → HTTP Request (send,
   fullResponse, never throws) → *Settle Send (sent | send_failed | send_unknown) → [*Send Unknown? → *Wait
-  Reconcile → *Reconcile Fetch → *Reconcile Check (echo found ⇒ sent, else stays send_unknown, NEVER a
-  blind resend)] → *Record Send → Outcome.  Every refusal/cancel → *Cancel Label → *Record Cancel (event
+  Reconcile → *Reconcile Fetch → *Owner Row? (V7: what the one history knows about the window's rows) →
+  *Reconcile Check (an attributed echo ⇒ sent, else stays send_unknown, NEVER a blind resend)] → *Record Send
+  → Outcome.  Every refusal/cancel → *Cancel Label → *Record Cancel (event
   state + drop the AI history rows a cancelled generation wrote) → Outcome.
 Pauses are clamped (reading ≤ 8 s, typing ≤ 12 s, listening ≤ 12 s).
 
@@ -217,25 +218,62 @@ RECONCILE_JS = r"""// RECONCILE (A7): the transport may have accepted the messag
 // chatId fields fails here); the echo must be newer than the trigger in the window's order (time desc, Wappi
 // order on ties); a row the transport marks as sent from the phone (tapi from_where) is the owner's, not ours;
 // and EXACTLY ONE distinct row may match — none or several (the owner typed the same text) stay send_unknown.
+// V7 (iteration 2026-09-28): the single candidate needs POSITIVE attribution — the absence of a phone mark proves
+// nothing. A response whose uuid names ANOTHER profile is a foreign window; a row naming another profile is
+// dropped; the webhook phone type counts as the phone. The candidate is ours when the transport marks it as an API
+// send (from_where 'api', the outgoing_message_api type, or a task id — never the isFromAPI flag, which tapi sets
+// on phone rows too) or the one history recorded it from the transport's outgoing_message_api webhook (Owner Row?
+// — this node's input). A row the history already gives to the OWNER (owner_app: the app's own send carries the
+// same api mark; owner_phone) or to another reply (ai) is never ours. Absent facts give no verdict.
 const s = $('Settle Send').first().json;
 const trig = $('Webhook').first().json.body.messages[0];
-const fetchedAll = ($json.messages || []).filter(m => m && typeof m === 'object');
-const fetched = fetchedAll.filter(m => !(m.chatId && trig.chatId && m.chatId !== trig.chatId));
+let fetch = {};
+try { fetch = $('Reconcile Fetch').first().json || {}; } catch (e) { fetch = {}; }
+let sources = {};
+try { const x = $json.sources; sources = (x && typeof x === 'object' && !Array.isArray(x)) ? x : {}; } catch (e) { sources = {}; }
+const norm = v => (v === undefined || v === null) ? '' : String(v).trim().toLowerCase();
+const pid = norm(trig.profile_id);
+const scope = norm(fetch.uuid);
+const foreignScope = pid !== '' && scope !== '' && scope !== pid;
+const fetchedAll = (Array.isArray(fetch.messages) ? fetch.messages : []).filter(m => m && typeof m === 'object');
+const fetched = foreignScope ? [] : fetchedAll.filter(m => !(m.chatId && trig.chatId && m.chatId !== trig.chatId)
+                                                     && !(pid && m.profile_id && norm(m.profile_id) !== pid));
 fetched.forEach((m, i) => { m.__i = i; });
 fetched.sort((a, b) => ((b.time || 0) - (a.time || 0)) || ((a.__i || 0) - (b.__i || 0)));
 const trigIdx = fetched.findIndex(m => m.id === trig.id);
-const ours = m => m.fromMe === true && typeof m.body === 'string' && m.from_where !== 'phone'
+const ours = m => m.fromMe === true && typeof m.body === 'string' && m.from_where !== 'phone' && m.wh_type !== 'outgoing_message_phone'
   && m.body.trim() === String(s.text).trim() && (m.time || 0) >= (Number(s.sendStartedAt) - 5);
+const viaApi = m => m.from_where === 'api' || m.wh_type === 'outgoing_message_api' || (typeof m.task_id === 'string' && m.task_id.trim() !== '');
 const cands = [];
 for (const m of (trigIdx < 0 ? [] : fetched.slice(0, trigIdx))) {
   if (ours(m) && !cands.some(x => String(x.id) === String(m.id))) cands.push(m);
 }
-const hit = cands.length === 1 ? cands[0] : null;
-const why = trigIdx < 0 ? 'reconcile: window without the trigger' : (cands.length > 1 ? 'reconcile: ambiguous echo (' + cands.length + ' rows)' : '');
+const one = cands.length === 1 ? cands[0] : null;
+const known = one ? String(sources[String(one.id)] || '') : '';
+const hit = one && (known === 'outgoing_api' || (known === '' && viaApi(one))) ? one : null;
+const why = foreignScope ? 'reconcile: window of another profile'
+  : trigIdx < 0 ? 'reconcile: window without the trigger'
+  : cands.length > 1 ? 'reconcile: ambiguous echo (' + cands.length + ' rows)'
+  : (one && !hit && known) ? 'reconcile: row ' + String(one.id) + ' is recorded as ' + known
+  : (one && !hit) ? 'reconcile: unattributed outgoing row ' + String(one.id) + ' (no api mark)' : '';
 return [{ json: { state: hit ? 'sent' : 'send_unknown', transportMessageId: hit ? String(hit.id || '') : '',
                   error: hit ? '' : [s.error, why].filter(Boolean).join(' | ').slice(0, 300), reconciled: !!hit,
-                  foreignFetched: fetchedAll.length - fetched.length }, pairedItem: { item: 0 } }];
+                  foreignFetched: fetchedAll.length - fetched.length, candidateId: one ? String(one.id || '') : '',
+                  candidateSource: known }, pairedItem: { item: 0 } }];
 """
+
+# V7: what the ONE history already knows about the rows of the reconcile window — read-only, one row always (an
+# aggregate), so the Code node after it decides; a failed read leaves `sources` absent there, i.e. no facts.
+OWNER_ROW_SQL = """-- V7: the one history's source for every row of the reconcile window. owner_app (the app's own send through
+-- the proxy) and owner_phone are the owner's, never our echo; outgoing_api is the transport's own webhook for
+-- an API send, positive proof the row was sent through the API. Read-only; always exactly one row.
+select coalesce(jsonb_object_agg(h.message_id, h.source), '{}'::jsonb) as sources
+from chat_history_events h
+where h.profile_id = $1 and h.chat_id = $2
+  and h.message_id in (select jsonb_array_elements_text($3::jsonb));"""
+OWNER_ROW_PARAMS = ("={{ [ " + TRIG + ".profile_id, " + TRIG + ".from, JSON.stringify((Array.isArray($json.messages) ? $json.messages : [])"
+                    ".filter(m => m && m.id !== undefined && m.id !== null).map(m => String(m.id))) ] }}")
+
 
 CANCEL_LABEL_JS = r"""// CANCEL LABEL: one place that names why a reply did not go out, from whichever gate refused it.
 const j = $input.first().json || {};
@@ -459,6 +497,7 @@ def patch(fname, base):
                       "typeVersion": 1.1, "position": [1472, 420], "webhookId": nid(fname, "Wait Reconcile", "wh")})
     ch |= ensure(wf, fetch("Reconcile Fetch", base, [1664, 420], fname))
     ch |= ensure(wf, code("Reconcile Check", RECONCILE_JS, [1856, 420], fname))
+    ch |= ensure(wf, pg("Owner Row?", OWNER_ROW_SQL, OWNER_ROW_PARAMS, [1760, 620], fname))   # V7, appended
     ch |= ensure(wf, pg("Record Send", RECORD_SEND_SQL, key + ", $json.state, $json.transportMessageId, $json.error, $execution.id ] }}", [2048, 288], fname))
     ch |= set_edges(wf, "Retrieve Answer", [["Final Fetch"]])
     ch |= set_edges(wf, "Ask to Send Text", [["Final Fetch"]])
@@ -479,7 +518,8 @@ def patch(fname, base):
     ch |= set_edges(wf, "Settle Send", [["Send Unknown?"]])
     ch |= set_edges(wf, "Send Unknown?", [["Wait Reconcile"], ["Record Send"]])
     ch |= set_edges(wf, "Wait Reconcile", [["Reconcile Fetch"]])
-    ch |= set_edges(wf, "Reconcile Fetch", [["Reconcile Check"]])
+    ch |= set_edges(wf, "Reconcile Fetch", [["Owner Row?"]])
+    ch |= set_edges(wf, "Owner Row?", [["Reconcile Check"]])
     ch |= set_edges(wf, "Reconcile Check", [["Record Send"]])
     ch |= set_edges(wf, "Record Send", [["Outcome"]])
 
@@ -496,13 +536,15 @@ def check():
         wf = json.load(open(os.path.join(WF, f), encoding="utf-8"))
         need = ("Claim Event", "Claimed?", "Generated?", "Final Fetch", "Final Check", "Final OK?", "Acquire Send Lease",
                 "Send Allowed?", "Settle Send", "Send Unknown?", "Wait Reconcile", "Reconcile Fetch", "Reconcile Check",
-                "Record Send", "Cancel Label", "Record Cancel", "Peer Recheck?", "Wait Peer Recheck", "Recheck Fetch")
+                "Record Send", "Cancel Label", "Record Cancel", "Peer Recheck?", "Wait Peer Recheck", "Recheck Fetch", "Owner Row?")
             # Claim / Record Send / Record Cancel / Cancel Label are re-shaped by apply-history-handoff.py (stage 4) — not compared here.
         if any(node(wf, n) is None for n in need) or LATEST_COMBINE_PATCH_NEW not in node(wf, "Latest+Combine")["parameters"]["jsCode"] \
                 or node(wf, "Acquire Send Lease")["parameters"]["query"] != ACQUIRE_SQL or node(wf, "Final Check")["parameters"]["jsCode"] != FINAL_CHECK_JS \
                 or not node(wf, "Acquire Send Lease")["parameters"]["options"]["queryReplacement"].endswith(ACQUIRE_PARAMS_TAIL) \
                 or node(wf, "Wait Peer Recheck")["parameters"].get("amount") != PEER_RECHECK_SECONDS \
-                or node(wf, "Reconcile Check")["parameters"]["jsCode"] != RECONCILE_JS:
+                or node(wf, "Reconcile Check")["parameters"]["jsCode"] != RECONCILE_JS \
+                or node(wf, "Owner Row?")["parameters"]["query"] != OWNER_ROW_SQL \
+                or node(wf, "Owner Row?")["parameters"]["options"]["queryReplacement"] != OWNER_ROW_PARAMS:
             bad.append(f)
     return bad
 

@@ -13,7 +13,9 @@ send-idempotency scenarios of stage 3 (accepted-but-response-lost, HTTP 5xx, slo
 Transport routes (both /api/sync/ + /tapi/sync/, and /api/ + /tapi/ for profile ops):
     GET  messages/get?profile_id&chat_id&limit   -> {status:"done", messages:[newest first], count}
     GET  messages/id/get?profile_id&message_id    -> {status:"done", message:{...}}
-    POST message/send?profile_id  {body,recipient}-> {status:"done", message_id, time}  (+ appends echo row)
+    POST message/send?profile_id  {body,recipient}-> {status:"done", message_id, time}  (+ appends echo row, marked
+                                                     as the transport marks an API send: from_where "api", task_id)
+    messages/get answers carry the top-level uuid = the profile id, as Wappi/tapi do (V7 checks it)
     POST message/mark/read | chat/typing/start | chats/typing/start | message/reaction | chat/delete
     GET  get/status -> {authorized:true, profile_id}; profile/add|delete|logout, profile/all/get,
          webhook/url/set|get, webhook/types/set, qr/get, auth/* -> {status:"done", ...}
@@ -29,7 +31,8 @@ Control routes (never exist on the real transport):
                            mode "cross" (messages/get): answer with the window of chat `cross_chat` of the same
                            profile — the project-confirmed crossed-response bug; `after: <path substr>` keeps a
                            fault dormant until such a call was recorded (e.g. cross only the RECONCILE fetch,
-                           i.e. a messages/get after message/send)
+                           i.e. a messages/get after message/send); `echo: {...}` (message/send) is merged into
+                           the echo row the send appends — e.g. {"id": "<owner row id>"} or {"from_where": ""}
     POST /__mock/profile   {profile_id, authorized, phone, authorized_at, account_phone}   status fields for get/status
                            (account_phone: tapi only — the authorised account, returned as account.phone)
     GET  /__mock/state
@@ -40,6 +43,7 @@ import sys
 import threading
 import time
 import urllib.parse
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 PORT = int(os.environ.get("WAPPI_MOCK_PORT", "8765"))
@@ -151,7 +155,7 @@ class Handler(BaseHTTPRequestHandler):
                 break
         if fault and fault["mode"] == "cross":
             query = dict(query, chat_id=fault.get("cross_chat") or "")
-        status, resp = self._transport(method, tail, channel, query, body)
+        status, resp = self._transport(method, tail, channel, query, body, echo=(fault or {}).get("echo"))
         entry["status"] = status
         entry["resp"] = resp
         if fault and fault["mode"] == "status":
@@ -171,14 +175,14 @@ class Handler(BaseHTTPRequestHandler):
         return self._send(status, resp)
 
     # ---- transport semantics -------------------------------------------------------------
-    def _transport(self, method, tail, channel, q, b):
+    def _transport(self, method, tail, channel, q, b, echo=None):
         pid = q.get("profile_id") or b.get("profile_id") or ""
         with LOCK:
             if tail == "messages/get":
                 rows = list(STATE["messages"].get(_key(pid, q.get("chat_id", "")), []))
                 rows.sort(key=lambda m: -(m.get("time") or 0))
                 lim = int(q.get("limit") or 15)
-                return 200, {"status": "done", "messages": rows[:lim], "count": len(rows)}
+                return 200, {"status": "done", "messages": rows[:lim], "count": len(rows), "uuid": pid}
             if tail == "messages/id/get":
                 mid = q.get("message_id")
                 for rows in STATE["messages"].values():
@@ -192,9 +196,12 @@ class Handler(BaseHTTPRequestHandler):
                 mid = _new_id("sent")
                 row = {"id": mid, "chatId": chat_id, "from": recipient, "fromMe": True, "type": "chat",
                        "body": b.get("body", ""), "time": _now(), "senderName": "mock-bot",
-                       "quoted_message_id": b.get("quoted_message_id")}
+                       "quoted_message_id": b.get("quoted_message_id"),
+                       "from_where": "api", "task_id": uuid.uuid4().hex, "isFromAPI": True}
+                if isinstance(echo, dict):
+                    row.update(echo)
                 STATE["messages"].setdefault(_key(pid, chat_id), []).append(row)
-                return 200, {"status": "done", "message_id": mid, "time": row["time"]}
+                return 200, {"status": "done", "message_id": row["id"], "time": row["time"]}
             if tail in ("message/mark/read", "chat/typing/start", "chats/typing/start",
                         "message/reaction", "chat/delete", "webhook/url/set", "webhook/types/set",
                         "profile/delete", "profile/logout"):
@@ -251,7 +258,8 @@ class Handler(BaseHTTPRequestHandler):
                 f = {"match": b["match"], "mode": b.get("mode", "status"), "status": int(b.get("status", 500)),
                      "times": int(b.get("times", 1)), "delay": float(b.get("delay", 35)),
                      "profile_id": b.get("profile_id") or "", "after": b.get("after") or "",
-                     "cross_chat": b.get("cross_chat") or "", "armed_at": len(STATE["calls"])}
+                     "cross_chat": b.get("cross_chat") or "", "armed_at": len(STATE["calls"]),
+                     "echo": b.get("echo") if isinstance(b.get("echo"), dict) else None}
                 STATE["faults"].append(f)
                 return self._send(200, {"ok": True, "fault": f})
             if path == "/__mock/profile" and method == "POST":

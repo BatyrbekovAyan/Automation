@@ -131,13 +131,21 @@ class Run:
         return row
 
     # --- HTTP Request → Settle Send → [Send Unknown? → Reconcile] → Record Send ------------------------
-    def send(self, http_response, reconcile_snapshot=None):
+    def send(self, http_response, reconcile_snapshot=None, reconcile_uuid=None):
         assert not getattr(self, 'recheck_pending', False), 'the lease asked for a re-read (Peer Recheck?): call final() + lease() again'
         st = code(self.w, 'Settle Send', {'json': http_response}, self.named)[0]['json']
         self.named['Settle Send'] = st
         final = st
         if _cond(self.w, 'Send Unknown?', st):
-            rc = code(self.w, 'Reconcile Check', {'json': {'status': 'done', 'messages': [dict(x) for x in (reconcile_snapshot or [])]}}, self.named)[0]['json']
+            fetch = {'status': 'done', 'messages': [dict(x) for x in (reconcile_snapshot or [])]}
+            if reconcile_uuid is not None:
+                fetch['uuid'] = reconcile_uuid
+            self.named['Reconcile Fetch'] = fetch
+            item = fetch
+            if has_node(self.w, 'Owner Row?'):            # V7: the one history's sources for the window's rows
+                item = _sql(self.w, self.pg, 'Owner Row?', fetch, self.named, self.exec_id)
+                self.named['Owner Row?'] = item
+            rc = code(self.w, 'Reconcile Check', {'json': item}, self.named)[0]['json']
             self.named['Reconcile Check'] = rc
             final = rc
         self.record = _sql(self.w, self.pg, 'Record Send', final, self.named, self.exec_id)

@@ -1,0 +1,227 @@
+# V7 — AFTER (apply-reply-pipeline-v2.py: Reconcile Check positive attribution + Owner Row?; stage 3 → stage 4 regenerated, second run: no diff; --check OK)
+# 2026-10-07T11:32:42Z  python3 Tools/n8n/tests/test_reply_reconcile.py
+
+PASS R10 [WA] our echo newer than the trigger → sent with the echo's id
+PASS R10 [WA] the same text in ANOTHER chat (a crossed row inside our window) → send_unknown
+PASS R10 [WA] a fully crossed window of the neighbour chat (its own trigger-less rows, same template text) → send_unknown
+PASS R10 [WA] a crossed window WITHOUT chatId fields (no trigger in it) → send_unknown
+PASS R10 [WA] two DIFFERENT outgoing rows with our text → ambiguous → send_unknown
+PASS R10 [WA] the SAME echo row listed twice (one id) → still one candidate → sent
+PASS R10 [WA] the same text OLDER than the trigger yet inside the send window (trigger stamped late) → send_unknown
+PASS R10 [WA] our echo in rows that carry no chatId (the trigger is there) → sent
+PASS R10 [WA] a foreign row listed first, then our own echo → sent with OUR id
+PASS R10 [WA] the owner typed the SAME text by hand and our echo is there too → ambiguous → send_unknown
+PASS R10 [WA] only a row the transport marks as sent FROM THE PHONE (tapi from_where) with our text → send_unknown
+PASS R10 [WA] our echo in the same second as the trigger, listed above it (Wappi order breaks the tie) → sent
+PASS R10 [WA] our echo in the same second as the trigger but listed BELOW it → not newer → send_unknown
+PASS R10 [WA] no echo at all → send_unknown
+PASS R10 [WA] the reconcile fetch failed → send_unknown
+PASS V7 [WA] the ONLY candidate carries no transport mark at all (a manual row) → send_unknown, named unattributed
+PASS V7 [WA] a row naming ANOTHER profile, API-marked, with our text → dropped → send_unknown
+PASS V7 [WA] the webhook phone type with a task id (hostile mix) → the phone wins → send_unknown
+PASS V7 [WA] a response whose uuid names ANOTHER profile, a perfect API echo inside → foreign window → send_unknown
+PASS V7 [WA] a response whose uuid names OUR profile → no objection → sent
+PASS V7 [WA] only isFromAPI:true (tapi sets it on phone rows too) is NOT an API mark → send_unknown
+PASS V7 [WA] the owner's app send (API-marked) next to our API echo → ambiguous → send_unknown
+PASS V7 [WA] a phone row next to our API echo → sent with OUR id
+PASS V7 [WA] a task id alone (no from_where key) is an API mark → sent
+PASS V7 [WA] from_where api with an empty task id is an API mark → sent
+PASS V7 [WA] the history records the API-marked candidate as the OWNER's app send → send_unknown, named
+PASS V7 [WA] the history records the candidate as owner_phone → send_unknown
+PASS V7 [WA] the history already gives the candidate to another reply (ai) → send_unknown
+PASS V7 [WA] an UNMARKED candidate the history recorded from the transport's outgoing_message_api webhook → sent (WA rows without marks)
+PASS V7 [WA] outgoing_api of ANOTHER row does not attribute the unmarked candidate → send_unknown
+PASS R10 [WA] end to end: a crossed window after a lost send leaves the ledger send_unknown, no ai history row
+PASS V7 [WA] end to end: the only same-text row is the OWNER's app send (owner_app in the history) → send_unknown; the owner row keeps its source
+PASS V7 [WA] end to end: an unmarked echo the transport's outgoing_message_api webhook already recorded → sent, upgraded to ai
+PASS R10 [TG] our echo newer than the trigger → sent with the echo's id
+PASS R10 [TG] the same text in ANOTHER chat (a crossed row inside our window) → send_unknown
+PASS R10 [TG] a fully crossed window of the neighbour chat (its own trigger-less rows, same template text) → send_unknown
+PASS R10 [TG] a crossed window WITHOUT chatId fields (no trigger in it) → send_unknown
+PASS R10 [TG] two DIFFERENT outgoing rows with our text → ambiguous → send_unknown
+PASS R10 [TG] the SAME echo row listed twice (one id) → still one candidate → sent
+PASS R10 [TG] the same text OLDER than the trigger yet inside the send window (trigger stamped late) → send_unknown
+PASS R10 [TG] our echo in rows that carry no chatId (the trigger is there) → sent
+PASS R10 [TG] a foreign row listed first, then our own echo → sent with OUR id
+PASS R10 [TG] the owner typed the SAME text by hand and our echo is there too → ambiguous → send_unknown
+PASS R10 [TG] only a row the transport marks as sent FROM THE PHONE (tapi from_where) with our text → send_unknown
+PASS R10 [TG] our echo in the same second as the trigger, listed above it (Wappi order breaks the tie) → sent
+PASS R10 [TG] our echo in the same second as the trigger but listed BELOW it → not newer → send_unknown
+PASS R10 [TG] no echo at all → send_unknown
+PASS R10 [TG] the reconcile fetch failed → send_unknown
+PASS V7 [TG] the ONLY candidate carries no transport mark at all (a manual row) → send_unknown, named unattributed
+PASS V7 [TG] a row naming ANOTHER profile, API-marked, with our text → dropped → send_unknown
+PASS V7 [TG] the webhook phone type with a task id (hostile mix) → the phone wins → send_unknown
+PASS V7 [TG] a response whose uuid names ANOTHER profile, a perfect API echo inside → foreign window → send_unknown
+PASS V7 [TG] a response whose uuid names OUR profile → no objection → sent
+PASS V7 [TG] only isFromAPI:true (tapi sets it on phone rows too) is NOT an API mark → send_unknown
+PASS V7 [TG] the owner's app send (API-marked) next to our API echo → ambiguous → send_unknown
+PASS V7 [TG] a phone row next to our API echo → sent with OUR id
+PASS V7 [TG] a task id alone (no from_where key) is an API mark → sent
+PASS V7 [TG] from_where api with an empty task id is an API mark → sent
+PASS V7 [TG] the history records the API-marked candidate as the OWNER's app send → send_unknown, named
+PASS V7 [TG] the history records the candidate as owner_phone → send_unknown
+PASS V7 [TG] the history already gives the candidate to another reply (ai) → send_unknown
+PASS V7 [TG] an UNMARKED candidate the history recorded from the transport's outgoing_message_api webhook → sent (WA rows without marks)
+PASS V7 [TG] outgoing_api of ANOTHER row does not attribute the unmarked candidate → send_unknown
+PASS R10 [TG] end to end: a crossed window after a lost send leaves the ledger send_unknown, no ai history row
+PASS V7 [TG] end to end: the only same-text row is the OWNER's app send (owner_app in the history) → send_unknown; the owner row keeps its source
+PASS V7 [TG] end to end: an unmarked echo the transport's outgoing_message_api webhook already recorded → sent, upgraded to ai
+
+66 pass, 0 fail
+
+# --- generators: stage 3 → stage 4 twice; the second run leaves both templates byte-identical (cmp) ---
+reply pipeline v2: OK
+history/handoff: OK
+
+# --- structural verifiers (verify-reply-pipeline also rejects the pre-V7 templates: Reconcile Check lacks the attribution) ---
+ALL REPLY PIPELINE ASSERTS PASSED
+ALL HISTORY/HANDOFF ASSERTS PASSED
+ALL BATCHING ASSERTS PASSED
+ALL PARITY ASSERTS PASSED
+SELF-TEST PASSED: 33/33 cases
+OK  76 Postgres node(s) in 27 workflow file(s): no placeholder outside code, no {{ }}, no modifier, no leading =
+
+# --- staging re-import → verify-deployed --base http://localhost:5678 ---
+base http://localhost:5678: canonical 26 (diff 0), clones 2 (behind template 0), archived clones 0 (not counted), other 2
+  clone   stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True nodes=61 graph=e0f322bcf2c0 published=e0f322bcf2c0 sticky=None AT-CANONICAL
+  clone   stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True nodes=61 graph=621f365e1ed8 published=621f365e1ed8 sticky=None AT-CANONICAL
+
+# --- staging e2e-reply: V7 scenarios + reconcile-related (mock marks its echo like the transport) ---
+PASS  unmarked_echo_stays_send_unknown[wa] (18s) — V7: the answer is lost and the only row with our text carries NO API mark (no from_where, no task id — isFromAPI alone proves nothing) → send_unknown, never adopted
+      send_calls=1 outcome=send_unknown ledger=send_unknown|-|socket hang up | reconcile: unattributed outgoing row sent-000001 (no api mark) reconcile_error=socket hang up | reconcile: unattributed outgoing row sent-000001 (no api mark)
+PASS  unmarked_echo_stays_send_unknown[tg] (14s) — V7: the answer is lost and the only row with our text carries NO API mark (no from_where, no task id — isFromAPI alone proves nothing) → send_unknown, never adopted
+      send_calls=1 outcome=send_unknown ledger=send_unknown|-|socket hang up | reconcile: unattributed outgoing row sent-000001 (no api mark) reconcile_error=socket hang up | reconcile: unattributed outgoing row sent-000001 (no api mark)
+PASS  owner_app_same_text_stays_send_unknown[wa] (16s) — V7: the answer is lost and the only same-text row is the OWNER's app send (owner_app in the one history, API-marked like ours) → send_unknown; the owner row keeps its source, last_sent stays empty
+      outcome=send_unknown ledger=send_unknown|-|socket hang up | reconcile: row oapown-7be6a8ffae1a is recorded as owner_app owner_row_source=owner_app last_sent=- reconcile_error=socket hang up | reconcile: row oapown-7be6a8ffae1a is recorded as owner_app
+PASS  owner_app_same_text_stays_send_unknown[tg] (16s) — V7: the answer is lost and the only same-text row is the OWNER's app send (owner_app in the one history, API-marked like ours) → send_unknown; the owner row keeps its source, last_sent stays empty
+      outcome=send_unknown ledger=send_unknown|-|socket hang up | reconcile: row oapown-7be6a8ffae1a is recorded as owner_app owner_row_source=owner_app last_sent=- reconcile_error=socket hang up | reconcile: row oapown-7be6a8ffae1a is recorded as owner_app
+PASS  accept_then_drop_reconciles_sent[wa] (40s) — A7: the transport accepts the message but the HTTP answer is lost → reconciled as sent from the echo, NO resend
+      send_calls=1 outcome=sent ledger=sent|sent-000001|- reconciled=True ai_marks=[('true', 'sent', 'sent-000001')]
+PASS  accept_then_drop_reconciles_sent[tg] (34s) — A7: the transport accepts the message but the HTTP answer is lost → reconciled as sent from the echo, NO resend
+      send_calls=1 outcome=sent ledger=sent|sent-000001|- reconciled=True ai_marks=[('true', 'sent', 'sent-000001')]
+PASS  send_timeout_reconciles_from_echo[wa] (62s) — A7: the transport answers after our 30-s timeout (message really went out) → send_unknown → echo found → sent, no resend
+      send_calls=1 settle=send_unknown outcome=sent ledger=sent|sent-000001|-
+PASS  send_timeout_reconciles_from_echo[tg] (64s) — A7: the transport answers after our 30-s timeout (message really went out) → send_unknown → echo found → sent, no resend
+      send_calls=1 settle=send_unknown outcome=sent ledger=sent|sent-000001|-
+PASS  crossed_reconcile_stays_send_unknown[wa] (13s) — R10: the send's answer is lost and the reconcile fetch comes back CROSSED (the neighbour chat's window, with the same canned text) → send_unknown, never the neighbour's id
+      send_calls=1 outcome=send_unknown ledger=send_unknown|-|socket hang up | reconcile: window without the trigger reconciled=False foreignFetched=2 ai_history_rows=0
+PASS  crossed_reconcile_stays_send_unknown[tg] (13s) — R10: the send's answer is lost and the reconcile fetch comes back CROSSED (the neighbour chat's window, with the same canned text) → send_unknown, never the neighbour's id
+      send_calls=1 outcome=send_unknown ledger=send_unknown|-|socket hang up | reconcile: window without the trigger reconciled=False foreignFetched=2 ai_history_rows=0
+PASS  dropped_without_echo_stays_send_unknown[wa] (36s) — A7: the connection dies before the transport processed anything → no echo → the state STAYS send_unknown (visible in the ledger), no resend
+      send_calls=1 outcome=send_unknown ledger=send_unknown|-|socket hang up reconciled=False ai_memory_rows=1 ai_marks=[('true', 'unknown', '-')]
+PASS  dropped_without_echo_stays_send_unknown[tg] (34s) — A7: the connection dies before the transport processed anything → no echo → the state STAYS send_unknown (visible in the ledger), no resend
+      send_calls=1 outcome=send_unknown ledger=send_unknown|-|socket hang up reconciled=False ai_memory_rows=1 ai_marks=[('true', 'unknown', '-')]
+PASS  media_message_gets_the_ru_ask_for_text[wa] (13s) — a photo/document/sticker never reaches the model: the canned ask is Russian (+ Kazakh line), sent once, through the same send chain (stage 6, 2026-09-22)
+      {'executions': [('10202', 'success', 'sent', 'Outcome')], 'sends': 1, 'body': 'Напишите, пожалуйста, текстом, что вас интересует — фото, файлы и стикеры я не в', 'ledger': 'sent|sent-000001|-'}
+PASS  media_message_gets_the_ru_ask_for_text[tg] (11s) — a photo/document/sticker never reaches the model: the canned ask is Russian (+ Kazakh line), sent once, through the same send chain (stage 6, 2026-09-22)
+      {'executions': [('10203', 'success', 'sent', 'Outcome')], 'sends': 1, 'body': 'Напишите, пожалуйста, текстом, что вас интересует — фото, файлы и стикеры я не в', 'ledger': 'sent|sent-000001|-'}
+
+# --- FINAL REGRESSION after V5+V6+V7 (staging at V7 canon) ---
+# python3 Tools/n8n/staging/e2e-reply.py (all 21 scenarios × WA/TG)
+PASS  dup_parallel_once[wa] (30s) — A4: the same event delivered twice IN PARALLEL → one send, one 'duplic
+PASS  dup_parallel_once[tg] (29s) — A4: the same event delivered twice IN PARALLEL → one send, one 'duplic
+PASS  dup_sequential_once[wa] (29s) — A4: the same event re-delivered 1 s later (first run still in flight) 
+PASS  dup_sequential_once[tg] (29s) — A4: the same event re-delivered 1 s later (first run still in flight) 
+PASS  restart_stale_claim_reclaims[wa] (30s) — A4: a claim older than 10 min (n8n died mid-flight) is re-cla
+PASS  restart_stale_claim_reclaims[tg] (32s) — A4: a claim older than 10 min (n8n died mid-flight) is re-cla
+PASS  two_chats_parallel_independent[wa] (30s) — A4: two DIFFERENT chats at the same moment → two sends (t
+PASS  two_chats_parallel_independent[tg] (30s) — A4: two DIFFERENT chats at the same moment → two sends (t
+PASS  newer_incoming_during_llm_supersedes[wa] (30s) — A3: a NEWER client message while the answer is being 
+PASS  newer_incoming_during_llm_supersedes[tg] (30s) — A3: a NEWER client message while the answer is being 
+PASS  owner_reply_before_send_cancels[wa] (30s) — A3: the OWNER answers while the bot is composing → no au
+PASS  owner_reply_before_send_cancels[tg] (30s) — A3: the OWNER answers while the bot is composing → no au
+PASS  auto_off_mid_flight_cancels[wa] (30s) — A3: «Вместе» switched on while the answer is being gen
+PASS  auto_off_mid_flight_cancels[tg] (32s) — A3: «Вместе» switched on while the answer is being gen
+PASS  typing_failure_still_sends[wa] (32s) — A7: the typing indicator fails (HTTP 500) → the reply is stil
+PASS  typing_failure_still_sends[tg] (31s) — A7: the typing indicator fails (HTTP 500) → the reply is stil
+PASS  expired_lock_does_not_block[wa] (31s) — A4: a lease left behind by a dead run (expired) does not block
+PASS  expired_lock_does_not_block[tg] (30s) — A4: a lease left behind by a dead run (expired) does not block
+PASS  live_lock_blocks_send[wa] (28s) — A4: a LIVE lease held by another run of the same chat → this run d
+PASS  live_lock_blocks_send[tg] (30s) — A4: a LIVE lease held by another run of the same chat → this run d
+PASS  accept_then_drop_reconciles_sent[wa] (35s) — A7: the transport accepts the message but the HTTP answer
+PASS  accept_then_drop_reconciles_sent[tg] (35s) — A7: the transport accepts the message but the HTTP answer
+PASS  send_500_is_send_failed[wa] (31s) — A7: the transport answers HTTP 500 → send_failed recorded with t
+PASS  send_500_is_send_failed[tg] (29s) — A7: the transport answers HTTP 500 → send_failed recorded with t
+PASS  send_timeout_reconciles_from_echo[wa] (64s) — A7: the transport answers after our 30-s timeout (messag
+PASS  send_timeout_reconciles_from_echo[tg] (62s) — A7: the transport answers after our 30-s timeout (messag
+PASS  dropped_without_echo_stays_send_unknown[wa] (33s) — A7: the connection dies before the transport proce
+PASS  dropped_without_echo_stays_send_unknown[tg] (34s) — A7: the connection dies before the transport proce
+PASS  reordered_webhooks_one_reply[wa] (32s) — R6: two client messages whose webhooks arrive in REVERSE orde
+PASS  reordered_webhooks_one_reply[tg] (31s) — R6: two client messages whose webhooks arrive in REVERSE orde
+PASS  crossed_reconcile_stays_send_unknown[wa] (14s) — R10: the send's answer is lost and the reconcile fetc
+PASS  crossed_reconcile_stays_send_unknown[tg] (14s) — R10: the send's answer is lost and the reconcile fetc
+PASS  same_second_peer_after_final_fetch[wa] (51s) — V5: a SAME-second message claimed after A's Final Fetch
+PASS  same_second_peer_after_final_fetch[tg] (55s) — V5: a SAME-second message claimed after A's Final Fetch
+PASS  same_second_peer_wappi_lists_older[wa] (42s) — V5: the same race, but the re-read lists A first → ex
+PASS  same_second_peer_wappi_lists_older[tg] (41s) — V5: the same race, but the re-read lists A first → ex
+PASS  unmarked_echo_stays_send_unknown[wa] (15s) — V7: the answer is lost and the only row with our text car
+PASS  unmarked_echo_stays_send_unknown[tg] (16s) — V7: the answer is lost and the only row with our text car
+PASS  owner_app_same_text_stays_send_unknown[wa] (15s) — V7: the answer is lost and the only same-text row i
+PASS  owner_app_same_text_stays_send_unknown[tg] (15s) — V7: the answer is lost and the only same-text row i
+PASS  media_message_gets_the_ru_ask_for_text[wa] (12s) — a photo/document/sticker never reaches the model: t
+PASS  media_message_gets_the_ru_ask_for_text[tg] (13s) — a photo/document/sticker never reaches the model: t
+42 pass, 0 fail
+exit=0
+# python3 Tools/n8n/staging/e2e-handoff.py
+PASS  outgoing_phone_recorded[wa] (14s) — A6: a message the owner sent from the PHONE lands in the one histo
+PASS  outgoing_phone_recorded[tg] (9s) — A6: a message the owner sent from the PHONE lands in the one histor
+PASS  outgoing_api_history_only (4s) — A6: an API-sent message (unknown writer) is a history row only — ne
+PASS  outgoing_foreign_profile_filtered (4s) — A1/A6: an outgoing event naming ANOTHER profile is filtered b
+PASS  suppressed_incoming_recorded[wa] (4s) — A6: in «Вместе» the client's message is still recorded
+PASS  suppressed_incoming_recorded[tg] (4s) — A6: in «Вместе» the client's message is still recorded
+PASS  auto_reply_records_client_and_ai_rows (30s) — A6: a normal auto-reply leaves exactly client + ai histo
+FAIL  bot_knows_owner_agreement_after_auto_resumes [llm] (38s) — A6 acceptance: owner agreed by phone during
+PASS  handoff_tool_creates_request_once_and_pauses [llm] (59s) — A5 acceptance: the agent CREATES the reques
+PASS  notifier_delivers_self_message_and_survives_failure (47s) — A5 acceptance: the owner notice is a self-
+PASS  lost_send_settled_by_notifier (124s) — R9: a reply left send_pending > 10 min (its run died between th
+PASS  handoffs_webhook_owner_scoped_list_take_done (2s) — A5: the app's list/take/done are token-only and ow
+PASS  stale_or_replayed_auto_keeps_newer_handoff[wa] (2s) — R4: through the real SetReplyMode webhook, a rep
+PASS  stale_or_replayed_auto_keeps_newer_handoff[tg] (2s) — R4: through the real SetReplyMode webhook, a rep
+PASS  fast_clock_queued_auto_keeps_newer_handoff[wa] (2s) — R4-clock: through the real SetReplyMode webhook,
+PASS  fast_clock_queued_auto_keeps_newer_handoff[tg] (2s) — R4-clock: through the real SetReplyMode webhook,
+PASS  dashboard_shows_open_handoff_as_event (4s) — A5/A6: «Сводка» reports an open request as a REAL
+PASS  proxy_send_records_owner_app_row (6s) — A6: a message the owner sends from the APP (proxy) lands as ow
+PASS  delete_bot_wipes_history_and_requests (2s) — stage 4.7: deleting the bot wipes its history, requests, 
+18 pass, 1 fail
+exit=1
+# the one FAIL is the LLM-judged [llm] scenario (model called create_handoff instead of quoting the owner's agreement) —
+# it failed the same way on 2026-09-27 and before V7 (see V6-after.txt): model nondeterminism, outside this group.
+# python3 Tools/n8n/staging/e2e.py
+PASS  sr_no_identity_refused (0.1s) — SuggestReplies without appUserId → refusal envelope, LLM never runs
+PASS  sr_unknown_identity_refused (0.2s) — SuggestReplies with an unknown appUserId → refusal, LLM never r
+PASS  sr_identity_gets_cards (3.1s) — SuggestReplies with a fixture subscriber → 1–4 cards (real LLM cal
+PASS  setreplymode_invalid_is_4xx (0.1s) — SetReplyMode with an invalid body must answer a 4xx, not 200 + su
+PASS  setreplymode_valid_writes_row (0.2s) — SetReplyMode with a valid body → success:true, written:1, row
+PASS  bot_single_incoming_sends_once (29.3s) — one incoming text → exactly one send on the mock transport
+PASS  bot_duplicate_delivery_sends_once (29.3s) — the SAME event delivered twice → still exactly one send
+PASS  bot_human_reply_during_debounce_aborts (10.4s) — the owner answers inside the debounce window → no a
+PASS  bot_newer_incoming_supersedes (10.4s) — a newer client message inside the window → the old fragment 
+PASS  bot_callback_profile_mismatch_filtered (2.6s) — a callback naming ANOTHER profile than the registered 
+PASS  bot_suppressed_mode_no_send (2.9s) — «Вместе» (suppressed=true) → execution ends at the gate
+11 pass, 0 fail
+exit=0
+
+# --- python3 Tools/n8n/tests/run_all.py ---
+OK   test_auth_refresh.py: 12 pass, 0 fail
+OK   test_billing_identity.py: 14 pass, 0 fail
+OK   test_claim.py: 16 pass, 0 fail
+OK   test_create_seed.py: 52 pass, 0 fail
+OK   test_harness_selfcheck.py: 2 pass, 0 fail
+OK   test_legacy_generators.py: 5 pass, 0 fail
+OK   test_reply_lost_send.py: 5 pass, 0 fail
+OK   test_reply_memory.py: 44 pass, 0 fail
+OK   test_reply_mode.py: 43 pass, 0 fail
+OK   test_reply_order.py: 44 pass, 0 fail
+OK   test_reply_reconcile.py: 66 pass, 0 fail
+OK   test_sql_comment_injection.py: 36 pass, 0 fail
+OK   test_suggest_catalog.py: 24 pass, 0 fail
+OK   test_suggest_query.py: 17 pass, 0 fail
+OK   test_test_dialog.py: 17 pass, 0 fail
+OK   test_upload.py: 22 pass, 0 fail
+OK   test_verify_deployed.py: 26 pass, 0 fail
+OK   test_verify_parity.py: 36 pass, 0 fail
+OK   test_verify_sql_comments.py: 53 pass, 0 fail
+exit=0
+# (an earlier run_all under the concurrent e2e load had one V7 end-to-end case fail on timing: its row time was taken
+#  from the test's start, not from the Final Check's sendStartedAt; fixed in the test — reconcile 66/66 above.)

@@ -1,0 +1,108 @@
+# V7 — BEFORE (HEAD c84cbdb2, canonical bot templates unchanged; new tests + harness applied)
+# 2026-10-07T11:32:23Z  python3 Tools/n8n/tests/test_reply_reconcile.py
+
+PASS R10 [WA] our echo newer than the trigger → sent with the echo's id
+PASS R10 [WA] the same text in ANOTHER chat (a crossed row inside our window) → send_unknown
+PASS R10 [WA] a fully crossed window of the neighbour chat (its own trigger-less rows, same template text) → send_unknown
+PASS R10 [WA] a crossed window WITHOUT chatId fields (no trigger in it) → send_unknown
+PASS R10 [WA] two DIFFERENT outgoing rows with our text → ambiguous → send_unknown
+PASS R10 [WA] the SAME echo row listed twice (one id) → still one candidate → sent
+PASS R10 [WA] the same text OLDER than the trigger yet inside the send window (trigger stamped late) → send_unknown
+PASS R10 [WA] our echo in rows that carry no chatId (the trigger is there) → sent
+PASS R10 [WA] a foreign row listed first, then our own echo → sent with OUR id
+PASS R10 [WA] the owner typed the SAME text by hand and our echo is there too → ambiguous → send_unknown
+PASS R10 [WA] only a row the transport marks as sent FROM THE PHONE (tapi from_where) with our text → send_unknown
+PASS R10 [WA] our echo in the same second as the trigger, listed above it (Wappi order breaks the tie) → sent
+PASS R10 [WA] our echo in the same second as the trigger but listed BELOW it → not newer → send_unknown
+PASS R10 [WA] no echo at all → send_unknown
+PASS R10 [WA] the reconcile fetch failed → send_unknown
+FAIL V7 [WA] the ONLY candidate carries no transport mark at all (a manual row) → send_unknown, named unattributed
+      - got state=sent id='MANUAL' error='' foreign=0
+FAIL V7 [WA] a row naming ANOTHER profile, API-marked, with our text → dropped → send_unknown
+      - got state=sent id='OTHERP' error='' foreign=0
+FAIL V7 [WA] the webhook phone type with a task id (hostile mix) → the phone wins → send_unknown
+      - got state=sent id='PHONEWH' error='' foreign=0
+FAIL V7 [WA] a response whose uuid names ANOTHER profile, a perfect API echo inside → foreign window → send_unknown
+      - got state=sent id='ECHO' error='' foreign=0
+PASS V7 [WA] a response whose uuid names OUR profile → no objection → sent
+FAIL V7 [WA] only isFromAPI:true (tapi sets it on phone rows too) is NOT an API mark → send_unknown
+      - got state=sent id='FLAG' error='' foreign=0
+PASS V7 [WA] the owner's app send (API-marked) next to our API echo → ambiguous → send_unknown
+PASS V7 [WA] a phone row next to our API echo → sent with OUR id
+PASS V7 [WA] a task id alone (no from_where key) is an API mark → sent
+PASS V7 [WA] from_where api with an empty task id is an API mark → sent
+FAIL V7 [WA] the history records the API-marked candidate as the OWNER's app send → send_unknown, named
+      - got state=sent id='OWNER-APP' error='' foreign=0
+FAIL V7 [WA] the history records the candidate as owner_phone → send_unknown
+      - got state=sent id='OWN-PH' error='' foreign=0
+FAIL V7 [WA] the history already gives the candidate to another reply (ai) → send_unknown
+      - got state=sent id='AI-OTHER' error='' foreign=0
+PASS V7 [WA] an UNMARKED candidate the history recorded from the transport's outgoing_message_api webhook → sent (WA rows without marks)
+FAIL V7 [WA] outgoing_api of ANOTHER row does not attribute the unmarked candidate → send_unknown
+      - got state=sent id='MANUAL' error='' foreign=0
+PASS R10 [WA] end to end: a crossed window after a lost send leaves the ledger send_unknown, no ai history row
+FAIL V7 [WA] end to end: the only same-text row is the OWNER's app send (owner_app in the history) → send_unknown; the owner row keeps its source
+      - outcome=sent ledger={'TRIG': 'sent'}
+      - the refusal must name the owner row: {'state': 'sent', 'transportMessageId': 'OWNER-APP', 'error': '', 'reconciled': True, 'foreignFetched': 0}
+      - history=[('OWNER-APP', 'ai'), ('TRIG', 'client')]
+      - last_sent_message_id=[{'last_sent_message_id': 'OWNER-APP'}]
+PASS V7 [WA] end to end: an unmarked echo the transport's outgoing_message_api webhook already recorded → sent, upgraded to ai
+PASS R10 [TG] our echo newer than the trigger → sent with the echo's id
+PASS R10 [TG] the same text in ANOTHER chat (a crossed row inside our window) → send_unknown
+PASS R10 [TG] a fully crossed window of the neighbour chat (its own trigger-less rows, same template text) → send_unknown
+PASS R10 [TG] a crossed window WITHOUT chatId fields (no trigger in it) → send_unknown
+PASS R10 [TG] two DIFFERENT outgoing rows with our text → ambiguous → send_unknown
+PASS R10 [TG] the SAME echo row listed twice (one id) → still one candidate → sent
+PASS R10 [TG] the same text OLDER than the trigger yet inside the send window (trigger stamped late) → send_unknown
+PASS R10 [TG] our echo in rows that carry no chatId (the trigger is there) → sent
+PASS R10 [TG] a foreign row listed first, then our own echo → sent with OUR id
+PASS R10 [TG] the owner typed the SAME text by hand and our echo is there too → ambiguous → send_unknown
+PASS R10 [TG] only a row the transport marks as sent FROM THE PHONE (tapi from_where) with our text → send_unknown
+PASS R10 [TG] our echo in the same second as the trigger, listed above it (Wappi order breaks the tie) → sent
+PASS R10 [TG] our echo in the same second as the trigger but listed BELOW it → not newer → send_unknown
+PASS R10 [TG] no echo at all → send_unknown
+PASS R10 [TG] the reconcile fetch failed → send_unknown
+FAIL V7 [TG] the ONLY candidate carries no transport mark at all (a manual row) → send_unknown, named unattributed
+      - got state=sent id='MANUAL' error='' foreign=0
+FAIL V7 [TG] a row naming ANOTHER profile, API-marked, with our text → dropped → send_unknown
+      - got state=sent id='OTHERP' error='' foreign=0
+FAIL V7 [TG] the webhook phone type with a task id (hostile mix) → the phone wins → send_unknown
+      - got state=sent id='PHONEWH' error='' foreign=0
+FAIL V7 [TG] a response whose uuid names ANOTHER profile, a perfect API echo inside → foreign window → send_unknown
+      - got state=sent id='ECHO' error='' foreign=0
+PASS V7 [TG] a response whose uuid names OUR profile → no objection → sent
+FAIL V7 [TG] only isFromAPI:true (tapi sets it on phone rows too) is NOT an API mark → send_unknown
+      - got state=sent id='FLAG' error='' foreign=0
+PASS V7 [TG] the owner's app send (API-marked) next to our API echo → ambiguous → send_unknown
+PASS V7 [TG] a phone row next to our API echo → sent with OUR id
+PASS V7 [TG] a task id alone (no from_where key) is an API mark → sent
+PASS V7 [TG] from_where api with an empty task id is an API mark → sent
+FAIL V7 [TG] the history records the API-marked candidate as the OWNER's app send → send_unknown, named
+      - got state=sent id='OWNER-APP' error='' foreign=0
+FAIL V7 [TG] the history records the candidate as owner_phone → send_unknown
+      - got state=sent id='OWN-PH' error='' foreign=0
+FAIL V7 [TG] the history already gives the candidate to another reply (ai) → send_unknown
+      - got state=sent id='AI-OTHER' error='' foreign=0
+PASS V7 [TG] an UNMARKED candidate the history recorded from the transport's outgoing_message_api webhook → sent (WA rows without marks)
+FAIL V7 [TG] outgoing_api of ANOTHER row does not attribute the unmarked candidate → send_unknown
+      - got state=sent id='MANUAL' error='' foreign=0
+PASS R10 [TG] end to end: a crossed window after a lost send leaves the ledger send_unknown, no ai history row
+FAIL V7 [TG] end to end: the only same-text row is the OWNER's app send (owner_app in the history) → send_unknown; the owner row keeps its source
+      - outcome=sent ledger={'TRIG': 'sent'}
+      - the refusal must name the owner row: {'state': 'sent', 'transportMessageId': 'OWNER-APP', 'error': '', 'reconciled': True, 'foreignFetched': 0}
+      - history=[('OWNER-APP', 'ai'), ('TRIG', 'client')]
+      - last_sent_message_id=[{'last_sent_message_id': 'OWNER-APP'}]
+PASS V7 [TG] end to end: an unmarked echo the transport's outgoing_message_api webhook already recorded → sent, upgraded to ai
+
+46 pass, 20 fail
+
+# --- staging (n8n 2.36.7 + task runners; mock restarted with the V7 shape: uuid on messages/get, API marks on the echo, fault 'echo' override), STAGING WA/TG at HEAD canon (pre-V7) ---
+# python3 Tools/n8n/staging/e2e-reply.py --only unmarked_echo | owner_app_same_text
+FAIL  unmarked_echo_stays_send_unknown[wa] (14s) — V7: the answer is lost and the only row with our text carries NO API mark (no from_where, no task id — isFromAPI alone proves nothing) → send_unknown, never adopted
+      send_calls=1 outcome=sent ledger=sent|sent-000001|- reconcile_error=
+FAIL  unmarked_echo_stays_send_unknown[tg] (13s) — V7: the answer is lost and the only row with our text carries NO API mark (no from_where, no task id — isFromAPI alone proves nothing) → send_unknown, never adopted
+      send_calls=1 outcome=sent ledger=sent|sent-000001|- reconcile_error=
+FAIL  owner_app_same_text_stays_send_unknown[wa] (14s) — V7: the answer is lost and the only same-text row is the OWNER's app send (owner_app in the one history, API-marked like ours) → send_unknown; the owner row keeps its source, last_sent stays empty
+      outcome=sent ledger=sent|oapown-e33f729da4ea|- owner_row_source=ai last_sent=oapown-e33f729da4ea reconcile_error=
+FAIL  owner_app_same_text_stays_send_unknown[tg] (13s) — V7: the answer is lost and the only same-text row is the OWNER's app send (owner_app in the one history, API-marked like ours) → send_unknown; the owner row keeps its source, last_sent stays empty
+      outcome=sent ledger=sent|oapown-e33f729da4ea|- owner_row_source=ai last_sent=oapown-e33f729da4ea reconcile_error=

@@ -16,7 +16,7 @@ WF = os.path.join(HERE, "workflows")
 BOTS = ("4wYitz5ek30SVNlT-WhatsApp_Bot.json", "4VN3gsFaC2HUYmcc-Telegram_Bot.json")
 NEW = ("Claim Event", "Claimed?", "Generated?", "Final Fetch", "Final Check", "Final OK?", "Acquire Send Lease",
        "Send Allowed?", "Settle Send", "Send Unknown?", "Wait Reconcile", "Reconcile Fetch", "Reconcile Check",
-       "Record Send", "Cancel Label", "Record Cancel", "Peer Recheck?", "Wait Peer Recheck", "Recheck Fetch", "Stamp Draft")
+       "Record Send", "Cancel Label", "Record Cancel", "Peer Recheck?", "Wait Peer Recheck", "Recheck Fetch", "Stamp Draft", "Owner Row?")
 STATES = ("claimed", "generated", "send_pending", "sent", "send_failed", "send_unknown", "superseded", "cancelled_owner",
           "cancelled_mode", "cancelled_busy", "cancelled_fetch", "generation_failed", "quota_denied", "suppressed")
 
@@ -172,11 +172,37 @@ def verify(fname):
     js = node(wf, "Reconcile Check")["parameters"]["jsCode"]
     for frag in ("fromMe === true", "m.body.trim() === String(s.text).trim()", "sendStartedAt", "'send_unknown'",
                  "m.chatId && trig.chatId && m.chatId !== trig.chatId", "fetched.findIndex(m => m.id === trig.id)",
-                 "trigIdx < 0 ? [] : fetched.slice(0, trigIdx)", "cands.length === 1 ? cands[0] : null", "m.from_where !== 'phone'"):
+                 "trigIdx < 0 ? [] : fetched.slice(0, trigIdx)", "const one = cands.length === 1 ? cands[0] : null;", "m.from_where !== 'phone'",
+                 # V7: positive attribution — the window's profile (uuid), the row's profile, the webhook phone type, the
+                 # transport's API mark, and the one history's verdict on the candidate (Owner Row? → $json.sources)
+                 "$('Reconcile Fetch').first().json", "norm(fetch.uuid)", "scope !== pid", "norm(m.profile_id) !== pid",
+                 "m.wh_type !== 'outgoing_message_phone'", "m.from_where === 'api'", "m.wh_type === 'outgoing_message_api'",
+                 "typeof m.task_id === 'string' && m.task_id.trim() !== ''", "$json.sources",
+                 "const hit = one && (known === 'outgoing_api' || (known === '' && viaApi(one))) ? one : null;"):
         check(frag in js, f"{f}: Reconcile Check lacks {frag!r}")
     # negative (R10): the first same-text outgoing row anywhere in the response is not proof of OUR delivery
     check("rows.find(m => m.body.trim() === String(s.text).trim()" not in js,
           f"{f}: Reconcile Check adopts the first same-text row of any chat (R10: a crossed row becomes a false «sent»)")
+    # negative (V7): «exactly one non-phone candidate» alone is the old NEGATIVE filter (an owner's manual/app row, a row of
+    # another profile became a false «sent»), and isFromAPI is set on tapi phone rows too — never an attribution
+    check("const hit = cands.length === 1 ? cands[0] : null" not in js, f"{f}: Reconcile Check adopts a single candidate without attribution (V7)")
+    check("m.isFromAPI" not in js and "isFromAPI ===" not in js, f"{f}: Reconcile Check must not read isFromAPI as an API mark (V7)")
+    orow = node(wf, "Owner Row?")
+    q = orow["parameters"]["query"]
+    for frag in ("from chat_history_events h", "h.profile_id = $1 and h.chat_id = $2", "jsonb_array_elements_text($3::jsonb)",
+                 "jsonb_object_agg(h.message_id, h.source)", "as sources"):
+        check(frag in q, f"{f}: Owner Row? lacks {frag!r}")
+    check(not any(w in q.lower() for w in ("insert ", "update ", "delete ")), f"{f}: Owner Row? must be read-only")
+    check(orow.get("onError") == "continueRegularOutput" and orow.get("alwaysOutputData") is True,
+          f"{f}: Owner Row? must not stop the reconcile (a failed read = no facts, the Code node decides)")
+    op = orow["parameters"]["options"]["queryReplacement"]
+    check(".profile_id, " in op and ".from, JSON.stringify(" in op and "$json.messages" in op,
+          f"{f}: Owner Row? params must be (profile, chat, the ids of the Reconcile Fetch window): {op}")
+    cn = wf["connections"]
+    E = lambda t: {"node": t, "type": "main", "index": 0}
+    check(cn["Reconcile Fetch"]["main"] == [[E("Owner Row?")]] and cn["Owner Row?"]["main"] == [[E("Reconcile Check")]]
+          and cn["Reconcile Check"]["main"] == [[E("Record Send")]],
+          f"{f}: the reconcile branch must be Reconcile Fetch → Owner Row? → Reconcile Check → Record Send")
     check("message/send" not in js and "$http" not in js, f"{f}: Reconcile Check must never resend")
     wait = node(wf, "Wait Reconcile")
     check(wait["type"] == "n8n-nodes-base.wait" and wait["parameters"].get("amount") == 3 and wait.get("webhookId"),
