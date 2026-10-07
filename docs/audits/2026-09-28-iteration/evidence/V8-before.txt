@@ -1,0 +1,70 @@
+V8 — before: HEAD 18ca3e9d canonical Suggest Replies + generator (the new V8 cases in Tools/n8n/tests/test_suggest_query.py, run against the HEAD files)
+$ python3 Tools/n8n/tests/test_suggest_query.py
+PASS [WA] reviewer: long history keeps «а сколько?» and the picked direction; the new article leads the tokens
+PASS [WA] «а сколько?» after long turns: the question stays, the old subject survives as the head of its turn
+PASS [WA] a series of client messages keeps its NEWEST message (query + lastClientMessage)
+PASS [WA] no overflow: three codes and prices of the previous reply do not evict the new article
+PASS [WA] «а сколько?» with codes only in the context: the newer turn's code comes first
+PASS [WA] SQL: the newest article's row comes first although three newer rows match an old price; no foreign bot
+PASS [WA] SQL: «а за 15000 есть получше?» keeps the article row; 15000 does not match 150000 / 115000
+PASS [WA] SQL: one article with many rows still returns three rows, newest first (unchanged)
+PASS [TG] reviewer: long history keeps «а сколько?» and the picked direction; the new article leads the tokens
+PASS [TG] «а сколько?» after long turns: the question stays, the old subject survives as the head of its turn
+PASS [TG] a series of client messages keeps its NEWEST message (query + lastClientMessage)
+PASS [TG] no overflow: three codes and prices of the previous reply do not evict the new article
+PASS [TG] «а сколько?» with codes only in the context: the newer turn's code comes first
+PASS [TG] SQL: the newest article's row comes first although three newer rows match an old price; no foreign bot
+PASS [TG] SQL: «а за 15000 есть получше?» keeps the article row; 15000 does not match 150000 / 115000
+PASS [TG] SQL: one article with many rows still returns three rows, newest first (unchanged)
+FAIL [WA] V8 reviewer: an old turn > 500 (history clamped, burst whole) does not push out «А NEW12345 есть?»
+      - trailing tail='сти машины подробности машины подробности машины подробности'
+      - query='ости машины подробности машины подробности машины подробности машины подробности'
+      - tokens=['OLD54321']
+PASS [WA] V8 history lag: the new question only in the burst, the old turn > 500 in both
+FAIL [WA] V8 a multi-line turn is not doubled (history keeps it whole, the burst carries its lines)
+      - trailing='Первая строка про фильтр\nВторая строка NEW12345\nПервая строка про фильтр\nВторая строка NEW12345'
+      - multi-line + follow-up: trailing='Здравствуйте!\nНужен фильтр AB-11111 на Camry\nи масло 5w30\nа сколько?\nЗдравствуйте!\nНужен фильтр AB-11111 на Camry\nи масло 5w30'
+FAIL [WA] V8 a clamped multi-line turn (clamp in its LAST line) keeps its head code; the follow-up stays newest
+      - tail='ины подробности машины подробности машины подробности машины'
+      - tokens=[]
+FAIL [WA] V8 a clamped 3-line turn (clamp INSIDE a middle line): its tail line is not «newer» than the question
+      - tail='дробности машины подробности машины\nСрочно! артикул OLD54321'
+      - tokens=['OLD54321']
+      - head='подробности машины подробности машины по'
+PASS [WA] V8 the burst tail of a clamped LAST turn (history caught up) stays one copy, newest
+FAIL [WA] V8 a photo with a caption: the burst carries the bare caption, history «[фото] caption» — one copy
+      - trailing='[фото] вот такой нужен, OLD54321\nсколько стоит?\nвот такой нужен, OLD54321'
+      - history lag: trailing='[фото] вот такой нужен, OLD54321\nвот такой нужен, OLD54321\nсколько стоит?'
+PASS [WA] V8 a re-delivered fragment or pack (the client guard only drops a repeat of the TAIL) is deduplicated
+PASS [WA] V8 without a burst — and with a burst equal to an unclamped one-line history — nothing changes
+FAIL [TG] V8 reviewer: an old turn > 500 (history clamped, burst whole) does not push out «А NEW12345 есть?»
+      - trailing tail='сти машины подробности машины подробности машины подробности'
+      - query='ости машины подробности машины подробности машины подробности машины подробности'
+      - tokens=['OLD54321']
+PASS [TG] V8 history lag: the new question only in the burst, the old turn > 500 in both
+FAIL [TG] V8 a multi-line turn is not doubled (history keeps it whole, the burst carries its lines)
+      - trailing='Первая строка про фильтр\nВторая строка NEW12345\nПервая строка про фильтр\nВторая строка NEW12345'
+      - multi-line + follow-up: trailing='Здравствуйте!\nНужен фильтр AB-11111 на Camry\nи масло 5w30\nа сколько?\nЗдравствуйте!\nНужен фильтр AB-11111 на Camry\nи масло 5w30'
+FAIL [TG] V8 a clamped multi-line turn (clamp in its LAST line) keeps its head code; the follow-up stays newest
+      - tail='ины подробности машины подробности машины подробности машины'
+      - tokens=[]
+FAIL [TG] V8 a clamped 3-line turn (clamp INSIDE a middle line): its tail line is not «newer» than the question
+      - tail='дробности машины подробности машины\nСрочно! артикул OLD54321'
+      - tokens=['OLD54321']
+      - head='подробности машины подробности машины по'
+PASS [TG] V8 the burst tail of a clamped LAST turn (history caught up) stays one copy, newest
+FAIL [TG] V8 a photo with a caption: the burst carries the bare caption, history «[фото] caption» — one copy
+      - trailing='[фото] вот такой нужен, OLD54321\nсколько стоит?\nвот такой нужен, OLD54321'
+      - history lag: trailing='[фото] вот такой нужен, OLD54321\nвот такой нужен, OLD54321\nсколько стоит?'
+PASS [TG] V8 a re-delivered fragment or pack (the client guard only drops a repeat of the TAIL) is deduplicated
+PASS [TG] V8 without a burst — and with a burst equal to an unclamped one-line history — nothing changes
+FAIL V8 fuzz (seeded, 400 chats, the client's burst mirror): the newest turn is always newest, once, its code first
+      - the newest client turn is not newest in 138/400, e.g. ['y масло Camry масло Camry сколько фильтр колодки колодки\nсвеча сколько масло ещё', 'сколько Prado Camry OLD70278 фильтр OLD56827 масло свеча Prado Camry Prado Camry', ' ещё есть доставка свеча масло сколько оригинал\nещё Prado аналог есть сколько тг']
+      - the newest code is not the first exact token in 112/400
+FAIL V8 the merge's media placeholders mirror N8nSuggestionsProvider.MediaText, its clamp mirrors MaxTextChars
+      - client 500 vs server None
+      - client ['видео', 'голосовое сообщение', 'документ', 'сообщение', 'стикер', 'фото'] vs server []
+PASS fuzz (seeded, 300 chats): ≤ 900, the newest message and the direction always in the query, its code leads
+
+25 pass, 12 fail
+exit=1

@@ -164,6 +164,35 @@ def exact_newest(ctx):
         psql(f"delete from documents where metadata->>'fileId' = '{tag}';")
 
 
+@scenario("burst_merge_keeps_the_newest_question", "V8: history turns clamped at 500 + the whole burst (an old turn > 500, then «А NEW12345 есть?») — the deployed Prep keeps the new question newest and once, its article leads the tokens and its price-list row leads exactMatches; a multi-line turn is not doubled")
+def burst_merge(ctx):
+    owner, pid = owner_for(ctx)
+    tag = f"e2e-{ctx.run_id}"
+    for r in ("Свеча NEW12345 Iridium Toyota — 9900 тг", "Фильтр OLD54321 Camry — 3200 тг"):
+        psql(f"insert into documents (content, metadata) values ('{r}', '{{\"botWaId\": \"{STG_WA}\", \"fileId\": \"{tag}\"}}'::jsonb);")
+    try:
+        old = "OLD54321 " + "подробности машины " * 32
+        new = "А NEW12345 есть?"
+        st, d, ex = call(owner, payload(owner, pid, [m("client", old[:500], 1), m("client", new, 2)], last=old + "\n" + new,
+                                        know=knowledge([], {}, "Запчасти для Toyota", "Asia/Almaty", 1)))
+        prep = node_output(ex, "Prep") or {}
+        asm = node_output(ex, "Assemble") or {}
+        fenced = json.loads(asm["fencedData"].split("\n", 1)[1]) if asm.get("fencedData") else {}
+        exact = fenced.get("exactMatches", "")
+        ml = "Здравствуйте!\nНужен фильтр AB-11111 на Camry\nи масло 5w30"
+        st2, d2, ex2 = call(owner, payload(owner, pid, [m("client", ml, 1), m("client", "а сколько?", 2)], last=ml + "\nа сколько?",
+                                           know=knowledge([], {}, "Запчасти для Toyota", "Asia/Almaty", 1)))
+        prep2 = node_output(ex2, "Prep") or {}
+        trail = str(prep.get("trailingText", ""))
+        ok = (st == 200 and trail.endswith(new) and trail.count(new) == 1 and fenced.get("lastClientMessage") == trail
+              and (prep.get("exactTokens") or [])[:1] == ["NEW12345"] and exact.startswith("Свеча NEW12345")
+              and st2 == 200 and str(prep2.get("trailingText")) == ml + "\nа сколько?")
+        return ok, (f"http={st}/{st2} trail_tail={trail[-30:]!r} tokens={prep.get('exactTokens')} exact_head={exact[:30]!r} "
+                    f"multi_line_trail={str(prep2.get('trailingText'))!r}")
+    finally:
+        psql(f"delete from documents where metadata->>'fileId' = '{tag}';")
+
+
 @scenario("same_request_key_is_counted_once", "S3: a retry with the SAME request key (timeout / re-open) does not increment the daily counter; a new key does")
 def idempotent_count(ctx):
     owner, pid = owner_for(ctx)

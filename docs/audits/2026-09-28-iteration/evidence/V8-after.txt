@@ -1,0 +1,65 @@
+V8 — after: apply-suggest-v2.py STAGE5-MERGE (canonical regenerated: 1st run patched, 2nd run 'up to date', --check OK)
+$ python3 Tools/n8n/apply-suggest-v2.py && python3 Tools/n8n/apply-suggest-v2.py --check
+up to date  9PTyYcelRQI7bGDb-Suggest_Replies.json
+suggest v2: OK
+
+$ python3 Tools/n8n/tests/test_suggest_query.py
+PASS [WA] reviewer: long history keeps «а сколько?» and the picked direction; the new article leads the tokens
+PASS [WA] «а сколько?» after long turns: the question stays, the old subject survives as the head of its turn
+PASS [WA] a series of client messages keeps its NEWEST message (query + lastClientMessage)
+PASS [WA] no overflow: three codes and prices of the previous reply do not evict the new article
+PASS [WA] «а сколько?» with codes only in the context: the newer turn's code comes first
+PASS [WA] SQL: the newest article's row comes first although three newer rows match an old price; no foreign bot
+PASS [WA] SQL: «а за 15000 есть получше?» keeps the article row; 15000 does not match 150000 / 115000
+PASS [WA] SQL: one article with many rows still returns three rows, newest first (unchanged)
+PASS [TG] reviewer: long history keeps «а сколько?» and the picked direction; the new article leads the tokens
+PASS [TG] «а сколько?» after long turns: the question stays, the old subject survives as the head of its turn
+PASS [TG] a series of client messages keeps its NEWEST message (query + lastClientMessage)
+PASS [TG] no overflow: three codes and prices of the previous reply do not evict the new article
+PASS [TG] «а сколько?» with codes only in the context: the newer turn's code comes first
+PASS [TG] SQL: the newest article's row comes first although three newer rows match an old price; no foreign bot
+PASS [TG] SQL: «а за 15000 есть получше?» keeps the article row; 15000 does not match 150000 / 115000
+PASS [TG] SQL: one article with many rows still returns three rows, newest first (unchanged)
+PASS [WA] V8 reviewer: an old turn > 500 (history clamped, burst whole) does not push out «А NEW12345 есть?»
+PASS [WA] V8 history lag: the new question only in the burst, the old turn > 500 in both
+PASS [WA] V8 a multi-line turn is not doubled (history keeps it whole, the burst carries its lines)
+PASS [WA] V8 a clamped multi-line turn (clamp in its LAST line) keeps its head code; the follow-up stays newest
+PASS [WA] V8 a clamped 3-line turn (clamp INSIDE a middle line): its tail line is not «newer» than the question
+PASS [WA] V8 the burst tail of a clamped LAST turn (history caught up) stays one copy, newest
+PASS [WA] V8 a photo with a caption: the burst carries the bare caption, history «[фото] caption» — one copy
+PASS [WA] V8 a re-delivered fragment or pack (the client guard only drops a repeat of the TAIL) is deduplicated
+PASS [WA] V8 without a burst — and with a burst equal to an unclamped one-line history — nothing changes
+PASS [TG] V8 reviewer: an old turn > 500 (history clamped, burst whole) does not push out «А NEW12345 есть?»
+PASS [TG] V8 history lag: the new question only in the burst, the old turn > 500 in both
+PASS [TG] V8 a multi-line turn is not doubled (history keeps it whole, the burst carries its lines)
+PASS [TG] V8 a clamped multi-line turn (clamp in its LAST line) keeps its head code; the follow-up stays newest
+PASS [TG] V8 a clamped 3-line turn (clamp INSIDE a middle line): its tail line is not «newer» than the question
+PASS [TG] V8 the burst tail of a clamped LAST turn (history caught up) stays one copy, newest
+PASS [TG] V8 a photo with a caption: the burst carries the bare caption, history «[фото] caption» — one copy
+PASS [TG] V8 a re-delivered fragment or pack (the client guard only drops a repeat of the TAIL) is deduplicated
+PASS [TG] V8 without a burst — and with a burst equal to an unclamped one-line history — nothing changes
+PASS V8 fuzz (seeded, 400 chats, the client's burst mirror): the newest turn is always newest, once, its code first
+PASS V8 the merge's media placeholders mirror N8nSuggestionsProvider.MediaText, its clamp mirrors MaxTextChars
+PASS fuzz (seeded, 300 chats): ≤ 900, the newest message and the direction always in the query, its code leads
+
+37 pass, 0 fail
+exit=0
+
+$ python3 Tools/n8n/tests/test_suggest_catalog.py
+24 pass, 0 fail
+
+--- staging (n8n 2.36.7 + task runners): bootstrap re-import → verify-deployed → e2e-suggest
+$ python3 Tools/n8n/verify-deployed.py --base http://localhost:5678
+  OK      9PTyYcelRQI7bGDb 9PTyYcelRQI7bGDb-Suggest_Replies.json  active=True names=True graph=True published=True
+exit=0 (all canonical OK, 2 staging clones AT-CANONICAL)
+
+$ python3 Tools/n8n/staging/e2e-suggest.py --only burst_merge
+PASS  burst_merge_keeps_the_newest_question (11s) — V8: history turns clamped at 500 + the whole burst (an old turn > 500, then «А NEW12345 есть?») — the deployed Prep keeps the new question newest and once, its article leads the tokens and its price-list row leads exactMatches; a multi-line turn is not doubled
+      http=200/200 trail_tail='бности машины\nА NEW12345 есть?' tokens=['NEW12345', 'OLD54321'] exact_head='Свеча NEW12345 Iridium Toyota ' multi_line_trail='Здравствуйте!\nНужен фильтр AB-11111 на Camry\nи масло 5w30\nа сколько?'
+
+1 pass, 0 fail
+(full e2e-suggest: 9 pass, 0 fail)
+
+$ python3 Tools/n8n/tests/run_all.py  → 19/19 OK (test_suggest_query 37/0, test_suggest_catalog 24/0, test_verify_parity 36/0)
+$ verify-telegram-parity.py → ALL PARITY ASSERTS PASSED; verify-panel-prompts.js → PASS; inject-panel-prompts.py --check → up-to-date; verify-sql-comments.py → OK
+--- --check against the HEAD (pre-V8) canonical → 'suggest v2: MISSING/STALE' exit=2 (the generator now rejects the old merge)

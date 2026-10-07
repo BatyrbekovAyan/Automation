@@ -14,13 +14,19 @@ Contract (review R13 criteria + the refuter's objections):
     never pushes an article code out; three codes of an old reply do not evict the new one;
   * the SQL returns the newest article's row first, never another bot's row, and a bare-number token matches that
     number only (15000 is not 150000 / 115000).
+  * V8 (iteration 2026-09-28): the history × burst merge — `messages` turns clamped to 500 (media as «[фото] caption»)
+    against the unclamped `lastIncomingText` burst — keeps the newest client turn newest and single: a turn > 500, a
+    multi-line turn (clamped in its last or a middle line), a bare media caption, a re-delivered fragment or pack, a
+    history lagging behind the burst or cut by the 24-message window never land after the newest question; without a
+    burst, and with a burst that only repeats an unshaped history, the retrieval fields are unchanged.
 
     python3 Tools/n8n/tests/test_suggest_query.py
 """
 import json
 import random
+import re
 
-from harness import Case, bind, expr, node, report, run_js, sql_json, wf
+from harness import N8N, Case, bind, expr, node, report, run_js, sql_json, wf
 
 SUG = wf('9PTyYcelRQI7bGDb-Suggest_Replies.json')
 PREP_JS = node(SUG, 'Prep')['parameters']['jsCode']
@@ -155,6 +161,188 @@ for ch in CHANNELS:
         docs = [(i, f'Свеча NEW12345 партия {i}', scope(ch)) for i in range(1, 5)]
         rows, _ = exact_rows(pj, docs)
         c.check(rows == ['Свеча NEW12345 партия 4', 'Свеча NEW12345 партия 3', 'Свеча NEW12345 партия 2'], f'rows={rows}')
+
+
+# --- V8 (iteration 2026-09-28): the history × burst merge -------------------------------------------------------------
+# The client sends two views of the same unanswered client run: `messages` (each turn clamped to 500 chars by
+# N8nSuggestionsProvider.ToWireMessages, media as «[фото] caption») and `lastIncomingText` (the whole accumulated burst,
+# fragments joined by '\n', unclamped, raw captions). The old merge compared WHOLE history turns against burst LINES:
+# a clamped turn's full line, every line of a multi-line turn and a bare caption were «new» and were appended AFTER the
+# real newest question — which then fell out of trailingText / lastClientMessage / the exact tokens.
+OLD617 = 'OLD54321 ' + 'подробности машины ' * 32
+NEWQ = 'А NEW12345 есть?'
+ML2 = 'Строка один про фильтр AB-11111\n' + 'подробности машины ' * 30 + 'конец NEW99999'
+ML3 = 'Здравствуйте, нужны запчасти на Camry 2019:\n' + 'подробности машины ' * 26 + '\nСрочно! артикул OLD54321'
+
+
+def v8(ch, history, last, steer=None):
+    """A request whose history turns are clamped like the client clamps them (500)."""
+    return prep(body(ch, [m(r, t[:500], i) for i, (r, t) in enumerate(history)], steer=steer, last=last))
+
+
+for ch in CHANNELS:
+    with Case(f'[{ch}] V8 reviewer: an old turn > 500 (history clamped, burst whole) does not push out «А NEW12345 есть?»') as c:
+        c.check(len(OLD617) == 617, f'premise: {len(OLD617)}')
+        out = v8(ch, [('client', OLD617), ('client', NEWQ)], OLD617 + '\n' + NEWQ)
+        invariants(c, out)
+        c.check(out['trailingText'].endswith(NEWQ), f'trailing tail={out["trailingText"][-60:]!r}')
+        c.check(NEWQ in out['queryText'] and out['queryText'].count(NEWQ) == 1, f'query={out["queryText"][-80:]!r}')
+        c.check(out['exactTokens'][:1] == ['NEW12345'] and 'OLD54321' in out['exactTokens'], f'tokens={out["exactTokens"]}')
+        c.check(out['trailingText'].startswith('OLD54321'), f'the old turn must survive as its HEAD (R13): {out["trailingText"][:40]!r}')
+
+    with Case(f'[{ch}] V8 history lag: the new question only in the burst, the old turn > 500 in both') as c:
+        out = v8(ch, [('client', OLD617)], OLD617 + '\n' + NEWQ)
+        invariants(c, out)
+        c.check(out['trailingText'].endswith(NEWQ) and out['queryText'].count(NEWQ) == 1, f'tail={out["trailingText"][-60:]!r}')
+        c.check(out['exactTokens'][:1] == ['NEW12345'] and 'OLD54321' in out['exactTokens'], f'tokens={out["exactTokens"]}')
+
+    with Case(f'[{ch}] V8 a multi-line turn is not doubled (history keeps it whole, the burst carries its lines)') as c:
+        t = 'Первая строка про фильтр\nВторая строка NEW12345'
+        out = v8(ch, [('client', t)], t)
+        invariants(c, out)
+        c.check(out['queryText'].count('Первая строка') == 1 and out['trailingText'] == t, f'trailing={out["trailingText"]!r}')
+        c.check(out['exactTokens'] == ['NEW12345'], f'tokens={out["exactTokens"]}')
+        t2 = 'Здравствуйте!\nНужен фильтр AB-11111 на Camry\nи масло 5w30'
+        out = v8(ch, [('client', t2), ('client', 'а сколько?')], t2 + '\nа сколько?')
+        c.check(out['trailingText'].endswith('\nа сколько?') and out['trailingText'].count('Здравствуйте') == 1,
+                f'multi-line + follow-up: trailing={out["trailingText"]!r}')
+        c.check(out['exactTokens'][:1] == ['AB-11111'], f'tokens={out["exactTokens"]}')
+
+    with Case(f'[{ch}] V8 a clamped multi-line turn (clamp in its LAST line) keeps its head code; the follow-up stays newest') as c:
+        c.check(len(ML2) > 500 and '\n' not in ML2[32:500], 'premise: the clamp falls in the last line')
+        out = v8(ch, [('client', ML2), ('client', 'а сколько?')], ML2 + '\nа сколько?')
+        invariants(c, out)
+        c.check(out['trailingText'].endswith('\nа сколько?') and out['trailingText'].count('а сколько?') == 1, f'tail={out["trailingText"][-60:]!r}')
+        c.check('AB-11111' in out['exactTokens'], f'tokens={out["exactTokens"]}')
+
+    with Case(f'[{ch}] V8 a clamped 3-line turn (clamp INSIDE a middle line): its tail line is not «newer» than the question') as c:
+        c.check(ML3.index('\nСрочно') > 500 and ML3.index('\n') < 500, 'premise: the clamp falls inside line 2 of 3')
+        out = v8(ch, [('client', ML3), ('client', NEWQ)], ML3 + '\n' + NEWQ)
+        invariants(c, out)
+        c.check(out['trailingText'].endswith(NEWQ) and out['trailingText'].count(NEWQ) == 1, f'tail={out["trailingText"][-60:]!r}')
+        c.check(out['exactTokens'][:1] == ['NEW12345'], f'tokens={out["exactTokens"]}')
+        c.check(out['trailingText'].startswith('Здравствуйте, нужны запчасти'), f'head={out["trailingText"][:40]!r}')
+
+    with Case(f'[{ch}] V8 the burst tail of a clamped LAST turn (history caught up) stays one copy, newest') as c:
+        out = v8(ch, [('client', ML3)], ML3)
+        invariants(c, out)
+        c.check(out['trailingText'].endswith('Срочно! артикул OLD54321') and out['trailingText'].count('Срочно!') == 1,
+                f'tail={out["trailingText"][-60:]!r}')
+        c.check(out['exactTokens'][:1] == ['OLD54321'], f'tokens={out["exactTokens"]}')
+
+    with Case(f'[{ch}] V8 a photo with a caption: the burst carries the bare caption, history «[фото] caption» — one copy') as c:
+        cap = 'вот такой нужен, OLD54321'
+        out = v8(ch, [('client', '[фото] ' + cap), ('client', 'сколько стоит?')], cap + '\nсколько стоит?')
+        invariants(c, out)
+        c.check(out['trailingText'] == '[фото] ' + cap + '\nсколько стоит?', f'trailing={out["trailingText"]!r}')
+        lag = v8(ch, [('client', '[фото] ' + cap)], cap + '\nсколько стоит?')
+        c.check(lag['trailingText'] == '[фото] ' + cap + '\nсколько стоит?', f'history lag: trailing={lag["trailingText"]!r}')
+        bare = v8(ch, [('client', '[фото]'), ('client', 'такой есть?')], 'такой есть?')
+        c.check(bare['trailingText'] == '[фото]\nтакой есть?', f'caption-less photo: trailing={bare["trailingText"]!r}')
+
+    with Case(f'[{ch}] V8 a re-delivered fragment or pack (the client guard only drops a repeat of the TAIL) is deduplicated') as c:
+        a, b_ = 'нужен фильтр AB-11111', 'а сколько?'
+        out = v8(ch, [('client', a), ('client', b_)], a + '\n' + b_ + '\n' + a)
+        c.check(out['trailingText'] == a + '\n' + b_, f'repeat of a non-tail fragment: trailing={out["trailingText"]!r}')
+        out = v8(ch, [('client', a), ('client', b_)], a + '\n' + b_ + '\n' + a + '\n' + b_)
+        c.check(out['trailingText'] == a + '\n' + b_, f'repeat of a pack: trailing={out["trailingText"]!r}')
+        out = v8(ch, [('client', 'ок'), ('client', 'ок')], 'ок\nок')
+        c.check(out['trailingText'] == 'ок\nок', f'two equal short turns: trailing={out["trailingText"]!r}')
+
+    with Case(f'[{ch}] V8 without a burst — and with a burst equal to an unclamped one-line history — nothing changes') as c:
+        hist = [('client', 'нужен фильтр AB-11111'), ('business', 'есть'), ('client', 'а сколько?'), ('client', 'и масло 5w30 NEW12345')]
+        none = v8(ch, hist, None)
+        same = v8(ch, hist, 'а сколько?\nи масло 5w30 NEW12345')
+        keys = ('queryText', 'trailingText', 'exactTokens', 'skipRag')
+        c.check(all(none[k] == same[k] for k in keys), f'{[(k, none[k], same[k]) for k in keys if none[k] != same[k]]}')
+
+
+def v8_chat(rnd, k, lag_p=0.3, ml_p=0.15, long_p=0.15, media_p=0.1):
+    """One random chat as the CLIENT would send it: the history turns clamped to 500 (media as «[фото] caption»), the
+    burst = the whole unanswered client run (raw captions, unclamped), with history lagging behind it sometimes."""
+    words = ['фильтр', 'масло', 'свеча', 'колодки', 'Camry', 'Prado', 'оригинал', 'аналог', 'доставка', 'сколько', 'есть', 'тг', 'ещё']
+    phrase = lambda n: ' '.join(rnd.choice(words + [f'OLD{rnd.randint(10000, 99999)}']) for _ in range(n))
+    msgs = []
+    for i in range(rnd.randint(0, 6)):
+        msgs.append({'role': 'business', 'wire': phrase(rnd.randint(1, 30)), 'burst': None})
+    run = []
+    for i in range(rnd.randint(0, 4)):
+        kind = rnd.random()
+        if kind < media_p:
+            cap = rnd.choice(['', phrase(rnd.randint(1, 12))])
+            run.append({'wire': '[фото]' + (' ' + cap if cap else ''), 'burst': cap})
+            continue
+        if kind < media_p + long_p:
+            lines = [phrase(rnd.randint(1, 12)) for _ in range(rnd.randint(1, 3))]
+            lines[rnd.randrange(len(lines))] = phrase(rnd.randint(70, 110))        # one line long enough to cross 500
+            t = '\n'.join(lines)
+        elif kind < media_p + long_p + ml_p:
+            t = '\n'.join(phrase(rnd.randint(1, 12)) for _ in range(rnd.randint(2, 4)))
+        else:
+            t = phrase(rnd.randint(1, 20))
+        run.append({'wire': t, 'burst': t})
+    code = f'NEW{k:03d}{rnd.randint(10, 99)}'
+    newest = rnd.choice([f'а {code}?', f'{code} есть?', f'а сколько? {code}'])
+    run.append({'wire': newest, 'burst': newest})
+    lag = rnd.randint(1, min(2, len(run))) if rnd.random() < lag_p else 0
+    history = msgs + [{'role': 'client', **x} for x in run[:len(run) - lag]]
+    cut = rnd.randint(1, len(history) - 1) if len(history) > 2 and rnd.random() < 0.1 else 0   # the 24-message window
+    history = history[cut:]
+    wire = [m(x.get('role', 'client'), x['wire'][:500], i) for i, x in enumerate(history)]
+    lines = [x['burst'] for x in run if x['burst']]
+    redelivered = len(lines) > 1 and rnd.random() < 0.1
+    if redelivered:                       # a live-poll re-delivery the client guard (tail-only) lets through
+        lines.insert(rnd.randint(1, len(lines)), rnd.choice(lines[:-1]))
+        if lines[-1] != newest:
+            lines.append(newest)
+    burst = '\n'.join(lines)
+    shaped = any(len(x['wire']) > 500 or '\n' in x['wire'] or x['wire'].startswith('[фото]') for x in run) or lag > 0 or cut > 0 \
+        or redelivered
+    return wire, burst, newest, code, shaped
+
+
+with Case('V8 fuzz (seeded, 400 chats, the client\'s burst mirror): the newest turn is always newest, once, its code first') as c:
+    rnd = random.Random(928)
+    bodies, meta = [], []
+    for k in range(400):
+        wire, burst, newest, code, shaped = v8_chat(rnd, k)
+        steer = rnd.choice([None, None, f'Направление про {code}'])
+        bodies.append(body('WA' if k % 2 else 'TG', wire, steer=steer, last=burst))
+        bodies.append(body('WA' if k % 2 else 'TG', wire, steer=steer, last=None))
+        meta.append((newest, code, steer, shaped))
+    outs = prep_many(bodies)
+    lost = dup = bad_tok = over = lost_s = changed = 0
+    examples = []
+    for i, (newest, code, steer, shaped) in enumerate(meta):
+        out, no_burst = outs[2 * i], outs[2 * i + 1]
+        over += len(out['queryText']) > 900 or len(out['trailingText']) > 500
+        if not out['trailingText'].endswith(newest) or newest not in out['queryText']:
+            lost += 1
+            examples.append(out['trailingText'][-80:])
+        dup += out['trailingText'].count(code) > 1
+        bad_tok += out['exactTokens'][:1] != [code]
+        lost_s += bool(steer) and ('[направление] ' + steer) not in out['queryText']
+        # a burst that only repeats an unshaped, caught-up history (one-line turns ≤ 500, no media) changes nothing
+        changed += (not shaped) and any(out[k] != no_burst[k] for k in ('queryText', 'trailingText', 'exactTokens', 'skipRag'))
+    c.check(over == 0, f'{over} over budget')
+    c.check(lost == 0, f'the newest client turn is not newest in {lost}/400, e.g. {examples[:3]}')
+    c.check(dup == 0, f'the newest turn duplicated in {dup}/400')
+    c.check(bad_tok == 0, f'the newest code is not the first exact token in {bad_tok}/400')
+    c.check(lost_s == 0, f'the direction lost in {lost_s}/400')
+    c.check(changed == 0, f'a burst equal to an unshaped history changed the retrieval fields in {changed}/400')
+
+
+with Case('V8 the merge\'s media placeholders mirror N8nSuggestionsProvider.MediaText, its clamp mirrors MaxTextChars') as c:
+    gen = (N8N / 'apply-suggest-v2.py').read_text(encoding='utf-8')
+    pv = (N8N.parents[1] / 'Assets/Scripts/Chat/N8nSuggestionsProvider.cs').read_text(encoding='utf-8')
+    cl = re.search(r'MaxTextChars\s*=\s*(\d+)', pv)
+    sv = re.search(r'HISTORY_TURN_MAX\s*=\s*(\d+)', gen)
+    c.check(cl and sv and cl[1] == sv[1], f'client {cl and cl[1]} vs server {sv and sv[1]}')
+    body_ = pv[pv.index('public static string MediaText'):]
+    client_ph = set(re.findall(r'=>\s*"\[([^\]"]+)\]"', body_[:body_.index('return string.IsNullOrEmpty')]))
+    m_ = re.search(r'MEDIA_PLACEHOLDER\s*=\s*/\^\\\[\(([^)]*)\)', gen)
+    server_ph = set(m_[1].split('|')) if m_ else set()
+    c.check(client_ph and client_ph == server_ph, f'client {sorted(client_ph)} vs server {sorted(server_ph)}')
 
 
 with Case('fuzz (seeded, 300 chats): ≤ 900, the newest message and the direction always in the query, its code leads') as c:
