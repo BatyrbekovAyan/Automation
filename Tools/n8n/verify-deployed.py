@@ -17,6 +17,11 @@ Bot clones — judged by their REAL graphs (stored + published) against the temp
 Y») but never trusted. A fresh Create-made clone has no sticky and is AT-CANONICAL. ARCHIVED clones are listed
 apart and never counted: the owner retired them and n8n refuses PUT on them. An inactive, non-archived clone IS
 counted — the owner re-enables it with the channel toggles, which publishes its stored graph.
+Clone prompts (review V10, 2026-09-28) — the HEAD of the stored AND the published prompt, judged by content against
+the prompt history (update-clones.prompt_state): a head of an EARLIER Create/Edit map or template prompt is
+PROMPT-BEHIND and counts like a graph behind (exit 2) — the graph alone does not carry new shared instructions into
+an old bot's prompt; a head no map ever wrote is reported as custom (kept verbatim by update-clones) and NOT
+counted. The `Business Type:` label is printed beside the vertical and never decides.
 
     python3 Tools/n8n/verify-deployed.py                      # prod (Tools/n8n/.secrets/prod-api-key.txt)
     python3 Tools/n8n/verify-deployed.py --base http://localhost:5678
@@ -130,6 +135,29 @@ def check_canonical(wid, wf, full, staging):
     return row, problems
 
 
+def clone_verdict(c):
+    """One clone's verdict: graph (stored, published) and prompt head (stored, published) — the label never decides."""
+    parts = []
+    if not c["at_canonical"]:
+        parts.append("BEHIND")
+    elif not c["published_at_canonical"]:
+        parts.append("UNPUBLISHED (stored graph canonical, published is not)")
+    ps, v = c.get("prompt_state"), c.get("prompt_vertical")
+    if ps in uc.PROMPT_BEHIND:
+        parts.append(f"PROMPT-BEHIND ({v or 'generic template prompt'}, head of {c.get('prompt_since')})")
+    elif c.get("published_prompt_state") in uc.PROMPT_BEHIND:
+        parts.append("PROMPT-UNPUBLISHED (stored head current, the published head is behind)")
+    verdict = " ".join(parts) or "AT-CANONICAL"
+    info = f"  prompt={ps}{('/' + v) if v else ''}"
+    if ps == "custom":
+        info += f" (custom prompt — kept verbatim by update-clones, not counted: {c.get('prompt_note')})"
+    label = c.get("prompt_label")
+    if v and label is not None and label != uc.ip.BUSINESS_TYPE_LABELS.get(v):
+        info += f" (label {label!r}, the app labels {v} {uc.ip.BUSINESS_TYPE_LABELS.get(v)!r} — informational, the head decides)"
+    claim = "" if c["stamp_consistent"] else f"  (sticky claims {c['stamp']}, graph is {c['graph_stamp']})"
+    return verdict + info + claim
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default=os.environ.get("N8N_BASE_URL", uc.DEFAULT_BASE))
@@ -189,16 +217,21 @@ def main():
             report["unknown"].append({"id": wid, "name": full.get("name"), "active": bool(full.get("active")),
                                       "archived": bool(full.get("isArchived"))})
     behind = sum(1 for c in report["clones"] if not c["up_to_date"])
+    prompt_behind = sum(1 for c in report["clones"] if c.get("prompt_state") in uc.PROMPT_BEHIND
+                        or c.get("published_prompt_state") in uc.PROMPT_BEHIND)
+    custom = sum(1 for c in report["clones"] if c.get("prompt_state") == "custom")
     print(f"base {base}: canonical {len(report['canonical'])} (diff {diffs}), clones {len(report['clones'])} "
-          f"(behind template {behind}), archived clones {len(report['archived'])} (not counted), other {len(report['unknown'])}")
+          f"(behind template {behind}, of them prompt head behind {prompt_behind}; custom prompts {custom}, not counted), "
+          f"archived clones {len(report['archived'])} (not counted), other {len(report['unknown'])}")
+    if report["clones"] or report["archived"]:   # the prompt history (git) is needed only to judge clones
+        book = uc.prompt_book()
+        print(f"  prompt map = Create/Edit Vertical Prompt {book['map_ref']} (sha256 {book['map_hash']})")
     for r in report["canonical"]:
         print(f"  {r['status']:7} {r['id']} {r['file']}  active={r.get('active')} names={r.get('names_match')} "
               f"graph={r.get('params_match')} published={r.get('published_match')}{('  (' + r['note'] + ')') if r.get('note') else ''}")
     for c in report["clones"]:
-        verdict = "AT-CANONICAL" if c["up_to_date"] else ("UNPUBLISHED (stored graph canonical, published is not)" if c["at_canonical"] else "BEHIND")
-        claim = "" if c["stamp_consistent"] else f"  (sticky claims {c['stamp']}, graph is {c['graph_stamp']})"
         print(f"  clone   {c['id']} {c['name']!r} [{c['channel']}] active={c['active']} nodes={c['nodes']} "
-              f"graph={c['graph_stamp']} published={c['published_stamp']} sticky={c['stamp']} {verdict}{claim}")
+              f"graph={c['graph_stamp']} published={c['published_stamp']} sticky={c['stamp']} {clone_verdict(c)}")
     for c in report["archived"]:
         print(f"  archived {c['id']} {c['name']!r} [{c['channel']}] graph={c['graph_stamp']} — retired by the owner, not counted")
     if a.json:

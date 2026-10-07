@@ -1,0 +1,121 @@
+V10 — BEFORE the fix (HEAD 93fbf0fe + the new behavioural tests only; offline fake n8n API, prompts from git)
+command: python3 Tools/n8n/tests/test_verify_deployed.py
+date: 2026-10-07T16:42:37Z
+
+PASS D1 control: healthy canonical set, no clones -> exit 0
+PASS D1 prod 2026-09-25 (production-readback.json): fresh «23» without sticky is AT-CANONICAL, archived «13» listed apart -> exit 0
+PASS D1 fresh TG clone (re-ided nodes, instance credential ids) + edited WA bot + inactive (channels off) clone -> exit 0
+PASS D1 draft moved in the editor (positions only) while the published graph is canonical -> OK, exit 0
+PASS D1 staging base: derived set, Support Message left unbound ON PURPOSE, a staging bot clone -> exit 0; inactive webhook still -> 2
+PASS R3 NEG staging base: an Upload File copy that still WRITES to the real Supabase (writers not neutralised) -> DIFF, exit 2
+PASS V9 NEG staging base: a Price List Search copy still searching the real Supabase project (reader not redirected) -> DIFF, exit 2
+PASS D1 NEG forged correct sticky on a drifted clone graph -> BEHIND, «sticky claims … graph is …», exit 2
+PASS D1 NEG inactive required webhook (Wappi Proxy imported, never activated) -> DIFF, exit 2
+PASS D1 NEG a clone template switched on (templates must stay inactive) -> DIFF, exit 2
+PASS D1 NEG clone: canonical draft, but the PUBLISHED graph is the drifted one -> not at canonical, exit 2
+PASS D1 NEG canonical workflow: canonical draft, published graph has the Auth Gate bypassed -> DIFF, exit 2
+PASS D1 NEG Support Message: chat id bound AND an extra edit (Validate clamp removed) -> DIFF, exit 2
+PASS D1 NEG Support Message: connections rewired (Webhook -> Send, no gate/validation) hidden behind SUBSTITUTED -> DIFF, exit 2
+PASS D1 NEG Support Message deployed with the placeholder chat id (substitution not applied) -> DIFF, exit 2
+PASS D1 NEG Set Workflow State: Auth Gate bypassed (Webhook -> Validate) -> DIFF, exit 2
+PASS D1 NEG Set Workflow State: PROTECTED list lost the stage-7 ids -> DIFF, exit 2
+PASS D1 NEG a node disabled by hand (Wappi Proxy Auth Gate) -> DIFF, exit 2
+PASS D1 NEG Test Dialog imported with its credential placeholder unbound -> DIFF, exit 2
+PASS D1 NEG an ARCHIVED canonical workflow is not a running one -> DIFF, exit 2
+PASS D1 NEG the archive exemption is not blanket: a LIVE clone on the old graph still fails -> exit 2
+PASS D1 update-clones: fresh «23» (no sticky, canonical graph) is up to date — no needless PUT + re-activate of a live bot
+PASS D1 update-clones: forged sticky over a drifted graph is planned for update (drift is repairable)
+PASS D1 update-clones: canonical draft + stale PUBLISHED graph is planned for update (the apply re-publishes)
+PASS D1 update-clones: a clone rebuilt by build_target is up to date by its GRAPH (no endless would_update)
+PASS D1 deploy-canonical (shares graph_hash): healthy set is up to date; a hand-disabled node is planned for re-deploy
+PASS D1 update-clones: archived clones are skipped, never counted as clones
+PASS V10 premise: today's map is inject-prompts' composition (WA ≡ TG) and every vertical head of the prod epoch differs from it
+FAIL V10 T1 [whatsapp] canonical graph + auto_parts head of f08546f1 -> PROMPT-BEHIND (auto_parts), not up to date, exit 2
+FAIL V10 T3 [whatsapp] the T2 target, deployed, is up to date by graph AND prompt (verify exit 0, no second update)
+FAIL V10 T2 [whatsapp] graph AND head of f08546f1: dry-run names the vertical; build_target = what Create composes today, owner tail byte-identical
+FAIL V10 T5 [whatsapp] stored prompt at today's head, PUBLISHED prompt of f08546f1 -> not up to date, exit 2, planned for update
+FAIL V10 T6 [whatsapp] Edit grammar (a settings save at f08546f1) -> refreshed to exactly what Edit writes today, exit 2 before
+FAIL V10 T8 [whatsapp] e2e-auth form (label «Цветы», id flowers) with the flowers head of f08546f1 -> behind(flowers) by CONTENT, refreshed
+FAIL V10 T10 [whatsapp] legacy id (generic head) of the 95221844 template -> generic behind, refreshed to today's template prompt
+FAIL V10 T1 [telegram] canonical graph + auto_parts head of f08546f1 -> PROMPT-BEHIND (auto_parts), not up to date, exit 2
+FAIL V10 T3 [telegram] the T2 target, deployed, is up to date by graph AND prompt (verify exit 0, no second update)
+FAIL V10 T2 [telegram] graph AND head of f08546f1: dry-run names the vertical; build_target = what Create composes today, owner tail byte-identical
+FAIL V10 T5 [telegram] stored prompt at today's head, PUBLISHED prompt of f08546f1 -> not up to date, exit 2, planned for update
+FAIL V10 T6 [telegram] Edit grammar (a settings save at f08546f1) -> refreshed to exactly what Edit writes today, exit 2 before
+FAIL V10 T8 [telegram] e2e-auth form (label «Цветы», id flowers) with the flowers head of f08546f1 -> behind(flowers) by CONTENT, refreshed
+FAIL V10 T10 [telegram] legacy id (generic head) of the 95221844 template -> generic behind, refreshed to today's template prompt
+FAIL V10 T4 preservation: heads no map wrote, today's heads and non-grammar prompts are kept byte-identical; verify exit 0
+FAIL V10 T9 a head edited by hand under a known label -> custom: never refreshed automatically, exit 0, reported
+FAIL V10 T11 --set-vertical is the ONLY way a custom head is replaced (explicit operator decision)
+FAIL V10 NEG the prompt history is unreadable (no git) -> the tools refuse, never judge every head «custom»
+FAIL V10 apply: PUT publishes -> deactivate/activate never; read-back ok, prompt refreshed
+FAIL V10 apply: PUT does NOT publish -> deactivate/activate exactly once; read-back ok, prompt refreshed
+28 pass, 20 fail
+
+--- failure details (V10 cases; long report bodies trimmed) ---
+FAIL V10 T1 [whatsapp] canonical graph + auto_parts head of f08546f1 -> PROMPT-BEHIND (auto_parts), not up to date, exit 2
+      - exit 0: {'canonical_not_ok': [], 'clones': [('bot v10t1wh000000001', True, None)], 'archived': []}
+      - row: {'prompt_state': None, 'prompt_vertical': None, 'prompt_label': None, 'prompt_since': None, 'published_prompt_state': None, 'up_to_date': True, 'at_canonical': True}
+      - the report must name the stale prompt:
+FAIL V10 T3 [whatsapp] the T2 target, deployed, is up to date by graph AND prompt (verify exit 0, no second update)
+      - exit 0: {'prompt_state': None, 'prompt_vertical': None, 'prompt_label': None, 'prompt_since': None, 'published_prompt_state': None, 'up_to_date': True, 'at_canonical': True}
+FAIL V10 T2 [whatsapp] graph AND head of f08546f1: dry-run names the vertical; build_target = what Create composes today, owner tail byte-identical
+      - the dry-run must name the vertical and that its head is behind:
+      - the refreshed prompt must be exactly what Create composes today: differ at 459 (len 11557 vs 13273): 'е — клиент сам назвал артикул или авто. Если деталь не подбирается однозначно — попроси VIN и номер ' vs 'е — клиент сам назвал артикул или авто. Авто за клиента не подставляй и цену условно не называй («ес'
+      - label line kept, today's head in
+FAIL V10 T5 [whatsapp] stored prompt at today's head, PUBLISHED prompt of f08546f1 -> not up to date, exit 2, planned for update
+      - exit 0: {'prompt_state': None, 'prompt_vertical': None, 'prompt_label': None, 'prompt_since': None, 'published_prompt_state': None, 'up_to_date': True, 'at_canonical': True}
+      - {'prompt_state': None, 'prompt_vertical': None, 'prompt_label': None, 'prompt_since': None, 'published_prompt_state': None, 'up_to_date': True, 'at_canonical': True}
+      - {'clones': 1, 'up_to_date': 1, 'would_update': 0, 'updated': 0, 'failed': 0}
+FAIL V10 T6 [whatsapp] Edit grammar (a settings save at f08546f1) -> refreshed to exactly what Edit writes today, exit 2 before
+      - exit 0: {'prompt_state': None, 'prompt_vertical': None, 'prompt_label': None, 'prompt_since': None, 'published_prompt_state': None, 'up_to_date': True, 'at_canonical': True}
+      - must equal what the next Edit save writes: differ at 459 (len 11522 vs 13238): 'е — клиент сам назвал артикул или авто. Если деталь не подбирается однозначно — попроси VIN и номер ' vs 'е — клиент сам назвал артикул или авто. Авто за клиента не подставляй и цену условно не называй («ес'
+FAIL V10 T8 [whatsapp] e2e-auth form (label «Цветы», id flowers) with the flowers head of f08546f1 -> behind(flowers) by CONTENT, refreshed
+      - exit 0: {'prompt_state': None, 'prompt_vertical': None, 'prompt_label': None, 'prompt_since': None, 'published_prompt_state': None, 'up_to_date': True, 'at_canonical': True}
+      - differ at 2229 (len 11500 vs 12792): 'владельца (его дополнительные инструкции).\nПожелание владельца не делает ложный факт истинным и не о' vs 'владельца (его дополнительные инструкции — раздел «Additional Instructions» ниже).\nПожелание владель'
+      - the label decides nothing — the head is flowers: {'prompt_state': None, 'prompt_vertical': None, 'prompt_label': None, 'prompt_since': None, 'published_prompt_state': None, 'up_to_date': True, 'at_canonical': True}
+      - a label that is not the vertical's app label is reported:
+FAIL V10 T10 [whatsapp] legacy id (generic head) of the 95221844 template -> generic behind, refreshed to today's template prompt
+      - exit 0: {'prompt_state': None, 'prompt_vertical': None, 'prompt_label': None, 'prompt_since': None, 'published_prompt_state': None, 'up_to_date': True, 'at_canonical': True}
+      - differ at 1490 (len 1768 vs 2331): 'n and prices for products and services\n\nAdditional Instructions: Отвечай коротко. Постоянным клиента' vs 'n and prices for products and services\n\n##create_handoff##\nПередача владельцу — это ДЕЙСТВИЕ, не фра'
+FAIL V10 T1 [telegram] canonical graph + auto_parts head of f08546f1 -> PROMPT-BEHIND (auto_parts), not up to date, exit 2
+      - exit 0: {'canonical_not_ok': [], 'clones': [('bot v10t1te000000001', True, None)], 'archived': []}
+      - row: {'prompt_state': None, 'prompt_vertical': None, 'prompt_label': None, 'prompt_since': None, 'published_prompt_state': None, 'up_to_date': True, 'at_canonical': True}
+      - the report must name the stale prompt:
+FAIL V10 T3 [telegram] the T2 target, deployed, is up to date by graph AND prompt (verify exit 0, no second update)
+      - exit 0: {'prompt_state': None, 'prompt_vertical': None, 'prompt_label': None, 'prompt_since': None, 'published_prompt_state': None, 'up_to_date': True, 'at_canonical': True}
+FAIL V10 T2 [telegram] graph AND head of f08546f1: dry-run names the vertical; build_target = what Create composes today, owner tail byte-identical
+      - the dry-run must name the vertical and that its head is behind:
+      - the refreshed prompt must be exactly what Create composes today: differ at 459 (len 11557 vs 13273): 'е — клиент сам назвал артикул или авто. Если деталь не подбирается однозначно — попроси VIN и номер ' vs 'е — клиент сам назвал артикул или авто. Авто за клиента не подставляй и цену условно не называй («ес'
+      - label line kept, today's head in
+FAIL V10 T5 [telegram] stored prompt at today's head, PUBLISHED prompt of f08546f1 -> not up to date, exit 2, planned for update
+      - exit 0: {'prompt_state': None, 'prompt_vertical': None, 'prompt_label': None, 'prompt_since': None, 'published_prompt_state': None, 'up_to_date': True, 'at_canonical': True}
+      - {'prompt_state': None, 'prompt_vertical': None, 'prompt_label': None, 'prompt_since': None, 'published_prompt_state': None, 'up_to_date': True, 'at_canonical': True}
+      - {'clones': 1, 'up_to_date': 1, 'would_update': 0, 'updated': 0, 'failed': 0}
+FAIL V10 T6 [telegram] Edit grammar (a settings save at f08546f1) -> refreshed to exactly what Edit writes today, exit 2 before
+      - exit 0: {'prompt_state': None, 'prompt_vertical': None, 'prompt_label': None, 'prompt_since': None, 'published_prompt_state': None, 'up_to_date': True, 'at_canonical': True}
+      - must equal what the next Edit save writes: differ at 459 (len 11522 vs 13238): 'е — клиент сам назвал артикул или авто. Если деталь не подбирается однозначно — попроси VIN и номер ' vs 'е — клиент сам назвал артикул или авто. Авто за клиента не подставляй и цену условно не называй («ес'
+FAIL V10 T8 [telegram] e2e-auth form (label «Цветы», id flowers) with the flowers head of f08546f1 -> behind(flowers) by CONTENT, refreshed
+      - exit 0: {'prompt_state': None, 'prompt_vertical': None, 'prompt_label': None, 'prompt_since': None, 'published_prompt_state': None, 'up_to_date': True, 'at_canonical': True}
+      - differ at 2229 (len 11500 vs 12792): 'владельца (его дополнительные инструкции).\nПожелание владельца не делает ложный факт истинным и не о' vs 'владельца (его дополнительные инструкции — раздел «Additional Instructions» ниже).\nПожелание владель'
+      - the label decides nothing — the head is flowers: {'prompt_state': None, 'prompt_vertical': None, 'prompt_label': None, 'prompt_since': None, 'published_prompt_state': None, 'up_to_date': True, 'at_canonical': True}
+      - a label that is not the vertical's app label is reported:
+FAIL V10 T10 [telegram] legacy id (generic head) of the 95221844 template -> generic behind, refreshed to today's template prompt
+      - exit 0: {'prompt_state': None, 'prompt_vertical': None, 'prompt_label': None, 'prompt_since': None, 'published_prompt_state': None, 'up_to_date': True, 'at_canonical': True}
+      - differ at 1490 (len 1768 vs 2331): 'n and prices for products and services\n\nAdditional Instructions: Отвечай коротко. Постоянным клиента' vs 'n and prices for products and services\n\n##create_handoff##\nПередача владельцу — это ДЕЙСТВИЕ, не фра'
+FAIL V10 T4 preservation: heads no map wrote, today's heads and non-grammar prompts are kept byte-identical; verify exit 0
+      - {'v10p1wa000000001': None, 'v10p2wa000000001': None, 'v10p3tg000000001': None, 'v10p4wa000000001': None, 'v10p5tg000000001': None, 'v10p6wa000000001': None}
+FAIL V10 T9 a head edited by hand under a known label -> custom: never refreshed automatically, exit 0, reported
+      - whatsapp: exit 0: {'prompt_state': None, 'prompt_vertical': None, 'prompt_label': None, 'prompt_since': None, 'published_prompt_state': None, 'up_to_date': True, 'at_canonical': True}
+      - ctive=True names=True graph=True published=True
+      - telegram: exit 0: {'prompt_state': None, 'prompt_vertical': None, 'prompt_label': None, 'prompt_since': None, 'published_prompt_state': None, 'up_to_date': True, 'at_canonical': True}
+      - ctive=True names=True graph=True published=True
+FAIL V10 T11 --set-vertical is the ONLY way a custom head is replaced (explicit operator decision)
+      - EXCEPTION IndexError: list index out of range
+FAIL V10 NEG the prompt history is unreadable (no git) -> the tools refuse, never judge every head «custom»
+      - EXCEPTION AttributeError: module 'update_clones_py' has no attribute 'prompt_book'
+FAIL V10 apply: PUT publishes -> deactivate/activate never; read-back ok, prompt refreshed
+      - publish window: ['/workflows/v10apwa000000001/deactivate', '/workflows/v10apwa000000001/activate']
+      - stored and published prompt refreshed
+FAIL V10 apply: PUT does NOT publish -> deactivate/activate exactly once; read-back ok, prompt refreshed
+      - stored and published prompt refreshed

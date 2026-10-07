@@ -1,0 +1,80 @@
+V10 — AFTER the fix (HEAD 93fbf0fe + the uncommitted V10 change; offline fake n8n API, prompts from git; staging n8n 2.36.7)
+date: 2026-10-07T17:16:46Z
+
+1) command: python3 Tools/n8n/tests/test_verify_deployed.py   (before: 28 pass, 20 fail — see V10-before.txt)
+PASS D1 control: healthy canonical set, no clones -> exit 0
+PASS D1 prod 2026-09-25 (production-readback.json): fresh «23» without sticky is AT-CANONICAL, archived «13» listed apart -> exit 0
+PASS D1 fresh TG clone (re-ided nodes, instance credential ids) + edited WA bot + inactive (channels off) clone -> exit 0
+PASS D1 draft moved in the editor (positions only) while the published graph is canonical -> OK, exit 0
+PASS D1 staging base: derived set, Support Message left unbound ON PURPOSE, a staging bot clone -> exit 0; inactive webhook still -> 2
+PASS R3 NEG staging base: an Upload File copy that still WRITES to the real Supabase (writers not neutralised) -> DIFF, exit 2
+PASS V9 NEG staging base: a Price List Search copy still searching the real Supabase project (reader not redirected) -> DIFF, exit 2
+PASS D1 NEG forged correct sticky on a drifted clone graph -> BEHIND, «sticky claims … graph is …», exit 2
+PASS D1 NEG inactive required webhook (Wappi Proxy imported, never activated) -> DIFF, exit 2
+PASS D1 NEG a clone template switched on (templates must stay inactive) -> DIFF, exit 2
+PASS D1 NEG clone: canonical draft, but the PUBLISHED graph is the drifted one -> not at canonical, exit 2
+PASS D1 NEG canonical workflow: canonical draft, published graph has the Auth Gate bypassed -> DIFF, exit 2
+PASS D1 NEG Support Message: chat id bound AND an extra edit (Validate clamp removed) -> DIFF, exit 2
+PASS D1 NEG Support Message: connections rewired (Webhook -> Send, no gate/validation) hidden behind SUBSTITUTED -> DIFF, exit 2
+PASS D1 NEG Support Message deployed with the placeholder chat id (substitution not applied) -> DIFF, exit 2
+PASS D1 NEG Set Workflow State: Auth Gate bypassed (Webhook -> Validate) -> DIFF, exit 2
+PASS D1 NEG Set Workflow State: PROTECTED list lost the stage-7 ids -> DIFF, exit 2
+PASS D1 NEG a node disabled by hand (Wappi Proxy Auth Gate) -> DIFF, exit 2
+PASS D1 NEG Test Dialog imported with its credential placeholder unbound -> DIFF, exit 2
+PASS D1 NEG an ARCHIVED canonical workflow is not a running one -> DIFF, exit 2
+PASS D1 NEG the archive exemption is not blanket: a LIVE clone on the old graph still fails -> exit 2
+PASS D1 update-clones: fresh «23» (no sticky, canonical graph) is up to date — no needless PUT + re-activate of a live bot
+PASS D1 update-clones: forged sticky over a drifted graph is planned for update (drift is repairable)
+PASS D1 update-clones: canonical draft + stale PUBLISHED graph is planned for update (the apply re-publishes)
+PASS D1 update-clones: a clone rebuilt by build_target is up to date by its GRAPH (no endless would_update)
+PASS D1 deploy-canonical (shares graph_hash): healthy set is up to date; a hand-disabled node is planned for re-deploy
+PASS D1 update-clones: archived clones are skipped, never counted as clones
+PASS V10 premise: today's map is inject-prompts' composition (WA ≡ TG) and every vertical head of the prod epoch differs from it
+PASS V10 T1 [whatsapp] canonical graph + auto_parts head of f08546f1 -> PROMPT-BEHIND (auto_parts), not up to date, exit 2
+PASS V10 T3 [whatsapp] the T2 target, deployed, is up to date by graph AND prompt (verify exit 0, no second update)
+PASS V10 T2 [whatsapp] graph AND head of f08546f1: dry-run names the vertical; build_target = what Create composes today, owner tail byte-identical
+PASS V10 T5 [whatsapp] stored prompt at today's head, PUBLISHED prompt of f08546f1 -> not up to date, exit 2, planned for update
+PASS V10 T6 [whatsapp] Edit grammar (a settings save at f08546f1) -> refreshed to exactly what Edit writes today, exit 2 before
+PASS V10 T8 [whatsapp] e2e-auth form (label «Цветы», id flowers) with the flowers head of f08546f1 -> behind(flowers) by CONTENT, refreshed
+PASS V10 T10 [whatsapp] legacy id (generic head) of the 95221844 template -> generic behind, refreshed to today's template prompt
+PASS V10 T1 [telegram] canonical graph + auto_parts head of f08546f1 -> PROMPT-BEHIND (auto_parts), not up to date, exit 2
+PASS V10 T3 [telegram] the T2 target, deployed, is up to date by graph AND prompt (verify exit 0, no second update)
+PASS V10 T2 [telegram] graph AND head of f08546f1: dry-run names the vertical; build_target = what Create composes today, owner tail byte-identical
+PASS V10 T5 [telegram] stored prompt at today's head, PUBLISHED prompt of f08546f1 -> not up to date, exit 2, planned for update
+PASS V10 T6 [telegram] Edit grammar (a settings save at f08546f1) -> refreshed to exactly what Edit writes today, exit 2 before
+PASS V10 T8 [telegram] e2e-auth form (label «Цветы», id flowers) with the flowers head of f08546f1 -> behind(flowers) by CONTENT, refreshed
+PASS V10 T10 [telegram] legacy id (generic head) of the 95221844 template -> generic behind, refreshed to today's template prompt
+PASS V10 T4 preservation: heads no map wrote, today's heads and non-grammar prompts are kept byte-identical; verify exit 0
+PASS V10 T9 a head edited by hand under a known label -> custom: never refreshed automatically, exit 0, reported
+PASS V10 T11 --set-vertical is the ONLY way a custom head is replaced (explicit operator decision)
+PASS V10 NEG the prompt history is unreadable (no git) -> the tools refuse, never judge every head «custom»
+PASS V10 apply: PUT publishes -> deactivate/activate never; read-back ok, prompt refreshed
+PASS V10 apply: PUT does NOT publish -> deactivate/activate exactly once; read-back ok, prompt refreshed
+48 pass, 0 fail
+
+2) command: python3 Tools/n8n/tests/run_all.py   -> exit 0, 21/21 files OK (test_verify_deployed.py: 48 pass, 0 fail)
+   command: ~/.venvs/tiktoken/bin/python3 Tools/n8n/inject-prompts.py --check -> exit 0 (4 Create/Edit up-to-date, token floor OK);
+            a write run changes nothing (git status Tools/n8n/workflows Tools/n8n/prompts: empty) — no canonical JSON changes in V10
+
+3) staging (after bootstrap.py --bot wa:stgwa001 --bot tg:stgtg001)
+   command: python3 Tools/n8n/verify-deployed.py --base http://localhost:5678  -> exit 0
+   base http://localhost:5678: canonical 27 (diff 0), clones 2 (behind template 0, of them prompt head behind 0; custom prompts 2, not counted), archived clones 0 (not counted), other 2
+     prompt map = Create/Edit Vertical Prompt as introduced in d7796c32 (sha256 c89accf86308)
+     clone   stgtg40da979c774 'STAGING TG stgtg001' [telegram] active=True nodes=60 graph=63d5618f0990 published=63d5618f0990 sticky=None AT-CANONICAL  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+     clone   stgwab77f282533c 'STAGING WA stgwa001' [whatsapp] active=True nodes=60 graph=2f26b8306e59 published=2f26b8306e59 sticky=None AT-CANONICAL  prompt=custom (custom prompt — kept verbatim by update-clones, not counted: no Create/Edit grammar (Business Type line + Additional Instructions marker))
+
+   command: python3 Tools/n8n/staging/e2e-clone-update.py   -> exit 1 (see the note below)
+   FAIL clone_update_old_template_to_canonical
+      {"created": "NsrWN6mIbW1kLrcG", "dry_run": {"clones": 1, "up_to_date": 0, "would_update": 1, "updated": 0, "failed": 0}, "prompt_plan": "prompt: custom — kept verbatim (no Create/Edit grammar (Business Type line + Additional Instructions marker); replace only with --set-vertical NsrWN6mIbW1kLrcG=<vertical id>)", "apply": {"clones": 1, "up_to_date": 0, "would_update": 0, "updated": 1, "failed": 0}, "publish": "published by the PUT (served version = the update) — no deactivate/activate window", "rerun": {"clones": 1, "up_to_date": 1, "would_update": 0, "updated": 0, "failed": 0}, "path_kept": true, "canonical_names": true, "stamped": true, "active_after": true, "served_is_stored": true, "webhook": 200, "outcome": "generation_failed", "sends": 0, "ledger": "generation_failed|-", "node_errors": {"OpenAI": "The service is receiving too many requests from you — You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/."}, "answered": false, "prompt_kept": true, "custom_reported": true}
+   FAIL clone_update_refreshes_stale_vertical_head[wa]
+      {"created": "UmlpcAPPmfl1OkMM", "dry_run": {"clones": 1, "up_to_date": 0, "would_update": 1, "updated": 0, "failed": 0}, "prompt_plan": "prompt: auto_parts head behind (head of f15a9fb3) → refreshed to today's map (11575→13291 chars), owner tail 311 chars kept", "apply": {"clones": 1, "up_to_date": 0, "would_update": 0, "updated": 1, "failed": 0}, "publish": "published by the PUT (served version = the update) — no deactivate/activate window", "rerun": {"clones": 1, "up_to_date": 1, "would_update": 0, "updated": 0, "failed": 0}, "path_kept": true, "canonical_names": true, "stamped": true, "active_after": true, "served_is_stored": true, "webhook": 200, "outcome": "generation_failed", "sends": 0, "ledger": "generation_failed|-", "node_errors": {"OpenAI": "The service is receiving too many requests from you — You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/."}, "answered": false, "prompt_is_create_today": true, "owner_tail_kept": true, "published_prompt_is_it": true, "state_after": "at_canonical"}
+   FAIL clone_update_refreshes_stale_vertical_head[tg]
+      {"created": "CX4q2PP9eJXMpJmo", "dry_run": {"clones": 1, "up_to_date": 0, "would_update": 1, "updated": 0, "failed": 0}, "prompt_plan": "prompt: auto_parts head behind (head of f15a9fb3) → refreshed to today's map (11575→13291 chars), owner tail 311 chars kept", "apply": {"clones": 1, "up_to_date": 0, "would_update": 0, "updated": 1, "failed": 0}, "publish": "published by the PUT (served version = the update) — no deactivate/activate window", "rerun": {"clones": 1, "up_to_date": 1, "would_update": 0, "updated": 0, "failed": 0}, "path_kept": true, "canonical_names": true, "stamped": true, "active_after": true, "served_is_stored": true, "webhook": 200, "outcome": "generation_failed", "sends": 0, "ledger": "generation_failed|-", "node_errors": {"OpenAI": "The service is receiving too many requests from you — You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/."}, "answered": false, "prompt_is_create_today": true, "owner_tail_kept": true, "published_prompt_is_it": true, "state_after": "at_canonical"}
+
+   NOTE: every check of the clone update holds in all three scenarios (WA custom prompt kept byte for byte;
+   WA + TG vertical head of f08546f1 refreshed to exactly what Create composes today — n8n's own engine —, owner tail
+   byte-identical, the PUBLISHED prompt = the stored one, PUT published the update so no deactivate/activate window,
+   re-run a no-op, the updated clone's webhook ran the canonical chain and wrote its ledger row). The ONLY failing
+   field is `answered`: the staging OpenAI account has no credits (node error above: 429 «You have no credits
+   remaining»), so the agent ends in the honest `generation_failed` state and nothing is sent. Same environment
+   limit the V9 group recorded; the reply leg needs the owner to top up the staging OpenAI account and one re-run.

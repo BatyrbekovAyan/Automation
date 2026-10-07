@@ -5,11 +5,24 @@ any owner's bot and without losing what identifies it.
 A clone = a workflow n8n's Create WA/TG made from a template: the template's graph plus four identity
 fields (the Create workflow's `Set Fields` writes exactly these): the workflow NAME, the Webhook
 node's PATH (= the Wappi profile id; the webhookId beside it), the AI Agent's systemMessage (the
-bot's composed prompt: vertical + owner data), and the workflow SETTINGS. Everything else is the
-template. So an update = the CURRENT canonical template with the clone's identity fields carried
-over, plus the clone's credential ids per credential TYPE (prod and staging bind different ids).
-Files, mode rows, history, billing and the workflow id are untouched — they live in the database
-and are keyed by profile/workflow id, both preserved.
+bot's composed prompt), and the workflow SETTINGS. Everything else is the template. So an update =
+the CURRENT canonical template with the clone's identity fields carried over, plus the clone's
+credential ids per credential TYPE (prod and staging bind different ids). Files, mode rows, history,
+billing and the workflow id are untouched — they live in the database and are keyed by
+profile/workflow id, both preserved.
+
+The prompt is only HALF identity (review V10, 2026-09-28). Set Fields composes it as
+`[=]Business Type: <label>\n\n<HEAD>\n` + `\nAdditional Instructions: …`: the tail from the FIRST marker on is
+the owner's (instructions, About Business, products, services) and is carried over byte for byte; the HEAD is
+shared template content — the Create/Edit `Vertical Prompt` map's `vertical + _core + _universal`, or the
+template's own prompt for a legacy id — and a clone keeps the head of the map that was live when it was created
+or last saved. The head is judged by CONTENT against the prompt history (every committed Create/Edit PROMPTS map
+and every committed template prompt, read from git — `prompt_book`), never by the `Business Type:` label, which is
+free text: at_canonical (today's map) · behind (an EARLIER map's head of vertical v → refreshed to today's v, the
+same head the next Edit save would write) · generic / generic_behind (the template's own prompt, today's / an
+earlier one → refreshed) · custom (no map and no template ever wrote it: edited by hand, or no Create/Edit grammar)
+→ NEVER replaced automatically; only an explicit `--set-vertical <workflowId>=<vertical id>` does it. A clone with
+a behind head (stored or published) is NOT up to date, whatever its graph.
 
 Idempotent by GRAPH (review D1, 2026-09-27): a clone is up to date when its stored graph AND the graph n8n
 publishes (`activeVersion`) both hash to the template's `graph_stamp` — node name/type/version/parameters plus
@@ -22,10 +35,17 @@ Every updated clone still gets a `Template Version` sticky note (n8n's `meta` is
     python3 Tools/n8n/update-clones.py                                   # dry-run on the default base (prod, READ-ONLY)
     python3 Tools/n8n/update-clones.py --base http://localhost:5678 --apply --yes          # staging
     python3 Tools/n8n/update-clones.py --only <workflowId> --apply --yes --base https://n8n.choosereply.com   # prod, owner-authorised only
+    python3 Tools/n8n/update-clones.py --only <workflowId> --set-vertical <workflowId>=flowers     # a CUSTOM head, by an operator's decision
 
---apply without --yes refuses. The default is a dry-run that prints, per clone, the node diff and the
-identity fields it would preserve. After an apply the tool READS BACK every updated workflow and
-verifies: node set == canonical, identity fields preserved, stamp present, active state as before.
+--apply without --yes refuses. The default is a dry-run that prints, per clone, the node diff, the prompt plan
+(«prompt: auto_parts behind (head of <sha>) → refreshed N→M chars, owner tail K chars kept» / «custom — kept
+verbatim») and the identity fields it would preserve, plus the prompt map version it applies. Run it only AFTER
+the new Create/Edit are deployed: a save through an older Create/Edit map would put the old head back. After a
+PUT on an active clone the tool reads back whether n8n PUBLISHED the update (n8n 2.36 publishes a PUT on an
+active workflow by default) and only re-publishes with deactivate → activate when it did not — so a live bot's
+webhook is not unregistered for nothing. It then READS BACK every updated workflow and verifies: node set ==
+canonical, identity fields preserved, prompt == the planned one (stored and published), stamp present, active
+state as before.
 """
 import argparse
 import copy
@@ -33,13 +53,24 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 import urllib.error
 import urllib.request
+import importlib.util
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.dirname(os.path.dirname(HERE))
 WF = os.path.join(HERE, "workflows")
 TEMPLATES = {"whatsapp": "4wYitz5ek30SVNlT-WhatsApp_Bot.json", "telegram": "4VN3gsFaC2HUYmcc-Telegram_Bot.json"}
+# The Create workflow of each channel — its Vertical Prompt map is what a clone's head is compared with TODAY; the
+# Edit twins write the same map and join the history.
+CREATE = {"whatsapp": "XuvOp7TxOImOAmlj-CreateWhatsappWorkflow.json", "telegram": "Uz6HBBUpAiUqVysB-CreateTelegramWorkflow.json"}
+EDIT = {"whatsapp": "3qax5J9u2qsT9Vao-Edit_Whatsapp_Workflow.json", "telegram": "TwWPW3gIyjZS3foR-Edit_Telegram_Workflow.json"}
+PROMPT_BEHIND = ("behind", "generic_behind")
+_ip_spec = importlib.util.spec_from_file_location("inject_prompts", os.path.join(HERE, "inject-prompts.py"))
+ip = importlib.util.module_from_spec(_ip_spec)   # the ONE owner of the head composition (parse/compose seam)
+_ip_spec.loader.exec_module(ip)
 IDENTITY_NODES = ("Webhook", "AI Agent")
 STICKY = "n8n-nodes-base.stickyNote"
 STAMP_NODE = "Template Version"
@@ -216,17 +247,166 @@ def published_matches(full, same_graph):
     return None
 
 
+# ---------------------------------------------------------------------------------------------- the prompt head (V10)
+_PROMPT_BOOK = None
+
+
+def _git(args, data=None):
+    """git in the repository this tool lives in. Any failure is FATAL: without the history every head that is not
+    today's would read as «custom» and a stale prompt would pass as the owner's own."""
+    try:
+        return subprocess.run(["git", "-C", REPO, *args], input=data, capture_output=True, check=True).stdout
+    except (OSError, subprocess.CalledProcessError) as e:
+        detail = getattr(e, "stderr", b"") or b""
+        raise SystemExit(f"cannot read the prompt history from git in {REPO}: {e} {detail.decode(errors='replace').strip()[:200]} "
+                         "— clone prompts cannot be judged without it (run from a full git checkout)")
+
+
+def _committed_versions(rel_paths):
+    """[(commit, path, bytes)] of every committed version of the files, oldest first (one `git cat-file --batch`)."""
+    if _git(["rev-parse", "--is-shallow-repository"]).strip() == b"true":
+        raise SystemExit("shallow git clone: the prompt history is incomplete (git fetch --unshallow) — clone prompts cannot be judged")
+    pairs = []
+    for rel in rel_paths:
+        pairs += [(sha, rel) for sha in _git(["log", "--format=%H", "--reverse", "--", rel]).decode().split()]
+    if not pairs:
+        raise SystemExit(f"no committed history for {rel_paths} in {REPO} — clone prompts cannot be judged")
+    blob = _git(["cat-file", "--batch"], "".join(f"{sha}:{rel}\n" for sha, rel in pairs).encode())
+    out, pos = [], 0
+    for sha, rel in pairs:
+        nl = blob.index(b"\n", pos)
+        header = blob[pos:nl].decode()
+        pos = nl + 1
+        if header.endswith(" missing"):
+            continue
+        size = int(header.split()[2])
+        out.append((sha, rel, blob[pos:pos + size]))
+        pos += size + 1
+    return out
+
+
+def prompt_book():
+    """Today's heads and every head a committed map or template ever wrote (built once per process).
+
+    current[ch][v]  — the head Create of channel ch composes TODAY for vertical v (the working-tree map)
+    generic[ch]     — the head it composes today for an id without a vertical prompt (template prompt[1:])
+    known[head]     — {kind: vertical|generic, vertical, since}: every head of every committed version of the four
+                      Create/Edit maps and of both templates' prompts; `since` = the first commit that carried it."""
+    global _PROMPT_BOOK
+    if _PROMPT_BOOK is not None:
+        return _PROMPT_BOOK
+    rel = lambda f: os.path.relpath(os.path.join(WF, f), REPO)
+    current, generic, known = {}, {}, {}
+    for ch in TEMPLATES:
+        cmap = ip.prompts_of_workflow(json.load(open(os.path.join(WF, CREATE[ch]), encoding="utf-8")))
+        if not cmap:
+            raise SystemExit(f"{CREATE[ch]} carries no Vertical Prompt map — run inject-prompts.py")
+        current[ch] = cmap
+        generic[ch] = ip.generic_head(json.load(open(os.path.join(WF, TEMPLATES[ch]), encoding="utf-8")))
+    map_files = [rel(f) for ch in TEMPLATES for f in (CREATE[ch], EDIT[ch])]
+    tpl_files = [rel(TEMPLATES[ch]) for ch in TEMPLATES]
+    introduced = None   # the first commit of Create WA whose map is today's — the version this run applies
+    for sha, path, data in _committed_versions(map_files + tpl_files):
+        wf = json.loads(data)
+        if path in tpl_files:
+            h = ip.generic_head(wf)
+            if h and h not in known:
+                known[h] = {"kind": "generic", "vertical": None, "since": sha[:8]}
+            continue
+        m = ip.prompts_of_workflow(wf) or {}
+        for v, h in m.items():
+            if h not in known or known[h]["kind"] != "vertical":
+                known[h] = {"kind": "vertical", "vertical": v, "since": sha[:8]}
+        if introduced is None and path == map_files[0] and m == current["whatsapp"]:
+            introduced = sha[:8]
+    for ch in TEMPLATES:   # today's heads are known even before they are committed
+        for v, h in current[ch].items():
+            known.setdefault(h, {"kind": "vertical", "vertical": v, "since": "working tree"})
+        if generic[ch]:
+            known.setdefault(generic[ch], {"kind": "generic", "vertical": None, "since": "working tree"})
+    digest = hashlib.sha256(json.dumps(current["whatsapp"], sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:12]
+    _PROMPT_BOOK = {"current": current, "generic": generic, "known": known, "map_hash": digest,
+                    "map_ref": f"as introduced in {introduced}" if introduced else "of the working tree (not committed yet)"}
+    return _PROMPT_BOOK
+
+
+def system_message(wf):
+    a = node(wf or {}, "AI Agent")
+    return (((a or {}).get("parameters") or {}).get("options") or {}).get("systemMessage")
+
+
+def prompt_state(sm, channel):
+    """What a clone's head IS, by content: at_canonical | behind | generic | generic_behind | custom (+ vertical,
+    the label as written, `since` = the first commit of the map that wrote a behind head, a note for custom)."""
+    book = prompt_book()
+    out = {"state": "custom", "vertical": None, "label": None, "since": None, "note": None}
+    parts = ip.parse_system_message(sm)
+    if parts is None:
+        out["note"] = "no Create/Edit grammar (Business Type line + Additional Instructions marker)"
+        return out
+    out["label"] = parts["label"]
+    head = parts["head"]
+    for v, h in (book["current"].get(channel) or {}).items():
+        if head == h:
+            return dict(out, state="at_canonical", vertical=v)
+    if head == book["generic"].get(channel):
+        return dict(out, state="generic")
+    known = book["known"].get(head)
+    if known:
+        return dict(out, state="behind" if known["kind"] == "vertical" else "generic_behind", vertical=known["vertical"], since=known["since"])
+    out["note"] = ("the head matches no committed Create/Edit map and no template prompt — edited by hand, or written by a "
+                   "map newer than this checkout (pull first)")
+    return out
+
+
+def refreshed_prompt(sm, channel, set_vertical=None):
+    """The prompt the clone should carry: a behind head → today's head of the same vertical (generic → today's
+    template prompt); `set_vertical` → today's head of that vertical (the operator's explicit decision for a custom
+    head); otherwise the prompt unchanged. Always the same label line, the same leading '=' and the owner tail."""
+    parts = ip.parse_system_message(sm)
+    if parts is None:
+        return sm
+    book = prompt_book()
+    cur = book["current"].get(channel) or {}
+    if set_vertical:
+        if set_vertical not in cur:
+            raise SystemExit(f"--set-vertical: unknown vertical id {set_vertical!r} (known: {sorted(cur)})")
+        return ip.compose_system_message(parts, cur[set_vertical])
+    st = prompt_state(sm, channel)
+    if st["state"] == "behind" and st["vertical"] in cur:
+        return ip.compose_system_message(parts, cur[st["vertical"]])
+    if st["state"] == "generic_behind" and book["generic"].get(channel):
+        return ip.compose_system_message(parts, book["generic"][channel])
+    return sm
+
+
 def clone_state(full, tpl_stamp):
-    """One clone judged by its graphs: the stored (draft) graph and the published one against the template; what
-    the sticky merely CLAIMS is reported beside it, never trusted."""
+    """One clone judged by its graphs AND its prompt head: the stored (draft) version and the published one against
+    the template and today's map; what the sticky merely CLAIMS is reported beside it, never trusted. A custom head
+    is reported and never counted; a behind head (stored or published) makes the clone not up to date."""
     graph = graph_stamp(full)
     claimed = stamp_of(full)
     pub = published_graph(full)
     published_ok = published_matches(full, lambda g: graph_stamp(g) == tpl_stamp)
+    ch = channel_of(full)
+    ps = prompt_state(system_message(full), ch)
+    prompt_ok = ps["state"] not in PROMPT_BEHIND
+    published_prompt_ok = published_matches(full, lambda g: prompt_state(system_message(g), ch)["state"] not in PROMPT_BEHIND)
+    if pub is not None:
+        pub_state = prompt_state(system_message(pub), ch)["state"]
+    elif full.get("active") and full.get("activeVersionId") and full.get("activeVersionId") == full.get("versionId"):
+        pub_state = ps["state"]
+    else:
+        pub_state = None
+    judged = lambda st: None if st in (None, "custom") else st not in PROMPT_BEHIND
     return {"graph_stamp": graph, "published_stamp": graph_stamp(pub) if pub is not None else None, "stamp": claimed,
             "stamp_consistent": claimed is None or claimed == graph, "at_canonical": graph == tpl_stamp,
             "published_at_canonical": published_ok is not False,
-            "up_to_date": graph == tpl_stamp and published_ok is not False, "archived": bool(full.get("isArchived"))}
+            "prompt_state": ps["state"], "prompt_vertical": ps["vertical"], "prompt_label": ps["label"],
+            "prompt_since": ps["since"], "prompt_note": ps["note"], "prompt_at_canonical": judged(ps["state"]),
+            "published_prompt_state": pub_state, "published_prompt_at_canonical": judged(pub_state),
+            "up_to_date": graph == tpl_stamp and published_ok is not False and prompt_ok and published_prompt_ok is not False,
+            "archived": bool(full.get("isArchived"))}
 
 
 def credentials_by_type(wf):
@@ -237,8 +417,9 @@ def credentials_by_type(wf):
     return out
 
 
-def build_target(clone, tpl):
-    """The canonical template wearing the clone's identity (name, webhook path/id, prompt, settings, credentials by type)."""
+def build_target(clone, tpl, set_vertical=None):
+    """The canonical template wearing the clone's identity (name, webhook path/id, settings, credentials by type) and
+    its prompt — with a behind head brought to today's map (`refreshed_prompt`), the owner tail byte for byte."""
     target = copy.deepcopy(tpl)
     creds = credentials_by_type(clone)
     for n in target["nodes"]:
@@ -252,7 +433,8 @@ def build_target(clone, tpl):
     ca, ta = node(clone, "AI Agent"), node(target, "AI Agent")
     sm = ((ca.get("parameters") or {}).get("options") or {}).get("systemMessage")
     if sm is not None:
-        ta["parameters"].setdefault("options", {})["systemMessage"] = sm
+        ch = channel_of(clone) or channel_of(tpl)
+        ta["parameters"].setdefault("options", {})["systemMessage"] = refreshed_prompt(sm, ch, set_vertical)
     settings = dict(clone.get("settings") or {})
     settings.setdefault("executionOrder", "v1")
     nodes = real_nodes(target) + [stamp_node(template_stamp(tpl))]
@@ -290,7 +472,52 @@ def verify_after(base, wid, target, clone_was_active, stamp):
     av, vid = got.get("activeVersionId"), got.get("versionId")
     if clone_was_active and av and vid and av != vid:
         problems.append("published version is not the updated one (activeVersionId != versionId)")
+    pub = published_graph(got)
+    if clone_was_active and pub is not None:
+        if graph_stamp(pub) != graph_stamp(target):
+            problems.append("published graph is not the updated one")
+        if system_message(pub) != system_message(target):
+            problems.append("published prompt is not the updated one")
     return (not problems), ("; ".join(problems) if problems else "ok")
+
+
+def serves(got, target):
+    """Does n8n already SERVE `target` (active, published version = stored version, and — when the instance reports
+    it — the served graph and prompt are the target's)? Then no deactivate → activate is needed."""
+    av, vid = got.get("activeVersionId"), got.get("versionId")
+    if not (got.get("active") and av and vid and av == vid):
+        return False
+    pub = published_graph(got)
+    return pub is None or (graph_stamp(pub) == graph_stamp(target) and system_message(pub) == system_message(target))
+
+
+def prompt_plan(full, target, ch, cs, forced):
+    """One dry-run line: what happens to the clone's prompt."""
+    before, after = system_message(full) or "", system_message(target) or ""
+    parts = ip.parse_system_message(before)
+    tail = len(parts["tail"]) if parts else 0
+    st, v = cs["prompt_state"], cs["prompt_vertical"]
+    if forced:
+        return f"prompt: {st} → set to {forced} by --set-vertical ({len(before)}→{len(after)} chars), owner tail {tail} chars kept"
+    if before != after:
+        what = f"{v} head" if st == "behind" else "generic template head"
+        return f"prompt: {what} behind (head of {cs['prompt_since']}) → refreshed to today's map ({len(before)}→{len(after)} chars), owner tail {tail} chars kept"
+    if st == "custom":
+        return f"prompt: custom — kept verbatim ({cs['prompt_note']}; replace only with --set-vertical {full.get('id')}=<vertical id>)"
+    if st in PROMPT_BEHIND:
+        return f"prompt: {st} ({v}) but today's map has no head for it — kept; decide by hand"
+    return f"prompt: {st}{'/' + v if v else ''} — kept"
+
+
+def parse_set_vertical(items):
+    """--set-vertical <workflowId>=<vertical id> (repeatable) → {workflowId: vertical id}."""
+    out = {}
+    for it in items:
+        wid, sep, vid = it.partition("=")
+        if not sep or not wid or vid not in ip.VERTICALS:
+            sys.exit(f"--set-vertical expects <workflowId>=<vertical id>, vertical id one of {ip.VERTICALS}: {it!r}")
+        out[wid] = vid
+    return out
 
 
 def main():
@@ -299,14 +526,20 @@ def main():
     ap.add_argument("--only", action="append", default=[], help="workflow id(s) to consider")
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--yes", action="store_true", help="required with --apply")
+    ap.add_argument("--set-vertical", action="append", default=[], metavar="WID=ID",
+                    help="replace a CUSTOM prompt head with today's head of this vertical (an operator's decision)")
     a = ap.parse_args()
     base = a.base.rstrip("/")
     if a.apply and not a.yes:
         sys.exit("--apply requires --yes (an explicit, per-run authorisation)")
+    forced_ids = parse_set_vertical(a.set_vertical)
     tpls = {ch: canonical(ch, base) for ch in TEMPLATES}
     stamps = {ch: template_stamp(tpls[ch]) for ch in tpls}
     canonical_ids = {json.load(open(os.path.join(WF, f), encoding="utf-8")).get("id") for f in os.listdir(WF) if f.endswith(".json")}
+    book = prompt_book()
     print(f"base {base} · mode {'APPLY' if a.apply else 'dry-run'} · template stamps {stamps}")
+    print(f"prompt map applied: Create/Edit Vertical Prompt {book['map_ref']} (sha256 {book['map_hash']}) — deploy the matching "
+          f"Create/Edit BEFORE this run, or the next owner save would put an older head back")
     rows = list_workflows(base)
     clones = [w for w in rows if (not a.only or w["id"] in a.only) and w.get("id") not in canonical_ids]
     summary = {"clones": 0, "up_to_date": 0, "would_update": 0, "updated": 0, "failed": 0}
@@ -322,20 +555,34 @@ def main():
         ch = channel_of(full)
         stamp = stamps[ch]
         cs = clone_state(full, stamp)
-        if cs["up_to_date"]:   # by GRAPH (stored + published), never by the sticky alone
+        forced = forced_ids.get(full["id"])
+        if forced and ip.parse_system_message(system_message(full)) is None:
+            print(f"! {full['id']} --set-vertical ignored: the prompt carries no Create/Edit grammar to put a head into")
+            forced = None
+        if forced and refreshed_prompt(system_message(full), ch, forced) == system_message(full):
+            forced = None   # already that vertical's head of today
+        prompt_info = f"prompt {cs['prompt_state']}{'/' + cs['prompt_vertical'] if cs['prompt_vertical'] else ''}"
+        if cs["up_to_date"] and not forced:   # by GRAPH and PROMPT HEAD (stored + published), never by the sticky alone
             summary["up_to_date"] += 1
             note = "" if cs["stamp"] in (None, stamp) else f"; sticky claims {cs['stamp']}"
-            print(f"= {full['id']} {full['name']!r} [{ch}] up to date ({stamp}, graph-verified{note})")
+            custom = f"; {prompt_plan(full, full, ch, cs, None)}" if cs["prompt_state"] == "custom" else ""
+            print(f"= {full['id']} {full['name']!r} [{ch}] up to date ({stamp}, graph-verified, {prompt_info}{note}){custom}")
             continue
         if not cs["stamp_consistent"]:
             print(f"! {full['id']} {full['name']!r} sticky claims {cs['stamp']} but the graph is {cs['graph_stamp']} (template {stamp})")
         if cs["at_canonical"] and not cs["published_at_canonical"]:
             print(f"! {full['id']} {full['name']!r} stored graph is canonical but the PUBLISHED one is {cs['published_stamp']} — the apply re-publishes it")
-        target = build_target(full, tpls[ch])
+        if cs["prompt_state"] not in PROMPT_BEHIND and cs["published_prompt_state"] in PROMPT_BEHIND:
+            print(f"! {full['id']} {full['name']!r} stored prompt head is current but the PUBLISHED one is behind — the apply re-publishes it")
+        target = build_target(full, tpls[ch], set_vertical=forced)
         added, removed, changed, conn = node_diff(full, target)
         print(f"~ {full['id']} {full['name']!r} [{ch}] active={full.get('active')} → +{len(added)} -{len(removed)} ~{len(changed)} conn={'changed' if conn else 'same'}")
         print(f"    add: {added}\n    remove: {removed}\n    change: {changed}")
-        print(f"    keep: path={node(full, 'Webhook')['parameters']['path']!r} prompt={len(node(full, 'AI Agent')['parameters'].get('options', {}).get('systemMessage', '') or '')} chars, creds={sorted(credentials_by_type(full).keys())}")
+        print(f"    {prompt_plan(full, target, ch, cs, forced)}")
+        if cs["prompt_label"] is not None and cs["prompt_vertical"] and cs["prompt_label"] != ip.BUSINESS_TYPE_LABELS.get(cs["prompt_vertical"]):
+            print(f"    label {cs['prompt_label']!r} is not the app's label for {cs['prompt_vertical']} "
+                  f"({ip.BUSINESS_TYPE_LABELS.get(cs['prompt_vertical'])!r}) — informational, the head's content decides")
+        print(f"    keep: path={node(full, 'Webhook')['parameters']['path']!r} label line + owner tail, creds={sorted(credentials_by_type(full).keys())}")
         if not a.apply:
             summary["would_update"] += 1
             continue
@@ -347,11 +594,17 @@ def main():
             print(f"    PUT failed {st}: {str(resp)[:300]}")
             continue
         if was_active:
-            # re-publish the updated graph: an active workflow keeps serving its published version until re-activated
-            call(base, "POST", f"/workflows/{full['id']}/deactivate")
-            st3, r3 = call(base, "POST", f"/workflows/{full['id']}/activate")
-            if st3 != 200:
-                print(f"    re-activate failed {st3}: {str(r3)[:200]}")
+            # n8n 2.36 publishes a PUT on an active workflow by default: read back first and re-publish (deactivate →
+            # activate, a window in which the bot's webhook is unregistered) ONLY when the served version lags.
+            st2, now = call(base, "GET", f"/workflows/{full['id']}")
+            if st2 == 200 and serves(now, target):
+                print("    published by the PUT (served version = the update) — no deactivate/activate window")
+            else:
+                print("    the PUT did not publish the update — re-publishing (deactivate → activate)")
+                call(base, "POST", f"/workflows/{full['id']}/deactivate")
+                st3, r3 = call(base, "POST", f"/workflows/{full['id']}/activate")
+                if st3 != 200:
+                    print(f"    re-activate failed {st3}: {str(r3)[:200]}")
         ok, msg = verify_after(base, full["id"], target, was_active, stamp)
         summary["updated" if ok else "failed"] += 1
         print(f"    read-back: {msg}")

@@ -32,8 +32,19 @@ workflow — `deploy-canonical.py` (dry-run → `--apply --yes`, точка от
 - Существующие канонические → `deploy-canonical.py` (dry-run, затем `--apply --yes`; точка отката — versionId каждого).
 - `Set Workflow State`, `Support Message` → `build-client-webhooks.py --update`.
 - Новых workflow с фиксированными id в этой итерации НЕТ (`import:workflow` не требуется).
-- Клоны живых ботов на проде отсутствуют («13» архивирован, «15» удалён) — `update-clones.py` применять нечего; новый бот
-  от нового клиента соберётся уже из новых шаблонов.
+- **Клоны ботов — инвентарь только по выводу инструмента** (итерация 2026-09-28, V10). Прежняя строка «клонов нет, обновлять
+  нечего» была перенесена из журнала деплоя 24.09 и на 28.09 была ложной: «23» / `dt6hHFUVrW07unTj` был активен, с графом
+  и головой промпта шаблона 24.09. Поэтому список клонов берётся ТОЛЬКО из `verify-deployed.py --base <prod>` (строки
+  `clone` / `archived`), снятого непосредственно перед выкладкой. Последний известный инвентарь (2026-10-06, после ручной
+  уборки «23» по разрешению владельца, `docs/audits/2026-09-28-iteration/evidence/V12-retired-bot-undeletable.txt`):
+  27 workflow, из не-канонических только архивный «13», живых клонов нет. Если вывод покажет живые клоны, каждый
+  обновляется `update-clones.py`: dry-run, затем `--only <id> --apply --yes` по разрешению владельца на этот запуск.
+  Обновление клона = граф шаблона + ГОЛОВА промпта (вертикаль + `_core` + `_universal` по сегодняшней карте Create/Edit).
+  Хвост владельца (Additional Instructions, About Business, товары, услуги) переносится байт-в-байт. Голова определяется по
+  содержанию (история карт в git), а не по метке `Business Type:`. Головы `custom` (правленые руками, ни одна карта их не
+  писала) не трогаются; заменить такую голову можно только явно, `--set-vertical <id>=<вертикаль>`, по решению владельца.
+  Запускать ПОСЛЕ выкладки новых Create/Edit: иначе следующее сохранение настроек владельцем через старую карту вернёт
+  старую голову. Инструмент печатает версию карты, которую применяет.
 - Точный список к выкладке брать из `verify-deployed.py --base <prod>` (строки DIFF) — он же критерий готовности.
 
 Затрагиваемые группы: Auth Session, Wappi Proxy, все gated вебхуки, оба шаблона ботов, Create/Edit WA+TG, Suggest Replies,
@@ -41,7 +52,9 @@ Upload File, Delete File, Delete Bot Files, Dashboard Outcomes, Get Usage, Set R
 
 ## 3. Read-back
 
-`python3 Tools/n8n/verify-deployed.py --base <prod>` → **exit 0** (canonical без DIFF, клонов нет).
+`python3 Tools/n8n/verify-deployed.py --base <prod>` → **exit 0**. Это значит: канонические workflow без DIFF, и каждый живой
+клон `AT-CANONICAL` по графу И по голове промпта, сохранённой и опубликованной. `PROMPT-BEHIND` / `PROMPT-UNPUBLISHED`
+дают exit 2, как отставший граф. `prompt=custom` — предупреждение и не блокирует; по каждому такому клону решает владелец.
 
 ## 4. Canary на проде (нужен новый бот от нового клиента)
 
@@ -63,15 +76,18 @@ Device-pass до релиза: холодный старт R5, строка ID R
 ## 7. Откат
 
 - Workflow: `deploy-canonical.py` печатает versionId до каждого PUT — откат восстановлением предыдущей версии.
+  `update-clones.py` для клона делает то же (`rollback pointer: versionId …`).
 - Миграции additive (новые таблица/колонки, `if not exists`) — на старый код влияния не имеют; откат не требуется, при
   желании — drop новых объектов (на них пока никто не ссылается).
 - Клиент: не выкладывать до подтверждения сервера; откат = прежний билд.
 
 ## 8. Порядок
 
-1) read-only проверка дублей (R2) → 2) три миграции → 3) workflow-группа + `build-client-webhooks --update` →
-4) read-back `verify-deployed` exit 0 → 5) активность `crHandoffNtfy001` → 6) canary (.txt upload, Test Dialog, заявка) →
-7) только затем сборка и раскатка клиента.
+1) read-only проверка дублей (R2) → 2) миграции §1 по порядку → 3) workflow-группа (`deploy-canonical`: шаблоны, Create/Edit
+с новой картой промптов, gated) + `build-client-webhooks --update` → 4) инвентарь клонов по `verify-deployed`; для каждого
+живого клона `update-clones` dry-run → `--only <id> --apply --yes` → 5) read-back `verify-deployed` exit 0 (канон + клоны по
+графу и промпту) → 6) активность `crHandoffNtfy001` → 7) canary (.txt upload, Test Dialog, заявка; на обновлённом клоне —
+входящее → `sent`, Test Dialog отвечает по опубликованной версии с новой головой) → 8) только затем сборка и раскатка клиента.
 
 ## Отдельно (вне полосы этой итерации, решение владельца)
 

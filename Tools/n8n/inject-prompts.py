@@ -18,6 +18,7 @@ importable, this is a HARD failure with install instructions -- never a silent s
 missing tokenizer must never be mistaken for "the floor holds".
 """
 import json
+import re
 import sys
 import uuid
 from pathlib import Path
@@ -78,6 +79,56 @@ EDIT_NEW_HEAD = ("{{ $('Vertical Prompt').first().json.verticalPrompt ? "
                  '$json.nodes[5].parameters.options.systemMessage.slice(0, '
                  '$json.nodes[5].parameters.options.systemMessage.indexOf("\\n" + '
                  '"Additional Instructions: ")) }}')
+
+
+# ---------------------------------------------------------------------------------------------- the clone prompt seam
+# (V10, 2026-09-28) A bot clone's systemMessage, as Create's and Edit's Set Fields compose it, is
+#     [=]Business Type: <label>\n\n<HEAD>\n  +  \nAdditional Instructions: <the owner's tail …>
+# The HEAD is shared template content — PROMPTS[BusinessTypeId] (vertical + core + universal) or, for a legacy id,
+# the template's own prompt (Create's `.slice(1)`); everything from the FIRST marker on is the owner's (Additional
+# Instructions, About Business, Products, Services). Edit splits a stored prompt at that same first marker
+# (`indexOf("\n" + "Additional Instructions: ")`), so these two functions are the Python twin of that split.
+# update-clones.py / verify-deployed.py use them to bring a clone's head to today's map without touching its tail.
+MARKER = "\nAdditional Instructions: "
+_HEAD_RE = re.compile(r"(=?)Business Type: ([^\n]*)\n\n(.*)\n", re.S)
+PROMPTS_RE = re.compile(r"// PROMPTS-BEGIN[^\n]*\nconst PROMPTS = (\{.*?\});\n// PROMPTS-END", re.S)
+
+
+def parse_system_message(sm):
+    """{eq, label, head, tail} of a Create/Edit-composed prompt, or None when it does not carry that grammar (a prompt
+    edited by hand into another shape, the template's own prompt, a prompt without the marker). `tail` starts AT the
+    first marker and is the owner's, byte for byte."""
+    if not isinstance(sm, str):
+        return None
+    i = sm.find(MARKER)
+    if i < 0:
+        return None
+    m = _HEAD_RE.fullmatch(sm[:i])
+    if m is None:
+        return None
+    return {"eq": m.group(1), "label": m.group(2), "head": m.group(3), "tail": sm[i:]}
+
+
+def compose_system_message(parts: dict, head: str) -> str:
+    """The prompt with its head replaced and everything else (leading '=', the label line, the owner tail) kept —
+    what Edit writes on a save with that head, and what Create writes for the same form."""
+    return f"{parts['eq']}Business Type: {parts['label']}\n\n{head}\n{parts['tail']}"
+
+
+def prompts_of_workflow(wf: dict):
+    """The PROMPTS map a Create/Edit workflow carries in its `Vertical Prompt` node (None: no such node or no map)."""
+    node = next((n for n in wf.get("nodes", []) if n.get("name") == NODE_NAME), None)
+    js = ((node or {}).get("parameters") or {}).get("jsCode") or ""
+    m = PROMPTS_RE.search(js)
+    return json.loads(m.group(1)) if m else None
+
+
+def generic_head(template_wf: dict):
+    """The head Create writes for an id without a vertical prompt: the template's own systemMessage minus its first
+    character (Create's `systemMessage.slice(1)` — the leading '=' of an n8n expression)."""
+    node = next((n for n in template_wf.get("nodes", []) if n.get("name") == "AI Agent"), None)
+    sm = (((node or {}).get("parameters") or {}).get("options") or {}).get("systemMessage")
+    return sm[1:] if isinstance(sm, str) and sm else None
 
 
 def load_prompts() -> dict:
